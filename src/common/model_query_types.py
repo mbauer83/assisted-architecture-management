@@ -4,9 +4,10 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Literal, Protocol, runtime_checkable
 
-Layer = Literal[
+Domain = Literal[
     "motivation",
     "strategy",
+    "common",
     "business",
     "application",
     "technology",
@@ -52,12 +53,8 @@ class EntityRecord:
     name: str
     version: str
     status: str
-    phase_produced: str
-    owner_agent: str
-    safety_relevant: bool
-    engagement: str
-    layer: Layer
-    sublayer: str
+    domain: Domain
+    subdomain: str
     path: Path
     extra: dict[str, object]
     content_text: str
@@ -68,8 +65,7 @@ class EntityRecord:
     def __str__(self) -> str:
         return (
             f"[{self.artifact_id}] {self.name}  "
-            f"({self.artifact_type} · {self.layer}/{self.sublayer} · "
-            f"agent={self.owner_agent} · phase={self.phase_produced} · "
+            f"({self.artifact_type} · {self.domain}/{self.subdomain} · "
             f"status={self.status})"
         )
 
@@ -77,37 +73,30 @@ class EntityRecord:
 @dataclass(frozen=True)
 class ConnectionRecord:
     artifact_id: str
-    artifact_type: str
-    source: str | list[str]
-    target: str | list[str]
+    source: str
+    target: str
+    conn_type: str
     version: str
     status: str
-    phase_produced: str
-    owner_agent: str
-    engagement: str
-    conn_lang: str
-    conn_type: str
     path: Path
     extra: dict[str, object]
     content_text: str
 
     @property
     def source_ids(self) -> list[str]:
-        return self.source if isinstance(self.source, list) else [self.source]
+        return [self.source]
 
     @property
     def target_ids(self) -> list[str]:
-        return self.target if isinstance(self.target, list) else [self.target]
+        return [self.target]
 
     def involves(self, entity_id: str) -> bool:
         return entity_id in self.source_ids or entity_id in self.target_ids
 
     def __str__(self) -> str:
-        src = ", ".join(self.source_ids)
-        tgt = ", ".join(self.target_ids)
         return (
-            f"[{self.artifact_id}]  {src} --{self.conn_type}--> {tgt}  "
-            f"({self.conn_lang} · agent={self.owner_agent} · phase={self.phase_produced})"
+            f"[{self.artifact_id}]  {self.source} --{self.conn_type}--> {self.target}  "
+            f"(status={self.status})"
         )
 
 
@@ -119,19 +108,13 @@ class DiagramRecord:
     diagram_type: str
     version: str
     status: str
-    phase_produced: str
-    owner_agent: str
-    engagement: str
-    entity_ids_used: list[str]
-    connection_ids_used: list[str]
     path: Path
     extra: dict[str, object]
 
     def __str__(self) -> str:
         return (
             f"[{self.artifact_id}] {self.name}  "
-            f"({self.diagram_type} · agent={self.owner_agent} · "
-            f"phase={self.phase_produced} · status={self.status})"
+            f"({self.diagram_type} · status={self.status})"
         )
 
 
@@ -166,9 +149,6 @@ class ArtifactSummary:
     name: str
     version: str
     status: str
-    phase_produced: str
-    owner_agent: str
-    engagement: str
     record_type: Literal["entity", "connection", "diagram"]
     path: Path
 
@@ -177,7 +157,6 @@ class ArtifactSummary:
         return (
             f"[{self.artifact_id}]{label}  "
             f"({self.artifact_type} · {self.record_type} · "
-            f"agent={self.owner_agent} · phase={self.phase_produced} · "
             f"status={self.status})"
         )
 
@@ -189,9 +168,6 @@ def summary_from_entity(rec: EntityRecord) -> ArtifactSummary:
         name=rec.name,
         version=rec.version,
         status=rec.status,
-        phase_produced=rec.phase_produced,
-        owner_agent=rec.owner_agent,
-        engagement=rec.engagement,
         record_type="entity",
         path=rec.path,
     )
@@ -200,13 +176,10 @@ def summary_from_entity(rec: EntityRecord) -> ArtifactSummary:
 def summary_from_connection(rec: ConnectionRecord) -> ArtifactSummary:
     return ArtifactSummary(
         artifact_id=rec.artifact_id,
-        artifact_type=rec.artifact_type,
+        artifact_type="connection",
         name="",
         version=rec.version,
         status=rec.status,
-        phase_produced=rec.phase_produced,
-        owner_agent=rec.owner_agent,
-        engagement=rec.engagement,
         record_type="connection",
         path=rec.path,
     )
@@ -219,9 +192,6 @@ def summary_from_diagram(rec: DiagramRecord) -> ArtifactSummary:
         name=rec.name,
         version=rec.version,
         status=rec.status,
-        phase_produced=rec.phase_produced,
-        owner_agent=rec.owner_agent,
-        engagement=rec.engagement,
         record_type="diagram",
         path=rec.path,
     )
@@ -240,28 +210,17 @@ STANDARD_ENTITY_FIELDS = frozenset(
         "name",
         "version",
         "status",
-        "phase-produced",
-        "owner-agent",
-        "safety-relevant",
         "last-updated",
-        "engagement",
-        "produced-by-skill",
+        "keywords",
     }
 )
 
-STANDARD_CONNECTION_FIELDS = frozenset(
+STANDARD_OUTGOING_FIELDS = frozenset(
     {
-        "artifact-id",
-        "artifact-type",
-        "source",
-        "target",
+        "source-entity",
         "version",
         "status",
-        "phase-produced",
-        "owner-agent",
         "last-updated",
-        "engagement",
-        "produced-by-skill",
     }
 )
 
@@ -273,15 +232,11 @@ STANDARD_DIAGRAM_FIELDS = frozenset(
         "diagram-type",
         "version",
         "status",
-        "phase-produced",
-        "owner-agent",
-        "engagement",
-        "entity-ids-used",
-        "connection-ids-used",
-        "produced-by-skill",
+        "last-updated",
+        "keywords",
     }
 )
 
-LAYER_NAMES: frozenset[str] = frozenset(
-    {"motivation", "strategy", "business", "application", "technology", "implementation"}
+DOMAIN_NAMES: frozenset[str] = frozenset(
+    {"motivation", "strategy", "common", "business", "application", "technology", "implementation"}
 )

@@ -21,7 +21,7 @@ def register_query_search_tools(mcp: FastMCP) -> None:
         description=(
             "Search artifacts by text query (keyword-scored; may include semantic supplement if configured). "
             "Returns ranked hits as (score + summary record). "
-            "\n\nFilters: limit, layer, artifact_type, include_connections, include_diagrams." 
+            "\n\nFilters: limit, domain, artifact_type, include_connections, include_diagrams."
             "\n\nRepo selection: repo_scope defaults to both (engagement + enterprise)."
         ),
         structured_output=True,
@@ -30,9 +30,8 @@ def register_query_search_tools(mcp: FastMCP) -> None:
         query: str,
         *,
         limit: int = 10,
-        layer: str | list[str] | None = None,
+        domain: str | list[str] | None = None,
         artifact_type: str | list[str] | None = None,
-        engagement: str | None = None,
         include_connections: bool = True,
         include_diagrams: bool = True,
         prefer_record_type: Literal["entity", "connection", "diagram"] | None = None,
@@ -56,9 +55,8 @@ def register_query_search_tools(mcp: FastMCP) -> None:
         result = repo.search_artifacts(
             query,
             limit=limit,
-            layer=layer,
+            domain=domain,
             artifact_type=artifact_type,
-            engagement=engagement,
             include_connections=include_connections,
             include_diagrams=include_diagrams,
             prefer_record_type=prefer_record_type,

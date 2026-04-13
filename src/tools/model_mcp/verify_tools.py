@@ -135,7 +135,7 @@ def register_verify_tools(mcp: FastMCP) -> None:
         name="model_verify_all",
         title="Model Verifier: Verify Repo",
         description=(
-            "Batch-verify all model-entities/, connections/, and (optionally) diagram files under repo_root. "
+            "Batch-verify all model/ entities, .outgoing.md connections, and (optionally) diagram files under repo_root. "
             "return_mode='summary' returns counts + issues only; 'full' returns per-file issue lists." 
             " Verification runs in parallel by default for scalability."
             "\n\nRepo selection: repo_scope defaults to both (engagement + enterprise)."

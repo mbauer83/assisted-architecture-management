@@ -21,8 +21,8 @@ def register_query_list_read_tools(mcp: FastMCP) -> None:
         description=(
             "List artifacts (metadata-only) using framework-aligned filters (AND semantics). "
             "Returns lightweight summaries without loading full bodies. Very large replies possible with wide or absent filters. "
-            "\n\nKey filters: artifact_type, layer, owner_agent, phase_produced, status, safety_relevant, engagement. "
-            "\n\nSet include_connections/include_diagrams if you want non-entity results." 
+            "\n\nKey filters: artifact_type, domain, status. "
+            "\n\nSet include_connections/include_diagrams if you want non-entity results."
             "\n\nRepo selection: repo_scope defaults to both (engagement + enterprise)."
         ),
         structured_output=True,
@@ -33,16 +33,12 @@ def register_query_list_read_tools(mcp: FastMCP) -> None:
         repo_scope: RepoScope = "both",
         refresh: bool = False,
         artifact_type: str | list[str] | None = None,
-        layer: str | list[str] | None = None,
-        owner_agent: str | list[str] | None = None,
-        phase_produced: str | list[str] | None = None,
+        domain: str | list[str] | None = None,
         status: str | list[str] | None = None,
-        safety_relevant: bool | None = None,
-        engagement: str | None = None,
         include_connections: bool = False,
         include_diagrams: bool = False,
         fields: list[str] | None = None,
-    ) -> list[dict[str, object]]:  # noqa: PLR0913
+    ) -> list[dict[str, object]]:
         roots = resolve_repo_roots(
             repo_scope=repo_scope,
             repo_root=repo_root,
@@ -55,12 +51,8 @@ def register_query_list_read_tools(mcp: FastMCP) -> None:
             repo.refresh()
         summaries = repo.list_artifacts(
             artifact_type=artifact_type,
-            layer=layer,
-            owner_agent=owner_agent,
-            phase_produced=phase_produced,
+            domain=domain,
             status=status,
-            safety_relevant=safety_relevant,
-            engagement=engagement,
             include_connections=include_connections,
             include_diagrams=include_diagrams,
         )

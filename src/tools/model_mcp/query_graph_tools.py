@@ -13,7 +13,7 @@ def register_query_graph_tools(mcp: FastMCP) -> None:
         title="Model Query: Find Connections",
         description=(
             "Find connection records that touch a given entity_id. "
-            "direction: any|outbound|inbound; optionally filter by conn_lang and conn_type." 
+            "direction: any|outbound|inbound; optionally filter by conn_type."
             "\n\nRepo selection: repo_scope defaults to both (engagement + enterprise)."
         ),
         structured_output=True,
@@ -22,7 +22,6 @@ def register_query_graph_tools(mcp: FastMCP) -> None:
         entity_id: str,
         *,
         direction: Literal["any", "outbound", "inbound"] = "any",
-        conn_lang: str | None = None,
         conn_type: str | None = None,
         repo_root: str | None = None,
         repo_preset: RepoPreset | None = None,
@@ -44,7 +43,6 @@ def register_query_graph_tools(mcp: FastMCP) -> None:
         conns = repo.find_connections_for(
             entity_id,
             direction=direction,
-            conn_lang=conn_lang,
             conn_type=conn_type,
         )
 
@@ -60,7 +58,7 @@ def register_query_graph_tools(mcp: FastMCP) -> None:
         title="Model Query: Find Neighbors",
         description=(
             "Graph traversal: return entity_ids reachable from entity_id within max_hops using connections. "
-            "Optionally restrict to a connection language (conn_lang)." 
+            "Optionally restrict by conn_type."
             "\n\nRepo selection: repo_scope defaults to both (engagement + enterprise)."
         ),
         structured_output=True,
@@ -69,7 +67,7 @@ def register_query_graph_tools(mcp: FastMCP) -> None:
         entity_id: str,
         *,
         max_hops: int = 1,
-        conn_lang: str | None = None,
+        conn_type: str | None = None,
         repo_root: str | None = None,
         repo_preset: RepoPreset | None = None,
         enterprise_root: str | None = None,
@@ -87,7 +85,7 @@ def register_query_graph_tools(mcp: FastMCP) -> None:
         if refresh:
             repo.refresh()
 
-        neighbors = repo.find_neighbors(entity_id, max_hops=max_hops, conn_lang=conn_lang)
+        neighbors = repo.find_neighbors(entity_id, max_hops=max_hops, conn_type=conn_type)
         normalized = {k: sorted(list(v)) for k, v in neighbors.items()}
         return {
             "repo_roots": [str(p) for p in roots],

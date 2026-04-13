@@ -180,7 +180,7 @@ def register_watch_tools(mcp: FastMCP) -> None:
         name="model_tools_watch_start",
         title="Model Tools: Watch Repo",
         description=(
-            "Start a lightweight polling watcher that refreshes caches whenever files under model-entities/, connections/, "
+            "Start a lightweight polling watcher that refreshes caches whenever files under model/ "
             "or diagram-catalog/diagrams change. Intended for dev usage when you don’t have an external watcher." 
             "\n\nFor large repositories, prefer an external filesystem watcher and call model_tools_refresh periodically." 
             "\n\nRepo selection: repo_scope defaults to both (engagement + enterprise)."

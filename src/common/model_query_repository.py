@@ -5,7 +5,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Literal, cast, overload
 
-from src.common.model_query_parsing import parse_connection, parse_diagram, parse_entity
+from src.common.model_query_parsing import parse_diagram, parse_entity, parse_outgoing_file
 from src.common.model_query_scoring import score_connection, score_diagram, score_entity, tokenize
 from src.common.model_query_types import (
     ArtifactSummary,
@@ -70,21 +70,22 @@ class ModelRepository:
         self._loaded = True
 
     def _load_entities(self, mount: RepoMount) -> None:
-        entities_root = mount.root / "model-entities"
-        if not entities_root.exists():
+        model_root = mount.root / "model"
+        if not model_root.exists():
             return
-        for path in sorted(entities_root.rglob("*.md")):
-            rec = parse_entity(path, entities_root, mount)
+        for path in sorted(model_root.rglob("*.md")):
+            if path.name.endswith(".outgoing.md"):
+                continue
+            rec = parse_entity(path, model_root)
             if rec is not None:
                 self._insert_unique(self._entities, rec.artifact_id, rec, "entity")
 
     def _load_connections(self, mount: RepoMount) -> None:
-        connections_root = mount.root / "connections"
-        if not connections_root.exists():
+        model_root = mount.root / "model"
+        if not model_root.exists():
             return
-        for path in sorted(connections_root.rglob("*.md")):
-            rec = parse_connection(path, connections_root, mount)
-            if rec is not None:
+        for path in sorted(model_root.rglob("*.outgoing.md")):
+            for rec in parse_outgoing_file(path):
                 self._insert_unique(self._connections, rec.artifact_id, rec, "connection")
 
     def _load_diagrams(self, mount: RepoMount) -> None:
@@ -93,7 +94,9 @@ class ModelRepository:
             return
         for suffix in ("*.puml", "*.md"):
             for path in sorted(diagrams_root.rglob(suffix)):
-                rec = parse_diagram(path, mount)
+                if path.parent.name == "rendered":
+                    continue
+                rec = parse_diagram(path)
                 if rec is not None:
                     self._insert_unique(self._diagrams, rec.artifact_id, rec, "diagram")
 
@@ -160,13 +163,9 @@ class ModelRepository:
         self,
         *,
         artifact_type: str | None = None,
-        layer: str | None = None,
-        sublayer: str | None = None,
-        owner_agent: str | None = None,
-        phase_produced: str | None = None,
+        domain: str | None = None,
+        subdomain: str | None = None,
         status: str | None = None,
-        safety_relevant: bool | None = None,
-        engagement: str | None = None,
     ) -> list[EntityRecord]:
         self._ensure_loaded()
         results = [
@@ -175,13 +174,9 @@ class ModelRepository:
             if _matches_entity(
                 rec,
                 artifact_type=artifact_type,
-                layer=layer,
-                sublayer=sublayer,
-                owner_agent=owner_agent,
-                phase_produced=phase_produced,
+                domain=domain,
+                subdomain=subdomain,
                 status=status,
-                safety_relevant=safety_relevant,
-                engagement=engagement,
             )
         ]
         return sorted(results, key=lambda r: r.artifact_id)
@@ -189,14 +184,10 @@ class ModelRepository:
     def list_connections(
         self,
         *,
-        artifact_type: str | None = None,
-        conn_lang: str | None = None,
         conn_type: str | None = None,
         source: str | None = None,
         target: str | None = None,
-        owner_agent: str | None = None,
-        phase_produced: str | None = None,
-        engagement: str | None = None,
+        status: str | None = None,
     ) -> list[ConnectionRecord]:
         self._ensure_loaded()
         results = [
@@ -204,14 +195,10 @@ class ModelRepository:
             for rec in self._connections.values()
             if _matches_connection(
                 rec,
-                artifact_type=artifact_type,
-                conn_lang=conn_lang,
                 conn_type=conn_type,
                 source=source,
                 target=target,
-                owner_agent=owner_agent,
-                phase_produced=phase_produced,
-                engagement=engagement,
+                status=status,
             )
         ]
         return sorted(results, key=lambda r: r.artifact_id)
@@ -220,10 +207,7 @@ class ModelRepository:
         self,
         *,
         diagram_type: str | None = None,
-        owner_agent: str | None = None,
-        phase_produced: str | None = None,
         status: str | None = None,
-        engagement: str | None = None,
     ) -> list[DiagramRecord]:
         self._ensure_loaded()
         results = [
@@ -232,10 +216,7 @@ class ModelRepository:
             if _matches_diagram(
                 rec,
                 diagram_type=diagram_type,
-                owner_agent=owner_agent,
-                phase_produced=phase_produced,
                 status=status,
-                engagement=engagement,
             )
         ]
         return sorted(results, key=lambda r: r.artifact_id)
@@ -244,39 +225,33 @@ class ModelRepository:
         self,
         *,
         artifact_type: str | list[str] | None = None,
-        layer: str | list[str] | None = None,
-        owner_agent: str | list[str] | None = None,
-        phase_produced: str | list[str] | None = None,
+        domain: str | list[str] | None = None,
         status: str | list[str] | None = None,
-        safety_relevant: bool | None = None,
-        engagement: str | None = None,
         include_connections: bool = False,
         include_diagrams: bool = False,
     ) -> list[ArtifactSummary]:
         self._ensure_loaded()
         types = _to_set(artifact_type)
-        layers = _to_set(layer)
-        agents = _to_set(owner_agent)
-        phases = _to_set(phase_produced)
+        domains = _to_set(domain)
         statuses = _to_set(status)
 
         results: list[ArtifactSummary] = []
         results.extend(
             summary_from_entity(rec)
             for rec in self._entities.values()
-            if _matches_entity_sets(rec, types, layers, agents, phases, statuses, safety_relevant, engagement)
+            if _matches_entity_sets(rec, types, domains, statuses)
         )
         if include_connections:
             results.extend(
                 summary_from_connection(rec)
                 for rec in self._connections.values()
-                if _matches_connection_sets(rec, types, agents, phases, statuses, engagement)
+                if _matches_connection_sets(rec, statuses)
             )
         if include_diagrams:
             results.extend(
                 summary_from_diagram(rec)
                 for rec in self._diagrams.values()
-                if _matches_diagram_sets(rec, types, agents, phases, statuses, engagement)
+                if _matches_diagram_sets(rec, types, statuses)
             )
         return sorted(results, key=lambda s: s.artifact_id)
 
@@ -316,39 +291,33 @@ class ModelRepository:
         query: str,
         *,
         limit: int = 10,
-        layer: str | list[str] | None = None,
+        domain: str | list[str] | None = None,
         artifact_type: str | list[str] | None = None,
-        engagement: str | None = None,
         include_connections: bool = True,
         include_diagrams: bool = True,
         prefer_record_type: Literal["entity", "connection", "diagram"] | None = None,
         strict_record_type: bool = False,
     ) -> SearchResult:
-        layers = _to_set(layer)
+        domains = _to_set(domain)
         types = _to_set(artifact_type)
         return self.search(
             query,
             limit=limit,
-            layers=list(layers) if layers else None,
+            domains=list(domains) if domains else None,
             entity_types=list(types) if types else None,
             include_connections=include_connections,
             include_diagrams=include_diagrams,
-            engagement=engagement,
             prefer_record_type=prefer_record_type,
             strict_record_type=strict_record_type,
         )
 
     def count_artifacts_by(
         self,
-        group_by: Literal["artifact_type", "diagram_type", "phase_produced", "owner_agent"],
+        group_by: Literal["artifact_type", "diagram_type", "domain"],
         *,
         artifact_type: str | list[str] | None = None,
-        layer: str | list[str] | None = None,
-        owner_agent: str | list[str] | None = None,
-        phase_produced: str | list[str] | None = None,
+        domain: str | list[str] | None = None,
         status: str | list[str] | None = None,
-        safety_relevant: bool | None = None,
-        engagement: str | None = None,
         include_connections: bool = True,
         include_diagrams: bool = True,
     ) -> dict[str, int]:
@@ -357,10 +326,7 @@ class ModelRepository:
 
         if group_by == "diagram_type":
             diagrams = self.list_diagrams(
-                owner_agent=_single_or_none(owner_agent),
-                phase_produced=_single_or_none(phase_produced),
                 status=_single_or_none(status),
-                engagement=engagement,
             )
             for rec in diagrams:
                 key = rec.diagram_type or _NONE_LABEL
@@ -369,12 +335,8 @@ class ModelRepository:
 
         summaries = self.list_artifacts(
             artifact_type=artifact_type,
-            layer=layer,
-            owner_agent=owner_agent,
-            phase_produced=phase_produced,
+            domain=domain,
             status=status,
-            safety_relevant=safety_relevant,
-            engagement=engagement,
             include_connections=include_connections,
             include_diagrams=include_diagrams,
         )
@@ -389,20 +351,20 @@ class ModelRepository:
         connections = list(self._connections.values())
         diagrams = list(self._diagrams.values())
 
-        entities_by_layer: dict[str, int] = {}
+        entities_by_domain: dict[str, int] = {}
         for entity in entities:
-            entities_by_layer[entity.layer] = entities_by_layer.get(entity.layer, 0) + 1
+            entities_by_domain[entity.domain] = entities_by_domain.get(entity.domain, 0) + 1
 
-        connections_by_lang: dict[str, int] = {}
+        connections_by_type: dict[str, int] = {}
         for connection in connections:
-            connections_by_lang[connection.conn_lang] = connections_by_lang.get(connection.conn_lang, 0) + 1
+            connections_by_type[connection.conn_type] = connections_by_type.get(connection.conn_type, 0) + 1
 
         return {
             "entities": len(entities),
             "connections": len(connections),
             "diagrams": len(diagrams),
-            "entities_by_layer": entities_by_layer,
-            "connections_by_lang": connections_by_lang,
+            "entities_by_domain": entities_by_domain,
+            "connections_by_type": connections_by_type,
         }
 
     def find_connections_for(
@@ -410,14 +372,11 @@ class ModelRepository:
         entity_id: str,
         *,
         direction: Literal["any", "outbound", "inbound"] = "any",
-        conn_lang: str | None = None,
         conn_type: str | None = None,
     ) -> list[ConnectionRecord]:
         self._ensure_loaded()
         results: list[ConnectionRecord] = []
         for rec in self._connections.values():
-            if conn_lang is not None and rec.conn_lang != conn_lang:
-                continue
             if conn_type is not None and rec.conn_type != conn_type:
                 continue
             if not _matches_direction(rec, entity_id=entity_id, direction=direction):
@@ -430,7 +389,7 @@ class ModelRepository:
         entity_id: str,
         *,
         max_hops: int = 1,
-        conn_lang: str | None = None,
+        conn_type: str | None = None,
     ) -> dict[str, set[str]]:
         self._ensure_loaded()
         visited: set[str] = {entity_id}
@@ -438,7 +397,7 @@ class ModelRepository:
         result: dict[str, set[str]] = {}
 
         for hop in range(1, max_hops + 1):
-            next_frontier = _next_frontier(frontier, visited, self, conn_lang)
+            next_frontier = _next_frontier(frontier, visited, self, conn_type)
             if not next_frontier:
                 break
             result[str(hop)] = next_frontier
@@ -452,10 +411,9 @@ class ModelRepository:
         *,
         limit: int = 10,
         entity_types: list[str] | None = None,
-        layers: list[str] | None = None,
+        domains: list[str] | None = None,
         include_connections: bool = True,
         include_diagrams: bool = True,
-        engagement: str | None = None,
         prefer_record_type: Literal["entity", "connection", "diagram"] | None = None,
         strict_record_type: bool = False,
     ) -> SearchResult:
@@ -465,13 +423,13 @@ class ModelRepository:
         hits: list[SearchHit] = []
 
         entity_type_set = set(entity_types) if entity_types else set()
-        layer_set = set(layers) if layers else set()
+        domain_set = set(domains) if domains else set()
 
-        hits.extend(self._search_entities(query_lc, tokens, entity_type_set, layer_set, engagement))
+        hits.extend(self._search_entities(query_lc, tokens, entity_type_set, domain_set))
         if include_connections:
-            hits.extend(self._search_connections(query_lc, tokens, engagement))
+            hits.extend(self._search_connections(query_lc, tokens))
         if include_diagrams:
-            hits.extend(self._search_diagrams(query_lc, tokens, engagement))
+            hits.extend(self._search_diagrams(query_lc, tokens))
         self._apply_semantic_supplement(query, hits)
 
         if strict_record_type and prefer_record_type is not None:
@@ -491,37 +449,30 @@ class ModelRepository:
         query_lc: str,
         tokens: list[str],
         entity_type_set: set[str],
-        layer_set: set[str],
-        engagement: str | None,
+        domain_set: set[str],
     ) -> list[SearchHit]:
         hits: list[SearchHit] = []
         for rec in self._entities.values():
             if entity_type_set and rec.artifact_type not in entity_type_set:
                 continue
-            if layer_set and rec.layer not in layer_set:
-                continue
-            if engagement is not None and rec.engagement != engagement:
+            if domain_set and rec.domain not in domain_set:
                 continue
             score = score_entity(rec, query_lc, tokens)
             if score > 0:
                 hits.append(SearchHit(score=score, record_type="entity", record=rec))
         return hits
 
-    def _search_connections(self, query_lc: str, tokens: list[str], engagement: str | None) -> list[SearchHit]:
+    def _search_connections(self, query_lc: str, tokens: list[str]) -> list[SearchHit]:
         hits: list[SearchHit] = []
         for rec in self._connections.values():
-            if engagement is not None and rec.engagement != engagement:
-                continue
             score = score_connection(rec, query_lc, tokens)
             if score > 0:
                 hits.append(SearchHit(score=score, record_type="connection", record=rec))
         return hits
 
-    def _search_diagrams(self, query_lc: str, tokens: list[str], engagement: str | None) -> list[SearchHit]:
+    def _search_diagrams(self, query_lc: str, tokens: list[str]) -> list[SearchHit]:
         hits: list[SearchHit] = []
         for rec in self._diagrams.values():
-            if engagement is not None and rec.engagement != engagement:
-                continue
             score = score_diagram(rec, query_lc, tokens)
             if score > 0:
                 hits.append(SearchHit(score=score, record_type="diagram", record=rec))
@@ -552,47 +503,31 @@ def _matches_entity(
     rec: EntityRecord,
     *,
     artifact_type: str | None,
-    layer: str | None,
-    sublayer: str | None,
-    owner_agent: str | None,
-    phase_produced: str | None,
+    domain: str | None,
+    subdomain: str | None,
     status: str | None,
-    safety_relevant: bool | None,
-    engagement: str | None,
 ) -> bool:
     return (
         (artifact_type is None or rec.artifact_type == artifact_type)
-        and (layer is None or rec.layer == layer)
-        and (sublayer is None or rec.sublayer == sublayer)
-        and (owner_agent is None or rec.owner_agent == owner_agent)
-        and (phase_produced is None or rec.phase_produced == phase_produced)
+        and (domain is None or rec.domain == domain)
+        and (subdomain is None or rec.subdomain == subdomain)
         and (status is None or rec.status == status)
-        and (safety_relevant is None or rec.safety_relevant == safety_relevant)
-        and (engagement is None or rec.engagement == engagement)
     )
 
 
 def _matches_connection(
     rec: ConnectionRecord,
     *,
-    artifact_type: str | None,
-    conn_lang: str | None,
     conn_type: str | None,
     source: str | None,
     target: str | None,
-    owner_agent: str | None,
-    phase_produced: str | None,
-    engagement: str | None,
+    status: str | None,
 ) -> bool:
     return (
-        (artifact_type is None or rec.artifact_type == artifact_type)
-        and (conn_lang is None or rec.conn_lang == conn_lang)
-        and (conn_type is None or rec.conn_type == conn_type)
+        (conn_type is None or rec.conn_type == conn_type)
         and (source is None or source in rec.source_ids)
         and (target is None or target in rec.target_ids)
-        and (owner_agent is None or rec.owner_agent == owner_agent)
-        and (phase_produced is None or rec.phase_produced == phase_produced)
-        and (engagement is None or rec.engagement == engagement)
+        and (status is None or rec.status == status)
     )
 
 
@@ -600,72 +535,42 @@ def _matches_diagram(
     rec: DiagramRecord,
     *,
     diagram_type: str | None,
-    owner_agent: str | None,
-    phase_produced: str | None,
     status: str | None,
-    engagement: str | None,
 ) -> bool:
     return (
         (diagram_type is None or rec.diagram_type == diagram_type)
-        and (owner_agent is None or rec.owner_agent == owner_agent)
-        and (phase_produced is None or rec.phase_produced == phase_produced)
         and (status is None or rec.status == status)
-        and (engagement is None or rec.engagement == engagement)
     )
 
 
 def _matches_entity_sets(
     rec: EntityRecord,
     types: set[str],
-    layers: set[str],
-    agents: set[str],
-    phases: set[str],
+    domains: set[str],
     statuses: set[str],
-    safety_relevant: bool | None,
-    engagement: str | None,
 ) -> bool:
     return (
         (not types or rec.artifact_type in types)
-        and (not layers or rec.layer in layers)
-        and (not agents or rec.owner_agent in agents)
-        and (not phases or rec.phase_produced in phases)
+        and (not domains or rec.domain in domains)
         and (not statuses or rec.status in statuses)
-        and (safety_relevant is None or rec.safety_relevant == safety_relevant)
-        and (engagement is None or rec.engagement == engagement)
     )
 
 
 def _matches_connection_sets(
     rec: ConnectionRecord,
-    types: set[str],
-    agents: set[str],
-    phases: set[str],
     statuses: set[str],
-    engagement: str | None,
 ) -> bool:
-    return (
-        (not types or rec.artifact_type in types)
-        and (not agents or rec.owner_agent in agents)
-        and (not phases or rec.phase_produced in phases)
-        and (not statuses or rec.status in statuses)
-        and (engagement is None or rec.engagement == engagement)
-    )
+    return not statuses or rec.status in statuses
 
 
 def _matches_diagram_sets(
     rec: DiagramRecord,
     types: set[str],
-    agents: set[str],
-    phases: set[str],
     statuses: set[str],
-    engagement: str | None,
 ) -> bool:
     return (
         (not types or rec.artifact_type in types)
-        and (not agents or rec.owner_agent in agents)
-        and (not phases or rec.phase_produced in phases)
         and (not statuses or rec.status in statuses)
-        and (engagement is None or rec.engagement == engagement)
     )
 
 
@@ -673,11 +578,11 @@ def _next_frontier(
     frontier: set[str],
     visited: set[str],
     registry: ModelRepository,
-    conn_lang: str | None,
+    conn_type: str | None,
 ) -> set[str]:
     next_frontier: set[str] = set()
     for entity_id in frontier:
-        for conn in registry.find_connections_for(entity_id, conn_lang=conn_lang):
+        for conn in registry.find_connections_for(entity_id, conn_type=conn_type):
             for neighbor_id in conn.source_ids + conn.target_ids:
                 if neighbor_id != entity_id and neighbor_id not in visited:
                     next_frontier.add(neighbor_id)
@@ -713,15 +618,10 @@ def _single_or_none(value: str | list[str] | None) -> str | None:
 
 def _summary_group_key(
     summary: ArtifactSummary,
-    group_by: Literal["artifact_type", "diagram_type", "phase_produced", "owner_agent"],
+    group_by: Literal["artifact_type", "diagram_type", "domain"],
 ) -> str:
     if group_by == "artifact_type":
         return summary.artifact_type or _NONE_LABEL
-    if group_by == "phase_produced":
-        return summary.phase_produced or _NONE_LABEL
-    if group_by == "owner_agent":
-        return summary.owner_agent or _NONE_LABEL
-    # diagram_type grouping is handled directly over DiagramRecord in count_artifacts_by.
     return _NONE_LABEL
 
 
@@ -732,12 +632,8 @@ def _read_entity(rec: EntityRecord, *, mode: Literal["summary", "full"]) -> dict
         "name": rec.name,
         "version": rec.version,
         "status": rec.status,
-        "phase_produced": rec.phase_produced,
-        "owner_agent": rec.owner_agent,
-        "safety_relevant": rec.safety_relevant,
-        "engagement": rec.engagement,
-        "layer": rec.layer,
-        "sublayer": rec.sublayer,
+        "domain": rec.domain,
+        "subdomain": rec.subdomain,
         "record_type": "entity",
         "path": str(rec.path),
         "content_snippet": rec.content_text[:400] + ("…" if len(rec.content_text) > 400 else ""),
@@ -752,17 +648,11 @@ def _read_entity(rec: EntityRecord, *, mode: Literal["summary", "full"]) -> dict
 def _read_connection(rec: ConnectionRecord, *, mode: Literal["summary", "full"]) -> dict[str, object]:
     data: dict[str, object] = {
         "artifact_id": rec.artifact_id,
-        "artifact_type": rec.artifact_type,
-        "name": "",
         "source": rec.source,
         "target": rec.target,
+        "conn_type": rec.conn_type,
         "version": rec.version,
         "status": rec.status,
-        "phase_produced": rec.phase_produced,
-        "owner_agent": rec.owner_agent,
-        "engagement": rec.engagement,
-        "conn_lang": rec.conn_lang,
-        "conn_type": rec.conn_type,
         "record_type": "connection",
         "path": str(rec.path),
         "content_snippet": rec.content_text[:400] + ("…" if len(rec.content_text) > 400 else ""),
@@ -781,11 +671,6 @@ def _read_diagram(rec: DiagramRecord, *, mode: Literal["summary", "full"]) -> di
         "diagram_type": rec.diagram_type,
         "version": rec.version,
         "status": rec.status,
-        "phase_produced": rec.phase_produced,
-        "owner_agent": rec.owner_agent,
-        "engagement": rec.engagement,
-        "entity_ids_used": rec.entity_ids_used,
-        "connection_ids_used": rec.connection_ids_used,
         "record_type": "diagram",
         "path": str(rec.path),
         "content_snippet": "",

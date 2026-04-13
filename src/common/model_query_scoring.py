@@ -44,10 +44,8 @@ def score_entity(rec: EntityRecord, query_lc: str, tokens: list[str]) -> float:
     score += token_match_score(rec.artifact_id, query_lc, expanded, 2.5)
     score += token_match_score(rec.display_alias, query_lc, expanded, 2.0)
     score += token_match_score(rec.artifact_type, query_lc, expanded, 2.0)
-    score += token_match_score(rec.layer, query_lc, expanded, 1.5)
-    score += token_match_score(rec.sublayer, query_lc, expanded, 1.5)
-    score += token_match_score(rec.owner_agent, query_lc, expanded, 1.0)
-    score += token_match_score(rec.phase_produced, query_lc, expanded, 1.0)
+    score += token_match_score(rec.domain, query_lc, expanded, 1.5)
+    score += token_match_score(rec.subdomain, query_lc, expanded, 1.5)
     score += content_score(rec.content_text, expanded, 1.0)
     for value in rec.extra.values():
         score += token_match_score(str(value), query_lc, expanded, 0.5)
@@ -58,9 +56,7 @@ def score_connection(rec: ConnectionRecord, query_lc: str, tokens: list[str]) ->
     expanded = expand_tokens(tokens)
     score = 0.0
     score += token_match_score(rec.artifact_id, query_lc, expanded, 2.5)
-    score += token_match_score(rec.artifact_type, query_lc, expanded, 2.0)
-    score += token_match_score(rec.conn_lang, query_lc, expanded, 1.5)
-    score += token_match_score(rec.conn_type, query_lc, expanded, 1.5)
+    score += token_match_score(rec.conn_type, query_lc, expanded, 2.0)
     for entity_id in rec.source_ids + rec.target_ids:
         score += token_match_score(entity_id, query_lc, expanded, 1.5)
     score += content_score(rec.content_text, expanded, 1.0)
@@ -73,6 +69,4 @@ def score_diagram(rec: DiagramRecord, query_lc: str, tokens: list[str]) -> float
     score += token_match_score(rec.name, query_lc, expanded, 4.0)
     score += token_match_score(rec.artifact_id, query_lc, expanded, 2.5)
     score += token_match_score(rec.diagram_type, query_lc, expanded, 2.0)
-    score += token_match_score(rec.owner_agent, query_lc, expanded, 1.0)
-    score += token_match_score(rec.phase_produced, query_lc, expanded, 1.0)
     return score

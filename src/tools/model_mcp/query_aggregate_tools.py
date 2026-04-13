@@ -13,24 +13,20 @@ def register_query_aggregate_tools(mcp: FastMCP) -> None:
         title="Model Query: Count Artifacts By",
         description=(
             "Aggregate artifact counts for common inventory dimensions. "
-            "Supported group_by: artifact_type, diagram_type, phase_produced, owner_agent."
+            "Supported group_by: artifact_type, diagram_type, domain."
             "\n\nRepo selection: repo_scope defaults to both (engagement + enterprise)."
         ),
         structured_output=True,
     )
     def model_query_count_artifacts_by(
-        group_by: Literal["artifact_type", "diagram_type", "phase_produced", "owner_agent"],
+        group_by: Literal["artifact_type", "diagram_type", "domain"],
         *,
         repo_root: str | None = None,
         repo_scope: RepoScope = "both",
         refresh: bool = False,
         artifact_type: str | list[str] | None = None,
-        layer: str | list[str] | None = None,
-        owner_agent: str | list[str] | None = None,
-        phase_produced: str | list[str] | None = None,
+        domain: str | list[str] | None = None,
         status: str | list[str] | None = None,
-        safety_relevant: bool | None = None,
-        engagement: str | None = None,
         include_connections: bool = True,
         include_diagrams: bool = True,
     ) -> dict[str, object]:
@@ -48,12 +44,8 @@ def register_query_aggregate_tools(mcp: FastMCP) -> None:
         counts = repo.count_artifacts_by(
             group_by,
             artifact_type=artifact_type,
-            layer=layer,
-            owner_agent=owner_agent,
-            phase_produced=phase_produced,
+            domain=domain,
             status=status,
-            safety_relevant=safety_relevant,
-            engagement=engagement,
             include_connections=include_connections,
             include_diagrams=include_diagrams,
         )

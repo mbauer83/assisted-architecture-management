@@ -9,13 +9,12 @@ from src.common.model_verifier import entity_id_from_path
 from src.common.model_query_types import (
     ConnectionRecord,
     DiagramRecord,
+    Domain,
+    DOMAIN_NAMES,
     EntityRecord,
-    LAYER_NAMES,
-    Layer,
-    RepoMount,
-    STANDARD_CONNECTION_FIELDS,
     STANDARD_DIAGRAM_FIELDS,
     STANDARD_ENTITY_FIELDS,
+    STANDARD_OUTGOING_FIELDS,
 )
 
 
@@ -30,35 +29,6 @@ def extract_yaml_block(content: str) -> dict | None:
     except yaml.YAMLError:
         return None
 
-
-def extract_puml_frontmatter(content: str) -> dict | None:
-    lines = content.splitlines()
-    in_block = False
-    yaml_lines: list[str] = []
-
-    for line in lines:
-        stripped = line.strip()
-        if not in_block:
-            if stripped == "' ---":
-                in_block = True
-            elif stripped:
-                break
-            continue
-
-        if stripped == "' ---":
-            break
-        if stripped.startswith("' "):
-            yaml_lines.append(stripped[2:])
-        elif stripped == "'":
-            yaml_lines.append("")
-
-    if not yaml_lines:
-        return None
-
-    try:
-        return yaml.safe_load("\n".join(yaml_lines)) or {}
-    except yaml.YAMLError:
-        return None
 
 
 def extract_section(content: str, marker: str) -> str:
@@ -86,27 +56,16 @@ def extract_display_blocks(content: str) -> dict[str, str]:
     return blocks
 
 
-def derive_layer(path: Path, root: Path) -> tuple[Layer, str]:
+def derive_domain(path: Path, root: Path) -> tuple[Domain, str]:
     try:
         rel = path.relative_to(root)
         parts = rel.parts
-        layer_raw = parts[0] if len(parts) > 0 else "unknown"
-        sublayer = parts[1] if len(parts) > 1 else ""
-        layer: Layer = layer_raw if layer_raw in LAYER_NAMES else "unknown"  # type: ignore[assignment]
-        return layer, sublayer
+        domain_raw = parts[0] if len(parts) > 0 else "unknown"
+        subdomain = parts[1] if len(parts) > 1 else ""
+        domain: Domain = domain_raw if domain_raw in DOMAIN_NAMES else "unknown"  # type: ignore[assignment]
+        return domain, subdomain
     except ValueError:
         return "unknown", ""
-
-
-def derive_conn_lang_type(path: Path, root: Path) -> tuple[str, str]:
-    try:
-        rel = path.relative_to(root)
-        parts = rel.parts
-        conn_lang = parts[0] if len(parts) > 0 else "unknown"
-        conn_type = parts[1] if len(parts) > 1 else "unknown"
-        return conn_lang, conn_type
-    except ValueError:
-        return "unknown", "unknown"
 
 
 def extract_archimate_label_alias(display_blocks: dict[str, str]) -> tuple[str, str]:
@@ -121,7 +80,7 @@ def extract_archimate_label_alias(display_blocks: dict[str, str]) -> tuple[str, 
     return label, alias
 
 
-def parse_entity(path: Path, entities_root: Path, mount: RepoMount) -> EntityRecord | None:
+def parse_entity(path: Path, model_root: Path) -> EntityRecord | None:
     try:
         content = path.read_text(encoding="utf-8")
     except OSError:
@@ -131,17 +90,9 @@ def parse_entity(path: Path, entities_root: Path, mount: RepoMount) -> EntityRec
     if not frontmatter:
         return None
 
-    if mount.scope == "enterprise":
-        engagement = "enterprise"
-    else:
-        engagement = str(frontmatter.get("engagement", mount.engagement_label))
-
-    layer, sublayer = derive_layer(path, entities_root)
+    domain, subdomain = derive_domain(path, model_root)
     display_blocks = extract_display_blocks(content)
     display_label, display_alias = extract_archimate_label_alias(display_blocks)
-
-    safety_raw = frontmatter.get("safety-relevant", False)
-    safety_relevant = bool(safety_raw) if isinstance(safety_raw, bool) else False
 
     return EntityRecord(
         artifact_id=str(frontmatter.get("artifact-id", entity_id_from_path(path))),
@@ -149,12 +100,8 @@ def parse_entity(path: Path, entities_root: Path, mount: RepoMount) -> EntityRec
         name=str(frontmatter.get("name", "")),
         version=str(frontmatter.get("version", "")),
         status=str(frontmatter.get("status", "draft")),
-        phase_produced=str(frontmatter.get("phase-produced", "")),
-        owner_agent=str(frontmatter.get("owner-agent", "")),
-        safety_relevant=safety_relevant,
-        engagement=engagement,
-        layer=layer,
-        sublayer=sublayer,
+        domain=domain,
+        subdomain=subdomain,
         path=path,
         extra={key: value for key, value in frontmatter.items() if key not in STANDARD_ENTITY_FIELDS},
         content_text=extract_section(content, "content"),
@@ -164,7 +111,50 @@ def parse_entity(path: Path, entities_root: Path, mount: RepoMount) -> EntityRec
     )
 
 
-def parse_connection(path: Path, connections_root: Path, mount: RepoMount) -> ConnectionRecord | None:
+_CONN_HEADER_RE = re.compile(r"^###\s+(\S+)\s+→\s+(.+)$", re.MULTILINE)
+
+
+def parse_outgoing_file(path: Path) -> list[ConnectionRecord]:
+    """Parse an .outgoing.md file into individual ConnectionRecord entries."""
+    try:
+        content = path.read_text(encoding="utf-8")
+    except OSError:
+        return []
+
+    frontmatter = extract_yaml_block(content)
+    if not frontmatter:
+        return []
+
+    source_entity = str(frontmatter.get("source-entity", ""))
+    version = str(frontmatter.get("version", ""))
+    status = str(frontmatter.get("status", "draft"))
+    extra = {k: v for k, v in frontmatter.items() if k not in STANDARD_OUTGOING_FIELDS}
+
+    records: list[ConnectionRecord] = []
+    headers = list(_CONN_HEADER_RE.finditer(content))
+    for i, m in enumerate(headers):
+        conn_type = m.group(1).strip()
+        target = m.group(2).strip()
+        body_start = m.end()
+        body_end = headers[i + 1].start() if i + 1 < len(headers) else len(content)
+        body = content[body_start:body_end].strip()
+
+        artifact_id = f"{source_entity}---{target}@@{conn_type}"
+        records.append(ConnectionRecord(
+            artifact_id=artifact_id,
+            source=source_entity,
+            target=target,
+            conn_type=conn_type,
+            version=version,
+            status=status,
+            path=path,
+            extra=extra,
+            content_text=body,
+        ))
+    return records
+
+
+def parse_diagram(path: Path) -> DiagramRecord | None:
     try:
         content = path.read_text(encoding="utf-8")
     except OSError:
@@ -174,53 +164,6 @@ def parse_connection(path: Path, connections_root: Path, mount: RepoMount) -> Co
     if not frontmatter:
         return None
 
-    if mount.scope == "enterprise":
-        engagement = "enterprise"
-    else:
-        engagement = str(frontmatter.get("engagement", mount.engagement_label))
-
-    source_raw = frontmatter.get("source", "")
-    target_raw = frontmatter.get("target", "")
-    source: str | list[str] = source_raw if isinstance(source_raw, list) else str(source_raw)
-    target: str | list[str] = target_raw if isinstance(target_raw, list) else str(target_raw)
-    conn_lang, conn_type = derive_conn_lang_type(path, connections_root)
-
-    return ConnectionRecord(
-        artifact_id=str(frontmatter.get("artifact-id", path.stem)),
-        artifact_type=str(frontmatter.get("artifact-type", "")),
-        source=source,
-        target=target,
-        version=str(frontmatter.get("version", "")),
-        status=str(frontmatter.get("status", "draft")),
-        phase_produced=str(frontmatter.get("phase-produced", "")),
-        owner_agent=str(frontmatter.get("owner-agent", "")),
-        engagement=engagement,
-        conn_lang=conn_lang,
-        conn_type=conn_type,
-        path=path,
-        extra={key: value for key, value in frontmatter.items() if key not in STANDARD_CONNECTION_FIELDS},
-        content_text=extract_section(content, "content"),
-    )
-
-
-def parse_diagram(path: Path, mount: RepoMount) -> DiagramRecord | None:
-    try:
-        content = path.read_text(encoding="utf-8")
-    except OSError:
-        return None
-
-    frontmatter = extract_puml_frontmatter(content) if path.suffix == ".puml" else extract_yaml_block(content)
-    if not frontmatter:
-        return None
-
-    if mount.scope == "enterprise":
-        engagement = "enterprise"
-    else:
-        engagement = str(frontmatter.get("engagement", mount.engagement_label))
-
-    eids_raw = frontmatter.get("entity-ids-used") or []
-    cids_raw = frontmatter.get("connection-ids-used") or []
-
     return DiagramRecord(
         artifact_id=str(frontmatter.get("artifact-id", path.stem)),
         artifact_type=str(frontmatter.get("artifact-type", "diagram")),
@@ -228,11 +171,6 @@ def parse_diagram(path: Path, mount: RepoMount) -> DiagramRecord | None:
         diagram_type=str(frontmatter.get("diagram-type", "")),
         version=str(frontmatter.get("version", "")),
         status=str(frontmatter.get("status", "draft")),
-        phase_produced=str(frontmatter.get("phase-produced", "")),
-        owner_agent=str(frontmatter.get("owner-agent", "")),
-        engagement=engagement,
-        entity_ids_used=[str(x) for x in eids_raw] if isinstance(eids_raw, list) else [],
-        connection_ids_used=[str(x) for x in cids_raw] if isinstance(cids_raw, list) else [],
         path=path,
         extra={key: value for key, value in frontmatter.items() if key not in STANDARD_DIAGRAM_FIELDS},
     )

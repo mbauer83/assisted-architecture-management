@@ -29,10 +29,9 @@ from src.tools.model_mcp import (
 
 # Re-export commonly used tool functions for direct calling in tests.
 from src.tools.model_mcp.write_tools import (  # noqa: F401
-    model_create_connection,
+    model_add_connection,
     model_create_diagram,
     model_create_entity,
-    model_create_matrix,
     model_write_help,
 )
 from src.tools.model_mcp.verify_tools import (  # noqa: F401
@@ -45,9 +44,9 @@ logger = logging.getLogger(__name__)
 
 
 _INSTRUCTIONS = (
-    "ERP v2.0 model query + model verifier + model writer tools. "
-    "Targets an ERP v2.0 architecture repository (model-entities/, connections/, diagram-catalog/). "
-    "By default mounts both ENG-001 engagement repo + enterprise-repository; use repo_scope to restrict."
+    "Architecture repository model query + verifier + writer tools. "
+    "Targets an ArchiMate NEXT architecture repository (model/, diagram-catalog/). "
+    "By default mounts both engagement repo + enterprise-repository; use repo_scope to restrict."
 )
 
 _HOST = os.getenv("SDLC_MCP_HOST", "127.0.0.1")
