@@ -1,0 +1,60 @@
+---
+artifact-id: DIA@1712870400.e24hOY.application-component-map
+artifact-type: diagram
+name: "Application Domain — Component Map"
+version: 0.1.0
+status: draft
+keywords: [application, components, interfaces, data-objects]
+diagram-type: archimate-application
+last-updated: '2026-04-13'
+---
+@startuml application-component-map
+!include ../_archimate-stereotypes.puml
+
+title Application Domain — Components, Interfaces & Data Objects
+
+rectangle "Interfaces" <<ApplicationGrouping>> {
+  rectangle "MCP Interface" <<ApplicationInterface>> as AIF_wuleEe
+  rectangle "CLI Interface" <<ApplicationInterface>> as AIF_KxvYB
+  rectangle "REST Interface\n(future)" <<ApplicationInterface>> as AIF_XjbNQh
+}
+
+rectangle "Application Components" <<ApplicationGrouping>> {
+  rectangle "MCP Model\nServer" <<ApplicationComponent>> as APP_kRZYOA
+  rectangle "CLI Tool" <<ApplicationComponent>> as APP_kjC6ex
+  rectangle "Model\nVerifier" <<ApplicationComponent>> as APP_ca3vm7
+  rectangle "Model\nRegistry" <<ApplicationComponent>> as APP_yNhgdh
+  rectangle "Frontmatter\nParser" <<ApplicationComponent>> as APP_YOOEbL
+  rectangle "SQLite\nIndexer" <<ApplicationComponent>> as APP_JOmFWy
+  rectangle "Query\nEngine" <<ApplicationComponent>> as APP_v9LvfK
+  rectangle "Macro\nGenerator" <<ApplicationComponent>> as APP_rgulJL
+}
+
+rectangle "Data Objects" <<ApplicationGrouping>> {
+  rectangle "Entity\nMetadata" <<DataObject>> as DOB_ij5CH7
+  rectangle "Connection\nMetadata" <<DataObject>> as DOB_L3VfsH
+  rectangle "SQLite\nIndex" <<DataObject>> as DOB_3rilik
+  rectangle "PlantUML\nMacro Library" <<DataObject>> as DOB_H8UwKV
+}
+
+' Interface → Component serving
+AIF_wuleEe --> APP_kRZYOA
+AIF_KxvYB --> APP_kjC6ex
+
+' Component dependencies
+APP_kRZYOA --> APP_ca3vm7
+APP_kRZYOA --> APP_v9LvfK
+APP_kjC6ex --> APP_ca3vm7
+APP_kjC6ex --> APP_v9LvfK
+APP_ca3vm7 --> APP_YOOEbL
+APP_ca3vm7 --> APP_yNhgdh
+APP_JOmFWy --> APP_YOOEbL
+
+' Component → Data Object access
+APP_JOmFWy --> DOB_3rilik : <<access>> write
+APP_JOmFWy --> DOB_ij5CH7 : <<access>> write
+APP_JOmFWy --> DOB_L3VfsH : <<access>> write
+APP_v9LvfK --> DOB_3rilik : <<access>> read
+APP_rgulJL --> DOB_H8UwKV : <<access>> write
+
+@enduml

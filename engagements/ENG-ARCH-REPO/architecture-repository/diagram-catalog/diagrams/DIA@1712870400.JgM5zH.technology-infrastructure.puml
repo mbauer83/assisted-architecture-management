@@ -1,0 +1,51 @@
+---
+artifact-id: DIA@1712870400.JgM5zH.technology-infrastructure
+artifact-type: diagram
+name: "Technology Domain — Infrastructure"
+version: 0.1.0
+status: draft
+keywords: [technology, infrastructure, nodes, system-software, artifacts]
+diagram-type: archimate-technology
+last-updated: '2026-04-13'
+---
+@startuml technology-infrastructure
+!include ../_archimate-stereotypes.puml
+
+title Technology Domain — Infrastructure & Runtime
+
+rectangle "Developer Workstation" <<Node>> as NOD_4EFX7z {
+  rectangle "Python 3.11+" <<SystemSoftware>> as SSW_o7a0ad
+  rectangle "PlantUML Engine" <<SystemSoftware>> as SSW_xVrBYD
+  rectangle "Git VCS" <<SystemSoftware>> as SSW_TzzVd
+
+  rectangle "Git Repository" <<Artifact>> as ART_YsLpM8
+  rectangle "SQLite Database" <<Artifact>> as ART_FtioFJ
+}
+
+rectangle "Technology Services" <<TechnologyGrouping>> {
+  rectangle "File System\nService" <<TechnologyService>> as TSV_MSy15f
+  rectangle "Version Control\nService" <<TechnologyService>> as TSV_WluY9K
+}
+
+' System software provides services
+SSW_TzzVd -|> TSV_WluY9K : <<realization>>
+
+' Artifacts stored on filesystem
+TSV_MSy15f --> ART_YsLpM8 : hosts
+TSV_MSy15f --> ART_FtioFJ : hosts
+
+' Application components (from Application domain) run on technology
+rectangle "Application Components\n(from Application)" <<ApplicationGrouping>> {
+  rectangle "Model Verifier" <<ApplicationComponent>> as APP_ca3vm7
+  rectangle "SQLite Indexer" <<ApplicationComponent>> as APP_JOmFWy
+  rectangle "Query Engine" <<ApplicationComponent>> as APP_v9LvfK
+  rectangle "MCP Server" <<ApplicationComponent>> as APP_kRZYOA
+}
+
+SSW_o7a0ad --> APP_ca3vm7 : runs
+SSW_o7a0ad --> APP_JOmFWy : runs
+SSW_o7a0ad --> APP_v9LvfK : runs
+SSW_o7a0ad --> APP_kRZYOA : runs
+APP_JOmFWy --> ART_FtioFJ : writes
+
+@enduml

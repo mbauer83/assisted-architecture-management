@@ -1,0 +1,67 @@
+---
+artifact-id: DIA@1712870400.X7YYTc.common-services-processes
+artifact-type: diagram
+name: "Common Domain — Services & Processes"
+version: 0.1.0
+status: draft
+keywords: [common, services, processes, functions, events, roles]
+diagram-type: archimate-common
+last-updated: '2026-04-13'
+---
+@startuml common-services-processes
+!include ../_archimate-stereotypes.puml
+
+title Common Domain — Services, Processes & Behavioral Elements
+
+rectangle "Services" <<CommonGrouping>> {
+  rectangle "Authoring\nService" <<Service>> as SRV_Au1Th1
+  rectangle "Validation\nService" <<Service>> as SRV_Ij6Kl6
+  rectangle "Discovery, Querying\n& Stats Service" <<Service>> as SRV_Qr8St8
+  rectangle "Repository\nPromotion Service" <<Service>> as SRV_Uv9Wx9
+  rectangle "Configuration\nService" <<Service>> as SRV_e5MCiF
+  rectangle "Indexing\nService" <<Service>> as SRV_3I3Dtc
+}
+
+rectangle "Processes" <<CommonGrouping>> {
+  rectangle "Create Entity" <<Process>> as PRC_pFq3jC
+  rectangle "Create Connection" <<Process>> as PRC_ocenhK
+  rectangle "Create Diagram" <<Process>> as PRC_iGIf7W
+  rectangle "Verify Model" <<Process>> as PRC_oLRrwL
+  rectangle "Index Repository" <<Process>> as PRC_iJuFgE
+  rectangle "Promote Artifact" <<Process>> as PRC_0Rz5Ex
+  rectangle "Query Model" <<Process>> as PRC_vGhe4Z
+}
+
+rectangle "Functions" <<CommonGrouping>> {
+  rectangle "Frontmatter\nValidation" <<Function>> as FNC_ahr0mT
+  rectangle "Attribute Schema\nValidation" <<Function>> as FNC_B_F_Sq
+  rectangle "Referential\nIntegrity Check" <<Function>> as FNC_eAkU8w
+  rectangle "PlantUML\nSyntax Check" <<Function>> as FNC_wIVwom
+}
+
+rectangle "Roles" <<CommonGrouping>> {
+  rectangle "Author" <<Role>> as ROL_deMuTj
+  rectangle "Reviewer" <<Role>> as ROL_6VGCvh
+}
+
+' Service → Process compositions
+SRV_Au1Th1 *-- PRC_pFq3jC
+SRV_Au1Th1 *-- PRC_ocenhK
+SRV_Au1Th1 *-- PRC_iGIf7W
+SRV_Ij6Kl6 *-- PRC_oLRrwL
+SRV_3I3Dtc *-- PRC_iJuFgE
+SRV_Uv9Wx9 *-- PRC_0Rz5Ex
+SRV_Qr8St8 *-- PRC_vGhe4Z
+
+' Process → Function usages
+PRC_oLRrwL --> FNC_ahr0mT
+PRC_oLRrwL --> FNC_B_F_Sq
+PRC_oLRrwL --> FNC_eAkU8w
+PRC_oLRrwL --> FNC_wIVwom
+PRC_pFq3jC --> FNC_ahr0mT
+
+' Role → Service assignments
+ROL_deMuTj --> SRV_Au1Th1
+ROL_6VGCvh --> SRV_Ij6Kl6
+
+@enduml

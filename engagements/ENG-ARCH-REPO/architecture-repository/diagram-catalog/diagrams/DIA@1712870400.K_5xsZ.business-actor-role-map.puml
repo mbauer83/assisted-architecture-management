@@ -1,0 +1,63 @@
+---
+artifact-id: DIA@1712870400.K_5xsZ.business-actor-role-map
+artifact-type: diagram
+name: "Business Domain — Actors, Roles & Objects"
+version: 0.1.0
+status: draft
+keywords: [business, actors, roles, objects, interfaces]
+diagram-type: archimate-business
+last-updated: '2026-04-13'
+---
+@startuml business-actor-role-map
+!include ../_archimate-stereotypes.puml
+
+title Business Domain — Actors, Roles & Key Objects
+
+rectangle "Actors" <<BusinessGrouping>> {
+  rectangle "Architect" <<BusinessActor>> as ACT_Nn7Oo7
+  rectangle "Developer" <<BusinessActor>> as ACT_Pp8Qq8
+  rectangle "DevOps Engineer" <<BusinessActor>> as ACT_OLWiNc
+  rectangle "Product Owner" <<BusinessActor>> as ACT_Rr9Ss9
+  rectangle "Upper Technical\nManagement" <<BusinessActor>> as ACT_Ut1Vv1
+}
+
+rectangle "Roles (from Common)" <<CommonGrouping>> {
+  rectangle "Author" <<Role>> as ROL_deMuTj
+  rectangle "Reviewer" <<Role>> as ROL_6VGCvh
+}
+
+rectangle "Interface" <<BusinessGrouping>> {
+  rectangle "GUI Interface" <<BusinessInterface>> as BIF_zr7_vT
+}
+
+rectangle "Key Business Objects" <<BusinessGrouping>> {
+  rectangle "Entity File" <<BusinessObject>> as BOB_ie4vWU
+  rectangle "Connection File" <<BusinessObject>> as BOB_d8ETlx
+  rectangle "Diagram File" <<BusinessObject>> as BOB_8D68QW
+  rectangle "Architecture Model" <<BusinessObject>> as BOB_jqcFNe
+  rectangle "Engagement\nRepository" <<BusinessObject>> as BOB_so7gfN
+  rectangle "Enterprise\nRepository" <<BusinessObject>> as BOB_6Uok0b
+}
+
+' Actor → Role assignments
+ACT_Nn7Oo7 --> ROL_deMuTj : <<assignment>>
+ACT_Nn7Oo7 --> ROL_6VGCvh : <<assignment>>
+ACT_Pp8Qq8 --> ROL_deMuTj : <<assignment>>
+ACT_Rr9Ss9 --> ROL_6VGCvh : <<assignment>>
+ACT_Ut1Vv1 --> ROL_6VGCvh : <<assignment>>
+
+' Model composition
+BOB_jqcFNe *-- BOB_ie4vWU
+BOB_jqcFNe *-- BOB_d8ETlx
+BOB_jqcFNe *-- BOB_8D68QW
+
+' Repository composition
+BOB_so7gfN *-- BOB_jqcFNe
+BOB_6Uok0b *-- BOB_jqcFNe
+
+' Interface serves actors
+BIF_zr7_vT --> ACT_Nn7Oo7
+BIF_zr7_vT --> ACT_Rr9Ss9
+BIF_zr7_vT --> ACT_Ut1Vv1
+
+@enduml

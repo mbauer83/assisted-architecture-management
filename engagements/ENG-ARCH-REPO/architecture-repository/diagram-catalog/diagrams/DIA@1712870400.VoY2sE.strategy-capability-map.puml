@@ -1,0 +1,54 @@
+---
+artifact-id: DIA@1712870400.VoY2sE.strategy-capability-map
+artifact-type: diagram
+name: "Strategy — Capability Map"
+version: 0.1.0
+status: draft
+keywords: [strategy, capabilities, courses-of-action, goals]
+diagram-type: archimate-strategy
+last-updated: '2026-04-13'
+---
+@startuml strategy-capability-map
+!include ../_archimate-stereotypes.puml
+
+title Strategy Domain — Capabilities & Courses of Action
+
+rectangle "Goals (from Motivation)" <<MotivationGrouping>> {
+  rectangle "Maintain Coherence\n& Traceability" <<Goal>> as GOL_Po1Qw3
+  rectangle "Enable Scalable Reuse" <<Goal>> as GOL_Zx9Cv4
+  rectangle "Enable Cross-Stakeholder\nValidation" <<Goal>> as GOL_Lm2Bn2
+  rectangle "Support Planning\n(Humans & AI)" <<Goal>> as GOL_planning
+  rectangle "Provide Development\nGuidance (Humans & AI)" <<Goal>> as GOL_guidance
+}
+
+rectangle "Capabilities" <<StrategyGrouping>> {
+  rectangle "Architectural\nModeling" <<Capability>> as CAP_y4xZme
+  rectangle "Model\nValidation" <<Capability>> as CAP_gky5s4
+  rectangle "Artifact\nDiscovery" <<Capability>> as CAP_QrHHmz
+  rectangle "Artifact\nAuthoring" <<Capability>> as CAP_F4qy9O
+  rectangle "Repository\nGovernance" <<Capability>> as CAP_ZnmAHe
+  rectangle "Configuration\nManagement" <<Capability>> as CAP_0T4qjV
+}
+
+rectangle "Courses of Action" <<StrategyGrouping>> {
+  rectangle "Markdown File-Based\nApproach" <<CourseOfAction>> as COA_BbjFAy
+  rectangle "ArchiMate NEXT\nOntology Adoption" <<CourseOfAction>> as COA_utgeNR
+}
+
+' Goal → Capability realizations
+GOL_Po1Qw3 -|> CAP_y4xZme : <<realization>>
+GOL_Po1Qw3 -|> CAP_gky5s4 : <<realization>>
+GOL_Lm2Bn2 -|> CAP_QrHHmz : <<realization>>
+GOL_Lm2Bn2 -|> CAP_gky5s4 : <<realization>>
+GOL_Zx9Cv4 -|> CAP_ZnmAHe : <<realization>>
+GOL_planning -|> CAP_y4xZme : <<realization>>
+GOL_planning -|> CAP_F4qy9O : <<realization>>
+GOL_guidance -|> CAP_QrHHmz : <<realization>>
+
+' COA → Capability realizations
+COA_BbjFAy -|> CAP_y4xZme : <<realization>>
+COA_BbjFAy -|> CAP_F4qy9O : <<realization>>
+COA_utgeNR -|> CAP_y4xZme : <<realization>>
+COA_utgeNR -|> CAP_gky5s4 : <<realization>>
+
+@enduml
