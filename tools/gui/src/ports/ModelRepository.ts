@@ -10,6 +10,8 @@ import type {
   DiagramDetail,
   WriteResult,
   DiagramRefs,
+  OntologyClassification,
+  OntologyPair,
 } from '../domain'
 import type { NetworkError, NotFoundError } from '../domain'
 import type { MarkdownError } from '../application/MarkdownService'
@@ -58,4 +60,18 @@ export interface ModelRepository {
     dry_run?: boolean;
   }) => Effect.Effect<WriteResult, RepoError>
   readonly getWriteHelp: () => Effect.Effect<unknown, RepoError>
+  readonly getOntologyClassification: (sourceType: string) => Effect.Effect<OntologyClassification, RepoError>
+  readonly getOntologyPair: (sourceType: string, targetType: string) => Effect.Effect<OntologyPair, RepoError>
+  readonly createEntity: (body: {
+    artifact_type: string; name: string; summary?: string;
+    properties?: Record<string, string>; notes?: string;
+    keywords?: string[]; version?: string; status?: string;
+    dry_run?: boolean;
+  }) => Effect.Effect<WriteResult, RepoError>
+  readonly editEntity: (body: {
+    artifact_id: string; name?: string; summary?: string;
+    properties?: Record<string, string>; notes?: string;
+    keywords?: string[]; version?: string; status?: string;
+    dry_run?: boolean;
+  }) => Effect.Effect<WriteResult, RepoError>
 }

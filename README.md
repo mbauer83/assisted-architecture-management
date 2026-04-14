@@ -136,12 +136,16 @@ python -m src.tools.generate_macros path/to/architecture-repository
 
 ## Setup
 
-**Requirements**: Python >= 3.13, Node >= 18 (for GUI development), `uv`.
+**Requirements**: Python ≥ 3.13, Java ≥ 11 (for diagram verification), Node ≥ 18 (for GUI development), `uv`.
 
 ```bash
 # Python environment
 uv sync                        # core dependencies
 uv sync --extra gui            # + GUI server dependencies
+
+# Download plantuml.jar (SHA-256-verified from Maven Central, pinned version)
+get-plantuml                   # → tools/plantuml.jar (gitignored)
+# To upgrade: edit PLANTUML_VERSION in src/tools/get_plantuml.py, re-run
 
 # Initialise workspace
 arch-init                      # reads arch-workspace.yaml, writes .arch/init-state.yaml
@@ -152,8 +156,10 @@ arch-init                      # reads arch-workspace.yaml, writes .arch/init-st
 # GUI development (hot-reload)
 sdlc-gui-server &
 cd tools/gui && npm install && npm run dev
-# -> http://localhost:5173
+# → http://localhost:5173
 ```
+
+> **plantuml.jar** is downloaded on demand and gitignored. The Docker build fetches and verifies it automatically. For local development, `get-plantuml` places it at `tools/plantuml.jar`, which is the path the verifier and diagram renderer expect.
 
 ## GUI — Dockerized
 

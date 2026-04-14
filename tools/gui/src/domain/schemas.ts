@@ -143,6 +143,24 @@ export const WriteResultSchema = Schema.Struct({
 })
 export type WriteResult = typeof WriteResultSchema.Type
 
+// ── Ontology ──────────────────────────────────────────────────────────────────
+
+export const OntologyClassificationSchema = Schema.Struct({
+  source_type: Schema.String,
+  outgoing: Schema.Record({ key: Schema.String, value: Schema.Array(Schema.String) }),
+  incoming: Schema.Record({ key: Schema.String, value: Schema.Array(Schema.String) }),
+  symmetric: Schema.Record({ key: Schema.String, value: Schema.Array(Schema.String) }),
+})
+export type OntologyClassification = typeof OntologyClassificationSchema.Type
+
+export const OntologyPairSchema = Schema.Struct({
+  source_type: Schema.String,
+  target_type: Schema.String,
+  connection_types: Schema.Array(Schema.String),
+  symmetric: Schema.Array(Schema.String),
+})
+export type OntologyPair = typeof OntologyPairSchema.Type
+
 // ── Diagram refs ─────────────────────────────────────────────────────────────
 
 export const DiagramRefSchema = Schema.Struct({

@@ -1,15 +1,16 @@
 <script setup lang="ts">
-import { computed, inject, ref } from 'vue'
+import { computed, inject, onMounted, ref, watch } from 'vue'
 import { RouterLink } from 'vue-router'
 import { Effect } from 'effect'
 import { modelServiceKey } from '../keys'
-import type { ConnectionRecord, ConnectionList, DiagramRefs } from '../../domain'
+import type { ConnectionRecord, ConnectionList, DiagramRefs, OntologyClassification } from '../../domain'
 import EntitySearchInput from './EntitySearchInput.vue'
 
 const props = defineProps<{
   entityId: string
+  entityType: string
   connections: ConnectionList
-  direction: 'outbound' | 'inbound'
+  direction: 'outgoing' | 'incoming' | 'symmetric'
   loading: boolean
   error: string | null
 }>()
@@ -20,16 +21,48 @@ const emit = defineEmits<{
 
 const svc = inject(modelServiceKey)!
 
-// Group connections by the artifact_type of the connected entity
+// ── Ontology ──────────────────────────────────────────────────────────────────
+
+const ontology = ref<OntologyClassification | null>(null)
+
+onMounted(() => {
+  Effect.runPromise(svc.getOntologyClassification(props.entityType))
+    .then((o) => { ontology.value = o })
+    .catch(() => { /* silently degrade — sections built from existing connections */ })
+})
+
+watch(() => props.entityType, () => {
+  ontology.value = null
+  Effect.runPromise(svc.getOntologyClassification(props.entityType))
+    .then((o) => { ontology.value = o })
+    .catch(() => {})
+})
+
+// Permissible target types for this direction from the ontology
+const permissibleTypes = computed((): string[] => {
+  if (!ontology.value) return []
+  const map = ontology.value[props.direction] as Record<string, string[]>
+  return Object.keys(map).sort()
+})
+
+// ── Grouping ──────────────────────────────────────────────────────────────────
+
+// Group existing connections by the artifact_type-prefix of the connected entity
 const grouped = computed(() => {
   const groups: Record<string, ConnectionRecord[]> = {}
   for (const c of props.connections) {
-    const otherId = props.direction === 'outbound' ? c.target : c.source
+    const otherId = props.direction === 'incoming' ? c.source : c.target
     const typePart = otherId.split('@')[0] ?? 'unknown'
     if (!groups[typePart]) groups[typePart] = []
     groups[typePart].push({ ...c })
   }
-  return Object.entries(groups).sort(([a], [b]) => a.localeCompare(b))
+  return groups
+})
+
+// All section keys: union of ontology permissible types + types found in existing connections
+const sectionKeys = computed((): string[] => {
+  const all = new Set([...permissibleTypes.value, ...Object.keys(grouped.value)])
+  return Array.from(all).sort()
 })
 
 const friendlyName = (id: string) => {
@@ -37,22 +70,51 @@ const friendlyName = (id: string) => {
   return parts.length > 2 ? parts.slice(2).join(' ').replace(/-/g, ' ') : id
 }
 
-const otherEnd = (c: ConnectionList[number]) =>
-  props.direction === 'outbound' ? c.target : c.source
+const otherEnd = (c: ConnectionRecord) =>
+  props.direction === 'incoming' ? c.source : c.target
 
-// ── Add connection ───────────────────────────────────────────────────────────
+const titleLabel = computed(() => {
+  if (props.direction === 'outgoing') return 'Outgoing'
+  if (props.direction === 'incoming') return 'Incoming'
+  return 'Symmetric'
+})
 
-const addingFor = ref<string | null>(null) // entity-type group key
+// ── Add connection ─────────────────────────────────────────────────────────────
+
+const addingFor = ref<string | null>(null)
 const selectedTarget = ref<{ id: string; name: string } | null>(null)
-const connTypeInput = ref('')
+const connTypeOptions = ref<string[]>([])
+const connTypeSelected = ref('')
+const descInput = ref('')
 const addError = ref<string | null>(null)
 const addBusy = ref(false)
 
 const startAdd = (typeKey: string) => {
-  addingFor.value = addingFor.value === typeKey ? null : typeKey
+  if (addingFor.value === typeKey) {
+    addingFor.value = null
+    return
+  }
+  addingFor.value = typeKey
   selectedTarget.value = null
-  connTypeInput.value = ''
+  connTypeOptions.value = []
+  connTypeSelected.value = ''
+  descInput.value = ''
   addError.value = null
+  // Fetch permissible connection types for this source→target pair
+  Effect.runPromise(svc.getOntologyPair(props.entityType, typeKey))
+    .then((pair) => {
+      connTypeOptions.value = [...pair.connection_types]
+      if (pair.connection_types.length === 1) connTypeSelected.value = pair.connection_types[0]
+      else if (props.direction === 'symmetric') connTypeSelected.value = 'archimate-association'
+    })
+    .catch(() => {
+      connTypeOptions.value = []
+    })
+}
+
+const cancelAdd = () => {
+  addingFor.value = null
+  selectedTarget.value = null
 }
 
 const onSelectTarget = (id: string, name: string) => {
@@ -60,16 +122,18 @@ const onSelectTarget = (id: string, name: string) => {
 }
 
 const confirmAdd = () => {
-  if (!selectedTarget.value || !connTypeInput.value.trim()) return
+  if (!selectedTarget.value || !connTypeSelected.value) return
   addBusy.value = true
   addError.value = null
-  const source = props.direction === 'outbound' ? props.entityId : selectedTarget.value.id
-  const target = props.direction === 'outbound' ? selectedTarget.value.id : props.entityId
+  const isIncoming = props.direction === 'incoming'
+  const source = isIncoming ? selectedTarget.value.id : props.entityId
+  const target = isIncoming ? props.entityId : selectedTarget.value.id
   Effect.runPromise(
     svc.addConnection({
       source_entity: source,
-      connection_type: connTypeInput.value.trim(),
+      connection_type: connTypeSelected.value,
       target_entity: target,
+      description: descInput.value.trim() || undefined,
       dry_run: false,
     }),
   ).then((r) => {
@@ -77,7 +141,6 @@ const confirmAdd = () => {
     if (r.wrote) {
       addingFor.value = null
       selectedTarget.value = null
-      connTypeInput.value = ''
       emit('refresh')
     } else {
       addError.value = r.content ?? 'Verification failed'
@@ -88,15 +151,15 @@ const confirmAdd = () => {
   })
 }
 
-// ── Remove connection ────────────────────────────────────────────────────────
+// ── Remove connection ──────────────────────────────────────────────────────────
 
-const removingConn = ref<ConnectionList[number] | null>(null)
+const removingConn = ref<ConnectionRecord | null>(null)
 const diagramRefs = ref<DiagramRefs>([])
 const diagramRefsLoading = ref(false)
 const removeBusy = ref(false)
 const removeError = ref<string | null>(null)
 
-const startRemove = (c: ConnectionList[number]) => {
+const startRemove = (c: ConnectionRecord) => {
   removingConn.value = c
   removeError.value = null
   diagramRefsLoading.value = true
@@ -136,84 +199,75 @@ const confirmRemove = () => {
 
 <template>
   <div class="conn-panel">
-    <h2 class="conn-title">{{ direction === 'outbound' ? 'Outbound' : 'Inbound' }} connections</h2>
+    <h2 class="conn-title">{{ titleLabel }} connections</h2>
 
     <div v-if="loading" class="state-msg">Loading...</div>
     <div v-else-if="error" class="state-msg state-msg--error">{{ error }}</div>
-    <div v-else-if="!connections.length" class="state-msg">None</div>
 
     <template v-else>
-      <div v-for="[typeKey, conns] in grouped" :key="typeKey" class="type-group">
-        <div class="group-header">
-          <span class="group-type-badge">{{ typeKey }}</span>
-          <span class="group-count">{{ conns.length }}</span>
-          <button class="icon-btn add-btn" title="Add connection" @click="startAdd(typeKey)">+</button>
-        </div>
+      <template v-if="sectionKeys.length">
+        <div v-for="typeKey in sectionKeys" :key="typeKey" class="type-group">
+          <div class="group-header">
+            <span class="group-type-badge">{{ typeKey }}</span>
+            <span class="group-count">{{ (grouped[typeKey] ?? []).length }}</span>
+            <button class="icon-btn add-btn" title="Add connection" @click="startAdd(typeKey)">+</button>
+          </div>
 
-        <ul class="conn-list">
-          <li v-for="c in conns" :key="c.artifact_id" class="conn-item">
-            <span class="conn-type-badge">{{ c.conn_type.replace('archimate-', '') }}</span>
-            <RouterLink
-              :to="{ path: '/entity', query: { id: otherEnd(c) } }"
-              class="conn-target"
-            >{{ friendlyName(otherEnd(c)) }}</RouterLink>
-            <button class="icon-btn remove-btn" title="Remove connection" @click="startRemove(c)">×</button>
-          </li>
-        </ul>
+          <ul v-if="grouped[typeKey]?.length" class="conn-list">
+            <li v-for="c in grouped[typeKey]" :key="c.artifact_id" class="conn-item">
+              <span class="conn-type-badge">{{ c.conn_type.replace('archimate-', '') }}</span>
+              <RouterLink
+                :to="{ path: '/entity', query: { id: otherEnd(c) } }"
+                class="conn-target"
+              >{{ friendlyName(otherEnd(c)) }}</RouterLink>
+              <button class="icon-btn remove-btn" title="Remove connection" @click="startRemove(c)">×</button>
+            </li>
+          </ul>
 
-        <!-- Add connection form -->
-        <div v-if="addingFor === typeKey" class="add-form">
-          <div class="add-row">
-            <input
-              v-model="connTypeInput"
-              class="conn-type-input"
-              placeholder="Connection type (e.g. archimate-realization)"
-            />
+          <!-- Add form for this type group -->
+          <div v-if="addingFor === typeKey" class="add-form">
+            <div v-if="connTypeOptions.length" class="add-row">
+              <select v-model="connTypeSelected" class="conn-type-select">
+                <option value="" disabled>Select connection type...</option>
+                <option v-for="ct in connTypeOptions" :key="ct" :value="ct">
+                  {{ ct.replace('archimate-', '') }}
+                </option>
+              </select>
+            </div>
+            <div v-else class="state-msg">Loading connection types...</div>
+            <div class="add-row">
+              <EntitySearchInput
+                :type-prefix="typeKey"
+                placeholder="Search target entity..."
+                @select="onSelectTarget"
+              />
+            </div>
+            <div v-if="selectedTarget" class="selected-target">
+              Selected: <strong>{{ selectedTarget.name }}</strong>
+            </div>
+            <div class="add-row">
+              <input
+                v-model="descInput"
+                class="desc-input"
+                placeholder="Description (optional)"
+              />
+            </div>
+            <div class="add-actions">
+              <button class="cancel-btn" @click="cancelAdd">Cancel</button>
+              <button
+                class="add-confirm-btn"
+                :disabled="!selectedTarget || !connTypeSelected || addBusy"
+                @click="confirmAdd"
+              >Add</button>
+            </div>
+            <div v-if="addError" class="state-msg state-msg--error">{{ addError }}</div>
           </div>
-          <div class="add-row">
-            <EntitySearchInput
-              :type-prefix="addingFor !== '_new' ? addingFor ?? undefined : undefined"
-              placeholder="Search target entity..." @select="onSelectTarget"
-            />
-            <button
-              class="add-confirm-btn"
-              :disabled="!selectedTarget || !connTypeInput.trim() || addBusy"
-              @click="confirmAdd"
-            >Add</button>
-          </div>
-          <div v-if="selectedTarget" class="selected-target">
-            Selected: <strong>{{ selectedTarget.name }}</strong>
-          </div>
-          <div v-if="addError" class="state-msg state-msg--error">{{ addError }}</div>
         </div>
-      </div>
+      </template>
+
+      <!-- Fallback when no ontology data yet and no connections -->
+      <div v-else class="state-msg">None</div>
     </template>
-
-    <!-- "Add" button when no connections exist for new group -->
-    <div v-if="!loading && !error" class="add-new-group">
-      <button class="icon-btn add-btn" title="Add connection" @click="startAdd('_new')">+</button>
-      <div v-if="addingFor === '_new'" class="add-form">
-        <div class="add-row">
-          <input
-            v-model="connTypeInput"
-            class="conn-type-input"
-            placeholder="Connection type (e.g. archimate-realization)"
-          />
-        </div>
-        <div class="add-row">
-          <EntitySearchInput placeholder="Search target entity..." @select="onSelectTarget" />
-          <button
-            class="add-confirm-btn"
-            :disabled="!selectedTarget || !connTypeInput.trim() || addBusy"
-            @click="confirmAdd"
-          >Add</button>
-        </div>
-        <div v-if="selectedTarget" class="selected-target">
-          Selected: <strong>{{ selectedTarget.name }}</strong>
-        </div>
-        <div v-if="addError" class="state-msg state-msg--error">{{ addError }}</div>
-      </div>
-    </div>
 
     <!-- Remove confirmation dialog -->
     <div v-if="removingConn" class="modal-overlay" @click.self="cancelRemove">
@@ -284,19 +338,29 @@ const confirmRemove = () => {
 
 .add-form { margin-top: 8px; padding: 10px; background: #f9fafb; border-radius: 6px; }
 .add-row { display: flex; gap: 6px; margin-bottom: 6px; align-items: center; }
-.conn-type-input {
+.conn-type-select {
+  flex: 1; padding: 6px 10px; border-radius: 6px; border: 1px solid #d1d5db;
+  font-size: 12px; outline: none; background: white;
+}
+.conn-type-select:focus { border-color: #2563eb; }
+.desc-input {
   flex: 1; padding: 6px 10px; border-radius: 6px; border: 1px solid #d1d5db;
   font-size: 12px; outline: none;
 }
-.conn-type-input:focus { border-color: #2563eb; }
+.desc-input:focus { border-color: #2563eb; }
+.add-actions { display: flex; gap: 6px; justify-content: flex-end; margin-top: 4px; }
 .add-confirm-btn {
   padding: 6px 14px; background: #2563eb; color: white; border: none;
   border-radius: 6px; font-size: 13px; font-weight: 500; cursor: pointer; white-space: nowrap;
 }
 .add-confirm-btn:disabled { opacity: 0.5; cursor: not-allowed; }
 .add-confirm-btn:hover:not(:disabled) { background: #1d4ed8; }
-.selected-target { font-size: 12px; color: #374151; margin-top: 4px; }
-.add-new-group { margin-top: 8px; }
+.cancel-btn {
+  padding: 6px 14px; background: #f3f4f6; color: #374151; border: 1px solid #d1d5db;
+  border-radius: 6px; font-size: 13px; cursor: pointer;
+}
+.cancel-btn:hover { background: #e5e7eb; }
+.selected-target { font-size: 12px; color: #374151; margin-bottom: 4px; }
 
 /* Remove modal */
 .modal-overlay {

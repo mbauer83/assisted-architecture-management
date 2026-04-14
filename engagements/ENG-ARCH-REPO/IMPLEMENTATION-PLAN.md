@@ -157,7 +157,7 @@ enabling section-level search and reference graph traversal via the `framework_q
 | WS-G: Edit Tools | **COMPLETE** | `model_edit_entity`, `model_edit_connection`, `model_edit_diagram` |
 | WS-F: Framework Server | **COMPLETE** | Configurable scan roots; `docs/` structure (D7); 2 seed ADRs; framework server wired in `.mcp.json` |
 | WS-H: Two-Tiered Repos | **COMPLETE** | Connection ontology, arch-init CLI, asymmetric enforcement, cross-repo macros, promotion mechanism |
-| WS-E: GUI Tool | **IN PROGRESS** | E1–E4-phase2 done; diagram explorer, connection editor, graph explorer added; ontology-driven GUI pending |
+| WS-E: GUI Tool | **COMPLETE** | B-stream done: ontology-driven connection panels, entity create/edit, three-section layout |
 
 **Verification**: 173 files, 0 errors, 0 warnings (W350 resolves on MCP server restart — `tools/plantuml.jar` symlink + code fix in place).
 
@@ -225,7 +225,7 @@ Backend endpoints already in place for GUI work:
 
 ---
 
-## Remaining Work: Ontology-Driven GUI (Stream B)
+## Completed: Ontology-Driven GUI (Stream B, 2026-04-14)
 
 ### B1: Ontology Types + Port + Adapter + Service
 

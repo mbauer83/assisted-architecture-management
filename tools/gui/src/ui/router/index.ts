@@ -2,6 +2,7 @@ import { createRouter, createWebHistory } from 'vue-router'
 import HomeView from '../views/HomeView.vue'
 import EntitiesView from '../views/EntitiesView.vue'
 import EntityDetailView from '../views/EntityDetailView.vue'
+import EntityCreateView from '../views/EntityCreateView.vue'
 import SearchView from '../views/SearchView.vue'
 import DiagramsView from '../views/DiagramsView.vue'
 import DiagramDetailView from '../views/DiagramDetailView.vue'
@@ -12,6 +13,7 @@ export const router = createRouter({
   routes: [
     { path: '/', component: HomeView },
     { path: '/entities', component: EntitiesView },
+    { path: '/entity/create', component: EntityCreateView },
     { path: '/entity', component: EntityDetailView },
     { path: '/search', component: SearchView },
     { path: '/diagrams', component: DiagramsView },

@@ -25,4 +25,8 @@ export const makeModelService = (repo: ModelRepository) =>
     removeConnection: (body: Parameters<ModelRepository['removeConnection']>[0]) =>
       repo.removeConnection(body),
     getWriteHelp: () => repo.getWriteHelp(),
+    getOntologyClassification: (sourceType: string) => repo.getOntologyClassification(sourceType),
+    getOntologyPair: (sourceType: string, targetType: string) => repo.getOntologyPair(sourceType, targetType),
+    createEntity: (body: Parameters<ModelRepository['createEntity']>[0]) => repo.createEntity(body),
+    editEntity: (body: Parameters<ModelRepository['editEntity']>[0]) => repo.editEntity(body),
   }) as const

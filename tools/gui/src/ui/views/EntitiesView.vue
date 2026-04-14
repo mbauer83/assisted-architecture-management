@@ -58,10 +58,13 @@ const friendlyId = (id: string) => {
     </aside>
 
     <section class="content">
-      <h1 class="page-title">
-        {{ activeDomain ? activeDomain.charAt(0).toUpperCase() + activeDomain.slice(1) : 'All Entities' }}
-        <span v-if="entityList" class="count">({{ entityList.total }})</span>
-      </h1>
+      <div class="content-header">
+        <h1 class="page-title">
+          {{ activeDomain ? activeDomain.charAt(0).toUpperCase() + activeDomain.slice(1) : 'All Entities' }}
+          <span v-if="entityList" class="count">({{ entityList.total }})</span>
+        </h1>
+        <RouterLink to="/entity/create" class="create-btn">+ Create Entity</RouterLink>
+      </div>
 
       <div v-if="loading" class="state-msg">Loading…</div>
       <div v-else-if="error" class="state-msg state-msg--error">{{ error }}</div>
@@ -124,7 +127,14 @@ const friendlyId = (id: string) => {
 
 .content { flex: 1; min-width: 0; }
 
-.page-title { font-size: 20px; font-weight: 600; margin-bottom: 16px; }
+.content-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; }
+.page-title { font-size: 20px; font-weight: 600; margin-bottom: 0; }
+
+.create-btn {
+  padding: 7px 14px; background: #16a34a; color: white; border-radius: 6px;
+  font-size: 13px; font-weight: 500; white-space: nowrap;
+}
+.create-btn:hover { background: #15803d; text-decoration: none; }
 .count { font-size: 14px; font-weight: 400; color: #6b7280; margin-left: 6px; }
 
 .state-msg { color: #6b7280; }

@@ -304,6 +304,72 @@ def remove_connection(body: RemoveConnectionBody) -> dict[str, Any]:
     return _write_result_to_dict(result)
 
 
+class CreateEntityBody(BaseModel):
+    artifact_type: str
+    name: str
+    summary: str | None = None
+    properties: dict[str, str] | None = None
+    notes: str | None = None
+    keywords: list[str] | None = None
+    version: str = "0.1.0"
+    status: str = "draft"
+    dry_run: bool = True
+
+
+class EditEntityBody(BaseModel):
+    artifact_id: str
+    name: str | None = None
+    summary: str | None = None
+    properties: dict[str, str] | None = None
+    notes: str | None = None
+    keywords: list[str] | None = None
+    version: str | None = None
+    status: str | None = None
+    dry_run: bool = True
+
+
+@app.post("/api/entity")
+def create_entity(body: CreateEntityBody) -> dict[str, Any]:
+    repo_root, _registry, verifier = _get_write_deps()
+    from src.tools.model_write.entity import create_entity as _create
+    try:
+        result = _create(
+            repo_root=repo_root, verifier=verifier,
+            clear_repo_caches=_clear_caches,
+            artifact_type=body.artifact_type, name=body.name,
+            summary=body.summary, properties=body.properties,
+            notes=body.notes, keywords=body.keywords,
+            artifact_id=None, version=body.version,
+            status=body.status, last_updated=None, dry_run=body.dry_run,
+        )
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+    return _write_result_to_dict(result)
+
+
+@app.post("/api/entity/edit")
+def edit_entity(body: EditEntityBody) -> dict[str, Any]:
+    repo_root, registry, verifier = _get_write_deps()
+    from src.tools.model_write.entity_edit import edit_entity as _edit, _UNSET
+    # Only pass fields that were explicitly included in the request body
+    provided = body.model_fields_set
+    try:
+        result = _edit(
+            repo_root=repo_root, registry=registry, verifier=verifier,
+            clear_repo_caches=_clear_caches,
+            artifact_id=body.artifact_id,
+            name=body.name,
+            summary=body.summary if "summary" in provided else _UNSET,
+            properties=body.properties if "properties" in provided else _UNSET,
+            notes=body.notes if "notes" in provided else _UNSET,
+            keywords=body.keywords if "keywords" in provided else _UNSET,
+            version=body.version, status=body.status, dry_run=body.dry_run,
+        )
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+    return _write_result_to_dict(result)
+
+
 # ── Bootstrap ─────────────────────────────────────────────────────────────────
 
 def main(argv: list[str] | None = None) -> None:

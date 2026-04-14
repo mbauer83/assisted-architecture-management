@@ -12,6 +12,8 @@ import {
   DiagramDetailSchema,
   WriteResultSchema,
   DiagramRefsSchema,
+  OntologyClassificationSchema,
+  OntologyPairSchema,
 } from '../../domain/schemas'
 import { parseMarkdown } from '../../application/MarkdownService'
 
@@ -143,4 +145,20 @@ export const makeHttpModelRepository = (): ModelRepository => ({
 
   getWriteHelp: () =>
     fetchJson(buildUrl('/write-help'), Schema.Unknown),
+
+  getOntologyClassification: (sourceType: string) =>
+    fetchJson(
+      buildUrl('/ontology', { source_type: sourceType }),
+      OntologyClassificationSchema,
+    ),
+
+  getOntologyPair: (sourceType: string, targetType: string) =>
+    fetchJson(
+      buildUrl('/ontology', { source_type: sourceType, target_type: targetType }),
+      OntologyPairSchema,
+    ),
+
+  createEntity: (body) => postJson(buildUrl('/entity'), body, WriteResultSchema),
+
+  editEntity: (body) => postJson(buildUrl('/entity/edit'), body, WriteResultSchema),
 })
