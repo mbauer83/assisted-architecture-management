@@ -1,6 +1,5 @@
 """MCP server exposing framework/spec query and graph tools."""
 
-from __future__ import annotations
 
 import argparse
 import os
@@ -58,17 +57,12 @@ def main() -> None:
     parser = argparse.ArgumentParser(prog="sdlc-mcp-framework")
     parser.add_argument(
         "--transport",
-        choices=("stdio", "sse", "streamable-http"),
-        default=os.getenv("SDLC_MCP_TRANSPORT", "streamable-http"),
-        help="MCP transport",
-    )
-    parser.add_argument(
-        "--mount-path",
-        default=os.getenv("SDLC_MCP_MOUNT_PATH"),
-        help="Optional mount path for SSE transport",
+        choices=("stdio", "streamable-http"),
+        default=os.getenv("SDLC_MCP_TRANSPORT", "stdio"),
+        help="MCP transport (default: stdio)",
     )
     args = parser.parse_args()
-    mcp.run(transport=args.transport, mount_path=args.mount_path)
+    mcp.run(transport=args.transport)
 
 
 if __name__ == "__main__":

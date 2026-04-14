@@ -1,18 +1,18 @@
-from __future__ import annotations
 
 import subprocess
 import tempfile
 from pathlib import Path
 import re
-from typing import Callable
-
+from collections.abc import Callable
 from src.common.model_verifier import ModelVerifier
+from src.common.model_verifier_syntax import find_plantuml_jar
 from src.common.model_write import (
     DiagramConnectionInferenceMode,
     format_diagram_puml,
     infer_archimate_connection_ids_from_puml,
     infer_entity_ids_from_puml,
 )
+from src.common.model_write_layout import optimize_puml_layout
 from src.tools.generate_macros import generate_macros
 
 from .boundary import assert_engagement_write_root
@@ -34,7 +34,9 @@ def _verification_to_dict(path: Path, res) -> dict[str, object]:
 
 def _render_diagram_png(puml_path: Path, warnings: list[str]) -> Path | None:
     """Render a PUML file to PNG using PlantUML. Returns the PNG path or None."""
-    rendered_dir = puml_path.parent / "rendered"
+    # Render into the sibling rendered/ directory (diagram-catalog/rendered/),
+    # not a nested subdirectory under diagrams/.
+    rendered_dir = puml_path.parent.parent / "rendered"
     rendered_dir.mkdir(parents=True, exist_ok=True)
 
     # Extract @startuml..@enduml into a temp file (skip YAML frontmatter)
@@ -53,9 +55,15 @@ def _render_diagram_png(puml_path: Path, warnings: list[str]) -> Path | None:
         tmp.write(puml_body)
         tmp_path = Path(tmp.name)
 
+    jar = find_plantuml_jar()
+    if jar is None:
+        warnings.append("plantuml.jar not found; render skipped")
+        tmp_path.unlink(missing_ok=True)
+        return None
+
     try:
         result = subprocess.run(
-            ["java", "-jar", "plantuml.jar", "-tpng", "-o", str(rendered_dir), str(tmp_path)],
+            ["java", "-jar", str(jar), "-tpng", "-o", str(rendered_dir), str(tmp_path)],
             capture_output=True, text=True, timeout=30,
         )
         if result.returncode != 0:
@@ -124,6 +132,9 @@ def create_diagram(
             puml_body,
             count=1,
         )
+
+    # Auto-layout: insert hidden links and arrow direction hints
+    puml_body = optimize_puml_layout(puml_body)
 
     from .boundary import today_iso
     last = last_updated or today_iso()

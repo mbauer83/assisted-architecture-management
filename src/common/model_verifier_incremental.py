@@ -1,4 +1,3 @@
-from __future__ import annotations
 
 import hashlib
 import json
@@ -275,6 +274,7 @@ def load_incremental_state(path: Path) -> IncrementalState | None:
         git_head=str(git_head) if isinstance(git_head, str) else None,
         snapshots=snapshots,
         results=results,
+        include_registry=bool(raw.get("include_registry", False)),
     )
 
 
@@ -283,6 +283,7 @@ def save_incremental_state(path: Path, state: IncrementalState) -> None:
         "schema_version": state.schema_version,
         "engine_signature": state.engine_signature,
         "include_diagrams": state.include_diagrams,
+        "include_registry": state.include_registry,
         "git_head": state.git_head,
         "snapshots": state.snapshots,
         "results": state.results,

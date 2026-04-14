@@ -8,7 +8,6 @@ Keeps mcp_model_server.py small by factoring out:
 This module contains no FastMCP tool registrations.
 """
 
-from __future__ import annotations
 
 from dataclasses import dataclass
 from functools import lru_cache

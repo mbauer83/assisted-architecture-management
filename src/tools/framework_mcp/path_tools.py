@@ -1,8 +1,6 @@
-from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Sequence
-
+from collections.abc import Sequence
 from mcp.server.fastmcp import FastMCP  # type: ignore[import-not-found]
 
 from src.common.framework_query import FrameworkKnowledgeIndex, FrameworkReferenceEdge

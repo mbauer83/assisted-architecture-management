@@ -1,8 +1,14 @@
-from __future__ import annotations
 
 import re
+from pathlib import Path
 
 import yaml  # type: ignore[import-untyped]
+
+from src.common.model_schema import (
+    load_attribute_schema,
+    schema_all_properties,
+    schema_required_properties,
+)
 
 
 def format_entity_markdown(
@@ -18,6 +24,7 @@ def format_entity_markdown(
     properties: dict[str, str] | None,
     notes: str | None,
     display_archimate: dict[str, str],
+    repo_root: Path | None = None,
 ) -> str:
     frontmatter: dict[str, object] = {
         "artifact-id": artifact_id,
@@ -48,9 +55,17 @@ def format_entity_markdown(
 
     content_lines.extend(["## Properties", "", "| Attribute | Value |", "|---|---|"])
     props = properties or {}
+    schema_keys = _scaffold_keys_from_schema(repo_root, artifact_type) if repo_root else []
     if props:
         for key in sorted(props.keys()):
             content_lines.append(f"| {key} | {props[key]} |")
+        # Append any schema-required keys not already provided
+        for key in schema_keys:
+            if key not in props:
+                content_lines.append(f"| {key} | |")
+    elif schema_keys:
+        for key in schema_keys:
+            content_lines.append(f"| {key} | |")
     else:
         content_lines.append("| (none) | (none) |")
     content_lines.append("")
@@ -215,3 +230,20 @@ def format_matrix_markdown(
     yaml_text = yaml.safe_dump(fm_out, sort_keys=False).strip()
     body = matrix_markdown.strip("\n") + "\n"
     return f"---\n{yaml_text}\n---\n\n{body}"
+
+
+def _scaffold_keys_from_schema(repo_root: Path | None, artifact_type: str) -> list[str]:
+    """Return ordered attribute keys from the attribute schema for scaffolding.
+
+    Required keys come first, then optional keys.  Returns an empty list
+    when no schema is configured (free schema).
+    """
+    if repo_root is None:
+        return []
+    schema = load_attribute_schema(repo_root, artifact_type)
+    if schema is None:
+        return []
+    required = schema_required_properties(schema)
+    all_props = schema_all_properties(schema)
+    optional = [k for k in all_props if k not in required]
+    return required + optional

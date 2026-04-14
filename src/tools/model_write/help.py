@@ -1,6 +1,9 @@
-from __future__ import annotations
+"""Type catalog for model authoring tools.
 
-from src.common.archimate_types import ALL_CONNECTION_TYPES, ALL_ENTITY_TYPES
+Progressive discovery pattern: agents call this to learn valid entity/connection
+types before calling create/edit tools.  Grouped by domain for quick scanning.
+"""
+
 from src.common.model_write import (
     ARCHIMATE_STEREOTYPE_TO_CONNECTION_TYPE,
     CONNECTION_TYPES,
@@ -9,22 +12,31 @@ from src.common.model_write import (
 
 
 def write_help() -> dict[str, object]:
-    entity_types_sorted = sorted(list(ALL_ENTITY_TYPES))
-    connection_types_sorted = sorted(list(ALL_CONNECTION_TYPES))
-    missing_entity_mappings = sorted([t for t in entity_types_sorted if t not in ENTITY_TYPES])
-    missing_connection_mappings = sorted([t for t in connection_types_sorted if t not in CONNECTION_TYPES])
+    """Return entity/connection type catalog grouped by domain."""
     return {
-        "entity_types": entity_types_sorted,
-        "connection_types": connection_types_sorted,
-        "entity_type_mapping_complete": len(missing_entity_mappings) == 0,
-        "connection_type_mapping_complete": len(missing_connection_mappings) == 0,
-        "missing_entity_type_mappings": missing_entity_mappings,
-        "missing_connection_type_mappings": missing_connection_mappings,
-        "archimate_relationship_stereotypes": sorted(list(ARCHIMATE_STEREOTYPE_TO_CONNECTION_TYPE.keys())),
-        "notes": [
-            "Entity IDs in PUML should use underscore aliases (e.g. APP_001) to be inferable.",
-            "ArchiMate connection inference requires stereotypes like : <<serving>> on the connection line.",
-            "Matrix diagrams can be created with model_create_matrix (.md), with optional auto-linking of entity IDs.",
-            "Writer tools refuse to write outside engagements/<id>/work-repositories/.",
-        ],
+        "entity_types_by_domain": _entity_types_by_domain(),
+        "connection_types_by_language": _connection_types_by_language(),
+        "archimate_stereotypes": sorted(ARCHIMATE_STEREOTYPE_TO_CONNECTION_TYPE.keys()),
+        "conventions": {
+            "entity_id_format": "TYPE@epoch.random.friendly-name (auto-generated)",
+            "puml_alias_format": "TYPE_random (e.g. DRV_Qw7Er1)",
+            "statuses": ["draft", "active", "deprecated"],
+            "dry_run": "All create/edit tools default to dry_run=true for safe preview",
+        },
     }
+
+
+def _entity_types_by_domain() -> dict[str, list[str]]:
+    grouped: dict[str, list[str]] = {}
+    for type_name, info in sorted(ENTITY_TYPES.items()):
+        domain = info.layer_dir
+        grouped.setdefault(domain, []).append(type_name)
+    return grouped
+
+
+def _connection_types_by_language() -> dict[str, list[str]]:
+    grouped: dict[str, list[str]] = {}
+    for type_name, info in sorted(CONNECTION_TYPES.items()):
+        lang = info.conn_lang
+        grouped.setdefault(lang, []).append(type_name)
+    return grouped

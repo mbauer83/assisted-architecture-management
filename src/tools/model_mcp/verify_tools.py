@@ -1,4 +1,3 @@
-from __future__ import annotations
 
 from typing import Any, Literal
 
@@ -85,8 +84,10 @@ def model_verify_all(
     total_errors = sum(len(r.errors) for r in results)
     total_warnings = sum(len(r.warnings) for r in results)
 
+    # Both modes only include files with issues — "full" adds complete detail per issue,
+    # "summary" keeps a compact representation.  Valid files appear only in counts.
     if return_mode == "full":
-        payload: Any = [as_verification_result_dict(r) for r in results]
+        payload: Any = [as_verification_result_dict(r) for r in results if r.issues]
     else:
         payload = [
             {

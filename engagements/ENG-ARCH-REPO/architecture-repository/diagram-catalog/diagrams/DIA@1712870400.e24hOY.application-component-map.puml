@@ -11,6 +11,8 @@ last-updated: '2026-04-13'
 @startuml application-component-map
 !include ../_archimate-stereotypes.puml
 
+left to right direction
+
 title Application Domain — Components, Interfaces & Data Objects
 
 rectangle "Interfaces" <<ApplicationGrouping>> {

@@ -1,20 +1,19 @@
-from __future__ import annotations
 
 from pathlib import Path
 import os
 import re
-from typing import Callable
+from collections.abc import Callable
+
 import yaml
 
 from src.common.model_verifier import ModelRegistry, ModelVerifier
 from src.common.model_write import format_matrix_markdown
 
-from .boundary import assert_engagement_write_root, engagement_id_from_repo_root
+from .boundary import assert_engagement_write_root, today_iso
 from .types import WriteResult
 
 
-_ENTITY_ID_PATTERN = re.compile(r"\b([A-Z]+-\d{3})\b")
-_SKILL_ID_LINE_PATTERN = re.compile(r"^skill-id:\s*([^\s]+)\s*$", flags=re.MULTILINE)
+_ENTITY_ID_PATTERN = re.compile(r"\b([A-Z]{2,6}@\d+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+(?:\.[A-Za-z0-9_-]+)*)\b")
 
 
 def _verification_to_dict(path: Path, res) -> dict[str, object]:
@@ -56,26 +55,6 @@ def _display_name_from_entity_file(path: Path, artifact_id: str) -> str:
     name = str(fm.get("name", "")).strip()
     if not name:
         return artifact_id
-
-    # For skill concept objects, prefer the synchronized "Display Name" property.
-    try:
-        content = path.read_text(encoding="utf-8")
-        m = re.search(r"^\| Display Name \|\s*(.+?)\s*\|\s*$", content, flags=re.MULTILINE)
-        if m:
-            return m.group(1).strip()
-    except OSError:
-        pass
-
-    prefixes = (
-        "Skill: ",
-        "Input Concept: ",
-        "Output Concept: ",
-        "Input: ",
-        "Output: ",
-    )
-    for pref in prefixes:
-        if name.startswith(pref):
-            return name[len(pref) :].strip()
     return name
 
 
@@ -117,7 +96,6 @@ def _linkify_matrix_ids(
 
     out_lines: list[str] = []
     for line in matrix_markdown.splitlines():
-        # Only rewrite table rows that do not already contain markdown links.
         if line.startswith("| ") and not line.startswith("|---") and "](" not in line:
             out_lines.append(_ENTITY_ID_PATTERN.sub(repl, line))
         else:
@@ -126,34 +104,10 @@ def _linkify_matrix_ids(
     return "\n".join(out_lines), replaced
 
 
-def _build_skill_id_to_relpath(*, repo_root: Path, diagrams_dir: Path) -> dict[str, str]:
-    skill_map: dict[str, str] = {}
-    agents_dir = repo_root / "agents"
-    if not agents_dir.exists():
-        return skill_map
-
-    for skill_file in agents_dir.glob("*/skills/*.md"):
-        try:
-            text = skill_file.read_text(encoding="utf-8")
-        except OSError:
-            continue
-        m = _SKILL_ID_LINE_PATTERN.search(text)
-        if not m:
-            continue
-        skill_id = m.group(1).strip()
-        if not skill_id:
-            continue
-        rel = os.path.relpath(str(skill_file), start=str(diagrams_dir)).replace("\\", "/")
-        skill_map[skill_id] = rel
-
-    return skill_map
-
-
 def _build_diagram_id_to_relpath(*, diagrams_dir: Path, registry: ModelRegistry) -> dict[str, str]:
     diagram_map: dict[str, str] = {}
     _ = registry
 
-    # Ensure all local diagram files are discoverable by stem even if not yet indexed.
     if diagrams_dir.exists():
         for p in diagrams_dir.glob("*.puml"):
             if p.name.startswith("_"):
@@ -174,12 +128,11 @@ def _build_diagram_id_to_relpath(*, diagrams_dir: Path, registry: ModelRegistry)
 def _linkify_known_tokens_in_matrix_rows(
     *,
     matrix_markdown: str,
-    skill_id_to_relpath: dict[str, str],
     diagram_id_to_relpath: dict[str, str],
 ) -> tuple[str, int]:
-    """Link known skill IDs and diagram artifact IDs inside plain table rows."""
+    """Link known diagram artifact IDs inside plain table rows."""
 
-    if not skill_id_to_relpath and not diagram_id_to_relpath:
+    if not diagram_id_to_relpath:
         return matrix_markdown, 0
 
     replaced = 0
@@ -201,8 +154,7 @@ def _linkify_known_tokens_in_matrix_rows(
     out_lines: list[str] = []
     for line in matrix_markdown.splitlines():
         if line.startswith("| ") and not line.startswith("|---") and "](" not in line:
-            linked = replace_token_links(line, skill_id_to_relpath)
-            linked = replace_token_links(linked, diagram_id_to_relpath)
+            linked = replace_token_links(line, diagram_id_to_relpath)
             out_lines.append(linked)
         else:
             out_lines.append(line)
@@ -219,76 +171,53 @@ def create_matrix(
     name: str,
     purpose: str,
     matrix_markdown: str,
-    phase_produced: str,
-    owner_agent: str,
     artifact_id: str,
-    domain: str | None,
-    version: str,
-    status: str,
-    infer_entity_ids: bool,
-    auto_link_entity_ids: bool,
-    entity_ids_used: list[str] | None,
-    connection_ids_used: list[str] | None,
-    dry_run: bool,
+    keywords: list[str] | None = None,
+    version: str = "0.1.0",
+    status: str = "draft",
+    last_updated: str | None = None,
+    infer_entity_ids: bool = True,
+    auto_link_entity_ids: bool = True,
+    dry_run: bool = True,
 ) -> WriteResult:
     assert_engagement_write_root(repo_root)
 
-    engagement = engagement_id_from_repo_root(repo_root)
+    last = last_updated or today_iso()
 
-    inferred_entities: list[str] = []
     warnings: list[str] = []
-    if infer_entity_ids and entity_ids_used is None:
+    inferred_entities: list[str] = []
+    if infer_entity_ids:
         inferred_entities = _infer_entity_ids_from_matrix(matrix_markdown)
-        if not inferred_entities:
-            warnings.append(
-                "No entity IDs inferred from matrix markdown. Consider providing entity_ids_used for stronger traceability."
-            )
-
-    final_entity_ids = entity_ids_used if entity_ids_used is not None else inferred_entities
 
     body_markdown = matrix_markdown
     if auto_link_entity_ids:
-        ids_for_links = final_entity_ids if final_entity_ids else _infer_entity_ids_from_matrix(matrix_markdown)
+        ids_for_links = inferred_entities if inferred_entities else _infer_entity_ids_from_matrix(matrix_markdown)
         body_markdown, replaced_count = _linkify_matrix_ids(
             repo_root=repo_root,
             registry=registry,
             matrix_markdown=matrix_markdown,
             candidate_entity_ids=ids_for_links,
         )
-        if replaced_count == 0 and ids_for_links:
-            warnings.append(
-                "auto_link_entity_ids enabled, but no entity IDs were converted to links; check ID/path resolution."
-            )
 
         diagrams_dir = repo_root / "diagram-catalog" / "diagrams"
-        skill_links = _build_skill_id_to_relpath(repo_root=repo_root, diagrams_dir=diagrams_dir)
         diagram_links = _build_diagram_id_to_relpath(
             diagrams_dir=diagrams_dir,
             registry=registry,
         )
         body_markdown, known_link_replacements = _linkify_known_tokens_in_matrix_rows(
             matrix_markdown=body_markdown,
-            skill_id_to_relpath=skill_links,
             diagram_id_to_relpath=diagram_links,
         )
-        if known_link_replacements == 0:
-            warnings.append(
-                "auto_link_entity_ids enabled, but no skill/diagram references were converted to links."
-            )
 
     content = format_matrix_markdown(
-        engagement=engagement,
         artifact_id=artifact_id,
         name=name,
         version=version,
         status=status,
-        phase_produced=phase_produced,
-        owner_agent=owner_agent,
-        domain=domain,
+        last_updated=last,
+        keywords=keywords,
         purpose=purpose,
         matrix_markdown=body_markdown,
-        entity_ids_used=final_entity_ids,
-        connection_ids_used=connection_ids_used,
     )
 
     path = repo_root / "diagram-catalog" / "diagrams" / f"{artifact_id}.md"

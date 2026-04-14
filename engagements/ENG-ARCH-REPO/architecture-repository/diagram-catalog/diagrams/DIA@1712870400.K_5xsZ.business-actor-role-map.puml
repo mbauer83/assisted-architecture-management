@@ -11,6 +11,8 @@ last-updated: '2026-04-13'
 @startuml business-actor-role-map
 !include ../_archimate-stereotypes.puml
 
+left to right direction
+
 title Business Domain — Actors, Roles & Key Objects
 
 rectangle "Actors" <<BusinessGrouping>> {

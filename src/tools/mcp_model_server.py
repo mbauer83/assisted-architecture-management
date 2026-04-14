@@ -9,7 +9,6 @@ Tool logic lives in:
 - src/tools/model_write/* (writer I/O operations)
 """
 
-from __future__ import annotations
 
 import argparse
 import logging
@@ -21,6 +20,7 @@ from src.tools.model_mcp import (
     auto_start_default_watcher,
     install_call_tool_normalizer,
     normalize_incoming_tool_name,
+    register_edit_tools,
     register_query_tools,
     register_verify_tools,
     register_watch_tools,
@@ -32,7 +32,13 @@ from src.tools.model_mcp.write_tools import (  # noqa: F401
     model_add_connection,
     model_create_diagram,
     model_create_entity,
+    model_create_matrix,
     model_write_help,
+)
+from src.tools.model_mcp.edit_tools import (  # noqa: F401
+    model_edit_connection,
+    model_edit_diagram,
+    model_edit_entity,
 )
 from src.tools.model_mcp.verify_tools import (  # noqa: F401
     model_verify_all,
@@ -93,6 +99,7 @@ register_query_tools(mcp)
 register_verify_tools(mcp)
 register_watch_tools(mcp)
 register_write_tools(mcp)
+register_edit_tools(mcp)
 
 
 def main() -> None:
@@ -105,14 +112,9 @@ def main() -> None:
     parser = argparse.ArgumentParser(prog="sdlc-mcp-model")
     parser.add_argument(
         "--transport",
-        choices=("stdio", "sse", "streamable-http"),
-        default=os.getenv("SDLC_MCP_TRANSPORT", "streamable-http"),
+        choices=("stdio", "streamable-http"),
+        default=os.getenv("SDLC_MCP_TRANSPORT", "stdio"),
         help="MCP transport (default: stdio)",
-    )
-    parser.add_argument(
-        "--mount-path",
-        default=os.getenv("SDLC_MCP_MOUNT_PATH"),
-        help="Optional mount path for SSE transport (advanced)",
     )
     args = parser.parse_args()
 

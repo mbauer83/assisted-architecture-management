@@ -1,9 +1,8 @@
-from __future__ import annotations
 
 import sys
 import textwrap
 from pathlib import Path
-from typing import Callable
+from collections.abc import Callable
 from typing import Literal
 
 from .index import FrameworkKnowledgeIndex

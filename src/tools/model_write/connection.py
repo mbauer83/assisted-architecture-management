@@ -1,8 +1,6 @@
-from __future__ import annotations
 
 from pathlib import Path
-from typing import Callable
-
+from collections.abc import Callable
 from src.common.archimate_types import ALL_CONNECTION_TYPES
 from src.common.model_verifier import ModelRegistry, ModelVerifier
 from src.common.model_write import format_outgoing_markdown
@@ -11,7 +9,7 @@ from .boundary import assert_engagement_write_root, today_iso
 from .types import WriteResult
 
 
-def _verification_to_dict(path: Path, res) -> dict[str, object]:
+def verification_to_conn_dict(path: Path, res) -> dict[str, object]:
     return {
         "path": str(path),
         "file_type": "connection",
@@ -98,12 +96,12 @@ def _write_and_verify(
         _rollback(outgoing_path, prev)
         return WriteResult(
             wrote=False, path=outgoing_path, artifact_id=conn_id,
-            content=content, warnings=[], verification=_verification_to_dict(outgoing_path, res),
+            content=content, warnings=[], verification=verification_to_conn_dict(outgoing_path, res),
         )
 
     return WriteResult(
         wrote=True, path=outgoing_path, artifact_id=conn_id,
-        content=None, warnings=[], verification=_verification_to_dict(outgoing_path, res),
+        content=None, warnings=[], verification=verification_to_conn_dict(outgoing_path, res),
     )
 
 

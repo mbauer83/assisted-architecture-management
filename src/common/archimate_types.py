@@ -28,7 +28,6 @@ Design notes
   2. A flat ``frozenset[str]`` (``ALL_*``) for O(1) membership tests.
 """
 
-from __future__ import annotations
 
 # ---------------------------------------------------------------------------
 # Entity artifact-type values

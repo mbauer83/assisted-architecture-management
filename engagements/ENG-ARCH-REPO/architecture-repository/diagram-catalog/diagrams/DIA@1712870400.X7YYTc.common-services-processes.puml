@@ -11,6 +11,8 @@ last-updated: '2026-04-13'
 @startuml common-services-processes
 !include ../_archimate-stereotypes.puml
 
+top to bottom direction
+
 title Common Domain — Services, Processes & Behavioral Elements
 
 rectangle "Services" <<CommonGrouping>> {

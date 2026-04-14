@@ -10,7 +10,6 @@ I/O (writing files, cache invalidation, macro regeneration, verifier execution)
 belongs in tooling/infrastructure (see src/tools/model_write_ops.py).
 """
 
-from __future__ import annotations
 
 import re
 import secrets

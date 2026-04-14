@@ -11,21 +11,23 @@ last-updated: '2026-04-13'
 @startuml strategy-capability-map
 !include ../_archimate-stereotypes.puml
 
+top to bottom direction
+
 title Strategy Domain — Capabilities & Courses of Action
 
 rectangle "Goals (from Motivation)" <<MotivationGrouping>> {
   rectangle "Maintain Coherence\n& Traceability" <<Goal>> as GOL_Po1Qw3
-  rectangle "Enable Scalable Reuse" <<Goal>> as GOL_Zx9Cv4
   rectangle "Enable Cross-Stakeholder\nValidation" <<Goal>> as GOL_Lm2Bn2
   rectangle "Support Planning\n(Humans & AI)" <<Goal>> as GOL_planning
+  rectangle "Enable Scalable Reuse" <<Goal>> as GOL_Zx9Cv4
   rectangle "Provide Development\nGuidance (Humans & AI)" <<Goal>> as GOL_guidance
 }
 
 rectangle "Capabilities" <<StrategyGrouping>> {
   rectangle "Architectural\nModeling" <<Capability>> as CAP_y4xZme
   rectangle "Model\nValidation" <<Capability>> as CAP_gky5s4
-  rectangle "Artifact\nDiscovery" <<Capability>> as CAP_QrHHmz
   rectangle "Artifact\nAuthoring" <<Capability>> as CAP_F4qy9O
+  rectangle "Artifact\nDiscovery" <<Capability>> as CAP_QrHHmz
   rectangle "Repository\nGovernance" <<Capability>> as CAP_ZnmAHe
   rectangle "Configuration\nManagement" <<Capability>> as CAP_0T4qjV
 }
@@ -35,20 +37,34 @@ rectangle "Courses of Action" <<StrategyGrouping>> {
   rectangle "ArchiMate NEXT\nOntology Adoption" <<CourseOfAction>> as COA_utgeNR
 }
 
+' --- Horizontal spread within layers ---
+GOL_Po1Qw3 -[hidden]right- GOL_Lm2Bn2
+GOL_Lm2Bn2 -[hidden]right- GOL_planning
+GOL_planning -[hidden]right- GOL_Zx9Cv4
+GOL_Zx9Cv4 -[hidden]right- GOL_guidance
+
+CAP_y4xZme -[hidden]right- CAP_gky5s4
+CAP_gky5s4 -[hidden]right- CAP_F4qy9O
+CAP_F4qy9O -[hidden]right- CAP_QrHHmz
+CAP_QrHHmz -[hidden]right- CAP_ZnmAHe
+CAP_ZnmAHe -[hidden]right- CAP_0T4qjV
+
+COA_BbjFAy -[hidden]right- COA_utgeNR
+
 ' Goal → Capability realizations
-GOL_Po1Qw3 -|> CAP_y4xZme : <<realization>>
-GOL_Po1Qw3 -|> CAP_gky5s4 : <<realization>>
-GOL_Lm2Bn2 -|> CAP_QrHHmz : <<realization>>
-GOL_Lm2Bn2 -|> CAP_gky5s4 : <<realization>>
-GOL_Zx9Cv4 -|> CAP_ZnmAHe : <<realization>>
-GOL_planning -|> CAP_y4xZme : <<realization>>
-GOL_planning -|> CAP_F4qy9O : <<realization>>
-GOL_guidance -|> CAP_QrHHmz : <<realization>>
+GOL_Po1Qw3 -down-|> CAP_y4xZme : <<realization>>
+GOL_Po1Qw3 -down-|> CAP_gky5s4 : <<realization>>
+GOL_Lm2Bn2 -down-|> CAP_gky5s4 : <<realization>>
+GOL_Lm2Bn2 -down-|> CAP_QrHHmz : <<realization>>
+GOL_planning -down-|> CAP_y4xZme : <<realization>>
+GOL_planning -down-|> CAP_F4qy9O : <<realization>>
+GOL_Zx9Cv4 -down-|> CAP_ZnmAHe : <<realization>>
+GOL_guidance -down-|> CAP_QrHHmz : <<realization>>
 
 ' COA → Capability realizations
-COA_BbjFAy -|> CAP_y4xZme : <<realization>>
-COA_BbjFAy -|> CAP_F4qy9O : <<realization>>
-COA_utgeNR -|> CAP_y4xZme : <<realization>>
-COA_utgeNR -|> CAP_gky5s4 : <<realization>>
+COA_utgeNR -up-|> CAP_y4xZme : <<realization>>
+COA_utgeNR -up-|> CAP_gky5s4 : <<realization>>
+COA_BbjFAy -up-|> CAP_y4xZme : <<realization>>
+COA_BbjFAy -up-|> CAP_F4qy9O : <<realization>>
 
 @enduml

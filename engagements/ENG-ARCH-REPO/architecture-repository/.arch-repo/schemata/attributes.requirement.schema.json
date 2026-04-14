@@ -1,0 +1,21 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "attributes.requirement.schema.json",
+  "title": "Requirement Attribute Schema",
+  "description": "Attribute schema for Properties table in Requirement entities.",
+  "type": "object",
+  "required": ["Priority", "Category"],
+  "properties": {
+    "Priority": {
+      "type": "string",
+      "enum": ["Must", "Should", "Could", "Won't"]
+    },
+    "Category": {
+      "type": "string"
+    },
+    "Children": {
+      "type": "string"
+    }
+  },
+  "additionalProperties": true
+}

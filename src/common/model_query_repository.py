@@ -1,6 +1,5 @@
 """ERP v2.0 Model Query — indexed query API over entities, connections, and diagrams."""
 
-from __future__ import annotations
 
 from pathlib import Path
 from typing import Literal, cast, overload

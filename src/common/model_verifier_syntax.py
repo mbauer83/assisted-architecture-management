@@ -1,4 +1,3 @@
-from __future__ import annotations
 
 import os
 import re
@@ -16,7 +15,7 @@ def find_plantuml_jar() -> Path | None:
     for _ in range(6):
         candidate = candidate.parent
         if (candidate / "pyproject.toml").exists():
-            jar = candidate / "tools" / "plantuml.jar"
+            jar = candidate / "plantuml.jar"
             return jar if jar.exists() else None
     return None
 
@@ -87,7 +86,7 @@ def check_puml_syntax_batch(paths: list[Path], *, chunk_size: int = 120) -> dict
             issues_by_path[path].append(Issue(
                 Severity.WARNING,
                 "W350",
-                "tools/plantuml.jar not found; PUML syntax check skipped",
+                "plantuml.jar not found; PUML syntax check skipped",
                 str(path),
             ))
         return issues_by_path

@@ -1,10 +1,10 @@
 """ERP v2.0 model verification facade with modular helper backends."""
 
-from __future__ import annotations
 
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
-from typing import Callable, Literal
+from collections.abc import Callable
+from typing import Literal
 
 from src.common.model_verifier_incremental import (
     FileInventory,
@@ -24,9 +24,11 @@ from src.common.model_verifier_registry import ModelRegistry
 from src.common.model_verifier_rules import (
     check_artifact_id_entity,
     check_artifact_type,
+    check_attribute_schema,
     check_diagram_artifact_type,
     check_diagram_references_scoped,
     check_enum,
+    check_frontmatter_schema,
     check_puml_structure,
     check_required_fields,
     check_section,
@@ -57,6 +59,19 @@ class ModelVerifier:
         self.registry = registry
         self.check_puml_syntax = check_puml_syntax
 
+    def _repo_root_for_path(self, path: Path) -> Path | None:
+        """Resolve the architecture-repository root for a file path."""
+        if self.registry is None:
+            return None
+        resolved = path.resolve()
+        for root in self.registry.repo_roots:
+            try:
+                resolved.relative_to(root)
+                return root
+            except ValueError:
+                continue
+        return None
+
     def verify_entity_file(self, path: Path) -> VerificationResult:
         result = VerificationResult(path=path, file_type="entity")
         loc = str(path)
@@ -73,6 +88,12 @@ class ModelVerifier:
         check_enum(fm, "status", VALID_STATUSES, result, loc)
         check_section(content, "§content", required=True, result=result, loc=loc)
         check_section(content, "§display", required=True, result=result, loc=loc)
+
+        repo_root = self._repo_root_for_path(path)
+        if repo_root is not None:
+            check_frontmatter_schema(fm, repo_root, "entity", result, loc)
+            check_attribute_schema(content, fm, repo_root, result, loc)
+
         return result
 
     def verify_outgoing_file(self, path: Path) -> VerificationResult:
@@ -137,6 +158,10 @@ class ModelVerifier:
                     ))
                 seen_connections.add(conn_key)
 
+        repo_root = self._repo_root_for_path(path)
+        if repo_root is not None:
+            check_frontmatter_schema(fm, repo_root, "outgoing", result, loc)
+
         return result
 
     def verify_connection_file(self, path: Path) -> VerificationResult:
@@ -180,6 +205,11 @@ class ModelVerifier:
             result.issues.append(Issue(Severity.WARNING, "W002", "No ModelRegistry provided; entity/connection reference checks skipped", loc))
 
         check_puml_structure(content, fm, result, loc)
+
+        repo_root = self._repo_root_for_path(path)
+        if repo_root is not None:
+            check_frontmatter_schema(fm, repo_root, "diagram", result, loc)
+
         if run_syntax_check:
             result.issues.extend(check_puml_syntax(path, loc))
         return result
@@ -252,6 +282,7 @@ class ModelVerifier:
             git_head=head,
             snapshots=inv.snapshots,
             results={inv.path_to_rel[r.path]: serialize_result(r) for r in results},
+            include_registry=(self.registry is not None),
         )
         save_incremental_state(state_path, state)
 
@@ -273,7 +304,10 @@ class ModelVerifier:
             return True
         if prev.git_head != head:
             return True
-        return prev.engine_signature != engine_sig
+        if prev.engine_signature != engine_sig:
+            return True
+        # Registry availability changed — must re-verify to resolve/drop W002 warnings
+        return prev.include_registry != (self.registry is not None)
 
     def _verify_from_existing_incremental_state(
         self,

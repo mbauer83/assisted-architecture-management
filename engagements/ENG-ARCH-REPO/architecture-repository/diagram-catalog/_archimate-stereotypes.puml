@@ -18,6 +18,15 @@ skinparam roundcorner 4
 skinparam backgroundColor #FAFAFA
 
 ' ---------------------------------------------------------------------------
+' Layout directives — ortho routing for clean 90° connections, generous spacing.
+' Individual diagrams can override direction with
+'   left to right direction   or   top to bottom direction
+' ---------------------------------------------------------------------------
+skinparam linetype ortho
+skinparam nodesep 60
+skinparam ranksep 80
+
+' ---------------------------------------------------------------------------
 ' Grouping containers.
 ' Use the layer-specific stereotype when all contained elements belong to one
 ' ArchiMate layer.  Use <<Grouping>> (neutral white) when the container holds

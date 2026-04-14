@@ -446,80 +446,27 @@ content (A1-A6), then connections (A7), then diagrams (A8), then remaining tooli
 
 ---
 
-## Completion Status (as of 2026-04-13)
+## Current State (as of 2026-04-14)
 
-### WS-A: Architecture Content — COMPLETE
-- A1-A8 all done: 115 entities, 115 connections, 7 diagrams across all 6 domains
-- Attribute-schema-validation function entity added
-- Outgoing connections for all configurability requirements added
-- All diagrams rendered to PNG in `diagram-catalog/diagrams/rendered/`
+| Workstream | Status | Key facts |
+|-----------|--------|-----------|
+| WS-A: Architecture Content | **COMPLETE** | 115 entities, 115 connections, 7 diagrams, all 6 domains |
+| WS-B: Tooling Adaptation | **COMPLETE** | Types, parsing, registry, verification, write, macros, MCP tools |
+| WS-C: Schema Validation | **COMPLETE** | 9 JSON Schemas in `.arch-repo/schemata/`, Draft 2020-12, W041/W042 rules |
+| WS-D: Diagram Layout | **COMPLETE** | Auto-layout engine, ortho routing, direction heuristics |
+| WS-G: Edit Tools | **COMPLETE** | `model_edit_entity`, `model_edit_connection`, `model_edit_diagram` |
+| Codebase Modernization | **COMPLETE** | Python 3.13+, PEP 604/585, no `__future__` imports |
+| WS-E: GUI Tool | **NOT STARTED** | See below |
+| WS-F: Framework Server | **NOT STARTED** | See below |
 
-### WS-B: Tooling Adaptation — COMPLETE
-- B1-B4: Core types, parsing, registry, verification — all adapted for new conventions
-- B5-B6: Write system (entity/connection/diagram) + macro generation — done
-- B7: MCP tools, query system, CLI — all cleaned up:
-  - Removed: `phase-produced`, `owner-agent`, `safety-relevant`, `engagement`, `produced-by-skill` from all records/filters/CLI
-  - Renamed: `layer` → `domain`, `LAYER_NAMES` → `DOMAIN_NAMES`, `conn_lang` removed
-  - Query scan paths: `model-entities/` → `model/`, `connections/` → `*.outgoing.md` in `model/`
-  - Query parsing: `parse_connection()` → `parse_outgoing_file()` returning multiple `ConnectionRecord`s per file
-  - Diagram parsing: standard `---` YAML only, removed `' ---` comment-style parser
-  - MCP server imports/descriptions updated
-- Verification: 170 files, 0 errors, 14 warnings
-- Macros: 115 macros generated
+**Verification**: 170 files, 0 errors, 0 warnings. 115 macros generated.
 
-### Common Domain Visual Treatment — COMPLETE
-- Added `<<Service>>`, `<<Process>>`, `<<Function>>`, `<<Interaction>>`, `<<Event>>`, `<<Role>>` stereotypes in warm grey (#E0D8CC bg, #8C7E6A border)
-- Added `<<CommonGrouping>>` container stereotype
-- Fixed 3 diagrams (common-services-processes, cross-domain-realization, business-actor-role-map) to use common stereotypes
-- All 7 diagrams re-rendered with updated colors
+**MCP servers**: `sdlc-mcp-model` (stdio/streamable-http), `sdlc-mcp-framework` (stub).
+Config: `.mcp.json` / `.vscode/mcp.json`, `SDLC_MCP_MODEL_REPO_ROOT=engagements/ENG-ARCH-REPO/architecture-repository`.
 
 ---
 
-## Remaining Work (WS-C, WS-D, WS-E)
-
-### WS-C: Configurable Schema Validation
-
-**Design decision: JSON Schema** for both frontmatter and attribute schemata.
-Rationale: language-agnostic standard; schema files stored in git as `.json`; any tooling can validate; avoids coupling to Python-specific Pydantic. Python validation via `jsonschema` library.
-
-#### C1: Schema Infrastructure
-- Define schema config location: `.arch-repo/schemata/` in repo root
-- File convention: `frontmatter.{file-type}.schema.json` (e.g., `frontmatter.entity.schema.json`)
-- File convention: `attributes.{entity-type}.schema.json` (e.g., `attributes.requirement.schema.json`)
-- Connection metadata: `connection-metadata.{connection-type}.schema.json`
-- Default: free schema (no file = no constraints beyond tool-required frontmatter)
-
-#### C2: Schema Loading (`src/common/`)
-- `model_schema.py`: `load_frontmatter_schema(repo_root, file_type)`, `load_attribute_schema(repo_root, entity_type)`
-- Parse JSON Schema files, merge with tool-required base fields
-- Cache loaded schemas per repo root
-
-#### C3: Verification Integration
-- `model_verifier_rules.py`: add `check_frontmatter_schema()` and `check_attribute_schema()`
-- `check_frontmatter_schema()`: validate frontmatter dict against JSON Schema for file type
-- `check_attribute_schema()`: extract Properties table, validate against per-type attribute schema
-- Wire into `verify_entity_file()`, `verify_outgoing_file()`, `verify_diagram_file()`
-
-#### C4: Write System Integration
-- `model_write_formatting.py`: when attribute schema exists, scaffold Properties table with required/optional attributes
-- `model_write/entity.py`, `connection.py`: pass schema info for scaffolding
-
-#### C5: Update Requirements
-- Update `REQ configurable-frontmatter-schemata` content: specify JSON Schema format, `.arch-repo/schemata/` location, extend-only semantics
-- Update `REQ configurable-model-attribute-schemata` content: specify JSON Schema format for content-section attributes per entity-type/connection-type
-
-### WS-D: Diagram Layout Conventions
-
-#### D1: PlantUML Layout Directives
-- Add layout directives to `_archimate-stereotypes.puml`:
-  - `skinparam linetype ortho` for 90° circuit-board routing
-  - `skinparam nodesep 60` and `skinparam ranksep 80` for spacing
-- Update existing diagrams with `left to right direction` / `top to bottom direction` alternating per "container" (grouping, subdivided process or function) at the top level and per nesting level
-- Use PlantUML `together { }` blocks and explicit `-left->`, `-right->`, `-up->`, `-down->` arrow directions to control flow
-
-#### D2: Update Diagram Write Tool
-- `model_write/diagram.py`: include layout directive hint in generated PUML scaffolding
-- Document layout conventions in `model_write/help.py` catalog
+## Remaining Work (WS-E, WS-F)
 
 ### WS-E: GUI Discovery & Authoring Tool
 
@@ -548,21 +495,65 @@ Rationale: language-agnostic standard; schema files stored in git as `.json`; an
 4. Connection + diagram authoring
 5. Schema-aware forms (loading attribute schemata to generate form fields)
 
+### WS-F: Framework Server for Non-Model Content
+
+The framework MCP server (`sdlc-mcp-framework`) can serve non-model, non-diagram content in architecture repositories — ADRs, guidelines, specs, and other semi-structured textual files. Currently hardcoded to scan `framework/` and a few fixed paths.
+
+#### F1: Make scan roots configurable
+- Accept `SDLC_MCP_FRAMEWORK_DOC_ROOT` env var (default: repo root)
+- Scan all `.md` files under configurable subdirectories (e.g., `docs/`, `adrs/`, `specs/`)
+
+#### F2: Validate against ENG-ARCH-REPO
+- Test framework server against actual architecture repo non-model content
+- Ensure section-level search and reference graph work for arch repo docs
+
+---
+
+## Tool-Based Authoring Principle
+
+**All creation and editing of model entities, connections, and diagrams must go through tools.**
+Manual file editing does not scale and produces inconsistent results (layout issues, missing validation,
+schema drift). Tools handle ID generation, schema scaffolding, auto-layout, verification, and rendering
+automatically — fixing tool output quality is always preferable to manual intervention.
+
+**Prefer MCP tools over raw file reads** when working with the architecture model.
+The MCP tools provide filtered, paginated, and aggregated access that is far more token-efficient
+than reading entity/connection/diagram files directly.
+
+| Task | Tool | Hint |
+|------|------|------|
+| Count artifacts by type/domain | `model_query_stats` | Single call, small response |
+| List entities with filtering | `model_query_list_artifacts` | Paginated, filterable by type/domain/status |
+| Read one entity in full | `model_query_read_artifact` | Returns content without scanning |
+| Search across model | `model_query_search_artifacts` | Keyword scoring, ranked results |
+| Find connected entities | `model_query_find_neighbors` | Graph traversal without parsing .outgoing.md |
+| Verify model integrity | `model_verify_all` | Summary mode returns only files with issues |
+| Create new entity | `model_create_entity` | Handles ID generation, schema scaffolding, placement |
+| Edit entity | `model_edit_entity` | Partial merge, auto-verify, macro regeneration |
+| Add connection | `model_add_connection` | Appends to .outgoing.md, validates types |
+| Edit/remove connection | `model_edit_connection` | Rebuilds .outgoing.md, cleans up empty files |
+| Create diagram | `model_create_diagram` | Auto-layout, stereotypes, render PNG |
+| Edit diagram | `model_edit_diagram` | Re-layout + re-render, or frontmatter-only |
+| Type catalog (discovery) | `model_write_help` | Valid types by domain, connection types by language |
+
+**Anti-patterns**: Don't glob `model/**/*.md`, don't grep `.outgoing.md` files, don't manually construct/edit model files, don't manually edit diagram layout, don't import Python modules directly for verification.
+
 ---
 
 ## Acceptance Criteria
 
-1. ~~All entity files have complete frontmatter + content + display blocks~~ ✓
-2. ~~All domains populated: motivation, strategy, common, business, application, technology~~ ✓
-3. ~~Requirement specialization hierarchy explicit via .outgoing.md connections~~ ✓
-4. ~~Configurability principle with git-config requirements present~~ ✓
-5. ~~Cross-domain connections modeled (motivation→strategy→common→application→technology)~~ ✓
-6. ~~At least 7 diagrams covering all populated domains + cross-domain view~~ ✓
-7. ~~Tooling can parse new filename convention and .outgoing.md format~~ ✓
-8. ~~`ModelVerifier.verify_all()` passes on ENG-ARCH-REPO with no errors~~ ✓ (0 errors, 14 warnings)
-9. ~~`generate_macros()` produces valid _macros.puml from ENG-ARCH-REPO entities~~ ✓ (115 macros)
-10. ~~Duplicate goal file resolved~~ ✓
-11. Common domain elements render in warm grey, distinct from business/application colors ✓
-12. Configurable JSON Schema validation for frontmatter and attributes (WS-C)
-13. Diagram layout with ortho routing and alternating group directions (WS-D)
+1. ✓ All entity files have complete frontmatter + content + display blocks
+2. ✓ All domains populated: motivation, strategy, common, business, application, technology
+3. ✓ Requirement specialization hierarchy explicit via .outgoing.md connections
+4. ✓ Configurability principle with git-config requirements present
+5. ✓ Cross-domain connections modeled (motivation→strategy→common→application→technology)
+6. ✓ At least 7 diagrams covering all populated domains + cross-domain view
+7. ✓ Tooling can parse new filename convention and .outgoing.md format
+8. ✓ `ModelVerifier.verify_all()` passes with 0 errors, 0 warnings (170 files)
+9. ✓ `generate_macros()` produces valid _macros.puml (115 macros)
+10. ✓ Common domain elements render in warm grey, distinct from business/application colors
+11. ✓ Configurable JSON Schema validation for frontmatter and attributes (WS-C)
+12. ✓ Diagram auto-layout with ortho routing and direction heuristics (WS-D)
+13. ✓ Edit tools for entities, connections, and diagrams (WS-G)
 14. GUI discovery & authoring tool (WS-E)
+15. Framework server adapted for non-model arch repo content (WS-F)

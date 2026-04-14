@@ -1,0 +1,27 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "attributes.driver.schema.json",
+  "title": "Driver Attribute Schema",
+  "description": "Attribute schema for Properties table in Driver entities.",
+  "type": "object",
+  "required": ["Category", "Source"],
+  "properties": {
+    "Category": {
+      "type": "string",
+      "enum": [
+        "External Trend",
+        "Internal Challenge",
+        "Organizational",
+        "Organizational Constraint",
+        "Organizational Trend",
+        "Technical Trend",
+        "Technological",
+        "Technology Trend"
+      ]
+    },
+    "Source": {
+      "type": "string"
+    }
+  },
+  "additionalProperties": true
+}

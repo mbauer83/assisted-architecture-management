@@ -34,7 +34,6 @@ Import ``expand_tokens`` for the one-hop expansion used in scoring::
     # → ["pm", "decision", "project", "manager", "orchestration", ...]
 """
 
-from __future__ import annotations
 
 # ---------------------------------------------------------------------------
 # Primary synonym map  (key → list of expansion terms, all lowercase)

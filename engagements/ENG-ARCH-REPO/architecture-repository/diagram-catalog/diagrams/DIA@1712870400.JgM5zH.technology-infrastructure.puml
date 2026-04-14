@@ -11,10 +11,12 @@ last-updated: '2026-04-13'
 @startuml technology-infrastructure
 !include ../_archimate-stereotypes.puml
 
+top to bottom direction
+
 title Technology Domain — Infrastructure & Runtime
 
 rectangle "Developer Workstation" <<Node>> as NOD_4EFX7z {
-  rectangle "Python 3.11+" <<SystemSoftware>> as SSW_o7a0ad
+  rectangle "Python 3.13+" <<SystemSoftware>> as SSW_o7a0ad
   rectangle "PlantUML Engine" <<SystemSoftware>> as SSW_xVrBYD
   rectangle "Git VCS" <<SystemSoftware>> as SSW_TzzVd
 

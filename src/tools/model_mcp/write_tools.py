@@ -1,4 +1,3 @@
-from __future__ import annotations
 
 from typing import Any
 
@@ -132,6 +131,68 @@ def model_add_connection(
     return out
 
 
+def model_create_matrix(
+    *,
+    name: str,
+    purpose: str,
+    matrix_markdown: str,
+    artifact_id: str,
+    keywords: list[str] | None = None,
+    version: str = "0.1.0",
+    status: str = "draft",
+    last_updated: str | None = None,
+    infer_entity_ids: bool = True,
+    auto_link_entity_ids: bool = True,
+    dry_run: bool = True,
+    repo_root: str | None = None,
+    repo_preset: RepoPreset | None = None,
+    repo_scope: WriteRepoScope = "engagement",
+) -> dict[str, object]:
+    if repo_scope != "engagement":
+        raise ValueError("model_create_matrix only supports repo_scope='engagement'")
+
+    roots = resolve_repo_roots(
+        repo_scope="engagement",
+        repo_root=repo_root,
+        repo_preset=repo_preset,
+        enterprise_root=None,
+    )
+    key = roots_key(roots)
+    registry = registry_cached(key)
+    verifier = verifier_for(key, include_registry=True)
+
+    result = model_write_ops.create_matrix(
+        repo_root=roots[0],
+        registry=registry,
+        verifier=verifier,
+        clear_repo_caches=clear_caches_for_repo,
+        name=name,
+        purpose=purpose,
+        matrix_markdown=matrix_markdown,
+        artifact_id=artifact_id,
+        keywords=keywords,
+        version=version,
+        status=status,
+        last_updated=last_updated,
+        infer_entity_ids=infer_entity_ids,
+        auto_link_entity_ids=auto_link_entity_ids,
+        dry_run=dry_run,
+    )
+
+    out: dict[str, object] = {
+        "dry_run": dry_run,
+        "wrote": bool(result.wrote),
+        "path": str(result.path),
+        "artifact_id": result.artifact_id,
+        "verification": result.verification,
+    }
+    if result.content is not None:
+        out["content"] = result.content
+    if result.warnings:
+        out["warnings"] = result.warnings
+    return out
+
+
 def model_create_diagram(
     *,
     diagram_type: str,
@@ -195,10 +256,11 @@ def model_create_diagram(
 def register_write_tools(mcp: FastMCP) -> None:
     mcp.tool(
         name="model_write_help",
-        title="Model Write: Help & Catalog",
+        title="Model Write: Type Catalog",
         description=(
-            "Return the authoritative catalog of entity/connection types and key conventions. "
-            "Use this before calling model_create_entity/model_add_connection/model_create_diagram."
+            "Return valid entity types (by domain) and connection types (by language) "
+            "for use with create/edit tools. Call this to discover valid artifact_type "
+            "and connection_type values."
         ),
         structured_output=True,
     )(model_write_help)
@@ -223,6 +285,18 @@ def register_write_tools(mcp: FastMCP) -> None:
         ),
         structured_output=True,
     )(model_add_connection)
+
+    mcp.tool(
+        name="model_create_matrix",
+        title="Model Write: Create Connection Matrix",
+        description=(
+            "Create a markdown-based connection matrix diagram. "
+            "Use this instead of PUML diagrams when a large number of connections must be shown. "
+            "Matrix cells contain markdown links to entity files. "
+            "If dry_run=true, returns would-be content without writing."
+        ),
+        structured_output=True,
+    )(model_create_matrix)
 
     mcp.tool(
         name="model_create_diagram",

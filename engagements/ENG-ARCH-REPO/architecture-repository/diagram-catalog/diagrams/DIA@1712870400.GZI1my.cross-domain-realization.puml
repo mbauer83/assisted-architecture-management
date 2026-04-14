@@ -11,6 +11,8 @@ last-updated: '2026-04-13'
 @startuml cross-domain-realization
 !include ../_archimate-stereotypes.puml
 
+top to bottom direction
+
 title Cross-Domain Realization — Motivation through Technology
 
 rectangle "Motivation" <<MotivationGrouping>> {
@@ -21,9 +23,9 @@ rectangle "Motivation" <<MotivationGrouping>> {
 
 rectangle "Strategy" <<StrategyGrouping>> {
   rectangle "Architectural\nModeling" <<Capability>> as CAP_y4xZme
-  rectangle "Model Validation" <<Capability>> as CAP_gky5s4
-  rectangle "Artifact Discovery" <<Capability>> as CAP_QrHHmz
+  rectangle "Model\nValidation" <<Capability>> as CAP_gky5s4
   rectangle "Repository\nGovernance" <<Capability>> as CAP_ZnmAHe
+  rectangle "Artifact\nDiscovery" <<Capability>> as CAP_QrHHmz
 }
 
 rectangle "Common (Behavioral)" <<CommonGrouping>> {
@@ -42,34 +44,54 @@ rectangle "Application" <<ApplicationGrouping>> {
 }
 
 rectangle "Technology" <<TechnologyGrouping>> {
+  rectangle "Python 3.13+" <<SystemSoftware>> as SSW_o7a0ad
   rectangle "Developer\nWorkstation" <<Node>> as NOD_4EFX7z
-  rectangle "Python 3.11+" <<SystemSoftware>> as SSW_o7a0ad
   rectangle "Git Repository" <<Artifact>> as ART_YsLpM8
 }
 
-' Motivation → Strategy
-GOL_Po1Qw3 -[#7B3F9A]|> CAP_y4xZme : <<realization>>
-GOL_Po1Qw3 -[#7B3F9A]|> CAP_gky5s4 : <<realization>>
-GOL_Zx9Cv4 -[#7B3F9A]|> CAP_ZnmAHe : <<realization>>
-GOL_e3nCpO -[#7B3F9A]|> CAP_QrHHmz : <<realization>>
+' --- Horizontal spread within layers ---
+GOL_Po1Qw3 -[hidden]right- GOL_Zx9Cv4
+GOL_Zx9Cv4 -[hidden]right- GOL_e3nCpO
 
-' Strategy → Common
-CAP_y4xZme -[#8B6914]|> SRV_Au1Th1 : <<realization>>
-CAP_gky5s4 -[#8B6914]|> SRV_Ij6Kl6 : <<realization>>
-CAP_QrHHmz -[#8B6914]|> SRV_Qr8St8 : <<realization>>
-CAP_QrHHmz -[#8B6914]|> SRV_3I3Dtc : <<realization>>
+CAP_y4xZme -[hidden]right- CAP_gky5s4
+CAP_gky5s4 -[hidden]right- CAP_ZnmAHe
+CAP_ZnmAHe -[hidden]right- CAP_QrHHmz
 
-' Common → Application
-SRV_Au1Th1 -[#B8860B]|> APP_kRZYOA : <<realization>>
-SRV_Ij6Kl6 -[#B8860B]|> APP_ca3vm7 : <<realization>>
-SRV_Qr8St8 -[#B8860B]|> APP_v9LvfK : <<realization>>
-SRV_3I3Dtc -[#B8860B]|> APP_JOmFWy : <<realization>>
-APP_JOmFWy --> DOB_3rilik : <<access>>
+SRV_Au1Th1 -[hidden]right- SRV_Ij6Kl6
+SRV_Ij6Kl6 -[hidden]right- SRV_Qr8St8
+SRV_Qr8St8 -[hidden]right- SRV_3I3Dtc
 
-' Application → Technology
-APP_kRZYOA -[#0078A0]--> SSW_o7a0ad : runs on
-APP_ca3vm7 -[#0078A0]--> SSW_o7a0ad : runs on
-SSW_o7a0ad -[#2E7D32]--> NOD_4EFX7z : deployed on
-ART_YsLpM8 -[#2E7D32]--> NOD_4EFX7z : stored on
+APP_kRZYOA -[hidden]right- APP_ca3vm7
+APP_ca3vm7 -[hidden]right- APP_v9LvfK
+APP_v9LvfK -[hidden]right- APP_JOmFWy
+APP_JOmFWy -[hidden]right- DOB_3rilik
+
+SSW_o7a0ad -[hidden]right- NOD_4EFX7z
+NOD_4EFX7z -[hidden]right- ART_YsLpM8
+
+' Motivation → Strategy (purple)
+GOL_Po1Qw3 -[#7B3F9A]down-|> CAP_y4xZme : <<realization>>
+GOL_Po1Qw3 -[#7B3F9A]down-|> CAP_gky5s4 : <<realization>>
+GOL_Zx9Cv4 -[#7B3F9A]down-|> CAP_ZnmAHe : <<realization>>
+GOL_e3nCpO -[#7B3F9A]down-|> CAP_QrHHmz : <<realization>>
+
+' Strategy → Common (dark gold)
+CAP_y4xZme -[#8B6914]down-|> SRV_Au1Th1 : <<realization>>
+CAP_gky5s4 -[#8B6914]down-|> SRV_Ij6Kl6 : <<realization>>
+CAP_QrHHmz -[#8B6914]down-|> SRV_Qr8St8 : <<realization>>
+CAP_QrHHmz -[#8B6914]down-|> SRV_3I3Dtc : <<realization>>
+
+' Common → Application (gold)
+SRV_Au1Th1 -[#B8860B]down-|> APP_kRZYOA : <<realization>>
+SRV_Ij6Kl6 -[#B8860B]down-|> APP_ca3vm7 : <<realization>>
+SRV_Qr8St8 -[#B8860B]down-|> APP_v9LvfK : <<realization>>
+SRV_3I3Dtc -[#B8860B]down-|> APP_JOmFWy : <<realization>>
+APP_JOmFWy -down-> DOB_3rilik : <<access>>
+
+' Application → Technology (teal / green)
+APP_kRZYOA -[#0078A0]down--> SSW_o7a0ad : runs on
+APP_ca3vm7 -[#0078A0]down--> SSW_o7a0ad : runs on
+SSW_o7a0ad -[#2E7D32]down--> NOD_4EFX7z : deployed on
+ART_YsLpM8 -[#2E7D32]down--> NOD_4EFX7z : stored on
 
 @enduml

@@ -1,4 +1,3 @@
-from __future__ import annotations
 
 import re
 from dataclasses import dataclass, field
@@ -61,6 +60,7 @@ class IncrementalState:
     git_head: str | None
     snapshots: dict[str, dict[str, int | str]]
     results: dict[str, dict]
+    include_registry: bool = True  # added: invalidate cache if registry availability changes
 
 
 @dataclass(frozen=True)

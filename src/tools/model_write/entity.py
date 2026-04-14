@@ -1,11 +1,9 @@
-from __future__ import annotations
 
 from pathlib import Path
-from typing import Callable
-
+from collections.abc import Callable
 from src.common.archimate_types import ALL_ENTITY_TYPES
 from src.common.model_verifier import ModelVerifier
-from src.common.model_write import ENTITY_TYPES, generate_entity_id, format_entity_markdown, slugify
+from src.common.model_write import ENTITY_TYPES, generate_entity_id, format_entity_markdown
 from src.tools.generate_macros import generate_macros
 
 from .boundary import assert_engagement_write_root, today_iso
@@ -13,7 +11,7 @@ from .types import WriteResult
 from .verify import verify_content_in_temp_path
 
 
-def _verification_to_dict(path: Path, res) -> dict[str, object]:
+def verification_to_entity_dict(path: Path, res) -> dict[str, object]:
     return {
         "path": str(path),
         "file_type": "entity",
@@ -55,8 +53,7 @@ def create_entity(
     last = last_updated or today_iso()
 
     eid = artifact_id or generate_entity_id(info.prefix, name)
-    friendly = slugify(name)
-    path = repo_root / "model" / info.layer_dir / info.subdir / f"{eid}.{friendly}.md"
+    path = repo_root / "model" / info.layer_dir / info.subdir / f"{eid}.md"
 
     display = {
         "domain": info.archimate_layer,
@@ -92,7 +89,7 @@ def create_entity(
             artifact_id=eid,
             content=content,
             warnings=[],
-            verification=_verification_to_dict(path, res),
+            verification=verification_to_entity_dict(path, res),
         )
 
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -114,7 +111,7 @@ def create_entity(
             artifact_id=eid,
             content=content,
             warnings=[],
-            verification=_verification_to_dict(path, res),
+            verification=verification_to_entity_dict(path, res),
         )
 
     try:
@@ -130,5 +127,5 @@ def create_entity(
         artifact_id=eid,
         content=None,
         warnings=[],
-        verification=_verification_to_dict(path, res),
+        verification=verification_to_entity_dict(path, res),
     )

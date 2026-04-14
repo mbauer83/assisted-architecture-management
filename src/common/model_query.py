@@ -1,6 +1,5 @@
 """ERP v2.0 Model Query public API facade."""
 
-from __future__ import annotations
 
 from src.common.model_query_repository import ModelRepository
 from src.common.model_query_types import (
