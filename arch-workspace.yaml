@@ -1,0 +1,8 @@
+# Architecture workspace configuration.
+# Run `arch-init` to validate repos and generate .arch/init-state.yaml.
+
+engagement:
+  local: engagements/ENG-ARCH-REPO/architecture-repository
+
+enterprise:
+  local: enterprise-repository

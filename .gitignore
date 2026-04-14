@@ -17,8 +17,10 @@ tools/plantuml.jar
 .env.*
 
 # IDE / OS
-.claude/
 .DS_Store
 
 # Engagement-specific (not part of this repo)
 engagements/ENG-001/
+.arch/
+
+plantuml.jar

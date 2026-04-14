@@ -8,34 +8,68 @@ Architecture knowledge typically lives in slide decks, Confluence pages, or silo
 
 The key ideas:
 
-- **Single source of truth**: one git repository contains the full architecture model as plain Markdown files with structured frontmatter (entities, connections, diagrams).
-- **AI-native access**: an MCP server exposes the model to AI agents as typed tools — query, search, graph-traverse, create, edit — without the agent needing to know the file layout.
+- **Two-tiered repository model**: an *enterprise* repo holds the organisation-wide baseline; per-project *engagement* repos extend it with local decisions, designs, and trade-offs. Entities flow from engagement to enterprise via a promotion workflow.
+- **AI-native access**: an MCP server exposes the model to AI agents as typed tools — query, search, graph-traverse, create, edit, promote — without the agent needing to know the file layout.
 - **Human access**: a REST API, a CLI, and a browser GUI provide the same capabilities for humans.
-- **Verified integrity**: a built-in verifier enforces referential integrity, schema conformance, and diagram syntax.
+- **Verified integrity**: a built-in verifier enforces referential integrity, schema conformance, diagram syntax, and cross-repo reference rules.
 - **Self-describing**: this repository contains an ArchiMate model of its own architecture — the tooling, requirements, principles, components, and design decisions are all modelled using the framework itself (see `engagements/ENG-ARCH-REPO/`).
 
-## The Architecture Model of Its Own Design
+## Two-Tiered Architecture
 
-The engagement at `engagements/ENG-ARCH-REPO/architecture-repository/` is a fully populated ArchiMate model that describes **this system** — its drivers, goals, requirements, application components, services, and technology. It covers all six ArchiMate domains (motivation, strategy, business, common, application, technology) with 117+ entities, 119+ connections, and 7 diagrams.
+```
+enterprise-repository/        ← organisation-wide baseline (read-only during engagement)
+  model/
+    motivation/  strategy/  business/  application/  technology/  ...
 
-Exploring it through the GUI or the MCP tools is the quickest way to understand both the framework's capabilities and the architectural decisions behind it.
+engagements/
+  ENG-ARCH-REPO/              ← per-project engagement repo
+    architecture-repository/
+      model/                  ← engagement-specific entities and connections
+      diagram-catalog/        ← diagrams (may reference enterprise entities via macros)
+```
+
+**Enterprise repo** — curated, long-lived entities shared across all engagements. Engagement tools can read it but not write to it directly.
+
+**Engagement repo** — project-specific work. New entities and connections are created here. When ready, they are *promoted* to enterprise.
+
+**Promotion** — a one-way transfer of entities (with transitive closure of connections) from engagement to enterprise. Conflict detection matches by `(artifact_type, friendly_name)` so the same logical entity under different artifact IDs is recognised. Conflicts offer three resolution strategies: accept engagement version, accept enterprise version, or manual merge.
+
+**Asymmetric references** — enterprise entities can only reference other enterprise entities. Engagement entities may reference both engagement and enterprise entities. This is enforced by the verifier (errors E130/E131).
+
+### Workspace Configuration
+
+An `arch-workspace.yaml` at the workspace root declares both repos:
+
+```yaml
+engagement:
+  local: engagements/ENG-ARCH-REPO/architecture-repository
+  # or git: { url: "https://...", branch: main, path: .arch/repos/engagement }
+
+enterprise:
+  local: enterprise-repository
+  # or git: { url: "https://...", branch: main, path: .arch/repos/enterprise }
+```
+
+Run `arch-init` to validate paths (or clone git repos) and write `.arch/init-state.yaml` with resolved absolute paths. All tooling reads this state file on startup.
 
 ## Repository Layout
 
 ```
 src/
-  common/          # Core library: parsing, verification, query, write
-  tools/           # Entry-point servers: MCP model, MCP framework, GUI REST
+  common/          # Core library: parsing, verification, query, write, connection ontology
+  tools/           # Entry-point servers: MCP model, MCP framework, GUI REST, arch-init
 tools/
   gui/             # Vue 3 + TypeScript SPA (hexagonal ports-and-adapters)
-  plantuml.jar     # Symlink — diagram syntax verification
 engagements/
   ENG-ARCH-REPO/   # Self-describing architecture model + docs
+enterprise-repository/
+                   # Enterprise baseline (initially empty)
+arch-workspace.yaml
 ```
 
 ## Tooling
 
-The framework exposes three interfaces over the same underlying model. They are complementary, not alternatives.
+The framework exposes three interfaces over the same underlying model.
 
 ### MCP Server (primary — AI agent access)
 
@@ -50,22 +84,29 @@ The MCP server is the intended interface for AI agents (Claude, Copilot, etc.). 
 | `model_query_find_neighbors` | Graph traversal |
 | `model_create_entity` | Create entity (with dry-run) |
 | `model_add_connection` | Add connection (with dry-run) |
-| `model_create_diagram` | Create diagram |
+| `model_create_diagram` | Create diagram (with dry-run) |
 | `model_edit_entity/connection/diagram` | Edit existing artefacts |
+| `model_promote_to_enterprise` | Promote entity + transitive closure to enterprise |
 | `model_verify_all` | Verify referential integrity and schema |
+| `model_write_help` | List valid entity types and connection types |
 
 Configure in `.mcp.json` (Claude Code) or `.vscode/mcp.json` (VS Code):
 
 ```json
 {
   "mcpServers": {
-    "sdlc-mcp-model": {
-      "command": "sdlc-mcp-model",
-      "env": { "SDLC_MCP_MODEL_REPO_ROOT": "path/to/architecture-repository" }
+    "sdlc-model": {
+      "command": "uv",
+      "args": ["run", "sdlc-mcp-model", "--transport", "stdio"],
+      "env": {
+        "SDLC_MCP_MODEL_REPO_ROOT": "engagements/ENG-ARCH-REPO/architecture-repository"
+      }
     }
   }
 }
 ```
+
+When `arch-workspace.yaml` is present and `arch-init` has been run, the MCP server automatically discovers both repos from `.arch/init-state.yaml`. The env var override is still supported for single-repo use.
 
 A second MCP server (`sdlc-mcp-framework`) provides section-level search and cross-reference traversal over the `docs/` directory (ADRs, standards, specs).
 
@@ -81,59 +122,50 @@ A second MCP server (`sdlc-mcp-framework`) provides section-level search and cro
 | `GET /api/connections?entity_id=&direction=` | Connections for an entity |
 | `GET /api/neighbors?entity_id=&max_hops=` | Neighbour graph |
 | `GET /api/search?q=` | Full-text search |
+| `GET /api/ontology?source_type=&target_type=` | Connection ontology (permissible types) |
 
 ### CLI
 
-Direct Python entry points for scripting and CI pipelines:
-
 ```bash
-# Verify the full model
-python -m src.common.model_query --help
+# Initialise workspace (validate repos, write .arch/init-state.yaml)
+arch-init
 
 # Generate PlantUML macros (_macros.puml)
-python -m src.tools.generate_macros --repo-root path/to/architecture-repository
+python -m src.tools.generate_macros path/to/architecture-repository
 ```
 
 ## Setup
 
-**Requirements**: Python ≥ 3.13, Node ≥ 18 (for GUI development), `uv` or `pip`.
+**Requirements**: Python >= 3.13, Node >= 18 (for GUI development), `uv`.
 
 ```bash
 # Python environment
-pip install -e ".[gui]"          # or: uv sync --extra gui
+uv sync                        # core dependencies
+uv sync --extra gui            # + GUI server dependencies
+
+# Initialise workspace
+arch-init                      # reads arch-workspace.yaml, writes .arch/init-state.yaml
 
 # Install MCP servers into your AI tool's config
 # (edit .mcp.json — see Tooling section above)
 
 # GUI development (hot-reload)
-sdlc-gui-server --repo-root engagements/ENG-ARCH-REPO/architecture-repository &
+sdlc-gui-server &
 cd tools/gui && npm install && npm run dev
-# → http://localhost:5173
+# -> http://localhost:5173
 ```
 
 ## GUI — Dockerized
 
-The GUI packages the Vue SPA and the FastAPI REST server into a single container. The repository is mounted from the host at runtime, so no rebuild is needed when model files change (the server re-reads on each request).
-
-**Start with the bundled self-describing model:**
+The GUI packages the Vue SPA and the FastAPI REST server into a single container. The repository is mounted from the host at runtime, so no rebuild is needed when model files change.
 
 ```bash
+# Start with the bundled self-describing model
 docker compose up --build
-# → http://localhost:8000
-```
+# -> http://localhost:8000
 
-**Point at a different repository:**
-
-```bash
+# Point at a different repository
 ARCH_REPO_ROOT=/path/to/your/architecture-repository docker compose up --build
 ```
 
-**Or run the image directly:**
-
-```bash
-docker build -t arch-gui .
-docker run -p 8000:8000 -v /path/to/architecture-repository:/repo:ro arch-gui
-# → http://localhost:8000
-```
-
-The container serves the Vue SPA at `/` and the REST API at `/api/`. The `--host 0.0.0.0` flag is set in the default `CMD` so the port binding works out of the box.
+The container serves the Vue SPA at `/` and the REST API at `/api/`.

@@ -37,11 +37,32 @@ def default_engagement_repo_root() -> Path:
     env = os.getenv("SDLC_MCP_MODEL_REPO_ROOT")
     if env:
         return Path(env).expanduser()
+    # Try init state from arch-init
+    state = _load_init_state_cached()
+    if state and "engagement_root" in state:
+        return Path(state["engagement_root"])
     return workspace_root() / "engagements" / "ENG-001" / "work-repositories" / "architecture-repository"
 
 
 def default_enterprise_repo_root() -> Path:
+    state = _load_init_state_cached()
+    if state and "enterprise_root" in state:
+        return Path(state["enterprise_root"])
     return workspace_root() / "enterprise-repository"
+
+
+def _load_init_state_cached() -> dict | None:
+    """Load init state once, cache in module-level variable."""
+    global _init_state, _init_state_loaded
+    if not _init_state_loaded:
+        from src.tools.workspace_init import load_init_state
+        _init_state = load_init_state(workspace_root())
+        _init_state_loaded = True
+    return _init_state
+
+
+_init_state: dict | None = None
+_init_state_loaded = False
 
 
 def repo_root_from_preset(preset: RepoPreset) -> Path:

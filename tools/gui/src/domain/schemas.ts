@@ -45,7 +45,7 @@ export const EntityDetailSchema = Schema.Struct({
   path: Schema.String,
   content_snippet: Schema.String,
   content_text: Schema.optional(Schema.String),
-  content_html: Schema.optional(Schema.String), // New field for rendered HTML
+  content_html: Schema.optional(Schema.String),
   display_blocks: Schema.optional(Schema.Record({ key: Schema.String, value: Schema.String })),
   extra: Schema.optional(Schema.Unknown),
 })
@@ -85,6 +85,7 @@ export const SearchHitSchema = Schema.Struct({
   path: Schema.String,
   domain: Schema.optional(Schema.String),
   subdomain: Schema.optional(Schema.String),
+  diagram_type: Schema.optional(Schema.String),
 })
 export type SearchHit = typeof SearchHitSchema.Type
 
@@ -93,3 +94,62 @@ export const SearchResultSchema = Schema.Struct({
   hits: Schema.Array(SearchHitSchema),
 })
 export type SearchResult = typeof SearchResultSchema.Type
+
+// ── Diagram summary ──────────────────────────────────────────────────────────
+
+export const DiagramSummarySchema = Schema.Struct({
+  artifact_id: Schema.String,
+  name: Schema.String,
+  diagram_type: Schema.String,
+  version: Schema.String,
+  status: Schema.String,
+  path: Schema.String,
+})
+export type DiagramSummary = typeof DiagramSummarySchema.Type
+
+export const DiagramListSchema = Schema.Struct({
+  total: Schema.Number,
+  items: Schema.Array(DiagramSummarySchema),
+})
+export type DiagramList = typeof DiagramListSchema.Type
+
+// ── Diagram detail ───────────────────────────────────────────────────────────
+
+export const DiagramDetailSchema = Schema.Struct({
+  artifact_id: Schema.String,
+  artifact_type: Schema.String,
+  name: Schema.String,
+  diagram_type: Schema.String,
+  version: Schema.String,
+  status: Schema.String,
+  record_type: Schema.Literal('diagram'),
+  path: Schema.String,
+  content_snippet: Schema.String,
+  puml_source: Schema.optional(Schema.String),
+  rendered_filename: Schema.optional(Schema.NullOr(Schema.String)),
+  extra: Schema.optional(Schema.Unknown),
+})
+export type DiagramDetail = typeof DiagramDetailSchema.Type
+
+// ── Write results ────────────────────────────────────────────────────────────
+
+export const WriteResultSchema = Schema.Struct({
+  wrote: Schema.Boolean,
+  path: Schema.String,
+  artifact_id: Schema.String,
+  content: Schema.NullOr(Schema.String),
+  warnings: Schema.Array(Schema.String),
+  verification: Schema.NullOr(Schema.Unknown),
+})
+export type WriteResult = typeof WriteResultSchema.Type
+
+// ── Diagram refs ─────────────────────────────────────────────────────────────
+
+export const DiagramRefSchema = Schema.Struct({
+  artifact_id: Schema.String,
+  name: Schema.String,
+})
+export type DiagramRef = typeof DiagramRefSchema.Type
+
+export const DiagramRefsSchema = Schema.Array(DiagramRefSchema)
+export type DiagramRefs = typeof DiagramRefsSchema.Type

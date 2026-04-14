@@ -6,6 +6,10 @@ import type {
   ConnectionList,
   Neighbors,
   SearchResult,
+  DiagramList,
+  DiagramDetail,
+  WriteResult,
+  DiagramRefs,
 } from '../domain'
 import type { NetworkError, NotFoundError } from '../domain'
 import type { MarkdownError } from '../application/MarkdownService'
@@ -29,16 +33,29 @@ export interface ModelRepository {
   readonly listEntities: (params?: ListParams) => Effect.Effect<EntityList, RepoError>
   readonly getEntity: (id: string) => Effect.Effect<EntityDetail, RepoError | NotFoundError | MarkdownError>
   readonly getConnections: (
-    entityId: string,
-    direction?: Direction,
-    connType?: string,
+    entityId: string, direction?: Direction, connType?: string,
   ) => Effect.Effect<ConnectionList, RepoError>
   readonly getNeighbors: (
-    entityId: string,
-    maxHops?: number,
+    entityId: string, maxHops?: number,
   ) => Effect.Effect<Neighbors, RepoError>
   readonly search: (
-    query: string,
-    limit?: number,
+    query: string, limit?: number,
   ) => Effect.Effect<SearchResult, RepoError>
+  readonly listDiagrams: (
+    diagramType?: string, status?: string,
+  ) => Effect.Effect<DiagramList, RepoError>
+  readonly getDiagram: (id: string) => Effect.Effect<DiagramDetail, RepoError | NotFoundError>
+  readonly diagramImageUrl: (filename: string) => string
+  readonly getDiagramRefs: (
+    sourceId: string, targetId: string,
+  ) => Effect.Effect<DiagramRefs, RepoError>
+  readonly addConnection: (body: {
+    source_entity: string; connection_type: string; target_entity: string;
+    description?: string; dry_run?: boolean;
+  }) => Effect.Effect<WriteResult, RepoError>
+  readonly removeConnection: (body: {
+    source_entity: string; connection_type: string; target_entity: string;
+    dry_run?: boolean;
+  }) => Effect.Effect<WriteResult, RepoError>
+  readonly getWriteHelp: () => Effect.Effect<unknown, RepoError>
 }

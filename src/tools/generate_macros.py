@@ -86,43 +86,56 @@ def _sort_key(entry: tuple[str, str, str]) -> tuple[int, int, str]:
 # Main
 # ---------------------------------------------------------------------------
 
-def generate_macros(repo_root: Path) -> Path:
-    """Scan repo_root/model/ and write diagram-catalog/_macros.puml.
+def generate_macros(repo_root: Path, *, enterprise_root: Path | None = None) -> Path:
+    """Scan model/ directories and write diagram-catalog/_macros.puml.
+
+    When *enterprise_root* is provided, macros from both repos are combined
+    so that engagement diagrams can reference enterprise entities.  The macros
+    file is always written to *repo_root* (the engagement repo).
 
     Returns the path to the written file.
     """
+    roots_to_scan: list[Path] = []
+    if enterprise_root and (enterprise_root / "model").is_dir():
+        roots_to_scan.append(enterprise_root)
     entities_root = repo_root / "model"
     if not entities_root.is_dir():
         raise FileNotFoundError(f"model/ not found under {repo_root}")
+    roots_to_scan.append(repo_root)
 
     entries: list[tuple[str, str, str]] = []  # (domain, macro_line, alias)
+    seen_aliases: set[str] = set()
 
-    for md_file in sorted(entities_root.rglob("*.md")):
-        if md_file.name.endswith(".outgoing.md"):
-            continue
-        content = md_file.read_text(encoding="utf-8")
-        archimate = _extract_archimate_block(content)
-        if not archimate:
-            continue
+    for scan_root in roots_to_scan:
+        model_dir = scan_root / "model"
+        for md_file in sorted(model_dir.rglob("*.md")):
+            if md_file.name.endswith(".outgoing.md"):
+                continue
+            content = md_file.read_text(encoding="utf-8")
+            archimate = _extract_archimate_block(content)
+            if not archimate:
+                continue
 
-        label = archimate.get("label", "")
-        element_type = archimate.get("element-type", "")
-        alias_raw = archimate.get("alias", "")
+            label = archimate.get("label", "")
+            element_type = archimate.get("element-type", "")
+            alias_raw = archimate.get("alias", "")
 
-        if not (label and element_type and alias_raw):
-            continue
+            if not (label and element_type and alias_raw):
+                continue
 
-        alias = alias_raw.replace("-", "_")
-        macro_name = f"DECL_{alias}"
+            alias = alias_raw.replace("-", "_")
+            if alias in seen_aliases:
+                continue
+            seen_aliases.add(alias)
+            macro_name = f"DECL_{alias}"
 
-        # Derive domain from directory path or from display block
-        domain = archimate.get("domain", "")
-        if not domain:
-            rel = md_file.relative_to(entities_root)
-            domain = rel.parts[0] if rel.parts else "unknown"
+            domain = archimate.get("domain", "")
+            if not domain:
+                rel = md_file.relative_to(model_dir)
+                domain = rel.parts[0] if rel.parts else "unknown"
 
-        macro_line = f'!define {macro_name} rectangle "{label}" <<{element_type}>> as {alias}'
-        entries.append((domain, macro_line, alias))
+            macro_line = f'!define {macro_name} rectangle "{label}" <<{element_type}>> as {alias}'
+            entries.append((domain, macro_line, alias))
 
     entries.sort(key=_sort_key)
 

@@ -110,13 +110,21 @@ class ModelVerifier:
         check_required_fields(fm, OUTGOING_FILE_REQUIRED, result, loc)
         check_enum(fm, "status", VALID_STATUSES, result, loc)
 
+        file_scope = self._scope_for_path(path)
+
         # Validate source-entity references an actual entity
         source = fm.get("source-entity", "")
         if self.registry is not None and source:
-            if source not in self.registry.entity_ids():
+            all_entities = self.registry.entity_ids()
+            if source not in all_entities:
                 result.issues.append(Issue(
                     Severity.ERROR, "E120",
                     f"source-entity '{source}' not found in model", loc,
+                ))
+            elif file_scope == "enterprise" and source not in self.registry.enterprise_entity_ids():
+                result.issues.append(Issue(
+                    Severity.ERROR, "E131",
+                    f"enterprise connection has non-enterprise source-entity '{source}'", loc,
                 ))
 
         # Validate §connections marker is present
@@ -125,6 +133,16 @@ class ModelVerifier:
                 Severity.ERROR, "E121",
                 "Missing <!-- §connections --> section marker", loc,
             ))
+
+        # Scope-aware entity sets for target validation
+        if self.registry is not None:
+            allowed_entities = (
+                self.registry.enterprise_entity_ids()
+                if file_scope == "enterprise" else self.registry.entity_ids()
+            )
+            all_entities_for_scope = self.registry.entity_ids()
+        else:
+            allowed_entities = all_entities_for_scope = set()
 
         # Validate each connection section header
         seen_connections: set[str] = set()
@@ -145,11 +163,17 @@ class ModelVerifier:
                         Severity.ERROR, "E123",
                         f"Unknown connection type '{conn_type}'", loc,
                     ))
-                if self.registry is not None and target_id not in self.registry.entity_ids():
-                    result.issues.append(Issue(
-                        Severity.ERROR, "E124",
-                        f"Target entity '{target_id}' not found in model", loc,
-                    ))
+                if self.registry is not None and target_id not in allowed_entities:
+                    if target_id in all_entities_for_scope and file_scope == "enterprise":
+                        result.issues.append(Issue(
+                            Severity.ERROR, "E130",
+                            f"enterprise connection references non-enterprise entity '{target_id}'", loc,
+                        ))
+                    else:
+                        result.issues.append(Issue(
+                            Severity.ERROR, "E124",
+                            f"Target entity '{target_id}' not found in model", loc,
+                        ))
                 conn_key = f"{conn_type} → {target_id}"
                 if conn_key in seen_connections:
                     result.issues.append(Issue(

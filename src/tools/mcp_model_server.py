@@ -118,6 +118,20 @@ def main() -> None:
     )
     args = parser.parse_args()
 
+    # Check init state — warn if missing but don't block (backward compat)
+    from src.tools.workspace_init import load_init_state
+    state = load_init_state()
+    if state:
+        logger.info("arch-init state loaded: engagement=%s enterprise=%s",
+                     state.get("engagement_root"), state.get("enterprise_root"))
+    else:
+        repo_root_env = os.getenv("SDLC_MCP_MODEL_REPO_ROOT")
+        if not repo_root_env:
+            logger.warning(
+                "No .arch/init-state.yaml found and SDLC_MCP_MODEL_REPO_ROOT not set. "
+                "Run `arch-init` to configure workspace repos."
+            )
+
     if _WATCH_AUTO_START:
         try:
             watch_result = auto_start_default_watcher(

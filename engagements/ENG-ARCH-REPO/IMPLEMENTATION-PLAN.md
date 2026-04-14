@@ -156,13 +156,16 @@ enabling section-level search and reference graph traversal via the `framework_q
 | WS-D: Diagram Layout | **COMPLETE** | Auto-layout engine, ortho routing, direction heuristics |
 | WS-G: Edit Tools | **COMPLETE** | `model_edit_entity`, `model_edit_connection`, `model_edit_diagram` |
 | WS-F: Framework Server | **COMPLETE** | Configurable scan roots; `docs/` structure (D7); 2 seed ADRs; framework server wired in `.mcp.json` |
-| WS-E: GUI Tool | **IN PROGRESS** | E1–E4-phase2 done; authoring phases remain |
+| WS-H: Two-Tiered Repos | **COMPLETE** | Connection ontology, arch-init CLI, asymmetric enforcement, cross-repo macros, promotion mechanism |
+| WS-E: GUI Tool | **IN PROGRESS** | E1–E4-phase2 done; diagram explorer, connection editor, graph explorer added; ontology-driven GUI pending |
 
 **Verification**: 173 files, 0 errors, 0 warnings (W350 resolves on MCP server restart — `tools/plantuml.jar` symlink + code fix in place).
 
 **MCP servers** (configured in `.mcp.json` / `.vscode/mcp.json`):
 - `sdlc-mcp-model` — `SDLC_MCP_MODEL_REPO_ROOT=engagements/ENG-ARCH-REPO/architecture-repository`
 - `sdlc-mcp-framework` — `SDLC_MCP_FRAMEWORK_DOC_ROOT=engagements/ENG-ARCH-REPO/architecture-repository`, `SDLC_MCP_FRAMEWORK_SCAN_DIRS=docs`
+
+**Two-tiered repo config**: `arch-workspace.yaml` at project root, `arch-init` CLI writes `.arch/init-state.yaml`. MCP + GUI servers auto-discover both repos from init state.
 
 **GUI** (`sdlc-gui-server` + `tools/gui/` Vue SPA):
 - Stack: Vue 3 + TypeScript + Vite + Effect; FastAPI REST backend
@@ -172,31 +175,293 @@ enabling section-level search and reference graph traversal via the `framework_q
 
 ---
 
-## Remaining Work
+## Completed GUI Features (2026-04-14)
 
-### WS-E: GUI Authoring Phases (E4-3 through E4-5)
+### Diagram Explorer (E4-D)
+- ✓ `GET /api/diagrams` — list with type filtering
+- ✓ `GET /api/diagram?id=` — detail with PUML source + rendered PNG filename
+- ✓ `GET /api/diagram-image/{filename}` — serve rendered PNG
+- ✓ `GET /api/diagram-refs` — find diagrams referencing a connection
+- ✓ `DiagramsView.vue` — grid listing with diagram-type filter bar
+- ✓ `DiagramDetailView.vue` — rendered image, metadata, toggleable PUML source
+- ✓ Search results link to diagram detail pages
+- ✓ "Diagrams" added to nav bar
 
-**Prerequisite — write endpoints for `gui_server.py`** (before any authoring UI):
-1. `GET /api/write-help` → type catalog (artifact types, connection types, domains) for populating forms
-2. `POST /api/entity` body `{artifact_type, name, summary, keywords, status, dry_run}` → create entity (wraps model write + verify)
-3. `POST /api/connection` body `{source, connection_type, target, description, dry_run}` → add connection
-4. `POST /api/entity/{id}/verify` → verify single entity file
+### Connection Editor (E4-4)
+- ✓ `GET /api/write-help` — type catalog endpoint
+- ✓ `POST /api/connection` — add connection (wraps model write + verify)
+- ✓ `POST /api/connection/remove` — remove connection (wraps model write + verify)
+- ✓ `ConnectionsPanel.vue` — grouped by target-entity-type, +/× buttons per group/item
+- ✓ `EntitySearchInput.vue` — searchable by friendly name and random-id-part, filtered by entity type
+- ✓ Remove checks diagram references and shows confirmation dialog
 
-**E4-3: Entity creation view**
-- Form: artifact_type selector (from write-help), name, summary, keywords, status
-- Dry-run preview panel showing would-be file content + verification result
-- Confirm → POST to `/api/entity` with `dry_run=false`
-- On success: navigate to new entity detail view
+### Graph Explorer (E4-G)
+- ✓ `GraphExploreView.vue` — force-directed SVG graph rooted at selected entity
+- ✓ Click node to select → sidebar shows frontmatter and attributes
+- ✓ Double-click / "+" badge to expand (load neighbors)
+- ✓ Drag nodes, pan canvas, scroll to zoom
+- ✓ Domain-colored nodes with type labels
+- ✓ "Explore graph" button on entity detail view
+- ✓ `useForceGraph.ts` composable — custom force simulation (no external dependency)
 
-**E4-4: Connection authoring**
-- On entity detail view: "Add connection" button
-- Form: connection_type selector, target entity search/select
-- Dry-run preview, confirm → POST `/api/connection`
+---
 
-**E4-5: Schema-aware forms**
-- Fetch attribute schemata from JSON Schema files (`.arch-repo/schemata/`)
+## Completed Two-Tiered Repo Infrastructure (WS-H, 2026-04-14)
+
+| Task | Key files |
+|------|-----------|
+| H1: Connection Ontology | `src/common/connection_ontology.py` — element categories, RELATIONSHIP_RULES, symmetric detection, `permissible_connection_types()`, `classify_connections()` |
+| H2: Config + CLI Init | `src/tools/workspace_init.py`, `arch-workspace.yaml` — `arch-init` validates/clones repos, writes `.arch/init-state.yaml` |
+| H3: Gate Tooling on Init | `src/tools/model_mcp/context.py`, `src/tools/mcp_model_server.py` — init state loaded on startup, fallback to env vars |
+| H4: Asymmetric Enforcement | `src/common/model_verifier.py` — E130 (enterprise target refs non-enterprise), E131 (enterprise source refs non-enterprise) |
+| H5: Cross-Repo Macros | `src/tools/generate_macros.py` — `enterprise_root` param, scans both model/ dirs, deduplicates aliases |
+| H6: Promotion Mechanism | `src/tools/model_write/promote_to_enterprise.py` (types + plan), `promote_execute.py` (execute + rollback), `src/tools/model_mcp/write_tools.py` (MCP tool) |
+| H7: README Rewrite | `README.md` — describes two-tiered architecture, arch-workspace.yaml, promotion workflow |
+
+Backend endpoints already in place for GUI work:
+- `GET /api/ontology?source_type=&target_type=` — returns `classify_connections` or `permissible_connection_types`
+- `GET /api/write-help` — returns valid entity types and connection types
+- `POST /api/connection` and `POST /api/connection/remove` — already wired
+
+---
+
+## Remaining Work: Ontology-Driven GUI (Stream B)
+
+### B1: Ontology Types + Port + Adapter + Service
+
+Add ontology and entity-write capabilities through the hexagonal stack.
+
+#### B1a: Domain types — `tools/gui/src/domain/schemas.ts`
+
+Add after existing schemas:
+
+```typescript
+// Ontology: permissible connection targets grouped by direction
+export const OntologyClassification = Schema.Struct({
+  source_type: Schema.String,
+  outgoing: Schema.Record({ key: Schema.String, value: Schema.Array(Schema.String) }),
+  incoming: Schema.Record({ key: Schema.String, value: Schema.Array(Schema.String) }),
+  symmetric: Schema.Record({ key: Schema.String, value: Schema.Array(Schema.String) }),
+})
+export type OntologyClassification = Schema.Schema.Type<typeof OntologyClassification>
+
+// Ontology: permissible connection types for a specific source→target pair
+export const OntologyPair = Schema.Struct({
+  source_type: Schema.String,
+  target_type: Schema.String,
+  connection_types: Schema.Array(Schema.String),
+  symmetric: Schema.Array(Schema.String),
+})
+export type OntologyPair = Schema.Schema.Type<typeof OntologyPair>
+```
+
+`WriteResult` already exists and is sufficient for entity create/edit responses.
+
+#### B1b: Port — `tools/gui/src/ports/ModelRepository.ts`
+
+Add to the `ModelRepository` interface:
+
+```typescript
+readonly getOntologyClassification: (sourceType: string) => Effect<OntologyClassification, RepoError>
+readonly getOntologyPair: (sourceType: string, targetType: string) => Effect<OntologyPair, RepoError>
+readonly createEntity: (body: {
+  artifact_type: string; name: string; summary?: string;
+  properties?: Record<string, string>; notes?: string;
+  keywords?: string[]; version?: string; status?: string;
+  dry_run?: boolean;
+}) => Effect<WriteResult, RepoError>
+readonly editEntity: (body: {
+  artifact_id: string; name?: string; summary?: string;
+  properties?: Record<string, string>; notes?: string;
+  keywords?: string[]; version?: string; status?: string;
+  dry_run?: boolean;
+}) => Effect<WriteResult, RepoError>
+```
+
+#### B1c: Adapter — `tools/gui/src/adapters/http/HttpModelRepository.ts`
+
+Implement the new port methods using existing `fetchJson`/`postJson` helpers:
+
+```typescript
+getOntologyClassification: (sourceType) =>
+  fetchJson(`/ontology?source_type=${encodeURIComponent(sourceType)}`, OntologyClassificationSchema),
+getOntologyPair: (sourceType, targetType) =>
+  fetchJson(`/ontology?source_type=${enc(sourceType)}&target_type=${enc(targetType)}`, OntologyPairSchema),
+createEntity: (body) => postJson('/entity', body, WriteResultSchema),
+editEntity: (body) => postJson('/entity/edit', body, WriteResultSchema),
+```
+
+#### B1d: Service — `tools/gui/src/application/ModelService.ts`
+
+Pass through all four new methods (same delegation pattern as existing methods).
+
+---
+
+### B2: Backend Endpoints for Entity Create/Edit
+
+**File: `src/tools/gui_server.py`**
+
+Two new FastAPI endpoints:
+
+```python
+@app.post("/api/entity")
+def create_entity(body: dict[str, Any]) -> dict[str, Any]:
+    # Extract: artifact_type, name, summary, properties, notes, keywords, version, status, dry_run
+    # Resolve repo root from init state / env
+    # Call model_write_ops.create_entity(repo_root, verifier, ...)
+    # Return WriteResult-shaped dict
+
+@app.post("/api/entity/edit")
+def edit_entity(body: dict[str, Any]) -> dict[str, Any]:
+    # Extract: artifact_id + optional field overrides + dry_run
+    # Call model_write_ops.edit_entity(repo_root, registry, verifier, ...)
+    # Return WriteResult-shaped dict
+```
+
+Follow the same pattern as existing `POST /api/connection`: resolve repo, get verifier/registry, call ops module, return result dict. Check `model_write_ops.edit_entity` signature — the `model_edit_entity` MCP tool exists, so the ops function should be available.
+
+---
+
+### B3: Three-Section Connection Layout
+
+**File: `tools/gui/src/ui/components/ConnectionsPanel.vue`** — major rewrite
+
+Currently receives `direction` prop ("outbound"/"inbound"), groups connections by entity-type prefix.
+
+**New design:** Three instances rendered from `EntityDetailView.vue`:
+1. `<ConnectionsPanel direction="outgoing" />` — directed, this entity is source
+2. `<ConnectionsPanel direction="incoming" />` — directed, this entity is target
+3. `<ConnectionsPanel direction="symmetric" />` — undirected associations
+
+Each panel:
+1. On mount, call `svc.getOntologyClassification(entityDetail.artifact_type)` to get all permissible target types for this direction
+2. Also call `svc.getConnections(entityId, direction)` for existing connections
+3. Build sections: one per permissible target type (from ontology), even if 0 existing connections
+4. Each section header: type badge + count + "+" add button
+5. Each connection row: connection-type badge, entity name (RouterLink), "×" remove button
+6. Existing connections that don't match any ontology section go in an "Other" group
+
+**Props change:** Replace `direction: 'outbound' | 'inbound'` with `direction: 'outgoing' | 'incoming' | 'symmetric'`.
+
+**EntityDetailView.vue change:** Replace current two-column outbound/inbound grid with three panels. Symmetric panel only appears if ontology returns non-empty symmetric entries.
+
+---
+
+### B4: Ontology-Driven Connection Creation Flow
+
+**File: `tools/gui/src/ui/components/ConnectionsPanel.vue`** (same file, add-connection form)
+
+When "+" is clicked on a section header (target type known from the section):
+
+1. **Connection type dropdown** — call `svc.getOntologyPair(sourceType, targetType)` → populate `<select>` with permissible connection types. Pre-select if only one option.
+2. **Target entity search** — reuse `EntitySearchInput`, pass `prefixFilter={targetType}` to scope search to that entity type. Backend `GET /api/entities?artifact_type=` already supports this.
+3. **Description field** — optional textarea.
+4. **Confirm button** — `svc.addConnection({source_entity, connection_type, target_entity, description, dry_run: false})`.
+5. **Symmetric panel** — source/target labels are irrelevant for display; default connection type to `archimate-association`.
+
+Key difference from current: connection type is now a constrained dropdown (not free text), and target search is scoped by entity type.
+
+---
+
+### B5: Entity Creation View
+
+**New file: `tools/gui/src/ui/views/EntityCreateView.vue`** (~200 lines)
+
+**Route:** Add `{ path: '/entity/create', component: EntityCreateView }` to `tools/gui/src/ui/router/index.ts`.
+
+**Layout:**
+1. **Form section** (left/top):
+   - `artifact_type` — grouped `<select>` populated from `svc.getWriteHelp()` response (`entity_types` dict keyed by domain)
+   - `name` — text input (required)
+   - `summary` — textarea
+   - `keywords` — comma-separated text input → split to array
+   - `status` — select: draft/approved/deprecated (default: draft)
+   - `version` — text input (default: 0.1.0)
+   - `properties` — dynamic key-value pairs with add/remove rows
+   - `notes` — textarea
+2. **Preview section** (right/bottom):
+   - "Preview" button → calls `svc.createEntity({...fields, dry_run: true})`
+   - Shows: would-be `path`, `artifact_id`, rendered `content`, verification warnings/errors
+3. **Confirm section:**
+   - "Create" button (disabled until preview passes verification)
+   - Calls `svc.createEntity({...fields, dry_run: false})`
+   - On `wrote: true` → `router.push({ path: '/entity', query: { id: result.artifact_id } })`
+
+**Navigation:** Add "+ Create Entity" button to `EntitiesView.vue` header that links to `/entity/create`.
+
+---
+
+### B6: Entity Editing (inline in detail view)
+
+**File: `tools/gui/src/ui/views/EntityDetailView.vue`**
+
+Add edit mode toggle:
+
+1. **"Edit" button** in header (next to "Explore graph" button)
+2. Click toggles `editing` ref (boolean)
+3. When `editing`:
+   - Name → text input (prefilled)
+   - Summary → textarea (prefilled)
+   - Keywords → comma-separated input (prefilled)
+   - Status → select dropdown (prefilled)
+   - Properties → editable key-value pairs
+   - Notes → textarea
+   - "Save" and "Cancel" buttons appear
+4. **Save flow:**
+   - Dry-run: `svc.editEntity({artifact_id, ...changed_fields, dry_run: true})`
+   - Show verification result
+   - If clean → `svc.editEntity({...same, dry_run: false})`
+   - On `wrote: true` → reload entity detail, exit edit mode
+5. **Cancel:** Reset form fields to original values, exit edit mode
+
+---
+
+### B-Stream File Summary
+
+| File | Action | Task |
+|------|--------|------|
+| `tools/gui/src/domain/schemas.ts` | Add `OntologyClassification`, `OntologyPair` types | B1a |
+| `tools/gui/src/ports/ModelRepository.ts` | Add 4 methods: `getOntologyClassification`, `getOntologyPair`, `createEntity`, `editEntity` | B1b |
+| `tools/gui/src/adapters/http/HttpModelRepository.ts` | Implement 4 new port methods | B1c |
+| `tools/gui/src/application/ModelService.ts` | Delegate 4 new methods | B1d |
+| `src/tools/gui_server.py` | Add `POST /api/entity`, `POST /api/entity/edit` | B2 |
+| `tools/gui/src/ui/components/ConnectionsPanel.vue` | Major rewrite: 3-section ontology layout + constrained add flow | B3, B4 |
+| `tools/gui/src/ui/views/EntityDetailView.vue` | Three panels instead of two-column grid + edit mode toggle | B3, B6 |
+| `tools/gui/src/ui/views/EntityCreateView.vue` | **Create** ~200 lines: form + dry-run preview + confirm | B5 |
+| `tools/gui/src/ui/views/EntitiesView.vue` | Add "+ Create Entity" button in header | B5 |
+| `tools/gui/src/ui/router/index.ts` | Add `/entity/create` route | B5 |
+
+### B-Stream Implementation Order
+
+```
+B1 (types + port + adapter + service)  ──┐
+                                         ├──→ B3+B4 (connection layout + creation)
+B2 (backend POST /api/entity endpoints) ─┤
+                                         ├──→ B5 (entity creation view)
+                                         └──→ B6 (entity editing)
+```
+
+B1 and B2 are independent (frontend ports vs backend endpoints) and can be done in parallel. B3+B4 share a file (ConnectionsPanel.vue). B5 and B6 are independent but both need B1+B2.
+
+### B-Stream Verification
+
+1. **Ontology in GUI**: Open entity detail for a `goal` → outgoing section shows subsections for all permissible target types (requirement, outcome, etc.) even if empty
+2. **Add connection**: Click "+" on a `requirement` subsection → dropdown shows only valid connection types for goal→requirement → search filters to requirement entities only
+3. **Entity create**: `/entity/create` → fill form → preview shows dry-run content → confirm creates entity → navigates to detail
+4. **Entity edit**: Entity detail → Edit → change summary → Save → dry-run validates → writes → reloads
+5. **Symmetric**: Association connections appear in "Symmetric" panel, not in outgoing/incoming
+6. **Verifier**: `model_verify_all` on ENG-ARCH-REPO still returns 0 errors after all changes
+
+---
+
+## Future: Schema-Driven Forms (E4-5)
+
+Not part of the B-stream but still relevant. After B-stream is complete:
+
+- `GET /api/schemata?entity_type=` endpoint — returns JSON Schema for entity attributes from `.arch-repo/schemata/`
 - Drive form field generation (required/optional fields, enum constraints) from schema
-- Expose via `GET /api/schemata?entity_type=` endpoint
+- Used in both entity create/edit and connection creation forms
+- Potentially different attribute schemas per connection-type
 
 ---
 
