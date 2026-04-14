@@ -14,6 +14,7 @@ const detail = useAsync<EntityDetail>()
 const outbound = useAsync<ConnectionList>()
 const inbound = useAsync<ConnectionList>()
 
+
 const load = () => {
   if (!entityId.value) return
   detail.run(svc.getEntity(entityId.value))
@@ -59,8 +60,8 @@ const friendlyName = (id: string) => {
         <div class="artifact-id mono">{{ detail.data.value.artifact_id }}</div>
       </div>
 
-      <div v-if="detail.data.value.content_text" class="card content-card">
-        <pre class="content-text">{{ detail.data.value.content_text }}</pre>
+      <div v-if="detail.data.value?.content_html" class="card content-card">
+        <div class="markdown-body" v-html="detail.data.value.content_html"></div>
       </div>
 
       <div class="connections-section">
@@ -123,6 +124,9 @@ const friendlyName = (id: string) => {
 .content-card { padding: 16px 20px; margin-bottom: 24px; overflow-x: auto; }
 .content-text { white-space: pre-wrap; font-size: 13px; line-height: 1.6; color: #374151; }
 
+.markdown-body :deep(p) {  margin: 1rem 0 1.7rem 0; }
+.markdown-body :deep(ul) { padding-left: 1.5rem; }
+
 .connections-section { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
 @media (max-width: 700px) { .connections-section { grid-template-columns: 1fr; } }
 
@@ -168,4 +172,7 @@ const friendlyName = (id: string) => {
 .status--draft      { background: #f3f4f6; color: #6b7280; }
 .status--active     { background: #dcfce7; color: #166534; }
 .status--deprecated { background: #fee2e2; color: #991b1b; }
+
+.markdown-body :deep(table) { inline-size: 100%; border-collapse: collapse; margin-block: 2rem; min-inline-size: max-content; }
+.markdown-body :deep(th), .markdown-body :deep(td) { padding-inline: 1.25rem; padding-block: 0.75rem; text-align: start; border-bottom: 1px solid var(--border-color, #eee); }
 </style>

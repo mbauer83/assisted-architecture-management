@@ -8,6 +8,7 @@ import type {
   SearchResult,
 } from '../domain'
 import type { NetworkError, NotFoundError } from '../domain'
+import type { MarkdownError } from '../application/MarkdownService'
 
 export type Direction = 'any' | 'outbound' | 'inbound'
 
@@ -26,7 +27,7 @@ export type RepoError = NetworkError | ParseResult.ParseError
 export interface ModelRepository {
   readonly getStats: () => Effect.Effect<Stats, RepoError>
   readonly listEntities: (params?: ListParams) => Effect.Effect<EntityList, RepoError>
-  readonly getEntity: (id: string) => Effect.Effect<EntityDetail, RepoError | NotFoundError>
+  readonly getEntity: (id: string) => Effect.Effect<EntityDetail, RepoError | NotFoundError | MarkdownError>
   readonly getConnections: (
     entityId: string,
     direction?: Direction,

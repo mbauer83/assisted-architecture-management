@@ -45,6 +45,7 @@ export const EntityDetailSchema = Schema.Struct({
   path: Schema.String,
   content_snippet: Schema.String,
   content_text: Schema.optional(Schema.String),
+  content_html: Schema.optional(Schema.String), // New field for rendered HTML
   display_blocks: Schema.optional(Schema.Record({ key: Schema.String, value: Schema.String })),
   extra: Schema.optional(Schema.Unknown),
 })

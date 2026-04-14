@@ -9,6 +9,7 @@ import {
   NeighborsSchema,
   SearchResultSchema,
 } from '../../domain/schemas'
+import { parseMarkdown } from '../../application/MarkdownService'
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -78,7 +79,24 @@ export const makeHttpModelRepository = (): ModelRepository => ({
     ),
 
   getEntity: (id: string) =>
-    fetchJsonNotFound(buildUrl('/entity', { id }), EntityDetailSchema, id),
+    fetchJsonNotFound(buildUrl('/entity', { id }), EntityDetailSchema, id).pipe(
+    Effect.flatMap((entity) => {
+      // Check if the optional string exists and isn't empty
+      if (entity.content_text) {
+        return parseMarkdown(entity.content_text).pipe(
+          Effect.map((html) => ({
+            ...entity,
+            content_html: html
+          }))
+        )
+      }
+
+      // If content_text is undefined, succeed with content_html as undefined
+      return Effect.succeed({
+        ...entity
+      })
+    })
+  ),
 
   getConnections: (entityId: string, direction: Direction = 'any', connType?: string) =>
     fetchJson(
