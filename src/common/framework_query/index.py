@@ -36,9 +36,32 @@ class _DocData:
     body: str
 
 
+_DEFAULT_SCAN_PATHS = ["framework", "specs/IMPLEMENTATION_PLAN.md", "README.md", "CLAUDE.md"]
+
+
+def iter_doc_paths(root: Path, scan_paths: list[str]) -> list[Path]:
+    """Enumerate markdown files for the given root and scan-path list.
+
+    Each entry in *scan_paths* is interpreted relative to *root*:
+    - If it resolves to a directory, all ``*.md`` files are collected recursively.
+    - If it resolves to a file, that file is included directly.
+    - Non-existent entries are silently skipped.
+    """
+    paths: list[Path] = []
+    for entry in scan_paths:
+        candidate = root / entry
+        if candidate.is_dir():
+            paths.extend(sorted(candidate.rglob("*.md")))
+        elif candidate.is_file():
+            paths.append(candidate)
+    unique: dict[str, Path] = {str(p.resolve()): p for p in paths}
+    return sorted(unique.values(), key=lambda p: str(p))
+
+
 @dataclass
 class FrameworkKnowledgeIndex:
     root: Path
+    scan_paths: list[str] = field(default_factory=lambda: list(_DEFAULT_SCAN_PATHS))
     _docs: dict[str, _DocData] = field(default_factory=dict)
     _sections: dict[str, FrameworkSectionRecord] = field(default_factory=dict)
     _doc_sections: dict[str, list[FrameworkSectionRecord]] = field(default_factory=dict)
@@ -286,19 +309,7 @@ class FrameworkKnowledgeIndex:
         return []
 
     def _iter_doc_paths(self) -> list[Path]:
-        paths: list[Path] = []
-        framework_root = self.root / "framework"
-        if framework_root.exists():
-            paths.extend(sorted(framework_root.rglob("*.md")))
-        for path in [
-            self.root / "specs" / "IMPLEMENTATION_PLAN.md",
-            self.root / "README.md",
-            self.root / "CLAUDE.md",
-        ]:
-            if path.exists():
-                paths.append(path)
-        unique: dict[str, Path] = {str(path.resolve()): path for path in paths}
-        return sorted(unique.values(), key=lambda p: str(p))
+        return iter_doc_paths(self.root, self.scan_paths)
 
     def _build_reference_graph(self) -> None:
         self._edges = []

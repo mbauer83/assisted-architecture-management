@@ -122,10 +122,12 @@
 !define DECL_APP_ca3vm7 rectangle "Model Verifier" <<ApplicationComponent>> as APP_ca3vm7
 !define DECL_APP_kRZYOA rectangle "MCP Model Server" <<ApplicationComponent>> as APP_kRZYOA
 !define DECL_APP_kjC6ex rectangle "CLI Tool" <<ApplicationComponent>> as APP_kjC6ex
+!define DECL_APP_lmO0mp rectangle "GUI Authoring Tool" <<ApplicationComponent>> as APP_lmO0mp
 !define DECL_APP_rgulJL rectangle "Macro Generator" <<ApplicationComponent>> as APP_rgulJL
 !define DECL_APP_v9LvfK rectangle "Query Engine" <<ApplicationComponent>> as APP_v9LvfK
 !define DECL_APP_yNhgdh rectangle "Model Registry" <<ApplicationComponent>> as APP_yNhgdh
 !define DECL_AIF_KxvYB rectangle "CLI Interface" <<ApplicationInterface>> as AIF_KxvYB
+!define DECL_AIF_Ua50xU rectangle "Web Interface" <<ApplicationInterface>> as AIF_Ua50xU
 !define DECL_AIF_XjbNQh rectangle "REST Interface" <<ApplicationInterface>> as AIF_XjbNQh
 !define DECL_AIF_wuleEe rectangle "MCP Interface" <<ApplicationInterface>> as AIF_wuleEe
 !define DECL_DOB_3rilik rectangle "SQLite Index" <<DataObject>> as DOB_3rilik

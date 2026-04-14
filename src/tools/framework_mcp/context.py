@@ -5,7 +5,11 @@ import time
 from dataclasses import dataclass
 from pathlib import Path
 
-from src.common.framework_query import FrameworkKnowledgeIndex
+from src.common.framework_query import (
+    FrameworkKnowledgeIndex,
+    _DEFAULT_SCAN_PATHS,
+    iter_doc_paths,
+)
 
 
 def workspace_root() -> Path:
@@ -13,6 +17,12 @@ def workspace_root() -> Path:
 
 
 def default_framework_root() -> Path:
+    env_root = os.getenv("SDLC_MCP_FRAMEWORK_DOC_ROOT", "")
+    if env_root:
+        path = Path(env_root).expanduser()
+        if not path.is_absolute():
+            path = workspace_root() / path
+        return path
     return workspace_root()
 
 
@@ -25,20 +35,16 @@ def resolve_framework_root(*, root: str | None) -> Path:
     return default_framework_root()
 
 
+def _configured_scan_paths() -> list[str]:
+    """Read SDLC_MCP_FRAMEWORK_SCAN_DIRS (colon-separated); fall back to defaults."""
+    raw = os.getenv("SDLC_MCP_FRAMEWORK_SCAN_DIRS", "").strip()
+    if raw:
+        return [entry.strip() for entry in raw.split(":") if entry.strip()]
+    return list(_DEFAULT_SCAN_PATHS)
+
+
 def _iter_doc_paths(root: Path) -> list[Path]:
-    paths: list[Path] = []
-    framework_root = root / "framework"
-    if framework_root.exists():
-        paths.extend(sorted(framework_root.rglob("*.md")))
-    for path in [
-        root / "specs" / "IMPLEMENTATION_PLAN.md",
-        root / "README.md",
-        root / "CLAUDE.md",
-    ]:
-        if path.exists():
-            paths.append(path)
-    unique: dict[str, Path] = {str(path.resolve()): path for path in paths}
-    return sorted(unique.values(), key=lambda p: str(p))
+    return iter_doc_paths(root, _configured_scan_paths())
 
 
 def _mtime_fingerprint(root: Path) -> float:
@@ -71,6 +77,7 @@ def _poll_interval_s() -> float:
 class _FrameworkIndexHandle:
     index: FrameworkKnowledgeIndex
     root: Path
+    scan_paths: list[str]
     lock: threading.Lock
     fingerprint: float
     last_refresh_s: float
@@ -83,11 +90,15 @@ _pollers: dict[str, threading.Thread] = {}
 _stop_events: dict[str, threading.Event] = {}
 
 
-def _watcher_loop(root_key: str) -> None:
+def _handle_key(root: Path, scan_paths: list[str]) -> str:
+    return f"{root.resolve()}||{':'.join(scan_paths)}"
+
+
+def _watcher_loop(handle_key: str) -> None:
     while True:
         with _handles_lock:
-            stop = _stop_events.get(root_key)
-            handle = _handles.get(root_key)
+            stop = _stop_events.get(handle_key)
+            handle = _handles.get(handle_key)
         if stop is None or handle is None:
             return
         if stop.wait(timeout=_poll_interval_s()):
@@ -107,33 +118,35 @@ def _watcher_loop(root_key: str) -> None:
 
 
 def _ensure_handle(root: Path) -> _FrameworkIndexHandle:
-    root_key = str(root.resolve())
+    scan_paths = _configured_scan_paths()
+    hkey = _handle_key(root, scan_paths)
     with _handles_lock:
-        existing = _handles.get(root_key)
+        existing = _handles.get(hkey)
         if existing is not None:
             return existing
 
         now = time.time()
         fp = _mtime_fingerprint(root)
         handle = _FrameworkIndexHandle(
-            index=FrameworkKnowledgeIndex(root),
+            index=FrameworkKnowledgeIndex(root, scan_paths),
             root=root,
+            scan_paths=scan_paths,
             lock=threading.Lock(),
             fingerprint=fp,
             last_refresh_s=now,
             refresh_count=1,
         )
-        _handles[root_key] = handle
+        _handles[hkey] = handle
 
         stop = threading.Event()
-        _stop_events[root_key] = stop
+        _stop_events[hkey] = stop
         thread = threading.Thread(
             target=_watcher_loop,
-            args=(root_key,),
+            args=(hkey,),
             daemon=True,
-            name=f"framework-index-watch:{root_key}",
+            name=f"framework-index-watch:{hkey}",
         )
-        _pollers[root_key] = thread
+        _pollers[hkey] = thread
         thread.start()
         return handle
 

@@ -19,10 +19,15 @@ dev = [
     "pytest>=8.3",
     "pytest-bdd>=7.3",
 ]
+gui = [
+    "fastapi>=0.115.0",
+    "uvicorn[standard]>=0.32.0",
+]
 
 [project.scripts]
 sdlc-mcp-model = "src.tools.mcp_model_server:main"
 sdlc-mcp-framework = "src.tools.mcp_framework_server:main"
+sdlc-gui-server = "src.tools.gui_server:main"
 
 [build-system]
 requires = ["hatchling"]

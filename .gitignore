@@ -1,5 +1,24 @@
-.claude/
-.mypy_cache/
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
 .venv/
+.mypy_cache/
+
+# Node / Vue SPA
+tools/gui/node_modules/
+tools/gui/dist/
+
+# Docker / misc build artefacts
+tools/plantuml.jar
+
+# Environment / secrets
+.env
+.env.*
+
+# IDE / OS
+.claude/
+.DS_Store
+
+# Engagement-specific (not part of this repo)
 engagements/ENG-001/
-plantuml.jar

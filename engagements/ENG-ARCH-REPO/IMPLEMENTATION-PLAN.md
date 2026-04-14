@@ -5,15 +5,13 @@
 Self-describing architecture repository: an ArchiMate NEXT model of the architecture-repository
 system itself, with adapted tooling for the new conventions.
 
-**Two workstreams:**
-- **WS-A**: Complete the architecture specification across all ArchiMate NEXT domains
-- **WS-B**: Adapt `/src` tooling for new conventions (filename, connections, frontmatter)
+**Status**: Core model and tooling are complete. One workstream remains: the GUI tool (WS-E).
 
 ---
 
 ## Confirmed Design Decisions
 
-### D1. Filename Convention (NEW — differs from ENG-001)
+### D1. Filename Convention
 
 Entity: `TYPE@epoch.random.friendly-name.md`
 Example: `DRV@1712870400.Qw7Er1.codegen-velocity-exceeds-planning-review.md`
@@ -23,7 +21,6 @@ Artifact-id = full filename stem (everything before `.md`)
 ### D2. Connection Representation: `.outgoing.md` Files
 
 One file per entity, adjacent to the entity file, same name but `.outgoing.md` suffix.
-Example: `DRV@1712870400.Qw7Er1.codegen-velocity-exceeds-planning-review.outgoing.md`
 
 Format:
 
@@ -40,21 +37,16 @@ last-updated: '2026-04-12'
 ### archimate-influence → GOL@1712870400.Po1Qw3.maintain-coherence-and-traceability
 
 Description of the relationship.
-
-### archimate-specialization → REQ@1712870400.Cc2Dd2.semantic-full-text-search
-
-Description of the specialization.
 ```
 
 **Parsing rules:**
 - File frontmatter: `source-entity` identifies the source of all connections in the file
 - `<!-- §connections -->` marker delimits the connection section
 - Each `### {connection-type} → {target-entity-id}` heading defines one connection
-- Optional YAML fence block after heading for connection-specific metadata (e.g., `access-type: read-write`)
-- Body text after heading/metadata = human-readable description
+- Optional YAML fence block after heading for connection-specific metadata
 - Connection ID reconstructed as: `{source}---{target}@@{type}`
 
-### D3. Entity Frontmatter Schema (Reduced)
+### D3. Entity Frontmatter Schema
 
 ```yaml
 ---
@@ -68,13 +60,9 @@ last-updated: '2026-04-12'
 ---
 ```
 
-**Dropped** (vs ENG-001): `engagement`, `phase-produced`, `owner-agent`, `safety-relevant`, `produced-by-skill`
-**Added**: `keywords`
-**Changed**: statuses are `draft | active | deprecated` (not `baselined`)
+Statuses: `draft | active | deprecated`
 
-### D4. ArchiMate NEXT Domain Structure (strict)
-
-Directory: `model/` (not `model-entities/`)
+### D4. ArchiMate NEXT Domain Structure
 
 ```
 model/
@@ -83,12 +71,12 @@ model/
   business/       # actors, objects, interfaces, collaborations, contracts, representations, products
   common/         # services, processes, functions, events, interactions, roles (behavioral — shared across domains)
   application/    # components, collaborations, interfaces, data-objects
-  technology/     # nodes, devices, system-software, artifacts, paths, networksm (ArchiMate next merges "physical" into this layer)
+  technology/     # nodes, devices, system-software, artifacts, paths, networks
   implementation/ # (future: work-packages, deliverables)
 ```
 
-**Key NEXT change**: All behavioral elements (services, processes, functions, events, interactions)
-and roles go in `model/common/`, not under business/application/technology.
+All behavioral elements (services, processes, functions, events, interactions) and roles go in
+`model/common/`, not under business/application/technology.
 
 ### D5. Requirement Specialization Hierarchy
 
@@ -99,350 +87,62 @@ Parent → Children:
 - `authoring-tools` → `write-access-only-via-tools`, `gui-exploration-and-authoring-for-humans`
 - `verification-tools` → `verified-referential-integrity-model-diagrams-documents`, `verify-diagram-syntax-automatically`
 
-`support-models-diagrams-documents` stays standalone (no parent needed — confirmed).
-
 ### D6. Configurability Principle
 
 New principle: "Extensibility & Configurability"
-- Git-based configuration for enterprise repository and for engagement/project repositories
-- Configurable frontmatter schemata
-- Configurable attribute schemata for file sections (per entity-type and per connection-type)
+- Git-based configuration for enterprise + engagement repositories
+- Configurable frontmatter schemata (per file-type; required fields cannot be removed)
+- Configurable attribute schemata for content sections (per entity-type and connection-type)
 - Extensible ontology
 
-New requirements:
-- `configurable-frontmatter-schemata` — covers frontmatter fields. Specific per file-type (entity, connections-files, diagram). Fields required for tools / processes in the concept are mandatory - schema can extend (but not override or remove).
-- `configurable-model-attribute-schemata`  — covers attribute schemata for content sections (e.g., Properties table attributes per entity-type, connection metadata attributes per connection-type). Default is a free schema (no required attributes beyond frontmatter).
-- `git-based-repository-configuration` (enterprise + engagement config)
+Requirements: `configurable-frontmatter-schemata`, `configurable-model-attribute-schemata`, `git-based-repository-configuration`
 
----
+JSON Schemas live in `.arch-repo/schemata/` (9 schemas, Draft 2020-12).
 
-## WS-A: Architecture Content
+### D7. Non-Model Documentation Structure (`docs/`)
 
-### Phase A1: Motivation Domain
+Architecture repositories contain three kinds of content:
 
-**Write content for existing entities (all currently empty):**
+| Directory | Purpose |
+|-----------|---------|
+| `model/` | ArchiMate NEXT entities |
+| `diagram-catalog/` | PlantUML diagrams and rendered PNGs |
+| `docs/` | Semi-structured textual documentation |
 
-Stakeholders (5): architect, developer, devops-engineer, product-owner, upper-technical-management
-Drivers (5): codegen-velocity-exceeds-planning-review, increasing-autonomy-of-teams-systems, rising-complexity-and-interdependence, limited-central-governance-capacity, increasing-need-for-effective-llm-access
-Goals (11, minus 1 duplicate = 10): maintain-coherence-and-traceability, enable-scalable-reuse, enable-cross-stakeholder-validation, support-architecture-planning-for-{humans,AI}, provide-development-guidance-for-{humans,AI}, support-product-design-evolution-and-validation-for-{humans,ai}, support-technology-design-evolution-and-validation-for-{humans,ai}
-Requirements (25): all listed in existing files
+`docs/` is subdivided by doc-type:
 
-**Add new entities:**
+```
+docs/
+  adrs/        # Architecture Decision Records
+  standards/   # Coding/design standards and guidelines
+  specs/       # Technical specifications
+  README.md    # Conventions for this directory
+```
 
-| Type | Name | Rationale |
-|------|------|-----------|
-| PRI (Principle) | extensibility-and-configurability | Core principle: git-config for enterprise + engagement repos |
-| OUT (Outcome) | increased-architectural-coherence | Measurable outcome of the system |
-| OUT (Outcome) | reduced-planning-overhead | Measurable outcome |
-| REQ (Requirement) | configurable-frontmatter-schemata | Configurability requirement |
-| REQ (Requirement) | git-based-repository-configuration | Enterprise + engagement config |
+**No frontmatter.** The `doc-id` is the filename stem (e.g., `adr-001-archimate-next-adoption`).
+Metadata (status, authors, date) is expressed inside the required section headings.
 
-**Entity content pattern** (following ENG-001 format structure):
+**Enforced section headings by doc-type:**
+
+| `doc-type` | Required top-level sections (in order) |
+|------------|----------------------------------------|
+| `adr` | Status · Context · Decision · Consequences |
+| `standard` | Purpose · Scope · Rules · Rationale |
+| `spec` | Overview · Requirements · Specification · Acceptance Criteria |
+| `guideline` | Purpose · Guidance · Examples |
+
+**Cross-reference syntax** (parsed by the framework query server):
 
 ```markdown
----
-artifact-id: {full-stem}
-artifact-type: {type}
-name: "{Display Name}"
-version: 0.1.0
-status: draft
-keywords: [kw1, kw2]
-last-updated: '2026-04-12'
----
-
-<!-- §content -->
-
-## {Display Name}
-
-{Description paragraph(s)}
-
-## Properties
-
-| Attribute | Value |
-|---|---|
-| Key1 | Value1 |
-
-## Notes
-
-{Optional notes}
-
-<!-- §display -->
-
-### archimate
-
-```yaml
-layer: {Motivation|Strategy|Business|Application|Technology}
-element-type: {ArchiMateElementType}
-label: "{Display Name}"
-alias: {ALIAS_WITH_UNDERSCORES}
+[@DOC:target-doc-id#section-id](relative/path/to/doc.md)
 ```
 
-**Alias convention**: Since we no longer have PREFIX-NNN IDs, aliases need a new convention.
-Proposed: use the TYPE prefix + a short form, e.g., `DRV_Qw7Er1` (TYPE + random part of ID).
-This keeps aliases short enough for PlantUML while remaining unique.
+- `target-doc-id` = filename stem of the target document
+- `section-id` = slugified heading (lowercase, spaces → hyphens)
 
-### Phase A2: Strategy Domain
-
-New entities to create:
-
-| Type | Friendly Name | Description |
-|------|--------------|-------------|
-| CAP | architectural-modeling | Ability to create and maintain architectural models |
-| CAP | model-validation | Ability to verify model integrity and consistency |
-| CAP | artifact-discovery | Ability to find, explore, and query artifacts |
-| CAP | artifact-authoring | Ability to create new artifacts with tool support |
-| CAP | repository-governance | Ability to manage two-tier structure, promotion, lifecycle |
-| CAP | configuration-management | Ability to configure repository behavior via git-config |
-| COA | markdown-file-based-approach | Decision: markdown + directory structure over database-only |
-| COA | archimate-next-ontology-adoption | Decision: adopt ArchiMate NEXT over 3.x |
-
-### Phase A3: Common Domain (ArchiMate NEXT Behavioral)
-
-**Existing** (write content for):
-- SRV: authoring-service, validation-service, discovery-querying-stats-service, repository-promotion-service
-
-**New:**
-
-| Type | Friendly Name | Description |
-|------|--------------|-------------|
-| SRV | configuration-service | Manages repo configuration via git-config |
-| SRV | indexing-service | Runtime indexing into SQLite |
-| PRC (Process) | create-entity | Create a new model entity with frontmatter + display block |
-| PRC | create-connection | Add connection to .outgoing.md file |
-| PRC | create-diagram | Create new PUML diagram with frontmatter |
-| PRC | verify-model | Run verification across model, connections, diagrams |
-| PRC | index-repository | Extract metadata into SQLite for querying |
-| PRC | promote-artifact | Promote artifact from engagement to enterprise repo |
-| PRC | query-model | Search/traverse the model via various interfaces |
-| FNC (Function) | frontmatter-validation | Validate frontmatter against schema |
-| FNC | attribute-schema-validation | Validate content-section attributes against per-type attribute schemata |
-| FNC | referential-integrity-check | Verify all references resolve |
-| FNC | puml-syntax-check | Validate PlantUML syntax |
-| EVT (Event) | entity-created | Emitted when a new entity is created |
-| EVT | model-verified | Emitted when verification completes |
-| ROL | author | Human or AI creating artifacts |
-| ROL | reviewer | Human or AI validating artifacts |
-
-### Phase A4: Business Domain
-
-**Existing** (write content for):
-- ACT (5): architect, developer, devops-engineer, product-owner, upper-technical-management
-
-**New:**
-
-| Type | Friendly Name | Description |
-|------|--------------|-------------|
-| BIF | gui-interface | GUI for human exploration and authoring |
-| BOB | entity-file | Markdown file representing one model entity |
-| BOB | connection-file | .outgoing.md file representing entity connections |
-| BOB | diagram-file | PUML file representing an architectural diagram |
-| BOB | frontmatter-block | YAML frontmatter section of an artifact |
-| BOB | architecture-model | Complete model spanning all domains |
-| BOB | engagement-repository | Project/engagement-scoped repository |
-| BOB | enterprise-repository | Enterprise-scoped repository |
-
-### Phase A5: Application Domain
-
-| Type | Friendly Name | Description |
-|------|--------------|-------------|
-| APP | frontmatter-parser | Parses YAML frontmatter from .md and .puml files |
-| APP | model-verifier | Validates entities, connections, diagrams |
-| APP | model-registry | In-memory index of entity/connection metadata |
-| APP | macro-generator | Generates _macros.puml from entity display blocks |
-| APP | sqlite-indexer | Indexes metadata into SQLite for querying |
-| APP | query-engine | Supports full-text, metadata, and graph queries |
-| APP | mcp-model-server | MCP server for model operations |
-| APP | cli-tool | Command-line interface for model operations |
-| AIF | mcp-interface | MCP protocol interface |
-| AIF | cli-interface | CLI interface |
-| AIF | rest-interface | REST API interface (future) |
-| DOB | entity-metadata | Extracted entity frontmatter in index |
-| DOB | connection-metadata | Extracted connection data in index |
-| DOB | sqlite-index | SQLite database with indexed metadata |
-| DOB | puml-macro-library | Generated _macros.puml file |
-
-### Phase A6: Technology Domain
-
-| Type | Friendly Name | Description |
-|------|--------------|-------------|
-| NOD | developer-workstation | Local developer machine running the tools |
-| ART | git-repository | Git repo containing the architecture files |
-| ART | sqlite-database | SQLite file for runtime indexing |
-| SSW | python-runtime | Python 3.11+ runtime |
-| SSW | plantuml-engine | PlantUML rendering engine |
-| SSW | git-vcs | Git version control system |
-| TSV | file-system-service | Local filesystem read/write |
-| TSV | version-control-service | Git operations |
-
-### Phase A7: Connections (.outgoing.md files)
-
-**Within Motivation:**
-- Stakeholders → (association) → Drivers, Goals
-- Drivers → (influence) → Goals
-- Goals → (realization) → Outcomes
-- Requirements → (specialization) → child Requirements (hierarchy from D5)
-- Requirements → (realization) → Goals
-- Principle → (influence) → Requirements
-
-**Motivation → Strategy:**
-- Goals → (realization) → Capabilities
-- Requirements → (realization) → Capabilities
-- Courses of Action → (realization) → Capabilities
-
-**Strategy → Common/Business:**
-- Capabilities → (realization by) → Services, Processes
-- Actors → (assignment) → Roles
-
-**Common → Application:**
-- Services → (realization by) → Application Components + Application Services
-- Processes → (realization by) → Application Components
-
-**Application → Technology:**
-- Application Components → (serving/realization by) → Technology artifacts, nodes, system-software
-- Data Objects → (realization by) → Technology artifacts
-
-### Phase A8: Diagrams
-
-| Diagram | Type | Content |
-|---------|------|---------|
-| motivation-overview | archimate-motivation | All stakeholders, drivers, goals, outcomes, principles, requirements with connections |
-| strategy-capability-map | archimate-strategy | Capabilities, courses of action, connected to goals |
-| business-actor-role-map | archimate-business | Actors, roles, business objects, interfaces |
-| common-services-processes | archimate-common | Services, processes, functions, events with assignments |
-| application-component-map | archimate-application | All application components, interfaces, data objects, services |
-| technology-infrastructure | archimate-technology | Nodes, artifacts, system software, services |
-| cross-domain-realization | archimate-layered | Full cross-domain view showing realization chain |
-
----
-
-## WS-B: Tooling Adaptation
-
-### Phase B1: Core Type System (`src/common/`)
-
-**`model_verifier_types.py`:**
-- Change `ENTITY_ID_RE` from `^[A-Z]+-\d{3}$` to match new convention: `^[A-Z]{2,6}@\d+\.[A-Za-z0-9_-]+\..+$`
-- Update `entity_id_from_path()` to return full stem (not split on dot)
-- Change `VALID_STATUSES` from `{draft, baselined, deprecated}` to `{draft, active, deprecated}`
-- Update `ENTITY_REQUIRED` to remove `engagement`, `phase-produced`, `owner-agent`, `safety-relevant`; add `keywords` as optional
-- Update `CONNECTION_REQUIRED` — adapt for .outgoing.md (no longer per-file connection frontmatter)
-- Update `CONN_ID_ALLOWED_CHARS_RE` — entity IDs in connections now contain `@` and dots
-- Update `connection_artifact_id_matches_shape()` for new entity ID format in connection IDs
-- Add `AttributeSchema` type: dataclass with `required_attrs`, `optional_attrs`, `allowed_values` per attribute, loaded from config
-- Add `ATTRIBUTE_SCHEMA_REGISTRY`: dict mapping `(schema_scope, type_name)` → `AttributeSchema` (scope = "entity" or "connection"; type_name = entity-type or connection-type; default = free schema)
-
-**`archimate_types.py`:**
-- Rename layer references to "domain" in comments/docstrings (ArchiMate NEXT)
-- Add "common" domain to `ENTITY_TYPES_BY_LAYER` (behavioral elements)
-- Existing type registries remain mostly valid
-
-**`model_write_catalog.py`:**
-- Update `EntityTypeInfo` — add common domain entries (services, processes, functions, events, roles, interactions)
-- Change `ENTITY_TYPES` dict to route behavioral elements to `common/` subdirs
-- Update `CONNECTION_TYPES` — connection info no longer maps to directory paths (connections are in .outgoing.md)
-
-### Phase B2: Parsing (`src/common/`)
-
-**`model_verifier_parsing.py`:**
-- Add `parse_outgoing_file()` — new parser for .outgoing.md format:
-  1. Parse file frontmatter (source-entity, version, status, last-updated)
-  2. Find `<!-- §connections -->` marker
-  3. Split by `### ` headers
-  4. For each header: extract connection-type and target-entity-id
-  5. Extract optional YAML fence block for connection metadata
-  6. Extract body text as description
-  7. Return list of parsed connections with reconstructed connection IDs
-- Update `parse_connection_refs()` to work with new outgoing format
-- Add `parse_attribute_schema_config()` — loads attribute schema definitions from git-tracked config files:
-  1. Read schema config file(s) from `.arch-repo/` or configured path
-  2. Parse per-entity-type and per-connection-type attribute definitions
-  3. Return populated `AttributeSchema` instances for the schema registry
-- Add `parse_properties_table()` — extracts attribute key-value pairs from a Properties table in content sections
-
-### Phase B3: Registry (`src/common/`)
-
-**`model_verifier_registry.py`:**
-- `_scan_entity_meta()`: scan `model/` instead of `model-entities/`
-- `_scan_connection_meta()`: scan for `*.outgoing.md` files instead of `connections/` directory
-  - Parse each .outgoing.md using new parser
-  - Extract individual connections and register each with its reconstructed ID
-- `_ensure_entity_file_index()`: scan `model/` instead of `model-entities/`
-- `_ensure_connection_file_index()`: index by .outgoing.md path + section offset
-- `entity_id_from_path()`: return full stem for new-convention files
-
-### Phase B4: Verification (`src/common/`)
-
-**`model_verifier.py`:**
-- Add `verify_outgoing_file()` method — verifies a .outgoing.md file:
-  - Parse frontmatter, validate required fields
-  - For each connection section: validate connection type, resolve target entity
-  - Check for duplicate connections
-- Update `_verify_all_full()` / `_verify_inventory_subset()` to handle outgoing files
-- Remove/deprecate `verify_connection_file()` or keep it for backward compat
-
-**`model_verifier_rules.py`:**
-- `check_artifact_id_entity()`: update regex and filename-matching logic for new convention
-- `check_artifact_id_connection()`: adapt for outgoing file connection IDs
-- Relax enum checks: remove `phase-produced` and `owner-agent` validation when not in frontmatter
-- Update `check_reference_resolution_scoped()` for new entity ID format
-- Add `check_attribute_schema()`: validate content-section attributes against per-type attribute schemata:
-  1. Determine entity-type or connection-type from frontmatter
-  2. Look up applicable `AttributeSchema` from registry (default: free schema → skip)
-  3. Parse Properties table / connection metadata attributes
-  4. Verify required attributes present, values conform to allowed sets
-  5. Report missing required attributes and invalid values as verification errors
-
-**`model_verifier_incremental.py`:**
-- `_index_entity_files()`: scan `model/` not `model-entities/`
-- `_index_connection_files()`: scan for `*.outgoing.md` instead of `connections/**/*.md`
-  - Parse outgoing files, extract individual connection refs
-- `inventory_files()`: update classification logic
-
-### Phase B5: Write System (`src/common/`)
-
-**`model_write.py`:**
-- `slugify()`: keep as-is (still useful)
-- `prefix_num_from_id()` / `allocate_next_entity_id()`: replace with new ID generation using epoch + random
-- `connection_id_from_endpoints()`: update for new entity ID format
-- `infer_entity_ids_from_puml()`: update alias pattern matching for new convention
-- `infer_archimate_connection_ids_from_puml()`: update for new ID format
-
-**`model_write_formatting.py`:**
-- `format_entity_markdown()`: update frontmatter fields (remove dropped, add keywords); when an attribute schema is configured for the entity-type, scaffold the Properties table with required/optional attributes
-- `format_connection_markdown()` → replace with `format_outgoing_markdown()`: generates .outgoing.md; when an attribute schema is configured for the connection-type, scaffold metadata block with required/optional attributes
-- `format_diagram_puml()`: update frontmatter (remove engagement, phase-produced, owner-agent)
-- `format_matrix_markdown()`: same updates
-
-### Phase B6: Macro Generation (`src/tools/`)
-
-**`generate_macros.py`:**
-- Scan `model/` instead of `model-entities/`
-- Update alias extraction: new alias format (TYPE + random part, e.g., `DRV_Qw7Er1`)
-- Update `_sort_key()`: new sorting that works with epoch-based IDs
-- Update `_PREFIX_ORDER` if needed
-- Update header comment from "ENG-001" to generic
-
-### Phase B7: MCP Tools (`src/tools/model_mcp/`, `src/tools/model_write/`)
-
-- `write_tools.py`: update entity/connection creation for new conventions
-- `verify_tools.py`: update to use new verification methods
-- `query_list_read_tools.py`: update file discovery paths
-- `model_write/entity.py`: update path generation, ID allocation
-- `model_write/connection.py`: rewrite for .outgoing.md (append to file instead of create new)
-
----
-
-## Implementation Order
-
-```
-B1 (types) → B2 (parsing) → B3 (registry) → B4 (verification) → B5 (write) → B6 (macros)
-    ↕ interleave with
-A1 (motivation) → A2 (strategy) → A3 (common) → A4 (business) → A5 (application) → A6 (technology)
-    then
-A7 (connections) → A8 (diagrams) → B7 (MCP tools) → Final verification
-```
-
-**Practical approach**: Adapt core tooling first (B1-B4) so verification works, then write architecture
-content (A1-A6), then connections (A7), then diagrams (A8), then remaining tooling (B5-B7).
+**Framework server integration:** `sdlc-mcp-framework` is configured with
+`SDLC_MCP_FRAMEWORK_DOC_ROOT=<repo root>` and `SDLC_MCP_FRAMEWORK_SCAN_DIRS=docs`,
+enabling section-level search and reference graph traversal via the `framework_query_*` MCP tools.
 
 ---
 
@@ -450,93 +150,84 @@ content (A1-A6), then connections (A7), then diagrams (A8), then remaining tooli
 
 | Workstream | Status | Key facts |
 |-----------|--------|-----------|
-| WS-A: Architecture Content | **COMPLETE** | 115 entities, 115 connections, 7 diagrams, all 6 domains |
+| WS-A: Architecture Content | **COMPLETE** | 117 entities, 119 connections, 7 diagrams, all 6 domains |
 | WS-B: Tooling Adaptation | **COMPLETE** | Types, parsing, registry, verification, write, macros, MCP tools |
-| WS-C: Schema Validation | **COMPLETE** | 9 JSON Schemas in `.arch-repo/schemata/`, Draft 2020-12, W041/W042 rules |
+| WS-C: Schema Validation | **COMPLETE** | 9 JSON Schemas, Draft 2020-12, W041/W042 rules |
 | WS-D: Diagram Layout | **COMPLETE** | Auto-layout engine, ortho routing, direction heuristics |
 | WS-G: Edit Tools | **COMPLETE** | `model_edit_entity`, `model_edit_connection`, `model_edit_diagram` |
-| Codebase Modernization | **COMPLETE** | Python 3.13+, PEP 604/585, no `__future__` imports |
-| WS-E: GUI Tool | **NOT STARTED** | See below |
-| WS-F: Framework Server | **NOT STARTED** | See below |
+| WS-F: Framework Server | **COMPLETE** | Configurable scan roots; `docs/` structure (D7); 2 seed ADRs; framework server wired in `.mcp.json` |
+| WS-E: GUI Tool | **IN PROGRESS** | E1–E4-phase2 done; authoring phases remain |
 
-**Verification**: 170 files, 0 errors, 0 warnings. 115 macros generated.
+**Verification**: 173 files, 0 errors, 0 warnings (W350 resolves on MCP server restart — `tools/plantuml.jar` symlink + code fix in place).
 
-**MCP servers**: `sdlc-mcp-model` (stdio/streamable-http), `sdlc-mcp-framework` (stub).
-Config: `.mcp.json` / `.vscode/mcp.json`, `SDLC_MCP_MODEL_REPO_ROOT=engagements/ENG-ARCH-REPO/architecture-repository`.
+**MCP servers** (configured in `.mcp.json` / `.vscode/mcp.json`):
+- `sdlc-mcp-model` — `SDLC_MCP_MODEL_REPO_ROOT=engagements/ENG-ARCH-REPO/architecture-repository`
+- `sdlc-mcp-framework` — `SDLC_MCP_FRAMEWORK_DOC_ROOT=engagements/ENG-ARCH-REPO/architecture-repository`, `SDLC_MCP_FRAMEWORK_SCAN_DIRS=docs`
+
+**GUI** (`sdlc-gui-server` + `tools/gui/` Vue SPA):
+- Stack: Vue 3 + TypeScript + Vite + Effect; FastAPI REST backend
+- Hexagonal: `domain/` → `ports/` → `adapters/http/` → `application/` → `ui/`
+- Dockerized: `docker compose up --build` → http://localhost:8000
+- Dev: `sdlc-gui-server --repo-root <path>` + `npm run dev` in `tools/gui/` → http://localhost:5173
 
 ---
 
-## Remaining Work (WS-E, WS-F)
+## Remaining Work
 
-### WS-E: GUI Discovery & Authoring Tool
+### WS-E: GUI Authoring Phases (E4-3 through E4-5)
 
-#### E1: Architecture Model Entities
-- New entities needed: `APP gui-authoring-tool`, `AIF web-interface`
-- Connection: `BIF gui-interface` → served by → `APP gui-authoring-tool`
-- Connection: `APP gui-authoring-tool` → uses → `APP query-engine`, `APP model-verifier`
+**Prerequisite — write endpoints for `gui_server.py`** (before any authoring UI):
+1. `GET /api/write-help` → type catalog (artifact types, connection types, domains) for populating forms
+2. `POST /api/entity` body `{artifact_type, name, summary, keywords, status, dry_run}` → create entity (wraps model write + verify)
+3. `POST /api/connection` body `{source, connection_type, target, description, dry_run}` → add connection
+4. `POST /api/entity/{id}/verify` → verify single entity file
 
-#### E2: Technology Selection
-- Web-based SPA (React/Vue/Svelte) or desktop (Electron/Tauri)
-- Connects to MCP server or REST interface for all operations
-- Requirements from `REQ gui-exploration-and-authoring-for-humans`
+**E4-3: Entity creation view**
+- Form: artifact_type selector (from write-help), name, summary, keywords, status
+- Dry-run preview panel showing would-be file content + verification result
+- Confirm → POST to `/api/entity` with `dry_run=false`
+- On success: navigate to new entity detail view
 
-#### E3: Core Features
-- Model explorer: browse entities by domain, view entity details + connections
-- Graph navigator: interactive connection graph visualization (D3.js / Cytoscape)
-- Entity authoring: create/edit entities via forms, dry-run preview
-- Connection authoring: add connections via guided flow
-- Diagram viewer: render and display PUML diagrams
-- Search: full-text + metadata search across all artifacts
+**E4-4: Connection authoring**
+- On entity detail view: "Add connection" button
+- Form: connection_type selector, target entity search/select
+- Dry-run preview, confirm → POST `/api/connection`
 
-#### E4: Implementation Phases
-1. Read-only explorer (entity list, detail view, connection graph)
-2. Search + filtering
-3. Entity creation (form-based, calling MCP write tools)
-4. Connection + diagram authoring
-5. Schema-aware forms (loading attribute schemata to generate form fields)
-
-### WS-F: Framework Server for Non-Model Content
-
-The framework MCP server (`sdlc-mcp-framework`) can serve non-model, non-diagram content in architecture repositories — ADRs, guidelines, specs, and other semi-structured textual files. Currently hardcoded to scan `framework/` and a few fixed paths.
-
-#### F1: Make scan roots configurable
-- Accept `SDLC_MCP_FRAMEWORK_DOC_ROOT` env var (default: repo root)
-- Scan all `.md` files under configurable subdirectories (e.g., `docs/`, `adrs/`, `specs/`)
-
-#### F2: Validate against ENG-ARCH-REPO
-- Test framework server against actual architecture repo non-model content
-- Ensure section-level search and reference graph work for arch repo docs
+**E4-5: Schema-aware forms**
+- Fetch attribute schemata from JSON Schema files (`.arch-repo/schemata/`)
+- Drive form field generation (required/optional fields, enum constraints) from schema
+- Expose via `GET /api/schemata?entity_type=` endpoint
 
 ---
 
 ## Tool-Based Authoring Principle
 
 **All creation and editing of model entities, connections, and diagrams must go through tools.**
-Manual file editing does not scale and produces inconsistent results (layout issues, missing validation,
-schema drift). Tools handle ID generation, schema scaffolding, auto-layout, verification, and rendering
-automatically — fixing tool output quality is always preferable to manual intervention.
+Tools handle ID generation, schema scaffolding, auto-layout, verification, and rendering.
+Fixing tool output quality is always preferable to manual file editing.
 
-**Prefer MCP tools over raw file reads** when working with the architecture model.
-The MCP tools provide filtered, paginated, and aggregated access that is far more token-efficient
-than reading entity/connection/diagram files directly.
+**Prefer MCP tools over raw file reads** — they provide filtered, paginated, aggregated access
+that is far more token-efficient than scanning files directly.
 
-| Task | Tool | Hint |
-|------|------|------|
-| Count artifacts by type/domain | `model_query_stats` | Single call, small response |
-| List entities with filtering | `model_query_list_artifacts` | Paginated, filterable by type/domain/status |
-| Read one entity in full | `model_query_read_artifact` | Returns content without scanning |
-| Search across model | `model_query_search_artifacts` | Keyword scoring, ranked results |
-| Find connected entities | `model_query_find_neighbors` | Graph traversal without parsing .outgoing.md |
-| Verify model integrity | `model_verify_all` | Summary mode returns only files with issues |
-| Create new entity | `model_create_entity` | Handles ID generation, schema scaffolding, placement |
-| Edit entity | `model_edit_entity` | Partial merge, auto-verify, macro regeneration |
-| Add connection | `model_add_connection` | Appends to .outgoing.md, validates types |
-| Edit/remove connection | `model_edit_connection` | Rebuilds .outgoing.md, cleans up empty files |
-| Create diagram | `model_create_diagram` | Auto-layout, stereotypes, render PNG |
-| Edit diagram | `model_edit_diagram` | Re-layout + re-render, or frontmatter-only |
-| Type catalog (discovery) | `model_write_help` | Valid types by domain, connection types by language |
+| Task | Tool |
+|------|------|
+| Count artifacts by type/domain | `model_query_stats` |
+| List entities with filtering | `model_query_list_artifacts` |
+| Read one entity in full | `model_query_read_artifact` |
+| Search across model | `model_query_search_artifacts` |
+| Find connected entities | `model_query_find_neighbors` |
+| Verify model integrity | `model_verify_all` |
+| Create new entity | `model_create_entity` |
+| Edit entity | `model_edit_entity` |
+| Add connection | `model_add_connection` |
+| Edit/remove connection | `model_edit_connection` |
+| Create diagram | `model_create_diagram` |
+| Edit diagram | `model_edit_diagram` |
+| Type catalog | `model_write_help` |
 
-**Anti-patterns**: Don't glob `model/**/*.md`, don't grep `.outgoing.md` files, don't manually construct/edit model files, don't manually edit diagram layout, don't import Python modules directly for verification.
+**Anti-patterns**: Don't glob `model/**/*.md`, don't grep `.outgoing.md` files, don't manually
+construct/edit model files, don't manually edit diagram layout, don't import Python modules
+directly for verification.
 
 ---
 
@@ -548,12 +239,12 @@ than reading entity/connection/diagram files directly.
 4. ✓ Configurability principle with git-config requirements present
 5. ✓ Cross-domain connections modeled (motivation→strategy→common→application→technology)
 6. ✓ At least 7 diagrams covering all populated domains + cross-domain view
-7. ✓ Tooling can parse new filename convention and .outgoing.md format
-8. ✓ `ModelVerifier.verify_all()` passes with 0 errors, 0 warnings (170 files)
+7. ✓ Tooling parses new filename convention and .outgoing.md format
+8. ✓ `ModelVerifier.verify_all()` passes with 0 errors, 0 warnings
 9. ✓ `generate_macros()` produces valid _macros.puml (115 macros)
 10. ✓ Common domain elements render in warm grey, distinct from business/application colors
 11. ✓ Configurable JSON Schema validation for frontmatter and attributes (WS-C)
 12. ✓ Diagram auto-layout with ortho routing and direction heuristics (WS-D)
 13. ✓ Edit tools for entities, connections, and diagrams (WS-G)
-14. GUI discovery & authoring tool (WS-E)
-15. Framework server adapted for non-model arch repo content (WS-F)
+14. ✓ Framework server serves `docs/` with section search and reference graph (WS-F)
+15. ✓ E1 model entities + E4 Phase 1+2 (read-only explorer + search) (WS-E in progress)

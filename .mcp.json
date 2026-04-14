@@ -6,6 +6,14 @@
       "env": {
         "SDLC_MCP_MODEL_REPO_ROOT": "engagements/ENG-ARCH-REPO/architecture-repository"
       }
+    },
+    "sdlc-framework": {
+      "command": "uv",
+      "args": ["run", "sdlc-mcp-framework", "--transport", "stdio"],
+      "env": {
+        "SDLC_MCP_FRAMEWORK_DOC_ROOT": "engagements/ENG-ARCH-REPO/architecture-repository",
+        "SDLC_MCP_FRAMEWORK_SCAN_DIRS": "docs"
+      }
     }
   }
 }

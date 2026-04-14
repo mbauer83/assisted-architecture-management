@@ -1,6 +1,6 @@
 
 from .cli import main
-from .index import FrameworkKnowledgeIndex
+from .index import _DEFAULT_SCAN_PATHS, FrameworkKnowledgeIndex, iter_doc_paths
 from .types import (
     FrameworkDocRecord,
     FrameworkIndexStats,
@@ -11,6 +11,7 @@ from .types import (
 )
 
 __all__ = [
+    "_DEFAULT_SCAN_PATHS",
     "FrameworkDocRecord",
     "FrameworkIndexStats",
     "FrameworkKnowledgeIndex",
@@ -18,5 +19,6 @@ __all__ = [
     "FrameworkSearchHit",
     "FrameworkSectionRecord",
     "ReferenceDirection",
+    "iter_doc_paths",
     "main",
 ]

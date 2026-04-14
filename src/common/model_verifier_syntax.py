@@ -15,8 +15,11 @@ def find_plantuml_jar() -> Path | None:
     for _ in range(6):
         candidate = candidate.parent
         if (candidate / "pyproject.toml").exists():
-            jar = candidate / "plantuml.jar"
-            return jar if jar.exists() else None
+            for relpath in ("plantuml.jar", "tools/plantuml.jar"):
+                jar = candidate / relpath
+                if jar.exists():
+                    return jar
+            return None
     return None
 
 

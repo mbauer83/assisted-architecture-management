@@ -1,0 +1,18 @@
+.git
+.venv
+__pycache__
+*.pyc
+*.pyo
+*.egg-info
+.pytest_cache
+.mypy_cache
+.ruff_cache
+
+# GUI dev artefacts (the Dockerfile builds these from source)
+tools/gui/node_modules
+tools/gui/dist
+
+# Not needed in the image
+tests/
+spec/
+engagements/
