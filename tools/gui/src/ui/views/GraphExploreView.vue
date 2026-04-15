@@ -4,7 +4,7 @@ import { useRoute, RouterLink } from 'vue-router'
 import { Effect } from 'effect'
 import { modelServiceKey } from '../keys'
 import { useAsync } from '../composables/useAsync'
-import { useForceGraph, type GraphNode } from '../composables/useForceGraph'
+import { useForceGraph, type GraphNode, type LayoutMode } from '../composables/useForceGraph'
 import type { EntityDetail, ConnectionList } from '../../domain'
 
 const svc = inject(modelServiceKey)!
@@ -17,8 +17,11 @@ const svgHeight = ref(600)
 const selectedId = ref<string | null>(null)
 const selectedDetail = useAsync<EntityDetail>()
 
-const { nodes, edges, options, addNode, addEdge, markExpanded, restart } =
-  useForceGraph(() => svgWidth.value, () => svgHeight.value)
+const {
+  nodes, edges, options, layoutMode,
+  addNode, addEdge, markExpanded, restart,
+  applyClusterLayout, applyForceLayout,
+} = useForceGraph(() => svgWidth.value, () => svgHeight.value)
 
 const SPACING_PRESETS = [
   { label: 'Compact', repulsion: 1500, idealDist: 150 },
@@ -31,6 +34,16 @@ const applyPreset = (p: typeof SPACING_PRESETS[number]) => {
   options.repulsion = p.repulsion
   options.idealDist = p.idealDist
   restart()
+}
+
+const LAYOUT_MODES: { value: LayoutMode; label: string }[] = [
+  { value: 'force', label: 'Force' },
+  { value: 'cluster', label: 'Cluster' },
+]
+
+const switchLayout = (mode: LayoutMode) => {
+  if (mode === 'cluster') applyClusterLayout(rootId.value)
+  else applyForceLayout()
 }
 
 // Pan / zoom state
@@ -71,7 +84,8 @@ const expandNode = (entityId: string) => {
     for (const n of nodes.value) {
       if (!n.domain) resolveNodeDomain(n)
     }
-    restart()
+    if (layoutMode.value === 'cluster') applyClusterLayout(rootId.value)
+    else restart()
   })
 }
 
@@ -148,7 +162,7 @@ const onSvgMouseMove = (e: MouseEvent) => {
     const svgPt = toSvgCoords(e.clientX, e.clientY)
     dragging.value.x = svgPt.x + dragOffset.value.x
     dragging.value.y = svgPt.y + dragOffset.value.y
-    restart()
+    if (layoutMode.value === 'force') restart()
     return
   }
   if (isPanning.value) {
@@ -160,7 +174,10 @@ const onSvgMouseMove = (e: MouseEvent) => {
 }
 
 const onSvgMouseUp = () => {
-  if (dragging.value) { dragging.value.pinned = false; dragging.value = null; restart() }
+  if (dragging.value) {
+    dragging.value.pinned = false; dragging.value = null
+    if (layoutMode.value === 'force') restart()
+  }
   isPanning.value = false
 }
 
@@ -187,6 +204,10 @@ const edgePath = (e: typeof edges.value[number]) => {
   const src = nodes.value.find((n) => n.id === e.source)
   const tgt = nodes.value.find((n) => n.id === e.target)
   if (!src || !tgt) return ''
+  if (layoutMode.value === 'cluster') {
+    const midY = (src.y + tgt.y) / 2
+    return `M ${src.x} ${src.y} V ${midY} H ${tgt.x} V ${tgt.y}`
+  }
   return `M ${src.x} ${src.y} L ${tgt.x} ${tgt.y}`
 }
 </script>
@@ -200,6 +221,14 @@ const edgePath = (e: typeof edges.value[number]) => {
         </RouterLink>
         <span class="canvas-title">Graph Explorer</span>
         <div class="spacing-controls">
+          <span class="spacing-label">Layout:</span>
+          <button
+            v-for="m in LAYOUT_MODES" :key="m.value"
+            class="spacing-btn" :class="{ 'spacing-btn--active': layoutMode === m.value }"
+            @click="switchLayout(m.value)"
+          >{{ m.label }}</button>
+        </div>
+        <div v-if="layoutMode === 'force'" class="spacing-controls">
           <span class="spacing-label">Spacing:</span>
           <button
             v-for="p in SPACING_PRESETS" :key="p.label"

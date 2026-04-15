@@ -1,4 +1,7 @@
 import { ref, reactive, onUnmounted } from 'vue'
+import { hierarchy, cluster } from 'd3-hierarchy'
+
+export type LayoutMode = 'force' | 'cluster'
 
 export interface GraphNode {
   id: string
@@ -41,6 +44,7 @@ export function useForceGraph(width: () => number, height: () => number) {
   const nodes = ref<GraphNode[]>([])
   const edges = ref<GraphEdge[]>([])
   const options = reactive<ForceOptions>({ ...DEFAULTS })
+  const layoutMode = ref<LayoutMode>('force')
   let animId: number | null = null
   let running = false
 
@@ -141,7 +145,57 @@ export function useForceGraph(width: () => number, height: () => number) {
 
   const restart = () => { stop(); start() }
 
+  // ── Cluster / dendrogram layout ──────────────────────────────────────────
+
+  interface TreeNode { id: string; children?: TreeNode[] }
+
+  const buildTree = (rootId: string): TreeNode => {
+    const adj = new Map<string, string[]>()
+    for (const e of edges.value) {
+      if (!adj.has(e.source)) adj.set(e.source, [])
+      if (!adj.has(e.target)) adj.set(e.target, [])
+      adj.get(e.source)!.push(e.target)
+      adj.get(e.target)!.push(e.source)
+    }
+    const visited = new Set<string>()
+    const walk = (id: string): TreeNode => {
+      visited.add(id)
+      const kids = (adj.get(id) ?? []).filter((c) => !visited.has(c)).map(walk)
+      return kids.length ? { id, children: kids } : { id }
+    }
+    return walk(rootId)
+  }
+
+  const applyClusterLayout = (rootId: string) => {
+    stop()
+    layoutMode.value = 'cluster'
+    if (nodes.value.length === 0) return
+    const tree = buildTree(rootId)
+    const root = hierarchy(tree)
+    const pad = 60
+    cluster<TreeNode>().size([width() - pad * 2, height() - pad * 2])(root)
+    const posMap = new Map<string, { x: number; y: number }>()
+    for (const d of root.descendants()) {
+      posMap.set(d.data.id, { x: (d.x ?? 0) + pad, y: (d.y ?? 0) + pad })
+    }
+    for (const n of nodes.value) {
+      const pos = posMap.get(n.id)
+      if (pos) { n.x = pos.x; n.y = pos.y }
+      n.vx = 0; n.vy = 0
+    }
+  }
+
+  const applyForceLayout = () => {
+    layoutMode.value = 'force'
+    restart()
+  }
+
   onUnmounted(stop)
 
-  return { nodes, edges, options, addNode, addEdge, markExpanded, start, stop, restart }
+  return {
+    nodes, edges, options, layoutMode,
+    addNode, addEdge, markExpanded,
+    start, stop, restart,
+    applyClusterLayout, applyForceLayout,
+  }
 }
