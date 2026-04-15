@@ -29,7 +29,7 @@ def write_help() -> dict[str, object]:
 def _entity_types_by_domain() -> dict[str, list[str]]:
     grouped: dict[str, list[str]] = {}
     for type_name, info in sorted(ENTITY_TYPES.items()):
-        domain = info.layer_dir
+        domain = info.domain_dir
         grouped.setdefault(domain, []).append(type_name)
     return grouped
 

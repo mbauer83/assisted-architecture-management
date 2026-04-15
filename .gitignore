@@ -22,5 +22,8 @@ tools/plantuml.jar
 # Engagement-specific (not part of this repo)
 engagements/ENG-001/
 .arch/
+src/tools/model_mcp/__pycache__/
+src/tools/model_write/__pycache__/
+*.pyc
 
 plantuml.jar

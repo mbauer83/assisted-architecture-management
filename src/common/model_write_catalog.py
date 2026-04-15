@@ -5,14 +5,16 @@ from typing import Literal
 
 DiagramConnectionInferenceMode = Literal["none", "auto", "strict"]
 
-
+# 2026-04-15: EntityTypeInfo and ConnectionTypeInfo should be commonly used data-structures. Currently entity- and connection-info is duplicated and non-centralized (archimate_types.py, connection_ontology.py, model_write_catalog.py etc.)
+# EntityTypeInfo Needs additional info about entity class ([internal / external] [passive / active] structure element, [internal / external] behavior element).
+# Connection-restrictions (based on connection_ontology.py) can be specified in terms of predicates on 3-tuples of ([SOURCE], [RELATION], [TARGET]) where [SOURCE] and [TARGET] can be elements, connections or junctions.
 @dataclass(frozen=True)
 class EntityTypeInfo:
     artifact_type: str
     prefix: str
-    layer_dir: str
+    domain_dir: str
     subdir: str
-    archimate_layer: str
+    archimate_domain: str
     archimate_element_type: str
 
 
@@ -47,49 +49,28 @@ ENTITY_TYPES: dict[str, EntityTypeInfo] = {
     "event": EntityTypeInfo("event", "EVT", "common", "events", "Common", "Event"),
     "role": EntityTypeInfo("role", "ROL", "common", "roles", "Common", "Role"),
     "business-actor": EntityTypeInfo("business-actor", "ACT", "business", "actors", "Business", "BusinessActor"),
-    "business-role": EntityTypeInfo("business-role", "ROL", "business", "roles", "Business", "BusinessRole"),
-    "business-collaboration": EntityTypeInfo("business-collaboration", "BCO", "business", "collaborations", "Business", "BusinessCollaboration"),
     "business-interface": EntityTypeInfo("business-interface", "BIF", "business", "interfaces", "Business", "BusinessInterface"),
-    "business-process": EntityTypeInfo("business-process", "BPR", "business", "processes", "Business", "BusinessProcess"),
-    "business-function": EntityTypeInfo("business-function", "BFN", "business", "functions", "Business", "BusinessFunction"),
-    "business-interaction": EntityTypeInfo("business-interaction", "BIA", "business", "interactions", "Business", "BusinessInteraction"),
-    "business-event": EntityTypeInfo("business-event", "BEV", "business", "events", "Business", "BusinessEvent"),
-    "business-service": EntityTypeInfo("business-service", "BSV", "business", "services", "Business", "BusinessService"),
     "business-object": EntityTypeInfo("business-object", "BOB", "business", "objects", "Business", "BusinessObject"),
     "contract": EntityTypeInfo("contract", "CTR", "business", "contracts", "Business", "Contract"),
-    "representation": EntityTypeInfo("representation", "RPR", "business", "representations", "Business", "Representation"),
     "product": EntityTypeInfo("product", "PRD", "business", "products", "Business", "Product"),
     "application-component": EntityTypeInfo("application-component", "APP", "application", "components", "Application", "ApplicationComponent"),
-    "application-collaboration": EntityTypeInfo("application-collaboration", "ACO", "application", "collaborations", "Application", "ApplicationCollaboration"),
     "application-interface": EntityTypeInfo("application-interface", "AIF", "application", "interfaces", "Application", "ApplicationInterface"),
-    "application-function": EntityTypeInfo("application-function", "AFN", "application", "functions", "Application", "ApplicationFunction"),
-    "application-interaction": EntityTypeInfo("application-interaction", "AIA", "application", "interactions", "Application", "ApplicationInteraction"),
-    "application-process": EntityTypeInfo("application-process", "APR", "application", "processes", "Application", "ApplicationProcess"),
-    "application-event": EntityTypeInfo("application-event", "AEV", "application", "events", "Application", "ApplicationEvent"),
-    "application-service": EntityTypeInfo("application-service", "ASV", "application", "services", "Application", "ApplicationService"),
     "data-object": EntityTypeInfo("data-object", "DOB", "application", "data-objects", "Application", "DataObject"),
     "technology-node": EntityTypeInfo("technology-node", "NOD", "technology", "nodes", "Technology", "Node"),
     "device": EntityTypeInfo("device", "DEV", "technology", "devices", "Technology", "Device"),
     "system-software": EntityTypeInfo("system-software", "SSW", "technology", "system-software", "Technology", "SystemSoftware"),
-    "technology-collaboration": EntityTypeInfo("technology-collaboration", "TCO", "technology", "collaborations", "Technology", "TechnologyCollaboration"),
     "technology-interface": EntityTypeInfo("technology-interface", "TIF", "technology", "interfaces", "Technology", "TechnologyInterface"),
     "path": EntityTypeInfo("path", "PTH", "technology", "paths", "Technology", "Path"),
     "communication-network": EntityTypeInfo("communication-network", "NET", "technology", "networks", "Technology", "CommunicationNetwork"),
-    "technology-function": EntityTypeInfo("technology-function", "TFN", "technology", "functions", "Technology", "TechnologyFunction"),
-    "technology-process": EntityTypeInfo("technology-process", "TPR", "technology", "processes", "Technology", "TechnologyProcess"),
-    "technology-interaction": EntityTypeInfo("technology-interaction", "TIA", "technology", "interactions", "Technology", "TechnologyInteraction"),
-    "technology-event": EntityTypeInfo("technology-event", "TEV", "technology", "events", "Technology", "TechnologyEvent"),
-    "technology-service": EntityTypeInfo("technology-service", "TSV", "technology", "services", "Technology", "TechnologyService"),
     "artifact": EntityTypeInfo("artifact", "ART", "technology", "artifacts", "Technology", "Artifact"),
-    "equipment": EntityTypeInfo("equipment", "EQP", "physical", "equipment", "Physical", "Equipment"),
-    "facility": EntityTypeInfo("facility", "FAC", "physical", "facilities", "Physical", "Facility"),
-    "distribution-network": EntityTypeInfo("distribution-network", "DIS", "physical", "distribution-networks", "Physical", "DistributionNetwork"),
-    "material": EntityTypeInfo("material", "MAT", "physical", "materials", "Physical", "Material"),
+    "equipment": EntityTypeInfo("equipment", "EQP", "technology", "equipment", "Technology", "Equipment"),
+    "facility": EntityTypeInfo("facility", "FAC", "technology", "facilities", "Technology", "Facility"),
+    "distribution-network": EntityTypeInfo("distribution-network", "DIS", "technology", "distribution-networks", "Technology", "DistributionNetwork"),
+    "material": EntityTypeInfo("material", "MAT", "technology", "materials", "Technology", "Material"),
     "work-package": EntityTypeInfo("work-package", "WP", "implementation", "work-packages", "Implementation", "WorkPackage"),
     "deliverable": EntityTypeInfo("deliverable", "DEL", "implementation", "deliverables", "Implementation", "Deliverable"),
     "implementation-event": EntityTypeInfo("implementation-event", "IEV", "implementation", "events", "Implementation", "ImplementationEvent"),
     "plateau": EntityTypeInfo("plateau", "PLT", "implementation", "plateaus", "Implementation", "Plateau"),
-    "gap": EntityTypeInfo("gap", "GAP", "implementation", "gaps", "Implementation", "Gap"),
 }
 
 

@@ -324,7 +324,7 @@ def check_attribute_schema(
     schema = load_attribute_schema(repo_root, str(artifact_type))
     if schema is None:
         return
-    props = _parse_properties_table(content)
+    props = parse_properties_table(content)
     if props is None:
         # No Properties table found — if schema has required fields, report
         required = schema.get("required", [])
@@ -346,7 +346,7 @@ def check_attribute_schema(
         ))
 
 
-def _parse_properties_table(content: str) -> dict[str, str] | None:
+def parse_properties_table(content: str) -> dict[str, str] | None:
     """Extract key-value pairs from the ``## Properties`` markdown table.
 
     Returns ``None`` if no Properties table is found, or a dict mapping

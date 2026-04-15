@@ -53,10 +53,10 @@ def create_entity(
     last = last_updated or today_iso()
 
     eid = artifact_id or generate_entity_id(info.prefix, name)
-    path = repo_root / "model" / info.layer_dir / info.subdir / f"{eid}.md"
+    path = repo_root / "model" / info.domain_dir / info.subdir / f"{eid}.md"
 
     display = {
-        "domain": info.archimate_layer,
+        "domain": info.archimate_domain,
         "element-type": info.archimate_element_type,
         "label": name,
         "alias": f"{info.prefix}_{eid.split('.')[1]}" if '.' in eid else eid.replace("-", "_"),

@@ -320,25 +320,21 @@ skinparam rectangle<<Artifact>> {
   BackgroundColor #CCFFCC
   BorderColor #2E7D32
 }
-
-' ---------------------------------------------------------------------------
-' Physical layer  (#FFE0B2 — light orange)
-' ---------------------------------------------------------------------------
 skinparam rectangle<<Equipment>> {
-  BackgroundColor #FFE0B2
-  BorderColor #BF360C
+  BackgroundColor #CCFFCC
+  BorderColor #2E7D32
 }
 skinparam rectangle<<Facility>> {
-  BackgroundColor #FFE0B2
-  BorderColor #BF360C
+  BackgroundColor #CCFFCC
+  BorderColor #2E7D32
 }
 skinparam rectangle<<DistributionNetwork>> {
-  BackgroundColor #FFE0B2
-  BorderColor #BF360C
+  BackgroundColor #CCFFCC
+  BorderColor #2E7D32
 }
 skinparam rectangle<<Material>> {
-  BackgroundColor #FFE0B2
-  BorderColor #BF360C
+  BackgroundColor #CCFFCC
+  BorderColor #2E7D32
 }
 
 ' ---------------------------------------------------------------------------
@@ -353,10 +349,6 @@ skinparam rectangle<<Deliverable>> {
   BorderColor #8D4E00
 }
 skinparam rectangle<<ImplementationEvent>> {
-  BackgroundColor #FFE4C4
-  BorderColor #8D4E00
-}
-skinparam rectangle<<Gap>> {
   BackgroundColor #FFE4C4
   BorderColor #8D4E00
 }

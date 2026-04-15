@@ -21,7 +21,7 @@ Three semantic domains are covered:
    CQ ↔ "clarification request/question", ALG ↔ "algedonic", ADM ↔ "TOGAF phases", etc.
 
 3. **ArchiMate artifact-id prefix ↔ element type**
-   BPR ↔ "business process", APP ↔ "application component", etc.
+   APP ↔ "application component", etc.
    Also common domain concepts → related terms for improved recall.
 
 Usage
@@ -77,25 +77,16 @@ DOMAIN_SYNONYMS: dict[str, list[str]] = {
     # -----------------------------------------------------------------------
     # ArchiMate artifact-id prefixes ↔ element types
     # -----------------------------------------------------------------------
-    "bpr":  ["business", "process"],
-    "bsv":  ["business", "service"],
-    "bfn":  ["business", "function"],
-    "bev":  ["business", "event"],
     "bob":  ["business", "object"],
     "bif":  ["business", "interface"],
-    "bco":  ["business", "collaboration"],
     "act":  ["actor", "role", "agent", "business"],
-    "rol":  ["role", "business", "function"],
+    "rol":  ["role", "function"],
     "cap":  ["capability", "strategic"],
     "vs":   ["value", "stream"],
     "res":  ["resource", "strategic"],
     "app":  ["application", "component"],
-    "asv":  ["application", "service"],
-    "afn":  ["application", "function"],
     "aif":  ["interface", "port", "application"],
-    "aev":  ["application", "event"],
     "dob":  ["data", "object"],
-    "aco":  ["application", "collaboration"],
     "stk":  ["stakeholder"],
     "drv":  ["driver", "motivation"],
     "req":  ["requirement"],
@@ -108,7 +99,6 @@ DOMAIN_SYNONYMS: dict[str, list[str]] = {
     "ass":  ["assessment"],
     "wp":   ["work", "package", "implementation"],
     "del":  ["deliverable", "output"],
-    "gap":  ["gap", "analysis"],
     "plt":  ["plateau", "migration"],
     "nod":  ["node", "technology"],
     "ssw":  ["system", "software", "platform"],
@@ -229,24 +219,17 @@ def archimate_prefix_to_type() -> dict[str, str]:
         "RES": "resource",
         "COA": "course-of-action",
         "ACT": "business-actor",
-        "ROL": "business-role",
-        "BCO": "business-collaboration",
-        "BPR": "business-process",
-        "BFN": "business-function",
-        "BEV": "business-event",
-        "BSV": "business-service",
+        "ROL": "role",
+        "PRC": "process",
+        "FNC": "function",
+        "SRV": "service",
+        "INT": "interaction",
+        "EVT": "event",
         "BOB": "business-object",
         "BIF": "business-interface",
         "PRD": "product",
         "CTR": "contract",
-        "RPR": "representation",
         "APP": "application-component",
-        "ACO": "application-collaboration",
-        "AIA": "application-interaction",
-        "APR": "application-process",
-        "AFN": "application-function",
-        "AEV": "application-event",
-        "ASV": "application-service",
         "AIF": "application-interface",
         "DOB": "data-object",
         "NOD": "node",
@@ -255,13 +238,9 @@ def archimate_prefix_to_type() -> dict[str, str]:
         "TSV": "technology-service",
         "ART": "artifact",
         "NET": "network",
-        "TFN": "technology-function",
-        "TEV": "technology-event",
         "TIF": "technology-interface",
-        "TPR": "technology-process",
         "WP":  "work-package",
         "DEL": "deliverable",
-        "GAP": "gap",
         "PLT": "plateau",
         "IEV": "implementation-event",
     }

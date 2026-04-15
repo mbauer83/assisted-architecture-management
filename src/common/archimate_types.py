@@ -34,6 +34,55 @@ Design notes
 # (the ``artifact-type:`` field in entity frontmatter)
 # ---------------------------------------------------------------------------
 
+# Needs more information about classification hierarchy per domain (including specialization of "virtual" grouping classes) and should use EntityTypeInfo dataclass centrally.
+# See comments in model_write_catalog.py and connection_ontology.py for more details.
+# 
+# Core Domains
+#
+# Common Domain:
+# - External Active Structure Element (Interface) is an Active Structure Element
+# - Internal Active Structure Element is an Active Structure Element
+# - Path is an Active Structure Element
+# - Collaboration is an Internal Active Structure Element
+# - Role is an Internal Active Structure Element
+# - Process is an Internal Behavior Element
+# - Function is an Internal Behavior Element
+# - Grouping is a Composite Element
+# - Location is a Composite Element
+#
+# Motivation Domain:
+# - Stakeholder, Meaning, Value, Driver, Assessment, Goal, Outcome, Principle, Requirement are Motivation Elements
+#
+# Strategy Domain:
+# - Resource is a Structure Element
+# - Strategy Behavior Elements are Behavior Elements
+# - Capability, Course of Action, Value Stream are Strategy Behavior Elements
+#
+# Business Domain:
+# - Business Interface is an External Active Structure Element (Interface)
+# - Business Actor is an Internal Active Structure Element
+# - Business Object is a Passive Structure Element
+# - Product is a Composite Element
+#
+# Application Domain:
+# - Application Interface is an External Active Structure Element (Interface)
+# - Application Component is an Internal Active Structure Element
+# - Data Object is a Passive Structure Element
+#
+# Technology Domain:
+# - Technology Interface is an External Active Structure Element (Interface)
+# - Technology Internal Active Structure Elements are Technology Active Structure Elements
+# - Communication Network, Distribution Network are Technology Active Structure Elements
+# - Node, Device, System Software, Facility, Equipment are Technology Internal Active Structure Elements
+# - Technology Passive Structure Elements are Passive Structure Elements
+# - Artifact, Material are Technology Passive Structure Elements
+#
+# Implementation & Migration Domain:
+# - Work Package is a Behavior Element
+# - Deliverable is a Passive Structure Element
+# - Plateau is a Composite Element
+
+
 ENTITY_TYPES_BY_DOMAIN: dict[str, frozenset[str]] = {
     "motivation": frozenset(
         {
@@ -70,30 +119,16 @@ ENTITY_TYPES_BY_DOMAIN: dict[str, frozenset[str]] = {
     "business": frozenset(
         {
             "business-actor",
-            "business-role",
-            "business-collaboration",
             "business-interface",
-            "business-process",
-            "business-function",
-            "business-interaction",
-            "business-event",
-            "business-service",
             "business-object",
             "contract",
-            "representation",
             "product",
         }
     ),
     "application": frozenset(
         {
             "application-component",
-            "application-collaboration",
             "application-interface",
-            "application-function",
-            "application-interaction",
-            "application-process",
-            "application-event",
-            "application-service",
             "data-object",
         }
     ),
@@ -102,20 +137,10 @@ ENTITY_TYPES_BY_DOMAIN: dict[str, frozenset[str]] = {
             "technology-node",
             "device",
             "system-software",
-            "technology-collaboration",
             "technology-interface",
             "path",
             "communication-network",
-            "technology-function",
-            "technology-process",
-            "technology-interaction",
-            "technology-event",
-            "technology-service",
             "artifact",
-        }
-    ),
-    "physical": frozenset(
-        {
             "equipment",
             "facility",
             "distribution-network",
@@ -128,7 +153,6 @@ ENTITY_TYPES_BY_DOMAIN: dict[str, frozenset[str]] = {
             "deliverable",
             "implementation-event",
             "plateau",
-            "gap",
         }
     ),
 }
@@ -240,30 +264,16 @@ ARCHIMATE_ELEMENT_TYPES_BY_DOMAIN: dict[str, frozenset[str]] = {
     "business": frozenset(
         {
             "BusinessActor",
-            "BusinessRole",
-            "BusinessCollaboration",
             "BusinessInterface",
-            "BusinessProcess",
-            "BusinessFunction",
-            "BusinessInteraction",
-            "BusinessEvent",
-            "BusinessService",
             "BusinessObject",
             "Contract",
-            "Representation",
             "Product",
         }
     ),
     "application": frozenset(
         {
             "ApplicationComponent",
-            "ApplicationCollaboration",
             "ApplicationInterface",
-            "ApplicationFunction",
-            "ApplicationInteraction",
-            "ApplicationProcess",
-            "ApplicationEvent",
-            "ApplicationService",
             "DataObject",
         }
     ),
@@ -272,20 +282,10 @@ ARCHIMATE_ELEMENT_TYPES_BY_DOMAIN: dict[str, frozenset[str]] = {
             "Node",
             "Device",
             "SystemSoftware",
-            "TechnologyCollaboration",
             "TechnologyInterface",
             "Path",
             "CommunicationNetwork",
-            "TechnologyFunction",
-            "TechnologyProcess",
-            "TechnologyInteraction",
-            "TechnologyEvent",
-            "TechnologyService",
             "Artifact",
-        }
-    ),
-    "physical": frozenset(
-        {
             "Equipment",
             "Facility",
             "DistributionNetwork",
@@ -298,7 +298,6 @@ ARCHIMATE_ELEMENT_TYPES_BY_DOMAIN: dict[str, frozenset[str]] = {
             "Deliverable",
             "ImplementationEvent",
             "Plateau",
-            "Gap",
         }
     ),
 }

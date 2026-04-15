@@ -56,20 +56,18 @@ _DOMAIN_ORDER = {
     "business": 3,
     "application": 4,
     "technology": 5,
-    "physical": 6,
-    "implementation": 7,
+    "implementation": 6,
 }
 
 _PREFIX_ORDER = [
     "STK", "DRV", "ASM", "GOL", "OUT", "PRI", "REQ", "CST", "MEA", "VAL",
     "CAP", "VS", "RES", "COA",
     "SRV", "PRC", "FNC", "INT", "EVT", "ROL",
-    "ACT", "BCO", "BIF", "BPR", "BFN", "BIA", "BEV", "BSV", "BOB",
-    "APP", "ACO", "AIF", "AFN", "AIA", "APR", "AEV", "ASV", "DOB",
-    "NOD", "DEV", "SSW", "TCO", "TIF", "PTH", "NET", "TFN", "TPR",
-    "TIA", "TEV", "TSV", "ART",
+    "ACT", "BIF", "BOB",
+    "APP", "AIF", "DOB",
+    "NOD", "DEV", "SSW", "TIF", "PTH", "NET", "ART",
     "EQP", "FAC", "DIS", "MAT",
-    "WP", "DEL", "IEV", "GAP", "PLT",
+    "WP", "DEL", "IEV", "PLT",
 ]
 
 
