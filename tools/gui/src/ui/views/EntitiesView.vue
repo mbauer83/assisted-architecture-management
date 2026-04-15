@@ -15,8 +15,8 @@ const DOMAINS = [
   { key: '', label: 'All' },
   { key: 'motivation', label: 'Motivation' },
   { key: 'strategy', label: 'Strategy' },
-  { key: 'business', label: 'Business' },
   { key: 'common', label: 'Common' },
+  { key: 'business', label: 'Business' },
   { key: 'application', label: 'Application' },
   { key: 'technology', label: 'Technology' },
 ]
@@ -120,12 +120,12 @@ const friendlyId = (id: string) => {
 .domain-btn:hover { background: #f3f4f6; }
 .domain-btn.active { background: #eff6ff; color: #1d4ed8; font-weight: 500; }
 
-.domain--motivation.active { border-left-color: #d97706; }
-.domain--strategy.active   { border-left-color: #059669; }
-.domain--business.active   { border-left-color: #ca8a04; }
-.domain--common.active     { border-left-color: #92735a; }
-.domain--application.active{ border-left-color: #2563eb; }
-.domain--technology.active { border-left-color: #16a34a; }
+.domain--motivation.active { border-left-color: #d8c1e4; }
+.domain--strategy.active   { border-left-color: #efbd5d; }
+.domain--business.active   { border-left-color: #f4de7f; }
+.domain--common.active     { border-left-color: #e8e5d3; }
+.domain--application.active{ border-left-color: #b6d7e1; }
+.domain--technology.active { border-left-color: #c3e1b4; }
 
 .content { flex: 1; min-width: 0; }
 
@@ -161,12 +161,12 @@ const friendlyId = (id: string) => {
   background: #f3f4f6;
   color: #374151;
 }
-.domain-badge.domain--motivation { background: #fef3c7; color: #92400e; }
-.domain-badge.domain--strategy   { background: #d1fae5; color: #065f46; }
-.domain-badge.domain--business   { background: #fef9c3; color: #713f12; }
-.domain-badge.domain--common     { background: #f5f0eb; color: #57534e; }
-.domain-badge.domain--application{ background: #dbeafe; color: #1e40af; }
-.domain-badge.domain--technology { background: #dcfce7; color: #14532d; }
+.domain-badge.domain--motivation { background: #d8c1e4; color: #252327; }
+.domain-badge.domain--strategy   { background: #efbd5d; color: #252327; }
+.domain-badge.domain--business   { background: #f4de7f; color: #252327; }
+.domain-badge.domain--common     { background: #e8e5d3; color: #252327; }
+.domain-badge.domain--application{ background: #b6d7e1; color: #252327; }
+.domain-badge.domain--technology { background: #c3e1b4; color: #252327; }
 
 .status-badge {
   display: inline-block;

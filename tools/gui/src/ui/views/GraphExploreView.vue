@@ -56,8 +56,8 @@ const dragging = ref<GraphNode | null>(null)
 const dragOffset = ref({ x: 0, y: 0 })
 
 const DOMAIN_COLORS: Record<string, string> = {
-  motivation: '#d97706', strategy: '#059669', business: '#ca8a04',
-  common: '#92735a', application: '#2563eb', technology: '#16a34a',
+  motivation: '#d8c1e4', strategy: '#efbd5d', business: '#f4de7f',
+  common: '#e8e5d3', application: '#b6d7e1', technology: '#c3e1b4',
 }
 
 const nodeColor = (n: GraphNode) => DOMAIN_COLORS[n.domain ?? ''] ?? '#6b7280'
@@ -362,13 +362,13 @@ const edgePath = (e: typeof edges.value[number]) => {
 .content-body { font-size: 13px; line-height: 1.5; color: #374151; max-height: 300px; overflow-y: auto; }
 .content-body :deep(p) { margin: 0.5rem 0; }
 .domain-badge, .status-badge { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 500; }
-.domain--motivation { background: #fef3c7; color: #92400e; }
-.domain--strategy { background: #d1fae5; color: #065f46; }
-.domain--business { background: #fef9c3; color: #713f12; }
-.domain--common { background: #f5f0eb; color: #57534e; }
-.domain--application { background: #dbeafe; color: #1e40af; }
-.domain--technology { background: #dcfce7; color: #14532d; }
-.status--draft { background: #f3f4f6; color: #6b7280; }
-.status--active { background: #dcfce7; color: #166534; }
-.status--deprecated { background: #fee2e2; color: #991b1b; }
+.domain--motivation  { background: #d8c1e4; color: #252327; }
+.domain--strategy    { background: #efbd5d; color: #252327; }
+.domain--business    { background: #f4de7f; color: #252327; }
+.domain--common      { background: #e8e5d3; color: #252327; }
+.domain--application { background: #b6d7e1; color: #252327; }
+.domain--technology  { background: #c3e1b4; color: #252327; }
+.status--draft       { background: #f3f4f6; color: #6b7280; }
+.status--active      { background: #dcfce7; color: #166534; }
+.status--deprecated  { background: #fee2e2; color: #991b1b; }
 </style>

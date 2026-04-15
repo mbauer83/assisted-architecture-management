@@ -138,12 +138,12 @@ const friendlyName = (id: string) => {
   font-size: 11px;
   font-weight: 500;
 }
-.domain--motivation { background: #fef3c7; color: #92400e; }
-.domain--strategy   { background: #d1fae5; color: #065f46; }
-.domain--business   { background: #fef9c3; color: #713f12; }
-.domain--common     { background: #f5f0eb; color: #57534e; }
-.domain--application{ background: #dbeafe; color: #1e40af; }
-.domain--technology { background: #dcfce7; color: #14532d; }
+.domain--motivation { background: #d8c1e4; color: #252327; }
+.domain--strategy   { background: #efbd5d; color: #252327; }
+.domain--business   { background: #f4de7f; color: #252327; }
+.domain--common     { background: #e8e5d3; color: #252327; }
+.domain--application{ background: #b6d7e1; color: #252327; }
+.domain--technology { background: #c3e1b4; color: #252327; }
 
 .status-badge {
   display: inline-block;

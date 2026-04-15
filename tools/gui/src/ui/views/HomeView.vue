@@ -11,8 +11,8 @@ const { data: stats, error, loading, run } = useAsync<Stats>()
 const DOMAINS = [
   { key: 'motivation', label: 'Motivation' },
   { key: 'strategy', label: 'Strategy' },
-  { key: 'business', label: 'Business' },
   { key: 'common', label: 'Common' },
+  { key: 'business', label: 'Business' },
   { key: 'application', label: 'Application' },
   { key: 'technology', label: 'Technology' },
 ]
@@ -116,12 +116,12 @@ onMounted(() => run(svc.getStats()))
 .domain-name { font-weight: 500; font-size: 13px; }
 .domain-count { font-size: 20px; font-weight: 700; }
 
-.domain--motivation { border-left-color: #d97706; }
-.domain--strategy    { border-left-color: #059669; }
-.domain--business    { border-left-color: #ca8a04; }
-.domain--common      { border-left-color: #92735a; }
-.domain--application { border-left-color: #2563eb; }
-.domain--technology  { border-left-color: #16a34a; }
+.domain--motivation  { border-left-color: #d8c1e4; }
+.domain--strategy    { border-left-color: #efbd5d; }
+.domain--business    { border-left-color: #f4de7f; }
+.domain--common      { border-left-color: #e8e5d3; }
+.domain--application { border-left-color: #b6d7e1; }
+.domain--technology  { border-left-color: #c3e1b4; }
 
 .conn-table { border-collapse: collapse; }
 .conn-type { padding: 4px 16px 4px 0; font-family: monospace; font-size: 12px; color: #374151; }
