@@ -6,6 +6,6 @@ services:
     volumes:
       # Mount the repository to serve. Override ARCH_REPO_ROOT to point at any
       # architecture repository on the host.
-      - ${ARCH_REPO_ROOT:-./engagements/ENG-ARCH-REPO/architecture-repository}:/repo:ro
+      - ${ARCH_REPO_ROOT:-./engagements/ENG-ARCH-REPO/architecture-repository}:/repo
     environment:
       - PYTHONUNBUFFERED=1

@@ -636,6 +636,7 @@ def _read_entity(rec: EntityRecord, *, mode: Literal["summary", "full"]) -> dict
         "record_type": "entity",
         "path": str(rec.path),
         "content_snippet": rec.content_text[:400] + ("…" if len(rec.content_text) > 400 else ""),
+        "keywords": list(rec.keywords),
     }
     if mode == "full":
         data["content_text"] = rec.content_text

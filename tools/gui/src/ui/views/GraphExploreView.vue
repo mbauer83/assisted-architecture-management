@@ -4,7 +4,7 @@ import { useRoute, RouterLink } from 'vue-router'
 import { Effect } from 'effect'
 import { modelServiceKey } from '../keys'
 import { useAsync } from '../composables/useAsync'
-import { useForceGraph, type GraphNode, type LayoutMode } from '../composables/useForceGraph'
+import { useForceGraph, type GraphNode, type GraphEdge, type LayoutMode } from '../composables/useForceGraph'
 import type { EntityDetail, ConnectionList } from '../../domain'
 
 const svc = inject(modelServiceKey)!
@@ -19,9 +19,12 @@ const selectedDetail = useAsync<EntityDetail>()
 
 const {
   nodes, edges, options, layoutMode,
-  addNode, addEdge, markExpanded, restart,
+  addNode, addEdge, markExpanded, collapseNode, restart,
   applyClusterLayout, applyForceLayout,
 } = useForceGraph(() => svgWidth.value, () => svgHeight.value)
+
+// Selected edge (connection) for sidebar
+const selectedEdge = ref<GraphEdge | null>(null)
 
 const SPACING_PRESETS = [
   { label: 'Compact', repulsion: 1500, idealDist: 150 },
@@ -73,19 +76,25 @@ const truncLabel = (label: string, max = 22) =>
 // ── Data loading ─────────────────────────────────────────────────────────────
 
 const expandNode = (entityId: string) => {
+  const beforeIds = new Set(nodes.value.map((n) => n.id))
   Effect.runPromise(svc.getConnections(entityId, 'any')).then((conns: ConnectionList) => {
     for (const c of conns) {
       const otherId = c.source === entityId ? c.target : c.source
-      addNode({ id: otherId, label: friendlyName(otherId), type: otherId.split('@')[0] })
-      addEdge({ source: c.source, target: c.target, connType: c.conn_type })
+      const isNew = !beforeIds.has(otherId)
+      addNode({ id: otherId, label: friendlyName(otherId), type: otherId.split('@')[0], addedBy: isNew ? entityId : undefined })
+      addEdge({ source: c.source, target: c.target, connType: c.conn_type, description: c.content_text })
     }
     markExpanded(entityId)
-    // Resolve domain for newly added nodes
     for (const n of nodes.value) {
       if (!n.domain) resolveNodeDomain(n)
     }
-    if (layoutMode.value === 'cluster') applyClusterLayout(rootId.value)
-    else restart()
+    if (layoutMode.value === 'cluster') {
+      const { cx, cy } = applyClusterLayout(rootId.value, entityId)
+      if (cx !== undefined && cy !== undefined) {
+        viewBox.value.x = cx - viewBox.value.w / 2
+        viewBox.value.y = cy - viewBox.value.h / 2
+      }
+    } else restart()
   })
 }
 
@@ -93,6 +102,7 @@ const resolveNodeDomain = (n: GraphNode) => {
   Effect.runPromise(svc.getEntity(n.id)).then((d) => {
     n.domain = d.domain
     n.label = d.name || n.label
+    n.totalConns = (d.conn_in ?? 0) + (d.conn_sym ?? 0) + (d.conn_out ?? 0)
   }).catch(() => {})
 }
 
@@ -127,13 +137,25 @@ const updateSvgSize = () => {
 
 const selectNode = (id: string) => {
   selectedId.value = id
+  selectedEdge.value = null
   selectedDetail.run(svc.getEntity(id))
+}
+
+const onEdgeClick = (e: typeof edges.value[number]) => {
+  selectedEdge.value = e
+  selectedId.value = null
 }
 
 const onNodeClick = (n: GraphNode) => selectNode(n.id)
 
 const onNodeDblClick = (n: GraphNode) => {
-  if (!n.expanded) expandNode(n.id)
+  if (n.expanded) {
+    collapseNode(n.id)
+    if (layoutMode.value === 'cluster') applyClusterLayout(rootId.value)
+    else restart()
+  } else {
+    expandNode(n.id)
+  }
 }
 
 // ── Drag ─────────────────────────────────────────────────────────────────────
@@ -252,9 +274,11 @@ const edgePath = (e: typeof edges.value[number]) => {
             <polygon points="0 0, 8 3, 0 6" fill="#9ca3af" />
           </marker>
         </defs>
-        <!-- Edges -->
-        <g v-for="(e, i) in edges" :key="'e'+i">
+        <!-- Edges (wider hit area via transparent overlay) -->
+        <g v-for="(e, i) in edges" :key="'e'+i" class="graph-edge" @click.stop="onEdgeClick(e)">
           <path :d="edgePath(e)" stroke="#d1d5db" stroke-width="1.5" fill="none" marker-end="url(#arrowhead)" />
+          <path :d="edgePath(e)" stroke="transparent" stroke-width="10" fill="none"
+            :class="{ 'edge-selected': selectedEdge === e }" />
         </g>
         <!-- Nodes -->
         <g
@@ -278,13 +302,14 @@ const edgePath = (e: typeof edges.value[number]) => {
           <text dy="40" text-anchor="middle" fill="#374151" font-size="10">
             {{ truncLabel(n.label) }}
           </text>
+          <!-- + badge: show if unexpanded AND (totalConns unknown OR > 0) -->
           <circle
-            v-if="!n.expanded"
+            v-if="!n.expanded && (n.totalConns === undefined || n.totalConns > 0)"
             cx="17" cy="-17" r="7"
             fill="#2563eb" stroke="white" stroke-width="1.5" cursor="pointer"
           />
           <text
-            v-if="!n.expanded"
+            v-if="!n.expanded && (n.totalConns === undefined || n.totalConns > 0)"
             x="17" y="-14"
             text-anchor="middle" fill="white" font-size="9" font-weight="bold"
             pointer-events="none"
@@ -295,7 +320,26 @@ const edgePath = (e: typeof edges.value[number]) => {
 
     <aside class="graph-sidebar">
       <h2 class="sidebar-title">Details</h2>
-      <div v-if="!selectedId" class="sidebar-empty">Click a node to view details</div>
+      <div v-if="!selectedId && !selectedEdge" class="sidebar-empty">Click a node or edge to view details</div>
+
+      <!-- Edge details -->
+      <template v-else-if="selectedEdge">
+        <div class="detail-field"><label>Connection type</label><span class="detail-value mono">{{ selectedEdge.connType }}</span></div>
+        <div class="detail-field">
+          <label>Source</label>
+          <RouterLink :to="{ path: '/entity', query: { id: selectedEdge.source } }" class="detail-value detail-link">{{ friendlyName(selectedEdge.source) }}</RouterLink>
+        </div>
+        <div class="detail-field">
+          <label>Target</label>
+          <RouterLink :to="{ path: '/entity', query: { id: selectedEdge.target } }" class="detail-value detail-link">{{ friendlyName(selectedEdge.target) }}</RouterLink>
+        </div>
+        <div v-if="selectedEdge.description?.trim()" class="detail-content">
+          <label>Description</label>
+          <div class="content-body">{{ selectedEdge.description.trim() }}</div>
+        </div>
+      </template>
+
+      <!-- Node details -->
       <div v-else-if="selectedDetail.loading.value" class="sidebar-loading">Loading...</div>
       <div v-else-if="selectedDetail.error.value" class="sidebar-error">{{ selectedDetail.error.value }}</div>
       <template v-else-if="sd">
@@ -311,6 +355,9 @@ const edgePath = (e: typeof edges.value[number]) => {
         <div v-if="sd.content_html" class="detail-content">
           <label>Content</label>
           <div class="content-body markdown-body" v-html="sd.content_html"></div>
+        </div>
+        <div class="detail-explore">
+          <RouterLink :to="{ path: '/graph', query: { id: selectedId } }" class="explore-link">Explore graph →</RouterLink>
         </div>
       </template>
     </aside>
@@ -342,6 +389,9 @@ const edgePath = (e: typeof edges.value[number]) => {
 .graph-svg:active { cursor: grabbing; }
 .graph-node { cursor: pointer; }
 .graph-node:hover circle:first-child { filter: brightness(1.15); }
+.graph-edge { cursor: pointer; }
+.graph-edge:hover path:first-child { stroke: #6b7280; }
+.edge-selected { stroke: #2563eb !important; opacity: 0.3; }
 
 .graph-sidebar {
   width: 320px; background: white; border-left: 1px solid #e5e7eb;
@@ -359,8 +409,10 @@ const edgePath = (e: typeof edges.value[number]) => {
 .mono { font-family: monospace; }
 .detail-content { margin-top: 16px; }
 .detail-content label { display: block; font-size: 11px; color: #6b7280; text-transform: uppercase; letter-spacing: .05em; margin-bottom: 6px; }
-.content-body { font-size: 13px; line-height: 1.5; color: #374151; max-height: 300px; overflow-y: auto; }
+.content-body { font-size: 13px; line-height: 1.5; color: #374151; max-height: 300px; overflow-y: auto; white-space: pre-wrap; }
 .content-body :deep(p) { margin: 0.5rem 0; }
+.detail-explore { margin-top: 12px; }
+.explore-link { font-size: 12px; color: #2563eb; font-weight: 500; }
 .domain-badge, .status-badge { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 500; }
 .domain--motivation  { background: #d8c1e4; color: #252327; }
 .domain--strategy    { background: #efbd5d; color: #252327; }

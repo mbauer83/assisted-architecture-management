@@ -535,6 +535,44 @@ directly for verification.
 
 ---
 
+## WS-J: GUI Bug-Fix & Feature Wave (2026-04-15)
+
+### J1: Backend Data Enrichment ✓
+- [x] `src/common/model_query_types.py` — add `keywords: tuple[str, ...]` to `EntityRecord`
+- [x] `src/common/model_query_parsing.py` — extract keywords in `parse_entity`
+- [x] `src/common/model_query_repository.py` — include `keywords` + conn counts in `_read_entity` (full)
+- [x] `src/tools/model_write/boundary.py` — remove overly-strict `engagements` path check (keep enterprise-repository check only); fixes Docker + dev-mode write errors
+- [x] `src/tools/gui_server.py` — enrich `GET /api/entity` response with `keywords`, `summary`, `properties`, `notes` (via `parse_entity_file`); add `GET /api/entity-schemata?artifact_type=`; add `GET /api/diagram-entities?id=`
+
+### J2: Frontend Schema + Entity Detail View ✓
+- [x] `schemas.ts` — extend `EntityDetailSchema` with `keywords`, `summary`, `properties`, `notes`, `conn_in/sym/out`; extend `ConnectionRecordSchema` with `description` (alias of `content_text`); add `EntitySchemaInfoSchema`
+- [x] `ports/ModelRepository.ts`, `adapters/http/HttpModelRepository.ts`, `application/ModelService.ts` — wire `getEntitySchemata` and `getDiagramEntities`
+- [x] `EntityDetailView.vue` — fix `startEdit` to populate keywords from `keywords` field, summary from `summary` field, properties from `properties` field, notes from `notes` field
+
+### J3: Connection Info Tooltip ✓
+- [x] `ConnectionsPanel.vue` — add ⓘ icon next to connections that have `content_text`; on mouseover show a small tooltip with the description
+
+### J4: Entity Search Fix ✓
+- [x] `EntitySearchInput.vue` — add `artifactType` prop; pass it to backend `listEntities` instead of fetching all and filtering client-side by prefix (the prefix comparison was wrong: "GOAL@" vs actual "GOL@")
+- [x] `ConnectionsPanel.vue` — update EntitySearchInput usage to pass `artifactType={typeKey}`
+
+### J5: Graph Explorer Improvements ✓
+- [x] `useForceGraph.ts` — add `totalConns?` + `addedBy?` to `GraphNode`; add `description?` to `GraphEdge`; add `collapseNode`; `applyClusterLayout` returns center coords and uses growing canvas size
+- [x] `GraphExploreView.vue`:
+  - Selectable edges: click on edge path → show full connection details in the sidebar: connection type, source entity, target entity, description/summary (`content_text`)
+  - Collapse on dblclick: track `addedBy` per node; dblclick expanded node removes its subtree
+  - `+` badge: only show if `totalConns` is unknown or > 0 (set from entity detail on domain resolve)
+  - Cluster centering: after expansion, pan viewport to center on the expanded node
+
+### J6: Diagram Detail Entity List ✓
+- [x] `DiagramDetailView.vue` — add right-side entity list (identified by alias in PUML); clicking an entity shows its details (same fields and order as graph sidebar) + graph-explore link
+
+### J7: Entity Create Fixes ✓
+- [x] `EntityCreateView.vue` — widen form (max-width: 1160px, centered); Create button now enabled after clean preview (boundary fix in J1 unblocks preview)
+- [x] `EntityCreateView.vue` — on `artifact_type` change, fetch `GET /api/entity-schemata` and pre-populate properties table from schema-required fields; required fields' remove buttons disabled
+
+---
+
 ## Acceptance Criteria
 
 1. ✓ All entity files have complete frontmatter + content + display blocks

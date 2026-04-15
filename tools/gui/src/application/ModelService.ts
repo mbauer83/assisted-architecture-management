@@ -29,4 +29,6 @@ export const makeModelService = (repo: ModelRepository) =>
     getOntologyPair: (sourceType: string, targetType: string) => repo.getOntologyPair(sourceType, targetType),
     createEntity: (body: Parameters<ModelRepository['createEntity']>[0]) => repo.createEntity(body),
     editEntity: (body: Parameters<ModelRepository['editEntity']>[0]) => repo.editEntity(body),
+    getEntitySchemata: (artifactType: string) => repo.getEntitySchemata(artifactType),
+    getDiagramEntities: (diagramId: string) => repo.getDiagramEntities(diagramId),
   }) as const

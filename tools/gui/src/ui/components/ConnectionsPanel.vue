@@ -235,6 +235,10 @@ const confirmRemove = () => {
                 :to="{ path: '/entity', query: { id: otherEnd(c) } }"
                 class="conn-target"
               >{{ friendlyName(otherEnd(c)) }}</RouterLink>
+              <span v-if="c.content_text?.trim()" class="conn-info-wrap">
+                <span class="conn-info-btn" tabindex="0">ⓘ</span>
+                <span class="conn-info-tip">{{ c.content_text.trim() }}</span>
+              </span>
               <button class="icon-btn remove-btn" title="Remove connection" @click="startRemove(c)">×</button>
             </li>
           </ul>
@@ -252,7 +256,7 @@ const confirmRemove = () => {
             <div v-else class="state-msg">Loading connection types...</div>
             <div class="add-row">
               <EntitySearchInput
-                :type-prefix="typeKey"
+                :artifact-type="typeKey"
                 placeholder="Search target entity..."
                 @select="onSelectTarget"
               />
@@ -339,6 +343,21 @@ const confirmRemove = () => {
   background: #f3f4f6; color: #374151; white-space: nowrap;
 }
 .conn-target { font-weight: 500; }
+
+.conn-info-wrap {
+  position: relative; display: inline-flex; align-items: center; margin-left: 2px;
+}
+.conn-info-btn {
+  font-size: 12px; color: #6b7280; cursor: default; user-select: none; line-height: 1;
+}
+.conn-info-tip {
+  display: none; position: absolute; left: 100%; top: 50%; transform: translateY(-50%);
+  margin-left: 6px; background: #1e293b; color: #f1f5f9; font-size: 11px; line-height: 1.4;
+  padding: 6px 10px; border-radius: 6px; white-space: pre-wrap; max-width: 280px;
+  z-index: 60; pointer-events: none; box-shadow: 0 4px 12px rgba(0,0,0,.3);
+}
+.conn-info-wrap:hover .conn-info-tip,
+.conn-info-wrap:focus-within .conn-info-tip { display: block; }
 
 .icon-btn {
   width: 22px; height: 22px; border-radius: 4px; border: 1px solid #d1d5db;

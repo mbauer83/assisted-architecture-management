@@ -4,7 +4,7 @@ import { Effect } from 'effect'
 import { modelServiceKey } from '../keys'
 import type { EntityList } from '../../domain'
 
-const props = defineProps<{ placeholder?: string; typePrefix?: string }>()
+const props = defineProps<{ placeholder?: string; typePrefix?: string; artifactType?: string }>()
 const emit = defineEmits<{ select: [id: string, name: string] }>()
 
 const svc = inject(modelServiceKey)!
@@ -19,12 +19,11 @@ const doSearch = () => {
   const q = query.value.trim()
   if (q.length < 2) { results.value = []; return }
   loading.value = true
-  Effect.runPromise(svc.listEntities({ limit: 200 })).then((list) => {
+  // Use artifactType prop (preferred) or fall back to legacy typePrefix for backward compat
+  const filterType = props.artifactType ?? undefined
+  Effect.runPromise(svc.listEntities({ limit: 200, artifactType: filterType })).then((list) => {
     const lc = q.toLowerCase()
-    const prefix = props.typePrefix?.toUpperCase()
     results.value = list.items.filter((e) => {
-      // Constrain to entity type if prefix provided (e.g. "GOL", "CAP")
-      if (prefix && !e.artifact_id.startsWith(prefix + '@')) return false
       const friendly = e.name.toLowerCase()
       const randomPart = e.artifact_id.split('.')[1]?.toLowerCase() ?? ''
       return friendly.includes(lc) || randomPart.includes(lc) || e.artifact_id.toLowerCase().includes(lc)

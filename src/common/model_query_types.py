@@ -55,6 +55,7 @@ class EntityRecord:
     domain: Domain
     subdomain: str
     path: Path
+    keywords: tuple[str, ...]
     extra: dict[str, object]
     content_text: str
     display_blocks: dict[str, str]

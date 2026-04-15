@@ -142,7 +142,7 @@
 !define DECL_SSW_TzzVd rectangle "Git VCS" <<SystemSoftware>> as SSW_TzzVd
 !define DECL_SSW_o7a0ad rectangle "Python Runtime" <<SystemSoftware>> as SSW_o7a0ad
 !define DECL_SSW_xVrBYD rectangle "PlantUML Engine" <<SystemSoftware>> as SSW_xVrBYD
-!define DECL_TSV_MSy15f rectangle "File System Service" <<TechnologyService>> as TSV_MSy15f
-!define DECL_TSV_WluY9K rectangle "Version Control Service" <<TechnologyService>> as TSV_WluY9K
 !define DECL_ART_FtioFJ rectangle "SQLite Database" <<Artifact>> as ART_FtioFJ
 !define DECL_ART_YsLpM8 rectangle "Git Repository" <<Artifact>> as ART_YsLpM8
+!define DECL_TSV_MSy15f rectangle "File System Service" <<TechnologyService>> as TSV_MSy15f
+!define DECL_TSV_WluY9K rectangle "Version Control Service" <<TechnologyService>> as TSV_WluY9K

@@ -107,9 +107,27 @@ def list_entities(
 
 @app.get("/api/entity")
 def read_entity(id: str) -> dict[str, Any]:
-    result = _get_repo().read_artifact(id, mode="full")
+    repo = _get_repo()
+    result = repo.read_artifact(id, mode="full")
     if result is None:
         raise HTTPException(404, f"Not found: {id!r}")
+    # Enrich with parsed summary / properties / notes from file
+    entity_rec = repo.get_entity(id)
+    if entity_rec is not None:
+        from src.tools.model_write.parse_existing import parse_entity_file
+        try:
+            parsed = parse_entity_file(entity_rec.path)
+            result["summary"] = parsed.summary or ""
+            result["properties"] = parsed.properties
+            result["notes"] = parsed.notes or ""
+        except Exception:  # noqa: BLE001
+            pass
+        # Connection counts
+        counts = _build_conn_counts(repo)
+        inc, sym, out = counts.get(id, (0, 0, 0))
+        result["conn_in"] = inc
+        result["conn_sym"] = sym
+        result["conn_out"] = out
     return result
 
 
@@ -258,6 +276,48 @@ def get_ontology(
 def get_write_help() -> dict[str, Any]:
     from src.tools.model_write.help import write_help
     return write_help()
+
+
+@app.get("/api/entity-schemata")
+def get_entity_schemata(artifact_type: str) -> dict[str, Any]:
+    """Return the JSON attribute schema for an entity type, or {} if none configured."""
+    if _repo_root is None:
+        raise HTTPException(500, "Repository not initialized")
+    from src.common.model_schema import load_attribute_schema, schema_all_properties, schema_required_properties
+    schema = load_attribute_schema(_repo_root, artifact_type)
+    if schema is None:
+        return {"artifact_type": artifact_type, "schema": None, "properties": [], "required": []}
+    return {
+        "artifact_type": artifact_type,
+        "schema": schema,
+        "properties": schema_all_properties(schema),
+        "required": schema_required_properties(schema),
+    }
+
+
+_DOMAIN_ORDER = ["motivation", "strategy", "common", "business", "application", "technology", "implementation"]
+
+
+@app.get("/api/diagram-entities")
+def get_diagram_entities(id: str) -> list[dict[str, Any]]:
+    """Return entities referenced in a diagram, sorted by domain order."""
+    repo = _get_repo()
+    diag_rec = repo.get_diagram(id)
+    if diag_rec is None:
+        raise HTTPException(404, f"Diagram not found: {id!r}")
+    try:
+        puml = diag_rec.path.read_text(encoding="utf-8")
+    except OSError:
+        return []
+    entities = []
+    for rec in repo._entities.values():
+        if rec.display_alias and rec.display_alias in puml:
+            entities.append(_entity_to_summary(rec))
+    entities.sort(key=lambda e: (
+        _DOMAIN_ORDER.index(e["domain"]) if e["domain"] in _DOMAIN_ORDER else 99,
+        e["name"],
+    ))
+    return entities
 
 
 class AddConnectionBody(BaseModel):

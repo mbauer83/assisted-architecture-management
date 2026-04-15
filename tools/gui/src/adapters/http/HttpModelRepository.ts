@@ -14,6 +14,8 @@ import {
   DiagramRefsSchema,
   OntologyClassificationSchema,
   OntologyPairSchema,
+  EntitySchemaInfoSchema,
+  EntitySummarySchema,
 } from '../../domain/schemas'
 import { parseMarkdown } from '../../application/MarkdownService'
 
@@ -161,4 +163,12 @@ export const makeHttpModelRepository = (): ModelRepository => ({
   createEntity: (body) => postJson(buildUrl('/entity'), body, WriteResultSchema),
 
   editEntity: (body) => postJson(buildUrl('/entity/edit'), body, WriteResultSchema),
+
+  getEntitySchemata: (artifactType: string) =>
+    fetchJson(buildUrl('/entity-schemata', { artifact_type: artifactType }), EntitySchemaInfoSchema),
+
+  getDiagramEntities: (diagramId: string) =>
+    fetchJson(buildUrl('/diagram-entities', { id: diagramId }), Schema.Array(EntitySummarySchema)).pipe(
+      Effect.map((arr) => arr as import('../../domain').EntitySummary[]),
+    ),
 })

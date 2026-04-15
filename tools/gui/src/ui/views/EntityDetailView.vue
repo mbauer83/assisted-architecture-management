@@ -64,12 +64,11 @@ const startEdit = () => {
   if (!detail.data.value) return
   const d = detail.data.value
   editName.value = d.name
-  // Extract from display_blocks if present
-  editSummary.value = (d.display_blocks?.['Summary'] ?? d.content_snippet ?? '')
-  editKeywords.value = ''
+  editSummary.value = d.summary ?? ''
+  editKeywords.value = (d.keywords ?? []).join(', ')
   editStatus.value = d.status
-  editNotes.value = (d.display_blocks?.['Notes'] ?? '')
-  editProperties.value = []
+  editNotes.value = d.notes ?? ''
+  editProperties.value = Object.entries(d.properties ?? {}).map(([key, value]) => ({ key, value }))
   editPreview.value = null
   editError.value = null
   editing.value = true

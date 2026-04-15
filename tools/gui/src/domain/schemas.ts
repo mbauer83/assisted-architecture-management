@@ -47,10 +47,17 @@ export const EntityDetailSchema = Schema.Struct({
   record_type: Schema.Literal('entity'),
   path: Schema.String,
   content_snippet: Schema.String,
+  keywords: Schema.optional(Schema.Array(Schema.String)),
+  summary: Schema.optional(Schema.String),
+  properties: Schema.optional(Schema.Record({ key: Schema.String, value: Schema.String })),
+  notes: Schema.optional(Schema.String),
+  conn_in: Schema.optional(Schema.Number),
+  conn_sym: Schema.optional(Schema.Number),
+  conn_out: Schema.optional(Schema.Number),
   content_text: Schema.optional(Schema.String),
   content_html: Schema.optional(Schema.String),
   display_blocks: Schema.optional(Schema.Record({ key: Schema.String, value: Schema.String })),
-  extra: Schema.optional(Schema.Unknown),
+  extra: Schema.optional(Schema.Record({ key: Schema.String, value: Schema.Unknown })),
 })
 export type EntityDetail = typeof EntityDetailSchema.Type
 
@@ -64,7 +71,7 @@ export const ConnectionRecordSchema = Schema.Struct({
   version: Schema.String,
   status: Schema.String,
   path: Schema.String,
-  content_text: Schema.String,
+  content_text: Schema.String,   // raw body (description + optional properties)
 })
 export type ConnectionRecord = typeof ConnectionRecordSchema.Type
 
@@ -174,3 +181,13 @@ export type DiagramRef = typeof DiagramRefSchema.Type
 
 export const DiagramRefsSchema = Schema.Array(DiagramRefSchema)
 export type DiagramRefs = typeof DiagramRefsSchema.Type
+
+// ── Entity attribute schemata ─────────────────────────────────────────────────
+
+export const EntitySchemaInfoSchema = Schema.Struct({
+  artifact_type: Schema.String,
+  schema: Schema.NullOr(Schema.Unknown),
+  properties: Schema.Array(Schema.String),
+  required: Schema.Array(Schema.String),
+})
+export type EntitySchemaInfo = typeof EntitySchemaInfoSchema.Type

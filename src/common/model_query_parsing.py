@@ -93,6 +93,9 @@ def parse_entity(path: Path, model_root: Path) -> EntityRecord | None:
     display_blocks = extract_display_blocks(content)
     display_label, display_alias = extract_archimate_label_alias(display_blocks)
 
+    kw_raw = frontmatter.get("keywords") or []
+    keywords: tuple[str, ...] = tuple(str(k) for k in kw_raw) if isinstance(kw_raw, list) else ()
+
     return EntityRecord(
         artifact_id=str(frontmatter.get("artifact-id", entity_id_from_path(path))),
         artifact_type=str(frontmatter.get("artifact-type", "")),
@@ -101,6 +104,7 @@ def parse_entity(path: Path, model_root: Path) -> EntityRecord | None:
         status=str(frontmatter.get("status", "draft")),
         domain=domain,
         subdomain=subdomain,
+        keywords=keywords,
         path=path,
         extra={key: value for key, value in frontmatter.items() if key not in STANDARD_ENTITY_FIELDS},
         content_text=extract_section(content, "content"),

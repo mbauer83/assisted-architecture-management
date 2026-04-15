@@ -14,12 +14,15 @@ export interface GraphNode {
   vy: number
   expanded: boolean
   pinned: boolean
+  totalConns?: number   // sum of conn_in + conn_sym + conn_out; undefined = not yet loaded
+  addedBy?: string      // id of the node whose expansion added this node
 }
 
 export interface GraphEdge {
   source: string
   target: string
   connType: string
+  description?: string  // raw content_text from the connection
 }
 
 export interface ForceOptions {
@@ -166,23 +169,63 @@ export function useForceGraph(width: () => number, height: () => number) {
     return walk(rootId)
   }
 
-  const applyClusterLayout = (rootId: string) => {
+  const applyClusterLayout = (rootId: string, centerId?: string): { cx?: number; cy?: number } => {
     stop()
     layoutMode.value = 'cluster'
-    if (nodes.value.length === 0) return
+    if (nodes.value.length === 0) return {}
     const tree = buildTree(rootId)
     const root = hierarchy(tree)
     const pad = 60
-    cluster<TreeNode>().size([width() - pad * 2, height() - pad * 2])(root)
+    const n = nodes.value.length
+    // Use a canvas size that grows with node count so the graph can exceed the viewport
+    const W = Math.max(width() - pad * 2, n * 80)
+    const H = Math.max(height() - pad * 2, n * 40)
+    cluster<TreeNode>().size([W, H])(root)
     const posMap = new Map<string, { x: number; y: number }>()
     for (const d of root.descendants()) {
       posMap.set(d.data.id, { x: (d.x ?? 0) + pad, y: (d.y ?? 0) + pad })
     }
-    for (const n of nodes.value) {
-      const pos = posMap.get(n.id)
-      if (pos) { n.x = pos.x; n.y = pos.y }
-      n.vx = 0; n.vy = 0
+    for (const nd of nodes.value) {
+      const pos = posMap.get(nd.id)
+      if (pos) { nd.x = pos.x; nd.y = pos.y }
+      nd.vx = 0; nd.vy = 0
     }
+    const target = centerId ?? rootId
+    const pos = posMap.get(target)
+    return pos ? { cx: pos.x, cy: pos.y } : {}
+  }
+
+  /** Remove a node and all nodes that were added exclusively by its expansion. */
+  const collapseNode = (id: string) => {
+    const toRemove = new Set<string>()
+    const collect = (nodeId: string) => {
+      for (const n of nodes.value) {
+        if (n.addedBy === nodeId && !toRemove.has(n.id)) {
+          toRemove.add(n.id)
+          collect(n.id)
+        }
+      }
+    }
+    collect(id)
+    // Only remove a node if ALL its edges connect to either the collapsed subtree or the source
+    const retained = nodes.value.filter((n) => !toRemove.has(n.id)).map((n) => n.id)
+    const retainedSet = new Set(retained)
+    const safeToRemove = new Set<string>()
+    for (const rid of toRemove) {
+      const hasOutsideEdge = edges.value.some((e) =>
+        (e.source === rid || e.target === rid) &&
+        retainedSet.has(e.source === rid ? e.target : e.source) &&
+        e.source !== id && e.target !== id,
+      )
+      if (!hasOutsideEdge) safeToRemove.add(rid)
+    }
+    if (safeToRemove.size === 0) return
+    nodes.value = nodes.value.filter((n) => !safeToRemove.has(n.id))
+    edges.value = edges.value.filter(
+      (e) => !safeToRemove.has(e.source) && !safeToRemove.has(e.target),
+    )
+    const collapsed = nodes.value.find((n) => n.id === id)
+    if (collapsed) collapsed.expanded = false
   }
 
   const applyForceLayout = () => {
@@ -194,7 +237,7 @@ export function useForceGraph(width: () => number, height: () => number) {
 
   return {
     nodes, edges, options, layoutMode,
-    addNode, addEdge, markExpanded,
+    addNode, addEdge, markExpanded, collapseNode,
     start, stop, restart,
     applyClusterLayout, applyForceLayout,
   }

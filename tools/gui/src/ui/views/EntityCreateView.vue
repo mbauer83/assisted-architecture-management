@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { inject, onMounted, ref } from 'vue'
+import { inject, onMounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { Effect } from 'effect'
 import { modelServiceKey } from '../keys'
@@ -34,6 +34,22 @@ const busy = ref(false)
 const formError = ref<string | null>(null)
 const preview = ref<WriteResult | null>(null)
 const previewClean = ref(false)
+
+// ── Schema-driven properties ──────────────────────────────────────────────────
+
+const schemaProps = ref<string[]>([])
+const schemaRequired = ref<Set<string>>(new Set())
+
+watch(artifactType, (newType) => {
+  if (!newType) { schemaProps.value = []; schemaRequired.value = new Set(); return }
+  Effect.runPromise(svc.getEntitySchemata(newType)).then((info) => {
+    schemaProps.value = [...info.properties]
+    schemaRequired.value = new Set(info.required)
+    properties.value = info.properties.length > 0
+      ? [...info.properties].map((k) => ({ key: k, value: '' }))
+      : []
+  }).catch(() => { schemaProps.value = []; schemaRequired.value = new Set() })
+})
 
 // ── Property rows ─────────────────────────────────────────────────────────────
 
@@ -164,9 +180,9 @@ const doCreate = () => {
         <div class="form-row">
           <label class="form-label">Properties</label>
           <div v-for="(row, i) in properties" :key="i" class="prop-row">
-            <input v-model="row.key" class="prop-key" placeholder="key" />
+            <input v-model="row.key" class="prop-key" :placeholder="schemaRequired.has(row.key) ? row.key + ' *' : 'key'" :readonly="schemaProps.includes(row.key)" />
             <input v-model="row.value" class="prop-value" placeholder="value" />
-            <button class="remove-prop-btn icon-btn" @click="removePropRow(i)">×</button>
+            <button class="remove-prop-btn icon-btn" :disabled="schemaRequired.has(row.key)" @click="removePropRow(i)">×</button>
           </div>
           <button class="add-prop-btn" @click="addPropRow">+ Add property</button>
         </div>
@@ -213,7 +229,7 @@ const doCreate = () => {
 </template>
 
 <style scoped>
-.create-layout { max-width: 960px; }
+.create-layout { max-width: 1160px; margin: 0 auto; }
 
 .page-header { display: flex; align-items: center; gap: 16px; margin-bottom: 24px; }
 .back-link { font-size: 13px; color: #6b7280; background: none; border: none; cursor: pointer; padding: 0; }

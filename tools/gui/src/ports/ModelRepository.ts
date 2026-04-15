@@ -12,6 +12,8 @@ import type {
   DiagramRefs,
   OntologyClassification,
   OntologyPair,
+  EntitySchemaInfo,
+  EntitySummary,
 } from '../domain'
 import type { NetworkError, NotFoundError } from '../domain'
 import type { MarkdownError } from '../application/MarkdownService'
@@ -74,4 +76,6 @@ export interface ModelRepository {
     keywords?: string[]; version?: string; status?: string;
     dry_run?: boolean;
   }) => Effect.Effect<WriteResult, RepoError>
+  readonly getEntitySchemata: (artifactType: string) => Effect.Effect<EntitySchemaInfo, RepoError>
+  readonly getDiagramEntities: (diagramId: string) => Effect.Effect<EntitySummary[], RepoError>
 }
