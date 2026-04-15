@@ -1,0 +1,267 @@
+# Connection Ontology — ArchiMate NEXT connection types & relationship rules
+#
+# Single source of truth for connection type definitions and permitted
+# entity-level relationships.  Loaded by src/common/ontology_loader.py.
+#
+# Rule format:  [source, target, [connection-short-names]]
+#   source / target = entity type name, list of names, or @class reference
+#   @all   = every entity type
+#   @same  = same entity type as source
+#   @<cls> = element class from entity_ontology.yaml element_classes
+#   Connection short names are prefixed with "archimate-" at load time.
+
+# ── Connection type definitions ────────────────────────────────────────────
+
+connection_types:
+  archimate:
+    archimate-composition:
+      directory: composition
+      archimate_relationship_type: Composition
+      symmetric: false
+    archimate-aggregation:
+      directory: aggregation
+      archimate_relationship_type: Aggregation
+      symmetric: false
+    archimate-assignment:
+      directory: assignment
+      archimate_relationship_type: Assignment
+      symmetric: false
+    archimate-realization:
+      directory: realization
+      archimate_relationship_type: Realization
+      symmetric: false
+    archimate-serving:
+      directory: serving
+      archimate_relationship_type: Serving
+      symmetric: false
+    archimate-access:
+      directory: access
+      archimate_relationship_type: Access
+      symmetric: false
+    archimate-influence:
+      directory: influence
+      archimate_relationship_type: Influence
+      symmetric: false
+    archimate-association:
+      directory: association
+      archimate_relationship_type: Association
+      symmetric: true
+    archimate-specialization:
+      directory: specialization
+      archimate_relationship_type: Specialization
+      symmetric: false
+    archimate-flow:
+      directory: flow
+      archimate_relationship_type: Flow
+      symmetric: false
+    archimate-triggering:
+      directory: triggering
+      archimate_relationship_type: Triggering
+      symmetric: false
+
+  er:
+    er-one-to-many:    { directory: one-to-many }
+    er-many-to-many:   { directory: many-to-many }
+    er-one-to-one:     { directory: one-to-one }
+
+  sequence:
+    sequence-synchronous:  { directory: synchronous }
+    sequence-asynchronous: { directory: asynchronous }
+    sequence-return:       { directory: return }
+    sequence-create:       { directory: create }
+    sequence-destroy:      { directory: destroy }
+
+  activity:
+    activity-sequence-flow:    { directory: sequence-flow }
+    activity-decision:         { directory: decision }
+    activity-message-flow:     { directory: message-flow }
+    activity-data-association: { directory: data-association }
+
+  usecase:
+    usecase-include:        { directory: include }
+    usecase-extend:         { directory: extend }
+    usecase-association:    { directory: actor-association }
+    usecase-generalization: { directory: generalization }
+
+# ── Permitted relationship rules ───────────────────────────────────────────
+# Encoded from the ArchiMate NEXT specification.
+# Each rule is [source, target, [short connection types]].
+# Rules are additive — the loader merges all rules for each (src, tgt) pair.
+
+permitted_relationships:
+
+  # ── General ────────────────────────────────────────────────────────────
+  - ["@all", "@same", [aggregation, specialization]]
+  - ["@all", "@all", [association]]
+
+  # ── Common Domain (internal) ───────────────────────────────────────────
+  - ["@active-structure-element", path, [realization]]
+  - ["@external-active-structure-element", service, [assignment]]
+  - ["@internal-active-structure-element", role, [assignment]]
+  - [event, service, [triggering, flow]]
+  - [event, "@passive-structure-element", [access]]
+  - [event, "@internal-behavior-element", [triggering, flow]]
+  - [service, "@active-structure-element", [serving]]
+  - [service, service, [triggering, flow]]
+  - [service, "@passive-structure-element", [access]]
+  - [service, "@internal-behavior-element", [serving]]
+  - [role, "@external-active-structure-element", [aggregation]]
+  - [role, event, [assignment]]
+  - [role, "@internal-behavior-element", [assignment]]
+  - ["@internal-behavior-element", event, [triggering, flow]]
+  - ["@internal-behavior-element", service, [realization]]
+  - ["@internal-behavior-element", "@passive-structure-element", [access]]
+  - ["@internal-behavior-element", "@internal-behavior-element", [aggregation, triggering, flow]]
+
+  # ── Motivation Domain (internal) ───────────────────────────────────────
+  - ["@motivation-element", "@motivation-element", [influence]]
+  - [stakeholder, [meaning, value, driver], [association]]
+  - [value, outcome, [association]]
+  - [driver, [goal, assessment], [association]]
+  - [assessment, goal, [association]]
+  - [outcome, goal, [realization]]
+  - [principle, outcome, [realization]]
+  - [requirement, [principle, outcome], [realization]]
+
+  # ── Strategy Domain (internal) ─────────────────────────────────────────
+  - [resource, "@strategy-behavior-element", [assignment]]
+  - ["@strategy-behavior-element", "@strategy-behavior-element", [triggering, flow, serving]]
+  - [capability, course-of-action, [realization]]
+  - [value-stream, course-of-action, [realization]]
+
+  # ── Business Domain (internal) ─────────────────────────────────────────
+  - [business-actor, business-interface, [aggregation]]
+  - [business-actor, business-object, [assignment]]
+
+  # ── Application Domain (internal) ──────────────────────────────────────
+  - [application-component, application-interface, [assignment]]
+  - [application-component, data-object, [assignment]]
+
+  # ── Technology Domain (internal) ───────────────────────────────────────
+  - ["@technology-internal-active-structure-element", technology-interface, [aggregation]]
+  - [technology-node, [system-software, facility, device, equipment], [aggregation]]
+  - [system-software, system-software, [assignment]]
+  - [system-software, communication-network, [association]]
+  - [device, system-software, [assignment]]
+  - [device, communication-network, [association]]
+  - [equipment, device, [aggregation]]
+  - [facility, technology-node, [assignment, aggregation]]
+  - [facility, distribution-network, [association]]
+  - [facility, business-actor, [assignment]]
+  - [business-actor, distribution-network, [association]]
+
+  # ── Core Domain cross-relationships ────────────────────────────────────
+  - [application-interface, business-interface, [realization]]
+  - [data-object, business-object, [realization]]
+  - [technology-interface, application-interface, [realization]]
+  - [artifact, application-component, [realization]]
+  - [artifact, data-object, [realization]]
+  - [material, business-object, [realization]]
+
+  # ── Strategy → Motivation ──────────────────────────────────────────────
+  - ["@strategy-behavior-element", requirement, [influence, realization]]
+  - [resource, requirement, [influence, realization]]
+  - [course-of-action, outcome, [influence, realization]]
+
+  # ── Common → Motivation ────────────────────────────────────────────────
+  - [[event, function, path, process, role, service], requirement, [influence, realization]]
+
+  # ── Common → Strategy ──────────────────────────────────────────────────
+  - [[function, process], [capability, course-of-action, value-stream], [realization]]
+  - [path, resource, [realization]]
+
+  # ── Common → Business ──────────────────────────────────────────────────
+  - [[event, function, process], business-object, [access]]
+  - [role, business-interface, [aggregation]]
+  - [service, [business-actor, business-interface], [serving]]
+  - [service, business-object, [access]]
+
+  # ── Common → Application ───────────────────────────────────────────────
+  - [[event, function, process], data-object, [access]]
+  - [role, application-interface, [aggregation]]
+  - [service, [application-component, application-interface], [serving]]
+  - [service, data-object, [access]]
+
+  # ── Common → Technology ────────────────────────────────────────────────
+  - [[event, function, process, service], [artifact, material], [access]]
+  - [role, technology-interface, [aggregation]]
+  - [service, [communication-network, device, distribution-network, equipment, facility, technology-node, system-software, technology-interface], [serving]]
+
+  # ── Common → Implementation ────────────────────────────────────────────
+  - [event, deliverable, [access]]
+  - [event, plateau, [triggering]]
+  - [event, work-package, [flow, triggering]]
+
+  # ── Business & Application → Common ────────────────────────────────────
+  - [[business-actor, application-component], path, [realization]]
+  - [[business-actor, application-component], role, [assignment]]
+  - [[business-interface, application-interface], path, [realization]]
+  - [[business-interface, application-interface], service, [assignment]]
+  - [product, service, [aggregation]]
+
+  # ── Business & Application → Motivation ────────────────────────────────
+  - [[business-actor, business-interface, business-object, product, application-component, application-interface, data-object], requirement, [influence, realization]]
+
+  # ── Business & Application → Strategy ──────────────────────────────────
+  - [[business-actor, business-interface, business-object, product, application-component, application-interface, data-object], resource, [influence, realization]]
+
+  # ── Business & Application → Technology ────────────────────────────────
+  - [product, [artifact, material], [aggregation]]
+
+  # ── Business & Application → Implementation ────────────────────────────
+  - [[business-object, data-object], deliverable, [specialization]]
+
+  # ── Technology → Common ────────────────────────────────────────────────
+  - [[communication-network, device, distribution-network, equipment, facility, technology-node, system-software, technology-interface], path, [realization]]
+  - [[device, equipment, facility, technology-node, system-software, technology-interface], role, [assignment]]
+
+  # ── Technology → Motivation ────────────────────────────────────────────
+  - [[artifact, communication-network, device, distribution-network, equipment, facility, technology-node, system-software, technology-interface], requirement, [influence, realization]]
+
+  # ── Technology → Strategy ──────────────────────────────────────────────
+  - [[artifact, communication-network, device, distribution-network, equipment, facility, technology-node, system-software, technology-interface], resource, [realization]]
+
+  # ── Technology → Business & Application ────────────────────────────────
+  - [artifact, business-object, [specialization]]
+  - [artifact, application-component, [realization]]
+  - [artifact, data-object, [realization, specialization]]
+  - [distribution-network, business-actor, [aggregation]]
+  - [facility, business-actor, [assignment]]
+  - [material, [business-object], [realization, specialization]]
+  - [material, data-object, [specialization]]
+  - [technology-interface, application-interface, [realization]]
+
+  # ── Implementation & Migration (internal) ──────────────────────────────
+  - [work-package, work-package, [triggering, flow]]
+  - [work-package, deliverable, [access, realization]]
+  - [work-package, [event, implementation-event], [triggering, flow]]
+  - [deliverable, plateau, [realization]]
+  - [plateau, plateau, [triggering]]
+  - [plateau, [event, implementation-event], [triggering]]
+  - [implementation-event, work-package, [triggering, flow]]
+  - [implementation-event, deliverable, [access]]
+  - [implementation-event, plateau, [triggering]]
+
+  # ── Implementation → Common ────────────────────────────────────────────
+  - [[deliverable, work-package], [event, function, path, process, role, service], [realization]]
+  - [plateau, [event, function, path, process, role, service], [aggregation, realization]]
+  - [plateau, event, [triggering]]
+  - [work-package, event, [flow, triggering]]
+
+  # ── Implementation → Motivation ────────────────────────────────────────
+  - [deliverable, requirement, [realization]]
+  - [plateau, goal, [aggregation]]
+  - [plateau, requirement, [aggregation, influence, realization]]
+  - [work-package, requirement, [influence, realization]]
+
+  # ── Implementation → Strategy ──────────────────────────────────────────
+  - [[deliverable, work-package], [capability, course-of-action, resource, value-stream], [realization]]
+  - [plateau, [capability, course-of-action, resource, value-stream], [aggregation, realization]]
+
+  # ── Implementation → Business & Application ────────────────────────────
+  - [[deliverable, work-package], [business-actor, business-interface, business-object, product, application-component, application-interface, data-object], [realization]]
+  - [plateau, [business-actor, business-interface, business-object, product, application-component, application-interface, data-object], [aggregation, realization]]
+
+  # ── Implementation → Technology ────────────────────────────────────────
+  - [[deliverable, work-package], [artifact, communication-network, device, distribution-network, equipment, facility, material, technology-node, system-software, technology-interface], [realization]]
+  - [plateau, [artifact, communication-network, device, distribution-network, equipment, facility, material, technology-node, system-software, technology-interface], [aggregation, realization]]

@@ -34,12 +34,40 @@ def _get_repo() -> ModelRepository:
     return _repo
 
 
-def _entity_to_summary(e: EntityRecord) -> dict[str, Any]:
-    return {
+def _entity_to_summary(
+    e: EntityRecord,
+    conn_counts: dict[str, tuple[int, int, int]] | None = None,
+) -> dict[str, Any]:
+    d: dict[str, Any] = {
         "artifact_id": e.artifact_id, "artifact_type": e.artifact_type,
         "name": e.name, "version": e.version, "status": e.status,
         "domain": e.domain, "subdomain": e.subdomain, "path": str(e.path),
     }
+    if conn_counts is not None:
+        inc, sym, out = conn_counts.get(e.artifact_id, (0, 0, 0))
+        d["conn_in"] = inc
+        d["conn_sym"] = sym
+        d["conn_out"] = out
+    return d
+
+
+def _build_conn_counts(repo: ModelRepository) -> dict[str, tuple[int, int, int]]:
+    """Single pass over connections → {entity_id: (incoming, symmetric, outgoing)}."""
+    from src.common.ontology_loader import SYMMETRIC_CONNECTIONS
+
+    counts: dict[str, list[int]] = {}  # [in, sym, out]
+    for rec in repo._connections.values():
+        is_sym = rec.conn_type in SYMMETRIC_CONNECTIONS
+        src = counts.setdefault(rec.source, [0, 0, 0])
+        tgt = counts.setdefault(rec.target, [0, 0, 0])
+        if is_sym:
+            src[1] += 1
+            if rec.target != rec.source:
+                tgt[1] += 1
+        else:
+            src[2] += 1
+            tgt[0] += 1
+    return {k: (v[0], v[1], v[2]) for k, v in counts.items()}
 
 
 def _connection_to_dict(c: ConnectionRecord) -> dict[str, Any]:
@@ -70,9 +98,11 @@ def list_entities(
     status: str | None = None,
     limit: int = Query(default=200, le=1000), offset: int = 0,
 ) -> dict[str, Any]:
-    entities = _get_repo().list_entities(domain=domain, artifact_type=artifact_type, status=status)
+    repo = _get_repo()
+    entities = repo.list_entities(domain=domain, artifact_type=artifact_type, status=status)
     page = entities[offset : offset + limit]
-    return {"total": len(entities), "items": [_entity_to_summary(e) for e in page]}
+    counts = _build_conn_counts(repo)
+    return {"total": len(entities), "items": [_entity_to_summary(e, counts) for e in page]}
 
 
 @app.get("/api/entity")

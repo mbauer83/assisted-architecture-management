@@ -75,6 +75,7 @@ const friendlyId = (id: string) => {
             <th>Name</th>
             <th>Type</th>
             <th v-if="!activeDomain">Domain</th>
+            <th class="th-conn">Connections<br><span class="th-conn-sub">(in / symm. / out)</span></th>
             <th>Status</th>
           </tr>
         </thead>
@@ -89,6 +90,7 @@ const friendlyId = (id: string) => {
             <td v-if="!activeDomain">
               <span class="domain-badge" :class="`domain--${e.domain}`">{{ e.domain }}</span>
             </td>
+            <td class="conn-counts">({{ e.conn_in ?? 0 }} / {{ e.conn_sym ?? 0 }} / {{ e.conn_out ?? 0 }})</td>
             <td><span class="status-badge" :class="`status--${e.status}`">{{ e.status }}</span></td>
           </tr>
         </tbody>
@@ -146,6 +148,9 @@ const friendlyId = (id: string) => {
 .entity-table tr:last-child td { border-bottom: none; }
 .entity-table tr:hover td { background: #f9fafb; }
 .mono { font-family: monospace; font-size: 12px; color: #374151; }
+.conn-counts { font-family: monospace; font-size: 12px; color: #6b7280; white-space: nowrap; }
+.th-conn { line-height: 1.3; }
+.th-conn-sub { font-size: 9px; font-weight: 400; letter-spacing: 0; text-transform: none; color: #9ca3af; }
 
 .domain-badge {
   display: inline-block;

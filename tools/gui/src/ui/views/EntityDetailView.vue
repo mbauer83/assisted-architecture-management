@@ -226,17 +226,8 @@ const saveEdit = () => {
         <div class="markdown-body" v-html="detail.data.value.content_html"></div>
       </div>
 
-      <!-- Connections: three panels -->
-      <div class="connections-section">
-        <ConnectionsPanel
-          :entity-id="entityId"
-          :entity-type="detail.data.value.artifact_type"
-          :connections="outgoing.data.value ?? []"
-          direction="outgoing"
-          :loading="outgoing.loading.value"
-          :error="outgoing.error.value"
-          @refresh="loadConnections"
-        />
+      <!-- Connections: [INCOMING] [SYMMETRIC] [OUTGOING] on wide screens -->
+      <div class="connections-section" :class="{ 'has-symmetric': hasSymmetric }">
         <ConnectionsPanel
           :entity-id="entityId"
           :entity-type="detail.data.value.artifact_type"
@@ -254,6 +245,15 @@ const saveEdit = () => {
           direction="symmetric"
           :loading="symmetric.loading.value"
           :error="symmetric.error.value"
+          @refresh="loadConnections"
+        />
+        <ConnectionsPanel
+          :entity-id="entityId"
+          :entity-type="detail.data.value.artifact_type"
+          :connections="outgoing.data.value ?? []"
+          direction="outgoing"
+          :loading="outgoing.loading.value"
+          :error="outgoing.error.value"
           @refresh="loadConnections"
         />
       </div>
@@ -361,9 +361,11 @@ const saveEdit = () => {
 .save-btn:hover:not(:disabled) { background: #1d4ed8; }
 .cancel-btn:disabled, .preview-btn:disabled, .save-btn:disabled { opacity: 0.5; cursor: not-allowed; }
 
-/* Connections */
+/* Connections — [INCOMING] [SYMMETRIC] [OUTGOING] */
 .connections-section { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
-@media (max-width: 700px) { .connections-section { grid-template-columns: 1fr; } }
+.connections-section.has-symmetric { grid-template-columns: 1fr 1fr 1fr; }
+@media (max-width: 1000px) { .connections-section.has-symmetric { grid-template-columns: 1fr 1fr; } }
+@media (max-width: 700px) { .connections-section, .connections-section.has-symmetric { grid-template-columns: 1fr; } }
 
 .domain-badge { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 500; }
 .domain--motivation { background: #fef3c7; color: #92400e; }

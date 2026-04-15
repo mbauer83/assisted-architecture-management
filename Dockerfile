@@ -7,33 +7,40 @@ RUN npm ci
 COPY tools/gui/ ./
 RUN npm run build
 
-# ── Stage 2: Python runtime ───────────────────────────────────────────────────
-FROM python:3.13-slim
+# ── Stage 2: Python dependencies + Java + plantuml ───────────────────────────
+# This layer is cached as long as pyproject.toml doesn't change.
+FROM python:3.13-slim AS deps
 
 WORKDIR /app
 
-# Java runtime — required for plantuml diagram verification and rendering.
-# default-jre-headless on Debian bookworm resolves to OpenJDK 17.
 RUN apt-get update \
     && apt-get install -y --no-install-recommends default-jre-headless \
     && rm -rf /var/lib/apt/lists/*
 
-# Install Python package with GUI extras.
-# Editable install keeps __file__ at /app/src/… so relative path resolution
-# for tools/plantuml.jar and tools/gui/dist/ works correctly at runtime.
+# Install Python deps only (no project code yet).
+# Copy just pyproject.toml + a minimal src/ stub so pip can resolve the package.
 COPY pyproject.toml ./
-COPY src/ src/
-RUN pip install --no-cache-dir -e ".[gui]"
+RUN mkdir -p src/tools && \
+    echo '' > src/__init__.py && \
+    echo '' > src/tools/__init__.py && \
+    echo 'def main(): pass' > src/tools/get_plantuml.py && \
+    pip install --no-cache-dir -e ".[gui]"
 
-# Download and SHA-256-verify plantuml.jar from Maven Central.
-# Version is pinned in src/tools/get_plantuml.py; bump it there to upgrade.
+# Now copy the real get_plantuml to download the jar.
+COPY src/tools/get_plantuml.py src/tools/get_plantuml.py
 RUN get-plantuml
+
+# ── Stage 3: Final image with project code ───────────────────────────────────
+FROM deps AS runtime
+
+# Overlay actual source + config (deps layer already has the editable install
+# pointing at /app/src, so new files are picked up automatically).
+COPY config/ config/
+COPY src/ src/
 
 # Embed the pre-built SPA so the server can serve it at /
 COPY --from=frontend /build/dist/ tools/gui/dist/
 
 EXPOSE 8000
 
-# Mount your architecture repository at /repo via -v or docker-compose volumes.
-# The server also serves the built SPA from tools/gui/dist/.
 CMD ["sdlc-gui-server", "--repo-root", "/repo", "--host", "0.0.0.0"]

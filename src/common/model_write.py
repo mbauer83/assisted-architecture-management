@@ -17,12 +17,14 @@ import string
 import time
 
 from src.common.model_write_catalog import (
-    ARCHIMATE_STEREOTYPE_TO_CONNECTION_TYPE,
-    CONNECTION_TYPES,
-    ENTITY_TYPES,
     ConnectionTypeInfo,
     DiagramConnectionInferenceMode,
     EntityTypeInfo,
+)
+from src.common.ontology_loader import (
+    ARCHIMATE_STEREOTYPE_TO_CONNECTION_TYPE,
+    CONNECTION_TYPES,
+    ENTITY_TYPES,
 )
 from src.common.model_write_formatting import (
     format_diagram_puml,

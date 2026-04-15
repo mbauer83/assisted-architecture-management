@@ -22,6 +22,9 @@ export const EntitySummarySchema = Schema.Struct({
   domain: Schema.String,
   subdomain: Schema.String,
   path: Schema.String,
+  conn_in: Schema.optional(Schema.Number),
+  conn_sym: Schema.optional(Schema.Number),
+  conn_out: Schema.optional(Schema.Number),
 })
 export type EntitySummary = typeof EntitySummarySchema.Type
 

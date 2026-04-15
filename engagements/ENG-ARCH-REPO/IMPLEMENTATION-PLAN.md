@@ -146,7 +146,7 @@ enabling section-level search and reference graph traversal via the `framework_q
 
 ---
 
-## Current State (as of 2026-04-14)
+## Current State (as of 2026-04-15)
 
 | Workstream | Status | Key facts |
 |-----------|--------|-----------|
@@ -158,6 +158,7 @@ enabling section-level search and reference graph traversal via the `framework_q
 | WS-F: Framework Server | **COMPLETE** | Configurable scan roots; `docs/` structure (D7); 2 seed ADRs; framework server wired in `.mcp.json` |
 | WS-H: Two-Tiered Repos | **COMPLETE** | Connection ontology, arch-init CLI, asymmetric enforcement, cross-repo macros, promotion mechanism |
 | WS-E: GUI Tool | **COMPLETE** | B-stream done: ontology-driven connection panels, entity create/edit, three-section layout |
+| WS-I: YAML Ontology Config | **COMPLETE** | Entity + connection ontology as YAML; entity-level relationship rules; centralized EntityTypeInfo/ConnectionTypeInfo |
 
 **Verification**: 173 files, 0 errors, 0 warnings (W350 resolves on MCP server restart — `tools/plantuml.jar` symlink + code fix in place).
 
@@ -451,6 +452,44 @@ B1 and B2 are independent (frontend ports vs backend endpoints) and can be done 
 4. **Entity edit**: Entity detail → Edit → change summary → Save → dry-run validates → writes → reloads
 5. **Symmetric**: Association connections appear in "Symmetric" panel, not in outgoing/incoming
 6. **Verifier**: `model_verify_all` on ENG-ARCH-REPO still returns 0 errors after all changes
+
+---
+
+## Completed: YAML Ontology Config (WS-I, 2026-04-15)
+
+### D8. YAML-Based Ontology Configuration
+
+Entity types, connection types, and ArchiMate NEXT relationship rules are encoded as declarative YAML in `config/`:
+
+| File | Purpose |
+|------|---------|
+| `config/entity_ontology.yaml` | Entity types: prefix, domain, subdir, archimate_element_type, element_category, element_classes |
+| `config/connection_ontology.yaml` | Connection types: language, directory, symmetric flag, archimate_relationship_type; **permitted_relationships** rules |
+
+**Element classes** — each entity type declares its ArchiMate NEXT abstract classification classes (e.g., `active-structure-element`, `internal-behavior-element`). The loader inverts these to build class→member maps used for rule expansion.
+
+**Permitted relationship rules** — encoded as `[source, target, [connection-short-names]]` triples where source/target can be:
+- A specific entity type name
+- A list of entity types
+- `@class-name` — expanded to all members of the named element class
+- `@all` / `@same` — all entity types / same type as source
+
+Rules are additive; the loader merges all rules per (source, target) pair into a `frozenset[str]` of permitted connection types. The resulting entity-level rules replace the previous category-level `RELATIONSHIP_RULES` dict.
+
+### Centralized DataClasses
+
+`EntityTypeInfo` extended with `element_category` and `element_classes` fields. `ConnectionTypeInfo` extended with `symmetric` field. Both loaded from YAML via `ontology_loader.py`; all downstream modules (`archimate_types.py`, `connection_ontology.py`, `model_write.py`) derive registries from these.
+
+| Key file | Role |
+|----------|------|
+| `src/common/model_write_catalog.py` | Defines `EntityTypeInfo`, `ConnectionTypeInfo` dataclasses |
+| `src/common/ontology_loader.py` | Loads YAML, builds `ENTITY_TYPES`, `CONNECTION_TYPES`, `PERMITTED_RELATIONSHIPS`, indexed lookups |
+| `src/common/archimate_types.py` | Derives flat registries (`ALL_ENTITY_TYPES`, etc.) from loaded data |
+| `src/common/connection_ontology.py` | Query API (`permissible_connection_types`, `classify_connections`) using entity-level rules |
+
+### GUI: Three-Column Connection Layout
+
+Connection panels in `EntityDetailView.vue` ordered as **[INCOMING] [SYMMETRIC] [OUTGOING]**. On wide screens (>1000px) with symmetric connections, all three panels display side-by-side. Falls back to 2-column (>700px) and 1-column (mobile).
 
 ---
 

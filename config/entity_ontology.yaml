@@ -1,0 +1,410 @@
+# Entity Ontology — ArchiMate NEXT entity type definitions
+#
+# Single source of truth for entity type metadata, classification hierarchy,
+# and domain assignments.  Loaded by src/common/ontology_loader.py.
+#
+# Fields per entity type:
+#   prefix              – short ID prefix (e.g. STK, DRV)
+#   domain              – filesystem domain directory under model/
+#   subdir              – subdirectory within the domain
+#   archimate_domain    – display name of the ArchiMate domain
+#   archimate_element_type – CamelCase element type for diagram blocks
+#   element_category    – structural classification (active | behavioral | passive
+#                         | motivation | strategy | implementation | composite)
+#   element_classes     – ArchiMate NEXT abstract classification classes
+
+entity_types:
+
+  # ── Motivation Domain ────────────────────────────────────────────────────
+  stakeholder:
+    prefix: STK
+    domain: motivation
+    subdir: stakeholders
+    archimate_domain: Motivation
+    archimate_element_type: Stakeholder
+    element_category: motivation
+    element_classes: [motivation-element]
+
+  driver:
+    prefix: DRV
+    domain: motivation
+    subdir: drivers
+    archimate_domain: Motivation
+    archimate_element_type: Driver
+    element_category: motivation
+    element_classes: [motivation-element]
+
+  assessment:
+    prefix: ASS
+    domain: motivation
+    subdir: assessments
+    archimate_domain: Motivation
+    archimate_element_type: Assessment
+    element_category: motivation
+    element_classes: [motivation-element]
+
+  goal:
+    prefix: GOL
+    domain: motivation
+    subdir: goals
+    archimate_domain: Motivation
+    archimate_element_type: Goal
+    element_category: motivation
+    element_classes: [motivation-element]
+
+  outcome:
+    prefix: OUT
+    domain: motivation
+    subdir: outcomes
+    archimate_domain: Motivation
+    archimate_element_type: Outcome
+    element_category: motivation
+    element_classes: [motivation-element]
+
+  principle:
+    prefix: PRI
+    domain: motivation
+    subdir: principles
+    archimate_domain: Motivation
+    archimate_element_type: Principle
+    element_category: motivation
+    element_classes: [motivation-element]
+
+  requirement:
+    prefix: REQ
+    domain: motivation
+    subdir: requirements
+    archimate_domain: Motivation
+    archimate_element_type: Requirement
+    element_category: motivation
+    element_classes: [motivation-element]
+
+  architecture-constraint:
+    prefix: CST
+    domain: motivation
+    subdir: constraints
+    archimate_domain: Motivation
+    archimate_element_type: Constraint
+    element_category: motivation
+    element_classes: [motivation-element]
+
+  meaning:
+    prefix: MEA
+    domain: motivation
+    subdir: meanings
+    archimate_domain: Motivation
+    archimate_element_type: Meaning
+    element_category: motivation
+    element_classes: [motivation-element]
+
+  value:
+    prefix: VAL
+    domain: motivation
+    subdir: values
+    archimate_domain: Motivation
+    archimate_element_type: Value
+    element_category: motivation
+    element_classes: [motivation-element]
+
+  # ── Strategy Domain ──────────────────────────────────────────────────────
+  capability:
+    prefix: CAP
+    domain: strategy
+    subdir: capabilities
+    archimate_domain: Strategy
+    archimate_element_type: Capability
+    element_category: strategy
+    element_classes: [behavior-element, strategy-behavior-element]
+
+  value-stream:
+    prefix: VS
+    domain: strategy
+    subdir: value-streams
+    archimate_domain: Strategy
+    archimate_element_type: ValueStream
+    element_category: strategy
+    element_classes: [behavior-element, strategy-behavior-element]
+
+  resource:
+    prefix: RES
+    domain: strategy
+    subdir: resources
+    archimate_domain: Strategy
+    archimate_element_type: Resource
+    element_category: strategy
+    element_classes: [structure-element]
+
+  course-of-action:
+    prefix: COA
+    domain: strategy
+    subdir: courses-of-action
+    archimate_domain: Strategy
+    archimate_element_type: CourseOfAction
+    element_category: strategy
+    element_classes: [behavior-element, strategy-behavior-element]
+
+  # ── Common Domain (domain-neutral behavioral elements) ───────────────────
+  service:
+    prefix: SRV
+    domain: common
+    subdir: services
+    archimate_domain: Common
+    archimate_element_type: Service
+    element_category: behavioral
+    element_classes: [behavior-element]
+
+  process:
+    prefix: PRC
+    domain: common
+    subdir: processes
+    archimate_domain: Common
+    archimate_element_type: Process
+    element_category: behavioral
+    element_classes: [behavior-element, internal-behavior-element]
+
+  function:
+    prefix: FNC
+    domain: common
+    subdir: functions
+    archimate_domain: Common
+    archimate_element_type: Function
+    element_category: behavioral
+    element_classes: [behavior-element, internal-behavior-element]
+
+  interaction:
+    prefix: INT
+    domain: common
+    subdir: interactions
+    archimate_domain: Common
+    archimate_element_type: Interaction
+    element_category: behavioral
+    element_classes: [behavior-element, internal-behavior-element]
+
+  event:
+    prefix: EVT
+    domain: common
+    subdir: events
+    archimate_domain: Common
+    archimate_element_type: Event
+    element_category: behavioral
+    element_classes: [behavior-element]
+
+  role:
+    prefix: ROL
+    domain: common
+    subdir: roles
+    archimate_domain: Common
+    archimate_element_type: Role
+    element_category: active
+    element_classes: [active-structure-element, internal-active-structure-element]
+
+  # ── Business Domain ──────────────────────────────────────────────────────
+  business-actor:
+    prefix: ACT
+    domain: business
+    subdir: actors
+    archimate_domain: Business
+    archimate_element_type: BusinessActor
+    element_category: active
+    element_classes: [active-structure-element, internal-active-structure-element]
+
+  business-interface:
+    prefix: BIF
+    domain: business
+    subdir: interfaces
+    archimate_domain: Business
+    archimate_element_type: BusinessInterface
+    element_category: active
+    element_classes: [active-structure-element, external-active-structure-element]
+
+  business-object:
+    prefix: BOB
+    domain: business
+    subdir: objects
+    archimate_domain: Business
+    archimate_element_type: BusinessObject
+    element_category: passive
+    element_classes: [passive-structure-element]
+
+  contract:
+    prefix: CTR
+    domain: business
+    subdir: contracts
+    archimate_domain: Business
+    archimate_element_type: Contract
+    element_category: passive
+    element_classes: [passive-structure-element]
+
+  product:
+    prefix: PRD
+    domain: business
+    subdir: products
+    archimate_domain: Business
+    archimate_element_type: Product
+    element_category: composite
+    element_classes: [composite-element]
+
+  # ── Application Domain ───────────────────────────────────────────────────
+  application-component:
+    prefix: APP
+    domain: application
+    subdir: components
+    archimate_domain: Application
+    archimate_element_type: ApplicationComponent
+    element_category: active
+    element_classes: [active-structure-element, internal-active-structure-element]
+
+  application-interface:
+    prefix: AIF
+    domain: application
+    subdir: interfaces
+    archimate_domain: Application
+    archimate_element_type: ApplicationInterface
+    element_category: active
+    element_classes: [active-structure-element, external-active-structure-element]
+
+  data-object:
+    prefix: DOB
+    domain: application
+    subdir: data-objects
+    archimate_domain: Application
+    archimate_element_type: DataObject
+    element_category: passive
+    element_classes: [passive-structure-element]
+
+  # ── Technology Domain ────────────────────────────────────────────────────
+  technology-node:
+    prefix: NOD
+    domain: technology
+    subdir: nodes
+    archimate_domain: Technology
+    archimate_element_type: Node
+    element_category: active
+    element_classes: [active-structure-element, internal-active-structure-element, technology-internal-active-structure-element]
+
+  device:
+    prefix: DEV
+    domain: technology
+    subdir: devices
+    archimate_domain: Technology
+    archimate_element_type: Device
+    element_category: active
+    element_classes: [active-structure-element, internal-active-structure-element, technology-internal-active-structure-element]
+
+  system-software:
+    prefix: SSW
+    domain: technology
+    subdir: system-software
+    archimate_domain: Technology
+    archimate_element_type: SystemSoftware
+    element_category: active
+    element_classes: [active-structure-element, internal-active-structure-element, technology-internal-active-structure-element]
+
+  technology-interface:
+    prefix: TIF
+    domain: technology
+    subdir: interfaces
+    archimate_domain: Technology
+    archimate_element_type: TechnologyInterface
+    element_category: active
+    element_classes: [active-structure-element, external-active-structure-element]
+
+  path:
+    prefix: PTH
+    domain: technology
+    subdir: paths
+    archimate_domain: Technology
+    archimate_element_type: Path
+    element_category: active
+    element_classes: [active-structure-element]
+
+  communication-network:
+    prefix: NET
+    domain: technology
+    subdir: networks
+    archimate_domain: Technology
+    archimate_element_type: CommunicationNetwork
+    element_category: active
+    element_classes: [active-structure-element]
+
+  artifact:
+    prefix: ART
+    domain: technology
+    subdir: artifacts
+    archimate_domain: Technology
+    archimate_element_type: Artifact
+    element_category: passive
+    element_classes: [passive-structure-element]
+
+  equipment:
+    prefix: EQP
+    domain: technology
+    subdir: equipment
+    archimate_domain: Technology
+    archimate_element_type: Equipment
+    element_category: active
+    element_classes: [active-structure-element, internal-active-structure-element, technology-internal-active-structure-element]
+
+  facility:
+    prefix: FAC
+    domain: technology
+    subdir: facilities
+    archimate_domain: Technology
+    archimate_element_type: Facility
+    element_category: active
+    element_classes: [active-structure-element, internal-active-structure-element, technology-internal-active-structure-element]
+
+  distribution-network:
+    prefix: DIS
+    domain: technology
+    subdir: distribution-networks
+    archimate_domain: Technology
+    archimate_element_type: DistributionNetwork
+    element_category: active
+    element_classes: [active-structure-element]
+
+  material:
+    prefix: MAT
+    domain: technology
+    subdir: materials
+    archimate_domain: Technology
+    archimate_element_type: Material
+    element_category: passive
+    element_classes: [passive-structure-element]
+
+  # ── Implementation & Migration Domain ────────────────────────────────────
+  work-package:
+    prefix: WP
+    domain: implementation
+    subdir: work-packages
+    archimate_domain: Implementation
+    archimate_element_type: WorkPackage
+    element_category: implementation
+    element_classes: [behavior-element]
+
+  deliverable:
+    prefix: DEL
+    domain: implementation
+    subdir: deliverables
+    archimate_domain: Implementation
+    archimate_element_type: Deliverable
+    element_category: implementation
+    element_classes: [passive-structure-element]
+
+  implementation-event:
+    prefix: IEV
+    domain: implementation
+    subdir: events
+    archimate_domain: Implementation
+    archimate_element_type: ImplementationEvent
+    element_category: implementation
+    element_classes: [behavior-element]
+
+  plateau:
+    prefix: PLT
+    domain: implementation
+    subdir: plateaus
+    archimate_domain: Implementation
+    archimate_element_type: Plateau
+    element_category: implementation
+    element_classes: [composite-element]

@@ -45,12 +45,27 @@ const permissibleTypes = computed((): string[] => {
   return Object.keys(map).sort()
 })
 
+// Symmetric connection types derived from ontology
+const symmetricConnTypes = computed((): Set<string> => {
+  if (!ontology.value) return new Set()
+  const types = new Set<string>()
+  for (const conns of Object.values(ontology.value.symmetric)) {
+    for (const ct of conns) types.add(ct)
+  }
+  return types
+})
+
 // ── Grouping ──────────────────────────────────────────────────────────────────
 
-// Group existing connections by the artifact_type-prefix of the connected entity
+// Group existing connections by the artifact_type-prefix of the connected entity,
+// filtering to only show connections matching this panel's direction.
 const grouped = computed(() => {
   const groups: Record<string, ConnectionRecord[]> = {}
+  const symTypes = symmetricConnTypes.value
   for (const c of props.connections) {
+    const isSym = symTypes.has(c.conn_type)
+    if (props.direction === 'symmetric' && !isSym) continue
+    if (props.direction !== 'symmetric' && isSym) continue
     const otherId = props.direction === 'incoming' ? c.source : c.target
     const typePart = otherId.split('@')[0] ?? 'unknown'
     if (!groups[typePart]) groups[typePart] = []
