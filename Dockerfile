@@ -14,7 +14,12 @@ FROM python:3.13-slim AS deps
 WORKDIR /app
 
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends default-jre-headless \
+    && apt-get install -y --no-install-recommends \
+        default-jre-headless \
+        libharfbuzz0b \
+        libfontconfig1 \
+        fonts-dejavu-core \
+        graphviz \
     && rm -rf /var/lib/apt/lists/*
 
 # Install Python deps only (no project code yet).

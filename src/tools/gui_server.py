@@ -460,6 +460,110 @@ def edit_entity(body: EditEntityBody) -> dict[str, Any]:
     return _write_result_to_dict(result)
 
 
+# ── Diagram create / preview endpoints ───────────────────────────────────────
+
+@app.get("/api/entity-display-search")
+def entity_display_search(q: str, limit: int = Query(default=20, le=50)) -> list[dict[str, Any]]:
+    """Search entities and return archimate display metadata (alias, element-type, label).
+
+    Used by the diagram-creation form to populate the live entity-search dropdown.
+    """
+    import yaml as _yaml
+    repo = _get_repo()
+    result = repo.search_artifacts(q, limit=limit * 3)
+    items: list[dict[str, Any]] = []
+    for hit in result.hits:
+        if hit.record_type != "entity":
+            continue
+        rec = hit.record
+        if not isinstance(rec, EntityRecord):
+            continue
+        arch_data: dict = {}
+        arch_block = rec.display_blocks.get("archimate", "")
+        if arch_block:
+            try:
+                arch_data = _yaml.safe_load(arch_block) or {}
+            except Exception:
+                pass
+        items.append({
+            "artifact_id": rec.artifact_id, "name": rec.name,
+            "artifact_type": rec.artifact_type, "domain": rec.domain,
+            "subdomain": rec.subdomain, "status": rec.status,
+            "display_alias": rec.display_alias,
+            "element_type": arch_data.get("element-type", ""),
+            "element_label": arch_data.get("label", rec.name),
+        })
+        if len(items) >= limit:
+            break
+    return items
+
+
+class DiagramPreviewBody(BaseModel):
+    diagram_type: str
+    name: str
+    entity_ids: list[str]
+    connection_ids: list[str]
+
+
+@app.post("/api/diagram/preview")
+def preview_diagram(body: DiagramPreviewBody) -> dict[str, Any]:
+    """Generate a transient PUML + PNG preview without writing any files.
+
+    Returns ``{puml, image, warnings}`` where *image* is a base64 data-URL or null.
+    Uses the same PlantUML rendering pipeline as ``model_create_diagram``.
+    """
+    if _repo_root is None:
+        raise HTTPException(500, "Repository not initialized")
+    from src.tools.diagram_builder import generate_archimate_puml_body, render_puml_preview
+    repo = _get_repo()
+    entities = [e for eid in body.entity_ids if (e := repo.get_entity(eid)) is not None]
+    connections = [c for cid in body.connection_ids if (c := repo.get_connection(cid)) is not None]
+    puml = generate_archimate_puml_body(body.name, entities, connections, diagram_type=body.diagram_type)
+    image, warnings = render_puml_preview(puml, _repo_root)
+    return {"puml": puml, "image": image, "warnings": warnings}
+
+
+class CreateDiagramGuiBody(BaseModel):
+    diagram_type: str
+    name: str
+    entity_ids: list[str]
+    connection_ids: list[str]
+    keywords: list[str] | None = None
+    version: str = "0.1.0"
+    status: str = "draft"
+    dry_run: bool = True
+
+
+@app.post("/api/diagram")
+def create_diagram_gui(body: CreateDiagramGuiBody) -> dict[str, Any]:
+    """Create a diagram from a GUI-selected set of entities and connections.
+
+    Generates PUML via ``diagram_builder``, then delegates to ``create_diagram``
+    (same code path as the ``model_create_diagram`` MCP tool) for verification,
+    file writing, and PNG rendering.
+    """
+    from src.common.model_write import generate_entity_id
+    from src.tools.diagram_builder import generate_archimate_puml_body
+    from src.tools.model_write.diagram import create_diagram
+    repo = _get_repo()
+    repo_root, _, verifier = _get_write_deps()
+    entities = [e for eid in body.entity_ids if (e := repo.get_entity(eid)) is not None]
+    connections = [c for cid in body.connection_ids if (c := repo.get_connection(cid)) is not None]
+    puml = generate_archimate_puml_body(body.name, entities, connections, diagram_type=body.diagram_type)
+    artifact_id = generate_entity_id("DIA", body.name)
+    try:
+        result = create_diagram(
+            repo_root=repo_root, verifier=verifier, clear_repo_caches=_clear_caches,
+            diagram_type=body.diagram_type, name=body.name, puml=puml,
+            artifact_id=artifact_id, keywords=body.keywords,
+            version=body.version, status=body.status, last_updated=None,
+            connection_inference="none", dry_run=body.dry_run,
+        )
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+    return _write_result_to_dict(result)
+
+
 # ── Bootstrap ─────────────────────────────────────────────────────────────────
 
 def main(argv: list[str] | None = None) -> None:

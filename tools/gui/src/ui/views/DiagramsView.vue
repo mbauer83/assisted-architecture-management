@@ -41,7 +41,10 @@ watch(() => route.query.type, (t) => {
 
 <template>
   <div>
-    <h1 class="page-title">Diagrams</h1>
+    <div class="page-header">
+      <h1 class="page-title">Diagrams</h1>
+      <RouterLink to="/diagram/create" class="create-btn">+ Create Diagram</RouterLink>
+    </div>
 
     <div class="filter-bar">
       <button
@@ -76,7 +79,13 @@ watch(() => route.query.type, (t) => {
 </template>
 
 <style scoped>
-.page-title { font-size: 22px; font-weight: 600; margin-bottom: 20px; }
+.page-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px; }
+.page-title { font-size: 22px; font-weight: 600; margin-bottom: 0; }
+.create-btn {
+  padding: 7px 14px; background: #2563eb; color: white; border-radius: 6px;
+  font-size: 13px; font-weight: 500; text-decoration: none;
+}
+.create-btn:hover { background: #1d4ed8; text-decoration: none; }
 .result-count { font-size: 13px; color: #6b7280; margin-bottom: 12px; }
 .state-msg { color: #6b7280; }
 .state-msg--error { color: #dc2626; }

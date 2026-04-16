@@ -6,6 +6,7 @@ import EntityCreateView from '../views/EntityCreateView.vue'
 import SearchView from '../views/SearchView.vue'
 import DiagramsView from '../views/DiagramsView.vue'
 import DiagramDetailView from '../views/DiagramDetailView.vue'
+import CreateDiagramView from '../views/CreateDiagramView.vue'
 import GraphExploreView from '../views/GraphExploreView.vue'
 
 export const router = createRouter({
@@ -17,6 +18,7 @@ export const router = createRouter({
     { path: '/entity', component: EntityDetailView },
     { path: '/search', component: SearchView },
     { path: '/diagrams', component: DiagramsView },
+    { path: '/diagram/create', component: CreateDiagramView },
     { path: '/diagram', component: DiagramDetailView },
     { path: '/graph', component: GraphExploreView },
   ],

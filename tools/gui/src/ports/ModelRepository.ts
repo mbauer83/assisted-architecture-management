@@ -14,6 +14,8 @@ import type {
   OntologyPair,
   EntitySchemaInfo,
   EntitySummary,
+  EntityDisplayInfo,
+  DiagramPreviewResult,
 } from '../domain'
 import type { NetworkError, NotFoundError } from '../domain'
 import type { MarkdownError } from '../application/MarkdownService'
@@ -78,4 +80,16 @@ export interface ModelRepository {
   }) => Effect.Effect<WriteResult, RepoError>
   readonly getEntitySchemata: (artifactType: string) => Effect.Effect<EntitySchemaInfo, RepoError>
   readonly getDiagramEntities: (diagramId: string) => Effect.Effect<EntitySummary[], RepoError>
+  readonly searchEntityDisplay: (
+    query: string, limit?: number,
+  ) => Effect.Effect<EntityDisplayInfo[], RepoError>
+  readonly previewDiagram: (body: {
+    diagram_type: string; name: string;
+    entity_ids: string[]; connection_ids: string[];
+  }) => Effect.Effect<DiagramPreviewResult, RepoError>
+  readonly createDiagram: (body: {
+    diagram_type: string; name: string;
+    entity_ids: string[]; connection_ids: string[];
+    keywords?: string[]; version?: string; status?: string; dry_run?: boolean;
+  }) => Effect.Effect<WriteResult, RepoError>
 }

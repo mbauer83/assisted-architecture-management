@@ -182,6 +182,30 @@ export type DiagramRef = typeof DiagramRefSchema.Type
 export const DiagramRefsSchema = Schema.Array(DiagramRefSchema)
 export type DiagramRefs = typeof DiagramRefsSchema.Type
 
+// ── Entity display info (diagram create form) ────────────────────────────────
+
+export const EntityDisplayInfoSchema = Schema.Struct({
+  artifact_id: Schema.String,
+  name: Schema.String,
+  artifact_type: Schema.String,
+  domain: Schema.String,
+  subdomain: Schema.String,
+  status: Schema.String,
+  display_alias: Schema.String,
+  element_type: Schema.String,
+  element_label: Schema.String,
+})
+export type EntityDisplayInfo = typeof EntityDisplayInfoSchema.Type
+
+// ── Diagram preview result ────────────────────────────────────────────────────
+
+export const DiagramPreviewResultSchema = Schema.Struct({
+  puml: Schema.String,
+  image: Schema.NullOr(Schema.String),
+  warnings: Schema.Array(Schema.String),
+})
+export type DiagramPreviewResult = typeof DiagramPreviewResultSchema.Type
+
 // ── Entity attribute schemata ─────────────────────────────────────────────────
 
 export const EntitySchemaInfoSchema = Schema.Struct({

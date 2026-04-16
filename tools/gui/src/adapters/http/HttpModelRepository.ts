@@ -16,6 +16,8 @@ import {
   OntologyPairSchema,
   EntitySchemaInfoSchema,
   EntitySummarySchema,
+  EntityDisplayInfoSchema,
+  DiagramPreviewResultSchema,
 } from '../../domain/schemas'
 import { parseMarkdown } from '../../application/MarkdownService'
 
@@ -171,4 +173,16 @@ export const makeHttpModelRepository = (): ModelRepository => ({
     fetchJson(buildUrl('/diagram-entities', { id: diagramId }), Schema.Array(EntitySummarySchema)).pipe(
       Effect.map((arr) => arr as import('../../domain').EntitySummary[]),
     ),
+
+  searchEntityDisplay: (query: string, limit = 20) =>
+    fetchJson(
+      buildUrl('/entity-display-search', { q: query, limit }),
+      Schema.Array(EntityDisplayInfoSchema),
+    ).pipe(Effect.map((arr) => arr as import('../../domain').EntityDisplayInfo[])),
+
+  previewDiagram: (body) =>
+    postJson(buildUrl('/diagram/preview'), body, DiagramPreviewResultSchema),
+
+  createDiagram: (body) =>
+    postJson(buildUrl('/diagram'), body, WriteResultSchema),
 })
