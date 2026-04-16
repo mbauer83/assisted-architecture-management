@@ -66,7 +66,7 @@ Statuses: `draft | active | deprecated`
 
 ```
 model/
-  motivation/     # stakeholders, drivers, assessments, goals, outcomes, principles, requirements, constraints, values
+  motivation/     # stakeholders, drivers, assessments, goals, outcomes, principles, requirements, values
   strategy/       # capabilities, value-streams, resources, courses-of-action
   business/       # actors, objects, interfaces, collaborations, contracts, representations, products
   common/         # services, processes, functions, events, interactions, roles (behavioral — shared across domains)

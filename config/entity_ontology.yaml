@@ -79,15 +79,6 @@ entity_types:
     element_category: motivation
     element_classes: [motivation-element]
 
-  architecture-constraint:
-    prefix: CST
-    domain: motivation
-    subdir: constraints
-    archimate_domain: Motivation
-    archimate_element_type: Constraint
-    element_category: motivation
-    element_classes: [motivation-element]
-
   meaning:
     prefix: MEA
     domain: motivation

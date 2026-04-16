@@ -16,10 +16,13 @@ Alias convention (PlantUML):
 
 import re
 import sys
+import json
 from pathlib import Path
 
 import yaml
 
+from src.common.ontology_loader import ENTITY_TYPES
+from src.common.settings import archimate_type_markers
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -28,6 +31,8 @@ import yaml
 _DISPLAY_SECTION = re.compile(r"<!--\s*§display\s*-->", re.IGNORECASE)
 _ARCHIMATE_H3 = re.compile(r"###\s*archimate\b", re.IGNORECASE)
 _YAML_FENCE = re.compile(r"```ya?ml\s*\n(.*?)```", re.DOTALL)
+_PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
+_GLYPHS_PATH = _PROJECT_ROOT / "tools" / "gui" / "src" / "ui" / "lib" / "archimateGlyphs.json"
 
 
 def _extract_archimate_block(content: str) -> dict | None:
@@ -80,6 +85,48 @@ def _sort_key(entry: tuple[str, str, str]) -> tuple[int, int, str]:
     return domain_idx, prefix_idx, alias
 
 
+def _load_glyphs() -> dict:
+    return json.loads(_GLYPHS_PATH.read_text(encoding="utf-8"))
+
+
+def _generate_glyph_include(repo_root: Path) -> Path:
+    glyphs = _load_glyphs()
+    mode = archimate_type_markers()
+    lines = [
+        "' _archimate-glyphs.puml — generated ArchiMate glyph sprites",
+        "' Auto-generated from tools/gui/src/ui/lib/archimateGlyphs.json.",
+        "' Do not edit manually.",
+        "",
+    ]
+    if mode == "icons":
+        lines.append("hide stereotype")
+        lines.append("")
+        for info in sorted(ENTITY_TYPES.values(), key=lambda item: item.archimate_element_type):
+            kind = glyphs["types"].get(info.artifact_type)
+            if not kind:
+                continue
+            markup = glyphs["kinds"].get(kind)
+            if not markup:
+                continue
+            sprite_name = f"$archimate_{info.archimate_element_type}"
+            svg = (
+                '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" '
+                'fill="none" stroke="#252327" stroke-width="1.3" '
+                'stroke-linecap="round" stroke-linejoin="round">'
+                f"{markup}</svg>"
+            )
+            lines.append(f"sprite {sprite_name} {svg}")
+    out_path = repo_root / "diagram-catalog" / "_archimate-glyphs.puml"
+    out_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    return out_path
+
+
+def _macro_label(label: str, element_type: str) -> str:
+    if archimate_type_markers() != "icons":
+        return label
+    return f"<$archimate_{element_type}{{scale=0.9}}> {label}"
+
+
 # ---------------------------------------------------------------------------
 # Main
 # ---------------------------------------------------------------------------
@@ -101,6 +148,7 @@ def generate_macros(repo_root: Path, *, enterprise_root: Path | None = None) -> 
         raise FileNotFoundError(f"model/ not found under {repo_root}")
     roots_to_scan.append(repo_root)
 
+    _generate_glyph_include(repo_root)
     entries: list[tuple[str, str, str]] = []  # (domain, macro_line, alias)
     seen_aliases: set[str] = set()
 
@@ -132,7 +180,7 @@ def generate_macros(repo_root: Path, *, enterprise_root: Path | None = None) -> 
                 rel = md_file.relative_to(model_dir)
                 domain = rel.parts[0] if rel.parts else "unknown"
 
-            macro_line = f'!define {macro_name} rectangle "{label}" <<{element_type}>> as {alias}'
+            macro_line = f'!define {macro_name} rectangle "{_macro_label(label, element_type)}" <<{element_type}>> as {alias}'
             entries.append((domain, macro_line, alias))
 
     entries.sort(key=_sort_key)

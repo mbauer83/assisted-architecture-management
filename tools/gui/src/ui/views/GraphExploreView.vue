@@ -5,6 +5,7 @@ import { Effect } from 'effect'
 import { modelServiceKey } from '../keys'
 import { useAsync } from '../composables/useAsync'
 import { useForceGraph, type GraphNode, type GraphEdge, type LayoutMode } from '../composables/useForceGraph'
+import ArchimateTypeGlyph from '../components/ArchimateTypeGlyph.vue'
 import type { EntityDetail, ConnectionList } from '../../domain'
 
 const svc = inject(modelServiceKey)!
@@ -296,7 +297,7 @@ const edgePath = (e: typeof edges.value[number]) => {
             :stroke="selectedId === n.id ? '#1e293b' : 'white'"
             :stroke-width="selectedId === n.id ? 3 : 2"
           />
-          <text dy="4" text-anchor="middle" fill="white" font-size="9" font-weight="600">
+          <text dy="4" text-anchor="middle" fill="#252327" font-size="9" font-weight="600">
             {{ n.type }}
           </text>
           <text dy="40" text-anchor="middle" fill="#374151" font-size="10">
@@ -311,7 +312,7 @@ const edgePath = (e: typeof edges.value[number]) => {
           <text
             v-if="!n.expanded && (n.totalConns === undefined || n.totalConns > 0)"
             x="17" y="-14"
-            text-anchor="middle" fill="white" font-size="9" font-weight="bold"
+            text-anchor="middle" fill="#252327" font-size="9" font-weight="bold"
             pointer-events="none"
           >+</text>
         </g>
@@ -347,7 +348,13 @@ const edgePath = (e: typeof edges.value[number]) => {
           <label>Name</label>
           <RouterLink :to="{ path: '/entity', query: { id: selectedId } }" class="detail-value detail-link">{{ sd.name }}</RouterLink>
         </div>
-        <div class="detail-field"><label>Type</label><span class="detail-value mono">{{ sd.artifact_type }}</span></div>
+        <div class="detail-field">
+          <label>Type</label>
+          <span class="detail-type">
+            <ArchimateTypeGlyph :type="sd.artifact_type" :size="16" class="detail-glyph" />
+            <span class="detail-value mono">{{ sd.artifact_type }}</span>
+          </span>
+        </div>
         <div class="detail-field"><label>Domain</label><span class="detail-value domain-badge" :class="`domain--${sd.domain}`">{{ sd.domain }}</span></div>
         <div class="detail-field"><label>Status</label><span class="detail-value status-badge" :class="`status--${sd.status}`">{{ sd.status }}</span></div>
         <div class="detail-field"><label>Version</label><span class="detail-value">{{ sd.version }}</span></div>
@@ -404,6 +411,8 @@ const edgePath = (e: typeof edges.value[number]) => {
 .detail-field { margin-bottom: 12px; }
 .detail-field label { display: block; font-size: 11px; color: #6b7280; text-transform: uppercase; letter-spacing: .05em; margin-bottom: 2px; }
 .detail-value { font-size: 13px; color: #1e293b; }
+.detail-type { display: inline-flex; align-items: center; gap: 8px; }
+.detail-glyph { color: #374151; fill: none; flex: 0 0 auto; }
 .detail-link { font-weight: 600; }
 .id-value { font-size: 11px; color: #9ca3af; word-break: break-all; }
 .mono { font-family: monospace; }

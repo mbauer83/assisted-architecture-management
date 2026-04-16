@@ -4,6 +4,7 @@ import { router } from './ui/router'
 import { modelServiceKey } from './ui/keys'
 import { makeModelService } from './application/ModelService'
 import { makeHttpModelRepository } from './adapters/http/HttpModelRepository'
+import './ui/styles/shared.css'
 
 const app = createApp(App)
 app.use(router)

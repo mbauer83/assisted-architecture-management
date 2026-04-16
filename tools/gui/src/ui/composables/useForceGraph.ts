@@ -175,15 +175,16 @@ export function useForceGraph(width: () => number, height: () => number) {
     if (nodes.value.length === 0) return {}
     const tree = buildTree(rootId)
     const root = hierarchy(tree)
-    const pad = 60
+    const pad = 100
+    const x_pad_factor = 2
     const n = nodes.value.length
     // Use a canvas size that grows with node count so the graph can exceed the viewport
-    const W = Math.max(width() - pad * 2, n * 80)
+    const W = Math.max(width() - pad * x_pad_factor *2, n * 80)
     const H = Math.max(height() - pad * 2, n * 40)
     cluster<TreeNode>().size([W, H])(root)
     const posMap = new Map<string, { x: number; y: number }>()
     for (const d of root.descendants()) {
-      posMap.set(d.data.id, { x: (d.x ?? 0) + pad, y: (d.y ?? 0) + pad })
+      posMap.set(d.data.id, { x: (d.x ?? 0) + (pad * x_pad_factor), y: (d.y ?? 0) + pad })
     }
     for (const nd of nodes.value) {
       const pos = posMap.get(nd.id)

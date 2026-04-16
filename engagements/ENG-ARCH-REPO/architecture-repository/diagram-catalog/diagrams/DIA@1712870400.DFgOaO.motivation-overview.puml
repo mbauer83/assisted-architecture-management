@@ -1,12 +1,18 @@
 ---
 artifact-id: DIA@1712870400.DFgOaO.motivation-overview
 artifact-type: diagram
-name: "Motivation Domain Overview"
+name: Motivation Domain Overview
 version: 0.1.0
 status: draft
-keywords: [motivation, overview, stakeholders, drivers, goals, requirements]
+keywords:
+- motivation
+- overview
+- stakeholders
+- drivers
+- goals
+- requirements
 diagram-type: archimate-motivation
-last-updated: '2026-04-13'
+last-updated: '2026-04-16'
 ---
 @startuml motivation-overview
 !include ../_archimate-stereotypes.puml
@@ -47,26 +53,29 @@ rectangle "Outcomes & Principles" <<MotivationGrouping>> {
   rectangle "Extensibility &\nConfigurability" <<Principle>> as PRI_uraDPR
 }
 
-' --- Horizontal spread within layers ---
+' --- Auto-layout: spread elements within groupings ---
 STK_aB3dE1 -[hidden]right- STK_Zp8Lm4
 STK_Zp8Lm4 -[hidden]right- STK_K9xTq2
 STK_K9xTq2 -[hidden]right- STK_4oprPM
 STK_4oprPM -[hidden]right- STK_Rr9Ss9
-
 DRV_Qw7Er1 -[hidden]right- DRV_Ui5Op3
 DRV_Ui5Op3 -[hidden]right- DRV_Rt6Yu2
 DRV_Rt6Yu2 -[hidden]right- DRV_As4Df4
 DRV_As4Df4 -[hidden]right- DRV_ui6GDN
-
 GOL_5Fk9di -[hidden]right- GOL_Po1Qw3
 GOL_Po1Qw3 -[hidden]right- GOL_Zx9Cv4
 GOL_Zx9Cv4 -[hidden]right- GOL_Lm2Bn2
 GOL_Lm2Bn2 -[hidden]right- GOL_Iwha3
 GOL_Iwha3 -[hidden]right- GOL_Gh3Jk1
 GOL_Gh3Jk1 -[hidden]right- GOL_e3nCpO
-
 OUT_LrpdG0 -[hidden]right- OUT_AlZjX8
 OUT_AlZjX8 -[hidden]right- PRI_uraDPR
+
+
+' --- Horizontal spread within layers ---
+
+
+
 
 ' Stakeholder → Driver associations
 STK_aB3dE1 -down- DRV_Qw7Er1
@@ -92,7 +101,7 @@ DRV_ui6GDN .down.> GOL_e3nCpO : <<influence>>
 
 ' Goal → Outcome realizations
 GOL_Po1Qw3 -down-|> OUT_LrpdG0 : <<realization>>
-GOL_Zx9Cv4 -down-|> OUT_AlZjX8 : <<realization>>
-GOL_5Fk9di -down-|> OUT_AlZjX8 : <<realization>>
+OUT_AlZjX8 -up-|> GOL_Zx9Cv4 : <<realization>>
+OUT_AlZjX8 -up-|> GOL_5Fk9di : <<realization>>
 
 @enduml

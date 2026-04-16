@@ -10,6 +10,7 @@
 ' Reference palette: Archi open-source tool default theme.
 
 !define ARCHIMATE_VERSION 3.2
+!include _archimate-glyphs.puml
 
 skinparam defaultFontName "Helvetica Neue, Helvetica, Arial, sans-serif"
 skinparam defaultFontSize 12
@@ -99,10 +100,6 @@ skinparam rectangle<<Principle>> {
   BorderColor #7B3F9A
 }
 skinparam rectangle<<Requirement>> {
-  BackgroundColor #EDD6F0
-  BorderColor #7B3F9A
-}
-skinparam rectangle<<Constraint>> {
   BackgroundColor #EDD6F0
   BorderColor #7B3F9A
 }

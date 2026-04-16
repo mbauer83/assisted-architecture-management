@@ -9,140 +9,140 @@
 ' ---------------------------------------------------------------------------
 ' Motivation
 ' ---------------------------------------------------------------------------
-!define DECL_STK_4oprPM rectangle "DevOps Engineer" <<Stakeholder>> as STK_4oprPM
-!define DECL_STK_K9xTq2 rectangle "Developer" <<Stakeholder>> as STK_K9xTq2
-!define DECL_STK_Rr9Ss9 rectangle "Upper Technical Management" <<Stakeholder>> as STK_Rr9Ss9
-!define DECL_STK_Zp8Lm4 rectangle "Product Owner" <<Stakeholder>> as STK_Zp8Lm4
-!define DECL_STK_aB3dE1 rectangle "Architect" <<Stakeholder>> as STK_aB3dE1
-!define DECL_DRV_As4Df4 rectangle "Limited Central Governance Capacity" <<Driver>> as DRV_As4Df4
-!define DECL_DRV_Qw7Er1 rectangle "Code Generation Velocity Exceeds Planning & Review" <<Driver>> as DRV_Qw7Er1
-!define DECL_DRV_Rt6Yu2 rectangle "Increasing Autonomy of Teams & Systems" <<Driver>> as DRV_Rt6Yu2
-!define DECL_DRV_Ui5Op3 rectangle "Rising Complexity and Interdependence" <<Driver>> as DRV_Ui5Op3
-!define DECL_DRV_ui6GDN rectangle "Increasing Need for Effective LLM Access" <<Driver>> as DRV_ui6GDN
-!define DECL_GOL_5Fk9di rectangle "Support Architecture Planning for Humans" <<Goal>> as GOL_5Fk9di
-!define DECL_GOL_B6G__P rectangle "Support Technology Design Evolution and Validation for AI" <<Goal>> as GOL_B6G__P
-!define DECL_GOL_Gh3Jk1 rectangle "Provide Development Guidance for Humans" <<Goal>> as GOL_Gh3Jk1
-!define DECL_GOL_Iwha3 rectangle "Support Architecture Planning for AI" <<Goal>> as GOL_Iwha3
-!define DECL_GOL_Lm2Bn2 rectangle "Enable Cross-Stakeholder Validation" <<Goal>> as GOL_Lm2Bn2
-!define DECL_GOL_Po1Qw3 rectangle "Maintain Coherence and Traceability" <<Goal>> as GOL_Po1Qw3
-!define DECL_GOL_W6Z8pa rectangle "Support Technology Design Evolution and Validation for Humans" <<Goal>> as GOL_W6Z8pa
-!define DECL_GOL_Zx9Cv4 rectangle "Enable Scalable Reuse" <<Goal>> as GOL_Zx9Cv4
-!define DECL_GOL_e3nCpO rectangle "Provide Development Guidance for AI" <<Goal>> as GOL_e3nCpO
-!define DECL_GOL_hEEWS8 rectangle "Support Product Design Evolution and Validation for Humans" <<Goal>> as GOL_hEEWS8
-!define DECL_GOL_zBPs_y rectangle "Support Product Design Evolution and Validation for AI" <<Goal>> as GOL_zBPs_y
-!define DECL_OUT_AlZjX8 rectangle "Reduced Planning Overhead" <<Outcome>> as OUT_AlZjX8
-!define DECL_OUT_LrpdG0 rectangle "Increased Architectural Coherence" <<Outcome>> as OUT_LrpdG0
-!define DECL_PRI_uraDPR rectangle "Extensibility and Configurability" <<Principle>> as PRI_uraDPR
-!define DECL_REQ_5PPAX3 rectangle "Authoring Tools" <<Requirement>> as REQ_5PPAX3
-!define DECL_REQ_6ZR3nk rectangle "Configurable Model Attribute Schemata" <<Requirement>> as REQ_6ZR3nk
-!define DECL_REQ_Aa1Bb1 rectangle "Obligatory Structured Frontmatter" <<Requirement>> as REQ_Aa1Bb1
-!define DECL_REQ_Cc2Dd2 rectangle "Semantic Full-Text Search" <<Requirement>> as REQ_Cc2Dd2
-!define DECL_REQ_Ee3Ff3 rectangle "Verified Referential Integrity" <<Requirement>> as REQ_Ee3Ff3
-!define DECL_REQ_F4tfa3 rectangle "Discovery Tools" <<Requirement>> as REQ_F4tfa3
-!define DECL_REQ_Gg4Hh4 rectangle "Promotion Mechanism" <<Requirement>> as REQ_Gg4Hh4
-!define DECL_REQ_HR7AGz rectangle "Support Models, Diagrams, and Documents" <<Requirement>> as REQ_HR7AGz
-!define DECL_REQ_Ii5Jj5 rectangle "ArchiMate and UML Diagrams" <<Requirement>> as REQ_Ii5Jj5
-!define DECL_REQ_JTRw1x rectangle "Verification Tools" <<Requirement>> as REQ_JTRw1x
-!define DECL_REQ_KeGCZE rectangle "ArchiMate NEXT Ontology" <<Requirement>> as REQ_KeGCZE
-!define DECL_REQ_Kk6Ll6 rectangle "Unique IDs" <<Requirement>> as REQ_Kk6Ll6
-!define DECL_REQ_NfAmrl rectangle "GUI Exploration and Authoring for Humans" <<Requirement>> as REQ_NfAmrl
-!define DECL_REQ_NkMp_0 rectangle "PlantUML Diagrams" <<Requirement>> as REQ_NkMp_0
-!define DECL_REQ_OCTQ9j rectangle "Strictly Formatted Cross-References" <<Requirement>> as REQ_OCTQ9j
-!define DECL_REQ_O_Ppmp rectangle "Git Version Tracking" <<Requirement>> as REQ_O_Ppmp
-!define DECL_REQ_V5EdQk rectangle "Markdown Format" <<Requirement>> as REQ_V5EdQk
-!define DECL_REQ_cz8L4W rectangle "Git-Based Repository Configuration" <<Requirement>> as REQ_cz8L4W
-!define DECL_REQ_eBAa26 rectangle "Graph-Based Relationship Discovery" <<Requirement>> as REQ_eBAa26
-!define DECL_REQ_kOU3al rectangle "Two-Tiered Repository" <<Requirement>> as REQ_kOU3al
-!define DECL_REQ_m117_R rectangle "Write Access Only via Tools" <<Requirement>> as REQ_m117_R
-!define DECL_REQ_pSvaRl rectangle "Configurable Frontmatter Schemata" <<Requirement>> as REQ_pSvaRl
-!define DECL_REQ_peinbQ rectangle "Tool Interfaces: MCP, CLI, REST" <<Requirement>> as REQ_peinbQ
-!define DECL_REQ_s5B3gB rectangle "Metadata-Based Querying" <<Requirement>> as REQ_s5B3gB
-!define DECL_REQ_t_NpFC rectangle "Verify Diagram Syntax Automatically" <<Requirement>> as REQ_t_NpFC
-!define DECL_REQ_vlMSrd rectangle "File-Based Entities" <<Requirement>> as REQ_vlMSrd
+!define DECL_STK_4oprPM rectangle "<$archimate_Stakeholder{scale=0.9}> DevOps Engineer" <<Stakeholder>> as STK_4oprPM
+!define DECL_STK_K9xTq2 rectangle "<$archimate_Stakeholder{scale=0.9}> Developer" <<Stakeholder>> as STK_K9xTq2
+!define DECL_STK_Rr9Ss9 rectangle "<$archimate_Stakeholder{scale=0.9}> Upper Technical Management" <<Stakeholder>> as STK_Rr9Ss9
+!define DECL_STK_Zp8Lm4 rectangle "<$archimate_Stakeholder{scale=0.9}> Product Owner" <<Stakeholder>> as STK_Zp8Lm4
+!define DECL_STK_aB3dE1 rectangle "<$archimate_Stakeholder{scale=0.9}> Architect" <<Stakeholder>> as STK_aB3dE1
+!define DECL_DRV_As4Df4 rectangle "<$archimate_Driver{scale=0.9}> Limited Central Governance Capacity" <<Driver>> as DRV_As4Df4
+!define DECL_DRV_Qw7Er1 rectangle "<$archimate_Driver{scale=0.9}> Code Generation Velocity Exceeds Planning & Review" <<Driver>> as DRV_Qw7Er1
+!define DECL_DRV_Rt6Yu2 rectangle "<$archimate_Driver{scale=0.9}> Increasing Autonomy of Teams & Systems" <<Driver>> as DRV_Rt6Yu2
+!define DECL_DRV_Ui5Op3 rectangle "<$archimate_Driver{scale=0.9}> Rising Complexity and Interdependence" <<Driver>> as DRV_Ui5Op3
+!define DECL_DRV_ui6GDN rectangle "<$archimate_Driver{scale=0.9}> Increasing Need for Effective LLM Access" <<Driver>> as DRV_ui6GDN
+!define DECL_GOL_5Fk9di rectangle "<$archimate_Goal{scale=0.9}> Support Architecture Planning for Humans" <<Goal>> as GOL_5Fk9di
+!define DECL_GOL_B6G__P rectangle "<$archimate_Goal{scale=0.9}> Support Technology Design Evolution and Validation for AI" <<Goal>> as GOL_B6G__P
+!define DECL_GOL_Gh3Jk1 rectangle "<$archimate_Goal{scale=0.9}> Provide Development Guidance for Humans" <<Goal>> as GOL_Gh3Jk1
+!define DECL_GOL_Iwha3 rectangle "<$archimate_Goal{scale=0.9}> Support Architecture Planning for AI" <<Goal>> as GOL_Iwha3
+!define DECL_GOL_Lm2Bn2 rectangle "<$archimate_Goal{scale=0.9}> Enable Cross-Stakeholder Validation" <<Goal>> as GOL_Lm2Bn2
+!define DECL_GOL_Po1Qw3 rectangle "<$archimate_Goal{scale=0.9}> Maintain Coherence and Traceability" <<Goal>> as GOL_Po1Qw3
+!define DECL_GOL_W6Z8pa rectangle "<$archimate_Goal{scale=0.9}> Support Technology Design Evolution and Validation for Humans" <<Goal>> as GOL_W6Z8pa
+!define DECL_GOL_Zx9Cv4 rectangle "<$archimate_Goal{scale=0.9}> Enable Scalable Reuse" <<Goal>> as GOL_Zx9Cv4
+!define DECL_GOL_e3nCpO rectangle "<$archimate_Goal{scale=0.9}> Provide Development Guidance for AI" <<Goal>> as GOL_e3nCpO
+!define DECL_GOL_hEEWS8 rectangle "<$archimate_Goal{scale=0.9}> Support Product Design Evolution and Validation for Humans" <<Goal>> as GOL_hEEWS8
+!define DECL_GOL_zBPs_y rectangle "<$archimate_Goal{scale=0.9}> Support Product Design Evolution and Validation for AI" <<Goal>> as GOL_zBPs_y
+!define DECL_OUT_AlZjX8 rectangle "<$archimate_Outcome{scale=0.9}> Reduced Planning Overhead" <<Outcome>> as OUT_AlZjX8
+!define DECL_OUT_LrpdG0 rectangle "<$archimate_Outcome{scale=0.9}> Increased Architectural Coherence" <<Outcome>> as OUT_LrpdG0
+!define DECL_PRI_uraDPR rectangle "<$archimate_Principle{scale=0.9}> Extensibility and Configurability" <<Principle>> as PRI_uraDPR
+!define DECL_REQ_5PPAX3 rectangle "<$archimate_Requirement{scale=0.9}> Authoring Tools" <<Requirement>> as REQ_5PPAX3
+!define DECL_REQ_6ZR3nk rectangle "<$archimate_Requirement{scale=0.9}> Configurable Model Attribute Schemata" <<Requirement>> as REQ_6ZR3nk
+!define DECL_REQ_Aa1Bb1 rectangle "<$archimate_Requirement{scale=0.9}> Obligatory Structured Frontmatter" <<Requirement>> as REQ_Aa1Bb1
+!define DECL_REQ_Cc2Dd2 rectangle "<$archimate_Requirement{scale=0.9}> Semantic Full-Text Search" <<Requirement>> as REQ_Cc2Dd2
+!define DECL_REQ_Ee3Ff3 rectangle "<$archimate_Requirement{scale=0.9}> Verified Referential Integrity" <<Requirement>> as REQ_Ee3Ff3
+!define DECL_REQ_F4tfa3 rectangle "<$archimate_Requirement{scale=0.9}> Discovery Tools" <<Requirement>> as REQ_F4tfa3
+!define DECL_REQ_Gg4Hh4 rectangle "<$archimate_Requirement{scale=0.9}> Promotion Mechanism" <<Requirement>> as REQ_Gg4Hh4
+!define DECL_REQ_HR7AGz rectangle "<$archimate_Requirement{scale=0.9}> Support Models, Diagrams, and Documents" <<Requirement>> as REQ_HR7AGz
+!define DECL_REQ_Ii5Jj5 rectangle "<$archimate_Requirement{scale=0.9}> ArchiMate and UML Diagrams" <<Requirement>> as REQ_Ii5Jj5
+!define DECL_REQ_JTRw1x rectangle "<$archimate_Requirement{scale=0.9}> Verification Tools" <<Requirement>> as REQ_JTRw1x
+!define DECL_REQ_KeGCZE rectangle "<$archimate_Requirement{scale=0.9}> ArchiMate NEXT Ontology" <<Requirement>> as REQ_KeGCZE
+!define DECL_REQ_Kk6Ll6 rectangle "<$archimate_Requirement{scale=0.9}> Unique IDs" <<Requirement>> as REQ_Kk6Ll6
+!define DECL_REQ_NfAmrl rectangle "<$archimate_Requirement{scale=0.9}> GUI Exploration and Authoring for Humans" <<Requirement>> as REQ_NfAmrl
+!define DECL_REQ_NkMp_0 rectangle "<$archimate_Requirement{scale=0.9}> PlantUML Diagrams" <<Requirement>> as REQ_NkMp_0
+!define DECL_REQ_OCTQ9j rectangle "<$archimate_Requirement{scale=0.9}> Strictly Formatted Cross-References" <<Requirement>> as REQ_OCTQ9j
+!define DECL_REQ_O_Ppmp rectangle "<$archimate_Requirement{scale=0.9}> Git Version Tracking" <<Requirement>> as REQ_O_Ppmp
+!define DECL_REQ_V5EdQk rectangle "<$archimate_Requirement{scale=0.9}> Markdown Format" <<Requirement>> as REQ_V5EdQk
+!define DECL_REQ_cz8L4W rectangle "<$archimate_Requirement{scale=0.9}> Git-Based Repository Configuration" <<Requirement>> as REQ_cz8L4W
+!define DECL_REQ_eBAa26 rectangle "<$archimate_Requirement{scale=0.9}> Graph-Based Relationship Discovery" <<Requirement>> as REQ_eBAa26
+!define DECL_REQ_kOU3al rectangle "<$archimate_Requirement{scale=0.9}> Two-Tiered Repository" <<Requirement>> as REQ_kOU3al
+!define DECL_REQ_m117_R rectangle "<$archimate_Requirement{scale=0.9}> Write Access Only via Tools" <<Requirement>> as REQ_m117_R
+!define DECL_REQ_pSvaRl rectangle "<$archimate_Requirement{scale=0.9}> Configurable Frontmatter Schemata" <<Requirement>> as REQ_pSvaRl
+!define DECL_REQ_peinbQ rectangle "<$archimate_Requirement{scale=0.9}> Tool Interfaces: MCP, CLI, REST" <<Requirement>> as REQ_peinbQ
+!define DECL_REQ_s5B3gB rectangle "<$archimate_Requirement{scale=0.9}> Metadata-Based Querying" <<Requirement>> as REQ_s5B3gB
+!define DECL_REQ_t_NpFC rectangle "<$archimate_Requirement{scale=0.9}> Verify Diagram Syntax Automatically" <<Requirement>> as REQ_t_NpFC
+!define DECL_REQ_vlMSrd rectangle "<$archimate_Requirement{scale=0.9}> File-Based Entities" <<Requirement>> as REQ_vlMSrd
 
 ' ---------------------------------------------------------------------------
 ' Strategy
 ' ---------------------------------------------------------------------------
-!define DECL_CAP_0T4qjV rectangle "Configuration Management" <<Capability>> as CAP_0T4qjV
-!define DECL_CAP_F4qy9O rectangle "Artifact Authoring" <<Capability>> as CAP_F4qy9O
-!define DECL_CAP_QrHHmz rectangle "Artifact Discovery" <<Capability>> as CAP_QrHHmz
-!define DECL_CAP_ZnmAHe rectangle "Repository Governance" <<Capability>> as CAP_ZnmAHe
-!define DECL_CAP_gky5s4 rectangle "Model Validation" <<Capability>> as CAP_gky5s4
-!define DECL_CAP_y4xZme rectangle "Architectural Modeling" <<Capability>> as CAP_y4xZme
-!define DECL_COA_BbjFAy rectangle "Markdown File-Based Approach" <<CourseOfAction>> as COA_BbjFAy
-!define DECL_COA_utgeNR rectangle "ArchiMate NEXT Ontology Adoption" <<CourseOfAction>> as COA_utgeNR
+!define DECL_CAP_0T4qjV rectangle "<$archimate_Capability{scale=0.9}> Configuration Management" <<Capability>> as CAP_0T4qjV
+!define DECL_CAP_F4qy9O rectangle "<$archimate_Capability{scale=0.9}> Artifact Authoring" <<Capability>> as CAP_F4qy9O
+!define DECL_CAP_QrHHmz rectangle "<$archimate_Capability{scale=0.9}> Artifact Discovery" <<Capability>> as CAP_QrHHmz
+!define DECL_CAP_ZnmAHe rectangle "<$archimate_Capability{scale=0.9}> Repository Governance" <<Capability>> as CAP_ZnmAHe
+!define DECL_CAP_gky5s4 rectangle "<$archimate_Capability{scale=0.9}> Model Validation" <<Capability>> as CAP_gky5s4
+!define DECL_CAP_y4xZme rectangle "<$archimate_Capability{scale=0.9}> Architectural Modeling" <<Capability>> as CAP_y4xZme
+!define DECL_COA_BbjFAy rectangle "<$archimate_CourseOfAction{scale=0.9}> Markdown File-Based Approach" <<CourseOfAction>> as COA_BbjFAy
+!define DECL_COA_utgeNR rectangle "<$archimate_CourseOfAction{scale=0.9}> ArchiMate NEXT Ontology Adoption" <<CourseOfAction>> as COA_utgeNR
 
 ' ---------------------------------------------------------------------------
 ' Common
 ' ---------------------------------------------------------------------------
-!define DECL_SRV_3I3Dtc rectangle "Indexing Service" <<Service>> as SRV_3I3Dtc
-!define DECL_SRV_Au1Th1 rectangle "Authoring Service" <<Service>> as SRV_Au1Th1
-!define DECL_SRV_Ij6Kl6 rectangle "Validation Service" <<Service>> as SRV_Ij6Kl6
-!define DECL_SRV_Qr8St8 rectangle "Discovery, Querying & Stats Service" <<Service>> as SRV_Qr8St8
-!define DECL_SRV_Uv9Wx9 rectangle "Repository Promotion Service" <<Service>> as SRV_Uv9Wx9
-!define DECL_SRV_e5MCiF rectangle "Configuration Service" <<Service>> as SRV_e5MCiF
-!define DECL_PRC_0Rz5Ex rectangle "Promote Artifact" <<Process>> as PRC_0Rz5Ex
-!define DECL_PRC_iGIf7W rectangle "Create Diagram" <<Process>> as PRC_iGIf7W
-!define DECL_PRC_iJuFgE rectangle "Index Repository" <<Process>> as PRC_iJuFgE
-!define DECL_PRC_oLRrwL rectangle "Verify Model" <<Process>> as PRC_oLRrwL
-!define DECL_PRC_ocenhK rectangle "Create Connection" <<Process>> as PRC_ocenhK
-!define DECL_PRC_pFq3jC rectangle "Create Entity" <<Process>> as PRC_pFq3jC
-!define DECL_PRC_vGhe4Z rectangle "Query Model" <<Process>> as PRC_vGhe4Z
-!define DECL_FNC_B_F_Sq rectangle "Attribute Schema Validation" <<Function>> as FNC_B_F_Sq
-!define DECL_FNC_ahr0mT rectangle "Frontmatter Validation" <<Function>> as FNC_ahr0mT
-!define DECL_FNC_eAkU8w rectangle "Referential Integrity Check" <<Function>> as FNC_eAkU8w
-!define DECL_FNC_wIVwom rectangle "PlantUML Syntax Check" <<Function>> as FNC_wIVwom
-!define DECL_EVT_JXFmQ rectangle "Model Verified" <<Event>> as EVT_JXFmQ
-!define DECL_EVT_P4HzNt rectangle "Entity Created" <<Event>> as EVT_P4HzNt
-!define DECL_ROL_6VGCvh rectangle "Reviewer" <<Role>> as ROL_6VGCvh
-!define DECL_ROL_deMuTj rectangle "Author" <<Role>> as ROL_deMuTj
+!define DECL_SRV_3I3Dtc rectangle "<$archimate_Service{scale=0.9}> Indexing Service" <<Service>> as SRV_3I3Dtc
+!define DECL_SRV_Au1Th1 rectangle "<$archimate_Service{scale=0.9}> Authoring Service" <<Service>> as SRV_Au1Th1
+!define DECL_SRV_Ij6Kl6 rectangle "<$archimate_Service{scale=0.9}> Validation Service" <<Service>> as SRV_Ij6Kl6
+!define DECL_SRV_Qr8St8 rectangle "<$archimate_Service{scale=0.9}> Discovery, Querying & Stats Service" <<Service>> as SRV_Qr8St8
+!define DECL_SRV_Uv9Wx9 rectangle "<$archimate_Service{scale=0.9}> Repository Promotion Service" <<Service>> as SRV_Uv9Wx9
+!define DECL_SRV_e5MCiF rectangle "<$archimate_Service{scale=0.9}> Configuration Service" <<Service>> as SRV_e5MCiF
+!define DECL_PRC_0Rz5Ex rectangle "<$archimate_Process{scale=0.9}> Promote Artifact" <<Process>> as PRC_0Rz5Ex
+!define DECL_PRC_iGIf7W rectangle "<$archimate_Process{scale=0.9}> Create Diagram" <<Process>> as PRC_iGIf7W
+!define DECL_PRC_iJuFgE rectangle "<$archimate_Process{scale=0.9}> Index Repository" <<Process>> as PRC_iJuFgE
+!define DECL_PRC_oLRrwL rectangle "<$archimate_Process{scale=0.9}> Verify Model" <<Process>> as PRC_oLRrwL
+!define DECL_PRC_ocenhK rectangle "<$archimate_Process{scale=0.9}> Create Connection" <<Process>> as PRC_ocenhK
+!define DECL_PRC_pFq3jC rectangle "<$archimate_Process{scale=0.9}> Create Entity" <<Process>> as PRC_pFq3jC
+!define DECL_PRC_vGhe4Z rectangle "<$archimate_Process{scale=0.9}> Query Model" <<Process>> as PRC_vGhe4Z
+!define DECL_FNC_B_F_Sq rectangle "<$archimate_Function{scale=0.9}> Attribute Schema Validation" <<Function>> as FNC_B_F_Sq
+!define DECL_FNC_ahr0mT rectangle "<$archimate_Function{scale=0.9}> Frontmatter Validation" <<Function>> as FNC_ahr0mT
+!define DECL_FNC_eAkU8w rectangle "<$archimate_Function{scale=0.9}> Referential Integrity Check" <<Function>> as FNC_eAkU8w
+!define DECL_FNC_wIVwom rectangle "<$archimate_Function{scale=0.9}> PlantUML Syntax Check" <<Function>> as FNC_wIVwom
+!define DECL_EVT_JXFmQ rectangle "<$archimate_Event{scale=0.9}> Model Verified" <<Event>> as EVT_JXFmQ
+!define DECL_EVT_P4HzNt rectangle "<$archimate_Event{scale=0.9}> Entity Created" <<Event>> as EVT_P4HzNt
+!define DECL_ROL_6VGCvh rectangle "<$archimate_Role{scale=0.9}> Reviewer" <<Role>> as ROL_6VGCvh
+!define DECL_ROL_deMuTj rectangle "<$archimate_Role{scale=0.9}> Author" <<Role>> as ROL_deMuTj
 
 ' ---------------------------------------------------------------------------
 ' Business
 ' ---------------------------------------------------------------------------
-!define DECL_ACT_Nn7Oo7 rectangle "Architect" <<BusinessActor>> as ACT_Nn7Oo7
-!define DECL_ACT_OLWiNc rectangle "DevOps Engineer" <<BusinessActor>> as ACT_OLWiNc
-!define DECL_ACT_Pp8Qq8 rectangle "Developer" <<BusinessActor>> as ACT_Pp8Qq8
-!define DECL_ACT_Rr9Ss9 rectangle "Product Owner" <<BusinessActor>> as ACT_Rr9Ss9
-!define DECL_ACT_Ut1Vv1 rectangle "Upper Technical Management" <<BusinessActor>> as ACT_Ut1Vv1
-!define DECL_BIF_zr7_vT rectangle "GUI Interface" <<BusinessInterface>> as BIF_zr7_vT
-!define DECL_BOB_6Uok0b rectangle "Enterprise Repository" <<BusinessObject>> as BOB_6Uok0b
-!define DECL_BOB_8D68QW rectangle "Diagram File" <<BusinessObject>> as BOB_8D68QW
-!define DECL_BOB_GSnfM1 rectangle "Frontmatter Block" <<BusinessObject>> as BOB_GSnfM1
-!define DECL_BOB_d8ETlx rectangle "Connection File" <<BusinessObject>> as BOB_d8ETlx
-!define DECL_BOB_ie4vWU rectangle "Entity File" <<BusinessObject>> as BOB_ie4vWU
-!define DECL_BOB_jqcFNe rectangle "Architecture Model" <<BusinessObject>> as BOB_jqcFNe
-!define DECL_BOB_so7gfN rectangle "Engagement Repository" <<BusinessObject>> as BOB_so7gfN
+!define DECL_ACT_Nn7Oo7 rectangle "<$archimate_BusinessActor{scale=0.9}> Architect" <<BusinessActor>> as ACT_Nn7Oo7
+!define DECL_ACT_OLWiNc rectangle "<$archimate_BusinessActor{scale=0.9}> DevOps Engineer" <<BusinessActor>> as ACT_OLWiNc
+!define DECL_ACT_Pp8Qq8 rectangle "<$archimate_BusinessActor{scale=0.9}> Developer" <<BusinessActor>> as ACT_Pp8Qq8
+!define DECL_ACT_Rr9Ss9 rectangle "<$archimate_BusinessActor{scale=0.9}> Product Owner" <<BusinessActor>> as ACT_Rr9Ss9
+!define DECL_ACT_Ut1Vv1 rectangle "<$archimate_BusinessActor{scale=0.9}> Upper Technical Management" <<BusinessActor>> as ACT_Ut1Vv1
+!define DECL_BIF_zr7_vT rectangle "<$archimate_BusinessInterface{scale=0.9}> GUI Interface" <<BusinessInterface>> as BIF_zr7_vT
+!define DECL_BOB_6Uok0b rectangle "<$archimate_BusinessObject{scale=0.9}> Enterprise Repository" <<BusinessObject>> as BOB_6Uok0b
+!define DECL_BOB_8D68QW rectangle "<$archimate_BusinessObject{scale=0.9}> Diagram File" <<BusinessObject>> as BOB_8D68QW
+!define DECL_BOB_GSnfM1 rectangle "<$archimate_BusinessObject{scale=0.9}> Frontmatter Block" <<BusinessObject>> as BOB_GSnfM1
+!define DECL_BOB_d8ETlx rectangle "<$archimate_BusinessObject{scale=0.9}> Connection File" <<BusinessObject>> as BOB_d8ETlx
+!define DECL_BOB_ie4vWU rectangle "<$archimate_BusinessObject{scale=0.9}> Entity File" <<BusinessObject>> as BOB_ie4vWU
+!define DECL_BOB_jqcFNe rectangle "<$archimate_BusinessObject{scale=0.9}> Architecture Model" <<BusinessObject>> as BOB_jqcFNe
+!define DECL_BOB_so7gfN rectangle "<$archimate_BusinessObject{scale=0.9}> Engagement Repository" <<BusinessObject>> as BOB_so7gfN
 
 ' ---------------------------------------------------------------------------
 ' Application
 ' ---------------------------------------------------------------------------
-!define DECL_APP_JOmFWy rectangle "SQLite Indexer" <<ApplicationComponent>> as APP_JOmFWy
-!define DECL_APP_YOOEbL rectangle "Frontmatter Parser" <<ApplicationComponent>> as APP_YOOEbL
-!define DECL_APP_ca3vm7 rectangle "Model Verifier" <<ApplicationComponent>> as APP_ca3vm7
-!define DECL_APP_kRZYOA rectangle "MCP Model Server" <<ApplicationComponent>> as APP_kRZYOA
-!define DECL_APP_kjC6ex rectangle "CLI Tool" <<ApplicationComponent>> as APP_kjC6ex
-!define DECL_APP_lmO0mp rectangle "GUI Authoring Tool" <<ApplicationComponent>> as APP_lmO0mp
-!define DECL_APP_rgulJL rectangle "Macro Generator" <<ApplicationComponent>> as APP_rgulJL
-!define DECL_APP_v9LvfK rectangle "Query Engine" <<ApplicationComponent>> as APP_v9LvfK
-!define DECL_APP_yNhgdh rectangle "Model Registry" <<ApplicationComponent>> as APP_yNhgdh
-!define DECL_AIF_KxvYB rectangle "CLI Interface" <<ApplicationInterface>> as AIF_KxvYB
-!define DECL_AIF_Ua50xU rectangle "Web Interface" <<ApplicationInterface>> as AIF_Ua50xU
-!define DECL_AIF_XjbNQh rectangle "REST Interface" <<ApplicationInterface>> as AIF_XjbNQh
-!define DECL_AIF_wuleEe rectangle "MCP Interface" <<ApplicationInterface>> as AIF_wuleEe
-!define DECL_DOB_3rilik rectangle "SQLite Index" <<DataObject>> as DOB_3rilik
-!define DECL_DOB_H8UwKV rectangle "PlantUML Macro Library" <<DataObject>> as DOB_H8UwKV
-!define DECL_DOB_L3VfsH rectangle "Connection Metadata" <<DataObject>> as DOB_L3VfsH
-!define DECL_DOB_ij5CH7 rectangle "Entity Metadata" <<DataObject>> as DOB_ij5CH7
+!define DECL_APP_JOmFWy rectangle "<$archimate_ApplicationComponent{scale=0.9}> SQLite Indexer" <<ApplicationComponent>> as APP_JOmFWy
+!define DECL_APP_YOOEbL rectangle "<$archimate_ApplicationComponent{scale=0.9}> Frontmatter Parser" <<ApplicationComponent>> as APP_YOOEbL
+!define DECL_APP_ca3vm7 rectangle "<$archimate_ApplicationComponent{scale=0.9}> Model Verifier" <<ApplicationComponent>> as APP_ca3vm7
+!define DECL_APP_kRZYOA rectangle "<$archimate_ApplicationComponent{scale=0.9}> MCP Model Server" <<ApplicationComponent>> as APP_kRZYOA
+!define DECL_APP_kjC6ex rectangle "<$archimate_ApplicationComponent{scale=0.9}> CLI Tool" <<ApplicationComponent>> as APP_kjC6ex
+!define DECL_APP_lmO0mp rectangle "<$archimate_ApplicationComponent{scale=0.9}> GUI Authoring Tool" <<ApplicationComponent>> as APP_lmO0mp
+!define DECL_APP_rgulJL rectangle "<$archimate_ApplicationComponent{scale=0.9}> Macro Generator" <<ApplicationComponent>> as APP_rgulJL
+!define DECL_APP_v9LvfK rectangle "<$archimate_ApplicationComponent{scale=0.9}> Query Engine" <<ApplicationComponent>> as APP_v9LvfK
+!define DECL_APP_yNhgdh rectangle "<$archimate_ApplicationComponent{scale=0.9}> Model Registry" <<ApplicationComponent>> as APP_yNhgdh
+!define DECL_AIF_KxvYB rectangle "<$archimate_ApplicationInterface{scale=0.9}> CLI Interface" <<ApplicationInterface>> as AIF_KxvYB
+!define DECL_AIF_Ua50xU rectangle "<$archimate_ApplicationInterface{scale=0.9}> Web Interface" <<ApplicationInterface>> as AIF_Ua50xU
+!define DECL_AIF_XjbNQh rectangle "<$archimate_ApplicationInterface{scale=0.9}> REST Interface" <<ApplicationInterface>> as AIF_XjbNQh
+!define DECL_AIF_wuleEe rectangle "<$archimate_ApplicationInterface{scale=0.9}> MCP Interface" <<ApplicationInterface>> as AIF_wuleEe
+!define DECL_DOB_3rilik rectangle "<$archimate_DataObject{scale=0.9}> SQLite Index" <<DataObject>> as DOB_3rilik
+!define DECL_DOB_H8UwKV rectangle "<$archimate_DataObject{scale=0.9}> PlantUML Macro Library" <<DataObject>> as DOB_H8UwKV
+!define DECL_DOB_L3VfsH rectangle "<$archimate_DataObject{scale=0.9}> Connection Metadata" <<DataObject>> as DOB_L3VfsH
+!define DECL_DOB_ij5CH7 rectangle "<$archimate_DataObject{scale=0.9}> Entity Metadata" <<DataObject>> as DOB_ij5CH7
 
 ' ---------------------------------------------------------------------------
 ' Technology
 ' ---------------------------------------------------------------------------
-!define DECL_NOD_4EFX7z rectangle "Developer Workstation" <<Node>> as NOD_4EFX7z
-!define DECL_SSW_TzzVd rectangle "Git VCS" <<SystemSoftware>> as SSW_TzzVd
-!define DECL_SSW_o7a0ad rectangle "Python Runtime" <<SystemSoftware>> as SSW_o7a0ad
-!define DECL_SSW_xVrBYD rectangle "PlantUML Engine" <<SystemSoftware>> as SSW_xVrBYD
-!define DECL_ART_FtioFJ rectangle "SQLite Database" <<Artifact>> as ART_FtioFJ
-!define DECL_ART_YsLpM8 rectangle "Git Repository" <<Artifact>> as ART_YsLpM8
-!define DECL_TSV_MSy15f rectangle "File System Service" <<TechnologyService>> as TSV_MSy15f
-!define DECL_TSV_WluY9K rectangle "Version Control Service" <<TechnologyService>> as TSV_WluY9K
+!define DECL_NOD_4EFX7z rectangle "<$archimate_Node{scale=0.9}> Developer Workstation" <<Node>> as NOD_4EFX7z
+!define DECL_SSW_TzzVd rectangle "<$archimate_SystemSoftware{scale=0.9}> Git VCS" <<SystemSoftware>> as SSW_TzzVd
+!define DECL_SSW_o7a0ad rectangle "<$archimate_SystemSoftware{scale=0.9}> Python Runtime" <<SystemSoftware>> as SSW_o7a0ad
+!define DECL_SSW_xVrBYD rectangle "<$archimate_SystemSoftware{scale=0.9}> PlantUML Engine" <<SystemSoftware>> as SSW_xVrBYD
+!define DECL_ART_FtioFJ rectangle "<$archimate_Artifact{scale=0.9}> SQLite Database" <<Artifact>> as ART_FtioFJ
+!define DECL_ART_YsLpM8 rectangle "<$archimate_Artifact{scale=0.9}> Git Repository" <<Artifact>> as ART_YsLpM8
+!define DECL_TSV_MSy15f rectangle "<$archimate_TechnologyService{scale=0.9}> File System Service" <<TechnologyService>> as TSV_MSy15f
+!define DECL_TSV_WluY9K rectangle "<$archimate_TechnologyService{scale=0.9}> Version Control Service" <<TechnologyService>> as TSV_WluY9K

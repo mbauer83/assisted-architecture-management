@@ -28,7 +28,7 @@ def write_help() -> dict[str, object]:
 
 def _entity_types_by_domain() -> dict[str, list[str]]:
     grouped: dict[str, list[str]] = {}
-    for type_name, info in sorted(ENTITY_TYPES.items()):
+    for type_name, info in ENTITY_TYPES.items():
         domain = info.domain_dir
         grouped.setdefault(domain, []).append(type_name)
     return grouped
@@ -36,7 +36,7 @@ def _entity_types_by_domain() -> dict[str, list[str]]:
 
 def _connection_types_by_language() -> dict[str, list[str]]:
     grouped: dict[str, list[str]] = {}
-    for type_name, info in sorted(CONNECTION_TYPES.items()):
+    for type_name, info in CONNECTION_TYPES.items():
         lang = info.conn_lang
         grouped.setdefault(lang, []).append(type_name)
     return grouped

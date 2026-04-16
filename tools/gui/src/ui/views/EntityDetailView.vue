@@ -5,6 +5,7 @@ import { Effect } from 'effect'
 import { modelServiceKey } from '../keys'
 import { useAsync } from '../composables/useAsync'
 import ConnectionsPanel from '../components/ConnectionsPanel.vue'
+import ArchimateTypeGlyph from '../components/ArchimateTypeGlyph.vue'
 import type { EntityDetail, ConnectionList, OntologyClassification } from '../../domain'
 
 const svc = inject(modelServiceKey)!
@@ -168,7 +169,10 @@ const saveEdit = () => {
           </select>
         </div>
         <div class="meta-row">
-          <span class="meta-item mono">{{ detail.data.value.artifact_type }}</span>
+          <span class="meta-type">
+            <ArchimateTypeGlyph :type="detail.data.value.artifact_type" :size="16" class="meta-glyph" />
+            <span class="meta-item mono">{{ detail.data.value.artifact_type }}</span>
+          </span>
           <span class="sep">·</span>
           <span class="domain-badge" :class="`domain--${detail.data.value.domain}`">{{ detail.data.value.domain }}</span>
           <span v-if="detail.data.value.subdomain" class="sep">/ {{ detail.data.value.subdomain }}</span>
@@ -294,6 +298,8 @@ const saveEdit = () => {
 }
 
 .meta-row { display: flex; align-items: center; gap: 8px; font-size: 13px; color: #374151; margin-bottom: 6px; }
+.meta-type { display: inline-flex; align-items: center; gap: 8px; }
+.meta-glyph { color: #374151; fill: none; flex: 0 0 auto; }
 .sep { color: #9ca3af; }
 .artifact-id { font-size: 11px; color: #9ca3af; }
 .mono { font-family: monospace; }

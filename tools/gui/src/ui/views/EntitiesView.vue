@@ -1,43 +1,82 @@
 <script setup lang="ts">
-import { inject, onMounted, watch, computed } from 'vue'
-import { useRoute, useRouter, RouterLink } from 'vue-router'
+import { computed, inject, onMounted, ref, watch } from 'vue'
+import { RouterLink, useRoute, useRouter } from 'vue-router'
+import type { EntityList } from '../../domain'
 import { modelServiceKey } from '../keys'
 import { useAsync } from '../composables/useAsync'
-import type { EntityList } from '../../domain'
+import EntitiesTreemap from '../components/EntitiesTreemap.vue'
+import ArchimateTypeGlyph from '../components/ArchimateTypeGlyph.vue'
+import {
+  DOMAIN_OPTIONS,
+  friendlyEntityId,
+  getEntityConnectionTotal,
+  getDomainLabel,
+} from '../lib/domains'
+
+type ViewMode = 'table' | 'treemap'
+type SortKey = 'type' | 'in' | 'sym' | 'out' | 'total'
 
 const svc = inject(modelServiceKey)!
 const route = useRoute()
 const router = useRouter()
-
 const { data: entityList, error, loading, run } = useAsync<EntityList>()
 
-const DOMAINS = [
-  { key: '', label: 'All' },
-  { key: 'motivation', label: 'Motivation' },
-  { key: 'strategy', label: 'Strategy' },
-  { key: 'common', label: 'Common' },
-  { key: 'business', label: 'Business' },
-  { key: 'application', label: 'Application' },
-  { key: 'technology', label: 'Technology' },
-]
-
 const activeDomain = computed(() => (route.query.domain as string | undefined) ?? '')
+const viewMode = computed<ViewMode>(() => route.query.view === 'treemap' ? 'treemap' : 'table')
+const typeFilter = ref('')
+const sortKey = ref<SortKey | null>(null)
+const sortOrder = ref<1 | -1>(1)
 
-const setDomain = (domain: string) =>
-  domain
-    ? router.replace({ path: '/entities', query: { domain } })
-    : router.replace({ path: '/entities' })
+const replaceQuery = (patch: Record<string, string | undefined>) =>
+  router.replace({ path: '/entities', query: { ...route.query, ...patch } })
 
-const load = () =>
-  run(svc.listEntities(activeDomain.value ? { domain: activeDomain.value } : {}))
+const setDomain = (domain: string) => replaceQuery({ domain: domain || undefined })
+const setViewMode = (view: ViewMode) => replaceQuery({ view: view === 'table' ? undefined : view })
+const load = () => run(svc.listEntities(activeDomain.value ? { domain: activeDomain.value } : {}))
 
 onMounted(load)
-watch(activeDomain, load)
+watch(activeDomain, () => {
+  typeFilter.value = ''
+  load()
+})
 
-const friendlyId = (id: string) => {
-  const parts = id.split('.')
-  return parts.length > 2 ? parts.slice(2).join('.') : id
+const uniqueTypes = computed(() => {
+  const types = entityList.value?.items.map(item => item.artifact_type) ?? []
+  return [...new Set(types)].sort()
+})
+
+const compareValues = (left: number | string, right: number | string) =>
+  left < right ? -1 * sortOrder.value : left > right ? 1 * sortOrder.value : 0
+
+const sortBy = (key: SortKey) => {
+  if (sortKey.value !== key) {
+    sortKey.value = key
+    sortOrder.value = 1
+    return
+  }
+  if (sortOrder.value === 1) sortOrder.value = -1
+  else {
+    sortKey.value = null
+    sortOrder.value = 1
+  }
 }
+
+const sortedEntities = computed(() => {
+  const items = entityList.value?.items.filter(item =>
+    !typeFilter.value || item.artifact_type === typeFilter.value,
+  ) ?? []
+  if (!sortKey.value) return items
+  return [...items].sort((a, b) => {
+    if (sortKey.value === 'type') return compareValues(a.artifact_type, b.artifact_type)
+    if (sortKey.value === 'in') return compareValues(a.conn_in ?? 0, b.conn_in ?? 0)
+    if (sortKey.value === 'sym') return compareValues(a.conn_sym ?? 0, b.conn_sym ?? 0)
+    if (sortKey.value === 'out') return compareValues(a.conn_out ?? 0, b.conn_out ?? 0)
+    return compareValues(getEntityConnectionTotal(a), getEntityConnectionTotal(b))
+  })
+})
+
+const pageTitle = computed(() => activeDomain.value ? `${getDomainLabel(activeDomain.value)} Entities` : 'All Entities')
+const sortArrow = (key: SortKey) => sortKey.value === key ? (sortOrder.value === 1 ? '↑' : '↓') : ''
 </script>
 
 <template>
@@ -45,13 +84,13 @@ const friendlyId = (id: string) => {
     <aside class="sidebar">
       <h2 class="sidebar-title">Domain</h2>
       <ul class="domain-list">
-        <li v-for="d in DOMAINS" :key="d.key">
+        <li v-for="domain in DOMAIN_OPTIONS" :key="domain.key">
           <button
             class="domain-btn"
-            :class="{ active: activeDomain === d.key, [`domain--${d.key || 'all'}`]: true }"
-            @click="setDomain(d.key)"
+            :class="{ active: activeDomain === domain.key, [`domain-border--${domain.key || 'all'}`]: true }"
+            @click="setDomain(domain.key)"
           >
-            {{ d.label }}
+            {{ domain.label }}
           </button>
         </li>
       </ul>
@@ -59,39 +98,79 @@ const friendlyId = (id: string) => {
 
     <section class="content">
       <div class="content-header">
-        <h1 class="page-title">
-          {{ activeDomain ? activeDomain.charAt(0).toUpperCase() + activeDomain.slice(1) : 'All Entities' }}
-          <span v-if="entityList" class="count">({{ entityList.total }})</span>
-        </h1>
-        <RouterLink to="/entity/create" class="create-btn">+ Create Entity</RouterLink>
+        <div>
+          <h1 class="page-title">
+            {{ pageTitle }}
+            <span v-if="entityList" class="count">
+              ({{ sortedEntities.length }}<template v-if="typeFilter"> / {{ entityList.total }}</template>)
+            </span>
+          </h1>
+          <p class="subtitle">Filter by domain, then inspect the catalog as a sortable table or a connection-weighted treemap.</p>
+        </div>
+        <div class="actions">
+          <div class="view-toggle">
+            <button class="toggle-btn" :class="{ 'toggle-btn--active': viewMode === 'table' }" @click="setViewMode('table')">Table</button>
+            <button class="toggle-btn" :class="{ 'toggle-btn--active': viewMode === 'treemap' }" @click="setViewMode('treemap')">Treemap</button>
+          </div>
+          <RouterLink to="/entity/create" class="create-btn">+ Create Entity</RouterLink>
+        </div>
+      </div>
+
+      <div class="toolbar">
+        <label class="toolbar-field">
+          <span>Type</span>
+          <select v-model="typeFilter" class="toolbar-select">
+            <option value="">All</option>
+            <option v-for="type in uniqueTypes" :key="type" :value="type">{{ type }}</option>
+          </select>
+        </label>
       </div>
 
       <div v-if="loading" class="state-msg">Loading…</div>
       <div v-else-if="error" class="state-msg state-msg--error">{{ error }}</div>
 
+      <EntitiesTreemap
+        v-else-if="entityList && viewMode === 'treemap'"
+        :items="sortedEntities"
+        :active-domain="activeDomain"
+      />
+
       <table v-else-if="entityList" class="entity-table">
         <thead>
           <tr>
             <th>Name</th>
-            <th>Type</th>
+            <th><button class="sort-btn" @click="sortBy('type')">Type {{ sortArrow('type') }}</button></th>
             <th v-if="!activeDomain">Domain</th>
-            <th class="th-conn">Connections<br><span class="th-conn-sub">(in / symm. / out)</span></th>
+            <th class="th-conn">
+              <button class="sort-btn" @click="sortBy('total')">Connections {{ sortArrow('total') }}</button>
+              <span class="th-conn-sub">
+                (<button class="sort-sub" @click="sortBy('in')">in {{ sortArrow('in') }}</button> /
+                <button class="sort-sub" @click="sortBy('sym')">sym {{ sortArrow('sym') }}</button> /
+                <button class="sort-sub" @click="sortBy('out')">out {{ sortArrow('out') }}</button>)
+              </span>
+            </th>
             <th>Status</th>
           </tr>
         </thead>
         <tbody>
-          <tr v-for="e in entityList.items" :key="e.artifact_id">
+          <tr v-for="entity in sortedEntities" :key="entity.artifact_id">
             <td>
-              <RouterLink :to="{ path: '/entity', query: { id: e.artifact_id } }">
-                {{ e.name || friendlyId(e.artifact_id) }}
+              <RouterLink :to="{ path: '/entity', query: { id: entity.artifact_id } }">
+                {{ entity.name || friendlyEntityId(entity.artifact_id) }}
               </RouterLink>
             </td>
-            <td class="mono">{{ e.artifact_type }}</td>
-            <td v-if="!activeDomain">
-              <span class="domain-badge" :class="`domain--${e.domain}`">{{ e.domain }}</span>
+            <td>
+              <span class="type-cell">
+                <ArchimateTypeGlyph :type="entity.artifact_type" :size="15" class="type-glyph" />
+                <span class="mono">{{ entity.artifact_type }}</span>
+              </span>
             </td>
-            <td class="conn-counts">({{ e.conn_in ?? 0 }} / {{ e.conn_sym ?? 0 }} / {{ e.conn_out ?? 0 }})</td>
-            <td><span class="status-badge" :class="`status--${e.status}`">{{ e.status }}</span></td>
+            <td v-if="!activeDomain"><span class="domain-badge" :class="`domain--${entity.domain}`">{{ entity.domain }}</span></td>
+            <td class="conn-counts">
+              {{ getEntityConnectionTotal(entity) }}
+              <span class="conn-split">({{ entity.conn_in ?? 0 }} / {{ entity.conn_sym ?? 0 }} / {{ entity.conn_out ?? 0 }})</span>
+            </td>
+            <td><span class="status-badge" :class="`status--${entity.status}`">{{ entity.status }}</span></td>
           </tr>
         </tbody>
       </table>
@@ -101,81 +180,97 @@ const friendlyId = (id: string) => {
 
 <style scoped>
 .layout { display: flex; gap: 24px; }
-
 .sidebar { width: 160px; flex-shrink: 0; }
-.sidebar-title { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .05em; color: #6b7280; margin-bottom: 8px; }
+.sidebar-title, .toolbar-field span, .entity-table th {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: .05em;
+  color: #6b7280;
+}
+
 .domain-list { list-style: none; display: flex; flex-direction: column; gap: 2px; }
 .domain-btn {
   width: 100%;
-  text-align: left;
-  padding: 6px 10px;
+  padding: 7px 10px;
+  border: 0;
+  border-left: 3px solid transparent;
   border-radius: 6px;
-  border: none;
   background: transparent;
+  color: #374151;
   cursor: pointer;
   font-size: 13px;
-  color: #374151;
-  border-left: 3px solid transparent;
+  text-align: left;
 }
 .domain-btn:hover { background: #f3f4f6; }
 .domain-btn.active { background: #eff6ff; color: #1d4ed8; font-weight: 500; }
-
-.domain--motivation.active { border-left-color: #d8c1e4; }
-.domain--strategy.active   { border-left-color: #efbd5d; }
-.domain--business.active   { border-left-color: #f4de7f; }
-.domain--common.active     { border-left-color: #e8e5d3; }
-.domain--application.active{ border-left-color: #b6d7e1; }
-.domain--technology.active { border-left-color: #c3e1b4; }
+.domain-border--motivation.active { border-left-color: var(--domain-motivation); }
+.domain-border--strategy.active { border-left-color: var(--domain-strategy); }
+.domain-border--common.active { border-left-color: var(--domain-common); }
+.domain-border--business.active { border-left-color: var(--domain-business); }
+.domain-border--application.active { border-left-color: var(--domain-application); }
+.domain-border--technology.active { border-left-color: var(--domain-technology); }
 
 .content { flex: 1; min-width: 0; }
+.content-header, .actions, .view-toggle, .toolbar, .toolbar-field { display: flex; align-items: center; }
+.content-header { justify-content: space-between; gap: 16px; margin-bottom: 14px; }
+.actions, .view-toggle { gap: 10px; }
+.page-title { font-size: 22px; font-weight: 600; }
+.subtitle, .count, .state-msg, .conn-split { color: #6b7280; }
+.subtitle { margin-top: 2px; font-size: 13px; }
+.count { margin-left: 6px; font-size: 14px; font-weight: 400; }
+.toolbar { justify-content: space-between; margin-bottom: 14px; }
+.toolbar-field { gap: 8px; }
 
-.content-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; }
-.page-title { font-size: 20px; font-weight: 600; margin-bottom: 0; }
-
-.create-btn {
-  padding: 7px 14px; background: #16a34a; color: white; border-radius: 6px;
-  font-size: 13px; font-weight: 500; white-space: nowrap;
-}
-.create-btn:hover { background: #15803d; text-decoration: none; }
-.count { font-size: 14px; font-weight: 400; color: #6b7280; margin-left: 6px; }
-
-.state-msg { color: #6b7280; }
-.state-msg--error { color: #dc2626; }
-
-.entity-table { width: 100%; border-collapse: collapse; background: white; border-radius: 8px; overflow: hidden; border: 1px solid #e5e7eb; }
-.entity-table th { text-align: left; padding: 10px 14px; font-size: 11px; text-transform: uppercase; letter-spacing: .05em; color: #6b7280; background: #f9fafb; border-bottom: 1px solid #e5e7eb; }
-.entity-table td { padding: 9px 14px; border-bottom: 1px solid #f3f4f6; font-size: 13px; }
-.entity-table tr:last-child td { border-bottom: none; }
-.entity-table tr:hover td { background: #f9fafb; }
-.mono { font-family: monospace; font-size: 12px; color: #374151; }
-.conn-counts { font-family: monospace; font-size: 12px; color: #6b7280; white-space: nowrap; }
-.th-conn { line-height: 1.3; }
-.th-conn-sub { font-size: 9px; font-weight: 400; letter-spacing: 0; text-transform: none; color: #9ca3af; }
-
-.domain-badge {
-  display: inline-block;
-  padding: 2px 8px;
-  border-radius: 4px;
-  font-size: 11px;
-  font-weight: 500;
-  background: #f3f4f6;
+.toolbar-select, .toggle-btn {
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  background: white;
   color: #374151;
 }
-.domain-badge.domain--motivation { background: #d8c1e4; color: #252327; }
-.domain-badge.domain--strategy   { background: #efbd5d; color: #252327; }
-.domain-badge.domain--business   { background: #f4de7f; color: #252327; }
-.domain-badge.domain--common     { background: #e8e5d3; color: #252327; }
-.domain-badge.domain--application{ background: #b6d7e1; color: #252327; }
-.domain-badge.domain--technology { background: #c3e1b4; color: #252327; }
+.toolbar-select { min-width: 180px; padding: 7px 10px; }
+.toggle-btn { padding: 7px 12px; cursor: pointer; font-size: 13px; }
+.toggle-btn--active { background: #2563eb; border-color: #2563eb; color: white; }
 
-.status-badge {
-  display: inline-block;
-  padding: 2px 8px;
-  border-radius: 4px;
-  font-size: 11px;
+.create-btn {
+  padding: 8px 14px;
+  border-radius: 6px;
+  background: #16a34a;
+  color: white;
+  font-size: 13px;
   font-weight: 500;
+  white-space: nowrap;
 }
-.status--draft      { background: #f3f4f6; color: #6b7280; }
-.status--active     { background: #dcfce7; color: #166534; }
-.status--deprecated { background: #fee2e2; color: #991b1b; }
+.create-btn:hover { background: #15803d; text-decoration: none; }
+
+.entity-table {
+  width: 100%;
+  border-collapse: collapse;
+  background: white;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  overflow: hidden;
+}
+.entity-table th, .entity-table td { padding: 10px 14px; text-align: left; }
+.entity-table th { background: #f9fafb; border-bottom: 1px solid #e5e7eb; }
+.entity-table td { border-bottom: 1px solid #f3f4f6; font-size: 13px; }
+.entity-table tr:last-child td { border-bottom: 0; }
+.entity-table tr:hover td { background: #f9fafb; }
+
+.sort-btn, .sort-sub {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  font: inherit;
+}
+.th-conn { min-width: 170px; }
+.th-conn-sub { display: block; margin-top: 2px; font-size: 9px; font-weight: 400; letter-spacing: 0; text-transform: none; color: #9ca3af; }
+.type-cell { display: inline-flex; align-items: center; gap: 8px; }
+.type-glyph { color: #374151; fill: none; flex: 0 0 auto; }
+.mono, .conn-counts { font-family: monospace; }
+.mono { font-size: 12px; color: #374151; }
+.conn-counts { font-size: 12px; white-space: nowrap; }
+.state-msg--error { color: #dc2626; }
 </style>

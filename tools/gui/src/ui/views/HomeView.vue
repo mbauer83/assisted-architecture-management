@@ -4,18 +4,10 @@ import { RouterLink } from 'vue-router'
 import { modelServiceKey } from '../keys'
 import { useAsync } from '../composables/useAsync'
 import type { Stats } from '../../domain'
+import { DOMAIN_OPTIONS } from '../lib/domains'
 
 const svc = inject(modelServiceKey)!
 const { data: stats, error, loading, run } = useAsync<Stats>()
-
-const DOMAINS = [
-  { key: 'motivation', label: 'Motivation' },
-  { key: 'strategy', label: 'Strategy' },
-  { key: 'common', label: 'Common' },
-  { key: 'business', label: 'Business' },
-  { key: 'application', label: 'Application' },
-  { key: 'technology', label: 'Technology' },
-]
 
 onMounted(() => run(svc.getStats()))
 </script>
@@ -46,7 +38,7 @@ onMounted(() => run(svc.getStats()))
       <h2 class="section-title">Entities by Domain</h2>
       <div class="domain-grid">
         <RouterLink
-          v-for="d in DOMAINS"
+          v-for="d in DOMAIN_OPTIONS.filter(option => option.key)"
           :key="d.key"
           :to="{ path: '/entities', query: { domain: d.key } }"
           class="card card--domain"

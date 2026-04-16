@@ -131,28 +131,4 @@ const friendlyName = (id: string) => {
 .result-id { font-size: 11px; color: #9ca3af; }
 .mono { font-family: monospace; }
 
-.domain-badge {
-  display: inline-block;
-  padding: 2px 8px;
-  border-radius: 4px;
-  font-size: 11px;
-  font-weight: 500;
-}
-.domain--motivation { background: #d8c1e4; color: #252327; }
-.domain--strategy   { background: #efbd5d; color: #252327; }
-.domain--business   { background: #f4de7f; color: #252327; }
-.domain--common     { background: #e8e5d3; color: #252327; }
-.domain--application{ background: #b6d7e1; color: #252327; }
-.domain--technology { background: #c3e1b4; color: #252327; }
-
-.status-badge {
-  display: inline-block;
-  padding: 2px 8px;
-  border-radius: 4px;
-  font-size: 11px;
-  font-weight: 500;
-}
-.status--draft      { background: #f3f4f6; color: #6b7280; }
-.status--active     { background: #dcfce7; color: #166534; }
-.status--deprecated { background: #fee2e2; color: #991b1b; }
 </style>

@@ -5,6 +5,7 @@ import { Effect } from 'effect'
 import { modelServiceKey } from '../keys'
 import { useAsync } from '../composables/useAsync'
 import type { DiagramDetail, EntitySummary, EntityDetail } from '../../domain'
+import { getDomainColor } from '../lib/domains'
 
 const svc = inject(modelServiceKey)!
 const route = useRoute()
@@ -18,11 +19,6 @@ const diagramEntities = ref<EntitySummary[]>([])
 const selectedEntity = ref<EntityDetail | null>(null)
 const selectedEntityId = ref<string | null>(null)
 const selectedEntityHtml = ref<string | null>(null)
-
-const DOMAIN_COLORS: Record<string, string> = {
-  motivation: '#d8c1e4', strategy: '#efbd5d', business: '#f4de7f',
-  common: '#e8e5d3', application: '#b6d7e1', technology: '#c3e1b4',
-}
 
 const load = () => {
   if (!diagramId.value) return
@@ -94,7 +90,7 @@ const selectDiagramEntity = (id: string) => {
               :class="{ 'entity-list-item--active': selectedEntityId === e.artifact_id }"
               @click="selectDiagramEntity(e.artifact_id)"
             >
-              <span class="entity-domain-dot" :style="{ background: DOMAIN_COLORS[e.domain] ?? '#9ca3af' }" />
+              <span class="entity-domain-dot" :style="{ background: getDomainColor(e.domain) }" />
               <span class="entity-list-name">{{ e.name }}</span>
               <span class="entity-list-type">{{ e.artifact_type }}</span>
             </li>
@@ -175,14 +171,6 @@ const selectDiagramEntity = (id: string) => {
 .mono { font-family: monospace; }
 .se-content { font-size: 13px; line-height: 1.5; color: #374151; margin-top: 8px; }
 .se-content :deep(p) { margin: 0.5rem 0; }
-.domain-badge { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 500; }
-.domain--motivation { background: #d8c1e4; color: #252327; }
-.domain--strategy   { background: #efbd5d; color: #252327; }
-.domain--business   { background: #f4de7f; color: #252327; }
-.domain--common     { background: #e8e5d3; color: #252327; }
-.domain--application{ background: #b6d7e1; color: #252327; }
-.domain--technology { background: #c3e1b4; color: #252327; }
-
 .source-section { margin-top: 16px; }
 .toggle-btn {
   padding: 6px 14px; border-radius: 6px; border: 1px solid #d1d5db;
@@ -199,8 +187,4 @@ const selectDiagramEntity = (id: string) => {
   padding: 2px 8px; border-radius: 4px; font-size: 11px;
   background: #dbeafe; color: #1e40af; font-weight: 500;
 }
-.status-badge { padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 500; }
-.status--draft { background: #f3f4f6; color: #6b7280; }
-.status--active { background: #dcfce7; color: #166534; }
-.status--deprecated { background: #fee2e2; color: #991b1b; }
 </style>
