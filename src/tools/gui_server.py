@@ -9,7 +9,7 @@ from typing import Any, Literal
 
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, Response
 from pydantic import BaseModel
 import uvicorn
 
@@ -312,12 +312,48 @@ def get_diagram_entities(id: str) -> list[dict[str, Any]]:
     entities = []
     for rec in repo._entities.values():
         if rec.display_alias and rec.display_alias in puml:
-            entities.append(_entity_to_summary(rec))
+            s = _entity_to_summary(rec)
+            s["display_alias"] = rec.display_alias
+            entities.append(s)
     entities.sort(key=lambda e: (
         _DOMAIN_ORDER.index(e["domain"]) if e["domain"] in _DOMAIN_ORDER else 99,
         e["name"],
     ))
     return entities
+
+
+@app.get("/api/diagram-connections")
+def get_diagram_connections(id: str) -> list[dict[str, Any]]:
+    """Return connections between entities that are both referenced in the diagram."""
+    repo = _get_repo()
+    diag_rec = repo.get_diagram(id)
+    if diag_rec is None:
+        raise HTTPException(404, f"Diagram not found: {id!r}")
+    try:
+        puml = diag_rec.path.read_text(encoding="utf-8")
+    except OSError:
+        return []
+    in_diagram = {
+        rec.artifact_id: rec
+        for rec in repo._entities.values()
+        if rec.display_alias and rec.display_alias in puml
+    }
+    result: list[dict[str, Any]] = []
+    seen: set[str] = set()
+    for conn in repo._connections.values():
+        if conn.artifact_id in seen:
+            continue
+        src = in_diagram.get(conn.source)
+        tgt = in_diagram.get(conn.target)
+        if src and tgt:
+            d = _connection_to_dict(conn)
+            d["source_name"] = src.name
+            d["target_name"] = tgt.name
+            d["source_alias"] = src.display_alias
+            d["target_alias"] = tgt.display_alias
+            result.append(d)
+            seen.add(conn.artifact_id)
+    return result
 
 
 class AddConnectionBody(BaseModel):
@@ -562,6 +598,29 @@ def create_diagram_gui(body: CreateDiagramGuiBody) -> dict[str, Any]:
     except ValueError as e:
         raise HTTPException(400, str(e))
     return _write_result_to_dict(result)
+
+
+@app.get("/api/diagram-svg")
+def get_diagram_svg(id: str) -> Response:
+    """Render the stored PUML for a diagram to SVG on demand.
+
+    Returns raw SVG text (``image/svg+xml``).  Graphviz embeds each entity's
+    ``display_alias`` as a ``<title>`` element inside its node group, enabling
+    the browser to attach click handlers without any coordinate mapping.
+    """
+    if _repo_root is None:
+        raise HTTPException(500, "Repository not initialized")
+    from src.tools.diagram_builder import render_puml_svg
+    from src.tools.model_write.parse_existing import parse_diagram_file
+
+    diagram_path = _repo_root / "diagram-catalog" / "diagrams" / f"{id}.puml"
+    if not diagram_path.exists():
+        raise HTTPException(404, f"Diagram '{id}' not found")
+    parsed = parse_diagram_file(diagram_path)
+    svg, warnings = render_puml_svg(parsed.puml_body, _repo_root)
+    if svg is None:
+        raise HTTPException(500, f"SVG render failed: {'; '.join(warnings)}")
+    return Response(content=svg, media_type="image/svg+xml")
 
 
 class EditDiagramGuiBody(BaseModel):

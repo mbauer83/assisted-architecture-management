@@ -16,6 +16,7 @@ import type {
   EntitySummary,
   EntityDisplayInfo,
   DiagramPreviewResult,
+  DiagramConnection,
 } from '../domain'
 import type { NetworkError, NotFoundError } from '../domain'
 import type { MarkdownError } from '../application/MarkdownService'
@@ -80,6 +81,8 @@ export interface ModelRepository {
   }) => Effect.Effect<WriteResult, RepoError>
   readonly getEntitySchemata: (artifactType: string) => Effect.Effect<EntitySchemaInfo, RepoError>
   readonly getDiagramEntities: (diagramId: string) => Effect.Effect<EntitySummary[], RepoError>
+  readonly getDiagramConnections: (diagramId: string) => Effect.Effect<DiagramConnection[], RepoError>
+  readonly getDiagramSvg: (diagramId: string) => Effect.Effect<string, RepoError>
   readonly searchEntityDisplay: (
     query: string, limit?: number,
   ) => Effect.Effect<EntityDisplayInfo[], RepoError>

@@ -31,6 +31,8 @@ export const makeModelService = (repo: ModelRepository) =>
     editEntity: (body: Parameters<ModelRepository['editEntity']>[0]) => repo.editEntity(body),
     getEntitySchemata: (artifactType: string) => repo.getEntitySchemata(artifactType),
     getDiagramEntities: (diagramId: string) => repo.getDiagramEntities(diagramId),
+    getDiagramConnections: (diagramId: string) => repo.getDiagramConnections(diagramId),
+    getDiagramSvg: (diagramId: string) => repo.getDiagramSvg(diagramId),
     searchEntityDisplay: (query: string, limit?: number) => repo.searchEntityDisplay(query, limit),
     previewDiagram: (body: Parameters<ModelRepository['previewDiagram']>[0]) => repo.previewDiagram(body),
     createDiagram: (body: Parameters<ModelRepository['createDiagram']>[0]) => repo.createDiagram(body),

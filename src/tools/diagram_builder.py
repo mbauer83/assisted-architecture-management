@@ -2,7 +2,7 @@
 
 Used by the GUI REST server to build ArchiMate diagram PUML from a set of
 entity + connection records chosen via the create-diagram form, and to render
-a transient PNG preview without persisting any files to the model.
+transient PNG/SVG previews without persisting any files to the model.
 
 Both the PUML generation and the PlantUML rendering reuse the same conventions
 as the ``model_create_diagram`` / ``model_verify_file`` MCP tools (shared library
@@ -47,7 +47,7 @@ def generate_archimate_puml_body(
     The block includes ``!include`` directives for the archimate stereotype and
     glyph definition files so that it renders correctly out-of-the-box — both
     via ``create_diagram`` (which de-duplicates includes if already present) and
-    via ``render_puml_preview``.
+    via ``render_puml_preview`` / ``render_puml_svg``.
 
     Each entity is rendered using its archimate ``element-type`` and ``label``
     from the ``§display / archimate`` block (markdown code fences stripped before
@@ -98,14 +98,14 @@ def generate_archimate_puml_body(
     return "\n".join(lines)
 
 
-def render_puml_preview(
-    puml_body: str, repo_root: Path
+def _render_puml(
+    puml_body: str, repo_root: Path, fmt: str
 ) -> tuple[str | None, list[str]]:
-    """Render *puml_body* to PNG using PlantUML, entirely in temporary files.
+    """Core PlantUML render pipeline.
 
-    Returns ``(data_url, warnings)`` where *data_url* is a
-    ``data:image/png;base64,…`` string on success, or ``None`` on failure.
-    No files are written to the model repository.
+    *fmt* is ``"png"`` or ``"svg"``.  Returns ``(result, warnings)`` where
+    *result* is a ``data:image/png;base64,…`` data-URL for PNG, raw SVG text
+    for SVG, or ``None`` on failure.  No files are written to the model.
     """
     from src.common.model_verifier_syntax import find_plantuml_jar
     from src.common.settings import render_dpi
@@ -119,10 +119,7 @@ def render_puml_preview(
     if not diag_dir.exists():
         return None, [f"Diagram directory not found: {diag_dir}"]
 
-    # Strip diagram name so PlantUML uses the temp-file stem as its output name
     render_body = re.sub(r"@startuml\s+\S+", "@startuml", puml_body, count=1)
-
-    # Inject archimate stereotype / glyph includes when absent (same as create_diagram)
     includes: list[str] = []
     if "_archimate-stereotypes.puml" not in render_body:
         includes.append("!include ../_archimate-stereotypes.puml")
@@ -141,27 +138,30 @@ def render_puml_preview(
             tmp_path = Path(tmp.name)
 
         with tempfile.TemporaryDirectory() as out_dir:
-            dpi = render_dpi()
+            cmd = [
+                "java", "-Djava.awt.headless=true", "-jar", str(jar.resolve()),
+                f"-t{fmt}",
+            ]
+            if fmt == "png":
+                cmd.append(f"-Sdpi={render_dpi()}")
+            cmd += ["-o", out_dir, tmp_path.name]
             proc = subprocess.run(
-                [
-                    "java", "-Djava.awt.headless=true", "-jar", str(jar.resolve()),
-                    "-tpng", f"-Sdpi={dpi}", "-o", out_dir, tmp_path.name,
-                ],
-                cwd=str(diag_dir),
-                capture_output=True, text=True, timeout=60,
+                cmd, cwd=str(diag_dir), capture_output=True, text=True, timeout=60,
             )
             if proc.returncode != 0:
                 warnings.append(f"PlantUML render failed: {proc.stderr[:300]}")
                 return None, warnings
-            pngs = list(Path(out_dir).glob("*.png"))
-            if not pngs:
-                warnings.append("PlantUML produced no PNG output")
+            outputs = list(Path(out_dir).glob(f"*.{fmt}"))
+            if not outputs:
+                warnings.append(f"PlantUML produced no {fmt.upper()} output")
                 return None, warnings
-            data_url = (
-                "data:image/png;base64,"
-                + base64.b64encode(pngs[0].read_bytes()).decode()
-            )
-            return data_url, warnings
+            if fmt == "png":
+                return (
+                    "data:image/png;base64,"
+                    + base64.b64encode(outputs[0].read_bytes()).decode(),
+                    warnings,
+                )
+            return outputs[0].read_text(encoding="utf-8"), warnings
 
     except (OSError, subprocess.TimeoutExpired) as exc:
         warnings.append(f"Render error: {exc}")
@@ -169,3 +169,17 @@ def render_puml_preview(
     finally:
         if tmp_path is not None:
             tmp_path.unlink(missing_ok=True)
+
+
+def render_puml_preview(
+    puml_body: str, repo_root: Path
+) -> tuple[str | None, list[str]]:
+    """Render *puml_body* to PNG. Returns ``(data:image/png;base64,…, warnings)``."""
+    return _render_puml(puml_body, repo_root, "png")
+
+
+def render_puml_svg(
+    puml_body: str, repo_root: Path
+) -> tuple[str | None, list[str]]:
+    """Render *puml_body* to SVG. Returns ``(svg_text, warnings)``."""
+    return _render_puml(puml_body, repo_root, "svg")

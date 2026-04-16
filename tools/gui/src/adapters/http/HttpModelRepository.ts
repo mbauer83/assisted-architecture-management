@@ -18,6 +18,7 @@ import {
   EntitySummarySchema,
   EntityDisplayInfoSchema,
   DiagramPreviewResultSchema,
+  DiagramConnectionSchema,
 } from '../../domain/schemas'
 import { parseMarkdown } from '../../application/MarkdownService'
 
@@ -68,6 +69,16 @@ const fetchJsonNotFound = <A, I>(
       return new NetworkError({ status: 0, message: String(e) })
     },
   }).pipe(Effect.flatMap(Schema.decodeUnknown(schema)))
+
+const fetchText = (url: string): Effect.Effect<string, NetworkError> =>
+  Effect.tryPromise({
+    try: async () => {
+      const resp = await fetch(url)
+      if (!resp.ok) throw new NetworkError({ status: resp.status, message: resp.statusText })
+      return resp.text()
+    },
+    catch: (e) => e instanceof NetworkError ? e : new NetworkError({ status: 0, message: String(e) }),
+  })
 
 const postJson = <A, I>(
   url: string,
@@ -173,6 +184,14 @@ export const makeHttpModelRepository = (): ModelRepository => ({
     fetchJson(buildUrl('/diagram-entities', { id: diagramId }), Schema.Array(EntitySummarySchema)).pipe(
       Effect.map((arr) => arr as import('../../domain').EntitySummary[]),
     ),
+
+  getDiagramConnections: (diagramId: string) =>
+    fetchJson(buildUrl('/diagram-connections', { id: diagramId }), Schema.Array(DiagramConnectionSchema)).pipe(
+      Effect.map((arr) => arr as import('../../domain').DiagramConnection[]),
+    ),
+
+  getDiagramSvg: (diagramId: string) =>
+    fetchText(buildUrl('/diagram-svg', { id: diagramId })),
 
   searchEntityDisplay: (query: string, limit = 20) =>
     fetchJson(

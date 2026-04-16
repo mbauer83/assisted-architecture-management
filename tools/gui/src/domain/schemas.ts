@@ -22,6 +22,7 @@ export const EntitySummarySchema = Schema.Struct({
   domain: Schema.String,
   subdomain: Schema.String,
   path: Schema.String,
+  display_alias: Schema.optional(Schema.String),
   conn_in: Schema.optional(Schema.Number),
   conn_sym: Schema.optional(Schema.Number),
   conn_out: Schema.optional(Schema.Number),
@@ -198,6 +199,22 @@ export const EntityDisplayInfoSchema = Schema.Struct({
 export type EntityDisplayInfo = typeof EntityDisplayInfoSchema.Type
 
 // ── Diagram preview result ────────────────────────────────────────────────────
+
+export const DiagramConnectionSchema = Schema.Struct({
+  artifact_id: Schema.String,
+  source: Schema.String,
+  target: Schema.String,
+  conn_type: Schema.String,
+  version: Schema.String,
+  status: Schema.String,
+  path: Schema.String,
+  content_text: Schema.String,
+  source_name: Schema.String,
+  target_name: Schema.String,
+  source_alias: Schema.NullOr(Schema.String),
+  target_alias: Schema.NullOr(Schema.String),
+})
+export type DiagramConnection = typeof DiagramConnectionSchema.Type
 
 export const DiagramPreviewResultSchema = Schema.Struct({
   puml: Schema.String,
