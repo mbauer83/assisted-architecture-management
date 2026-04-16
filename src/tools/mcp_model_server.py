@@ -68,6 +68,11 @@ _STATELESS_HTTP = os.getenv("SDLC_MCP_STATELESS_HTTP", "1") in {"1", "true", "TR
 _WATCH_AUTO_START = os.getenv("SDLC_MCP_MODEL_WATCH_AUTO_START", "1") in {"1", "true", "TRUE", "yes", "YES"}
 _WATCH_INTERVAL_S = float(os.getenv("SDLC_MCP_MODEL_WATCH_INTERVAL_S", "2.0"))
 _WATCH_SCOPE = os.getenv("SDLC_MCP_MODEL_WATCH_SCOPE", "both")
+_WATCH_PERIODIC_RAW = os.getenv("SDLC_MCP_MODEL_WATCH_PERIODIC_REFRESH_S", "300")
+_WATCH_PERIODIC_S: float | None = (
+    None if _WATCH_PERIODIC_RAW.lower() in ("0", "off", "disabled")
+    else float(_WATCH_PERIODIC_RAW)
+)
 
 
 mcp = FastMCP(
@@ -136,6 +141,7 @@ def main() -> None:
         try:
             watch_result = auto_start_default_watcher(
                 interval_s=_WATCH_INTERVAL_S,
+                periodic_refresh_s=_WATCH_PERIODIC_S,
                 repo_scope=_WATCH_SCOPE if _WATCH_SCOPE in {"engagement", "enterprise", "both"} else "both",
             )
             logger.info("model watcher auto-start result: %s", watch_result)

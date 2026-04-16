@@ -6,6 +6,7 @@ import re
 from collections.abc import Callable
 from src.common.model_verifier import ModelVerifier
 from src.common.model_verifier_syntax import find_plantuml_jar
+from src.common.settings import render_dpi
 from src.common.model_write import (
     DiagramConnectionInferenceMode,
     format_diagram_puml,
@@ -49,10 +50,15 @@ def _render_diagram_png(puml_path: Path, warnings: list[str]) -> Path | None:
 
     puml_body = content[start:end + len("@enduml")]
 
+    # Strip the diagram name so PlantUML uses the temp-file stem as the output filename.
+    # When @startuml carries a name PlantUML uses that name instead, which breaks the
+    # temp→final rename below.
+    puml_body_for_render = re.sub(r"@startuml\s+\S+", "@startuml", puml_body, count=1)
+
     with tempfile.NamedTemporaryFile(
         mode="w", suffix=".puml", dir=puml_path.parent, delete=False, encoding="utf-8"
     ) as tmp:
-        tmp.write(puml_body)
+        tmp.write(puml_body_for_render)
         tmp_path = Path(tmp.name)
 
     jar = find_plantuml_jar()
@@ -62,19 +68,28 @@ def _render_diagram_png(puml_path: Path, warnings: list[str]) -> Path | None:
         return None
 
     try:
+        # Run java from the diagrams/ directory (same directory as the temp input file).
+        # PlantUML relativises the -o path against the Java process's initial CWD and
+        # then re-applies that relative form against the input file's directory.  When
+        # both are the same directory the path arithmetic is correct; running from the
+        # project root produces a doubled/wrong path.
+        dpi = render_dpi()
         result = subprocess.run(
-            ["java", "-jar", str(jar), "-tpng", "-o", str(rendered_dir), str(tmp_path)],
-            capture_output=True, text=True, timeout=30,
+            ["java", "-Djava.awt.headless=true", "-jar", str(jar.resolve()),
+             "-tpng", f"-Sdpi={dpi}", "-o", str(rendered_dir.resolve()), tmp_path.name],
+            cwd=str(puml_path.parent),
+            capture_output=True, text=True, timeout=60,
         )
         if result.returncode != 0:
             warnings.append(f"PlantUML render failed: {result.stderr[:200]}")
             return None
 
-        # PlantUML names output after the input file stem
         rendered = rendered_dir / f"{tmp_path.stem}.png"
         if rendered.exists():
-            # Rename to match the diagram artifact-id
-            final = rendered_dir / f"{puml_path.stem}.png"
+            stem = puml_path.stem
+            parts = stem.split(".", 2)
+            friendly_name = parts[2] if len(parts) >= 3 else stem
+            final = rendered_dir / f"{friendly_name}.png"
             rendered.rename(final)
             return final
         return None
@@ -118,7 +133,7 @@ def create_diagram(
     puml_body = puml.strip("\n") + "\n"
     warnings: list[str] = []
 
-    # Auto-include stereotypes for archimate diagrams
+    # Auto-include stereotypes + glyphs for archimate diagrams
     stereotypes_path = repo_root / "diagram-catalog" / "_archimate-stereotypes.puml"
     if (
         auto_include_stereotypes
@@ -129,6 +144,20 @@ def create_diagram(
         puml_body = re.sub(
             r"(@startuml\s+\S+\s*)\n",
             r"\1\n!include ../_archimate-stereotypes.puml\n",
+            puml_body,
+            count=1,
+        )
+
+    glyphs_path = repo_root / "diagram-catalog" / "_archimate-glyphs.puml"
+    if (
+        auto_include_stereotypes
+        and "archimate" in diagram_type.lower()
+        and glyphs_path.exists()
+        and "_archimate-glyphs.puml" not in puml_body
+    ):
+        puml_body = re.sub(
+            r"(!include \.\./\_archimate-stereotypes\.puml)\n",
+            r"\1\n!include ../_archimate-glyphs.puml\n",
             puml_body,
             count=1,
         )

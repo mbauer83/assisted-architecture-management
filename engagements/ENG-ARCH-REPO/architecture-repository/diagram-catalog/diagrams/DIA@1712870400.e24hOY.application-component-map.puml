@@ -1,42 +1,47 @@
 ---
 artifact-id: DIA@1712870400.e24hOY.application-component-map
 artifact-type: diagram
-name: "Application Domain — Component Map"
+name: "Application Domain \u2014 Component Map"
 version: 0.1.0
 status: draft
-keywords: [application, components, interfaces, data-objects]
+keywords:
+- application
+- components
+- interfaces
+- data-objects
 diagram-type: archimate-application
-last-updated: '2026-04-13'
+last-updated: '2026-04-16'
 ---
 @startuml application-component-map
 !include ../_archimate-stereotypes.puml
+!include ../_archimate-glyphs.puml
 
 left to right direction
 
 title Application Domain — Components, Interfaces & Data Objects
 
 rectangle "Interfaces" <<ApplicationGrouping>> {
-  rectangle "MCP Interface" <<ApplicationInterface>> as AIF_wuleEe
-  rectangle "CLI Interface" <<ApplicationInterface>> as AIF_KxvYB
-  rectangle "REST Interface\n(future)" <<ApplicationInterface>> as AIF_XjbNQh
+  rectangle "<$archimate_ApplicationInterface{scale=1.5}> MCP Interface" <<ApplicationInterface>> as AIF_wuleEe
+  rectangle "<$archimate_ApplicationInterface{scale=1.5}> CLI Interface" <<ApplicationInterface>> as AIF_KxvYB
+  rectangle "<$archimate_ApplicationInterface{scale=1.5}> REST Interface\n(future)" <<ApplicationInterface>> as AIF_XjbNQh
 }
 
 rectangle "Application Components" <<ApplicationGrouping>> {
-  rectangle "MCP Model\nServer" <<ApplicationComponent>> as APP_kRZYOA
-  rectangle "CLI Tool" <<ApplicationComponent>> as APP_kjC6ex
-  rectangle "Model\nVerifier" <<ApplicationComponent>> as APP_ca3vm7
-  rectangle "Model\nRegistry" <<ApplicationComponent>> as APP_yNhgdh
-  rectangle "Frontmatter\nParser" <<ApplicationComponent>> as APP_YOOEbL
-  rectangle "SQLite\nIndexer" <<ApplicationComponent>> as APP_JOmFWy
-  rectangle "Query\nEngine" <<ApplicationComponent>> as APP_v9LvfK
-  rectangle "Macro\nGenerator" <<ApplicationComponent>> as APP_rgulJL
+  rectangle "<$archimate_ApplicationComponent{scale=1.5}> MCP Model\nServer" <<ApplicationComponent>> as APP_kRZYOA
+  rectangle "<$archimate_ApplicationComponent{scale=1.5}> CLI Tool" <<ApplicationComponent>> as APP_kjC6ex
+  rectangle "<$archimate_ApplicationComponent{scale=1.5}> Model\nVerifier" <<ApplicationComponent>> as APP_ca3vm7
+  rectangle "<$archimate_ApplicationComponent{scale=1.5}> Model\nRegistry" <<ApplicationComponent>> as APP_yNhgdh
+  rectangle "<$archimate_ApplicationComponent{scale=1.5}> Frontmatter\nParser" <<ApplicationComponent>> as APP_YOOEbL
+  rectangle "<$archimate_ApplicationComponent{scale=1.5}> SQLite\nIndexer" <<ApplicationComponent>> as APP_JOmFWy
+  rectangle "<$archimate_ApplicationComponent{scale=1.5}> Query\nEngine" <<ApplicationComponent>> as APP_v9LvfK
+  rectangle "<$archimate_ApplicationComponent{scale=1.5}> Macro\nGenerator" <<ApplicationComponent>> as APP_rgulJL
 }
 
 rectangle "Data Objects" <<ApplicationGrouping>> {
-  rectangle "Entity\nMetadata" <<DataObject>> as DOB_ij5CH7
-  rectangle "Connection\nMetadata" <<DataObject>> as DOB_L3VfsH
-  rectangle "SQLite\nIndex" <<DataObject>> as DOB_3rilik
-  rectangle "PlantUML\nMacro Library" <<DataObject>> as DOB_H8UwKV
+  rectangle "<$archimate_DataObject{scale=1.5}> Entity\nMetadata" <<DataObject>> as DOB_ij5CH7
+  rectangle "<$archimate_DataObject{scale=1.5}> Connection\nMetadata" <<DataObject>> as DOB_L3VfsH
+  rectangle "<$archimate_DataObject{scale=1.5}> SQLite\nIndex" <<DataObject>> as DOB_3rilik
+  rectangle "<$archimate_DataObject{scale=1.5}> PlantUML\nMacro Library" <<DataObject>> as DOB_H8UwKV
 }
 
 ' Interface → Component serving

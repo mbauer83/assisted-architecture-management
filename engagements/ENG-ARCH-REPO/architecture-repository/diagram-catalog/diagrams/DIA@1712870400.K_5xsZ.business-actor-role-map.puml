@@ -1,44 +1,50 @@
 ---
 artifact-id: DIA@1712870400.K_5xsZ.business-actor-role-map
 artifact-type: diagram
-name: "Business Domain — Actors, Roles & Objects"
+name: "Business Domain \u2014 Actors, Roles & Objects"
 version: 0.1.0
 status: draft
-keywords: [business, actors, roles, objects, interfaces]
+keywords:
+- business
+- actors
+- roles
+- objects
+- interfaces
 diagram-type: archimate-business
-last-updated: '2026-04-13'
+last-updated: '2026-04-16'
 ---
 @startuml business-actor-role-map
 !include ../_archimate-stereotypes.puml
+!include ../_archimate-glyphs.puml
 
 left to right direction
 
 title Business Domain — Actors, Roles & Key Objects
 
 rectangle "Actors" <<BusinessGrouping>> {
-  rectangle "Architect" <<BusinessActor>> as ACT_Nn7Oo7
-  rectangle "Developer" <<BusinessActor>> as ACT_Pp8Qq8
-  rectangle "DevOps Engineer" <<BusinessActor>> as ACT_OLWiNc
-  rectangle "Product Owner" <<BusinessActor>> as ACT_Rr9Ss9
-  rectangle "Upper Technical\nManagement" <<BusinessActor>> as ACT_Ut1Vv1
+  rectangle "<$archimate_BusinessActor{scale=1.5}> Architect" <<BusinessActor>> as ACT_Nn7Oo7
+  rectangle "<$archimate_BusinessActor{scale=1.5}> Developer" <<BusinessActor>> as ACT_Pp8Qq8
+  rectangle "<$archimate_BusinessActor{scale=1.5}> DevOps Engineer" <<BusinessActor>> as ACT_OLWiNc
+  rectangle "<$archimate_BusinessActor{scale=1.5}> Product Owner" <<BusinessActor>> as ACT_Rr9Ss9
+  rectangle "<$archimate_BusinessActor{scale=1.5}> Upper Technical\nManagement" <<BusinessActor>> as ACT_Ut1Vv1
 }
 
 rectangle "Roles (from Common)" <<CommonGrouping>> {
-  rectangle "Author" <<Role>> as ROL_deMuTj
-  rectangle "Reviewer" <<Role>> as ROL_6VGCvh
+  rectangle "<$archimate_Role{scale=1.5}> Author" <<Role>> as ROL_deMuTj
+  rectangle "<$archimate_Role{scale=1.5}> Reviewer" <<Role>> as ROL_6VGCvh
 }
 
 rectangle "Interface" <<BusinessGrouping>> {
-  rectangle "GUI Interface" <<BusinessInterface>> as BIF_zr7_vT
+  rectangle "<$archimate_BusinessInterface{scale=1.5}> GUI Interface" <<BusinessInterface>> as BIF_zr7_vT
 }
 
 rectangle "Key Business Objects" <<BusinessGrouping>> {
-  rectangle "Entity File" <<BusinessObject>> as BOB_ie4vWU
-  rectangle "Connection File" <<BusinessObject>> as BOB_d8ETlx
-  rectangle "Diagram File" <<BusinessObject>> as BOB_8D68QW
-  rectangle "Architecture Model" <<BusinessObject>> as BOB_jqcFNe
-  rectangle "Engagement\nRepository" <<BusinessObject>> as BOB_so7gfN
-  rectangle "Enterprise\nRepository" <<BusinessObject>> as BOB_6Uok0b
+  rectangle "<$archimate_BusinessObject{scale=1.5}> Entity File" <<BusinessObject>> as BOB_ie4vWU
+  rectangle "<$archimate_BusinessObject{scale=1.5}> Connection File" <<BusinessObject>> as BOB_d8ETlx
+  rectangle "<$archimate_BusinessObject{scale=1.5}> Diagram File" <<BusinessObject>> as BOB_8D68QW
+  rectangle "<$archimate_BusinessObject{scale=1.5}> Architecture Model" <<BusinessObject>> as BOB_jqcFNe
+  rectangle "<$archimate_BusinessObject{scale=1.5}> Engagement\nRepository" <<BusinessObject>> as BOB_so7gfN
+  rectangle "<$archimate_BusinessObject{scale=1.5}> Enterprise\nRepository" <<BusinessObject>> as BOB_6Uok0b
 }
 
 ' Actor → Role assignments

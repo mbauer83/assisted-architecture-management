@@ -1,6 +1,7 @@
 """ERP v2.0 Model Query — indexed query API over entities, connections, and diagrams."""
 
 
+import threading
 from pathlib import Path
 from typing import Literal, cast, overload
 
@@ -47,16 +48,21 @@ class ModelRepository:
         self._connections: dict[str, ConnectionRecord] = {}
         self._diagrams: dict[str, DiagramRecord] = {}
         self._loaded = False
+        self._lock = threading.Lock()
 
     def _ensure_loaded(self) -> None:
-        if not self._loaded:
-            self._load_all()
+        if self._loaded:
+            return
+        with self._lock:
+            if not self._loaded:
+                self._load_all()
 
     def refresh(self) -> None:
-        self._entities = {}
-        self._connections = {}
-        self._diagrams = {}
-        self._loaded = False
+        with self._lock:
+            self._entities = {}
+            self._connections = {}
+            self._diagrams = {}
+            self._loaded = False
 
     def _load_all(self) -> None:
         self._entities = {}

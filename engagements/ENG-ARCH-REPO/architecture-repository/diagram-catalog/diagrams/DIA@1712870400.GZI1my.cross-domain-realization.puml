@@ -1,73 +1,75 @@
 ---
 artifact-id: DIA@1712870400.GZI1my.cross-domain-realization
 artifact-type: diagram
-name: "Cross-Domain Realization Chain"
+name: Cross-Domain Realization Chain
 version: 0.1.0
 status: draft
-keywords: [cross-domain, realization, layered, end-to-end]
+keywords:
+- cross-domain
+- realization
+- layered
+- end-to-end
 diagram-type: archimate-layered
-last-updated: '2026-04-13'
+last-updated: '2026-04-16'
 ---
 @startuml cross-domain-realization
 !include ../_archimate-stereotypes.puml
+!include ../_archimate-glyphs.puml
 
 top to bottom direction
 
 title Cross-Domain Realization — Motivation through Technology
 
 rectangle "Motivation" <<MotivationGrouping>> {
-  rectangle "Maintain Coherence\n& Traceability" <<Goal>> as GOL_Po1Qw3
-  rectangle "Enable Scalable\nReuse" <<Goal>> as GOL_Zx9Cv4
-  rectangle "Provide Development\nGuidance (AI)" <<Goal>> as GOL_e3nCpO
+  rectangle "<$archimate_Goal{scale=1.5}> Maintain Coherence\n& Traceability" <<Goal>> as GOL_Po1Qw3
+  rectangle "<$archimate_Goal{scale=1.5}> Enable Scalable\nReuse" <<Goal>> as GOL_Zx9Cv4
+  rectangle "<$archimate_Goal{scale=1.5}> Provide Development\nGuidance (AI)" <<Goal>> as GOL_e3nCpO
 }
 
 rectangle "Strategy" <<StrategyGrouping>> {
-  rectangle "Architectural\nModeling" <<Capability>> as CAP_y4xZme
-  rectangle "Model\nValidation" <<Capability>> as CAP_gky5s4
-  rectangle "Repository\nGovernance" <<Capability>> as CAP_ZnmAHe
-  rectangle "Artifact\nDiscovery" <<Capability>> as CAP_QrHHmz
+  rectangle "<$archimate_Capability{scale=1.5}> Architectural\nModeling" <<Capability>> as CAP_y4xZme
+  rectangle "<$archimate_Capability{scale=1.5}> Model\nValidation" <<Capability>> as CAP_gky5s4
+  rectangle "<$archimate_Capability{scale=1.5}> Repository\nGovernance" <<Capability>> as CAP_ZnmAHe
+  rectangle "<$archimate_Capability{scale=1.5}> Artifact\nDiscovery" <<Capability>> as CAP_QrHHmz
 }
 
 rectangle "Common (Behavioral)" <<CommonGrouping>> {
-  rectangle "Authoring\nService" <<Service>> as SRV_Au1Th1
-  rectangle "Validation\nService" <<Service>> as SRV_Ij6Kl6
-  rectangle "Discovery\nService" <<Service>> as SRV_Qr8St8
-  rectangle "Indexing\nService" <<Service>> as SRV_3I3Dtc
+  rectangle "<$archimate_Service{scale=1.5}> Authoring\nService" <<Service>> as SRV_Au1Th1
+  rectangle "<$archimate_Service{scale=1.5}> Validation\nService" <<Service>> as SRV_Ij6Kl6
+  rectangle "<$archimate_Service{scale=1.5}> Discovery\nService" <<Service>> as SRV_Qr8St8
+  rectangle "<$archimate_Service{scale=1.5}> Indexing\nService" <<Service>> as SRV_3I3Dtc
 }
 
 rectangle "Application" <<ApplicationGrouping>> {
-  rectangle "MCP Server" <<ApplicationComponent>> as APP_kRZYOA
-  rectangle "Model Verifier" <<ApplicationComponent>> as APP_ca3vm7
-  rectangle "Query Engine" <<ApplicationComponent>> as APP_v9LvfK
-  rectangle "SQLite Indexer" <<ApplicationComponent>> as APP_JOmFWy
-  rectangle "SQLite Index" <<DataObject>> as DOB_3rilik
+  rectangle "<$archimate_ApplicationComponent{scale=1.5}> MCP Server" <<ApplicationComponent>> as APP_kRZYOA
+  rectangle "<$archimate_ApplicationComponent{scale=1.5}> Model Verifier" <<ApplicationComponent>> as APP_ca3vm7
+  rectangle "<$archimate_ApplicationComponent{scale=1.5}> Query Engine" <<ApplicationComponent>> as APP_v9LvfK
+  rectangle "<$archimate_ApplicationComponent{scale=1.5}> SQLite Indexer" <<ApplicationComponent>> as APP_JOmFWy
+  rectangle "<$archimate_DataObject{scale=1.5}> SQLite Index" <<DataObject>> as DOB_3rilik
 }
 
 rectangle "Technology" <<TechnologyGrouping>> {
-  rectangle "Python 3.13+" <<SystemSoftware>> as SSW_o7a0ad
-  rectangle "Developer\nWorkstation" <<Node>> as NOD_4EFX7z
-  rectangle "Git Repository" <<Artifact>> as ART_YsLpM8
+  rectangle "<$archimate_SystemSoftware{scale=1.5}> Python 3.13+" <<SystemSoftware>> as SSW_o7a0ad
+  rectangle "<$archimate_Node{scale=1.5}> Developer\nWorkstation" <<Node>> as NOD_4EFX7z
+  rectangle "<$archimate_Artifact{scale=1.5}> Git Repository" <<Artifact>> as ART_YsLpM8
 }
 
-' --- Horizontal spread within layers ---
+' --- Auto-layout: spread elements within groupings ---
 GOL_Po1Qw3 -[hidden]right- GOL_Zx9Cv4
 GOL_Zx9Cv4 -[hidden]right- GOL_e3nCpO
-
 CAP_y4xZme -[hidden]right- CAP_gky5s4
 CAP_gky5s4 -[hidden]right- CAP_ZnmAHe
 CAP_ZnmAHe -[hidden]right- CAP_QrHHmz
-
 SRV_Au1Th1 -[hidden]right- SRV_Ij6Kl6
 SRV_Ij6Kl6 -[hidden]right- SRV_Qr8St8
 SRV_Qr8St8 -[hidden]right- SRV_3I3Dtc
-
 APP_kRZYOA -[hidden]right- APP_ca3vm7
 APP_ca3vm7 -[hidden]right- APP_v9LvfK
 APP_v9LvfK -[hidden]right- APP_JOmFWy
 APP_JOmFWy -[hidden]right- DOB_3rilik
-
 SSW_o7a0ad -[hidden]right- NOD_4EFX7z
 NOD_4EFX7z -[hidden]right- ART_YsLpM8
+
 
 ' Motivation → Strategy (purple)
 GOL_Po1Qw3 -[#7B3F9A]down-|> CAP_y4xZme : <<realization>>

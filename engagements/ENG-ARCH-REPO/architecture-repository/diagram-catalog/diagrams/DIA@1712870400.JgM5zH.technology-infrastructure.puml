@@ -1,27 +1,33 @@
 ---
 artifact-id: DIA@1712870400.JgM5zH.technology-infrastructure
 artifact-type: diagram
-name: "Technology Domain — Infrastructure"
+name: "Technology Domain \u2014 Infrastructure"
 version: 0.1.0
 status: draft
-keywords: [technology, infrastructure, nodes, system-software, artifacts]
+keywords:
+- technology
+- infrastructure
+- nodes
+- system-software
+- artifacts
 diagram-type: archimate-technology
-last-updated: '2026-04-13'
+last-updated: '2026-04-16'
 ---
 @startuml technology-infrastructure
 !include ../_archimate-stereotypes.puml
+!include ../_archimate-glyphs.puml
 
 top to bottom direction
 
 title Technology Domain — Infrastructure & Runtime
 
-rectangle "Developer Workstation" <<Node>> as NOD_4EFX7z {
-  rectangle "Python 3.13+" <<SystemSoftware>> as SSW_o7a0ad
-  rectangle "PlantUML Engine" <<SystemSoftware>> as SSW_xVrBYD
-  rectangle "Git VCS" <<SystemSoftware>> as SSW_TzzVd
+rectangle "<$archimate_Node{scale=1.5}> Developer Workstation" <<Node>> as NOD_4EFX7z {
+  rectangle "<$archimate_SystemSoftware{scale=1.5}> Python 3.13+" <<SystemSoftware>> as SSW_o7a0ad
+  rectangle "<$archimate_SystemSoftware{scale=1.5}> PlantUML Engine" <<SystemSoftware>> as SSW_xVrBYD
+  rectangle "<$archimate_SystemSoftware{scale=1.5}> Git VCS" <<SystemSoftware>> as SSW_TzzVd
 
-  rectangle "Git Repository" <<Artifact>> as ART_YsLpM8
-  rectangle "SQLite Database" <<Artifact>> as ART_FtioFJ
+  rectangle "<$archimate_Artifact{scale=1.5}> Git Repository" <<Artifact>> as ART_YsLpM8
+  rectangle "<$archimate_Artifact{scale=1.5}> SQLite Database" <<Artifact>> as ART_FtioFJ
 }
 
 rectangle "Technology Services" <<TechnologyGrouping>> {
@@ -38,11 +44,15 @@ TSV_MSy15f --> ART_FtioFJ : hosts
 
 ' Application components (from Application domain) run on technology
 rectangle "Application Components\n(from Application)" <<ApplicationGrouping>> {
-  rectangle "Model Verifier" <<ApplicationComponent>> as APP_ca3vm7
-  rectangle "SQLite Indexer" <<ApplicationComponent>> as APP_JOmFWy
-  rectangle "Query Engine" <<ApplicationComponent>> as APP_v9LvfK
-  rectangle "MCP Server" <<ApplicationComponent>> as APP_kRZYOA
+  rectangle "<$archimate_ApplicationComponent{scale=1.5}> Model Verifier" <<ApplicationComponent>> as APP_ca3vm7
+  rectangle "<$archimate_ApplicationComponent{scale=1.5}> SQLite Indexer" <<ApplicationComponent>> as APP_JOmFWy
+  rectangle "<$archimate_ApplicationComponent{scale=1.5}> Query Engine" <<ApplicationComponent>> as APP_v9LvfK
+  rectangle "<$archimate_ApplicationComponent{scale=1.5}> MCP Server" <<ApplicationComponent>> as APP_kRZYOA
 }
+
+' --- Auto-layout: spread elements within groupings ---
+TSV_MSy15f -[hidden]right- TSV_WluY9K
+
 
 SSW_o7a0ad --> APP_ca3vm7 : runs
 SSW_o7a0ad --> APP_JOmFWy : runs

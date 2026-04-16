@@ -46,10 +46,12 @@ def _parse_groupings(puml: str) -> list[_GroupInfo]:
                 group_idx += 1
                 result.append(current)
 
-        # Element with alias inside a grouping (has `as ALIAS`, no `{`)
+        # Element with alias inside a grouping (has `as ALIAS`, no trailing `{`)
+        # Note: sprite labels like <$name{scale=0.9}> contain `{` mid-line, so we
+        # only exclude lines where `{` appears at the end (container openings).
         elif current is not None and depth > 0:
             m = re.search(r"\bas\s+(\w+)", stripped)
-            if m and "{" not in stripped:
+            if m and not re.search(r"\{\s*$", stripped):
                 current.aliases.append(m.group(1))
 
         depth += stripped.count("{") - stripped.count("}")

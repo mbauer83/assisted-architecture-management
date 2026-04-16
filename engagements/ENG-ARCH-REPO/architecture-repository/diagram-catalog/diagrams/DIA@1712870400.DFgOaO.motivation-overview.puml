@@ -16,41 +16,42 @@ last-updated: '2026-04-16'
 ---
 @startuml motivation-overview
 !include ../_archimate-stereotypes.puml
+!include ../_archimate-glyphs.puml
 
 top to bottom direction
 
 title Motivation Domain Overview — Architecture Repository
 
 rectangle "Stakeholders" <<MotivationGrouping>> {
-  rectangle "Architect" <<Stakeholder>> as STK_aB3dE1
-  rectangle "Product Owner" <<Stakeholder>> as STK_Zp8Lm4
-  rectangle "Developer" <<Stakeholder>> as STK_K9xTq2
-  rectangle "DevOps Engineer" <<Stakeholder>> as STK_4oprPM
-  rectangle "Upper Technical\nManagement" <<Stakeholder>> as STK_Rr9Ss9
+  rectangle "<$archimate_Stakeholder{scale=1.5}> Architect" <<Stakeholder>> as STK_aB3dE1
+  rectangle "<$archimate_Stakeholder{scale=1.5}> Product Owner" <<Stakeholder>> as STK_Zp8Lm4
+  rectangle "<$archimate_Stakeholder{scale=1.5}> Developer" <<Stakeholder>> as STK_K9xTq2
+  rectangle "<$archimate_Stakeholder{scale=1.5}> DevOps Engineer" <<Stakeholder>> as STK_4oprPM
+  rectangle "<$archimate_Stakeholder{scale=1.5}> Upper Technical\nManagement" <<Stakeholder>> as STK_Rr9Ss9
 }
 
 rectangle "Drivers" <<MotivationGrouping>> {
-  rectangle "Code Generation Velocity\nExceeds Planning & Review" <<Driver>> as DRV_Qw7Er1
-  rectangle "Rising Complexity &\nInterdependence" <<Driver>> as DRV_Ui5Op3
-  rectangle "Increasing Autonomy\nof Teams & Systems" <<Driver>> as DRV_Rt6Yu2
-  rectangle "Limited Central\nGovernance Capacity" <<Driver>> as DRV_As4Df4
-  rectangle "Increasing Need for\nEffective LLM Access" <<Driver>> as DRV_ui6GDN
+  rectangle "<$archimate_Driver{scale=1.5}> Code Generation Velocity\nExceeds Planning & Review" <<Driver>> as DRV_Qw7Er1
+  rectangle "<$archimate_Driver{scale=1.5}> Rising Complexity &\nInterdependence" <<Driver>> as DRV_Ui5Op3
+  rectangle "<$archimate_Driver{scale=1.5}> Increasing Autonomy\nof Teams & Systems" <<Driver>> as DRV_Rt6Yu2
+  rectangle "<$archimate_Driver{scale=1.5}> Limited Central\nGovernance Capacity" <<Driver>> as DRV_As4Df4
+  rectangle "<$archimate_Driver{scale=1.5}> Increasing Need for\nEffective LLM Access" <<Driver>> as DRV_ui6GDN
 }
 
 rectangle "Goals" <<MotivationGrouping>> {
-  rectangle "Support Architecture\nPlanning (Humans)" <<Goal>> as GOL_5Fk9di
-  rectangle "Maintain Coherence\n& Traceability" <<Goal>> as GOL_Po1Qw3
-  rectangle "Enable Scalable\nReuse" <<Goal>> as GOL_Zx9Cv4
-  rectangle "Enable Cross-Stakeholder\nValidation" <<Goal>> as GOL_Lm2Bn2
-  rectangle "Support Architecture\nPlanning (AI)" <<Goal>> as GOL_Iwha3
-  rectangle "Provide Development\nGuidance (Humans)" <<Goal>> as GOL_Gh3Jk1
-  rectangle "Provide Development\nGuidance (AI)" <<Goal>> as GOL_e3nCpO
+  rectangle "<$archimate_Goal{scale=1.5}> Support Architecture\nPlanning (Humans)" <<Goal>> as GOL_5Fk9di
+  rectangle "<$archimate_Goal{scale=1.5}> Maintain Coherence\n& Traceability" <<Goal>> as GOL_Po1Qw3
+  rectangle "<$archimate_Goal{scale=1.5}> Enable Scalable\nReuse" <<Goal>> as GOL_Zx9Cv4
+  rectangle "<$archimate_Goal{scale=1.5}> Enable Cross-Stakeholder\nValidation" <<Goal>> as GOL_Lm2Bn2
+  rectangle "<$archimate_Goal{scale=1.5}> Support Architecture\nPlanning (AI)" <<Goal>> as GOL_Iwha3
+  rectangle "<$archimate_Goal{scale=1.5}> Provide Development\nGuidance (Humans)" <<Goal>> as GOL_Gh3Jk1
+  rectangle "<$archimate_Goal{scale=1.5}> Provide Development\nGuidance (AI)" <<Goal>> as GOL_e3nCpO
 }
 
 rectangle "Outcomes & Principles" <<MotivationGrouping>> {
-  rectangle "Increased Architectural\nCoherence" <<Outcome>> as OUT_LrpdG0
-  rectangle "Reduced Planning\nOverhead" <<Outcome>> as OUT_AlZjX8
-  rectangle "Extensibility &\nConfigurability" <<Principle>> as PRI_uraDPR
+  rectangle "<$archimate_Outcome{scale=1.5}> Increased Architectural\nCoherence" <<Outcome>> as OUT_LrpdG0
+  rectangle "<$archimate_Outcome{scale=1.5}> Reduced Planning\nOverhead" <<Outcome>> as OUT_AlZjX8
+  rectangle "<$archimate_Principle{scale=1.5}> Extensibility &\nConfigurability" <<Principle>> as PRI_uraDPR
 }
 
 ' --- Auto-layout: spread elements within groupings ---
@@ -70,11 +71,6 @@ GOL_Iwha3 -[hidden]right- GOL_Gh3Jk1
 GOL_Gh3Jk1 -[hidden]right- GOL_e3nCpO
 OUT_LrpdG0 -[hidden]right- OUT_AlZjX8
 OUT_AlZjX8 -[hidden]right- PRI_uraDPR
-
-
-' --- Horizontal spread within layers ---
-
-
 
 
 ' Stakeholder → Driver associations

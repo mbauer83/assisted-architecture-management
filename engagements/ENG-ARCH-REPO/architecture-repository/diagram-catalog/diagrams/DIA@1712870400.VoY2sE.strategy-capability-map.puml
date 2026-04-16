@@ -1,55 +1,59 @@
 ---
 artifact-id: DIA@1712870400.VoY2sE.strategy-capability-map
 artifact-type: diagram
-name: "Strategy — Capability Map"
+name: "Strategy \u2014 Capability Map"
 version: 0.1.0
 status: draft
-keywords: [strategy, capabilities, courses-of-action, goals]
+keywords:
+- strategy
+- capabilities
+- courses-of-action
+- goals
 diagram-type: archimate-strategy
-last-updated: '2026-04-13'
+last-updated: '2026-04-16'
 ---
 @startuml strategy-capability-map
 !include ../_archimate-stereotypes.puml
+!include ../_archimate-glyphs.puml
 
 top to bottom direction
 
 title Strategy Domain — Capabilities & Courses of Action
 
 rectangle "Goals (from Motivation)" <<MotivationGrouping>> {
-  rectangle "Maintain Coherence\n& Traceability" <<Goal>> as GOL_Po1Qw3
-  rectangle "Enable Cross-Stakeholder\nValidation" <<Goal>> as GOL_Lm2Bn2
-  rectangle "Support Planning\n(Humans & AI)" <<Goal>> as GOL_planning
-  rectangle "Enable Scalable Reuse" <<Goal>> as GOL_Zx9Cv4
-  rectangle "Provide Development\nGuidance (Humans & AI)" <<Goal>> as GOL_guidance
+  rectangle "<$archimate_Goal{scale=1.5}> Maintain Coherence\n& Traceability" <<Goal>> as GOL_Po1Qw3
+  rectangle "<$archimate_Goal{scale=1.5}> Enable Cross-Stakeholder\nValidation" <<Goal>> as GOL_Lm2Bn2
+  rectangle "<$archimate_Goal{scale=1.5}> Support Planning\n(Humans & AI)" <<Goal>> as GOL_planning
+  rectangle "<$archimate_Goal{scale=1.5}> Enable Scalable Reuse" <<Goal>> as GOL_Zx9Cv4
+  rectangle "<$archimate_Goal{scale=1.5}> Provide Development\nGuidance (Humans & AI)" <<Goal>> as GOL_guidance
 }
 
 rectangle "Capabilities" <<StrategyGrouping>> {
-  rectangle "Architectural\nModeling" <<Capability>> as CAP_y4xZme
-  rectangle "Model\nValidation" <<Capability>> as CAP_gky5s4
-  rectangle "Artifact\nAuthoring" <<Capability>> as CAP_F4qy9O
-  rectangle "Artifact\nDiscovery" <<Capability>> as CAP_QrHHmz
-  rectangle "Repository\nGovernance" <<Capability>> as CAP_ZnmAHe
-  rectangle "Configuration\nManagement" <<Capability>> as CAP_0T4qjV
+  rectangle "<$archimate_Capability{scale=1.5}> Architectural\nModeling" <<Capability>> as CAP_y4xZme
+  rectangle "<$archimate_Capability{scale=1.5}> Model\nValidation" <<Capability>> as CAP_gky5s4
+  rectangle "<$archimate_Capability{scale=1.5}> Artifact\nAuthoring" <<Capability>> as CAP_F4qy9O
+  rectangle "<$archimate_Capability{scale=1.5}> Artifact\nDiscovery" <<Capability>> as CAP_QrHHmz
+  rectangle "<$archimate_Capability{scale=1.5}> Repository\nGovernance" <<Capability>> as CAP_ZnmAHe
+  rectangle "<$archimate_Capability{scale=1.5}> Configuration\nManagement" <<Capability>> as CAP_0T4qjV
 }
 
 rectangle "Courses of Action" <<StrategyGrouping>> {
-  rectangle "Markdown File-Based\nApproach" <<CourseOfAction>> as COA_BbjFAy
-  rectangle "ArchiMate NEXT\nOntology Adoption" <<CourseOfAction>> as COA_utgeNR
+  rectangle "<$archimate_CourseOfAction{scale=1.5}> Markdown File-Based\nApproach" <<CourseOfAction>> as COA_BbjFAy
+  rectangle "<$archimate_CourseOfAction{scale=1.5}> ArchiMate NEXT\nOntology Adoption" <<CourseOfAction>> as COA_utgeNR
 }
 
-' --- Horizontal spread within layers ---
+' --- Auto-layout: spread elements within groupings ---
 GOL_Po1Qw3 -[hidden]right- GOL_Lm2Bn2
 GOL_Lm2Bn2 -[hidden]right- GOL_planning
 GOL_planning -[hidden]right- GOL_Zx9Cv4
 GOL_Zx9Cv4 -[hidden]right- GOL_guidance
-
 CAP_y4xZme -[hidden]right- CAP_gky5s4
 CAP_gky5s4 -[hidden]right- CAP_F4qy9O
 CAP_F4qy9O -[hidden]right- CAP_QrHHmz
 CAP_QrHHmz -[hidden]right- CAP_ZnmAHe
 CAP_ZnmAHe -[hidden]right- CAP_0T4qjV
-
 COA_BbjFAy -[hidden]right- COA_utgeNR
+
 
 ' Goal → Capability realizations
 GOL_Po1Qw3 -down-|> CAP_y4xZme : <<realization>>
