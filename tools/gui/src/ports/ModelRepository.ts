@@ -92,4 +92,9 @@ export interface ModelRepository {
     entity_ids: string[]; connection_ids: string[];
     keywords?: string[]; version?: string; status?: string; dry_run?: boolean;
   }) => Effect.Effect<WriteResult, RepoError>
+  readonly editDiagram: (body: {
+    artifact_id: string; diagram_type: string; name: string;
+    entity_ids: string[]; connection_ids: string[];
+    version?: string; status?: string; dry_run?: boolean;
+  }) => Effect.Effect<WriteResult, RepoError>
 }

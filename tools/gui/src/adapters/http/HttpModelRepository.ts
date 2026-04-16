@@ -185,4 +185,7 @@ export const makeHttpModelRepository = (): ModelRepository => ({
 
   createDiagram: (body) =>
     postJson(buildUrl('/diagram'), body, WriteResultSchema),
+
+  editDiagram: (body) =>
+    postJson(buildUrl('/diagram/edit'), body, WriteResultSchema),
 })

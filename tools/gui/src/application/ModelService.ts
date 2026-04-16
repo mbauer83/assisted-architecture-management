@@ -34,4 +34,5 @@ export const makeModelService = (repo: ModelRepository) =>
     searchEntityDisplay: (query: string, limit?: number) => repo.searchEntityDisplay(query, limit),
     previewDiagram: (body: Parameters<ModelRepository['previewDiagram']>[0]) => repo.previewDiagram(body),
     createDiagram: (body: Parameters<ModelRepository['createDiagram']>[0]) => repo.createDiagram(body),
+    editDiagram: (body: Parameters<ModelRepository['editDiagram']>[0]) => repo.editDiagram(body),
   }) as const

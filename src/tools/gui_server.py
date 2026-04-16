@@ -564,6 +564,44 @@ def create_diagram_gui(body: CreateDiagramGuiBody) -> dict[str, Any]:
     return _write_result_to_dict(result)
 
 
+class EditDiagramGuiBody(BaseModel):
+    artifact_id: str
+    diagram_type: str
+    name: str
+    entity_ids: list[str]
+    connection_ids: list[str]
+    version: str | None = None
+    status: str | None = None
+    dry_run: bool = True
+
+
+@app.post("/api/diagram/edit")
+def edit_diagram_gui(body: EditDiagramGuiBody) -> dict[str, Any]:
+    """Edit an existing diagram's entity/connection selection and regenerate its PUML.
+
+    Regenerates PUML via ``diagram_builder`` from the given entity/connection
+    selection, then delegates to ``edit_diagram`` (same code path as the
+    ``model_edit_diagram`` MCP tool). Keywords are preserved from the existing file.
+    """
+    from src.tools.diagram_builder import generate_archimate_puml_body
+    from src.tools.model_write.diagram_edit import edit_diagram
+    repo = _get_repo()
+    repo_root, _, verifier = _get_write_deps()
+    entities = [e for eid in body.entity_ids if (e := repo.get_entity(eid)) is not None]
+    connections = [c for cid in body.connection_ids if (c := repo.get_connection(cid)) is not None]
+    puml = generate_archimate_puml_body(body.name, entities, connections, diagram_type=body.diagram_type)
+    try:
+        result = edit_diagram(
+            repo_root=repo_root, verifier=verifier, clear_repo_caches=_clear_caches,
+            artifact_id=body.artifact_id, puml=puml, name=body.name,
+            keywords=..., version=body.version, status=body.status,
+            dry_run=body.dry_run,
+        )
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+    return _write_result_to_dict(result)
+
+
 # ── Bootstrap ─────────────────────────────────────────────────────────────────
 
 def main(argv: list[str] | None = None) -> None:

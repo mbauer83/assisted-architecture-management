@@ -8,6 +8,7 @@ import DiagramsView from '../views/DiagramsView.vue'
 import DiagramDetailView from '../views/DiagramDetailView.vue'
 import CreateDiagramView from '../views/CreateDiagramView.vue'
 import GraphExploreView from '../views/GraphExploreView.vue'
+import EditDiagramView from '../views/EditDiagramView.vue'
 
 export const router = createRouter({
   history: createWebHistory(),
@@ -19,6 +20,7 @@ export const router = createRouter({
     { path: '/search', component: SearchView },
     { path: '/diagrams', component: DiagramsView },
     { path: '/diagram/create', component: CreateDiagramView },
+    { path: '/diagram/edit', component: EditDiagramView },
     { path: '/diagram', component: DiagramDetailView },
     { path: '/graph', component: GraphExploreView },
   ],
