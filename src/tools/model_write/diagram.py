@@ -103,6 +103,59 @@ def _render_diagram_png(puml_path: Path, warnings: list[str]) -> Path | None:
             pass
 
 
+def _render_diagram_svg(puml_path: Path, warnings: list[str]) -> Path | None:
+    """Render a PUML file to SVG using PlantUML. Returns the SVG path or None."""
+    rendered_dir = puml_path.parent.parent / "rendered"
+    rendered_dir.mkdir(parents=True, exist_ok=True)
+
+    content = puml_path.read_text(encoding="utf-8")
+    start = content.find("@startuml")
+    end = content.find("@enduml")
+    if start == -1 or end == -1:
+        return None
+
+    puml_body = content[start:end + len("@enduml")]
+    puml_body_for_render = re.sub(r"@startuml\s+\S+", "@startuml", puml_body, count=1)
+
+    with tempfile.NamedTemporaryFile(
+        mode="w", suffix=".puml", dir=puml_path.parent, delete=False, encoding="utf-8"
+    ) as tmp:
+        tmp.write(puml_body_for_render)
+        tmp_path = Path(tmp.name)
+
+    jar = find_plantuml_jar()
+    if jar is None:
+        tmp_path.unlink(missing_ok=True)
+        return None
+
+    try:
+        result = subprocess.run(
+            ["java", "-Djava.awt.headless=true", "-jar", str(jar.resolve()),
+             "-tsvg", "-o", str(rendered_dir.resolve()), tmp_path.name],
+            cwd=str(puml_path.parent),
+            capture_output=True, text=True, timeout=60,
+        )
+        if result.returncode != 0:
+            return None
+
+        rendered = rendered_dir / f"{tmp_path.stem}.svg"
+        if rendered.exists():
+            stem = puml_path.stem
+            parts = stem.split(".", 2)
+            friendly_name = parts[2] if len(parts) >= 3 else stem
+            final = rendered_dir / f"{friendly_name}.svg"
+            rendered.rename(final)
+            return final
+        return None
+    except (OSError, subprocess.TimeoutExpired):
+        return None
+    finally:
+        try:
+            tmp_path.unlink()
+        except OSError:
+            pass
+
+
 def create_diagram(
     *,
     repo_root: Path,
@@ -220,10 +273,11 @@ def create_diagram(
             verification=_verification_to_dict(path, res),
         )
 
-    # Render PNG after successful write
+    # Render PNG + SVG after successful write
     png_path = _render_diagram_png(path, warnings)
     if png_path:
         warnings.append(f"Rendered PNG: {png_path}")
+    _render_diagram_svg(path, warnings)
 
     clear_repo_caches(repo_root)
 

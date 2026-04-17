@@ -9,7 +9,7 @@ from src.common.model_write import format_diagram_puml
 from src.common.model_write_layout import optimize_puml_layout
 
 from .boundary import assert_engagement_write_root, today_iso
-from .diagram import _render_diagram_png
+from .diagram import _render_diagram_png, _render_diagram_svg
 from .parse_existing import parse_diagram_file
 from .types import WriteResult
 from .verify import verify_content_in_temp_path
@@ -109,6 +109,7 @@ def edit_diagram(
     png_path = _render_diagram_png(diagram_path, warnings)
     if png_path:
         warnings.append(f"Rendered PNG: {png_path}")
+    _render_diagram_svg(diagram_path, warnings)
 
     clear_repo_caches(repo_root)
     return WriteResult(

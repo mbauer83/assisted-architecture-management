@@ -600,27 +600,78 @@ def create_diagram_gui(body: CreateDiagramGuiBody) -> dict[str, Any]:
     return _write_result_to_dict(result)
 
 
+def _rendered_svg_name(d: DiagramRecord) -> str | None:
+    """Derive the rendered SVG filename for a diagram."""
+    if _repo_root is None:
+        return None
+    rendered_dir = _repo_root / "diagram-catalog" / "rendered"
+    parts = d.artifact_id.split(".")
+    if len(parts) >= 3:
+        friendly = ".".join(parts[2:])
+        candidate = rendered_dir / f"{friendly}.svg"
+        if candidate.exists():
+            return candidate.name
+    if rendered_dir.exists():
+        for f in rendered_dir.iterdir():
+            if f.suffix == ".svg" and f.stem in d.artifact_id:
+                return f.name
+    return None
+
+
 @app.get("/api/diagram-svg")
 def get_diagram_svg(id: str) -> Response:
-    """Render the stored PUML for a diagram to SVG on demand.
-
-    Returns raw SVG text (``image/svg+xml``).  Graphviz embeds each entity's
-    ``display_alias`` as a ``<title>`` element inside its node group, enabling
-    the browser to attach click handlers without any coordinate mapping.
-    """
+    """Return SVG for a diagram — serves cached file first, falls back to live render."""
     if _repo_root is None:
         raise HTTPException(500, "Repository not initialized")
-    from src.tools.diagram_builder import render_puml_svg
-    from src.tools.model_write.parse_existing import parse_diagram_file
 
     diagram_path = _repo_root / "diagram-catalog" / "diagrams" / f"{id}.puml"
     if not diagram_path.exists():
         raise HTTPException(404, f"Diagram '{id}' not found")
+
+    # Serve pre-computed SVG if available
+    diag_rec = _get_repo().get_diagram(id)
+    if diag_rec:
+        svg_name = _rendered_svg_name(diag_rec)
+        if svg_name:
+            svg_path = _repo_root / "diagram-catalog" / "rendered" / svg_name
+            if svg_path.exists():
+                return Response(content=svg_path.read_bytes(), media_type="image/svg+xml")
+
+    from src.tools.diagram_builder import render_puml_svg
+    from src.tools.model_write.parse_existing import parse_diagram_file
     parsed = parse_diagram_file(diagram_path)
     svg, warnings = render_puml_svg(parsed.puml_body, _repo_root)
     if svg is None:
         raise HTTPException(500, f"SVG render failed: {'; '.join(warnings)}")
     return Response(content=svg, media_type="image/svg+xml")
+
+
+@app.get("/api/diagram-download")
+def download_diagram(id: str, format: Literal["png", "svg"] = "png") -> FileResponse:
+    """Download a rendered diagram file as an attachment."""
+    if _repo_root is None:
+        raise HTTPException(500, "Repository not initialized")
+    rendered_dir = _repo_root / "diagram-catalog" / "rendered"
+    diag_rec = _get_repo().get_diagram(id)
+    if diag_rec is None:
+        raise HTTPException(404, f"Diagram '{id}' not found")
+
+    if format == "svg":
+        svg_name = _rendered_svg_name(diag_rec)
+        if svg_name:
+            path = rendered_dir / svg_name
+            if path.exists():
+                return FileResponse(path, media_type="image/svg+xml",
+                                    headers={"Content-Disposition": f'attachment; filename="{svg_name}"'})
+        raise HTTPException(404, "SVG not yet rendered — save the diagram to generate it")
+
+    png_name = _rendered_png_name(diag_rec)
+    if png_name:
+        path = rendered_dir / png_name
+        if path.exists():
+            return FileResponse(path, media_type="image/png",
+                                headers={"Content-Disposition": f'attachment; filename="{png_name}"'})
+    raise HTTPException(404, "PNG not yet rendered — save the diagram to generate it")
 
 
 class EditDiagramGuiBody(BaseModel):

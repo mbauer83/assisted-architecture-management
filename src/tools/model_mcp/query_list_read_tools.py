@@ -18,10 +18,10 @@ def register_query_list_read_tools(mcp: FastMCP) -> None:
         name="model_query_list_artifacts",
         title="Model Query: List Artifacts",
         description=(
-            "List artifacts (metadata-only) using framework-aligned filters (AND semantics). "
-            "Returns lightweight summaries without loading full bodies. Very large replies possible with wide or absent filters. "
-            "\n\nKey filters: artifact_type, domain, status. "
-            "\n\nSet include_connections/include_diagrams if you want non-entity results."
+            "List artifacts (metadata-only) with AND-semantics filters. "
+            "Returns lightweight summaries; use artifact_type, domain, or status to narrow results. "
+            "Pass fields=[...] to project only the keys you need. "
+            "include_connections and include_diagrams default to false (entities only)."
             "\n\nRepo selection: repo_scope defaults to both (engagement + enterprise)."
         ),
         structured_output=True,

@@ -132,15 +132,11 @@ def create_archimate_diagram(
     e1_alias = f"{e1_parts[0].split('@')[0]}_{e1_parts[1]}"
     e2_alias = f"{e2_parts[0].split('@')[0]}_{e2_parts[1]}"
 
-    # Read macros file to get the actual DECL macro names
-    macros_path = repo_root / "diagram-catalog" / "_macros.puml"
-    macros_content = macros_path.read_text(encoding="utf-8") if macros_path.exists() else ""
-
     puml = f"""@startuml test-diagram-archimate-application
 !include ../_macros.puml
 
-DECL_{e1_alias}
-DECL_{e2_alias}
+$DECL_{e1_alias}()
+$DECL_{e2_alias}()
 
 {e1_alias} -[#0078A0]-> {e2_alias} : <<serving>>
 @enduml

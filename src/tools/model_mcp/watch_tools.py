@@ -249,13 +249,78 @@ def auto_start_default_watcher(
 # ---------------------------------------------------------------------------
 
 def register_watch_tools(mcp: FastMCP) -> None:
+    """Register watcher lifecycle tools on *mcp*.
+
+    Called by the standalone arch-mcp-watch server.  Not registered on the
+    main sdlc-mcp-model server — that server auto-starts the watcher at
+    startup without exposing lifecycle tools to agents.
+    """
+    from typing import Literal
+
+    @mcp.tool(
+        name="model_tools_watch",
+        title="Model Tools: Watch Lifecycle",
+        description=(
+            "Control the file-system watcher that auto-refreshes model caches. "
+            "action='start' — begin polling (interval_s default 2 s, periodic refresh default 300 s); "
+            "action='stop' — stop the watcher; "
+            "action='status' — return current watcher state."
+            "\n\nThe main model server starts the watcher automatically at startup; "
+            "use this tool only when you need explicit lifecycle control."
+            "\n\nRepo selection: repo_scope defaults to both (engagement + enterprise)."
+        ),
+        structured_output=True,
+    )
+    def model_tools_watch(
+        action: Literal["start", "stop", "status"],
+        *,
+        interval_s: float = 2.0,
+        periodic_refresh_s: float | None = 300.0,
+        repo_root: str | None = None,
+        repo_preset: RepoPreset | None = None,
+        enterprise_root: str | None = None,
+        repo_scope: RepoScope = "both",
+    ) -> dict[str, object]:
+        roots = resolve_repo_roots(
+            repo_scope=repo_scope,
+            repo_root=repo_root,
+            repo_preset=repo_preset,
+            enterprise_root=enterprise_root,
+        )
+        repo_key = _roots_key(roots)
+        if action == "start":
+            return _start_watcher(roots, interval_s=interval_s, periodic_refresh_s=periodic_refresh_s)
+        if action == "stop":
+            with _watch_lock:
+                stop = _watch_stop.get(repo_key)
+                t = _watch_threads.get(repo_key)
+            if stop is None or t is None:
+                return {"repo_roots": [str(r) for r in roots], "stopped": False, "reason": "not_running"}
+            stop.set()
+            t.join(timeout=1.0)
+            with _watch_lock:
+                running = bool(t.is_alive())
+                st = dict(_watch_state.get(repo_key, {}))
+                st["running"] = running
+                _watch_state[repo_key] = st
+            return {"repo_roots": [str(r) for r in roots], "stopped": True, "running": running}
+        # status
+        with _watch_lock:
+            thread = _watch_threads.get(repo_key)
+            state = dict(_watch_state.get(repo_key, {}))
+        return {
+            "repo_roots": [str(r) for r in roots],
+            "running": bool(thread and thread.is_alive()),
+            "state": state,
+        }
+
     @mcp.tool(
         name="model_tools_refresh",
         title="Model Tools: Refresh Index",
         description=(
-            "Force a re-scan/re-index/re-cache for the selected repository. "
-            "Waits for any in-progress refresh to finish before running. "
-            "Use this after updating entity/connection/diagram files, or from a periodic task."
+            "Force a synchronous re-scan and cache refresh for the selected repository. "
+            "Use this after writing entity/connection/diagram files outside the MCP tools, "
+            "or when the auto-watcher has not yet picked up recent changes."
             "\n\nRepo selection: repo_scope defaults to both (engagement + enterprise)."
         ),
         structured_output=True,
@@ -275,99 +340,3 @@ def register_watch_tools(mcp: FastMCP) -> None:
         )
         sync_refresh(roots)
         return {"repo_roots": [str(p) for p in roots], "repo_scope": repo_scope, "refreshed": True}
-
-    @mcp.tool(
-        name="model_tools_watch_start",
-        title="Model Tools: Watch Repo",
-        description=(
-            "Start a polling watcher that refreshes caches when files under model/ "
-            "or diagram-catalog/diagrams change, and periodically (periodic_refresh_s, default 300s)."
-            "\n\nRepo selection: repo_scope defaults to both (engagement + enterprise)."
-        ),
-        structured_output=True,
-    )
-    def model_tools_watch_start(
-        *,
-        interval_s: float = 2.0,
-        periodic_refresh_s: float | None = 300.0,
-        repo_root: str | None = None,
-        repo_preset: RepoPreset | None = None,
-        enterprise_root: str | None = None,
-        repo_scope: RepoScope = "both",
-    ) -> dict[str, object]:
-        roots = resolve_repo_roots(
-            repo_scope=repo_scope,
-            repo_root=repo_root,
-            repo_preset=repo_preset,
-            enterprise_root=enterprise_root,
-        )
-        return _start_watcher(roots, interval_s=interval_s, periodic_refresh_s=periodic_refresh_s)
-
-    @mcp.tool(
-        name="model_tools_watch_status",
-        title="Model Tools: Watch Status",
-        description=(
-            "Return watcher status for the selected repository."
-            "\n\nRepo selection: repo_scope defaults to both (engagement + enterprise)."
-        ),
-        structured_output=True,
-    )
-    def model_tools_watch_status(
-        *,
-        repo_root: str | None = None,
-        repo_preset: RepoPreset | None = None,
-        enterprise_root: str | None = None,
-        repo_scope: RepoScope = "both",
-    ) -> dict[str, object]:
-        roots = resolve_repo_roots(
-            repo_scope=repo_scope,
-            repo_root=repo_root,
-            repo_preset=repo_preset,
-            enterprise_root=enterprise_root,
-        )
-        repo_key = _roots_key(roots)
-        with _watch_lock:
-            thread = _watch_threads.get(repo_key)
-            state = dict(_watch_state.get(repo_key, {}))
-        return {
-            "repo_roots": [str(r) for r in roots],
-            "running": bool(thread and thread.is_alive()),
-            "state": state,
-        }
-
-    @mcp.tool(
-        name="model_tools_watch_stop",
-        title="Model Tools: Stop Watch",
-        description=(
-            "Stop the polling watcher (if running) for the selected repository."
-            "\n\nRepo selection: repo_scope defaults to both (engagement + enterprise)."
-        ),
-        structured_output=True,
-    )
-    def model_tools_watch_stop(
-        *,
-        repo_root: str | None = None,
-        repo_preset: RepoPreset | None = None,
-        enterprise_root: str | None = None,
-        repo_scope: RepoScope = "both",
-    ) -> dict[str, object]:
-        roots = resolve_repo_roots(
-            repo_scope=repo_scope,
-            repo_root=repo_root,
-            repo_preset=repo_preset,
-            enterprise_root=enterprise_root,
-        )
-        repo_key = _roots_key(roots)
-        with _watch_lock:
-            stop = _watch_stop.get(repo_key)
-            t = _watch_threads.get(repo_key)
-        if stop is None or t is None:
-            return {"repo_roots": [str(r) for r in roots], "stopped": False, "reason": "not_running"}
-        stop.set()
-        t.join(timeout=1.0)
-        with _watch_lock:
-            running = bool(t.is_alive())
-            st = dict(_watch_state.get(repo_key, {}))
-            st["running"] = running
-            _watch_state[repo_key] = st
-        return {"repo_roots": [str(r) for r in roots], "stopped": True, "running": running}

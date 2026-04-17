@@ -128,8 +128,8 @@ def test_model_query_mcp_projection_and_aggregate_tool(tmp_path: Path) -> None:
     assert searched["hits"]
     assert set(searched["hits"][0].keys()) <= {"artifact_id", "record_type", "score"}
 
-    grouped = tool_map["model_query_count_artifacts_by"].fn(
-        "diagram_type",
+    grouped = tool_map["model_query_stats"].fn(
+        group_by="diagram_type",
         repo_root=str(repo_root),
         repo_scope="engagement",
     )

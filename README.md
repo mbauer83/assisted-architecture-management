@@ -75,20 +75,41 @@ The framework exposes three interfaces over the same underlying model.
 
 The MCP server is the intended interface for AI agents (Claude, Copilot, etc.). It exposes typed tools for querying and authoring the model:
 
+**Query**
+
 | Tool | Purpose |
 |------|---------|
 | `model_query_stats` | Count entities, connections, diagrams |
-| `model_query_list_artifacts` | List with domain/type filtering |
-| `model_query_read_artifact` | Read one entity in full |
+| `model_query_list_artifacts` | List with domain/type/status filtering |
+| `model_query_read_artifact` | Read one artifact in full |
 | `model_query_search_artifacts` | Full-text + keyword search |
-| `model_query_find_neighbors` | Graph traversal |
+| `model_query_find_neighbors` | Graph traversal from an entity |
+| `model_query_find_connections_for` | Connections for an entity (direction + type filter) |
+| `model_query_count_artifacts_by` | Count grouped by a field |
+
+**Write**
+
+| Tool | Purpose |
+|------|---------|
 | `model_create_entity` | Create entity (with dry-run) |
-| `model_add_connection` | Add connection (with dry-run) |
-| `model_create_diagram` | Create diagram (with dry-run) |
-| `model_edit_entity/connection/diagram` | Edit existing artefacts |
-| `model_promote_to_enterprise` | Promote entity + transitive closure to enterprise |
-| `model_verify_all` | Verify referential integrity and schema |
+| `model_edit_entity` | Edit existing entity fields |
+| `model_add_connection` | Add connection between entities (with dry-run) |
+| `model_edit_connection` | Edit or remove an existing connection |
+| `model_create_diagram` | Create ArchiMate diagram (with dry-run + PNG render) |
+| `model_edit_diagram` | Edit existing diagram (regenerate PUML + PNG) |
+| `model_create_matrix` | Create connection matrix (structured table view) |
+| `model_promote_to_enterprise` | Promote entity + transitive closure to enterprise repo |
 | `model_write_help` | List valid entity types and connection types |
+
+**Verification and lifecycle**
+
+| Tool | Purpose |
+|------|---------|
+| `model_verify_all` | Verify referential integrity and schema across all files |
+| `model_verify_file` | Verify a single file |
+| `model_tools_watch_start` | Start file watcher for live reload |
+| `model_tools_watch_stop` / `model_tools_watch_status` | Manage file watcher |
+| `model_tools_refresh` | Manually refresh cached model state |
 
 Configure in `.mcp.json` (Claude Code) or `.vscode/mcp.json` (VS Code):
 
@@ -114,15 +135,73 @@ A second MCP server (`sdlc-mcp-framework`) provides section-level search and cro
 
 `sdlc-gui-server` exposes a REST API at `http://localhost:8000/api/`:
 
+**Entities**
+
 | Endpoint | Description |
 |----------|-------------|
 | `GET /api/stats` | Model statistics |
-| `GET /api/entities` | List entities (`?domain=`, `?artifact_type=`, `?status=`) |
-| `GET /api/entity?id=` | Full entity detail |
+| `GET /api/entities` | List entities (`?domain=`, `?artifact_type=`, `?status=`, `?limit=`, `?offset=`) |
+| `GET /api/entity?id=` | Full entity detail with summary, properties, notes, keywords, connection counts |
 | `GET /api/connections?entity_id=&direction=` | Connections for an entity |
 | `GET /api/neighbors?entity_id=&max_hops=` | Neighbour graph |
 | `GET /api/search?q=` | Full-text search |
-| `GET /api/ontology?source_type=&target_type=` | Connection ontology (permissible types) |
+| `GET /api/ontology?source_type=` | Connection classification for a source entity type |
+| `GET /api/ontology?source_type=&target_type=` | Permissible connection types for a source/target pair |
+| `GET /api/write-help` | Valid entity types and connection types |
+| `GET /api/entity-schemata?artifact_type=` | JSON attribute schema for an entity type |
+| `GET /api/entity-display-search?q=` | Entity search enriched with ArchiMate display metadata |
+| `POST /api/entity` | Create entity (`dry_run` supported) |
+| `POST /api/entity/edit` | Edit entity fields (`dry_run` supported) |
+
+**Diagrams**
+
+| Endpoint | Description |
+|----------|-------------|
+| `GET /api/diagrams` | List diagrams (`?diagram_type=`, `?status=`) |
+| `GET /api/diagram?id=` | Diagram detail with PUML source |
+| `GET /api/diagram-image/{filename}` | Serve rendered PNG |
+| `GET /api/diagram-svg?id=` | Render diagram PUML to interactive SVG on demand |
+| `GET /api/diagram-entities?id=` | Entities referenced in a diagram (with display aliases) |
+| `GET /api/diagram-connections?id=` | Connections between entities present in a diagram |
+| `GET /api/diagram-refs?source_id=&target_id=` | Find diagrams referencing a connection |
+| `POST /api/diagram` | Create diagram from entity/connection selection |
+| `POST /api/diagram/edit` | Edit diagram entity/connection selection |
+| `POST /api/diagram/preview` | Preview diagram as PNG + PUML without writing files |
+
+**Connections**
+
+| Endpoint | Description |
+|----------|-------------|
+| `POST /api/connection` | Add connection (`dry_run` supported) |
+| `POST /api/connection/remove` | Remove connection (`dry_run` supported) |
+
+### GUI Tool — Browser Interface
+
+`sdlc-gui-server` also serves the Vue SPA at `/`. The GUI provides a full read/write interface for human users and is backed by the REST API above.
+
+**Entity management**
+- **Entity list** — filterable by domain, artifact type, and status; connection count badges; "+ Create Entity" button
+- **Entity detail** — metadata, parsed summary/properties/notes, three-column connection layout (Incoming / Symmetric / Outgoing); each panel shows ontology-permissible groups with per-group add ("+") and per-connection remove ("×") buttons; connection description tooltips
+- **Entity edit** — inline edit mode on the detail view; type-aware property fields; dry-run preview before commit
+- **Entity create** — form with grouped type selector, schema-driven required property fields, dry-run preview, navigate to created entity on confirm
+- **Search** — full-text search with type and domain chips per result
+
+**Diagram management**
+- **Diagram list** — grid with diagram-type filter bar
+- **Diagram detail** — interactive SVG viewer rendered on demand from stored PUML:
+  - Pan (drag), zoom (scroll wheel), reset (double-click)
+  - Clickable entity nodes → entity metadata in sidebar (name, type, domain, status, content summary)
+  - Clickable connection arrows → connection type and source → target detail in sidebar
+  - Toggleable raw PUML source
+  - "Edit" button links to diagram editor
+- **Diagram create** — live entity search with ArchiMate-type glyphs, auto-detection of connections between selected entities, PNG preview, save to repository
+- **Diagram edit** — pre-loads entities from the existing diagram, same UI as creation
+
+**Graph explorer**
+- Force-directed SVG graph rooted at any entity
+- Click node to select → sidebar shows metadata; double-click to expand neighbors
+- Click edge for connection detail in sidebar
+- Drag nodes, pan canvas, scroll to zoom; collapse expanded subtrees on double-click
 
 ### CLI
 
@@ -136,7 +215,7 @@ python -m src.tools.generate_macros path/to/architecture-repository
 
 ## Setup
 
-**Requirements**: Python ≥ 3.13, Java ≥ 11 (for diagram verification), Node ≥ 18 (for GUI development), `uv`.
+**Requirements**: Python ≥ 3.13, Java ≥ 11 (for diagram verification and rendering), Node ≥ 18 (for GUI development), `uv`.
 
 ```bash
 # Python environment
@@ -174,4 +253,4 @@ docker compose up --build
 ARCH_REPO_ROOT=/path/to/your/architecture-repository docker compose up --build
 ```
 
-The container serves the Vue SPA at `/` and the REST API at `/api/`.
+The container serves the Vue SPA at `/` and the REST API at `/api/`. System dependencies for PlantUML SVG/PNG rendering (Java, Graphviz, fonts) are included in the image.

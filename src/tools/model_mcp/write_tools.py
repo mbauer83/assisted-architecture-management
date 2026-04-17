@@ -347,9 +347,10 @@ def register_write_tools(mcp: FastMCP) -> None:
         name="model_write_help",
         title="Model Write: Type Catalog",
         description=(
-            "Return valid entity types (by domain) and connection types (by language) "
-            "for use with create/edit tools. Call this to discover valid artifact_type "
-            "and connection_type values."
+            "Return the full catalog of valid artifact_type and connection_type values. "
+            "Call this before model_create_entity or model_add_connection — type names "
+            "are non-obvious identifiers (e.g. 'archimate-influence', not 'influence') "
+            "and guessing them without this catalog will cause validation errors."
         ),
         structured_output=True,
     )(model_write_help)
@@ -391,8 +392,14 @@ def register_write_tools(mcp: FastMCP) -> None:
         name="model_create_diagram",
         title="Model Write: Create Diagram",
         description=(
-            "Create a diagram .puml file with YAML frontmatter. "
-            "Renders PNG after successful write. Supports dry_run for safe iteration."
+            "Create an ArchiMate diagram from a complete PlantUML body. "
+            "puml must be a full @startuml…@enduml block using entity display_alias values "
+            "as element identifiers (e.g. 'rectangle \"<$archimate_BusinessActor{scale=1.5}> Name\" "
+            "<<BusinessActor>> as ACT_Xx1Yy1'). "
+            "Read each entity with model_query_read_artifact(mode='full') to get its display_alias "
+            "and archimate display block before writing the PUML. "
+            "auto_include_stereotypes=true (default) injects the !include directives automatically. "
+            "Renders PNG after write. Use dry_run=true to validate before committing."
         ),
         structured_output=True,
     )(model_create_diagram)

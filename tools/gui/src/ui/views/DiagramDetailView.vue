@@ -7,6 +7,7 @@ import { useAsync } from '../composables/useAsync'
 import type { DiagramDetail, EntitySummary, EntityDetail, DiagramConnection } from '../../domain'
 import { getDomainColor } from '../lib/domains'
 import ArchimateTypeGlyph from '../components/ArchimateTypeGlyph.vue'
+import DownloadMenu from '../components/DownloadMenu.vue'
 
 const svc = inject(modelServiceKey)!
 const route = useRoute()
@@ -191,11 +192,8 @@ onUnmounted(() => {
     <div class="page-hdr">
       <RouterLink to="/diagrams" class="back">← Diagrams</RouterLink>
       <h1 v-if="detail.data.value" class="pg-title">{{ detail.data.value.name }}</h1>
-      <RouterLink
-        v-if="detail.data.value"
-        :to="{ path: '/diagram/edit', query: { id: diagramId } }"
-        class="edit-btn"
-      >Edit</RouterLink>
+      <DownloadMenu v-if="detail.data.value" :diagram-id="diagramId" :diagram-name="detail.data.value.name" />
+      <RouterLink v-if="detail.data.value" :to="{ path: '/diagram/edit', query: { id: diagramId } }" class="edit-btn">Edit</RouterLink>
     </div>
 
     <div v-if="detail.loading.value" class="state">Loading…</div>

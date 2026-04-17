@@ -146,7 +146,7 @@ enabling section-level search and reference graph traversal via the `framework_q
 
 ---
 
-## Current State (as of 2026-04-15)
+## Current State (as of 2026-04-16)
 
 | Workstream | Status | Key facts |
 |-----------|--------|-----------|
@@ -159,6 +159,8 @@ enabling section-level search and reference graph traversal via the `framework_q
 | WS-H: Two-Tiered Repos | **COMPLETE** | Connection ontology, arch-init CLI, asymmetric enforcement, cross-repo macros, promotion mechanism |
 | WS-E: GUI Tool | **COMPLETE** | B-stream done: ontology-driven connection panels, entity create/edit, three-section layout |
 | WS-I: YAML Ontology Config | **COMPLETE** | Entity + connection ontology as YAML; entity-level relationship rules; centralized EntityTypeInfo/ConnectionTypeInfo |
+| WS-J: GUI Bug-Fix Wave | **COMPLETE** | Keywords/properties/notes in entity detail, schema-driven forms, graph edge selection, diagram entity list |
+| WS-K: GUI Diagram Authoring | **COMPLETE** | Diagram create/edit views, interactive SVG viewer (pan/zoom, clickable entities + connections) |
 
 **Verification**: 173 files, 0 errors, 0 warnings (W350 resolves on MCP server restart — `tools/plantuml.jar` symlink + code fix in place).
 
@@ -171,8 +173,9 @@ enabling section-level search and reference graph traversal via the `framework_q
 **GUI** (`sdlc-gui-server` + `tools/gui/` Vue SPA):
 - Stack: Vue 3 + TypeScript + Vite + Effect; FastAPI REST backend
 - Hexagonal: `domain/` → `ports/` → `adapters/http/` → `application/` → `ui/`
-- Dockerized: `docker compose up --build` → http://localhost:8000
+- Dockerized: `docker compose up --build` → http://localhost:8000 (includes Java, Graphviz, fonts for rendering)
 - Dev: `sdlc-gui-server --repo-root <path>` + `npm run dev` in `tools/gui/` → http://localhost:5173
+- Views: Home, Entities (list/detail/create/edit), Search, Diagrams (list/detail/create/edit), Graph Explorer
 
 ---
 
@@ -570,6 +573,101 @@ directly for verification.
 ### J7: Entity Create Fixes ✓
 - [x] `EntityCreateView.vue` — widen form (max-width: 1160px, centered); Create button now enabled after clean preview (boundary fix in J1 unblocks preview)
 - [x] `EntityCreateView.vue` — on `artifact_type` change, fetch `GET /api/entity-schemata` and pre-populate properties table from schema-required fields; required fields' remove buttons disabled
+
+---
+
+---
+
+## WS-K: GUI Diagram Authoring & Interactive Viewer (2026-04-16)
+
+### K1: Diagram Builder Utility
+
+New module `src/tools/diagram_builder.py` — shared pipeline for GUI diagram operations:
+
+| Function | Purpose |
+|----------|---------|
+| `generate_archimate_puml_body(name, entities, connections, diagram_type)` | Build `@startuml…@enduml` block from entity/connection records; reads each entity's `§display / archimate` block for element-type and label |
+| `render_puml_preview(puml_body, repo_root)` | Render to PNG → `data:image/png;base64,…` data-URL |
+| `render_puml_svg(puml_body, repo_root)` | Render to SVG text for interactive browser display |
+| `_render_puml(puml_body, repo_root, fmt)` | Shared core: writes temp file, runs `plantuml.jar -t{fmt}`, returns result |
+
+Both render functions write a temporary `.puml` file into `diagram-catalog/diagrams/` (so relative `!include` paths resolve), run PlantUML, and clean up. Includes are injected if absent.
+
+### K2: Backend Endpoints
+
+New endpoints added to `src/tools/gui_server.py`:
+
+| Endpoint | Description |
+|----------|-------------|
+| `GET /api/diagram-svg?id=` | Render stored PUML to SVG; PlantUML embeds display aliases as `data-entity` attributes on entity groups, enabling browser-side click handlers |
+| `GET /api/diagram-entities?id=` | Entities referenced in a diagram (identified by alias presence in PUML); includes `display_alias` field |
+| `GET /api/diagram-connections?id=` | Connections where both source and target entities appear in the diagram; enriched with `source_name`, `target_name`, `source_alias`, `target_alias` |
+| `GET /api/entity-display-search?q=` | Entity search returning ArchiMate display metadata (`element_type`, `element_label`, `display_alias`) for the diagram creation form |
+| `POST /api/diagram` | Create diagram from GUI-selected entity/connection IDs; generates PUML via `diagram_builder`, delegates to `create_diagram` |
+| `POST /api/diagram/edit` | Edit existing diagram; regenerates PUML, delegates to `edit_diagram`; preserves existing keywords |
+| `POST /api/diagram/preview` | Transient PUML + PNG preview without writing files; returns `{puml, image, warnings}` |
+
+### K3: Diagram Creation View (`CreateDiagramView.vue`)
+
+Route: `/diagram/create` — linked from the Diagrams list header.
+
+- Diagram type selector (archimate-business, application, technology, etc.)
+- Diagram name input
+- Live entity search with ArchiMate type glyph + domain colour chip per result (`entity-display-search` endpoint)
+- Selected entities shown as removable chips with glyphs
+- Auto-detection of connections between selected entities (fetched per entity pair, deduplicated)
+- Connections panel: grouped by type, toggle individual connections in/out
+- PNG preview (calls `POST /api/diagram/preview`); warnings displayed inline
+- Save calls `POST /api/diagram` with `dry_run: false`; navigates to new diagram detail on success
+
+### K4: Diagram Edit View (`EditDiagramView.vue`)
+
+Route: `/diagram/edit?id=…` — linked from "Edit" button in DiagramDetailView header.
+
+- Pre-loads existing diagram entities via `GET /api/diagram-entities`; adapts them to `EntityDisplayInfo` for glyph rendering
+- Pre-fetches connections between all loaded entities
+- Same entity-search / connection-toggle UI as CreateDiagramView
+- Saves via `POST /api/diagram/edit` with the diagram's `artifact_id`; navigates back to detail on success
+
+### K5: Interactive SVG Diagram Viewer (DiagramDetailView.vue rewrite)
+
+Replaced static PNG display with interactive inline SVG:
+
+**Pan and zoom**
+- Scroll wheel → zoom centred on cursor (0.2× – 8× range)
+- Drag → pan; double-click → reset to 1:1
+- Non-passive wheel listener via `watch(containerRef, …)` to avoid scroll conflict with `v-else-if` conditional mount
+
+**Entity interactivity**
+- `attachInteractivity()` called after SVG + entity list load (`flush: 'post'`)
+- Matches PlantUML entity groups via `data-entity` attribute (PlantUML ≥ 1.2022), with fallbacks: `id="entity_ALIAS"`, plain `id="ALIAS"`, Graphviz `<title>` child
+- Sets `data-entity-id` on matched groups; click → `selectEntity(artifactId)` → loads entity detail in sidebar
+- Selected entity: blue outline stroke only (no fill change), `svg-selected` CSS class
+
+**Connection interactivity**
+- Matches PlantUML link groups (which carry `data-entity-1` and `data-entity-2` attributes with source/target aliases)
+- Maps `source_alias:target_alias` → `DiagramConnection` record from `GET /api/diagram-connections`
+- Sets `data-conn-id`; click → shows connection type + source → target in sidebar, `svg-conn-selected` CSS class
+- Entity and connection selections are mutually exclusive
+
+**Sidebar**
+- Entity list (domain-coloured dots, ArchiMate glyphs) — click to select
+- Selected entity panel: name (links to entity detail), type/domain/status chips, content summary, graph link
+- Selected connection panel: connection type, source → target names, description if present
+
+### K5: Domain / Schema Changes
+
+| File | Change |
+|------|--------|
+| `domain/schemas.ts` | Add `DiagramConnectionSchema` / `DiagramConnection` type (connection record + source/target names + aliases) |
+| `ports/ModelRepository.ts` | Add `getDiagramConnections(diagramId)`, `getDiagramSvg(diagramId)`, `searchEntityDisplay(q)`, `previewDiagram`, `createDiagram`, `editDiagram` |
+| `adapters/http/HttpModelRepository.ts` | Implement all new port methods; add `fetchText` helper for non-JSON SVG response |
+| `application/ModelService.ts` | Pass through all new methods |
+| `ui/router/index.ts` | Add `/diagram/create` and `/diagram/edit` routes |
+
+### K6: Docker Build Fix
+
+Added to `apt-get install` in the Dockerfile: `libharfbuzz0b`, `libfontconfig1`, `fonts-dejavu-core`, `graphviz` — required for PlantUML SVG/PNG rendering in the container.
 
 ---
 

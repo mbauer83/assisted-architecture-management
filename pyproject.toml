@@ -29,6 +29,7 @@ sdlc-mcp-model = "src.tools.mcp_model_server:main"
 sdlc-mcp-framework = "src.tools.mcp_framework_server:main"
 sdlc-gui-server = "src.tools.gui_server:main"
 arch-init = "src.tools.workspace_init:main"
+arch-mcp-watch = "src.tools.mcp_watch_server:main"
 get-plantuml = "src.tools.get_plantuml:main"
 
 [build-system]

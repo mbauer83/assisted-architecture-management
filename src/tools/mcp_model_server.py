@@ -23,7 +23,6 @@ from src.tools.model_mcp import (
     register_edit_tools,
     register_query_tools,
     register_verify_tools,
-    register_watch_tools,
     register_write_tools,
 )
 
@@ -41,6 +40,7 @@ from src.tools.model_mcp.edit_tools import (  # noqa: F401
     model_edit_entity,
 )
 from src.tools.model_mcp.verify_tools import (  # noqa: F401
+    model_verify,
     model_verify_all,
     model_verify_file,
 )
@@ -102,7 +102,6 @@ install_call_tool_normalizer(mcp)
 # Register tool groups.
 register_query_tools(mcp)
 register_verify_tools(mcp)
-register_watch_tools(mcp)
 register_write_tools(mcp)
 register_edit_tools(mcp)
 

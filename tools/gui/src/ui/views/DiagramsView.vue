@@ -4,6 +4,7 @@ import { useRoute, useRouter, RouterLink } from 'vue-router'
 import { modelServiceKey } from '../keys'
 import { useAsync } from '../composables/useAsync'
 import type { DiagramList } from '../../domain'
+import DownloadMenu from '../components/DownloadMenu.vue'
 
 const svc = inject(modelServiceKey)!
 const route = useRoute()
@@ -61,18 +62,17 @@ watch(() => route.query.type, (t) => {
       <p class="result-count">{{ data.total }} diagram{{ data.total !== 1 ? 's' : '' }}</p>
 
       <div class="diagram-grid">
-        <RouterLink
-          v-for="d in data.items" :key="d.artifact_id"
-          :to="{ path: '/diagram', query: { id: d.artifact_id } }"
-          class="diagram-card card"
-        >
-          <div class="diagram-name">{{ d.name }}</div>
-          <div class="diagram-meta">
-            <span class="diagram-type-badge">{{ d.diagram_type.replace('archimate-', '') }}</span>
-            <span class="status-badge" :class="`status--${d.status}`">{{ d.status }}</span>
-          </div>
-          <div class="diagram-id mono">{{ d.artifact_id }}</div>
-        </RouterLink>
+        <div v-for="d in data.items" :key="d.artifact_id" class="diagram-card card">
+          <RouterLink :to="{ path: '/diagram', query: { id: d.artifact_id } }" class="card-link">
+            <div class="diagram-name">{{ d.name }}</div>
+            <div class="diagram-meta">
+              <span class="diagram-type-badge">{{ d.diagram_type.replace('archimate-', '') }}</span>
+              <span class="status-badge" :class="`status--${d.status}`">{{ d.status }}</span>
+            </div>
+            <div class="diagram-id mono">{{ d.artifact_id }}</div>
+          </RouterLink>
+          <DownloadMenu :diagram-id="d.artifact_id" :diagram-name="d.name" class="card-dl" />
+        </div>
       </div>
     </template>
   </div>
@@ -103,10 +103,13 @@ watch(() => route.query.type, (t) => {
   display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 12px;
 }
 .card {
-  background: white; border-radius: 8px; border: 1px solid #e5e7eb; padding: 16px;
-  color: inherit;
+  background: white; border-radius: 8px; border: 1px solid #e5e7eb;
+  position: relative;
 }
-.card:hover { text-decoration: none; box-shadow: 0 2px 8px rgba(0,0,0,.08); }
+.card:hover { box-shadow: 0 2px 8px rgba(0,0,0,.08); }
+.card-link { display: block; padding: 16px; color: inherit; text-decoration: none; }
+.card-link:hover { text-decoration: none; }
+.card-dl { position: absolute; top: 10px; right: 10px; }
 
 .diagram-name { font-weight: 600; font-size: 14px; margin-bottom: 8px; }
 .diagram-meta { display: flex; gap: 8px; align-items: center; margin-bottom: 6px; }
