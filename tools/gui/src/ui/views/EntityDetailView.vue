@@ -9,6 +9,12 @@ import ArchimateTypeGlyph from '../components/ArchimateTypeGlyph.vue'
 import type { EntityDetail, ConnectionList, OntologyClassification } from '../../domain'
 
 const svc = inject(modelServiceKey)!
+const adminMode = ref(false)
+onMounted(() => {
+  Effect.runPromise(svc.getServerInfo())
+    .then((info: any) => { adminMode.value = Boolean(info?.admin_mode) })
+    .catch(() => {})
+})
 const route = useRoute()
 
 const entityId = computed(() => (route.query.id as string | undefined) ?? '')
@@ -107,11 +113,17 @@ const buildEditBody = (dryRun: boolean) => {
   }
 }
 
+const isGlobalEntity = computed(() => detail.data.value?.is_global ?? false)
+// Use admin endpoint when editing a global entity in admin mode
+const editFn = computed(() =>
+  (isGlobalEntity.value && adminMode.value) ? svc.adminEditEntity : svc.editEntity
+)
+
 const previewEdit = () => {
   editBusy.value = true
   editError.value = null
   editPreview.value = null
-  Effect.runPromise(svc.editEntity(buildEditBody(true))).then((r) => {
+  Effect.runPromise(editFn.value(buildEditBody(true))).then((r) => {
     editBusy.value = false
     editPreview.value = { content: r.content, warnings: [...r.warnings] }
   }).catch((e) => {
@@ -123,7 +135,7 @@ const previewEdit = () => {
 const saveEdit = () => {
   editBusy.value = true
   editError.value = null
-  Effect.runPromise(svc.editEntity(buildEditBody(false))).then((r) => {
+  Effect.runPromise(editFn.value(buildEditBody(false))).then((r) => {
     editBusy.value = false
     if (r.wrote) {
       editing.value = false
@@ -142,14 +154,30 @@ const saveEdit = () => {
 <template>
   <div>
     <div class="top-bar">
-      <RouterLink to="/entities" class="back-link">← Browse entities</RouterLink>
+      <RouterLink
+        :to="detail.data.value?.is_global ? '/global/entities' : '/entities'"
+        class="back-link"
+      >← Browse entities</RouterLink>
       <div class="top-actions">
+        <span v-if="detail.data.value?.is_global" class="global-badge" title="From the global (enterprise) repository">Global</span>
         <RouterLink
           v-if="entityId"
           :to="{ path: '/graph', query: { id: entityId } }"
           class="graph-btn"
         >Explore graph</RouterLink>
-        <button v-if="detail.data.value && !editing" class="edit-btn" @click="startEdit">Edit</button>
+        <RouterLink
+          v-if="detail.data.value && !detail.data.value.is_global && !editing"
+          :to="{ path: '/promote', query: { entity_id: entityId } }"
+          class="promote-btn"
+          title="Promote this entity to the global repository"
+        >↑ Promote to Global</RouterLink>
+        <button
+          v-if="detail.data.value && !editing && (!detail.data.value.is_global || adminMode)"
+          class="edit-btn"
+          :class="{ 'edit-btn--admin': detail.data.value.is_global && adminMode }"
+          :title="detail.data.value.is_global && adminMode ? 'Edit global entity (admin mode)' : undefined"
+          @click="startEdit"
+        >Edit{{ detail.data.value.is_global && adminMode ? ' ⚠' : '' }}</button>
       </div>
     </div>
 
@@ -238,6 +266,8 @@ const saveEdit = () => {
           direction="incoming"
           :loading="incoming.loading.value"
           :error="incoming.error.value"
+          :readonly="isGlobalEntity && !adminMode"
+          :admin-mode="isGlobalEntity && adminMode"
           @refresh="loadConnections"
         />
         <ConnectionsPanel
@@ -248,6 +278,8 @@ const saveEdit = () => {
           direction="symmetric"
           :loading="symmetric.loading.value"
           :error="symmetric.error.value"
+          :readonly="isGlobalEntity && !adminMode"
+          :admin-mode="isGlobalEntity && adminMode"
           @refresh="loadConnections"
         />
         <ConnectionsPanel
@@ -257,6 +289,8 @@ const saveEdit = () => {
           direction="outgoing"
           :loading="outgoing.loading.value"
           :error="outgoing.error.value"
+          :readonly="isGlobalEntity && !adminMode"
+          :admin-mode="isGlobalEntity && adminMode"
           @refresh="loadConnections"
         />
       </div>
@@ -281,6 +315,25 @@ const saveEdit = () => {
   border: 1px solid #d1d5db; font-size: 13px; font-weight: 500; cursor: pointer;
 }
 .edit-btn:hover { background: #e5e7eb; }
+
+.promote-btn {
+  padding: 6px 14px; border-radius: 6px; background: #fef3c7; color: #92400e;
+  border: 1px solid #fde68a; font-size: 13px; font-weight: 500;
+}
+.promote-btn:hover { background: #fde68a; text-decoration: none; }
+
+.edit-btn--admin {
+  background: #7c2d12; color: #fed7aa; border-color: #ea580c;
+}
+.edit-btn--admin:hover { background: #9a3412; }
+
+.global-badge {
+  display: inline-block;
+  background: #fef3c7; color: #92400e;
+  border: 1px solid #fde68a; border-radius: 4px;
+  padding: 2px 8px; font-size: 11px; font-weight: 700;
+  text-transform: uppercase; letter-spacing: .05em;
+}
 
 .state-msg { color: #6b7280; padding: 4px 0; }
 .state-msg--error { color: #dc2626; }

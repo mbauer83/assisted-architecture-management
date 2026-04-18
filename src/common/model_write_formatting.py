@@ -25,6 +25,7 @@ def format_entity_markdown(
     notes: str | None,
     display_archimate: dict[str, str],
     repo_root: Path | None = None,
+    extra_frontmatter: dict[str, object] | None = None,
 ) -> str:
     frontmatter: dict[str, object] = {
         "artifact-id": artifact_id,
@@ -47,6 +48,8 @@ def format_entity_markdown(
         "last-updated",
     ]
     fm_out = {key: frontmatter[key] for key in ordered_keys if key in frontmatter}
+    if extra_frontmatter:
+        fm_out.update(extra_frontmatter)
 
     content_lines: list[str] = ["<!-- §content -->", "", f"## {name}", ""]
     if summary:

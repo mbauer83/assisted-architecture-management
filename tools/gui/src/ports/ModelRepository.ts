@@ -17,16 +17,21 @@ import type {
   EntityDisplayInfo,
   DiagramPreviewResult,
   DiagramConnection,
+  PromotionPlan,
+  PromotionResult,
 } from '../domain'
 import type { NetworkError, NotFoundError } from '../domain'
 import type { MarkdownError } from '../application/MarkdownService'
 
 export type Direction = 'any' | 'outbound' | 'inbound'
 
+export type RepoScope = 'engagement' | 'global'
+
 export interface ListParams {
   readonly domain?: string
   readonly artifactType?: string
   readonly status?: string
+  readonly scope?: RepoScope
   readonly limit?: number
   readonly offset?: number
 }
@@ -36,6 +41,7 @@ export type RepoError = NetworkError | ParseResult.ParseError
 
 /** Outbound port: the application's view of the model backend. */
 export interface ModelRepository {
+  readonly getServerInfo: () => Effect.Effect<unknown, RepoError>
   readonly getStats: () => Effect.Effect<Stats, RepoError>
   readonly listEntities: (params?: ListParams) => Effect.Effect<EntityList, RepoError>
   readonly getEntity: (id: string) => Effect.Effect<EntityDetail, RepoError | NotFoundError | MarkdownError>
@@ -100,4 +106,39 @@ export interface ModelRepository {
     entity_ids: string[]; connection_ids: string[];
     version?: string; status?: string; dry_run?: boolean;
   }) => Effect.Effect<WriteResult, RepoError>
+  // ── Admin write methods (active only in --admin-mode) ───────────────────
+  readonly adminCreateEntity: (body: {
+    artifact_type: string; name: string; summary?: string;
+    properties?: Record<string, string>; notes?: string;
+    keywords?: string[]; version?: string; status?: string; dry_run?: boolean;
+  }) => Effect.Effect<WriteResult, RepoError>
+  readonly adminEditEntity: (body: {
+    artifact_id: string; name?: string; summary?: string;
+    properties?: Record<string, string>; notes?: string;
+    keywords?: string[]; version?: string; status?: string; dry_run?: boolean;
+  }) => Effect.Effect<WriteResult, RepoError>
+  readonly adminAddConnection: (body: {
+    source_entity: string; connection_type: string; target_entity: string;
+    description?: string; dry_run?: boolean;
+  }) => Effect.Effect<WriteResult, RepoError>
+  readonly adminRemoveConnection: (body: {
+    source_entity: string; connection_type: string; target_entity: string;
+    dry_run?: boolean;
+  }) => Effect.Effect<WriteResult, RepoError>
+  readonly planPromotion: (body: {
+    entity_id: string;
+    exclude_entity_ids?: string[];
+    exclude_connection_ids?: string[];
+  }) => Effect.Effect<PromotionPlan, RepoError>
+  readonly executePromotion: (body: {
+    entity_id: string;
+    exclude_entity_ids?: string[];
+    exclude_connection_ids?: string[];
+    conflict_resolutions?: Array<{
+      engagement_id: string;
+      strategy: 'accept_engagement' | 'accept_enterprise' | 'merge';
+      merged_fields?: Record<string, unknown>;
+    }>;
+    dry_run?: boolean;
+  }) => Effect.Effect<PromotionResult, RepoError>
 }

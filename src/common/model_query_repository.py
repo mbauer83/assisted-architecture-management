@@ -22,6 +22,22 @@ from src.common.model_query_types import (
     summary_from_diagram,
     summary_from_entity,
 )
+from src.common._model_query_helpers import (
+    matches_entity as _matches_entity,
+    matches_connection as _matches_connection,
+    matches_diagram as _matches_diagram,
+    matches_entity_sets as _matches_entity_sets,
+    matches_connection_sets as _matches_connection_sets,
+    matches_diagram_sets as _matches_diagram_sets,
+    next_frontier as _next_frontier,
+    matches_direction as _matches_direction,
+    to_set as _to_set,
+    single_or_none as _single_or_none,
+    summary_group_key as _summary_group_key,
+    read_entity as _read_entity,
+    read_connection as _read_connection,
+    read_diagram as _read_diagram,
+)
 
 _NONE_LABEL = "(none)"
 
@@ -503,190 +519,6 @@ class ModelRepository:
             if rec is not None:
                 hits.append(SearchHit(score=sem_score * 3.0, record_type="entity", record=rec))
 
-
-def _matches_entity(
-    rec: EntityRecord,
-    *,
-    artifact_type: str | None,
-    domain: str | None,
-    subdomain: str | None,
-    status: str | None,
-) -> bool:
-    return (
-        (artifact_type is None or rec.artifact_type == artifact_type)
-        and (domain is None or rec.domain == domain)
-        and (subdomain is None or rec.subdomain == subdomain)
-        and (status is None or rec.status == status)
-    )
-
-
-def _matches_connection(
-    rec: ConnectionRecord,
-    *,
-    conn_type: str | None,
-    source: str | None,
-    target: str | None,
-    status: str | None,
-) -> bool:
-    return (
-        (conn_type is None or rec.conn_type == conn_type)
-        and (source is None or source in rec.source_ids)
-        and (target is None or target in rec.target_ids)
-        and (status is None or rec.status == status)
-    )
-
-
-def _matches_diagram(
-    rec: DiagramRecord,
-    *,
-    diagram_type: str | None,
-    status: str | None,
-) -> bool:
-    return (
-        (diagram_type is None or rec.diagram_type == diagram_type)
-        and (status is None or rec.status == status)
-    )
-
-
-def _matches_entity_sets(
-    rec: EntityRecord,
-    types: set[str],
-    domains: set[str],
-    statuses: set[str],
-) -> bool:
-    return (
-        (not types or rec.artifact_type in types)
-        and (not domains or rec.domain in domains)
-        and (not statuses or rec.status in statuses)
-    )
-
-
-def _matches_connection_sets(
-    rec: ConnectionRecord,
-    statuses: set[str],
-) -> bool:
-    return not statuses or rec.status in statuses
-
-
-def _matches_diagram_sets(
-    rec: DiagramRecord,
-    types: set[str],
-    statuses: set[str],
-) -> bool:
-    return (
-        (not types or rec.artifact_type in types)
-        and (not statuses or rec.status in statuses)
-    )
-
-
-def _next_frontier(
-    frontier: set[str],
-    visited: set[str],
-    registry: ModelRepository,
-    conn_type: str | None,
-) -> set[str]:
-    next_frontier: set[str] = set()
-    for entity_id in frontier:
-        for conn in registry.find_connections_for(entity_id, conn_type=conn_type):
-            for neighbor_id in conn.source_ids + conn.target_ids:
-                if neighbor_id != entity_id and neighbor_id not in visited:
-                    next_frontier.add(neighbor_id)
-    return next_frontier
-
-
-def _matches_direction(
-    rec: ConnectionRecord,
-    *,
-    entity_id: str,
-    direction: Literal["any", "outbound", "inbound"],
-) -> bool:
-    in_src = entity_id in rec.source_ids
-    in_tgt = entity_id in rec.target_ids
-    if direction == "outbound":
-        return in_src
-    if direction == "inbound":
-        return in_tgt
-    return in_src or in_tgt
-
-
-def _to_set(value: str | list[str] | None) -> set[str]:
-    if value is None:
-        return set()
-    return {value} if isinstance(value, str) else set(value)
-
-
-def _single_or_none(value: str | list[str] | None) -> str | None:
-    if isinstance(value, str):
-        return value
-    return None
-
-
-def _summary_group_key(
-    summary: ArtifactSummary,
-    group_by: Literal["artifact_type", "diagram_type", "domain"],
-) -> str:
-    if group_by == "artifact_type":
-        return summary.artifact_type or _NONE_LABEL
-    return _NONE_LABEL
-
-
-def _read_entity(rec: EntityRecord, *, mode: Literal["summary", "full"]) -> dict[str, object]:
-    data: dict[str, object] = {
-        "artifact_id": rec.artifact_id,
-        "artifact_type": rec.artifact_type,
-        "name": rec.name,
-        "version": rec.version,
-        "status": rec.status,
-        "domain": rec.domain,
-        "subdomain": rec.subdomain,
-        "record_type": "entity",
-        "path": str(rec.path),
-        "content_snippet": rec.content_text[:400] + ("…" if len(rec.content_text) > 400 else ""),
-        "keywords": list(rec.keywords),
-    }
-    if mode == "full":
-        data["content_text"] = rec.content_text
-        data["display_blocks"] = rec.display_blocks
-        data["extra"] = rec.extra
-    return data
-
-
-def _read_connection(rec: ConnectionRecord, *, mode: Literal["summary", "full"]) -> dict[str, object]:
-    data: dict[str, object] = {
-        "artifact_id": rec.artifact_id,
-        "source": rec.source,
-        "target": rec.target,
-        "conn_type": rec.conn_type,
-        "version": rec.version,
-        "status": rec.status,
-        "record_type": "connection",
-        "path": str(rec.path),
-        "content_snippet": rec.content_text[:400] + ("…" if len(rec.content_text) > 400 else ""),
-    }
-    if mode == "full":
-        data["content_text"] = rec.content_text
-        data["extra"] = rec.extra
-    return data
-
-
-def _read_diagram(rec: DiagramRecord, *, mode: Literal["summary", "full"]) -> dict[str, object]:
-    data: dict[str, object] = {
-        "artifact_id": rec.artifact_id,
-        "artifact_type": rec.artifact_type,
-        "name": rec.name,
-        "diagram_type": rec.diagram_type,
-        "version": rec.version,
-        "status": rec.status,
-        "record_type": "diagram",
-        "path": str(rec.path),
-        "content_snippet": "",
-    }
-    if mode == "full":
-        try:
-            data["puml_source"] = rec.path.read_text(encoding="utf-8")
-        except OSError:
-            data["puml_source"] = ""
-        data["extra"] = rec.extra
-    return data
-
+# All private helpers (_matches_*, _next_frontier, _to_set, etc.) live in
+# src/common/_model_query_helpers.py and are imported at the top of this file.
 

@@ -1,15 +1,25 @@
 <script setup lang="ts">
-import { inject, onMounted } from 'vue'
+import { inject, onMounted, computed } from 'vue'
 import { RouterLink } from 'vue-router'
 import { modelServiceKey } from '../keys'
 import { useAsync } from '../composables/useAsync'
-import type { Stats } from '../../domain'
+import type { Stats, EntityList } from '../../domain'
 import { DOMAIN_OPTIONS } from '../lib/domains'
 
 const svc = inject(modelServiceKey)!
 const { data: stats, error, loading, run } = useAsync<Stats>()
+const { data: engList, run: runEng } = useAsync<EntityList>()
+const { data: gloList, run: runGlo } = useAsync<EntityList>()
 
-onMounted(() => run(svc.getStats()))
+onMounted(() => {
+  run(svc.getStats())
+  runEng(svc.listEntities({ scope: 'engagement', limit: 1 }))
+  runGlo(svc.listEntities({ scope: 'global', limit: 1 }))
+})
+
+const engCount = computed(() => engList.value?.total ?? null)
+const gloCount = computed(() => gloList.value?.total ?? null)
+const hasGlobal = computed(() => gloCount.value !== null && gloCount.value > 0)
 </script>
 
 <template>
@@ -20,25 +30,48 @@ onMounted(() => run(svc.getStats()))
     <div v-else-if="error" class="state-msg state-msg--error">{{ error }}</div>
 
     <template v-else-if="stats">
-      <div class="summary-cards">
-        <div class="card card--stat">
-          <span class="stat-num">{{ stats.entities }}</span>
-          <span class="stat-label">Entities</span>
+
+      <!-- Two-repo summary cards -->
+      <div class="repo-cards">
+        <div class="repo-card repo-card--engagement">
+          <div class="repo-card__header">
+            <span class="repo-label">Engagement</span>
+          </div>
+          <div class="repo-stats">
+            <div class="repo-stat">
+              <span class="stat-num">{{ engCount ?? stats.entities }}</span>
+              <span class="stat-label">Entities</span>
+            </div>
+            <div class="repo-stat">
+              <span class="stat-num">{{ stats.connections }}</span>
+              <span class="stat-label">Connections</span>
+            </div>
+            <div class="repo-stat">
+              <span class="stat-num">{{ stats.diagrams }}</span>
+              <span class="stat-label">Diagrams</span>
+            </div>
+          </div>
         </div>
-        <div class="card card--stat">
-          <span class="stat-num">{{ stats.connections }}</span>
-          <span class="stat-label">Connections</span>
-        </div>
-        <div class="card card--stat">
-          <span class="stat-num">{{ stats.diagrams }}</span>
-          <span class="stat-label">Diagrams</span>
+
+        <div class="repo-card repo-card--global" :class="{ 'repo-card--empty': !hasGlobal }">
+          <div class="repo-card__header">
+            <span class="repo-label repo-label--global">Global</span>
+          </div>
+          <div class="repo-stats">
+            <div class="repo-stat">
+              <span class="stat-num">{{ gloCount ?? '–' }}</span>
+              <span class="stat-label">Entities</span>
+            </div>
+          </div>
+          <p v-if="!hasGlobal" class="repo-empty">No global entities yet. Promote engagement entities to populate the global repository.</p>
         </div>
       </div>
 
-      <h2 class="section-title">Entities by Domain</h2>
+      <!-- Domain breakdown for engagement repo -->
+      <h2 class="section-title">Engagement — Entities by Domain</h2>
       <div class="domain-grid">
         <RouterLink
-          v-for="d in DOMAIN_OPTIONS.filter(option => option.key)"
+          v-for="d in DOMAIN_OPTIONS.filter(opt => opt.key)"
           :key="d.key"
           :to="{ path: '/entities', query: { domain: d.key } }"
           class="card card--domain"
@@ -65,37 +98,60 @@ onMounted(() => run(svc.getStats()))
 <style scoped>
 .page-title { font-size: 22px; font-weight: 600; margin-bottom: 20px; }
 .section-title { font-size: 16px; font-weight: 600; margin: 28px 0 12px; color: #374151; }
-
 .state-msg { color: #6b7280; padding: 12px 0; }
 .state-msg--error { color: #dc2626; }
 
-.summary-cards {
-  display: flex;
+/* ── Two-repo cards ──────────────────────────────────────────── */
+.repo-cards {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
   gap: 16px;
-  flex-wrap: wrap;
+  margin-bottom: 28px;
 }
+@media (max-width: 640px) { .repo-cards { grid-template-columns: 1fr; } }
 
+.repo-card {
+  background: white;
+  border-radius: 8px;
+  border: 1px solid #e5e7eb;
+  padding: 16px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.repo-card--global { border-color: #fde68a; background: #fffdf5; }
+.repo-card--empty { opacity: .85; }
+
+.repo-card__header { display: flex; align-items: center; gap: 10px; }
+
+.repo-label {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .07em;
+  color: #475569;
+}
+.repo-label--global { color: #92400e; }
+
+.repo-stats { display: flex; gap: 20px; flex-wrap: wrap; }
+.repo-stat { display: flex; flex-direction: column; }
+.stat-num { font-size: 26px; font-weight: 700; color: #1e293b; line-height: 1.1; }
+.stat-label { font-size: 11px; color: #6b7280; text-transform: uppercase; letter-spacing: .04em; }
+
+.repo-empty { font-size: 13px; color: #92400e; font-style: italic; }
+
+/* ── Domain grid ─────────────────────────────────────────────── */
+.domain-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  gap: 12px;
+}
 .card {
   background: white;
   border-radius: 8px;
   border: 1px solid #e5e7eb;
   padding: 16px 20px;
 }
-
-.card--stat {
-  display: flex;
-  flex-direction: column;
-  min-width: 110px;
-}
-.stat-num { font-size: 28px; font-weight: 700; color: #1e293b; }
-.stat-label { font-size: 12px; color: #6b7280; text-transform: uppercase; letter-spacing: 0.05em; }
-
-.domain-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
-  gap: 12px;
-}
-
 .card--domain {
   display: flex;
   justify-content: space-between;

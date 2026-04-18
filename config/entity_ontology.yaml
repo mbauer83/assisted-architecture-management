@@ -399,3 +399,16 @@ entity_types:
     archimate_element_type: Plateau
     element_category: implementation
     element_classes: [composite-element]
+
+  # ── Cross-repo Reference ─────────────────────────────────────────────────
+  # NOT an ArchiMate element.  Created automatically as a per-engagement proxy
+  # for a global (enterprise) entity.  May not be created or edited directly;
+  # only produced by the connection-to-global-entity mechanism.
+  global-entity-reference:
+    prefix: GRF
+    domain: common
+    subdir: global-references
+    archimate_domain: ""        # not an ArchiMate domain — skipped by macro/diagram generators
+    archimate_element_type: ""  # not an ArchiMate element type
+    element_category: reference
+    element_classes: []

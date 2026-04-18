@@ -42,6 +42,13 @@ def create_entity(
 ) -> WriteResult:
     assert_engagement_write_root(repo_root)
 
+    if artifact_type == "global-entity-reference":
+        raise ValueError(
+            "global-entity-reference entities may not be created directly. "
+            "Use model_ensure_global_entity_reference (MCP) or "
+            "POST /api/global-entity-reference (GUI) instead."
+        )
+
     if artifact_type not in ALL_ENTITY_TYPES:
         raise ValueError(f"Unknown entity artifact_type: {artifact_type!r}")
     info = ENTITY_TYPES.get(artifact_type)

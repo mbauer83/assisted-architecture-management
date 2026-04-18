@@ -16,6 +16,19 @@ Execution logic lives in promote_execute.py.
 
 from __future__ import annotations
 
+# Connection types traversed bidirectionally to build the transitive closure
+# pre-selection for promotion.  Each captures a structural / dependency bond
+# between elements that typically should travel together.
+PROMOTION_TRAVERSAL_TYPES: frozenset[str] = frozenset({
+    "archimate-composition",   # whole ↔ part (structural)
+    "archimate-aggregation",   # whole ↔ part (weaker structural)
+    "archimate-assignment",    # actor/role ↔ behavioural element
+    "archimate-realization",   # implementation ↔ abstraction
+    "archimate-serving",       # provider ↔ consumer of service
+    "archimate-flow",          # data/material flow endpoint ↔ endpoint
+    "archimate-triggering",    # trigger ↔ triggered process
+})
+
 from dataclasses import dataclass, field
 from typing import Any, Literal
 
@@ -71,6 +84,17 @@ class PromotionResult:
 # Helpers
 # ---------------------------------------------------------------------------
 
+def _parse_conn_full(cid: str) -> tuple[str, str, str] | None:
+    """Parse 'source conn_type → target' → (source, conn_type, target)."""
+    if " → " not in cid:
+        return None
+    left, target = cid.rsplit(" → ", 1)
+    parts = left.split(" ", 1)
+    if len(parts) < 2:
+        return None
+    return (parts[0].strip(), parts[1].strip(), target.strip())
+
+
 def _friendly_name(artifact_id: str) -> str:
     """Extract the friendly-name segment from an artifact_id."""
     parts = artifact_id.split(".")
@@ -119,10 +143,19 @@ def plan_promotion(
     repo: ModelRepository,
     *,
     include_transitive: bool = True,
+    exclude_entity_ids: set[str] | None = None,
+    exclude_connection_ids: set[str] | None = None,
 ) -> PromotionPlan:
-    """Compute entities/connections to promote, detecting name-based conflicts."""
+    """Compute entities/connections to promote, detecting name-based conflicts.
+
+    Transitive closure follows ``PROMOTION_TRAVERSAL_TYPES`` bidirectionally.
+    ``exclude_entity_ids`` and ``exclude_connection_ids`` are removed from
+    the preselection before returning so callers can prune the plan.
+    """
     all_entities = registry.entity_ids()
     enterprise_ids = registry.enterprise_entity_ids()
+    # GRFs are engagement-only proxies; never promote them
+    grf_ids = {eid for eid in all_entities if eid.startswith("GRF@")}
 
     if entity_id not in all_entities:
         raise ValueError(f"Entity '{entity_id}' not found in model")
@@ -135,13 +168,16 @@ def plan_promotion(
     visited: set[str] = set()
     warnings: list[str] = []
 
-    def _parse_conn(cid: str) -> tuple[str, str] | None:
-        """Parse '{source} {type} → {target}' → (source, target)."""
-        if " → " not in cid:
-            return None
-        left, target = cid.rsplit(" → ", 1)
-        parts = left.split(" ", 1)
-        return (parts[0].strip(), target.strip()) if parts else None
+    # Pre-index connections by entity for efficient traversal
+    conn_by_entity: dict[str, list[tuple[str, str, str]]] = {}
+    for cid in registry.connection_ids():
+        parsed = _parse_conn_full(cid)
+        if parsed is None:
+            continue
+        src, conn_type, tgt = parsed
+        conn_by_entity.setdefault(src, []).append((cid, conn_type, tgt))
+        if tgt != src:
+            conn_by_entity.setdefault(tgt, []).append((cid, conn_type, src))
 
     def _walk(eid: str) -> None:
         if eid in visited:
@@ -150,16 +186,16 @@ def plan_promotion(
         if eid in enterprise_ids:
             already.append(eid)
             return
+        if eid in grf_ids:
+            return  # GRFs are never promoted
         candidates.append(eid)
         if not include_transitive:
             return
-        for cid in registry.connection_ids():
-            parsed = _parse_conn(cid)
-            if parsed is None:
+        for _cid, conn_type, neighbor in conn_by_entity.get(eid, []):
+            if conn_type not in PROMOTION_TRAVERSAL_TYPES:
                 continue
-            src, tgt = parsed
-            if src == eid and tgt in all_entities:
-                _walk(tgt)
+            if neighbor in all_entities:
+                _walk(neighbor)
 
     _walk(entity_id)
 
@@ -186,18 +222,28 @@ def plan_promotion(
         else:
             to_add.append(eid)
 
-    # Connections: include those whose source is being promoted and
-    # whose target is either promoted, resolved-conflict, or enterprise
+    # Connections: include those where source is promotable and target is
+    # promotable, a resolved-conflict entity, or already in enterprise.
     promotable = set(to_add) | {c.engagement_id for c in conflicts}
     target_ok = promotable | enterprise_ids
     conn_ids: list[str] = []
     for cid in registry.connection_ids():
-        parsed = _parse_conn(cid)
+        parsed = _parse_conn_full(cid)
         if parsed is None:
             continue
-        src, tgt = parsed
+        src, _conn_type, tgt = parsed
         if src in promotable and tgt in target_ok:
             conn_ids.append(cid)
+
+    # Apply caller-supplied exclusions
+    exc_ents = exclude_entity_ids or set()
+    exc_conns = exclude_connection_ids or set()
+    if exc_ents:
+        to_add = [e for e in to_add if e not in exc_ents]
+        already = [e for e in already if e not in exc_ents]
+        conflicts = [c for c in conflicts if c.engagement_id not in exc_ents]
+    if exc_conns:
+        conn_ids = [c for c in conn_ids if c not in exc_conns]
 
     return PromotionPlan(
         root_entity=entity_id,

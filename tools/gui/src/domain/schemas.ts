@@ -22,6 +22,7 @@ export const EntitySummarySchema = Schema.Struct({
   domain: Schema.String,
   subdomain: Schema.String,
   path: Schema.String,
+  is_global: Schema.optional(Schema.Boolean),
   display_alias: Schema.optional(Schema.String),
   conn_in: Schema.optional(Schema.Number),
   conn_sym: Schema.optional(Schema.Number),
@@ -52,6 +53,7 @@ export const EntityDetailSchema = Schema.Struct({
   summary: Schema.optional(Schema.String),
   properties: Schema.optional(Schema.Record({ key: Schema.String, value: Schema.String })),
   notes: Schema.optional(Schema.String),
+  is_global: Schema.optional(Schema.Boolean),
   conn_in: Schema.optional(Schema.Number),
   conn_sym: Schema.optional(Schema.Number),
   conn_out: Schema.optional(Schema.Number),
@@ -94,6 +96,7 @@ export const SearchHitSchema = Schema.Struct({
   artifact_type: Schema.String,
   status: Schema.String,
   path: Schema.String,
+  is_global: Schema.optional(Schema.Boolean),
   domain: Schema.optional(Schema.String),
   subdomain: Schema.optional(Schema.String),
   diagram_type: Schema.optional(Schema.String),
@@ -232,3 +235,36 @@ export const EntitySchemaInfoSchema = Schema.Struct({
   required: Schema.Array(Schema.String),
 })
 export type EntitySchemaInfo = typeof EntitySchemaInfoSchema.Type
+
+// ── Promotion ─────────────────────────────────────────────────────────────────
+
+export const PromotionConflictSchema = Schema.Struct({
+  engagement_id: Schema.String,
+  enterprise_id: Schema.String,
+  artifact_type: Schema.String,
+  engagement_name: Schema.String,
+  enterprise_name: Schema.String,
+  engagement_fields: Schema.Record({ key: Schema.String, value: Schema.Unknown }),
+  enterprise_fields: Schema.Record({ key: Schema.String, value: Schema.Unknown }),
+})
+export type PromotionConflict = typeof PromotionConflictSchema.Type
+
+export const PromotionPlanSchema = Schema.Struct({
+  entity_id: Schema.String,
+  entities_to_add: Schema.Array(Schema.String),
+  conflicts: Schema.Array(PromotionConflictSchema),
+  connection_ids: Schema.Array(Schema.String),
+  already_in_enterprise: Schema.Array(Schema.String),
+  warnings: Schema.Array(Schema.String),
+})
+export type PromotionPlan = typeof PromotionPlanSchema.Type
+
+export const PromotionResultSchema = Schema.Struct({
+  dry_run: Schema.Boolean,
+  executed: Schema.Boolean,
+  copied_files: Schema.Array(Schema.String),
+  updated_files: Schema.Array(Schema.String),
+  verification_errors: Schema.Array(Schema.String),
+  rolled_back: Schema.Boolean,
+})
+export type PromotionResult = typeof PromotionResultSchema.Type

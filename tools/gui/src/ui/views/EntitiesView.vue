@@ -2,6 +2,7 @@
 import { computed, inject, onMounted, ref, watch } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
 import type { EntityList } from '../../domain'
+import type { RepoScope } from '../../ports/ModelRepository'
 import { modelServiceKey } from '../keys'
 import { useAsync } from '../composables/useAsync'
 import EntitiesTreemap from '../components/EntitiesTreemap.vue'
@@ -13,6 +14,8 @@ import {
   getDomainLabel,
 } from '../lib/domains'
 
+const props = defineProps<{ scope?: RepoScope }>()
+
 type ViewMode = 'table' | 'treemap'
 type SortKey = 'type' | 'in' | 'sym' | 'out' | 'total'
 
@@ -21,6 +24,9 @@ const route = useRoute()
 const router = useRouter()
 const { data: entityList, error, loading, run } = useAsync<EntityList>()
 
+const isGlobal = computed(() => props.scope === 'global')
+const basePath = computed(() => isGlobal.value ? '/global/entities' : '/entities')
+
 const activeDomain = computed(() => (route.query.domain as string | undefined) ?? '')
 const viewMode = computed<ViewMode>(() => route.query.view === 'treemap' ? 'treemap' : 'table')
 const typeFilter = ref('')
@@ -28,14 +34,17 @@ const sortKey = ref<SortKey | null>(null)
 const sortOrder = ref<1 | -1>(1)
 
 const replaceQuery = (patch: Record<string, string | undefined>) =>
-  router.replace({ path: '/entities', query: { ...route.query, ...patch } })
+  router.replace({ path: basePath.value, query: { ...route.query, ...patch } })
 
 const setDomain = (domain: string) => replaceQuery({ domain: domain || undefined })
 const setViewMode = (view: ViewMode) => replaceQuery({ view: view === 'table' ? undefined : view })
-const load = () => run(svc.listEntities(activeDomain.value ? { domain: activeDomain.value } : {}))
+const load = () => run(svc.listEntities({
+  ...(activeDomain.value ? { domain: activeDomain.value } : {}),
+  scope: props.scope,
+}))
 
 onMounted(load)
-watch(activeDomain, () => {
+watch([activeDomain, () => props.scope], () => {
   typeFilter.value = ''
   load()
 })
@@ -75,7 +84,10 @@ const sortedEntities = computed(() => {
   })
 })
 
-const pageTitle = computed(() => activeDomain.value ? `${getDomainLabel(activeDomain.value)} Entities` : 'All Entities')
+const pageTitle = computed(() => {
+  const scope = isGlobal.value ? 'Global ' : ''
+  return activeDomain.value ? `${scope}${getDomainLabel(activeDomain.value)} Entities` : `${scope}Entities`
+})
 const sortArrow = (key: SortKey) => sortKey.value === key ? (sortOrder.value === 1 ? '↑' : '↓') : ''
 </script>
 
@@ -100,19 +112,23 @@ const sortArrow = (key: SortKey) => sortKey.value === key ? (sortOrder.value ===
       <div class="content-header">
         <div>
           <h1 class="page-title">
+            <span v-if="isGlobal" class="global-badge">Global</span>
             {{ pageTitle }}
             <span v-if="entityList" class="count">
               ({{ sortedEntities.length }}<template v-if="typeFilter"> / {{ entityList.total }}</template>)
             </span>
           </h1>
-          <p class="subtitle">Filter by domain, then inspect the catalog as a sortable table or a connection-weighted treemap.</p>
+          <p class="subtitle">
+            <template v-if="isGlobal">Read-only view of the shared global (enterprise) repository.</template>
+            <template v-else>Filter by domain, then inspect the catalog as a sortable table or a connection-weighted treemap.</template>
+          </p>
         </div>
         <div class="actions">
           <div class="view-toggle">
             <button class="toggle-btn" :class="{ 'toggle-btn--active': viewMode === 'table' }" @click="setViewMode('table')">Table</button>
             <button class="toggle-btn" :class="{ 'toggle-btn--active': viewMode === 'treemap' }" @click="setViewMode('treemap')">Treemap</button>
           </div>
-          <RouterLink to="/entity/create" class="create-btn">+ Create Entity</RouterLink>
+          <RouterLink v-if="!isGlobal" to="/entity/create" class="create-btn">+ Create Entity</RouterLink>
         </div>
       </div>
 
@@ -153,11 +169,12 @@ const sortArrow = (key: SortKey) => sortKey.value === key ? (sortOrder.value ===
           </tr>
         </thead>
         <tbody>
-          <tr v-for="entity in sortedEntities" :key="entity.artifact_id">
+          <tr v-for="entity in sortedEntities" :key="entity.artifact_id" :class="{ 'row--global': entity.is_global }">
             <td>
               <RouterLink :to="{ path: '/entity', query: { id: entity.artifact_id } }">
                 {{ entity.name || friendlyEntityId(entity.artifact_id) }}
               </RouterLink>
+              <span v-if="entity.is_global && !isGlobal" class="global-chip" title="From the global repository">global</span>
             </td>
             <td>
               <span class="type-cell">
@@ -273,4 +290,35 @@ const sortArrow = (key: SortKey) => sortKey.value === key ? (sortOrder.value ===
 .mono { font-size: 12px; color: #374151; }
 .conn-counts { font-size: 12px; white-space: nowrap; }
 .state-msg--error { color: #dc2626; }
+
+.global-badge {
+  display: inline-block;
+  background: #fef3c7;
+  color: #92400e;
+  border: 1px solid #fde68a;
+  border-radius: 4px;
+  padding: 1px 7px;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .05em;
+  margin-right: 8px;
+  vertical-align: middle;
+}
+
+.global-chip {
+  display: inline-block;
+  margin-left: 8px;
+  background: #fef3c7;
+  color: #92400e;
+  border: 1px solid #fde68a;
+  border-radius: 3px;
+  padding: 0 5px;
+  font-size: 10px;
+  font-weight: 600;
+  vertical-align: middle;
+}
+
+.row--global td { background: #fffbeb; }
+.row--global:hover td { background: #fef9e7; }
 </style>

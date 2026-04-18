@@ -4,8 +4,10 @@ services:
     ports:
       - "8000:8000"
     volumes:
-      # Mount the repository to serve. Override ARCH_REPO_ROOT to point at any
-      # architecture repository on the host.
+      # Engagement repo. Override ARCH_REPO_ROOT to point at any engagement repo.
       - ${ARCH_REPO_ROOT:-./engagements/ENG-ARCH-REPO/architecture-repository}:/repo
+      # Enterprise (global) repo. Override ARCH_ENTERPRISE_ROOT to point elsewhere.
+      - ${ARCH_ENTERPRISE_ROOT:-./enterprise-repository}:/enterprise-repo
     environment:
       - PYTHONUNBUFFERED=1
+      - ARCH_ENTERPRISE_ROOT=/enterprise-repo

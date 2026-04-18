@@ -9,11 +9,13 @@ import DiagramDetailView from '../views/DiagramDetailView.vue'
 import CreateDiagramView from '../views/CreateDiagramView.vue'
 import GraphExploreView from '../views/GraphExploreView.vue'
 import EditDiagramView from '../views/EditDiagramView.vue'
+import PromoteView from '../views/PromoteView.vue'
 
 export const router = createRouter({
   history: createWebHistory(),
   routes: [
     { path: '/', component: HomeView },
+    // Engagement repo routes
     { path: '/entities', component: EntitiesView },
     { path: '/entity/create', component: EntityCreateView },
     { path: '/entity', component: EntityDetailView },
@@ -23,5 +25,11 @@ export const router = createRouter({
     { path: '/diagram/edit', component: EditDiagramView },
     { path: '/diagram', component: DiagramDetailView },
     { path: '/graph', component: GraphExploreView },
+    // Global (enterprise) repo routes — reuse same views with scope param
+    { path: '/global/entities', component: EntitiesView, props: () => ({ scope: 'global' }) },
+    { path: '/global/diagrams', component: DiagramsView, props: () => ({ scope: 'global' }) },
+    { path: '/global/search', redirect: '/search' },
+    // Promotion
+    { path: '/promote', component: PromoteView },
   ],
 })

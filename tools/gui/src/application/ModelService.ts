@@ -8,8 +8,10 @@ export type ModelService = ReturnType<typeof makeModelService>
 
 export const makeModelService = (repo: ModelRepository) =>
   ({
+    getServerInfo: () => repo.getServerInfo(),
     getStats: () => repo.getStats(),
     listEntities: (params: ListParams = {}) => repo.listEntities(params),
+    listEntitiesGlobal: (params: ListParams = {}) => repo.listEntities({ ...params, scope: 'global' }),
     getEntity: (id: string) => repo.getEntity(id),
     getConnections: (entityId: string, direction: Direction = 'any') =>
       repo.getConnections(entityId, direction),
@@ -37,4 +39,10 @@ export const makeModelService = (repo: ModelRepository) =>
     previewDiagram: (body: Parameters<ModelRepository['previewDiagram']>[0]) => repo.previewDiagram(body),
     createDiagram: (body: Parameters<ModelRepository['createDiagram']>[0]) => repo.createDiagram(body),
     editDiagram: (body: Parameters<ModelRepository['editDiagram']>[0]) => repo.editDiagram(body),
+    adminCreateEntity: (body: Parameters<ModelRepository['adminCreateEntity']>[0]) => repo.adminCreateEntity(body),
+    adminEditEntity: (body: Parameters<ModelRepository['adminEditEntity']>[0]) => repo.adminEditEntity(body),
+    adminAddConnection: (body: Parameters<ModelRepository['adminAddConnection']>[0]) => repo.adminAddConnection(body),
+    adminRemoveConnection: (body: Parameters<ModelRepository['adminRemoveConnection']>[0]) => repo.adminRemoveConnection(body),
+    planPromotion: (body: Parameters<ModelRepository['planPromotion']>[0]) => repo.planPromotion(body),
+    executePromotion: (body: Parameters<ModelRepository['executePromotion']>[0]) => repo.executePromotion(body),
   }) as const

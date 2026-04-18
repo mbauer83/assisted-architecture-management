@@ -8,7 +8,7 @@
   "properties": {
     "Priority": {
       "type": "string",
-      "enum": ["Must", "Should", "Could", "Won't"]
+      "enum": ["Must", "Should", "Could", "Won't", "Never"]
     },
     "Category": {
       "type": "string"

@@ -74,6 +74,7 @@ const onBlur = () => {
         @mousedown.prevent="selectEntity(e)"
       >
         <span class="item-name">{{ e.name || friendlyName(e.artifact_id) }}</span>
+        <span v-if="e.is_global" class="item-global">global</span>
         <span class="item-type">{{ e.artifact_type }}</span>
         <span class="item-id">{{ e.artifact_id.split('.')[1] }}</span>
       </button>
@@ -103,6 +104,11 @@ const onBlur = () => {
 }
 .dropdown-item:hover { background: #f3f4f6; }
 .item-name { font-weight: 500; flex: 1; }
+.item-global {
+  font-size: 10px; font-weight: 600; padding: 0 5px;
+  background: #fef3c7; color: #92400e; border: 1px solid #fde68a; border-radius: 3px;
+  flex-shrink: 0;
+}
 .item-type { font-size: 11px; color: #6b7280; }
 .item-id { font-size: 11px; color: #9ca3af; font-family: monospace; }
 .dropdown-empty { padding: 12px; color: #6b7280; font-size: 13px; text-align: center; }

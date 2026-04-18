@@ -32,6 +32,7 @@ from src.tools.model_mcp.write_tools import (  # noqa: F401
     model_create_diagram,
     model_create_entity,
     model_create_matrix,
+    model_promote_to_enterprise,
     model_write_help,
 )
 from src.tools.model_mcp.edit_tools import (  # noqa: F401

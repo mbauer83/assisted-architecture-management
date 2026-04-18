@@ -19,6 +19,8 @@ import {
   EntityDisplayInfoSchema,
   DiagramPreviewResultSchema,
   DiagramConnectionSchema,
+  PromotionPlanSchema,
+  PromotionResultSchema,
 } from '../../domain/schemas'
 import { parseMarkdown } from '../../application/MarkdownService'
 
@@ -27,8 +29,9 @@ import { parseMarkdown } from '../../application/MarkdownService'
 const buildUrl = (
   path: string,
   params?: Readonly<Record<string, string | number | boolean | undefined>>,
+  adminPath?: boolean,
 ): string => {
-  const url = new URL('/api' + path, window.location.origin)
+  const url = new URL((adminPath ? '/admin/api' : '/api') + path, window.location.origin)
   if (params) {
     for (const [k, v] of Object.entries(params)) {
       if (v !== undefined) url.searchParams.set(k, String(v))
@@ -105,13 +108,15 @@ const postJson = <A, I>(
 // ── Factory ───────────────────────────────────────────────────────────────────
 
 export const makeHttpModelRepository = (): ModelRepository => ({
+  getServerInfo: () => fetchJson(buildUrl('/admin/server-info'), Schema.Unknown),
   getStats: () => fetchJson(buildUrl('/stats'), StatsSchema),
 
   listEntities: (params: ListParams = {}) =>
     fetchJson(
       buildUrl('/entities', {
         domain: params.domain, artifact_type: params.artifactType,
-        status: params.status, limit: params.limit, offset: params.offset,
+        status: params.status, scope: params.scope,
+        limit: params.limit, offset: params.offset,
       }),
       EntityListSchema,
     ),
@@ -207,4 +212,19 @@ export const makeHttpModelRepository = (): ModelRepository => ({
 
   editDiagram: (body) =>
     postJson(buildUrl('/diagram/edit'), body, WriteResultSchema),
+
+  adminCreateEntity: (body) =>
+    postJson(buildUrl('/admin/entity', undefined, true), body, WriteResultSchema),
+  adminEditEntity: (body) =>
+    postJson(buildUrl('/admin/entity/edit', undefined, true), body, WriteResultSchema),
+  adminAddConnection: (body) =>
+    postJson(buildUrl('/admin/connection', undefined, true), body, WriteResultSchema),
+  adminRemoveConnection: (body) =>
+    postJson(buildUrl('/admin/connection/remove', undefined, true), body, WriteResultSchema),
+
+  planPromotion: (body) =>
+    postJson(buildUrl('/promote/plan'), body, PromotionPlanSchema),
+
+  executePromotion: (body) =>
+    postJson(buildUrl('/promote/execute'), body, PromotionResultSchema),
 })

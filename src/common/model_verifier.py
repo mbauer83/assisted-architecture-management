@@ -29,6 +29,7 @@ from src.common.model_verifier_rules import (
     check_diagram_references_scoped,
     check_enum,
     check_frontmatter_schema,
+    check_global_entity_reference,
     check_puml_structure,
     check_required_fields,
     check_section,
@@ -88,6 +89,9 @@ class ModelVerifier:
         check_enum(fm, "status", VALID_STATUSES, result, loc)
         check_section(content, "§content", required=True, result=result, loc=loc)
         check_section(content, "§display", required=True, result=result, loc=loc)
+
+        if str(fm.get("artifact-type", "")) == "global-entity-reference":
+            check_global_entity_reference(fm, self.registry, result, loc)
 
         repo_root = self._repo_root_for_path(path)
         if repo_root is not None:

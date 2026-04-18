@@ -19,7 +19,6 @@ const submit = () => {
   run(svc.search(query.value.trim()))
 }
 
-// Run search if navigated to with ?q=
 if (query.value) run(svc.search(query.value.trim()))
 
 watch(() => route.query.q, (q) => {
@@ -78,6 +77,7 @@ const friendlyName = (id: string) => {
           </div>
           <div class="result-meta">
             <span class="mono result-type">{{ h.artifact_type }}</span>
+            <span v-if="h.is_global" class="global-chip">global</span>
             <span v-if="h.domain" class="domain-badge" :class="`domain--${h.domain}`">{{ h.domain }}</span>
             <span class="status-badge" :class="`status--${h.status}`">{{ h.status }}</span>
           </div>
@@ -131,4 +131,10 @@ const friendlyName = (id: string) => {
 .result-id { font-size: 11px; color: #9ca3af; }
 .mono { font-family: monospace; }
 
+.global-chip {
+  display: inline-block;
+  background: #fef3c7; color: #92400e;
+  border: 1px solid #fde68a; border-radius: 3px;
+  padding: 0 5px; font-size: 10px; font-weight: 600;
+}
 </style>

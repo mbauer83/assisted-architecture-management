@@ -13,6 +13,8 @@ const props = defineProps<{
   direction: 'outgoing' | 'incoming' | 'symmetric'
   loading: boolean
   error: string | null
+  readonly?: boolean
+  adminMode?: boolean
 }>()
 
 const emit = defineEmits<{
@@ -118,8 +120,11 @@ const startAdd = (typeKey: string) => {
   // Fetch permissible connection types for this source→target pair
   Effect.runPromise(svc.getOntologyPair(props.entityType, typeKey))
     .then((pair) => {
-      connTypeOptions.value = [...pair.connection_types]
-      if (pair.connection_types.length === 1) connTypeSelected.value = pair.connection_types[0]
+      const types = props.direction === 'symmetric'
+        ? pair.connection_types.filter(ct => symmetricConnTypes.value.has(ct))
+        : [...pair.connection_types]
+      connTypeOptions.value = types
+      if (types.length === 1) connTypeSelected.value = types[0]
       else if (props.direction === 'symmetric') connTypeSelected.value = 'archimate-association'
     })
     .catch(() => {
@@ -143,8 +148,9 @@ const confirmAdd = () => {
   const isIncoming = props.direction === 'incoming'
   const source = isIncoming ? selectedTarget.value.id : props.entityId
   const target = isIncoming ? props.entityId : selectedTarget.value.id
+  const addFn = props.adminMode ? svc.adminAddConnection : svc.addConnection
   Effect.runPromise(
-    svc.addConnection({
+    addFn({
       source_entity: source,
       connection_type: connTypeSelected.value,
       target_entity: target,
@@ -194,8 +200,9 @@ const confirmRemove = () => {
   removeBusy.value = true
   removeError.value = null
   const c = removingConn.value
+  const removeFn = props.adminMode ? svc.adminRemoveConnection : svc.removeConnection
   Effect.runPromise(
-    svc.removeConnection({
+    removeFn({
       source_entity: c.source,
       connection_type: c.conn_type,
       target_entity: c.target,
@@ -225,7 +232,7 @@ const confirmRemove = () => {
           <div class="group-header">
             <span class="group-type-badge">{{ typeKey }}</span>
             <span class="group-count">{{ (grouped[typeKey] ?? []).length }}</span>
-            <button class="icon-btn add-btn" title="Add connection" @click="startAdd(typeKey)">+</button>
+            <button v-if="!readonly" class="icon-btn add-btn" title="Add connection" @click="startAdd(typeKey)">+</button>
           </div>
 
           <ul v-if="grouped[typeKey]?.length" class="conn-list">
@@ -239,7 +246,7 @@ const confirmRemove = () => {
                 <span class="conn-info-btn" tabindex="0">ⓘ</span>
                 <span class="conn-info-tip">{{ c.content_text.trim() }}</span>
               </span>
-              <button class="icon-btn remove-btn" title="Remove connection" @click="startRemove(c)">×</button>
+              <button v-if="!readonly" class="icon-btn remove-btn" title="Remove connection" @click="startRemove(c)">×</button>
             </li>
           </ul>
 

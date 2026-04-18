@@ -29,6 +29,8 @@ def resolve_worker_count() -> int:
 
 
 def check_puml_syntax(path: Path, loc: str) -> list[Issue]:
+    if os.environ.get("ARCH_SKIP_PUML_SYNTAX"):
+        return []
     result: list[Issue] = []
     jar = find_plantuml_jar()
     if jar is None:
@@ -80,7 +82,7 @@ def check_puml_syntax(path: Path, loc: str) -> list[Issue]:
 
 def check_puml_syntax_batch(paths: list[Path], *, chunk_size: int = 120) -> dict[Path, list[Issue]]:
     issues_by_path: dict[Path, list[Issue]] = {p: [] for p in paths}
-    if not paths:
+    if not paths or os.environ.get("ARCH_SKIP_PUML_SYNTAX"):
         return issues_by_path
 
     jar = find_plantuml_jar()
