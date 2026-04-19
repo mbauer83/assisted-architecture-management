@@ -51,30 +51,50 @@ def _build_content(
     version: str,
     status: str,
     last_updated: str,
+    src_cardinality: str | None = None,
+    tgt_cardinality: str | None = None,
 ) -> str:
-    conn_header = f"### {connection_type} → {target_entity}"
+    src_part = f" [{src_cardinality}]" if src_cardinality else ""
+    tgt_part = f"[{tgt_cardinality}] " if tgt_cardinality else ""
+    conn_header = f"### {connection_type}{src_part} → {tgt_part}{target_entity}"
 
     if outgoing_path.exists():
         existing = outgoing_path.read_text(encoding="utf-8")
-        if conn_header in existing:
-            raise ValueError(
-                f"Connection '{connection_type} → {target_entity}' already exists in {outgoing_path.name}"
-            )
+        # Duplicate check ignores cardinalities — same (conn_type, target) pair is a duplicate
+        dup_marker = f"### {connection_type} → "
+        dup_marker_with_card = f"### {connection_type} ["
+        for line in existing.splitlines():
+            if line.startswith(dup_marker) or line.startswith(dup_marker_with_card):
+                _, after_arrow = line.split(" → ", 1)
+                existing_target = after_arrow.strip()
+                if existing_target.startswith("["):
+                    bracket_end = existing_target.find("]")
+                    if bracket_end != -1:
+                        existing_target = existing_target[bracket_end + 1:].lstrip()
+                if existing_target == target_entity:
+                    raise ValueError(
+                        f"Connection '{connection_type} → {target_entity}' already exists in {outgoing_path.name}"
+                    )
         new_section = f"\n\n{conn_header}\n"
         if description and description.strip():
             new_section += f"\n{description.strip()}\n"
         return existing.rstrip("\n") + new_section
 
+    conn_dict: dict[str, str] = {
+        "connection_type": connection_type,
+        "target_entity": target_entity,
+        "description": description or "",
+    }
+    if src_cardinality:
+        conn_dict["src_cardinality"] = src_cardinality
+    if tgt_cardinality:
+        conn_dict["tgt_cardinality"] = tgt_cardinality
     return format_outgoing_markdown(
         source_entity=source_entity,
         version=version,
         status=status,
         last_updated=last_updated,
-        connections=[{
-            "connection_type": connection_type,
-            "target_entity": target_entity,
-            "description": description or "",
-        }],
+        connections=[conn_dict],
     )
 
 
@@ -129,6 +149,8 @@ def add_connection(
     status: str,
     last_updated: str | None,
     dry_run: bool,
+    src_cardinality: str | None = None,
+    tgt_cardinality: str | None = None,
 ) -> WriteResult:
     """Add a connection to the source entity's .outgoing.md file."""
     assert_engagement_write_root(repo_root)
@@ -141,6 +163,8 @@ def add_connection(
     content = _build_content(
         outgoing_path, source_entity, connection_type, target_entity,
         description, version, status, last,
+        src_cardinality=src_cardinality,
+        tgt_cardinality=tgt_cardinality,
     )
 
     if dry_run:

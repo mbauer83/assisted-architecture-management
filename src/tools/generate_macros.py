@@ -73,7 +73,7 @@ _PREFIX_ORDER = [
     "APP", "AIF", "DOB",
     "NOD", "DEV", "SSW", "TIF", "PTH", "NET", "ART",
     "EQP", "FAC", "DIS", "MAT",
-    "WP", "DEL", "IEV", "PLT",
+    "WP", "DEL", "PLT",
 ]
 
 

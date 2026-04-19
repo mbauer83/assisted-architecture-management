@@ -135,7 +135,7 @@ skinparam rectangle<<CourseOfAction>> {
 ' ---------------------------------------------------------------------------
 ' Common domain  (#E0D8CC — warm grey with ochre undertone)
 ' Domain-neutral behavioral elements (ArchiMate NEXT): Service, Process,
-' Function, Interaction, Event, Role.  These are not bound to any layer.
+' Function, Collaboration, Event, Role.  These are not bound to any layer.
 ' ---------------------------------------------------------------------------
 skinparam rectangle<<CommonGrouping>> {
   BackgroundColor #EDE8E1
@@ -153,7 +153,7 @@ skinparam rectangle<<Function>> {
   BackgroundColor #E0D8CC
   BorderColor #8C7E6A
 }
-skinparam rectangle<<Interaction>> {
+skinparam rectangle<<Collaboration>> {
   BackgroundColor #E0D8CC
   BorderColor #8C7E6A
 }
@@ -177,10 +177,6 @@ skinparam rectangle<<BusinessRole>> {
   BackgroundColor #FFFAC8
   BorderColor #B8860B
 }
-skinparam rectangle<<BusinessCollaboration>> {
-  BackgroundColor #FFFAC8
-  BorderColor #B8860B
-}
 skinparam rectangle<<BusinessInterface>> {
   BackgroundColor #FFFAC8
   BorderColor #B8860B
@@ -193,10 +189,6 @@ skinparam rectangle<<BusinessFunction>> {
   BackgroundColor #FFFAC8
   BorderColor #B8860B
 }
-skinparam rectangle<<BusinessInteraction>> {
-  BackgroundColor #FFFAC8
-  BorderColor #B8860B
-}
 skinparam rectangle<<BusinessEvent>> {
   BackgroundColor #FFFAC8
   BorderColor #B8860B
@@ -206,14 +198,6 @@ skinparam rectangle<<BusinessService>> {
   BorderColor #B8860B
 }
 skinparam rectangle<<BusinessObject>> {
-  BackgroundColor #FFFAC8
-  BorderColor #B8860B
-}
-skinparam rectangle<<Contract>> {
-  BackgroundColor #FFFAC8
-  BorderColor #B8860B
-}
-skinparam rectangle<<Representation>> {
   BackgroundColor #FFFAC8
   BorderColor #B8860B
 }
@@ -238,10 +222,6 @@ skinparam rectangle<<ApplicationInterface>> {
   BorderColor #0078A0
 }
 skinparam rectangle<<ApplicationFunction>> {
-  BackgroundColor #CCF2FF
-  BorderColor #0078A0
-}
-skinparam rectangle<<ApplicationInteraction>> {
   BackgroundColor #CCF2FF
   BorderColor #0078A0
 }
@@ -298,10 +278,6 @@ skinparam rectangle<<TechnologyFunction>> {
   BorderColor #2E7D32
 }
 skinparam rectangle<<TechnologyProcess>> {
-  BackgroundColor #CCFFCC
-  BorderColor #2E7D32
-}
-skinparam rectangle<<TechnologyInteraction>> {
   BackgroundColor #CCFFCC
   BorderColor #2E7D32
 }

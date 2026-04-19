@@ -87,6 +87,9 @@ def model_edit_entity(
     return _result_dict(dry_run, result)
 
 
+_EDIT_CONN_UNSET = object()
+
+
 def model_edit_connection(
     *,
     source_entity: str,
@@ -94,11 +97,18 @@ def model_edit_connection(
     connection_type: str,
     operation: str = "update",
     description: str | None = None,
+    src_cardinality: str | None = None,
+    tgt_cardinality: str | None = None,
     dry_run: bool = True,
     repo_root: str | None = None,
     repo_preset: RepoPreset | None = None,
     repo_scope: WriteRepoScope = "engagement",
 ) -> dict[str, object]:
+    """Edit or remove a connection.
+
+    For operation='update': description, src_cardinality, tgt_cardinality are
+    applied. Pass "" for a cardinality to remove it; omit (None) to preserve it.
+    """
     if repo_scope != "engagement":
         raise ValueError("model_edit_connection only supports repo_scope='engagement'")
 
@@ -112,11 +122,14 @@ def model_edit_connection(
             connection_type=connection_type, dry_run=dry_run,
         )
     else:
+        from src.tools.model_write.connection_edit import _UNSET
         result = model_write_ops.edit_connection(
             repo_root=root, registry=registry, verifier=verifier,
             clear_repo_caches=clear_caches_for_repo,
             source_entity=source_entity, target_entity=target_entity,
             connection_type=connection_type, description=description,
+            src_cardinality=src_cardinality if src_cardinality is not None else _UNSET,
+            tgt_cardinality=tgt_cardinality if tgt_cardinality is not None else _UNSET,
             dry_run=dry_run,
         )
     return _result_dict(dry_run, result)
@@ -178,7 +191,9 @@ def register_edit_tools(mcp: FastMCP) -> None:
         description=(
             "Edit or remove a connection in an .outgoing.md file. "
             "Identify by source_entity + target_entity + connection_type. "
-            "operation='update' (default) changes description; operation='remove' deletes it."
+            "operation='update' (default) changes description, src_cardinality, and/or "
+            "tgt_cardinality; pass '' to remove an existing cardinality, omit (null) to "
+            "preserve it. operation='remove' deletes the connection."
         ),
         structured_output=True,
     )(model_edit_connection)

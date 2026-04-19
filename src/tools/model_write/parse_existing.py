@@ -203,10 +203,24 @@ def _extract_display_archimate(display_section: str) -> dict[str, str]:
     return {str(k): str(v) for k, v in parsed.items()} if parsed else {}
 
 
+# Connection header: "conn-type [[src_card]] → [[tgt_card] ]target_id"
+_CONN_HEADER_RE = re.compile(
+    r"^(?P<conn_type>[a-z][a-z0-9-]+)"
+    r"(?:\s+\[(?P<src_card>[^\]]+)\])?"
+    r"\s+→\s+"
+    r"(?:\[(?P<tgt_card>[^\]]+)\]\s+)?"
+    r"(?P<target_id>\S+)$"
+)
+
+
 def _parse_connection_sections(connections_text: str) -> list[dict[str, str]]:
-    """Parse H3 connection sections from the connections area of an .outgoing.md file."""
+    """Parse H3 connection sections from the connections area of an .outgoing.md file.
+
+    Each returned dict has keys: connection_type, target_entity, description.
+    When cardinalities are present, src_cardinality and tgt_cardinality are
+    also included so that round-trip reformatting preserves them.
+    """
     connections: list[dict[str, str]] = []
-    # Split by ### headers
     sections = re.split(r"^### ", connections_text, flags=re.MULTILINE)
 
     for section in sections:
@@ -214,20 +228,20 @@ def _parse_connection_sections(connections_text: str) -> list[dict[str, str]]:
         if not section:
             continue
 
-        # First line is the header: "{connection_type} → {target_entity}"
         first_line, *rest = section.split("\n", 1)
-        m = re.match(r"^(.+?)\s*→\s*(.+)$", first_line.strip())
+        m = _CONN_HEADER_RE.match(first_line.strip())
         if not m:
             continue
 
-        connection_type = m.group(1).strip()
-        target_entity = m.group(2).strip()
-        description = rest[0].strip() if rest else ""
-
-        connections.append({
-            "connection_type": connection_type,
-            "target_entity": target_entity,
-            "description": description,
-        })
+        conn: dict[str, str] = {
+            "connection_type": m.group("conn_type"),
+            "target_entity": m.group("target_id"),
+            "description": rest[0].strip() if rest else "",
+        }
+        if m.group("src_card"):
+            conn["src_cardinality"] = m.group("src_card")
+        if m.group("tgt_card"):
+            conn["tgt_cardinality"] = m.group("tgt_card")
+        connections.append(conn)
 
     return connections

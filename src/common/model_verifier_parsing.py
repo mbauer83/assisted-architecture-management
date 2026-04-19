@@ -101,8 +101,14 @@ def parse_connection_refs(path: Path) -> ConnectionRefs | None:
     for line in content.splitlines():
         if line.startswith("### ") and " → " in line:
             header = line[4:].strip()
-            _, target_id = header.split(" → ", 1)
-            tgts.append(target_id.strip())
+            # Handle optional cardinalities: "conn-type [src] → [tgt] target_id"
+            after_arrow = header.split(" → ", 1)[1].strip()
+            # Strip optional target cardinality "[tgt_card] " prefix
+            if after_arrow.startswith("["):
+                bracket_end = after_arrow.find("]")
+                if bracket_end != -1:
+                    after_arrow = after_arrow[bracket_end + 1:].lstrip()
+            tgts.append(after_arrow)
 
     return ConnectionRefs(
         source_ids=tuple(srcs),

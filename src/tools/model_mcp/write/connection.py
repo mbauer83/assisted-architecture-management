@@ -12,6 +12,8 @@ def model_add_connection(
     connection_type: str,
     target_entity: str,
     description: str | None = None,
+    src_cardinality: str | None = None,
+    tgt_cardinality: str | None = None,
     version: str = "0.1.0",
     status: str = "draft",
     last_updated: str | None = None,
@@ -94,6 +96,7 @@ def model_add_connection(
         clear_repo_caches=clear_caches_for_repo,
         source_entity=effective_source, connection_type=connection_type,
         target_entity=effective_target, description=description,
+        src_cardinality=src_cardinality, tgt_cardinality=tgt_cardinality,
         version=version, status=status, last_updated=last_updated, dry_run=dry_run,
     )
     out = _out(result, dry_run=dry_run)
@@ -118,6 +121,8 @@ def register(mcp: FastMCP) -> None:
             "Connecting from/to a global entity automatically creates a per-engagement "
             "proxy (global-entity-reference) if one does not already exist — handles "
             "outgoing, incoming, and symmetric connections transparently. "
+            "Optional src_cardinality / tgt_cardinality annotate the source or target end "
+            "of the connection (e.g. '1', '0..1', '1..*', '*'). Not permitted on junctions. "
             "dry_run=true returns would-be content without writing."
         ),
         structured_output=True,

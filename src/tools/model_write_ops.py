@@ -18,6 +18,7 @@ from src.tools.model_write import (
     edit_connection,
     edit_diagram,
     edit_entity,
+    get_type_guidance,  # filter: list[str] | None = None
     promote_entity,
     remove_connection,
     write_help,
@@ -31,6 +32,7 @@ __all__ = [
     "WriteRepoScope",
     "WriteResult",
     "write_help",
+    "get_type_guidance",
     "create_entity",
     "edit_entity",
     "promote_entity",

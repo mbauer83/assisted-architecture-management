@@ -11,6 +11,9 @@ from .connection import _resolve_outgoing_path, verification_to_conn_dict, _roll
 from .types import WriteResult
 
 
+_UNSET = object()
+
+
 def edit_connection(
     *,
     repo_root: Path,
@@ -21,12 +24,16 @@ def edit_connection(
     target_entity: str,
     connection_type: str,
     description: str | None = None,
+    src_cardinality: str | None | object = _UNSET,
+    tgt_cardinality: str | None | object = _UNSET,
     dry_run: bool,
 ) -> WriteResult:
-    """Update the description of an existing connection.
+    """Update an existing connection (description and/or cardinalities).
 
     Identifies the connection by (source, target, type) triple.
-    Rebuilds the .outgoing.md file with the updated description.
+    Rebuilds the .outgoing.md file with the updated fields.
+    Pass src_cardinality="" or tgt_cardinality="" to remove an existing cardinality.
+    Omit (leave as _UNSET) to preserve the existing value.
     """
     assert_engagement_write_root(repo_root)
     outgoing_path = _resolve_outgoing_path(registry, source_entity)
@@ -42,6 +49,16 @@ def edit_connection(
     for conn in parsed.connections:
         if conn["connection_type"] == connection_type and conn["target_entity"] == target_entity:
             conn["description"] = description or ""
+            if src_cardinality is not _UNSET:
+                if src_cardinality:
+                    conn["src_cardinality"] = str(src_cardinality)
+                else:
+                    conn.pop("src_cardinality", None)
+            if tgt_cardinality is not _UNSET:
+                if tgt_cardinality:
+                    conn["tgt_cardinality"] = str(tgt_cardinality)
+                else:
+                    conn.pop("tgt_cardinality", None)
             found = True
             break
 

@@ -13,6 +13,7 @@ from .connection_edit import edit_connection, remove_connection
 from .diagram import create_diagram
 from .diagram_edit import edit_diagram
 from .matrix import create_matrix
+from .type_guidance import get_type_guidance
 
 __all__ = [
     "WriteResult",
@@ -26,4 +27,5 @@ __all__ = [
     "create_diagram",
     "edit_diagram",
     "create_matrix",
+    "get_type_guidance",
 ]

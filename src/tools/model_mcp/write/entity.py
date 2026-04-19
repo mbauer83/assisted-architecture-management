@@ -10,6 +10,13 @@ def model_write_help() -> dict[str, object]:
     return model_write_ops.write_help()
 
 
+def model_write_modeling_guidance(
+    filter: list[str] | None = None,  # noqa: A002
+) -> dict[str, object]:
+    """Return focused modeling guidelines for the specified entity types or domains."""
+    return model_write_ops.get_type_guidance(filter=filter)
+
+
 def model_create_entity(
     *,
     artifact_type: str,
@@ -53,6 +60,21 @@ def register(mcp: FastMCP) -> None:
         ),
         structured_output=True,
     )(model_write_help)
+
+    mcp.tool(
+        name="model_write_modeling_guidance", title="Model Write: Modeling Guidelines",
+        description=(
+            "Return focused modeling guidelines for a selectable subset of ArchiMate entity "
+            "types or domains. Includes for each type: name, prefix, archimate_domain "
+            "(omitted when filtering by domain), element_classes, create_when, "
+            "never_create_when, and permitted_connections (outgoing/incoming/symmetric "
+            "classified by connection type and counterpart entity type). "
+            "filter accepts either entity-type names (e.g. ['requirement', 'goal']) or "
+            "domain names (e.g. ['Motivation', 'Strategy']) — never mixed. "
+            "Omit filter to return guidance for all entity types."
+        ),
+        structured_output=True,
+    )(model_write_modeling_guidance)
 
     mcp.tool(
         name="model_create_entity", title="Model Write: Create Entity",

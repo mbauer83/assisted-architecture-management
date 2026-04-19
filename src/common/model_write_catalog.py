@@ -19,8 +19,9 @@ class EntityTypeInfo:
     subdir: str
     archimate_domain: str
     archimate_element_type: str
-    element_category: str  # active | behavioral | passive | motivation | strategy | implementation | composite
     element_classes: tuple[str, ...]  # ArchiMate NEXT classification classes
+    create_when: str
+    never_create_when: str
 
 
 @dataclass(frozen=True)

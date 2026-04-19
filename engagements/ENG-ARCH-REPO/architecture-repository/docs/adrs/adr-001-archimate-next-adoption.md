@@ -14,7 +14,7 @@ them. Two candidates were evaluated:
 
 - **ArchiMate 3.x** — the established OMG standard, widely supported by tooling.
 - **ArchiMate NEXT** — an evolution that restructures the layer model, moves all behavioral
-  elements (services, processes, functions, events, interactions, roles) into a shared `common/`
+  elements (services, processes, functions, events, collaborations, roles) into a shared `common/`
   domain, and merges the physical layer into technology.
 
 The key operational pressure is that this repository is authored and queried primarily by AI agents
@@ -30,7 +30,7 @@ any particular modeling tool.
 
 Adopt ArchiMate NEXT.
 
-Behavioral elements (services, processes, functions, events, interactions) and roles are placed
+Behavioral elements (services, processes, functions, events, collaborations) and roles are placed
 in `model/common/` regardless of whether they support business, application, or technology
 concerns. The physical layer is not used; physical infrastructure is expressed under `technology/`.
 

@@ -77,6 +77,8 @@ class AddConnectionBody(BaseModel):
     connection_type: str
     target_entity: str
     description: str | None = None
+    src_cardinality: str | None = None
+    tgt_cardinality: str | None = None
     dry_run: bool = True
 
 
@@ -130,6 +132,7 @@ def add_connection(body: AddConnectionBody) -> dict[str, Any]:
             clear_repo_caches=s.clear_caches,
             source_entity=effective_source, connection_type=body.connection_type,
             target_entity=effective_target, description=body.description,
+            src_cardinality=body.src_cardinality, tgt_cardinality=body.tgt_cardinality,
             version="0.1.0", status="draft", last_updated=None, dry_run=body.dry_run,
         )
     except ValueError as e:

@@ -42,85 +42,12 @@ Import ``expand_tokens`` for the one-hop expansion used in scoring::
 # The reverse index is built automatically below so lookups are bidirectional.
 
 DOMAIN_SYNONYMS: dict[str, list[str]] = {
-    # -----------------------------------------------------------------------
-    # Agent abbreviations ↔ role descriptions
-    # -----------------------------------------------------------------------
-    "pm":   ["project", "manager", "orchestration", "coordinator", "supervisor"],
-    "sa":   ["solution", "architect", "architecture", "business", "motivation"],
-    "swa":  ["software", "architect", "application", "technology", "principal", "engineer"],
-    "do":   ["devops", "platform", "infrastructure", "deployment", "pipeline"],
-    "de":   ["developer", "implementing", "implementation", "coding", "coder"],
-    "qa":   ["quality", "assurance", "testing", "validation", "test"],
-    "po":   ["product", "owner", "requirements", "backlog", "user", "stories"],
-    "csco": ["safety", "compliance", "security", "risk", "chief", "officer"],
-    "sm":   ["sales", "marketing", "market", "swot", "commercial"],
-
-    # -----------------------------------------------------------------------
-    # Protocol / concept abbreviations
-    # -----------------------------------------------------------------------
-    "cq":     ["clarification", "question", "request", "query", "answer"],
-    "alg":    ["algedonic", "escalation", "signal", "bypass", "fast", "path"],
-    "adm":    ["architecture", "development", "method", "phase", "togaf"],
-    "adr":    ["decision", "record", "architectural"],
-    "erp":    ["entity", "registry", "pattern"],
-    "bdd":    ["behavior", "driven", "scenario", "gherkin", "feature"],
-    "puml":   ["plantuml", "diagram", "uml", "visualization"],
-    "ep":     ["entry", "point", "engagement", "onboarding"],
-    "vsm":    ["viable", "system", "model", "cybernetic"],
-    "sib":    ["standard", "information", "base", "approved"],
-    "fts":    ["full", "text", "search", "index"],
-    "raci":   ["responsible", "accountable", "consulted", "informed"],
-    "iia":    ["inferred", "annotated", "source", "evidence"],
-    "pr":     ["pull", "request", "code", "review", "merge"],
-    "ci":     ["continuous", "integration", "pipeline", "build"],
-
-    # -----------------------------------------------------------------------
-    # ArchiMate artifact-id prefixes ↔ element types
-    # -----------------------------------------------------------------------
-    "bob":  ["business", "object"],
-    "bif":  ["business", "interface"],
-    "act":  ["actor", "role", "agent", "business"],
-    "rol":  ["role", "function"],
-    "cap":  ["capability", "strategic"],
-    "vs":   ["value", "stream"],
-    "res":  ["resource", "strategic"],
-    "app":  ["application", "component"],
-    "aif":  ["interface", "port", "application"],
-    "dob":  ["data", "object"],
-    "stk":  ["stakeholder"],
-    "drv":  ["driver", "motivation"],
-    "req":  ["requirement"],
-    "pri":  ["principle"],
-    "gol":  ["goal", "objective"],
-    "out":  ["outcome"],
-    "mea":  ["meaning", "representation"],
-    "val":  ["value"],
-    "ass":  ["assessment"],
-    "wp":   ["work", "package", "implementation"],
-    "del":  ["deliverable", "output"],
-    "plt":  ["plateau", "migration"],
-    "nod":  ["node", "technology"],
-    "ssw":  ["system", "software", "platform"],
-    "tsv":  ["technology", "service"],
-    "art":  ["artifact", "deployment"],
 
     # -----------------------------------------------------------------------
     # Common domain concepts ↔ related terms (improves recall for natural-language queries)
     # -----------------------------------------------------------------------
-    "event":      ["workflow", "eventstore", "record", "log", "publish"],
-    "handoff":    ["transfer", "delivery", "artifact", "cross-role"],
-    "sprint":     ["iteration", "cycle", "planning", "agile"],
-    "skill":      ["phase", "capability", "invocation", "prompt"],
-    "learning":   ["correction", "feedback", "mistake", "improvement", "reflexion"],
-    "promotion":  ["enterprise", "elevation", "governance", "board"],
-    "snapshot":   ["state", "checkpoint", "persistence", "replay"],
-    "brownfield": ["existing", "legacy", "migration", "reverse", "onboarding"],
-    "greenfield": ["new", "fresh", "forward", "start", "cold"],
-    "gateway":    ["port", "interface", "adapter", "boundary"],
     "policy":     ["rule", "constraint", "principle", "governance"],
     "trace":      ["traceability", "link", "reference", "dependency"],
-    "scaffold":   ["template", "stub", "skeleton", "boilerplate"],
-    "gate":       ["checkpoint", "review", "approval", "criteria", "evaluation"],
     "diagram":    ["puml", "visualization", "view", "model"],
     "entity":     ["artifact", "model", "element", "instance"],
     "connection": ["relation", "link", "edge", "association", "realization"],
@@ -178,25 +105,6 @@ def expand_tokens(tokens: list[str]) -> list[str]:
                 seen.add(syn)
     return expanded
 
-
-def agent_abbreviations() -> dict[str, str]:
-    """Return the canonical mapping of agent abbreviation → display name.
-
-    Useful for UI labelling and system-prompt display.
-    """
-    return {
-        "PM":   "Project Manager",
-        "SA":   "Solution Architect",
-        "SwA":  "Software Architect / Principal Engineer",
-        "DO":   "DevOps / Platform Engineer",
-        "DE":   "Implementing Developer",
-        "QA":   "QA Engineer",
-        "PO":   "Product Owner",
-        "CSCO": "Chief Safety & Compliance Officer",
-        "SM":   "Sales & Marketing Manager",
-    }
-
-
 def archimate_prefix_to_type() -> dict[str, str]:
     """Return the canonical mapping of artifact-id prefix → ArchiMate element type.
 
@@ -220,13 +128,12 @@ def archimate_prefix_to_type() -> dict[str, str]:
         "ROL": "role",
         "PRC": "process",
         "FNC": "function",
+        "CLB": "collaboration",
         "SRV": "service",
-        "INT": "interaction",
         "EVT": "event",
         "BOB": "business-object",
         "BIF": "business-interface",
         "PRD": "product",
-        "CTR": "contract",
         "APP": "application-component",
         "AIF": "application-interface",
         "DOB": "data-object",
@@ -240,5 +147,4 @@ def archimate_prefix_to_type() -> dict[str, str]:
         "WP":  "work-package",
         "DEL": "deliverable",
         "PLT": "plateau",
-        "IEV": "implementation-event",
     }

@@ -8,7 +8,7 @@ from mcp.server.fastmcp import FastMCP  # type: ignore[import-not-found]
 from src.tools.model_mcp.write._common import WriteRepoScope, DiagramConnectionInferenceMode
 from src.tools.model_mcp.write.connection import model_add_connection
 from src.tools.model_mcp.write.diagram import model_create_diagram, model_create_matrix
-from src.tools.model_mcp.write.entity import model_create_entity, model_write_help
+from src.tools.model_mcp.write.entity import model_create_entity, model_write_help, model_write_modeling_guidance
 from src.tools.model_mcp.write.promote import model_promote_to_enterprise
 
 __all__ = [
@@ -20,6 +20,7 @@ __all__ = [
     "model_create_matrix",
     "model_promote_to_enterprise",
     "model_write_help",
+    "model_write_modeling_guidance",
 ]
 
 

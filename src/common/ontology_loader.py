@@ -37,8 +37,9 @@ for _name, _info in _entity_data["entity_types"].items():
         subdir=_info["subdir"],
         archimate_domain=_info["archimate_domain"],
         archimate_element_type=_info["archimate_element_type"],
-        element_category=_info["element_category"],
         element_classes=tuple(_info.get("element_classes", ())),
+        create_when=_info.get("create_when", ""),
+        never_create_when=_info.get("never_create_when", ""),
     )
 
 # ── CONNECTION_TYPES ─────────────────────────────────────────────────────
@@ -67,11 +68,6 @@ for _etype, _einfo in ENTITY_TYPES.items():
         CLASS_MEMBERS.setdefault(_cls, []).append(_etype)
 
 ALL_ENTITY_TYPE_NAMES: list[str] = sorted(ENTITY_TYPES)
-
-# ── Category map ─────────────────────────────────────────────────────────
-CATEGORY_MAP: dict[str, str] = {
-    n: info.element_category for n, info in ENTITY_TYPES.items()
-}
 
 # ── Symmetric connections ────────────────────────────────────────────────
 SYMMETRIC_CONNECTIONS: frozenset[str] = frozenset(

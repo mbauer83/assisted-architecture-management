@@ -103,7 +103,13 @@ def format_outgoing_markdown(
     Each entry in *connections* should have keys:
       - ``connection_type``: e.g. ``archimate-realization``
       - ``target_entity``: target artifact-id
-      - ``description``: prose description of the relationship
+      - ``description``: prose description of the relationship (optional)
+      - ``src_cardinality``: source-end cardinality (optional, e.g. "1", "0..1", "1..*", "*")
+      - ``tgt_cardinality``: target-end cardinality (optional, same format)
+
+    Header format:  ### conn-type [src_card] → [tgt_card] target_id
+    Both cardinality parts are omitted when absent.  Cardinalities are not
+    permitted on junction connections.
     """
     frontmatter = {
         "source-entity": source_entity,
@@ -118,8 +124,13 @@ def format_outgoing_markdown(
         conn_type = conn["connection_type"]
         target = conn["target_entity"]
         desc = conn.get("description", "").strip()
+        src_card = conn.get("src_cardinality", "").strip()
+        tgt_card = conn.get("tgt_cardinality", "").strip()
+
+        src_part = f" [{src_card}]" if src_card else ""
+        tgt_part = f"[{tgt_card}] " if tgt_card else ""
         sections.append("")
-        sections.append(f"### {conn_type} → {target}")
+        sections.append(f"### {conn_type}{src_part} → {tgt_part}{target}")
         if desc:
             sections.append("")
             sections.append(desc)

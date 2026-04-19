@@ -68,14 +68,14 @@ Statuses: `draft | active | deprecated`
 model/
   motivation/     # stakeholders, drivers, assessments, goals, outcomes, principles, requirements, values
   strategy/       # capabilities, value-streams, resources, courses-of-action
-  business/       # actors, objects, interfaces, collaborations, contracts, representations, products
-  common/         # services, processes, functions, events, interactions, roles (behavioral — shared across domains)
+  business/       # actors, objects, interfaces, collaborations, products
+  common/         # services, processes, functions, events, roles (behavioral — shared across domains)
   application/    # components, collaborations, interfaces, data-objects
   technology/     # nodes, devices, system-software, artifacts, paths, networks
   implementation/ # (future: work-packages, deliverables)
 ```
 
-All behavioral elements (services, processes, functions, events, interactions) and roles go in
+All behavioral elements (services, processes, functions, events) and roles go in
 `model/common/`, not under business/application/technology.
 
 ### D5. Requirement Specialization Hierarchy

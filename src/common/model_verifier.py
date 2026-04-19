@@ -1,6 +1,7 @@
 """ERP v2.0 model verification facade with modular helper backends."""
 
 
+import re
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from collections.abc import Callable
@@ -53,6 +54,37 @@ from src.common.model_verifier_types import (
     VerifierRuntimeConfig,
     entity_id_from_path,
 )
+
+
+# Cardinality: n  |  n..m  |  n..*  |  *
+_CARDINALITY_RE = re.compile(r"^\d+$|^\d+\.\.\d+$|^\d+\.\.\*$|^\*$")
+
+# Connection header after "### ":
+#   conn-type [[src_card]] → [[tgt_card] ]target_id
+_CONN_HEADER_RE = re.compile(
+    r"^(?P<conn_type>[a-z][a-z0-9-]+)"
+    r"(?:\s+\[(?P<src_card>[^\]]+)\])?"
+    r"\s+→\s+"
+    r"(?:\[(?P<tgt_card>[^\]]+)\]\s+)?"
+    r"(?P<target_id>\S+)$"
+)
+
+
+def _parse_conn_header(header: str) -> tuple[str, str, str, str] | None:
+    """Parse a connection header line (after '### ').
+
+    Returns (conn_type, src_card, tgt_card, target_id) or None on failure.
+    src_card / tgt_card are empty strings when absent.
+    """
+    m = _CONN_HEADER_RE.match(header)
+    if not m:
+        return None
+    return (
+        m.group("conn_type"),
+        m.group("src_card") or "",
+        m.group("tgt_card") or "",
+        m.group("target_id"),
+    )
 
 
 class ModelVerifier:
@@ -153,20 +185,26 @@ class ModelVerifier:
         for line in content.splitlines():
             if line.startswith("### "):
                 header = line[4:].strip()
-                if " → " not in header:
+                parsed = _parse_conn_header(header)
+                if parsed is None:
                     result.issues.append(Issue(
                         Severity.ERROR, "E122",
                         f"Connection header missing ' → ' separator: '{header}'", loc,
                     ))
                     continue
-                conn_type, target_id = header.split(" → ", 1)
-                conn_type = conn_type.strip()
-                target_id = target_id.strip()
+                conn_type, src_card, tgt_card, target_id = parsed
                 if conn_type not in CONNECTION_TYPES:
                     result.issues.append(Issue(
                         Severity.ERROR, "E123",
                         f"Unknown connection type '{conn_type}'", loc,
                     ))
+                for card_label, card_val in (("source", src_card), ("target", tgt_card)):
+                    if card_val and not _CARDINALITY_RE.match(card_val):
+                        result.issues.append(Issue(
+                            Severity.ERROR, "E125",
+                            f"Invalid {card_label} cardinality '{card_val}' in '{header}' "
+                            f"— expected n, n..m, n..*, or *", loc,
+                        ))
                 if self.registry is not None and target_id not in allowed_entities:
                     if target_id in all_entities_for_scope and file_scope == "enterprise":
                         result.issues.append(Issue(
