@@ -24,6 +24,26 @@ server. Never read or write model files directly.
 
 Apply these before deciding what to create. They govern *when* and *how much* to model.
 
+### Domain-driven thinking first
+
+ArchiMate is a notation language, not a thinking framework. Before deciding which element types to use, reason about the problem domain and solution domain from first principles:
+
+- **Problem domain:** What forces, trends, or conditions is this enterprise subject to? What do stakeholders actually care about and why? What problems are unresolved? Research and reason about this — don't just transcribe what the user says. The quality of the motivation layer depends on genuine understanding of the drivers at work.
+- **Solution domain:** What capabilities, processes, and components actually address these problems? What does the architecture provide that changes the situation? Again, reason about the solution before selecting element types.
+
+ArchiMate elements should map onto real domain concepts that have been understood first. Choose the element type *after* you have identified the concept, not by fitting available concepts into pre-selected types. When in doubt, name the concept clearly and then ask: which ArchiMate type fits best?
+
+This is especially important in the Motivation domain: a driver should reflect a real force or condition; an assessment should capture a genuine judgment about its consequences; a goal should express an intent that stakeholders actually hold. These should not be invented to fill a template.
+
+### Iterative, progressive modeling
+
+Modeling is not completed in a single pass. The depth of the model should match current knowledge:
+
+- Early in a project, drivers and goals may be identified without detailed outcomes or requirements.
+- Outcomes add measurability and can be introduced as the understanding of success criteria matures.
+- Requirements may connect directly to goals (via influence or association) when outcomes are not yet defined; this is a valid intermediate state, not an error.
+- Each modeling session should improve the highest-leverage gaps — don't wait for completeness in one area before moving to another.
+
 ### Selective domain coverage
 
 No engagement requires content in all domains. Determine which domains are relevant
@@ -60,9 +80,7 @@ apply the same test to what hasn't been modeled yet.
 
 ### Recommended sequencing for a planning or modeling effort
 
-1. **Motivation first.** Goals, outcomes, and requirements must be coherent and
-   connected to drivers and stakeholders before anything else is built. Improve or
-   complete the motivation model if it is not yet adequate.
+1. **Motivation first.** Drivers, stakeholders, goals, and requirements must be coherent and connected before anything else is built. Outcomes add measurability and can be introduced iteratively — they are not required for every goal at every stage. Improve or complete the motivation model to the depth appropriate to the current iteration of the modeling task.
 2. **Common, Business, Application.** Apply the Pareto principle throughout.
 3. **Implementation & Migration** when the engagement explicitly involves planning or
    tracking change — infer from context.
@@ -145,9 +163,11 @@ the right tool without guessing.
 | `model_edit_connection` | Update description/cardinalities (`operation="update"`) or delete a connection (`operation="remove"`); always `dry_run=true` first |
 
 ### Verification
-Verification runs automatically on every write tool call. Check the `verification`
-field in the response — it reports any constraint violations. There is no need to
-call a separate verify tool after creating or editing.
+| Tool | When to use |
+|---|---|
+| `model_verify` | Run repo-wide verification after a large batch of changes or at the end of a modeling session. Returns issue counts and files with errors/warnings. Use `return_mode="full"` for per-issue detail, `repo_scope="engagement"` to target the current repo. Fix all errors before closing a session; resolve warnings on any entity you created or modified. |
+
+Per-entity verification runs automatically on every write — check the `verification` field in each response for immediate feedback. `model_verify` is for batch-end or session-end repo-wide checks, not after every individual write.
 
 ---
 
@@ -194,6 +214,9 @@ Call with `dry_run=true`. Read the `content` preview — verify type, name, summ
 **Step 6 — Commit and verify.**
 Call with `dry_run=false`. Check the `verification` field in the response. If it reports errors, fix the underlying issue (wrong type, missing required connection, invalid relationship) and re-dry-run before retrying. Report `artifact_id` values to the user.
 
+**Step 7 — Repo-wide verification (after large batches or at session end).**
+After creating or modifying more than a handful of entities, run `model_verify(repo_scope="engagement", return_mode="full")`. Fix all errors; resolve warnings on any entity you created or edited this session. Pre-existing warnings on untouched files are not your responsibility to fix unless specifically asked.
+
 ### Writing good entity summaries
 
 The `summary` parameter is the most important free-text field — it's what makes the model self-documenting and searchable. Write one sentence answering: *what is this element and what role does it play in the architecture?* Avoid restating the name or type. A requirement summary should state the actual constraint; a process summary should state what it does and why it matters.
@@ -209,12 +232,12 @@ before committing to a type — it provides the full guidance and permitted conn
 | Type | Create when | Never create when |
 |---|---|---|
 | `stakeholder` | Generalized perspectives affected by and interested in the architecture | Every individual without abstraction |
-| `driver` | Internal/external factors motivating the enterprise to define goals | Too operational, concrete, or solution-oriented |
-| `assessment` | Statements/judgments about states of affairs related to drivers | Too vague, directional, or describes a role performing evaluation |
-| `goal` | High-level statements of intent or desired states | Too specific (→ requirement), or describes an achieved result (→ outcome) |
-| `outcome` | Observable strategic results, performance metrics, target states | General intent/direction (→ goal), or describes a strategy |
+| `driver` | Internal/external forces, trends, or conditions motivating the enterprise to define goals; external drivers need not connect to any stakeholder | Too operational, concrete, solution-oriented, or expresses a judgment about a specific state of affairs (→ assessment) |
+| `assessment` | Specific judgments about what a driver means for the enterprise — the conclusion that a force creates a particular problem or gap motivating a goal | Too vague, directional, or describes a role performing an evaluation rather than a conclusion about enterprise context |
+| `goal` | High-level statements of intent or desired states; must link to at least one stakeholder and one driver or assessment; may connect to requirements directly when outcomes are not yet defined | Too specific (→ requirement), or describes an achieved/measurable result (→ outcome) |
+| `outcome` | Observable results or target states that represent meaningful progress toward a goal; added iteratively as success criteria become clearer | General intent/direction (→ goal), or describes a strategy or process |
 | `principle` | Broad, lasting normative rules informing how the enterprise operates | Too specific, narrow, or situative; widely understood policies without architectural impact |
-| `requirement` | Specific statements of need, obligation, constraint, or prohibition | Too general or high-level (→ goal), or not directly relevant to the architecture |
+| `requirement` | Specific statements of need, obligation, constraint, or prohibition; realizes outcomes or principles; may influence or associate with goals directly when no outcome intermediary exists | Too general or high-level (→ goal), or not directly relevant to the architecture |
 | `meaning` | How specific stakeholders interpret architecture elements | Not specific or interest-relative; doesn't resolve relevant ambiguity |
 | `value` | Worth, utility, or benefit of elements to external stakeholders | Not specific; doesn't clarify how the architecture provides value |
 
@@ -277,7 +300,7 @@ before committing to a type — it provides the full guidance and permitted conn
 
 ### Common disambiguation calls
 
-**goal vs. outcome vs. requirement:** A goal states a desired direction ("improve reliability"). An outcome is a measurable, observable result that signals the goal is achieved ("99.9% uptime over 30 days"). A requirement is a specific constraint or obligation the architecture must satisfy to reach that outcome ("the system must recover from failure within 30 seconds"). When an element has both a directional intent and a specific measurable target, split it.
+**goal vs. outcome vs. requirement:** A goal states a desired direction ("improve reliability"). An outcome is an observable result or target state indicating meaningful progress toward the goal ("architecture review rework rate measurably reduced"). A requirement is a specific constraint or obligation the architecture must satisfy ("the system must verify referential integrity on every write"). Outcomes are not required for every goal — requirements may connect to goals directly (via influence or association) when outcomes are not yet defined. When an element has both directional intent and a specific measurable target, split it into a goal and an outcome. A requirement never realizes a goal; it realizes outcomes or principles, and may influence or associate with goals.
 
 **process vs. function:** Ask whether the grouping principle is *sequence* (this happens, then that) or *resource/capability* (these activities share the same people, knowledge, or system). Sequence → process. Shared resource → function.
 
@@ -311,7 +334,7 @@ before committing to a type — it provides the full guidance and permitted conn
 - `usecase-*` — use-case diagrams only
 
 ### Key permitted relationship patterns
-- **Motivation chain:** `driver --association--> assessment --association--> goal`, `outcome --realization--> goal`, `requirement --realization--> outcome/principle`
+- **Motivation chain:** `driver --influence/association--> assessment --association--> goal`, `outcome --realization--> goal`, `requirement --realization--> outcome/principle`; requirements may also `--influence/association--> goal` directly when no outcome intermediary is modeled; external drivers need not connect to any stakeholder
 - **Strategy:** `capability --realization--> course-of-action`, `resource --assignment--> capability`
 - **Cross-layer realizations:** `process/function --realization--> service`, `artifact --realization--> application-component`, `data-object --realization--> business-object`, `application-interface --realization--> business-interface`
 - **Universal:** `archimate-association` (symmetric, always valid between any two types)

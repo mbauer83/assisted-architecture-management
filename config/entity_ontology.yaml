@@ -33,8 +33,8 @@ entity_types:
     archimate_domain: Motivation
     archimate_element_type: Driver
     element_classes: [motivation-element]
-    create_when: "Create drivers to model internal or external factors (conditions, dynamics, trends etc.) that motivate the enterprise to define its goals and implement changes. Drivers should be associated with one or more stakeholders and one or more goals / outcomes / assessments etc."
-    never_create_when: "Don't model something as a driver that is too operational, concrete or solution-oriented. Drivers should be more high-level, strategic and enduring in nature."
+    create_when: "Create drivers to model internal or external factors (conditions, dynamics, trends etc.) that motivate the enterprise to define its goals and implement changes. External drivers (market forces, technology trends, regulatory changes) need not be directly associated with any stakeholder. Internal drivers should be associated with relevant stakeholders. Drivers should influence one or more goals or assessments."
+    never_create_when: "Don't model something as a driver that is too operational, concrete or solution-oriented. Drivers should be high-level, strategic and enduring in nature. Don't model a specific judgment about a state of affairs as a driver — that is an assessment."
 
   assessment:
     prefix: ASS
@@ -43,8 +43,8 @@ entity_types:
     archimate_domain: Motivation
     archimate_element_type: Assessment
     element_classes: [motivation-element]
-    create_when: "Create assessments to model statements (judgments, evaluations, analyses) about specific states of affairs related to specific drivers of the enterprise. Assessments should be associated with one or more drivers and one or more goals / outcomes etc.."
-    never_create_when: "Don't model something as an assessment if is insufficiently specific or if it describes a direction or motivation, or a role / actor performing an evaluation. Only include if connecting drivers to goals is insufficient."
+    create_when: "Create assessments to model specific statements (judgments, evaluations, analyses) about states of affairs that arise in the context of one or more drivers. An assessment makes explicit what a driver means for the enterprise — how a force or trend creates a specific problem, gap, or condition that motivates one or more goals. Assessments should be connected to one or more drivers (via association) and one or more goals (via association or influence)."
+    never_create_when: "Don't model something as an assessment if it describes a direction or general motivation (driver), a desired state (goal), or an observable result (outcome). Don't create an assessment to describe a role or actor performing an evaluation — assessments describe conclusions about the enterprise context, not activities."
 
   goal:
     prefix: GOL
@@ -53,8 +53,8 @@ entity_types:
     archimate_domain: Motivation
     archimate_element_type: Goal
     element_classes: [motivation-element]
-    create_when: "Create goals to model high-level statements of intent or desired states of affairs that the enterprise aims to achieve. Goals can be specialized until they can be connected to specific outcomes and requirements. (Leaf-)Goals should be associated at least with one outcome."
-    never_create_when: "Don't model something as a goal if it is too specific as a \"need\" or \"mustn't\" (requirement) or describes an achieved result (outcome). Goals must also be distinguished from general rules (principles)." 
+    create_when: "Create goals to model high-level statements of intent or desired states of affairs that the enterprise aims to achieve. Goals should be associated with at least one stakeholder and connected to at least one driver or assessment. Goals may be refined progressively: initially they may connect directly to requirements; outcomes can be added iteratively as the model matures to add measurability between goals and their requirements."
+    never_create_when: "Don't model something as a goal if it is too specific as a need or constraint (requirement) or describes an achieved or measurable result (outcome). Goals must be distinguished from general normative rules (principles)."
 
 
   outcome:
@@ -84,7 +84,7 @@ entity_types:
     archimate_domain: Motivation
     archimate_element_type: Requirement
     element_classes: [motivation-element]
-    create_when: "Create requirements to model specific statements of need, obligation, constraint or prohibition that the architecture must satisfy in order to achieve the enterprise's goals and fulfill its motivations. Requirements should be associated with at least one outcome or principle."
+    create_when: "Create requirements to model specific statements of need, obligation, constraint or prohibition that the architecture must satisfy in order to achieve the enterprise's goals and fulfill its motivations. Requirements should realize at least one outcome or principle. Requirements may also influence or be associated with goals directly, but do not realize goals — the realization chain runs through outcomes (or principles). Where outcomes are not yet modeled, use influence or association to connect requirements to goals."
     never_create_when: "Don't model something as a requirement if it is too general or high-level (goal) or not directly relevant to the architecture."
 
   meaning:

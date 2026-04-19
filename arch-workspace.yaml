@@ -5,4 +5,4 @@ engagement:
   local: engagements/ENG-ARCH-REPO/architecture-repository
 
 enterprise:
-  git: { url: "git@github.com:mbauer83/global-architecture-repository.git", branch: main, path: ./enterprise-repository }
+  git: { url: "git@github.com-personal:mbauer83/global-architecture-repository.git", branch: main, path: ./enterprise-repository }
