@@ -17,46 +17,57 @@ connection_types:
     archimate-composition:
       directory: composition
       archimate_relationship_type: Composition
+      puml_arrow: "-->"
       symmetric: false
     archimate-aggregation:
       directory: aggregation
       archimate_relationship_type: Aggregation
+      puml_arrow: "-->"
       symmetric: false
     archimate-assignment:
       directory: assignment
       archimate_relationship_type: Assignment
+      puml_arrow: "-->"
       symmetric: false
     archimate-realization:
       directory: realization
       archimate_relationship_type: Realization
+      puml_arrow: "..|>"
       symmetric: false
     archimate-serving:
       directory: serving
       archimate_relationship_type: Serving
+      puml_arrow: "-->"
       symmetric: false
     archimate-access:
       directory: access
       archimate_relationship_type: Access
+      puml_arrow: "-->"
       symmetric: false
     archimate-influence:
       directory: influence
       archimate_relationship_type: Influence
+      puml_arrow: "..>"
       symmetric: false
     archimate-association:
       directory: association
       archimate_relationship_type: Association
+      puml_arrow: "--"
       symmetric: true
     archimate-specialization:
       directory: specialization
       archimate_relationship_type: Specialization
+      puml_arrow: "--|>"
       symmetric: false
     archimate-flow:
       directory: flow
       archimate_relationship_type: Flow
+      puml_arrow: "..>"
       symmetric: false
     archimate-triggering:
       directory: triggering
       archimate_relationship_type: Triggering
+      puml_arrow: "-->"
       symmetric: false
 
   er:

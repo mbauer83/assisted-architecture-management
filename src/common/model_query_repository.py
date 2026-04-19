@@ -253,7 +253,7 @@ class ModelRepository:
     ) -> list[ArtifactSummary]:
         self._ensure_loaded()
         types = _to_set(artifact_type)
-        domains = _to_set(domain)
+        domains = {d.lower() for d in _to_set(domain)}
         statuses = _to_set(status)
 
         results: list[ArtifactSummary] = []
@@ -319,7 +319,7 @@ class ModelRepository:
         prefer_record_type: Literal["entity", "connection", "diagram"] | None = None,
         strict_record_type: bool = False,
     ) -> SearchResult:
-        domains = _to_set(domain)
+        domains = {d.lower() for d in _to_set(domain)}
         types = _to_set(artifact_type)
         return self.search(
             query,

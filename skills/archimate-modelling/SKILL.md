@@ -123,6 +123,12 @@ map of everything in the model.
 - **Propose intermediate results for discussion.** A partial diagram shared early is
   more valuable than a complete one shared too late. Iterate toward the goal.
 
+**PlantUML rules (hard-won — violating these causes rendering errors):**
+- **Verify connections in the model before drawing them.** Use `model_query_find_connections_for` on each source entity; never assume a connection exists. Diagrams referencing non-existent connections render with errors or misrepresent the model.
+- **No newlines in label strings.** The MCP tool passes `\n` as a literal newline character (0x0A) inside double-quoted PlantUML strings, which is a syntax error. Use full single-line labels only.
+- **Use `left to right direction`** for dense goal→outcome or requirement→service layers; default top-down direction becomes unreadable beyond ~10 elements.
+- **Realization arrows in PUML:** `TARGET -left-|> SOURCE : <<realization>>` points from concrete to abstract (correct ArchiMate direction).
+
 ---
 
 ## MCP Tool Map
@@ -139,7 +145,7 @@ the right tool without guessing.
 ### Reading and searching
 | Tool | When to use |
 |---|---|
-| `model_query_list_artifacts` | List artifacts with AND-filtered metadata (domain, artifact_type, status); returns summaries only |
+| `model_query_list_artifacts` | List artifacts with AND-filtered metadata (domain, artifact_type, status); returns summaries only. Domain values are case-insensitive; canonical lowercase form: `"common"`, `"motivation"`, `"strategy"`, `"business"`, `"application"`, `"technology"`, `"implementation"`. |
 | `model_query_read_artifact` | Read one artifact by `artifact_id`; use `mode="summary"` for frontmatter + snippet, `mode="full"` for complete content |
 | `model_query_search_artifacts` | Keyword search across all artifacts; use for duplicate checks and exploration |
 | `model_query_find_connections_for` | Find connections touching a specific entity; filter by direction (`any`/`outbound`/`inbound`) and/or `conn_type` |
@@ -156,10 +162,12 @@ the right tool without guessing.
 | `model_create_entity` | Create a new entity; always call with `dry_run=true` first |
 | `model_add_connection` | Add a connection between two entities; always `dry_run=true` first; automatically creates a GRF proxy when connecting to an enterprise entity |
 
+> **Parallel write limit:** `model_create_entity` and `model_add_connection` stall when more than ~8 are issued in the same parallel batch. Issue write calls in sequential batches of ≤8; read/query calls can remain parallel.
+
 ### Editing
 | Tool | When to use |
 |---|---|
-| `model_edit_entity` | Update `name`, `summary`, `properties`, `notes`, `keywords`, `version`, or `status` on an existing entity; always `dry_run=true` first |
+| `model_edit_entity` | Update `name`, `summary`, `properties`, `notes`, `keywords`, `version`, or `status` on an existing entity; always `dry_run=true` first. **Cannot change `artifact_type`** — fix wrong types by direct file edit as a last resort. |
 | `model_edit_connection` | Update description/cardinalities (`operation="update"`) or delete a connection (`operation="remove"`); always `dry_run=true` first |
 
 ### Verification

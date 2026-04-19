@@ -22,6 +22,7 @@ class EntityTypeInfo:
     element_classes: tuple[str, ...]  # ArchiMate NEXT classification classes
     create_when: str
     never_create_when: str
+    has_sprite: bool = False
 
 
 @dataclass(frozen=True)
@@ -36,3 +37,4 @@ class ConnectionTypeInfo:
     conn_dir: str
     archimate_relationship_type: str | None = None
     symmetric: bool = False
+    puml_arrow: str = "-->"

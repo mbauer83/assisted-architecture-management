@@ -20,7 +20,9 @@ def register_query_search_tools(mcp: FastMCP) -> None:
         description=(
             "Search artifacts by text query (keyword-scored; may include semantic supplement if configured). "
             "Returns ranked hits as (score + summary record). "
-            "\n\nFilters: limit, domain, artifact_type, include_connections, include_diagrams."
+            "\n\nFilters: limit, domain, artifact_type, include_connections, include_diagrams. "
+            "Domain filter is case-insensitive; canonical lowercase values: "
+            "\"common\", \"motivation\", \"strategy\", \"business\", \"application\", \"technology\", \"implementation\"."
             "\n\nRepo selection: repo_scope defaults to both (engagement + enterprise)."
         ),
         structured_output=True,

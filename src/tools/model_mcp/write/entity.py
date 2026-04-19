@@ -51,6 +51,8 @@ def model_create_entity(
 
 
 def register(mcp: FastMCP) -> None:
+    from src.tools.model_mcp.write_queue import queued
+
     mcp.tool(
         name="model_write_help", title="Model Write: Type Catalog",
         description=(
@@ -83,4 +85,4 @@ def register(mcp: FastMCP) -> None:
             "config (repo_root optional). dry_run=true validates without writing."
         ),
         structured_output=True,
-    )(model_create_entity)
+    )(queued(model_create_entity))

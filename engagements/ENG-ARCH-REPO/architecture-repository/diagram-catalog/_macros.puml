@@ -156,6 +156,9 @@
 !procedure $DECL_REQ_V5EdQk()
   rectangle "<$archimate_Requirement{scale=1.5}> Markdown Format" <<Requirement>> as REQ_V5EdQk
 !endprocedure
+!procedure $DECL_REQ_X5jYC0()
+  rectangle "<$archimate_Requirement{scale=1.5}> Concurrent Tool-Call Handling" <<Requirement>> as REQ_X5jYC0
+!endprocedure
 !procedure $DECL_REQ_cz8L4W()
   rectangle "<$archimate_Requirement{scale=1.5}> Git-Based Repository Configuration" <<Requirement>> as REQ_cz8L4W
 !endprocedure
@@ -230,11 +233,20 @@
 !procedure $DECL_SRV_3I3Dtc()
   rectangle "<$archimate_Service{scale=1.5}> Indexing Service" <<Service>> as SRV_3I3Dtc
 !endprocedure
+!procedure $DECL_SRV_AIGnSY()
+  rectangle "<$archimate_Service{scale=1.5}> Diagram Scaffolding Service" <<Service>> as SRV_AIGnSY
+!endprocedure
 !procedure $DECL_SRV_Au1Th1()
   rectangle "<$archimate_Service{scale=1.5}> Authoring Service" <<Service>> as SRV_Au1Th1
 !endprocedure
+!procedure $DECL_SRV_EQmHDg()
+  rectangle "<$archimate_Service{scale=1.5}> Architecture Conformance Service" <<Service>> as SRV_EQmHDg
+!endprocedure
 !procedure $DECL_SRV_Ij6Kl6()
   rectangle "<$archimate_Service{scale=1.5}> Validation Service" <<Service>> as SRV_Ij6Kl6
+!endprocedure
+!procedure $DECL_SRV_M5EG4U()
+  rectangle "<$archimate_Service{scale=1.5}> Implementation Guidance Service" <<Service>> as SRV_M5EG4U
 !endprocedure
 !procedure $DECL_SRV_Qr8St8()
   rectangle "<$archimate_Service{scale=1.5}> Discovery, Querying & Stats Service" <<Service>> as SRV_Qr8St8
@@ -245,11 +257,41 @@
 !procedure $DECL_SRV_e5MCiF()
   rectangle "<$archimate_Service{scale=1.5}> Configuration Service" <<Service>> as SRV_e5MCiF
 !endprocedure
+!procedure $DECL_PRC_00bowZ()
+  rectangle "<$archimate_Process{scale=1.5}> Run Quality Gates" <<Process>> as PRC_00bowZ
+!endprocedure
+!procedure $DECL_PRC_0NPVDb()
+  rectangle "<$archimate_Process{scale=1.5}> Author Model Artifact" <<Process>> as PRC_0NPVDb
+!endprocedure
 !procedure $DECL_PRC_0Rz5Ex()
   rectangle "<$archimate_Process{scale=1.5}> Promote Artifact" <<Process>> as PRC_0Rz5Ex
 !endprocedure
-!procedure $DECL_PRC_iGIf7W()
-  rectangle "<$archimate_Process{scale=1.5}> Create Diagram" <<Process>> as PRC_iGIf7W
+!procedure $DECL_PRC_2LTLXq()
+  rectangle "<$archimate_Process{scale=1.5}> Assess Implementation Against Model" <<Process>> as PRC_2LTLXq
+!endprocedure
+!procedure $DECL_PRC_9jDEGV()
+  rectangle "<$archimate_Process{scale=1.5}> Receive Implementation Query" <<Process>> as PRC_9jDEGV
+!endprocedure
+!procedure $DECL_PRC_9z9W91()
+  rectangle "<$archimate_Process{scale=1.5}> Extract Architecture Baseline" <<Process>> as PRC_9z9W91
+!endprocedure
+!procedure $DECL_PRC_GHVpDA()
+  rectangle "<$archimate_Process{scale=1.5}> Guide Implementation" <<Process>> as PRC_GHVpDA
+!endprocedure
+!procedure $DECL_PRC_L8tjrh()
+  rectangle "<$archimate_Process{scale=1.5}> Compute Dependency Closure" <<Process>> as PRC_L8tjrh
+!endprocedure
+!procedure $DECL_PRC_Tz_a_O()
+  rectangle "<$archimate_Process{scale=1.5}> Initialize Repository" <<Process>> as PRC_Tz_a_O
+!endprocedure
+!procedure $DECL_PRC_U4aAdh()
+  rectangle "<$archimate_Process{scale=1.5}> Architecture Modelling & Planning" <<Process>> as PRC_U4aAdh
+!endprocedure
+!procedure $DECL_PRC_YnnXpZ()
+  rectangle "<$archimate_Process{scale=1.5}> Report Architecture Deviations" <<Process>> as PRC_YnnXpZ
+!endprocedure
+!procedure $DECL_PRC_dEhS8H()
+  rectangle "<$archimate_Process{scale=1.5}> Synthesize Implementation Guidance" <<Process>> as PRC_dEhS8H
 !endprocedure
 !procedure $DECL_PRC_iJuFgE()
   rectangle "<$archimate_Process{scale=1.5}> Index Repository" <<Process>> as PRC_iJuFgE
@@ -257,23 +299,53 @@
 !procedure $DECL_PRC_oLRrwL()
   rectangle "<$archimate_Process{scale=1.5}> Verify Model" <<Process>> as PRC_oLRrwL
 !endprocedure
-!procedure $DECL_PRC_ocenhK()
-  rectangle "<$archimate_Process{scale=1.5}> Create Connection" <<Process>> as PRC_ocenhK
+!procedure $DECL_PRC_ovDBpv()
+  rectangle "<$archimate_Process{scale=1.5}> Deliver Implementation Guidance" <<Process>> as PRC_ovDBpv
 !endprocedure
-!procedure $DECL_PRC_pFq3jC()
-  rectangle "<$archimate_Process{scale=1.5}> Create Entity" <<Process>> as PRC_pFq3jC
+!procedure $DECL_PRC_phHJht()
+  rectangle "<$archimate_Process{scale=1.5}> Execute Promotion" <<Process>> as PRC_phHJht
+!endprocedure
+!procedure $DECL_PRC_pxK4fR()
+  rectangle "<$archimate_Process{scale=1.5}> Retrieve Architectural Context" <<Process>> as PRC_pxK4fR
 !endprocedure
 !procedure $DECL_PRC_vGhe4Z()
   rectangle "<$archimate_Process{scale=1.5}> Query Model" <<Process>> as PRC_vGhe4Z
 !endprocedure
+!procedure $DECL_PRC_vOWkdL()
+  rectangle "<$archimate_Process{scale=1.5}> Scaffold Diagram" <<Process>> as PRC_vOWkdL
+!endprocedure
+!procedure $DECL_PRC_vlE_5j()
+  rectangle "<$archimate_Process{scale=1.5}> Review Architecture Conformance" <<Process>> as PRC_vlE_5j
+!endprocedure
+!procedure $DECL_FNC_3jpc7O()
+  rectangle "<$archimate_Function{scale=1.5}> Metadata Filter" <<Function>> as FNC_3jpc7O
+!endprocedure
 !procedure $DECL_FNC_B_F_Sq()
   rectangle "<$archimate_Function{scale=1.5}> Attribute Schema Validation" <<Function>> as FNC_B_F_Sq
+!endprocedure
+!procedure $DECL_FNC_BdEMPx()
+  rectangle "<$archimate_Function{scale=1.5}> Graph Traversal" <<Function>> as FNC_BdEMPx
+!endprocedure
+!procedure $DECL_FNC_YD31f3()
+  rectangle "<$archimate_Function{scale=1.5}> Serialize Write Requests" <<Function>> as FNC_YD31f3
 !endprocedure
 !procedure $DECL_FNC_ahr0mT()
   rectangle "<$archimate_Function{scale=1.5}> Frontmatter Validation" <<Function>> as FNC_ahr0mT
 !endprocedure
+!procedure $DECL_FNC_b3mOTJ()
+  rectangle "<$archimate_Function{scale=1.5}> Build Connection Graph" <<Function>> as FNC_b3mOTJ
+!endprocedure
+!procedure $DECL_FNC_bFY40B()
+  rectangle "<$archimate_Function{scale=1.5}> Full-Text Search" <<Function>> as FNC_bFY40B
+!endprocedure
+!procedure $DECL_FNC_bPhoR2()
+  rectangle "<$archimate_Function{scale=1.5}> Frontmatter Parsing" <<Function>> as FNC_bPhoR2
+!endprocedure
 !procedure $DECL_FNC_eAkU8w()
   rectangle "<$archimate_Function{scale=1.5}> Referential Integrity Check" <<Function>> as FNC_eAkU8w
+!endprocedure
+!procedure $DECL_FNC_n_JYA2()
+  rectangle "<$archimate_Function{scale=1.5}> Alias Resolution" <<Function>> as FNC_n_JYA2
 !endprocedure
 !procedure $DECL_FNC_wIVwom()
   rectangle "<$archimate_Function{scale=1.5}> PlantUML Syntax Check" <<Function>> as FNC_wIVwom
@@ -284,16 +356,34 @@
 !procedure $DECL_EVT_P4HzNt()
   rectangle "<$archimate_Event{scale=1.5}> Entity Created" <<Event>> as EVT_P4HzNt
 !endprocedure
+!procedure $DECL_EVT_Y7qmHh()
+  rectangle "<$archimate_Event{scale=1.5}> Artifact Promoted" <<Event>> as EVT_Y7qmHh
+!endprocedure
+!procedure $DECL_EVT_b6XB2D()
+  rectangle "<$archimate_Event{scale=1.5}> Repository Indexed" <<Event>> as EVT_b6XB2D
+!endprocedure
+!procedure $DECL_EVT_yQI1rI()
+  rectangle "<$archimate_Event{scale=1.5}> Verification Failed" <<Event>> as EVT_yQI1rI
+!endprocedure
 !procedure $DECL_ROL_6VGCvh()
   rectangle "<$archimate_Role{scale=1.5}> Reviewer" <<Role>> as ROL_6VGCvh
 !endprocedure
 !procedure $DECL_ROL_deMuTj()
   rectangle "<$archimate_Role{scale=1.5}> Author" <<Role>> as ROL_deMuTj
 !endprocedure
+!procedure $DECL_ROL_lM1u7O()
+  rectangle "<$archimate_Role{scale=1.5}> Developer" <<Role>> as ROL_lM1u7O
+!endprocedure
+!procedure $DECL_ROL_udXPfB()
+  rectangle "<$archimate_Role{scale=1.5}> AI Agent" <<Role>> as ROL_udXPfB
+!endprocedure
 
 ' ---------------------------------------------------------------------------
 ' Business
 ' ---------------------------------------------------------------------------
+!procedure $DECL_ACT_CUvO_l()
+  rectangle "<$archimate_BusinessActor{scale=1.5}> AI Language Model" <<BusinessActor>> as ACT_CUvO_l
+!endprocedure
 !procedure $DECL_ACT_Nn7Oo7()
   rectangle "<$archimate_BusinessActor{scale=1.5}> Architect" <<BusinessActor>> as ACT_Nn7Oo7
 !endprocedure
@@ -340,8 +430,17 @@
 !procedure $DECL_APP_JOmFWy()
   rectangle "<$archimate_ApplicationComponent{scale=1.5}> SQLite Indexer" <<ApplicationComponent>> as APP_JOmFWy
 !endprocedure
+!procedure $DECL_APP_SCKD2U()
+  rectangle "<$archimate_ApplicationComponent{scale=1.5}> Diagram Scaffolder" <<ApplicationComponent>> as APP_SCKD2U
+!endprocedure
 !procedure $DECL_APP_YOOEbL()
   rectangle "<$archimate_ApplicationComponent{scale=1.5}> Frontmatter Parser" <<ApplicationComponent>> as APP_YOOEbL
+!endprocedure
+!procedure $DECL_APP__5znuv()
+  rectangle "<$archimate_ApplicationComponent{scale=1.5}> Promotion Engine" <<ApplicationComponent>> as APP__5znuv
+!endprocedure
+!procedure $DECL_APP_a9k_mJ()
+  rectangle "<$archimate_ApplicationComponent{scale=1.5}> Write Request Queue" <<ApplicationComponent>> as APP_a9k_mJ
 !endprocedure
 !procedure $DECL_APP_ca3vm7()
   rectangle "<$archimate_ApplicationComponent{scale=1.5}> Model Verifier" <<ApplicationComponent>> as APP_ca3vm7
@@ -358,8 +457,14 @@
 !procedure $DECL_APP_rgulJL()
   rectangle "<$archimate_ApplicationComponent{scale=1.5}> Macro Generator" <<ApplicationComponent>> as APP_rgulJL
 !endprocedure
+!procedure $DECL_APP_tIMxjr()
+  rectangle "<$archimate_ApplicationComponent{scale=1.5}> Promotion Engine" <<ApplicationComponent>> as APP_tIMxjr
+!endprocedure
 !procedure $DECL_APP_v9LvfK()
   rectangle "<$archimate_ApplicationComponent{scale=1.5}> Query Engine" <<ApplicationComponent>> as APP_v9LvfK
+!endprocedure
+!procedure $DECL_APP_w51oVF()
+  rectangle "<$archimate_ApplicationComponent{scale=1.5}> Workspace Initializer" <<ApplicationComponent>> as APP_w51oVF
 !endprocedure
 !procedure $DECL_APP_yNhgdh()
   rectangle "<$archimate_ApplicationComponent{scale=1.5}> Model Registry" <<ApplicationComponent>> as APP_yNhgdh
@@ -382,6 +487,9 @@
 !procedure $DECL_DOB_H8UwKV()
   rectangle "<$archimate_DataObject{scale=1.5}> PlantUML Macro Library" <<DataObject>> as DOB_H8UwKV
 !endprocedure
+!procedure $DECL_DOB_I9qEoI()
+  rectangle "<$archimate_DataObject{scale=1.5}> Workspace Configuration" <<DataObject>> as DOB_I9qEoI
+!endprocedure
 !procedure $DECL_DOB_L3VfsH()
   rectangle "<$archimate_DataObject{scale=1.5}> Connection Metadata" <<DataObject>> as DOB_L3VfsH
 !endprocedure
@@ -401,6 +509,9 @@
 !procedure $DECL_SSW_o7a0ad()
   rectangle "<$archimate_SystemSoftware{scale=1.5}> Python Runtime" <<SystemSoftware>> as SSW_o7a0ad
 !endprocedure
+!procedure $DECL_SSW_uX4zkF()
+  rectangle "<$archimate_SystemSoftware{scale=1.5}> File System Service" <<SystemSoftware>> as SSW_uX4zkF
+!endprocedure
 !procedure $DECL_SSW_xVrBYD()
   rectangle "<$archimate_SystemSoftware{scale=1.5}> PlantUML Engine" <<SystemSoftware>> as SSW_xVrBYD
 !endprocedure
@@ -409,10 +520,4 @@
 !endprocedure
 !procedure $DECL_ART_YsLpM8()
   rectangle "<$archimate_Artifact{scale=1.5}> Git Repository" <<Artifact>> as ART_YsLpM8
-!endprocedure
-!procedure $DECL_TSV_MSy15f()
-  rectangle "<$archimate_TechnologyService{scale=1.5}> File System Service" <<TechnologyService>> as TSV_MSy15f
-!endprocedure
-!procedure $DECL_TSV_WluY9K()
-  rectangle "<$archimate_TechnologyService{scale=1.5}> Version Control Service" <<TechnologyService>> as TSV_WluY9K
 !endprocedure

@@ -95,6 +95,8 @@ def model_promote_to_enterprise(
 
 
 def register(mcp: FastMCP) -> None:
+    from src.tools.model_mcp.write_queue import queued
+
     mcp.tool(
         name="model_promote_to_enterprise", title="Model Write: Promote to Enterprise",
         description=(
@@ -105,4 +107,4 @@ def register(mcp: FastMCP) -> None:
             "exclude_entities / exclude_connections prune the pre-selected closure."
         ),
         structured_output=True,
-    )(model_promote_to_enterprise)
+    )(queued(model_promote_to_enterprise))

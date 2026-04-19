@@ -174,6 +174,8 @@ def model_edit_diagram(
 
 
 def register_edit_tools(mcp: FastMCP) -> None:
+    from src.tools.model_mcp.write_queue import queued
+
     mcp.tool(
         name="model_edit_entity",
         title="Model Write: Edit Entity",
@@ -183,7 +185,7 @@ def register_edit_tools(mcp: FastMCP) -> None:
             "Bumps last-updated automatically. Regenerates macros if name changes."
         ),
         structured_output=True,
-    )(model_edit_entity)
+    )(queued(model_edit_entity))
 
     mcp.tool(
         name="model_edit_connection",
@@ -196,7 +198,7 @@ def register_edit_tools(mcp: FastMCP) -> None:
             "preserve it. operation='remove' deletes the connection."
         ),
         structured_output=True,
-    )(model_edit_connection)
+    )(queued(model_edit_connection))
 
     mcp.tool(
         name="model_edit_diagram",
@@ -207,4 +209,4 @@ def register_edit_tools(mcp: FastMCP) -> None:
             "updated if provided. Re-verifies and re-renders PNG."
         ),
         structured_output=True,
-    )(model_edit_diagram)
+    )(queued(model_edit_diagram))

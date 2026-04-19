@@ -21,7 +21,9 @@ def register_query_list_read_tools(mcp: FastMCP) -> None:
             "List artifacts (metadata-only) with AND-semantics filters. "
             "Returns lightweight summaries; use artifact_type, domain, or status to narrow results. "
             "Pass fields=[...] to project only the keys you need. "
-            "include_connections and include_diagrams default to false (entities only)."
+            "include_connections and include_diagrams default to false (entities only). "
+            "Domain filter is case-insensitive; canonical lowercase values: "
+            "\"common\", \"motivation\", \"strategy\", \"business\", \"application\", \"technology\", \"implementation\"."
             "\n\nRepo selection: repo_scope defaults to both (engagement + enterprise)."
         ),
         structured_output=True,

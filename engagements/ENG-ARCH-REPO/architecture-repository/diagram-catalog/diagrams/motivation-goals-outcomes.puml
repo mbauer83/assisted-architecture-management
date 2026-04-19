@@ -1,0 +1,98 @@
+---
+artifact-id: motivation-goals-outcomes
+artifact-type: diagram
+name: "Motivation \u2014 Goals and Outcomes"
+version: 0.1.0
+status: draft
+keywords:
+- motivation
+- goals
+- outcomes
+- success-criteria
+- realization
+diagram-type: archimate-motivation
+last-updated: '2026-04-19'
+---
+@startuml motivation-goals-outcomes
+!include ../_archimate-stereotypes.puml
+!include ../_archimate-glyphs.puml
+left to right direction
+
+title Motivation — Goals & Outcomes: Success Criteria by Theme
+
+rectangle "Coherence & Validation" <<MotivationGrouping>> {
+  rectangle "<$archimate_Goal{scale=1.5}> Maintain Coherence and Traceability" <<Goal>> as GOL_Po1Qw3
+  rectangle "<$archimate_Goal{scale=1.5}> Enable Cross-Stakeholder Validation" <<Goal>> as GOL_Lm2Bn2
+  rectangle "<$archimate_Outcome{scale=1.5}> Increased Architectural Coherence" <<Outcome>> as OUT_LrpdG0
+  rectangle "<$archimate_Outcome{scale=1.5}> Stakeholder Concerns and Hand-Off Points Explicitly Verifiable" <<Outcome>> as OUT_YSRwR0
+}
+
+rectangle "Planning & Guidance" <<MotivationGrouping>> {
+  rectangle "<$archimate_Goal{scale=1.5}> Support Architecture Planning for Humans" <<Goal>> as GOL_5Fk9di
+  rectangle "<$archimate_Goal{scale=1.5}> Support Architecture Planning for AI" <<Goal>> as GOL_Iwha3
+  rectangle "<$archimate_Goal{scale=1.5}> Provide Development Guidance for Humans" <<Goal>> as GOL_Gh3Jk1
+  rectangle "<$archimate_Goal{scale=1.5}> Provide Development Guidance for AI" <<Goal>> as GOL_e3nCpO
+  rectangle "<$archimate_Outcome{scale=1.5}> Reduced Planning Overhead" <<Outcome>> as OUT_AlZjX8
+  rectangle "<$archimate_Outcome{scale=1.5}> Architectural Guidance Available Without Specialist Dependency" <<Outcome>> as OUT_FXFGrO
+  rectangle "<$archimate_Outcome{scale=1.5}> AI Agents Produce Fewer Architecture-Drift Corrections" <<Outcome>> as OUT_AzP1Q
+}
+
+rectangle "Technology & Product Design" <<MotivationGrouping>> {
+  rectangle "<$archimate_Goal{scale=1.5}> Support Technology Design for Humans" <<Goal>> as GOL_W6Z8pa
+  rectangle "<$archimate_Goal{scale=1.5}> Support Technology Design for AI" <<Goal>> as GOL_B6GP
+  rectangle "<$archimate_Goal{scale=1.5}> Support Product Design for Humans" <<Goal>> as GOL_hEEWS8
+  rectangle "<$archimate_Goal{scale=1.5}> Support Product Design for AI" <<Goal>> as GOL_zBPs_y
+  rectangle "<$archimate_Outcome{scale=1.5}> Technology Changes Validated Against Architecture Before Implementation" <<Outcome>> as OUT_a5mNob
+  rectangle "<$archimate_Outcome{scale=1.5}> AI Agents Query Technology Architecture to Identify Constraints" <<Outcome>> as OUT_i3Bi
+  rectangle "<$archimate_Outcome{scale=1.5}> Product Requirements Traceable to Realized Components" <<Outcome>> as OUT_9jS0BB
+  rectangle "<$archimate_Outcome{scale=1.5}> AI Agents Traverse Product-Architecture Traceability Chains" <<Outcome>> as OUT_CnCVI
+}
+
+rectangle "Governance & Scale" <<MotivationGrouping>> {
+  rectangle "<$archimate_Goal{scale=1.5}> Enable Architecture Management at Scale" <<Goal>> as GOL_Zx9Cv4
+  rectangle "<$archimate_Goal{scale=1.5}> Enable Cross-Engagement Architectural Reuse" <<Goal>> as GOL_kCcPph
+  rectangle "<$archimate_Outcome{scale=1.5}> Architecture Governance Scales Without Proportional Coordination Overhead" <<Outcome>> as OUT_aOcRl9
+  rectangle "<$archimate_Outcome{scale=1.5}> Proven Patterns Promoted and Adopted Across Engagements" <<Outcome>> as OUT_edEkJa
+}
+
+GOL_Po1Qw3 -[hidden]right- OUT_LrpdG0
+GOL_Lm2Bn2 -[hidden]right- OUT_YSRwR0
+GOL_Po1Qw3 -[hidden]down- GOL_Lm2Bn2
+OUT_LrpdG0 -[hidden]down- OUT_YSRwR0
+GOL_5Fk9di -[hidden]right- OUT_AlZjX8
+GOL_Iwha3 -[hidden]right- OUT_AlZjX8
+GOL_Gh3Jk1 -[hidden]right- OUT_FXFGrO
+GOL_e3nCpO -[hidden]right- OUT_AzP1Q
+GOL_5Fk9di -[hidden]down- GOL_Iwha3
+GOL_Iwha3 -[hidden]down- GOL_Gh3Jk1
+GOL_Gh3Jk1 -[hidden]down- GOL_e3nCpO
+OUT_AlZjX8 -[hidden]down- OUT_FXFGrO
+OUT_FXFGrO -[hidden]down- OUT_AzP1Q
+GOL_W6Z8pa -[hidden]right- OUT_a5mNob
+GOL_B6GP -[hidden]right- OUT_i3Bi
+GOL_hEEWS8 -[hidden]right- OUT_9jS0BB
+GOL_zBPs_y -[hidden]right- OUT_CnCVI
+GOL_W6Z8pa -[hidden]down- GOL_B6GP
+GOL_B6GP -[hidden]down- GOL_hEEWS8
+GOL_hEEWS8 -[hidden]down- GOL_zBPs_y
+OUT_a5mNob -[hidden]down- OUT_i3Bi
+OUT_i3Bi -[hidden]down- OUT_9jS0BB
+OUT_9jS0BB -[hidden]down- OUT_CnCVI
+GOL_Zx9Cv4 -[hidden]right- OUT_aOcRl9
+GOL_kCcPph -[hidden]right- OUT_edEkJa
+GOL_Zx9Cv4 -[hidden]down- GOL_kCcPph
+OUT_aOcRl9 -[hidden]down- OUT_edEkJa
+
+OUT_LrpdG0 -left-|> GOL_Po1Qw3 : <<realization>>
+OUT_YSRwR0 -left-|> GOL_Lm2Bn2 : <<realization>>
+OUT_AlZjX8 -left-|> GOL_5Fk9di : <<realization>>
+OUT_AlZjX8 -left-|> GOL_Iwha3 : <<realization>>
+OUT_FXFGrO -left-|> GOL_Gh3Jk1 : <<realization>>
+OUT_AzP1Q -left-|> GOL_e3nCpO : <<realization>>
+OUT_a5mNob -left-|> GOL_W6Z8pa : <<realization>>
+OUT_i3Bi -left-|> GOL_B6GP : <<realization>>
+OUT_9jS0BB -left-|> GOL_hEEWS8 : <<realization>>
+OUT_CnCVI -left-|> GOL_zBPs_y : <<realization>>
+OUT_aOcRl9 -left-|> GOL_Zx9Cv4 : <<realization>>
+OUT_edEkJa -left-|> GOL_kCcPph : <<realization>>
+@enduml

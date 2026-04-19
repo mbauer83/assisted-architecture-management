@@ -55,15 +55,8 @@ def _extract_archimate_block(content: str) -> dict | None:
         return None
 
 
-_DOMAIN_ORDER = {
-    "motivation": 0,
-    "strategy": 1,
-    "common": 2,
-    "business": 3,
-    "application": 4,
-    "technology": 5,
-    "implementation": 6,
-}
+from src.common.ontology_loader import DOMAIN_ORDER as _DOMAIN_ORDER_LIST
+_DOMAIN_ORDER = {d: i for i, d in enumerate(_DOMAIN_ORDER_LIST)}
 
 _PREFIX_ORDER = [
     "STK", "DRV", "ASM", "GOL", "OUT", "PRI", "REQ", "CST", "MEA", "VAL",

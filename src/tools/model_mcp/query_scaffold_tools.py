@@ -18,23 +18,15 @@ from src.tools.model_mcp.context import (
     resolve_repo_roots,
     roots_key,
 )
-from src.common.ontology_loader import CONNECTION_TYPES, ENTITY_TYPES
+from src.common.ontology_loader import CONNECTION_TYPES, DOMAIN_GROUPING, ENTITY_TYPES
 from src.common.model_query_parsing import extract_archimate_label_alias
 
 
-# conn_dir → PUML arrow glyph
+# conn_dir → PUML arrow (derived from ontology at module load)
 _ARROW: dict[str, str] = {
-    "composition": "*--",
-    "aggregation": "o--",
-    "assignment": "--",
-    "realization": "..|>",
-    "serving": "-->",
-    "access": "..>",
-    "influence": "..>",
-    "association": "--",
-    "specialization": "--|>",
-    "flow": "..>",
-    "triggering": "-->",
+    ct.conn_dir: ct.puml_arrow
+    for ct in CONNECTION_TYPES.values()
+    if ct.conn_lang == "archimate" and ct.conn_dir
 }
 
 # conn_dir → PUML stereotype label (absent → no label)
@@ -45,10 +37,8 @@ _LABEL: dict[str, str] = {
     "assignment": "<<Assignment>>",
 }
 
-_DOMAIN_ORDER = [
-    "Motivation", "Strategy", "Business", "Common",
-    "Application", "Technology", "Implementation",
-]
+from src.common.ontology_loader import DOMAIN_ORDER as _DOMAIN_ORDER_LOWER
+_DOMAIN_ORDER = [d.title() for d in _DOMAIN_ORDER_LOWER]
 
 
 def _extract_prose(text: str | None) -> str | None:
@@ -71,10 +61,12 @@ def _domain(artifact_type: str) -> str:
 
 def _entity_decl(artifact_type: str, label: str, alias: str) -> str:
     info = ENTITY_TYPES.get(artifact_type)
-    if not info:
+    if not info or not info.archimate_element_type:
         return f'rectangle "{label}" as {alias}'
     et = info.archimate_element_type
-    return f'rectangle "<$archimate_{et}{{scale=1.5}}> {label}" <<{et}>> as {alias}'
+    if info.has_sprite:
+        return f'rectangle "<$archimate_{et}{{scale=1.5}}> {label}" <<{et}>> as {alias}'
+    return f'rectangle "{label}" <<{et}>> as {alias}'
 
 
 def _conn_line(src: str, conn_dir: str, tgt: str, note: str | None = None) -> str:
@@ -139,13 +131,22 @@ def _build_puml(
     multi = len(by_domain) > 1
     ordered = [d for d in _DOMAIN_ORDER if d in by_domain] + [d for d in by_domain if d not in _DOMAIN_ORDER]
 
-    lines: list[str] = [f"@startuml {name.lower().replace(' ', '-')}", "", f"{dir_kw} direction", "", f"title {name}", ""]
+    lines: list[str] = [
+        f"@startuml {name.lower().replace(' ', '-')}",
+        "!include ../_archimate-stereotypes.puml",
+        "",
+        f"{dir_kw} direction",
+        "",
+        f"title {name}",
+        "",
+    ]
 
     for domain in ordered:
         elems = by_domain[domain]
         indent = "  " if multi else ""
         if multi:
-            lines.append(f'rectangle "{domain}" <<CommonGrouping>> {{')
+            grouping = DOMAIN_GROUPING.get(domain.lower(), "Grouping")
+            lines.append(f'rectangle "{domain}" <<{grouping}>> {{')
         for e in elems:
             lines.extend(_emit_entity(e, children_map.get(e["display_alias"], []), indent, children_map))
         if multi:

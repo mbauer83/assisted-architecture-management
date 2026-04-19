@@ -28,7 +28,7 @@ def verify_content_in_temp_path(
         diagrams.mkdir(parents=True, exist_ok=True)
 
         if support_repo_root is not None:
-            for support in ("_macros.puml", "_archimate-stereotypes.puml"):
+            for support in ("_macros.puml", "_archimate-stereotypes.puml", "_archimate-glyphs.puml"):
                 src = support_repo_root / "diagram-catalog" / support
                 if src.exists():
                     (cat / support).write_text(src.read_text(encoding="utf-8"), encoding="utf-8")

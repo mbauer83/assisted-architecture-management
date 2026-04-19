@@ -22,6 +22,7 @@ entity_types:
     subdir: stakeholders
     archimate_domain: Motivation
     archimate_element_type: Stakeholder
+    has_sprite: true
     element_classes: [motivation-element]
     create_when: "Create generalized stakeholders to model perspectives which are relevantly affected by and interested in the architecture. Stakeholders should be associated with one or more drivers and one or more goals / outcomes / assessments etc.."
     never_create_when: "Don't create stakeholders to model participation in specific behavior or for every individual participant affected by the architecture without some abstraction / generalization to avoid over-modeling."
@@ -32,6 +33,7 @@ entity_types:
     subdir: drivers
     archimate_domain: Motivation
     archimate_element_type: Driver
+    has_sprite: true
     element_classes: [motivation-element]
     create_when: "Create drivers to model internal or external factors (conditions, dynamics, trends etc.) that motivate the enterprise to define its goals and implement changes. External drivers (market forces, technology trends, regulatory changes) need not be directly associated with any stakeholder. Internal drivers should be associated with relevant stakeholders. Drivers should influence one or more goals or assessments."
     never_create_when: "Don't model something as a driver that is too operational, concrete or solution-oriented. Drivers should be high-level, strategic and enduring in nature. Don't model a specific judgment about a state of affairs as a driver — that is an assessment."
@@ -42,6 +44,7 @@ entity_types:
     subdir: assessments
     archimate_domain: Motivation
     archimate_element_type: Assessment
+    has_sprite: true
     element_classes: [motivation-element]
     create_when: "Create assessments to model specific statements (judgments, evaluations, analyses) about states of affairs that arise in the context of one or more drivers. An assessment makes explicit what a driver means for the enterprise — how a force or trend creates a specific problem, gap, or condition that motivates one or more goals. Assessments should be connected to one or more drivers (via association) and one or more goals (via association or influence)."
     never_create_when: "Don't model something as an assessment if it describes a direction or general motivation (driver), a desired state (goal), or an observable result (outcome). Don't create an assessment to describe a role or actor performing an evaluation — assessments describe conclusions about the enterprise context, not activities."
@@ -52,6 +55,7 @@ entity_types:
     subdir: goals
     archimate_domain: Motivation
     archimate_element_type: Goal
+    has_sprite: true
     element_classes: [motivation-element]
     create_when: "Create goals to model high-level statements of intent or desired states of affairs that the enterprise aims to achieve. Goals should be associated with at least one stakeholder and connected to at least one driver or assessment. Goals may be refined progressively: initially they may connect directly to requirements; outcomes can be added iteratively as the model matures to add measurability between goals and their requirements."
     never_create_when: "Don't model something as a goal if it is too specific as a need or constraint (requirement) or describes an achieved or measurable result (outcome). Goals must be distinguished from general normative rules (principles)."
@@ -63,6 +67,7 @@ entity_types:
     subdir: outcomes
     archimate_domain: Motivation
     archimate_element_type: Outcome
+    has_sprite: true
     element_classes: [motivation-element]
     create_when: "Create outcomes to model observable strategic results, value-realizations, performance metrics and target-states whose achievement represents a significant contribution to the successful fulfillment of a specific goal. Outcomes should be associated with at least one goal."
     never_create_when: "Don't model something as an outcome if specifies a general intent, hope or direction (goal) or if it describes a strategy or process to achieve a goal."
@@ -73,6 +78,7 @@ entity_types:
     subdir: principles
     archimate_domain: Motivation
     archimate_element_type: Principle
+    has_sprite: true
     element_classes: [motivation-element]
     create_when: "Create principle to model broad, long-lasting normative rules or guidelines which inform the way the enterprise operates and evolves. Create only where it impacts specific architectural decisions."
     never_create_when: "Don't model something as a principle if it is too specific, narrowly applicable, or situative / volatile. Also avoid modeling widely understodo general policies which don't affect specific architectural decisions."
@@ -83,6 +89,7 @@ entity_types:
     subdir: requirements
     archimate_domain: Motivation
     archimate_element_type: Requirement
+    has_sprite: true
     element_classes: [motivation-element]
     create_when: "Create requirements to model specific statements of need, obligation, constraint or prohibition that the architecture must satisfy in order to achieve the enterprise's goals and fulfill its motivations. Requirements should realize at least one outcome or principle. Requirements may also influence or be associated with goals directly, but do not realize goals — the realization chain runs through outcomes (or principles). Where outcomes are not yet modeled, use influence or association to connect requirements to goals."
     never_create_when: "Don't model something as a requirement if it is too general or high-level (goal) or not directly relevant to the architecture."
@@ -93,6 +100,7 @@ entity_types:
     subdir: meanings
     archimate_domain: Motivation
     archimate_element_type: Meaning
+    has_sprite: false
     element_classes: [motivation-element]
     create_when: "Create meanings to model how different stakeholders interpret elements of the architecture (usually passive structure elements) and should be connected accordingly. Meanings stand in n-to-m relationships with passive structure elements."
     never_create_when: "Don't model something as a meaning if it is not a sufficiently specific or interest-relative description of a stakeholder's interpretation of some element of the architecture. Do not create if it does not clarify relevant perspectives or resolve important ambiguities about the architecture."
@@ -104,6 +112,7 @@ entity_types:
     subdir: values
     archimate_domain: Motivation
     archimate_element_type: Value
+    has_sprite: false
     element_classes: [motivation-element]
     create_when: "Create values to model the worth, utility, importance, benefit, or desirability for a customer, end-user or other stakeholder of some element of the architecture (usually an active structure element) and should be connected accordingly. Values stand in n-to-m relationships with active structure elements."
     never_create_when: "Don't model something as a value if it is not sufficiently specific or interest-relative description of the value of some element of the architecture to some concern of a usually external stakeholder. Do not create if it does not clarify relevant perspectives or resolve important ambiguities about how the architecture provides value."
@@ -116,6 +125,7 @@ entity_types:
     subdir: capabilities
     archimate_domain: Strategy
     archimate_element_type: Capability
+    has_sprite: true
     element_classes: [behavior-element, strategy-behavior-element]
     create_when: "Create capabilities to model generalabilities or capacities of the enterprise which express what it needs to do. These are usually stable unless the business-model of the enterprise changes. Resources are assigned to Capabilities, which realize Courses of Action."
     never_create_when: "Don't model something as a capability if it is too volatile or situative or if it describes a specific process or course of action."
@@ -126,6 +136,7 @@ entity_types:
     subdir: value-streams
     archimate_domain: Strategy
     archimate_element_type: ValueStream
+    has_sprite: false
     element_classes: [behavior-element, strategy-behavior-element]
     create_when: "Create value streams to model the sequence of activities that create value for customers, end-users, or other stakeholders. Value streams are typically realized by processes and potentially other elements."
     never_create_when: "Don't model something as a value stream if it is not focused on value-creation. Value streams should be distinguished from processes, functions, capabilities and courses of action."
@@ -136,6 +147,7 @@ entity_types:
     subdir: resources
     archimate_domain: Strategy
     archimate_element_type: Resource
+    has_sprite: false
     element_classes: [structure-element]
     create_when: "Create resources to model tangible or intangible strategic assets owned or controlled by the enterprise which are relevant to capabilities and may be realized by both passive and active elements."
     never_create_when: "Don't model something as a resource if it is not a strategic asset relevant to specific capabilities or if it is too volatile or situative."
@@ -146,6 +158,7 @@ entity_types:
     subdir: courses-of-action
     archimate_domain: Strategy
     archimate_element_type: CourseOfAction
+    has_sprite: true
     element_classes: [behavior-element, strategy-behavior-element]
     create_when: "Create courses of action to model specific strategic or tactical approaches or plans about how resources and capabilities are organized to influence or realize specific outcomes or requirements."
     never_create_when: "Don't model something as a course of action if it describes specific processes or functions, low-level tasks or deliverables. Courses of action should be distinguished from processes, functions and work-packages."
@@ -157,6 +170,7 @@ entity_types:
     subdir: services
     archimate_domain: Common
     archimate_element_type: Service
+    has_sprite: true
     element_classes: [behavior-element]
     create_when: "Create services to model explicit, well-defined behavior provided by some active structure element (e.g. Application Component, Role, Business Actor, System Software) to its environment. Services serve other behavior or active structure elements, may have assigned Interfaces and be realized by Processes or Functions."
     never_create_when: "Don't model something as a service if it does not describe units of behavior grouped by external relevance and visibility to consumers from said consumers' perspective. Services should be distinguished from processes andfunctions which may realize them."
@@ -167,6 +181,7 @@ entity_types:
     subdir: processes
     archimate_domain: Common
     archimate_element_type: Process
+    has_sprite: true
     element_classes: [behavior-element, internal-behavior-element]
     create_when: "Create processes to model causally / temporally ordered sequences of internal behavior to achieve a specific result. Processes may be subdivided into subordinate Processes or Functions, may be served by Services, may realize Products or Services, and may have directly or indirectly assigned Roles, Actors, Collaborations, or Application Components. Processes usually involve triggering or flow relations between subordinate elements and between each other (often mediated via Events)."
     never_create_when: "Don't model something as a Process when it describes a grouping of behavior that is mainly resource-oriented instead causally / temporally structured (Functions), when it describes how to organize Resources and Capabilities (Course of Action), or when it describes an external view on some functionality (Service, Interface). Processes may involve Junctions and one layer of subdivision, but should not be too detailed, complex, or low-level. Sequence-, Activity-, or BPMN-modeling should be used for these purposes."
@@ -177,6 +192,7 @@ entity_types:
     subdir: functions
     archimate_domain: Common
     archimate_element_type: Function
+    has_sprite: true
     element_classes: [behavior-element, internal-behavior-element]
     create_when: "Create functions to model grouping of behavior that is mainly grouped by Resources, required knowledge, capacities etc. instead of causally / temporally structured. Functions may be subdivided into subordinate Functions or Processes, may be served by Services, may realize Products or Services, and may have directly or indirectly assigned Roles, Actors, Collaborations, or Application Components."
     never_create_when: "Don't model something as a Function when it describes a causally / temporally ordered sequence of behavior (Process), when it describes how to organize Resources and Capabilities (Course of Action), or when it describes an external view on some functionality (Service, Interface). Functions may involve Junctions and one layer of subdivision, but should not be too detailed, complex, or low-level. Sequence-, Activity-, or BPMN-modeling should be used for these purposes."
@@ -187,6 +203,7 @@ entity_types:
     subdir: events
     archimate_domain: Common
     archimate_element_type: Event
+    has_sprite: true
     element_classes: [behavior-element]
     create_when: "Create events to model something that happens in an enterprise, such as a state change. Events may trigger or interrupt processes or functions, may access passive structure elements and may be raised / triggered by processes or functions."
     never_create_when: "Don't model something as an event if it is not relevant as a trigger or interruption to processes or functions, or if it does not represent a significant state change in the enterprise. Do not over-model events for minor state-changes that do not coordinate significant behavior."
@@ -197,6 +214,7 @@ entity_types:
     subdir: roles
     archimate_domain: Common
     archimate_element_type: Role
+    has_sprite: true
     element_classes: [active-structure-element, internal-active-structure-element]
     create_when: "Create roles to model abstract types of behavior-performing entities that share certain responsibilities or capabilities relevant to the architecture. Roles usually de-couple behaviors from the Actors, Application Components or Collaborations which perform them, and may be assigned to Processes, Functions and Services."
     never_create_when: "Don't model something as a role if it is not (an abstraction of) a behavior-performing entity of if the decoupling of behavior from specific actors or components does not provide any insight or value. Do not create roles for every individual participant in processes or functions without some generalization or abstraction to avoid over-modeling."
@@ -207,6 +225,7 @@ entity_types:
     subdir: paths
     archimate_domain: Common
     archimate_element_type: Path
+    has_sprite: false
     element_classes: [active-structure-element]
     create_when: "Create paths to model logical link through which internal active structure elements like Roles, Application Components, Nodes, System Software etc. may exchange energy, material, or data. Paths may be realized by Distribution Networks or Communication Networks together with the active structure elements connected by them."
     never_create_when: "Don't model something as a path if it is better modeled as a direct Collaboration or other relation, or if it is specific Communication or Distribution Network."
@@ -220,6 +239,7 @@ entity_types:
     subdir: actors
     archimate_domain: Business
     archimate_element_type: BusinessActor
+    has_sprite: true
     element_classes: [active-structure-element, internal-active-structure-element]
     create_when: "Create business actors to model organizational entities (e.g. departments, teams, external organizations) that perform behavior relevant to the architecture. Business actors may be assigned to processes, functions and services and may be assigned to roles."
     never_create_when: "Don't model something as a business actor if it is not a concrete personal or organizational entity that performs behavior relevant to the architecture. Do not create business actors for every individual participant in processes or functions without some generalization or abstraction to avoid over-modeling."
@@ -230,6 +250,7 @@ entity_types:
     subdir: interfaces
     archimate_domain: Business
     archimate_element_type: BusinessInterface
+    has_sprite: true
     element_classes: [active-structure-element, external-active-structure-element]
     create_when: "Create business interfaces to model ways (or channels) through which one or more services are made accessible to a role or actor."
     never_create_when: "Don't model something as a business interface if it represents specific behavior instead of ways to access that behavior, or if the distinction between service and interface does not provide any insight or value."
@@ -240,6 +261,7 @@ entity_types:
     subdir: objects
     archimate_domain: Business
     archimate_element_type: BusinessObject
+    has_sprite: true
     element_classes: [passive-structure-element]
     create_when: "Create business objects to model types of tangible or intangible entities or concepts that are used or produced by business processes, functions, events, or services."
     never_create_when: "Don't model something as a business object if it is not relevant to the business processes, functions, events or services."
@@ -250,6 +272,7 @@ entity_types:
     subdir: products
     archimate_domain: Business
     archimate_element_type: Product
+    has_sprite: false
     element_classes: [composite-element]
     create_when: "Create products to model coherent collections of tangible or intangible objects (business or data objects), services, artifacts offered as a whole to internal or external customers. Products may aggregate objects, services, artifacts, and materials and have associated values."
     never_create_when: "Don't model something as a product if it is not a coherent offering or if no concrete elements are aggregated as parts of it."
@@ -261,6 +284,7 @@ entity_types:
     subdir: components
     archimate_domain: Application
     archimate_element_type: ApplicationComponent
+    has_sprite: true
     element_classes: [active-structure-element, internal-active-structure-element]
     create_when: "Create application components to model modular, deployable units of software at any level that perform behavior relevant to the architecture. Application components may be sources of truth for data objects and may be assigned to internal behavior elements (optionally via roles) or application events."
     never_create_when: "Don't model something as an application component if it is a specific behavior of a component or not specific enough to correspond to actual deployable software. "
@@ -271,6 +295,7 @@ entity_types:
     subdir: interfaces
     archimate_domain: Application
     archimate_element_type: ApplicationInterface
+    has_sprite: true
     element_classes: [active-structure-element, external-active-structure-element]
     create_when: "Create application interfaces to model points of access (and associated contracts, parameters, post-conditions, data-formats) where an Application Component exposes services."
     never_create_when: "Don't model something as an application interface if it would be better modeled as a service, process or function. Do not create if there is no meaningful distinction or impact of describing a specific way of accessing some behavior." 
@@ -281,6 +306,7 @@ entity_types:
     subdir: data-objects
     archimate_domain: Application
     archimate_element_type: DataObject
+    has_sprite: true
     element_classes: [passive-structure-element]
     create_when: "Create data objects to model types of data relevant to the architecture which are used or produced by application components, processes, functions, events or services. Data Objects are usually associated with Application Components managing them as sources of truth."
     never_create_when: "Don't model something as a data object if it is not relevant to the behavior elements or if it is too granular to be relevant at the architectural level."
@@ -292,6 +318,7 @@ entity_types:
     subdir: nodes
     archimate_domain: Technology
     archimate_element_type: Node
+    has_sprite: true
     element_classes: [active-structure-element, internal-active-structure-element, technology-internal-active-structure-element]
     create_when: "Create technology nodes to model generic IT or physical structure which hosts or interacts with other such structures."
     never_create_when: "Don't model something as a technology node if it does not provide a coherent collection of hardware and software components which provide services used to support applications."
@@ -302,6 +329,7 @@ entity_types:
     subdir: devices
     archimate_domain: Technology
     archimate_element_type: Device
+    has_sprite: false
     element_classes: [active-structure-element, internal-active-structure-element, technology-internal-active-structure-element]
     create_when: "Create devices to model specific (potentially virtualized) IT hardware used for storage of data, processing and similar."
     never_create_when: "Don't model something as a device if it is better modeled as a technology node because it is general and represents a generic execution environment."
@@ -312,6 +340,7 @@ entity_types:
     subdir: system-software
     archimate_domain: Technology
     archimate_element_type: SystemSoftware
+    has_sprite: true
     element_classes: [active-structure-element, internal-active-structure-element, technology-internal-active-structure-element]
     create_when: "Create system software to model software that provides or contributes to an environment for execution, storage and use of other software or data deployed with it."
     never_create_when: "Don't model something as system software if it is better represented as an application component because it directly provides business-relevant behavior or a technology node because it represents a general execution environment."
@@ -322,6 +351,7 @@ entity_types:
     subdir: interfaces
     archimate_domain: Technology
     archimate_element_type: TechnologyInterface
+    has_sprite: false
     element_classes: [active-structure-element, external-active-structure-element]
     create_when: "Create technology interfaces to model points of access where nodes, devices, facilities, equipment or system software makes services available."
     never_create_when: "Don't model something as a technology interface if it provides no meaningful distinction of if the way of accessing some behavior does not have any impact or relevance to the architecture."
@@ -332,6 +362,7 @@ entity_types:
     subdir: networks
     archimate_domain: Technology
     archimate_element_type: CommunicationNetwork
+    has_sprite: false
     element_classes: [active-structure-element]
     create_when: "Create communication networks to model sets of IT structures for routing, transmission, and reception of data. Communication networks usually connect Devices and / or System Software and realize Paths."
     never_create_when: "Don't model something as a communication network if it is a logical, abstract channel for communication or distribution (Path). Don't create if the existence or structure of the network is not directly relevant to architectural decisions."
@@ -342,6 +373,7 @@ entity_types:
     subdir: artifacts
     archimate_domain: Technology
     archimate_element_type: Artifact
+    has_sprite: true
     element_classes: [passive-structure-element]
     create_when: "Create artifacts to model \"tangible\" assets like databases, source files, container images, scripts, databases, tables, messages, documents, specifications and model files. Artifacts may realize Application Components, Data Objects, or System Software. They may be assigned to devices or system software to indicate their deployment there."
     never_create_when: "Don't model something as an artifact if it is too abstract to be tangible in the above sense. Don't create an artifact unless it has relevance to the questions addressed by the architecture or is relevant to architectural decisions above the elements it realizes."
@@ -352,6 +384,7 @@ entity_types:
     subdir: equipment
     archimate_domain: Technology
     archimate_element_type: Equipment
+    has_sprite: false
     element_classes: [active-structure-element, internal-active-structure-element, technology-internal-active-structure-element]
     create_when: "Create equipment to model physical, non-IT assets that are used by the enterprise and relevant to the architecture. This includes e.g. machinery, vehicles, furniture, tools, instruments, or similar."
     never_create_when: "Don't model something as equipment if it is information technology or if it is not relevant to the questions or decisions addressed by the architecture."
@@ -362,6 +395,7 @@ entity_types:
     subdir: facilities
     archimate_domain: Technology
     archimate_element_type: Facility
+    has_sprite: false
     element_classes: [active-structure-element, internal-active-structure-element, technology-internal-active-structure-element]
     create_when: "Create facilities to model physical locations, buildings, rooms, or similar that are used by the enterprise and relevant to the architecture."
     never_create_when: "Don't model something as a facility if it is better modeled as a Resource or Process in some facility. Don't create a facility if it is not relevant to the questions or decisions addressed by the architecture."
@@ -372,6 +406,7 @@ entity_types:
     subdir: distribution-networks
     archimate_domain: Technology
     archimate_element_type: DistributionNetwork
+    has_sprite: false
     element_classes: [active-structure-element]
     create_when: "Create distribution networks to model physical networks used to transport energy or materials. Distribution networks are the physical realization of Paths between Facilities."
     never_create_when: "Don't model something as a distribution network if it is a logical, abstract channel for distribution (Path). Don't create if the existence or structure of the network is not directly relevant to architectural decisions."
@@ -382,6 +417,7 @@ entity_types:
     subdir: materials
     archimate_domain: Technology
     archimate_element_type: Material
+    has_sprite: false
     element_classes: [passive-structure-element]
     create_when: "Create materials to model physical substances or resources (including energy sources) used by the enterprise and relevant to the architecture."
     never_create_when: "Don't model something as a material if it carries out processes (Equipment), or if it is not relevant to the questions or decisions addressed by the architecture."
@@ -393,6 +429,7 @@ entity_types:
     subdir: work-packages
     archimate_domain: Implementation
     archimate_element_type: WorkPackage
+    has_sprite: false
     element_classes: [behavior-element]
     create_when: "Create work packages to model sets of actions designed and identified to achieve specific objectives (Goals, Outcomes, or Deliverables) within specified resource- and time-constraints. Work packages can be used to model project-actions at any granularity."
     never_create_when: "Don't model something as a work package if it is a recurring process of the daily work instead of a one-off process to achieve a specific objective. Don't create as a replacement for actual sprint planning or task management artifacts. Work packages provide a higher-level, architectural view of progress in the enterprise's efforts."
@@ -403,6 +440,7 @@ entity_types:
     subdir: deliverables
     archimate_domain: Implementation
     archimate_element_type: Deliverable
+    has_sprite: false
     element_classes: [passive-structure-element]
     create_when: "Create deliverables to model tangible or intangible outputs produced as a result of work packages. These may and often will be parts of the architecture itself."
     never_create_when: "Don't model something as a deliverable if it is not an output of implementation activities relevant to the questions and decisions addressed by the architecture."
@@ -414,6 +452,7 @@ entity_types:
     subdir: plateaus
     archimate_domain: Implementation
     archimate_element_type: Plateau
+    has_sprite: false
     element_classes: [composite-element]
     create_when: "Create plateaus to model significant states of the architecture at specific points in time, usually representing the result of a significant phase of transformation or implementation. Plateaus are often used to model current, transition and future states of the architecture."
     never_create_when: "Don't model something as a plateau if it is not a significant stage in the evolution of the architecture or if it is not sufficiently comprehensive and temporally localized to represent a meaningful state of the architecture at a specific point in time."
@@ -428,6 +467,7 @@ entity_types:
     subdir: global-references
     archimate_domain: ""        # not an ArchiMate domain — skipped by macro/diagram generators
     archimate_element_type: ""  # not an ArchiMate element type
+    has_sprite: false
     element_classes: []
     create_when: ""
     never_create_when: ""

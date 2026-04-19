@@ -113,6 +113,8 @@ def model_add_connection(
 
 
 def register(mcp: FastMCP) -> None:
+    from src.tools.model_mcp.write_queue import queued
+
     mcp.tool(
         name="model_add_connection", title="Model Write: Add Connection",
         description=(
@@ -126,4 +128,4 @@ def register(mcp: FastMCP) -> None:
             "dry_run=true returns would-be content without writing."
         ),
         structured_output=True,
-    )(model_add_connection)
+    )(queued(model_add_connection))

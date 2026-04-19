@@ -79,6 +79,8 @@ def model_create_diagram(
 
 
 def register(mcp: FastMCP) -> None:
+    from src.tools.model_mcp.write_queue import queued
+
     mcp.tool(
         name="model_create_matrix", title="Model Write: Create Connection Matrix",
         description=(
@@ -86,7 +88,7 @@ def register(mcp: FastMCP) -> None:
             "arch-init config. dry_run=true returns would-be content without writing."
         ),
         structured_output=True,
-    )(model_create_matrix)
+    )(queued(model_create_matrix))
 
     mcp.tool(
         name="model_create_diagram", title="Model Write: Create Diagram",
@@ -98,4 +100,4 @@ def register(mcp: FastMCP) -> None:
             "dry_run=true validates without writing."
         ),
         structured_output=True,
-    )(model_create_diagram)
+    )(queued(model_create_diagram))

@@ -1,0 +1,99 @@
+---
+artifact-id: architecture-modelling-planning-workflow
+artifact-type: diagram
+name: "Architecture Modelling & Planning \u2014 Workflow"
+version: 0.1.0
+status: draft
+keywords:
+- process
+- modelling
+- planning
+- workflow
+- AI
+- authoring
+- verification
+diagram-type: process-workflow
+last-updated: '2026-04-20'
+---
+@startuml architecture-modelling-planning-workflow
+!include ../_archimate-stereotypes.puml
+
+top to bottom direction
+
+title Architecture Modelling & Planning -- Workflow
+
+rectangle "Motivation" <<MotivationGrouping>> {
+  rectangle "<$archimate_Goal{scale=1.5}> Support Architecture Planning for Humans" <<Goal>> as GOL_5Fk9di
+  rectangle "<$archimate_Goal{scale=1.5}> Support Architecture Planning for AI" <<Goal>> as GOL_Iwha3
+  rectangle "<$archimate_Requirement{scale=1.5}> Concurrent Tool-Call Handling" <<Requirement>> as REQ_fLpCKU
+}
+
+rectangle "Business" <<BusinessGrouping>> {
+  rectangle "<$archimate_BusinessActor{scale=1.5}> Architect" <<BusinessActor>> as ACT_Nn7Oo7
+  rectangle "<$archimate_BusinessActor{scale=1.5}> AI Language Model" <<BusinessActor>> as ACT_CUvO_l
+}
+
+rectangle "Common" <<CommonGrouping>> {
+  rectangle "<$archimate_Role{scale=1.5}> Author" <<Role>> as ROL_deMuTj
+  rectangle "<$archimate_Role{scale=1.5}> AI Agent" <<Role>> as ROL_udXPfB
+  rectangle "<$archimate_Process{scale=1.5}> Architecture Modelling & Planning" <<Process>> as PRC_U4aAdh {
+    rectangle "<$archimate_Process{scale=1.5}> Query Model" <<Process>> as PRC_vGhe4Z
+    rectangle "<$archimate_Process{scale=1.5}> Author Model Artifact" <<Process>> as PRC_0NPVDb
+    rectangle "<$archimate_Process{scale=1.5}> Verify Model" <<Process>> as PRC_oLRrwL
+    rectangle "<$archimate_Process{scale=1.5}> Scaffold Diagram" <<Process>> as PRC_vOWkdL
+  }
+  rectangle "<$archimate_Service{scale=1.5}> Authoring Service" <<Service>> as SRV_Au1Th1
+  rectangle "<$archimate_Service{scale=1.5}> Discovery & Stats Service" <<Service>> as SRV_Qr8St8
+  rectangle "<$archimate_Service{scale=1.5}> Validation Service" <<Service>> as SRV_Ij6Kl6
+  rectangle "<$archimate_Service{scale=1.5}> Diagram Scaffolding Service" <<Service>> as SRV_AIGnSY
+}
+
+rectangle "Application" <<ApplicationGrouping>> {
+  rectangle "<$archimate_ApplicationComponent{scale=1.5}> Query Engine" <<ApplicationComponent>> as APP_v9LvfK
+  rectangle "<$archimate_ApplicationComponent{scale=1.5}> Model Verifier" <<ApplicationComponent>> as APP_ca3vm7
+  rectangle "<$archimate_ApplicationComponent{scale=1.5}> Diagram Scaffolder" <<ApplicationComponent>> as APP_SCKD2U
+  rectangle "<$archimate_ApplicationComponent{scale=1.5}> Write Request Queue" <<ApplicationComponent>> as APP_a9k_mJ
+}
+
+' --- Auto-layout: spread elements within groupings ---
+GOL_5Fk9di -[hidden]right- GOL_Iwha3
+GOL_Iwha3 -[hidden]right- REQ_fLpCKU
+ACT_Nn7Oo7 -[hidden]right- ACT_CUvO_l
+ROL_deMuTj -[hidden]right- ROL_udXPfB
+ROL_udXPfB -[hidden]right- PRC_vGhe4Z
+PRC_vGhe4Z -[hidden]right- PRC_0NPVDb
+PRC_0NPVDb -[hidden]right- PRC_oLRrwL
+PRC_oLRrwL -[hidden]right- PRC_vOWkdL
+PRC_vOWkdL -[hidden]right- SRV_Au1Th1
+SRV_Au1Th1 -[hidden]right- SRV_Qr8St8
+SRV_Qr8St8 -[hidden]right- SRV_Ij6Kl6
+SRV_Ij6Kl6 -[hidden]right- SRV_AIGnSY
+APP_v9LvfK -[hidden]right- APP_ca3vm7
+APP_ca3vm7 -[hidden]right- APP_SCKD2U
+APP_SCKD2U -[hidden]right- APP_a9k_mJ
+
+
+' --- Auto-layout: spread elements within groupings ---
+
+
+PRC_U4aAdh ..> GOL_5Fk9di : <<Influence>>
+PRC_U4aAdh ..> GOL_Iwha3 : <<Influence>>
+ACT_Nn7Oo7 -down- ROL_deMuTj : <<Assignment>>
+ACT_CUvO_l -down- ROL_udXPfB : <<Assignment>>
+ROL_deMuTj -- PRC_U4aAdh : <<Assignment>>
+ROL_udXPfB -- PRC_U4aAdh : <<Assignment>>
+PRC_vGhe4Z --> PRC_0NPVDb : <<Triggering>>
+PRC_0NPVDb --> PRC_oLRrwL : <<Triggering>>
+PRC_oLRrwL --> PRC_vOWkdL : <<Triggering>>
+PRC_U4aAdh ..|> SRV_Au1Th1
+PRC_U4aAdh ..|> SRV_Qr8St8
+PRC_U4aAdh ..|> SRV_Ij6Kl6
+PRC_U4aAdh ..|> SRV_AIGnSY
+SRV_Au1Th1 .up.|> REQ_fLpCKU
+SRV_Qr8St8 .up.|> REQ_fLpCKU
+SRV_Qr8St8 .down.|> APP_v9LvfK
+SRV_Ij6Kl6 .down.|> APP_ca3vm7
+APP_SCKD2U .up.|> SRV_AIGnSY
+APP_a9k_mJ .up.|> REQ_fLpCKU
+
+@enduml

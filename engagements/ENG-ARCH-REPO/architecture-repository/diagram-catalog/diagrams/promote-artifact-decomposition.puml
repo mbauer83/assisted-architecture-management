@@ -1,0 +1,53 @@
+---
+artifact-id: promote-artifact-decomposition
+artifact-type: diagram
+name: "Promote Artifact \u2014 Sub-process Decomposition"
+version: 0.1.0
+status: draft
+keywords:
+- promote
+- artifact
+- sub-process
+- governance
+- workflow
+diagram-type: archimate-common
+last-updated: '2026-04-19'
+---
+@startuml promote-artifact-decomposition
+
+!include ../_archimate-stereotypes.puml
+!include ../_archimate-glyphs.puml
+left to right direction
+
+title Promote Artifact: Sub-process Decomposition
+
+rectangle "<$archimate_Service{scale=1.5}> Repository Promotion Service" <<Service>> as SRV_Uv9Wx9
+
+rectangle "<$archimate_Process{scale=1.5}> Promote Artifact" <<Process>> as PRC_0Rz5Ex {
+  rectangle "<$archimate_Process{scale=1.5}> Compute Dependency Closure" <<Process>> as PRC_L8tjrh
+  rectangle "<$archimate_Process{scale=1.5}> Run Quality Gates" <<Process>> as PRC_00bowZ
+  rectangle "<$archimate_Process{scale=1.5}> Execute Promotion" <<Process>> as PRC_phHJht
+  PRC_L8tjrh -[hidden]right- PRC_00bowZ
+  PRC_00bowZ -[hidden]right- PRC_phHJht
+}
+
+package "Functions" {
+  rectangle "<$archimate_Function{scale=1.5}> Graph Traversal" <<Function>> as FNC_BdEMPx
+  rectangle "<$archimate_Function{scale=1.5}> Frontmatter Validation" <<Function>> as FNC_ahr0mT
+  rectangle "<$archimate_Function{scale=1.5}> Referential Integrity Check" <<Function>> as FNC_eAkU8w
+  rectangle "<$archimate_Function{scale=1.5}> Attribute Schema Validation" <<Function>> as FNC_B_F
+}
+
+rectangle "<$archimate_Event{scale=1.5}> Artifact Promoted" <<Event>> as EVT_Y7qmHh
+
+PRC_0Rz5Ex ..|> SRV_Uv9Wx9
+
+PRC_L8tjrh --> PRC_00bowZ : <<Triggering>>
+PRC_L8tjrh --> FNC_BdEMPx : <<Triggering>>
+PRC_00bowZ --> PRC_phHJht : <<Triggering>>
+PRC_00bowZ --> FNC_ahr0mT : <<Triggering>>
+PRC_00bowZ --> FNC_eAkU8w : <<Triggering>>
+PRC_00bowZ --> FNC_B_F : <<Triggering>>
+PRC_phHJht --> EVT_Y7qmHh : <<Triggering>>
+
+@enduml

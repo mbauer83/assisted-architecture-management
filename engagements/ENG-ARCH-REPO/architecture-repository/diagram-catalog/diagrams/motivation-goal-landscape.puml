@@ -1,0 +1,75 @@
+---
+artifact-id: motivation-goal-landscape
+artifact-type: diagram
+name: "Motivation \u2014 Goal Landscape"
+version: 0.1.0
+status: draft
+keywords:
+- motivation
+- goals
+- stakeholders
+- goal-landscape
+- assessments
+diagram-type: archimate-motivation
+last-updated: '2026-04-19'
+---
+@startuml motivation-goal-landscape
+!include ../_archimate-stereotypes.puml
+!include ../_archimate-glyphs.puml
+top to bottom direction
+
+title Motivation — Goal Landscape: From Problems to Goals
+
+rectangle "Motivating Assessments" <<MotivationGrouping>> {
+  rectangle "<$archimate_Assessment{scale=1.5}> AI Code Generation Outpaces Sequential Review" <<Assessment>> as ASS_EI3FpR
+  rectangle "<$archimate_Assessment{scale=1.5}> Centralized Governance Cannot Scale" <<Assessment>> as ASS_a6vxyj
+  rectangle "<$archimate_Assessment{scale=1.5}> LLMs Cannot Use Unstructured Architectural Knowledge" <<Assessment>> as ASS_s68vVo
+  rectangle "<$archimate_Assessment{scale=1.5}> Implicit Interdependencies Are Unmaintainable Without Explicit Models" <<Assessment>> as ASS_9YWsDh
+}
+
+rectangle "Human Stakeholder Goals" <<MotivationGrouping>> {
+  rectangle "<$archimate_Goal{scale=1.5}> Support Architecture Planning for Humans" <<Goal>> as GOL_5Fk9di
+  rectangle "<$archimate_Goal{scale=1.5}> Provide Development Guidance for Humans" <<Goal>> as GOL_Gh3Jk1
+  rectangle "<$archimate_Goal{scale=1.5}> Support Technology Design for Humans" <<Goal>> as GOL_W6Z8pa
+  rectangle "<$archimate_Goal{scale=1.5}> Support Product Design for Humans" <<Goal>> as GOL_hEEWS8
+  rectangle "<$archimate_Goal{scale=1.5}> Enable Cross-Stakeholder Validation" <<Goal>> as GOL_Lm2Bn2
+}
+
+rectangle "AI Agent Goals" <<MotivationGrouping>> {
+  rectangle "<$archimate_Goal{scale=1.5}> Support Architecture Planning for AI" <<Goal>> as GOL_Iwha3
+  rectangle "<$archimate_Goal{scale=1.5}> Provide Development Guidance for AI" <<Goal>> as GOL_e3nCpO
+  rectangle "<$archimate_Goal{scale=1.5}> Support Technology Design for AI" <<Goal>> as GOL_B6GP
+  rectangle "<$archimate_Goal{scale=1.5}> Support Product Design for AI" <<Goal>> as GOL_zBPs_y
+}
+
+rectangle "Governance Goals" <<MotivationGrouping>> {
+  rectangle "<$archimate_Goal{scale=1.5}> Maintain Coherence and Traceability" <<Goal>> as GOL_Po1Qw3
+  rectangle "<$archimate_Goal{scale=1.5}> Enable Architecture Management at Scale" <<Goal>> as GOL_Zx9Cv4
+  rectangle "<$archimate_Goal{scale=1.5}> Enable Cross-Engagement Architectural Reuse" <<Goal>> as GOL_kCcPph
+}
+
+ASS_EI3FpR -[hidden]right- ASS_a6vxyj
+ASS_a6vxyj -[hidden]right- ASS_s68vVo
+ASS_s68vVo -[hidden]right- ASS_9YWsDh
+GOL_5Fk9di -[hidden]right- GOL_Gh3Jk1
+GOL_Gh3Jk1 -[hidden]right- GOL_W6Z8pa
+GOL_W6Z8pa -[hidden]right- GOL_hEEWS8
+GOL_hEEWS8 -[hidden]right- GOL_Lm2Bn2
+GOL_Iwha3 -[hidden]right- GOL_e3nCpO
+GOL_e3nCpO -[hidden]right- GOL_B6GP
+GOL_B6GP -[hidden]right- GOL_zBPs_y
+GOL_Po1Qw3 -[hidden]right- GOL_Zx9Cv4
+GOL_Zx9Cv4 -[hidden]right- GOL_kCcPph
+
+ASS_EI3FpR .down.> GOL_5Fk9di : <<association>>
+ASS_EI3FpR .down.> GOL_Iwha3 : <<association>>
+ASS_EI3FpR .down.> GOL_Gh3Jk1 : <<association>>
+ASS_EI3FpR .down.> GOL_e3nCpO : <<association>>
+ASS_a6vxyj .down.> GOL_Po1Qw3 : <<association>>
+ASS_a6vxyj .down.> GOL_Zx9Cv4 : <<association>>
+ASS_s68vVo .down.> GOL_Iwha3 : <<association>>
+ASS_s68vVo .down.> GOL_e3nCpO : <<association>>
+ASS_s68vVo .down.> GOL_B6GP : <<association>>
+ASS_9YWsDh .down.> GOL_Po1Qw3 : <<association>>
+ASS_9YWsDh .down.> GOL_Lm2Bn2 : <<association>>
+@enduml

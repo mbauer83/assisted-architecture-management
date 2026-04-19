@@ -9,14 +9,10 @@ from fastapi.responses import FileResponse, Response
 from pydantic import BaseModel
 
 from src.common.model_query_types import DiagramRecord, EntityRecord
+from src.common.ontology_loader import DOMAIN_ORDER as _DOMAIN_ORDER
 from src.tools.gui_routers import state as s
 
 router = APIRouter()
-
-_DOMAIN_ORDER = [
-    "motivation", "strategy", "common", "business",
-    "application", "technology", "implementation",
-]
 
 
 def _rendered_name(d: DiagramRecord, suffix: str) -> str | None:
@@ -110,6 +106,30 @@ def get_diagram_entities(id: str) -> list[dict[str, Any]]:
     return entities
 
 
+def _parse_explicit_connection_pairs(puml: str) -> set[tuple[str, str]]:
+    """Return (src_alias, tgt_alias) pairs for connection lines explicitly drawn in PUML.
+
+    Skips comment lines and hidden layout links so only visible connections are
+    reported. Checks both directions so symmetric connections (association) match
+    regardless of which alias appears first.
+    """
+    import re as _re
+    _conn_re = _re.compile(
+        r"^\s*(\w+)\s+"
+        r"([-.*|o<>][^\s]*[-.*|o<>])"
+        r"\s+(\w+)"
+    )
+    pairs: set[tuple[str, str]] = set()
+    for line in puml.splitlines():
+        stripped = line.strip()
+        if stripped.startswith("'") or "[hidden]" in stripped:
+            continue
+        m = _conn_re.match(line)
+        if m:
+            pairs.add((m.group(1), m.group(3)))
+    return pairs
+
+
 @router.get("/api/diagram-connections")
 def get_diagram_connections(id: str) -> list[dict[str, Any]]:
     repo = s.get_repo()
@@ -125,6 +145,7 @@ def get_diagram_connections(id: str) -> list[dict[str, Any]]:
         for rec in repo._entities.values()
         if rec.display_alias and rec.display_alias in puml
     }
+    explicit_pairs = _parse_explicit_connection_pairs(puml)
     result: list[dict[str, Any]] = []
     seen: set[str] = set()
     for conn in repo._connections.values():
@@ -133,11 +154,15 @@ def get_diagram_connections(id: str) -> list[dict[str, Any]]:
         src = in_diagram.get(conn.source)
         tgt = in_diagram.get(conn.target)
         if src and tgt:
+            sa = src.display_alias or ""
+            ta = tgt.display_alias or ""
+            if (sa, ta) not in explicit_pairs and (ta, sa) not in explicit_pairs:
+                continue
             d = s.connection_to_dict(conn)
             d["source_name"] = src.name
             d["target_name"] = tgt.name
-            d["source_alias"] = src.display_alias
-            d["target_alias"] = tgt.display_alias
+            d["source_alias"] = sa
+            d["target_alias"] = ta
             result.append(d)
             seen.add(conn.artifact_id)
     return result

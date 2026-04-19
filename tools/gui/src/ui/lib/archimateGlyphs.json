@@ -23,7 +23,8 @@
     "technology-service": "<path d=\"M2.9 8h3.3\" /><circle cx=\"9.7\" cy=\"8\" r=\"3.3\" /><path d=\"M6.9 5.7a4.7 4.7 0 0 1 0 4.6\" opacity=\".65\" />",
     "system-software": "<circle cx=\"7.2\" cy=\"8\" r=\"3.3\" /><circle cx=\"9.8\" cy=\"8.8\" r=\"3.3\" />",
     "artifact": "<path d=\"M4 3.5h5.8l2.2 2.2v6.8H4z\" /><path d=\"M9.8 3.5v2.2H12\" />",
-    "generic": "<rect x=\"3.4\" y=\"3.4\" width=\"9.2\" height=\"9.2\" rx=\"1.5\" />"
+    "generic": "<rect x=\"3.4\" y=\"3.4\" width=\"9.2\" height=\"9.2\" rx=\"1.5\" />",
+    "assessment": "<path d=\"M2.5 3h11a1 1 0 0 1 1 1v6a1 1 0 0 1-1 1H6l-2 3 1-3H2.5a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1z\" />"
   },
   "types": {
     "role": "role",
@@ -48,6 +49,7 @@
     "technology-node": "technology-node",
     "technology-service": "technology-service",
     "system-software": "system-software",
-    "artifact": "artifact"
+    "artifact": "artifact",
+    "assessment": "assessment"
   }
 }

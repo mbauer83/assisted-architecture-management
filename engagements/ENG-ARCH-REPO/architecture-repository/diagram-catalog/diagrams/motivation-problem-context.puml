@@ -1,0 +1,69 @@
+---
+artifact-id: motivation-problem-context
+artifact-type: diagram
+name: "Motivation \u2014 Problem Context"
+version: 0.1.0
+status: draft
+keywords:
+- motivation
+- drivers
+- assessments
+- stakeholders
+- problem-context
+diagram-type: archimate-motivation
+last-updated: '2026-04-19'
+---
+@startuml motivation-problem-context
+!include ../_archimate-stereotypes.puml
+!include ../_archimate-glyphs.puml
+top to bottom direction
+
+title Motivation — Problem Context: Drivers, Assessments & Stakeholders
+
+rectangle "Stakeholders" <<MotivationGrouping>> {
+  rectangle "<$archimate_Stakeholder{scale=1.5}> Architect" <<Stakeholder>> as STK_aB3dE1
+  rectangle "<$archimate_Stakeholder{scale=1.5}> Developer" <<Stakeholder>> as STK_K9xTq2
+  rectangle "<$archimate_Stakeholder{scale=1.5}> Product Owner" <<Stakeholder>> as STK_Zp8Lm4
+  rectangle "<$archimate_Stakeholder{scale=1.5}> DevOps Engineer" <<Stakeholder>> as STK_4oprPM
+  rectangle "<$archimate_Stakeholder{scale=1.5}> Upper Technical Management" <<Stakeholder>> as STK_Rr9Ss9
+}
+
+rectangle "Drivers" <<MotivationGrouping>> {
+  rectangle "<$archimate_Driver{scale=1.5}> AI-Assisted Development as Dominant Production Mode" <<Driver>> as DRV_GR9prv
+  rectangle "<$archimate_Driver{scale=1.5}> Increasing Autonomy of Teams & Systems" <<Driver>> as DRV_Rt6Yu2
+  rectangle "<$archimate_Driver{scale=1.5}> Rising Complexity and Interdependence" <<Driver>> as DRV_Ui5Op3
+}
+
+rectangle "Assessments" <<MotivationGrouping>> {
+  rectangle "<$archimate_Assessment{scale=1.5}> AI Code Generation Volume Outpaces Sequential Review Capacity" <<Assessment>> as ASS_EI3FpR
+  rectangle "<$archimate_Assessment{scale=1.5}> Centralized Governance Cannot Scale to Concurrent Development Contexts" <<Assessment>> as ASS_a6vxyj
+  rectangle "<$archimate_Assessment{scale=1.5}> LLM-Based Agents Cannot Effectively Use Unstructured Architectural Knowledge" <<Assessment>> as ASS_s68vVo
+  rectangle "<$archimate_Assessment{scale=1.5}> Implicit System Interdependencies Are Unmaintainable Without Explicit Models" <<Assessment>> as ASS_9YWsDh
+}
+
+STK_aB3dE1 -[hidden]right- STK_K9xTq2
+STK_K9xTq2 -[hidden]right- STK_Zp8Lm4
+STK_Zp8Lm4 -[hidden]right- STK_4oprPM
+STK_4oprPM -[hidden]right- STK_Rr9Ss9
+DRV_GR9prv -[hidden]right- DRV_Rt6Yu2
+DRV_Rt6Yu2 -[hidden]right- DRV_Ui5Op3
+ASS_EI3FpR -[hidden]right- ASS_a6vxyj
+ASS_a6vxyj -[hidden]right- ASS_s68vVo
+ASS_s68vVo -[hidden]right- ASS_9YWsDh
+
+STK_aB3dE1 -down- DRV_GR9prv
+STK_aB3dE1 -down- DRV_Rt6Yu2
+STK_aB3dE1 -down- DRV_Ui5Op3
+STK_K9xTq2 -down- DRV_GR9prv
+STK_Zp8Lm4 -down- DRV_GR9prv
+STK_Zp8Lm4 -down- DRV_Ui5Op3
+STK_4oprPM -down- DRV_Rt6Yu2
+STK_4oprPM -down- DRV_Ui5Op3
+STK_Rr9Ss9 -down- DRV_Rt6Yu2
+
+DRV_GR9prv .down.> ASS_EI3FpR : <<influence>>
+DRV_GR9prv .down.> ASS_a6vxyj : <<influence>>
+DRV_GR9prv .down.> ASS_s68vVo : <<influence>>
+DRV_Rt6Yu2 .down.> ASS_a6vxyj : <<influence>>
+DRV_Ui5Op3 .down.> ASS_9YWsDh : <<influence>>
+@enduml

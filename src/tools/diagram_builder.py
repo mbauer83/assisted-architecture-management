@@ -17,6 +17,13 @@ import tempfile
 from pathlib import Path
 
 from src.common.model_query_types import ConnectionRecord, EntityRecord
+from src.common.ontology_loader import (
+    CONNECTION_TYPES,
+    DOMAIN_DISPLAY,
+    DOMAIN_GROUPING,
+    DOMAIN_ORDER,
+    ELEMENT_TYPE_HAS_SPRITE,
+)
 
 
 def _parse_archimate_block(raw: str) -> dict:
@@ -54,33 +61,52 @@ def generate_archimate_puml_body(
     parsing).  Falls back to the raw name when no archimate block is present.
     Connections use the canonical ``SRC --> TGT : <<conn_type>>`` format.
     """
+    from collections import defaultdict
+
     diagram_name = re.sub(r"[^a-zA-Z0-9_-]", "-", name.lower()).strip("-") or "diagram"
     is_archimate = "archimate" in diagram_type.lower()
 
     lines: list[str] = [f"@startuml {diagram_name}"]
     if is_archimate:
         lines.append("!include ../_archimate-stereotypes.puml")
-        lines.append("!include ../_archimate-glyphs.puml")
     lines.append("")
     lines.append(f"title {name}")
     lines.append("")
 
+    domain_entities: dict[str, list[EntityRecord]] = defaultdict(list)
     for entity in entity_records:
-        alias = entity.display_alias
-        if not alias:
-            continue
-        arch_data = _parse_archimate_block(entity.display_blocks.get("archimate", ""))
-        element_type = arch_data.get("element-type", "")
-        label = arch_data.get("label", entity.name).replace('"', "'")
-        if element_type:
-            lines.append(
-                f'rectangle "<$archimate_{element_type}{{scale=1.5}}> {label}"'
-                f" <<{element_type}>> as {alias}"
-            )
-        else:
-            lines.append(f'rectangle "{label}" as {alias}')
+        domain_entities[(entity.domain or "").lower()].append(entity)
 
-    lines.append("")
+    ordered_domains = [d for d in DOMAIN_ORDER if d in domain_entities]
+    for d in sorted(domain_entities):
+        if d not in DOMAIN_ORDER:
+            ordered_domains.append(d)
+
+    for domain in ordered_domains:
+        grouping = _DOMAIN_GROUPING.get(domain)
+        display = _DOMAIN_DISPLAY.get(domain, domain.title())
+        indent = "  " if grouping else ""
+        if grouping:
+            lines.append(f'rectangle "{display}" <<{grouping}>> {{')
+        for entity in domain_entities[domain]:
+            alias = entity.display_alias
+            if not alias:
+                continue
+            arch_data = _parse_archimate_block(entity.display_blocks.get("archimate", ""))
+            element_type = arch_data.get("element-type", "")
+            label = arch_data.get("label", entity.name).replace('"', "'")
+            if element_type and ELEMENT_TYPE_HAS_SPRITE.get(element_type, False):
+                lines.append(
+                    f'{indent}rectangle "<$archimate_{element_type}{{scale=1.5}}> {label}"'
+                    f" <<{element_type}>> as {alias}"
+                )
+            elif element_type:
+                lines.append(f'{indent}rectangle "{label}" <<{element_type}>> as {alias}')
+            else:
+                lines.append(f'{indent}rectangle "{label}" as {alias}')
+        if grouping:
+            lines.append("}")
+        lines.append("")
 
     alias_by_id = {e.artifact_id: e.display_alias for e in entity_records}
     conn_lines: list[str] = []
@@ -88,7 +114,8 @@ def generate_archimate_puml_body(
         src = alias_by_id.get(conn.source)
         tgt = alias_by_id.get(conn.target)
         if src and tgt:
-            conn_lines.append(f"{src} --> {tgt} : <<{conn.conn_type}>>")
+            arrow = CONNECTION_TYPES[conn.conn_type].puml_arrow if conn.conn_type in CONNECTION_TYPES else "-->"
+            conn_lines.append(f"{src} {arrow} {tgt} : <<{conn.conn_type}>>")
     if conn_lines:
         lines.append("' Connections")
         lines.extend(conn_lines)

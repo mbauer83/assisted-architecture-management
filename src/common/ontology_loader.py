@@ -40,6 +40,7 @@ for _name, _info in _entity_data["entity_types"].items():
         element_classes=tuple(_info.get("element_classes", ())),
         create_when=_info.get("create_when", ""),
         never_create_when=_info.get("never_create_when", ""),
+        has_sprite=bool(_info.get("has_sprite", False)),
     )
 
 # ── CONNECTION_TYPES ─────────────────────────────────────────────────────
@@ -52,6 +53,7 @@ for _lang, _types in _conn_data["connection_types"].items():
             conn_dir=_info["directory"],
             archimate_relationship_type=_info.get("archimate_relationship_type"),
             symmetric=_info.get("symmetric", False),
+            puml_arrow=_info.get("puml_arrow", "-->"),
         )
 
 # ── Derived: stereotype → connection type ────────────────────────────────
@@ -68,6 +70,37 @@ for _etype, _einfo in ENTITY_TYPES.items():
         CLASS_MEMBERS.setdefault(_cls, []).append(_etype)
 
 ALL_ENTITY_TYPE_NAMES: list[str] = sorted(ENTITY_TYPES)
+
+# ── Domain ordering & display (derived from entity_ontology.yaml insertion order) ──
+#: Unique archimate_domain values in the order they first appear in the YAML.
+#: Domains with empty archimate_domain (e.g. global-entity-reference) are excluded.
+DOMAIN_ORDER: list[str] = list(dict.fromkeys(
+    et.archimate_domain.lower()
+    for et in ENTITY_TYPES.values()
+    if et.archimate_domain
+))
+
+#: domain_lower → grouping stereotype name (e.g. "motivation" → "MotivationGrouping")
+DOMAIN_GROUPING: dict[str, str] = {
+    d: et.archimate_domain + "Grouping"
+    for et in ENTITY_TYPES.values()
+    if et.archimate_domain
+    for d in [et.archimate_domain.lower()]
+}
+
+#: domain_lower → display name as it appears in diagrams
+DOMAIN_DISPLAY: dict[str, str] = {
+    et.archimate_domain.lower(): et.archimate_domain
+    for et in ENTITY_TYPES.values()
+    if et.archimate_domain
+}
+
+#: archimate_element_type → has_sprite bool
+ELEMENT_TYPE_HAS_SPRITE: dict[str, bool] = {
+    et.archimate_element_type: et.has_sprite
+    for et in ENTITY_TYPES.values()
+    if et.archimate_element_type
+}
 
 # ── Symmetric connections ────────────────────────────────────────────────
 SYMMETRIC_CONNECTIONS: frozenset[str] = frozenset(
