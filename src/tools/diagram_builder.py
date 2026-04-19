@@ -83,8 +83,8 @@ def generate_archimate_puml_body(
             ordered_domains.append(d)
 
     for domain in ordered_domains:
-        grouping = _DOMAIN_GROUPING.get(domain)
-        display = _DOMAIN_DISPLAY.get(domain, domain.title())
+        grouping = DOMAIN_GROUPING.get(domain)
+        display = DOMAIN_DISPLAY.get(domain, domain.title())
         indent = "  " if grouping else ""
         if grouping:
             lines.append(f'rectangle "{display}" <<{grouping}>> {{')
