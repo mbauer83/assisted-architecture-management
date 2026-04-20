@@ -1,5 +1,5 @@
 import { ref, reactive, onUnmounted } from 'vue'
-import { hierarchy, cluster } from 'd3-hierarchy'
+import { hierarchy } from 'd3-hierarchy'
 
 export type LayoutMode = 'force' | 'cluster'
 
@@ -152,6 +152,57 @@ export function useForceGraph(width: () => number, height: () => number) {
 
   interface TreeNode { id: string; children?: TreeNode[] }
 
+  const estimateNodeWidth = (id: string) => {
+    const node = nodes.value.find((n) => n.id === id)
+    const label = node?.label ?? id
+    return Math.max(140, 44 + label.length * 1.5)
+  }
+
+  const computeTreeMetrics = (
+    node: TreeNode,
+    depth: number,
+    metrics: Map<string, { depth: number; width: number }>,
+  ): number => {
+    const children = node.children ?? []
+    const childWidths = children.map((child) => computeTreeMetrics(child, depth + 1, metrics))
+    const siblingGap = Math.max(36, Math.max(0, ...children.map((child) => estimateNodeWidth(child.id) * 0.15)))
+    const subtreeWidth = children.length
+      ? Math.max(
+          estimateNodeWidth(node.id),
+          childWidths.reduce((sum, width) => sum + width, 0) + siblingGap * (children.length - 1),
+        )
+      : estimateNodeWidth(node.id)
+    metrics.set(node.id, { depth, width: subtreeWidth })
+    return subtreeWidth
+  }
+
+  const assignTreePositions = (
+    node: TreeNode,
+    left: number,
+    metrics: Map<string, { depth: number; width: number }>,
+    posMap: Map<string, { x: number; y: number }>,
+    levelGap: number,
+    topPad: number,
+  ) => {
+    const metric = metrics.get(node.id)
+    if (!metric) return
+    const children = node.children ?? []
+    const x = left + metric.width / 2
+    const y = topPad + metric.depth * levelGap
+    posMap.set(node.id, { x, y })
+
+    if (!children.length) return
+
+    const siblingGap = Math.max(36, Math.max(0, ...children.map((child) => estimateNodeWidth(child.id) * 0.35)))
+    let cursor = left
+    for (const child of children) {
+      const childMetric = metrics.get(child.id)
+      if (!childMetric) continue
+      assignTreePositions(child, cursor, metrics, posMap, levelGap, topPad)
+      cursor += childMetric.width + siblingGap
+    }
+  }
+
   const buildTree = (rootId: string): TreeNode => {
     const adj = new Map<string, string[]>()
     for (const e of edges.value) {
@@ -175,17 +226,19 @@ export function useForceGraph(width: () => number, height: () => number) {
     if (nodes.value.length === 0) return {}
     const tree = buildTree(rootId)
     const root = hierarchy(tree)
-    const pad = 100
-    const x_pad_factor = 2
-    const n = nodes.value.length
-    // Use a canvas size that grows with node count so the graph can exceed the viewport
-    const W = Math.max(width() - pad * x_pad_factor *2, n * 80)
-    const H = Math.max(height() - pad * 2, n * 40)
-    cluster<TreeNode>().size([W, H])(root)
+    const leftPad = 140
+    const topPad = 110
+    const rightPad = 140
+    const bottomPad = 110
+    const maxDepth = Math.max(...root.descendants().map((d) => d.depth), 0)
+    const levelGap = Math.max(110, Math.min(180, width() / Math.max(maxDepth + 1, 2)))
+    const metrics = new Map<string, { depth: number; width: number }>()
+    const totalWidth = computeTreeMetrics(tree, 0, metrics)
     const posMap = new Map<string, { x: number; y: number }>()
-    for (const d of root.descendants()) {
-      posMap.set(d.data.id, { x: (d.x ?? 0) + (pad * x_pad_factor), y: (d.y ?? 0) + pad })
-    }
+    assignTreePositions(tree, leftPad, metrics, posMap, levelGap, topPad)
+
+    const canvasWidth = Math.max(width(), totalWidth + leftPad + rightPad)
+    const canvasHeight = Math.max(height(), topPad + bottomPad + maxDepth * levelGap)
     for (const nd of nodes.value) {
       const pos = posMap.get(nd.id)
       if (pos) { nd.x = pos.x; nd.y = pos.y }
@@ -193,7 +246,7 @@ export function useForceGraph(width: () => number, height: () => number) {
     }
     const target = centerId ?? rootId
     const pos = posMap.get(target)
-    return pos ? { cx: pos.x, cy: pos.y } : {}
+    return pos ? { cx: Math.min(Math.max(pos.x, 0), canvasWidth), cy: Math.min(Math.max(pos.y, 0), canvasHeight) } : {}
   }
 
   /** Remove a node and all nodes that were added exclusively by its expansion. */

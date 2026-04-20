@@ -49,8 +49,11 @@ def _parse_groupings(puml: str) -> list[_GroupInfo]:
         # Element with alias inside a grouping (has `as ALIAS`, no trailing `{`)
         # Note: sprite labels like <$name{scale=0.9}> contain `{` mid-line, so we
         # only exclude lines where `{` appears at the end (container openings).
+        # Strip quoted strings before searching to avoid matching "as" inside label text
+        # (e.g. "AI-Assisted Development as Dominant Production Mode").
         elif current is not None and depth > 0:
-            m = re.search(r"\bas\s+(\w+)", stripped)
+            without_quotes = re.sub(r'"[^"]*"', '""', stripped)
+            m = re.search(r"\bas\s+(\w+)", without_quotes)
             if m and not re.search(r"\{\s*$", stripped):
                 current.aliases.append(m.group(1))
 

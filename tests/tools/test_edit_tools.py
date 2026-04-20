@@ -1,6 +1,7 @@
-"""Behavioural tests for entity and connection edit MCP tools.
+"""Behavioural tests for entity, connection, and diagram edit/delete MCP tools.
 
-Covers model_edit_entity, model_edit_connection (remove), and model_edit_diagram
+ Covers model_edit_entity, model_delete_entity, model_edit_connection (remove),
+ and model_edit_diagram / model_delete_diagram
 via the MCP server interface, exercising dry-run and live writes.
 """
 
@@ -115,6 +116,71 @@ class TestEditEntity:
             )
 
 
+class TestDeleteEntity:
+    def test_delete_entity_dry_run_returns_preview(self, repo: Path) -> None:
+        eid = _make_entity(repo, "requirement", "Delete Me")
+        result = mcp.model_delete_entity(
+            artifact_id=eid, dry_run=True, repo_root=str(repo),
+        )
+        assert result["wrote"] is False
+        assert "Would delete entity" in str(result.get("content", ""))
+
+    def test_delete_entity_removes_entity_and_owned_outgoing(self, repo: Path) -> None:
+        src = _make_entity(repo, "requirement", "Source")
+        tgt = _make_entity(repo, "outcome", "Target")
+        _make_connection(repo, src, tgt, "archimate-realization")
+
+        entity_path = next((repo / "model").rglob(f"{src}.md"))
+        outgoing_path = entity_path.with_suffix(".outgoing.md")
+        assert entity_path.exists()
+        assert outgoing_path.exists()
+
+        result = mcp.model_delete_entity(
+            artifact_id=src, dry_run=False, repo_root=str(repo),
+        )
+        assert result["wrote"] is True
+        assert not entity_path.exists()
+        assert not outgoing_path.exists()
+
+    def test_delete_entity_blocked_by_incoming_connection_tree(self, repo: Path) -> None:
+        src = _make_entity(repo, "requirement", "Incoming Src")
+        tgt = _make_entity(repo, "outcome", "Blocked Tgt")
+        _make_connection(repo, src, tgt, "archimate-realization")
+
+        with pytest.raises(ValueError, match="incoming-connections"):
+            mcp.model_delete_entity(
+                artifact_id=tgt, dry_run=False, repo_root=str(repo),
+            )
+
+    def test_delete_entity_blocked_by_diagram_reference_tree(self, repo: Path) -> None:
+        eid = _make_entity(repo, "requirement", "Diagram Ref Entity")
+        diag_path = repo / "diagram-catalog" / "diagrams" / "ref-diagram.puml"
+        _write(
+            diag_path,
+            f"""\
+---
+artifact-id: ref-diagram
+artifact-type: diagram
+diagram-type: activity-bpmn
+name: "Ref Diagram"
+entity-ids-used:
+  - {eid}
+version: 0.1.0
+status: active
+last-updated: '2026-04-20'
+---
+@startuml
+:x;
+@enduml
+""",
+        )
+
+        with pytest.raises(ValueError, match="diagrams"):
+            mcp.model_delete_entity(
+                artifact_id=eid, dry_run=False, repo_root=str(repo),
+            )
+
+
 # ---------------------------------------------------------------------------
 # model_remove_connection (via edit_tools)
 # ---------------------------------------------------------------------------
@@ -201,3 +267,31 @@ title {name}
         )
         assert result["wrote"] is False
         assert "New Title" in str(result.get("content", ""))
+
+
+class TestDeleteDiagram:
+    def test_delete_diagram_dry_run_returns_preview(self, repo: Path) -> None:
+        diag_id = TestEditDiagram()._make_diagram(repo, "Delete Dry Diagram")
+        result = mcp.model_delete_diagram(
+            artifact_id=diag_id, dry_run=True, repo_root=str(repo),
+        )
+        assert result["wrote"] is False
+        assert "Would delete diagram" in str(result.get("content", ""))
+
+    def test_delete_diagram_removes_source_and_rendered_files(self, repo: Path) -> None:
+        diag_id = TestEditDiagram()._make_diagram(repo, "Delete Live Diagram")
+        diag_path = repo / "diagram-catalog" / "diagrams" / f"{diag_id}.puml"
+        rendered_dir = repo / "diagram-catalog" / "rendered"
+        rendered_dir.mkdir(parents=True, exist_ok=True)
+        png = rendered_dir / f"{diag_id}.png"
+        svg = rendered_dir / f"{diag_id}.svg"
+        png.write_text("png", encoding="utf-8")
+        svg.write_text("svg", encoding="utf-8")
+
+        result = mcp.model_delete_diagram(
+            artifact_id=diag_id, dry_run=False, repo_root=str(repo),
+        )
+        assert result["wrote"] is True
+        assert not diag_path.exists()
+        assert not png.exists()
+        assert not svg.exists()

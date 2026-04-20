@@ -126,8 +126,43 @@ map of everything in the model.
 **PlantUML rules (hard-won — violating these causes rendering errors):**
 - **Verify connections in the model before drawing them.** Use `model_query_find_connections_for` on each source entity; never assume a connection exists. Diagrams referencing non-existent connections render with errors or misrepresent the model.
 - **No newlines in label strings.** The MCP tool passes `\n` as a literal newline character (0x0A) inside double-quoted PlantUML strings, which is a syntax error. Use full single-line labels only.
-- **Use `left to right direction`** for dense goal→outcome or requirement→service layers; default top-down direction becomes unreadable beyond ~10 elements.
-- **Realization arrows in PUML:** `TARGET -left-|> SOURCE : <<realization>>` points from concrete to abstract (correct ArchiMate direction).
+- **Direction choice:** Use `left to right direction` for wide, shallow diagrams (e.g. goals → outcomes in one row). Use `top to bottom direction` for tall, multi-layer chains (e.g. drivers → assessments → goals → outcomes → requirements spanning 5 layers).
+- **Realization arrows:** Direction word tracks the diagram's overall flow. LTR diagram: `TARGET -left-|> SOURCE : <<realization>>`. TTB diagram: `TARGET -up-|> SOURCE : <<realization>>`. Always points from concrete to abstract.
+- **`together {}` is broken in this repo.** `_archimate-stereotypes.puml` sets `skinparam linetype ortho` globally, which is incompatible with `together {}` — it causes E350 rendering errors. Never use `together {}`. Use named containers instead (see Multi-layer layout patterns below).
+- **No phantom helper nodes.** Transparent `<<Hidden>>` or bare `<<Grouping>>` rectangles used purely for routing also fail with E350 when targeted by `-[hidden]->`. Use `-[hidden]right-` / `-[hidden]down-` between real model elements only.
+- **Read an existing working diagram first.** Before attempting a layout pattern you haven't used in this repo, open a diagram from `diagram-catalog/diagrams/` that renders correctly and extract the pattern from it. `motivation-goals-outcomes.puml` is a reliable LTR reference; `motivation-chain-drivers-to-requirements.puml` is a reliable TTB multi-layer reference.
+
+**Multi-layer layout patterns (TTB with alternating H/V groupings):**
+
+Use this pattern when a diagram has several conceptual layers stacked vertically (e.g. the motivation chain). Each layer gets one named `<<MotivationGrouping>>` container. Horizontal layers spread elements with `-[hidden]right-` chains; vertical layers stack with `-[hidden]down-` chains. Inter-layer `-[hidden]down-` anchors from the last element of one container to the first element of the next enforce TTB stacking order.
+
+```plantuml
+top to bottom direction
+
+' H-layer (elements spread left→right)
+rectangle "Layer A" <<MotivationGrouping>> {
+  rectangle "..." <<Driver>> as A1
+  rectangle "..." <<Driver>> as A2
+  rectangle "..." <<Driver>> as A3
+}
+A1 -[hidden]right- A2
+A2 -[hidden]right- A3
+
+' V-layer (elements stacked top→bottom)
+rectangle "Layer B" <<MotivationGrouping>> {
+  rectangle "..." <<Assessment>> as B1
+  rectangle "..." <<Assessment>> as B2
+}
+B1 -[hidden]down- B2
+
+' Inter-layer anchor: last H-element → first V-element
+A3 -[hidden]down- B1
+
+' Realization (TTB: concrete points up to abstract)
+B1 -up-|> A1 : <<realization>>
+```
+
+This pattern renders cleanly with `linetype ortho` and produces the desired 90° arrows without any `together {}` or helper nodes.
 
 ---
 

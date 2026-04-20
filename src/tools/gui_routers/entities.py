@@ -7,7 +7,7 @@ from typing import Any
 from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel
 
-from src.common.model_query_types import EntityRecord
+from src.tools.gui_routers.entity_listing import build_entity_summary_rows
 from src.tools.gui_routers import state as s
 
 router = APIRouter()
@@ -34,8 +34,7 @@ def list_entities(
     else:
         entities = [e for e in entities if e.artifact_type != "global-entity-reference"]
     page = entities[offset: offset + limit]
-    counts = s.build_conn_counts(repo)
-    return {"total": len(entities), "items": [s.entity_to_summary(e, counts) for e in page]}
+    return {"total": len(entities), "items": build_entity_summary_rows(page, repo)}
 
 
 @router.get("/api/entity")
@@ -106,6 +105,11 @@ class EditEntityBody(BaseModel):
     dry_run: bool = True
 
 
+class DeleteEntityBody(BaseModel):
+    artifact_id: str
+    dry_run: bool = True
+
+
 @router.post("/api/entity")
 def create_entity(body: CreateEntityBody) -> dict[str, Any]:
     repo_root, _registry, verifier = s.get_write_deps()
@@ -140,6 +144,21 @@ def edit_entity(body: EditEntityBody) -> dict[str, Any]:
             notes=body.notes if "notes" in provided else _UNSET,
             keywords=body.keywords if "keywords" in provided else _UNSET,
             version=body.version, status=body.status, dry_run=body.dry_run,
+        )
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+    return s.write_result_to_dict(result)
+
+
+@router.post("/api/entity/remove")
+def delete_entity(body: DeleteEntityBody) -> dict[str, Any]:
+    repo_root, registry, _verifier = s.get_write_deps()
+    from src.tools.model_write.entity_delete import delete_entity as _delete
+    try:
+        result = _delete(
+            repo_root=repo_root, registry=registry,
+            clear_repo_caches=s.clear_caches,
+            artifact_id=body.artifact_id, dry_run=body.dry_run,
         )
     except ValueError as e:
         raise HTTPException(400, str(e))

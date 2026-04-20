@@ -166,7 +166,7 @@ def _render_puml(
 
         with tempfile.TemporaryDirectory() as out_dir:
             cmd = [
-                "java", "-Djava.awt.headless=true", "-jar", str(jar.resolve()),
+                "java", "-Djava.awt.headless=true", "-DPLANTUML_LIMIT_SIZE=16384", "-jar", str(jar.resolve()),
                 f"-t{fmt}",
             ]
             if fmt == "png":

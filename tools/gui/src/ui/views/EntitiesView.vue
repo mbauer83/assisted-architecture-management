@@ -84,6 +84,38 @@ const sortedEntities = computed(() => {
   })
 })
 
+const hierarchicalEntities = computed(() => {
+  const items = sortedEntities.value
+  const byId = new Map(items.map(item => [item.artifact_id, item]))
+  const children = new Map<string, typeof items>()
+  const roots: typeof items = []
+
+  for (const item of items) {
+    const parentId = item.parent_entity_id ?? item.parent_specialization_id
+    if (parentId && byId.has(parentId)) {
+      const bucket = children.get(parentId) ?? []
+      bucket.push(item)
+      children.set(parentId, bucket)
+    } else {
+      roots.push(item)
+    }
+  }
+
+  const ordered: typeof items = []
+  const visit = (item: typeof items[number]) => {
+    ordered.push(item)
+    for (const child of children.get(item.artifact_id) ?? []) visit(child)
+  }
+  for (const root of roots) visit(root)
+  return ordered
+})
+
+const hierarchyMarker = (relationType?: string) => {
+  if (relationType === 'composition') return '◆'
+  if (relationType === 'aggregation') return '◇'
+  return '↳'
+}
+
 const pageTitle = computed(() => {
   const scope = isGlobal.value ? 'Global ' : ''
   return activeDomain.value ? `${scope}${getDomainLabel(activeDomain.value)} Entities` : `${scope}Entities`
@@ -115,7 +147,7 @@ const sortArrow = (key: SortKey) => sortKey.value === key ? (sortOrder.value ===
             <span v-if="isGlobal" class="global-badge">Global</span>
             {{ pageTitle }}
             <span v-if="entityList" class="count">
-              ({{ sortedEntities.length }}<template v-if="typeFilter"> / {{ entityList.total }}</template>)
+              ({{ hierarchicalEntities.length }}<template v-if="typeFilter"> / {{ entityList.total }}</template>)
             </span>
           </h1>
           <p class="subtitle">
@@ -147,7 +179,7 @@ const sortArrow = (key: SortKey) => sortKey.value === key ? (sortOrder.value ===
 
       <EntitiesTreemap
         v-else-if="entityList && viewMode === 'treemap'"
-        :items="sortedEntities"
+        :items="hierarchicalEntities"
         :active-domain="activeDomain"
       />
 
@@ -169,11 +201,16 @@ const sortArrow = (key: SortKey) => sortKey.value === key ? (sortOrder.value ===
           </tr>
         </thead>
         <tbody>
-          <tr v-for="entity in sortedEntities" :key="entity.artifact_id" :class="{ 'row--global': entity.is_global }">
+          <tr v-for="entity in hierarchicalEntities" :key="entity.artifact_id" :class="{ 'row--global': entity.is_global }">
             <td>
-              <RouterLink :to="{ path: '/entity', query: { id: entity.artifact_id } }">
-                {{ entity.name || friendlyEntityId(entity.artifact_id) }}
-              </RouterLink>
+              <div class="name-cell" :style="{ paddingLeft: `${(entity.hierarchy_depth ?? entity.specialization_depth ?? 0) * 18}px` }">
+                <span v-if="(entity.hierarchy_depth ?? entity.specialization_depth)" class="spec-marker">
+                  {{ hierarchyMarker(entity.hierarchy_relation_type) }}
+                </span>
+                <RouterLink :to="{ path: '/entity', query: { id: entity.artifact_id } }">
+                  {{ entity.name || friendlyEntityId(entity.artifact_id) }}
+                </RouterLink>
+              </div>
               <span v-if="entity.is_global && !isGlobal" class="global-chip" title="From the global repository">global</span>
             </td>
             <td>
@@ -285,6 +322,8 @@ const sortArrow = (key: SortKey) => sortKey.value === key ? (sortOrder.value ===
 .th-conn { min-width: 170px; }
 .th-conn-sub { display: block; margin-top: 2px; font-size: 9px; font-weight: 400; letter-spacing: 0; text-transform: none; color: #9ca3af; }
 .type-cell { display: inline-flex; align-items: center; gap: 8px; }
+.name-cell { display: inline-flex; align-items: center; gap: 6px; }
+.spec-marker { color: #9ca3af; font-size: 12px; }
 .type-glyph { color: #374151; fill: none; flex: 0 0 auto; }
 .mono, .conn-counts { font-family: monospace; }
 .mono { font-size: 12px; color: #374151; }

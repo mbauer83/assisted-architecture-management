@@ -2,12 +2,14 @@
 
 from __future__ import annotations
 
+import re
 from typing import Any, Literal
 
 from fastapi import APIRouter, HTTPException, Query
 from fastapi.responses import FileResponse, Response
 from pydantic import BaseModel
 
+from src.common.model_query_parsing import extract_declared_puml_aliases, normalize_puml_alias
 from src.common.model_query_types import DiagramRecord, EntityRecord
 from src.common.ontology_loader import DOMAIN_ORDER as _DOMAIN_ORDER
 from src.tools.gui_routers import state as s
@@ -78,9 +80,14 @@ def get_diagram_refs(source_id: str, target_id: str) -> list[dict[str, str]]:
 def _puml_contains(d: DiagramRecord, *aliases: str) -> bool:
     try:
         puml = d.path.read_text(encoding="utf-8")
-        return all(a in puml for a in aliases)
+        declared_aliases = _declared_aliases_in_puml(puml)
+        return all(normalize_puml_alias(a) in declared_aliases for a in aliases)
     except OSError:
         return False
+
+
+def _declared_aliases_in_puml(puml: str) -> set[str]:
+    return extract_declared_puml_aliases(puml)
 
 
 @router.get("/api/diagram-entities")
@@ -93,9 +100,10 @@ def get_diagram_entities(id: str) -> list[dict[str, Any]]:
         puml = diag_rec.path.read_text(encoding="utf-8")
     except OSError:
         return []
+    declared_aliases = _declared_aliases_in_puml(puml)
     entities = []
     for rec in repo._entities.values():
-        if rec.display_alias and rec.display_alias in puml:
+        if rec.display_alias and normalize_puml_alias(rec.display_alias) in declared_aliases:
             row = s.entity_to_summary(rec)
             row["display_alias"] = rec.display_alias
             entities.append(row)
@@ -113,8 +121,7 @@ def _parse_explicit_connection_pairs(puml: str) -> set[tuple[str, str]]:
     reported. Checks both directions so symmetric connections (association) match
     regardless of which alias appears first.
     """
-    import re as _re
-    _conn_re = _re.compile(
+    _conn_re = re.compile(
         r"^\s*(\w+)\s+"
         r"([-.*|o<>][^\s]*[-.*|o<>])"
         r"\s+(\w+)"
@@ -126,7 +133,7 @@ def _parse_explicit_connection_pairs(puml: str) -> set[tuple[str, str]]:
             continue
         m = _conn_re.match(line)
         if m:
-            pairs.add((m.group(1), m.group(3)))
+            pairs.add((normalize_puml_alias(m.group(1)), normalize_puml_alias(m.group(3))))
     return pairs
 
 
@@ -140,10 +147,11 @@ def get_diagram_connections(id: str) -> list[dict[str, Any]]:
         puml = diag_rec.path.read_text(encoding="utf-8")
     except OSError:
         return []
+    declared_aliases = _declared_aliases_in_puml(puml)
     in_diagram = {
         rec.artifact_id: rec
         for rec in repo._entities.values()
-        if rec.display_alias and rec.display_alias in puml
+        if rec.display_alias and normalize_puml_alias(rec.display_alias) in declared_aliases
     }
     explicit_pairs = _parse_explicit_connection_pairs(puml)
     result: list[dict[str, Any]] = []
@@ -154,8 +162,8 @@ def get_diagram_connections(id: str) -> list[dict[str, Any]]:
         src = in_diagram.get(conn.source)
         tgt = in_diagram.get(conn.target)
         if src and tgt:
-            sa = src.display_alias or ""
-            ta = tgt.display_alias or ""
+            sa = normalize_puml_alias(src.display_alias or "")
+            ta = normalize_puml_alias(tgt.display_alias or "")
             if (sa, ta) not in explicit_pairs and (ta, sa) not in explicit_pairs:
                 continue
             d = s.connection_to_dict(conn)
@@ -273,6 +281,11 @@ class EditDiagramGuiBody(BaseModel):
     dry_run: bool = True
 
 
+class DeleteDiagramBody(BaseModel):
+    artifact_id: str
+    dry_run: bool = True
+
+
 @router.post("/api/diagram/preview")
 def preview_diagram(body: DiagramPreviewBody) -> dict[str, Any]:
     repo_root = s._repo_root
@@ -302,6 +315,7 @@ def create_diagram_gui(body: CreateDiagramGuiBody) -> dict[str, Any]:
             repo_root=repo_root, verifier=verifier, clear_repo_caches=s.clear_caches,
             diagram_type=body.diagram_type, name=body.name, puml=puml,
             artifact_id=generate_entity_id("DIA", body.name), keywords=body.keywords,
+            entity_ids_used=body.entity_ids, connection_ids_used=body.connection_ids,
             version=body.version, status=body.status, last_updated=None,
             connection_inference="none", dry_run=body.dry_run,
         )
@@ -323,7 +337,22 @@ def edit_diagram_gui(body: EditDiagramGuiBody) -> dict[str, Any]:
         result = edit_diagram(
             repo_root=repo_root, verifier=verifier, clear_repo_caches=s.clear_caches,
             artifact_id=body.artifact_id, puml=puml, name=body.name,
-            keywords=..., version=body.version, status=body.status, dry_run=body.dry_run,
+            keywords=..., entity_ids_used=body.entity_ids, connection_ids_used=body.connection_ids,
+            version=body.version, status=body.status, dry_run=body.dry_run,
+        )
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+    return s.write_result_to_dict(result)
+
+
+@router.post("/api/diagram/remove")
+def delete_diagram_gui(body: DeleteDiagramBody) -> dict[str, Any]:
+    repo_root, _registry, _verifier = s.get_write_deps()
+    from src.tools.model_write.diagram_delete import delete_diagram
+    try:
+        result = delete_diagram(
+            repo_root=repo_root, clear_repo_caches=s.clear_caches,
+            artifact_id=body.artifact_id, dry_run=body.dry_run,
         )
     except ValueError as e:
         raise HTTPException(400, str(e))

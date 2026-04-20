@@ -36,6 +36,8 @@ from .entity import verification_to_entity_dict
 from .parse_existing import parse_entity_file, parse_outgoing_file
 from .types import WriteResult
 from .verify import verify_content_in_temp_path
+from .entity_delete import _delete_entity_core
+from .diagram_delete import _delete_diagram_core
 
 
 # ---------------------------------------------------------------------------
@@ -184,6 +186,24 @@ def admin_edit_entity(
     return WriteResult(wrote=True, path=entity_file, artifact_id=artifact_id,
                        content=None, warnings=[],
                        verification=verification_to_entity_dict(entity_file, res))
+
+
+def admin_delete_entity(
+    *,
+    repo_root: Path,
+    registry: ModelRegistry,
+    clear_repo_caches: Callable[[Path], None],
+    artifact_id: str,
+    dry_run: bool,
+) -> WriteResult:
+    assert_enterprise_write_root(repo_root)
+    return _delete_entity_core(
+        repo_root=repo_root,
+        registry=registry,
+        clear_repo_caches=clear_repo_caches,
+        artifact_id=artifact_id,
+        dry_run=dry_run,
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -355,4 +375,20 @@ def _write_diagram_to_enterprise(
         wrote=True, path=path, artifact_id=artifact_id,
         content=None, warnings=[],
         verification={"file_type": "diagram", "valid": True, "issues": []},
+    )
+
+
+def admin_delete_diagram(
+    *,
+    repo_root: Path,
+    clear_repo_caches: Callable[[Path], None],
+    artifact_id: str,
+    dry_run: bool,
+) -> WriteResult:
+    assert_enterprise_write_root(repo_root)
+    return _delete_diagram_core(
+        repo_root=repo_root,
+        clear_repo_caches=clear_repo_caches,
+        artifact_id=artifact_id,
+        dry_run=dry_run,
     )

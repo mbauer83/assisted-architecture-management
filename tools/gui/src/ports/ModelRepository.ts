@@ -85,6 +85,9 @@ export interface ModelRepository {
     keywords?: string[]; version?: string; status?: string;
     dry_run?: boolean;
   }) => Effect.Effect<WriteResult, RepoError>
+  readonly deleteEntity: (body: {
+    artifact_id: string; dry_run?: boolean;
+  }) => Effect.Effect<WriteResult, RepoError>
   readonly getEntitySchemata: (artifactType: string) => Effect.Effect<EntitySchemaInfo, RepoError>
   readonly getDiagramEntities: (diagramId: string) => Effect.Effect<EntitySummary[], RepoError>
   readonly getDiagramConnections: (diagramId: string) => Effect.Effect<DiagramConnection[], RepoError>
@@ -106,6 +109,9 @@ export interface ModelRepository {
     entity_ids: string[]; connection_ids: string[];
     version?: string; status?: string; dry_run?: boolean;
   }) => Effect.Effect<WriteResult, RepoError>
+  readonly deleteDiagram: (body: {
+    artifact_id: string; dry_run?: boolean;
+  }) => Effect.Effect<WriteResult, RepoError>
   // ── Admin write methods (active only in --admin-mode) ───────────────────
   readonly adminCreateEntity: (body: {
     artifact_type: string; name: string; summary?: string;
@@ -117,6 +123,9 @@ export interface ModelRepository {
     properties?: Record<string, string>; notes?: string;
     keywords?: string[]; version?: string; status?: string; dry_run?: boolean;
   }) => Effect.Effect<WriteResult, RepoError>
+  readonly adminDeleteEntity: (body: {
+    artifact_id: string; dry_run?: boolean;
+  }) => Effect.Effect<WriteResult, RepoError>
   readonly adminAddConnection: (body: {
     source_entity: string; connection_type: string; target_entity: string;
     description?: string; dry_run?: boolean;
@@ -124,6 +133,9 @@ export interface ModelRepository {
   readonly adminRemoveConnection: (body: {
     source_entity: string; connection_type: string; target_entity: string;
     dry_run?: boolean;
+  }) => Effect.Effect<WriteResult, RepoError>
+  readonly adminDeleteDiagram: (body: {
+    artifact_id: string; dry_run?: boolean;
   }) => Effect.Effect<WriteResult, RepoError>
   readonly planPromotion: (body: {
     entity_id: string;

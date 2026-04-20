@@ -1,6 +1,5 @@
 """Diagram editing operations."""
 
-import re
 from pathlib import Path
 from collections.abc import Callable
 
@@ -36,6 +35,8 @@ def edit_diagram(
     puml: str | None = None,
     name: str | None = None,
     keywords: list[str] | None = ...,  # type: ignore[assignment]
+    entity_ids_used: list[str] | None = None,
+    connection_ids_used: list[str] | None = None,
     version: str | None = None,
     status: str | None = None,
     dry_run: bool,
@@ -65,8 +66,8 @@ def edit_diagram(
     # Determine PUML body
     if puml is not None:
         puml_body = puml.strip("\n") + "\n"
-        # Strip existing hidden links before re-optimizing (idempotency)
-        puml_body = _strip_hidden_links(puml_body)
+        # optimize_puml_layout is idempotent: it skips when [hidden] links are
+        # already present, so user-provided explicit hidden chains are preserved.
         puml_body = optimize_puml_layout(puml_body)
     else:
         puml_body = parsed.puml_body
@@ -79,6 +80,10 @@ def edit_diagram(
         status=eff_status,
         last_updated=today_iso(),
         keywords=eff_keywords,
+        entity_ids_used=entity_ids_used if entity_ids_used is not None else fm.get("entity-ids-used"),
+        connection_ids_used=(
+            connection_ids_used if connection_ids_used is not None else fm.get("connection-ids-used")
+        ),
         puml_body=puml_body,
     )
 
@@ -118,7 +123,3 @@ def edit_diagram(
         verification=_verification_to_dict(diagram_path, res),
     )
 
-
-def _strip_hidden_links(puml: str) -> str:
-    """Remove [hidden] links so auto-layout can be cleanly re-applied."""
-    return re.sub(r"^.*\[hidden\].*\n?", "", puml, flags=re.MULTILINE)

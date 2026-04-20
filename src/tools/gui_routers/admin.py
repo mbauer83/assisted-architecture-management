@@ -62,6 +62,11 @@ class AdminEditEntityBody(BaseModel):
     dry_run: bool = True
 
 
+class AdminDeleteEntityBody(BaseModel):
+    artifact_id: str
+    dry_run: bool = True
+
+
 @router.post("/entity")
 def admin_create_entity(body: AdminCreateEntityBody) -> dict[str, Any]:
     _require_admin()
@@ -97,6 +102,22 @@ def admin_edit_entity(body: AdminEditEntityBody) -> dict[str, Any]:
             notes=body.notes if "notes" in provided else _UNSET,
             keywords=body.keywords if "keywords" in provided else _UNSET,
             version=body.version, status=body.status, dry_run=body.dry_run,
+        )
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+    return s.write_result_to_dict(result)
+
+
+@router.post("/entity/remove")
+def admin_delete_entity(body: AdminDeleteEntityBody) -> dict[str, Any]:
+    _require_admin()
+    ent_root, registry, _verifier = s.get_admin_write_deps()
+    from src.tools.model_write.admin_ops import admin_delete_entity as _delete
+    try:
+        result = _delete(
+            repo_root=ent_root, registry=registry,
+            clear_repo_caches=s.clear_caches,
+            artifact_id=body.artifact_id, dry_run=body.dry_run,
         )
     except ValueError as e:
         raise HTTPException(400, str(e))
@@ -168,6 +189,11 @@ class AdminCreateDiagramBody(BaseModel):
     dry_run: bool = True
 
 
+class AdminDeleteDiagramBody(BaseModel):
+    artifact_id: str
+    dry_run: bool = True
+
+
 @router.post("/diagram")
 def admin_create_diagram(body: AdminCreateDiagramBody) -> dict[str, Any]:
     """Create a diagram in the enterprise (global) repository.
@@ -197,6 +223,21 @@ def admin_create_diagram(body: AdminCreateDiagramBody) -> dict[str, Any]:
             artifact_id=generate_entity_id("DIA", body.name),
             keywords=body.keywords, version=body.version, status=body.status,
             dry_run=body.dry_run,
+        )
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+    return s.write_result_to_dict(result)
+
+
+@router.post("/diagram/remove")
+def admin_delete_diagram(body: AdminDeleteDiagramBody) -> dict[str, Any]:
+    _require_admin()
+    ent_root, _registry, _verifier = s.get_admin_write_deps()
+    from src.tools.model_write.admin_ops import admin_delete_diagram as _delete
+    try:
+        result = _delete(
+            repo_root=ent_root, clear_repo_caches=s.clear_caches,
+            artifact_id=body.artifact_id, dry_run=body.dry_run,
         )
     except ValueError as e:
         raise HTTPException(400, str(e))

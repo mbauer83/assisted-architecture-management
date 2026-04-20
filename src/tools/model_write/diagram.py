@@ -75,7 +75,7 @@ def _render_diagram_png(puml_path: Path, warnings: list[str]) -> Path | None:
         # project root produces a doubled/wrong path.
         dpi = render_dpi()
         result = subprocess.run(
-            ["java", "-Djava.awt.headless=true", "-jar", str(jar.resolve()),
+            ["java", "-Djava.awt.headless=true", "-DPLANTUML_LIMIT_SIZE=16384", "-jar", str(jar.resolve()),
              "-tpng", f"-Sdpi={dpi}", "-o", str(rendered_dir.resolve()), tmp_path.name],
             cwd=str(puml_path.parent),
             capture_output=True, text=True, timeout=60,
@@ -166,6 +166,8 @@ def create_diagram(
     puml: str,
     artifact_id: str | None,
     keywords: list[str] | None = None,
+    entity_ids_used: list[str] | None = None,
+    connection_ids_used: list[str] | None = None,
     version: str,
     status: str,
     last_updated: str | None,
@@ -229,6 +231,8 @@ def create_diagram(
         status=status,
         last_updated=last,
         keywords=keywords,
+        entity_ids_used=entity_ids_used,
+        connection_ids_used=connection_ids_used,
         puml_body=puml_body,
     )
 

@@ -181,6 +181,7 @@ export const makeHttpModelRepository = (): ModelRepository => ({
   createEntity: (body) => postJson(buildUrl('/entity'), body, WriteResultSchema),
 
   editEntity: (body) => postJson(buildUrl('/entity/edit'), body, WriteResultSchema),
+  deleteEntity: (body) => postJson(buildUrl('/entity/remove'), body, WriteResultSchema),
 
   getEntitySchemata: (artifactType: string) =>
     fetchJson(buildUrl('/entity-schemata', { artifact_type: artifactType }), EntitySchemaInfoSchema),
@@ -212,15 +213,21 @@ export const makeHttpModelRepository = (): ModelRepository => ({
 
   editDiagram: (body) =>
     postJson(buildUrl('/diagram/edit'), body, WriteResultSchema),
+  deleteDiagram: (body) =>
+    postJson(buildUrl('/diagram/remove'), body, WriteResultSchema),
 
   adminCreateEntity: (body) =>
     postJson(buildUrl('/admin/entity', undefined, true), body, WriteResultSchema),
   adminEditEntity: (body) =>
     postJson(buildUrl('/admin/entity/edit', undefined, true), body, WriteResultSchema),
+  adminDeleteEntity: (body) =>
+    postJson(buildUrl('/admin/entity/remove', undefined, true), body, WriteResultSchema),
   adminAddConnection: (body) =>
     postJson(buildUrl('/admin/connection', undefined, true), body, WriteResultSchema),
   adminRemoveConnection: (body) =>
     postJson(buildUrl('/admin/connection/remove', undefined, true), body, WriteResultSchema),
+  adminDeleteDiagram: (body) =>
+    postJson(buildUrl('/admin/diagram/remove', undefined, true), body, WriteResultSchema),
 
   planPromotion: (body) =>
     postJson(buildUrl('/promote/plan'), body, PromotionPlanSchema),

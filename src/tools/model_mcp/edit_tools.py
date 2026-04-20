@@ -173,6 +173,49 @@ def model_edit_diagram(
     return _result_dict(dry_run, result)
 
 
+def model_delete_entity(
+    *,
+    artifact_id: str,
+    dry_run: bool = True,
+    repo_root: str | None = None,
+    repo_preset: RepoPreset | None = None,
+    repo_scope: WriteRepoScope = "engagement",
+) -> dict[str, object]:
+    if repo_scope != "engagement":
+        raise ValueError("model_delete_entity only supports repo_scope='engagement'")
+
+    root, registry, _verifier = _resolve(repo_root, repo_preset, need_registry=True)
+    result = model_write_ops.delete_entity(
+        repo_root=root,
+        registry=registry,
+        clear_repo_caches=clear_caches_for_repo,
+        artifact_id=artifact_id,
+        dry_run=dry_run,
+    )
+    return _result_dict(dry_run, result)
+
+
+def model_delete_diagram(
+    *,
+    artifact_id: str,
+    dry_run: bool = True,
+    repo_root: str | None = None,
+    repo_preset: RepoPreset | None = None,
+    repo_scope: WriteRepoScope = "engagement",
+) -> dict[str, object]:
+    if repo_scope != "engagement":
+        raise ValueError("model_delete_diagram only supports repo_scope='engagement'")
+
+    root, _registry, _verifier = _resolve(repo_root, repo_preset, need_registry=False)
+    result = model_write_ops.delete_diagram(
+        repo_root=root,
+        clear_repo_caches=clear_caches_for_repo,
+        artifact_id=artifact_id,
+        dry_run=dry_run,
+    )
+    return _result_dict(dry_run, result)
+
+
 def register_edit_tools(mcp: FastMCP) -> None:
     from src.tools.model_mcp.write_queue import queued
 
@@ -210,3 +253,24 @@ def register_edit_tools(mcp: FastMCP) -> None:
         ),
         structured_output=True,
     )(queued(model_edit_diagram))
+
+    mcp.tool(
+        name="model_delete_entity",
+        title="Model Write: Delete Entity",
+        description=(
+            "Delete an entity from the engagement repository. "
+            "Fails if other connections, diagrams, or global-entity-references still depend on it; "
+            "the error lists those dependents as a deletion tree."
+        ),
+        structured_output=True,
+    )(queued(model_delete_entity))
+
+    mcp.tool(
+        name="model_delete_diagram",
+        title="Model Write: Delete Diagram",
+        description=(
+            "Delete a diagram from the engagement repository, including rendered PNG/SVG siblings "
+            "when present."
+        ),
+        structured_output=True,
+    )(queued(model_delete_diagram))

@@ -5,7 +5,14 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
-from fastapi import HTTPException
+try:
+    from fastapi import HTTPException
+except ModuleNotFoundError:  # pragma: no cover - test env without GUI deps
+    class HTTPException(Exception):
+        def __init__(self, status_code: int, detail: str) -> None:
+            self.status_code = status_code
+            self.detail = detail
+            super().__init__(detail)
 
 from src.common.model_query import ModelRepository
 from src.common.model_query_types import ConnectionRecord, DiagramRecord, EntityRecord

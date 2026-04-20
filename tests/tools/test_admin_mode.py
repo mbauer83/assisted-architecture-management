@@ -195,6 +195,85 @@ class TestBoundaryGuards:
         assert result.wrote is False  # dry_run
         # No exception means the enterprise boundary check passed
 
+    def test_standard_delete_entity_rejects_enterprise_root(
+        self, enterprise_root: Path
+    ) -> None:
+        from src.common.model_verifier import ModelRegistry
+        from src.tools.model_write.entity_delete import delete_entity
+        with pytest.raises(ValueError, match="enterprise"):
+            delete_entity(
+                repo_root=enterprise_root,
+                registry=ModelRegistry(enterprise_root),
+                clear_repo_caches=lambda _: None,
+                artifact_id="REQ@2000000000.GloAAA.global-req",
+                dry_run=True,
+            )
+
+    def test_admin_delete_entity_accepts_enterprise_root(
+        self, enterprise_root: Path
+    ) -> None:
+        from src.common.model_verifier import ModelRegistry
+        from src.tools.model_write.admin_ops import admin_delete_entity
+
+        entity_id = "REQ@2000000000.GloAAA.global-req"
+        _write(
+            enterprise_root / "model" / "motivation" / "requirements" / f"{entity_id}.md",
+            _entity_md(entity_id, "requirement", "Global Req"),
+        )
+
+        result = admin_delete_entity(
+            repo_root=enterprise_root,
+            registry=ModelRegistry(enterprise_root),
+            clear_repo_caches=lambda _: None,
+            artifact_id=entity_id,
+            dry_run=True,
+        )
+        assert result.wrote is False
+
+    def test_standard_delete_diagram_rejects_enterprise_root(
+        self, enterprise_root: Path
+    ) -> None:
+        from src.tools.model_write.diagram_delete import delete_diagram
+        with pytest.raises(ValueError, match="enterprise"):
+            delete_diagram(
+                repo_root=enterprise_root,
+                clear_repo_caches=lambda _: None,
+                artifact_id="diag-1",
+                dry_run=True,
+            )
+
+    def test_admin_delete_diagram_accepts_enterprise_root(
+        self, enterprise_root: Path
+    ) -> None:
+        from src.tools.model_write.admin_ops import admin_delete_diagram
+
+        diag_id = "diag-1"
+        _write(
+            enterprise_root / "diagram-catalog" / "diagrams" / f"{diag_id}.puml",
+            f"""\
+---
+artifact-id: {diag_id}
+artifact-type: diagram
+diagram-type: activity-bpmn
+name: "Diag"
+version: 0.1.0
+status: active
+last-updated: '2026-04-20'
+---
+@startuml
+:x;
+@enduml
+""",
+        )
+
+        result = admin_delete_diagram(
+            repo_root=enterprise_root,
+            clear_repo_caches=lambda _: None,
+            artifact_id=diag_id,
+            dry_run=True,
+        )
+        assert result.wrote is False
+
 
 # ---------------------------------------------------------------------------
 # Broken-reference cleanup

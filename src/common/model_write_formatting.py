@@ -147,6 +147,8 @@ def format_diagram_puml(
     status: str,
     last_updated: str,
     keywords: list[str] | None = None,
+    entity_ids_used: list[str] | None = None,
+    connection_ids_used: list[str] | None = None,
     puml_body: str,
 ) -> str:
     frontmatter: dict[str, object] = {
@@ -159,6 +161,10 @@ def format_diagram_puml(
     if keywords:
         frontmatter["keywords"] = keywords
     frontmatter["diagram-type"] = diagram_type
+    if entity_ids_used:
+        frontmatter["entity-ids-used"] = entity_ids_used
+    if connection_ids_used:
+        frontmatter["connection-ids-used"] = connection_ids_used
     frontmatter["last-updated"] = last_updated
 
     ordered_keys = [
@@ -169,6 +175,8 @@ def format_diagram_puml(
         "status",
         "keywords",
         "diagram-type",
+        "entity-ids-used",
+        "connection-ids-used",
         "last-updated",
     ]
     fm_out = {key: frontmatter[key] for key in ordered_keys if key in frontmatter}

@@ -264,8 +264,65 @@ def check_puml_structure(content: str, fm: dict, result: VerificationResult, loc
                 loc,
             ))
 
+    _check_entity_aliases_declared(content, fm, result, loc)
+
+
+def _check_entity_aliases_declared(content: str, fm: dict, result: VerificationResult, loc: str) -> None:
+    entity_ids = fm.get("entity-ids-used")
+    if not isinstance(entity_ids, list):
+        return
+
+    declared_aliases = _extract_declared_puml_aliases(content)
+    for eid in entity_ids:
+        eid_str = str(eid)
+        entity_path = result.path.parents[2] / "model"
+        matches = list(entity_path.rglob(f"{eid_str}.md"))
+        if not matches:
+            continue
+        try:
+            entity_text = matches[0].read_text(encoding="utf-8")
+        except OSError:
+            continue
+        alias = _extract_entity_display_alias(entity_text)
+        if alias and _normalize_puml_alias(alias) not in declared_aliases:
+            result.issues.append(Issue(
+                Severity.ERROR,
+                "E309",
+                (
+                    f"entity-ids-used references '{eid_str}' with display alias '{alias}', "
+                    "but that alias is not declared in the PUML body"
+                ),
+                loc,
+            ))
+
+
+def _normalize_puml_alias(alias: str) -> str:
+    return alias.strip().replace("-", "_")
+
+
+def _extract_declared_puml_aliases(content: str) -> set[str]:
+    aliases: set[str] = set()
+    for line in content.splitlines():
+        stripped = line.strip()
+        if not stripped or stripped.startswith("'"):
+            continue
+        if stripped.endswith("{"):
+            continue
+        m = re.search(r"\bas\s+([A-Za-z0-9_-]+)\s*$", stripped)
+        if m:
+            aliases.add(_normalize_puml_alias(m.group(1)))
+    return aliases
+
+
+def _extract_entity_display_alias(entity_text: str) -> str:
+    marker = "<!-- §display -->"
+    pos = entity_text.find(marker)
+    if pos == -1:
+        return ""
+    display_body = entity_text[pos + len(marker):]
+    m = re.search(r"alias:\s*([A-Za-z0-9_-]+)", display_body)
+    return _normalize_puml_alias(m.group(1)) if m else ""
+
 
 def check_diagram_artifact_type(fm: dict, result: VerificationResult, loc: str) -> None:
     check_artifact_type(fm, DIAGRAM_ARTIFACT_TYPES, "diagram artifact type", result, loc)
-
-

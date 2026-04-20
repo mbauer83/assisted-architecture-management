@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { inject, onMounted, ref, watch, computed } from 'vue'
-import { useRoute, RouterLink } from 'vue-router'
+import { useRoute, useRouter, RouterLink } from 'vue-router'
 import { Effect } from 'effect'
 import { modelServiceKey } from '../keys'
 import { useAsync } from '../composables/useAsync'
@@ -9,6 +9,7 @@ import ArchimateTypeGlyph from '../components/ArchimateTypeGlyph.vue'
 import type { EntityDetail, ConnectionList, OntologyClassification } from '../../domain'
 
 const svc = inject(modelServiceKey)!
+const router = useRouter()
 const adminMode = ref(false)
 onMounted(() => {
   Effect.runPromise(svc.getServerInfo())
@@ -66,6 +67,10 @@ const editNotes = ref('')
 const editBusy = ref(false)
 const editError = ref<string | null>(null)
 const editPreview = ref<{ content: string | null; warnings: string[] } | null>(null)
+const deleteBusy = ref(false)
+const deleteError = ref<string | null>(null)
+const deletePreview = ref<{ content: string | null; warnings: string[] } | null>(null)
+const confirmDelete = ref(false)
 
 const startEdit = () => {
   if (!detail.data.value) return
@@ -118,6 +123,9 @@ const isGlobalEntity = computed(() => detail.data.value?.is_global ?? false)
 const editFn = computed(() =>
   (isGlobalEntity.value && adminMode.value) ? svc.adminEditEntity : svc.editEntity
 )
+const deleteFn = computed(() =>
+  (isGlobalEntity.value && adminMode.value) ? svc.adminDeleteEntity : svc.deleteEntity
+)
 
 const previewEdit = () => {
   editBusy.value = true
@@ -149,6 +157,78 @@ const saveEdit = () => {
     editError.value = String(e)
   })
 }
+
+const previewDelete = () => {
+  if (!entityId.value) return
+  deleteBusy.value = true
+  deleteError.value = null
+  deletePreview.value = null
+  confirmDelete.value = true
+  Effect.runPromise(deleteFn.value({ artifact_id: entityId.value, dry_run: true })).then((r: any) => {
+    deleteBusy.value = false
+    deletePreview.value = { content: r.content, warnings: [...r.warnings] }
+  }).catch((e) => {
+    deleteBusy.value = false
+    if (typeof e === 'object' && e !== null) {
+      if ('detail' in e) {
+        deleteError.value = String((e as any).detail)
+      } else if ('message' in e) {
+        // check if message is JSON with "detail" field
+        try {
+          const json = JSON.parse(String((e as any).message))
+          if ('detail' in json) {
+            deleteError.value = String(json.detail)
+          } else {
+            deleteError.value = String((e as any).message)
+          }
+        } catch (e) {
+          deleteError.value = String((e as any).message)
+        }
+      } else {
+        deleteError.value = JSON.stringify(e)
+      }
+    } else {
+      deleteError.value = String(e)
+    }
+  })
+}
+
+const cancelDelete = () => {
+  confirmDelete.value = false
+  deletePreview.value = null
+  deleteError.value = null
+}
+
+const executeDelete = () => {
+  if (!entityId.value) return
+  deleteBusy.value = true
+  deleteError.value = null
+  Effect.runPromise(deleteFn.value({ artifact_id: entityId.value, dry_run: false })).then((r: any) => {
+    deleteBusy.value = false
+    if (r.wrote) {
+      console.log('Delete successful')
+      router.push(detail.data.value?.is_global ? '/global/entities' : '/entities')
+    } else {
+      console.error('Delete failed', r)
+      deleteError.value = r.content ?? 'Delete failed'
+    }
+  }).catch((e) => {
+    deleteBusy.value = false
+    // See if we can extract JSON with a "detail" field from the error message
+    console.error('Delete failed', e)
+    if (typeof e === 'object' && e !== null) {
+      if ('detail' in e) {
+        deleteError.value = String((e as any).detail)
+      } else if ('message' in e) {
+        deleteError.value = String((e as any).message)
+      } else {
+        deleteError.value = JSON.stringify(e)
+      }
+    } else {
+      deleteError.value = String(e)
+    }
+  })
+}
 </script>
 
 <template>
@@ -178,6 +258,12 @@ const saveEdit = () => {
           :title="detail.data.value.is_global && adminMode ? 'Edit global entity (admin mode)' : undefined"
           @click="startEdit"
         >Edit{{ detail.data.value.is_global && adminMode ? ' ⚠' : '' }}</button>
+        <button
+          v-if="detail.data.value && !editing && (!detail.data.value.is_global || adminMode)"
+          class="delete-btn"
+          :title="detail.data.value.is_global && adminMode ? 'Delete global entity (admin mode)' : undefined"
+          @click="previewDelete"
+        >Delete{{ detail.data.value.is_global && adminMode ? ' ⚠' : '' }}</button>
       </div>
     </div>
 
@@ -257,6 +343,25 @@ const saveEdit = () => {
         <div class="markdown-body" v-html="detail.data.value.content_html"></div>
       </div>
 
+      <div v-if="confirmDelete" class="delete-panel card">
+        <div class="delete-title">Delete Entity</div>
+        <div class="delete-text">
+          Deletion removes the entity artifact and its owned outgoing file. It is blocked while
+          other connections, diagrams, or global references still depend on the entity.
+        </div>
+        <div v-if="deletePreview?.warnings.length" class="preview-warnings">
+          <div v-for="w in deletePreview.warnings" :key="w" class="preview-warn">{{ w }}</div>
+        </div>
+        <pre v-if="deletePreview?.content" class="delete-preview">{{ deletePreview.content }}</pre>
+        <pre v-if="deleteError" class="state-msg state-msg--error state-msg--block">{{ deleteError }}</pre>
+        <div class="edit-actions">
+          <button class="cancel-btn" :disabled="deleteBusy" @click="cancelDelete">Cancel</button>
+          <button class="delete-confirm-btn" :disabled="deleteBusy" @click="executeDelete">
+            {{ deleteBusy ? 'Deleting…' : 'Delete Entity' }}
+          </button>
+        </div>
+      </div>
+
       <!-- Connections: [INCOMING] [SYMMETRIC] [OUTGOING] on wide screens -->
       <div class="connections-section" :class="{ 'has-symmetric': hasSymmetric }">
         <ConnectionsPanel
@@ -315,6 +420,11 @@ const saveEdit = () => {
   border: 1px solid #d1d5db; font-size: 13px; font-weight: 500; cursor: pointer;
 }
 .edit-btn:hover { background: #e5e7eb; }
+.delete-btn {
+  padding: 6px 14px; border-radius: 6px; background: #fef2f2; color: #b91c1c;
+  border: 1px solid #fecaca; font-size: 13px; font-weight: 500; cursor: pointer;
+}
+.delete-btn:hover { background: #fee2e2; }
 
 .promote-btn {
   padding: 6px 14px; border-radius: 6px; background: #fef3c7; color: #92400e;
@@ -337,6 +447,7 @@ const saveEdit = () => {
 
 .state-msg { color: #6b7280; padding: 4px 0; }
 .state-msg--error { color: #dc2626; }
+.state-msg--block { white-space: pre-wrap; overflow-x: auto; }
 
 .entity-header { margin-bottom: 20px; }
 .entity-title-row { display: flex; align-items: center; gap: 12px; margin-bottom: 8px; flex-wrap: wrap; }
@@ -400,6 +511,13 @@ const saveEdit = () => {
 .preview-warnings { margin-bottom: 8px; }
 .preview-warn { font-size: 12px; color: #b45309; }
 .preview-content { font-size: 11px; color: #374151; white-space: pre-wrap; max-height: 200px; overflow-y: auto; font-family: monospace; }
+.delete-panel { padding: 16px; margin-bottom: 24px; border-color: #fecaca; background: #fff7f7; }
+.delete-title { font-size: 14px; font-weight: 700; color: #991b1b; margin-bottom: 6px; }
+.delete-text { font-size: 13px; color: #7f1d1d; margin-bottom: 10px; }
+.delete-preview {
+  font-size: 11px; color: #374151; white-space: pre-wrap; max-height: 260px; overflow-y: auto;
+  font-family: monospace; background: #fff; border: 1px solid #fecaca; border-radius: 6px; padding: 10px;
+}
 
 .edit-actions { display: flex; gap: 8px; justify-content: flex-end; padding-top: 4px; }
 .cancel-btn {
@@ -417,7 +535,12 @@ const saveEdit = () => {
   border-radius: 6px; font-size: 13px; font-weight: 500; cursor: pointer;
 }
 .save-btn:hover:not(:disabled) { background: #1d4ed8; }
-.cancel-btn:disabled, .preview-btn:disabled, .save-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+.delete-confirm-btn {
+  padding: 7px 16px; background: #dc2626; color: white; border: none;
+  border-radius: 6px; font-size: 13px; font-weight: 600; cursor: pointer;
+}
+.delete-confirm-btn:hover:not(:disabled) { background: #b91c1c; }
+.cancel-btn:disabled, .preview-btn:disabled, .save-btn:disabled, .delete-confirm-btn:disabled { opacity: 0.5; cursor: not-allowed; }
 
 /* Connections — [INCOMING] [SYMMETRIC] [OUTGOING] */
 .connections-section { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }

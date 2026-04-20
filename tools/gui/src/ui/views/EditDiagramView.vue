@@ -152,10 +152,12 @@ interface ConnTypeGroup { included: ConnEntry[]; excluded: ConnEntry[] }
 
 const getConnsByType = (entityId: string): Map<string, ConnTypeGroup> => {
   const byType = new Map<string, ConnTypeGroup>()
+  if (!effectiveEntityIds.value.has(entityId)) return byType
   for (const conn of allModelConns.value.values()) {
     const isOut = conn.source === entityId
     const isIn = conn.target === entityId
     if (!isOut && !isIn) continue
+    if (!effectiveEntityIds.value.has(conn.source) || !effectiveEntityIds.value.has(conn.target)) continue
     const otherId = isOut ? conn.target : conn.source
     if (!effectiveEntityIds.value.has(otherId)) continue
     const inc = isConnIncluded(conn.artifact_id)
@@ -304,7 +306,6 @@ const load = async () => {
   svgHtml.value = svg; svgLoading.value = false
   diagramEntities.value = summaries; diagramConnections.value = dconns
 
-  const entityIdSet = new Set(summaries.map(s => s.artifact_id))
   includedEntities.value = summaries.map(s => ({
     artifact_id: s.artifact_id, name: s.name, artifact_type: s.artifact_type,
     domain: s.domain, subdomain: s.subdomain, status: s.status,
@@ -315,10 +316,9 @@ const load = async () => {
     summaries.map(s => Effect.runPromise(svc.getConnections(s.artifact_id, 'any')).catch(() => [] as ConnectionRecord[]))
   )
   const map = new Map<string, ConnectionRecord>()
-  const inc = new Set<string>()
+  const inc = new Set<string>(dconns.map(c => c.artifact_id))
   for (const cs of connArrays) for (const c of cs) {
     map.set(c.artifact_id, c)
-    if (entityIdSet.has(c.source) && entityIdSet.has(c.target)) inc.add(c.artifact_id)
   }
   allModelConns.value = map; includedConnIds.value = inc
 }

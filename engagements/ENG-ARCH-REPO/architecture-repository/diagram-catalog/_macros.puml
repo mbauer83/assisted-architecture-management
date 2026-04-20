@@ -81,6 +81,9 @@
 !procedure $DECL_OUT_FXFGrO()
   rectangle "<$archimate_Outcome{scale=1.5}> Architectural Guidance Available Without Specialist Dependency" <<Outcome>> as OUT_FXFGrO
 !endprocedure
+!procedure $DECL_OUT_JZMIk3()
+  rectangle "<$archimate_Outcome{scale=1.5}> AI Agents Efficiently Discover and Edit Architecture Artifacts" <<Outcome>> as OUT_JZMIk3
+!endprocedure
 !procedure $DECL_OUT_LrpdG0()
   rectangle "<$archimate_Outcome{scale=1.5}> Increased Architectural Coherence" <<Outcome>> as OUT_LrpdG0
 !endprocedure
@@ -122,6 +125,9 @@
 !endprocedure
 !procedure $DECL_REQ_F4tfa3()
   rectangle "<$archimate_Requirement{scale=1.5}> Discovery Tools" <<Requirement>> as REQ_F4tfa3
+!endprocedure
+!procedure $DECL_REQ_Ga1zwy()
+  rectangle "<$archimate_Requirement{scale=1.5}> YAML instead of JSON for structured output via MCP" <<Requirement>> as REQ_Ga1zwy
 !endprocedure
 !procedure $DECL_REQ_Gg4Hh4()
   rectangle "<$archimate_Requirement{scale=1.5}> Promotion Mechanism" <<Requirement>> as REQ_Gg4Hh4
@@ -190,7 +196,7 @@
   rectangle "<$archimate_Assessment{scale=1.5}> Implicit System Interdependencies Are Unmaintainable Without Explicit Models" <<Assessment>> as ASS_9YWsDh
 !endprocedure
 !procedure $DECL_ASS_EI3FpR()
-  rectangle "<$archimate_Assessment{scale=1.5}> AI Code Generation Volume Outpaces Sequential Architectural Review Capacity" <<Assessment>> as ASS_EI3FpR
+  rectangle "<$archimate_Assessment{scale=1.5}> AI Code Generation Volume Outpaces Architectural Planning and Review Capacity" <<Assessment>> as ASS_EI3FpR
 !endprocedure
 !procedure $DECL_ASS_a6vxyj()
   rectangle "<$archimate_Assessment{scale=1.5}> Centralized Governance Cannot Scale to Concurrent Development Contexts" <<Assessment>> as ASS_a6vxyj
@@ -230,23 +236,20 @@
 ' ---------------------------------------------------------------------------
 ' Common
 ' ---------------------------------------------------------------------------
-!procedure $DECL_SRV_3I3Dtc()
-  rectangle "<$archimate_Service{scale=1.5}> Indexing Service" <<Service>> as SRV_3I3Dtc
-!endprocedure
 !procedure $DECL_SRV_AIGnSY()
-  rectangle "<$archimate_Service{scale=1.5}> Diagram Scaffolding Service" <<Service>> as SRV_AIGnSY
+  rectangle "<$archimate_Service{scale=1.5}> Diagram Authoring Service" <<Service>> as SRV_AIGnSY
 !endprocedure
 !procedure $DECL_SRV_Au1Th1()
   rectangle "<$archimate_Service{scale=1.5}> Authoring Service" <<Service>> as SRV_Au1Th1
 !endprocedure
-!procedure $DECL_SRV_EQmHDg()
-  rectangle "<$archimate_Service{scale=1.5}> Architecture Conformance Service" <<Service>> as SRV_EQmHDg
+!procedure $DECL_SRV_GsUtNL()
+  rectangle "<$archimate_Service{scale=1.5}> Model Authoring Service" <<Service>> as SRV_GsUtNL
 !endprocedure
 !procedure $DECL_SRV_Ij6Kl6()
-  rectangle "<$archimate_Service{scale=1.5}> Validation Service" <<Service>> as SRV_Ij6Kl6
+  rectangle "<$archimate_Service{scale=1.5}> Verification Service" <<Service>> as SRV_Ij6Kl6
 !endprocedure
-!procedure $DECL_SRV_M5EG4U()
-  rectangle "<$archimate_Service{scale=1.5}> Implementation Guidance Service" <<Service>> as SRV_M5EG4U
+!procedure $DECL_SRV_J8ekRD()
+  rectangle "<$archimate_Service{scale=1.5}> Model Verification Service" <<Service>> as SRV_J8ekRD
 !endprocedure
 !procedure $DECL_SRV_Qr8St8()
   rectangle "<$archimate_Service{scale=1.5}> Discovery, Querying & Stats Service" <<Service>> as SRV_Qr8St8
@@ -257,11 +260,14 @@
 !procedure $DECL_SRV_e5MCiF()
   rectangle "<$archimate_Service{scale=1.5}> Configuration Service" <<Service>> as SRV_e5MCiF
 !endprocedure
+!procedure $DECL_SRV_vQKsM9()
+  rectangle "<$archimate_Service{scale=1.5}> Diagram Verification Service" <<Service>> as SRV_vQKsM9
+!endprocedure
 !procedure $DECL_PRC_00bowZ()
   rectangle "<$archimate_Process{scale=1.5}> Run Quality Gates" <<Process>> as PRC_00bowZ
 !endprocedure
 !procedure $DECL_PRC_0NPVDb()
-  rectangle "<$archimate_Process{scale=1.5}> Author Model Artifact" <<Process>> as PRC_0NPVDb
+  rectangle "<$archimate_Process{scale=1.5}> Author Model Artifacts" <<Process>> as PRC_0NPVDb
 !endprocedure
 !procedure $DECL_PRC_0Rz5Ex()
   rectangle "<$archimate_Process{scale=1.5}> Promote Artifact" <<Process>> as PRC_0Rz5Ex
@@ -276,7 +282,7 @@
   rectangle "<$archimate_Process{scale=1.5}> Extract Architecture Baseline" <<Process>> as PRC_9z9W91
 !endprocedure
 !procedure $DECL_PRC_GHVpDA()
-  rectangle "<$archimate_Process{scale=1.5}> Guide Implementation" <<Process>> as PRC_GHVpDA
+  rectangle "<$archimate_Process{scale=1.5}> Architecture Implementation" <<Process>> as PRC_GHVpDA
 !endprocedure
 !procedure $DECL_PRC_L8tjrh()
   rectangle "<$archimate_Process{scale=1.5}> Compute Dependency Closure" <<Process>> as PRC_L8tjrh
@@ -312,10 +318,10 @@
   rectangle "<$archimate_Process{scale=1.5}> Query Model" <<Process>> as PRC_vGhe4Z
 !endprocedure
 !procedure $DECL_PRC_vOWkdL()
-  rectangle "<$archimate_Process{scale=1.5}> Scaffold Diagram" <<Process>> as PRC_vOWkdL
+  rectangle "<$archimate_Process{scale=1.5}> Author Diagrams" <<Process>> as PRC_vOWkdL
 !endprocedure
 !procedure $DECL_PRC_vlE_5j()
-  rectangle "<$archimate_Process{scale=1.5}> Review Architecture Conformance" <<Process>> as PRC_vlE_5j
+  rectangle "<$archimate_Process{scale=1.5}> Architecture Conformance Review" <<Process>> as PRC_vlE_5j
 !endprocedure
 !procedure $DECL_FNC_3jpc7O()
   rectangle "<$archimate_Function{scale=1.5}> Metadata Filter" <<Function>> as FNC_3jpc7O
@@ -327,7 +333,7 @@
   rectangle "<$archimate_Function{scale=1.5}> Graph Traversal" <<Function>> as FNC_BdEMPx
 !endprocedure
 !procedure $DECL_FNC_YD31f3()
-  rectangle "<$archimate_Function{scale=1.5}> Serialize Write Requests" <<Function>> as FNC_YD31f3
+  rectangle "<$archimate_Function{scale=1.5}> Enqueue Write Commands" <<Function>> as FNC_YD31f3
 !endprocedure
 !procedure $DECL_FNC_ahr0mT()
   rectangle "<$archimate_Function{scale=1.5}> Frontmatter Validation" <<Function>> as FNC_ahr0mT
@@ -359,8 +365,17 @@
 !procedure $DECL_EVT_Y7qmHh()
   rectangle "<$archimate_Event{scale=1.5}> Artifact Promoted" <<Event>> as EVT_Y7qmHh
 !endprocedure
+!procedure $DECL_EVT_YkLI6s()
+  rectangle "<$archimate_Event{scale=1.5}> Architecture Repo Filesystem Watcher Reports Changes" <<Event>> as EVT_YkLI6s
+!endprocedure
+!procedure $DECL_EVT_b5rSJ3()
+  rectangle "<$archimate_Event{scale=1.5}> Write Command Submitted" <<Event>> as EVT_b5rSJ3
+!endprocedure
 !procedure $DECL_EVT_b6XB2D()
   rectangle "<$archimate_Event{scale=1.5}> Repository Indexed" <<Event>> as EVT_b6XB2D
+!endprocedure
+!procedure $DECL_EVT_udZBmo()
+  rectangle "<$archimate_Event{scale=1.5}> Re-Indexing Interval Completed" <<Event>> as EVT_udZBmo
 !endprocedure
 !procedure $DECL_EVT_yQI1rI()
   rectangle "<$archimate_Event{scale=1.5}> Verification Failed" <<Event>> as EVT_yQI1rI

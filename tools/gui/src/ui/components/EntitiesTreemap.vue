@@ -4,7 +4,7 @@ import { useRouter } from 'vue-router'
 import { hierarchy, treemap, type HierarchyRectangularNode } from 'd3-hierarchy'
 import type { EntitySummary } from '../../domain'
 import ArchimateTypeGlyph from './ArchimateTypeGlyph.vue'
-import { friendlyEntityId, getDomainColor, getDomainLabel, getEntityConnectionTotal, softTint } from '../lib/domains'
+import { friendlyEntityId, getDomainColor, getDomainLabel, getEntityConnectionTotal } from '../lib/domains'
 
 type TreeGroup = { name: string; color: string; children: TreeLeaf[] }
 type TreeLeaf = { entity: EntitySummary; value: number; color: string }
@@ -45,13 +45,13 @@ const treeData = computed<TreeGroup[]>(() => {
     list.push({
       entity,
       value: getEntityConnectionTotal(entity),
-      color: groupMode.value === 'domain' ? getDomainColor(entity.domain) : softTint(domainColor.value),
+      color: groupMode.value === 'domain' ? getDomainColor(entity.domain) : domainColor.value,
     })
     groups.set(name, list)
   }
   return [...groups.entries()].sort(([a], [b]) => a.localeCompare(b)).map(([name, children]) => ({
     name,
-    color: groupMode.value === 'domain' ? getDomainColor(children[0]?.entity.domain) : softTint(domainColor.value, 0.7),
+    color: groupMode.value === 'domain' ? getDomainColor(children[0]?.entity.domain) : domainColor.value,
     children: children.sort((a, b) => b.value - a.value || (a.entity.name || a.entity.artifact_id).localeCompare(b.entity.name || b.entity.artifact_id)),
   }))
 })
@@ -250,7 +250,7 @@ watch(() => props.items, resetView)
       <div class="treemap-note">
         Sized by total connections. Drag to pan, wheel to zoom.
         <span v-if="groupMode === 'domain'">Grouped by domain.</span>
-        <span v-else>Grouped by subdomain with light domain tinting.</span>
+        <span v-else>Grouped by subdomain.</span>
       </div>
       <div class="treemap-controls">
         <button class="control-btn" title="Zoom out" @click="zoomByButton(-0.35)">−</button>

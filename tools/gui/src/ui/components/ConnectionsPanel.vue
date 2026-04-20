@@ -26,8 +26,25 @@ const svc = inject(modelServiceKey)!
 // ── Ontology ──────────────────────────────────────────────────────────────────
 
 const ontology = ref<OntologyClassification | null>(null)
+const prefixToType = ref<Record<string, string>>({})
+
+const loadTypeCatalog = () => {
+  Effect.runPromise(svc.getWriteHelp())
+    .then((help: any) => {
+      const catalog = help?.entity_type_catalog
+      if (!catalog || typeof catalog !== 'object') return
+      const next: Record<string, string> = {}
+      for (const [artifactType, info] of Object.entries(catalog)) {
+        const prefix = typeof (info as any)?.prefix === 'string' ? (info as any).prefix : ''
+        if (prefix) next[prefix] = artifactType
+      }
+      prefixToType.value = next
+    })
+    .catch(() => {})
+}
 
 onMounted(() => {
+  loadTypeCatalog()
   Effect.runPromise(svc.getOntologyClassification(props.entityType))
     .then((o) => { ontology.value = o })
     .catch(() => { /* silently degrade — sections built from existing connections */ })
@@ -59,6 +76,11 @@ const symmetricConnTypes = computed((): Set<string> => {
 
 // ── Grouping ──────────────────────────────────────────────────────────────────
 
+const artifactTypeFromId = (artifactId: string) => {
+  const prefix = artifactId.split('@')[0] ?? ''
+  return prefixToType.value[prefix] ?? prefix.toLowerCase()
+}
+
 // Group existing connections by the artifact_type-prefix of the connected entity,
 // filtering to only show connections matching this panel's direction.
 const grouped = computed(() => {
@@ -69,7 +91,7 @@ const grouped = computed(() => {
     if (props.direction === 'symmetric' && !isSym) continue
     if (props.direction !== 'symmetric' && isSym) continue
     const otherId = props.direction === 'incoming' ? c.source : c.target
-    const typePart = otherId.split('@')[0] ?? 'unknown'
+    const typePart = artifactTypeFromId(otherId)
     if (!groups[typePart]) groups[typePart] = []
     groups[typePart].push({ ...c })
   }

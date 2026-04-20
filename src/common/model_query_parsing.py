@@ -73,10 +73,28 @@ def extract_archimate_label_alias(display_blocks: dict[str, str]) -> tuple[str, 
         return "", ""
     block = re.sub(r"```\w*\s*|\s*```", " ", archimate_block)
     label_match = re.search(r"label:\s*[\"']?([^\"'\n]+)[\"']?", block)
-    alias_match = re.search(r"alias:\s*(\w+)", block)
+    alias_match = re.search(r"alias:\s*([A-Za-z0-9_-]+)", block)
     label = label_match.group(1).strip() if label_match else ""
-    alias = alias_match.group(1).strip() if alias_match else ""
+    alias = alias_match.group(1).strip().replace("-", "_") if alias_match else ""
     return label, alias
+
+
+def normalize_puml_alias(alias: str) -> str:
+    return alias.strip().replace("-", "_")
+
+
+def extract_declared_puml_aliases(content: str) -> set[str]:
+    aliases: set[str] = set()
+    for line in content.splitlines():
+        stripped = line.strip()
+        if not stripped or stripped.startswith("'"):
+            continue
+        if stripped.endswith("{"):
+            continue
+        m = re.search(r"\bas\s+([A-Za-z0-9_-]+)\s*$", stripped)
+        if m:
+            aliases.add(normalize_puml_alias(m.group(1)))
+    return aliases
 
 
 def parse_entity(path: Path, model_root: Path) -> EntityRecord | None:
