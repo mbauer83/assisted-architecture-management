@@ -28,7 +28,7 @@ class ParsedOutgoing:
     """Structured representation of an existing .outgoing.md file."""
 
     frontmatter: dict[str, object]
-    connections: list[dict[str, str]]  # each has connection_type, target_entity, description
+    connections: list[dict[str, object]]  # keys: connection_type, target_entity, description, optional src/tgt_cardinality, associated_entities
     raw_text: str
 
 
@@ -233,15 +233,22 @@ def _parse_connection_sections(connections_text: str) -> list[dict[str, str]]:
         if not m:
             continue
 
-        conn: dict[str, str] = {
+        raw_body = rest[0].strip() if rest else ""
+        _assoc_re = re.compile(r"<!--\s*§assoc\s+(\S+)\s*-->")
+        assoc_ids = _assoc_re.findall(raw_body)
+        clean_desc = _assoc_re.sub("", raw_body).strip()
+
+        conn: dict[str, object] = {
             "connection_type": m.group("conn_type"),
             "target_entity": m.group("target_id"),
-            "description": rest[0].strip() if rest else "",
+            "description": clean_desc,
         }
         if m.group("src_card"):
             conn["src_cardinality"] = m.group("src_card")
         if m.group("tgt_card"):
             conn["tgt_cardinality"] = m.group("tgt_card")
+        if assoc_ids:
+            conn["associated_entities"] = assoc_ids
         connections.append(conn)
 
     return connections

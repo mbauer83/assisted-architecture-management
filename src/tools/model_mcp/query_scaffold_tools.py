@@ -59,7 +59,12 @@ def _domain(artifact_type: str) -> str:
     return info.archimate_domain if info else "Common"
 
 
+_JUNCTION_TYPES = frozenset({"and-junction", "or-junction"})
+
+
 def _entity_decl(artifact_type: str, label: str, alias: str) -> str:
+    if artifact_type in _JUNCTION_TYPES:
+        return f'circle " " as {alias}'
     info = ENTITY_TYPES.get(artifact_type)
     if not info or not info.archimate_element_type:
         return f'rectangle "{label}" as {alias}'
@@ -111,11 +116,11 @@ def _build_puml(
 ) -> str:
     alias_to_entity = {e["display_alias"]: e for e in entities}
 
-    # Build composition hierarchy
+    # Build composition/aggregation hierarchy for visual nesting
     children_map: dict[str, list[dict]] = {}
     comp_children: set[str] = set()
     for conn in connections:
-        if conn["conn_dir"] == "composition":
+        if conn["conn_dir"] in ("composition", "aggregation"):
             child_alias = conn["target_alias"]
             if child_alias in alias_to_entity:
                 children_map.setdefault(conn["source_alias"], []).append(alias_to_entity[child_alias])
@@ -165,8 +170,8 @@ def _build_puml(
         lines.extend(layout_lines)
         lines.append("")
 
-    # Non-composition connections (composition is shown structurally via nesting)
-    non_comp = [c for c in connections if c["conn_dir"] != "composition"]
+    # Non-structural connections (composition/aggregation shown via nesting)
+    non_comp = [c for c in connections if c["conn_dir"] not in ("composition", "aggregation")]
     if non_comp:
         lines.append("' --- Connections ---")
         for c in non_comp:

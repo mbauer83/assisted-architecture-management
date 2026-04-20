@@ -10,7 +10,7 @@ from .entity import create_entity
 from .entity_edit import edit_entity, promote_entity
 from .entity_delete import delete_entity
 from .connection import add_connection
-from .connection_edit import edit_connection, remove_connection
+from .connection_edit import edit_connection, remove_connection, edit_connection_associations
 from .diagram import create_diagram
 from .diagram_edit import edit_diagram
 from .diagram_delete import delete_diagram
@@ -26,6 +26,7 @@ __all__ = [
     "promote_entity",
     "add_connection",
     "edit_connection",
+    "edit_connection_associations",
     "remove_connection",
     "create_diagram",
     "edit_diagram",

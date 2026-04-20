@@ -134,6 +134,8 @@ def format_outgoing_markdown(
         if desc:
             sections.append("")
             sections.append(desc)
+        for assoc_id in conn.get("associated_entities") or []:
+            sections.append(f"<!-- §assoc {assoc_id} -->")
 
     return "---\n" + frontmatter_text + "\n---\n\n" + "\n".join(sections) + "\n"
 

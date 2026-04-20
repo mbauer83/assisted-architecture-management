@@ -89,9 +89,8 @@ def extract_declared_puml_aliases(content: str) -> set[str]:
         stripped = line.strip()
         if not stripped or stripped.startswith("'"):
             continue
-        if stripped.endswith("{"):
-            continue
-        m = re.search(r"\bas\s+([A-Za-z0-9_-]+)\s*$", stripped)
+        # Match "as ALIAS" optionally followed by "{" (composite/container entity declarations)
+        m = re.search(r"\bas\s+([A-Za-z0-9_-]+)\s*\{?\s*$", stripped)
         if m:
             aliases.add(normalize_puml_alias(m.group(1)))
     return aliases
@@ -132,7 +131,15 @@ def parse_entity(path: Path, model_root: Path) -> EntityRecord | None:
     )
 
 
-_CONN_HEADER_RE = re.compile(r"^###\s+(\S+)\s+→\s+(.+)$", re.MULTILINE)
+_CONN_HEADER_RE = re.compile(
+    r"^###\s+(\S+)"                  # conn_type
+    r"(?:\s+\[([^\]]+)\])?"          # optional [src_card]
+    r"\s+→\s+"                       # arrow
+    r"(?:\[([^\]]+)\]\s+)?"          # optional [tgt_card]
+    r"(.+)$",                        # target_id
+    re.MULTILINE,
+)
+_ASSOC_RE = re.compile(r"<!--\s*§assoc\s+(\S+)\s*-->")
 
 
 def parse_outgoing_file(path: Path) -> list[ConnectionRecord]:
@@ -155,10 +162,14 @@ def parse_outgoing_file(path: Path) -> list[ConnectionRecord]:
     headers = list(_CONN_HEADER_RE.finditer(content))
     for i, m in enumerate(headers):
         conn_type = m.group(1).strip()
-        target = m.group(2).strip()
+        src_card = (m.group(2) or "").strip()
+        tgt_card = (m.group(3) or "").strip()
+        target = m.group(4).strip()
         body_start = m.end()
         body_end = headers[i + 1].start() if i + 1 < len(headers) else len(content)
         body = content[body_start:body_end].strip()
+        assoc = tuple(_ASSOC_RE.findall(body))
+        clean_body = _ASSOC_RE.sub("", body).strip()
 
         artifact_id = f"{source_entity}---{target}@@{conn_type}"
         records.append(ConnectionRecord(
@@ -170,7 +181,10 @@ def parse_outgoing_file(path: Path) -> list[ConnectionRecord]:
             status=status,
             path=path,
             extra=extra,
-            content_text=body,
+            content_text=clean_body,
+            associated_entities=assoc,
+            src_cardinality=src_card,
+            tgt_cardinality=tgt_card,
         ))
     return records
 

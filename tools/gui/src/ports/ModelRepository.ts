@@ -64,10 +64,21 @@ export interface ModelRepository {
   ) => Effect.Effect<DiagramRefs, RepoError>
   readonly addConnection: (body: {
     source_entity: string; connection_type: string; target_entity: string;
-    description?: string; dry_run?: boolean;
+    description?: string; src_cardinality?: string; tgt_cardinality?: string;
+    dry_run?: boolean;
+  }) => Effect.Effect<WriteResult, RepoError>
+  readonly editConnection: (body: {
+    source_entity: string; connection_type: string; target_entity: string;
+    description?: string; src_cardinality?: string; tgt_cardinality?: string;
+    dry_run?: boolean;
   }) => Effect.Effect<WriteResult, RepoError>
   readonly removeConnection: (body: {
     source_entity: string; connection_type: string; target_entity: string;
+    dry_run?: boolean;
+  }) => Effect.Effect<WriteResult, RepoError>
+  readonly manageConnectionAssociations: (body: {
+    source_entity: string; connection_type: string; target_entity: string;
+    add_entities?: string[]; remove_entities?: string[];
     dry_run?: boolean;
   }) => Effect.Effect<WriteResult, RepoError>
   readonly getWriteHelp: () => Effect.Effect<unknown, RepoError>
@@ -128,7 +139,8 @@ export interface ModelRepository {
   }) => Effect.Effect<WriteResult, RepoError>
   readonly adminAddConnection: (body: {
     source_entity: string; connection_type: string; target_entity: string;
-    description?: string; dry_run?: boolean;
+    description?: string; src_cardinality?: string; tgt_cardinality?: string;
+    dry_run?: boolean;
   }) => Effect.Effect<WriteResult, RepoError>
   readonly adminRemoveConnection: (body: {
     source_entity: string; connection_type: string; target_entity: string;

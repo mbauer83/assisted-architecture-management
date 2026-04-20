@@ -161,7 +161,12 @@ export const makeHttpModelRepository = (): ModelRepository => ({
 
   addConnection: (body) => postJson(buildUrl('/connection'), body, WriteResultSchema),
 
+  editConnection: (body) => postJson(buildUrl('/connection/edit'), body, WriteResultSchema),
+
   removeConnection: (body) => postJson(buildUrl('/connection/remove'), body, WriteResultSchema),
+
+  manageConnectionAssociations: (body) =>
+    postJson(buildUrl('/connection/associate'), body, WriteResultSchema),
 
   getWriteHelp: () =>
     fetchJson(buildUrl('/write-help'), Schema.Unknown),

@@ -124,7 +124,9 @@ def register(mcp: FastMCP) -> None:
             "proxy (global-entity-reference) if one does not already exist — handles "
             "outgoing, incoming, and symmetric connections transparently. "
             "Optional src_cardinality / tgt_cardinality annotate the source or target end "
-            "of the connection (e.g. '1', '0..1', '1..*', '*'). Not permitted on junctions. "
+            "of the connection (e.g. '1', '0..1', '1..*', '*'). "
+            "Junction endpoints: cardinalities prohibited; all connections at a junction "
+            "must share the same type (first connection locks it). "
             "dry_run=true returns would-be content without writing."
         ),
         structured_output=True,

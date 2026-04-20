@@ -107,6 +107,9 @@ def connection_to_dict(c: ConnectionRecord) -> dict[str, Any]:
         "artifact_id": c.artifact_id, "source": c.source, "target": resolved_target,
         "conn_type": c.conn_type, "version": c.version, "status": c.status,
         "path": str(c.path), "content_text": c.content_text,
+        "associated_entities": list(c.associated_entities),
+        "src_cardinality": c.src_cardinality,
+        "tgt_cardinality": c.tgt_cardinality,
     }
     if via_grf:
         d["grf_artifact_id"] = c.target

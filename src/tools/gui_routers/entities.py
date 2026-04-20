@@ -112,6 +112,8 @@ class DeleteEntityBody(BaseModel):
 
 @router.post("/api/entity")
 def create_entity(body: CreateEntityBody) -> dict[str, Any]:
+    if body.artifact_type == "global-entity-reference":
+        raise HTTPException(400, "global-entity-reference entities cannot be created directly")
     repo_root, _registry, verifier = s.get_write_deps()
     from src.tools.model_write.entity import create_entity as _create
     try:

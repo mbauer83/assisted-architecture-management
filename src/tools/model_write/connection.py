@@ -1,4 +1,5 @@
 
+import re
 from pathlib import Path
 from collections.abc import Callable
 from src.common.archimate_types import ALL_CONNECTION_TYPES
@@ -7,6 +8,9 @@ from src.common.model_write import format_outgoing_markdown
 
 from .boundary import assert_engagement_write_root, today_iso
 from .types import WriteResult
+
+_JUNCTION_ENTITY_TYPES = frozenset({"and-junction", "or-junction"})
+_CONN_TYPE_RE = re.compile(r"^### (\S+)", re.MULTILINE)
 
 
 def verification_to_conn_dict(path: Path, res) -> dict[str, object]:
@@ -21,6 +25,61 @@ def verification_to_conn_dict(path: Path, res) -> dict[str, object]:
     }
 
 
+def _entity_artifact_type(registry: ModelRegistry, entity_id: str) -> str | None:
+    """Read artifact-type from an entity's frontmatter without importing the full parser."""
+    import yaml as _yaml
+    path = registry.find_file_by_id(entity_id)
+    if path is None:
+        return None
+    try:
+        content = path.read_text(encoding="utf-8")
+        if not content.startswith("---"):
+            return None
+        end = content.find("\n---", 3)
+        if end == -1:
+            return None
+        fm = _yaml.safe_load(content[3:end].strip()) or {}
+        return str(fm.get("artifact-type", "")) or None
+    except Exception:
+        return None
+
+
+def _check_junction_homogeneity(
+    registry: ModelRegistry,
+    connection_type: str,
+    source_entity: str,
+    target_entity: str,
+) -> None:
+    """Enforce that all connections at a junction have the same relationship type.
+
+    Reads the junction's .outgoing.md file to determine the locked type (set by
+    the first connection added).  Checks both the source and target when either
+    is a junction.  Incoming connections to a junction (stored in other entities'
+    outgoing files) are not checked here — the write layer enforces homogeneity
+    whenever a connection involving a junction is written.
+    """
+    for entity_id in (source_entity, target_entity):
+        if _entity_artifact_type(registry, entity_id) not in _JUNCTION_ENTITY_TYPES:
+            continue
+        junc_file = registry.find_file_by_id(entity_id)
+        if junc_file is None:
+            continue
+        out_file = junc_file.with_suffix(".outgoing.md")
+        if not out_file.exists():
+            continue
+        existing_types = {
+            m for m in _CONN_TYPE_RE.findall(out_file.read_text(encoding="utf-8"))
+            if m != connection_type
+        }
+        if existing_types:
+            locked = sorted(existing_types)[0]
+            raise ValueError(
+                f"Junction '{entity_id}' is locked to connection type '{locked}' "
+                f"(determined by its first connection). All connections at a junction "
+                f"must be the same type. Cannot add '{connection_type}'."
+            )
+
+
 def _validate_inputs(
     registry: ModelRegistry,
     connection_type: str,
@@ -33,6 +92,7 @@ def _validate_inputs(
         raise ValueError(f"Source entity '{source_entity}' not found in model")
     if target_entity not in registry.entity_ids():
         raise ValueError(f"Target entity '{target_entity}' not found in model")
+    _check_junction_homogeneity(registry, connection_type, source_entity, target_entity)
 
 
 def _resolve_outgoing_path(registry: ModelRegistry, source_entity: str) -> Path:
@@ -155,6 +215,14 @@ def add_connection(
     """Add a connection to the source entity's .outgoing.md file."""
     assert_engagement_write_root(repo_root)
     _validate_inputs(registry, connection_type, source_entity, target_entity)
+
+    if src_cardinality or tgt_cardinality:
+        for eid, label in ((source_entity, "source"), (target_entity, "target")):
+            if _entity_artifact_type(registry, eid) in _JUNCTION_ENTITY_TYPES:
+                raise ValueError(
+                    f"Cardinalities are not permitted at junction connection-ends "
+                    f"(the {label} entity '{eid}' is a junction)."
+                )
 
     last = last_updated or today_iso()
     outgoing_path = _resolve_outgoing_path(registry, source_entity)

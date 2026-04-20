@@ -79,7 +79,10 @@ export const ConnectionRecordSchema = Schema.Struct({
   version: Schema.String,
   status: Schema.String,
   path: Schema.String,
-  content_text: Schema.String,   // raw body (description + optional properties)
+  content_text: Schema.String,
+  src_cardinality: Schema.optional(Schema.String),
+  tgt_cardinality: Schema.optional(Schema.String),
+  associated_entities: Schema.optional(Schema.Array(Schema.String)),
 })
 export type ConnectionRecord = typeof ConnectionRecordSchema.Type
 

@@ -28,9 +28,14 @@ def write_help() -> dict[str, object]:
     }
 
 
+_INTERNAL_TYPES: frozenset[str] = frozenset({"global-entity-reference"})
+
+
 def _entity_types_by_domain() -> dict[str, list[str]]:
     grouped: dict[str, list[str]] = {}
     for type_name, info in ENTITY_TYPES.items():
+        if type_name in _INTERNAL_TYPES:
+            continue
         domain = info.domain_dir
         grouped.setdefault(domain, []).append(type_name)
     return grouped

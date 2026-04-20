@@ -17,6 +17,12 @@ const props = defineProps<{
   adminMode?: boolean
 }>()
 
+// Helper to resolve entity name from id via loaded connections or prefix
+const friendlyName = (id: string) => {
+  const parts = id.split('.')
+  return parts.length > 2 ? parts.slice(2).join(' ').replace(/-/g, ' ') : id
+}
+
 const emit = defineEmits<{
   refresh: []
 }>()
@@ -104,11 +110,6 @@ const sectionKeys = computed((): string[] => {
   return Array.from(all).sort()
 })
 
-const friendlyName = (id: string) => {
-  const parts = id.split('.')
-  return parts.length > 2 ? parts.slice(2).join(' ').replace(/-/g, ' ') : id
-}
-
 const otherEnd = (c: ConnectionRecord) =>
   props.direction === 'incoming' ? c.source : c.target
 
@@ -118,6 +119,63 @@ const titleLabel = computed(() => {
   return 'Symmetric'
 })
 
+// ── Association expand/edit ───────────────────────────────────────────────────
+
+const expandedAssoc = ref<Set<string>>(new Set())
+const assocAddTarget = ref<Record<string, { id: string; name: string } | null>>({})
+const assocBusy = ref<Record<string, boolean>>({})
+const assocError = ref<Record<string, string | null>>({})
+
+const toggleAssoc = (connId: string) => {
+  const next = new Set(expandedAssoc.value)
+  if (next.has(connId)) next.delete(connId)
+  else next.add(connId)
+  expandedAssoc.value = next
+}
+
+const onAssocTargetSelect = (connId: string, id: string, name: string) => {
+  assocAddTarget.value = { ...assocAddTarget.value, [connId]: { id, name } }
+}
+
+const addAssociation = (c: ConnectionRecord) => {
+  const picked = assocAddTarget.value[c.artifact_id]
+  if (!picked) return
+  assocBusy.value = { ...assocBusy.value, [c.artifact_id]: true }
+  assocError.value = { ...assocError.value, [c.artifact_id]: null }
+  Effect.runPromise(
+    svc.manageConnectionAssociations({
+      source_entity: c.source, connection_type: c.conn_type, target_entity: c.target,
+      add_entities: [picked.id], dry_run: false,
+    }),
+  ).then((r) => {
+    assocBusy.value = { ...assocBusy.value, [c.artifact_id]: false }
+    if (r.wrote) {
+      assocAddTarget.value = { ...assocAddTarget.value, [c.artifact_id]: null }
+      emit('refresh')
+    } else {
+      assocError.value = { ...assocError.value, [c.artifact_id]: r.content ?? 'Failed' }
+    }
+  }).catch((e) => {
+    assocBusy.value = { ...assocBusy.value, [c.artifact_id]: false }
+    assocError.value = { ...assocError.value, [c.artifact_id]: String(e) }
+  })
+}
+
+const removeAssociation = (c: ConnectionRecord, entityId: string) => {
+  assocBusy.value = { ...assocBusy.value, [c.artifact_id]: true }
+  Effect.runPromise(
+    svc.manageConnectionAssociations({
+      source_entity: c.source, connection_type: c.conn_type, target_entity: c.target,
+      remove_entities: [entityId], dry_run: false,
+    }),
+  ).then((r) => {
+    assocBusy.value = { ...assocBusy.value, [c.artifact_id]: false }
+    if (r.wrote) emit('refresh')
+  }).catch(() => {
+    assocBusy.value = { ...assocBusy.value, [c.artifact_id]: false }
+  })
+}
+
 // ── Add connection ─────────────────────────────────────────────────────────────
 
 const addingFor = ref<string | null>(null)
@@ -125,6 +183,8 @@ const selectedTarget = ref<{ id: string; name: string } | null>(null)
 const connTypeOptions = ref<string[]>([])
 const connTypeSelected = ref('')
 const descInput = ref('')
+const srcCardInput = ref('')
+const tgtCardInput = ref('')
 const addError = ref<string | null>(null)
 const addBusy = ref(false)
 
@@ -138,6 +198,8 @@ const startAdd = (typeKey: string) => {
   connTypeOptions.value = []
   connTypeSelected.value = ''
   descInput.value = ''
+  srcCardInput.value = ''
+  tgtCardInput.value = ''
   addError.value = null
   // Fetch permissible connection types for this source→target pair
   Effect.runPromise(svc.getOntologyPair(props.entityType, typeKey))
@@ -177,6 +239,8 @@ const confirmAdd = () => {
       connection_type: connTypeSelected.value,
       target_entity: target,
       description: descInput.value.trim() || undefined,
+      src_cardinality: srcCardInput.value.trim() || undefined,
+      tgt_cardinality: tgtCardInput.value.trim() || undefined,
       dry_run: false,
     }),
   ).then((r) => {
@@ -258,17 +322,62 @@ const confirmRemove = () => {
           </div>
 
           <ul v-if="grouped[typeKey]?.length" class="conn-list">
-            <li v-for="c in grouped[typeKey]" :key="c.artifact_id" class="conn-item">
-              <span class="conn-type-badge">{{ c.conn_type.replace('archimate-', '') }}</span>
-              <RouterLink
-                :to="{ path: '/entity', query: { id: otherEnd(c) } }"
-                class="conn-target"
-              >{{ friendlyName(otherEnd(c)) }}</RouterLink>
-              <span v-if="c.content_text?.trim()" class="conn-info-wrap">
-                <span class="conn-info-btn" tabindex="0">ⓘ</span>
-                <span class="conn-info-tip">{{ c.content_text.trim() }}</span>
-              </span>
-              <button v-if="!readonly" class="icon-btn remove-btn" title="Remove connection" @click="startRemove(c)">×</button>
+            <li v-for="c in grouped[typeKey]" :key="c.artifact_id" class="conn-item-wrap">
+              <div class="conn-item">
+                <span class="conn-type-badge">{{ c.conn_type.replace('archimate-', '') }}</span>
+                <span v-if="c.src_cardinality || c.tgt_cardinality" class="conn-card-badge">
+                  {{ c.src_cardinality || '·' }}..{{ c.tgt_cardinality || '·' }}
+                </span>
+                <RouterLink
+                  :to="{ path: '/entity', query: { id: otherEnd(c) } }"
+                  class="conn-target"
+                >{{ friendlyName(otherEnd(c)) }}</RouterLink>
+                <span v-if="c.content_text?.trim()" class="conn-info-wrap">
+                  <span class="conn-info-btn" tabindex="0">ⓘ</span>
+                  <span class="conn-info-tip">{{ c.content_text.trim() }}</span>
+                </span>
+                <button
+                  v-if="!readonly"
+                  class="icon-btn assoc-btn"
+                  :class="{ 'assoc-btn--active': expandedAssoc.has(c.artifact_id) }"
+                  :title="expandedAssoc.has(c.artifact_id) ? 'Hide associations' : 'Associations'"
+                  @click="toggleAssoc(c.artifact_id)"
+                >
+                  {{ (c.associated_entities?.length ?? 0) > 0 ? `⊕${c.associated_entities!.length}` : '⊕' }}
+                </button>
+                <button v-if="!readonly" class="icon-btn remove-btn" title="Remove connection" @click="startRemove(c)">×</button>
+              </div>
+
+              <!-- Second-order associations panel -->
+              <div v-if="!readonly && expandedAssoc.has(c.artifact_id)" class="assoc-panel">
+                <div class="assoc-chips">
+                  <span
+                    v-for="eid in (c.associated_entities ?? [])"
+                    :key="eid"
+                    class="assoc-chip"
+                  >
+                    <RouterLink :to="{ path: '/entity', query: { id: eid } }" class="assoc-chip-link">{{ friendlyName(eid) }}</RouterLink>
+                    <button
+                      class="assoc-chip-remove"
+                      :disabled="assocBusy[c.artifact_id]"
+                      @click="removeAssociation(c, eid)"
+                    >×</button>
+                  </span>
+                  <span v-if="!(c.associated_entities?.length)" class="assoc-empty">No associations</span>
+                </div>
+                <div class="assoc-add-row">
+                  <EntitySearchInput
+                    placeholder="Associate entity..."
+                    @select="(id, name) => onAssocTargetSelect(c.artifact_id, id, name)"
+                  />
+                  <button
+                    class="assoc-add-btn"
+                    :disabled="!assocAddTarget[c.artifact_id] || assocBusy[c.artifact_id]"
+                    @click="addAssociation(c)"
+                  >+</button>
+                </div>
+                <div v-if="assocError[c.artifact_id]" class="state-msg state-msg--error">{{ assocError[c.artifact_id] }}</div>
+              </div>
             </li>
           </ul>
 
@@ -299,6 +408,14 @@ const confirmRemove = () => {
                 class="desc-input"
                 placeholder="Description (optional)"
               />
+            </div>
+            <div class="add-row add-row--card">
+              <label class="card-label">src</label>
+              <input v-model="srcCardInput" class="card-input" placeholder="e.g. 1" maxlength="8" />
+              <span class="card-sep">→</span>
+              <label class="card-label">tgt</label>
+              <input v-model="tgtCardInput" class="card-input" placeholder="e.g. *" maxlength="8" />
+              <span class="card-hint">cardinality (optional)</span>
             </div>
             <div class="add-actions">
               <button class="cancel-btn" @click="cancelAdd">Cancel</button>
@@ -366,12 +483,17 @@ const confirmRemove = () => {
 .group-count { font-size: 11px; color: #9ca3af; }
 
 .conn-list { list-style: none; display: flex; flex-direction: column; gap: 4px; }
-.conn-item { display: flex; align-items: baseline; gap: 8px; font-size: 13px; }
+.conn-item-wrap { display: flex; flex-direction: column; gap: 2px; }
+.conn-item { display: flex; align-items: center; gap: 6px; font-size: 13px; }
 .conn-type-badge {
   padding: 1px 6px; border-radius: 4px; font-size: 11px;
   background: #f3f4f6; color: #374151; white-space: nowrap;
 }
 .conn-target { font-weight: 500; }
+.conn-card-badge {
+  font-size: 10px; color: #6b7280; font-family: monospace; white-space: nowrap;
+  background: #f3f4f6; padding: 1px 4px; border-radius: 3px;
+}
 
 .conn-info-wrap {
   position: relative; display: inline-flex; align-items: center; margin-left: 2px;
@@ -398,6 +520,49 @@ const confirmRemove = () => {
 .add-btn:hover { background: #f0fdf4; }
 .remove-btn { color: #dc2626; border-color: #fecaca; margin-left: auto; }
 .remove-btn:hover { background: #fef2f2; }
+.assoc-btn {
+  color: #2563eb; border-color: #bfdbfe; font-size: 10px; font-weight: 600;
+}
+.assoc-btn:hover { background: #eff6ff; }
+.assoc-btn--active { background: #eff6ff; }
+
+/* Association panel */
+.assoc-panel {
+  margin-left: 12px; padding: 6px 10px; background: #f0f9ff;
+  border-radius: 6px; border: 1px solid #bae6fd; font-size: 12px;
+}
+.assoc-chips { display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 6px; align-items: center; }
+.assoc-chip {
+  display: inline-flex; align-items: center; gap: 2px;
+  background: #dbeafe; border: 1px solid #93c5fd; border-radius: 12px;
+  padding: 1px 6px; font-size: 11px;
+}
+.assoc-chip-link { color: #1d4ed8; text-decoration: none; }
+.assoc-chip-link:hover { text-decoration: underline; }
+.assoc-chip-remove {
+  background: none; border: none; color: #64748b; cursor: pointer;
+  padding: 0 1px; font-size: 12px; line-height: 1;
+}
+.assoc-chip-remove:hover { color: #dc2626; }
+.assoc-empty { color: #94a3b8; font-style: italic; }
+.assoc-add-row { display: flex; gap: 4px; align-items: center; }
+.assoc-add-btn {
+  padding: 4px 8px; background: #2563eb; color: white; border: none;
+  border-radius: 4px; font-size: 12px; cursor: pointer; flex-shrink: 0;
+}
+.assoc-add-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+.assoc-add-btn:hover:not(:disabled) { background: #1d4ed8; }
+
+/* Cardinality row in add form */
+.add-row--card { align-items: center; gap: 4px; }
+.card-label { font-size: 11px; color: #6b7280; white-space: nowrap; }
+.card-input {
+  width: 52px; padding: 4px 6px; border-radius: 4px; border: 1px solid #d1d5db;
+  font-size: 11px; font-family: monospace; outline: none;
+}
+.card-input:focus { border-color: #2563eb; }
+.card-sep { color: #9ca3af; font-size: 11px; margin: 0 2px; }
+.card-hint { font-size: 10px; color: #9ca3af; margin-left: 4px; }
 
 .add-form { margin-top: 8px; padding: 10px; background: #f9fafb; border-radius: 6px; }
 .add-row { display: flex; gap: 6px; margin-bottom: 6px; align-items: center; }

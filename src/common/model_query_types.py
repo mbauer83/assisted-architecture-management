@@ -81,6 +81,9 @@ class ConnectionRecord:
     path: Path
     extra: dict[str, object]
     content_text: str
+    associated_entities: tuple[str, ...] = field(default_factory=tuple)
+    src_cardinality: str = ""
+    tgt_cardinality: str = ""
 
     @property
     def source_ids(self) -> list[str]:

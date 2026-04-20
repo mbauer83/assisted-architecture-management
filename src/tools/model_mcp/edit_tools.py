@@ -173,6 +173,35 @@ def model_edit_diagram(
     return _result_dict(dry_run, result)
 
 
+def model_edit_connection_associations(
+    *,
+    source_entity: str,
+    connection_type: str,
+    target_entity: str,
+    add_entities: list[str] | None = None,
+    remove_entities: list[str] | None = None,
+    dry_run: bool = True,
+    repo_root: str | None = None,
+    repo_preset: RepoPreset | None = None,
+    repo_scope: WriteRepoScope = "engagement",
+) -> dict[str, object]:
+    """Add or remove second-order association entity IDs from a connection."""
+    if repo_scope != "engagement":
+        raise ValueError("model_edit_connection_associations only supports repo_scope='engagement'")
+
+    root, registry, verifier = _resolve(repo_root, repo_preset, need_registry=True)
+    from src.tools.model_write.connection_edit import edit_connection_associations
+    result = edit_connection_associations(
+        repo_root=root, registry=registry, verifier=verifier,
+        clear_repo_caches=clear_caches_for_repo,
+        source_entity=source_entity, connection_type=connection_type,
+        target_entity=target_entity,
+        add_entities=add_entities, remove_entities=remove_entities,
+        dry_run=dry_run,
+    )
+    return _result_dict(dry_run, result)
+
+
 def model_delete_entity(
     *,
     artifact_id: str,
@@ -253,6 +282,18 @@ def register_edit_tools(mcp: FastMCP) -> None:
         ),
         structured_output=True,
     )(queued(model_edit_diagram))
+
+    mcp.tool(
+        name="model_edit_connection_associations",
+        title="Model Write: Edit Connection Associations",
+        description=(
+            "Add or remove second-order association entity IDs from a connection. "
+            "Associations link a connection to additional entities beyond source and target "
+            "(stored as <!-- §assoc ENTITY_ID --> annotations). "
+            "add_entities and remove_entities may both be provided in one call."
+        ),
+        structured_output=True,
+    )(queued(model_edit_connection_associations))
 
     mcp.tool(
         name="model_delete_entity",

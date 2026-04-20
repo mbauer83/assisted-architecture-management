@@ -229,7 +229,28 @@ entity_types:
     element_classes: [active-structure-element]
     create_when: "Create paths to model logical link through which internal active structure elements like Roles, Application Components, Nodes, System Software etc. may exchange energy, material, or data. Paths may be realized by Distribution Networks or Communication Networks together with the active structure elements connected by them."
     never_create_when: "Don't model something as a path if it is better modeled as a direct Collaboration or other relation, or if it is specific Communication or Distribution Network."
-    
+
+  and-junction:
+    prefix: JNA
+    domain: common
+    subdir: junctions
+    archimate_domain: Common
+    archimate_element_type: AndJunction
+    has_sprite: false
+    element_classes: [junction]
+    create_when: "Create AND-junctions to model a point where ALL incoming relationships must be present to produce the outgoing relationships (logical AND / synchronization / fork). Junctions may mediate any ArchiMate relationship type — not just triggering or flow — but ALL connections at the junction must be the same type, and the relationship type must be permitted between the actual source and target elements (the junction does not create new permissions). Cardinalities are not permitted at junction connection-ends."
+    never_create_when: "Don't use a junction when a direct relationship between elements suffices. Don't use to circumvent relationship permission rules. Don't mix relationship types at one junction."
+
+  or-junction:
+    prefix: JNO
+    domain: common
+    subdir: junctions
+    archimate_domain: Common
+    archimate_element_type: OrJunction
+    has_sprite: false
+    element_classes: [junction]
+    create_when: "Create OR-junctions to model a point where ANY ONE of the incoming relationships is sufficient to produce the outgoing relationships (logical OR / decision / merge). The same type-homogeneity and permission rules apply as for AND-junctions: all connections at the junction must be the same type, the type must be permitted between actual source and target elements, and cardinalities are not permitted at junction connection-ends. Use naming to distinguish inclusive OR (default — name freely) from exclusive OR (XOR — prefix the entity name with 'XOR', e.g. 'XOR Process Branch')."
+    never_create_when: "Don't use a junction when a direct relationship between elements suffices. Don't use to circumvent relationship permission rules. Don't mix relationship types at one junction."
 
 
   # ── Business Domain ──────────────────────────────────────────────────────

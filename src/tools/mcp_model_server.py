@@ -39,6 +39,7 @@ from src.tools.model_mcp.edit_tools import (  # noqa: F401
     model_delete_diagram,
     model_delete_entity,
     model_edit_connection,
+    model_edit_connection_associations,
     model_edit_diagram,
     model_edit_entity,
 )

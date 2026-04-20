@@ -2,7 +2,9 @@
 import logging
 from typing import Any
 
+import yaml  # type: ignore[import-untyped]
 from mcp.server.fastmcp import FastMCP  # type: ignore[import-not-found]
+from mcp.types import TextContent
 
 
 logger = logging.getLogger(__name__)
@@ -23,20 +25,29 @@ def normalize_incoming_tool_name(tool_name: str, *, known_tools: set[str]) -> st
 
 
 def install_call_tool_normalizer(mcp: FastMCP) -> None:
-    """Override FastMCP CallTool handler to normalize bridged tool names."""
+    """Override FastMCP CallTool handler to normalize tool names and emit YAML responses."""
 
-    async def _call_tool_handler_with_normalization(name: str, arguments: dict[str, Any]) -> Any:
+    async def _call_tool_handler(name: str, arguments: dict[str, Any]) -> Any:
         tools = mcp._tool_manager.list_tools()  # type: ignore[attr-defined]
         known = {t.name for t in tools}
         normalized = normalize_incoming_tool_name(name, known_tools=known)
         if normalized != name:
             logger.info("Normalized incoming tool name %r -> %r", name, normalized)
         context = mcp.get_context()
-        return await mcp._tool_manager.call_tool(  # type: ignore[attr-defined]
-            normalized,
-            arguments,
-            context=context,
-            convert_result=True,
+        # Get raw Python result; convert dict/list to compact YAML for token efficiency
+        result = await mcp._tool_manager.call_tool(  # type: ignore[attr-defined]
+            normalized, arguments, context=context, convert_result=False,
         )
+        if isinstance(result, (dict, list)):
+            yaml_text = yaml.dump(
+                result, default_flow_style=False, allow_unicode=True,
+                sort_keys=False,
+            ).rstrip()
+            return [TextContent(type="text", text=yaml_text)]
+        # Fall back to FastMCP normal conversion for strings, ContentBlocks, etc.
+        tool = mcp._tool_manager.get_tool(normalized)  # type: ignore[attr-defined]
+        if tool is None:
+            return [TextContent(type="text", text=str(result))]
+        return tool.fn_metadata.convert_result(result)
 
-    mcp._mcp_server.call_tool(validate_input=False)(_call_tool_handler_with_normalization)  # type: ignore[attr-defined]
+    mcp._mcp_server.call_tool(validate_input=False)(_call_tool_handler)  # type: ignore[attr-defined]

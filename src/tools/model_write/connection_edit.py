@@ -165,6 +165,73 @@ def remove_connection(
     )
 
 
+def edit_connection_associations(
+    *,
+    repo_root: Path,
+    registry: ModelRegistry,
+    verifier: ModelVerifier,
+    clear_repo_caches: Callable[[Path], None],
+    source_entity: str,
+    connection_type: str,
+    target_entity: str,
+    add_entities: list[str] | None = None,
+    remove_entities: list[str] | None = None,
+    dry_run: bool,
+) -> WriteResult:
+    """Add or remove second-order association entity IDs from a connection section.
+
+    Second-order associations are stored as ``<!-- §assoc ENTITY_ID -->`` annotations
+    in the connection section body of the source entity's .outgoing.md file.
+    ``add_entities`` and ``remove_entities`` may both be specified in one call.
+    """
+    assert_engagement_write_root(repo_root)
+    outgoing_path = _resolve_outgoing_path(registry, source_entity)
+
+    if not outgoing_path.exists():
+        raise ValueError(f"No outgoing file for '{source_entity}'")
+
+    from .parse_existing import parse_outgoing_file
+    parsed = parse_outgoing_file(outgoing_path)
+
+    found = False
+    for conn in parsed.connections:
+        if conn["connection_type"] == connection_type and conn["target_entity"] == target_entity:
+            existing: list[str] = list(conn.get("associated_entities") or [])
+            for eid in (add_entities or []):
+                if eid not in existing:
+                    existing.append(eid)
+            remove_set = set(remove_entities or [])
+            existing = [e for e in existing if e not in remove_set]
+            if existing:
+                conn["associated_entities"] = existing
+            else:
+                conn.pop("associated_entities", None)
+            found = True
+            break
+
+    if not found:
+        raise ValueError(
+            f"Connection '{connection_type} -> {target_entity}' not found in {outgoing_path.name}"
+        )
+
+    content = format_outgoing_markdown(
+        source_entity=source_entity,
+        version=str(parsed.frontmatter.get("version", "0.1.0")),
+        status=str(parsed.frontmatter.get("status", "draft")),
+        last_updated=today_iso(),
+        connections=parsed.connections,
+    )
+    conn_id = f"{connection_type} -> {target_entity}"
+
+    if dry_run:
+        return WriteResult(
+            wrote=False, path=outgoing_path, artifact_id=conn_id,
+            content=content, warnings=[], verification=None,
+        )
+
+    return _write_verify_clear(outgoing_path, content, verifier, conn_id, clear_repo_caches, repo_root)
+
+
 def _write_verify_clear(
     outgoing_path: Path,
     content: str,

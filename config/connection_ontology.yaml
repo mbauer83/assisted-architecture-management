@@ -105,6 +105,16 @@ permitted_relationships:
   - ["@all", "@same", [aggregation, specialization]]
   - ["@all", "@all", [association]]
 
+  # ── Junctions ──────────────────────────────────────────────────────────
+  # A junction may mediate ANY relationship type that is otherwise permitted
+  # between the elements it connects.  It does NOT create new permissions —
+  # the relationship type must be valid for the actual source→target pair
+  # (without the junction).  All connections at one junction must be the
+  # same type (enforced at write time).  Cardinalities are not permitted
+  # at junction endpoints.
+  - ["@all", "@junction", [composition, aggregation, assignment, realization, serving, access, influence, association, specialization, flow, triggering]]
+  - ["@junction", "@all", [composition, aggregation, assignment, realization, serving, access, influence, association, specialization, flow, triggering]]
+
   # ── Common Domain (internal) ───────────────────────────────────────────
   - ["@active-structure-element", path, [realization]]
   - ["@external-active-structure-element", service, [assignment]]

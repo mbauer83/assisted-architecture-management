@@ -42,6 +42,9 @@ def _parse_archimate_block(raw: str) -> dict:
         return {}
 
 
+_JUNCTION_TYPES = frozenset({"and-junction", "or-junction"})
+
+
 def generate_archimate_puml_body(
     name: str,
     entity_records: list[EntityRecord],
@@ -56,9 +59,8 @@ def generate_archimate_puml_body(
     via ``create_diagram`` (which de-duplicates includes if already present) and
     via ``render_puml_preview`` / ``render_puml_svg``.
 
-    Each entity is rendered using its archimate ``element-type`` and ``label``
-    from the ``§display / archimate`` block (markdown code fences stripped before
-    parsing).  Falls back to the raw name when no archimate block is present.
+    Entities are grouped by domain; composition/aggregation children are nested
+    inside their parent declarations.  Junction entities render as circles.
     Connections use the canonical ``SRC --> TGT : <<conn_type>>`` format.
     """
     from collections import defaultdict
@@ -73,9 +75,56 @@ def generate_archimate_puml_body(
     lines.append(f"title {name}")
     lines.append("")
 
+    alias_by_id = {e.artifact_id: e.display_alias for e in entity_records}
+    entity_by_alias = {e.display_alias: e for e in entity_records if e.display_alias}
+
+    # Build composition/aggregation hierarchy for visual nesting
+    children_map: dict[str, list[EntityRecord]] = defaultdict(list)
+    comp_children: set[str] = set()
+    for conn in connection_records:
+        ct = CONNECTION_TYPES.get(conn.conn_type)
+        if ct and ct.conn_dir in ("composition", "aggregation"):
+            src_alias = alias_by_id.get(conn.source)
+            tgt_alias = alias_by_id.get(conn.target)
+            if src_alias and tgt_alias and tgt_alias in entity_by_alias:
+                children_map[src_alias].append(entity_by_alias[tgt_alias])
+                comp_children.add(tgt_alias)
+
+    def _render_entity(entity: EntityRecord, indent: str) -> list[str]:
+        alias = entity.display_alias
+        if not alias:
+            return []
+        if entity.artifact_type in _JUNCTION_TYPES:
+            return [f'{indent}circle " " as {alias}']
+        arch_data = _parse_archimate_block(entity.display_blocks.get("archimate", ""))
+        element_type = arch_data.get("element-type", "")
+        label = arch_data.get("label", entity.name).replace('"', "'")
+        children = children_map.get(alias, [])
+        if element_type and ELEMENT_TYPE_HAS_SPRITE.get(element_type, False):
+            decl = (
+                f'{indent}rectangle "<$archimate_{element_type}{{scale=1.5}}> {label}"'
+                f" <<{element_type}>> as {alias}"
+            )
+        elif element_type:
+            decl = f'{indent}rectangle "{label}" <<{element_type}>> as {alias}'
+        else:
+            decl = f'{indent}rectangle "{label}" as {alias}'
+        if not children:
+            return [decl]
+        inner = indent + "  "
+        result = [f"{decl} {{"]
+        child_aliases = [c.display_alias for c in children if c.display_alias]
+        for child in children:
+            result.extend(_render_entity(child, inner))
+        for i in range(len(child_aliases) - 1):
+            result.append(f"{inner}{child_aliases[i]} -[hidden]right- {child_aliases[i + 1]}")
+        result.append(f"{indent}}}")
+        return result
+
     domain_entities: dict[str, list[EntityRecord]] = defaultdict(list)
     for entity in entity_records:
-        domain_entities[(entity.domain or "").lower()].append(entity)
+        if entity.display_alias and entity.display_alias not in comp_children:
+            domain_entities[(entity.domain or "").lower()].append(entity)
 
     ordered_domains = [d for d in DOMAIN_ORDER if d in domain_entities]
     for d in sorted(domain_entities):
@@ -89,32 +138,21 @@ def generate_archimate_puml_body(
         if grouping:
             lines.append(f'rectangle "{display}" <<{grouping}>> {{')
         for entity in domain_entities[domain]:
-            alias = entity.display_alias
-            if not alias:
-                continue
-            arch_data = _parse_archimate_block(entity.display_blocks.get("archimate", ""))
-            element_type = arch_data.get("element-type", "")
-            label = arch_data.get("label", entity.name).replace('"', "'")
-            if element_type and ELEMENT_TYPE_HAS_SPRITE.get(element_type, False):
-                lines.append(
-                    f'{indent}rectangle "<$archimate_{element_type}{{scale=1.5}}> {label}"'
-                    f" <<{element_type}>> as {alias}"
-                )
-            elif element_type:
-                lines.append(f'{indent}rectangle "{label}" <<{element_type}>> as {alias}')
-            else:
-                lines.append(f'{indent}rectangle "{label}" as {alias}')
+            lines.extend(_render_entity(entity, indent))
         if grouping:
             lines.append("}")
         lines.append("")
 
-    alias_by_id = {e.artifact_id: e.display_alias for e in entity_records}
     conn_lines: list[str] = []
     for conn in connection_records:
+        ct = CONNECTION_TYPES.get(conn.conn_type)
+        # Composition/aggregation shown structurally via nesting — skip as connection lines
+        if ct and ct.conn_dir in ("composition", "aggregation"):
+            continue
         src = alias_by_id.get(conn.source)
         tgt = alias_by_id.get(conn.target)
         if src and tgt:
-            arrow = CONNECTION_TYPES[conn.conn_type].puml_arrow if conn.conn_type in CONNECTION_TYPES else "-->"
+            arrow = ct.puml_arrow if ct else "-->"
             conn_lines.append(f"{src} {arrow} {tgt} : <<{conn.conn_type}>>")
     if conn_lines:
         lines.append("' Connections")

@@ -40,6 +40,7 @@ const svgError = ref<string | null>(null)
 const svgContainer = ref<HTMLElement | null>(null)
 const svgNodeElems = ref(new Map<string, Element>())
 const prevHighlighted = ref<Element | null>(null)
+let _interactivityController: AbortController | null = null
 
 const load = () => {
   if (!diagramId.value) return
@@ -88,6 +89,9 @@ const addConnectionHitAreas = (group: SVGGElement) => {
 
 // Build alias→artifact_id map and attach click handlers after SVG + entities load
 const attachInteractivity = () => {
+  _interactivityController?.abort()
+  _interactivityController = new AbortController()
+  const { signal } = _interactivityController
   svgNodeElems.value.clear()
   prevHighlighted.value = null
   const svgEl = svgContainer.value?.querySelector('svg')
@@ -113,12 +117,14 @@ const attachInteractivity = () => {
       const t = g.querySelector(':scope > title')?.textContent?.trim() ?? ''
       if (aliasToId.has(t)) alias = t
     }
+    // Strategy 5: PlantUML cluster_ prefix for composite/container entity groups
+    if (!alias && g.id.startsWith('cluster_') && aliasToId.has(g.id.slice(8))) alias = g.id.slice(8)
     if (!alias) continue
 
     const artifactId = aliasToId.get(alias)!
     g.setAttribute('data-entity-id', artifactId)
     svgNodeElems.value.set(artifactId, g)
-    g.addEventListener('click', (ev) => { ev.stopPropagation(); selectEntity(artifactId) })
+    g.addEventListener('click', (ev) => { ev.stopPropagation(); selectEntity(artifactId) }, { signal })
   }
 
   // Link groups
@@ -133,7 +139,7 @@ const attachInteractivity = () => {
     if (!conn) continue
     addConnectionHitAreas(g)
     g.setAttribute('data-conn-id', conn.artifact_id)
-    g.addEventListener('click', (ev) => { ev.stopPropagation(); selectConnection(conn, g) })
+    g.addEventListener('click', (ev) => { ev.stopPropagation(); selectConnection(conn, g) }, { signal })
   }
 }
 
@@ -336,6 +342,7 @@ onUnmounted(() => {
   containerRef.value?.removeEventListener('wheel', onWheel)
   window.removeEventListener('mousemove', onMouseMove)
   window.removeEventListener('mouseup', onMouseUp)
+  _interactivityController?.abort()
 })
 </script>
 
@@ -487,9 +494,13 @@ onUnmounted(() => {
 .svg-wrap :deep([data-entity-id]) { cursor: pointer; }
 .svg-wrap :deep([data-entity-id]:hover) > :not(title) { opacity: 0.85; }
 .svg-wrap :deep([data-entity-id]:hover) polygon,
-.svg-wrap :deep([data-entity-id]:hover) rect { stroke: #2563eb !important; stroke-width: 2 !important; }
+.svg-wrap :deep([data-entity-id]:hover) rect,
+.svg-wrap :deep([data-entity-id]:hover) polyline,
+.svg-wrap :deep([data-entity-id]:hover) ellipse { stroke: #2563eb !important; stroke-width: 2 !important; }
 .svg-wrap :deep(.svg-selected) polygon,
-.svg-wrap :deep(.svg-selected) rect { stroke: #2563eb !important; stroke-width: 2.5 !important; }
+.svg-wrap :deep(.svg-selected) rect,
+.svg-wrap :deep(.svg-selected) polyline,
+.svg-wrap :deep(.svg-selected) ellipse { stroke: #2563eb !important; stroke-width: 2.5 !important; }
 .svg-wrap :deep([data-conn-id]) { cursor: pointer; }
 .svg-wrap :deep([data-conn-id]:hover) path, .svg-wrap :deep([data-conn-id]:hover) polygon { stroke: #2563eb !important; stroke-width: 2 !important; }
 .svg-wrap :deep(.svg-conn-selected) path, .svg-wrap :deep(.svg-conn-selected) polygon { stroke: #2563eb !important; stroke-width: 2.5 !important; }

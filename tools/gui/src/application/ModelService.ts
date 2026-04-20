@@ -24,8 +24,12 @@ export const makeModelService = (repo: ModelRepository) =>
       repo.getDiagramRefs(sourceId, targetId),
     addConnection: (body: Parameters<ModelRepository['addConnection']>[0]) =>
       repo.addConnection(body),
+    editConnection: (body: Parameters<ModelRepository['editConnection']>[0]) =>
+      repo.editConnection(body),
     removeConnection: (body: Parameters<ModelRepository['removeConnection']>[0]) =>
       repo.removeConnection(body),
+    manageConnectionAssociations: (body: Parameters<ModelRepository['manageConnectionAssociations']>[0]) =>
+      repo.manageConnectionAssociations(body),
     getWriteHelp: () => repo.getWriteHelp(),
     getOntologyClassification: (sourceType: string) => repo.getOntologyClassification(sourceType),
     getOntologyPair: (sourceType: string, targetType: string) => repo.getOntologyPair(sourceType, targetType),

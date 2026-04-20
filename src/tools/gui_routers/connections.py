@@ -150,6 +150,63 @@ def add_connection(body: AddConnectionBody) -> dict[str, Any]:
     return d
 
 
+class EditConnectionBody(BaseModel):
+    source_entity: str
+    connection_type: str
+    target_entity: str
+    description: str | None = None
+    src_cardinality: str | None = None
+    tgt_cardinality: str | None = None
+    dry_run: bool = True
+
+
+class ConnectionAssociateBody(BaseModel):
+    source_entity: str
+    connection_type: str
+    target_entity: str
+    add_entities: list[str] | None = None
+    remove_entities: list[str] | None = None
+    dry_run: bool = True
+
+
+@router.post("/api/connection/edit")
+def edit_connection(body: EditConnectionBody) -> dict[str, Any]:
+    repo_root, registry, verifier = s.get_write_deps()
+    from src.tools.model_write.connection_edit import edit_connection as _edit, _UNSET
+    provided = body.model_fields_set
+    try:
+        result = _edit(
+            repo_root=repo_root, registry=registry, verifier=verifier,
+            clear_repo_caches=s.clear_caches,
+            source_entity=body.source_entity, connection_type=body.connection_type,
+            target_entity=body.target_entity, description=body.description,
+            src_cardinality=body.src_cardinality if "src_cardinality" in provided else _UNSET,
+            tgt_cardinality=body.tgt_cardinality if "tgt_cardinality" in provided else _UNSET,
+            dry_run=body.dry_run,
+        )
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+    return s.write_result_to_dict(result)
+
+
+@router.post("/api/connection/associate")
+def manage_connection_associations(body: ConnectionAssociateBody) -> dict[str, Any]:
+    repo_root, registry, verifier = s.get_write_deps()
+    from src.tools.model_write.connection_edit import edit_connection_associations as _assoc
+    try:
+        result = _assoc(
+            repo_root=repo_root, registry=registry, verifier=verifier,
+            clear_repo_caches=s.clear_caches,
+            source_entity=body.source_entity, connection_type=body.connection_type,
+            target_entity=body.target_entity,
+            add_entities=body.add_entities, remove_entities=body.remove_entities,
+            dry_run=body.dry_run,
+        )
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+    return s.write_result_to_dict(result)
+
+
 @router.post("/api/connection/remove")
 def remove_connection(body: RemoveConnectionBody) -> dict[str, Any]:
     repo_root, registry, verifier = s.get_write_deps()
