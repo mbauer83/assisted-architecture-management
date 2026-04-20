@@ -21,6 +21,7 @@ from pathlib import Path
 
 import yaml
 
+from src.common.model_query_parsing import normalize_puml_alias
 from src.common.ontology_loader import ENTITY_TYPES
 from src.tools._svg_sprite_convert import browser_markup_to_plantuml_svg as _browser_markup_to_plantuml_svg
 from src.common.settings import archimate_type_markers, sprite_scale
@@ -106,6 +107,7 @@ def _generate_glyph_include(repo_root: Path) -> Path:
             sprite_name = f"$archimate_{info.archimate_element_type}"
             lines.append(f"sprite {sprite_name} {_browser_markup_to_plantuml_svg(markup)}")
     out_path = repo_root / "diagram-catalog" / "_archimate-glyphs.puml"
+    out_path.parent.mkdir(parents=True, exist_ok=True)
     out_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
     return out_path
 
@@ -159,7 +161,7 @@ def generate_macros(repo_root: Path, *, enterprise_root: Path | None = None) -> 
             if not (label and element_type and alias_raw):
                 continue
 
-            alias = alias_raw.replace("-", "_")
+            alias = normalize_puml_alias(str(alias_raw))
             if alias in seen_aliases:
                 continue
             seen_aliases.add(alias)

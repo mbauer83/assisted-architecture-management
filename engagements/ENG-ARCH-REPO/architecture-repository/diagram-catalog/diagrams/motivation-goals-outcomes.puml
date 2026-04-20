@@ -34,18 +34,18 @@ rectangle "Planning & Guidance" <<MotivationGrouping>> {
   rectangle "<$archimate_Goal{scale=1.5}> Provide Development Guidance for AI" <<Goal>> as GOL_e3nCpO
   rectangle "<$archimate_Outcome{scale=1.5}> Reduced Planning Overhead" <<Outcome>> as OUT_AlZjX8
   rectangle "<$archimate_Outcome{scale=1.5}> Architectural Guidance Available Without Specialist Dependency" <<Outcome>> as OUT_FXFGrO
-  rectangle "<$archimate_Outcome{scale=1.5}> AI Agents Produce Fewer Architecture-Drift Corrections" <<Outcome>> as OUT_AzP1Q
+  rectangle "<$archimate_Outcome{scale=1.5}> AI Agents Produce Fewer Architecture-Drift Corrections" <<Outcome>> as OUT__AzP1Q
 }
 
 rectangle "Technology & Product Design" <<MotivationGrouping>> {
   rectangle "<$archimate_Goal{scale=1.5}> Support Technology Design for Humans" <<Goal>> as GOL_W6Z8pa
-  rectangle "<$archimate_Goal{scale=1.5}> Support Technology Design for AI" <<Goal>> as GOL_B6GP
+  rectangle "<$archimate_Goal{scale=1.5}> Support Technology Design for AI" <<Goal>> as GOL_B6G__P
   rectangle "<$archimate_Goal{scale=1.5}> Support Product Design for Humans" <<Goal>> as GOL_hEEWS8
   rectangle "<$archimate_Goal{scale=1.5}> Support Product Design for AI" <<Goal>> as GOL_zBPs_y
   rectangle "<$archimate_Outcome{scale=1.5}> Technology Changes Validated Against Architecture Before Implementation" <<Outcome>> as OUT_a5mNob
-  rectangle "<$archimate_Outcome{scale=1.5}> AI Agents Query Technology Architecture to Identify Constraints" <<Outcome>> as OUT_i3Bi
+  rectangle "<$archimate_Outcome{scale=1.5}> AI Agents Query Technology Architecture to Identify Constraints" <<Outcome>> as OUT_i_3Bi_
   rectangle "<$archimate_Outcome{scale=1.5}> Product Requirements Traceable to Realized Components" <<Outcome>> as OUT_9jS0BB
-  rectangle "<$archimate_Outcome{scale=1.5}> AI Agents Traverse Product-Architecture Traceability Chains" <<Outcome>> as OUT_CnCVI
+  rectangle "<$archimate_Outcome{scale=1.5}> AI Agents Traverse Product-Architecture Traceability Chains" <<Outcome>> as OUT_Cn_CVI
 }
 
 rectangle "Governance & Scale" <<MotivationGrouping>> {
@@ -62,22 +62,22 @@ OUT_LrpdG0 -[hidden]down- OUT_YSRwR0
 GOL_5Fk9di -[hidden]right- OUT_AlZjX8
 GOL_Iwha3 -[hidden]right- OUT_AlZjX8
 GOL_Gh3Jk1 -[hidden]right- OUT_FXFGrO
-GOL_e3nCpO -[hidden]right- OUT_AzP1Q
+GOL_e3nCpO -[hidden]right- OUT__AzP1Q
 GOL_5Fk9di -[hidden]down- GOL_Iwha3
 GOL_Iwha3 -[hidden]down- GOL_Gh3Jk1
 GOL_Gh3Jk1 -[hidden]down- GOL_e3nCpO
 OUT_AlZjX8 -[hidden]down- OUT_FXFGrO
-OUT_FXFGrO -[hidden]down- OUT_AzP1Q
+OUT_FXFGrO -[hidden]down- OUT__AzP1Q
 GOL_W6Z8pa -[hidden]right- OUT_a5mNob
-GOL_B6GP -[hidden]right- OUT_i3Bi
+GOL_B6G__P -[hidden]right- OUT_i_3Bi_
 GOL_hEEWS8 -[hidden]right- OUT_9jS0BB
-GOL_zBPs_y -[hidden]right- OUT_CnCVI
-GOL_W6Z8pa -[hidden]down- GOL_B6GP
-GOL_B6GP -[hidden]down- GOL_hEEWS8
+GOL_zBPs_y -[hidden]right- OUT_Cn_CVI
+GOL_W6Z8pa -[hidden]down- GOL_B6G__P
+GOL_B6G__P -[hidden]down- GOL_hEEWS8
 GOL_hEEWS8 -[hidden]down- GOL_zBPs_y
-OUT_a5mNob -[hidden]down- OUT_i3Bi
-OUT_i3Bi -[hidden]down- OUT_9jS0BB
-OUT_9jS0BB -[hidden]down- OUT_CnCVI
+OUT_a5mNob -[hidden]down- OUT_i_3Bi_
+OUT_i_3Bi_ -[hidden]down- OUT_9jS0BB
+OUT_9jS0BB -[hidden]down- OUT_Cn_CVI
 GOL_Zx9Cv4 -[hidden]right- OUT_aOcRl9
 GOL_kCcPph -[hidden]right- OUT_edEkJa
 GOL_Zx9Cv4 -[hidden]down- GOL_kCcPph
@@ -88,11 +88,11 @@ OUT_YSRwR0 -left-|> GOL_Lm2Bn2 : <<realization>>
 OUT_AlZjX8 -left-|> GOL_5Fk9di : <<realization>>
 OUT_AlZjX8 -left-|> GOL_Iwha3 : <<realization>>
 OUT_FXFGrO -left-|> GOL_Gh3Jk1 : <<realization>>
-OUT_AzP1Q -left-|> GOL_e3nCpO : <<realization>>
+OUT__AzP1Q -left-|> GOL_e3nCpO : <<realization>>
 OUT_a5mNob -left-|> GOL_W6Z8pa : <<realization>>
-OUT_i3Bi -left-|> GOL_B6GP : <<realization>>
+OUT_i_3Bi_ -left-|> GOL_B6G__P : <<realization>>
 OUT_9jS0BB -left-|> GOL_hEEWS8 : <<realization>>
-OUT_CnCVI -left-|> GOL_zBPs_y : <<realization>>
+OUT_Cn_CVI -left-|> GOL_zBPs_y : <<realization>>
 OUT_aOcRl9 -left-|> GOL_Zx9Cv4 : <<realization>>
 OUT_edEkJa -left-|> GOL_kCcPph : <<realization>>
 @enduml

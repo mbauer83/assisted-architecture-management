@@ -1,0 +1,216 @@
+from __future__ import annotations
+
+from pathlib import Path
+
+from src.common.model_query_types import ConnectionRecord, EntityRecord
+from src.tools.diagram_builder import generate_archimate_puml_body
+from src.tools.generate_macros import generate_macros
+from src.tools.model_mcp.query_scaffold_tools import model_diagram_scaffold
+
+
+def _entity(
+    artifact_id: str,
+    artifact_type: str,
+    name: str,
+    alias: str,
+    *,
+    domain: str = "motivation",
+    subdomain: str = "goals",
+) -> EntityRecord:
+    return EntityRecord(
+        artifact_id=artifact_id,
+        artifact_type=artifact_type,
+        name=name,
+        version="0.1.0",
+        status="draft",
+        domain=domain,
+        subdomain=subdomain,
+        path=Path(f"/tmp/{artifact_id}.md"),
+        keywords=(),
+        extra={},
+        content_text="",
+        display_blocks={},
+        display_label=name,
+        display_alias=alias,
+    )
+
+
+def _conn(source: str, target: str, conn_type: str = "archimate-realization") -> ConnectionRecord:
+    return ConnectionRecord(
+        artifact_id=f"{source}---{target}@@{conn_type}",
+        source=source,
+        target=target,
+        conn_type=conn_type,
+        version="0.1.0",
+        status="draft",
+        path=Path("/tmp/test.outgoing.md"),
+        extra={},
+        content_text="",
+    )
+
+
+def test_generate_archimate_puml_body_normalizes_aliases_in_entities_and_connections() -> None:
+    goal = _entity(
+        "GOL@1.B6G_-P.support-technology-design-for-ai",
+        "goal",
+        "Support Technology Design for AI",
+        "GOL_B6G_-P",
+    )
+    outcome = _entity(
+        "OUT@1.i-3Bi-.ai-agents-query-technology-architecture",
+        "outcome",
+        "AI Agents Query Technology Architecture to Identify Constraints",
+        "OUT_i-3Bi-",
+        subdomain="outcomes",
+    )
+
+    puml = generate_archimate_puml_body(
+        "Alias Test",
+        [goal, outcome],
+        [_conn(outcome.artifact_id, goal.artifact_id)],
+        diagram_type="archimate-motivation",
+    )
+
+    assert " as GOL_B6G__P" in puml
+    assert " as OUT_i_3Bi_" in puml
+    assert "OUT_i_3Bi_ ..|> GOL_B6G__P" in puml
+    assert "GOL_B6G_-P" not in puml
+    assert "OUT_i-3Bi-" not in puml
+
+
+def test_generate_macros_normalizes_aliases(tmp_path: Path) -> None:
+    repo_root = tmp_path / "engagements" / "ENG-T" / "architecture-repository"
+    entity_path = repo_root / "model" / "motivation" / "outcomes" / "OUT@1.i-3Bi-.alias-test.md"
+    entity_path.parent.mkdir(parents=True, exist_ok=True)
+    entity_path.write_text(
+        """\
+---
+artifact-id: OUT@1.i-3Bi-.alias-test
+artifact-type: outcome
+name: "Alias Test"
+version: 0.1.0
+status: draft
+last-updated: '2026-04-20'
+---
+
+<!-- §content -->
+
+## Alias Test
+
+<!-- §display -->
+
+### archimate
+
+```yaml
+domain: Motivation
+element-type: Outcome
+label: "Alias Test"
+alias: OUT_i-3Bi-
+```
+""",
+        encoding="utf-8",
+    )
+
+    out_path = generate_macros(repo_root)
+    content = out_path.read_text(encoding="utf-8")
+
+    assert "$DECL_OUT_i_3Bi_" in content
+    assert " as OUT_i_3Bi_" in content
+    assert "OUT_i-3Bi-" not in content
+
+
+def test_model_diagram_scaffold_uses_canonical_aliases(tmp_path: Path) -> None:
+    repo_root = tmp_path / "engagements" / "ENG-T" / "architecture-repository"
+    goal_id = "GOL@1.B6G_-P.support-technology-design-for-ai"
+    outcome_id = "OUT@1.i-3Bi-.ai-agents-query-technology-architecture"
+    goal_path = repo_root / "model" / "motivation" / "goals" / f"{goal_id}.md"
+    outcome_path = repo_root / "model" / "motivation" / "outcomes" / f"{outcome_id}.md"
+    outgoing_path = repo_root / "model" / "motivation" / "outcomes" / f"{outcome_id}.outgoing.md"
+
+    goal_path.parent.mkdir(parents=True, exist_ok=True)
+    outcome_path.parent.mkdir(parents=True, exist_ok=True)
+    goal_path.write_text(
+        f"""\
+---
+artifact-id: {goal_id}
+artifact-type: goal
+name: "Support Technology Design for AI"
+version: 0.1.0
+status: draft
+last-updated: '2026-04-20'
+---
+
+<!-- §content -->
+
+## Support Technology Design for AI
+
+<!-- §display -->
+
+### archimate
+
+```yaml
+domain: Motivation
+element-type: Goal
+label: "Support Technology Design for AI"
+alias: GOL_B6G_-P
+```
+""",
+        encoding="utf-8",
+    )
+    outcome_path.write_text(
+        f"""\
+---
+artifact-id: {outcome_id}
+artifact-type: outcome
+name: "AI Agents Query Technology Architecture to Identify Constraints"
+version: 0.1.0
+status: draft
+last-updated: '2026-04-20'
+---
+
+<!-- §content -->
+
+## AI Agents Query Technology Architecture to Identify Constraints
+
+<!-- §display -->
+
+### archimate
+
+```yaml
+domain: Motivation
+element-type: Outcome
+label: "AI Agents Query Technology Architecture to Identify Constraints"
+alias: OUT_i-3Bi-
+```
+""",
+        encoding="utf-8",
+    )
+    outgoing_path.write_text(
+        f"""\
+---
+source-entity: {outcome_id}
+version: 0.1.0
+status: draft
+last-updated: '2026-04-20'
+---
+
+<!-- §connections -->
+
+### archimate-realization → {goal_id}
+""",
+        encoding="utf-8",
+    )
+
+    result = model_diagram_scaffold(
+        entity_ids=[goal_id, outcome_id],
+        diagram_name="Alias Scaffold",
+        repo_root=str(repo_root),
+        repo_scope="engagement",
+    )
+    puml = str(result["puml"])
+
+    assert " as GOL_B6G__P" in puml
+    assert " as OUT_i_3Bi_" in puml
+    assert "OUT_i_3Bi_ ..|> GOL_B6G__P" in puml
+    assert "GOL_B6G_-P" not in puml
+    assert "OUT_i-3Bi-" not in puml

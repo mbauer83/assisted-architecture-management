@@ -189,7 +189,7 @@ Given old artifact-id `PRC@ts.hash.old-slug` and new name → new slug:
 | `model/…/PRC@ts.hash.old-slug.md` | rename to `PRC@ts.hash.new-slug.md` |
 | `model/…/PRC@ts.hash.old-slug.outgoing.md` | rename to `PRC@ts.hash.new-slug.outgoing.md` (if exists) |
 | `artifact-id: PRC@ts.hash.old-slug` in `.md` frontmatter | update to `PRC@ts.hash.new-slug` |
-| All `.outgoing.md` files across BOTH repos containing `PRC@ts.hash.old-slug` | update every occurrence (connection target headers + `§assoc` annotations) |
+| All `.outgoing.md` files across engagement repo containing `PRC@ts.hash.old-slug` | update every occurrence (connection target headers + `§assoc` annotations) |
 | PUML diagram files | **no change** — diagrams reference entities by `display_alias` (e.g. `PRC_U4aAdh`), not by artifact-id |
 | `.outgoing.md` **headers** format | `### conn-type [src] → [tgt] PRC@ts.hash.old-slug` → update target token |
 | `<!-- §assoc PRC@ts.hash.old-slug -->` annotations | update inline |

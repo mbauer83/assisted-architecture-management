@@ -16,6 +16,7 @@ import subprocess
 import tempfile
 from pathlib import Path
 
+from src.common.model_query_parsing import normalize_puml_alias
 from src.common.model_query_types import ConnectionRecord, EntityRecord
 from src.common.ontology_loader import (
     CONNECTION_TYPES,
@@ -75,8 +76,16 @@ def generate_archimate_puml_body(
     lines.append(f"title {name}")
     lines.append("")
 
-    alias_by_id = {e.artifact_id: e.display_alias for e in entity_records}
-    entity_by_alias = {e.display_alias: e for e in entity_records if e.display_alias}
+    alias_by_id = {
+        e.artifact_id: normalize_puml_alias(e.display_alias)
+        for e in entity_records
+        if e.display_alias
+    }
+    entity_by_alias = {
+        normalize_puml_alias(e.display_alias): e
+        for e in entity_records
+        if e.display_alias
+    }
 
     # Build composition/aggregation hierarchy for visual nesting
     children_map: dict[str, list[EntityRecord]] = defaultdict(list)
@@ -91,7 +100,7 @@ def generate_archimate_puml_body(
                 comp_children.add(tgt_alias)
 
     def _render_entity(entity: EntityRecord, indent: str) -> list[str]:
-        alias = entity.display_alias
+        alias = normalize_puml_alias(entity.display_alias)
         if not alias:
             return []
         if entity.artifact_type in _JUNCTION_TYPES:
@@ -113,7 +122,7 @@ def generate_archimate_puml_body(
             return [decl]
         inner = indent + "  "
         result = [f"{decl} {{"]
-        child_aliases = [c.display_alias for c in children if c.display_alias]
+        child_aliases = [normalize_puml_alias(c.display_alias) for c in children if c.display_alias]
         for child in children:
             result.extend(_render_entity(child, inner))
         for i in range(len(child_aliases) - 1):
@@ -123,7 +132,8 @@ def generate_archimate_puml_body(
 
     domain_entities: dict[str, list[EntityRecord]] = defaultdict(list)
     for entity in entity_records:
-        if entity.display_alias and entity.display_alias not in comp_children:
+        alias = normalize_puml_alias(entity.display_alias)
+        if alias and alias not in comp_children:
             domain_entities[(entity.domain or "").lower()].append(entity)
 
     ordered_domains = [d for d in DOMAIN_ORDER if d in domain_entities]

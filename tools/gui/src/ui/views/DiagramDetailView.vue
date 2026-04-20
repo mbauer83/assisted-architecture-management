@@ -41,6 +41,7 @@ const svgContainer = ref<HTMLElement | null>(null)
 const svgNodeElems = ref(new Map<string, Element>())
 const prevHighlighted = ref<Element | null>(null)
 let _interactivityController: AbortController | null = null
+let _attachRun = 0
 
 const load = () => {
   if (!diagramId.value) return
@@ -88,12 +89,16 @@ const addConnectionHitAreas = (group: SVGGElement) => {
 }
 
 // Build alias→artifact_id map and attach click handlers after SVG + entities load
-const attachInteractivity = () => {
+const attachInteractivity = async () => {
+  const runId = ++_attachRun
   _interactivityController?.abort()
   _interactivityController = new AbortController()
   const { signal } = _interactivityController
   svgNodeElems.value.clear()
   prevHighlighted.value = null
+  await nextTick()
+  await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()))
+  if (runId !== _attachRun || signal.aborted) return
   const svgEl = svgContainer.value?.querySelector('svg')
   if (!svgEl || !diagramEntities.value.length) return
 
@@ -143,7 +148,7 @@ const attachInteractivity = () => {
   }
 }
 
-watch([svgHtml, diagramEntities, diagramConnections], attachInteractivity, { flush: 'post' })
+watch([svgHtml, diagramEntities, diagramConnections], () => { void attachInteractivity() }, { flush: 'post' })
 
 // Sync sidebar selection → SVG highlight
 watch(selectedId, (newId) => {
