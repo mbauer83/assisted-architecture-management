@@ -12,6 +12,7 @@ from pathlib import Path
 import pytest
 
 from src.tools import mcp_model_server as mcp
+from src.common.model_verifier_registry import ModelRegistry
 
 
 # ---------------------------------------------------------------------------
@@ -73,13 +74,56 @@ class TestEditEntity:
         assert "Updated Name" in content
         assert "name: Updated Name" in content
 
-    def test_edit_preserves_artifact_id(self, repo: Path) -> None:
+    def test_edit_renames_artifact_id_slug_and_path(self, repo: Path) -> None:
         eid = _make_entity(repo, "requirement", "Preserve Me")
         result = mcp.model_edit_entity(
-            artifact_id=eid, name="New", dry_run=False, repo_root=str(repo),
+            artifact_id=eid, name="New Name", dry_run=False, repo_root=str(repo),
         )
         path = Path(str(result["path"]))
-        assert eid in path.read_text()
+        new_id = str(result["artifact_id"])
+        assert new_id != eid
+        assert new_id.endswith(".new-name")
+        assert path.name == f"{new_id}.md"
+        assert new_id in path.read_text()
+
+    def test_edit_entity_renames_owned_outgoing_and_updates_references(self, repo: Path) -> None:
+        src = _make_entity(repo, "requirement", "Source Name")
+        tgt = _make_entity(repo, "outcome", "Target Name")
+        other = _make_entity(repo, "goal", "Other Name")
+        _make_connection(repo, src, tgt, "archimate-realization")
+        _make_connection(repo, other, src, "archimate-association")
+
+        old_entity_path = next((repo / "model").rglob(f"{src}.md"))
+        old_outgoing_path = old_entity_path.with_suffix(".outgoing.md")
+        other_outgoing_path = next((repo / "model").rglob(f"{other}.outgoing.md"))
+
+        result = mcp.model_edit_entity(
+            artifact_id=src, name="Renamed Source", dry_run=False, repo_root=str(repo),
+        )
+
+        new_id = str(result["artifact_id"])
+        new_entity_path = Path(str(result["path"]))
+        new_outgoing_path = new_entity_path.with_suffix(".outgoing.md")
+
+        assert not old_entity_path.exists()
+        assert not old_outgoing_path.exists()
+        assert new_entity_path.exists()
+        assert new_outgoing_path.exists()
+        assert new_id in new_entity_path.read_text()
+        assert new_id in new_outgoing_path.read_text()
+        assert src not in new_outgoing_path.read_text()
+        assert new_id in other_outgoing_path.read_text()
+        assert src not in other_outgoing_path.read_text()
+
+    def test_model_registry_uses_canonical_connection_artifact_ids(self, repo: Path) -> None:
+        src = _make_entity(repo, "driver", "Source Driver")
+        tgt = _make_entity(repo, "assessment", "Target Assessment")
+        _make_connection(repo, src, tgt, "archimate-influence")
+
+        registry = ModelRegistry([repo])
+        expected = f"{src}---{tgt}@@archimate-influence"
+
+        assert expected in registry.connection_ids()
 
     def test_edit_nonexistent_entity_raises(self, repo: Path) -> None:
         with pytest.raises(ValueError, match="not found"):

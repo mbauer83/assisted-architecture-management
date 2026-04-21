@@ -34,7 +34,7 @@ def workspace_root() -> Path:
 def default_engagement_repo_root() -> Path:
     import os
 
-    env = os.getenv("SDLC_MCP_MODEL_REPO_ROOT")
+    env = os.getenv("ARCH_MCP_MODEL_REPO_ROOT")
     if env:
         return Path(env).expanduser()
     # Try init state from arch-init
@@ -118,9 +118,28 @@ def roots_key(roots: list[Path]) -> str:
     return "|".join(str(p.resolve()) for p in roots)
 
 
+def _shared_state_repo_for_roots(roots: list[Path]) -> ModelRepository | None:
+    try:
+        from src.tools.gui_routers import state as gui_state
+    except Exception:  # noqa: BLE001
+        return None
+
+    repo = gui_state.maybe_get_repo()
+    if repo is None:
+        return None
+    configured = gui_state.configured_roots()
+    wanted = [p.resolve() for p in roots]
+    if configured == wanted:
+        return repo
+    return None
+
+
 @lru_cache(maxsize=8)
 def repo_cached(roots_key_str: str) -> ModelRepository:
     roots = [Path(p) for p in roots_key_str.split("|") if p]
+    shared = _shared_state_repo_for_roots(roots)
+    if shared is not None:
+        return shared
     return ModelRepository(roots)
 
 
@@ -136,10 +155,27 @@ def verifier_for(roots_key_str: str, *, include_registry: bool) -> ModelVerifier
     return ModelVerifier(None)
 
 
-def clear_caches_for_repo(_: Path | list[Path]) -> None:
-    # Compatibility behavior: clear all caches regardless of which mounted root changed.
+def refresh_caches_for_repo(root_or_roots: Path | list[Path]) -> None:
+    roots = root_or_roots if isinstance(root_or_roots, list) else [root_or_roots]
+    shared = _shared_state_repo_for_roots(roots)
+    if shared is not None:
+        try:
+            from src.tools.gui_routers import state as gui_state
+            gui_state.refresh_now()
+        except Exception:  # noqa: BLE001
+            shared.refresh()
     repo_cached.cache_clear()
     registry_cached.cache_clear()
+
+
+def clear_caches_for_repo(root_or_roots: Path | list[Path]) -> None:
+    refresh_caches_for_repo(root_or_roots)
+    roots = root_or_roots if isinstance(root_or_roots, list) else [root_or_roots]
+    try:
+        from src.tools.model_mcp.watch_tools import schedule_refresh
+    except Exception:  # noqa: BLE001
+        return
+    schedule_refresh(roots)
 
 
 @dataclass(frozen=True)

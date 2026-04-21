@@ -73,13 +73,22 @@ def admin_create_entity(body: AdminCreateEntityBody) -> dict[str, Any]:
     ent_root, _, verifier = s.get_admin_write_deps()
     from src.tools.model_write.admin_ops import admin_create_entity as _create
     try:
-        result = _create(
-            repo_root=ent_root, verifier=verifier, clear_repo_caches=s.clear_caches,
-            artifact_type=body.artifact_type, name=body.name,
-            summary=body.summary, properties=body.properties,
-            notes=body.notes, keywords=body.keywords,
-            artifact_id=None, version=body.version,
-            status=body.status, last_updated=None, dry_run=body.dry_run,
+        result = s.run_serialized_write(
+            _create,
+            repo_root=ent_root,
+            verifier=verifier,
+            clear_repo_caches=s.clear_caches,
+            artifact_type=body.artifact_type,
+            name=body.name,
+            summary=body.summary,
+            properties=body.properties,
+            notes=body.notes,
+            keywords=body.keywords,
+            artifact_id=None,
+            version=body.version,
+            status=body.status,
+            last_updated=None,
+            dry_run=body.dry_run,
         )
     except ValueError as e:
         raise HTTPException(400, str(e))
@@ -93,15 +102,21 @@ def admin_edit_entity(body: AdminEditEntityBody) -> dict[str, Any]:
     from src.tools.model_write.admin_ops import admin_edit_entity as _edit, _UNSET
     provided = body.model_fields_set
     try:
-        result = _edit(
-            repo_root=ent_root, registry=registry, verifier=verifier,
+        result = s.run_serialized_write(
+            _edit,
+            repo_root=ent_root,
+            registry=registry,
+            verifier=verifier,
             clear_repo_caches=s.clear_caches,
-            artifact_id=body.artifact_id, name=body.name,
+            artifact_id=body.artifact_id,
+            name=body.name,
             summary=body.summary if "summary" in provided else _UNSET,
             properties=body.properties if "properties" in provided else _UNSET,
             notes=body.notes if "notes" in provided else _UNSET,
             keywords=body.keywords if "keywords" in provided else _UNSET,
-            version=body.version, status=body.status, dry_run=body.dry_run,
+            version=body.version,
+            status=body.status,
+            dry_run=body.dry_run,
         )
     except ValueError as e:
         raise HTTPException(400, str(e))
@@ -114,10 +129,13 @@ def admin_delete_entity(body: AdminDeleteEntityBody) -> dict[str, Any]:
     ent_root, registry, _verifier = s.get_admin_write_deps()
     from src.tools.model_write.admin_ops import admin_delete_entity as _delete
     try:
-        result = _delete(
-            repo_root=ent_root, registry=registry,
+        result = s.run_serialized_write(
+            _delete,
+            repo_root=ent_root,
+            registry=registry,
             clear_repo_caches=s.clear_caches,
-            artifact_id=body.artifact_id, dry_run=body.dry_run,
+            artifact_id=body.artifact_id,
+            dry_run=body.dry_run,
         )
     except ValueError as e:
         raise HTTPException(400, str(e))
@@ -147,12 +165,20 @@ def admin_add_connection(body: AdminAddConnectionBody) -> dict[str, Any]:
     ent_root, registry, verifier = s.get_admin_write_deps()
     from src.tools.model_write.admin_ops import admin_add_connection as _add
     try:
-        result = _add(
-            repo_root=ent_root, registry=registry, verifier=verifier,
+        result = s.run_serialized_write(
+            _add,
+            repo_root=ent_root,
+            registry=registry,
+            verifier=verifier,
             clear_repo_caches=s.clear_caches,
-            source_entity=body.source_entity, connection_type=body.connection_type,
-            target_entity=body.target_entity, description=body.description,
-            version="0.1.0", status="active", last_updated=None, dry_run=body.dry_run,
+            source_entity=body.source_entity,
+            connection_type=body.connection_type,
+            target_entity=body.target_entity,
+            description=body.description,
+            version="0.1.0",
+            status="active",
+            last_updated=None,
+            dry_run=body.dry_run,
         )
     except ValueError as e:
         raise HTTPException(400, str(e))
@@ -165,11 +191,16 @@ def admin_remove_connection(body: AdminRemoveConnectionBody) -> dict[str, Any]:
     ent_root, registry, verifier = s.get_admin_write_deps()
     from src.tools.model_write.admin_ops import admin_remove_connection as _remove
     try:
-        result = _remove(
-            repo_root=ent_root, registry=registry, verifier=verifier,
+        result = s.run_serialized_write(
+            _remove,
+            repo_root=ent_root,
+            registry=registry,
+            verifier=verifier,
             clear_repo_caches=s.clear_caches,
-            source_entity=body.source_entity, connection_type=body.connection_type,
-            target_entity=body.target_entity, dry_run=body.dry_run,
+            source_entity=body.source_entity,
+            connection_type=body.connection_type,
+            target_entity=body.target_entity,
+            dry_run=body.dry_run,
         )
     except ValueError as e:
         raise HTTPException(400, str(e))
@@ -217,11 +248,18 @@ def admin_create_diagram(body: AdminCreateDiagramBody) -> dict[str, Any]:
     connections = [c for cid in body.connection_ids if (c := repo.get_connection(cid)) is not None]
     puml = generate_archimate_puml_body(body.name, entities, connections, diagram_type=body.diagram_type)
     try:
-        result = _write_diagram_to_enterprise(
-            repo_root=ent_root, verifier=verifier, clear_repo_caches=s.clear_caches,
-            diagram_type=body.diagram_type, name=body.name, puml=puml,
+        result = s.run_serialized_write(
+            _write_diagram_to_enterprise,
+            repo_root=ent_root,
+            verifier=verifier,
+            clear_repo_caches=s.clear_caches,
+            diagram_type=body.diagram_type,
+            name=body.name,
+            puml=puml,
             artifact_id=generate_entity_id("DIA", body.name),
-            keywords=body.keywords, version=body.version, status=body.status,
+            keywords=body.keywords,
+            version=body.version,
+            status=body.status,
             dry_run=body.dry_run,
         )
     except ValueError as e:
@@ -235,9 +273,12 @@ def admin_delete_diagram(body: AdminDeleteDiagramBody) -> dict[str, Any]:
     ent_root, _registry, _verifier = s.get_admin_write_deps()
     from src.tools.model_write.admin_ops import admin_delete_diagram as _delete
     try:
-        result = _delete(
-            repo_root=ent_root, clear_repo_caches=s.clear_caches,
-            artifact_id=body.artifact_id, dry_run=body.dry_run,
+        result = s.run_serialized_write(
+            _delete,
+            repo_root=ent_root,
+            clear_repo_caches=s.clear_caches,
+            artifact_id=body.artifact_id,
+            dry_run=body.dry_run,
         )
     except ValueError as e:
         raise HTTPException(400, str(e))

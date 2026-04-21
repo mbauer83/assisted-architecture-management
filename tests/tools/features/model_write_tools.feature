@@ -1,5 +1,5 @@
 Feature: MCP model writer tools
-  The sdlc-model MCP server should provide deterministic writer tools
+  The arch-model MCP server should provide deterministic writer tools
   that produce ArchiMate NEXT compliant entity, connection, matrix, and diagram artifacts
   with a dry-run mode and strong repo-boundary enforcement.
 

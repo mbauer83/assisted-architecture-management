@@ -75,6 +75,8 @@ export const ConnectionRecordSchema = Schema.Struct({
   artifact_id: Schema.String,
   source: Schema.String,
   target: Schema.String,
+  source_name: Schema.optional(Schema.String),
+  target_name: Schema.optional(Schema.String),
   conn_type: Schema.String,
   version: Schema.String,
   status: Schema.String,

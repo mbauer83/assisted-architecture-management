@@ -51,6 +51,16 @@ def queued(fn: _F) -> _F:
     return wrapper  # type: ignore[return-value]
 
 
+def run_sync(fn: Callable[..., Any], /, *args: Any, **kwargs: Any) -> Any:
+    """Execute a synchronous write through the shared single-worker queue.
+
+    This is intended for REST handlers, which are currently synchronous and need
+    to serialize writes with MCP tool calls once both paths share one process.
+    """
+
+    return _get_executor().submit(fn, *args, **kwargs).result()
+
+
 def shutdown(wait: bool = True) -> None:
     """Shut down the write queue executor (for testing / clean teardown)."""
     global _executor

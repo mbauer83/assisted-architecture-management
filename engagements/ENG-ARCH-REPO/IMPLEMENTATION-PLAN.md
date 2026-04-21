@@ -140,8 +140,8 @@ Metadata (status, authors, date) is expressed inside the required section headin
 - `target-doc-id` = filename stem of the target document
 - `section-id` = slugified heading (lowercase, spaces → hyphens)
 
-**Framework server integration:** `sdlc-mcp-framework` is configured with
-`SDLC_MCP_FRAMEWORK_DOC_ROOT=<repo root>` and `SDLC_MCP_FRAMEWORK_SCAN_DIRS=docs`,
+**Framework server integration:** `arch-mcp-framework` is configured with
+`ARCH_MCP_FRAMEWORK_DOC_ROOT=<repo root>` and `ARCH_MCP_FRAMEWORK_SCAN_DIRS=docs`,
 enabling section-level search and reference graph traversal via the `framework_query_*` MCP tools.
 
 ---
@@ -165,16 +165,16 @@ enabling section-level search and reference graph traversal via the `framework_q
 **Verification**: 173 files, 0 errors, 0 warnings (W350 resolves on MCP server restart — `tools/plantuml.jar` symlink + code fix in place).
 
 **MCP servers** (configured in `.mcp.json` / `.vscode/mcp.json`):
-- `sdlc-mcp-model` — `SDLC_MCP_MODEL_REPO_ROOT=engagements/ENG-ARCH-REPO/architecture-repository`
-- `sdlc-mcp-framework` — `SDLC_MCP_FRAMEWORK_DOC_ROOT=engagements/ENG-ARCH-REPO/architecture-repository`, `SDLC_MCP_FRAMEWORK_SCAN_DIRS=docs`
+- `arch-mcp-model` — `ARCH_MCP_MODEL_REPO_ROOT=engagements/ENG-ARCH-REPO/architecture-repository`
+- `arch-mcp-framework` — `ARCH_MCP_FRAMEWORK_DOC_ROOT=engagements/ENG-ARCH-REPO/architecture-repository`, `ARCH_MCP_FRAMEWORK_SCAN_DIRS=docs`
 
 **Two-tiered repo config**: `arch-workspace.yaml` at project root, `arch-init` CLI writes `.arch/init-state.yaml`. MCP + GUI servers auto-discover both repos from init state.
 
-**GUI** (`sdlc-gui-server` + `tools/gui/` Vue SPA):
+**GUI** (`arch-backend` + `tools/gui/` Vue SPA):
 - Stack: Vue 3 + TypeScript + Vite + Effect; FastAPI REST backend
 - Hexagonal: `domain/` → `ports/` → `adapters/http/` → `application/` → `ui/`
 - Dockerized: `docker compose up --build` → http://localhost:8000 (includes Java, Graphviz, fonts for rendering)
-- Dev: `sdlc-gui-server --repo-root <path>` + `npm run dev` in `tools/gui/` → http://localhost:5173
+- Dev: `arch-backend --repo-root <path>` + `npm run dev` in `tools/gui/` → http://localhost:5173
 - Views: Home, Entities (list/detail/create/edit), Search, Diagrams (list/detail/create/edit), Graph Explorer
 
 ---

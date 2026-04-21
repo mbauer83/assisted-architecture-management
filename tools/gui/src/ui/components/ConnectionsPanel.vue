@@ -89,6 +89,12 @@ const artifactTypeFromId = (artifactId: string) => {
 
 // Group existing connections by the artifact_type-prefix of the connected entity,
 // filtering to only show connections matching this panel's direction.
+const otherArtifactId = (c: ConnectionRecord) => {
+  if (props.direction === 'incoming') return c.source
+  if (props.direction === 'symmetric') return c.source === props.entityId ? c.target : c.source
+  return c.target
+}
+
 const grouped = computed(() => {
   const groups: Record<string, ConnectionRecord[]> = {}
   const symTypes = symmetricConnTypes.value
@@ -96,7 +102,7 @@ const grouped = computed(() => {
     const isSym = symTypes.has(c.conn_type)
     if (props.direction === 'symmetric' && !isSym) continue
     if (props.direction !== 'symmetric' && isSym) continue
-    const otherId = props.direction === 'incoming' ? c.source : c.target
+    const otherId = otherArtifactId(c)
     const typePart = artifactTypeFromId(otherId)
     if (!groups[typePart]) groups[typePart] = []
     groups[typePart].push({ ...c })
@@ -110,8 +116,17 @@ const sectionKeys = computed((): string[] => {
   return Array.from(all).sort()
 })
 
-const otherEnd = (c: ConnectionRecord) =>
-  props.direction === 'incoming' ? c.source : c.target
+const otherEnd = (c: ConnectionRecord) => otherArtifactId(c)
+
+const otherEndName = (c: ConnectionRecord) => {
+  if (props.direction === 'incoming') return c.source_name || friendlyName(c.source)
+  if (props.direction === 'symmetric') {
+    const otherId = otherEnd(c)
+    if (otherId === c.source) return c.source_name || friendlyName(c.source)
+    return c.target_name || friendlyName(c.target)
+  }
+  return c.target_name || friendlyName(c.target)
+}
 
 const titleLabel = computed(() => {
   if (props.direction === 'outgoing') return 'Outgoing'
@@ -331,7 +346,7 @@ const confirmRemove = () => {
                 <RouterLink
                   :to="{ path: '/entity', query: { id: otherEnd(c) } }"
                   class="conn-target"
-                >{{ friendlyName(otherEnd(c)) }}</RouterLink>
+                >{{ otherEndName(c) }}</RouterLink>
                 <span v-if="c.content_text?.trim()" class="conn-info-wrap">
                   <span class="conn-info-btn" tabindex="0">ⓘ</span>
                   <span class="conn-info-tip">{{ c.content_text.trim() }}</span>

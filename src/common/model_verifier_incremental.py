@@ -63,20 +63,20 @@ def verifier_engine_signature() -> str:
 
 
 def load_runtime_config() -> VerifierRuntimeConfig:
-    mode_raw = os.getenv("SDLC_MODEL_VERIFY_MODE", "incremental").strip().lower()
+    mode_raw = os.getenv("ARCH_MODEL_VERIFY_MODE", "incremental").strip().lower()
     mode: Literal["full", "incremental"] = "incremental" if mode_raw == "incremental" else "full"
 
-    state_root_raw = os.getenv("SDLC_MODEL_VERIFY_STATE_DIR", "").strip()
+    state_root_raw = os.getenv("ARCH_MODEL_VERIFY_STATE_DIR", "").strip()
     if state_root_raw:
         state_dir = Path(state_root_raw).expanduser()
     else:
         xdg_cache = os.getenv("XDG_CACHE_HOME", "").strip()
         cache_root = Path(xdg_cache).expanduser() if xdg_cache else Path.home() / ".cache"
-        state_dir = cache_root / "sdlc-agents" / "model-verifier"
+        state_dir = cache_root / "arch-agents" / "model-verifier"
 
-    ratio = _read_float_env("SDLC_MODEL_VERIFY_INCREMENTAL_MAX_CHANGED_RATIO", default=0.30)
-    count = _read_int_env("SDLC_MODEL_VERIFY_INCREMENTAL_MAX_CHANGED_COUNT", default=200)
-    log_mode = _read_bool_env("SDLC_MODEL_VERIFY_LOG_MODE", default=True)
+    ratio = _read_float_env("ARCH_MODEL_VERIFY_INCREMENTAL_MAX_CHANGED_RATIO", default=0.30)
+    count = _read_int_env("ARCH_MODEL_VERIFY_INCREMENTAL_MAX_CHANGED_COUNT", default=200)
+    log_mode = _read_bool_env("ARCH_MODEL_VERIFY_LOG_MODE", default=True)
 
     return VerifierRuntimeConfig(
         mode=mode,

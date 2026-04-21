@@ -8,7 +8,7 @@ from typing import Any
 
 from mcp.server.fastmcp import FastMCP  # type: ignore[import-not-found]
 
-from src.tools.model_mcp.context import RepoPreset, RepoScope, clear_caches_for_repo, resolve_repo_roots
+from src.tools.model_mcp.context import RepoPreset, RepoScope, refresh_caches_for_repo, resolve_repo_roots
 
 
 # ---------------------------------------------------------------------------
@@ -78,7 +78,7 @@ def _coord(roots: list[Path]) -> _RefreshCoord:
 
 def _do_refresh(roots: list[Path]) -> None:
     """Perform the actual cache clear + macro regeneration."""
-    clear_caches_for_repo(roots)
+    refresh_caches_for_repo(roots)
     try:
         from src.tools.generate_macros import generate_macros  # noqa: PLC0415
     except ImportError:
@@ -252,7 +252,7 @@ def register_watch_tools(mcp: FastMCP) -> None:
     """Register watcher lifecycle tools on *mcp*.
 
     Called by the standalone arch-mcp-watch server.  Not registered on the
-    main sdlc-mcp-model server — that server auto-starts the watcher at
+    main arch-mcp-model server — that server auto-starts the watcher at
     startup without exposing lifecycle tools to agents.
     """
     from typing import Literal

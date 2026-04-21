@@ -41,8 +41,8 @@ const loadConnections = () => {
   if (!entityId.value) return
   outgoing.run(svc.getConnections(entityId.value, 'outbound'))
   incoming.run(svc.getConnections(entityId.value, 'inbound'))
-  // Symmetric connections share both directions; we show ones where this entity is source
-  symmetric.run(svc.getConnections(entityId.value, 'outbound'))
+  // Symmetric connections can be stored with this entity on either side.
+  symmetric.run(svc.getConnections(entityId.value, 'any'))
 }
 
 onMounted(load)
@@ -148,7 +148,11 @@ const saveEdit = () => {
     if (r.wrote) {
       editing.value = false
       editPreview.value = null
-      load()
+      if (r.artifact_id && r.artifact_id !== entityId.value) {
+        router.replace({ path: '/entity', query: { id: r.artifact_id } })
+      } else {
+        load()
+      }
     } else {
       editError.value = r.content ?? 'Verification failed'
     }

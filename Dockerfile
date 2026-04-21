@@ -48,4 +48,4 @@ COPY --from=frontend /build/dist/ tools/gui/dist/
 
 EXPOSE 8000
 
-CMD ["sdlc-gui-server", "--repo-root", "/repo", "--host", "0.0.0.0"]
+CMD ["arch-backend", "--repo-root", "/repo", "--host", "0.0.0.0"]

@@ -1,18 +1,15 @@
 {
   "mcpServers": {
-    "sdlc-model": {
+    "arch-model": {
       "command": "uv",
-      "args": ["run", "sdlc-mcp-model", "--transport", "stdio"],
-      "env": {
-        "SDLC_MCP_MODEL_REPO_ROOT": "engagements/ENG-ARCH-REPO/architecture-repository"
-      }
+      "args": ["run", "arch-mcp-stdio"]
     },
-    "sdlc-framework": {
+    "arch-framework": {
       "command": "uv",
-      "args": ["run", "sdlc-mcp-framework", "--transport", "stdio"],
+      "args": ["run", "arch-mcp-framework", "--transport", "stdio"],
       "env": {
-        "SDLC_MCP_FRAMEWORK_DOC_ROOT": "engagements/ENG-ARCH-REPO/architecture-repository",
-        "SDLC_MCP_FRAMEWORK_SCAN_DIRS": "docs"
+        "ARCH_MCP_FRAMEWORK_DOC_ROOT": "engagements/ENG-ARCH-REPO/architecture-repository",
+        "ARCH_MCP_FRAMEWORK_SCAN_DIRS": "docs"
       }
     }
   }

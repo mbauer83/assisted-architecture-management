@@ -49,6 +49,19 @@ def get_repo() -> ModelRepository:
     return _repo
 
 
+def maybe_get_repo() -> ModelRepository | None:
+    return _repo
+
+
+def configured_roots() -> list[Path]:
+    roots: list[Path] = []
+    if _repo_root is not None:
+        roots.append(_repo_root.resolve())
+    if _enterprise_root is not None:
+        roots.append(_enterprise_root.resolve())
+    return roots
+
+
 def is_global(path: Path) -> bool:
     return _enterprise_root is not None and path.is_relative_to(_enterprise_root)
 
@@ -102,7 +115,17 @@ def resolve_grf(artifact_id: str) -> tuple[str, bool]:
 
 
 def connection_to_dict(c: ConnectionRecord) -> dict[str, Any]:
+    repo = _repo
     resolved_target, via_grf = resolve_grf(c.target)
+    src_name = c.source
+    tgt_name = resolved_target
+    if repo is not None:
+        src_rec = repo.get_entity(c.source)
+        tgt_rec = repo.get_entity(resolved_target)
+        if src_rec is not None and src_rec.name:
+            src_name = src_rec.name
+        if tgt_rec is not None and tgt_rec.name:
+            tgt_name = tgt_rec.name
     d: dict[str, Any] = {
         "artifact_id": c.artifact_id, "source": c.source, "target": resolved_target,
         "conn_type": c.conn_type, "version": c.version, "status": c.status,
@@ -110,6 +133,8 @@ def connection_to_dict(c: ConnectionRecord) -> dict[str, Any]:
         "associated_entities": list(c.associated_entities),
         "src_cardinality": c.src_cardinality,
         "tgt_cardinality": c.tgt_cardinality,
+        "source_name": src_name,
+        "target_name": tgt_name,
     }
     if via_grf:
         d["grf_artifact_id"] = c.target
@@ -159,6 +184,24 @@ def get_admin_write_deps() -> tuple[Path, Any, Any]:
 def clear_caches(_: Path) -> None:
     if _repo is not None:
         _repo.refresh()
+        try:
+            from src.tools.model_mcp.watch_tools import schedule_refresh
+        except Exception:  # noqa: BLE001
+            return
+        roots = configured_roots()
+        if roots:
+            schedule_refresh(roots)
+
+
+def refresh_now() -> None:
+    if _repo is not None:
+        _repo.refresh()
+
+
+def run_serialized_write(fn: Any, /, *args: Any, **kwargs: Any) -> Any:
+    from src.tools.model_mcp.write_queue import run_sync
+
+    return run_sync(fn, *args, **kwargs)
 
 
 def write_result_to_dict(result: Any) -> dict[str, Any]:

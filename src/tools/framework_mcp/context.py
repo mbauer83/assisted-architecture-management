@@ -17,7 +17,7 @@ def workspace_root() -> Path:
 
 
 def default_framework_root() -> Path:
-    env_root = os.getenv("SDLC_MCP_FRAMEWORK_DOC_ROOT", "")
+    env_root = os.getenv("ARCH_MCP_FRAMEWORK_DOC_ROOT", "")
     if env_root:
         path = Path(env_root).expanduser()
         if not path.is_absolute():
@@ -36,8 +36,8 @@ def resolve_framework_root(*, root: str | None) -> Path:
 
 
 def _configured_scan_paths() -> list[str]:
-    """Read SDLC_MCP_FRAMEWORK_SCAN_DIRS (colon-separated); fall back to defaults."""
-    raw = os.getenv("SDLC_MCP_FRAMEWORK_SCAN_DIRS", "").strip()
+    """Read ARCH_MCP_FRAMEWORK_SCAN_DIRS (colon-separated); fall back to defaults."""
+    raw = os.getenv("ARCH_MCP_FRAMEWORK_SCAN_DIRS", "").strip()
     if raw:
         return [entry.strip() for entry in raw.split(":") if entry.strip()]
     return list(_DEFAULT_SCAN_PATHS)
@@ -58,7 +58,7 @@ def _mtime_fingerprint(root: Path) -> float:
 
 
 def _ttl_ms() -> int:
-    raw = os.getenv("SDLC_MCP_FRAMEWORK_INDEX_TTL_MS", "1500")
+    raw = os.getenv("ARCH_MCP_FRAMEWORK_INDEX_TTL_MS", "1500")
     try:
         return max(int(raw), 100)
     except ValueError:
@@ -66,7 +66,7 @@ def _ttl_ms() -> int:
 
 
 def _poll_interval_s() -> float:
-    raw = os.getenv("SDLC_MCP_FRAMEWORK_INDEX_POLL_S", "1.0")
+    raw = os.getenv("ARCH_MCP_FRAMEWORK_INDEX_POLL_S", "1.0")
     try:
         return max(float(raw), 0.25)
     except ValueError:

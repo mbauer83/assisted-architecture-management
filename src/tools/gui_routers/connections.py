@@ -106,10 +106,15 @@ def add_connection(body: AddConnectionBody) -> dict[str, Any]:
         repo = s.get_repo()
         global_rec = repo.get_entity(global_id)
         global_name = global_rec.name if global_rec else global_id
-        grf_result = ensure_global_entity_reference(
-            engagement_repo=repo, engagement_root=repo_root, verifier=verifier,
-            clear_repo_caches=s.clear_caches, global_entity_id=global_id,
-            global_entity_name=global_name, dry_run=body.dry_run,
+        grf_result = s.run_serialized_write(
+            ensure_global_entity_reference,
+            engagement_repo=repo,
+            engagement_root=repo_root,
+            verifier=verifier,
+            clear_repo_caches=s.clear_caches,
+            global_entity_id=global_id,
+            global_entity_name=global_name,
+            dry_run=body.dry_run,
         )
         if grf_result.wrote:
             grf_warnings.append(f"Created global-entity-reference proxy {grf_result.artifact_id}")
@@ -127,13 +132,22 @@ def add_connection(body: AddConnectionBody) -> dict[str, Any]:
         effective_target = grf_artifact_id
 
     try:
-        result = _add(
-            repo_root=repo_root, registry=registry, verifier=verifier,
+        result = s.run_serialized_write(
+            _add,
+            repo_root=repo_root,
+            registry=registry,
+            verifier=verifier,
             clear_repo_caches=s.clear_caches,
-            source_entity=effective_source, connection_type=body.connection_type,
-            target_entity=effective_target, description=body.description,
-            src_cardinality=body.src_cardinality, tgt_cardinality=body.tgt_cardinality,
-            version="0.1.0", status="draft", last_updated=None, dry_run=body.dry_run,
+            source_entity=effective_source,
+            connection_type=body.connection_type,
+            target_entity=effective_target,
+            description=body.description,
+            src_cardinality=body.src_cardinality,
+            tgt_cardinality=body.tgt_cardinality,
+            version="0.1.0",
+            status="draft",
+            last_updated=None,
+            dry_run=body.dry_run,
         )
     except ValueError as e:
         raise HTTPException(400, str(e))
@@ -175,11 +189,16 @@ def edit_connection(body: EditConnectionBody) -> dict[str, Any]:
     from src.tools.model_write.connection_edit import edit_connection as _edit, _UNSET
     provided = body.model_fields_set
     try:
-        result = _edit(
-            repo_root=repo_root, registry=registry, verifier=verifier,
+        result = s.run_serialized_write(
+            _edit,
+            repo_root=repo_root,
+            registry=registry,
+            verifier=verifier,
             clear_repo_caches=s.clear_caches,
-            source_entity=body.source_entity, connection_type=body.connection_type,
-            target_entity=body.target_entity, description=body.description,
+            source_entity=body.source_entity,
+            connection_type=body.connection_type,
+            target_entity=body.target_entity,
+            description=body.description,
             src_cardinality=body.src_cardinality if "src_cardinality" in provided else _UNSET,
             tgt_cardinality=body.tgt_cardinality if "tgt_cardinality" in provided else _UNSET,
             dry_run=body.dry_run,
@@ -194,12 +213,17 @@ def manage_connection_associations(body: ConnectionAssociateBody) -> dict[str, A
     repo_root, registry, verifier = s.get_write_deps()
     from src.tools.model_write.connection_edit import edit_connection_associations as _assoc
     try:
-        result = _assoc(
-            repo_root=repo_root, registry=registry, verifier=verifier,
+        result = s.run_serialized_write(
+            _assoc,
+            repo_root=repo_root,
+            registry=registry,
+            verifier=verifier,
             clear_repo_caches=s.clear_caches,
-            source_entity=body.source_entity, connection_type=body.connection_type,
+            source_entity=body.source_entity,
+            connection_type=body.connection_type,
             target_entity=body.target_entity,
-            add_entities=body.add_entities, remove_entities=body.remove_entities,
+            add_entities=body.add_entities,
+            remove_entities=body.remove_entities,
             dry_run=body.dry_run,
         )
     except ValueError as e:
@@ -212,11 +236,16 @@ def remove_connection(body: RemoveConnectionBody) -> dict[str, Any]:
     repo_root, registry, verifier = s.get_write_deps()
     from src.tools.model_write.connection_edit import remove_connection as _remove
     try:
-        result = _remove(
-            repo_root=repo_root, registry=registry, verifier=verifier,
+        result = s.run_serialized_write(
+            _remove,
+            repo_root=repo_root,
+            registry=registry,
+            verifier=verifier,
             clear_repo_caches=s.clear_caches,
-            source_entity=body.source_entity, connection_type=body.connection_type,
-            target_entity=body.target_entity, dry_run=body.dry_run,
+            source_entity=body.source_entity,
+            connection_type=body.connection_type,
+            target_entity=body.target_entity,
+            dry_run=body.dry_run,
         )
     except ValueError as e:
         raise HTTPException(400, str(e))

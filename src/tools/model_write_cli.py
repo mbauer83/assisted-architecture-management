@@ -3,11 +3,15 @@
 from __future__ import annotations
 
 import argparse
+import json
 import sys
 from pathlib import Path
+from urllib.error import HTTPError, URLError
+from urllib.request import Request, urlopen
 
 from src.common.model_verifier import ModelRegistry
 from src.tools.model_write import delete_diagram, delete_entity
+from src.tools.backend_runtime import backend_url, read_backend_state, probe_backend
 from src.tools.workspace_init import load_init_state
 
 
@@ -44,6 +48,38 @@ def main(argv: list[str] | None = None) -> int:
     if not args.repo_root:
         parser.error("No --repo-root given and no arch-init state found.")
     repo_root = Path(args.repo_root)
+
+    state = read_backend_state(repo_root)
+    if state is not None and isinstance(state.get("port"), int) and probe_backend(int(state["port"])):
+        port = int(state["port"])
+        path = "/api/entity/remove" if args.command == "delete-entity" else "/api/diagram/remove"
+        body = {"artifact_id": args.artifact_id, "dry_run": bool(args.dry_run)}
+        req = Request(
+            f"{backend_url(port)}{path}",
+            data=json.dumps(body).encode("utf-8"),
+            headers={"Content-Type": "application/json", "Accept": "application/json"},
+            method="POST",
+        )
+        try:
+            with urlopen(req, timeout=10.0) as resp:  # noqa: S310
+                result = json.loads(resp.read().decode("utf-8"))
+        except HTTPError as exc:
+            detail = exc.read().decode("utf-8", errors="replace").strip()
+            print(detail or str(exc), file=sys.stderr)
+            return 1
+        except (URLError, TimeoutError, OSError, ValueError) as exc:
+            print(f"Backend proxy failed: {exc}", file=sys.stderr)
+            return 1
+
+        if result.get("content"):
+            print(str(result["content"]))
+        else:
+            action = "Would delete" if args.dry_run else "Deleted"
+            print(f"{action} {args.command.split('-', 1)[1]} '{result.get('artifact_id')}' at {result.get('path')}")
+        for warning in result.get("warnings") or []:
+            print(f"Warning: {warning}")
+        return 0
+
     registry = ModelRegistry(repo_root)
 
     try:

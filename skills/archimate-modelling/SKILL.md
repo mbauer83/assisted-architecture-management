@@ -15,7 +15,7 @@ description: >
 
 # ArchiMate NEXT Modeling Skill
 
-All model access and mutations go through `model_*` MCP tools from the `sdlc-model`
+All model access and mutations go through `model_*` MCP tools from the `arch-model`
 server. Never read or write model files directly.
 
 ---

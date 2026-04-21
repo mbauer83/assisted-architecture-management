@@ -59,20 +59,20 @@ _INSTRUCTIONS = (
     "By default mounts both engagement repo + enterprise-repository; use repo_scope to restrict."
 )
 
-_HOST = os.getenv("SDLC_MCP_HOST", "127.0.0.1")
-_PORT = int(os.getenv("SDLC_MCP_PORT", "8000"))
-_LOG_LEVEL = os.getenv("SDLC_MCP_LOG_LEVEL", "INFO")
-_SERVER_NAME = os.getenv("SDLC_MCP_SERVER_NAME", "sdlc_model")
-_MOUNT_PATH = os.getenv("SDLC_MCP_MOUNT_PATH", "/")
-_SSE_PATH = os.getenv("SDLC_MCP_SSE_PATH", "/sse")
-_MESSAGE_PATH = os.getenv("SDLC_MCP_MESSAGE_PATH", "/messages/")
-_STREAMABLE_HTTP_PATH = os.getenv("SDLC_MCP_STREAMABLE_HTTP_PATH", "/mcp")
-_JSON_RESPONSE = os.getenv("SDLC_MCP_JSON_RESPONSE", "1") in {"1", "true", "TRUE", "yes", "YES"}
-_STATELESS_HTTP = os.getenv("SDLC_MCP_STATELESS_HTTP", "1") in {"1", "true", "TRUE", "yes", "YES"}
-_WATCH_AUTO_START = os.getenv("SDLC_MCP_MODEL_WATCH_AUTO_START", "1") in {"1", "true", "TRUE", "yes", "YES"}
-_WATCH_INTERVAL_S = float(os.getenv("SDLC_MCP_MODEL_WATCH_INTERVAL_S", "2.0"))
-_WATCH_SCOPE = os.getenv("SDLC_MCP_MODEL_WATCH_SCOPE", "both")
-_WATCH_PERIODIC_RAW = os.getenv("SDLC_MCP_MODEL_WATCH_PERIODIC_REFRESH_S", "300")
+_HOST = os.getenv("ARCH_MCP_HOST", "127.0.0.1")
+_PORT = int(os.getenv("ARCH_MCP_PORT", "8000"))
+_LOG_LEVEL = os.getenv("ARCH_MCP_LOG_LEVEL", "INFO")
+_SERVER_NAME = os.getenv("ARCH_MCP_SERVER_NAME", "arch_model")
+_MOUNT_PATH = os.getenv("ARCH_MCP_MOUNT_PATH", "/")
+_SSE_PATH = os.getenv("ARCH_MCP_SSE_PATH", "/sse")
+_MESSAGE_PATH = os.getenv("ARCH_MCP_MESSAGE_PATH", "/messages/")
+_STREAMABLE_HTTP_PATH = os.getenv("ARCH_MCP_STREAMABLE_HTTP_PATH", "/mcp")
+_JSON_RESPONSE = os.getenv("ARCH_MCP_JSON_RESPONSE", "1") in {"1", "true", "TRUE", "yes", "YES"}
+_STATELESS_HTTP = os.getenv("ARCH_MCP_STATELESS_HTTP", "1") in {"1", "true", "TRUE", "yes", "YES"}
+_WATCH_AUTO_START = os.getenv("ARCH_MCP_MODEL_WATCH_AUTO_START", "1") in {"1", "true", "TRUE", "yes", "YES"}
+_WATCH_INTERVAL_S = float(os.getenv("ARCH_MCP_MODEL_WATCH_INTERVAL_S", "2.0"))
+_WATCH_SCOPE = os.getenv("ARCH_MCP_MODEL_WATCH_SCOPE", "both")
+_WATCH_PERIODIC_RAW = os.getenv("ARCH_MCP_MODEL_WATCH_PERIODIC_REFRESH_S", "300")
 _WATCH_PERIODIC_S: float | None = (
     None if _WATCH_PERIODIC_RAW.lower() in ("0", "off", "disabled")
     else float(_WATCH_PERIODIC_RAW)
@@ -110,21 +110,39 @@ register_write_tools(mcp)
 register_edit_tools(mcp)
 
 
-def main() -> None:
+def main(argv: list[str] | None = None) -> None:
     """Run the MCP server.
 
     Default transport is stdio. For containerized deployments where the MCP host
     cannot spawn a stdio subprocess, use SSE/HTTP transports.
     """
 
-    parser = argparse.ArgumentParser(prog="sdlc-mcp-model")
+    parser = argparse.ArgumentParser(prog="arch-mcp-model")
     parser.add_argument(
         "--transport",
         choices=("stdio", "streamable-http"),
-        default=os.getenv("SDLC_MCP_TRANSPORT", "stdio"),
+        default=os.getenv("ARCH_MCP_TRANSPORT", "stdio"),
         help="MCP transport (default: stdio)",
     )
-    args = parser.parse_args()
+    parser.add_argument(
+        "--standalone-stdio",
+        action="store_true",
+        default=os.getenv("ARCH_MCP_STANDALONE_STDIO", "0") in {"1", "true", "TRUE", "yes", "YES"},
+        help="Run an in-process stdio MCP server instead of attaching to arch-backend",
+    )
+    args = parser.parse_args(argv)
+
+    if args.transport == "streamable-http":
+        from src.tools.arch_backend import main as backend_main
+
+        backend_main([])
+        return
+
+    if args.transport == "stdio" and not args.standalone_stdio:
+        from src.tools.arch_mcp_stdio import main as bridge_main
+
+        bridge_main(["--port", str(_PORT)])
+        return
 
     # Check init state — warn if missing but don't block (backward compat)
     from src.tools.workspace_init import load_init_state
@@ -133,10 +151,10 @@ def main() -> None:
         logger.info("arch-init state loaded: engagement=%s enterprise=%s",
                      state.get("engagement_root"), state.get("enterprise_root"))
     else:
-        repo_root_env = os.getenv("SDLC_MCP_MODEL_REPO_ROOT")
+        repo_root_env = os.getenv("ARCH_MCP_MODEL_REPO_ROOT")
         if not repo_root_env:
             logger.warning(
-                "No .arch/init-state.yaml found and SDLC_MCP_MODEL_REPO_ROOT not set. "
+                "No .arch/init-state.yaml found and ARCH_MCP_MODEL_REPO_ROOT not set. "
                 "Run `arch-init` to configure workspace repos."
             )
 

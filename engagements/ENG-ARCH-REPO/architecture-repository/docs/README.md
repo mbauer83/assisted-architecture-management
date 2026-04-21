@@ -68,5 +68,5 @@ See [@DOC:adr-002-markdown-file-based-approach#decision](adr-002-markdown-file-b
 for the related file-format decision.
 ```
 
-Cross-references are indexed by the `sdlc-mcp-framework` server, enabling reference graph
+Cross-references are indexed by the `arch-mcp-framework` server, enabling reference graph
 traversal across all documents in this directory.

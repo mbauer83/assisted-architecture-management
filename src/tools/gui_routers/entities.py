@@ -117,14 +117,22 @@ def create_entity(body: CreateEntityBody) -> dict[str, Any]:
     repo_root, _registry, verifier = s.get_write_deps()
     from src.tools.model_write.entity import create_entity as _create
     try:
-        result = _create(
-            repo_root=repo_root, verifier=verifier,
+        result = s.run_serialized_write(
+            _create,
+            repo_root=repo_root,
+            verifier=verifier,
             clear_repo_caches=s.clear_caches,
-            artifact_type=body.artifact_type, name=body.name,
-            summary=body.summary, properties=body.properties,
-            notes=body.notes, keywords=body.keywords,
-            artifact_id=None, version=body.version,
-            status=body.status, last_updated=None, dry_run=body.dry_run,
+            artifact_type=body.artifact_type,
+            name=body.name,
+            summary=body.summary,
+            properties=body.properties,
+            notes=body.notes,
+            keywords=body.keywords,
+            artifact_id=None,
+            version=body.version,
+            status=body.status,
+            last_updated=None,
+            dry_run=body.dry_run,
         )
     except ValueError as e:
         raise HTTPException(400, str(e))
@@ -137,15 +145,21 @@ def edit_entity(body: EditEntityBody) -> dict[str, Any]:
     from src.tools.model_write.entity_edit import edit_entity as _edit, _UNSET
     provided = body.model_fields_set
     try:
-        result = _edit(
-            repo_root=repo_root, registry=registry, verifier=verifier,
+        result = s.run_serialized_write(
+            _edit,
+            repo_root=repo_root,
+            registry=registry,
+            verifier=verifier,
             clear_repo_caches=s.clear_caches,
-            artifact_id=body.artifact_id, name=body.name,
+            artifact_id=body.artifact_id,
+            name=body.name,
             summary=body.summary if "summary" in provided else _UNSET,
             properties=body.properties if "properties" in provided else _UNSET,
             notes=body.notes if "notes" in provided else _UNSET,
             keywords=body.keywords if "keywords" in provided else _UNSET,
-            version=body.version, status=body.status, dry_run=body.dry_run,
+            version=body.version,
+            status=body.status,
+            dry_run=body.dry_run,
         )
     except ValueError as e:
         raise HTTPException(400, str(e))
@@ -157,10 +171,13 @@ def delete_entity(body: DeleteEntityBody) -> dict[str, Any]:
     repo_root, registry, _verifier = s.get_write_deps()
     from src.tools.model_write.entity_delete import delete_entity as _delete
     try:
-        result = _delete(
-            repo_root=repo_root, registry=registry,
+        result = s.run_serialized_write(
+            _delete,
+            repo_root=repo_root,
+            registry=registry,
             clear_repo_caches=s.clear_caches,
-            artifact_id=body.artifact_id, dry_run=body.dry_run,
+            artifact_id=body.artifact_id,
+            dry_run=body.dry_run,
         )
     except ValueError as e:
         raise HTTPException(400, str(e))

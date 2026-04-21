@@ -17,16 +17,16 @@ _INSTRUCTIONS = (
     "Use query-first retrieval and summary-first reads."
 )
 
-_HOST = os.getenv("SDLC_MCP_HOST", "127.0.0.1")
-_PORT = int(os.getenv("SDLC_MCP_PORT", "8002"))
-_LOG_LEVEL = os.getenv("SDLC_MCP_LOG_LEVEL", "INFO")
-_SERVER_NAME = os.getenv("SDLC_MCP_SERVER_NAME", "sdlc_framework")
-_MOUNT_PATH = os.getenv("SDLC_MCP_MOUNT_PATH", "/")
-_SSE_PATH = os.getenv("SDLC_MCP_SSE_PATH", "/sse")
-_MESSAGE_PATH = os.getenv("SDLC_MCP_MESSAGE_PATH", "/messages/")
-_STREAMABLE_HTTP_PATH = os.getenv("SDLC_MCP_STREAMABLE_HTTP_PATH", "/mcp")
-_JSON_RESPONSE = os.getenv("SDLC_MCP_JSON_RESPONSE", "1") in {"1", "true", "TRUE", "yes", "YES"}
-_STATELESS_HTTP = os.getenv("SDLC_MCP_STATELESS_HTTP", "1") in {"1", "true", "TRUE", "yes", "YES"}
+_HOST = os.getenv("ARCH_MCP_HOST", "127.0.0.1")
+_PORT = int(os.getenv("ARCH_MCP_PORT", "8002"))
+_LOG_LEVEL = os.getenv("ARCH_MCP_LOG_LEVEL", "INFO")
+_SERVER_NAME = os.getenv("ARCH_MCP_SERVER_NAME", "arch_framework")
+_MOUNT_PATH = os.getenv("ARCH_MCP_MOUNT_PATH", "/")
+_SSE_PATH = os.getenv("ARCH_MCP_SSE_PATH", "/sse")
+_MESSAGE_PATH = os.getenv("ARCH_MCP_MESSAGE_PATH", "/messages/")
+_STREAMABLE_HTTP_PATH = os.getenv("ARCH_MCP_STREAMABLE_HTTP_PATH", "/mcp")
+_JSON_RESPONSE = os.getenv("ARCH_MCP_JSON_RESPONSE", "1") in {"1", "true", "TRUE", "yes", "YES"}
+_STATELESS_HTTP = os.getenv("ARCH_MCP_STATELESS_HTTP", "1") in {"1", "true", "TRUE", "yes", "YES"}
 
 mcp = FastMCP(
     name=_SERVER_NAME,
@@ -54,11 +54,11 @@ register_framework_query_tools(mcp)
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(prog="sdlc-mcp-framework")
+    parser = argparse.ArgumentParser(prog="arch-mcp-framework")
     parser.add_argument(
         "--transport",
         choices=("stdio", "streamable-http"),
-        default=os.getenv("SDLC_MCP_TRANSPORT", "stdio"),
+        default=os.getenv("ARCH_MCP_TRANSPORT", "stdio"),
         help="MCP transport (default: stdio)",
     )
     args = parser.parse_args()

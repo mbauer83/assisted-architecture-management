@@ -311,13 +311,23 @@ def create_diagram_gui(body: CreateDiagramGuiBody) -> dict[str, Any]:
     connections = [c for cid in body.connection_ids if (c := repo.get_connection(cid)) is not None]
     puml = generate_archimate_puml_body(body.name, entities, connections, diagram_type=body.diagram_type)
     try:
-        result = create_diagram(
-            repo_root=repo_root, verifier=verifier, clear_repo_caches=s.clear_caches,
-            diagram_type=body.diagram_type, name=body.name, puml=puml,
-            artifact_id=generate_entity_id("DIA", body.name), keywords=body.keywords,
-            entity_ids_used=body.entity_ids, connection_ids_used=body.connection_ids,
-            version=body.version, status=body.status, last_updated=None,
-            connection_inference="none", dry_run=body.dry_run,
+        result = s.run_serialized_write(
+            create_diagram,
+            repo_root=repo_root,
+            verifier=verifier,
+            clear_repo_caches=s.clear_caches,
+            diagram_type=body.diagram_type,
+            name=body.name,
+            puml=puml,
+            artifact_id=generate_entity_id("DIA", body.name),
+            keywords=body.keywords,
+            entity_ids_used=body.entity_ids,
+            connection_ids_used=body.connection_ids,
+            version=body.version,
+            status=body.status,
+            last_updated=None,
+            connection_inference="none",
+            dry_run=body.dry_run,
         )
     except ValueError as e:
         raise HTTPException(400, str(e))
@@ -334,11 +344,20 @@ def edit_diagram_gui(body: EditDiagramGuiBody) -> dict[str, Any]:
     connections = [c for cid in body.connection_ids if (c := repo.get_connection(cid)) is not None]
     puml = generate_archimate_puml_body(body.name, entities, connections, diagram_type=body.diagram_type)
     try:
-        result = edit_diagram(
-            repo_root=repo_root, verifier=verifier, clear_repo_caches=s.clear_caches,
-            artifact_id=body.artifact_id, puml=puml, name=body.name,
-            keywords=..., entity_ids_used=body.entity_ids, connection_ids_used=body.connection_ids,
-            version=body.version, status=body.status, dry_run=body.dry_run,
+        result = s.run_serialized_write(
+            edit_diagram,
+            repo_root=repo_root,
+            verifier=verifier,
+            clear_repo_caches=s.clear_caches,
+            artifact_id=body.artifact_id,
+            puml=puml,
+            name=body.name,
+            keywords=...,
+            entity_ids_used=body.entity_ids,
+            connection_ids_used=body.connection_ids,
+            version=body.version,
+            status=body.status,
+            dry_run=body.dry_run,
         )
     except ValueError as e:
         raise HTTPException(400, str(e))
@@ -350,9 +369,12 @@ def delete_diagram_gui(body: DeleteDiagramBody) -> dict[str, Any]:
     repo_root, _registry, _verifier = s.get_write_deps()
     from src.tools.model_write.diagram_delete import delete_diagram
     try:
-        result = delete_diagram(
-            repo_root=repo_root, clear_repo_caches=s.clear_caches,
-            artifact_id=body.artifact_id, dry_run=body.dry_run,
+        result = s.run_serialized_write(
+            delete_diagram,
+            repo_root=repo_root,
+            clear_repo_caches=s.clear_caches,
+            artifact_id=body.artifact_id,
+            dry_run=body.dry_run,
         )
     except ValueError as e:
         raise HTTPException(400, str(e))

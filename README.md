@@ -73,67 +73,111 @@ The framework exposes three interfaces over the same underlying model.
 
 ### MCP Server (primary — AI agent access)
 
-The MCP server is the intended interface for AI agents (Claude, Copilot, etc.). It exposes typed tools for querying and authoring the model:
+The MCP model server is the intended interface for AI agents (Claude, Copilot, etc.). It exposes typed tools for querying, verification, authoring, and promotion:
 
-**Query**
-
-| Tool | Purpose |
-|------|---------|
-| `model_query_stats` | Count entities, connections, diagrams |
-| `model_query_list_artifacts` | List with domain/type/status filtering |
-| `model_query_read_artifact` | Read one artifact in full |
-| `model_query_search_artifacts` | Full-text + keyword search |
-| `model_query_find_neighbors` | Graph traversal from an entity |
-| `model_query_find_connections_for` | Connections for an entity (direction + type filter) |
-| `model_query_count_artifacts_by` | Count grouped by a field |
-
-**Write**
+**Model query**
 
 | Tool | Purpose |
 |------|---------|
+| `model_query_stats` | Model counts and grouped breakdowns |
+| `model_query_list_artifacts` | Metadata listing with domain/type/status filters |
+| `model_query_read_artifact` | Read one artifact in summary or full mode |
+| `model_query_search_artifacts` | Ranked artifact search across entities, connections, and diagrams |
+| `model_query_find_neighbors` | Graph traversal from a starting entity |
+| `model_query_find_connections_for` | Connections touching an entity with direction/type filters |
+| `model_diagram_scaffold` | Suggest diagram scope and PUML scaffolding from selected entities |
+
+**Model write / edit**
+
+| Tool | Purpose |
+|------|---------|
+| `model_write_help` | Catalog of valid entity and connection types |
+| `model_write_modeling_guidance` | Focused modeling guidance by domain or entity type |
 | `model_create_entity` | Create entity (with dry-run) |
 | `model_edit_entity` | Edit existing entity fields |
+| `model_delete_entity` | Delete an entity with dependency checks |
 | `model_add_connection` | Add connection between entities (with dry-run) |
 | `model_edit_connection` | Edit or remove an existing connection |
-| `model_create_diagram` | Create ArchiMate diagram (with dry-run + PNG render) |
-| `model_edit_diagram` | Edit existing diagram (regenerate PUML + PNG) |
+| `model_edit_connection_associations` | Add or remove `§assoc` second-order associations |
+| `model_create_diagram` | Create an ArchiMate diagram from PUML |
+| `model_edit_diagram` | Edit an existing diagram |
+| `model_delete_diagram` | Delete a diagram and rendered siblings |
 | `model_create_matrix` | Create connection matrix (structured table view) |
 | `model_promote_to_enterprise` | Promote entity + transitive closure to enterprise repo |
-| `model_write_help` | List valid entity types and connection types |
 
-**Verification and lifecycle**
+**Model verification**
 
 | Tool | Purpose |
 |------|---------|
-| `model_verify_all` | Verify referential integrity and schema across all files |
-| `model_verify_file` | Verify a single file |
-| `model_tools_watch_start` | Start file watcher for live reload |
-| `model_tools_watch_stop` / `model_tools_watch_status` | Manage file watcher |
-| `model_tools_refresh` | Manually refresh cached model state |
+| `model_verify` | Verify one file or the whole repo, with summary or full issue detail |
 
 Configure in `.mcp.json` (Claude Code) or `.vscode/mcp.json` (VS Code):
 
 ```json
 {
   "mcpServers": {
-    "sdlc-model": {
+    "arch-model": {
       "command": "uv",
-      "args": ["run", "sdlc-mcp-model", "--transport", "stdio"],
+      "args": ["run", "arch-mcp-stdio"]
+    }
+  }
+}
+```
+
+`arch-mcp-stdio` auto-starts the unified `arch-backend` when needed and connects over `/mcp`, so GUI and MCP traffic share the same in-process cache and write queue.
+
+This is intended to work well with MCP hosts that eagerly start configured servers when the IDE/app launches: the spawned command becomes a lightweight launcher/bridge, while `arch-backend` remains the single warm backend for the workspace.
+
+When `arch-workspace.yaml` is present and `arch-init` has been run, the backend discovers both repos from `.arch/init-state.yaml`. The env var override is still supported for direct standalone server use.
+
+For backward compatibility inside the Python entry point, `arch-mcp-model --transport stdio` also attaches to the unified backend by default. Use `--standalone-stdio` only when you explicitly want a direct one-process stdio server.
+
+By default, the launcher manages a local host backend. It does **not** guess that a Dockerized or otherwise external backend is already running just because something responds on port `8000`.
+
+To attach MCP launchers to an externally managed backend instead, set:
+
+```json
+{
+  "mcpServers": {
+    "arch-model": {
+      "command": "uv",
+      "args": ["run", "arch-mcp-stdio"],
       "env": {
-        "SDLC_MCP_MODEL_REPO_ROOT": "engagements/ENG-ARCH-REPO/architecture-repository"
+        "ARCH_MCP_BACKEND_URL": "http://127.0.0.1:8000"
       }
     }
   }
 }
 ```
 
-When `arch-workspace.yaml` is present and `arch-init` has been run, the MCP server automatically discovers both repos from `.arch/init-state.yaml`. The env var override is still supported for single-repo use.
+That makes the deployment choice explicit and avoids ambiguous startup behavior.
 
-A second MCP server (`sdlc-mcp-framework`) provides section-level search and cross-reference traversal over the `docs/` directory (ADRs, standards, specs).
+`arch-mcp-watch` is a separate optional MCP server for explicit watcher lifecycle control:
+
+| Tool | Purpose |
+|------|---------|
+| `model_tools_watch` | Start, stop, or inspect the model auto-refresh watcher |
+| `model_tools_refresh` | Force a synchronous model refresh |
+
+A second MCP server (`arch-mcp-framework`) provides section-level search and reference-graph traversal over the `docs/` directory (ADRs, standards, specs):
+
+| Tool | Purpose |
+|------|---------|
+| `framework_query_stats` | Document and index statistics |
+| `framework_query_list_docs` | List indexed docs |
+| `framework_query_read_doc` | Read a document |
+| `framework_query_list_sections` | List document sections |
+| `framework_query_search_docs` | Search docs and sections |
+| `framework_query_neighbors` | Traverse reference graph neighbors |
+| `framework_query_related_docs` | Find docs related by references |
+| `framework_query_resolve_ref` | Resolve a specific cross-reference |
+| `framework_query_path` / `framework_query_path_batch` | Compute paths in the reference graph |
+| `framework_query_missing_links` | Find missing or broken references |
+| `framework_query_validate_refs` | Validate cross-reference integrity |
 
 ### REST API (GUI backend and programmatic access)
 
-`sdlc-gui-server` exposes a REST API at `http://localhost:8000/api/`:
+`arch-backend` exposes a REST API at `http://localhost:8000/api/` and MCP Streamable HTTP at `http://localhost:8000/mcp`:
 
 **Entities**
 
@@ -152,6 +196,7 @@ A second MCP server (`sdlc-mcp-framework`) provides section-level search and cro
 | `GET /api/entity-display-search?q=` | Entity search enriched with ArchiMate display metadata |
 | `POST /api/entity` | Create entity (`dry_run` supported) |
 | `POST /api/entity/edit` | Edit entity fields (`dry_run` supported) |
+| `POST /api/entity/remove` | Delete entity (`dry_run` supported) |
 
 **Diagrams**
 
@@ -164,44 +209,51 @@ A second MCP server (`sdlc-mcp-framework`) provides section-level search and cro
 | `GET /api/diagram-entities?id=` | Entities referenced in a diagram (with display aliases) |
 | `GET /api/diagram-connections?id=` | Connections between entities present in a diagram |
 | `GET /api/diagram-refs?source_id=&target_id=` | Find diagrams referencing a connection |
+| `GET /api/diagram-download?id=&format=png|svg` | Download rendered diagram output |
 | `POST /api/diagram` | Create diagram from entity/connection selection |
 | `POST /api/diagram/edit` | Edit diagram entity/connection selection |
 | `POST /api/diagram/preview` | Preview diagram as PNG + PUML without writing files |
+| `POST /api/diagram/remove` | Delete diagram (`dry_run` supported) |
 
 **Connections**
 
 | Endpoint | Description |
 |----------|-------------|
 | `POST /api/connection` | Add connection (`dry_run` supported) |
+| `POST /api/connection/edit` | Edit connection description/cardinalities |
+| `POST /api/connection/associate` | Add or remove connection associations |
 | `POST /api/connection/remove` | Remove connection (`dry_run` supported) |
+| `POST /api/cleanup-broken-refs` | Find and optionally clean up broken GRF proxies |
+
+**Promotion**
+
+| Endpoint | Description |
+|----------|-------------|
+| `POST /api/promote/plan` | Compute promotion closure, conflicts, and warnings |
+| `POST /api/promote/execute` | Execute promotion to enterprise and replace engagement artifacts with GRF proxies |
+
+**Admin mode**
+
+When `arch-backend --admin-mode` is used, `/admin/api/*` exposes enterprise-repo write endpoints for entities, connections, diagrams, and `GET /admin/api/server-info`.
 
 ### GUI Tool — Browser Interface
 
-`sdlc-gui-server` also serves the Vue SPA at `/`. The GUI provides a full read/write interface for human users and is backed by the REST API above.
+`arch-backend` also serves the Vue SPA at `/`. `arch-gui-server` is a thin wrapper around the unified backend entry point.
 
-**Entity management**
-- **Entity list** — filterable by domain, artifact type, and status; connection count badges; "+ Create Entity" button
-- **Entity detail** — metadata, parsed summary/properties/notes, three-column connection layout (Incoming / Symmetric / Outgoing); each panel shows ontology-permissible groups with per-group add ("+") and per-connection remove ("×") buttons; connection description tooltips
-- **Entity edit** — inline edit mode on the detail view; type-aware property fields; dry-run preview before commit
-- **Entity create** — form with grouped type selector, schema-driven required property fields, dry-run preview, navigate to created entity on confirm
-- **Search** — full-text search with type and domain chips per result
+Current GUI capabilities:
 
-**Diagram management**
-- **Diagram list** — grid with diagram-type filter bar
-- **Diagram detail** — interactive SVG viewer rendered on demand from stored PUML:
-  - Pan (drag), zoom (scroll wheel), reset (double-click)
-  - Clickable entity nodes → entity metadata in sidebar (name, type, domain, status, content summary)
-  - Clickable connection arrows → connection type and source → target detail in sidebar
-  - Toggleable raw PUML source
-  - "Edit" button links to diagram editor
-- **Diagram create** — live entity search with ArchiMate-type glyphs, auto-detection of connections between selected entities, PNG preview, save to repository
-- **Diagram edit** — pre-loads entities from the existing diagram, same UI as creation
+- **Home / overview** — engagement vs global summary cards, domain breakdown, connection-type breakdown
+- **Entities catalog** — engagement and global views, domain filtering, type filter, sortable table, connection-weighted treemap, hierarchy display for specialization/composition/aggregation
+- **Entity detail** — metadata, parsed content, connection counts, inline editing, deletion, and three connection panels with ontology-aware add/edit/remove flows
+- **Entity creation** — grouped type selector, schema-aware properties, dry-run preview, create-and-open flow
+- **Search** — full-text artifact search with typed result rows
+- **Diagrams catalog** — engagement and global listings
+- **Diagram detail** — interactive SVG viewer, entity/connection side panels, rendered download menu, raw PUML toggle, edit entry point
+- **Diagram create/edit** — entity search with glyphs, connection inclusion management, preview before save
+- **Graph explorer** — force-directed interactive neighborhood exploration from any entity
+- **Promotion view** — entity picker, closure review, conflict strategy selection, execution to the global repository
 
-**Graph explorer**
-- Force-directed SVG graph rooted at any entity
-- Click node to select → sidebar shows metadata; double-click to expand neighbors
-- Click edge for connection detail in sidebar
-- Drag nodes, pan canvas, scroll to zoom; collapse expanded subtrees on double-click
+The GUI is a human-facing client over the REST API. It does not expose every admin endpoint as dedicated screens, but it does cover normal engagement authoring, exploration, and promotion workflows.
 
 ### CLI
 
@@ -232,10 +284,19 @@ arch-init                      # reads arch-workspace.yaml, writes .arch/init-st
 # Install MCP servers into your AI tool's config
 # (edit .mcp.json — see Tooling section above)
 
-# GUI development (hot-reload)
-sdlc-gui-server &
+# Preferred local default: run the unified backend on the host.
+# It serves the built Vue app at http://localhost:8000/
+arch-backend &
+
+# Inspect / stop / restart it when needed
+arch-backend --status
+arch-backend --stop
+arch-backend --restart
+
+# Frontend development with Vite hot-reload:
+# Vite serves the UI at http://localhost:5173/ and proxies /api to arch-backend on :8000
 cd tools/gui && npm install && npm run dev
-# → http://localhost:5173
+# → open http://localhost:5173
 ```
 
 > **plantuml.jar** is downloaded on demand and gitignored. The Docker build fetches and verifies it automatically. For local development, `get-plantuml` places it at `tools/plantuml.jar`, which is the path the verifier and diagram renderer expect.
@@ -254,3 +315,14 @@ ARCH_REPO_ROOT=/path/to/your/architecture-repository docker compose up --build
 ```
 
 The container serves the Vue SPA at `/` and the REST API at `/api/`. System dependencies for PlantUML SVG/PNG rendering (Java, Graphviz, fonts) are included in the image.
+
+If you want host-started MCP clients to attach to a Dockerized backend instead of auto-starting a separate host backend:
+
+- expose the container on `localhost:8000` as the compose file already does
+- configure the MCP client to run `arch-mcp-stdio`
+- set `ARCH_MCP_BACKEND_URL=http://127.0.0.1:8000` in that MCP config
+
+In practice this means Dockerized backend and auto-started MCP servers can work together, but they are still two deployment modes:
+
+- normal local-dev mode: host `arch-backend` + host MCP launchers
+- containerized mode: Docker `arch-backend` + host MCP launchers explicitly attaching to the published port

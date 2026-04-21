@@ -4,7 +4,7 @@ from pathlib import Path
 from collections.abc import Callable
 
 from src.common.model_verifier import ModelRegistry, ModelVerifier
-from src.common.model_write import ENTITY_TYPES, format_entity_markdown
+from src.common.model_write import ENTITY_TYPES, format_entity_markdown, slugify
 from src.tools.generate_macros import generate_macros
 
 from .boundary import assert_engagement_write_root, today_iso
@@ -15,6 +15,38 @@ from .verify import verify_content_in_temp_path
 
 # Sentinel to distinguish "not provided" from explicit None
 _UNSET = object()
+
+
+def _rename_entity_identity(
+    *,
+    entity_file: Path,
+    repo_root: Path,
+    old_artifact_id: str,
+    new_artifact_id: str,
+) -> tuple[Path, int]:
+    new_entity_file = entity_file.with_name(f"{new_artifact_id}.md")
+
+    old_outgoing = entity_file.with_suffix(".outgoing.md")
+    new_outgoing = new_entity_file.with_suffix(".outgoing.md")
+    cascade_updates = 0
+
+    if old_outgoing.exists():
+        outgoing_text = old_outgoing.read_text(encoding="utf-8").replace(old_artifact_id, new_artifact_id)
+        new_outgoing.write_text(outgoing_text, encoding="utf-8")
+        if new_outgoing != old_outgoing:
+            old_outgoing.unlink()
+        cascade_updates += 1
+
+    for outgoing_path in (repo_root / "model").rglob("*.outgoing.md"):
+        if outgoing_path == new_outgoing:
+            continue
+        text = outgoing_path.read_text(encoding="utf-8")
+        if old_artifact_id not in text:
+            continue
+        outgoing_path.write_text(text.replace(old_artifact_id, new_artifact_id), encoding="utf-8")
+        cascade_updates += 1
+
+    return new_entity_file, cascade_updates
 
 
 def edit_entity(
@@ -48,15 +80,27 @@ def edit_entity(
     parsed = parse_entity_file(entity_file)
     fm = parsed.frontmatter
     artifact_type = str(fm.get("artifact-type", ""))
+    current_name = str(fm.get("name", ""))
+    effective_artifact_id = artifact_id
+    target_entity_file = entity_file
+    rename_summary: list[str] = []
 
     # Merge updates — _UNSET means "keep existing"
-    eff_name = name if name is not None else str(fm.get("name", ""))
+    eff_name = name if name is not None else current_name
     eff_version = version if version is not None else str(fm.get("version", "0.1.0"))
     eff_status = status if status is not None else str(fm.get("status", "draft"))
     eff_keywords = keywords if keywords is not _UNSET else (fm.get("keywords") or None)
     eff_summary = summary if summary is not _UNSET else parsed.summary
     eff_properties = properties if properties is not _UNSET else (parsed.properties or None)
     eff_notes = notes if notes is not _UNSET else parsed.notes
+    if name is not None:
+        current_slug = slugify(current_name)
+        next_slug = slugify(eff_name)
+        if next_slug != current_slug:
+            effective_artifact_id = f"{artifact_id.rsplit('.', 1)[0]}.{next_slug}"
+            target_entity_file = entity_file.with_name(f"{effective_artifact_id}.md")
+            if target_entity_file.exists() and target_entity_file != entity_file:
+                raise ValueError(f"Target entity file already exists: {target_entity_file.name}")
 
     # Update display block — keep existing, update label if name changed
     display = dict(parsed.display_archimate)
@@ -64,7 +108,7 @@ def edit_entity(
         display["label"] = eff_name
 
     content = format_entity_markdown(
-        artifact_id=artifact_id,
+        artifact_id=effective_artifact_id,
         artifact_type=artifact_type,
         name=eff_name,
         version=eff_version,
@@ -77,27 +121,69 @@ def edit_entity(
         display_archimate=display,
     )
 
+    preview_res = verify_content_in_temp_path(
+        verifier=verifier,
+        file_type="entity",
+        desired_name=target_entity_file.name,
+        content=content,
+    )
+
     if dry_run:
-        res = verify_content_in_temp_path(
-            verifier=verifier, file_type="entity",
-            desired_name=entity_file.name, content=content,
-        )
+        if effective_artifact_id != artifact_id:
+            impacted = 0
+            own_outgoing = entity_file.with_suffix(".outgoing.md")
+            if own_outgoing.exists():
+                impacted += 1
+            for outgoing_path in (repo_root / "model").rglob("*.outgoing.md"):
+                if outgoing_path == own_outgoing:
+                    continue
+                try:
+                    if artifact_id in outgoing_path.read_text(encoding="utf-8"):
+                        impacted += 1
+                except OSError:
+                    continue
+            rename_summary.append(
+                f"Rename will update artifact-id to {effective_artifact_id} and rewrite {impacted} outgoing file(s)."
+            )
         return WriteResult(
-            wrote=False, path=entity_file, artifact_id=artifact_id,
-            content=content, warnings=[],
-            verification=verification_to_entity_dict(entity_file, res),
+            wrote=False, path=target_entity_file, artifact_id=effective_artifact_id,
+            content=content, warnings=rename_summary,
+            verification=verification_to_entity_dict(target_entity_file, preview_res),
+        )
+
+    if not preview_res.valid:
+        return WriteResult(
+            wrote=False,
+            path=target_entity_file,
+            artifact_id=effective_artifact_id,
+            content=content,
+            warnings=rename_summary,
+            verification=verification_to_entity_dict(target_entity_file, preview_res),
         )
 
     prev = entity_file.read_text(encoding="utf-8")
-    entity_file.write_text(content, encoding="utf-8")
+    target_entity_file.write_text(content, encoding="utf-8")
+    if target_entity_file != entity_file:
+        entity_file.unlink()
+        target_entity_file, cascade_count = _rename_entity_identity(
+            entity_file=entity_file,
+            repo_root=repo_root,
+            old_artifact_id=artifact_id,
+            new_artifact_id=effective_artifact_id,
+        )
+        rename_summary.append(f"Renamed artifact-id to {effective_artifact_id} and updated {cascade_count} outgoing file(s).")
 
-    res = verifier.verify_entity_file(entity_file)
+    res = verifier.verify_entity_file(target_entity_file)
     if not res.valid:
-        entity_file.write_text(prev, encoding="utf-8")
+        if target_entity_file != entity_file:
+            target_entity_file.unlink(missing_ok=True)
+            entity_file.write_text(prev, encoding="utf-8")
+        else:
+            entity_file.write_text(prev, encoding="utf-8")
         return WriteResult(
-            wrote=False, path=entity_file, artifact_id=artifact_id,
-            content=content, warnings=[],
-            verification=verification_to_entity_dict(entity_file, res),
+            wrote=False, path=target_entity_file, artifact_id=effective_artifact_id,
+            content=content, warnings=rename_summary,
+            verification=verification_to_entity_dict(target_entity_file, res),
         )
 
     if name is not None:
@@ -108,9 +194,9 @@ def edit_entity(
 
     clear_repo_caches(repo_root)
     return WriteResult(
-        wrote=True, path=entity_file, artifact_id=artifact_id,
-        content=None, warnings=[],
-        verification=verification_to_entity_dict(entity_file, res),
+        wrote=True, path=target_entity_file, artifact_id=effective_artifact_id,
+        content=None, warnings=rename_summary,
+        verification=verification_to_entity_dict(target_entity_file, res),
     )
 
 

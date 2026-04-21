@@ -146,8 +146,17 @@ class ModelRegistry:
                     if line.startswith("### ") and " → " in line:
                         header = line[4:].strip()
                         conn_type, target_id = header.split(" → ", 1)
-                        # Connection key: source + type + target
-                        conn_key = f"{source_entity} {conn_type.strip()} → {target_id.strip()}"
+                        src_card_end = conn_type.find(" [")
+                        if src_card_end != -1:
+                            conn_type = conn_type[:src_card_end]
+                        target_id = target_id.strip()
+                        if target_id.startswith("["):
+                            bracket_end = target_id.find("]")
+                            if bracket_end != -1:
+                                target_id = target_id[bracket_end + 1:].lstrip()
+                        conn_type = conn_type.strip()
+                        target_id = target_id.strip()
+                        conn_key = f"{source_entity}---{target_id}@@{conn_type}"
                         out[conn_key] = (status, scope)
             except Exception:
                 pass

@@ -194,3 +194,29 @@ def test_entity_rows_emit_hierarchy_metadata_for_specialization_composition_and_
         ("parent_entity_id" not in row) or isinstance(row["parent_entity_id"], str)
         for row in rows.values()
     )
+
+
+def test_connection_to_dict_resolves_live_endpoint_names(engagement_root: Path, enterprise_root: Path) -> None:
+    src_id = "REQ@1000000000.SrcAAA.source-name"
+    tgt_id = "REQ@1000000001.TgtAAA.target-name"
+    _write(
+        engagement_root / "model" / "motivation" / "requirements" / f"{src_id}.md",
+        _entity_md(src_id, "Source Display Name"),
+    )
+    _write(
+        engagement_root / "model" / "motivation" / "requirements" / f"{tgt_id}.md",
+        _entity_md(tgt_id, "Target Display Name"),
+    )
+    _write(
+        engagement_root / "model" / "motivation" / "requirements" / f"{src_id}.outgoing.md",
+        _outgoing_md(src_id, [("archimate-association", tgt_id)]),
+    )
+
+    repo = ModelRepository([engagement_root, enterprise_root])
+    gui_state.init_state(repo, engagement_root, enterprise_root)
+
+    conn = repo.find_connections_for(src_id)[0]
+    payload = gui_state.connection_to_dict(conn)
+
+    assert payload["source_name"] == "Source Display Name"
+    assert payload["target_name"] == "Target Display Name"

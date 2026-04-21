@@ -1,6 +1,6 @@
 """Standalone MCP server exposing model watcher lifecycle tools.
 
-Add this server alongside sdlc-mcp-model in your MCP config when agents
+Add this server alongside arch-mcp-model in your MCP config when agents
 need explicit watcher lifecycle control (start/stop/status) or manual
 cache refresh.  The main model server auto-starts the watcher at startup;
 this server is optional and can be omitted when lifecycle control is not needed.
@@ -10,7 +10,7 @@ this server is optional and can be omitted when lifecycle control is not needed.
         "command": "uv",
         "args": ["run", "arch-mcp-watch", "--transport", "stdio"],
         "env": {
-            "SDLC_MCP_MODEL_REPO_ROOT": "engagements/ENG-ARCH-REPO/architecture-repository"
+            "ARCH_MCP_MODEL_REPO_ROOT": "engagements/ENG-ARCH-REPO/architecture-repository"
         }
     }
 """
@@ -29,12 +29,12 @@ mcp = FastMCP(
         "Watcher lifecycle tools for the architecture model MCP server. "
         "Use model_tools_watch(action=start|stop|status) to control the file watcher, "
         "and model_tools_refresh to manually re-index after file changes. "
-        "The main model server (sdlc-mcp-model) starts the watcher automatically; "
+        "The main model server (arch-mcp-model) starts the watcher automatically; "
         "register this server only when explicit lifecycle control is required."
     ),
-    host=os.getenv("SDLC_MCP_HOST", "127.0.0.1"),
-    port=int(os.getenv("SDLC_MCP_WATCH_PORT", "8001")),
-    log_level=os.getenv("SDLC_MCP_LOG_LEVEL", "INFO"),  # type: ignore[arg-type]
+    host=os.getenv("ARCH_MCP_HOST", "127.0.0.1"),
+    port=int(os.getenv("ARCH_MCP_WATCH_PORT", "8001")),
+    log_level=os.getenv("ARCH_MCP_LOG_LEVEL", "INFO"),  # type: ignore[arg-type]
 )
 
 install_call_tool_normalizer(mcp)
@@ -46,7 +46,7 @@ def main() -> None:
     parser.add_argument(
         "--transport",
         choices=("stdio", "streamable-http"),
-        default=os.getenv("SDLC_MCP_TRANSPORT", "stdio"),
+        default=os.getenv("ARCH_MCP_TRANSPORT", "stdio"),
     )
     args = parser.parse_args()
     mcp.run(transport=args.transport)
