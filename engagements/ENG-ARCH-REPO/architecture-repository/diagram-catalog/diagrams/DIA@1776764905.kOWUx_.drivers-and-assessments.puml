@@ -1,0 +1,69 @@
+---
+artifact-id: DIA@1776764905.kOWUx_.drivers-and-assessments
+artifact-type: diagram
+name: Drivers and Assessments
+version: 0.1.0
+status: draft
+diagram-type: archimate-motivation
+entity-ids-used:
+- DRV@1712870400.Ui5Op3.rising-complexity-and-interdependence
+- DRV@1776760327.CuhLPB.need-to-balance-organizational-differentiation-with-integration
+- DRV@1712870400.Rt6Yu2.increasing-demand-for-more-autonomy-of-teams-systems
+- DRV@1776628131.GR9prv.ai-assisted-development-as-dominant-production-mode
+- ASS@1776628138.a6vxyj.centralized-governance-cannot-scale-to-concurrent-development-contexts
+- ASS@1776628134.EI3FpR.ai-code-generation-volume-outpaces-sequential-architectural-review-capacity
+- ASS@1776628140.s68vVo.llm-based-agents-cannot-effectively-use-unstructured-architectural-knowledge
+- ASS@1776628142.9YWsDh.implicit-system-interdependencies-are-unmaintainable-without-explicit-models
+connection-ids-used:
+- DRV@1712870400.Ui5Op3.rising-complexity-and-interdependence---ASS@1776628142.9YWsDh.implicit-system-interdependencies-are-unmaintainable-without-explicit-models@@archimate-influence
+- DRV@1776760327.CuhLPB.need-to-balance-organizational-differentiation-with-integration---DRV@1712870400.Ui5Op3.rising-complexity-and-interdependence@@archimate-association
+- DRV@1776760327.CuhLPB.need-to-balance-organizational-differentiation-with-integration---ASS@1776628134.EI3FpR.ai-code-generation-volume-outpaces-sequential-architectural-review-capacity@@archimate-influence
+- DRV@1776760327.CuhLPB.need-to-balance-organizational-differentiation-with-integration---DRV@1776628131.GR9prv.ai-assisted-development-as-dominant-production-mode@@archimate-association
+- DRV@1712870400.Rt6Yu2.increasing-demand-for-more-autonomy-of-teams-systems---ASS@1776628138.a6vxyj.centralized-governance-cannot-scale-to-concurrent-development-contexts@@archimate-influence
+- DRV@1776628131.GR9prv.ai-assisted-development-as-dominant-production-mode---DRV@1712870400.Rt6Yu2.increasing-demand-for-more-autonomy-of-teams-systems@@archimate-association
+- DRV@1776628131.GR9prv.ai-assisted-development-as-dominant-production-mode---ASS@1776628134.EI3FpR.ai-code-generation-volume-outpaces-sequential-architectural-review-capacity@@archimate-influence
+- DRV@1776628131.GR9prv.ai-assisted-development-as-dominant-production-mode---ASS@1776628138.a6vxyj.centralized-governance-cannot-scale-to-concurrent-development-contexts@@archimate-influence
+- DRV@1776628131.GR9prv.ai-assisted-development-as-dominant-production-mode---ASS@1776628140.s68vVo.llm-based-agents-cannot-effectively-use-unstructured-architectural-knowledge@@archimate-influence
+last-updated: '2026-04-21'
+---
+@startuml drivers-and-assessments
+!include ../_archimate-stereotypes.puml
+!include ../_archimate-glyphs.puml
+
+top to bottom direction
+
+title Drivers and Assessments
+
+rectangle "Drivers" <<MotivationGrouping>> {
+  rectangle "<$archimate_Driver{scale=1.5}> Need to Balance Organizational Differentiation with Integration" <<Driver>> as DRV_CuhLPB
+  rectangle "<$archimate_Driver{scale=1.5}> AI-Assisted Development as Dominant Production Mode" <<Driver>> as DRV_GR9prv
+  rectangle "<$archimate_Driver{scale=1.5}> Increasing Demand for More Autonomy of Teams & Systems" <<Driver>> as DRV_Rt6Yu2
+  rectangle "<$archimate_Driver{scale=1.5}> Rising Complexity and Interdependence" <<Driver>> as DRV_Ui5Op3
+}
+DRV_CuhLPB -[hidden]right- DRV_GR9prv
+DRV_GR9prv -[hidden]right- DRV_Rt6Yu2
+DRV_Rt6Yu2 -[hidden]right- DRV_Ui5Op3
+
+rectangle "Assessments" <<MotivationGrouping>> {
+  rectangle "<$archimate_Assessment{scale=1.5}> AI Code Generation Volume Outpaces Architectural Planning and Review Capacity" <<Assessment>> as ASS_EI3FpR
+  rectangle "<$archimate_Assessment{scale=1.5}> LLM-Based Agents Cannot Effectively Use Unstructured Architectural Knowledge" <<Assessment>> as ASS_s68vVo
+  rectangle "<$archimate_Assessment{scale=1.5}> Centralized Governance Cannot Scale to Concurrent Development Contexts" <<Assessment>> as ASS_a6vxyj
+  rectangle "<$archimate_Assessment{scale=1.5}> Implicit System Interdependencies Are Unmaintainable Without Explicit Models" <<Assessment>> as ASS_9YWsDh
+}
+ASS_EI3FpR -[hidden]down- ASS_s68vVo
+ASS_s68vVo -[hidden]down- ASS_a6vxyj
+ASS_a6vxyj -[hidden]down- ASS_9YWsDh
+DRV_Ui5Op3 -[hidden]down- ASS_EI3FpR
+
+' Connections
+DRV_CuhLPB -- DRV_Ui5Op3 : <<association>>
+DRV_CuhLPB -- DRV_GR9prv : <<association>>
+DRV_GR9prv -- DRV_Rt6Yu2 : <<association>>
+DRV_CuhLPB .down.> ASS_EI3FpR : <<influence>>
+DRV_GR9prv .down.> ASS_EI3FpR : <<influence>>
+DRV_GR9prv .down.> ASS_s68vVo : <<influence>>
+DRV_GR9prv .down.> ASS_a6vxyj : <<influence>>
+DRV_Rt6Yu2 .down.> ASS_a6vxyj : <<influence>>
+DRV_Ui5Op3 .down.> ASS_9YWsDh : <<influence>>
+
+@enduml

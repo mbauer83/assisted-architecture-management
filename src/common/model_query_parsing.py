@@ -4,7 +4,7 @@ from pathlib import Path
 
 import yaml  # type: ignore[import-untyped]
 
-from src.common.model_verifier import entity_id_from_path
+from src.common.model_verifier_types import entity_id_from_path
 from src.common.model_query_types import (
     ConnectionRecord,
     DiagramRecord,

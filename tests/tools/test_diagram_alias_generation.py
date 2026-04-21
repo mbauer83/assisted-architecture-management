@@ -78,6 +78,36 @@ def test_generate_archimate_puml_body_normalizes_aliases_in_entities_and_connect
     assert "OUT_i-3Bi-" not in puml
 
 
+def test_generate_archimate_puml_body_single_domain_uses_type_groupings() -> None:
+    driver_a = _entity("DRV@1.a.driver-a", "driver", "Driver A", "DRV_A", subdomain="drivers")
+    driver_b = _entity("DRV@1.b.driver-b", "driver", "Driver B", "DRV_B", subdomain="drivers")
+    assessment = _entity(
+        "ASS@1.a.assessment-a",
+        "assessment",
+        "Assessment A",
+        "ASS_A",
+        subdomain="assessments",
+    )
+
+    puml = generate_archimate_puml_body(
+        "Drivers and Assessments",
+        [driver_a, driver_b, assessment],
+        [
+            _conn(driver_a.artifact_id, assessment.artifact_id, "archimate-influence"),
+            _conn(driver_b.artifact_id, driver_a.artifact_id, "archimate-association"),
+        ],
+        diagram_type="archimate-motivation",
+    )
+
+    assert 'rectangle "Motivation" <<MotivationGrouping>>' not in puml
+    assert 'rectangle "Drivers" <<MotivationGrouping>> {' in puml
+    assert 'rectangle "Assessments" <<MotivationGrouping>> {' in puml
+    assert "top to bottom direction" in puml
+    assert "DRV_A -[hidden]right- DRV_B" in puml
+    assert "DRV_B -[hidden]down- ASS_A" in puml
+    assert "DRV_A .down.> ASS_A : <<influence>>" in puml
+
+
 def test_generate_macros_normalizes_aliases(tmp_path: Path) -> None:
     repo_root = tmp_path / "engagements" / "ENG-T" / "architecture-repository"
     entity_path = repo_root / "model" / "motivation" / "outcomes" / "OUT@1.i-3Bi-.alias-test.md"
@@ -214,3 +244,101 @@ last-updated: '2026-04-20'
     assert "OUT_i_3Bi_ ..|> GOL_B6G__P" in puml
     assert "GOL_B6G_-P" not in puml
     assert "OUT_i-3Bi-" not in puml
+
+
+def test_model_diagram_scaffold_single_domain_uses_type_groupings(tmp_path: Path) -> None:
+    repo_root = tmp_path / "engagements" / "ENG-T" / "architecture-repository"
+    driver_id = "DRV@1.a.driver-a"
+    assessment_id = "ASS@1.a.assessment-a"
+    driver_path = repo_root / "model" / "motivation" / "drivers" / f"{driver_id}.md"
+    assessment_path = repo_root / "model" / "motivation" / "assessments" / f"{assessment_id}.md"
+    outgoing_path = repo_root / "model" / "motivation" / "drivers" / f"{driver_id}.outgoing.md"
+
+    driver_path.parent.mkdir(parents=True, exist_ok=True)
+    assessment_path.parent.mkdir(parents=True, exist_ok=True)
+    driver_path.write_text(
+        f"""\
+---
+artifact-id: {driver_id}
+artifact-type: driver
+name: "Driver A"
+version: 0.1.0
+status: draft
+last-updated: '2026-04-20'
+---
+
+<!-- §content -->
+
+## Driver A
+
+<!-- §display -->
+
+### archimate
+
+```yaml
+domain: Motivation
+element-type: Driver
+label: "Driver A"
+alias: DRV_A
+```
+""",
+        encoding="utf-8",
+    )
+    assessment_path.write_text(
+        f"""\
+---
+artifact-id: {assessment_id}
+artifact-type: assessment
+name: "Assessment A"
+version: 0.1.0
+status: draft
+last-updated: '2026-04-20'
+---
+
+<!-- §content -->
+
+## Assessment A
+
+<!-- §display -->
+
+### archimate
+
+```yaml
+domain: Motivation
+element-type: Assessment
+label: "Assessment A"
+alias: ASS_A
+```
+""",
+        encoding="utf-8",
+    )
+    outgoing_path.write_text(
+        f"""\
+---
+source-entity: {driver_id}
+version: 0.1.0
+status: draft
+last-updated: '2026-04-20'
+---
+
+<!-- §connections -->
+
+### archimate-influence → {assessment_id}
+""",
+        encoding="utf-8",
+    )
+
+    result = model_diagram_scaffold(
+        entity_ids=[driver_id, assessment_id],
+        diagram_name="Drivers and Assessments",
+        repo_root=str(repo_root),
+        repo_scope="engagement",
+    )
+    puml = str(result["puml"])
+
+    assert 'rectangle "Motivation" <<MotivationGrouping>>' not in puml
+    assert 'rectangle "Drivers" <<MotivationGrouping>> {' in puml
+    assert 'rectangle "Assessments" <<MotivationGrouping>> {' in puml
+    assert "top to bottom direction" in puml
+    assert "DRV_A -[hidden]down- ASS_A" in puml
+    assert "DRV_A .down.> ASS_A : <<Influence>>" in puml

@@ -3,6 +3,7 @@ import hashlib
 import json
 import os
 import subprocess
+import tempfile
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Literal
@@ -247,7 +248,16 @@ def _add_diagram_refs(
 def state_file_path(repo_path: Path, *, include_diagrams: bool, state_dir: Path) -> Path:
     key = hashlib.sha256(str(repo_path.resolve()).encode("utf-8")).hexdigest()[:16]
     suffix = "with-diagrams" if include_diagrams else "no-diagrams"
-    state_dir.mkdir(parents=True, exist_ok=True)
+    try:
+        state_dir.mkdir(parents=True, exist_ok=True)
+    except OSError:
+        fallback_dir = repo_path / ".arch" / "model-verifier"
+        try:
+            fallback_dir.mkdir(parents=True, exist_ok=True)
+        except OSError:
+            fallback_dir = Path(tempfile.gettempdir()) / "arch-agents" / "model-verifier"
+            fallback_dir.mkdir(parents=True, exist_ok=True)
+        state_dir = fallback_dir
     return state_dir / f"{key}.{suffix}.state-v1.json"
 
 

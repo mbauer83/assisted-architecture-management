@@ -14,6 +14,7 @@ import base64
 import re
 import subprocess
 import tempfile
+from collections import defaultdict
 from pathlib import Path
 
 from src.common.model_query_parsing import normalize_puml_alias
@@ -24,6 +25,7 @@ from src.common.ontology_loader import (
     DOMAIN_GROUPING,
     DOMAIN_ORDER,
     ELEMENT_TYPE_HAS_SPRITE,
+    ENTITY_TYPES,
 )
 
 
@@ -44,6 +46,71 @@ def _parse_archimate_block(raw: str) -> dict:
 
 
 _JUNCTION_TYPES = frozenset({"and-junction", "or-junction"})
+_ENTITY_TYPE_ORDER = list(ENTITY_TYPES)
+
+
+def _entity_archimate_element_type(entity: EntityRecord) -> str:
+    arch_data = _parse_archimate_block(entity.display_blocks.get("archimate", ""))
+    element_type = str(arch_data.get("element-type") or "").strip()
+    if element_type:
+        return element_type
+    info = ENTITY_TYPES.get(entity.artifact_type)
+    return info.archimate_element_type if info else ""
+
+
+def _pluralize_label(label: str) -> str:
+    words = label.split()
+    if not words:
+        return label
+    last = words[-1]
+    lower = last.lower()
+    if lower.endswith(("s", "x", "z")) or lower.endswith(("ch", "sh")):
+        last = last + "es"
+    elif lower.endswith("y") and (len(lower) == 1 or lower[-2] not in "aeiou"):
+        last = last[:-1] + "ies"
+    else:
+        last = last + "s"
+    words[-1] = last
+    return " ".join(words)
+
+
+def _type_group_label(entity: EntityRecord) -> str:
+    element_type = _entity_archimate_element_type(entity)
+    if element_type:
+        return _pluralize_label(element_type)
+    return _pluralize_label(entity.artifact_type.replace("-", " ").title())
+
+
+def _insert_arrow_direction(arrow: str, direction: str) -> str:
+    if "[hidden]" in arrow or re.search(r"(up|down|left|right)", arrow):
+        return arrow
+    match = re.match(r"(.*\])(.+)", arrow)
+    if match:
+        return match.group(1) + direction + match.group(2)
+    if arrow.startswith("."):
+        return "." + direction + arrow[1:]
+    if arrow.startswith("-"):
+        rest = arrow[1:]
+        sep = "" if rest.startswith("-") else "-"
+        return "-" + direction + sep + rest
+    return arrow
+
+
+def _ordered_type_groups(entities: list[EntityRecord]) -> list[tuple[str, list[EntityRecord]]]:
+    grouped: dict[str, list[EntityRecord]] = defaultdict(list)
+    labels: dict[str, str] = {}
+    for entity in entities:
+        grouped[entity.artifact_type].append(entity)
+        labels.setdefault(entity.artifact_type, _type_group_label(entity))
+    ordered_types = [t for t in _ENTITY_TYPE_ORDER if t in grouped]
+    for artifact_type in grouped:
+        if artifact_type not in ordered_types:
+            ordered_types.append(artifact_type)
+    return [(labels[artifact_type], grouped[artifact_type]) for artifact_type in ordered_types]
+
+
+def _display_connection_label(conn_type: str) -> str:
+    return conn_type.removeprefix("archimate-")
 
 
 def generate_archimate_puml_body(
@@ -64,8 +131,6 @@ def generate_archimate_puml_body(
     inside their parent declarations.  Junction entities render as circles.
     Connections use the canonical ``SRC --> TGT : <<conn_type>>`` format.
     """
-    from collections import defaultdict
-
     diagram_name = re.sub(r"[^a-zA-Z0-9_-]", "-", name.lower()).strip("-") or "diagram"
     is_archimate = "archimate" in diagram_type.lower()
 
@@ -141,17 +206,52 @@ def generate_archimate_puml_body(
         if d not in DOMAIN_ORDER:
             ordered_domains.append(d)
 
-    for domain in ordered_domains:
-        grouping = DOMAIN_GROUPING.get(domain)
-        display = DOMAIN_DISPLAY.get(domain, domain.title())
-        indent = "  " if grouping else ""
-        if grouping:
-            lines.append(f'rectangle "{display}" <<{grouping}>> {{')
-        for entity in domain_entities[domain]:
-            lines.extend(_render_entity(entity, indent))
-        if grouping:
+    single_domain = len(ordered_domains) == 1
+    group_index_by_alias: dict[str, int] = {}
+
+    if single_domain and ordered_domains:
+        domain = ordered_domains[0]
+        grouping = DOMAIN_GROUPING.get(domain, "Grouping")
+        lines.insert(3, "top to bottom direction")
+        lines.insert(4, "")
+
+        top_level_entities = domain_entities[domain]
+        type_groups = _ordered_type_groups(top_level_entities)
+        prev_anchor_alias: str | None = None
+        for idx, (label, entities_in_group) in enumerate(type_groups):
+            lines.append(f'rectangle "{label}" <<{grouping}>> {{')
+            for entity in entities_in_group:
+                lines.extend(_render_entity(entity, "  "))
+                alias = normalize_puml_alias(entity.display_alias)
+                if alias:
+                    group_index_by_alias[alias] = idx
             lines.append("}")
-        lines.append("")
+
+            top_aliases = [
+                normalize_puml_alias(entity.display_alias)
+                for entity in entities_in_group
+                if entity.display_alias
+            ]
+            axis = "right" if idx % 2 == 0 else "down"
+            for i in range(len(top_aliases) - 1):
+                lines.append(f"{top_aliases[i]} -[hidden]{axis}- {top_aliases[i + 1]}")
+            if prev_anchor_alias and top_aliases:
+                lines.append(f"{prev_anchor_alias} -[hidden]down- {top_aliases[0]}")
+            if top_aliases:
+                prev_anchor_alias = top_aliases[-1]
+            lines.append("")
+    else:
+        for domain in ordered_domains:
+            grouping = DOMAIN_GROUPING.get(domain)
+            display = DOMAIN_DISPLAY.get(domain, domain.title())
+            indent = "  " if grouping else ""
+            if grouping:
+                lines.append(f'rectangle "{display}" <<{grouping}>> {{')
+            for entity in domain_entities[domain]:
+                lines.extend(_render_entity(entity, indent))
+            if grouping:
+                lines.append("}")
+            lines.append("")
 
     conn_lines: list[str] = []
     for conn in connection_records:
@@ -163,7 +263,13 @@ def generate_archimate_puml_body(
         tgt = alias_by_id.get(conn.target)
         if src and tgt:
             arrow = ct.puml_arrow if ct else "-->"
-            conn_lines.append(f"{src} {arrow} {tgt} : <<{conn.conn_type}>>")
+            if single_domain:
+                src_group = group_index_by_alias.get(src)
+                tgt_group = group_index_by_alias.get(tgt)
+                if src_group is not None and tgt_group is not None and src_group != tgt_group:
+                    direction = "down" if src_group < tgt_group else "up"
+                    arrow = _insert_arrow_direction(arrow, direction)
+            conn_lines.append(f"{src} {arrow} {tgt} : <<{_display_connection_label(conn.conn_type)}>>")
     if conn_lines:
         lines.append("' Connections")
         lines.extend(conn_lines)
