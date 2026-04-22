@@ -3,31 +3,28 @@ from typing import Any, Literal
 
 from mcp.server.fastmcp import FastMCP  # type: ignore[import-not-found]
 
-from src.tools.artifact_mcp.context import RepoPreset, RepoScope, resolve_repo_roots, roots_key, verifier_for
+from src.tools.artifact_mcp.context import RepoScope, resolve_repo_roots, roots_key, verifier_for
 from src.tools.artifact_mcp.formatting import as_verification_result_dict
 
 
 def artifact_verify(
     path: str | None = None,
     *,
-    file_type: Literal["entity", "connection", "diagram"] | None = None,
+    file_type: Literal["entity", "connection", "diagram", "document"] | None = None,
     include_diagrams: bool = True,
-    include_registry: bool = True,
     return_mode: Literal["summary", "full"] = "summary",
     repo_root: str | None = None,
-    repo_preset: RepoPreset | None = None,
-    enterprise_root: str | None = None,
     repo_scope: RepoScope = "both",
 ) -> dict[str, Any]:
     roots = resolve_repo_roots(
         repo_scope=repo_scope,
         repo_root=repo_root,
-        repo_preset=repo_preset,
-        enterprise_root=enterprise_root,
+        repo_preset=None,
+        enterprise_root=None,
     )
     key = roots_key(roots)
     engagement_root = roots[0]
-    verifier = verifier_for(key, include_registry=include_registry)
+    verifier = verifier_for(key, include_registry=True)
 
     if path is not None:
         from pathlib import Path
@@ -40,6 +37,8 @@ def artifact_verify(
                 p.suffix == ".md" and "diagram-catalog" in p.parts and "diagrams" in p.parts
             ):
                 inferred = "diagram"
+            elif p.suffix == ".md" and "documents" in p.parts:
+                inferred = "document"
             else:
                 inferred = "connection" if "connections" in p.parts else "entity"
         match inferred:
@@ -49,6 +48,8 @@ def artifact_verify(
                 result = verifier.verify_connection_file(p)
             case "diagram":
                 result = verifier.verify_matrix_diagram_file(p) if p.suffix == ".md" else verifier.verify_diagram_file(p)
+            case "document":
+                result = verifier.verify_document_file(p)
         out = as_verification_result_dict(result)
         out["repo_roots"] = [str(r) for r in roots]
         out["repo_scope"] = repo_scope
@@ -80,7 +81,6 @@ def artifact_verify(
         "repo_roots": [str(r) for r in roots],
         "repo_scope": repo_scope,
         "include_diagrams": include_diagrams,
-        "include_registry": include_registry,
         "counts": {
             "files": total,
             "valid_files": total_valid,
@@ -96,20 +96,14 @@ def artifact_verify(
 def artifact_verify_file(
     path: str,
     *,
-    file_type: Literal["entity", "connection", "diagram"] | None = None,
-    include_registry: bool = True,
+    file_type: Literal["entity", "connection", "diagram", "document"] | None = None,
     repo_root: str | None = None,
-    repo_preset: RepoPreset | None = None,
-    enterprise_root: str | None = None,
     repo_scope: RepoScope = "both",
 ) -> dict[str, Any]:
     return artifact_verify(
         path,
         file_type=file_type,
-        include_registry=include_registry,
         repo_root=repo_root,
-        repo_preset=repo_preset,
-        enterprise_root=enterprise_root,
         repo_scope=repo_scope,
     )
 
@@ -117,20 +111,14 @@ def artifact_verify_file(
 def artifact_verify_all(
     *,
     include_diagrams: bool = True,
-    include_registry: bool = True,
     return_mode: Literal["summary", "full"] = "summary",
     repo_root: str | None = None,
-    repo_preset: RepoPreset | None = None,
-    enterprise_root: str | None = None,
     repo_scope: RepoScope = "both",
 ) -> dict[str, Any]:
     return artifact_verify(
         include_diagrams=include_diagrams,
-        include_registry=include_registry,
         return_mode=return_mode,
         repo_root=repo_root,
-        repo_preset=repo_preset,
-        enterprise_root=enterprise_root,
         repo_scope=repo_scope,
     )
 

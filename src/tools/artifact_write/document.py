@@ -4,7 +4,7 @@ from collections.abc import Callable
 
 import yaml  # type: ignore[import-untyped]
 
-from src.common.artifact_document_schema import get_document_schema
+from src.common.artifact_document_schema import get_document_schema, get_document_subdirectory
 from src.common.artifact_write import generate_entity_id, slugify
 
 from .boundary import assert_engagement_write_root, today_iso
@@ -52,8 +52,24 @@ def _build_placeholder_body(required_sections: list[str]) -> str:
     return "\n".join(parts)
 
 
-def _doc_dir(repo_root: Path, doc_type: str) -> Path:
-    return repo_root / "documents" / doc_type
+def _doc_dir(repo_root: Path, doc_subdirectory: str) -> Path:
+    return repo_root / "documents" / Path(doc_subdirectory)
+
+
+def _verification_to_document_dict(path: Path, res) -> dict[str, object]:
+    return {
+        "path": str(path),
+        "file_type": "document",
+        "valid": res.valid,
+        "issues": [
+            {"severity": i.severity, "code": i.code, "message": i.message, "location": i.location}
+            for i in res.issues
+        ],
+    }
+
+
+def _document_write_allowed(res) -> bool:
+    return res.valid and not res.issues
 
 
 def create_document(
@@ -82,11 +98,12 @@ def create_document(
         )
 
     abbreviation: str = schema.get("abbreviation") or doc_type.upper()
+    doc_subdirectory = get_document_subdirectory(schema, doc_type)
     required_sections: list[str] = schema.get("required_sections") or []
 
     last = last_updated or today_iso()
     doc_id = artifact_id or _generate_document_id(abbreviation, title)
-    doc_dir = _doc_dir(repo_root, doc_type)
+    doc_dir = _doc_dir(repo_root, doc_subdirectory)
     path = doc_dir / f"{doc_id}.md"
 
     actual_body = body or _build_placeholder_body(required_sections)
@@ -102,17 +119,35 @@ def create_document(
         body=actual_body,
     )
 
-    verification = {"valid": True, "issues": []}
+    preview_res = verify_content_in_temp_path(
+        verifier=verifier,
+        file_type="document",
+        desired_name=f"{doc_subdirectory}/{path.name}",
+        content=content,
+        support_repo_root=repo_root,
+    )
+    verification = _verification_to_document_dict(path, preview_res)
+
+    if dry_run or not _document_write_allowed(preview_res):
+        return WriteResult(
+            wrote=False,
+            path=path,
+            artifact_id=doc_id,
+            content=content,
+            warnings=[],
+            verification=verification,
+        )
+
     if not dry_run:
         doc_dir.mkdir(parents=True, exist_ok=True)
         path.write_text(content, encoding="utf-8")
         clear_repo_caches(path)
 
     return WriteResult(
-        wrote=not dry_run,
+        wrote=True,
         path=path,
         artifact_id=doc_id,
-        content=content if dry_run else None,
+        content=None,
         warnings=[],
         verification=verification,
     )
@@ -182,16 +217,35 @@ def edit_document(
         body=new_body,
     )
 
-    verification = {"valid": True, "issues": []}
+    relative_path = path.relative_to(repo_root / "documents").as_posix()
+    preview_res = verify_content_in_temp_path(
+        verifier=verifier,
+        file_type="document",
+        desired_name=relative_path,
+        content=content,
+        support_repo_root=repo_root,
+    )
+    verification = _verification_to_document_dict(path, preview_res)
+
+    if dry_run or not _document_write_allowed(preview_res):
+        return WriteResult(
+            wrote=False,
+            path=path,
+            artifact_id=artifact_id,
+            content=content,
+            warnings=[],
+            verification=verification,
+        )
+
     if not dry_run:
         path.write_text(content, encoding="utf-8")
         clear_repo_caches(path)
 
     return WriteResult(
-        wrote=not dry_run,
+        wrote=True,
         path=path,
         artifact_id=artifact_id,
-        content=content if dry_run else None,
+        content=None,
         warnings=[],
         verification=verification,
     )

@@ -7,4 +7,4 @@ export function buildReferenceMarkdown(params: {
   title: string
   section?: string
 }): string
-export function draftDocumentPath(docType?: string): string
+export function draftDocumentPath(docType?: string, subdirectory?: string): string

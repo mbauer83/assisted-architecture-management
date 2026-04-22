@@ -32,4 +32,9 @@ export const buildReferenceMarkdown = ({ currentPath, targetPath, title, section
   return `[${label}](${href}${suffix})`
 }
 
-export const draftDocumentPath = (docType) => `documents/${docType || 'draft'}/__draft__.md`
+export const draftDocumentPath = (docType, subdirectory) => {
+  const targetDir = String(subdirectory || docType || 'draft')
+    .replace(/\\/g, '/')
+    .replace(/^\/+|\/+$/g, '')
+  return `documents/${targetDir || 'draft'}/__draft__.md`
+}

@@ -13,6 +13,19 @@ def _project(record: dict[str, object], fields: list[str] | None) -> dict[str, o
     return {field: record[field] for field in fields if field in record}
 
 
+def _include_flags(
+    include_record_types: list[Literal["entities", "connections", "diagrams", "documents"]] | None,
+    *,
+    default: tuple[str, ...],
+) -> tuple[bool, bool, bool]:
+    selected = set(include_record_types or default)
+    return (
+        "connections" in selected,
+        "diagrams" in selected,
+        "documents" in selected,
+    )
+
+
 def register_query_list_read_tools(mcp: FastMCP) -> None:
     @mcp.tool(
         name="artifact_query_list_artifacts",
@@ -21,7 +34,7 @@ def register_query_list_read_tools(mcp: FastMCP) -> None:
             "List artifacts (metadata-only) with AND-semantics filters. "
             "Returns lightweight summaries; use artifact_type, domain, or status to narrow results. "
             "Pass fields=[...] to project only the keys you need. "
-            "include_connections, include_diagrams, and include_documents default to false (entities only). "
+            "include_record_types defaults to ['entities']. "
             "Domain filter is case-insensitive; canonical lowercase values: "
             "\"common\", \"motivation\", \"strategy\", \"business\", \"application\", \"technology\", \"implementation\"."
             "\n\nRepo selection: repo_scope defaults to both (engagement + enterprise)."
@@ -32,13 +45,10 @@ def register_query_list_read_tools(mcp: FastMCP) -> None:
         *,
         repo_root: str | None = None,
         repo_scope: RepoScope = "both",
-        refresh: bool = False,
         artifact_type: str | list[str] | None = None,
         domain: str | list[str] | None = None,
         status: str | list[str] | None = None,
-        include_connections: bool = False,
-        include_diagrams: bool = False,
-        include_documents: bool = False,
+        include_record_types: list[Literal["entities", "connections", "diagrams", "documents"]] | None = None,
         fields: list[str] | None = None,
     ) -> list[dict[str, object]]:
         roots = resolve_repo_roots(
@@ -49,8 +59,10 @@ def register_query_list_read_tools(mcp: FastMCP) -> None:
         )
         key = roots_key(roots)
         repo = repo_cached(key)
-        if refresh:
-            repo.refresh()
+        include_connections, include_diagrams, include_documents = _include_flags(
+            include_record_types,
+            default=("entities",),
+        )
         summaries = repo.list_artifacts(
             artifact_type=artifact_type,
             domain=domain,
@@ -85,7 +97,6 @@ def register_query_list_read_tools(mcp: FastMCP) -> None:
         section: str | None = None,
         repo_root: str | None = None,
         repo_scope: RepoScope = "both",
-        refresh: bool = False,
     ) -> dict[str, object] | None:
         roots = resolve_repo_roots(
             repo_scope=repo_scope,
@@ -95,8 +106,6 @@ def register_query_list_read_tools(mcp: FastMCP) -> None:
         )
         key = roots_key(roots)
         repo = repo_cached(key)
-        if refresh:
-            repo.refresh()
         result = repo.read_artifact(artifact_id, mode=mode, section=section)
         if result is None:
             return None

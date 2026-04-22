@@ -159,6 +159,7 @@ export const DocumentTypeSchema = Schema.Struct({
   doc_type: Schema.String,
   abbreviation: Schema.String,
   name: Schema.String,
+  subdirectory: Schema.String,
   required_sections: Schema.Array(Schema.String),
 })
 export type DocumentType = typeof DocumentTypeSchema.Type

@@ -17,6 +17,7 @@ const loading = ref(false)
 const saving = ref(false)
 const deleting = ref(false)
 const error = ref<string | null>(null)
+const verificationIssues = ref<string[]>([])
 const showReferencePicker = ref(false)
 const editorRef = ref<InstanceType<typeof MarkdownEditor> | null>(null)
 
@@ -24,10 +25,33 @@ const title = ref('')
 const status = ref('draft')
 const keywords = ref('')
 const body = ref('')
+const titleTouched = ref(false)
+const saveAttempted = ref(false)
+const titleError = computed(() =>
+  (!title.value.trim() && (titleTouched.value || saveAttempted.value))
+    ? 'Title is required.'
+    : null,
+)
+
+const collectVerificationIssues = (verification: unknown): string[] => {
+  if (!verification || typeof verification !== 'object') return []
+  const issues = (verification as { issues?: unknown }).issues
+  if (!Array.isArray(issues)) return []
+  return issues
+    .map((issue) => {
+      if (!issue || typeof issue !== 'object') return null
+      const code = typeof (issue as { code?: unknown }).code === 'string' ? (issue as { code: string }).code : ''
+      const message = typeof (issue as { message?: unknown }).message === 'string' ? (issue as { message: string }).message : ''
+      if (!code && !message) return null
+      return code ? `${code}: ${message}` : message
+    })
+    .filter((issue): issue is string => Boolean(issue))
+}
 
 const load = () => {
   loading.value = true
   error.value = null
+  verificationIssues.value = []
   Effect.runPromise(svc.getDocument(documentId.value)).then((doc) => {
     detail.value = doc
     title.value = doc.title
@@ -45,6 +69,10 @@ onMounted(load)
 watch(documentId, load)
 
 const save = () => {
+  saveAttempted.value = true
+  titleTouched.value = true
+  verificationIssues.value = []
+  if (titleError.value) return
   saving.value = true
   error.value = null
   Effect.runPromise(svc.editDocument(documentId.value, {
@@ -53,7 +81,15 @@ const save = () => {
     keywords: keywords.value.split(',').map((value) => value.trim()).filter(Boolean),
     body: body.value,
     dry_run: false,
-  })).then(() => {
+  })).then((result) => {
+    if (!result.wrote) {
+      verificationIssues.value = collectVerificationIssues(result.verification)
+      error.value = verificationIssues.value.length
+        ? 'Document could not be saved until the validation issues are fixed.'
+        : 'Document could not be saved.'
+      saving.value = false
+      return
+    }
     saving.value = false
     load()
   }).catch((e) => {
@@ -97,8 +133,15 @@ const insertReference = (markdownLink: string) => {
     <div v-else-if="detail" class="card">
       <div class="meta-grid">
         <label class="form-field form-field--wide">
-          <span>Title</span>
-          <input v-model="title" class="form-control" type="text" />
+          <span>Title *</span>
+          <input
+            v-model="title"
+            class="form-control"
+            :class="{ 'form-control--invalid': titleError }"
+            type="text"
+            @blur="titleTouched = true"
+          />
+          <div v-if="titleError" class="field-error">{{ titleError }}</div>
         </label>
 
         <div class="form-field">
@@ -141,6 +184,9 @@ const insertReference = (markdownLink: string) => {
       </div>
 
       <div v-if="error" class="state-msg state-msg--error">{{ error }}</div>
+      <ul v-if="verificationIssues.length" class="issue-list">
+        <li v-for="issue in verificationIssues" :key="issue">{{ issue }}</li>
+      </ul>
     </div>
 
     <div v-if="showReferencePicker" class="overlay" @click.self="showReferencePicker = false">
@@ -168,6 +214,14 @@ const insertReference = (markdownLink: string) => {
   border: 1px solid #cbd5e1;
   border-radius: 8px;
   font-size: 13px;
+}
+.form-control--invalid {
+  border-color: #dc2626;
+  background: #fef2f2;
+}
+.field-error {
+  color: #dc2626;
+  font-size: 12px;
 }
 .readonly-pill {
   display: inline-flex;
@@ -206,6 +260,12 @@ const insertReference = (markdownLink: string) => {
 .danger-btn { background: #fee2e2; color: #991b1b; }
 .state-msg { color: #64748b; }
 .state-msg--error { color: #dc2626; margin-top: 10px; }
+.issue-list {
+  margin: 10px 0 0;
+  padding-left: 18px;
+  color: #991b1b;
+  font-size: 13px;
+}
 .overlay {
   position: fixed;
   inset: 0;

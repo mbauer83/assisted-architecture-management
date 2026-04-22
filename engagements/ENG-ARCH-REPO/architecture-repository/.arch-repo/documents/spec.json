@@ -1,7 +1,6 @@
 {
-  "abbreviation": "ADR",
-  "name": "Architecture Decision Record",
-  "subdirectory": "adr",
+  "abbreviation": "SPC",
+  "name": "Specification",
   "frontmatter_schema": {
     "type": "object",
     "required": ["title", "status"],
@@ -12,5 +11,5 @@
       "date": {"type": "string"}
     }
   },
-  "required_sections": ["Context", "Decision", "Consequences"]
+  "required_sections": ["Scope", "Summary", "Specification"]
 }

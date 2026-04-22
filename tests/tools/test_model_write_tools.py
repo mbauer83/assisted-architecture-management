@@ -46,7 +46,6 @@ def dry_run_create_entity(repo_root: Path) -> dict[str, object]:
         summary="A short description.",
         dry_run=True,
         repo_root=str(repo_root),
-        repo_scope="engagement",
     )
 
 
@@ -86,7 +85,6 @@ def _write_entity(repo_root: Path, artifact_type: str, name: str) -> dict[str, o
         summary=f"Test entity: {name}",
         dry_run=False,
         repo_root=str(repo_root),
-        repo_scope="engagement",
     )
     assert result.get("wrote") is True
     return result
@@ -148,7 +146,6 @@ $DECL_{e2_alias}()
         artifact_id="test-diagram-archimate-application",
         dry_run=False,
         repo_root=str(repo_root),
-        repo_scope="engagement",
         connection_inference="strict",
     )
 
@@ -187,7 +184,6 @@ def test_model_create_matrix_writes_valid_matrix(repo_root: Path) -> None:
         artifact_id="matrix-test-v1",
         dry_run=False,
         repo_root=str(repo_root),
-        repo_scope="engagement",
     )
 
     assert result.get("wrote") is True

@@ -3,7 +3,7 @@ from typing import Literal
 
 from mcp.server.fastmcp import FastMCP  # type: ignore[import-not-found]
 
-from src.tools.artifact_mcp.context import RepoPreset, RepoScope, repo_cached, resolve_repo_roots, roots_key
+from src.tools.artifact_mcp.context import RepoScope, repo_cached, resolve_repo_roots, roots_key
 
 
 def register_query_graph_tools(mcp: FastMCP) -> None:
@@ -23,21 +23,16 @@ def register_query_graph_tools(mcp: FastMCP) -> None:
         direction: Literal["any", "outbound", "inbound"] = "any",
         conn_type: str | None = None,
         repo_root: str | None = None,
-        repo_preset: RepoPreset | None = None,
-        enterprise_root: str | None = None,
         repo_scope: RepoScope = "both",
-        refresh: bool = False,
     ) -> list[dict[str, object]]:
         roots = resolve_repo_roots(
             repo_scope=repo_scope,
             repo_root=repo_root,
-            repo_preset=repo_preset,
-            enterprise_root=enterprise_root,
+            repo_preset=None,
+            enterprise_root=None,
         )
         key = roots_key(roots)
         repo = repo_cached(key)
-        if refresh:
-            repo.refresh()
 
         conns = repo.find_connections_for(
             entity_id,
@@ -68,21 +63,16 @@ def register_query_graph_tools(mcp: FastMCP) -> None:
         max_hops: int = 1,
         conn_type: str | None = None,
         repo_root: str | None = None,
-        repo_preset: RepoPreset | None = None,
-        enterprise_root: str | None = None,
         repo_scope: RepoScope = "both",
-        refresh: bool = False,
     ) -> dict[str, object]:
         roots = resolve_repo_roots(
             repo_scope=repo_scope,
             repo_root=repo_root,
-            repo_preset=repo_preset,
-            enterprise_root=enterprise_root,
+            repo_preset=None,
+            enterprise_root=None,
         )
         key = roots_key(roots)
         repo = repo_cached(key)
-        if refresh:
-            repo.refresh()
 
         neighbors = repo.find_neighbors(entity_id, max_hops=max_hops, conn_type=conn_type)
         normalized = {k: sorted(list(v)) for k, v in neighbors.items()}

@@ -7,7 +7,7 @@ from typing import Any
 from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel
 
-from src.common.artifact_document_schema import load_document_schemata
+from src.common.artifact_document_schema import get_document_subdirectory, load_document_schemata
 from src.tools.gui_routers import state as s
 
 router = APIRouter()
@@ -50,6 +50,7 @@ def list_document_types() -> list[dict[str, object]]:
             "doc_type": doc_type,
             "abbreviation": schema.get("abbreviation", doc_type.upper()),
             "name": schema.get("name", doc_type),
+            "subdirectory": get_document_subdirectory(schema, doc_type),
             "required_sections": schema.get("required_sections", []),
         }
         for doc_type, schema in sorted(schemata.items())
@@ -123,6 +124,7 @@ def create_document(req: CreateDocumentRequest) -> dict[str, Any]:
         "artifact_id": result.artifact_id,
         "path": str(result.path),
         "content": result.content,
+        "warnings": result.warnings,
         "verification": result.verification,
     }
 
@@ -151,6 +153,7 @@ def edit_document(artifact_id: str, req: EditDocumentRequest) -> dict[str, Any]:
         "artifact_id": result.artifact_id,
         "path": str(result.path),
         "content": result.content,
+        "warnings": result.warnings,
         "verification": result.verification,
     }
 
@@ -170,4 +173,7 @@ def delete_document(artifact_id: str, dry_run: bool = False) -> dict[str, Any]:
         "wrote": result.wrote,
         "artifact_id": result.artifact_id,
         "path": str(result.path),
+        "content": result.content,
+        "warnings": result.warnings,
+        "verification": result.verification,
     }

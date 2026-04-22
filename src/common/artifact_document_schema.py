@@ -22,3 +22,13 @@ def load_document_schemata(repo_root: Path) -> dict[str, dict]:
 
 def get_document_schema(repo_root: Path, doc_type: str) -> dict | None:
     return load_document_schemata(repo_root).get(doc_type)
+
+
+def get_document_subdirectory(schema: dict, doc_type: str) -> str:
+    raw = str(schema.get("subdirectory") or doc_type).strip().replace("\\", "/")
+    parts = [part for part in raw.split("/") if part and part != "."]
+    if not parts or any(part == ".." for part in parts):
+        raise ValueError(
+            f"Invalid document subdirectory for doc-type {doc_type!r}: {raw!r}"
+        )
+    return "/".join(parts)

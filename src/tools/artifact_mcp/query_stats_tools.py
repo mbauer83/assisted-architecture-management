@@ -3,7 +3,18 @@ from typing import Literal
 
 from mcp.server.fastmcp import FastMCP  # type: ignore[import-not-found]
 
-from src.tools.artifact_mcp.context import RepoPreset, RepoScope, repo_cached, resolve_repo_roots, roots_key
+from src.tools.artifact_mcp.context import RepoScope, repo_cached, resolve_repo_roots, roots_key
+
+
+def _include_flags(
+    include_record_types: list[Literal["entities", "connections", "diagrams", "documents"]] | None,
+) -> tuple[bool, bool, bool]:
+    selected = set(include_record_types or ["entities", "connections", "diagrams", "documents"])
+    return (
+        "connections" in selected,
+        "diagrams" in selected,
+        "documents" in selected,
+    )
 
 
 def register_query_stats_tools(mcp: FastMCP) -> None:
@@ -26,25 +37,20 @@ def register_query_stats_tools(mcp: FastMCP) -> None:
         artifact_type: str | list[str] | None = None,
         domain: str | list[str] | None = None,
         status: str | list[str] | None = None,
-        include_connections: bool = True,
-        include_diagrams: bool = True,
+        include_record_types: list[Literal["entities", "connections", "diagrams", "documents"]] | None = None,
         repo_root: str | None = None,
-        repo_preset: RepoPreset | None = None,
-        enterprise_root: str | None = None,
         repo_scope: RepoScope = "both",
-        refresh: bool = False,
     ) -> dict[str, object]:
         roots = resolve_repo_roots(
             repo_scope=repo_scope,
             repo_root=repo_root,
-            repo_preset=repo_preset,
-            enterprise_root=enterprise_root,
+            repo_preset=None,
+            enterprise_root=None,
         )
         key = roots_key(roots)
         repo = repo_cached(key)
-        if refresh:
-            repo.refresh()
         if group_by is not None:
+            include_connections, include_diagrams, include_documents = _include_flags(include_record_types)
             counts = repo.count_artifacts_by(
                 group_by,
                 artifact_type=artifact_type,
@@ -53,6 +59,8 @@ def register_query_stats_tools(mcp: FastMCP) -> None:
                 include_connections=include_connections,
                 include_diagrams=include_diagrams,
             )
+            if not include_documents and group_by == "artifact_type":
+                counts.pop("document", None)
             return {
                 "repo_roots": [str(p) for p in roots],
                 "repo_scope": repo_scope,

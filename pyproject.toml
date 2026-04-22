@@ -26,12 +26,10 @@ gui = [
 
 [project.scripts]
 arch-mcp-artifacts = "src.tools.mcp_artifact_server:main"
-arch-mcp-framework = "src.tools.mcp_framework_server:main"
 arch-gui-server = "src.tools.gui_server:main"
 arch-backend = "src.tools.arch_backend:main"
 arch-mcp-stdio = "src.tools.arch_mcp_stdio:main"
 arch-init = "src.tools.workspace_init:main"
-arch-mcp-watch = "src.tools.mcp_watch_server:main"
 get-plantuml = "src.tools.get_plantuml:main"
 arch-model-write = "src.tools.model_write_cli:main"
 

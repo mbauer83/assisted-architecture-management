@@ -2,7 +2,7 @@
 
 ## Overview
 
-Documents are first-class artifacts alongside entities, connections, and diagrams. They live in `documents/{doc_type}/` inside the architecture repository. Document types are defined by JSON schemata in `.arch-repo/documents/{doc_type}.json`. First supported type: ADR (Architecture Decision Record).
+Documents are first-class artifacts alongside entities, connections, and diagrams. They live in `documents/{subdirectory}/` inside the architecture repository, where the subdirectory is configured per type in the schema file. Document types are defined by JSON schemata in `.arch-repo/documents/{doc_type}.json`. First supported type: ADR (Architecture Decision Record).
 
 ---
 
@@ -13,7 +13,7 @@ All Python code, MCP tools, test files, and CLI renamed from `model_*` to `artif
 
 ### Document Schema Format
 - `src/common/artifact_document_schema.py` — `load_document_schemata(repo_root)`, `get_document_schema(repo_root, doc_type)`
-- `engagements/ENG-ARCH-REPO/architecture-repository/.arch-repo/documents/adr.json` — ADR schema with `abbreviation`, `name`, `frontmatter_schema`, `required_sections`
+- `engagements/ENG-ARCH-REPO/architecture-repository/.arch-repo/documents/adr.json` — ADR schema with `abbreviation`, `name`, `subdirectory`, `frontmatter_schema`, `required_sections`
 
 ### Domain Types
 - `src/common/artifact_types.py` — `DocumentRecord` dataclass, `summary_from_document`, `STANDARD_DOCUMENT_FIELDS`. `SearchHit.record_type` and `ArtifactSummary.record_type` Literals extended to `"document"`.
@@ -89,6 +89,7 @@ export const DocumentTypeSchema = Schema.Struct({
   doc_type: Schema.String,
   abbreviation: Schema.String,
   name: Schema.String,
+  subdirectory: Schema.String,
   required_sections: Schema.Array(Schema.String),
 })
 export type DocumentType = typeof DocumentTypeSchema.Type
@@ -406,6 +407,7 @@ Example: `ADR@1776857796.mvQlgb.use-adr-format.md`
 {
   "abbreviation": "ADR",
   "name": "Architecture Decision Record",
+  "subdirectory": "adr",
   "frontmatter_schema": { /* JSON Schema for frontmatter fields */ },
   "required_sections": ["Context", "Decision", "Consequences"]
 }
@@ -415,7 +417,7 @@ Example: `ADR@1776857796.mvQlgb.use-adr-format.md`
 
 | Method | Path | Handler |
 |--------|------|---------|
-| GET | `/api/document-types` | `list_document_types()` → `[{doc_type, abbreviation, name, required_sections}]` |
+| GET | `/api/document-types` | `list_document_types()` → `[{doc_type, abbreviation, name, subdirectory, required_sections}]` |
 | GET | `/api/document-schemata` | `get_document_schemata()` → `{doc_type: schema_dict}` |
 | GET | `/api/documents?doc_type=&status=&limit=&offset=` | `list_documents()` → `{total, items: [DocumentSummary]}` |
 | GET | `/api/document?id=` | `read_document(id)` → `DocumentDetail` |

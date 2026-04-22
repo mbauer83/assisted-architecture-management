@@ -1,8 +1,8 @@
 """MCP write tools: matrix and diagram creation."""
 from mcp.server.fastmcp import FastMCP  # type: ignore[import-not-found]
 from src.tools.artifact_mcp.write._common import (
-    DiagramConnectionInferenceMode, WriteRepoScope, _out, clear_caches_for_repo,
-    artifact_write_ops, registry_cached, resolve_repo_roots, roots_key, verifier_for, RepoPreset,
+    DiagramConnectionInferenceMode, _out, clear_caches_for_repo,
+    artifact_write_ops, registry_cached, resolve_repo_roots, roots_key, verifier_for,
 )
 
 
@@ -20,14 +20,10 @@ def artifact_create_matrix(
     auto_link_entity_ids: bool = True,
     dry_run: bool = True,
     repo_root: str | None = None,
-    repo_preset: RepoPreset | None = None,
-    repo_scope: WriteRepoScope = "engagement",
 ) -> dict[str, object]:
-    if repo_scope != "engagement":
-        raise ValueError("artifact_create_matrix only supports repo_scope='engagement'")
     roots = resolve_repo_roots(
         repo_scope="engagement", repo_root=repo_root,
-        repo_preset=repo_preset, enterprise_root=None,
+        repo_preset=None, enterprise_root=None,
     )
     key = roots_key(roots)
     result = artifact_write_ops.create_matrix(
@@ -57,14 +53,10 @@ def artifact_create_diagram(
     auto_include_stereotypes: bool = True,
     dry_run: bool = True,
     repo_root: str | None = None,
-    repo_preset: RepoPreset | None = None,
-    repo_scope: WriteRepoScope = "engagement",
 ) -> dict[str, object]:
-    if repo_scope != "engagement":
-        raise ValueError("artifact_create_diagram only supports repo_scope='engagement'")
     roots = resolve_repo_roots(
         repo_scope="engagement", repo_root=repo_root,
-        repo_preset=repo_preset, enterprise_root=None,
+        repo_preset=None, enterprise_root=None,
     )
     key = roots_key(roots)
     result = artifact_write_ops.create_diagram(

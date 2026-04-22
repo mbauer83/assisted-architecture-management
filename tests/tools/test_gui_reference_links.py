@@ -39,7 +39,7 @@ def test_build_reference_markdown_uses_relative_path_for_new_document_draft() ->
         """
         import { buildReferenceMarkdown, draftDocumentPath } from './tools/gui/src/ui/lib/referenceLinks.js'
         const value = buildReferenceMarkdown({
-          currentPath: draftDocumentPath('adr'),
+          currentPath: draftDocumentPath('adr', 'decisions/adr'),
           targetPath: '/tmp/ws/engagements/ENG/architecture-repository/documents/spec/SPE@2.b.target.md',
           title: 'Target Spec',
           section: 'Decision',
@@ -47,7 +47,17 @@ def test_build_reference_markdown_uses_relative_path_for_new_document_draft() ->
         console.log(value)
         """,
     )
-    assert output == '[Target Spec - Decision](../spec/SPE@2.b.target.md#decision)'
+    assert output == '[Target Spec - Decision](../../spec/SPE@2.b.target.md#decision)'
+
+
+def test_draft_document_path_uses_configured_subdirectory() -> None:
+    output = _run_node(
+        """
+        import { draftDocumentPath } from './tools/gui/src/ui/lib/referenceLinks.js'
+        console.log(draftDocumentPath('adr', 'decisions/adr'))
+        """,
+    )
+    assert output == 'documents/decisions/adr/__draft__.md'
 
 
 def test_repo_relative_normalization_strips_absolute_prefix() -> None:

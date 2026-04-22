@@ -1,8 +1,8 @@
 """MCP write tools: document create, edit, delete."""
 from mcp.server.fastmcp import FastMCP  # type: ignore[import-not-found]
 from src.tools.artifact_mcp.write._common import (
-    WriteRepoScope, _out, clear_caches_for_repo, artifact_write_ops,
-    resolve_repo_roots, roots_key, verifier_for, RepoPreset,
+    _out, clear_caches_for_repo, artifact_write_ops,
+    resolve_repo_roots, roots_key, verifier_for,
 )
 
 
@@ -19,11 +19,10 @@ def artifact_create_document(
     last_updated: str | None = None,
     dry_run: bool = True,
     repo_root: str | None = None,
-    repo_preset: RepoPreset | None = None,
 ) -> dict[str, object]:
     roots = resolve_repo_roots(
         repo_scope="engagement", repo_root=repo_root,
-        repo_preset=repo_preset, enterprise_root=None,
+        repo_preset=None, enterprise_root=None,
     )
     result = artifact_write_ops.create_document(
         repo_root=roots[0],
@@ -55,11 +54,10 @@ def artifact_edit_document(
     last_updated: str | None = None,
     dry_run: bool = True,
     repo_root: str | None = None,
-    repo_preset: RepoPreset | None = None,
 ) -> dict[str, object]:
     roots = resolve_repo_roots(
         repo_scope="engagement", repo_root=repo_root,
-        repo_preset=repo_preset, enterprise_root=None,
+        repo_preset=None, enterprise_root=None,
     )
     result = artifact_write_ops.edit_document(
         repo_root=roots[0],
@@ -83,11 +81,10 @@ def artifact_delete_document(
     artifact_id: str,
     dry_run: bool = True,
     repo_root: str | None = None,
-    repo_preset: RepoPreset | None = None,
 ) -> dict[str, object]:
     roots = resolve_repo_roots(
         repo_scope="engagement", repo_root=repo_root,
-        repo_preset=repo_preset, enterprise_root=None,
+        repo_preset=None, enterprise_root=None,
     )
     result = artifact_write_ops.delete_document(
         repo_root=roots[0],

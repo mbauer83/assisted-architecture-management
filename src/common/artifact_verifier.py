@@ -536,7 +536,7 @@ class ArtifactVerifier:
 def _infer_repo_root_for_document(path: Path) -> Path | None:
     """Walk up from a document path to find the repo root (parent of documents/)."""
     for parent in path.parents:
-        if (parent / "documents").exists() and (parent / ".arch").exists():
+        if (parent / "documents").exists() and (parent / ".arch-repo").exists():
             return parent
         if (parent / "documents").exists() and (parent / "model").exists():
             return parent

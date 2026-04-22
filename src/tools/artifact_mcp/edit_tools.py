@@ -6,16 +6,12 @@ from mcp.server.fastmcp import FastMCP  # type: ignore[import-not-found]
 
 from src.tools import artifact_write_ops
 from src.tools.artifact_mcp.context import (
-    RepoPreset,
     clear_caches_for_repo,
     registry_cached,
     resolve_repo_roots,
     roots_key,
     verifier_for,
 )
-
-WriteRepoScope = artifact_write_ops.WriteRepoScope
-
 
 def _result_dict(dry_run: bool, result: artifact_write_ops.WriteResult) -> dict[str, object]:
     out: dict[str, object] = {
@@ -32,10 +28,10 @@ def _result_dict(dry_run: bool, result: artifact_write_ops.WriteResult) -> dict[
     return out
 
 
-def _resolve(repo_root, repo_preset, *, need_registry: bool):
+def _resolve(repo_root, *, need_registry: bool):
     roots = resolve_repo_roots(
         repo_scope="engagement", repo_root=repo_root,
-        repo_preset=repo_preset, enterprise_root=None,
+        repo_preset=None, enterprise_root=None,
     )
     key = roots_key(roots)
     registry = registry_cached(key) if need_registry else None
@@ -55,13 +51,8 @@ def artifact_edit_entity(
     status: str | None = None,
     dry_run: bool = True,
     repo_root: str | None = None,
-    repo_preset: RepoPreset | None = None,
-    repo_scope: WriteRepoScope = "engagement",
 ) -> dict[str, object]:
-    if repo_scope != "engagement":
-        raise ValueError("artifact_edit_entity only supports repo_scope='engagement'")
-
-    root, registry, verifier = _resolve(repo_root, repo_preset, need_registry=True)
+    root, registry, verifier = _resolve(repo_root, need_registry=True)
 
     kwargs: dict[str, Any] = {}
     if name is not None:
@@ -101,18 +92,13 @@ def artifact_edit_connection(
     tgt_cardinality: str | None = None,
     dry_run: bool = True,
     repo_root: str | None = None,
-    repo_preset: RepoPreset | None = None,
-    repo_scope: WriteRepoScope = "engagement",
 ) -> dict[str, object]:
     """Edit or remove a connection.
 
     For operation='update': description, src_cardinality, tgt_cardinality are
     applied. Pass "" for a cardinality to remove it; omit (None) to preserve it.
     """
-    if repo_scope != "engagement":
-        raise ValueError("artifact_edit_connection only supports repo_scope='engagement'")
-
-    root, registry, verifier = _resolve(repo_root, repo_preset, need_registry=True)
+    root, registry, verifier = _resolve(repo_root, need_registry=True)
 
     if operation == "remove":
         result = artifact_write_ops.remove_connection(
@@ -145,13 +131,8 @@ def artifact_edit_diagram(
     status: str | None = None,
     dry_run: bool = True,
     repo_root: str | None = None,
-    repo_preset: RepoPreset | None = None,
-    repo_scope: WriteRepoScope = "engagement",
 ) -> dict[str, object]:
-    if repo_scope != "engagement":
-        raise ValueError("artifact_edit_diagram only supports repo_scope='engagement'")
-
-    root, _registry, verifier = _resolve(repo_root, repo_preset, need_registry=True)
+    root, _registry, verifier = _resolve(repo_root, need_registry=True)
 
     kwargs: dict[str, Any] = {}
     if puml is not None:
@@ -182,14 +163,9 @@ def artifact_edit_connection_associations(
     remove_entities: list[str] | None = None,
     dry_run: bool = True,
     repo_root: str | None = None,
-    repo_preset: RepoPreset | None = None,
-    repo_scope: WriteRepoScope = "engagement",
 ) -> dict[str, object]:
     """Add or remove second-order association entity IDs from a connection."""
-    if repo_scope != "engagement":
-        raise ValueError("artifact_edit_connection_associations only supports repo_scope='engagement'")
-
-    root, registry, verifier = _resolve(repo_root, repo_preset, need_registry=True)
+    root, registry, verifier = _resolve(repo_root, need_registry=True)
     from src.tools.artifact_write.connection_edit import edit_connection_associations
     result = edit_connection_associations(
         repo_root=root, registry=registry, verifier=verifier,
@@ -207,13 +183,8 @@ def artifact_delete_entity(
     artifact_id: str,
     dry_run: bool = True,
     repo_root: str | None = None,
-    repo_preset: RepoPreset | None = None,
-    repo_scope: WriteRepoScope = "engagement",
 ) -> dict[str, object]:
-    if repo_scope != "engagement":
-        raise ValueError("artifact_delete_entity only supports repo_scope='engagement'")
-
-    root, registry, _verifier = _resolve(repo_root, repo_preset, need_registry=True)
+    root, registry, _verifier = _resolve(repo_root, need_registry=True)
     result = artifact_write_ops.delete_entity(
         repo_root=root,
         registry=registry,
@@ -229,13 +200,8 @@ def artifact_delete_diagram(
     artifact_id: str,
     dry_run: bool = True,
     repo_root: str | None = None,
-    repo_preset: RepoPreset | None = None,
-    repo_scope: WriteRepoScope = "engagement",
 ) -> dict[str, object]:
-    if repo_scope != "engagement":
-        raise ValueError("artifact_delete_diagram only supports repo_scope='engagement'")
-
-    root, _registry, _verifier = _resolve(repo_root, repo_preset, need_registry=False)
+    root, _registry, _verifier = _resolve(repo_root, need_registry=False)
     result = artifact_write_ops.delete_diagram(
         repo_root=root,
         clear_repo_caches=clear_caches_for_repo,

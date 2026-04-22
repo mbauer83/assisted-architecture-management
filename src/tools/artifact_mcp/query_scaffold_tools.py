@@ -13,7 +13,6 @@ from mcp.server.fastmcp import FastMCP  # type: ignore[import-not-found]
 
 from src.common.archimate_relation_rendering import render_archimate_relation
 from src.tools.artifact_mcp.context import (
-    RepoPreset,
     RepoScope,
     repo_cached,
     resolve_repo_roots,
@@ -302,8 +301,6 @@ def artifact_diagram_scaffold(
     diagram_name: str = "Architecture Diagram",
     direction: Literal["top_to_bottom", "left_to_right"] = "top_to_bottom",
     repo_root: str | None = None,
-    repo_preset: RepoPreset | None = None,
-    enterprise_root: str | None = None,
     repo_scope: RepoScope = "both",
 ) -> dict[str, object]:
     """Generate a PUML scaffold for artifact_create_diagram.
@@ -316,8 +313,8 @@ def artifact_diagram_scaffold(
     roots = resolve_repo_roots(
         repo_scope=repo_scope,
         repo_root=repo_root,
-        repo_preset=repo_preset,
-        enterprise_root=enterprise_root,
+        repo_preset=None,
+        enterprise_root=None,
     )
     repo = repo_cached(roots_key(roots))
 

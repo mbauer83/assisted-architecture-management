@@ -109,8 +109,7 @@ def test_model_query_mcp_projection_and_aggregate_tool(tmp_path: Path) -> None:
     listed = tool_map["artifact_query_list_artifacts"].fn(
         repo_root=str(repo_root),
         repo_scope="engagement",
-        include_connections=False,
-        include_diagrams=False,
+        include_record_types=["entities"],
         fields=["artifact_id", "path"],
     )
     assert listed
@@ -121,8 +120,7 @@ def test_model_query_mcp_projection_and_aggregate_tool(tmp_path: Path) -> None:
         repo_root=str(repo_root),
         repo_scope="engagement",
         fields=["artifact_id", "record_type", "score"],
-        include_connections=False,
-        include_diagrams=True,
+        include_record_types=["entities", "diagrams", "documents"],
         prefer_record_type="diagram",
     )
     assert searched["hits"]

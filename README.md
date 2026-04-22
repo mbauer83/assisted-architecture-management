@@ -1,6 +1,6 @@
 # Scalable Architecture Management for Humans and AI
 
-A framework for managing software architecture in a structured, git-versioned, and discoverable way — designed to work equally well for human practitioners and AI agents.
+A system for managing software architecture in a structured, git-versioned, and discoverable way — designed to work equally well for human practitioners and AI agents.
 
 ## Purpose and Goals
 
@@ -12,7 +12,7 @@ The key ideas:
 - **AI-native access**: an MCP server exposes the model to AI agents as typed tools — query, search, graph-traverse, create, edit, promote — without the agent needing to know the file layout.
 - **Human access**: a REST API, a CLI, and a browser GUI provide the same capabilities for humans.
 - **Verified integrity**: a built-in verifier enforces referential integrity, schema conformance, diagram syntax, and cross-repo reference rules.
-- **Self-describing**: this repository contains an ArchiMate model of its own architecture — the tooling, requirements, principles, components, and design decisions are all modelled using the framework itself (see `engagements/ENG-ARCH-REPO/`).
+- **Self-describing**: this repository contains an ArchiMate model of its own architecture — the tooling, requirements, principles, components, and design decisions are all modelled using the repository itself (see `engagements/ENG-ARCH-REPO/`).
 
 ## Two-Tiered Architecture
 
@@ -57,7 +57,7 @@ Run `arch-init` to validate paths (or clone git repos) and write `.arch/init-sta
 ```
 src/
   common/          # Core library: parsing, verification, query, write, connection ontology
-  tools/           # Entry-point servers: MCP model, MCP framework, GUI REST, arch-init
+  tools/           # Entry-point servers: MCP/REST backend, GUI server wrapper, arch-init
 tools/
   gui/             # Vue 3 + TypeScript SPA (hexagonal ports-and-adapters)
 engagements/
@@ -69,54 +69,57 @@ arch-workspace.yaml
 
 ## Tooling
 
-The framework exposes three interfaces over the same underlying model.
+The repository exposes three interfaces over the same underlying artifacts.
 
 ### MCP Server (primary — AI agent access)
 
-The MCP model server is the intended interface for AI agents (Claude, Copilot, etc.). It exposes typed tools for querying, verification, authoring, and promotion:
+The MCP server is the primary interface for AI agents. It exposes typed `artifact_*` tools for querying, verification, authoring, and promotion across entities, connections, diagrams, and documents.
 
-**Model query**
-
-| Tool | Purpose |
-|------|---------|
-| `model_query_stats` | Model counts and grouped breakdowns |
-| `model_query_list_artifacts` | Metadata listing with domain/type/status filters |
-| `model_query_read_artifact` | Read one artifact in summary or full mode |
-| `model_query_search_artifacts` | Ranked artifact search across entities, connections, and diagrams |
-| `model_query_find_neighbors` | Graph traversal from a starting entity |
-| `model_query_find_connections_for` | Connections touching an entity with direction/type filters |
-| `model_diagram_scaffold` | Suggest diagram scope and PUML scaffolding from selected entities |
-
-**Model write / edit**
+**Artifact query**
 
 | Tool | Purpose |
 |------|---------|
-| `model_write_help` | Catalog of valid entity and connection types |
-| `model_write_modeling_guidance` | Focused modeling guidance by domain or entity type |
-| `model_create_entity` | Create entity (with dry-run) |
-| `model_edit_entity` | Edit existing entity fields |
-| `model_delete_entity` | Delete an entity with dependency checks |
-| `model_add_connection` | Add connection between entities (with dry-run) |
-| `model_edit_connection` | Edit or remove an existing connection |
-| `model_edit_connection_associations` | Add or remove `§assoc` second-order associations |
-| `model_create_diagram` | Create an ArchiMate diagram from PUML |
-| `model_edit_diagram` | Edit an existing diagram |
-| `model_delete_diagram` | Delete a diagram and rendered siblings |
-| `model_create_matrix` | Create connection matrix (structured table view) |
-| `model_promote_to_enterprise` | Promote entity + transitive closure to enterprise repo |
+| `artifact_query_stats` | Repository counts and grouped breakdowns |
+| `artifact_query_list_artifacts` | Metadata listing with domain/type/status filters |
+| `artifact_query_read_artifact` | Read one artifact in summary or full mode; supports document section reads |
+| `artifact_query_search_artifacts` | Ranked search across entities, connections, diagrams, and documents |
+| `artifact_query_find_neighbors` | Graph traversal from a starting entity |
+| `artifact_query_find_connections_for` | Connections touching an entity with direction/type filters |
+| `artifact_diagram_scaffold` | Suggest diagram scope and PUML scaffolding from selected entities |
 
-**Model verification**
+**Artifact write / edit**
 
 | Tool | Purpose |
 |------|---------|
-| `model_verify` | Verify one file or the whole repo, with summary or full issue detail |
+| `artifact_write_help` | Catalog of valid entity and connection types |
+| `artifact_write_modeling_guidance` | Focused modeling guidance by domain or entity type |
+| `artifact_create_entity` | Create entity (with dry-run) |
+| `artifact_edit_entity` | Edit existing entity fields |
+| `artifact_delete_entity` | Delete an entity with dependency checks |
+| `artifact_add_connection` | Add connection between entities (with dry-run) |
+| `artifact_edit_connection` | Edit or remove an existing connection |
+| `artifact_edit_connection_associations` | Add or remove `§assoc` second-order associations |
+| `artifact_create_diagram` | Create an ArchiMate diagram from PUML |
+| `artifact_edit_diagram` | Edit an existing diagram |
+| `artifact_delete_diagram` | Delete a diagram and rendered siblings |
+| `artifact_create_matrix` | Create connection matrix (structured table view) |
+| `artifact_create_document` | Create a document from a configured doc type |
+| `artifact_edit_document` | Edit an existing document |
+| `artifact_delete_document` | Delete a document |
+| `artifact_promote_to_enterprise` | Promote entity + transitive closure to enterprise repo |
+
+**Artifact verification**
+
+| Tool | Purpose |
+|------|---------|
+| `artifact_verify` | Verify one file or the whole repo, with summary or full issue detail |
 
 Configure in `.mcp.json` (Claude Code) or `.vscode/mcp.json` (VS Code):
 
 ```json
 {
   "mcpServers": {
-    "arch-model": {
+    "arch-repo": {
       "command": "uv",
       "args": ["run", "arch-mcp-stdio"]
     }
@@ -130,8 +133,6 @@ This is intended to work well with MCP hosts that eagerly start configured serve
 
 When `arch-workspace.yaml` is present and `arch-init` has been run, the backend discovers both repos from `.arch/init-state.yaml`. The env var override is still supported for direct standalone server use.
 
-For backward compatibility inside the Python entry point, `arch-mcp-model --transport stdio` also attaches to the unified backend by default. Use `--standalone-stdio` only when you explicitly want a direct one-process stdio server.
-
 By default, the launcher manages a local host backend. It does **not** guess that a Dockerized or otherwise external backend is already running just because something responds on port `8000`.
 
 To attach MCP launchers to an externally managed backend instead, set:
@@ -139,7 +140,7 @@ To attach MCP launchers to an externally managed backend instead, set:
 ```json
 {
   "mcpServers": {
-    "arch-model": {
+    "arch-repo": {
       "command": "uv",
       "args": ["run", "arch-mcp-stdio"],
       "env": {
@@ -151,29 +152,6 @@ To attach MCP launchers to an externally managed backend instead, set:
 ```
 
 That makes the deployment choice explicit and avoids ambiguous startup behavior.
-
-`arch-mcp-watch` is a separate optional MCP server for explicit watcher lifecycle control:
-
-| Tool | Purpose |
-|------|---------|
-| `model_tools_watch` | Start, stop, or inspect the model auto-refresh watcher |
-| `model_tools_refresh` | Force a synchronous model refresh |
-
-A second MCP server (`arch-mcp-framework`) provides section-level search and reference-graph traversal over the `docs/` directory (ADRs, standards, specs):
-
-| Tool | Purpose |
-|------|---------|
-| `framework_query_stats` | Document and index statistics |
-| `framework_query_list_docs` | List indexed docs |
-| `framework_query_read_doc` | Read a document |
-| `framework_query_list_sections` | List document sections |
-| `framework_query_search_docs` | Search docs and sections |
-| `framework_query_neighbors` | Traverse reference graph neighbors |
-| `framework_query_related_docs` | Find docs related by references |
-| `framework_query_resolve_ref` | Resolve a specific cross-reference |
-| `framework_query_path` / `framework_query_path_batch` | Compute paths in the reference graph |
-| `framework_query_missing_links` | Find missing or broken references |
-| `framework_query_validate_refs` | Validate cross-reference integrity |
 
 ### REST API (GUI backend and programmatic access)
 
@@ -224,6 +202,18 @@ A second MCP server (`arch-mcp-framework`) provides section-level search and ref
 | `POST /api/connection/associate` | Add or remove connection associations |
 | `POST /api/connection/remove` | Remove connection (`dry_run` supported) |
 | `POST /api/cleanup-broken-refs` | Find and optionally clean up broken GRF proxies |
+
+**Documents**
+
+| Endpoint | Description |
+|----------|-------------|
+| `GET /api/document-types` | List configured document types and required sections |
+| `GET /api/document-schemata` | Read raw document-type schemata |
+| `GET /api/documents` | List documents (`?doc_type=`, `?status=`, `?limit=`, `?offset=`) |
+| `GET /api/document?id=` | Read one document |
+| `POST /api/document` | Create document (`dry_run` supported) |
+| `PUT /api/document/{id}` | Edit document (`dry_run` supported) |
+| `DELETE /api/document/{id}?dry_run=` | Delete document |
 
 **Promotion**
 

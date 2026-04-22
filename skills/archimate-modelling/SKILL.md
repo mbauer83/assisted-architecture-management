@@ -1,5 +1,5 @@
 ---
-name: archimate-modeling
+name: archimate-modelling
 description: >
   Use this skill whenever you are working with the ArchiMate NEXT architecture repository
   in this project — creating entities, adding connections, reading or exploring model
@@ -13,14 +13,14 @@ description: >
   is any chance it applies, use it.
 ---
 
-# ArchiMate NEXT Modeling Skill
+# ArchiMate NEXT Modelling Skill
 
 All model access and mutations go through `model_*` MCP tools from the `arch-model`
 server. Never read or write model files directly.
 
 ---
 
-## Modeling Principles
+## Modelling Principles
 
 Apply these before deciding what to create. They govern *when* and *how much* to model.
 
@@ -28,7 +28,7 @@ Apply these before deciding what to create. They govern *when* and *how much* to
 
 ArchiMate is a notation language, not a thinking framework. Before deciding which element types to use, reason about the problem domain and solution domain from first principles:
 
-- **Problem domain:** What forces, trends, or conditions is this enterprise subject to? What do stakeholders actually care about and why? What problems are unresolved? Research and reason about this — don't just transcribe what the user says. The quality of the motivation layer depends on genuine understanding of the drivers at work.
+- **Problem domain:** What forces, trends, or conditions is this task subject to? What do stakeholders actually care about and why? What problems are unresolved? Research and reason about this, then dialectically work towards a shared understanding with the user — don't just transcribe what the user says. The quality of the motivation layer depends on genuine understanding of the drivers at work.
 - **Solution domain:** What capabilities, processes, and components actually address these problems? What does the architecture provide that changes the situation? Again, reason about the solution before selecting element types.
 
 ArchiMate elements should map onto real domain concepts that have been understood first. Choose the element type *after* you have identified the concept, not by fitting available concepts into pre-selected types. When in doubt, name the concept clearly and then ask: which ArchiMate type fits best?
