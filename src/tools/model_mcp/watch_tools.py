@@ -1,22 +1,27 @@
 
-import hashlib
 import threading
 import time
-from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
 from mcp.server.fastmcp import FastMCP  # type: ignore[import-not-found]
 
-from src.tools.model_mcp.context import RepoPreset, RepoScope, refresh_caches_for_repo, resolve_repo_roots
+from src.tools.model_mcp.context import (
+    RepoPreset,
+    RepoScope,
+    enqueue_refresh_for_roots,
+    resolve_repo_roots,
+    sync_refresh_for_roots,
+)
+from src.common.model_index.coordination import suppress_redundant_refresh_paths
 
 
 # ---------------------------------------------------------------------------
-# Fingerprinting
+# Snapshotting
 # ---------------------------------------------------------------------------
 
-def _repo_state_fingerprint(repo_path: Path) -> str:
-    digest = hashlib.blake2b(digest_size=16)
+def _repo_state_snapshot(repo_path: Path) -> dict[str, tuple[int, int]]:
+    snapshot: dict[str, tuple[int, int]] = {}
     for sub in ("model", "diagram-catalog/diagrams"):
         root = repo_path / sub
         if not root.exists():
@@ -26,20 +31,31 @@ def _repo_state_fingerprint(repo_path: Path) -> str:
                 if p.is_file():
                     st = p.stat()
                     rel = p.relative_to(repo_path).as_posix()
-                    digest.update(rel.encode("utf-8"))
-                    digest.update(str(int(st.st_mtime_ns)).encode("ascii"))
-                    digest.update(str(int(st.st_size)).encode("ascii"))
+                    snapshot[rel] = (int(st.st_mtime_ns), int(st.st_size))
             except OSError:
                 continue
-    return digest.hexdigest()
+    return snapshot
 
 
-def _roots_state_fingerprint(roots: list[Path]) -> str:
-    digest = hashlib.blake2b(digest_size=16)
-    for root in roots:
-        digest.update(str(root.resolve()).encode("utf-8"))
-        digest.update(_repo_state_fingerprint(root).encode("ascii"))
-    return digest.hexdigest()
+def _roots_state_snapshot(roots: list[Path]) -> dict[Path, dict[str, tuple[int, int]]]:
+    return {root.resolve(): _repo_state_snapshot(root) for root in roots}
+
+
+def _diff_snapshots(
+    previous: dict[Path, dict[str, tuple[int, int]]],
+    current: dict[Path, dict[str, tuple[int, int]]],
+) -> tuple[list[Path], bool]:
+    changed: list[Path] = []
+    missing_roots = set(previous) ^ set(current)
+    if missing_roots:
+        return [], True
+    for root, current_files in current.items():
+        previous_files = previous.get(root, {})
+        rels = set(previous_files) | set(current_files)
+        for rel in rels:
+            if previous_files.get(rel) != current_files.get(rel):
+                changed.append(root / rel)
+    return changed, False
 
 
 def _roots_key(roots: list[Path]) -> str:
@@ -47,89 +63,16 @@ def _roots_key(roots: list[Path]) -> str:
 
 
 # ---------------------------------------------------------------------------
-# Refresh coordinator — deduplicates concurrent triggers (watcher, periodic, tool)
-#
-# Design: lock + pending Event per roots-key.
-#   schedule_refresh()  — non-blocking; sets pending; starts bg thread if lock is free.
-#   sync_refresh()      — blocking; waits for any in-progress refresh, then runs one more.
-#
-# Guarantee: at most one refresh worker runs at a time per roots-key.
-# If a new trigger arrives while a refresh is in progress, the worker sees the
-# pending flag after finishing and runs one additional pass — no pile-up.
+# Refresh queue wrappers
 # ---------------------------------------------------------------------------
-
-@dataclass
-class _RefreshCoord:
-    lock: threading.Lock = field(default_factory=threading.Lock)
-    pending: threading.Event = field(default_factory=threading.Event)
-
-
-_refresh_coords: dict[str, _RefreshCoord] = {}
-_refresh_mu = threading.Lock()
-
-
-def _coord(roots: list[Path]) -> _RefreshCoord:
-    key = _roots_key(roots)
-    with _refresh_mu:
-        if key not in _refresh_coords:
-            _refresh_coords[key] = _RefreshCoord()
-        return _refresh_coords[key]
-
-
-def _do_refresh(roots: list[Path]) -> None:
-    """Perform the actual cache clear + macro regeneration."""
-    refresh_caches_for_repo(roots)
-    try:
-        from src.tools.generate_macros import generate_macros  # noqa: PLC0415
-    except ImportError:
-        return
-    for root in roots:
-        if (root / "model").is_dir():
-            try:
-                generate_macros(root)
-            except Exception:  # noqa: BLE001
-                pass
-
-
-def _refresh_worker(roots: list[Path], coord: _RefreshCoord) -> None:
-    """Background worker: drain pending refreshes; release lock when quiescent."""
-    try:
-        while True:
-            coord.pending.clear()
-            _do_refresh(roots)
-            if not coord.pending.is_set():
-                break
-    except Exception:  # noqa: BLE001
-        pass
-    finally:
-        coord.lock.release()
 
 
 def schedule_refresh(roots: list[Path]) -> None:
-    """Non-blocking: request one refresh. Deduplicates if one is already running."""
-    c = _coord(roots)
-    c.pending.set()
-    if c.lock.acquire(blocking=False):
-        t = threading.Thread(
-            target=_refresh_worker,
-            args=(roots, c),
-            daemon=True,
-            name=f"model-refresh:{_roots_key(roots)}",
-        )
-        t.start()
-    # else: in-progress worker will see pending and do one more pass
+    enqueue_refresh_for_roots(roots, full_refresh=True)
 
 
 def sync_refresh(roots: list[Path]) -> None:
-    """Blocking: wait for any in-progress refresh, then run one synchronously."""
-    c = _coord(roots)
-    c.pending.set()
-    c.lock.acquire()  # wait for any running worker
-    try:
-        c.pending.clear()
-        _do_refresh(roots)
-    finally:
-        c.lock.release()
+    sync_refresh_for_roots(roots)
 
 
 # ---------------------------------------------------------------------------
@@ -149,7 +92,7 @@ def _watcher_loop(
     periodic_refresh_s: float | None = None,
 ) -> None:
     repo_key = _roots_key(roots)
-    last_fp = _roots_state_fingerprint(roots)
+    last_snapshot = _roots_state_snapshot(roots)
     last_periodic = time.monotonic()
     with _watch_lock:
         _watch_state[repo_key] = {
@@ -157,7 +100,7 @@ def _watcher_loop(
             "interval_s": interval_s,
             "periodic_refresh_s": periodic_refresh_s,
             "running": True,
-            "last_fingerprint": last_fp,
+            "last_fingerprint": f"{sum(len(files) for files in last_snapshot.values())} files",
             "last_refresh_time": None,
             "refresh_count": 0,
         }
@@ -166,19 +109,25 @@ def _watcher_loop(
         time.sleep(interval_s)
         try:
             now = time.monotonic()
-            fp = _roots_state_fingerprint(roots)
+            snapshot = _roots_state_snapshot(roots)
+            changed_paths, must_full_refresh = _diff_snapshots(last_snapshot, snapshot)
+            if changed_paths and not must_full_refresh:
+                changed_paths = suppress_redundant_refresh_paths(roots, changed_paths)
             force = (
                 periodic_refresh_s is not None
                 and (now - last_periodic) >= periodic_refresh_s
             )
-            if fp != last_fp or force:
-                schedule_refresh(roots)
-                last_fp = fp
+            if changed_paths or force or must_full_refresh:
+                if force or must_full_refresh or len(changed_paths) > 64:
+                    enqueue_refresh_for_roots(roots, full_refresh=True)
+                else:
+                    enqueue_refresh_for_roots(roots, changed_paths=changed_paths)
+                last_snapshot = snapshot
                 if force:
                     last_periodic = now
                 with _watch_lock:
                     st = _watch_state.get(repo_key, {})
-                    st["last_fingerprint"] = fp
+                    st["last_fingerprint"] = f"{sum(len(files) for files in snapshot.values())} files"
                     st["last_refresh_time"] = time.time()
                     prev = st.get("refresh_count", 0)
                     st["refresh_count"] = (prev + 1) if isinstance(prev, int) else 1
@@ -202,13 +151,13 @@ def _start_watcher(
     with _watch_lock:
         if repo_key in _watch_threads and _watch_threads[repo_key].is_alive():
             return {"repo_roots": [str(r) for r in roots], "started": False, "reason": "already_running"}
-        fp = _roots_state_fingerprint(roots)
+        snapshot = _roots_state_snapshot(roots)
         _watch_state[repo_key] = {
             "repo_roots": [str(r) for r in roots],
             "interval_s": interval_s,
             "periodic_refresh_s": periodic_refresh_s,
             "running": True,
-            "last_fingerprint": fp,
+            "last_fingerprint": f"{sum(len(files) for files in snapshot.values())} files",
             "last_refresh_time": None,
             "refresh_count": 0,
         }

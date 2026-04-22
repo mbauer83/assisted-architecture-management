@@ -185,7 +185,7 @@ def _delete_entity_core(
     except Exception:  # noqa: BLE001
         warnings.append("Macro regeneration skipped after deletion")
 
-    clear_repo_caches(repo_root)
+    clear_repo_caches(entity_file)
     return WriteResult(
         wrote=True,
         path=entity_file,

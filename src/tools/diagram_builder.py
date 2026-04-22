@@ -17,6 +17,7 @@ import tempfile
 from collections import defaultdict
 from pathlib import Path
 
+from src.common.archimate_relation_rendering import display_connection_label, render_archimate_relation
 from src.common.model_query_parsing import normalize_puml_alias
 from src.common.model_query_types import ConnectionRecord, EntityRecord
 from src.common.ontology_loader import (
@@ -109,10 +110,6 @@ def _ordered_type_groups(entities: list[EntityRecord]) -> list[tuple[str, list[E
     return [(labels[artifact_type], grouped[artifact_type]) for artifact_type in ordered_types]
 
 
-def _display_connection_label(conn_type: str) -> str:
-    return conn_type.removeprefix("archimate-")
-
-
 def generate_archimate_puml_body(
     name: str,
     entity_records: list[EntityRecord],
@@ -129,7 +126,8 @@ def generate_archimate_puml_body(
 
     Entities are grouped by domain; composition/aggregation children are nested
     inside their parent declarations.  Junction entities render as circles.
-    Connections use the canonical ``SRC --> TGT : <<conn_type>>`` format.
+    ArchiMate connections render via PlantUML ArchiMate relation macros when
+    available; other connections fall back to infix arrow syntax.
     """
     diagram_name = re.sub(r"[^a-zA-Z0-9_-]", "-", name.lower()).strip("-") or "diagram"
     is_archimate = "archimate" in diagram_type.lower()
@@ -262,14 +260,20 @@ def generate_archimate_puml_body(
         src = alias_by_id.get(conn.source)
         tgt = alias_by_id.get(conn.target)
         if src and tgt:
-            arrow = ct.puml_arrow if ct else "-->"
+            direction: str | None = None
             if single_domain:
                 src_group = group_index_by_alias.get(src)
                 tgt_group = group_index_by_alias.get(tgt)
                 if src_group is not None and tgt_group is not None and src_group != tgt_group:
                     direction = "down" if src_group < tgt_group else "up"
-                    arrow = _insert_arrow_direction(arrow, direction)
-            conn_lines.append(f"{src} {arrow} {tgt} : <<{_display_connection_label(conn.conn_type)}>>")
+            macro_line = render_archimate_relation(src, tgt, conn.conn_type, direction=direction, label_text="")
+            if macro_line is not None:
+                conn_lines.append(macro_line)
+                continue
+            arrow = ct.puml_arrow if ct else "-->"
+            if direction:
+                arrow = _insert_arrow_direction(arrow, direction)
+            conn_lines.append(f"{src} {arrow} {tgt} : <<{display_connection_label(conn.conn_type)}>>")
     if conn_lines:
         lines.append("' Connections")
         lines.extend(conn_lines)
@@ -289,7 +293,7 @@ def _render_puml(
     for SVG, or ``None`` on failure.  No files are written to the model.
     """
     from src.common.model_verifier_syntax import find_plantuml_jar
-    from src.common.settings import render_dpi
+    from src.common.settings import plantuml_limit_size, render_dpi
 
     warnings: list[str] = []
     jar = find_plantuml_jar()
@@ -320,7 +324,7 @@ def _render_puml(
 
         with tempfile.TemporaryDirectory() as out_dir:
             cmd = [
-                "java", "-Djava.awt.headless=true", "-DPLANTUML_LIMIT_SIZE=16384", "-jar", str(jar.resolve()),
+                "java", "-Djava.awt.headless=true", f"-DPLANTUML_LIMIT_SIZE={plantuml_limit_size()}", "-jar", str(jar.resolve()),
                 f"-t{fmt}",
             ]
             if fmt == "png":

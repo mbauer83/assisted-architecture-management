@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Literal, cast
+from typing import Iterable, Literal, cast
 
 from src.common._model_query_helpers import (
     matches_connection as _matches_connection,
@@ -21,6 +21,7 @@ from src.common._model_query_helpers import (
     summary_group_key as _summary_group_key,
     to_set as _to_set,
 )
+from src.common.model_index import ReadModelVersion
 from src.common.model_index import shared_model_index
 from src.common.model_query_scoring import score_connection, score_diagram, score_entity, tokenize
 from src.common.model_query_types import (
@@ -77,6 +78,27 @@ class ModelRepository:
 
     def refresh(self) -> None:
         self._index.refresh()
+
+    def read_model_version(self) -> ReadModelVersion:
+        return self._index.read_model_version()
+
+    def apply_file_change(self, path: Path) -> None:
+        if path.name.endswith(".outgoing.md"):
+            self._index.apply_outgoing_file_change(path)
+            return
+        if self._index._is_diagram_source_path(path):
+            self._index.apply_diagram_file_change(path)
+            return
+        if path.suffix == ".md":
+            self._index.apply_entity_file_change(path)
+            return
+        self.refresh()
+
+    def apply_file_changes(self, paths: Iterable[Path]) -> ReadModelVersion:
+        return self._index.apply_file_changes(list(paths))
+
+    def read_entity_context(self, artifact_id: str) -> dict[str, object] | None:
+        return self._index.read_entity_context(artifact_id)
 
     def get_entity(self, artifact_id: str) -> EntityRecord | None:
         return self._index.get_entity(artifact_id)

@@ -10,6 +10,7 @@ _DEFAULTS = {
         "archimate_type_markers": "labels",
         "sprite_scale": 1.5,
         "render_dpi": 150,
+        "plantuml_limit_size": 16384,
     }
 }
 
@@ -42,3 +43,11 @@ def render_dpi() -> int:
         return max(72, int(value))
     except (TypeError, ValueError):
         return 150
+
+
+def plantuml_limit_size() -> int:
+    value = load_settings()["diagrams"].get("plantuml_limit_size", 16384)
+    try:
+        return max(4096, int(value))
+    except (TypeError, ValueError):
+        return 16384

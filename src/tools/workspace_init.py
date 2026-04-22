@@ -23,39 +23,14 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 import yaml
-
-
-# ---------------------------------------------------------------------------
-# Config schema
-# ---------------------------------------------------------------------------
-
-CONFIG_FILENAME = "arch-workspace.yaml"
-STATE_DIR = ".arch"
-STATE_FILENAME = "init-state.yaml"
-
-
-def _find_config(start: Path) -> Path | None:
-    """Walk *start* and its parents looking for CONFIG_FILENAME."""
-    current = start.resolve()
-    while True:
-        candidate = current / CONFIG_FILENAME
-        if candidate.is_file():
-            return candidate
-        parent = current.parent
-        if parent == current:
-            return None
-        current = parent
-
-
-def _parse_config(path: Path) -> dict:
-    with open(path, encoding="utf-8") as fh:
-        data = yaml.safe_load(fh)
-    if not isinstance(data, dict):
-        raise SystemExit(f"ERROR: {path} must be a YAML mapping")
-    for key in ("engagement", "enterprise"):
-        if key not in data:
-            raise SystemExit(f"ERROR: {path} is missing required key '{key}'")
-    return data
+from src.common.workspace_paths import (
+    CONFIG_FILENAME,
+    STATE_DIR,
+    STATE_FILENAME,
+    find_workspace_config as _find_config,
+    load_workspace_state as load_init_state,
+    parse_workspace_config as _parse_config,
+)
 
 
 # ---------------------------------------------------------------------------
@@ -186,21 +161,6 @@ def _write_state(
     return state_path
 
 
-def load_init_state(start: Path | None = None) -> dict | None:
-    """Load init state from .arch/init-state.yaml, or None if not found.
-
-    Walks from *start* (default CWD) up to filesystem root.
-    """
-    current = (start or Path.cwd()).resolve()
-    while True:
-        candidate = current / STATE_DIR / STATE_FILENAME
-        if candidate.is_file():
-            with open(candidate, encoding="utf-8") as fh:
-                return yaml.safe_load(fh)
-        parent = current.parent
-        if parent == current:
-            return None
-        current = parent
 
 
 # ---------------------------------------------------------------------------

@@ -1,9 +1,9 @@
 <script setup lang="ts">
-import { inject, ref, computed, onUnmounted } from 'vue'
+import { inject, ref, computed, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { Effect } from 'effect'
 import { modelServiceKey } from '../keys'
-import type { EntityDisplayInfo, ConnectionRecord, DiagramPreviewResult } from '../../domain'
+import type { EntityDisplayInfo, EntityContextConnection, DiagramPreviewResult } from '../../domain'
 import ArchimateTypeGlyph from '../components/ArchimateTypeGlyph.vue'
 
 const toGlyphKey = (t: string) => t.replace(/[A-Z]/g, (c, i) => (i > 0 ? '-' : '') + c.toLowerCase())
@@ -29,6 +29,7 @@ const DIAGRAM_TYPES = [
 
 const searchQuery = ref('')
 const searchResults = ref<EntityDisplayInfo[]>([])
+const suggestionGroups = ref<Array<{ hop: number; items: EntityDisplayInfo[] }>>([])
 const showDropdown = ref(false)
 let searchTimer: ReturnType<typeof setTimeout> | null = null
 
@@ -38,12 +39,14 @@ const includedEntityIds = computed(() => new Set(includedEntities.value.map((e) 
 const onSearchInput = () => {
   if (searchTimer) clearTimeout(searchTimer)
   const q = searchQuery.value.trim()
-  if (!q) { searchResults.value = []; showDropdown.value = false; return }
+  if (!q) {
+    searchResults.value = []
+    showDropdown.value = false
+    void refreshDiscovery()
+    return
+  }
   searchTimer = setTimeout(() => {
-    Effect.runPromise(svc.searchEntityDisplay(q, 20)).then((res) => {
-      searchResults.value = res.filter((r) => !includedEntityIds.value.has(r.artifact_id))
-      showDropdown.value = searchResults.value.length > 0
-    }).catch(() => {})
+    void refreshDiscovery()
   }, 280)
 }
 
@@ -52,7 +55,7 @@ const closeDropdown = () => { setTimeout(() => { showDropdown.value = false }, 1
 // ── Connection management ─────────────────────────────────────────────────────
 
 // All model connections fetched for included entities, keyed by artifact_id
-const allModelConns = ref<Map<string, ConnectionRecord>>(new Map())
+const allModelConns = ref<Map<string, EntityContextConnection>>(new Map())
 // artifact_ids of connections selected for diagram inclusion
 const includedConnIds = ref<Set<string>>(new Set())
 
@@ -77,16 +80,34 @@ const availableConns = computed(() =>
 const nameOf = (id: string) =>
   includedEntities.value.find((e) => e.artifact_id === id)?.name ?? id
 
+const refreshDiscovery = async () => {
+  const discovery = await Effect.runPromise(
+    svc.discoverDiagramEntities({
+      includedEntityIds: includedEntities.value.map((e) => e.artifact_id),
+      query: searchQuery.value.trim() || undefined,
+      maxHops: 2,
+      limit: 20,
+    }),
+  ).catch(() => null)
+  if (!discovery) return
+  allModelConns.value = new Map(discovery.candidate_connections.map((conn) => [conn.artifact_id, conn]))
+  searchResults.value = discovery.search_results.filter((r) => !includedEntityIds.value.has(r.artifact_id))
+  suggestionGroups.value = discovery.suggested_entities.map((group) => ({
+    hop: group.hop,
+    items: group.items.filter((item) => !includedEntityIds.value.has(item.artifact_id)),
+  })).filter((group) => group.items.length > 0)
+  showDropdown.value = Boolean(searchQuery.value.trim() && searchResults.value.length)
+}
+
 const addEntity = async (entity: EntityDisplayInfo) => {
   if (includedEntityIds.value.has(entity.artifact_id)) return
   includedEntities.value.push(entity)
   showDropdown.value = false
   searchQuery.value = ''
-  const conns = await Effect.runPromise(svc.getConnections(entity.artifact_id, 'any')).catch(() => [])
-  for (const conn of conns) {
-    allModelConns.value.set(conn.artifact_id, conn)
+  await refreshDiscovery()
+  for (const conn of allModelConns.value.values()) {
     const otherId = conn.source === entity.artifact_id ? conn.target : conn.source
-    if (includedEntityIds.value.has(otherId)) {
+    if ((conn.source === entity.artifact_id || conn.target === entity.artifact_id) && includedEntityIds.value.has(otherId)) {
       includedConnIds.value.add(conn.artifact_id)
     }
   }
@@ -100,6 +121,7 @@ const removeEntity = (artifactId: string) => {
       includedConnIds.value.delete(id)
     }
   }
+  void refreshDiscovery()
 }
 
 const removeConn = (id: string) => includedConnIds.value.delete(id)
@@ -153,6 +175,7 @@ const doCreate = () => {
 }
 
 onUnmounted(() => { if (searchTimer) clearTimeout(searchTimer) })
+onMounted(() => { void refreshDiscovery() })
 </script>
 
 <template>
@@ -212,6 +235,21 @@ onUnmounted(() => { if (searchTimer) clearTimeout(searchTimer) })
               <span class="dd-glyph" :title="e.element_type || e.artifact_type"><ArchimateTypeGlyph :type="toGlyphKey(e.element_type || e.artifact_type)" :size="16" /></span>
               <span class="chip-name">{{ e.name }}</span>
               <button class="chip-rm" @click="removeEntity(e.artifact_id)" title="Remove">×</button>
+            </div>
+          </div>
+        </div>
+
+        <div v-if="suggestionGroups.length" class="form-row">
+          <label class="lbl">Nearby Entities</label>
+          <div v-for="group in suggestionGroups" :key="group.hop" class="suggest-group">
+            <div class="avail-header">Hop {{ group.hop }}</div>
+            <div class="chips">
+              <div v-for="e in group.items" :key="e.artifact_id" class="chip chip--suggest">
+                <span class="dd-glyph" :title="e.element_type || e.artifact_type"><ArchimateTypeGlyph :type="toGlyphKey(e.element_type || e.artifact_type)" :size="16" /></span>
+                <span class="chip-name">{{ e.name }}</span>
+                <span class="dd-domain">{{ e.domain }}</span>
+                <button class="conn-btn conn-add" @click="addEntity(e)" title="Add entity">+</button>
+              </div>
             </div>
           </div>
         </div>

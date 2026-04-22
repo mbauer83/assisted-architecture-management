@@ -8,10 +8,7 @@ this server is optional and can be omitted when lifecycle control is not needed.
 .mcp.json example:
     "arch-watch": {
         "command": "uv",
-        "args": ["run", "arch-mcp-watch", "--transport", "stdio"],
-        "env": {
-            "ARCH_MCP_MODEL_REPO_ROOT": "engagements/ENG-ARCH-REPO/architecture-repository"
-        }
+        "args": ["run", "arch-mcp-watch", "--transport", "stdio"]
     }
 """
 

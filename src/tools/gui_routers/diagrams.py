@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import re
+from difflib import SequenceMatcher
 from typing import Any, Literal
 
 from fastapi import APIRouter, HTTPException, Query
@@ -48,6 +49,16 @@ def read_diagram(id: str) -> dict[str, Any]:
     diag_rec = s.get_repo().get_diagram(id)
     if diag_rec:
         result["rendered_filename"] = _rendered_name(diag_rec, ".png")
+        result["is_global"] = s.is_global(diag_rec.path)
+        from src.tools.model_write.parse_existing import parse_diagram_file
+
+        parsed = parse_diagram_file(diag_rec.path)
+        entity_ids_used = parsed.frontmatter.get("entity-ids-used")
+        connection_ids_used = parsed.frontmatter.get("connection-ids-used")
+        if isinstance(entity_ids_used, list):
+            result["entity_ids_used"] = [str(x) for x in entity_ids_used]
+        if isinstance(connection_ids_used, list):
+            result["connection_ids_used"] = [str(x) for x in connection_ids_used]
     return result
 
 
@@ -90,16 +101,34 @@ def _declared_aliases_in_puml(puml: str) -> set[str]:
     return extract_declared_puml_aliases(puml)
 
 
-@router.get("/api/diagram-entities")
-def get_diagram_entities(id: str) -> list[dict[str, Any]]:
-    repo = s.get_repo()
-    diag_rec = repo.get_diagram(id)
-    if diag_rec is None:
-        raise HTTPException(404, f"Diagram not found: {id!r}")
+def _entity_display_item(rec: EntityRecord) -> dict[str, Any]:
+    import yaml as _yaml
+
+    arch_data: dict[str, Any] = {}
+    arch_block = rec.display_blocks.get("archimate", "")
+    if arch_block:
+        try:
+            arch_data = _yaml.safe_load(arch_block) or {}
+        except Exception:  # noqa: BLE001
+            arch_data = {}
+    return {
+        "artifact_id": rec.artifact_id,
+        "name": rec.name,
+        "artifact_type": rec.artifact_type,
+        "domain": rec.domain,
+        "subdomain": rec.subdomain,
+        "status": rec.status,
+        "display_alias": rec.display_alias,
+        "element_type": arch_data.get("element-type", ""),
+        "element_label": arch_data.get("label", rec.name),
+    }
+
+
+def _diagram_entities_and_puml(repo: Any, diag_rec: DiagramRecord) -> tuple[list[dict[str, Any]], str]:
     try:
         puml = diag_rec.path.read_text(encoding="utf-8")
     except OSError:
-        return []
+        return [], ""
     declared_aliases = _declared_aliases_in_puml(puml)
     entities = []
     for rec in repo._entities.values():
@@ -111,6 +140,122 @@ def get_diagram_entities(id: str) -> list[dict[str, Any]]:
         _DOMAIN_ORDER.index(e["domain"]) if e["domain"] in _DOMAIN_ORDER else 99,
         e["name"],
     ))
+    return entities, puml
+
+
+def _candidate_connections_for_entities(repo: Any, entity_ids: list[str]) -> list[dict[str, Any]]:
+    candidate_map: dict[str, dict[str, Any]] = {}
+    for entity_id in entity_ids:
+        context = repo.read_entity_context(entity_id)
+        if context is None:
+            continue
+        for bucket in ("outbound", "inbound", "symmetric"):
+            for conn in context["connections"][bucket]:
+                candidate_map.setdefault(conn["artifact_id"], conn)
+    return [candidate_map[artifact_id] for artifact_id in sorted(candidate_map)]
+
+
+def _diagram_context_payload(repo: Any, diag_rec: DiagramRecord) -> dict[str, Any]:
+    version = repo.read_model_version()
+    diagram = read_diagram(diag_rec.artifact_id)
+    entities, puml = _diagram_entities_and_puml(repo, diag_rec)
+    entity_ids = [str(entity["artifact_id"]) for entity in entities]
+    in_diagram = {
+        str(entity["artifact_id"]): rec
+        for entity in entities
+        if (rec := repo.get_entity(str(entity["artifact_id"]))) is not None
+    }
+    explicit_pairs = _parse_explicit_connection_pairs(puml)
+    connections: list[dict[str, Any]] = []
+    seen: set[str] = set()
+    for conn in repo._connections.values():
+        if conn.artifact_id in seen:
+            continue
+        src = in_diagram.get(conn.source)
+        tgt = in_diagram.get(conn.target)
+        if src is None or tgt is None:
+            continue
+        sa = normalize_puml_alias(src.display_alias or "")
+        ta = normalize_puml_alias(tgt.display_alias or "")
+        if (sa, ta) not in explicit_pairs and (ta, sa) not in explicit_pairs:
+            continue
+        d = s.connection_to_dict(conn)
+        d["source_name"] = src.name
+        d["target_name"] = tgt.name
+        d["source_alias"] = sa
+        d["target_alias"] = ta
+        connections.append(d)
+        seen.add(conn.artifact_id)
+    return {
+        "diagram": diagram,
+        "entities": entities,
+        "connections": connections,
+        "candidate_connections": _candidate_connections_for_entities(repo, entity_ids),
+        "suggested_entities": _hop_suggestions(repo, entity_ids, max_hops=2, limit_per_hop=25),
+        "explicit_connection_pairs": [list(pair) for pair in sorted(explicit_pairs)],
+        "generation": version.generation,
+        "etag": version.etag,
+    }
+
+
+def _hop_suggestions(repo: Any, entity_ids: list[str], *, max_hops: int, limit_per_hop: int) -> list[dict[str, Any]]:
+    included = set(entity_ids)
+    frontier = set(entity_ids)
+    visited = set(entity_ids)
+    groups: list[dict[str, Any]] = []
+    for hop in range(1, max(max_hops, 0) + 1):
+        next_frontier: set[str] = set()
+        for entity_id in frontier:
+            context = repo.read_entity_context(entity_id)
+            if context is None:
+                continue
+            for bucket in ("outbound", "inbound", "symmetric"):
+                for conn in context["connections"][bucket]:
+                    other_id = str(conn["other_entity_id"])
+                    if other_id not in visited:
+                        next_frontier.add(other_id)
+        next_frontier.difference_update(visited)
+        if not next_frontier:
+            break
+        items = [
+            _entity_display_item(rec)
+            for entity_id in sorted(next_frontier)
+            if entity_id not in included and (rec := repo.get_entity(entity_id)) is not None and rec.artifact_type != "global-entity-reference"
+        ]
+        items.sort(key=lambda item: (
+            _DOMAIN_ORDER.index(item["domain"]) if item["domain"] in _DOMAIN_ORDER else 99,
+            item["name"],
+        ))
+        if items:
+            groups.append({"hop": hop, "items": items[:limit_per_hop]})
+        visited.update(next_frontier)
+        frontier = next_frontier
+    return groups
+
+
+def _fuzzy_entity_hits(repo: Any, q: str, limit: int, excluded: set[str]) -> list[dict[str, Any]]:
+    query = q.strip().lower()
+    if not query or limit <= 0:
+        return []
+    scored: list[tuple[float, EntityRecord]] = []
+    for rec in repo._entities.values():
+        if rec.artifact_type == "global-entity-reference" or rec.artifact_id in excluded:
+            continue
+        haystack = " ".join((rec.name, rec.artifact_type, rec.domain, rec.subdomain, rec.content_text[:400]))
+        score = SequenceMatcher(None, query, haystack.lower()).ratio()
+        if score >= 0.35:
+            scored.append((score, rec))
+    scored.sort(key=lambda item: item[0], reverse=True)
+    return [_entity_display_item(rec) for _, rec in scored[:limit]]
+
+
+@router.get("/api/diagram-entities")
+def get_diagram_entities(id: str) -> list[dict[str, Any]]:
+    repo = s.get_repo()
+    diag_rec = repo.get_diagram(id)
+    if diag_rec is None:
+        raise HTTPException(404, f"Diagram not found: {id!r}")
+    entities, _puml = _diagram_entities_and_puml(repo, diag_rec)
     return entities
 
 
@@ -126,6 +271,10 @@ def _parse_explicit_connection_pairs(puml: str) -> set[tuple[str, str]]:
         r"([-.*|o<>][^\s]*[-.*|o<>])"
         r"\s+(\w+)"
     )
+    _macro_re = re.compile(
+        r"^\s*Rel_[A-Za-z0-9]+(?:_(?:Up|Down|Left|Right))?"
+        r"\(\s*(\w+)\s*,\s*(\w+)"
+    )
     pairs: set[tuple[str, str]] = set()
     for line in puml.splitlines():
         stripped = line.strip()
@@ -134,6 +283,10 @@ def _parse_explicit_connection_pairs(puml: str) -> set[tuple[str, str]]:
         m = _conn_re.match(line)
         if m:
             pairs.add((normalize_puml_alias(m.group(1)), normalize_puml_alias(m.group(3))))
+            continue
+        macro = _macro_re.match(line)
+        if macro:
+            pairs.add((normalize_puml_alias(macro.group(1)), normalize_puml_alias(macro.group(2))))
     return pairs
 
 
@@ -143,37 +296,16 @@ def get_diagram_connections(id: str) -> list[dict[str, Any]]:
     diag_rec = repo.get_diagram(id)
     if diag_rec is None:
         raise HTTPException(404, f"Diagram not found: {id!r}")
-    try:
-        puml = diag_rec.path.read_text(encoding="utf-8")
-    except OSError:
-        return []
-    declared_aliases = _declared_aliases_in_puml(puml)
-    in_diagram = {
-        rec.artifact_id: rec
-        for rec in repo._entities.values()
-        if rec.display_alias and normalize_puml_alias(rec.display_alias) in declared_aliases
-    }
-    explicit_pairs = _parse_explicit_connection_pairs(puml)
-    result: list[dict[str, Any]] = []
-    seen: set[str] = set()
-    for conn in repo._connections.values():
-        if conn.artifact_id in seen:
-            continue
-        src = in_diagram.get(conn.source)
-        tgt = in_diagram.get(conn.target)
-        if src and tgt:
-            sa = normalize_puml_alias(src.display_alias or "")
-            ta = normalize_puml_alias(tgt.display_alias or "")
-            if (sa, ta) not in explicit_pairs and (ta, sa) not in explicit_pairs:
-                continue
-            d = s.connection_to_dict(conn)
-            d["source_name"] = src.name
-            d["target_name"] = tgt.name
-            d["source_alias"] = sa
-            d["target_alias"] = ta
-            result.append(d)
-            seen.add(conn.artifact_id)
-    return result
+    return _diagram_context_payload(repo, diag_rec)["connections"]
+
+
+@router.get("/api/diagram-context")
+def get_diagram_context(id: str) -> dict[str, Any]:
+    repo = s.get_repo()
+    diag_rec = repo.get_diagram(id)
+    if diag_rec is None:
+        raise HTTPException(404, f"Diagram not found: {id!r}")
+    return _diagram_context_payload(repo, diag_rec)
 
 
 @router.get("/api/diagram-svg")
@@ -222,7 +354,6 @@ def download_diagram(id: str, format: Literal["png", "svg"] = "png") -> FileResp
 
 @router.get("/api/entity-display-search")
 def entity_display_search(q: str, limit: int = Query(default=20, le=50)) -> list[dict[str, Any]]:
-    import yaml as _yaml
     repo = s.get_repo()
     hits = repo.search_artifacts(q, limit=limit * 3).hits
     items: list[dict[str, Any]] = []
@@ -232,24 +363,35 @@ def entity_display_search(q: str, limit: int = Query(default=20, le=50)) -> list
         rec = h.record
         if rec.artifact_type == "global-entity-reference":
             continue
-        arch_data: dict = {}
-        arch_block = rec.display_blocks.get("archimate", "")
-        if arch_block:
-            try:
-                arch_data = _yaml.safe_load(arch_block) or {}
-            except Exception:  # noqa: BLE001
-                pass
-        items.append({
-            "artifact_id": rec.artifact_id, "name": rec.name,
-            "artifact_type": rec.artifact_type, "domain": rec.domain,
-            "subdomain": rec.subdomain, "status": rec.status,
-            "display_alias": rec.display_alias,
-            "element_type": arch_data.get("element-type", ""),
-            "element_label": arch_data.get("label", rec.name),
-        })
+        items.append(_entity_display_item(rec))
         if len(items) >= limit:
             break
+    if len(items) < limit:
+        seen = {str(item["artifact_id"]) for item in items}
+        items.extend(_fuzzy_entity_hits(repo, q, limit - len(items), seen))
     return items
+
+
+@router.get("/api/diagram-entity-discovery")
+def diagram_entity_discovery(
+    q: str | None = None,
+    included_entity_ids: str | None = None,
+    max_hops: int = Query(default=2, ge=1, le=4),
+    limit: int = Query(default=20, ge=1, le=50),
+) -> dict[str, Any]:
+    repo = s.get_repo()
+    included = [
+        entity_id.strip() for entity_id in (included_entity_ids or "").split(",")
+        if entity_id.strip() and repo.get_entity(entity_id.strip()) is not None
+    ]
+    excluded = set(included)
+    search_results = entity_display_search(q or "", limit=limit) if (q or "").strip() else []
+    search_results = [item for item in search_results if str(item["artifact_id"]) not in excluded][:limit]
+    return {
+        "search_results": search_results,
+        "candidate_connections": _candidate_connections_for_entities(repo, included),
+        "suggested_entities": _hop_suggestions(repo, included, max_hops=max_hops, limit_per_hop=limit),
+    }
 
 
 class DiagramPreviewBody(BaseModel):

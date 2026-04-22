@@ -2,6 +2,8 @@
 from datetime import date
 from pathlib import Path
 
+from src.common.workspace_paths import infer_repo_scope
+
 
 def today_iso() -> str:
     return date.today().isoformat()
@@ -16,7 +18,7 @@ def assert_engagement_write_root(repo_root: Path) -> None:
     assert_enterprise_write_root instead.
     """
     p = repo_root.resolve()
-    if "enterprise-repository" in p.parts:
+    if infer_repo_scope(p) == "enterprise":
         raise ValueError(
             "Refusing to write to enterprise repository. "
             "Point repo_root at an engagement repository."
@@ -26,7 +28,7 @@ def assert_engagement_write_root(repo_root: Path) -> None:
 def assert_enterprise_write_root(repo_root: Path) -> None:
     """Accept only the enterprise repository root — for admin-mode GUI writes."""
     p = repo_root.resolve()
-    if "enterprise-repository" not in p.parts:
+    if infer_repo_scope(p) != "enterprise":
         raise ValueError(
             "Admin write expected enterprise repository root, got: "
             f"{p}"

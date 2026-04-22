@@ -6,7 +6,7 @@ import { modelServiceKey } from '../keys'
 import { useAsync } from '../composables/useAsync'
 import type {
   DiagramDetail, EntitySummary, DiagramConnection,
-  EntityDisplayInfo, ConnectionRecord, DiagramPreviewResult,
+  EntityDisplayInfo, EntityContextConnection, DiagramPreviewResult,
 } from '../../domain'
 import ArchimateTypeGlyph from '../components/ArchimateTypeGlyph.vue'
 
@@ -77,8 +77,9 @@ const diagramConnections = ref<DiagramConnection[]>([])
 
 // Entities currently in diagram (loaded from backend)
 const includedEntities = ref<EntityDisplayInfo[]>([])
-// All known connections (fetched for all entities)
-const allModelConns = ref<Map<string, ConnectionRecord>>(new Map())
+const suggestionGroups = ref<Array<{ hop: number; items: EntityDisplayInfo[] }>>([])
+// All candidate model connections around the effective diagram entity set
+const allModelConns = ref<Map<string, EntityContextConnection>>(new Map())
 // Connections that were originally in the diagram
 const includedConnIds = ref<Set<string>>(new Set())
 
@@ -147,7 +148,7 @@ const toggleConn = (connId: string) => {
 
 // ── Connection table per entity ───────────────────────────────────────────────
 
-interface ConnEntry { conn: ConnectionRecord; direction: 'out' | 'in'; otherName: string; otherId: string }
+interface ConnEntry { conn: EntityContextConnection; direction: 'out' | 'in'; otherName: string; otherId: string }
 interface ConnTypeGroup { included: ConnEntry[]; excluded: ConnEntry[] }
 
 const getConnsByType = (entityId: string): Map<string, ConnTypeGroup> => {
@@ -198,6 +199,7 @@ const toggleEntityRemoval = (id: string) => {
   }
   toRemoveEntityIds.value = nextE
   updateHighlights()
+  void refreshDiscovery()
 }
 
 const attachInteractivity = () => {
@@ -249,15 +251,40 @@ watch([toRemoveEntityIds, toRemoveConnIds, selectedNewConnIds], updateHighlights
 const searchQuery = ref(''); const searchResults = ref<EntityDisplayInfo[]>([]); const showDropdown = ref(false)
 let searchTimer: ReturnType<typeof setTimeout> | null = null
 
+const refreshDiscovery = async () => {
+  const discovery = await Effect.runPromise(
+    svc.discoverDiagramEntities({
+      includedEntityIds: [...effectiveEntityIds.value],
+      query: searchQuery.value.trim() || undefined,
+      maxHops: 3,
+      limit: 20,
+    }),
+  ).catch(() => null)
+  if (!discovery) return
+  allModelConns.value = new Map(discovery.candidate_connections.map((conn) => [conn.artifact_id, conn]))
+  searchResults.value = discovery.search_results.filter(
+    (item) => !effectiveEntityIds.value.has(item.artifact_id),
+  )
+  suggestionGroups.value = discovery.suggested_entities
+    .map((group) => ({
+      hop: group.hop,
+      items: group.items.filter((item) => !effectiveEntityIds.value.has(item.artifact_id)),
+    }))
+    .filter((group) => group.items.length > 0)
+  showDropdown.value = Boolean(searchQuery.value.trim() && searchResults.value.length)
+}
+
 const onSearchInput = () => {
   if (searchTimer) clearTimeout(searchTimer)
   const q = searchQuery.value.trim()
-  if (!q) { searchResults.value = []; showDropdown.value = false; return }
+  if (!q) {
+    searchResults.value = []
+    showDropdown.value = false
+    void refreshDiscovery()
+    return
+  }
   searchTimer = setTimeout(() => {
-    Effect.runPromise(svc.searchEntityDisplay(q, 20)).then(res => {
-      searchResults.value = res.filter(r => !includedEntityIds.value.has(r.artifact_id) && !toAddEntityIds.value.has(r.artifact_id))
-      showDropdown.value = searchResults.value.length > 0
-    }).catch(() => {})
+    void refreshDiscovery()
   }, 280)
 }
 const closeDropdown = () => { setTimeout(() => { showDropdown.value = false }, 150) }
@@ -266,16 +293,14 @@ const addEntity = async (entity: EntityDisplayInfo) => {
   if (includedEntityIds.value.has(entity.artifact_id) || toAddEntityIds.value.has(entity.artifact_id)) return
   entitiesToAdd.value = [...entitiesToAdd.value, entity]
   showDropdown.value = false; searchQuery.value = ''
-  const conns = await Effect.runPromise(svc.getConnections(entity.artifact_id, 'any')).catch(() => [] as ConnectionRecord[])
-  const map = new Map(allModelConns.value)
+  await refreshDiscovery()
   const next = new Set(selectedNewConnIds.value)
-  for (const conn of conns) {
-    map.set(conn.artifact_id, conn)
-    // Auto-include connections to existing (non-removed, non-to-add) entities
+  for (const conn of allModelConns.value.values()) {
+    const touchesAdded = conn.source === entity.artifact_id || conn.target === entity.artifact_id
     const other = conn.source === entity.artifact_id ? conn.target : conn.source
-    if (effectiveEntityIds.value.has(other) && !toAddEntityIds.value.has(other)) next.add(conn.artifact_id)
+    if (touchesAdded && effectiveEntityIds.value.has(other)) next.add(conn.artifact_id)
   }
-  allModelConns.value = map; selectedNewConnIds.value = next
+  selectedNewConnIds.value = next
 }
 
 const removeToAddEntity = (id: string) => {
@@ -284,46 +309,67 @@ const removeToAddEntity = (id: string) => {
   const nc = new Set(selectedNewConnIds.value)
   for (const [cid, c] of allModelConns.value) if (c.source === id || c.target === id) nc.delete(cid)
   selectedNewConnIds.value = nc
+  void refreshDiscovery()
 }
 
 // ── Load ──────────────────────────────────────────────────────────────────────
 
 const load = async () => {
   if (!diagramId.value) return
-  diagramDetail.run(svc.getDiagram(diagramId.value))
+  diagramDetail.loading.value = true
+  diagramDetail.error.value = null
   svgHtml.value = null; svgLoading.value = true; svgError.value = null
   toRemoveEntityIds.value = new Set(); toRemoveConnIds.value = new Set()
   entitiesToAdd.value = []; selectedNewConnIds.value = new Set()
   expandedEntityIds.value = new Set()
   includedEntities.value = []; allModelConns.value = new Map(); includedConnIds.value = new Set()
+  suggestionGroups.value = []
 
-  const [summaries, dconns, svg] = await Promise.all([
-    Effect.runPromise(svc.getDiagramEntities(diagramId.value)).catch(() => [] as EntitySummary[]),
-    Effect.runPromise(svc.getDiagramConnections(diagramId.value)).catch(() => [] as DiagramConnection[]),
+  const [context, svg] = await Promise.all([
+    Effect.runPromise(svc.getDiagramContext(diagramId.value)).catch((e) => {
+      diagramDetail.error.value = String(e)
+      return null
+    }),
     Effect.runPromise(svc.getDiagramSvg(diagramId.value)).catch((e) => { svgError.value = String(e); return null as null }),
   ])
 
   svgHtml.value = svg; svgLoading.value = false
-  diagramEntities.value = summaries; diagramConnections.value = dconns
+  if (!context) {
+    diagramDetail.loading.value = false
+    return
+  }
 
-  includedEntities.value = summaries.map(s => ({
+  diagramDetail.data.value = context.diagram
+  diagramDetail.loading.value = false
+  diagramEntities.value = context.entities as EntitySummary[]
+  diagramConnections.value = context.connections as DiagramConnection[]
+
+  includedEntities.value = context.entities.map(s => ({
     artifact_id: s.artifact_id, name: s.name, artifact_type: s.artifact_type,
     domain: s.domain, subdomain: s.subdomain, status: s.status,
     display_alias: s.display_alias ?? '', element_type: s.artifact_type, element_label: s.name,
   }))
+  allModelConns.value = new Map(context.candidate_connections.map((conn) => [conn.artifact_id, conn]))
+  suggestionGroups.value = context.suggested_entities.map((group) => ({
+    hop: group.hop,
+    items: group.items.slice(),
+  }))
 
-  const connArrays = await Promise.all(
-    summaries.map(s => Effect.runPromise(svc.getConnections(s.artifact_id, 'any')).catch(() => [] as ConnectionRecord[]))
-  )
-  const map = new Map<string, ConnectionRecord>()
-  const inc = new Set<string>(dconns.map(c => c.artifact_id))
-  for (const cs of connArrays) for (const c of cs) {
-    map.set(c.artifact_id, c)
+  // Use the stored frontmatter selection as the primary edit-state source of truth.
+  // Parsed diagram connections are merged in as a fallback/supplement, because the
+  // parser can be incomplete for some diagram syntaxes while the persisted ids
+  // reflect the user's actual saved selection.
+  const inc = new Set<string>()
+  for (const cid of context.diagram.connection_ids_used ?? []) {
+    if (allModelConns.value.has(cid)) inc.add(cid)
   }
-  allModelConns.value = map; includedConnIds.value = inc
+  for (const conn of context.connections) inc.add(conn.artifact_id)
+  includedConnIds.value = inc
+  void refreshDiscovery()
 }
 
 onMounted(load)
+watch(diagramId, load)
 
 // ── Preview + Save ────────────────────────────────────────────────────────────
 
@@ -436,6 +482,27 @@ onUnmounted(() => {
 
         <!-- Scrollable content -->
         <div class="sb-scroll">
+          <div v-if="suggestionGroups.length" class="sb-section">
+            <div class="sb-sec-hdr">
+              Nearby <span class="sb-count">{{ suggestionGroups.reduce((sum, group) => sum + group.items.length, 0) }}</span>
+            </div>
+            <div v-for="group in suggestionGroups" :key="group.hop" class="suggest-block">
+              <div class="conn-type-lbl">Hop {{ group.hop }}</div>
+              <div class="suggest-list">
+                <button
+                  v-for="entity in group.items"
+                  :key="entity.artifact_id"
+                  class="suggest-row"
+                  @click="addEntity(entity)"
+                >
+                  <span class="dd-glyph"><ArchimateTypeGlyph :type="toGlyphKey(entity.element_type || entity.artifact_type)" :size="13" /></span>
+                  <span class="ent-name">{{ entity.name }}</span>
+                  <span class="dd-domain">{{ entity.domain }}</span>
+                  <span class="conn-btn conn-add">+</span>
+                </button>
+              </div>
+            </div>
+          </div>
 
           <!-- Entity list (non-removed existing + to-add) -->
           <div v-if="effectiveEntitiesList.length" class="sb-section">
@@ -619,6 +686,19 @@ onUnmounted(() => {
 .sb-sec-hdr { display: flex; align-items: center; gap: 5px; padding: 6px 10px 4px; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: #6b7280; }
 .sb-sec-hdr--rm { color: #dc2626; }
 .sb-count { font-size: 10px; font-weight: 400; color: #9ca3af; }
+.suggest-block { padding: 4px 8px 8px; }
+.suggest-list { display: flex; flex-direction: column; gap: 4px; }
+.suggest-row {
+  display: flex; align-items: center; gap: 6px; width: 100%;
+  padding: 6px 8px; border: 1px solid #e5e7eb; border-radius: 6px;
+  background: #f8fafc; color: #374151; cursor: pointer; text-align: left;
+}
+.suggest-row:hover { background: #eef6ff; border-color: #bfdbfe; }
+.conn-btn { display: inline-flex; align-items: center; justify-content: center; }
+.conn-add {
+  width: 18px; height: 18px; border-radius: 999px; background: #dbeafe; color: #1d4ed8;
+  font-size: 14px; font-weight: 700; flex-shrink: 0;
+}
 
 /* Entity rows */
 .ent-block { }

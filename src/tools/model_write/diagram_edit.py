@@ -116,10 +116,9 @@ def edit_diagram(
         warnings.append(f"Rendered PNG: {png_path}")
     _render_diagram_svg(diagram_path, warnings)
 
-    clear_repo_caches(repo_root)
+    clear_repo_caches(diagram_path)
     return WriteResult(
         wrote=True, path=diagram_path, artifact_id=artifact_id,
         content=None, warnings=warnings,
         verification=_verification_to_dict(diagram_path, res),
     )
-

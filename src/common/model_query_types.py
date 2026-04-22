@@ -2,6 +2,7 @@
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Literal, Protocol, runtime_checkable
+from src.common.workspace_paths import infer_repo_scope
 
 Domain = Literal[
     "motivation",
@@ -41,7 +42,7 @@ def infer_engagement_label(root: Path, *, scope: MountScope) -> str:
 
 def infer_mount(root: Path) -> RepoMount:
     resolved = root.resolve()
-    scope: MountScope = "enterprise" if resolved.name == "enterprise-repository" else "engagement"
+    scope: MountScope = "enterprise" if infer_repo_scope(resolved) == "enterprise" else "engagement"
     return RepoMount(root=resolved, scope=scope, engagement_label=infer_engagement_label(resolved, scope=scope))
 
 

@@ -62,6 +62,26 @@ def read_entity(id: str) -> dict[str, Any]:
     return result
 
 
+@router.get("/api/entity-context")
+def read_entity_context(id: str) -> dict[str, Any]:
+    repo = s.get_repo()
+    context = repo.read_entity_context(id)
+    if context is None:
+        raise HTTPException(404, f"Not found: {id!r}")
+    entity_rec = repo.get_entity(id)
+    if entity_rec is not None:
+        from src.tools.model_write.parse_existing import parse_entity_file
+        try:
+            parsed = parse_entity_file(entity_rec.path)
+            context["entity"]["summary"] = parsed.summary or ""
+            context["entity"]["properties"] = parsed.properties
+            context["entity"]["notes"] = parsed.notes or ""
+        except Exception:  # noqa: BLE001
+            pass
+        context["entity"]["is_global"] = s.is_global(entity_rec.path)
+    return context
+
+
 @router.get("/api/entity-schemata")
 def get_entity_schemata(artifact_type: str) -> dict[str, Any]:
     repo_root = s._repo_root

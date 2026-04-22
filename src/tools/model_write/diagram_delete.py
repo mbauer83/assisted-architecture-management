@@ -80,7 +80,7 @@ def _delete_diagram_core(
     diagram_path.unlink(missing_ok=False)
     for path in rendered:
         path.unlink(missing_ok=True)
-    clear_repo_caches(repo_root)
+    clear_repo_caches(diagram_path)
     return WriteResult(
         wrote=True,
         path=diagram_path,

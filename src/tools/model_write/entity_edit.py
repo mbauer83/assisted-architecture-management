@@ -23,19 +23,19 @@ def _rename_entity_identity(
     repo_root: Path,
     old_artifact_id: str,
     new_artifact_id: str,
-) -> tuple[Path, int]:
+) -> tuple[Path, list[Path]]:
     new_entity_file = entity_file.with_name(f"{new_artifact_id}.md")
 
     old_outgoing = entity_file.with_suffix(".outgoing.md")
     new_outgoing = new_entity_file.with_suffix(".outgoing.md")
-    cascade_updates = 0
+    changed_paths: list[Path] = []
 
     if old_outgoing.exists():
         outgoing_text = old_outgoing.read_text(encoding="utf-8").replace(old_artifact_id, new_artifact_id)
         new_outgoing.write_text(outgoing_text, encoding="utf-8")
         if new_outgoing != old_outgoing:
             old_outgoing.unlink()
-        cascade_updates += 1
+        changed_paths.extend([old_outgoing, new_outgoing])
 
     for outgoing_path in (repo_root / "model").rglob("*.outgoing.md"):
         if outgoing_path == new_outgoing:
@@ -44,9 +44,9 @@ def _rename_entity_identity(
         if old_artifact_id not in text:
             continue
         outgoing_path.write_text(text.replace(old_artifact_id, new_artifact_id), encoding="utf-8")
-        cascade_updates += 1
+        changed_paths.append(outgoing_path)
 
-    return new_entity_file, cascade_updates
+    return new_entity_file, changed_paths
 
 
 def edit_entity(
@@ -165,13 +165,17 @@ def edit_entity(
     target_entity_file.write_text(content, encoding="utf-8")
     if target_entity_file != entity_file:
         entity_file.unlink()
-        target_entity_file, cascade_count = _rename_entity_identity(
+        target_entity_file, renamed_paths = _rename_entity_identity(
             entity_file=entity_file,
             repo_root=repo_root,
             old_artifact_id=artifact_id,
             new_artifact_id=effective_artifact_id,
         )
-        rename_summary.append(f"Renamed artifact-id to {effective_artifact_id} and updated {cascade_count} outgoing file(s).")
+        rename_summary.append(
+            f"Renamed artifact-id to {effective_artifact_id} and updated {len(renamed_paths)} outgoing file(s)."
+        )
+    else:
+        renamed_paths = []
 
     res = verifier.verify_entity_file(target_entity_file)
     if not res.valid:
@@ -192,7 +196,10 @@ def edit_entity(
         except Exception:  # noqa: BLE001
             pass
 
-    clear_repo_caches(repo_root)
+    if target_entity_file != entity_file:
+        clear_repo_caches([entity_file, target_entity_file, *renamed_paths])
+    else:
+        clear_repo_caches(target_entity_file)
     return WriteResult(
         wrote=True, path=target_entity_file, artifact_id=effective_artifact_id,
         content=None, warnings=rename_summary,

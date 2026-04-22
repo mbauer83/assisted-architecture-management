@@ -91,6 +91,38 @@ export type ConnectionRecord = typeof ConnectionRecordSchema.Type
 export const ConnectionListSchema = Schema.Array(ConnectionRecordSchema)
 export type ConnectionList = typeof ConnectionListSchema.Type
 
+export const EntityContextConnectionSchema = Schema.extend(
+  ConnectionRecordSchema,
+  Schema.Struct({
+    source_artifact_type: Schema.String,
+    target_artifact_type: Schema.String,
+    source_domain: Schema.String,
+    target_domain: Schema.String,
+    source_scope: Schema.String,
+    target_scope: Schema.String,
+    other_entity_id: Schema.String,
+    direction: Schema.String,
+  }),
+)
+export type EntityContextConnection = typeof EntityContextConnectionSchema.Type
+
+export const EntityContextSchema = Schema.Struct({
+  entity: EntityDetailSchema,
+  connections: Schema.Struct({
+    outbound: Schema.Array(EntityContextConnectionSchema),
+    inbound: Schema.Array(EntityContextConnectionSchema),
+    symmetric: Schema.Array(EntityContextConnectionSchema),
+  }),
+  counts: Schema.Struct({
+    conn_in: Schema.Number,
+    conn_out: Schema.Number,
+    conn_sym: Schema.Number,
+  }),
+  generation: Schema.Number,
+  etag: Schema.String,
+})
+export type EntityContext = typeof EntityContextSchema.Type
+
 // ── Neighbors ────────────────────────────────────────────────────────────────
 
 export const NeighborsSchema = Schema.Record({ key: Schema.String, value: Schema.Array(Schema.String) })
@@ -148,9 +180,12 @@ export const DiagramDetailSchema = Schema.Struct({
   status: Schema.String,
   record_type: Schema.Literal('diagram'),
   path: Schema.String,
+  is_global: Schema.optional(Schema.Boolean),
   content_snippet: Schema.String,
   puml_source: Schema.optional(Schema.String),
   rendered_filename: Schema.optional(Schema.NullOr(Schema.String)),
+  entity_ids_used: Schema.optional(Schema.Array(Schema.String)),
+  connection_ids_used: Schema.optional(Schema.Array(Schema.String)),
   extra: Schema.optional(Schema.Unknown),
 })
 export type DiagramDetail = typeof DiagramDetailSchema.Type
@@ -228,6 +263,35 @@ export const DiagramConnectionSchema = Schema.Struct({
   target_alias: Schema.NullOr(Schema.String),
 })
 export type DiagramConnection = typeof DiagramConnectionSchema.Type
+
+export const DiagramContextSchema = Schema.Struct({
+  diagram: DiagramDetailSchema,
+  entities: Schema.Array(EntitySummarySchema),
+  connections: Schema.Array(DiagramConnectionSchema),
+  candidate_connections: Schema.Array(EntityContextConnectionSchema),
+  suggested_entities: Schema.Array(
+    Schema.Struct({
+      hop: Schema.Number,
+      items: Schema.Array(EntityDisplayInfoSchema),
+    }),
+  ),
+  explicit_connection_pairs: Schema.Array(Schema.Array(Schema.String)),
+  generation: Schema.Number,
+  etag: Schema.String,
+})
+export type DiagramContext = typeof DiagramContextSchema.Type
+
+export const DiagramEntityDiscoverySchema = Schema.Struct({
+  search_results: Schema.Array(EntityDisplayInfoSchema),
+  candidate_connections: Schema.Array(EntityContextConnectionSchema),
+  suggested_entities: Schema.Array(
+    Schema.Struct({
+      hop: Schema.Number,
+      items: Schema.Array(EntityDisplayInfoSchema),
+    }),
+  ),
+})
+export type DiagramEntityDiscovery = typeof DiagramEntityDiscoverySchema.Type
 
 export const DiagramPreviewResultSchema = Schema.Struct({
   puml: Schema.String,

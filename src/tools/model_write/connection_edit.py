@@ -144,7 +144,7 @@ def remove_connection(
     if not remaining:
         prev = outgoing_path.read_text(encoding="utf-8")
         outgoing_path.unlink()
-        clear_repo_caches(repo_root)
+        clear_repo_caches(outgoing_path)
         return WriteResult(
             wrote=True, path=outgoing_path, artifact_id=conn_id,
             content=None, warnings=["Deleted empty .outgoing.md file"],
@@ -255,7 +255,7 @@ def _write_verify_clear(
             content=content, warnings=[], verification=vdict,
         )
 
-    clear_repo_caches(repo_root)
+    clear_repo_caches(outgoing_path)
     return WriteResult(
         wrote=True, path=outgoing_path, artifact_id=conn_id,
         content=None, warnings=[], verification=vdict,

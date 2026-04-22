@@ -126,7 +126,7 @@ def create_entity(
     except Exception:  # noqa: BLE001
         pass
 
-    clear_repo_caches(repo_root)
+    clear_repo_caches(path)
 
     return WriteResult(
         wrote=True,

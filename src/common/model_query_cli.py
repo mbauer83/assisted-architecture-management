@@ -5,6 +5,7 @@ from pathlib import Path
 from typing import Any
 
 from src.common.model_query_types import ConnectionRecord, DiagramRecord, EntityRecord
+from src.common.workspace_paths import resolve_workspace_repo_roots
 
 USAGE = """\
 Usage: python -m src.common.model_query <subcommand> [options]
@@ -33,7 +34,7 @@ Subcommands:
       Keyword-score all records against QUERY.
 
 Defaults:
-  --repo    engagements/ENG-ARCH-REPO/architecture-repository
+  --repo    engagement repo from workspace config
   --limit   10
   --hops    1
 """
@@ -45,7 +46,13 @@ def repo_from_args(args: list[str]) -> tuple[Path, list[str]]:
         repo = Path(args[idx + 1])
         args = args[:idx] + args[idx + 2 :]
     else:
-        repo = Path("engagements/ENG-ARCH-REPO/architecture-repository")
+        roots = resolve_workspace_repo_roots(Path.cwd())
+        if roots is None:
+            raise SystemExit(
+                "ERROR: --repo not provided and no workspace configuration found. "
+                "Run arch-init or provide arch-workspace.yaml."
+            )
+        repo = roots[0]
     return repo, args
 
 

@@ -73,7 +73,7 @@ def test_generate_archimate_puml_body_normalizes_aliases_in_entities_and_connect
 
     assert " as GOL_B6G__P" in puml
     assert " as OUT_i_3Bi_" in puml
-    assert "OUT_i_3Bi_ ..|> GOL_B6G__P" in puml
+    assert 'Rel_Realization(OUT_i_3Bi_, GOL_B6G__P, "")' in puml
     assert "GOL_B6G_-P" not in puml
     assert "OUT_i-3Bi-" not in puml
 
@@ -105,7 +105,7 @@ def test_generate_archimate_puml_body_single_domain_uses_type_groupings() -> Non
     assert "top to bottom direction" in puml
     assert "DRV_A -[hidden]right- DRV_B" in puml
     assert "DRV_B -[hidden]down- ASS_A" in puml
-    assert "DRV_A .down.> ASS_A : <<influence>>" in puml
+    assert 'Rel_Influence_Down(DRV_A, ASS_A, "")' in puml
 
 
 def test_generate_macros_normalizes_aliases(tmp_path: Path) -> None:
@@ -241,7 +241,7 @@ last-updated: '2026-04-20'
 
     assert " as GOL_B6G__P" in puml
     assert " as OUT_i_3Bi_" in puml
-    assert "OUT_i_3Bi_ ..|> GOL_B6G__P" in puml
+    assert 'Rel_Realization(OUT_i_3Bi_, GOL_B6G__P, "")' in puml
     assert "GOL_B6G_-P" not in puml
     assert "OUT_i-3Bi-" not in puml
 
@@ -341,4 +341,4 @@ last-updated: '2026-04-20'
     assert 'rectangle "Assessments" <<MotivationGrouping>> {' in puml
     assert "top to bottom direction" in puml
     assert "DRV_A -[hidden]down- ASS_A" in puml
-    assert "DRV_A .down.> ASS_A : <<Influence>>" in puml
+    assert 'Rel_Influence_Down(DRV_A, ASS_A, "")' in puml

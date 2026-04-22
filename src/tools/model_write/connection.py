@@ -243,5 +243,5 @@ def add_connection(
 
     result = _write_and_verify(outgoing_path, content, verifier, connection_type, target_entity)
     if result.wrote:
-        clear_repo_caches(repo_root)
+        clear_repo_caches(outgoing_path)
     return result

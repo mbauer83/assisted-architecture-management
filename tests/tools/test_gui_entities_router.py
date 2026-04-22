@@ -220,3 +220,79 @@ def test_connection_to_dict_resolves_live_endpoint_names(engagement_root: Path, 
 
     assert payload["source_name"] == "Source Display Name"
     assert payload["target_name"] == "Target Display Name"
+
+
+def test_entity_context_read_model_groups_connections_and_counts(
+    engagement_root: Path,
+    enterprise_root: Path,
+) -> None:
+    src_id = "REQ@1000000000.SrcAAA.source"
+    tgt_id = "REQ@1000000001.TgtAAA.target"
+    peer_id = "REQ@1000000002.PeerAA.peer"
+    _write(engagement_root / "model" / "motivation" / "requirements" / f"{src_id}.md", _entity_md(src_id, "Source"))
+    _write(engagement_root / "model" / "motivation" / "requirements" / f"{tgt_id}.md", _entity_md(tgt_id, "Target"))
+    _write(engagement_root / "model" / "motivation" / "requirements" / f"{peer_id}.md", _entity_md(peer_id, "Peer"))
+    _write(
+        engagement_root / "model" / "motivation" / "requirements" / f"{src_id}.outgoing.md",
+        _outgoing_md(src_id, [("archimate-association", tgt_id), ("archimate-flow", peer_id)]),
+    )
+    _write(
+        engagement_root / "model" / "motivation" / "requirements" / f"{peer_id}.outgoing.md",
+        _outgoing_md(peer_id, [("archimate-association", src_id)]),
+    )
+
+    repo = ModelRepository([engagement_root, enterprise_root])
+    gui_state.init_state(repo, engagement_root, enterprise_root)
+
+    payload = repo.read_entity_context(src_id)
+    assert payload is not None
+
+    assert payload["entity"]["artifact_id"] == src_id
+    assert payload["counts"] == {"conn_in": 0, "conn_out": 1, "conn_sym": 2}
+    assert [conn["artifact_id"] for conn in payload["connections"]["outbound"]] == [f"{src_id}---{peer_id}@@archimate-flow"]
+    assert payload["connections"]["inbound"] == []
+    assert {conn["artifact_id"] for conn in payload["connections"]["symmetric"]} == {
+        f"{src_id}---{tgt_id}@@archimate-association",
+        f"{peer_id}---{src_id}@@archimate-association",
+    }
+    assert payload["generation"] >= 1
+
+
+def test_clear_caches_applies_incremental_outgoing_changes(
+    engagement_root: Path,
+    enterprise_root: Path,
+) -> None:
+    src_id = "REQ@1000000000.SrcAAA.source"
+    tgt_a = "REQ@1000000001.TgtAAA.target-a"
+    tgt_b = "REQ@1000000002.TgtBBB.target-b"
+    for artifact_id, name in ((src_id, "Source"), (tgt_a, "Target A"), (tgt_b, "Target B")):
+        _write(engagement_root / "model" / "motivation" / "requirements" / f"{artifact_id}.md", _entity_md(artifact_id, name))
+    outgoing_path = engagement_root / "model" / "motivation" / "requirements" / f"{src_id}.outgoing.md"
+    _write(outgoing_path, _outgoing_md(src_id, [("archimate-flow", tgt_a)]))
+
+    repo = ModelRepository([engagement_root, enterprise_root])
+    gui_state.init_state(repo, engagement_root, enterprise_root)
+
+    before = repo.read_entity_context(src_id)
+    assert before is not None
+    assert before["counts"] == {"conn_in": 0, "conn_out": 1, "conn_sym": 2}
+
+    _write(outgoing_path, _outgoing_md(src_id, [("archimate-flow", tgt_a), ("archimate-serving", tgt_b)]))
+    gui_state.clear_caches(outgoing_path)
+
+    after = repo.read_entity_context(src_id)
+    assert after is not None
+    assert after["counts"] == {"conn_in": 0, "conn_out": 2, "conn_sym": 2}
+    assert after["generation"] > before["generation"]
+    assert {conn["artifact_id"] for conn in after["connections"]["outbound"]} == {
+        f"{src_id}---{tgt_a}@@archimate-flow",
+        f"{src_id}---{tgt_b}@@archimate-serving",
+    }
+
+
+def test_entity_detail_view_uses_entity_context_request() -> None:
+    view_path = Path("tools/gui/src/ui/views/EntityDetailView.vue")
+    content = view_path.read_text(encoding="utf-8")
+
+    assert "svc.getEntityContext(entityId.value)" in content
+    assert "svc.getConnections(" not in content

@@ -27,7 +27,7 @@ const diagramConnections = ref<DiagramConnection[]>([])
 const selectedEntity = ref<EntityDetail | null>(null)
 const selectedId = ref<string | null>(null)
 const selectedConnection = ref<DiagramConnection | null>(null)
-const isGlobalDiagram = computed(() => detail.data.value?.path.includes('/enterprise-repository/') ?? false)
+const isGlobalDiagram = computed(() => detail.data.value?.is_global ?? false)
 const deleteFn = computed(() =>
   (isGlobalDiagram.value && adminMode.value) ? svc.adminDeleteDiagram : svc.deleteDiagram,
 )
@@ -45,14 +45,24 @@ let _attachRun = 0
 
 const load = () => {
   if (!diagramId.value) return
-  detail.run(svc.getDiagram(diagramId.value))
+  detail.loading.value = true
+  detail.error.value = null
   svgHtml.value = null; svgLoading.value = true; svgError.value = null
-  Effect.runPromise(svc.getDiagramEntities(diagramId.value))
-    .then((ents) => { diagramEntities.value = /* sort by archimate domain, then entity-type */ents.sort( (a, b) => a.domain.localeCompare(b.domain) || a.artifact_type.localeCompare(b.artifact_type) || a.name.localeCompare(b.name) ) })
-    .catch(() => { diagramEntities.value = [] })
-  Effect.runPromise(svc.getDiagramConnections(diagramId.value))
-    .then((cs) => { diagramConnections.value = cs })
-    .catch(() => { diagramConnections.value = [] })
+  Effect.runPromise(svc.getDiagramContext(diagramId.value))
+    .then((context) => {
+      detail.data.value = context.diagram
+      detail.loading.value = false
+      diagramEntities.value = context.entities
+        .slice()
+        .sort((a, b) => a.domain.localeCompare(b.domain) || a.artifact_type.localeCompare(b.artifact_type) || a.name.localeCompare(b.name))
+      diagramConnections.value = context.connections.slice()
+    })
+    .catch((e) => {
+      detail.error.value = String(e)
+      detail.loading.value = false
+      diagramEntities.value = []
+      diagramConnections.value = []
+    })
   Effect.runPromise(svc.getDiagramSvg(diagramId.value))
     .then((svg) => { svgHtml.value = svg; svgLoading.value = false })
     .catch((e) => { svgError.value = String(e); svgLoading.value = false })

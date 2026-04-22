@@ -16,6 +16,7 @@ except ModuleNotFoundError:  # pragma: no cover - test env without GUI deps
 
 from src.common.model_query import ModelRepository
 from src.common.model_query_types import ConnectionRecord, DiagramRecord, EntityRecord
+from src.common.model_index.coordination import publish_authoritative_mutation
 
 
 # Module-level server state — set by gui_server.main() before uvicorn starts.
@@ -181,16 +182,13 @@ def get_admin_write_deps() -> tuple[Path, Any, Any]:
     return _enterprise_root, registry, ModelVerifier(registry)
 
 
-def clear_caches(_: Path) -> None:
+def clear_caches(path: Path | list[Path]) -> None:
     if _repo is not None:
-        _repo.refresh()
-        try:
-            from src.tools.model_mcp.watch_tools import schedule_refresh
-        except Exception:  # noqa: BLE001
-            return
+        changed_paths = path if isinstance(path, list) else [path]
+        version = _repo.apply_file_changes(changed_paths)
         roots = configured_roots()
         if roots:
-            schedule_refresh(roots)
+            publish_authoritative_mutation(roots, changed_paths=changed_paths, version=version)
 
 
 def refresh_now() -> None:

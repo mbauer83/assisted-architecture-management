@@ -8,7 +8,8 @@ Keeps mcp_model_server.py small by factoring out:
 This module contains no FastMCP tool registrations.
 """
 
-
+import threading
+import time
 from dataclasses import dataclass
 from functools import lru_cache
 from pathlib import Path
@@ -16,11 +17,17 @@ from typing import Literal
 
 from src.common.model_query import ModelRepository
 from src.common.model_verifier import ModelRegistry, ModelVerifier
+from src.common.model_index.coordination import (
+    publish_background_refresh_completed,
+    wait_for_write_queue_drain,
+)
+from src.common.model_index.versioning import ReadModelVersion
+from src.common.workspace_paths import resolve_workspace_repo_roots
 
 
 RepoPreset = Literal[
-    "ENG-001-architecture",
-    "enterprise-architecture",
+    "engagement",
+    "enterprise",
 ]
 
 RepoScope = Literal["engagement", "enterprise", "both"]
@@ -31,47 +38,47 @@ def workspace_root() -> Path:
     return Path(__file__).resolve().parents[3]
 
 
+def _workspace_repo_roots() -> tuple[Path, Path] | None:
+    return resolve_workspace_repo_roots(workspace_root())
+
+
 def default_engagement_repo_root() -> Path:
     import os
 
     env = os.getenv("ARCH_MCP_MODEL_REPO_ROOT")
     if env:
         return Path(env).expanduser()
-    # Try init state from arch-init
-    state = _load_init_state_cached()
-    if state and "engagement_root" in state:
-        return Path(state["engagement_root"])
-    return workspace_root() / "engagements" / "ENG-001" / "work-repositories" / "architecture-repository"
+    roots = _workspace_repo_roots()
+    if roots is None:
+        raise RuntimeError(
+            "Could not resolve engagement repo root. "
+            "Run `arch-init` or provide arch-workspace.yaml / ARCH_MCP_MODEL_REPO_ROOT."
+        )
+    return roots[0]
 
 
 def default_enterprise_repo_root() -> Path:
-    state = _load_init_state_cached()
-    if state and "enterprise_root" in state:
-        return Path(state["enterprise_root"])
-    return workspace_root() / "enterprise-repository"
-
-
-def _load_init_state_cached() -> dict | None:
-    """Load init state once, cache in module-level variable."""
-    global _init_state, _init_state_loaded
-    if not _init_state_loaded:
-        from src.tools.workspace_init import load_init_state
-        _init_state = load_init_state(workspace_root())
-        _init_state_loaded = True
-    return _init_state
-
-
-_init_state: dict | None = None
-_init_state_loaded = False
+    roots = _workspace_repo_roots()
+    if roots is None:
+        raise RuntimeError(
+            "Could not resolve enterprise repo root. "
+            "Run `arch-init` or provide arch-workspace.yaml."
+        )
+    return roots[1]
 
 
 def repo_root_from_preset(preset: RepoPreset) -> Path:
-    root = workspace_root()
+    roots = _workspace_repo_roots()
+    if roots is None:
+        raise RuntimeError(
+            "Could not resolve workspace repo roots for repo_preset. "
+            "Run `arch-init` or provide arch-workspace.yaml."
+        )
     match preset:
-        case "ENG-001-architecture":
-            return root / "engagements" / "ENG-001" / "work-repositories" / "architecture-repository"
-        case "enterprise-architecture":
-            return root / "enterprise-repository"
+        case "engagement":
+            return roots[0]
+        case "enterprise":
+            return roots[1]
 
 
 def resolve_repo_root(*, repo_root: str | None, repo_preset: RepoPreset | None) -> Path:
@@ -155,27 +162,139 @@ def verifier_for(roots_key_str: str, *, include_registry: bool) -> ModelVerifier
     return ModelVerifier(None)
 
 
-def refresh_caches_for_repo(root_or_roots: Path | list[Path]) -> None:
-    roots = root_or_roots if isinstance(root_or_roots, list) else [root_or_roots]
+def _refresh_repo_now(roots: list[Path]) -> ReadModelVersion:
+    key = roots_key(roots)
     shared = _shared_state_repo_for_roots(roots)
     if shared is not None:
-        try:
-            from src.tools.gui_routers import state as gui_state
-            gui_state.refresh_now()
-        except Exception:  # noqa: BLE001
-            shared.refresh()
-    repo_cached.cache_clear()
+        shared.refresh()
+        version = shared.read_model_version()
+    else:
+        repo = repo_cached(key)
+        repo.refresh()
+        version = repo.read_model_version()
     registry_cached.cache_clear()
+    return version
+
+
+def _apply_paths_now(roots: list[Path], paths: list[Path]) -> ReadModelVersion:
+    key = roots_key(roots)
+    shared = _shared_state_repo_for_roots(roots)
+    repo = shared if shared is not None else repo_cached(key)
+    version = repo.apply_file_changes(paths)
+    registry_cached.cache_clear()
+    return version
+
+
+def _regenerate_macros(roots: list[Path]) -> None:
+    try:
+        from src.tools.generate_macros import generate_macros
+    except Exception:  # noqa: BLE001
+        return
+    for root in roots:
+        if (root / "model").is_dir():
+            try:
+                generate_macros(root)
+            except Exception:  # noqa: BLE001
+                pass
+
+
+@dataclass
+class _RefreshQueue:
+    cond: threading.Condition
+    pending_full: bool = False
+    pending_paths: set[Path] | None = None
+    next_due_monotonic: float = 0.0
+    worker: threading.Thread | None = None
+
+
+_queues: dict[str, _RefreshQueue] = {}
+_queues_mu = threading.Lock()
+_REFRESH_DEBOUNCE_S = 0.20
+
+
+def _queue_for(roots: list[Path]) -> _RefreshQueue:
+    key = roots_key(roots)
+    with _queues_mu:
+        queue = _queues.get(key)
+        if queue is None:
+            queue = _RefreshQueue(cond=threading.Condition(), pending_paths=set())
+            _queues[key] = queue
+        return queue
+
+
+def _refresh_worker(roots: list[Path], queue: _RefreshQueue) -> None:
+    while True:
+        with queue.cond:
+            while not queue.pending_full and not queue.pending_paths:
+                queue.worker = None
+                return
+            delay = max(0.0, queue.next_due_monotonic - time.monotonic())
+            if delay > 0:
+                queue.cond.wait(timeout=delay)
+                continue
+            pending_full = queue.pending_full
+            pending_paths = sorted(queue.pending_paths or [])
+            queue.pending_full = False
+            queue.pending_paths = set()
+        wait_for_write_queue_drain()
+        if pending_full:
+            version = _refresh_repo_now(roots)
+            publish_background_refresh_completed(roots, full_refresh=True, changed_paths=[], version=version)
+            _regenerate_macros(roots)
+            continue
+        if pending_paths:
+            version = _apply_paths_now(roots, pending_paths)
+            publish_background_refresh_completed(
+                roots,
+                full_refresh=False,
+                changed_paths=pending_paths,
+                version=version,
+            )
+            _regenerate_macros(roots)
+
+
+def enqueue_refresh_for_roots(
+    root_or_roots: Path | list[Path],
+    *,
+    changed_paths: list[Path] | None = None,
+    full_refresh: bool = False,
+) -> None:
+    roots = root_or_roots if isinstance(root_or_roots, list) else [root_or_roots]
+    queue = _queue_for(roots)
+    with queue.cond:
+        if full_refresh:
+            queue.pending_full = True
+            queue.pending_paths = set()
+        elif changed_paths:
+            if queue.pending_paths is None:
+                queue.pending_paths = set()
+            queue.pending_paths.update(path.resolve() for path in changed_paths)
+        queue.next_due_monotonic = time.monotonic() + _REFRESH_DEBOUNCE_S
+        if queue.worker is None or not queue.worker.is_alive():
+            queue.worker = threading.Thread(
+                target=_refresh_worker,
+                args=(roots, queue),
+                daemon=True,
+                name=f"model-refresh:{roots_key(roots)}",
+            )
+            queue.worker.start()
+        queue.cond.notify_all()
+
+
+def sync_refresh_for_roots(root_or_roots: Path | list[Path]) -> None:
+    roots = root_or_roots if isinstance(root_or_roots, list) else [root_or_roots]
+    wait_for_write_queue_drain()
+    version = _refresh_repo_now(roots)
+    _regenerate_macros(roots)
+    publish_background_refresh_completed(roots, full_refresh=True, changed_paths=[], version=version)
+
+
+def refresh_caches_for_repo(root_or_roots: Path | list[Path]) -> None:
+    sync_refresh_for_roots(root_or_roots)
 
 
 def clear_caches_for_repo(root_or_roots: Path | list[Path]) -> None:
-    refresh_caches_for_repo(root_or_roots)
-    roots = root_or_roots if isinstance(root_or_roots, list) else [root_or_roots]
-    try:
-        from src.tools.model_mcp.watch_tools import schedule_refresh
-    except Exception:  # noqa: BLE001
-        return
-    schedule_refresh(roots)
+    enqueue_refresh_for_roots(root_or_roots, full_refresh=True)
 
 
 @dataclass(frozen=True)

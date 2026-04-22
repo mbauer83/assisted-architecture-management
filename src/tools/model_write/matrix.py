@@ -260,7 +260,7 @@ def create_matrix(
             verification=_verification_to_dict(path, res),
         )
 
-    clear_repo_caches(repo_root)
+    clear_repo_caches(path)
 
     return WriteResult(
         wrote=True,

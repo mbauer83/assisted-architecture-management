@@ -56,7 +56,7 @@ logger = logging.getLogger(__name__)
 _INSTRUCTIONS = (
     "Architecture repository model query + verifier + writer tools. "
     "Targets an ArchiMate NEXT architecture repository (model/, diagram-catalog/). "
-    "By default mounts both engagement repo + enterprise-repository; use repo_scope to restrict."
+    "By default mounts both engagement repo + enterprise repo; use repo_scope to restrict."
 )
 
 _HOST = os.getenv("ARCH_MCP_HOST", "127.0.0.1")

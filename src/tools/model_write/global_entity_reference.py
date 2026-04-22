@@ -122,7 +122,7 @@ def ensure_global_entity_reference(
         generate_macros(engagement_root)
     except Exception:  # noqa: BLE001
         pass
-    clear_repo_caches(engagement_root)
+    clear_repo_caches(path)
 
     return WriteResult(
         wrote=True,

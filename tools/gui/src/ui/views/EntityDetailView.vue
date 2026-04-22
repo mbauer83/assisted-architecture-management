@@ -6,7 +6,7 @@ import { modelServiceKey } from '../keys'
 import { useAsync } from '../composables/useAsync'
 import ConnectionsPanel from '../components/ConnectionsPanel.vue'
 import ArchimateTypeGlyph from '../components/ArchimateTypeGlyph.vue'
-import type { EntityDetail, ConnectionList, OntologyClassification } from '../../domain'
+import type { EntityContext } from '../../domain'
 
 const svc = inject(modelServiceKey)!
 const router = useRouter()
@@ -20,40 +20,22 @@ const route = useRoute()
 
 const entityId = computed(() => (route.query.id as string | undefined) ?? '')
 
-const detail = useAsync<EntityDetail>()
-const outgoing = useAsync<ConnectionList>()
-const incoming = useAsync<ConnectionList>()
-const symmetric = useAsync<ConnectionList>()
-
-// Whether the symmetric panel should be shown (based on ontology)
-const ontology = ref<OntologyClassification | null>(null)
+const context = useAsync<EntityContext>()
+const detail = computed(() => context.data.value?.entity ?? null)
+const outgoing = computed(() => context.data.value?.connections.outbound ?? [])
+const incoming = computed(() => context.data.value?.connections.inbound ?? [])
+const symmetric = computed(() => context.data.value?.connections.symmetric ?? [])
 const hasSymmetric = computed(() =>
-  ontology.value ? Object.keys(ontology.value.symmetric).length > 0 : false,
+  (context.data.value?.counts.conn_sym ?? 0) > 0 || symmetric.value.length > 0,
 )
 
 const load = () => {
   if (!entityId.value) return
-  detail.run(svc.getEntity(entityId.value))
-  loadConnections()
-}
-
-const loadConnections = () => {
-  if (!entityId.value) return
-  outgoing.run(svc.getConnections(entityId.value, 'outbound'))
-  incoming.run(svc.getConnections(entityId.value, 'inbound'))
-  // Symmetric connections can be stored with this entity on either side.
-  symmetric.run(svc.getConnections(entityId.value, 'any'))
+  context.run(svc.getEntityContext(entityId.value))
 }
 
 onMounted(load)
 watch(entityId, load)
-
-watch(() => detail.data.value?.artifact_type, (newType) => {
-  if (!newType) return
-  Effect.runPromise(svc.getOntologyClassification(newType))
-    .then((o) => { ontology.value = o })
-    .catch(() => {})
-})
 
 // ── Edit mode ─────────────────────────────────────────────────────────────────
 
@@ -73,8 +55,9 @@ const deletePreview = ref<{ content: string | null; warnings: string[] } | null>
 const confirmDelete = ref(false)
 
 const startEdit = () => {
-  if (!detail.data.value) return
-  const d = detail.data.value
+  if (!detail.value) return
+  const d = detail.value
+  if (!d) return
   editName.value = d.name
   editSummary.value = d.summary ?? ''
   editKeywords.value = (d.keywords ?? []).join(', ')
@@ -118,7 +101,7 @@ const buildEditBody = (dryRun: boolean) => {
   }
 }
 
-const isGlobalEntity = computed(() => detail.data.value?.is_global ?? false)
+const isGlobalEntity = computed(() => detail.value?.is_global ?? false)
 // Use admin endpoint when editing a global entity in admin mode
 const editFn = computed(() =>
   (isGlobalEntity.value && adminMode.value) ? svc.adminEditEntity : svc.editEntity
@@ -211,7 +194,7 @@ const executeDelete = () => {
     deleteBusy.value = false
     if (r.wrote) {
       console.log('Delete successful')
-      router.push(detail.data.value?.is_global ? '/global/entities' : '/entities')
+      router.push(detail.value?.is_global ? '/global/entities' : '/entities')
     } else {
       console.error('Delete failed', r)
       deleteError.value = r.content ?? 'Delete failed'
@@ -239,47 +222,47 @@ const executeDelete = () => {
   <div>
     <div class="top-bar">
       <RouterLink
-        :to="detail.data.value?.is_global ? '/global/entities' : '/entities'"
+        :to="detail?.is_global ? '/global/entities' : '/entities'"
         class="back-link"
       >← Browse entities</RouterLink>
       <div class="top-actions">
-        <span v-if="detail.data.value?.is_global" class="global-badge" title="From the global (enterprise) repository">Global</span>
+        <span v-if="detail?.is_global" class="global-badge" title="From the global (enterprise) repository">Global</span>
         <RouterLink
           v-if="entityId"
           :to="{ path: '/graph', query: { id: entityId } }"
           class="graph-btn"
         >Explore graph</RouterLink>
         <RouterLink
-          v-if="detail.data.value && !detail.data.value.is_global && !editing"
+          v-if="detail && !detail.is_global && !editing"
           :to="{ path: '/promote', query: { entity_id: entityId } }"
           class="promote-btn"
           title="Promote this entity to the global repository"
         >↑ Promote to Global</RouterLink>
         <button
-          v-if="detail.data.value && !editing && (!detail.data.value.is_global || adminMode)"
+          v-if="detail && !editing && (!detail.is_global || adminMode)"
           class="edit-btn"
-          :class="{ 'edit-btn--admin': detail.data.value.is_global && adminMode }"
-          :title="detail.data.value.is_global && adminMode ? 'Edit global entity (admin mode)' : undefined"
+          :class="{ 'edit-btn--admin': detail.is_global && adminMode }"
+          :title="detail.is_global && adminMode ? 'Edit global entity (admin mode)' : undefined"
           @click="startEdit"
-        >Edit{{ detail.data.value.is_global && adminMode ? ' ⚠' : '' }}</button>
+        >Edit{{ detail.is_global && adminMode ? ' ⚠' : '' }}</button>
         <button
-          v-if="detail.data.value && !editing && (!detail.data.value.is_global || adminMode)"
+          v-if="detail && !editing && (!detail.is_global || adminMode)"
           class="delete-btn"
-          :title="detail.data.value.is_global && adminMode ? 'Delete global entity (admin mode)' : undefined"
+          :title="detail.is_global && adminMode ? 'Delete global entity (admin mode)' : undefined"
           @click="previewDelete"
-        >Delete{{ detail.data.value.is_global && adminMode ? ' ⚠' : '' }}</button>
+        >Delete{{ detail.is_global && adminMode ? ' ⚠' : '' }}</button>
       </div>
     </div>
 
-    <div v-if="detail.loading.value" class="state-msg">Loading...</div>
-    <div v-else-if="detail.error.value" class="state-msg state-msg--error">{{ detail.error.value }}</div>
+    <div v-if="context.loading.value" class="state-msg">Loading...</div>
+    <div v-else-if="context.error.value" class="state-msg state-msg--error">{{ context.error.value }}</div>
 
-    <template v-else-if="detail.data.value">
+    <template v-else-if="detail">
       <div class="entity-header">
         <div class="entity-title-row">
-          <h1 v-if="!editing" class="entity-name">{{ detail.data.value.name }}</h1>
+          <h1 v-if="!editing" class="entity-name">{{ detail.name }}</h1>
           <input v-else v-model="editName" class="edit-name-input" />
-          <span v-if="!editing" class="status-badge" :class="`status--${detail.data.value.status}`">{{ detail.data.value.status }}</span>
+          <span v-if="!editing" class="status-badge" :class="`status--${detail.status}`">{{ detail.status }}</span>
           <select v-else v-model="editStatus" class="edit-status-select">
             <option value="draft">draft</option>
             <option value="active">active</option>
@@ -288,16 +271,16 @@ const executeDelete = () => {
         </div>
         <div class="meta-row">
           <span class="meta-type">
-            <ArchimateTypeGlyph :type="detail.data.value.artifact_type" :size="16" class="meta-glyph" />
-            <span class="meta-item mono">{{ detail.data.value.artifact_type }}</span>
+            <ArchimateTypeGlyph :type="detail.artifact_type" :size="16" class="meta-glyph" />
+            <span class="meta-item mono">{{ detail.artifact_type }}</span>
           </span>
           <span class="sep">·</span>
-          <span class="domain-badge" :class="`domain--${detail.data.value.domain}`">{{ detail.data.value.domain }}</span>
-          <span v-if="detail.data.value.subdomain" class="sep">/ {{ detail.data.value.subdomain }}</span>
+          <span class="domain-badge" :class="`domain--${detail.domain}`">{{ detail.domain }}</span>
+          <span v-if="detail.subdomain" class="sep">/ {{ detail.subdomain }}</span>
           <span class="sep">·</span>
-          <span class="meta-item">v{{ detail.data.value.version }}</span>
+          <span class="meta-item">v{{ detail.version }}</span>
         </div>
-        <div class="artifact-id mono">{{ detail.data.value.artifact_id }}</div>
+        <div class="artifact-id mono">{{ detail.artifact_id }}</div>
       </div>
 
       <!-- Edit form -->
@@ -343,8 +326,8 @@ const executeDelete = () => {
       </div>
 
       <!-- Content -->
-      <div v-else-if="detail.data.value?.content_html" class="card content-card">
-        <div class="markdown-body" v-html="detail.data.value.content_html"></div>
+      <div v-else-if="detail?.content_html" class="card content-card">
+        <div class="markdown-body" v-html="detail.content_html"></div>
       </div>
 
       <div v-if="confirmDelete" class="delete-panel card">
@@ -370,37 +353,37 @@ const executeDelete = () => {
       <div class="connections-section" :class="{ 'has-symmetric': hasSymmetric }">
         <ConnectionsPanel
           :entity-id="entityId"
-          :entity-type="detail.data.value.artifact_type"
-          :connections="incoming.data.value ?? []"
+          :entity-type="detail.artifact_type"
+          :connections="incoming"
           direction="incoming"
-          :loading="incoming.loading.value"
-          :error="incoming.error.value"
+          :loading="context.loading.value"
+          :error="context.error.value"
           :readonly="isGlobalEntity && !adminMode"
           :admin-mode="isGlobalEntity && adminMode"
-          @refresh="loadConnections"
+          @refresh="load"
         />
         <ConnectionsPanel
           v-if="hasSymmetric"
           :entity-id="entityId"
-          :entity-type="detail.data.value.artifact_type"
-          :connections="symmetric.data.value ?? []"
+          :entity-type="detail.artifact_type"
+          :connections="symmetric"
           direction="symmetric"
-          :loading="symmetric.loading.value"
-          :error="symmetric.error.value"
+          :loading="context.loading.value"
+          :error="context.error.value"
           :readonly="isGlobalEntity && !adminMode"
           :admin-mode="isGlobalEntity && adminMode"
-          @refresh="loadConnections"
+          @refresh="load"
         />
         <ConnectionsPanel
           :entity-id="entityId"
-          :entity-type="detail.data.value.artifact_type"
-          :connections="outgoing.data.value ?? []"
+          :entity-type="detail.artifact_type"
+          :connections="outgoing"
           direction="outgoing"
-          :loading="outgoing.loading.value"
-          :error="outgoing.error.value"
+          :loading="context.loading.value"
+          :error="context.error.value"
           :readonly="isGlobalEntity && !adminMode"
           :admin-mode="isGlobalEntity && adminMode"
-          @refresh="loadConnections"
+          @refresh="load"
         />
       </div>
     </template>

@@ -2,3 +2,4 @@ diagrams:
   archimate_type_markers: icons
   sprite_scale: 1.5
   render_dpi: 150
+  plantuml_limit_size: 16384

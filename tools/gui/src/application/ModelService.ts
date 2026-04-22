@@ -13,12 +13,14 @@ export const makeModelService = (repo: ModelRepository) =>
     listEntities: (params: ListParams = {}) => repo.listEntities(params),
     listEntitiesGlobal: (params: ListParams = {}) => repo.listEntities({ ...params, scope: 'global' }),
     getEntity: (id: string) => repo.getEntity(id),
+    getEntityContext: (id: string) => repo.getEntityContext(id),
     getConnections: (entityId: string, direction: Direction = 'any') =>
       repo.getConnections(entityId, direction),
     search: (query: string, limit?: number) => repo.search(query, limit),
     listDiagrams: (diagramType?: string, status?: string) =>
       repo.listDiagrams(diagramType, status),
     getDiagram: (id: string) => repo.getDiagram(id),
+    getDiagramContext: (id: string) => repo.getDiagramContext(id),
     diagramImageUrl: (filename: string) => repo.diagramImageUrl(filename),
     getDiagramRefs: (sourceId: string, targetId: string) =>
       repo.getDiagramRefs(sourceId, targetId),
@@ -41,6 +43,8 @@ export const makeModelService = (repo: ModelRepository) =>
     getDiagramConnections: (diagramId: string) => repo.getDiagramConnections(diagramId),
     getDiagramSvg: (diagramId: string) => repo.getDiagramSvg(diagramId),
     searchEntityDisplay: (query: string, limit?: number) => repo.searchEntityDisplay(query, limit),
+    discoverDiagramEntities: (params: Parameters<ModelRepository['discoverDiagramEntities']>[0]) =>
+      repo.discoverDiagramEntities(params),
     previewDiagram: (body: Parameters<ModelRepository['previewDiagram']>[0]) => repo.previewDiagram(body),
     createDiagram: (body: Parameters<ModelRepository['createDiagram']>[0]) => repo.createDiagram(body),
     editDiagram: (body: Parameters<ModelRepository['editDiagram']>[0]) => repo.editDiagram(body),

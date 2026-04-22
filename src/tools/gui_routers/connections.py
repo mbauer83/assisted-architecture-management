@@ -31,6 +31,7 @@ def get_neighbors(entity_id: str, max_hops: int = 1) -> dict[str, list[str]]:
 @router.get("/api/search")
 def search(q: str, limit: int = 20) -> dict[str, Any]:
     from src.common.model_query_types import DiagramRecord, EntityRecord
+    from src.common.model_query_types import ConnectionRecord
     result = s.get_repo().search_artifacts(q, limit=limit)
     hits = []
     for h in result.hits:
@@ -45,6 +46,9 @@ def search(q: str, limit: int = 20) -> dict[str, Any]:
             hit["domain"] = rec.domain
             hit["subdomain"] = rec.subdomain
             hit["is_global"] = s.is_global(rec.path)
+        if isinstance(rec, ConnectionRecord):
+            hit["source"] = rec.source
+            hit["target"] = rec.target
         if isinstance(rec, DiagramRecord):
             hit["diagram_type"] = rec.diagram_type
         hits.append(hit)

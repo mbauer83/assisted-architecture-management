@@ -99,6 +99,13 @@ _CONN_LINE_RE = re.compile(
     r"(\s*(?::\s*.*)?)$"  # (7) optional : label
 )
 
+_MACRO_CONN_RE = re.compile(
+    r"^(\s*)"
+    r"(Rel_[A-Za-z0-9]+)"
+    r"(?:_(Up|Down|Left|Right))?"
+    r"\(\s*(\w+)\s*,\s*(\w+)(.*)\)\s*$"
+)
+
 
 def _insert_arrow_direction(arrow: str, direction: str) -> str:
     """Insert a direction hint into PlantUML arrow syntax.
@@ -184,27 +191,52 @@ def optimize_puml_layout(puml_body: str) -> str:
     # --- Phase 2: Add arrow direction hints to inter-grouping connections ---
     for i, line in enumerate(lines):
         m = _CONN_LINE_RE.match(line)
-        if not m:
+        if m:
+            src_alias = m.group(2)
+            arrow = m.group(4)
+            tgt_alias = m.group(6)
+
+            src_group = alias_to_group.get(src_alias)
+            tgt_group = alias_to_group.get(tgt_alias)
+
+            if src_group is None or tgt_group is None:
+                continue
+            if src_group == tgt_group:
+                continue  # Intra-grouping — don't add layer hints
+
+            hint = flow_dir if src_group < tgt_group else reverse_dir
+            new_arrow = _insert_arrow_direction(arrow, hint)
+            if new_arrow != arrow:
+                lines[i] = (
+                    m.group(1) + m.group(2) + m.group(3) + new_arrow + m.group(5) + m.group(6) + m.group(7)
+                )
             continue
 
-        src_alias = m.group(2)
-        arrow = m.group(4)
-        tgt_alias = m.group(6)
+        macro = _MACRO_CONN_RE.match(line)
+        if not macro:
+            continue
 
+        src_alias = macro.group(4)
+        tgt_alias = macro.group(5)
         src_group = alias_to_group.get(src_alias)
         tgt_group = alias_to_group.get(tgt_alias)
-
-        if src_group is None or tgt_group is None:
+        if src_group is None or tgt_group is None or src_group == tgt_group:
             continue
-        if src_group == tgt_group:
-            continue  # Intra-grouping — don't add layer hints
-
+        if macro.group(3):
+            continue
         hint = flow_dir if src_group < tgt_group else reverse_dir
-        new_arrow = _insert_arrow_direction(arrow, hint)
-        if new_arrow != arrow:
-            lines[i] = (
-                m.group(1) + m.group(2) + m.group(3) + new_arrow + m.group(5) + m.group(6) + m.group(7)
-            )
+        lines[i] = (
+            macro.group(1)
+            + macro.group(2)
+            + "_"
+            + hint.title()
+            + "("
+            + src_alias
+            + ", "
+            + tgt_alias
+            + macro.group(6)
+            + ")"
+        )
 
     # --- Phase 3: Generate hidden links block ---
     # In TB mode, elements within groupings need horizontal spread (hidden right links).

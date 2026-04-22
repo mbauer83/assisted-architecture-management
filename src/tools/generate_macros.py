@@ -215,13 +215,17 @@ def main() -> None:
     if len(sys.argv) > 1:
         repo_root = Path(sys.argv[1]).resolve()
     else:
-        project_root = Path(__file__).resolve().parent.parent.parent
-        repo_root = (
-            project_root
-            / "engagements"
-            / "ENG-ARCH-REPO"
-            / "architecture-repository"
-        )
+        from src.common.workspace_paths import resolve_workspace_repo_roots
+
+        roots = resolve_workspace_repo_roots(Path.cwd())
+        if roots is None:
+            print(
+                "ERROR: no repo_root argument provided and no workspace configuration found. "
+                "Run arch-init or provide arch-workspace.yaml.",
+                file=sys.stderr,
+            )
+            sys.exit(1)
+        repo_root = roots[0]
 
     if not repo_root.is_dir():
         print(f"ERROR: repo_root does not exist: {repo_root}", file=sys.stderr)

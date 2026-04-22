@@ -107,7 +107,7 @@ def admin_create_entity(
         generate_macros(repo_root)
     except Exception:  # noqa: BLE001
         pass
-    clear_repo_caches(repo_root)
+    clear_repo_caches(path)
     return WriteResult(wrote=True, path=path, artifact_id=eid, content=None,
                        warnings=[], verification=verification_to_entity_dict(path, res))
 
@@ -182,7 +182,7 @@ def admin_edit_entity(
             generate_macros(repo_root)
         except Exception:  # noqa: BLE001
             pass
-    clear_repo_caches(repo_root)
+    clear_repo_caches(entity_file)
     return WriteResult(wrote=True, path=entity_file, artifact_id=artifact_id,
                        content=None, warnings=[],
                        verification=verification_to_entity_dict(entity_file, res))
@@ -241,7 +241,7 @@ def admin_add_connection(
     result = _write_and_verify_conn(outgoing_path, content, verifier,
                                     connection_type, target_entity)
     if result.wrote:
-        clear_repo_caches(repo_root)
+        clear_repo_caches(outgoing_path)
     return result
 
 
@@ -287,7 +287,7 @@ def admin_remove_connection(
 
     if not remaining:
         outgoing_path.unlink()
-        clear_repo_caches(repo_root)
+        clear_repo_caches(outgoing_path)
         return WriteResult(wrote=True, path=outgoing_path, artifact_id=conn_id,
                            content=None, warnings=["Deleted empty .outgoing.md file"],
                            verification={"path": str(outgoing_path), "file_type": "connection",
@@ -307,7 +307,7 @@ def admin_remove_connection(
         _rollback(outgoing_path, prev)
         return WriteResult(wrote=False, path=outgoing_path, artifact_id=conn_id,
                            content=content, warnings=[], verification=vdict)
-    clear_repo_caches(repo_root)
+    clear_repo_caches(outgoing_path)
     return WriteResult(wrote=True, path=outgoing_path, artifact_id=conn_id,
                        content=None, warnings=[], verification=vdict)
 
@@ -370,7 +370,7 @@ def _write_diagram_to_enterprise(
             },
         )
 
-    clear_repo_caches(repo_root)
+    clear_repo_caches(path)
     return WriteResult(
         wrote=True, path=path, artifact_id=artifact_id,
         content=None, warnings=[],

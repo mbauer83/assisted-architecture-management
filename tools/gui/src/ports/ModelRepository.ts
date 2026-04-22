@@ -3,11 +3,14 @@ import type {
   Stats,
   EntityList,
   EntityDetail,
+  EntityContext,
   ConnectionList,
   Neighbors,
   SearchResult,
   DiagramList,
   DiagramDetail,
+  DiagramContext,
+  DiagramEntityDiscovery,
   WriteResult,
   DiagramRefs,
   OntologyClassification,
@@ -45,6 +48,7 @@ export interface ModelRepository {
   readonly getStats: () => Effect.Effect<Stats, RepoError>
   readonly listEntities: (params?: ListParams) => Effect.Effect<EntityList, RepoError>
   readonly getEntity: (id: string) => Effect.Effect<EntityDetail, RepoError | NotFoundError | MarkdownError>
+  readonly getEntityContext: (id: string) => Effect.Effect<EntityContext, RepoError | NotFoundError | MarkdownError>
   readonly getConnections: (
     entityId: string, direction?: Direction, connType?: string,
   ) => Effect.Effect<ConnectionList, RepoError>
@@ -58,6 +62,7 @@ export interface ModelRepository {
     diagramType?: string, status?: string,
   ) => Effect.Effect<DiagramList, RepoError>
   readonly getDiagram: (id: string) => Effect.Effect<DiagramDetail, RepoError | NotFoundError>
+  readonly getDiagramContext: (id: string) => Effect.Effect<DiagramContext, RepoError | NotFoundError>
   readonly diagramImageUrl: (filename: string) => string
   readonly getDiagramRefs: (
     sourceId: string, targetId: string,
@@ -106,6 +111,12 @@ export interface ModelRepository {
   readonly searchEntityDisplay: (
     query: string, limit?: number,
   ) => Effect.Effect<EntityDisplayInfo[], RepoError>
+  readonly discoverDiagramEntities: (params: {
+    includedEntityIds?: string[]
+    query?: string
+    maxHops?: number
+    limit?: number
+  }) => Effect.Effect<DiagramEntityDiscovery, RepoError>
   readonly previewDiagram: (body: {
     diagram_type: string; name: string;
     entity_ids: string[]; connection_ids: string[];

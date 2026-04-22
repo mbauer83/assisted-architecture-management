@@ -11,6 +11,7 @@ from typing import Literal
 
 from mcp.server.fastmcp import FastMCP  # type: ignore[import-not-found]
 
+from src.common.archimate_relation_rendering import render_archimate_relation
 from src.tools.model_mcp.context import (
     RepoPreset,
     RepoScope,
@@ -85,6 +86,10 @@ def _conn_line(src: str, conn_dir: str, tgt: str, note: str | None = None) -> st
     if note:
         line += f"  ' {note}"
     return line
+
+
+def _conn_type_from_dir(conn_dir: str) -> str:
+    return f"archimate-{conn_dir}"
 
 
 def _pluralize_label(label: str) -> str:
@@ -247,22 +252,44 @@ def _build_puml(
         for c in non_comp:
             conn_dir = c["conn_dir"]
             if len(ordered) == 1:
-                arrow = _ARROW.get(conn_dir, "-->")
                 src_group = group_index_by_alias.get(c["source_alias"])
                 tgt_group = group_index_by_alias.get(c["target_alias"])
+                direction_hint: str | None = None
                 if src_group is not None and tgt_group is not None and src_group != tgt_group:
                     direction_hint = "down" if src_group < tgt_group else "up"
-                    arrow = _insert_arrow_direction(arrow, direction_hint)
-                label = _LABEL.get(conn_dir, "")
-                parts = [c["source_alias"], arrow, c["target_alias"]]
-                if label:
-                    parts.append(f": {label}")
-                line = " ".join(parts)
+                line = render_archimate_relation(
+                    c["source_alias"],
+                    c["target_alias"],
+                    _conn_type_from_dir(conn_dir),
+                    direction=direction_hint,
+                    label_text="",
+                )
+                if line is None:
+                    arrow = _ARROW.get(conn_dir, "-->")
+                    if direction_hint:
+                        arrow = _insert_arrow_direction(arrow, direction_hint)
+                    label = _LABEL.get(conn_dir, "")
+                    parts = [c["source_alias"], arrow, c["target_alias"]]
+                    if label:
+                        parts.append(f": {label}")
+                    line = " ".join(parts)
                 if c.get("description"):
                     line += f"  ' {c['description']}"
                 lines.append(line)
             else:
-                lines.append(_conn_line(c["source_alias"], c["conn_dir"], c["target_alias"], c.get("description")))
+                line = render_archimate_relation(
+                    c["source_alias"],
+                    c["target_alias"],
+                    _conn_type_from_dir(conn_dir),
+                    label_text="",
+                )
+                if line is None:
+                    line = _conn_line(c["source_alias"], c["conn_dir"], c["target_alias"], c.get("description"))
+                    lines.append(line)
+                    continue
+                if c.get("description"):
+                    line += f"  ' {c['description']}"
+                lines.append(line)
         lines.append("")
 
     lines.append("@enduml")

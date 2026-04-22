@@ -6,7 +6,7 @@ import re
 from collections.abc import Callable
 from src.common.model_verifier import ModelVerifier
 from src.common.model_verifier_syntax import find_plantuml_jar
-from src.common.settings import render_dpi
+from src.common.settings import plantuml_limit_size, render_dpi
 from src.common.model_write import (
     DiagramConnectionInferenceMode,
     format_diagram_puml,
@@ -75,7 +75,7 @@ def _render_diagram_png(puml_path: Path, warnings: list[str]) -> Path | None:
         # project root produces a doubled/wrong path.
         dpi = render_dpi()
         result = subprocess.run(
-            ["java", "-Djava.awt.headless=true", "-DPLANTUML_LIMIT_SIZE=16384", "-jar", str(jar.resolve()),
+            ["java", "-Djava.awt.headless=true", f"-DPLANTUML_LIMIT_SIZE={plantuml_limit_size()}", "-jar", str(jar.resolve()),
              "-tpng", f"-Sdpi={dpi}", "-o", str(rendered_dir.resolve()), tmp_path.name],
             cwd=str(puml_path.parent),
             capture_output=True, text=True, timeout=60,
@@ -130,7 +130,7 @@ def _render_diagram_svg(puml_path: Path, warnings: list[str]) -> Path | None:
 
     try:
         result = subprocess.run(
-            ["java", "-Djava.awt.headless=true", "-jar", str(jar.resolve()),
+            ["java", "-Djava.awt.headless=true", f"-DPLANTUML_LIMIT_SIZE={plantuml_limit_size()}", "-jar", str(jar.resolve()),
              "-tsvg", "-o", str(rendered_dir.resolve()), tmp_path.name],
             cwd=str(puml_path.parent),
             capture_output=True, text=True, timeout=60,
@@ -283,7 +283,7 @@ def create_diagram(
         warnings.append(f"Rendered PNG: {png_path}")
     _render_diagram_svg(path, warnings)
 
-    clear_repo_caches(repo_root)
+    clear_repo_caches(path)
 
     return WriteResult(
         wrote=True,

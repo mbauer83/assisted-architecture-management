@@ -5,11 +5,14 @@ import {
   StatsSchema,
   EntityListSchema,
   EntityDetailSchema,
+  EntityContextSchema,
   ConnectionListSchema,
   NeighborsSchema,
   SearchResultSchema,
   DiagramListSchema,
   DiagramDetailSchema,
+  DiagramContextSchema,
+  DiagramEntityDiscoverySchema,
   WriteResultSchema,
   DiagramRefsSchema,
   OntologyClassificationSchema,
@@ -133,6 +136,18 @@ export const makeHttpModelRepository = (): ModelRepository => ({
       }),
     ),
 
+  getEntityContext: (id: string) =>
+    fetchJsonNotFound(buildUrl('/entity-context', { id }), EntityContextSchema, id).pipe(
+      Effect.flatMap((context) => {
+        if (context.entity.content_text) {
+          return parseMarkdown(context.entity.content_text).pipe(
+            Effect.map((html) => ({ ...context, entity: { ...context.entity, content_html: html } })),
+          )
+        }
+        return Effect.succeed({ ...context, entity: { ...context.entity } })
+      }),
+    ),
+
   getConnections: (entityId: string, direction: Direction = 'any', connType?: string) =>
     fetchJson(
       buildUrl('/connections', { entity_id: entityId, direction, conn_type: connType }),
@@ -150,6 +165,9 @@ export const makeHttpModelRepository = (): ModelRepository => ({
 
   getDiagram: (id: string) =>
     fetchJsonNotFound(buildUrl('/diagram', { id }), DiagramDetailSchema, id),
+
+  getDiagramContext: (id: string) =>
+    fetchJsonNotFound(buildUrl('/diagram-context', { id }), DiagramContextSchema, id),
 
   diagramImageUrl: (filename: string) => `/api/diagram-image/${encodeURIComponent(filename)}`,
 
@@ -209,6 +227,17 @@ export const makeHttpModelRepository = (): ModelRepository => ({
       buildUrl('/entity-display-search', { q: query, limit }),
       Schema.Array(EntityDisplayInfoSchema),
     ).pipe(Effect.map((arr) => arr as import('../../domain').EntityDisplayInfo[])),
+
+  discoverDiagramEntities: ({ includedEntityIds = [], query, maxHops = 2, limit = 20 }) =>
+    fetchJson(
+      buildUrl('/diagram-entity-discovery', {
+        q: query,
+        max_hops: maxHops,
+        limit,
+        included_entity_ids: includedEntityIds.join(','),
+      }),
+      DiagramEntityDiscoverySchema,
+    ),
 
   previewDiagram: (body) =>
     postJson(buildUrl('/diagram/preview'), body, DiagramPreviewResultSchema),

@@ -17,13 +17,20 @@ so FastMCP can derive the correct JSON schema.
 from __future__ import annotations
 
 import asyncio
+import threading
 from concurrent.futures import ThreadPoolExecutor
 from functools import wraps
 from typing import Any, Callable, TypeVar
 
+from src.common.model_index.coordination import publish_write_queue_state
+
 _F = TypeVar("_F", bound=Callable[..., Any])
 
 _executor: ThreadPoolExecutor | None = None
+_state_cond = threading.Condition()
+_submitted_jobs = 0
+_completed_jobs = 0
+_active_jobs = 0
 
 
 def _get_executor() -> ThreadPoolExecutor:
@@ -33,6 +40,46 @@ def _get_executor() -> ThreadPoolExecutor:
             max_workers=1, thread_name_prefix="model-write-queue"
         )
     return _executor
+
+
+def _emit_queue_state() -> None:
+    with _state_cond:
+        publish_write_queue_state(
+            active_jobs=_active_jobs,
+            pending_jobs=max(_submitted_jobs - _completed_jobs - _active_jobs, 0),
+        )
+
+
+def _run_job(fn: Callable[..., Any], /, *args: Any, **kwargs: Any) -> Any:
+    global _active_jobs, _completed_jobs
+    with _state_cond:
+        _active_jobs += 1
+        publish_write_queue_state(
+            active_jobs=_active_jobs,
+            pending_jobs=max(_submitted_jobs - _completed_jobs - _active_jobs, 0),
+        )
+    try:
+        return fn(*args, **kwargs)
+    finally:
+        with _state_cond:
+            _active_jobs -= 1
+            _completed_jobs += 1
+            publish_write_queue_state(
+                active_jobs=_active_jobs,
+                pending_jobs=max(_submitted_jobs - _completed_jobs - _active_jobs, 0),
+            )
+            _state_cond.notify_all()
+
+
+def _submit(fn: Callable[..., Any], /, *args: Any, **kwargs: Any):
+    global _submitted_jobs
+    with _state_cond:
+        _submitted_jobs += 1
+        publish_write_queue_state(
+            active_jobs=_active_jobs,
+            pending_jobs=max(_submitted_jobs - _completed_jobs - _active_jobs, 0),
+        )
+    return _get_executor().submit(_run_job, fn, *args, **kwargs)
 
 
 def queued(fn: _F) -> _F:
@@ -46,7 +93,8 @@ def queued(fn: _F) -> _F:
     @wraps(fn)
     async def wrapper(*args: Any, **kwargs: Any) -> Any:
         loop = asyncio.get_running_loop()
-        return await loop.run_in_executor(_get_executor(), lambda: fn(*args, **kwargs))
+        future = _submit(fn, *args, **kwargs)
+        return await asyncio.wrap_future(future, loop=loop)
 
     return wrapper  # type: ignore[return-value]
 
@@ -58,12 +106,34 @@ def run_sync(fn: Callable[..., Any], /, *args: Any, **kwargs: Any) -> Any:
     to serialize writes with MCP tool calls once both paths share one process.
     """
 
-    return _get_executor().submit(fn, *args, **kwargs).result()
+    return _submit(fn, *args, **kwargs).result()
+
+
+def wait_until_idle(timeout_s: float | None = None) -> bool:
+    import time
+
+    deadline = None if timeout_s is None else time.monotonic() + timeout_s
+    with _state_cond:
+        while _active_jobs > 0 or (_submitted_jobs - _completed_jobs) > 0:
+            if deadline is None:
+                _state_cond.wait()
+                continue
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                return False
+            _state_cond.wait(timeout=remaining)
+    return True
 
 
 def shutdown(wait: bool = True) -> None:
     """Shut down the write queue executor (for testing / clean teardown)."""
-    global _executor
+    global _executor, _submitted_jobs, _completed_jobs, _active_jobs
     if _executor is not None:
         _executor.shutdown(wait=wait)
         _executor = None
+    with _state_cond:
+        _submitted_jobs = 0
+        _completed_jobs = 0
+        _active_jobs = 0
+        publish_write_queue_state(active_jobs=0, pending_jobs=0)
+        _state_cond.notify_all()

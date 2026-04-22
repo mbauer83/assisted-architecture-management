@@ -93,7 +93,7 @@ class ModelVerifier:
         self.check_puml_syntax = check_puml_syntax
 
     def _repo_root_for_path(self, path: Path) -> Path | None:
-        """Resolve the architecture-repository root for a file path."""
+        """Resolve the configured model repository root for a file path."""
         if self.registry is None:
             return None
         resolved = path.resolve()
@@ -444,7 +444,9 @@ class ModelVerifier:
     def _scope_for_path(self, path: Path) -> Literal["enterprise", "engagement", "unknown"]:
         if self.registry is not None:
             return self.registry.scope_for_path(path)
-        return "enterprise" if "enterprise-repository" in path.resolve().parts else "engagement"
+        from src.common.workspace_paths import infer_repo_scope
+
+        return infer_repo_scope(path)
 
 
 def _verify_paths(
