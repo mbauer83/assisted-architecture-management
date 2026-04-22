@@ -4,7 +4,7 @@ from pathlib import Path
 
 from starlette.routing import Match
 
-from src.tools import mcp_model_server
+from src.tools import mcp_artifact_server
 from src.tools import backend_runtime
 from src.tools import arch_backend
 from src.tools.arch_backend import _build_app
@@ -18,7 +18,7 @@ def test_arch_mcp_model_stdio_delegates_to_bridge_by_default(monkeypatch) -> Non
 
     monkeypatch.setattr("src.tools.arch_mcp_stdio.main", fake_bridge_main)
 
-    mcp_model_server.main(["--transport", "stdio"])
+    mcp_artifact_server.main(["--transport", "stdio"])
 
     assert called["argv"] == ["--port", "8000"]
 
@@ -29,9 +29,9 @@ def test_arch_mcp_model_stdio_can_still_run_standalone(monkeypatch) -> None:
     def fake_run(*, transport: str) -> None:
         called["run"] = transport
 
-    monkeypatch.setattr(mcp_model_server.mcp, "run", fake_run)
+    monkeypatch.setattr(mcp_artifact_server.mcp, "run", fake_run)
 
-    mcp_model_server.main(["--transport", "stdio", "--standalone-stdio"])
+    mcp_artifact_server.main(["--transport", "stdio", "--standalone-stdio"])
 
     assert called["run"] == "stdio"
 

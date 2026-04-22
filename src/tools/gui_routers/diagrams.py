@@ -10,8 +10,8 @@ from fastapi import APIRouter, HTTPException, Query
 from fastapi.responses import FileResponse, Response
 from pydantic import BaseModel
 
-from src.common.model_query_parsing import extract_declared_puml_aliases, normalize_puml_alias
-from src.common.model_query_types import DiagramRecord, EntityRecord
+from src.common.artifact_parsing import extract_declared_puml_aliases, normalize_puml_alias
+from src.common.artifact_types import DiagramRecord, EntityRecord
 from src.common.ontology_loader import DOMAIN_ORDER as _DOMAIN_ORDER
 from src.tools.gui_routers import state as s
 
@@ -50,7 +50,7 @@ def read_diagram(id: str) -> dict[str, Any]:
     if diag_rec:
         result["rendered_filename"] = _rendered_name(diag_rec, ".png")
         result["is_global"] = s.is_global(diag_rec.path)
-        from src.tools.model_write.parse_existing import parse_diagram_file
+        from src.tools.artifact_write.parse_existing import parse_diagram_file
 
         parsed = parse_diagram_file(diag_rec.path)
         entity_ids_used = parsed.frontmatter.get("entity-ids-used")
@@ -324,7 +324,7 @@ def get_diagram_svg(id: str) -> Response:
             if svg_path.exists():
                 return Response(content=svg_path.read_bytes(), media_type="image/svg+xml")
     from src.tools.diagram_builder import render_puml_svg
-    from src.tools.model_write.parse_existing import parse_diagram_file
+    from src.tools.artifact_write.parse_existing import parse_diagram_file
     parsed = parse_diagram_file(diagram_path)
     svg, warnings = render_puml_svg(parsed.puml_body, repo_root)
     if svg is None:
@@ -444,9 +444,9 @@ def preview_diagram(body: DiagramPreviewBody) -> dict[str, Any]:
 
 @router.post("/api/diagram")
 def create_diagram_gui(body: CreateDiagramGuiBody) -> dict[str, Any]:
-    from src.common.model_write import generate_entity_id
+    from src.common.artifact_write import generate_entity_id
     from src.tools.diagram_builder import generate_archimate_puml_body
-    from src.tools.model_write.diagram import create_diagram
+    from src.tools.artifact_write.diagram import create_diagram
     repo = s.get_repo()
     repo_root, _, verifier = s.get_write_deps()
     entities = [e for eid in body.entity_ids if (e := repo.get_entity(eid)) is not None]
@@ -479,7 +479,7 @@ def create_diagram_gui(body: CreateDiagramGuiBody) -> dict[str, Any]:
 @router.post("/api/diagram/edit")
 def edit_diagram_gui(body: EditDiagramGuiBody) -> dict[str, Any]:
     from src.tools.diagram_builder import generate_archimate_puml_body
-    from src.tools.model_write.diagram_edit import edit_diagram
+    from src.tools.artifact_write.diagram_edit import edit_diagram
     repo = s.get_repo()
     repo_root, _, verifier = s.get_write_deps()
     entities = [e for eid in body.entity_ids if (e := repo.get_entity(eid)) is not None]
@@ -509,7 +509,7 @@ def edit_diagram_gui(body: EditDiagramGuiBody) -> dict[str, Any]:
 @router.post("/api/diagram/remove")
 def delete_diagram_gui(body: DeleteDiagramBody) -> dict[str, Any]:
     repo_root, _registry, _verifier = s.get_write_deps()
-    from src.tools.model_write.diagram_delete import delete_diagram
+    from src.tools.artifact_write.diagram_delete import delete_diagram
     try:
         result = s.run_serialized_write(
             delete_diagram,

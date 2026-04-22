@@ -10,7 +10,7 @@ from pathlib import Path
 
 import pytest
 
-from src.tools import mcp_model_server as mcp
+from src.tools import mcp_artifact_server as mcp
 
 
 # ---------------------------------------------------------------------------
@@ -93,7 +93,7 @@ class TestPromotionDryRun:
         eng_id = "REQ@1000000001.EngAaa.eng-req"
         _make_entity(engagement_root, eng_id, "requirement", "Eng Req")
 
-        result = mcp.model_promote_to_enterprise(
+        result = mcp.artifact_promote_to_enterprise(
             entity_id=eng_id,
             dry_run=True,
             repo_root=str(engagement_root),
@@ -112,7 +112,7 @@ class TestPromotionDryRun:
         _make_entity(engagement_root, eng_id, "requirement", "Shared Req")
         _make_entity(enterprise_root, ent_id, "requirement", "Shared Req")  # same name → conflict
 
-        result = mcp.model_promote_to_enterprise(
+        result = mcp.artifact_promote_to_enterprise(
             entity_id=eng_id,
             dry_run=True,
             repo_root=str(engagement_root),
@@ -146,7 +146,7 @@ last-updated: '2026-04-17'
 ### archimate-aggregation → {ent_id}
 """)
 
-        result = mcp.model_promote_to_enterprise(
+        result = mcp.artifact_promote_to_enterprise(
             entity_id=eng_id,
             dry_run=True,
             repo_root=str(engagement_root),
@@ -178,7 +178,7 @@ last-updated: '2026-04-17'
 
 ### archimate-aggregation → {eng_id2}
 """)
-        result = mcp.model_promote_to_enterprise(
+        result = mcp.artifact_promote_to_enterprise(
             entity_id=eng_id1,
             exclude_entities=[eng_id2],
             dry_run=True,
@@ -200,7 +200,7 @@ class TestPromotionExecute:
         eng_id = "REQ@1000000001.EngAaa.live-req"
         _make_entity(engagement_root, eng_id, "requirement", "Live Req")
 
-        result = mcp.model_promote_to_enterprise(
+        result = mcp.artifact_promote_to_enterprise(
             entity_id=eng_id,
             dry_run=False,
             repo_root=str(engagement_root),
@@ -223,7 +223,7 @@ class TestPromotionExecute:
         )
         assert orig_path.exists()
 
-        result = mcp.model_promote_to_enterprise(
+        result = mcp.artifact_promote_to_enterprise(
             entity_id=eng_id,
             dry_run=False,
             repo_root=str(engagement_root),
@@ -245,7 +245,7 @@ class TestPromotionExecute:
         _make_entity(engagement_root, eng_id, "requirement", "Conflict Req")
         _make_entity(enterprise_root, ent_id, "requirement", "Conflict Req")
 
-        result = mcp.model_promote_to_enterprise(
+        result = mcp.artifact_promote_to_enterprise(
             entity_id=eng_id,
             dry_run=False,
             conflict_resolutions=[{
@@ -319,7 +319,7 @@ last-updated: '2026-04-17'
 ### archimate-association → {grf_id}
 """)
 
-        result = mcp.model_promote_to_enterprise(
+        result = mcp.artifact_promote_to_enterprise(
             entity_id=eng_id,
             dry_run=False,
             repo_root=str(engagement_root),

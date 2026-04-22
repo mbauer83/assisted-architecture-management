@@ -17,6 +17,16 @@ export const makeModelService = (repo: ModelRepository) =>
     getConnections: (entityId: string, direction: Direction = 'any') =>
       repo.getConnections(entityId, direction),
     search: (query: string, limit?: number) => repo.search(query, limit),
+    listDocumentTypes: () => repo.listDocumentTypes(),
+    listDocuments: (params?: Parameters<ModelRepository['listDocuments']>[0]) => repo.listDocuments(params),
+    getDocument: (id: string) => repo.getDocument(id),
+    createDocument: (body: Parameters<ModelRepository['createDocument']>[0]) => repo.createDocument(body),
+    editDocument: (id: string, body: Parameters<ModelRepository['editDocument']>[1]) => repo.editDocument(id, body),
+    deleteDocument: (id: string, dryRun?: boolean) => repo.deleteDocument(id, dryRun),
+    artifactSearch: (query: string, params?: Parameters<ModelRepository['artifactSearch']>[1]) =>
+      repo.artifactSearch(query, params),
+    searchReferenceArtifacts: (params: Parameters<ModelRepository['searchReferenceArtifacts']>[0]) =>
+      repo.searchReferenceArtifacts(params),
     listDiagrams: (diagramType?: string, status?: string) =>
       repo.listDiagrams(diagramType, status),
     getDiagram: (id: string) => repo.getDiagram(id),

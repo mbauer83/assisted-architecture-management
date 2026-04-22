@@ -9,8 +9,8 @@ Updated for ArchiMate NEXT conventions:
 
 from pathlib import Path
 
-from src.common.model_query import ModelRepository
-from src.tools import mcp_model_server
+from src.common.artifact_query import ArtifactRepository
+from src.tools import mcp_artifact_server
 
 
 def _write(path: Path, content: str) -> None:
@@ -76,7 +76,7 @@ title Event Activity Overview
 
 def test_model_repository_search_priority_and_counts(tmp_path: Path) -> None:
     repo_root = _build_repo(tmp_path / "repo")
-    repo = ModelRepository(repo_root)
+    repo = ArtifactRepository(repo_root)
 
     strict = repo.search_artifacts(
         "event",
@@ -104,9 +104,9 @@ def test_model_repository_search_priority_and_counts(tmp_path: Path) -> None:
 
 def test_model_query_mcp_projection_and_aggregate_tool(tmp_path: Path) -> None:
     repo_root = _build_repo(tmp_path / "repo")
-    tool_map = mcp_model_server.mcp._tool_manager._tools
+    tool_map = mcp_artifact_server.mcp._tool_manager._tools
 
-    listed = tool_map["model_query_list_artifacts"].fn(
+    listed = tool_map["artifact_query_list_artifacts"].fn(
         repo_root=str(repo_root),
         repo_scope="engagement",
         include_connections=False,
@@ -116,7 +116,7 @@ def test_model_query_mcp_projection_and_aggregate_tool(tmp_path: Path) -> None:
     assert listed
     assert set(listed[0].keys()) == {"artifact_id", "path"}
 
-    searched = tool_map["model_query_search_artifacts"].fn(
+    searched = tool_map["artifact_query_search_artifacts"].fn(
         "event",
         repo_root=str(repo_root),
         repo_scope="engagement",
@@ -128,7 +128,7 @@ def test_model_query_mcp_projection_and_aggregate_tool(tmp_path: Path) -> None:
     assert searched["hits"]
     assert set(searched["hits"][0].keys()) <= {"artifact_id", "record_type", "score"}
 
-    grouped = tool_map["model_query_stats"].fn(
+    grouped = tool_map["artifact_query_stats"].fn(
         group_by="diagram_type",
         repo_root=str(repo_root),
         repo_scope="engagement",

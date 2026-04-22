@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from src.common.model_query_types import EntityRecord
+from src.common.artifact_types import EntityRecord
 from src.tools.gui_routers import state as s
 
 

@@ -2,10 +2,10 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from src.common.model_query_types import ConnectionRecord, EntityRecord
+from src.common.artifact_types import ConnectionRecord, EntityRecord
 from src.tools.diagram_builder import generate_archimate_puml_body
 from src.tools.generate_macros import generate_macros
-from src.tools.model_mcp.query_scaffold_tools import model_diagram_scaffold
+from src.tools.artifact_mcp.query_scaffold_tools import artifact_diagram_scaffold
 
 
 def _entity(
@@ -73,7 +73,7 @@ def test_generate_archimate_puml_body_normalizes_aliases_in_entities_and_connect
 
     assert " as GOL_B6G__P" in puml
     assert " as OUT_i_3Bi_" in puml
-    assert 'Rel_Realization(OUT_i_3Bi_, GOL_B6G__P, "")' in puml
+    assert 'Rel_Realization_Up(OUT_i_3Bi_, GOL_B6G__P, "")' in puml
     assert "GOL_B6G_-P" not in puml
     assert "OUT_i-3Bi-" not in puml
 
@@ -231,7 +231,7 @@ last-updated: '2026-04-20'
         encoding="utf-8",
     )
 
-    result = model_diagram_scaffold(
+    result = artifact_diagram_scaffold(
         entity_ids=[goal_id, outcome_id],
         diagram_name="Alias Scaffold",
         repo_root=str(repo_root),
@@ -241,7 +241,7 @@ last-updated: '2026-04-20'
 
     assert " as GOL_B6G__P" in puml
     assert " as OUT_i_3Bi_" in puml
-    assert 'Rel_Realization(OUT_i_3Bi_, GOL_B6G__P, "")' in puml
+    assert 'Rel_Realization_Up(OUT_i_3Bi_, GOL_B6G__P, "")' in puml
     assert "GOL_B6G_-P" not in puml
     assert "OUT_i-3Bi-" not in puml
 
@@ -328,7 +328,7 @@ last-updated: '2026-04-20'
         encoding="utf-8",
     )
 
-    result = model_diagram_scaffold(
+    result = artifact_diagram_scaffold(
         entity_ids=[driver_id, assessment_id],
         diagram_name="Drivers and Assessments",
         repo_root=str(repo_root),

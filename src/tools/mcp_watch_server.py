@@ -17,7 +17,6 @@ import os
 
 from mcp.server.fastmcp import FastMCP  # type: ignore[import-not-found]
 
-from src.tools.model_mcp import install_call_tool_normalizer, register_watch_tools
 
 
 mcp = FastMCP(
@@ -34,7 +33,6 @@ mcp = FastMCP(
     log_level=os.getenv("ARCH_MCP_LOG_LEVEL", "INFO"),  # type: ignore[arg-type]
 )
 
-install_call_tool_normalizer(mcp)
 register_watch_tools(mcp)
 
 

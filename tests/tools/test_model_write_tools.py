@@ -17,8 +17,8 @@ from pathlib import Path
 import pytest
 from pytest_bdd import given, scenarios, then, when
 
-from src.common.model_verifier import ModelRegistry, ModelVerifier
-from src.tools import mcp_model_server as tools
+from src.common.artifact_verifier import ArtifactRegistry, ArtifactVerifier
+from src.tools import mcp_artifact_server as tools
 
 
 scenarios("features/model_write_tools.feature")
@@ -40,7 +40,7 @@ def empty_repo(repo_root: Path) -> Path:
 
 @when("I dry-run create an entity", target_fixture="dry_run_result")
 def dry_run_create_entity(repo_root: Path) -> dict[str, object]:
-    return tools.model_create_entity(
+    return tools.artifact_create_entity(
         artifact_type="capability",
         name="My Capability",
         summary="A short description.",
@@ -61,7 +61,7 @@ def dry_run_result_valid(dry_run_result: dict[str, object]) -> None:
 @when("I attempt to add a connection referencing unknown entities", target_fixture="conn_error")
 def add_connection_unknown_entities(repo_root: Path) -> Exception:
     with pytest.raises(Exception) as exc:
-        tools.model_add_connection(
+        tools.artifact_add_connection(
             connection_type="archimate-serving",
             source_entity="APP@0000000000.XXXXXX.nonexistent-source",
             target_entity="APP@0000000000.YYYYYY.nonexistent-target",
@@ -80,7 +80,7 @@ def connection_error_helpful(conn_error: Exception) -> None:
 
 def _write_entity(repo_root: Path, artifact_type: str, name: str) -> dict[str, object]:
     """Create an entity using the tool and return the result dict."""
-    result = tools.model_create_entity(
+    result = tools.artifact_create_entity(
         artifact_type=artifact_type,
         name=name,
         summary=f"Test entity: {name}",
@@ -103,7 +103,7 @@ def repo_with_entities_and_connection(repo_root: Path) -> tuple[Path, str, str]:
     e1_id = str(e1["artifact_id"])
     e2_id = str(e2["artifact_id"])
 
-    conn = tools.model_add_connection(
+    conn = tools.artifact_add_connection(
         connection_type="archimate-serving",
         source_entity=e1_id,
         target_entity=e2_id,
@@ -114,7 +114,7 @@ def repo_with_entities_and_connection(repo_root: Path) -> tuple[Path, str, str]:
     assert conn.get("wrote") is True
 
     # Sanity: verifier should pass across repo.
-    verifier = ModelVerifier(ModelRegistry(repo_root))
+    verifier = ArtifactVerifier(ArtifactRegistry(repo_root))
     results = verifier.verify_all(repo_root)
     assert all(r.valid for r in results), [i for r in results for i in r.errors]
     return repo_root, e1_id, e2_id
@@ -141,7 +141,7 @@ $DECL_{e2_alias}()
 {e1_alias} -[#0078A0]-> {e2_alias} : <<serving>>
 @enduml
 """
-    return tools.model_create_diagram(
+    return tools.artifact_create_diagram(
         diagram_type="archimate-application",
         name="Test Diagram",
         puml=puml,
@@ -164,7 +164,7 @@ def diagram_inferred_ids(
 
     # Verify the created file.
     p = Path(diagram_result["path"])
-    verifier = ModelVerifier(ModelRegistry(repo_root))
+    verifier = ArtifactVerifier(ArtifactRegistry(repo_root))
     res = verifier.verify_diagram_file(p)
     assert res.valid is True, res.issues
 
@@ -176,7 +176,7 @@ def test_model_create_matrix_writes_valid_matrix(repo_root: Path) -> None:
     """Matrix creation should produce a verifiable matrix diagram file."""
     _write_entity(repo_root, "application-component", "EventStore")
 
-    result = tools.model_create_matrix(
+    result = tools.artifact_create_matrix(
         name="Connection Matrix",
         purpose="Show connections between application components.",
         matrix_markdown=(

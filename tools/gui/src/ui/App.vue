@@ -97,6 +97,7 @@ const hitTypeLabel = (hit: any): string => {
         <span class="nav__section-label">Engagement</span>
         <nav class="nav__links" aria-label="Engagement">
           <RouterLink to="/entities">Browse</RouterLink>
+          <RouterLink to="/documents">Documents</RouterLink>
           <RouterLink to="/diagrams">Diagrams</RouterLink>
           <RouterLink to="/promote" class="nav__promote">↑ Promote</RouterLink>
         </nav>

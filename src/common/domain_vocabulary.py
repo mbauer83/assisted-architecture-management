@@ -2,7 +2,7 @@
 SDLC Multi-Agent System — domain vocabulary for search and NLP.
 
 Provides the canonical bidirectional synonym map used by:
-  - ``ModelRepository.search`` / ``search_artifacts`` (keyword expansion)
+  - ``ArtifactRepository.search`` / ``search_artifacts`` (keyword expansion)
   - ``LearningStore.query_learnings`` (optional synonym expansion in Stage 5b)
   - Any future NLP pipeline operating on framework artifact text
 

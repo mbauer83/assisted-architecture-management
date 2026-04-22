@@ -1,9 +1,9 @@
 """Global-entity-reference verifier rules."""
 from __future__ import annotations
 from typing import TYPE_CHECKING
-from src.common.model_verifier_types import Issue, Severity, VerificationResult
+from src.common.artifact_verifier_types import Issue, Severity, VerificationResult
 if TYPE_CHECKING:
-    from src.common.model_verifier_registry import ModelRegistry
+    from src.common.artifact_verifier_registry import ArtifactRegistry
 
 # Global-entity-reference rules
 # ---------------------------------------------------------------------------
@@ -14,7 +14,7 @@ _GRF_FRONTMATTER_KEY = "global-entity-id"
 
 def check_global_entity_reference(
     fm: dict,
-    registry: "ModelRegistry | None",
+    registry: "ArtifactRegistry | None",
     result: VerificationResult,
     loc: str,
 ) -> None:

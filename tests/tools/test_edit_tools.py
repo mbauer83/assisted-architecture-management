@@ -11,8 +11,8 @@ from pathlib import Path
 
 import pytest
 
-from src.tools import mcp_model_server as mcp
-from src.common.model_verifier_registry import ModelRegistry
+from src.tools import mcp_artifact_server as mcp
+from src.common.artifact_verifier_registry import ArtifactRegistry
 
 
 # ---------------------------------------------------------------------------
@@ -33,7 +33,7 @@ def repo(tmp_path: Path) -> Path:
 
 
 def _make_entity(repo: Path, artifact_type: str, name: str) -> str:
-    result = mcp.model_create_entity(
+    result = mcp.artifact_create_entity(
         artifact_type=artifact_type, name=name,
         summary=f"Summary for {name}",
         dry_run=False, repo_root=str(repo),
@@ -43,7 +43,7 @@ def _make_entity(repo: Path, artifact_type: str, name: str) -> str:
 
 
 def _make_connection(repo: Path, src: str, tgt: str, conn_type: str) -> None:
-    result = mcp.model_add_connection(
+    result = mcp.artifact_add_connection(
         source_entity=src, connection_type=conn_type,
         target_entity=tgt, dry_run=False, repo_root=str(repo),
     )
@@ -57,7 +57,7 @@ def _make_connection(repo: Path, src: str, tgt: str, conn_type: str) -> None:
 class TestEditEntity:
     def test_dry_run_returns_preview_content(self, repo: Path) -> None:
         eid = _make_entity(repo, "requirement", "Original Name")
-        result = mcp.model_edit_entity(
+        result = mcp.artifact_edit_entity(
             artifact_id=eid, name="New Name", dry_run=True, repo_root=str(repo),
         )
         assert result["wrote"] is False
@@ -65,7 +65,7 @@ class TestEditEntity:
 
     def test_live_edit_name_updates_file(self, repo: Path) -> None:
         eid = _make_entity(repo, "requirement", "First Name")
-        result = mcp.model_edit_entity(
+        result = mcp.artifact_edit_entity(
             artifact_id=eid, name="Updated Name", dry_run=False, repo_root=str(repo),
         )
         assert result["wrote"] is True
@@ -76,7 +76,7 @@ class TestEditEntity:
 
     def test_edit_renames_artifact_id_slug_and_path(self, repo: Path) -> None:
         eid = _make_entity(repo, "requirement", "Preserve Me")
-        result = mcp.model_edit_entity(
+        result = mcp.artifact_edit_entity(
             artifact_id=eid, name="New Name", dry_run=False, repo_root=str(repo),
         )
         path = Path(str(result["path"]))
@@ -97,7 +97,7 @@ class TestEditEntity:
         old_outgoing_path = old_entity_path.with_suffix(".outgoing.md")
         other_outgoing_path = next((repo / "model").rglob(f"{other}.outgoing.md"))
 
-        result = mcp.model_edit_entity(
+        result = mcp.artifact_edit_entity(
             artifact_id=src, name="Renamed Source", dry_run=False, repo_root=str(repo),
         )
 
@@ -120,21 +120,21 @@ class TestEditEntity:
         tgt = _make_entity(repo, "assessment", "Target Assessment")
         _make_connection(repo, src, tgt, "archimate-influence")
 
-        registry = ModelRegistry([repo])
+        registry = ArtifactRegistry([repo])
         expected = f"{src}---{tgt}@@archimate-influence"
 
         assert expected in registry.connection_ids()
 
     def test_edit_nonexistent_entity_raises(self, repo: Path) -> None:
         with pytest.raises(ValueError, match="not found"):
-            mcp.model_edit_entity(
+            mcp.artifact_edit_entity(
                 artifact_id="REQ@9999999999.NoExist.ghost",
                 name="X", dry_run=False, repo_root=str(repo),
             )
 
     def test_edit_status(self, repo: Path) -> None:
         eid = _make_entity(repo, "requirement", "Status Test")
-        result = mcp.model_edit_entity(
+        result = mcp.artifact_edit_entity(
             artifact_id=eid, status="active", dry_run=False, repo_root=str(repo),
         )
         assert result["wrote"] is True
@@ -142,7 +142,7 @@ class TestEditEntity:
 
     def test_edit_keywords(self, repo: Path) -> None:
         eid = _make_entity(repo, "requirement", "KW Test")
-        result = mcp.model_edit_entity(
+        result = mcp.artifact_edit_entity(
             artifact_id=eid, keywords=["alpha", "beta"], dry_run=False, repo_root=str(repo),
         )
         assert result["wrote"] is True
@@ -153,7 +153,7 @@ class TestEditEntity:
         # GRF entities are auto-managed; direct creation is blocked at create_entity,
         # but we confirm the type guard is in place
         with pytest.raises(ValueError, match="global-entity-reference"):
-            mcp.model_create_entity(
+            mcp.artifact_create_entity(
                 artifact_type="global-entity-reference",
                 name="Should Fail",
                 dry_run=False, repo_root=str(repo),
@@ -163,7 +163,7 @@ class TestEditEntity:
 class TestDeleteEntity:
     def test_delete_entity_dry_run_returns_preview(self, repo: Path) -> None:
         eid = _make_entity(repo, "requirement", "Delete Me")
-        result = mcp.model_delete_entity(
+        result = mcp.artifact_delete_entity(
             artifact_id=eid, dry_run=True, repo_root=str(repo),
         )
         assert result["wrote"] is False
@@ -179,7 +179,7 @@ class TestDeleteEntity:
         assert entity_path.exists()
         assert outgoing_path.exists()
 
-        result = mcp.model_delete_entity(
+        result = mcp.artifact_delete_entity(
             artifact_id=src, dry_run=False, repo_root=str(repo),
         )
         assert result["wrote"] is True
@@ -192,7 +192,7 @@ class TestDeleteEntity:
         _make_connection(repo, src, tgt, "archimate-realization")
 
         with pytest.raises(ValueError, match="incoming-connections"):
-            mcp.model_delete_entity(
+            mcp.artifact_delete_entity(
                 artifact_id=tgt, dry_run=False, repo_root=str(repo),
             )
 
@@ -220,7 +220,7 @@ last-updated: '2026-04-20'
         )
 
         with pytest.raises(ValueError, match="diagrams"):
-            mcp.model_delete_entity(
+            mcp.artifact_delete_entity(
                 artifact_id=eid, dry_run=False, repo_root=str(repo),
             )
 
@@ -235,7 +235,7 @@ class TestRemoveConnection:
         tgt = _make_entity(repo, "application-component", "TgtApp")
         _make_connection(repo, src, tgt, "archimate-serving")
 
-        result = mcp.model_edit_connection(
+        result = mcp.artifact_edit_connection(
             source_entity=src, connection_type="archimate-serving",
             target_entity=tgt, operation="remove", dry_run=True, repo_root=str(repo),
         )
@@ -246,7 +246,7 @@ class TestRemoveConnection:
         tgt = _make_entity(repo, "application-component", "TgtDel")
         _make_connection(repo, src, tgt, "archimate-serving")
 
-        result = mcp.model_edit_connection(
+        result = mcp.artifact_edit_connection(
             source_entity=src, connection_type="archimate-serving",
             target_entity=tgt, operation="remove", dry_run=False, repo_root=str(repo),
         )
@@ -260,7 +260,7 @@ class TestRemoveConnection:
     def test_remove_nonexistent_connection_raises(self, repo: Path) -> None:
         src = _make_entity(repo, "application-component", "SrcOnly")
         with pytest.raises((ValueError, Exception)):
-            mcp.model_edit_connection(
+            mcp.artifact_edit_connection(
                 source_entity=src, connection_type="archimate-serving",
                 target_entity="APP@9999999999.NoExist.ghost",
                 operation="remove", dry_run=False, repo_root=str(repo),
@@ -284,7 +284,7 @@ title {name}
 
 @enduml
 """
-        result = mcp.model_create_diagram(
+        result = mcp.artifact_create_diagram(
             diagram_type="activity-bpmn",
             name=name, puml=puml,
             artifact_id=f"test-diagram-{name.lower().replace(' ', '-')}",
@@ -295,7 +295,7 @@ title {name}
 
     def test_edit_diagram_name_updates_title(self, repo: Path) -> None:
         diag_id = self._make_diagram(repo, "Original Diagram")
-        result = mcp.model_edit_diagram(
+        result = mcp.artifact_edit_diagram(
             artifact_id=diag_id, name="Updated Diagram",
             dry_run=False, repo_root=str(repo),
         )
@@ -305,7 +305,7 @@ title {name}
 
     def test_edit_diagram_dry_run_returns_preview(self, repo: Path) -> None:
         diag_id = self._make_diagram(repo, "Dry Run Diagram")
-        result = mcp.model_edit_diagram(
+        result = mcp.artifact_edit_diagram(
             artifact_id=diag_id, name="New Title",
             dry_run=True, repo_root=str(repo),
         )
@@ -316,7 +316,7 @@ title {name}
 class TestDeleteDiagram:
     def test_delete_diagram_dry_run_returns_preview(self, repo: Path) -> None:
         diag_id = TestEditDiagram()._make_diagram(repo, "Delete Dry Diagram")
-        result = mcp.model_delete_diagram(
+        result = mcp.artifact_delete_diagram(
             artifact_id=diag_id, dry_run=True, repo_root=str(repo),
         )
         assert result["wrote"] is False
@@ -332,7 +332,7 @@ class TestDeleteDiagram:
         png.write_text("png", encoding="utf-8")
         svg.write_text("svg", encoding="utf-8")
 
-        result = mcp.model_delete_diagram(
+        result = mcp.artifact_delete_diagram(
             artifact_id=diag_id, dry_run=False, repo_root=str(repo),
         )
         assert result["wrote"] is True

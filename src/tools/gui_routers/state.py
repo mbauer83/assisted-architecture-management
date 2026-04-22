@@ -14,20 +14,20 @@ except ModuleNotFoundError:  # pragma: no cover - test env without GUI deps
             self.detail = detail
             super().__init__(detail)
 
-from src.common.model_query import ModelRepository
-from src.common.model_query_types import ConnectionRecord, DiagramRecord, EntityRecord
-from src.common.model_index.coordination import publish_authoritative_mutation
+from src.common.artifact_query import ArtifactRepository
+from src.common.artifact_types import ConnectionRecord, DiagramRecord, EntityRecord
+from src.common.artifact_index.coordination import publish_authoritative_mutation
 
 
 # Module-level server state — set by gui_server.main() before uvicorn starts.
-_repo: ModelRepository | None = None
+_repo: ArtifactRepository | None = None
 _repo_root: Path | None = None          # engagement root — used for writes
 _enterprise_root: Path | None = None    # enterprise root — read-only in normal mode
 _admin_mode: bool = False               # when True, enterprise writes are permitted via /admin/api/*
 
 
 def init_state(
-    repo: ModelRepository,
+    repo: ArtifactRepository,
     repo_root: Path,
     enterprise_root: Path | None,
     *,
@@ -44,13 +44,13 @@ def is_admin_mode() -> bool:
     return _admin_mode
 
 
-def get_repo() -> ModelRepository:
+def get_repo() -> ArtifactRepository:
     if _repo is None:
         raise HTTPException(500, "Repository not initialized")
     return _repo
 
 
-def maybe_get_repo() -> ModelRepository | None:
+def maybe_get_repo() -> ArtifactRepository | None:
     return _repo
 
 
@@ -85,7 +85,7 @@ def entity_to_summary(
     return d
 
 
-def build_conn_counts(repo: ModelRepository) -> dict[str, tuple[int, int, int]]:
+def build_conn_counts(repo: ArtifactRepository) -> dict[str, tuple[int, int, int]]:
     from src.common.ontology_loader import SYMMETRIC_CONNECTIONS
     counts: dict[str, list[int]] = {}
     for rec in repo._connections.values():
@@ -153,13 +153,13 @@ def get_write_deps() -> tuple[Path, Any, Any]:
     """Return (engagement_root, registry, verifier). Registry spans both repos."""
     if _repo_root is None:
         raise HTTPException(500, "Repository not initialized")
-    from src.common.model_verifier import ModelVerifier
-    from src.common.model_verifier_registry import ModelRegistry
+    from src.common.artifact_verifier import ArtifactVerifier
+    from src.common.artifact_verifier_registry import ArtifactRegistry
     roots: list[Path] = [_repo_root]
     if _enterprise_root is not None:
         roots.append(_enterprise_root)
-    registry = ModelRegistry(roots)
-    return _repo_root, registry, ModelVerifier(registry)
+    registry = ArtifactRegistry(roots)
+    return _repo_root, registry, ArtifactVerifier(registry)
 
 
 def get_admin_write_deps() -> tuple[Path, Any, Any]:
@@ -173,13 +173,13 @@ def get_admin_write_deps() -> tuple[Path, Any, Any]:
         raise HTTPException(403, "Admin mode is not enabled")
     if _enterprise_root is None:
         raise HTTPException(500, "Enterprise repository not configured")
-    from src.common.model_verifier import ModelVerifier
-    from src.common.model_verifier_registry import ModelRegistry
+    from src.common.artifact_verifier import ArtifactVerifier
+    from src.common.artifact_verifier_registry import ArtifactRegistry
     roots: list[Path] = [_enterprise_root]
     if _repo_root is not None:
         roots.append(_repo_root)
-    registry = ModelRegistry(roots)
-    return _enterprise_root, registry, ModelVerifier(registry)
+    registry = ArtifactRegistry(roots)
+    return _enterprise_root, registry, ArtifactVerifier(registry)
 
 
 def clear_caches(path: Path | list[Path]) -> None:
@@ -197,7 +197,7 @@ def refresh_now() -> None:
 
 
 def run_serialized_write(fn: Any, /, *args: Any, **kwargs: Any) -> Any:
-    from src.tools.model_mcp.write_queue import run_sync
+    from src.tools.artifact_mcp.write_queue import run_sync
 
     return run_sync(fn, *args, **kwargs)
 

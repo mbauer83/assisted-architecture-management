@@ -10,11 +10,11 @@ from pathlib import Path
 
 import pytest
 
-from src.common.model_verifier import ModelVerifier
-from src.common.model_verifier_registry import ModelRegistry
-from src.common.model_write_formatting import format_outgoing_markdown
-from src.tools.model_write.parse_existing import parse_outgoing_file
-from src.tools.model_write.type_guidance import get_type_guidance
+from src.common.artifact_verifier import ArtifactVerifier
+from src.common.artifact_verifier_registry import ArtifactRegistry
+from src.common.artifact_write_formatting import format_outgoing_markdown
+from src.tools.artifact_write.parse_existing import parse_outgoing_file
+from src.tools.artifact_write.type_guidance import get_type_guidance
 
 
 # ---------------------------------------------------------------------------
@@ -260,8 +260,8 @@ class TestVerifierCardinality:
         src, tgt = _setup_two_entities(repo)
         out_path = repo / "model/motivation/requirements" / f"{src}.outgoing.md"
         _write(out_path, _outgoing(src, [f"### archimate-realization [1] → [0..*] {tgt}"]))
-        registry = ModelRegistry(repo)
-        verifier = ModelVerifier(registry)
+        registry = ArtifactRegistry(repo)
+        verifier = ArtifactVerifier(registry)
         result = verifier.verify_outgoing_file(out_path)
         assert result.valid, [i.message for i in result.issues]
 
@@ -270,8 +270,8 @@ class TestVerifierCardinality:
         for card in ["1", "0", "0..1", "1..5", "*", "1..*", "0..*"]:
             out_path = repo / "model/motivation/requirements" / f"{src}.outgoing.md"
             _write(out_path, _outgoing(src, [f"### archimate-association [{card}] → {tgt}"]))
-            registry = ModelRegistry(repo)
-            verifier = ModelVerifier(registry)
+            registry = ArtifactRegistry(repo)
+            verifier = ArtifactVerifier(registry)
             result = verifier.verify_outgoing_file(out_path)
             assert result.valid, f"Cardinality '{card}' failed: {[i.message for i in result.issues]}"
 
@@ -279,8 +279,8 @@ class TestVerifierCardinality:
         src, tgt = _setup_two_entities(repo)
         out_path = repo / "model/motivation/requirements" / f"{src}.outgoing.md"
         _write(out_path, _outgoing(src, [f"### archimate-realization [1:n] → {tgt}"]))
-        registry = ModelRegistry(repo)
-        verifier = ModelVerifier(registry)
+        registry = ArtifactRegistry(repo)
+        verifier = ArtifactVerifier(registry)
         result = verifier.verify_outgoing_file(out_path)
         assert not result.valid
         assert any(i.code == "E125" for i in result.issues)
@@ -289,8 +289,8 @@ class TestVerifierCardinality:
         src, tgt = _setup_two_entities(repo)
         out_path = repo / "model/motivation/requirements" / f"{src}.outgoing.md"
         _write(out_path, _outgoing(src, [f"### archimate-realization → [many] {tgt}"]))
-        registry = ModelRegistry(repo)
-        verifier = ModelVerifier(registry)
+        registry = ArtifactRegistry(repo)
+        verifier = ArtifactVerifier(registry)
         result = verifier.verify_outgoing_file(out_path)
         assert not result.valid
         assert any(i.code == "E125" for i in result.issues)
@@ -300,10 +300,10 @@ class TestAddConnectionWithCardinality:
     """Integration tests: add_connection writes and verifies cardinalities."""
 
     def test_add_connection_with_src_cardinality(self, repo: Path) -> None:
-        from src.tools.model_write.connection import add_connection
+        from src.tools.artifact_write.connection import add_connection
         src, tgt = _setup_two_entities(repo)
-        registry = ModelRegistry(repo)
-        verifier = ModelVerifier(registry)
+        registry = ArtifactRegistry(repo)
+        verifier = ArtifactVerifier(registry)
 
         def clear(_: Path) -> None:
             pass
@@ -329,10 +329,10 @@ class TestAddConnectionWithCardinality:
         assert "### archimate-realization [1] →" in content
 
     def test_add_connection_with_both_cardinalities(self, repo: Path) -> None:
-        from src.tools.model_write.connection import add_connection
+        from src.tools.artifact_write.connection import add_connection
         src, tgt = _setup_two_entities(repo)
-        registry = ModelRegistry(repo)
-        verifier = ModelVerifier(registry)
+        registry = ArtifactRegistry(repo)
+        verifier = ArtifactVerifier(registry)
 
         def clear(_: Path) -> None:
             pass
@@ -385,7 +385,7 @@ class TestElementCategoryRemoved:
 
 
 # ===========================================================================
-# Feature iii: model_write_modeling_guidance MCP tool
+# Feature iii: artifact_write_modeling_guidance MCP tool
 # ===========================================================================
 
 class TestGetTypeGuidance:
@@ -465,7 +465,7 @@ class TestGetTypeGuidance:
         assert r_both["total"] == r_mot["total"] + r_str["total"]
 
     def test_mcp_tool_function_reachable(self) -> None:
-        from src.tools.model_mcp.write.entity import model_write_modeling_guidance
-        result = model_write_modeling_guidance(filter=["stakeholder"])
+        from src.tools.artifact_mcp.write.entity import artifact_write_modeling_guidance
+        result = artifact_write_modeling_guidance(filter=["stakeholder"])
         assert result["total"] == 1
         assert result["entity_types"][0]["name"] == "stakeholder"

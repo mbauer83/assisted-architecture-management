@@ -20,12 +20,16 @@ def clear_mcp_context_caches():
     The init-state module-level flag must also be reset so the real workspace
     enterprise repo isn't silently loaded into subsequent isolated-repo tests.
     """
-    import src.tools.model_mcp.context as ctx
+    import src.tools.artifact_mcp.context as ctx
+    from src.tools.artifact_mcp.write_queue import shutdown as shutdown_write_queue
+
+    shutdown_write_queue(wait=True)
     ctx.repo_cached.cache_clear()
     ctx.registry_cached.cache_clear()
     ctx._init_state = None
     ctx._init_state_loaded = False
     yield
+    shutdown_write_queue(wait=True)
     ctx.repo_cached.cache_clear()
     ctx.registry_cached.cache_clear()
     ctx._init_state = None

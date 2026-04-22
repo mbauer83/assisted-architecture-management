@@ -9,7 +9,7 @@ from pathlib import Path
 import uvicorn
 from mcp.server.fastmcp.server import StreamableHTTPASGIApp
 
-from src.common.model_query import ModelRepository
+from src.common.artifact_query import ArtifactRepository
 from src.tools import gui_server
 from src.tools.backend_runtime import (
     backend_status,
@@ -20,8 +20,8 @@ from src.tools.backend_runtime import (
     write_backend_state,
 )
 from src.tools.gui_routers import state as gui_state
-from src.tools.mcp_model_server import mcp
-from src.tools.model_mcp import auto_start_default_watcher
+from src.tools.mcp_artifact_server import mcp
+from src.tools.artifact_mcp import auto_start_default_watcher
 
 
 def _build_app():  # type: ignore[no-untyped-def]
@@ -31,6 +31,7 @@ def _build_app():  # type: ignore[no-untyped-def]
     from src.tools.gui_routers.admin import router as admin_router
     from src.tools.gui_routers.connections import router as connections_router
     from src.tools.gui_routers.diagrams import router as diagrams_router
+    from src.tools.gui_routers.documents import router as documents_router
     from src.tools.gui_routers.entities import router as entities_router
     from src.tools.gui_routers.promote import router as promote_router
 
@@ -54,6 +55,7 @@ def _build_app():  # type: ignore[no-untyped-def]
     app.include_router(entities_router)
     app.include_router(connections_router)
     app.include_router(diagrams_router)
+    app.include_router(documents_router)
     app.include_router(promote_router)
     app.include_router(admin_router)
     # Starlette mounts only match `/mcp/…`, not the bare `/mcp` path.
@@ -164,7 +166,7 @@ def main(argv: list[str] | None = None) -> None:
         roots.append(enterprise_root_path)
 
     gui_state.init_state(
-        ModelRepository(roots),
+        ArtifactRepository(roots),
         repo_root_path,
         enterprise_root_path,
         admin_mode=args.admin_mode,

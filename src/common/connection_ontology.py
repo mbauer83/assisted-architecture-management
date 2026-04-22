@@ -2,7 +2,7 @@
 connection_ontology.py — ArchiMate relationship query API.
 
 All rules are loaded from config/connection_ontology.yaml via ontology_loader.
-Used by ModelVerifier (rule enforcement), GUI (form generation), and MCP tools.
+Used by ArtifactVerifier (rule enforcement), GUI (form generation), and MCP tools.
 """
 
 from __future__ import annotations

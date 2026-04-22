@@ -25,7 +25,7 @@ gui = [
 ]
 
 [project.scripts]
-arch-mcp-model = "src.tools.mcp_model_server:main"
+arch-mcp-artifacts = "src.tools.mcp_artifact_server:main"
 arch-mcp-framework = "src.tools.mcp_framework_server:main"
 arch-gui-server = "src.tools.gui_server:main"
 arch-backend = "src.tools.arch_backend:main"

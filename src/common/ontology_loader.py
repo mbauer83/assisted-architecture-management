@@ -13,7 +13,7 @@ import yaml  # type: ignore[import-untyped]
 
 # Import dataclass definitions only (no circular dependency — model_write_catalog
 # does NOT import from this module at class-definition time).
-from src.common.model_write_catalog import ConnectionTypeInfo, EntityTypeInfo
+from src.common.artifact_write_catalog import ConnectionTypeInfo, EntityTypeInfo
 
 _CONFIG_DIR = Path(__file__).resolve().parent.parent.parent / "config"
 

@@ -18,8 +18,8 @@ from collections import defaultdict
 from pathlib import Path
 
 from src.common.archimate_relation_rendering import display_connection_label, render_archimate_relation
-from src.common.model_query_parsing import normalize_puml_alias
-from src.common.model_query_types import ConnectionRecord, EntityRecord
+from src.common.artifact_parsing import normalize_puml_alias
+from src.common.artifact_types import ConnectionRecord, EntityRecord
 from src.common.ontology_loader import (
     CONNECTION_TYPES,
     DOMAIN_DISPLAY,
@@ -292,7 +292,7 @@ def _render_puml(
     *result* is a ``data:image/png;base64,…`` data-URL for PNG, raw SVG text
     for SVG, or ``None`` on failure.  No files are written to the model.
     """
-    from src.common.model_verifier_syntax import find_plantuml_jar
+    from src.common.artifact_verifier_syntax import find_plantuml_jar
     from src.common.settings import plantuml_limit_size, render_dpi
 
     warnings: list[str] = []

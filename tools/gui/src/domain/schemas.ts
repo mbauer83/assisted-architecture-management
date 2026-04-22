@@ -6,8 +6,10 @@ export const StatsSchema = Schema.Struct({
   entities: Schema.Number,
   connections: Schema.Number,
   diagrams: Schema.Number,
+  documents: Schema.optional(Schema.Number),
   entities_by_domain: Schema.Record({ key: Schema.String, value: Schema.Number }),
   connections_by_type: Schema.Record({ key: Schema.String, value: Schema.Number }),
+  documents_by_type: Schema.optional(Schema.Record({ key: Schema.String, value: Schema.Number })),
 })
 export type Stats = typeof StatsSchema.Type
 
@@ -150,6 +152,101 @@ export const SearchResultSchema = Schema.Struct({
   hits: Schema.Array(SearchHitSchema),
 })
 export type SearchResult = typeof SearchResultSchema.Type
+
+// ── Document types ────────────────────────────────────────────────────────────
+
+export const DocumentTypeSchema = Schema.Struct({
+  doc_type: Schema.String,
+  abbreviation: Schema.String,
+  name: Schema.String,
+  required_sections: Schema.Array(Schema.String),
+})
+export type DocumentType = typeof DocumentTypeSchema.Type
+
+export const DocumentTypesSchema = Schema.Array(DocumentTypeSchema)
+
+export const DocumentSummarySchema = Schema.Struct({
+  artifact_id: Schema.String,
+  doc_type: Schema.String,
+  title: Schema.String,
+  status: Schema.String,
+  path: Schema.String,
+  keywords: Schema.Array(Schema.String),
+  sections: Schema.Array(Schema.String),
+})
+export type DocumentSummary = typeof DocumentSummarySchema.Type
+
+export const DocumentListSchema = Schema.Struct({
+  total: Schema.Number,
+  items: Schema.Array(DocumentSummarySchema),
+})
+export type DocumentList = typeof DocumentListSchema.Type
+
+export const DocumentDetailSchema = Schema.Struct({
+  artifact_id: Schema.String,
+  artifact_type: Schema.Literal('document'),
+  doc_type: Schema.String,
+  title: Schema.String,
+  status: Schema.String,
+  record_type: Schema.Literal('document'),
+  path: Schema.String,
+  keywords: Schema.Array(Schema.String),
+  sections: Schema.Array(Schema.String),
+  content_snippet: Schema.String,
+  content_text: Schema.optional(Schema.String),
+  extra: Schema.optional(Schema.Record({ key: Schema.String, value: Schema.Unknown })),
+})
+export type DocumentDetail = typeof DocumentDetailSchema.Type
+
+// ── Artifact search (cross-type) ──────────────────────────────────────────────
+
+export const ArtifactSearchHitSchema = Schema.Struct({
+  score: Schema.Number,
+  record_type: Schema.Union(
+    Schema.Literal('entity'),
+    Schema.Literal('connection'),
+    Schema.Literal('diagram'),
+    Schema.Literal('document'),
+  ),
+  artifact_id: Schema.String,
+  name: Schema.String,
+  status: Schema.String,
+  path: Schema.String,
+})
+export type ArtifactSearchHit = typeof ArtifactSearchHitSchema.Type
+
+export const ArtifactSearchResultSchema = Schema.Struct({
+  query: Schema.String,
+  hits: Schema.Array(ArtifactSearchHitSchema),
+})
+export type ArtifactSearchResult = typeof ArtifactSearchResultSchema.Type
+
+// ── Reference search ─────────────────────────────────────────────────────────
+
+export const ReferenceSearchHitSchema = Schema.Struct({
+  artifact_id: Schema.String,
+  record_type: Schema.Union(
+    Schema.Literal('entity'),
+    Schema.Literal('diagram'),
+    Schema.Literal('document'),
+  ),
+  name: Schema.String,
+  status: Schema.String,
+  path: Schema.String,
+  domain: Schema.optional(Schema.NullOr(Schema.String)),
+  artifact_type: Schema.optional(Schema.String),
+  diagram_type: Schema.optional(Schema.String),
+  doc_type: Schema.optional(Schema.String),
+  sections: Schema.optional(Schema.Array(Schema.String)),
+  is_global: Schema.optional(Schema.Boolean),
+})
+export type ReferenceSearchHit = typeof ReferenceSearchHitSchema.Type
+
+export const ReferenceSearchResultSchema = Schema.Struct({
+  query: Schema.String,
+  hits: Schema.Array(ReferenceSearchHitSchema),
+})
+export type ReferenceSearchResult = typeof ReferenceSearchResultSchema.Type
 
 // ── Diagram summary ──────────────────────────────────────────────────────────
 

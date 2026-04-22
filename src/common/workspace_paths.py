@@ -103,4 +103,8 @@ def infer_repo_scope(path: Path, *, start: Path | None = None) -> RepoScope:
             return "engagement"
         except ValueError:
             pass
-    return "engagement" if "engagements" in resolved.parts else "enterprise"
+    if "engagements" in resolved.parts:
+        return "engagement"
+    if "enterprise-repository" in resolved.parts:
+        return "enterprise"
+    return "engagement"

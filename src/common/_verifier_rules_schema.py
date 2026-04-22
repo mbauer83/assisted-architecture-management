@@ -1,8 +1,8 @@
 """JSON Schema and attribute validation rules."""
 from __future__ import annotations
 from pathlib import Path
-from src.common.model_verifier_types import Issue, Severity, VerificationResult
-from src.common.model_schema import (
+from src.common.artifact_verifier_types import Issue, Severity, VerificationResult
+from src.common.artifact_schema import (
     load_attribute_schema, load_frontmatter_schema, validate_against_schema,
 )
 

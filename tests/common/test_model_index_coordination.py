@@ -2,8 +2,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from src.common.model_query import ModelRepository
-from src.common.model_index.coordination import (
+from src.common.artifact_query import ArtifactRepository
+from src.common.artifact_index.coordination import (
     publish_authoritative_mutation,
     suppress_redundant_refresh_paths,
 )
@@ -100,7 +100,7 @@ REQ_TestAA --> REQ_TestBB
 """,
     )
 
-    repo = ModelRepository([root])
+    repo = ArtifactRepository([root])
     before = repo.read_model_version()
 
     _write(entity_path, _entity_md(entity_id, "Sample Updated", "REQ_TestAA"))

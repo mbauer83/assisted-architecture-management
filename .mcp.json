@@ -1,6 +1,6 @@
 {
   "mcpServers": {
-    "arch-model": {
+    "arch-artifacts": {
       "command": "uv",
       "args": ["run", "arch-mcp-stdio"]
     },

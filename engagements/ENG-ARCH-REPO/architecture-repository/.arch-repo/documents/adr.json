@@ -1,0 +1,15 @@
+{
+  "abbreviation": "ADR",
+  "name": "Architecture Decision Record",
+  "frontmatter_schema": {
+    "type": "object",
+    "required": ["title", "status"],
+    "properties": {
+      "title": {"type": "string"},
+      "status": {"type": "string", "enum": ["draft", "accepted", "rejected", "superseded"]},
+      "deciders": {"type": "array", "items": {"type": "string"}},
+      "date": {"type": "string"}
+    }
+  },
+  "required_sections": ["Context", "Decision", "Consequences"]
+}

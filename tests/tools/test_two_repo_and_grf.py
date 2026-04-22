@@ -1,7 +1,7 @@
 """Behavioural tests for the two-tiered repo system and global-entity-reference (GRF).
 
 Covers:
-- ModelRepository loading from both engagement and enterprise repos
+- ArtifactRepository loading from both engagement and enterprise repos
 - is_global classification via path
 - GRF creation / reuse (ensure_global_entity_reference)
 - model_add_connection transparent GRF routing for global-entity targets
@@ -19,10 +19,10 @@ from pathlib import Path
 
 import pytest
 
-from src.common.model_query import ModelRepository
-from src.common.model_verifier import ModelVerifier
-from src.common.model_verifier_registry import ModelRegistry
-from src.tools import mcp_model_server as mcp_tools
+from src.common.artifact_query import ArtifactRepository
+from src.common.artifact_verifier import ArtifactVerifier
+from src.common.artifact_verifier_registry import ArtifactRegistry
+from src.tools import mcp_artifact_server as mcp_tools
 
 
 # ---------------------------------------------------------------------------
@@ -168,7 +168,7 @@ class TestTwoRepoLoading:
             _entity_md("REQ@2000000000.GloAAA.global-req", "requirement", "Global Req"),
         )
 
-        repo = ModelRepository([engagement_root, enterprise_root])
+        repo = ArtifactRepository([engagement_root, enterprise_root])
         ids = {e.artifact_id for e in repo.list_entities()}
         assert "REQ@1000000000.EngAAA.eng-req" in ids
         assert "REQ@2000000000.GloAAA.global-req" in ids
@@ -187,7 +187,7 @@ class TestTwoRepoLoading:
         _write(eng_file, _entity_md("REQ@1000000000.EngAAA.eng-req", "requirement", "E"))
         _write(ent_file, _entity_md("REQ@2000000000.GloAAA.global-req", "requirement", "G"))
 
-        repo = ModelRepository([engagement_root, enterprise_root])
+        repo = ArtifactRepository([engagement_root, enterprise_root])
         eng_rec = repo.get_entity("REQ@1000000000.EngAAA.eng-req")
         ent_rec = repo.get_entity("REQ@2000000000.GloAAA.global-req")
         assert eng_rec is not None and ent_rec is not None
@@ -207,7 +207,7 @@ class TestTwoRepoLoading:
             / "REQ@2000000000.GloAAA.global-req.md",
             _entity_md("REQ@2000000000.GloAAA.global-req", "requirement", "G"),
         )
-        registry = ModelRegistry([engagement_root, enterprise_root])
+        registry = ArtifactRegistry([engagement_root, enterprise_root])
         assert registry.scope_of_entity("REQ@1000000000.EngAAA.eng-req") == "engagement"
         assert registry.scope_of_entity("REQ@2000000000.GloAAA.global-req") == "enterprise"
 
@@ -220,13 +220,13 @@ class TestGrfCreation:
     def test_ensure_creates_new_grf(
         self, engagement_root: Path, enterprise_root: Path
     ) -> None:
-        from src.tools.model_write.global_entity_reference import ensure_global_entity_reference
+        from src.tools.artifact_write.global_entity_reference import ensure_global_entity_reference
 
-        repo = ModelRepository(engagement_root)
+        repo = ArtifactRepository(engagement_root)
         result = ensure_global_entity_reference(
             engagement_repo=repo,
             engagement_root=engagement_root,
-            verifier=ModelVerifier(None),
+            verifier=ArtifactVerifier(None),
             clear_repo_caches=lambda _: None,
             global_entity_id="REQ@2000000000.GloAAA.global-req",
             global_entity_name="Global Req",
@@ -241,15 +241,15 @@ class TestGrfCreation:
     def test_ensure_reuses_existing_grf(
         self, engagement_root: Path
     ) -> None:
-        from src.tools.model_write.global_entity_reference import ensure_global_entity_reference
+        from src.tools.artifact_write.global_entity_reference import ensure_global_entity_reference
 
         global_id = "REQ@2000000000.GloAAA.global-req"
-        repo = ModelRepository(engagement_root)
+        repo = ArtifactRepository(engagement_root)
 
         r1 = ensure_global_entity_reference(
             engagement_repo=repo,
             engagement_root=engagement_root,
-            verifier=ModelVerifier(None),
+            verifier=ArtifactVerifier(None),
             clear_repo_caches=lambda _: None,
             global_entity_id=global_id,
             global_entity_name="Global Req",
@@ -257,11 +257,11 @@ class TestGrfCreation:
         )
         assert r1.wrote is True
 
-        repo2 = ModelRepository(engagement_root)  # refresh
+        repo2 = ArtifactRepository(engagement_root)  # refresh
         r2 = ensure_global_entity_reference(
             engagement_repo=repo2,
             engagement_root=engagement_root,
-            verifier=ModelVerifier(None),
+            verifier=ArtifactVerifier(None),
             clear_repo_caches=lambda _: None,
             global_entity_id=global_id,
             global_entity_name="Global Req",
@@ -271,7 +271,7 @@ class TestGrfCreation:
         assert r2.artifact_id == r1.artifact_id
 
     def test_build_grf_map(self, engagement_root: Path) -> None:
-        from src.tools.model_write.global_entity_reference import build_grf_map
+        from src.tools.artifact_write.global_entity_reference import build_grf_map
 
         grf_dir = engagement_root / "model" / "common" / "global-references"
         _write(
@@ -282,7 +282,7 @@ class TestGrfCreation:
                 "REQ@2000000000.GloAAA.global-req",
             ),
         )
-        repo = ModelRepository(engagement_root)
+        repo = ArtifactRepository(engagement_root)
         grf_map = build_grf_map(repo)
         assert grf_map["GRF@1000000001.AbcDef.global-req"] == "REQ@2000000000.GloAAA.global-req"
 
@@ -305,8 +305,8 @@ class TestGrfVerifierRules:
         grf_path = engagement_root / "model" / "common" / "global-references" / f"{grf_id}.md"
         _write(grf_path, _grf_md(grf_id, "Global Req", global_id))
 
-        registry = ModelRegistry([engagement_root, enterprise_root])
-        verifier = ModelVerifier(registry)
+        registry = ArtifactRegistry([engagement_root, enterprise_root])
+        verifier = ArtifactVerifier(registry)
         result = verifier.verify_entity_file(grf_path)
         errors = [i for i in result.issues if i.severity == "error"]
         assert not errors, [i.message for i in errors]
@@ -319,7 +319,7 @@ class TestGrfVerifierRules:
         # Write a GRF without global-entity-id
         _write(grf_path, _entity_md(grf_id, "global-entity-reference", "Bad GRF"))
 
-        verifier = ModelVerifier(None)
+        verifier = ArtifactVerifier(None)
         result = verifier.verify_entity_file(grf_path)
         codes = {i.code for i in result.issues if i.severity == "error"}
         assert "E140" in codes
@@ -339,8 +339,8 @@ class TestGrfVerifierRules:
             / "REQ@2000000000.GloAAA.other.md",
             _entity_md("REQ@2000000000.GloAAA.other", "requirement", "Other"),
         )
-        registry = ModelRegistry([engagement_root, enterprise_root])
-        verifier = ModelVerifier(registry)
+        registry = ArtifactRegistry([engagement_root, enterprise_root])
+        verifier = ArtifactVerifier(registry)
         result = verifier.verify_entity_file(grf_path)
         codes = {i.code for i in result.issues if i.severity == "error"}
         assert "E141" in codes
@@ -349,7 +349,7 @@ class TestGrfVerifierRules:
         grf_id = "GRF@1000000001.AbcDef.no-ent"
         grf_path = engagement_root / "model" / "common" / "global-references" / f"{grf_id}.md"
         _write(grf_path, _grf_md(grf_id, "Some Ref", "REQ@2000000000.GloAAA.unknown"))
-        verifier = ModelVerifier(None)
+        verifier = ArtifactVerifier(None)
         result = verifier.verify_entity_file(grf_path)
         codes = {i.code for i in result.issues if i.severity == "warning"}
         errors = {i.code for i in result.issues if i.severity == "error"}
@@ -383,7 +383,7 @@ class TestAddConnectionGrfRouting:
     ) -> None:
         eng_id, glo_id = self._setup_repos(engagement_root, enterprise_root)
 
-        result = mcp_tools.model_add_connection(
+        result = mcp_tools.artifact_add_connection(
             source_entity=eng_id,
             connection_type="archimate-realization",
             target_entity=glo_id,
@@ -415,7 +415,7 @@ class TestAddConnectionGrfRouting:
         eng_id, glo_id = self._setup_repos(engagement_root, enterprise_root)
 
         # First connection creates GRF
-        r1 = mcp_tools.model_add_connection(
+        r1 = mcp_tools.artifact_add_connection(
             source_entity=eng_id, connection_type="archimate-realization",
             target_entity=glo_id, dry_run=False,
             repo_root=str(engagement_root), enterprise_root=str(enterprise_root),
@@ -428,7 +428,7 @@ class TestAddConnectionGrfRouting:
             engagement_root / "model" / "strategy" / "capabilities" / f"{eng_id2}.md",
             _entity_md(eng_id2, "capability", "My Cap 2"),
         )
-        r2 = mcp_tools.model_add_connection(
+        r2 = mcp_tools.artifact_add_connection(
             source_entity=eng_id2, connection_type="archimate-serving",
             target_entity=glo_id, dry_run=False,
             repo_root=str(engagement_root), enterprise_root=str(enterprise_root),
@@ -448,7 +448,7 @@ class TestAddConnectionGrfRouting:
             engagement_root / "model" / "strategy" / "capabilities" / f"{eng_id2}.md",
             _entity_md(eng_id2, "capability", "Cap 2"),
         )
-        result = mcp_tools.model_add_connection(
+        result = mcp_tools.artifact_add_connection(
             source_entity=eng_id1, connection_type="archimate-aggregation",
             target_entity=eng_id2, dry_run=False, repo_root=str(engagement_root),
         )
@@ -461,7 +461,7 @@ class TestAddConnectionGrfRouting:
         """When source is an enterprise entity, a GRF is created and used as source."""
         eng_id, glo_id = self._setup_repos(engagement_root, enterprise_root)
 
-        result = mcp_tools.model_add_connection(
+        result = mcp_tools.artifact_add_connection(
             source_entity=glo_id,          # enterprise → engagement direction
             connection_type="archimate-influence",
             target_entity=eng_id,
@@ -493,7 +493,7 @@ class TestAddConnectionGrfRouting:
         """For a symmetric connection where target is enterprise, GRF is created for target."""
         eng_id, glo_id = self._setup_repos(engagement_root, enterprise_root)
 
-        result = mcp_tools.model_add_connection(
+        result = mcp_tools.artifact_add_connection(
             source_entity=eng_id,
             connection_type="archimate-association",  # symmetric
             target_entity=glo_id,
@@ -526,14 +526,14 @@ class TestAddConnectionGrfRouting:
             _entity_md(eng_id2, "capability", "Cap 2"),
         )
 
-        r1 = mcp_tools.model_add_connection(
+        r1 = mcp_tools.artifact_add_connection(
             source_entity=glo_id, connection_type="archimate-influence",
             target_entity=eng_id, dry_run=False,
             repo_root=str(engagement_root), enterprise_root=str(enterprise_root),
         )
         grf_id_1 = r1["grf_source_id"]
 
-        r2 = mcp_tools.model_add_connection(
+        r2 = mcp_tools.artifact_add_connection(
             source_entity=glo_id, connection_type="archimate-influence",
             target_entity=eng_id2, dry_run=False,
             repo_root=str(engagement_root), enterprise_root=str(enterprise_root),
@@ -549,7 +549,7 @@ class TestPromotionPlan:
     def test_plan_excludes_grf_entities(
         self, engagement_root: Path, enterprise_root: Path
     ) -> None:
-        from src.tools.model_write.promote_to_enterprise import plan_promotion
+        from src.tools.artifact_write.promote_to_enterprise import plan_promotion
 
         eng_id = "CAP@1000000001.EngBBB.my-cap"
         grf_id = "GRF@1000000002.GrfCCC.grf-ref"
@@ -573,8 +573,8 @@ class TestPromotionPlan:
             _outgoing_md(eng_id, [("archimate-realization", grf_id)]),
         )
 
-        registry = ModelRegistry([engagement_root, enterprise_root])
-        repo = ModelRepository([engagement_root, enterprise_root])
+        registry = ArtifactRegistry([engagement_root, enterprise_root])
+        repo = ArtifactRepository([engagement_root, enterprise_root])
         plan = plan_promotion(eng_id, registry, repo)
 
         assert eng_id in plan.entities_to_add
@@ -584,7 +584,7 @@ class TestPromotionPlan:
     def test_plan_exclude_params(
         self, engagement_root: Path, enterprise_root: Path
     ) -> None:
-        from src.tools.model_write.promote_to_enterprise import plan_promotion
+        from src.tools.artifact_write.promote_to_enterprise import plan_promotion
 
         eng_id1 = "CAP@1000000001.EngBBB.cap1"
         eng_id2 = "CAP@1000000002.EngCCC.cap2"
@@ -598,8 +598,8 @@ class TestPromotionPlan:
             _outgoing_md(eng_id1, [("archimate-aggregation", eng_id2)]),
         )
 
-        registry = ModelRegistry([engagement_root, enterprise_root])
-        repo = ModelRepository([engagement_root, enterprise_root])
+        registry = ArtifactRegistry([engagement_root, enterprise_root])
+        repo = ArtifactRepository([engagement_root, enterprise_root])
         plan = plan_promotion(
             eng_id1, registry, repo,
             exclude_entity_ids={eng_id2},
@@ -616,8 +616,8 @@ class TestPromotionExecuteOutgoingRewrite:
     def test_grf_targets_rewritten_to_enterprise_ids(
         self, engagement_root: Path, enterprise_root: Path
     ) -> None:
-        from src.tools.model_write.promote_execute import make_target_resolver, _rewrite_outgoing
-        from src.tools.model_write.promote_to_enterprise import PromotionResult, PromotionPlan
+        from src.tools.artifact_write.promote_execute import make_target_resolver, _rewrite_outgoing
+        from src.tools.artifact_write.promote_to_enterprise import PromotionResult, PromotionPlan
 
         grf_id = "GRF@1000000002.GrfCCC.grf-ref"
         glo_id = "REQ@2000000000.GloAAA.global-req"
@@ -649,8 +649,8 @@ class TestPromotionExecuteOutgoingRewrite:
     def test_stranded_targets_dropped_with_warning(
         self, engagement_root: Path, enterprise_root: Path
     ) -> None:
-        from src.tools.model_write.promote_execute import make_target_resolver, _rewrite_outgoing
-        from src.tools.model_write.promote_to_enterprise import PromotionResult, PromotionPlan
+        from src.tools.artifact_write.promote_execute import make_target_resolver, _rewrite_outgoing
+        from src.tools.artifact_write.promote_to_enterprise import PromotionResult, PromotionPlan
 
         eng_id = "CAP@1000000001.EngBBB.my-cap"
         other_eng = "CAP@1000000003.EngDDD.other"
@@ -704,13 +704,13 @@ class TestPromotionExecuteFullRoundTrip:
     def test_entity_copied_to_enterprise(
         self, engagement_root: Path, enterprise_root: Path
     ) -> None:
-        from src.tools.model_write.promote_to_enterprise import plan_promotion
-        from src.tools.model_write.promote_execute import execute_promotion
+        from src.tools.artifact_write.promote_to_enterprise import plan_promotion
+        from src.tools.artifact_write.promote_execute import execute_promotion
 
         eng_id, grf_id, glo_id = self._setup(engagement_root, enterprise_root)
-        registry = ModelRegistry([engagement_root, enterprise_root])
-        repo = ModelRepository([engagement_root, enterprise_root])
-        verifier = ModelVerifier(registry)
+        registry = ArtifactRegistry([engagement_root, enterprise_root])
+        repo = ArtifactRepository([engagement_root, enterprise_root])
+        verifier = ArtifactVerifier(registry)
 
         plan = plan_promotion(eng_id, registry, repo)
         result = execute_promotion(plan, engagement_root, enterprise_root, verifier, registry)
@@ -722,13 +722,13 @@ class TestPromotionExecuteFullRoundTrip:
     def test_grf_target_rewritten_in_enterprise_outgoing(
         self, engagement_root: Path, enterprise_root: Path
     ) -> None:
-        from src.tools.model_write.promote_to_enterprise import plan_promotion
-        from src.tools.model_write.promote_execute import execute_promotion
+        from src.tools.artifact_write.promote_to_enterprise import plan_promotion
+        from src.tools.artifact_write.promote_execute import execute_promotion
 
         eng_id, grf_id, glo_id = self._setup(engagement_root, enterprise_root)
-        registry = ModelRegistry([engagement_root, enterprise_root])
-        repo = ModelRepository([engagement_root, enterprise_root])
-        verifier = ModelVerifier(registry)
+        registry = ArtifactRegistry([engagement_root, enterprise_root])
+        repo = ArtifactRepository([engagement_root, enterprise_root])
+        verifier = ArtifactVerifier(registry)
 
         plan = plan_promotion(eng_id, registry, repo)
         result = execute_promotion(plan, engagement_root, enterprise_root, verifier, registry)
@@ -746,16 +746,16 @@ class TestPromotionExecuteFullRoundTrip:
     def test_promoted_engagement_entity_replaced_by_grf(
         self, engagement_root: Path, enterprise_root: Path
     ) -> None:
-        from src.tools.model_write.promote_to_enterprise import plan_promotion
-        from src.tools.model_write.promote_execute import execute_promotion
+        from src.tools.artifact_write.promote_to_enterprise import plan_promotion
+        from src.tools.artifact_write.promote_execute import execute_promotion
 
         eng_id, grf_id, glo_id = self._setup(engagement_root, enterprise_root)
         orig_eng_file = (
             engagement_root / "model" / "strategy" / "capabilities" / f"{eng_id}.md"
         )
-        registry = ModelRegistry([engagement_root, enterprise_root])
-        repo = ModelRepository([engagement_root, enterprise_root])
-        verifier = ModelVerifier(registry)
+        registry = ArtifactRegistry([engagement_root, enterprise_root])
+        repo = ArtifactRepository([engagement_root, enterprise_root])
+        verifier = ArtifactVerifier(registry)
 
         plan = plan_promotion(eng_id, registry, repo)
         result = execute_promotion(plan, engagement_root, enterprise_root, verifier, registry)
@@ -774,8 +774,8 @@ class TestPromotionExecuteFullRoundTrip:
     def test_outgoing_references_updated_after_replacement(
         self, engagement_root: Path, enterprise_root: Path
     ) -> None:
-        from src.tools.model_write.promote_to_enterprise import plan_promotion
-        from src.tools.model_write.promote_execute import execute_promotion
+        from src.tools.artifact_write.promote_to_enterprise import plan_promotion
+        from src.tools.artifact_write.promote_execute import execute_promotion
 
         eng_id, grf_id, glo_id = self._setup(engagement_root, enterprise_root)
 
@@ -792,9 +792,9 @@ class TestPromotionExecuteFullRoundTrip:
             _outgoing_md(other_eng, [("archimate-influence", eng_id)]),
         )
 
-        registry = ModelRegistry([engagement_root, enterprise_root])
-        repo = ModelRepository([engagement_root, enterprise_root])
-        verifier = ModelVerifier(registry)
+        registry = ArtifactRegistry([engagement_root, enterprise_root])
+        repo = ArtifactRepository([engagement_root, enterprise_root])
+        verifier = ArtifactVerifier(registry)
 
         plan = plan_promotion(eng_id, registry, repo)
         result = execute_promotion(plan, engagement_root, enterprise_root, verifier, registry)

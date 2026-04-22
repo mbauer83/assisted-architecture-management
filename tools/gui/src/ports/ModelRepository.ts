@@ -7,6 +7,11 @@ import type {
   ConnectionList,
   Neighbors,
   SearchResult,
+  DocumentType,
+  DocumentList,
+  DocumentDetail,
+  ArtifactSearchResult,
+  ReferenceSearchResult,
   DiagramList,
   DiagramDetail,
   DiagramContext,
@@ -176,4 +181,32 @@ export interface ModelRepository {
     }>;
     dry_run?: boolean;
   }) => Effect.Effect<PromotionResult, RepoError>
+  // ── Document methods ──────────────────────────────────────────────────────
+  readonly listDocumentTypes: () => Effect.Effect<DocumentType[], RepoError>
+  readonly listDocuments: (params?: {
+    doc_type?: string; status?: string; limit?: number; offset?: number;
+  }) => Effect.Effect<DocumentList, RepoError>
+  readonly getDocument: (id: string) => Effect.Effect<DocumentDetail, RepoError | NotFoundError>
+  readonly createDocument: (body: {
+    doc_type: string; title: string; body?: string;
+    keywords?: string[]; extra_frontmatter?: Record<string, unknown>;
+    version?: string; status?: string; dry_run?: boolean;
+  }) => Effect.Effect<WriteResult, RepoError>
+  readonly editDocument: (id: string, body: {
+    title?: string; body?: string; keywords?: string[];
+    extra_frontmatter?: Record<string, unknown>;
+    status?: string; version?: string; dry_run?: boolean;
+  }) => Effect.Effect<WriteResult, RepoError>
+  readonly deleteDocument: (id: string, dry_run?: boolean) => Effect.Effect<WriteResult, RepoError>
+  readonly artifactSearch: (q: string, params?: {
+    limit?: number; include_documents?: boolean; include_diagrams?: boolean;
+  }) => Effect.Effect<ArtifactSearchResult, RepoError>
+  readonly searchReferenceArtifacts: (params: {
+    q?: string
+    kind?: 'entity' | 'diagram' | 'document'
+    domains?: string[]
+    entity_types?: string[]
+    doc_types?: string[]
+    limit?: number
+  }) => Effect.Effect<ReferenceSearchResult, RepoError>
 }

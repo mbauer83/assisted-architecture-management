@@ -9,6 +9,11 @@ import {
   ConnectionListSchema,
   NeighborsSchema,
   SearchResultSchema,
+  DocumentTypesSchema,
+  DocumentListSchema,
+  DocumentDetailSchema,
+  ArtifactSearchResultSchema,
+  ReferenceSearchResultSchema,
   DiagramListSchema,
   DiagramDetailSchema,
   DiagramContextSchema,
@@ -108,6 +113,45 @@ const postJson = <A, I>(
       e instanceof NetworkError ? e : new NetworkError({ status: 0, message: String(e) }),
   }).pipe(Effect.flatMap(Schema.decodeUnknown(schema)))
 
+const putJson = <A, I>(
+  url: string,
+  body: unknown,
+  schema: Schema.Schema<A, I>,
+): Effect.Effect<A, NetworkError | ParseResult.ParseError> =>
+  Effect.tryPromise({
+    try: async () => {
+      const resp = await fetch(url, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      })
+      if (!resp.ok) {
+        const text = await resp.text().catch(() => resp.statusText)
+        throw new NetworkError({ status: resp.status, message: text })
+      }
+      return resp.json() as Promise<unknown>
+    },
+    catch: (e) =>
+      e instanceof NetworkError ? e : new NetworkError({ status: 0, message: String(e) }),
+  }).pipe(Effect.flatMap(Schema.decodeUnknown(schema)))
+
+const deleteReq = <A, I>(
+  url: string,
+  schema: Schema.Schema<A, I>,
+): Effect.Effect<A, NetworkError | ParseResult.ParseError> =>
+  Effect.tryPromise({
+    try: async () => {
+      const resp = await fetch(url, { method: 'DELETE' })
+      if (!resp.ok) {
+        const text = await resp.text().catch(() => resp.statusText)
+        throw new NetworkError({ status: resp.status, message: text })
+      }
+      return resp.json() as Promise<unknown>
+    },
+    catch: (e) =>
+      e instanceof NetworkError ? e : new NetworkError({ status: 0, message: String(e) }),
+  }).pipe(Effect.flatMap(Schema.decodeUnknown(schema)))
+
 // ── Factory ───────────────────────────────────────────────────────────────────
 
 export const makeHttpModelRepository = (): ModelRepository => ({
@@ -159,6 +203,39 @@ export const makeHttpModelRepository = (): ModelRepository => ({
 
   search: (query: string, limit = 20) =>
     fetchJson(buildUrl('/search', { q: query, limit }), SearchResultSchema),
+
+  listDocumentTypes: () =>
+    fetchJson(buildUrl('/document-types'), DocumentTypesSchema).pipe(
+      Effect.map((items) => [...items] as import('../../domain').DocumentType[]),
+    ),
+
+  listDocuments: (params = {}) =>
+    fetchJson(buildUrl('/documents', params), DocumentListSchema),
+
+  getDocument: (id) =>
+    fetchJsonNotFound(buildUrl('/document', { id }), DocumentDetailSchema, id),
+
+  createDocument: (body) =>
+    postJson(buildUrl('/document'), body, WriteResultSchema),
+
+  editDocument: (id, body) =>
+    putJson(buildUrl(`/document/${encodeURIComponent(id)}`), body, WriteResultSchema),
+
+  deleteDocument: (id, dry_run) =>
+    deleteReq(buildUrl(`/document/${encodeURIComponent(id)}`, { dry_run }), WriteResultSchema),
+
+  artifactSearch: (q, params = {}) =>
+    fetchJson(buildUrl('/artifact-search', { q, ...params }), ArtifactSearchResultSchema),
+
+  searchReferenceArtifacts: (params) =>
+    fetchJson(buildUrl('/reference-search', {
+      q: params.q,
+      kind: params.kind,
+      domains: params.domains?.join(','),
+      entity_types: params.entity_types?.join(','),
+      doc_types: params.doc_types?.join(','),
+      limit: params.limit,
+    }), ReferenceSearchResultSchema),
 
   listDiagrams: (diagramType?: string, status?: string) =>
     fetchJson(buildUrl('/diagrams', { diagram_type: diagramType, status }), DiagramListSchema),

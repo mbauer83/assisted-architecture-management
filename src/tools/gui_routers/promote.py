@@ -35,11 +35,11 @@ class PromotionExecuteBody(BaseModel):
 @router.post("/api/promote/plan")
 def promotion_plan(body: PromotionPlanBody) -> dict[str, Any]:
     """Compute the promotion plan for an entity (transitive closure, conflicts)."""
-    from src.common.model_verifier_registry import ModelRegistry
-    from src.tools.model_write.promote_to_enterprise import plan_promotion
+    from src.common.artifact_verifier_registry import ArtifactRegistry
+    from src.tools.artifact_write.promote_to_enterprise import plan_promotion
 
     eng_root, ent_root = s.get_both_roots()
-    registry = ModelRegistry([eng_root, ent_root])
+    registry = ArtifactRegistry([eng_root, ent_root])
     repo = s.get_repo()
     try:
         plan = plan_promotion(
@@ -70,13 +70,13 @@ def promotion_plan(body: PromotionPlanBody) -> dict[str, Any]:
 @router.post("/api/promote/execute")
 def promotion_execute(body: PromotionExecuteBody) -> dict[str, Any]:
     """Execute a (possibly pruned) promotion plan, then replace promoted entities with GRF proxies."""
-    from src.common.model_verifier import ModelVerifier
-    from src.common.model_verifier_registry import ModelRegistry
-    from src.tools.model_write.promote_execute import execute_promotion
-    from src.tools.model_write.promote_to_enterprise import ConflictResolution, plan_promotion
+    from src.common.artifact_verifier import ArtifactVerifier
+    from src.common.artifact_verifier_registry import ArtifactRegistry
+    from src.tools.artifact_write.promote_execute import execute_promotion
+    from src.tools.artifact_write.promote_to_enterprise import ConflictResolution, plan_promotion
 
     eng_root, ent_root = s.get_both_roots()
-    registry = ModelRegistry([eng_root, ent_root])
+    registry = ArtifactRegistry([eng_root, ent_root])
     repo = s.get_repo()
     try:
         plan = plan_promotion(
@@ -101,7 +101,7 @@ def promotion_execute(body: PromotionExecuteBody) -> dict[str, Any]:
         for r in body.conflict_resolutions
     ]
     result = execute_promotion(
-        plan, eng_root, ent_root, ModelVerifier(registry), registry,
+        plan, eng_root, ent_root, ArtifactVerifier(registry), registry,
         conflict_resolutions=resolutions,
     )
     if result.executed:

@@ -21,7 +21,7 @@ from pathlib import Path
 
 import yaml
 
-from src.common.model_query_parsing import normalize_puml_alias
+from src.common.artifact_parsing import normalize_puml_alias
 from src.common.ontology_loader import ENTITY_TYPES
 from src.tools._svg_sprite_convert import browser_markup_to_plantuml_svg as _browser_markup_to_plantuml_svg
 from src.common.settings import archimate_type_markers, sprite_scale

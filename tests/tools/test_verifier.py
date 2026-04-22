@@ -1,4 +1,4 @@
-"""Behavioural tests for ModelVerifier rules.
+"""Behavioural tests for ArtifactVerifier rules.
 
 Covers verify_entity_file, verify_outgoing_file, and verify_all for both
 single-repo and two-repo setups.  GRF-specific verifier rules are in
@@ -11,8 +11,8 @@ from pathlib import Path
 
 import pytest
 
-from src.common.model_verifier import ModelVerifier
-from src.common.model_verifier_registry import ModelRegistry
+from src.common.artifact_verifier import ArtifactVerifier
+from src.common.artifact_verifier_registry import ArtifactRegistry
 
 
 # ---------------------------------------------------------------------------
@@ -97,7 +97,7 @@ class TestVerifyEntityFile:
         eid = "REQ@1000000000.AbcDef.my-req"
         path = repo / "model" / "motivation" / "requirements" / f"{eid}.md"
         _write(path, _entity(eid))
-        result = ModelVerifier().verify_entity_file(path)
+        result = ArtifactVerifier().verify_entity_file(path)
         assert result.valid, [i.message for i in result.issues]
 
     def test_missing_artifact_id_field(self, repo: Path) -> None:
@@ -121,7 +121,7 @@ label: "Bad"
 alias: REQ_XxXxXx
 ```
 """)
-        result = ModelVerifier().verify_entity_file(path)
+        result = ArtifactVerifier().verify_entity_file(path)
         assert not result.valid
         codes = {i.code for i in result.issues if i.severity == "error"}
         assert "E021" in codes  # missing required field
@@ -131,7 +131,7 @@ alias: REQ_XxXxXx
         path = repo / "model" / "motivation" / "requirements" / f"{eid}.md"
         content = _entity(eid, artifact_type="not-a-real-type")
         _write(path, content)
-        result = ModelVerifier().verify_entity_file(path)
+        result = ArtifactVerifier().verify_entity_file(path)
         assert not result.valid
         assert any(i.code == "E102" for i in result.issues)
 
@@ -139,7 +139,7 @@ alias: REQ_XxXxXx
         eid = "REQ@1000000003.AbcDef.no-content"
         path = repo / "model" / "motivation" / "requirements" / f"{eid}.md"
         _write(path, _entity(eid, no_content_section=True))
-        result = ModelVerifier().verify_entity_file(path)
+        result = ArtifactVerifier().verify_entity_file(path)
         assert not result.valid
         assert any(i.code == "E031" for i in result.issues)
 
@@ -148,7 +148,7 @@ alias: REQ_XxXxXx
         wrong_id = "REQ@1000000004.AbcDef.wrong-name"
         path = repo / "model" / "motivation" / "requirements" / f"{eid}.md"
         _write(path, _entity(wrong_id))  # frontmatter id ≠ filename
-        result = ModelVerifier().verify_entity_file(path)
+        result = ArtifactVerifier().verify_entity_file(path)
         assert not result.valid
         assert any(i.code == "E104" for i in result.issues)
 
@@ -158,9 +158,62 @@ alias: REQ_XxXxXx
         _write(path, _entity(eid, extra_fm="\nbad-status: yes").replace(
             "status: draft", "status: invalid-value"
         ))
-        result = ModelVerifier().verify_entity_file(path)
+        result = ArtifactVerifier().verify_entity_file(path)
         assert not result.valid
         assert any(i.code == "E022" for i in result.issues)
+
+
+def _document_schema(repo: Path) -> None:
+    schema_path = repo / ".arch-repo" / "documents" / "adr.json"
+    _write(
+        schema_path,
+        """\
+{
+  "abbreviation": "ADR",
+  "name": "Architecture Decision Record",
+  "frontmatter_schema": {
+    "type": "object",
+    "required": ["artifact-id", "artifact-type", "doc-type", "title", "status", "version", "last-updated"],
+    "properties": {
+      "artifact-id": { "type": "string" },
+      "artifact-type": { "const": "document" },
+      "doc-type": { "const": "adr" },
+      "title": { "type": "string" },
+      "status": { "type": "string" },
+      "version": { "type": "string" },
+      "last-updated": { "type": "string" }
+    }
+  },
+  "required_sections": ["Context", "Decision", "Consequences"]
+}
+""",
+    )
+
+
+def _document(artifact_id: str, body: str) -> str:
+    return f"""\
+---
+artifact-id: {artifact_id}
+artifact-type: document
+doc-type: adr
+title: "ADR Title"
+status: draft
+version: 0.1.0
+last-updated: '2026-04-22'
+---
+
+## Context
+
+{body}
+
+## Decision
+
+Decision.
+
+## Consequences
+
+Consequences.
+"""
 
 
 # ---------------------------------------------------------------------------
@@ -181,8 +234,8 @@ class TestVerifyOutgoingFile:
         self._setup_entities(repo, (src, "requirement"), (tgt, "requirement"))
         out_path = repo / "model" / "motivation" / "requirements" / f"{src}.outgoing.md"
         _write(out_path, _outgoing(src, [("archimate-association", tgt)]))
-        registry = ModelRegistry(repo)
-        result = ModelVerifier(registry).verify_outgoing_file(out_path)
+        registry = ArtifactRegistry(repo)
+        result = ArtifactVerifier(registry).verify_outgoing_file(out_path)
         assert result.valid, [i.message for i in result.issues]
 
     def test_unknown_source_entity(self, repo: Path) -> None:
@@ -191,8 +244,8 @@ class TestVerifyOutgoingFile:
         ghost_src = "REQ@9999999999.GhostX.ghost"
         out_path = repo / "model" / "motivation" / "requirements" / f"{ghost_src}.outgoing.md"
         _write(out_path, _outgoing(ghost_src, [("archimate-association", tgt)]))
-        registry = ModelRegistry(repo)
-        result = ModelVerifier(registry).verify_outgoing_file(out_path)
+        registry = ArtifactRegistry(repo)
+        result = ArtifactVerifier(registry).verify_outgoing_file(out_path)
         assert not result.valid
         assert any(i.code == "E120" for i in result.issues)
 
@@ -201,8 +254,8 @@ class TestVerifyOutgoingFile:
         self._setup_entities(repo, (src, "requirement"))
         out_path = repo / "model" / "motivation" / "requirements" / f"{src}.outgoing.md"
         _write(out_path, _outgoing(src, [("archimate-association", "REQ@9999999999.GhostX.ghost")]))
-        registry = ModelRegistry(repo)
-        result = ModelVerifier(registry).verify_outgoing_file(out_path)
+        registry = ArtifactRegistry(repo)
+        result = ArtifactVerifier(registry).verify_outgoing_file(out_path)
         assert not result.valid
         assert any(i.code == "E124" for i in result.issues)
 
@@ -212,8 +265,8 @@ class TestVerifyOutgoingFile:
         self._setup_entities(repo, (src, "requirement"), (tgt, "requirement"))
         out_path = repo / "model" / "motivation" / "requirements" / f"{src}.outgoing.md"
         _write(out_path, _outgoing(src, [("not-a-real-connection-type", tgt)]))
-        registry = ModelRegistry(repo)
-        result = ModelVerifier(registry).verify_outgoing_file(out_path)
+        registry = ArtifactRegistry(repo)
+        result = ArtifactVerifier(registry).verify_outgoing_file(out_path)
         assert not result.valid
         assert any(i.code == "E123" for i in result.issues)
 
@@ -224,8 +277,8 @@ class TestVerifyOutgoingFile:
         out_path = repo / "model" / "motivation" / "requirements" / f"{src}.outgoing.md"
         content = _outgoing(src, [("archimate-association", tgt)]).replace("<!-- §connections -->", "")
         _write(out_path, content)
-        registry = ModelRegistry(repo)
-        result = ModelVerifier(registry).verify_outgoing_file(out_path)
+        registry = ArtifactRegistry(repo)
+        result = ArtifactVerifier(registry).verify_outgoing_file(out_path)
         assert not result.valid
         assert any(i.code == "E121" for i in result.issues)
 
@@ -250,10 +303,45 @@ class TestVerifyOutgoingFile:
         # Enterprise outgoing targeting engagement entity → error
         out_path = ent_root / "model" / "motivation" / "requirements" / f"{ent_id}.outgoing.md"
         _write(out_path, _outgoing(ent_id, [("archimate-association", eng_id)]))
-        registry = ModelRegistry([eng_root, ent_root])
-        result = ModelVerifier(registry).verify_outgoing_file(out_path)
+        registry = ArtifactRegistry([eng_root, ent_root])
+        result = ArtifactVerifier(registry).verify_outgoing_file(out_path)
         assert not result.valid
         assert any(i.code == "E130" for i in result.issues)
+
+
+class TestVerifyDocumentFile:
+    def test_relative_internal_markdown_link_is_allowed(self, repo: Path) -> None:
+        _document_schema(repo)
+        target_id = "ADR@1000000001.AbcDef.target"
+        source_id = "ADR@1000000000.AbcDef.source"
+        target = repo / "documents" / "adr" / f"{target_id}.md"
+        source = repo / "documents" / "adr" / f"{source_id}.md"
+        _write(target, _document(target_id, "Target body."))
+        _write(source, _document(source_id, f"[Target](./{target_id}.md)"))
+
+        registry = ArtifactRegistry(repo)
+        result = ArtifactVerifier(registry).verify_document_file(source)
+
+        assert result.valid, [i.message for i in result.issues]
+        assert not any(i.code == "W156" for i in result.issues)
+
+    def test_absolute_internal_markdown_link_warns(self, repo: Path) -> None:
+        _document_schema(repo)
+        source_id = "ADR@1000000000.AbcDef.source"
+        source = repo / "documents" / "adr" / f"{source_id}.md"
+        _write(
+            source,
+            _document(
+                source_id,
+                "[Absolute](/tmp/workspace/architecture-repository/model/application/components/APP@1.AbcDef.target.md)",
+            ),
+        )
+
+        registry = ArtifactRegistry(repo)
+        result = ArtifactVerifier(registry).verify_document_file(source)
+
+        assert any(i.code == "W156" for i in result.issues)
+        assert any("must be relative" in i.message for i in result.issues)
 
 
 # ---------------------------------------------------------------------------
@@ -267,8 +355,8 @@ class TestVerifyAll:
             repo / "model" / "motivation" / "requirements" / f"{eid}.md",
             _entity(eid),
         )
-        registry = ModelRegistry(repo)
-        results = ModelVerifier(registry).verify_all(repo, include_diagrams=False)
+        registry = ArtifactRegistry(repo)
+        results = ArtifactVerifier(registry).verify_all(repo, include_diagrams=False)
         assert all(r.valid for r in results), [
             f"{r.path.name}: {[i.message for i in r.issues]}" for r in results if not r.valid
         ]
@@ -277,8 +365,8 @@ class TestVerifyAll:
         eid = "REQ@1000000000.AbcDef.bad"
         path = repo / "model" / "motivation" / "requirements" / f"{eid}.md"
         _write(path, _entity(eid, no_content_section=True))
-        registry = ModelRegistry(repo)
-        results = ModelVerifier(registry).verify_all(repo, include_diagrams=False)
+        registry = ArtifactRegistry(repo)
+        results = ArtifactVerifier(registry).verify_all(repo, include_diagrams=False)
         assert any(not r.valid for r in results)
 
     def test_verify_all_two_repos(self, tmp_path: Path) -> None:
@@ -292,10 +380,10 @@ class TestVerifyAll:
         _write(eng_root / "model" / "motivation" / "requirements" / f"{eng_id}.md", _entity(eng_id))
         _write(ent_root / "model" / "motivation" / "requirements" / f"{ent_id}.md", _entity(ent_id))
 
-        registry = ModelRegistry([eng_root, ent_root])
+        registry = ArtifactRegistry([eng_root, ent_root])
         # verify_all for each root independently
         for root in (eng_root, ent_root):
-            results = ModelVerifier(registry).verify_all(root, include_diagrams=False)
+            results = ArtifactVerifier(registry).verify_all(root, include_diagrams=False)
             assert all(r.valid for r in results), [
                 i.message for r in results for i in r.issues if i.severity == "error"
             ]

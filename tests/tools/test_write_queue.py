@@ -17,7 +17,7 @@ from typing import Any
 
 import pytest
 
-from src.tools.model_mcp.write_queue import queued, shutdown
+from src.tools.artifact_mcp.write_queue import queued, shutdown
 
 
 @pytest.fixture(autouse=True)

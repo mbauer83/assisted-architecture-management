@@ -30,8 +30,8 @@ def get_neighbors(entity_id: str, max_hops: int = 1) -> dict[str, list[str]]:
 
 @router.get("/api/search")
 def search(q: str, limit: int = 20) -> dict[str, Any]:
-    from src.common.model_query_types import DiagramRecord, EntityRecord
-    from src.common.model_query_types import ConnectionRecord
+    from src.common.artifact_types import DiagramRecord, EntityRecord
+    from src.common.artifact_types import ConnectionRecord
     result = s.get_repo().search_artifacts(q, limit=limit)
     hits = []
     for h in result.hits:
@@ -72,7 +72,7 @@ def get_ontology(source_type: str, target_type: str | None = None) -> dict[str, 
 
 @router.get("/api/write-help")
 def get_write_help() -> dict[str, Any]:
-    from src.tools.model_write.help import write_help
+    from src.tools.artifact_write.help import write_help
     return write_help()
 
 
@@ -96,7 +96,7 @@ class RemoveConnectionBody(BaseModel):
 @router.post("/api/connection")
 def add_connection(body: AddConnectionBody) -> dict[str, Any]:
     repo_root, registry, verifier = s.get_write_deps()
-    from src.tools.model_write.connection import add_connection as _add
+    from src.tools.artifact_write.connection import add_connection as _add
 
     effective_source = body.source_entity
     effective_target = body.target_entity
@@ -106,7 +106,7 @@ def add_connection(body: AddConnectionBody) -> dict[str, Any]:
 
     def _ensure_grf(global_id: str) -> str:
         nonlocal registry, verifier
-        from src.tools.model_write.global_entity_reference import ensure_global_entity_reference
+        from src.tools.artifact_write.global_entity_reference import ensure_global_entity_reference
         repo = s.get_repo()
         global_rec = repo.get_entity(global_id)
         global_name = global_rec.name if global_rec else global_id
@@ -190,7 +190,7 @@ class ConnectionAssociateBody(BaseModel):
 @router.post("/api/connection/edit")
 def edit_connection(body: EditConnectionBody) -> dict[str, Any]:
     repo_root, registry, verifier = s.get_write_deps()
-    from src.tools.model_write.connection_edit import edit_connection as _edit, _UNSET
+    from src.tools.artifact_write.connection_edit import edit_connection as _edit, _UNSET
     provided = body.model_fields_set
     try:
         result = s.run_serialized_write(
@@ -215,7 +215,7 @@ def edit_connection(body: EditConnectionBody) -> dict[str, Any]:
 @router.post("/api/connection/associate")
 def manage_connection_associations(body: ConnectionAssociateBody) -> dict[str, Any]:
     repo_root, registry, verifier = s.get_write_deps()
-    from src.tools.model_write.connection_edit import edit_connection_associations as _assoc
+    from src.tools.artifact_write.connection_edit import edit_connection_associations as _assoc
     try:
         result = s.run_serialized_write(
             _assoc,
@@ -238,7 +238,7 @@ def manage_connection_associations(body: ConnectionAssociateBody) -> dict[str, A
 @router.post("/api/connection/remove")
 def remove_connection(body: RemoveConnectionBody) -> dict[str, Any]:
     repo_root, registry, verifier = s.get_write_deps()
-    from src.tools.model_write.connection_edit import remove_connection as _remove
+    from src.tools.artifact_write.connection_edit import remove_connection as _remove
     try:
         result = s.run_serialized_write(
             _remove,
@@ -269,7 +269,7 @@ def cleanup_broken_refs(body: CleanupBrokenRefsBody) -> dict[str, Any]:
     A GRF is broken when the enterprise entity it points to no longer exists.
     dry_run=true (default) returns the plan without modifying files.
     """
-    from src.tools.model_write.cleanup_broken_refs import cleanup_broken_refs as _cleanup
+    from src.tools.artifact_write.cleanup_broken_refs import cleanup_broken_refs as _cleanup
     import dataclasses
     eng_root = s._repo_root
     ent_root = s._enterprise_root
