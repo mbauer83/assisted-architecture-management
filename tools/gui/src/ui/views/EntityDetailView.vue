@@ -25,9 +25,6 @@ const detail = computed(() => context.data.value?.entity ?? null)
 const outgoing = computed(() => context.data.value?.connections.outbound ?? [])
 const incoming = computed(() => context.data.value?.connections.inbound ?? [])
 const symmetric = computed(() => context.data.value?.connections.symmetric ?? [])
-const hasSymmetric = computed(() =>
-  (context.data.value?.counts.conn_sym ?? 0) > 0 || symmetric.value.length > 0,
-)
 
 const load = () => {
   if (!entityId.value) return
@@ -350,7 +347,7 @@ const executeDelete = () => {
       </div>
 
       <!-- Connections: [INCOMING] [SYMMETRIC] [OUTGOING] on wide screens -->
-      <div class="connections-section" :class="{ 'has-symmetric': hasSymmetric }">
+      <div class="connections-section">
         <ConnectionsPanel
           :entity-id="entityId"
           :entity-type="detail.artifact_type"
@@ -363,7 +360,6 @@ const executeDelete = () => {
           @refresh="load"
         />
         <ConnectionsPanel
-          v-if="hasSymmetric"
           :entity-id="entityId"
           :entity-type="detail.artifact_type"
           :connections="symmetric"
@@ -530,10 +526,9 @@ const executeDelete = () => {
 .cancel-btn:disabled, .preview-btn:disabled, .save-btn:disabled, .delete-confirm-btn:disabled { opacity: 0.5; cursor: not-allowed; }
 
 /* Connections — [INCOMING] [SYMMETRIC] [OUTGOING] */
-.connections-section { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
-.connections-section.has-symmetric { grid-template-columns: 1fr 1fr 1fr; }
-@media (max-width: 1000px) { .connections-section.has-symmetric { grid-template-columns: 1fr 1fr; } }
-@media (max-width: 700px) { .connections-section, .connections-section.has-symmetric { grid-template-columns: 1fr; } }
+.connections-section { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px; }
+@media (max-width: 1000px) { .connections-section { grid-template-columns: 1fr 1fr; } }
+@media (max-width: 700px) { .connections-section { grid-template-columns: 1fr; } }
 
 .domain-badge { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 500; }
 .domain--motivation { background: #d8c1e4; color: #252327; }

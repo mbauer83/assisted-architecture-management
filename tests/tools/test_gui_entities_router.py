@@ -296,3 +296,6 @@ def test_entity_detail_view_uses_entity_context_request() -> None:
 
     assert "svc.getEntityContext(entityId.value)" in content
     assert "svc.getConnections(" not in content
+    assert 'direction="symmetric"' in content
+    assert 'v-if="hasSymmetric"' not in content
+    assert ":class=\"{ 'has-symmetric': hasSymmetric }\"" not in content

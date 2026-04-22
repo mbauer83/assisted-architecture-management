@@ -161,7 +161,7 @@ const queueTooltip = (entity: EntitySummary, clientX: number, clientY: number) =
   const roomRight = rect.width - localX
   const roomBottom = rect.height - localY
   tooltipPos.value = {
-    x: clamp(roomRight > TOOLTIP_WIDTH + TOOLTIP_GAP ? localX + TOOLTIP_GAP : localX - TOOLTIP_WIDTH - TOOLTIP_GAP, 8, rect.width - TOOLTIP_WIDTH - 8),
+    x: clamp(roomRight > TOOLTIP_WIDTH + TOOLTIP_GAP ? localX + 120 : localX - TOOLTIP_WIDTH + 380, 8, rect.width + 400 - 8),
     y: clamp(roomBottom > TOOLTIP_HEIGHT + TOOLTIP_GAP ? localY + TOOLTIP_GAP : localY - TOOLTIP_HEIGHT - TOOLTIP_GAP, 8, rect.height - TOOLTIP_HEIGHT - 8),
   }
   hoverTimer = setTimeout(() => {
