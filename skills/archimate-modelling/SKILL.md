@@ -15,7 +15,7 @@ description: >
 
 # ArchiMate NEXT Modelling Skill
 
-All model access and mutations go through `model_*` MCP tools from the `arch-model`
+All model access and mutations go through `artifact_*` MCP tools from the `arch-repo`
 server. Never read or write model files directly.
 
 ---
@@ -50,7 +50,7 @@ No engagement requires content in all domains. Determine which domains are relev
 by reading the user's request and conversational context, then confirming against
 existing model content with targeted queries — not by asking the user directly. The
 user's plans, goals, and the questions they are trying to answer usually make domain
-scope clear. When they don't, `model_query_stats` and a targeted search will reveal
+scope clear. When they don't, `artifact_query_stats` and a targeted search will reveal
 what is already modeled and where the gaps are. Only escalate to the user when domain
 scope remains genuinely ambiguous after that discovery.
 
@@ -124,7 +124,7 @@ map of everything in the model.
   more valuable than a complete one shared too late. Iterate toward the goal.
 
 **PlantUML rules (hard-won — violating these causes rendering errors):**
-- **Verify connections in the model before drawing them.** Use `model_query_find_connections_for` on each source entity; never assume a connection exists. Diagrams referencing non-existent connections render with errors or misrepresent the model.
+- **Verify connections in the model before drawing them.** Use `artifact_query_find_connections_for` on each source entity; never assume a connection exists. Diagrams referencing non-existent connections render with errors or misrepresent the model.
 - **No newlines in label strings.** The MCP tool passes `\n` as a literal newline character (0x0A) inside double-quoted PlantUML strings, which is a syntax error. Use full single-line labels only.
 - **Direction choice:** Use `left to right direction` for wide, shallow diagrams (e.g. goals → outcomes in one row). Use `top to bottom direction` for tall, multi-layer chains (e.g. drivers → assessments → goals → outcomes → requirements spanning 5 layers).
 - **Realization arrows:** Direction word tracks the diagram's overall flow. LTR diagram: `TARGET -left-|> SOURCE : <<realization>>`. TTB diagram: `TARGET -up-|> SOURCE : <<realization>>`. Always points from concrete to abstract.
@@ -174,43 +174,54 @@ the right tool without guessing.
 ### Orientation
 | Tool | When to use |
 |---|---|
-| `model_query_stats` | When you need broad orientation — confirms server connection, shows counts by domain/type. Use at the start of a fresh session or when the scope of existing content is genuinely unclear. Skip when the user's request is specific enough to go straight to targeted search. |
-| `model_write_help` | When uncertain about a type or connection identifier — returns the full catalog of valid `artifact_type` and `connection_type` names. Call once; names are non-obvious and guessing causes validation errors. |
+| `artifact_query_stats` | When you need broad orientation — confirms server connection, shows counts by domain/type. Use at the start of a fresh session or when the scope of existing content is genuinely unclear. Skip when the user's request is specific enough to go straight to targeted search. |
+| `artifact_write_help` | When uncertain about a type or connection identifier — returns the full catalog of valid `artifact_type` and `connection_type` names. Call once; names are non-obvious and guessing causes validation errors. |
 
 ### Reading and searching
 | Tool | When to use |
 |---|---|
-| `model_query_list_artifacts` | List artifacts with AND-filtered metadata (domain, artifact_type, status); returns summaries only. Domain values are case-insensitive; canonical lowercase form: `"common"`, `"motivation"`, `"strategy"`, `"business"`, `"application"`, `"technology"`, `"implementation"`. |
-| `model_query_read_artifact` | Read one artifact by `artifact_id`; use `mode="summary"` for frontmatter + snippet, `mode="full"` for complete content |
-| `model_query_search_artifacts` | Keyword search across all artifacts; use for duplicate checks and exploration |
-| `model_query_find_connections_for` | Find connections touching a specific entity; filter by direction (`any`/`outbound`/`inbound`) and/or `conn_type` |
-| `model_query_find_neighbors` | Graph traversal from an entity; controls `max_hops` and optional `conn_type` filter |
+| `artifact_query_list_artifacts` | List artifacts with AND-filtered metadata (domain, artifact_type, status); returns summaries only. Domain values are case-insensitive; canonical lowercase form: `"common"`, `"motivation"`, `"strategy"`, `"business"`, `"application"`, `"technology"`, `"implementation"`. |
+| `artifact_query_read_artifact` | Read one artifact by `artifact_id`; use `mode="summary"` for frontmatter + snippet, `mode="full"` for complete content |
+| `artifact_query_search_artifacts` | Keyword search across all artifacts; use for duplicate checks and exploration |
+| `artifact_query_find_connections_for` | Find connections touching a specific entity; filter by direction (`any`/`outbound`/`inbound`) and/or `conn_type` |
+| `artifact_query_find_neighbors` | Graph traversal from an entity; controls `max_hops` and optional `conn_type` filter |
+| `artifact_diagram_scaffold` | Suggest a diagram scope and PUML scaffold from a selected entity set; use when moving from model exploration into viewpoint design. |
 
 ### Type and connection guidance
 | Tool | When to use |
 |---|---|
-| `model_write_modeling_guidance` | Call when the right type or connection is unclear, or before creating elements in a domain you haven't modeled yet in this session. Returns `create_when`, `never_create_when`, and `permitted_connections` (outgoing/incoming/symmetric). The baked-in tables below cover quick orientation; this tool is authoritative and returns `permitted_connections` which the tables don't fully capture. `filter` accepts entity-type names (e.g. `["requirement", "goal"]`) OR domain names (e.g. `["Motivation"]`) — never mixed. Omit for all types. |
+| `artifact_write_modeling_guidance` | Call when the right type or connection is unclear, or before creating elements in a domain you haven't modeled yet in this session. Returns `create_when`, `never_create_when`, and `permitted_connections` (outgoing/incoming/symmetric). The baked-in tables below cover quick orientation; this tool is authoritative and returns `permitted_connections` which the tables don't fully capture. `filter` accepts entity-type names (e.g. `["requirement", "goal"]`) OR domain names (e.g. `["Motivation"]`) — never mixed. Omit for all types. |
 
 ### Creating
 | Tool | When to use |
 |---|---|
-| `model_create_entity` | Create a new entity; always call with `dry_run=true` first |
-| `model_add_connection` | Add a connection between two entities; always `dry_run=true` first; automatically creates a GRF proxy when connecting to an enterprise entity |
+| `artifact_create_entity` | Create a new entity; always call with `dry_run=true` first |
+| `artifact_add_connection` | Add a connection between two entities; always `dry_run=true` first; automatically creates a GRF proxy when connecting to an enterprise entity |
+| `artifact_create_diagram` | Create a diagram from an explicitly selected entity/connection set after the model content and viewpoint are clear; preview mentally first and use small, focused scopes. |
+| `artifact_create_matrix` | Create a matrix diagram when the key question is about many-to-many relationships and a node-link diagram would be too dense. |
+| `artifact_create_document` | Create a structured architecture document when the user needs narrative or tabular documentation alongside the model. |
 
-> **Parallel write limit:** `model_create_entity` and `model_add_connection` stall when more than ~8 are issued in the same parallel batch. Issue write calls in sequential batches of ≤8; read/query calls can remain parallel.
+> **Parallel write limit:** `artifact_create_entity` and `artifact_add_connection` stall when more than ~8 are issued in the same parallel batch. Issue write calls in sequential batches of ≤8; read/query calls can remain parallel.
 
 ### Editing
 | Tool | When to use |
 |---|---|
-| `model_edit_entity` | Update `name`, `summary`, `properties`, `notes`, `keywords`, `version`, or `status` on an existing entity; always `dry_run=true` first. **Cannot change `artifact_type`** — fix wrong types by direct file edit as a last resort. |
-| `model_edit_connection` | Update description/cardinalities (`operation="update"`) or delete a connection (`operation="remove"`); always `dry_run=true` first |
+| `artifact_edit_entity` | Update `name`, `summary`, `properties`, `notes`, `keywords`, `version`, or `status` on an existing entity; always `dry_run=true` first. **Cannot change `artifact_type`** — fix wrong types by direct file edit as a last resort. |
+| `artifact_edit_connection` | Update description/cardinalities (`operation="update"`) or delete a connection (`operation="remove"`); always `dry_run=true` first |
+| `artifact_edit_connection_associations` | Add or remove second-order `§assoc` relationships on an existing connection when the connection itself needs contextual linkage to other entities. |
+| `artifact_delete_entity` | Delete an entity only when the user clearly intends removal and dependency checks have been considered; always `dry_run=true` first. |
+| `artifact_edit_diagram` | Update the explicit entity/connection selection of an existing diagram when refining scope, related-entity inclusion, or relation visibility. |
+| `artifact_delete_diagram` | Delete an obsolete diagram; always `dry_run=true` first if there is any uncertainty about downstream references. |
+| `artifact_edit_document` | Update an existing document when architecture narrative or tabular documentation needs to track model changes. |
+| `artifact_delete_document` | Delete an obsolete document; use cautiously and prefer dry-run first. |
+| `artifact_promote_to_enterprise` | Promote an explicitly selected set of engagement entities and connections to enterprise; dry-run first, review conflicts carefully, and never assume transitive closure is implied. |
 
 ### Verification
 | Tool | When to use |
 |---|---|
-| `model_verify` | Run repo-wide verification after a large batch of changes or at the end of a modeling session. Returns issue counts and files with errors/warnings. Use `return_mode="full"` for per-issue detail, `repo_scope="engagement"` to target the current repo. Fix all errors before closing a session; resolve warnings on any entity you created or modified. |
+| `artifact_verify` | Run repo-wide verification after a large batch of changes or at the end of a modeling session. Returns issue counts and files with errors/warnings. Use `return_mode="full"` for per-issue detail, `repo_scope="engagement"` to target the current repo. Fix all errors before closing a session; resolve warnings on any entity you created or modified. |
 
-Per-entity verification runs automatically on every write — check the `verification` field in each response for immediate feedback. `model_verify` is for batch-end or session-end repo-wide checks, not after every individual write.
+Per-entity verification runs automatically on every write — check the `verification` field in each response for immediate feedback. `artifact_verify` is for batch-end or session-end repo-wide checks, not after every individual write.
 
 ---
 
@@ -230,24 +241,24 @@ When creating multiple entities, dry-run the full batch first, show a compact su
 **Step 1 — Understand and explore.**
 Read the request and conversation context to identify what's being asked and which domains and types are likely involved. Do a targeted search to find related existing content and potential duplicates in one pass:
 ```
-model_query_search_artifacts(query="<key concept>", limit=10)
+artifact_query_search_artifacts(query="<key concept>", limit=10)
 ```
-If the request is broad enough that you genuinely need a count overview first, call `model_query_stats` — but don't load broad stats before you know what you're looking for.
+If the request is broad enough that you genuinely need a count overview first, call `artifact_query_stats` — but don't load broad stats before you know what you're looking for.
 
 **Step 2 — Resolve type and connection choices.**
-When the right entity type or connection is unclear, call `model_write_modeling_guidance(filter=[...])`. When the type is already obvious from context and the baked-in reference, skip this call. If you're working in a domain you haven't touched this session, call it once for that domain as a warm-up.
+When the right entity type or connection is unclear, call `artifact_write_modeling_guidance(filter=[...])`. When the type is already obvious from context and the baked-in reference, skip this call. If you're working in a domain you haven't touched this session, call it once for that domain as a warm-up.
 
 **Step 3 — Check for duplicates.**
 If Step 1 didn't already surface candidates, do a focused check before creating:
 ```
-model_query_list_artifacts(artifact_type="...", domain="...")
+artifact_query_list_artifacts(artifact_type="...", domain="...")
 ```
-Read a candidate with `model_query_read_artifact(mode="full")` to decide whether to reuse, edit, or create a genuinely distinct entity.
+Read a candidate with `artifact_query_read_artifact(mode="full")` to decide whether to reuse, edit, or create a genuinely distinct entity.
 
 **Step 4 — Check for existing connections.**
 Before adding a connection, confirm it doesn't already exist:
 ```
-model_query_find_connections_for(entity_id="...", direction="any")
+artifact_query_find_connections_for(entity_id="...", direction="any")
 ```
 For symmetric types (e.g. `archimate-association`), one direction check is enough.
 
@@ -258,7 +269,7 @@ Call with `dry_run=true`. Read the `content` preview — verify type, name, summ
 Call with `dry_run=false`. Check the `verification` field in the response. If it reports errors, fix the underlying issue (wrong type, missing required connection, invalid relationship) and re-dry-run before retrying. Report `artifact_id` values to the user.
 
 **Step 7 — Repo-wide verification (after large batches or at session end).**
-After creating or modifying more than a handful of entities, run `model_verify(repo_scope="engagement", return_mode="full")`. Fix all errors; resolve warnings on any entity you created or edited this session. Pre-existing warnings on untouched files are not your responsibility to fix unless specifically asked.
+After creating or modifying more than a handful of entities, run `artifact_verify(repo_scope="engagement", return_mode="full")`. Fix all errors; resolve warnings on any entity you created or edited this session. Pre-existing warnings on untouched files are not your responsibility to fix unless specifically asked.
 
 ### Writing good entity summaries
 
@@ -268,7 +279,7 @@ The `summary` parameter is the most important free-text field — it's what make
 
 ## Entity Type Quick Reference
 
-Use this table for quick orientation. Always confirm with `model_write_modeling_guidance`
+Use this table for quick orientation. Always confirm with `artifact_write_modeling_guidance`
 before committing to a type — it provides the full guidance and permitted connections.
 
 ### Motivation Domain
@@ -338,7 +349,7 @@ before committing to a type — it provides the full guidance and permitted conn
 | `deliverable` | Tangible/intangible outputs produced as results of work packages | Not an output of implementation activities relevant to architecture |
 | `plateau` | Significant architecture states at specific points in time (current/transition/future) | Not a significant stage; not sufficiently comprehensive or temporally localized |
 
-> `global-entity-reference` (GRF) is created automatically by `model_add_connection`
+> `global-entity-reference` (GRF) is created automatically by `artifact_add_connection`
 > when connecting to an enterprise entity. Never create or edit GRF entities directly.
 
 ### Common disambiguation calls
@@ -383,14 +394,14 @@ before committing to a type — it provides the full guidance and permitted conn
 - **Universal:** `archimate-association` (symmetric, always valid between any two types)
 - **Same type:** `archimate-aggregation`, `archimate-specialization` (always valid)
 
-When uncertain whether a connection is permitted, call `model_write_modeling_guidance`
+When uncertain whether a connection is permitted, call `artifact_write_modeling_guidance`
 with the source type — its `permitted_connections` field is authoritative.
 
 ---
 
 ## Cardinalities
 
-Add `src_cardinality` / `tgt_cardinality` on `model_add_connection` **only** when
+Add `src_cardinality` / `tgt_cardinality` on `artifact_add_connection` **only** when
 multiplicity is architecturally significant. Leave absent otherwise.
 Valid values: `"1"`, `"0..1"`, `"1..*"`, `"*"`. Not permitted on junction connections.
 
@@ -404,4 +415,4 @@ Valid values: `"1"`, `"0..1"`, `"1..*"`, `"*"`. Not permitted on junction connec
 
 Use `repo_preset` to target a named engagement (e.g. `"ENG-001-architecture"`) when
 multiple engagements are configured. When connecting to an enterprise entity,
-`model_add_connection` handles the GRF proxy automatically.
+`artifact_add_connection` handles the GRF proxy automatically.

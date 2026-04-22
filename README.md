@@ -32,7 +32,7 @@ engagements/
 
 **Engagement repo** — project-specific work. New entities and connections are created here. When ready, they are *promoted* to enterprise.
 
-**Promotion** — a one-way transfer of entities (with transitive closure of connections) from engagement to enterprise. Conflict detection matches by `(artifact_type, friendly_name)` so the same logical entity under different artifact IDs is recognised. Conflicts offer three resolution strategies: accept engagement version, accept enterprise version, or manual merge.
+**Promotion** — a one-way transfer of an explicitly selected set of entities and connections from engagement to enterprise. Conflict detection matches by `(artifact_type, friendly_name)` so the same logical entity under different artifact IDs is recognised. Conflicts offer three resolution strategies: accept engagement version, accept enterprise version, or manual merge.
 
 **Asymmetric references** — enterprise entities can only reference other enterprise entities. Engagement entities may reference both engagement and enterprise entities. This is enforced by the verifier (errors E130/E131).
 
@@ -106,7 +106,7 @@ The MCP server is the primary interface for AI agents. It exposes typed `artifac
 | `artifact_create_document` | Create a document from a configured doc type |
 | `artifact_edit_document` | Edit an existing document |
 | `artifact_delete_document` | Delete a document |
-| `artifact_promote_to_enterprise` | Promote entity + transitive closure to enterprise repo |
+| `artifact_promote_to_enterprise` | Promote an explicitly selected entity/connection set to enterprise repo |
 
 **Artifact verification**
 
@@ -219,8 +219,8 @@ That makes the deployment choice explicit and avoids ambiguous startup behavior.
 
 | Endpoint | Description |
 |----------|-------------|
-| `POST /api/promote/plan` | Compute promotion closure, conflicts, and warnings |
-| `POST /api/promote/execute` | Execute promotion to enterprise and replace engagement artifacts with GRF proxies |
+| `POST /api/promote/plan` | Compute promotion plan, conflicts, and warnings for an explicit selection |
+| `POST /api/promote/execute` | Execute promotion for an explicit selection and replace engagement artifacts with GRF proxies |
 
 **Admin mode**
 
@@ -239,9 +239,9 @@ Current GUI capabilities:
 - **Search** — full-text artifact search with typed result rows
 - **Diagrams catalog** — engagement and global listings
 - **Diagram detail** — interactive SVG viewer, entity/connection side panels, rendered download menu, raw PUML toggle, edit entry point
-- **Diagram create/edit** — entity search with glyphs, connection inclusion management, preview before save
+- **Diagram create/edit** — entity search with glyphs, row-level related-entity expansion, connection inclusion management, preview before save
 - **Graph explorer** — force-directed interactive neighborhood exploration from any entity
-- **Promotion view** — entity picker, closure review, conflict strategy selection, execution to the global repository
+- **Promotion view** — root entity picker, explicit entity/connection set curation, conflict strategy selection, execution to the global repository
 
 The GUI is a human-facing client over the REST API. It does not expose every admin endpoint as dedicated screens, but it does cover normal engagement authoring, exploration, and promotion workflows.
 

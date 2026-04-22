@@ -166,12 +166,16 @@ export interface ModelRepository {
     artifact_id: string; dry_run?: boolean;
   }) => Effect.Effect<WriteResult, RepoError>
   readonly planPromotion: (body: {
-    entity_id: string;
+    entity_id?: string;
+    entity_ids?: string[];
+    connection_ids?: string[];
     exclude_entity_ids?: string[];
     exclude_connection_ids?: string[];
   }) => Effect.Effect<PromotionPlan, RepoError>
   readonly executePromotion: (body: {
-    entity_id: string;
+    entity_id?: string;
+    entity_ids?: string[];
+    connection_ids?: string[];
     exclude_entity_ids?: string[];
     exclude_connection_ids?: string[];
     conflict_resolutions?: Array<{

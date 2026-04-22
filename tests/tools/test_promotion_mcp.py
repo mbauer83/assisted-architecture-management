@@ -121,33 +121,17 @@ class TestPromotionDryRun:
 
         assert any(c["engagement_id"] == eng_id for c in result["conflicts"])
 
-    def test_already_in_enterprise_reported_via_closure(
+    def test_explicit_enterprise_selection_is_reported(
         self, engagement_root: Path, enterprise_root: Path
     ) -> None:
-        # eng_id aggregates ent_id (already in enterprise); ent_id should be in already_in_enterprise
         eng_id = "REQ@1000000010.EngAaa.root-req"
         ent_id = "REQ@2000000001.EntBbb.global-req"
         _make_entity(engagement_root, eng_id, "requirement", "Root Req")
         _make_entity(enterprise_root, ent_id, "requirement", "Global Req")
-        outgoing = (
-            engagement_root / "model" / "motivation" / "requirements"
-            / f"{eng_id}.outgoing.md"
-        )
-        _write(outgoing, f"""\
----
-source-entity: {eng_id}
-version: 0.1.0
-status: active
-last-updated: '2026-04-17'
----
-
-<!-- §connections -->
-
-### archimate-aggregation → {ent_id}
-""")
 
         result = mcp.artifact_promote_to_enterprise(
             entity_id=eng_id,
+            entity_ids=[eng_id, ent_id],
             dry_run=True,
             repo_root=str(engagement_root),
             enterprise_root=str(enterprise_root),
@@ -161,25 +145,9 @@ last-updated: '2026-04-17'
         eng_id2 = "REQ@1000000002.EngBbb.req2"
         _make_entity(engagement_root, eng_id1, "requirement", "Req 1")
         _make_entity(engagement_root, eng_id2, "requirement", "Req 2")
-        # Add aggregation so eng_id2 is in closure
-        outgoing = (
-            engagement_root / "model" / "motivation" / "requirements"
-            / f"{eng_id1}.outgoing.md"
-        )
-        _write(outgoing, f"""\
----
-source-entity: {eng_id1}
-version: 0.1.0
-status: active
-last-updated: '2026-04-17'
----
-
-<!-- §connections -->
-
-### archimate-aggregation → {eng_id2}
-""")
         result = mcp.artifact_promote_to_enterprise(
             entity_id=eng_id1,
+            entity_ids=[eng_id1, eng_id2],
             exclude_entities=[eng_id2],
             dry_run=True,
             repo_root=str(engagement_root),

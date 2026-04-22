@@ -67,25 +67,28 @@ class _ConflictHandler(Protocol):
         result: PromotionResult,
         backups: list[tuple[Path, bytes | None]],
         resolve_target: TargetResolver,
+        included_connection_ids: set[str],
     ) -> None: ...
 
 
 class _AcceptEnterpriseHandler:
-    def handle(self, conflict, eng_root, ent_root, registry, result, backups, resolve_target):
+    def handle(self, conflict, eng_root, ent_root, registry, result, backups, resolve_target, included_connection_ids):
         pass  # Keep enterprise entity as-is; engagement version discarded
 
 
 @dataclass
 class _AcceptEngagementHandler:
-    def handle(self, conflict, eng_root, ent_root, registry, result, backups, resolve_target):
-        _replace_enterprise_content(conflict, eng_root, ent_root, registry, result, backups, resolve_target)
+    def handle(self, conflict, eng_root, ent_root, registry, result, backups, resolve_target, included_connection_ids):
+        _replace_enterprise_content(
+            conflict, eng_root, ent_root, registry, result, backups, resolve_target, included_connection_ids,
+        )
 
 
 @dataclass
 class _MergeHandler:
     merged_fields: dict[str, Any]
 
-    def handle(self, conflict, eng_root, ent_root, registry, result, backups, resolve_target):
+    def handle(self, conflict, eng_root, ent_root, registry, result, backups, resolve_target, included_connection_ids):
         _apply_merge(conflict, ent_root, registry, self.merged_fields, result, backups)
 
 
@@ -137,6 +140,7 @@ def execute_promotion(
     promoted_ids = set(plan.entities_to_add) | {c.engagement_id for c in plan.conflicts}
     enterprise_ids = registry.enterprise_entity_ids()
     resolve_target = make_target_resolver(grf_map, promoted_ids, enterprise_ids)
+    included_connection_ids = set(plan.connection_ids)
 
     resolutions = {r.engagement_id: r for r in (conflict_resolutions or [])}
 
@@ -145,7 +149,7 @@ def execute_promotion(
         for eid in plan.entities_to_add:
             _copy_entity(
                 eid, engagement_root, enterprise_root,
-                registry, result, ent_copied, ent_backups, resolve_target,
+                registry, result, ent_copied, ent_backups, resolve_target, included_connection_ids,
             )
 
         # 2. Conflicts
@@ -166,7 +170,7 @@ def execute_promotion(
                 continue
             handler.handle(
                 conflict, engagement_root, enterprise_root,
-                registry, result, ent_backups, resolve_target,
+                registry, result, ent_backups, resolve_target, included_connection_ids,
             )
 
         # 3. Regenerate enterprise macros
@@ -228,6 +232,7 @@ def _copy_entity(
     copied: list[Path],
     backups: list[tuple[Path, bytes | None]],
     resolve_target: TargetResolver,
+    included_connection_ids: set[str],
 ) -> None:
     src = registry.find_file_by_id(eid)
     if src is None:
@@ -249,6 +254,7 @@ def _copy_entity(
             outgoing.read_text(encoding="utf-8"),
             resolve_target=resolve_target,
             result=result,
+            included_connection_ids=included_connection_ids,
         )
         dest_out.parent.mkdir(parents=True, exist_ok=True)
         dest_out.write_text(rewritten, encoding="utf-8")
@@ -260,6 +266,7 @@ def _rewrite_outgoing(
     content: str,
     resolve_target: TargetResolver,
     result: PromotionResult,
+    included_connection_ids: set[str] | None = None,
 ) -> str:
     """Rewrite an outgoing.md for inclusion in the enterprise repo.
 
@@ -269,15 +276,28 @@ def _rewrite_outgoing(
     - Engagement-only entity not in set → section dropped with warning
     """
     _CONN_HEADER = re.compile(r"^### (.+?) → (.+)$")
+    _SOURCE_ENTITY = re.compile(r"^source-entity:\s*(.+?)\s*$")
     lines = content.splitlines(keepends=True)
     out: list[str] = []
     drop_section = False
+    source_entity_id: str | None = None
 
     for line in lines:
         stripped = line.rstrip("\n")
+        if source_entity_id is None:
+            src_match = _SOURCE_ENTITY.match(stripped)
+            if src_match:
+                source_entity_id = src_match.group(1).strip()
         m = _CONN_HEADER.match(stripped)
         if m:
             conn_type, target_id = m.group(1).strip(), m.group(2).strip()
+            conn_artifact_id = (
+                f"{source_entity_id}---{target_id}@@{conn_type}"
+                if source_entity_id is not None else None
+            )
+            if included_connection_ids is not None and conn_artifact_id is not None and conn_artifact_id not in included_connection_ids:
+                drop_section = True
+                continue
             resolved = resolve_target(target_id)
             if resolved is None:
                 result.plan.warnings.append(
@@ -404,6 +424,7 @@ def _replace_enterprise_content(
     result: PromotionResult,
     backups: list[tuple[Path, bytes | None]],
     resolve_target: TargetResolver,
+    included_connection_ids: set[str],
 ) -> None:
     ent_path = registry.find_file_by_id(conflict.enterprise_id)
     eng_path = registry.find_file_by_id(conflict.engagement_id)
@@ -425,7 +446,10 @@ def _replace_enterprise_content(
         ent_outgoing = ent_root / eng_outgoing.relative_to(eng_root)
         backups.append((ent_outgoing, ent_outgoing.read_bytes() if ent_outgoing.exists() else None))
         rewritten = _rewrite_outgoing(
-            eng_outgoing.read_text(encoding="utf-8"), resolve_target=resolve_target, result=result
+            eng_outgoing.read_text(encoding="utf-8"),
+            resolve_target=resolve_target,
+            result=result,
+            included_connection_ids=included_connection_ids,
         ).replace(conflict.engagement_id, conflict.enterprise_id, 1)
         ent_outgoing.parent.mkdir(parents=True, exist_ok=True)
         ent_outgoing.write_text(rewritten, encoding="utf-8")

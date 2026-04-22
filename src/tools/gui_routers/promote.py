@@ -13,7 +13,9 @@ router = APIRouter()
 
 
 class PromotionPlanBody(BaseModel):
-    entity_id: str
+    entity_id: str | None = None
+    entity_ids: list[str] = []
+    connection_ids: list[str] = []
     exclude_entity_ids: list[str] = []
     exclude_connection_ids: list[str] = []
 
@@ -25,7 +27,9 @@ class ConflictResolutionBody(BaseModel):
 
 
 class PromotionExecuteBody(BaseModel):
-    entity_id: str
+    entity_id: str | None = None
+    entity_ids: list[str] = []
+    connection_ids: list[str] = []
     exclude_entity_ids: list[str] = []
     exclude_connection_ids: list[str] = []
     conflict_resolutions: list[ConflictResolutionBody] = []
@@ -34,7 +38,7 @@ class PromotionExecuteBody(BaseModel):
 
 @router.post("/api/promote/plan")
 def promotion_plan(body: PromotionPlanBody) -> dict[str, Any]:
-    """Compute the promotion plan for an entity (transitive closure, conflicts)."""
+    """Compute the promotion plan for an explicit selection of entities and connections."""
     from src.common.artifact_verifier_registry import ArtifactRegistry
     from src.tools.artifact_write.promote_to_enterprise import plan_promotion
 
@@ -44,13 +48,15 @@ def promotion_plan(body: PromotionPlanBody) -> dict[str, Any]:
     try:
         plan = plan_promotion(
             body.entity_id, registry, repo,
+            entity_ids=body.entity_ids or None,
+            connection_ids=set(body.connection_ids) or None,
             exclude_entity_ids=set(body.exclude_entity_ids) or None,
             exclude_connection_ids=set(body.exclude_connection_ids) or None,
         )
     except ValueError as e:
         raise HTTPException(400, str(e))
     return {
-        "entity_id": body.entity_id,
+        "entity_id": body.entity_id or (body.entity_ids[0] if body.entity_ids else ""),
         "entities_to_add": plan.entities_to_add,
         "conflicts": [
             {
@@ -69,7 +75,7 @@ def promotion_plan(body: PromotionPlanBody) -> dict[str, Any]:
 
 @router.post("/api/promote/execute")
 def promotion_execute(body: PromotionExecuteBody) -> dict[str, Any]:
-    """Execute a (possibly pruned) promotion plan, then replace promoted entities with GRF proxies."""
+    """Execute a promotion plan built from an explicit selection of entities and connections."""
     from src.common.artifact_verifier import ArtifactVerifier
     from src.common.artifact_verifier_registry import ArtifactRegistry
     from src.tools.artifact_write.promote_execute import execute_promotion
@@ -81,6 +87,8 @@ def promotion_execute(body: PromotionExecuteBody) -> dict[str, Any]:
     try:
         plan = plan_promotion(
             body.entity_id, registry, repo,
+            entity_ids=body.entity_ids or None,
+            connection_ids=set(body.connection_ids) or None,
             exclude_entity_ids=set(body.exclude_entity_ids) or None,
             exclude_connection_ids=set(body.exclude_connection_ids) or None,
         )

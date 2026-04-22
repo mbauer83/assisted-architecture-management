@@ -6,7 +6,7 @@ Covers:
 - GRF creation / reuse (ensure_global_entity_reference)
 - model_add_connection transparent GRF routing for global-entity targets
 - Verifier rules E140 / E141 / W141 for GRF entities
-- Promotion plan: excludes GRFs, builds transitive closure
+- Promotion plan: excludes GRFs and respects explicit selection
 - Promotion execute: rewrites GRF targets in outgoing files
 - Promotion execute: replaces promoted engagement entities with GRFs
 - Promotion execute: updates engagement outgoing references after replacement
@@ -602,6 +602,7 @@ class TestPromotionPlan:
         repo = ArtifactRepository([engagement_root, enterprise_root])
         plan = plan_promotion(
             eng_id1, registry, repo,
+            entity_ids=[eng_id1, eng_id2],
             exclude_entity_ids={eng_id2},
         )
         assert eng_id1 in plan.entities_to_add
@@ -639,12 +640,17 @@ class TestPromotionExecuteOutgoingRewrite:
             promoted_ids={eng_id},
             enterprise_ids={glo_id},
         )
-        rewritten = _rewrite_outgoing(content, resolve_target=resolver, result=result)
+        rewritten = _rewrite_outgoing(
+            content,
+            resolve_target=resolver,
+            result=result,
+            included_connection_ids={f"{eng_id}---{grf_id}@@archimate-realization"},
+        )
 
         assert grf_id not in rewritten
         assert glo_id in rewritten
         assert "archimate-realization" in rewritten
-        assert "archimate-serving" in rewritten
+        assert "archimate-serving" not in rewritten
 
     def test_stranded_targets_dropped_with_warning(
         self, engagement_root: Path, enterprise_root: Path
@@ -664,7 +670,12 @@ class TestPromotionExecuteOutgoingRewrite:
         )
         result = PromotionResult(plan=plan, executed=False)
         resolver = make_target_resolver({}, promoted_ids={eng_id}, enterprise_ids=set())
-        rewritten = _rewrite_outgoing(content, resolve_target=resolver, result=result)
+        rewritten = _rewrite_outgoing(
+            content,
+            resolve_target=resolver,
+            result=result,
+            included_connection_ids=set(),
+        )
 
         assert other_eng not in rewritten
         assert any(other_eng in w for w in result.plan.warnings)
@@ -785,8 +796,7 @@ class TestPromotionExecuteFullRoundTrip:
             engagement_root / "model" / "strategy" / "capabilities" / f"{other_eng}.md",
             _entity_md(other_eng, "capability", "Other Cap"),
         )
-        # Use archimate-influence (not in PROMOTION_TRAVERSAL_TYPES) so other_eng
-        # is NOT pulled into the promotion closure
+        # Keep this entity outside the explicit promotion selection.
         _write(
             engagement_root / "model" / "strategy" / "capabilities" / f"{other_eng}.outgoing.md",
             _outgoing_md(other_eng, [("archimate-influence", eng_id)]),

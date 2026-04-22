@@ -9,7 +9,8 @@ from src.tools.artifact_mcp.write._common import (
 def artifact_promote_to_enterprise(
     *,
     entity_id: str,
-    include_transitive: bool = True,
+    entity_ids: list[str] | None = None,
+    connection_ids: list[str] | None = None,
     dry_run: bool = True,
     conflict_resolutions: list[dict[str, object]] | None = None,
     exclude_entities: list[str] | None = None,
@@ -21,8 +22,7 @@ def artifact_promote_to_enterprise(
     """Promote an entity from the engagement repo to the enterprise repo.
 
     Defaults use repos from arch-init workspace config (repo_root, enterprise_root optional).
-    The transitive closure is pre-selected via structural/dependency relations;
-    exclude_entities / exclude_connections prune it before execution.
+    Promotion is explicit: only the selected entities and connections are promoted.
     After promotion, the entity is replaced in the engagement repo by a GRF proxy.
     dry_run=true returns the plan without modifying any files.
     """
@@ -45,7 +45,8 @@ def artifact_promote_to_enterprise(
 
     plan = plan_promotion(
         entity_id, registry, repo,
-        include_transitive=include_transitive,
+        entity_ids=entity_ids or [entity_id],
+        connection_ids=set(connection_ids) if connection_ids else None,
         exclude_entity_ids=set(exclude_entities) if exclude_entities else None,
         exclude_connection_ids=set(exclude_connections) if exclude_connections else None,
     )
@@ -100,11 +101,11 @@ def register(mcp: FastMCP) -> None:
     mcp.tool(
         name="artifact_promote_to_enterprise", title="Artifact Write: Promote to Enterprise",
         description=(
-            "Promote an entity and its structural/dependency closure from the engagement "
+            "Promote an explicit set of selected entities and connections from the engagement "
             "repo to the enterprise repo. Defaults use arch-init workspace config. "
             "After successful promotion the entity is replaced by a GRF proxy in the "
             "engagement repo. dry_run=true returns the plan without modifying files. "
-            "exclude_entities / exclude_connections prune the pre-selected closure."
+            "exclude_entities / exclude_connections prune the explicit selection."
         ),
         structured_output=True,
     )(queued(artifact_promote_to_enterprise))

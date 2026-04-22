@@ -5,13 +5,12 @@ import { Effect } from 'effect'
 import { modelServiceKey } from '../keys'
 import type { EntityDisplayInfo, EntityContextConnection, DiagramPreviewResult } from '../../domain'
 import ArchimateTypeGlyph from '../components/ArchimateTypeGlyph.vue'
+import EntitySelectionList from '../components/EntitySelectionList.vue'
 
 const toGlyphKey = (t: string) => t.replace(/[A-Z]/g, (c, i) => (i > 0 ? '-' : '') + c.toLowerCase())
 
 const svc = inject(modelServiceKey)!
 const router = useRouter()
-
-// ── Form ──────────────────────────────────────────────────────────────────────
 
 const name = ref('')
 const diagramType = ref('archimate-business')
@@ -25,16 +24,67 @@ const DIAGRAM_TYPES = [
   { key: 'archimate-layered', label: 'Layered' },
 ]
 
-// ── Entity search ─────────────────────────────────────────────────────────────
-
 const searchQuery = ref('')
 const searchResults = ref<EntityDisplayInfo[]>([])
-const suggestionGroups = ref<Array<{ hop: number; items: EntityDisplayInfo[] }>>([])
 const showDropdown = ref(false)
 let searchTimer: ReturnType<typeof setTimeout> | null = null
 
 const includedEntities = ref<EntityDisplayInfo[]>([])
+const highlightedEntityIds = ref<Set<string>>(new Set())
+const expandedConnectionEntityIds = ref<Set<string>>(new Set())
+const expandedRelatedEntityIds = ref<Set<string>>(new Set())
 const includedEntityIds = computed(() => new Set(includedEntities.value.map((e) => e.artifact_id)))
+
+const allModelConns = ref<Map<string, EntityContextConnection>>(new Map())
+const includedConnIds = ref<Set<string>>(new Set())
+
+const selectionRows = computed(() =>
+  includedEntities.value.map((entity) => ({
+    entity,
+    newInclusion: highlightedEntityIds.value.has(entity.artifact_id),
+    badgeText: highlightedEntityIds.value.has(entity.artifact_id) ? 'new' : undefined,
+    actionKind: 'remove' as const,
+    actionTitle: 'Remove entity from diagram',
+  })),
+)
+
+const relatedEntitiesById = computed<Record<string, EntityDisplayInfo[]>>(() => {
+  const related: Record<string, EntityDisplayInfo[]> = {}
+  const seenByEntity = new Map<string, Set<string>>()
+  for (const entity of includedEntities.value) related[entity.artifact_id] = []
+  for (const conn of allModelConns.value.values()) {
+    const endpoints: Array<[string, string]> = [
+      [conn.source, conn.target],
+      [conn.target, conn.source],
+    ]
+    for (const [ownerId, otherId] of endpoints) {
+      if (!includedEntityIds.value.has(ownerId) || includedEntityIds.value.has(otherId)) continue
+      const name = ownerId === conn.source ? (conn.target_name ?? otherId) : (conn.source_name ?? otherId)
+      const artifactType = ownerId === conn.source ? conn.target_artifact_type : conn.source_artifact_type
+      const domain = ownerId === conn.source ? conn.target_domain : conn.source_domain
+      const scope = ownerId === conn.source ? conn.target_scope : conn.source_scope
+      const seen = seenByEntity.get(ownerId) ?? new Set<string>()
+      if (seen.has(otherId)) continue
+      seen.add(otherId)
+      seenByEntity.set(ownerId, seen)
+      related[ownerId].push({
+        artifact_id: otherId,
+        name,
+        artifact_type: artifactType,
+        domain,
+        subdomain: '',
+        status: scope,
+        display_alias: '',
+        element_type: artifactType,
+        element_label: name,
+      })
+    }
+  }
+  for (const entityId of Object.keys(related)) {
+    related[entityId].sort((a, b) => a.name.localeCompare(b.name))
+  }
+  return related
+})
 
 const onSearchInput = () => {
   if (searchTimer) clearTimeout(searchTimer)
@@ -52,82 +102,79 @@ const onSearchInput = () => {
 
 const closeDropdown = () => { setTimeout(() => { showDropdown.value = false }, 150) }
 
-// ── Connection management ─────────────────────────────────────────────────────
-
-// All model connections fetched for included entities, keyed by artifact_id
-const allModelConns = ref<Map<string, EntityContextConnection>>(new Map())
-// artifact_ids of connections selected for diagram inclusion
-const includedConnIds = ref<Set<string>>(new Set())
-
-const includedConns = computed(() =>
-  [...allModelConns.value.values()].filter(
-    (c) =>
-      includedConnIds.value.has(c.artifact_id) &&
-      includedEntityIds.value.has(c.source) &&
-      includedEntityIds.value.has(c.target),
-  ),
-)
-
-const availableConns = computed(() =>
-  [...allModelConns.value.values()].filter(
-    (c) =>
-      !includedConnIds.value.has(c.artifact_id) &&
-      includedEntityIds.value.has(c.source) &&
-      includedEntityIds.value.has(c.target),
-  ),
-)
-
-const nameOf = (id: string) =>
-  includedEntities.value.find((e) => e.artifact_id === id)?.name ?? id
-
 const refreshDiscovery = async () => {
   const discovery = await Effect.runPromise(
     svc.discoverDiagramEntities({
       includedEntityIds: includedEntities.value.map((e) => e.artifact_id),
       query: searchQuery.value.trim() || undefined,
-      maxHops: 2,
+      maxHops: 1,
       limit: 20,
     }),
   ).catch(() => null)
   if (!discovery) return
   allModelConns.value = new Map(discovery.candidate_connections.map((conn) => [conn.artifact_id, conn]))
   searchResults.value = discovery.search_results.filter((r) => !includedEntityIds.value.has(r.artifact_id))
-  suggestionGroups.value = discovery.suggested_entities.map((group) => ({
-    hop: group.hop,
-    items: group.items.filter((item) => !includedEntityIds.value.has(item.artifact_id)),
-  })).filter((group) => group.items.length > 0)
   showDropdown.value = Boolean(searchQuery.value.trim() && searchResults.value.length)
 }
 
 const addEntity = async (entity: EntityDisplayInfo) => {
   if (includedEntityIds.value.has(entity.artifact_id)) return
   includedEntities.value.push(entity)
+  highlightedEntityIds.value = new Set(highlightedEntityIds.value).add(entity.artifact_id)
+  expandedRelatedEntityIds.value = new Set(expandedRelatedEntityIds.value)
   showDropdown.value = false
   searchQuery.value = ''
   await refreshDiscovery()
+  const nextConnIds = new Set(includedConnIds.value)
   for (const conn of allModelConns.value.values()) {
     const otherId = conn.source === entity.artifact_id ? conn.target : conn.source
     if ((conn.source === entity.artifact_id || conn.target === entity.artifact_id) && includedEntityIds.value.has(otherId)) {
-      includedConnIds.value.add(conn.artifact_id)
+      nextConnIds.add(conn.artifact_id)
     }
   }
+  includedConnIds.value = nextConnIds
 }
 
 const removeEntity = (artifactId: string) => {
   includedEntities.value = includedEntities.value.filter((e) => e.artifact_id !== artifactId)
-  for (const id of [...includedConnIds.value]) {
+  const nextHighlighted = new Set(highlightedEntityIds.value)
+  nextHighlighted.delete(artifactId)
+  highlightedEntityIds.value = nextHighlighted
+  const nextExpandedConns = new Set(expandedConnectionEntityIds.value)
+  nextExpandedConns.delete(artifactId)
+  expandedConnectionEntityIds.value = nextExpandedConns
+  const nextExpandedRelated = new Set(expandedRelatedEntityIds.value)
+  nextExpandedRelated.delete(artifactId)
+  expandedRelatedEntityIds.value = nextExpandedRelated
+  const nextConnIds = new Set(includedConnIds.value)
+  for (const id of [...nextConnIds]) {
     const c = allModelConns.value.get(id)
-    if (c && (c.source === artifactId || c.target === artifactId)) {
-      includedConnIds.value.delete(id)
-    }
+    if (c && (c.source === artifactId || c.target === artifactId)) nextConnIds.delete(id)
   }
+  includedConnIds.value = nextConnIds
   void refreshDiscovery()
 }
 
-const removeConn = (id: string) => includedConnIds.value.delete(id)
-const addConn = (id: string) => includedConnIds.value.add(id)
+const toggleConnections = (entityId: string) => {
+  const next = new Set(expandedConnectionEntityIds.value)
+  if (next.has(entityId)) next.delete(entityId)
+  else next.add(entityId)
+  expandedConnectionEntityIds.value = next
+}
 
-// ── Preview ───────────────────────────────────────────────────────────────────
+const toggleRelated = (entityId: string) => {
+  const next = new Set(expandedRelatedEntityIds.value)
+  if (next.has(entityId)) next.delete(entityId)
+  else next.add(entityId)
+  expandedRelatedEntityIds.value = next
+}
+
+const toggleConnection = (id: string) => {
+  const next = new Set(includedConnIds.value)
+  if (next.has(id)) next.delete(id)
+  else next.add(id)
+  includedConnIds.value = next
+}
 
 const preview = ref<DiagramPreviewResult | null>(null)
 const previewBusy = ref(false)
@@ -142,14 +189,12 @@ const doPreview = () => {
       diagram_type: diagramType.value,
       name: name.value,
       entity_ids: includedEntities.value.map((e) => e.artifact_id),
-      connection_ids: includedConns.value.map((c) => c.artifact_id),
+      connection_ids: [...includedConnIds.value],
     }),
   )
     .then((r) => { preview.value = r; previewBusy.value = false })
     .catch((e) => { previewError.value = String(e); previewBusy.value = false })
 }
-
-// ── Create ────────────────────────────────────────────────────────────────────
 
 const createBusy = ref(false)
 const createError = ref<string | null>(null)
@@ -162,7 +207,7 @@ const doCreate = () => {
       diagram_type: diagramType.value,
       name: name.value,
       entity_ids: includedEntities.value.map((e) => e.artifact_id),
-      connection_ids: includedConns.value.map((c) => c.artifact_id),
+      connection_ids: [...includedConnIds.value],
       dry_run: false,
     }),
   )
@@ -186,7 +231,6 @@ onMounted(() => { void refreshDiscovery() })
     </div>
 
     <div class="columns">
-      <!-- ── Left: form ─────────────────────────────────────────────────── -->
       <section class="card form-col">
         <div class="form-row">
           <label class="lbl">Name <span class="req">*</span></label>
@@ -200,7 +244,6 @@ onMounted(() => { void refreshDiscovery() })
           </select>
         </div>
 
-        <!-- Entity search -->
         <div class="form-row">
           <label class="lbl">Add Entities</label>
           <div class="search-wrap">
@@ -227,60 +270,22 @@ onMounted(() => { void refreshDiscovery() })
           </div>
         </div>
 
-        <!-- Included entities -->
         <div v-if="includedEntities.length" class="form-row">
-          <label class="lbl">Entities ({{ includedEntities.length }})</label>
-          <div class="chips">
-            <div v-for="e in includedEntities" :key="e.artifact_id" class="chip">
-              <span class="dd-glyph" :title="e.element_type || e.artifact_type"><ArchimateTypeGlyph :type="toGlyphKey(e.element_type || e.artifact_type)" :size="16" /></span>
-              <span class="chip-name">{{ e.name }}</span>
-              <button class="chip-rm" @click="removeEntity(e.artifact_id)" title="Remove">×</button>
-            </div>
-          </div>
-        </div>
-
-        <div v-if="suggestionGroups.length" class="form-row">
-          <label class="lbl">Nearby Entities</label>
-          <div v-for="group in suggestionGroups" :key="group.hop" class="suggest-group">
-            <div class="avail-header">Hop {{ group.hop }}</div>
-            <div class="chips">
-              <div v-for="e in group.items" :key="e.artifact_id" class="chip chip--suggest">
-                <span class="dd-glyph" :title="e.element_type || e.artifact_type"><ArchimateTypeGlyph :type="toGlyphKey(e.element_type || e.artifact_type)" :size="16" /></span>
-                <span class="chip-name">{{ e.name }}</span>
-                <span class="dd-domain">{{ e.domain }}</span>
-                <button class="conn-btn conn-add" @click="addEntity(e)" title="Add entity">+</button>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <!-- Connections panel -->
-        <div v-if="includedEntities.length >= 2" class="form-row">
-          <label class="lbl">Connections</label>
-          <div v-if="!includedConns.length && !availableConns.length" class="empty-msg">
-            No model connections found between included entities.
-          </div>
-
-          <!-- Included -->
-          <div v-for="c in includedConns" :key="c.artifact_id" class="conn-row conn-row--in">
-            <span class="conn-label">
-              {{ nameOf(c.source) }}
-              <em> {{ c.conn_type }} </em>
-              {{ nameOf(c.target) }}
-            </span>
-            <button class="conn-btn conn-rm" @click="removeConn(c.artifact_id)" title="Remove from diagram">−</button>
-          </div>
-
-          <!-- Available (not yet included) -->
-          <div v-if="availableConns.length" class="avail-header">Available from model:</div>
-          <div v-for="c in availableConns" :key="c.artifact_id" class="conn-row conn-row--avail">
-            <span class="conn-label">
-              {{ nameOf(c.source) }}
-              <em> {{ c.conn_type }} </em>
-              {{ nameOf(c.target) }}
-            </span>
-            <button class="conn-btn conn-add" @click="addConn(c.artifact_id)" title="Add to diagram">+</button>
-          </div>
+          <label class="lbl">Included Entities ({{ includedEntities.length }})</label>
+          <EntitySelectionList
+            :rows="selectionRows"
+            :candidate-connections="[...allModelConns.values()]"
+            :included-entity-ids="[...includedEntityIds]"
+            :included-connection-ids="[...includedConnIds]"
+            :related-entities-by-id="relatedEntitiesById"
+            :expanded-connection-entity-ids="[...expandedConnectionEntityIds]"
+            :expanded-related-entity-ids="[...expandedRelatedEntityIds]"
+            @toggle-connections="toggleConnections"
+            @toggle-related="toggleRelated"
+            @toggle-connection="toggleConnection"
+            @add-related-entity="addEntity"
+            @entity-action="removeEntity"
+          />
         </div>
 
         <div v-if="createError" class="state-err">{{ createError }}</div>
@@ -300,7 +305,6 @@ onMounted(() => { void refreshDiscovery() })
         </div>
       </section>
 
-      <!-- ── Right: preview ────────────────────────────────────────────── -->
       <section class="card preview-col">
         <div v-if="!preview && !previewBusy && !previewError" class="preview-hint">
           Select entities and connections, then click <strong>Preview</strong>.
@@ -329,7 +333,7 @@ onMounted(() => { void refreshDiscovery() })
 .back-link:hover { color: #374151; }
 .page-title { font-size: 20px; font-weight: 600; margin: 0; }
 
-.columns { display: grid; grid-template-columns: 420px 1fr; gap: 20px; align-items: start; }
+.columns { display: grid; grid-template-columns: 480px 1fr; gap: 20px; align-items: start; }
 @media (max-width: 860px) { .columns { grid-template-columns: 1fr; } }
 
 .card { background: white; border-radius: 8px; border: 1px solid #e5e7eb; padding: 20px; }
@@ -347,23 +351,7 @@ onMounted(() => { void refreshDiscovery() })
 .dd-glyph { display: flex; align-items: center; flex-shrink: 0; color: #4b5563; }
 .dd-name { font-weight: 500; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .dd-domain { font-size: 11px; color: #9ca3af; white-space: nowrap; }
-.chips { display: flex; flex-direction: column; gap: 5px; }
-.chip { display: flex; align-items: center; gap: 6px; padding: 5px 8px; background: #f9fafb; border: 1px solid #e5e7eb; border-radius: 6px; }
-.chip-name { font-size: 13px; font-weight: 500; flex: 1; }
-.chip-rm { margin-left: auto; width: 20px; height: 20px; border-radius: 4px; border: 1px solid #fca5a5; background: white; color: #dc2626; cursor: pointer; font-size: 14px; line-height: 1; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
-.chip-rm:hover { background: #fef2f2; }
-.empty-msg { font-size: 12px; color: #9ca3af; padding: 4px 0; }
-.conn-row { display: flex; align-items: center; gap: 6px; padding: 5px 8px; border-radius: 6px; margin-bottom: 4px; font-size: 12px; }
-.conn-row--in { background: #f0fdf4; border: 1px solid #bbf7d0; }
-.conn-row--avail { background: #f9fafb; border: 1px solid #e5e7eb; }
-.conn-label { flex: 1; line-height: 1.4; }
-.conn-label em { font-style: normal; font-weight: 600; color: #6b7280; }
-.conn-btn { width: 22px; height: 22px; border-radius: 4px; border: none; cursor: pointer; font-size: 16px; line-height: 1; display: flex; align-items: center; justify-content: center; flex-shrink: 0; font-weight: 700; }
-.conn-rm { background: #fee2e2; color: #dc2626; }
-.conn-rm:hover { background: #fecaca; }
-.conn-add { background: #dcfce7; color: #16a34a; }
-.conn-add:hover { background: #bbf7d0; }
-.avail-header { font-size: 11px; font-weight: 700; color: #9ca3af; text-transform: uppercase; letter-spacing: .04em; margin: 8px 0 4px; }
+
 .actions { display: flex; gap: 8px; justify-content: flex-end; padding-top: 8px; }
 .btn-preview { padding: 7px 16px; background: #f3f4f6; color: #1d4ed8; border: 1px solid #bfdbfe; border-radius: 6px; font-size: 13px; cursor: pointer; font-weight: 500; }
 .btn-preview:hover:not(:disabled) { background: #eff6ff; }

@@ -9,6 +9,7 @@ import type {
   EntityDisplayInfo, EntityContextConnection, DiagramPreviewResult,
 } from '../../domain'
 import ArchimateTypeGlyph from '../components/ArchimateTypeGlyph.vue'
+import EntitySelectionList from '../components/EntitySelectionList.vue'
 
 const svc = inject(modelServiceKey)!
 const route = useRoute()
@@ -16,8 +17,6 @@ const router = useRouter()
 
 const diagramId = computed(() => (route.query.id as string | undefined) ?? '')
 const diagramDetail = useAsync<DiagramDetail>()
-
-// ── Pan / Zoom ────────────────────────────────────────────────────────────────
 
 const containerRef = ref<HTMLElement | null>(null)
 const scale = ref(1); const tx = ref(0); const ty = ref(0)
@@ -60,44 +59,29 @@ watch(containerRef, (el, prev) => {
   el?.addEventListener('wheel', onWheel, { passive: false })
 })
 
-// ── SVG ───────────────────────────────────────────────────────────────────────
-
 const svgHtml = ref<string | null>(null)
 const svgLoading = ref(false)
 const svgError = ref<string | null>(null)
 const svgContainer = ref<HTMLElement | null>(null)
-
 const svgEntityElems = new Map<string, Element>()
 const svgConnElems = new Map<string, Element>()
 
-// ── Diagram state ─────────────────────────────────────────────────────────────
-
 const diagramEntities = ref<EntitySummary[]>([])
 const diagramConnections = ref<DiagramConnection[]>([])
-
-// Entities currently in diagram (loaded from backend)
 const includedEntities = ref<EntityDisplayInfo[]>([])
-const suggestionGroups = ref<Array<{ hop: number; items: EntityDisplayInfo[] }>>([])
-// All candidate model connections around the effective diagram entity set
 const allModelConns = ref<Map<string, EntityContextConnection>>(new Map())
-// Connections that were originally in the diagram
 const includedConnIds = ref<Set<string>>(new Set())
 
-// Entities selected for removal via SVG click
 const toRemoveEntityIds = ref<Set<string>>(new Set())
-// Connections manually excluded (originally included but removed)
 const toRemoveConnIds = ref<Set<string>>(new Set())
-// New entities to add
 const entitiesToAdd = ref<EntityDisplayInfo[]>([])
-// New connections to include (for newly added entities)
 const selectedNewConnIds = ref<Set<string>>(new Set())
-// Expanded state for entity list entries
-const expandedEntityIds = ref<Set<string>>(new Set())
+const expandedConnectionEntityIds = ref<Set<string>>(new Set())
+const expandedRelatedEntityIds = ref<Set<string>>(new Set())
 
 const includedEntityIds = computed(() => new Set(includedEntities.value.map(e => e.artifact_id)))
 const toAddEntityIds = computed(() => new Set(entitiesToAdd.value.map(e => e.artifact_id)))
 
-// All entities that will be in the final diagram (existing - removed + to-add)
 const effectiveEntityIds = computed(() => {
   const s = new Set<string>()
   for (const e of includedEntities.value) if (!toRemoveEntityIds.value.has(e.artifact_id)) s.add(e.artifact_id)
@@ -105,29 +89,76 @@ const effectiveEntityIds = computed(() => {
   return s
 })
 
-// Entity list for sidebar: non-removed existing + to-be-added
 const effectiveEntitiesList = computed(() => [
   ...includedEntities.value.filter(e => !toRemoveEntityIds.value.has(e.artifact_id)),
   ...entitiesToAdd.value,
 ])
 
+const selectionRows = computed(() =>
+  effectiveEntitiesList.value.map((entity) => {
+    const isNew = toAddEntityIds.value.has(entity.artifact_id)
+    const actionKind: 'remove' | 'mark-remove' = isNew ? 'remove' : 'mark-remove'
+    return {
+      entity,
+      newInclusion: isNew,
+      badgeText: isNew ? 'new' : undefined,
+      actionKind,
+      actionTitle: isNew ? 'Remove entity from pending additions' : 'Mark entity for removal',
+    }
+  }),
+)
+
 const toRemoveEntities = computed(() =>
   includedEntities.value.filter(e => toRemoveEntityIds.value.has(e.artifact_id))
 )
 
-const nameOf = (id: string) =>
-  includedEntities.value.find(e => e.artifact_id === id)?.name ??
-  entitiesToAdd.value.find(e => e.artifact_id === id)?.name ?? id
-
 const toGlyphKey = (t: string) => t.replace(/[A-Z]/g, (c, i) => (i > 0 ? '-' : '') + c.toLowerCase())
-
-const isToAdd = (id: string) => toAddEntityIds.value.has(id)
-
-// ── Connection state ──────────────────────────────────────────────────────────
 
 const isConnIncluded = (connId: string): boolean =>
   (includedConnIds.value.has(connId) && !toRemoveConnIds.value.has(connId))
   || selectedNewConnIds.value.has(connId)
+
+const finalConnIds = computed(() => [
+  ...[...includedConnIds.value].filter(id => !toRemoveConnIds.value.has(id)),
+  ...[...selectedNewConnIds.value],
+])
+
+const relatedEntitiesById = computed<Record<string, EntityDisplayInfo[]>>(() => {
+  const related: Record<string, EntityDisplayInfo[]> = {}
+  const seenByEntity = new Map<string, Set<string>>()
+  for (const entity of effectiveEntitiesList.value) related[entity.artifact_id] = []
+  for (const conn of allModelConns.value.values()) {
+    const endpoints: Array<[string, string]> = [
+      [conn.source, conn.target],
+      [conn.target, conn.source],
+    ]
+    for (const [ownerId, otherId] of endpoints) {
+      if (!effectiveEntityIds.value.has(ownerId) || effectiveEntityIds.value.has(otherId)) continue
+      if (toRemoveEntityIds.value.has(ownerId)) continue
+      const name = ownerId === conn.source ? (conn.target_name ?? otherId) : (conn.source_name ?? otherId)
+      const artifactType = ownerId === conn.source ? conn.target_artifact_type : conn.source_artifact_type
+      const domain = ownerId === conn.source ? conn.target_domain : conn.source_domain
+      const scope = ownerId === conn.source ? conn.target_scope : conn.source_scope
+      const seen = seenByEntity.get(ownerId) ?? new Set<string>()
+      if (seen.has(otherId)) continue
+      seen.add(otherId)
+      seenByEntity.set(ownerId, seen)
+      related[ownerId].push({
+        artifact_id: otherId,
+        name,
+        artifact_type: artifactType,
+        domain,
+        subdomain: '',
+        status: scope,
+        display_alias: '',
+        element_type: artifactType,
+        element_label: name,
+      })
+    }
+  }
+  for (const entityId of Object.keys(related)) related[entityId].sort((a, b) => a.name.localeCompare(b.name))
+  return related
+})
 
 const toggleConn = (connId: string) => {
   if (isConnIncluded(connId)) {
@@ -146,39 +177,19 @@ const toggleConn = (connId: string) => {
   updateHighlights()
 }
 
-// ── Connection table per entity ───────────────────────────────────────────────
-
-interface ConnEntry { conn: EntityContextConnection; direction: 'out' | 'in'; otherName: string; otherId: string }
-interface ConnTypeGroup { included: ConnEntry[]; excluded: ConnEntry[] }
-
-const getConnsByType = (entityId: string): Map<string, ConnTypeGroup> => {
-  const byType = new Map<string, ConnTypeGroup>()
-  if (!effectiveEntityIds.value.has(entityId)) return byType
-  for (const conn of allModelConns.value.values()) {
-    const isOut = conn.source === entityId
-    const isIn = conn.target === entityId
-    if (!isOut && !isIn) continue
-    if (!effectiveEntityIds.value.has(conn.source) || !effectiveEntityIds.value.has(conn.target)) continue
-    const otherId = isOut ? conn.target : conn.source
-    if (!effectiveEntityIds.value.has(otherId)) continue
-    const inc = isConnIncluded(conn.artifact_id)
-    const entry: ConnEntry = {
-      conn, direction: isOut ? 'out' : 'in', otherName: nameOf(otherId), otherId,
-    }
-    if (!byType.has(conn.conn_type)) byType.set(conn.conn_type, { included: [], excluded: [] })
-    const g = byType.get(conn.conn_type)!
-    if (inc) g.included.push(entry); else g.excluded.push(entry)
-  }
-  return byType
+const toggleConnections = (entityId: string) => {
+  const next = new Set(expandedConnectionEntityIds.value)
+  if (next.has(entityId)) next.delete(entityId)
+  else next.add(entityId)
+  expandedConnectionEntityIds.value = next
 }
 
-const toggleExpand = (id: string) => {
-  const next = new Set(expandedEntityIds.value)
-  if (next.has(id)) next.delete(id); else next.add(id)
-  expandedEntityIds.value = next
+const toggleRelated = (entityId: string) => {
+  const next = new Set(expandedRelatedEntityIds.value)
+  if (next.has(entityId)) next.delete(entityId)
+  else next.add(entityId)
+  expandedRelatedEntityIds.value = next
 }
-
-// ── SVG interaction ───────────────────────────────────────────────────────────
 
 const updateHighlights = () => {
   for (const [id, el] of svgEntityElems) el.classList.toggle('svg-remove', toRemoveEntityIds.value.has(id))
@@ -190,16 +201,28 @@ const updateHighlights = () => {
 
 const toggleEntityRemoval = (id: string) => {
   const nextE = new Set(toRemoveEntityIds.value)
-  if (nextE.has(id)) {
-    nextE.delete(id)
-  } else {
-    nextE.add(id)
-    // Collapse expansion when entity is removed
-    const nextExp = new Set(expandedEntityIds.value); nextExp.delete(id); expandedEntityIds.value = nextExp
-  }
+  if (nextE.has(id)) nextE.delete(id)
+  else nextE.add(id)
   toRemoveEntityIds.value = nextE
+  const nextConn = new Set(expandedConnectionEntityIds.value); nextConn.delete(id); expandedConnectionEntityIds.value = nextConn
+  const nextRel = new Set(expandedRelatedEntityIds.value); nextRel.delete(id); expandedRelatedEntityIds.value = nextRel
   updateHighlights()
   void refreshDiscovery()
+}
+
+const removeToAddEntity = (id: string) => {
+  entitiesToAdd.value = entitiesToAdd.value.filter(e => e.artifact_id !== id)
+  const nextConnPanel = new Set(expandedConnectionEntityIds.value); nextConnPanel.delete(id); expandedConnectionEntityIds.value = nextConnPanel
+  const nextRelatedPanel = new Set(expandedRelatedEntityIds.value); nextRelatedPanel.delete(id); expandedRelatedEntityIds.value = nextRelatedPanel
+  const nextConnIds = new Set(selectedNewConnIds.value)
+  for (const [cid, c] of allModelConns.value) if (c.source === id || c.target === id) nextConnIds.delete(cid)
+  selectedNewConnIds.value = nextConnIds
+  void refreshDiscovery()
+}
+
+const handleEntityAction = (entityId: string) => {
+  if (toAddEntityIds.value.has(entityId)) removeToAddEntity(entityId)
+  else toggleEntityRemoval(entityId)
 }
 
 const attachInteractivity = () => {
@@ -243,12 +266,11 @@ const attachInteractivity = () => {
 }
 
 watch([svgHtml, diagramEntities, diagramConnections], attachInteractivity, { flush: 'post' })
-// Re-run highlights when connection state changes
 watch([toRemoveEntityIds, toRemoveConnIds, selectedNewConnIds], updateHighlights)
 
-// ── Search / add ──────────────────────────────────────────────────────────────
-
-const searchQuery = ref(''); const searchResults = ref<EntityDisplayInfo[]>([]); const showDropdown = ref(false)
+const searchQuery = ref('')
+const searchResults = ref<EntityDisplayInfo[]>([])
+const showDropdown = ref(false)
 let searchTimer: ReturnType<typeof setTimeout> | null = null
 
 const refreshDiscovery = async () => {
@@ -256,21 +278,13 @@ const refreshDiscovery = async () => {
     svc.discoverDiagramEntities({
       includedEntityIds: [...effectiveEntityIds.value],
       query: searchQuery.value.trim() || undefined,
-      maxHops: 3,
+      maxHops: 1,
       limit: 20,
     }),
   ).catch(() => null)
   if (!discovery) return
   allModelConns.value = new Map(discovery.candidate_connections.map((conn) => [conn.artifact_id, conn]))
-  searchResults.value = discovery.search_results.filter(
-    (item) => !effectiveEntityIds.value.has(item.artifact_id),
-  )
-  suggestionGroups.value = discovery.suggested_entities
-    .map((group) => ({
-      hop: group.hop,
-      items: group.items.filter((item) => !effectiveEntityIds.value.has(item.artifact_id)),
-    }))
-    .filter((group) => group.items.length > 0)
+  searchResults.value = discovery.search_results.filter((item) => !effectiveEntityIds.value.has(item.artifact_id))
   showDropdown.value = Boolean(searchQuery.value.trim() && searchResults.value.length)
 }
 
@@ -303,17 +317,6 @@ const addEntity = async (entity: EntityDisplayInfo) => {
   selectedNewConnIds.value = next
 }
 
-const removeToAddEntity = (id: string) => {
-  entitiesToAdd.value = entitiesToAdd.value.filter(e => e.artifact_id !== id)
-  const ne = new Set(expandedEntityIds.value); ne.delete(id); expandedEntityIds.value = ne
-  const nc = new Set(selectedNewConnIds.value)
-  for (const [cid, c] of allModelConns.value) if (c.source === id || c.target === id) nc.delete(cid)
-  selectedNewConnIds.value = nc
-  void refreshDiscovery()
-}
-
-// ── Load ──────────────────────────────────────────────────────────────────────
-
 const load = async () => {
   if (!diagramId.value) return
   diagramDetail.loading.value = true
@@ -321,9 +324,9 @@ const load = async () => {
   svgHtml.value = null; svgLoading.value = true; svgError.value = null
   toRemoveEntityIds.value = new Set(); toRemoveConnIds.value = new Set()
   entitiesToAdd.value = []; selectedNewConnIds.value = new Set()
-  expandedEntityIds.value = new Set()
+  expandedConnectionEntityIds.value = new Set()
+  expandedRelatedEntityIds.value = new Set()
   includedEntities.value = []; allModelConns.value = new Map(); includedConnIds.value = new Set()
-  suggestionGroups.value = []
 
   const [context, svg] = await Promise.all([
     Effect.runPromise(svc.getDiagramContext(diagramId.value)).catch((e) => {
@@ -350,15 +353,7 @@ const load = async () => {
     display_alias: s.display_alias ?? '', element_type: s.artifact_type, element_label: s.name,
   }))
   allModelConns.value = new Map(context.candidate_connections.map((conn) => [conn.artifact_id, conn]))
-  suggestionGroups.value = context.suggested_entities.map((group) => ({
-    hop: group.hop,
-    items: group.items.slice(),
-  }))
 
-  // Use the stored frontmatter selection as the primary edit-state source of truth.
-  // Parsed diagram connections are merged in as a fallback/supplement, because the
-  // parser can be incomplete for some diagram syntaxes while the persisted ids
-  // reflect the user's actual saved selection.
   const inc = new Set<string>()
   for (const cid of context.diagram.connection_ids_used ?? []) {
     if (allModelConns.value.has(cid)) inc.add(cid)
@@ -371,8 +366,6 @@ const load = async () => {
 onMounted(load)
 watch(diagramId, load)
 
-// ── Preview + Save ────────────────────────────────────────────────────────────
-
 const preview = ref<DiagramPreviewResult | null>(null)
 const previewBusy = ref(false)
 const previewError = ref<string | null>(null)
@@ -383,10 +376,6 @@ const saveBusy = ref(false)
 const finalEntityIds = computed(() => [
   ...includedEntities.value.filter(e => !toRemoveEntityIds.value.has(e.artifact_id)).map(e => e.artifact_id),
   ...entitiesToAdd.value.map(e => e.artifact_id),
-])
-const finalConnIds = computed(() => [
-  ...[...includedConnIds.value].filter(id => !toRemoveConnIds.value.has(id)),
-  ...[...selectedNewConnIds.value],
 ])
 
 const doPreview = () => {
@@ -445,7 +434,6 @@ onUnmounted(() => {
     </div>
 
     <div class="main-grid">
-      <!-- SVG canvas -->
       <div ref="containerRef" class="img-container" @mousedown="onMouseDown" @dblclick="resetView">
         <div :style="canvasStyle">
           <div v-if="svgLoading" class="no-img">Rendering SVG…</div>
@@ -457,9 +445,7 @@ onUnmounted(() => {
         <div class="zoom-hint">Click entity to mark for removal · Click connection to toggle · Scroll/drag to navigate</div>
       </div>
 
-      <!-- Sidebar -->
       <aside class="sidebar card">
-        <!-- Search (always visible) -->
         <div class="sb-search">
           <div class="search-wrap">
             <input
@@ -480,102 +466,29 @@ onUnmounted(() => {
           </div>
         </div>
 
-        <!-- Scrollable content -->
         <div class="sb-scroll">
-          <div v-if="suggestionGroups.length" class="sb-section">
-            <div class="sb-sec-hdr">
-              Nearby <span class="sb-count">{{ suggestionGroups.reduce((sum, group) => sum + group.items.length, 0) }}</span>
-            </div>
-            <div v-for="group in suggestionGroups" :key="group.hop" class="suggest-block">
-              <div class="conn-type-lbl">Hop {{ group.hop }}</div>
-              <div class="suggest-list">
-                <button
-                  v-for="entity in group.items"
-                  :key="entity.artifact_id"
-                  class="suggest-row"
-                  @click="addEntity(entity)"
-                >
-                  <span class="dd-glyph"><ArchimateTypeGlyph :type="toGlyphKey(entity.element_type || entity.artifact_type)" :size="13" /></span>
-                  <span class="ent-name">{{ entity.name }}</span>
-                  <span class="dd-domain">{{ entity.domain }}</span>
-                  <span class="conn-btn conn-add">+</span>
-                </button>
-              </div>
-            </div>
-          </div>
-
-          <!-- Entity list (non-removed existing + to-add) -->
           <div v-if="effectiveEntitiesList.length" class="sb-section">
             <div class="sb-sec-hdr">
-              Entities <span class="sb-count">{{ effectiveEntitiesList.length }}</span>
+              Included Entities <span class="sb-count">{{ effectiveEntitiesList.length }}</span>
             </div>
-
-            <div v-for="entity in effectiveEntitiesList" :key="entity.artifact_id" class="ent-block">
-              <!-- Entity row -->
-              <div
-                class="ent-row"
-                :class="{ 'ent-row--new': isToAdd(entity.artifact_id) }"
-                 @click="toggleExpand(entity.artifact_id)"
-                 title="Expand connections"
-              >
-                <div
-                  class="expand-indicator"
-                  :class="{ expanded: expandedEntityIds.has(entity.artifact_id) }"
-                >▶</div>
-                <span class="dd-glyph"><ArchimateTypeGlyph :type="toGlyphKey(entity.element_type || entity.artifact_type)" :size="13" /></span>
-                <span class="ent-name">{{ entity.name }}</span>
-                <span v-if="isToAdd(entity.artifact_id)" class="new-tag">new</span>
-                <button
-                  v-if="isToAdd(entity.artifact_id)"
-                  class="rm-btn" @click="removeToAddEntity(entity.artifact_id)" title="Remove"
-                >×</button>
-                <button
-                  v-else
-                  class="rm-btn rm-btn--entity" @click="toggleEntityRemoval(entity.artifact_id)" title="Mark for removal"
-                >−</button>
-              </div>
-
-              <!-- Connection expansion -->
-              <div class="list-entity" :class="{ 'is-expanded': expandedEntityIds.has(entity.artifact_id) }">
-                <template v-for="[connsByType] in [[getConnsByType(entity.artifact_id)]]" :key="'ct-'+entity.artifact_id">
-                  <div v-if="!connsByType.size" class="no-conns">No connections to diagram entities.</div>
-                  <div v-for="[connType, group] in connsByType" :key="connType" class="conn-type-block">
-                    <div class="conn-type-lbl">{{ connType }}</div>
-                    <div class="conn-cols">
-                      <div class="conn-col conn-col--inc">
-                        <div class="col-hdr">Included</div>
-                        <div
-                          v-for="entry in group.included" :key="entry.conn.artifact_id"
-                          class="conn-entry conn-entry--inc"
-                          @click="toggleConn(entry.conn.artifact_id)"
-                          title="Click to exclude"
-                        >
-                          <span class="dir-arrow">{{ entry.direction === 'out' ? '→' : '←' }}</span>
-                          <span class="other-name">{{ entry.otherName }}</span>
-                        </div>
-                        <div v-if="!group.included.length" class="col-empty">—</div>
-                      </div>
-                      <div class="conn-col conn-col--excl">
-                        <div class="col-hdr">Excluded</div>
-                        <div
-                          v-for="entry in group.excluded" :key="entry.conn.artifact_id"
-                          class="conn-entry conn-entry--excl"
-                          @click="toggleConn(entry.conn.artifact_id)"
-                          title="Click to include"
-                        >
-                          <span class="dir-arrow">{{ entry.direction === 'out' ? '→' : '←' }}</span>
-                          <span class="other-name">{{ entry.otherName }}</span>
-                        </div>
-                        <div v-if="!group.excluded.length" class="col-empty">—</div>
-                      </div>
-                    </div>
-                  </div>
-                </template>
-              </div>
+            <div class="entity-section">
+              <EntitySelectionList
+                :rows="selectionRows"
+                :candidate-connections="[...allModelConns.values()]"
+                :included-entity-ids="[...effectiveEntityIds]"
+                :included-connection-ids="finalConnIds"
+                :related-entities-by-id="relatedEntitiesById"
+                :expanded-connection-entity-ids="[...expandedConnectionEntityIds]"
+                :expanded-related-entity-ids="[...expandedRelatedEntityIds]"
+                @toggle-connections="toggleConnections"
+                @toggle-related="toggleRelated"
+                @toggle-connection="toggleConn"
+                @add-related-entity="addEntity"
+                @entity-action="handleEntityAction"
+              />
             </div>
           </div>
 
-          <!-- For removal (entities only) -->
           <div v-if="toRemoveEntities.length" class="sb-section">
             <div class="sb-sec-hdr sb-sec-hdr--rm">
               For removal <span class="sb-count">{{ toRemoveEntities.length }}</span>
@@ -591,7 +504,6 @@ onUnmounted(() => {
             Loading diagram entities…
           </div>
 
-          <!-- Actions -->
           <div class="sb-actions">
             <button class="btn-preview" :disabled="previewBusy || !diagramDetail.data.value" @click="doPreview">
               {{ previewBusy ? 'Rendering…' : 'Preview' }}
@@ -610,7 +522,6 @@ onUnmounted(() => {
       </aside>
     </div>
 
-    <!-- Preview (below) -->
     <div v-if="preview || previewBusy || previewError" class="preview-row">
       <div v-if="previewBusy" class="state-msg">Rendering preview…</div>
       <div v-if="previewError" class="state-err">{{ previewError }}</div>
@@ -638,7 +549,6 @@ onUnmounted(() => {
 .main-grid { display: grid; grid-template-columns: 1fr 50%; gap: 16px; align-items: start; }
 @media (max-width: 860px) { .main-grid { grid-template-columns: 1fr; } }
 
-/* SVG canvas */
 .img-container {
   position: relative; overflow: hidden; background: #f8fafc;
   border: 1px solid #e5e7eb; border-radius: 8px; min-height: 500px;
@@ -664,10 +574,8 @@ onUnmounted(() => {
 .reset-btn:hover { background: white; }
 .zoom-hint { position: absolute; bottom: 6px; left: 50%; transform: translateX(-50%); font-size: 11px; color: #9ca3af; background: rgba(255,255,255,.8); padding: 2px 8px; border-radius: 4px; pointer-events: none; white-space: nowrap; }
 
-/* Sidebar */
 .card { background: white; border-radius: 8px; border: 1px solid #e5e7eb; }
 .sidebar { display: flex; flex-direction: column; position: sticky; top: 16px; max-height: calc(100vh - 80px); overflow: hidden; }
-
 .sb-search { padding: 10px; border-bottom: 1px solid #f3f4f6; flex-shrink: 0; position: relative; z-index: 10; }
 .search-wrap { position: relative; }
 .inp { width: 100%; padding: 7px 10px; border-radius: 6px; border: 1px solid #d1d5db; font-size: 13px; outline: none; box-sizing: border-box; }
@@ -681,62 +589,12 @@ onUnmounted(() => {
 .dd-domain { font-size: 11px; color: #9ca3af; white-space: nowrap; }
 
 .sb-scroll { flex: 1; overflow-y: auto; display: flex; flex-direction: column; min-height: 0; }
-
 .sb-section { border-bottom: 1px solid #f3f4f6; }
-.sb-sec-hdr { display: flex; align-items: center; gap: 5px; padding: 6px 10px 4px; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: #6b7280; }
+.sb-sec-hdr { display: flex; align-items: center; gap: 5px; padding: 8px 10px 6px; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: #6b7280; }
 .sb-sec-hdr--rm { color: #dc2626; }
 .sb-count { font-size: 10px; font-weight: 400; color: #9ca3af; }
-.suggest-block { padding: 4px 8px 8px; }
-.suggest-list { display: flex; flex-direction: column; gap: 4px; }
-.suggest-row {
-  display: flex; align-items: center; gap: 6px; width: 100%;
-  padding: 6px 8px; border: 1px solid #e5e7eb; border-radius: 6px;
-  background: #f8fafc; color: #374151; cursor: pointer; text-align: left;
-}
-.suggest-row:hover { background: #eef6ff; border-color: #bfdbfe; }
-.conn-btn { display: inline-flex; align-items: center; justify-content: center; }
-.conn-add {
-  width: 18px; height: 18px; border-radius: 999px; background: #dbeafe; color: #1d4ed8;
-  font-size: 14px; font-weight: 700; flex-shrink: 0;
-}
+.entity-section { padding: 0 10px 10px; }
 
-/* Entity rows */
-.ent-block { }
-.ent-row { display: flex; align-items: center; gap: 4px; padding: 3px 8px; cursor: pointer; }
-.ent-row:hover { background: #f9fafb; }
-.ent-row--new { opacity: 0.75; }
-.ent-row--new:hover { background: #f0fdf4; }
-.list-entity { display: none; }
-.list-entity.is-expanded { display: block; }
-.ent-block:has(.conn-entry--excl) .ent-row { background: #ffcbcb; }
-.expand-indicator { background: none; border: none; font-size: 9px; color: #9ca3af; padding: 1px 2px; transition: transform 0.12s; flex-shrink: 0; line-height: 1; }
-.expand-indicator:hover { color: #6b7280; }
-.expand-indicator.expanded { transform: rotate(90deg); }
-.ent-name { font-size: 12px; font-weight: 500; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #374151; }
-.new-tag { font-size: 9px; font-weight: 600; color: #059669; background: #d1fae5; padding: 1px 4px; border-radius: 3px; white-space: nowrap; flex-shrink: 0; }
-.rm-btn { background: none; border: none; cursor: pointer; color: #d1d5db; font-size: 14px; padding: 0 2px; line-height: 1; flex-shrink: 0; }
-.rm-btn:hover { color: #dc2626; }
-.rm-btn--entity:hover { color: #ef4444; }
-
-/* Connection type expansion */
-.conn-type-block { padding: 4px 8px 4px 20px; border-top: 1px solid #f9fafb; }
-.conn-type-lbl { font-size: 10px; font-weight: 700; color: #6366f1; text-transform: uppercase; letter-spacing: .04em; margin-bottom: 3px; }
-.conn-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; }
-.conn-col { display: flex; flex-direction: column; gap: 1px; }
-.col-hdr { font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; padding: 1px 3px; margin-bottom: 1px; }
-.conn-col--inc .col-hdr { color: #059669; }
-.conn-col--excl .col-hdr { color: #9ca3af; }
-.conn-entry { display: flex; align-items: center; gap: 3px; padding: 2px 4px; border-radius: 3px; cursor: pointer; font-size: 11px; overflow: hidden; }
-.conn-entry--inc { background: #f0fdf4; color: #374151; }
-.conn-entry--inc:hover { background: #dcfce7; }
-.conn-entry--excl { background: #f9fafb; color: #9ca3af; }
-.conn-entry--excl:hover { background: #f3f4f6; color: #374151; }
-.dir-arrow { font-size: 10px; flex-shrink: 0; color: #6b7280; }
-.other-name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.col-empty { font-size: 10px; color: #e5e7eb; padding: 2px 4px; }
-.no-conns { font-size: 11px; color: #9ca3af; padding: 4px 8px 4px 20px; }
-
-/* For removal */
 .rm-row { display: flex; align-items: center; gap: 5px; padding: 4px 10px; font-size: 12px; }
 .rm-glyph { color: #dc2626; opacity: 0.7; }
 .rm-name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #374151; }
@@ -744,8 +602,6 @@ onUnmounted(() => {
 .undo-btn:hover { color: #374151; }
 
 .sb-hint { padding: 12px 10px; font-size: 11px; color: #9ca3af; }
-
-/* Actions */
 .sb-actions { padding: 10px; display: flex; flex-direction: column; gap: 6px; margin-top: auto; border-top: 1px solid #f3f4f6; flex-shrink: 0; }
 .btn-preview { width: 100%; padding: 7px 12px; background: #f3f4f6; color: #1d4ed8; border: 1px solid #bfdbfe; border-radius: 6px; font-size: 13px; cursor: pointer; font-weight: 500; }
 .btn-preview:hover:not(:disabled) { background: #eff6ff; }
@@ -754,13 +610,11 @@ onUnmounted(() => {
 .btn-preview:disabled, .btn-save:disabled { opacity: .5; cursor: not-allowed; }
 .save-err { font-size: 12px; color: #dc2626; }
 
-/* Preview */
 .preview-row { margin-top: 16px; }
 .state-msg { font-size: 13px; color: #6b7280; }
 .state-err { font-size: 13px; color: #dc2626; margin-top: 6px; }
 .warn-msg { font-size: 12px; color: #b45309; margin-bottom: 4px; }
-.preview-img { max-width: 100%; border-radius: 6px; border: 1px solid #e5e7eb; display: block; margin-top: 8px; }
+.preview-img { max-width: 100%; border-radius: 8px; border: 1px solid #e5e7eb; display: block; }
 .toggle-src { margin-top: 10px; font-size: 12px; color: #2563eb; background: none; border: none; cursor: pointer; padding: 0; }
-.toggle-src:hover { text-decoration: underline; }
-.puml-src { font-size: 11px; font-family: monospace; white-space: pre-wrap; margin-top: 8px; background: #1e293b; color: #e2e8f0; border-radius: 6px; padding: 10px; max-height: 400px; overflow-y: auto; }
+.puml-src { font-size: 11px; font-family: monospace; white-space: pre-wrap; margin-top: 8px; background: #f9fafb; border: 1px solid #e5e7eb; border-radius: 6px; padding: 10px; max-height: 400px; overflow-y: auto; }
 </style>
