@@ -7,8 +7,7 @@
     "properties": {
       "title": {"type": "string"},
       "status": {"type": "string", "enum": ["draft", "accepted", "rejected", "superseded"]},
-      "deciders": {"type": "array", "items": {"type": "string"}},
-      "date": {"type": "string"}
+      "keywords": {"type": "array", "items": {"type": "string"}}
     }
   },
   "required_sections": ["Scope", "Summary", "Specification"]

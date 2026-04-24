@@ -22,7 +22,8 @@ def find_connection_ids_for(index: "ArtifactIndex", entity_id: str, *, direction
         where.append("conn_type = ?")
         params.append(conn_type)
     sql = "SELECT DISTINCT connection_id AS artifact_id FROM entity_context_edges WHERE " + " AND ".join(where) + " ORDER BY artifact_id"
-    rows = index._conn.execute(sql, params).fetchall()
+    with index._lock:
+        rows = index._conn.execute(sql, params).fetchall()
     return [str(row["artifact_id"]) for row in rows]
 
 
@@ -63,7 +64,8 @@ def search_artifacts(
         params.append(prefer_record_type)
     sql += "score DESC, artifact_id ASC LIMIT ?"
     params.append(str(max(limit, 0)))
-    rows = index._conn.execute(sql, params).fetchall()
+    with index._lock:
+        rows = index._conn.execute(sql, params).fetchall()
     return [(str(r["artifact_id"]), str(r["record_type"]), float(r["score"])) for r in rows]
 
 
@@ -71,25 +73,26 @@ def find_neighbors(index: "ArtifactIndex", entity_id: str, *, max_hops: int = 1,
     index._ensure_loaded()
     if max_hops < 1:
         return {}
-    rows = index._conn.execute(
-        """
-        WITH RECURSIVE walk(depth, entity_id, visited) AS (
-            SELECT 0, ?, ',' || ? || ','
-            UNION ALL
-            SELECT
-                walk.depth + 1,
-                CASE WHEN connections.source = walk.entity_id THEN connections.target ELSE connections.source END,
-                walk.visited || CASE WHEN connections.source = walk.entity_id THEN connections.target ELSE connections.source END || ','
-            FROM walk
-            JOIN connections ON (connections.source = walk.entity_id OR connections.target = walk.entity_id)
-            WHERE walk.depth < ?
-              AND (? IS NULL OR connections.conn_type = ?)
-              AND instr(walk.visited, ',' || CASE WHEN connections.source = walk.entity_id THEN connections.target ELSE connections.source END || ',') = 0
-        )
-        SELECT depth, entity_id FROM walk WHERE depth > 0
-        """,
-        (entity_id, entity_id, max_hops, conn_type, conn_type),
-    ).fetchall()
+    with index._lock:
+        rows = index._conn.execute(
+            """
+            WITH RECURSIVE walk(depth, entity_id, visited) AS (
+                SELECT 0, ?, ',' || ? || ','
+                UNION ALL
+                SELECT
+                    walk.depth + 1,
+                    CASE WHEN connections.source = walk.entity_id THEN connections.target ELSE connections.source END,
+                    walk.visited || CASE WHEN connections.source = walk.entity_id THEN connections.target ELSE connections.source END || ','
+                FROM walk
+                JOIN connections ON (connections.source = walk.entity_id OR connections.target = walk.entity_id)
+                WHERE walk.depth < ?
+                  AND (? IS NULL OR connections.conn_type = ?)
+                  AND instr(walk.visited, ',' || CASE WHEN connections.source = walk.entity_id THEN connections.target ELSE connections.source END || ',') = 0
+            )
+            SELECT depth, entity_id FROM walk WHERE depth > 0
+            """,
+            (entity_id, entity_id, max_hops, conn_type, conn_type),
+        ).fetchall()
     result: dict[str, set[str]] = {}
     for row in rows:
         result.setdefault(str(int(row["depth"])), set()).add(str(row["entity_id"]))

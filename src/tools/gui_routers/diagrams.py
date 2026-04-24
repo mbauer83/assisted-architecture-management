@@ -220,7 +220,7 @@ def _hop_suggestions(repo: Any, entity_ids: list[str], *, max_hops: int, limit_p
         items = [
             _entity_display_item(rec)
             for entity_id in sorted(next_frontier)
-            if entity_id not in included and (rec := repo.get_entity(entity_id)) is not None and rec.artifact_type != "global-entity-reference"
+            if entity_id not in included and (rec := repo.get_entity(entity_id)) is not None and rec.artifact_type != "global-artifact-reference"
         ]
         items.sort(key=lambda item: (
             _DOMAIN_ORDER.index(item["domain"]) if item["domain"] in _DOMAIN_ORDER else 99,
@@ -239,7 +239,7 @@ def _fuzzy_entity_hits(repo: Any, q: str, limit: int, excluded: set[str]) -> lis
         return []
     scored: list[tuple[float, EntityRecord]] = []
     for rec in repo._entities.values():
-        if rec.artifact_type == "global-entity-reference" or rec.artifact_id in excluded:
+        if rec.artifact_type == "global-artifact-reference" or rec.artifact_id in excluded:
             continue
         haystack = " ".join((rec.name, rec.artifact_type, rec.domain, rec.subdomain, rec.content_text[:400]))
         score = SequenceMatcher(None, query, haystack.lower()).ratio()
@@ -361,7 +361,7 @@ def entity_display_search(q: str, limit: int = Query(default=20, le=50)) -> list
         if h.record_type != "entity" or not isinstance(h.record, EntityRecord):
             continue
         rec = h.record
-        if rec.artifact_type == "global-entity-reference":
+        if rec.artifact_type == "global-artifact-reference":
             continue
         items.append(_entity_display_item(rec))
         if len(items) >= limit:

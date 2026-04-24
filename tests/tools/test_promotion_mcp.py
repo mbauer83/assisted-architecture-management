@@ -201,8 +201,8 @@ class TestPromotionExecute:
         assert result["executed"] is True
         assert not orig_path.exists(), "Original entity should be replaced by GRF"
         grf_dir = engagement_root / "model" / "common" / "global-references"
-        grfs = list(grf_dir.rglob("GRF@*.md")) if grf_dir.exists() else []
-        assert grfs, "A GRF proxy should have been created"
+        grfs = list(grf_dir.rglob("GAR@*.md")) if grf_dir.exists() else []
+        assert grfs, "A GAR proxy should have been created"
         assert any(eng_id in f.read_text() for f in grfs)
 
     def test_accept_enterprise_conflict_resolution(
@@ -235,23 +235,24 @@ class TestPromotionExecute:
         self, engagement_root: Path, enterprise_root: Path
     ) -> None:
         eng_id = "REQ@1000000004.EngEee.main-req"
-        grf_id = "GRF@1000000005.GrfFff.grf-ref"
+        grf_id = "GAR@1000000005.GrfFff.grf-ref"
         glo_id = "REQ@2000000005.EntGgg.global-req"
 
         _make_entity(engagement_root, eng_id, "requirement", "Main Req")
         _make_entity(enterprise_root, glo_id, "requirement", "Global Req")
-        # GRF proxy
+        # GAR proxy
         grf_path = (
             engagement_root / "model" / "common" / "global-references" / f"{grf_id}.md"
         )
         _write(grf_path, f"""\
 ---
 artifact-id: {grf_id}
-artifact-type: global-entity-reference
+artifact-type: global-artifact-reference
 name: "Global Req Ref"
 version: 0.1.0
 status: active
-global-entity-id: {glo_id}
+global-artifact-id: {glo_id}
+global-artifact-type: entity
 last-updated: '2026-04-17'
 ---
 
@@ -267,7 +268,7 @@ last-updated: '2026-04-17'
 domain: ""
 element-type: ""
 label: "Global Req Ref"
-alias: GRF_GrfFff
+alias: GAR_GrfFff
 ```
 """)
         outgoing_path = (

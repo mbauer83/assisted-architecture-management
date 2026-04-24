@@ -21,8 +21,7 @@ def get_type_guidance(
     filter is treated as an entity-type filter; otherwise it is treated as a domain
     filter.  Omit ``filter`` (or pass ``None``) to return guidance for all types.
 
-    - Entity-type filter → ``archimate_domain`` included per entry (types may span
-      domains).
+    - Entity-type filter → ``archimate_domain`` (domain display name) included per entry.
     - Domain filter → ``archimate_domain`` omitted (it equals the requested domain).
     - No filter → ``archimate_domain`` included (types span all domains).
     """
@@ -41,13 +40,12 @@ def get_type_guidance(
             include_domain = True
             domain_context = None
         else:
-            # Treat as domain filter (case-insensitive on both domain_dir and archimate_domain)
+            # Treat as domain filter (case-insensitive match on domain_dir)
             unknown_types = [n for n in filter if n not in all_infos]
             domain_set = {d.lower() for d in filter}
             selected = [
                 info for info in all_infos.values()
                 if info.domain_dir.lower() in domain_set
-                or info.archimate_domain.lower() in domain_set
             ]
             if not selected:
                 return {
@@ -61,7 +59,7 @@ def get_type_guidance(
             include_domain = False
             domain_context = filter
 
-    selected = sorted(selected, key=lambda x: (x.archimate_domain, x.artifact_type))
+    selected = sorted(selected, key=lambda x: (x.domain_dir, x.artifact_type))
 
     entries: list[dict[str, object]] = []
     for info in selected:
@@ -71,7 +69,7 @@ def get_type_guidance(
             "prefix": info.prefix,
         }
         if include_domain:
-            entry["archimate_domain"] = info.archimate_domain
+            entry["archimate_domain"] = info.domain_dir.capitalize()
         entry["element_classes"] = list(info.element_classes)
         entry["create_when"] = info.create_when
         entry["never_create_when"] = info.never_create_when

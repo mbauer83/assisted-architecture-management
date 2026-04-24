@@ -1,3 +1,8 @@
+backend:
+  port: 8000
+  log_path: .arch/backend.log
+  min_log_level: INFO
+
 diagrams:
   archimate_type_markers: icons
   sprite_scale: 1.5

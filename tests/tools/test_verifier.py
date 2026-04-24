@@ -343,6 +343,78 @@ class TestVerifyDocumentFile:
         assert any(i.code == "W156" for i in result.issues)
         assert any("must be relative" in i.message for i in result.issues)
 
+    def test_required_entity_connection_accepts_class_term(self, repo: Path) -> None:
+        _document_schema(repo)
+        schema_path = repo / ".arch-repo" / "documents" / "adr.json"
+        schema_path.write_text(
+            schema_path.read_text(encoding="utf-8").replace(
+                '"required_sections": ["Context", "Decision", "Consequences"]',
+                '"required_sections": ["Context", "Decision", "Consequences"],\n'
+                '  "required_entity_type_connections": ["@internal-behavior-element"]',
+            ),
+            encoding="utf-8",
+        )
+        from src.common.ontology_loader import ENTITY_TYPES
+        entity_id = "FNC@1000000002.AbcDef.function"
+        info = ENTITY_TYPES["function"]
+        entity_path = repo / "model" / info.domain_dir / info.subdir / f"{entity_id}.md"
+        _write(entity_path, _entity(entity_id, "function"))
+
+        doc_id = "ADR@1000000000.AbcDef.source"
+        doc_path = repo / "documents" / "adr" / f"{doc_id}.md"
+        _write(doc_path, _document(doc_id, f"[Function](../../model/{info.domain_dir}/{info.subdir}/{entity_id}.md)"))
+
+        result = ArtifactVerifier(ArtifactRegistry(repo)).verify_document_file(doc_path)
+
+        assert not any(i.code == "E155" for i in result.issues), [i.message for i in result.issues]
+
+    def test_required_entity_connection_reports_class_term_readably(self, repo: Path) -> None:
+        _document_schema(repo)
+        schema_path = repo / ".arch-repo" / "documents" / "adr.json"
+        schema_path.write_text(
+            schema_path.read_text(encoding="utf-8").replace(
+                '"required_sections": ["Context", "Decision", "Consequences"]',
+                '"required_sections": ["Context", "Decision", "Consequences"],\n'
+                '  "required_entity_type_connections": ["@internal-behavior-element"]',
+            ),
+            encoding="utf-8",
+        )
+        doc_id = "ADR@1000000000.AbcDef.source"
+        doc_path = repo / "documents" / "adr" / f"{doc_id}.md"
+        _write(doc_path, _document(doc_id, "No entity links."))
+
+        result = ArtifactVerifier(ArtifactRegistry(repo)).verify_document_file(doc_path)
+
+        e155_messages = [i.message for i in result.issues if i.code == "E155"]
+        assert e155_messages == [
+            "Required entity-type connection missing: link at least one internal behavior element"
+        ]
+
+    def test_required_entity_connection_accepts_all_term(self, repo: Path) -> None:
+        _document_schema(repo)
+        schema_path = repo / ".arch-repo" / "documents" / "adr.json"
+        schema_path.write_text(
+            schema_path.read_text(encoding="utf-8").replace(
+                '"required_sections": ["Context", "Decision", "Consequences"]',
+                '"required_sections": ["Context", "Decision", "Consequences"],\n'
+                '  "required_entity_type_connections": ["@all"]',
+            ),
+            encoding="utf-8",
+        )
+        from src.common.ontology_loader import ENTITY_TYPES
+        entity_id = "REQ@1000000003.AbcDef.req"
+        info = ENTITY_TYPES["requirement"]
+        entity_path = repo / "model" / info.domain_dir / info.subdir / f"{entity_id}.md"
+        _write(entity_path, _entity(entity_id, "requirement"))
+
+        doc_id = "ADR@1000000000.AbcDef.source"
+        doc_path = repo / "documents" / "adr" / f"{doc_id}.md"
+        _write(doc_path, _document(doc_id, f"[Requirement](../../model/{info.domain_dir}/{info.subdir}/{entity_id}.md#details)"))
+
+        result = ArtifactVerifier(ArtifactRegistry(repo)).verify_document_file(doc_path)
+
+        assert not any(i.code == "E155" for i in result.issues), [i.message for i in result.issues]
+
 
 # ---------------------------------------------------------------------------
 # verify_all

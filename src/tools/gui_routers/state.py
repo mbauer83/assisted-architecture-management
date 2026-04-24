@@ -24,6 +24,7 @@ _repo: ArtifactRepository | None = None
 _repo_root: Path | None = None          # engagement root — used for writes
 _enterprise_root: Path | None = None    # enterprise root — read-only in normal mode
 _admin_mode: bool = False               # when True, enterprise writes are permitted via /admin/api/*
+_read_only: bool = False                # when True, all engagement writes are blocked
 
 
 def init_state(
@@ -32,16 +33,22 @@ def init_state(
     enterprise_root: Path | None,
     *,
     admin_mode: bool = False,
+    read_only: bool = False,
 ) -> None:
-    global _repo, _repo_root, _enterprise_root, _admin_mode
+    global _repo, _repo_root, _enterprise_root, _admin_mode, _read_only
     _repo = repo
     _repo_root = repo_root
     _enterprise_root = enterprise_root
     _admin_mode = admin_mode
+    _read_only = read_only
 
 
 def is_admin_mode() -> bool:
     return _admin_mode
+
+
+def is_read_only() -> bool:
+    return _read_only
 
 
 def get_repo() -> ArtifactRepository:
@@ -102,22 +109,22 @@ def build_conn_counts(repo: ArtifactRepository) -> dict[str, tuple[int, int, int
     return {k: (v[0], v[1], v[2]) for k, v in counts.items()}
 
 
-def resolve_grf(artifact_id: str) -> tuple[str, bool]:
-    """If artifact_id is a GRF, return (global_entity_id, True); else (artifact_id, False)."""
+def resolve_gar(artifact_id: str) -> tuple[str, bool]:
+    """If artifact_id is a GAR, return (global_artifact_id, True); else (artifact_id, False)."""
     repo = _repo
     if repo is None:
         return artifact_id, False
     rec = repo.get_entity(artifact_id)
-    if rec is not None and rec.artifact_type == "global-entity-reference":
-        geid = rec.extra.get("global-entity-id")
-        if isinstance(geid, str) and geid:
-            return geid, True
+    if rec is not None and rec.artifact_type == "global-artifact-reference":
+        gaid = rec.extra.get("global-artifact-id")
+        if isinstance(gaid, str) and gaid:
+            return gaid, True
     return artifact_id, False
 
 
 def connection_to_dict(c: ConnectionRecord) -> dict[str, Any]:
     repo = _repo
-    resolved_target, via_grf = resolve_grf(c.target)
+    resolved_target, via_gar = resolve_gar(c.target)
     src_name = c.source
     tgt_name = resolved_target
     if repo is not None:
@@ -137,8 +144,8 @@ def connection_to_dict(c: ConnectionRecord) -> dict[str, Any]:
         "source_name": src_name,
         "target_name": tgt_name,
     }
-    if via_grf:
-        d["grf_artifact_id"] = c.target
+    if via_gar:
+        d["gar_artifact_id"] = c.target
     return d
 
 
@@ -198,6 +205,12 @@ def refresh_now() -> None:
 
 def run_serialized_write(fn: Any, /, *args: Any, **kwargs: Any) -> Any:
     from src.tools.artifact_mcp.write_queue import run_sync
+    from src.tools.write_block_manager import is_blocked
+
+    # Check write-block state before passing to queue
+    target_root = kwargs.get("repo_root") or (args[0] if args else None)
+    if target_root is not None and is_blocked(Path(str(target_root))):
+        raise HTTPException(503, "Writes are temporarily blocked (sync in progress or read-only mode)")
 
     return run_sync(fn, *args, **kwargs)
 

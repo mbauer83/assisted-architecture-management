@@ -29,6 +29,12 @@ class ArtifactRegistry:
     def enterprise_entity_ids(self) -> set[str]:
         return self._index.enterprise_entity_ids()
 
+    def enterprise_document_ids(self) -> set[str]:
+        return self._index.enterprise_document_ids()
+
+    def enterprise_diagram_ids(self) -> set[str]:
+        return self._index.enterprise_diagram_ids()
+
     def engagement_entity_ids(self) -> set[str]:
         return self._index.engagement_entity_ids()
 

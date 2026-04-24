@@ -28,9 +28,10 @@ def _require_admin() -> None:
 
 @router.get("/server-info")
 def server_info() -> dict[str, Any]:
-    """Return server configuration including admin-mode status."""
+    """Return server configuration including admin-mode and read-only status."""
     return {
         "admin_mode": s.is_admin_mode(),
+        "read_only": s.is_read_only(),
         "engagement_root": str(s._repo_root) if s._repo_root else None,
         "enterprise_root": str(s._enterprise_root) if s._enterprise_root else None,
     }

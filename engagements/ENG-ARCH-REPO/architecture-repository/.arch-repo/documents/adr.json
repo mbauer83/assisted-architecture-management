@@ -12,5 +12,6 @@
       "date": {"type": "string"}
     }
   },
-  "required_sections": ["Context", "Decision", "Consequences"]
+  "required_sections": ["Context", "Decision", "Consequences"],
+  "suggested_entity_type_connections": ["@all"]
 }

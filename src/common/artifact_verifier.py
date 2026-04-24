@@ -124,7 +124,7 @@ class ArtifactVerifier:
         check_section(content, "§content", required=True, result=result, loc=loc)
         check_section(content, "§display", required=True, result=result, loc=loc)
 
-        if str(fm.get("artifact-type", "")) == "global-entity-reference":
+        if str(fm.get("artifact-type", "")) == "global-artifact-reference":
             check_global_entity_reference(fm, self.registry, result, loc)
 
         repo_root = self._repo_root_for_path(path)
@@ -457,7 +457,7 @@ class ArtifactVerifier:
         by_path = {r.path: r for r in out}
         return [by_path[inv.rel_to_path[r]] for r in inv.ordered_paths if r in relpaths and inv.rel_to_path[r] in by_path]
 
-    def verify_document_file(self, path: Path) -> VerificationResult:
+    def verify_document_file(self, path: Path) -> VerificationResult:  # noqa: C901
         result = VerificationResult(path=path, file_type="document")
         loc = str(path)
         content = read_file(path, result, loc)
@@ -497,6 +497,30 @@ class ArtifactVerifier:
                                     f"Required section '## {section}' missing from document",
                                     loc,
                                 ))
+                    # E155: required entity-type connections
+                    required_entity_types: list[str] = schema.get("required_entity_type_connections") or []
+                    if required_entity_types:
+                        from src.common.ontology_loader import (
+                            entity_type_term_matches,
+                            expand_entity_type_term,
+                            format_entity_type_term,
+                        )
+
+                        linked_types = _linked_entity_types(path, content)
+                        for etype in required_entity_types:
+                            label = format_entity_type_term(etype)
+                            if not expand_entity_type_term(etype):
+                                result.issues.append(Issue(
+                                    Severity.ERROR, "E155",
+                                    f"Unknown required entity-type connection term: {label} ({etype})",
+                                    loc,
+                                ))
+                            elif not entity_type_term_matches(etype, linked_types):
+                                result.issues.append(Issue(
+                                    Severity.ERROR, "E155",
+                                    f"Required entity-type connection missing: link at least one {label}",
+                                    loc,
+                                ))
 
         # W155: unresolvable internal markdown links
         for m in re.finditer(r"\[([^\]]+)\]\(([^)]+)\)", content):
@@ -531,6 +555,32 @@ class ArtifactVerifier:
         from src.common.workspace_paths import infer_repo_scope
 
         return infer_repo_scope(path)
+
+
+def _linked_entity_types(doc_path: Path, content: str) -> set[str]:
+    """Return the set of artifact-type values found in entities linked from a document."""
+    types: set[str] = set()
+    for m in re.finditer(r"\[([^\]]+)\]\(([^)]+)\)", content):
+        href = m.group(2)
+        if href.startswith("http") or href.startswith("#"):
+            continue
+        anchor_idx = href.find("#")
+        file_href = href[:anchor_idx] if anchor_idx >= 0 else href
+        if not file_href.endswith(".md"):
+            continue
+        target = (doc_path.parent / file_href).resolve()
+        if not target.is_file():
+            continue
+        try:
+            target_content = target.read_text(encoding="utf-8")
+        except OSError:
+            continue
+        fm = parse_frontmatter(target_content, VerificationResult(path=target, file_type="entity"), str(target))
+        if fm:
+            etype = fm.get("artifact-type", "")
+            if etype:
+                types.add(str(etype))
+    return types
 
 
 def _infer_repo_root_for_document(path: Path) -> Path | None:

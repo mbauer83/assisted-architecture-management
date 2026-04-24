@@ -9,9 +9,9 @@ Architecture knowledge typically lives in slide decks, Confluence pages, or silo
 The key ideas:
 
 - **Two-tiered repository model**: an *enterprise* repo holds the organisation-wide baseline; per-project *engagement* repos extend it with local decisions, designs, and trade-offs. Entities flow from engagement to enterprise via a promotion workflow.
-- **AI-native access**: an MCP server exposes the model to AI agents as typed tools — query, search, graph-traverse, create, edit, promote — without the agent needing to know the file layout.
+- **AI-native access**: an MCP server exposes the model to AI agents as typed tools — without the agent needing to know the file layout, it can query, search, navigate relationships, create/edit/delete artifacts, and promote decisions to shared repositories.
 - **Human access**: a REST API, a CLI, and a browser GUI provide the same capabilities for humans.
-- **Verified integrity**: a built-in verifier enforces referential integrity, schema conformance, diagram syntax, and cross-repo reference rules.
+- **Verified integrity**: a built-in verifier enforces referential integrity, schema conformance, diagram syntax, and cross-repo reference rules. Models stay consistent as humans and AI edit them together.
 - **Self-describing**: this repository contains an ArchiMate model of its own architecture — the tooling, requirements, principles, components, and design decisions are all modelled using the repository itself (see `engagements/ENG-ARCH-REPO/`).
 
 ## Two-Tiered Architecture
@@ -26,21 +26,26 @@ engagements/
     architecture-repository/
       model/                  ← engagement-specific entities and connections
       diagram-catalog/        ← diagrams (may reference enterprise entities via macros)
+      documents/              ← ADRs, standards, specifications, and other structured docs
 ```
 
 **Enterprise repo** — curated, long-lived entities shared across all engagements. Engagement tools can read it but not write to it directly.
 
-**Engagement repo** — project-specific work. New entities and connections are created here. When ready, they are *promoted* to enterprise.
+**Engagement repo** — project-specific work. New entities, connections, diagrams, and documents are created here. When ready, they are *promoted* to enterprise.
 
 **Promotion** — a one-way transfer of an explicitly selected set of entities and connections from engagement to enterprise. Conflict detection matches by `(artifact_type, friendly_name)` so the same logical entity under different artifact IDs is recognised. Conflicts offer three resolution strategies: accept engagement version, accept enterprise version, or manual merge.
 
-**Asymmetric references** — enterprise entities can only reference other enterprise entities. Engagement entities may reference both engagement and enterprise entities. This is enforced by the verifier (errors E130/E131).
+**Asymmetric references** — enterprise entities can only reference other enterprise entities. Engagement entities may reference both engagement and enterprise entities. This is enforced by the verifier.
 
 ### Workspace Configuration
 
 An `arch-workspace.yaml` at the workspace root declares both repos:
 
 ```yaml
+backend:
+  port: 8000
+  log_path: .arch/backend.log
+
 engagement:
   local: engagements/ENG-ARCH-REPO/architecture-repository
   # or git: { url: "https://...", branch: main, path: .arch/repos/engagement }
@@ -51,6 +56,10 @@ enterprise:
 ```
 
 Run `arch-init` to validate paths (or clone git repos) and write `.arch/init-state.yaml` with resolved absolute paths. All tooling reads this state file on startup.
+
+`backend.port` is optional. If omitted, tooling falls back to `config/settings.yaml` and then `8000`.
+`backend.log_path` is optional and may be absolute or workspace-relative.
+`backend.min_log_level` is configured in `config/settings.yaml` and controls the minimum log level written by `arch-backend` (`DEBUG`, `INFO`, `WARNING`, `ERROR`, or `CRITICAL`; default `INFO`).
 
 ## Repository Layout
 
@@ -67,252 +76,332 @@ enterprise-repository/
 arch-workspace.yaml
 ```
 
-## Tooling
+## Affordances for Humans and AI Agents
 
-The repository exposes three interfaces over the same underlying artifacts.
+The system provides three complementary interfaces (REST API, MCP server, browser GUI) over the same underlying artifacts. This section describes what's possible; the interfaces differ only in ease of use for each audience.
 
-### MCP Server (primary — AI agent access)
+### Discovery and Exploration
 
-The MCP server is the primary interface for AI agents. It exposes typed `artifact_*` tools for querying, verification, authoring, and promotion across entities, connections, diagrams, and documents.
+**Search and Filter**
+- Full-text search across all artifacts (entities, connections, diagrams, documents) with relevance ranking
+- Filter by domain, type, status, keyword
+- Browse hierarchies (specialization, composition, aggregation)
+- Explore relationship graphs with interactive navigation: "What connects to this? How many hops to reach that concept?"
 
-**Artifact query**
+**Consistent Metadata**
+- Every artifact has uniform attributes: name, version, status (draft/active/retired), keywords, creation/modification timestamps
+- Entities are scoped to a domain (motivation, strategy, business, application, technology, implementation) and classified by type (Goal, Requirement, Capability, Service, Application Component, Technology, etc.)
+- Connections are typed (realizes, supports, composes, specializes, depends-on, etc.) with optional source/target cardinality and free-form descriptions
 
-| Tool | Purpose |
-|------|---------|
-| `artifact_query_stats` | Repository counts and grouped breakdowns |
-| `artifact_query_list_artifacts` | Metadata listing with domain/type/status filters |
-| `artifact_query_read_artifact` | Read one artifact in summary or full mode; supports document section reads |
-| `artifact_query_search_artifacts` | Ranked search across entities, connections, diagrams, and documents |
-| `artifact_query_find_neighbors` | Graph traversal from a starting entity |
-| `artifact_query_find_connections_for` | Connections touching an entity with direction/type filters |
-| `artifact_diagram_scaffold` | Suggest diagram scope and PUML scaffolding from selected entities |
+This consistency means both humans and AI can rely on predictable structure for exploration and analysis.
 
-**Artifact write / edit**
+### Verification and Integrity Checks
 
-| Tool | Purpose |
-|------|---------|
-| `artifact_write_help` | Catalog of valid entity and connection types |
-| `artifact_write_modeling_guidance` | Focused modeling guidance by domain or entity type |
-| `artifact_create_entity` | Create entity (with dry-run) |
-| `artifact_edit_entity` | Edit existing entity fields |
-| `artifact_delete_entity` | Delete an entity with dependency checks |
-| `artifact_add_connection` | Add connection between entities (with dry-run) |
-| `artifact_edit_connection` | Edit or remove an existing connection |
-| `artifact_edit_connection_associations` | Add or remove `§assoc` second-order associations |
-| `artifact_create_diagram` | Create an ArchiMate diagram from PUML |
-| `artifact_edit_diagram` | Edit an existing diagram |
-| `artifact_delete_diagram` | Delete a diagram and rendered siblings |
-| `artifact_create_matrix` | Create connection matrix (structured table view) |
-| `artifact_create_document` | Create a document from a configured doc type |
-| `artifact_edit_document` | Edit an existing document |
-| `artifact_delete_document` | Delete a document |
-| `artifact_promote_to_enterprise` | Promote an explicitly selected entity/connection set to enterprise repo |
+The system continuously verifies:
+- **Schema conformance**: entity properties match their type definition
+- **Referential integrity**: every connection endpoint exists and is of the expected type
+- **Cross-repo consistency**: enterprise entities don't reference engagement entities; GRF (global-entity-reference) proxies correctly track promoted entities
+- **Diagram syntax**: PlantUML is valid; referenced entities are present
+- **Document frontmatter**: required fields match schema
 
-**Artifact verification**
+Verification runs:
+- On every write (blocks invalid operations immediately)
+- On demand for the whole repository (CI/CD, pre-promotion review)
+- In real time in the GUI (validation issues highlight as you type)
 
-| Tool | Purpose |
-|------|---------|
-| `artifact_verify` | Verify one file or the whole repo, with summary or full issue detail |
+AI agents receive verification results in structured form (error codes, locations, remediation hints). Humans see clear error messages and suggestions in the UI.
+
+### Authoring and Editing
+
+**For Humans:**
+- **Form-driven entity creation**: schema-aware form fields with guided property entry
+- **Inline connection editing**: drag-and-drop connection pickers with ontology-guided relationship types
+- **Diagram authoring**: visual entity picker with related-entity expansion, side-by-side connection management, live PUML preview
+- **Document authoring**: type-specific templates with required sections and frontmatter fields pre-populated
+- **Preview before commit**: dry-run every write operation to see validation results before saving
+- **Interactive SVG diagrams**: click into entities from diagram views, follow relationships visually
+
+**For AI Agents:**
+- **Typed tools**: every creation/edit operation is a typed tool with schema validation built in
+- **Dry-run mode**: agents can preview changes before committing
+- **Guided namespace**: write tools offer autocomplete over existing entity IDs and types
+- **Structured feedback**: verification errors return codes and locations, not just prose
+
+**For Both:**
+- **Atomic transactions**: writes are serialized to prevent conflicts between concurrent human and AI edits
+- **Version control**: every change is committed to git with authorship; history is queryable
+- **Explicit promotion**: edits stay local to the engagement repo; promotion to enterprise is explicit and traced
+
+### Write-Block and Sync Safety
+
+When multiple sources (humans, AI agents, scheduled syncs) need to coordinate:
+- **Write blocking**: repos can be temporarily blocked during git sync operations without losing data
+- **Auto-recovery**: if a sync fails, the system automatically unblocks after a timeout to prevent deadlock
+- **Real-time notifications**: the GUI shows sync progress and blocks via toast notifications; agents receive events via SSE
+
+### Modeling Guidance
+
+The system exposes:
+- **Entity type catalog**: valid types per domain, create-when/never-create guidance, valid outgoing/incoming connections
+- **Connection ontology**: for a given source entity type, which target types and connection types are permissible
+- **Domain reference models**: example entities and connection patterns per domain (motivation, strategy, business, application, technology)
+
+Humans can browse this guidance in the GUI; AI agents request it as structured data before authoring.
+
+## Interfaces
+
+The system exposes three complementary interfaces to the same artifact store:
+
+### MCP Server (AI Agents)
 
 Configure in `.mcp.json` (Claude Code) or `.vscode/mcp.json` (VS Code):
 
 ```json
 {
   "mcpServers": {
-    "arch-repo": {
+    "arch-repo-read": {
       "command": "uv",
-      "args": ["run", "arch-mcp-stdio"]
+      "args": ["run", "arch-mcp-stdio-read"]
+    },
+    "arch-repo-write": {
+      "command": "uv",
+      "args": ["run", "arch-mcp-stdio-write"]
     }
   }
 }
 ```
 
-`arch-mcp-stdio` auto-starts the unified `arch-backend` when needed and connects over `/mcp`, so GUI and MCP traffic share the same in-process cache and write queue.
+The MCP interface is split into two separate servers so agents can be constrained by capability (read-only access vs. authoring).
 
-This is intended to work well with MCP hosts that eagerly start configured servers when the IDE/app launches: the spawned command becomes a lightweight launcher/bridge, while `arch-backend` remains the single warm backend for the workspace.
+Both STDIO bridges auto-start the unified backend when needed and connect to it via HTTP, so GUI and MCP traffic share the same in-process cache and write queue. This avoids conflicts and ensures humans and AI see the latest state.
 
-When `arch-workspace.yaml` is present and `arch-init` has been run, the backend discovers both repos from `.arch/init-state.yaml`. The env var override is still supported for direct standalone server use.
-
-By default, the launcher manages a local host backend. It does **not** guess that a Dockerized or otherwise external backend is already running just because something responds on port `8000`.
-
-To attach MCP launchers to an externally managed backend instead, set:
+To attach MCP clients to an external backend instead:
 
 ```json
 {
   "mcpServers": {
-    "arch-repo": {
+    "arch-repo-read": {
       "command": "uv",
-      "args": ["run", "arch-mcp-stdio"],
-      "env": {
-        "ARCH_MCP_BACKEND_URL": "http://127.0.0.1:8000"
-      }
+      "args": ["run", "arch-mcp-stdio-read"],
+      "env": { "ARCH_MCP_BACKEND_URL": "http://127.0.0.1:8000" }
     }
   }
 }
 ```
 
-That makes the deployment choice explicit and avoids ambiguous startup behavior.
+### REST API (Programmatic Access)
 
-### REST API (GUI backend and programmatic access)
+`arch-backend` exposes a REST API at `http://localhost:<backend-port>/api/` for querying and authoring. This is the same interface the browser GUI uses, so it covers the full feature set.
 
-`arch-backend` exposes a REST API at `http://localhost:8000/api/` and MCP Streamable HTTP at `http://localhost:8000/mcp`:
+### Browser GUI
 
-**Entities**
+`arch-backend` also serves the Vue SPA at `/`. The GUI covers:
 
-| Endpoint | Description |
-|----------|-------------|
-| `GET /api/stats` | Model statistics |
-| `GET /api/entities` | List entities (`?domain=`, `?artifact_type=`, `?status=`, `?limit=`, `?offset=`) |
-| `GET /api/entity?id=` | Full entity detail with summary, properties, notes, keywords, connection counts |
-| `GET /api/connections?entity_id=&direction=` | Connections for an entity |
-| `GET /api/neighbors?entity_id=&max_hops=` | Neighbour graph |
-| `GET /api/search?q=` | Full-text search |
-| `GET /api/ontology?source_type=` | Connection classification for a source entity type |
-| `GET /api/ontology?source_type=&target_type=` | Permissible connection types for a source/target pair |
-| `GET /api/write-help` | Valid entity types and connection types |
-| `GET /api/entity-schemata?artifact_type=` | JSON attribute schema for an entity type |
-| `GET /api/entity-display-search?q=` | Entity search enriched with ArchiMate display metadata |
-| `POST /api/entity` | Create entity (`dry_run` supported) |
-| `POST /api/entity/edit` | Edit entity fields (`dry_run` supported) |
-| `POST /api/entity/remove` | Delete entity (`dry_run` supported) |
+- **Overview** — engagement vs. enterprise summary, domain and connection-type breakdowns
+- **Exploration** — entity and diagram catalogs with filtering, search, treemap views, graph navigation
+- **Authoring** — entity/diagram/document creation and editing with schema-aware forms and live preview
+- **Verification** — real-time validation feedback, conflict detection on promotion
+- **Promotion** — explicit entity/connection curation with conflict resolution strategies
 
-**Diagrams**
+The GUI is built over the REST API, so anything a human can do in the browser can also be automated via API calls or MCP tools.
 
-| Endpoint | Description |
-|----------|-------------|
-| `GET /api/diagrams` | List diagrams (`?diagram_type=`, `?status=`) |
-| `GET /api/diagram?id=` | Diagram detail with PUML source |
-| `GET /api/diagram-image/{filename}` | Serve rendered PNG |
-| `GET /api/diagram-svg?id=` | Render diagram PUML to interactive SVG on demand |
-| `GET /api/diagram-entities?id=` | Entities referenced in a diagram (with display aliases) |
-| `GET /api/diagram-connections?id=` | Connections between entities present in a diagram |
-| `GET /api/diagram-refs?source_id=&target_id=` | Find diagrams referencing a connection |
-| `GET /api/diagram-download?id=&format=png|svg` | Download rendered diagram output |
-| `POST /api/diagram` | Create diagram from entity/connection selection |
-| `POST /api/diagram/edit` | Edit diagram entity/connection selection |
-| `POST /api/diagram/preview` | Preview diagram as PNG + PUML without writing files |
-| `POST /api/diagram/remove` | Delete diagram (`dry_run` supported) |
-
-**Connections**
-
-| Endpoint | Description |
-|----------|-------------|
-| `POST /api/connection` | Add connection (`dry_run` supported) |
-| `POST /api/connection/edit` | Edit connection description/cardinalities |
-| `POST /api/connection/associate` | Add or remove connection associations |
-| `POST /api/connection/remove` | Remove connection (`dry_run` supported) |
-| `POST /api/cleanup-broken-refs` | Find and optionally clean up broken GRF proxies |
-
-**Documents**
-
-| Endpoint | Description |
-|----------|-------------|
-| `GET /api/document-types` | List configured document types and required sections |
-| `GET /api/document-schemata` | Read raw document-type schemata |
-| `GET /api/documents` | List documents (`?doc_type=`, `?status=`, `?limit=`, `?offset=`) |
-| `GET /api/document?id=` | Read one document |
-| `POST /api/document` | Create document (`dry_run` supported) |
-| `PUT /api/document/{id}` | Edit document (`dry_run` supported) |
-| `DELETE /api/document/{id}?dry_run=` | Delete document |
-
-**Promotion**
-
-| Endpoint | Description |
-|----------|-------------|
-| `POST /api/promote/plan` | Compute promotion plan, conflicts, and warnings for an explicit selection |
-| `POST /api/promote/execute` | Execute promotion for an explicit selection and replace engagement artifacts with GRF proxies |
-
-**Admin mode**
-
-When `arch-backend --admin-mode` is used, `/admin/api/*` exposes enterprise-repo write endpoints for entities, connections, diagrams, and `GET /admin/api/server-info`.
-
-### GUI Tool — Browser Interface
-
-`arch-backend` also serves the Vue SPA at `/`. `arch-gui-server` is a thin wrapper around the unified backend entry point.
-
-Current GUI capabilities:
-
-- **Home / overview** — engagement vs global summary cards, domain breakdown, connection-type breakdown
-- **Entities catalog** — engagement and global views, domain filtering, type filter, sortable table, connection-weighted treemap, hierarchy display for specialization/composition/aggregation
-- **Entity detail** — metadata, parsed content, connection counts, inline editing, deletion, and three connection panels with ontology-aware add/edit/remove flows
-- **Entity creation** — grouped type selector, schema-aware properties, dry-run preview, create-and-open flow
-- **Search** — full-text artifact search with typed result rows
-- **Diagrams catalog** — engagement and global listings
-- **Diagram detail** — interactive SVG viewer, entity/connection side panels, rendered download menu, raw PUML toggle, edit entry point
-- **Diagram create/edit** — entity search with glyphs, row-level related-entity expansion, connection inclusion management, preview before save
-- **Graph explorer** — force-directed interactive neighborhood exploration from any entity
-- **Promotion view** — root entity picker, explicit entity/connection set curation, conflict strategy selection, execution to the global repository
-
-The GUI is a human-facing client over the REST API. It does not expose every admin endpoint as dedicated screens, but it does cover normal engagement authoring, exploration, and promotion workflows.
-
-### CLI
-
-```bash
-# Initialise workspace (validate repos, write .arch/init-state.yaml)
-arch-init
-
-# Generate PlantUML macros (_macros.puml)
-python -m src.tools.generate_macros path/to/architecture-repository
-```
-
-## Setup
+## Installation and Setup
 
 **Requirements**: Python ≥ 3.13, Java ≥ 11 (for diagram verification and rendering), Node ≥ 18 (for GUI development), `uv`.
+
+### 1. Install Dependencies
 
 ```bash
 # Python environment
 uv sync                        # core dependencies
 uv sync --extra gui            # + GUI server dependencies
 
-# Download plantuml.jar (SHA-256-verified from Maven Central, pinned version)
+# Download and verify plantuml.jar from Maven Central
 get-plantuml                   # → tools/plantuml.jar (gitignored)
-# To upgrade: edit PLANTUML_VERSION in src/tools/get_plantuml.py, re-run
-
-# Initialise workspace
-arch-init                      # reads arch-workspace.yaml, writes .arch/init-state.yaml
-
-# Install MCP servers into your AI tool's config
-# (edit .mcp.json — see Tooling section above)
-
-# Preferred local default: run the unified backend on the host.
-# It serves the built Vue app at http://localhost:8000/
-arch-backend &
-
-# Inspect / stop / restart it when needed
-arch-backend --status
-arch-backend --stop
-arch-backend --restart
-
-# Frontend development with Vite hot-reload:
-# Vite serves the UI at http://localhost:5173/ and proxies /api to arch-backend on :8000
-cd tools/gui && npm install && npm run dev
-# → open http://localhost:5173
 ```
 
-> **plantuml.jar** is downloaded on demand and gitignored. The Docker build fetches and verifies it automatically. For local development, `get-plantuml` places it at `tools/plantuml.jar`, which is the path the verifier and diagram renderer expect.
+### 2. Initialise Workspace
 
-## GUI — Dockerized
+```bash
+# Create or validate arch-workspace.yaml (see Two-Tiered Architecture section above)
+# Then run:
+arch-init                      # reads arch-workspace.yaml, writes .arch/init-state.yaml
+```
 
-The GUI packages the Vue SPA and the FastAPI REST server into a single container. The repository is mounted from the host at runtime, so no rebuild is needed when model files change.
+### 3. Start the Backend
+
+```bash
+# Run the unified backend (serves API at :8000 and MCP at :8000/mcp)
+arch-backend --daemon
+
+# Inspect / stop / restart
+arch-backend --status
+arch-backend --stop
+arch-backend --restart --daemon
+```
+
+The backend also serves the built Vue app at `http://localhost:8000/`.
+
+`arch-backend --daemon` starts the backend in a new session, redirects stdin from
+`/dev/null`, and writes output to `backend.log_path`. This avoids shell
+job-control stops that can happen with raw `arch-backend &` if a background
+process reads from the terminal. `arch-backend &` is still supported and also
+detaches stdin when a background TTY job is detected, but `--daemon` is the
+preferred operational form.
+
+If the frontend appears stuck on "Loading...", diagnose the actual transport
+path before assuming an application lock:
+
+```bash
+arch-backend --status
+curl --max-time 5 http://127.0.0.1:8000/api/stats
+curl --max-time 5 http://127.0.0.1:5173/api/stats
+tail -n 100 .arch/backend.log  # or the configured backend.log_path
+```
+
+If status reports `process state: T`, the backend process is stopped while still
+holding the port. Stop and restart it with:
+
+```bash
+arch-backend --stop
+arch-backend --daemon
+```
+
+### 4. Configure MCP Access for AI Agents
+
+Edit `.mcp.json` or your IDE's MCP config (see **MCP Server** section above).
+
+If using Claude Code, the default config already points to the auto-starting backend.
+
+### 5. Frontend Development (Optional)
+
+For active frontend development with Vite hot-reload:
+
+```bash
+cd tools/gui
+npm install
+npm run dev
+# → open http://localhost:5173
+# API calls are proxied to arch-backend on :8000
+```
+
+## Running in Docker
+
+The GUI packages the Vue SPA and FastAPI server into a single container:
 
 ```bash
 # Start with the bundled self-describing model
 docker compose up --build
-# -> http://localhost:8000
+# → http://localhost:8000
 
-# Point at a different repository
+# Or point at a different repository
 ARCH_REPO_ROOT=/path/to/your/architecture-repository docker compose up --build
 ```
 
-The container serves the Vue SPA at `/` and the REST API at `/api/`. System dependencies for PlantUML SVG/PNG rendering (Java, Graphviz, fonts) are included in the image.
+The container includes system dependencies for PlantUML diagram rendering (Java, Graphviz, fonts).
 
-If you want host-started MCP clients to attach to a Dockerized backend instead of auto-starting a separate host backend:
+If you want host-started MCP clients to attach to the Dockerized backend:
 
-- expose the container on `localhost:8000` as the compose file already does
-- configure the MCP client to run `arch-mcp-stdio`
-- set `ARCH_MCP_BACKEND_URL=http://127.0.0.1:8000` in that MCP config
+1. Ensure the container is published on `localhost:8000` (the compose file does this by default)
+2. In your MCP config, set `ARCH_MCP_BACKEND_URL=http://127.0.0.1:8000`
+3. The MCP launcher will skip starting its own backend and attach to the published port instead
 
-In practice this means Dockerized backend and auto-started MCP servers can work together, but they are still two deployment modes:
+## Modes and Permissions
 
-- normal local-dev mode: host `arch-backend` + host MCP launchers
-- containerized mode: Docker `arch-backend` + host MCP launchers explicitly attaching to the published port
+**Normal mode (default)**
+- Humans and AI agents can read/write the engagement repository
+- The enterprise repository is read-only (accessed via promotion)
+
+**Admin mode** (`arch-backend --admin-mode`)
+- Enables direct enterprise repository writes via the GUI and REST API
+- Intended for curating the shared baseline; normally not needed during engagement work
+- The browser GUI shows a banner when admin mode is active
+
+**Read-only mode** (`arch-backend --read-only`)
+- All write operations are blocked globally (useful for review/audit deployments)
+- The browser GUI shows a banner and disables write buttons
+- The MCP write server remains available but rejects all mutations
+
+## Continuous Git Sync
+
+When a repository is configured as a git repo (not just a local path), the backend:
+
+- Periodically checks the configured branch for updates
+- If new commits are found, temporarily blocks write operations, pulls the changes, and resumes
+- Notifies the GUI with toast messages and publishes events for connected agents
+- Auto-unblocks if a pull fails (prevents deadlock)
+
+This allows external changes (e.g., team updates to the enterprise repo) to be automatically pulled into the workspace without disrupting ongoing work.
+
+## Configuration Reference
+
+### Entity Types (`config/entity_ontology.yaml`)
+
+Each entry defines one ArchiMate NEXT entity type:
+
+```yaml
+requirement:
+  prefix: REQ           # short ID prefix, e.g. REQ@epoch.random.slug
+  domain: motivation    # filesystem domain directory under model/
+  subdir: requirements  # subdirectory within the domain
+  archimate_element_type: Requirement   # CamelCase element type for diagram blocks
+  element_classes: [motivation-element] # ArchiMate classification classes
+  has_sprite: true      # whether a diagram sprite exists for this type
+  create_when: "…"      # guidance on when to use this type
+  never_create_when: "…"
+```
+
+Internal/meta types that should not appear in domain groupings or catalogs carry `internal: true`.
+
+### Connection Types (`config/connection_ontology.yaml`)
+
+Each entry defines one connection type, grouped by diagram language (`archimate`, `er`, `sequence`, `activity`, `usecase`):
+
+```yaml
+archimate-realization:
+  archimate_relationship_type: Realization  # ArchiMate stereotype name
+  puml_arrow: "..|>"    # PlantUML arrow syntax
+  symmetric: false      # true for bidirectional relationships (e.g. association)
+```
+
+Permitted relationships between entity types are defined in the `permitted_relationships:` section using `[source, target, [connection-short-names]]` rules with `@class` and `@all` wildcards.
+
+### Document Types (`.arch-repo/documents/*.json`)
+
+Each file defines one document type. The filename (without `.json`) is the `doc-type` frontmatter value used in document files.
+
+```json
+{
+  "abbreviation": "STD",
+  "name": "Standard",
+  "subdirectory": "standards",
+  "frontmatter_schema": {
+    "type": "object",
+    "required": ["title", "status"],
+    "properties": {
+      "title":      { "type": "string" },
+      "status":     { "type": "string", "enum": ["draft", "accepted", "rejected", "superseded"] },
+      "applies_to": { "type": "array", "items": { "type": "string" } },
+      "date":       { "type": "string" }
+    }
+  },
+  "required_sections": ["Scope", "Motivation", "Summary", "Specification"],
+  "required_entity_type_connections": ["requirement", "@internal-behavior-element"],
+  "suggested_entity_type_connections": ["principle", "goal", "@all"]
+}
+```
+
+**`frontmatter_schema`** — JSON Schema for the document's YAML frontmatter. Fields outside the built-in set (`title`, `status`, `keywords`) are rendered as type-specific form fields in the GUI and validated on write.
+
+**`required_sections`** — Section headings (matching `## Heading`) that must be present in the document body. Missing sections are reported as E154 verification errors.
+
+**`required_entity_type_connections`** — Entity type terms of which at least one matching entity must be linked (via a Markdown link in the body) for verification to pass. Terms may be a concrete entity type (`requirement`), `@all`, or any element class from `config/entity_ontology.yaml` prefixed with `@` (for example `@internal-behavior-element`, using the same syntax as `config/connection_ontology.yaml`). Missing links are reported as E155 errors and block writes.
+
+**`suggested_entity_type_connections`** — Entity type terms whose linking is recommended but not enforced. The GUI displays these as blue "Suggested entity links" notices to prompt the author.
+
+## Further Reading
+
+- **[ArchiMate Forum](https://www.opengroup.org/archimate-forum)** — the modelling language
+- **`engagements/ENG-ARCH-REPO/`** — a self-describing model of this system's own architecture
+- **`src/common/ontology_loader.py`** — entity types, connection types, and domain definitions
+- **`.arch-repo/documents/`** — structured documentation templates (ADR, Standard, Specification)

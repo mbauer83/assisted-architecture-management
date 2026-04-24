@@ -93,6 +93,14 @@ def queued(fn: _F) -> _F:
 
     @wraps(fn)
     async def wrapper(*args: Any, **kwargs: Any) -> Any:
+        # Check write-block state before submitting to queue
+        repo_root_str = kwargs.get("repo_root")
+        if repo_root_str is not None:
+            from pathlib import Path
+            from src.tools.write_block_manager import is_blocked
+            if is_blocked(Path(repo_root_str)):
+                raise RuntimeError("Writes are temporarily blocked (sync in progress or read-only mode)")
+
         loop = asyncio.get_running_loop()
         future = _submit(fn, *args, **kwargs)
         return await asyncio.wrap_future(future, loop=loop)

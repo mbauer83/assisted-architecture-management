@@ -22,11 +22,11 @@ from src.common.ontology_loader import CONNECTION_TYPES, DOMAIN_GROUPING, ENTITY
 from src.common.artifact_parsing import extract_archimate_label_alias
 
 
-# conn_dir → PUML arrow (derived from ontology at module load)
+# conn_short_name → PUML arrow (archimate connections only)
 _ARROW: dict[str, str] = {
-    ct.conn_dir: ct.puml_arrow
+    ct.artifact_type.split("-", 1)[1]: ct.puml_arrow
     for ct in CONNECTION_TYPES.values()
-    if ct.conn_lang == "archimate" and ct.conn_dir
+    if ct.conn_lang == "archimate"
 }
 
 # conn_dir → PUML stereotype label (absent → no label)
@@ -57,7 +57,7 @@ def _extract_prose(text: str | None) -> str | None:
 
 def _domain(artifact_type: str) -> str:
     info = ENTITY_TYPES.get(artifact_type)
-    return info.archimate_domain if info else "Common"
+    return info.domain_dir.capitalize() if info else "Common"
 
 
 _JUNCTION_TYPES = frozenset({"and-junction", "or-junction"})
@@ -361,7 +361,7 @@ def artifact_diagram_scaffold(
                 continue
             seen.add(key)
             ct = CONNECTION_TYPES.get(conn_rec.conn_type)
-            conn_dir = ct.conn_dir if ct else conn_rec.conn_type
+            conn_dir = conn_rec.conn_type.split("-", 1)[1]
             connections.append({
                 "source_alias": src_alias,
                 "conn_dir": conn_dir,

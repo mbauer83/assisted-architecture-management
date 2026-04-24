@@ -55,19 +55,55 @@ def search(q: str, limit: int = 20) -> dict[str, Any]:
     return {"query": result.query, "hits": hits}
 
 
+def _resolve_effective_type(artifact_id: str | None, declared_type: str) -> tuple[str, bool]:
+    """Return (effective_type, is_non_entity_gar) for an artifact.
+
+    Entity GARs resolve to their original entity subtype.
+    Document/diagram GARs return is_non_entity_gar=True (not valid as connection endpoints).
+    Non-GAR artifacts return declared_type unchanged.
+    """
+    if artifact_id is None:
+        return declared_type, False
+    repo = s.maybe_get_repo()
+    if repo is None:
+        return declared_type, False
+    rec = repo.get_entity(artifact_id)
+    if rec is None or rec.artifact_type != "global-artifact-reference":
+        return declared_type, False
+    if rec.extra.get("global-artifact-type") != "entity":
+        return declared_type, True
+    entity_type = rec.extra.get("global-artifact-entity-type")
+    return (entity_type or declared_type), False
+
+
 @router.get("/api/ontology")
-def get_ontology(source_type: str, target_type: str | None = None) -> dict[str, Any]:
+def get_ontology(
+    source_type: str,
+    target_type: str | None = None,
+    source_id: str | None = None,
+    target_id: str | None = None,
+) -> dict[str, Any]:
     from src.common.connection_ontology import (
         classify_connections, is_symmetric, permissible_connection_types,
     )
-    if target_type:
-        conn_types = permissible_connection_types(source_type, target_type)
+    effective_source, source_is_non_entity_gar = _resolve_effective_type(source_id, source_type)
+    effective_target, target_is_non_entity_gar = _resolve_effective_type(target_id, target_type or "")
+
+    if source_is_non_entity_gar or target_is_non_entity_gar:
+        return {
+            "source_type": source_type, "target_type": target_type,
+            "connection_types": [],
+            "error": "document/diagram global-artifact-references are not valid connection endpoints",
+        }
+
+    if effective_target:
+        conn_types = permissible_connection_types(effective_source, effective_target)
         return {
             "source_type": source_type, "target_type": target_type,
             "connection_types": conn_types,
             "symmetric": [ct for ct in conn_types if is_symmetric(ct)],
         }
-    return {"source_type": source_type, **classify_connections(source_type)}
+    return {"source_type": source_type, **classify_connections(effective_source)}
 
 
 @router.get("/api/write-help")
@@ -93,6 +129,15 @@ class RemoveConnectionBody(BaseModel):
     dry_run: bool = True
 
 
+def _reject_if_non_entity_gar(artifact_id: str, role: str) -> None:
+    """Raise 400 if the given artifact is a document/diagram GAR (not valid as connection endpoint)."""
+    rec = s.maybe_get_repo() and s.maybe_get_repo().get_entity(artifact_id)  # type: ignore[union-attr]
+    if rec is None:
+        return
+    if rec.artifact_type == "global-artifact-reference" and rec.extra.get("global-artifact-type") != "entity":
+        raise HTTPException(400, f"Cannot use a document/diagram global-artifact-reference as a connection {role}")
+
+
 @router.post("/api/connection")
 def add_connection(body: AddConnectionBody) -> dict[str, Any]:
     repo_root, registry, verifier = s.get_write_deps()
@@ -100,40 +145,47 @@ def add_connection(body: AddConnectionBody) -> dict[str, Any]:
 
     effective_source = body.source_entity
     effective_target = body.target_entity
-    grf_source_id: str | None = None
-    grf_artifact_id: str | None = None
-    grf_warnings: list[str] = []
+    gar_source_id: str | None = None
+    gar_artifact_id: str | None = None
+    gar_warnings: list[str] = []
 
-    def _ensure_grf(global_id: str) -> str:
+    def _ensure_gar(global_id: str) -> str:
         nonlocal registry, verifier
-        from src.tools.artifact_write.global_entity_reference import ensure_global_entity_reference
+        from src.tools.artifact_write.global_artifact_reference import ensure_global_artifact_reference
         repo = s.get_repo()
         global_rec = repo.get_entity(global_id)
         global_name = global_rec.name if global_rec else global_id
-        grf_result = s.run_serialized_write(
-            ensure_global_entity_reference,
+        global_entity_type = global_rec.artifact_type if global_rec else None
+        gar_result = s.run_serialized_write(
+            ensure_global_artifact_reference,
             engagement_repo=repo,
             engagement_root=repo_root,
             verifier=verifier,
             clear_repo_caches=s.clear_caches,
-            global_entity_id=global_id,
-            global_entity_name=global_name,
+            global_artifact_id=global_id,
+            global_artifact_name=global_name,
+            global_artifact_type="entity",
+            global_artifact_entity_type=global_entity_type,
             dry_run=body.dry_run,
         )
-        if grf_result.wrote:
-            grf_warnings.append(f"Created global-entity-reference proxy {grf_result.artifact_id}")
+        if gar_result.wrote:
+            gar_warnings.append(f"Created global-artifact-reference proxy {gar_result.artifact_id}")
             _, registry, verifier = s.get_write_deps()
         else:
-            grf_warnings.append(f"Routed via existing global-entity-reference {grf_result.artifact_id}")
-        return grf_result.artifact_id
+            gar_warnings.append(f"Routed via existing global-artifact-reference {gar_result.artifact_id}")
+        return gar_result.artifact_id
+
+    # Reject document/diagram GAR endpoints
+    _reject_if_non_entity_gar(body.source_entity, "source")
+    _reject_if_non_entity_gar(body.target_entity, "target")
 
     if s._enterprise_root is not None and registry.scope_of_entity(body.source_entity) == "enterprise":
-        grf_source_id = _ensure_grf(body.source_entity)
-        effective_source = grf_source_id
+        gar_source_id = _ensure_gar(body.source_entity)
+        effective_source = gar_source_id
 
     if s._enterprise_root is not None and registry.scope_of_entity(body.target_entity) == "enterprise":
-        grf_artifact_id = _ensure_grf(body.target_entity)
-        effective_target = grf_artifact_id
+        gar_artifact_id = _ensure_gar(body.target_entity)
+        effective_target = gar_artifact_id
 
     try:
         result = s.run_serialized_write(
@@ -157,14 +209,14 @@ def add_connection(body: AddConnectionBody) -> dict[str, Any]:
         raise HTTPException(400, str(e))
 
     d = s.write_result_to_dict(result)
-    if grf_source_id:
-        d["grf_source_id"] = grf_source_id
+    if gar_source_id:
+        d["gar_source_id"] = gar_source_id
         d["original_source"] = body.source_entity
-    if grf_artifact_id:
-        d["grf_artifact_id"] = grf_artifact_id
+    if gar_artifact_id:
+        d["gar_artifact_id"] = gar_artifact_id
         d["original_target"] = body.target_entity
-    if grf_warnings:
-        d["warnings"] = (d.get("warnings") or []) + grf_warnings
+    if gar_warnings:
+        d["warnings"] = (d.get("warnings") or []) + gar_warnings
     return d
 
 

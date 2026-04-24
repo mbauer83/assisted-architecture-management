@@ -2,38 +2,86 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from starlette.routing import Match
+import yaml
 
+from src.common import settings
 from src.tools import mcp_artifact_server
 from src.tools import backend_runtime
 from src.tools import arch_backend
 from src.tools.arch_backend import _build_app
 
 
-def test_arch_mcp_model_stdio_delegates_to_bridge_by_default(monkeypatch) -> None:
-    called: dict[str, list[str]] = {}
+def test_arch_mcp_stdio_read_connects_to_read_path(monkeypatch) -> None:
+    """arch-mcp-stdio (default) bridges to /mcp/read."""
+    from src.tools import arch_mcp_stdio
 
-    def fake_bridge_main(argv: list[str] | None = None) -> None:
-        called["argv"] = argv or []
+    urls: list[str] = []
 
-    monkeypatch.setattr("src.tools.arch_mcp_stdio.main", fake_bridge_main)
+    def fake_anyio_run(fn, url: str) -> None:
+        urls.append(url)
 
-    mcp_artifact_server.main(["--transport", "stdio"])
+    monkeypatch.setattr(arch_mcp_stdio.anyio, "run", fake_anyio_run)
+    monkeypatch.setattr(arch_mcp_stdio, "ensure_backend_running",
+                        lambda port, start_if_missing, cwd=None: port)
+    monkeypatch.setattr(arch_mcp_stdio, "configured_backend_url", lambda: None)
 
-    assert called["argv"] == ["--port", "8000"]
+    arch_mcp_stdio.main([])
+
+    assert urls and urls[0].endswith("/mcp/read")
 
 
-def test_arch_mcp_model_stdio_can_still_run_standalone(monkeypatch) -> None:
-    called: dict[str, object] = {"run": False}
+def test_arch_mcp_stdio_write_connects_to_write_path(monkeypatch) -> None:
+    """arch-mcp-stdio --server write bridges to /mcp/write."""
+    from src.tools import arch_mcp_stdio
 
-    def fake_run(*, transport: str) -> None:
-        called["run"] = transport
+    urls: list[str] = []
 
-    monkeypatch.setattr(mcp_artifact_server.mcp, "run", fake_run)
+    def fake_anyio_run(fn, url: str) -> None:
+        urls.append(url)
 
-    mcp_artifact_server.main(["--transport", "stdio", "--standalone-stdio"])
+    monkeypatch.setattr(arch_mcp_stdio.anyio, "run", fake_anyio_run)
+    monkeypatch.setattr(arch_mcp_stdio, "ensure_backend_running",
+                        lambda port, start_if_missing, cwd=None: port)
+    monkeypatch.setattr(arch_mcp_stdio, "configured_backend_url", lambda: None)
 
-    assert called["run"] == "stdio"
+    arch_mcp_stdio.main(["--server", "write"])
+
+    assert urls and urls[0].endswith("/mcp/write")
+
+
+def test_arch_mcp_stdio_uses_project_directory_for_autostart(monkeypatch, tmp_path: Path) -> None:
+    from src.tools import arch_mcp_stdio
+
+    calls: dict[str, object] = {}
+
+    monkeypatch.setattr(arch_mcp_stdio.anyio, "run", lambda fn, url: None)
+    monkeypatch.setattr(arch_mcp_stdio, "_project_directory", lambda: tmp_path)
+
+    def fake_resolve_backend_port(start=None, explicit_port=None):
+        calls["resolve_start"] = start
+        return 8123
+
+    monkeypatch.setattr(
+        arch_mcp_stdio,
+        "resolve_backend_port",
+        fake_resolve_backend_port,
+    )
+    monkeypatch.setattr(
+        arch_mcp_stdio,
+        "ensure_backend_running",
+        lambda port, start_if_missing, cwd=None: (
+            calls.setdefault("ensure_port", port),
+            calls.setdefault("ensure_cwd", cwd),
+            8123,
+        )[-1],
+    )
+    monkeypatch.setattr(arch_mcp_stdio, "configured_backend_url", lambda: None)
+
+    arch_mcp_stdio.main([])
+
+    assert calls["resolve_start"] == tmp_path
+    assert calls["ensure_port"] == 8123
+    assert calls["ensure_cwd"] == tmp_path
 
 
 def test_backend_state_path_falls_back_without_arch_init(tmp_path: Path) -> None:
@@ -63,6 +111,69 @@ def test_ensure_backend_running_uses_explicit_external_backend(monkeypatch) -> N
     assert port == 8000
 
 
+def test_resolve_backend_port_uses_workspace_config(tmp_path: Path) -> None:
+    config_path = tmp_path / "arch-workspace.yaml"
+    config_path.write_text(
+        yaml.safe_dump(
+            {
+                "engagement": {"local": "eng"},
+                "enterprise": {"local": "ent"},
+                "backend": {"port": 8123},
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    port = backend_runtime.resolve_backend_port(start=tmp_path)
+
+    assert port == 8123
+
+
+def test_resolve_backend_port_falls_back_to_global_settings(monkeypatch) -> None:
+    monkeypatch.setattr(backend_runtime, "load_workspace_config", lambda start=None: None)
+    monkeypatch.setattr(backend_runtime, "global_backend_port", lambda: 8456)
+
+    port = backend_runtime.resolve_backend_port()
+
+    assert port == 8456
+
+
+def test_backend_log_path_uses_configured_workspace_relative_path(monkeypatch, tmp_path: Path) -> None:
+    monkeypatch.setattr(backend_runtime, "configured_backend_log_path", lambda: "runtime/backend.log")
+    monkeypatch.setattr(backend_runtime, "workspace_root", lambda start=None: tmp_path)
+
+    path = backend_runtime.backend_log_path(tmp_path / "subdir")
+
+    assert path == tmp_path / "runtime" / "backend.log"
+
+
+def test_backend_log_path_uses_configured_absolute_path(monkeypatch, tmp_path: Path) -> None:
+    configured = tmp_path / "logs" / "backend.log"
+    monkeypatch.setattr(backend_runtime, "configured_backend_log_path", lambda: str(configured))
+
+    path = backend_runtime.backend_log_path()
+
+    assert path == configured
+
+
+def test_backend_min_log_level_defaults_to_info(monkeypatch) -> None:
+    monkeypatch.setattr(settings, "load_settings", lambda: {"backend": {}})
+
+    assert settings.backend_min_log_level() == "INFO"
+
+
+def test_backend_min_log_level_normalizes_warn_alias(monkeypatch) -> None:
+    monkeypatch.setattr(settings, "load_settings", lambda: {"backend": {"min_log_level": "warn"}})
+
+    assert settings.backend_min_log_level() == "WARNING"
+
+
+def test_backend_min_log_level_rejects_invalid_values(monkeypatch) -> None:
+    monkeypatch.setattr(settings, "load_settings", lambda: {"backend": {"min_log_level": "verbose"}})
+
+    assert settings.backend_min_log_level() == "INFO"
+
+
 def test_backend_start_command_falls_back_to_uv_for_gui_extras(monkeypatch) -> None:
     monkeypatch.setattr(backend_runtime.shutil, "which", lambda name: "/usr/bin/uv" if name == "uv" else None)
 
@@ -80,27 +191,25 @@ def test_backend_start_command_only_uses_current_python_when_uv_unavailable(monk
     assert cmd == [backend_runtime.sys.executable, "-m", "src.tools.arch_backend", "--port", "8123"]
 
 
-def test_unified_backend_routes_mcp_on_bare_and_slash_paths() -> None:
+def test_matches_arch_backend_process_for_console_script_path() -> None:
+    argv = [
+        "/home/user/project/.venv/bin/python3",
+        "/home/user/project/.venv/bin/arch-backend",
+        "--port",
+        "8000",
+    ]
+
+    assert backend_runtime._matches_arch_backend_process(argv) is True
+
+
+def test_unified_backend_routes_split_mcp_paths() -> None:
     app = _build_app()
-    bare_scope = {
-        "type": "http",
-        "method": "POST",
-        "path": "/mcp",
-        "root_path": "",
-        "scheme": "http",
-        "query_string": b"",
-        "headers": [],
-        "client": ("127.0.0.1", 1234),
-        "server": ("127.0.0.1", 8000),
-    }
-    slash_scope = {**bare_scope, "path": "/mcp/"}
+    actual_paths = {getattr(route, "path", None) for route in app.routes}
 
-    mcp_routes = [route for route in app.routes if getattr(route, "path", None) in {"/mcp", "/mcp/"}]
-    bare_matches = [route.matches(bare_scope)[0] for route in mcp_routes]
-    slash_matches = [route.matches(slash_scope)[0] for route in mcp_routes]
-
-    assert Match.FULL in bare_matches
-    assert Match.FULL in slash_matches
+    assert "/mcp/read" in actual_paths
+    assert "/mcp/read/" in actual_paths
+    assert "/mcp/write" in actual_paths
+    assert "/mcp/write/" in actual_paths
 
 
 def test_stop_backend_returns_not_running_when_no_state(monkeypatch) -> None:
@@ -121,8 +230,29 @@ def test_backend_status_reports_not_running_when_no_state(monkeypatch) -> None:
     assert result == {"running": False, "reason": "not_running"}
 
 
+def test_find_arch_backend_instances_excludes_current_status_process(monkeypatch, tmp_path: Path) -> None:
+    proc_root = tmp_path / "proc"
+    current = proc_root / "123"
+    other = proc_root / "456"
+    current.mkdir(parents=True)
+    other.mkdir(parents=True)
+    (current / "cmdline").write_bytes(b"arch-backend\x00--status\x00")
+    (current / "stat").write_text("123 (arch-backend) R 0 0 0\n", encoding="utf-8")
+    (other / "cmdline").write_bytes(b"arch-backend\x00--port\x008123\x00")
+    (other / "stat").write_text("456 (arch-backend) S 0 0 0\n", encoding="utf-8")
+
+    monkeypatch.setattr(backend_runtime, "_PROC_DIR", proc_root)
+    monkeypatch.setattr(backend_runtime, "_list_listening_socket_inodes", lambda: {})
+    monkeypatch.setattr(backend_runtime.os, "getpid", lambda: 123)
+
+    result = backend_runtime.find_arch_backend_instances()
+
+    assert [instance["pid"] for instance in result] == [456]
+
+
 def test_backend_status_reports_unmanaged_backend(monkeypatch) -> None:
     monkeypatch.setattr(backend_runtime, "read_backend_state", lambda start=None: None)
+    monkeypatch.setattr(backend_runtime, "find_arch_backend_instance_for_port", lambda port: None)
     monkeypatch.setattr(backend_runtime, "probe_backend", lambda port, timeout_s=1.0: True)
 
     result = backend_runtime.backend_status(port=8000)
@@ -132,12 +262,205 @@ def test_backend_status_reports_unmanaged_backend(monkeypatch) -> None:
 
 def test_backend_status_reports_port_in_use(monkeypatch) -> None:
     monkeypatch.setattr(backend_runtime, "read_backend_state", lambda start=None: None)
+    monkeypatch.setattr(backend_runtime, "find_arch_backend_instance_for_port", lambda port: None)
     monkeypatch.setattr(backend_runtime, "probe_backend", lambda port, timeout_s=1.0: False)
     monkeypatch.setattr(backend_runtime, "port_in_use", lambda host="127.0.0.1", port=8000: True)
 
     result = backend_runtime.backend_status(port=8000)
 
     assert result == {"running": False, "reason": "port_in_use", "port": 8000}
+
+
+def test_backend_status_reports_untracked_arch_backend_as_running(monkeypatch) -> None:
+    monkeypatch.setattr(backend_runtime, "read_backend_state", lambda start=None: None)
+    monkeypatch.setattr(
+        backend_runtime,
+        "find_arch_backend_instance_for_port",
+        lambda port: {
+            "pid": 654,
+            "ports": [port],
+            "declared_port": port,
+            "process_state": "S",
+            "stdin": "/dev/null",
+            "stdout": "/tmp/backend.log",
+            "stderr": "/tmp/backend.log",
+        },
+    )
+    monkeypatch.setattr(backend_runtime, "backend_log_path", lambda start=None: Path("/tmp/backend.log"))
+    monkeypatch.setattr(backend_runtime, "probe_backend", lambda port, timeout_s=1.0: True)
+
+    result = backend_runtime.backend_status(port=8000)
+
+    assert result == {
+        "running": True,
+        "reason": "ok_untracked",
+        "pid": 654,
+        "port": 8000,
+        "process_state": "S",
+        "stdin": "/dev/null",
+        "stdout": "/tmp/backend.log",
+        "stderr": "/tmp/backend.log",
+        "log_path": "/tmp/backend.log",
+    }
+
+
+def test_backend_status_reports_stopped_arch_backend(monkeypatch) -> None:
+    monkeypatch.setattr(backend_runtime, "read_backend_state", lambda start=None: None)
+    monkeypatch.setattr(
+        backend_runtime,
+        "find_arch_backend_instance_for_port",
+        lambda port: {
+            "pid": 654,
+            "ports": [port],
+            "declared_port": port,
+            "process_state": "T",
+            "stdin": "/dev/pts/8",
+            "stdout": "/tmp/backend.log",
+            "stderr": "/tmp/backend.log",
+        },
+    )
+    monkeypatch.setattr(backend_runtime, "backend_log_path", lambda start=None: Path("/tmp/backend.log"))
+
+    result = backend_runtime.backend_status(port=8000)
+
+    assert result == {
+        "running": False,
+        "reason": "stopped_backend",
+        "pid": 654,
+        "port": 8000,
+        "process_state": "T",
+        "stdin": "/dev/pts/8",
+        "stdout": "/tmp/backend.log",
+        "stderr": "/tmp/backend.log",
+        "log_path": "/tmp/backend.log",
+    }
+
+
+def test_backend_status_reports_unhealthy_arch_backend(monkeypatch) -> None:
+    monkeypatch.setattr(backend_runtime, "read_backend_state", lambda start=None: None)
+    monkeypatch.setattr(
+        backend_runtime,
+        "find_arch_backend_instance_for_port",
+        lambda port: {
+            "pid": 654,
+            "ports": [port],
+            "declared_port": port,
+            "process_state": "S",
+            "stdin": "/dev/null",
+            "stdout": "/tmp/backend.log",
+            "stderr": "/tmp/backend.log",
+        },
+    )
+    monkeypatch.setattr(backend_runtime, "backend_log_path", lambda start=None: Path("/tmp/backend.log"))
+    monkeypatch.setattr(backend_runtime, "probe_backend", lambda port, timeout_s=1.0: False)
+
+    result = backend_runtime.backend_status(port=8000)
+
+    assert result == {
+        "running": False,
+        "reason": "unhealthy_backend",
+        "pid": 654,
+        "port": 8000,
+        "process_state": "S",
+        "stdin": "/dev/null",
+        "stdout": "/tmp/backend.log",
+        "stderr": "/tmp/backend.log",
+        "log_path": "/tmp/backend.log",
+    }
+
+
+def test_port_in_use_returns_false_when_socket_unavailable(monkeypatch) -> None:
+    class _SocketModule:
+        AF_INET = object()
+        SOCK_STREAM = object()
+
+        @staticmethod
+        def socket(*args, **kwargs):
+            raise PermissionError("sandbox")
+
+    monkeypatch.setattr(backend_runtime, "socket", _SocketModule)
+
+    assert backend_runtime.port_in_use(port=8000) is False
+
+
+def test_backend_status_removes_stale_pid(monkeypatch) -> None:
+    removed: list[object] = []
+
+    monkeypatch.setattr(backend_runtime, "read_backend_state", lambda start=None: {"pid": 123, "port": 8000})
+    monkeypatch.setattr(backend_runtime, "_process_exists", lambda pid: False)
+    monkeypatch.setattr(backend_runtime, "remove_backend_state", lambda start=None: removed.append(start))
+
+    result = backend_runtime.backend_status(port=8000)
+
+    assert result == {"running": False, "reason": "stale_pid", "pid": 123, "port": 8000}
+    assert removed == [None]
+
+
+def test_backend_status_reports_tracked_stopped_backend_without_probe(monkeypatch) -> None:
+    probed: list[int] = []
+
+    monkeypatch.setattr(backend_runtime, "read_backend_state", lambda start=None: {"pid": 123, "port": 8000})
+    monkeypatch.setattr(backend_runtime, "_process_exists", lambda pid: True)
+    monkeypatch.setattr(backend_runtime, "_read_process_state", lambda pid: "T")
+    monkeypatch.setattr(
+        backend_runtime,
+        "backend_process_diagnostics",
+        lambda pid: {"stdin": "/dev/pts/8", "stdout": "/tmp/backend.log", "stderr": "/tmp/backend.log"},
+    )
+    monkeypatch.setattr(backend_runtime, "backend_log_path", lambda start=None: Path("/tmp/backend.log"))
+    monkeypatch.setattr(backend_runtime, "probe_backend", lambda port, timeout_s=1.0: probed.append(port) or True)
+
+    result = backend_runtime.backend_status(port=8000)
+
+    assert result == {
+        "running": False,
+        "reason": "stopped_backend",
+        "pid": 123,
+        "port": 8000,
+        "process_state": "T",
+        "stdin": "/dev/pts/8",
+        "stdout": "/tmp/backend.log",
+        "stderr": "/tmp/backend.log",
+        "log_path": "/tmp/backend.log",
+    }
+    assert probed == []
+
+
+def test_stop_backend_stops_matching_instance_on_configured_port(monkeypatch) -> None:
+    monkeypatch.setattr(backend_runtime, "read_backend_state", lambda start=None: None)
+    monkeypatch.setattr(
+        backend_runtime,
+        "find_arch_backend_instances",
+        lambda: [{"pid": 456, "ports": [8123], "declared_port": 8123}],
+    )
+    monkeypatch.setattr(
+        backend_runtime,
+        "_stop_pid",
+        lambda pid, cwd=None, timeout_s=5.0, port=None: {"stopped": True, "pid": pid, "port": port},
+    )
+
+    result = backend_runtime.stop_backend(port=8123)
+
+    assert result == {"stopped": True, "pid": 456, "port": 8123}
+
+
+def test_stop_backend_returns_single_other_port_when_only_other_instance_exists(monkeypatch) -> None:
+    monkeypatch.setattr(backend_runtime, "read_backend_state", lambda start=None: None)
+    monkeypatch.setattr(
+        backend_runtime,
+        "find_arch_backend_instances",
+        lambda: [{"pid": 456, "ports": [8124], "declared_port": 8124}],
+    )
+
+    result = backend_runtime.stop_backend(port=8123)
+
+    assert result == {
+        "stopped": False,
+        "reason": "single_other_port",
+        "pid": 456,
+        "port": 8124,
+        "expected_port": 8123,
+    }
 
 
 def test_stop_backend_removes_stale_pid(monkeypatch) -> None:
@@ -157,8 +480,68 @@ def test_stop_backend_removes_stale_pid(monkeypatch) -> None:
     assert removed == [None]
 
 
+def test_stop_pid_continues_stopped_process_before_terminating(monkeypatch) -> None:
+    signals: list[int] = []
+    alive = iter([True, False])
+
+    monkeypatch.setattr(backend_runtime, "read_backend_state", lambda start=None: None)
+    monkeypatch.setattr(backend_runtime, "_read_process_state", lambda pid: "T")
+    monkeypatch.setattr(backend_runtime, "_process_exists", lambda pid: next(alive))
+
+    def fake_kill(pid: int, sig: int) -> None:
+        signals.append(sig)
+
+    monkeypatch.setattr(backend_runtime.os, "kill", fake_kill)
+
+    result = backend_runtime._stop_pid(123, port=8000)
+
+    assert result == {"stopped": True, "pid": 123, "port": 8000}
+    assert signals[:2] == [backend_runtime.signal.SIGCONT, backend_runtime.signal.SIGTERM]
+
+
+def test_stop_pid_escalates_to_sigkill_after_timeout(monkeypatch) -> None:
+    signals: list[int] = []
+    kill_phase = {"sigkill_sent": False, "checks_after_sigkill": 0}
+
+    monkeypatch.setattr(backend_runtime, "read_backend_state", lambda start=None: None)
+    monkeypatch.setattr(backend_runtime, "_read_process_state", lambda pid: "S")
+    monkeypatch.setattr(backend_runtime.time, "sleep", lambda s: None)
+
+    now = {"value": 0.0}
+
+    def fake_monotonic() -> float:
+        now["value"] += 0.2
+        return now["value"]
+
+    monkeypatch.setattr(backend_runtime.time, "monotonic", fake_monotonic)
+
+    def fake_process_exists(pid: int) -> bool:
+        if not kill_phase["sigkill_sent"]:
+            return True
+        kill_phase["checks_after_sigkill"] += 1
+        return kill_phase["checks_after_sigkill"] < 2
+
+    monkeypatch.setattr(backend_runtime, "_process_exists", fake_process_exists)
+
+    def fake_kill(pid: int, sig: int) -> None:
+        signals.append(sig)
+        if sig == backend_runtime.signal.SIGKILL:
+            kill_phase["sigkill_sent"] = True
+
+    monkeypatch.setattr(backend_runtime.os, "kill", fake_kill)
+
+    result = backend_runtime._stop_pid(123, port=8000, timeout_s=1.0)
+
+    assert result == {"stopped": True, "pid": 123, "port": 8000}
+    assert signals == [backend_runtime.signal.SIGTERM, backend_runtime.signal.SIGKILL]
+
+
 def test_arch_backend_stop_prints_not_running(monkeypatch, capsys) -> None:
-    monkeypatch.setattr(arch_backend, "stop_backend", lambda: {"stopped": False, "reason": "not_running"})
+    monkeypatch.setattr(
+        arch_backend,
+        "stop_backend",
+        lambda **kwargs: {"stopped": False, "reason": "not_running"},
+    )
 
     arch_backend.main(["--stop"])
 
@@ -179,6 +562,161 @@ def test_arch_backend_status_prints_running(monkeypatch, capsys) -> None:
     assert "running on port 8000" in out
 
 
+def test_arch_backend_status_prints_stopped_backend(monkeypatch, capsys) -> None:
+    monkeypatch.setattr(
+        arch_backend,
+        "backend_status",
+        lambda port=8000: {
+            "running": False,
+            "reason": "stopped_backend",
+            "pid": 321,
+            "port": port,
+            "process_state": "T",
+            "stdin": "/dev/pts/8",
+            "stdout": "/tmp/backend.log",
+            "stderr": "/tmp/backend.log",
+            "log_path": "/tmp/backend.log",
+        },
+    )
+
+    arch_backend.main(["--status"])
+
+    out = capsys.readouterr().out
+    assert "backend process pid 321 is stopped on port 8000" in out
+    assert "process state: T" in out
+    assert "stdin=/dev/pts/8" in out
+    assert "log: /tmp/backend.log" in out
+
+
+def test_arch_backend_start_returns_when_untracked_backend_already_running(monkeypatch, capsys) -> None:
+    monkeypatch.setattr(arch_backend, "read_backend_state", lambda: None)
+    monkeypatch.setattr(
+        arch_backend,
+        "backend_status",
+        lambda port=8000: {"running": True, "reason": "ok_untracked", "pid": 777, "port": port},
+    )
+
+    arch_backend.main([])
+
+    out = capsys.readouterr().out
+    assert "backend already running on port 8000 (pid 777)" in out
+
+
+def test_arch_backend_start_refuses_unhealthy_backend(monkeypatch) -> None:
+    monkeypatch.setattr(arch_backend, "read_backend_state", lambda: None)
+    monkeypatch.setattr(
+        arch_backend,
+        "backend_status",
+        lambda port=8000: {"running": False, "reason": "stopped_backend", "pid": 777, "port": port},
+    )
+
+    try:
+        arch_backend.main([])
+    except SystemExit as exc:
+        assert "is on port 8000 but is not healthy" in str(exc)
+    else:
+        raise AssertionError("expected SystemExit")
+
+
+def test_redirect_stdio_to_backend_log_detaches_stdin(monkeypatch, tmp_path: Path) -> None:
+    log_path = tmp_path / ".arch" / "backend.log"
+    opened: list[tuple[object, int, object | None]] = []
+    duped: list[tuple[int, int]] = []
+    closed: list[int] = []
+
+    def fake_open(path: object, flags: int, mode: object | None = None) -> int:
+        opened.append((path, flags, mode))
+        return 10 if Path(path) == log_path else 11
+
+    monkeypatch.setattr(arch_backend, "backend_log_path", lambda start=None: log_path)
+    monkeypatch.setattr(arch_backend.os, "open", fake_open)
+    monkeypatch.setattr(arch_backend.os, "dup2", lambda src, dst: duped.append((src, dst)))
+    monkeypatch.setattr(arch_backend.os, "close", lambda fd: closed.append(fd))
+
+    class _FakeStream:
+        def __init__(self, fd: int) -> None:
+            self._fd = fd
+
+        def fileno(self) -> int:
+            return self._fd
+
+    monkeypatch.setattr(arch_backend.sys, "stdin", _FakeStream(0))
+    monkeypatch.setattr(arch_backend.sys, "stdout", _FakeStream(1))
+    monkeypatch.setattr(arch_backend.sys, "stderr", _FakeStream(2))
+
+    result = arch_backend._redirect_stdio_to_backend_log(start=tmp_path)
+
+    assert result == log_path
+    assert opened == [
+        (log_path, arch_backend.os.O_WRONLY | arch_backend.os.O_CREAT | arch_backend.os.O_APPEND, 0o644),
+        (arch_backend.os.devnull, arch_backend.os.O_RDONLY, None),
+    ]
+    assert duped == [(11, 0), (10, 1), (10, 2)]
+    assert closed == [10, 11]
+
+
+def test_start_daemon_detaches_stdin_and_session(monkeypatch, tmp_path: Path) -> None:
+    calls: list[dict[str, object]] = []
+
+    class _Proc:
+        pid = 4321
+
+    def fake_popen(command, **kwargs):
+        calls.append({"command": command, **kwargs})
+        return _Proc()
+
+    monkeypatch.setattr(arch_backend.sys, "argv", ["arch-backend", "--daemon", "--port", "8123"])
+    monkeypatch.setattr(arch_backend.subprocess, "Popen", fake_popen)
+
+    log_path = tmp_path / ".arch" / "backend.log"
+    pid = arch_backend._start_daemon(argv=None, log_path=log_path)
+
+    assert pid == 4321
+    assert calls
+    assert calls[0]["command"] == ["arch-backend", "--port", "8123"]
+    assert calls[0]["stdin"] is arch_backend.subprocess.DEVNULL
+    assert calls[0]["stderr"] is arch_backend.subprocess.STDOUT
+    assert calls[0]["start_new_session"] is True
+    assert calls[0]["cwd"] == str(Path.cwd())
+
+
+def test_arch_backend_daemon_waits_for_probe(monkeypatch, tmp_path: Path, capsys) -> None:
+    monkeypatch.setattr(arch_backend, "read_backend_state", lambda: None)
+    monkeypatch.setattr(
+        arch_backend,
+        "backend_status",
+        lambda port=8000: {"running": False, "reason": "not_running", "port": port},
+    )
+    monkeypatch.setattr(arch_backend, "backend_log_path", lambda start=None: tmp_path / ".arch" / "backend.log")
+    monkeypatch.setattr(arch_backend, "_start_daemon", lambda argv, log_path: 4321)
+    monkeypatch.setattr(arch_backend, "probe_backend", lambda port: True)
+
+    arch_backend.main(["--daemon", "--port", "8123"])
+
+    out = capsys.readouterr().out
+    assert "backend started on port 8123 (pid 4321)" in out
+
+
+def test_arch_backend_redirects_stdio_when_background_tty_job(monkeypatch, tmp_path: Path) -> None:
+    redirected: list[Path | None] = []
+
+    monkeypatch.setattr(arch_backend, "_is_background_tty_job", lambda: True)
+    monkeypatch.setattr(arch_backend, "_redirect_stdio_to_backend_log", lambda start=None: redirected.append(start) or tmp_path / ".arch" / "backend.log")
+    monkeypatch.setattr(arch_backend, "backend_status", lambda port=8000: {"running": False, "reason": "not_running"})
+    monkeypatch.setattr(arch_backend, "read_backend_state", lambda: None)
+    monkeypatch.setattr(
+        arch_backend.gui_server,
+        "resolve_server_roots",
+        lambda repo_root, enterprise_root: (tmp_path, None),
+    )
+    monkeypatch.setattr(arch_backend, "_build_app", lambda: object())
+    monkeypatch.setattr(arch_backend.uvicorn, "run", lambda app, host, port, log_level: None)
+
+    arch_backend.main(["--repo-root", str(tmp_path)])
+
+    assert redirected == [Path.cwd()]
+
+
 def test_arch_backend_status_prints_unmanaged_backend(monkeypatch, capsys) -> None:
     monkeypatch.setattr(
         arch_backend,
@@ -192,11 +730,44 @@ def test_arch_backend_status_prints_unmanaged_backend(monkeypatch, capsys) -> No
     assert "not managed by this workspace" in out
 
 
+def test_arch_backend_stop_prompts_for_single_other_port_and_stops(monkeypatch, capsys) -> None:
+    calls: list[int] = []
+
+    def fake_stop_backend(*, port=None, cwd=None, timeout_s=5.0):
+        calls.append(int(port))
+        if len(calls) == 1:
+            return {"stopped": False, "reason": "single_other_port", "pid": 321, "port": 8124, "expected_port": 8123}
+        return {"stopped": True, "pid": 321, "port": 8124}
+
+    monkeypatch.setattr(arch_backend, "stop_backend", fake_stop_backend)
+    monkeypatch.setattr(arch_backend, "_confirm_stop_other_instance", lambda **kwargs: True)
+
+    arch_backend.main(["--stop", "--port", "8123"])
+
+    out = capsys.readouterr().out
+    assert "stopped backend pid 321" in out
+    assert calls == [8123, 8124]
+
+
+def test_arch_backend_status_prints_removed_stale_backend(monkeypatch, capsys) -> None:
+    monkeypatch.setattr(
+        arch_backend,
+        "backend_status",
+        lambda port=8000: {"running": False, "reason": "stale_pid", "pid": 321, "port": port},
+    )
+
+    arch_backend.main(["--status"])
+
+    out = capsys.readouterr().out
+    assert "removed stale backend pid 321" in out
+
+
 def test_arch_backend_restart_stops_then_returns_to_startup(monkeypatch, capsys, tmp_path: Path) -> None:
+    monkeypatch.setattr(arch_backend, "backend_min_log_level", lambda: "WARNING")
     monkeypatch.setattr(
         arch_backend,
         "stop_backend",
-        lambda: {"stopped": True, "pid": 123, "port": 8000},
+        lambda **kwargs: {"stopped": True, "pid": 123, "port": 8000},
     )
     monkeypatch.setattr(arch_backend, "read_backend_state", lambda: None)
     monkeypatch.setattr(
@@ -215,6 +786,7 @@ def test_arch_backend_restart_stops_then_returns_to_startup(monkeypatch, capsys,
     def fake_run(app, host: str, port: int, log_level: str) -> None:
         ran["host"] = host
         ran["port"] = port
+        ran["log_level"] = log_level
 
     monkeypatch.setattr(arch_backend.uvicorn, "run", fake_run)
 
@@ -222,7 +794,33 @@ def test_arch_backend_restart_stops_then_returns_to_startup(monkeypatch, capsys,
 
     out = capsys.readouterr().out
     assert "stopped backend pid 123" in out
-    assert ran == {"host": "127.0.0.1", "port": 8000}
+    assert ran == {"host": "127.0.0.1", "port": 8000, "log_level": "warning"}
+
+
+def test_arch_backend_build_failure_does_not_write_backend_state(monkeypatch, tmp_path: Path) -> None:
+    monkeypatch.setattr(arch_backend, "read_backend_state", lambda: None)
+    monkeypatch.setattr(
+        arch_backend,
+        "backend_status",
+        lambda port=8000: {"running": False, "reason": "not_running"},
+    )
+    monkeypatch.setattr(
+        arch_backend.gui_server,
+        "resolve_server_roots",
+        lambda repo_root, enterprise_root: (tmp_path, None),
+    )
+    wrote: list[object] = []
+    monkeypatch.setattr(arch_backend, "write_backend_state", lambda port: wrote.append(port))
+    monkeypatch.setattr(arch_backend, "_build_app", lambda: (_ for _ in ()).throw(ModuleNotFoundError("fastapi")))
+
+    try:
+        arch_backend.main(["--repo-root", str(tmp_path)])
+    except ModuleNotFoundError as exc:
+        assert "fastapi" in str(exc)
+    else:
+        raise AssertionError("expected ModuleNotFoundError")
+
+    assert wrote == []
 
 
 def test_arch_backend_refuses_to_start_when_port_used_by_other_process(monkeypatch) -> None:

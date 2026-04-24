@@ -101,8 +101,8 @@ def _entity_ref_blockers(
                 continue
             fm = parse_frontmatter_from_path(other_entity) or {}
             if (
-                str(fm.get("artifact-type", "")) == "global-entity-reference"
-                and str(fm.get("global-entity-id", "")) == artifact_id
+                str(fm.get("artifact-type", "")) == "global-artifact-reference"
+                and str(fm.get("global-artifact-id", "")) == artifact_id
             ):
                 grf_refs.append(
                     str(fm.get("artifact-id", other_entity.stem))

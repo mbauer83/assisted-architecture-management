@@ -7,7 +7,6 @@
 #   prefix              – short ID prefix (e.g. STK, DRV)
 #   domain              – filesystem domain directory under model/
 #   subdir              – subdirectory within the domain
-#   archimate_domain    – display name of the ArchiMate domain
 #   archimate_element_type – CamelCase element type for diagram blocks
 #   element_classes     – ArchiMate NEXT abstract classification classes
 #   create_when         - A brief description for when to model something as this type
@@ -20,7 +19,6 @@ entity_types:
     prefix: STK
     domain: motivation
     subdir: stakeholders
-    archimate_domain: Motivation
     archimate_element_type: Stakeholder
     has_sprite: true
     element_classes: [motivation-element]
@@ -31,7 +29,6 @@ entity_types:
     prefix: DRV
     domain: motivation
     subdir: drivers
-    archimate_domain: Motivation
     archimate_element_type: Driver
     has_sprite: true
     element_classes: [motivation-element]
@@ -42,7 +39,6 @@ entity_types:
     prefix: ASS
     domain: motivation
     subdir: assessments
-    archimate_domain: Motivation
     archimate_element_type: Assessment
     has_sprite: true
     element_classes: [motivation-element]
@@ -53,7 +49,6 @@ entity_types:
     prefix: GOL
     domain: motivation
     subdir: goals
-    archimate_domain: Motivation
     archimate_element_type: Goal
     has_sprite: true
     element_classes: [motivation-element]
@@ -65,7 +60,6 @@ entity_types:
     prefix: OUT
     domain: motivation
     subdir: outcomes
-    archimate_domain: Motivation
     archimate_element_type: Outcome
     has_sprite: true
     element_classes: [motivation-element]
@@ -76,7 +70,6 @@ entity_types:
     prefix: PRI
     domain: motivation
     subdir: principles
-    archimate_domain: Motivation
     archimate_element_type: Principle
     has_sprite: true
     element_classes: [motivation-element]
@@ -87,7 +80,6 @@ entity_types:
     prefix: REQ
     domain: motivation
     subdir: requirements
-    archimate_domain: Motivation
     archimate_element_type: Requirement
     has_sprite: true
     element_classes: [motivation-element]
@@ -98,7 +90,6 @@ entity_types:
     prefix: MEA
     domain: motivation
     subdir: meanings
-    archimate_domain: Motivation
     archimate_element_type: Meaning
     has_sprite: false
     element_classes: [motivation-element]
@@ -110,7 +101,6 @@ entity_types:
     prefix: VAL
     domain: motivation
     subdir: values
-    archimate_domain: Motivation
     archimate_element_type: Value
     has_sprite: false
     element_classes: [motivation-element]
@@ -123,7 +113,6 @@ entity_types:
     prefix: CAP
     domain: strategy
     subdir: capabilities
-    archimate_domain: Strategy
     archimate_element_type: Capability
     has_sprite: true
     element_classes: [behavior-element, strategy-behavior-element]
@@ -134,7 +123,6 @@ entity_types:
     prefix: VS
     domain: strategy
     subdir: value-streams
-    archimate_domain: Strategy
     archimate_element_type: ValueStream
     has_sprite: false
     element_classes: [behavior-element, strategy-behavior-element]
@@ -145,7 +133,6 @@ entity_types:
     prefix: RES
     domain: strategy
     subdir: resources
-    archimate_domain: Strategy
     archimate_element_type: Resource
     has_sprite: false
     element_classes: [structure-element]
@@ -156,7 +143,6 @@ entity_types:
     prefix: COA
     domain: strategy
     subdir: courses-of-action
-    archimate_domain: Strategy
     archimate_element_type: CourseOfAction
     has_sprite: true
     element_classes: [behavior-element, strategy-behavior-element]
@@ -168,7 +154,6 @@ entity_types:
     prefix: SRV
     domain: common
     subdir: services
-    archimate_domain: Common
     archimate_element_type: Service
     has_sprite: true
     element_classes: [behavior-element]
@@ -179,7 +164,6 @@ entity_types:
     prefix: PRC
     domain: common
     subdir: processes
-    archimate_domain: Common
     archimate_element_type: Process
     has_sprite: true
     element_classes: [behavior-element, internal-behavior-element]
@@ -190,7 +174,6 @@ entity_types:
     prefix: FNC
     domain: common
     subdir: functions
-    archimate_domain: Common
     archimate_element_type: Function
     has_sprite: true
     element_classes: [behavior-element, internal-behavior-element]
@@ -201,7 +184,6 @@ entity_types:
     prefix: EVT
     domain: common
     subdir: events
-    archimate_domain: Common
     archimate_element_type: Event
     has_sprite: true
     element_classes: [behavior-element]
@@ -212,7 +194,6 @@ entity_types:
     prefix: ROL
     domain: common
     subdir: roles
-    archimate_domain: Common
     archimate_element_type: Role
     has_sprite: true
     element_classes: [active-structure-element, internal-active-structure-element]
@@ -223,7 +204,6 @@ entity_types:
     prefix: PTH
     domain: common
     subdir: paths
-    archimate_domain: Common
     archimate_element_type: Path
     has_sprite: false
     element_classes: [active-structure-element]
@@ -234,7 +214,6 @@ entity_types:
     prefix: JNA
     domain: common
     subdir: junctions
-    archimate_domain: Common
     archimate_element_type: AndJunction
     has_sprite: false
     element_classes: [junction]
@@ -245,7 +224,6 @@ entity_types:
     prefix: JNO
     domain: common
     subdir: junctions
-    archimate_domain: Common
     archimate_element_type: OrJunction
     has_sprite: false
     element_classes: [junction]
@@ -258,7 +236,6 @@ entity_types:
     prefix: ACT
     domain: business
     subdir: actors
-    archimate_domain: Business
     archimate_element_type: BusinessActor
     has_sprite: true
     element_classes: [active-structure-element, internal-active-structure-element]
@@ -269,7 +246,6 @@ entity_types:
     prefix: BIF
     domain: business
     subdir: interfaces
-    archimate_domain: Business
     archimate_element_type: BusinessInterface
     has_sprite: true
     element_classes: [active-structure-element, external-active-structure-element]
@@ -280,7 +256,6 @@ entity_types:
     prefix: BOB
     domain: business
     subdir: objects
-    archimate_domain: Business
     archimate_element_type: BusinessObject
     has_sprite: true
     element_classes: [passive-structure-element]
@@ -291,7 +266,6 @@ entity_types:
     prefix: PRD
     domain: business
     subdir: products
-    archimate_domain: Business
     archimate_element_type: Product
     has_sprite: false
     element_classes: [composite-element]
@@ -303,7 +277,6 @@ entity_types:
     prefix: APP
     domain: application
     subdir: components
-    archimate_domain: Application
     archimate_element_type: ApplicationComponent
     has_sprite: true
     element_classes: [active-structure-element, internal-active-structure-element]
@@ -314,7 +287,6 @@ entity_types:
     prefix: AIF
     domain: application
     subdir: interfaces
-    archimate_domain: Application
     archimate_element_type: ApplicationInterface
     has_sprite: true
     element_classes: [active-structure-element, external-active-structure-element]
@@ -325,7 +297,6 @@ entity_types:
     prefix: DOB
     domain: application
     subdir: data-objects
-    archimate_domain: Application
     archimate_element_type: DataObject
     has_sprite: true
     element_classes: [passive-structure-element]
@@ -337,7 +308,6 @@ entity_types:
     prefix: NOD
     domain: technology
     subdir: nodes
-    archimate_domain: Technology
     archimate_element_type: Node
     has_sprite: true
     element_classes: [active-structure-element, internal-active-structure-element, technology-internal-active-structure-element]
@@ -348,7 +318,6 @@ entity_types:
     prefix: DEV
     domain: technology
     subdir: devices
-    archimate_domain: Technology
     archimate_element_type: Device
     has_sprite: false
     element_classes: [active-structure-element, internal-active-structure-element, technology-internal-active-structure-element]
@@ -359,7 +328,6 @@ entity_types:
     prefix: SSW
     domain: technology
     subdir: system-software
-    archimate_domain: Technology
     archimate_element_type: SystemSoftware
     has_sprite: true
     element_classes: [active-structure-element, internal-active-structure-element, technology-internal-active-structure-element]
@@ -370,7 +338,6 @@ entity_types:
     prefix: TIF
     domain: technology
     subdir: interfaces
-    archimate_domain: Technology
     archimate_element_type: TechnologyInterface
     has_sprite: false
     element_classes: [active-structure-element, external-active-structure-element]
@@ -381,7 +348,6 @@ entity_types:
     prefix: NET
     domain: technology
     subdir: networks
-    archimate_domain: Technology
     archimate_element_type: CommunicationNetwork
     has_sprite: false
     element_classes: [active-structure-element]
@@ -392,7 +358,6 @@ entity_types:
     prefix: ART
     domain: technology
     subdir: artifacts
-    archimate_domain: Technology
     archimate_element_type: Artifact
     has_sprite: true
     element_classes: [passive-structure-element]
@@ -403,7 +368,6 @@ entity_types:
     prefix: EQP
     domain: technology
     subdir: equipment
-    archimate_domain: Technology
     archimate_element_type: Equipment
     has_sprite: false
     element_classes: [active-structure-element, internal-active-structure-element, technology-internal-active-structure-element]
@@ -414,7 +378,6 @@ entity_types:
     prefix: FAC
     domain: technology
     subdir: facilities
-    archimate_domain: Technology
     archimate_element_type: Facility
     has_sprite: false
     element_classes: [active-structure-element, internal-active-structure-element, technology-internal-active-structure-element]
@@ -425,7 +388,6 @@ entity_types:
     prefix: DIS
     domain: technology
     subdir: distribution-networks
-    archimate_domain: Technology
     archimate_element_type: DistributionNetwork
     has_sprite: false
     element_classes: [active-structure-element]
@@ -436,7 +398,6 @@ entity_types:
     prefix: MAT
     domain: technology
     subdir: materials
-    archimate_domain: Technology
     archimate_element_type: Material
     has_sprite: false
     element_classes: [passive-structure-element]
@@ -448,7 +409,6 @@ entity_types:
     prefix: WP
     domain: implementation
     subdir: work-packages
-    archimate_domain: Implementation
     archimate_element_type: WorkPackage
     has_sprite: false
     element_classes: [behavior-element]
@@ -459,7 +419,6 @@ entity_types:
     prefix: DEL
     domain: implementation
     subdir: deliverables
-    archimate_domain: Implementation
     archimate_element_type: Deliverable
     has_sprite: false
     element_classes: [passive-structure-element]
@@ -471,7 +430,6 @@ entity_types:
     prefix: PLT
     domain: implementation
     subdir: plateaus
-    archimate_domain: Implementation
     archimate_element_type: Plateau
     has_sprite: false
     element_classes: [composite-element]
@@ -482,11 +440,11 @@ entity_types:
   # NOT an ArchiMate element.  Created automatically as a per-engagement proxy
   # for a global (enterprise) entity.  May not be created or edited directly;
   # only produced by the connection-to-global-entity mechanism.
-  global-entity-reference:
-    prefix: GRF
+  global-artifact-reference:
+    prefix: GAR
     domain: common
     subdir: global-references
-    archimate_domain: ""        # not an ArchiMate domain — skipped by macro/diagram generators
+    internal: true              # not a modelling element — skipped by domain display
     archimate_element_type: ""  # not an ArchiMate element type
     has_sprite: false
     element_classes: []

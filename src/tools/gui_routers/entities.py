@@ -51,9 +51,9 @@ def list_entities(
         entities = [e for e in entities if s.is_global(e.path)]
     elif scope == "engagement":
         entities = [e for e in entities if not s.is_global(e.path)
-                    and e.artifact_type != "global-entity-reference"]
+                    and e.artifact_type != "global-artifact-reference"]
     else:
-        entities = [e for e in entities if e.artifact_type != "global-entity-reference"]
+        entities = [e for e in entities if e.artifact_type != "global-artifact-reference"]
     page = entities[offset: offset + limit]
     return {"total": len(entities), "items": build_entity_summary_rows(page, repo)}
 
@@ -153,8 +153,8 @@ class DeleteEntityBody(BaseModel):
 
 @router.post("/api/entity")
 def create_entity(body: CreateEntityBody) -> dict[str, Any]:
-    if body.artifact_type == "global-entity-reference":
-        raise HTTPException(400, "global-entity-reference entities cannot be created directly")
+    if body.artifact_type == "global-artifact-reference":
+        raise HTTPException(400, "global-artifact-reference entities cannot be created directly")
     repo_root, _registry, verifier = s.get_write_deps()
     from src.tools.artifact_write.entity import create_entity as _create
     try:
@@ -256,7 +256,7 @@ def search_reference_artifacts(
 
     if kind in (None, "entity"):
         for entity in repo.list_entities():
-            if entity.artifact_type == "global-entity-reference":
+            if entity.artifact_type == "global-artifact-reference":
                 continue
             if selected_domains and entity.domain not in selected_domains:
                 continue

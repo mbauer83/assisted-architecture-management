@@ -41,6 +41,26 @@ def _get_engagement_root() -> Any:
     return repo_root
 
 
+_FIXED_FIELDS = {"title", "status", "keywords"}
+
+
+def _extra_frontmatter_fields(schema: dict[str, Any]) -> list[dict[str, Any]]:
+    """Extract type-specific frontmatter fields from schema (excluding fixed fields)."""
+    fm = schema.get("frontmatter_schema", {})
+    props = fm.get("properties", {})
+    required = set(fm.get("required", []))
+    return [
+        {
+            "name": k,
+            "field_type": v.get("type", "string"),
+            "array_items_type": v.get("items", {}).get("type") if v.get("type") == "array" else None,
+            "required": k in required,
+        }
+        for k, v in props.items()
+        if k not in _FIXED_FIELDS
+    ]
+
+
 @router.get("/api/document-types")
 def list_document_types() -> list[dict[str, object]]:
     repo_root = _get_engagement_root()
@@ -52,6 +72,9 @@ def list_document_types() -> list[dict[str, object]]:
             "name": schema.get("name", doc_type),
             "subdirectory": get_document_subdirectory(schema, doc_type),
             "required_sections": schema.get("required_sections", []),
+            "extra_frontmatter_fields": _extra_frontmatter_fields(schema),
+            "required_entity_type_connections": schema.get("required_entity_type_connections", []),
+            "suggested_entity_type_connections": schema.get("suggested_entity_type_connections", []),
         }
         for doc_type, schema in sorted(schemata.items())
     ]
@@ -104,7 +127,8 @@ def create_document(req: CreateDocumentRequest) -> dict[str, Any]:
     from src.tools.artifact_write.document import create_document as _create
     repo_root, _, verifier = s.get_write_deps()
 
-    result = _create(
+    result = s.run_serialized_write(
+        _create,
         repo_root=repo_root,
         verifier=verifier,
         clear_repo_caches=s.clear_caches,
@@ -134,7 +158,8 @@ def edit_document(artifact_id: str, req: EditDocumentRequest) -> dict[str, Any]:
     from src.tools.artifact_write.document import edit_document as _edit
     repo_root, _, verifier = s.get_write_deps()
 
-    result = _edit(
+    result = s.run_serialized_write(
+        _edit,
         repo_root=repo_root,
         verifier=verifier,
         clear_repo_caches=s.clear_caches,
@@ -163,7 +188,8 @@ def delete_document(artifact_id: str, dry_run: bool = False) -> dict[str, Any]:
     from src.tools.artifact_write.document import delete_document as _delete
     repo_root, _, _ = s.get_write_deps()
 
-    result = _delete(
+    result = s.run_serialized_write(
+        _delete,
         repo_root=repo_root,
         clear_repo_caches=s.clear_caches,
         artifact_id=artifact_id,

@@ -34,6 +34,8 @@ import { parseMarkdown } from '../../application/MarkdownService'
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
+const REQUEST_TIMEOUT_MS = 10000
+
 const buildUrl = (
   path: string,
   params?: Readonly<Record<string, string | number | boolean | undefined>>,
@@ -48,13 +50,31 @@ const buildUrl = (
   return url.toString()
 }
 
+const fetchWithTimeout = async (url: string, init?: RequestInit): Promise<Response> => {
+  const controller = new AbortController()
+  const timeout = window.setTimeout(() => controller.abort(new DOMException(`Timed out after ${REQUEST_TIMEOUT_MS}ms`, 'TimeoutError')), REQUEST_TIMEOUT_MS)
+  try {
+    return await fetch(url, { ...init, signal: controller.signal })
+  } catch (error) {
+    console.error('HTTP request failed', {
+      url,
+      method: init?.method ?? 'GET',
+      timeoutMs: REQUEST_TIMEOUT_MS,
+      error,
+    })
+    throw error
+  } finally {
+    window.clearTimeout(timeout)
+  }
+}
+
 const fetchJson = <A, I>(
   url: string,
   schema: Schema.Schema<A, I>,
 ): Effect.Effect<A, NetworkError | ParseResult.ParseError> =>
   Effect.tryPromise({
     try: async () => {
-      const resp = await fetch(url)
+      const resp = await fetchWithTimeout(url)
       if (resp.status === 404) throw new NotFoundError({ id: url })
       if (!resp.ok) throw new NetworkError({ status: resp.status, message: resp.statusText })
       return resp.json() as Promise<unknown>
@@ -70,7 +90,7 @@ const fetchJsonNotFound = <A, I>(
 ): Effect.Effect<A, NetworkError | ParseResult.ParseError | NotFoundError> =>
   Effect.tryPromise({
     try: async () => {
-      const resp = await fetch(url)
+      const resp = await fetchWithTimeout(url)
       if (resp.status === 404) throw new NotFoundError({ id })
       if (!resp.ok) throw new NetworkError({ status: resp.status, message: resp.statusText })
       return resp.json() as Promise<unknown>
@@ -84,7 +104,7 @@ const fetchJsonNotFound = <A, I>(
 const fetchText = (url: string): Effect.Effect<string, NetworkError> =>
   Effect.tryPromise({
     try: async () => {
-      const resp = await fetch(url)
+      const resp = await fetchWithTimeout(url)
       if (!resp.ok) throw new NetworkError({ status: resp.status, message: resp.statusText })
       return resp.text()
     },
@@ -98,7 +118,7 @@ const postJson = <A, I>(
 ): Effect.Effect<A, NetworkError | ParseResult.ParseError> =>
   Effect.tryPromise({
     try: async () => {
-      const resp = await fetch(url, {
+      const resp = await fetchWithTimeout(url, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),
@@ -120,7 +140,7 @@ const putJson = <A, I>(
 ): Effect.Effect<A, NetworkError | ParseResult.ParseError> =>
   Effect.tryPromise({
     try: async () => {
-      const resp = await fetch(url, {
+      const resp = await fetchWithTimeout(url, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),
@@ -141,7 +161,7 @@ const deleteReq = <A, I>(
 ): Effect.Effect<A, NetworkError | ParseResult.ParseError> =>
   Effect.tryPromise({
     try: async () => {
-      const resp = await fetch(url, { method: 'DELETE' })
+      const resp = await fetchWithTimeout(url, { method: 'DELETE' })
       if (!resp.ok) {
         const text = await resp.text().catch(() => resp.statusText)
         throw new NetworkError({ status: resp.status, message: text })
@@ -155,7 +175,7 @@ const deleteReq = <A, I>(
 // ── Factory ───────────────────────────────────────────────────────────────────
 
 export const makeHttpModelRepository = (): ModelRepository => ({
-  getServerInfo: () => fetchJson(buildUrl('/admin/server-info'), Schema.Unknown),
+  getServerInfo: () => fetchJson(buildUrl('/server-info', undefined, true), Schema.Unknown),
   getStats: () => fetchJson(buildUrl('/stats'), StatsSchema),
 
   listEntities: (params: ListParams = {}) =>
@@ -328,17 +348,17 @@ export const makeHttpModelRepository = (): ModelRepository => ({
     postJson(buildUrl('/diagram/remove'), body, WriteResultSchema),
 
   adminCreateEntity: (body) =>
-    postJson(buildUrl('/admin/entity', undefined, true), body, WriteResultSchema),
+    postJson(buildUrl('/entity', undefined, true), body, WriteResultSchema),
   adminEditEntity: (body) =>
-    postJson(buildUrl('/admin/entity/edit', undefined, true), body, WriteResultSchema),
+    postJson(buildUrl('/entity/edit', undefined, true), body, WriteResultSchema),
   adminDeleteEntity: (body) =>
-    postJson(buildUrl('/admin/entity/remove', undefined, true), body, WriteResultSchema),
+    postJson(buildUrl('/entity/remove', undefined, true), body, WriteResultSchema),
   adminAddConnection: (body) =>
-    postJson(buildUrl('/admin/connection', undefined, true), body, WriteResultSchema),
+    postJson(buildUrl('/connection', undefined, true), body, WriteResultSchema),
   adminRemoveConnection: (body) =>
-    postJson(buildUrl('/admin/connection/remove', undefined, true), body, WriteResultSchema),
+    postJson(buildUrl('/connection/remove', undefined, true), body, WriteResultSchema),
   adminDeleteDiagram: (body) =>
-    postJson(buildUrl('/admin/diagram/remove', undefined, true), body, WriteResultSchema),
+    postJson(buildUrl('/diagram/remove', undefined, true), body, WriteResultSchema),
 
   planPromotion: (body) =>
     postJson(buildUrl('/promote/plan'), body, PromotionPlanSchema),

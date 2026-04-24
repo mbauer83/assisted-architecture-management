@@ -64,14 +64,16 @@ alias: {prefix}_{rand}
 
 def _grf_md(artifact_id: str, name: str, global_id: str) -> str:
     rand = artifact_id.split(".")[1] if "." in artifact_id else "XXXXXX"
+    prefix = artifact_id.split("@")[0] if "@" in artifact_id else "GAR"
     return f"""\
 ---
 artifact-id: {artifact_id}
-artifact-type: global-entity-reference
+artifact-type: global-artifact-reference
 name: "{name}"
 version: 0.1.0
 status: active
-global-entity-id: {global_id}
+global-artifact-id: {global_id}
+global-artifact-type: entity
 last-updated: '2026-04-18'
 ---
 
@@ -87,7 +89,7 @@ last-updated: '2026-04-18'
 domain: ""
 element-type: ""
 label: "{name}"
-alias: GRF_{rand}
+alias: {prefix}_{rand}
 ```
 """
 
@@ -285,7 +287,7 @@ class TestCleanupBrokenRefs:
     ) -> tuple[str, str, str]:
         """Returns (eng_id, grf_id, glo_id_that_no_longer_exists)."""
         eng_id = "REQ@1000000001.EngAaa.eng-req"
-        grf_id = "GRF@1000000002.GrfBbb.broken-ref"
+        grf_id = "GAR@1000000002.GrfBbb.broken-ref"
         glo_id_deleted = "REQ@2000000001.DelCcc.deleted-req"
 
         _write(
@@ -364,7 +366,7 @@ class TestCleanupBrokenRefs:
 
         # Create a VALID GRF pointing to an enterprise entity that exists
         eng_id = "REQ@1000000003.EngDdd.eng2"
-        grf_id = "GRF@1000000004.GrfEee.valid-ref"
+        grf_id = "GAR@1000000004.GrfEee.valid-ref"
         glo_id = "REQ@2000000002.EntFff.real-req"
 
         _write(

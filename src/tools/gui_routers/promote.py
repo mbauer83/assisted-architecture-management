@@ -18,6 +18,8 @@ class PromotionPlanBody(BaseModel):
     connection_ids: list[str] = []
     exclude_entity_ids: list[str] = []
     exclude_connection_ids: list[str] = []
+    document_ids: list[str] = []
+    diagram_ids: list[str] = []
 
 
 class ConflictResolutionBody(BaseModel):
@@ -32,6 +34,8 @@ class PromotionExecuteBody(BaseModel):
     connection_ids: list[str] = []
     exclude_entity_ids: list[str] = []
     exclude_connection_ids: list[str] = []
+    document_ids: list[str] = []
+    diagram_ids: list[str] = []
     conflict_resolutions: list[ConflictResolutionBody] = []
     dry_run: bool = True
 
@@ -52,6 +56,8 @@ def promotion_plan(body: PromotionPlanBody) -> dict[str, Any]:
             connection_ids=set(body.connection_ids) or None,
             exclude_entity_ids=set(body.exclude_entity_ids) or None,
             exclude_connection_ids=set(body.exclude_connection_ids) or None,
+            document_ids=body.document_ids or None,
+            diagram_ids=body.diagram_ids or None,
         )
     except ValueError as e:
         raise HTTPException(400, str(e))
@@ -69,6 +75,20 @@ def promotion_plan(body: PromotionPlanBody) -> dict[str, Any]:
         ],
         "connection_ids": plan.connection_ids,
         "already_in_enterprise": plan.already_in_enterprise,
+        "documents_to_add": plan.documents_to_add,
+        "diagrams_to_add": plan.diagrams_to_add,
+        "doc_conflicts": [
+            {"engagement_id": c.engagement_id, "enterprise_id": c.enterprise_id,
+             "doc_type": c.doc_type,
+             "engagement_title": c.engagement_title, "enterprise_title": c.enterprise_title}
+            for c in plan.doc_conflicts
+        ],
+        "diagram_conflicts": [
+            {"engagement_id": c.engagement_id, "enterprise_id": c.enterprise_id,
+             "diagram_type": c.diagram_type,
+             "engagement_name": c.engagement_name, "enterprise_name": c.enterprise_name}
+            for c in plan.diagram_conflicts
+        ],
         "warnings": plan.warnings,
     }
 
@@ -91,6 +111,8 @@ def promotion_execute(body: PromotionExecuteBody) -> dict[str, Any]:
             connection_ids=set(body.connection_ids) or None,
             exclude_entity_ids=set(body.exclude_entity_ids) or None,
             exclude_connection_ids=set(body.exclude_connection_ids) or None,
+            document_ids=body.document_ids or None,
+            diagram_ids=body.diagram_ids or None,
         )
     except ValueError as e:
         raise HTTPException(400, str(e))

@@ -15,84 +15,73 @@
 connection_types:
   archimate:
     archimate-composition:
-      directory: composition
       archimate_relationship_type: Composition
       puml_arrow: "-->"
       symmetric: false
     archimate-aggregation:
-      directory: aggregation
       archimate_relationship_type: Aggregation
       puml_arrow: "-->"
       symmetric: false
     archimate-assignment:
-      directory: assignment
       archimate_relationship_type: Assignment
       puml_arrow: "-->"
       symmetric: false
     archimate-realization:
-      directory: realization
       archimate_relationship_type: Realization
       puml_arrow: "..|>"
       symmetric: false
     archimate-serving:
-      directory: serving
       archimate_relationship_type: Serving
       puml_arrow: "-->"
       symmetric: false
     archimate-access:
-      directory: access
       archimate_relationship_type: Access
       puml_arrow: "-->"
       symmetric: false
     archimate-influence:
-      directory: influence
       archimate_relationship_type: Influence
       puml_arrow: "..>"
       symmetric: false
     archimate-association:
-      directory: association
       archimate_relationship_type: Association
       puml_arrow: "--"
       symmetric: true
     archimate-specialization:
-      directory: specialization
       archimate_relationship_type: Specialization
       puml_arrow: "--|>"
       symmetric: false
     archimate-flow:
-      directory: flow
       archimate_relationship_type: Flow
       puml_arrow: "..>"
       symmetric: false
     archimate-triggering:
-      directory: triggering
       archimate_relationship_type: Triggering
       puml_arrow: "-->"
       symmetric: false
 
   er:
-    er-one-to-many:    { directory: one-to-many }
-    er-many-to-many:   { directory: many-to-many }
-    er-one-to-one:     { directory: one-to-one }
+    er-one-to-many:    {}
+    er-many-to-many:   {}
+    er-one-to-one:     {}
 
   sequence:
-    sequence-synchronous:  { directory: synchronous }
-    sequence-asynchronous: { directory: asynchronous }
-    sequence-return:       { directory: return }
-    sequence-create:       { directory: create }
-    sequence-destroy:      { directory: destroy }
+    sequence-synchronous:  {}
+    sequence-asynchronous: {}
+    sequence-return:       {}
+    sequence-create:       {}
+    sequence-destroy:      {}
 
   activity:
-    activity-sequence-flow:    { directory: sequence-flow }
-    activity-decision:         { directory: decision }
-    activity-message-flow:     { directory: message-flow }
-    activity-data-association: { directory: data-association }
+    activity-sequence-flow:    {}
+    activity-decision:         {}
+    activity-message-flow:     {}
+    activity-data-association: {}
 
   usecase:
-    usecase-include:        { directory: include }
-    usecase-extend:         { directory: extend }
-    usecase-association:    { directory: actor-association }
-    usecase-generalization: { directory: generalization }
+    usecase-include:        {}
+    usecase-extend:         {}
+    usecase-association:    {}
+    usecase-generalization: {}
 
 # ── Permitted relationship rules ───────────────────────────────────────────
 # Encoded from the ArchiMate NEXT specification.

@@ -27,7 +27,7 @@ from src.common.artifact_query import ArtifactRepository
 from src.common.artifact_verifier_registry import ArtifactRegistry
 
 
-_GRF_FRONTMATTER_KEY = "global-entity-id"
+_GRF_FRONTMATTER_KEY = "global-artifact-id"
 _GRF_CONN_HEADER = re.compile(r"^### .+ → (.+)$", re.MULTILINE)
 
 
@@ -53,7 +53,7 @@ def find_broken_grfs(
 ) -> list[tuple[str, Path]]:
     """Return [(grf_artifact_id, grf_path)] for GRFs whose global-entity-id is missing."""
     broken: list[tuple[str, Path]] = []
-    for rec in engagement_repo.list_entities(artifact_type="global-entity-reference"):
+    for rec in engagement_repo.list_entities(artifact_type="global-artifact-reference"):
         geid = rec.extra.get(_GRF_FRONTMATTER_KEY)
         if not isinstance(geid, str) or not geid:
             broken.append((rec.artifact_id, rec.path))

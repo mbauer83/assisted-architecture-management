@@ -153,6 +153,16 @@ export const SearchResultSchema = Schema.Struct({
 })
 export type SearchResult = typeof SearchResultSchema.Type
 
+// ── Frontmatter fields ────────────────────────────────────────────────────────
+
+export const FrontmatterFieldSchema = Schema.Struct({
+  name: Schema.String,
+  field_type: Schema.String,
+  array_items_type: Schema.optional(Schema.NullOr(Schema.String)),
+  required: Schema.Boolean,
+})
+export type FrontmatterField = typeof FrontmatterFieldSchema.Type
+
 // ── Document types ────────────────────────────────────────────────────────────
 
 export const DocumentTypeSchema = Schema.Struct({
@@ -161,6 +171,9 @@ export const DocumentTypeSchema = Schema.Struct({
   name: Schema.String,
   subdirectory: Schema.String,
   required_sections: Schema.Array(Schema.String),
+  extra_frontmatter_fields: Schema.optional(Schema.Array(FrontmatterFieldSchema)),
+  required_entity_type_connections: Schema.optional(Schema.Array(Schema.String)),
+  suggested_entity_type_connections: Schema.optional(Schema.Array(Schema.String)),
 })
 export type DocumentType = typeof DocumentTypeSchema.Type
 

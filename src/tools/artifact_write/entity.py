@@ -42,9 +42,9 @@ def create_entity(
 ) -> WriteResult:
     assert_engagement_write_root(repo_root)
 
-    if artifact_type == "global-entity-reference":
+    if artifact_type == "global-artifact-reference":
         raise ValueError(
-            "global-entity-reference entities may not be created directly. "
+            "global-artifact-reference entities may not be created directly. "
             "Use model_ensure_global_entity_reference (MCP) or "
             "POST /api/global-entity-reference (GUI) instead."
         )
@@ -63,7 +63,7 @@ def create_entity(
     path = repo_root / "model" / info.domain_dir / info.subdir / f"{eid}.md"
 
     display = {
-        "domain": info.archimate_domain,
+        "domain": info.domain_dir.capitalize(),
         "element-type": info.archimate_element_type,
         "label": name,
         "alias": f"{info.prefix}_{eid.split('.')[1]}" if '.' in eid else eid.replace("-", "_"),

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import argparse
 import logging
-import os
+from pathlib import Path
 
 import anyio
 from anyio.streams.memory import MemoryObjectReceiveStream, MemoryObjectSendStream
@@ -13,10 +13,14 @@ from mcp.client.streamable_http import streamablehttp_client
 from mcp.server.stdio import stdio_server
 from mcp.shared.message import SessionMessage
 
-from src.tools.backend_runtime import backend_url, configured_backend_url, ensure_backend_running
+from src.tools.backend_runtime import backend_url, configured_backend_url, ensure_backend_running, resolve_backend_port
 
 
 logger = logging.getLogger(__name__)
+
+
+def _project_directory() -> Path:
+    return Path(__file__).resolve().parents[2]
 
 
 async def _pump_reader_to_writer(
@@ -40,13 +44,20 @@ async def _run_bridge(url: str) -> None:
 
 def main(argv: list[str] | None = None) -> None:
     parser = argparse.ArgumentParser(prog="arch-mcp-stdio")
-    parser.add_argument("--port", type=int, default=8000)
+    parser.add_argument("--port", type=int, default=None)
     parser.add_argument("--no-autostart", action="store_true", default=False)
+    parser.add_argument("--server", choices=("read", "write"), default="read",
+                        help="Which MCP server to connect to (read or write)")
     args = parser.parse_args(argv)
 
-    port = ensure_backend_running(port=args.port, start_if_missing=not args.no_autostart)
+    project_dir = _project_directory()
+    port = ensure_backend_running(
+        port=resolve_backend_port(start=project_dir, explicit_port=args.port),
+        start_if_missing=not args.no_autostart,
+        cwd=project_dir,
+    )
     target_base = configured_backend_url() or backend_url(port)
-    anyio.run(_run_bridge, f"{target_base}/mcp")
+    anyio.run(_run_bridge, f"{target_base}/mcp/{args.server}")
 
 
 if __name__ == "__main__":

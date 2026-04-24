@@ -58,40 +58,43 @@ def artifact_add_connection(
 
     effective_source = source_entity
     effective_target = target_entity
-    grf_source_id: str | None = None
-    grf_artifact_id: str | None = None
+    gar_source_id: str | None = None
+    gar_artifact_id: str | None = None
     warnings: list[str] = []
 
-    def _ensure_grf(global_id: str) -> str:
+    def _ensure_gar(global_id: str) -> str:
         nonlocal registry, verifier
-        from src.tools.artifact_write.global_entity_reference import ensure_global_entity_reference
+        from src.tools.artifact_write.global_artifact_reference import ensure_global_artifact_reference
         full_repo = repo_cached(both_key)
         rec = full_repo.get_entity(global_id)
         name = rec.name if rec else global_id
+        entity_type = rec.artifact_type if rec else None
         eng_repo = repo_cached(roots_key(both_roots[:1]))
-        grf_result = ensure_global_entity_reference(
+        gar_result = ensure_global_artifact_reference(
             engagement_repo=eng_repo, engagement_root=eng_root, verifier=verifier,
             clear_repo_caches=clear_caches_for_repo,
-            global_entity_id=global_id, global_entity_name=name, dry_run=dry_run,
+            global_artifact_id=global_id, global_artifact_name=name,
+            global_artifact_type="entity", global_artifact_entity_type=entity_type,
+            dry_run=dry_run,
         )
-        if grf_result.wrote:
-            warnings.append(f"Created GRF proxy {grf_result.artifact_id} for {global_id}")
+        if gar_result.wrote:
+            warnings.append(f"Created GAR proxy {gar_result.artifact_id} for {global_id}")
             clear_caches_for_repo(eng_root)
         else:
-            warnings.append(f"Routed via existing GRF proxy {grf_result.artifact_id}")
+            warnings.append(f"Routed via existing GAR proxy {gar_result.artifact_id}")
         full_repo.refresh()
         eng_repo.refresh()
         registry.refresh()
         verifier = verifier_for(both_key, include_registry=True)
-        return grf_result.artifact_id
+        return gar_result.artifact_id
 
     if source_entity in registry.enterprise_entity_ids():
-        grf_source_id = _ensure_grf(source_entity)
-        effective_source = grf_source_id
+        gar_source_id = _ensure_gar(source_entity)
+        effective_source = gar_source_id
 
     if target_entity in registry.enterprise_entity_ids():
-        grf_artifact_id = _ensure_grf(target_entity)
-        effective_target = grf_artifact_id
+        gar_artifact_id = _ensure_gar(target_entity)
+        effective_target = gar_artifact_id
 
     result = artifact_write_ops.add_connection(
         repo_root=eng_root, registry=registry, verifier=verifier,
@@ -102,11 +105,11 @@ def artifact_add_connection(
         version=version, status=status, last_updated=last_updated, dry_run=dry_run,
     )
     out = _out(result, dry_run=dry_run)
-    if grf_source_id:
-        out["grf_source_id"] = grf_source_id
+    if gar_source_id:
+        out["gar_source_id"] = gar_source_id
         out["original_source"] = source_entity
-    if grf_artifact_id:
-        out["grf_artifact_id"] = grf_artifact_id
+    if gar_artifact_id:
+        out["gar_artifact_id"] = gar_artifact_id
         out["original_target"] = target_entity
     all_warnings = warnings + list(result.warnings or [])
     if all_warnings:

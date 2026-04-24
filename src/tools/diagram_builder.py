@@ -155,7 +155,7 @@ def generate_archimate_puml_body(
     comp_children: set[str] = set()
     for conn in connection_records:
         ct = CONNECTION_TYPES.get(conn.conn_type)
-        if ct and ct.conn_dir in ("composition", "aggregation"):
+        if ct and ct.artifact_type in ("archimate-composition", "archimate-aggregation"):
             src_alias = alias_by_id.get(conn.source)
             tgt_alias = alias_by_id.get(conn.target)
             if src_alias and tgt_alias and tgt_alias in entity_by_alias:
@@ -255,7 +255,7 @@ def generate_archimate_puml_body(
     for conn in connection_records:
         ct = CONNECTION_TYPES.get(conn.conn_type)
         # Composition/aggregation shown structurally via nesting — skip as connection lines
-        if ct and ct.conn_dir in ("composition", "aggregation"):
+        if ct and ct.artifact_type in ("archimate-composition", "archimate-aggregation"):
             continue
         src = alias_by_id.get(conn.source)
         tgt = alias_by_id.get(conn.target)

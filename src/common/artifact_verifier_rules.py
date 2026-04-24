@@ -13,7 +13,7 @@ from src.common.artifact_verifier_types import (
     entity_id_from_path,
 )
 from src.common._verifier_rules_schema import check_frontmatter_schema, check_attribute_schema, parse_properties_table
-from src.common._verifier_rules_grf import check_global_entity_reference
+from src.common._verifier_rules_grf import check_global_artifact_reference as check_global_entity_reference
 
 
 def check_required_fields(fm: dict, required: frozenset[str], result: VerificationResult, loc: str) -> None:

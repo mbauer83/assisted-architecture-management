@@ -73,7 +73,7 @@ def admin_create_entity(
     eid = artifact_id or generate_entity_id(info.prefix, name)
     path = repo_root / "model" / info.domain_dir / info.subdir / f"{eid}.md"
     display = {
-        "domain": info.archimate_domain,
+        "domain": info.domain_dir.capitalize(),
         "element-type": info.archimate_element_type,
         "label": name,
         "alias": f"{info.prefix}_{eid.split('.')[1]}" if "." in eid else eid.replace("-", "_"),

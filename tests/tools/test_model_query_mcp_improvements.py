@@ -104,7 +104,7 @@ def test_model_repository_search_priority_and_counts(tmp_path: Path) -> None:
 
 def test_model_query_mcp_projection_and_aggregate_tool(tmp_path: Path) -> None:
     repo_root = _build_repo(tmp_path / "repo")
-    tool_map = mcp_artifact_server.mcp._tool_manager._tools
+    tool_map = mcp_artifact_server.mcp_read._tool_manager._tools
 
     listed = tool_map["artifact_query_list_artifacts"].fn(
         repo_root=str(repo_root),

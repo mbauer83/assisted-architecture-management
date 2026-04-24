@@ -1,8 +1,9 @@
 <script setup lang="ts">
-import { computed, inject, onMounted, ref, watch } from 'vue'
+import { computed, inject, onMounted, ref, watch, nextTick } from 'vue'
 import { useRouter } from 'vue-router'
 import { Effect } from 'effect'
 import { modelServiceKey } from '../keys'
+import { useWriteBlock } from '../composables/useWriteBlock'
 import MarkdownEditor from '../components/MarkdownEditor.vue'
 import ArtifactReferenceInput from '../components/ArtifactReferenceInput.vue'
 import { draftDocumentPath } from '../lib/referenceLinks.js'
@@ -10,9 +11,11 @@ import type { DocumentType } from '../../domain'
 
 const svc = inject(modelServiceKey)!
 const router = useRouter()
+const writeBlocked = useWriteBlock()
 
 const documentTypes = ref<DocumentType[]>([])
 const docType = ref('')
+const docTypeRaw = ref('')
 const title = ref('')
 const status = ref('draft')
 const keywords = ref('')
@@ -29,12 +32,35 @@ const syncingAutoBody = ref(false)
 const titleTouched = ref(false)
 const submitAttempted = ref(false)
 
+// Frontmatter field tracking
+const headerWasManuallyEdited = ref(false)
+const lastAutoFrontmatter = ref<Record<string, string | string[]>>({})
+const extraFrontmatter = ref<Record<string, string | string[]>>({})
+
+// Type switch warning dialog
+const typeSwitchWarning = ref<string | null>(null)
+const pendingDocType = ref<string | null>(null)
+
 const placeholderBody = (requiredSections: readonly string[]) =>
   requiredSections.map((section) => `## ${section}\n\n`).join('\n')
+
+const formatFieldLabel = (name: string) =>
+  name.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())
+
+const formatEntityTypeTerm = (term: string) => {
+  if (term === '@all') return 'Any entity'
+  const normalized = term.startsWith('@') ? term.slice(1) : term
+  return normalized.replace(/[-_]/g, ' ').replace(/\b\w/g, c => c.toUpperCase())
+}
 
 const selectedType = computed(() =>
   documentTypes.value.find((type) => type.doc_type === docType.value) ?? null,
 )
+
+const extraFields = computed(() => selectedType.value?.extra_frontmatter_fields ?? [])
+const requiredEntityTypes = computed(() => selectedType.value?.required_entity_type_connections ?? [])
+const suggestedEntityTypes = computed(() => selectedType.value?.suggested_entity_type_connections ?? [])
+
 const draftPath = computed(() => draftDocumentPath(docType.value, selectedType.value?.subdirectory))
 const titleError = computed(() =>
   (!title.value.trim() && (titleTouched.value || submitAttempted.value))
@@ -61,7 +87,10 @@ onMounted(() => {
   loading.value = true
   Effect.runPromise(svc.listDocumentTypes()).then((types) => {
     documentTypes.value = types
-    if (!docType.value && types.length > 0) docType.value = types[0].doc_type
+    if (!docType.value && types.length > 0) {
+      docType.value = types[0].doc_type
+      docTypeRaw.value = types[0].doc_type
+    }
     loading.value = false
   }).catch((e) => {
     error.value = String(e)
@@ -74,17 +103,85 @@ watch(body, (nextValue) => {
   bodyWasManuallyEdited.value = nextValue !== lastAutoBody.value
 })
 
+watch(extraFrontmatter, (next) => {
+  if (syncingAutoBody.value) return
+  headerWasManuallyEdited.value = JSON.stringify(next) !== JSON.stringify(lastAutoFrontmatter.value)
+}, { deep: true })
+
+watch(docTypeRaw, (next) => {
+  if (next === docType.value) return
+  const dirtyParts = [
+    ...(headerWasManuallyEdited.value ? ['header fields'] : []),
+    ...(bodyWasManuallyEdited.value ? ['body'] : []),
+  ]
+  if (dirtyParts.length > 0) {
+    typeSwitchWarning.value = `Switching type will reset your edited ${dirtyParts.join(' and ')}.`
+    pendingDocType.value = next
+    nextTick(() => { docTypeRaw.value = docType.value })
+  } else {
+    docType.value = next
+  }
+})
+
 watch(selectedType, (type) => {
   if (!type) return
-  const nextPlaceholder = placeholderBody(type.required_sections)
-  if (!bodyWasManuallyEdited.value || body.value === lastAutoBody.value || !body.value.trim()) {
+  const nextBody = placeholderBody(type.required_sections)
+  if (!headerWasManuallyEdited.value && !bodyWasManuallyEdited.value) {
     syncingAutoBody.value = true
-    body.value = nextPlaceholder
-    lastAutoBody.value = nextPlaceholder
+    // Reset body
+    body.value = nextBody
+    lastAutoBody.value = nextBody
     bodyWasManuallyEdited.value = false
+    // Reset frontmatter
+    const defaults: Record<string, string | string[]> = {}
+    for (const f of type.extra_frontmatter_fields ?? []) {
+      defaults[f.name] = f.field_type === 'array' ? [] : ''
+    }
+    extraFrontmatter.value = { ...defaults }
+    lastAutoFrontmatter.value = { ...defaults }
+    headerWasManuallyEdited.value = false
     syncingAutoBody.value = false
   }
 })
+
+const onArrayFieldInput = (fieldName: string, raw: string) => {
+  extraFrontmatter.value[fieldName] = raw.split(',').map(v => v.trim()).filter(Boolean)
+  headerWasManuallyEdited.value = true
+}
+
+const buildExtraFrontmatter = (): Record<string, unknown> | undefined => {
+  const result: Record<string, unknown> = {}
+  for (const f of extraFields.value) {
+    const v = extraFrontmatter.value[f.name]
+    if (Array.isArray(v) && v.length > 0) result[f.name] = v
+    else if (typeof v === 'string' && v.trim()) result[f.name] = v.trim()
+  }
+  return Object.keys(result).length > 0 ? result : undefined
+}
+
+const confirmTypeSwitch = () => {
+  if (!pendingDocType.value) return
+  headerWasManuallyEdited.value = false
+  bodyWasManuallyEdited.value = false
+  docType.value = pendingDocType.value
+  docTypeRaw.value = pendingDocType.value
+  typeSwitchWarning.value = null
+  pendingDocType.value = null
+}
+
+const cancelTypeSwitch = () => {
+  typeSwitchWarning.value = null
+  pendingDocType.value = null
+  docTypeRaw.value = docType.value
+}
+
+const resetAll = () => {
+  headerWasManuallyEdited.value = false
+  bodyWasManuallyEdited.value = false
+  const current = docType.value
+  docType.value = ''
+  nextTick(() => { docType.value = current })
+}
 
 const submit = () => {
   submitAttempted.value = true
@@ -99,6 +196,7 @@ const submit = () => {
     body: body.value,
     keywords: keywords.value.split(',').map((value) => value.trim()).filter(Boolean),
     status: status.value,
+    extra_frontmatter: buildExtraFrontmatter(),
     dry_run: false,
   })).then((result) => {
     if (!result.wrote) {
@@ -134,7 +232,7 @@ const insertReference = (markdownLink: string) => {
       <div class="form-grid">
         <label class="form-field">
           <span>Document Type</span>
-          <select v-model="docType" class="form-control">
+          <select v-model="docTypeRaw" class="form-control">
             <option v-for="type in documentTypes" :key="type.doc_type" :value="type.doc_type">{{ type.name }}</option>
           </select>
         </label>
@@ -148,6 +246,16 @@ const insertReference = (markdownLink: string) => {
             <option value="superseded">superseded</option>
           </select>
         </label>
+      </div>
+
+      <div v-if="typeSwitchWarning" class="type-switch-warning">
+        {{ typeSwitchWarning }}
+        <button class="link-btn warn" @click="confirmTypeSwitch">Switch anyway</button>
+        <button class="link-btn" @click="cancelTypeSwitch">Keep editing</button>
+      </div>
+      <div v-else-if="headerWasManuallyEdited || bodyWasManuallyEdited" class="dirty-hint">
+        Document type cannot be changed after editing —
+        <button class="link-btn" @click="resetAll">clear all</button> to reset.
       </div>
 
       <label class="form-field">
@@ -168,6 +276,38 @@ const insertReference = (markdownLink: string) => {
         <input v-model="keywords" class="form-control" type="text" placeholder="Comma-separated terms" />
       </label>
 
+      <template v-for="field in extraFields" :key="field.name">
+        <label class="form-field">
+          <span>{{ formatFieldLabel(field.name) }}{{ field.required ? ' *' : '' }}</span>
+          <input
+            v-if="field.field_type === 'array'"
+            :value="(extraFrontmatter[field.name] as string[] || []).join(', ')"
+            @input="onArrayFieldInput(field.name, ($event.target as HTMLInputElement).value)"
+            class="form-control"
+            type="text"
+            placeholder="Comma-separated values"
+          />
+          <input
+            v-else
+            v-model="(extraFrontmatter as any)[field.name]"
+            @input="headerWasManuallyEdited = true"
+            class="form-control"
+            :type="field.name === 'date' ? 'date' : 'text'"
+          />
+        </label>
+      </template>
+
+      <div v-if="requiredEntityTypes.length" class="entity-connection-hint entity-connection-hint--required">
+        <strong>Required entity links:</strong>
+        Link at least one matching entity for each term:
+        <span v-for="(t, i) in requiredEntityTypes" :key="t" class="entity-type-tag entity-type-tag--required" :title="t">{{ formatEntityTypeTerm(t) }}<span v-if="i < requiredEntityTypes.length - 1">,&nbsp;</span></span>
+      </div>
+      <div v-if="suggestedEntityTypes.length" class="entity-connection-hint entity-connection-hint--suggested">
+        <strong>Suggested entity links:</strong>
+        Consider linking matching entities for:
+        <span v-for="(t, i) in suggestedEntityTypes" :key="t" class="entity-type-tag" :title="t">{{ formatEntityTypeTerm(t) }}<span v-if="i < suggestedEntityTypes.length - 1">,&nbsp;</span></span>
+      </div>
+
       <div class="form-field">
         <span>Body</span>
         <div class="editor-toolbar">
@@ -187,7 +327,7 @@ const insertReference = (markdownLink: string) => {
       </ul>
 
       <div class="actions">
-        <button class="submit-btn" type="button" :disabled="saving || !docType" @click="submit">Create Document</button>
+        <button class="submit-btn" type="button" :disabled="saving || !docType || writeBlocked" :title="writeBlocked ? 'Write operations are temporarily blocked' : ''" @click="submit">Create Document</button>
       </div>
     </div>
 
@@ -262,5 +402,74 @@ const insertReference = (markdownLink: string) => {
   background: rgba(15, 23, 42, 0.3);
   padding: 16px;
 }
-@media (max-width: 700px) { .form-grid { grid-template-columns: 1fr; } }
+
+.type-switch-warning {
+  background: #fef3c7;
+  border: 1px solid #f59e0b;
+  border-radius: 6px;
+  padding: 8px 12px;
+  font-size: 12px;
+  color: #92400e;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.dirty-hint {
+  font-size: 12px;
+  color: #64748b;
+  margin-bottom: 10px;
+}
+
+.link-btn {
+  border: none;
+  background: none;
+  cursor: pointer;
+  color: #2563eb;
+  font-size: 12px;
+  padding: 0;
+  text-decoration: underline;
+}
+
+.link-btn.warn {
+  color: #b45309;
+}
+
+.link-btn:hover {
+  opacity: 0.8;
+}
+
+.entity-connection-hint {
+  border-radius: 6px;
+  padding: 8px 12px;
+  font-size: 12px;
+  margin-bottom: 10px;
+  line-height: 1.6;
+}
+.entity-connection-hint--required {
+  background: #fef2f2;
+  border: 1px solid #fca5a5;
+  color: #991b1b;
+}
+.entity-connection-hint--suggested {
+  background: #eff6ff;
+  border: 1px solid #93c5fd;
+  color: #1e40af;
+}
+.entity-type-tag {
+  font-family: monospace;
+  font-size: 11px;
+  background: rgba(0, 0, 0, .06);
+  border-radius: 3px;
+  padding: 1px 4px;
+}
+.entity-type-tag--required {
+  background: rgba(220, 38, 38, .1);
+}
+
+@media (max-width: 700px) {
+  .form-grid { grid-template-columns: 1fr; }
+  .type-switch-warning { flex-direction: column; align-items: flex-start; gap: 8px; }
+}
 </style>

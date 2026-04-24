@@ -28,7 +28,7 @@ def write_help() -> dict[str, object]:
     }
 
 
-_INTERNAL_TYPES: frozenset[str] = frozenset({"global-entity-reference"})
+_INTERNAL_TYPES: frozenset[str] = frozenset({"global-artifact-reference"})
 
 
 def _entity_types_by_domain() -> dict[str, list[str]]:
@@ -47,7 +47,7 @@ def _entity_type_catalog() -> dict[str, dict[str, object]]:
             "prefix": info.prefix,
             "domain": info.domain_dir,
             "subdir": info.subdir,
-            "archimate_domain": info.archimate_domain,
+            "archimate_domain": info.domain_dir.capitalize(),
             "archimate_element_type": info.archimate_element_type,
             "element_classes": list(info.element_classes),
         }
@@ -67,7 +67,6 @@ def _connection_type_catalog() -> dict[str, dict[str, object]]:
     return {
         type_name: {
             "language": info.conn_lang,
-            "directory": info.conn_dir,
             "archimate_relationship_type": info.archimate_relationship_type,
             "symmetric": info.symmetric,
             "puml_arrow": info.puml_arrow,

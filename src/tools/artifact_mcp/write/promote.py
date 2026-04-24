@@ -11,6 +11,8 @@ def artifact_promote_to_enterprise(
     entity_id: str,
     entity_ids: list[str] | None = None,
     connection_ids: list[str] | None = None,
+    document_ids: list[str] | None = None,
+    diagram_ids: list[str] | None = None,
     dry_run: bool = True,
     conflict_resolutions: list[dict[str, object]] | None = None,
     exclude_entities: list[str] | None = None,
@@ -19,11 +21,11 @@ def artifact_promote_to_enterprise(
     repo_preset: RepoPreset | None = None,
     enterprise_root: str | None = None,
 ) -> dict[str, object]:
-    """Promote an entity from the engagement repo to the enterprise repo.
+    """Promote entities, connections, documents, and diagrams from engagement to enterprise repo.
 
     Defaults use repos from arch-init workspace config (repo_root, enterprise_root optional).
-    Promotion is explicit: only the selected entities and connections are promoted.
-    After promotion, the entity is replaced in the engagement repo by a GRF proxy.
+    Promotion is explicit: only the selected artifacts are promoted.
+    After promotion, promoted engagement artifacts are replaced by GAR proxies.
     dry_run=true returns the plan without modifying any files.
     """
     from src.tools.artifact_mcp.context import resolve_enterprise_repo_root
@@ -49,6 +51,8 @@ def artifact_promote_to_enterprise(
         connection_ids=set(connection_ids) if connection_ids else None,
         exclude_entity_ids=set(exclude_entities) if exclude_entities else None,
         exclude_connection_ids=set(exclude_connections) if exclude_connections else None,
+        document_ids=document_ids or None,
+        diagram_ids=diagram_ids or None,
     )
 
     out: dict[str, object] = {
@@ -65,6 +69,20 @@ def artifact_promote_to_enterprise(
         ],
         "connections_to_promote": plan.connection_ids,
         "already_in_enterprise": plan.already_in_enterprise,
+        "documents_to_add": plan.documents_to_add,
+        "diagrams_to_add": plan.diagrams_to_add,
+        "doc_conflicts": [
+            {"engagement_id": c.engagement_id, "enterprise_id": c.enterprise_id,
+             "doc_type": c.doc_type,
+             "engagement_title": c.engagement_title, "enterprise_title": c.enterprise_title}
+            for c in plan.doc_conflicts
+        ],
+        "diagram_conflicts": [
+            {"engagement_id": c.engagement_id, "enterprise_id": c.enterprise_id,
+             "diagram_type": c.diagram_type,
+             "engagement_name": c.engagement_name, "enterprise_name": c.enterprise_name}
+            for c in plan.diagram_conflicts
+        ],
         "warnings": plan.warnings,
     }
 

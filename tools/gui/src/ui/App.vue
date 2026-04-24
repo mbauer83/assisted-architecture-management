@@ -1,18 +1,79 @@
 <script setup lang="ts">
 import { RouterLink, RouterView, useRouter } from 'vue-router'
-import { inject, ref, onMounted } from 'vue'
+import { inject, provide, ref, onMounted, onUnmounted, computed } from 'vue'
 import { Effect } from 'effect'
 import { modelServiceKey } from './keys'
 import ArchimateTypeGlyph from './components/ArchimateTypeGlyph.vue'
+import ToastStack from './components/ToastStack.vue'
 
 const svc = inject(modelServiceKey)!
 const router = useRouter()
 const adminMode = ref(false)
+const readOnly = ref(false)
+const writeBlocked = ref(false)
+
+const toasts = ref<Array<{id: number, message: string, type: 'info'|'warn'|'error'}>>([])
+let toastCounter = 0
+
+const addToast = (message: string, type: 'info'|'warn'|'error' = 'info', durationMs = 4000) => {
+  const id = ++toastCounter
+  toasts.value.push({ id, message, type })
+  setTimeout(() => { toasts.value = toasts.value.filter(t => t.id !== id) }, durationMs)
+}
+
+const anyWriteBlocked = computed(() => readOnly.value || writeBlocked.value)
+
+let eventSource: EventSource | null = null
 
 onMounted(() => {
   Effect.runPromise(svc.getServerInfo())
-    .then((info: any) => { adminMode.value = Boolean(info?.admin_mode) })
+    .then((info: any) => {
+      adminMode.value = Boolean(info?.admin_mode)
+      readOnly.value = Boolean(info?.read_only)
+    })
     .catch(() => {})
+
+  // Subscribe to SSE events
+  try {
+    eventSource = new EventSource('/api/events')
+
+    eventSource.addEventListener('write_block_changed', (e) => {
+      const data = JSON.parse(e.data)
+      writeBlocked.value = data.blocked
+      addToast(
+        data.blocked ? 'Sync in progress — writes paused' : 'Sync complete — writes resumed',
+        data.blocked ? 'warn' : 'info'
+      )
+    })
+
+    eventSource.addEventListener('git_sync_started', () => {
+      addToast('Pulling updates…', 'info')
+    })
+
+    eventSource.addEventListener('git_sync_completed', (e) => {
+      const data = JSON.parse(e.data)
+      addToast(`Pulled ${data.commits_pulled} commit(s)`, 'info')
+    })
+
+    eventSource.addEventListener('git_sync_failed', (e) => {
+      const data = JSON.parse(e.data)
+      addToast(
+        `Sync failed: ${data.error}. Writes resume in ${data.auto_unblock_in_seconds}s`,
+        'error',
+        7000
+      )
+    })
+  } catch (err) {
+    console.error('Failed to connect to event stream:', err)
+  }
+
+  provide('writeBlocked', anyWriteBlocked)
+})
+
+onUnmounted(() => {
+  if (eventSource) {
+    eventSource.close()
+  }
 })
 
 const searchQuery = ref('')
@@ -150,9 +211,16 @@ const hitTypeLabel = (hit: any): string => {
     ending this session or restarting in normal mode.
   </output>
 
+  <!-- Read-only mode banner — visible when --read-only is active -->
+  <output v-if="readOnly" class="readonly-banner">
+    <strong>Read-only mode</strong> — write operations are disabled.
+  </output>
+
   <main class="main">
     <RouterView />
   </main>
+
+  <ToastStack :toasts="toasts" />
 </template>
 
 <style>
@@ -322,6 +390,16 @@ pre, code {
   font-size: 12px;
   color: #fed7aa;
 }
+
+.readonly-banner {
+  background: #1e3a5f;
+  color: #bfdbfe;
+  padding: 7px 24px;
+  font-size: 13px;
+  line-height: 1.5;
+  border-bottom: 2px solid #3b82f6;
+}
+.readonly-banner strong { color: #93c5fd; font-weight: 700; }
 
 .main {
   max-width: 1200px;

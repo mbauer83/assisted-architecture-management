@@ -1,8 +1,12 @@
 {
   "mcpServers": {
-    "arch-repo": {
+    "arch-repo-read": {
       "command": "uv",
-      "args": ["run", "arch-mcp-stdio"]
+      "args": ["run", "arch-mcp-stdio-read"]
+    },
+    "arch-repo-write": {
+      "command": "uv",
+      "args": ["run", "arch-mcp-stdio-write"]
     }
   }
 }

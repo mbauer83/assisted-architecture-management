@@ -357,6 +357,14 @@ class ArtifactIndex:
         self._ensure_loaded()
         return {aid for aid, rec in self._entities.items() if self.scope_for_path(rec.path) == "enterprise"}
 
+    def enterprise_document_ids(self) -> set[str]:
+        self._ensure_loaded()
+        return {aid for aid, rec in self._documents.items() if self.scope_for_path(rec.path) == "enterprise"}
+
+    def enterprise_diagram_ids(self) -> set[str]:
+        self._ensure_loaded()
+        return {aid for aid, rec in self._diagrams.items() if self.scope_for_path(rec.path) == "enterprise"}
+
     def engagement_entity_ids(self) -> set[str]:
         self._ensure_loaded()
         return {aid for aid, rec in self._entities.items() if self.scope_for_path(rec.path) == "engagement"}

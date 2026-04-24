@@ -129,13 +129,14 @@ class ArtifactRepository:
         doc_type: str | None = None,
         status: str | None = None,
     ) -> list[DocumentRecord]:
-        results = [
-            rec
-            for rec in self._documents.values()
-            if (doc_type is None or rec.doc_type == doc_type)
-            and (status is None or rec.status == status)
-        ]
-        return sorted(results, key=lambda r: r.artifact_id)
+        with self._index._lock:
+            results = [
+                rec
+                for rec in self._documents.values()
+                if (doc_type is None or rec.doc_type == doc_type)
+                and (status is None or rec.status == status)
+            ]
+            return sorted(results, key=lambda r: r.artifact_id)
 
     def list_entities(
         self,
@@ -145,18 +146,19 @@ class ArtifactRepository:
         subdomain: str | None = None,
         status: str | None = None,
     ) -> list[EntityRecord]:
-        results = [
-            rec
-            for rec in self._entities.values()
-            if _matches_entity(
-                rec,
-                artifact_type=artifact_type,
-                domain=domain,
-                subdomain=subdomain,
-                status=status,
-            )
-        ]
-        return sorted(results, key=lambda r: r.artifact_id)
+        with self._index._lock:
+            results = [
+                rec
+                for rec in self._entities.values()
+                if _matches_entity(
+                    rec,
+                    artifact_type=artifact_type,
+                    domain=domain,
+                    subdomain=subdomain,
+                    status=status,
+                )
+            ]
+            return sorted(results, key=lambda r: r.artifact_id)
 
     def list_connections(
         self,
@@ -166,18 +168,19 @@ class ArtifactRepository:
         target: str | None = None,
         status: str | None = None,
     ) -> list[ConnectionRecord]:
-        results = [
-            rec
-            for rec in self._connections.values()
-            if _matches_connection(
-                rec,
-                conn_type=conn_type,
-                source=source,
-                target=target,
-                status=status,
-            )
-        ]
-        return sorted(results, key=lambda r: r.artifact_id)
+        with self._index._lock:
+            results = [
+                rec
+                for rec in self._connections.values()
+                if _matches_connection(
+                    rec,
+                    conn_type=conn_type,
+                    source=source,
+                    target=target,
+                    status=status,
+                )
+            ]
+            return sorted(results, key=lambda r: r.artifact_id)
 
     def list_diagrams(
         self,
@@ -185,16 +188,17 @@ class ArtifactRepository:
         diagram_type: str | None = None,
         status: str | None = None,
     ) -> list[DiagramRecord]:
-        results = [
-            rec
-            for rec in self._diagrams.values()
-            if _matches_diagram(
-                rec,
-                diagram_type=diagram_type,
-                status=status,
-            )
-        ]
-        return sorted(results, key=lambda r: r.artifact_id)
+        with self._index._lock:
+            results = [
+                rec
+                for rec in self._diagrams.values()
+                if _matches_diagram(
+                    rec,
+                    diagram_type=diagram_type,
+                    status=status,
+                )
+            ]
+            return sorted(results, key=lambda r: r.artifact_id)
 
     def list_artifacts(
         self,
@@ -210,31 +214,32 @@ class ArtifactRepository:
         domains = {d.lower() for d in _to_set(domain)}
         statuses = _to_set(status)
 
-        results: list[ArtifactSummary] = []
-        results.extend(
-            summary_from_entity(rec)
-            for rec in self._entities.values()
-            if _matches_entity_sets(rec, types, domains, statuses)
-        )
-        if include_connections:
+        with self._index._lock:
+            results: list[ArtifactSummary] = []
             results.extend(
-                summary_from_connection(rec)
-                for rec in self._connections.values()
-                if _matches_connection_sets(rec, statuses)
+                summary_from_entity(rec)
+                for rec in self._entities.values()
+                if _matches_entity_sets(rec, types, domains, statuses)
             )
-        if include_diagrams:
-            results.extend(
-                summary_from_diagram(rec)
-                for rec in self._diagrams.values()
-                if _matches_diagram_sets(rec, types, statuses)
-            )
-        if include_documents:
-            results.extend(
-                summary_from_document(rec)
-                for rec in self._documents.values()
-                if (not statuses or rec.status in statuses)
-            )
-        return sorted(results, key=lambda s: s.artifact_id)
+            if include_connections:
+                results.extend(
+                    summary_from_connection(rec)
+                    for rec in self._connections.values()
+                    if _matches_connection_sets(rec, statuses)
+                )
+            if include_diagrams:
+                results.extend(
+                    summary_from_diagram(rec)
+                    for rec in self._diagrams.values()
+                    if _matches_diagram_sets(rec, types, statuses)
+                )
+            if include_documents:
+                results.extend(
+                    summary_from_document(rec)
+                    for rec in self._documents.values()
+                    if (not statuses or rec.status in statuses)
+                )
+            return sorted(results, key=lambda s: s.artifact_id)
 
     def read_artifact(
         self,
@@ -243,34 +248,36 @@ class ArtifactRepository:
         mode: Literal["summary", "full"] = "summary",
         section: str | None = None,
     ) -> dict[str, object] | None:
-        entity = self._entities.get(artifact_id)
-        if entity is not None:
-            return _read_entity(entity, mode=mode)
-        connection = self._connections.get(artifact_id)
-        if connection is not None:
-            return _read_connection(connection, mode=mode)
-        diagram = self._diagrams.get(artifact_id)
-        if diagram is not None:
-            return _read_diagram(diagram, mode=mode)
-        document = self._documents.get(artifact_id)
-        if document is not None:
-            return _read_document(document, mode=mode, section=section)
-        return None
+        with self._index._lock:
+            entity = self._entities.get(artifact_id)
+            if entity is not None:
+                return _read_entity(entity, mode=mode)
+            connection = self._connections.get(artifact_id)
+            if connection is not None:
+                return _read_connection(connection, mode=mode)
+            diagram = self._diagrams.get(artifact_id)
+            if diagram is not None:
+                return _read_diagram(diagram, mode=mode)
+            document = self._documents.get(artifact_id)
+            if document is not None:
+                return _read_document(document, mode=mode, section=section)
+            return None
 
     def summarize_artifact(self, artifact_id: str) -> ArtifactSummary | None:
-        entity = self._entities.get(artifact_id)
-        if entity is not None:
-            return summary_from_entity(entity)
-        connection = self._connections.get(artifact_id)
-        if connection is not None:
-            return summary_from_connection(connection)
-        diagram = self._diagrams.get(artifact_id)
-        if diagram is not None:
-            return summary_from_diagram(diagram)
-        document = self._documents.get(artifact_id)
-        if document is not None:
-            return summary_from_document(document)
-        return None
+        with self._index._lock:
+            entity = self._entities.get(artifact_id)
+            if entity is not None:
+                return summary_from_entity(entity)
+            connection = self._connections.get(artifact_id)
+            if connection is not None:
+                return summary_from_connection(connection)
+            diagram = self._diagrams.get(artifact_id)
+            if diagram is not None:
+                return summary_from_diagram(diagram)
+            document = self._documents.get(artifact_id)
+            if document is not None:
+                return summary_from_document(document)
+            return None
 
     def search_artifacts(
         self,
@@ -331,32 +338,33 @@ class ArtifactRepository:
         return dict(sorted(counts.items(), key=lambda item: item[0]))
 
     def stats(self) -> dict[str, object]:
-        entities = list(self._entities.values())
-        connections = list(self._connections.values())
-        diagrams = list(self._diagrams.values())
-        documents = list(self._documents.values())
+        with self._index._lock:
+            entities = list(self._entities.values())
+            connections = list(self._connections.values())
+            diagrams = list(self._diagrams.values())
+            documents = list(self._documents.values())
 
-        entities_by_domain: dict[str, int] = {}
-        for entity in entities:
-            entities_by_domain[entity.domain] = entities_by_domain.get(entity.domain, 0) + 1
+            entities_by_domain: dict[str, int] = {}
+            for entity in entities:
+                entities_by_domain[entity.domain] = entities_by_domain.get(entity.domain, 0) + 1
 
-        connections_by_type: dict[str, int] = {}
-        for connection in connections:
-            connections_by_type[connection.conn_type] = connections_by_type.get(connection.conn_type, 0) + 1
+            connections_by_type: dict[str, int] = {}
+            for connection in connections:
+                connections_by_type[connection.conn_type] = connections_by_type.get(connection.conn_type, 0) + 1
 
-        documents_by_type: dict[str, int] = {}
-        for doc in documents:
-            documents_by_type[doc.doc_type] = documents_by_type.get(doc.doc_type, 0) + 1
+            documents_by_type: dict[str, int] = {}
+            for doc in documents:
+                documents_by_type[doc.doc_type] = documents_by_type.get(doc.doc_type, 0) + 1
 
-        return {
-            "entities": len(entities),
-            "connections": len(connections),
-            "diagrams": len(diagrams),
-            "documents": len(documents),
-            "entities_by_domain": entities_by_domain,
-            "connections_by_type": connections_by_type,
-            "documents_by_type": documents_by_type,
-        }
+            return {
+                "entities": len(entities),
+                "connections": len(connections),
+                "diagrams": len(diagrams),
+                "documents": len(documents),
+                "entities_by_domain": entities_by_domain,
+                "connections_by_type": connections_by_type,
+                "documents_by_type": documents_by_type,
+            }
 
     def find_connections_for(
         self,

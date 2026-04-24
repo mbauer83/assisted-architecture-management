@@ -35,12 +35,12 @@ for _name, _info in _entity_data["entity_types"].items():
         prefix=_info["prefix"],
         domain_dir=_info["domain"],
         subdir=_info["subdir"],
-        archimate_domain=_info["archimate_domain"],
         archimate_element_type=_info["archimate_element_type"],
         element_classes=tuple(_info.get("element_classes", ())),
         create_when=_info.get("create_when", ""),
         never_create_when=_info.get("never_create_when", ""),
         has_sprite=bool(_info.get("has_sprite", False)),
+        internal=bool(_info.get("internal", False)),
     )
 
 # ── CONNECTION_TYPES ─────────────────────────────────────────────────────
@@ -50,7 +50,6 @@ for _lang, _types in _conn_data["connection_types"].items():
         CONNECTION_TYPES[_name] = ConnectionTypeInfo(
             artifact_type=_name,
             conn_lang=_lang,
-            conn_dir=_info["directory"],
             archimate_relationship_type=_info.get("archimate_relationship_type"),
             symmetric=_info.get("symmetric", False),
             puml_arrow=_info.get("puml_arrow", "-->"),
@@ -58,9 +57,9 @@ for _lang, _types in _conn_data["connection_types"].items():
 
 # ── Derived: stereotype → connection type ────────────────────────────────
 ARCHIMATE_STEREOTYPE_TO_CONNECTION_TYPE: dict[str, str] = {
-    ct.conn_dir: ct.artifact_type
+    ct.archimate_relationship_type.lower(): ct.artifact_type
     for ct in CONNECTION_TYPES.values()
-    if ct.conn_lang == "archimate"
+    if ct.conn_lang == "archimate" and ct.archimate_relationship_type
 }
 
 # ── Element-class membership (inverted from entity element_classes) ──────
@@ -72,27 +71,26 @@ for _etype, _einfo in ENTITY_TYPES.items():
 ALL_ENTITY_TYPE_NAMES: list[str] = sorted(ENTITY_TYPES)
 
 # ── Domain ordering & display (derived from entity_ontology.yaml insertion order) ──
-#: Unique archimate_domain values in the order they first appear in the YAML.
-#: Domains with empty archimate_domain (e.g. global-entity-reference) are excluded.
+#: Unique domain_dir values in the order they first appear in the YAML.
+#: Internal types (e.g. global-entity-reference) are excluded.
 DOMAIN_ORDER: list[str] = list(dict.fromkeys(
-    et.archimate_domain.lower()
+    et.domain_dir
     for et in ENTITY_TYPES.values()
-    if et.archimate_domain
+    if not et.internal
 ))
 
-#: domain_lower → grouping stereotype name (e.g. "motivation" → "MotivationGrouping")
+#: domain_dir → grouping stereotype name (e.g. "motivation" → "MotivationGrouping")
 DOMAIN_GROUPING: dict[str, str] = {
-    d: et.archimate_domain + "Grouping"
+    et.domain_dir: et.domain_dir.capitalize() + "Grouping"
     for et in ENTITY_TYPES.values()
-    if et.archimate_domain
-    for d in [et.archimate_domain.lower()]
+    if not et.internal
 }
 
-#: domain_lower → display name as it appears in diagrams
+#: domain_dir → display name (capitalized) as it appears in diagrams
 DOMAIN_DISPLAY: dict[str, str] = {
-    et.archimate_domain.lower(): et.archimate_domain
+    et.domain_dir: et.domain_dir.capitalize()
     for et in ENTITY_TYPES.values()
-    if et.archimate_domain
+    if not et.internal
 }
 
 #: archimate_element_type → has_sprite bool
@@ -122,6 +120,24 @@ def _expand_ref(ref: str | list, all_types: list[str]) -> list[str]:
     if ref.startswith("@"):
         return list(CLASS_MEMBERS.get(ref[1:], []))
     return [ref]
+
+
+def expand_entity_type_term(term: str) -> list[str]:
+    """Expand a concrete entity type, @all, or @element-class term."""
+    return _expand_ref(term, ALL_ENTITY_TYPE_NAMES)
+
+
+def format_entity_type_term(term: str) -> str:
+    """Return a readable label for a concrete entity type, @all, or @element-class term."""
+    if term == "@all":
+        return "entity"
+    normalized = term[1:] if term.startswith("@") else term
+    return normalized.replace("-", " ").replace("_", " ")
+
+
+def entity_type_term_matches(term: str, linked_types: set[str]) -> bool:
+    """Return whether linked entity types satisfy a document type requirement term."""
+    return bool(set(expand_entity_type_term(term)) & linked_types)
 
 
 def _build_rules() -> dict[tuple[str, str], set[str]]:

@@ -200,74 +200,75 @@ def apply_document_file_change(index: "ArtifactIndex", path: Path, *, bump_gener
 
 def read_entity_context(index: "ArtifactIndex", entity_id: str) -> EntityContextReadModel | None:
     index._ensure_loaded()
-    entity = index._entities.get(entity_id)
-    if entity is None:
-        return None
-    counts_row = index._conn.execute(
-        "SELECT conn_in, conn_out, conn_sym FROM entity_context_stats WHERE entity_id = ?",
-        (entity_id,),
-    ).fetchone()
-    counts: EntityContextCounts = {
-        "conn_in": int(counts_row["conn_in"]) if counts_row is not None else 0,
-        "conn_out": int(counts_row["conn_out"]) if counts_row is not None else 0,
-        "conn_sym": int(counts_row["conn_sym"]) if counts_row is not None else 0,
-    }
-    grouped: dict[str, list[EntityContextConnection]] = {"outbound": [], "inbound": [], "symmetric": []}
-    rows = index._conn.execute(
-        """
-        SELECT *
-        FROM entity_context_edges
-        WHERE entity_id = ?
-        ORDER BY direction_bucket, connection_id
-        """,
-        (entity_id,),
-    ).fetchall()
-    for row in rows:
-        record = index._connections[str(row["connection_id"])]
-        grouped[str(row["direction_bucket"])].append(
-            {
-                "artifact_id": str(row["connection_id"]),
-                "source": str(row["source_id"]),
-                "target": str(row["target_id"]),
-                "conn_type": str(row["conn_type"]),
-                "version": record.version,
-                "status": str(row["connection_status"]),
-                "path": str(row["path"]),
-                "content_text": str(row["content_text"]),
-                "associated_entities": json.loads(str(row["associated_entities_json"])),
-                "src_cardinality": str(row["src_cardinality"]),
-                "tgt_cardinality": str(row["tgt_cardinality"]),
-                "source_name": str(row["source_name"]),
-                "target_name": str(row["target_name"]),
-                "source_artifact_type": str(row["source_artifact_type"]),
-                "target_artifact_type": str(row["target_artifact_type"]),
-                "source_domain": str(row["source_domain"]),
-                "target_domain": str(row["target_domain"]),
-                "source_scope": str(row["source_scope"]),
-                "target_scope": str(row["target_scope"]),
-                "other_entity_id": str(row["other_entity_id"]),
-                "direction": str(row["direction_bucket"]),
-            }
-        )
-    return {
-        "entity": {
-            "artifact_id": entity.artifact_id,
-            "artifact_type": entity.artifact_type,
-            "name": entity.name,
-            "version": entity.version,
-            "status": entity.status,
-            "domain": entity.domain,
-            "subdomain": entity.subdomain,
-            "record_type": "entity",
-            "path": str(entity.path),
-            "content_snippet": entity.content_text[:240],
-            "keywords": list(entity.keywords),
-            "content_text": entity.content_text,
-            "display_blocks": entity.display_blocks,
-            "extra": entity.extra,
-        },
-        "connections": grouped,
-        "counts": counts,
-        "generation": index._generation,
-        "etag": index.read_model_version().etag,
-    }
+    with index._lock:
+        entity = index._entities.get(entity_id)
+        if entity is None:
+            return None
+        counts_row = index._conn.execute(
+            "SELECT conn_in, conn_out, conn_sym FROM entity_context_stats WHERE entity_id = ?",
+            (entity_id,),
+        ).fetchone()
+        counts: EntityContextCounts = {
+            "conn_in": int(counts_row["conn_in"]) if counts_row is not None else 0,
+            "conn_out": int(counts_row["conn_out"]) if counts_row is not None else 0,
+            "conn_sym": int(counts_row["conn_sym"]) if counts_row is not None else 0,
+        }
+        grouped: dict[str, list[EntityContextConnection]] = {"outbound": [], "inbound": [], "symmetric": []}
+        rows = index._conn.execute(
+            """
+            SELECT *
+            FROM entity_context_edges
+            WHERE entity_id = ?
+            ORDER BY direction_bucket, connection_id
+            """,
+            (entity_id,),
+        ).fetchall()
+        for row in rows:
+            record = index._connections[str(row["connection_id"])]
+            grouped[str(row["direction_bucket"])].append(
+                {
+                    "artifact_id": str(row["connection_id"]),
+                    "source": str(row["source_id"]),
+                    "target": str(row["target_id"]),
+                    "conn_type": str(row["conn_type"]),
+                    "version": record.version,
+                    "status": str(row["connection_status"]),
+                    "path": str(row["path"]),
+                    "content_text": str(row["content_text"]),
+                    "associated_entities": json.loads(str(row["associated_entities_json"])),
+                    "src_cardinality": str(row["src_cardinality"]),
+                    "tgt_cardinality": str(row["tgt_cardinality"]),
+                    "source_name": str(row["source_name"]),
+                    "target_name": str(row["target_name"]),
+                    "source_artifact_type": str(row["source_artifact_type"]),
+                    "target_artifact_type": str(row["target_artifact_type"]),
+                    "source_domain": str(row["source_domain"]),
+                    "target_domain": str(row["target_domain"]),
+                    "source_scope": str(row["source_scope"]),
+                    "target_scope": str(row["target_scope"]),
+                    "other_entity_id": str(row["other_entity_id"]),
+                    "direction": str(row["direction_bucket"]),
+                }
+            )
+        return {
+            "entity": {
+                "artifact_id": entity.artifact_id,
+                "artifact_type": entity.artifact_type,
+                "name": entity.name,
+                "version": entity.version,
+                "status": entity.status,
+                "domain": entity.domain,
+                "subdomain": entity.subdomain,
+                "record_type": "entity",
+                "path": str(entity.path),
+                "content_snippet": entity.content_text[:240],
+                "keywords": list(entity.keywords),
+                "content_text": entity.content_text,
+                "display_blocks": entity.display_blocks,
+                "extra": entity.extra,
+            },
+            "connections": grouped,
+            "counts": counts,
+            "generation": index._generation,
+            "etag": index.read_model_version().etag,
+        }

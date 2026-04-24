@@ -17,12 +17,12 @@ class EntityTypeInfo:
     prefix: str
     domain_dir: str
     subdir: str
-    archimate_domain: str
     archimate_element_type: str
     element_classes: tuple[str, ...]  # ArchiMate NEXT classification classes
     create_when: str
     never_create_when: str
     has_sprite: bool = False
+    internal: bool = False
 
 
 @dataclass(frozen=True)
@@ -34,7 +34,6 @@ class ConnectionTypeInfo:
 
     artifact_type: str
     conn_lang: str
-    conn_dir: str
     archimate_relationship_type: str | None = None
     symmetric: bool = False
     puml_arrow: str = "-->"
