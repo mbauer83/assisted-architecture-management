@@ -90,12 +90,22 @@ def port_in_use(*, host: str = "127.0.0.1", port: int) -> bool:
         sock.close()
 
 
-def backend_start_command(*, port: int) -> list[str]:
-    uv = shutil.which("uv")
-    if uv:
-        return [uv, "run", "--extra", "gui", "arch-backend", "--port", str(port)]
-
+def backend_start_command(*, port: int, project_dir: Path | None = None) -> list[str]:
     if importlib.util.find_spec("fastapi") and importlib.util.find_spec("uvicorn"):
         return [sys.executable, "-m", "src.tools.arch_backend", "--port", str(port)]
+
+    uv = shutil.which("uv")
+    if uv and project_dir is not None and (project_dir / "pyproject.toml").exists():
+        return [
+            uv,
+            "run",
+            "--project",
+            str(project_dir),
+            "--extra",
+            "gui",
+            "arch-backend",
+            "--port",
+            str(port),
+        ]
 
     return [sys.executable, "-m", "src.tools.arch_backend", "--port", str(port)]

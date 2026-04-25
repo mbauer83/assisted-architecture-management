@@ -25,7 +25,7 @@ def test_arch_mcp_stdio_read_connects_to_read_path(monkeypatch) -> None:
 
     monkeypatch.setattr(arch_mcp_stdio.anyio, "run", fake_anyio_run)
     monkeypatch.setattr(arch_mcp_stdio, "ensure_backend_running",
-                        lambda port, start_if_missing, cwd=None: port)
+                        lambda port, start_if_missing, cwd=None, project_dir=None: port)
     monkeypatch.setattr(arch_mcp_stdio, "configured_backend_url", lambda: None)
 
     arch_mcp_stdio.main([])
@@ -44,7 +44,7 @@ def test_arch_mcp_stdio_write_connects_to_write_path(monkeypatch) -> None:
 
     monkeypatch.setattr(arch_mcp_stdio.anyio, "run", fake_anyio_run)
     monkeypatch.setattr(arch_mcp_stdio, "ensure_backend_running",
-                        lambda port, start_if_missing, cwd=None: port)
+                        lambda port, start_if_missing, cwd=None, project_dir=None: port)
     monkeypatch.setattr(arch_mcp_stdio, "configured_backend_url", lambda: None)
 
     arch_mcp_stdio.main(["--server", "write"])
@@ -52,13 +52,18 @@ def test_arch_mcp_stdio_write_connects_to_write_path(monkeypatch) -> None:
     assert urls and urls[0].endswith("/mcp/write")
 
 
-def test_arch_mcp_stdio_uses_project_directory_for_autostart(monkeypatch, tmp_path: Path) -> None:
+def test_arch_mcp_stdio_uses_workspace_directory_for_autostart(monkeypatch, tmp_path: Path) -> None:
     from src.tools import arch_mcp_stdio
 
     calls: dict[str, object] = {}
+    workspace_dir = tmp_path / "workspace"
+    project_dir = tmp_path / "tooling"
+    workspace_dir.mkdir()
+    project_dir.mkdir()
 
     monkeypatch.setattr(arch_mcp_stdio.anyio, "run", lambda fn, url: None)
-    monkeypatch.setattr(arch_mcp_stdio, "_project_directory", lambda: tmp_path)
+    monkeypatch.setattr(arch_mcp_stdio, "_project_directory", lambda: project_dir)
+    monkeypatch.chdir(workspace_dir)
 
     def fake_resolve_backend_port(start=None, explicit_port=None):
         calls["resolve_start"] = start
@@ -72,9 +77,10 @@ def test_arch_mcp_stdio_uses_project_directory_for_autostart(monkeypatch, tmp_pa
     monkeypatch.setattr(
         arch_mcp_stdio,
         "ensure_backend_running",
-        lambda port, start_if_missing, cwd=None: (
+        lambda port, start_if_missing, cwd=None, project_dir=None: (
             calls.setdefault("ensure_port", port),
             calls.setdefault("ensure_cwd", cwd),
+            calls.setdefault("ensure_project_dir", project_dir),
             8123,
         )[-1],
     )
@@ -82,9 +88,10 @@ def test_arch_mcp_stdio_uses_project_directory_for_autostart(monkeypatch, tmp_pa
 
     arch_mcp_stdio.main([])
 
-    assert calls["resolve_start"] == tmp_path
+    assert calls["resolve_start"] == workspace_dir
     assert calls["ensure_port"] == 8123
-    assert calls["ensure_cwd"] == tmp_path
+    assert calls["ensure_cwd"] == workspace_dir
+    assert calls["ensure_project_dir"] == project_dir
 
 
 def test_backend_state_path_falls_back_without_arch_init(tmp_path: Path) -> None:
@@ -177,21 +184,87 @@ def test_backend_min_log_level_rejects_invalid_values(monkeypatch) -> None:
     assert settings.backend_min_log_level() == "INFO"
 
 
-def test_backend_start_command_falls_back_to_uv_for_gui_extras(monkeypatch) -> None:
-    monkeypatch.setattr(backend_probe.shutil, "which", lambda name: "/usr/bin/uv" if name == "uv" else None)
-
-    cmd = backend_probe.backend_start_command(port=8123)
-
-    assert cmd == ["/usr/bin/uv", "run", "--extra", "gui", "arch-backend", "--port", "8123"]
-
-
-def test_backend_start_command_only_uses_current_python_when_uv_unavailable(monkeypatch) -> None:
-    monkeypatch.setattr(backend_probe.shutil, "which", lambda name: None)
+def test_backend_start_command_prefers_current_python_when_backend_deps_exist(monkeypatch) -> None:
     monkeypatch.setattr(backend_probe.importlib.util, "find_spec", lambda name: object())
 
     cmd = backend_probe.backend_start_command(port=8123)
 
     assert cmd == [backend_probe.sys.executable, "-m", "src.tools.arch_backend", "--port", "8123"]
+
+
+def test_backend_start_command_uses_uv_with_explicit_project_when_deps_missing(
+    monkeypatch, tmp_path: Path
+) -> None:
+    project_dir = tmp_path / "tooling"
+    project_dir.mkdir()
+    (project_dir / "pyproject.toml").write_text("[project]\nname = 'tooling'\n", encoding="utf-8")
+
+    monkeypatch.setattr(backend_probe.importlib.util, "find_spec", lambda name: None)
+    monkeypatch.setattr(backend_probe.shutil, "which", lambda name: "/usr/bin/uv" if name == "uv" else None)
+
+    cmd = backend_probe.backend_start_command(port=8123, project_dir=project_dir)
+
+    assert cmd == [
+        "/usr/bin/uv",
+        "run",
+        "--project",
+        str(project_dir),
+        "--extra",
+        "gui",
+        "arch-backend",
+        "--port",
+        "8123",
+    ]
+
+
+def test_ensure_backend_running_starts_backend_in_workspace_using_project_launcher(
+    monkeypatch, tmp_path: Path
+) -> None:
+    workspace_dir = tmp_path / "workspace"
+    project_dir = tmp_path / "tooling"
+    workspace_dir.mkdir()
+    project_dir.mkdir()
+
+    popen_calls: dict[str, object] = {}
+    probe_ports: list[int] = []
+    probe_results = iter([False, True])
+
+    monkeypatch.setattr(backend_control, "resolve_backend_port", lambda start=None, explicit_port=None: 8123)
+    monkeypatch.setattr(backend_control, "read_backend_state", lambda start=None: None)
+    monkeypatch.setattr(backend_control, "configured_backend_url", lambda: None)
+    monkeypatch.setattr(
+        backend_control,
+        "backend_log_path",
+        lambda start=None: workspace_dir / ".arch" / "backend.log",
+    )
+    monkeypatch.setattr(
+        backend_control,
+        "backend_start_command",
+        lambda port, project_dir=None: popen_calls.setdefault("command", ["launcher", str(port), str(project_dir)]),
+    )
+    monkeypatch.setattr(backend_control.time, "sleep", lambda seconds: None)
+    monkeypatch.setattr(backend_control.time, "monotonic", lambda: 0.0)
+
+    def fake_probe_backend(port, timeout_s=1.0):
+        probe_ports.append(port)
+        return next(probe_results)
+
+    monkeypatch.setattr(backend_control, "probe_backend", fake_probe_backend)
+
+    class FakePopen:
+        def __init__(self, command, cwd=None, **kwargs):
+            popen_calls["spawned_command"] = command
+            popen_calls["cwd"] = cwd
+
+    monkeypatch.setattr(backend_control.subprocess, "Popen", FakePopen)
+
+    port = backend_control.ensure_backend_running(port=8123, cwd=workspace_dir, project_dir=project_dir)
+
+    assert port == 8123
+    assert popen_calls["command"] == ["launcher", "8123", str(project_dir)]
+    assert popen_calls["spawned_command"] == ["launcher", "8123", str(project_dir)]
+    assert popen_calls["cwd"] == str(workspace_dir)
+    assert probe_ports == [8123, 8123]
 
 
 def test_matches_arch_backend_process_for_console_script_path() -> None:

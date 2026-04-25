@@ -52,10 +52,12 @@ def main(argv: list[str] | None = None) -> None:
     args = parser.parse_args(argv)
 
     project_dir = _project_directory()
+    workspace_dir = Path.cwd()
     port = ensure_backend_running(
-        port=resolve_backend_port(start=project_dir, explicit_port=args.port),
+        port=resolve_backend_port(start=workspace_dir, explicit_port=args.port),
         start_if_missing=not args.no_autostart,
-        cwd=project_dir,
+        cwd=workspace_dir,
+        project_dir=project_dir,
     )
     target_base = configured_backend_url() or backend_url(port)
     anyio.run(_run_bridge, f"{target_base}/mcp/{args.server}")

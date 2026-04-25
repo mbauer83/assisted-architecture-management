@@ -37,7 +37,13 @@ from src.tools.backend_process import (
 logger = logging.getLogger(__name__)
 
 
-def ensure_backend_running(*, port: int | None = None, start_if_missing: bool = True, cwd: Path | None = None) -> int:
+def ensure_backend_running(
+    *,
+    port: int | None = None,
+    start_if_missing: bool = True,
+    cwd: Path | None = None,
+    project_dir: Path | None = None,
+) -> int:
     resolved_port = resolve_backend_port(start=cwd, explicit_port=port)
     state = read_backend_state(cwd)
     if state is not None:
@@ -65,7 +71,7 @@ def ensure_backend_running(*, port: int | None = None, start_if_missing: bool = 
     log_path = backend_log_path(cwd)
     log_path.parent.mkdir(parents=True, exist_ok=True)
     with open(log_path, "ab") as log:
-        command = backend_start_command(port=resolved_port)
+        command = backend_start_command(port=resolved_port, project_dir=project_dir)
         logger.info("Starting backend with command: %s", " ".join(command))
         subprocess.Popen(
             command,
