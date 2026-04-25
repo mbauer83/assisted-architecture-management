@@ -23,6 +23,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 import yaml
+from src.common.repo_paths import MODEL
 from src.common.workspace_paths import (
     CONFIG_FILENAME,
     STATE_DIR,
@@ -84,7 +85,7 @@ def _resolve_repo(
             raise SystemExit(
                 f"ERROR: {label} local path does not exist: {resolved}"
             )
-        if not (resolved / "model").is_dir():
+        if not (resolved / MODEL).is_dir():
             raise SystemExit(
                 f"ERROR: {label} path has no model/ directory: {resolved}"
             )
@@ -126,10 +127,10 @@ def _resolve_repo(
             print(f"  {label}: cloning {url} (branch={branch}) → {dest}")
             _clone(url, branch, dest)
 
-        model_dir = dest / "model"
+        model_dir = dest / MODEL
         if not model_dir.is_dir():
             raise SystemExit(
-                f"ERROR: cloned {label} repo has no model/ directory: {dest}"
+                f"ERROR: cloned {label} repo has no {MODEL}/ directory: {dest}"
             )
         return dest
 

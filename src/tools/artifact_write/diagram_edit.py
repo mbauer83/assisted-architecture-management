@@ -5,6 +5,7 @@ from collections.abc import Callable
 
 from src.common.artifact_verifier import ArtifactVerifier
 from src.common.artifact_write import format_diagram_puml
+from src.common.repo_paths import DIAGRAM_CATALOG, DIAGRAMS
 from src.common.artifact_write_layout import optimize_puml_layout
 
 from .boundary import assert_engagement_write_root, today_iso
@@ -50,7 +51,7 @@ def edit_diagram(
     assert_engagement_write_root(repo_root)
     warnings: list[str] = []
 
-    diagram_path = repo_root / "diagram-catalog" / "diagrams" / f"{artifact_id}.puml"
+    diagram_path = repo_root / DIAGRAM_CATALOG / DIAGRAMS / f"{artifact_id}.puml"
     if not diagram_path.exists():
         raise ValueError(f"Diagram '{artifact_id}' not found at {diagram_path}")
 

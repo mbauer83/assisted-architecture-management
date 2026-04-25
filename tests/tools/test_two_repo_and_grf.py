@@ -239,6 +239,11 @@ class TestGrfCreation:
     ) -> None:
         from src.tools.artifact_write.global_artifact_reference import ensure_global_artifact_reference
 
+        from src.infrastructure.artifact_index import notify_paths_changed
+
+        def _notify(path: Path | list[Path]) -> None:
+            notify_paths_changed(path if isinstance(path, list) else [path])
+
         global_id = "REQ@2000000000.GloAAA.global-req"
         repo = ArtifactRepository(engagement_root)
 
@@ -246,7 +251,7 @@ class TestGrfCreation:
             engagement_repo=repo,
             engagement_root=engagement_root,
             verifier=ArtifactVerifier(None),
-            clear_repo_caches=lambda _: None,
+            clear_repo_caches=_notify,
             global_artifact_id=global_id,
             global_artifact_name="Global Req",
             global_artifact_type="entity",
@@ -254,12 +259,12 @@ class TestGrfCreation:
         )
         assert r1.wrote is True
 
-        repo2 = ArtifactRepository(engagement_root)  # refresh
+        repo2 = ArtifactRepository(engagement_root)
         r2 = ensure_global_artifact_reference(
             engagement_repo=repo2,
             engagement_root=engagement_root,
             verifier=ArtifactVerifier(None),
-            clear_repo_caches=lambda _: None,
+            clear_repo_caches=_notify,
             global_artifact_id=global_id,
             global_artifact_name="Global Req",
             global_artifact_type="entity",

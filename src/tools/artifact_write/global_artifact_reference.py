@@ -13,6 +13,7 @@ from collections.abc import Callable
 
 from src.common.artifact_query import ArtifactRepository
 from src.common.artifact_write import ENTITY_TYPES, generate_entity_id
+from src.common.repo_paths import MODEL
 from src.common.artifact_write_formatting import format_entity_markdown
 from src.common.artifact_verifier import ArtifactVerifier
 from src.tools.generate_macros import generate_macros
@@ -52,7 +53,7 @@ def ensure_global_artifact_reference(
 
     existing = find_existing_gar(engagement_repo, global_artifact_id)
     if existing is not None:
-        path = engagement_root / "model" / "common" / "global-references" / f"{existing}.md"
+        path = engagement_root / MODEL / "common" / "global-references" / f"{existing}.md"
         return WriteResult(
             wrote=False, path=path, artifact_id=existing,
             content=None, warnings=["GAR already exists"], verification=None,
@@ -60,7 +61,7 @@ def ensure_global_artifact_reference(
 
     info = ENTITY_TYPES[_GAR_TYPE]
     eid = generate_entity_id(info.prefix, global_artifact_name)
-    path = engagement_root / "model" / info.domain_dir / info.subdir / f"{eid}.md"
+    path = engagement_root / MODEL / info.domain_dir / info.subdir / f"{eid}.md"
 
     display = {
         "domain": "",

@@ -2,15 +2,20 @@
 from __future__ import annotations
 
 import json
+from functools import lru_cache
 from pathlib import Path
+from typing import Any
+
+from src.common.repo_paths import ARCH_DOC_SCHEMATA, ARCH_REPO
 
 
-def load_document_schemata(repo_root: Path) -> dict[str, dict]:
+@lru_cache(maxsize=4)
+def load_document_schemata(repo_root: Path) -> dict[str, dict[str, Any]]:
     """Return {doc_type: schema_dict} for all .arch-repo/documents/*.json files."""
-    schemata_dir = repo_root / ".arch-repo" / "documents"
+    schemata_dir = repo_root / ARCH_REPO / ARCH_DOC_SCHEMATA
     if not schemata_dir.exists():
         return {}
-    result: dict[str, dict] = {}
+    result: dict[str, dict[str, Any]] = {}
     for schema_file in sorted(schemata_dir.glob("*.json")):
         try:
             data = json.loads(schema_file.read_text(encoding="utf-8"))
@@ -20,7 +25,7 @@ def load_document_schemata(repo_root: Path) -> dict[str, dict]:
     return result
 
 
-def get_document_schema(repo_root: Path, doc_type: str) -> dict | None:
+def get_document_schema(repo_root: Path, doc_type: str) -> dict[str, Any] | None:
     return load_document_schemata(repo_root).get(doc_type)
 
 

@@ -49,7 +49,7 @@ def test_create_document_uses_schema_subdirectory(tmp_path: Path) -> None:
         dry_run=False,
     )
 
-    assert result.path == repo / "documents" / "decisions" / "adr" / "ADR@1000000000.AbcDef.structured-paths.md"
+    assert result.path == repo / "docs" / "decisions" / "adr" / "ADR@1000000000.AbcDef.structured-paths.md"
     assert result.path.exists()
 
 
@@ -73,7 +73,7 @@ def test_create_document_defaults_subdirectory_to_doc_type(tmp_path: Path) -> No
         dry_run=False,
     )
 
-    assert result.path == repo / "documents" / "adr" / "ADR@1000000001.AbcDef.fallback-directory.md"
+    assert result.path == repo / "docs" / "adr" / "ADR@1000000001.AbcDef.fallback-directory.md"
     assert result.path.exists()
 
 

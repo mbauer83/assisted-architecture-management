@@ -109,10 +109,32 @@ def backend_url(port: int) -> str:
     return f"http://127.0.0.1:{port}"
 
 
+def load_workspace_config(start: Path | None = None) -> dict | None:
+    """Load arch-workspace.yaml from *start* or any parent directory. Returns None if not found."""
+    import yaml
+    search = start or Path.cwd()
+    for candidate in [search, *search.parents]:
+        cfg = candidate / "arch-workspace.yaml"
+        if cfg.exists():
+            try:
+                data = yaml.safe_load(cfg.read_text(encoding="utf-8"))
+                return data if isinstance(data, dict) else None
+            except Exception:  # noqa: BLE001
+                return None
+    return None
+
+
 def resolve_backend_port(*, start: Path | None = None, explicit_port: int | None = None) -> int:
     if explicit_port is not None:
         logger.info("Using explicit backend port %s", explicit_port)
         return explicit_port
+
+    cfg = load_workspace_config(start)
+    if cfg is not None:
+        port = cfg.get("backend", {}).get("port")
+        if isinstance(port, int):
+            logger.info("Using backend port %s from arch-workspace.yaml", port)
+            return port
 
     resolved = global_backend_port()
     logger.info("Using backend port %s from config/settings.yaml", resolved)
@@ -196,19 +218,31 @@ def _parse_cli_port(argv: list[str]) -> int | None:
 
 
 def _matches_arch_backend_process(argv: list[str]) -> bool:
+    """Return True only when the process IS arch-backend, not when it merely launched one.
+
+    ``uv run ... arch-backend ...`` is intentionally excluded: the process is ``uv``,
+    not the backend itself.  Only Python or the arch-backend binary qualify.
+    """
     if not argv:
         return False
     argv0 = pathlib.PurePath(argv[0]).name
+    # Direct binary: arch-backend
     if argv0 == "arch-backend":
         return True
-    if argv0.startswith("python") and len(argv) >= 3 and argv[1] == "-m" and argv[2] == "src.tools.arch_backend":
-        return True
-    normalized = {pathlib.PurePath(arg).name for arg in argv}
-    if "arch-backend" in normalized:
-        return True
-    if any(arg.endswith("src/tools/arch_backend.py") for arg in argv):
-        return True
-    return "src.tools.arch_backend" in argv
+    # Python interpreter running arch-backend
+    if argv0.startswith("python"):
+        if len(argv) < 2:
+            return False
+        # python -m src.tools.arch_backend …
+        if argv[1] == "-m" and len(argv) >= 3 and argv[2] in ("src.tools.arch_backend", "arch_backend"):
+            return True
+        # python /path/to/arch-backend … (script path, not module)
+        if pathlib.PurePath(argv[1]).name == "arch-backend":
+            return True
+        # python /path/to/arch_backend.py …
+        if any(arg.endswith("src/tools/arch_backend.py") for arg in argv[1:3]):
+            return True
+    return False
 
 
 def _list_listening_socket_inodes() -> dict[str, int]:
@@ -589,12 +623,43 @@ def stop_backend(*, cwd: Path | None = None, timeout_s: float = 5.0, port: int |
             port=resolved_port,
         )
     if len(matches) > 1:
-        return {
-            "stopped": False,
-            "reason": "multiple_matching",
-            "port": resolved_port,
-            "pids": [int(instance["pid"]) for instance in matches],
-        }
+        # Prefer the process that owns the listening socket; launcher wrappers
+        # (e.g. ``uv run``) may share the declared port but not the socket.
+        socket_owners = [m for m in matches if resolved_port in list(m.get("ports") or [])]
+        if len(socket_owners) == 1:
+            instance = socket_owners[0]
+            logger.info(
+                "Resolved multiple port matches to socket owner pid=%s for port=%s",
+                instance["pid"], resolved_port,
+            )
+            result = _stop_pid(int(instance["pid"]), cwd=cwd, timeout_s=timeout_s, port=resolved_port)
+            # Terminate any declarants that claimed the port but don't own the socket (e.g. launcher wrappers).
+            for m in matches:
+                leftover_pid = int(m["pid"])
+                if leftover_pid == int(instance["pid"]):
+                    continue
+                logger.info("Terminating leftover arch-backend declarant pid=%s for port=%s", leftover_pid, resolved_port)
+                try:
+                    os.kill(leftover_pid, signal.SIGTERM)
+                except ProcessLookupError:
+                    continue
+                wait_deadline = time.monotonic() + min(timeout_s, 3.0)
+                while time.monotonic() < wait_deadline:
+                    if not _process_exists(leftover_pid):
+                        break
+                    time.sleep(0.1)
+            return result
+        # Genuinely multiple backend instances on the same port — stop all.
+        pids = [int(m["pid"]) for m in (socket_owners or matches)]
+        logger.warning("Stopping all %d arch-backend instances on port %s: %s", len(pids), resolved_port, pids)
+        stopped_pids: list[int] = []
+        for pid in pids:
+            r = _stop_pid(pid, cwd=cwd, timeout_s=timeout_s, port=resolved_port)
+            if r.get("stopped"):
+                stopped_pids.append(pid)
+        if stopped_pids:
+            return {"stopped": True, "pid": stopped_pids[0], "pids": stopped_pids, "port": resolved_port}
+        return {"stopped": False, "reason": "multiple_matching", "port": resolved_port, "pids": pids}
 
     if len(instances) == 1:
         instance = instances[0]

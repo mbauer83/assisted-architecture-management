@@ -6,10 +6,11 @@ import hashlib
 import sqlite3
 import threading
 from pathlib import Path
-from typing import cast, overload
+from typing import TypeVar
 
 from .bootstrap import get_shared_index, normalize_mounts, service_key
 from src.common.artifact_parsing import parse_diagram, parse_document, parse_entity, parse_outgoing_file
+from src.common.repo_paths import DIAGRAM_CATALOG, DIAGRAMS, DOCS, MODEL, RENDERED
 from src.common.workspace_paths import infer_repo_scope
 from src.common.artifact_types import (
     ConnectionRecord,
@@ -20,6 +21,8 @@ from src.common.artifact_types import (
     RepoMount,
 )
 
+_ArtifactRecord = TypeVar("_ArtifactRecord", EntityRecord, ConnectionRecord, DiagramRecord, DocumentRecord)
+
 from .context import (
     apply_diagram_file_change,
     apply_document_file_change,
@@ -29,7 +32,14 @@ from .context import (
     rebuild_entity_context_for,
     rebuild_entity_context_projection,
 )
-from .queries import find_connection_ids_for, find_neighbors, search_artifacts
+from .queries import (
+    find_connection_ids_by_types,
+    find_connection_ids_for,
+    find_neighbors,
+    get_all_connection_stats,
+    get_connection_stats_for,
+    search_artifacts,
+)
 from .schema import init_db
 from .storage import (
     delete_connection_record,
@@ -60,6 +70,11 @@ class ArtifactIndex:
         self._connections: dict[str, ConnectionRecord] = {}
         self._diagrams: dict[str, DiagramRecord] = {}
         self._documents: dict[str, DocumentRecord] = {}
+        # Reverse indexes: resolved path → artifact_id (or set of ids for connections)
+        self._entity_by_path: dict[Path, str] = {}
+        self._connections_by_path: dict[Path, set[str]] = {}
+        self._diagram_by_path: dict[Path, str] = {}
+        self._document_by_path: dict[Path, str] = {}
         self._loaded = False
         self._generation = 0
         self._etag = build_read_model_etag(self._scope_key, self._generation)
@@ -106,7 +121,7 @@ class ArtifactIndex:
         diagrams: dict[str, DiagramRecord],
         documents: dict[str, DocumentRecord],
     ) -> None:
-        model_root = mount.root / "model"
+        model_root = mount.root / MODEL
         if model_root.exists():
             for path in sorted(model_root.rglob("*.md")):
                 if path.name.endswith(".outgoing.md"):
@@ -117,15 +132,15 @@ class ArtifactIndex:
             for path in sorted(model_root.rglob("*.outgoing.md")):
                 for rec in parse_outgoing_file(path):
                     self._insert_mounted(connections, rec.artifact_id, rec, "connection", mount.root)
-        diagrams_root = mount.root / "diagram-catalog" / "diagrams"
+        diagrams_root = mount.root / DIAGRAM_CATALOG / DIAGRAMS
         if diagrams_root.exists():
             for suffix in ("*.puml", "*.md"):
                 for path in sorted(diagrams_root.rglob(suffix)):
-                    if path.parent.name != "rendered":
+                    if path.parent.name != RENDERED:
                         rec = parse_diagram(path)
                         if rec is not None:
                             self._insert_mounted(diagrams, rec.artifact_id, rec, "diagram", mount.root)
-        docs_root = mount.root / "documents"
+        docs_root = mount.root / DOCS
         if docs_root.exists():
             for path in sorted(docs_root.rglob("*.md")):
                 rec = parse_document(path)
@@ -134,9 +149,9 @@ class ArtifactIndex:
 
     @staticmethod
     def _insert_mounted(
-        store: dict[str, EntityRecord] | dict[str, ConnectionRecord] | dict[str, DiagramRecord] | dict[str, DocumentRecord],
+        store: dict[str, _ArtifactRecord],
         artifact_id: str,
-        rec: EntityRecord | ConnectionRecord | DiagramRecord | DocumentRecord,
+        rec: _ArtifactRecord,
         label: str,
         mount_root: Path,
     ) -> None:
@@ -151,39 +166,11 @@ class ArtifactIndex:
         raise DuplicateArtifactIdError(f"Duplicate {label} artifact-id '{artifact_id}' in {rec.path} and {existing.path}")
 
     @staticmethod
-    @overload
-    def _insert_unique(store: dict[str, EntityRecord], artifact_id: str, rec: EntityRecord, label: str) -> None: ...
-
-    @staticmethod
-    @overload
-    def _insert_unique(store: dict[str, ConnectionRecord], artifact_id: str, rec: ConnectionRecord, label: str) -> None: ...
-
-    @staticmethod
-    @overload
-    def _insert_unique(store: dict[str, DiagramRecord], artifact_id: str, rec: DiagramRecord, label: str) -> None: ...
-
-    @staticmethod
-    @overload
-    def _insert_unique(store: dict[str, DocumentRecord], artifact_id: str, rec: DocumentRecord, label: str) -> None: ...
-
-    @staticmethod
-    def _insert_unique(
-        store: dict[str, EntityRecord] | dict[str, ConnectionRecord] | dict[str, DiagramRecord] | dict[str, DocumentRecord],
-        artifact_id: str,
-        rec: EntityRecord | ConnectionRecord | DiagramRecord | DocumentRecord,
-        label: str,
-    ) -> None:
+    def _insert_unique(store: dict[str, _ArtifactRecord], artifact_id: str, rec: _ArtifactRecord, label: str) -> None:
         existing = store.get(artifact_id)
         if existing is not None:
             raise DuplicateArtifactIdError(f"Duplicate {label} artifact-id '{artifact_id}' in {rec.path} and {existing.path}")
-        if isinstance(rec, EntityRecord):
-            cast("dict[str, EntityRecord]", store)[artifact_id] = rec
-        elif isinstance(rec, ConnectionRecord):
-            cast("dict[str, ConnectionRecord]", store)[artifact_id] = rec
-        elif isinstance(rec, DocumentRecord):
-            cast("dict[str, DocumentRecord]", store)[artifact_id] = rec
-        else:
-            cast("dict[str, DiagramRecord]", store)[artifact_id] = rec
+        store[artifact_id] = rec
 
     @staticmethod
     def _scope_for_root(root: Path) -> str:
@@ -205,7 +192,7 @@ class ArtifactIndex:
 
     def _model_root_for_path(self, path: Path) -> Path | None:
         mount = self._mount_for_path(path)
-        return None if mount is None else mount.root / "model"
+        return None if mount is None else mount.root / MODEL
 
     def _is_diagram_source_path(self, path: Path) -> bool:
         mount = self._mount_for_path(path)
@@ -225,7 +212,7 @@ class ArtifactIndex:
             rel = path.resolve().relative_to(mount.root.resolve()).as_posix()
         except ValueError:
             return False
-        return rel.startswith("documents/") and path.suffix == ".md"
+        return rel.startswith(f"{DOCS}/") and path.suffix == ".md"
 
     def _rebuild_entity_context_projection(self) -> None:
         rebuild_entity_context_projection(self)
@@ -396,6 +383,15 @@ class ArtifactIndex:
     def connection_status(self, artifact_id: str) -> str | None:
         rec = self.get_connection(artifact_id)
         return rec.status if rec is not None else None
+
+    def get_all_connection_stats(self) -> dict[str, tuple[int, int, int]]:
+        return get_all_connection_stats(self)
+
+    def get_connection_stats_for(self, entity_id: str) -> tuple[int, int, int]:
+        return get_connection_stats_for(self, entity_id)
+
+    def find_connection_ids_by_types(self, types: frozenset[str]) -> list[str]:
+        return find_connection_ids_by_types(self, types)
 
     def find_connection_ids_for(self, entity_id: str, *, direction: str = "any", conn_type: str | None = None) -> list[str]:
         return find_connection_ids_for(self, entity_id, direction=direction, conn_type=conn_type)

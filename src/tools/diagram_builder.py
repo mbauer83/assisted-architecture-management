@@ -19,6 +19,7 @@ from pathlib import Path
 
 from src.common.archimate_relation_rendering import display_connection_label, render_archimate_relation
 from src.common.artifact_parsing import normalize_puml_alias
+from src.common.repo_paths import DIAGRAM_CATALOG, DIAGRAMS
 from src.common.artifact_types import ConnectionRecord, EntityRecord
 from src.common.ontology_loader import (
     CONNECTION_TYPES,
@@ -300,7 +301,7 @@ def _render_puml(
     if jar is None:
         return None, ["plantuml.jar not found; render skipped"]
 
-    diag_dir = repo_root / "diagram-catalog" / "diagrams"
+    diag_dir = repo_root / DIAGRAM_CATALOG / DIAGRAMS
     if not diag_dir.exists():
         return None, [f"Diagram directory not found: {diag_dir}"]
 

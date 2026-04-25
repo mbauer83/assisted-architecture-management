@@ -13,6 +13,7 @@ _HIERARCHY_PRIORITY = {
     "archimate-composition": 1,
     "archimate-aggregation": 2,
 }
+_HIERARCHY_TYPES = frozenset(_HIERARCHY_PRIORITY)
 
 _HIERARCHY_LABEL = {
     "archimate-specialization": "specialization",
@@ -24,7 +25,7 @@ _HIERARCHY_LABEL = {
 def hierarchy_meta(entities: list[EntityRecord], repo) -> dict[str, dict[str, object]]:
     entity_ids = {e.artifact_id for e in entities}
     parent_by_child: dict[str, tuple[str, str]] = {}
-    for conn in repo.list_connections():
+    for conn in repo.list_connections_by_types(_HIERARCHY_TYPES):
         if conn.conn_type not in _HIERARCHY_PRIORITY:
             continue
         if conn.conn_type == "archimate-specialization":

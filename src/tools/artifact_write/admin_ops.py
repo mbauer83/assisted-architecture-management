@@ -20,6 +20,7 @@ from collections.abc import Callable
 from src.common.archimate_types import ALL_CONNECTION_TYPES, ALL_ENTITY_TYPES
 from src.common.artifact_verifier import ArtifactRegistry, ArtifactVerifier
 from src.common.artifact_write import ENTITY_TYPES, generate_entity_id, format_outgoing_markdown
+from src.common.repo_paths import DIAGRAM_CATALOG, DIAGRAMS, MODEL
 from src.common.artifact_write_formatting import format_entity_markdown
 from src.tools.generate_macros import generate_macros
 
@@ -71,7 +72,7 @@ def admin_create_entity(
 
     last = last_updated or today_iso()
     eid = artifact_id or generate_entity_id(info.prefix, name)
-    path = repo_root / "model" / info.domain_dir / info.subdir / f"{eid}.md"
+    path = repo_root / MODEL / info.domain_dir / info.subdir / f"{eid}.md"
     display = {
         "domain": info.domain_dir.capitalize(),
         "element-type": info.archimate_element_type,
@@ -335,7 +336,7 @@ def _write_diagram_to_enterprise(
     import re
     from src.common.artifact_write import format_diagram_puml
 
-    diagrams_dir = repo_root / "diagram-catalog" / "diagrams"
+    diagrams_dir = repo_root / DIAGRAM_CATALOG / DIAGRAMS
     diagrams_dir.mkdir(parents=True, exist_ok=True)
     path = diagrams_dir / f"{artifact_id}.puml"
 

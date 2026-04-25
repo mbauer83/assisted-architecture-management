@@ -5,6 +5,7 @@ from collections.abc import Callable
 
 from src.common.artifact_verifier import ArtifactRegistry, ArtifactVerifier
 from src.common.artifact_write import ENTITY_TYPES, format_entity_markdown, slugify
+from src.common.repo_paths import MODEL
 from src.tools.generate_macros import generate_macros
 
 from .boundary import assert_engagement_write_root, today_iso
@@ -37,7 +38,7 @@ def _rename_entity_identity(
             old_outgoing.unlink()
         changed_paths.extend([old_outgoing, new_outgoing])
 
-    for outgoing_path in (repo_root / "model").rglob("*.outgoing.md"):
+    for outgoing_path in (repo_root / MODEL).rglob("*.outgoing.md"):
         if outgoing_path == new_outgoing:
             continue
         text = outgoing_path.read_text(encoding="utf-8")
@@ -134,7 +135,7 @@ def edit_entity(
             own_outgoing = entity_file.with_suffix(".outgoing.md")
             if own_outgoing.exists():
                 impacted += 1
-            for outgoing_path in (repo_root / "model").rglob("*.outgoing.md"):
+            for outgoing_path in (repo_root / MODEL).rglob("*.outgoing.md"):
                 if outgoing_path == own_outgoing:
                     continue
                 try:

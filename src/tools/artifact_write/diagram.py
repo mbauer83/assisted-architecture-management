@@ -6,6 +6,7 @@ import re
 from collections.abc import Callable
 from src.common.artifact_verifier import ArtifactVerifier
 from src.common.artifact_verifier_syntax import find_plantuml_jar
+from src.common.repo_paths import DIAGRAM_CATALOG, DIAGRAMS, RENDERED
 from src.common.settings import plantuml_limit_size, render_dpi
 from src.common.artifact_write import (
     DiagramConnectionInferenceMode,
@@ -37,7 +38,7 @@ def _render_diagram_png(puml_path: Path, warnings: list[str]) -> Path | None:
     """Render a PUML file to PNG using PlantUML. Returns the PNG path or None."""
     # Render into the sibling rendered/ directory (diagram-catalog/rendered/),
     # not a nested subdirectory under diagrams/.
-    rendered_dir = puml_path.parent.parent / "rendered"
+    rendered_dir = puml_path.parent.parent / RENDERED
     rendered_dir.mkdir(parents=True, exist_ok=True)
 
     # Extract @startuml..@enduml into a temp file (skip YAML frontmatter)
@@ -105,7 +106,7 @@ def _render_diagram_png(puml_path: Path, warnings: list[str]) -> Path | None:
 
 def _render_diagram_svg(puml_path: Path, warnings: list[str]) -> Path | None:
     """Render a PUML file to SVG using PlantUML. Returns the SVG path or None."""
-    rendered_dir = puml_path.parent.parent / "rendered"
+    rendered_dir = puml_path.parent.parent / RENDERED
     rendered_dir.mkdir(parents=True, exist_ok=True)
 
     content = puml_path.read_text(encoding="utf-8")
@@ -189,7 +190,7 @@ def create_diagram(
     warnings: list[str] = []
 
     # Auto-include stereotypes + glyphs for archimate diagrams
-    stereotypes_path = repo_root / "diagram-catalog" / "_archimate-stereotypes.puml"
+    stereotypes_path = repo_root / DIAGRAM_CATALOG / "_archimate-stereotypes.puml"
     if (
         auto_include_stereotypes
         and "archimate" in diagram_type.lower()
@@ -203,7 +204,7 @@ def create_diagram(
             count=1,
         )
 
-    glyphs_path = repo_root / "diagram-catalog" / "_archimate-glyphs.puml"
+    glyphs_path = repo_root / DIAGRAM_CATALOG / "_archimate-glyphs.puml"
     if (
         auto_include_stereotypes
         and "archimate" in diagram_type.lower()
@@ -236,7 +237,7 @@ def create_diagram(
         puml_body=puml_body,
     )
 
-    path = repo_root / "diagram-catalog" / "diagrams" / f"{effective_id}.puml"
+    path = repo_root / DIAGRAM_CATALOG / DIAGRAMS / f"{effective_id}.puml"
 
     if dry_run:
         res = verify_content_in_temp_path(

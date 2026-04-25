@@ -6,6 +6,7 @@ from collections.abc import Callable
 from pathlib import Path
 
 from src.common.artifact_verifier_parsing import parse_frontmatter_from_path
+from src.common.repo_paths import DIAGRAM_CATALOG, DIAGRAMS, RENDERED
 
 from .boundary import assert_engagement_write_root
 from .types import WriteResult
@@ -21,12 +22,12 @@ def _verification(path: Path) -> dict[str, object]:
 
 
 def _find_diagram_file(repo_root: Path, artifact_id: str) -> Path | None:
-    diagrams_root = repo_root / "diagram-catalog" / "diagrams"
+    diagrams_root = repo_root / DIAGRAM_CATALOG / DIAGRAMS
     if not diagrams_root.exists():
         return None
     for suffix in ("*.puml", "*.md"):
         for path in sorted(diagrams_root.rglob(suffix)):
-            if path.parent.name == "rendered":
+            if path.parent.name == RENDERED:
                 continue
             fm = parse_frontmatter_from_path(path) or {}
             if str(fm.get("artifact-id", "")) == artifact_id:
@@ -35,7 +36,7 @@ def _find_diagram_file(repo_root: Path, artifact_id: str) -> Path | None:
 
 
 def _rendered_paths(diagram_path: Path) -> list[Path]:
-    rendered_dir = diagram_path.parent.parent / "rendered"
+    rendered_dir = diagram_path.parent.parent / RENDERED
     stem = diagram_path.stem
     parts = stem.split(".", 2)
     friendly_name = parts[2] if len(parts) >= 3 else stem

@@ -14,6 +14,8 @@ from pathlib import Path
 
 import yaml
 
+from src.common.repo_paths import DIAGRAM_CATALOG, DOCS, MODEL
+
 _FM_RE = re.compile(r"^---\n(.*?)\n---\s*\n?", re.DOTALL)
 
 
@@ -86,13 +88,13 @@ def _classify(rel: str) -> str | None:
     if not parts:
         return None
     top = parts[0]
-    if top == "model":
+    if top == MODEL:
         if rel.endswith(".outgoing.md"):
             return "connections"
         return "entity" if rel.endswith(".md") else None
-    if top == "documents":
+    if top == DOCS:
         return "document" if rel.endswith(".md") else None
-    if top == "diagram-catalog":
+    if top == DIAGRAM_CATALOG:
         return "diagram"
     return None
 

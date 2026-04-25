@@ -19,6 +19,8 @@ import asyncio
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
+from src.common.repo_paths import DIAGRAM_CATALOG, DOCS, MODEL
+
 router = APIRouter()
 
 
@@ -45,7 +47,10 @@ async def sync_status() -> dict:
 
     eng_root = s.maybe_engagement_root()
     if eng_root is not None:
-        dirty = await asyncio.to_thread(enterprise_git_ops.has_uncommitted_changes, eng_root)
+        dirty = await asyncio.to_thread(
+            enterprise_git_ops.has_uncommitted_changes, eng_root,
+            MODEL, DOCS, DIAGRAM_CATALOG,
+        )
         out["engagement"] = {"has_uncommitted_changes": dirty}
 
     ent_root = s.maybe_enterprise_root()

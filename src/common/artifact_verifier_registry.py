@@ -3,7 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Literal
 
-from src.common.artifact_index import shared_artifact_index
+from src.infrastructure.artifact_index import shared_artifact_index
 
 
 class ArtifactRegistry:
@@ -11,7 +11,6 @@ class ArtifactRegistry:
 
     def __init__(self, repo_root: Path | list[Path]) -> None:
         self._index = shared_artifact_index(repo_root)
-        self._index.refresh()
 
     @property
     def repo_roots(self) -> list[Path]:

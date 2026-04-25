@@ -38,6 +38,14 @@ logger = logging.getLogger(__name__)
 _REQUEST_WATCHDOG_S = 5.0
 
 
+def _print_stopped(result: dict) -> None:
+    pids = result.get("pids")
+    if isinstance(pids, list) and len(pids) > 1:
+        print(f"stopped backend pids {', '.join(str(p) for p in pids)}")
+    else:
+        print(f"stopped backend pid {result.get('pid')}")
+
+
 def _confirm_stop_other_instance(*, expected_port: int, pid: int, actual_port: object) -> bool:
     prompt = (
         f"Configured backend port is {expected_port}, but found one arch-backend instance "
@@ -116,7 +124,8 @@ def _print_status_details(result: dict[str, object]) -> None:
 
 def _daemon_argv(argv: list[str] | None) -> list[str]:
     raw_args = list(sys.argv[1:] if argv is None else argv)
-    return [arg for arg in raw_args if arg != "--daemon"]
+    # Strip lifecycle control flags — the daemon should just start, not stop-then-start again.
+    return [arg for arg in raw_args if arg not in ("--daemon", "--restart", "--stop")]
 
 
 def _start_daemon(*, argv: list[str] | None, log_path: Path) -> int:
@@ -368,7 +377,7 @@ def main(argv: list[str] | None = None) -> None:
         result = stop_backend(port=resolved_port)
         reason = result.get("reason")
         if result.get("stopped"):
-            print(f"stopped backend pid {result.get('pid')}")
+            _print_stopped(result)
         elif reason == "not_running":
             print("backend is not running")
         elif reason == "stale_pid":
@@ -379,14 +388,11 @@ def main(argv: list[str] | None = None) -> None:
             if _confirm_stop_other_instance(expected_port=resolved_port, pid=pid, actual_port=other_port):
                 follow_up = stop_backend(port=int(other_port) if isinstance(other_port, int) else None)
                 if follow_up.get("stopped"):
-                    print(f"stopped backend pid {follow_up.get('pid')}")
+                    _print_stopped(follow_up)
                 else:
                     raise SystemExit(f"failed to stop backend pid {follow_up.get('pid')}")
             else:
                 raise SystemExit(1)
-        elif reason == "multiple_matching":
-            pids = ", ".join(str(pid) for pid in result.get("pids", []))
-            raise SystemExit(f"multiple arch-backend instances match port {resolved_port}: {pids}")
         elif reason == "invalid_state":
             print("removed invalid backend state")
         else:
@@ -397,7 +403,7 @@ def main(argv: list[str] | None = None) -> None:
         result = stop_backend(port=resolved_port)
         reason = result.get("reason")
         if result.get("stopped"):
-            print(f"stopped backend pid {result.get('pid')}")
+            _print_stopped(result)
         elif reason not in {"not_running", "stale_pid", "invalid_state"}:
             raise SystemExit(f"failed to restart backend pid {result.get('pid')}")
 
@@ -414,10 +420,19 @@ def main(argv: list[str] | None = None) -> None:
             print(f"backend already running on port {status.get('port')} (pid {status.get('pid')})")
             return
         if status.get("reason") in {"stopped_backend", "unhealthy_backend"}:
-            raise SystemExit(
-                f"arch-backend pid {status.get('pid')} is on port {resolved_port} but is not healthy; "
-                f"run 'arch-backend --stop' or 'arch-backend --restart --daemon'"
-            )
+            if args.restart:
+                # A declarant survived the restart stop; attempt cleanup and continue.
+                cleanup = stop_backend(port=resolved_port)
+                if not cleanup.get("stopped") and cleanup.get("reason") not in {"not_running", "stale_pid"}:
+                    raise SystemExit(
+                        f"arch-backend pid {status.get('pid')} is not healthy and could not be stopped; "
+                        f"run 'arch-backend --stop' manually"
+                    )
+            else:
+                raise SystemExit(
+                    f"arch-backend pid {status.get('pid')} is on port {resolved_port} but is not healthy; "
+                    f"run 'arch-backend --stop' or 'arch-backend --restart --daemon'"
+                )
         if status.get("reason") == "unmanaged_backend":
             print(f"backend already responding on port {resolved_port} but is not managed by this workspace")
             return
@@ -476,13 +491,18 @@ def main(argv: list[str] | None = None) -> None:
         args.host,
         resolved_port,
     )
+    repo = ArtifactRepository(roots)
+    repo.refresh()  # eager-load index at startup so first request is fast
     gui_state.init_state(
-        ArtifactRepository(roots),
+        repo,
         repo_root_path,
         enterprise_root_path,
         admin_mode=args.admin_mode,
         read_only=args.read_only,
     )
+
+    from src.common.artifact_document_schema import load_document_schemata
+    load_document_schemata(repo_root_path)  # pre-warm schema cache so first navigation is fast
 
     # Pre-block engagement repo if read-only mode is active
     if args.read_only:

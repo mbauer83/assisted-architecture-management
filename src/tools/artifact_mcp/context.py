@@ -17,11 +17,12 @@ from typing import Literal
 
 from src.common.artifact_query import ArtifactRepository
 from src.common.artifact_verifier import ArtifactRegistry, ArtifactVerifier
-from src.common.artifact_index.coordination import (
+from src.infrastructure.artifact_index.coordination import (
     publish_background_refresh_completed,
     wait_for_write_queue_drain,
 )
-from src.common.artifact_index.versioning import ReadModelVersion
+from src.infrastructure.artifact_index.versioning import ReadModelVersion
+from src.common.repo_paths import MODEL
 from src.common.workspace_paths import resolve_workspace_repo_roots
 
 
@@ -163,6 +164,7 @@ def verifier_for(roots_key_str: str, *, include_registry: bool) -> ArtifactVerif
 
 
 def _refresh_repo_now(roots: list[Path]) -> ReadModelVersion:
+    from src.infrastructure.artifact_index import shared_artifact_index
     key = roots_key(roots)
     shared = _shared_state_repo_for_roots(roots)
     if shared is not None:
@@ -172,15 +174,18 @@ def _refresh_repo_now(roots: list[Path]) -> ReadModelVersion:
         repo = repo_cached(key)
         repo.refresh()
         version = repo.read_model_version()
+    shared_artifact_index(roots).refresh()
     registry_cached.cache_clear()
     return version
 
 
 def _apply_paths_now(roots: list[Path], paths: list[Path]) -> ReadModelVersion:
+    from src.infrastructure.artifact_index import shared_artifact_index
     key = roots_key(roots)
     shared = _shared_state_repo_for_roots(roots)
     repo = shared if shared is not None else repo_cached(key)
     version = repo.apply_file_changes(paths)
+    shared_artifact_index(roots).apply_file_changes(paths)
     registry_cached.cache_clear()
     return version
 
@@ -191,7 +196,7 @@ def _regenerate_macros(roots: list[Path]) -> None:
     except Exception:  # noqa: BLE001
         return
     for root in roots:
-        if (root / "model").is_dir():
+        if (root / MODEL).is_dir():
             try:
                 generate_macros(root)
             except Exception:  # noqa: BLE001
@@ -294,6 +299,9 @@ def refresh_caches_for_repo(root_or_roots: Path | list[Path]) -> None:
 
 
 def clear_caches_for_repo(root_or_roots: Path | list[Path]) -> None:
+    from src.infrastructure.artifact_index import notify_paths_changed
+    paths = root_or_roots if isinstance(root_or_roots, list) else [root_or_roots]
+    notify_paths_changed(paths)
     enqueue_refresh_for_roots(root_or_roots, full_refresh=True)
 
 

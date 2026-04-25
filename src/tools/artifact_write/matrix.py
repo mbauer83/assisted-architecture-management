@@ -8,6 +8,7 @@ import yaml
 
 from src.common.artifact_verifier import ArtifactRegistry, ArtifactVerifier
 from src.common.artifact_write import format_matrix_markdown
+from src.common.repo_paths import DIAGRAM_CATALOG, DIAGRAMS
 
 from .boundary import assert_engagement_write_root, today_iso
 from .types import WriteResult
@@ -67,7 +68,7 @@ def _linkify_matrix_ids(
 ) -> tuple[str, int]:
     """Replace plain entity IDs with relative markdown links in matrix rows."""
 
-    diagrams_dir = repo_root / "diagram-catalog" / "diagrams"
+    diagrams_dir = repo_root / DIAGRAM_CATALOG / DIAGRAMS
     id_to_relpath: dict[str, str] = {}
     id_to_link_text: dict[str, str] = {}
 
@@ -199,7 +200,7 @@ def create_matrix(
             candidate_entity_ids=ids_for_links,
         )
 
-        diagrams_dir = repo_root / "diagram-catalog" / "diagrams"
+        diagrams_dir = repo_root / DIAGRAM_CATALOG / DIAGRAMS
         diagram_links = _build_diagram_id_to_relpath(
             diagrams_dir=diagrams_dir,
             registry=registry,
@@ -220,7 +221,7 @@ def create_matrix(
         matrix_markdown=body_markdown,
     )
 
-    path = repo_root / "diagram-catalog" / "diagrams" / f"{artifact_id}.md"
+    path = repo_root / DIAGRAM_CATALOG / DIAGRAMS / f"{artifact_id}.md"
 
     if dry_run:
         from tempfile import TemporaryDirectory

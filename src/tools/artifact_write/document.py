@@ -6,6 +6,7 @@ import yaml  # type: ignore[import-untyped]
 
 from src.common.artifact_document_schema import get_document_schema, get_document_subdirectory
 from src.common.artifact_write import generate_entity_id, slugify
+from src.common.repo_paths import DOCS
 
 from .boundary import assert_engagement_write_root, today_iso
 from .types import WriteResult
@@ -53,7 +54,7 @@ def _build_placeholder_body(required_sections: list[str]) -> str:
 
 
 def _doc_dir(repo_root: Path, doc_subdirectory: str) -> Path:
-    return repo_root / "documents" / Path(doc_subdirectory)
+    return repo_root / DOCS / Path(doc_subdirectory)
 
 
 def _verification_to_document_dict(path: Path, res) -> dict[str, object]:
@@ -170,7 +171,7 @@ def edit_document(
 ) -> WriteResult:
     assert_engagement_write_root(repo_root)
 
-    docs_root = repo_root / "documents"
+    docs_root = repo_root / DOCS
     candidates = list(docs_root.rglob(f"{artifact_id}.md")) if docs_root.exists() else []
     if not candidates:
         raise ValueError(f"Document '{artifact_id}' not found under {docs_root}")
@@ -217,7 +218,7 @@ def edit_document(
         body=new_body,
     )
 
-    relative_path = path.relative_to(repo_root / "documents").as_posix()
+    relative_path = path.relative_to(repo_root / DOCS).as_posix()
     preview_res = verify_content_in_temp_path(
         verifier=verifier,
         file_type="document",
@@ -260,7 +261,7 @@ def delete_document(
 ) -> WriteResult:
     assert_engagement_write_root(repo_root)
 
-    docs_root = repo_root / "documents"
+    docs_root = repo_root / DOCS
     candidates = list(docs_root.rglob(f"{artifact_id}.md")) if docs_root.exists() else []
     if not candidates:
         raise ValueError(f"Document '{artifact_id}' not found under {docs_root}")

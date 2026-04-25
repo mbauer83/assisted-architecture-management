@@ -3,6 +3,7 @@ from pathlib import Path
 from collections.abc import Callable
 from src.common.archimate_types import ALL_ENTITY_TYPES
 from src.common.artifact_verifier import ArtifactVerifier
+from src.common.repo_paths import MODEL
 from src.common.artifact_write import ENTITY_TYPES, generate_entity_id, format_entity_markdown
 from src.tools.generate_macros import generate_macros
 
@@ -60,7 +61,7 @@ def create_entity(
     last = last_updated or today_iso()
 
     eid = artifact_id or generate_entity_id(info.prefix, name)
-    path = repo_root / "model" / info.domain_dir / info.subdir / f"{eid}.md"
+    path = repo_root / MODEL / info.domain_dir / info.subdir / f"{eid}.md"
 
     display = {
         "domain": info.domain_dir.capitalize(),

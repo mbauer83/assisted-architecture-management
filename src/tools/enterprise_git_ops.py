@@ -14,6 +14,7 @@ import subprocess
 from datetime import datetime, timezone
 from pathlib import Path
 
+from src.common.repo_paths import DIAGRAM_CATALOG, DOCS, MODEL
 from src.tools import enterprise_sync_state
 from src.tools.enterprise_sync_state import EnterpriseSyncState
 
@@ -46,8 +47,11 @@ def current_commit(repo: Path) -> str | None:
     return out if rc == 0 else None
 
 
-def has_uncommitted_changes(repo: Path) -> bool:
-    rc, out, _ = _run(repo, "status", "--porcelain")
+def has_uncommitted_changes(repo: Path, *pathspecs: str) -> bool:
+    args = ["status", "--porcelain"]
+    if pathspecs:
+        args += ["--", *pathspecs]
+    rc, out, _ = _run(repo, *args)
     return rc == 0 and bool(out)
 
 
@@ -71,7 +75,7 @@ def promotion_merged_into_main(repo: Path) -> bool:
     """Detect merge via content diff: empty diff means working branch is in origin/main."""
     rc, out, _ = _run(
         repo, "diff", "origin/main", "HEAD",
-        "--", "model", "documents", "diagram-catalog",
+        "--", MODEL, DOCS, DIAGRAM_CATALOG,
     )
     return rc == 0 and not out
 

@@ -136,9 +136,19 @@ def rebuild_sqlite(index: "ArtifactIndex") -> None:
             )
     index._rebuild_entity_context_projection()
 
+    # Rebuild reverse path → id indexes
+    index._entity_by_path = {rec.path.resolve(): rec.artifact_id for rec in index._entities.values()}
+    index._diagram_by_path = {rec.path.resolve(): rec.artifact_id for rec in index._diagrams.values()}
+    index._document_by_path = {rec.path.resolve(): rec.artifact_id for rec in index._documents.values()}
+    conn_by_path: dict[Path, set[str]] = {}
+    for rec in index._connections.values():
+        conn_by_path.setdefault(rec.path.resolve(), set()).add(rec.artifact_id)
+    index._connections_by_path = conn_by_path
+
 
 def upsert_entity_record(index: "ArtifactIndex", rec: EntityRecord) -> None:
     index._entities[rec.artifact_id] = rec
+    index._entity_by_path[rec.path.resolve()] = rec.artifact_id
     with index._conn:
         index._conn.execute("DELETE FROM entities WHERE artifact_id = ?", (rec.artifact_id,))
         index._conn.execute(
@@ -173,7 +183,9 @@ def upsert_entity_record(index: "ArtifactIndex", rec: EntityRecord) -> None:
 
 
 def delete_entity_record(index: "ArtifactIndex", artifact_id: str) -> None:
-    index._entities.pop(artifact_id, None)
+    old = index._entities.pop(artifact_id, None)
+    if old is not None:
+        index._entity_by_path.pop(old.path.resolve(), None)
     with index._conn:
         index._conn.execute("DELETE FROM entities WHERE artifact_id = ?", (artifact_id,))
         index._conn.execute("DELETE FROM entity_context_edges WHERE entity_id = ?", (artifact_id,))
@@ -184,6 +196,7 @@ def delete_entity_record(index: "ArtifactIndex", artifact_id: str) -> None:
 
 def upsert_connection_record(index: "ArtifactIndex", rec: ConnectionRecord) -> None:
     index._connections[rec.artifact_id] = rec
+    index._connections_by_path.setdefault(rec.path.resolve(), set()).add(rec.artifact_id)
     with index._conn:
         index._conn.execute("DELETE FROM connections WHERE artifact_id = ?", (rec.artifact_id,))
         index._conn.execute(
@@ -209,7 +222,14 @@ def upsert_connection_record(index: "ArtifactIndex", rec: ConnectionRecord) -> N
 
 
 def delete_connection_record(index: "ArtifactIndex", artifact_id: str) -> None:
-    index._connections.pop(artifact_id, None)
+    old = index._connections.pop(artifact_id, None)
+    if old is not None:
+        key = old.path.resolve()
+        path_set = index._connections_by_path.get(key)
+        if path_set:
+            path_set.discard(artifact_id)
+            if not path_set:
+                del index._connections_by_path[key]
     with index._conn:
         index._conn.execute("DELETE FROM connections WHERE artifact_id = ?", (artifact_id,))
         index._conn.execute("DELETE FROM entity_context_edges WHERE connection_id = ?", (artifact_id,))
@@ -219,6 +239,7 @@ def delete_connection_record(index: "ArtifactIndex", artifact_id: str) -> None:
 
 def upsert_diagram_record(index: "ArtifactIndex", rec: DiagramRecord) -> None:
     index._diagrams[rec.artifact_id] = rec
+    index._diagram_by_path[rec.path.resolve()] = rec.artifact_id
     with index._conn:
         index._conn.execute("DELETE FROM diagrams WHERE artifact_id = ?", (rec.artifact_id,))
         index._conn.execute(
@@ -253,7 +274,9 @@ def upsert_diagram_record(index: "ArtifactIndex", rec: DiagramRecord) -> None:
 
 
 def delete_diagram_record(index: "ArtifactIndex", artifact_id: str) -> None:
-    index._diagrams.pop(artifact_id, None)
+    old = index._diagrams.pop(artifact_id, None)
+    if old is not None:
+        index._diagram_by_path.pop(old.path.resolve(), None)
     with index._conn:
         index._conn.execute("DELETE FROM diagrams WHERE artifact_id = ?", (artifact_id,))
         if index._fts_enabled:
@@ -300,6 +323,7 @@ def _connection_row(index: "ArtifactIndex", rec: ConnectionRecord) -> tuple[str,
 
 def upsert_document_record(index: "ArtifactIndex", rec: DocumentRecord) -> None:
     index._documents[rec.artifact_id] = rec
+    index._document_by_path[rec.path.resolve()] = rec.artifact_id
     with index._conn:
         index._conn.execute("DELETE FROM documents WHERE artifact_id = ?", (rec.artifact_id,))
         index._conn.execute(
@@ -324,7 +348,9 @@ def upsert_document_record(index: "ArtifactIndex", rec: DocumentRecord) -> None:
 
 
 def delete_document_record(index: "ArtifactIndex", artifact_id: str) -> None:
-    index._documents.pop(artifact_id, None)
+    old = index._documents.pop(artifact_id, None)
+    if old is not None:
+        index._document_by_path.pop(old.path.resolve(), None)
     with index._conn:
         index._conn.execute("DELETE FROM documents WHERE artifact_id = ?", (artifact_id,))
         if index._fts_enabled:

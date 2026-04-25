@@ -74,8 +74,7 @@ def read_entity(id: str) -> dict[str, Any]:
             result["notes"] = parsed.notes or ""
         except Exception:  # noqa: BLE001
             pass
-        counts = s.build_conn_counts(repo)
-        inc, sym, out = counts.get(id, (0, 0, 0))
+        inc, sym, out = repo.connection_counts_for(id)
         result["conn_in"] = inc
         result["conn_sym"] = sym
         result["conn_out"] = out
@@ -105,7 +104,7 @@ def read_entity_context(id: str) -> dict[str, Any]:
 
 @router.get("/api/entity-schemata")
 def get_entity_schemata(artifact_type: str) -> dict[str, Any]:
-    repo_root = s._repo_root
+    repo_root = s.maybe_engagement_root()
     if repo_root is None:
         raise HTTPException(500, "Repository not initialized")
     from src.common.artifact_schema import (

@@ -22,6 +22,7 @@ from pathlib import Path
 import yaml
 
 from src.common.artifact_parsing import normalize_puml_alias
+from src.common.repo_paths import DIAGRAM_CATALOG, MODEL
 from src.common.ontology_loader import ENTITY_TYPES
 from src.tools._svg_sprite_convert import browser_markup_to_plantuml_svg as _browser_markup_to_plantuml_svg
 from src.common.settings import archimate_type_markers, sprite_scale
@@ -106,7 +107,7 @@ def _generate_glyph_include(repo_root: Path) -> Path:
                 continue
             sprite_name = f"$archimate_{info.archimate_element_type}"
             lines.append(f"sprite {sprite_name} {_browser_markup_to_plantuml_svg(markup)}")
-    out_path = repo_root / "diagram-catalog" / "_archimate-glyphs.puml"
+    out_path = repo_root / DIAGRAM_CATALOG / "_archimate-glyphs.puml"
     out_path.parent.mkdir(parents=True, exist_ok=True)
     out_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
     return out_path
@@ -133,11 +134,11 @@ def generate_macros(repo_root: Path, *, enterprise_root: Path | None = None) -> 
     Returns the path to the written file.
     """
     roots_to_scan: list[Path] = []
-    if enterprise_root and (enterprise_root / "model").is_dir():
+    if enterprise_root and (enterprise_root / MODEL).is_dir():
         roots_to_scan.append(enterprise_root)
-    entities_root = repo_root / "model"
+    entities_root = repo_root / MODEL
     if not entities_root.is_dir():
-        raise FileNotFoundError(f"model/ not found under {repo_root}")
+        raise FileNotFoundError(f"{MODEL}/ not found under {repo_root}")
     roots_to_scan.append(repo_root)
 
     _generate_glyph_include(repo_root)
@@ -145,7 +146,7 @@ def generate_macros(repo_root: Path, *, enterprise_root: Path | None = None) -> 
     seen_aliases: set[str] = set()
 
     for scan_root in roots_to_scan:
-        model_dir = scan_root / "model"
+        model_dir = scan_root / MODEL
         for md_file in sorted(model_dir.rglob("*.md")):
             if md_file.name.endswith(".outgoing.md"):
                 continue
@@ -204,7 +205,7 @@ def generate_macros(repo_root: Path, *, enterprise_root: Path | None = None) -> 
         lines.append(macro_line)
 
     output = "\n".join(lines) + "\n"
-    out_path = repo_root / "diagram-catalog" / "_macros.puml"
+    out_path = repo_root / DIAGRAM_CATALOG / "_macros.puml"
     out_path.parent.mkdir(parents=True, exist_ok=True)
     out_path.write_text(output, encoding="utf-8")
     print(f"Written {len(entries)} macros → {out_path}")

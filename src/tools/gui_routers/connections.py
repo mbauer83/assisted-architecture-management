@@ -179,11 +179,12 @@ def add_connection(body: AddConnectionBody) -> dict[str, Any]:
     _reject_if_non_entity_gar(body.source_entity, "source")
     _reject_if_non_entity_gar(body.target_entity, "target")
 
-    if s._enterprise_root is not None and registry.scope_of_entity(body.source_entity) == "enterprise":
+    _enterprise_root = s.maybe_enterprise_root()
+    if _enterprise_root is not None and registry.scope_of_entity(body.source_entity) == "enterprise":
         gar_source_id = _ensure_gar(body.source_entity)
         effective_source = gar_source_id
 
-    if s._enterprise_root is not None and registry.scope_of_entity(body.target_entity) == "enterprise":
+    if _enterprise_root is not None and registry.scope_of_entity(body.target_entity) == "enterprise":
         gar_artifact_id = _ensure_gar(body.target_entity)
         effective_target = gar_artifact_id
 
@@ -323,8 +324,8 @@ def cleanup_broken_refs(body: CleanupBrokenRefsBody) -> dict[str, Any]:
     """
     from src.tools.artifact_write.cleanup_broken_refs import cleanup_broken_refs as _cleanup
     import dataclasses
-    eng_root = s._repo_root
-    ent_root = s._enterprise_root
+    eng_root = s.maybe_engagement_root()
+    ent_root = s.maybe_enterprise_root()
     if eng_root is None:
         raise HTTPException(500, "Repository not initialized")
     if ent_root is None:

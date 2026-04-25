@@ -54,6 +54,7 @@ from src.common.artifact_verifier_types import (
     VerifierRuntimeConfig,
     entity_id_from_path,
 )
+from src.common.repo_paths import ARCH_REPO, DOCS, MODEL
 
 
 # Cardinality: n  |  n..m  |  n..*  |  *
@@ -317,8 +318,8 @@ class ArtifactVerifier:
     def _verify_all_full(self, repo_path: Path, *, include_diagrams: bool) -> list[VerificationResult]:
         inv = inventory_files(repo_path, include_diagrams=include_diagrams)
         results = self._verify_inventory_subset(inv, set(inv.ordered_paths))
-        # Verify documents/ directory — not tracked by FileInventory
-        docs_root = repo_path / "documents"
+        # Verify docs/ directory — not tracked by FileInventory
+        docs_root = repo_path / DOCS
         if docs_root.exists():
             doc_files = sorted(docs_root.rglob("*.md"))
             worker_count = resolve_worker_count()
@@ -350,8 +351,8 @@ class ArtifactVerifier:
                 cfg=cfg,
             )
 
-        # Verify documents/ — always fresh, not tracked by incremental state
-        docs_root = repo_path / "documents"
+        # Verify docs/ — always fresh, not tracked by incremental state
+        docs_root = repo_path / DOCS
         if docs_root.exists():
             doc_files = sorted(docs_root.rglob("*.md"))
             worker_count = resolve_worker_count()
@@ -584,11 +585,11 @@ def _linked_entity_types(doc_path: Path, content: str) -> set[str]:
 
 
 def _infer_repo_root_for_document(path: Path) -> Path | None:
-    """Walk up from a document path to find the repo root (parent of documents/)."""
+    """Walk up from a document path to find the repo root (parent of docs/)."""
     for parent in path.parents:
-        if (parent / "documents").exists() and (parent / ".arch-repo").exists():
+        if (parent / DOCS).exists() and (parent / ARCH_REPO).exists():
             return parent
-        if (parent / "documents").exists() and (parent / "model").exists():
+        if (parent / DOCS).exists() and (parent / MODEL).exists():
             return parent
     return None
 

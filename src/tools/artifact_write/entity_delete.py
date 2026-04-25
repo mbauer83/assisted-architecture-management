@@ -7,6 +7,7 @@ from pathlib import Path
 
 from src.common.artifact_verifier import ArtifactRegistry
 from src.common.artifact_verifier_parsing import parse_diagram_refs, parse_frontmatter_from_path
+from src.common.repo_paths import DIAGRAM_CATALOG, DIAGRAMS, MODEL, RENDERED
 
 from .boundary import assert_engagement_write_root
 from .parse_existing import parse_outgoing_file
@@ -39,12 +40,12 @@ def _owned_connection_ids(artifact_id: str, outgoing_path: Path) -> list[str]:
 def _diagram_paths(repo_roots: list[Path]) -> list[Path]:
     paths: list[Path] = []
     for root in repo_roots:
-        diagrams_root = root / "diagram-catalog" / "diagrams"
+        diagrams_root = root / DIAGRAM_CATALOG / DIAGRAMS
         if not diagrams_root.exists():
             continue
         for suffix in ("*.puml", "*.md"):
             for path in diagrams_root.rglob(suffix):
-                if path.parent.name != "rendered":
+                if path.parent.name != RENDERED:
                     paths.append(path)
     return sorted(paths)
 
@@ -80,7 +81,7 @@ def _entity_ref_blockers(
     diagram_refs: list[str] = []
     grf_refs: list[str] = []
     for root in registry.repo_roots:
-        model_root = root / "model"
+        model_root = root / MODEL
         if not model_root.exists():
             continue
         for outgoing_path in sorted(model_root.rglob("*.outgoing.md")):

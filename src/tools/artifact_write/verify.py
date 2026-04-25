@@ -5,6 +5,7 @@ from typing import Literal
 import os
 
 from src.common.artifact_verifier import ArtifactVerifier, VerificationResult
+from src.common.repo_paths import ARCH_REPO, DIAGRAM_CATALOG, DIAGRAMS, DOCS, MODEL
 
 
 def verify_content_in_temp_path(
@@ -24,13 +25,13 @@ def verify_content_in_temp_path(
     tmp_root = Path(tempfile.mkdtemp(prefix=f"model-write-verify-{file_type}-"))
 
     if file_type == "diagram":
-        cat = tmp_root / "diagram-catalog"
-        diagrams = cat / "diagrams"
+        cat = tmp_root / DIAGRAM_CATALOG
+        diagrams = cat / DIAGRAMS
         diagrams.mkdir(parents=True, exist_ok=True)
 
         if support_repo_root is not None:
             for support in ("_macros.puml", "_archimate-stereotypes.puml", "_archimate-glyphs.puml"):
-                src = support_repo_root / "diagram-catalog" / support
+                src = support_repo_root / DIAGRAM_CATALOG / support
                 if src.exists():
                     (cat / support).write_text(src.read_text(encoding="utf-8"), encoding="utf-8")
 
@@ -38,15 +39,15 @@ def verify_content_in_temp_path(
     elif file_type == "document":
         desired_relpath = Path(desired_name)
         if support_repo_root is not None:
-            arch_repo = support_repo_root / ".arch-repo"
+            arch_repo = support_repo_root / ARCH_REPO
             if arch_repo.exists():
-                os.symlink(arch_repo, tmp_root / ".arch-repo", target_is_directory=True)
-            model_root = support_repo_root / "model"
+                os.symlink(arch_repo, tmp_root / ARCH_REPO, target_is_directory=True)
+            model_root = support_repo_root / MODEL
             if model_root.exists():
-                os.symlink(model_root, tmp_root / "model", target_is_directory=True)
+                os.symlink(model_root, tmp_root / MODEL, target_is_directory=True)
 
-            source_docs_root = support_repo_root / "documents"
-            mirrored_docs_root = tmp_root / "documents"
+            source_docs_root = support_repo_root / DOCS
+            mirrored_docs_root = tmp_root / DOCS
             mirrored_docs_root.mkdir(parents=True, exist_ok=True)
             if source_docs_root.exists():
                 for existing in source_docs_root.rglob("*"):
@@ -57,7 +58,7 @@ def verify_content_in_temp_path(
                     elif rel != desired_relpath:
                         target.parent.mkdir(parents=True, exist_ok=True)
                         os.symlink(existing, target)
-        tmp_path = tmp_root / "documents" / desired_name
+        tmp_path = tmp_root / DOCS / desired_name
         tmp_path.parent.mkdir(parents=True, exist_ok=True)
     else:
         tmp_path = tmp_root / desired_name

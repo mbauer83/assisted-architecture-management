@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from pathlib import Path
 from typing import Any
 
 from fastapi import APIRouter, HTTPException, Query
@@ -36,9 +37,11 @@ class EditDocumentRequest(BaseModel):
     dry_run: bool = False
 
 
-def _get_engagement_root() -> Any:
-    repo_root, _, _ = s.get_write_deps()
-    return repo_root
+def _get_engagement_root() -> Path:
+    root = s.maybe_engagement_root()
+    if root is None:
+        raise HTTPException(500, "Repository not initialized")
+    return root
 
 
 _FIXED_FIELDS = {"title", "status", "keywords"}

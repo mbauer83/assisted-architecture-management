@@ -23,7 +23,7 @@ from concurrent.futures import ThreadPoolExecutor
 from functools import wraps
 from typing import Any, Callable, TypeVar
 
-from src.common.artifact_index.coordination import publish_write_queue_state
+from src.infrastructure.artifact_index.coordination import publish_write_queue_state
 
 _F = TypeVar("_F", bound=Callable[..., Any])
 

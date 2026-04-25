@@ -25,6 +25,7 @@ from pathlib import Path
 
 from src.common.artifact_query import ArtifactRepository
 from src.common.artifact_verifier_registry import ArtifactRegistry
+from src.common.repo_paths import MODEL
 
 
 _GRF_FRONTMATTER_KEY = "global-artifact-id"
@@ -99,7 +100,7 @@ def plan_cleanup(
     broken = find_broken_grfs(eng_repo, engagement_root, enterprise_entity_ids)
 
     report = CleanupReport(broken_grfs=[b[0] for b in broken])
-    model_root = engagement_root / "model"
+    model_root = engagement_root / MODEL
 
     for grf_id, grf_path in broken:
         # Find outgoing files that connect to this GRF
@@ -129,7 +130,7 @@ def execute_cleanup(
 
     eng_repo = ArtifactRepository(engagement_root)
     broken = find_broken_grfs(eng_repo, engagement_root, enterprise_entity_ids)
-    model_root = engagement_root / "model"
+    model_root = engagement_root / MODEL
 
     for grf_id, grf_path in broken:
         # Remove connections first

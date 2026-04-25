@@ -13,16 +13,17 @@ from pydantic import BaseModel
 from src.common.artifact_parsing import extract_declared_puml_aliases, normalize_puml_alias
 from src.common.artifact_types import DiagramRecord, EntityRecord
 from src.common.ontology_loader import DOMAIN_ORDER as _DOMAIN_ORDER
+from src.common.repo_paths import DIAGRAM_CATALOG, DIAGRAMS, RENDERED
 from src.tools.gui_routers import state as s
 
 router = APIRouter()
 
 
 def _rendered_name(d: DiagramRecord, suffix: str) -> str | None:
-    repo_root = s._repo_root
+    repo_root = s.maybe_engagement_root()
     if repo_root is None:
         return None
-    rendered_dir = repo_root / "diagram-catalog" / "rendered"
+    rendered_dir = repo_root / DIAGRAM_CATALOG / RENDERED
     parts = d.artifact_id.split(".")
     if len(parts) >= 3:
         candidate = rendered_dir / f"{'.'.join(parts[2:])}{suffix}"
@@ -64,11 +65,12 @@ def read_diagram(id: str) -> dict[str, Any]:
 
 @router.get("/api/diagram-image/{filename}")
 def get_diagram_image(filename: str) -> FileResponse:
-    if s._repo_root is None:
+    repo_root = s.maybe_engagement_root()
+    if repo_root is None:
         raise HTTPException(500, "Repository not initialized")
     if "/" in filename or "\\" in filename or ".." in filename:
         raise HTTPException(400, "Invalid filename")
-    path = s._repo_root / "diagram-catalog" / "rendered" / filename
+    path = repo_root / DIAGRAM_CATALOG / RENDERED / filename
     if not path.exists():
         raise HTTPException(404, f"Rendered image not found: {filename}")
     return FileResponse(path, media_type="image/png")
@@ -310,17 +312,17 @@ def get_diagram_context(id: str) -> dict[str, Any]:
 
 @router.get("/api/diagram-svg")
 def get_diagram_svg(id: str) -> Response:
-    repo_root = s._repo_root
+    repo_root = s.maybe_engagement_root()
     if repo_root is None:
         raise HTTPException(500, "Repository not initialized")
-    diagram_path = repo_root / "diagram-catalog" / "diagrams" / f"{id}.puml"
+    diagram_path = repo_root / DIAGRAM_CATALOG / DIAGRAMS / f"{id}.puml"
     if not diagram_path.exists():
         raise HTTPException(404, f"Diagram '{id}' not found")
     diag_rec = s.get_repo().get_diagram(id)
     if diag_rec:
         svg_name = _rendered_name(diag_rec, ".svg")
         if svg_name:
-            svg_path = repo_root / "diagram-catalog" / "rendered" / svg_name
+            svg_path = repo_root / DIAGRAM_CATALOG / RENDERED / svg_name
             if svg_path.exists():
                 return Response(content=svg_path.read_bytes(), media_type="image/svg+xml")
     from src.tools.diagram_builder import render_puml_svg
@@ -334,13 +336,13 @@ def get_diagram_svg(id: str) -> Response:
 
 @router.get("/api/diagram-download")
 def download_diagram(id: str, format: Literal["png", "svg"] = "png") -> FileResponse:
-    repo_root = s._repo_root
+    repo_root = s.maybe_engagement_root()
     if repo_root is None:
         raise HTTPException(500, "Repository not initialized")
     diag_rec = s.get_repo().get_diagram(id)
     if diag_rec is None:
         raise HTTPException(404, f"Diagram '{id}' not found")
-    rendered_dir = repo_root / "diagram-catalog" / "rendered"
+    rendered_dir = repo_root / DIAGRAM_CATALOG / RENDERED
     suffix = ".svg" if format == "svg" else ".png"
     media = "image/svg+xml" if format == "svg" else "image/png"
     fname = _rendered_name(diag_rec, suffix)
@@ -430,7 +432,7 @@ class DeleteDiagramBody(BaseModel):
 
 @router.post("/api/diagram/preview")
 def preview_diagram(body: DiagramPreviewBody) -> dict[str, Any]:
-    repo_root = s._repo_root
+    repo_root = s.maybe_engagement_root()
     if repo_root is None:
         raise HTTPException(500, "Repository not initialized")
     from src.tools.diagram_builder import generate_archimate_puml_body, render_puml_preview

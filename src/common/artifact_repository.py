@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Iterable, Literal, cast
+from typing import Iterable, Literal
 
 from src.common._artifact_query_helpers import (
     matches_connection as _matches_connection,
@@ -22,8 +22,8 @@ from src.common._artifact_query_helpers import (
     summary_group_key as _summary_group_key,
     to_set as _to_set,
 )
-from src.common.artifact_index import ReadModelVersion
-from src.common.artifact_index import shared_artifact_index
+from src.infrastructure.artifact_index import ReadModelVersion
+from src.infrastructure.artifact_index import shared_artifact_index
 from src.common.artifact_scoring import score_connection, score_diagram, score_document, score_entity, tokenize
 from src.common.artifact_types import (
     ArtifactSummary,
@@ -54,7 +54,6 @@ class ArtifactRepository:
     ) -> None:
         self._index = shared_artifact_index(repo_root)
         self._semantic = semantic_provider
-        self._index.refresh()
 
     @property
     def repo_mounts(self) -> list[RepoMount]:
@@ -366,6 +365,18 @@ class ArtifactRepository:
                 "documents_by_type": documents_by_type,
             }
 
+    def connection_counts(self) -> dict[str, tuple[int, int, int]]:
+        """Return {entity_id: (conn_in, conn_sym, conn_out)} from the pre-computed projection."""
+        return self._index.get_all_connection_stats()
+
+    def connection_counts_for(self, entity_id: str) -> tuple[int, int, int]:
+        """Return (conn_in, conn_sym, conn_out) for a single entity."""
+        return self._index.get_connection_stats_for(entity_id)
+
+    def list_connections_by_types(self, types: frozenset[str]) -> list[ConnectionRecord]:
+        ids = self._index.find_connection_ids_by_types(types)
+        return [rec for cid in ids if (rec := self._connections.get(cid)) is not None]
+
     def find_connections_for(
         self,
         entity_id: str,
@@ -416,28 +427,36 @@ class ArtifactRepository:
         )
         seen: set[tuple[str, str]] = set()
         for artifact_id, record_type, score in indexed_hits:
-            rec = (
-                self._entities.get(artifact_id)
-                if record_type == "entity"
-                else self._connections.get(artifact_id)
-                if record_type == "connection"
-                else self._documents.get(artifact_id)
-                if record_type == "document"
-                else self._diagrams.get(artifact_id)
-            )
-            if rec is None:
-                continue
-            if record_type == "entity":
-                entity_rec = cast(EntityRecord, rec)
-                if entity_type_set and entity_rec.artifact_type not in entity_type_set:
-                    continue
-                if domain_set and entity_rec.domain not in domain_set:
+            match record_type:
+                case "entity":
+                    entity_rec = self._entities.get(artifact_id)
+                    if entity_rec is None:
+                        continue
+                    if entity_type_set and entity_rec.artifact_type not in entity_type_set:
+                        continue
+                    if domain_set and entity_rec.domain not in domain_set:
+                        continue
+                    rec = entity_rec
+                case "connection":
+                    rec = self._connections.get(artifact_id)
+                    if rec is None:
+                        continue
+                case "document":
+                    rec = self._documents.get(artifact_id)
+                    if rec is None:
+                        continue
+                case "diagram":
+                    rec = self._diagrams.get(artifact_id)
+                    if rec is None:
+                        continue
+                case _:
                     continue
             key = (record_type, artifact_id)
             if key in seen:
                 continue
             seen.add(key)
-            hits.append(SearchHit(score=score, record_type=cast(Literal["entity", "connection", "diagram", "document"], record_type), record=rec))
+            typed_rt: Literal["entity", "connection", "diagram", "document"] = record_type  # type: ignore[assignment]
+            hits.append(SearchHit(score=score, record_type=typed_rt, record=rec))
 
         if not hits:
             hits.extend(self._search_entities(query_lc, tokens, entity_type_set, domain_set))

@@ -38,3 +38,19 @@ def get_shared_index(factory: type["ArtifactIndex"], repo_root: Path | list[Path
             service = factory(mounts)
             _services[key] = service
         return service
+
+
+def notify_paths_changed(paths: list[Path]) -> None:
+    """Notify all loaded indexes of changed paths for incremental re-indexing.
+
+    Called synchronously by write operations so the index is immediately consistent
+    without waiting for the background refresh queue.
+    """
+    resolved = [p.resolve() for p in paths]
+    with _services_mu:
+        active = list(_services.values())
+    for idx in active:
+        roots = [m.root.resolve() for m in idx.repo_mounts]
+        relevant = [p for p in resolved if any(p == r or str(p).startswith(str(r) + "/") for r in roots)]
+        if relevant:
+            idx.apply_file_changes(relevant)

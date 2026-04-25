@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import threading
 from pathlib import Path
 from typing import Any
 
@@ -16,10 +17,13 @@ except ModuleNotFoundError:  # pragma: no cover - test env without GUI deps
 
 from src.common.artifact_query import ArtifactRepository
 from src.common.artifact_types import ConnectionRecord, DiagramRecord, EntityRecord
-from src.common.artifact_index.coordination import publish_authoritative_mutation
+from src.infrastructure.artifact_index.coordination import publish_authoritative_mutation
 
 
 # Module-level server state — set by gui_server.main() before uvicorn starts.
+# Guarded by _state_lock so background threads (git sync, refresh workers) can
+# safely read these values without racing against init_state().
+_state_lock = threading.Lock()
 _repo: ArtifactRepository | None = None
 _repo_root: Path | None = None          # engagement root — used for writes
 _enterprise_root: Path | None = None    # enterprise root — read-only in normal mode
@@ -36,52 +40,63 @@ def init_state(
     read_only: bool = False,
 ) -> None:
     global _repo, _repo_root, _enterprise_root, _admin_mode, _read_only
-    _repo = repo
-    _repo_root = repo_root
-    _enterprise_root = enterprise_root
-    _admin_mode = admin_mode
-    _read_only = read_only
+    with _state_lock:
+        _repo = repo
+        _repo_root = repo_root
+        _enterprise_root = enterprise_root
+        _admin_mode = admin_mode
+        _read_only = read_only
 
 
 def is_admin_mode() -> bool:
-    return _admin_mode
+    with _state_lock:
+        return _admin_mode
 
 
 def is_read_only() -> bool:
-    return _read_only
+    with _state_lock:
+        return _read_only
 
 
 def get_repo() -> ArtifactRepository:
-    if _repo is None:
+    with _state_lock:
+        repo = _repo
+    if repo is None:
         raise HTTPException(500, "Repository not initialized")
-    return _repo
+    return repo
 
 
 def maybe_get_repo() -> ArtifactRepository | None:
-    return _repo
+    with _state_lock:
+        return _repo
 
 
 def maybe_engagement_root() -> Path | None:
     """Return the engagement repository root, or None if not initialised."""
-    return _repo_root
+    with _state_lock:
+        return _repo_root
 
 
 def maybe_enterprise_root() -> Path | None:
     """Return the enterprise repository root, or None if not configured."""
-    return _enterprise_root
+    with _state_lock:
+        return _enterprise_root
 
 
 def configured_roots() -> list[Path]:
-    roots: list[Path] = []
-    if _repo_root is not None:
-        roots.append(_repo_root.resolve())
-    if _enterprise_root is not None:
-        roots.append(_enterprise_root.resolve())
-    return roots
+    with _state_lock:
+        roots: list[Path] = []
+        if _repo_root is not None:
+            roots.append(_repo_root.resolve())
+        if _enterprise_root is not None:
+            roots.append(_enterprise_root.resolve())
+        return roots
 
 
 def is_global(path: Path) -> bool:
-    return _enterprise_root is not None and path.is_relative_to(_enterprise_root)
+    with _state_lock:
+        ent = _enterprise_root
+    return ent is not None and path.is_relative_to(ent)
 
 
 def entity_to_summary(
@@ -103,25 +118,13 @@ def entity_to_summary(
 
 
 def build_conn_counts(repo: ArtifactRepository) -> dict[str, tuple[int, int, int]]:
-    from src.common.ontology_loader import SYMMETRIC_CONNECTIONS
-    counts: dict[str, list[int]] = {}
-    for rec in repo._connections.values():
-        is_sym = rec.conn_type in SYMMETRIC_CONNECTIONS
-        src = counts.setdefault(rec.source, [0, 0, 0])
-        tgt = counts.setdefault(rec.target, [0, 0, 0])
-        if is_sym:
-            src[1] += 1
-            if rec.target != rec.source:
-                tgt[1] += 1
-        else:
-            src[2] += 1
-            tgt[0] += 1
-    return {k: (v[0], v[1], v[2]) for k, v in counts.items()}
+    return repo.connection_counts()
 
 
 def resolve_gar(artifact_id: str) -> tuple[str, bool]:
     """If artifact_id is a GAR, return (global_artifact_id, True); else (artifact_id, False)."""
-    repo = _repo
+    with _state_lock:
+        repo = _repo
     if repo is None:
         return artifact_id, False
     rec = repo.get_entity(artifact_id)
@@ -133,7 +136,8 @@ def resolve_gar(artifact_id: str) -> tuple[str, bool]:
 
 
 def connection_to_dict(c: ConnectionRecord) -> dict[str, Any]:
-    repo = _repo
+    with _state_lock:
+        repo = _repo
     resolved_target, via_gar = resolve_gar(c.target)
     src_name = c.source
     tgt_name = resolved_target
@@ -168,15 +172,18 @@ def diagram_to_summary(d: DiagramRecord) -> dict[str, Any]:
 
 def get_write_deps() -> tuple[Path, Any, Any]:
     """Return (engagement_root, registry, verifier). Registry spans both repos."""
-    if _repo_root is None:
-        raise HTTPException(500, "Repository not initialized")
     from src.common.artifact_verifier import ArtifactVerifier
     from src.common.artifact_verifier_registry import ArtifactRegistry
-    roots: list[Path] = [_repo_root]
-    if _enterprise_root is not None:
-        roots.append(_enterprise_root)
+    with _state_lock:
+        repo_root = _repo_root
+        enterprise_root = _enterprise_root
+    if repo_root is None:
+        raise HTTPException(500, "Repository not initialized")
+    roots: list[Path] = [repo_root]
+    if enterprise_root is not None:
+        roots.append(enterprise_root)
     registry = ArtifactRegistry(roots)
-    return _repo_root, registry, ArtifactVerifier(registry)
+    return repo_root, registry, ArtifactVerifier(registry)
 
 
 def get_admin_write_deps() -> tuple[Path, Any, Any]:
@@ -186,31 +193,39 @@ def get_admin_write_deps() -> tuple[Path, Any, Any]:
     not configured.  Registry spans both repos so cross-repo entity references
     in outgoing files validate correctly.
     """
-    if not _admin_mode:
-        raise HTTPException(403, "Admin mode is not enabled")
-    if _enterprise_root is None:
-        raise HTTPException(500, "Enterprise repository not configured")
     from src.common.artifact_verifier import ArtifactVerifier
     from src.common.artifact_verifier_registry import ArtifactRegistry
-    roots: list[Path] = [_enterprise_root]
-    if _repo_root is not None:
-        roots.append(_repo_root)
+    with _state_lock:
+        admin_mode = _admin_mode
+        enterprise_root = _enterprise_root
+        repo_root = _repo_root
+    if not admin_mode:
+        raise HTTPException(403, "Admin mode is not enabled")
+    if enterprise_root is None:
+        raise HTTPException(500, "Enterprise repository not configured")
+    roots: list[Path] = [enterprise_root]
+    if repo_root is not None:
+        roots.append(repo_root)
     registry = ArtifactRegistry(roots)
-    return _enterprise_root, registry, ArtifactVerifier(registry)
+    return enterprise_root, registry, ArtifactVerifier(registry)
 
 
 def clear_caches(path: Path | list[Path]) -> None:
-    if _repo is not None:
+    with _state_lock:
+        repo = _repo
+    if repo is not None:
         changed_paths = path if isinstance(path, list) else [path]
-        version = _repo.apply_file_changes(changed_paths)
+        version = repo.apply_file_changes(changed_paths)
         roots = configured_roots()
         if roots:
             publish_authoritative_mutation(roots, changed_paths=changed_paths, version=version)
 
 
 def refresh_now() -> None:
-    if _repo is not None:
-        _repo.refresh()
+    with _state_lock:
+        repo = _repo
+    if repo is not None:
+        repo.refresh()
 
 
 def run_serialized_write(fn: Any, /, *args: Any, **kwargs: Any) -> Any:

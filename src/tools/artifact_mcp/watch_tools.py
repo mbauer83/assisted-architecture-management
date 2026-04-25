@@ -3,13 +3,14 @@ import time
 from pathlib import Path
 from typing import Any
 
+from src.common.repo_paths import DIAGRAM_CATALOG, DIAGRAMS, MODEL
 from src.tools.artifact_mcp.context import (
     RepoPreset,
     RepoScope,
     enqueue_refresh_for_roots,
     resolve_repo_roots,
 )
-from src.common.artifact_index.coordination import suppress_redundant_refresh_paths
+from src.infrastructure.artifact_index.coordination import suppress_redundant_refresh_paths
 
 
 # ---------------------------------------------------------------------------
@@ -18,7 +19,7 @@ from src.common.artifact_index.coordination import suppress_redundant_refresh_pa
 
 def _repo_state_snapshot(repo_path: Path) -> dict[str, tuple[int, int]]:
     snapshot: dict[str, tuple[int, int]] = {}
-    for sub in ("model", "diagram-catalog/diagrams"):
+    for sub in (MODEL, f"{DIAGRAM_CATALOG}/{DIAGRAMS}"):
         root = repo_path / sub
         if not root.exists():
             continue

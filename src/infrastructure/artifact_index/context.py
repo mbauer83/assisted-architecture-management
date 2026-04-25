@@ -123,7 +123,8 @@ def recompute_entity_context_stats(index: "ArtifactIndex", entity_id: str) -> No
 def apply_entity_file_change(index: "ArtifactIndex", path: Path, *, bump_generation: bool = True) -> None:
     index._ensure_loaded()
     with index._lock:
-        old_record = next((rec for rec in index._entities.values() if rec.path == path), None)
+        old_id = index._entity_by_path.get(path.resolve())
+        old_record = index._entities.get(old_id) if old_id is not None else None
         model_root = index._model_root_for_path(path)
         new_record = parse_entity(path, model_root) if path.exists() and model_root is not None else None
         impacted_ids: set[str] = set()
@@ -153,7 +154,8 @@ def apply_entity_file_change(index: "ArtifactIndex", path: Path, *, bump_generat
 def apply_outgoing_file_change(index: "ArtifactIndex", path: Path, *, bump_generation: bool = True) -> None:
     index._ensure_loaded()
     with index._lock:
-        old_records = [rec for rec in index._connections.values() if rec.path == path]
+        old_ids = index._connections_by_path.get(path.resolve(), set())
+        old_records = [index._connections[cid] for cid in old_ids if cid in index._connections]
         old_by_id = {rec.artifact_id: rec for rec in old_records}
         new_records = parse_outgoing_file(path) if path.exists() else []
         new_by_id = {rec.artifact_id: rec for rec in new_records}
@@ -175,7 +177,8 @@ def apply_outgoing_file_change(index: "ArtifactIndex", path: Path, *, bump_gener
 def apply_diagram_file_change(index: "ArtifactIndex", path: Path, *, bump_generation: bool = True) -> None:
     index._ensure_loaded()
     with index._lock:
-        old_record = next((rec for rec in index._diagrams.values() if rec.path == path), None)
+        old_id = index._diagram_by_path.get(path.resolve())
+        old_record = index._diagrams.get(old_id) if old_id is not None else None
         new_record = parse_diagram(path) if path.exists() else None
         if old_record is not None and (new_record is None or old_record.artifact_id != new_record.artifact_id):
             index._delete_diagram_record(old_record.artifact_id)
@@ -188,7 +191,8 @@ def apply_diagram_file_change(index: "ArtifactIndex", path: Path, *, bump_genera
 def apply_document_file_change(index: "ArtifactIndex", path: Path, *, bump_generation: bool = True) -> None:
     index._ensure_loaded()
     with index._lock:
-        old_record = next((rec for rec in index._documents.values() if rec.path == path), None)
+        old_id = index._document_by_path.get(path.resolve())
+        old_record = index._documents.get(old_id) if old_id is not None else None
         new_record = parse_document(path) if path.exists() else None
         if old_record is not None and (new_record is None or old_record.artifact_id != new_record.artifact_id):
             index._delete_document_record(old_record.artifact_id)

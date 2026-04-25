@@ -4,6 +4,7 @@ from pathlib import Path
 from typing import Any, Literal
 
 from src.common.artifact_verifier_registry import ArtifactRegistry
+from src.common.repo_paths import MODEL
 from src.common.artifact_verifier_types import (
     DIAGRAM_ARTIFACT_TYPES,
     ENTITY_ID_RE,
@@ -275,7 +276,7 @@ def _check_entity_aliases_declared(content: str, fm: dict, result: VerificationR
     declared_aliases = _extract_declared_puml_aliases(content)
     for eid in entity_ids:
         eid_str = str(eid)
-        entity_path = result.path.parents[2] / "model"
+        entity_path = result.path.parents[2] / MODEL
         matches = list(entity_path.rglob(f"{eid_str}.md"))
         if not matches:
             continue

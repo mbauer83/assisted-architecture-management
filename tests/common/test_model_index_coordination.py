@@ -3,7 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from src.common.artifact_query import ArtifactRepository
-from src.common.artifact_index.coordination import (
+from src.infrastructure.artifact_index.coordination import (
     publish_authoritative_mutation,
     suppress_redundant_refresh_paths,
 )

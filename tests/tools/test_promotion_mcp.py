@@ -60,18 +60,33 @@ alias: {prefix}_{rand}
 """
 
 
+import subprocess
+
+
+def _git_init(path: Path) -> None:
+    path.mkdir(parents=True, exist_ok=True)
+    subprocess.run(["git", "init", "-b", "main"], cwd=path, check=True, capture_output=True)
+    subprocess.run(["git", "config", "user.email", "test@test.com"], cwd=path, check=True, capture_output=True)
+    subprocess.run(["git", "config", "user.name", "Test"], cwd=path, check=True, capture_output=True)
+    (path / ".gitkeep").write_text("")
+    subprocess.run(["git", "add", ".gitkeep"], cwd=path, check=True, capture_output=True)
+    subprocess.run(["git", "commit", "-m", "init"], cwd=path, check=True, capture_output=True)
+
+
 @pytest.fixture()
 def engagement_root(tmp_path: Path) -> Path:
     root = tmp_path / "engagements" / "ENG-T" / "architecture-repository"
-    (root / "model").mkdir(parents=True)
-    (root / "diagram-catalog" / "diagrams").mkdir(parents=True)
+    _git_init(root)
+    (root / "model").mkdir(parents=True, exist_ok=True)
+    (root / "diagram-catalog" / "diagrams").mkdir(parents=True, exist_ok=True)
     return root
 
 
 @pytest.fixture()
 def enterprise_root(tmp_path: Path) -> Path:
     root = tmp_path / "enterprise-repository"
-    (root / "model").mkdir(parents=True)
+    _git_init(root)
+    (root / "model").mkdir(parents=True, exist_ok=True)
     return root
 
 

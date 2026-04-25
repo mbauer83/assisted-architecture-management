@@ -3,6 +3,7 @@ from typing import Any, Literal
 
 from mcp.server.fastmcp import FastMCP  # type: ignore[import-not-found]
 
+from src.common.repo_paths import DIAGRAM_CATALOG, DIAGRAMS, DOCS
 from src.tools.artifact_mcp.context import RepoScope, resolve_repo_roots, roots_key, verifier_for
 from src.tools.artifact_mcp.formatting import as_verification_result_dict
 
@@ -34,10 +35,10 @@ def artifact_verify(
         inferred = file_type
         if inferred is None:
             if p.suffix == ".puml" or (
-                p.suffix == ".md" and "diagram-catalog" in p.parts and "diagrams" in p.parts
+                p.suffix == ".md" and DIAGRAM_CATALOG in p.parts and DIAGRAMS in p.parts
             ):
                 inferred = "diagram"
-            elif p.suffix == ".md" and "documents" in p.parts:
+            elif p.suffix == ".md" and DOCS in p.parts:
                 inferred = "document"
             else:
                 inferred = "connection" if "connections" in p.parts else "entity"

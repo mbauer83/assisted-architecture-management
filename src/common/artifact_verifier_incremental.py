@@ -10,6 +10,7 @@ from typing import Literal
 
 from src.common.artifact_verifier_parsing import parse_connection_refs, parse_diagram_refs
 from src.common.artifact_verifier_types import IncrementalState, VerificationResult, VerifierRuntimeConfig, entity_id_from_path
+from src.common.repo_paths import DIAGRAM_CATALOG, DIAGRAMS, MODEL
 
 
 @dataclass
@@ -153,7 +154,7 @@ def _new_inventory(repo_path: Path, *, include_diagrams: bool) -> FileInventory:
 
 
 def _index_entity_files(inventory: FileInventory) -> None:
-    entity_root = inventory.repo_path / "model"
+    entity_root = inventory.repo_path / MODEL
     if not entity_root.exists():
         return
     for path in sorted(entity_root.rglob("*.md")):
@@ -165,7 +166,7 @@ def _index_entity_files(inventory: FileInventory) -> None:
 
 
 def _index_connection_files(inventory: FileInventory) -> None:
-    model_root = inventory.repo_path / "model"
+    model_root = inventory.repo_path / MODEL
     if not model_root.exists():
         return
     for path in sorted(model_root.rglob("*.outgoing.md")):
@@ -199,7 +200,7 @@ def _index_connection_neighbors(
 
 
 def _index_diagram_files(inventory: FileInventory) -> None:
-    diagrams_dir = inventory.repo_path / "diagram-catalog" / "diagrams"
+    diagrams_dir = inventory.repo_path / DIAGRAM_CATALOG / DIAGRAMS
     if not diagrams_dir.exists():
         return
     for path in sorted(diagrams_dir.rglob("*.puml")):

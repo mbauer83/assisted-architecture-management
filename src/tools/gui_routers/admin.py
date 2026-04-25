@@ -32,8 +32,8 @@ def server_info() -> dict[str, Any]:
     return {
         "admin_mode": s.is_admin_mode(),
         "read_only": s.is_read_only(),
-        "engagement_root": str(s._repo_root) if s._repo_root else None,
-        "enterprise_root": str(s._enterprise_root) if s._enterprise_root else None,
+        "engagement_root": str(r) if (r := s.maybe_engagement_root()) else None,
+        "enterprise_root": str(r) if (r := s.maybe_enterprise_root()) else None,
     }
 
 

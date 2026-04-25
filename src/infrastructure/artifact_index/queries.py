@@ -8,6 +8,40 @@ if TYPE_CHECKING:
     from .service import ArtifactIndex
 
 
+def get_all_connection_stats(index: "ArtifactIndex") -> dict[str, tuple[int, int, int]]:
+    """Return {entity_id: (conn_in, conn_sym, conn_out)} from the pre-computed projection."""
+    index._ensure_loaded()
+    with index._lock:
+        rows = index._conn.execute(
+            "SELECT entity_id, conn_in, conn_sym, conn_out FROM entity_context_stats"
+        ).fetchall()
+    return {str(r["entity_id"]): (int(r["conn_in"]), int(r["conn_sym"]), int(r["conn_out"])) for r in rows}
+
+
+def get_connection_stats_for(index: "ArtifactIndex", entity_id: str) -> tuple[int, int, int]:
+    """Return (conn_in, conn_sym, conn_out) for a single entity."""
+    index._ensure_loaded()
+    with index._lock:
+        row = index._conn.execute(
+            "SELECT conn_in, conn_sym, conn_out FROM entity_context_stats WHERE entity_id = ?",
+            (entity_id,),
+        ).fetchone()
+    if row is None:
+        return (0, 0, 0)
+    return (int(row["conn_in"]), int(row["conn_sym"]), int(row["conn_out"]))
+
+
+def find_connection_ids_by_types(index: "ArtifactIndex", types: frozenset[str]) -> list[str]:
+    index._ensure_loaded()
+    if not types:
+        return []
+    placeholders = ",".join("?" * len(types))
+    sql = f"SELECT artifact_id FROM connections WHERE conn_type IN ({placeholders}) ORDER BY artifact_id"
+    with index._lock:
+        rows = index._conn.execute(sql, tuple(types)).fetchall()
+    return [str(row["artifact_id"]) for row in rows]
+
+
 def find_connection_ids_for(index: "ArtifactIndex", entity_id: str, *, direction: str = "any", conn_type: str | None = None) -> list[str]:
     index._ensure_loaded()
     where = ["entity_id = ?"]

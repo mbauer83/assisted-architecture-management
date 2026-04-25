@@ -10,6 +10,7 @@ from dataclasses import dataclass
 
 from src.common.artifact_verifier import ArtifactRegistry, ArtifactVerifier
 from src.common.artifact_query import ArtifactRepository
+from src.common.repo_paths import DOCS, MODEL
 from src.tools.generate_macros import generate_macros
 from src.tools.artifact_write.parse_existing import parse_entity_file
 from src.tools.artifact_write.promote_to_enterprise import (
@@ -100,7 +101,7 @@ def execute_promotion(
         for dc in plan.diagram_conflicts:
             _resolve_simple_conflict(dc, "diagram", engagement_root, enterprise_root, registry, result, ent_backups, resolutions)
 
-        if (enterprise_root / "model").is_dir():
+        if (enterprise_root / MODEL).is_dir():
             try: generate_macros(enterprise_root)
             except Exception: pass
 
@@ -231,7 +232,7 @@ def _replace_artifact_with_gar(aid, eng_root, eng_repo, registry, result, artifa
 
 
 def _update_outgoing_references(old_id, new_id, eng_root, result):
-    model_dir = eng_root / "model"
+    model_dir = eng_root / MODEL
     if not model_dir.is_dir(): return
     pattern = re.compile(rf"(^### .+? → ){re.escape(old_id)}$", re.MULTILINE)
     for f in model_dir.rglob("*.outgoing.md"):
@@ -243,7 +244,7 @@ def _update_outgoing_references(old_id, new_id, eng_root, result):
 
 
 def _update_body_references(old_id, eng_root, result):
-    docs_dir = eng_root / "documents"
+    docs_dir = eng_root / DOCS
     if not docs_dir.is_dir(): return
     pat = re.compile(rf"\]\(\s*([^)]*?{re.escape(old_id)}[^)]*?)\s*\)")
     for f in docs_dir.rglob("*.md"):

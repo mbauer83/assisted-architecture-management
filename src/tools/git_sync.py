@@ -21,6 +21,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Literal
 
+from src.common.repo_paths import DIAGRAM_CATALOG, DOCS, MODEL
 from src.tools import enterprise_sync_state
 
 logger = logging.getLogger(__name__)
@@ -153,7 +154,7 @@ class GitSyncManager:
     async def _promotion_merged(self, enterprise_root: Path) -> bool:
         rc, out, _ = await self._git(
             enterprise_root, "diff", "origin/main", "HEAD",
-            "--", "model", "documents", "diagram-catalog",
+            "--", MODEL, DOCS, DIAGRAM_CATALOG,
         )
         return rc == 0 and not out.strip()
 
