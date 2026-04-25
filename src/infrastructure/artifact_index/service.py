@@ -73,7 +73,9 @@ class ArtifactIndex:
         self._mem = _MemStore()
         name_hash = hashlib.blake2b(service_key(mounts).encode("utf-8"), digest_size=10).hexdigest()
         self._db = _SqliteStore(name_hash, self._mem, self.scope_for_path)
-        self._registry = _ScopeRegistry(self._mem, self._lock, self._ensure_loaded, self.scope_for_path)
+        self._registry = _ScopeRegistry(
+            self._mem, self._lock, self._ensure_loaded, self.scope_for_path
+        )
 
     def _ensure_loaded(self) -> None:
         if not self._ready.is_set():
@@ -154,65 +156,116 @@ class ArtifactIndex:
             results = [v for v in collection.values() if predicate(v)]
         return sorted(results, key=lambda r: r.artifact_id)
 
-    def list_entities(self, *, artifact_type: str | None = None, domain: str | None = None,
-                      subdomain: str | None = None, status: str | None = None) -> list[EntityRecord]:
-        return self._list_sorted(self._mem.entities, lambda r: matches_entity(
-            r, artifact_type=artifact_type, domain=domain, subdomain=subdomain, status=status,
-        ))
+    def list_entities(
+        self,
+        *,
+        artifact_type: str | None = None,
+        domain: str | None = None,
+        subdomain: str | None = None,
+        status: str | None = None,
+    ) -> list[EntityRecord]:
+        return self._list_sorted(
+            self._mem.entities,
+            lambda r: matches_entity(
+                r,
+                artifact_type=artifact_type,
+                domain=domain,
+                subdomain=subdomain,
+                status=status,
+            ),
+        )
 
-    def list_connections(self, *, conn_type: str | None = None, source: str | None = None,
-                         target: str | None = None, status: str | None = None) -> list[ConnectionRecord]:
-        return self._list_sorted(self._mem.connections, lambda r: matches_connection(
-            r, conn_type=conn_type, source=source, target=target, status=status,
-        ))
+    def list_connections(
+        self,
+        *,
+        conn_type: str | None = None,
+        source: str | None = None,
+        target: str | None = None,
+        status: str | None = None,
+    ) -> list[ConnectionRecord]:
+        return self._list_sorted(
+            self._mem.connections,
+            lambda r: matches_connection(
+                r,
+                conn_type=conn_type,
+                source=source,
+                target=target,
+                status=status,
+            ),
+        )
 
-    def list_diagrams(self, *, diagram_type: str | None = None,
-                      status: str | None = None) -> list[DiagramRecord]:
-        return self._list_sorted(self._mem.diagrams, lambda r: matches_diagram(
-            r, diagram_type=diagram_type, status=status,
-        ))
+    def list_diagrams(
+        self, *, diagram_type: str | None = None, status: str | None = None
+    ) -> list[DiagramRecord]:
+        return self._list_sorted(
+            self._mem.diagrams,
+            lambda r: matches_diagram(
+                r,
+                diagram_type=diagram_type,
+                status=status,
+            ),
+        )
 
-    def list_documents(self, *, doc_type: str | None = None,
-                       status: str | None = None) -> list[DocumentRecord]:
-        return self._list_sorted(self._mem.documents, lambda r: (
-            (doc_type is None or r.doc_type == doc_type)
-            and (status is None or r.status == status)
-        ))
+    def list_documents(
+        self, *, doc_type: str | None = None, status: str | None = None
+    ) -> list[DocumentRecord]:
+        return self._list_sorted(
+            self._mem.documents,
+            lambda r: (
+                (doc_type is None or r.doc_type == doc_type)
+                and (status is None or r.status == status)
+            ),
+        )
 
-    def list_artifacts(self, *, artifact_type: str | list[str] | None = None,
-                       domain: str | list[str] | None = None, status: str | list[str] | None = None,
-                       include_connections: bool = False, include_diagrams: bool = False,
-                       include_documents: bool = False) -> list[ArtifactSummary]:
+    def list_artifacts(
+        self,
+        *,
+        artifact_type: str | list[str] | None = None,
+        domain: str | list[str] | None = None,
+        status: str | list[str] | None = None,
+        include_connections: bool = False,
+        include_diagrams: bool = False,
+        include_documents: bool = False,
+    ) -> list[ArtifactSummary]:
         self._ensure_loaded()
         types = to_set(artifact_type)
         domains = {d.lower() for d in to_set(domain)}
         statuses = to_set(status)
         with self._lock:
             out: list[ArtifactSummary] = [
-                summary_from_entity(r) for r in self._mem.entities.values()
+                summary_from_entity(r)
+                for r in self._mem.entities.values()
                 if matches_entity_sets(r, types, domains, statuses)
             ]
             if include_connections:
                 out.extend(
-                    summary_from_connection(r) for r in self._mem.connections.values()
+                    summary_from_connection(r)
+                    for r in self._mem.connections.values()
                     if matches_connection_sets(r, statuses)
                 )
             if include_diagrams:
                 out.extend(
-                    summary_from_diagram(r) for r in self._mem.diagrams.values()
+                    summary_from_diagram(r)
+                    for r in self._mem.diagrams.values()
                     if matches_diagram_sets(r, types, statuses)
                 )
             if include_documents:
                 out.extend(
-                    summary_from_document(r) for r in self._mem.documents.values()
+                    summary_from_document(r)
+                    for r in self._mem.documents.values()
                     if (not statuses or r.status in statuses)
                 )
         return sorted(out, key=lambda s: s.artifact_id)
 
     # ── Richer reads ──────────────────────────────────────────────────────────
 
-    def read_artifact(self, artifact_id: str, *, mode: Literal["summary", "full"] = "summary",
-                      section: str | None = None) -> dict[str, object] | None:
+    def read_artifact(
+        self,
+        artifact_id: str,
+        *,
+        mode: Literal["summary", "full"] = "summary",
+        section: str | None = None,
+    ) -> dict[str, object] | None:
         self._ensure_loaded()
         with self._lock:
             ent = self._mem.entities.get(artifact_id)
@@ -253,12 +306,20 @@ class ArtifactIndex:
             if entity is None:
                 return None
             entity_data: dict[str, object] = {
-                "artifact_id": entity.artifact_id, "artifact_type": entity.artifact_type,
-                "name": entity.name, "version": entity.version, "status": entity.status,
-                "domain": entity.domain, "subdomain": entity.subdomain, "record_type": "entity",
-                "path": str(entity.path), "content_snippet": entity.content_text[:240],
-                "keywords": list(entity.keywords), "content_text": entity.content_text,
-                "display_blocks": entity.display_blocks, "extra": entity.extra,
+                "artifact_id": entity.artifact_id,
+                "artifact_type": entity.artifact_type,
+                "name": entity.name,
+                "version": entity.version,
+                "status": entity.status,
+                "domain": entity.domain,
+                "subdomain": entity.subdomain,
+                "record_type": "entity",
+                "path": str(entity.path),
+                "content_snippet": entity.content_text[:240],
+                "keywords": list(entity.keywords),
+                "content_text": entity.content_text,
+                "display_blocks": entity.display_blocks,
+                "extra": entity.extra,
             }
             return _q.entity_context(
                 self._db.conn, entity_id, entity_data, self._generation, self._etag
@@ -297,40 +358,66 @@ class ArtifactIndex:
         self._ensure_loaded()
         with self._lock:
             return [
-                r for cid in _q.connection_ids_by_types(self._db.conn, types)
+                r
+                for cid in _q.connection_ids_by_types(self._db.conn, types)
                 if (r := self._mem.connections.get(cid)) is not None
             ]
 
-    def find_connections_for(self, entity_id: str, *,
-                              direction: Literal["any", "outbound", "inbound"] = "any",
-                              conn_type: str | None = None) -> list[ConnectionRecord]:
+    def find_connections_for(
+        self,
+        entity_id: str,
+        *,
+        direction: Literal["any", "outbound", "inbound"] = "any",
+        conn_type: str | None = None,
+    ) -> list[ConnectionRecord]:
         self._ensure_loaded()
         with self._lock:
             return [
-                r for cid in _q.connection_ids_for(
-                    self._db.conn, entity_id, direction=direction, conn_type=conn_type,
+                r
+                for cid in _q.connection_ids_for(
+                    self._db.conn,
+                    entity_id,
+                    direction=direction,
+                    conn_type=conn_type,
                 )
                 if (r := self._mem.connections.get(cid)) is not None
             ]
 
-    def find_neighbors(self, entity_id: str, *,
-                       max_hops: int = 1, conn_type: str | None = None) -> dict[str, set[str]]:
+    def find_neighbors(
+        self, entity_id: str, *, max_hops: int = 1, conn_type: str | None = None
+    ) -> dict[str, set[str]]:
         self._ensure_loaded()
         with self._lock:
             return _q.find_neighbors(
-                self._db.conn, entity_id, max_hops=max_hops, conn_type=conn_type,
+                self._db.conn,
+                entity_id,
+                max_hops=max_hops,
+                conn_type=conn_type,
             )
 
-    def search_fts(self, query: str, *, limit: int, include_connections: bool,
-                   include_diagrams: bool, include_documents: bool,
-                   prefer_record_type: str | None, strict_record_type: bool) -> list[tuple[str, str, float]]:
+    def search_fts(
+        self,
+        query: str,
+        *,
+        limit: int,
+        include_connections: bool,
+        include_diagrams: bool,
+        include_documents: bool,
+        prefer_record_type: str | None,
+        strict_record_type: bool,
+    ) -> list[tuple[str, str, float]]:
         self._ensure_loaded()
         with self._lock:
             return _q.search_fts(
-                self._db.conn, query, limit=limit,
-                include_connections=include_connections, include_diagrams=include_diagrams,
-                include_documents=include_documents, prefer_record_type=prefer_record_type,
-                strict_record_type=strict_record_type, fts_enabled=self._db.fts_enabled,
+                self._db.conn,
+                query,
+                limit=limit,
+                include_connections=include_connections,
+                include_diagrams=include_diagrams,
+                include_documents=include_documents,
+                prefer_record_type=prefer_record_type,
+                strict_record_type=strict_record_type,
+                fts_enabled=self._db.fts_enabled,
             )
 
     # ── Scope ─────────────────────────────────────────────────────────────────
@@ -349,24 +436,49 @@ class ArtifactIndex:
         rec = self.get_entity(artifact_id)
         return self.scope_for_path(rec.path) if rec is not None else "unknown"
 
-    def scope_of_connection(self, artifact_id: str) -> Literal["enterprise", "engagement", "unknown"]:
+    def scope_of_connection(
+        self, artifact_id: str
+    ) -> Literal["enterprise", "engagement", "unknown"]:
         rec = self.get_connection(artifact_id)
         return self.scope_for_path(rec.path) if rec is not None else "unknown"
 
     # ── Registry-style queries (delegated to _ScopeRegistry) ─────────────────
 
-    def entity_ids(self) -> set[str]: return self._registry.entity_ids()
-    def connection_ids(self) -> set[str]: return self._registry.connection_ids()
-    def enterprise_entity_ids(self) -> set[str]: return self._registry.enterprise_entity_ids()
-    def engagement_entity_ids(self) -> set[str]: return self._registry.engagement_entity_ids()
-    def enterprise_connection_ids(self) -> set[str]: return self._registry.enterprise_connection_ids()
-    def engagement_connection_ids(self) -> set[str]: return self._registry.engagement_connection_ids()
-    def enterprise_document_ids(self) -> set[str]: return self._registry.enterprise_document_ids()
-    def enterprise_diagram_ids(self) -> set[str]: return self._registry.enterprise_diagram_ids()
-    def entity_status(self, artifact_id: str) -> str | None: return self._registry.entity_status(artifact_id)
-    def entity_statuses(self) -> dict[str, str]: return self._registry.entity_statuses()
-    def connection_status(self, artifact_id: str) -> str | None: return self._registry.connection_status(artifact_id)
-    def find_file_by_id(self, artifact_id: str) -> Path | None: return self._registry.find_file_by_id(artifact_id)
+    def entity_ids(self) -> set[str]:
+        return self._registry.entity_ids()
+
+    def connection_ids(self) -> set[str]:
+        return self._registry.connection_ids()
+
+    def enterprise_entity_ids(self) -> set[str]:
+        return self._registry.enterprise_entity_ids()
+
+    def engagement_entity_ids(self) -> set[str]:
+        return self._registry.engagement_entity_ids()
+
+    def enterprise_connection_ids(self) -> set[str]:
+        return self._registry.enterprise_connection_ids()
+
+    def engagement_connection_ids(self) -> set[str]:
+        return self._registry.engagement_connection_ids()
+
+    def enterprise_document_ids(self) -> set[str]:
+        return self._registry.enterprise_document_ids()
+
+    def enterprise_diagram_ids(self) -> set[str]:
+        return self._registry.enterprise_diagram_ids()
+
+    def entity_status(self, artifact_id: str) -> str | None:
+        return self._registry.entity_status(artifact_id)
+
+    def entity_statuses(self) -> dict[str, str]:
+        return self._registry.entity_statuses()
+
+    def connection_status(self, artifact_id: str) -> str | None:
+        return self._registry.connection_status(artifact_id)
+
+    def find_file_by_id(self, artifact_id: str) -> Path | None:
+        return self._registry.find_file_by_id(artifact_id)
 
     # ── Internal helpers ──────────────────────────────────────────────────────
 

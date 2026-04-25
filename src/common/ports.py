@@ -30,7 +30,8 @@ class ArtifactStorePort(Protocol):
 
     # Filtered list queries (return sorted copies — callers never hold the live dict)
     def list_entities(
-        self, *,
+        self,
+        *,
         artifact_type: str | None = None,
         domain: str | None = None,
         subdomain: str | None = None,
@@ -38,7 +39,8 @@ class ArtifactStorePort(Protocol):
     ) -> list[EntityRecord]: ...
 
     def list_connections(
-        self, *,
+        self,
+        *,
         conn_type: str | None = None,
         source: str | None = None,
         target: str | None = None,
@@ -46,15 +48,22 @@ class ArtifactStorePort(Protocol):
     ) -> list[ConnectionRecord]: ...
 
     def list_diagrams(
-        self, *, diagram_type: str | None = None, status: str | None = None,
+        self,
+        *,
+        diagram_type: str | None = None,
+        status: str | None = None,
     ) -> list[DiagramRecord]: ...
 
     def list_documents(
-        self, *, doc_type: str | None = None, status: str | None = None,
+        self,
+        *,
+        doc_type: str | None = None,
+        status: str | None = None,
     ) -> list[DocumentRecord]: ...
 
     def list_artifacts(
-        self, *,
+        self,
+        *,
         artifact_type: str | list[str] | None = None,
         domain: str | list[str] | None = None,
         status: str | list[str] | None = None,
@@ -65,7 +74,9 @@ class ArtifactStorePort(Protocol):
 
     # Richer reads
     def read_artifact(
-        self, artifact_id: str, *,
+        self,
+        artifact_id: str,
+        *,
         mode: Literal["summary", "full"] = "summary",
         section: str | None = None,
     ) -> dict[str, object] | None: ...
@@ -79,17 +90,25 @@ class ArtifactStorePort(Protocol):
     def connection_counts_for(self, entity_id: str) -> tuple[int, int, int]: ...
     def list_connections_by_types(self, types: frozenset[str]) -> list[ConnectionRecord]: ...
     def find_connections_for(
-        self, entity_id: str, *,
+        self,
+        entity_id: str,
+        *,
         direction: Literal["any", "outbound", "inbound"] = "any",
         conn_type: str | None = None,
     ) -> list[ConnectionRecord]: ...
     def find_neighbors(
-        self, entity_id: str, *, max_hops: int = 1, conn_type: str | None = None,
+        self,
+        entity_id: str,
+        *,
+        max_hops: int = 1,
+        conn_type: str | None = None,
     ) -> dict[str, set[str]]: ...
 
     # FTS search
     def search_fts(
-        self, query: str, *,
+        self,
+        query: str,
+        *,
         limit: int,
         include_connections: bool,
         include_diagrams: bool,
@@ -100,8 +119,12 @@ class ArtifactStorePort(Protocol):
 
     # Scope
     def scope_for_path(self, path: Path) -> Literal["enterprise", "engagement", "unknown"]: ...
-    def scope_of_entity(self, artifact_id: str) -> Literal["enterprise", "engagement", "unknown"]: ...
-    def scope_of_connection(self, artifact_id: str) -> Literal["enterprise", "engagement", "unknown"]: ...
+    def scope_of_entity(
+        self, artifact_id: str
+    ) -> Literal["enterprise", "engagement", "unknown"]: ...
+    def scope_of_connection(
+        self, artifact_id: str
+    ) -> Literal["enterprise", "engagement", "unknown"]: ...
 
     # Registry-style queries
     def entity_ids(self) -> set[str]: ...
@@ -129,6 +152,7 @@ class ArtifactStorePort(Protocol):
 @dataclass(frozen=True)
 class ArtifactParsers:
     """Injectable parser callables — swap out for lightweight fakes in tests."""
+
     parse_entity: Callable[[Path, Path], EntityRecord | None]
     parse_outgoing: Callable[[Path], list[ConnectionRecord]]
     parse_diagram: Callable[[Path], DiagramRecord | None]
@@ -142,6 +166,7 @@ class ArtifactParsers:
             parse_entity,
             parse_outgoing_file,
         )
+
         return ArtifactParsers(
             parse_entity=parse_entity,
             parse_outgoing=parse_outgoing_file,

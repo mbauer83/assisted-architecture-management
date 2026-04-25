@@ -25,22 +25,30 @@ def search_fts(
         return []
     match_query = " OR ".join(f'"{token}"' for token in tokens)
     statements = [
-        "SELECT artifact_id, 'entity' AS record_type, 1.0 / (1.0 + bm25(entities_fts)) AS score FROM entities_fts WHERE entities_fts MATCH ?"
+        "SELECT artifact_id, 'entity' AS record_type, "
+        "1.0 / (1.0 + bm25(entities_fts)) AS score "
+        "FROM entities_fts WHERE entities_fts MATCH ?"
     ]
     params: list[str] = [match_query]
     if include_connections:
         statements.append(
-            "SELECT artifact_id, 'connection' AS record_type, 1.0 / (1.0 + bm25(connections_fts)) AS score FROM connections_fts WHERE connections_fts MATCH ?"
+            "SELECT artifact_id, 'connection' AS record_type, "
+            "1.0 / (1.0 + bm25(connections_fts)) AS score "
+            "FROM connections_fts WHERE connections_fts MATCH ?"
         )
         params.append(match_query)
     if include_diagrams:
         statements.append(
-            "SELECT artifact_id, 'diagram' AS record_type, 1.0 / (1.0 + bm25(diagrams_fts)) AS score FROM diagrams_fts WHERE diagrams_fts MATCH ?"
+            "SELECT artifact_id, 'diagram' AS record_type, "
+            "1.0 / (1.0 + bm25(diagrams_fts)) AS score "
+            "FROM diagrams_fts WHERE diagrams_fts MATCH ?"
         )
         params.append(match_query)
     if include_documents:
         statements.append(
-            "SELECT artifact_id, 'document' AS record_type, 1.0 / (1.0 + bm25(documents_fts)) AS score FROM documents_fts WHERE documents_fts MATCH ?"
+            "SELECT artifact_id, 'document' AS record_type, "
+            "1.0 / (1.0 + bm25(documents_fts)) AS score "
+            "FROM documents_fts WHERE documents_fts MATCH ?"
         )
         params.append(match_query)
     sql = "SELECT artifact_id, record_type, score FROM (" + " UNION ALL ".join(statements) + ")"
@@ -61,7 +69,10 @@ def all_connection_stats(conn: sqlite3.Connection) -> dict[str, tuple[int, int, 
     rows = conn.execute(
         "SELECT entity_id, conn_in, conn_sym, conn_out FROM entity_context_stats"
     ).fetchall()
-    return {str(r["entity_id"]): (int(r["conn_in"]), int(r["conn_sym"]), int(r["conn_out"])) for r in rows}
+    return {
+        str(r["entity_id"]): (int(r["conn_in"]), int(r["conn_sym"]), int(r["conn_out"]))
+        for r in rows
+    }
 
 
 def connection_stats_for(conn: sqlite3.Connection, entity_id: str) -> tuple[int, int, int]:
@@ -78,7 +89,10 @@ def connection_ids_by_types(conn: sqlite3.Connection, types: frozenset[str]) -> 
     if not types:
         return []
     placeholders = ",".join("?" * len(types))
-    sql = f"SELECT artifact_id FROM connections WHERE conn_type IN ({placeholders}) ORDER BY artifact_id"
+    sql = (
+        f"SELECT artifact_id FROM connections WHERE conn_type IN ({placeholders})"
+        " ORDER BY artifact_id"
+    )
     rows = conn.execute(sql, tuple(types)).fetchall()
     return [str(row["artifact_id"]) for row in rows]
 
@@ -126,13 +140,23 @@ def find_neighbors(
             UNION ALL
             SELECT
                 walk.depth + 1,
-                CASE WHEN connections.source = walk.entity_id THEN connections.target ELSE connections.source END,
-                walk.visited || CASE WHEN connections.source = walk.entity_id THEN connections.target ELSE connections.source END || ','
+                CASE WHEN connections.source = walk.entity_id
+                     THEN connections.target ELSE connections.source END,
+                walk.visited
+                    || CASE WHEN connections.source = walk.entity_id
+                            THEN connections.target ELSE connections.source END
+                    || ','
             FROM walk
-            JOIN connections ON (connections.source = walk.entity_id OR connections.target = walk.entity_id)
+            JOIN connections ON (
+                connections.source = walk.entity_id
+                OR connections.target = walk.entity_id
+            )
             WHERE walk.depth < ?
               AND (? IS NULL OR connections.conn_type = ?)
-              AND instr(walk.visited, ',' || CASE WHEN connections.source = walk.entity_id THEN connections.target ELSE connections.source END || ',') = 0
+              AND instr(walk.visited,
+                  ',' || CASE WHEN connections.source = walk.entity_id
+                              THEN connections.target ELSE connections.source END
+                  || ',') = 0
         )
         SELECT depth, entity_id FROM walk WHERE depth > 0
         """,
@@ -160,7 +184,11 @@ def entity_context(
         "conn_out": int(counts_row["conn_out"]) if counts_row is not None else 0,
         "conn_sym": int(counts_row["conn_sym"]) if counts_row is not None else 0,
     }
-    grouped: dict[str, list[EntityContextConnection]] = {"outbound": [], "inbound": [], "symmetric": []}
+    grouped: dict[str, list[EntityContextConnection]] = {
+        "outbound": [],
+        "inbound": [],
+        "symmetric": [],
+    }
     rows = conn.execute(
         """
         SELECT *

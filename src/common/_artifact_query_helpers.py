@@ -22,6 +22,7 @@ _NONE_LABEL = "(none)"
 # Scalar filters
 # ---------------------------------------------------------------------------
 
+
 def matches_entity(
     rec: EntityRecord,
     *,
@@ -55,9 +56,8 @@ def matches_connection(
 
 
 def matches_diagram(rec: DiagramRecord, *, diagram_type: str | None, status: str | None) -> bool:
-    return (
-        (diagram_type is None or rec.diagram_type == diagram_type)
-        and (status is None or rec.status == status)
+    return (diagram_type is None or rec.diagram_type == diagram_type) and (
+        status is None or rec.status == status
     )
 
 
@@ -65,7 +65,10 @@ def matches_diagram(rec: DiagramRecord, *, diagram_type: str | None, status: str
 # Set filters
 # ---------------------------------------------------------------------------
 
-def matches_entity_sets(rec: EntityRecord, types: set[str], domains: set[str], statuses: set[str]) -> bool:
+
+def matches_entity_sets(
+    rec: EntityRecord, types: set[str], domains: set[str], statuses: set[str]
+) -> bool:
     return (
         (not types or rec.artifact_type in types)
         and (not domains or rec.domain in domains)
@@ -84,6 +87,7 @@ def matches_diagram_sets(rec: DiagramRecord, types: set[str], statuses: set[str]
 # ---------------------------------------------------------------------------
 # Graph helpers
 # ---------------------------------------------------------------------------
+
 
 def next_frontier(
     frontier: set[str],
@@ -119,6 +123,7 @@ def matches_direction(
 # Utility
 # ---------------------------------------------------------------------------
 
+
 def to_set(value: str | list[str] | None) -> set[str]:
     if value is None:
         return set()
@@ -142,12 +147,18 @@ def summary_group_key(
 # Read serialisers
 # ---------------------------------------------------------------------------
 
+
 def read_entity(rec: EntityRecord, *, mode: Literal["summary", "full"]) -> dict[str, object]:
     data: dict[str, object] = {
-        "artifact_id": rec.artifact_id, "artifact_type": rec.artifact_type,
-        "name": rec.name, "version": rec.version, "status": rec.status,
-        "domain": rec.domain, "subdomain": rec.subdomain,
-        "record_type": "entity", "path": str(rec.path),
+        "artifact_id": rec.artifact_id,
+        "artifact_type": rec.artifact_type,
+        "name": rec.name,
+        "version": rec.version,
+        "status": rec.status,
+        "domain": rec.domain,
+        "subdomain": rec.subdomain,
+        "record_type": "entity",
+        "path": str(rec.path),
         "content_snippet": rec.content_text[:400] + ("…" if len(rec.content_text) > 400 else ""),
         "keywords": list(rec.keywords),
     }
@@ -158,11 +169,18 @@ def read_entity(rec: EntityRecord, *, mode: Literal["summary", "full"]) -> dict[
     return data
 
 
-def read_connection(rec: ConnectionRecord, *, mode: Literal["summary", "full"]) -> dict[str, object]:
+def read_connection(
+    rec: ConnectionRecord, *, mode: Literal["summary", "full"]
+) -> dict[str, object]:
     data: dict[str, object] = {
-        "artifact_id": rec.artifact_id, "source": rec.source, "target": rec.target,
-        "conn_type": rec.conn_type, "version": rec.version, "status": rec.status,
-        "record_type": "connection", "path": str(rec.path),
+        "artifact_id": rec.artifact_id,
+        "source": rec.source,
+        "target": rec.target,
+        "conn_type": rec.conn_type,
+        "version": rec.version,
+        "status": rec.status,
+        "record_type": "connection",
+        "path": str(rec.path),
         "content_snippet": rec.content_text[:400] + ("…" if len(rec.content_text) > 400 else ""),
     }
     if mode == "full":
@@ -173,10 +191,14 @@ def read_connection(rec: ConnectionRecord, *, mode: Literal["summary", "full"]) 
 
 def read_diagram(rec: DiagramRecord, *, mode: Literal["summary", "full"]) -> dict[str, object]:
     data: dict[str, object] = {
-        "artifact_id": rec.artifact_id, "artifact_type": rec.artifact_type,
-        "name": rec.name, "diagram_type": rec.diagram_type,
-        "version": rec.version, "status": rec.status,
-        "record_type": "diagram", "path": str(rec.path),
+        "artifact_id": rec.artifact_id,
+        "artifact_type": rec.artifact_type,
+        "name": rec.name,
+        "diagram_type": rec.diagram_type,
+        "version": rec.version,
+        "status": rec.status,
+        "record_type": "diagram",
+        "path": str(rec.path),
         "content_snippet": "",
     }
     if mode == "full":
@@ -195,10 +217,15 @@ def read_document(
     section: str | None = None,
 ) -> dict[str, object]:
     data: dict[str, object] = {
-        "artifact_id": rec.artifact_id, "artifact_type": "document",
-        "doc_type": rec.doc_type, "title": rec.title, "status": rec.status,
-        "record_type": "document", "path": str(rec.path),
-        "keywords": list(rec.keywords), "sections": list(rec.sections),
+        "artifact_id": rec.artifact_id,
+        "artifact_type": "document",
+        "doc_type": rec.doc_type,
+        "title": rec.title,
+        "status": rec.status,
+        "record_type": "document",
+        "path": str(rec.path),
+        "keywords": list(rec.keywords),
+        "sections": list(rec.sections),
         "content_snippet": rec.content_text[:400] + ("…" if len(rec.content_text) > 400 else ""),
     }
     if mode == "full":
@@ -212,6 +239,7 @@ def read_document(
 
 def _extract_section(content: str, section: str) -> str:
     import re
+
     pattern = re.compile(r"^##\s+" + re.escape(section) + r"\s*$", re.MULTILINE | re.IGNORECASE)
     m = pattern.search(content)
     if not m:

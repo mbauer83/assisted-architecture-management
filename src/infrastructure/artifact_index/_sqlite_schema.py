@@ -19,7 +19,8 @@ CREATE TABLE IF NOT EXISTS connections (
     source TEXT NOT NULL, target TEXT NOT NULL, conn_type TEXT NOT NULL,
     version TEXT NOT NULL, status TEXT NOT NULL, path TEXT NOT NULL,
     scope TEXT NOT NULL, extra_json TEXT NOT NULL, content_text TEXT NOT NULL,
-    associated_entities_json TEXT NOT NULL, src_cardinality TEXT NOT NULL, tgt_cardinality TEXT NOT NULL
+    associated_entities_json TEXT NOT NULL,
+    src_cardinality TEXT NOT NULL, tgt_cardinality TEXT NOT NULL
 );
 CREATE TABLE IF NOT EXISTS diagrams (
     artifact_id TEXT PRIMARY KEY,
@@ -43,12 +44,15 @@ CREATE TABLE IF NOT EXISTS entity_context_edges (
     source_domain TEXT NOT NULL, target_domain TEXT NOT NULL,
     source_scope TEXT NOT NULL, target_scope TEXT NOT NULL,
     path TEXT NOT NULL, content_text TEXT NOT NULL,
-    associated_entities_json TEXT NOT NULL, src_cardinality TEXT NOT NULL, tgt_cardinality TEXT NOT NULL,
+    associated_entities_json TEXT NOT NULL,
+    src_cardinality TEXT NOT NULL, tgt_cardinality TEXT NOT NULL,
     PRIMARY KEY (entity_id, connection_id, direction_bucket)
 );
 CREATE TABLE IF NOT EXISTS entity_context_stats (
     entity_id TEXT PRIMARY KEY,
-    conn_in INTEGER NOT NULL DEFAULT 0, conn_out INTEGER NOT NULL DEFAULT 0, conn_sym INTEGER NOT NULL DEFAULT 0
+    conn_in INTEGER NOT NULL DEFAULT 0,
+    conn_out INTEGER NOT NULL DEFAULT 0,
+    conn_sym INTEGER NOT NULL DEFAULT 0
 );
 
 CREATE INDEX IF NOT EXISTS idx_entities_type ON entities(artifact_type);
@@ -62,13 +66,15 @@ CREATE INDEX IF NOT EXISTS idx_diagrams_type ON diagrams(diagram_type);
 CREATE INDEX IF NOT EXISTS idx_diagrams_status ON diagrams(status);
 CREATE INDEX IF NOT EXISTS idx_documents_doc_type ON documents(doc_type);
 CREATE INDEX IF NOT EXISTS idx_documents_status ON documents(status);
-CREATE INDEX IF NOT EXISTS idx_entity_context_edges_entity ON entity_context_edges(entity_id, direction_bucket, connection_id);
+CREATE INDEX IF NOT EXISTS idx_entity_context_edges_entity
+    ON entity_context_edges(entity_id, direction_bucket, connection_id);
 CREATE INDEX IF NOT EXISTS idx_entity_context_edges_other ON entity_context_edges(other_entity_id);
 """
 
 FTS_SQL = """
 CREATE VIRTUAL TABLE IF NOT EXISTS entities_fts USING fts5(
-    artifact_id UNINDEXED, name, artifact_type, domain, subdomain, keywords, content_text, display_label
+    artifact_id UNINDEXED, name, artifact_type, domain,
+    subdomain, keywords, content_text, display_label
 );
 CREATE VIRTUAL TABLE IF NOT EXISTS connections_fts USING fts5(
     artifact_id UNINDEXED, source, target, conn_type, content_text

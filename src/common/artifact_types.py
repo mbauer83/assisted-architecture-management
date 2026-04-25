@@ -1,7 +1,7 @@
-
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Literal, Protocol, runtime_checkable
+
 from src.common.workspace_paths import infer_repo_scope
 
 Domain = Literal[
@@ -43,7 +43,9 @@ def infer_engagement_label(root: Path, *, scope: MountScope) -> str:
 def infer_mount(root: Path) -> RepoMount:
     resolved = root.resolve()
     scope: MountScope = "enterprise" if infer_repo_scope(resolved) == "enterprise" else "engagement"
-    return RepoMount(root=resolved, scope=scope, engagement_label=infer_engagement_label(resolved, scope=scope))
+    return RepoMount(
+        root=resolved, scope=scope, engagement_label=infer_engagement_label(resolved, scope=scope)
+    )
 
 
 @dataclass(frozen=True)
@@ -116,10 +118,7 @@ class DiagramRecord:
     extra: dict[str, object]
 
     def __str__(self) -> str:
-        return (
-            f"[{self.artifact_id}] {self.name}  "
-            f"({self.diagram_type} · status={self.status})"
-        )
+        return f"[{self.artifact_id}] {self.name}  ({self.diagram_type} · status={self.status})"
 
 
 @dataclass(frozen=True)
@@ -130,9 +129,9 @@ class DocumentRecord:
     status: str
     path: Path
     keywords: tuple[str, ...]
-    sections: tuple[str, ...]   # heading text of ## sections, in order
+    sections: tuple[str, ...]  # heading text of ## sections, in order
     content_text: str
-    extra: dict[str, object]    # frontmatter fields beyond standard ones
+    extra: dict[str, object]  # frontmatter fields beyond standard ones
 
 
 def summary_from_document(rec: DocumentRecord) -> "ArtifactSummary":
@@ -148,7 +147,16 @@ def summary_from_document(rec: DocumentRecord) -> "ArtifactSummary":
 
 
 STANDARD_DOCUMENT_FIELDS = frozenset(
-    {"artifact-id", "artifact-type", "doc-type", "title", "status", "version", "last-updated", "keywords"}
+    {
+        "artifact-id",
+        "artifact-type",
+        "doc-type",
+        "title",
+        "status",
+        "version",
+        "last-updated",
+        "keywords",
+    }
 )
 
 
@@ -233,8 +241,7 @@ def summary_from_diagram(rec: DiagramRecord) -> ArtifactSummary:
 
 @runtime_checkable
 class SemanticSearchProvider(Protocol):
-    def top_k(self, query: str, k: int, *, threshold: float = 0.75) -> list[tuple[float, str]]:
-        ...
+    def top_k(self, query: str, k: int, *, threshold: float = 0.75) -> list[tuple[float, str]]: ...
 
 
 STANDARD_ENTITY_FIELDS = frozenset(
