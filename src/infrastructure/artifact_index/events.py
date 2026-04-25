@@ -61,7 +61,7 @@ class IndexEventBus:
             with self._lock:
                 registered = self._subscribers.get(event_type, [])
                 if handler in registered:
-                    registered.remove(handler)
+                    registered.remove(handler)  # type: ignore[arg-type]
 
         return unsubscribe
 

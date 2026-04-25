@@ -15,16 +15,15 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Literal
 
-from src.common.artifact_query import ArtifactRepository
+from src.common.artifact_query import ArtifactRepository, shared_artifact_index
 from src.common.artifact_verifier import ArtifactRegistry, ArtifactVerifier
+from src.common.repo_paths import MODEL
+from src.common.workspace_paths import resolve_workspace_repo_roots
 from src.infrastructure.artifact_index.coordination import (
     publish_background_refresh_completed,
     wait_for_write_queue_drain,
 )
 from src.infrastructure.artifact_index.versioning import ReadModelVersion
-from src.common.repo_paths import MODEL
-from src.common.workspace_paths import resolve_workspace_repo_roots
-
 
 RepoPreset = Literal[
     "engagement",
@@ -148,13 +147,13 @@ def repo_cached(roots_key_str: str) -> ArtifactRepository:
     shared = _shared_state_repo_for_roots(roots)
     if shared is not None:
         return shared
-    return ArtifactRepository(roots)
+    return ArtifactRepository(shared_artifact_index(roots))
 
 
 @lru_cache(maxsize=8)
 def registry_cached(roots_key_str: str) -> ArtifactRegistry:
     roots = [Path(p) for p in roots_key_str.split("|") if p]
-    return ArtifactRegistry(roots)
+    return ArtifactRegistry(shared_artifact_index(roots))
 
 
 def verifier_for(roots_key_str: str, *, include_registry: bool) -> ArtifactVerifier:
@@ -244,7 +243,9 @@ def _refresh_worker(roots: list[Path], queue: _RefreshQueue) -> None:
         wait_for_write_queue_drain()
         if pending_full:
             version = _refresh_repo_now(roots)
-            publish_background_refresh_completed(roots, full_refresh=True, changed_paths=[], version=version)
+            publish_background_refresh_completed(
+                roots, full_refresh=True, changed_paths=[], version=version
+            )
             _regenerate_macros(roots)
             continue
         if pending_paths:
@@ -291,7 +292,9 @@ def sync_refresh_for_roots(root_or_roots: Path | list[Path]) -> None:
     wait_for_write_queue_drain()
     version = _refresh_repo_now(roots)
     _regenerate_macros(roots)
-    publish_background_refresh_completed(roots, full_refresh=True, changed_paths=[], version=version)
+    publish_background_refresh_completed(
+        roots, full_refresh=True, changed_paths=[], version=version
+    )
 
 
 def refresh_caches_for_repo(root_or_roots: Path | list[Path]) -> None:

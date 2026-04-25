@@ -1,7 +1,7 @@
-from .versioning import ReadModelVersion
-from .service import ArtifactIndex, shared_artifact_index
 from .bootstrap import notify_paths_changed
+from .service import ArtifactIndex, shared_artifact_index
 from .types import EntityContextConnection, EntityContextCounts, EntityContextReadModel
+from .versioning import ReadModelVersion
 
 __all__ = [
     "EntityContextConnection",

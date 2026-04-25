@@ -9,7 +9,7 @@ Updated for ArchiMate NEXT conventions:
 
 from pathlib import Path
 
-from src.common.artifact_query import ArtifactRepository
+from src.common.artifact_query import ArtifactRepository, shared_artifact_index
 from src.tools import mcp_artifact_server
 
 
@@ -76,7 +76,7 @@ title Event Activity Overview
 
 def test_model_repository_search_priority_and_counts(tmp_path: Path) -> None:
     repo_root = _build_repo(tmp_path / "repo")
-    repo = ArtifactRepository(repo_root)
+    repo = ArtifactRepository(shared_artifact_index(repo_root))
 
     strict = repo.search_artifacts(
         "event",

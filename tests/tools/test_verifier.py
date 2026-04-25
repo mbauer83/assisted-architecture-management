@@ -13,6 +13,7 @@ import pytest
 
 from src.common.artifact_verifier import ArtifactVerifier
 from src.common.artifact_verifier_registry import ArtifactRegistry
+from src.infrastructure.artifact_index import shared_artifact_index
 
 
 # ---------------------------------------------------------------------------
@@ -234,7 +235,7 @@ class TestVerifyOutgoingFile:
         self._setup_entities(repo, (src, "requirement"), (tgt, "requirement"))
         out_path = repo / "model" / "motivation" / "requirements" / f"{src}.outgoing.md"
         _write(out_path, _outgoing(src, [("archimate-association", tgt)]))
-        registry = ArtifactRegistry(repo)
+        registry = ArtifactRegistry(shared_artifact_index(repo))
         result = ArtifactVerifier(registry).verify_outgoing_file(out_path)
         assert result.valid, [i.message for i in result.issues]
 
@@ -244,7 +245,7 @@ class TestVerifyOutgoingFile:
         ghost_src = "REQ@9999999999.GhostX.ghost"
         out_path = repo / "model" / "motivation" / "requirements" / f"{ghost_src}.outgoing.md"
         _write(out_path, _outgoing(ghost_src, [("archimate-association", tgt)]))
-        registry = ArtifactRegistry(repo)
+        registry = ArtifactRegistry(shared_artifact_index(repo))
         result = ArtifactVerifier(registry).verify_outgoing_file(out_path)
         assert not result.valid
         assert any(i.code == "E120" for i in result.issues)
@@ -254,7 +255,7 @@ class TestVerifyOutgoingFile:
         self._setup_entities(repo, (src, "requirement"))
         out_path = repo / "model" / "motivation" / "requirements" / f"{src}.outgoing.md"
         _write(out_path, _outgoing(src, [("archimate-association", "REQ@9999999999.GhostX.ghost")]))
-        registry = ArtifactRegistry(repo)
+        registry = ArtifactRegistry(shared_artifact_index(repo))
         result = ArtifactVerifier(registry).verify_outgoing_file(out_path)
         assert not result.valid
         assert any(i.code == "E124" for i in result.issues)
@@ -265,7 +266,7 @@ class TestVerifyOutgoingFile:
         self._setup_entities(repo, (src, "requirement"), (tgt, "requirement"))
         out_path = repo / "model" / "motivation" / "requirements" / f"{src}.outgoing.md"
         _write(out_path, _outgoing(src, [("not-a-real-connection-type", tgt)]))
-        registry = ArtifactRegistry(repo)
+        registry = ArtifactRegistry(shared_artifact_index(repo))
         result = ArtifactVerifier(registry).verify_outgoing_file(out_path)
         assert not result.valid
         assert any(i.code == "E123" for i in result.issues)
@@ -277,7 +278,7 @@ class TestVerifyOutgoingFile:
         out_path = repo / "model" / "motivation" / "requirements" / f"{src}.outgoing.md"
         content = _outgoing(src, [("archimate-association", tgt)]).replace("<!-- §connections -->", "")
         _write(out_path, content)
-        registry = ArtifactRegistry(repo)
+        registry = ArtifactRegistry(shared_artifact_index(repo))
         result = ArtifactVerifier(registry).verify_outgoing_file(out_path)
         assert not result.valid
         assert any(i.code == "E121" for i in result.issues)
@@ -303,7 +304,7 @@ class TestVerifyOutgoingFile:
         # Enterprise outgoing targeting engagement entity → error
         out_path = ent_root / "model" / "motivation" / "requirements" / f"{ent_id}.outgoing.md"
         _write(out_path, _outgoing(ent_id, [("archimate-association", eng_id)]))
-        registry = ArtifactRegistry([eng_root, ent_root])
+        registry = ArtifactRegistry(shared_artifact_index([eng_root, ent_root]))
         result = ArtifactVerifier(registry).verify_outgoing_file(out_path)
         assert not result.valid
         assert any(i.code == "E130" for i in result.issues)
@@ -319,7 +320,7 @@ class TestVerifyDocumentFile:
         _write(target, _document(target_id, "Target body."))
         _write(source, _document(source_id, f"[Target](./{target_id}.md)"))
 
-        registry = ArtifactRegistry(repo)
+        registry = ArtifactRegistry(shared_artifact_index(repo))
         result = ArtifactVerifier(registry).verify_document_file(source)
 
         assert result.valid, [i.message for i in result.issues]
@@ -337,7 +338,7 @@ class TestVerifyDocumentFile:
             ),
         )
 
-        registry = ArtifactRegistry(repo)
+        registry = ArtifactRegistry(shared_artifact_index(repo))
         result = ArtifactVerifier(registry).verify_document_file(source)
 
         assert any(i.code == "W156" for i in result.issues)
@@ -364,7 +365,7 @@ class TestVerifyDocumentFile:
         doc_path = repo / "documents" / "adr" / f"{doc_id}.md"
         _write(doc_path, _document(doc_id, f"[Function](../../model/{info.domain_dir}/{info.subdir}/{entity_id}.md)"))
 
-        result = ArtifactVerifier(ArtifactRegistry(repo)).verify_document_file(doc_path)
+        result = ArtifactVerifier(ArtifactRegistry(shared_artifact_index(repo))).verify_document_file(doc_path)
 
         assert not any(i.code == "E155" for i in result.issues), [i.message for i in result.issues]
 
@@ -383,7 +384,7 @@ class TestVerifyDocumentFile:
         doc_path = repo / "documents" / "adr" / f"{doc_id}.md"
         _write(doc_path, _document(doc_id, "No entity links."))
 
-        result = ArtifactVerifier(ArtifactRegistry(repo)).verify_document_file(doc_path)
+        result = ArtifactVerifier(ArtifactRegistry(shared_artifact_index(repo))).verify_document_file(doc_path)
 
         e155_messages = [i.message for i in result.issues if i.code == "E155"]
         assert e155_messages == [
@@ -411,7 +412,7 @@ class TestVerifyDocumentFile:
         doc_path = repo / "documents" / "adr" / f"{doc_id}.md"
         _write(doc_path, _document(doc_id, f"[Requirement](../../model/{info.domain_dir}/{info.subdir}/{entity_id}.md#details)"))
 
-        result = ArtifactVerifier(ArtifactRegistry(repo)).verify_document_file(doc_path)
+        result = ArtifactVerifier(ArtifactRegistry(shared_artifact_index(repo))).verify_document_file(doc_path)
 
         assert not any(i.code == "E155" for i in result.issues), [i.message for i in result.issues]
 
@@ -427,7 +428,7 @@ class TestVerifyAll:
             repo / "model" / "motivation" / "requirements" / f"{eid}.md",
             _entity(eid),
         )
-        registry = ArtifactRegistry(repo)
+        registry = ArtifactRegistry(shared_artifact_index(repo))
         results = ArtifactVerifier(registry).verify_all(repo, include_diagrams=False)
         assert all(r.valid for r in results), [
             f"{r.path.name}: {[i.message for i in r.issues]}" for r in results if not r.valid
@@ -437,7 +438,7 @@ class TestVerifyAll:
         eid = "REQ@1000000000.AbcDef.bad"
         path = repo / "model" / "motivation" / "requirements" / f"{eid}.md"
         _write(path, _entity(eid, no_content_section=True))
-        registry = ArtifactRegistry(repo)
+        registry = ArtifactRegistry(shared_artifact_index(repo))
         results = ArtifactVerifier(registry).verify_all(repo, include_diagrams=False)
         assert any(not r.valid for r in results)
 
@@ -452,7 +453,7 @@ class TestVerifyAll:
         _write(eng_root / "model" / "motivation" / "requirements" / f"{eng_id}.md", _entity(eng_id))
         _write(ent_root / "model" / "motivation" / "requirements" / f"{ent_id}.md", _entity(ent_id))
 
-        registry = ArtifactRegistry([eng_root, ent_root])
+        registry = ArtifactRegistry(shared_artifact_index([eng_root, ent_root]))
         # verify_all for each root independently
         for root in (eng_root, ent_root):
             results = ArtifactVerifier(registry).verify_all(root, include_diagrams=False)

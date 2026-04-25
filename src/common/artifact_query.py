@@ -13,6 +13,7 @@ from src.common.artifact_types import (
     SearchResult,
     SemanticSearchProvider,
 )
+from src.infrastructure.artifact_index import shared_artifact_index
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -33,6 +34,7 @@ __all__ = [
     "SearchResult",
     "SemanticSearchProvider",
     "main",
+    "shared_artifact_index",
 ]
 
 

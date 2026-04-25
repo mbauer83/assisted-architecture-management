@@ -93,7 +93,7 @@ def fmt_diagram(rec: DiagramRecord) -> str:
 
 
 def main(argv: list[str] | None = None) -> int:
-    from src.common.artifact_query import ArtifactRepository
+    from src.common.artifact_query import ArtifactRepository, shared_artifact_index
 
     args = list(argv if argv is not None else sys.argv[1:])
     if not args or args[0] in ("-h", "--help"):
@@ -107,7 +107,7 @@ def main(argv: list[str] | None = None) -> int:
         print(f"Error: repository path does not exist: {repo}", file=sys.stderr)
         return 1
 
-    registry = ArtifactRepository(repo)
+    registry = ArtifactRepository(shared_artifact_index(repo))
     dispatch = {
         "stats": _cmd_stats,
         "entities": _cmd_entities,

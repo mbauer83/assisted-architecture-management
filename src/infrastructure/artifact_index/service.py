@@ -1,59 +1,59 @@
-"""Shared runtime SQLite-backed index for entities, connections, and diagrams."""
+"""SQLite-backed artifact index — in-memory read model with incremental update."""
 
 from __future__ import annotations
 
 import hashlib
-import sqlite3
 import threading
+from collections import Counter
 from pathlib import Path
-from typing import TypeVar
+from typing import Callable, Literal, TypeVar
 
-from .bootstrap import get_shared_index, normalize_mounts, service_key
-from src.common.artifact_parsing import parse_diagram, parse_document, parse_entity, parse_outgoing_file
-from src.common.repo_paths import DIAGRAM_CATALOG, DIAGRAMS, DOCS, MODEL, RENDERED
-from src.common.workspace_paths import infer_repo_scope
+from src.common._artifact_query_helpers import (
+    matches_connection,
+    matches_connection_sets,
+    matches_diagram,
+    matches_diagram_sets,
+    matches_entity,
+    matches_entity_sets,
+    read_connection,
+    read_diagram,
+    read_document,
+    read_entity,
+    to_set,
+)
 from src.common.artifact_types import (
+    ArtifactSummary,
     ConnectionRecord,
     DiagramRecord,
     DocumentRecord,
-    DuplicateArtifactIdError,
     EntityRecord,
     RepoMount,
+    summary_from_connection,
+    summary_from_diagram,
+    summary_from_document,
+    summary_from_entity,
 )
+from src.common.workspace_paths import infer_repo_scope
 
-_ArtifactRecord = TypeVar("_ArtifactRecord", EntityRecord, ConnectionRecord, DiagramRecord, DocumentRecord)
-
-from .context import (
-    apply_diagram_file_change,
-    apply_document_file_change,
-    apply_entity_file_change,
-    apply_outgoing_file_change,
-    read_entity_context,
-    rebuild_entity_context_for,
-    rebuild_entity_context_projection,
+from . import _sqlite_queries as _q
+from ._mem_store import _MemStore
+from ._scope_registry import _ScopeRegistry
+from ._service_incremental import (
+    apply_diagram_change,
+    apply_document_change,
+    apply_entity_change,
+    apply_outgoing_change,
+    is_diagram_source_path,
+    is_document_path,
+    scan_mount,
 )
-from .queries import (
-    find_connection_ids_by_types,
-    find_connection_ids_for,
-    find_neighbors,
-    get_all_connection_stats,
-    get_connection_stats_for,
-    search_artifacts,
-)
-from .schema import init_db
-from .storage import (
-    delete_connection_record,
-    delete_diagram_record,
-    delete_document_record,
-    delete_entity_record,
-    rebuild_sqlite,
-    upsert_diagram_record,
-    upsert_connection_record,
-    upsert_document_record,
-    upsert_entity_record,
-)
+from ._sqlite_store import _SqliteStore
+from .bootstrap import get_shared_index, normalize_mounts, service_key
 from .types import EntityContextReadModel
 from .versioning import ReadModelVersion, build_read_model_etag
+
+_T = TypeVar("_T", EntityRecord, ConnectionRecord, DiagramRecord, DocumentRecord)
+
 
 def shared_artifact_index(repo_root: Path | list[Path] | list[RepoMount]) -> "ArtifactIndex":
     return get_shared_index(ArtifactIndex, repo_root)
@@ -62,361 +62,314 @@ def shared_artifact_index(repo_root: Path | list[Path] | list[RepoMount]) -> "Ar
 class ArtifactIndex:
     def __init__(self, repo_root: Path | list[Path] | list[RepoMount]) -> None:
         mounts = normalize_mounts(repo_root)
-        self.repo_mounts = mounts
-        self.repo_roots = [m.root for m in mounts]
-        self.repo_root = mounts[0].root
+        self.repo_mounts: list[RepoMount] = mounts
+        self.repo_roots: list[Path] = [m.root for m in mounts]
+        self.repo_root: Path = mounts[0].root
         self._scope_key = service_key(mounts)
-        self._entities: dict[str, EntityRecord] = {}
-        self._connections: dict[str, ConnectionRecord] = {}
-        self._diagrams: dict[str, DiagramRecord] = {}
-        self._documents: dict[str, DocumentRecord] = {}
-        # Reverse indexes: resolved path → artifact_id (or set of ids for connections)
-        self._entity_by_path: dict[Path, str] = {}
-        self._connections_by_path: dict[Path, set[str]] = {}
-        self._diagram_by_path: dict[Path, str] = {}
-        self._document_by_path: dict[Path, str] = {}
-        self._loaded = False
-        self._generation = 0
-        self._etag = build_read_model_etag(self._scope_key, self._generation)
         self._lock = threading.RLock()
-        self._fts_enabled = True
+        self._ready = threading.Event()
+        self._generation = 0
+        self._etag = build_read_model_etag(self._scope_key, 0)
+        self._mem = _MemStore()
         name_hash = hashlib.blake2b(service_key(mounts).encode("utf-8"), digest_size=10).hexdigest()
-        self._conn = sqlite3.connect(
-            f"file:arch-artifact-index-{name_hash}?mode=memory&cache=shared",
-            uri=True,
-            check_same_thread=False,
-        )
-        self._conn.row_factory = sqlite3.Row
-        init_db(self)
+        self._db = _SqliteStore(name_hash, self._mem, self.scope_for_path)
+        self._registry = _ScopeRegistry(self._mem, self._lock, self._ensure_loaded, self.scope_for_path)
 
     def _ensure_loaded(self) -> None:
-        if self._loaded:
-            return
-        with self._lock:
-            if not self._loaded:
-                self.refresh()
+        if not self._ready.is_set():
+            with self._lock:
+                if not self._ready.is_set():
+                    self.refresh()
+                    self._ready.set()
 
     def refresh(self) -> None:
         with self._lock:
-            entities: dict[str, EntityRecord] = {}
-            connections: dict[str, ConnectionRecord] = {}
-            diagrams: dict[str, DiagramRecord] = {}
-            documents: dict[str, DocumentRecord] = {}
+            self._mem.clear()
             for mount in self.repo_mounts:
-                self._scan_mount(mount, entities, connections, diagrams, documents)
-            self._entities = entities
-            self._connections = connections
-            self._diagrams = diagrams
-            self._documents = documents
-            rebuild_sqlite(self)
-            self._generation += 1
-            self._etag = build_read_model_etag(self._scope_key, self._generation)
-            self._loaded = True
-
-    def _scan_mount(
-        self,
-        mount: RepoMount,
-        entities: dict[str, EntityRecord],
-        connections: dict[str, ConnectionRecord],
-        diagrams: dict[str, DiagramRecord],
-        documents: dict[str, DocumentRecord],
-    ) -> None:
-        model_root = mount.root / MODEL
-        if model_root.exists():
-            for path in sorted(model_root.rglob("*.md")):
-                if path.name.endswith(".outgoing.md"):
-                    continue
-                rec = parse_entity(path, model_root)
-                if rec is not None:
-                    self._insert_mounted(entities, rec.artifact_id, rec, "entity", mount.root)
-            for path in sorted(model_root.rglob("*.outgoing.md")):
-                for rec in parse_outgoing_file(path):
-                    self._insert_mounted(connections, rec.artifact_id, rec, "connection", mount.root)
-        diagrams_root = mount.root / DIAGRAM_CATALOG / DIAGRAMS
-        if diagrams_root.exists():
-            for suffix in ("*.puml", "*.md"):
-                for path in sorted(diagrams_root.rglob(suffix)):
-                    if path.parent.name != RENDERED:
-                        rec = parse_diagram(path)
-                        if rec is not None:
-                            self._insert_mounted(diagrams, rec.artifact_id, rec, "diagram", mount.root)
-        docs_root = mount.root / DOCS
-        if docs_root.exists():
-            for path in sorted(docs_root.rglob("*.md")):
-                rec = parse_document(path)
-                if rec is not None:
-                    self._insert_mounted(documents, rec.artifact_id, rec, "document", mount.root)
-
-    @staticmethod
-    def _insert_mounted(
-        store: dict[str, _ArtifactRecord],
-        artifact_id: str,
-        rec: _ArtifactRecord,
-        label: str,
-        mount_root: Path,
-    ) -> None:
-        existing = store.get(artifact_id)
-        if existing is None:
-            ArtifactIndex._insert_unique(store, artifact_id, rec, label)
-            return
-        try:
-            existing.path.resolve().relative_to(mount_root.resolve())
-        except ValueError:
-            return
-        raise DuplicateArtifactIdError(f"Duplicate {label} artifact-id '{artifact_id}' in {rec.path} and {existing.path}")
-
-    @staticmethod
-    def _insert_unique(store: dict[str, _ArtifactRecord], artifact_id: str, rec: _ArtifactRecord, label: str) -> None:
-        existing = store.get(artifact_id)
-        if existing is not None:
-            raise DuplicateArtifactIdError(f"Duplicate {label} artifact-id '{artifact_id}' in {rec.path} and {existing.path}")
-        store[artifact_id] = rec
-
-    @staticmethod
-    def _scope_for_root(root: Path) -> str:
-        return "enterprise" if infer_repo_scope(root) == "enterprise" else "engagement"
-
-    def scope_for_path(self, path: Path) -> str:
-        resolved = path.resolve()
-        for root in self.repo_roots:
-            try:
-                resolved.relative_to(root)
-            except ValueError:
-                continue
-            return self._scope_for_root(root)
-        return "unknown"
-
-    def _mount_for_path(self, path: Path) -> RepoMount | None:
-        resolved = path.resolve()
-        return next((mount for mount in self.repo_mounts if resolved.is_relative_to(mount.root)), None)
-
-    def _model_root_for_path(self, path: Path) -> Path | None:
-        mount = self._mount_for_path(path)
-        return None if mount is None else mount.root / MODEL
-
-    def _is_diagram_source_path(self, path: Path) -> bool:
-        mount = self._mount_for_path(path)
-        if mount is None:
-            return False
-        try:
-            rel = path.resolve().relative_to(mount.root.resolve()).as_posix()
-        except ValueError:
-            return False
-        return rel.startswith("diagram-catalog/diagrams/") and path.suffix in {".md", ".puml"}
-
-    def _is_document_path(self, path: Path) -> bool:
-        mount = self._mount_for_path(path)
-        if mount is None:
-            return False
-        try:
-            rel = path.resolve().relative_to(mount.root.resolve()).as_posix()
-        except ValueError:
-            return False
-        return rel.startswith(f"{DOCS}/") and path.suffix == ".md"
-
-    def _rebuild_entity_context_projection(self) -> None:
-        rebuild_entity_context_projection(self)
-
-    def _upsert_entity_record(self, rec: EntityRecord) -> None:
-        upsert_entity_record(self, rec)
-
-    def _delete_entity_record(self, artifact_id: str) -> None:
-        delete_entity_record(self, artifact_id)
-
-    def _upsert_connection_record(self, rec: ConnectionRecord) -> None:
-        upsert_connection_record(self, rec)
-
-    def _delete_connection_record(self, artifact_id: str) -> None:
-        delete_connection_record(self, artifact_id)
-
-    def _upsert_diagram_record(self, rec: DiagramRecord) -> None:
-        upsert_diagram_record(self, rec)
-
-    def _delete_diagram_record(self, artifact_id: str) -> None:
-        delete_diagram_record(self, artifact_id)
-
-    def _upsert_document_record(self, rec: DocumentRecord) -> None:
-        upsert_document_record(self, rec)
-
-    def _delete_document_record(self, artifact_id: str) -> None:
-        delete_document_record(self, artifact_id)
-
-    def _bump_generation(self) -> None:
-        self._generation += 1
-        self._etag = build_read_model_etag(self._scope_key, self._generation)
-        self._loaded = True
-
-    def generation(self) -> int:
-        self._ensure_loaded()
-        return self._generation
-
-    def read_model_version(self) -> ReadModelVersion:
-        self._ensure_loaded()
-        return ReadModelVersion(generation=self._generation, etag=self._etag)
-
-    def apply_entity_file_change(self, path: Path) -> None:
-        apply_entity_file_change(self, path)
-
-    def apply_outgoing_file_change(self, path: Path) -> None:
-        apply_outgoing_file_change(self, path)
-
-    def apply_diagram_file_change(self, path: Path) -> None:
-        apply_diagram_file_change(self, path)
-
-    def apply_document_file_change(self, path: Path) -> None:
-        apply_document_file_change(self, path)
+                scan_mount(mount, self._mem)
+            self._db.rebuild()
+            self._mem.rebuild_path_indexes()
+            self._bump_generation()
+            self._ready.set()
 
     def apply_file_changes(self, paths: list[Path]) -> ReadModelVersion:
         self._ensure_loaded()
-        normalized = sorted({path.resolve() for path in paths})
+        normalized = sorted({p.resolve() for p in paths})
         if not normalized:
             return self.read_model_version()
-        if any(path.is_dir() for path in normalized):
+        if any(p.is_dir() for p in normalized):
             self.refresh()
             return self.read_model_version()
         with self._lock:
             for path in normalized:
                 if path.name.endswith(".outgoing.md"):
-                    apply_outgoing_file_change(self, path, bump_generation=False)
-                elif self._is_diagram_source_path(path):
-                    apply_diagram_file_change(self, path, bump_generation=False)
-                elif self._is_document_path(path):
-                    apply_document_file_change(self, path, bump_generation=False)
+                    apply_outgoing_change(path, self._mem, self._db)
+                elif is_diagram_source_path(path, self.repo_mounts):
+                    apply_diagram_change(path, self._mem, self._db)
+                elif is_document_path(path, self.repo_mounts):
+                    apply_document_change(path, self._mem, self._db)
                 elif path.suffix == ".md":
-                    apply_entity_file_change(self, path, bump_generation=False)
+                    apply_entity_change(path, self._mem, self._db, self.repo_mounts)
                 else:
                     self.refresh()
                     return self.read_model_version()
             self._bump_generation()
         return self.read_model_version()
 
-    def rebuild_entity_context_for(self, entity_id: str) -> None:
-        rebuild_entity_context_for(self, entity_id)
-
-    def read_entity_context(self, entity_id: str) -> EntityContextReadModel | None:
-        return read_entity_context(self, entity_id)
-
-    def entity_records(self) -> dict[str, EntityRecord]:
+    def read_model_version(self) -> ReadModelVersion:
         self._ensure_loaded()
-        return self._entities
+        return ReadModelVersion(generation=self._generation, etag=self._etag)
 
-    def connection_records(self) -> dict[str, ConnectionRecord]:
+    def generation(self) -> int:
         self._ensure_loaded()
-        return self._connections
+        return self._generation
 
-    def diagram_records(self) -> dict[str, DiagramRecord]:
-        self._ensure_loaded()
-        return self._diagrams
-
-    def document_records(self) -> dict[str, DocumentRecord]:
-        self._ensure_loaded()
-        return self._documents
-
-    def get_document(self, artifact_id: str) -> DocumentRecord | None:
-        self._ensure_loaded()
-        return self._documents.get(artifact_id)
+    # ── Point lookups ─────────────────────────────────────────────────────────
 
     def get_entity(self, artifact_id: str) -> EntityRecord | None:
         self._ensure_loaded()
-        return self._entities.get(artifact_id)
+        with self._lock:
+            return self._mem.entities.get(artifact_id)
 
     def get_connection(self, artifact_id: str) -> ConnectionRecord | None:
         self._ensure_loaded()
-        return self._connections.get(artifact_id)
+        with self._lock:
+            return self._mem.connections.get(artifact_id)
 
     def get_diagram(self, artifact_id: str) -> DiagramRecord | None:
         self._ensure_loaded()
-        return self._diagrams.get(artifact_id)
+        with self._lock:
+            return self._mem.diagrams.get(artifact_id)
 
-    def find_file_by_id(self, artifact_id: str) -> Path | None:
-        rec = self.get_entity(artifact_id)
-        return rec.path if rec is not None else None
-
-    def entity_ids(self) -> set[str]:
+    def get_document(self, artifact_id: str) -> DocumentRecord | None:
         self._ensure_loaded()
-        return set(self._entities.keys())
+        with self._lock:
+            return self._mem.documents.get(artifact_id)
 
-    def connection_ids(self) -> set[str]:
+    # ── Filtered list queries ─────────────────────────────────────────────────
+
+    def _list_sorted(self, collection: dict[str, _T], predicate: Callable[[_T], bool]) -> list[_T]:
         self._ensure_loaded()
-        return set(self._connections.keys())
+        with self._lock:
+            results = [v for v in collection.values() if predicate(v)]
+        return sorted(results, key=lambda r: r.artifact_id)
 
-    def enterprise_entity_ids(self) -> set[str]:
+    def list_entities(self, *, artifact_type: str | None = None, domain: str | None = None,
+                      subdomain: str | None = None, status: str | None = None) -> list[EntityRecord]:
+        return self._list_sorted(self._mem.entities, lambda r: matches_entity(
+            r, artifact_type=artifact_type, domain=domain, subdomain=subdomain, status=status,
+        ))
+
+    def list_connections(self, *, conn_type: str | None = None, source: str | None = None,
+                         target: str | None = None, status: str | None = None) -> list[ConnectionRecord]:
+        return self._list_sorted(self._mem.connections, lambda r: matches_connection(
+            r, conn_type=conn_type, source=source, target=target, status=status,
+        ))
+
+    def list_diagrams(self, *, diagram_type: str | None = None,
+                      status: str | None = None) -> list[DiagramRecord]:
+        return self._list_sorted(self._mem.diagrams, lambda r: matches_diagram(
+            r, diagram_type=diagram_type, status=status,
+        ))
+
+    def list_documents(self, *, doc_type: str | None = None,
+                       status: str | None = None) -> list[DocumentRecord]:
+        return self._list_sorted(self._mem.documents, lambda r: (
+            (doc_type is None or r.doc_type == doc_type)
+            and (status is None or r.status == status)
+        ))
+
+    def list_artifacts(self, *, artifact_type: str | list[str] | None = None,
+                       domain: str | list[str] | None = None, status: str | list[str] | None = None,
+                       include_connections: bool = False, include_diagrams: bool = False,
+                       include_documents: bool = False) -> list[ArtifactSummary]:
         self._ensure_loaded()
-        return {aid for aid, rec in self._entities.items() if self.scope_for_path(rec.path) == "enterprise"}
+        types = to_set(artifact_type)
+        domains = {d.lower() for d in to_set(domain)}
+        statuses = to_set(status)
+        with self._lock:
+            out: list[ArtifactSummary] = [
+                summary_from_entity(r) for r in self._mem.entities.values()
+                if matches_entity_sets(r, types, domains, statuses)
+            ]
+            if include_connections:
+                out.extend(
+                    summary_from_connection(r) for r in self._mem.connections.values()
+                    if matches_connection_sets(r, statuses)
+                )
+            if include_diagrams:
+                out.extend(
+                    summary_from_diagram(r) for r in self._mem.diagrams.values()
+                    if matches_diagram_sets(r, types, statuses)
+                )
+            if include_documents:
+                out.extend(
+                    summary_from_document(r) for r in self._mem.documents.values()
+                    if (not statuses or r.status in statuses)
+                )
+        return sorted(out, key=lambda s: s.artifact_id)
 
-    def enterprise_document_ids(self) -> set[str]:
+    # ── Richer reads ──────────────────────────────────────────────────────────
+
+    def read_artifact(self, artifact_id: str, *, mode: Literal["summary", "full"] = "summary",
+                      section: str | None = None) -> dict[str, object] | None:
         self._ensure_loaded()
-        return {aid for aid, rec in self._documents.items() if self.scope_for_path(rec.path) == "enterprise"}
+        with self._lock:
+            ent = self._mem.entities.get(artifact_id)
+            if ent is not None:
+                return read_entity(ent, mode=mode)
+            conn = self._mem.connections.get(artifact_id)
+            if conn is not None:
+                return read_connection(conn, mode=mode)
+            diag = self._mem.diagrams.get(artifact_id)
+            if diag is not None:
+                return read_diagram(diag, mode=mode)
+            doc = self._mem.documents.get(artifact_id)
+            if doc is not None:
+                return read_document(doc, mode=mode, section=section)
+        return None
 
-    def enterprise_diagram_ids(self) -> set[str]:
+    def summarize_artifact(self, artifact_id: str) -> ArtifactSummary | None:
         self._ensure_loaded()
-        return {aid for aid, rec in self._diagrams.items() if self.scope_for_path(rec.path) == "enterprise"}
+        with self._lock:
+            ent = self._mem.entities.get(artifact_id)
+            if ent is not None:
+                return summary_from_entity(ent)
+            conn = self._mem.connections.get(artifact_id)
+            if conn is not None:
+                return summary_from_connection(conn)
+            diag = self._mem.diagrams.get(artifact_id)
+            if diag is not None:
+                return summary_from_diagram(diag)
+            doc = self._mem.documents.get(artifact_id)
+            if doc is not None:
+                return summary_from_document(doc)
+        return None
 
-    def engagement_entity_ids(self) -> set[str]:
+    def read_entity_context(self, entity_id: str) -> EntityContextReadModel | None:
         self._ensure_loaded()
-        return {aid for aid, rec in self._entities.items() if self.scope_for_path(rec.path) == "engagement"}
+        with self._lock:
+            entity = self._mem.entities.get(entity_id)
+            if entity is None:
+                return None
+            entity_data: dict[str, object] = {
+                "artifact_id": entity.artifact_id, "artifact_type": entity.artifact_type,
+                "name": entity.name, "version": entity.version, "status": entity.status,
+                "domain": entity.domain, "subdomain": entity.subdomain, "record_type": "entity",
+                "path": str(entity.path), "content_snippet": entity.content_text[:240],
+                "keywords": list(entity.keywords), "content_text": entity.content_text,
+                "display_blocks": entity.display_blocks, "extra": entity.extra,
+            }
+            return _q.entity_context(
+                self._db.conn, entity_id, entity_data, self._generation, self._etag
+            )
 
-    def enterprise_connection_ids(self) -> set[str]:
+    def stats(self) -> dict[str, object]:
         self._ensure_loaded()
-        return {aid for aid, rec in self._connections.items() if self.scope_for_path(rec.path) == "enterprise"}
+        with self._lock:
+            entities = list(self._mem.entities.values())
+            connections = list(self._mem.connections.values())
+            diagrams = list(self._mem.diagrams.values())
+            documents = list(self._mem.documents.values())
+        return {
+            "entities": len(entities),
+            "connections": len(connections),
+            "diagrams": len(diagrams),
+            "documents": len(documents),
+            "entities_by_domain": dict(Counter(e.domain for e in entities)),
+            "connections_by_type": dict(Counter(c.conn_type for c in connections)),
+            "documents_by_type": dict(Counter(d.doc_type for d in documents)),
+        }
 
-    def engagement_connection_ids(self) -> set[str]:
+    # ── Connection queries ────────────────────────────────────────────────────
+
+    def connection_counts(self) -> dict[str, tuple[int, int, int]]:
         self._ensure_loaded()
-        return {aid for aid, rec in self._connections.items() if self.scope_for_path(rec.path) == "engagement"}
+        with self._lock:
+            return _q.all_connection_stats(self._db.conn)
 
-    def scope_of_entity(self, artifact_id: str) -> str:
+    def connection_counts_for(self, entity_id: str) -> tuple[int, int, int]:
+        self._ensure_loaded()
+        with self._lock:
+            return _q.connection_stats_for(self._db.conn, entity_id)
+
+    def list_connections_by_types(self, types: frozenset[str]) -> list[ConnectionRecord]:
+        self._ensure_loaded()
+        with self._lock:
+            return [
+                r for cid in _q.connection_ids_by_types(self._db.conn, types)
+                if (r := self._mem.connections.get(cid)) is not None
+            ]
+
+    def find_connections_for(self, entity_id: str, *,
+                              direction: Literal["any", "outbound", "inbound"] = "any",
+                              conn_type: str | None = None) -> list[ConnectionRecord]:
+        self._ensure_loaded()
+        with self._lock:
+            return [
+                r for cid in _q.connection_ids_for(
+                    self._db.conn, entity_id, direction=direction, conn_type=conn_type,
+                )
+                if (r := self._mem.connections.get(cid)) is not None
+            ]
+
+    def find_neighbors(self, entity_id: str, *,
+                       max_hops: int = 1, conn_type: str | None = None) -> dict[str, set[str]]:
+        self._ensure_loaded()
+        with self._lock:
+            return _q.find_neighbors(
+                self._db.conn, entity_id, max_hops=max_hops, conn_type=conn_type,
+            )
+
+    def search_fts(self, query: str, *, limit: int, include_connections: bool,
+                   include_diagrams: bool, include_documents: bool,
+                   prefer_record_type: str | None, strict_record_type: bool) -> list[tuple[str, str, float]]:
+        self._ensure_loaded()
+        with self._lock:
+            return _q.search_fts(
+                self._db.conn, query, limit=limit,
+                include_connections=include_connections, include_diagrams=include_diagrams,
+                include_documents=include_documents, prefer_record_type=prefer_record_type,
+                strict_record_type=strict_record_type, fts_enabled=self._db.fts_enabled,
+            )
+
+    # ── Scope ─────────────────────────────────────────────────────────────────
+
+    def scope_for_path(self, path: Path) -> Literal["enterprise", "engagement", "unknown"]:
+        resolved = path.resolve()
+        for root in self.repo_roots:
+            try:
+                resolved.relative_to(root)
+                return "enterprise" if infer_repo_scope(root) == "enterprise" else "engagement"
+            except ValueError:
+                continue
+        return "unknown"
+
+    def scope_of_entity(self, artifact_id: str) -> Literal["enterprise", "engagement", "unknown"]:
         rec = self.get_entity(artifact_id)
         return self.scope_for_path(rec.path) if rec is not None else "unknown"
 
-    def scope_of_connection(self, artifact_id: str) -> str:
+    def scope_of_connection(self, artifact_id: str) -> Literal["enterprise", "engagement", "unknown"]:
         rec = self.get_connection(artifact_id)
         return self.scope_for_path(rec.path) if rec is not None else "unknown"
 
-    def entity_status(self, artifact_id: str) -> str | None:
-        rec = self.get_entity(artifact_id)
-        return rec.status if rec is not None else None
+    # ── Registry-style queries (delegated to _ScopeRegistry) ─────────────────
 
-    def entity_statuses(self) -> dict[str, str]:
-        self._ensure_loaded()
-        return {aid: rec.status for aid, rec in self._entities.items()}
+    def entity_ids(self) -> set[str]: return self._registry.entity_ids()
+    def connection_ids(self) -> set[str]: return self._registry.connection_ids()
+    def enterprise_entity_ids(self) -> set[str]: return self._registry.enterprise_entity_ids()
+    def engagement_entity_ids(self) -> set[str]: return self._registry.engagement_entity_ids()
+    def enterprise_connection_ids(self) -> set[str]: return self._registry.enterprise_connection_ids()
+    def engagement_connection_ids(self) -> set[str]: return self._registry.engagement_connection_ids()
+    def enterprise_document_ids(self) -> set[str]: return self._registry.enterprise_document_ids()
+    def enterprise_diagram_ids(self) -> set[str]: return self._registry.enterprise_diagram_ids()
+    def entity_status(self, artifact_id: str) -> str | None: return self._registry.entity_status(artifact_id)
+    def entity_statuses(self) -> dict[str, str]: return self._registry.entity_statuses()
+    def connection_status(self, artifact_id: str) -> str | None: return self._registry.connection_status(artifact_id)
+    def find_file_by_id(self, artifact_id: str) -> Path | None: return self._registry.find_file_by_id(artifact_id)
 
-    def connection_status(self, artifact_id: str) -> str | None:
-        rec = self.get_connection(artifact_id)
-        return rec.status if rec is not None else None
+    # ── Internal helpers ──────────────────────────────────────────────────────
 
-    def get_all_connection_stats(self) -> dict[str, tuple[int, int, int]]:
-        return get_all_connection_stats(self)
-
-    def get_connection_stats_for(self, entity_id: str) -> tuple[int, int, int]:
-        return get_connection_stats_for(self, entity_id)
-
-    def find_connection_ids_by_types(self, types: frozenset[str]) -> list[str]:
-        return find_connection_ids_by_types(self, types)
-
-    def find_connection_ids_for(self, entity_id: str, *, direction: str = "any", conn_type: str | None = None) -> list[str]:
-        return find_connection_ids_for(self, entity_id, direction=direction, conn_type=conn_type)
-
-    def search_artifacts(
-        self,
-        query: str,
-        *,
-        limit: int = 10,
-        include_connections: bool = True,
-        include_diagrams: bool = True,
-        include_documents: bool = True,
-        prefer_record_type: str | None = None,
-        strict_record_type: bool = False,
-    ) -> list[tuple[str, str, float]]:
-        return search_artifacts(
-            self,
-            query,
-            limit=limit,
-            include_connections=include_connections,
-            include_diagrams=include_diagrams,
-            include_documents=include_documents,
-            prefer_record_type=prefer_record_type,
-            strict_record_type=strict_record_type,
-        )
-
-    def find_neighbors(self, entity_id: str, *, max_hops: int = 1, conn_type: str | None = None) -> dict[str, set[str]]:
-        return find_neighbors(self, entity_id, max_hops=max_hops, conn_type=conn_type)
+    def _bump_generation(self) -> None:
+        self._generation += 1
+        self._etag = build_read_model_etag(self._scope_key, self._generation)

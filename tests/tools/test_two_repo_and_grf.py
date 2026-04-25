@@ -19,10 +19,11 @@ from pathlib import Path
 
 import pytest
 
-from src.common.artifact_query import ArtifactRepository
+from src.common.artifact_query import ArtifactRepository, shared_artifact_index
 from src.common.artifact_verifier import ArtifactVerifier
 from src.common.artifact_verifier_registry import ArtifactRegistry
 from src.tools import mcp_artifact_server as mcp_tools
+from src.infrastructure.artifact_index import shared_artifact_index
 
 
 # ---------------------------------------------------------------------------
@@ -163,7 +164,7 @@ class TestTwoRepoLoading:
             _entity_md("REQ@2000000000.GloAAA.global-req", "requirement", "Global Req"),
         )
 
-        repo = ArtifactRepository([engagement_root, enterprise_root])
+        repo = ArtifactRepository(shared_artifact_index([engagement_root, enterprise_root]))
         ids = {e.artifact_id for e in repo.list_entities()}
         assert "REQ@1000000000.EngAAA.eng-req" in ids
         assert "REQ@2000000000.GloAAA.global-req" in ids
@@ -182,7 +183,7 @@ class TestTwoRepoLoading:
         _write(eng_file, _entity_md("REQ@1000000000.EngAAA.eng-req", "requirement", "E"))
         _write(ent_file, _entity_md("REQ@2000000000.GloAAA.global-req", "requirement", "G"))
 
-        repo = ArtifactRepository([engagement_root, enterprise_root])
+        repo = ArtifactRepository(shared_artifact_index([engagement_root, enterprise_root]))
         eng_rec = repo.get_entity("REQ@1000000000.EngAAA.eng-req")
         ent_rec = repo.get_entity("REQ@2000000000.GloAAA.global-req")
         assert eng_rec is not None and ent_rec is not None
@@ -202,7 +203,7 @@ class TestTwoRepoLoading:
             / "REQ@2000000000.GloAAA.global-req.md",
             _entity_md("REQ@2000000000.GloAAA.global-req", "requirement", "G"),
         )
-        registry = ArtifactRegistry([engagement_root, enterprise_root])
+        registry = ArtifactRegistry(shared_artifact_index([engagement_root, enterprise_root]))
         assert registry.scope_of_entity("REQ@1000000000.EngAAA.eng-req") == "engagement"
         assert registry.scope_of_entity("REQ@2000000000.GloAAA.global-req") == "enterprise"
 
@@ -217,7 +218,7 @@ class TestGrfCreation:
     ) -> None:
         from src.tools.artifact_write.global_artifact_reference import ensure_global_artifact_reference
 
-        repo = ArtifactRepository(engagement_root)
+        repo = ArtifactRepository(shared_artifact_index(engagement_root))
         result = ensure_global_artifact_reference(
             engagement_repo=repo,
             engagement_root=engagement_root,
@@ -245,7 +246,7 @@ class TestGrfCreation:
             notify_paths_changed(path if isinstance(path, list) else [path])
 
         global_id = "REQ@2000000000.GloAAA.global-req"
-        repo = ArtifactRepository(engagement_root)
+        repo = ArtifactRepository(shared_artifact_index(engagement_root))
 
         r1 = ensure_global_artifact_reference(
             engagement_repo=repo,
@@ -259,7 +260,7 @@ class TestGrfCreation:
         )
         assert r1.wrote is True
 
-        repo2 = ArtifactRepository(engagement_root)
+        repo2 = ArtifactRepository(shared_artifact_index(engagement_root))
         r2 = ensure_global_artifact_reference(
             engagement_repo=repo2,
             engagement_root=engagement_root,
@@ -285,7 +286,7 @@ class TestGrfCreation:
                 "REQ@2000000000.GloAAA.global-req",
             ),
         )
-        repo = ArtifactRepository(engagement_root)
+        repo = ArtifactRepository(shared_artifact_index(engagement_root))
         gar_map = build_gar_map(repo)
         assert gar_map["GAR@1000000001.AbcDef.global-req"] == "REQ@2000000000.GloAAA.global-req"
 
@@ -308,7 +309,7 @@ class TestGrfVerifierRules:
         gar_path = engagement_root / "model" / "common" / "global-references" / f"{gar_id}.md"
         _write(gar_path, _grf_md(gar_id, "Global Req", global_id))
 
-        registry = ArtifactRegistry([engagement_root, enterprise_root])
+        registry = ArtifactRegistry(shared_artifact_index([engagement_root, enterprise_root]))
         verifier = ArtifactVerifier(registry)
         result = verifier.verify_entity_file(gar_path)
         errors = [i for i in result.issues if i.severity == "error"]
@@ -342,7 +343,7 @@ class TestGrfVerifierRules:
             / "REQ@2000000000.GloAAA.other.md",
             _entity_md("REQ@2000000000.GloAAA.other", "requirement", "Other"),
         )
-        registry = ArtifactRegistry([engagement_root, enterprise_root])
+        registry = ArtifactRegistry(shared_artifact_index([engagement_root, enterprise_root]))
         verifier = ArtifactVerifier(registry)
         result = verifier.verify_entity_file(gar_path)
         codes = {i.code for i in result.issues if i.severity == "error"}
@@ -576,8 +577,8 @@ class TestPromotionPlan:
             _outgoing_md(eng_id, [("archimate-realization", gar_id)]),
         )
 
-        registry = ArtifactRegistry([engagement_root, enterprise_root])
-        repo = ArtifactRepository([engagement_root, enterprise_root])
+        registry = ArtifactRegistry(shared_artifact_index([engagement_root, enterprise_root]))
+        repo = ArtifactRepository(shared_artifact_index([engagement_root, enterprise_root]))
         plan = plan_promotion(eng_id, registry, repo)
 
         assert eng_id in plan.entities_to_add
@@ -601,8 +602,8 @@ class TestPromotionPlan:
             _outgoing_md(eng_id1, [("archimate-aggregation", eng_id2)]),
         )
 
-        registry = ArtifactRegistry([engagement_root, enterprise_root])
-        repo = ArtifactRepository([engagement_root, enterprise_root])
+        registry = ArtifactRegistry(shared_artifact_index([engagement_root, enterprise_root]))
+        repo = ArtifactRepository(shared_artifact_index([engagement_root, enterprise_root]))
         plan = plan_promotion(
             eng_id1, registry, repo,
             entity_ids=[eng_id1, eng_id2],
@@ -620,7 +621,7 @@ class TestPromotionExecuteOutgoingRewrite:
     def test_grf_targets_rewritten_to_enterprise_ids(
         self, engagement_root: Path, enterprise_root: Path
     ) -> None:
-        from src.tools.artifact_write.promote_execute import make_target_resolver, _rewrite_outgoing
+        from src.tools.artifact_write._promote_file_ops import make_target_resolver, rewrite_outgoing as _rewrite_outgoing
         from src.tools.artifact_write.promote_to_enterprise import PromotionResult, PromotionPlan
 
         gar_id = "GAR@1000000002.GarCCC.gar-ref"
@@ -658,7 +659,7 @@ class TestPromotionExecuteOutgoingRewrite:
     def test_stranded_targets_dropped_with_warning(
         self, engagement_root: Path, enterprise_root: Path
     ) -> None:
-        from src.tools.artifact_write.promote_execute import make_target_resolver, _rewrite_outgoing
+        from src.tools.artifact_write._promote_file_ops import make_target_resolver, rewrite_outgoing as _rewrite_outgoing
         from src.tools.artifact_write.promote_to_enterprise import PromotionResult, PromotionPlan
 
         eng_id = "CAP@1000000001.EngBBB.my-cap"
@@ -722,8 +723,8 @@ class TestPromotionExecuteFullRoundTrip:
         from src.tools.artifact_write.promote_execute import execute_promotion
 
         eng_id, gar_id, glo_id = self._setup(engagement_root, enterprise_root)
-        registry = ArtifactRegistry([engagement_root, enterprise_root])
-        repo = ArtifactRepository([engagement_root, enterprise_root])
+        registry = ArtifactRegistry(shared_artifact_index([engagement_root, enterprise_root]))
+        repo = ArtifactRepository(shared_artifact_index([engagement_root, enterprise_root]))
         verifier = ArtifactVerifier(registry)
 
         plan = plan_promotion(eng_id, registry, repo)
@@ -740,8 +741,8 @@ class TestPromotionExecuteFullRoundTrip:
         from src.tools.artifact_write.promote_execute import execute_promotion
 
         eng_id, gar_id, glo_id = self._setup(engagement_root, enterprise_root)
-        registry = ArtifactRegistry([engagement_root, enterprise_root])
-        repo = ArtifactRepository([engagement_root, enterprise_root])
+        registry = ArtifactRegistry(shared_artifact_index([engagement_root, enterprise_root]))
+        repo = ArtifactRepository(shared_artifact_index([engagement_root, enterprise_root]))
         verifier = ArtifactVerifier(registry)
 
         plan = plan_promotion(eng_id, registry, repo)
@@ -767,8 +768,8 @@ class TestPromotionExecuteFullRoundTrip:
         orig_eng_file = (
             engagement_root / "model" / "strategy" / "capabilities" / f"{eng_id}.md"
         )
-        registry = ArtifactRegistry([engagement_root, enterprise_root])
-        repo = ArtifactRepository([engagement_root, enterprise_root])
+        registry = ArtifactRegistry(shared_artifact_index([engagement_root, enterprise_root]))
+        repo = ArtifactRepository(shared_artifact_index([engagement_root, enterprise_root]))
         verifier = ArtifactVerifier(registry)
 
         plan = plan_promotion(eng_id, registry, repo)
@@ -805,8 +806,8 @@ class TestPromotionExecuteFullRoundTrip:
             _outgoing_md(other_eng, [("archimate-influence", eng_id)]),
         )
 
-        registry = ArtifactRegistry([engagement_root, enterprise_root])
-        repo = ArtifactRepository([engagement_root, enterprise_root])
+        registry = ArtifactRegistry(shared_artifact_index([engagement_root, enterprise_root]))
+        repo = ArtifactRepository(shared_artifact_index([engagement_root, enterprise_root]))
         verifier = ArtifactVerifier(registry)
 
         plan = plan_promotion(eng_id, registry, repo)

@@ -23,7 +23,7 @@ import re
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from src.common.artifact_query import ArtifactRepository
+from src.common.artifact_query import ArtifactRepository, shared_artifact_index
 from src.common.artifact_verifier_registry import ArtifactRegistry
 from src.common.repo_paths import MODEL
 
@@ -96,7 +96,7 @@ def plan_cleanup(
     enterprise_entity_ids: set[str],
 ) -> CleanupReport:
     """Compute what a cleanup run would do — no files are modified."""
-    eng_repo = ArtifactRepository(engagement_root)
+    eng_repo = ArtifactRepository(shared_artifact_index(engagement_root))
     broken = find_broken_grfs(eng_repo, engagement_root, enterprise_entity_ids)
 
     report = CleanupReport(broken_grfs=[b[0] for b in broken])
@@ -128,7 +128,7 @@ def execute_cleanup(
     report = plan_cleanup(engagement_root, enterprise_entity_ids)
     report.executed = True
 
-    eng_repo = ArtifactRepository(engagement_root)
+    eng_repo = ArtifactRepository(shared_artifact_index(engagement_root))
     broken = find_broken_grfs(eng_repo, engagement_root, enterprise_entity_ids)
     model_root = engagement_root / MODEL
 
@@ -164,7 +164,7 @@ def cleanup_broken_refs(
     dry_run: bool = True,
 ) -> CleanupReport:
     """Top-level entry — plan or execute broken-GRF cleanup."""
-    ent_repo = ArtifactRepository(enterprise_root)
+    ent_repo = ArtifactRepository(shared_artifact_index(enterprise_root))
     enterprise_ids = {rec.artifact_id for rec in ent_repo.list_entities()}
     if dry_run:
         return plan_cleanup(engagement_root, enterprise_ids)

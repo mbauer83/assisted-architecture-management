@@ -15,6 +15,7 @@ from pathlib import Path
 import pytest
 
 from src.tools.artifact_write.boundary import assert_engagement_write_root, assert_enterprise_write_root
+from src.infrastructure.artifact_index import shared_artifact_index
 
 
 # ---------------------------------------------------------------------------
@@ -154,7 +155,7 @@ class TestBoundaryGuards:
         with pytest.raises(ValueError, match="enterprise"):
             add_connection(
                 repo_root=enterprise_root,
-                registry=ArtifactRegistry(enterprise_root),
+                registry=ArtifactRegistry(shared_artifact_index(enterprise_root)),
                 verifier=ArtifactVerifier(None),
                 clear_repo_caches=lambda _: None,
                 source_entity="X", connection_type="archimate-association",
@@ -205,7 +206,7 @@ class TestBoundaryGuards:
         with pytest.raises(ValueError, match="enterprise"):
             delete_entity(
                 repo_root=enterprise_root,
-                registry=ArtifactRegistry(enterprise_root),
+                registry=ArtifactRegistry(shared_artifact_index(enterprise_root)),
                 clear_repo_caches=lambda _: None,
                 artifact_id="REQ@2000000000.GloAAA.global-req",
                 dry_run=True,
@@ -225,7 +226,7 @@ class TestBoundaryGuards:
 
         result = admin_delete_entity(
             repo_root=enterprise_root,
-            registry=ArtifactRegistry(enterprise_root),
+            registry=ArtifactRegistry(shared_artifact_index(enterprise_root)),
             clear_repo_caches=lambda _: None,
             artifact_id=entity_id,
             dry_run=True,
