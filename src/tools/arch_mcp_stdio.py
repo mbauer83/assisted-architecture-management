@@ -13,7 +13,8 @@ from mcp.client.streamable_http import streamablehttp_client
 from mcp.server.stdio import stdio_server
 from mcp.shared.message import SessionMessage
 
-from src.tools.backend_runtime import backend_url, configured_backend_url, ensure_backend_running, resolve_backend_port
+from src.tools.backend_probe import backend_url, configured_backend_url, resolve_backend_port
+from src.tools.backend_control import ensure_backend_running
 
 
 logger = logging.getLogger(__name__)

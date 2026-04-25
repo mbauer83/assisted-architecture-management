@@ -11,7 +11,8 @@ from urllib.request import Request, urlopen
 
 from src.common.artifact_verifier import ArtifactRegistry
 from src.tools.artifact_write import delete_diagram, delete_entity
-from src.tools.backend_runtime import backend_url, read_backend_state, probe_backend
+from src.tools.backend_probe import backend_url, probe_backend
+from src.tools.backend_state import read_backend_state
 from src.tools.workspace_init import load_init_state
 
 

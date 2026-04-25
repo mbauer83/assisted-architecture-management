@@ -208,7 +208,9 @@ The GUI is built over the REST API, so anything a human can do in the browser ca
 ```bash
 # Python environment
 uv sync                        # core dependencies
+uv sync --dev                  # + pytest, ruff, zuban
 uv sync --extra gui            # + GUI server dependencies
+uv sync --dev --extra gui      # full local developer setup
 
 # Download and verify plantuml.jar from Maven Central
 get-plantuml                   # → tools/plantuml.jar (gitignored)
@@ -278,6 +280,19 @@ npm run dev
 # → open http://localhost:5173
 # API calls are proxied to arch-backend on :8000
 ```
+
+### 6. Quality Checks
+
+Run the Python lint and type checks from the workspace root:
+
+```bash
+uv run ruff check src tests gen_id.py
+uv run zuban check
+```
+
+`ruff` is configured for import sorting plus core error detection and ignores the
+model/content repositories and the Vue frontend tree. `zuban` runs in
+Mypy-compatible mode against `src/`, `tests/`, and `gen_id.py`.
 
 ## Running in Docker
 

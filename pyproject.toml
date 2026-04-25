@@ -18,6 +18,8 @@ dependencies = [
 dev = [
     "pytest>=8.3",
     "pytest-bdd>=7.3",
+    "ruff>=0.15.11",
+    "zuban>=0.7.0",
 ]
 gui = [
     "fastapi>=0.115.0",
@@ -40,8 +42,47 @@ build-backend = "hatchling.build"
 [tool.hatch.build.targets.wheel]
 packages = ["src"]
 
+[tool.ruff]
+target-version = "py313"
+line-length = 100
+extend-exclude = [
+    ".arch",
+    ".venv",
+    "engagements",
+    "enterprise-repository",
+    "tools/gui",
+]
+
+[tool.ruff.lint]
+select = [
+    "E",
+    "F",
+    "I",
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**/*.py" = [
+    "E402",
+]
+
+[tool.zuban]
+mode = "mypy"
+python_version = "3.13"
+files = [
+    "src",
+    "tests",
+    "gen_id.py",
+]
+exclude = "(^|/)(\\.arch|\\.venv|engagements|enterprise-repository|tools/gui)(/|$)"
+ignore_missing_imports = true
+check_untyped_defs = true
+warn_unused_ignores = true
+warn_unreachable = true
+
 [dependency-groups]
 dev = [
     "pytest>=8.3",
     "pytest-bdd>=7.3",
+    "ruff>=0.15.11",
+    "zuban>=0.7.0",
 ]
