@@ -3,10 +3,12 @@ import { inject, onMounted, watch, computed, ref } from 'vue'
 import { useRoute, RouterLink } from 'vue-router'
 import { Effect } from 'effect'
 import { modelServiceKey } from '../keys'
-import { useAsync } from '../composables/useAsync'
+import { useQuery } from '../composables/useQuery'
 import { useForceGraph, type GraphNode, type GraphEdge, type LayoutMode } from '../composables/useForceGraph'
 import ArchimateTypeGlyph from '../components/ArchimateTypeGlyph.vue'
-import type { EntityDetail, ConnectionList } from '../../domain'
+import type { EntityDetail, ConnectionList, NotFoundError } from '../../domain'
+import type { MarkdownError } from '../../application/MarkdownService'
+import type { RepoError } from '../../ports/ModelRepository'
 
 const svc = inject(modelServiceKey)!
 const route = useRoute()
@@ -16,7 +18,7 @@ const svgRef = ref<SVGSVGElement | null>(null)
 const svgWidth = ref(800)
 const svgHeight = ref(600)
 const selectedId = ref<string | null>(null)
-const selectedDetail = useAsync<EntityDetail>()
+const selectedDetail = useQuery<EntityDetail, RepoError | NotFoundError | MarkdownError>()
 
 const {
   nodes, edges, options, layoutMode,
@@ -434,10 +436,10 @@ const edgePath = (e: typeof edges.value[number]) => {
         Loading...
       </div>
       <div
-        v-else-if="selectedDetail.error.value"
+        v-else-if="selectedDetail.errorMessage.value"
         class="sidebar-error"
       >
-        {{ selectedDetail.error.value }}
+        {{ selectedDetail.errorMessage.value }}
       </div>
       <template v-else-if="sd">
         <div class="detail-field">

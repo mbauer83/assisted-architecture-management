@@ -1,10 +1,12 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
 import { inject } from 'vue'
-import { Effect } from 'effect'
+import { Effect, Exit } from 'effect'
 import { modelServiceKey } from '../keys'
-import type { SyncStatus, ArtifactChange, SyncSaveResult } from '../../domain'
-import { readErrorMessage } from '../lib/errors'
+import type { SyncStatus, SyncChangesResult } from '../../domain'
+import type { RepoError } from '../../ports/ModelRepository'
+import { useQuery } from '../composables/useQuery'
+import { useMutation } from '../composables/useMutation'
 
 type DialogMode =
   | 'engagement-save'
@@ -26,11 +28,12 @@ const svc = inject(modelServiceKey)!
 
 const commitMessage = ref('')
 const pushToRemote = ref(true)
-const busy = ref(false)
-const error = ref<string | null>(null)
-const result = ref<string | null>(null)
-const artifacts = ref<ArtifactChange[]>([])
-const loadingChanges = ref(false)
+
+const changesQuery = useQuery<SyncChangesResult, RepoError>()
+const saveMutation = useMutation<string, RepoError>()
+
+const artifacts = computed(() => changesQuery.data.value?.artifacts ?? [])
+const displayError = computed(() => changesQuery.errorMessage.value ?? saveMutation.errorMessage.value)
 
 const repoScope = computed((): 'engagement' | 'enterprise' =>
   props.mode.startsWith('enterprise') ? 'enterprise' : 'engagement',
@@ -38,13 +41,7 @@ const repoScope = computed((): 'engagement' | 'enterprise' =>
 
 onMounted(() => {
   if (props.mode === 'engagement-save' || props.mode === 'enterprise-save') {
-    loadingChanges.value = true
-    void Effect.runPromise(svc.getChanges(repoScope.value))
-      .then(r => { artifacts.value = [...r.artifacts] })
-      .catch((reason: unknown) => {
-        error.value = readErrorMessage(reason)
-      })
-      .finally(() => { loadingChanges.value = false })
+    changesQuery.run(svc.getChanges(repoScope.value))
   }
 })
 
@@ -62,7 +59,7 @@ const entStatus = computed(() => props.syncStatus?.enterprise ?? null)
 const branchName = computed(() => entStatus.value?.branch ?? null)
 
 const confirmLabel = computed(() => {
-  if (busy.value) {
+  if (saveMutation.running.value) {
     switch (props.mode) {
       case 'engagement-save': return 'Saving…'
       case 'enterprise-save': return 'Saving…'
@@ -84,60 +81,49 @@ const needsCommitMessage = computed(
 )
 
 const canSubmit = computed(() => {
-  if (busy.value) return false
-  if (result.value) return false
+  if (saveMutation.running.value) return false
+  if (saveMutation.result.value) return false
   if (needsCommitMessage.value && !commitMessage.value.trim()) return false
   return true
 })
 
+const buildSaveEffect = (): Effect.Effect<string, RepoError, never> => {
+  switch (props.mode) {
+    case 'engagement-save':
+      return Effect.map(
+        svc.saveEngagementChanges({ message: commitMessage.value.trim(), push: pushToRemote.value }),
+        (res) => res.commit
+          ? `Committed ${res.commit.slice(0, 8)}${res.pushed ? ' and pushed' : ''}`
+          : 'Saved (nothing to commit)',
+      )
+    case 'enterprise-save':
+      return Effect.map(
+        svc.saveEnterpriseChanges({ message: commitMessage.value.trim() }),
+        (res) => res.commit
+          ? `Committed ${res.commit.slice(0, 8)} on branch ${res.branch ?? branchName.value ?? 'unknown'}`
+          : 'Saved (nothing to commit)',
+      )
+    case 'enterprise-submit':
+      return Effect.map(
+        svc.submitEnterpriseChanges(),
+        (res) => res.already_submitted
+          ? `Already submitted on branch ${res.branch ?? branchName.value ?? 'unknown'}`
+          : `Branch ${res.branch ?? 'unknown'} ready — open a pull request to merge into the enterprise repository`,
+      )
+    case 'enterprise-withdraw':
+      return Effect.map(
+        svc.withdrawEnterpriseChanges(),
+        (res) => res.nothing_to_discard ? 'Nothing to discard'
+          : res.discarded_branch ? `Branch ${res.discarded_branch} discarded`
+          : 'Submission withdrawn',
+      )
+  }
+}
+
 const execute = async () => {
   if (!canSubmit.value) return
-  busy.value = true
-  error.value = null
-  try {
-    let res: SyncSaveResult
-    switch (props.mode) {
-      case 'engagement-save':
-        res = await Effect.runPromise(
-          svc.saveEngagementChanges({ message: commitMessage.value.trim(), push: pushToRemote.value }),
-        )
-        result.value = res.commit
-          ? `Committed ${res.commit.slice(0, 8)}${res.pushed ? ' and pushed' : ''}`
-          : 'Saved (nothing to commit)'
-        break
-      case 'enterprise-save':
-        res = await Effect.runPromise(
-          svc.saveEnterpriseChanges({ message: commitMessage.value.trim() }),
-        )
-        result.value = res.commit
-          ? `Committed ${res.commit.slice(0, 8)} on branch ${res.branch ?? branchName.value ?? 'unknown'}`
-          : 'Saved (nothing to commit)'
-        break
-      case 'enterprise-submit':
-        res = await Effect.runPromise(svc.submitEnterpriseChanges())
-        if (res.already_submitted) {
-          result.value = `Already submitted on branch ${res.branch ?? branchName.value ?? 'unknown'}`
-        } else {
-          result.value = `Branch ${res.branch ?? 'unknown'} ready — open a pull request to merge into the enterprise repository`
-        }
-        break
-      case 'enterprise-withdraw':
-        res = await Effect.runPromise(svc.withdrawEnterpriseChanges())
-        if (res.nothing_to_discard) {
-          result.value = 'Nothing to discard'
-        } else {
-          result.value = res.discarded_branch
-            ? `Branch ${res.discarded_branch} discarded`
-            : 'Submission withdrawn'
-        }
-        break
-    }
-    emit('done', result.value ?? '')
-  } catch (reason: unknown) {
-    error.value = readErrorMessage(reason)
-  } finally {
-    busy.value = false
-  }
+  const exit = await saveMutation.run(buildSaveEffect())
+  if (Exit.isSuccess(exit)) emit('done', exit.value)
 }
 </script>
 
@@ -165,11 +151,11 @@ const execute = async () => {
       <div class="dialog__body">
         <!-- Changes summary (save modes only) -->
         <div
-          v-if="!result && (mode === 'engagement-save' || mode === 'enterprise-save')"
+          v-if="!saveMutation.result.value && (mode === 'engagement-save' || mode === 'enterprise-save')"
           class="changes-panel"
         >
           <div
-            v-if="loadingChanges"
+            v-if="changesQuery.loading.value"
             class="changes-loading"
           >
             Loading changes…
@@ -213,11 +199,11 @@ const execute = async () => {
 
         <!-- Success state -->
         <div
-          v-if="result"
+          v-if="saveMutation.result.value"
           class="result-msg"
         >
           <div class="result-text">
-            {{ result }}
+            {{ saveMutation.result.value }}
           </div>
           <div
             v-if="mode === 'enterprise-submit'"
@@ -240,7 +226,7 @@ const execute = async () => {
               class="field__input"
               type="text"
               placeholder="Describe your changes…"
-              :disabled="busy"
+              :disabled="saveMutation.running.value"
               @keydown.enter.prevent="execute"
             >
           </div>
@@ -248,7 +234,7 @@ const execute = async () => {
             <input
               v-model="pushToRemote"
               type="checkbox"
-              :disabled="busy"
+              :disabled="saveMutation.running.value"
             >
             <span>Push to remote</span>
           </label>
@@ -271,7 +257,7 @@ const execute = async () => {
               class="field__input"
               type="text"
               placeholder="Describe your changes…"
-              :disabled="busy"
+              :disabled="saveMutation.running.value"
               @keydown.enter.prevent="execute"
             >
           </div>
@@ -303,23 +289,23 @@ const execute = async () => {
         </template>
 
         <div
-          v-if="error"
+          v-if="displayError"
           class="error-msg"
         >
-          {{ error }}
+          {{ displayError }}
         </div>
       </div>
 
       <div class="dialog__footer">
         <button
           class="btn btn--cancel"
-          :disabled="busy"
+          :disabled="saveMutation.running.value"
           @click="emit('close')"
         >
-          {{ result ? 'Close' : 'Cancel' }}
+          {{ saveMutation.result.value ? 'Close' : 'Cancel' }}
         </button>
         <button
-          v-if="!result"
+          v-if="!saveMutation.result.value"
           class="btn"
           :class="mode === 'enterprise-withdraw' ? 'btn--danger' : 'btn--primary'"
           :disabled="!canSubmit"

@@ -1,12 +1,15 @@
 <script setup lang="ts">
-import { inject, ref, computed, onMounted, onUnmounted } from 'vue'
-import { Effect } from 'effect'
+import { inject, ref, computed, watch, onMounted, onUnmounted } from 'vue'
+import { Effect, Exit } from 'effect'
 import { useRoute } from 'vue-router'
 import { modelServiceKey } from '../keys'
 import EntitySearchInput from '../components/EntitySearchInput.vue'
 import ArchimateTypeGlyph from '../components/ArchimateTypeGlyph.vue'
 import EntitySelectionList from '../components/EntitySelectionList.vue'
-import type { PromotionPlan, EntityDisplayInfo, EntityContextConnection } from '../../domain'
+import type { PromotionPlan, PromotionResult, EntityDisplayInfo, EntityContextConnection } from '../../domain'
+import type { RepoError } from '../../ports/ModelRepository'
+import { useQuery } from '../composables/useQuery'
+import { useMutation } from '../composables/useMutation'
 
 type ConflictStrategy = 'accept_engagement' | 'accept_enterprise' | 'merge'
 type Step = 'pick' | 'review' | 'execute' | 'done'
@@ -32,18 +35,26 @@ const searchResults = ref<EntityDisplayInfo[]>([])
 const showDropdown = ref(false)
 let searchTimer: ReturnType<typeof setTimeout> | null = null
 
-const plan = ref<PromotionPlan | null>(null)
-const planning = ref(false)
-const planError = ref<string | null>(null)
+const planQuery = useQuery<PromotionPlan, RepoError>()
+const executeMutation = useMutation<PromotionResult, RepoError>()
+
 const conflictStrategies = ref<Record<string, ConflictStrategy>>({})
 
-const executing = ref(false)
-const executeError = ref<string | null>(null)
-const executeResult = ref<{
-  copied_files: string[]
-  updated_files: string[]
-  verification_errors: string[]
-} | null>(null)
+watch(() => planQuery.data.value, (newPlan) => {
+  if (!newPlan) return
+  conflictStrategies.value = Object.fromEntries(
+    newPlan.conflicts.map((c) => [
+      c.engagement_id,
+      conflictStrategies.value[c.engagement_id] ?? 'accept_enterprise',
+    ]),
+  )
+})
+
+const executeError = computed(() => {
+  const r = executeMutation.result.value
+  if (r && !r.executed) return r.verification_errors.join('\n') || 'Execution failed'
+  return executeMutation.errorMessage.value
+})
 
 const selectionRows = computed(() =>
   includedEntities.value.map((entity) => ({
@@ -75,15 +86,9 @@ const relatedEntitiesById = computed<Record<string, EntityDisplayInfo[]>>(() => 
       const domain = ownerId === conn.source ? conn.target_domain : conn.source_domain
       const scope = ownerId === conn.source ? conn.target_scope : conn.source_scope
       related[ownerId].push({
-        artifact_id: otherId,
-        name,
-        artifact_type: artifactType,
-        domain,
-        subdomain: '',
-        status: scope,
-        display_alias: '',
-        element_type: artifactType,
-        element_label: name,
+        artifact_id: otherId, name, artifact_type: artifactType, domain,
+        subdomain: '', status: scope, display_alias: '',
+        element_type: artifactType, element_label: name,
       })
     }
   }
@@ -92,56 +97,45 @@ const relatedEntitiesById = computed<Record<string, EntityDisplayInfo[]>>(() => 
 })
 
 const unresolvedConflicts = computed(() =>
-  (plan.value?.conflicts ?? []).filter(c => !conflictStrategies.value[c.engagement_id])
+  (planQuery.data.value?.conflicts ?? []).filter(c => !conflictStrategies.value[c.engagement_id])
 )
 const totalToPromote = computed(() =>
-  (plan.value?.entities_to_add.length ?? 0) + (plan.value?.conflicts.length ?? 0)
+  (planQuery.data.value?.entities_to_add.length ?? 0) + (planQuery.data.value?.conflicts.length ?? 0)
 )
 const canExecute = computed(() =>
   includedEntities.value.length > 0 && unresolvedConflicts.value.length === 0
 )
 
 const refreshDiscovery = async () => {
-  const discovery = await Effect.runPromise(
+  const exit = await Effect.runPromiseExit(
     svc.discoverDiagramEntities({
       includedEntityIds: includedEntities.value.map((e) => e.artifact_id),
       query: searchQuery.value.trim() || undefined,
       maxHops: 1,
       limit: 20,
     }),
-  ).catch(() => null)
-  if (!discovery) return
-  allModelConns.value = new Map(discovery.candidate_connections.map((conn) => [conn.artifact_id, conn]))
-  searchResults.value = discovery.search_results.filter((item) => !includedEntityIds.value.has(item.artifact_id))
-  showDropdown.value = Boolean(searchQuery.value.trim() && searchResults.value.length)
+  )
+  Exit.match(exit, {
+    onSuccess: (discovery) => {
+      allModelConns.value = new Map(discovery.candidate_connections.map((conn) => [conn.artifact_id, conn]))
+      searchResults.value = discovery.search_results.filter((item) => !includedEntityIds.value.has(item.artifact_id))
+      showDropdown.value = Boolean(searchQuery.value.trim() && searchResults.value.length)
+    },
+    onFailure: () => { /* discovery errors are non-critical; state stays as-is */ },
+  })
 }
 
-const refreshPlan = async () => {
+const refreshPlan = () => {
   if (!includedEntities.value.length) {
-    plan.value = null
+    planQuery.reset()
     conflictStrategies.value = {}
     return
   }
-  planning.value = true
-  planError.value = null
-  const nextPlan = await Effect.runPromise(
-    svc.planPromotion({
-      entity_id: selectedEntityId.value || includedEntities.value[0]?.artifact_id,
-      entity_ids: includedEntities.value.map((e) => e.artifact_id),
-      connection_ids: [...includedConnIds.value],
-    }),
-  ).catch((e) => {
-    planError.value = String(e)
-    return null
-  })
-  planning.value = false
-  if (!nextPlan) return
-  plan.value = nextPlan
-  const nextStrategies: Record<string, ConflictStrategy> = {}
-  for (const conflict of nextPlan.conflicts) {
-    nextStrategies[conflict.engagement_id] = conflictStrategies.value[conflict.engagement_id] ?? 'accept_enterprise'
-  }
-  conflictStrategies.value = nextStrategies
+  planQuery.run(svc.planPromotion({
+    entity_id: selectedEntityId.value || includedEntities.value[0]?.artifact_id,
+    entity_ids: includedEntities.value.map((e) => e.artifact_id),
+    connection_ids: [...includedConnIds.value],
+  }))
 }
 
 const onSearchInput = () => {
@@ -153,9 +147,7 @@ const onSearchInput = () => {
     void refreshDiscovery()
     return
   }
-  searchTimer = setTimeout(() => {
-    void refreshDiscovery()
-  }, 280)
+  searchTimer = setTimeout(() => { void refreshDiscovery() }, 280)
 }
 
 const closeDropdown = () => { setTimeout(() => { showDropdown.value = false }, 150) }
@@ -175,28 +167,22 @@ const addEntity = async (entity: EntityDisplayInfo) => {
     }
   }
   includedConnIds.value = nextConnIds
-  await refreshPlan()
+  refreshPlan()
 }
 
 const removeEntity = async (artifactId: string) => {
   includedEntities.value = includedEntities.value.filter((e) => e.artifact_id !== artifactId)
-  const nextNewIds = new Set(newInclusionIds.value)
-  nextNewIds.delete(artifactId)
-  newInclusionIds.value = nextNewIds
-  const nextConnPanel = new Set(expandedConnectionEntityIds.value)
-  nextConnPanel.delete(artifactId)
-  expandedConnectionEntityIds.value = nextConnPanel
-  const nextRelatedPanel = new Set(expandedRelatedEntityIds.value)
-  nextRelatedPanel.delete(artifactId)
-  expandedRelatedEntityIds.value = nextRelatedPanel
-  const nextConnIds = new Set(includedConnIds.value)
-  for (const id of [...nextConnIds]) {
-    const conn = allModelConns.value.get(id)
-    if (conn && (conn.source === artifactId || conn.target === artifactId)) nextConnIds.delete(id)
-  }
-  includedConnIds.value = nextConnIds
+  newInclusionIds.value = new Set([...newInclusionIds.value].filter(id => id !== artifactId))
+  expandedConnectionEntityIds.value = new Set([...expandedConnectionEntityIds.value].filter(id => id !== artifactId))
+  expandedRelatedEntityIds.value = new Set([...expandedRelatedEntityIds.value].filter(id => id !== artifactId))
+  includedConnIds.value = new Set(
+    [...includedConnIds.value].filter((id) => {
+      const conn = allModelConns.value.get(id)
+      return !(conn && (conn.source === artifactId || conn.target === artifactId))
+    }),
+  )
   await refreshDiscovery()
-  await refreshPlan()
+  refreshPlan()
 }
 
 const toggleConnections = (entityId: string) => {
@@ -213,47 +199,46 @@ const toggleRelated = (entityId: string) => {
   expandedRelatedEntityIds.value = next
 }
 
-const toggleConnection = async (id: string) => {
+const toggleConnection = (id: string) => {
   const next = new Set(includedConnIds.value)
   if (next.has(id)) next.delete(id)
   else next.add(id)
   includedConnIds.value = next
-  await refreshPlan()
+  refreshPlan()
 }
 
 const loadSelectedEntity = async (id: string, fallbackName: string) => {
-  const entity = await Effect.runPromise(svc.getEntity(id)).catch(() => null)
-  if (!entity) return null
-  selectedEntityId.value = id
-  selectedEntityName.value = entity.name || fallbackName
-  return {
-    artifact_id: entity.artifact_id,
-    name: entity.name,
-    artifact_type: entity.artifact_type,
-    domain: entity.domain,
-    subdomain: entity.subdomain,
-    status: entity.status,
-    display_alias: '',
-    element_type: entity.artifact_type,
-    element_label: entity.name,
-  } as EntityDisplayInfo
+  const exit = await Effect.runPromiseExit(svc.getEntity(id))
+  return Exit.match(exit, {
+    onSuccess: (entity) => ({
+      artifact_id: entity.artifact_id, name: entity.name,
+      artifact_type: entity.artifact_type, domain: entity.domain,
+      subdomain: entity.subdomain, status: entity.status,
+      display_alias: '', element_type: entity.artifact_type, element_label: entity.name,
+    }),
+    onFailure: () => {
+      selectedEntityName.value = fallbackName
+      return null
+    },
+  })
 }
 
 const startPromotion = async () => {
   if (!selectedEntityId.value) return
   const rootEntity = await loadSelectedEntity(selectedEntityId.value, selectedEntityName.value)
   if (!rootEntity) {
-    planError.value = 'Could not load selected entity'
+    planQuery.reset()
     return
   }
+  selectedEntityName.value = rootEntity.name
   includedEntities.value = [rootEntity]
   newInclusionIds.value = new Set()
   includedConnIds.value = new Set()
   expandedConnectionEntityIds.value = new Set()
   expandedRelatedEntityIds.value = new Set()
-  executeError.value = null
+  executeMutation.reset()
   await refreshDiscovery()
-  await refreshPlan()
+  refreshPlan()
   step.value = 'review'
 }
 
@@ -264,38 +249,21 @@ const onEntityPicked = (id: string, name: string) => {
 
 const execute = () => {
   if (!canExecute.value) return
-  executing.value = true
-  executeError.value = null
   step.value = 'execute'
   const resolutions = Object.entries(conflictStrategies.value).map(([id, strategy]) => ({
-    engagement_id: id,
-    strategy,
+    engagement_id: id, strategy,
   }))
-  Effect.runPromise(
-    svc.executePromotion({
-      entity_id: selectedEntityId.value || includedEntities.value[0]?.artifact_id,
-      entity_ids: includedEntities.value.map((e) => e.artifact_id),
-      connection_ids: [...includedConnIds.value],
-      conflict_resolutions: resolutions,
-      dry_run: false,
-    }),
-  ).then(result => {
-    if (result.executed) {
-      executeResult.value = {
-        copied_files: [...result.copied_files],
-        updated_files: [...result.updated_files],
-        verification_errors: [...result.verification_errors],
-      }
-      step.value = 'done'
-    } else {
-      executeError.value = [...result.verification_errors].join('\n') || 'Execution failed'
-      step.value = 'review'
-    }
-  }).catch(e => {
-    executeError.value = String(e)
-    step.value = 'review'
-  }).finally(() => {
-    executing.value = false
+  void executeMutation.run(svc.executePromotion({
+    entity_id: selectedEntityId.value || includedEntities.value[0]?.artifact_id,
+    entity_ids: includedEntities.value.map((e) => e.artifact_id),
+    connection_ids: [...includedConnIds.value],
+    conflict_resolutions: resolutions,
+    dry_run: false,
+  })).then((exit) => {
+    Exit.match(exit, {
+      onSuccess: (r) => { step.value = r.executed ? 'done' : 'review' },
+      onFailure: () => { step.value = 'review' },
+    })
   })
 }
 
@@ -309,10 +277,8 @@ const restart = () => {
   includedConnIds.value = new Set()
   expandedConnectionEntityIds.value = new Set()
   expandedRelatedEntityIds.value = new Set()
-  plan.value = null
-  planError.value = null
-  executeResult.value = null
-  executeError.value = null
+  planQuery.reset()
+  executeMutation.reset()
   conflictStrategies.value = {}
 }
 
@@ -401,10 +367,10 @@ onUnmounted(() => {
         </button>
       </div>
       <p
-        v-if="planError"
+        v-if="planQuery.errorMessage.value"
         class="error-msg"
       >
-        {{ planError }}
+        {{ planQuery.errorMessage.value }}
       </p>
     </div>
 
@@ -489,10 +455,10 @@ onUnmounted(() => {
           <div class="step-actions">
             <button
               class="btn btn--primary"
-              :disabled="!canExecute || executing || planning"
+              :disabled="!canExecute || executeMutation.running.value || planQuery.loading.value"
               @click="execute"
             >
-              {{ executing ? 'Promoting…' : `Promote ${totalToPromote} ${totalToPromote === 1 ? 'entity' : 'entities'} →` }}
+              {{ executeMutation.running.value ? 'Promoting…' : `Promote ${totalToPromote} ${totalToPromote === 1 ? 'entity' : 'entities'} →` }}
             </button>
           </div>
         </div>
@@ -502,24 +468,24 @@ onUnmounted(() => {
             Plan Summary
           </h2>
           <div
-            v-if="planning"
+            v-if="planQuery.loading.value"
             class="state-msg"
           >
             Refreshing plan…
           </div>
           <p
-            v-if="planError"
+            v-if="planQuery.errorMessage.value"
             class="error-msg"
           >
-            {{ planError }}
+            {{ planQuery.errorMessage.value }}
           </p>
-          <template v-if="plan">
+          <template v-if="planQuery.data.value">
             <div
-              v-if="plan.warnings.length"
+              v-if="planQuery.data.value.warnings.length"
               class="warnings-box"
             >
               <div
-                v-for="w in plan.warnings"
+                v-for="w in planQuery.data.value.warnings"
                 :key="w"
                 class="warn-item"
               >
@@ -528,7 +494,7 @@ onUnmounted(() => {
             </div>
 
             <div
-              v-if="plan.already_in_enterprise.length"
+              v-if="planQuery.data.value.already_in_enterprise.length"
               class="section"
             >
               <h3 class="section-title">
@@ -536,7 +502,7 @@ onUnmounted(() => {
               </h3>
               <ul class="id-list id-list--muted">
                 <li
-                  v-for="id in plan.already_in_enterprise"
+                  v-for="id in planQuery.data.value.already_in_enterprise"
                   :key="id"
                   class="mono"
                 >
@@ -546,7 +512,7 @@ onUnmounted(() => {
             </div>
 
             <div
-              v-if="plan.entities_to_add.length"
+              v-if="planQuery.data.value.entities_to_add.length"
               class="section"
             >
               <h3 class="section-title">
@@ -554,7 +520,7 @@ onUnmounted(() => {
               </h3>
               <ul class="id-list">
                 <li
-                  v-for="id in plan.entities_to_add"
+                  v-for="id in planQuery.data.value.entities_to_add"
                   :key="id"
                   class="mono"
                 >
@@ -564,14 +530,14 @@ onUnmounted(() => {
             </div>
 
             <div
-              v-if="plan.conflicts.length"
+              v-if="planQuery.data.value.conflicts.length"
               class="section"
             >
               <h3 class="section-title section-title--warn">
                 Conflicts
               </h3>
               <div
-                v-for="c in plan.conflicts"
+                v-for="c in planQuery.data.value.conflicts"
                 :key="c.engagement_id"
                 class="conflict-card"
               >
@@ -602,7 +568,7 @@ onUnmounted(() => {
             </div>
 
             <div
-              v-if="plan.connection_ids.length"
+              v-if="planQuery.data.value.connection_ids.length"
               class="section"
             >
               <h3 class="section-title">
@@ -610,7 +576,7 @@ onUnmounted(() => {
               </h3>
               <ul class="id-list">
                 <li
-                  v-for="id in plan.connection_ids"
+                  v-for="id in planQuery.data.value.connection_ids"
                   :key="id"
                   class="mono"
                 >
@@ -632,14 +598,14 @@ onUnmounted(() => {
     </template>
 
     <div
-      v-if="step === 'done' && executeResult"
+      v-if="step === 'done' && executeMutation.result.value?.executed"
       class="card step-card step-card--success"
     >
       <h2 class="card-title card-title--success">
         Promotion complete
       </h2>
       <div
-        v-if="executeResult.copied_files.length"
+        v-if="executeMutation.result.value.copied_files.length"
         class="result-section"
       >
         <h3 class="section-title">
@@ -647,7 +613,7 @@ onUnmounted(() => {
         </h3>
         <ul class="id-list">
           <li
-            v-for="f in executeResult.copied_files"
+            v-for="f in executeMutation.result.value.copied_files"
             :key="f"
             class="mono"
           >
@@ -656,7 +622,7 @@ onUnmounted(() => {
         </ul>
       </div>
       <div
-        v-if="executeResult.updated_files.length"
+        v-if="executeMutation.result.value.updated_files.length"
         class="result-section"
       >
         <h3 class="section-title">
@@ -664,7 +630,7 @@ onUnmounted(() => {
         </h3>
         <ul class="id-list">
           <li
-            v-for="f in executeResult.updated_files"
+            v-for="f in executeMutation.result.value.updated_files"
             :key="f"
             class="mono"
           >

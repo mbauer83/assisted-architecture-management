@@ -2,9 +2,9 @@
 import { computed, inject, onMounted, ref, watch } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
 import type { EntityList } from '../../domain'
-import type { RepoScope } from '../../ports/ModelRepository'
+import type { RepoScope, RepoError } from '../../ports/ModelRepository'
 import { modelServiceKey } from '../keys'
-import { useAsync } from '../composables/useAsync'
+import { useQuery } from '../composables/useQuery'
 import EntitiesTreemap from '../components/EntitiesTreemap.vue'
 import ArchimateTypeGlyph from '../components/ArchimateTypeGlyph.vue'
 import {
@@ -22,7 +22,7 @@ type SortKey = 'type' | 'in' | 'sym' | 'out' | 'total'
 const svc = inject(modelServiceKey)!
 const route = useRoute()
 const router = useRouter()
-const entityListState = useAsync<EntityList>()
+const entityListState = useQuery<EntityList, RepoError>()
 
 const isGlobal = computed(() => props.scope === 'global')
 const basePath = computed(() => isGlobal.value ? '/global/entities' : '/entities')
@@ -221,10 +221,10 @@ const sortArrow = (key: SortKey) => sortKey.value === key ? (sortOrder.value ===
         Loading…
       </div>
       <div
-        v-else-if="entityListState.error.value"
+        v-else-if="entityListState.errorMessage.value"
         class="state-msg state-msg--error"
       >
-        {{ entityListState.error.value }}
+        {{ entityListState.errorMessage.value }}
       </div>
 
       <EntitiesTreemap

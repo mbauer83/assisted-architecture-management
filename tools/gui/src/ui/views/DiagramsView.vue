@@ -1,9 +1,9 @@
 <script setup lang="ts">
 import { computed, inject, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter, RouterLink } from 'vue-router'
-import type { RepoScope } from '../../ports/ModelRepository'
+import type { RepoScope, RepoError } from '../../ports/ModelRepository'
 import { modelServiceKey } from '../keys'
-import { useAsync } from '../composables/useAsync'
+import { useQuery } from '../composables/useQuery'
 import type { DiagramList } from '../../domain'
 import DownloadMenu from '../components/DownloadMenu.vue'
 
@@ -14,7 +14,7 @@ const isGlobal = computed(() => props.scope === 'global')
 const svc = inject(modelServiceKey)!
 const route = useRoute()
 const router = useRouter()
-const diagramsState = useAsync<DiagramList>()
+const diagramsState = useQuery<DiagramList, RepoError>()
 
 const DIAGRAM_TYPES = [
   { key: '', label: 'All' },
@@ -92,10 +92,10 @@ watch(() => route.query.type, (t) => {
         Loading...
       </div>
       <div
-        v-else-if="diagramsState.error.value"
+        v-else-if="diagramsState.errorMessage.value"
         class="state-msg state-msg--error"
       >
-        {{ diagramsState.error.value }}
+        {{ diagramsState.errorMessage.value }}
       </div>
 
       <template v-else-if="diagramsState.data.value">

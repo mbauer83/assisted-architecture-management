@@ -180,6 +180,9 @@
 !procedure $DECL_REQ_m117_R()
   rectangle "<$archimate_Requirement{scale=1.5}> Write Access Only via Tools" <<Requirement>> as REQ_m117_R
 !endprocedure
+!procedure $DECL_REQ_nnvsra()
+  rectangle "<$archimate_Requirement{scale=1.5}> Write composable, maintainable, intelligible code" <<Requirement>> as REQ_nnvsra
+!endprocedure
 !procedure $DECL_REQ_pSvaRl()
   rectangle "<$archimate_Requirement{scale=1.5}> Configurable Frontmatter Schemata" <<Requirement>> as REQ_pSvaRl
 !endprocedure

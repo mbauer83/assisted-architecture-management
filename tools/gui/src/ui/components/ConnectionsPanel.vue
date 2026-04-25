@@ -1,17 +1,21 @@
 <script setup lang="ts">
 import { computed, inject, onMounted, ref, watch } from 'vue'
 import { RouterLink } from 'vue-router'
-import { Effect } from 'effect'
+import { Effect, Exit } from 'effect'
 import { modelServiceKey } from '../keys'
 import type {
   ConnectionRecord,
   ConnectionList,
   DiagramRefs,
   OntologyClassification,
+  OntologyPair,
   WriteHelp,
+  WriteResult,
 } from '../../domain'
+import type { RepoError } from '../../ports/ModelRepository'
 import EntitySearchInput from './EntitySearchInput.vue'
-import { readErrorMessage } from '../lib/errors'
+import { useQuery } from '../composables/useQuery'
+import { useMutation } from '../composables/useMutation'
 
 const props = defineProps<{
   entityId: string
@@ -24,7 +28,6 @@ const props = defineProps<{
   adminMode?: boolean
 }>()
 
-// Helper to resolve entity name from id via loaded connections or prefix
 const friendlyName = (id: string) => {
   const parts = id.split('.')
   return parts.length > 2 ? parts.slice(2).join(' ').replace(/-/g, ' ') : id
@@ -38,53 +41,36 @@ const svc = inject(modelServiceKey)!
 
 // ── Ontology ──────────────────────────────────────────────────────────────────
 
-const ontology = ref<OntologyClassification | null>(null)
-const prefixToType = ref<Record<string, string>>({})
+const ontologyQuery = useQuery<OntologyClassification, RepoError>()
+const writeHelpQuery = useQuery<WriteHelp, RepoError>()
 
-const loadTypeCatalog = () => {
-  void Effect.runPromise(svc.getWriteHelp())
-    .then((help: WriteHelp) => {
-      const catalog = help.entity_type_catalog
-      if (!catalog) return
-      const next: Record<string, string> = {}
-      for (const [artifactType, info] of Object.entries(catalog)) {
-        if (info.prefix) {
-          next[info.prefix] = artifactType
-        }
-      }
-      prefixToType.value = next
-    })
-    .catch((error: unknown) => {
-      console.error('Failed to load write help', readErrorMessage(error))
-    })
-}
+const ontology = computed(() => ontologyQuery.data.value)
+
+const prefixToType = computed((): Record<string, string> => {
+  const catalog = writeHelpQuery.data.value?.entity_type_catalog
+  if (!catalog) return {}
+  return Object.fromEntries(
+    Object.entries(catalog)
+      .filter(([, info]) => info.prefix)
+      .map(([artifactType, info]) => [info.prefix, artifactType])
+  )
+})
 
 onMounted(() => {
-  loadTypeCatalog()
-  void Effect.runPromise(svc.getOntologyClassification(props.entityType))
-    .then((o) => { ontology.value = o })
-    .catch((error: unknown) => {
-      console.error('Failed to load ontology classification', readErrorMessage(error))
-    })
+  writeHelpQuery.run(svc.getWriteHelp())
+  ontologyQuery.run(svc.getOntologyClassification(props.entityType))
 })
 
 watch(() => props.entityType, () => {
-  ontology.value = null
-  void Effect.runPromise(svc.getOntologyClassification(props.entityType))
-    .then((o) => { ontology.value = o })
-    .catch((error: unknown) => {
-      console.error('Failed to refresh ontology classification', readErrorMessage(error))
-    })
+  ontologyQuery.run(svc.getOntologyClassification(props.entityType))
 })
 
-// Permissible target types for this direction from the ontology
 const permissibleTypes = computed((): string[] => {
   if (!ontology.value) return []
   const map = ontology.value[props.direction] as Record<string, string[]>
   return Object.keys(map).sort()
 })
 
-// Symmetric connection types derived from ontology
 const symmetricConnTypes = computed((): Set<string> => {
   if (!ontology.value) return new Set()
   const types = new Set<string>()
@@ -101,8 +87,6 @@ const artifactTypeFromId = (artifactId: string) => {
   return prefixToType.value[prefix] ?? prefix.toLowerCase()
 }
 
-// Group existing connections by the artifact_type-prefix of the connected entity,
-// filtering to only show connections matching this panel's direction.
 const otherArtifactId = (c: ConnectionRecord) => {
   if (props.direction === 'incoming') return c.source
   if (props.direction === 'symmetric') return c.source === props.entityId ? c.target : c.source
@@ -124,7 +108,6 @@ const grouped = computed(() => {
   return groups
 })
 
-// All section keys: union of ontology permissible types + types found in existing connections
 const sectionKeys = computed((): string[] => {
   const all = new Set([...permissibleTypes.value, ...Object.keys(grouped.value)])
   return Array.from(all).sort()
@@ -209,45 +192,55 @@ const removeAssociation = (c: ConnectionRecord, entityId: string) => {
 
 const addingFor = ref<string | null>(null)
 const selectedTarget = ref<{ id: string; name: string } | null>(null)
-const connTypeOptions = ref<string[]>([])
 const connTypeSelected = ref('')
 const descInput = ref('')
 const srcCardInput = ref('')
 const tgtCardInput = ref('')
-const addError = ref<string | null>(null)
-const addBusy = ref(false)
+
+const pairQuery = useQuery<OntologyPair, RepoError>()
+const addMutation = useMutation<WriteResult, RepoError>()
+
+const connTypeOptions = computed((): string[] => {
+  const pair = pairQuery.data.value
+  if (!pair) return []
+  return props.direction === 'symmetric'
+    ? pair.connection_types.filter(ct => symmetricConnTypes.value.has(ct))
+    : [...pair.connection_types]
+})
+
+watch(() => pairQuery.data.value, (pair) => {
+  if (!pair) return
+  const types = connTypeOptions.value
+  if (types.length === 1) connTypeSelected.value = types[0]
+  else if (props.direction === 'symmetric') connTypeSelected.value = 'archimate-association'
+})
+
+const addError = computed(() =>
+  addMutation.result.value?.wrote === false
+    ? (addMutation.result.value.content ?? 'Verification failed')
+    : addMutation.errorMessage.value
+)
 
 const startAdd = (typeKey: string) => {
   if (addingFor.value === typeKey) {
     addingFor.value = null
+    pairQuery.reset()
     return
   }
   addingFor.value = typeKey
   selectedTarget.value = null
-  connTypeOptions.value = []
   connTypeSelected.value = ''
   descInput.value = ''
   srcCardInput.value = ''
   tgtCardInput.value = ''
-  addError.value = null
-  // Fetch permissible connection types for this source→target pair
-  Effect.runPromise(svc.getOntologyPair(props.entityType, typeKey))
-    .then((pair) => {
-      const types = props.direction === 'symmetric'
-        ? pair.connection_types.filter(ct => symmetricConnTypes.value.has(ct))
-        : [...pair.connection_types]
-      connTypeOptions.value = types
-      if (types.length === 1) connTypeSelected.value = types[0]
-      else if (props.direction === 'symmetric') connTypeSelected.value = 'archimate-association'
-    })
-    .catch(() => {
-      connTypeOptions.value = []
-    })
+  addMutation.reset()
+  pairQuery.run(svc.getOntologyPair(props.entityType, typeKey))
 }
 
 const cancelAdd = () => {
   addingFor.value = null
   selectedTarget.value = null
+  pairQuery.reset()
 }
 
 const onSelectTarget = (id: string, name: string) => {
@@ -256,81 +249,64 @@ const onSelectTarget = (id: string, name: string) => {
 
 const confirmAdd = () => {
   if (!selectedTarget.value || !connTypeSelected.value) return
-  addBusy.value = true
-  addError.value = null
   const isIncoming = props.direction === 'incoming'
   const source = isIncoming ? selectedTarget.value.id : props.entityId
   const target = isIncoming ? props.entityId : selectedTarget.value.id
   const addFn = props.adminMode ? svc.adminAddConnection : svc.addConnection
-  Effect.runPromise(
-    addFn({
-      source_entity: source,
-      connection_type: connTypeSelected.value,
-      target_entity: target,
-      description: descInput.value.trim() || undefined,
-      src_cardinality: srcCardInput.value.trim() || undefined,
-      tgt_cardinality: tgtCardInput.value.trim() || undefined,
-      dry_run: false,
-    }),
-  ).then((r) => {
-    addBusy.value = false
-    if (r.wrote) {
-      addingFor.value = null
-      selectedTarget.value = null
-      emit('refresh')
-    } else {
-      addError.value = r.content ?? 'Verification failed'
-    }
-  }).catch((e) => {
-    addBusy.value = false
-    addError.value = String(e)
-  })
+  void addMutation.run(addFn({
+    source_entity: source,
+    connection_type: connTypeSelected.value,
+    target_entity: target,
+    description: descInput.value.trim() || undefined,
+    src_cardinality: srcCardInput.value.trim() || undefined,
+    tgt_cardinality: tgtCardInput.value.trim() || undefined,
+    dry_run: false,
+  })).then((exit) => Exit.match(exit, {
+    onSuccess: (r) => {
+      if (r.wrote) { addingFor.value = null; selectedTarget.value = null; emit('refresh') }
+    },
+    onFailure: () => {},
+  }))
 }
 
 // ── Remove connection ──────────────────────────────────────────────────────────
 
 const removingConn = ref<ConnectionRecord | null>(null)
-const diagramRefs = ref<DiagramRefs>([])
-const diagramRefsLoading = ref(false)
-const removeBusy = ref(false)
-const removeError = ref<string | null>(null)
+const diagramRefsQuery = useQuery<DiagramRefs, RepoError>()
+const removeMutation = useMutation<WriteResult, RepoError>()
+
+const removeError = computed(() =>
+  removeMutation.result.value?.wrote === false
+    ? (removeMutation.result.value.content ?? 'Verification failed')
+    : removeMutation.errorMessage.value
+)
 
 const startRemove = (c: ConnectionRecord) => {
   removingConn.value = c
-  removeError.value = null
-  diagramRefsLoading.value = true
-  Effect.runPromise(svc.getDiagramRefs(c.source, c.target)).then((refs) => {
-    diagramRefs.value = refs
-    diagramRefsLoading.value = false
-  }).catch(() => {
-    diagramRefs.value = []
-    diagramRefsLoading.value = false
-  })
+  removeMutation.reset()
+  diagramRefsQuery.run(svc.getDiagramRefs(c.source, c.target))
 }
 
-const cancelRemove = () => { removingConn.value = null }
+const cancelRemove = () => {
+  removingConn.value = null
+  diagramRefsQuery.reset()
+}
 
 const confirmRemove = () => {
   if (!removingConn.value) return
-  removeBusy.value = true
-  removeError.value = null
   const c = removingConn.value
   const removeFn = props.adminMode ? svc.adminRemoveConnection : svc.removeConnection
-  Effect.runPromise(
-    removeFn({
-      source_entity: c.source,
-      connection_type: c.conn_type,
-      target_entity: c.target,
-      dry_run: false,
-    }),
-  ).then((r) => {
-    removeBusy.value = false
-    if (r.wrote) { removingConn.value = null; emit('refresh') }
-    else { removeError.value = r.content ?? 'Verification failed' }
-  }).catch((e) => {
-    removeBusy.value = false
-    removeError.value = String(e)
-  })
+  void removeMutation.run(removeFn({
+    source_entity: c.source,
+    connection_type: c.conn_type,
+    target_entity: c.target,
+    dry_run: false,
+  })).then((exit) => Exit.match(exit, {
+    onSuccess: (r) => {
+      if (r.wrote) { removingConn.value = null; emit('refresh') }
+    },
+    onFailure: () => {},
+  }))
 }
 </script>
 
@@ -555,7 +531,7 @@ const confirmRemove = () => {
               </button>
               <button
                 class="add-confirm-btn"
-                :disabled="!selectedTarget || !connTypeSelected || addBusy"
+                :disabled="!selectedTarget || !connTypeSelected || addMutation.running.value"
                 @click="confirmAdd"
               >
                 Add
@@ -595,18 +571,18 @@ const confirmRemove = () => {
           {{ removingConn.source }} → {{ removingConn.target }}
         </p>
         <div
-          v-if="diagramRefsLoading"
+          v-if="diagramRefsQuery.loading.value"
           class="state-msg"
         >
           Checking diagram references...
         </div>
-        <template v-else-if="diagramRefs.length">
+        <template v-else-if="(diagramRefsQuery.data.value ?? []).length">
           <p class="modal-warn">
-            This connection is referenced in {{ diagramRefs.length }} diagram(s):
+            This connection is referenced in {{ (diagramRefsQuery.data.value ?? []).length }} diagram(s):
           </p>
           <ul class="diagram-ref-list">
             <li
-              v-for="d in diagramRefs"
+              v-for="d in (diagramRefsQuery.data.value ?? [])"
               :key="d.artifact_id"
             >
               {{ d.name }}
@@ -631,7 +607,7 @@ const confirmRemove = () => {
           </button>
           <button
             class="modal-btn modal-btn--danger"
-            :disabled="removeBusy || diagramRefsLoading"
+            :disabled="removeMutation.running.value || diagramRefsQuery.loading.value"
             @click="confirmRemove"
           >
             Remove

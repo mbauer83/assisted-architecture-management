@@ -1,23 +1,44 @@
 <script setup lang="ts">
 import { inject, ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { Effect } from 'effect'
+import { Effect, Exit } from 'effect'
 import DOMPurify from 'dompurify'
 import { modelServiceKey } from '../keys'
-import { useAsync } from '../composables/useAsync'
 import type {
-  DiagramDetail, EntitySummary, DiagramConnection,
-  EntityDisplayInfo, EntityContextConnection, DiagramPreviewResult,
+  DiagramContext, EntitySummary, DiagramConnection,
+  EntityDisplayInfo, EntityContextConnection, DiagramPreviewResult, WriteResult,
 } from '../../domain'
+import type { RepoError } from '../../ports/ModelRepository'
+import type { NotFoundError } from '../../domain'
 import ArchimateTypeGlyph from '../components/ArchimateTypeGlyph.vue'
 import EntitySelectionList from '../components/EntitySelectionList.vue'
+import { useQuery } from '../composables/useQuery'
+import { useMutation } from '../composables/useMutation'
 
 const svc = inject(modelServiceKey)!
 const route = useRoute()
 const router = useRouter()
 
 const diagramId = computed(() => (route.query.id as string | undefined) ?? '')
-const diagramDetail = useAsync<DiagramDetail>()
+
+const contextQuery = useQuery<DiagramContext, RepoError | NotFoundError>()
+const svgQuery = useQuery<string, RepoError>()
+const previewMutation = useMutation<DiagramPreviewResult, RepoError>()
+const saveMutation = useMutation<WriteResult, RepoError>()
+
+const diagramDetail = computed(() => contextQuery.data.value?.diagram ?? null)
+const svgHtml = computed(() =>
+  svgQuery.data.value
+    ? DOMPurify.sanitize(svgQuery.data.value, { USE_PROFILES: { svg: true, svgFilters: true } })
+    : null
+)
+const saveError = computed(() => {
+  const r = saveMutation.result.value
+  if (r && !r.wrote) return r.content ?? 'Verification failed'
+  return saveMutation.errorMessage.value
+})
+
+// ── Pan / Zoom ────────────────────────────────────────────────────────────────
 
 const containerRef = ref<HTMLElement | null>(null)
 const scale = ref(1); const tx = ref(0); const ty = ref(0)
@@ -60,12 +81,7 @@ watch(containerRef, (el, prev) => {
   el?.addEventListener('wheel', onWheel, { passive: false })
 })
 
-const svgHtml = ref<string | null>(null)
-const svgLoading = ref(false)
-const svgError = ref<string | null>(null)
-const svgContainer = ref<HTMLElement | null>(null)
-const svgEntityElems = new Map<string, Element>()
-const svgConnElems = new Map<string, Element>()
+// ── Diagram entity / connection state ─────────────────────────────────────────
 
 const diagramEntities = ref<EntitySummary[]>([])
 const diagramConnections = ref<DiagramConnection[]>([])
@@ -98,12 +114,10 @@ const effectiveEntitiesList = computed(() => [
 const selectionRows = computed(() =>
   effectiveEntitiesList.value.map((entity) => {
     const isNew = toAddEntityIds.value.has(entity.artifact_id)
-    const actionKind: 'remove' | 'mark-remove' = isNew ? 'remove' : 'mark-remove'
     return {
-      entity,
-      newInclusion: isNew,
+      entity, newInclusion: isNew,
       badgeText: isNew ? 'new' : undefined,
-      actionKind,
+      actionKind: isNew ? 'remove' as const : 'mark-remove' as const,
       actionTitle: isNew ? 'Remove entity from pending additions' : 'Mark entity for removal',
     }
   }),
@@ -129,10 +143,7 @@ const relatedEntitiesById = computed<Record<string, EntityDisplayInfo[]>>(() => 
   const seenByEntity = new Map<string, Set<string>>()
   for (const entity of effectiveEntitiesList.value) related[entity.artifact_id] = []
   for (const conn of allModelConns.value.values()) {
-    const endpoints: Array<[string, string]> = [
-      [conn.source, conn.target],
-      [conn.target, conn.source],
-    ]
+    const endpoints: Array<[string, string]> = [[conn.source, conn.target], [conn.target, conn.source]]
     for (const [ownerId, otherId] of endpoints) {
       if (!effectiveEntityIds.value.has(ownerId) || effectiveEntityIds.value.has(otherId)) continue
       if (toRemoveEntityIds.value.has(ownerId)) continue
@@ -145,15 +156,9 @@ const relatedEntitiesById = computed<Record<string, EntityDisplayInfo[]>>(() => 
       seen.add(otherId)
       seenByEntity.set(ownerId, seen)
       related[ownerId].push({
-        artifact_id: otherId,
-        name,
-        artifact_type: artifactType,
-        domain,
-        subdomain: '',
-        status: scope,
-        display_alias: '',
-        element_type: artifactType,
-        element_label: name,
+        artifact_id: otherId, name, artifact_type: artifactType, domain,
+        subdomain: '', status: scope, display_alias: '',
+        element_type: artifactType, element_label: name,
       })
     }
   }
@@ -161,20 +166,29 @@ const relatedEntitiesById = computed<Record<string, EntityDisplayInfo[]>>(() => 
   return related
 })
 
-const toggleConn = (connId: string) => {
-  if (isConnIncluded(connId)) {
-    if (includedConnIds.value.has(connId)) {
-      const next = new Set(toRemoveConnIds.value); next.add(connId); toRemoveConnIds.value = next
-    } else {
-      const next = new Set(selectedNewConnIds.value); next.delete(connId); selectedNewConnIds.value = next
-    }
-  } else {
-    if (includedConnIds.value.has(connId)) {
-      const next = new Set(toRemoveConnIds.value); next.delete(connId); toRemoveConnIds.value = next
-    } else {
-      const next = new Set(selectedNewConnIds.value); next.add(connId); selectedNewConnIds.value = next
-    }
+const svgEntityElems = new Map<string, Element>()
+const svgConnElems = new Map<string, Element>()
+const svgContainer = ref<HTMLElement | null>(null)
+
+const updateHighlights = () => {
+  for (const [id, el] of svgEntityElems) el.classList.toggle('svg-remove', toRemoveEntityIds.value.has(id))
+  for (const [id, el] of svgConnElems) {
+    const excl = !isConnIncluded(id) && includedConnIds.value.has(id)
+    el.classList.toggle('svg-remove', excl)
   }
+}
+
+const toggleConn = (connId: string) => {
+  const included = isConnIncluded(connId)
+  const inIncluded = includedConnIds.value.has(connId)
+  const removeItems = included
+    ? [...toRemoveConnIds.value, connId]
+    : [...toRemoveConnIds.value].filter(id => id !== connId)
+  toRemoveConnIds.value = inIncluded ? new Set(removeItems) : toRemoveConnIds.value
+  const newConnItems = included
+    ? [...selectedNewConnIds.value].filter(id => id !== connId)
+    : [...selectedNewConnIds.value, connId]
+  selectedNewConnIds.value = !inIncluded ? new Set(newConnItems) : selectedNewConnIds.value
   updateHighlights()
 }
 
@@ -192,39 +206,31 @@ const toggleRelated = (entityId: string) => {
   expandedRelatedEntityIds.value = next
 }
 
-const updateHighlights = () => {
-  for (const [id, el] of svgEntityElems) el.classList.toggle('svg-remove', toRemoveEntityIds.value.has(id))
-  for (const [id, el] of svgConnElems) {
-    const excl = !isConnIncluded(id) && includedConnIds.value.has(id)
-    el.classList.toggle('svg-remove', excl)
-  }
-}
-
 const toggleEntityRemoval = (id: string) => {
-  const nextE = new Set(toRemoveEntityIds.value)
-  if (nextE.has(id)) nextE.delete(id)
-  else nextE.add(id)
-  toRemoveEntityIds.value = nextE
-  const nextConn = new Set(expandedConnectionEntityIds.value); nextConn.delete(id); expandedConnectionEntityIds.value = nextConn
-  const nextRel = new Set(expandedRelatedEntityIds.value); nextRel.delete(id); expandedRelatedEntityIds.value = nextRel
+  toRemoveEntityIds.value = toRemoveEntityIds.value.has(id)
+    ? new Set([...toRemoveEntityIds.value].filter(x => x !== id))
+    : new Set([...toRemoveEntityIds.value, id])
+  expandedConnectionEntityIds.value = new Set([...expandedConnectionEntityIds.value].filter(x => x !== id))
+  expandedRelatedEntityIds.value = new Set([...expandedRelatedEntityIds.value].filter(x => x !== id))
   updateHighlights()
   void refreshDiscovery()
 }
 
 const removeToAddEntity = (id: string) => {
   entitiesToAdd.value = entitiesToAdd.value.filter(e => e.artifact_id !== id)
-  const nextConnPanel = new Set(expandedConnectionEntityIds.value); nextConnPanel.delete(id); expandedConnectionEntityIds.value = nextConnPanel
-  const nextRelatedPanel = new Set(expandedRelatedEntityIds.value); nextRelatedPanel.delete(id); expandedRelatedEntityIds.value = nextRelatedPanel
-  const nextConnIds = new Set(selectedNewConnIds.value)
-  for (const [cid, c] of allModelConns.value) if (c.source === id || c.target === id) nextConnIds.delete(cid)
-  selectedNewConnIds.value = nextConnIds
+  expandedConnectionEntityIds.value = new Set([...expandedConnectionEntityIds.value].filter(x => x !== id))
+  expandedRelatedEntityIds.value = new Set([...expandedRelatedEntityIds.value].filter(x => x !== id))
+  selectedNewConnIds.value = new Set(
+    [...selectedNewConnIds.value].filter((cid) => {
+      const c = allModelConns.value.get(cid)
+      return !(c && (c.source === id || c.target === id))
+    }),
+  )
   void refreshDiscovery()
 }
 
-const handleEntityAction = (entityId: string) => {
-  if (toAddEntityIds.value.has(entityId)) removeToAddEntity(entityId)
-  else toggleEntityRemoval(entityId)
-}
+const handleEntityAction = (entityId: string) =>
+  toAddEntityIds.value.has(entityId) ? removeToAddEntity(entityId) : toggleEntityRemoval(entityId)
 
 const attachInteractivity = () => {
   svgEntityElems.clear(); svgConnElems.clear()
@@ -269,24 +275,29 @@ const attachInteractivity = () => {
 watch([svgHtml, diagramEntities, diagramConnections], attachInteractivity, { flush: 'post' })
 watch([toRemoveEntityIds, toRemoveConnIds, selectedNewConnIds], updateHighlights)
 
+// ── Search / discovery ────────────────────────────────────────────────────────
+
 const searchQuery = ref('')
 const searchResults = ref<EntityDisplayInfo[]>([])
 const showDropdown = ref(false)
 let searchTimer: ReturnType<typeof setTimeout> | null = null
 
 const refreshDiscovery = async () => {
-  const discovery = await Effect.runPromise(
+  const exit = await Effect.runPromiseExit(
     svc.discoverDiagramEntities({
       includedEntityIds: [...effectiveEntityIds.value],
       query: searchQuery.value.trim() || undefined,
-      maxHops: 1,
-      limit: 20,
+      maxHops: 1, limit: 20,
     }),
-  ).catch(() => null)
-  if (!discovery) return
-  allModelConns.value = new Map(discovery.candidate_connections.map((conn) => [conn.artifact_id, conn]))
-  searchResults.value = discovery.search_results.filter((item) => !effectiveEntityIds.value.has(item.artifact_id))
-  showDropdown.value = Boolean(searchQuery.value.trim() && searchResults.value.length)
+  )
+  Exit.match(exit, {
+    onSuccess: (discovery) => {
+      allModelConns.value = new Map(discovery.candidate_connections.map((conn) => [conn.artifact_id, conn]))
+      searchResults.value = discovery.search_results.filter((item) => !effectiveEntityIds.value.has(item.artifact_id))
+      showDropdown.value = Boolean(searchQuery.value.trim() && searchResults.value.length)
+    },
+    onFailure: () => {},
+  })
 }
 
 const onSearchInput = () => {
@@ -298,9 +309,7 @@ const onSearchInput = () => {
     void refreshDiscovery()
     return
   }
-  searchTimer = setTimeout(() => {
-    void refreshDiscovery()
-  }, 280)
+  searchTimer = setTimeout(() => { void refreshDiscovery() }, 280)
 }
 const closeDropdown = () => { setTimeout(() => { showDropdown.value = false }, 150) }
 
@@ -318,62 +327,48 @@ const addEntity = async (entity: EntityDisplayInfo) => {
   selectedNewConnIds.value = next
 }
 
+// ── Load ──────────────────────────────────────────────────────────────────────
+
 const load = async () => {
   if (!diagramId.value) return
-  diagramDetail.loading.value = true
-  diagramDetail.error.value = null
-  svgHtml.value = null; svgLoading.value = true; svgError.value = null
   toRemoveEntityIds.value = new Set(); toRemoveConnIds.value = new Set()
   entitiesToAdd.value = []; selectedNewConnIds.value = new Set()
-  expandedConnectionEntityIds.value = new Set()
-  expandedRelatedEntityIds.value = new Set()
+  expandedConnectionEntityIds.value = new Set(); expandedRelatedEntityIds.value = new Set()
   includedEntities.value = []; allModelConns.value = new Map(); includedConnIds.value = new Set()
+  previewMutation.reset(); saveMutation.reset()
 
-  const [context, svg] = await Promise.all([
-    Effect.runPromise(svc.getDiagramContext(diagramId.value)).catch((e) => {
-      diagramDetail.error.value = String(e)
-      return null
-    }),
-    Effect.runPromise(svc.getDiagramSvg(diagramId.value)).catch((e) => { svgError.value = String(e); return null }),
-  ])
+  contextQuery.run(svc.getDiagramContext(diagramId.value))
+  svgQuery.run(svc.getDiagramSvg(diagramId.value))
 
-  svgHtml.value = svg ? DOMPurify.sanitize(svg, { USE_PROFILES: { svg: true, svgFilters: true } }) : null
-  svgLoading.value = false
-  if (!context) {
-    diagramDetail.loading.value = false
-    return
-  }
-
-  diagramDetail.data.value = context.diagram
-  diagramDetail.loading.value = false
-  diagramEntities.value = context.entities as EntitySummary[]
-  diagramConnections.value = context.connections as DiagramConnection[]
-
-  includedEntities.value = context.entities.map(s => ({
-    artifact_id: s.artifact_id, name: s.name, artifact_type: s.artifact_type,
-    domain: s.domain, subdomain: s.subdomain, status: s.status,
-    display_alias: s.display_alias ?? '', element_type: s.artifact_type, element_label: s.name,
-  }))
-  allModelConns.value = new Map(context.candidate_connections.map((conn) => [conn.artifact_id, conn]))
-
-  const inc = new Set<string>()
-  for (const cid of context.diagram.connection_ids_used ?? []) {
-    if (allModelConns.value.has(cid)) inc.add(cid)
-  }
-  for (const conn of context.connections) inc.add(conn.artifact_id)
-  includedConnIds.value = inc
-  void refreshDiscovery()
+  const exit = await Effect.runPromiseExit(svc.getDiagramContext(diagramId.value))
+  Exit.match(exit, {
+    onSuccess: (context) => {
+      diagramEntities.value = context.entities as EntitySummary[]
+      diagramConnections.value = context.connections as DiagramConnection[]
+      includedEntities.value = context.entities.map(s => ({
+        artifact_id: s.artifact_id, name: s.name, artifact_type: s.artifact_type,
+        domain: s.domain, subdomain: s.subdomain, status: s.status,
+        display_alias: s.display_alias ?? '', element_type: s.artifact_type, element_label: s.name,
+      }))
+      allModelConns.value = new Map(context.candidate_connections.map((conn) => [conn.artifact_id, conn]))
+      const inc = new Set<string>()
+      for (const cid of context.diagram.connection_ids_used ?? []) {
+        if (allModelConns.value.has(cid)) inc.add(cid)
+      }
+      for (const conn of context.connections) inc.add(conn.artifact_id)
+      includedConnIds.value = inc
+      void refreshDiscovery()
+    },
+    onFailure: () => {},
+  })
 }
 
 onMounted(load)
 watch(diagramId, load)
 
-const preview = ref<DiagramPreviewResult | null>(null)
-const previewBusy = ref(false)
-const previewError = ref<string | null>(null)
+// ── Preview / Save ────────────────────────────────────────────────────────────
+
 const showPuml = ref(false)
-const saveError = ref<string | null>(null)
-const saveBusy = ref(false)
 
 const finalEntityIds = computed(() => [
   ...includedEntities.value.filter(e => !toRemoveEntityIds.value.has(e.artifact_id)).map(e => e.artifact_id),
@@ -381,35 +376,28 @@ const finalEntityIds = computed(() => [
 ])
 
 const doPreview = () => {
-  if (!diagramDetail.data.value) return
-  previewBusy.value = true; previewError.value = null; preview.value = null
-  Effect.runPromise(svc.previewDiagram({
-    diagram_type: diagramDetail.data.value.diagram_type,
-    name: diagramDetail.data.value.name,
+  if (!diagramDetail.value) return
+  void previewMutation.run(svc.previewDiagram({
+    diagram_type: diagramDetail.value.diagram_type,
+    name: diagramDetail.value.name,
     entity_ids: finalEntityIds.value,
     connection_ids: finalConnIds.value,
   }))
-    .then(r => { preview.value = r; previewBusy.value = false })
-    .catch(e => { previewError.value = String(e); previewBusy.value = false })
 }
 
 const doSave = () => {
-  if (!diagramDetail.data.value) return
-  saveBusy.value = true; saveError.value = null
-  void Effect.runPromise(svc.editDiagram({
+  if (!diagramDetail.value) return
+  void saveMutation.run(svc.editDiagram({
     artifact_id: diagramId.value,
-    diagram_type: diagramDetail.data.value.diagram_type,
-    name: diagramDetail.data.value.name,
+    diagram_type: diagramDetail.value.diagram_type,
+    name: diagramDetail.value.name,
     entity_ids: finalEntityIds.value,
     connection_ids: finalConnIds.value,
     dry_run: false,
+  })).then((exit) => Exit.match(exit, {
+    onSuccess: (r) => { if (r.wrote) void router.push({ path: '/diagram', query: { id: diagramId.value } }) },
+    onFailure: () => {},
   }))
-    .then(r => {
-      saveBusy.value = false
-      if (r.wrote) void router.push({ path: '/diagram', query: { id: diagramId.value } })
-      else saveError.value = r.content ?? 'Verification failed'
-    })
-    .catch(e => { saveBusy.value = false; saveError.value = String(e) })
 }
 
 onUnmounted(() => {
@@ -432,16 +420,16 @@ onUnmounted(() => {
       <div class="hdr-info">
         <h1 class="pg-title">
           <span
-            v-if="diagramDetail.loading.value"
+            v-if="contextQuery.loading.value"
             class="faded"
           >Loading…</span>
-          <span v-else-if="diagramDetail.data.value">{{ diagramDetail.data.value.name }}</span>
+          <span v-else-if="diagramDetail">{{ diagramDetail.name }}</span>
         </h1>
         <span
-          v-if="diagramDetail.data.value"
+          v-if="diagramDetail"
           class="type-badge"
         >
-          {{ diagramDetail.data.value.diagram_type.replace('archimate-', '') }}
+          {{ diagramDetail.diagram_type.replace('archimate-', '') }}
         </span>
       </div>
     </div>
@@ -455,16 +443,16 @@ onUnmounted(() => {
       >
         <div :style="canvasStyle">
           <div
-            v-if="svgLoading"
+            v-if="svgQuery.loading.value"
             class="no-img"
           >
             Rendering SVG…
           </div>
           <div
-            v-else-if="svgError"
+            v-else-if="svgQuery.errorMessage.value"
             class="no-img err-txt"
           >
-            {{ svgError }}
+            {{ svgQuery.errorMessage.value }}
           </div>
           <div
             v-else-if="svgHtml"
@@ -586,18 +574,18 @@ onUnmounted(() => {
           <div class="sb-actions">
             <button
               class="btn-preview"
-              :disabled="previewBusy || !diagramDetail.data.value"
+              :disabled="previewMutation.running.value || !diagramDetail"
               @click="doPreview"
             >
-              {{ previewBusy ? 'Rendering…' : 'Preview' }}
+              {{ previewMutation.running.value ? 'Rendering…' : 'Preview' }}
             </button>
             <button
               class="btn-save"
-              :disabled="saveBusy || !preview || !diagramDetail.data.value"
-              :title="!preview ? 'Run Preview first' : ''"
+              :disabled="saveMutation.running.value || !previewMutation.result.value || !diagramDetail"
+              :title="!previewMutation.result.value ? 'Run Preview first' : ''"
               @click="doSave"
             >
-              {{ saveBusy ? 'Saving…' : 'Save Changes' }}
+              {{ saveMutation.running.value ? 'Saving…' : 'Save Changes' }}
             </button>
             <div
               v-if="saveError"
@@ -611,32 +599,32 @@ onUnmounted(() => {
     </div>
 
     <div
-      v-if="preview || previewBusy || previewError"
+      v-if="previewMutation.result.value || previewMutation.running.value || previewMutation.errorMessage.value"
       class="preview-row"
     >
       <div
-        v-if="previewBusy"
+        v-if="previewMutation.running.value"
         class="state-msg"
       >
         Rendering preview…
       </div>
       <div
-        v-if="previewError"
+        v-if="previewMutation.errorMessage.value"
         class="state-err"
       >
-        {{ previewError }}
+        {{ previewMutation.errorMessage.value }}
       </div>
-      <template v-if="preview">
+      <template v-if="previewMutation.result.value">
         <div
-          v-for="w in preview.warnings"
+          v-for="w in previewMutation.result.value.warnings"
           :key="w"
           class="warn-msg"
         >
           {{ w }}
         </div>
         <img
-          v-if="preview.image"
-          :src="preview.image"
+          v-if="previewMutation.result.value.image"
+          :src="previewMutation.result.value.image"
           class="preview-img"
           alt="Preview"
         >
@@ -655,7 +643,7 @@ onUnmounted(() => {
         <pre
           v-if="showPuml"
           class="puml-src"
-        >{{ preview.puml }}</pre>
+        >{{ previewMutation.result.value.puml }}</pre>
       </template>
     </div>
   </div>

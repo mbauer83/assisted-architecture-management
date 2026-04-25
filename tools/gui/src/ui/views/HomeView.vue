@@ -2,14 +2,15 @@
 import { inject, onMounted, computed } from 'vue'
 import { RouterLink } from 'vue-router'
 import { modelServiceKey } from '../keys'
-import { useAsync } from '../composables/useAsync'
+import { useQuery } from '../composables/useQuery'
 import type { Stats, EntityList } from '../../domain'
+import type { RepoError } from '../../ports/ModelRepository'
 import { DOMAIN_OPTIONS } from '../lib/domains'
 
 const svc = inject(modelServiceKey)!
-const statsState = useAsync<Stats>()
-const engagementListState = useAsync<EntityList>()
-const globalListState = useAsync<EntityList>()
+const statsState = useQuery<Stats, RepoError>()
+const engagementListState = useQuery<EntityList, RepoError>()
+const globalListState = useQuery<EntityList, RepoError>()
 
 onMounted(() => {
   statsState.run(svc.getStats())
@@ -35,10 +36,10 @@ const hasGlobal = computed(() => gloCount.value !== null && gloCount.value > 0)
       Loading…
     </div>
     <div
-      v-else-if="statsState.error.value"
+      v-else-if="statsState.errorMessage.value"
       class="state-msg state-msg--error"
     >
-      {{ statsState.error.value }}
+      {{ statsState.errorMessage.value }}
     </div>
 
     <template v-else-if="statsState.data.value">

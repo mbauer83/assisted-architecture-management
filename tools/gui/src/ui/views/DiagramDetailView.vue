@@ -1,15 +1,18 @@
 <script setup lang="ts">
 import { inject, onMounted, onUnmounted, watch, computed, ref, nextTick } from 'vue'
 import { useRoute, useRouter, RouterLink } from 'vue-router'
-import { Effect } from 'effect'
+import { Effect, Exit } from 'effect'
 import DOMPurify from 'dompurify'
 import { modelServiceKey } from '../keys'
-import { useAsync } from '../composables/useAsync'
-import type { DiagramDetail, EntitySummary, EntityDetail, DiagramConnection } from '../../domain'
+import type { DiagramContext, EntityDetail, DiagramConnection, WriteResult } from '../../domain'
+import type { RepoError } from '../../ports/ModelRepository'
+import type { NotFoundError } from '../../domain'
+import type { MarkdownError } from '../../application/MarkdownService'
 import { getDomainColor } from '../lib/domains'
 import ArchimateTypeGlyph from '../components/ArchimateTypeGlyph.vue'
 import DownloadMenu from '../components/DownloadMenu.vue'
-import { readErrorMessage } from '../lib/errors'
+import { useQuery } from '../composables/useQuery'
+import { useMutation } from '../composables/useMutation'
 
 const svc = inject(modelServiceKey)!
 const route = useRoute()
@@ -17,28 +20,41 @@ const router = useRouter()
 const adminMode = ref(false)
 
 const diagramId = computed(() => (route.query.id as string | undefined) ?? '')
-const detail = useAsync<DiagramDetail>()
+
+const contextQuery = useQuery<DiagramContext, RepoError | NotFoundError>()
+const svgQuery = useQuery<string, RepoError>()
+const entityQuery = useQuery<EntityDetail, RepoError | NotFoundError | MarkdownError>()
+const deleteMutation = useMutation<WriteResult, RepoError>()
+
+const detail = computed(() => contextQuery.data.value?.diagram ?? null)
+const diagramEntities = computed(() =>
+  (contextQuery.data.value?.entities ?? [])
+    .slice()
+    .sort((a, b) => a.domain.localeCompare(b.domain) || a.artifact_type.localeCompare(b.artifact_type) || a.name.localeCompare(b.name))
+)
+const diagramConnections = computed(() => contextQuery.data.value?.connections ?? [])
+
+const svgHtml = computed(() =>
+  svgQuery.data.value
+    ? DOMPurify.sanitize(svgQuery.data.value, { USE_PROFILES: { svg: true, svgFilters: true } })
+    : null
+)
+
 const showSource = ref(false)
-const deleteBusy = ref(false)
-const deleteError = ref<string | null>(null)
 const deletePreview = ref<{ content: string | null; warnings: string[] } | null>(null)
 const confirmDelete = ref(false)
-
-const diagramEntities = ref<EntitySummary[]>([])
-const diagramConnections = ref<DiagramConnection[]>([])
-const selectedEntity = ref<EntityDetail | null>(null)
-const selectedId = ref<string | null>(null)
-const selectedConnection = ref<DiagramConnection | null>(null)
-const isGlobalDiagram = computed(() => detail.data.value?.is_global ?? false)
+const isGlobalDiagram = computed(() => detail.value?.is_global ?? false)
 const deleteFn = computed(() =>
   (isGlobalDiagram.value && adminMode.value) ? svc.adminDeleteDiagram : svc.deleteDiagram,
 )
+const deleteError = computed(() => {
+  const r = deleteMutation.result.value
+  if (r && !r.wrote) return r.content ?? 'Delete failed'
+  return deleteMutation.errorMessage.value
+})
 
 // ── SVG rendering ─────────────────────────────────────────────────────────────
 
-const svgHtml = ref<string | null>(null)
-const svgLoading = ref(false)
-const svgError = ref<string | null>(null)
 const svgContainer = ref<HTMLElement | null>(null)
 const svgNodeElems = ref(new Map<string, Element>())
 const prevHighlighted = ref<Element | null>(null)
@@ -47,43 +63,22 @@ let _attachRun = 0
 
 const load = () => {
   if (!diagramId.value) return
-  detail.loading.value = true
-  detail.error.value = null
-  svgHtml.value = null; svgLoading.value = true; svgError.value = null
-  void Effect.runPromise(svc.getDiagramContext(diagramId.value))
-    .then((context) => {
-      detail.data.value = context.diagram
-      detail.loading.value = false
-      diagramEntities.value = context.entities
-        .slice()
-        .sort((a, b) => a.domain.localeCompare(b.domain) || a.artifact_type.localeCompare(b.artifact_type) || a.name.localeCompare(b.name))
-      diagramConnections.value = context.connections.slice()
-    })
-    .catch((reason: unknown) => {
-      detail.error.value = readErrorMessage(reason)
-      detail.loading.value = false
-      diagramEntities.value = []
-      diagramConnections.value = []
-    })
-  void Effect.runPromise(svc.getDiagramSvg(diagramId.value))
-    .then((svg) => {
-      svgHtml.value = DOMPurify.sanitize(svg, { USE_PROFILES: { svg: true, svgFilters: true } })
-      svgLoading.value = false
-    })
-    .catch((reason: unknown) => { svgError.value = readErrorMessage(reason); svgLoading.value = false })
+  contextQuery.run(svc.getDiagramContext(diagramId.value))
+  svgQuery.run(svc.getDiagramSvg(diagramId.value))
 }
 
 onMounted(() => {
-  void Effect.runPromise(svc.getServerInfo())
-    .then((info) => { adminMode.value = info.admin_mode })
-    .catch((reason: unknown) => {
-      detail.error.value = readErrorMessage(reason)
-    })
+  void Effect.runPromiseExit(svc.getServerInfo()).then((exit) =>
+    Exit.match(exit, {
+      onSuccess: (info) => { adminMode.value = info.admin_mode },
+      onFailure: () => {},
+    }),
+  )
+  load()
 })
 
 const addConnectionHitAreas = (group: SVGGElement) => {
   for (const oldHit of Array.from(group.querySelectorAll('[data-conn-hit]'))) oldHit.remove()
-
   const segments = Array.from(group.querySelectorAll<SVGElement>('path, line, polyline'))
   for (const segment of segments) {
     if (segment.closest('[data-entity-id]')) continue
@@ -105,7 +100,6 @@ const addConnectionHitAreas = (group: SVGGElement) => {
   }
 }
 
-// Build alias→artifact_id map and attach click handlers after SVG + entities load
 const attachInteractivity = async () => {
   const runId = ++_attachRun
   _interactivityController?.abort()
@@ -127,19 +121,14 @@ const attachInteractivity = async () => {
 
   for (const g of Array.from(svgEl.querySelectorAll<SVGGElement>('g'))) {
     let alias: string | null = null
-    // Strategy 1: PlantUML >= 1.2022 sets data-entity="ALIAS" on entity groups
     const de = g.getAttribute('data-entity')
     if (de && aliasToId.has(de)) alias = de
-    // Strategy 2: PlantUML id="entity_ALIAS"
     if (!alias && g.id.startsWith('entity_') && aliasToId.has(g.id.slice(7))) alias = g.id.slice(7)
-    // Strategy 3: plain id match (older PlantUML or Graphviz direct alias as id)
     if (!alias && g.id && aliasToId.has(g.id)) alias = g.id
-    // Strategy 4: Graphviz <title> child
     if (!alias) {
       const t = g.querySelector(':scope > title')?.textContent?.trim() ?? ''
       if (aliasToId.has(t)) alias = t
     }
-    // Strategy 5: PlantUML cluster_ prefix for composite/container entity groups
     if (!alias && g.id.startsWith('cluster_') && aliasToId.has(g.id.slice(8))) alias = g.id.slice(8)
     if (!alias) continue
 
@@ -149,7 +138,6 @@ const attachInteractivity = async () => {
     g.addEventListener('click', (ev) => { ev.stopPropagation(); selectEntity(artifactId) }, { signal })
   }
 
-  // Link groups
   const aliasToConn = new Map<string, DiagramConnection>()
   for (const c of diagramConnections.value) {
     if (c.source_alias && c.target_alias) aliasToConn.set(`${c.source_alias}:${c.target_alias}`, c)
@@ -167,7 +155,11 @@ const attachInteractivity = async () => {
 
 watch([svgHtml, diagramEntities, diagramConnections], () => { void attachInteractivity() }, { flush: 'post' })
 
-// Sync sidebar selection → SVG highlight
+// ── Selection ─────────────────────────────────────────────────────────────────
+
+const selectedId = ref<string | null>(null)
+const selectedConnection = ref<DiagramConnection | null>(null)
+
 watch(selectedId, (newId) => {
   prevHighlighted.value?.classList.remove('svg-selected')
   prevHighlighted.value = null
@@ -189,13 +181,13 @@ const selectConnection = (conn: DiagramConnection, el: SVGGElement) => {
 }
 const selectEntity = (id: string) => {
   clearConnection()
-  if (selectedId.value === id) { selectedId.value = null; selectedEntity.value = null; return }
-  selectedId.value = id; selectedEntity.value = null
-  void Effect.runPromise(svc.getEntity(id))
-    .then((entity) => { selectedEntity.value = entity })
-    .catch((reason: unknown) => {
-      detail.error.value = readErrorMessage(reason)
-    })
+  if (selectedId.value === id) {
+    selectedId.value = null
+    entityQuery.reset()
+    return
+  }
+  selectedId.value = id
+  entityQuery.run(svc.getEntity(id))
 }
 
 const toGlyphKey = (t: string) => t.replace(/[A-Z]/g, (c, i) => (i > 0 ? '-' : '') + c.toLowerCase())
@@ -231,25 +223,17 @@ const fitDiagramToViewport = async () => {
   const svgEl = svgContainer.value?.querySelector('svg') as SVGSVGElement | null
   if (!container || !svgEl) return
 
-  let contentWidth = 0
-  let contentHeight = 0
-  let contentX = 0
-  let contentY = 0
-
+  let contentWidth = 0, contentHeight = 0, contentX = 0, contentY = 0
   try {
     const graphRoot = svgEl.querySelector('g')
     const bbox = (graphRoot ?? svgEl).getBBox()
-    contentX = bbox.x
-    contentY = bbox.y
-    contentWidth = bbox.width
-    contentHeight = bbox.height
+    contentX = bbox.x; contentY = bbox.y
+    contentWidth = bbox.width; contentHeight = bbox.height
   } catch {
     const viewBox = svgEl.viewBox?.baseVal
     if (viewBox && viewBox.width > 0 && viewBox.height > 0) {
-      contentX = viewBox.x
-      contentY = viewBox.y
-      contentWidth = viewBox.width
-      contentHeight = viewBox.height
+      contentX = viewBox.x; contentY = viewBox.y
+      contentWidth = viewBox.width; contentHeight = viewBox.height
     } else {
       const widthAttr = Number(svgEl.getAttribute('width') ?? '')
       const heightAttr = Number(svgEl.getAttribute('height') ?? '')
@@ -257,7 +241,6 @@ const fitDiagramToViewport = async () => {
       contentHeight = Number.isFinite(heightAttr) && heightAttr > 0 ? heightAttr : svgEl.clientHeight
     }
   }
-
   if (!contentWidth || !contentHeight) return
 
   const rect = container.getBoundingClientRect()
@@ -267,7 +250,6 @@ const fitDiagramToViewport = async () => {
   const availableWidth = Math.max(rect.width - horizontalPadding * 2, 80)
   const availableHeight = Math.max(rect.height - topPadding - bottomPadding, 80)
   const fittedScale = Math.min(availableWidth / contentWidth, availableHeight / contentHeight)
-
   if (!Number.isFinite(fittedScale) || fittedScale <= 0) return
 
   fitScale.value = fittedScale
@@ -312,39 +294,33 @@ const resetView = () => {
   ty.value = fitTy.value
 }
 
+// ── Delete ────────────────────────────────────────────────────────────────────
+
 const previewDelete = () => {
   if (!diagramId.value) return
-  deleteBusy.value = true
-  deleteError.value = null
-  deletePreview.value = null
   confirmDelete.value = true
-  void Effect.runPromise(deleteFn.value({ artifact_id: diagramId.value, dry_run: true })).then((r) => {
-    deleteBusy.value = false
-    deletePreview.value = { content: r.content, warnings: [...r.warnings] }
-  }).catch((reason: unknown) => {
-    deleteBusy.value = false
-    deleteError.value = readErrorMessage(reason)
-  })
+  deletePreview.value = null
+  deleteMutation.reset()
+  void deleteMutation.run(deleteFn.value({ artifact_id: diagramId.value, dry_run: true }))
+    .then((exit) => Exit.match(exit, {
+      onSuccess: (r) => { deletePreview.value = { content: r.content, warnings: [...r.warnings] } },
+      onFailure: () => {},
+    }))
 }
 
 const cancelDelete = () => {
   confirmDelete.value = false
   deletePreview.value = null
-  deleteError.value = null
+  deleteMutation.reset()
 }
 
 const executeDelete = () => {
   if (!diagramId.value) return
-  deleteBusy.value = true
-  deleteError.value = null
-  void Effect.runPromise(deleteFn.value({ artifact_id: diagramId.value, dry_run: false })).then((r) => {
-    deleteBusy.value = false
-    if (r.wrote) void router.push(isGlobalDiagram.value ? '/global/diagrams' : '/diagrams')
-    else deleteError.value = r.content ?? 'Delete failed'
-  }).catch((reason: unknown) => {
-    deleteBusy.value = false
-    deleteError.value = readErrorMessage(reason)
-  })
+  void deleteMutation.run(deleteFn.value({ artifact_id: diagramId.value, dry_run: false }))
+    .then((exit) => Exit.match(exit, {
+      onSuccess: (r) => { if (r.wrote) void router.push(isGlobalDiagram.value ? '/global/diagrams' : '/diagrams') },
+      onFailure: () => {},
+    }))
 }
 
 watch(containerRef, (el, prev) => {
@@ -358,10 +334,7 @@ watch(containerRef, (el, prev) => {
   })
   resizeObserver.observe(el)
 })
-watch(() => svgHtml.value, (svg) => {
-  if (svg) void fitDiagramToViewport()
-})
-onMounted(load)
+watch(svgHtml, (svg) => { if (svg) void fitDiagramToViewport() })
 watch(diagramId, load)
 onUnmounted(() => {
   resizeObserver?.disconnect()
@@ -382,25 +355,25 @@ onUnmounted(() => {
         ← Diagrams
       </RouterLink>
       <h1
-        v-if="detail.data.value"
+        v-if="detail"
         class="pg-title"
       >
-        {{ detail.data.value.name }}
+        {{ detail.name }}
       </h1>
       <DownloadMenu
-        v-if="detail.data.value"
+        v-if="detail"
         :diagram-id="diagramId"
-        :diagram-name="detail.data.value.name"
+        :diagram-name="detail.name"
       />
       <RouterLink
-        v-if="detail.data.value"
+        v-if="detail"
         :to="{ path: '/diagram/edit', query: { id: diagramId } }"
         class="edit-btn"
       >
         Edit
       </RouterLink>
       <button
-        v-if="detail.data.value && (!isGlobalDiagram || adminMode)"
+        v-if="detail && (!isGlobalDiagram || adminMode)"
         class="delete-btn"
         @click="previewDelete"
       >
@@ -409,26 +382,26 @@ onUnmounted(() => {
     </div>
 
     <div
-      v-if="detail.loading.value"
+      v-if="contextQuery.loading.value"
       class="state"
     >
       Loading…
     </div>
     <div
-      v-else-if="detail.error.value"
+      v-else-if="contextQuery.errorMessage.value"
       class="state err"
     >
-      {{ detail.error.value }}
+      {{ contextQuery.errorMessage.value }}
     </div>
 
-    <template v-else-if="detail.data.value">
+    <template v-else-if="detail">
       <div class="meta">
-        <span class="type-badge">{{ detail.data.value.diagram_type.replace('archimate-', '') }}</span>
+        <span class="type-badge">{{ detail.diagram_type.replace('archimate-', '') }}</span>
         <span
           class="status-badge"
-          :class="`status--${detail.data.value.status}`"
-        >{{ detail.data.value.status }}</span>
-        <span class="mono faded">v{{ detail.data.value.version }} · {{ detail.data.value.artifact_id }}</span>
+          :class="`status--${detail.status}`"
+        >{{ detail.status }}</span>
+        <span class="mono faded">v{{ detail.version }} · {{ detail.artifact_id }}</span>
       </div>
 
       <div class="main-grid">
@@ -441,16 +414,16 @@ onUnmounted(() => {
         >
           <div :style="canvasStyle">
             <div
-              v-if="svgLoading"
+              v-if="svgQuery.loading.value"
               class="no-img"
             >
               Rendering SVG…
             </div>
             <div
-              v-else-if="svgError"
+              v-else-if="svgQuery.errorMessage.value"
               class="no-img err-txt"
             >
-              {{ svgError }}
+              {{ svgQuery.errorMessage.value }}
             </div>
             <div
               v-else-if="svgHtml"
@@ -509,7 +482,6 @@ onUnmounted(() => {
             </li>
           </ul>
 
-          <!-- Inline entity detail — no page scroll needed -->
           <div
             v-if="selectedConnection"
             class="ent-det"
@@ -534,21 +506,21 @@ onUnmounted(() => {
             </div>
           </div>
           <div
-            v-if="selectedId && !selectedEntity"
+            v-if="selectedId && entityQuery.loading.value"
             class="ent-det ent-det--loading"
           >
             Loading…
           </div>
           <div
-            v-if="selectedEntity"
+            v-if="entityQuery.data.value"
             class="ent-det"
           >
             <div class="det-hdr">
               <RouterLink
-                :to="{ path: '/entity', query: { id: selectedEntity.artifact_id } }"
+                :to="{ path: '/entity', query: { id: entityQuery.data.value.artifact_id } }"
                 class="det-name"
               >
-                {{ selectedEntity.name }}
+                {{ entityQuery.data.value.name }}
               </RouterLink>
               <button
                 class="det-close"
@@ -560,21 +532,21 @@ onUnmounted(() => {
             <div class="det-chips">
               <span
                 class="chip"
-                :class="`domain--${selectedEntity.domain}`"
-              >{{ selectedEntity.domain }}</span>
+                :class="`domain--${entityQuery.data.value.domain}`"
+              >{{ entityQuery.data.value.domain }}</span>
               <span
                 class="chip"
-                :class="`status--${selectedEntity.status}`"
-              >{{ selectedEntity.status }}</span>
-              <span class="chip chip-type">{{ selectedEntity.artifact_type }}</span>
+                :class="`status--${entityQuery.data.value.status}`"
+              >{{ entityQuery.data.value.status }}</span>
+              <span class="chip chip-type">{{ entityQuery.data.value.artifact_type }}</span>
             </div>
             <div
-              v-if="selectedEntity.content_html"
+              v-if="entityQuery.data.value.content_html"
               class="det-content markdown-body"
-              v-html="selectedEntity.content_html"
+              v-html="entityQuery.data.value.content_html"
             />
             <RouterLink
-              :to="{ path: '/graph', query: { id: selectedEntity.artifact_id } }"
+              :to="{ path: '/graph', query: { id: entityQuery.data.value.artifact_id } }"
               class="explore-lnk"
             >
               Explore in graph →
@@ -616,23 +588,23 @@ onUnmounted(() => {
         <div class="delete-actions">
           <button
             class="toggle-btn"
-            :disabled="deleteBusy"
+            :disabled="deleteMutation.running.value"
             @click="cancelDelete"
           >
             Cancel
           </button>
           <button
             class="delete-confirm-btn"
-            :disabled="deleteBusy"
+            :disabled="deleteMutation.running.value"
             @click="executeDelete"
           >
-            {{ deleteBusy ? 'Deleting…' : 'Delete Diagram' }}
+            {{ deleteMutation.running.value ? 'Deleting…' : 'Delete Diagram' }}
           </button>
         </div>
       </div>
 
       <div
-        v-if="detail.data.value.puml_source"
+        v-if="detail.puml_source"
         class="src-row"
       >
         <button
@@ -644,7 +616,7 @@ onUnmounted(() => {
         <pre
           v-if="showSource"
           class="puml-src"
-        >{{ detail.data.value.puml_source }}</pre>
+        >{{ detail.puml_source }}</pre>
       </div>
     </template>
   </div>

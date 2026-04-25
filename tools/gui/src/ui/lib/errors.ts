@@ -57,3 +57,10 @@ export const hasVerificationErrors = (verification: unknown): boolean => {
   const { errors } = verification
   return Array.isArray(errors) && errors.length > 0
 }
+
+export const formatEffectError = (e: unknown): string => {
+  if (isRecord(e) && e._tag === 'NotFoundError' && typeof e.id === 'string') {
+    return `Not found: ${e.id}`
+  }
+  return readErrorMessage(e)
+}

@@ -23,6 +23,9 @@ export default tseslint.config(
         tsconfigRootDir: import.meta.dirname,
       },
     },
+    rules: {
+      '@typescript-eslint/no-unused-expressions': ['error', { allowTernary: true }],
+    },
   },
   {
     files: ['**/*.vue'],
@@ -47,6 +50,7 @@ export default tseslint.config(
     },
     rules: {
       'vue/multi-word-component-names': 'off',
+      '@typescript-eslint/no-unused-expressions': ['error', { allowTernary: true }],
     },
   },
   {

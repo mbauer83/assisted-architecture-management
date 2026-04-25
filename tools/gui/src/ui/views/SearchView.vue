@@ -2,14 +2,15 @@
 import { inject, ref, watch } from 'vue'
 import { useRoute, useRouter, RouterLink } from 'vue-router'
 import { modelServiceKey } from '../keys'
-import { useAsync } from '../composables/useAsync'
+import { useQuery } from '../composables/useQuery'
 import type { SearchResult } from '../../domain'
+import type { RepoError } from '../../ports/ModelRepository'
 
 const svc = inject(modelServiceKey)!
 const route = useRoute()
 const router = useRouter()
 
-const searchState = useAsync<SearchResult>()
+const searchState = useQuery<SearchResult, RepoError>()
 
 const query = ref((route.query.q as string | undefined) ?? '')
 
@@ -64,10 +65,10 @@ const friendlyName = (id: string) => {
       Searching…
     </div>
     <div
-      v-else-if="searchState.error.value"
+      v-else-if="searchState.errorMessage.value"
       class="state-msg state-msg--error"
     >
-      {{ searchState.error.value }}
+      {{ searchState.errorMessage.value }}
     </div>
 
     <template v-else-if="searchState.data.value">

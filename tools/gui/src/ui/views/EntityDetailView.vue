@@ -3,10 +3,13 @@ import { inject, onMounted, ref, watch, computed } from 'vue'
 import { useRoute, useRouter, RouterLink } from 'vue-router'
 import { Effect } from 'effect'
 import { modelServiceKey } from '../keys'
-import { useAsync } from '../composables/useAsync'
+import { useQuery } from '../composables/useQuery'
 import ConnectionsPanel from '../components/ConnectionsPanel.vue'
 import ArchimateTypeGlyph from '../components/ArchimateTypeGlyph.vue'
 import type { EntityContext, WriteResult } from '../../domain'
+import type { NotFoundError } from '../../domain'
+import type { MarkdownError } from '../../application/MarkdownService'
+import type { RepoError } from '../../ports/ModelRepository'
 import { readErrorMessage } from '../lib/errors'
 
 const svc = inject(modelServiceKey)!
@@ -23,7 +26,7 @@ const route = useRoute()
 
 const entityId = computed(() => (route.query.id as string | undefined) ?? '')
 
-const context = useAsync<EntityContext>()
+const context = useQuery<EntityContext, RepoError | NotFoundError | MarkdownError>()
 const detail = computed(() => context.data.value?.entity ?? null)
 const outgoing = computed(() => context.data.value?.connections.outbound ?? [])
 const incoming = computed(() => context.data.value?.connections.inbound ?? [])
@@ -241,10 +244,10 @@ const executeDelete = () => {
       Loading...
     </div>
     <div
-      v-else-if="context.error.value"
+      v-else-if="context.errorMessage.value"
       class="state-msg state-msg--error"
     >
-      {{ context.error.value }}
+      {{ context.errorMessage.value }}
     </div>
 
     <template v-else-if="detail">
@@ -495,7 +498,7 @@ const executeDelete = () => {
           :connections="incoming"
           direction="incoming"
           :loading="context.loading.value"
-          :error="context.error.value"
+          :error="context.errorMessage.value"
           :readonly="isGlobalEntity && !adminMode"
           :admin-mode="isGlobalEntity && adminMode"
           @refresh="load"
@@ -506,7 +509,7 @@ const executeDelete = () => {
           :connections="symmetric"
           direction="symmetric"
           :loading="context.loading.value"
-          :error="context.error.value"
+          :error="context.errorMessage.value"
           :readonly="isGlobalEntity && !adminMode"
           :admin-mode="isGlobalEntity && adminMode"
           @refresh="load"
@@ -517,7 +520,7 @@ const executeDelete = () => {
           :connections="outgoing"
           direction="outgoing"
           :loading="context.loading.value"
-          :error="context.error.value"
+          :error="context.errorMessage.value"
           :readonly="isGlobalEntity && !adminMode"
           :admin-mode="isGlobalEntity && adminMode"
           @refresh="load"
