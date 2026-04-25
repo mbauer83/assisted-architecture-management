@@ -4,6 +4,7 @@ from pathlib import Path
 
 from src.common.artifact_verifier import ArtifactRegistry, ArtifactVerifier
 from src.tools.artifact_write.document import create_document, edit_document
+from src.infrastructure.artifact_index import shared_artifact_index
 
 
 def _write(path: Path, content: str) -> None:
@@ -26,7 +27,7 @@ def _schema(repo: Path, *, subdirectory: str | None = None) -> None:
 
 
 def _verifier(repo: Path) -> ArtifactVerifier:
-    return ArtifactVerifier(ArtifactRegistry(repo))
+    return ArtifactVerifier(ArtifactRegistry(shared_artifact_index(repo)))
 
 
 def test_create_document_uses_schema_subdirectory(tmp_path: Path) -> None:

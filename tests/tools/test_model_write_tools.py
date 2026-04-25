@@ -19,6 +19,7 @@ from pytest_bdd import given, scenarios, then, when
 
 from src.common.artifact_verifier import ArtifactRegistry, ArtifactVerifier
 from src.tools import mcp_artifact_server as tools
+from src.infrastructure.artifact_index import shared_artifact_index
 
 
 scenarios("features/model_write_tools.feature")
@@ -112,7 +113,7 @@ def repo_with_entities_and_connection(repo_root: Path) -> tuple[Path, str, str]:
     assert conn.get("wrote") is True
 
     # Sanity: verifier should pass across repo.
-    verifier = ArtifactVerifier(ArtifactRegistry(repo_root))
+    verifier = ArtifactVerifier(ArtifactRegistry(shared_artifact_index(repo_root)))
     results = verifier.verify_all(repo_root)
     assert all(r.valid for r in results), [i for r in results for i in r.errors]
     return repo_root, e1_id, e2_id
@@ -161,7 +162,7 @@ def diagram_inferred_ids(
 
     # Verify the created file.
     p = Path(diagram_result["path"])
-    verifier = ArtifactVerifier(ArtifactRegistry(repo_root))
+    verifier = ArtifactVerifier(ArtifactRegistry(shared_artifact_index(repo_root)))
     res = verifier.verify_diagram_file(p)
     assert res.valid is True, res.issues
 

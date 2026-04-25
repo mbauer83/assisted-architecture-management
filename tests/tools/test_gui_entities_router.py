@@ -6,7 +6,7 @@ from pathlib import Path
 
 import pytest
 
-from src.common.artifact_query import ArtifactRepository
+from src.common.artifact_query import ArtifactRepository, shared_artifact_index
 from src.tools.gui_routers.entity_listing import build_entity_summary_rows
 from src.tools.gui_routers import state as gui_state
 
@@ -99,9 +99,9 @@ def test_global_scope_listing_survives_root_entities_without_specialization_pare
         _entity_md(engagement_req, "Engagement Req"),
     )
 
-    gui_state.init_state(ArtifactRepository([engagement_root, enterprise_root]), engagement_root, enterprise_root)
+    gui_state.init_state(ArtifactRepository(shared_artifact_index([engagement_root, enterprise_root])), engagement_root, enterprise_root)
 
-    repo = ArtifactRepository([engagement_root, enterprise_root])
+    repo = ArtifactRepository(shared_artifact_index([engagement_root, enterprise_root]))
     gui_state.init_state(repo, engagement_root, enterprise_root)
 
     global_entities = [entity for entity in repo.list_entities() if gui_state.is_global(entity.path)]
@@ -164,7 +164,7 @@ def test_entity_rows_emit_hierarchy_metadata_for_specialization_composition_and_
         _entity_md(global_req, "Global Req"),
     )
 
-    repo = ArtifactRepository([engagement_root, enterprise_root])
+    repo = ArtifactRepository(shared_artifact_index([engagement_root, enterprise_root]))
     gui_state.init_state(repo, engagement_root, enterprise_root)
 
     engagement_entities = [entity for entity in repo.list_entities() if not gui_state.is_global(entity.path)]
@@ -212,7 +212,7 @@ def test_connection_to_dict_resolves_live_endpoint_names(engagement_root: Path, 
         _outgoing_md(src_id, [("archimate-association", tgt_id)]),
     )
 
-    repo = ArtifactRepository([engagement_root, enterprise_root])
+    repo = ArtifactRepository(shared_artifact_index([engagement_root, enterprise_root]))
     gui_state.init_state(repo, engagement_root, enterprise_root)
 
     conn = repo.find_connections_for(src_id)[0]
@@ -241,7 +241,7 @@ def test_entity_context_read_model_groups_connections_and_counts(
         _outgoing_md(peer_id, [("archimate-association", src_id)]),
     )
 
-    repo = ArtifactRepository([engagement_root, enterprise_root])
+    repo = ArtifactRepository(shared_artifact_index([engagement_root, enterprise_root]))
     gui_state.init_state(repo, engagement_root, enterprise_root)
 
     payload = repo.read_entity_context(src_id)
@@ -270,7 +270,7 @@ def test_clear_caches_applies_incremental_outgoing_changes(
     outgoing_path = engagement_root / "model" / "motivation" / "requirements" / f"{src_id}.outgoing.md"
     _write(outgoing_path, _outgoing_md(src_id, [("archimate-flow", tgt_a)]))
 
-    repo = ArtifactRepository([engagement_root, enterprise_root])
+    repo = ArtifactRepository(shared_artifact_index([engagement_root, enterprise_root]))
     gui_state.init_state(repo, engagement_root, enterprise_root)
 
     before = repo.read_entity_context(src_id)

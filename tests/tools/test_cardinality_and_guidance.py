@@ -15,6 +15,7 @@ from src.common.artifact_verifier_registry import ArtifactRegistry
 from src.common.artifact_write_formatting import format_outgoing_markdown
 from src.tools.artifact_write.parse_existing import parse_outgoing_file
 from src.tools.artifact_write.type_guidance import get_type_guidance
+from src.infrastructure.artifact_index import shared_artifact_index
 
 
 # ---------------------------------------------------------------------------
@@ -260,7 +261,7 @@ class TestVerifierCardinality:
         src, tgt = _setup_two_entities(repo)
         out_path = repo / "model/motivation/requirements" / f"{src}.outgoing.md"
         _write(out_path, _outgoing(src, [f"### archimate-realization [1] → [0..*] {tgt}"]))
-        registry = ArtifactRegistry(repo)
+        registry = ArtifactRegistry(shared_artifact_index(repo))
         verifier = ArtifactVerifier(registry)
         result = verifier.verify_outgoing_file(out_path)
         assert result.valid, [i.message for i in result.issues]
@@ -270,7 +271,7 @@ class TestVerifierCardinality:
         for card in ["1", "0", "0..1", "1..5", "*", "1..*", "0..*"]:
             out_path = repo / "model/motivation/requirements" / f"{src}.outgoing.md"
             _write(out_path, _outgoing(src, [f"### archimate-association [{card}] → {tgt}"]))
-            registry = ArtifactRegistry(repo)
+            registry = ArtifactRegistry(shared_artifact_index(repo))
             verifier = ArtifactVerifier(registry)
             result = verifier.verify_outgoing_file(out_path)
             assert result.valid, f"Cardinality '{card}' failed: {[i.message for i in result.issues]}"
@@ -279,7 +280,7 @@ class TestVerifierCardinality:
         src, tgt = _setup_two_entities(repo)
         out_path = repo / "model/motivation/requirements" / f"{src}.outgoing.md"
         _write(out_path, _outgoing(src, [f"### archimate-realization [1:n] → {tgt}"]))
-        registry = ArtifactRegistry(repo)
+        registry = ArtifactRegistry(shared_artifact_index(repo))
         verifier = ArtifactVerifier(registry)
         result = verifier.verify_outgoing_file(out_path)
         assert not result.valid
@@ -289,7 +290,7 @@ class TestVerifierCardinality:
         src, tgt = _setup_two_entities(repo)
         out_path = repo / "model/motivation/requirements" / f"{src}.outgoing.md"
         _write(out_path, _outgoing(src, [f"### archimate-realization → [many] {tgt}"]))
-        registry = ArtifactRegistry(repo)
+        registry = ArtifactRegistry(shared_artifact_index(repo))
         verifier = ArtifactVerifier(registry)
         result = verifier.verify_outgoing_file(out_path)
         assert not result.valid
@@ -302,7 +303,7 @@ class TestAddConnectionWithCardinality:
     def test_add_connection_with_src_cardinality(self, repo: Path) -> None:
         from src.tools.artifact_write.connection import add_connection
         src, tgt = _setup_two_entities(repo)
-        registry = ArtifactRegistry(repo)
+        registry = ArtifactRegistry(shared_artifact_index(repo))
         verifier = ArtifactVerifier(registry)
 
         def clear(_: Path) -> None:
@@ -331,7 +332,7 @@ class TestAddConnectionWithCardinality:
     def test_add_connection_with_both_cardinalities(self, repo: Path) -> None:
         from src.tools.artifact_write.connection import add_connection
         src, tgt = _setup_two_entities(repo)
-        registry = ArtifactRegistry(repo)
+        registry = ArtifactRegistry(shared_artifact_index(repo))
         verifier = ArtifactVerifier(registry)
 
         def clear(_: Path) -> None:

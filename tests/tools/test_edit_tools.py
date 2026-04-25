@@ -13,6 +13,7 @@ import pytest
 
 from src.tools import mcp_artifact_server as mcp
 from src.common.artifact_verifier_registry import ArtifactRegistry
+from src.infrastructure.artifact_index import shared_artifact_index
 
 
 # ---------------------------------------------------------------------------
@@ -120,7 +121,7 @@ class TestEditEntity:
         tgt = _make_entity(repo, "assessment", "Target Assessment")
         _make_connection(repo, src, tgt, "archimate-influence")
 
-        registry = ArtifactRegistry([repo])
+        registry = ArtifactRegistry(shared_artifact_index([repo]))
         expected = f"{src}---{tgt}@@archimate-influence"
 
         assert expected in registry.connection_ids()

@@ -19,7 +19,6 @@ from src.common.artifact_query import ArtifactRepository
 from src.common.artifact_types import ConnectionRecord, DiagramRecord, EntityRecord
 from src.infrastructure.artifact_index.coordination import publish_authoritative_mutation
 
-
 # Module-level server state — set by gui_server.main() before uvicorn starts.
 # Guarded by _state_lock so background threads (git sync, refresh workers) can
 # safely read these values without racing against init_state().
@@ -174,6 +173,7 @@ def get_write_deps() -> tuple[Path, Any, Any]:
     """Return (engagement_root, registry, verifier). Registry spans both repos."""
     from src.common.artifact_verifier import ArtifactVerifier
     from src.common.artifact_verifier_registry import ArtifactRegistry
+    from src.infrastructure.artifact_index import shared_artifact_index
     with _state_lock:
         repo_root = _repo_root
         enterprise_root = _enterprise_root
@@ -182,7 +182,7 @@ def get_write_deps() -> tuple[Path, Any, Any]:
     roots: list[Path] = [repo_root]
     if enterprise_root is not None:
         roots.append(enterprise_root)
-    registry = ArtifactRegistry(roots)
+    registry = ArtifactRegistry(shared_artifact_index(roots))
     return repo_root, registry, ArtifactVerifier(registry)
 
 
@@ -195,6 +195,7 @@ def get_admin_write_deps() -> tuple[Path, Any, Any]:
     """
     from src.common.artifact_verifier import ArtifactVerifier
     from src.common.artifact_verifier_registry import ArtifactRegistry
+    from src.infrastructure.artifact_index import shared_artifact_index
     with _state_lock:
         admin_mode = _admin_mode
         enterprise_root = _enterprise_root
@@ -206,7 +207,7 @@ def get_admin_write_deps() -> tuple[Path, Any, Any]:
     roots: list[Path] = [enterprise_root]
     if repo_root is not None:
         roots.append(repo_root)
-    registry = ArtifactRegistry(roots)
+    registry = ArtifactRegistry(shared_artifact_index(roots))
     return enterprise_root, registry, ArtifactVerifier(registry)
 
 

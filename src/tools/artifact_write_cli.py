@@ -10,6 +10,7 @@ from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 
 from src.common.artifact_verifier import ArtifactRegistry
+from src.infrastructure.artifact_index import shared_artifact_index
 from src.tools.artifact_write import delete_diagram, delete_entity
 from src.tools.backend_probe import backend_url, probe_backend
 from src.tools.backend_state import read_backend_state
@@ -81,7 +82,7 @@ def main(argv: list[str] | None = None) -> int:
             print(f"Warning: {warning}")
         return 0
 
-    registry = ArtifactRegistry(repo_root)
+    registry = ArtifactRegistry(shared_artifact_index(repo_root))
 
     try:
         if args.command == "delete-entity":

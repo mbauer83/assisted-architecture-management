@@ -244,12 +244,12 @@ def _run_foreground(args: argparse.Namespace, parser: argparse.ArgumentParser, r
     if enterprise_root_path is not None:
         roots.append(enterprise_root_path)
 
-    from src.common.artifact_query import ArtifactRepository
+    from src.common.artifact_query import ArtifactRepository, shared_artifact_index
     logger.info(
         "Initializing backend for repo_root=%s enterprise_root=%s admin_mode=%s read_only=%s host=%s port=%s",
         repo_root_path, enterprise_root_path, args.admin_mode, args.read_only, args.host, resolved_port,
     )
-    repo = ArtifactRepository(roots)
+    repo = ArtifactRepository(shared_artifact_index(roots))
     repo.refresh()
     from src.tools.gui_routers import state as gui_state
     gui_state.init_state(repo, repo_root_path, enterprise_root_path,
