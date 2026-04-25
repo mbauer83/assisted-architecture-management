@@ -126,6 +126,9 @@ def read_document(id: str) -> dict[str, Any]:
     result = repo.read_artifact(id, mode="full")
     if result is None:
         raise HTTPException(404, f"Not found: {id!r}")
+    doc = repo.get_document(id)
+    if doc is not None:
+        result["is_global"] = s.is_global(doc.path)
     return result
 
 

@@ -210,6 +210,7 @@ export const DocumentDetailSchema = Schema.Struct({
   sections: Schema.Array(Schema.String),
   content_snippet: Schema.String,
   content_text: Schema.optional(Schema.String),
+  is_global: Schema.optional(Schema.Boolean),
   extra: Schema.optional(Schema.Record({ key: Schema.String, value: Schema.Unknown })),
 })
 export type DocumentDetail = typeof DocumentDetailSchema.Type
@@ -436,6 +437,24 @@ export const PromotionConflictSchema = Schema.Struct({
 })
 export type PromotionConflict = typeof PromotionConflictSchema.Type
 
+export const PromotionDocumentConflictSchema = Schema.Struct({
+  engagement_id: Schema.String,
+  enterprise_id: Schema.String,
+  doc_type: Schema.String,
+  engagement_title: Schema.String,
+  enterprise_title: Schema.String,
+})
+export type PromotionDocumentConflict = typeof PromotionDocumentConflictSchema.Type
+
+export const PromotionDiagramConflictSchema = Schema.Struct({
+  engagement_id: Schema.String,
+  enterprise_id: Schema.String,
+  diagram_type: Schema.String,
+  engagement_name: Schema.String,
+  enterprise_name: Schema.String,
+})
+export type PromotionDiagramConflict = typeof PromotionDiagramConflictSchema.Type
+
 export const PromotionPlanSchema = Schema.Struct({
   entity_id: Schema.String,
   entities_to_add: Schema.Array(Schema.String),
@@ -443,6 +462,11 @@ export const PromotionPlanSchema = Schema.Struct({
   connection_ids: Schema.Array(Schema.String),
   already_in_enterprise: Schema.Array(Schema.String),
   warnings: Schema.Array(Schema.String),
+  documents_to_add: Schema.Array(Schema.String),
+  diagrams_to_add: Schema.Array(Schema.String),
+  doc_conflicts: Schema.Array(PromotionDocumentConflictSchema),
+  diagram_conflicts: Schema.Array(PromotionDiagramConflictSchema),
+  schema_errors: Schema.Array(Schema.String),
 })
 export type PromotionPlan = typeof PromotionPlanSchema.Type
 

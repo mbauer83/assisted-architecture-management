@@ -9,6 +9,7 @@ import pytest
 from src.application.artifact_query import ArtifactRepository
 from src.infrastructure.artifact_index import shared_artifact_index
 from src.infrastructure.gui.routers import state as gui_state
+from src.infrastructure.gui.routers.documents import read_document
 from src.infrastructure.gui.routers.entity_listing import build_entity_summary_rows
 
 
@@ -67,6 +68,24 @@ last-updated: '2026-04-20'
 <!-- §connections -->
 
 {sections}
+"""
+
+
+def _document_md(artifact_id: str, title: str) -> str:
+    return f"""\
+---
+artifact-id: {artifact_id}
+artifact-type: document
+doc-type: adr
+title: "{title}"
+version: 0.1.0
+status: draft
+last-updated: '2026-04-25'
+---
+
+# {title}
+
+Document body.
 """
 
 
@@ -309,3 +328,70 @@ def test_entity_detail_view_uses_entity_context_request() -> None:
     assert 'direction="symmetric"' in content
     assert 'v-if="hasSymmetric"' not in content
     assert ":class=\"{ 'has-symmetric': hasSymmetric }\"" not in content
+
+
+def test_document_router_marks_global_documents(tmp_path: Path) -> None:
+    engagement_root = tmp_path / "engagements" / "ENG-DOC" / "architecture-repository"
+    enterprise_root = tmp_path / "enterprise-repository"
+    (engagement_root / "model").mkdir(parents=True)
+    _write(
+        enterprise_root / "docs" / "adrs" / "ADR@2000000000.DocAAA.global-doc.md",
+        _document_md("ADR@2000000000.DocAAA.global-doc", "Global Doc"),
+    )
+
+    repo = ArtifactRepository(shared_artifact_index([engagement_root, enterprise_root]))
+    gui_state.init_state(repo, engagement_root, enterprise_root)
+
+    payload = read_document("ADR@2000000000.DocAAA.global-doc")
+
+    assert payload["artifact_id"] == "ADR@2000000000.DocAAA.global-doc"
+    assert payload["is_global"] is True
+
+
+def test_entity_detail_view_supports_reference_picker_for_summary_and_notes() -> None:
+    view_path = Path("tools/gui/src/ui/views/EntityDetailView.vue")
+    content = view_path.read_text(encoding="utf-8")
+
+    assert "ArtifactReferenceInput" in content
+    assert "openReferencePicker('summary')" in content
+    assert "openReferencePicker('notes')" in content
+    assert "addToast('Entity saved')" in content
+
+
+def test_document_detail_view_keeps_reference_insert_near_editor_and_confirms_save() -> None:
+    view_path = Path("tools/gui/src/ui/views/DocumentDetailView.vue")
+    content = view_path.read_text(encoding="utf-8")
+
+    assert content.count("Insert Reference") == 1
+    assert "class=\"bottom-actions\"" in content
+    assert "addToast('Document saved')" in content
+
+
+def test_edit_diagram_view_shows_header_save_actions_and_confirms_save() -> None:
+    view_path = Path("tools/gui/src/ui/views/EditDiagramView.vue")
+    content = view_path.read_text(encoding="utf-8")
+
+    assert "class=\"hdr-actions\"" in content
+    assert "addToast('Diagram saved')" in content
+
+
+def test_promote_view_supports_document_and_diagram_promotion() -> None:
+    view_content = Path("tools/gui/src/ui/views/PromoteView.vue").read_text(encoding="utf-8")
+    workflow_content = Path(
+        "tools/gui/src/ui/composables/usePromotionWorkflow.ts"
+    ).read_text(encoding="utf-8")
+
+    assert "initializeFromRoute" in view_content
+    assert "document_ids:" in workflow_content
+    assert "diagram_ids:" in workflow_content
+    assert "routeQuery.value.document_id" in workflow_content
+    assert "routeQuery.value.diagram_id" in workflow_content
+
+
+def test_diagram_detail_view_queues_connection_matches_and_promote_button() -> None:
+    view_path = Path("tools/gui/src/ui/views/DiagramDetailView.vue")
+    content = view_path.read_text(encoding="utf-8")
+
+    assert "aliasToConnQueue" in content
+    assert "selectedConnectionGroup" in content
+    assert "query: { diagram_id: diagramId }" in content

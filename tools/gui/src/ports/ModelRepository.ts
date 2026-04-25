@@ -176,6 +176,8 @@ export interface ModelRepository {
     connection_ids?: string[];
     exclude_entity_ids?: string[];
     exclude_connection_ids?: string[];
+    document_ids?: string[];
+    diagram_ids?: string[];
   }) => Effect.Effect<PromotionPlan, RepoError>
   readonly executePromotion: (body: {
     entity_id?: string;
@@ -183,6 +185,8 @@ export interface ModelRepository {
     connection_ids?: string[];
     exclude_entity_ids?: string[];
     exclude_connection_ids?: string[];
+    document_ids?: string[];
+    diagram_ids?: string[];
     conflict_resolutions?: Array<{
       engagement_id: string;
       strategy: 'accept_engagement' | 'accept_enterprise' | 'merge';

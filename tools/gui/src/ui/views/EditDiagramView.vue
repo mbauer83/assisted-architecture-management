@@ -3,7 +3,7 @@ import { inject, ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { Effect, Exit } from 'effect'
 import DOMPurify from 'dompurify'
-import { modelServiceKey } from '../keys'
+import { modelServiceKey, toastKey } from '../keys'
 import type {
   DiagramContext, EntitySummary, DiagramConnection,
   EntityDisplayInfo, EntityContextConnection, DiagramPreviewResult, WriteResult,
@@ -16,6 +16,7 @@ import { useQuery } from '../composables/useQuery'
 import { useMutation } from '../composables/useMutation'
 
 const svc = inject(modelServiceKey)!
+const addToast = inject(toastKey)!
 const route = useRoute()
 const router = useRouter()
 
@@ -385,19 +386,19 @@ const doPreview = () => {
   }))
 }
 
-const doSave = () => {
+const doSave = async () => {
   if (!diagramDetail.value) return
-  void saveMutation.run(svc.editDiagram({
+  const exit = await saveMutation.run(svc.editDiagram({
     artifact_id: diagramId.value,
     diagram_type: diagramDetail.value.diagram_type,
     name: diagramDetail.value.name,
     entity_ids: finalEntityIds.value,
     connection_ids: finalConnIds.value,
     dry_run: false,
-  })).then((exit) => Exit.match(exit, {
-    onSuccess: (r) => { if (r.wrote) void router.push({ path: '/diagram', query: { id: diagramId.value } }) },
-    onFailure: () => {},
   }))
+  if (!Exit.isSuccess(exit) || !exit.value.wrote) return
+  addToast('Diagram saved')
+  void router.push({ path: '/diagram', query: { id: diagramId.value } })
 }
 
 onUnmounted(() => {
@@ -431,6 +432,23 @@ onUnmounted(() => {
         >
           {{ diagramDetail.diagram_type.replace('archimate-', '') }}
         </span>
+      </div>
+      <div class="hdr-actions">
+        <button
+          class="btn-preview"
+          :disabled="previewMutation.running.value || !diagramDetail"
+          @click="doPreview"
+        >
+          {{ previewMutation.running.value ? 'Rendering…' : 'Preview' }}
+        </button>
+        <button
+          class="btn-save"
+          :disabled="saveMutation.running.value || !previewMutation.result.value || !diagramDetail"
+          :title="!previewMutation.result.value ? 'Run Preview first' : ''"
+          @click="doSave"
+        >
+          {{ saveMutation.running.value ? 'Saving…' : 'Save Changes' }}
+        </button>
       </div>
     </div>
 
@@ -652,6 +670,7 @@ onUnmounted(() => {
 <style scoped>
 .page { max-width: 100%; }
 .page-hdr { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; }
+.hdr-actions { display: flex; gap: 8px; margin-left: auto; }
 .back-link { font-size: 13px; color: #6b7280; background: none; border: none; cursor: pointer; padding: 0; flex-shrink: 0; }
 .back-link:hover { color: #374151; }
 .hdr-info { display: flex; align-items: center; gap: 10px; flex: 1; min-width: 0; }

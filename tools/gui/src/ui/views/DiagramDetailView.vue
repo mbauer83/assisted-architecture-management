@@ -58,6 +58,7 @@ const deleteError = computed(() => {
 const svgContainer = ref<HTMLElement | null>(null)
 const svgNodeElems = ref(new Map<string, Element>())
 const prevHighlighted = ref<Element | null>(null)
+const selectedConnectionGroup = ref<SVGGElement | null>(null)
 let _interactivityController: AbortController | null = null
 let _attachRun = 0
 
@@ -138,14 +139,27 @@ const attachInteractivity = async () => {
     g.addEventListener('click', (ev) => { ev.stopPropagation(); selectEntity(artifactId) }, { signal })
   }
 
-  const aliasToConn = new Map<string, DiagramConnection>()
-  for (const c of diagramConnections.value) {
-    if (c.source_alias && c.target_alias) aliasToConn.set(`${c.source_alias}:${c.target_alias}`, c)
+  const aliasToConnQueue = new Map<string, DiagramConnection[]>()
+  const aliasToConnFallback = new Map<string, DiagramConnection>()
+  for (const conn of diagramConnections.value) {
+    if (!conn.source_alias || !conn.target_alias) continue
+    const forwardKey = `${conn.source_alias}:${conn.target_alias}`
+    const reverseKey = `${conn.target_alias}:${conn.source_alias}`
+    const queue = aliasToConnQueue.get(forwardKey) ?? []
+    queue.push(conn)
+    aliasToConnQueue.set(forwardKey, queue)
+    aliasToConnFallback.set(forwardKey, conn)
+    if (!aliasToConnFallback.has(reverseKey)) aliasToConnFallback.set(reverseKey, conn)
   }
   for (const g of Array.from(svgEl.querySelectorAll<SVGGElement>('g[data-entity-1]'))) {
     const a1 = g.getAttribute('data-entity-1') ?? ''
     const a2 = g.getAttribute('data-entity-2') ?? ''
-    const conn = aliasToConn.get(`${a1}:${a2}`) ?? aliasToConn.get(`${a2}:${a1}`)
+    const forwardKey = `${a1}:${a2}`
+    const reverseKey = `${a2}:${a1}`
+    const conn = aliasToConnQueue.get(forwardKey)?.shift()
+      ?? aliasToConnQueue.get(reverseKey)?.shift()
+      ?? aliasToConnFallback.get(forwardKey)
+      ?? aliasToConnFallback.get(reverseKey)
     if (!conn) continue
     addConnectionHitAreas(g)
     g.setAttribute('data-conn-id', conn.artifact_id)
@@ -170,14 +184,19 @@ watch(selectedId, (newId) => {
 })
 
 const clearConnection = () => {
-  svgContainer.value?.querySelector('.svg-conn-selected')?.classList.remove('svg-conn-selected')
+  selectedConnectionGroup.value?.classList.remove('svg-conn-selected')
+  selectedConnectionGroup.value = null
   selectedConnection.value = null
 }
 const selectConnection = (conn: DiagramConnection, el: SVGGElement) => {
   if (selectedId.value) selectedId.value = null
   const same = selectedConnection.value?.artifact_id === conn.artifact_id
   clearConnection()
-  if (!same) { selectedConnection.value = conn; el.classList.add('svg-conn-selected') }
+  if (!same) {
+    selectedConnection.value = conn
+    selectedConnectionGroup.value = el
+    el.classList.add('svg-conn-selected')
+  }
 }
 const selectEntity = (id: string) => {
   clearConnection()
@@ -365,6 +384,13 @@ onUnmounted(() => {
         :diagram-id="diagramId"
         :diagram-name="detail.name"
       />
+      <RouterLink
+        v-if="detail && !isGlobalDiagram"
+        :to="{ path: '/promote', query: { diagram_id: diagramId } }"
+        class="promote-btn"
+      >
+        ↑ Promote to Global
+      </RouterLink>
       <RouterLink
         v-if="detail"
         :to="{ path: '/diagram/edit', query: { id: diagramId } }"
@@ -627,6 +653,11 @@ onUnmounted(() => {
 .page-hdr { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; }
 .back { font-size: 13px; color: #6b7280; } .back:hover { color: #374151; text-decoration: none; }
 .pg-title { font-size: 20px; font-weight: 700; flex: 1; margin: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.promote-btn {
+  padding: 5px 16px; background: #fef3c7; border: 1px solid #fde68a; border-radius: 6px;
+  font-size: 13px; font-weight: 500; color: #92400e; text-decoration: none; flex-shrink: 0;
+}
+.promote-btn:hover { background: #fde68a; text-decoration: none; }
 .edit-btn { padding: 5px 16px; background: #f3f4f6; border: 1px solid #d1d5db; border-radius: 6px; font-size: 13px; font-weight: 500; color: #374151; text-decoration: none; flex-shrink: 0; } .edit-btn:hover { background: #e5e7eb; }
 .delete-btn { padding: 5px 16px; background: #fef2f2; border: 1px solid #fecaca; border-radius: 6px; font-size: 13px; font-weight: 600; color: #b91c1c; cursor: pointer; flex-shrink: 0; }
 .delete-btn:hover { background: #fee2e2; }
@@ -661,8 +692,14 @@ onUnmounted(() => {
 .svg-wrap :deep(.svg-selected) polyline,
 .svg-wrap :deep(.svg-selected) ellipse { stroke: #2563eb !important; stroke-width: 2.5 !important; }
 .svg-wrap :deep([data-conn-id]) { cursor: pointer; }
-.svg-wrap :deep([data-conn-id]:hover) path, .svg-wrap :deep([data-conn-id]:hover) polygon { stroke: #2563eb !important; stroke-width: 2 !important; }
-.svg-wrap :deep(.svg-conn-selected) path, .svg-wrap :deep(.svg-conn-selected) polygon { stroke: #2563eb !important; stroke-width: 2.5 !important; }
+.svg-wrap :deep([data-conn-id]:hover) path,
+.svg-wrap :deep([data-conn-id]:hover) polygon,
+.svg-wrap :deep([data-conn-id]:hover) line,
+.svg-wrap :deep([data-conn-id]:hover) polyline { stroke: #2563eb !important; stroke-width: 2 !important; }
+.svg-wrap :deep(.svg-conn-selected) path,
+.svg-wrap :deep(.svg-conn-selected) polygon,
+.svg-wrap :deep(.svg-conn-selected) line,
+.svg-wrap :deep(.svg-conn-selected) polyline { stroke: #2563eb !important; stroke-width: 2.5 !important; }
 .reset-btn { position: absolute; top: 8px; right: 8px; padding: 4px 10px; background: rgba(255,255,255,.92); border: 1px solid #d1d5db; border-radius: 5px; font-size: 12px; cursor: pointer; color: #374151; }
 .reset-btn:hover { background: white; }
 .zoom-hint { position: absolute; bottom: 6px; left: 50%; transform: translateX(-50%); font-size: 11px; color: #9ca3af; background: rgba(255,255,255,.8); padding: 2px 8px; border-radius: 4px; pointer-events: none; white-space: nowrap; }

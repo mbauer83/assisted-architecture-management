@@ -1,299 +1,23 @@
 <script setup lang="ts">
-import { inject, ref, computed, watch, onMounted, onUnmounted } from 'vue'
-import { Effect, Exit } from 'effect'
+import { computed, inject, onMounted, onUnmounted } from 'vue'
 import { useRoute } from 'vue-router'
 import { modelServiceKey } from '../keys'
-import EntitySearchInput from '../components/EntitySearchInput.vue'
-import ArchimateTypeGlyph from '../components/ArchimateTypeGlyph.vue'
 import EntitySelectionList from '../components/EntitySelectionList.vue'
-import type { PromotionPlan, PromotionResult, EntityDisplayInfo, EntityContextConnection } from '../../domain'
-import type { RepoError } from '../../ports/ModelRepository'
-import { useQuery } from '../composables/useQuery'
-import { useMutation } from '../composables/useMutation'
-
-type ConflictStrategy = 'accept_engagement' | 'accept_enterprise' | 'merge'
-type Step = 'pick' | 'review' | 'execute' | 'done'
+import PromotionArtifactGroup from '../components/PromotionArtifactGroup.vue'
+import PromotionPlanSummary from '../components/PromotionPlanSummary.vue'
+import { usePromotionWorkflow } from '../composables/usePromotionWorkflow'
+import { artifactKindLabel } from '../composables/promotionShared'
 
 const svc = inject(modelServiceKey)!
 const route = useRoute()
-const toGlyphKey = (t: string) => t.replace(/[A-Z]/g, (c, i) => (i > 0 ? '-' : '') + c.toLowerCase())
 
-const step = ref<Step>('pick')
-const selectedEntityId = ref('')
-const selectedEntityName = ref('')
-
-const includedEntities = ref<EntityDisplayInfo[]>([])
-const newInclusionIds = ref<Set<string>>(new Set())
-const allModelConns = ref<Map<string, EntityContextConnection>>(new Map())
-const includedConnIds = ref<Set<string>>(new Set())
-const expandedConnectionEntityIds = ref<Set<string>>(new Set())
-const expandedRelatedEntityIds = ref<Set<string>>(new Set())
-const includedEntityIds = computed(() => new Set(includedEntities.value.map((e) => e.artifact_id)))
-
-const searchQuery = ref('')
-const searchResults = ref<EntityDisplayInfo[]>([])
-const showDropdown = ref(false)
-let searchTimer: ReturnType<typeof setTimeout> | null = null
-
-const planQuery = useQuery<PromotionPlan, RepoError>()
-const executeMutation = useMutation<PromotionResult, RepoError>()
-
-const conflictStrategies = ref<Record<string, ConflictStrategy>>({})
-
-watch(() => planQuery.data.value, (newPlan) => {
-  if (!newPlan) return
-  conflictStrategies.value = Object.fromEntries(
-    newPlan.conflicts.map((c) => [
-      c.engagement_id,
-      conflictStrategies.value[c.engagement_id] ?? 'accept_enterprise',
-    ]),
-  )
-})
-
-const executeError = computed(() => {
-  const r = executeMutation.result.value
-  if (r && !r.executed) return r.verification_errors.join('\n') || 'Execution failed'
-  return executeMutation.errorMessage.value
-})
-
-const selectionRows = computed(() =>
-  includedEntities.value.map((entity) => ({
-    entity,
-    newInclusion: newInclusionIds.value.has(entity.artifact_id),
-    badgeText: newInclusionIds.value.has(entity.artifact_id) ? 'new' : undefined,
-    actionKind: 'remove' as const,
-    actionTitle: 'Remove entity from promotion set',
-  })),
-)
-
-const relatedEntitiesById = computed<Record<string, EntityDisplayInfo[]>>(() => {
-  const related: Record<string, EntityDisplayInfo[]> = {}
-  const seenByEntity = new Map<string, Set<string>>()
-  for (const entity of includedEntities.value) related[entity.artifact_id] = []
-  for (const conn of allModelConns.value.values()) {
-    const endpoints: Array<[string, string]> = [
-      [conn.source, conn.target],
-      [conn.target, conn.source],
-    ]
-    for (const [ownerId, otherId] of endpoints) {
-      if (!includedEntityIds.value.has(ownerId) || includedEntityIds.value.has(otherId)) continue
-      const seen = seenByEntity.get(ownerId) ?? new Set<string>()
-      if (seen.has(otherId)) continue
-      seen.add(otherId)
-      seenByEntity.set(ownerId, seen)
-      const name = ownerId === conn.source ? (conn.target_name ?? otherId) : (conn.source_name ?? otherId)
-      const artifactType = ownerId === conn.source ? conn.target_artifact_type : conn.source_artifact_type
-      const domain = ownerId === conn.source ? conn.target_domain : conn.source_domain
-      const scope = ownerId === conn.source ? conn.target_scope : conn.source_scope
-      related[ownerId].push({
-        artifact_id: otherId, name, artifact_type: artifactType, domain,
-        subdomain: '', status: scope, display_alias: '',
-        element_type: artifactType, element_label: name,
-      })
-    }
-  }
-  for (const entityId of Object.keys(related)) related[entityId].sort((a, b) => a.name.localeCompare(b.name))
-  return related
-})
-
-const unresolvedConflicts = computed(() =>
-  (planQuery.data.value?.conflicts ?? []).filter(c => !conflictStrategies.value[c.engagement_id])
-)
-const totalToPromote = computed(() =>
-  (planQuery.data.value?.entities_to_add.length ?? 0) + (planQuery.data.value?.conflicts.length ?? 0)
-)
-const canExecute = computed(() =>
-  includedEntities.value.length > 0 && unresolvedConflicts.value.length === 0
-)
-
-const refreshDiscovery = async () => {
-  const exit = await Effect.runPromiseExit(
-    svc.discoverDiagramEntities({
-      includedEntityIds: includedEntities.value.map((e) => e.artifact_id),
-      query: searchQuery.value.trim() || undefined,
-      maxHops: 1,
-      limit: 20,
-    }),
-  )
-  Exit.match(exit, {
-    onSuccess: (discovery) => {
-      allModelConns.value = new Map(discovery.candidate_connections.map((conn) => [conn.artifact_id, conn]))
-      searchResults.value = discovery.search_results.filter((item) => !includedEntityIds.value.has(item.artifact_id))
-      showDropdown.value = Boolean(searchQuery.value.trim() && searchResults.value.length)
-    },
-    onFailure: () => { /* discovery errors are non-critical; state stays as-is */ },
-  })
-}
-
-const refreshPlan = () => {
-  if (!includedEntities.value.length) {
-    planQuery.reset()
-    conflictStrategies.value = {}
-    return
-  }
-  planQuery.run(svc.planPromotion({
-    entity_id: selectedEntityId.value || includedEntities.value[0]?.artifact_id,
-    entity_ids: includedEntities.value.map((e) => e.artifact_id),
-    connection_ids: [...includedConnIds.value],
-  }))
-}
-
-const onSearchInput = () => {
-  if (searchTimer) clearTimeout(searchTimer)
-  const q = searchQuery.value.trim()
-  if (!q) {
-    searchResults.value = []
-    showDropdown.value = false
-    void refreshDiscovery()
-    return
-  }
-  searchTimer = setTimeout(() => { void refreshDiscovery() }, 280)
-}
-
-const closeDropdown = () => { setTimeout(() => { showDropdown.value = false }, 150) }
-
-const addEntity = async (entity: EntityDisplayInfo) => {
-  if (includedEntityIds.value.has(entity.artifact_id)) return
-  includedEntities.value.push(entity)
-  newInclusionIds.value = new Set(newInclusionIds.value).add(entity.artifact_id)
-  showDropdown.value = false
-  searchQuery.value = ''
-  await refreshDiscovery()
-  const nextConnIds = new Set(includedConnIds.value)
-  for (const conn of allModelConns.value.values()) {
-    const otherId = conn.source === entity.artifact_id ? conn.target : conn.source
-    if ((conn.source === entity.artifact_id || conn.target === entity.artifact_id) && includedEntityIds.value.has(otherId)) {
-      nextConnIds.add(conn.artifact_id)
-    }
-  }
-  includedConnIds.value = nextConnIds
-  refreshPlan()
-}
-
-const removeEntity = async (artifactId: string) => {
-  includedEntities.value = includedEntities.value.filter((e) => e.artifact_id !== artifactId)
-  newInclusionIds.value = new Set([...newInclusionIds.value].filter(id => id !== artifactId))
-  expandedConnectionEntityIds.value = new Set([...expandedConnectionEntityIds.value].filter(id => id !== artifactId))
-  expandedRelatedEntityIds.value = new Set([...expandedRelatedEntityIds.value].filter(id => id !== artifactId))
-  includedConnIds.value = new Set(
-    [...includedConnIds.value].filter((id) => {
-      const conn = allModelConns.value.get(id)
-      return !(conn && (conn.source === artifactId || conn.target === artifactId))
-    }),
-  )
-  await refreshDiscovery()
-  refreshPlan()
-}
-
-const toggleConnections = (entityId: string) => {
-  const next = new Set(expandedConnectionEntityIds.value)
-  if (next.has(entityId)) next.delete(entityId)
-  else next.add(entityId)
-  expandedConnectionEntityIds.value = next
-}
-
-const toggleRelated = (entityId: string) => {
-  const next = new Set(expandedRelatedEntityIds.value)
-  if (next.has(entityId)) next.delete(entityId)
-  else next.add(entityId)
-  expandedRelatedEntityIds.value = next
-}
-
-const toggleConnection = (id: string) => {
-  const next = new Set(includedConnIds.value)
-  if (next.has(id)) next.delete(id)
-  else next.add(id)
-  includedConnIds.value = next
-  refreshPlan()
-}
-
-const loadSelectedEntity = async (id: string, fallbackName: string) => {
-  const exit = await Effect.runPromiseExit(svc.getEntity(id))
-  return Exit.match(exit, {
-    onSuccess: (entity) => ({
-      artifact_id: entity.artifact_id, name: entity.name,
-      artifact_type: entity.artifact_type, domain: entity.domain,
-      subdomain: entity.subdomain, status: entity.status,
-      display_alias: '', element_type: entity.artifact_type, element_label: entity.name,
-    }),
-    onFailure: () => {
-      selectedEntityName.value = fallbackName
-      return null
-    },
-  })
-}
-
-const startPromotion = async () => {
-  if (!selectedEntityId.value) return
-  const rootEntity = await loadSelectedEntity(selectedEntityId.value, selectedEntityName.value)
-  if (!rootEntity) {
-    planQuery.reset()
-    return
-  }
-  selectedEntityName.value = rootEntity.name
-  includedEntities.value = [rootEntity]
-  newInclusionIds.value = new Set()
-  includedConnIds.value = new Set()
-  expandedConnectionEntityIds.value = new Set()
-  expandedRelatedEntityIds.value = new Set()
-  executeMutation.reset()
-  await refreshDiscovery()
-  refreshPlan()
-  step.value = 'review'
-}
-
-const onEntityPicked = (id: string, name: string) => {
-  selectedEntityId.value = id
-  selectedEntityName.value = name
-}
-
-const execute = () => {
-  if (!canExecute.value) return
-  step.value = 'execute'
-  const resolutions = Object.entries(conflictStrategies.value).map(([id, strategy]) => ({
-    engagement_id: id, strategy,
-  }))
-  void executeMutation.run(svc.executePromotion({
-    entity_id: selectedEntityId.value || includedEntities.value[0]?.artifact_id,
-    entity_ids: includedEntities.value.map((e) => e.artifact_id),
-    connection_ids: [...includedConnIds.value],
-    conflict_resolutions: resolutions,
-    dry_run: false,
-  })).then((exit) => {
-    Exit.match(exit, {
-      onSuccess: (r) => { step.value = r.executed ? 'done' : 'review' },
-      onFailure: () => { step.value = 'review' },
-    })
-  })
-}
-
-const restart = () => {
-  step.value = 'pick'
-  selectedEntityId.value = ''
-  selectedEntityName.value = ''
-  includedEntities.value = []
-  newInclusionIds.value = new Set()
-  allModelConns.value = new Map()
-  includedConnIds.value = new Set()
-  expandedConnectionEntityIds.value = new Set()
-  expandedRelatedEntityIds.value = new Set()
-  planQuery.reset()
-  executeMutation.reset()
-  conflictStrategies.value = {}
-}
+const workflow = usePromotionWorkflow(svc, computed(() => route.query as Record<string, unknown>))
 
 onMounted(() => {
-  const preId = route.query.entity_id as string | undefined
-  if (preId) {
-    selectedEntityId.value = preId
-    const parts = preId.split('.')
-    selectedEntityName.value = parts.length > 2 ? parts.slice(2).join('-') : preId
-    void startPromotion()
-  }
+  void workflow.initializeFromRoute()
 })
-
 onUnmounted(() => {
-  if (searchTimer) clearTimeout(searchTimer)
+  workflow.cleanup()
 })
 </script>
 
@@ -304,14 +28,14 @@ onUnmounted(() => {
         Promote to Global Repository
       </h1>
       <p class="page-sub">
-        Build an explicit promotion set of entities and connections, review any conflicts, then execute.
+        Build an explicit promotion set of entities, documents, and diagrams, review conflicts, then execute.
       </p>
     </div>
 
     <div class="steps">
       <div
         class="step"
-        :class="{ active: step === 'pick', done: step !== 'pick' }"
+        :class="{ active: workflow.step.value === 'pick', done: workflow.step.value !== 'pick' }"
       >
         1. Select root
       </div>
@@ -320,7 +44,7 @@ onUnmounted(() => {
       </div>
       <div
         class="step"
-        :class="{ active: step === 'review', done: step === 'execute' || step === 'done' }"
+        :class="{ active: workflow.step.value === 'review', done: workflow.step.value === 'execute' || workflow.step.value === 'done' }"
       >
         2. Curate set
       </div>
@@ -329,321 +53,219 @@ onUnmounted(() => {
       </div>
       <div
         class="step"
-        :class="{ active: step === 'execute' || step === 'done' }"
+        :class="{ active: workflow.step.value === 'execute' || workflow.step.value === 'done' }"
       >
         3. Execute
       </div>
     </div>
 
     <div
-      v-if="step === 'pick'"
-      class="card step-card"
+      v-if="workflow.step.value === 'pick'"
+      class="card"
     >
       <h2 class="card-title">
-        Select the first entity to promote
+        Select the first artifact to promote
       </h2>
       <p class="card-hint">
-        Promotion now uses only the entities and connections you explicitly include.
+        Start with an entity, document, or diagram, then add anything else that belongs in the same global promotion.
       </p>
-      <EntitySearchInput
-        placeholder="Search engagement entities…"
-        @select="onEntityPicked"
-      />
+      <div class="search-wrap">
+        <input
+          v-model="workflow.rootQuery.value"
+          class="inp"
+          placeholder="Search entities, documents, or diagrams…"
+          @input="workflow.scheduleRootSearch"
+          @blur="workflow.closeRootDropdown"
+          @focus="() => { if (workflow.rootResults.value.length) workflow.showRootDropdown.value = true }"
+        >
+        <div
+          v-if="workflow.showRootDropdown.value"
+          class="dropdown"
+        >
+          <button
+            v-for="artifact in workflow.rootResults.value"
+            :key="artifact.artifact_id"
+            class="dd-item"
+            @mousedown.prevent="workflow.selectRoot(artifact)"
+          >
+            <span class="dd-name">{{ artifact.name }}</span>
+            <span class="dd-type">{{ artifactKindLabel(artifact.record_type) }}</span>
+            <span class="dd-id mono">{{ artifact.artifact_id }}</span>
+          </button>
+        </div>
+      </div>
       <div
-        v-if="selectedEntityId"
-        class="selected-entity"
+        v-if="workflow.selectedRoot.value"
+        class="selected-artifact"
       >
         <span class="sel-label">Selected:</span>
-        <span class="sel-name">{{ selectedEntityName }}</span>
-        <span class="sel-id mono">{{ selectedEntityId }}</span>
+        <span class="sel-name">{{ workflow.selectedRoot.value.name }}</span>
+        <span class="artifact-kind-badge">{{ artifactKindLabel(workflow.selectedRoot.value.record_type) }}</span>
+        <span class="sel-id mono">{{ workflow.selectedRoot.value.artifact_id }}</span>
       </div>
       <div class="step-actions">
         <button
           class="btn btn--primary"
-          :disabled="!selectedEntityId"
-          @click="startPromotion"
+          :disabled="!workflow.selectedRoot.value"
+          @click="workflow.startPromotion"
         >
           Build promotion set →
         </button>
       </div>
       <p
-        v-if="planQuery.errorMessage.value"
+        v-if="workflow.planQuery.errorMessage.value"
         class="error-msg"
       >
-        {{ planQuery.errorMessage.value }}
+        {{ workflow.planQuery.errorMessage.value }}
       </p>
     </div>
 
-    <template v-if="step === 'review'">
+    <template v-if="workflow.step.value === 'review'">
       <div class="review-grid">
-        <div class="card step-card">
+        <div class="card">
           <div class="plan-header">
-            <h2 class="card-title">
-              Promotion set for <span class="mono">{{ selectedEntityName }}</span>
-            </h2>
+            <div>
+              <h2 class="card-title">
+                Promotion set for <span class="mono">{{ workflow.selectedRoot.value?.name }}</span>
+              </h2>
+              <p class="card-hint card-hint--compact">
+                Root {{ workflow.selectedRoot.value?.record_type }} · {{ workflow.totalSelectedArtifacts.value }} selected artifact{{ workflow.totalSelectedArtifacts.value === 1 ? '' : 's' }}
+              </p>
+            </div>
             <button
               class="btn btn--ghost"
-              @click="restart"
+              @click="workflow.restart"
             >
               ← Start over
             </button>
           </div>
 
           <div class="form-row">
-            <label class="section-title">Add Entities</label>
+            <label class="section-title">Add Artifacts</label>
             <div class="search-wrap">
               <input
-                v-model="searchQuery"
+                v-model="workflow.addQuery.value"
                 class="inp"
-                placeholder="Search by name, type, domain…"
-                @input="onSearchInput"
-                @blur="closeDropdown"
-                @focus="() => { if (searchResults.length) showDropdown = true }"
+                placeholder="Search entities, documents, or diagrams…"
+                @input="workflow.scheduleAddSearch"
+                @blur="workflow.closeAddDropdown"
+                @focus="() => { if (workflow.addResults.value.length) workflow.showAddDropdown.value = true }"
               >
               <div
-                v-if="showDropdown"
+                v-if="workflow.showAddDropdown.value"
                 class="dropdown"
               >
                 <button
-                  v-for="r in searchResults"
-                  :key="r.artifact_id"
+                  v-for="artifact in workflow.addResults.value"
+                  :key="artifact.artifact_id"
                   class="dd-item"
-                  @mousedown.prevent="addEntity(r)"
+                  @mousedown.prevent="workflow.addArtifact(artifact)"
                 >
-                  <span
-                    class="dd-glyph"
-                    :title="r.element_type || r.artifact_type"
-                  ><ArchimateTypeGlyph
-                    :type="toGlyphKey(r.element_type || r.artifact_type)"
-                    :size="16"
-                  /></span>
-                  <span class="dd-name">{{ r.name }}</span>
-                  <span class="dd-domain">{{ r.domain }}</span>
+                  <span class="dd-name">{{ artifact.name }}</span>
+                  <span class="dd-type">{{ artifactKindLabel(artifact.record_type) }}</span>
+                  <span class="dd-id mono">{{ artifact.artifact_id }}</span>
                 </button>
               </div>
             </div>
           </div>
 
           <div
-            v-if="includedEntities.length"
+            v-if="workflow.includedEntities.value.length"
             class="form-row"
           >
-            <label class="section-title">Included Entities ({{ includedEntities.length }})</label>
+            <label class="section-title">Included Entities ({{ workflow.includedEntities.value.length }})</label>
             <EntitySelectionList
-              :rows="selectionRows"
-              :candidate-connections="[...allModelConns.values()]"
-              :included-entity-ids="[...includedEntityIds]"
-              :included-connection-ids="[...includedConnIds]"
-              :related-entities-by-id="relatedEntitiesById"
-              :expanded-connection-entity-ids="[...expandedConnectionEntityIds]"
-              :expanded-related-entity-ids="[...expandedRelatedEntityIds]"
-              @toggle-connections="toggleConnections"
-              @toggle-related="toggleRelated"
-              @toggle-connection="toggleConnection"
-              @add-related-entity="addEntity"
-              @entity-action="removeEntity"
+              :rows="workflow.selectionRows.value"
+              :candidate-connections="[...workflow.allModelConns.value.values()]"
+              :included-entity-ids="[...workflow.includedEntityIds.value]"
+              :included-connection-ids="[...workflow.includedConnIds.value]"
+              :related-entities-by-id="workflow.relatedEntitiesById.value"
+              :expanded-connection-entity-ids="[...workflow.expandedConnectionEntityIds.value]"
+              :expanded-related-entity-ids="[...workflow.expandedRelatedEntityIds.value]"
+              @toggle-connections="workflow.toggleConnections"
+              @toggle-related="workflow.toggleRelated"
+              @toggle-connection="workflow.toggleConnection"
+              @add-related-entity="workflow.addArtifact({ artifact_id: $event.artifact_id, name: $event.name, record_type: 'entity', status: $event.status })"
+              @entity-action="workflow.removeEntity"
             />
           </div>
 
+          <PromotionArtifactGroup
+            v-if="workflow.includedDocuments.value.length"
+            title="Included Documents"
+            :artifacts="workflow.includedDocuments.value"
+            @remove="workflow.removeArtifact('document', $event)"
+          />
+          <PromotionArtifactGroup
+            v-if="workflow.includedDiagrams.value.length"
+            title="Included Diagrams"
+            :artifacts="workflow.includedDiagrams.value"
+            @remove="workflow.removeArtifact('diagram', $event)"
+          />
+
           <div
-            v-if="executeError"
+            v-if="workflow.executeError.value"
             class="error-msg"
           >
-            {{ executeError }}
+            {{ workflow.executeError.value }}
           </div>
-
           <div class="step-actions">
             <button
               class="btn btn--primary"
-              :disabled="!canExecute || executeMutation.running.value || planQuery.loading.value"
-              @click="execute"
+              :disabled="!workflow.canExecute.value || workflow.executeMutation.running.value || workflow.planQuery.loading.value"
+              @click="workflow.execute"
             >
-              {{ executeMutation.running.value ? 'Promoting…' : `Promote ${totalToPromote} ${totalToPromote === 1 ? 'entity' : 'entities'} →` }}
+              {{ workflow.executeMutation.running.value ? 'Promoting…' : `Promote ${workflow.promotionTargetCount.value} ${workflow.promotionTargetCount.value === 1 ? 'artifact' : 'artifacts'} →` }}
             </button>
           </div>
         </div>
 
-        <div class="card step-card">
-          <h2 class="card-title">
-            Plan Summary
-          </h2>
-          <div
-            v-if="planQuery.loading.value"
-            class="state-msg"
-          >
-            Refreshing plan…
-          </div>
-          <p
-            v-if="planQuery.errorMessage.value"
-            class="error-msg"
-          >
-            {{ planQuery.errorMessage.value }}
-          </p>
-          <template v-if="planQuery.data.value">
-            <div
-              v-if="planQuery.data.value.warnings.length"
-              class="warnings-box"
-            >
-              <div
-                v-for="w in planQuery.data.value.warnings"
-                :key="w"
-                class="warn-item"
-              >
-                {{ w }}
-              </div>
-            </div>
-
-            <div
-              v-if="planQuery.data.value.already_in_enterprise.length"
-              class="section"
-            >
-              <h3 class="section-title">
-                Already in global repository
-              </h3>
-              <ul class="id-list id-list--muted">
-                <li
-                  v-for="id in planQuery.data.value.already_in_enterprise"
-                  :key="id"
-                  class="mono"
-                >
-                  {{ id }}
-                </li>
-              </ul>
-            </div>
-
-            <div
-              v-if="planQuery.data.value.entities_to_add.length"
-              class="section"
-            >
-              <h3 class="section-title">
-                New entities to promote
-              </h3>
-              <ul class="id-list">
-                <li
-                  v-for="id in planQuery.data.value.entities_to_add"
-                  :key="id"
-                  class="mono"
-                >
-                  {{ id }}
-                </li>
-              </ul>
-            </div>
-
-            <div
-              v-if="planQuery.data.value.conflicts.length"
-              class="section"
-            >
-              <h3 class="section-title section-title--warn">
-                Conflicts
-              </h3>
-              <div
-                v-for="c in planQuery.data.value.conflicts"
-                :key="c.engagement_id"
-                class="conflict-card"
-              >
-                <div class="conflict-header">
-                  <span class="mono">{{ c.engagement_id }}</span>
-                  <span class="conflict-vs"> vs global </span>
-                  <span class="mono">{{ c.enterprise_id }}</span>
-                </div>
-                <div class="conflict-strategies">
-                  <label
-                    v-for="opt in [
-                      { value: 'accept_enterprise', label: 'Keep global version' },
-                      { value: 'accept_engagement', label: 'Replace with selected version' },
-                    ]"
-                    :key="opt.value"
-                    class="strategy-opt"
-                  >
-                    <input
-                      v-model="conflictStrategies[c.engagement_id]"
-                      type="radio"
-                      :name="`conflict-${c.engagement_id}`"
-                      :value="opt.value"
-                    >
-                    {{ opt.label }}
-                  </label>
-                </div>
-              </div>
-            </div>
-
-            <div
-              v-if="planQuery.data.value.connection_ids.length"
-              class="section"
-            >
-              <h3 class="section-title">
-                Selected connections
-              </h3>
-              <ul class="id-list">
-                <li
-                  v-for="id in planQuery.data.value.connection_ids"
-                  :key="id"
-                  class="mono"
-                >
-                  {{ id }}
-                </li>
-              </ul>
-            </div>
-
-            <div
-              v-if="unresolvedConflicts.length"
-              class="warn-banner"
-            >
-              {{ unresolvedConflicts.length }} conflict{{ unresolvedConflicts.length > 1 ? 's' : '' }}
-              still need{{ unresolvedConflicts.length === 1 ? 's' : '' }} a resolution strategy.
-            </div>
-          </template>
-        </div>
+        <PromotionPlanSummary
+          :loading="workflow.planQuery.loading.value"
+          :error-message="workflow.planQuery.errorMessage.value ?? ''"
+          :plan="workflow.planQuery.data.value ?? null"
+          :strategies="workflow.conflictStrategies.value"
+          :unresolved-count="workflow.unresolvedConflicts.value.length"
+          @set-strategy="workflow.setConflictStrategy"
+        />
       </div>
     </template>
 
     <div
-      v-if="step === 'done' && executeMutation.result.value?.executed"
-      class="card step-card step-card--success"
+      v-if="workflow.step.value === 'done' && workflow.executeMutation.result.value?.executed"
+      class="card step-card--success"
     >
       <h2 class="card-title card-title--success">
         Promotion complete
       </h2>
       <div
-        v-if="executeMutation.result.value.copied_files.length"
+        v-for="entry in [
+          { title: 'Files added to global repo', items: workflow.executeMutation.result.value.copied_files },
+          { title: 'Files updated', items: workflow.executeMutation.result.value.updated_files },
+        ]"
+        v-show="entry.items.length"
+        :key="entry.title"
         class="result-section"
       >
         <h3 class="section-title">
-          Files added to global repo
+          {{ entry.title }}
         </h3>
         <ul class="id-list">
           <li
-            v-for="f in executeMutation.result.value.copied_files"
-            :key="f"
+            v-for="file in entry.items"
+            :key="file"
             class="mono"
           >
-            {{ f }}
-          </li>
-        </ul>
-      </div>
-      <div
-        v-if="executeMutation.result.value.updated_files.length"
-        class="result-section"
-      >
-        <h3 class="section-title">
-          Files updated
-        </h3>
-        <ul class="id-list">
-          <li
-            v-for="f in executeMutation.result.value.updated_files"
-            :key="f"
-            class="mono"
-          >
-            {{ f }}
+            {{ file }}
           </li>
         </ul>
       </div>
       <div class="step-actions">
         <button
           class="btn btn--primary"
-          @click="restart"
+          @click="workflow.restart"
         >
-          Promote another entity
+          Promote another artifact
         </button>
       </div>
     </div>
@@ -654,58 +276,60 @@ onUnmounted(() => {
 .promote-view { max-width: 1280px; }
 .page-header { margin-bottom: 24px; }
 .page-title { font-size: 22px; font-weight: 600; margin-bottom: 6px; }
-.page-sub { font-size: 13px; color: #6b7280; max-width: 720px; }
+.page-sub { font-size: 13px; color: #6b7280; max-width: 760px; }
 .steps { display: flex; align-items: center; gap: 6px; margin-bottom: 24px; }
 .step { padding: 5px 12px; border-radius: 20px; font-size: 12px; font-weight: 500; background: #f1f5f9; color: #64748b; }
 .step.active { background: #2563eb; color: white; }
 .step.done { background: #dcfce7; color: #166534; }
 .step-arrow { color: #9ca3af; font-size: 16px; }
-.review-grid { display: grid; grid-template-columns: minmax(0, 1.3fr) minmax(320px, .8fr); gap: 16px; align-items: start; }
+.review-grid { display: grid; grid-template-columns: minmax(0, 1.3fr) minmax(320px, 0.8fr); gap: 16px; align-items: start; }
 @media (max-width: 980px) { .review-grid { grid-template-columns: 1fr; } }
 .card { background: white; border-radius: 8px; border: 1px solid #e5e7eb; padding: 20px 24px; margin-bottom: 16px; }
 .step-card--success { border-color: #bbf7d0; background: #f0fdf4; }
 .card-title { font-size: 16px; font-weight: 600; color: #111827; margin-bottom: 10px; }
 .card-title--success { color: #166534; }
 .card-hint { font-size: 13px; color: #6b7280; margin-bottom: 14px; }
+.card-hint--compact { margin-bottom: 0; }
 .plan-header { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; margin-bottom: 10px; }
 .form-row { margin-bottom: 16px; }
-.section { margin-top: 18px; }
-.section-title { font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; color: #374151; margin-bottom: 8px; }
-.section-title--warn { color: #b45309; }
+.section-title { font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; color: #374151; margin-bottom: 8px; display: block; }
 .search-wrap { position: relative; }
 .inp { width: 100%; padding: 7px 10px; border-radius: 6px; border: 1px solid #d1d5db; font-size: 13px; outline: none; box-sizing: border-box; background: white; }
 .inp:focus { border-color: #2563eb; }
-.dropdown { position: absolute; top: calc(100% + 3px); left: 0; right: 0; background: white; border: 1px solid #d1d5db; border-radius: 6px; box-shadow: 0 4px 12px rgba(0,0,0,.1); z-index: 100; max-height: 260px; overflow-y: auto; }
-.dd-item { display: flex; align-items: center; gap: 6px; width: 100%; text-align: left; padding: 8px 10px; background: none; border: none; border-bottom: 1px solid #f3f4f6; cursor: pointer; font-size: 13px; }
+.dropdown {
+  position: absolute; top: calc(100% + 3px); left: 0; right: 0; background: white;
+  border: 1px solid #d1d5db; border-radius: 6px; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  z-index: 100; max-height: 260px; overflow-y: auto;
+}
+.dd-item {
+  display: flex; align-items: center; gap: 8px; width: 100%; text-align: left; padding: 8px 10px;
+  background: none; border: none; border-bottom: 1px solid #f3f4f6; cursor: pointer; font-size: 13px;
+}
 .dd-item:last-child { border-bottom: none; }
 .dd-item:hover { background: #f0f7ff; }
-.dd-glyph { display: flex; align-items: center; flex-shrink: 0; color: #4b5563; }
 .dd-name { font-weight: 500; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.dd-domain { font-size: 11px; color: #9ca3af; white-space: nowrap; }
-.id-list { list-style: none; display: flex; flex-direction: column; gap: 3px; }
-.id-list--muted .mono { color: #9ca3af; }
-.conflict-card { border: 1px solid #fde68a; border-radius: 6px; padding: 10px 14px; margin-bottom: 8px; background: #fffbeb; }
-.conflict-header { margin-bottom: 8px; }
-.conflict-vs { color: #9ca3af; margin: 0 6px; font-size: 12px; }
-.conflict-strategies { display: flex; gap: 16px; flex-wrap: wrap; }
-.strategy-opt { display: flex; align-items: center; gap: 6px; font-size: 13px; cursor: pointer; }
-.strategy-opt input[type=radio] { accent-color: #2563eb; }
-.warnings-box { background: #fffbeb; border: 1px solid #fde68a; border-radius: 6px; padding: 10px 14px; margin-bottom: 14px; }
-.warn-item { font-size: 13px; color: #92400e; }
-.warn-banner { margin-top: 14px; padding: 10px 14px; background: #fef3c7; border: 1px solid #fde68a; border-radius: 6px; font-size: 13px; color: #92400e; font-weight: 500; }
-.step-actions { margin-top: 20px; display: flex; gap: 10px; }
-.selected-entity { display: flex; align-items: center; gap: 10px; margin: 12px 0; padding: 10px 14px; background: #eff6ff; border-radius: 6px; border: 1px solid #bfdbfe; }
+.dd-type { font-size: 11px; color: #475569; white-space: nowrap; }
+.dd-id { font-size: 11px; color: #9ca3af; }
+.selected-artifact {
+  display: flex; align-items: center; gap: 10px; margin: 12px 0; padding: 10px 14px;
+  background: #eff6ff; border-radius: 6px; border: 1px solid #bfdbfe; flex-wrap: wrap;
+}
 .sel-label { font-size: 11px; font-weight: 700; text-transform: uppercase; color: #3b82f6; }
 .sel-name { font-weight: 600; color: #1e40af; }
+.artifact-kind-badge {
+  display: inline-flex; align-items: center; border-radius: 999px; padding: 2px 8px;
+  background: #e2e8f0; color: #334155; font-size: 11px; font-weight: 600;
+}
 .sel-id { font-size: 11px; color: #6b7280; }
+.step-actions { margin-top: 20px; display: flex; gap: 10px; }
 .btn { padding: 8px 18px; border-radius: 6px; font-size: 13px; font-weight: 500; cursor: pointer; border: 1px solid transparent; }
 .btn--primary { background: #2563eb; color: white; }
 .btn--primary:hover:not(:disabled) { background: #1d4ed8; }
-.btn--primary:disabled { opacity: .5; cursor: not-allowed; }
+.btn--primary:disabled { opacity: 0.5; cursor: not-allowed; }
 .btn--ghost { background: transparent; color: #6b7280; border-color: #d1d5db; }
 .btn--ghost:hover { background: #f9fafb; }
-.state-msg { font-size: 13px; color: #6b7280; }
-.error-msg { margin-top: 12px; color: #dc2626; font-size: 13px; }
+.error-msg { margin-top: 12px; color: #dc2626; font-size: 13px; white-space: pre-wrap; }
 .result-section { margin-top: 14px; }
+.id-list { list-style: none; display: flex; flex-direction: column; gap: 3px; }
 .mono { font-family: monospace; font-size: 12px; }
 </style>

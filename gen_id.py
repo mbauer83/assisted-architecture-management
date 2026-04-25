@@ -7,9 +7,11 @@
 
 import secrets
 import string
-import typer
 from pathlib import Path
 from typing import Annotated, Optional
+
+import typer
+
 
 def main(
     n: Annotated[int, typer.Argument(help="Length of each ID")] = 6,

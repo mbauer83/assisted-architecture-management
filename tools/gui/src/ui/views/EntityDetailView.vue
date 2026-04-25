@@ -2,10 +2,11 @@
 import { inject, onMounted, ref, watch, computed } from 'vue'
 import { useRoute, useRouter, RouterLink } from 'vue-router'
 import { Effect } from 'effect'
-import { modelServiceKey } from '../keys'
+import { modelServiceKey, toastKey } from '../keys'
 import { useQuery } from '../composables/useQuery'
 import ConnectionsPanel from '../components/ConnectionsPanel.vue'
 import ArchimateTypeGlyph from '../components/ArchimateTypeGlyph.vue'
+import ArtifactReferenceInput from '../components/ArtifactReferenceInput.vue'
 import type { EntityContext, WriteResult } from '../../domain'
 import type { NotFoundError } from '../../domain'
 import type { MarkdownError } from '../../application/MarkdownService'
@@ -13,6 +14,7 @@ import type { RepoError } from '../../ports/ModelRepository'
 import { readErrorMessage } from '../lib/errors'
 
 const svc = inject(modelServiceKey)!
+const addToast = inject(toastKey)!
 const router = useRouter()
 const adminMode = ref(false)
 onMounted(() => {
@@ -56,6 +58,10 @@ const deleteBusy = ref(false)
 const deleteError = ref<string | null>(null)
 const deletePreview = ref<{ content: string | null; warnings: string[] } | null>(null)
 const confirmDelete = ref(false)
+const showReferencePicker = ref(false)
+const activeReferenceField = ref<'summary' | 'notes'>('summary')
+const summaryTextareaRef = ref<HTMLTextAreaElement | null>(null)
+const notesTextareaRef = ref<HTMLTextAreaElement | null>(null)
 
 const startEdit = () => {
   if (!detail.value) return
@@ -132,6 +138,7 @@ const saveEdit = () => {
   void Effect.runPromise(editFn.value(buildEditBody(false))).then((r) => {
     editBusy.value = false
     if (r.wrote) {
+      addToast('Entity saved')
       editing.value = false
       editPreview.value = null
       if (r.artifact_id && r.artifact_id !== entityId.value) {
@@ -185,6 +192,29 @@ const executeDelete = () => {
     deleteError.value = readErrorMessage(reason)
   })
 }
+
+const openReferencePicker = (field: 'summary' | 'notes') => {
+  activeReferenceField.value = field
+  showReferencePicker.value = true
+}
+
+const insertReference = (markdownLink: string) => {
+  const textarea = activeReferenceField.value === 'summary'
+    ? summaryTextareaRef.value
+    : notesTextareaRef.value
+  if (!textarea) return
+  const start = textarea.selectionStart ?? textarea.value.length
+  const end = textarea.selectionEnd ?? start
+  const currentValue = activeReferenceField.value === 'summary' ? editSummary.value : editNotes.value
+  const nextValue = `${currentValue.slice(0, start)}${markdownLink}${currentValue.slice(end)}`
+  if (activeReferenceField.value === 'summary') editSummary.value = nextValue
+  else editNotes.value = nextValue
+  requestAnimationFrame(() => {
+    textarea.focus()
+    const cursor = start + markdownLink.length
+    textarea.setSelectionRange(cursor, cursor)
+  })
+}
 </script>
 
 <template>
@@ -233,6 +263,30 @@ const executeDelete = () => {
           @click="previewDelete"
         >
           Delete{{ detail.is_global && adminMode ? ' ⚠' : '' }}
+        </button>
+        <button
+          v-if="editing"
+          class="cancel-btn"
+          :disabled="editBusy"
+          @click="cancelEdit"
+        >
+          Cancel
+        </button>
+        <button
+          v-if="editing"
+          class="preview-btn"
+          :disabled="editBusy"
+          @click="previewEdit"
+        >
+          Preview
+        </button>
+        <button
+          v-if="editing"
+          class="save-btn"
+          :disabled="editBusy"
+          @click="saveEdit"
+        >
+          Save
         </button>
       </div>
     </div>
@@ -318,7 +372,17 @@ const executeDelete = () => {
       >
         <div class="form-row">
           <label class="form-label">Summary</label>
+          <div class="field-tools">
+            <button
+              class="insert-ref-btn"
+              type="button"
+              @click="openReferencePicker('summary')"
+            >
+              Insert Reference
+            </button>
+          </div>
           <textarea
+            ref="summaryTextareaRef"
             v-model="editSummary"
             class="edit-textarea"
             rows="3"
@@ -334,7 +398,17 @@ const executeDelete = () => {
         </div>
         <div class="form-row">
           <label class="form-label">Notes</label>
+          <div class="field-tools">
+            <button
+              class="insert-ref-btn"
+              type="button"
+              @click="openReferencePicker('notes')"
+            >
+              Insert Reference
+            </button>
+          </div>
           <textarea
+            ref="notesTextareaRef"
             v-model="editNotes"
             class="edit-textarea"
             rows="3"
@@ -526,6 +600,18 @@ const executeDelete = () => {
           @refresh="load"
         />
       </div>
+
+      <div
+        v-if="showReferencePicker"
+        class="overlay"
+        @click.self="showReferencePicker = false"
+      >
+        <ArtifactReferenceInput
+          :current-path="detail?.path"
+          @insert="insertReference"
+          @close="showReferencePicker = false"
+        />
+      </div>
     </template>
   </div>
 </template>
@@ -608,6 +694,12 @@ const executeDelete = () => {
 .form-row { margin-bottom: 14px; }
 .form-label { display: block; font-size: 12px; font-weight: 600; color: #374151; margin-bottom: 4px; text-transform: uppercase; letter-spacing: .04em; }
 .form-hint { font-weight: 400; text-transform: none; color: #9ca3af; }
+.field-tools { display: flex; justify-content: flex-end; margin-bottom: 6px; }
+.insert-ref-btn {
+  padding: 4px 10px; border-radius: 6px; border: 1px solid #d1d5db;
+  background: #f8fafc; color: #374151; font-size: 12px; cursor: pointer;
+}
+.insert-ref-btn:hover { background: #f1f5f9; }
 .edit-input {
   width: 100%; padding: 7px 10px; border-radius: 6px; border: 1px solid #d1d5db;
   font-size: 13px; outline: none; box-sizing: border-box;
@@ -673,6 +765,10 @@ const executeDelete = () => {
 .connections-section { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px; }
 @media (max-width: 1000px) { .connections-section { grid-template-columns: 1fr 1fr; } }
 @media (max-width: 700px) { .connections-section { grid-template-columns: 1fr; } }
+.overlay {
+  position: fixed; inset: 0; background: rgba(15, 23, 42, 0.48);
+  display: flex; align-items: center; justify-content: center; padding: 24px; z-index: 50;
+}
 
 .domain-badge { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 500; }
 .domain--motivation { background: #d8c1e4; color: #252327; }

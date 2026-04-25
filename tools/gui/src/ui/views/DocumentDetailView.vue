@@ -1,14 +1,15 @@
 <script setup lang="ts">
 import { computed, inject, onMounted, ref, watch } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
+import { RouterLink, useRoute, useRouter } from 'vue-router'
 import { Effect } from 'effect'
-import { modelServiceKey } from '../keys'
+import { modelServiceKey, toastKey } from '../keys'
 import MarkdownEditor from '../components/MarkdownEditor.vue'
 import ArtifactReferenceInput from '../components/ArtifactReferenceInput.vue'
 import type { DocumentDetail } from '../../domain'
 import { collectVerificationIssues, readErrorMessage } from '../lib/errors'
 
 const svc = inject(modelServiceKey)!
+const addToast = inject(toastKey)!
 const route = useRoute()
 const router = useRouter()
 
@@ -22,6 +23,7 @@ const verificationIssues = ref<string[]>([])
 const showReferencePicker = ref(false)
 type MarkdownEditorHandle = { insertAtCursor: (markdownLink: string) => void }
 const editorRef = ref<MarkdownEditorHandle | null>(null)
+const isGlobalDocument = computed(() => detail.value?.is_global ?? false)
 
 const title = ref('')
 const status = ref('draft')
@@ -35,67 +37,70 @@ const titleError = computed(() =>
     : null,
 )
 
-const load = () => {
+const load = async () => {
   loading.value = true
   error.value = null
   verificationIssues.value = []
-  void Effect.runPromise(svc.getDocument(documentId.value)).then((doc) => {
+  try {
+    const doc = await Effect.runPromise(svc.getDocument(documentId.value))
     detail.value = doc
     title.value = doc.title
     status.value = doc.status
     keywords.value = (doc.keywords ?? []).join(', ')
     body.value = doc.content_text ?? ''
-    loading.value = false
-  }).catch((reason: unknown) => {
+  } catch (reason: unknown) {
     error.value = readErrorMessage(reason)
+  } finally {
     loading.value = false
-  })
+  }
 }
 
 onMounted(load)
 watch(documentId, load)
 
-const save = () => {
+const save = async () => {
   saveAttempted.value = true
   titleTouched.value = true
   verificationIssues.value = []
   if (titleError.value) return
   saving.value = true
   error.value = null
-  void Effect.runPromise(svc.editDocument(documentId.value, {
-    title: title.value,
-    status: status.value,
-    keywords: keywords.value.split(',').map((value) => value.trim()).filter(Boolean),
-    body: body.value,
-    dry_run: false,
-  })).then((result) => {
+  try {
+    const result = await Effect.runPromise(svc.editDocument(documentId.value, {
+      title: title.value,
+      status: status.value,
+      keywords: keywords.value.split(',').map((value) => value.trim()).filter(Boolean),
+      body: body.value,
+      dry_run: false,
+    }))
     if (!result.wrote) {
       verificationIssues.value = collectVerificationIssues(result.verification)
       error.value = verificationIssues.value.length
         ? 'Document could not be saved until the validation issues are fixed.'
         : 'Document could not be saved.'
-      saving.value = false
       return
     }
-    saving.value = false
-      load()
-  }).catch((reason: unknown) => {
+    addToast('Document saved')
+    await load()
+  } catch (reason: unknown) {
     error.value = readErrorMessage(reason)
+  } finally {
     saving.value = false
-  })
+  }
 }
 
-const remove = () => {
+const remove = async () => {
   if (!window.confirm(`Delete document ${documentId.value}?`)) return
   deleting.value = true
   error.value = null
-  void Effect.runPromise(svc.deleteDocument(documentId.value, false)).then(() => {
-    deleting.value = false
+  try {
+    await Effect.runPromise(svc.deleteDocument(documentId.value, false))
     void router.push('/documents')
-  }).catch((reason: unknown) => {
+  } catch (reason: unknown) {
     error.value = readErrorMessage(reason)
+  } finally {
     deleting.value = false
-  })
+  }
 }
 
 const insertReference = (markdownLink: string) => {
@@ -114,13 +119,13 @@ const insertReference = (markdownLink: string) => {
         ← Documents
       </button>
       <div class="page-actions">
-        <button
+        <RouterLink
+          v-if="detail && !isGlobalDocument"
+          :to="{ path: '/promote', query: { document_id: detail.artifact_id } }"
           class="secondary-btn"
-          type="button"
-          @click="showReferencePicker = true"
         >
-          Insert Reference
-        </button>
+          ↑ Promote to Global
+        </RouterLink>
         <button
           class="primary-btn"
           type="button"
@@ -170,7 +175,9 @@ const insertReference = (markdownLink: string) => {
           <div
             v-if="titleError"
             class="field-error"
-          >{{ titleError }}</div>
+          >
+            {{ titleError }}
+          </div>
         </label>
 
         <div class="form-field">
@@ -227,6 +234,17 @@ const insertReference = (markdownLink: string) => {
         <code>{{ detail.path }}</code>
       </div>
 
+      <div class="bottom-actions">
+        <button
+          class="primary-btn"
+          type="button"
+          :disabled="saving || loading"
+          @click="save"
+        >
+          Save
+        </button>
+      </div>
+
       <div
         v-if="error"
         class="state-msg state-msg--error"
@@ -270,44 +288,13 @@ const insertReference = (markdownLink: string) => {
 .form-field { display: flex; flex-direction: column; gap: 6px; margin-bottom: 14px; }
 .form-field--wide { grid-column: span 1; }
 .form-field span { font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; color: #64748b; font-weight: 700; }
-.form-control {
-  padding: 9px 11px;
-  border: 1px solid #cbd5e1;
-  border-radius: 8px;
-  font-size: 13px;
-}
-.form-control--invalid {
-  border-color: #dc2626;
-  background: #fef2f2;
-}
-.field-error {
-  color: #dc2626;
-  font-size: 12px;
-}
-.readonly-pill {
-  display: inline-flex;
-  align-items: center;
-  min-height: 39px;
-  padding: 0 11px;
-  border-radius: 8px;
-  background: #eff6ff;
-  color: #1d4ed8;
-  font-size: 13px;
-  font-weight: 600;
-}
-.editor-toolbar {
-  display: flex;
-  justify-content: flex-end;
-  margin-bottom: 8px;
-}
-.artifact-meta {
-  display: flex;
-  gap: 10px;
-  flex-wrap: wrap;
-  margin-top: 14px;
-  color: #64748b;
-  font-size: 12px;
-}
+.form-control { padding: 9px 11px; border: 1px solid #cbd5e1; border-radius: 8px; font-size: 13px; }
+.form-control--invalid { border-color: #dc2626; background: #fef2f2; }
+.field-error { color: #dc2626; font-size: 12px; }
+.readonly-pill { display: inline-flex; align-items: center; min-height: 39px; padding: 0 11px; border-radius: 8px; background: #eff6ff; color: #1d4ed8; font-size: 13px; font-weight: 600; }
+.editor-toolbar { display: flex; justify-content: flex-end; margin-bottom: 8px; }
+.artifact-meta { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 14px; color: #64748b; font-size: 12px; }
+.bottom-actions { display: flex; justify-content: flex-end; margin-top: 16px; }
 .primary-btn, .secondary-btn, .danger-btn {
   border: 0;
   border-radius: 8px;

@@ -2,7 +2,7 @@
 import { RouterView } from 'vue-router'
 import { inject, provide, ref, onMounted, onUnmounted, computed } from 'vue'
 import { Effect } from 'effect'
-import { modelServiceKey } from './keys'
+import { modelServiceKey, toastKey } from './keys'
 import NavBar from './components/NavBar.vue'
 import ToastStack from './components/ToastStack.vue'
 import SaveChangesDialog from './components/SaveChangesDialog.vue'
@@ -30,6 +30,8 @@ const addToast = (message: string, type: 'info'|'warn'|'error' = 'info', duratio
 const anyWriteBlocked = computed(() => readOnly.value || writeBlocked.value)
 const engDirty = computed(() => syncStatus.value?.engagement?.has_uncommitted_changes ?? false)
 const entStatus = computed(() => syncStatus.value?.enterprise ?? null)
+provide('writeBlocked', anyWriteBlocked)
+provide(toastKey, addToast)
 
 const loadSyncStatus = () => {
   void Effect.runPromise(svc.getSyncStatus())
@@ -124,8 +126,6 @@ onMounted(() => {
   } catch (err) {
     console.error('Failed to connect to event stream:', err)
   }
-
-  provide('writeBlocked', anyWriteBlocked)
 })
 
 onUnmounted(() => {
