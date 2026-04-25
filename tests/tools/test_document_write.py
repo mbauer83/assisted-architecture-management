@@ -2,9 +2,9 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from src.common.artifact_verifier import ArtifactRegistry, ArtifactVerifier
-from src.tools.artifact_write.document import create_document, edit_document
+from src.application.verification.artifact_verifier import ArtifactRegistry, ArtifactVerifier
 from src.infrastructure.artifact_index import shared_artifact_index
+from src.infrastructure.write.artifact_write.document import create_document, edit_document
 
 
 def _write(path: Path, content: str) -> None:

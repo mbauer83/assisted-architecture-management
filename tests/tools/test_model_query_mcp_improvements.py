@@ -9,8 +9,9 @@ Updated for ArchiMate NEXT conventions:
 
 from pathlib import Path
 
-from src.common.artifact_query import ArtifactRepository, shared_artifact_index
-from src.tools import mcp_artifact_server
+from src.application.artifact_query import ArtifactRepository
+from src.infrastructure.artifact_index import shared_artifact_index
+from src.infrastructure.mcp import mcp_artifact_server
 
 
 def _write(path: Path, content: str) -> None:

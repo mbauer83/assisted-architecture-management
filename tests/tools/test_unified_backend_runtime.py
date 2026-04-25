@@ -4,20 +4,14 @@ from pathlib import Path
 
 import yaml
 
-from src.common import settings
-from src.tools import mcp_artifact_server
-from src.tools import backend_control
-from src.tools import backend_probe
-from src.tools import backend_process
-from src.tools import backend_state
-from src.tools import arch_backend
-from src.tools.arch_backend_app import _build_app
+from src.config import settings
+from src.infrastructure.backend import arch_backend, backend_control, backend_probe, backend_process, backend_state
+from src.infrastructure.backend.arch_backend_app import _build_app
+from src.infrastructure.mcp import arch_mcp_stdio
 
 
 def test_arch_mcp_stdio_read_connects_to_read_path(monkeypatch) -> None:
     """arch-mcp-stdio (default) bridges to /mcp/read."""
-    from src.tools import arch_mcp_stdio
-
     urls: list[str] = []
 
     def fake_anyio_run(fn, url: str) -> None:
@@ -35,8 +29,6 @@ def test_arch_mcp_stdio_read_connects_to_read_path(monkeypatch) -> None:
 
 def test_arch_mcp_stdio_write_connects_to_write_path(monkeypatch) -> None:
     """arch-mcp-stdio --server write bridges to /mcp/write."""
-    from src.tools import arch_mcp_stdio
-
     urls: list[str] = []
 
     def fake_anyio_run(fn, url: str) -> None:
@@ -53,8 +45,6 @@ def test_arch_mcp_stdio_write_connects_to_write_path(monkeypatch) -> None:
 
 
 def test_arch_mcp_stdio_uses_workspace_directory_for_autostart(monkeypatch, tmp_path: Path) -> None:
-    from src.tools import arch_mcp_stdio
-
     calls: dict[str, object] = {}
     workspace_dir = tmp_path / "workspace"
     project_dir = tmp_path / "tooling"
@@ -189,7 +179,7 @@ def test_backend_start_command_prefers_current_python_when_backend_deps_exist(mo
 
     cmd = backend_probe.backend_start_command(port=8123)
 
-    assert cmd == [backend_probe.sys.executable, "-m", "src.tools.arch_backend", "--port", "8123"]
+    assert cmd == [backend_probe.sys.executable, "-m", "src.infrastructure.backend.arch_backend", "--port", "8123"]
 
 
 def test_backend_start_command_uses_uv_with_explicit_project_when_deps_missing(
@@ -284,7 +274,7 @@ def test_matches_arch_backend_process_for_direct_binary() -> None:
 
 def test_matches_arch_backend_process_for_module_invocation() -> None:
     assert backend_process._matches_arch_backend_process(
-        ["python3", "-m", "src.tools.arch_backend", "--port", "8000"]
+        ["python3", "-m", "src.infrastructure.backend.arch_backend", "--port", "8000"]
     ) is True
 
 
@@ -943,7 +933,11 @@ def test_arch_backend_redirects_stdio_when_background_tty_job(monkeypatch, tmp_p
     redirected: list[Path | None] = []
 
     monkeypatch.setattr(arch_backend, "_is_background_tty_job", lambda: True)
-    monkeypatch.setattr(arch_backend, "_redirect_stdio_to_backend_log", lambda start=None: redirected.append(start) or tmp_path / ".arch" / "backend.log")
+    monkeypatch.setattr(
+        arch_backend,
+        "_redirect_stdio_to_backend_log",
+        lambda start=None: redirected.append(start) or tmp_path / ".arch" / "backend.log",
+    )
     monkeypatch.setattr(arch_backend, "backend_status", lambda port=8000: {"running": False, "reason": "not_running"})
     monkeypatch.setattr(arch_backend, "read_backend_state", lambda: None)
     monkeypatch.setattr(
@@ -1053,7 +1047,11 @@ def test_arch_backend_build_failure_does_not_write_backend_state(monkeypatch, tm
     )
     wrote: list[object] = []
     monkeypatch.setattr(arch_backend, "write_backend_state", lambda port: wrote.append(port))
-    monkeypatch.setattr(arch_backend, "_build_app", lambda git_ssh_passphrase=None: (_ for _ in ()).throw(ModuleNotFoundError("fastapi")))
+    monkeypatch.setattr(
+        arch_backend,
+        "_build_app",
+        lambda git_ssh_passphrase=None: (_ for _ in ()).throw(ModuleNotFoundError("fastapi")),
+    )
 
     try:
         arch_backend.main(["--repo-root", str(tmp_path)])

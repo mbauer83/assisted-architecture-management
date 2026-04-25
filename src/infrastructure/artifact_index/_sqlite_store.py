@@ -5,8 +5,8 @@ import sqlite3
 from pathlib import Path
 from typing import Callable
 
-from src.common.artifact_types import ConnectionRecord, DiagramRecord, DocumentRecord, EntityRecord
-from src.common.ontology_loader import SYMMETRIC_CONNECTIONS
+from src.domain.artifact_types import ConnectionRecord, DiagramRecord, DocumentRecord, EntityRecord
+from src.domain.ontology_loader import SYMMETRIC_CONNECTIONS
 
 from ._mem_store import _MemStore
 from ._sqlite_schema import FTS_SQL, SCHEMA_SQL

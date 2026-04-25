@@ -14,9 +14,7 @@ from pathlib import Path
 
 import pytest
 
-from src.tools.artifact_write.boundary import assert_engagement_write_root, assert_enterprise_write_root
 from src.infrastructure.artifact_index import shared_artifact_index
-
 
 # ---------------------------------------------------------------------------
 # Fixtures
@@ -134,8 +132,8 @@ class TestBoundaryGuards:
     def test_standard_create_entity_rejects_enterprise_root(
         self, engagement_root: Path, enterprise_root: Path
     ) -> None:
-        from src.common.artifact_verifier import ArtifactVerifier
-        from src.tools.artifact_write.entity import create_entity
+        from src.application.verification.artifact_verifier import ArtifactVerifier
+        from src.infrastructure.write.artifact_write.entity import create_entity
         with pytest.raises(ValueError, match="enterprise"):
             create_entity(
                 repo_root=enterprise_root,
@@ -150,8 +148,8 @@ class TestBoundaryGuards:
     def test_standard_add_connection_rejects_enterprise_root(
         self, enterprise_root: Path
     ) -> None:
-        from src.common.artifact_verifier import ArtifactRegistry, ArtifactVerifier
-        from src.tools.artifact_write.connection import add_connection
+        from src.application.verification.artifact_verifier import ArtifactRegistry, ArtifactVerifier
+        from src.infrastructure.write.artifact_write.connection import add_connection
         with pytest.raises(ValueError, match="enterprise"):
             add_connection(
                 repo_root=enterprise_root,
@@ -167,8 +165,8 @@ class TestBoundaryGuards:
     def test_admin_create_entity_rejects_engagement_root(
         self, engagement_root: Path
     ) -> None:
-        from src.common.artifact_verifier import ArtifactVerifier
-        from src.tools.artifact_write.admin_ops import admin_create_entity
+        from src.application.verification.artifact_verifier import ArtifactVerifier
+        from src.infrastructure.write.artifact_write.admin_ops import admin_create_entity
         with pytest.raises(ValueError, match="enterprise"):
             admin_create_entity(
                 repo_root=engagement_root,  # wrong root → should be rejected
@@ -183,8 +181,8 @@ class TestBoundaryGuards:
     def test_admin_create_entity_accepts_enterprise_root(
         self, enterprise_root: Path
     ) -> None:
-        from src.common.artifact_verifier import ArtifactVerifier
-        from src.tools.artifact_write.admin_ops import admin_create_entity
+        from src.application.verification.artifact_verifier import ArtifactVerifier
+        from src.infrastructure.write.artifact_write.admin_ops import admin_create_entity
         # dry_run=True — no files written, just verifies the guard passes
         result = admin_create_entity(
             repo_root=enterprise_root,
@@ -201,8 +199,8 @@ class TestBoundaryGuards:
     def test_standard_delete_entity_rejects_enterprise_root(
         self, enterprise_root: Path
     ) -> None:
-        from src.common.artifact_verifier import ArtifactRegistry
-        from src.tools.artifact_write.entity_delete import delete_entity
+        from src.application.verification.artifact_verifier import ArtifactRegistry
+        from src.infrastructure.write.artifact_write.entity_delete import delete_entity
         with pytest.raises(ValueError, match="enterprise"):
             delete_entity(
                 repo_root=enterprise_root,
@@ -215,8 +213,8 @@ class TestBoundaryGuards:
     def test_admin_delete_entity_accepts_enterprise_root(
         self, enterprise_root: Path
     ) -> None:
-        from src.common.artifact_verifier import ArtifactRegistry
-        from src.tools.artifact_write.admin_ops import admin_delete_entity
+        from src.application.verification.artifact_verifier import ArtifactRegistry
+        from src.infrastructure.write.artifact_write.admin_ops import admin_delete_entity
 
         entity_id = "REQ@2000000000.GloAAA.global-req"
         _write(
@@ -236,7 +234,7 @@ class TestBoundaryGuards:
     def test_standard_delete_diagram_rejects_enterprise_root(
         self, enterprise_root: Path
     ) -> None:
-        from src.tools.artifact_write.diagram_delete import delete_diagram
+        from src.infrastructure.write.artifact_write.diagram_delete import delete_diagram
         with pytest.raises(ValueError, match="enterprise"):
             delete_diagram(
                 repo_root=enterprise_root,
@@ -248,7 +246,7 @@ class TestBoundaryGuards:
     def test_admin_delete_diagram_accepts_enterprise_root(
         self, enterprise_root: Path
     ) -> None:
-        from src.tools.artifact_write.admin_ops import admin_delete_diagram
+        from src.infrastructure.write.artifact_write.admin_ops import admin_delete_diagram
 
         diag_id = "diag-1"
         _write(
@@ -310,7 +308,7 @@ class TestCleanupBrokenRefs:
     def test_dry_run_reports_broken_grf(
         self, engagement_root: Path, enterprise_root: Path
     ) -> None:
-        from src.tools.artifact_write.cleanup_broken_refs import cleanup_broken_refs
+        from src.infrastructure.write.artifact_write.cleanup_broken_refs import cleanup_broken_refs
 
         _, grf_id, _ = self._setup(engagement_root, enterprise_root)
 
@@ -326,7 +324,7 @@ class TestCleanupBrokenRefs:
     def test_dry_run_does_not_modify_files(
         self, engagement_root: Path, enterprise_root: Path
     ) -> None:
-        from src.tools.artifact_write.cleanup_broken_refs import cleanup_broken_refs
+        from src.infrastructure.write.artifact_write.cleanup_broken_refs import cleanup_broken_refs
 
         eng_id, grf_id, _ = self._setup(engagement_root, enterprise_root)
         grf_path = engagement_root / "model" / "common" / "global-references" / f"{grf_id}.md"
@@ -343,7 +341,7 @@ class TestCleanupBrokenRefs:
     def test_execute_removes_broken_grf_and_connections(
         self, engagement_root: Path, enterprise_root: Path
     ) -> None:
-        from src.tools.artifact_write.cleanup_broken_refs import cleanup_broken_refs
+        from src.infrastructure.write.artifact_write.cleanup_broken_refs import cleanup_broken_refs
 
         eng_id, grf_id, _ = self._setup(engagement_root, enterprise_root)
         grf_path = engagement_root / "model" / "common" / "global-references" / f"{grf_id}.md"
@@ -363,7 +361,7 @@ class TestCleanupBrokenRefs:
     def test_non_broken_grf_not_touched(
         self, engagement_root: Path, enterprise_root: Path
     ) -> None:
-        from src.tools.artifact_write.cleanup_broken_refs import cleanup_broken_refs
+        from src.infrastructure.write.artifact_write.cleanup_broken_refs import cleanup_broken_refs
 
         # Create a VALID GRF pointing to an enterprise entity that exists
         eng_id = "REQ@1000000003.EngDdd.eng2"
@@ -392,7 +390,7 @@ class TestCleanupBrokenRefs:
     def test_no_broken_grfs_reports_empty(
         self, engagement_root: Path, enterprise_root: Path
     ) -> None:
-        from src.tools.artifact_write.cleanup_broken_refs import cleanup_broken_refs
+        from src.infrastructure.write.artifact_write.cleanup_broken_refs import cleanup_broken_refs
 
         report = cleanup_broken_refs(engagement_root, enterprise_root, dry_run=True)
         assert report.broken_grfs == []

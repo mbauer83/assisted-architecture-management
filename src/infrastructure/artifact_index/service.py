@@ -8,7 +8,7 @@ from collections import Counter
 from pathlib import Path
 from typing import Callable, Literal, TypeVar
 
-from src.common._artifact_query_helpers import (
+from src.application._artifact_query_helpers import (
     matches_connection,
     matches_connection_sets,
     matches_diagram,
@@ -21,7 +21,8 @@ from src.common._artifact_query_helpers import (
     read_entity,
     to_set,
 )
-from src.common.artifact_types import (
+from src.config.workspace_paths import infer_repo_scope
+from src.domain.artifact_types import (
     ArtifactSummary,
     ConnectionRecord,
     DiagramRecord,
@@ -33,7 +34,6 @@ from src.common.artifact_types import (
     summary_from_document,
     summary_from_entity,
 )
-from src.common.workspace_paths import infer_repo_scope
 
 from . import _sqlite_queries as _q
 from ._mem_store import _MemStore

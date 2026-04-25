@@ -6,9 +6,10 @@ from pathlib import Path
 
 import pytest
 
-from src.common.artifact_query import ArtifactRepository, shared_artifact_index
-from src.tools.gui_routers.entity_listing import build_entity_summary_rows
-from src.tools.gui_routers import state as gui_state
+from src.application.artifact_query import ArtifactRepository
+from src.infrastructure.artifact_index import shared_artifact_index
+from src.infrastructure.gui.routers import state as gui_state
+from src.infrastructure.gui.routers.entity_listing import build_entity_summary_rows
 
 
 def _write(path: Path, content: str) -> None:
@@ -99,7 +100,11 @@ def test_global_scope_listing_survives_root_entities_without_specialization_pare
         _entity_md(engagement_req, "Engagement Req"),
     )
 
-    gui_state.init_state(ArtifactRepository(shared_artifact_index([engagement_root, enterprise_root])), engagement_root, enterprise_root)
+    gui_state.init_state(
+        ArtifactRepository(shared_artifact_index([engagement_root, enterprise_root])),
+        engagement_root,
+        enterprise_root,
+    )
 
     repo = ArtifactRepository(shared_artifact_index([engagement_root, enterprise_root]))
     gui_state.init_state(repo, engagement_root, enterprise_root)
@@ -249,7 +254,9 @@ def test_entity_context_read_model_groups_connections_and_counts(
 
     assert payload["entity"]["artifact_id"] == src_id
     assert payload["counts"] == {"conn_in": 0, "conn_out": 1, "conn_sym": 2}
-    assert [conn["artifact_id"] for conn in payload["connections"]["outbound"]] == [f"{src_id}---{peer_id}@@archimate-flow"]
+    assert [conn["artifact_id"] for conn in payload["connections"]["outbound"]] == [
+        f"{src_id}---{peer_id}@@archimate-flow"
+    ]
     assert payload["connections"]["inbound"] == []
     assert {conn["artifact_id"] for conn in payload["connections"]["symmetric"]} == {
         f"{src_id}---{tgt_id}@@archimate-association",
@@ -266,7 +273,10 @@ def test_clear_caches_applies_incremental_outgoing_changes(
     tgt_a = "REQ@1000000001.TgtAAA.target-a"
     tgt_b = "REQ@1000000002.TgtBBB.target-b"
     for artifact_id, name in ((src_id, "Source"), (tgt_a, "Target A"), (tgt_b, "Target B")):
-        _write(engagement_root / "model" / "motivation" / "requirements" / f"{artifact_id}.md", _entity_md(artifact_id, name))
+        _write(
+            engagement_root / "model" / "motivation" / "requirements" / f"{artifact_id}.md",
+            _entity_md(artifact_id, name),
+        )
     outgoing_path = engagement_root / "model" / "motivation" / "requirements" / f"{src_id}.outgoing.md"
     _write(outgoing_path, _outgoing_md(src_id, [("archimate-flow", tgt_a)]))
 

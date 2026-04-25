@@ -17,10 +17,9 @@ from pathlib import Path
 import pytest
 from pytest_bdd import given, scenarios, then, when
 
-from src.common.artifact_verifier import ArtifactRegistry, ArtifactVerifier
-from src.tools import mcp_artifact_server as tools
+from src.application.verification.artifact_verifier import ArtifactRegistry, ArtifactVerifier
 from src.infrastructure.artifact_index import shared_artifact_index
-
+from src.infrastructure.mcp import mcp_artifact_server as tools
 
 scenarios("features/model_write_tools.feature")
 

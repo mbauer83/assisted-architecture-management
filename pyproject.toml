@@ -27,13 +27,13 @@ gui = [
 ]
 
 [project.scripts]
-arch-gui-server = "src.tools.gui_server:main"
-arch-backend = "src.tools.arch_backend:main"
-arch-mcp-stdio-read = "src.tools.arch_mcp_stdio:main"
-arch-mcp-stdio-write = "src.tools.arch_mcp_stdio_write:main_write"
-arch-init = "src.tools.workspace_init:main"
-get-plantuml = "src.tools.get_plantuml:main"
-arch-model-write = "src.tools.model_write_cli:main"
+arch-gui-server = "src.infrastructure.gui.gui_server:main"
+arch-backend = "src.infrastructure.backend.arch_backend:main"
+arch-mcp-stdio-read = "src.infrastructure.mcp.arch_mcp_stdio:main"
+arch-mcp-stdio-write = "src.infrastructure.mcp.arch_mcp_stdio_write:main_write"
+arch-init = "src.infrastructure.workspace.workspace_init:main"
+get-plantuml = "src.infrastructure.bootstrap.get_plantuml:main"
+arch-model-write = "src.infrastructure.write.artifact_write_cli:main"
 
 [build-system]
 requires = ["hatchling"]

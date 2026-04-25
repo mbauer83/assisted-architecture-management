@@ -1,6 +1,8 @@
 from __future__ import annotations
 
-from src.tools.gui_routers._diagram_context import parse_explicit_connection_pairs as _parse_explicit_connection_pairs
+from src.infrastructure.gui.routers._diagram_context import (
+    parse_explicit_connection_pairs as _parse_explicit_connection_pairs,
+)
 
 
 def test_parse_explicit_connection_pairs_supports_archimate_relation_macros() -> None:

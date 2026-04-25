@@ -11,10 +11,9 @@ from pathlib import Path
 
 import pytest
 
-from src.tools import mcp_artifact_server as mcp
-from src.common.artifact_verifier_registry import ArtifactRegistry
+from src.application.verification.artifact_verifier_registry import ArtifactRegistry
 from src.infrastructure.artifact_index import shared_artifact_index
-
+from src.infrastructure.mcp import mcp_artifact_server as mcp
 
 # ---------------------------------------------------------------------------
 # Helpers

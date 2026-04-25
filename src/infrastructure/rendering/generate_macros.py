@@ -1,0 +1,272 @@
+"""
+generate_macros.py — Regenerate _macros.puml from entity §display ###archimate blocks.
+
+Usage:
+    uv run python -m src.infrastructure.rendering.generate_macros [REPO_ROOT]
+
+The script scans every .md entity file under <REPO_ROOT>/model/ for a
+§display ###archimate block, extracts domain/element-type/label/alias fields,
+and writes <REPO_ROOT>/diagram-catalog/_macros.puml.
+
+Alias convention (PlantUML):
+    Aliases follow the pattern TYPE_random (e.g. DRV_Qw7Er1).
+    In diagram source files, reference elements by their alias.
+"""
+
+import json
+import re
+import sys
+from pathlib import Path
+
+import yaml
+
+from src.application.artifact_parsing import normalize_puml_alias
+from src.config.repo_paths import DIAGRAM_CATALOG, MODEL
+from src.config.settings import archimate_type_markers, sprite_scale
+from src.domain.ontology_loader import DOMAIN_ORDER as _DOMAIN_ORDER_LIST
+from src.domain.ontology_loader import ENTITY_TYPES
+from src.infrastructure.rendering._svg_sprite_convert import (
+    browser_markup_to_plantuml_svg as _browser_markup_to_plantuml_svg,
+)
+
+# ---------------------------------------------------------------------------
+# Helpers
+# ---------------------------------------------------------------------------
+
+_DISPLAY_SECTION = re.compile(r"<!--\s*§display\s*-->", re.IGNORECASE)
+_ARCHIMATE_H3 = re.compile(r"###\s*archimate\b", re.IGNORECASE)
+_YAML_FENCE = re.compile(r"```ya?ml\s*\n(.*?)```", re.DOTALL)
+_PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent.parent
+_GLYPHS_PATH = _PROJECT_ROOT / "tools" / "gui" / "src" / "ui" / "lib" / "archimateGlyphs.json"
+
+
+def _extract_archimate_block(content: str) -> dict | None:
+    """Return the parsed archimate YAML block from §display, or None."""
+    m = _DISPLAY_SECTION.search(content)
+    if not m:
+        return None
+    display_text = content[m.end() :]
+    h3 = _ARCHIMATE_H3.search(display_text)
+    if not h3:
+        return None
+    after_h3 = display_text[h3.end() :]
+    fence = _YAML_FENCE.search(after_h3)
+    if not fence:
+        return None
+    try:
+        return yaml.safe_load(fence.group(1)) or {}
+    except yaml.YAMLError:
+        return None
+
+
+_DOMAIN_ORDER = {d: i for i, d in enumerate(_DOMAIN_ORDER_LIST)}
+
+_PREFIX_ORDER = [
+    "STK",
+    "DRV",
+    "ASM",
+    "GOL",
+    "OUT",
+    "PRI",
+    "REQ",
+    "CST",
+    "MEA",
+    "VAL",
+    "CAP",
+    "VS",
+    "RES",
+    "COA",
+    "SRV",
+    "PRC",
+    "FNC",
+    "INT",
+    "EVT",
+    "ROL",
+    "ACT",
+    "BIF",
+    "BOB",
+    "APP",
+    "AIF",
+    "DOB",
+    "NOD",
+    "DEV",
+    "SSW",
+    "TIF",
+    "PTH",
+    "NET",
+    "ART",
+    "EQP",
+    "FAC",
+    "DIS",
+    "MAT",
+    "WP",
+    "DEL",
+    "PLT",
+]
+
+
+def _sort_key(entry: tuple[str, str, str]) -> tuple[int, int, str]:
+    """Sort by domain → prefix → alias."""
+    domain, _, alias = entry
+    prefix = alias.split("_")[0] if "_" in alias else alias
+    domain_idx = _DOMAIN_ORDER.get(domain.lower(), 99)
+    prefix_idx = _PREFIX_ORDER.index(prefix) if prefix in _PREFIX_ORDER else 99
+    return domain_idx, prefix_idx, alias
+
+
+def _load_glyphs() -> dict:
+    return json.loads(_GLYPHS_PATH.read_text(encoding="utf-8"))
+
+
+def _generate_glyph_include(repo_root: Path) -> Path:
+    glyphs = _load_glyphs()
+    mode = archimate_type_markers()
+    lines = [
+        "' _archimate-glyphs.puml — generated ArchiMate glyph sprites",
+        "' Auto-generated from tools/gui/src/ui/lib/archimateGlyphs.json.",
+        "' Do not edit manually.",
+        "",
+    ]
+    if mode == "icons":
+        lines.append("hide stereotype")
+        lines.append("")
+        for info in sorted(ENTITY_TYPES.values(), key=lambda item: item.archimate_element_type):
+            kind = glyphs["types"].get(info.artifact_type)
+            if not kind:
+                continue
+            markup = glyphs["kinds"].get(kind)
+            if not markup:
+                continue
+            sprite_name = f"$archimate_{info.archimate_element_type}"
+            lines.append(f"sprite {sprite_name} {_browser_markup_to_plantuml_svg(markup)}")
+    out_path = repo_root / DIAGRAM_CATALOG / "_archimate-glyphs.puml"
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    out_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    return out_path
+
+
+def _macro_label(label: str, element_type: str) -> str:
+    if archimate_type_markers() != "icons":
+        return label
+    scale = sprite_scale()
+    return f"<$archimate_{element_type}{{scale={scale}}}> {label}"
+
+
+# ---------------------------------------------------------------------------
+# Main
+# ---------------------------------------------------------------------------
+
+
+def generate_macros(repo_root: Path, *, enterprise_root: Path | None = None) -> Path:
+    """Scan model/ directories and write diagram-catalog/_macros.puml.
+
+    When *enterprise_root* is provided, macros from both repos are combined
+    so that engagement diagrams can reference enterprise entities.  The macros
+    file is always written to *repo_root* (the engagement repo).
+
+    Returns the path to the written file.
+    """
+    roots_to_scan: list[Path] = []
+    if enterprise_root and (enterprise_root / MODEL).is_dir():
+        roots_to_scan.append(enterprise_root)
+    entities_root = repo_root / MODEL
+    if not entities_root.is_dir():
+        raise FileNotFoundError(f"{MODEL}/ not found under {repo_root}")
+    roots_to_scan.append(repo_root)
+
+    _generate_glyph_include(repo_root)
+    entries: list[tuple[str, str, str]] = []  # (domain, macro_line, alias)
+    seen_aliases: set[str] = set()
+
+    for scan_root in roots_to_scan:
+        model_dir = scan_root / MODEL
+        for md_file in sorted(model_dir.rglob("*.md")):
+            if md_file.name.endswith(".outgoing.md"):
+                continue
+            content = md_file.read_text(encoding="utf-8")
+            archimate = _extract_archimate_block(content)
+            if not archimate:
+                continue
+
+            label = archimate.get("label", "")
+            element_type = archimate.get("element-type", "")
+            alias_raw = archimate.get("alias", "")
+
+            if not (label and element_type and alias_raw):
+                continue
+
+            alias = normalize_puml_alias(str(alias_raw))
+            if alias in seen_aliases:
+                continue
+            seen_aliases.add(alias)
+
+            domain = archimate.get("domain", "")
+            if not domain:
+                rel = md_file.relative_to(model_dir)
+                domain = rel.parts[0] if rel.parts else "unknown"
+
+            proc_name = f"$DECL_{alias}"
+            macro_line = (
+                f"!procedure {proc_name}()\n"
+                f'  rectangle "{_macro_label(label, element_type)}" <<{element_type}>> as {alias}\n'
+                f"!endprocedure"
+            )
+            entries.append((domain, macro_line, alias))
+
+    entries.sort(key=_sort_key)
+
+    lines: list[str] = [
+        "' _macros.puml — ArchiMate element procedure library",
+        "' Auto-generated from entity §display ###archimate blocks.",
+        "' Do not edit manually — regenerated by generate_macros().",
+        "'",
+        "' USAGE CONVENTION:",
+        "'   Declare element inside a grouping rectangle:  $DECL_DRV_Qw7Er1()",
+        "'   Reference element in a connection line:       DRV_Qw7Er1",
+        "",
+    ]
+
+    current_domain = None
+    for domain, macro_line, _ in entries:
+        if domain != current_domain:
+            if current_domain is not None:
+                lines.append("")
+            lines.append(f"' {'-' * 75}")
+            lines.append(f"' {domain}")
+            lines.append(f"' {'-' * 75}")
+            current_domain = domain
+        lines.append(macro_line)
+
+    output = "\n".join(lines) + "\n"
+    out_path = repo_root / DIAGRAM_CATALOG / "_macros.puml"
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    out_path.write_text(output, encoding="utf-8")
+    print(f"Written {len(entries)} macros → {out_path}")
+    return out_path
+
+
+def main() -> None:
+    if len(sys.argv) > 1:
+        repo_root = Path(sys.argv[1]).resolve()
+    else:
+        from src.config.workspace_paths import resolve_workspace_repo_roots
+
+        roots = resolve_workspace_repo_roots(Path.cwd())
+        if roots is None:
+            print(
+                "ERROR: no repo_root argument provided and no workspace configuration found. "
+                "Run arch-init or provide arch-workspace.yaml.",
+                file=sys.stderr,
+            )
+            sys.exit(1)
+        repo_root = roots[0]
+
+    if not repo_root.is_dir():
+        print(f"ERROR: repo_root does not exist: {repo_root}", file=sys.stderr)
+        sys.exit(1)
+
+    generate_macros(repo_root)
+
+
+if __name__ == "__main__":
+    main()

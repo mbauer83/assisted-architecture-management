@@ -5,13 +5,14 @@ from __future__ import annotations
 from pathlib import Path
 from typing import TypeVar
 
-from src.common.artifact_parsing import (
+from src.application.artifact_parsing import (
     parse_diagram,
     parse_document,
     parse_entity,
     parse_outgoing_file,
 )
-from src.common.artifact_types import (
+from src.config.repo_paths import DIAGRAM_CATALOG, DIAGRAMS, DOCS, MODEL, RENDERED
+from src.domain.artifact_types import (
     ConnectionRecord,
     DiagramRecord,
     DocumentRecord,
@@ -19,7 +20,6 @@ from src.common.artifact_types import (
     EntityRecord,
     RepoMount,
 )
-from src.common.repo_paths import DIAGRAM_CATALOG, DIAGRAMS, DOCS, MODEL, RENDERED
 
 from ._mem_store import _MemStore
 from ._sqlite_store import _SqliteStore

@@ -2,10 +2,10 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from src.common.artifact_types import ConnectionRecord, EntityRecord
-from src.tools.diagram_builder import generate_archimate_puml_body
-from src.tools.generate_macros import generate_macros
-from src.tools.artifact_mcp.query_scaffold_tools import artifact_diagram_scaffold
+from src.domain.artifact_types import ConnectionRecord, EntityRecord
+from src.infrastructure.mcp.artifact_mcp.query_scaffold_tools import artifact_diagram_scaffold
+from src.infrastructure.rendering.diagram_builder import generate_archimate_puml_body
+from src.infrastructure.rendering.generate_macros import generate_macros
 
 
 def _entity(

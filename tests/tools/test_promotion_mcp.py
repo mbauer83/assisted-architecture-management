@@ -6,12 +6,12 @@ exclude params, and rollback on verification failure.
 
 from __future__ import annotations
 
+import subprocess
 from pathlib import Path
 
 import pytest
 
-from src.tools import mcp_artifact_server as mcp
-
+from src.infrastructure.mcp import mcp_artifact_server as mcp
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -59,10 +59,6 @@ alias: {prefix}_{rand}
 ```
 """
 
-
-import subprocess
-
-
 def _git_init(path: Path) -> None:
     path.mkdir(parents=True, exist_ok=True)
     subprocess.run(["git", "init", "-b", "main"], cwd=path, check=True, capture_output=True)
@@ -91,7 +87,7 @@ def enterprise_root(tmp_path: Path) -> Path:
 
 
 def _make_entity(root: Path, artifact_id: str, artifact_type: str, name: str) -> None:
-    from src.common.ontology_loader import ENTITY_TYPES
+    from src.domain.ontology_loader import ENTITY_TYPES
     info = ENTITY_TYPES[artifact_type]
     path = root / "model" / info.domain_dir / info.subdir / f"{artifact_id}.md"
     _write(path, _entity_md(artifact_id, artifact_type, name))

@@ -7,8 +7,8 @@ unwriteable.
 
 from __future__ import annotations
 
-from src.common.archimate_types import ALL_CONNECTION_TYPES, ALL_ENTITY_TYPES
-from src.common.artifact_write import CONNECTION_TYPES, ENTITY_TYPES
+from src.application.modeling.artifact_write import CONNECTION_TYPES, ENTITY_TYPES
+from src.domain.archimate_types import ALL_CONNECTION_TYPES, ALL_ENTITY_TYPES
 
 
 def test_writer_entity_type_mapping_covers_all() -> None:

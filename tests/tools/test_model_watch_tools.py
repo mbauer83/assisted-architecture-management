@@ -8,7 +8,7 @@ Updated for ArchiMate NEXT conventions:
 import os
 from pathlib import Path
 
-from src.tools.artifact_mcp.watch_tools import _repo_state_snapshot, _roots_state_snapshot
+from src.infrastructure.mcp.artifact_mcp.watch_tools import _repo_state_snapshot, _roots_state_snapshot
 
 
 def _write(path: Path, content: str) -> None:

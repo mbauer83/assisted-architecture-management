@@ -1,13 +1,10 @@
 from __future__ import annotations
 
 import hashlib
-from dataclasses import dataclass
 
+from src.application.read_models import ReadModelVersion
 
-@dataclass(frozen=True)
-class ReadModelVersion:
-    generation: int
-    etag: str
+__all__ = ["ReadModelVersion", "build_read_model_etag"]
 
 
 def build_read_model_etag(scope_key: str, generation: int) -> str:

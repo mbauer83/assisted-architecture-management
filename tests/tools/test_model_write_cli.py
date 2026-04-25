@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from src.tools.artifact_write_cli import main
+from src.infrastructure.write.artifact_write_cli import main
 
 
 def _write(path: Path, content: str) -> None:

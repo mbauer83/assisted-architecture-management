@@ -9,8 +9,10 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Literal
 
-from src.common.artifact_repository import ArtifactRepository
-from src.common.artifact_types import (
+from src.application.artifact_repository import ArtifactRepository
+from src.application.ports import ArtifactStorePort
+from src.application.read_models import EntityContextReadModel
+from src.domain.artifact_types import (
     ArtifactSummary,
     ConnectionRecord,
     DiagramRecord,
@@ -23,9 +25,7 @@ from src.common.artifact_types import (
     summary_from_document,
     summary_from_entity,
 )
-from src.common.ports import ArtifactStorePort
 from src.infrastructure.artifact_index import ArtifactIndex, ReadModelVersion
-from src.infrastructure.artifact_index.types import EntityContextReadModel
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
 

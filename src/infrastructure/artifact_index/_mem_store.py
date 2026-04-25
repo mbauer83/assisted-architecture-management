@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from src.common.artifact_types import ConnectionRecord, DiagramRecord, DocumentRecord, EntityRecord
+from src.domain.artifact_types import ConnectionRecord, DiagramRecord, DocumentRecord, EntityRecord
 
 
 @dataclass

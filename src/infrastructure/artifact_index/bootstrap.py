@@ -4,7 +4,7 @@ import threading
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-from src.common.artifact_types import RepoMount, infer_mount
+from src.domain.artifact_types import RepoMount, infer_mount
 
 if TYPE_CHECKING:
     from .service import ArtifactIndex

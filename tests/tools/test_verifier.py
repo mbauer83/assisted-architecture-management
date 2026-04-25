@@ -11,10 +11,9 @@ from pathlib import Path
 
 import pytest
 
-from src.common.artifact_verifier import ArtifactVerifier
-from src.common.artifact_verifier_registry import ArtifactRegistry
+from src.application.verification.artifact_verifier import ArtifactVerifier
+from src.application.verification.artifact_verifier_registry import ArtifactRegistry
 from src.infrastructure.artifact_index import shared_artifact_index
-
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -224,7 +223,7 @@ Consequences.
 class TestVerifyOutgoingFile:
     def _setup_entities(self, repo: Path, *eids_and_types) -> None:
         for eid, etype in eids_and_types:
-            from src.common.ontology_loader import ENTITY_TYPES
+            from src.domain.ontology_loader import ENTITY_TYPES
             info = ENTITY_TYPES[etype]
             path = repo / "model" / info.domain_dir / info.subdir / f"{eid}.md"
             _write(path, _entity(eid, etype))
@@ -355,7 +354,7 @@ class TestVerifyDocumentFile:
             ),
             encoding="utf-8",
         )
-        from src.common.ontology_loader import ENTITY_TYPES
+        from src.domain.ontology_loader import ENTITY_TYPES
         entity_id = "FNC@1000000002.AbcDef.function"
         info = ENTITY_TYPES["function"]
         entity_path = repo / "model" / info.domain_dir / info.subdir / f"{entity_id}.md"
@@ -402,7 +401,7 @@ class TestVerifyDocumentFile:
             ),
             encoding="utf-8",
         )
-        from src.common.ontology_loader import ENTITY_TYPES
+        from src.domain.ontology_loader import ENTITY_TYPES
         entity_id = "REQ@1000000003.AbcDef.req"
         info = ENTITY_TYPES["requirement"]
         entity_path = repo / "model" / info.domain_dir / info.subdir / f"{entity_id}.md"
@@ -410,7 +409,13 @@ class TestVerifyDocumentFile:
 
         doc_id = "ADR@1000000000.AbcDef.source"
         doc_path = repo / "documents" / "adr" / f"{doc_id}.md"
-        _write(doc_path, _document(doc_id, f"[Requirement](../../model/{info.domain_dir}/{info.subdir}/{entity_id}.md#details)"))
+        _write(
+            doc_path,
+            _document(
+                doc_id,
+                f"[Requirement](../../model/{info.domain_dir}/{info.subdir}/{entity_id}.md#details)",
+            ),
+        )
 
         result = ArtifactVerifier(ArtifactRegistry(shared_artifact_index(repo))).verify_document_file(doc_path)
 

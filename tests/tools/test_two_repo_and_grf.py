@@ -19,12 +19,11 @@ from pathlib import Path
 
 import pytest
 
-from src.common.artifact_query import ArtifactRepository, shared_artifact_index
-from src.common.artifact_verifier import ArtifactVerifier
-from src.common.artifact_verifier_registry import ArtifactRegistry
-from src.tools import mcp_artifact_server as mcp_tools
+from src.application.artifact_query import ArtifactRepository
+from src.application.verification.artifact_verifier import ArtifactVerifier
+from src.application.verification.artifact_verifier_registry import ArtifactRegistry
 from src.infrastructure.artifact_index import shared_artifact_index
-
+from src.infrastructure.mcp import mcp_artifact_server as mcp_tools
 
 # ---------------------------------------------------------------------------
 # Fixtures
@@ -216,7 +215,7 @@ class TestGrfCreation:
     def test_ensure_creates_new_grf(
         self, engagement_root: Path, enterprise_root: Path
     ) -> None:
-        from src.tools.artifact_write.global_artifact_reference import ensure_global_artifact_reference
+        from src.infrastructure.write.artifact_write.global_artifact_reference import ensure_global_artifact_reference
 
         repo = ArtifactRepository(shared_artifact_index(engagement_root))
         result = ensure_global_artifact_reference(
@@ -238,9 +237,8 @@ class TestGrfCreation:
     def test_ensure_reuses_existing_grf(
         self, engagement_root: Path
     ) -> None:
-        from src.tools.artifact_write.global_artifact_reference import ensure_global_artifact_reference
-
         from src.infrastructure.artifact_index import notify_paths_changed
+        from src.infrastructure.write.artifact_write.global_artifact_reference import ensure_global_artifact_reference
 
         def _notify(path: Path | list[Path]) -> None:
             notify_paths_changed(path if isinstance(path, list) else [path])
@@ -275,7 +273,7 @@ class TestGrfCreation:
         assert r2.artifact_id == r1.artifact_id
 
     def test_build_grf_map(self, engagement_root: Path) -> None:
-        from src.tools.artifact_write.global_artifact_reference import build_gar_map
+        from src.infrastructure.write.artifact_write.global_artifact_reference import build_gar_map
 
         gar_dir = engagement_root / "model" / "common" / "global-references"
         _write(
@@ -553,7 +551,7 @@ class TestPromotionPlan:
     def test_plan_excludes_grf_entities(
         self, engagement_root: Path, enterprise_root: Path
     ) -> None:
-        from src.tools.artifact_write.promote_to_enterprise import plan_promotion
+        from src.infrastructure.write.artifact_write.promote_to_enterprise import plan_promotion
 
         eng_id = "CAP@1000000001.EngBBB.my-cap"
         gar_id = "GAR@1000000002.GarCCC.gar-ref"
@@ -588,7 +586,7 @@ class TestPromotionPlan:
     def test_plan_exclude_params(
         self, engagement_root: Path, enterprise_root: Path
     ) -> None:
-        from src.tools.artifact_write.promote_to_enterprise import plan_promotion
+        from src.infrastructure.write.artifact_write.promote_to_enterprise import plan_promotion
 
         eng_id1 = "CAP@1000000001.EngBBB.cap1"
         eng_id2 = "CAP@1000000002.EngCCC.cap2"
@@ -621,8 +619,9 @@ class TestPromotionExecuteOutgoingRewrite:
     def test_grf_targets_rewritten_to_enterprise_ids(
         self, engagement_root: Path, enterprise_root: Path
     ) -> None:
-        from src.tools.artifact_write._promote_file_ops import make_target_resolver, rewrite_outgoing as _rewrite_outgoing
-        from src.tools.artifact_write.promote_to_enterprise import PromotionResult, PromotionPlan
+        from src.infrastructure.write.artifact_write._promote_file_ops import make_target_resolver
+        from src.infrastructure.write.artifact_write._promote_file_ops import rewrite_outgoing as _rewrite_outgoing
+        from src.infrastructure.write.artifact_write.promote_to_enterprise import PromotionPlan, PromotionResult
 
         gar_id = "GAR@1000000002.GarCCC.gar-ref"
         glo_id = "REQ@2000000000.GloAAA.global-req"
@@ -659,8 +658,9 @@ class TestPromotionExecuteOutgoingRewrite:
     def test_stranded_targets_dropped_with_warning(
         self, engagement_root: Path, enterprise_root: Path
     ) -> None:
-        from src.tools.artifact_write._promote_file_ops import make_target_resolver, rewrite_outgoing as _rewrite_outgoing
-        from src.tools.artifact_write.promote_to_enterprise import PromotionResult, PromotionPlan
+        from src.infrastructure.write.artifact_write._promote_file_ops import make_target_resolver
+        from src.infrastructure.write.artifact_write._promote_file_ops import rewrite_outgoing as _rewrite_outgoing
+        from src.infrastructure.write.artifact_write.promote_to_enterprise import PromotionPlan, PromotionResult
 
         eng_id = "CAP@1000000001.EngBBB.my-cap"
         other_eng = "CAP@1000000003.EngDDD.other"
@@ -719,8 +719,8 @@ class TestPromotionExecuteFullRoundTrip:
     def test_entity_copied_to_enterprise(
         self, engagement_root: Path, enterprise_root: Path
     ) -> None:
-        from src.tools.artifact_write.promote_to_enterprise import plan_promotion
-        from src.tools.artifact_write.promote_execute import execute_promotion
+        from src.infrastructure.write.artifact_write.promote_execute import execute_promotion
+        from src.infrastructure.write.artifact_write.promote_to_enterprise import plan_promotion
 
         eng_id, gar_id, glo_id = self._setup(engagement_root, enterprise_root)
         registry = ArtifactRegistry(shared_artifact_index([engagement_root, enterprise_root]))
@@ -737,8 +737,8 @@ class TestPromotionExecuteFullRoundTrip:
     def test_grf_target_rewritten_in_enterprise_outgoing(
         self, engagement_root: Path, enterprise_root: Path
     ) -> None:
-        from src.tools.artifact_write.promote_to_enterprise import plan_promotion
-        from src.tools.artifact_write.promote_execute import execute_promotion
+        from src.infrastructure.write.artifact_write.promote_execute import execute_promotion
+        from src.infrastructure.write.artifact_write.promote_to_enterprise import plan_promotion
 
         eng_id, gar_id, glo_id = self._setup(engagement_root, enterprise_root)
         registry = ArtifactRegistry(shared_artifact_index([engagement_root, enterprise_root]))
@@ -761,8 +761,8 @@ class TestPromotionExecuteFullRoundTrip:
     def test_promoted_engagement_entity_replaced_by_grf(
         self, engagement_root: Path, enterprise_root: Path
     ) -> None:
-        from src.tools.artifact_write.promote_to_enterprise import plan_promotion
-        from src.tools.artifact_write.promote_execute import execute_promotion
+        from src.infrastructure.write.artifact_write.promote_execute import execute_promotion
+        from src.infrastructure.write.artifact_write.promote_to_enterprise import plan_promotion
 
         eng_id, gar_id, glo_id = self._setup(engagement_root, enterprise_root)
         orig_eng_file = (
@@ -789,8 +789,8 @@ class TestPromotionExecuteFullRoundTrip:
     def test_outgoing_references_updated_after_replacement(
         self, engagement_root: Path, enterprise_root: Path
     ) -> None:
-        from src.tools.artifact_write.promote_to_enterprise import plan_promotion
-        from src.tools.artifact_write.promote_execute import execute_promotion
+        from src.infrastructure.write.artifact_write.promote_execute import execute_promotion
+        from src.infrastructure.write.artifact_write.promote_to_enterprise import plan_promotion
 
         eng_id, gar_id, glo_id = self._setup(engagement_root, enterprise_root)
 

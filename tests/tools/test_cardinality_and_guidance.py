@@ -5,18 +5,16 @@ Also covers the removal of element_category from EntityTypeInfo (feature ii).
 
 from __future__ import annotations
 
-import re
 from pathlib import Path
 
 import pytest
 
-from src.common.artifact_verifier import ArtifactVerifier
-from src.common.artifact_verifier_registry import ArtifactRegistry
-from src.common.artifact_write_formatting import format_outgoing_markdown
-from src.tools.artifact_write.parse_existing import parse_outgoing_file
-from src.tools.artifact_write.type_guidance import get_type_guidance
+from src.application.modeling.artifact_write_formatting import format_outgoing_markdown
+from src.application.verification.artifact_verifier import ArtifactVerifier
+from src.application.verification.artifact_verifier_registry import ArtifactRegistry
 from src.infrastructure.artifact_index import shared_artifact_index
-
+from src.infrastructure.write.artifact_write.parse_existing import parse_outgoing_file
+from src.infrastructure.write.artifact_write.type_guidance import get_type_guidance
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -301,7 +299,7 @@ class TestAddConnectionWithCardinality:
     """Integration tests: add_connection writes and verifies cardinalities."""
 
     def test_add_connection_with_src_cardinality(self, repo: Path) -> None:
-        from src.tools.artifact_write.connection import add_connection
+        from src.infrastructure.write.artifact_write.connection import add_connection
         src, tgt = _setup_two_entities(repo)
         registry = ArtifactRegistry(shared_artifact_index(repo))
         verifier = ArtifactVerifier(registry)
@@ -330,7 +328,7 @@ class TestAddConnectionWithCardinality:
         assert "### archimate-realization [1] →" in content
 
     def test_add_connection_with_both_cardinalities(self, repo: Path) -> None:
-        from src.tools.artifact_write.connection import add_connection
+        from src.infrastructure.write.artifact_write.connection import add_connection
         src, tgt = _setup_two_entities(repo)
         registry = ArtifactRegistry(shared_artifact_index(repo))
         verifier = ArtifactVerifier(registry)
@@ -366,20 +364,20 @@ class TestAddConnectionWithCardinality:
 
 class TestElementCategoryRemoved:
     def test_entity_type_info_has_no_element_category(self) -> None:
-        from src.common.ontology_loader import ENTITY_TYPES
+        from src.domain.ontology_loader import ENTITY_TYPES
         info = ENTITY_TYPES["requirement"]
         assert not hasattr(info, "element_category"), (
             "element_category should have been removed from EntityTypeInfo"
         )
 
     def test_entity_type_info_still_has_element_classes(self) -> None:
-        from src.common.ontology_loader import ENTITY_TYPES
+        from src.domain.ontology_loader import ENTITY_TYPES
         info = ENTITY_TYPES["requirement"]
         assert hasattr(info, "element_classes")
         assert "motivation-element" in info.element_classes
 
     def test_category_map_not_exported(self) -> None:
-        import src.common.ontology_loader as ol
+        import src.domain.ontology_loader as ol
         assert not hasattr(ol, "CATEGORY_MAP"), (
             "CATEGORY_MAP should have been removed from ontology_loader"
         )
@@ -391,7 +389,7 @@ class TestElementCategoryRemoved:
 
 class TestGetTypeGuidance:
     def test_all_types_returned_when_no_filter(self) -> None:
-        from src.common.ontology_loader import ENTITY_TYPES
+        from src.domain.ontology_loader import ENTITY_TYPES
         result = get_type_guidance()
         assert result["total"] == len(ENTITY_TYPES)
         assert isinstance(result["entity_types"], list)
@@ -466,7 +464,7 @@ class TestGetTypeGuidance:
         assert r_both["total"] == r_mot["total"] + r_str["total"]
 
     def test_mcp_tool_function_reachable(self) -> None:
-        from src.tools.artifact_mcp.write.entity import artifact_write_modeling_guidance
+        from src.infrastructure.mcp.artifact_mcp.write.entity import artifact_write_modeling_guidance
         result = artifact_write_modeling_guidance(filter=["stakeholder"])
         assert result["total"] == 1
         assert result["entity_types"][0]["name"] == "stakeholder"

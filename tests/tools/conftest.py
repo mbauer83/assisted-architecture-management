@@ -1,6 +1,7 @@
 """Shared test fixtures and session-scoped cleanup for tools tests."""
 
 import os
+
 import pytest
 
 # Disable PlantUML syntax checking during tests to avoid JVM resource contention
@@ -20,8 +21,8 @@ def clear_mcp_context_caches():
     The init-state module-level flag must also be reset so the real workspace
     enterprise repo isn't silently loaded into subsequent isolated-repo tests.
     """
-    import src.tools.artifact_mcp.context as ctx
-    from src.tools.artifact_mcp.write_queue import shutdown as shutdown_write_queue
+    import src.infrastructure.mcp.artifact_mcp.context as ctx
+    from src.infrastructure.mcp.artifact_mcp.write_queue import shutdown as shutdown_write_queue
 
     shutdown_write_queue(wait=True)
     ctx.repo_cached.cache_clear()
