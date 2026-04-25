@@ -1,16 +1,12 @@
 {
   "servers": {
-    "arch-model": {
+    "arch-repo-read": {
       "command": "uv",
-      "args": ["run", "arch-mcp-stdio"]
+      "args": ["run", "arch-mcp-stdio-read"]
     },
-    "arch-framework": {
+    "arch-repo-write": {
       "command": "uv",
-      "args": ["run", "arch-mcp-framework", "--transport", "stdio"],
-      "env": {
-        "ARCH_MCP_FRAMEWORK_DOC_ROOT": "engagements/ENG-ARCH-REPO/architecture-repository",
-        "ARCH_MCP_FRAMEWORK_SCAN_DIRS": "docs"
-      }
+      "args": ["run", "arch-mcp-stdio-write"]
     }
   }
 }
