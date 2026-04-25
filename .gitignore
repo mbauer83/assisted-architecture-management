@@ -27,3 +27,4 @@ src/tools/model_write/__pycache__/
 *.pyc
 
 plantuml.jar
+.worktrees/
