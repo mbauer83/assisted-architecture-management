@@ -26,6 +26,7 @@ def _make_app():  # type: ignore[no-untyped-def]
     from src.tools.gui_routers.diagrams import router as diagrams_router
     from src.tools.gui_routers.entities import router as entities_router
     from src.tools.gui_routers.promote import router as promote_router
+    from src.tools.gui_routers.sync import router as sync_router
 
     app = FastAPI(title="Architecture Repository GUI", version="0.2.0")
     app.add_middleware(
@@ -38,6 +39,7 @@ def _make_app():  # type: ignore[no-untyped-def]
     app.include_router(connections_router)
     app.include_router(diagrams_router)
     app.include_router(promote_router)
+    app.include_router(sync_router)
     app.include_router(admin_router)
     return app
 

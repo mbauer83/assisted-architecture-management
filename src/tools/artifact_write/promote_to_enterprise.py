@@ -5,9 +5,12 @@ enterprise repo.  Supported types: entities (+ connections), documents, diagrams
 This is a one-way operation.
 
 Conflict detection:
-- Entities: matched by (artifact_type, normalized_name)
+- Entities: matched by (artifact_type, normalized_name) OR (artifact_type, id_suffix)
 - Documents: matched by (doc_type, normalized_title)
 - Diagrams:  matched by (diagram_type, normalized_name)
+
+Schema superset verification (see promote_schema_check.py) blocks promotion when
+engagement schemata are not supersets of the corresponding enterprise schemata.
 
 Execution logic lives in promote_execute.py.
 """
@@ -20,6 +23,7 @@ from typing import Any, Literal
 from src.common.artifact_query import ArtifactRepository
 from src.common.artifact_verifier import ArtifactRegistry
 from src.tools.artifact_write.parse_existing import parse_entity_file
+from src.tools.artifact_write.promote_schema_check import check_promotion_schema_compatibility
 
 
 # ---------------------------------------------------------------------------
@@ -77,6 +81,7 @@ class PromotionPlan:
     diagrams_to_add: list[str] = field(default_factory=list)
     doc_conflicts: list[DocPromotionConflict] = field(default_factory=list)
     diagram_conflicts: list[DiagramPromotionConflict] = field(default_factory=list)
+    schema_errors: list[str] = field(default_factory=list)
 
 
 @dataclass
@@ -92,6 +97,13 @@ class PromotionResult:
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
+def _extract_id_suffix(artifact_id: str) -> str | None:
+    """Return the portion after '@' (epoch.random), or None if the ID has no '@'."""
+    if "@" not in artifact_id:
+        return None
+    return artifact_id.split("@", 1)[1]
+
 
 def _parse_conn_full(cid: str) -> tuple[str, str, str] | None:
     if "---" in cid and "@@" in cid:
@@ -124,6 +136,23 @@ def _build_enterprise_name_index(
             continue
         key = (rec.artifact_type, _normalize_name(rec.name))
         index[key] = rec
+    return index
+
+
+def _build_enterprise_id_suffix_index(
+    repo: ArtifactRepository,
+    registry: ArtifactRegistry,
+) -> dict[tuple[str, str], Any]:
+    """Index enterprise entities by (artifact_type, id_suffix) to catch same-ID renames."""
+    enterprise_ids = registry.enterprise_entity_ids()
+    index: dict[tuple[str, str], Any] = {}
+    for eid in enterprise_ids:
+        rec = repo.get_entity(eid)
+        if rec is None:
+            continue
+        suffix = _extract_id_suffix(eid)
+        if suffix is not None:
+            index[(rec.artifact_type, suffix)] = rec
     return index
 
 
@@ -166,7 +195,8 @@ def plan_promotion(
     if missing:
         raise ValueError(f"Entity '{missing[0]}' not found in model")
 
-    ent_index = _build_enterprise_name_index(repo, registry)
+    ent_name_index = _build_enterprise_name_index(repo, registry)
+    ent_id_suffix_index = _build_enterprise_id_suffix_index(repo, registry)
     warnings: list[str] = []
     already: list[str] = []
     candidates: list[str] = []
@@ -186,8 +216,13 @@ def plan_promotion(
         if rec is None:
             warnings.append(f"Entity record not found for {eid}")
             continue
-        key = (rec.artifact_type, _normalize_name(rec.name))
-        ent_rec = ent_index.get(key)
+        # Match by name first, then fall back to ID suffix (catches same entity renamed in one repo)
+        name_key = (rec.artifact_type, _normalize_name(rec.name))
+        ent_rec = ent_name_index.get(name_key)
+        if ent_rec is None:
+            suffix = _extract_id_suffix(eid)
+            if suffix is not None:
+                ent_rec = ent_id_suffix_index.get((rec.artifact_type, suffix))
         if ent_rec is not None:
             conflicts.append(PromotionConflict(
                 engagement_id=eid,
@@ -284,6 +319,14 @@ def plan_promotion(
         else:
             diags_to_add.append(did)
 
+    schema_errors = check_promotion_schema_compatibility(
+        entity_ids=to_add + [c.engagement_id for c in conflicts],
+        has_diagrams=bool(diags_to_add or diagram_conflicts),
+        document_ids=docs_to_add + [c.engagement_id for c in doc_conflicts],
+        registry=registry,
+        repo=repo,
+    )
+
     return PromotionPlan(
         root_entity=selected_ids[0] if selected_ids else (document_ids or diagram_ids or [""])[0],
         entities_to_add=to_add,
@@ -295,4 +338,5 @@ def plan_promotion(
         diagrams_to_add=diags_to_add,
         doc_conflicts=doc_conflicts,
         diagram_conflicts=diagram_conflicts,
+        schema_errors=schema_errors,
     )

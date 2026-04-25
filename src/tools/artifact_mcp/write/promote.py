@@ -84,9 +84,13 @@ def artifact_promote_to_enterprise(
             for c in plan.diagram_conflicts
         ],
         "warnings": plan.warnings,
+        "schema_errors": plan.schema_errors,
     }
 
     if not dry_run:
+        from src.tools.enterprise_git_ops import ensure_working_branch
+        ensure_working_branch(ent_root)
+
         resolutions = [
             ConflictResolution(
                 engagement_id=str(r["engagement_id"]),

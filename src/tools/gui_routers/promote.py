@@ -90,6 +90,7 @@ def promotion_plan(body: PromotionPlanBody) -> dict[str, Any]:
             for c in plan.diagram_conflicts
         ],
         "warnings": plan.warnings,
+        "schema_errors": plan.schema_errors,
     }
 
 
@@ -123,6 +124,9 @@ def promotion_execute(body: PromotionExecuteBody) -> dict[str, Any]:
             "copied_files": [], "updated_files": [],
             "verification_errors": [], "rolled_back": False,
         }
+
+    from src.tools.enterprise_git_ops import ensure_working_branch
+    ensure_working_branch(ent_root)
 
     resolutions = [
         ConflictResolution(

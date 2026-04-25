@@ -1,4 +1,5 @@
 import type { Effect, ParseResult } from 'effect'
+import type { SyncChangesResult } from '../domain/schemas-changes'
 import type {
   Stats,
   EntityList,
@@ -27,6 +28,8 @@ import type {
   DiagramConnection,
   PromotionPlan,
   PromotionResult,
+  SyncStatus,
+  SyncSaveResult,
 } from '../domain'
 import type { NetworkError, NotFoundError } from '../domain'
 import type { MarkdownError } from '../application/MarkdownService'
@@ -202,6 +205,13 @@ export interface ModelRepository {
     status?: string; version?: string; dry_run?: boolean;
   }) => Effect.Effect<WriteResult, RepoError>
   readonly deleteDocument: (id: string, dry_run?: boolean) => Effect.Effect<WriteResult, RepoError>
+  // ── Sync / save workflow ──────────────────────────────────────────────────
+  readonly getSyncStatus: () => Effect.Effect<SyncStatus, RepoError>
+  readonly saveEngagementChanges: (body: { message: string; push?: boolean }) => Effect.Effect<SyncSaveResult, RepoError>
+  readonly saveEnterpriseChanges: (body: { message: string }) => Effect.Effect<SyncSaveResult, RepoError>
+  readonly submitEnterpriseChanges: () => Effect.Effect<SyncSaveResult, RepoError>
+  readonly withdrawEnterpriseChanges: () => Effect.Effect<SyncSaveResult, RepoError>
+  readonly getChanges: (repo: 'engagement' | 'enterprise') => Effect.Effect<SyncChangesResult, RepoError>
   readonly artifactSearch: (q: string, params?: {
     limit?: number; include_documents?: boolean; include_diagrams?: boolean;
   }) => Effect.Effect<ArtifactSearchResult, RepoError>

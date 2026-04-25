@@ -92,3 +92,6 @@ mcp_write = FastMCP(
 
 register_write_tools(mcp_write)
 register_edit_tools(mcp_write)
+
+from src.tools.artifact_mcp.write import sync_ops as _sync_ops
+_sync_ops.register(mcp_write)

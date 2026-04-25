@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import asyncio
 import logging
 import os
 import subprocess
@@ -133,9 +134,10 @@ def _start_daemon(*, argv: list[str] | None, log_path: Path) -> int:
     return int(proc.pid)
 
 
-def _find_git_repos() -> list[Path]:
-    """Return paths of repos configured with git: spec in arch-workspace.yaml."""
+def _find_git_repos() -> "list[RepoSpec]":
+    """Return git-backed repos from arch-workspace.yaml, tagged with their role."""
     from src.common.workspace_paths import find_workspace_config, parse_workspace_config
+    from src.tools.git_sync import RepoSpec
 
     cfg = find_workspace_config(Path.cwd())
     if cfg is None:
@@ -148,7 +150,10 @@ def _find_git_repos() -> list[Path]:
         if "git" in spec:
             git_spec = spec["git"]
             rel = git_spec.get("path", f"./{key}-repository")
-            repos.append((workspace_root / rel).resolve())
+            repos.append(RepoSpec(
+                path=(workspace_root / rel).resolve(),
+                role=key,  # type: ignore[arg-type]
+            ))
     return repos
 
 
@@ -164,12 +169,25 @@ def _build_app(git_ssh_passphrase: str | None = None):  # type: ignore[no-untype
     from src.tools.gui_routers.entities import router as entities_router
     from src.tools.gui_routers.events import router as events_router
     from src.tools.gui_routers.promote import router as promote_router
+    from src.tools.gui_routers.sync import router as sync_router
 
     mcp_read.streamable_http_app()
     mcp_write.streamable_http_app()
 
     read_app = StreamableHTTPASGIApp(mcp_read.session_manager)
     write_app = StreamableHTTPASGIApp(mcp_write.session_manager)
+
+    async def _on_repo_changed(repo_path: Path) -> None:
+        """Refresh the artifact index and notify GUI clients after a git pull or merge."""
+        repo = gui_state.maybe_get_repo()
+        if repo is not None:
+            await asyncio.to_thread(repo.refresh)
+        from src.tools.gui_routers.events import event_bus
+        await event_bus.publish({
+            "type": "sync_repository_updated",
+            "repo": str(repo_path),
+            "label": "Repository updated — refreshing view…",
+        })
 
     @asynccontextmanager
     async def lifespan(_app: FastAPI):
@@ -180,13 +198,19 @@ def _build_app(git_ssh_passphrase: str | None = None):  # type: ignore[no-untype
             auto_start_default_watcher()
             logger.info("Default watcher auto-started")
 
-            # Start git-sync manager if there are git-backed repos
             git_repos = _find_git_repos()
             sync_mgr = None
             if git_repos:
                 from src.tools.git_sync import GitSyncManager
-                logger.info("Starting git-sync for repos: %s", ", ".join(str(repo) for repo in git_repos))
-                sync_mgr = GitSyncManager(git_repos, ssh_passphrase=git_ssh_passphrase)
+                logger.info(
+                    "Starting git-sync for repos: %s",
+                    ", ".join(f"{r.path}({r.role})" for r in git_repos),
+                )
+                sync_mgr = GitSyncManager(
+                    git_repos,
+                    ssh_passphrase=git_ssh_passphrase,
+                    on_repo_changed=_on_repo_changed,
+                )
                 await sync_mgr.start()
             else:
                 logger.info("No git-backed repositories configured for sync")
@@ -239,6 +263,7 @@ def _build_app(git_ssh_passphrase: str | None = None):  # type: ignore[no-untype
     app.include_router(diagrams_router)
     app.include_router(documents_router)
     app.include_router(promote_router)
+    app.include_router(sync_router)
     app.include_router(admin_router)
     app.include_router(events_router)
     # Starlette mounts only match `/mcp/…`, not the bare `/mcp` path.

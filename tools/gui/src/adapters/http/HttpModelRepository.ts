@@ -29,7 +29,10 @@ import {
   DiagramConnectionSchema,
   PromotionPlanSchema,
   PromotionResultSchema,
+  SyncStatusSchema,
+  SyncSaveResultSchema,
 } from '../../domain/schemas'
+import { SyncChangesResultSchema } from '../../domain/schemas-changes'
 import { parseMarkdown } from '../../application/MarkdownService'
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -179,14 +182,10 @@ export const makeHttpModelRepository = (): ModelRepository => ({
   getStats: () => fetchJson(buildUrl('/stats'), StatsSchema),
 
   listEntities: (params: ListParams = {}) =>
-    fetchJson(
-      buildUrl('/entities', {
-        domain: params.domain, artifact_type: params.artifactType,
-        status: params.status, scope: params.scope,
-        limit: params.limit, offset: params.offset,
-      }),
-      EntityListSchema,
-    ),
+    fetchJson(buildUrl('/entities', {
+      domain: params.domain, artifact_type: params.artifactType,
+      status: params.status, scope: params.scope, limit: params.limit, offset: params.offset,
+    }), EntityListSchema),
 
   getEntity: (id: string) =>
     fetchJsonNotFound(buildUrl('/entity', { id }), EntityDetailSchema, id).pipe(
@@ -213,14 +212,9 @@ export const makeHttpModelRepository = (): ModelRepository => ({
     ),
 
   getConnections: (entityId: string, direction: Direction = 'any', connType?: string) =>
-    fetchJson(
-      buildUrl('/connections', { entity_id: entityId, direction, conn_type: connType }),
-      ConnectionListSchema,
-    ),
-
+    fetchJson(buildUrl('/connections', { entity_id: entityId, direction, conn_type: connType }), ConnectionListSchema),
   getNeighbors: (entityId: string, maxHops = 1) =>
     fetchJson(buildUrl('/neighbors', { entity_id: entityId, max_hops: maxHops }), NeighborsSchema),
-
   search: (query: string, limit = 20) =>
     fetchJson(buildUrl('/search', { q: query, limit }), SearchResultSchema),
 
@@ -249,12 +243,8 @@ export const makeHttpModelRepository = (): ModelRepository => ({
 
   searchReferenceArtifacts: (params) =>
     fetchJson(buildUrl('/reference-search', {
-      q: params.q,
-      kind: params.kind,
-      domains: params.domains?.join(','),
-      entity_types: params.entity_types?.join(','),
-      doc_types: params.doc_types?.join(','),
-      limit: params.limit,
+      q: params.q, kind: params.kind, domains: params.domains?.join(','),
+      entity_types: params.entity_types?.join(','), doc_types: params.doc_types?.join(','), limit: params.limit,
     }), ReferenceSearchResultSchema),
 
   listDiagrams: (diagramType?: string, status?: string) =>
@@ -269,10 +259,7 @@ export const makeHttpModelRepository = (): ModelRepository => ({
   diagramImageUrl: (filename: string) => `/api/diagram-image/${encodeURIComponent(filename)}`,
 
   getDiagramRefs: (sourceId: string, targetId: string) =>
-    fetchJson(
-      buildUrl('/diagram-refs', { source_id: sourceId, target_id: targetId }),
-      DiagramRefsSchema,
-    ),
+    fetchJson(buildUrl('/diagram-refs', { source_id: sourceId, target_id: targetId }), DiagramRefsSchema),
 
   addConnection: (body) => postJson(buildUrl('/connection'), body, WriteResultSchema),
 
@@ -287,16 +274,9 @@ export const makeHttpModelRepository = (): ModelRepository => ({
     fetchJson(buildUrl('/write-help'), Schema.Unknown),
 
   getOntologyClassification: (sourceType: string) =>
-    fetchJson(
-      buildUrl('/ontology', { source_type: sourceType }),
-      OntologyClassificationSchema,
-    ),
-
+    fetchJson(buildUrl('/ontology', { source_type: sourceType }), OntologyClassificationSchema),
   getOntologyPair: (sourceType: string, targetType: string) =>
-    fetchJson(
-      buildUrl('/ontology', { source_type: sourceType, target_type: targetType }),
-      OntologyPairSchema,
-    ),
+    fetchJson(buildUrl('/ontology', { source_type: sourceType, target_type: targetType }), OntologyPairSchema),
 
   createEntity: (body) => postJson(buildUrl('/entity'), body, WriteResultSchema),
 
@@ -320,21 +300,12 @@ export const makeHttpModelRepository = (): ModelRepository => ({
     fetchText(buildUrl('/diagram-svg', { id: diagramId })),
 
   searchEntityDisplay: (query: string, limit = 20) =>
-    fetchJson(
-      buildUrl('/entity-display-search', { q: query, limit }),
-      Schema.Array(EntityDisplayInfoSchema),
-    ).pipe(Effect.map((arr) => arr as import('../../domain').EntityDisplayInfo[])),
-
+    fetchJson(buildUrl('/entity-display-search', { q: query, limit }), Schema.Array(EntityDisplayInfoSchema))
+      .pipe(Effect.map((arr) => arr as import('../../domain').EntityDisplayInfo[])),
   discoverDiagramEntities: ({ includedEntityIds = [], query, maxHops = 2, limit = 20 }) =>
-    fetchJson(
-      buildUrl('/diagram-entity-discovery', {
-        q: query,
-        max_hops: maxHops,
-        limit,
-        included_entity_ids: includedEntityIds.join(','),
-      }),
-      DiagramEntityDiscoverySchema,
-    ),
+    fetchJson(buildUrl('/diagram-entity-discovery', {
+      q: query, max_hops: maxHops, limit, included_entity_ids: includedEntityIds.join(','),
+    }), DiagramEntityDiscoverySchema),
 
   previewDiagram: (body) =>
     postJson(buildUrl('/diagram/preview'), body, DiagramPreviewResultSchema),
@@ -365,4 +336,11 @@ export const makeHttpModelRepository = (): ModelRepository => ({
 
   executePromotion: (body) =>
     postJson(buildUrl('/promote/execute'), body, PromotionResultSchema),
+
+  getSyncStatus: () => fetchJson('/api/sync/status', SyncStatusSchema),
+  saveEngagementChanges: (body) => postJson('/api/sync/engagement/save', { push: true, ...body }, SyncSaveResultSchema),
+  saveEnterpriseChanges: (body) => postJson('/api/sync/enterprise/save', body, SyncSaveResultSchema),
+  submitEnterpriseChanges: () => postJson('/api/sync/enterprise/submit', {}, SyncSaveResultSchema),
+  withdrawEnterpriseChanges: () => postJson('/api/sync/enterprise/withdraw', { confirm: true }, SyncSaveResultSchema),
+  getChanges: (repo) => fetchJson(buildUrl('/sync/changes', { repo }), SyncChangesResultSchema),
 })

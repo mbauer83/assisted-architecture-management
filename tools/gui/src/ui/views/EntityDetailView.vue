@@ -92,7 +92,7 @@ const buildEditBody = (dryRun: boolean) => {
     summary: editSummary.value || undefined,
     keywords: kws.length ? kws : undefined,
     status: editStatus.value || undefined,
-    properties: Object.keys(props).length ? props : undefined,
+    properties: props,
     notes: editNotes.value || undefined,
     dry_run: dryRun,
   }

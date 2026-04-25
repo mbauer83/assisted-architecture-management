@@ -8,7 +8,7 @@ Architecture knowledge typically lives in slide decks, Confluence pages, or silo
 
 The key ideas:
 
-- **Two-tiered repository model**: an *enterprise* repo holds the organisation-wide baseline; per-project *engagement* repos extend it with local decisions, designs, and trade-offs. Entities flow from engagement to enterprise via a promotion workflow.
+- **Two-tiered repository model**: an *enterprise* repo holds architecture content that is valid organisation-wide and represents a deliberately shared state; per-project *engagement* repos are used both for adding specific local detail for teams / individuals and to draft and develop architecture models before promoting them to the enterprise repository via a specific workflow.
 - **AI-native access**: an MCP server exposes the model to AI agents as typed tools — without the agent needing to know the file layout, it can query, search, navigate relationships, create/edit/delete artifacts, and promote decisions to shared repositories.
 - **Human access**: a REST API, a CLI, and a browser GUI provide the same capabilities for humans.
 - **Verified integrity**: a built-in verifier enforces referential integrity, schema conformance, diagram syntax, and cross-repo reference rules. Models stay consistent as humans and AI edit them together.
@@ -22,7 +22,7 @@ enterprise-repository/        ← organisation-wide baseline (read-only during e
     motivation/  strategy/  business/  application/  technology/  ...
 
 engagements/
-  ENG-ARCH-REPO/              ← per-project engagement repo
+  ENG-ARCH-REPO/              ← per-project repo
     architecture-repository/
       model/                  ← engagement-specific entities and connections
       diagram-catalog/        ← diagrams (may reference enterprise entities via macros)
@@ -33,19 +33,15 @@ engagements/
 
 **Engagement repo** — project-specific work. New entities, connections, diagrams, and documents are created here. When ready, they are *promoted* to enterprise.
 
-**Promotion** — a one-way transfer of an explicitly selected set of entities and connections from engagement to enterprise. Conflict detection matches by `(artifact_type, friendly_name)` so the same logical entity under different artifact IDs is recognised. Conflicts offer three resolution strategies: accept engagement version, accept enterprise version, or manual merge.
+**Promotion** — a one-way transfer of an explicitly selected set of entities and connections from engagement to enterprise. Conflict detection matches by both `(artifact_type, normalized_name)` and `(artifact_type, id_suffix)` — the same entity renamed in one repo is caught by the ID match, and the same name with a different ID is caught by the name match. Conflicts offer three resolution strategies: accept engagement version, accept enterprise version, or manual merge. Promotion is blocked when the engagement repo's schemata are not supersets of the enterprise schemata (see **Configuration Reference** below).
 
 **Asymmetric references** — enterprise entities can only reference other enterprise entities. Engagement entities may reference both engagement and enterprise entities. This is enforced by the verifier.
 
 ### Workspace Configuration
 
-An `arch-workspace.yaml` at the workspace root declares both repos:
+An `arch-workspace.yaml` at the workspace root declares the two repositories:
 
 ```yaml
-backend:
-  port: 8000
-  log_path: .arch/backend.log
-
 engagement:
   local: engagements/ENG-ARCH-REPO/architecture-repository
   # or git: { url: "https://...", branch: main, path: .arch/repos/engagement }
@@ -57,9 +53,7 @@ enterprise:
 
 Run `arch-init` to validate paths (or clone git repos) and write `.arch/init-state.yaml` with resolved absolute paths. All tooling reads this state file on startup.
 
-`backend.port` is optional. If omitted, tooling falls back to `config/settings.yaml` and then `8000`.
-`backend.log_path` is optional and may be absolute or workspace-relative.
-`backend.min_log_level` is configured in `config/settings.yaml` and controls the minimum log level written by `arch-backend` (`DEBUG`, `INFO`, `WARNING`, `ERROR`, or `CRITICAL`; default `INFO`).
+Backend settings (port, log path, log level) are configured in `config/settings.yaml`, not in `arch-workspace.yaml`. See **Configuration Reference** below.
 
 ## Repository Layout
 
@@ -137,7 +131,7 @@ AI agents receive verification results in structured form (error codes, location
 When multiple sources (humans, AI agents, scheduled syncs) need to coordinate:
 - **Write blocking**: repos can be temporarily blocked during git sync operations without losing data
 - **Auto-recovery**: if a sync fails, the system automatically unblocks after a timeout to prevent deadlock
-- **Real-time notifications**: the GUI shows sync progress and blocks via toast notifications; agents receive events via SSE
+- **Real-time notifications**: the GUI subscribes to `GET /api/events` (SSE) and displays sync progress and write-lock state via toast notifications; AI agents poll REST endpoints or read write-block state from operation responses rather than receiving push events
 
 ### Modeling Guidance
 
@@ -322,18 +316,127 @@ If you want host-started MCP clients to attach to the Dockerized backend:
 - The browser GUI shows a banner and disables write buttons
 - The MCP write server remains available but rejects all mutations
 
+## Saving and Sharing Work
+
+Architecture changes accumulate as file edits. They are persisted to git in two explicit steps: *saving* (committing locally) and, for enterprise changes, *submitting for review* (pushing a branch for team review).
+
+### Engagement Repository
+
+Changes in the engagement repo are saved via:
+
+- **GUI**: "Save Changes" button → commits all uncommitted changes with a message; optionally pushes to the remote immediately.
+- **MCP tool**: `artifact_save_changes(message="…", target="engagement")`.
+- **REST API**: `POST /api/sync/engagement/save` `{"message": "…", "push": true}`.
+
+If `push=true` (default), the commit is pushed to the remote branch immediately after committing.
+
+### Enterprise Repository — Branch-Based Review Workflow
+
+Enterprise changes (e.g. after promoting engagement artifacts) follow a three-step lifecycle designed to work with any git hosting platform (GitHub, GitLab, Gitea, etc.) without requiring API integration:
+
+```
+ Make changes          Save changes         Submit for review
+ (promote artifacts)   (commit to           (push branch →
+                        working branch)      create PR manually)
+        │                    │                    │
+        ▼                    ▼                    ▼
+  [accumulating] ──────► [accumulating] ──────► [pending]
+                                                   │
+                              ◄────────────────────┘
+                         [synced]   ← auto-detected when branch
+                                      is merged into main
+```
+
+**Accumulating** — when the first enterprise write (promotion) happens, the system automatically creates an isolated working branch (e.g. `arch/work-20260425-143012`). Subsequent promotions accumulate on the same branch. The enterprise read view always reflects the branch content, so all queries are consistent with your in-progress work.
+
+**Saving** — commits the working branch without pushing. Use this to checkpoint progress:
+- **GUI**: "Save Enterprise Changes" → commit dialog.
+- **MCP**: `artifact_save_changes(message="…", target="enterprise")`.
+- **REST**: `POST /api/sync/enterprise/save`.
+
+**Submitting for review** — pushes the branch and marks it as pending. No API integration needed; the returned branch name is used to open a PR manually in your hosting platform:
+- **GUI**: "Submit for Review" → shows branch name and guidance.
+- **MCP**: `artifact_submit_for_review()`.
+- **REST**: `POST /api/sync/enterprise/submit`.
+
+**Auto-merge detection** — the background sync polls `origin/main` every cycle. When the working branch content is detected in `origin/main` (via content diff, which handles squash/rebase merges), the system automatically checks out `main`, pulls, and transitions back to the *synced* state. The GUI notifies with "Your changes have been merged".
+
+**Discarding changes** — to abandon a working branch without merging:
+- **GUI**: "Discard Changes" (requires confirmation).
+- **MCP**: `artifact_withdraw_changes(confirm=True)`.
+- **REST**: `POST /api/sync/enterprise/withdraw` `{"confirm": true}`.
+
+The sync state for the enterprise repo is persisted in `.arch/enterprise-sync.json` and survives backend restarts.
+
+### SSH Key Passphrases
+
+If the git remote requires an SSH key with a passphrase, supply it via environment variable or startup argument. The passphrase is never stored on disk; it is passed to git subprocesses via a temporary `SSH_ASKPASS` helper at runtime:
+
+```bash
+# Via environment variable (inherited by auto-started backends)
+export ARCH_GIT_SSH_PASSWORD="my passphrase"
+arch-backend --daemon
+
+# Via explicit argument (overrides env var)
+arch-backend --git-ssh-password "my passphrase" --daemon
+```
+
 ## Continuous Git Sync
 
-When a repository is configured as a git repo (not just a local path), the backend:
+When a repository is configured as a git repo (not just a local path), the backend runs a background sync loop every 60 seconds (configurable). Behavior differs by repository role:
 
-- Periodically checks the configured branch for updates
-- If new commits are found, temporarily blocks write operations, pulls the changes, and resumes
-- Notifies the GUI with toast messages and publishes events for connected agents
-- Auto-unblocks if a pull fails (prevents deadlock)
+**Engagement repository**
+- Fetches from origin on every cycle.
+- If behind and the workspace is clean: `git pull --ff-only`.
+- If behind and there are local commits: `git pull --rebase` (rebases local work on top of team changes).
+- If a rebase conflict is detected: aborts cleanly, emits a conflict event, and waits for manual resolution.
 
-This allows external changes (e.g., team updates to the enterprise repo) to be automatically pulled into the workspace without disrupting ongoing work.
+**Enterprise repository**
+- *Synced*: fetches and fast-forward pulls as normal (main is always clean).
+- *Accumulating*: fetches only; emits a divergence event if `origin/main` has moved ahead.
+- *Pending*: fetches and runs a content diff to detect whether the working branch has been merged into `origin/main`. When detected, transitions automatically back to *synced* (checks out main, pulls, deletes local branch).
+
+In all cases:
+- Writes are temporarily blocked during pull/checkout operations to prevent corruption.
+- If a sync operation fails, the write block is automatically lifted after 60 seconds.
+- After any pull or merge transition, the artifact index is refreshed and the GUI is notified via the SSE event bus.
 
 ## Configuration Reference
+
+### Backend Settings (`config/settings.yaml`)
+
+```yaml
+backend:
+  port: 8000                  # TCP port for arch-backend (default 8000)
+  log_path: .arch/backend.log # Log file path; relative paths are workspace-relative
+  min_log_level: INFO         # DEBUG | INFO | WARNING | ERROR | CRITICAL
+
+diagrams:
+  archimate_type_markers: icons   # icons | labels
+  sprite_scale: 1.5
+  render_dpi: 150
+  plantuml_limit_size: 16384
+```
+
+These settings apply globally and are read by `arch-backend` at startup. They are **not** configurable via `arch-workspace.yaml`.
+
+### Per-Repository Schemata (`.arch-repo/schemata/`)
+
+Each repository (engagement and enterprise) may contain a `.arch-repo/schemata/` directory with JSON Schema files that extend or constrain the global ontology for that repo:
+
+```
+.arch-repo/schemata/
+  attributes.{entity-type}.schema.json   # additional required/optional fields per entity type
+  frontmatter.entity.schema.json          # constraints on entity frontmatter fields
+  frontmatter.outgoing.schema.json        # constraints on connection outgoing frontmatter
+  frontmatter.diagram.schema.json         # constraints on diagram frontmatter
+```
+
+**Attribute profiles** (`attributes.{type}.schema.json`) define JSON Schema constraints on the `properties:` section of entities of that type. The `required` list enforces mandatory fields; `properties` declares their types and allowed values.
+
+**Frontmatter schemas** (`frontmatter.{entity|outgoing|diagram}.schema.json`) constrain the YAML frontmatter fields common to all entities, connections, or diagrams in the repo.
+
+**Promotion superset rule**: an engagement repo's schemata must be *supersets* of the enterprise repo's schemata. That is, every property and required field defined in an enterprise schema must also appear in the corresponding engagement schema. Promotion is blocked — with a per-violation error message — if this invariant is not met. This ensures promoted entities always satisfy the enterprise constraints after transfer.
 
 ### Entity Types (`config/entity_ontology.yaml`)
 

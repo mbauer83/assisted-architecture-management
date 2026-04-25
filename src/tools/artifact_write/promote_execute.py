@@ -62,6 +62,8 @@ def execute_promotion(
     conflict_resolutions: list[ConflictResolution] | None = None,
 ) -> PromotionResult:
     result = PromotionResult(plan=plan, executed=False)
+    if plan.schema_errors:
+        result.verification_errors = list(plan.schema_errors); return result
     ent_copied: list[Path] = []
     ent_backups: list[tuple[Path, bytes | None]] = []
 
@@ -120,19 +122,11 @@ def execute_promotion(
         for eid in list(plan.entities_to_add) + [c.engagement_id for c in plan.conflicts]:
             _replace_artifact_with_gar(eid, engagement_root, eng_repo, registry, result, "entity")
 
-        acc_docs = list(plan.documents_to_add) + [
-            c.engagement_id for c in plan.doc_conflicts
-            if resolutions.get(c.engagement_id) and resolutions[c.engagement_id].strategy == "accept_engagement"
-        ]
-        for did in acc_docs:
+        _accepted = lambda confs: [c.engagement_id for c in confs if resolutions.get(c.engagement_id) and resolutions[c.engagement_id].strategy == "accept_engagement"]
+        for did in plan.documents_to_add + _accepted(plan.doc_conflicts):
             doc = eng_repo.get_document(did)
             _replace_artifact_with_gar(did, engagement_root, eng_repo, registry, result, "document", name=doc.title if doc else did)
-
-        acc_diags = list(plan.diagrams_to_add) + [
-            c.engagement_id for c in plan.diagram_conflicts
-            if resolutions.get(c.engagement_id) and resolutions[c.engagement_id].strategy == "accept_engagement"
-        ]
-        for did in acc_diags:
+        for did in plan.diagrams_to_add + _accepted(plan.diagram_conflicts):
             diag = eng_repo.get_diagram(did)
             _replace_artifact_with_gar(did, engagement_root, eng_repo, registry, result, "diagram", name=diag.name if diag else did)
 
@@ -165,8 +159,6 @@ def _copy_entity(eid, eng_root, ent_root, registry, result, copied, backups, res
         dest_out = ent_root / outgoing.relative_to(eng_root)
         backups.append((dest_out, dest_out.read_bytes() if dest_out.exists() else None))
         dest_out.parent.mkdir(parents=True, exist_ok=True)
-        # Pass conn_ids=None to copy all connections with resolvable targets;
-        # the explicit conn_ids selection only applies to cross-entity connection promotion.
         dest_out.write_text(_rewrite_outgoing(outgoing.read_text(encoding="utf-8"), resolve_target=resolve_target, result=result, conn_ids=None), encoding="utf-8")
         copied.append(dest_out); result.copied_files.append(str(outgoing.relative_to(eng_root)))
 
@@ -208,13 +200,10 @@ def _replace_artifact_with_gar(aid, eng_root, eng_repo, registry, result, artifa
     if name is None or artifact_type == "entity":
         try:
             parsed = parse_entity_file(src)
-            if name is None:
-                name = str(parsed.frontmatter.get("name", aid))
-            if artifact_type == "entity":
-                entity_subtype = str(parsed.frontmatter.get("artifact-type", ""))  or None
+            if name is None: name = str(parsed.frontmatter.get("name", aid))
+            if artifact_type == "entity": entity_subtype = str(parsed.frontmatter.get("artifact-type", "")) or None
         except Exception:
-            if name is None:
-                name = aid
+            if name is None: name = aid
 
     from src.tools.artifact_write.global_artifact_reference import ensure_global_artifact_reference
     gar_result = ensure_global_artifact_reference(

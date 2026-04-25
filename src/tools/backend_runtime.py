@@ -19,7 +19,6 @@ from urllib.request import Request, urlopen
 
 from src.common.settings import backend_log_path as configured_backend_log_path
 from src.common.settings import backend_port as global_backend_port
-from src.common.workspace_paths import load_workspace_config
 from src.tools.workspace_init import load_init_state
 
 
@@ -56,18 +55,6 @@ def backend_state_path(start: Path | None = None) -> Path:
 
 
 def backend_log_path(start: Path | None = None) -> Path:
-    loaded = load_workspace_config(start)
-    if loaded is not None:
-        workspace_config_path, cfg = loaded
-        backend = cfg.get("backend")
-        if isinstance(backend, dict):
-            value = backend.get("log_path")
-            if isinstance(value, str) and value.strip():
-                configured = Path(value.strip()).expanduser()
-                if configured.is_absolute():
-                    return configured
-                return (workspace_config_path.parent / configured).resolve()
-
     configured = Path(configured_backend_log_path()).expanduser()
     if configured.is_absolute():
         return configured
@@ -126,18 +113,6 @@ def resolve_backend_port(*, start: Path | None = None, explicit_port: int | None
     if explicit_port is not None:
         logger.info("Using explicit backend port %s", explicit_port)
         return explicit_port
-
-    loaded = load_workspace_config(start)
-    if loaded is not None:
-        _, cfg = loaded
-        backend = cfg.get("backend")
-        if isinstance(backend, dict):
-            try:
-                resolved = max(1, min(65535, int(backend.get("port", 8000))))
-                logger.info("Using backend port %s from arch-workspace.yaml", resolved)
-                return resolved
-            except (TypeError, ValueError):
-                logger.warning("Invalid backend.port in arch-workspace.yaml; falling back to global settings")
 
     resolved = global_backend_port()
     logger.info("Using backend port %s from config/settings.yaml", resolved)

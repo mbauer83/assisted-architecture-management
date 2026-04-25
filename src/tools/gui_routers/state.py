@@ -61,6 +61,16 @@ def maybe_get_repo() -> ArtifactRepository | None:
     return _repo
 
 
+def maybe_engagement_root() -> Path | None:
+    """Return the engagement repository root, or None if not initialised."""
+    return _repo_root
+
+
+def maybe_enterprise_root() -> Path | None:
+    """Return the enterprise repository root, or None if not configured."""
+    return _enterprise_root
+
+
 def configured_roots() -> list[Path]:
     roots: list[Path] = []
     if _repo_root is not None:

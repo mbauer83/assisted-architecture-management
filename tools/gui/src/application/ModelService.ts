@@ -67,4 +67,10 @@ export const makeModelService = (repo: ModelRepository) =>
     adminDeleteDiagram: (body: Parameters<ModelRepository['adminDeleteDiagram']>[0]) => repo.adminDeleteDiagram(body),
     planPromotion: (body: Parameters<ModelRepository['planPromotion']>[0]) => repo.planPromotion(body),
     executePromotion: (body: Parameters<ModelRepository['executePromotion']>[0]) => repo.executePromotion(body),
+    getSyncStatus: () => repo.getSyncStatus(),
+    saveEngagementChanges: (body: Parameters<ModelRepository['saveEngagementChanges']>[0]) => repo.saveEngagementChanges(body),
+    saveEnterpriseChanges: (body: Parameters<ModelRepository['saveEnterpriseChanges']>[0]) => repo.saveEnterpriseChanges(body),
+    submitEnterpriseChanges: () => repo.submitEnterpriseChanges(),
+    withdrawEnterpriseChanges: () => repo.withdrawEnterpriseChanges(),
+    getChanges: (scope: Parameters<ModelRepository['getChanges']>[0]) => repo.getChanges(scope),
   }) as const
