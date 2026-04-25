@@ -66,21 +66,33 @@ const onBlur = () => {
       @input="onInput"
       @focus="showDropdown = results.length > 0"
       @blur="onBlur"
-    />
-    <div v-if="showDropdown && results.length" class="dropdown">
+    >
+    <div
+      v-if="showDropdown && results.length"
+      class="dropdown"
+    >
       <button
-        v-for="e in results" :key="e.artifact_id"
+        v-for="e in results"
+        :key="e.artifact_id"
         class="dropdown-item"
         @mousedown.prevent="selectEntity(e)"
       >
         <span class="item-name">{{ e.name || friendlyName(e.artifact_id) }}</span>
-        <span v-if="e.is_global" class="item-global">global</span>
+        <span
+          v-if="e.is_global"
+          class="item-global"
+        >global</span>
         <span class="item-type">{{ e.artifact_type }}</span>
         <span class="item-id">{{ e.artifact_id.split('.')[1] }}</span>
       </button>
     </div>
-    <div v-else-if="showDropdown && query.length >= 2 && !loading" class="dropdown">
-      <div class="dropdown-empty">No matches</div>
+    <div
+      v-else-if="showDropdown && query.length >= 2 && !loading"
+      class="dropdown"
+    >
+      <div class="dropdown-empty">
+        No matches
+      </div>
     </div>
   </div>
 </template>

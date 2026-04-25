@@ -1,10 +1,15 @@
 """JSON Schema and attribute validation rules."""
+
 from __future__ import annotations
+
 from pathlib import Path
-from src.common.artifact_verifier_types import Issue, Severity, VerificationResult
+
 from src.common.artifact_schema import (
-    load_attribute_schema, load_frontmatter_schema, validate_against_schema,
+    load_attribute_schema,
+    load_frontmatter_schema,
+    validate_against_schema,
 )
+from src.common.artifact_verifier_types import Issue, Severity, VerificationResult
 
 # ---------------------------------------------------------------------------
 # Configurable JSON Schema checks (WS-C)
@@ -29,12 +34,14 @@ def check_frontmatter_schema(
         return
     errors = validate_against_schema(fm, schema)
     for msg in errors:
-        result.issues.append(Issue(
-            Severity.WARNING,
-            "W041",
-            f"Frontmatter schema ({file_type}): {msg}",
-            loc,
-        ))
+        result.issues.append(
+            Issue(
+                Severity.WARNING,
+                "W041",
+                f"Frontmatter schema ({file_type}): {msg}",
+                loc,
+            )
+        )
 
 
 def check_attribute_schema(
@@ -63,21 +70,28 @@ def check_attribute_schema(
         # No Properties table found — if schema has required fields, report
         required = schema.get("required", [])
         if required:
-            result.issues.append(Issue(
-                Severity.WARNING,
-                "W042",
-                f"Attribute schema ({artifact_type}): no Properties table found but schema requires: {required}",
-                loc,
-            ))
+            result.issues.append(
+                Issue(
+                    Severity.WARNING,
+                    "W042",
+                    (
+                        f"Attribute schema ({artifact_type}): no Properties "
+                        f"table found but schema requires: {required}"
+                    ),
+                    loc,
+                )
+            )
         return
     errors = validate_against_schema(props, schema)
     for msg in errors:
-        result.issues.append(Issue(
-            Severity.WARNING,
-            "W042",
-            f"Attribute schema ({artifact_type}): {msg}",
-            loc,
-        ))
+        result.issues.append(
+            Issue(
+                Severity.WARNING,
+                "W042",
+                f"Attribute schema ({artifact_type}): {msg}",
+                loc,
+            )
+        )
 
 
 def parse_properties_table(content: str) -> dict[str, str] | None:

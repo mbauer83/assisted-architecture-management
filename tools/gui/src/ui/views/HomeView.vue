@@ -7,30 +7,41 @@ import type { Stats, EntityList } from '../../domain'
 import { DOMAIN_OPTIONS } from '../lib/domains'
 
 const svc = inject(modelServiceKey)!
-const { data: stats, error, loading, run } = useAsync<Stats>()
-const { data: engList, run: runEng } = useAsync<EntityList>()
-const { data: gloList, run: runGlo } = useAsync<EntityList>()
+const statsState = useAsync<Stats>()
+const engagementListState = useAsync<EntityList>()
+const globalListState = useAsync<EntityList>()
 
 onMounted(() => {
-  run(svc.getStats())
-  runEng(svc.listEntities({ scope: 'engagement', limit: 1 }))
-  runGlo(svc.listEntities({ scope: 'global', limit: 1 }))
+  statsState.run(svc.getStats())
+  engagementListState.run(svc.listEntities({ scope: 'engagement', limit: 1 }))
+  globalListState.run(svc.listEntities({ scope: 'global', limit: 1 }))
 })
 
-const engCount = computed(() => engList.value?.total ?? null)
-const gloCount = computed(() => gloList.value?.total ?? null)
+const engCount = computed(() => engagementListState.data.value?.total ?? null)
+const gloCount = computed(() => globalListState.data.value?.total ?? null)
 const hasGlobal = computed(() => gloCount.value !== null && gloCount.value > 0)
 </script>
 
 <template>
   <div>
-    <h1 class="page-title">Model Overview</h1>
+    <h1 class="page-title">
+      Model Overview
+    </h1>
 
-    <div v-if="loading" class="state-msg">Loading…</div>
-    <div v-else-if="error" class="state-msg state-msg--error">{{ error }}</div>
+    <div
+      v-if="statsState.loading.value"
+      class="state-msg"
+    >
+      Loading…
+    </div>
+    <div
+      v-else-if="statsState.error.value"
+      class="state-msg state-msg--error"
+    >
+      {{ statsState.error.value }}
+    </div>
 
-    <template v-else-if="stats">
-
+    <template v-else-if="statsState.data.value">
       <!-- Two-repo summary cards -->
       <div class="repo-cards">
         <div class="repo-card repo-card--engagement">
@@ -39,21 +50,24 @@ const hasGlobal = computed(() => gloCount.value !== null && gloCount.value > 0)
           </div>
           <div class="repo-stats">
             <div class="repo-stat">
-              <span class="stat-num">{{ engCount ?? stats.entities }}</span>
+              <span class="stat-num">{{ engCount ?? statsState.data.value.entities }}</span>
               <span class="stat-label">Entities</span>
             </div>
             <div class="repo-stat">
-              <span class="stat-num">{{ stats.connections }}</span>
+              <span class="stat-num">{{ statsState.data.value.connections }}</span>
               <span class="stat-label">Connections</span>
             </div>
             <div class="repo-stat">
-              <span class="stat-num">{{ stats.diagrams }}</span>
+              <span class="stat-num">{{ statsState.data.value.diagrams }}</span>
               <span class="stat-label">Diagrams</span>
             </div>
           </div>
         </div>
 
-        <div class="repo-card repo-card--global" :class="{ 'repo-card--empty': !hasGlobal }">
+        <div
+          class="repo-card repo-card--global"
+          :class="{ 'repo-card--empty': !hasGlobal }"
+        >
           <div class="repo-card__header">
             <span class="repo-label repo-label--global">Global</span>
           </div>
@@ -63,12 +77,19 @@ const hasGlobal = computed(() => gloCount.value !== null && gloCount.value > 0)
               <span class="stat-label">Entities</span>
             </div>
           </div>
-          <p v-if="!hasGlobal" class="repo-empty">No global entities yet. Promote engagement entities to populate the global repository.</p>
+          <p
+            v-if="!hasGlobal"
+            class="repo-empty"
+          >
+            No global entities yet. Promote engagement entities to populate the global repository.
+          </p>
         </div>
       </div>
 
       <!-- Domain breakdown for engagement repo -->
-      <h2 class="section-title">Engagement — Entities by Domain</h2>
+      <h2 class="section-title">
+        Engagement — Entities by Domain
+      </h2>
       <div class="domain-grid">
         <RouterLink
           v-for="d in DOMAIN_OPTIONS.filter(opt => opt.key)"
@@ -78,16 +99,25 @@ const hasGlobal = computed(() => gloCount.value !== null && gloCount.value > 0)
           :class="`domain--${d.key}`"
         >
           <span class="domain-name">{{ d.label }}</span>
-          <span class="domain-count">{{ stats.entities_by_domain[d.key] ?? 0 }}</span>
+          <span class="domain-count">{{ statsState.data.value.entities_by_domain[d.key] ?? 0 }}</span>
         </RouterLink>
       </div>
 
-      <h2 class="section-title">Connections by Type</h2>
+      <h2 class="section-title">
+        Connections by Type
+      </h2>
       <table class="conn-table">
         <tbody>
-          <tr v-for="(count, type) in stats.connections_by_type" :key="type">
-            <td class="conn-type">{{ type }}</td>
-            <td class="conn-count">{{ count }}</td>
+          <tr
+            v-for="(count, type) in statsState.data.value.connections_by_type"
+            :key="type"
+          >
+            <td class="conn-type">
+              {{ type }}
+            </td>
+            <td class="conn-count">
+              {{ count }}
+            </td>
           </tr>
         </tbody>
       </table>

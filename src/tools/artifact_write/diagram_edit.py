@@ -1,14 +1,15 @@
 """Diagram editing operations."""
 
-from pathlib import Path
 from collections.abc import Callable
+from pathlib import Path
 
 from src.common.artifact_verifier import ArtifactVerifier
 from src.common.artifact_write import format_diagram_puml
-from src.common.repo_paths import DIAGRAM_CATALOG, DIAGRAMS
 from src.common.artifact_write_layout import optimize_puml_layout
+from src.common.repo_paths import DIAGRAM_CATALOG, DIAGRAMS
 
 from .boundary import assert_engagement_write_root, today_iso
+from .coerce import as_optional_str_list
 from .diagram import _render_diagram_png, _render_diagram_svg
 from .parse_existing import parse_diagram_file
 from .types import WriteResult
@@ -61,7 +62,7 @@ def edit_diagram(
     eff_name = name if name is not None else str(fm.get("name", ""))
     eff_version = version if version is not None else str(fm.get("version", "0.1.0"))
     eff_status = status if status is not None else str(fm.get("status", "draft"))
-    eff_keywords = keywords if keywords is not ... else (fm.get("keywords") or None)
+    eff_keywords = keywords if keywords is not ... else as_optional_str_list(fm.get("keywords"))
     diagram_type = str(fm.get("diagram-type", "archimate"))
 
     # Determine PUML body
@@ -81,22 +82,31 @@ def edit_diagram(
         status=eff_status,
         last_updated=today_iso(),
         keywords=eff_keywords,
-        entity_ids_used=entity_ids_used if entity_ids_used is not None else fm.get("entity-ids-used"),
+        entity_ids_used=entity_ids_used
+        if entity_ids_used is not None
+        else as_optional_str_list(fm.get("entity-ids-used")),
         connection_ids_used=(
-            connection_ids_used if connection_ids_used is not None else fm.get("connection-ids-used")
+            connection_ids_used
+            if connection_ids_used is not None
+            else as_optional_str_list(fm.get("connection-ids-used"))
         ),
         puml_body=puml_body,
     )
 
     if dry_run:
         res = verify_content_in_temp_path(
-            verifier=verifier, file_type="diagram",
-            desired_name=diagram_path.name, content=content,
+            verifier=verifier,
+            file_type="diagram",
+            desired_name=diagram_path.name,
+            content=content,
             support_repo_root=repo_root,
         )
         return WriteResult(
-            wrote=False, path=diagram_path, artifact_id=artifact_id,
-            content=content, warnings=warnings,
+            wrote=False,
+            path=diagram_path,
+            artifact_id=artifact_id,
+            content=content,
+            warnings=warnings,
             verification=_verification_to_dict(diagram_path, res),
         )
 
@@ -107,8 +117,11 @@ def edit_diagram(
     if not res.valid:
         diagram_path.write_text(prev, encoding="utf-8")
         return WriteResult(
-            wrote=False, path=diagram_path, artifact_id=artifact_id,
-            content=content, warnings=warnings,
+            wrote=False,
+            path=diagram_path,
+            artifact_id=artifact_id,
+            content=content,
+            warnings=warnings,
             verification=_verification_to_dict(diagram_path, res),
         )
 
@@ -119,7 +132,10 @@ def edit_diagram(
 
     clear_repo_caches(diagram_path)
     return WriteResult(
-        wrote=True, path=diagram_path, artifact_id=artifact_id,
-        content=None, warnings=warnings,
+        wrote=True,
+        path=diagram_path,
+        artifact_id=artifact_id,
+        content=None,
+        warnings=warnings,
         verification=_verification_to_dict(diagram_path, res),
     )

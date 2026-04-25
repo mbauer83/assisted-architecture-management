@@ -21,7 +21,8 @@ def is_symmetric(conn_type: str) -> bool:
 
 
 def permissible_connection_types(
-    source_type: str, target_type: str,
+    source_type: str,
+    target_type: str,
 ) -> list[str]:
     """Return ArchiMate connection types valid between source and target type."""
     result: set[str] = set()

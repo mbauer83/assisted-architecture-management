@@ -1,9 +1,8 @@
-
 import math
 import re
 
-from src.common.domain_vocabulary import expand_tokens
 from src.common.artifact_types import ConnectionRecord, DiagramRecord, DocumentRecord, EntityRecord
+from src.common.domain_vocabulary import expand_tokens
 
 
 def tokenize(text: str) -> list[str]:

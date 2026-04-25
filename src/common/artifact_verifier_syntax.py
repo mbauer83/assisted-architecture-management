@@ -1,4 +1,3 @@
-
 import os
 import re
 import subprocess
@@ -34,7 +33,14 @@ def check_puml_syntax(path: Path, loc: str) -> list[Issue]:
     result: list[Issue] = []
     jar = find_plantuml_jar()
     if jar is None:
-        return [Issue(Severity.WARNING, "W350", "tools/plantuml.jar not found; PUML syntax check skipped", loc)]
+        return [
+            Issue(
+                Severity.WARNING,
+                "W350",
+                "tools/plantuml.jar not found; PUML syntax check skipped",
+                loc,
+            )
+        ]
 
     java = os.environ.get("JAVA_HOME", "")
     java_exe = (Path(java) / "bin" / "java") if java else Path("java")
@@ -48,7 +54,11 @@ def check_puml_syntax(path: Path, loc: str) -> list[Issue]:
                 timeout=30,
             )
     except FileNotFoundError:
-        return [Issue(Severity.WARNING, "W351", "java not found on PATH; PUML syntax check skipped", loc)]
+        return [
+            Issue(
+                Severity.WARNING, "W351", "java not found on PATH; PUML syntax check skipped", loc
+            )
+        ]
     except subprocess.TimeoutExpired:
         return [Issue(Severity.WARNING, "W352", "plantuml render timed out after 30 s", loc)]
 
@@ -77,7 +87,9 @@ def check_puml_syntax(path: Path, loc: str) -> list[Issue]:
         and ln.strip() not in ("Some diagram description contains errors",)
     ]
     msg = signal_lines[0] if signal_lines else f"exit {proc.returncode}"
-    return [Issue(Severity.ERROR, "E350", f"PlantUML error (exit {proc.returncode}): {msg[:200]}", loc)]
+    return [
+        Issue(Severity.ERROR, "E350", f"PlantUML error (exit {proc.returncode}): {msg[:200]}", loc)
+    ]
 
 
 def check_puml_syntax_batch(paths: list[Path], *, chunk_size: int = 120) -> dict[Path, list[Issue]]:
@@ -88,19 +100,21 @@ def check_puml_syntax_batch(paths: list[Path], *, chunk_size: int = 120) -> dict
     jar = find_plantuml_jar()
     if jar is None:
         for path in paths:
-            issues_by_path[path].append(Issue(
-                Severity.WARNING,
-                "W350",
-                "plantuml.jar not found; PUML syntax check skipped",
-                str(path),
-            ))
+            issues_by_path[path].append(
+                Issue(
+                    Severity.WARNING,
+                    "W350",
+                    "plantuml.jar not found; PUML syntax check skipped",
+                    str(path),
+                )
+            )
         return issues_by_path
 
     java = os.environ.get("JAVA_HOME", "")
     java_exe = (Path(java) / "bin" / "java") if java else Path("java")
 
     for i in range(0, len(paths), chunk_size):
-        path_chunk = paths[i:i + chunk_size]
+        path_chunk = paths[i : i + chunk_size]
         try:
             with tempfile.TemporaryDirectory() as tmp_out:
                 proc = subprocess.run(
@@ -120,21 +134,25 @@ def check_puml_syntax_batch(paths: list[Path], *, chunk_size: int = 120) -> dict
                 )
         except FileNotFoundError:
             for path in path_chunk:
-                issues_by_path[path].append(Issue(
-                    Severity.WARNING,
-                    "W351",
-                    "java not found on PATH; PUML syntax check skipped",
-                    str(path),
-                ))
+                issues_by_path[path].append(
+                    Issue(
+                        Severity.WARNING,
+                        "W351",
+                        "java not found on PATH; PUML syntax check skipped",
+                        str(path),
+                    )
+                )
             continue
         except subprocess.TimeoutExpired:
             for path in path_chunk:
-                issues_by_path[path].append(Issue(
-                    Severity.WARNING,
-                    "W352",
-                    "plantuml render timed out after 120 s",
-                    str(path),
-                ))
+                issues_by_path[path].append(
+                    Issue(
+                        Severity.WARNING,
+                        "W352",
+                        "plantuml render timed out after 120 s",
+                        str(path),
+                    )
+                )
             continue
 
         if proc.returncode == 0:
@@ -146,7 +164,12 @@ def check_puml_syntax_batch(paths: list[Path], *, chunk_size: int = 120) -> dict
         if file_error_matches:
             for matched_path in file_error_matches:
                 candidate = Path(matched_path.strip())
-                issue = Issue(Severity.ERROR, "E350", f"PlantUML: Error line in file: {candidate}", str(candidate))
+                issue = Issue(
+                    Severity.ERROR,
+                    "E350",
+                    f"PlantUML: Error line in file: {candidate}",
+                    str(candidate),
+                )
                 if candidate in issues_by_path:
                     issues_by_path[candidate].append(issue)
                     attributed = True
@@ -161,12 +184,14 @@ def check_puml_syntax_batch(paths: list[Path], *, chunk_size: int = 120) -> dict
             fallback = syntax_lines[0].strip()
             for path in path_chunk:
                 if not issues_by_path[path]:
-                    issues_by_path[path].append(Issue(
-                        Severity.ERROR,
-                        "E350",
-                        f"PlantUML: {fallback}",
-                        str(path),
-                    ))
+                    issues_by_path[path].append(
+                        Issue(
+                            Severity.ERROR,
+                            "E350",
+                            f"PlantUML: {fallback}",
+                            str(path),
+                        )
+                    )
             attributed = True
 
         if attributed:

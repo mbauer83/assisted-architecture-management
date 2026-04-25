@@ -2,6 +2,7 @@
 import { inject, ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { Effect } from 'effect'
+import DOMPurify from 'dompurify'
 import { modelServiceKey } from '../keys'
 import { useAsync } from '../composables/useAsync'
 import type {
@@ -333,10 +334,11 @@ const load = async () => {
       diagramDetail.error.value = String(e)
       return null
     }),
-    Effect.runPromise(svc.getDiagramSvg(diagramId.value)).catch((e) => { svgError.value = String(e); return null as null }),
+    Effect.runPromise(svc.getDiagramSvg(diagramId.value)).catch((e) => { svgError.value = String(e); return null }),
   ])
 
-  svgHtml.value = svg; svgLoading.value = false
+  svgHtml.value = svg ? DOMPurify.sanitize(svg, { USE_PROFILES: { svg: true, svgFilters: true } }) : null
+  svgLoading.value = false
   if (!context) {
     diagramDetail.loading.value = false
     return
@@ -394,7 +396,7 @@ const doPreview = () => {
 const doSave = () => {
   if (!diagramDetail.data.value) return
   saveBusy.value = true; saveError.value = null
-  Effect.runPromise(svc.editDiagram({
+  void Effect.runPromise(svc.editDiagram({
     artifact_id: diagramId.value,
     diagram_type: diagramDetail.data.value.diagram_type,
     name: diagramDetail.data.value.name,
@@ -404,7 +406,7 @@ const doSave = () => {
   }))
     .then(r => {
       saveBusy.value = false
-      if (r.wrote) router.push({ path: '/diagram', query: { id: diagramId.value } })
+      if (r.wrote) void router.push({ path: '/diagram', query: { id: diagramId.value } })
       else saveError.value = r.content ?? 'Verification failed'
     })
     .catch(e => { saveBusy.value = false; saveError.value = String(e) })
@@ -421,44 +423,99 @@ onUnmounted(() => {
 <template>
   <div class="page">
     <div class="page-hdr">
-      <button class="back-link" @click="router.push({ path: '/diagram', query: { id: diagramId } })">← Back</button>
+      <button
+        class="back-link"
+        @click="router.push({ path: '/diagram', query: { id: diagramId } })"
+      >
+        ← Back
+      </button>
       <div class="hdr-info">
         <h1 class="pg-title">
-          <span v-if="diagramDetail.loading.value" class="faded">Loading…</span>
+          <span
+            v-if="diagramDetail.loading.value"
+            class="faded"
+          >Loading…</span>
           <span v-else-if="diagramDetail.data.value">{{ diagramDetail.data.value.name }}</span>
         </h1>
-        <span v-if="diagramDetail.data.value" class="type-badge">
+        <span
+          v-if="diagramDetail.data.value"
+          class="type-badge"
+        >
           {{ diagramDetail.data.value.diagram_type.replace('archimate-', '') }}
         </span>
       </div>
     </div>
 
     <div class="main-grid">
-      <div ref="containerRef" class="img-container" @mousedown="onMouseDown" @dblclick="resetView">
+      <div
+        ref="containerRef"
+        class="img-container"
+        @mousedown="onMouseDown"
+        @dblclick="resetView"
+      >
         <div :style="canvasStyle">
-          <div v-if="svgLoading" class="no-img">Rendering SVG…</div>
-          <div v-else-if="svgError" class="no-img err-txt">{{ svgError }}</div>
-          <div v-else-if="svgHtml" ref="svgContainer" class="svg-wrap" v-html="svgHtml" />
-          <div v-else class="no-img">No diagram rendered.</div>
+          <div
+            v-if="svgLoading"
+            class="no-img"
+          >
+            Rendering SVG…
+          </div>
+          <div
+            v-else-if="svgError"
+            class="no-img err-txt"
+          >
+            {{ svgError }}
+          </div>
+          <div
+            v-else-if="svgHtml"
+            ref="svgContainer"
+            class="svg-wrap"
+            v-html="svgHtml"
+          />
+          <div
+            v-else
+            class="no-img"
+          >
+            No diagram rendered.
+          </div>
         </div>
-        <button v-if="isTransformed" class="reset-btn" @click.stop="resetView">⊙ Reset</button>
-        <div class="zoom-hint">Click entity to mark for removal · Click connection to toggle · Scroll/drag to navigate</div>
+        <button
+          v-if="isTransformed"
+          class="reset-btn"
+          @click.stop="resetView"
+        >
+          ⊙ Reset
+        </button>
+        <div class="zoom-hint">
+          Click entity to mark for removal · Click connection to toggle · Scroll/drag to navigate
+        </div>
       </div>
 
       <aside class="sidebar card">
         <div class="sb-search">
           <div class="search-wrap">
             <input
-              v-model="searchQuery" class="inp" placeholder="Search entities to add…"
-              @input="onSearchInput" @blur="closeDropdown"
+              v-model="searchQuery"
+              class="inp"
+              placeholder="Search entities to add…"
+              @input="onSearchInput"
+              @blur="closeDropdown"
               @focus="() => { if (searchResults.length) showDropdown = true }"
-            />
-            <div v-if="showDropdown" class="dropdown">
+            >
+            <div
+              v-if="showDropdown"
+              class="dropdown"
+            >
               <button
-                v-for="r in searchResults" :key="r.artifact_id"
-                class="dd-item" @mousedown.prevent="addEntity(r)"
+                v-for="r in searchResults"
+                :key="r.artifact_id"
+                class="dd-item"
+                @mousedown.prevent="addEntity(r)"
               >
-                <span class="dd-glyph"><ArchimateTypeGlyph :type="toGlyphKey(r.element_type || r.artifact_type)" :size="14" /></span>
+                <span class="dd-glyph"><ArchimateTypeGlyph
+                  :type="toGlyphKey(r.element_type || r.artifact_type)"
+                  :size="14"
+                /></span>
                 <span class="dd-name">{{ r.name }}</span>
                 <span class="dd-domain">{{ r.domain }}</span>
               </button>
@@ -467,7 +524,10 @@ onUnmounted(() => {
         </div>
 
         <div class="sb-scroll">
-          <div v-if="effectiveEntitiesList.length" class="sb-section">
+          <div
+            v-if="effectiveEntitiesList.length"
+            class="sb-section"
+          >
             <div class="sb-sec-hdr">
               Included Entities <span class="sb-count">{{ effectiveEntitiesList.length }}</span>
             </div>
@@ -489,23 +549,46 @@ onUnmounted(() => {
             </div>
           </div>
 
-          <div v-if="toRemoveEntities.length" class="sb-section">
+          <div
+            v-if="toRemoveEntities.length"
+            class="sb-section"
+          >
             <div class="sb-sec-hdr sb-sec-hdr--rm">
               For removal <span class="sb-count">{{ toRemoveEntities.length }}</span>
             </div>
-            <div v-for="entity in toRemoveEntities" :key="entity.artifact_id" class="rm-row">
-              <span class="dd-glyph rm-glyph"><ArchimateTypeGlyph :type="toGlyphKey(entity.element_type || entity.artifact_type)" :size="13" /></span>
+            <div
+              v-for="entity in toRemoveEntities"
+              :key="entity.artifact_id"
+              class="rm-row"
+            >
+              <span class="dd-glyph rm-glyph"><ArchimateTypeGlyph
+                :type="toGlyphKey(entity.element_type || entity.artifact_type)"
+                :size="13"
+              /></span>
               <span class="rm-name">{{ entity.name }}</span>
-              <button class="undo-btn" @click="toggleEntityRemoval(entity.artifact_id)" title="Restore">↩</button>
+              <button
+                class="undo-btn"
+                title="Restore"
+                @click="toggleEntityRemoval(entity.artifact_id)"
+              >
+                ↩
+              </button>
             </div>
           </div>
 
-          <div v-if="!effectiveEntitiesList.length && !toRemoveEntities.length" class="sb-hint">
+          <div
+            v-if="!effectiveEntitiesList.length && !toRemoveEntities.length"
+            class="sb-hint"
+          >
             Loading diagram entities…
           </div>
 
           <div class="sb-actions">
-            <button class="btn-preview" :disabled="previewBusy || !diagramDetail.data.value" @click="doPreview">
+            <button
+              class="btn-preview"
+              :disabled="previewBusy || !diagramDetail.data.value"
+              @click="doPreview"
+            >
               {{ previewBusy ? 'Rendering…' : 'Preview' }}
             </button>
             <button
@@ -516,21 +599,63 @@ onUnmounted(() => {
             >
               {{ saveBusy ? 'Saving…' : 'Save Changes' }}
             </button>
-            <div v-if="saveError" class="save-err">{{ saveError }}</div>
+            <div
+              v-if="saveError"
+              class="save-err"
+            >
+              {{ saveError }}
+            </div>
           </div>
         </div>
       </aside>
     </div>
 
-    <div v-if="preview || previewBusy || previewError" class="preview-row">
-      <div v-if="previewBusy" class="state-msg">Rendering preview…</div>
-      <div v-if="previewError" class="state-err">{{ previewError }}</div>
+    <div
+      v-if="preview || previewBusy || previewError"
+      class="preview-row"
+    >
+      <div
+        v-if="previewBusy"
+        class="state-msg"
+      >
+        Rendering preview…
+      </div>
+      <div
+        v-if="previewError"
+        class="state-err"
+      >
+        {{ previewError }}
+      </div>
       <template v-if="preview">
-        <div v-for="w in preview.warnings" :key="w" class="warn-msg">{{ w }}</div>
-        <img v-if="preview.image" :src="preview.image" class="preview-img" alt="Preview" />
-        <div v-else class="state-msg">No image rendered.</div>
-        <button class="toggle-src" @click="showPuml = !showPuml">{{ showPuml ? 'Hide' : 'Show' }} PUML</button>
-        <pre v-if="showPuml" class="puml-src">{{ preview.puml }}</pre>
+        <div
+          v-for="w in preview.warnings"
+          :key="w"
+          class="warn-msg"
+        >
+          {{ w }}
+        </div>
+        <img
+          v-if="preview.image"
+          :src="preview.image"
+          class="preview-img"
+          alt="Preview"
+        >
+        <div
+          v-else
+          class="state-msg"
+        >
+          No image rendered.
+        </div>
+        <button
+          class="toggle-src"
+          @click="showPuml = !showPuml"
+        >
+          {{ showPuml ? 'Hide' : 'Show' }} PUML
+        </button>
+        <pre
+          v-if="showPuml"
+          class="puml-src"
+        >{{ preview.puml }}</pre>
       </template>
     </div>
   </div>

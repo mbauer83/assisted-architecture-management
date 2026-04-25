@@ -12,14 +12,12 @@ Default behaviour: when no schema file exists for a given scope/type,
 validation is skipped (free schema).
 """
 
-
 import json
 from functools import lru_cache
 from pathlib import Path
 from typing import Any
 
 import jsonschema  # type: ignore[import-untyped]
-
 
 SCHEMATA_DIR = ".arch-repo/schemata"
 
@@ -45,21 +43,15 @@ def load_attribute_schema(repo_root: Path, artifact_type: str) -> dict[str, Any]
     return _load_schema_file(repo_root, f"attributes.{artifact_type}.schema.json")
 
 
-def load_connection_metadata_schema(
-    repo_root: Path, connection_type: str
-) -> dict[str, Any] | None:
+def load_connection_metadata_schema(repo_root: Path, connection_type: str) -> dict[str, Any] | None:
     """Load the metadata JSON Schema for *connection_type*.
 
     Returns ``None`` when no schema file exists (free schema — skip validation).
     """
-    return _load_schema_file(
-        repo_root, f"connection-metadata.{connection_type}.schema.json"
-    )
+    return _load_schema_file(repo_root, f"connection-metadata.{connection_type}.schema.json")
 
 
-def validate_against_schema(
-    instance: dict[str, Any], schema: dict[str, Any]
-) -> list[str]:
+def validate_against_schema(instance: dict[str, Any], schema: dict[str, Any]) -> list[str]:
     """Validate *instance* against *schema*, returning a list of error messages.
 
     Returns an empty list when *instance* conforms to *schema*.

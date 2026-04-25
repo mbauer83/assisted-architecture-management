@@ -4,7 +4,8 @@ import { Effect } from 'effect'
 import { modelServiceKey } from '../keys'
 import { DOMAIN_OPTIONS, getDomainLabel } from '../lib/domains'
 import { buildReferenceMarkdown } from '../lib/referenceLinks.js'
-import type { DocumentType, ReferenceSearchHit } from '../../domain'
+import type { DocumentType, ReferenceSearchHit, WriteHelp } from '../../domain'
+import { readErrorMessage } from '../lib/errors'
 
 interface Props {
   currentPath?: string
@@ -12,7 +13,6 @@ interface Props {
 
 type ArtifactKind = 'entity' | 'diagram' | 'document'
 type FilterStage = 'kind' | 'scope' | 'entity-type'
-type WriteHelp = { entity_types_by_domain: Record<string, string[]> }
 
 const props = defineProps<Props>()
 const emit = defineEmits<{
@@ -111,7 +111,7 @@ const runSearch = () => {
     return
   }
   loading.value = true
-  Effect.runPromise(svc.searchReferenceArtifacts({
+  void Effect.runPromise(svc.searchReferenceArtifacts({
     q: query.value.trim(),
     kind: selectedKind.value,
     domains: selectedKind.value === 'document' ? undefined : selectedDomains.value,
@@ -121,7 +121,8 @@ const runSearch = () => {
   })).then((result) => {
     results.value = [...result.hits]
     loading.value = false
-  }).catch(() => {
+  }).catch((error: unknown) => {
+    console.error('Reference artifact search failed', readErrorMessage(error))
     results.value = []
     loading.value = false
   })
@@ -136,8 +137,16 @@ watch(query, scheduleSearch)
 watch([selectedKind, selectedDomains, selectedEntityTypes, selectedDocTypes], scheduleSearch, { deep: true })
 
 onMounted(() => {
-  Effect.runPromise(svc.listDocumentTypes()).then((types) => { documentTypes.value = types }).catch(() => {})
-  Effect.runPromise(svc.getWriteHelp()).then((data) => { writeHelp.value = data as WriteHelp }).catch(() => {})
+  void Effect.runPromise(svc.listDocumentTypes())
+    .then((types) => { documentTypes.value = types })
+    .catch((error: unknown) => {
+      console.error('Failed to load document types', readErrorMessage(error))
+    })
+  void Effect.runPromise(svc.getWriteHelp())
+    .then((data) => { writeHelp.value = data })
+    .catch((error: unknown) => {
+      console.error('Failed to load write help', readErrorMessage(error))
+    })
 })
 </script>
 
@@ -148,7 +157,13 @@ onMounted(() => {
         <h3>Insert Reference</h3>
         <p>Select an artifact, narrow it with staged filters, and insert a link at the cursor.</p>
       </div>
-      <button class="reference-picker__close" type="button" @click="emit('close')">×</button>
+      <button
+        class="reference-picker__close"
+        type="button"
+        @click="emit('close')"
+      >
+        ×
+      </button>
     </div>
 
     <div class="reference-picker__search">
@@ -159,25 +174,42 @@ onMounted(() => {
         placeholder="Search by title, name, or artifact ID..."
         @focus="dropdownOpen = true"
         @click="dropdownOpen = true"
-      />
+      >
     </div>
 
-    <div v-if="dropdownOpen" class="reference-picker__dropdown">
+    <div
+      v-if="dropdownOpen"
+      class="reference-picker__dropdown"
+    >
       <section class="reference-picker__filters">
         <div class="reference-picker__filters-header">
-          <div class="reference-picker__stage-title">{{ stageTitle }}</div>
+          <div class="reference-picker__stage-title">
+            {{ stageTitle }}
+          </div>
           <div class="reference-picker__nav">
-            <button class="nav-btn" type="button" :disabled="currentStage === 'kind'" @click="goBack">Back</button>
+            <button
+              class="nav-btn"
+              type="button"
+              :disabled="currentStage === 'kind'"
+              @click="goBack"
+            >
+              Back
+            </button>
             <button
               v-if="selectedKind === 'entity' && currentStage === 'scope'"
               class="nav-btn nav-btn--primary"
               type="button"
               @click="goForward"
-            >Entity Types</button>
+            >
+              Entity Types
+            </button>
           </div>
         </div>
 
-        <div v-if="currentStage === 'kind'" class="reference-picker__chips">
+        <div
+          v-if="currentStage === 'kind'"
+          class="reference-picker__chips"
+        >
           <button
             v-for="kind in ['entity', 'diagram', 'document'] as ArtifactKind[]"
             :key="kind"
@@ -185,10 +217,15 @@ onMounted(() => {
             :class="{ 'chip--active': selectedKind === kind }"
             type="button"
             @click="selectKind(kind)"
-          >{{ kind }}</button>
+          >
+            {{ kind }}
+          </button>
         </div>
 
-        <div v-else-if="currentStage === 'scope' && selectedKind === 'document'" class="reference-picker__chips">
+        <div
+          v-else-if="currentStage === 'scope' && selectedKind === 'document'"
+          class="reference-picker__chips"
+        >
           <button
             v-for="docType in documentTypes"
             :key="docType.doc_type"
@@ -196,10 +233,15 @@ onMounted(() => {
             :class="{ 'chip--active': selectedDocTypes.includes(docType.doc_type) }"
             type="button"
             @click="selectedDocTypes = toggleValue(selectedDocTypes, docType.doc_type)"
-          >{{ docType.name }}</button>
+          >
+            {{ docType.name }}
+          </button>
         </div>
 
-        <div v-else-if="currentStage === 'scope'" class="reference-picker__chips">
+        <div
+          v-else-if="currentStage === 'scope'"
+          class="reference-picker__chips"
+        >
           <button
             v-for="domain in (selectedKind === 'diagram' ? diagramDomainOptions : domainOptions)"
             :key="domain.key"
@@ -207,10 +249,15 @@ onMounted(() => {
             :class="{ 'chip--active': selectedDomains.includes(domain.key) }"
             type="button"
             @click="selectedDomains = toggleValue(selectedDomains, domain.key)"
-          >{{ domain.label }}</button>
+          >
+            {{ domain.label }}
+          </button>
         </div>
 
-        <div v-else class="reference-picker__chips">
+        <div
+          v-else
+          class="reference-picker__chips"
+        >
           <button
             v-for="entityType in availableEntityTypes"
             :key="entityType"
@@ -218,7 +265,9 @@ onMounted(() => {
             :class="{ 'chip--active': selectedEntityTypes.includes(entityType) }"
             type="button"
             @click="selectedEntityTypes = toggleValue(selectedEntityTypes, entityType)"
-          >{{ entityType }}</button>
+          >
+            {{ entityType }}
+          </button>
         </div>
 
         <div class="reference-picker__summary">
@@ -230,21 +279,59 @@ onMounted(() => {
       </section>
 
       <section class="reference-picker__results">
-        <div v-if="!selectedKind" class="reference-picker__state">Choose `entity`, `diagram`, or `document` first.</div>
-        <div v-else-if="loading" class="reference-picker__state">Searching…</div>
-        <div v-else-if="!results.length" class="reference-picker__state">No matches for the current filters.</div>
+        <div
+          v-if="!selectedKind"
+          class="reference-picker__state"
+        >
+          Choose `entity`, `diagram`, or `document` first.
+        </div>
+        <div
+          v-else-if="loading"
+          class="reference-picker__state"
+        >
+          Searching…
+        </div>
+        <div
+          v-else-if="!results.length"
+          class="reference-picker__state"
+        >
+          No matches for the current filters.
+        </div>
 
-        <div v-else class="reference-picker__result-list">
-          <div v-for="hit in results" :key="hit.artifact_id" class="result-card">
+        <div
+          v-else
+          class="reference-picker__result-list"
+        >
+          <div
+            v-for="hit in results"
+            :key="hit.artifact_id"
+            class="result-card"
+          >
             <div class="result-card__row">
-              <button class="result-card__main" type="button" @click="insertLink(hit)">
+              <button
+                class="result-card__main"
+                type="button"
+                @click="insertLink(hit)"
+              >
                 <span class="result-card__title">{{ hit.name }}</span>
                 <span class="result-card__meta">
                   <span class="badge">{{ hit.record_type }}</span>
-                  <span v-if="hit.domain" class="badge badge--muted">{{ hit.domain }}</span>
-                  <span v-if="hit.doc_type" class="badge badge--muted">{{ hit.doc_type }}</span>
-                  <span v-if="hit.artifact_type" class="badge badge--muted">{{ hit.artifact_type }}</span>
-                  <span v-if="hit.diagram_type" class="badge badge--muted">{{ hit.diagram_type }}</span>
+                  <span
+                    v-if="hit.domain"
+                    class="badge badge--muted"
+                  >{{ hit.domain }}</span>
+                  <span
+                    v-if="hit.doc_type"
+                    class="badge badge--muted"
+                  >{{ hit.doc_type }}</span>
+                  <span
+                    v-if="hit.artifact_type"
+                    class="badge badge--muted"
+                  >{{ hit.artifact_type }}</span>
+                  <span
+                    v-if="hit.diagram_type"
+                    class="badge badge--muted"
+                  >{{ hit.diagram_type }}</span>
                 </span>
               </button>
               <button
@@ -252,19 +339,28 @@ onMounted(() => {
                 class="result-card__toggle"
                 type="button"
                 @click="expandedDocs = { ...expandedDocs, [hit.artifact_id]: !expandedDocs[hit.artifact_id] }"
-              >{{ expandedDocs[hit.artifact_id] ? '▾' : '▸' }}</button>
+              >
+                {{ expandedDocs[hit.artifact_id] ? '▾' : '▸' }}
+              </button>
             </div>
 
-            <div class="result-card__path">{{ hit.path }}</div>
+            <div class="result-card__path">
+              {{ hit.path }}
+            </div>
 
-            <div v-if="hit.record_type === 'document' && expandedDocs[hit.artifact_id]" class="result-card__sections">
+            <div
+              v-if="hit.record_type === 'document' && expandedDocs[hit.artifact_id]"
+              class="result-card__sections"
+            >
               <button
                 v-for="section in hit.sections ?? []"
                 :key="section"
                 class="section-chip"
                 type="button"
                 @click="insertLink(hit, section)"
-              ># {{ section }}</button>
+              >
+                # {{ section }}
+              </button>
             </div>
           </div>
         </div>

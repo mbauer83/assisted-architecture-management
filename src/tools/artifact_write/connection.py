@@ -1,7 +1,7 @@
-
 import re
-from pathlib import Path
 from collections.abc import Callable
+from pathlib import Path
+
 from src.common.archimate_types import ALL_CONNECTION_TYPES
 from src.common.artifact_verifier import ArtifactRegistry, ArtifactVerifier
 from src.common.artifact_write import format_outgoing_markdown
@@ -28,6 +28,7 @@ def verification_to_conn_dict(path: Path, res) -> dict[str, object]:
 def _entity_artifact_type(registry: ArtifactRegistry, entity_id: str) -> str | None:
     """Read artifact-type from an entity's frontmatter without importing the full parser."""
     import yaml as _yaml
+
     path = registry.find_file_by_id(entity_id)
     if path is None:
         return None
@@ -38,7 +39,7 @@ def _entity_artifact_type(registry: ArtifactRegistry, entity_id: str) -> str | N
         end = content.find("\n---", 3)
         if end == -1:
             return None
-        fm = _yaml.safe_load(content[3:end].strip()) or {}
+        fm: dict[str, object] = _yaml.safe_load(content[3:end].strip()) or {}
         return str(fm.get("artifact-type", "")) or None
     except Exception:
         return None
@@ -68,7 +69,8 @@ def _check_junction_homogeneity(
         if not out_file.exists():
             continue
         existing_types = {
-            m for m in _CONN_TYPE_RE.findall(out_file.read_text(encoding="utf-8"))
+            m
+            for m in _CONN_TYPE_RE.findall(out_file.read_text(encoding="utf-8"))
             if m != connection_type
         }
         if existing_types:
@@ -130,7 +132,7 @@ def _build_content(
                 if existing_target.startswith("["):
                     bracket_end = existing_target.find("]")
                     if bracket_end != -1:
-                        existing_target = existing_target[bracket_end + 1:].lstrip()
+                        existing_target = existing_target[bracket_end + 1 :].lstrip()
                 if existing_target == target_entity:
                     raise ValueError(
                         f"Connection '{connection_type} → {target_entity}' already exists in {outgoing_path.name}"
@@ -140,7 +142,7 @@ def _build_content(
             new_section += f"\n{description.strip()}\n"
         return existing.rstrip("\n") + new_section
 
-    conn_dict: dict[str, str] = {
+    conn_dict: dict[str, object] = {
         "connection_type": connection_type,
         "target_entity": target_entity,
         "description": description or "",
@@ -176,13 +178,21 @@ def _write_and_verify(
     if not res.valid:
         _rollback(outgoing_path, prev)
         return WriteResult(
-        wrote=False, path=outgoing_path, artifact_id=conn_id,
-            content=content, warnings=[], verification=verification_to_conn_dict(outgoing_path, res),
+            wrote=False,
+            path=outgoing_path,
+            artifact_id=conn_id,
+            content=content,
+            warnings=[],
+            verification=verification_to_conn_dict(outgoing_path, res),
         )
 
     return WriteResult(
-        wrote=True, path=outgoing_path, artifact_id=conn_id,
-        content=None, warnings=[], verification=verification_to_conn_dict(outgoing_path, res),
+        wrote=True,
+        path=outgoing_path,
+        artifact_id=conn_id,
+        content=None,
+        warnings=[],
+        verification=verification_to_conn_dict(outgoing_path, res),
     )
 
 
@@ -230,19 +240,31 @@ def add_connection(
     conn_id = f"{source_entity}---{target_entity}@@{connection_type}"
 
     content = _build_content(
-        outgoing_path, source_entity, connection_type, target_entity,
-        description, version, status, last,
+        outgoing_path,
+        source_entity,
+        connection_type,
+        target_entity,
+        description,
+        version,
+        status,
+        last,
         src_cardinality=src_cardinality,
         tgt_cardinality=tgt_cardinality,
     )
 
     if dry_run:
         return WriteResult(
-            wrote=False, path=outgoing_path, artifact_id=conn_id,
-            content=content, warnings=[], verification=None,
+            wrote=False,
+            path=outgoing_path,
+            artifact_id=conn_id,
+            content=content,
+            warnings=[],
+            verification=None,
         )
 
-    result = _write_and_verify(outgoing_path, content, verifier, source_entity, connection_type, target_entity)
+    result = _write_and_verify(
+        outgoing_path, content, verifier, source_entity, connection_type, target_entity
+    )
     if result.wrote:
         clear_repo_caches(outgoing_path)
     return result

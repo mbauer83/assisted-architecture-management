@@ -8,14 +8,12 @@ from pathlib import Path
 
 import anyio
 from anyio.streams.memory import MemoryObjectReceiveStream, MemoryObjectSendStream
-
 from mcp.client.streamable_http import streamablehttp_client
 from mcp.server.stdio import stdio_server
 from mcp.shared.message import SessionMessage
 
-from src.tools.backend_probe import backend_url, configured_backend_url, resolve_backend_port
 from src.tools.backend_control import ensure_backend_running
-
+from src.tools.backend_probe import backend_url, configured_backend_url, resolve_backend_port
 
 logger = logging.getLogger(__name__)
 
@@ -47,8 +45,12 @@ def main(argv: list[str] | None = None) -> None:
     parser = argparse.ArgumentParser(prog="arch-mcp-stdio")
     parser.add_argument("--port", type=int, default=None)
     parser.add_argument("--no-autostart", action="store_true", default=False)
-    parser.add_argument("--server", choices=("read", "write"), default="read",
-                        help="Which MCP server to connect to (read or write)")
+    parser.add_argument(
+        "--server",
+        choices=("read", "write"),
+        default="read",
+        help="Which MCP server to connect to (read or write)",
+    )
     args = parser.parse_args(argv)
 
     project_dir = _project_directory()

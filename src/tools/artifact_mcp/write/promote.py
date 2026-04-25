@@ -1,8 +1,15 @@
 """MCP write tools: promotion to enterprise."""
+
 from mcp.server.fastmcp import FastMCP  # type: ignore[import-not-found]
+
 from src.tools.artifact_mcp.write._common import (
-    clear_caches_for_repo, registry_cached, repo_cached,
-    resolve_repo_roots, roots_key, verifier_for, RepoPreset,
+    RepoPreset,
+    clear_caches_for_repo,
+    registry_cached,
+    repo_cached,
+    resolve_repo_roots,
+    roots_key,
+    verifier_for,
 )
 
 
@@ -29,24 +36,30 @@ def artifact_promote_to_enterprise(
     dry_run=true returns the plan without modifying any files.
     """
     from src.tools.artifact_mcp.context import resolve_enterprise_repo_root
-    from src.tools.artifact_write.promote_to_enterprise import ConflictResolution, plan_promotion
     from src.tools.artifact_write.promote_execute import execute_promotion
+    from src.tools.artifact_write.promote_to_enterprise import ConflictResolution, plan_promotion
 
     eng_root = resolve_repo_roots(
-        repo_scope="engagement", repo_root=repo_root,
-        repo_preset=repo_preset, enterprise_root=None,
+        repo_scope="engagement",
+        repo_root=repo_root,
+        repo_preset=repo_preset,
+        enterprise_root=None,
     )[0]
     ent_root = resolve_enterprise_repo_root(enterprise_root=enterprise_root)
     both_roots = resolve_repo_roots(
-        repo_scope="both", repo_root=repo_root,
-        repo_preset=repo_preset, enterprise_root=enterprise_root,
+        repo_scope="both",
+        repo_root=repo_root,
+        repo_preset=repo_preset,
+        enterprise_root=enterprise_root,
     )
     both_key = roots_key(both_roots)
     registry = registry_cached(both_key)
     repo = repo_cached(both_key)
 
     plan = plan_promotion(
-        entity_id, registry, repo,
+        entity_id,
+        registry,
+        repo,
         entity_ids=entity_ids or [entity_id],
         connection_ids=set(connection_ids) if connection_ids else None,
         exclude_entity_ids=set(exclude_entities) if exclude_entities else None,
@@ -56,14 +69,18 @@ def artifact_promote_to_enterprise(
     )
 
     out: dict[str, object] = {
-        "dry_run": dry_run, "entity_id": entity_id,
+        "dry_run": dry_run,
+        "entity_id": entity_id,
         "entities_to_add": plan.entities_to_add,
         "conflicts": [
             {
-                "engagement_id": c.engagement_id, "enterprise_id": c.enterprise_id,
+                "engagement_id": c.engagement_id,
+                "enterprise_id": c.enterprise_id,
                 "artifact_type": c.artifact_type,
-                "engagement_name": c.engagement_name, "enterprise_name": c.enterprise_name,
-                "engagement_fields": c.engagement_fields, "enterprise_fields": c.enterprise_fields,
+                "engagement_name": c.engagement_name,
+                "enterprise_name": c.enterprise_name,
+                "engagement_fields": c.engagement_fields,
+                "enterprise_fields": c.enterprise_fields,
             }
             for c in plan.conflicts
         ],
@@ -72,15 +89,23 @@ def artifact_promote_to_enterprise(
         "documents_to_add": plan.documents_to_add,
         "diagrams_to_add": plan.diagrams_to_add,
         "doc_conflicts": [
-            {"engagement_id": c.engagement_id, "enterprise_id": c.enterprise_id,
-             "doc_type": c.doc_type,
-             "engagement_title": c.engagement_title, "enterprise_title": c.enterprise_title}
+            {
+                "engagement_id": c.engagement_id,
+                "enterprise_id": c.enterprise_id,
+                "doc_type": c.doc_type,
+                "engagement_title": c.engagement_title,
+                "enterprise_title": c.enterprise_title,
+            }
             for c in plan.doc_conflicts
         ],
         "diagram_conflicts": [
-            {"engagement_id": c.engagement_id, "enterprise_id": c.enterprise_id,
-             "diagram_type": c.diagram_type,
-             "engagement_name": c.engagement_name, "enterprise_name": c.enterprise_name}
+            {
+                "engagement_id": c.engagement_id,
+                "enterprise_id": c.enterprise_id,
+                "diagram_type": c.diagram_type,
+                "engagement_name": c.engagement_name,
+                "enterprise_name": c.enterprise_name,
+            }
             for c in plan.diagram_conflicts
         ],
         "warnings": plan.warnings,
@@ -89,6 +114,7 @@ def artifact_promote_to_enterprise(
 
     if not dry_run:
         from src.tools.enterprise_git_ops import ensure_working_branch
+
         ensure_working_branch(ent_root)
 
         resolutions = [
@@ -100,17 +126,22 @@ def artifact_promote_to_enterprise(
             for r in (conflict_resolutions or [])
         ]
         result = execute_promotion(
-            plan, eng_root, ent_root,
-            verifier_for(both_key, include_registry=True), registry,
+            plan,
+            eng_root,
+            ent_root,
+            verifier_for(both_key, include_registry=True),
+            registry,
             conflict_resolutions=resolutions,
         )
-        out.update({
-            "executed": result.executed,
-            "copied_files": result.copied_files,
-            "updated_files": result.updated_files,
-            "verification_errors": result.verification_errors,
-            "rolled_back": result.rolled_back,
-        })
+        out.update(
+            {
+                "executed": result.executed,
+                "copied_files": result.copied_files,
+                "updated_files": result.updated_files,
+                "verification_errors": result.verification_errors,
+                "rolled_back": result.rolled_back,
+            }
+        )
         if result.executed:
             clear_caches_for_repo(eng_root)
 
@@ -121,7 +152,8 @@ def register(mcp: FastMCP) -> None:
     from src.tools.artifact_mcp.write_queue import queued
 
     mcp.tool(
-        name="artifact_promote_to_enterprise", title="Artifact Write: Promote to Enterprise",
+        name="artifact_promote_to_enterprise",
+        title="Artifact Write: Promote to Enterprise",
         description=(
             "Promote an explicit set of selected entities and connections from the engagement "
             "repo to the enterprise repo. Defaults use arch-init workspace config. "

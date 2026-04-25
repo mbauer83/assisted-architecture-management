@@ -294,6 +294,18 @@ uv run zuban check
 model/content repositories and the Vue frontend tree. `zuban` runs in
 Mypy-compatible mode against `src/`, `tests/`, and `gen_id.py`.
 
+Run the frontend lint and type checks from `tools/gui`:
+
+```bash
+cd tools/gui
+npm run lint
+npm run typecheck
+```
+
+The frontend uses ESLint 9 with the Vue and TypeScript flat-config presets plus
+type-aware rules, and `vue-tsc`/`tsc` for application and Vite config
+type-checking.
+
 ## Running in Docker
 
 The GUI packages the Vue SPA and FastAPI server into a single container:

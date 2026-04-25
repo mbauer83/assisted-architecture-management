@@ -7,8 +7,9 @@ from typing import Any
 from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel
 
-from src.tools.gui_routers.entity_listing import build_entity_summary_rows
+from src.infrastructure.artifact_index.types import EntityContextReadModel
 from src.tools.gui_routers import state as s
+from src.tools.gui_routers.entity_listing import build_entity_summary_rows
 
 router = APIRouter()
 
@@ -31,7 +32,11 @@ def _diagram_domain(diagram_type: str) -> str | None:
         return None
     suffix = diagram_type.removeprefix("archimate-")
     domain = suffix.split("-", 1)[0]
-    return domain if domain in {"motivation", "strategy", "business", "application", "technology", "common"} else None
+    return (
+        domain
+        if domain in {"motivation", "strategy", "business", "application", "technology", "common"}
+        else None
+    )
 
 
 @router.get("/api/stats")
@@ -41,20 +46,26 @@ def get_stats() -> dict[str, Any]:
 
 @router.get("/api/entities")
 def list_entities(
-    domain: str | None = None, artifact_type: str | None = None,
-    status: str | None = None, scope: str | None = None,
-    limit: int = Query(default=200, le=1000), offset: int = 0,
+    domain: str | None = None,
+    artifact_type: str | None = None,
+    status: str | None = None,
+    scope: str | None = None,
+    limit: int = Query(default=200, le=1000),
+    offset: int = 0,
 ) -> dict[str, Any]:
     repo = s.get_repo()
     entities = repo.list_entities(domain=domain, artifact_type=artifact_type, status=status)
     if scope == "global":
         entities = [e for e in entities if s.is_global(e.path)]
     elif scope == "engagement":
-        entities = [e for e in entities if not s.is_global(e.path)
-                    and e.artifact_type != "global-artifact-reference"]
+        entities = [
+            e
+            for e in entities
+            if not s.is_global(e.path) and e.artifact_type != "global-artifact-reference"
+        ]
     else:
         entities = [e for e in entities if e.artifact_type != "global-artifact-reference"]
-    page = entities[offset: offset + limit]
+    page = entities[offset : offset + limit]
     return {"total": len(entities), "items": build_entity_summary_rows(page, repo)}
 
 
@@ -67,6 +78,7 @@ def read_entity(id: str) -> dict[str, Any]:
     entity_rec = repo.get_entity(id)
     if entity_rec is not None:
         from src.tools.artifact_write.parse_existing import parse_entity_file
+
         try:
             parsed = parse_entity_file(entity_rec.path)
             result["summary"] = parsed.summary or ""
@@ -83,7 +95,7 @@ def read_entity(id: str) -> dict[str, Any]:
 
 
 @router.get("/api/entity-context")
-def read_entity_context(id: str) -> dict[str, Any]:
+def read_entity_context(id: str) -> EntityContextReadModel:
     repo = s.get_repo()
     context = repo.read_entity_context(id)
     if context is None:
@@ -91,6 +103,7 @@ def read_entity_context(id: str) -> dict[str, Any]:
     entity_rec = repo.get_entity(id)
     if entity_rec is not None:
         from src.tools.artifact_write.parse_existing import parse_entity_file
+
         try:
             parsed = parse_entity_file(entity_rec.path)
             context["entity"]["summary"] = parsed.summary or ""
@@ -108,8 +121,11 @@ def get_entity_schemata(artifact_type: str) -> dict[str, Any]:
     if repo_root is None:
         raise HTTPException(500, "Repository not initialized")
     from src.common.artifact_schema import (
-        load_attribute_schema, schema_all_properties, schema_required_properties,
+        load_attribute_schema,
+        schema_all_properties,
+        schema_required_properties,
     )
+
     schema = load_attribute_schema(repo_root, artifact_type)
     if schema is None:
         return {"artifact_type": artifact_type, "schema": None, "properties": [], "required": []}
@@ -156,6 +172,7 @@ def create_entity(body: CreateEntityBody) -> dict[str, Any]:
         raise HTTPException(400, "global-artifact-reference entities cannot be created directly")
     repo_root, _registry, verifier = s.get_write_deps()
     from src.tools.artifact_write.entity import create_entity as _create
+
     try:
         result = s.run_serialized_write(
             _create,
@@ -182,7 +199,9 @@ def create_entity(body: CreateEntityBody) -> dict[str, Any]:
 @router.post("/api/entity/edit")
 def edit_entity(body: EditEntityBody) -> dict[str, Any]:
     repo_root, registry, verifier = s.get_write_deps()
-    from src.tools.artifact_write.entity_edit import edit_entity as _edit, _UNSET
+    from src.tools.artifact_write.entity_edit import _UNSET
+    from src.tools.artifact_write.entity_edit import edit_entity as _edit
+
     provided = body.model_fields_set
     try:
         result = s.run_serialized_write(
@@ -225,14 +244,16 @@ def search_artifacts(
     hits = []
     for h in result.hits:
         aid = getattr(h.record, "artifact_id", "")
-        hits.append({
-            "score": h.score,
-            "record_type": h.record_type,
-            "artifact_id": aid,
-            "name": getattr(h.record, "name", getattr(h.record, "title", "")),
-            "status": getattr(h.record, "status", ""),
-            "path": str(h.record.path),
-        })
+        hits.append(
+            {
+                "score": h.score,
+                "record_type": h.record_type,
+                "artifact_id": aid,
+                "name": getattr(h.record, "name", getattr(h.record, "title", "")),
+                "status": getattr(h.record, "status", ""),
+                "path": str(h.record.path),
+            }
+        )
     return {"query": result.query, "hits": hits}
 
 
@@ -246,8 +267,12 @@ def search_reference_artifacts(
     limit: int = Query(default=30, le=100),
 ) -> dict[str, Any]:
     repo = s.get_repo()
-    selected_domains = {value.strip().lower() for value in (domains or "").split(",") if value.strip()}
-    selected_entity_types = {value.strip() for value in (entity_types or "").split(",") if value.strip()}
+    selected_domains = {
+        value.strip().lower() for value in (domains or "").split(",") if value.strip()
+    }
+    selected_entity_types = {
+        value.strip() for value in (entity_types or "").split(",") if value.strip()
+    }
     selected_doc_types = {value.strip() for value in (doc_types or "").split(",") if value.strip()}
     q_lc = q.strip().lower()
 
@@ -263,49 +288,63 @@ def search_reference_artifacts(
                 continue
             if q_lc and q_lc not in entity.name.lower() and q_lc not in entity.artifact_id.lower():
                 continue
-            hits.append({
-                "artifact_id": entity.artifact_id,
-                "record_type": "entity",
-                "name": entity.name,
-                "status": entity.status,
-                "path": str(entity.path),
-                "domain": entity.domain,
-                "artifact_type": entity.artifact_type,
-                "is_global": s.is_global(entity.path),
-            })
+            hits.append(
+                {
+                    "artifact_id": entity.artifact_id,
+                    "record_type": "entity",
+                    "name": entity.name,
+                    "status": entity.status,
+                    "path": str(entity.path),
+                    "domain": entity.domain,
+                    "artifact_type": entity.artifact_type,
+                    "is_global": s.is_global(entity.path),
+                }
+            )
 
     if kind in (None, "diagram"):
         for diagram in repo.list_diagrams():
             domain = _diagram_domain(diagram.diagram_type)
             if selected_domains and (domain is None or domain not in selected_domains):
                 continue
-            if q_lc and q_lc not in diagram.name.lower() and q_lc not in diagram.artifact_id.lower():
+            if (
+                q_lc
+                and q_lc not in diagram.name.lower()
+                and q_lc not in diagram.artifact_id.lower()
+            ):
                 continue
-            hits.append({
-                "artifact_id": diagram.artifact_id,
-                "record_type": "diagram",
-                "name": diagram.name,
-                "status": diagram.status,
-                "path": str(diagram.path),
-                "diagram_type": diagram.diagram_type,
-                "domain": domain,
-            })
+            hits.append(
+                {
+                    "artifact_id": diagram.artifact_id,
+                    "record_type": "diagram",
+                    "name": diagram.name,
+                    "status": diagram.status,
+                    "path": str(diagram.path),
+                    "diagram_type": diagram.diagram_type,
+                    "domain": domain,
+                }
+            )
 
     if kind in (None, "document"):
         for document in repo.list_documents():
             if selected_doc_types and document.doc_type not in selected_doc_types:
                 continue
-            if q_lc and q_lc not in document.title.lower() and q_lc not in document.artifact_id.lower():
+            if (
+                q_lc
+                and q_lc not in document.title.lower()
+                and q_lc not in document.artifact_id.lower()
+            ):
                 continue
-            hits.append({
-                "artifact_id": document.artifact_id,
-                "record_type": "document",
-                "name": document.title,
-                "status": document.status,
-                "path": str(document.path),
-                "doc_type": document.doc_type,
-                "sections": list(document.sections),
-            })
+            hits.append(
+                {
+                    "artifact_id": document.artifact_id,
+                    "record_type": "document",
+                    "name": document.title,
+                    "status": document.status,
+                    "path": str(document.path),
+                    "doc_type": document.doc_type,
+                    "sections": list(document.sections),
+                }
+            )
 
     hits.sort(key=lambda hit: _score_reference_hit(str(hit["name"]), str(hit["artifact_id"]), q))
     return {"query": q, "hits": hits[:limit]}
@@ -315,6 +354,7 @@ def search_reference_artifacts(
 def delete_entity(body: DeleteEntityBody) -> dict[str, Any]:
     repo_root, registry, _verifier = s.get_write_deps()
     from src.tools.artifact_write.entity_delete import delete_entity as _delete
+
     try:
         result = s.run_serialized_write(
             _delete,

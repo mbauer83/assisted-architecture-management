@@ -184,7 +184,7 @@ const showPuml = ref(false)
 const doPreview = () => {
   previewBusy.value = true
   previewError.value = null
-  Effect.runPromise(
+  void Effect.runPromise(
     svc.previewDiagram({
       diagram_type: diagramType.value,
       name: name.value,
@@ -202,7 +202,7 @@ const createError = ref<string | null>(null)
 const doCreate = () => {
   createBusy.value = true
   createError.value = null
-  Effect.runPromise(
+  void Effect.runPromise(
     svc.createDiagram({
       diagram_type: diagramType.value,
       name: name.value,
@@ -213,7 +213,7 @@ const doCreate = () => {
   )
     .then((r) => {
       createBusy.value = false
-      if (r.wrote) router.push({ path: '/diagram', query: { id: r.artifact_id } })
+      if (r.wrote) void router.push({ path: '/diagram', query: { id: r.artifact_id } })
       else createError.value = r.content ?? 'Verification failed — check warnings'
     })
     .catch((e) => { createBusy.value = false; createError.value = String(e) })
@@ -226,21 +226,41 @@ onMounted(() => { void refreshDiscovery() })
 <template>
   <div class="layout">
     <div class="page-header">
-      <button class="back-link" @click="router.back()">← Back</button>
-      <h1 class="page-title">Create Diagram</h1>
+      <button
+        class="back-link"
+        @click="router.back()"
+      >
+        ← Back
+      </button>
+      <h1 class="page-title">
+        Create Diagram
+      </h1>
     </div>
 
     <div class="columns">
       <section class="card form-col">
         <div class="form-row">
           <label class="lbl">Name <span class="req">*</span></label>
-          <input v-model="name" class="inp" placeholder="Diagram name" />
+          <input
+            v-model="name"
+            class="inp"
+            placeholder="Diagram name"
+          >
         </div>
 
         <div class="form-row">
           <label class="lbl">Diagram Type</label>
-          <select v-model="diagramType" class="inp">
-            <option v-for="dt in DIAGRAM_TYPES" :key="dt.key" :value="dt.key">{{ dt.label }}</option>
+          <select
+            v-model="diagramType"
+            class="inp"
+          >
+            <option
+              v-for="dt in DIAGRAM_TYPES"
+              :key="dt.key"
+              :value="dt.key"
+            >
+              {{ dt.label }}
+            </option>
           </select>
         </div>
 
@@ -254,15 +274,24 @@ onMounted(() => { void refreshDiscovery() })
               @input="onSearchInput"
               @blur="closeDropdown"
               @focus="() => { if (searchResults.length) showDropdown = true }"
-            />
-            <div v-if="showDropdown" class="dropdown">
+            >
+            <div
+              v-if="showDropdown"
+              class="dropdown"
+            >
               <button
                 v-for="r in searchResults"
                 :key="r.artifact_id"
                 class="dd-item"
                 @mousedown.prevent="addEntity(r)"
               >
-                <span class="dd-glyph" :title="r.element_type || r.artifact_type"><ArchimateTypeGlyph :type="toGlyphKey(r.element_type || r.artifact_type)" :size="16" /></span>
+                <span
+                  class="dd-glyph"
+                  :title="r.element_type || r.artifact_type"
+                ><ArchimateTypeGlyph
+                  :type="toGlyphKey(r.element_type || r.artifact_type)"
+                  :size="16"
+                /></span>
                 <span class="dd-name">{{ r.name }}</span>
                 <span class="dd-domain">{{ r.domain }}</span>
               </button>
@@ -270,7 +299,10 @@ onMounted(() => { void refreshDiscovery() })
           </div>
         </div>
 
-        <div v-if="includedEntities.length" class="form-row">
+        <div
+          v-if="includedEntities.length"
+          class="form-row"
+        >
           <label class="lbl">Included Entities ({{ includedEntities.length }})</label>
           <EntitySelectionList
             :rows="selectionRows"
@@ -288,38 +320,82 @@ onMounted(() => { void refreshDiscovery() })
           />
         </div>
 
-        <div v-if="createError" class="state-err">{{ createError }}</div>
+        <div
+          v-if="createError"
+          class="state-err"
+        >
+          {{ createError }}
+        </div>
 
         <div class="actions">
           <button
             class="btn-preview"
             :disabled="previewBusy || !name.trim() || !includedEntities.length"
             @click="doPreview"
-          >{{ previewBusy ? 'Rendering…' : 'Preview' }}</button>
+          >
+            {{ previewBusy ? 'Rendering…' : 'Preview' }}
+          </button>
           <button
             class="btn-create"
             :disabled="createBusy || !preview"
             :title="!preview ? 'Run Preview first' : ''"
             @click="doCreate"
-          >{{ createBusy ? 'Creating…' : 'Create Diagram' }}</button>
+          >
+            {{ createBusy ? 'Creating…' : 'Create Diagram' }}
+          </button>
         </div>
       </section>
 
       <section class="card preview-col">
-        <div v-if="!preview && !previewBusy && !previewError" class="preview-hint">
+        <div
+          v-if="!preview && !previewBusy && !previewError"
+          class="preview-hint"
+        >
           Select entities and connections, then click <strong>Preview</strong>.
         </div>
-        <div v-if="previewBusy" class="state-msg">Rendering…</div>
-        <div v-if="previewError" class="state-err">{{ previewError }}</div>
+        <div
+          v-if="previewBusy"
+          class="state-msg"
+        >
+          Rendering…
+        </div>
+        <div
+          v-if="previewError"
+          class="state-err"
+        >
+          {{ previewError }}
+        </div>
 
         <template v-if="preview">
-          <div v-for="w in preview.warnings" :key="w" class="warn">{{ w }}</div>
-          <img v-if="preview.image" :src="preview.image" class="preview-img" alt="Diagram preview" />
-          <div v-else class="state-msg">No image could be rendered.</div>
-          <button class="toggle-src" @click="showPuml = !showPuml">
+          <div
+            v-for="w in preview.warnings"
+            :key="w"
+            class="warn"
+          >
+            {{ w }}
+          </div>
+          <img
+            v-if="preview.image"
+            :src="preview.image"
+            class="preview-img"
+            alt="Diagram preview"
+          >
+          <div
+            v-else
+            class="state-msg"
+          >
+            No image could be rendered.
+          </div>
+          <button
+            class="toggle-src"
+            @click="showPuml = !showPuml"
+          >
             {{ showPuml ? 'Hide' : 'Show' }} PUML source
           </button>
-          <pre v-if="showPuml" class="puml-src">{{ preview.puml }}</pre>
+          <pre
+            v-if="showPuml"
+            class="puml-src"
+          >{{ preview.puml }}</pre>
         </template>
       </section>
     </div>

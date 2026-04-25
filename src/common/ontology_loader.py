@@ -73,11 +73,9 @@ ALL_ENTITY_TYPE_NAMES: list[str] = sorted(ENTITY_TYPES)
 # ── Domain ordering & display (derived from entity_ontology.yaml insertion order) ──
 #: Unique domain_dir values in the order they first appear in the YAML.
 #: Internal types (e.g. global-entity-reference) are excluded.
-DOMAIN_ORDER: list[str] = list(dict.fromkeys(
-    et.domain_dir
-    for et in ENTITY_TYPES.values()
-    if not et.internal
-))
+DOMAIN_ORDER: list[str] = list(
+    dict.fromkeys(et.domain_dir for et in ENTITY_TYPES.values() if not et.internal)
+)
 
 #: domain_dir → grouping stereotype name (e.g. "motivation" → "MotivationGrouping")
 DOMAIN_GROUPING: dict[str, str] = {
@@ -88,9 +86,7 @@ DOMAIN_GROUPING: dict[str, str] = {
 
 #: domain_dir → display name (capitalized) as it appears in diagrams
 DOMAIN_DISPLAY: dict[str, str] = {
-    et.domain_dir: et.domain_dir.capitalize()
-    for et in ENTITY_TYPES.values()
-    if not et.internal
+    et.domain_dir: et.domain_dir.capitalize() for et in ENTITY_TYPES.values() if not et.internal
 }
 
 #: archimate_element_type → has_sprite bool
@@ -107,6 +103,7 @@ SYMMETRIC_CONNECTIONS: frozenset[str] = frozenset(
 
 
 # ── Expand rule references ───────────────────────────────────────────────
+
 
 def _expand_ref(ref: str | list, all_types: list[str]) -> list[str]:
     """Expand a source/target reference to concrete entity-type names."""

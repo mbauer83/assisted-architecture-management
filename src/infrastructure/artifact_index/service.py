@@ -299,10 +299,10 @@ class ArtifactIndex:
                 return summary_from_document(doc)
         return None
 
-    def read_entity_context(self, entity_id: str) -> EntityContextReadModel | None:
+    def read_entity_context(self, artifact_id: str) -> EntityContextReadModel | None:
         self._ensure_loaded()
         with self._lock:
-            entity = self._mem.entities.get(entity_id)
+            entity = self._mem.entities.get(artifact_id)
             if entity is None:
                 return None
             entity_data: dict[str, object] = {
@@ -322,7 +322,7 @@ class ArtifactIndex:
                 "extra": entity.extra,
             }
             return _q.entity_context(
-                self._db.conn, entity_id, entity_data, self._generation, self._etag
+                self._db.conn, artifact_id, entity_data, self._generation, self._etag
             )
 
     def stats(self) -> dict[str, object]:

@@ -9,7 +9,7 @@ export interface AsyncState<A> {
 
 export interface AsyncHandle<A> extends AsyncState<A> {
   /** Execute an Effect, writing success/failure into the reactive state. */
-  run<E>(effect: Effect.Effect<A, E, never>): void
+  readonly run: <E>(effect: Effect.Effect<A, E, never>) => void
 }
 
 /**
@@ -22,10 +22,10 @@ export const useAsync = <A>(): AsyncHandle<A> => {
   const error: Ref<string | null> = ref(null)
   const loading: Ref<boolean> = ref(false)
 
-  function run<E>(effect: Effect.Effect<A, E, never>): void {
+  const run = <E>(effect: Effect.Effect<A, E, never>): void => {
     loading.value = true
     error.value = null
-    Effect.runPromiseExit(effect).then((exit) => {
+    void Effect.runPromiseExit(effect).then((exit) => {
       loading.value = false
       if (Exit.isSuccess(exit)) {
         data.value = exit.value

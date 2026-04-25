@@ -1,11 +1,11 @@
 """Backward-compat shim — delegates to global_artifact_reference."""
+
 from src.tools.artifact_write.global_artifact_reference import (  # noqa: F401
     _GAR_TYPE as _GRF_TYPE,
-    _GAR_ID_KEY as _GRF_FRONTMATTER_KEY,
-    find_existing_gar as find_existing_grf,
-    build_gar_map as build_grf_map,
 )
-from src.tools.artifact_write.global_artifact_reference import ensure_global_artifact_reference as _ensure_gar
+from src.tools.artifact_write.global_artifact_reference import (
+    ensure_global_artifact_reference as _ensure_gar,
+)
 
 
 def ensure_global_entity_reference(

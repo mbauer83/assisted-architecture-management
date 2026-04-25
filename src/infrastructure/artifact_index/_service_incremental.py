@@ -29,6 +29,7 @@ _ArtT = TypeVar("_ArtT", EntityRecord, ConnectionRecord, DiagramRecord, Document
 
 # ── Path classification helpers ───────────────────────────────────────────────
 
+
 def mount_for_path(path: Path, mounts: list[RepoMount]) -> RepoMount | None:
     resolved = path.resolve()
     return next((m for m in mounts if resolved.is_relative_to(m.root)), None)
@@ -63,6 +64,7 @@ def is_document_path(path: Path, mounts: list[RepoMount]) -> bool:
 
 # ── Full scan ─────────────────────────────────────────────────────────────────
 
+
 def _insert_mounted(
     rec: _ArtT,
     label: str,
@@ -78,8 +80,7 @@ def _insert_mounted(
     except ValueError:
         return
     raise DuplicateArtifactIdError(
-        f"Duplicate {label} artifact-id '{rec.artifact_id}'"
-        f" in {rec.path} and {existing.path}"
+        f"Duplicate {label} artifact-id '{rec.artifact_id}' in {rec.path} and {existing.path}"
     )
 
 
@@ -111,6 +112,7 @@ def scan_mount(mount: RepoMount, mem: _MemStore) -> None:
 
 
 # ── Incremental updates ───────────────────────────────────────────────────────
+
 
 def apply_entity_change(
     path: Path,

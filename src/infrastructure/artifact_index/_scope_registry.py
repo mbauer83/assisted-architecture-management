@@ -45,38 +45,48 @@ class _ScopeRegistry:
     def enterprise_entity_ids(self) -> set[str]:
         self._ensure_loaded()
         with self._lock:
-            return {aid for aid, r in self._mem.entities.items()
-                    if self._scope(r.path) == "enterprise"}
+            return {
+                aid for aid, r in self._mem.entities.items() if self._scope(r.path) == "enterprise"
+            }
 
     def engagement_entity_ids(self) -> set[str]:
         self._ensure_loaded()
         with self._lock:
-            return {aid for aid, r in self._mem.entities.items()
-                    if self._scope(r.path) == "engagement"}
+            return {
+                aid for aid, r in self._mem.entities.items() if self._scope(r.path) == "engagement"
+            }
 
     def enterprise_connection_ids(self) -> set[str]:
         self._ensure_loaded()
         with self._lock:
-            return {aid for aid, r in self._mem.connections.items()
-                    if self._scope(r.path) == "enterprise"}
+            return {
+                aid
+                for aid, r in self._mem.connections.items()
+                if self._scope(r.path) == "enterprise"
+            }
 
     def engagement_connection_ids(self) -> set[str]:
         self._ensure_loaded()
         with self._lock:
-            return {aid for aid, r in self._mem.connections.items()
-                    if self._scope(r.path) == "engagement"}
+            return {
+                aid
+                for aid, r in self._mem.connections.items()
+                if self._scope(r.path) == "engagement"
+            }
 
     def enterprise_document_ids(self) -> set[str]:
         self._ensure_loaded()
         with self._lock:
-            return {aid for aid, r in self._mem.documents.items()
-                    if self._scope(r.path) == "enterprise"}
+            return {
+                aid for aid, r in self._mem.documents.items() if self._scope(r.path) == "enterprise"
+            }
 
     def enterprise_diagram_ids(self) -> set[str]:
         self._ensure_loaded()
         with self._lock:
-            return {aid for aid, r in self._mem.diagrams.items()
-                    if self._scope(r.path) == "enterprise"}
+            return {
+                aid for aid, r in self._mem.diagrams.items() if self._scope(r.path) == "enterprise"
+            }
 
     # ── Status and file lookups ───────────────────────────────────────────────
 

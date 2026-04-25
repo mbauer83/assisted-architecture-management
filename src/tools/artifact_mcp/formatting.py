@@ -1,4 +1,3 @@
-
 from typing import Any
 
 from src.common.artifact_verifier import Issue, VerificationResult

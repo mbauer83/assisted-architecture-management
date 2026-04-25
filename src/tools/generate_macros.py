@@ -13,19 +13,21 @@ Alias convention (PlantUML):
     In diagram source files, reference elements by their alias.
 """
 
-
+import json
 import re
 import sys
-import json
 from pathlib import Path
 
 import yaml
 
 from src.common.artifact_parsing import normalize_puml_alias
-from src.common.repo_paths import DIAGRAM_CATALOG, MODEL
+from src.common.ontology_loader import DOMAIN_ORDER as _DOMAIN_ORDER_LIST
 from src.common.ontology_loader import ENTITY_TYPES
-from src.tools._svg_sprite_convert import browser_markup_to_plantuml_svg as _browser_markup_to_plantuml_svg
+from src.common.repo_paths import DIAGRAM_CATALOG, MODEL
 from src.common.settings import archimate_type_markers, sprite_scale
+from src.tools._svg_sprite_convert import (
+    browser_markup_to_plantuml_svg as _browser_markup_to_plantuml_svg,
+)
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -43,11 +45,11 @@ def _extract_archimate_block(content: str) -> dict | None:
     m = _DISPLAY_SECTION.search(content)
     if not m:
         return None
-    display_text = content[m.end():]
+    display_text = content[m.end() :]
     h3 = _ARCHIMATE_H3.search(display_text)
     if not h3:
         return None
-    after_h3 = display_text[h3.end():]
+    after_h3 = display_text[h3.end() :]
     fence = _YAML_FENCE.search(after_h3)
     if not fence:
         return None
@@ -57,18 +59,49 @@ def _extract_archimate_block(content: str) -> dict | None:
         return None
 
 
-from src.common.ontology_loader import DOMAIN_ORDER as _DOMAIN_ORDER_LIST
 _DOMAIN_ORDER = {d: i for i, d in enumerate(_DOMAIN_ORDER_LIST)}
 
 _PREFIX_ORDER = [
-    "STK", "DRV", "ASM", "GOL", "OUT", "PRI", "REQ", "CST", "MEA", "VAL",
-    "CAP", "VS", "RES", "COA",
-    "SRV", "PRC", "FNC", "INT", "EVT", "ROL",
-    "ACT", "BIF", "BOB",
-    "APP", "AIF", "DOB",
-    "NOD", "DEV", "SSW", "TIF", "PTH", "NET", "ART",
-    "EQP", "FAC", "DIS", "MAT",
-    "WP", "DEL", "PLT",
+    "STK",
+    "DRV",
+    "ASM",
+    "GOL",
+    "OUT",
+    "PRI",
+    "REQ",
+    "CST",
+    "MEA",
+    "VAL",
+    "CAP",
+    "VS",
+    "RES",
+    "COA",
+    "SRV",
+    "PRC",
+    "FNC",
+    "INT",
+    "EVT",
+    "ROL",
+    "ACT",
+    "BIF",
+    "BOB",
+    "APP",
+    "AIF",
+    "DOB",
+    "NOD",
+    "DEV",
+    "SSW",
+    "TIF",
+    "PTH",
+    "NET",
+    "ART",
+    "EQP",
+    "FAC",
+    "DIS",
+    "MAT",
+    "WP",
+    "DEL",
+    "PLT",
 ]
 
 
@@ -83,7 +116,6 @@ def _sort_key(entry: tuple[str, str, str]) -> tuple[int, int, str]:
 
 def _load_glyphs() -> dict:
     return json.loads(_GLYPHS_PATH.read_text(encoding="utf-8"))
-
 
 
 def _generate_glyph_include(repo_root: Path) -> Path:
@@ -123,6 +155,7 @@ def _macro_label(label: str, element_type: str) -> str:
 # ---------------------------------------------------------------------------
 # Main
 # ---------------------------------------------------------------------------
+
 
 def generate_macros(repo_root: Path, *, enterprise_root: Path | None = None) -> Path:
     """Scan model/ directories and write diagram-catalog/_macros.puml.

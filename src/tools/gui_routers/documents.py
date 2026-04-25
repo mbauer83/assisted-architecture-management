@@ -56,7 +56,9 @@ def _extra_frontmatter_fields(schema: dict[str, Any]) -> list[dict[str, Any]]:
         {
             "name": k,
             "field_type": v.get("type", "string"),
-            "array_items_type": v.get("items", {}).get("type") if v.get("type") == "array" else None,
+            "array_items_type": v.get("items", {}).get("type")
+            if v.get("type") == "array"
+            else None,
             "required": k in required,
         }
         for k, v in props.items()
@@ -77,7 +79,9 @@ def list_document_types() -> list[dict[str, object]]:
             "required_sections": schema.get("required_sections", []),
             "extra_frontmatter_fields": _extra_frontmatter_fields(schema),
             "required_entity_type_connections": schema.get("required_entity_type_connections", []),
-            "suggested_entity_type_connections": schema.get("suggested_entity_type_connections", []),
+            "suggested_entity_type_connections": schema.get(
+                "suggested_entity_type_connections", []
+            ),
         }
         for doc_type, schema in sorted(schemata.items())
     ]
@@ -98,7 +102,7 @@ def list_documents(
 ) -> dict[str, Any]:
     repo = s.get_repo()
     docs = repo.list_documents(doc_type=doc_type, status=status)
-    page = docs[offset: offset + limit]
+    page = docs[offset : offset + limit]
     return {
         "total": len(docs),
         "items": [
@@ -128,6 +132,7 @@ def read_document(id: str) -> dict[str, Any]:
 @router.post("/api/document")
 def create_document(req: CreateDocumentRequest) -> dict[str, Any]:
     from src.tools.artifact_write.document import create_document as _create
+
     repo_root, _, verifier = s.get_write_deps()
 
     result = s.run_serialized_write(
@@ -159,6 +164,7 @@ def create_document(req: CreateDocumentRequest) -> dict[str, Any]:
 @router.put("/api/document/{artifact_id}")
 def edit_document(artifact_id: str, req: EditDocumentRequest) -> dict[str, Any]:
     from src.tools.artifact_write.document import edit_document as _edit
+
     repo_root, _, verifier = s.get_write_deps()
 
     result = s.run_serialized_write(
@@ -189,6 +195,7 @@ def edit_document(artifact_id: str, req: EditDocumentRequest) -> dict[str, Any]:
 @router.delete("/api/document/{artifact_id}")
 def delete_document(artifact_id: str, dry_run: bool = False) -> dict[str, Any]:
     from src.tools.artifact_write.document import delete_document as _delete
+
     repo_root, _, _ = s.get_write_deps()
 
     result = s.run_serialized_write(

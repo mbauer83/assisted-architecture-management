@@ -78,7 +78,7 @@ const truncLabel = (label: string, max = 22) =>
 
 const expandNode = (entityId: string) => {
   const beforeIds = new Set(nodes.value.map((n) => n.id))
-  Effect.runPromise(svc.getConnections(entityId, 'any')).then((conns: ConnectionList) => {
+  void Effect.runPromise(svc.getConnections(entityId, 'any')).then((conns: ConnectionList) => {
     for (const c of conns) {
       const otherId = c.source === entityId ? c.target : c.source
       const isNew = !beforeIds.has(otherId)
@@ -239,25 +239,40 @@ const edgePath = (e: typeof edges.value[number]) => {
   <div class="graph-layout">
     <div class="graph-canvas">
       <div class="canvas-header">
-        <RouterLink v-if="rootId" :to="{ path: '/entity', query: { id: rootId } }" class="back-link">
+        <RouterLink
+          v-if="rootId"
+          :to="{ path: '/entity', query: { id: rootId } }"
+          class="back-link"
+        >
           ← Back to entity
         </RouterLink>
         <span class="canvas-title">Graph Explorer</span>
         <div class="spacing-controls">
           <span class="spacing-label">Layout:</span>
           <button
-            v-for="m in LAYOUT_MODES" :key="m.value"
-            class="spacing-btn" :class="{ 'spacing-btn--active': layoutMode === m.value }"
+            v-for="m in LAYOUT_MODES"
+            :key="m.value"
+            class="spacing-btn"
+            :class="{ 'spacing-btn--active': layoutMode === m.value }"
             @click="switchLayout(m.value)"
-          >{{ m.label }}</button>
+          >
+            {{ m.label }}
+          </button>
         </div>
-        <div v-if="layoutMode === 'force'" class="spacing-controls">
+        <div
+          v-if="layoutMode === 'force'"
+          class="spacing-controls"
+        >
           <span class="spacing-label">Spacing:</span>
           <button
-            v-for="p in SPACING_PRESETS" :key="p.label"
-            class="spacing-btn" :class="{ 'spacing-btn--active': options.idealDist === p.idealDist }"
+            v-for="p in SPACING_PRESETS"
+            :key="p.label"
+            class="spacing-btn"
+            :class="{ 'spacing-btn--active': options.idealDist === p.idealDist }"
             @click="applyPreset(p)"
-          >{{ p.label }}</button>
+          >
+            {{ p.label }}
+          </button>
         </div>
       </div>
       <svg
@@ -271,19 +286,46 @@ const edgePath = (e: typeof edges.value[number]) => {
         @wheel.prevent="onWheel"
       >
         <defs>
-          <marker id="arrowhead" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
-            <polygon points="0 0, 8 3, 0 6" fill="#9ca3af" />
+          <marker
+            id="arrowhead"
+            markerWidth="8"
+            markerHeight="6"
+            refX="8"
+            refY="3"
+            orient="auto"
+          >
+            <polygon
+              points="0 0, 8 3, 0 6"
+              fill="#9ca3af"
+            />
           </marker>
         </defs>
         <!-- Edges (wider hit area via transparent overlay) -->
-        <g v-for="(e, i) in edges" :key="'e'+i" class="graph-edge" @click.stop="onEdgeClick(e)">
-          <path :d="edgePath(e)" stroke="#d1d5db" stroke-width="1.5" fill="none" marker-end="url(#arrowhead)" />
-          <path :d="edgePath(e)" stroke="transparent" stroke-width="10" fill="none"
-            :class="{ 'edge-selected': selectedEdge === e }" />
+        <g
+          v-for="(e, i) in edges"
+          :key="'e'+i"
+          class="graph-edge"
+          @click.stop="onEdgeClick(e)"
+        >
+          <path
+            :d="edgePath(e)"
+            stroke="#d1d5db"
+            stroke-width="1.5"
+            fill="none"
+            marker-end="url(#arrowhead)"
+          />
+          <path
+            :d="edgePath(e)"
+            stroke="transparent"
+            stroke-width="10"
+            fill="none"
+            :class="{ 'edge-selected': selectedEdge === e }"
+          />
         </g>
         <!-- Nodes -->
         <g
-          v-for="n in nodes" :key="n.id"
+          v-for="n in nodes"
+          :key="n.id"
           class="graph-node"
           :transform="`translate(${n.x}, ${n.y})`"
           @mousedown="onNodeMouseDown($event, n)"
@@ -297,22 +339,42 @@ const edgePath = (e: typeof edges.value[number]) => {
             :stroke="selectedId === n.id ? '#1e293b' : 'white'"
             :stroke-width="selectedId === n.id ? 3 : 2"
           />
-          <text dy="4" text-anchor="middle" fill="#252327" font-size="9" font-weight="600">
+          <text
+            dy="4"
+            text-anchor="middle"
+            fill="#252327"
+            font-size="9"
+            font-weight="600"
+          >
             {{ n.type }}
           </text>
-          <text dy="40" text-anchor="middle" fill="#374151" font-size="10">
+          <text
+            dy="40"
+            text-anchor="middle"
+            fill="#374151"
+            font-size="10"
+          >
             {{ truncLabel(n.label) }}
           </text>
           <!-- + badge: show if unexpanded AND (totalConns unknown OR > 0) -->
           <circle
             v-if="!n.expanded && (n.totalConns === undefined || n.totalConns > 0)"
-            cx="17" cy="-17" r="7"
-            fill="#2563eb" stroke="white" stroke-width="1.5" cursor="pointer"
+            cx="17"
+            cy="-17"
+            r="7"
+            fill="#2563eb"
+            stroke="white"
+            stroke-width="1.5"
+            cursor="pointer"
           />
           <text
             v-if="!n.expanded && (n.totalConns === undefined || n.totalConns > 0)"
-            x="17" y="-14"
-            text-anchor="middle" fill="#252327" font-size="9" font-weight="bold"
+            x="17"
+            y="-14"
+            text-anchor="middle"
+            fill="#252327"
+            font-size="9"
+            font-weight="bold"
             pointer-events="none"
           >+</text>
         </g>
@@ -320,51 +382,119 @@ const edgePath = (e: typeof edges.value[number]) => {
     </div>
 
     <aside class="graph-sidebar">
-      <h2 class="sidebar-title">Details</h2>
-      <div v-if="!selectedId && !selectedEdge" class="sidebar-empty">Click a node or edge to view details</div>
+      <h2 class="sidebar-title">
+        Details
+      </h2>
+      <div
+        v-if="!selectedId && !selectedEdge"
+        class="sidebar-empty"
+      >
+        Click a node or edge to view details
+      </div>
 
       <!-- Edge details -->
       <template v-else-if="selectedEdge">
-        <div class="detail-field"><label>Connection type</label><span class="detail-value mono">{{ selectedEdge.connType }}</span></div>
+        <div class="detail-field">
+          <label>Connection type</label><span class="detail-value mono">{{ selectedEdge.connType }}</span>
+        </div>
         <div class="detail-field">
           <label>Source</label>
-          <RouterLink :to="{ path: '/entity', query: { id: selectedEdge.source } }" class="detail-value detail-link">{{ friendlyName(selectedEdge.source) }}</RouterLink>
+          <RouterLink
+            :to="{ path: '/entity', query: { id: selectedEdge.source } }"
+            class="detail-value detail-link"
+          >
+            {{ friendlyName(selectedEdge.source) }}
+          </RouterLink>
         </div>
         <div class="detail-field">
           <label>Target</label>
-          <RouterLink :to="{ path: '/entity', query: { id: selectedEdge.target } }" class="detail-value detail-link">{{ friendlyName(selectedEdge.target) }}</RouterLink>
+          <RouterLink
+            :to="{ path: '/entity', query: { id: selectedEdge.target } }"
+            class="detail-value detail-link"
+          >
+            {{ friendlyName(selectedEdge.target) }}
+          </RouterLink>
         </div>
-        <div v-if="selectedEdge.description?.trim()" class="detail-content">
+        <div
+          v-if="selectedEdge.description?.trim()"
+          class="detail-content"
+        >
           <label>Description</label>
-          <div class="content-body">{{ selectedEdge.description.trim() }}</div>
+          <div class="content-body">
+            {{ selectedEdge.description.trim() }}
+          </div>
         </div>
       </template>
 
       <!-- Node details -->
-      <div v-else-if="selectedDetail.loading.value" class="sidebar-loading">Loading...</div>
-      <div v-else-if="selectedDetail.error.value" class="sidebar-error">{{ selectedDetail.error.value }}</div>
+      <div
+        v-else-if="selectedDetail.loading.value"
+        class="sidebar-loading"
+      >
+        Loading...
+      </div>
+      <div
+        v-else-if="selectedDetail.error.value"
+        class="sidebar-error"
+      >
+        {{ selectedDetail.error.value }}
+      </div>
       <template v-else-if="sd">
         <div class="detail-field">
           <label>Name</label>
-          <RouterLink :to="{ path: '/entity', query: { id: selectedId } }" class="detail-value detail-link">{{ sd.name }}</RouterLink>
+          <RouterLink
+            :to="{ path: '/entity', query: { id: selectedId } }"
+            class="detail-value detail-link"
+          >
+            {{ sd.name }}
+          </RouterLink>
         </div>
         <div class="detail-field">
           <label>Type</label>
           <span class="detail-type">
-            <ArchimateTypeGlyph :type="sd.artifact_type" :size="16" class="detail-glyph" />
+            <ArchimateTypeGlyph
+              :type="sd.artifact_type"
+              :size="16"
+              class="detail-glyph"
+            />
             <span class="detail-value mono">{{ sd.artifact_type }}</span>
           </span>
         </div>
-        <div class="detail-field"><label>Domain</label><span class="detail-value domain-badge" :class="`domain--${sd.domain}`">{{ sd.domain }}</span></div>
-        <div class="detail-field"><label>Status</label><span class="detail-value status-badge" :class="`status--${sd.status}`">{{ sd.status }}</span></div>
-        <div class="detail-field"><label>Version</label><span class="detail-value">{{ sd.version }}</span></div>
-        <div class="detail-field"><label>Artifact ID</label><span class="detail-value mono id-value">{{ sd.artifact_id }}</span></div>
-        <div v-if="sd.content_html" class="detail-content">
+        <div class="detail-field">
+          <label>Domain</label><span
+            class="detail-value domain-badge"
+            :class="`domain--${sd.domain}`"
+          >{{ sd.domain }}</span>
+        </div>
+        <div class="detail-field">
+          <label>Status</label><span
+            class="detail-value status-badge"
+            :class="`status--${sd.status}`"
+          >{{ sd.status }}</span>
+        </div>
+        <div class="detail-field">
+          <label>Version</label><span class="detail-value">{{ sd.version }}</span>
+        </div>
+        <div class="detail-field">
+          <label>Artifact ID</label><span class="detail-value mono id-value">{{ sd.artifact_id }}</span>
+        </div>
+        <div
+          v-if="sd.content_html"
+          class="detail-content"
+        >
           <label>Content</label>
-          <div class="content-body markdown-body" v-html="sd.content_html"></div>
+          <div
+            class="content-body markdown-body"
+            v-html="sd.content_html"
+          />
         </div>
         <div class="detail-explore">
-          <RouterLink :to="{ path: '/graph', query: { id: selectedId } }" class="explore-link">Explore graph →</RouterLink>
+          <RouterLink
+            :to="{ path: '/graph', query: { id: selectedId } }"
+            class="explore-link"
+          >
+            Explore graph →
+          </RouterLink>
         </div>
       </template>
     </aside>

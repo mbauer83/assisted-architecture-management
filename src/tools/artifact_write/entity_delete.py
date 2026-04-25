@@ -14,7 +14,9 @@ from .parse_existing import parse_outgoing_file
 from .types import WriteResult
 
 
-def _verification(path: Path, *, valid: bool, issues: list[dict[str, object]] | None = None) -> dict[str, object]:
+def _verification(
+    path: Path, *, valid: bool, issues: list[dict[str, object]] | None = None
+) -> dict[str, object]:
     return {
         "path": str(path),
         "file_type": "entity",
@@ -105,9 +107,7 @@ def _entity_ref_blockers(
                 str(fm.get("artifact-type", "")) == "global-artifact-reference"
                 and str(fm.get("global-artifact-id", "")) == artifact_id
             ):
-                grf_refs.append(
-                    str(fm.get("artifact-id", other_entity.stem))
-                )
+                grf_refs.append(str(fm.get("artifact-id", other_entity.stem)))
 
     for diagram_path in _diagram_paths(registry.repo_roots):
         refs = parse_diagram_refs(diagram_path) or {}
@@ -164,7 +164,11 @@ def _delete_entity_core(
         preview = "\n".join(
             [
                 f"Would delete entity: {entity_file}",
-                *( [f"Would delete outgoing file: {outgoing_path}"] if outgoing_path.exists() else [] ),
+                *(
+                    [f"Would delete outgoing file: {outgoing_path}"]
+                    if outgoing_path.exists()
+                    else []
+                ),
             ]
         )
         return WriteResult(
@@ -182,6 +186,7 @@ def _delete_entity_core(
 
     try:
         from src.tools.generate_macros import generate_macros
+
         generate_macros(repo_root)
     except Exception:  # noqa: BLE001
         warnings.append("Macro regeneration skipped after deletion")

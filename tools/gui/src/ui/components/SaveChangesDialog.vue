@@ -3,7 +3,8 @@ import { ref, computed, onMounted } from 'vue'
 import { inject } from 'vue'
 import { Effect } from 'effect'
 import { modelServiceKey } from '../keys'
-import type { SyncStatus, ArtifactChange } from '../../domain'
+import type { SyncStatus, ArtifactChange, SyncSaveResult } from '../../domain'
+import { readErrorMessage } from '../lib/errors'
 
 type DialogMode =
   | 'engagement-save'
@@ -38,9 +39,11 @@ const repoScope = computed((): 'engagement' | 'enterprise' =>
 onMounted(() => {
   if (props.mode === 'engagement-save' || props.mode === 'enterprise-save') {
     loadingChanges.value = true
-    Effect.runPromise(svc.getChanges(repoScope.value))
+    void Effect.runPromise(svc.getChanges(repoScope.value))
       .then(r => { artifacts.value = [...r.artifacts] })
-      .catch(() => {})
+      .catch((reason: unknown) => {
+        error.value = readErrorMessage(reason)
+      })
       .finally(() => { loadingChanges.value = false })
   }
 })
@@ -51,6 +54,7 @@ const title = computed(() => {
     case 'enterprise-save': return 'Save Enterprise Changes'
     case 'enterprise-submit': return 'Submit for Review'
     case 'enterprise-withdraw': return 'Discard Submission'
+    default: return 'Save Changes'
   }
 })
 
@@ -71,6 +75,7 @@ const confirmLabel = computed(() => {
     case 'enterprise-save': return 'Save & Commit'
     case 'enterprise-submit': return 'Submit for Review'
     case 'enterprise-withdraw': return 'Discard Submission'
+    default: return 'Continue'
   }
 })
 
@@ -90,7 +95,7 @@ const execute = async () => {
   busy.value = true
   error.value = null
   try {
-    let res: any
+    let res: SyncSaveResult
     switch (props.mode) {
       case 'engagement-save':
         res = await Effect.runPromise(
@@ -128,8 +133,8 @@ const execute = async () => {
         break
     }
     emit('done', result.value ?? '')
-  } catch (e: any) {
-    error.value = e?.message ?? String(e)
+  } catch (reason: unknown) {
+    error.value = readErrorMessage(reason)
   } finally {
     busy.value = false
   }
@@ -137,38 +142,87 @@ const execute = async () => {
 </script>
 
 <template>
-  <div class="dialog-overlay" @mousedown.self="emit('close')">
-    <div class="dialog" role="dialog" :aria-label="title">
+  <div
+    class="dialog-overlay"
+    @mousedown.self="emit('close')"
+  >
+    <div
+      class="dialog"
+      role="dialog"
+      :aria-label="title"
+    >
       <div class="dialog__header">
         <span class="dialog__title">{{ title }}</span>
-        <button class="dialog__close" @click="emit('close')" aria-label="Close">×</button>
+        <button
+          class="dialog__close"
+          aria-label="Close"
+          @click="emit('close')"
+        >
+          ×
+        </button>
       </div>
 
       <div class="dialog__body">
-
         <!-- Changes summary (save modes only) -->
-        <div v-if="!result && (mode === 'engagement-save' || mode === 'enterprise-save')" class="changes-panel">
-          <div v-if="loadingChanges" class="changes-loading">Loading changes…</div>
+        <div
+          v-if="!result && (mode === 'engagement-save' || mode === 'enterprise-save')"
+          class="changes-panel"
+        >
+          <div
+            v-if="loadingChanges"
+            class="changes-loading"
+          >
+            Loading changes…
+          </div>
           <template v-else-if="artifacts.length">
-            <div class="changes-header">{{ artifacts.length }} artifact{{ artifacts.length !== 1 ? 's' : '' }} changed</div>
+            <div class="changes-header">
+              {{ artifacts.length }} artifact{{ artifacts.length !== 1 ? 's' : '' }} changed
+            </div>
             <ul class="changes-list">
-              <li v-for="a in artifacts" :key="a.artifact_id" class="change-row">
-                <span class="change-status" :class="`change-status--${a.file_status}`">{{ a.file_status[0].toUpperCase() }}</span>
+              <li
+                v-for="a in artifacts"
+                :key="a.artifact_id"
+                class="change-row"
+              >
+                <span
+                  class="change-status"
+                  :class="`change-status--${a.file_status}`"
+                >{{ a.file_status[0].toUpperCase() }}</span>
                 <span class="change-name">{{ a.name !== a.artifact_id ? a.name : '' }}</span>
                 <code class="change-id">{{ a.artifact_id }}</code>
-                <span v-if="a.changes.length" class="change-tags">
-                  <span v-for="c in a.changes" :key="c" class="change-tag">{{ c }}</span>
+                <span
+                  v-if="a.changes.length"
+                  class="change-tags"
+                >
+                  <span
+                    v-for="c in a.changes"
+                    :key="c"
+                    class="change-tag"
+                  >{{ c }}</span>
                 </span>
               </li>
             </ul>
           </template>
-          <div v-else class="changes-empty">No tracked changes detected</div>
+          <div
+            v-else
+            class="changes-empty"
+          >
+            No tracked changes detected
+          </div>
         </div>
 
         <!-- Success state -->
-        <div v-if="result" class="result-msg">
-          <div class="result-text">{{ result }}</div>
-          <div v-if="mode === 'enterprise-submit'" class="result-hint">
+        <div
+          v-if="result"
+          class="result-msg"
+        >
+          <div class="result-text">
+            {{ result }}
+          </div>
+          <div
+            v-if="mode === 'enterprise-submit'"
+            class="result-hint"
+          >
             Push the branch and open a pull request in your enterprise repository to complete the review.
           </div>
         </div>
@@ -176,7 +230,10 @@ const execute = async () => {
         <!-- Engagement save form -->
         <template v-else-if="mode === 'engagement-save'">
           <div class="field">
-            <label class="field__label" for="sc-commit-msg">Commit message</label>
+            <label
+              class="field__label"
+              for="sc-commit-msg"
+            >Commit message</label>
             <input
               id="sc-commit-msg"
               v-model="commitMessage"
@@ -185,10 +242,14 @@ const execute = async () => {
               placeholder="Describe your changes…"
               :disabled="busy"
               @keydown.enter.prevent="execute"
-            />
+            >
           </div>
           <label class="checkbox-row">
-            <input v-model="pushToRemote" type="checkbox" :disabled="busy" />
+            <input
+              v-model="pushToRemote"
+              type="checkbox"
+              :disabled="busy"
+            >
             <span>Push to remote</span>
           </label>
         </template>
@@ -200,7 +261,10 @@ const execute = async () => {
             <code v-if="branchName">{{ branchName }}</code> and can be submitted for review later.
           </p>
           <div class="field">
-            <label class="field__label" for="sc-ent-msg">Commit message</label>
+            <label
+              class="field__label"
+              for="sc-ent-msg"
+            >Commit message</label>
             <input
               id="sc-ent-msg"
               v-model="commitMessage"
@@ -209,7 +273,7 @@ const execute = async () => {
               placeholder="Describe your changes…"
               :disabled="busy"
               @keydown.enter.prevent="execute"
-            />
+            >
           </div>
         </template>
 
@@ -221,7 +285,10 @@ const execute = async () => {
             and mark it ready for review.
             All uncommitted changes must be saved first.
           </p>
-          <p v-if="entStatus?.commits_ahead" class="dialog__hint">
+          <p
+            v-if="entStatus?.commits_ahead"
+            class="dialog__hint"
+          >
             {{ entStatus.commits_ahead }} commit(s) ahead of enterprise main.
           </p>
         </template>
@@ -235,11 +302,20 @@ const execute = async () => {
           </p>
         </template>
 
-        <div v-if="error" class="error-msg">{{ error }}</div>
+        <div
+          v-if="error"
+          class="error-msg"
+        >
+          {{ error }}
+        </div>
       </div>
 
       <div class="dialog__footer">
-        <button class="btn btn--cancel" :disabled="busy" @click="emit('close')">
+        <button
+          class="btn btn--cancel"
+          :disabled="busy"
+          @click="emit('close')"
+        >
           {{ result ? 'Close' : 'Cancel' }}
         </button>
         <button

@@ -1,8 +1,20 @@
 """MCP write tools: connection creation."""
+
+from typing import Literal
+
 from mcp.server.fastmcp import FastMCP  # type: ignore[import-not-found]
+
 from src.tools.artifact_mcp.write._common import (
-    WriteRepoScope, _out, clear_caches_for_repo, artifact_write_ops,
-    registry_cached, repo_cached, resolve_repo_roots, roots_key, verifier_for, RepoPreset,
+    RepoPreset,
+    WriteRepoScope,
+    _out,
+    artifact_write_ops,
+    clear_caches_for_repo,
+    registry_cached,
+    repo_cached,
+    resolve_repo_roots,
+    roots_key,
+    verifier_for,
 )
 
 
@@ -33,12 +45,11 @@ def artifact_add_connection(
     if repo_scope != "engagement":
         raise ValueError("artifact_add_connection only supports repo_scope='engagement'")
 
-    from src.tools.artifact_mcp.context import resolve_enterprise_repo_root
     # Determine scope: only include enterprise root when it was explicitly provided
     # OR when the caller's repo_root matches the init-state engagement root.
     # This prevents registry cache pollution in tests that provide an isolated
     # engagement repo but don't provide an enterprise root.
-    scope: str
+    scope: WriteRepoScope | Literal["both"]
     if enterprise_root:
         scope = "both"
     elif repo_root or repo_preset:
@@ -48,8 +59,10 @@ def artifact_add_connection(
         # Default: use both roots from init-state (normal production path)
         scope = "both"
     both_roots = resolve_repo_roots(
-        repo_scope=scope, repo_root=repo_root,
-        repo_preset=repo_preset, enterprise_root=enterprise_root,
+        repo_scope=scope,
+        repo_root=repo_root,
+        repo_preset=repo_preset,
+        enterprise_root=enterprise_root,
     )
     both_key = roots_key(both_roots)
     registry = registry_cached(both_key)
@@ -64,17 +77,24 @@ def artifact_add_connection(
 
     def _ensure_gar(global_id: str) -> str:
         nonlocal registry, verifier
-        from src.tools.artifact_write.global_artifact_reference import ensure_global_artifact_reference
+        from src.tools.artifact_write.global_artifact_reference import (
+            ensure_global_artifact_reference,
+        )
+
         full_repo = repo_cached(both_key)
         rec = full_repo.get_entity(global_id)
         name = rec.name if rec else global_id
         entity_type = rec.artifact_type if rec else None
         eng_repo = repo_cached(roots_key(both_roots[:1]))
         gar_result = ensure_global_artifact_reference(
-            engagement_repo=eng_repo, engagement_root=eng_root, verifier=verifier,
+            engagement_repo=eng_repo,
+            engagement_root=eng_root,
+            verifier=verifier,
             clear_repo_caches=clear_caches_for_repo,
-            global_artifact_id=global_id, global_artifact_name=name,
-            global_artifact_type="entity", global_artifact_entity_type=entity_type,
+            global_artifact_id=global_id,
+            global_artifact_name=name,
+            global_artifact_type="entity",
+            global_artifact_entity_type=entity_type,
             dry_run=dry_run,
         )
         if gar_result.wrote:
@@ -97,12 +117,20 @@ def artifact_add_connection(
         effective_target = gar_artifact_id
 
     result = artifact_write_ops.add_connection(
-        repo_root=eng_root, registry=registry, verifier=verifier,
+        repo_root=eng_root,
+        registry=registry,
+        verifier=verifier,
         clear_repo_caches=clear_caches_for_repo,
-        source_entity=effective_source, connection_type=connection_type,
-        target_entity=effective_target, description=description,
-        src_cardinality=src_cardinality, tgt_cardinality=tgt_cardinality,
-        version=version, status=status, last_updated=last_updated, dry_run=dry_run,
+        source_entity=effective_source,
+        connection_type=connection_type,
+        target_entity=effective_target,
+        description=description,
+        src_cardinality=src_cardinality,
+        tgt_cardinality=tgt_cardinality,
+        version=version,
+        status=status,
+        last_updated=last_updated,
+        dry_run=dry_run,
     )
     out = _out(result, dry_run=dry_run)
     if gar_source_id:
@@ -121,7 +149,8 @@ def register(mcp: FastMCP) -> None:
     from src.tools.artifact_mcp.write_queue import queued
 
     mcp.tool(
-        name="artifact_add_connection", title="Artifact Write: Add Connection",
+        name="artifact_add_connection",
+        title="Artifact Write: Add Connection",
         description=(
             "Add a connection to an entity's .outgoing.md file. Defaults use repos from "
             "arch-init workspace config (repo_root, enterprise_root optional). "

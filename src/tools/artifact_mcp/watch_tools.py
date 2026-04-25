@@ -4,18 +4,18 @@ from pathlib import Path
 from typing import Any
 
 from src.common.repo_paths import DIAGRAM_CATALOG, DIAGRAMS, MODEL
+from src.infrastructure.artifact_index.coordination import suppress_redundant_refresh_paths
 from src.tools.artifact_mcp.context import (
     RepoPreset,
     RepoScope,
     enqueue_refresh_for_roots,
     resolve_repo_roots,
 )
-from src.infrastructure.artifact_index.coordination import suppress_redundant_refresh_paths
-
 
 # ---------------------------------------------------------------------------
 # Snapshotting
 # ---------------------------------------------------------------------------
+
 
 def _repo_state_snapshot(repo_path: Path) -> dict[str, tuple[int, int]]:
     snapshot: dict[str, tuple[int, int]] = {}
@@ -93,10 +93,7 @@ def _watcher_loop(
             changed_paths, must_full_refresh = _diff_snapshots(last_snapshot, snapshot)
             if changed_paths and not must_full_refresh:
                 changed_paths = suppress_redundant_refresh_paths(roots, changed_paths)
-            force = (
-                periodic_refresh_s is not None
-                and (now - last_periodic) >= periodic_refresh_s
-            )
+            force = periodic_refresh_s is not None and (now - last_periodic) >= periodic_refresh_s
             if changed_paths or force or must_full_refresh:
                 if force or must_full_refresh or len(changed_paths) > 64:
                     enqueue_refresh_for_roots(roots, full_refresh=True)
@@ -107,7 +104,9 @@ def _watcher_loop(
                     last_periodic = now
                 with _watch_lock:
                     st = _watch_state.get(repo_key, {})
-                    st["last_fingerprint"] = f"{sum(len(files) for files in snapshot.values())} files"
+                    st["last_fingerprint"] = (
+                        f"{sum(len(files) for files in snapshot.values())} files"
+                    )
                     st["last_refresh_time"] = time.time()
                     prev = st.get("refresh_count", 0)
                     st["refresh_count"] = (prev + 1) if isinstance(prev, int) else 1
@@ -130,7 +129,11 @@ def _start_watcher(
     repo_key = _roots_key(roots)
     with _watch_lock:
         if repo_key in _watch_threads and _watch_threads[repo_key].is_alive():
-            return {"repo_roots": [str(r) for r in roots], "started": False, "reason": "already_running"}
+            return {
+                "repo_roots": [str(r) for r in roots],
+                "started": False,
+                "reason": "already_running",
+            }
         snapshot = _roots_state_snapshot(roots)
         _watch_state[repo_key] = {
             "repo_roots": [str(r) for r in roots],

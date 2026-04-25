@@ -45,30 +45,66 @@ const filteredItems = computed(() => {
   <div class="documents-page">
     <div class="page-header">
       <div>
-        <h1 class="page-title">Documents</h1>
+        <h1 class="page-title">
+          Documents
+        </h1>
       </div>
-      <button class="create-btn" type="button" @click="router.push('/documents/new')">+ New Document</button>
+      <button
+        class="create-btn"
+        type="button"
+        @click="router.push('/documents/new')"
+      >
+        + New Document
+      </button>
     </div>
 
     <div class="toolbar card">
       <label class="toolbar-field">
         <span>Type</span>
-        <select v-model="docTypeFilter" class="toolbar-select" @change="load">
+        <select
+          v-model="docTypeFilter"
+          class="toolbar-select"
+          @change="load"
+        >
           <option value="">All</option>
-          <option v-for="type in documentTypes" :key="type.doc_type" :value="type.doc_type">{{ type.name }}</option>
+          <option
+            v-for="type in documentTypes"
+            :key="type.doc_type"
+            :value="type.doc_type"
+          >{{ type.name }}</option>
         </select>
       </label>
       <label class="toolbar-field toolbar-field--grow">
         <span>Title</span>
-        <input v-model="titleFilter" class="toolbar-input" type="text" placeholder="Filter by title..." />
+        <input
+          v-model="titleFilter"
+          class="toolbar-input"
+          type="text"
+          placeholder="Filter by title..."
+        >
       </label>
     </div>
 
-    <div v-if="loading" class="state-msg">Loading…</div>
-    <div v-else-if="error" class="state-msg state-msg--error">{{ error }}</div>
+    <div
+      v-if="loading"
+      class="state-msg"
+    >
+      Loading…
+    </div>
+    <div
+      v-else-if="error"
+      class="state-msg state-msg--error"
+    >
+      {{ error }}
+    </div>
 
-    <div v-else class="card table-card">
-      <div class="result-count">{{ filteredItems.length }} document{{ filteredItems.length === 1 ? '' : 's' }}</div>
+    <div
+      v-else
+      class="card table-card"
+    >
+      <div class="result-count">
+        {{ filteredItems.length }} document{{ filteredItems.length === 1 ? '' : 's' }}
+      </div>
       <table class="documents-table">
         <thead>
           <tr>
@@ -78,13 +114,30 @@ const filteredItems = computed(() => {
           </tr>
         </thead>
         <tbody>
-          <tr v-for="doc in filteredItems" :key="doc.artifact_id">
-            <td><RouterLink :to="`/documents/${doc.artifact_id}`">{{ doc.title }}</RouterLink></td>
+          <tr
+            v-for="doc in filteredItems"
+            :key="doc.artifact_id"
+          >
+            <td>
+              <RouterLink :to="`/documents/${doc.artifact_id}`">
+                {{ doc.title }}
+              </RouterLink>
+            </td>
             <td><span class="doc-type">{{ doc.doc_type }}</span></td>
-            <td><span class="status-badge" :class="`status--${doc.status}`">{{ doc.status }}</span></td>
+            <td>
+              <span
+                class="status-badge"
+                :class="`status--${doc.status}`"
+              >{{ doc.status }}</span>
+            </td>
           </tr>
           <tr v-if="!filteredItems.length">
-            <td colspan="3" class="empty-row">No documents found.</td>
+            <td
+              colspan="3"
+              class="empty-row"
+            >
+              No documents found.
+            </td>
           </tr>
         </tbody>
       </table>

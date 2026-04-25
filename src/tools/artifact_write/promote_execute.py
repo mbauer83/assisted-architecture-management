@@ -54,8 +54,15 @@ def execute_promotion(
     try:
         for eid in plan.entities_to_add:
             copy_entity(
-                eid, engagement_root, enterprise_root, registry,
-                result, ent_copied, ent_backups, resolve_target, conn_ids,
+                eid,
+                engagement_root,
+                enterprise_root,
+                registry,
+                result,
+                ent_copied,
+                ent_backups,
+                resolve_target,
+                conn_ids,
             )
 
         for conflict in plan.conflicts:
@@ -73,8 +80,14 @@ def execute_promotion(
                 )
                 continue
             handler.handle(
-                conflict, engagement_root, enterprise_root, registry,
-                result, ent_backups, resolve_target, conn_ids,
+                conflict,
+                engagement_root,
+                enterprise_root,
+                registry,
+                result,
+                ent_backups,
+                resolve_target,
+                conn_ids,
             )
 
         for did in plan.documents_to_add:
@@ -83,8 +96,14 @@ def execute_promotion(
             )
         for dc in plan.doc_conflicts:
             _resolve_simple_conflict(
-                dc, "document", engagement_root, enterprise_root,
-                registry, result, ent_backups, resolutions,
+                dc,
+                "document",
+                engagement_root,
+                enterprise_root,
+                registry,
+                result,
+                ent_backups,
+                resolutions,
             )
 
         for did in plan.diagrams_to_add:
@@ -93,8 +112,14 @@ def execute_promotion(
             )
         for diag_dc in plan.diagram_conflicts:
             _resolve_simple_conflict(
-                diag_dc, "diagram", engagement_root, enterprise_root,
-                registry, result, ent_backups, resolutions,
+                diag_dc,
+                "diagram",
+                engagement_root,
+                enterprise_root,
+                registry,
+                result,
+                ent_backups,
+                resolutions,
             )
 
         if (enterprise_root / MODEL).is_dir():
@@ -109,7 +134,8 @@ def execute_promotion(
             for r in ArtifactVerifier(ent_registry).verify_all(
                 enterprise_root, include_diagrams=False
             )
-            for i in r.issues if i.severity == "error"
+            for i in r.issues
+            if i.severity == "error"
         ]
         result.verification_errors = errors
 
@@ -125,7 +151,8 @@ def execute_promotion(
 
         def _accepted(confs: list[Any]) -> list[str]:
             return [
-                c.engagement_id for c in confs
+                c.engagement_id
+                for c in confs
                 if resolutions.get(c.engagement_id)
                 and resolutions[c.engagement_id].strategy == "accept_engagement"
             ]
@@ -133,13 +160,23 @@ def execute_promotion(
         for did in plan.documents_to_add + _accepted(plan.doc_conflicts):
             doc = eng_repo.get_document(did)
             _replace_artifact_with_gar(
-                did, engagement_root, eng_repo, registry, result, "document",
+                did,
+                engagement_root,
+                eng_repo,
+                registry,
+                result,
+                "document",
                 name=doc.title if doc else did,
             )
         for did in plan.diagrams_to_add + _accepted(plan.diagram_conflicts):
             diag = eng_repo.get_diagram(did)
             _replace_artifact_with_gar(
-                did, engagement_root, eng_repo, registry, result, "diagram",
+                did,
+                engagement_root,
+                eng_repo,
+                registry,
+                result,
+                "diagram",
                 name=diag.name if diag else did,
             )
 
@@ -158,17 +195,21 @@ def execute_promotion(
 
 
 def _resolve_simple_conflict(
-    dc: Any, kind: str, eng_root: Path, ent_root: Path,
-    registry: Any, result: Any, backups: list[Any], resolutions: dict[str, Any],
+    dc: Any,
+    kind: str,
+    eng_root: Path,
+    ent_root: Path,
+    registry: Any,
+    result: Any,
+    backups: list[Any],
+    resolutions: dict[str, Any],
 ) -> None:
     res = resolutions.get(dc.engagement_id)
     if res and res.strategy == "accept_engagement":
         eng_path = registry.find_file_by_id(dc.engagement_id)
         ent_path = registry.find_file_by_id(dc.enterprise_id)
         if not eng_path or not ent_path:
-            result.plan.warnings.append(
-                f"Could not find files for conflict {dc.engagement_id}"
-            )
+            result.plan.warnings.append(f"Could not find files for conflict {dc.engagement_id}")
             return
         content = eng_path.read_text(encoding="utf-8").replace(
             dc.engagement_id, dc.enterprise_id, 1
@@ -181,8 +222,14 @@ def _resolve_simple_conflict(
 
 
 def _replace_artifact_with_gar(
-    aid: str, eng_root: Path, eng_repo: Any, registry: Any,
-    result: Any, artifact_type: str, *, name: str | None = None,
+    aid: str,
+    eng_root: Path,
+    eng_repo: Any,
+    registry: Any,
+    result: Any,
+    artifact_type: str,
+    *,
+    name: str | None = None,
 ) -> None:
     """Replace a promoted engagement artifact with a GAR proxy."""
     src = registry.find_file_by_id(aid)
@@ -203,10 +250,15 @@ def _replace_artifact_with_gar(
     from src.tools.artifact_write.global_artifact_reference import ensure_global_artifact_reference
 
     gar_result = ensure_global_artifact_reference(
-        engagement_repo=eng_repo, engagement_root=eng_root, verifier=ArtifactVerifier(None),
-        clear_repo_caches=lambda _: None, global_artifact_id=aid,
-        global_artifact_name=name, global_artifact_type=artifact_type,
-        global_artifact_entity_type=entity_subtype, dry_run=False,
+        engagement_repo=eng_repo,
+        engagement_root=eng_root,
+        verifier=ArtifactVerifier(None),
+        clear_repo_caches=lambda _: None,
+        global_artifact_id=aid,
+        global_artifact_name=name,
+        global_artifact_type=artifact_type,
+        global_artifact_entity_type=entity_subtype,
+        dry_run=False,
     )
     result.updated_files.append(f"[created GAR] {gar_result.artifact_id}")
 

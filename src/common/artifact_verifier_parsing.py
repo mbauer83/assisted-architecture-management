@@ -1,9 +1,9 @@
-
 from pathlib import Path
 
 import yaml
 
 from src.common.artifact_verifier_types import ConnectionRefs, Issue, Severity, VerificationResult
+
 
 def read_file(path: Path, result: VerificationResult, loc: str) -> str | None:
     try:
@@ -32,23 +32,33 @@ def extract_yaml_block(content: str) -> dict | None:
 
 def parse_frontmatter(content: str, result: VerificationResult, loc: str) -> dict | None:
     if not content.startswith("---"):
-        result.issues.append(Issue(Severity.ERROR, "E011", "File does not begin with YAML frontmatter (--- block)", loc))
+        result.issues.append(
+            Issue(
+                Severity.ERROR, "E011", "File does not begin with YAML frontmatter (--- block)", loc
+            )
+        )
         return None
 
     end = content.find("\n---", 3)
     if end == -1:
-        result.issues.append(Issue(Severity.ERROR, "E012", "Frontmatter opening --- has no closing ---", loc))
+        result.issues.append(
+            Issue(Severity.ERROR, "E012", "Frontmatter opening --- has no closing ---", loc)
+        )
         return None
 
     yaml_block = content[3:end].strip()
     try:
         fm = yaml.safe_load(yaml_block)
     except yaml.YAMLError as exc:
-        result.issues.append(Issue(Severity.ERROR, "E013", f"Frontmatter YAML parse error: {exc}", loc))
+        result.issues.append(
+            Issue(Severity.ERROR, "E013", f"Frontmatter YAML parse error: {exc}", loc)
+        )
         return None
 
     if not isinstance(fm, dict):
-        result.issues.append(Issue(Severity.ERROR, "E014", "Frontmatter is not a YAML mapping", loc))
+        result.issues.append(
+            Issue(Severity.ERROR, "E014", "Frontmatter is not a YAML mapping", loc)
+        )
         return None
 
     return fm
@@ -63,12 +73,14 @@ def parse_puml_frontmatter(content: str, result: VerificationResult, loc: str) -
     if content.startswith("---"):
         return parse_frontmatter(content, result, loc)
 
-    result.issues.append(Issue(
-        Severity.ERROR,
-        "E311",
-        "PUML file has no YAML frontmatter (expected --- block before @startuml)",
-        loc,
-    ))
+    result.issues.append(
+        Issue(
+            Severity.ERROR,
+            "E311",
+            "PUML file has no YAML frontmatter (expected --- block before @startuml)",
+            loc,
+        )
+    )
     return None
 
 
@@ -107,7 +119,7 @@ def parse_connection_refs(path: Path) -> ConnectionRefs | None:
             if after_arrow.startswith("["):
                 bracket_end = after_arrow.find("]")
                 if bracket_end != -1:
-                    after_arrow = after_arrow[bracket_end + 1:].lstrip()
+                    after_arrow = after_arrow[bracket_end + 1 :].lstrip()
             tgts.append(after_arrow)
 
     return ConnectionRefs(

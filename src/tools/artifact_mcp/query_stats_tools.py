@@ -1,4 +1,3 @@
-
 from typing import Literal
 
 from mcp.server.fastmcp import FastMCP  # type: ignore[import-not-found]
@@ -37,7 +36,8 @@ def register_query_stats_tools(mcp: FastMCP) -> None:
         artifact_type: str | list[str] | None = None,
         domain: str | list[str] | None = None,
         status: str | list[str] | None = None,
-        include_record_types: list[Literal["entities", "connections", "diagrams", "documents"]] | None = None,
+        include_record_types: list[Literal["entities", "connections", "diagrams", "documents"]]
+        | None = None,
         repo_root: str | None = None,
         repo_scope: RepoScope = "both",
     ) -> dict[str, object]:
@@ -50,7 +50,9 @@ def register_query_stats_tools(mcp: FastMCP) -> None:
         key = roots_key(roots)
         repo = repo_cached(key)
         if group_by is not None:
-            include_connections, include_diagrams, include_documents = _include_flags(include_record_types)
+            include_connections, include_diagrams, include_documents = _include_flags(
+                include_record_types
+            )
             counts = repo.count_artifacts_by(
                 group_by,
                 artifact_type=artifact_type,

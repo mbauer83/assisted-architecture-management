@@ -6,10 +6,30 @@ import logging
 import os
 import pathlib
 from pathlib import Path
-
+from typing import TypedDict
 
 logger = logging.getLogger(__name__)
 _PROC_DIR = Path("/proc")
+
+
+class ProcessDiagnostics(TypedDict):
+    process_state: str | None
+    ports: list[int]
+    stdin: str | None
+    stdout: str | None
+    stderr: str | None
+    argv: list[str]
+
+
+class BackendInstance(TypedDict):
+    pid: int
+    argv: list[str]
+    ports: list[int]
+    declared_port: int | None
+    process_state: str | None
+    stdin: str | None
+    stdout: str | None
+    stderr: str | None
 
 
 def _read_cmdline(pid: int) -> list[str]:
@@ -58,7 +78,11 @@ def _matches_arch_backend_process(argv: list[str]) -> bool:
         if len(argv) < 2:
             return False
         # python -m src.tools.arch_backend …
-        if argv[1] == "-m" and len(argv) >= 3 and argv[2] in ("src.tools.arch_backend", "arch_backend"):
+        if (
+            argv[1] == "-m"
+            and len(argv) >= 3
+            and argv[2] in ("src.tools.arch_backend", "arch_backend")
+        ):
             return True
         # python /path/to/arch-backend … (script path, not module)
         if pathlib.PurePath(argv[1]).name == "arch-backend":
@@ -117,7 +141,7 @@ def _fd_target(pid: int, fd: int) -> str | None:
         return None
 
 
-def backend_process_diagnostics(pid: int) -> dict[str, object]:
+def backend_process_diagnostics(pid: int) -> ProcessDiagnostics:
     inode_to_port = _list_listening_socket_inodes()
     return {
         "process_state": _read_process_state(pid),
@@ -129,9 +153,9 @@ def backend_process_diagnostics(pid: int) -> dict[str, object]:
     }
 
 
-def find_arch_backend_instances() -> list[dict[str, object]]:
+def find_arch_backend_instances() -> list[BackendInstance]:
     inode_to_port = _list_listening_socket_inodes()
-    candidates: list[dict[str, object]] = []
+    candidates: list[BackendInstance] = []
     current_pid = os.getpid()
     try:
         proc_entries = [entry for entry in _PROC_DIR.iterdir() if entry.name.isdigit()]
@@ -162,10 +186,10 @@ def find_arch_backend_instances() -> list[dict[str, object]]:
         len(candidates),
         [
             {
-                "pid": int(candidate["pid"]),
-                "ports": list(candidate.get("ports") or []),
-                "declared_port": candidate.get("declared_port"),
-                "process_state": candidate.get("process_state"),
+                "pid": candidate["pid"],
+                "ports": candidate["ports"],
+                "declared_port": candidate["declared_port"],
+                "process_state": candidate["process_state"],
             }
             for candidate in candidates
         ],
@@ -173,25 +197,28 @@ def find_arch_backend_instances() -> list[dict[str, object]]:
     return candidates
 
 
-def find_arch_backend_instance_for_port(port: int) -> dict[str, object] | None:
+def find_arch_backend_instance_for_port(port: int) -> BackendInstance | None:
     matches = [
         instance
         for instance in find_arch_backend_instances()
-        if port in list(instance.get("ports") or [])
-        or instance.get("declared_port") == port
+        if port in instance["ports"] or instance["declared_port"] == port
     ]
     if len(matches) == 1:
         logger.info(
             "Matched arch-backend pid %s for port %s (state=%s, ports=%s, declared_port=%s)",
-            matches[0].get("pid"),
+            matches[0]["pid"],
             port,
-            matches[0].get("process_state"),
-            matches[0].get("ports"),
-            matches[0].get("declared_port"),
+            matches[0]["process_state"],
+            matches[0]["ports"],
+            matches[0]["declared_port"],
         )
         return matches[0]
     if len(matches) > 1:
-        logger.warning("Multiple arch-backend candidates matched port %s: %s", port, [m.get("pid") for m in matches])
+        logger.warning(
+            "Multiple arch-backend candidates matched port %s: %s",
+            port,
+            [m["pid"] for m in matches],
+        )
     else:
         logger.info("No arch-backend process candidate matched port %s", port)
     return None

@@ -164,6 +164,7 @@ def verifier_for(roots_key_str: str, *, include_registry: bool) -> ArtifactVerif
 
 def _refresh_repo_now(roots: list[Path]) -> ReadModelVersion:
     from src.infrastructure.artifact_index import shared_artifact_index
+
     key = roots_key(roots)
     shared = _shared_state_repo_for_roots(roots)
     if shared is not None:
@@ -180,6 +181,7 @@ def _refresh_repo_now(roots: list[Path]) -> ReadModelVersion:
 
 def _apply_paths_now(roots: list[Path], paths: list[Path]) -> ReadModelVersion:
     from src.infrastructure.artifact_index import shared_artifact_index
+
     key = roots_key(roots)
     shared = _shared_state_repo_for_roots(roots)
     repo = shared if shared is not None else repo_cached(key)
@@ -303,6 +305,7 @@ def refresh_caches_for_repo(root_or_roots: Path | list[Path]) -> None:
 
 def clear_caches_for_repo(root_or_roots: Path | list[Path]) -> None:
     from src.infrastructure.artifact_index import notify_paths_changed
+
     paths = root_or_roots if isinstance(root_or_roots, list) else [root_or_roots]
     notify_paths_changed(paths)
     enqueue_refresh_for_roots(root_or_roots, full_refresh=True)

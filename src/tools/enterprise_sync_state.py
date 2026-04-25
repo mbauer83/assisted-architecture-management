@@ -9,6 +9,7 @@ pending      — working branch has been pushed; waiting for it to be merged int
 The state is persisted to .arch/enterprise-sync.json so it survives backend
 restarts. All public functions are thread-safe.
 """
+
 from __future__ import annotations
 
 import json
@@ -25,10 +26,10 @@ _lock = threading.Lock()
 @dataclass
 class EnterpriseSyncState:
     status: EnterpriseSyncStatus = "synced"
-    branch: str | None = None        # e.g. "arch/work-20260425-143012"
-    branch_tip: str | None = None    # commit SHA recorded at push time
-    pushed_at: str | None = None     # ISO-8601 timestamp of push
-    commits_behind: int = 0          # commits on origin/main not yet on working branch
+    branch: str | None = None  # e.g. "arch/work-20260425-143012"
+    branch_tip: str | None = None  # commit SHA recorded at push time
+    pushed_at: str | None = None  # ISO-8601 timestamp of push
+    commits_behind: int = 0  # commits on origin/main not yet on working branch
 
     def is_synced(self) -> bool:
         return self.status == "synced"

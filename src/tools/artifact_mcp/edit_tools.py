@@ -1,9 +1,12 @@
 """MCP tool definitions for editing entities, connections, and diagrams."""
 
+from pathlib import Path
 from typing import Any
 
 from mcp.server.fastmcp import FastMCP  # type: ignore[import-not-found]
 
+from src.common.artifact_verifier import ArtifactVerifier
+from src.common.artifact_verifier_registry import ArtifactRegistry
 from src.tools import artifact_write_ops
 from src.tools.artifact_mcp.context import (
     clear_caches_for_repo,
@@ -12,6 +15,7 @@ from src.tools.artifact_mcp.context import (
     roots_key,
     verifier_for,
 )
+
 
 def _result_dict(dry_run: bool, result: artifact_write_ops.WriteResult) -> dict[str, object]:
     out: dict[str, object] = {
@@ -28,15 +32,25 @@ def _result_dict(dry_run: bool, result: artifact_write_ops.WriteResult) -> dict[
     return out
 
 
-def _resolve(repo_root, *, need_registry: bool):
+def _resolve(
+    repo_root: str | None, *, need_registry: bool
+) -> tuple[Path, ArtifactRegistry | None, ArtifactVerifier]:
     roots = resolve_repo_roots(
-        repo_scope="engagement", repo_root=repo_root,
-        repo_preset=None, enterprise_root=None,
+        repo_scope="engagement",
+        repo_root=repo_root,
+        repo_preset=None,
+        enterprise_root=None,
     )
     key = roots_key(roots)
     registry = registry_cached(key) if need_registry else None
     verifier = verifier_for(key, include_registry=need_registry)
     return roots[0], registry, verifier
+
+
+def _require_registry(registry: ArtifactRegistry | None) -> ArtifactRegistry:
+    if registry is None:
+        raise RuntimeError("Registry is required for this operation")
+    return registry
 
 
 def artifact_edit_entity(
@@ -53,6 +67,7 @@ def artifact_edit_entity(
     repo_root: str | None = None,
 ) -> dict[str, object]:
     root, registry, verifier = _resolve(repo_root, need_registry=True)
+    registry = _require_registry(registry)
 
     kwargs: dict[str, Any] = {}
     if name is not None:
@@ -71,9 +86,13 @@ def artifact_edit_entity(
         kwargs["status"] = status
 
     result = artifact_write_ops.edit_entity(
-        repo_root=root, registry=registry, verifier=verifier,
+        repo_root=root,
+        registry=registry,
+        verifier=verifier,
         clear_repo_caches=clear_caches_for_repo,
-        artifact_id=artifact_id, dry_run=dry_run, **kwargs,
+        artifact_id=artifact_id,
+        dry_run=dry_run,
+        **kwargs,
     )
     return _result_dict(dry_run, result)
 
@@ -99,21 +118,31 @@ def artifact_edit_connection(
     applied. Pass "" for a cardinality to remove it; omit (None) to preserve it.
     """
     root, registry, verifier = _resolve(repo_root, need_registry=True)
+    registry = _require_registry(registry)
 
     if operation == "remove":
         result = artifact_write_ops.remove_connection(
-            repo_root=root, registry=registry, verifier=verifier,
+            repo_root=root,
+            registry=registry,
+            verifier=verifier,
             clear_repo_caches=clear_caches_for_repo,
-            source_entity=source_entity, target_entity=target_entity,
-            connection_type=connection_type, dry_run=dry_run,
+            source_entity=source_entity,
+            target_entity=target_entity,
+            connection_type=connection_type,
+            dry_run=dry_run,
         )
     else:
         from src.tools.artifact_write.connection_edit import _UNSET
+
         result = artifact_write_ops.edit_connection(
-            repo_root=root, registry=registry, verifier=verifier,
+            repo_root=root,
+            registry=registry,
+            verifier=verifier,
             clear_repo_caches=clear_caches_for_repo,
-            source_entity=source_entity, target_entity=target_entity,
-            connection_type=connection_type, description=description,
+            source_entity=source_entity,
+            target_entity=target_entity,
+            connection_type=connection_type,
+            description=description,
             src_cardinality=src_cardinality if src_cardinality is not None else _UNSET,
             tgt_cardinality=tgt_cardinality if tgt_cardinality is not None else _UNSET,
             dry_run=dry_run,
@@ -147,9 +176,12 @@ def artifact_edit_diagram(
         kwargs["status"] = status
 
     result = artifact_write_ops.edit_diagram(
-        repo_root=root, verifier=verifier,
+        repo_root=root,
+        verifier=verifier,
         clear_repo_caches=clear_caches_for_repo,
-        artifact_id=artifact_id, dry_run=dry_run, **kwargs,
+        artifact_id=artifact_id,
+        dry_run=dry_run,
+        **kwargs,
     )
     return _result_dict(dry_run, result)
 
@@ -166,13 +198,19 @@ def artifact_edit_connection_associations(
 ) -> dict[str, object]:
     """Add or remove second-order association entity IDs from a connection."""
     root, registry, verifier = _resolve(repo_root, need_registry=True)
+    registry = _require_registry(registry)
     from src.tools.artifact_write.connection_edit import edit_connection_associations
+
     result = edit_connection_associations(
-        repo_root=root, registry=registry, verifier=verifier,
+        repo_root=root,
+        registry=registry,
+        verifier=verifier,
         clear_repo_caches=clear_caches_for_repo,
-        source_entity=source_entity, connection_type=connection_type,
+        source_entity=source_entity,
+        connection_type=connection_type,
         target_entity=target_entity,
-        add_entities=add_entities, remove_entities=remove_entities,
+        add_entities=add_entities,
+        remove_entities=remove_entities,
         dry_run=dry_run,
     )
     return _result_dict(dry_run, result)
@@ -185,6 +223,7 @@ def artifact_delete_entity(
     repo_root: str | None = None,
 ) -> dict[str, object]:
     root, registry, _verifier = _resolve(repo_root, need_registry=True)
+    registry = _require_registry(registry)
     result = artifact_write_ops.delete_entity(
         repo_root=root,
         registry=registry,

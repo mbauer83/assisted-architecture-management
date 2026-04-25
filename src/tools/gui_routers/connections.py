@@ -30,17 +30,23 @@ def get_neighbors(entity_id: str, max_hops: int = 1) -> dict[str, list[str]]:
 
 @router.get("/api/search")
 def search(q: str, limit: int = 20) -> dict[str, Any]:
-    from src.common.artifact_types import DiagramRecord, EntityRecord
-    from src.common.artifact_types import ConnectionRecord
+    from src.common.artifact_types import ConnectionRecord, DiagramRecord, EntityRecord
+
     result = s.get_repo().search_artifacts(q, limit=limit)
     hits = []
     for h in result.hits:
         rec = h.record
-        artifact_type = getattr(rec, "artifact_type", None) or getattr(rec, "conn_type", "connection")
+        artifact_type = getattr(rec, "artifact_type", None) or getattr(
+            rec, "conn_type", "connection"
+        )
         hit: dict[str, Any] = {
-            "score": h.score, "record_type": h.record_type,
-            "artifact_id": rec.artifact_id, "artifact_type": artifact_type,
-            "status": rec.status, "path": str(rec.path), "name": getattr(rec, "name", ""),
+            "score": h.score,
+            "record_type": h.record_type,
+            "artifact_id": rec.artifact_id,
+            "artifact_type": artifact_type,
+            "status": rec.status,
+            "path": str(rec.path),
+            "name": getattr(rec, "name", ""),
         }
         if isinstance(rec, EntityRecord):
             hit["domain"] = rec.domain
@@ -73,7 +79,7 @@ def _resolve_effective_type(artifact_id: str | None, declared_type: str) -> tupl
     if rec.extra.get("global-artifact-type") != "entity":
         return declared_type, True
     entity_type = rec.extra.get("global-artifact-entity-type")
-    return (entity_type or declared_type), False
+    return (entity_type if isinstance(entity_type, str) and entity_type else declared_type), False
 
 
 @router.get("/api/ontology")
@@ -84,14 +90,20 @@ def get_ontology(
     target_id: str | None = None,
 ) -> dict[str, Any]:
     from src.common.connection_ontology import (
-        classify_connections, is_symmetric, permissible_connection_types,
+        classify_connections,
+        is_symmetric,
+        permissible_connection_types,
     )
+
     effective_source, source_is_non_entity_gar = _resolve_effective_type(source_id, source_type)
-    effective_target, target_is_non_entity_gar = _resolve_effective_type(target_id, target_type or "")
+    effective_target, target_is_non_entity_gar = _resolve_effective_type(
+        target_id, target_type or ""
+    )
 
     if source_is_non_entity_gar or target_is_non_entity_gar:
         return {
-            "source_type": source_type, "target_type": target_type,
+            "source_type": source_type,
+            "target_type": target_type,
             "connection_types": [],
             "error": "document/diagram global-artifact-references are not valid connection endpoints",
         }
@@ -99,7 +111,8 @@ def get_ontology(
     if effective_target:
         conn_types = permissible_connection_types(effective_source, effective_target)
         return {
-            "source_type": source_type, "target_type": target_type,
+            "source_type": source_type,
+            "target_type": target_type,
             "connection_types": conn_types,
             "symmetric": [ct for ct in conn_types if is_symmetric(ct)],
         }
@@ -109,6 +122,7 @@ def get_ontology(
 @router.get("/api/write-help")
 def get_write_help() -> dict[str, Any]:
     from src.tools.artifact_write.help import write_help
+
     return write_help()
 
 
@@ -131,11 +145,17 @@ class RemoveConnectionBody(BaseModel):
 
 def _reject_if_non_entity_gar(artifact_id: str, role: str) -> None:
     """Raise 400 if the given artifact is a document/diagram GAR (not valid as connection endpoint)."""
-    rec = s.maybe_get_repo() and s.maybe_get_repo().get_entity(artifact_id)  # type: ignore[union-attr]
+    repo = s.maybe_get_repo()
+    rec = repo.get_entity(artifact_id) if repo is not None else None
     if rec is None:
         return
-    if rec.artifact_type == "global-artifact-reference" and rec.extra.get("global-artifact-type") != "entity":
-        raise HTTPException(400, f"Cannot use a document/diagram global-artifact-reference as a connection {role}")
+    if (
+        rec.artifact_type == "global-artifact-reference"
+        and rec.extra.get("global-artifact-type") != "entity"
+    ):
+        raise HTTPException(
+            400, f"Cannot use a document/diagram global-artifact-reference as a connection {role}"
+        )
 
 
 @router.post("/api/connection")
@@ -151,7 +171,10 @@ def add_connection(body: AddConnectionBody) -> dict[str, Any]:
 
     def _ensure_gar(global_id: str) -> str:
         nonlocal registry, verifier
-        from src.tools.artifact_write.global_artifact_reference import ensure_global_artifact_reference
+        from src.tools.artifact_write.global_artifact_reference import (
+            ensure_global_artifact_reference,
+        )
+
         repo = s.get_repo()
         global_rec = repo.get_entity(global_id)
         global_name = global_rec.name if global_rec else global_id
@@ -172,7 +195,9 @@ def add_connection(body: AddConnectionBody) -> dict[str, Any]:
             gar_warnings.append(f"Created global-artifact-reference proxy {gar_result.artifact_id}")
             _, registry, verifier = s.get_write_deps()
         else:
-            gar_warnings.append(f"Routed via existing global-artifact-reference {gar_result.artifact_id}")
+            gar_warnings.append(
+                f"Routed via existing global-artifact-reference {gar_result.artifact_id}"
+            )
         return gar_result.artifact_id
 
     # Reject document/diagram GAR endpoints
@@ -180,11 +205,17 @@ def add_connection(body: AddConnectionBody) -> dict[str, Any]:
     _reject_if_non_entity_gar(body.target_entity, "target")
 
     _enterprise_root = s.maybe_enterprise_root()
-    if _enterprise_root is not None and registry.scope_of_entity(body.source_entity) == "enterprise":
+    if (
+        _enterprise_root is not None
+        and registry.scope_of_entity(body.source_entity) == "enterprise"
+    ):
         gar_source_id = _ensure_gar(body.source_entity)
         effective_source = gar_source_id
 
-    if _enterprise_root is not None and registry.scope_of_entity(body.target_entity) == "enterprise":
+    if (
+        _enterprise_root is not None
+        and registry.scope_of_entity(body.target_entity) == "enterprise"
+    ):
         gar_artifact_id = _ensure_gar(body.target_entity)
         effective_target = gar_artifact_id
 
@@ -243,7 +274,9 @@ class ConnectionAssociateBody(BaseModel):
 @router.post("/api/connection/edit")
 def edit_connection(body: EditConnectionBody) -> dict[str, Any]:
     repo_root, registry, verifier = s.get_write_deps()
-    from src.tools.artifact_write.connection_edit import edit_connection as _edit, _UNSET
+    from src.tools.artifact_write.connection_edit import _UNSET
+    from src.tools.artifact_write.connection_edit import edit_connection as _edit
+
     provided = body.model_fields_set
     try:
         result = s.run_serialized_write(
@@ -269,6 +302,7 @@ def edit_connection(body: EditConnectionBody) -> dict[str, Any]:
 def manage_connection_associations(body: ConnectionAssociateBody) -> dict[str, Any]:
     repo_root, registry, verifier = s.get_write_deps()
     from src.tools.artifact_write.connection_edit import edit_connection_associations as _assoc
+
     try:
         result = s.run_serialized_write(
             _assoc,
@@ -292,6 +326,7 @@ def manage_connection_associations(body: ConnectionAssociateBody) -> dict[str, A
 def remove_connection(body: RemoveConnectionBody) -> dict[str, Any]:
     repo_root, registry, verifier = s.get_write_deps()
     from src.tools.artifact_write.connection_edit import remove_connection as _remove
+
     try:
         result = s.run_serialized_write(
             _remove,
@@ -311,6 +346,7 @@ def remove_connection(body: RemoveConnectionBody) -> dict[str, Any]:
 
 # ── Broken-reference cleanup ──────────────────────────────────────────────────
 
+
 class CleanupBrokenRefsBody(BaseModel):
     dry_run: bool = True
 
@@ -322,8 +358,10 @@ def cleanup_broken_refs(body: CleanupBrokenRefsBody) -> dict[str, Any]:
     A GRF is broken when the enterprise entity it points to no longer exists.
     dry_run=true (default) returns the plan without modifying files.
     """
-    from src.tools.artifact_write.cleanup_broken_refs import cleanup_broken_refs as _cleanup
     import dataclasses
+
+    from src.tools.artifact_write.cleanup_broken_refs import cleanup_broken_refs as _cleanup
+
     eng_root = s.maybe_engagement_root()
     ent_root = s.maybe_enterprise_root()
     if eng_root is None:

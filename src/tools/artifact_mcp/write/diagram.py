@@ -1,8 +1,16 @@
 """MCP write tools: matrix and diagram creation."""
+
 from mcp.server.fastmcp import FastMCP  # type: ignore[import-not-found]
+
 from src.tools.artifact_mcp.write._common import (
-    DiagramConnectionInferenceMode, _out, clear_caches_for_repo,
-    artifact_write_ops, registry_cached, resolve_repo_roots, roots_key, verifier_for,
+    DiagramConnectionInferenceMode,
+    _out,
+    artifact_write_ops,
+    clear_caches_for_repo,
+    registry_cached,
+    resolve_repo_roots,
+    roots_key,
+    verifier_for,
 )
 
 
@@ -22,18 +30,27 @@ def artifact_create_matrix(
     repo_root: str | None = None,
 ) -> dict[str, object]:
     roots = resolve_repo_roots(
-        repo_scope="engagement", repo_root=repo_root,
-        repo_preset=None, enterprise_root=None,
+        repo_scope="engagement",
+        repo_root=repo_root,
+        repo_preset=None,
+        enterprise_root=None,
     )
     key = roots_key(roots)
     result = artifact_write_ops.create_matrix(
-        repo_root=roots[0], registry=registry_cached(key),
+        repo_root=roots[0],
+        registry=registry_cached(key),
         verifier=verifier_for(key, include_registry=True),
         clear_repo_caches=clear_caches_for_repo,
-        name=name, purpose=purpose, matrix_markdown=matrix_markdown,
-        artifact_id=artifact_id, keywords=keywords, version=version,
-        status=status, last_updated=last_updated,
-        infer_entity_ids=infer_entity_ids, auto_link_entity_ids=auto_link_entity_ids,
+        name=name,
+        purpose=purpose,
+        matrix_markdown=matrix_markdown,
+        artifact_id=artifact_id,
+        keywords=keywords,
+        version=version,
+        status=status,
+        last_updated=last_updated,
+        infer_entity_ids=infer_entity_ids,
+        auto_link_entity_ids=auto_link_entity_ids,
         dry_run=dry_run,
     )
     return _out(result, dry_run=dry_run)
@@ -55,17 +72,27 @@ def artifact_create_diagram(
     repo_root: str | None = None,
 ) -> dict[str, object]:
     roots = resolve_repo_roots(
-        repo_scope="engagement", repo_root=repo_root,
-        repo_preset=None, enterprise_root=None,
+        repo_scope="engagement",
+        repo_root=repo_root,
+        repo_preset=None,
+        enterprise_root=None,
     )
     key = roots_key(roots)
     result = artifact_write_ops.create_diagram(
-        repo_root=roots[0], verifier=verifier_for(key, include_registry=True),
+        repo_root=roots[0],
+        verifier=verifier_for(key, include_registry=True),
         clear_repo_caches=clear_caches_for_repo,
-        diagram_type=diagram_type, name=name, puml=puml, artifact_id=artifact_id,
-        keywords=keywords, version=version, status=status, last_updated=last_updated,
+        diagram_type=diagram_type,
+        name=name,
+        puml=puml,
+        artifact_id=artifact_id,
+        keywords=keywords,
+        version=version,
+        status=status,
+        last_updated=last_updated,
         connection_inference=connection_inference,
-        auto_include_stereotypes=auto_include_stereotypes, dry_run=dry_run,
+        auto_include_stereotypes=auto_include_stereotypes,
+        dry_run=dry_run,
     )
     return _out(result, dry_run=dry_run)
 
@@ -74,7 +101,8 @@ def register(mcp: FastMCP) -> None:
     from src.tools.artifact_mcp.write_queue import queued
 
     mcp.tool(
-        name="artifact_create_matrix", title="Artifact Write: Create Connection Matrix",
+        name="artifact_create_matrix",
+        title="Artifact Write: Create Connection Matrix",
         description=(
             "Create a markdown connection-matrix diagram. Defaults to engagement repo from "
             "arch-init config. dry_run=true returns would-be content without writing."
@@ -83,7 +111,8 @@ def register(mcp: FastMCP) -> None:
     )(queued(artifact_create_matrix))
 
     mcp.tool(
-        name="artifact_create_diagram", title="Artifact Write: Create Diagram",
+        name="artifact_create_diagram",
+        title="Artifact Write: Create Diagram",
         description=(
             "Create an ArchiMate diagram from a complete PlantUML body. "
             "Defaults to engagement repo from arch-init config. "

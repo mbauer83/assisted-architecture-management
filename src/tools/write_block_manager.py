@@ -3,7 +3,6 @@
 import threading
 from pathlib import Path
 
-
 _lock = threading.Lock()
 _blocked: set[str] = set()
 

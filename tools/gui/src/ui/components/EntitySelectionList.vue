@@ -82,7 +82,11 @@ const actionLabel = (row: EntityRow) => row.actionKind === 'mark-remove' ? '−'
 
 <template>
   <div class="entity-list">
-    <div v-for="row in rows" :key="row.entity.artifact_id" class="entity-block">
+    <div
+      v-for="row in rows"
+      :key="row.entity.artifact_id"
+      class="entity-block"
+    >
       <div
         class="entity-row"
         :class="{
@@ -95,17 +99,28 @@ const actionLabel = (row: EntityRow) => row.actionKind === 'mark-remove' ? '−'
           :class="{ expanded: expandedConnectionIdSet.has(row.entity.artifact_id) }"
           :title="expandedConnectionIdSet.has(row.entity.artifact_id) ? 'Hide connections' : 'Show connections'"
           @click="emit('toggleConnections', row.entity.artifact_id)"
-        >▶</button>
+        >
+          ▶
+        </button>
         <button
           class="row-main"
           :title="expandedConnectionIdSet.has(row.entity.artifact_id) ? 'Hide connections' : 'Show connections'"
           @click="emit('toggleConnections', row.entity.artifact_id)"
         >
-          <span class="dd-glyph" :title="row.entity.element_type || row.entity.artifact_type">
-            <ArchimateTypeGlyph :type="toGlyphKey(row.entity.element_type || row.entity.artifact_type)" :size="14" />
+          <span
+            class="dd-glyph"
+            :title="row.entity.element_type || row.entity.artifact_type"
+          >
+            <ArchimateTypeGlyph
+              :type="toGlyphKey(row.entity.element_type || row.entity.artifact_type)"
+              :size="14"
+            />
           </span>
           <span class="entity-name">{{ row.entity.name }}</span>
-          <span v-if="row.badgeText" class="entity-badge">{{ row.badgeText }}</span>
+          <span
+            v-if="row.badgeText"
+            class="entity-badge"
+          >{{ row.badgeText }}</span>
         </button>
         <button
           class="related-btn"
@@ -122,18 +137,34 @@ const actionLabel = (row: EntityRow) => row.actionKind === 'mark-remove' ? '−'
           class="row-action-btn"
           :title="row.actionTitle ?? ''"
           @click="emit('entityAction', row.entity.artifact_id)"
-        >{{ actionLabel(row) }}</button>
+        >
+          {{ actionLabel(row) }}
+        </button>
       </div>
 
-      <div v-if="expandedConnectionIdSet.has(row.entity.artifact_id)" class="entity-panel">
-        <div v-if="!getConnsByType(row.entity.artifact_id).length" class="empty-msg">
+      <div
+        v-if="expandedConnectionIdSet.has(row.entity.artifact_id)"
+        class="entity-panel"
+      >
+        <div
+          v-if="!getConnsByType(row.entity.artifact_id).length"
+          class="empty-msg"
+        >
           No connections to currently included entities.
         </div>
-        <div v-for="[connType, group] in getConnsByType(row.entity.artifact_id)" :key="connType" class="conn-type-block">
-          <div class="conn-type-label">{{ connType }}</div>
+        <div
+          v-for="[connType, group] in getConnsByType(row.entity.artifact_id)"
+          :key="connType"
+          class="conn-type-block"
+        >
+          <div class="conn-type-label">
+            {{ connType }}
+          </div>
           <div class="conn-cols">
             <div class="conn-col">
-              <div class="col-header col-header--included">Included</div>
+              <div class="col-header col-header--included">
+                Included
+              </div>
               <button
                 v-for="entry in group.included"
                 :key="entry.conn.artifact_id"
@@ -144,10 +175,17 @@ const actionLabel = (row: EntityRow) => row.actionKind === 'mark-remove' ? '−'
                 <span class="dir-arrow">{{ entry.direction === 'out' ? '→' : '←' }}</span>
                 <span class="other-name">{{ entry.otherName }}</span>
               </button>
-              <div v-if="!group.included.length" class="col-empty">—</div>
+              <div
+                v-if="!group.included.length"
+                class="col-empty"
+              >
+                —
+              </div>
             </div>
             <div class="conn-col">
-              <div class="col-header">Excluded</div>
+              <div class="col-header">
+                Excluded
+              </div>
               <button
                 v-for="entry in group.excluded"
                 :key="entry.conn.artifact_id"
@@ -158,28 +196,54 @@ const actionLabel = (row: EntityRow) => row.actionKind === 'mark-remove' ? '−'
                 <span class="dir-arrow">{{ entry.direction === 'out' ? '→' : '←' }}</span>
                 <span class="other-name">{{ entry.otherName }}</span>
               </button>
-              <div v-if="!group.excluded.length" class="col-empty">—</div>
+              <div
+                v-if="!group.excluded.length"
+                class="col-empty"
+              >
+                —
+              </div>
             </div>
           </div>
         </div>
       </div>
 
-      <div v-if="expandedRelatedIdSet.has(row.entity.artifact_id)" class="entity-panel entity-panel--related">
-        <div v-if="!relatedEntitiesById[row.entity.artifact_id]?.length" class="empty-msg">
+      <div
+        v-if="expandedRelatedIdSet.has(row.entity.artifact_id)"
+        class="entity-panel entity-panel--related"
+      >
+        <div
+          v-if="!relatedEntitiesById[row.entity.artifact_id]?.length"
+          class="empty-msg"
+        >
           No non-included first-degree related entities.
         </div>
-        <div v-else class="related-list">
+        <div
+          v-else
+          class="related-list"
+        >
           <div
             v-for="entity in relatedEntitiesById[row.entity.artifact_id]"
             :key="entity.artifact_id"
             class="related-row"
           >
-            <span class="dd-glyph" :title="entity.element_type || entity.artifact_type">
-              <ArchimateTypeGlyph :type="toGlyphKey(entity.element_type || entity.artifact_type)" :size="13" />
+            <span
+              class="dd-glyph"
+              :title="entity.element_type || entity.artifact_type"
+            >
+              <ArchimateTypeGlyph
+                :type="toGlyphKey(entity.element_type || entity.artifact_type)"
+                :size="13"
+              />
             </span>
             <span class="related-name">{{ entity.name }}</span>
             <span class="related-domain">{{ entity.domain }}</span>
-            <button class="include-btn" title="Include entity" @click="emit('addRelatedEntity', entity)">+</button>
+            <button
+              class="include-btn"
+              title="Include entity"
+              @click="emit('addRelatedEntity', entity)"
+            >
+              +
+            </button>
           </div>
         </div>
       </div>

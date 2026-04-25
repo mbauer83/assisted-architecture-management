@@ -4,7 +4,8 @@ import { inject, ref } from 'vue'
 import { Effect } from 'effect'
 import { modelServiceKey } from '../keys'
 import ArchimateTypeGlyph from './ArchimateTypeGlyph.vue'
-import type { EnterpriseSyncStatus } from '../../domain'
+import type { EnterpriseSyncStatus, SearchHit } from '../../domain'
+import { readErrorMessage } from '../lib/errors'
 
 type SaveMode = 'engagement-save' | 'enterprise-save' | 'enterprise-submit' | 'enterprise-withdraw'
 
@@ -21,7 +22,14 @@ const svc = inject(modelServiceKey)!
 const router = useRouter()
 
 const searchQuery = ref('')
-const searchHits = ref<any[]>([])
+type SearchDropdownHit = SearchHit | {
+  record_type: 'entity'
+  artifact_id: string
+  name: string
+  artifact_type: string
+}
+
+const searchHits = ref<SearchDropdownHit[]>([])
 const showDropdown = ref(false)
 let debounceTimer: ReturnType<typeof setTimeout> | null = null
 
@@ -30,83 +38,176 @@ const onSearchInput = () => {
   if (debounceTimer) clearTimeout(debounceTimer)
   if (q.length < 2) { searchHits.value = []; showDropdown.value = false; return }
   debounceTimer = setTimeout(() => {
-    Effect.runPromise(svc.search(q, 20))
-      .then((result: any) => {
-        const raw: any[] = result.hits ?? []
+    void Effect.runPromise(svc.search(q, 20))
+      .then((result) => {
+        const raw = result.hits
         const seen = new Set<string>()
-        const resolved: any[] = []
+        const resolved: SearchDropdownHit[] = []
         for (const hit of raw) {
           if (hit.record_type === 'connection') {
-            for (const id of [hit.source, hit.target].filter(Boolean)) {
-              if (!seen.has(id)) { seen.add(id); resolved.push({ record_type: 'entity-ref', artifact_id: id, name: id, artifact_type: 'generic' }) }
+            for (const id of [hit.source, hit.target].filter((value): value is string => Boolean(value))) {
+              if (!seen.has(id)) {
+                seen.add(id)
+                resolved.push({ record_type: 'entity', artifact_id: id, name: id, artifact_type: 'generic' })
+              }
             }
           } else if (!seen.has(hit.artifact_id)) {
-            seen.add(hit.artifact_id); resolved.push(hit)
+            seen.add(hit.artifact_id)
+            resolved.push(hit)
           }
         }
-        const entityNames = new Map(resolved.filter(h => h.record_type !== 'entity-ref').map(h => [h.artifact_id, h.name]))
-        searchHits.value = resolved.slice(0, 12).map(h =>
-          h.record_type === 'entity-ref' ? { ...h, name: entityNames.get(h.artifact_id) || h.artifact_id, record_type: 'entity' } : h
-        )
+        const entityNames = new Map(resolved.map((hit) => [hit.artifact_id, hit.name]))
+        searchHits.value = resolved.slice(0, 12).map((hit) => ({
+          ...hit,
+          name: entityNames.get(hit.artifact_id) ?? hit.artifact_id,
+        }))
         showDropdown.value = searchHits.value.length > 0
       })
-      .catch(() => { searchHits.value = []; showDropdown.value = false })
+      .catch((error: unknown) => {
+        console.error('Search failed', readErrorMessage(error))
+        searchHits.value = []
+        showDropdown.value = false
+      })
   }, 280)
 }
 
-const selectHit = (hit: any) => {
+const selectHit = (hit: SearchDropdownHit) => {
   showDropdown.value = false; searchQuery.value = ''; searchHits.value = []
-  if (hit.record_type === 'diagram') router.push({ path: '/diagram', query: { id: hit.artifact_id } })
-  else router.push({ path: '/entity', query: { id: hit.artifact_id } })
+  if (hit.record_type === 'diagram') void router.push({ path: '/diagram', query: { id: hit.artifact_id } })
+  else void router.push({ path: '/entity', query: { id: hit.artifact_id } })
 }
 const submitSearch = () => {
   const q = searchQuery.value.trim()
   if (!q) return
   showDropdown.value = false
-  router.push({ path: '/search', query: { q } })
+  void router.push({ path: '/search', query: { q } })
   searchQuery.value = ''; searchHits.value = []
 }
 const onSearchBlur = () => { setTimeout(() => { showDropdown.value = false }, 180) }
 const onSearchFocus = () => { if (searchHits.value.length > 0) showDropdown.value = true }
-const hitGlyphType = (hit: any) => (hit.record_type === 'diagram' || hit.record_type === 'connection') ? 'generic' : (hit.artifact_type ?? 'generic')
-const hitTypeLabel = (hit: any) => (hit.artifact_type || hit.record_type || '').replace(/^archimate[-_]/i, '')
+const hitGlyphType = (hit: SearchDropdownHit) =>
+  (hit.record_type === 'diagram' || hit.record_type === 'connection') ? 'generic' : hit.artifact_type
+const hitTypeLabel = (hit: SearchDropdownHit) => (hit.artifact_type || hit.record_type || '').replace(/^archimate[-_]/i, '')
 </script>
 
 <template>
   <header class="nav">
-    <RouterLink class="nav__brand" to="/">Architecture Repository</RouterLink>
+    <RouterLink
+      class="nav__brand"
+      to="/"
+    >
+      Architecture Repository
+    </RouterLink>
     <div class="nav__sections">
       <div class="nav__section">
         <span class="nav__section-label">Engagement</span>
-        <nav class="nav__links" aria-label="Engagement">
-          <button v-if="!readOnly" class="nav__save-btn" :class="{ 'nav__save-btn--clean': !engDirty }" :disabled="!engDirty" @click="emit('openSaveDialog', 'engagement-save')">● Save</button>
-          <RouterLink to="/entities">Browse</RouterLink>
-          <RouterLink to="/documents">Documents</RouterLink>
-          <RouterLink to="/diagrams">Diagrams</RouterLink>
-          <RouterLink to="/promote" class="nav__promote">↑ Promote</RouterLink>
+        <nav
+          class="nav__links"
+          aria-label="Engagement"
+        >
+          <button
+            v-if="!readOnly"
+            class="nav__save-btn"
+            :class="{ 'nav__save-btn--clean': !engDirty }"
+            :disabled="!engDirty"
+            @click="emit('openSaveDialog', 'engagement-save')"
+          >
+            ● Save
+          </button>
+          <RouterLink to="/entities">
+            Browse
+          </RouterLink>
+          <RouterLink to="/documents">
+            Documents
+          </RouterLink>
+          <RouterLink to="/diagrams">
+            Diagrams
+          </RouterLink>
+          <RouterLink
+            to="/promote"
+            class="nav__promote"
+          >
+            ↑ Promote
+          </RouterLink>
         </nav>
       </div>
-      <div class="nav__divider" aria-hidden="true"></div>
+      <div
+        class="nav__divider"
+        aria-hidden="true"
+      />
       <div class="nav__section">
         <span class="nav__section-label nav__section-label--global">Global</span>
-        <nav class="nav__links" aria-label="Global">
+        <nav
+          class="nav__links"
+          aria-label="Global"
+        >
           <template v-if="entStatus && adminMode">
-            <button v-if="entStatus.has_uncommitted_changes" class="nav__save-btn nav__save-btn--global" @click="emit('openSaveDialog', 'enterprise-save')">● Save</button>
-            <button v-if="entStatus.status === 'accumulating'" class="nav__action-btn" @click="emit('openSaveDialog', 'enterprise-submit')">Submit</button>
-            <button v-if="entStatus.status === 'pending'" class="nav__action-btn nav__action-btn--warn" @click="emit('openSaveDialog', 'enterprise-withdraw')">Discard</button>
-            <span v-if="entStatus.status !== 'synced'" class="nav__ent-status" :class="`nav__ent-status--${entStatus.status}`">{{ entStatus.label }}</span>
+            <button
+              v-if="entStatus.has_uncommitted_changes"
+              class="nav__save-btn nav__save-btn--global"
+              @click="emit('openSaveDialog', 'enterprise-save')"
+            >
+              ● Save
+            </button>
+            <button
+              v-if="entStatus.status === 'accumulating'"
+              class="nav__action-btn"
+              @click="emit('openSaveDialog', 'enterprise-submit')"
+            >
+              Submit
+            </button>
+            <button
+              v-if="entStatus.status === 'pending'"
+              class="nav__action-btn nav__action-btn--warn"
+              @click="emit('openSaveDialog', 'enterprise-withdraw')"
+            >
+              Discard
+            </button>
+            <span
+              v-if="entStatus.status !== 'synced'"
+              class="nav__ent-status"
+              :class="`nav__ent-status--${entStatus.status}`"
+            >{{ entStatus.label }}</span>
           </template>
-          <RouterLink to="/global/entities">Browse</RouterLink>
-          <RouterLink to="/global/diagrams">Diagrams</RouterLink>
+          <RouterLink to="/global/entities">
+            Browse
+          </RouterLink>
+          <RouterLink to="/global/diagrams">
+            Diagrams
+          </RouterLink>
         </nav>
       </div>
     </div>
-    <form class="nav__search" @submit.prevent="submitSearch">
-      <input v-model="searchQuery" class="nav__search-input" type="search" placeholder="Search…" aria-label="Search" autocomplete="off"
-        @input="onSearchInput" @focus="onSearchFocus" @blur="onSearchBlur" />
-      <div v-if="showDropdown" class="nav__search-dropdown">
-        <button v-for="hit in searchHits" :key="hit.artifact_id" class="nav__search-item" @mousedown.prevent="selectHit(hit)">
-          <ArchimateTypeGlyph :type="hitGlyphType(hit)" :size="14" class="nav__search-item-glyph" />
+    <form
+      class="nav__search"
+      @submit.prevent="submitSearch"
+    >
+      <input
+        v-model="searchQuery"
+        class="nav__search-input"
+        type="search"
+        placeholder="Search…"
+        aria-label="Search"
+        autocomplete="off"
+        @input="onSearchInput"
+        @focus="onSearchFocus"
+        @blur="onSearchBlur"
+      >
+      <div
+        v-if="showDropdown"
+        class="nav__search-dropdown"
+      >
+        <button
+          v-for="hit in searchHits"
+          :key="hit.artifact_id"
+          class="nav__search-item"
+          @mousedown.prevent="selectHit(hit)"
+        >
+          <ArchimateTypeGlyph
+            :type="hitGlyphType(hit)"
+            :size="14"
+            class="nav__search-item-glyph"
+          />
           <span class="nav__search-item-name">{{ hit.name || hit.artifact_id }}</span>
           <span class="nav__search-item-type">{{ hitTypeLabel(hit) }}</span>
         </button>

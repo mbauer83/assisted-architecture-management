@@ -5,7 +5,7 @@ can merge partial updates and re-format via the canonical formatter.
 """
 
 import re
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from pathlib import Path
 
 import yaml  # type: ignore[import-untyped]
@@ -28,7 +28,9 @@ class ParsedOutgoing:
     """Structured representation of an existing .outgoing.md file."""
 
     frontmatter: dict[str, object]
-    connections: list[dict[str, object]]  # keys: connection_type, target_entity, description, optional src/tgt_cardinality, associated_entities
+    connections: list[
+        dict[str, object]
+    ]  # keys: connection_type, target_entity, description, optional src/tgt_cardinality, associated_entities
     raw_text: str
 
 
@@ -132,7 +134,7 @@ def _extract_after(text: str, marker: str) -> str:
     return text[pos + len(marker) :]
 
 
-def _extract_summary(content_section: str, entity_name: str) -> str | None:
+def _extract_summary(content_section: str, entity_name: object) -> str | None:
     """Extract the summary paragraph(s) between the heading and ## Properties."""
     lines = content_section.strip().splitlines()
     collecting = False
@@ -213,14 +215,14 @@ _CONN_HEADER_RE = re.compile(
 )
 
 
-def _parse_connection_sections(connections_text: str) -> list[dict[str, str]]:
+def _parse_connection_sections(connections_text: str) -> list[dict[str, object]]:
     """Parse H3 connection sections from the connections area of an .outgoing.md file.
 
     Each returned dict has keys: connection_type, target_entity, description.
     When cardinalities are present, src_cardinality and tgt_cardinality are
     also included so that round-trip reformatting preserves them.
     """
-    connections: list[dict[str, str]] = []
+    connections: list[dict[str, object]] = []
     sections = re.split(r"^### ", connections_text, flags=re.MULTILINE)
 
     for section in sections:

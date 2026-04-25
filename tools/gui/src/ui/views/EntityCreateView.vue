@@ -3,20 +3,22 @@ import { inject, onMounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { Effect } from 'effect'
 import { modelServiceKey } from '../keys'
-import type { WriteResult } from '../../domain'
+import type { WriteHelp, WriteResult } from '../../domain'
+import { hasVerificationErrors, readErrorMessage } from '../lib/errors'
 
 const svc = inject(modelServiceKey)!
 const router = useRouter()
 
-// ── Write-help data ───────────────────────────────────────────────────────────
-
-type WriteHelp = { entity_types_by_domain: Record<string, string[]> }
 const writeHelp = ref<WriteHelp | null>(null)
 
 onMounted(() => {
-  Effect.runPromise(svc.getWriteHelp()).then((h) => {
-    writeHelp.value = h as WriteHelp
-  }).catch(() => {})
+  void Effect.runPromise(svc.getWriteHelp())
+    .then((help) => {
+      writeHelp.value = help
+    })
+    .catch((error: unknown) => {
+      formError.value = readErrorMessage(error)
+    })
 })
 
 // ── Form state ────────────────────────────────────────────────────────────────
@@ -42,13 +44,19 @@ const schemaRequired = ref<Set<string>>(new Set())
 
 watch(artifactType, (newType) => {
   if (!newType) { schemaProps.value = []; schemaRequired.value = new Set(); return }
-  Effect.runPromise(svc.getEntitySchemata(newType)).then((info) => {
-    schemaProps.value = [...info.properties]
-    schemaRequired.value = new Set(info.required)
-    properties.value = info.properties.length > 0
-      ? [...info.properties].map((k) => ({ key: k, value: '' }))
-      : []
-  }).catch(() => { schemaProps.value = []; schemaRequired.value = new Set() })
+  void Effect.runPromise(svc.getEntitySchemata(newType))
+    .then((info) => {
+      schemaProps.value = [...info.properties]
+      schemaRequired.value = new Set(info.required)
+      properties.value = info.properties.length > 0
+        ? [...info.properties].map((key) => ({ key, value: '' }))
+        : []
+    })
+    .catch((error: unknown) => {
+      schemaProps.value = []
+      schemaRequired.value = new Set()
+      formError.value = readErrorMessage(error)
+    })
 })
 
 // ── Property rows ─────────────────────────────────────────────────────────────
@@ -88,18 +96,16 @@ const doPreview = () => {
   formError.value = null
   preview.value = null
   previewClean.value = false
-  Effect.runPromise(svc.createEntity(buildBody(true))).then((r) => {
-    busy.value = false
-    preview.value = r
-    previewClean.value = !r.verification || (
-      Array.isArray((r.verification as { errors?: unknown[] })?.errors)
-        ? (r.verification as { errors: unknown[] }).errors.length === 0
-        : true
-    )
-  }).catch((e) => {
-    busy.value = false
-    formError.value = String(e)
-  })
+  void Effect.runPromise(svc.createEntity(buildBody(true)))
+    .then((result) => {
+      busy.value = false
+      preview.value = result
+      previewClean.value = !hasVerificationErrors(result.verification)
+    })
+    .catch((error: unknown) => {
+      busy.value = false
+      formError.value = readErrorMessage(error)
+    })
 }
 
 // ── Create ────────────────────────────────────────────────────────────────────
@@ -107,25 +113,34 @@ const doPreview = () => {
 const doCreate = () => {
   busy.value = true
   formError.value = null
-  Effect.runPromise(svc.createEntity(buildBody(false))).then((r) => {
-    busy.value = false
-    if (r.wrote) {
-      router.push({ path: '/entity', query: { id: r.artifact_id } })
-    } else {
-      formError.value = r.content ?? 'Verification failed'
-    }
-  }).catch((e) => {
-    busy.value = false
-    formError.value = String(e)
-  })
+  void Effect.runPromise(svc.createEntity(buildBody(false)))
+    .then((result) => {
+      busy.value = false
+      if (result.wrote) {
+        void router.push({ path: '/entity', query: { id: result.artifact_id } })
+      } else {
+        formError.value = result.content ?? 'Verification failed'
+      }
+    })
+    .catch((error: unknown) => {
+      busy.value = false
+      formError.value = readErrorMessage(error)
+    })
 }
 </script>
 
 <template>
   <div class="create-layout">
     <div class="page-header">
-      <button class="back-link" @click="router.back()">← Back</button>
-      <h1 class="page-title">Create Entity</h1>
+      <button
+        class="back-link"
+        @click="router.back()"
+      >
+        ← Back
+      </button>
+      <h1 class="page-title">
+        Create Entity
+      </h1>
     </div>
 
     <div class="form-and-preview">
@@ -133,15 +148,29 @@ const doCreate = () => {
       <section class="form-section card">
         <div class="form-row">
           <label class="form-label">Artifact Type <span class="required">*</span></label>
-          <select v-model="artifactType" class="form-select">
-            <option value="" disabled>Select type...</option>
+          <select
+            v-model="artifactType"
+            class="form-select"
+          >
+            <option
+              value=""
+              disabled
+            >
+              Select type...
+            </option>
             <template v-if="writeHelp">
               <optgroup
                 v-for="(types, domain) in writeHelp.entity_types_by_domain"
                 :key="domain"
                 :label="domain"
               >
-                <option v-for="t in types" :key="t" :value="t">{{ t }}</option>
+                <option
+                  v-for="t in types"
+                  :key="t"
+                  :value="t"
+                >
+                  {{ t }}
+                </option>
               </optgroup>
             </template>
           </select>
@@ -149,80 +178,173 @@ const doCreate = () => {
 
         <div class="form-row">
           <label class="form-label">Name <span class="required">*</span></label>
-          <input v-model="name" class="form-input" placeholder="Human-readable name" />
+          <input
+            v-model="name"
+            class="form-input"
+            placeholder="Human-readable name"
+          >
         </div>
 
         <div class="form-row">
           <label class="form-label">Summary</label>
-          <textarea v-model="summary" class="form-textarea" rows="3" placeholder="Short description..." />
+          <textarea
+            v-model="summary"
+            class="form-textarea"
+            rows="3"
+            placeholder="Short description..."
+          />
         </div>
 
         <div class="form-row">
           <label class="form-label">Keywords <span class="form-hint">(comma-separated)</span></label>
-          <input v-model="keywords" class="form-input" placeholder="e.g. model, tooling, automation" />
+          <input
+            v-model="keywords"
+            class="form-input"
+            placeholder="e.g. model, tooling, automation"
+          >
         </div>
 
         <div class="form-row two-col">
           <div>
             <label class="form-label">Status</label>
-            <select v-model="status" class="form-select">
-              <option value="draft">draft</option>
-              <option value="active">active</option>
-              <option value="deprecated">deprecated</option>
+            <select
+              v-model="status"
+              class="form-select"
+            >
+              <option value="draft">
+                draft
+              </option>
+              <option value="active">
+                active
+              </option>
+              <option value="deprecated">
+                deprecated
+              </option>
             </select>
           </div>
           <div>
             <label class="form-label">Version</label>
-            <input v-model="version" class="form-input" placeholder="0.1.0" />
+            <input
+              v-model="version"
+              class="form-input"
+              placeholder="0.1.0"
+            >
           </div>
         </div>
 
         <div class="form-row">
           <label class="form-label">Properties</label>
-          <div v-for="(row, i) in properties" :key="i" class="prop-row">
-            <input v-model="row.key" class="prop-key" :placeholder="schemaRequired.has(row.key) ? row.key + ' *' : 'key'" :readonly="schemaProps.includes(row.key)" />
-            <input v-model="row.value" class="prop-value" placeholder="value" />
-            <button class="remove-prop-btn icon-btn" :disabled="schemaRequired.has(row.key)" @click="removePropRow(i)">×</button>
+          <div
+            v-for="(row, i) in properties"
+            :key="i"
+            class="prop-row"
+          >
+            <input
+              v-model="row.key"
+              class="prop-key"
+              :placeholder="schemaRequired.has(row.key) ? row.key + ' *' : 'key'"
+              :readonly="schemaProps.includes(row.key)"
+            >
+            <input
+              v-model="row.value"
+              class="prop-value"
+              placeholder="value"
+            >
+            <button
+              class="remove-prop-btn icon-btn"
+              :disabled="schemaRequired.has(row.key)"
+              @click="removePropRow(i)"
+            >
+              ×
+            </button>
           </div>
-          <button class="add-prop-btn" @click="addPropRow">+ Add property</button>
+          <button
+            class="add-prop-btn"
+            @click="addPropRow"
+          >
+            + Add property
+          </button>
         </div>
 
         <div class="form-row">
           <label class="form-label">Notes</label>
-          <textarea v-model="notes" class="form-textarea" rows="3" placeholder="Additional notes..." />
+          <textarea
+            v-model="notes"
+            class="form-textarea"
+            rows="3"
+            placeholder="Additional notes..."
+          />
         </div>
 
-        <div v-if="formError" class="state-msg state-msg--error">{{ formError }}</div>
+        <div
+          v-if="formError"
+          class="state-msg state-msg--error"
+        >
+          {{ formError }}
+        </div>
 
         <div class="form-actions">
-          <button class="preview-btn" :disabled="busy" @click="doPreview">Preview</button>
+          <button
+            class="preview-btn"
+            :disabled="busy"
+            @click="doPreview"
+          >
+            Preview
+          </button>
           <button
             class="create-btn"
             :disabled="busy || !previewClean"
             :title="!previewClean ? 'Run preview first to enable create' : ''"
             @click="doCreate"
-          >Create</button>
+          >
+            Create
+          </button>
         </div>
       </section>
 
       <!-- Preview pane -->
-      <section v-if="preview" class="preview-section card">
-        <h2 class="preview-title">Dry-run preview</h2>
+      <section
+        v-if="preview"
+        class="preview-section card"
+      >
+        <h2 class="preview-title">
+          Dry-run preview
+        </h2>
         <div class="preview-meta">
           <span class="mono">{{ preview.artifact_id }}</span>
           <span class="preview-path mono">→ {{ preview.path }}</span>
         </div>
 
-        <div v-if="preview.warnings.length" class="preview-warnings">
-          <div v-for="w in preview.warnings" :key="w" class="preview-warn">{{ w }}</div>
+        <div
+          v-if="preview.warnings.length"
+          class="preview-warnings"
+        >
+          <div
+            v-for="w in preview.warnings"
+            :key="w"
+            class="preview-warn"
+          >
+            {{ w }}
+          </div>
         </div>
 
-        <div v-if="!previewClean" class="state-msg state-msg--error">
+        <div
+          v-if="!previewClean"
+          class="state-msg state-msg--error"
+        >
           Verification issues found — fix them before creating.
         </div>
-        <div v-else class="state-msg state-msg--ok">Verification passed.</div>
+        <div
+          v-else
+          class="state-msg state-msg--ok"
+        >
+          Verification passed.
+        </div>
 
-        <pre v-if="preview.content" class="preview-content">{{ preview.content }}</pre>
+        <pre
+          v-if="preview.content"
+          class="preview-content"
+        >{{ preview.content }}</pre>
       </section>
     </div>
   </div>

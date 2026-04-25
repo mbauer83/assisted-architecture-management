@@ -9,6 +9,7 @@ Three tools manage the git persistence lifecycle for both repositories:
 These tools operate on the repositories configured via arch-workspace.yaml and
 resolved at startup; no explicit repo-path arguments are required.
 """
+
 from __future__ import annotations
 
 from mcp.server.fastmcp import FastMCP  # type: ignore[import-not-found]
@@ -43,8 +44,11 @@ def artifact_save_changes(
             if push:
                 enterprise_git_ops.push_engagement(eng_root)
             return {
-                "ok": True, "target": "engagement",
-                "commit": commit, "pushed": push, "message": message,
+                "ok": True,
+                "target": "engagement",
+                "commit": commit,
+                "pushed": push,
+                "message": message,
             }
         else:
             ent_root = maybe_enterprise_root()
@@ -53,8 +57,11 @@ def artifact_save_changes(
             enterprise_git_ops.ensure_working_branch(ent_root)
             commit = enterprise_git_ops.commit_enterprise_work(ent_root, message)
             return {
-                "ok": True, "target": "enterprise",
-                "commit": commit, "pushed": False, "message": message,
+                "ok": True,
+                "target": "enterprise",
+                "commit": commit,
+                "pushed": False,
+                "message": message,
                 "next_step": (
                     "Use artifact_submit_for_review to push this branch for team review."
                 ),
@@ -84,8 +91,10 @@ def artifact_submit_for_review() -> dict[str, object]:
     state = load_state(ent_root)
     if state.is_pending():
         return {
-            "ok": True, "already_submitted": True,
-            "branch": state.branch, "pushed_at": state.pushed_at,
+            "ok": True,
+            "already_submitted": True,
+            "branch": state.branch,
+            "pushed_at": state.pushed_at,
             "message": (
                 "Branch was already submitted. Waiting for team review. "
                 "The system will detect when it is merged."
@@ -103,7 +112,8 @@ def artifact_submit_for_review() -> dict[str, object]:
     try:
         branch = enterprise_git_ops.push_enterprise_branch(ent_root)
         return {
-            "ok": True, "branch": branch,
+            "ok": True,
+            "branch": branch,
             "message": (
                 f"Enterprise changes pushed to branch '{branch}'. "
                 "Create a pull request from this branch in your version-control platform "
@@ -138,13 +148,17 @@ def artifact_withdraw_changes(*, confirm: bool = False) -> dict[str, object]:
 
     state = load_state(ent_root)
     if state.is_synced():
-        return {"ok": True, "nothing_to_discard": True,
-                "message": "No pending enterprise changes to discard."}
+        return {
+            "ok": True,
+            "nothing_to_discard": True,
+            "message": "No pending enterprise changes to discard.",
+        }
 
     try:
         branch = enterprise_git_ops.abandon_enterprise_branch(ent_root)
         return {
-            "ok": True, "discarded_branch": branch,
+            "ok": True,
+            "discarded_branch": branch,
             "message": "All pending enterprise changes have been discarded.",
         }
     except RuntimeError as exc:

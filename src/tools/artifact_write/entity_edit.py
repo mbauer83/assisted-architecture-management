@@ -1,14 +1,15 @@
 """Entity editing and promotion operations."""
 
-from pathlib import Path
 from collections.abc import Callable
+from pathlib import Path
 
 from src.common.artifact_verifier import ArtifactRegistry, ArtifactVerifier
-from src.common.artifact_write import ENTITY_TYPES, format_entity_markdown, slugify
+from src.common.artifact_write import format_entity_markdown, slugify
 from src.common.repo_paths import MODEL
 from src.tools.generate_macros import generate_macros
 
 from .boundary import assert_engagement_write_root, today_iso
+from .coerce import as_optional_str, as_optional_str_dict, as_optional_str_list
 from .entity import verification_to_entity_dict
 from .parse_existing import parse_entity_file
 from .types import WriteResult
@@ -32,7 +33,9 @@ def _rename_entity_identity(
     changed_paths: list[Path] = []
 
     if old_outgoing.exists():
-        outgoing_text = old_outgoing.read_text(encoding="utf-8").replace(old_artifact_id, new_artifact_id)
+        outgoing_text = old_outgoing.read_text(encoding="utf-8").replace(
+            old_artifact_id, new_artifact_id
+        )
         new_outgoing.write_text(outgoing_text, encoding="utf-8")
         if new_outgoing != old_outgoing:
             old_outgoing.unlink()
@@ -90,10 +93,14 @@ def edit_entity(
     eff_name = name if name is not None else current_name
     eff_version = version if version is not None else str(fm.get("version", "0.1.0"))
     eff_status = status if status is not None else str(fm.get("status", "draft"))
-    eff_keywords = keywords if keywords is not _UNSET else (fm.get("keywords") or None)
-    eff_summary = summary if summary is not _UNSET else parsed.summary
-    eff_properties = properties if properties is not _UNSET else (parsed.properties or None)
-    eff_notes = notes if notes is not _UNSET else parsed.notes
+    eff_keywords = as_optional_str_list(keywords if keywords is not _UNSET else fm.get("keywords"))
+    eff_summary = as_optional_str(summary) if summary is not _UNSET else parsed.summary
+    eff_properties = (
+        as_optional_str_dict(properties)
+        if properties is not _UNSET
+        else (parsed.properties or None)
+    )
+    eff_notes = as_optional_str(notes) if notes is not _UNSET else parsed.notes
     if name is not None:
         current_slug = slugify(current_name)
         next_slug = slugify(eff_name)
@@ -147,8 +154,11 @@ def edit_entity(
                 f"Rename will update artifact-id to {effective_artifact_id} and rewrite {impacted} outgoing file(s)."
             )
         return WriteResult(
-            wrote=False, path=target_entity_file, artifact_id=effective_artifact_id,
-            content=content, warnings=rename_summary,
+            wrote=False,
+            path=target_entity_file,
+            artifact_id=effective_artifact_id,
+            content=content,
+            warnings=rename_summary,
             verification=verification_to_entity_dict(target_entity_file, preview_res),
         )
 
@@ -186,8 +196,11 @@ def edit_entity(
         else:
             entity_file.write_text(prev, encoding="utf-8")
         return WriteResult(
-            wrote=False, path=target_entity_file, artifact_id=effective_artifact_id,
-            content=content, warnings=rename_summary,
+            wrote=False,
+            path=target_entity_file,
+            artifact_id=effective_artifact_id,
+            content=content,
+            warnings=rename_summary,
             verification=verification_to_entity_dict(target_entity_file, res),
         )
 
@@ -198,12 +211,16 @@ def edit_entity(
             pass
 
     if target_entity_file != entity_file:
-        clear_repo_caches([entity_file, target_entity_file, *renamed_paths])
+        for changed_path in [entity_file, target_entity_file, *renamed_paths]:
+            clear_repo_caches(changed_path)
     else:
         clear_repo_caches(target_entity_file)
     return WriteResult(
-        wrote=True, path=target_entity_file, artifact_id=effective_artifact_id,
-        content=None, warnings=rename_summary,
+        wrote=True,
+        path=target_entity_file,
+        artifact_id=effective_artifact_id,
+        content=None,
+        warnings=rename_summary,
         verification=verification_to_entity_dict(target_entity_file, res),
     )
 
@@ -248,9 +265,13 @@ def promote_entity(
     new_version = _bump_version(current_version, current_status)
 
     return edit_entity(
-        repo_root=repo_root, registry=registry, verifier=verifier,
+        repo_root=repo_root,
+        registry=registry,
+        verifier=verifier,
         clear_repo_caches=clear_repo_caches,
-        artifact_id=artifact_id, status=next_status, version=new_version,
+        artifact_id=artifact_id,
+        status=next_status,
+        version=new_version,
         dry_run=dry_run,
     )
 

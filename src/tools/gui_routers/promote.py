@@ -52,7 +52,9 @@ def promotion_plan(body: PromotionPlanBody) -> dict[str, Any]:
     repo = s.get_repo()
     try:
         plan = plan_promotion(
-            body.entity_id, registry, repo,
+            body.entity_id,
+            registry,
+            repo,
             entity_ids=body.entity_ids or None,
             connection_ids=set(body.connection_ids) or None,
             exclude_entity_ids=set(body.exclude_entity_ids) or None,
@@ -67,10 +69,13 @@ def promotion_plan(body: PromotionPlanBody) -> dict[str, Any]:
         "entities_to_add": plan.entities_to_add,
         "conflicts": [
             {
-                "engagement_id": c.engagement_id, "enterprise_id": c.enterprise_id,
+                "engagement_id": c.engagement_id,
+                "enterprise_id": c.enterprise_id,
                 "artifact_type": c.artifact_type,
-                "engagement_name": c.engagement_name, "enterprise_name": c.enterprise_name,
-                "engagement_fields": c.engagement_fields, "enterprise_fields": c.enterprise_fields,
+                "engagement_name": c.engagement_name,
+                "enterprise_name": c.enterprise_name,
+                "engagement_fields": c.engagement_fields,
+                "enterprise_fields": c.enterprise_fields,
             }
             for c in plan.conflicts
         ],
@@ -79,15 +84,23 @@ def promotion_plan(body: PromotionPlanBody) -> dict[str, Any]:
         "documents_to_add": plan.documents_to_add,
         "diagrams_to_add": plan.diagrams_to_add,
         "doc_conflicts": [
-            {"engagement_id": c.engagement_id, "enterprise_id": c.enterprise_id,
-             "doc_type": c.doc_type,
-             "engagement_title": c.engagement_title, "enterprise_title": c.enterprise_title}
+            {
+                "engagement_id": c.engagement_id,
+                "enterprise_id": c.enterprise_id,
+                "doc_type": c.doc_type,
+                "engagement_title": c.engagement_title,
+                "enterprise_title": c.enterprise_title,
+            }
             for c in plan.doc_conflicts
         ],
         "diagram_conflicts": [
-            {"engagement_id": c.engagement_id, "enterprise_id": c.enterprise_id,
-             "diagram_type": c.diagram_type,
-             "engagement_name": c.engagement_name, "enterprise_name": c.enterprise_name}
+            {
+                "engagement_id": c.engagement_id,
+                "enterprise_id": c.enterprise_id,
+                "diagram_type": c.diagram_type,
+                "engagement_name": c.engagement_name,
+                "enterprise_name": c.enterprise_name,
+            }
             for c in plan.diagram_conflicts
         ],
         "warnings": plan.warnings,
@@ -109,7 +122,9 @@ def promotion_execute(body: PromotionExecuteBody) -> dict[str, Any]:
     repo = s.get_repo()
     try:
         plan = plan_promotion(
-            body.entity_id, registry, repo,
+            body.entity_id,
+            registry,
+            repo,
             entity_ids=body.entity_ids or None,
             connection_ids=set(body.connection_ids) or None,
             exclude_entity_ids=set(body.exclude_entity_ids) or None,
@@ -122,28 +137,41 @@ def promotion_execute(body: PromotionExecuteBody) -> dict[str, Any]:
 
     if body.dry_run:
         return {
-            "dry_run": True, "executed": False,
-            "copied_files": [], "updated_files": [],
-            "verification_errors": [], "rolled_back": False,
+            "dry_run": True,
+            "executed": False,
+            "copied_files": [],
+            "updated_files": [],
+            "verification_errors": [],
+            "rolled_back": False,
         }
 
     from src.tools.enterprise_git_ops import ensure_working_branch
+
     ensure_working_branch(ent_root)
 
     resolutions = [
         ConflictResolution(
-            engagement_id=r.engagement_id, strategy=r.strategy, merged_fields=r.merged_fields,
+            engagement_id=r.engagement_id,
+            strategy=r.strategy,
+            merged_fields=r.merged_fields,
         )
         for r in body.conflict_resolutions
     ]
     result = execute_promotion(
-        plan, eng_root, ent_root, ArtifactVerifier(registry), registry,
+        plan,
+        eng_root,
+        ent_root,
+        ArtifactVerifier(registry),
+        registry,
         conflict_resolutions=resolutions,
     )
     if result.executed:
         repo.refresh()
     return {
-        "dry_run": False, "executed": result.executed,
-        "copied_files": result.copied_files, "updated_files": result.updated_files,
-        "verification_errors": result.verification_errors, "rolled_back": result.rolled_back,
+        "dry_run": False,
+        "executed": result.executed,
+        "copied_files": result.copied_files,
+        "updated_files": result.updated_files,
+        "verification_errors": result.verification_errors,
+        "rolled_back": result.rolled_back,
     }

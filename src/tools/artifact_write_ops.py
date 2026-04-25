@@ -4,11 +4,9 @@ The implementation was split into smaller modules under src/tools/model_write/.
 This module remains as a stable import path for MCP server code and tests.
 """
 
-
 from typing import Literal
 
 from src.common.artifact_write import DiagramConnectionInferenceMode
-
 from src.tools.artifact_write import (
     WriteResult,
     add_connection,
@@ -28,7 +26,6 @@ from src.tools.artifact_write import (
     remove_connection,
     write_help,
 )
-
 
 WriteRepoScope = Literal["engagement"]
 

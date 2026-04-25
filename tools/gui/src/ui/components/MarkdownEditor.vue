@@ -131,20 +131,35 @@ defineExpose({
         :class="{ 'markdown-editor__tab--active': activeTab === 'edit' }"
         type="button"
         @click="activeTab = 'edit'"
-      >Edit</button>
+      >
+        Edit
+      </button>
       <button
         class="markdown-editor__tab"
         :class="{ 'markdown-editor__tab--active': activeTab === 'preview' }"
         type="button"
         @click="activeTab = 'preview'"
-      >Preview</button>
+      >
+        Preview
+      </button>
     </div>
 
-    <div v-show="activeTab === 'edit'" class="markdown-editor__surface">
-      <div ref="mountEl" class="markdown-editor__mount" :data-placeholder="placeholder"></div>
+    <div
+      v-show="activeTab === 'edit'"
+      class="markdown-editor__surface"
+    >
+      <div
+        ref="mountEl"
+        class="markdown-editor__mount"
+        :data-placeholder="placeholder"
+      />
     </div>
 
-    <div v-show="activeTab === 'preview'" class="markdown-editor__preview" v-html="previewHtml"></div>
+    <div
+      v-show="activeTab === 'preview'"
+      class="markdown-editor__preview"
+      v-html="previewHtml"
+    />
   </div>
 </template>
 

@@ -27,9 +27,15 @@ def make_target_resolver(
 
 
 def copy_entity(
-    eid: str, eng_root: Path, ent_root: Path, registry: Any,
-    result: Any, copied: list[Path], backups: list[Any],
-    resolve_target: TargetResolver, conn_ids: Any,
+    eid: str,
+    eng_root: Path,
+    ent_root: Path,
+    registry: Any,
+    result: Any,
+    copied: list[Path],
+    backups: list[Any],
+    resolve_target: TargetResolver,
+    conn_ids: Any,
 ) -> None:
     src = registry.find_file_by_id(eid)
     if src is None:
@@ -51,7 +57,9 @@ def copy_entity(
         dest_out.write_text(
             rewrite_outgoing(
                 outgoing.read_text(encoding="utf-8"),
-                resolve_target=resolve_target, result=result, conn_ids=None,
+                resolve_target=resolve_target,
+                result=result,
+                conn_ids=None,
             ),
             encoding="utf-8",
         )
@@ -60,8 +68,13 @@ def copy_entity(
 
 
 def copy_simple(
-    aid: str, eng_root: Path, ent_root: Path, registry: Any,
-    result: Any, copied: list[Path], backups: list[Any],
+    aid: str,
+    eng_root: Path,
+    ent_root: Path,
+    registry: Any,
+    result: Any,
+    copied: list[Path],
+    backups: list[Any],
 ) -> None:
     """Copy a document or diagram file verbatim to enterprise."""
     src = registry.find_file_by_id(aid)
@@ -131,8 +144,7 @@ def rewrite_outgoing(
         if m:
             conn_type, target_id = m.group(1).strip(), m.group(2).strip()
             conn_aid = (
-                f"{source_entity_id}---{target_id}@@{conn_type}"
-                if source_entity_id else None
+                f"{source_entity_id}---{target_id}@@{conn_type}" if source_entity_id else None
             )
             if conn_ids is not None and conn_aid is not None and conn_aid not in conn_ids:
                 drop_section = True

@@ -1,20 +1,23 @@
-
 import re
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Literal
+from typing import Final, Literal, TypeAlias
 
 from src.common.archimate_types import ALL_CONNECTION_TYPES, ALL_ENTITY_TYPES
 
 
 class Severity:
-    ERROR = "error"
-    WARNING = "warning"
+    ERROR: Final[Literal["error"]] = "error"
+    WARNING: Final[Literal["warning"]] = "warning"
+
+
+SeverityLiteral: TypeAlias = Literal["error", "warning"]
+VerificationFileType: TypeAlias = Literal["entity", "connection", "diagram", "document"]
 
 
 @dataclass(frozen=True)
 class Issue:
-    severity: Literal["error", "warning"]
+    severity: SeverityLiteral
     code: str
     message: str
     location: str
@@ -23,7 +26,7 @@ class Issue:
 @dataclass
 class VerificationResult:
     path: Path
-    file_type: Literal["entity", "connection", "diagram"]
+    file_type: VerificationFileType
     issues: list[Issue] = field(default_factory=list)
 
     @property
@@ -86,6 +89,7 @@ def connection_header_matches_shape(header: str) -> bool:
         return False
     parts = header.split(" → ", 1)
     return len(parts) == 2 and bool(parts[0].strip()) and bool(parts[1].strip())
+
 
 ENTITY_TYPES: frozenset[str] = ALL_ENTITY_TYPES
 CONNECTION_TYPES: frozenset[str] = ALL_CONNECTION_TYPES

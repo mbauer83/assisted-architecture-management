@@ -208,7 +208,13 @@ def optimize_puml_layout(puml_body: str) -> str:
             new_arrow = _insert_arrow_direction(arrow, hint)
             if new_arrow != arrow:
                 lines[i] = (
-                    m.group(1) + m.group(2) + m.group(3) + new_arrow + m.group(5) + m.group(6) + m.group(7)
+                    m.group(1)
+                    + m.group(2)
+                    + m.group(3)
+                    + new_arrow
+                    + m.group(5)
+                    + m.group(6)
+                    + m.group(7)
                 )
             continue
 

@@ -22,7 +22,7 @@ type SortKey = 'type' | 'in' | 'sym' | 'out' | 'total'
 const svc = inject(modelServiceKey)!
 const route = useRoute()
 const router = useRouter()
-const { data: entityList, error, loading, run } = useAsync<EntityList>()
+const entityListState = useAsync<EntityList>()
 
 const isGlobal = computed(() => props.scope === 'global')
 const basePath = computed(() => isGlobal.value ? '/global/entities' : '/entities')
@@ -34,11 +34,11 @@ const sortKey = ref<SortKey | null>(null)
 const sortOrder = ref<1 | -1>(1)
 
 const replaceQuery = (patch: Record<string, string | undefined>) =>
-  router.replace({ path: basePath.value, query: { ...route.query, ...patch } })
+  void router.replace({ path: basePath.value, query: { ...route.query, ...patch } })
 
 const setDomain = (domain: string) => replaceQuery({ domain: domain || undefined })
 const setViewMode = (view: ViewMode) => replaceQuery({ view: view === 'table' ? undefined : view })
-const load = () => run(svc.listEntities({
+const load = () => entityListState.run(svc.listEntities({
   ...(activeDomain.value ? { domain: activeDomain.value } : {}),
   scope: props.scope,
 }))
@@ -50,7 +50,7 @@ watch([activeDomain, () => props.scope], () => {
 })
 
 const uniqueTypes = computed(() => {
-  const types = entityList.value?.items.map(item => item.artifact_type) ?? []
+  const types = entityListState.data.value?.items.map(item => item.artifact_type) ?? []
   return [...new Set(types)].sort()
 })
 
@@ -71,7 +71,7 @@ const sortBy = (key: SortKey) => {
 }
 
 const sortedEntities = computed(() => {
-  const items = entityList.value?.items.filter(item =>
+  const items = entityListState.data.value?.items.filter(item =>
     !typeFilter.value || item.artifact_type === typeFilter.value,
   ) ?? []
   if (!sortKey.value) return items
@@ -126,9 +126,14 @@ const sortArrow = (key: SortKey) => sortKey.value === key ? (sortOrder.value ===
 <template>
   <div class="layout">
     <aside class="sidebar">
-      <h2 class="sidebar-title">Domain</h2>
+      <h2 class="sidebar-title">
+        Domain
+      </h2>
       <ul class="domain-list">
-        <li v-for="domain in DOMAIN_OPTIONS" :key="domain.key">
+        <li
+          v-for="domain in DOMAIN_OPTIONS"
+          :key="domain.key"
+        >
           <button
             class="domain-btn"
             :class="{ active: activeDomain === domain.key, [`domain-border--${domain.key || 'all'}`]: true }"
@@ -144,87 +149,186 @@ const sortArrow = (key: SortKey) => sortKey.value === key ? (sortOrder.value ===
       <div class="content-header">
         <div>
           <h1 class="page-title">
-            <span v-if="isGlobal" class="global-badge">Global</span>
+            <span
+              v-if="isGlobal"
+              class="global-badge"
+            >Global</span>
             {{ pageTitle }}
-            <span v-if="entityList" class="count">
-              ({{ hierarchicalEntities.length }}<template v-if="typeFilter"> / {{ entityList.total }}</template>)
+            <span
+              v-if="entityListState.data.value"
+              class="count"
+            >
+              ({{ hierarchicalEntities.length }}<template v-if="typeFilter"> / {{ entityListState.data.value.total }}</template>)
             </span>
           </h1>
           <p class="subtitle">
-            <template v-if="isGlobal">Read-only view of the shared global (enterprise) repository.</template>
-            <template v-else>Filter by domain, then inspect the catalog as a sortable table or a connection-weighted treemap.</template>
+            <template v-if="isGlobal">
+              Read-only view of the shared global (enterprise) repository.
+            </template>
+            <template v-else>
+              Filter by domain, then inspect the catalog as a sortable table or a connection-weighted treemap.
+            </template>
           </p>
         </div>
         <div class="actions">
           <div class="view-toggle">
-            <button class="toggle-btn" :class="{ 'toggle-btn--active': viewMode === 'table' }" @click="setViewMode('table')">Table</button>
-            <button class="toggle-btn" :class="{ 'toggle-btn--active': viewMode === 'treemap' }" @click="setViewMode('treemap')">Treemap</button>
+            <button
+              class="toggle-btn"
+              :class="{ 'toggle-btn--active': viewMode === 'table' }"
+              @click="setViewMode('table')"
+            >
+              Table
+            </button>
+            <button
+              class="toggle-btn"
+              :class="{ 'toggle-btn--active': viewMode === 'treemap' }"
+              @click="setViewMode('treemap')"
+            >
+              Treemap
+            </button>
           </div>
-          <RouterLink v-if="!isGlobal" to="/entity/create" class="create-btn">+ Create Entity</RouterLink>
+          <RouterLink
+            v-if="!isGlobal"
+            to="/entity/create"
+            class="create-btn"
+          >
+            + Create Entity
+          </RouterLink>
         </div>
       </div>
 
       <div class="toolbar">
         <label class="toolbar-field">
           <span>Type</span>
-          <select v-model="typeFilter" class="toolbar-select">
+          <select
+            v-model="typeFilter"
+            class="toolbar-select"
+          >
             <option value="">All</option>
-            <option v-for="type in uniqueTypes" :key="type" :value="type">{{ type }}</option>
+            <option
+              v-for="type in uniqueTypes"
+              :key="type"
+              :value="type"
+            >{{ type }}</option>
           </select>
         </label>
       </div>
 
-      <div v-if="loading" class="state-msg">Loading…</div>
-      <div v-else-if="error" class="state-msg state-msg--error">{{ error }}</div>
+      <div
+        v-if="entityListState.loading.value"
+        class="state-msg"
+      >
+        Loading…
+      </div>
+      <div
+        v-else-if="entityListState.error.value"
+        class="state-msg state-msg--error"
+      >
+        {{ entityListState.error.value }}
+      </div>
 
       <EntitiesTreemap
-        v-else-if="entityList && viewMode === 'treemap'"
+        v-else-if="entityListState.data.value && viewMode === 'treemap'"
         :items="hierarchicalEntities"
         :active-domain="activeDomain"
       />
 
-      <table v-else-if="entityList" class="entity-table">
+      <table
+        v-else-if="entityListState.data.value"
+        class="entity-table"
+      >
         <thead>
           <tr>
             <th>Name</th>
-            <th><button class="sort-btn" @click="sortBy('type')">Type {{ sortArrow('type') }}</button></th>
-            <th v-if="!activeDomain">Domain</th>
+            <th>
+              <button
+                class="sort-btn"
+                @click="sortBy('type')"
+              >
+                Type {{ sortArrow('type') }}
+              </button>
+            </th>
+            <th v-if="!activeDomain">
+              Domain
+            </th>
             <th class="th-conn">
-              <button class="sort-btn" @click="sortBy('total')">Connections {{ sortArrow('total') }}</button>
+              <button
+                class="sort-btn"
+                @click="sortBy('total')"
+              >
+                Connections {{ sortArrow('total') }}
+              </button>
               <span class="th-conn-sub">
-                (<button class="sort-sub" @click="sortBy('in')">in {{ sortArrow('in') }}</button> /
-                <button class="sort-sub" @click="sortBy('sym')">sym {{ sortArrow('sym') }}</button> /
-                <button class="sort-sub" @click="sortBy('out')">out {{ sortArrow('out') }}</button>)
+                (<button
+                  class="sort-sub"
+                  @click="sortBy('in')"
+                >in {{ sortArrow('in') }}</button> /
+                <button
+                  class="sort-sub"
+                  @click="sortBy('sym')"
+                >sym {{ sortArrow('sym') }}</button> /
+                <button
+                  class="sort-sub"
+                  @click="sortBy('out')"
+                >out {{ sortArrow('out') }}</button>)
               </span>
             </th>
             <th>Status</th>
           </tr>
         </thead>
         <tbody>
-          <tr v-for="entity in hierarchicalEntities" :key="entity.artifact_id" :class="{ 'row--global': entity.is_global }">
+          <tr
+            v-for="entity in hierarchicalEntities"
+            :key="entity.artifact_id"
+            :class="{ 'row--global': entity.is_global }"
+          >
             <td>
-              <div class="name-cell" :style="{ paddingLeft: `${(entity.hierarchy_depth ?? entity.specialization_depth ?? 0) * 18}px` }">
-                <span v-if="(entity.hierarchy_depth ?? entity.specialization_depth)" class="spec-marker">
+              <div
+                class="name-cell"
+                :style="{ paddingLeft: `${(entity.hierarchy_depth ?? entity.specialization_depth ?? 0) * 18}px` }"
+              >
+                <span
+                  v-if="(entity.hierarchy_depth ?? entity.specialization_depth)"
+                  class="spec-marker"
+                >
                   {{ hierarchyMarker(entity.hierarchy_relation_type) }}
                 </span>
                 <RouterLink :to="{ path: '/entity', query: { id: entity.artifact_id } }">
                   {{ entity.name || friendlyEntityId(entity.artifact_id) }}
                 </RouterLink>
               </div>
-              <span v-if="entity.is_global && !isGlobal" class="global-chip" title="From the global repository">global</span>
+              <span
+                v-if="entity.is_global && !isGlobal"
+                class="global-chip"
+                title="From the global repository"
+              >global</span>
             </td>
             <td>
               <span class="type-cell">
-                <ArchimateTypeGlyph :type="entity.artifact_type" :size="15" class="type-glyph" />
+                <ArchimateTypeGlyph
+                  :type="entity.artifact_type"
+                  :size="15"
+                  class="type-glyph"
+                />
                 <span class="mono">{{ entity.artifact_type }}</span>
               </span>
             </td>
-            <td v-if="!activeDomain"><span class="domain-badge" :class="`domain--${entity.domain}`">{{ entity.domain }}</span></td>
+            <td v-if="!activeDomain">
+              <span
+                class="domain-badge"
+                :class="`domain--${entity.domain}`"
+              >{{ entity.domain }}</span>
+            </td>
             <td class="conn-counts">
               {{ getEntityConnectionTotal(entity) }}
               <span class="conn-split">({{ entity.conn_in ?? 0 }} / {{ entity.conn_sym ?? 0 }} / {{ entity.conn_out ?? 0 }})</span>
             </td>
-            <td><span class="status-badge" :class="`status--${entity.status}`">{{ entity.status }}</span></td>
+            <td>
+              <span
+                class="status-badge"
+                :class="`status--${entity.status}`"
+              >{{ entity.status }}</span>
+            </td>
           </tr>
         </tbody>
       </table>

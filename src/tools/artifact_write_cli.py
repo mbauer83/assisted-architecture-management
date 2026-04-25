@@ -33,11 +33,15 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     sub = parser.add_subparsers(dest="command", required=True)
 
-    delete_entity_parser = sub.add_parser("delete-entity", help="Delete an entity from the engagement repo")
+    delete_entity_parser = sub.add_parser(
+        "delete-entity", help="Delete an entity from the engagement repo"
+    )
     delete_entity_parser.add_argument("artifact_id")
     delete_entity_parser.add_argument("--dry-run", action="store_true")
 
-    delete_diagram_parser = sub.add_parser("delete-diagram", help="Delete a diagram from the engagement repo")
+    delete_diagram_parser = sub.add_parser(
+        "delete-diagram", help="Delete a diagram from the engagement repo"
+    )
     delete_diagram_parser.add_argument("artifact_id")
     delete_diagram_parser.add_argument("--dry-run", action="store_true")
     return parser
@@ -52,8 +56,8 @@ def main(argv: list[str] | None = None) -> int:
     repo_root = Path(args.repo_root)
 
     state = read_backend_state(repo_root)
-    if state is not None and isinstance(state.get("port"), int) and probe_backend(int(state["port"])):
-        port = int(state["port"])
+    if state is not None and probe_backend(state["port"]):
+        port = state["port"]
         path = "/api/entity/remove" if args.command == "delete-entity" else "/api/diagram/remove"
         body = {"artifact_id": args.artifact_id, "dry_run": bool(args.dry_run)}
         req = Request(
@@ -77,7 +81,9 @@ def main(argv: list[str] | None = None) -> int:
             print(str(result["content"]))
         else:
             action = "Would delete" if args.dry_run else "Deleted"
-            print(f"{action} {args.command.split('-', 1)[1]} '{result.get('artifact_id')}' at {result.get('path')}")
+            print(
+                f"{action} {args.command.split('-', 1)[1]} '{result.get('artifact_id')}' at {result.get('path')}"
+            )
         for warning in result.get("warnings") or []:
             print(f"Warning: {warning}")
         return 0

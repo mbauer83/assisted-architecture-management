@@ -7,7 +7,6 @@ from typing import Any
 from src.common.artifact_types import EntityRecord
 from src.tools.gui_routers import state as s
 
-
 _HIERARCHY_PRIORITY = {
     "archimate-specialization": 0,
     "archimate-composition": 1,
@@ -71,7 +70,8 @@ def hierarchy_meta(entities: list[EntityRecord], repo) -> dict[str, dict[str, ob
                     "hierarchy_relation_type": _HIERARCHY_LABEL[parent_by_child[e.artifact_id][1]],
                     "parent_specialization_id": parent_by_child[e.artifact_id][0],
                 }
-                if e.artifact_id in parent_by_child else {}
+                if e.artifact_id in parent_by_child
+                else {}
             ),
             "hierarchy_depth": depth_for(e.artifact_id),
             "specialization_depth": depth_for(e.artifact_id),

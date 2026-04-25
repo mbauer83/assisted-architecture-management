@@ -9,21 +9,21 @@ const svc = inject(modelServiceKey)!
 const route = useRoute()
 const router = useRouter()
 
-const { data: result, error, loading, run } = useAsync<SearchResult>()
+const searchState = useAsync<SearchResult>()
 
 const query = ref((route.query.q as string | undefined) ?? '')
 
 const submit = () => {
   if (!query.value.trim()) return
-  router.replace({ path: '/search', query: { q: query.value } })
-  run(svc.search(query.value.trim()))
+  void router.replace({ path: '/search', query: { q: query.value } })
+  searchState.run(svc.search(query.value.trim()))
 }
 
-if (query.value) run(svc.search(query.value.trim()))
+if (query.value) searchState.run(svc.search(query.value.trim()))
 
 watch(() => route.query.q, (q) => {
   query.value = (q as string | undefined) ?? ''
-  if (query.value) run(svc.search(query.value.trim()))
+  if (query.value) searchState.run(svc.search(query.value.trim()))
 })
 
 const friendlyName = (id: string) => {
@@ -34,29 +34,60 @@ const friendlyName = (id: string) => {
 
 <template>
   <div>
-    <h1 class="page-title">Search</h1>
+    <h1 class="page-title">
+      Search
+    </h1>
 
-    <form class="search-form" @submit.prevent="submit">
+    <form
+      class="search-form"
+      @submit.prevent="submit"
+    >
       <input
         v-model="query"
         class="search-input"
         type="text"
         placeholder="Search entities, connections, diagrams…"
         autofocus
-      />
-      <button type="submit" class="search-btn">Search</button>
+      >
+      <button
+        type="submit"
+        class="search-btn"
+      >
+        Search
+      </button>
     </form>
 
-    <div v-if="loading" class="state-msg">Searching…</div>
-    <div v-else-if="error" class="state-msg state-msg--error">{{ error }}</div>
+    <div
+      v-if="searchState.loading.value"
+      class="state-msg"
+    >
+      Searching…
+    </div>
+    <div
+      v-else-if="searchState.error.value"
+      class="state-msg state-msg--error"
+    >
+      {{ searchState.error.value }}
+    </div>
 
-    <template v-else-if="result">
-      <p class="result-count">{{ result.hits.length }} result{{ result.hits.length !== 1 ? 's' : '' }} for "{{ result.query }}"</p>
+    <template v-else-if="searchState.data.value">
+      <p class="result-count">
+        {{ searchState.data.value.hits.length }} result{{ searchState.data.value.hits.length !== 1 ? 's' : '' }} for "{{ searchState.data.value.query }}"
+      </p>
 
-      <div v-if="!result.hits.length" class="state-msg">No results found.</div>
+      <div
+        v-if="!searchState.data.value.hits.length"
+        class="state-msg"
+      >
+        No results found.
+      </div>
 
       <ul class="result-list">
-        <li v-for="h in result.hits" :key="h.artifact_id" class="result-item card">
+        <li
+          v-for="h in searchState.data.value.hits"
+          :key="h.artifact_id"
+          class="result-item card"
+        >
           <div class="result-top">
             <RouterLink
               v-if="h.record_type === 'entity'"
@@ -72,16 +103,31 @@ const friendlyName = (id: string) => {
             >
               {{ h.name || friendlyName(h.artifact_id) }}
             </RouterLink>
-            <span v-else class="result-name">{{ h.name || friendlyName(h.artifact_id) }}</span>
+            <span
+              v-else
+              class="result-name"
+            >{{ h.name || friendlyName(h.artifact_id) }}</span>
             <span class="score">{{ h.score.toFixed(1) }}</span>
           </div>
           <div class="result-meta">
             <span class="mono result-type">{{ h.artifact_type }}</span>
-            <span v-if="h.is_global" class="global-chip">global</span>
-            <span v-if="h.domain" class="domain-badge" :class="`domain--${h.domain}`">{{ h.domain }}</span>
-            <span class="status-badge" :class="`status--${h.status}`">{{ h.status }}</span>
+            <span
+              v-if="h.is_global"
+              class="global-chip"
+            >global</span>
+            <span
+              v-if="h.domain"
+              class="domain-badge"
+              :class="`domain--${h.domain}`"
+            >{{ h.domain }}</span>
+            <span
+              class="status-badge"
+              :class="`status--${h.status}`"
+            >{{ h.status }}</span>
           </div>
-          <div class="result-id mono">{{ h.artifact_id }}</div>
+          <div class="result-id mono">
+            {{ h.artifact_id }}
+          </div>
         </li>
       </ul>
     </template>

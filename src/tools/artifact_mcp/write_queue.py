@@ -16,8 +16,8 @@ so FastMCP can derive the correct JSON schema.
 
 from __future__ import annotations
 
-import atexit
 import asyncio
+import atexit
 import threading
 from concurrent.futures import ThreadPoolExecutor
 from functools import wraps
@@ -37,9 +37,7 @@ _active_jobs = 0
 def _get_executor() -> ThreadPoolExecutor:
     global _executor
     if _executor is None or _executor._shutdown:
-        _executor = ThreadPoolExecutor(
-            max_workers=1, thread_name_prefix="model-write-queue"
-        )
+        _executor = ThreadPoolExecutor(max_workers=1, thread_name_prefix="model-write-queue")
     return _executor
 
 
@@ -97,9 +95,13 @@ def queued(fn: _F) -> _F:
         repo_root_str = kwargs.get("repo_root")
         if repo_root_str is not None:
             from pathlib import Path
+
             from src.tools.write_block_manager import is_blocked
+
             if is_blocked(Path(repo_root_str)):
-                raise RuntimeError("Writes are temporarily blocked (sync in progress or read-only mode)")
+                raise RuntimeError(
+                    "Writes are temporarily blocked (sync in progress or read-only mode)"
+                )
 
         loop = asyncio.get_running_loop()
         future = _submit(fn, *args, **kwargs)

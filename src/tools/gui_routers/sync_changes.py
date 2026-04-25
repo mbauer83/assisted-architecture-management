@@ -6,6 +6,7 @@ Outgoing-connection file changes are merged into their source entity's record.
 
 Used exclusively by the GUI save-dialog; not exposed via MCP.
 """
+
 from __future__ import annotations
 
 import re
@@ -28,7 +29,9 @@ def list_changes(repo_root: Path) -> list[dict]:
     rc, top_out = _run(repo, "rev-parse", "--show-toplevel")
     git_top = Path(top_out.strip()).resolve() if rc == 0 else repo
     try:
-        prefix = repo.relative_to(git_top)  # e.g. "engagements/ENG-ARCH-REPO/architecture-repository"
+        prefix = repo.relative_to(
+            git_top
+        )  # e.g. "engagements/ENG-ARCH-REPO/architecture-repository"
     except ValueError:
         prefix = Path(".")
 
@@ -54,10 +57,16 @@ def list_changes(repo_root: Path) -> list[dict]:
 
 # ─── Git helpers ──────────────────────────────────────────────────────────────
 
+
 def _run(repo: Path, *args: str) -> tuple[int, str]:
     from src.tools.git_env import get_ssh_env
+
     r = subprocess.run(
-        ["git", *args], cwd=repo, capture_output=True, text=True, timeout=10,
+        ["git", *args],
+        cwd=repo,
+        capture_output=True,
+        text=True,
+        timeout=10,
         env=get_ssh_env(),
     )
     return r.returncode, r.stdout
@@ -83,6 +92,7 @@ def _git_show(repo: Path, git_rel: str) -> str | None:
 
 # ─── Path classification ──────────────────────────────────────────────────────
 
+
 def _classify(rel: str) -> str | None:
     parts = Path(rel).parts
     if not parts:
@@ -101,9 +111,10 @@ def _classify(rel: str) -> str | None:
 
 # ─── Content helpers ──────────────────────────────────────────────────────────
 
+
 def _split_fm(text: str) -> tuple[str, str]:
     m = _FM_RE.match(text)
-    return (m.group(1), text[m.end():].strip()) if m else ("", text.strip())
+    return (m.group(1), text[m.end() :].strip()) if m else ("", text.strip())
 
 
 def _parse_fm(text: str) -> dict:
@@ -139,8 +150,14 @@ def _diff_changes(old: str, new: str, kind: str) -> list[str]:
 
 # ─── Per-file handlers ────────────────────────────────────────────────────────
 
+
 def _handle_artifact(
-    repo: Path, rel: str, git_path: str, xy: str, kind: str, entries: dict[str, dict],
+    repo: Path,
+    rel: str,
+    git_path: str,
+    xy: str,
+    kind: str,
+    entries: dict[str, dict],
 ) -> None:
     file_status = _file_status(xy)
     path = repo / rel
@@ -173,7 +190,11 @@ def _handle_artifact(
 
 
 def _handle_outgoing(
-    repo: Path, rel: str, git_path: str, xy: str, entries: dict[str, dict],
+    repo: Path,
+    rel: str,
+    git_path: str,
+    xy: str,
+    entries: dict[str, dict],
 ) -> None:
     path = repo / rel
     file_status = _file_status(xy)

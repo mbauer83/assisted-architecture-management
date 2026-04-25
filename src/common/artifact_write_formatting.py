@@ -1,4 +1,3 @@
-
 import re
 from pathlib import Path
 
@@ -9,6 +8,13 @@ from src.common.artifact_schema import (
     schema_all_properties,
     schema_required_properties,
 )
+
+
+def _dump_yaml_text(data: object) -> str:
+    dumped = yaml.safe_dump(data, sort_keys=False)
+    if not isinstance(dumped, str):
+        raise TypeError("yaml.safe_dump returned non-string output")
+    return dumped.strip()
 
 
 def format_entity_markdown(
@@ -76,7 +82,7 @@ def format_entity_markdown(
     if notes and notes.strip():
         content_lines.extend(["## Notes", "", notes.strip(), ""])
 
-    display_yaml = yaml.safe_dump(display_archimate, sort_keys=False).strip()
+    display_yaml = _dump_yaml_text(display_archimate)
     display_lines = [
         "<!-- §display -->",
         "",
@@ -86,8 +92,16 @@ def format_entity_markdown(
         display_yaml,
         "```",
     ]
-    frontmatter_text = yaml.safe_dump(fm_out, sort_keys=False).strip()
-    return "---\n" + frontmatter_text + "\n---\n\n" + "\n".join(content_lines) + "\n\n" + "\n".join(display_lines) + "\n"
+    frontmatter_text = _dump_yaml_text(fm_out)
+    return (
+        "---\n"
+        + frontmatter_text
+        + "\n---\n\n"
+        + "\n".join(content_lines)
+        + "\n\n"
+        + "\n".join(display_lines)
+        + "\n"
+    )
 
 
 def format_outgoing_markdown(
@@ -96,7 +110,7 @@ def format_outgoing_markdown(
     version: str,
     status: str,
     last_updated: str,
-    connections: list[dict[str, str]],
+    connections: list[dict[str, object]],
 ) -> str:
     """Format an .outgoing.md file.
 
@@ -117,15 +131,15 @@ def format_outgoing_markdown(
         "status": status,
         "last-updated": last_updated,
     }
-    frontmatter_text = yaml.safe_dump(frontmatter, sort_keys=False).strip()
+    frontmatter_text = _dump_yaml_text(frontmatter)
 
     sections: list[str] = ["<!-- §connections -->"]
     for conn in connections:
-        conn_type = conn["connection_type"]
-        target = conn["target_entity"]
-        desc = conn.get("description", "").strip()
-        src_card = conn.get("src_cardinality", "").strip()
-        tgt_card = conn.get("tgt_cardinality", "").strip()
+        conn_type = str(conn["connection_type"])
+        target = str(conn["target_entity"])
+        desc = str(conn.get("description", "")).strip()
+        src_card = str(conn.get("src_cardinality", "")).strip()
+        tgt_card = str(conn.get("tgt_cardinality", "")).strip()
 
         src_part = f" [{src_card}]" if src_card else ""
         tgt_part = f"[{tgt_card}] " if tgt_card else ""
@@ -134,8 +148,10 @@ def format_outgoing_markdown(
         if desc:
             sections.append("")
             sections.append(desc)
-        for assoc_id in conn.get("associated_entities") or []:
-            sections.append(f"<!-- §assoc {assoc_id} -->")
+        assoc_ids = conn.get("associated_entities")
+        if isinstance(assoc_ids, list):
+            for assoc_id in assoc_ids:
+                sections.append(f"<!-- §assoc {assoc_id} -->")
 
     return "---\n" + frontmatter_text + "\n---\n\n" + "\n".join(sections) + "\n"
 
@@ -182,7 +198,7 @@ def format_diagram_puml(
         "last-updated",
     ]
     fm_out = {key: frontmatter[key] for key in ordered_keys if key in frontmatter}
-    yaml_text = yaml.safe_dump(fm_out, sort_keys=False).strip()
+    yaml_text = _dump_yaml_text(fm_out)
 
     body = _ensure_visible_title(puml_body, name)
     return f"---\n{yaml_text}\n---\n{body}"
@@ -194,7 +210,8 @@ def _ensure_visible_title(puml_body: str, title_text: str) -> str:
         return puml_body.strip("\n") + "\n"
 
     has_title = any(
-        (not line.lstrip().startswith("'")) and re.match(r"^\s*title(\s|$)", line, flags=re.IGNORECASE)
+        (not line.lstrip().startswith("'"))
+        and re.match(r"^\s*title(\s|$)", line, flags=re.IGNORECASE)
         for line in lines
     )
     if has_title:
@@ -251,7 +268,7 @@ def format_matrix_markdown(
         "purpose",
     ]
     fm_out = {key: frontmatter[key] for key in ordered_keys if key in frontmatter}
-    yaml_text = yaml.safe_dump(fm_out, sort_keys=False).strip()
+    yaml_text = _dump_yaml_text(fm_out)
     body = matrix_markdown.strip("\n") + "\n"
     return f"---\n{yaml_text}\n---\n\n{body}"
 

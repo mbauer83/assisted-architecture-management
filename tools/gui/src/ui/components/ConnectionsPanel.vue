@@ -3,8 +3,15 @@ import { computed, inject, onMounted, ref, watch } from 'vue'
 import { RouterLink } from 'vue-router'
 import { Effect } from 'effect'
 import { modelServiceKey } from '../keys'
-import type { ConnectionRecord, ConnectionList, DiagramRefs, OntologyClassification } from '../../domain'
+import type {
+  ConnectionRecord,
+  ConnectionList,
+  DiagramRefs,
+  OntologyClassification,
+  WriteHelp,
+} from '../../domain'
 import EntitySearchInput from './EntitySearchInput.vue'
+import { readErrorMessage } from '../lib/errors'
 
 const props = defineProps<{
   entityId: string
@@ -35,32 +42,39 @@ const ontology = ref<OntologyClassification | null>(null)
 const prefixToType = ref<Record<string, string>>({})
 
 const loadTypeCatalog = () => {
-  Effect.runPromise(svc.getWriteHelp())
-    .then((help: any) => {
-      const catalog = help?.entity_type_catalog
-      if (!catalog || typeof catalog !== 'object') return
+  void Effect.runPromise(svc.getWriteHelp())
+    .then((help: WriteHelp) => {
+      const catalog = help.entity_type_catalog
+      if (!catalog) return
       const next: Record<string, string> = {}
       for (const [artifactType, info] of Object.entries(catalog)) {
-        const prefix = typeof (info as any)?.prefix === 'string' ? (info as any).prefix : ''
-        if (prefix) next[prefix] = artifactType
+        if (info.prefix) {
+          next[info.prefix] = artifactType
+        }
       }
       prefixToType.value = next
     })
-    .catch(() => {})
+    .catch((error: unknown) => {
+      console.error('Failed to load write help', readErrorMessage(error))
+    })
 }
 
 onMounted(() => {
   loadTypeCatalog()
-  Effect.runPromise(svc.getOntologyClassification(props.entityType))
+  void Effect.runPromise(svc.getOntologyClassification(props.entityType))
     .then((o) => { ontology.value = o })
-    .catch(() => { /* silently degrade — sections built from existing connections */ })
+    .catch((error: unknown) => {
+      console.error('Failed to load ontology classification', readErrorMessage(error))
+    })
 })
 
 watch(() => props.entityType, () => {
   ontology.value = null
-  Effect.runPromise(svc.getOntologyClassification(props.entityType))
+  void Effect.runPromise(svc.getOntologyClassification(props.entityType))
     .then((o) => { ontology.value = o })
-    .catch(() => {})
+    .catch((error: unknown) => {
+      console.error('Failed to refresh ontology classification', readErrorMessage(error))
+    })
 })
 
 // Permissible target types for this direction from the ontology
@@ -322,33 +336,74 @@ const confirmRemove = () => {
 
 <template>
   <div class="conn-panel">
-    <h2 class="conn-title">{{ titleLabel }} connections</h2>
+    <h2 class="conn-title">
+      {{ titleLabel }} connections
+    </h2>
 
-    <div v-if="loading" class="state-msg">Loading...</div>
-    <div v-else-if="error" class="state-msg state-msg--error">{{ error }}</div>
+    <div
+      v-if="loading"
+      class="state-msg"
+    >
+      Loading...
+    </div>
+    <div
+      v-else-if="error"
+      class="state-msg state-msg--error"
+    >
+      {{ error }}
+    </div>
 
     <template v-else>
       <template v-if="sectionKeys.length">
-        <div v-for="typeKey in sectionKeys" :key="typeKey" class="type-group">
+        <div
+          v-for="typeKey in sectionKeys"
+          :key="typeKey"
+          class="type-group"
+        >
           <div class="group-header">
             <span class="group-type-badge">{{ typeKey }}</span>
             <span class="group-count">{{ (grouped[typeKey] ?? []).length }}</span>
-            <button v-if="!readonly" class="icon-btn add-btn" title="Add connection" @click="startAdd(typeKey)">+</button>
+            <button
+              v-if="!readonly"
+              class="icon-btn add-btn"
+              title="Add connection"
+              @click="startAdd(typeKey)"
+            >
+              +
+            </button>
           </div>
 
-          <ul v-if="grouped[typeKey]?.length" class="conn-list">
-            <li v-for="c in grouped[typeKey]" :key="c.artifact_id" class="conn-item-wrap">
+          <ul
+            v-if="grouped[typeKey]?.length"
+            class="conn-list"
+          >
+            <li
+              v-for="c in grouped[typeKey]"
+              :key="c.artifact_id"
+              class="conn-item-wrap"
+            >
               <div class="conn-item">
                 <span class="conn-type-badge">{{ c.conn_type.replace('archimate-', '') }}</span>
-                <span v-if="c.src_cardinality || c.tgt_cardinality" class="conn-card-badge">
+                <span
+                  v-if="c.src_cardinality || c.tgt_cardinality"
+                  class="conn-card-badge"
+                >
                   {{ c.src_cardinality || '·' }}..{{ c.tgt_cardinality || '·' }}
                 </span>
                 <RouterLink
                   :to="{ path: '/entity', query: { id: otherEnd(c) } }"
                   class="conn-target"
-                >{{ otherEndName(c) }}</RouterLink>
-                <span v-if="c.content_text?.trim()" class="conn-info-wrap">
-                  <span class="conn-info-btn" tabindex="0">ⓘ</span>
+                >
+                  {{ otherEndName(c) }}
+                </RouterLink>
+                <span
+                  v-if="c.content_text?.trim()"
+                  class="conn-info-wrap"
+                >
+                  <span
+                    class="conn-info-btn"
+                    tabindex="0"
+                  >ⓘ</span>
                   <span class="conn-info-tip">{{ c.content_text.trim() }}</span>
                 </span>
                 <button
@@ -360,25 +415,41 @@ const confirmRemove = () => {
                 >
                   {{ (c.associated_entities?.length ?? 0) > 0 ? `⊕${c.associated_entities!.length}` : '⊕' }}
                 </button>
-                <button v-if="!readonly" class="icon-btn remove-btn" title="Remove connection" @click="startRemove(c)">×</button>
+                <button
+                  v-if="!readonly"
+                  class="icon-btn remove-btn"
+                  title="Remove connection"
+                  @click="startRemove(c)"
+                >
+                  ×
+                </button>
               </div>
 
               <!-- Second-order associations panel -->
-              <div v-if="!readonly && expandedAssoc.has(c.artifact_id)" class="assoc-panel">
+              <div
+                v-if="!readonly && expandedAssoc.has(c.artifact_id)"
+                class="assoc-panel"
+              >
                 <div class="assoc-chips">
                   <span
                     v-for="eid in (c.associated_entities ?? [])"
                     :key="eid"
                     class="assoc-chip"
                   >
-                    <RouterLink :to="{ path: '/entity', query: { id: eid } }" class="assoc-chip-link">{{ friendlyName(eid) }}</RouterLink>
+                    <RouterLink
+                      :to="{ path: '/entity', query: { id: eid } }"
+                      class="assoc-chip-link"
+                    >{{ friendlyName(eid) }}</RouterLink>
                     <button
                       class="assoc-chip-remove"
                       :disabled="assocBusy[c.artifact_id]"
                       @click="removeAssociation(c, eid)"
                     >×</button>
                   </span>
-                  <span v-if="!(c.associated_entities?.length)" class="assoc-empty">No associations</span>
+                  <span
+                    v-if="!(c.associated_entities?.length)"
+                    class="assoc-empty"
+                  >No associations</span>
                 </div>
                 <div class="assoc-add-row">
                   <EntitySearchInput
@@ -389,24 +460,54 @@ const confirmRemove = () => {
                     class="assoc-add-btn"
                     :disabled="!assocAddTarget[c.artifact_id] || assocBusy[c.artifact_id]"
                     @click="addAssociation(c)"
-                  >+</button>
+                  >
+                    +
+                  </button>
                 </div>
-                <div v-if="assocError[c.artifact_id]" class="state-msg state-msg--error">{{ assocError[c.artifact_id] }}</div>
+                <div
+                  v-if="assocError[c.artifact_id]"
+                  class="state-msg state-msg--error"
+                >
+                  {{ assocError[c.artifact_id] }}
+                </div>
               </div>
             </li>
           </ul>
 
           <!-- Add form for this type group -->
-          <div v-if="addingFor === typeKey" class="add-form">
-            <div v-if="connTypeOptions.length" class="add-row">
-              <select v-model="connTypeSelected" class="conn-type-select">
-                <option value="" disabled>Select connection type...</option>
-                <option v-for="ct in connTypeOptions" :key="ct" :value="ct">
+          <div
+            v-if="addingFor === typeKey"
+            class="add-form"
+          >
+            <div
+              v-if="connTypeOptions.length"
+              class="add-row"
+            >
+              <select
+                v-model="connTypeSelected"
+                class="conn-type-select"
+              >
+                <option
+                  value=""
+                  disabled
+                >
+                  Select connection type...
+                </option>
+                <option
+                  v-for="ct in connTypeOptions"
+                  :key="ct"
+                  :value="ct"
+                >
                   {{ ct.replace('archimate-', '') }}
                 </option>
               </select>
             </div>
-            <div v-else class="state-msg">Loading connection types...</div>
+            <div
+              v-else
+              class="state-msg"
+            >
+              Loading connection types...
+            </div>
             <div class="add-row">
               <EntitySearchInput
                 :artifact-type="typeKey"
@@ -414,7 +515,10 @@ const confirmRemove = () => {
                 @select="onSelectTarget"
               />
             </div>
-            <div v-if="selectedTarget" class="selected-target">
+            <div
+              v-if="selectedTarget"
+              class="selected-target"
+            >
               Selected: <strong>{{ selectedTarget.name }}</strong>
             </div>
             <div class="add-row">
@@ -422,57 +526,116 @@ const confirmRemove = () => {
                 v-model="descInput"
                 class="desc-input"
                 placeholder="Description (optional)"
-              />
+              >
             </div>
             <div class="add-row add-row--card">
               <label class="card-label">src</label>
-              <input v-model="srcCardInput" class="card-input" placeholder="e.g. 1" maxlength="8" />
+              <input
+                v-model="srcCardInput"
+                class="card-input"
+                placeholder="e.g. 1"
+                maxlength="8"
+              >
               <span class="card-sep">→</span>
               <label class="card-label">tgt</label>
-              <input v-model="tgtCardInput" class="card-input" placeholder="e.g. *" maxlength="8" />
+              <input
+                v-model="tgtCardInput"
+                class="card-input"
+                placeholder="e.g. *"
+                maxlength="8"
+              >
               <span class="card-hint">cardinality (optional)</span>
             </div>
             <div class="add-actions">
-              <button class="cancel-btn" @click="cancelAdd">Cancel</button>
+              <button
+                class="cancel-btn"
+                @click="cancelAdd"
+              >
+                Cancel
+              </button>
               <button
                 class="add-confirm-btn"
                 :disabled="!selectedTarget || !connTypeSelected || addBusy"
                 @click="confirmAdd"
-              >Add</button>
+              >
+                Add
+              </button>
             </div>
-            <div v-if="addError" class="state-msg state-msg--error">{{ addError }}</div>
+            <div
+              v-if="addError"
+              class="state-msg state-msg--error"
+            >
+              {{ addError }}
+            </div>
           </div>
         </div>
       </template>
 
       <!-- Fallback when no ontology data yet and no connections -->
-      <div v-else class="state-msg">None</div>
+      <div
+        v-else
+        class="state-msg"
+      >
+        None
+      </div>
     </template>
 
     <!-- Remove confirmation dialog -->
-    <div v-if="removingConn" class="modal-overlay" @click.self="cancelRemove">
+    <div
+      v-if="removingConn"
+      class="modal-overlay"
+      @click.self="cancelRemove"
+    >
       <div class="modal">
-        <h3 class="modal-title">Remove connection?</h3>
+        <h3 class="modal-title">
+          Remove connection?
+        </h3>
         <p class="modal-desc">
           <strong>{{ removingConn.conn_type.replace('archimate-', '') }}</strong>
           {{ removingConn.source }} → {{ removingConn.target }}
         </p>
-        <div v-if="diagramRefsLoading" class="state-msg">Checking diagram references...</div>
+        <div
+          v-if="diagramRefsLoading"
+          class="state-msg"
+        >
+          Checking diagram references...
+        </div>
         <template v-else-if="diagramRefs.length">
-          <p class="modal-warn">This connection is referenced in {{ diagramRefs.length }} diagram(s):</p>
+          <p class="modal-warn">
+            This connection is referenced in {{ diagramRefs.length }} diagram(s):
+          </p>
           <ul class="diagram-ref-list">
-            <li v-for="d in diagramRefs" :key="d.artifact_id">{{ d.name }}</li>
+            <li
+              v-for="d in diagramRefs"
+              :key="d.artifact_id"
+            >
+              {{ d.name }}
+            </li>
           </ul>
-          <p class="modal-warn">Those diagram references will become dangling.</p>
+          <p class="modal-warn">
+            Those diagram references will become dangling.
+          </p>
         </template>
-        <div v-if="removeError" class="state-msg state-msg--error">{{ removeError }}</div>
+        <div
+          v-if="removeError"
+          class="state-msg state-msg--error"
+        >
+          {{ removeError }}
+        </div>
         <div class="modal-actions">
-          <button class="modal-btn modal-btn--cancel" @click="cancelRemove">Cancel</button>
+          <button
+            class="modal-btn modal-btn--cancel"
+            @click="cancelRemove"
+          >
+            Cancel
+          </button>
           <button
             class="modal-btn modal-btn--danger"
             :disabled="removeBusy || diagramRefsLoading"
             @click="confirmRemove"
-          >Remove</button>
+          >
+            Remove
+          </button>
         </div>
       </div>
     </div>

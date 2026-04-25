@@ -7,6 +7,7 @@ import NavBar from './components/NavBar.vue'
 import ToastStack from './components/ToastStack.vue'
 import SaveChangesDialog from './components/SaveChangesDialog.vue'
 import type { SyncStatus } from '../domain'
+import { isRecord, readErrorMessage } from './lib/errors'
 
 type SaveMode = 'engagement-save' | 'enterprise-save' | 'enterprise-submit' | 'enterprise-withdraw'
 
@@ -31,33 +32,87 @@ const engDirty = computed(() => syncStatus.value?.engagement?.has_uncommitted_ch
 const entStatus = computed(() => syncStatus.value?.enterprise ?? null)
 
 const loadSyncStatus = () => {
-  Effect.runPromise(svc.getSyncStatus()).then(s => { syncStatus.value = s }).catch(() => {})
+  void Effect.runPromise(svc.getSyncStatus())
+    .then((status) => {
+      syncStatus.value = status
+    })
+    .catch((error: unknown) => {
+      addToast(`Failed to load sync status: ${readErrorMessage(error)}`, 'error')
+    })
 }
+
+type WriteBlockChangedEvent = { blocked: boolean }
+type GitSyncCompletedEvent = { commits_pulled: number }
+type GitSyncFailedEvent = { error: string; auto_unblock_in_seconds: number }
+
+const parseEventData = <T extends Record<string, unknown>>(
+  raw: string,
+  guard: (value: Record<string, unknown>) => value is T,
+): T | null => {
+  try {
+    const parsed = JSON.parse(raw) as unknown
+    if (isRecord(parsed) && guard(parsed)) {
+      return parsed
+    }
+  } catch {
+    return null
+  }
+  return null
+}
+
+const isWriteBlockChangedEvent = (value: Record<string, unknown>): value is WriteBlockChangedEvent =>
+  typeof value.blocked === 'boolean'
+
+const isGitSyncCompletedEvent = (value: Record<string, unknown>): value is GitSyncCompletedEvent =>
+  typeof value.commits_pulled === 'number'
+
+const isGitSyncFailedEvent = (value: Record<string, unknown>): value is GitSyncFailedEvent =>
+  typeof value.error === 'string' && typeof value.auto_unblock_in_seconds === 'number'
 
 let eventSource: EventSource | null = null
 
 onMounted(() => {
-  Effect.runPromise(svc.getServerInfo())
-    .then((info: any) => { adminMode.value = Boolean(info?.admin_mode); readOnly.value = Boolean(info?.read_only) })
-    .catch(() => {})
+  void Effect.runPromise(svc.getServerInfo())
+    .then((info) => {
+      adminMode.value = info.admin_mode
+      readOnly.value = info.read_only
+    })
+    .catch((error: unknown) => {
+      addToast(`Failed to load server info: ${readErrorMessage(error)}`, 'error')
+    })
 
   loadSyncStatus()
 
   try {
     eventSource = new EventSource('/api/events')
 
-    eventSource.addEventListener('write_block_changed', (e) => {
-      const data = JSON.parse(e.data)
+    eventSource.addEventListener('write_block_changed', (e: MessageEvent<string>) => {
+      const data = parseEventData(e.data, isWriteBlockChangedEvent)
+      if (!data) {
+        addToast('Received malformed write-block event', 'error')
+        return
+      }
       writeBlocked.value = data.blocked
-      addToast(data.blocked ? 'Sync in progress — writes paused' : 'Sync complete — writes resumed', data.blocked ? 'warn' : 'info')
+      addToast(
+        data.blocked ? 'Sync in progress — writes paused' : 'Sync complete — writes resumed',
+        data.blocked ? 'warn' : 'info',
+      )
     })
     eventSource.addEventListener('git_sync_started', () => { addToast('Pulling updates…', 'info') })
-    eventSource.addEventListener('git_sync_completed', (e) => {
-      const data = JSON.parse(e.data)
+    eventSource.addEventListener('git_sync_completed', (e: MessageEvent<string>) => {
+      const data = parseEventData(e.data, isGitSyncCompletedEvent)
+      if (!data) {
+        addToast('Received malformed sync-complete event', 'error')
+        return
+      }
       addToast(`Pulled ${data.commits_pulled} commit(s)`, 'info')
     })
-    eventSource.addEventListener('git_sync_failed', (e) => {
-      const data = JSON.parse(e.data)
+    eventSource.addEventListener('git_sync_failed', (e: MessageEvent<string>) => {
+      const data = parseEventData(e.data, isGitSyncFailedEvent)
+      if (!data) {
+        addToast('Received malformed sync-failure event', 'error')
+        return
+      }
       addToast(`Sync failed: ${data.error}. Writes resume in ${data.auto_unblock_in_seconds}s`, 'error', 7000)
     })
 
@@ -73,7 +128,11 @@ onMounted(() => {
   provide('writeBlocked', anyWriteBlocked)
 })
 
-onUnmounted(() => { if (eventSource) eventSource.close() })
+onUnmounted(() => {
+  if (eventSource) {
+    eventSource.close()
+  }
+})
 </script>
 
 <template>
@@ -85,12 +144,18 @@ onUnmounted(() => { if (eventSource) eventSource.close() })
     @open-save-dialog="saveDialogMode = $event"
   />
 
-  <output v-if="adminMode" class="admin-banner">
+  <output
+    v-if="adminMode"
+    class="admin-banner"
+  >
     <strong>Admin mode</strong> — writes to both repositories are permitted.
     Use the <strong>Save</strong> and <strong>Submit</strong> controls in the Global nav to commit and submit enterprise changes.
   </output>
 
-  <output v-if="readOnly" class="readonly-banner">
+  <output
+    v-if="readOnly"
+    class="readonly-banner"
+  >
     <strong>Read-only mode</strong> — write operations are disabled.
   </output>
 

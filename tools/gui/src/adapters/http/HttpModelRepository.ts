@@ -31,6 +31,8 @@ import {
   PromotionResultSchema,
   SyncStatusSchema,
   SyncSaveResultSchema,
+  ServerInfoSchema,
+  WriteHelpSchema,
 } from '../../domain/schemas'
 import { SyncChangesResultSchema } from '../../domain/schemas-changes'
 import { parseMarkdown } from '../../application/MarkdownService'
@@ -178,7 +180,7 @@ const deleteReq = <A, I>(
 // ── Factory ───────────────────────────────────────────────────────────────────
 
 export const makeHttpModelRepository = (): ModelRepository => ({
-  getServerInfo: () => fetchJson(buildUrl('/server-info', undefined, true), Schema.Unknown),
+  getServerInfo: () => fetchJson(buildUrl('/server-info', undefined, true), ServerInfoSchema),
   getStats: () => fetchJson(buildUrl('/stats'), StatsSchema),
 
   listEntities: (params: ListParams = {}) =>
@@ -270,8 +272,7 @@ export const makeHttpModelRepository = (): ModelRepository => ({
   manageConnectionAssociations: (body) =>
     postJson(buildUrl('/connection/associate'), body, WriteResultSchema),
 
-  getWriteHelp: () =>
-    fetchJson(buildUrl('/write-help'), Schema.Unknown),
+  getWriteHelp: () => fetchJson(buildUrl('/write-help'), WriteHelpSchema),
 
   getOntologyClassification: (sourceType: string) =>
     fetchJson(buildUrl('/ontology', { source_type: sourceType }), OntologyClassificationSchema),

@@ -1,21 +1,18 @@
-
+import re
 import subprocess
 import tempfile
-from pathlib import Path
-import re
 from collections.abc import Callable
+from pathlib import Path
+
 from src.common.artifact_verifier import ArtifactVerifier
 from src.common.artifact_verifier_syntax import find_plantuml_jar
-from src.common.repo_paths import DIAGRAM_CATALOG, DIAGRAMS, RENDERED
-from src.common.settings import plantuml_limit_size, render_dpi
 from src.common.artifact_write import (
     DiagramConnectionInferenceMode,
     format_diagram_puml,
-    infer_archimate_connection_ids_from_puml,
-    infer_entity_ids_from_puml,
 )
 from src.common.artifact_write_layout import optimize_puml_layout
-from src.tools.generate_macros import generate_macros
+from src.common.repo_paths import DIAGRAM_CATALOG, DIAGRAMS, RENDERED
+from src.common.settings import plantuml_limit_size, render_dpi
 
 from .boundary import assert_engagement_write_root
 from .types import WriteResult
@@ -49,7 +46,7 @@ def _render_diagram_png(puml_path: Path, warnings: list[str]) -> Path | None:
         warnings.append("Cannot render: @startuml/@enduml markers not found")
         return None
 
-    puml_body = content[start:end + len("@enduml")]
+    puml_body = content[start : end + len("@enduml")]
 
     # Strip the diagram name so PlantUML uses the temp-file stem as the output filename.
     # When @startuml carries a name PlantUML uses that name instead, which breaks the
@@ -76,10 +73,22 @@ def _render_diagram_png(puml_path: Path, warnings: list[str]) -> Path | None:
         # project root produces a doubled/wrong path.
         dpi = render_dpi()
         result = subprocess.run(
-            ["java", "-Djava.awt.headless=true", f"-DPLANTUML_LIMIT_SIZE={plantuml_limit_size()}", "-jar", str(jar.resolve()),
-             "-tpng", f"-Sdpi={dpi}", "-o", str(rendered_dir.resolve()), tmp_path.name],
+            [
+                "java",
+                "-Djava.awt.headless=true",
+                f"-DPLANTUML_LIMIT_SIZE={plantuml_limit_size()}",
+                "-jar",
+                str(jar.resolve()),
+                "-tpng",
+                f"-Sdpi={dpi}",
+                "-o",
+                str(rendered_dir.resolve()),
+                tmp_path.name,
+            ],
             cwd=str(puml_path.parent),
-            capture_output=True, text=True, timeout=60,
+            capture_output=True,
+            text=True,
+            timeout=60,
         )
         if result.returncode != 0:
             warnings.append(f"PlantUML render failed: {result.stderr[:200]}")
@@ -115,7 +124,7 @@ def _render_diagram_svg(puml_path: Path, warnings: list[str]) -> Path | None:
     if start == -1 or end == -1:
         return None
 
-    puml_body = content[start:end + len("@enduml")]
+    puml_body = content[start : end + len("@enduml")]
     puml_body_for_render = re.sub(r"@startuml\s+\S+", "@startuml", puml_body, count=1)
 
     with tempfile.NamedTemporaryFile(
@@ -131,10 +140,21 @@ def _render_diagram_svg(puml_path: Path, warnings: list[str]) -> Path | None:
 
     try:
         result = subprocess.run(
-            ["java", "-Djava.awt.headless=true", f"-DPLANTUML_LIMIT_SIZE={plantuml_limit_size()}", "-jar", str(jar.resolve()),
-             "-tsvg", "-o", str(rendered_dir.resolve()), tmp_path.name],
+            [
+                "java",
+                "-Djava.awt.headless=true",
+                f"-DPLANTUML_LIMIT_SIZE={plantuml_limit_size()}",
+                "-jar",
+                str(jar.resolve()),
+                "-tsvg",
+                "-o",
+                str(rendered_dir.resolve()),
+                tmp_path.name,
+            ],
             cwd=str(puml_path.parent),
-            capture_output=True, text=True, timeout=60,
+            capture_output=True,
+            text=True,
+            timeout=60,
         )
         if result.returncode != 0:
             return None
@@ -222,6 +242,7 @@ def create_diagram(
     puml_body = optimize_puml_layout(puml_body)
 
     from .boundary import today_iso
+
     last = last_updated or today_iso()
 
     content = format_diagram_puml(

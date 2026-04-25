@@ -1,6 +1,5 @@
 """ERP v2.0 Model Query public API facade."""
 
-
 from src.common.artifact_repository import ArtifactRepository
 from src.common.artifact_types import (
     ArtifactSummary,

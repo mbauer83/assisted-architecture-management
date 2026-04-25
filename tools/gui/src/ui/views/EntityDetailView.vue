@@ -6,15 +6,18 @@ import { modelServiceKey } from '../keys'
 import { useAsync } from '../composables/useAsync'
 import ConnectionsPanel from '../components/ConnectionsPanel.vue'
 import ArchimateTypeGlyph from '../components/ArchimateTypeGlyph.vue'
-import type { EntityContext } from '../../domain'
+import type { EntityContext, WriteResult } from '../../domain'
+import { readErrorMessage } from '../lib/errors'
 
 const svc = inject(modelServiceKey)!
 const router = useRouter()
 const adminMode = ref(false)
 onMounted(() => {
-  Effect.runPromise(svc.getServerInfo())
-    .then((info: any) => { adminMode.value = Boolean(info?.admin_mode) })
-    .catch(() => {})
+  void Effect.runPromise(svc.getServerInfo())
+    .then((info) => { adminMode.value = info.admin_mode })
+    .catch((reason: unknown) => {
+      editError.value = readErrorMessage(reason)
+    })
 })
 const route = useRoute()
 
@@ -111,34 +114,34 @@ const previewEdit = () => {
   editBusy.value = true
   editError.value = null
   editPreview.value = null
-  Effect.runPromise(editFn.value(buildEditBody(true))).then((r) => {
+  void Effect.runPromise(editFn.value(buildEditBody(true))).then((r) => {
     editBusy.value = false
     editPreview.value = { content: r.content, warnings: [...r.warnings] }
-  }).catch((e) => {
+  }).catch((reason: unknown) => {
     editBusy.value = false
-    editError.value = String(e)
+    editError.value = readErrorMessage(reason)
   })
 }
 
 const saveEdit = () => {
   editBusy.value = true
   editError.value = null
-  Effect.runPromise(editFn.value(buildEditBody(false))).then((r) => {
+  void Effect.runPromise(editFn.value(buildEditBody(false))).then((r) => {
     editBusy.value = false
     if (r.wrote) {
       editing.value = false
       editPreview.value = null
       if (r.artifact_id && r.artifact_id !== entityId.value) {
-        router.replace({ path: '/entity', query: { id: r.artifact_id } })
+        void router.replace({ path: '/entity', query: { id: r.artifact_id } })
       } else {
         load()
       }
     } else {
       editError.value = r.content ?? 'Verification failed'
     }
-  }).catch((e) => {
+  }).catch((reason: unknown) => {
     editBusy.value = false
-    editError.value = String(e)
+    editError.value = readErrorMessage(reason)
   })
 }
 
@@ -148,32 +151,12 @@ const previewDelete = () => {
   deleteError.value = null
   deletePreview.value = null
   confirmDelete.value = true
-  Effect.runPromise(deleteFn.value({ artifact_id: entityId.value, dry_run: true })).then((r: any) => {
+  void Effect.runPromise(deleteFn.value({ artifact_id: entityId.value, dry_run: true })).then((r: WriteResult) => {
     deleteBusy.value = false
     deletePreview.value = { content: r.content, warnings: [...r.warnings] }
-  }).catch((e) => {
+  }).catch((reason: unknown) => {
     deleteBusy.value = false
-    if (typeof e === 'object' && e !== null) {
-      if ('detail' in e) {
-        deleteError.value = String((e as any).detail)
-      } else if ('message' in e) {
-        // check if message is JSON with "detail" field
-        try {
-          const json = JSON.parse(String((e as any).message))
-          if ('detail' in json) {
-            deleteError.value = String(json.detail)
-          } else {
-            deleteError.value = String((e as any).message)
-          }
-        } catch (e) {
-          deleteError.value = String((e as any).message)
-        }
-      } else {
-        deleteError.value = JSON.stringify(e)
-      }
-    } else {
-      deleteError.value = String(e)
-    }
+    deleteError.value = readErrorMessage(reason)
   })
 }
 
@@ -187,30 +170,16 @@ const executeDelete = () => {
   if (!entityId.value) return
   deleteBusy.value = true
   deleteError.value = null
-  Effect.runPromise(deleteFn.value({ artifact_id: entityId.value, dry_run: false })).then((r: any) => {
+  void Effect.runPromise(deleteFn.value({ artifact_id: entityId.value, dry_run: false })).then((r: WriteResult) => {
     deleteBusy.value = false
     if (r.wrote) {
-      console.log('Delete successful')
-      router.push(detail.value?.is_global ? '/global/entities' : '/entities')
+      void router.push(detail.value?.is_global ? '/global/entities' : '/entities')
     } else {
-      console.error('Delete failed', r)
       deleteError.value = r.content ?? 'Delete failed'
     }
-  }).catch((e) => {
+  }).catch((reason: unknown) => {
     deleteBusy.value = false
-    // See if we can extract JSON with a "detail" field from the error message
-    console.error('Delete failed', e)
-    if (typeof e === 'object' && e !== null) {
-      if ('detail' in e) {
-        deleteError.value = String((e as any).detail)
-      } else if ('message' in e) {
-        deleteError.value = String((e as any).message)
-      } else {
-        deleteError.value = JSON.stringify(e)
-      }
-    } else {
-      deleteError.value = String(e)
-    }
+    deleteError.value = readErrorMessage(reason)
   })
 }
 </script>
@@ -221,126 +190,298 @@ const executeDelete = () => {
       <RouterLink
         :to="detail?.is_global ? '/global/entities' : '/entities'"
         class="back-link"
-      >← Browse entities</RouterLink>
+      >
+        ← Browse entities
+      </RouterLink>
       <div class="top-actions">
-        <span v-if="detail?.is_global" class="global-badge" title="From the global (enterprise) repository">Global</span>
+        <span
+          v-if="detail?.is_global"
+          class="global-badge"
+          title="From the global (enterprise) repository"
+        >Global</span>
         <RouterLink
           v-if="entityId"
           :to="{ path: '/graph', query: { id: entityId } }"
           class="graph-btn"
-        >Explore graph</RouterLink>
+        >
+          Explore graph
+        </RouterLink>
         <RouterLink
           v-if="detail && !detail.is_global && !editing"
           :to="{ path: '/promote', query: { entity_id: entityId } }"
           class="promote-btn"
           title="Promote this entity to the global repository"
-        >↑ Promote to Global</RouterLink>
+        >
+          ↑ Promote to Global
+        </RouterLink>
         <button
           v-if="detail && !editing && (!detail.is_global || adminMode)"
           class="edit-btn"
           :class="{ 'edit-btn--admin': detail.is_global && adminMode }"
           :title="detail.is_global && adminMode ? 'Edit global entity (admin mode)' : undefined"
           @click="startEdit"
-        >Edit{{ detail.is_global && adminMode ? ' ⚠' : '' }}</button>
+        >
+          Edit{{ detail.is_global && adminMode ? ' ⚠' : '' }}
+        </button>
         <button
           v-if="detail && !editing && (!detail.is_global || adminMode)"
           class="delete-btn"
           :title="detail.is_global && adminMode ? 'Delete global entity (admin mode)' : undefined"
           @click="previewDelete"
-        >Delete{{ detail.is_global && adminMode ? ' ⚠' : '' }}</button>
+        >
+          Delete{{ detail.is_global && adminMode ? ' ⚠' : '' }}
+        </button>
       </div>
     </div>
 
-    <div v-if="context.loading.value" class="state-msg">Loading...</div>
-    <div v-else-if="context.error.value" class="state-msg state-msg--error">{{ context.error.value }}</div>
+    <div
+      v-if="context.loading.value"
+      class="state-msg"
+    >
+      Loading...
+    </div>
+    <div
+      v-else-if="context.error.value"
+      class="state-msg state-msg--error"
+    >
+      {{ context.error.value }}
+    </div>
 
     <template v-else-if="detail">
       <div class="entity-header">
         <div class="entity-title-row">
-          <h1 v-if="!editing" class="entity-name">{{ detail.name }}</h1>
-          <input v-else v-model="editName" class="edit-name-input" />
-          <span v-if="!editing" class="status-badge" :class="`status--${detail.status}`">{{ detail.status }}</span>
-          <select v-else v-model="editStatus" class="edit-status-select">
-            <option value="draft">draft</option>
-            <option value="active">active</option>
-            <option value="deprecated">deprecated</option>
+          <h1
+            v-if="!editing"
+            class="entity-name"
+          >
+            {{ detail.name }}
+          </h1>
+          <input
+            v-else
+            v-model="editName"
+            class="edit-name-input"
+          >
+          <span
+            v-if="!editing"
+            class="status-badge"
+            :class="`status--${detail.status}`"
+          >{{ detail.status }}</span>
+          <select
+            v-else
+            v-model="editStatus"
+            class="edit-status-select"
+          >
+            <option value="draft">
+              draft
+            </option>
+            <option value="active">
+              active
+            </option>
+            <option value="deprecated">
+              deprecated
+            </option>
           </select>
         </div>
         <div class="meta-row">
           <span class="meta-type">
-            <ArchimateTypeGlyph :type="detail.artifact_type" :size="16" class="meta-glyph" />
+            <ArchimateTypeGlyph
+              :type="detail.artifact_type"
+              :size="16"
+              class="meta-glyph"
+            />
             <span class="meta-item mono">{{ detail.artifact_type }}</span>
           </span>
           <span class="sep">·</span>
-          <span class="domain-badge" :class="`domain--${detail.domain}`">{{ detail.domain }}</span>
-          <span v-if="detail.subdomain" class="sep">/ {{ detail.subdomain }}</span>
+          <span
+            class="domain-badge"
+            :class="`domain--${detail.domain}`"
+          >{{ detail.domain }}</span>
+          <span
+            v-if="detail.subdomain"
+            class="sep"
+          >/ {{ detail.subdomain }}</span>
           <span class="sep">·</span>
           <span class="meta-item">v{{ detail.version }}</span>
         </div>
-        <div class="artifact-id mono">{{ detail.artifact_id }}</div>
+        <div class="artifact-id mono">
+          {{ detail.artifact_id }}
+        </div>
       </div>
 
       <!-- Edit form -->
-      <div v-if="editing" class="edit-form card">
+      <div
+        v-if="editing"
+        class="edit-form card"
+      >
         <div class="form-row">
           <label class="form-label">Summary</label>
-          <textarea v-model="editSummary" class="edit-textarea" rows="3" />
+          <textarea
+            v-model="editSummary"
+            class="edit-textarea"
+            rows="3"
+          />
         </div>
         <div class="form-row">
           <label class="form-label">Keywords <span class="form-hint">(comma-separated)</span></label>
-          <input v-model="editKeywords" class="edit-input" placeholder="e.g. model, tooling, automation" />
+          <input
+            v-model="editKeywords"
+            class="edit-input"
+            placeholder="e.g. model, tooling, automation"
+          >
         </div>
         <div class="form-row">
           <label class="form-label">Notes</label>
-          <textarea v-model="editNotes" class="edit-textarea" rows="3" />
+          <textarea
+            v-model="editNotes"
+            class="edit-textarea"
+            rows="3"
+          />
         </div>
         <div class="form-row">
           <label class="form-label">Properties</label>
-          <div v-for="(row, i) in editProperties" :key="i" class="prop-row">
-            <input v-model="row.key" class="prop-key" placeholder="key" />
-            <input v-model="row.value" class="prop-value" placeholder="value" />
-            <button class="icon-btn remove-prop-btn" @click="removePropertyRow(i)">×</button>
+          <div
+            v-for="(row, i) in editProperties"
+            :key="i"
+            class="prop-row"
+          >
+            <input
+              v-model="row.key"
+              class="prop-key"
+              placeholder="key"
+            >
+            <input
+              v-model="row.value"
+              class="prop-value"
+              placeholder="value"
+            >
+            <button
+              class="icon-btn remove-prop-btn"
+              @click="removePropertyRow(i)"
+            >
+              ×
+            </button>
           </div>
-          <button class="add-prop-btn" @click="addPropertyRow">+ Add property</button>
+          <button
+            class="add-prop-btn"
+            @click="addPropertyRow"
+          >
+            + Add property
+          </button>
         </div>
 
         <!-- Preview -->
-        <div v-if="editPreview" class="preview-box">
-          <div class="preview-header">Dry-run preview</div>
-          <div v-if="editPreview.warnings.length" class="preview-warnings">
-            <div v-for="w in editPreview.warnings" :key="w" class="preview-warn">{{ w }}</div>
+        <div
+          v-if="editPreview"
+          class="preview-box"
+        >
+          <div class="preview-header">
+            Dry-run preview
           </div>
-          <pre v-if="editPreview.content" class="preview-content">{{ editPreview.content }}</pre>
+          <div
+            v-if="editPreview.warnings.length"
+            class="preview-warnings"
+          >
+            <div
+              v-for="w in editPreview.warnings"
+              :key="w"
+              class="preview-warn"
+            >
+              {{ w }}
+            </div>
+          </div>
+          <pre
+            v-if="editPreview.content"
+            class="preview-content"
+          >{{ editPreview.content }}</pre>
         </div>
 
-        <div v-if="editError" class="state-msg state-msg--error">{{ editError }}</div>
+        <div
+          v-if="editError"
+          class="state-msg state-msg--error"
+        >
+          {{ editError }}
+        </div>
 
         <div class="edit-actions">
-          <button class="cancel-btn" :disabled="editBusy" @click="cancelEdit">Cancel</button>
-          <button class="preview-btn" :disabled="editBusy" @click="previewEdit">Preview</button>
-          <button class="save-btn" :disabled="editBusy" @click="saveEdit">Save</button>
+          <button
+            class="cancel-btn"
+            :disabled="editBusy"
+            @click="cancelEdit"
+          >
+            Cancel
+          </button>
+          <button
+            class="preview-btn"
+            :disabled="editBusy"
+            @click="previewEdit"
+          >
+            Preview
+          </button>
+          <button
+            class="save-btn"
+            :disabled="editBusy"
+            @click="saveEdit"
+          >
+            Save
+          </button>
         </div>
       </div>
 
       <!-- Content -->
-      <div v-else-if="detail?.content_html" class="card content-card">
-        <div class="markdown-body" v-html="detail.content_html"></div>
+      <div
+        v-else-if="detail?.content_html"
+        class="card content-card"
+      >
+        <div
+          class="markdown-body"
+          v-html="detail.content_html"
+        />
       </div>
 
-      <div v-if="confirmDelete" class="delete-panel card">
-        <div class="delete-title">Delete Entity</div>
+      <div
+        v-if="confirmDelete"
+        class="delete-panel card"
+      >
+        <div class="delete-title">
+          Delete Entity
+        </div>
         <div class="delete-text">
           Deletion removes the entity artifact and its owned outgoing file. It is blocked while
           other connections, diagrams, or global references still depend on the entity.
         </div>
-        <div v-if="deletePreview?.warnings.length" class="preview-warnings">
-          <div v-for="w in deletePreview.warnings" :key="w" class="preview-warn">{{ w }}</div>
+        <div
+          v-if="deletePreview?.warnings.length"
+          class="preview-warnings"
+        >
+          <div
+            v-for="w in deletePreview.warnings"
+            :key="w"
+            class="preview-warn"
+          >
+            {{ w }}
+          </div>
         </div>
-        <pre v-if="deletePreview?.content" class="delete-preview">{{ deletePreview.content }}</pre>
-        <pre v-if="deleteError" class="state-msg state-msg--error state-msg--block">{{ deleteError }}</pre>
+        <pre
+          v-if="deletePreview?.content"
+          class="delete-preview"
+        >{{ deletePreview.content }}</pre>
+        <pre
+          v-if="deleteError"
+          class="state-msg state-msg--error state-msg--block"
+        >{{ deleteError }}</pre>
         <div class="edit-actions">
-          <button class="cancel-btn" :disabled="deleteBusy" @click="cancelDelete">Cancel</button>
-          <button class="delete-confirm-btn" :disabled="deleteBusy" @click="executeDelete">
+          <button
+            class="cancel-btn"
+            :disabled="deleteBusy"
+            @click="cancelDelete"
+          >
+            Cancel
+          </button>
+          <button
+            class="delete-confirm-btn"
+            :disabled="deleteBusy"
+            @click="executeDelete"
+          >
             {{ deleteBusy ? 'Deleting…' : 'Delete Entity' }}
           </button>
         </div>

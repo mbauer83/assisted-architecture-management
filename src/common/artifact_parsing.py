@@ -1,22 +1,21 @@
-
 import re
 from pathlib import Path
 
 import yaml  # type: ignore[import-untyped]
 
-from src.common.artifact_verifier_types import entity_id_from_path
 from src.common.artifact_types import (
-    ConnectionRecord,
-    DiagramRecord,
-    DocumentRecord,
-    Domain,
     DOMAIN_NAMES,
-    EntityRecord,
     STANDARD_DIAGRAM_FIELDS,
     STANDARD_DOCUMENT_FIELDS,
     STANDARD_ENTITY_FIELDS,
     STANDARD_OUTGOING_FIELDS,
+    ConnectionRecord,
+    DiagramRecord,
+    DocumentRecord,
+    Domain,
+    EntityRecord,
 )
+from src.common.artifact_verifier_types import entity_id_from_path
 
 
 def extract_yaml_block(content: str) -> dict | None:
@@ -29,7 +28,6 @@ def extract_yaml_block(content: str) -> dict | None:
         return yaml.safe_load(content[3:end].strip()) or {}
     except yaml.YAMLError:
         return None
-
 
 
 def extract_section(content: str, marker: str) -> str:
@@ -112,7 +110,7 @@ def parse_entity(path: Path, model_root: Path) -> EntityRecord | None:
     display_blocks = extract_display_blocks(content)
     display_label, display_alias = extract_archimate_label_alias(display_blocks)
 
-    kw_raw = frontmatter.get("keywords") or []
+    kw_raw: object = frontmatter.get("keywords") or []
     keywords: tuple[str, ...] = tuple(str(k) for k in kw_raw) if isinstance(kw_raw, list) else ()
 
     return EntityRecord(
@@ -125,7 +123,9 @@ def parse_entity(path: Path, model_root: Path) -> EntityRecord | None:
         subdomain=subdomain,
         keywords=keywords,
         path=path,
-        extra={key: value for key, value in frontmatter.items() if key not in STANDARD_ENTITY_FIELDS},
+        extra={
+            key: value for key, value in frontmatter.items() if key not in STANDARD_ENTITY_FIELDS
+        },
         content_text=extract_section(content, "content"),
         display_blocks=display_blocks,
         display_label=display_label,
@@ -134,11 +134,11 @@ def parse_entity(path: Path, model_root: Path) -> EntityRecord | None:
 
 
 _CONN_HEADER_RE = re.compile(
-    r"^###\s+(\S+)"                  # conn_type
-    r"(?:\s+\[([^\]]+)\])?"          # optional [src_card]
-    r"\s+→\s+"                       # arrow
-    r"(?:\[([^\]]+)\]\s+)?"          # optional [tgt_card]
-    r"(.+)$",                        # target_id
+    r"^###\s+(\S+)"  # conn_type
+    r"(?:\s+\[([^\]]+)\])?"  # optional [src_card]
+    r"\s+→\s+"  # arrow
+    r"(?:\[([^\]]+)\]\s+)?"  # optional [tgt_card]
+    r"(.+)$",  # target_id
     re.MULTILINE,
 )
 _ASSOC_RE = re.compile(r"<!--\s*§assoc\s+(\S+)\s*-->")
@@ -174,20 +174,22 @@ def parse_outgoing_file(path: Path) -> list[ConnectionRecord]:
         clean_body = _ASSOC_RE.sub("", body).strip()
 
         artifact_id = f"{source_entity}---{target}@@{conn_type}"
-        records.append(ConnectionRecord(
-            artifact_id=artifact_id,
-            source=source_entity,
-            target=target,
-            conn_type=conn_type,
-            version=version,
-            status=status,
-            path=path,
-            extra=extra,
-            content_text=clean_body,
-            associated_entities=assoc,
-            src_cardinality=src_card,
-            tgt_cardinality=tgt_card,
-        ))
+        records.append(
+            ConnectionRecord(
+                artifact_id=artifact_id,
+                source=source_entity,
+                target=target,
+                conn_type=conn_type,
+                version=version,
+                status=status,
+                path=path,
+                extra=extra,
+                content_text=clean_body,
+                associated_entities=assoc,
+                src_cardinality=src_card,
+                tgt_cardinality=tgt_card,
+            )
+        )
     return records
 
 
@@ -209,7 +211,9 @@ def parse_diagram(path: Path) -> DiagramRecord | None:
         version=str(frontmatter.get("version", "")),
         status=str(frontmatter.get("status", "draft")),
         path=path,
-        extra={key: value for key, value in frontmatter.items() if key not in STANDARD_DIAGRAM_FIELDS},
+        extra={
+            key: value for key, value in frontmatter.items() if key not in STANDARD_DIAGRAM_FIELDS
+        },
     )
 
 
@@ -231,10 +235,7 @@ def parse_document(path: Path) -> DocumentRecord | None:
     # Extract body (everything after the second ---)
     body = re.sub(r"^---\n.*?\n---\n", "", content, count=1, flags=re.DOTALL).strip()
 
-    sections = tuple(
-        m.group(1).strip()
-        for m in re.finditer(r"^##\s+(.+)$", body, re.MULTILINE)
-    )
+    sections = tuple(m.group(1).strip() for m in re.finditer(r"^##\s+(.+)$", body, re.MULTILINE))
 
     raw_kw = frontmatter.get("keywords", [])
     keywords: tuple[str, ...] = tuple(str(k) for k in (raw_kw if isinstance(raw_kw, list) else []))

@@ -6,6 +6,7 @@ import { modelServiceKey } from '../keys'
 import MarkdownEditor from '../components/MarkdownEditor.vue'
 import ArtifactReferenceInput from '../components/ArtifactReferenceInput.vue'
 import type { DocumentDetail } from '../../domain'
+import { collectVerificationIssues, readErrorMessage } from '../lib/errors'
 
 const svc = inject(modelServiceKey)!
 const route = useRoute()
@@ -19,7 +20,8 @@ const deleting = ref(false)
 const error = ref<string | null>(null)
 const verificationIssues = ref<string[]>([])
 const showReferencePicker = ref(false)
-const editorRef = ref<InstanceType<typeof MarkdownEditor> | null>(null)
+type MarkdownEditorHandle = { insertAtCursor: (markdownLink: string) => void }
+const editorRef = ref<MarkdownEditorHandle | null>(null)
 
 const title = ref('')
 const status = ref('draft')
@@ -33,34 +35,19 @@ const titleError = computed(() =>
     : null,
 )
 
-const collectVerificationIssues = (verification: unknown): string[] => {
-  if (!verification || typeof verification !== 'object') return []
-  const issues = (verification as { issues?: unknown }).issues
-  if (!Array.isArray(issues)) return []
-  return issues
-    .map((issue) => {
-      if (!issue || typeof issue !== 'object') return null
-      const code = typeof (issue as { code?: unknown }).code === 'string' ? (issue as { code: string }).code : ''
-      const message = typeof (issue as { message?: unknown }).message === 'string' ? (issue as { message: string }).message : ''
-      if (!code && !message) return null
-      return code ? `${code}: ${message}` : message
-    })
-    .filter((issue): issue is string => Boolean(issue))
-}
-
 const load = () => {
   loading.value = true
   error.value = null
   verificationIssues.value = []
-  Effect.runPromise(svc.getDocument(documentId.value)).then((doc) => {
+  void Effect.runPromise(svc.getDocument(documentId.value)).then((doc) => {
     detail.value = doc
     title.value = doc.title
     status.value = doc.status
     keywords.value = (doc.keywords ?? []).join(', ')
     body.value = doc.content_text ?? ''
     loading.value = false
-  }).catch((e) => {
-    error.value = String(e)
+  }).catch((reason: unknown) => {
+    error.value = readErrorMessage(reason)
     loading.value = false
   })
 }
@@ -75,7 +62,7 @@ const save = () => {
   if (titleError.value) return
   saving.value = true
   error.value = null
-  Effect.runPromise(svc.editDocument(documentId.value, {
+  void Effect.runPromise(svc.editDocument(documentId.value, {
     title: title.value,
     status: status.value,
     keywords: keywords.value.split(',').map((value) => value.trim()).filter(Boolean),
@@ -91,9 +78,9 @@ const save = () => {
       return
     }
     saving.value = false
-    load()
-  }).catch((e) => {
-    error.value = String(e)
+      load()
+  }).catch((reason: unknown) => {
+    error.value = readErrorMessage(reason)
     saving.value = false
   })
 }
@@ -102,11 +89,11 @@ const remove = () => {
   if (!window.confirm(`Delete document ${documentId.value}?`)) return
   deleting.value = true
   error.value = null
-  Effect.runPromise(svc.deleteDocument(documentId.value, false)).then(() => {
+  void Effect.runPromise(svc.deleteDocument(documentId.value, false)).then(() => {
     deleting.value = false
-    router.push('/documents')
-  }).catch((e) => {
-    error.value = String(e)
+    void router.push('/documents')
+  }).catch((reason: unknown) => {
+    error.value = readErrorMessage(reason)
     deleting.value = false
   })
 }
@@ -119,18 +106,57 @@ const insertReference = (markdownLink: string) => {
 <template>
   <div class="detail-page">
     <div class="page-header">
-      <button class="back-link" type="button" @click="router.push('/documents')">← Documents</button>
+      <button
+        class="back-link"
+        type="button"
+        @click="router.push('/documents')"
+      >
+        ← Documents
+      </button>
       <div class="page-actions">
-        <button class="secondary-btn" type="button" @click="showReferencePicker = true">Insert Reference</button>
-        <button class="primary-btn" type="button" :disabled="saving || loading" @click="save">Save</button>
-        <button class="danger-btn" type="button" :disabled="deleting || loading" @click="remove">Delete</button>
+        <button
+          class="secondary-btn"
+          type="button"
+          @click="showReferencePicker = true"
+        >
+          Insert Reference
+        </button>
+        <button
+          class="primary-btn"
+          type="button"
+          :disabled="saving || loading"
+          @click="save"
+        >
+          Save
+        </button>
+        <button
+          class="danger-btn"
+          type="button"
+          :disabled="deleting || loading"
+          @click="remove"
+        >
+          Delete
+        </button>
       </div>
     </div>
 
-    <div v-if="loading" class="state-msg">Loading…</div>
-    <div v-else-if="error && !detail" class="state-msg state-msg--error">{{ error }}</div>
+    <div
+      v-if="loading"
+      class="state-msg"
+    >
+      Loading…
+    </div>
+    <div
+      v-else-if="error && !detail"
+      class="state-msg state-msg--error"
+    >
+      {{ error }}
+    </div>
 
-    <div v-else-if="detail" class="card">
+    <div
+      v-else-if="detail"
+      class="card"
+    >
       <div class="meta-grid">
         <label class="form-field form-field--wide">
           <span>Title *</span>
@@ -140,18 +166,26 @@ const insertReference = (markdownLink: string) => {
             :class="{ 'form-control--invalid': titleError }"
             type="text"
             @blur="titleTouched = true"
-          />
-          <div v-if="titleError" class="field-error">{{ titleError }}</div>
+          >
+          <div
+            v-if="titleError"
+            class="field-error"
+          >{{ titleError }}</div>
         </label>
 
         <div class="form-field">
           <span>Type</span>
-          <div class="readonly-pill">{{ detail.doc_type }}</div>
+          <div class="readonly-pill">
+            {{ detail.doc_type }}
+          </div>
         </div>
 
         <label class="form-field">
           <span>Status</span>
-          <select v-model="status" class="form-control">
+          <select
+            v-model="status"
+            class="form-control"
+          >
             <option value="draft">draft</option>
             <option value="accepted">accepted</option>
             <option value="rejected">rejected</option>
@@ -162,13 +196,23 @@ const insertReference = (markdownLink: string) => {
 
       <label class="form-field">
         <span>Keywords</span>
-        <input v-model="keywords" class="form-control" type="text" />
+        <input
+          v-model="keywords"
+          class="form-control"
+          type="text"
+        >
       </label>
 
       <div class="form-field">
         <span>Body</span>
         <div class="editor-toolbar">
-          <button class="secondary-btn" type="button" @click="showReferencePicker = true">Insert Reference</button>
+          <button
+            class="secondary-btn"
+            type="button"
+            @click="showReferencePicker = true"
+          >
+            Insert Reference
+          </button>
         </div>
         <MarkdownEditor
           ref="editorRef"
@@ -183,13 +227,30 @@ const insertReference = (markdownLink: string) => {
         <code>{{ detail.path }}</code>
       </div>
 
-      <div v-if="error" class="state-msg state-msg--error">{{ error }}</div>
-      <ul v-if="verificationIssues.length" class="issue-list">
-        <li v-for="issue in verificationIssues" :key="issue">{{ issue }}</li>
+      <div
+        v-if="error"
+        class="state-msg state-msg--error"
+      >
+        {{ error }}
+      </div>
+      <ul
+        v-if="verificationIssues.length"
+        class="issue-list"
+      >
+        <li
+          v-for="issue in verificationIssues"
+          :key="issue"
+        >
+          {{ issue }}
+        </li>
       </ul>
     </div>
 
-    <div v-if="showReferencePicker" class="overlay" @click.self="showReferencePicker = false">
+    <div
+      v-if="showReferencePicker"
+      class="overlay"
+      @click.self="showReferencePicker = false"
+    >
       <ArtifactReferenceInput
         :current-path="detail?.path"
         @insert="insertReference"

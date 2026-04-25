@@ -2,12 +2,14 @@
 import { inject, onMounted, onUnmounted, watch, computed, ref, nextTick } from 'vue'
 import { useRoute, useRouter, RouterLink } from 'vue-router'
 import { Effect } from 'effect'
+import DOMPurify from 'dompurify'
 import { modelServiceKey } from '../keys'
 import { useAsync } from '../composables/useAsync'
 import type { DiagramDetail, EntitySummary, EntityDetail, DiagramConnection } from '../../domain'
 import { getDomainColor } from '../lib/domains'
 import ArchimateTypeGlyph from '../components/ArchimateTypeGlyph.vue'
 import DownloadMenu from '../components/DownloadMenu.vue'
+import { readErrorMessage } from '../lib/errors'
 
 const svc = inject(modelServiceKey)!
 const route = useRoute()
@@ -48,7 +50,7 @@ const load = () => {
   detail.loading.value = true
   detail.error.value = null
   svgHtml.value = null; svgLoading.value = true; svgError.value = null
-  Effect.runPromise(svc.getDiagramContext(diagramId.value))
+  void Effect.runPromise(svc.getDiagramContext(diagramId.value))
     .then((context) => {
       detail.data.value = context.diagram
       detail.loading.value = false
@@ -57,21 +59,26 @@ const load = () => {
         .sort((a, b) => a.domain.localeCompare(b.domain) || a.artifact_type.localeCompare(b.artifact_type) || a.name.localeCompare(b.name))
       diagramConnections.value = context.connections.slice()
     })
-    .catch((e) => {
-      detail.error.value = String(e)
+    .catch((reason: unknown) => {
+      detail.error.value = readErrorMessage(reason)
       detail.loading.value = false
       diagramEntities.value = []
       diagramConnections.value = []
     })
-  Effect.runPromise(svc.getDiagramSvg(diagramId.value))
-    .then((svg) => { svgHtml.value = svg; svgLoading.value = false })
-    .catch((e) => { svgError.value = String(e); svgLoading.value = false })
+  void Effect.runPromise(svc.getDiagramSvg(diagramId.value))
+    .then((svg) => {
+      svgHtml.value = DOMPurify.sanitize(svg, { USE_PROFILES: { svg: true, svgFilters: true } })
+      svgLoading.value = false
+    })
+    .catch((reason: unknown) => { svgError.value = readErrorMessage(reason); svgLoading.value = false })
 }
 
 onMounted(() => {
-  Effect.runPromise(svc.getServerInfo())
-    .then((info: any) => { adminMode.value = Boolean(info?.admin_mode) })
-    .catch(() => {})
+  void Effect.runPromise(svc.getServerInfo())
+    .then((info) => { adminMode.value = info.admin_mode })
+    .catch((reason: unknown) => {
+      detail.error.value = readErrorMessage(reason)
+    })
 })
 
 const addConnectionHitAreas = (group: SVGGElement) => {
@@ -184,7 +191,11 @@ const selectEntity = (id: string) => {
   clearConnection()
   if (selectedId.value === id) { selectedId.value = null; selectedEntity.value = null; return }
   selectedId.value = id; selectedEntity.value = null
-  Effect.runPromise(svc.getEntity(id)).then((d) => { selectedEntity.value = d }).catch(() => {})
+  void Effect.runPromise(svc.getEntity(id))
+    .then((entity) => { selectedEntity.value = entity })
+    .catch((reason: unknown) => {
+      detail.error.value = readErrorMessage(reason)
+    })
 }
 
 const toGlyphKey = (t: string) => t.replace(/[A-Z]/g, (c, i) => (i > 0 ? '-' : '') + c.toLowerCase())
@@ -307,12 +318,12 @@ const previewDelete = () => {
   deleteError.value = null
   deletePreview.value = null
   confirmDelete.value = true
-  Effect.runPromise(deleteFn.value({ artifact_id: diagramId.value, dry_run: true })).then((r: any) => {
+  void Effect.runPromise(deleteFn.value({ artifact_id: diagramId.value, dry_run: true })).then((r) => {
     deleteBusy.value = false
     deletePreview.value = { content: r.content, warnings: [...r.warnings] }
-  }).catch((e) => {
+  }).catch((reason: unknown) => {
     deleteBusy.value = false
-    deleteError.value = String(e)
+    deleteError.value = readErrorMessage(reason)
   })
 }
 
@@ -326,13 +337,13 @@ const executeDelete = () => {
   if (!diagramId.value) return
   deleteBusy.value = true
   deleteError.value = null
-  Effect.runPromise(deleteFn.value({ artifact_id: diagramId.value, dry_run: false })).then((r: any) => {
+  void Effect.runPromise(deleteFn.value({ artifact_id: diagramId.value, dry_run: false })).then((r) => {
     deleteBusy.value = false
-    if (r.wrote) router.push(isGlobalDiagram.value ? '/global/diagrams' : '/diagrams')
+    if (r.wrote) void router.push(isGlobalDiagram.value ? '/global/diagrams' : '/diagrams')
     else deleteError.value = r.content ?? 'Delete failed'
-  }).catch((e) => {
+  }).catch((reason: unknown) => {
     deleteBusy.value = false
-    deleteError.value = String(e)
+    deleteError.value = readErrorMessage(reason)
   })
 }
 
@@ -364,38 +375,107 @@ onUnmounted(() => {
 <template>
   <div class="page">
     <div class="page-hdr">
-      <RouterLink to="/diagrams" class="back">← Diagrams</RouterLink>
-      <h1 v-if="detail.data.value" class="pg-title">{{ detail.data.value.name }}</h1>
-      <DownloadMenu v-if="detail.data.value" :diagram-id="diagramId" :diagram-name="detail.data.value.name" />
-      <RouterLink v-if="detail.data.value" :to="{ path: '/diagram/edit', query: { id: diagramId } }" class="edit-btn">Edit</RouterLink>
+      <RouterLink
+        to="/diagrams"
+        class="back"
+      >
+        ← Diagrams
+      </RouterLink>
+      <h1
+        v-if="detail.data.value"
+        class="pg-title"
+      >
+        {{ detail.data.value.name }}
+      </h1>
+      <DownloadMenu
+        v-if="detail.data.value"
+        :diagram-id="diagramId"
+        :diagram-name="detail.data.value.name"
+      />
+      <RouterLink
+        v-if="detail.data.value"
+        :to="{ path: '/diagram/edit', query: { id: diagramId } }"
+        class="edit-btn"
+      >
+        Edit
+      </RouterLink>
       <button
         v-if="detail.data.value && (!isGlobalDiagram || adminMode)"
         class="delete-btn"
         @click="previewDelete"
-      >Delete{{ isGlobalDiagram && adminMode ? ' ⚠' : '' }}</button>
+      >
+        Delete{{ isGlobalDiagram && adminMode ? ' ⚠' : '' }}
+      </button>
     </div>
 
-    <div v-if="detail.loading.value" class="state">Loading…</div>
-    <div v-else-if="detail.error.value" class="state err">{{ detail.error.value }}</div>
+    <div
+      v-if="detail.loading.value"
+      class="state"
+    >
+      Loading…
+    </div>
+    <div
+      v-else-if="detail.error.value"
+      class="state err"
+    >
+      {{ detail.error.value }}
+    </div>
 
     <template v-else-if="detail.data.value">
       <div class="meta">
         <span class="type-badge">{{ detail.data.value.diagram_type.replace('archimate-', '') }}</span>
-        <span class="status-badge" :class="`status--${detail.data.value.status}`">{{ detail.data.value.status }}</span>
+        <span
+          class="status-badge"
+          :class="`status--${detail.data.value.status}`"
+        >{{ detail.data.value.status }}</span>
         <span class="mono faded">v{{ detail.data.value.version }} · {{ detail.data.value.artifact_id }}</span>
       </div>
 
       <div class="main-grid">
         <!-- Diagram: pan + zoom + interactive SVG -->
-        <div ref="containerRef" class="img-container" @mousedown="onMouseDown" @dblclick="resetView">
+        <div
+          ref="containerRef"
+          class="img-container"
+          @mousedown="onMouseDown"
+          @dblclick="resetView"
+        >
           <div :style="canvasStyle">
-            <div v-if="svgLoading" class="no-img">Rendering SVG…</div>
-            <div v-else-if="svgError" class="no-img err-txt">{{ svgError }}</div>
-            <div v-else-if="svgHtml" ref="svgContainer" class="svg-wrap" v-html="svgHtml" />
-            <div v-else class="no-img">No diagram rendered.</div>
+            <div
+              v-if="svgLoading"
+              class="no-img"
+            >
+              Rendering SVG…
+            </div>
+            <div
+              v-else-if="svgError"
+              class="no-img err-txt"
+            >
+              {{ svgError }}
+            </div>
+            <div
+              v-else-if="svgHtml"
+              ref="svgContainer"
+              class="svg-wrap"
+              v-html="svgHtml"
+            />
+            <div
+              v-else
+              class="no-img"
+            >
+              No diagram rendered.
+            </div>
           </div>
-          <button v-if="isTransformed" class="reset-btn" @click.stop="resetView" title="Reset view">⊙ Reset</button>
-          <div class="zoom-hint">Scroll to zoom · Drag to pan · Click entity to inspect · Double-click to reset</div>
+          <button
+            v-if="isTransformed"
+            class="reset-btn"
+            title="Reset view"
+            @click.stop="resetView"
+          >
+            ⊙ Reset
+          </button>
+          <div class="zoom-hint">
+            Scroll to zoom · Drag to pan · Click entity to inspect · Double-click to reset
+          </div>
         </div>
 
         <!-- Sidebar: entity list + inline detail -->
@@ -406,73 +486,165 @@ onUnmounted(() => {
           </div>
           <ul class="ent-list">
             <li
-              v-for="e in diagramEntities" :key="e.artifact_id"
-              class="ent-item" :class="{ 'ent--active': selectedId === e.artifact_id }"
+              v-for="e in diagramEntities"
+              :key="e.artifact_id"
+              class="ent-item"
+              :class="{ 'ent--active': selectedId === e.artifact_id }"
               @click="selectEntity(e.artifact_id)"
             >
-              <span class="ent-glyph" :title="e.artifact_type">
-                <ArchimateTypeGlyph :type="toGlyphKey(e.artifact_type)" :size="13" />
+              <span
+                class="ent-glyph"
+                :title="e.artifact_type"
+              >
+                <ArchimateTypeGlyph
+                  :type="toGlyphKey(e.artifact_type)"
+                  :size="13"
+                />
               </span>
-              <span class="ent-dot" :style="{ background: getDomainColor(e.domain) }" />
+              <span
+                class="ent-dot"
+                :style="{ background: getDomainColor(e.domain) }"
+              />
               <span class="ent-name">{{ e.name }}</span>
             </li>
           </ul>
 
           <!-- Inline entity detail — no page scroll needed -->
-          <div v-if="selectedConnection" class="ent-det">
+          <div
+            v-if="selectedConnection"
+            class="ent-det"
+          >
             <div class="det-hdr">
               <span class="det-name">{{ selectedConnection.conn_type }}</span>
-              <button class="det-close" @click="clearConnection()">×</button>
+              <button
+                class="det-close"
+                @click="clearConnection()"
+              >
+                ×
+              </button>
             </div>
-            <div class="conn-flow">{{ selectedConnection.source_name }} → {{ selectedConnection.target_name }}</div>
-            <div v-if="selectedConnection.content_text?.trim()" class="det-content">{{ selectedConnection.content_text }}</div>
+            <div class="conn-flow">
+              {{ selectedConnection.source_name }} → {{ selectedConnection.target_name }}
+            </div>
+            <div
+              v-if="selectedConnection.content_text?.trim()"
+              class="det-content"
+            >
+              {{ selectedConnection.content_text }}
+            </div>
           </div>
-          <div v-if="selectedId && !selectedEntity" class="ent-det ent-det--loading">Loading…</div>
-          <div v-if="selectedEntity" class="ent-det">
+          <div
+            v-if="selectedId && !selectedEntity"
+            class="ent-det ent-det--loading"
+          >
+            Loading…
+          </div>
+          <div
+            v-if="selectedEntity"
+            class="ent-det"
+          >
             <div class="det-hdr">
               <RouterLink
                 :to="{ path: '/entity', query: { id: selectedEntity.artifact_id } }"
                 class="det-name"
-              >{{ selectedEntity.name }}</RouterLink>
-              <button class="det-close" @click="selectEntity(selectedId!)">×</button>
+              >
+                {{ selectedEntity.name }}
+              </RouterLink>
+              <button
+                class="det-close"
+                @click="selectEntity(selectedId!)"
+              >
+                ×
+              </button>
             </div>
             <div class="det-chips">
-              <span class="chip" :class="`domain--${selectedEntity.domain}`">{{ selectedEntity.domain }}</span>
-              <span class="chip" :class="`status--${selectedEntity.status}`">{{ selectedEntity.status }}</span>
+              <span
+                class="chip"
+                :class="`domain--${selectedEntity.domain}`"
+              >{{ selectedEntity.domain }}</span>
+              <span
+                class="chip"
+                :class="`status--${selectedEntity.status}`"
+              >{{ selectedEntity.status }}</span>
               <span class="chip chip-type">{{ selectedEntity.artifact_type }}</span>
             </div>
-            <div v-if="selectedEntity.content_html" class="det-content markdown-body" v-html="selectedEntity.content_html" />
+            <div
+              v-if="selectedEntity.content_html"
+              class="det-content markdown-body"
+              v-html="selectedEntity.content_html"
+            />
             <RouterLink
               :to="{ path: '/graph', query: { id: selectedEntity.artifact_id } }"
               class="explore-lnk"
-            >Explore in graph →</RouterLink>
+            >
+              Explore in graph →
+            </RouterLink>
           </div>
         </aside>
       </div>
 
-      <div v-if="confirmDelete" class="delete-panel">
-        <div class="delete-title">Delete Diagram</div>
+      <div
+        v-if="confirmDelete"
+        class="delete-panel"
+      >
+        <div class="delete-title">
+          Delete Diagram
+        </div>
         <div class="delete-text">
           Deletion removes the diagram source file and any rendered PNG/SVG siblings.
         </div>
-        <div v-if="deletePreview?.warnings.length" class="preview-warnings">
-          <div v-for="w in deletePreview.warnings" :key="w" class="preview-warn">{{ w }}</div>
+        <div
+          v-if="deletePreview?.warnings.length"
+          class="preview-warnings"
+        >
+          <div
+            v-for="w in deletePreview.warnings"
+            :key="w"
+            class="preview-warn"
+          >
+            {{ w }}
+          </div>
         </div>
-        <pre v-if="deletePreview?.content" class="delete-preview">{{ deletePreview.content }}</pre>
-        <pre v-if="deleteError" class="state err state-block">{{ deleteError }}</pre>
+        <pre
+          v-if="deletePreview?.content"
+          class="delete-preview"
+        >{{ deletePreview.content }}</pre>
+        <pre
+          v-if="deleteError"
+          class="state err state-block"
+        >{{ deleteError }}</pre>
         <div class="delete-actions">
-          <button class="toggle-btn" :disabled="deleteBusy" @click="cancelDelete">Cancel</button>
-          <button class="delete-confirm-btn" :disabled="deleteBusy" @click="executeDelete">
+          <button
+            class="toggle-btn"
+            :disabled="deleteBusy"
+            @click="cancelDelete"
+          >
+            Cancel
+          </button>
+          <button
+            class="delete-confirm-btn"
+            :disabled="deleteBusy"
+            @click="executeDelete"
+          >
             {{ deleteBusy ? 'Deleting…' : 'Delete Diagram' }}
           </button>
         </div>
       </div>
 
-      <div v-if="detail.data.value.puml_source" class="src-row">
-        <button class="toggle-btn" @click="showSource = !showSource">
+      <div
+        v-if="detail.data.value.puml_source"
+        class="src-row"
+      >
+        <button
+          class="toggle-btn"
+          @click="showSource = !showSource"
+        >
           {{ showSource ? 'Hide' : 'Show' }} PUML source
         </button>
-        <pre v-if="showSource" class="puml-src">{{ detail.data.value.puml_source }}</pre>
+        <pre
+          v-if="showSource"
+          class="puml-src"
+        >{{ detail.data.value.puml_source }}</pre>
       </div>
     </template>
   </div>

@@ -25,14 +25,15 @@ from src.common.artifact_verifier import ArtifactRegistry
 from src.tools.artifact_write.parse_existing import parse_entity_file
 from src.tools.artifact_write.promote_schema_check import check_promotion_schema_compatibility
 
-
 # ---------------------------------------------------------------------------
 # Data types
 # ---------------------------------------------------------------------------
 
+
 @dataclass
 class PromotionConflict:
     """An engagement entity that matches an enterprise entity by type+name."""
+
     engagement_id: str
     enterprise_id: str
     artifact_type: str
@@ -45,6 +46,7 @@ class PromotionConflict:
 @dataclass
 class DocPromotionConflict:
     """An engagement document that matches an enterprise document by doc_type+title."""
+
     engagement_id: str
     enterprise_id: str
     doc_type: str
@@ -55,6 +57,7 @@ class DocPromotionConflict:
 @dataclass
 class DiagramPromotionConflict:
     """An engagement diagram that matches an enterprise diagram by diagram_type+name."""
+
     engagement_id: str
     enterprise_id: str
     diagram_type: str
@@ -97,6 +100,7 @@ class PromotionResult:
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
 
 def _extract_id_suffix(artifact_id: str) -> str | None:
     """Return the portion after '@' (epoch.random), or None if the ID has no '@'."""
@@ -171,6 +175,7 @@ def _entity_frontmatter(registry: ArtifactRegistry, eid: str) -> dict[str, Any]:
 # Plan
 # ---------------------------------------------------------------------------
 
+
 def plan_promotion(
     entity_id: str | None,
     registry: ArtifactRegistry,
@@ -224,15 +229,17 @@ def plan_promotion(
             if suffix is not None:
                 ent_rec = ent_id_suffix_index.get((rec.artifact_type, suffix))
         if ent_rec is not None:
-            conflicts.append(PromotionConflict(
-                engagement_id=eid,
-                enterprise_id=ent_rec.artifact_id,
-                artifact_type=rec.artifact_type,
-                engagement_name=rec.name,
-                enterprise_name=ent_rec.name,
-                engagement_fields=_entity_frontmatter(registry, eid),
-                enterprise_fields=_entity_frontmatter(registry, ent_rec.artifact_id),
-            ))
+            conflicts.append(
+                PromotionConflict(
+                    engagement_id=eid,
+                    enterprise_id=ent_rec.artifact_id,
+                    artifact_type=rec.artifact_type,
+                    engagement_name=rec.name,
+                    enterprise_name=ent_rec.name,
+                    engagement_fields=_entity_frontmatter(registry, eid),
+                    enterprise_fields=_entity_frontmatter(registry, ent_rec.artifact_id),
+                )
+            )
         else:
             to_add.append(eid)
 
@@ -268,7 +275,7 @@ def plan_promotion(
         if doc_rec.artifact_id in enterprise_doc_ids:
             key = (doc_rec.doc_type, _normalize_name(doc_rec.title))
             enterprise_doc_index[key] = doc_rec
-    for did in (document_ids or []):
+    for did in document_ids or []:
         doc = repo.get_document(did)
         if doc is None:
             warnings.append(f"Document not found: {did}")
@@ -279,13 +286,15 @@ def plan_promotion(
         key = (doc.doc_type, _normalize_name(doc.title))
         ent_doc = enterprise_doc_index.get(key)
         if ent_doc is not None:
-            doc_conflicts.append(DocPromotionConflict(
-                engagement_id=did,
-                enterprise_id=ent_doc.artifact_id,
-                doc_type=doc.doc_type,
-                engagement_title=doc.title,
-                enterprise_title=ent_doc.title,
-            ))
+            doc_conflicts.append(
+                DocPromotionConflict(
+                    engagement_id=did,
+                    enterprise_id=ent_doc.artifact_id,
+                    doc_type=doc.doc_type,
+                    engagement_title=doc.title,
+                    enterprise_title=ent_doc.title,
+                )
+            )
         else:
             docs_to_add.append(did)
 
@@ -298,7 +307,7 @@ def plan_promotion(
         if diag_rec.artifact_id in enterprise_diag_ids:
             key = (diag_rec.diagram_type, _normalize_name(diag_rec.name))
             enterprise_diag_index[key] = diag_rec
-    for did in (diagram_ids or []):
+    for did in diagram_ids or []:
         diag = repo.get_diagram(did)
         if diag is None:
             warnings.append(f"Diagram not found: {did}")
@@ -309,13 +318,15 @@ def plan_promotion(
         key = (diag.diagram_type, _normalize_name(diag.name))
         ent_diag = enterprise_diag_index.get(key)
         if ent_diag is not None:
-            diagram_conflicts.append(DiagramPromotionConflict(
-                engagement_id=did,
-                enterprise_id=ent_diag.artifact_id,
-                diagram_type=diag.diagram_type,
-                engagement_name=diag.name,
-                enterprise_name=ent_diag.name,
-            ))
+            diagram_conflicts.append(
+                DiagramPromotionConflict(
+                    engagement_id=did,
+                    enterprise_id=ent_diag.artifact_id,
+                    diagram_type=diag.diagram_type,
+                    engagement_name=diag.name,
+                    enterprise_name=ent_diag.name,
+                )
+            )
         else:
             diags_to_add.append(did)
 

@@ -10,17 +10,19 @@ import time
 import traceback
 from contextlib import AsyncExitStack, asynccontextmanager
 from pathlib import Path
+from typing import TYPE_CHECKING, cast
 
 from mcp.server.fastmcp.server import StreamableHTTPASGIApp
 
-from src.tools import gui_server
+from src.tools.artifact_mcp import auto_start_default_watcher
 from src.tools.gui_routers import state as gui_state
 from src.tools.mcp_artifact_server import mcp_read, mcp_write
-from src.tools.artifact_mcp import auto_start_default_watcher
-
 
 logger = logging.getLogger(__name__)
 _REQUEST_WATCHDOG_S = 5.0
+
+if TYPE_CHECKING:
+    from src.tools.git_sync import RepoSpec
 
 
 def _find_git_repos() -> "list[RepoSpec]":
@@ -39,10 +41,12 @@ def _find_git_repos() -> "list[RepoSpec]":
         if "git" in spec:
             git_spec = spec["git"]
             rel = git_spec.get("path", f"./{key}-repository")
-            repos.append(RepoSpec(
-                path=(workspace_root / rel).resolve(),
-                role=key,  # type: ignore[arg-type]
-            ))
+            repos.append(
+                RepoSpec(
+                    path=(workspace_root / rel).resolve(),
+                    role=key,  # type: ignore[arg-type]
+                )
+            )
     return repos
 
 
@@ -59,10 +63,10 @@ def _log_thread_dump(*, reason: str) -> None:
 
 
 def _build_app(git_ssh_passphrase: str | None = None):  # type: ignore[no-untyped-def]
-    from fastapi import FastAPI
-    from fastapi import Request
+    from fastapi import FastAPI, Request
     from fastapi.middleware.cors import CORSMiddleware
     from fastapi.staticfiles import StaticFiles
+
     from src.tools.gui_routers.admin import router as admin_router
     from src.tools.gui_routers.connections import router as connections_router
     from src.tools.gui_routers.diagrams import router as diagrams_router
@@ -84,11 +88,14 @@ def _build_app(git_ssh_passphrase: str | None = None):  # type: ignore[no-untype
         if repo is not None:
             await asyncio.to_thread(repo.refresh)
         from src.tools.gui_routers.events import event_bus
-        await event_bus.publish({
-            "type": "sync_repository_updated",
-            "repo": str(repo_path),
-            "label": "Repository updated — refreshing view…",
-        })
+
+        await event_bus.publish(
+            {
+                "type": "sync_repository_updated",
+                "repo": str(repo_path),
+                "label": "Repository updated — refreshing view…",
+            }
+        )
 
     @asynccontextmanager
     async def lifespan(_app: FastAPI):
@@ -103,6 +110,7 @@ def _build_app(git_ssh_passphrase: str | None = None):  # type: ignore[no-untype
             sync_mgr = None
             if git_repos:
                 from src.tools.git_sync import GitSyncManager
+
                 logger.info(
                     "Starting git-sync for repos: %s",
                     ", ".join(f"{r.path}({r.role})" for r in git_repos),
@@ -181,10 +189,10 @@ def _build_app(git_ssh_passphrase: str | None = None):  # type: ignore[no-untype
     # Starlette mounts only match `/mcp/…`, not the bare `/mcp` path.
     # Serve the MCP ASGI handlers on both variants so IDE clients can POST to
     # `/mcp` without getting routed into the SPA/static handler.
-    app.add_route("/mcp/read", read_app, include_in_schema=False)
-    app.add_route("/mcp/read/", read_app, include_in_schema=False)
-    app.add_route("/mcp/write", write_app, include_in_schema=False)
-    app.add_route("/mcp/write/", write_app, include_in_schema=False)
+    app.add_route("/mcp/read", cast(object, read_app), include_in_schema=False)  # type: ignore[arg-type]
+    app.add_route("/mcp/read/", cast(object, read_app), include_in_schema=False)  # type: ignore[arg-type]
+    app.add_route("/mcp/write", cast(object, write_app), include_in_schema=False)  # type: ignore[arg-type]
+    app.add_route("/mcp/write/", cast(object, write_app), include_in_schema=False)  # type: ignore[arg-type]
 
     gui_dist = Path(__file__).resolve().parent.parent.parent / "tools" / "gui" / "dist"
     if gui_dist.exists():

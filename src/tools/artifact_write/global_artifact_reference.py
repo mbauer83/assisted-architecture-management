@@ -8,19 +8,19 @@ this module is the only authorised creator.
 """
 
 from __future__ import annotations
-from pathlib import Path
+
 from collections.abc import Callable
+from pathlib import Path
 
 from src.common.artifact_query import ArtifactRepository
-from src.common.artifact_write import ENTITY_TYPES, generate_entity_id
-from src.common.repo_paths import MODEL
-from src.common.artifact_write_formatting import format_entity_markdown
 from src.common.artifact_verifier import ArtifactVerifier
+from src.common.artifact_write import ENTITY_TYPES, generate_entity_id
+from src.common.artifact_write_formatting import format_entity_markdown
+from src.common.repo_paths import MODEL
 from src.tools.generate_macros import generate_macros
 
 from .boundary import assert_engagement_write_root, today_iso
 from .types import WriteResult
-
 
 _GAR_TYPE = "global-artifact-reference"
 _GAR_ID_KEY = "global-artifact-id"
@@ -44,7 +44,7 @@ def ensure_global_artifact_reference(
     clear_repo_caches: Callable[[Path], None],
     global_artifact_id: str,
     global_artifact_name: str,
-    global_artifact_type: str,        # "entity" | "document" | "diagram"
+    global_artifact_type: str,  # "entity" | "document" | "diagram"
     global_artifact_entity_type: str | None = None,  # e.g. "capability" for entity GARs
     dry_run: bool = False,
 ) -> WriteResult:
@@ -55,8 +55,12 @@ def ensure_global_artifact_reference(
     if existing is not None:
         path = engagement_root / MODEL / "common" / "global-references" / f"{existing}.md"
         return WriteResult(
-            wrote=False, path=path, artifact_id=existing,
-            content=None, warnings=["GAR already exists"], verification=None,
+            wrote=False,
+            path=path,
+            artifact_id=existing,
+            content=None,
+            warnings=["GAR already exists"],
+            verification=None,
         )
 
     info = ENTITY_TYPES[_GAR_TYPE]
@@ -84,14 +88,22 @@ def ensure_global_artifact_reference(
         extra_frontmatter={
             _GAR_ID_KEY: global_artifact_id,
             _GAR_TYPE_KEY: global_artifact_type,
-            **({_GAR_ENTITY_TYPE_KEY: global_artifact_entity_type} if global_artifact_entity_type else {}),
+            **(
+                {_GAR_ENTITY_TYPE_KEY: global_artifact_entity_type}
+                if global_artifact_entity_type
+                else {}
+            ),
         },
     )
 
     if dry_run:
         return WriteResult(
-            wrote=False, path=path, artifact_id=eid,
-            content=content, warnings=[], verification=None,
+            wrote=False,
+            path=path,
+            artifact_id=eid,
+            content=content,
+            warnings=[],
+            verification=None,
         )
 
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -104,10 +116,17 @@ def ensure_global_artifact_reference(
         except OSError:
             pass
         return WriteResult(
-            wrote=False, path=path, artifact_id=eid, content=content, warnings=[],
+            wrote=False,
+            path=path,
+            artifact_id=eid,
+            content=content,
+            warnings=[],
             verification={
                 "valid": False,
-                "issues": [{"severity": i.severity, "code": i.code, "message": i.message} for i in res.issues],
+                "issues": [
+                    {"severity": i.severity, "code": i.code, "message": i.message}
+                    for i in res.issues
+                ],
             },
         )
 
@@ -118,8 +137,12 @@ def ensure_global_artifact_reference(
     clear_repo_caches(path)
 
     return WriteResult(
-        wrote=True, path=path, artifact_id=eid,
-        content=None, warnings=[], verification={"valid": True, "issues": []},
+        wrote=True,
+        path=path,
+        artifact_id=eid,
+        content=None,
+        warnings=[],
+        verification={"valid": True, "issues": []},
     )
 
 

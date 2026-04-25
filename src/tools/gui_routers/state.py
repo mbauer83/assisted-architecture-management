@@ -4,16 +4,21 @@ from __future__ import annotations
 
 import threading
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
-try:
+if TYPE_CHECKING:
     from fastapi import HTTPException
-except ModuleNotFoundError:  # pragma: no cover - test env without GUI deps
-    class HTTPException(Exception):
-        def __init__(self, status_code: int, detail: str) -> None:
-            self.status_code = status_code
-            self.detail = detail
-            super().__init__(detail)
+else:
+    try:
+        from fastapi import HTTPException
+    except ModuleNotFoundError:  # pragma: no cover - test env without GUI deps
+
+        class HTTPException(Exception):
+            def __init__(self, status_code: int, detail: str) -> None:
+                self.status_code = status_code
+                self.detail = detail
+                super().__init__(detail)
+
 
 from src.common.artifact_query import ArtifactRepository
 from src.common.artifact_types import ConnectionRecord, DiagramRecord, EntityRecord
@@ -24,10 +29,10 @@ from src.infrastructure.artifact_index.coordination import publish_authoritative
 # safely read these values without racing against init_state().
 _state_lock = threading.Lock()
 _repo: ArtifactRepository | None = None
-_repo_root: Path | None = None          # engagement root — used for writes
-_enterprise_root: Path | None = None    # enterprise root — read-only in normal mode
-_admin_mode: bool = False               # when True, enterprise writes are permitted via /admin/api/*
-_read_only: bool = False                # when True, all engagement writes are blocked
+_repo_root: Path | None = None  # engagement root — used for writes
+_enterprise_root: Path | None = None  # enterprise root — read-only in normal mode
+_admin_mode: bool = False  # when True, enterprise writes are permitted via /admin/api/*
+_read_only: bool = False  # when True, all engagement writes are blocked
 
 
 def init_state(
@@ -103,9 +108,14 @@ def entity_to_summary(
     conn_counts: dict[str, tuple[int, int, int]] | None = None,
 ) -> dict[str, Any]:
     d: dict[str, Any] = {
-        "artifact_id": e.artifact_id, "artifact_type": e.artifact_type,
-        "name": e.name, "version": e.version, "status": e.status,
-        "domain": e.domain, "subdomain": e.subdomain, "path": str(e.path),
+        "artifact_id": e.artifact_id,
+        "artifact_type": e.artifact_type,
+        "name": e.name,
+        "version": e.version,
+        "status": e.status,
+        "domain": e.domain,
+        "subdomain": e.subdomain,
+        "path": str(e.path),
         "is_global": is_global(e.path),
     }
     if conn_counts is not None:
@@ -148,9 +158,14 @@ def connection_to_dict(c: ConnectionRecord) -> dict[str, Any]:
         if tgt_rec is not None and tgt_rec.name:
             tgt_name = tgt_rec.name
     d: dict[str, Any] = {
-        "artifact_id": c.artifact_id, "source": c.source, "target": resolved_target,
-        "conn_type": c.conn_type, "version": c.version, "status": c.status,
-        "path": str(c.path), "content_text": c.content_text,
+        "artifact_id": c.artifact_id,
+        "source": c.source,
+        "target": resolved_target,
+        "conn_type": c.conn_type,
+        "version": c.version,
+        "status": c.status,
+        "path": str(c.path),
+        "content_text": c.content_text,
         "associated_entities": list(c.associated_entities),
         "src_cardinality": c.src_cardinality,
         "tgt_cardinality": c.tgt_cardinality,
@@ -164,8 +179,12 @@ def connection_to_dict(c: ConnectionRecord) -> dict[str, Any]:
 
 def diagram_to_summary(d: DiagramRecord) -> dict[str, Any]:
     return {
-        "artifact_id": d.artifact_id, "name": d.name, "diagram_type": d.diagram_type,
-        "version": d.version, "status": d.status, "path": str(d.path),
+        "artifact_id": d.artifact_id,
+        "name": d.name,
+        "diagram_type": d.diagram_type,
+        "version": d.version,
+        "status": d.status,
+        "path": str(d.path),
     }
 
 
@@ -174,6 +193,7 @@ def get_write_deps() -> tuple[Path, Any, Any]:
     from src.common.artifact_verifier import ArtifactVerifier
     from src.common.artifact_verifier_registry import ArtifactRegistry
     from src.infrastructure.artifact_index import shared_artifact_index
+
     with _state_lock:
         repo_root = _repo_root
         enterprise_root = _enterprise_root
@@ -196,6 +216,7 @@ def get_admin_write_deps() -> tuple[Path, Any, Any]:
     from src.common.artifact_verifier import ArtifactVerifier
     from src.common.artifact_verifier_registry import ArtifactRegistry
     from src.infrastructure.artifact_index import shared_artifact_index
+
     with _state_lock:
         admin_mode = _admin_mode
         enterprise_root = _enterprise_root
@@ -236,16 +257,20 @@ def run_serialized_write(fn: Any, /, *args: Any, **kwargs: Any) -> Any:
     # Check write-block state before passing to queue
     target_root = kwargs.get("repo_root") or (args[0] if args else None)
     if target_root is not None and is_blocked(Path(str(target_root))):
-        raise HTTPException(503, "Writes are temporarily blocked (sync in progress or read-only mode)")
+        raise HTTPException(
+            503, "Writes are temporarily blocked (sync in progress or read-only mode)"
+        )
 
     return run_sync(fn, *args, **kwargs)
 
 
 def write_result_to_dict(result: Any) -> dict[str, Any]:
     return {
-        "wrote": bool(result.wrote), "path": str(result.path),
+        "wrote": bool(result.wrote),
+        "path": str(result.path),
         "artifact_id": result.artifact_id,
-        "content": result.content, "warnings": result.warnings,
+        "content": result.content,
+        "warnings": result.warnings,
         "verification": result.verification,
     }
 

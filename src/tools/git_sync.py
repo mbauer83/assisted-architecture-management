@@ -10,6 +10,7 @@ enterprise  — state-machine-aware (see enterprise_sync_state.py):
   accumulating: fetch only; emits sync_enterprise_diverged if origin/main moved
   pending     : fetch + content-diff; auto-transitions to main on merge detection
 """
+
 from __future__ import annotations
 
 import asyncio
@@ -34,6 +35,7 @@ _AUTO_UNBLOCK_S = 60.0
 @dataclass
 class RepoSpec:
     """A git-backed repository and its role within the two-tier model."""
+
     path: Path
     role: Literal["engagement", "enterprise"]
 
@@ -57,9 +59,12 @@ class GitSyncManager:
         if self._ssh_passphrase:
             self._askpass_script = self._create_askpass_script()
             from src.tools import git_env
+
             git_env.set_ssh_env(self._ssh_env())
         self._task = asyncio.create_task(self._poll_loop(), name="git-sync")
-        logger.info("git-sync started for %d repo(s) (poll %.1fs)", len(self._repos), self._poll_interval_s)
+        logger.info(
+            "git-sync started for %d repo(s) (poll %.1fs)", len(self._repos), self._poll_interval_s
+        )
 
     async def stop(self) -> None:
         if self._task:
@@ -76,6 +81,7 @@ class GitSyncManager:
                 pass
             self._askpass_script = None
         from src.tools import git_env
+
         git_env.set_ssh_env(None)
 
     # ------------------------------------------------------------------
@@ -125,16 +131,21 @@ class GitSyncManager:
 
     async def _git(self, repo: Path, *args: str, timeout: float = 10.0) -> tuple[int, str, str]:
         proc = await asyncio.create_subprocess_exec(
-            "git", *args, cwd=repo,
-            stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE,
+            "git",
+            *args,
+            cwd=repo,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
             env=self._git_env(),
         )
         try:
             out, err = await asyncio.wait_for(proc.communicate(), timeout=timeout)
         except asyncio.TimeoutError:
-            proc.kill(); await proc.communicate()
+            proc.kill()
+            await proc.communicate()
             return -1, "", "timeout"
-        return proc.returncode, out.decode(errors="replace"), err.decode(errors="replace")
+        return_code = proc.returncode if proc.returncode is not None else -1
+        return return_code, out.decode(errors="replace"), err.decode(errors="replace")
 
     async def _is_git_repo(self, path: Path) -> bool:
         rc, _, _ = await self._git(path, "rev-parse", "--git-dir")
@@ -153,8 +164,14 @@ class GitSyncManager:
 
     async def _promotion_merged(self, enterprise_root: Path) -> bool:
         rc, out, _ = await self._git(
-            enterprise_root, "diff", "origin/main", "HEAD",
-            "--", MODEL, DOCS, DIAGRAM_CATALOG,
+            enterprise_root,
+            "diff",
+            "origin/main",
+            "HEAD",
+            "--",
+            MODEL,
+            DOCS,
+            DIAGRAM_CATALOG,
         )
         return rc == 0 and not out.strip()
 
@@ -165,10 +182,13 @@ class GitSyncManager:
     async def _auto_unblock(self, repo: Path, delay_s: float, was_blocked: bool) -> None:
         await asyncio.sleep(delay_s)
         if not was_blocked:
-            from src.tools.write_block_manager import unblock_repo
             from src.tools.gui_routers.events import event_bus
+            from src.tools.write_block_manager import unblock_repo
+
             unblock_repo(repo)
-            await event_bus.publish({"type": "write_block_changed", "repo": str(repo), "blocked": False})
+            await event_bus.publish(
+                {"type": "write_block_changed", "repo": str(repo), "blocked": False}
+            )
             logger.info("auto-unblock completed for %s", repo)
 
     # ------------------------------------------------------------------
@@ -183,14 +203,16 @@ class GitSyncManager:
             return
         rc, _, err = await self._git(repo, "fetch", "origin", timeout=_FETCH_TIMEOUT_S)
         if rc != 0:
-            logger.warning("fetch failed for engagement %s: %s", repo, err.strip()); return
+            logger.warning("fetch failed for engagement %s: %s", repo, err.strip())
+            return
 
         behind = await self._count(repo, "HEAD..@{u}")
         if behind == 0:
             return
         ahead = await self._count(repo, "@{u}..HEAD")
         if not await self._is_clean(repo) and ahead == 0:
-            logger.info("skipping engagement pull %s: uncommitted changes", repo); return
+            logger.info("skipping engagement pull %s: uncommitted changes", repo)
+            return
 
         pull_args = ["pull", "--rebase"] if ahead > 0 else ["pull", "--ff-only"]
         repo_label, was_blocked = str(repo), is_blocked(repo)
@@ -201,20 +223,29 @@ class GitSyncManager:
             rc, _, err = await self._git(repo, *pull_args, timeout=_PULL_TIMEOUT_S)
         except Exception as exc:
             logger.exception("pull error for engagement %s", repo)
-            await event_bus.publish({"type": "sync_pull_failed", "repo": repo_label, "error": str(exc)})
-            asyncio.create_task(self._auto_unblock(repo, _AUTO_UNBLOCK_S, was_blocked)); return
+            await event_bus.publish(
+                {"type": "sync_pull_failed", "repo": repo_label, "error": str(exc)}
+            )
+            asyncio.create_task(self._auto_unblock(repo, _AUTO_UNBLOCK_S, was_blocked))
+            return
 
         if rc == 0:
             if not was_blocked:
                 unblock_repo(repo)
-            await event_bus.publish({"type": "sync_pull_completed", "repo": repo_label, "commits_pulled": behind})
+            await event_bus.publish(
+                {"type": "sync_pull_completed", "repo": repo_label, "commits_pulled": behind}
+            )
             await self._notify_changed(repo)
         else:
             if "--rebase" in pull_args and "CONFLICT" in err:
                 await self._git(repo, "rebase", "--abort")
-                await event_bus.publish({"type": "sync_conflict", "repo": repo_label, "error": err.strip()})
+                await event_bus.publish(
+                    {"type": "sync_conflict", "repo": repo_label, "error": err.strip()}
+                )
             else:
-                await event_bus.publish({"type": "sync_pull_failed", "repo": repo_label, "error": err.strip()})
+                await event_bus.publish(
+                    {"type": "sync_pull_failed", "repo": repo_label, "error": err.strip()}
+                )
             asyncio.create_task(self._auto_unblock(repo, _AUTO_UNBLOCK_S, was_blocked))
 
     # ------------------------------------------------------------------
@@ -226,7 +257,8 @@ class GitSyncManager:
             return
         rc, _, err = await self._git(root, "fetch", "origin", timeout=_FETCH_TIMEOUT_S)
         if rc != 0:
-            logger.warning("fetch failed for enterprise %s: %s", root, err.strip()); return
+            logger.warning("fetch failed for enterprise %s: %s", root, err.strip())
+            return
 
         state = enterprise_sync_state.load(root)
         if state.is_synced():
@@ -249,31 +281,45 @@ class GitSyncManager:
         try:
             rc, _, err = await self._git(root, "pull", "--ff-only", timeout=_PULL_TIMEOUT_S)
         except Exception as exc:
-            await event_bus.publish({"type": "sync_pull_failed", "repo": root_label, "error": str(exc)})
-            asyncio.create_task(self._auto_unblock(root, _AUTO_UNBLOCK_S, was_blocked)); return
+            await event_bus.publish(
+                {"type": "sync_pull_failed", "repo": root_label, "error": str(exc)}
+            )
+            asyncio.create_task(self._auto_unblock(root, _AUTO_UNBLOCK_S, was_blocked))
+            return
 
         if rc == 0:
             if not was_blocked:
                 unblock_repo(root)
-            await event_bus.publish({"type": "sync_pull_completed", "repo": root_label, "commits_pulled": behind})
+            await event_bus.publish(
+                {"type": "sync_pull_completed", "repo": root_label, "commits_pulled": behind}
+            )
             await self._notify_changed(root)
         else:
-            await event_bus.publish({"type": "sync_pull_failed", "repo": root_label, "error": err.strip()})
+            await event_bus.publish(
+                {"type": "sync_pull_failed", "repo": root_label, "error": err.strip()}
+            )
             asyncio.create_task(self._auto_unblock(root, _AUTO_UNBLOCK_S, was_blocked))
 
     async def _ent_accumulating(
-        self, root: Path, state: enterprise_sync_state.EnterpriseSyncState,
+        self,
+        root: Path,
+        state: enterprise_sync_state.EnterpriseSyncState,
     ) -> None:
         from src.tools.gui_routers.events import event_bus
+
         behind = await self._count(root, "HEAD..origin/main")
         if behind != state.commits_behind:
             state.commits_behind = behind
             enterprise_sync_state.save(root, state)
         if behind > 0:
-            await event_bus.publish({"type": "sync_enterprise_diverged", "repo": str(root), "commits_behind": behind})
+            await event_bus.publish(
+                {"type": "sync_enterprise_diverged", "repo": str(root), "commits_behind": behind}
+            )
 
     async def _ent_pending(
-        self, root: Path, state: enterprise_sync_state.EnterpriseSyncState,
+        self,
+        root: Path,
+        state: enterprise_sync_state.EnterpriseSyncState,
     ) -> None:
         from src.tools.gui_routers.events import event_bus
         from src.tools.write_block_manager import block_repo, unblock_repo
@@ -303,4 +349,6 @@ class GitSyncManager:
         except Exception as exc:
             logger.exception("enterprise merge transition failed for %s", root)
             unblock_repo(root)
-            await event_bus.publish({"type": "sync_enterprise_merge_failed", "repo": root_label, "error": str(exc)})
+            await event_bus.publish(
+                {"type": "sync_enterprise_merge_failed", "repo": root_label, "error": str(exc)}
+            )

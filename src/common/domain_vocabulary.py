@@ -42,14 +42,13 @@ Import ``expand_tokens`` for the one-hop expansion used in scoring::
 # The reverse index is built automatically below so lookups are bidirectional.
 
 DOMAIN_SYNONYMS: dict[str, list[str]] = {
-
     # -----------------------------------------------------------------------
     # Common domain concepts ↔ related terms (improves recall for natural-language queries)
     # -----------------------------------------------------------------------
-    "policy":     ["rule", "constraint", "principle", "governance"],
-    "trace":      ["traceability", "link", "reference", "dependency"],
-    "diagram":    ["puml", "visualization", "view", "model"],
-    "entity":     ["artifact", "model", "element", "instance"],
+    "policy": ["rule", "constraint", "principle", "governance"],
+    "trace": ["traceability", "link", "reference", "dependency"],
+    "diagram": ["puml", "visualization", "view", "model"],
+    "entity": ["artifact", "model", "element", "instance"],
     "connection": ["relation", "link", "edge", "association", "realization"],
 }
 
@@ -105,6 +104,7 @@ def expand_tokens(tokens: list[str]) -> list[str]:
                 seen.add(syn)
     return expanded
 
+
 def archimate_prefix_to_type() -> dict[str, str]:
     """Return the canonical mapping of artifact-id prefix → ArchiMate element type.
 
@@ -121,7 +121,7 @@ def archimate_prefix_to_type() -> dict[str, str]:
         "MEA": "meaning",
         "VAL": "value",
         "CAP": "capability",
-        "VS":  "value-stream",
+        "VS": "value-stream",
         "RES": "resource",
         "COA": "course-of-action",
         "ACT": "business-actor",
@@ -144,7 +144,7 @@ def archimate_prefix_to_type() -> dict[str, str]:
         "ART": "artifact",
         "NET": "network",
         "TIF": "technology-interface",
-        "WP":  "work-package",
+        "WP": "work-package",
         "DEL": "deliverable",
         "PLT": "plateau",
     }

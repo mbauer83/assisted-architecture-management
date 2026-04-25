@@ -1,4 +1,3 @@
-
 from typing import Literal
 
 from mcp.server.fastmcp import FastMCP  # type: ignore[import-not-found]

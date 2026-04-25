@@ -16,17 +16,23 @@ _DEFAULTS = {
         "sprite_scale": 1.5,
         "render_dpi": 150,
         "plantuml_limit_size": 16384,
-    }
+    },
 }
+
+_SettingsSection = dict[str, object]
 
 
 def load_settings() -> dict:
     path = _CONFIG_DIR / "settings.yaml"
     if not path.exists():
         return _DEFAULTS.copy()
-    data = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
-    backend = {**_DEFAULTS["backend"], **(data.get("backend") or {})}
-    diagrams = {**_DEFAULTS["diagrams"], **(data.get("diagrams") or {})}
+    data: dict[str, object] = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
+    backend_raw = data.get("backend")
+    diagrams_raw = data.get("diagrams")
+    backend_section: _SettingsSection = backend_raw if isinstance(backend_raw, dict) else {}
+    diagrams_section: _SettingsSection = diagrams_raw if isinstance(diagrams_raw, dict) else {}
+    backend = {**_DEFAULTS["backend"], **backend_section}
+    diagrams = {**_DEFAULTS["diagrams"], **diagrams_section}
     return {"backend": backend, "diagrams": diagrams}
 
 

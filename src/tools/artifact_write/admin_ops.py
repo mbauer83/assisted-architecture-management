@@ -14,36 +14,41 @@ check entirely at the callsite level.
 
 from __future__ import annotations
 
-from pathlib import Path
 from collections.abc import Callable
+from pathlib import Path
 
-from src.common.archimate_types import ALL_CONNECTION_TYPES, ALL_ENTITY_TYPES
+from src.common.archimate_types import ALL_ENTITY_TYPES
 from src.common.artifact_verifier import ArtifactRegistry, ArtifactVerifier
-from src.common.artifact_write import ENTITY_TYPES, generate_entity_id, format_outgoing_markdown
-from src.common.repo_paths import DIAGRAM_CATALOG, DIAGRAMS, MODEL
+from src.common.artifact_write import ENTITY_TYPES, format_outgoing_markdown, generate_entity_id
 from src.common.artifact_write_formatting import format_entity_markdown
+from src.common.repo_paths import DIAGRAM_CATALOG, DIAGRAMS, MODEL
 from src.tools.generate_macros import generate_macros
 
 from .boundary import assert_enterprise_write_root, today_iso
+from .coerce import as_optional_str, as_optional_str_dict, as_optional_str_list
 from .connection import (
     _build_content as _build_conn_content,
+)
+from .connection import (
     _resolve_outgoing_path,
     _rollback,
     _validate_inputs,
-    _write_and_verify as _write_and_verify_conn,
     verification_to_conn_dict,
 )
+from .connection import (
+    _write_and_verify as _write_and_verify_conn,
+)
+from .diagram_delete import _delete_diagram_core
 from .entity import verification_to_entity_dict
+from .entity_delete import _delete_entity_core
 from .parse_existing import parse_entity_file, parse_outgoing_file
 from .types import WriteResult
 from .verify import verify_content_in_temp_path
-from .entity_delete import _delete_entity_core
-from .diagram_delete import _delete_diagram_core
-
 
 # ---------------------------------------------------------------------------
 # Entity
 # ---------------------------------------------------------------------------
+
 
 def admin_create_entity(
     *,
@@ -80,17 +85,31 @@ def admin_create_entity(
         "alias": f"{info.prefix}_{eid.split('.')[1]}" if "." in eid else eid.replace("-", "_"),
     }
     content = format_entity_markdown(
-        artifact_id=eid, artifact_type=artifact_type, name=name,
-        version=version, status=status, last_updated=last,
-        keywords=keywords, summary=summary, properties=properties,
-        notes=notes, display_archimate=display,
+        artifact_id=eid,
+        artifact_type=artifact_type,
+        name=name,
+        version=version,
+        status=status,
+        last_updated=last,
+        keywords=keywords,
+        summary=summary,
+        properties=properties,
+        notes=notes,
+        display_archimate=display,
     )
 
     if dry_run:
-        res = verify_content_in_temp_path(verifier=verifier, file_type="entity",
-                                          desired_name=path.name, content=content)
-        return WriteResult(wrote=False, path=path, artifact_id=eid, content=content,
-                           warnings=[], verification=verification_to_entity_dict(path, res))
+        res = verify_content_in_temp_path(
+            verifier=verifier, file_type="entity", desired_name=path.name, content=content
+        )
+        return WriteResult(
+            wrote=False,
+            path=path,
+            artifact_id=eid,
+            content=content,
+            warnings=[],
+            verification=verification_to_entity_dict(path, res),
+        )
 
     path.parent.mkdir(parents=True, exist_ok=True)
     prev = path.read_text(encoding="utf-8") if path.exists() else None
@@ -101,16 +120,28 @@ def admin_create_entity(
             path.unlink(missing_ok=True)
         else:
             path.write_text(prev, encoding="utf-8")
-        return WriteResult(wrote=False, path=path, artifact_id=eid, content=content,
-                           warnings=[], verification=verification_to_entity_dict(path, res))
+        return WriteResult(
+            wrote=False,
+            path=path,
+            artifact_id=eid,
+            content=content,
+            warnings=[],
+            verification=verification_to_entity_dict(path, res),
+        )
 
     try:
         generate_macros(repo_root)
     except Exception:  # noqa: BLE001
         pass
     clear_repo_caches(path)
-    return WriteResult(wrote=True, path=path, artifact_id=eid, content=None,
-                       warnings=[], verification=verification_to_entity_dict(path, res))
+    return WriteResult(
+        wrote=True,
+        path=path,
+        artifact_id=eid,
+        content=None,
+        warnings=[],
+        verification=verification_to_entity_dict(path, res),
+    )
 
 
 _UNSET = object()
@@ -145,38 +176,59 @@ def admin_edit_entity(
     eff_name = name if name is not None else str(fm.get("name", ""))
     eff_version = version if version is not None else str(fm.get("version", "0.1.0"))
     eff_status = status if status is not None else str(fm.get("status", "draft"))
-    eff_keywords = keywords if keywords is not _UNSET else (fm.get("keywords") or None)
-    eff_summary = summary if summary is not _UNSET else parsed.summary
-    eff_properties = properties if properties is not _UNSET else (parsed.properties or None)
-    eff_notes = notes if notes is not _UNSET else parsed.notes
+    eff_keywords = as_optional_str_list(keywords if keywords is not _UNSET else fm.get("keywords"))
+    eff_summary = as_optional_str(summary) if summary is not _UNSET else parsed.summary
+    eff_properties = (
+        as_optional_str_dict(properties)
+        if properties is not _UNSET
+        else (parsed.properties or None)
+    )
+    eff_notes = as_optional_str(notes) if notes is not _UNSET else parsed.notes
 
     display = dict(parsed.display_archimate)
     if name is not None and display:
         display["label"] = eff_name
 
     content = format_entity_markdown(
-        artifact_id=artifact_id, artifact_type=artifact_type,
-        name=eff_name, version=eff_version, status=eff_status,
-        last_updated=today_iso(), keywords=eff_keywords,
-        summary=eff_summary, properties=eff_properties,
-        notes=eff_notes, display_archimate=display,
+        artifact_id=artifact_id,
+        artifact_type=artifact_type,
+        name=eff_name,
+        version=eff_version,
+        status=eff_status,
+        last_updated=today_iso(),
+        keywords=eff_keywords,
+        summary=eff_summary,
+        properties=eff_properties,
+        notes=eff_notes,
+        display_archimate=display,
     )
 
     if dry_run:
-        res = verify_content_in_temp_path(verifier=verifier, file_type="entity",
-                                          desired_name=entity_file.name, content=content)
-        return WriteResult(wrote=False, path=entity_file, artifact_id=artifact_id,
-                           content=content, warnings=[],
-                           verification=verification_to_entity_dict(entity_file, res))
+        res = verify_content_in_temp_path(
+            verifier=verifier, file_type="entity", desired_name=entity_file.name, content=content
+        )
+        return WriteResult(
+            wrote=False,
+            path=entity_file,
+            artifact_id=artifact_id,
+            content=content,
+            warnings=[],
+            verification=verification_to_entity_dict(entity_file, res),
+        )
 
     prev = entity_file.read_text(encoding="utf-8")
     entity_file.write_text(content, encoding="utf-8")
     res = verifier.verify_entity_file(entity_file)
     if not res.valid:
         entity_file.write_text(prev, encoding="utf-8")
-        return WriteResult(wrote=False, path=entity_file, artifact_id=artifact_id,
-                           content=content, warnings=[],
-                           verification=verification_to_entity_dict(entity_file, res))
+        return WriteResult(
+            wrote=False,
+            path=entity_file,
+            artifact_id=artifact_id,
+            content=content,
+            warnings=[],
+            verification=verification_to_entity_dict(entity_file, res),
+        )
 
     if name is not None:
         try:
@@ -184,9 +236,14 @@ def admin_edit_entity(
         except Exception:  # noqa: BLE001
             pass
     clear_repo_caches(entity_file)
-    return WriteResult(wrote=True, path=entity_file, artifact_id=artifact_id,
-                       content=None, warnings=[],
-                       verification=verification_to_entity_dict(entity_file, res))
+    return WriteResult(
+        wrote=True,
+        path=entity_file,
+        artifact_id=artifact_id,
+        content=None,
+        warnings=[],
+        verification=verification_to_entity_dict(entity_file, res),
+    )
 
 
 def admin_delete_entity(
@@ -211,6 +268,7 @@ def admin_delete_entity(
 # Connection
 # ---------------------------------------------------------------------------
 
+
 def admin_add_connection(
     *,
     repo_root: Path,
@@ -232,15 +290,35 @@ def admin_add_connection(
     last = last_updated or today_iso()
     outgoing_path = _resolve_outgoing_path(registry, source_entity)
     conn_id = f"{connection_type} → {target_entity}"
-    content = _build_conn_content(outgoing_path, source_entity, connection_type,
-                                  target_entity, description, version, status, last)
+    content = _build_conn_content(
+        outgoing_path,
+        source_entity,
+        connection_type,
+        target_entity,
+        description,
+        version,
+        status,
+        last,
+    )
 
     if dry_run:
-        return WriteResult(wrote=False, path=outgoing_path, artifact_id=conn_id,
-                           content=content, warnings=[], verification=None)
+        return WriteResult(
+            wrote=False,
+            path=outgoing_path,
+            artifact_id=conn_id,
+            content=content,
+            warnings=[],
+            verification=None,
+        )
 
-    result = _write_and_verify_conn(outgoing_path, content, verifier,
-                                    connection_type, target_entity)
+    result = _write_and_verify_conn(
+        outgoing_path,
+        content,
+        verifier,
+        source_entity,
+        connection_type,
+        target_entity,
+    )
     if result.wrote:
         clear_repo_caches(outgoing_path)
     return result
@@ -266,7 +344,8 @@ def admin_remove_connection(
     parsed = parse_outgoing_file(outgoing_path)
     conn_id = f"{connection_type} -> {target_entity}"
     remaining = [
-        c for c in parsed.connections
+        c
+        for c in parsed.connections
         if not (c["connection_type"] == connection_type and c["target_entity"] == target_entity)
     ]
     if len(remaining) == len(parsed.connections):
@@ -274,31 +353,53 @@ def admin_remove_connection(
 
     if dry_run:
         if not remaining:
-            return WriteResult(wrote=False, path=outgoing_path, artifact_id=conn_id,
-                               content="(file would be deleted — last connection removed)",
-                               warnings=[], verification=None)
+            return WriteResult(
+                wrote=False,
+                path=outgoing_path,
+                artifact_id=conn_id,
+                content="(file would be deleted — last connection removed)",
+                warnings=[],
+                verification=None,
+            )
         content = format_outgoing_markdown(
             source_entity=source_entity,
             version=str(parsed.frontmatter.get("version", "0.1.0")),
             status=str(parsed.frontmatter.get("status", "active")),
-            last_updated=today_iso(), connections=remaining,
+            last_updated=today_iso(),
+            connections=remaining,
         )
-        return WriteResult(wrote=False, path=outgoing_path, artifact_id=conn_id,
-                           content=content, warnings=[], verification=None)
+        return WriteResult(
+            wrote=False,
+            path=outgoing_path,
+            artifact_id=conn_id,
+            content=content,
+            warnings=[],
+            verification=None,
+        )
 
     if not remaining:
         outgoing_path.unlink()
         clear_repo_caches(outgoing_path)
-        return WriteResult(wrote=True, path=outgoing_path, artifact_id=conn_id,
-                           content=None, warnings=["Deleted empty .outgoing.md file"],
-                           verification={"path": str(outgoing_path), "file_type": "connection",
-                                         "valid": True, "issues": []})
+        return WriteResult(
+            wrote=True,
+            path=outgoing_path,
+            artifact_id=conn_id,
+            content=None,
+            warnings=["Deleted empty .outgoing.md file"],
+            verification={
+                "path": str(outgoing_path),
+                "file_type": "connection",
+                "valid": True,
+                "issues": [],
+            },
+        )
 
     content = format_outgoing_markdown(
         source_entity=source_entity,
         version=str(parsed.frontmatter.get("version", "0.1.0")),
         status=str(parsed.frontmatter.get("status", "active")),
-        last_updated=today_iso(), connections=remaining,
+        last_updated=today_iso(),
+        connections=remaining,
     )
     prev = outgoing_path.read_text(encoding="utf-8")
     outgoing_path.write_text(content, encoding="utf-8")
@@ -306,16 +407,29 @@ def admin_remove_connection(
     vdict = verification_to_conn_dict(outgoing_path, res)
     if not res.valid:
         _rollback(outgoing_path, prev)
-        return WriteResult(wrote=False, path=outgoing_path, artifact_id=conn_id,
-                           content=content, warnings=[], verification=vdict)
+        return WriteResult(
+            wrote=False,
+            path=outgoing_path,
+            artifact_id=conn_id,
+            content=content,
+            warnings=[],
+            verification=vdict,
+        )
     clear_repo_caches(outgoing_path)
-    return WriteResult(wrote=True, path=outgoing_path, artifact_id=conn_id,
-                       content=None, warnings=[], verification=vdict)
+    return WriteResult(
+        wrote=True,
+        path=outgoing_path,
+        artifact_id=conn_id,
+        content=None,
+        warnings=[],
+        verification=vdict,
+    )
 
 
 # ---------------------------------------------------------------------------
 # Diagram
 # ---------------------------------------------------------------------------
+
 
 def _write_diagram_to_enterprise(
     *,
@@ -333,7 +447,6 @@ def _write_diagram_to_enterprise(
 ) -> WriteResult:
     """Write a diagram PUML file into the enterprise repo's diagram-catalog."""
     assert_enterprise_write_root(repo_root)
-    import re
     from src.common.artifact_write import format_diagram_puml
 
     diagrams_dir = repo_root / DIAGRAM_CATALOG / DIAGRAMS
@@ -341,15 +454,23 @@ def _write_diagram_to_enterprise(
     path = diagrams_dir / f"{artifact_id}.puml"
 
     content = format_diagram_puml(
-        artifact_id=artifact_id, diagram_type=diagram_type,
-        name=name, puml=puml, keywords=keywords,
-        version=version, status=status, last_updated=today_iso(),
+        artifact_id=artifact_id,
+        diagram_type=diagram_type,
+        name=name,
+        puml_body=puml,
+        keywords=keywords,
+        version=version,
+        status=status,
+        last_updated=today_iso(),
     )
 
     if dry_run:
         return WriteResult(
-            wrote=False, path=path, artifact_id=artifact_id,
-            content=content, warnings=[],
+            wrote=False,
+            path=path,
+            artifact_id=artifact_id,
+            content=content,
+            warnings=[],
             verification={"file_type": "diagram", "valid": True, "issues": []},
         )
 
@@ -362,19 +483,28 @@ def _write_diagram_to_enterprise(
         else:
             path.write_text(prev, encoding="utf-8")
         return WriteResult(
-            wrote=False, path=path, artifact_id=artifact_id,
-            content=content, warnings=[],
+            wrote=False,
+            path=path,
+            artifact_id=artifact_id,
+            content=content,
+            warnings=[],
             verification={
-                "file_type": "diagram", "valid": False,
-                "issues": [{"severity": i.severity, "code": i.code,
-                            "message": i.message} for i in res.issues],
+                "file_type": "diagram",
+                "valid": False,
+                "issues": [
+                    {"severity": i.severity, "code": i.code, "message": i.message}
+                    for i in res.issues
+                ],
             },
         )
 
     clear_repo_caches(path)
     return WriteResult(
-        wrote=True, path=path, artifact_id=artifact_id,
-        content=None, warnings=[],
+        wrote=True,
+        path=path,
+        artifact_id=artifact_id,
+        content=None,
+        warnings=[],
         verification={"file_type": "diagram", "valid": True, "issues": []},
     )
 

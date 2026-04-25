@@ -158,9 +158,7 @@ class ArtifactRepository:
     def connection_counts_for(self, entity_id: str) -> tuple[int, int, int]:
         return self._store.connection_counts_for(entity_id)
 
-    def list_connections_by_types(
-        self, types: frozenset[str]
-    ) -> list[ConnectionRecord]:
+    def list_connections_by_types(self, types: frozenset[str]) -> list[ConnectionRecord]:
         return self._store.list_connections_by_types(types)
 
     def find_connections_for(
@@ -170,9 +168,7 @@ class ArtifactRepository:
         direction: Literal["any", "outbound", "inbound"] = "any",
         conn_type: str | None = None,
     ) -> list[ConnectionRecord]:
-        return self._store.find_connections_for(
-            entity_id, direction=direction, conn_type=conn_type
-        )
+        return self._store.find_connections_for(entity_id, direction=direction, conn_type=conn_type)
 
     def find_neighbors(
         self,
@@ -181,9 +177,7 @@ class ArtifactRepository:
         max_hops: int = 1,
         conn_type: str | None = None,
     ) -> dict[str, set[str]]:
-        return self._store.find_neighbors(
-            entity_id, max_hops=max_hops, conn_type=conn_type
-        )
+        return self._store.find_neighbors(entity_id, max_hops=max_hops, conn_type=conn_type)
 
     def count_artifacts_by(
         self,

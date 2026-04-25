@@ -1,10 +1,7 @@
-
 import re
-from pathlib import Path
-from typing import Any, Literal
+from typing import Literal
 
 from src.common.artifact_verifier_registry import ArtifactRegistry
-from src.common.repo_paths import MODEL
 from src.common.artifact_verifier_types import (
     DIAGRAM_ARTIFACT_TYPES,
     ENTITY_ID_RE,
@@ -13,19 +10,22 @@ from src.common.artifact_verifier_types import (
     VerificationResult,
     entity_id_from_path,
 )
-from src.common._verifier_rules_schema import check_frontmatter_schema, check_attribute_schema, parse_properties_table
-from src.common._verifier_rules_grf import check_global_artifact_reference as check_global_entity_reference
+from src.common.repo_paths import MODEL
 
 
-def check_required_fields(fm: dict, required: frozenset[str], result: VerificationResult, loc: str) -> None:
+def check_required_fields(
+    fm: dict, required: frozenset[str], result: VerificationResult, loc: str
+) -> None:
     for field_name in sorted(required):
         if field_name not in fm or fm[field_name] is None:
-            result.issues.append(Issue(
-                Severity.ERROR,
-                "E021",
-                f"Required frontmatter field '{field_name}' is missing or null",
-                loc,
-            ))
+            result.issues.append(
+                Issue(
+                    Severity.ERROR,
+                    "E021",
+                    f"Required frontmatter field '{field_name}' is missing or null",
+                    loc,
+                )
+            )
 
 
 def check_artifact_id_entity(fm: dict, result: VerificationResult, loc: str) -> None:
@@ -33,22 +33,26 @@ def check_artifact_id_entity(fm: dict, result: VerificationResult, loc: str) -> 
         return
     aid = str(fm["artifact-id"])
     if not ENTITY_ID_RE.match(aid):
-        result.issues.append(Issue(
-            Severity.ERROR,
-            "E101",
-            f"artifact-id '{aid}' does not match TYPE@epoch.random.name pattern",
-            loc,
-        ))
+        result.issues.append(
+            Issue(
+                Severity.ERROR,
+                "E101",
+                f"artifact-id '{aid}' does not match TYPE@epoch.random.name pattern",
+                loc,
+            )
+        )
         return
 
     file_id = entity_id_from_path(result.path)
     if file_id != aid:
-        result.issues.append(Issue(
-            Severity.ERROR,
-            "E104",
-            f"entity filename stem '{file_id}' does not match artifact-id '{aid}'",
-            loc,
-        ))
+        result.issues.append(
+            Issue(
+                Severity.ERROR,
+                "E104",
+                f"entity filename stem '{file_id}' does not match artifact-id '{aid}'",
+                loc,
+            )
+        )
 
 
 def check_artifact_type(
@@ -62,12 +66,14 @@ def check_artifact_type(
         return
     artifact_type = str(fm["artifact-type"])
     if artifact_type not in valid:
-        result.issues.append(Issue(
-            Severity.ERROR,
-            "E102",
-            f"artifact-type '{artifact_type}' is not a recognised {label}",
-            loc,
-        ))
+        result.issues.append(
+            Issue(
+                Severity.ERROR,
+                "E102",
+                f"artifact-type '{artifact_type}' is not a recognised {label}",
+                loc,
+            )
+        )
 
 
 def check_enum(
@@ -81,12 +87,17 @@ def check_enum(
         return
     value = str(fm[field_name])
     if value not in valid:
-        result.issues.append(Issue(
-            Severity.ERROR,
-            "E022",
-            f"Field '{field_name}' has invalid value '{value}'; expected one of: {sorted(valid)}",
-            loc,
-        ))
+        result.issues.append(
+            Issue(
+                Severity.ERROR,
+                "E022",
+                (
+                    f"Field '{field_name}' has invalid value '{value}'; "
+                    f"expected one of: {sorted(valid)}"
+                ),
+                loc,
+            )
+        )
 
 
 def check_section(
@@ -102,7 +113,10 @@ def check_section(
         return
     severity = Severity.ERROR if required else Severity.WARNING
     code = "E031" if required else "W031"
-    msg = f"Section marker '{marker}' is {'absent' if required else 'absent (optional for connections)'}"
+    msg = (
+        f"Section marker '{marker}' is "
+        f"{'absent' if required else 'absent (optional for connections)'}"
+    )
     result.issues.append(Issue(severity, code, msg, loc))
 
 
@@ -115,9 +129,13 @@ def check_diagram_references_scoped(
 ) -> None:
     diagram_is_baselined = str(fm.get("status", "")) == "baselined"
 
-    allowed_entities = registry.enterprise_entity_ids() if file_scope == "enterprise" else registry.entity_ids()
+    allowed_entities = (
+        registry.enterprise_entity_ids() if file_scope == "enterprise" else registry.entity_ids()
+    )
     allowed_connections = (
-        registry.enterprise_connection_ids() if file_scope == "enterprise" else registry.connection_ids()
+        registry.enterprise_connection_ids()
+        if file_scope == "enterprise"
+        else registry.connection_ids()
     )
     all_entities = registry.entity_ids()
     all_connections = registry.connection_ids()
@@ -159,7 +177,9 @@ def _check_entity_ids_used(
     entity_ids = fm["entity-ids-used"]
     if not isinstance(entity_ids, list):
         if entity_ids is not None:
-            result.issues.append(Issue(Severity.WARNING, "W303", "entity-ids-used should be a YAML list", loc))
+            result.issues.append(
+                Issue(Severity.WARNING, "W303", "entity-ids-used should be a YAML list", loc)
+            )
         return
 
     for eid in entity_ids:
@@ -172,21 +192,29 @@ def _check_entity_ids_used(
                 )
                 result.issues.append(Issue(Severity.ERROR, "E310", msg, loc))
             else:
-                result.issues.append(Issue(
-                    Severity.ERROR,
-                    "E301",
-                    f"entity-ids-used references unknown entity '{eid_str}'",
-                    loc,
-                ))
+                result.issues.append(
+                    Issue(
+                        Severity.ERROR,
+                        "E301",
+                        f"entity-ids-used references unknown entity '{eid_str}'",
+                        loc,
+                    )
+                )
             continue
 
         if diagram_is_baselined and registry.entity_status(eid_str) == "draft":
-            result.issues.append(Issue(
-                Severity.ERROR,
-                "E306",
-                f"baselined diagram references draft entity '{eid_str}' — all entities in a baselined diagram must be baselined",
-                loc,
-            ))
+            result.issues.append(
+                Issue(
+                    Severity.ERROR,
+                    "E306",
+                    (
+                        "baselined diagram references draft entity "
+                        f"'{eid_str}' — all entities in a baselined diagram "
+                        "must be baselined"
+                    ),
+                    loc,
+                )
+            )
 
 
 def _check_connection_ids_used(
@@ -204,7 +232,9 @@ def _check_connection_ids_used(
     conn_ids = fm["connection-ids-used"]
     if not isinstance(conn_ids, list):
         if conn_ids is not None:
-            result.issues.append(Issue(Severity.WARNING, "W304", "connection-ids-used should be a YAML list", loc))
+            result.issues.append(
+                Issue(Severity.WARNING, "W304", "connection-ids-used should be a YAML list", loc)
+            )
         return
 
     for cid in conn_ids:
@@ -217,24 +247,28 @@ def _check_connection_ids_used(
                 )
                 result.issues.append(Issue(Severity.ERROR, "E320", msg, loc))
             else:
-                result.issues.append(Issue(
-                    Severity.ERROR,
-                    "E302",
-                    f"connection-ids-used references unknown connection '{cid_str}'",
-                    loc,
-                ))
+                result.issues.append(
+                    Issue(
+                        Severity.ERROR,
+                        "E302",
+                        f"connection-ids-used references unknown connection '{cid_str}'",
+                        loc,
+                    )
+                )
             continue
 
         if diagram_is_baselined and registry.connection_status(cid_str) == "draft":
-            result.issues.append(Issue(
-                Severity.ERROR,
-                "E307",
-                (
-                    f"baselined diagram references draft connection '{cid_str}' — "
-                    "all connections in a baselined diagram must be baselined"
-                ),
-                loc,
-            ))
+            result.issues.append(
+                Issue(
+                    Severity.ERROR,
+                    "E307",
+                    (
+                        f"baselined diagram references draft connection '{cid_str}' — "
+                        "all connections in a baselined diagram must be baselined"
+                    ),
+                    loc,
+                )
+            )
 
 
 def check_puml_structure(content: str, fm: dict, result: VerificationResult, loc: str) -> None:
@@ -244,31 +278,42 @@ def check_puml_structure(content: str, fm: dict, result: VerificationResult, loc
         result.issues.append(Issue(Severity.ERROR, "E305", "@enduml marker is missing", loc))
 
     body_lines = [line for line in content.splitlines() if not line.lstrip().startswith("'")]
-    has_visible_title = any(re.match(r"^\s*title(\s|$)", line, flags=re.IGNORECASE) for line in body_lines)
+    has_visible_title = any(
+        re.match(r"^\s*title(\s|$)", line, flags=re.IGNORECASE) for line in body_lines
+    )
     if not has_visible_title:
-        result.issues.append(Issue(
-            Severity.ERROR,
-            "E308",
-            "Diagram must include a visible title line (for example: 'title <diagram name>')",
-            loc,
-        ))
+        result.issues.append(
+            Issue(
+                Severity.ERROR,
+                "E308",
+                "Diagram must include a visible title line (for example: 'title <diagram name>')",
+                loc,
+            )
+        )
 
     diagram_type = str(fm.get("diagram-type", ""))
     if "archimate" in diagram_type or "usecase" in diagram_type:
         has_macros = "_macros.puml" in content
         has_stereotypes = "_archimate-stereotypes.puml" in content
         if not has_macros and not has_stereotypes:
-            result.issues.append(Issue(
-                Severity.ERROR,
-                "E303",
-                "ArchiMate/use-case diagram must include _macros.puml or _archimate-stereotypes.puml",
-                loc,
-            ))
+            result.issues.append(
+                Issue(
+                    Severity.ERROR,
+                    "E303",
+                    (
+                        "ArchiMate/use-case diagram must include "
+                        "_macros.puml or _archimate-stereotypes.puml"
+                    ),
+                    loc,
+                )
+            )
 
     _check_entity_aliases_declared(content, fm, result, loc)
 
 
-def _check_entity_aliases_declared(content: str, fm: dict, result: VerificationResult, loc: str) -> None:
+def _check_entity_aliases_declared(
+    content: str, fm: dict, result: VerificationResult, loc: str
+) -> None:
     entity_ids = fm.get("entity-ids-used")
     if not isinstance(entity_ids, list):
         return
@@ -286,15 +331,17 @@ def _check_entity_aliases_declared(content: str, fm: dict, result: VerificationR
             continue
         alias = _extract_entity_display_alias(entity_text)
         if alias and _normalize_puml_alias(alias) not in declared_aliases:
-            result.issues.append(Issue(
-                Severity.ERROR,
-                "E309",
-                (
-                    f"entity-ids-used references '{eid_str}' with display alias '{alias}', "
-                    "but that alias is not declared in the PUML body"
-                ),
-                loc,
-            ))
+            result.issues.append(
+                Issue(
+                    Severity.ERROR,
+                    "E309",
+                    (
+                        f"entity-ids-used references '{eid_str}' with display alias '{alias}', "
+                        "but that alias is not declared in the PUML body"
+                    ),
+                    loc,
+                )
+            )
 
 
 def _normalize_puml_alias(alias: str) -> str:
@@ -320,7 +367,7 @@ def _extract_entity_display_alias(entity_text: str) -> str:
     pos = entity_text.find(marker)
     if pos == -1:
         return ""
-    display_body = entity_text[pos + len(marker):]
+    display_body = entity_text[pos + len(marker) :]
     m = re.search(r"alias:\s*([A-Za-z0-9_-]+)", display_body)
     return _normalize_puml_alias(m.group(1)) if m else ""
 

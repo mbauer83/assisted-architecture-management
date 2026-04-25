@@ -30,6 +30,8 @@ import type {
   PromotionResult,
   SyncStatus,
   SyncSaveResult,
+  ServerInfo,
+  WriteHelp,
 } from '../domain'
 import type { NetworkError, NotFoundError } from '../domain'
 import type { MarkdownError } from '../application/MarkdownService'
@@ -52,7 +54,7 @@ export type RepoError = NetworkError | ParseResult.ParseError
 
 /** Outbound port: the application's view of the model backend. */
 export interface ModelRepository {
-  readonly getServerInfo: () => Effect.Effect<unknown, RepoError>
+  readonly getServerInfo: () => Effect.Effect<ServerInfo, RepoError>
   readonly getStats: () => Effect.Effect<Stats, RepoError>
   readonly listEntities: (params?: ListParams) => Effect.Effect<EntityList, RepoError>
   readonly getEntity: (id: string) => Effect.Effect<EntityDetail, RepoError | NotFoundError | MarkdownError>
@@ -94,7 +96,7 @@ export interface ModelRepository {
     add_entities?: string[]; remove_entities?: string[];
     dry_run?: boolean;
   }) => Effect.Effect<WriteResult, RepoError>
-  readonly getWriteHelp: () => Effect.Effect<unknown, RepoError>
+  readonly getWriteHelp: () => Effect.Effect<WriteHelp, RepoError>
   readonly getOntologyClassification: (sourceType: string) => Effect.Effect<OntologyClassification, RepoError>
   readonly getOntologyPair: (sourceType: string, targetType: string) => Effect.Effect<OntologyPair, RepoError>
   readonly createEntity: (body: {

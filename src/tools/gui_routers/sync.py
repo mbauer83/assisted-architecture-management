@@ -12,6 +12,7 @@ POST /api/sync/enterprise/save      — commit enterprise changes to working bra
 POST /api/sync/enterprise/submit    — push enterprise working branch for team review
 POST /api/sync/enterprise/withdraw  — discard all pending enterprise changes
 """
+
 from __future__ import annotations
 
 import asyncio
@@ -37,6 +38,7 @@ class WithdrawBody(BaseModel):
 # Status
 # ---------------------------------------------------------------------------
 
+
 @router.get("/api/sync/status")
 async def sync_status() -> dict:
     """Return the current sync state for all configured repositories."""
@@ -48,8 +50,11 @@ async def sync_status() -> dict:
     eng_root = s.maybe_engagement_root()
     if eng_root is not None:
         dirty = await asyncio.to_thread(
-            enterprise_git_ops.has_uncommitted_changes, eng_root,
-            MODEL, DOCS, DIAGRAM_CATALOG,
+            enterprise_git_ops.has_uncommitted_changes,
+            eng_root,
+            MODEL,
+            DOCS,
+            DIAGRAM_CATALOG,
         )
         out["engagement"] = {"has_uncommitted_changes": dirty}
 
@@ -106,6 +111,7 @@ def _status_label(status: str) -> str:
 # Engagement: save
 # ---------------------------------------------------------------------------
 
+
 @router.post("/api/sync/engagement/save")
 async def save_engagement(body: SaveBody) -> dict:
     """Commit (and optionally push) all engagement repository changes."""
@@ -122,10 +128,14 @@ async def save_engagement(body: SaveBody) -> dict:
         )
         if body.push:
             await asyncio.to_thread(enterprise_git_ops.push_engagement, eng_root)
-        await event_bus.publish({
-            "type": "sync_engagement_saved",
-            "commit": commit, "pushed": body.push, "message": body.message,
-        })
+        await event_bus.publish(
+            {
+                "type": "sync_engagement_saved",
+                "commit": commit,
+                "pushed": body.push,
+                "message": body.message,
+            }
+        )
         return {"ok": True, "commit": commit, "pushed": body.push, "message": body.message}
     except ValueError as exc:
         raise HTTPException(400, str(exc))
@@ -136,6 +146,7 @@ async def save_engagement(body: SaveBody) -> dict:
 # ---------------------------------------------------------------------------
 # Enterprise: save / submit / withdraw
 # ---------------------------------------------------------------------------
+
 
 @router.post("/api/sync/enterprise/save")
 async def save_enterprise(body: SaveBody) -> dict:
@@ -153,10 +164,14 @@ async def save_enterprise(body: SaveBody) -> dict:
             enterprise_git_ops.commit_enterprise_work, ent_root, body.message
         )
         sync_state = enterprise_sync_state.load(ent_root)
-        await event_bus.publish({
-            "type": "sync_enterprise_saved",
-            "commit": commit, "branch": sync_state.branch, "message": body.message,
-        })
+        await event_bus.publish(
+            {
+                "type": "sync_enterprise_saved",
+                "commit": commit,
+                "branch": sync_state.branch,
+                "message": body.message,
+            }
+        )
         return {"ok": True, "commit": commit, "message": body.message}
     except ValueError as exc:
         raise HTTPException(400, str(exc))
@@ -167,7 +182,8 @@ async def save_enterprise(body: SaveBody) -> dict:
 @router.post("/api/sync/enterprise/submit")
 async def submit_enterprise() -> dict:
     """Push the enterprise working branch for team review."""
-    from src.tools import enterprise_git_ops, enterprise_sync_state as es
+    from src.tools import enterprise_git_ops
+    from src.tools import enterprise_sync_state as es
     from src.tools.gui_routers import state as s
     from src.tools.gui_routers.events import event_bus
 
@@ -178,21 +194,26 @@ async def submit_enterprise() -> dict:
     sync_state = es.load(ent_root)
     if sync_state.is_pending():
         return {
-            "ok": True, "already_submitted": True,
-            "branch": sync_state.branch, "pushed_at": sync_state.pushed_at,
+            "ok": True,
+            "already_submitted": True,
+            "branch": sync_state.branch,
+            "pushed_at": sync_state.pushed_at,
         }
     if sync_state.is_synced():
         raise HTTPException(400, "No enterprise changes to submit for review")
 
     try:
         branch = await asyncio.to_thread(enterprise_git_ops.push_enterprise_branch, ent_root)
-        await event_bus.publish({
-            "type": "sync_enterprise_submitted", "branch": branch,
-            "label": (
-                f"Enterprise changes submitted for review on branch '{branch}'. "
-                "Create a pull request in your version-control platform."
-            ),
-        })
+        await event_bus.publish(
+            {
+                "type": "sync_enterprise_submitted",
+                "branch": branch,
+                "label": (
+                    f"Enterprise changes submitted for review on branch '{branch}'. "
+                    "Create a pull request in your version-control platform."
+                ),
+            }
+        )
         return {"ok": True, "branch": branch}
     except ValueError as exc:
         raise HTTPException(400, str(exc))
@@ -203,7 +224,8 @@ async def submit_enterprise() -> dict:
 @router.post("/api/sync/enterprise/withdraw")
 async def withdraw_enterprise(body: WithdrawBody) -> dict:
     """Discard all pending enterprise changes and return the repo to main."""
-    from src.tools import enterprise_git_ops, enterprise_sync_state as es
+    from src.tools import enterprise_git_ops
+    from src.tools import enterprise_sync_state as es
     from src.tools.gui_routers import state as s
     from src.tools.gui_routers.events import event_bus
 
@@ -223,10 +245,13 @@ async def withdraw_enterprise(body: WithdrawBody) -> dict:
 
     try:
         branch = await asyncio.to_thread(enterprise_git_ops.abandon_enterprise_branch, ent_root)
-        await event_bus.publish({
-            "type": "sync_enterprise_withdrawn", "discarded_branch": branch,
-            "label": "Pending enterprise changes have been discarded.",
-        })
+        await event_bus.publish(
+            {
+                "type": "sync_enterprise_withdrawn",
+                "discarded_branch": branch,
+                "label": "Pending enterprise changes have been discarded.",
+            }
+        )
         return {"ok": True, "discarded_branch": branch}
     except RuntimeError as exc:
         raise HTTPException(500, str(exc))

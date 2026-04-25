@@ -1,15 +1,15 @@
 """Connection editing and removal operations."""
 
-from pathlib import Path
 from collections.abc import Callable
+from pathlib import Path
 
 from src.common.artifact_verifier import ArtifactRegistry, ArtifactVerifier
 from src.common.artifact_write import format_outgoing_markdown
 
 from .boundary import assert_engagement_write_root, today_iso
-from .connection import _resolve_outgoing_path, verification_to_conn_dict, _rollback
+from .coerce import as_optional_str_list
+from .connection import _resolve_outgoing_path, _rollback, verification_to_conn_dict
 from .types import WriteResult
-
 
 _UNSET = object()
 
@@ -42,6 +42,7 @@ def edit_connection(
         raise ValueError(f"No outgoing file for '{source_entity}'")
 
     from .parse_existing import parse_outgoing_file
+
     parsed = parse_outgoing_file(outgoing_path)
 
     # Find the target connection
@@ -78,12 +79,21 @@ def edit_connection(
 
     if dry_run:
         return WriteResult(
-            wrote=False, path=outgoing_path, artifact_id=conn_id,
-            content=content, warnings=[], verification=None,
+            wrote=False,
+            path=outgoing_path,
+            artifact_id=conn_id,
+            content=content,
+            warnings=[],
+            verification=None,
         )
 
     return _write_verify_clear(
-        outgoing_path, content, verifier, conn_id, clear_repo_caches, repo_root,
+        outgoing_path,
+        content,
+        verifier,
+        conn_id,
+        clear_repo_caches,
+        repo_root,
     )
 
 
@@ -109,12 +119,14 @@ def remove_connection(
         raise ValueError(f"No outgoing file for '{source_entity}'")
 
     from .parse_existing import parse_outgoing_file
+
     parsed = parse_outgoing_file(outgoing_path)
     conn_id = f"{connection_type} -> {target_entity}"
 
     original_count = len(parsed.connections)
     remaining = [
-        c for c in parsed.connections
+        c
+        for c in parsed.connections
         if not (c["connection_type"] == connection_type and c["target_entity"] == target_entity)
     ]
 
@@ -124,9 +136,12 @@ def remove_connection(
     if dry_run:
         if not remaining:
             return WriteResult(
-                wrote=False, path=outgoing_path, artifact_id=conn_id,
+                wrote=False,
+                path=outgoing_path,
+                artifact_id=conn_id,
                 content="(file would be deleted — last connection removed)",
-                warnings=[], verification=None,
+                warnings=[],
+                verification=None,
             )
         content = format_outgoing_markdown(
             source_entity=source_entity,
@@ -136,20 +151,31 @@ def remove_connection(
             connections=remaining,
         )
         return WriteResult(
-            wrote=False, path=outgoing_path, artifact_id=conn_id,
-            content=content, warnings=[], verification=None,
+            wrote=False,
+            path=outgoing_path,
+            artifact_id=conn_id,
+            content=content,
+            warnings=[],
+            verification=None,
         )
 
     # Real write
     if not remaining:
-        prev = outgoing_path.read_text(encoding="utf-8")
+        outgoing_path.read_text(encoding="utf-8")
         outgoing_path.unlink()
         clear_repo_caches(outgoing_path)
         return WriteResult(
-            wrote=True, path=outgoing_path, artifact_id=conn_id,
-            content=None, warnings=["Deleted empty .outgoing.md file"],
-            verification={"path": str(outgoing_path), "file_type": "connection",
-                          "valid": True, "issues": []},
+            wrote=True,
+            path=outgoing_path,
+            artifact_id=conn_id,
+            content=None,
+            warnings=["Deleted empty .outgoing.md file"],
+            verification={
+                "path": str(outgoing_path),
+                "file_type": "connection",
+                "valid": True,
+                "issues": [],
+            },
         )
 
     content = format_outgoing_markdown(
@@ -161,7 +187,12 @@ def remove_connection(
     )
 
     return _write_verify_clear(
-        outgoing_path, content, verifier, conn_id, clear_repo_caches, repo_root,
+        outgoing_path,
+        content,
+        verifier,
+        conn_id,
+        clear_repo_caches,
+        repo_root,
     )
 
 
@@ -191,13 +222,14 @@ def edit_connection_associations(
         raise ValueError(f"No outgoing file for '{source_entity}'")
 
     from .parse_existing import parse_outgoing_file
+
     parsed = parse_outgoing_file(outgoing_path)
 
     found = False
     for conn in parsed.connections:
         if conn["connection_type"] == connection_type and conn["target_entity"] == target_entity:
-            existing: list[str] = list(conn.get("associated_entities") or [])
-            for eid in (add_entities or []):
+            existing = as_optional_str_list(conn.get("associated_entities")) or []
+            for eid in add_entities or []:
                 if eid not in existing:
                     existing.append(eid)
             remove_set = set(remove_entities or [])
@@ -225,11 +257,17 @@ def edit_connection_associations(
 
     if dry_run:
         return WriteResult(
-            wrote=False, path=outgoing_path, artifact_id=conn_id,
-            content=content, warnings=[], verification=None,
+            wrote=False,
+            path=outgoing_path,
+            artifact_id=conn_id,
+            content=content,
+            warnings=[],
+            verification=None,
         )
 
-    return _write_verify_clear(outgoing_path, content, verifier, conn_id, clear_repo_caches, repo_root)
+    return _write_verify_clear(
+        outgoing_path, content, verifier, conn_id, clear_repo_caches, repo_root
+    )
 
 
 def _write_verify_clear(
@@ -251,12 +289,20 @@ def _write_verify_clear(
     if not res.valid:
         _rollback(outgoing_path, prev)
         return WriteResult(
-            wrote=False, path=outgoing_path, artifact_id=conn_id,
-            content=content, warnings=[], verification=vdict,
+            wrote=False,
+            path=outgoing_path,
+            artifact_id=conn_id,
+            content=content,
+            warnings=[],
+            verification=vdict,
         )
 
     clear_repo_caches(outgoing_path)
     return WriteResult(
-        wrote=True, path=outgoing_path, artifact_id=conn_id,
-        content=None, warnings=[], verification=vdict,
+        wrote=True,
+        path=outgoing_path,
+        artifact_id=conn_id,
+        content=None,
+        warnings=[],
+        verification=vdict,
     )

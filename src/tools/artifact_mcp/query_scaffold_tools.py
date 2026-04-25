@@ -12,15 +12,15 @@ from typing import Literal
 from mcp.server.fastmcp import FastMCP  # type: ignore[import-not-found]
 
 from src.common.archimate_relation_rendering import render_archimate_relation
+from src.common.artifact_parsing import extract_archimate_label_alias
+from src.common.ontology_loader import CONNECTION_TYPES, DOMAIN_GROUPING, ENTITY_TYPES
+from src.common.ontology_loader import DOMAIN_ORDER as _DOMAIN_ORDER_LOWER
 from src.tools.artifact_mcp.context import (
     RepoScope,
     repo_cached,
     resolve_repo_roots,
     roots_key,
 )
-from src.common.ontology_loader import CONNECTION_TYPES, DOMAIN_GROUPING, ENTITY_TYPES
-from src.common.artifact_parsing import extract_archimate_label_alias
-
 
 # conn_short_name → PUML arrow (archimate connections only)
 _ARROW: dict[str, str] = {
@@ -37,7 +37,6 @@ _LABEL: dict[str, str] = {
     "assignment": "<<Assignment>>",
 }
 
-from src.common.ontology_loader import DOMAIN_ORDER as _DOMAIN_ORDER_LOWER
 _DOMAIN_ORDER = [d.title() for d in _DOMAIN_ORDER_LOWER]
 _ENTITY_TYPE_ORDER = list(ENTITY_TYPES)
 
@@ -47,6 +46,7 @@ def _extract_prose(text: str | None) -> str | None:
     if not text:
         return None
     import re
+
     cleaned = re.sub(r"```[\s\S]*?```", "", text).strip()
     for line in cleaned.splitlines():
         line = line.strip()
@@ -145,7 +145,9 @@ def _emit_entity(
     lines = [f"{indent}{decl} {{"]
     inner = indent + "  "
     for child in children:
-        lines.extend(_emit_entity(child, children_map.get(child["display_alias"], []), inner, children_map))
+        lines.extend(
+            _emit_entity(child, children_map.get(child["display_alias"], []), inner, children_map)
+        )
     for i in range(len(child_aliases) - 1):
         lines.append(f"{inner}{child_aliases[i]} -[hidden]right- {child_aliases[i + 1]}")
     lines.append(f"{indent}}}")
@@ -168,7 +170,9 @@ def _build_puml(
         if conn["conn_dir"] in ("composition", "aggregation"):
             child_alias = conn["target_alias"]
             if child_alias in alias_to_entity:
-                children_map.setdefault(conn["source_alias"], []).append(alias_to_entity[child_alias])
+                children_map.setdefault(conn["source_alias"], []).append(
+                    alias_to_entity[child_alias]
+                )
                 comp_children.add(child_alias)
 
     # Top-level per domain — exclude direct composition children
@@ -179,7 +183,9 @@ def _build_puml(
 
     dir_kw = "top to bottom" if direction == "top_to_bottom" else "left to right"
     multi = len(by_domain) > 1
-    ordered = [d for d in _DOMAIN_ORDER if d in by_domain] + [d for d in by_domain if d not in _DOMAIN_ORDER]
+    ordered = [d for d in _DOMAIN_ORDER if d in by_domain] + [
+        d for d in by_domain if d not in _DOMAIN_ORDER
+    ]
 
     lines: list[str] = [
         f"@startuml {name.lower().replace(' ', '-')}",
@@ -209,7 +215,9 @@ def _build_puml(
             elems = type_groups[artifact_type]
             lines.append(f'rectangle "{_type_group_label(artifact_type)}" <<{grouping}>> {{')
             for e in elems:
-                lines.extend(_emit_entity(e, children_map.get(e["display_alias"], []), "  ", children_map))
+                lines.extend(
+                    _emit_entity(e, children_map.get(e["display_alias"], []), "  ", children_map)
+                )
                 group_index_by_alias[e["display_alias"]] = idx
             lines.append("}")
             tl_aliases = [e["display_alias"] for e in elems]
@@ -229,7 +237,9 @@ def _build_puml(
                 grouping = DOMAIN_GROUPING.get(domain.lower(), "Grouping")
                 lines.append(f'rectangle "{domain}" <<{grouping}>> {{')
             for e in elems:
-                lines.extend(_emit_entity(e, children_map.get(e["display_alias"], []), indent, children_map))
+                lines.extend(
+                    _emit_entity(e, children_map.get(e["display_alias"], []), indent, children_map)
+                )
             if multi:
                 lines.append("}")
             lines.append("")
@@ -283,7 +293,9 @@ def _build_puml(
                     label_text="",
                 )
                 if line is None:
-                    line = _conn_line(c["source_alias"], c["conn_dir"], c["target_alias"], c.get("description"))
+                    line = _conn_line(
+                        c["source_alias"], c["conn_dir"], c["target_alias"], c.get("description")
+                    )
                     lines.append(line)
                     continue
                 if c.get("description"):
@@ -334,16 +346,17 @@ def artifact_diagram_scaffold(
         if not alias:
             missing_alias.append(eid)
             continue
-        entities.append({
-            "artifact_id": eid,
-            "artifact_type": str(rec.get("artifact_type") or ""),
-            "name": str(rec.get("name") or ""),
-            "display_alias": alias,
-            "display_label": label,
-        })
+        entities.append(
+            {
+                "artifact_id": eid,
+                "artifact_type": str(rec.get("artifact_type") or ""),
+                "name": str(rec.get("name") or ""),
+                "display_alias": alias,
+                "display_label": label,
+            }
+        )
 
     # Collect connections where both endpoints are in the requested set
-    alias_to_id = {e["display_alias"]: e["artifact_id"] for e in entities}
     id_to_alias = {e["artifact_id"]: e["display_alias"] for e in entities}
 
     connections: list[dict] = []
@@ -360,14 +373,15 @@ def artifact_diagram_scaffold(
             if key in seen:
                 continue
             seen.add(key)
-            ct = CONNECTION_TYPES.get(conn_rec.conn_type)
             conn_dir = conn_rec.conn_type.split("-", 1)[1]
-            connections.append({
-                "source_alias": src_alias,
-                "conn_dir": conn_dir,
-                "target_alias": tgt_alias,
-                "description": _extract_prose(conn_rec.content_text),
-            })
+            connections.append(
+                {
+                    "source_alias": src_alias,
+                    "conn_dir": conn_dir,
+                    "target_alias": tgt_alias,
+                    "description": _extract_prose(conn_rec.content_text),
+                }
+            )
 
     puml = _build_puml(
         entities=entities,
@@ -379,13 +393,20 @@ def artifact_diagram_scaffold(
     return {
         "puml": puml,
         "entities_included": [
-            {"artifact_id": e["artifact_id"], "alias": e["display_alias"],
-             "name": e["name"], "type": e["artifact_type"]}
+            {
+                "artifact_id": e["artifact_id"],
+                "alias": e["display_alias"],
+                "name": e["name"],
+                "type": e["artifact_type"],
+            }
             for e in entities
         ],
         "connections_included": [
-            {"source_alias": c["source_alias"], "conn_dir": c["conn_dir"],
-             "target_alias": c["target_alias"]}
+            {
+                "source_alias": c["source_alias"],
+                "conn_dir": c["conn_dir"],
+                "target_alias": c["target_alias"],
+            }
             for c in connections
         ],
         "entities_not_found": not_found,

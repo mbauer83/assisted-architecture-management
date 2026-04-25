@@ -18,30 +18,40 @@ from __future__ import annotations
 
 import argparse
 import subprocess
-import sys
 from datetime import datetime, timezone
 from pathlib import Path
+from typing import TypedDict
 
 import yaml
+
 from src.common.repo_paths import MODEL
 from src.common.workspace_paths import (
     CONFIG_FILENAME,
     STATE_DIR,
     STATE_FILENAME,
+)
+from src.common.workspace_paths import (
     find_workspace_config as _find_config,
-    load_workspace_state as load_init_state,
+)
+from src.common.workspace_paths import (
+    load_workspace_state as _load_workspace_state,
+)
+from src.common.workspace_paths import (
     parse_workspace_config as _parse_config,
 )
-
 
 # ---------------------------------------------------------------------------
 # Git helpers
 # ---------------------------------------------------------------------------
 
+
 def _run_git(args: list[str], cwd: Path | None = None) -> subprocess.CompletedProcess[str]:
     return subprocess.run(
-        ["git", *args], cwd=cwd,
-        capture_output=True, text=True, timeout=120,
+        ["git", *args],
+        cwd=cwd,
+        capture_output=True,
+        text=True,
+        timeout=120,
     )
 
 
@@ -63,14 +73,13 @@ def _clone(url: str, branch: str, dest: Path) -> None:
     dest.parent.mkdir(parents=True, exist_ok=True)
     r = _run_git(["clone", "--branch", branch, url, str(dest)])
     if r.returncode != 0:
-        raise SystemExit(
-            f"ERROR: git clone failed for {url}\n{r.stderr.strip()}"
-        )
+        raise SystemExit(f"ERROR: git clone failed for {url}\n{r.stderr.strip()}")
 
 
 # ---------------------------------------------------------------------------
 # Repo resolution
 # ---------------------------------------------------------------------------
+
 
 def _resolve_repo(
     label: str,
@@ -82,13 +91,9 @@ def _resolve_repo(
         local = Path(spec["local"])
         resolved = local if local.is_absolute() else workspace_root / local
         if not resolved.is_dir():
-            raise SystemExit(
-                f"ERROR: {label} local path does not exist: {resolved}"
-            )
+            raise SystemExit(f"ERROR: {label} local path does not exist: {resolved}")
         if not (resolved / MODEL).is_dir():
-            raise SystemExit(
-                f"ERROR: {label} path has no model/ directory: {resolved}"
-            )
+            raise SystemExit(f"ERROR: {label} path has no model/ directory: {resolved}")
         return resolved.resolve()
 
     if "git" in spec:
@@ -107,9 +112,7 @@ def _resolve_repo(
 
         if dest.is_dir():
             if not _is_git_repo(dest):
-                raise SystemExit(
-                    f"ERROR: {label} path exists but is not a git repo: {dest}"
-                )
+                raise SystemExit(f"ERROR: {label} path exists but is not a git repo: {dest}")
             actual_branch = _current_branch(dest)
             if actual_branch != branch:
                 raise SystemExit(
@@ -129,19 +132,48 @@ def _resolve_repo(
 
         model_dir = dest / MODEL
         if not model_dir.is_dir():
-            raise SystemExit(
-                f"ERROR: cloned {label} repo has no {MODEL}/ directory: {dest}"
-            )
+            raise SystemExit(f"ERROR: cloned {label} repo has no {MODEL}/ directory: {dest}")
         return dest
 
-    raise SystemExit(
-        f"ERROR: {label} must specify either 'local' or 'git'"
-    )
+    raise SystemExit(f"ERROR: {label} must specify either 'local' or 'git'")
 
 
 # ---------------------------------------------------------------------------
 # State file
 # ---------------------------------------------------------------------------
+
+
+class InitState(TypedDict):
+    workspace_root: str
+    engagement_root: str
+    enterprise_root: str
+    initialized_at: str
+
+
+def load_init_state(start: Path | None = None) -> InitState | None:
+    """Return the persisted arch-init state for the current workspace, if any."""
+    state = _load_workspace_state(start)
+    if not isinstance(state, dict):
+        return None
+    workspace_root = state.get("workspace_root")
+    engagement_root = state.get("engagement_root")
+    enterprise_root = state.get("enterprise_root")
+    initialized_at = state.get("initialized_at")
+    if not isinstance(workspace_root, str):
+        return None
+    if not isinstance(engagement_root, str):
+        return None
+    if not isinstance(enterprise_root, str):
+        return None
+    if not isinstance(initialized_at, str):
+        return None
+    return InitState(
+        workspace_root=workspace_root,
+        engagement_root=engagement_root,
+        enterprise_root=enterprise_root,
+        initialized_at=initialized_at,
+    )
+
 
 def _write_state(
     workspace_root: Path,
@@ -162,11 +194,10 @@ def _write_state(
     return state_path
 
 
-
-
 # ---------------------------------------------------------------------------
 # CLI entry point
 # ---------------------------------------------------------------------------
+
 
 def main(argv: list[str] | None = None) -> None:
     parser = argparse.ArgumentParser(
@@ -174,7 +205,9 @@ def main(argv: list[str] | None = None) -> None:
         description="Initialize architecture workspace from arch-workspace.yaml",
     )
     parser.add_argument(
-        "--config", type=Path, default=None,
+        "--config",
+        type=Path,
+        default=None,
         help="Path to arch-workspace.yaml (default: search from CWD upward)",
     )
     args = parser.parse_args(argv)
@@ -186,9 +219,7 @@ def main(argv: list[str] | None = None) -> None:
     else:
         config_path = _find_config(Path.cwd())
         if config_path is None:
-            raise SystemExit(
-                f"ERROR: {CONFIG_FILENAME} not found in current directory or parents"
-            )
+            raise SystemExit(f"ERROR: {CONFIG_FILENAME} not found in current directory or parents")
 
     workspace_root = config_path.parent
     print(f"arch-init: using {config_path}")
@@ -200,7 +231,7 @@ def main(argv: list[str] | None = None) -> None:
     enterprise_root = _resolve_repo("enterprise", cfg["enterprise"], workspace_root)
 
     state_path = _write_state(workspace_root, engagement_root, enterprise_root)
-    print(f"\narch-init: success")
+    print("\narch-init: success")
     print(f"  engagement: {engagement_root}")
     print(f"  enterprise: {enterprise_root}")
     print(f"  state file: {state_path}")

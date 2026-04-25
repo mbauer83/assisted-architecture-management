@@ -114,10 +114,7 @@ def _open_path_to_elements(d: str) -> str:
     segs = _parse_path_segments(d)
     if not segs:
         return ""
-    all_aligned = all(
-        abs(s[0][0] - s[1][0]) < 0.05 or abs(s[0][1] - s[1][1]) < 0.05
-        for s in segs
-    )
+    all_aligned = all(abs(s[0][0] - s[1][0]) < 0.05 or abs(s[0][1] - s[1][1]) < 0.05 for s in segs)
     if all_aligned and len(segs) >= 2:
         sx, sy = segs[0][0]
         ex, ey = segs[-1][1]
@@ -170,14 +167,20 @@ def browser_markup_to_plantuml_svg(markup: str) -> str:
         attrs = m.group("attrs")
         close = m.group("close")
         if tag == "path":
-            d_val = (re.search(r'\bd="([^"]*)"', attrs) or type("", (), {"group": lambda *_: ""})()).group(1)
+            d_val = (
+                re.search(r'\bd="([^"]*)"', attrs) or type("", (), {"group": lambda *_: ""})()
+            ).group(1)
             if re.search(r"[Zz]", d_val):
                 attrs = _ensure_attr(_ensure_attr(attrs, "fill", _SPRITE_STROKE), "stroke", "none")
                 return f"<{tag}{attrs}{close}"
             return _open_path_to_elements(d_val)
         if tag == "rect":
             return _rect_to_outline_paths(attrs)
-        attrs = _ensure_attr(_ensure_attr(_ensure_attr(attrs, "fill", "none"), "stroke", _SPRITE_STROKE), "stroke-width", "1.3")
+        attrs = _ensure_attr(
+            _ensure_attr(_ensure_attr(attrs, "fill", "none"), "stroke", _SPRITE_STROKE),
+            "stroke-width",
+            "1.3",
+        )
         return f"<{tag}{attrs}{close}"
 
     return f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16">{_SVG_ELEM_RE.sub(_patch, markup)}</svg>'

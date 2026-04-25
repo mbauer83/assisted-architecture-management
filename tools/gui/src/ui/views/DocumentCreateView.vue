@@ -8,6 +8,7 @@ import MarkdownEditor from '../components/MarkdownEditor.vue'
 import ArtifactReferenceInput from '../components/ArtifactReferenceInput.vue'
 import { draftDocumentPath } from '../lib/referenceLinks.js'
 import type { DocumentType } from '../../domain'
+import { collectVerificationIssues, readErrorMessage } from '../lib/errors'
 
 const svc = inject(modelServiceKey)!
 const router = useRouter()
@@ -25,7 +26,8 @@ const saving = ref(false)
 const error = ref<string | null>(null)
 const verificationIssues = ref<string[]>([])
 const showReferencePicker = ref(false)
-const editorRef = ref<InstanceType<typeof MarkdownEditor> | null>(null)
+type MarkdownEditorHandle = { insertAtCursor: (markdownLink: string) => void }
+const editorRef = ref<MarkdownEditorHandle | null>(null)
 const lastAutoBody = ref('')
 const bodyWasManuallyEdited = ref(false)
 const syncingAutoBody = ref(false)
@@ -68,32 +70,17 @@ const titleError = computed(() =>
     : null,
 )
 
-const collectVerificationIssues = (verification: unknown): string[] => {
-  if (!verification || typeof verification !== 'object') return []
-  const issues = (verification as { issues?: unknown }).issues
-  if (!Array.isArray(issues)) return []
-  return issues
-    .map((issue) => {
-      if (!issue || typeof issue !== 'object') return null
-      const code = typeof (issue as { code?: unknown }).code === 'string' ? (issue as { code: string }).code : ''
-      const message = typeof (issue as { message?: unknown }).message === 'string' ? (issue as { message: string }).message : ''
-      if (!code && !message) return null
-      return code ? `${code}: ${message}` : message
-    })
-    .filter((issue): issue is string => Boolean(issue))
-}
-
 onMounted(() => {
   loading.value = true
-  Effect.runPromise(svc.listDocumentTypes()).then((types) => {
+  void Effect.runPromise(svc.listDocumentTypes()).then((types) => {
     documentTypes.value = types
     if (!docType.value && types.length > 0) {
       docType.value = types[0].doc_type
       docTypeRaw.value = types[0].doc_type
     }
     loading.value = false
-  }).catch((e) => {
-    error.value = String(e)
+  }).catch((reason: unknown) => {
+    error.value = readErrorMessage(reason)
     loading.value = false
   })
 })
@@ -117,7 +104,7 @@ watch(docTypeRaw, (next) => {
   if (dirtyParts.length > 0) {
     typeSwitchWarning.value = `Switching type will reset your edited ${dirtyParts.join(' and ')}.`
     pendingDocType.value = next
-    nextTick(() => { docTypeRaw.value = docType.value })
+    void nextTick(() => { docTypeRaw.value = docType.value })
   } else {
     docType.value = next
   }
@@ -180,7 +167,7 @@ const resetAll = () => {
   bodyWasManuallyEdited.value = false
   const current = docType.value
   docType.value = ''
-  nextTick(() => { docType.value = current })
+  void nextTick(() => { docType.value = current })
 }
 
 const submit = () => {
@@ -190,7 +177,7 @@ const submit = () => {
   if (titleError.value) return
   error.value = null
   saving.value = true
-  Effect.runPromise(svc.createDocument({
+  void Effect.runPromise(svc.createDocument({
     doc_type: docType.value,
     title: title.value,
     body: body.value,
@@ -208,9 +195,9 @@ const submit = () => {
       return
     }
     saving.value = false
-    router.push(`/documents/${result.artifact_id}`)
-  }).catch((e) => {
-    error.value = String(e)
+    void router.push(`/documents/${result.artifact_id}`)
+  }).catch((reason: unknown) => {
+    error.value = readErrorMessage(reason)
     saving.value = false
   })
 }
@@ -223,23 +210,49 @@ const insertReference = (markdownLink: string) => {
 <template>
   <div class="create-page">
     <div class="page-header">
-      <button class="back-link" type="button" @click="router.push('/documents')">← Documents</button>
-      <h1 class="page-title">New Document</h1>
+      <button
+        class="back-link"
+        type="button"
+        @click="router.push('/documents')"
+      >
+        ← Documents
+      </button>
+      <h1 class="page-title">
+        New Document
+      </h1>
     </div>
 
-    <div v-if="loading" class="state-msg">Loading…</div>
-    <div v-else class="card">
+    <div
+      v-if="loading"
+      class="state-msg"
+    >
+      Loading…
+    </div>
+    <div
+      v-else
+      class="card"
+    >
       <div class="form-grid">
         <label class="form-field">
           <span>Document Type</span>
-          <select v-model="docTypeRaw" class="form-control">
-            <option v-for="type in documentTypes" :key="type.doc_type" :value="type.doc_type">{{ type.name }}</option>
+          <select
+            v-model="docTypeRaw"
+            class="form-control"
+          >
+            <option
+              v-for="type in documentTypes"
+              :key="type.doc_type"
+              :value="type.doc_type"
+            >{{ type.name }}</option>
           </select>
         </label>
 
         <label class="form-field">
           <span>Status</span>
-          <select v-model="status" class="form-control">
+          <select
+            v-model="status"
+            class="form-control"
+          >
             <option value="draft">draft</option>
             <option value="accepted">accepted</option>
             <option value="rejected">rejected</option>
@@ -248,14 +261,35 @@ const insertReference = (markdownLink: string) => {
         </label>
       </div>
 
-      <div v-if="typeSwitchWarning" class="type-switch-warning">
+      <div
+        v-if="typeSwitchWarning"
+        class="type-switch-warning"
+      >
         {{ typeSwitchWarning }}
-        <button class="link-btn warn" @click="confirmTypeSwitch">Switch anyway</button>
-        <button class="link-btn" @click="cancelTypeSwitch">Keep editing</button>
+        <button
+          class="link-btn warn"
+          @click="confirmTypeSwitch"
+        >
+          Switch anyway
+        </button>
+        <button
+          class="link-btn"
+          @click="cancelTypeSwitch"
+        >
+          Keep editing
+        </button>
       </div>
-      <div v-else-if="headerWasManuallyEdited || bodyWasManuallyEdited" class="dirty-hint">
+      <div
+        v-else-if="headerWasManuallyEdited || bodyWasManuallyEdited"
+        class="dirty-hint"
+      >
         Document type cannot be changed after editing —
-        <button class="link-btn" @click="resetAll">clear all</button> to reset.
+        <button
+          class="link-btn"
+          @click="resetAll"
+        >
+          clear all
+        </button> to reset.
       </div>
 
       <label class="form-field">
@@ -267,51 +301,84 @@ const insertReference = (markdownLink: string) => {
           type="text"
           placeholder="Use concise, decision-oriented wording"
           @blur="titleTouched = true"
-        />
-        <div v-if="titleError" class="field-error">{{ titleError }}</div>
+        >
+        <div
+          v-if="titleError"
+          class="field-error"
+        >{{ titleError }}</div>
       </label>
 
       <label class="form-field">
         <span>Keywords</span>
-        <input v-model="keywords" class="form-control" type="text" placeholder="Comma-separated terms" />
+        <input
+          v-model="keywords"
+          class="form-control"
+          type="text"
+          placeholder="Comma-separated terms"
+        >
       </label>
 
-      <template v-for="field in extraFields" :key="field.name">
+      <template
+        v-for="field in extraFields"
+        :key="field.name"
+      >
         <label class="form-field">
           <span>{{ formatFieldLabel(field.name) }}{{ field.required ? ' *' : '' }}</span>
           <input
             v-if="field.field_type === 'array'"
             :value="(extraFrontmatter[field.name] as string[] || []).join(', ')"
-            @input="onArrayFieldInput(field.name, ($event.target as HTMLInputElement).value)"
             class="form-control"
             type="text"
             placeholder="Comma-separated values"
-          />
+            @input="onArrayFieldInput(field.name, ($event.target as HTMLInputElement).value)"
+          >
           <input
             v-else
             v-model="(extraFrontmatter as any)[field.name]"
-            @input="headerWasManuallyEdited = true"
             class="form-control"
             :type="field.name === 'date' ? 'date' : 'text'"
-          />
+            @input="headerWasManuallyEdited = true"
+          >
         </label>
       </template>
 
-      <div v-if="requiredEntityTypes.length" class="entity-connection-hint entity-connection-hint--required">
+      <div
+        v-if="requiredEntityTypes.length"
+        class="entity-connection-hint entity-connection-hint--required"
+      >
         <strong>Required entity links:</strong>
         Link at least one matching entity for each term:
-        <span v-for="(t, i) in requiredEntityTypes" :key="t" class="entity-type-tag entity-type-tag--required" :title="t">{{ formatEntityTypeTerm(t) }}<span v-if="i < requiredEntityTypes.length - 1">,&nbsp;</span></span>
+        <span
+          v-for="(t, i) in requiredEntityTypes"
+          :key="t"
+          class="entity-type-tag entity-type-tag--required"
+          :title="t"
+        >{{ formatEntityTypeTerm(t) }}<span v-if="i < requiredEntityTypes.length - 1">,&nbsp;</span></span>
       </div>
-      <div v-if="suggestedEntityTypes.length" class="entity-connection-hint entity-connection-hint--suggested">
+      <div
+        v-if="suggestedEntityTypes.length"
+        class="entity-connection-hint entity-connection-hint--suggested"
+      >
         <strong>Suggested entity links:</strong>
         Consider linking matching entities for:
-        <span v-for="(t, i) in suggestedEntityTypes" :key="t" class="entity-type-tag" :title="t">{{ formatEntityTypeTerm(t) }}<span v-if="i < suggestedEntityTypes.length - 1">,&nbsp;</span></span>
+        <span
+          v-for="(t, i) in suggestedEntityTypes"
+          :key="t"
+          class="entity-type-tag"
+          :title="t"
+        >{{ formatEntityTypeTerm(t) }}<span v-if="i < suggestedEntityTypes.length - 1">,&nbsp;</span></span>
       </div>
 
       <div class="form-field">
         <span>Body</span>
         <div class="editor-toolbar">
-          <button class="secondary-btn" type="button" @click="showReferencePicker = true">Insert Reference</button>
+          <button
+            class="secondary-btn"
+            type="button"
+            @click="showReferencePicker = true"
+          >
+            Insert Reference
+          </button>
         </div>
         <MarkdownEditor
           ref="editorRef"
@@ -321,17 +388,42 @@ const insertReference = (markdownLink: string) => {
         />
       </div>
 
-      <div v-if="error" class="state-msg state-msg--error">{{ error }}</div>
-      <ul v-if="verificationIssues.length" class="issue-list">
-        <li v-for="issue in verificationIssues" :key="issue">{{ issue }}</li>
+      <div
+        v-if="error"
+        class="state-msg state-msg--error"
+      >
+        {{ error }}
+      </div>
+      <ul
+        v-if="verificationIssues.length"
+        class="issue-list"
+      >
+        <li
+          v-for="issue in verificationIssues"
+          :key="issue"
+        >
+          {{ issue }}
+        </li>
       </ul>
 
       <div class="actions">
-        <button class="submit-btn" type="button" :disabled="saving || !docType || writeBlocked" :title="writeBlocked ? 'Write operations are temporarily blocked' : ''" @click="submit">Create Document</button>
+        <button
+          class="submit-btn"
+          type="button"
+          :disabled="saving || !docType || writeBlocked"
+          :title="writeBlocked ? 'Write operations are temporarily blocked' : ''"
+          @click="submit"
+        >
+          Create Document
+        </button>
       </div>
     </div>
 
-    <div v-if="showReferencePicker" class="overlay" @click.self="showReferencePicker = false">
+    <div
+      v-if="showReferencePicker"
+      class="overlay"
+      @click.self="showReferencePicker = false"
+    >
       <ArtifactReferenceInput
         :current-path="draftPath"
         @insert="insertReference"

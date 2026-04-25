@@ -6,14 +6,19 @@ import json
 import logging
 import os
 from pathlib import Path
+from typing import TypedDict
 
 from src.common.settings import backend_log_path as configured_backend_log_path
 from src.tools.workspace_init import load_init_state
 
-
 BACKEND_STATE_FILENAME = "backend.pid"
 BACKEND_LOG_FILENAME = "backend.log"
 logger = logging.getLogger(__name__)
+
+
+class BackendState(TypedDict):
+    pid: int
+    port: int
 
 
 def workspace_root(start: Path | None = None) -> Path | None:
@@ -57,14 +62,21 @@ def backend_log_path(start: Path | None = None) -> Path:
     return (base / configured).resolve()
 
 
-def read_backend_state(start: Path | None = None) -> dict[str, object] | None:
+def read_backend_state(start: Path | None = None) -> BackendState | None:
     path = backend_state_path(start)
     if not path.exists():
         return None
     try:
-        return json.loads(path.read_text(encoding="utf-8"))
+        data = json.loads(path.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError):
         return None
+    if not isinstance(data, dict):
+        return None
+    pid = data.get("pid")
+    port = data.get("port")
+    if not isinstance(pid, int) or not isinstance(port, int):
+        return None
+    return BackendState(pid=pid, port=port)
 
 
 def _process_exists(pid: int) -> bool:

@@ -61,16 +61,16 @@ def diagram_entities_and_puml(
             row = s.entity_to_summary(rec)
             row["display_alias"] = rec.display_alias
             entities.append(row)
-    entities.sort(key=lambda e: (
-        _DOMAIN_ORDER.index(e["domain"]) if e["domain"] in _DOMAIN_ORDER else 99,
-        e["name"],
-    ))
+    entities.sort(
+        key=lambda e: (
+            _DOMAIN_ORDER.index(e["domain"]) if e["domain"] in _DOMAIN_ORDER else 99,
+            e["name"],
+        )
+    )
     return entities, puml
 
 
-def candidate_connections_for_entities(
-    repo: Any, entity_ids: list[str]
-) -> list[dict[str, Any]]:
+def candidate_connections_for_entities(repo: Any, entity_ids: list[str]) -> list[dict[str, Any]]:
     candidate_map: dict[str, dict[str, Any]] = {}
     for entity_id in entity_ids:
         context = repo.read_entity_context(entity_id)
@@ -179,10 +179,12 @@ def hop_suggestions(
             if (rec := repo.get_entity(entity_id)) is not None
             and rec.artifact_type != "global-artifact-reference"
         ]
-        items.sort(key=lambda item: (
-            _DOMAIN_ORDER.index(item["domain"]) if item["domain"] in _DOMAIN_ORDER else 99,
-            item["name"],
-        ))
+        items.sort(
+            key=lambda item: (
+                _DOMAIN_ORDER.index(item["domain"]) if item["domain"] in _DOMAIN_ORDER else 99,
+                item["name"],
+            )
+        )
         if items:
             groups.append({"hop": hop, "items": items[:limit_per_hop]})
         visited.update(next_frontier)
@@ -190,9 +192,7 @@ def hop_suggestions(
     return groups
 
 
-def fuzzy_entity_hits(
-    repo: Any, q: str, limit: int, excluded: set[str]
-) -> list[dict[str, Any]]:
+def fuzzy_entity_hits(repo: Any, q: str, limit: int, excluded: set[str]) -> list[dict[str, Any]]:
     query = q.strip().lower()
     if not query or limit <= 0:
         return []
@@ -200,9 +200,9 @@ def fuzzy_entity_hits(
     for rec in repo.list_entities():
         if rec.artifact_type == "global-artifact-reference" or rec.artifact_id in excluded:
             continue
-        haystack = " ".join((
-            rec.name, rec.artifact_type, rec.domain, rec.subdomain, rec.content_text[:400]
-        ))
+        haystack = " ".join(
+            (rec.name, rec.artifact_type, rec.domain, rec.subdomain, rec.content_text[:400])
+        )
         score = SequenceMatcher(None, query, haystack.lower()).ratio()
         if score >= 0.35:
             scored.append((score, rec))

@@ -1,16 +1,24 @@
-
-from pathlib import Path
 from collections.abc import Callable
+from pathlib import Path
 
 import yaml  # type: ignore[import-untyped]
 
 from src.common.artifact_document_schema import get_document_schema, get_document_subdirectory
-from src.common.artifact_write import generate_entity_id, slugify
+from src.common.artifact_verifier import ArtifactVerifier
+from src.common.artifact_write import generate_entity_id
 from src.common.repo_paths import DOCS
 
 from .boundary import assert_engagement_write_root, today_iso
+from .coerce import as_optional_str_list
 from .types import WriteResult
 from .verify import verify_content_in_temp_path
+
+
+def _dump_yaml_text(data: object) -> str:
+    dumped = yaml.dump(data, default_flow_style=False, allow_unicode=True, sort_keys=False)
+    if not isinstance(dumped, str):
+        raise TypeError("yaml.dump returned non-string output")
+    return dumped.rstrip()
 
 
 def _generate_document_id(abbreviation: str, title: str) -> str:
@@ -42,7 +50,7 @@ def _format_document_markdown(
         fm["keywords"] = keywords
     if extra_frontmatter:
         fm.update({k: v for k, v in extra_frontmatter.items() if k not in fm})
-    frontmatter = yaml.dump(fm, default_flow_style=False, allow_unicode=True, sort_keys=False).rstrip()
+    frontmatter = _dump_yaml_text(fm)
     return f"---\n{frontmatter}\n---\n\n{body.strip()}\n"
 
 
@@ -76,7 +84,7 @@ def _document_write_allowed(res) -> bool:
 def create_document(
     *,
     repo_root: Path,
-    verifier: object,
+    verifier: ArtifactVerifier,
     clear_repo_caches: Callable[[Path], None],
     doc_type: str,
     title: str,
@@ -157,7 +165,7 @@ def create_document(
 def edit_document(
     *,
     repo_root: Path,
-    verifier: object,
+    verifier: ArtifactVerifier,
     clear_repo_caches: Callable[[Path], None],
     artifact_id: str,
     title: str | None,
@@ -184,8 +192,8 @@ def edit_document(
     end = raw.find("\n---", 3)
     if end == -1:
         raise ValueError(f"Document at {path} has malformed YAML frontmatter")
-    fm = yaml.safe_load(raw[3:end].strip()) or {}
-    existing_body = raw[end + 4:].lstrip("\n")
+    fm: dict[str, object] = yaml.safe_load(raw[3:end].strip()) or {}
+    existing_body = raw[end + 4 :].lstrip("\n")
 
     if title is not None:
         fm["title"] = title
@@ -210,10 +218,21 @@ def edit_document(
         status=str(fm.get("status", "draft")),
         version=str(fm.get("version", "")),
         last_updated=str(fm.get("last-updated", today_iso())),
-        keywords=list(fm.get("keywords") or []),
+        keywords=as_optional_str_list(fm.get("keywords")),
         extra_frontmatter={
-            k: v for k, v in fm.items()
-            if k not in {"artifact-id", "artifact-type", "doc-type", "title", "status", "version", "last-updated", "keywords"}
+            k: v
+            for k, v in fm.items()
+            if k
+            not in {
+                "artifact-id",
+                "artifact-type",
+                "doc-type",
+                "title",
+                "status",
+                "version",
+                "last-updated",
+                "keywords",
+            }
         },
         body=new_body,
     )

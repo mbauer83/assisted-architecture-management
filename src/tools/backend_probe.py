@@ -9,11 +9,9 @@ import shutil
 import socket
 import sys
 from pathlib import Path
-from urllib.error import URLError
 from urllib.request import Request, urlopen
 
 from src.common.settings import backend_port as global_backend_port
-
 
 logger = logging.getLogger(__name__)
 
@@ -21,6 +19,7 @@ logger = logging.getLogger(__name__)
 def load_workspace_config(start: Path | None = None) -> dict | None:
     """Load arch-workspace.yaml from *start* or any parent directory. Returns None if not found."""
     import yaml
+
     search = start or Path.cwd()
     for candidate in [search, *search.parents]:
         cfg = candidate / "arch-workspace.yaml"

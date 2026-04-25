@@ -7,6 +7,7 @@ on startup, so the same askpass credentials apply here as in the background sync
 
 Engagement-repo helpers are also here to keep all git commit/push logic in one place.
 """
+
 from __future__ import annotations
 
 import logging
@@ -25,10 +26,14 @@ _PUSH_TIMEOUT = 60
 
 def _run(repo: Path, *args: str, timeout: float = _GIT_TIMEOUT) -> tuple[int, str, str]:
     from src.tools.git_env import get_ssh_env
+
     result = subprocess.run(
         ["git", *args],
-        cwd=repo, capture_output=True, text=True,
-        timeout=timeout, env=get_ssh_env(),
+        cwd=repo,
+        capture_output=True,
+        text=True,
+        timeout=timeout,
+        env=get_ssh_env(),
     )
     return result.returncode, result.stdout.strip(), result.stderr.strip()
 
@@ -36,6 +41,7 @@ def _run(repo: Path, *args: str, timeout: float = _GIT_TIMEOUT) -> tuple[int, st
 # ---------------------------------------------------------------------------
 # Introspection helpers
 # ---------------------------------------------------------------------------
+
 
 def current_branch(repo: Path) -> str | None:
     rc, out, _ = _run(repo, "rev-parse", "--abbrev-ref", "HEAD")
@@ -74,8 +80,14 @@ def commits_behind_main(repo: Path) -> int:
 def promotion_merged_into_main(repo: Path) -> bool:
     """Detect merge via content diff: empty diff means working branch is in origin/main."""
     rc, out, _ = _run(
-        repo, "diff", "origin/main", "HEAD",
-        "--", MODEL, DOCS, DIAGRAM_CATALOG,
+        repo,
+        "diff",
+        "origin/main",
+        "HEAD",
+        "--",
+        MODEL,
+        DOCS,
+        DIAGRAM_CATALOG,
     )
     return rc == 0 and not out
 
@@ -83,6 +95,7 @@ def promotion_merged_into_main(repo: Path) -> bool:
 # ---------------------------------------------------------------------------
 # Enterprise branch lifecycle
 # ---------------------------------------------------------------------------
+
 
 def ensure_working_branch(enterprise_root: Path) -> str:
     """Ensure the enterprise checkout is on a working branch, creating one if SYNCED.
@@ -98,13 +111,16 @@ def ensure_working_branch(enterprise_root: Path) -> str:
             if branch != state.branch:
                 logger.warning(
                     "Enterprise branch mismatch: state=%s actual=%s — reconciling",
-                    state.branch, branch,
+                    state.branch,
+                    branch,
                 )
                 enterprise_sync_state.save(
                     enterprise_root,
                     EnterpriseSyncState(
-                        status=state.status, branch=branch,
-                        branch_tip=state.branch_tip, pushed_at=state.pushed_at,
+                        status=state.status,
+                        branch=branch,
+                        branch_tip=state.branch_tip,
+                        pushed_at=state.pushed_at,
                         commits_behind=state.commits_behind,
                     ),
                 )
@@ -114,9 +130,7 @@ def ensure_working_branch(enterprise_root: Path) -> str:
     branch_name = f"arch/work-{ts}"
     rc, _, stderr = _run(enterprise_root, "checkout", "-b", branch_name)
     if rc != 0:
-        raise RuntimeError(
-            f"Failed to create enterprise working branch '{branch_name}': {stderr}"
-        )
+        raise RuntimeError(f"Failed to create enterprise working branch '{branch_name}': {stderr}")
     enterprise_sync_state.save(
         enterprise_root,
         EnterpriseSyncState(status="accumulating", branch=branch_name),
@@ -161,7 +175,9 @@ def push_enterprise_branch(enterprise_root: Path) -> str:
     enterprise_sync_state.save(
         enterprise_root,
         EnterpriseSyncState(
-            status="pending", branch=branch, branch_tip=commit,
+            status="pending",
+            branch=branch,
+            branch_tip=commit,
             pushed_at=datetime.now(timezone.utc).isoformat(),
             commits_behind=state.commits_behind,
         ),
@@ -187,6 +203,7 @@ def abandon_enterprise_branch(enterprise_root: Path) -> str | None:
 # ---------------------------------------------------------------------------
 # Engagement repo
 # ---------------------------------------------------------------------------
+
 
 def commit_engagement_work(engagement_root: Path, message: str) -> str:
     """Stage and commit all changes in the engagement repo. Returns the commit hash."""

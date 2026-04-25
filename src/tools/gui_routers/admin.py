@@ -26,6 +26,7 @@ def _require_admin() -> None:
 
 # ── Server info ───────────────────────────────────────────────────────────────
 
+
 @router.get("/server-info")
 def server_info() -> dict[str, Any]:
     """Return server configuration including admin-mode and read-only status."""
@@ -38,6 +39,7 @@ def server_info() -> dict[str, Any]:
 
 
 # ── Entity endpoints (enterprise) ────────────────────────────────────────────
+
 
 class AdminCreateEntityBody(BaseModel):
     artifact_type: str
@@ -73,6 +75,7 @@ def admin_create_entity(body: AdminCreateEntityBody) -> dict[str, Any]:
     _require_admin()
     ent_root, _, verifier = s.get_admin_write_deps()
     from src.tools.artifact_write.admin_ops import admin_create_entity as _create
+
     try:
         result = s.run_serialized_write(
             _create,
@@ -100,7 +103,9 @@ def admin_create_entity(body: AdminCreateEntityBody) -> dict[str, Any]:
 def admin_edit_entity(body: AdminEditEntityBody) -> dict[str, Any]:
     _require_admin()
     ent_root, registry, verifier = s.get_admin_write_deps()
-    from src.tools.artifact_write.admin_ops import admin_edit_entity as _edit, _UNSET
+    from src.tools.artifact_write.admin_ops import _UNSET
+    from src.tools.artifact_write.admin_ops import admin_edit_entity as _edit
+
     provided = body.model_fields_set
     try:
         result = s.run_serialized_write(
@@ -129,6 +134,7 @@ def admin_delete_entity(body: AdminDeleteEntityBody) -> dict[str, Any]:
     _require_admin()
     ent_root, registry, _verifier = s.get_admin_write_deps()
     from src.tools.artifact_write.admin_ops import admin_delete_entity as _delete
+
     try:
         result = s.run_serialized_write(
             _delete,
@@ -144,6 +150,7 @@ def admin_delete_entity(body: AdminDeleteEntityBody) -> dict[str, Any]:
 
 
 # ── Connection endpoints (enterprise) ────────────────────────────────────────
+
 
 class AdminAddConnectionBody(BaseModel):
     source_entity: str
@@ -165,6 +172,7 @@ def admin_add_connection(body: AdminAddConnectionBody) -> dict[str, Any]:
     _require_admin()
     ent_root, registry, verifier = s.get_admin_write_deps()
     from src.tools.artifact_write.admin_ops import admin_add_connection as _add
+
     try:
         result = s.run_serialized_write(
             _add,
@@ -191,6 +199,7 @@ def admin_remove_connection(body: AdminRemoveConnectionBody) -> dict[str, Any]:
     _require_admin()
     ent_root, registry, verifier = s.get_admin_write_deps()
     from src.tools.artifact_write.admin_ops import admin_remove_connection as _remove
+
     try:
         result = s.run_serialized_write(
             _remove,
@@ -209,6 +218,7 @@ def admin_remove_connection(body: AdminRemoveConnectionBody) -> dict[str, Any]:
 
 
 # ── Diagram endpoints (enterprise) ───────────────────────────────────────────
+
 
 class AdminCreateDiagramBody(BaseModel):
     diagram_type: str
@@ -237,17 +247,20 @@ def admin_create_diagram(body: AdminCreateDiagramBody) -> dict[str, Any]:
     """
     _require_admin()
     ent_root, _, verifier = s.get_admin_write_deps()
-    from src.tools.artifact_write.boundary import assert_enterprise_write_root
     from src.common.artifact_write import generate_entity_id
-    from src.tools.diagram_builder import generate_archimate_puml_body
+
     # Import the core diagram writing helper that wraps format + write + render
     from src.tools.artifact_write.admin_ops import _write_diagram_to_enterprise
+    from src.tools.artifact_write.boundary import assert_enterprise_write_root
+    from src.tools.diagram_builder import generate_archimate_puml_body
 
     assert_enterprise_write_root(ent_root)
     repo = s.get_repo()
     entities = [e for eid in body.entity_ids if (e := repo.get_entity(eid)) is not None]
     connections = [c for cid in body.connection_ids if (c := repo.get_connection(cid)) is not None]
-    puml = generate_archimate_puml_body(body.name, entities, connections, diagram_type=body.diagram_type)
+    puml = generate_archimate_puml_body(
+        body.name, entities, connections, diagram_type=body.diagram_type
+    )
     try:
         result = s.run_serialized_write(
             _write_diagram_to_enterprise,
@@ -273,6 +286,7 @@ def admin_delete_diagram(body: AdminDeleteDiagramBody) -> dict[str, Any]:
     _require_admin()
     ent_root, _registry, _verifier = s.get_admin_write_deps()
     from src.tools.artifact_write.admin_ops import admin_delete_diagram as _delete
+
     try:
         result = s.run_serialized_write(
             _delete,

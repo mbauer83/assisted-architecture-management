@@ -19,8 +19,14 @@ class _MemStore:
 
     def clear(self) -> None:
         for attr in (
-            "entities", "connections", "diagrams", "documents",
-            "entity_by_path", "connections_by_path", "diagram_by_path", "document_by_path",
+            "entities",
+            "connections",
+            "diagrams",
+            "documents",
+            "entity_by_path",
+            "connections_by_path",
+            "diagram_by_path",
+            "document_by_path",
         ):
             getattr(self, attr).clear()
 

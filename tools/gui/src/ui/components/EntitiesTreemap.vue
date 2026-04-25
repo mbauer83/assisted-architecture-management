@@ -219,7 +219,7 @@ const onMove = (event: MouseEvent) => {
 
 const stopPan = () => {
   if (panning.value && pressedLeafId.value && !movedDuringGesture.value) {
-    openEntity(pressedLeafId.value)
+    void openEntity(pressedLeafId.value)
   }
   panning.value = false
   movedDuringGesture.value = false
@@ -245,7 +245,10 @@ watch(() => props.items, resetView)
 </script>
 
 <template>
-  <div ref="hostRef" class="treemap-card">
+  <div
+    ref="hostRef"
+    class="treemap-card"
+  >
     <div class="treemap-topbar">
       <div class="treemap-note">
         Sized by total connections. Drag to pan, wheel to zoom.
@@ -253,17 +256,66 @@ watch(() => props.items, resetView)
         <span v-else>Grouped by subdomain.</span>
       </div>
       <div class="treemap-controls">
-        <button class="control-btn" title="Zoom out" @click="zoomByButton(-0.35)">−</button>
-        <button class="control-btn" title="Reset zoom and pan" @click="resetView">{{ zoom.toFixed(1) }}x</button>
-        <button class="control-btn" title="Zoom in" @click="zoomByButton(0.35)">+</button>
+        <button
+          class="control-btn"
+          title="Zoom out"
+          @click="zoomByButton(-0.35)"
+        >
+          −
+        </button>
+        <button
+          class="control-btn"
+          title="Reset zoom and pan"
+          @click="resetView"
+        >
+          {{ zoom.toFixed(1) }}x
+        </button>
+        <button
+          class="control-btn"
+          title="Zoom in"
+          @click="zoomByButton(0.35)"
+        >
+          +
+        </button>
       </div>
     </div>
-    <svg ref="svgRef" class="treemap-svg" :viewBox="viewBox" preserveAspectRatio="xMidYMid meet" @wheel.prevent="onWheel" @mousedown="startPan">
-      <rect class="interaction-bg" x="0" y="0" :width="size.width" :height="size.height" />
+    <svg
+      ref="svgRef"
+      class="treemap-svg"
+      :viewBox="viewBox"
+      preserveAspectRatio="xMidYMid meet"
+      @wheel.prevent="onWheel"
+      @mousedown="startPan"
+    >
+      <rect
+        class="interaction-bg"
+        x="0"
+        y="0"
+        :width="size.width"
+        :height="size.height"
+      />
       <g :transform="transform">
-        <g v-for="group in groups" :key="group.key">
-          <rect class="group-shell" :x="group.x" :y="group.y" :width="group.width" :height="group.height" :fill="group.color" fill-opacity="0.16" :stroke="group.color" />
-          <text v-if="group.showLabel" class="group-label" :x="group.x + 10" :y="group.y + group.fontSize + 5" :font-size="group.fontSize">{{ group.name }}</text>
+        <g
+          v-for="group in groups"
+          :key="group.key"
+        >
+          <rect
+            class="group-shell"
+            :x="group.x"
+            :y="group.y"
+            :width="group.width"
+            :height="group.height"
+            :fill="group.color"
+            fill-opacity="0.16"
+            :stroke="group.color"
+          />
+          <text
+            v-if="group.showLabel"
+            class="group-label"
+            :x="group.x + 10"
+            :y="group.y + group.fontSize + 5"
+            :font-size="group.fontSize"
+          >{{ group.name }}</text>
         </g>
         <g
           v-for="leaf in leaves"
@@ -273,8 +325,18 @@ watch(() => props.items, resetView)
           @mousemove="queueTooltip(leaf.entity, $event.clientX, $event.clientY)"
           @mouseleave="clearTooltip"
         >
-          <rect class="leaf-block" :x="leaf.x" :y="leaf.y" :width="leaf.width" :height="leaf.height" :fill="leaf.color" />
-          <g v-if="leaf.showIcon" class="leaf-copy">
+          <rect
+            class="leaf-block"
+            :x="leaf.x"
+            :y="leaf.y"
+            :width="leaf.width"
+            :height="leaf.height"
+            :fill="leaf.color"
+          />
+          <g
+            v-if="leaf.showIcon"
+            class="leaf-copy"
+          >
             <ArchimateTypeGlyph
               :type="leaf.entity.artifact_type"
               :x="leaf.x + leaf.left"
@@ -282,21 +344,47 @@ watch(() => props.items, resetView)
               :size="leaf.iconSize"
               class="leaf-glyph"
             />
-            <text v-if="leaf.showName" class="leaf-name" :x="leaf.x + leaf.textX" :y="leaf.y + 8 + leaf.nameSize" :font-size="leaf.nameSize">{{ leaf.label }}</text>
-            <text v-if="leaf.showMeta" class="leaf-meta" :x="leaf.x + leaf.textX" :y="leaf.y + 10 + leaf.nameSize + leaf.metaSize + 4" :font-size="leaf.metaSize">{{ leaf.value }} connections</text>
+            <text
+              v-if="leaf.showName"
+              class="leaf-name"
+              :x="leaf.x + leaf.textX"
+              :y="leaf.y + 8 + leaf.nameSize"
+              :font-size="leaf.nameSize"
+            >{{ leaf.label }}</text>
+            <text
+              v-if="leaf.showMeta"
+              class="leaf-meta"
+              :x="leaf.x + leaf.textX"
+              :y="leaf.y + 10 + leaf.nameSize + leaf.metaSize + 4"
+              :font-size="leaf.metaSize"
+            >{{ leaf.value }} connections</text>
           </g>
         </g>
       </g>
     </svg>
-    <div v-if="tooltipLeaf" class="leaf-tooltip" :style="{ left: `${tooltipPos.x}px`, top: `${tooltipPos.y}px` }">
+    <div
+      v-if="tooltipLeaf"
+      class="leaf-tooltip"
+      :style="{ left: `${tooltipPos.x}px`, top: `${tooltipPos.y}px` }"
+    >
       <div class="tooltip-head">
-        <ArchimateTypeGlyph :type="tooltipLeaf.artifact_type" :size="18" class="tooltip-glyph" />
+        <ArchimateTypeGlyph
+          :type="tooltipLeaf.artifact_type"
+          :size="18"
+          class="tooltip-glyph"
+        />
         <div>
-          <div class="tooltip-name">{{ tooltipLeaf.name || friendlyEntityId(tooltipLeaf.artifact_id) }}</div>
-          <div class="tooltip-type">{{ tooltipLeaf.artifact_type }}</div>
+          <div class="tooltip-name">
+            {{ tooltipLeaf.name || friendlyEntityId(tooltipLeaf.artifact_id) }}
+          </div>
+          <div class="tooltip-type">
+            {{ tooltipLeaf.artifact_type }}
+          </div>
         </div>
       </div>
-      <div class="tooltip-id">{{ tooltipLeaf.artifact_id }}</div>
+      <div class="tooltip-id">
+        {{ tooltipLeaf.artifact_id }}
+      </div>
     </div>
   </div>
 </template>

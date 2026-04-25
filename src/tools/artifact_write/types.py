@@ -1,4 +1,3 @@
-
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -11,4 +10,4 @@ class WriteResult:
     artifact_id: str
     content: str | None
     warnings: list[str]
-    verification: dict[str, Any]
+    verification: dict[str, Any] | None

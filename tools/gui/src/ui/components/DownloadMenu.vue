@@ -12,11 +12,34 @@ const download = (format: 'png' | 'svg') => {
 
 <template>
   <div class="dl-wrap">
-    <button class="dl-btn" @click.stop.prevent="open = !open" title="Download">↓</button>
-    <div v-if="open" class="dl-overlay" @click.stop="open = false" />
-    <div v-if="open" class="dl-dropdown">
-      <button class="dl-opt" @click.stop="download('svg')">SVG</button>
-      <button class="dl-opt" @click.stop="download('png')">PNG</button>
+    <button
+      class="dl-btn"
+      title="Download"
+      @click.stop.prevent="open = !open"
+    >
+      ↓
+    </button>
+    <div
+      v-if="open"
+      class="dl-overlay"
+      @click.stop="open = false"
+    />
+    <div
+      v-if="open"
+      class="dl-dropdown"
+    >
+      <button
+        class="dl-opt"
+        @click.stop="download('svg')"
+      >
+        SVG
+      </button>
+      <button
+        class="dl-opt"
+        @click.stop="download('png')"
+      >
+        PNG
+      </button>
     </div>
   </div>
 </template>

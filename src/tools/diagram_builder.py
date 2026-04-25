@@ -8,6 +8,7 @@ Both the PUML generation and the PlantUML rendering reuse the same conventions
 as the ``model_create_diagram`` / ``model_verify_file`` MCP tools (shared library
 code from ``src.common``).
 """
+
 from __future__ import annotations
 
 import base64
@@ -17,9 +18,11 @@ import tempfile
 from collections import defaultdict
 from pathlib import Path
 
-from src.common.archimate_relation_rendering import display_connection_label, render_archimate_relation
+from src.common.archimate_relation_rendering import (
+    display_connection_label,
+    render_archimate_relation,
+)
 from src.common.artifact_parsing import normalize_puml_alias
-from src.common.repo_paths import DIAGRAM_CATALOG, DIAGRAMS
 from src.common.artifact_types import ConnectionRecord, EntityRecord
 from src.common.ontology_loader import (
     CONNECTION_TYPES,
@@ -29,6 +32,7 @@ from src.common.ontology_loader import (
     ELEMENT_TYPE_HAS_SPRITE,
     ENTITY_TYPES,
 )
+from src.common.repo_paths import DIAGRAM_CATALOG, DIAGRAMS
 
 
 def _parse_archimate_block(raw: str) -> dict:
@@ -146,9 +150,7 @@ def generate_archimate_puml_body(
         if e.display_alias
     }
     entity_by_alias = {
-        normalize_puml_alias(e.display_alias): e
-        for e in entity_records
-        if e.display_alias
+        normalize_puml_alias(e.display_alias): e for e in entity_records if e.display_alias
     }
 
     # Build composition/aggregation hierarchy for visual nesting
@@ -237,15 +239,17 @@ def generate_archimate_puml_body(
             if prev_anchor_alias and top_aliases:
                 lines.append(f"{prev_anchor_alias} -[hidden]down- {top_aliases[0]}")
             if top_aliases:
-                prev_anchor_alias = top_aliases[-1]
+                anchor_alias = top_aliases[-1]
+                if anchor_alias:
+                    prev_anchor_alias = anchor_alias
             lines.append("")
     else:
         for domain in ordered_domains:
-            grouping = DOMAIN_GROUPING.get(domain)
+            group_style: str | None = DOMAIN_GROUPING.get(domain)
             display = DOMAIN_DISPLAY.get(domain, domain.title())
-            indent = "  " if grouping else ""
-            if grouping:
-                lines.append(f'rectangle "{display}" <<{grouping}>> {{')
+            indent = "  " if group_style else ""
+            if group_style:
+                lines.append(f'rectangle "{display}" <<{group_style}>> {{')
             for entity in domain_entities[domain]:
                 lines.extend(_render_entity(entity, indent))
             if grouping:
@@ -267,14 +271,18 @@ def generate_archimate_puml_body(
                 tgt_group = group_index_by_alias.get(tgt)
                 if src_group is not None and tgt_group is not None and src_group != tgt_group:
                     direction = "down" if src_group < tgt_group else "up"
-            macro_line = render_archimate_relation(src, tgt, conn.conn_type, direction=direction, label_text="")
+            macro_line = render_archimate_relation(
+                src, tgt, conn.conn_type, direction=direction, label_text=""
+            )
             if macro_line is not None:
                 conn_lines.append(macro_line)
                 continue
             arrow = ct.puml_arrow if ct else "-->"
             if direction:
                 arrow = _insert_arrow_direction(arrow, direction)
-            conn_lines.append(f"{src} {arrow} {tgt} : <<{display_connection_label(conn.conn_type)}>>")
+            conn_lines.append(
+                f"{src} {arrow} {tgt} : <<{display_connection_label(conn.conn_type)}>>"
+            )
     if conn_lines:
         lines.append("' Connections")
         lines.extend(conn_lines)
@@ -284,9 +292,7 @@ def generate_archimate_puml_body(
     return "\n".join(lines)
 
 
-def _render_puml(
-    puml_body: str, repo_root: Path, fmt: str
-) -> tuple[str | None, list[str]]:
+def _render_puml(puml_body: str, repo_root: Path, fmt: str) -> tuple[str | None, list[str]]:
     """Core PlantUML render pipeline.
 
     *fmt* is ``"png"`` or ``"svg"``.  Returns ``(result, warnings)`` where
@@ -325,14 +331,22 @@ def _render_puml(
 
         with tempfile.TemporaryDirectory() as out_dir:
             cmd = [
-                "java", "-Djava.awt.headless=true", f"-DPLANTUML_LIMIT_SIZE={plantuml_limit_size()}", "-jar", str(jar.resolve()),
+                "java",
+                "-Djava.awt.headless=true",
+                f"-DPLANTUML_LIMIT_SIZE={plantuml_limit_size()}",
+                "-jar",
+                str(jar.resolve()),
                 f"-t{fmt}",
             ]
             if fmt == "png":
                 cmd.append(f"-Sdpi={render_dpi()}")
             cmd += ["-o", out_dir, tmp_path.name]
             proc = subprocess.run(
-                cmd, cwd=str(diag_dir), capture_output=True, text=True, timeout=60,
+                cmd,
+                cwd=str(diag_dir),
+                capture_output=True,
+                text=True,
+                timeout=60,
             )
             if proc.returncode != 0:
                 warnings.append(f"PlantUML render failed: {proc.stderr[:300]}")
@@ -343,8 +357,7 @@ def _render_puml(
                 return None, warnings
             if fmt == "png":
                 return (
-                    "data:image/png;base64,"
-                    + base64.b64encode(outputs[0].read_bytes()).decode(),
+                    "data:image/png;base64," + base64.b64encode(outputs[0].read_bytes()).decode(),
                     warnings,
                 )
             return outputs[0].read_text(encoding="utf-8"), warnings
@@ -357,15 +370,11 @@ def _render_puml(
             tmp_path.unlink(missing_ok=True)
 
 
-def render_puml_preview(
-    puml_body: str, repo_root: Path
-) -> tuple[str | None, list[str]]:
+def render_puml_preview(puml_body: str, repo_root: Path) -> tuple[str | None, list[str]]:
     """Render *puml_body* to PNG. Returns ``(data:image/png;base64,…, warnings)``."""
     return _render_puml(puml_body, repo_root, "png")
 
 
-def render_puml_svg(
-    puml_body: str, repo_root: Path
-) -> tuple[str | None, list[str]]:
+def render_puml_svg(puml_body: str, repo_root: Path) -> tuple[str | None, list[str]]:
     """Render *puml_body* to SVG. Returns ``(svg_text, warnings)``."""
     return _render_puml(puml_body, repo_root, "svg")

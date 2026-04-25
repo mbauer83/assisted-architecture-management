@@ -7,7 +7,7 @@ one-line change rather than a grep-and-replace across the entire codebase.
 MODEL = "model"
 DOCS = "docs"
 DIAGRAM_CATALOG = "diagram-catalog"
-DIAGRAMS = "diagrams"       # subdirectory within DIAGRAM_CATALOG/
-RENDERED = "rendered"       # subdirectory within DIAGRAMS/ — excluded from indexing
+DIAGRAMS = "diagrams"  # subdirectory within DIAGRAM_CATALOG/
+RENDERED = "rendered"  # subdirectory within DIAGRAMS/ — excluded from indexing
 ARCH_REPO = ".arch-repo"
 ARCH_DOC_SCHEMATA = "documents"  # subdirectory within ARCH_REPO/ — document type JSON schemas

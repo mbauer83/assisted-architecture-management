@@ -1,4 +1,3 @@
-
 from datetime import date
 from pathlib import Path
 
@@ -29,10 +28,7 @@ def assert_enterprise_write_root(repo_root: Path) -> None:
     """Accept only the enterprise repository root — for admin-mode GUI writes."""
     p = repo_root.resolve()
     if infer_repo_scope(p) != "enterprise":
-        raise ValueError(
-            "Admin write expected enterprise repository root, got: "
-            f"{p}"
-        )
+        raise ValueError(f"Admin write expected enterprise repository root, got: {p}")
 
 
 def engagement_id_from_repo_root(repo_root: Path) -> str:

@@ -13,15 +13,29 @@ from src.tools.artifact_write.promote_to_enterprise import ConflictResolution
 
 class _ConflictHandler(Protocol):
     def handle(
-        self, conflict: Any, eng_root: Path, ent_root: Path, registry: Any,
-        result: Any, backups: Any, resolve_target: Any, conn_ids: Any,
+        self,
+        conflict: Any,
+        eng_root: Path,
+        ent_root: Path,
+        registry: Any,
+        result: Any,
+        backups: Any,
+        resolve_target: Any,
+        conn_ids: Any,
     ) -> None: ...
 
 
 class _AcceptEnterpriseHandler:
     def handle(
-        self, conflict: Any, eng_root: Path, ent_root: Path, registry: Any,
-        result: Any, backups: Any, resolve_target: Any, conn_ids: Any,
+        self,
+        conflict: Any,
+        eng_root: Path,
+        ent_root: Path,
+        registry: Any,
+        result: Any,
+        backups: Any,
+        resolve_target: Any,
+        conn_ids: Any,
     ) -> None:
         pass
 
@@ -29,8 +43,15 @@ class _AcceptEnterpriseHandler:
 @dataclass
 class _AcceptEngagementHandler:
     def handle(
-        self, conflict: Any, eng_root: Path, ent_root: Path, registry: Any,
-        result: Any, backups: Any, resolve_target: Any, conn_ids: Any,
+        self,
+        conflict: Any,
+        eng_root: Path,
+        ent_root: Path,
+        registry: Any,
+        result: Any,
+        backups: Any,
+        resolve_target: Any,
+        conn_ids: Any,
     ) -> None:
         replace_enterprise_content(
             conflict, eng_root, ent_root, registry, result, backups, resolve_target, conn_ids
@@ -42,8 +63,15 @@ class _MergeHandler:
     merged_fields: dict[str, Any]
 
     def handle(
-        self, conflict: Any, eng_root: Path, ent_root: Path, registry: Any,
-        result: Any, backups: Any, resolve_target: Any, conn_ids: Any,
+        self,
+        conflict: Any,
+        eng_root: Path,
+        ent_root: Path,
+        registry: Any,
+        result: Any,
+        backups: Any,
+        resolve_target: Any,
+        conn_ids: Any,
     ) -> None:
         apply_merge(conflict, ent_root, registry, self.merged_fields, result, backups)
 
@@ -61,15 +89,19 @@ def build_handler(resolution: ConflictResolution) -> _ConflictHandler | None:
 
 
 def replace_enterprise_content(
-    conflict: Any, eng_root: Path, ent_root: Path, registry: Any,
-    result: Any, backups: list[Any], resolve_target: TargetResolver, conn_ids: Any,
+    conflict: Any,
+    eng_root: Path,
+    ent_root: Path,
+    registry: Any,
+    result: Any,
+    backups: list[Any],
+    resolve_target: TargetResolver,
+    conn_ids: Any,
 ) -> None:
     ent_path = registry.find_file_by_id(conflict.enterprise_id)
     eng_path = registry.find_file_by_id(conflict.engagement_id)
     if not ent_path or not eng_path:
-        result.plan.warnings.append(
-            f"Could not find files for conflict {conflict.engagement_id}"
-        )
+        result.plan.warnings.append(f"Could not find files for conflict {conflict.engagement_id}")
         return
     content = eng_path.read_text(encoding="utf-8").replace(
         conflict.engagement_id, conflict.enterprise_id, 1
@@ -83,7 +115,9 @@ def replace_enterprise_content(
         backups.append((ent_outgoing, ent_outgoing.read_bytes() if ent_outgoing.exists() else None))
         rewritten = rewrite_outgoing(
             eng_outgoing.read_text(encoding="utf-8"),
-            resolve_target=resolve_target, result=result, conn_ids=conn_ids,
+            resolve_target=resolve_target,
+            result=result,
+            conn_ids=conn_ids,
         ).replace(conflict.engagement_id, conflict.enterprise_id, 1)
         ent_outgoing.parent.mkdir(parents=True, exist_ok=True)
         ent_outgoing.write_text(rewritten, encoding="utf-8")
@@ -91,8 +125,12 @@ def replace_enterprise_content(
 
 
 def apply_merge(
-    conflict: Any, ent_root: Path, registry: Any,
-    merged_fields: dict[str, Any], result: Any, backups: list[Any],
+    conflict: Any,
+    ent_root: Path,
+    registry: Any,
+    merged_fields: dict[str, Any],
+    result: Any,
+    backups: list[Any],
 ) -> None:
     from src.common.artifact_write_formatting import format_entity_markdown
     from src.tools.artifact_write.boundary import today_iso
@@ -106,7 +144,8 @@ def apply_merge(
     parsed = parse_entity_file(ent_path)
     fm = dict(parsed.frontmatter)
     content = format_entity_markdown(
-        artifact_id=conflict.enterprise_id, artifact_type=conflict.artifact_type,
+        artifact_id=conflict.enterprise_id,
+        artifact_type=conflict.artifact_type,
         name=merged_fields.get("name", fm.get("name", "")),
         version=merged_fields.get("version", fm.get("version", "0.1.0")),
         status=merged_fields.get("status", fm.get("status", "draft")),

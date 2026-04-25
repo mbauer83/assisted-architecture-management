@@ -334,45 +334,93 @@ onUnmounted(() => {
 <template>
   <div class="promote-view">
     <div class="page-header">
-      <h1 class="page-title">Promote to Global Repository</h1>
+      <h1 class="page-title">
+        Promote to Global Repository
+      </h1>
       <p class="page-sub">
         Build an explicit promotion set of entities and connections, review any conflicts, then execute.
       </p>
     </div>
 
     <div class="steps">
-      <div class="step" :class="{ active: step === 'pick', done: step !== 'pick' }">1. Select root</div>
-      <div class="step-arrow">›</div>
-      <div class="step" :class="{ active: step === 'review', done: step === 'execute' || step === 'done' }">2. Curate set</div>
-      <div class="step-arrow">›</div>
-      <div class="step" :class="{ active: step === 'execute' || step === 'done' }">3. Execute</div>
+      <div
+        class="step"
+        :class="{ active: step === 'pick', done: step !== 'pick' }"
+      >
+        1. Select root
+      </div>
+      <div class="step-arrow">
+        ›
+      </div>
+      <div
+        class="step"
+        :class="{ active: step === 'review', done: step === 'execute' || step === 'done' }"
+      >
+        2. Curate set
+      </div>
+      <div class="step-arrow">
+        ›
+      </div>
+      <div
+        class="step"
+        :class="{ active: step === 'execute' || step === 'done' }"
+      >
+        3. Execute
+      </div>
     </div>
 
-    <div v-if="step === 'pick'" class="card step-card">
-      <h2 class="card-title">Select the first entity to promote</h2>
+    <div
+      v-if="step === 'pick'"
+      class="card step-card"
+    >
+      <h2 class="card-title">
+        Select the first entity to promote
+      </h2>
       <p class="card-hint">
         Promotion now uses only the entities and connections you explicitly include.
       </p>
-      <EntitySearchInput placeholder="Search engagement entities…" @select="onEntityPicked" />
-      <div v-if="selectedEntityId" class="selected-entity">
+      <EntitySearchInput
+        placeholder="Search engagement entities…"
+        @select="onEntityPicked"
+      />
+      <div
+        v-if="selectedEntityId"
+        class="selected-entity"
+      >
         <span class="sel-label">Selected:</span>
         <span class="sel-name">{{ selectedEntityName }}</span>
         <span class="sel-id mono">{{ selectedEntityId }}</span>
       </div>
       <div class="step-actions">
-        <button class="btn btn--primary" :disabled="!selectedEntityId" @click="startPromotion">
+        <button
+          class="btn btn--primary"
+          :disabled="!selectedEntityId"
+          @click="startPromotion"
+        >
           Build promotion set →
         </button>
       </div>
-      <p v-if="planError" class="error-msg">{{ planError }}</p>
+      <p
+        v-if="planError"
+        class="error-msg"
+      >
+        {{ planError }}
+      </p>
     </div>
 
     <template v-if="step === 'review'">
       <div class="review-grid">
         <div class="card step-card">
           <div class="plan-header">
-            <h2 class="card-title">Promotion set for <span class="mono">{{ selectedEntityName }}</span></h2>
-            <button class="btn btn--ghost" @click="restart">← Start over</button>
+            <h2 class="card-title">
+              Promotion set for <span class="mono">{{ selectedEntityName }}</span>
+            </h2>
+            <button
+              class="btn btn--ghost"
+              @click="restart"
+            >
+              ← Start over
+            </button>
           </div>
 
           <div class="form-row">
@@ -385,15 +433,24 @@ onUnmounted(() => {
                 @input="onSearchInput"
                 @blur="closeDropdown"
                 @focus="() => { if (searchResults.length) showDropdown = true }"
-              />
-              <div v-if="showDropdown" class="dropdown">
+              >
+              <div
+                v-if="showDropdown"
+                class="dropdown"
+              >
                 <button
                   v-for="r in searchResults"
                   :key="r.artifact_id"
                   class="dd-item"
                   @mousedown.prevent="addEntity(r)"
                 >
-                  <span class="dd-glyph" :title="r.element_type || r.artifact_type"><ArchimateTypeGlyph :type="toGlyphKey(r.element_type || r.artifact_type)" :size="16" /></span>
+                  <span
+                    class="dd-glyph"
+                    :title="r.element_type || r.artifact_type"
+                  ><ArchimateTypeGlyph
+                    :type="toGlyphKey(r.element_type || r.artifact_type)"
+                    :size="16"
+                  /></span>
                   <span class="dd-name">{{ r.name }}</span>
                   <span class="dd-domain">{{ r.domain }}</span>
                 </button>
@@ -401,7 +458,10 @@ onUnmounted(() => {
             </div>
           </div>
 
-          <div v-if="includedEntities.length" class="form-row">
+          <div
+            v-if="includedEntities.length"
+            class="form-row"
+          >
             <label class="section-title">Included Entities ({{ includedEntities.length }})</label>
             <EntitySelectionList
               :rows="selectionRows"
@@ -419,71 +479,150 @@ onUnmounted(() => {
             />
           </div>
 
-          <div v-if="executeError" class="error-msg">{{ executeError }}</div>
+          <div
+            v-if="executeError"
+            class="error-msg"
+          >
+            {{ executeError }}
+          </div>
 
           <div class="step-actions">
-            <button class="btn btn--primary" :disabled="!canExecute || executing || planning" @click="execute">
+            <button
+              class="btn btn--primary"
+              :disabled="!canExecute || executing || planning"
+              @click="execute"
+            >
               {{ executing ? 'Promoting…' : `Promote ${totalToPromote} ${totalToPromote === 1 ? 'entity' : 'entities'} →` }}
             </button>
           </div>
         </div>
 
         <div class="card step-card">
-          <h2 class="card-title">Plan Summary</h2>
-          <div v-if="planning" class="state-msg">Refreshing plan…</div>
-          <p v-if="planError" class="error-msg">{{ planError }}</p>
+          <h2 class="card-title">
+            Plan Summary
+          </h2>
+          <div
+            v-if="planning"
+            class="state-msg"
+          >
+            Refreshing plan…
+          </div>
+          <p
+            v-if="planError"
+            class="error-msg"
+          >
+            {{ planError }}
+          </p>
           <template v-if="plan">
-            <div v-if="plan.warnings.length" class="warnings-box">
-              <div v-for="w in plan.warnings" :key="w" class="warn-item">{{ w }}</div>
+            <div
+              v-if="plan.warnings.length"
+              class="warnings-box"
+            >
+              <div
+                v-for="w in plan.warnings"
+                :key="w"
+                class="warn-item"
+              >
+                {{ w }}
+              </div>
             </div>
 
-            <div v-if="plan.already_in_enterprise.length" class="section">
-              <h3 class="section-title">Already in global repository</h3>
+            <div
+              v-if="plan.already_in_enterprise.length"
+              class="section"
+            >
+              <h3 class="section-title">
+                Already in global repository
+              </h3>
               <ul class="id-list id-list--muted">
-                <li v-for="id in plan.already_in_enterprise" :key="id" class="mono">{{ id }}</li>
+                <li
+                  v-for="id in plan.already_in_enterprise"
+                  :key="id"
+                  class="mono"
+                >
+                  {{ id }}
+                </li>
               </ul>
             </div>
 
-            <div v-if="plan.entities_to_add.length" class="section">
-              <h3 class="section-title">New entities to promote</h3>
+            <div
+              v-if="plan.entities_to_add.length"
+              class="section"
+            >
+              <h3 class="section-title">
+                New entities to promote
+              </h3>
               <ul class="id-list">
-                <li v-for="id in plan.entities_to_add" :key="id" class="mono">{{ id }}</li>
+                <li
+                  v-for="id in plan.entities_to_add"
+                  :key="id"
+                  class="mono"
+                >
+                  {{ id }}
+                </li>
               </ul>
             </div>
 
-            <div v-if="plan.conflicts.length" class="section">
-              <h3 class="section-title section-title--warn">Conflicts</h3>
-              <div v-for="c in plan.conflicts" :key="c.engagement_id" class="conflict-card">
+            <div
+              v-if="plan.conflicts.length"
+              class="section"
+            >
+              <h3 class="section-title section-title--warn">
+                Conflicts
+              </h3>
+              <div
+                v-for="c in plan.conflicts"
+                :key="c.engagement_id"
+                class="conflict-card"
+              >
                 <div class="conflict-header">
                   <span class="mono">{{ c.engagement_id }}</span>
                   <span class="conflict-vs"> vs global </span>
                   <span class="mono">{{ c.enterprise_id }}</span>
                 </div>
                 <div class="conflict-strategies">
-                  <label v-for="opt in [
-                    { value: 'accept_enterprise', label: 'Keep global version' },
-                    { value: 'accept_engagement', label: 'Replace with selected version' },
-                  ]" :key="opt.value" class="strategy-opt">
+                  <label
+                    v-for="opt in [
+                      { value: 'accept_enterprise', label: 'Keep global version' },
+                      { value: 'accept_engagement', label: 'Replace with selected version' },
+                    ]"
+                    :key="opt.value"
+                    class="strategy-opt"
+                  >
                     <input
+                      v-model="conflictStrategies[c.engagement_id]"
                       type="radio"
                       :name="`conflict-${c.engagement_id}`"
                       :value="opt.value"
-                      v-model="conflictStrategies[c.engagement_id]"
-                    />
+                    >
                     {{ opt.label }}
                   </label>
                 </div>
               </div>
             </div>
 
-            <div v-if="plan.connection_ids.length" class="section">
-              <h3 class="section-title">Selected connections</h3>
+            <div
+              v-if="plan.connection_ids.length"
+              class="section"
+            >
+              <h3 class="section-title">
+                Selected connections
+              </h3>
               <ul class="id-list">
-                <li v-for="id in plan.connection_ids" :key="id" class="mono">{{ id }}</li>
+                <li
+                  v-for="id in plan.connection_ids"
+                  :key="id"
+                  class="mono"
+                >
+                  {{ id }}
+                </li>
               </ul>
             </div>
 
-            <div v-if="unresolvedConflicts.length" class="warn-banner">
+            <div
+              v-if="unresolvedConflicts.length"
+              class="warn-banner"
+            >
               {{ unresolvedConflicts.length }} conflict{{ unresolvedConflicts.length > 1 ? 's' : '' }}
               still need{{ unresolvedConflicts.length === 1 ? 's' : '' }} a resolution strategy.
             </div>
@@ -492,22 +631,54 @@ onUnmounted(() => {
       </div>
     </template>
 
-    <div v-if="step === 'done' && executeResult" class="card step-card step-card--success">
-      <h2 class="card-title card-title--success">Promotion complete</h2>
-      <div v-if="executeResult.copied_files.length" class="result-section">
-        <h3 class="section-title">Files added to global repo</h3>
+    <div
+      v-if="step === 'done' && executeResult"
+      class="card step-card step-card--success"
+    >
+      <h2 class="card-title card-title--success">
+        Promotion complete
+      </h2>
+      <div
+        v-if="executeResult.copied_files.length"
+        class="result-section"
+      >
+        <h3 class="section-title">
+          Files added to global repo
+        </h3>
         <ul class="id-list">
-          <li v-for="f in executeResult.copied_files" :key="f" class="mono">{{ f }}</li>
+          <li
+            v-for="f in executeResult.copied_files"
+            :key="f"
+            class="mono"
+          >
+            {{ f }}
+          </li>
         </ul>
       </div>
-      <div v-if="executeResult.updated_files.length" class="result-section">
-        <h3 class="section-title">Files updated</h3>
+      <div
+        v-if="executeResult.updated_files.length"
+        class="result-section"
+      >
+        <h3 class="section-title">
+          Files updated
+        </h3>
         <ul class="id-list">
-          <li v-for="f in executeResult.updated_files" :key="f" class="mono">{{ f }}</li>
+          <li
+            v-for="f in executeResult.updated_files"
+            :key="f"
+            class="mono"
+          >
+            {{ f }}
+          </li>
         </ul>
       </div>
       <div class="step-actions">
-        <button class="btn btn--primary" @click="restart">Promote another entity</button>
+        <button
+          class="btn btn--primary"
+          @click="restart"
+        >
+          Promote another entity
+        </button>
       </div>
     </div>
   </div>

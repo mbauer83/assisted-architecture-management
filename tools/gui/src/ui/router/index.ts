@@ -1,4 +1,5 @@
 import { createRouter, createWebHistory } from 'vue-router'
+import { defineAsyncComponent } from 'vue'
 import HomeView from '../views/HomeView.vue'
 import EntitiesView from '../views/EntitiesView.vue'
 import EntityDetailView from '../views/EntityDetailView.vue'
@@ -19,9 +20,9 @@ export const router = createRouter({
     { path: '/entities', component: EntitiesView },
     { path: '/entity/create', component: EntityCreateView },
     { path: '/entity', component: EntityDetailView },
-    { path: '/documents', component: () => import('../views/DocumentsView.vue') },
-    { path: '/documents/new', component: () => import('../views/DocumentCreateView.vue') },
-    { path: '/documents/:id', component: () => import('../views/DocumentDetailView.vue') },
+    { path: '/documents', component: defineAsyncComponent(() => import('../views/DocumentsView.vue')) },
+    { path: '/documents/new', component: defineAsyncComponent(() => import('../views/DocumentCreateView.vue')) },
+    { path: '/documents/:id', component: defineAsyncComponent(() => import('../views/DocumentDetailView.vue')) },
     { path: '/search', component: SearchView },
     { path: '/diagrams', component: DiagramsView },
     { path: '/diagram/create', component: CreateDiagramView },

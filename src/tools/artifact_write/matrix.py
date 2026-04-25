@@ -1,8 +1,7 @@
-
-from pathlib import Path
 import os
 import re
 from collections.abc import Callable
+from pathlib import Path
 
 import yaml
 
@@ -13,8 +12,9 @@ from src.common.repo_paths import DIAGRAM_CATALOG, DIAGRAMS
 from .boundary import assert_engagement_write_root, today_iso
 from .types import WriteResult
 
-
-_ENTITY_ID_PATTERN = re.compile(r"\b([A-Z]{2,6}@\d+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+(?:\.[A-Za-z0-9_-]+)*)\b")
+_ENTITY_ID_PATTERN = re.compile(
+    r"\b([A-Z]{2,6}@\d+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+(?:\.[A-Za-z0-9_-]+)*)\b"
+)
 
 
 def _verification_to_dict(path: Path, res) -> dict[str, object]:
@@ -105,7 +105,9 @@ def _linkify_matrix_ids(
     return "\n".join(out_lines), replaced
 
 
-def _build_diagram_id_to_relpath(*, diagrams_dir: Path, registry: ArtifactRegistry) -> dict[str, str]:
+def _build_diagram_id_to_relpath(
+    *, diagrams_dir: Path, registry: ArtifactRegistry
+) -> dict[str, str]:
     diagram_map: dict[str, str] = {}
     _ = registry
 
@@ -192,7 +194,11 @@ def create_matrix(
 
     body_markdown = matrix_markdown
     if auto_link_entity_ids:
-        ids_for_links = inferred_entities if inferred_entities else _infer_entity_ids_from_matrix(matrix_markdown)
+        ids_for_links = (
+            inferred_entities
+            if inferred_entities
+            else _infer_entity_ids_from_matrix(matrix_markdown)
+        )
         body_markdown, replaced_count = _linkify_matrix_ids(
             repo_root=repo_root,
             registry=registry,

@@ -1,4 +1,3 @@
-
 from typing import Any, Literal
 
 from mcp.server.fastmcp import FastMCP  # type: ignore[import-not-found]
@@ -29,6 +28,7 @@ def artifact_verify(
 
     if path is not None:
         from pathlib import Path
+
         p = Path(path).expanduser()
         if not p.is_absolute():
             p = engagement_root / p
@@ -48,7 +48,11 @@ def artifact_verify(
             case "connection":
                 result = verifier.verify_connection_file(p)
             case "diagram":
-                result = verifier.verify_matrix_diagram_file(p) if p.suffix == ".md" else verifier.verify_diagram_file(p)
+                result = (
+                    verifier.verify_matrix_diagram_file(p)
+                    if p.suffix == ".md"
+                    else verifier.verify_diagram_file(p)
+                )
             case "document":
                 result = verifier.verify_document_file(p)
         out = as_verification_result_dict(result)
@@ -71,7 +75,12 @@ def artifact_verify(
                 "file_type": r.file_type,
                 "valid": r.valid,
                 "issues": [
-                    {"severity": i.severity, "code": i.code, "message": i.message, "location": i.location}
+                    {
+                        "severity": i.severity,
+                        "code": i.code,
+                        "message": i.message,
+                        "location": i.location,
+                    }
                     for i in r.issues
                 ],
             }
@@ -130,9 +139,11 @@ def register_verify_tools(mcp: FastMCP) -> None:
         title="Artifact Verifier",
         description=(
             "Verify one file or all model files. "
-            "Pass path= to verify a single entity/connection/diagram file (absolute or relative to repo_root; "
+            "Pass path= to verify a single entity/connection/diagram file "
+            "(absolute or relative to repo_root; "
             "file_type is inferred if omitted). "
-            "Omit path to verify the entire repository — returns issue counts and a list of files with errors/warnings. "
+            "Omit path to verify the entire repository — returns issue "
+            "counts and a list of files with errors/warnings. "
             "return_mode='summary' (default) gives compact issue lines; 'full' gives per-issue detail."
             "\n\nRepo selection: repo_scope defaults to both (engagement + enterprise)."
         ),

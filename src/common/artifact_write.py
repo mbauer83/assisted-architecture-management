@@ -1,15 +1,14 @@
-"""model_write.py — Model artifact generation helpers.
+"""Public facade for deterministic artifact-writing helpers.
 
-This module contains the reusable logic needed to generate model artifacts:
-- entity/connection type catalogs (writer-side path mapping)
-- ID generation using epoch + random
-- deterministic formatting of entity markdown, .outgoing.md, and diagram PUML
+This module is the stable import surface used by the write layer. It exposes:
+- ontology-backed entity/connection catalogs
+- ID generation helpers
+- deterministic formatting helpers for entity, connection, diagram, and matrix artifacts
 - best-effort inference of referenced IDs from PUML
 
 I/O (writing files, cache invalidation, macro regeneration, verifier execution)
-belongs in tooling/infrastructure (see src/tools/model_write_ops.py).
+belongs in tooling/infrastructure (see ``src/tools/artifact_write_ops.py``).
 """
-
 
 import re
 import secrets
@@ -17,14 +16,7 @@ import string
 import time
 
 from src.common.artifact_write_catalog import (
-    ConnectionTypeInfo,
     DiagramConnectionInferenceMode,
-    EntityTypeInfo,
-)
-from src.common.ontology_loader import (
-    ARCHIMATE_STEREOTYPE_TO_CONNECTION_TYPE,
-    CONNECTION_TYPES,
-    ENTITY_TYPES,
 )
 from src.common.artifact_write_formatting import (
     format_diagram_puml,
@@ -32,7 +24,26 @@ from src.common.artifact_write_formatting import (
     format_matrix_markdown,
     format_outgoing_markdown,
 )
+from src.common.ontology_loader import (
+    ARCHIMATE_STEREOTYPE_TO_CONNECTION_TYPE,
+    CONNECTION_TYPES,
+    ENTITY_TYPES,
+)
 
+__all__ = [
+    "ARCHIMATE_STEREOTYPE_TO_CONNECTION_TYPE",
+    "CONNECTION_TYPES",
+    "DiagramConnectionInferenceMode",
+    "ENTITY_TYPES",
+    "format_diagram_puml",
+    "format_entity_markdown",
+    "format_matrix_markdown",
+    "format_outgoing_markdown",
+    "generate_entity_id",
+    "infer_archimate_connection_ids_from_puml",
+    "infer_entity_ids_from_puml",
+    "slugify",
+]
 
 # ---------------------------------------------------------------------------
 # Deterministic helpers
@@ -116,10 +127,12 @@ def infer_archimate_connection_ids_from_puml(
             warnings.append(msg)
             continue
 
-        connections.append({
-            "source_alias": src,
-            "target_alias": tgt,
-            "connection_type": conn_type,
-        })
+        connections.append(
+            {
+                "source_alias": src,
+                "target_alias": tgt,
+                "connection_type": conn_type,
+            }
+        )
 
     return connections, warnings

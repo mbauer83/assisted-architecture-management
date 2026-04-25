@@ -1,10 +1,10 @@
-
-from pathlib import Path
 from collections.abc import Callable
+from pathlib import Path
+
 from src.common.archimate_types import ALL_ENTITY_TYPES
 from src.common.artifact_verifier import ArtifactVerifier
+from src.common.artifact_write import ENTITY_TYPES, format_entity_markdown, generate_entity_id
 from src.common.repo_paths import MODEL
-from src.common.artifact_write import ENTITY_TYPES, generate_entity_id, format_entity_markdown
 from src.tools.generate_macros import generate_macros
 
 from .boundary import assert_engagement_write_root, today_iso
@@ -67,7 +67,7 @@ def create_entity(
         "domain": info.domain_dir.capitalize(),
         "element-type": info.archimate_element_type,
         "label": name,
-        "alias": f"{info.prefix}_{eid.split('.')[1]}" if '.' in eid else eid.replace("-", "_"),
+        "alias": f"{info.prefix}_{eid.split('.')[1]}" if "." in eid else eid.replace("-", "_"),
     }
 
     content = format_entity_markdown(

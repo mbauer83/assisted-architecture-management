@@ -140,6 +140,8 @@ export const SearchHitSchema = Schema.Struct({
   artifact_type: Schema.String,
   status: Schema.String,
   path: Schema.String,
+  source: Schema.optional(Schema.String),
+  target: Schema.optional(Schema.String),
   is_global: Schema.optional(Schema.Boolean),
   domain: Schema.optional(Schema.String),
   subdomain: Schema.optional(Schema.String),
@@ -490,3 +492,33 @@ export const SyncSaveResultSchema = Schema.Struct({
   nothing_to_discard: Schema.optional(Schema.Boolean),
 })
 export type SyncSaveResult = typeof SyncSaveResultSchema.Type
+
+// ── Server / write-help metadata ─────────────────────────────────────────────
+
+export const ServerInfoSchema = Schema.Struct({
+  admin_mode: Schema.Boolean,
+  read_only: Schema.Boolean,
+  engagement_root: Schema.NullOr(Schema.String),
+  enterprise_root: Schema.NullOr(Schema.String),
+})
+export type ServerInfo = typeof ServerInfoSchema.Type
+
+export const WriteHelpEntityTypeCatalogEntrySchema = Schema.Struct({
+  prefix: Schema.String,
+})
+export type WriteHelpEntityTypeCatalogEntry =
+  typeof WriteHelpEntityTypeCatalogEntrySchema.Type
+
+export const WriteHelpSchema = Schema.Struct({
+  entity_types_by_domain: Schema.Record({
+    key: Schema.String,
+    value: Schema.Array(Schema.String),
+  }),
+  entity_type_catalog: Schema.optional(
+    Schema.Record({
+      key: Schema.String,
+      value: WriteHelpEntityTypeCatalogEntrySchema,
+    }),
+  ),
+})
+export type WriteHelp = typeof WriteHelpSchema.Type

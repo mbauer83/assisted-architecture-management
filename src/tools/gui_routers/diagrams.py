@@ -165,16 +165,15 @@ def download_diagram(id: str, format: Literal["png", "svg"] = "png") -> FileResp
         path = rendered_dir / fname
         if path.exists():
             return FileResponse(
-                path, media_type=media,
+                path,
+                media_type=media,
                 headers={"Content-Disposition": f'attachment; filename="{fname}"'},
             )
     raise HTTPException(404, f"{format.upper()} not yet rendered — save the diagram first")
 
 
 @router.get("/api/entity-display-search")
-def entity_display_search(
-    q: str, limit: int = Query(default=20, le=50)
-) -> list[dict[str, Any]]:
+def entity_display_search(q: str, limit: int = Query(default=20, le=50)) -> list[dict[str, Any]]:
     repo = s.get_repo()
     hits = repo.search_artifacts(q, limit=limit * 3).hits
     items: list[dict[str, Any]] = []
@@ -202,16 +201,17 @@ def diagram_entity_discovery(
 ) -> dict[str, Any]:
     repo = s.get_repo()
     included = [
-        entity_id.strip() for entity_id in (included_entity_ids or "").split(",")
+        entity_id.strip()
+        for entity_id in (included_entity_ids or "").split(",")
         if entity_id.strip() and repo.get_entity(entity_id.strip()) is not None
     ]
     excluded = set(included)
     search_results: list[dict[str, Any]] = (
         entity_display_search(q or "", limit=limit) if (q or "").strip() else []
     )
-    search_results = [
-        item for item in search_results if str(item["artifact_id"]) not in excluded
-    ][:limit]
+    search_results = [item for item in search_results if str(item["artifact_id"]) not in excluded][
+        :limit
+    ]
     return {
         "search_results": search_results,
         "candidate_connections": candidate_connections_for_entities(repo, included),

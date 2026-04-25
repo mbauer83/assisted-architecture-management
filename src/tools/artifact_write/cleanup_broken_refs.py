@@ -13,7 +13,8 @@ This tool:
 dry_run=True (default) reports every removal without touching any files.
 
 Entry points:
-  - CLI:  uv run python -m src.tools.model_write.cleanup_broken_refs [--repo-root ...] [--enterprise-root ...] [--execute]
+  - CLI:  uv run python -m src.tools.model_write.cleanup_broken_refs
+          [--repo-root ...] [--enterprise-root ...] [--execute]
   - REST: POST /api/cleanup-broken-refs  (GUI router, engagement only — not MCP)
 """
 
@@ -24,9 +25,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from src.common.artifact_query import ArtifactRepository, shared_artifact_index
-from src.common.artifact_verifier_registry import ArtifactRegistry
 from src.common.repo_paths import MODEL
-
 
 _GRF_FRONTMATTER_KEY = "global-artifact-id"
 _GRF_CONN_HEADER = re.compile(r"^### .+ → (.+)$", re.MULTILINE)
@@ -34,9 +33,9 @@ _GRF_CONN_HEADER = re.compile(r"^### .+ → (.+)$", re.MULTILINE)
 
 @dataclass
 class CleanupAction:
-    kind: str          # "remove_connection" | "delete_grf"
+    kind: str  # "remove_connection" | "delete_grf"
     path: str
-    detail: str        # human-readable description
+    detail: str  # human-readable description
 
 
 @dataclass
@@ -105,17 +104,21 @@ def plan_cleanup(
     for grf_id, grf_path in broken:
         # Find outgoing files that connect to this GRF
         for out_path, count in _outgoing_files_referencing(grf_id, model_root):
-            report.actions.append(CleanupAction(
-                kind="remove_connection",
-                path=str(out_path.relative_to(engagement_root)),
-                detail=f"Remove {count} connection(s) → {grf_id}",
-            ))
+            report.actions.append(
+                CleanupAction(
+                    kind="remove_connection",
+                    path=str(out_path.relative_to(engagement_root)),
+                    detail=f"Remove {count} connection(s) → {grf_id}",
+                )
+            )
         # Mark GRF for deletion
-        report.actions.append(CleanupAction(
-            kind="delete_grf",
-            path=str(grf_path.relative_to(engagement_root)),
-            detail=f"Delete broken GRF {grf_id}",
-        ))
+        report.actions.append(
+            CleanupAction(
+                kind="delete_grf",
+                path=str(grf_path.relative_to(engagement_root)),
+                detail=f"Delete broken GRF {grf_id}",
+            )
+        )
 
     return report
 
@@ -175,6 +178,7 @@ def cleanup_broken_refs(
 # CLI entry point
 # ---------------------------------------------------------------------------
 
+
 def main(argv: list[str] | None = None) -> None:
     import argparse
     import json
@@ -186,30 +190,50 @@ def main(argv: list[str] | None = None) -> None:
             "Default is dry-run; pass --execute to apply changes."
         ),
     )
-    parser.add_argument("--repo-root", default=None, help="Engagement repo root (default: from arch-init)")
-    parser.add_argument("--enterprise-root", default=None, help="Enterprise repo root (default: from arch-init)")
-    parser.add_argument("--execute", action="store_true", default=False,
-                        help="Apply changes (default: dry-run only)")
-    parser.add_argument("--json", action="store_true", default=False,
-                        help="Output JSON instead of human-readable text")
+    parser.add_argument(
+        "--repo-root", default=None, help="Engagement repo root (default: from arch-init)"
+    )
+    parser.add_argument(
+        "--enterprise-root", default=None, help="Enterprise repo root (default: from arch-init)"
+    )
+    parser.add_argument(
+        "--execute",
+        action="store_true",
+        default=False,
+        help="Apply changes (default: dry-run only)",
+    )
+    parser.add_argument(
+        "--json",
+        action="store_true",
+        default=False,
+        help="Output JSON instead of human-readable text",
+    )
     args = parser.parse_args(argv)
 
     from src.tools.workspace_init import load_init_state
+
     ws = load_init_state()
 
-    eng_root = Path(args.repo_root) if args.repo_root else (
-        Path(ws["engagement_root"]) if ws and "engagement_root" in ws else None
+    eng_root = (
+        Path(args.repo_root)
+        if args.repo_root
+        else (Path(ws["engagement_root"]) if ws and "engagement_root" in ws else None)
     )
-    ent_root = Path(args.enterprise_root) if args.enterprise_root else (
-        Path(ws["enterprise_root"]) if ws and "enterprise_root" in ws else None
+    ent_root = (
+        Path(args.enterprise_root)
+        if args.enterprise_root
+        else (Path(ws["enterprise_root"]) if ws and "enterprise_root" in ws else None)
     )
     if eng_root is None or ent_root is None:
-        parser.error("Could not resolve repo roots. Pass --repo-root and --enterprise-root or run arch-init.")
+        parser.error(
+            "Could not resolve repo roots. Pass --repo-root and --enterprise-root or run arch-init."
+        )
 
     report = cleanup_broken_refs(eng_root, ent_root, dry_run=not args.execute)
 
     if args.json:
         import dataclasses
+
         print(json.dumps(dataclasses.asdict(report), indent=2))
         return
 

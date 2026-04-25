@@ -42,8 +42,11 @@ def _confirm_stop_other_instance(*, expected_port: int, pid: int, actual_port: o
     )
     if not sys.stdin.isatty():
         print(
-            f"found one arch-backend instance on port {actual_port} (pid {pid}), "
-            f"but the configured port is {expected_port}; rerun interactively or pass --port {actual_port}"
+            (
+                f"found one arch-backend instance on port {actual_port} "
+                f"(pid {pid}), but the configured port is {expected_port}; "
+                f"rerun interactively or pass --port {actual_port}"
+            )
         )
         return False
     try:
@@ -126,7 +129,12 @@ def _run_status(resolved_port: int) -> None:
         print(f"backend is running on port {result.get('port')} (pid {result.get('pid')})")
         _print_status_details(result)
     elif reason == "unmanaged_backend":
-        print(f"backend is responding on port {result.get('port')} but is not managed by this workspace")
+        print(
+            (
+                "backend is responding on port "
+                f"{result.get('port')} but is not managed by this workspace"
+            )
+        )
         _print_status_details(result)
     elif reason == "port_in_use":
         print(f"port {result.get('port')} is in use by another process")
@@ -137,7 +145,12 @@ def _run_status(resolved_port: int) -> None:
         print(f"backend process pid {result.get('pid')} is stopped on port {result.get('port')}")
         _print_status_details(result)
     elif reason == "unhealthy_backend":
-        print(f"backend process pid {result.get('pid')} is not responding on port {result.get('port')}")
+        print(
+            (
+                f"backend process pid {result.get('pid')} is not responding "
+                f"on port {result.get('port')}"
+            )
+        )
         _print_status_details(result)
     elif reason == "stale_pid":
         print(f"removed stale backend pid {result.get('pid')}")
@@ -163,7 +176,9 @@ def _run_stop(args: argparse.Namespace, resolved_port: int) -> None:
             raise SystemExit("failed to determine backend pid")
         pid = pid_obj
         other_port = result.get("port")
-        if _confirm_stop_other_instance(expected_port=resolved_port, pid=pid, actual_port=other_port):
+        if _confirm_stop_other_instance(
+            expected_port=resolved_port, pid=pid, actual_port=other_port
+        ):
             follow_up = stop_backend(port=int(other_port) if isinstance(other_port, int) else None)
             if follow_up.get("stopped"):
                 _print_stopped(follow_up)
@@ -196,19 +211,37 @@ def _guard_prestart(resolved_port: int, *, for_daemon: bool, restart: bool) -> b
     if status.get("reason") in {"stopped_backend", "unhealthy_backend"}:
         if for_daemon and restart:
             cleanup = stop_backend(port=resolved_port)
-            if not cleanup.get("stopped") and cleanup.get("reason") not in {"not_running", "stale_pid"}:
+            if not cleanup.get("stopped") and cleanup.get("reason") not in {
+                "not_running",
+                "stale_pid",
+            }:
                 raise SystemExit(
-                    f"arch-backend pid {status.get('pid')} is not healthy and could not be stopped; "
-                    f"run 'arch-backend --stop' manually"
+                    (
+                        f"arch-backend pid {status.get('pid')} is not healthy "
+                        "and could not be stopped; run "
+                        "'arch-backend --stop' manually"
+                    )
                 )
         else:
-            suffix = " or 'arch-backend --restart --daemon'" if for_daemon else " or 'arch-backend --restart'"
+            suffix = (
+                " or 'arch-backend --restart --daemon'"
+                if for_daemon
+                else " or 'arch-backend --restart'"
+            )
             raise SystemExit(
-                f"arch-backend pid {status.get('pid')} is on port {resolved_port} but is not healthy; "
-                f"run 'arch-backend --stop'{suffix}"
+                (
+                    f"arch-backend pid {status.get('pid')} is on port "
+                    f"{resolved_port} but is not healthy; run "
+                    f"'arch-backend --stop'{suffix}"
+                )
             )
     if status.get("reason") == "unmanaged_backend":
-        print(f"backend already responding on port {resolved_port} but is not managed by this workspace")
+        print(
+            (
+                f"backend already responding on port {resolved_port} but is "
+                "not managed by this workspace"
+            )
+        )
         return False
     if status.get("reason") == "port_in_use":
         raise SystemExit(f"port {resolved_port} is already in use by another process")
@@ -229,11 +262,15 @@ def _run_daemon(args: argparse.Namespace, resolved_port: int, argv: list[str] | 
     raise SystemExit(f"timed out waiting for backend on port {resolved_port}; see {log_path}")
 
 
-def _run_foreground(args: argparse.Namespace, parser: argparse.ArgumentParser, resolved_port: int) -> None:
+def _run_foreground(
+    args: argparse.Namespace, parser: argparse.ArgumentParser, resolved_port: int
+) -> None:
     if not _guard_prestart(resolved_port, for_daemon=False, restart=False):
         return
 
-    repo_root_path, enterprise_root_path = gui_server.resolve_server_roots(args.repo_root, args.enterprise_root)
+    repo_root_path, enterprise_root_path = gui_server.resolve_server_roots(
+        args.repo_root, args.enterprise_root
+    )
     if repo_root_path is None:
         parser.error(
             "No --repo-root given, ARCH_REPO_ROOT not set, and no .arch/init-state.yaml found. "
@@ -245,19 +282,36 @@ def _run_foreground(args: argparse.Namespace, parser: argparse.ArgumentParser, r
         roots.append(enterprise_root_path)
 
     from src.common.artifact_query import ArtifactRepository, shared_artifact_index
+
     logger.info(
-        "Initializing backend for repo_root=%s enterprise_root=%s admin_mode=%s read_only=%s host=%s port=%s",
-        repo_root_path, enterprise_root_path, args.admin_mode, args.read_only, args.host, resolved_port,
+        (
+            "Initializing backend for repo_root=%s enterprise_root=%s "
+            "admin_mode=%s read_only=%s host=%s port=%s"
+        ),
+        repo_root_path,
+        enterprise_root_path,
+        args.admin_mode,
+        args.read_only,
+        args.host,
+        resolved_port,
     )
     repo = ArtifactRepository(shared_artifact_index(roots))
     repo.refresh()
     from src.tools.gui_routers import state as gui_state
-    gui_state.init_state(repo, repo_root_path, enterprise_root_path,
-                         admin_mode=args.admin_mode, read_only=args.read_only)
+
+    gui_state.init_state(
+        repo,
+        repo_root_path,
+        enterprise_root_path,
+        admin_mode=args.admin_mode,
+        read_only=args.read_only,
+    )
     from src.common.artifact_document_schema import load_document_schemata
+
     load_document_schemata(repo_root_path)
     if args.read_only:
         from src.tools.write_block_manager import block_repo
+
         block_repo(repo_root_path)
 
     git_ssh_passphrase = args.git_ssh_password or os.environ.get("ARCH_GIT_SSH_PASSWORD") or None
@@ -277,26 +331,66 @@ def _run_foreground(args: argparse.Namespace, parser: argparse.ArgumentParser, r
 
 def _build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(description="Unified architecture backend")
-    p.add_argument("--repo-root", default=None,
-                   help="Engagement repository root (default: ARCH_REPO_ROOT env var or arch-init state)")
-    p.add_argument("--enterprise-root", default=None,
-                   help="Enterprise repository root (default: ARCH_ENTERPRISE_ROOT env var or arch-init state)")
-    p.add_argument("--admin-mode", action="store_true", default=False,
-                   help="Enable enterprise-repo writes through /admin/api/*")
-    p.add_argument("--read-only", action="store_true", default=False,
-                   help="Block all engagement-repo writes (use for shared/review deployments)")
-    p.add_argument("--stop", action="store_true", default=False,
-                   help="Stop the currently running arch-backend for this workspace")
-    p.add_argument("--status", action="store_true", default=False,
-                   help="Show whether arch-backend is running for this workspace")
-    p.add_argument("--restart", action="store_true", default=False,
-                   help="Restart the currently running backend before starting a new one")
-    p.add_argument("--daemon", action="store_true", default=False,
-                   help="Start arch-backend detached with stdin from /dev/null and output in .arch/backend.log")
+    p.add_argument(
+        "--repo-root",
+        default=None,
+        help="Engagement repository root (default: ARCH_REPO_ROOT env var or arch-init state)",
+    )
+    p.add_argument(
+        "--enterprise-root",
+        default=None,
+        help=(
+            "Enterprise repository root (default: ARCH_ENTERPRISE_ROOT env var "
+            "or arch-init state)"
+        ),
+    )
+    p.add_argument(
+        "--admin-mode",
+        action="store_true",
+        default=False,
+        help="Enable enterprise-repo writes through /admin/api/*",
+    )
+    p.add_argument(
+        "--read-only",
+        action="store_true",
+        default=False,
+        help="Block all engagement-repo writes (use for shared/review deployments)",
+    )
+    p.add_argument(
+        "--stop",
+        action="store_true",
+        default=False,
+        help="Stop the currently running arch-backend for this workspace",
+    )
+    p.add_argument(
+        "--status",
+        action="store_true",
+        default=False,
+        help="Show whether arch-backend is running for this workspace",
+    )
+    p.add_argument(
+        "--restart",
+        action="store_true",
+        default=False,
+        help="Restart the currently running backend before starting a new one",
+    )
+    p.add_argument(
+        "--daemon",
+        action="store_true",
+        default=False,
+        help=(
+            "Start arch-backend detached with stdin from /dev/null and output "
+            "in .arch/backend.log"
+        ),
+    )
     p.add_argument("--host", default="127.0.0.1")
     p.add_argument("--port", type=int, default=None)
-    p.add_argument("--git-ssh-password", default=None, metavar="PASSPHRASE",
-                   help="SSH key passphrase for git operations (overrides ARCH_GIT_SSH_PASSWORD env var)")
+    p.add_argument(
+        "--git-ssh-password",
+        default=None,
+        metavar="PASSPHRASE",
+        help="SSH key passphrase for git operations (overrides ARCH_GIT_SSH_PASSWORD env var)",
+    )
     return p
 
 

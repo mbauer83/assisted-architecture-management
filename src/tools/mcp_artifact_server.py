@@ -20,19 +20,6 @@ from src.tools.artifact_mcp import (
     register_verify_tools,
     register_write_tools,
 )
-
-# Re-export tool functions for direct calling in tests.
-from src.tools.artifact_mcp.write_tools import (  # noqa: F401
-    artifact_add_connection,
-    artifact_create_diagram,
-    artifact_create_document,
-    artifact_create_entity,
-    artifact_create_matrix,
-    artifact_delete_document,
-    artifact_edit_document,
-    artifact_promote_to_enterprise,
-    artifact_write_help,
-)
 from src.tools.artifact_mcp.edit_tools import (  # noqa: F401
     artifact_delete_diagram,
     artifact_delete_entity,
@@ -45,6 +32,20 @@ from src.tools.artifact_mcp.verify_tools import (  # noqa: F401
     artifact_verify,
     artifact_verify_all,
     artifact_verify_file,
+)
+from src.tools.artifact_mcp.write import sync_ops as _sync_ops
+
+# Re-export tool functions for direct calling in tests.
+from src.tools.artifact_mcp.write_tools import (  # noqa: F401
+    artifact_add_connection,
+    artifact_create_diagram,
+    artifact_create_document,
+    artifact_create_entity,
+    artifact_create_matrix,
+    artifact_delete_document,
+    artifact_edit_document,
+    artifact_promote_to_enterprise,
+    artifact_write_help,
 )
 
 _HOST = os.getenv("ARCH_MCP_HOST", "127.0.0.1")
@@ -93,5 +94,4 @@ mcp_write = FastMCP(
 register_write_tools(mcp_write)
 register_edit_tools(mcp_write)
 
-from src.tools.artifact_mcp.write import sync_ops as _sync_ops
 _sync_ops.register(mcp_write)
