@@ -123,6 +123,7 @@ onMounted(() => {
     eventSource.addEventListener('sync_enterprise_saved', onSyncEvent('Enterprise changes saved'))
     eventSource.addEventListener('sync_enterprise_submitted', onSyncEvent('Enterprise submission ready'))
     eventSource.addEventListener('sync_enterprise_withdrawn', onSyncEvent('Enterprise submission withdrawn'))
+    eventSource.addEventListener('sync_status_changed', () => { loadSyncStatus() })
   } catch (err) {
     console.error('Failed to connect to event stream:', err)
   }

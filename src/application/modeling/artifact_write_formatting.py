@@ -240,8 +240,12 @@ def format_matrix_markdown(
     status: str,
     last_updated: str,
     keywords: list[str] | None = None,
-    purpose: str,
     matrix_markdown: str,
+    entity_ids: list[str] | None = None,
+    from_entity_ids: list[str] | None = None,
+    to_entity_ids: list[str] | None = None,
+    conn_type_configs: list[dict[str, object]] | None = None,
+    combined: bool | None = None,
 ) -> str:
     frontmatter: dict[str, object] = {
         "artifact-id": artifact_id,
@@ -254,7 +258,15 @@ def format_matrix_markdown(
     if keywords:
         frontmatter["keywords"] = keywords
     frontmatter["last-updated"] = last_updated
-    frontmatter["purpose"] = purpose.strip()
+    if from_entity_ids is not None:
+        frontmatter["from-entity-ids"] = from_entity_ids
+        frontmatter["to-entity-ids"] = to_entity_ids or []
+    elif entity_ids:
+        frontmatter["entity-ids"] = entity_ids
+    if conn_type_configs:
+        frontmatter["conn-type-configs"] = conn_type_configs
+    if combined is not None:
+        frontmatter["combined"] = combined
 
     ordered_keys = [
         "artifact-id",
@@ -265,7 +277,11 @@ def format_matrix_markdown(
         "status",
         "keywords",
         "last-updated",
-        "purpose",
+        "entity-ids",
+        "from-entity-ids",
+        "to-entity-ids",
+        "conn-type-configs",
+        "combined",
     ]
     fm_out = {key: frontmatter[key] for key in ordered_keys if key in frontmatter}
     yaml_text = _dump_yaml_text(fm_out)

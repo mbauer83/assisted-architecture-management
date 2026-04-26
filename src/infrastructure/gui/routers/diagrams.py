@@ -66,7 +66,49 @@ def read_diagram(id: str) -> dict[str, Any]:
             result["entity_ids_used"] = [str(x) for x in entity_ids_used]
         if isinstance(connection_ids_used, list):
             result["connection_ids_used"] = [str(x) for x in connection_ids_used]
+        if diag_rec.diagram_type == "matrix":
+            result["matrix_body"] = parsed.puml_body.strip()
     return result
+
+
+@router.get("/api/matrix-config")
+def get_matrix_config(id: str) -> dict[str, Any]:
+    """Return entity-ids, conn-type-configs, combined flag, and body for a matrix diagram."""
+    from src.infrastructure.write.artifact_write.parse_existing import parse_diagram_file
+
+    repo = s.get_repo()
+    diag_rec = repo.get_diagram(id)
+    if diag_rec is None or diag_rec.diagram_type != "matrix":
+        raise HTTPException(404, f"Matrix diagram not found: {id!r}")
+    parsed = parse_diagram_file(diag_rec.path)
+    fm = parsed.frontmatter
+    raw_eids = fm.get("entity-ids")
+    entity_ids = [str(x) for x in raw_eids] if isinstance(raw_eids, list) else []
+    raw_from = fm.get("from-entity-ids")
+    from_entity_ids = [str(x) for x in raw_from] if isinstance(raw_from, list) else None
+    raw_to = fm.get("to-entity-ids")
+    to_entity_ids = [str(x) for x in raw_to] if isinstance(raw_to, list) else None
+    raw_configs = fm.get("conn-type-configs")
+    conn_type_configs = [
+        {"conn_type": str(c.get("conn_type", "")), "active": bool(c.get("active", True))}
+        for c in raw_configs
+        if isinstance(c, dict)
+    ] if isinstance(raw_configs, list) else []
+    raw_kws = fm.get("keywords")
+    keywords = [str(k) for k in raw_kws] if isinstance(raw_kws, list) else []
+    return {
+        "artifact_id": diag_rec.artifact_id,
+        "name": diag_rec.name,
+        "status": diag_rec.status,
+        "version": diag_rec.version,
+        "keywords": keywords,
+        "entity_ids": entity_ids,
+        "from_entity_ids": from_entity_ids,
+        "to_entity_ids": to_entity_ids,
+        "conn_type_configs": conn_type_configs,
+        "combined": bool(fm.get("combined", False)),
+        "matrix_body": parsed.puml_body.strip(),
+    }
 
 
 @router.get("/api/diagram-image/{filename}")
@@ -170,6 +212,15 @@ def download_diagram(id: str, format: Literal["png", "svg"] = "png") -> FileResp
                 headers={"Content-Disposition": f'attachment; filename="{fname}"'},
             )
     raise HTTPException(404, f"{format.upper()} not yet rendered — save the diagram first")
+
+
+@router.get("/api/entity-display-item")
+def get_entity_display_item(id: str) -> dict[str, Any]:
+    repo = s.get_repo()
+    rec = repo.get_entity(id)
+    if rec is None:
+        raise HTTPException(404, f"Entity {id!r} not found")
+    return entity_display_item(rec)
 
 
 @router.get("/api/entity-display-search")

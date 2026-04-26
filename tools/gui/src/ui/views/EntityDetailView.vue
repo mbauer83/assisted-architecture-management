@@ -608,6 +608,7 @@ const insertReference = (markdownLink: string) => {
       >
         <ArtifactReferenceInput
           :current-path="detail?.path"
+          :fixed-kinds="['diagram', 'document']"
           @insert="insertReference"
           @close="showReferencePicker = false"
         />

@@ -54,6 +54,7 @@ class GitSyncManager:
         self._on_repo_changed = on_repo_changed
         self._task: asyncio.Task[None] | None = None
         self._askpass_script: Path | None = None
+        self._last_dirty_state: dict[Path, bool] = {}
 
     async def start(self) -> None:
         if self._ssh_passphrase:
@@ -201,6 +202,14 @@ class GitSyncManager:
 
         if not await self._is_git_repo(repo):
             return
+
+        is_clean = await self._is_clean(repo)
+        is_dirty = not is_clean
+        was_dirty = self._last_dirty_state.get(repo, False)
+        if is_dirty != was_dirty:
+            self._last_dirty_state[repo] = is_dirty
+            await event_bus.publish({"type": "sync_status_changed", "repo": str(repo)})
+
         rc, _, err = await self._git(repo, "fetch", "origin", timeout=_FETCH_TIMEOUT_S)
         if rc != 0:
             logger.warning("fetch failed for engagement %s: %s", repo, err.strip())
@@ -210,7 +219,7 @@ class GitSyncManager:
         if behind == 0:
             return
         ahead = await self._count(repo, "@{u}..HEAD")
-        if not await self._is_clean(repo) and ahead == 0:
+        if not is_clean and ahead == 0:
             logger.info("skipping engagement pull %s: uncommitted changes", repo)
             return
 

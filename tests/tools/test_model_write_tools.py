@@ -175,7 +175,6 @@ def test_model_create_matrix_writes_valid_matrix(repo_root: Path) -> None:
 
     result = tools.artifact_create_matrix(
         name="Connection Matrix",
-        purpose="Show connections between application components.",
         matrix_markdown=(
             "| Source | Target | Type |\n"
             "|---|---|---|\n"

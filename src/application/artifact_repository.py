@@ -16,6 +16,7 @@ from src.application._artifact_search import (
 )
 from src.application.ports import ArtifactStorePort
 from src.application.read_models import (
+    EntityContextConnection,
     EntityContextReadModel,
     ReadModelVersion,  # noqa: F401
 )
@@ -70,6 +71,9 @@ class ArtifactRepository:
 
     def read_entity_context(self, artifact_id: str) -> EntityContextReadModel | None:
         return self._store.read_entity_context(artifact_id)
+
+    def candidate_connections_for_entities(self, entity_ids: list[str]) -> list[EntityContextConnection]:
+        return self._store.candidate_connections_for_entities(entity_ids)
 
     def get_entity(self, artifact_id: str) -> EntityRecord | None:
         return self._store.get_entity(artifact_id)

@@ -27,6 +27,8 @@ import {
   EntityDisplayInfoSchema,
   DiagramPreviewResultSchema,
   DiagramConnectionSchema,
+  MatrixConfigSchema,
+  MatrixPreviewResultSchema,
   PromotionPlanSchema,
   PromotionResultSchema,
   SyncStatusSchema,
@@ -300,6 +302,9 @@ export const makeHttpModelRepository = (): ModelRepository => ({
   getDiagramSvg: (diagramId: string) =>
     fetchText(buildUrl('/diagram-svg', { id: diagramId })),
 
+  getEntityDisplayItem: (artifactId: string) =>
+    fetchJson(buildUrl('/entity-display-item', { id: artifactId }), EntityDisplayInfoSchema),
+
   searchEntityDisplay: (query: string, limit = 20) =>
     fetchJson(buildUrl('/entity-display-search', { q: query, limit }), Schema.Array(EntityDisplayInfoSchema))
       .pipe(Effect.map((arr) => arr as import('../../domain').EntityDisplayInfo[])),
@@ -318,6 +323,18 @@ export const makeHttpModelRepository = (): ModelRepository => ({
     postJson(buildUrl('/diagram/edit'), body, WriteResultSchema),
   deleteDiagram: (body) =>
     postJson(buildUrl('/diagram/remove'), body, WriteResultSchema),
+
+  getMatrixConfig: (id: string) =>
+    fetchJson(buildUrl('/matrix-config', { id }), MatrixConfigSchema),
+
+  previewMatrix: (body: object) =>
+    postJson(buildUrl('/matrix/preview'), body, MatrixPreviewResultSchema),
+
+  createMatrixDiagram: (body: object) =>
+    postJson(buildUrl('/matrix'), body, WriteResultSchema),
+
+  editMatrixDiagram: (body: object) =>
+    postJson(buildUrl('/matrix/edit'), body, WriteResultSchema),
 
   adminCreateEntity: (body) =>
     postJson(buildUrl('/entity', undefined, true), body, WriteResultSchema),

@@ -300,9 +300,38 @@ export const DiagramDetailSchema = Schema.Struct({
   rendered_filename: Schema.optional(Schema.NullOr(Schema.String)),
   entity_ids_used: Schema.optional(Schema.Array(Schema.String)),
   connection_ids_used: Schema.optional(Schema.Array(Schema.String)),
+  matrix_body: Schema.optional(Schema.String),
   extra: Schema.optional(Schema.Unknown),
 })
 export type DiagramDetail = typeof DiagramDetailSchema.Type
+
+// ── Matrix diagram ───────────────────────────────────────────────────────────
+
+export const MatrixConnTypeConfigSchema = Schema.Struct({
+  conn_type: Schema.String,
+  active: Schema.Boolean,
+})
+export type MatrixConnTypeConfig = typeof MatrixConnTypeConfigSchema.Type
+
+export const MatrixConfigSchema = Schema.Struct({
+  artifact_id: Schema.String,
+  name: Schema.String,
+  status: Schema.String,
+  version: Schema.String,
+  keywords: Schema.Array(Schema.String),
+  entity_ids: Schema.Array(Schema.String),
+  from_entity_ids: Schema.optional(Schema.NullOr(Schema.Array(Schema.String))),
+  to_entity_ids: Schema.optional(Schema.NullOr(Schema.Array(Schema.String))),
+  conn_type_configs: Schema.Array(MatrixConnTypeConfigSchema),
+  combined: Schema.Boolean,
+  matrix_body: Schema.String,
+})
+export type MatrixConfig = typeof MatrixConfigSchema.Type
+
+export const MatrixPreviewResultSchema = Schema.Struct({
+  markdown: Schema.String,
+})
+export type MatrixPreviewResult = typeof MatrixPreviewResultSchema.Type
 
 // ── Write results ────────────────────────────────────────────────────────────
 

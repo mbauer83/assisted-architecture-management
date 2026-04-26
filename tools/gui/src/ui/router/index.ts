@@ -25,6 +25,8 @@ export const router = createRouter({
     { path: '/documents/:id', component: defineAsyncComponent(() => import('../views/DocumentDetailView.vue')) },
     { path: '/search', component: SearchView },
     { path: '/diagrams', component: DiagramsView },
+    { path: '/diagram/create/matrix', component: defineAsyncComponent(() => import('../views/CreateMatrixView.vue')) },
+    { path: '/diagram/edit/matrix', component: defineAsyncComponent(() => import('../views/EditMatrixView.vue')) },
     { path: '/diagram/create', component: CreateDiagramView },
     { path: '/diagram/edit', component: EditDiagramView },
     { path: '/diagram', component: DiagramDetailView },

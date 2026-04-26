@@ -2,6 +2,7 @@
 import { inject, onMounted, onUnmounted, watch, computed, ref, nextTick } from 'vue'
 import { useRoute, useRouter, RouterLink } from 'vue-router'
 import { Effect, Exit } from 'effect'
+import { marked } from 'marked'
 import DOMPurify from 'dompurify'
 import { modelServiceKey } from '../keys'
 import type { DiagramContext, EntityDetail, DiagramConnection, WriteResult } from '../../domain'
@@ -13,6 +14,7 @@ import ArchimateTypeGlyph from '../components/ArchimateTypeGlyph.vue'
 import DownloadMenu from '../components/DownloadMenu.vue'
 import { useQuery } from '../composables/useQuery'
 import { useMutation } from '../composables/useMutation'
+import { toGlyphKey } from '../lib/glyphKey'
 
 const svc = inject(modelServiceKey)!
 const route = useRoute()
@@ -38,6 +40,16 @@ const svgHtml = computed(() =>
   svgQuery.data.value
     ? DOMPurify.sanitize(svgQuery.data.value, { USE_PROFILES: { svg: true, svgFilters: true } })
     : null
+)
+
+const matrixHtml = computed(() => {
+  const body = (detail.value as Record<string, unknown> | null)?.matrix_body
+  if (!body || detail.value?.diagram_type !== 'matrix') return null
+  return DOMPurify.sanitize(marked.parse(body as string) as string)
+})
+
+const editPath = computed(() =>
+  detail.value?.diagram_type === 'matrix' ? '/diagram/edit/matrix' : '/diagram/edit',
 )
 
 const showSource = ref(false)
@@ -209,7 +221,6 @@ const selectEntity = (id: string) => {
   entityQuery.run(svc.getEntity(id))
 }
 
-const toGlyphKey = (t: string) => t.replace(/[A-Z]/g, (c, i) => (i > 0 ? '-' : '') + c.toLowerCase())
 
 // ── Pan / Zoom ────────────────────────────────────────────────────────────────
 
@@ -393,7 +404,7 @@ onUnmounted(() => {
       </RouterLink>
       <RouterLink
         v-if="detail"
-        :to="{ path: '/diagram/edit', query: { id: diagramId } }"
+        :to="{ path: editPath, query: { id: diagramId } }"
         class="edit-btn"
       >
         Edit
@@ -431,8 +442,15 @@ onUnmounted(() => {
       </div>
 
       <div class="main-grid">
-        <!-- Diagram: pan + zoom + interactive SVG -->
+        <!-- Matrix: rendered markdown tables -->
         <div
+          v-if="detail?.diagram_type === 'matrix' && matrixHtml"
+          class="matrix-view"
+          v-html="matrixHtml"
+        />
+        <!-- ArchiMate: pan+zoom SVG canvas -->
+        <div
+          v-else
           ref="containerRef"
           class="img-container"
           @mousedown="onMouseDown"
@@ -745,4 +763,9 @@ onUnmounted(() => {
 .src-row { margin-top: 16px; }
 .toggle-btn { padding: 5px 14px; border-radius: 6px; border: 1px solid #d1d5db; background: white; font-size: 13px; cursor: pointer; color: #374151; margin-bottom: 8px; } .toggle-btn:hover { background: #f9fafb; }
 .puml-src { background: #1e293b; color: #e2e8f0; padding: 16px; border-radius: 8px; font-size: 12px; line-height: 1.5; overflow-x: auto; white-space: pre; }
+.matrix-view { overflow-x: auto; padding: 16px; background: white; border-radius: 8px; border: 1px solid #e5e7eb; }
+.matrix-view :deep(th) { writing-mode: vertical-rl; transform: rotate(180deg); min-width: 2rem; padding: 8px 4px; font-size: 11px; }
+.matrix-view :deep(td), .matrix-view :deep(th) { border: 1px solid #e2e8f0; padding: 4px 8px; }
+.matrix-view :deep(table) { border-collapse: collapse; margin-bottom: 20px; }
+.matrix-view :deep(h2) { font-size: 13px; font-weight: 700; margin: 16px 0 6px; color: #374151; }
 </style>

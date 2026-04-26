@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import hashlib
+import json
 import threading
 from collections import Counter
 from pathlib import Path
@@ -49,7 +50,7 @@ from ._service_incremental import (
 )
 from ._sqlite_store import _SqliteStore
 from .bootstrap import get_shared_index, normalize_mounts, service_key
-from .types import EntityContextReadModel
+from .types import EntityContextConnection, EntityContextReadModel
 from .versioning import ReadModelVersion, build_read_model_etag
 
 _T = TypeVar("_T", EntityRecord, ConnectionRecord, DiagramRecord, DocumentRecord)
@@ -479,6 +480,38 @@ class ArtifactIndex:
 
     def find_file_by_id(self, artifact_id: str) -> Path | None:
         return self._registry.find_file_by_id(artifact_id)
+
+    def candidate_connections_for_entities(self, entity_ids: list[str]) -> list[EntityContextConnection]:
+        """Return all enriched connection dicts touching any of the given entity IDs (single query)."""
+        self._ensure_loaded()
+        with self._lock:
+            rows = _q.connections_for_entity_set(self._db.conn, frozenset(entity_ids))
+        result: list[EntityContextConnection] = []
+        for row in rows:
+            result.append(EntityContextConnection(
+                artifact_id=str(row["connection_id"]),
+                source=str(row["source_id"]),
+                target=str(row["target_id"]),
+                conn_type=str(row["conn_type"]),
+                version=str(row["connection_version"]),
+                status=str(row["connection_status"]),
+                path=str(row["path"]),
+                content_text=str(row["content_text"]),
+                associated_entities=json.loads(str(row["associated_entities_json"])),
+                src_cardinality=str(row["src_cardinality"]),
+                tgt_cardinality=str(row["tgt_cardinality"]),
+                source_name=str(row["source_name"]),
+                target_name=str(row["target_name"]),
+                source_artifact_type=str(row["source_artifact_type"]),
+                target_artifact_type=str(row["target_artifact_type"]),
+                source_domain=str(row["source_domain"]),
+                target_domain=str(row["target_domain"]),
+                source_scope=str(row["source_scope"]),
+                target_scope=str(row["target_scope"]),
+                other_entity_id=str(row["other_entity_id"]),
+                direction=str(row["direction_bucket"]),
+            ))
+        return result
 
     # ── Internal helpers ──────────────────────────────────────────────────────
 

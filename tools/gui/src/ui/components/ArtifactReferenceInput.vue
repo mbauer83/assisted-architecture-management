@@ -9,6 +9,7 @@ import { readErrorMessage } from '../lib/errors'
 
 interface Props {
   currentPath?: string
+  fixedKinds?: ArtifactKind[]
 }
 
 type ArtifactKind = 'entity' | 'diagram' | 'document'
@@ -17,6 +18,7 @@ type FilterStage = 'kind' | 'scope' | 'entity-type'
 const props = defineProps<Props>()
 const emit = defineEmits<{
   insert: [markdownLink: string]
+  select: [hit: ReferenceSearchHit]
   close: []
 }>()
 
@@ -38,6 +40,12 @@ let debounceTimer: ReturnType<typeof setTimeout> | null = null
 
 const domainOptions = DOMAIN_OPTIONS.filter((option) => option.key)
 const diagramDomainOptions = domainOptions.filter((option) => option.key !== 'common')
+
+const allKinds: ArtifactKind[] = ['entity', 'diagram', 'document']
+const availableKinds = computed(() =>
+  props.fixedKinds?.length ? props.fixedKinds : allKinds,
+)
+const kindIsLocked = computed(() => (props.fixedKinds?.length ?? 0) === 1)
 
 const selectedDomainLabels = computed(() =>
   selectedDomains.value.map((domain) => getDomainLabel(domain)),
@@ -71,6 +79,7 @@ const insertLink = (hit: ReferenceSearchHit, section?: string) => {
     title: hit.name,
     section,
   }))
+  emit('select', hit)
   emit('close')
 }
 
@@ -90,7 +99,7 @@ const goBack = () => {
     currentStage.value = 'scope'
     return
   }
-  if (currentStage.value === 'scope') {
+  if (currentStage.value === 'scope' && !kindIsLocked.value) {
     currentStage.value = 'kind'
     selectedKind.value = null
     selectedDomains.value = []
@@ -137,6 +146,9 @@ watch(query, scheduleSearch)
 watch([selectedKind, selectedDomains, selectedEntityTypes, selectedDocTypes], scheduleSearch, { deep: true })
 
 onMounted(() => {
+  if (props.fixedKinds?.length === 1) {
+    selectKind(props.fixedKinds[0])
+  }
   void Effect.runPromise(svc.listDocumentTypes())
     .then((types) => { documentTypes.value = types })
     .catch((error: unknown) => {
@@ -190,7 +202,7 @@ onMounted(() => {
             <button
               class="nav-btn"
               type="button"
-              :disabled="currentStage === 'kind'"
+              :disabled="currentStage === 'kind' || (kindIsLocked && currentStage === 'scope')"
               @click="goBack"
             >
               Back
@@ -211,7 +223,7 @@ onMounted(() => {
           class="reference-picker__chips"
         >
           <button
-            v-for="kind in ['entity', 'diagram', 'document'] as ArtifactKind[]"
+            v-for="kind in availableKinds"
             :key="kind"
             class="chip"
             :class="{ 'chip--active': selectedKind === kind }"

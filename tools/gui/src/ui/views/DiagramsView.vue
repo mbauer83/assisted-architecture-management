@@ -29,6 +29,14 @@ const DIAGRAM_TYPES = [
 const selectedType = ref((route.query.type as string) ?? '')
 
 const basePath = computed(() => isGlobal.value ? '/global/diagrams' : '/diagrams')
+const showCreateMenu = ref(false)
+let _closeMenuTimer: ReturnType<typeof setTimeout> | null = null
+const closeCreateMenu = () => {
+  _closeMenuTimer = setTimeout(() => { showCreateMenu.value = false }, 150)
+}
+const keepCreateMenu = () => {
+  if (_closeMenuTimer !== null) { clearTimeout(_closeMenuTimer); _closeMenuTimer = null }
+}
 
 const load = () => {
   if (isGlobal.value) return
@@ -58,13 +66,39 @@ watch(() => route.query.type, (t) => {
         >Global</span>
         Diagrams
       </h1>
-      <RouterLink
+      <div
         v-if="!isGlobal"
-        to="/diagram/create"
-        class="create-btn"
+        class="create-wrap"
+        @mouseenter="keepCreateMenu"
       >
-        + Create Diagram
-      </RouterLink>
+        <button
+          class="create-btn"
+          @click="showCreateMenu = !showCreateMenu"
+          @blur="closeCreateMenu"
+        >
+          + Create Diagram ▾
+        </button>
+        <div
+          v-if="showCreateMenu"
+          class="create-menu"
+          @mouseenter="keepCreateMenu"
+        >
+          <RouterLink
+            to="/diagram/create"
+            class="create-opt"
+            @click="showCreateMenu = false"
+          >
+            ArchiMate Diagram
+          </RouterLink>
+          <RouterLink
+            to="/diagram/create/matrix"
+            class="create-opt"
+            @click="showCreateMenu = false"
+          >
+            Matrix Diagram
+          </RouterLink>
+        </div>
+      </div>
     </div>
 
     <template v-if="isGlobal">
@@ -148,11 +182,22 @@ watch(() => route.query.type, (t) => {
   padding: 2px 8px; font-size: 11px; font-weight: 700;
   text-transform: uppercase; letter-spacing: .05em;
 }
+.create-wrap { position: relative; }
 .create-btn {
   padding: 7px 14px; background: #2563eb; color: white; border-radius: 6px;
-  font-size: 13px; font-weight: 500; text-decoration: none;
+  font-size: 13px; font-weight: 500; border: none; cursor: pointer;
 }
-.create-btn:hover { background: #1d4ed8; text-decoration: none; }
+.create-btn:hover { background: #1d4ed8; }
+.create-menu {
+  position: absolute; right: 0; top: calc(100% + 4px); z-index: 20;
+  background: white; border: 1px solid #e5e7eb; border-radius: 6px;
+  box-shadow: 0 4px 12px rgba(0,0,0,.12); min-width: 170px; padding: 4px 0;
+}
+.create-opt {
+  display: block; padding: 8px 14px; font-size: 13px; color: #374151;
+  text-decoration: none; white-space: nowrap;
+}
+.create-opt:hover { background: #f9fafb; color: #1d4ed8; text-decoration: none; }
 .result-count { font-size: 13px; color: #6b7280; margin-bottom: 12px; }
 .state-msg { color: #6b7280; }
 .state-msg--error { color: #dc2626; }

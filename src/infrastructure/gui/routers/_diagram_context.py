@@ -71,15 +71,7 @@ def diagram_entities_and_puml(
 
 
 def candidate_connections_for_entities(repo: Any, entity_ids: list[str]) -> list[dict[str, Any]]:
-    candidate_map: dict[str, dict[str, Any]] = {}
-    for entity_id in entity_ids:
-        context = repo.read_entity_context(entity_id)
-        if context is None:
-            continue
-        for bucket in ("outbound", "inbound", "symmetric"):
-            for conn in context["connections"][bucket]:
-                candidate_map.setdefault(conn["artifact_id"], conn)
-    return [candidate_map[aid] for aid in sorted(candidate_map)]
+    return repo.candidate_connections_for_entities(entity_ids)
 
 
 def parse_explicit_connection_pairs(puml: str) -> set[tuple[str, str]]:

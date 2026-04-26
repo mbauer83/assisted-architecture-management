@@ -1,13 +1,11 @@
 <script setup lang="ts">
-import { inject, ref, computed, onMounted, onUnmounted } from 'vue'
+import { inject, ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { Effect } from 'effect'
 import { modelServiceKey } from '../keys'
 import type { EntityDisplayInfo, EntityContextConnection, DiagramPreviewResult } from '../../domain'
-import ArchimateTypeGlyph from '../components/ArchimateTypeGlyph.vue'
 import EntitySelectionList from '../components/EntitySelectionList.vue'
-
-const toGlyphKey = (t: string) => t.replace(/[A-Z]/g, (c, i) => (i > 0 ? '-' : '') + c.toLowerCase())
+import EntityPickerInput from '../components/EntityPickerInput.vue'
 
 const svc = inject(modelServiceKey)!
 const router = useRouter()
@@ -24,10 +22,6 @@ const DIAGRAM_TYPES = [
   { key: 'archimate-layered', label: 'Layered' },
 ]
 
-const searchQuery = ref('')
-const searchResults = ref<EntityDisplayInfo[]>([])
-const showDropdown = ref(false)
-let searchTimer: ReturnType<typeof setTimeout> | null = null
 
 const includedEntities = ref<EntityDisplayInfo[]>([])
 const highlightedEntityIds = ref<Set<string>>(new Set())
@@ -86,35 +80,16 @@ const relatedEntitiesById = computed<Record<string, EntityDisplayInfo[]>>(() => 
   return related
 })
 
-const onSearchInput = () => {
-  if (searchTimer) clearTimeout(searchTimer)
-  const q = searchQuery.value.trim()
-  if (!q) {
-    searchResults.value = []
-    showDropdown.value = false
-    void refreshDiscovery()
-    return
-  }
-  searchTimer = setTimeout(() => {
-    void refreshDiscovery()
-  }, 280)
-}
-
-const closeDropdown = () => { setTimeout(() => { showDropdown.value = false }, 150) }
-
 const refreshDiscovery = async () => {
   const discovery = await Effect.runPromise(
     svc.discoverDiagramEntities({
       includedEntityIds: includedEntities.value.map((e) => e.artifact_id),
-      query: searchQuery.value.trim() || undefined,
       maxHops: 1,
       limit: 20,
     }),
   ).catch(() => null)
   if (!discovery) return
   allModelConns.value = new Map(discovery.candidate_connections.map((conn) => [conn.artifact_id, conn]))
-  searchResults.value = discovery.search_results.filter((r) => !includedEntityIds.value.has(r.artifact_id))
-  showDropdown.value = Boolean(searchQuery.value.trim() && searchResults.value.length)
 }
 
 const addEntity = async (entity: EntityDisplayInfo) => {
@@ -122,8 +97,6 @@ const addEntity = async (entity: EntityDisplayInfo) => {
   includedEntities.value.push(entity)
   highlightedEntityIds.value = new Set(highlightedEntityIds.value).add(entity.artifact_id)
   expandedRelatedEntityIds.value = new Set(expandedRelatedEntityIds.value)
-  showDropdown.value = false
-  searchQuery.value = ''
   await refreshDiscovery()
   const nextConnIds = new Set(includedConnIds.value)
   for (const conn of allModelConns.value.values()) {
@@ -219,7 +192,7 @@ const doCreate = () => {
     .catch((e) => { createBusy.value = false; createError.value = String(e) })
 }
 
-onUnmounted(() => { if (searchTimer) clearTimeout(searchTimer) })
+
 onMounted(() => { void refreshDiscovery() })
 </script>
 
@@ -266,37 +239,10 @@ onMounted(() => { void refreshDiscovery() })
 
         <div class="form-row">
           <label class="lbl">Add Entities</label>
-          <div class="search-wrap">
-            <input
-              v-model="searchQuery"
-              class="inp"
-              placeholder="Search by name, type, domain…"
-              @input="onSearchInput"
-              @blur="closeDropdown"
-              @focus="() => { if (searchResults.length) showDropdown = true }"
-            >
-            <div
-              v-if="showDropdown"
-              class="dropdown"
-            >
-              <button
-                v-for="r in searchResults"
-                :key="r.artifact_id"
-                class="dd-item"
-                @mousedown.prevent="addEntity(r)"
-              >
-                <span
-                  class="dd-glyph"
-                  :title="r.element_type || r.artifact_type"
-                ><ArchimateTypeGlyph
-                  :type="toGlyphKey(r.element_type || r.artifact_type)"
-                  :size="16"
-                /></span>
-                <span class="dd-name">{{ r.name }}</span>
-                <span class="dd-domain">{{ r.domain }}</span>
-              </button>
-            </div>
-          </div>
+          <EntityPickerInput
+            :excluded-ids="includedEntityIds"
+            @select="addEntity"
+          />
         </div>
 
         <div
@@ -418,15 +364,6 @@ onMounted(() => { void refreshDiscovery() })
 .req { color: #dc2626; }
 .inp { width: 100%; padding: 7px 10px; border-radius: 6px; border: 1px solid #d1d5db; font-size: 13px; outline: none; box-sizing: border-box; background: white; }
 .inp:focus { border-color: #2563eb; }
-
-.search-wrap { position: relative; }
-.dropdown { position: absolute; top: calc(100% + 3px); left: 0; right: 0; background: white; border: 1px solid #d1d5db; border-radius: 6px; box-shadow: 0 4px 12px rgba(0,0,0,.1); z-index: 100; max-height: 260px; overflow-y: auto; }
-.dd-item { display: flex; align-items: center; gap: 6px; width: 100%; text-align: left; padding: 8px 10px; background: none; border: none; border-bottom: 1px solid #f3f4f6; cursor: pointer; font-size: 13px; }
-.dd-item:last-child { border-bottom: none; }
-.dd-item:hover { background: #f0f7ff; }
-.dd-glyph { display: flex; align-items: center; flex-shrink: 0; color: #4b5563; }
-.dd-name { font-weight: 500; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.dd-domain { font-size: 11px; color: #9ca3af; white-space: nowrap; }
 
 .actions { display: flex; gap: 8px; justify-content: flex-end; padding-top: 8px; }
 .btn-preview { padding: 7px 16px; background: #f3f4f6; color: #1d4ed8; border: 1px solid #bfdbfe; border-radius: 6px; font-size: 13px; cursor: pointer; font-weight: 500; }

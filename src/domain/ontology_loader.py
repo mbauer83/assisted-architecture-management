@@ -99,6 +99,12 @@ SYMMETRIC_CONNECTIONS: frozenset[str] = frozenset(
     n for n, ct in CONNECTION_TYPES.items() if ct.symmetric
 )
 
+# ── Matrix abbreviations (abbreviation → conn_type, then inverted) ───────
+#: abbreviation → conn_type as declared in the YAML (uniqueness enforced by dict keys)
+MATRIX_ABBREVIATIONS_BY_ABBREV: dict[str, str] = dict(_conn_data.get("matrix_abbreviations", {}))
+#: conn_type → abbreviation (for fast lookup in matrix builder)
+CONN_TYPE_ABBREVIATIONS: dict[str, str] = {v: k for k, v in MATRIX_ABBREVIATIONS_BY_ABBREV.items()}
+
 
 # ── Expand rule references ───────────────────────────────────────────────
 

@@ -2,6 +2,7 @@
 import { computed } from 'vue'
 import type { EntityDisplayInfo, EntityContextConnection } from '../../domain'
 import ArchimateTypeGlyph from './ArchimateTypeGlyph.vue'
+import { toGlyphKey } from '../lib/glyphKey'
 
 type EntityRowActionKind = 'remove' | 'mark-remove'
 
@@ -50,7 +51,6 @@ const includedConnectionIdSet = computed(() => new Set(props.includedConnectionI
 const expandedConnectionIdSet = computed(() => new Set(props.expandedConnectionEntityIds))
 const expandedRelatedIdSet = computed(() => new Set(props.expandedRelatedEntityIds))
 
-const toGlyphKey = (t: string) => t.replace(/[A-Z]/g, (c, i) => (i > 0 ? '-' : '') + c.toLowerCase())
 
 const getConnsByType = (entityId: string): Array<[string, ConnTypeGroup]> => {
   if (!includedEntityIdSet.value.has(entityId)) return []

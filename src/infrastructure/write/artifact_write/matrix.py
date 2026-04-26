@@ -172,7 +172,6 @@ def create_matrix(
     verifier: ArtifactVerifier,
     clear_repo_caches: Callable[[Path], None],
     name: str,
-    purpose: str,
     matrix_markdown: str,
     artifact_id: str,
     keywords: list[str] | None = None,
@@ -181,6 +180,11 @@ def create_matrix(
     last_updated: str | None = None,
     infer_entity_ids: bool = True,
     auto_link_entity_ids: bool = True,
+    entity_ids: list[str] | None = None,
+    from_entity_ids: list[str] | None = None,
+    to_entity_ids: list[str] | None = None,
+    conn_type_configs: list[dict[str, object]] | None = None,
+    combined: bool | None = None,
     dry_run: bool = True,
 ) -> WriteResult:
     assert_engagement_write_root(repo_root)
@@ -223,8 +227,12 @@ def create_matrix(
         status=status,
         last_updated=last,
         keywords=keywords,
-        purpose=purpose,
         matrix_markdown=body_markdown,
+        entity_ids=entity_ids,
+        from_entity_ids=from_entity_ids,
+        to_entity_ids=to_entity_ids,
+        conn_type_configs=conn_type_configs,
+        combined=combined,
     )
 
     path = repo_root / DIAGRAM_CATALOG / DIAGRAMS / f"{artifact_id}.md"

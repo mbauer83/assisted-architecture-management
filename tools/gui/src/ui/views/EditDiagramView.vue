@@ -12,8 +12,10 @@ import type { RepoError } from '../../ports/ModelRepository'
 import type { NotFoundError } from '../../domain'
 import ArchimateTypeGlyph from '../components/ArchimateTypeGlyph.vue'
 import EntitySelectionList from '../components/EntitySelectionList.vue'
+import EntityPickerInput from '../components/EntityPickerInput.vue'
 import { useQuery } from '../composables/useQuery'
 import { useMutation } from '../composables/useMutation'
+import { toGlyphKey } from '../lib/glyphKey'
 
 const svc = inject(modelServiceKey)!
 const addToast = inject(toastKey)!
@@ -28,6 +30,12 @@ const previewMutation = useMutation<DiagramPreviewResult, RepoError>()
 const saveMutation = useMutation<WriteResult, RepoError>()
 
 const diagramDetail = computed(() => contextQuery.data.value?.diagram ?? null)
+
+watch(diagramDetail, (d) => {
+  if (d?.diagram_type === 'matrix') {
+    void router.replace({ path: '/diagram/edit/matrix', query: { id: diagramId.value } })
+  }
+})
 const svgHtml = computed(() =>
   svgQuery.data.value
     ? DOMPurify.sanitize(svgQuery.data.value, { USE_PROFILES: { svg: true, svgFilters: true } })
@@ -128,7 +136,6 @@ const toRemoveEntities = computed(() =>
   includedEntities.value.filter(e => toRemoveEntityIds.value.has(e.artifact_id))
 )
 
-const toGlyphKey = (t: string) => t.replace(/[A-Z]/g, (c, i) => (i > 0 ? '-' : '') + c.toLowerCase())
 
 const isConnIncluded = (connId: string): boolean =>
   (includedConnIds.value.has(connId) && !toRemoveConnIds.value.has(connId))
@@ -278,46 +285,21 @@ watch([toRemoveEntityIds, toRemoveConnIds, selectedNewConnIds], updateHighlights
 
 // ── Search / discovery ────────────────────────────────────────────────────────
 
-const searchQuery = ref('')
-const searchResults = ref<EntityDisplayInfo[]>([])
-const showDropdown = ref(false)
-let searchTimer: ReturnType<typeof setTimeout> | null = null
-
 const refreshDiscovery = async () => {
   const exit = await Effect.runPromiseExit(
     svc.discoverDiagramEntities({
       includedEntityIds: [...effectiveEntityIds.value],
-      query: searchQuery.value.trim() || undefined,
       maxHops: 1, limit: 20,
     }),
   )
-  Exit.match(exit, {
-    onSuccess: (discovery) => {
-      allModelConns.value = new Map(discovery.candidate_connections.map((conn) => [conn.artifact_id, conn]))
-      searchResults.value = discovery.search_results.filter((item) => !effectiveEntityIds.value.has(item.artifact_id))
-      showDropdown.value = Boolean(searchQuery.value.trim() && searchResults.value.length)
-    },
-    onFailure: () => {},
-  })
-}
-
-const onSearchInput = () => {
-  if (searchTimer) clearTimeout(searchTimer)
-  const q = searchQuery.value.trim()
-  if (!q) {
-    searchResults.value = []
-    showDropdown.value = false
-    void refreshDiscovery()
-    return
+  if (Exit.isSuccess(exit)) {
+    allModelConns.value = new Map(exit.value.candidate_connections.map((conn) => [conn.artifact_id, conn]))
   }
-  searchTimer = setTimeout(() => { void refreshDiscovery() }, 280)
 }
-const closeDropdown = () => { setTimeout(() => { showDropdown.value = false }, 150) }
 
 const addEntity = async (entity: EntityDisplayInfo) => {
   if (includedEntityIds.value.has(entity.artifact_id) || toAddEntityIds.value.has(entity.artifact_id)) return
   entitiesToAdd.value = [...entitiesToAdd.value, entity]
-  showDropdown.value = false; searchQuery.value = ''
   await refreshDiscovery()
   const next = new Set(selectedNewConnIds.value)
   for (const conn of allModelConns.value.values()) {
@@ -402,7 +384,6 @@ const doSave = async () => {
 }
 
 onUnmounted(() => {
-  if (searchTimer) clearTimeout(searchTimer)
   containerRef.value?.removeEventListener('wheel', onWheel)
   window.removeEventListener('mousemove', onMouseMove)
   window.removeEventListener('mouseup', onMouseUp)
@@ -499,34 +480,10 @@ onUnmounted(() => {
 
       <aside class="sidebar card">
         <div class="sb-search">
-          <div class="search-wrap">
-            <input
-              v-model="searchQuery"
-              class="inp"
-              placeholder="Search entities to add…"
-              @input="onSearchInput"
-              @blur="closeDropdown"
-              @focus="() => { if (searchResults.length) showDropdown = true }"
-            >
-            <div
-              v-if="showDropdown"
-              class="dropdown"
-            >
-              <button
-                v-for="r in searchResults"
-                :key="r.artifact_id"
-                class="dd-item"
-                @mousedown.prevent="addEntity(r)"
-              >
-                <span class="dd-glyph"><ArchimateTypeGlyph
-                  :type="toGlyphKey(r.element_type || r.artifact_type)"
-                  :size="14"
-                /></span>
-                <span class="dd-name">{{ r.name }}</span>
-                <span class="dd-domain">{{ r.domain }}</span>
-              </button>
-            </div>
-          </div>
+          <EntityPickerInput
+            :excluded-ids="effectiveEntityIds"
+            @select="addEntity"
+          />
         </div>
 
         <div class="sb-scroll">
@@ -709,17 +666,8 @@ onUnmounted(() => {
 .card { background: white; border-radius: 8px; border: 1px solid #e5e7eb; }
 .sidebar { display: flex; flex-direction: column; position: sticky; top: 16px; max-height: calc(100vh - 80px); overflow: hidden; }
 .sb-search { padding: 10px; border-bottom: 1px solid #f3f4f6; flex-shrink: 0; position: relative; z-index: 10; }
-.search-wrap { position: relative; }
 .inp { width: 100%; padding: 7px 10px; border-radius: 6px; border: 1px solid #d1d5db; font-size: 13px; outline: none; box-sizing: border-box; }
 .inp:focus { border-color: #6366f1; }
-.dropdown { position: absolute; top: calc(100% + 3px); left: 0; right: 0; background: white; border: 1px solid #d1d5db; border-radius: 6px; box-shadow: 0 4px 12px rgba(0,0,0,.12); z-index: 100; max-height: 240px; overflow-y: auto; }
-.dd-item { display: flex; align-items: center; gap: 6px; width: 100%; text-align: left; padding: 7px 10px; background: none; border: none; border-bottom: 1px solid #f3f4f6; cursor: pointer; font-size: 13px; }
-.dd-item:last-child { border-bottom: none; }
-.dd-item:hover { background: #f0f7ff; }
-.dd-glyph { display: flex; align-items: center; flex-shrink: 0; color: #4b5563; }
-.dd-name { font-weight: 500; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.dd-domain { font-size: 11px; color: #9ca3af; white-space: nowrap; }
-
 .sb-scroll { flex: 1; overflow-y: auto; display: flex; flex-direction: column; min-height: 0; }
 .sb-section { border-bottom: 1px solid #f3f4f6; }
 .sb-sec-hdr { display: flex; align-items: center; gap: 5px; padding: 8px 10px 6px; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: #6b7280; }

@@ -11,7 +11,7 @@ from typing import Literal
 
 from src.application.artifact_repository import ArtifactRepository
 from src.application.ports import ArtifactStorePort
-from src.application.read_models import EntityContextReadModel
+from src.application.read_models import EntityContextConnection, EntityContextReadModel
 from src.domain.artifact_types import (
     ArtifactSummary,
     ConnectionRecord,
@@ -236,6 +236,9 @@ class FakeStore:
 
     def read_entity_context(self, artifact_id: str) -> EntityContextReadModel | None:
         return None
+
+    def candidate_connections_for_entities(self, entity_ids: list[str]) -> list[EntityContextConnection]:
+        return []
 
     def stats(self) -> dict[str, object]:
         return {"entities": len(self._entities), "connections": len(self._connections)}

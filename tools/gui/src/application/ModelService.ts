@@ -52,6 +52,7 @@ export const makeModelService = (repo: ModelRepository) =>
     getDiagramEntities: (diagramId: string) => repo.getDiagramEntities(diagramId),
     getDiagramConnections: (diagramId: string) => repo.getDiagramConnections(diagramId),
     getDiagramSvg: (diagramId: string) => repo.getDiagramSvg(diagramId),
+    getEntityDisplayItem: (artifactId: string) => repo.getEntityDisplayItem(artifactId),
     searchEntityDisplay: (query: string, limit?: number) => repo.searchEntityDisplay(query, limit),
     discoverDiagramEntities: (params: Parameters<ModelRepository['discoverDiagramEntities']>[0]) =>
       repo.discoverDiagramEntities(params),
@@ -73,4 +74,8 @@ export const makeModelService = (repo: ModelRepository) =>
     submitEnterpriseChanges: () => repo.submitEnterpriseChanges(),
     withdrawEnterpriseChanges: () => repo.withdrawEnterpriseChanges(),
     getChanges: (scope: Parameters<ModelRepository['getChanges']>[0]) => repo.getChanges(scope),
+    getMatrixConfig: (id: string) => repo.getMatrixConfig(id),
+    previewMatrix: (body: Parameters<ModelRepository['previewMatrix']>[0]) => repo.previewMatrix(body),
+    createMatrixDiagram: (body: Parameters<ModelRepository['createMatrixDiagram']>[0]) => repo.createMatrixDiagram(body),
+    editMatrixDiagram: (body: Parameters<ModelRepository['editMatrixDiagram']>[0]) => repo.editMatrixDiagram(body),
   }) as const

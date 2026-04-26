@@ -124,6 +124,28 @@ def connection_ids_for(
     return [str(row["artifact_id"]) for row in rows]
 
 
+def connections_for_entity_set(
+    conn: sqlite3.Connection,
+    entity_ids: frozenset[str],
+) -> list[dict]:
+    """Single query returning all entity_context_edges rows touching any entity in the set."""
+    if not entity_ids:
+        return []
+    phs = ",".join("?" * len(entity_ids))
+    rows = conn.execute(
+        f"SELECT * FROM entity_context_edges WHERE entity_id IN ({phs})",
+        tuple(entity_ids),
+    ).fetchall()
+    # Deduplicate by connection_id; prefer outbound perspective when multiple rows exist
+    seen: dict[str, dict] = {}
+    for row in rows:
+        cid = str(row["connection_id"])
+        existing = seen.get(cid)
+        if existing is None or str(row["direction_bucket"]) == "outbound":
+            seen[cid] = dict(row)
+    return list(seen.values())
+
+
 def find_neighbors(
     conn: sqlite3.Connection,
     entity_id: str,

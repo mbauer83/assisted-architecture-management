@@ -10,6 +10,24 @@
 #   @<cls> = element class from entity_ontology.yaml element_classes
 #   Connection short names are prefixed with "archimate-" at load time.
 
+# ── Matrix diagram abbreviations ──────────────────────────────────────────
+# Single-letter uppercase abbreviations used in combined matrix tables.
+# Declared as {abbreviation: connection-type} — duplicate keys are a YAML
+# error, which guarantees uniqueness at declaration time.
+
+matrix_abbreviations:
+  A: archimate-association
+  C: archimate-composition
+  F: archimate-flow
+  G: archimate-aggregation
+  I: archimate-influence
+  P: archimate-specialization
+  R: archimate-realization
+  S: archimate-assignment
+  T: archimate-triggering
+  V: archimate-serving
+  X: archimate-access
+
 # ── Connection type definitions ────────────────────────────────────────────
 
 connection_types:

@@ -26,6 +26,8 @@ import type {
   EntityDisplayInfo,
   DiagramPreviewResult,
   DiagramConnection,
+  MatrixConfig,
+  MatrixPreviewResult,
   PromotionPlan,
   PromotionResult,
   SyncStatus,
@@ -118,6 +120,7 @@ export interface ModelRepository {
   readonly getDiagramEntities: (diagramId: string) => Effect.Effect<EntitySummary[], RepoError>
   readonly getDiagramConnections: (diagramId: string) => Effect.Effect<DiagramConnection[], RepoError>
   readonly getDiagramSvg: (diagramId: string) => Effect.Effect<string, RepoError>
+  readonly getEntityDisplayItem: (artifactId: string) => Effect.Effect<EntityDisplayInfo, RepoError>
   readonly searchEntityDisplay: (
     query: string, limit?: number,
   ) => Effect.Effect<EntityDisplayInfo[], RepoError>
@@ -229,4 +232,8 @@ export interface ModelRepository {
     doc_types?: string[]
     limit?: number
   }) => Effect.Effect<ReferenceSearchResult, RepoError>
+  readonly getMatrixConfig: (id: string) => Effect.Effect<MatrixConfig, RepoError>
+  readonly previewMatrix: (body: object) => Effect.Effect<MatrixPreviewResult, RepoError>
+  readonly createMatrixDiagram: (body: object) => Effect.Effect<WriteResult, RepoError>
+  readonly editMatrixDiagram: (body: object) => Effect.Effect<WriteResult, RepoError>
 }

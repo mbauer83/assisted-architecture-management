@@ -57,8 +57,10 @@ export default tseslint.config(
     files: [
       'src/ui/components/ArchimateTypeGlyph.vue',
       'src/ui/components/MarkdownEditor.vue',
+      'src/ui/views/CreateMatrixView.vue',
       'src/ui/views/DiagramDetailView.vue',
       'src/ui/views/EditDiagramView.vue',
+      'src/ui/views/EditMatrixView.vue',
       'src/ui/views/EntityDetailView.vue',
       'src/ui/views/GraphExploreView.vue',
     ],

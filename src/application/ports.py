@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Callable, Literal, Protocol
 
-from src.application.read_models import EntityContextReadModel, ReadModelVersion
+from src.application.read_models import EntityContextConnection, EntityContextReadModel, ReadModelVersion
 from src.domain.artifact_types import (
     ArtifactSummary,
     ConnectionRecord,
@@ -82,6 +82,7 @@ class ArtifactStorePort(Protocol):
 
     def summarize_artifact(self, artifact_id: str) -> ArtifactSummary | None: ...
     def read_entity_context(self, artifact_id: str) -> EntityContextReadModel | None: ...
+    def candidate_connections_for_entities(self, entity_ids: list[str]) -> list[EntityContextConnection]: ...
     def stats(self) -> dict[str, object]: ...
 
     # Connection-specific queries

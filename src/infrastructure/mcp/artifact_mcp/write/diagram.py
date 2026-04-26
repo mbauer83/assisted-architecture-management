@@ -17,7 +17,6 @@ from src.infrastructure.mcp.artifact_mcp.write._common import (
 def artifact_create_matrix(
     *,
     name: str,
-    purpose: str,
     matrix_markdown: str,
     artifact_id: str,
     keywords: list[str] | None = None,
@@ -42,7 +41,6 @@ def artifact_create_matrix(
         verifier=verifier_for(key, include_registry=True),
         clear_repo_caches=clear_caches_for_repo,
         name=name,
-        purpose=purpose,
         matrix_markdown=matrix_markdown,
         artifact_id=artifact_id,
         keywords=keywords,

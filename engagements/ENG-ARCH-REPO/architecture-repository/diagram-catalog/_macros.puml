@@ -214,12 +214,6 @@
 ' ---------------------------------------------------------------------------
 ' Strategy
 ' ---------------------------------------------------------------------------
-!procedure $DECL_CAP_0T4qjV()
-  rectangle "<$archimate_Capability{scale=1.5}> Configuration Management" <<Capability>> as CAP_0T4qjV
-!endprocedure
-!procedure $DECL_CAP_F4qy9O()
-  rectangle "<$archimate_Capability{scale=1.5}> Artifact Authoring" <<Capability>> as CAP_F4qy9O
-!endprocedure
 !procedure $DECL_CAP_QrHHmz()
   rectangle "<$archimate_Capability{scale=1.5}> Artifact Discovery" <<Capability>> as CAP_QrHHmz
 !endprocedure
