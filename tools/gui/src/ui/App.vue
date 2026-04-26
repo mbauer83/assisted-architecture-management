@@ -44,8 +44,8 @@ const loadSyncStatus = () => {
 }
 
 type WriteBlockChangedEvent = { blocked: boolean }
-type GitSyncCompletedEvent = { commits_pulled: number }
-type GitSyncFailedEvent = { error: string; auto_unblock_in_seconds: number }
+type SyncPullCompletedEvent = { commits_pulled: number }
+type SyncPullFailedEvent = { error: string; auto_unblock_in_seconds: number }
 
 const parseEventData = <T extends Record<string, unknown>>(
   raw: string,
@@ -65,13 +65,14 @@ const parseEventData = <T extends Record<string, unknown>>(
 const isWriteBlockChangedEvent = (value: Record<string, unknown>): value is WriteBlockChangedEvent =>
   typeof value.blocked === 'boolean'
 
-const isGitSyncCompletedEvent = (value: Record<string, unknown>): value is GitSyncCompletedEvent =>
+const isSyncPullCompletedEvent = (value: Record<string, unknown>): value is SyncPullCompletedEvent =>
   typeof value.commits_pulled === 'number'
 
-const isGitSyncFailedEvent = (value: Record<string, unknown>): value is GitSyncFailedEvent =>
+const isSyncPullFailedEvent = (value: Record<string, unknown>): value is SyncPullFailedEvent =>
   typeof value.error === 'string' && typeof value.auto_unblock_in_seconds === 'number'
 
 let eventSource: EventSource | null = null
+let pollTimer: ReturnType<typeof setInterval> | null = null
 
 onMounted(() => {
   void Effect.runPromise(svc.getServerInfo())
@@ -84,6 +85,9 @@ onMounted(() => {
     })
 
   loadSyncStatus()
+
+  // Fallback poll so the Save button stays accurate even when SSE events are missed.
+  pollTimer = setInterval(() => { loadSyncStatus() }, 30_000)
 
   try {
     eventSource = new EventSource('/api/events')
@@ -100,17 +104,18 @@ onMounted(() => {
         data.blocked ? 'warn' : 'info',
       )
     })
-    eventSource.addEventListener('git_sync_started', () => { addToast('Pulling updates…', 'info') })
-    eventSource.addEventListener('git_sync_completed', (e: MessageEvent<string>) => {
-      const data = parseEventData(e.data, isGitSyncCompletedEvent)
+    eventSource.addEventListener('sync_pull_started', () => { addToast('Pulling updates…', 'info') })
+    eventSource.addEventListener('sync_pull_completed', (e: MessageEvent<string>) => {
+      const data = parseEventData(e.data, isSyncPullCompletedEvent)
       if (!data) {
         addToast('Received malformed sync-complete event', 'error')
         return
       }
       addToast(`Pulled ${data.commits_pulled} commit(s)`, 'info')
+      loadSyncStatus()
     })
-    eventSource.addEventListener('git_sync_failed', (e: MessageEvent<string>) => {
-      const data = parseEventData(e.data, isGitSyncFailedEvent)
+    eventSource.addEventListener('sync_pull_failed', (e: MessageEvent<string>) => {
+      const data = parseEventData(e.data, isSyncPullFailedEvent)
       if (!data) {
         addToast('Received malformed sync-failure event', 'error')
         return
@@ -124,6 +129,8 @@ onMounted(() => {
     eventSource.addEventListener('sync_enterprise_submitted', onSyncEvent('Enterprise submission ready'))
     eventSource.addEventListener('sync_enterprise_withdrawn', onSyncEvent('Enterprise submission withdrawn'))
     eventSource.addEventListener('sync_status_changed', () => { loadSyncStatus() })
+    eventSource.addEventListener('sync_repository_updated', () => { loadSyncStatus() })
+    eventSource.addEventListener('artifact_write_completed', () => { loadSyncStatus() })
   } catch (err) {
     console.error('Failed to connect to event stream:', err)
   }
@@ -132,6 +139,9 @@ onMounted(() => {
 onUnmounted(() => {
   if (eventSource) {
     eventSource.close()
+  }
+  if (pollTimer !== null) {
+    clearInterval(pollTimer)
   }
 })
 </script>

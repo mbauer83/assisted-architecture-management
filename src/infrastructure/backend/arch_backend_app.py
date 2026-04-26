@@ -103,6 +103,9 @@ def _build_app(git_ssh_passphrase: str | None = None):  # type: ignore[no-untype
             logger.info("Starting MCP session managers")
             await stack.enter_async_context(mcp_read.session_manager.run())
             await stack.enter_async_context(mcp_write.session_manager.run())
+            from src.infrastructure.mcp.artifact_mcp.write_queue import attach_event_loop
+
+            attach_event_loop(asyncio.get_running_loop())
             auto_start_default_watcher()
             logger.info("Default watcher auto-started")
 

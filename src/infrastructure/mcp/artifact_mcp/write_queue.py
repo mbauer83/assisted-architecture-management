@@ -32,6 +32,28 @@ _state_cond = threading.Condition()
 _submitted_jobs = 0
 _completed_jobs = 0
 _active_jobs = 0
+_event_loop: asyncio.AbstractEventLoop | None = None
+
+
+def attach_event_loop(loop: asyncio.AbstractEventLoop) -> None:
+    """Store the running event loop so worker threads can schedule SSE notifications."""
+    global _event_loop
+    _event_loop = loop
+
+
+def _notify_gui_dirty() -> None:
+    """Emit sync_status_changed on the GUI event bus from a worker thread (best-effort)."""
+    if _event_loop is None or not _event_loop.is_running():
+        return
+    try:
+        from src.infrastructure.gui.routers.events import event_bus
+
+        asyncio.run_coroutine_threadsafe(
+            event_bus.publish({"type": "artifact_write_completed"}),
+            _event_loop,
+        )
+    except Exception:
+        pass
 
 
 def _get_executor() -> ThreadPoolExecutor:
@@ -58,7 +80,9 @@ def _run_job(fn: Callable[..., Any], /, *args: Any, **kwargs: Any) -> Any:
             pending_jobs=max(_submitted_jobs - _completed_jobs - _active_jobs, 0),
         )
     try:
-        return fn(*args, **kwargs)
+        result = fn(*args, **kwargs)
+        _notify_gui_dirty()
+        return result
     finally:
         with _state_cond:
             _active_jobs -= 1

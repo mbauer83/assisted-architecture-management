@@ -233,7 +233,8 @@ class GitSyncManager:
         except Exception as exc:
             logger.exception("pull error for engagement %s", repo)
             await event_bus.publish(
-                {"type": "sync_pull_failed", "repo": repo_label, "error": str(exc)}
+                {"type": "sync_pull_failed", "repo": repo_label, "error": str(exc),
+                 "auto_unblock_in_seconds": int(_AUTO_UNBLOCK_S)}
             )
             asyncio.create_task(self._auto_unblock(repo, _AUTO_UNBLOCK_S, was_blocked))
             return
@@ -253,7 +254,8 @@ class GitSyncManager:
                 )
             else:
                 await event_bus.publish(
-                    {"type": "sync_pull_failed", "repo": repo_label, "error": err.strip()}
+                    {"type": "sync_pull_failed", "repo": repo_label, "error": err.strip(),
+                     "auto_unblock_in_seconds": int(_AUTO_UNBLOCK_S)}
                 )
             asyncio.create_task(self._auto_unblock(repo, _AUTO_UNBLOCK_S, was_blocked))
 
@@ -291,7 +293,8 @@ class GitSyncManager:
             rc, _, err = await self._git(root, "pull", "--ff-only", timeout=_PULL_TIMEOUT_S)
         except Exception as exc:
             await event_bus.publish(
-                {"type": "sync_pull_failed", "repo": root_label, "error": str(exc)}
+                {"type": "sync_pull_failed", "repo": root_label, "error": str(exc),
+                 "auto_unblock_in_seconds": int(_AUTO_UNBLOCK_S)}
             )
             asyncio.create_task(self._auto_unblock(root, _AUTO_UNBLOCK_S, was_blocked))
             return
@@ -305,7 +308,8 @@ class GitSyncManager:
             await self._notify_changed(root)
         else:
             await event_bus.publish(
-                {"type": "sync_pull_failed", "repo": root_label, "error": err.strip()}
+                {"type": "sync_pull_failed", "repo": root_label, "error": err.strip(),
+                 "auto_unblock_in_seconds": int(_AUTO_UNBLOCK_S)}
             )
             asyncio.create_task(self._auto_unblock(root, _AUTO_UNBLOCK_S, was_blocked))
 
