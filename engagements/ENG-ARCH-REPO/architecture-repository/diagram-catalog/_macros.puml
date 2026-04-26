@@ -212,28 +212,6 @@
 !endprocedure
 
 ' ---------------------------------------------------------------------------
-' Strategy
-' ---------------------------------------------------------------------------
-!procedure $DECL_CAP_QrHHmz()
-  rectangle "<$archimate_Capability{scale=1.5}> Artifact Discovery" <<Capability>> as CAP_QrHHmz
-!endprocedure
-!procedure $DECL_CAP_ZnmAHe()
-  rectangle "<$archimate_Capability{scale=1.5}> Repository Governance" <<Capability>> as CAP_ZnmAHe
-!endprocedure
-!procedure $DECL_CAP_gky5s4()
-  rectangle "<$archimate_Capability{scale=1.5}> Model Validation" <<Capability>> as CAP_gky5s4
-!endprocedure
-!procedure $DECL_CAP_y4xZme()
-  rectangle "<$archimate_Capability{scale=1.5}> Architectural Modeling" <<Capability>> as CAP_y4xZme
-!endprocedure
-!procedure $DECL_COA_BbjFAy()
-  rectangle "<$archimate_CourseOfAction{scale=1.5}> Markdown File-Based Approach" <<CourseOfAction>> as COA_BbjFAy
-!endprocedure
-!procedure $DECL_COA_utgeNR()
-  rectangle "<$archimate_CourseOfAction{scale=1.5}> ArchiMate NEXT Ontology Adoption" <<CourseOfAction>> as COA_utgeNR
-!endprocedure
-
-' ---------------------------------------------------------------------------
 ' Common
 ' ---------------------------------------------------------------------------
 !procedure $DECL_SRV_AIGnSY()
