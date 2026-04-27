@@ -12,7 +12,11 @@ description: >
 
 # ArchiMate Modelling Skill
 
-All model access and mutations go through `artifact_*` MCP tools from the `arch-repo`. Read operations go through `arch-repo-read`, while write operations (where they are available) go through `arch-repo-write`. Always use these tools instead of direct file edits. They enforce verification, maintain the integrity of the knowledge graph, and ensure that read-results are up-to-date.
+All model access and mutations go through `artifact_*` MCP tools from the
+architecture-repository MCP servers. Read/query/verify operations go through
+`arch-repo-read`; mutations go through `arch-repo-write`. Always use these tools
+instead of direct file edits. They enforce verification, maintain graph
+integrity, and keep read results aligned with the indexed repository state.
 ---
 
 ## Modelling Principles
@@ -155,11 +159,21 @@ This pattern renders cleanly with `linetype ortho` and produces the desired 90°
 Quick reference for every available tool, organized by purpose. Use this to pick
 the right tool without guessing.
 
+### Server split and output shape
+
+- `arch-repo-read` exposes query and verification tools only. They are read-only.
+- `arch-repo-write` exposes creation, editing, promotion, save/review, and bulk
+  deletion tools.
+- `artifact_write_help` and `artifact_write_modeling_guidance` are exposed on the
+  write server but are still read-only. They return YAML text, not structured JSON.
+- The single-item delete MCP tools are intentionally not part of the exposed MCP
+  surface anymore. Use `artifact_bulk_delete`, even for a single delete.
+
 ### Orientation
 | Tool | When to use |
 |---|---|
 | `artifact_query_stats` | When you need broad orientation — confirms server connection, shows counts by domain/type. Use at the start of a fresh session or when the scope of existing content is genuinely unclear. Skip when the user's request is specific enough to go straight to targeted search. |
-| `artifact_write_help` | When uncertain about a type or connection identifier — returns the full catalog of valid `artifact_type` and `connection_type` names. Call once; names are non-obvious and guessing causes validation errors. |
+| `artifact_write_help` | When uncertain about a type or connection identifier — returns the full catalog of valid `artifact_type` and `connection_type` names as YAML text. Call once; names are non-obvious and guessing causes validation errors. |
 
 ### Reading and searching
 | Tool | When to use |
@@ -174,13 +188,14 @@ the right tool without guessing.
 ### Type and connection guidance
 | Tool | When to use |
 |---|---|
-| `artifact_write_modeling_guidance` | Call when the right type or connection is unclear, or before creating elements in a domain you haven't modeled yet in this session. Returns `create_when`, `never_create_when`, and `permitted_connections` (outgoing/incoming/symmetric). The baked-in tables below cover quick orientation; this tool is authoritative and returns `permitted_connections` which the tables don't fully capture. `filter` accepts entity-type names (e.g. `["requirement", "goal"]`) OR domain names (e.g. `["Motivation"]`) — never mixed. Omit for all types. |
+| `artifact_write_modeling_guidance` | Call when the right type or connection is unclear, or before creating elements in a domain you haven't modeled yet in this session. Returns YAML text covering `create_when`, `never_create_when`, and `permitted_connections` (outgoing/incoming/symmetric). The baked-in tables below cover quick orientation; this tool is authoritative and returns `permitted_connections` which the tables don't fully capture. `filter` accepts entity-type names (e.g. `["requirement", "goal"]`) OR domain names (e.g. `["Motivation"]`) — never mixed. Omit for all types. |
 
 ### Creating
 | Tool | When to use |
 |---|---|
 | `artifact_create_entity` | Create a new entity; always call with `dry_run=true` first |
 | `artifact_add_connection` | Add a connection between two entities; always `dry_run=true` first; automatically creates a GRF proxy when connecting to an enterprise entity |
+| `artifact_bulk_write` | Use for coordinated batches of additive/mutating work: several entity creates, multiple connection additions, or a mixed create/edit pass that should be planned and verified together. Prefer this over many single calls when the operations are interdependent. |
 | `artifact_create_diagram` | Create a diagram from an explicitly selected entity/connection set after the model content and viewpoint are clear; preview mentally first and use small, focused scopes. |
 | `artifact_create_matrix` | Create a matrix diagram when the key question is about many-to-many relationships and a node-link diagram would be too dense. |
 | `artifact_create_document` | Create a structured architecture document when the user needs narrative or tabular documentation alongside the model. |
@@ -191,11 +206,9 @@ the right tool without guessing.
 | `artifact_edit_entity` | Update `name`, `summary`, `properties`, `notes`, `keywords`, `version`, or `status` on an existing entity; always `dry_run=true` first. **Cannot change `artifact_type`** — fix wrong types by direct file edit as a last resort. |
 | `artifact_edit_connection` | Update description/cardinalities (`operation="update"`) or delete a connection (`operation="remove"`); always `dry_run=true` first |
 | `artifact_edit_connection_associations` | Add or remove second-order `§assoc` relationships on an existing connection when the connection itself needs contextual linkage to other entities. |
-| `artifact_delete_entity` | Delete an entity only when the user clearly intends removal and dependency checks have been considered; always `dry_run=true` first. |
 | `artifact_edit_diagram` | Update the explicit entity/connection selection of an existing diagram when refining scope, related-entity inclusion, or relation visibility. |
-| `artifact_delete_diagram` | Delete an obsolete diagram; always `dry_run=true` first if there is any uncertainty about downstream references. |
 | `artifact_edit_document` | Update an existing document when architecture narrative or tabular documentation needs to track model changes. |
-| `artifact_delete_document` | Delete an obsolete document; use cautiously and prefer dry-run first. |
+| `artifact_bulk_delete` | Use for all MCP-surface deletion work — entities, connections, diagrams, and documents. It supports single deletes as well as coordinated destructive batches, resolves safe dependency order, performs preflight consistency checks, and returns batch-level verification. |
 | `artifact_promote_to_enterprise` | Promote an explicitly selected set of engagement entities and connections to enterprise; dry-run first, review conflicts carefully, and never assume transitive closure is implied. |
 
 ### Verification
@@ -204,6 +217,13 @@ the right tool without guessing.
 | `artifact_verify` | Run repo-wide verification after a large batch of changes or at the end of a modeling session. Returns issue counts and files with errors/warnings. Use `return_mode="full"` for per-issue detail, `repo_scope="engagement"` to target the current repo. Fix all errors before closing a session; resolve warnings on any entity you created or modified. |
 
 Per-entity verification runs automatically on every write — check the `verification` field in each response for immediate feedback. `artifact_verify` is for batch-end or session-end repo-wide checks, not after every individual write.
+
+### Save / review lifecycle
+| Tool | When to use |
+|---|---|
+| `artifact_save_changes` | Commit accumulated repository changes after a coherent batch of modeling work. |
+| `artifact_submit_for_review` | Push pending enterprise working-branch changes for team review after promotion or enterprise-targeted work. |
+| `artifact_withdraw_changes` | Discard pending enterprise working-branch changes only when the user clearly intends abandonment. This is destructive. |
 
 ---
 
@@ -250,7 +270,11 @@ Call with `dry_run=true`. Read the `content` preview — verify type, name, summ
 **Step 6 — Commit and verify.**
 Call with `dry_run=false`. Check the `verification` field in the response. If it reports errors, fix the underlying issue (wrong type, missing required connection, invalid relationship) and re-dry-run before retrying. Report `artifact_id` values to the user.
 
-**Step 7 — Repo-wide verification (after large batches or at session end).**
+**Step 7 — Use the batch tools when operations are interdependent.**
+- For several creates/edits/connections that depend on one another, prefer `artifact_bulk_write` over many ad hoc single calls.
+- For deletions, prefer `artifact_bulk_delete` even for a single entity/document/diagram/connection. It is the canonical MCP delete surface and performs dependency-aware preflight.
+
+**Step 8 — Repo-wide verification (after large batches or at session end).**
 After creating or modifying more than a handful of entities, run `artifact_verify(repo_scope="engagement", return_mode="full")`. Fix all errors; resolve warnings on any entity you created or edited this session. Pre-existing warnings on untouched files are not your responsibility to fix unless specifically asked.
 
 ### Writing good entity summaries
@@ -391,10 +415,9 @@ Valid values: `"1"`, `"0..1"`, `"1..*"`, `"*"`. Not permitted on junction connec
 
 ## Repo Scoping
 
-- `repo_scope="engagement"` — default for all writes; targets the current engagement repo
-- `repo_scope="both"` — default for queries; reads engagement + enterprise
-- `repo_scope="enterprise"` — read enterprise repo only
-
-Use `repo_preset` to target a named engagement (e.g. `"ENG-001-architecture"`) when
-multiple engagements are configured. When connecting to an enterprise entity,
-`artifact_add_connection` handles the GRF proxy automatically.
+- Query tools default to `repo_scope="both"` and can be narrowed to
+  `repo_scope="engagement"` or `repo_scope="enterprise"` when needed.
+- Write tools target the current engagement repository. `repo_root` is optional and
+  is mainly useful for explicit test isolation or non-default workspace layouts.
+- When connecting to an enterprise entity, `artifact_add_connection` handles the GRF
+  proxy automatically.
