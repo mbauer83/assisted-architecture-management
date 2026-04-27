@@ -2,6 +2,7 @@
 
 from mcp.server.fastmcp import FastMCP  # type: ignore[import-not-found]
 
+from src.infrastructure.mcp.artifact_mcp.tool_annotations import LOCAL_WRITE
 from src.infrastructure.mcp.artifact_mcp.write._common import (
     _out,
     artifact_write_ops,
@@ -22,7 +23,6 @@ def artifact_create_document(
     artifact_id: str | None = None,
     version: str = "0.1.0",
     status: str = "draft",
-    last_updated: str | None = None,
     dry_run: bool = True,
     repo_root: str | None = None,
 ) -> dict[str, object]:
@@ -44,7 +44,7 @@ def artifact_create_document(
         artifact_id=artifact_id,
         version=version,
         status=status,
-        last_updated=last_updated,
+        last_updated=None,
         dry_run=dry_run,
     )
     return _out(result, dry_run=dry_run)
@@ -59,7 +59,6 @@ def artifact_edit_document(
     extra_frontmatter: dict[str, object] | None = None,
     status: str | None = None,
     version: str | None = None,
-    last_updated: str | None = None,
     dry_run: bool = True,
     repo_root: str | None = None,
 ) -> dict[str, object]:
@@ -80,7 +79,7 @@ def artifact_edit_document(
         extra_frontmatter=extra_frontmatter,
         status=status,
         version=version,
-        last_updated=last_updated,
+        last_updated=None,
         dry_run=dry_run,
     )
     return _out(result, dry_run=dry_run)
@@ -120,6 +119,7 @@ def register(mcp: FastMCP) -> None:
             "placeholder sections are generated from the schema's required_sections. "
             "Set dry_run=false to write the file."
         ),
+        annotations=LOCAL_WRITE,
         structured_output=True,
     )(queued(artifact_create_document))
 
@@ -132,15 +132,6 @@ def register(mcp: FastMCP) -> None:
             "body replaces the entire body when supplied. "
             "Set dry_run=false to write the file."
         ),
+        annotations=LOCAL_WRITE,
         structured_output=True,
     )(queued(artifact_edit_document))
-
-    mcp.tool(
-        name="artifact_delete_document",
-        title="Artifact Write: Delete Document",
-        description=(
-            "Delete an architecture document by artifact_id. "
-            "Set dry_run=false to perform the deletion."
-        ),
-        structured_output=True,
-    )(queued(artifact_delete_document))

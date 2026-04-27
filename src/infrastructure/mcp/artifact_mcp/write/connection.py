@@ -4,9 +4,8 @@ from typing import Literal
 
 from mcp.server.fastmcp import FastMCP  # type: ignore[import-not-found]
 
+from src.infrastructure.mcp.artifact_mcp.tool_annotations import LOCAL_WRITE
 from src.infrastructure.mcp.artifact_mcp.write._common import (
-    RepoPreset,
-    WriteRepoScope,
     _out,
     artifact_write_ops,
     clear_caches_for_repo,
@@ -18,51 +17,27 @@ from src.infrastructure.mcp.artifact_mcp.write._common import (
 )
 
 
-def artifact_add_connection(
+def _add_connection_impl(
     *,
     source_entity: str,
     connection_type: str,
     target_entity: str,
-    description: str | None = None,
-    src_cardinality: str | None = None,
-    tgt_cardinality: str | None = None,
-    version: str = "0.1.0",
-    status: str = "draft",
-    last_updated: str | None = None,
-    dry_run: bool = True,
-    repo_root: str | None = None,
-    repo_preset: RepoPreset | None = None,
-    repo_scope: WriteRepoScope = "engagement",
-    enterprise_root: str | None = None,
+    description: str | None,
+    src_cardinality: str | None,
+    tgt_cardinality: str | None,
+    version: str,
+    status: str,
+    dry_run: bool,
+    repo_root: str | None,
+    provisional_ids: frozenset[str],
 ) -> dict[str, object]:
-    """Add a connection in the engagement repo.
-
-    Defaults use repos from arch-init workspace config; enterprise_root is optional.
-    When source_entity or target_entity is a global (enterprise) entity, a
-    global-entity-reference proxy is created or reused automatically so all
-    connection endpoints are represented in the engagement repo.
-    """
-    if repo_scope != "engagement":
-        raise ValueError("artifact_add_connection only supports repo_scope='engagement'")
-
-    # Determine scope: only include enterprise root when it was explicitly provided
-    # OR when the caller's repo_root matches the init-state engagement root.
-    # This prevents registry cache pollution in tests that provide an isolated
-    # engagement repo but don't provide an enterprise root.
-    scope: WriteRepoScope | Literal["both"]
-    if enterprise_root:
-        scope = "both"
-    elif repo_root or repo_preset:
-        # Explicit caller repo — enterprise only if also explicitly given
-        scope = "engagement"
-    else:
-        # Default: use both roots from init-state (normal production path)
-        scope = "both"
+    """Internal implementation shared by the MCP tool and bulk_write."""
+    scope: Literal["engagement", "both"] = "engagement" if repo_root else "both"
     both_roots = resolve_repo_roots(
         repo_scope=scope,
         repo_root=repo_root,
-        repo_preset=repo_preset,
-        enterprise_root=enterprise_root,
+        repo_preset=None,
+        enterprise_root=None,
     )
     both_key = roots_key(both_roots)
     registry = registry_cached(both_key)
@@ -129,8 +104,9 @@ def artifact_add_connection(
         tgt_cardinality=tgt_cardinality,
         version=version,
         status=status,
-        last_updated=last_updated,
+        last_updated=None,
         dry_run=dry_run,
+        extra_known_ids=provisional_ids,
     )
     out = _out(result, dry_run=dry_run)
     if gar_source_id:
@@ -145,6 +121,41 @@ def artifact_add_connection(
     return out
 
 
+def artifact_add_connection(
+    *,
+    source_entity: str,
+    connection_type: str,
+    target_entity: str,
+    description: str | None = None,
+    src_cardinality: str | None = None,
+    tgt_cardinality: str | None = None,
+    version: str = "0.1.0",
+    status: str = "draft",
+    dry_run: bool = True,
+    repo_root: str | None = None,
+) -> dict[str, object]:
+    """Add a connection in the engagement repo.
+
+    Defaults use repos from arch-init workspace config.
+    When source_entity or target_entity is a global (enterprise) entity, a
+    global-entity-reference proxy is created or reused automatically so all
+    connection endpoints are represented in the engagement repo.
+    """
+    return _add_connection_impl(
+        source_entity=source_entity,
+        connection_type=connection_type,
+        target_entity=target_entity,
+        description=description,
+        src_cardinality=src_cardinality,
+        tgt_cardinality=tgt_cardinality,
+        version=version,
+        status=status,
+        dry_run=dry_run,
+        repo_root=repo_root,
+        provisional_ids=frozenset(),
+    )
+
+
 def register(mcp: FastMCP) -> None:
     from src.infrastructure.mcp.artifact_mcp.write_queue import queued
 
@@ -153,7 +164,7 @@ def register(mcp: FastMCP) -> None:
         title="Artifact Write: Add Connection",
         description=(
             "Add a connection to an entity's .outgoing.md file. Defaults use repos from "
-            "arch-init workspace config (repo_root, enterprise_root optional). "
+            "arch-init workspace config (repo_root optional). "
             "Connecting from/to a global entity automatically creates a per-engagement "
             "proxy (global-entity-reference) if one does not already exist — handles "
             "outgoing, incoming, and symmetric connections transparently. "
@@ -163,5 +174,6 @@ def register(mcp: FastMCP) -> None:
             "must share the same type (first connection locks it). "
             "dry_run=true returns would-be content without writing."
         ),
+        annotations=LOCAL_WRITE,
         structured_output=True,
     )(queued(artifact_add_connection))

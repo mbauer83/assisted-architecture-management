@@ -66,7 +66,6 @@ def add_connection_unknown_entities(repo_root: Path) -> Exception:
             target_entity="APP@0000000000.YYYYYY.nonexistent-target",
             dry_run=False,
             repo_root=str(repo_root),
-            repo_scope="engagement",
         )
     return exc.value
 
@@ -107,7 +106,6 @@ def repo_with_entities_and_connection(repo_root: Path) -> tuple[Path, str, str]:
         target_entity=e2_id,
         dry_run=False,
         repo_root=str(repo_root),
-        repo_scope="engagement",
     )
     assert conn.get("wrote") is True
 

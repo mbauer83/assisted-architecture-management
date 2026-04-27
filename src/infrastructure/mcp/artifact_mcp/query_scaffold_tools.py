@@ -21,6 +21,7 @@ from src.infrastructure.mcp.artifact_mcp.context import (
     resolve_repo_roots,
     roots_key,
 )
+from src.infrastructure.mcp.artifact_mcp.tool_annotations import READ_ONLY
 
 # conn_short_name → PUML arrow (archimate connections only)
 _ARROW: dict[str, str] = {
@@ -426,5 +427,6 @@ def register_query_scaffold_tools(mcp: FastMCP) -> None:
             "Use direction='left_to_right' for process sequences; "
             "direction='top_to_bottom' (default) for layered cross-domain views."
         ),
+        annotations=READ_ONLY,
         structured_output=True,
     )(artifact_diagram_scaffold)

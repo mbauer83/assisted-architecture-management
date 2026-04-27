@@ -2,6 +2,7 @@
 
 from mcp.server.fastmcp import FastMCP  # type: ignore[import-not-found]
 
+from src.infrastructure.mcp.artifact_mcp.tool_annotations import LOCAL_WRITE
 from src.infrastructure.mcp.artifact_mcp.write._common import (
     DiagramConnectionInferenceMode,
     _out,
@@ -22,7 +23,6 @@ def artifact_create_matrix(
     keywords: list[str] | None = None,
     version: str = "0.1.0",
     status: str = "draft",
-    last_updated: str | None = None,
     infer_entity_ids: bool = True,
     auto_link_entity_ids: bool = True,
     dry_run: bool = True,
@@ -46,7 +46,7 @@ def artifact_create_matrix(
         keywords=keywords,
         version=version,
         status=status,
-        last_updated=last_updated,
+        last_updated=None,
         infer_entity_ids=infer_entity_ids,
         auto_link_entity_ids=auto_link_entity_ids,
         dry_run=dry_run,
@@ -63,7 +63,6 @@ def artifact_create_diagram(
     keywords: list[str] | None = None,
     version: str = "0.1.0",
     status: str = "draft",
-    last_updated: str | None = None,
     connection_inference: DiagramConnectionInferenceMode = "none",
     auto_include_stereotypes: bool = True,
     dry_run: bool = True,
@@ -87,7 +86,7 @@ def artifact_create_diagram(
         keywords=keywords,
         version=version,
         status=status,
-        last_updated=last_updated,
+        last_updated=None,
         connection_inference=connection_inference,
         auto_include_stereotypes=auto_include_stereotypes,
         dry_run=dry_run,
@@ -105,6 +104,7 @@ def register(mcp: FastMCP) -> None:
             "Create a markdown connection-matrix diagram. Defaults to engagement repo from "
             "arch-init config. dry_run=true returns would-be content without writing."
         ),
+        annotations=LOCAL_WRITE,
         structured_output=True,
     )(queued(artifact_create_matrix))
 
@@ -118,5 +118,6 @@ def register(mcp: FastMCP) -> None:
             "auto_include_stereotypes=true injects !include directives automatically. "
             "dry_run=true validates without writing."
         ),
+        annotations=LOCAL_WRITE,
         structured_output=True,
     )(queued(artifact_create_diagram))

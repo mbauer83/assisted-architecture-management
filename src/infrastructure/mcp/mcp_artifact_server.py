@@ -28,6 +28,7 @@ from src.infrastructure.mcp.artifact_mcp.edit_tools import (  # noqa: F401
     artifact_edit_diagram,
     artifact_edit_entity,
 )
+from src.infrastructure.mcp.artifact_mcp.name_normalization import install_call_tool_normalizer
 from src.infrastructure.mcp.artifact_mcp.verify_tools import (  # noqa: F401
     artifact_verify,
     artifact_verify_all,
@@ -38,11 +39,11 @@ from src.infrastructure.mcp.artifact_mcp.write import sync_ops as _sync_ops
 # Re-export tool functions for direct calling in tests.
 from src.infrastructure.mcp.artifact_mcp.write_tools import (  # noqa: F401
     artifact_add_connection,
+    artifact_bulk_delete,
     artifact_create_diagram,
     artifact_create_document,
     artifact_create_entity,
     artifact_create_matrix,
-    artifact_delete_document,
     artifact_edit_document,
     artifact_promote_to_enterprise,
     artifact_write_help,
@@ -78,6 +79,7 @@ mcp_read = FastMCP(
 
 register_query_tools(mcp_read)
 register_verify_tools(mcp_read)
+install_call_tool_normalizer(mcp_read)
 
 
 mcp_write = FastMCP(

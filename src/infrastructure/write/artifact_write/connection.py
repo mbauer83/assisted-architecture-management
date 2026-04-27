@@ -87,21 +87,34 @@ def _validate_inputs(
     connection_type: str,
     source_entity: str,
     target_entity: str,
+    extra_known_ids: frozenset[str] = frozenset(),
 ) -> None:
     if connection_type not in ALL_CONNECTION_TYPES:
         raise ValueError(f"Unknown connection type: {connection_type!r}")
-    if source_entity not in registry.entity_ids():
+    known_ids = registry.entity_ids() | extra_known_ids
+    if source_entity not in known_ids:
         raise ValueError(f"Source entity '{source_entity}' not found in model")
-    if target_entity not in registry.entity_ids():
+    if target_entity not in known_ids:
         raise ValueError(f"Target entity '{target_entity}' not found in model")
     _check_junction_homogeneity(registry, connection_type, source_entity, target_entity)
 
 
-def _resolve_outgoing_path(registry: ArtifactRegistry, source_entity: str) -> Path:
+def _resolve_outgoing_path(
+    registry: ArtifactRegistry,
+    source_entity: str,
+    *,
+    dry_run: bool = False,
+    extra_known_ids: frozenset[str] = frozenset(),
+) -> Path:
     source_file = registry.find_file_by_id(source_entity)
-    if source_file is None:
-        raise ValueError(f"Cannot locate file for source entity '{source_entity}'")
-    return source_file.with_suffix(".outgoing.md")
+    if source_file is not None:
+        return source_file.with_suffix(".outgoing.md")
+    if dry_run and source_entity in extra_known_ids:
+        # Provisional entity: return a synthetic path for content preview
+        repo_roots = registry.repo_roots
+        if repo_roots:
+            return repo_roots[0] / f"{source_entity}.outgoing.md"
+    raise ValueError(f"Cannot locate file for source entity '{source_entity}'")
 
 
 def _build_content(
@@ -222,10 +235,13 @@ def add_connection(
     dry_run: bool,
     src_cardinality: str | None = None,
     tgt_cardinality: str | None = None,
+    extra_known_ids: frozenset[str] = frozenset(),
 ) -> WriteResult:
     """Add a connection to the source entity's .outgoing.md file."""
     assert_engagement_write_root(repo_root)
-    _validate_inputs(registry, connection_type, source_entity, target_entity)
+    _validate_inputs(
+        registry, connection_type, source_entity, target_entity, extra_known_ids
+    )
 
     if src_cardinality or tgt_cardinality:
         for eid, label in ((source_entity, "source"), (target_entity, "target")):
@@ -236,7 +252,9 @@ def add_connection(
                 )
 
     last = last_updated or today_iso()
-    outgoing_path = _resolve_outgoing_path(registry, source_entity)
+    outgoing_path = _resolve_outgoing_path(
+        registry, source_entity, dry_run=dry_run, extra_known_ids=extra_known_ids
+    )
     conn_id = f"{source_entity}---{target_entity}@@{connection_type}"
 
     content = _build_content(

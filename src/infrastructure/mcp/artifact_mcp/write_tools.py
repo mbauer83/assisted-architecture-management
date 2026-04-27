@@ -5,12 +5,12 @@ Logic lives in src/tools/model_mcp/write/*.
 
 from mcp.server.fastmcp import FastMCP  # type: ignore[import-not-found]
 
+from src.infrastructure.mcp.artifact_mcp.bulk_tools import artifact_bulk_delete
 from src.infrastructure.mcp.artifact_mcp.write._common import DiagramConnectionInferenceMode, WriteRepoScope
 from src.infrastructure.mcp.artifact_mcp.write.connection import artifact_add_connection
 from src.infrastructure.mcp.artifact_mcp.write.diagram import artifact_create_diagram, artifact_create_matrix
 from src.infrastructure.mcp.artifact_mcp.write.document import (
     artifact_create_document,
-    artifact_delete_document,
     artifact_edit_document,
 )
 from src.infrastructure.mcp.artifact_mcp.write.entity import (
@@ -24,11 +24,11 @@ __all__ = [
     "DiagramConnectionInferenceMode",
     "WriteRepoScope",
     "artifact_add_connection",
+    "artifact_bulk_delete",
     "artifact_create_diagram",
     "artifact_create_document",
     "artifact_create_entity",
     "artifact_create_matrix",
-    "artifact_delete_document",
     "artifact_edit_document",
     "artifact_promote_to_enterprise",
     "artifact_write_help",
@@ -37,6 +37,7 @@ __all__ = [
 
 
 def register_write_tools(mcp: FastMCP) -> None:
+    from src.infrastructure.mcp.artifact_mcp import bulk_tools
     from src.infrastructure.mcp.artifact_mcp.write import connection, diagram, document, entity, promote
 
     entity.register(mcp)
@@ -44,3 +45,4 @@ def register_write_tools(mcp: FastMCP) -> None:
     diagram.register(mcp)
     document.register(mcp)
     promote.register(mcp)
+    bulk_tools.register(mcp)

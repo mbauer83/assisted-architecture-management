@@ -2,6 +2,7 @@
 
 from mcp.server.fastmcp import FastMCP  # type: ignore[import-not-found]
 
+from src.infrastructure.mcp.artifact_mcp.tool_annotations import LOCAL_WRITE, READ_ONLY
 from src.infrastructure.mcp.artifact_mcp.write._common import (
     _out,
     artifact_write_ops,
@@ -34,7 +35,6 @@ def artifact_create_entity(
     artifact_id: str | None = None,
     version: str = "0.1.0",
     status: str = "draft",
-    last_updated: str | None = None,
     dry_run: bool = True,
     repo_root: str | None = None,
 ) -> dict[str, object]:
@@ -57,7 +57,7 @@ def artifact_create_entity(
         artifact_id=artifact_id,
         version=version,
         status=status,
-        last_updated=last_updated,
+        last_updated=None,
         dry_run=dry_run,
     )
     return _out(result, dry_run=dry_run)
@@ -74,7 +74,8 @@ def register(mcp: FastMCP) -> None:
             "Call this before artifact_create_entity or artifact_add_connection — type names "
             "are non-obvious identifiers and guessing them causes validation errors."
         ),
-        structured_output=True,
+        annotations=READ_ONLY,
+        structured_output=False,
     )(artifact_write_help)
 
     mcp.tool(
@@ -90,7 +91,8 @@ def register(mcp: FastMCP) -> None:
             "domain names (e.g. ['Motivation', 'Strategy']) — never mixed. "
             "Omit filter to return guidance for all entity types."
         ),
-        structured_output=True,
+        annotations=READ_ONLY,
+        structured_output=False,
     )(artifact_write_modeling_guidance)
 
     mcp.tool(
@@ -100,5 +102,6 @@ def register(mcp: FastMCP) -> None:
             "Create a model entity file. Defaults to the engagement repo from arch-init workspace "
             "config (repo_root optional). dry_run=true validates without writing."
         ),
+        annotations=LOCAL_WRITE,
         structured_output=True,
     )(queued(artifact_create_entity))

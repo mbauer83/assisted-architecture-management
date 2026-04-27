@@ -1,23 +1,18 @@
 ---
 name: archimate-modelling
 description: >
-  Use this skill whenever you are working with the ArchiMate NEXT architecture repository
-  in this project — creating entities, adding connections, reading or exploring model
-  content, or answering questions about architecture. Trigger on any request that involves
+  Use this skill whenever you are doing architectural planning, reverse architecture modelling, or verifying what was built against existing architectural plans. Creating architectural model entities, adding connections, reading or exploring model content, or answering questions about architecture. Trigger on any request that involves
   modeling stakeholders, drivers, goals, outcomes, requirements, capabilities, courses of
-  action, value streams, roles, processes, functions, services, application components,
+  action, value streams, roles, processes, functions, services, application components, business objects,
   data objects, technology nodes, artifacts, work packages, deliverables, or plateaus.
   Also trigger when the user asks to "add to the model", "connect X to Y", "what's in the
-  model", "create an architecture element", "update the architecture", or anything that
-  references the model or architecture repository. Use this skill proactively — if there
-  is any chance it applies, use it.
+  model", "create an architecture element", "update the architecture", "check the architecture", "check the model",
+  "verify against the architecture" or anything that references the model or architecture repository.
 ---
 
-# ArchiMate NEXT Modelling Skill
+# ArchiMate Modelling Skill
 
-All model access and mutations go through `artifact_*` MCP tools from the `arch-repo`
-server. Never read or write model files directly.
-
+All model access and mutations go through `artifact_*` MCP tools from the `arch-repo`. Read operations go through `arch-repo-read`, while write operations (where they are available) go through `arch-repo-write`. Always use these tools instead of direct file edits. They enforce verification, maintain the integrity of the knowledge graph, and ensure that read-results are up-to-date.
 ---
 
 ## Modelling Principles
@@ -26,14 +21,12 @@ Apply these before deciding what to create. They govern *when* and *how much* to
 
 ### Domain-driven thinking first
 
-ArchiMate is a notation language, not a thinking framework. Before deciding which element types to use, reason about the problem domain and solution domain from first principles:
+ArchiMate is a notation language, not a thinking framework. Always think first in terms of the actual problem-space and solution-space for a given task, then determine the appropriate granularity at which a situation should be modeled, and then determine the appropriate entity-types and connection-types to model the situation. Rote application of templates or patterns without understanding the actual problem and solution spaces is a common source of over-modeling, misrepresentation, and low-value content. 
 
-- **Problem domain:** What forces, trends, or conditions is this task subject to? What do stakeholders actually care about and why? What problems are unresolved? Research and reason about this, then dialectically work towards a shared understanding with the user — don't just transcribe what the user says. The quality of the motivation layer depends on genuine understanding of the drivers at work.
-- **Solution domain:** What capabilities, processes, and components actually address these problems? What does the architecture provide that changes the situation? Again, reason about the solution before selecting element types.
+- **Problem space:** What forces, trends, or conditions is this task subject to, how is it naturally decomposed into sub-problems by causal/temporal relationships? What resource needs are shared by which related sub-problems? What are underlying assumptions or constraints? What do stakeholders actually care about and why? What problems are unresolved? What requirements need to be addressed when solving these problems? Research and reason about this, then dialectically work towards a shared understanding with the user — don't just transcribe what the user says. 
+- **Solution space:** What set of concepts in which relations best capture the problem-space within the constraints and conventions on the solution-space? Which roles, interaction-surfaces and consumer-oriented services are provided internally or externally. Which processes, functions and important events are involved? How are they distributed and linked between components, actors, data objects? How do elements trace to the motivation domain? What are the key architectural questions that need to be answered, and which elements and connections are required to answer them?
 
-ArchiMate elements should map onto real domain concepts that have been understood first. Choose the element type *after* you have identified the concept, not by fitting available concepts into pre-selected types. When in doubt, name the concept clearly and then ask: which ArchiMate type fits best?
-
-This is especially important in the Motivation domain: a driver should reflect a real force or condition; an assessment should capture a genuine judgment about its consequences; a goal should express an intent that stakeholders actually hold. These should not be invented to fill a template.
+This is important in all domains. For the Motivation domain: a driver should reflect a real force or condition; an assessment should capture a genuine judgment about its consequences; a goal should express an intent that stakeholders actually hold. For the common domain: A service should describe collected behavior that is actually related and presented to consumers in a unified manner via one or more interfaces. Services should be composed of processes, which should be sub-divided into causally / temporally sequenced functions (when the steps sequenced by the process define their scope primarily via the resources they work with) or into sub-processes (when these steps are themselves defined by internal causal / temporal structure that will be modelled). In the application domain, data objects and application components should correspond to actual identifiable units and available data in the system. None of these should be invented to fill a template.
 
 ### Iterative, progressive modeling
 
@@ -46,13 +39,7 @@ Modeling is not completed in a single pass. The depth of the model should match 
 
 ### Selective domain coverage
 
-No engagement requires content in all domains. Determine which domains are relevant
-by reading the user's request and conversational context, then confirming against
-existing model content with targeted queries — not by asking the user directly. The
-user's plans, goals, and the questions they are trying to answer usually make domain
-scope clear. When they don't, `artifact_query_stats` and a targeted search will reveal
-what is already modeled and where the gaps are. Only escalate to the user when domain
-scope remains genuinely ambiguous after that discovery.
+No user-interaction requires content in all domains. Determine which domains are relevant by reading the user's request and conversational context, then confirming against existing model content with targeted queries. The user's plans, goals, and the questions they are trying to answer usually make domain scope clear. When they don't, `artifact_query_stats` and a targeted search will reveal what is already modeled and where the gaps are. Only escalate to the user when domain scope remains genuinely ambiguous after that discovery.
 
 Domain applicability heuristics:
 - **Motivation** — almost always relevant; goals, requirements, and drivers anchor
@@ -71,12 +58,8 @@ Domain applicability heuristics:
 
 ### Pareto principle — minimal sufficient coverage first
 
-Over-modeling is a real risk: it consumes time, creates maintenance burden, and
-obscures the signal in noise. On each iteration, identify the highest-leverage
-elements — the ones without which the key architectural questions cannot be
-answered — and model those first. Resist comprehensiveness. Three well-chosen
-requirements are more useful than fifteen vague ones. On subsequent iterations,
-apply the same test to what hasn't been modeled yet.
+Over-modeling is a real risk: it consumes time, creates maintenance burden, and obscures the signal in noise. On each iteration, identify the highest-leverage elements — the ones without which the key architectural questions cannot be
+answered — and model those first. Resist comprehensiveness. Fewer well-chosen requirements are more useful than more vague ones. On subsequent iterations, apply the same test to what hasn't been modeled yet.
 
 ### Recommended sequencing for a planning or modeling effort
 
@@ -88,7 +71,7 @@ apply the same test to what hasn't been modeled yet.
 
 ---
 
-## Model vs. Diagram — Two Distinct Activities
+## Model vs. Diagram vs Documents — Three Distinct Activities
 
 These are related but different work, with different disciplines.
 
@@ -114,7 +97,7 @@ map of everything in the model.
   what makes a diagram useful.
 
 **When composing a diagram:**
-- **Start from one central element** and add others by following the most
+- **Start from one central element or a small set of central elements** and add others by following the most
   architecturally significant relationships for the target audience.
 - **Keep each diagram small and focused.** Many small diagrams serving distinct
   viewpoints are more useful than one large diagram that tries to show everything.
@@ -130,7 +113,8 @@ map of everything in the model.
 - **Realization arrows:** Direction word tracks the diagram's overall flow. LTR diagram: `TARGET -left-|> SOURCE : <<realization>>`. TTB diagram: `TARGET -up-|> SOURCE : <<realization>>`. Always points from concrete to abstract.
 - **`together {}` is broken in this repo.** `_archimate-stereotypes.puml` sets `skinparam linetype ortho` globally, which is incompatible with `together {}` — it causes E350 rendering errors. Never use `together {}`. Use named containers instead (see Multi-layer layout patterns below).
 - **No phantom helper nodes.** Transparent `<<Hidden>>` or bare `<<Grouping>>` rectangles used purely for routing also fail with E350 when targeted by `-[hidden]->`. Use `-[hidden]right-` / `-[hidden]down-` between real model elements only.
-- **Read an existing working diagram first.** Before attempting a layout pattern you haven't used in this repo, open a diagram from `diagram-catalog/diagrams/` that renders correctly and extract the pattern from it. `motivation-goals-outcomes.puml` is a reliable LTR reference; `motivation-chain-drivers-to-requirements.puml` is a reliable TTB multi-layer reference.
+- **Read an existing working diagram first.** Before attempting a layout pattern you haven't used in this repo, open a diagram from `diagram-catalog/diagrams/` that renders correctly and extract the pattern from it.
+
 
 **Multi-layer layout patterns (TTB with alternating H/V groupings):**
 
@@ -200,8 +184,6 @@ the right tool without guessing.
 | `artifact_create_diagram` | Create a diagram from an explicitly selected entity/connection set after the model content and viewpoint are clear; preview mentally first and use small, focused scopes. |
 | `artifact_create_matrix` | Create a matrix diagram when the key question is about many-to-many relationships and a node-link diagram would be too dense. |
 | `artifact_create_document` | Create a structured architecture document when the user needs narrative or tabular documentation alongside the model. |
-
-> **Parallel write limit:** `artifact_create_entity` and `artifact_add_connection` stall when more than ~8 are issued in the same parallel batch. Issue write calls in sequential batches of ≤8; read/query calls can remain parallel.
 
 ### Editing
 | Tool | When to use |

@@ -5,6 +5,7 @@ from mcp.server.fastmcp import FastMCP  # type: ignore[import-not-found]
 from src.config.repo_paths import DIAGRAM_CATALOG, DIAGRAMS, DOCS
 from src.infrastructure.mcp.artifact_mcp.context import RepoScope, resolve_repo_roots, roots_key, verifier_for
 from src.infrastructure.mcp.artifact_mcp.formatting import as_verification_result_dict
+from src.infrastructure.mcp.artifact_mcp.tool_annotations import READ_ONLY
 
 
 def artifact_verify(
@@ -147,5 +148,6 @@ def register_verify_tools(mcp: FastMCP) -> None:
             "return_mode='summary' (default) gives compact issue lines; 'full' gives per-issue detail."
             "\n\nRepo selection: repo_scope defaults to both (engagement + enterprise)."
         ),
+        annotations=READ_ONLY,
         structured_output=True,
     )(artifact_verify)

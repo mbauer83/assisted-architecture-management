@@ -14,22 +14,13 @@ from src.infrastructure.mcp.artifact_mcp.context import (
     roots_key,
     verifier_for,
 )
+from src.infrastructure.mcp.artifact_mcp.tool_annotations import DESTRUCTIVE_LOCAL_WRITE, LOCAL_WRITE
+from src.infrastructure.mcp.artifact_mcp.write._common import _out
 from src.infrastructure.write import artifact_write_ops
 
 
 def _result_dict(dry_run: bool, result: artifact_write_ops.WriteResult) -> dict[str, object]:
-    out: dict[str, object] = {
-        "dry_run": dry_run,
-        "wrote": bool(result.wrote),
-        "path": str(result.path),
-        "artifact_id": result.artifact_id,
-        "verification": result.verification,
-    }
-    if result.content is not None:
-        out["content"] = result.content
-    if result.warnings:
-        out["warnings"] = result.warnings
-    return out
+    return _out(result, dry_run=dry_run)
 
 
 def _resolve(
@@ -261,6 +252,7 @@ def register_edit_tools(mcp: FastMCP) -> None:
             "Supports name, summary, properties, notes, keywords, version, status. "
             "Bumps last-updated automatically. Regenerates macros if name changes."
         ),
+        annotations=LOCAL_WRITE,
         structured_output=True,
     )(queued(artifact_edit_entity))
 
@@ -274,6 +266,7 @@ def register_edit_tools(mcp: FastMCP) -> None:
             "tgt_cardinality; pass '' to remove an existing cardinality, omit (null) to "
             "preserve it. operation='remove' deletes the connection."
         ),
+        annotations=DESTRUCTIVE_LOCAL_WRITE,
         structured_output=True,
     )(queued(artifact_edit_connection))
 
@@ -285,6 +278,7 @@ def register_edit_tools(mcp: FastMCP) -> None:
             "auto-layout re-applied. Frontmatter fields (name, keywords, version, status) "
             "updated if provided. Re-verifies and re-renders PNG."
         ),
+        annotations=LOCAL_WRITE,
         structured_output=True,
     )(queued(artifact_edit_diagram))
 
@@ -297,26 +291,6 @@ def register_edit_tools(mcp: FastMCP) -> None:
             "(stored as <!-- §assoc ENTITY_ID --> annotations). "
             "add_entities and remove_entities may both be provided in one call."
         ),
+        annotations=LOCAL_WRITE,
         structured_output=True,
     )(queued(artifact_edit_connection_associations))
-
-    mcp.tool(
-        name="artifact_delete_entity",
-        title="Artifact Write: Delete Entity",
-        description=(
-            "Delete an entity from the engagement repository. "
-            "Fails if other connections, diagrams, or global-entity-references still depend on it; "
-            "the error lists those dependents as a deletion tree."
-        ),
-        structured_output=True,
-    )(queued(artifact_delete_entity))
-
-    mcp.tool(
-        name="artifact_delete_diagram",
-        title="Artifact Write: Delete Diagram",
-        description=(
-            "Delete a diagram from the engagement repository, including rendered PNG/SVG siblings "
-            "when present."
-        ),
-        structured_output=True,
-    )(queued(artifact_delete_diagram))

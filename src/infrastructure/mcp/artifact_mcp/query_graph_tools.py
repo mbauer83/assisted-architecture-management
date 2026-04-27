@@ -3,6 +3,7 @@ from typing import Literal
 from mcp.server.fastmcp import FastMCP  # type: ignore[import-not-found]
 
 from src.infrastructure.mcp.artifact_mcp.context import RepoScope, repo_cached, resolve_repo_roots, roots_key
+from src.infrastructure.mcp.artifact_mcp.tool_annotations import READ_ONLY
 
 
 def register_query_graph_tools(mcp: FastMCP) -> None:
@@ -11,9 +12,12 @@ def register_query_graph_tools(mcp: FastMCP) -> None:
         title="Artifact Query: Find Connections",
         description=(
             "Find connection records that touch a given entity_id. "
-            "direction: any|outbound|inbound; optionally filter by conn_type."
+            "direction: any|outbound|inbound; optionally filter by conn_type. "
+            "fields: optional list of keys to include in each result — e.g. "
+            "['source_entity','target_entity','connection_type'] for fast dedup checks."
             "\n\nRepo selection: repo_scope defaults to both (engagement + enterprise)."
         ),
+        annotations=READ_ONLY,
         structured_output=True,
     )
     def artifact_query_find_connections_for(
@@ -21,6 +25,7 @@ def register_query_graph_tools(mcp: FastMCP) -> None:
         *,
         direction: Literal["any", "outbound", "inbound"] = "any",
         conn_type: str | None = None,
+        fields: list[str] | None = None,
         repo_root: str | None = None,
         repo_scope: RepoScope = "both",
     ) -> list[dict[str, object]]:
@@ -39,10 +44,13 @@ def register_query_graph_tools(mcp: FastMCP) -> None:
             conn_type=conn_type,
         )
 
+        fields_set = set(fields) if fields else None
         out: list[dict[str, object]] = []
         for c in conns:
             d = repo.read_artifact(c.artifact_id, mode="summary")
             if d is not None:
+                if fields_set:
+                    d = {k: v for k, v in d.items() if k in fields_set}
                 out.append(d)
         return out
 
@@ -54,6 +62,7 @@ def register_query_graph_tools(mcp: FastMCP) -> None:
             "Optionally restrict by conn_type."
             "\n\nRepo selection: repo_scope defaults to both (engagement + enterprise)."
         ),
+        annotations=READ_ONLY,
         structured_output=True,
     )
     def artifact_query_find_neighbors(

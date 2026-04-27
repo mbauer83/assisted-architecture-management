@@ -4,6 +4,7 @@ from typing import Literal
 from mcp.server.fastmcp import FastMCP  # type: ignore[import-not-found]
 
 from src.infrastructure.mcp.artifact_mcp.context import RepoScope, repo_cached, resolve_repo_roots, roots_key
+from src.infrastructure.mcp.artifact_mcp.tool_annotations import READ_ONLY
 
 
 def _project(record: dict[str, object], fields: list[str] | None) -> dict[str, object]:
@@ -37,6 +38,7 @@ def register_query_search_tools(mcp: FastMCP) -> None:
             '"common", "motivation", "strategy", "business", "application", "technology", "implementation".'
             "\n\nRepo selection: repo_scope defaults to both (engagement + enterprise)."
         ),
+        annotations=READ_ONLY,
         structured_output=True,
     )
     def artifact_query_search_artifacts(

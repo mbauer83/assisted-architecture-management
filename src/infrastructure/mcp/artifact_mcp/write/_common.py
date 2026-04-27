@@ -29,7 +29,7 @@ WriteRepoScope = artifact_write_ops.WriteRepoScope
 DiagramConnectionInferenceMode = artifact_write_ops.DiagramConnectionInferenceMode
 
 
-def _out(result, *, dry_run: bool) -> dict[str, object]:
+def _out(result, *, dry_run: bool, include_content: bool | None = None) -> dict[str, object]:
     out: dict[str, object] = {
         "dry_run": dry_run,
         "wrote": bool(result.wrote),
@@ -37,7 +37,8 @@ def _out(result, *, dry_run: bool) -> dict[str, object]:
         "artifact_id": result.artifact_id,
         "verification": result.verification,
     }
-    if result.content is not None:
+    show_content = dry_run if include_content is None else include_content
+    if show_content and result.content is not None:
         out["content"] = result.content
     if result.warnings:
         out["warnings"] = result.warnings

@@ -245,6 +245,46 @@ process reads from the terminal. `arch-backend &` is still supported and also
 detaches stdin when a background TTY job is detected, but `--daemon` is the
 preferred operational form.
 
+To inspect the current MCP tool surface with the latest MCP Inspector:
+
+```bash
+# Inspect the read-only MCP server via stdio transport
+tmp_cfg="$(mktemp)"
+cat >"$tmp_cfg" <<JSON
+{
+  "mcpServers": {
+    "default-server": {
+      "type": "stdio",
+      "command": "uv",
+      "args": ["--directory", "$(pwd)", "run", "arch-mcp-stdio-read"]
+    }
+  }
+}
+JSON
+npx -y @modelcontextprotocol/inspector@latest --config "$tmp_cfg" --server default-server
+
+# Inspect the write-capable MCP server via stdio transport
+tmp_cfg="$(mktemp)"
+cat >"$tmp_cfg" <<JSON
+{
+  "mcpServers": {
+    "default-server": {
+      "type": "stdio",
+      "command": "uv",
+      "args": ["--directory", "$(pwd)", "run", "arch-mcp-stdio-write"]
+    }
+  }
+}
+JSON
+npx -y @modelcontextprotocol/inspector@latest --config "$tmp_cfg" --server default-server
+```
+
+Connection type: `stdio`
+
+This launches the Inspector with an explicit `stdio` server configuration, so the
+UI does not depend on any previously persisted localStorage state such as an old
+Streamable HTTP URL. The local MCP bridge entrypoints then connect to the unified backend.
+
 If the frontend appears stuck on "Loading...", diagnose the actual transport
 path before assuming an application lock:
 

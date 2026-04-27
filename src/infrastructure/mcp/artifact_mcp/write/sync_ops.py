@@ -14,6 +14,11 @@ from __future__ import annotations
 
 from mcp.server.fastmcp import FastMCP  # type: ignore[import-not-found]
 
+from src.infrastructure.mcp.artifact_mcp.tool_annotations import (
+    DESTRUCTIVE_LOCAL_WRITE,
+    OPEN_WORLD_WRITE,
+)
+
 
 def artifact_save_changes(
     *,
@@ -175,6 +180,7 @@ def register(mcp: FastMCP) -> None:
             "target='enterprise' commits changes to the enterprise working branch "
             "(use artifact_submit_for_review to push it for team review)."
         ),
+        annotations=OPEN_WORLD_WRITE,
         structured_output=True,
     )(artifact_save_changes)
 
@@ -186,6 +192,7 @@ def register(mcp: FastMCP) -> None:
             "Returns the branch name; create a pull request from it in your "
             "version-control platform. The system auto-detects when it is merged."
         ),
+        annotations=OPEN_WORLD_WRITE,
         structured_output=True,
     )(artifact_submit_for_review)
 
@@ -196,5 +203,6 @@ def register(mcp: FastMCP) -> None:
             "Permanently discard all pending enterprise changes (requires confirm=True). "
             "Only affects the enterprise repository. Cannot be undone."
         ),
+        annotations=DESTRUCTIVE_LOCAL_WRITE,
         structured_output=True,
     )(artifact_withdraw_changes)

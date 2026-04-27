@@ -34,6 +34,17 @@ def _write(path: Path, content: str) -> None:
     path.write_text(content, encoding="utf-8")
 
 
+def _use_workspace_roots(
+    monkeypatch: pytest.MonkeyPatch,
+    engagement_root: Path,
+    enterprise_root: Path,
+) -> None:
+    monkeypatch.setattr(
+        "src.infrastructure.mcp.artifact_mcp.context.resolve_workspace_repo_roots",
+        lambda _start=None: (engagement_root.resolve(), enterprise_root.resolve()),
+    )
+
+
 def _entity_md(
     artifact_id: str,
     artifact_type: str,
@@ -381,8 +392,12 @@ class TestAddConnectionGrfRouting:
         return eng_id, glo_id
 
     def test_connection_to_global_entity_auto_creates_grf(
-        self, engagement_root: Path, enterprise_root: Path
+        self,
+        engagement_root: Path,
+        enterprise_root: Path,
+        monkeypatch: pytest.MonkeyPatch,
     ) -> None:
+        _use_workspace_roots(monkeypatch, engagement_root, enterprise_root)
         eng_id, glo_id = self._setup_repos(engagement_root, enterprise_root)
 
         result = mcp_tools.artifact_add_connection(
@@ -390,8 +405,6 @@ class TestAddConnectionGrfRouting:
             connection_type="archimate-realization",
             target_entity=glo_id,
             dry_run=False,
-            repo_root=str(engagement_root),
-            enterprise_root=str(enterprise_root),
         )
 
         assert result.get("wrote") is True
@@ -412,15 +425,18 @@ class TestAddConnectionGrfRouting:
         assert glo_id not in content
 
     def test_connection_to_global_entity_reuses_existing_grf(
-        self, engagement_root: Path, enterprise_root: Path
+        self,
+        engagement_root: Path,
+        enterprise_root: Path,
+        monkeypatch: pytest.MonkeyPatch,
     ) -> None:
+        _use_workspace_roots(monkeypatch, engagement_root, enterprise_root)
         eng_id, glo_id = self._setup_repos(engagement_root, enterprise_root)
 
         # First connection creates GRF
         r1 = mcp_tools.artifact_add_connection(
             source_entity=eng_id, connection_type="archimate-realization",
             target_entity=glo_id, dry_run=False,
-            repo_root=str(engagement_root), enterprise_root=str(enterprise_root),
         )
         gar_id_1 = r1["gar_artifact_id"]
 
@@ -433,7 +449,6 @@ class TestAddConnectionGrfRouting:
         r2 = mcp_tools.artifact_add_connection(
             source_entity=eng_id2, connection_type="archimate-serving",
             target_entity=glo_id, dry_run=False,
-            repo_root=str(engagement_root), enterprise_root=str(enterprise_root),
         )
         assert r2["gar_artifact_id"] == gar_id_1  # same GAR reused
 
@@ -458,9 +473,13 @@ class TestAddConnectionGrfRouting:
         assert "grf_artifact_id" not in result
 
     def test_connection_from_global_entity_auto_creates_grf_for_source(
-        self, engagement_root: Path, enterprise_root: Path
+        self,
+        engagement_root: Path,
+        enterprise_root: Path,
+        monkeypatch: pytest.MonkeyPatch,
     ) -> None:
         """When source is an enterprise entity, a GRF is created and used as source."""
+        _use_workspace_roots(monkeypatch, engagement_root, enterprise_root)
         eng_id, glo_id = self._setup_repos(engagement_root, enterprise_root)
 
         result = mcp_tools.artifact_add_connection(
@@ -468,8 +487,6 @@ class TestAddConnectionGrfRouting:
             connection_type="archimate-influence",
             target_entity=eng_id,
             dry_run=False,
-            repo_root=str(engagement_root),
-            enterprise_root=str(enterprise_root),
         )
 
         assert result.get("wrote") is True
@@ -490,9 +507,13 @@ class TestAddConnectionGrfRouting:
         assert glo_id not in content
 
     def test_symmetric_connection_with_global_entity_auto_creates_grf(
-        self, engagement_root: Path, enterprise_root: Path
+        self,
+        engagement_root: Path,
+        enterprise_root: Path,
+        monkeypatch: pytest.MonkeyPatch,
     ) -> None:
         """For a symmetric connection where target is enterprise, GRF is created for target."""
+        _use_workspace_roots(monkeypatch, engagement_root, enterprise_root)
         eng_id, glo_id = self._setup_repos(engagement_root, enterprise_root)
 
         result = mcp_tools.artifact_add_connection(
@@ -500,8 +521,6 @@ class TestAddConnectionGrfRouting:
             connection_type="archimate-association",  # symmetric
             target_entity=glo_id,
             dry_run=False,
-            repo_root=str(engagement_root),
-            enterprise_root=str(enterprise_root),
         )
 
         assert result.get("wrote") is True
@@ -518,9 +537,13 @@ class TestAddConnectionGrfRouting:
         assert glo_id not in content
 
     def test_connection_from_global_reuses_existing_grf(
-        self, engagement_root: Path, enterprise_root: Path
+        self,
+        engagement_root: Path,
+        enterprise_root: Path,
+        monkeypatch: pytest.MonkeyPatch,
     ) -> None:
         """A second connection from the same global entity reuses its existing GRF."""
+        _use_workspace_roots(monkeypatch, engagement_root, enterprise_root)
         eng_id, glo_id = self._setup_repos(engagement_root, enterprise_root)
         eng_id2 = "CAP@1000000002.EngCCC.cap2"
         _write(
@@ -531,14 +554,12 @@ class TestAddConnectionGrfRouting:
         r1 = mcp_tools.artifact_add_connection(
             source_entity=glo_id, connection_type="archimate-influence",
             target_entity=eng_id, dry_run=False,
-            repo_root=str(engagement_root), enterprise_root=str(enterprise_root),
         )
         gar_id_1 = r1["gar_source_id"]
 
         r2 = mcp_tools.artifact_add_connection(
             source_entity=glo_id, connection_type="archimate-influence",
             target_entity=eng_id2, dry_run=False,
-            repo_root=str(engagement_root), enterprise_root=str(enterprise_root),
         )
         assert r2["gar_source_id"] == gar_id_1
 

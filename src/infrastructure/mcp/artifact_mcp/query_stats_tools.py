@@ -3,6 +3,7 @@ from typing import Literal
 from mcp.server.fastmcp import FastMCP  # type: ignore[import-not-found]
 
 from src.infrastructure.mcp.artifact_mcp.context import RepoScope, repo_cached, resolve_repo_roots, roots_key
+from src.infrastructure.mcp.artifact_mcp.tool_annotations import READ_ONLY
 
 
 def _include_flags(
@@ -28,6 +29,7 @@ def register_query_stats_tools(mcp: FastMCP) -> None:
             "breakdown instead of the default summary."
             "\n\nRepo selection: repo_scope defaults to both (engagement + enterprise)."
         ),
+        annotations=READ_ONLY,
         structured_output=True,
     )
     def artifact_query_stats(

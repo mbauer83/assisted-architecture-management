@@ -2,8 +2,8 @@
 
 from mcp.server.fastmcp import FastMCP  # type: ignore[import-not-found]
 
+from src.infrastructure.mcp.artifact_mcp.tool_annotations import DESTRUCTIVE_LOCAL_WRITE
 from src.infrastructure.mcp.artifact_mcp.write._common import (
-    RepoPreset,
     clear_caches_for_repo,
     registry_cached,
     repo_cached,
@@ -25,7 +25,6 @@ def artifact_promote_to_enterprise(
     exclude_entities: list[str] | None = None,
     exclude_connections: list[str] | None = None,
     repo_root: str | None = None,
-    repo_preset: RepoPreset | None = None,
     enterprise_root: str | None = None,
 ) -> dict[str, object]:
     """Promote entities, connections, documents, and diagrams from engagement to enterprise repo.
@@ -42,14 +41,14 @@ def artifact_promote_to_enterprise(
     eng_root = resolve_repo_roots(
         repo_scope="engagement",
         repo_root=repo_root,
-        repo_preset=repo_preset,
+        repo_preset=None,
         enterprise_root=None,
     )[0]
     ent_root = resolve_enterprise_repo_root(enterprise_root=enterprise_root)
     both_roots = resolve_repo_roots(
         repo_scope="both",
         repo_root=repo_root,
-        repo_preset=repo_preset,
+        repo_preset=None,
         enterprise_root=enterprise_root,
     )
     both_key = roots_key(both_roots)
@@ -161,5 +160,6 @@ def register(mcp: FastMCP) -> None:
             "engagement repo. dry_run=true returns the plan without modifying files. "
             "exclude_entities / exclude_connections prune the explicit selection."
         ),
+        annotations=DESTRUCTIVE_LOCAL_WRITE,
         structured_output=True,
     )(queued(artifact_promote_to_enterprise))
