@@ -25,7 +25,7 @@
   rectangle "<$archimate_Stakeholder{scale=1.5}> Architect" <<Stakeholder>> as STK_aB3dE1
 !endprocedure
 !procedure $DECL_DRV_CuhLPB()
-  rectangle "<$archimate_Driver{scale=1.5}> Need to Balance Organizational Differentiation with Integration" <<Driver>> as DRV_CuhLPB
+  rectangle "<$archimate_Driver{scale=1.5}> Need to Balance Increased Autonomy with Integration" <<Driver>> as DRV_CuhLPB
 !endprocedure
 !procedure $DECL_DRV_GR9prv()
   rectangle "<$archimate_Driver{scale=1.5}> AI-Assisted Development as Dominant Production Mode" <<Driver>> as DRV_GR9prv
@@ -34,7 +34,7 @@
   rectangle "<$archimate_Driver{scale=1.5}> Increasing Demand for More Autonomy of Teams & Systems" <<Driver>> as DRV_Rt6Yu2
 !endprocedure
 !procedure $DECL_DRV_Ui5Op3()
-  rectangle "<$archimate_Driver{scale=1.5}> Rising Complexity and Interdependence" <<Driver>> as DRV_Ui5Op3
+  rectangle "<$archimate_Driver{scale=1.5}> Rising Software Complexity & Interdependence" <<Driver>> as DRV_Ui5Op3
 !endprocedure
 !procedure $DECL_GOL_5Fk9di()
   rectangle "<$archimate_Goal{scale=1.5}> Support Architecture Planning for Humans" <<Goal>> as GOL_5Fk9di
@@ -118,7 +118,7 @@
   rectangle "<$archimate_Requirement{scale=1.5}> Configurable Model Attribute Schemata" <<Requirement>> as REQ_6ZR3nk
 !endprocedure
 !procedure $DECL_REQ_Aa1Bb1()
-  rectangle "<$archimate_Requirement{scale=1.5}> Obligatory Structured Frontmatter" <<Requirement>> as REQ_Aa1Bb1
+  rectangle "<$archimate_Requirement{scale=1.5}> Obligatory Structured Frontmatter for Artifacts" <<Requirement>> as REQ_Aa1Bb1
 !endprocedure
 !procedure $DECL_REQ_Cc2Dd2()
   rectangle "<$archimate_Requirement{scale=1.5}> Semantic Full-Text Search" <<Requirement>> as REQ_Cc2Dd2
@@ -196,7 +196,7 @@
   rectangle "<$archimate_Requirement{scale=1.5}> Verify Diagram Syntax Automatically" <<Requirement>> as REQ_t_NpFC
 !endprocedure
 !procedure $DECL_REQ_vlMSrd()
-  rectangle "<$archimate_Requirement{scale=1.5}> File-Based Entities" <<Requirement>> as REQ_vlMSrd
+  rectangle "<$archimate_Requirement{scale=1.5}> File-Based Artifacts" <<Requirement>> as REQ_vlMSrd
 !endprocedure
 !procedure $DECL_ASS_9YWsDh()
   rectangle "<$archimate_Assessment{scale=1.5}> Implicit System Interdependencies Are Unmaintainable Without Explicit Models" <<Assessment>> as ASS_9YWsDh
@@ -395,23 +395,44 @@
 !procedure $DECL_BIF_zr7_vT()
   rectangle "<$archimate_BusinessInterface{scale=1.5}> GUI Interface" <<BusinessInterface>> as BIF_zr7_vT
 !endprocedure
+!procedure $DECL_BOB_55sMuE()
+  rectangle "<$archimate_BusinessObject{scale=1.5}> Document" <<BusinessObject>> as BOB_55sMuE
+!endprocedure
 !procedure $DECL_BOB_6Uok0b()
   rectangle "<$archimate_BusinessObject{scale=1.5}> Enterprise Repository" <<BusinessObject>> as BOB_6Uok0b
 !endprocedure
 !procedure $DECL_BOB_8D68QW()
-  rectangle "<$archimate_BusinessObject{scale=1.5}> Diagram File" <<BusinessObject>> as BOB_8D68QW
+  rectangle "<$archimate_BusinessObject{scale=1.5}> Textual Diagram Representation" <<BusinessObject>> as BOB_8D68QW
 !endprocedure
 !procedure $DECL_BOB_GSnfM1()
   rectangle "<$archimate_BusinessObject{scale=1.5}> Frontmatter Block" <<BusinessObject>> as BOB_GSnfM1
 !endprocedure
+!procedure $DECL_BOB_IW_x2w()
+  rectangle "<$archimate_BusinessObject{scale=1.5}> ArchiMate Diagram" <<BusinessObject>> as BOB_IW_x2w
+!endprocedure
+!procedure $DECL_BOB_K8XxDs()
+  rectangle "<$archimate_BusinessObject{scale=1.5}> Entity" <<BusinessObject>> as BOB_K8XxDs
+!endprocedure
+!procedure $DECL_BOB_W__CQh()
+  rectangle "<$archimate_BusinessObject{scale=1.5}> Rendered Diagram Representation" <<BusinessObject>> as BOB_W__CQh
+!endprocedure
+!procedure $DECL_BOB__9wvnA()
+  rectangle "<$archimate_BusinessObject{scale=1.5}> Entity Summary" <<BusinessObject>> as BOB__9wvnA
+!endprocedure
+!procedure $DECL_BOB_bIR3Oj()
+  rectangle "<$archimate_BusinessObject{scale=1.5}> Attribute-Profile per Entity-Type" <<BusinessObject>> as BOB_bIR3Oj
+!endprocedure
 !procedure $DECL_BOB_d8ETlx()
-  rectangle "<$archimate_BusinessObject{scale=1.5}> Connection File" <<BusinessObject>> as BOB_d8ETlx
+  rectangle "<$archimate_BusinessObject{scale=1.5}> Outgoing Connections File" <<BusinessObject>> as BOB_d8ETlx
+!endprocedure
+!procedure $DECL_BOB_eGCeZq()
+  rectangle "<$archimate_BusinessObject{scale=1.5}> Diagram" <<BusinessObject>> as BOB_eGCeZq
+!endprocedure
+!procedure $DECL_BOB_hbwZHh()
+  rectangle "<$archimate_BusinessObject{scale=1.5}> Matrix diagram" <<BusinessObject>> as BOB_hbwZHh
 !endprocedure
 !procedure $DECL_BOB_ie4vWU()
   rectangle "<$archimate_BusinessObject{scale=1.5}> Entity File" <<BusinessObject>> as BOB_ie4vWU
-!endprocedure
-!procedure $DECL_BOB_jqcFNe()
-  rectangle "<$archimate_BusinessObject{scale=1.5}> Architecture Model" <<BusinessObject>> as BOB_jqcFNe
 !endprocedure
 !procedure $DECL_BOB_so7gfN()
   rectangle "<$archimate_BusinessObject{scale=1.5}> Engagement Repository" <<BusinessObject>> as BOB_so7gfN
@@ -428,9 +449,6 @@
 !endprocedure
 !procedure $DECL_APP_YOOEbL()
   rectangle "<$archimate_ApplicationComponent{scale=1.5}> Frontmatter Parser" <<ApplicationComponent>> as APP_YOOEbL
-!endprocedure
-!procedure $DECL_APP__5znuv()
-  rectangle "<$archimate_ApplicationComponent{scale=1.5}> Promotion Engine" <<ApplicationComponent>> as APP__5znuv
 !endprocedure
 !procedure $DECL_APP_a9k_mJ()
   rectangle "<$archimate_ApplicationComponent{scale=1.5}> Write Request Queue" <<ApplicationComponent>> as APP_a9k_mJ
@@ -477,17 +495,29 @@
 !procedure $DECL_DOB_3rilik()
   rectangle "<$archimate_DataObject{scale=1.5}> SQLite Index" <<DataObject>> as DOB_3rilik
 !endprocedure
+!procedure $DECL_DOB_4Z28xK()
+  rectangle "<$archimate_DataObject{scale=1.5}> Textual Diagram Representation" <<DataObject>> as DOB_4Z28xK
+!endprocedure
 !procedure $DECL_DOB_H8UwKV()
   rectangle "<$archimate_DataObject{scale=1.5}> PlantUML Macro Library" <<DataObject>> as DOB_H8UwKV
 !endprocedure
 !procedure $DECL_DOB_I9qEoI()
   rectangle "<$archimate_DataObject{scale=1.5}> Workspace Configuration" <<DataObject>> as DOB_I9qEoI
 !endprocedure
-!procedure $DECL_DOB_L3VfsH()
-  rectangle "<$archimate_DataObject{scale=1.5}> Connection Metadata" <<DataObject>> as DOB_L3VfsH
+!procedure $DECL_DOB_LeI0v_()
+  rectangle "<$archimate_DataObject{scale=1.5}> Outgoing Connections File" <<DataObject>> as DOB_LeI0v_
 !endprocedure
-!procedure $DECL_DOB_ij5CH7()
-  rectangle "<$archimate_DataObject{scale=1.5}> Entity Metadata" <<DataObject>> as DOB_ij5CH7
+!procedure $DECL_DOB_QQQFYs()
+  rectangle "<$archimate_DataObject{scale=1.5}> Entity File" <<DataObject>> as DOB_QQQFYs
+!endprocedure
+!procedure $DECL_DOB_V_MgY1()
+  rectangle "<$archimate_DataObject{scale=1.5}> YAML Artifact Frontmatter" <<DataObject>> as DOB_V_MgY1
+!endprocedure
+!procedure $DECL_DOB_mYDZot()
+  rectangle "<$archimate_DataObject{scale=1.5}> Markdown Model Description" <<DataObject>> as DOB_mYDZot
+!endprocedure
+!procedure $DECL_DOB_oTbZxl()
+  rectangle "<$archimate_DataObject{scale=1.5}> Document Markdown File" <<DataObject>> as DOB_oTbZxl
 !endprocedure
 
 ' ---------------------------------------------------------------------------

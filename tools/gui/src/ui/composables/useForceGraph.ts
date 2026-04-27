@@ -23,6 +23,8 @@ export interface GraphEdge {
   target: string
   connType: string
   description?: string  // raw content_text from the connection
+  srcCardinality?: string
+  tgtCardinality?: string
 }
 
 export interface ForceOptions {
@@ -37,11 +39,16 @@ const DEFAULTS: ForceOptions = {
   repulsion: 3000,
   attraction: 0.005,
   idealDist: 250,
-  centerPull: 0.003,
+  centerPull: 0.0005,
   damping: 0.85,
 }
 
 const MIN_VELOCITY = 0.01
+// When a node is expanded its spring to its own parent lengthens by this factor,
+// pushing the whole sub-cluster away.  Un-expanded siblings keep the normal idealDist.
+const EXPANSION_FACTOR = 2.0
+// Expanded cluster-centres repel each other more strongly so clusters don't overlap.
+const EXPANDED_REPULSION = 4.0
 
 export function useForceGraph(width: () => number, height: () => number) {
   const nodes = ref<GraphNode[]>([])
@@ -53,16 +60,42 @@ export function useForceGraph(width: () => number, height: () => number) {
 
   const addNode = (node: Omit<GraphNode, 'x' | 'y' | 'vx' | 'vy' | 'expanded' | 'pinned'>) => {
     if (nodes.value.some((n) => n.id === node.id)) return
-    const cx = width() / 2
-    const cy = height() / 2
+    const parent = node.addedBy ? nodes.value.find((n) => n.id === node.addedBy) : null
+    const ox = parent ? parent.x : width() / 2
+    const oy = parent ? parent.y : height() / 2
     const angle = Math.random() * Math.PI * 2
-    const dist = 60 + Math.random() * 120
+    const dist = options.idealDist * (0.8 + Math.random() * 0.5)
     nodes.value.push({
       ...node,
-      x: cx + Math.cos(angle) * dist,
-      y: cy + Math.sin(angle) * dist,
+      x: ox + Math.cos(angle) * dist,
+      y: oy + Math.sin(angle) * dist,
       vx: 0, vy: 0,
       expanded: false, pinned: false,
+    })
+  }
+
+  /** Distribute nodes added by expanding `parentId` in an arc pointing away from the grandparent.
+   *  Root expansions use a full ring; all others use a 160° arc on the far side. */
+  const spreadAroundParent = (parentId: string) => {
+    const parent = nodes.value.find((n) => n.id === parentId)
+    const children = nodes.value.filter((n) => n.addedBy === parentId)
+    if (!parent || children.length === 0) return
+
+    const grandparent = parent.addedBy ? nodes.value.find((n) => n.id === parent.addedBy) : null
+    const awayAngle = grandparent
+      ? Math.atan2(parent.y - grandparent.y, parent.x - grandparent.x)
+      : Math.atan2(parent.y - height() / 2, parent.x - width() / 2)
+
+    const dist = options.idealDist * 1.1
+    const isRoot = !grandparent
+    const halfSpread = isRoot ? Math.PI : Math.PI * 0.8
+    children.forEach((n, i) => {
+      const t = children.length > 1 ? i / (children.length - 1) - 0.5 : 0
+      const angle = awayAngle + halfSpread * 2 * t
+      n.x = parent.x + Math.cos(angle) * dist
+      n.y = parent.y + Math.sin(angle) * dist
+      n.vx = Math.cos(angle) * 5
+      n.vy = Math.sin(angle) * 5
     })
   }
 
@@ -70,7 +103,7 @@ export function useForceGraph(width: () => number, height: () => number) {
     const exists = edges.value.some(
       (e) => e.source === edge.source && e.target === edge.target && e.connType === edge.connType,
     )
-    if (!exists) edges.value.push(edge)
+    if (!exists) edges.value.push({ ...edge })
   }
 
   const markExpanded = (id: string) => {
@@ -85,28 +118,36 @@ export function useForceGraph(width: () => number, height: () => number) {
     const cy = height() / 2
     const { repulsion, attraction, idealDist, centerPull, damping } = options
 
-    // Repulsion between all pairs
+    // Repulsion between all pairs; expanded cluster-centres repel each other extra.
     for (let i = 0; i < ns.length; i++) {
       for (let j = i + 1; j < ns.length; j++) {
         const dx = ns[j].x - ns[i].x
         const dy = ns[j].y - ns[i].y
         const dist = Math.max(Math.sqrt(dx * dx + dy * dy), 1)
-        const force = repulsion / (dist * dist)
+        const r = (ns[i].expanded && ns[j].expanded) ? repulsion * EXPANDED_REPULSION : repulsion
+        const force = r / (dist * dist)
         const fx = (dx / dist) * force
         const fy = (dy / dist) * force
         if (!ns[i].pinned) { ns[i].vx -= fx; ns[i].vy -= fy }
         if (!ns[j].pinned) { ns[j].vx += fx; ns[j].vy += fy }
       }
     }
-    // Attraction along edges
+    // Attraction along edges.
+    // When the child side of a parent→child edge is expanded, use a longer spring so
+    // the sub-cluster moves away from the grandparent.  Un-expanded siblings keep
+    // idealDist.  Multi-connected nodes settle at the geometric centre of their springs.
     for (const e of es) {
       const src = ns.find((n) => n.id === e.source)
       const tgt = ns.find((n) => n.id === e.target)
       if (!src || !tgt) continue
+      const childNode = src.addedBy === tgt.id ? src
+        : tgt.addedBy === src.id ? tgt
+        : null
+      const springDist = childNode?.expanded ? idealDist * EXPANSION_FACTOR : idealDist
       const dx = tgt.x - src.x
       const dy = tgt.y - src.y
       const dist = Math.max(Math.sqrt(dx * dx + dy * dy), 1)
-      const force = (dist - idealDist) * attraction
+      const force = (dist - springDist) * attraction
       const fx = (dx / dist) * force
       const fy = (dy / dist) * force
       if (!src.pinned) { src.vx += fx; src.vy += fy }
@@ -291,7 +332,7 @@ export function useForceGraph(width: () => number, height: () => number) {
 
   return {
     nodes, edges, options, layoutMode,
-    addNode, addEdge, markExpanded, collapseNode,
+    addNode, addEdge, markExpanded, collapseNode, spreadAroundParent,
     start, stop, restart,
     applyClusterLayout, applyForceLayout,
   }

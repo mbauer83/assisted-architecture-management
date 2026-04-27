@@ -29,7 +29,7 @@ const basePath = computed(() => isGlobal.value ? '/global/entities' : '/entities
 
 const activeDomain = computed(() => (route.query.domain as string | undefined) ?? '')
 const viewMode = computed<ViewMode>(() => route.query.view === 'treemap' ? 'treemap' : 'table')
-const typeFilter = ref('')
+const typeFilter = ref((route.query.type as string | undefined) ?? '')
 const sortKey = ref<SortKey | null>(null)
 const sortOrder = ref<1 | -1>(1)
 
@@ -86,27 +86,53 @@ const sortedEntities = computed(() => {
 
 const hierarchicalEntities = computed(() => {
   const items = sortedEntities.value
-  const byId = new Map(items.map(item => [item.artifact_id, item]))
-  const children = new Map<string, typeof items>()
-  const roots: typeof items = []
+  const byId = new Map(items.map((item) => [item.artifact_id, item]))
+
+  type ChildEntry = { entity: typeof items[number]; relationType: string | undefined }
+  const children = new Map<string, ChildEntry[]>()
 
   for (const item of items) {
-    const parentId = item.parent_entity_id ?? item.parent_specialization_id
-    if (parentId && byId.has(parentId)) {
-      const bucket = children.get(parentId) ?? []
-      bucket.push(item)
-      children.set(parentId, bucket)
-    } else {
-      roots.push(item)
+    const rawParents = item.all_parents?.length
+      ? item.all_parents
+      : item.parent_entity_id
+        ? [{ parent_id: item.parent_entity_id, relation_type: item.hierarchy_relation_type ?? '' }]
+        : []
+    for (const p of rawParents.filter((p) => byId.has(p.parent_id))) {
+      const bucket = children.get(p.parent_id) ?? []
+      bucket.push({ entity: item, relationType: p.relation_type || undefined })
+      children.set(p.parent_id, bucket)
     }
   }
 
+  const hasParent = new Set<string>()
+  for (const entries of children.values()) for (const { entity } of entries) hasParent.add(entity.artifact_id)
+  const roots = items.filter((item) => !hasParent.has(item.artifact_id))
+
   const ordered: typeof items = []
-  const visit = (item: typeof items[number]) => {
-    ordered.push(item)
-    for (const child of children.get(item.artifact_id) ?? []) visit(child)
+  const visited = new Set<string>()
+  const currentPath = new Set<string>()
+
+  // parentKey is the full ancestry key of the parent node, propagated down so that
+  // each (entity, ancestor-path) combination gets a unique visit key.  This lets
+  // grandchildren appear once per each copy of their parent, not just once globally.
+  const visit = (item: typeof items[number], depth: number, parentId: string | null, relationType: string | null, parentKey: string) => {
+    if (currentPath.has(item.artifact_id)) return  // cycle guard
+    const key = `${item.artifact_id}::${parentKey}`
+    if (visited.has(key)) return
+    visited.add(key)
+    ordered.push(
+      parentId !== null
+        ? { ...item, parent_entity_id: parentId, hierarchy_relation_type: relationType ?? undefined, hierarchy_depth: depth, specialization_depth: depth }
+        : { ...item, hierarchy_depth: depth, specialization_depth: depth },
+    )
+    currentPath.add(item.artifact_id)
+    for (const { entity: child, relationType: rt } of children.get(item.artifact_id) ?? []) {
+      visit(child, depth + 1, item.artifact_id, rt ?? null, key)
+    }
+    currentPath.delete(item.artifact_id)
   }
-  for (const root of roots) visit(root)
+
+  for (const root of roots) visit(root, 0, null, null, '')
   return ordered
 })
 
@@ -115,6 +141,14 @@ const hierarchyMarker = (relationType?: string) => {
   if (relationType === 'aggregation') return '◇'
   return '↳'
 }
+
+const browseReturnQuery = computed(() => {
+  const q: Record<string, string> = {}
+  if (activeDomain.value) q.domain = activeDomain.value
+  if (viewMode.value !== 'table') q.view = viewMode.value
+  if (typeFilter.value) q.type = typeFilter.value
+  return q
+})
 
 const pageTitle = computed(() => {
   const scope = isGlobal.value ? 'Global ' : ''
@@ -227,111 +261,120 @@ const sortArrow = (key: SortKey) => sortKey.value === key ? (sortOrder.value ===
         {{ entityListState.errorMessage.value }}
       </div>
 
-      <EntitiesTreemap
-        v-else-if="entityListState.data.value && viewMode === 'treemap'"
-        :items="hierarchicalEntities"
-        :active-domain="activeDomain"
-      />
+      <template v-else-if="entityListState.data.value">
+        <div
+          v-if="hierarchicalEntities.length === 0"
+          class="state-msg"
+        >
+          No entities found{{ activeDomain ? ` in ${getDomainLabel(activeDomain)}` : '' }}{{ typeFilter ? ` of type "${typeFilter}"` : '' }}.
+        </div>
 
-      <table
-        v-else-if="entityListState.data.value"
-        class="entity-table"
-      >
-        <thead>
-          <tr>
-            <th>Name</th>
-            <th>
-              <button
-                class="sort-btn"
-                @click="sortBy('type')"
-              >
-                Type {{ sortArrow('type') }}
-              </button>
-            </th>
-            <th v-if="!activeDomain">
-              Domain
-            </th>
-            <th class="th-conn">
-              <button
-                class="sort-btn"
-                @click="sortBy('total')"
-              >
-                Connections {{ sortArrow('total') }}
-              </button>
-              <span class="th-conn-sub">
-                (<button
-                  class="sort-sub"
-                  @click="sortBy('in')"
-                >in {{ sortArrow('in') }}</button> /
+        <EntitiesTreemap
+          v-else-if="viewMode === 'treemap'"
+          :items="sortedEntities"
+          :active-domain="activeDomain"
+        />
+
+        <table
+          v-else
+          class="entity-table"
+        >
+          <thead>
+            <tr>
+              <th>Name</th>
+              <th>
                 <button
-                  class="sort-sub"
-                  @click="sortBy('sym')"
-                >sym {{ sortArrow('sym') }}</button> /
-                <button
-                  class="sort-sub"
-                  @click="sortBy('out')"
-                >out {{ sortArrow('out') }}</button>)
-              </span>
-            </th>
-            <th>Status</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr
-            v-for="entity in hierarchicalEntities"
-            :key="entity.artifact_id"
-            :class="{ 'row--global': entity.is_global }"
-          >
-            <td>
-              <div
-                class="name-cell"
-                :style="{ paddingLeft: `${(entity.hierarchy_depth ?? entity.specialization_depth ?? 0) * 18}px` }"
-              >
-                <span
-                  v-if="(entity.hierarchy_depth ?? entity.specialization_depth)"
-                  class="spec-marker"
+                  class="sort-btn"
+                  @click="sortBy('type')"
                 >
-                  {{ hierarchyMarker(entity.hierarchy_relation_type) }}
+                  Type {{ sortArrow('type') }}
+                </button>
+              </th>
+              <th v-if="!activeDomain">
+                Domain
+              </th>
+              <th class="th-conn">
+                <button
+                  class="sort-btn"
+                  @click="sortBy('total')"
+                >
+                  Connections {{ sortArrow('total') }}
+                </button>
+                <span class="th-conn-sub">
+                  (<button
+                    class="sort-sub"
+                    @click="sortBy('in')"
+                  >in {{ sortArrow('in') }}</button> /
+                  <button
+                    class="sort-sub"
+                    @click="sortBy('sym')"
+                  >sym {{ sortArrow('sym') }}</button> /
+                  <button
+                    class="sort-sub"
+                    @click="sortBy('out')"
+                  >out {{ sortArrow('out') }}</button>)
                 </span>
-                <RouterLink :to="{ path: '/entity', query: { id: entity.artifact_id } }">
-                  {{ entity.name || friendlyEntityId(entity.artifact_id) }}
-                </RouterLink>
-              </div>
-              <span
-                v-if="entity.is_global && !isGlobal"
-                class="global-chip"
-                title="From the global repository"
-              >global</span>
-            </td>
-            <td>
-              <span class="type-cell">
-                <ArchimateTypeGlyph
-                  :type="entity.artifact_type"
-                  :size="15"
-                  class="type-glyph"
-                />
-                <span class="mono">{{ entity.artifact_type }}</span>
-              </span>
-            </td>
-            <td v-if="!activeDomain">
-              <span
-                class="domain-badge"
-                :class="`domain--${entity.domain}`"
-              >{{ entity.domain }}</span>
-            </td>
-            <td class="conn-counts">
-              {{ getEntityConnectionTotal(entity) }}
-              <span class="conn-split">({{ entity.conn_in ?? 0 }} / {{ entity.conn_sym ?? 0 }} / {{ entity.conn_out ?? 0 }})</span>
-            </td>
-            <td>
-              <span
-                class="status-badge"
-                :class="`status--${entity.status}`"
-              >{{ entity.status }}</span>
-            </td>
-          </tr>
-        </tbody>
-      </table>
+              </th>
+              <th>Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr
+              v-for="entity in hierarchicalEntities"
+              :key="`${entity.artifact_id}::${entity.parent_entity_id ?? ''}`"
+              :class="{ 'row--global': entity.is_global }"
+            >
+              <td>
+                <div
+                  class="name-cell"
+                  :style="{ paddingLeft: `${(entity.hierarchy_depth ?? entity.specialization_depth ?? 0) * 18}px` }"
+                >
+                  <span
+                    v-if="(entity.hierarchy_depth ?? entity.specialization_depth)"
+                    class="spec-marker"
+                  >
+                    {{ hierarchyMarker(entity.hierarchy_relation_type) }}
+                  </span>
+                  <RouterLink :to="{ path: '/entity', query: { id: entity.artifact_id, ...browseReturnQuery } }">
+                    {{ entity.name || friendlyEntityId(entity.artifact_id) }}
+                  </RouterLink>
+                </div>
+                <span
+                  v-if="entity.is_global && !isGlobal"
+                  class="global-chip"
+                  title="From the global repository"
+                >global</span>
+              </td>
+              <td>
+                <span class="type-cell">
+                  <ArchimateTypeGlyph
+                    :type="entity.artifact_type"
+                    :size="15"
+                    class="type-glyph"
+                  />
+                  <span class="mono">{{ entity.artifact_type }}</span>
+                </span>
+              </td>
+              <td v-if="!activeDomain">
+                <span
+                  class="domain-badge"
+                  :class="`domain--${entity.domain}`"
+                >{{ entity.domain }}</span>
+              </td>
+              <td class="conn-counts">
+                {{ getEntityConnectionTotal(entity) }}
+                <span class="conn-split">({{ entity.conn_in ?? 0 }} / {{ entity.conn_sym ?? 0 }} / {{ entity.conn_out ?? 0 }})</span>
+              </td>
+              <td>
+                <span
+                  class="status-badge"
+                  :class="`status--${entity.status}`"
+                >{{ entity.status }}</span>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </template>
     </section>
   </div>
 </template>

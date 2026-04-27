@@ -31,6 +31,10 @@ export const EntitySummarySchema = Schema.Struct({
   hierarchy_depth: Schema.optional(Schema.Number),
   parent_specialization_id: Schema.optional(Schema.NullOr(Schema.String)),
   specialization_depth: Schema.optional(Schema.Number),
+  all_parents: Schema.optional(Schema.Array(Schema.Struct({
+    parent_id: Schema.String,
+    relation_type: Schema.String,
+  }))),
   conn_in: Schema.optional(Schema.Number),
   conn_sym: Schema.optional(Schema.Number),
   conn_out: Schema.optional(Schema.Number),

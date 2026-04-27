@@ -54,8 +54,13 @@ export const hasVerificationErrors = (verification: unknown): boolean => {
   if (!isRecord(verification)) {
     return false
   }
-  const { errors } = verification
-  return Array.isArray(errors) && errors.length > 0
+  // Check valid flag first (primary indicator)
+  if (verification.valid === false) {
+    return true
+  }
+  // Also check for issues array (backward compatibility and detailed errors)
+  const { issues } = verification
+  return Array.isArray(issues) && issues.length > 0
 }
 
 export const formatEffectError = (e: unknown): string => {

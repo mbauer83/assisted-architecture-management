@@ -3,6 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from src.domain.artifact_types import ConnectionRecord, EntityRecord
+from src.domain.archimate_relation_rendering import format_cardinality_label
 from src.infrastructure.mcp.artifact_mcp.query_scaffold_tools import artifact_diagram_scaffold
 from src.infrastructure.rendering.diagram_builder import generate_archimate_puml_body
 from src.infrastructure.rendering.generate_macros import generate_macros
@@ -35,7 +36,14 @@ def _entity(
     )
 
 
-def _conn(source: str, target: str, conn_type: str = "archimate-realization") -> ConnectionRecord:
+def _conn(
+    source: str,
+    target: str,
+    conn_type: str = "archimate-realization",
+    *,
+    src_cardinality: str = "",
+    tgt_cardinality: str = "",
+) -> ConnectionRecord:
     return ConnectionRecord(
         artifact_id=f"{source}---{target}@@{conn_type}",
         source=source,
@@ -46,6 +54,8 @@ def _conn(source: str, target: str, conn_type: str = "archimate-realization") ->
         path=Path("/tmp/test.outgoing.md"),
         extra={},
         content_text="",
+        src_cardinality=src_cardinality,
+        tgt_cardinality=tgt_cardinality,
     )
 
 
@@ -342,3 +352,67 @@ last-updated: '2026-04-20'
     assert "top to bottom direction" in puml
     assert "DRV_A -[hidden]down- ASS_A" in puml
     assert 'Rel_Influence_Down(DRV_A, ASS_A, "")' in puml
+
+
+# ── format_cardinality_label unit tests ───────────────────────────────────────
+
+
+def test_format_cardinality_label_both_ends() -> None:
+    assert format_cardinality_label("1", "0..*") == "1 -> 0..*"
+
+
+def test_format_cardinality_label_src_only() -> None:
+    assert format_cardinality_label("1", "") == "1 ->"
+
+
+def test_format_cardinality_label_tgt_only() -> None:
+    assert format_cardinality_label("", "*") == "-> *"
+
+
+def test_format_cardinality_label_neither() -> None:
+    assert format_cardinality_label("", "") == ""
+
+
+# ── generate_archimate_puml_body cardinality rendering ───────────────────────
+
+
+def test_generate_archimate_puml_body_renders_cardinality_both_ends() -> None:
+    goal = _entity("GOL@1.a.goal-a", "goal", "Goal A", "GOL_A")
+    outcome = _entity("OUT@1.a.outcome-a", "outcome", "Outcome A", "OUT_A", subdomain="outcomes")
+    conn = _conn(
+        outcome.artifact_id,
+        goal.artifact_id,
+        "archimate-realization",
+        src_cardinality="1",
+        tgt_cardinality="0..*",
+    )
+
+    puml = generate_archimate_puml_body("Test", [goal, outcome], [conn])
+
+    assert '1 -> 0..*' in puml
+    assert 'Rel_Realization_Up(OUT_A, GOL_A, "1 -> 0..*")' in puml
+
+
+def test_generate_archimate_puml_body_renders_cardinality_src_only() -> None:
+    goal = _entity("GOL@1.a.goal-a", "goal", "Goal A", "GOL_A")
+    outcome = _entity("OUT@1.a.outcome-a", "outcome", "Outcome A", "OUT_A", subdomain="outcomes")
+    conn = _conn(
+        outcome.artifact_id,
+        goal.artifact_id,
+        "archimate-realization",
+        src_cardinality="1",
+    )
+
+    puml = generate_archimate_puml_body("Test", [goal, outcome], [conn])
+
+    assert 'Rel_Realization_Up(OUT_A, GOL_A, "1 ->")' in puml
+
+
+def test_generate_archimate_puml_body_no_cardinality_keeps_empty_label() -> None:
+    goal = _entity("GOL@1.a.goal-a", "goal", "Goal A", "GOL_A")
+    outcome = _entity("OUT@1.a.outcome-a", "outcome", "Outcome A", "OUT_A", subdomain="outcomes")
+    conn = _conn(outcome.artifact_id, goal.artifact_id, "archimate-realization")
+
+    puml = generate_archimate_puml_body("Test", [goal, outcome], [conn])
+
+    assert 'Rel_Realization_Up(OUT_A, GOL_A, "")' in puml

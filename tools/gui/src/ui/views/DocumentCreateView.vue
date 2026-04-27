@@ -25,6 +25,7 @@ const loading = ref(false)
 const saving = ref(false)
 const error = ref<string | null>(null)
 const verificationIssues = ref<string[]>([])
+const warnings = ref<string[]>([])
 const showReferencePicker = ref(false)
 type MarkdownEditorHandle = { insertAtCursor: (markdownLink: string) => void }
 const editorRef = ref<MarkdownEditorHandle | null>(null)
@@ -94,6 +95,10 @@ watch(extraFrontmatter, (next) => {
   if (syncingAutoBody.value) return
   headerWasManuallyEdited.value = JSON.stringify(next) !== JSON.stringify(lastAutoFrontmatter.value)
 }, { deep: true })
+
+watch(title, () => {
+  verificationIssues.value = []
+})
 
 watch(docTypeRaw, (next) => {
   if (next === docType.value) return
@@ -174,6 +179,7 @@ const submit = () => {
   submitAttempted.value = true
   titleTouched.value = true
   verificationIssues.value = []
+  warnings.value = []
   if (titleError.value) return
   error.value = null
   saving.value = true
@@ -188,6 +194,7 @@ const submit = () => {
   })).then((result) => {
     if (!result.wrote) {
       verificationIssues.value = collectVerificationIssues(result.verification)
+      warnings.value = result.warnings ?? []
       error.value = verificationIssues.value.length
         ? 'Document could not be created until the validation issues are fixed.'
         : 'Document could not be created.'
@@ -389,6 +396,19 @@ const insertReference = (markdownLink: string) => {
       </div>
 
       <div
+        v-if="warnings.length"
+        class="warnings-block"
+      >
+        <div
+          v-for="w in warnings"
+          :key="w"
+          class="warn"
+        >
+          {{ w }}
+        </div>
+      </div>
+
+      <div
         v-if="error"
         class="state-msg state-msg--error"
       >
@@ -480,6 +500,8 @@ const insertReference = (markdownLink: string) => {
 }
 .state-msg { color: #64748b; margin-bottom: 12px; }
 .state-msg--error { color: #dc2626; }
+.warnings-block { margin-bottom: 12px; }
+.warn { font-size: 12px; color: #b45309; margin-bottom: 4px; }
 .issue-list {
   margin: 0 0 12px;
   padding-left: 18px;

@@ -4,7 +4,7 @@ import { useRouter } from 'vue-router'
 import { Effect } from 'effect'
 import { modelServiceKey } from '../keys'
 import type { WriteHelp, WriteResult } from '../../domain'
-import { hasVerificationErrors, readErrorMessage } from '../lib/errors'
+import { hasVerificationErrors, readErrorMessage, collectVerificationIssues } from '../lib/errors'
 
 const svc = inject(modelServiceKey)!
 const router = useRouter()
@@ -36,6 +36,7 @@ const busy = ref(false)
 const formError = ref<string | null>(null)
 const preview = ref<WriteResult | null>(null)
 const previewClean = ref(false)
+const previewIssues = ref<string[]>([])
 
 // ── Schema-driven properties ──────────────────────────────────────────────────
 
@@ -57,6 +58,12 @@ watch(artifactType, (newType) => {
       schemaRequired.value = new Set()
       formError.value = readErrorMessage(error)
     })
+})
+
+watch(name, () => {
+  // Reset preview state when name changes - forces user to re-preview
+  preview.value = null
+  previewClean.value = false
 })
 
 // ── Property rows ─────────────────────────────────────────────────────────────
@@ -96,11 +103,15 @@ const doPreview = () => {
   formError.value = null
   preview.value = null
   previewClean.value = false
+  previewIssues.value = []
   void Effect.runPromise(svc.createEntity(buildBody(true)))
     .then((result) => {
       busy.value = false
       preview.value = result
       previewClean.value = !hasVerificationErrors(result.verification)
+      if (!previewClean.value) {
+        previewIssues.value = collectVerificationIssues(result.verification)
+      }
     })
     .catch((error: unknown) => {
       busy.value = false
@@ -316,23 +327,18 @@ const doCreate = () => {
         </div>
 
         <div
-          v-if="preview.warnings.length"
-          class="preview-warnings"
-        >
-          <div
-            v-for="w in preview.warnings"
-            :key="w"
-            class="preview-warn"
-          >
-            {{ w }}
-          </div>
-        </div>
-
-        <div
           v-if="!previewClean"
           class="state-msg state-msg--error"
         >
-          Verification issues found — fix them before creating.
+          <strong>Verification issues found:</strong>
+          <ul style="margin-top: 4px; font-size: 12px; margin-bottom: 0; padding-left: 18px;">
+            <li
+              v-for="issue in previewIssues"
+              :key="issue"
+            >
+              {{ issue }}
+            </li>
+          </ul>
         </div>
         <div
           v-else
@@ -428,8 +434,6 @@ const doCreate = () => {
 .preview-meta { font-size: 12px; color: #6b7280; margin-bottom: 8px; display: flex; flex-direction: column; gap: 2px; }
 .preview-path { color: #9ca3af; }
 .mono { font-family: monospace; }
-.preview-warnings { margin-bottom: 8px; }
-.preview-warn { font-size: 12px; color: #b45309; }
 .preview-content {
   font-size: 11px; color: #374151; white-space: pre-wrap; max-height: 400px; overflow-y: auto;
   font-family: monospace; margin-top: 12px; background: #f9fafb; border-radius: 6px; padding: 10px;

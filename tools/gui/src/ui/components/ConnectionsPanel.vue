@@ -197,6 +197,11 @@ const descInput = ref('')
 const srcCardInput = ref('')
 const tgtCardInput = ref('')
 
+const CARDINALITY_RE = /^\d+$|^\d+\.\.\d+$|^\d+\.\.\*$|^\*$/
+const cardError = (v: string) => v.trim() && !CARDINALITY_RE.test(v.trim()) ? 'Use: n, n..m, n..*, or *' : ''
+const srcCardError = computed(() => cardError(srcCardInput.value))
+const tgtCardError = computed(() => cardError(tgtCardInput.value))
+
 const pairQuery = useQuery<OntologyPair, RepoError>()
 const addMutation = useMutation<WriteResult, RepoError>()
 
@@ -363,9 +368,7 @@ const confirmRemove = () => {
                 <span
                   v-if="c.src_cardinality || c.tgt_cardinality"
                   class="conn-card-badge"
-                >
-                  {{ c.src_cardinality || '·' }}..{{ c.tgt_cardinality || '·' }}
-                </span>
+                >{{ c.src_cardinality ? `[${c.src_cardinality}]` : '' }}→{{ c.tgt_cardinality ? `[${c.tgt_cardinality}]` : '' }}</span>
                 <RouterLink
                   :to="{ path: '/entity', query: { id: otherEnd(c) } }"
                   class="conn-target"
@@ -505,22 +508,30 @@ const confirmRemove = () => {
               >
             </div>
             <div class="add-row add-row--card">
-              <label class="card-label">src</label>
+              <label class="card-label">source</label>
               <input
                 v-model="srcCardInput"
                 class="card-input"
-                placeholder="e.g. 1"
-                maxlength="8"
+                :class="{ 'card-input--error': srcCardError }"
+                placeholder="e.g. 1..*"
+                maxlength="20"
               >
               <span class="card-sep">→</span>
-              <label class="card-label">tgt</label>
+              <label class="card-label">target</label>
               <input
                 v-model="tgtCardInput"
                 class="card-input"
-                placeholder="e.g. *"
-                maxlength="8"
+                :class="{ 'card-input--error': tgtCardError }"
+                placeholder="e.g. 0..*"
+                maxlength="20"
               >
-              <span class="card-hint">cardinality (optional)</span>
+              <span class="card-hint">cardinality range, e.g. 1, 0..1, 1..*, * (optional)</span>
+            </div>
+            <div
+              v-if="srcCardError || tgtCardError"
+              class="state-msg state-msg--error"
+            >
+              {{ srcCardError || tgtCardError }}
             </div>
             <div class="add-actions">
               <button
@@ -531,7 +542,7 @@ const confirmRemove = () => {
               </button>
               <button
                 class="add-confirm-btn"
-                :disabled="!selectedTarget || !connTypeSelected || addMutation.running.value"
+                :disabled="!selectedTarget || !connTypeSelected || !!srcCardError || !!tgtCardError || addMutation.running.value"
                 @click="confirmAdd"
               >
                 Add

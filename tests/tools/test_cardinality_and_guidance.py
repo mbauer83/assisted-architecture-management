@@ -359,6 +359,113 @@ class TestAddConnectionWithCardinality:
 
 
 # ===========================================================================
+# Feature i (extended): API body cardinality validation (Pydantic)
+# ===========================================================================
+
+class TestConnectionBodyCardinality:
+    """Pydantic-level validation of cardinality fields on Add/Edit request bodies."""
+
+    def test_add_body_accepts_valid_formats(self) -> None:
+        from src.infrastructure.gui.routers.connections import AddConnectionBody
+
+        for card in ["1", "0", "0..1", "1..5", "100..200", "*", "1..*", "0..*"]:
+            body = AddConnectionBody(
+                source_entity="A",
+                connection_type="archimate-realization",
+                target_entity="B",
+                src_cardinality=card,
+            )
+            assert body.src_cardinality == card
+
+            body = AddConnectionBody(
+                source_entity="A",
+                connection_type="archimate-realization",
+                target_entity="B",
+                tgt_cardinality=card,
+            )
+            assert body.tgt_cardinality == card
+
+    def test_add_body_rejects_invalid_formats(self) -> None:
+        from pydantic import ValidationError
+
+        from src.infrastructure.gui.routers.connections import AddConnectionBody
+
+        for bad in ["1:n", "many", "1-5", "n", "one", "1..n", "*..1", "1..2..3"]:
+            with pytest.raises(ValidationError, match="Invalid cardinality"):
+                AddConnectionBody(
+                    source_entity="A",
+                    connection_type="archimate-realization",
+                    target_entity="B",
+                    src_cardinality=bad,
+                )
+            with pytest.raises(ValidationError, match="Invalid cardinality"):
+                AddConnectionBody(
+                    source_entity="A",
+                    connection_type="archimate-realization",
+                    target_entity="B",
+                    tgt_cardinality=bad,
+                )
+
+    def test_add_body_accepts_none(self) -> None:
+        from src.infrastructure.gui.routers.connections import AddConnectionBody
+
+        body = AddConnectionBody(
+            source_entity="A",
+            connection_type="archimate-realization",
+            target_entity="B",
+        )
+        assert body.src_cardinality is None
+        assert body.tgt_cardinality is None
+
+    def test_edit_body_accepts_valid_formats(self) -> None:
+        from src.infrastructure.gui.routers.connections import EditConnectionBody
+
+        body = EditConnectionBody(
+            source_entity="A",
+            connection_type="archimate-realization",
+            target_entity="B",
+            src_cardinality="1..*",
+            tgt_cardinality="0..1",
+        )
+        assert body.src_cardinality == "1..*"
+        assert body.tgt_cardinality == "0..1"
+
+    def test_edit_body_rejects_invalid_formats(self) -> None:
+        from pydantic import ValidationError
+
+        from src.infrastructure.gui.routers.connections import EditConnectionBody
+
+        with pytest.raises(ValidationError, match="Invalid cardinality"):
+            EditConnectionBody(
+                source_entity="A",
+                connection_type="archimate-realization",
+                target_entity="B",
+                src_cardinality="1:n",
+            )
+        with pytest.raises(ValidationError, match="Invalid cardinality"):
+            EditConnectionBody(
+                source_entity="A",
+                connection_type="archimate-realization",
+                target_entity="B",
+                tgt_cardinality="many",
+            )
+
+    def test_edit_body_accepts_none_to_clear(self) -> None:
+        """None is valid for edit — it signals 'remove this cardinality'."""
+        from src.infrastructure.gui.routers.connections import EditConnectionBody
+
+        body = EditConnectionBody(
+            source_entity="A",
+            connection_type="archimate-realization",
+            target_entity="B",
+            src_cardinality=None,
+            tgt_cardinality=None,
+        )
+        assert body.src_cardinality is None
+        assert body.tgt_cardinality is None
+
+
+# ===========================================================================
 # Feature ii: element_category removed from EntityTypeInfo
 # ===========================================================================
 

@@ -20,3 +20,21 @@ Rel_Association(B, C, "")
 
     assert ("A", "B") in pairs
     assert ("B", "C") in pairs
+
+
+def test_parse_explicit_connection_pairs_handles_cardinality_labels() -> None:
+    """Cardinality labels in macro calls must not affect connection pair extraction."""
+    puml = """\
+@startuml test
+rectangle "A" as A
+rectangle "B" as B
+rectangle "C" as C
+Rel_Realization_Up(A, B, "[1 -> 0..*]")
+Rel_Association(B, C, "[1 ->]")
+@enduml
+"""
+
+    pairs = _parse_explicit_connection_pairs(puml)
+
+    assert ("A", "B") in pairs
+    assert ("B", "C") in pairs

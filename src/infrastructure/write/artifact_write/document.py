@@ -8,6 +8,7 @@ from src.application.modeling.artifact_write import generate_entity_id
 from src.application.verification.artifact_verifier import ArtifactVerifier
 from src.config.repo_paths import DOCS
 
+from ._artifact_deduplication import extract_friendly_slug, get_repository, validate_document_unique
 from .boundary import assert_engagement_write_root, today_iso
 from .coerce import as_optional_str_list
 from .types import WriteResult
@@ -114,6 +115,32 @@ def create_document(
     doc_id = artifact_id or _generate_document_id(abbreviation, title)
     doc_dir = _doc_dir(repo_root, doc_subdirectory)
     path = doc_dir / f"{doc_id}.md"
+
+    friendly_slug = extract_friendly_slug(doc_id)
+    repo = get_repository(repo_root)
+    try:
+        validate_document_unique(repo, doc_type, friendly_slug)
+    except ValueError as e:
+        # Report validation error in preview/dry_run
+        error_msg = str(e)
+        return WriteResult(
+            wrote=False,
+            path=path,
+            artifact_id=doc_id,
+            content=None,
+            warnings=[],
+            verification={
+                "valid": False,
+                "issues": [
+                    {
+                        "severity": "error",
+                        "code": "duplicate_artifact",
+                        "message": error_msg,
+                        "location": None,
+                    }
+                ],
+            },
+        )
 
     actual_body = body or _build_placeholder_body(required_sections)
     content = _format_document_markdown(

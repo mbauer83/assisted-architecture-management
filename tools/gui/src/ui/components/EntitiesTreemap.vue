@@ -125,17 +125,19 @@ const groups = computed(() =>
 )
 
 const leaves = computed(() =>
-  (layout.value.leaves() as HierarchyRectangularNode<TreeLeaf>[]).map(leaf => ({
-    key: leaf.data.entity.artifact_id,
-    entity: leaf.data.entity,
-    value: leaf.data.value,
-    color: leaf.data.color,
-    x: leaf.x0,
-    y: leaf.y0,
-    width: leaf.x1 - leaf.x0,
-    height: leaf.y1 - leaf.y0,
-    ...leafVisuals(leaf),
-  })),
+  (layout.value.leaves() as HierarchyRectangularNode<TreeLeaf>[])
+    .filter(leaf => leaf.data.entity != null)
+    .map(leaf => ({
+      key: leaf.data.entity.artifact_id,
+      entity: leaf.data.entity,
+      value: leaf.data.value,
+      color: leaf.data.color,
+      x: leaf.x0,
+      y: leaf.y0,
+      width: leaf.x1 - leaf.x0,
+      height: leaf.y1 - leaf.y0,
+      ...leafVisuals(leaf),
+    })),
 )
 
 const clampZoom = (next: number) => Math.min(12, Math.max(1, next))

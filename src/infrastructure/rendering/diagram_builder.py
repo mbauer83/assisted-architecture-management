@@ -22,6 +22,7 @@ from src.application.artifact_parsing import normalize_puml_alias
 from src.config.repo_paths import DIAGRAM_CATALOG, DIAGRAMS
 from src.domain.archimate_relation_rendering import (
     display_connection_label,
+    format_cardinality_label,
     render_archimate_relation,
 )
 from src.domain.artifact_types import ConnectionRecord, EntityRecord
@@ -271,8 +272,9 @@ def generate_archimate_puml_body(
                 tgt_group = group_index_by_alias.get(tgt)
                 if src_group is not None and tgt_group is not None and src_group != tgt_group:
                     direction = "down" if src_group < tgt_group else "up"
+            card_label = format_cardinality_label(conn.src_cardinality, conn.tgt_cardinality)
             macro_line = render_archimate_relation(
-                src, tgt, conn.conn_type, direction=direction, label_text=""
+                src, tgt, conn.conn_type, direction=direction, label_text=card_label
             )
             if macro_line is not None:
                 conn_lines.append(macro_line)
@@ -280,9 +282,10 @@ def generate_archimate_puml_body(
             arrow = ct.puml_arrow if ct else "-->"
             if direction:
                 arrow = _insert_arrow_direction(arrow, direction)
-            conn_lines.append(
-                f"{src} {arrow} {tgt} : <<{display_connection_label(conn.conn_type)}>>"
-            )
+            conn_label = f"<<{display_connection_label(conn.conn_type)}>>"
+            if card_label:
+                conn_label = f"{conn_label} {card_label}"
+            conn_lines.append(f"{src} {arrow} {tgt} : {conn_label}")
     if conn_lines:
         lines.append("' Connections")
         lines.extend(conn_lines)

@@ -1,9 +1,10 @@
 <script setup lang="ts">
-import { inject, ref, computed, onMounted } from 'vue'
+import { inject, ref, computed, onMounted, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { Effect } from 'effect'
 import { modelServiceKey } from '../keys'
 import type { EntityDisplayInfo, EntityContextConnection, DiagramPreviewResult } from '../../domain'
+import { hasVerificationErrors, collectVerificationIssues } from '../lib/errors'
 import EntitySelectionList from '../components/EntitySelectionList.vue'
 import EntityPickerInput from '../components/EntityPickerInput.vue'
 
@@ -149,14 +150,22 @@ const toggleConnection = (id: string) => {
   includedConnIds.value = next
 }
 
+watch(name, () => {
+  preview.value = null
+  previewClean.value = false
+})
+
 const preview = ref<DiagramPreviewResult | null>(null)
 const previewBusy = ref(false)
 const previewError = ref<string | null>(null)
+const previewClean = ref(false)
+const previewIssues = ref<string[]>([])
 const showPuml = ref(false)
 
 const doPreview = () => {
   previewBusy.value = true
   previewError.value = null
+  previewIssues.value = []
   void Effect.runPromise(
     svc.previewDiagram({
       diagram_type: diagramType.value,
@@ -165,7 +174,14 @@ const doPreview = () => {
       connection_ids: [...includedConnIds.value],
     }),
   )
-    .then((r) => { preview.value = r; previewBusy.value = false })
+    .then((r) => {
+      preview.value = r
+      previewClean.value = !hasVerificationErrors(r.verification)
+      if (!previewClean.value) {
+        previewIssues.value = collectVerificationIssues(r.verification)
+      }
+      previewBusy.value = false
+    })
     .catch((e) => { previewError.value = String(e); previewBusy.value = false })
 }
 
@@ -283,8 +299,8 @@ onMounted(() => { void refreshDiscovery() })
           </button>
           <button
             class="btn-create"
-            :disabled="createBusy || !preview"
-            :title="!preview ? 'Run Preview first' : ''"
+            :disabled="createBusy || !previewClean"
+            :title="!previewClean ? 'Run preview first to enable create' : ''"
             @click="doCreate"
           >
             {{ createBusy ? 'Creating…' : 'Create Diagram' }}
@@ -314,11 +330,24 @@ onMounted(() => { void refreshDiscovery() })
 
         <template v-if="preview">
           <div
-            v-for="w in preview.warnings"
-            :key="w"
-            class="warn"
+            v-if="!previewClean"
+            class="state-err"
           >
-            {{ w }}
+            <strong>Verification issues found:</strong>
+            <ul style="margin-top: 4px; font-size: 12px; margin-bottom: 0; padding-left: 18px;">
+              <li
+                v-for="issue in previewIssues"
+                :key="issue"
+              >
+                {{ issue }}
+              </li>
+            </ul>
+          </div>
+          <div
+            v-else
+            class="state-msg"
+          >
+            Verification passed.
           </div>
           <img
             v-if="preview.image"

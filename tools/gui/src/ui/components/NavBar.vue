@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { RouterLink, useRouter } from 'vue-router'
-import { inject, ref } from 'vue'
+import { RouterLink, useRoute, useRouter } from 'vue-router'
+import { computed, inject, ref } from 'vue'
 import { Effect } from 'effect'
 import { modelServiceKey } from '../keys'
 import ArchimateTypeGlyph from './ArchimateTypeGlyph.vue'
@@ -19,7 +19,17 @@ defineProps<{
 const emit = defineEmits<{ openSaveDialog: [mode: SaveMode] }>()
 
 const svc = inject(modelServiceKey)!
+const route = useRoute()
 const router = useRouter()
+
+const browseTo = computed(() => {
+  const q: Record<string, string> = {}
+  const { domain, view, type } = route.query
+  if (domain) q.domain = domain as string
+  if (view) q.view = view as string
+  if (type) q.type = type as string
+  return Object.keys(q).length ? { path: '/entities', query: q } : '/entities'
+})
 
 const searchQuery = ref('')
 type SearchDropdownHit = SearchHit | {
@@ -114,7 +124,7 @@ const hitTypeLabel = (hit: SearchDropdownHit) => (hit.artifact_type || hit.recor
           >
             ● Save
           </button>
-          <RouterLink to="/entities">
+          <RouterLink :to="browseTo">
             Browse
           </RouterLink>
           <RouterLink to="/documents">

@@ -14,6 +14,7 @@ from src.application.verification.artifact_verifier_syntax import find_plantuml_
 from src.config.repo_paths import DIAGRAM_CATALOG, DIAGRAMS, RENDERED
 from src.config.settings import plantuml_limit_size, render_dpi
 
+from ._artifact_deduplication import extract_friendly_slug, get_repository, validate_diagram_unique
 from .boundary import assert_engagement_write_root
 from .types import WriteResult
 from .verify import verify_content_in_temp_path
@@ -259,6 +260,32 @@ def create_diagram(
     )
 
     path = repo_root / DIAGRAM_CATALOG / DIAGRAMS / f"{effective_id}.puml"
+
+    friendly_slug = extract_friendly_slug(effective_id)
+    repo = get_repository(repo_root)
+    try:
+        validate_diagram_unique(repo, diagram_type, friendly_slug)
+    except ValueError as e:
+        # Report validation error in preview/dry_run
+        error_msg = str(e)
+        return WriteResult(
+            wrote=False,
+            path=path,
+            artifact_id=effective_id,
+            content=None,
+            warnings=[error_msg],
+            verification={
+                "valid": False,
+                "issues": [
+                    {
+                        "severity": "error",
+                        "code": "duplicate_artifact",
+                        "message": error_msg,
+                        "location": None,
+                    }
+                ],
+            },
+        )
 
     if dry_run:
         res = verify_content_in_temp_path(

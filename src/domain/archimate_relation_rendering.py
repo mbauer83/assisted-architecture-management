@@ -14,6 +14,19 @@ def display_connection_label(conn_type: str) -> str:
     return conn_type.removeprefix("archimate-")
 
 
+def format_cardinality_label(src_cardinality: str, tgt_cardinality: str) -> str:
+    """Return a compact cardinality label for a connection, or '' when neither end is set."""
+    has_src = bool(src_cardinality)
+    has_tgt = bool(tgt_cardinality)
+    if has_src and has_tgt:
+        return f"{src_cardinality} -> {tgt_cardinality}"
+    if has_src:
+        return f"{src_cardinality} ->"
+    if has_tgt:
+        return f"-> {tgt_cardinality}"
+    return ""
+
+
 def render_archimate_relation(
     source_alias: str,
     target_alias: str,

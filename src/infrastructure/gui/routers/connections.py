@@ -2,12 +2,22 @@
 
 from __future__ import annotations
 
+import re
 from typing import Any, Literal
 
 from fastapi import APIRouter, HTTPException
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
 
 from src.infrastructure.gui.routers import state as s
+
+# Accepted cardinality formats: n  |  n..m  |  n..*  |  *
+_CARDINALITY_RE = re.compile(r"^\d+$|^\d+\.\.\d+$|^\d+\.\.\*$|^\*$")
+
+
+def _check_cardinality(v: str | None) -> str | None:
+    if v is not None and v != "" and not _CARDINALITY_RE.match(v):
+        raise ValueError(f"Invalid cardinality '{v}': accepted forms are n, n..m, n..*, or *")
+    return v
 
 router = APIRouter()
 
@@ -135,6 +145,11 @@ class AddConnectionBody(BaseModel):
     tgt_cardinality: str | None = None
     dry_run: bool = True
 
+    @field_validator("src_cardinality", "tgt_cardinality")
+    @classmethod
+    def validate_cardinality(cls, v: str | None) -> str | None:
+        return _check_cardinality(v)
+
 
 class RemoveConnectionBody(BaseModel):
     source_entity: str
@@ -260,6 +275,11 @@ class EditConnectionBody(BaseModel):
     src_cardinality: str | None = None
     tgt_cardinality: str | None = None
     dry_run: bool = True
+
+    @field_validator("src_cardinality", "tgt_cardinality")
+    @classmethod
+    def validate_cardinality(cls, v: str | None) -> str | None:
+        return _check_cardinality(v)
 
 
 class ConnectionAssociateBody(BaseModel):

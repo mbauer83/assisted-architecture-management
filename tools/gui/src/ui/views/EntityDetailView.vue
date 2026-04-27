@@ -28,6 +28,19 @@ const route = useRoute()
 
 const entityId = computed(() => (route.query.id as string | undefined) ?? '')
 
+const browseQuery = computed(() => {
+  const q: Record<string, string> = {}
+  const { domain, view, type } = route.query
+  if (domain) q.domain = domain as string
+  if (view) q.view = view as string
+  if (type) q.type = type as string
+  return q
+})
+const backTo = computed(() => ({
+  path: detail.value?.is_global ? '/global/entities' : '/entities',
+  query: browseQuery.value,
+}))
+
 const context = useQuery<EntityContext, RepoError | NotFoundError | MarkdownError>()
 const detail = computed(() => context.data.value?.entity ?? null)
 const outgoing = computed(() => context.data.value?.connections.outbound ?? [])
@@ -142,7 +155,7 @@ const saveEdit = () => {
       editing.value = false
       editPreview.value = null
       if (r.artifact_id && r.artifact_id !== entityId.value) {
-        void router.replace({ path: '/entity', query: { id: r.artifact_id } })
+        void router.replace({ path: '/entity', query: { id: r.artifact_id, ...browseQuery.value } })
       } else {
         load()
       }
@@ -183,7 +196,7 @@ const executeDelete = () => {
   void Effect.runPromise(deleteFn.value({ artifact_id: entityId.value, dry_run: false })).then((r: WriteResult) => {
     deleteBusy.value = false
     if (r.wrote) {
-      void router.push(detail.value?.is_global ? '/global/entities' : '/entities')
+      void router.push(backTo.value)
     } else {
       deleteError.value = r.content ?? 'Delete failed'
     }
@@ -221,7 +234,7 @@ const insertReference = (markdownLink: string) => {
   <div>
     <div class="top-bar">
       <RouterLink
-        :to="detail?.is_global ? '/global/entities' : '/entities'"
+        :to="backTo"
         class="back-link"
       >
         ← Browse entities

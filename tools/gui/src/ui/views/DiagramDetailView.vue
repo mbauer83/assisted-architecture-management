@@ -38,7 +38,10 @@ const diagramConnections = computed(() => contextQuery.data.value?.connections ?
 
 const svgHtml = computed(() =>
   svgQuery.data.value
-    ? DOMPurify.sanitize(svgQuery.data.value, { USE_PROFILES: { svg: true, svgFilters: true } })
+    ? DOMPurify.sanitize(svgQuery.data.value, {
+        USE_PROFILES: { svg: true, svgFilters: true },
+        ADD_ATTR: ['data-entity', 'data-entity-1', 'data-entity-2'],
+      })
     : null
 )
 
@@ -109,7 +112,7 @@ const addConnectionHitAreas = (group: SVGGElement) => {
     hit.setAttribute('stroke-width', String(hitWidth))
     hit.setAttribute('pointer-events', 'stroke')
     hit.setAttribute('vector-effect', 'non-scaling-stroke')
-    group.insertBefore(hit, group.firstChild)
+    group.appendChild(hit)
   }
 }
 
@@ -128,7 +131,10 @@ const attachInteractivity = async () => {
 
   const aliasToId = new Map<string, string>()
   for (const e of diagramEntities.value) {
-    if (e.display_alias) aliasToId.set(e.display_alias, e.artifact_id)
+    if (e.display_alias) {
+      aliasToId.set(e.display_alias, e.artifact_id)
+      aliasToId.set(e.display_alias.replace(/[^a-zA-Z0-9_]/g, '_'), e.artifact_id)
+    }
   }
   if (!aliasToId.size) return
 
@@ -163,6 +169,15 @@ const attachInteractivity = async () => {
     aliasToConnFallback.set(forwardKey, conn)
     if (!aliasToConnFallback.has(reverseKey)) aliasToConnFallback.set(reverseKey, conn)
   }
+
+  const attachConnGroup = (g: SVGGElement, conn: DiagramConnection) => {
+    if (g.hasAttribute('data-conn-id')) return
+    addConnectionHitAreas(g)
+    g.setAttribute('data-conn-id', conn.artifact_id)
+    g.addEventListener('click', (ev) => { ev.stopPropagation(); selectConnection(conn, g) }, { signal })
+  }
+
+  // Primary: attribute-based (works when DOMPurify preserves data-entity-1/2)
   for (const g of Array.from(svgEl.querySelectorAll<SVGGElement>('g[data-entity-1]'))) {
     const a1 = g.getAttribute('data-entity-1') ?? ''
     const a2 = g.getAttribute('data-entity-2') ?? ''
@@ -173,9 +188,16 @@ const attachInteractivity = async () => {
       ?? aliasToConnFallback.get(forwardKey)
       ?? aliasToConnFallback.get(reverseKey)
     if (!conn) continue
-    addConnectionHitAreas(g)
-    g.setAttribute('data-conn-id', conn.artifact_id)
-    g.addEventListener('click', (ev) => { ev.stopPropagation(); selectConnection(conn, g) }, { signal })
+    attachConnGroup(g, conn)
+  }
+
+  // Fallback: id-based lookup via PlantUML's link_SOURCE_TARGET convention
+  for (const conn of diagramConnections.value) {
+    if (!conn.source_alias || !conn.target_alias) continue
+    const fwdId = `link_${conn.source_alias}_${conn.target_alias}`
+    const revId = `link_${conn.target_alias}_${conn.source_alias}`
+    const g = (svgEl.getElementById(fwdId) ?? svgEl.getElementById(revId)) as SVGGElement | null
+    if (g) attachConnGroup(g, conn)
   }
 }
 

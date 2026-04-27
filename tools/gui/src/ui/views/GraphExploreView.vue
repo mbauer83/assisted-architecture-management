@@ -22,7 +22,7 @@ const selectedDetail = useQuery<EntityDetail, RepoError | NotFoundError | Markdo
 
 const {
   nodes, edges, options, layoutMode,
-  addNode, addEdge, markExpanded, collapseNode, restart,
+  addNode, addEdge, markExpanded, collapseNode, spreadAroundParent, restart,
   applyClusterLayout, applyForceLayout,
 } = useForceGraph(() => svgWidth.value, () => svgHeight.value)
 
@@ -85,9 +85,17 @@ const expandNode = (entityId: string) => {
       const otherId = c.source === entityId ? c.target : c.source
       const isNew = !beforeIds.has(otherId)
       addNode({ id: otherId, label: friendlyName(otherId), type: otherId.split('@')[0], addedBy: isNew ? entityId : undefined })
-      addEdge({ source: c.source, target: c.target, connType: c.conn_type, description: c.content_text })
+      addEdge({
+          source: c.source,
+          target: c.target,
+          connType: c.conn_type,
+          description: c.content_text,
+          srcCardinality: c.src_cardinality || undefined,
+          tgtCardinality: c.tgt_cardinality || undefined,
+        })
     }
     markExpanded(entityId)
+    spreadAroundParent(entityId)
     for (const n of nodes.value) {
       if (!n.domain) resolveNodeDomain(n)
     }
@@ -235,6 +243,24 @@ const edgePath = (e: typeof edges.value[number]) => {
   }
   return `M ${src.x} ${src.y} L ${tgt.x} ${tgt.y}`
 }
+
+const shownEdgeCount = (nodeId: string) =>
+  edges.value.filter((e) => e.source === nodeId || e.target === nodeId).length
+
+// Returns SVG coords for a cardinality label at `frac` (0=source, 1=target) along edge.
+// Offset 8px perpendicular-ish above the line for legibility.
+const edgeCardPos = (e: typeof edges.value[number], frac: number) => {
+  const src = nodes.value.find((n) => n.id === e.source)
+  const tgt = nodes.value.find((n) => n.id === e.target)
+  if (!src || !tgt) return { x: 0, y: 0 }
+  const dx = tgt.x - src.x
+  const dy = tgt.y - src.y
+  const len = Math.max(Math.sqrt(dx * dx + dy * dy), 1)
+  return {
+    x: src.x + dx * frac - (dy / len) * 8,
+    y: src.y + dy * frac + (dx / len) * 8,
+  }
+}
 </script>
 
 <template>
@@ -324,6 +350,36 @@ const edgePath = (e: typeof edges.value[number]) => {
             :class="{ 'edge-selected': selectedEdge === e }"
           />
         </g>
+        <!-- Cardinality labels (rendered above edges, below nodes) -->
+        <template
+          v-for="(e, i) in edges"
+          :key="'card'+i"
+        >
+          <text
+            v-if="e.srcCardinality"
+            :x="edgeCardPos(e, 0.2).x"
+            :y="edgeCardPos(e, 0.2).y"
+            text-anchor="middle"
+            font-size="8"
+            fill="#374151"
+            stroke="white"
+            stroke-width="3"
+            paint-order="stroke"
+            pointer-events="none"
+          >{{ e.srcCardinality }}</text>
+          <text
+            v-if="e.tgtCardinality"
+            :x="edgeCardPos(e, 0.8).x"
+            :y="edgeCardPos(e, 0.8).y"
+            text-anchor="middle"
+            font-size="8"
+            fill="#374151"
+            stroke="white"
+            stroke-width="3"
+            paint-order="stroke"
+            pointer-events="none"
+          >{{ e.tgtCardinality }}</text>
+        </template>
         <!-- Nodes -->
         <g
           v-for="n in nodes"
@@ -358,9 +414,9 @@ const edgePath = (e: typeof edges.value[number]) => {
           >
             {{ truncLabel(n.label) }}
           </text>
-          <!-- + badge: show if unexpanded AND (totalConns unknown OR > 0) -->
+          <!-- + badge: show if unexpanded AND there are connections not yet shown -->
           <circle
-            v-if="!n.expanded && (n.totalConns === undefined || n.totalConns > 0)"
+            v-if="!n.expanded && (n.totalConns === undefined || n.totalConns > shownEdgeCount(n.id))"
             cx="17"
             cy="-17"
             r="7"
@@ -370,7 +426,7 @@ const edgePath = (e: typeof edges.value[number]) => {
             cursor="pointer"
           />
           <text
-            v-if="!n.expanded && (n.totalConns === undefined || n.totalConns > 0)"
+            v-if="!n.expanded && (n.totalConns === undefined || n.totalConns > shownEdgeCount(n.id))"
             x="17"
             y="-14"
             text-anchor="middle"
@@ -398,6 +454,15 @@ const edgePath = (e: typeof edges.value[number]) => {
       <template v-else-if="selectedEdge">
         <div class="detail-field">
           <label>Connection type</label><span class="detail-value mono">{{ selectedEdge.connType }}</span>
+        </div>
+        <div
+          v-if="selectedEdge.srcCardinality || selectedEdge.tgtCardinality"
+          class="detail-field"
+        >
+          <label>Cardinality</label>
+          <span class="detail-value mono">
+            {{ selectedEdge.srcCardinality || '?' }} → {{ selectedEdge.tgtCardinality || '?' }}
+          </span>
         </div>
         <div class="detail-field">
           <label>Source</label>

@@ -23,7 +23,7 @@ _HIERARCHY_LABEL = {
 
 def hierarchy_meta(entities: list[EntityRecord], repo) -> dict[str, dict[str, object]]:
     entity_ids = {e.artifact_id for e in entities}
-    parent_by_child: dict[str, tuple[str, str]] = {}
+    parents_by_child: dict[str, list[tuple[str, str]]] = {}
     for conn in repo.list_connections_by_types(_HIERARCHY_TYPES):
         if conn.conn_type not in _HIERARCHY_PRIORITY:
             continue
@@ -35,49 +35,49 @@ def hierarchy_meta(entities: list[EntityRecord], repo) -> dict[str, dict[str, ob
             child_id = conn.target
         if child_id not in entity_ids or parent_id not in entity_ids:
             continue
-        prev = parent_by_child.get(child_id)
-        candidate = (parent_id, conn.conn_type)
-        if prev is None:
-            parent_by_child[child_id] = candidate
-            continue
-        prev_parent, prev_conn_type = prev
-        prev_key = (_HIERARCHY_PRIORITY[prev_conn_type], prev_parent)
-        next_key = (_HIERARCHY_PRIORITY[conn.conn_type], parent_id)
-        if next_key < prev_key:
-            parent_by_child[child_id] = candidate
+        if child_id not in parents_by_child:
+            parents_by_child[child_id] = []
+        parents_by_child[child_id].append((parent_id, conn.conn_type))
+
+    for child_id in parents_by_child:
+        parents_by_child[child_id].sort(key=lambda p: (_HIERARCHY_PRIORITY[p[1]], p[0]))
 
     depth_cache: dict[str, int] = {}
 
     def depth_for(entity_id: str, trail: set[str] | None = None) -> int:
         if entity_id in depth_cache:
             return depth_cache[entity_id]
-        parent = parent_by_child.get(entity_id)
-        if not parent:
+        parents = parents_by_child.get(entity_id, [])
+        if not parents:
             depth_cache[entity_id] = 0
             return 0
         trail = trail or set()
         if entity_id in trail:
             depth_cache[entity_id] = 0
             return 0
-        depth_cache[entity_id] = depth_for(parent[0], trail | {entity_id}) + 1
+        min_depth = min(depth_for(p[0], trail | {entity_id}) for p in parents)
+        depth_cache[entity_id] = min_depth + 1
         return depth_cache[entity_id]
 
-    return {
-        e.artifact_id: {
-            **(
-                {
-                    "parent_entity_id": parent_by_child[e.artifact_id][0],
-                    "hierarchy_relation_type": _HIERARCHY_LABEL[parent_by_child[e.artifact_id][1]],
-                    "parent_specialization_id": parent_by_child[e.artifact_id][0],
-                }
-                if e.artifact_id in parent_by_child
-                else {}
-            ),
+    result: dict[str, dict[str, object]] = {}
+    for e in entities:
+        parents = parents_by_child.get(e.artifact_id, [])
+        primary = parents[0] if parents else None
+        meta: dict[str, object] = {
             "hierarchy_depth": depth_for(e.artifact_id),
             "specialization_depth": depth_for(e.artifact_id),
+            "all_parents": [
+                {"parent_id": pid, "relation_type": _HIERARCHY_LABEL[ct]}
+                for pid, ct in parents
+            ],
         }
-        for e in entities
-    }
+        if primary:
+            pid, ct = primary
+            meta["parent_entity_id"] = pid
+            meta["parent_specialization_id"] = pid
+            meta["hierarchy_relation_type"] = _HIERARCHY_LABEL[ct]
+        result[e.artifact_id] = meta
+    return result
 
 
 def build_entity_summary_rows(

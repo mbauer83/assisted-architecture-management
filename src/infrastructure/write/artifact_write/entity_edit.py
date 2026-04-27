@@ -8,6 +8,7 @@ from src.application.verification.artifact_verifier import ArtifactRegistry, Art
 from src.config.repo_paths import MODEL
 from src.infrastructure.rendering.generate_macros import generate_macros
 
+from ._artifact_deduplication import get_repository, validate_entity_unique
 from .boundary import assert_engagement_write_root, today_iso
 from .coerce import as_optional_str, as_optional_str_dict, as_optional_str_list
 from .entity import verification_to_entity_dict
@@ -109,6 +110,8 @@ def edit_entity(
             target_entity_file = entity_file.with_name(f"{effective_artifact_id}.md")
             if target_entity_file.exists() and target_entity_file != entity_file:
                 raise ValueError(f"Target entity file already exists: {target_entity_file.name}")
+            repo = get_repository(repo_root)
+            validate_entity_unique(repo, artifact_type, next_slug, exclude_artifact_id=artifact_id)
 
     # Update display block — keep existing, update label if name changed
     display = dict(parsed.display_archimate)
