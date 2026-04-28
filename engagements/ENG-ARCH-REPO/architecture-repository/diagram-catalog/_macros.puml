@@ -156,9 +156,6 @@
 !procedure $DECL_REQ_NkMp_0()
   rectangle "<$archimate_Requirement{scale=1.5}> PlantUML Diagrams" <<Requirement>> as REQ_NkMp_0
 !endprocedure
-!procedure $DECL_REQ_OCTQ9j()
-  rectangle "<$archimate_Requirement{scale=1.5}> Strictly Formatted Cross-References" <<Requirement>> as REQ_OCTQ9j
-!endprocedure
 !procedure $DECL_REQ_O_Ppmp()
   rectangle "<$archimate_Requirement{scale=1.5}> Git Version Tracking" <<Requirement>> as REQ_O_Ppmp
 !endprocedure

@@ -88,7 +88,9 @@ def _build_app(git_ssh_passphrase: str | None = None):  # type: ignore[no-untype
         if repo is not None:
             await asyncio.to_thread(repo.refresh)
         from src.infrastructure.gui.routers.events import event_bus
+        from src.infrastructure.gui.routers.sync_status_cache import invalidate_sync_status_cache
 
+        invalidate_sync_status_cache(repo=repo_path)
         await event_bus.publish(
             {
                 "type": "sync_repository_updated",

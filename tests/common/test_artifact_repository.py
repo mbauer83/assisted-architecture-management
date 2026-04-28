@@ -248,8 +248,23 @@ class FakeStore:
         return {}
     def connection_counts_for(self, entity_id: str) -> tuple[int, int, int]:
         return (0, 0, 0)
+    def connection_counts_for_entities(
+        self, entity_ids: list[str] | set[str] | frozenset[str]
+    ) -> dict[str, tuple[int, int, int]]:
+        return {entity_id: (0, 0, 0) for entity_id in entity_ids}
     def list_connections_by_types(self, types: frozenset[str]) -> list[ConnectionRecord]:
         return [r for r in self._connections.values() if r.conn_type in types]
+    def list_connections_by_types_for_entities(
+        self,
+        types: frozenset[str],
+        entity_ids: list[str] | set[str] | frozenset[str],
+    ) -> list[ConnectionRecord]:
+        entity_set = set(entity_ids)
+        return [
+            r
+            for r in self._connections.values()
+            if r.conn_type in types and (r.source in entity_set or r.target in entity_set)
+        ]
     def find_connections_for(self, entity_id: str, *,
                               direction: Literal["any", "outbound", "inbound"] = "any",
                               conn_type: str | None = None) -> list[ConnectionRecord]:

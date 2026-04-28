@@ -24,7 +24,7 @@ _HIERARCHY_LABEL = {
 def hierarchy_meta(entities: list[EntityRecord], repo) -> dict[str, dict[str, object]]:
     entity_ids = {e.artifact_id for e in entities}
     parents_by_child: dict[str, list[tuple[str, str]]] = {}
-    for conn in repo.list_connections_by_types(_HIERARCHY_TYPES):
+    for conn in repo.list_connections_by_types_for_entities(_HIERARCHY_TYPES, entity_ids):
         if conn.conn_type not in _HIERARCHY_PRIORITY:
             continue
         if conn.conn_type == "archimate-specialization":
@@ -84,7 +84,7 @@ def build_entity_summary_rows(
     entities: list[EntityRecord],
     repo,
 ) -> list[dict[str, Any]]:
-    counts = s.build_conn_counts(repo)
+    counts = s.build_conn_counts_for_entities(repo, [entity.artifact_id for entity in entities])
     hierarchy = hierarchy_meta(entities, repo)
     items: list[dict[str, Any]] = []
     for entity in entities:

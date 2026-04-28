@@ -42,6 +42,7 @@ import { parseMarkdown } from '../../application/MarkdownService'
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 const REQUEST_TIMEOUT_MS = 10000
+let serverInfoPromise: Promise<unknown> | null = null
 
 const buildUrl = (
   path: string,
@@ -182,7 +183,24 @@ const deleteReq = <A, I>(
 // ── Factory ───────────────────────────────────────────────────────────────────
 
 export const makeHttpModelRepository = (): ModelRepository => ({
-  getServerInfo: () => fetchJson(buildUrl('/server-info', undefined, true), ServerInfoSchema),
+  getServerInfo: () => Effect.tryPromise({
+    try: async () => {
+      if (serverInfoPromise === null) {
+        serverInfoPromise = fetchWithTimeout(buildUrl('/server-info', undefined, true))
+          .then(async (resp) => {
+            if (!resp.ok) throw new NetworkError({ status: resp.status, message: resp.statusText })
+            return resp.json() as Promise<unknown>
+          })
+          .catch((e) => {
+            serverInfoPromise = null
+            throw e
+          })
+      }
+      return await serverInfoPromise
+    },
+    catch: (e) =>
+      e instanceof NetworkError ? e : new NetworkError({ status: 0, message: String(e) }),
+  }).pipe(Effect.flatMap(Schema.decodeUnknown(ServerInfoSchema))),
   getStats: () => fetchJson(buildUrl('/stats'), StatsSchema),
 
   listEntities: (params: ListParams = {}) =>

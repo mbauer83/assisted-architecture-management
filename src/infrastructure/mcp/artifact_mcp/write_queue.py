@@ -47,7 +47,9 @@ def _notify_gui_dirty() -> None:
         return
     try:
         from src.infrastructure.gui.routers.events import event_bus
+        from src.infrastructure.gui.routers.sync_status_cache import invalidate_sync_status_cache
 
+        invalidate_sync_status_cache()
         asyncio.run_coroutine_threadsafe(
             event_bus.publish({"type": "artifact_write_completed"}),
             _event_loop,
@@ -127,9 +129,10 @@ def queued(fn: _F) -> _F:
                     "Writes are temporarily blocked (sync in progress or read-only mode)"
                 )
 
-        loop = asyncio.get_running_loop()
         future = _submit(fn, *args, **kwargs)
-        return await asyncio.wrap_future(future, loop=loop)
+        while not future.done():
+            await asyncio.sleep(0.001)
+        return future.result()
 
     return wrapper  # type: ignore[return-value]
 
@@ -164,7 +167,7 @@ def shutdown(wait: bool = True) -> None:
     """Shut down the write queue executor (for testing / clean teardown)."""
     global _executor, _submitted_jobs, _completed_jobs, _active_jobs
     if _executor is not None:
-        _executor.shutdown(wait=wait)
+        _executor.shutdown(wait=wait, cancel_futures=True)
         _executor = None
     with _state_cond:
         _submitted_jobs = 0
@@ -174,4 +177,21 @@ def shutdown(wait: bool = True) -> None:
         _state_cond.notify_all()
 
 
-atexit.register(lambda: shutdown(wait=False))
+def _shutdown_atexit() -> None:
+    """Best-effort executor teardown during interpreter shutdown.
+
+    Avoid publishing queue-state events here; subscriber modules may already be
+    partially torn down, and tests explicitly exercise the full shutdown path.
+    """
+
+    global _executor
+    executor = _executor
+    _executor = None
+    if executor is not None:
+        try:
+            executor.shutdown(wait=False, cancel_futures=True)
+        except Exception:
+            pass
+
+
+atexit.register(_shutdown_atexit)

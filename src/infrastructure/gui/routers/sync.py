@@ -20,7 +20,7 @@ import asyncio
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
-from src.config.repo_paths import DIAGRAM_CATALOG, DOCS, MODEL
+from src.infrastructure.gui.routers import sync_status_cache
 
 router = APIRouter()
 
@@ -41,43 +41,8 @@ class WithdrawBody(BaseModel):
 
 @router.get("/api/sync/status")
 async def sync_status() -> dict:
-    """Return the current sync state for all configured repositories."""
-    from src.infrastructure.git import enterprise_git_ops, enterprise_sync_state
-    from src.infrastructure.gui.routers import state as s
-
-    out: dict = {"engagement": None, "enterprise": None}
-
-    eng_root = s.maybe_engagement_root()
-    if eng_root is not None:
-        dirty = await asyncio.to_thread(
-            enterprise_git_ops.has_uncommitted_changes,
-            eng_root,
-            MODEL,
-            DOCS,
-            DIAGRAM_CATALOG,
-        )
-        out["engagement"] = {"has_uncommitted_changes": dirty}
-
-    ent_root = s.maybe_enterprise_root()
-    if ent_root is not None:
-        sync_state = enterprise_sync_state.load(ent_root)
-        dirty = await asyncio.to_thread(enterprise_git_ops.has_uncommitted_changes, ent_root)
-        info: dict = {
-            "status": sync_state.status,
-            "label": _status_label(sync_state.status),
-            "branch": sync_state.branch,
-            "branch_tip": sync_state.branch_tip,
-            "pushed_at": sync_state.pushed_at,
-            "commits_behind": sync_state.commits_behind,
-            "has_uncommitted_changes": dirty,
-        }
-        if sync_state.is_accumulating():
-            info["commits_ahead"] = await asyncio.to_thread(
-                enterprise_git_ops.commits_ahead_of_main, ent_root
-            )
-        out["enterprise"] = info
-
-    return out
+    """Return the cached sync state for all configured repositories."""
+    return await sync_status_cache.get_sync_status()
 
 
 @router.get("/api/sync/changes")
@@ -128,6 +93,7 @@ async def save_engagement(body: SaveBody) -> dict:
         )
         if body.push:
             await asyncio.to_thread(enterprise_git_ops.push_engagement, eng_root)
+        sync_status_cache.invalidate_sync_status_cache(repo=eng_root)
         await event_bus.publish(
             {
                 "type": "sync_engagement_saved",
@@ -164,6 +130,7 @@ async def save_enterprise(body: SaveBody) -> dict:
             enterprise_git_ops.commit_enterprise_work, ent_root, body.message
         )
         sync_state = enterprise_sync_state.load(ent_root)
+        sync_status_cache.invalidate_sync_status_cache(repo=ent_root)
         await event_bus.publish(
             {
                 "type": "sync_enterprise_saved",
@@ -204,6 +171,7 @@ async def submit_enterprise() -> dict:
 
     try:
         branch = await asyncio.to_thread(enterprise_git_ops.push_enterprise_branch, ent_root)
+        sync_status_cache.invalidate_sync_status_cache(repo=ent_root)
         await event_bus.publish(
             {
                 "type": "sync_enterprise_submitted",
@@ -245,6 +213,7 @@ async def withdraw_enterprise(body: WithdrawBody) -> dict:
 
     try:
         branch = await asyncio.to_thread(enterprise_git_ops.abandon_enterprise_branch, ent_root)
+        sync_status_cache.invalidate_sync_status_cache(repo=ent_root)
         await event_bus.publish(
             {
                 "type": "sync_enterprise_withdrawn",

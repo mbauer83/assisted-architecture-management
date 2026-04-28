@@ -355,12 +355,34 @@ class ArtifactIndex:
         with self._lock:
             return _q.connection_stats_for(self._db.conn, entity_id)
 
+    def connection_counts_for_entities(
+        self, entity_ids: list[str] | set[str] | frozenset[str]
+    ) -> dict[str, tuple[int, int, int]]:
+        self._ensure_loaded()
+        with self._lock:
+            return _q.connection_stats_for_set(self._db.conn, frozenset(entity_ids))
+
     def list_connections_by_types(self, types: frozenset[str]) -> list[ConnectionRecord]:
         self._ensure_loaded()
         with self._lock:
             return [
                 r
                 for cid in _q.connection_ids_by_types(self._db.conn, types)
+                if (r := self._mem.connections.get(cid)) is not None
+            ]
+
+    def list_connections_by_types_for_entities(
+        self,
+        types: frozenset[str],
+        entity_ids: list[str] | set[str] | frozenset[str],
+    ) -> list[ConnectionRecord]:
+        self._ensure_loaded()
+        with self._lock:
+            return [
+                r
+                for cid in _q.connection_ids_by_types_for_entity_set(
+                    self._db.conn, types, frozenset(entity_ids)
+                )
                 if (r := self._mem.connections.get(cid)) is not None
             ]
 

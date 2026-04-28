@@ -7,6 +7,7 @@ from typing import Any, Literal
 from fastapi import APIRouter, HTTPException, Query
 from fastapi.responses import FileResponse, Response
 
+from src.application.artifact_parsing import parse_diagram_source
 from src.config.repo_paths import DIAGRAM_CATALOG, DIAGRAMS, RENDERED
 from src.domain.artifact_types import DiagramRecord, EntityRecord
 from src.infrastructure.gui.routers import state as s
@@ -57,31 +58,32 @@ def read_diagram(id: str) -> dict[str, Any]:
     if diag_rec:
         result["rendered_filename"] = _rendered_name(diag_rec, ".png")
         result["is_global"] = s.is_global(diag_rec.path)
-        from src.infrastructure.write.artifact_write.parse_existing import parse_diagram_file
-
-        parsed = parse_diagram_file(diag_rec.path)
-        entity_ids_used = parsed.frontmatter.get("entity-ids-used")
-        connection_ids_used = parsed.frontmatter.get("connection-ids-used")
+        parsed = parse_diagram_source(str(result.get("puml_source", "")))
+        frontmatter = parsed["frontmatter"]
+        entity_ids_used = frontmatter.get("entity-ids-used")
+        connection_ids_used = frontmatter.get("connection-ids-used")
         if isinstance(entity_ids_used, list):
             result["entity_ids_used"] = [str(x) for x in entity_ids_used]
         if isinstance(connection_ids_used, list):
             result["connection_ids_used"] = [str(x) for x in connection_ids_used]
         if diag_rec.diagram_type == "matrix":
-            result["matrix_body"] = parsed.puml_body.strip()
+            result["matrix_body"] = str(parsed["puml_body"]).strip()
     return result
 
 
 @router.get("/api/matrix-config")
 def get_matrix_config(id: str) -> dict[str, Any]:
     """Return entity-ids, conn-type-configs, combined flag, and body for a matrix diagram."""
-    from src.infrastructure.write.artifact_write.parse_existing import parse_diagram_file
-
     repo = s.get_repo()
     diag_rec = repo.get_diagram(id)
     if diag_rec is None or diag_rec.diagram_type != "matrix":
         raise HTTPException(404, f"Matrix diagram not found: {id!r}")
-    parsed = parse_diagram_file(diag_rec.path)
-    fm = parsed.frontmatter
+    try:
+        puml_source = diag_rec.path.read_text(encoding="utf-8")
+    except OSError:
+        raise HTTPException(500, f"Failed to read matrix diagram: {id!r}")
+    parsed = parse_diagram_source(puml_source)
+    fm = parsed["frontmatter"]
     raw_eids = fm.get("entity-ids")
     entity_ids = [str(x) for x in raw_eids] if isinstance(raw_eids, list) else []
     raw_from = fm.get("from-entity-ids")
@@ -107,7 +109,7 @@ def get_matrix_config(id: str) -> dict[str, Any]:
         "to_entity_ids": to_entity_ids,
         "conn_type_configs": conn_type_configs,
         "combined": bool(fm.get("combined", False)),
-        "matrix_body": parsed.puml_body.strip(),
+        "matrix_body": str(parsed["puml_body"]).strip(),
     }
 
 

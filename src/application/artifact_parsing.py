@@ -1,5 +1,6 @@
 import re
 from pathlib import Path
+from typing import Any
 
 import yaml  # type: ignore[import-untyped]
 
@@ -53,6 +54,69 @@ def extract_display_blocks(content: str) -> dict[str, str]:
     for lang, body in zip(iterator, iterator):
         blocks[lang.strip()] = body.strip()
     return blocks
+
+
+def parse_entity_content_sections(content_section: str) -> dict[str, Any]:
+    """Extract summary, properties, and notes from an entity content section."""
+
+    def _extract_summary_text(text: str) -> str:
+        lines = text.strip().splitlines()
+        collecting = False
+        summary_lines: list[str] = []
+
+        for line in lines:
+            if line.startswith("## ") and not collecting:
+                collecting = True
+                continue
+            if collecting:
+                if line.startswith("## "):
+                    break
+                summary_lines.append(line)
+        return "\n".join(summary_lines).strip()
+
+    def _extract_properties_map(text: str) -> dict[str, str]:
+        props: dict[str, str] = {}
+        in_table = False
+        for line in text.splitlines():
+            stripped = line.strip()
+            if stripped == "## Properties":
+                in_table = True
+                continue
+            if in_table and stripped.startswith("## "):
+                break
+            if in_table and stripped.startswith("|") and "---" not in stripped:
+                cells = [c.strip() for c in stripped.split("|")[1:-1]]
+                if len(cells) >= 2 and cells[0] not in ("Attribute", "(none)"):
+                    props[cells[0]] = cells[1]
+        return props
+
+    def _extract_notes_text(text: str) -> str:
+        lines = text.splitlines()
+        in_notes = False
+        notes_lines: list[str] = []
+        for line in lines:
+            stripped = line.strip()
+            if stripped == "## Notes":
+                in_notes = True
+                continue
+            if in_notes:
+                if stripped.startswith("## "):
+                    break
+                notes_lines.append(line)
+        return "\n".join(notes_lines).strip()
+
+    return {
+        "summary": _extract_summary_text(content_section),
+        "properties": _extract_properties_map(content_section),
+        "notes": _extract_notes_text(content_section),
+    }
+
+
+def parse_diagram_source(content: str) -> dict[str, Any]:
+    """Extract frontmatter and body from diagram source text."""
+    frontmatter = extract_yaml_block(content) or {}
+    body = re.sub(r"^---\n.*?\n---\n", "", content, count=1, flags=re.DOTALL)
+    return {"frontmatter": frontmatter, "puml_body": body}
 
 
 def derive_domain(path: Path, root: Path) -> tuple[Domain, str]:

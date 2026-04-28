@@ -7,6 +7,7 @@ from typing import Any
 from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel
 
+from src.application.artifact_parsing import parse_entity_content_sections
 from src.application.read_models import EntityContextReadModel
 from src.infrastructure.gui.routers import state as s
 from src.infrastructure.gui.routers.entity_listing import build_entity_summary_rows
@@ -77,15 +78,10 @@ def read_entity(id: str) -> dict[str, Any]:
         raise HTTPException(404, f"Not found: {id!r}")
     entity_rec = repo.get_entity(id)
     if entity_rec is not None:
-        from src.infrastructure.write.artifact_write.parse_existing import parse_entity_file
-
-        try:
-            parsed = parse_entity_file(entity_rec.path)
-            result["summary"] = parsed.summary or ""
-            result["properties"] = parsed.properties
-            result["notes"] = parsed.notes or ""
-        except Exception:  # noqa: BLE001
-            pass
+        parsed = parse_entity_content_sections(entity_rec.content_text)
+        result["summary"] = parsed["summary"]
+        result["properties"] = parsed["properties"]
+        result["notes"] = parsed["notes"]
         inc, sym, out = repo.connection_counts_for(id)
         result["conn_in"] = inc
         result["conn_sym"] = sym
@@ -102,15 +98,10 @@ def read_entity_context(id: str) -> EntityContextReadModel:
         raise HTTPException(404, f"Not found: {id!r}")
     entity_rec = repo.get_entity(id)
     if entity_rec is not None:
-        from src.infrastructure.write.artifact_write.parse_existing import parse_entity_file
-
-        try:
-            parsed = parse_entity_file(entity_rec.path)
-            context["entity"]["summary"] = parsed.summary or ""
-            context["entity"]["properties"] = parsed.properties
-            context["entity"]["notes"] = parsed.notes or ""
-        except Exception:  # noqa: BLE001
-            pass
+        parsed = parse_entity_content_sections(entity_rec.content_text)
+        context["entity"]["summary"] = parsed["summary"]
+        context["entity"]["properties"] = parsed["properties"]
+        context["entity"]["notes"] = parsed["notes"]
         context["entity"]["is_global"] = s.is_global(entity_rec.path)
     return context
 

@@ -85,6 +85,25 @@ def connection_stats_for(conn: sqlite3.Connection, entity_id: str) -> tuple[int,
     return (int(row["conn_in"]), int(row["conn_sym"]), int(row["conn_out"]))
 
 
+def connection_stats_for_set(
+    conn: sqlite3.Connection, entity_ids: frozenset[str]
+) -> dict[str, tuple[int, int, int]]:
+    if not entity_ids:
+        return {}
+    placeholders = ",".join("?" * len(entity_ids))
+    rows = conn.execute(
+        (
+            "SELECT entity_id, conn_in, conn_sym, conn_out "
+            f"FROM entity_context_stats WHERE entity_id IN ({placeholders})"
+        ),
+        tuple(entity_ids),
+    ).fetchall()
+    return {
+        str(r["entity_id"]): (int(r["conn_in"]), int(r["conn_sym"]), int(r["conn_out"]))
+        for r in rows
+    }
+
+
 def connection_ids_by_types(conn: sqlite3.Connection, types: frozenset[str]) -> list[str]:
     if not types:
         return []
@@ -94,6 +113,26 @@ def connection_ids_by_types(conn: sqlite3.Connection, types: frozenset[str]) -> 
         " ORDER BY artifact_id"
     )
     rows = conn.execute(sql, tuple(types)).fetchall()
+    return [str(row["artifact_id"]) for row in rows]
+
+
+def connection_ids_by_types_for_entity_set(
+    conn: sqlite3.Connection,
+    types: frozenset[str],
+    entity_ids: frozenset[str],
+) -> list[str]:
+    if not types or not entity_ids:
+        return []
+    type_placeholders = ",".join("?" * len(types))
+    entity_placeholders = ",".join("?" * len(entity_ids))
+    sql = (
+        "SELECT DISTINCT artifact_id FROM connections "
+        f"WHERE conn_type IN ({type_placeholders}) "
+        f"AND (source IN ({entity_placeholders}) OR target IN ({entity_placeholders})) "
+        "ORDER BY artifact_id"
+    )
+    params = tuple(types) + tuple(entity_ids) + tuple(entity_ids)
+    rows = conn.execute(sql, params).fetchall()
     return [str(row["artifact_id"]) for row in rows]
 
 

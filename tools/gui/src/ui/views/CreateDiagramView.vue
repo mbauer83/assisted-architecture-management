@@ -4,7 +4,6 @@ import { useRouter } from 'vue-router'
 import { Effect } from 'effect'
 import { modelServiceKey } from '../keys'
 import type { EntityDisplayInfo, EntityContextConnection, DiagramPreviewResult } from '../../domain'
-import { hasVerificationErrors, collectVerificationIssues } from '../lib/errors'
 import EntitySelectionList from '../components/EntitySelectionList.vue'
 import EntityPickerInput from '../components/EntityPickerInput.vue'
 
@@ -176,10 +175,8 @@ const doPreview = () => {
   )
     .then((r) => {
       preview.value = r
-      previewClean.value = !hasVerificationErrors(r.verification)
-      if (!previewClean.value) {
-        previewIssues.value = collectVerificationIssues(r.verification)
-      }
+      previewClean.value = true
+      previewIssues.value = []
       previewBusy.value = false
     })
     .catch((e) => { previewError.value = String(e); previewBusy.value = false })

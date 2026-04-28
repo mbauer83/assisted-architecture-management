@@ -130,6 +130,12 @@ def build_conn_counts(repo: ArtifactRepository) -> dict[str, tuple[int, int, int
     return repo.connection_counts()
 
 
+def build_conn_counts_for_entities(
+    repo: ArtifactRepository, entity_ids: list[str]
+) -> dict[str, tuple[int, int, int]]:
+    return repo.connection_counts_for_entities(entity_ids)
+
+
 def resolve_gar(artifact_id: str) -> tuple[str, bool]:
     """If artifact_id is a GAR, return (global_artifact_id, True); else (artifact_id, False)."""
     with _state_lock:

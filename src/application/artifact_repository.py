@@ -164,8 +164,20 @@ class ArtifactRepository:
     def connection_counts_for(self, entity_id: str) -> tuple[int, int, int]:
         return self._store.connection_counts_for(entity_id)
 
+    def connection_counts_for_entities(
+        self, entity_ids: list[str] | set[str] | frozenset[str]
+    ) -> dict[str, tuple[int, int, int]]:
+        return self._store.connection_counts_for_entities(entity_ids)
+
     def list_connections_by_types(self, types: frozenset[str]) -> list[ConnectionRecord]:
         return self._store.list_connections_by_types(types)
+
+    def list_connections_by_types_for_entities(
+        self,
+        types: frozenset[str],
+        entity_ids: list[str] | set[str] | frozenset[str],
+    ) -> list[ConnectionRecord]:
+        return self._store.list_connections_by_types_for_entities(types, entity_ids)
 
     def find_connections_for(
         self,

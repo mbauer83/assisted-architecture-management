@@ -194,7 +194,7 @@ const submit = () => {
   })).then((result) => {
     if (!result.wrote) {
       verificationIssues.value = collectVerificationIssues(result.verification)
-      warnings.value = result.warnings ?? []
+      warnings.value = [...(result.warnings ?? [])]
       error.value = verificationIssues.value.length
         ? 'Document could not be created until the validation issues are fixed.'
         : 'Document could not be created.'
