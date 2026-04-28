@@ -111,8 +111,17 @@
 !procedure $DECL_PRI_uraDPR()
   rectangle "<$archimate_Principle{scale=1.5}> Extensibility and Configurability" <<Principle>> as PRI_uraDPR
 !endprocedure
+!procedure $DECL_REQ_3cJ1Yi()
+  rectangle "<$archimate_Requirement{scale=1.5}> Configurable documents" <<Requirement>> as REQ_3cJ1Yi
+!endprocedure
+!procedure $DECL_REQ_4iTd6A()
+  rectangle "<$archimate_Requirement{scale=1.5}> Verified section structure for documents" <<Requirement>> as REQ_4iTd6A
+!endprocedure
 !procedure $DECL_REQ_5PPAX3()
   rectangle "<$archimate_Requirement{scale=1.5}> Authoring Tools" <<Requirement>> as REQ_5PPAX3
+!endprocedure
+!procedure $DECL_REQ_64JvM1()
+  rectangle "<$archimate_Requirement{scale=1.5}> List-view for documents" <<Requirement>> as REQ_64JvM1
 !endprocedure
 !procedure $DECL_REQ_6ZR3nk()
   rectangle "<$archimate_Requirement{scale=1.5}> Configurable Model Attribute Schemata" <<Requirement>> as REQ_6ZR3nk
@@ -139,16 +148,19 @@
   rectangle "<$archimate_Requirement{scale=1.5}> Support Models, Diagrams, and Documents" <<Requirement>> as REQ_HR7AGz
 !endprocedure
 !procedure $DECL_REQ_Ii5Jj5()
-  rectangle "<$archimate_Requirement{scale=1.5}> ArchiMate and UML Diagrams" <<Requirement>> as REQ_Ii5Jj5
+  rectangle "<$archimate_Requirement{scale=1.5}> ArchiMate and UML ER/Sequence/Activity Diagrams" <<Requirement>> as REQ_Ii5Jj5
 !endprocedure
 !procedure $DECL_REQ_JTRw1x()
   rectangle "<$archimate_Requirement{scale=1.5}> Verification Tools" <<Requirement>> as REQ_JTRw1x
 !endprocedure
 !procedure $DECL_REQ_KeGCZE()
-  rectangle "<$archimate_Requirement{scale=1.5}> ArchiMate NEXT Ontology" <<Requirement>> as REQ_KeGCZE
+  rectangle "<$archimate_Requirement{scale=1.5}> ArchiMate NEXT Model Ontology" <<Requirement>> as REQ_KeGCZE
 !endprocedure
 !procedure $DECL_REQ_Kk6Ll6()
-  rectangle "<$archimate_Requirement{scale=1.5}> Unique IDs" <<Requirement>> as REQ_Kk6Ll6
+  rectangle "<$archimate_Requirement{scale=1.5}> Verified unique identifiers for Entities, Connections, Diagrams, and Documents" <<Requirement>> as REQ_Kk6Ll6
+!endprocedure
+!procedure $DECL_REQ_LnytwA()
+  rectangle "<$archimate_Requirement{scale=1.5}> Grid-view for diagrams" <<Requirement>> as REQ_LnytwA
 !endprocedure
 !procedure $DECL_REQ_NfAmrl()
   rectangle "<$archimate_Requirement{scale=1.5}> GUI Exploration and Authoring for Humans" <<Requirement>> as REQ_NfAmrl
@@ -159,23 +171,44 @@
 !procedure $DECL_REQ_O_Ppmp()
   rectangle "<$archimate_Requirement{scale=1.5}> Git Version Tracking" <<Requirement>> as REQ_O_Ppmp
 !endprocedure
+!procedure $DECL_REQ_Qgqh33()
+  rectangle "<$archimate_Requirement{scale=1.5}> Configurable structure per document-type" <<Requirement>> as REQ_Qgqh33
+!endprocedure
+!procedure $DECL_REQ_UoHGZy()
+  rectangle "<$archimate_Requirement{scale=1.5}> Configurable entities" <<Requirement>> as REQ_UoHGZy
+!endprocedure
 !procedure $DECL_REQ_V5EdQk()
   rectangle "<$archimate_Requirement{scale=1.5}> Markdown Format" <<Requirement>> as REQ_V5EdQk
+!endprocedure
+!procedure $DECL_REQ_W_G4L5()
+  rectangle "<$archimate_Requirement{scale=1.5}> List-view for entities" <<Requirement>> as REQ_W_G4L5
 !endprocedure
 !procedure $DECL_REQ_X5jYC0()
   rectangle "<$archimate_Requirement{scale=1.5}> Concurrent Tool-Call Handling" <<Requirement>> as REQ_X5jYC0
 !endprocedure
+!procedure $DECL_REQ_aDohcf()
+  rectangle "<$archimate_Requirement{scale=1.5}> Extensibility & Configurability" <<Requirement>> as REQ_aDohcf
+!endprocedure
 !procedure $DECL_REQ_cz8L4W()
   rectangle "<$archimate_Requirement{scale=1.5}> Git-Based Repository Configuration" <<Requirement>> as REQ_cz8L4W
 !endprocedure
+!procedure $DECL_REQ_dGaLkH()
+  rectangle "<$archimate_Requirement{scale=1.5}> Declarative modelling ontology for extensibility & adaptability" <<Requirement>> as REQ_dGaLkH
+!endprocedure
 !procedure $DECL_REQ_eBAa26()
   rectangle "<$archimate_Requirement{scale=1.5}> Graph-Based Relationship Discovery" <<Requirement>> as REQ_eBAa26
+!endprocedure
+!procedure $DECL_REQ_eFz3z9()
+  rectangle "<$archimate_Requirement{scale=1.5}> Treemap view for entities" <<Requirement>> as REQ_eFz3z9
 !endprocedure
 !procedure $DECL_REQ_kOU3al()
   rectangle "<$archimate_Requirement{scale=1.5}> Two-Tiered Repository" <<Requirement>> as REQ_kOU3al
 !endprocedure
 !procedure $DECL_REQ_m117_R()
   rectangle "<$archimate_Requirement{scale=1.5}> Write Access Only via Tools" <<Requirement>> as REQ_m117_R
+!endprocedure
+!procedure $DECL_REQ_mvrJxo()
+  rectangle "<$archimate_Requirement{scale=1.5}> Authoring tools use verifier" <<Requirement>> as REQ_mvrJxo
 !endprocedure
 !procedure $DECL_REQ_nnvsra()
   rectangle "<$archimate_Requirement{scale=1.5}> Write composable, maintainable, intelligible code" <<Requirement>> as REQ_nnvsra
@@ -186,11 +219,17 @@
 !procedure $DECL_REQ_peinbQ()
   rectangle "<$archimate_Requirement{scale=1.5}> Tool Interfaces: MCP, CLI, REST" <<Requirement>> as REQ_peinbQ
 !endprocedure
+!procedure $DECL_REQ_qpOBOQ()
+  rectangle "<$archimate_Requirement{scale=1.5}> Configurable diagrams" <<Requirement>> as REQ_qpOBOQ
+!endprocedure
 !procedure $DECL_REQ_s5B3gB()
   rectangle "<$archimate_Requirement{scale=1.5}> Metadata-Based Querying" <<Requirement>> as REQ_s5B3gB
 !endprocedure
 !procedure $DECL_REQ_t_NpFC()
   rectangle "<$archimate_Requirement{scale=1.5}> Verify Diagram Syntax Automatically" <<Requirement>> as REQ_t_NpFC
+!endprocedure
+!procedure $DECL_REQ_v0TJX4()
+  rectangle "<$archimate_Requirement{scale=1.5}> Multi-item overviews for entities, diagrams, documents" <<Requirement>> as REQ_v0TJX4
 !endprocedure
 !procedure $DECL_REQ_vlMSrd()
   rectangle "<$archimate_Requirement{scale=1.5}> File-Based Artifacts" <<Requirement>> as REQ_vlMSrd
