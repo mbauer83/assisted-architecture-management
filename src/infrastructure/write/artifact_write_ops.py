@@ -8,6 +8,7 @@ from typing import Literal
 
 from src.application.modeling.artifact_write import DiagramConnectionInferenceMode
 from src.infrastructure.write.artifact_write import (
+    SyncDiagramToModelResult,
     WriteResult,
     add_connection,
     create_diagram,
@@ -24,6 +25,7 @@ from src.infrastructure.write.artifact_write import (
     get_type_guidance,  # filter: list[str] | None = None
     promote_entity,
     remove_connection,
+    sync_diagram_to_model,
     write_help,
 )
 
@@ -31,6 +33,7 @@ WriteRepoScope = Literal["engagement"]
 
 __all__ = [
     "DiagramConnectionInferenceMode",
+    "SyncDiagramToModelResult",
     "WriteRepoScope",
     "WriteResult",
     "write_help",
@@ -44,6 +47,7 @@ __all__ = [
     "remove_connection",
     "create_diagram",
     "edit_diagram",
+    "sync_diagram_to_model",
     "delete_diagram",
     "create_matrix",
     "create_document",

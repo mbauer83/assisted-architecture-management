@@ -19,6 +19,7 @@ import {
   DiagramContextSchema,
   DiagramEntityDiscoverySchema,
   WriteResultSchema,
+  SyncDiagramToModelResultSchema,
   DiagramRefsSchema,
   OntologyClassificationSchema,
   OntologyPairSchema,
@@ -341,6 +342,8 @@ export const makeHttpModelRepository = (): ModelRepository => ({
     postJson(buildUrl('/diagram/edit'), body, WriteResultSchema),
   deleteDiagram: (body) =>
     postJson(buildUrl('/diagram/remove'), body, WriteResultSchema),
+  syncDiagramToModel: (body) =>
+    postJson(buildUrl('/diagram/sync'), body, SyncDiagramToModelResultSchema),
 
   getMatrixConfig: (id: string) =>
     fetchJson(buildUrl('/matrix-config', { id }), MatrixConfigSchema),

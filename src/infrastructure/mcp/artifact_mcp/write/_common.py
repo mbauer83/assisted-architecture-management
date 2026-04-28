@@ -2,7 +2,9 @@
 
 from src.infrastructure.mcp.artifact_mcp.context import (
     RepoPreset,
+    authoritative_callbacks_for,
     clear_caches_for_repo,
+    mutation_context_for,
     registry_cached,
     repo_cached,
     resolve_repo_roots,
@@ -16,8 +18,10 @@ __all__ = [
     "RepoPreset",
     "WriteRepoScope",
     "_out",
+    "authoritative_callbacks_for",
     "artifact_write_ops",
     "clear_caches_for_repo",
+    "mutation_context_for",
     "registry_cached",
     "repo_cached",
     "resolve_repo_roots",

@@ -401,6 +401,42 @@ class ArtifactVerifier:
             )
         return self._verify_all_full(repo_path, include_diagrams=include_diagrams)
 
+    def verify_paths(
+        self,
+        repo_path: Path,
+        *,
+        changed_paths: list[Path],
+        verification_scope: Literal["changed", "impacted", "full"] = "impacted",
+        include_diagrams: bool = True,
+    ) -> list[VerificationResult]:
+        if verification_scope == "full":
+            return self._verify_all_full(repo_path, include_diagrams=include_diagrams)
+
+        inv = inventory_files(repo_path, include_diagrams=include_diagrams)
+        relpaths = {
+            inv.path_to_rel[path.resolve()]
+            for path in changed_paths
+            if path.resolve() in inv.path_to_rel
+        }
+        if not relpaths:
+            return []
+
+        selected = relpaths if verification_scope == "changed" else expand_impacted_paths(inv, relpaths)
+        results = self._verify_inventory_subset(inv, selected)
+
+        docs_root = repo_path / DOCS
+        if docs_root.exists():
+            doc_files = [
+                path
+                for path in changed_paths
+                if path.suffix == ".md" and path.exists() and docs_root in path.resolve().parents
+            ]
+            worker_count = resolve_worker_count()
+            results.extend(
+                _verify_paths(doc_files, self.verify_document_file, workers=worker_count)
+            )
+        return results
+
     def _verify_all_full(
         self, repo_path: Path, *, include_diagrams: bool
     ) -> list[VerificationResult]:

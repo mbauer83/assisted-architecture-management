@@ -24,6 +24,7 @@ from functools import wraps
 from typing import Any, Callable, TypeVar
 
 from src.infrastructure.artifact_index.coordination import publish_write_queue_state
+from src.infrastructure.write.operation_registry import operation_registry
 
 _F = TypeVar("_F", bound=Callable[..., Any])
 
@@ -33,6 +34,9 @@ _submitted_jobs = 0
 _completed_jobs = 0
 _active_jobs = 0
 _event_loop: asyncio.AbstractEventLoop | None = None
+_active_tool_name: str | None = None
+_active_operation_id: str | None = None
+_active_phase: str | None = None
 
 
 def attach_event_loop(loop: asyncio.AbstractEventLoop) -> None:
@@ -70,16 +74,26 @@ def _emit_queue_state() -> None:
         publish_write_queue_state(
             active_jobs=_active_jobs,
             pending_jobs=max(_submitted_jobs - _completed_jobs - _active_jobs, 0),
+            active_tool_name=_active_tool_name,
+            active_operation_id=_active_operation_id,
+            active_phase=_active_phase,
         )
 
 
-def _run_job(fn: Callable[..., Any], /, *args: Any, **kwargs: Any) -> Any:
+def _run_job(tool_name: str, fn: Callable[..., Any], /, *args: Any, **kwargs: Any) -> Any:
     global _active_jobs, _completed_jobs
+    global _active_tool_name, _active_operation_id, _active_phase
     with _state_cond:
         _active_jobs += 1
+        _active_tool_name = tool_name
+        _active_operation_id = None
+        _active_phase = "running"
         publish_write_queue_state(
             active_jobs=_active_jobs,
             pending_jobs=max(_submitted_jobs - _completed_jobs - _active_jobs, 0),
+            active_tool_name=_active_tool_name,
+            active_operation_id=_active_operation_id,
+            active_phase=_active_phase,
         )
     try:
         result = fn(*args, **kwargs)
@@ -89,22 +103,32 @@ def _run_job(fn: Callable[..., Any], /, *args: Any, **kwargs: Any) -> Any:
         with _state_cond:
             _active_jobs -= 1
             _completed_jobs += 1
+            if _active_jobs == 0:
+                _active_tool_name = None
+                _active_operation_id = None
+                _active_phase = None
             publish_write_queue_state(
                 active_jobs=_active_jobs,
                 pending_jobs=max(_submitted_jobs - _completed_jobs - _active_jobs, 0),
+                active_tool_name=_active_tool_name,
+                active_operation_id=_active_operation_id,
+                active_phase=_active_phase,
             )
             _state_cond.notify_all()
 
 
-def _submit(fn: Callable[..., Any], /, *args: Any, **kwargs: Any):
+def _submit(tool_name: str, fn: Callable[..., Any], /, *args: Any, **kwargs: Any):
     global _submitted_jobs
     with _state_cond:
         _submitted_jobs += 1
         publish_write_queue_state(
             active_jobs=_active_jobs,
             pending_jobs=max(_submitted_jobs - _completed_jobs - _active_jobs, 0),
+            active_tool_name=_active_tool_name,
+            active_operation_id=_active_operation_id,
+            active_phase=_active_phase,
         )
-    return _get_executor().submit(_run_job, fn, *args, **kwargs)
+    return _get_executor().submit(_run_job, tool_name, fn, *args, **kwargs)
 
 
 def queued(fn: _F) -> _F:
@@ -129,7 +153,7 @@ def queued(fn: _F) -> _F:
                     "Writes are temporarily blocked (sync in progress or read-only mode)"
                 )
 
-        future = _submit(fn, *args, **kwargs)
+        future = _submit(fn.__name__, fn, *args, **kwargs)
         while not future.done():
             await asyncio.sleep(0.001)
         return future.result()
@@ -144,7 +168,7 @@ def run_sync(fn: Callable[..., Any], /, *args: Any, **kwargs: Any) -> Any:
     to serialize writes with MCP tool calls once both paths share one process.
     """
 
-    return _submit(fn, *args, **kwargs).result()
+    return _submit(fn.__name__, fn, *args, **kwargs).result()
 
 
 def wait_until_idle(timeout_s: float | None = None) -> bool:
@@ -166,6 +190,7 @@ def wait_until_idle(timeout_s: float | None = None) -> bool:
 def shutdown(wait: bool = True) -> None:
     """Shut down the write queue executor (for testing / clean teardown)."""
     global _executor, _submitted_jobs, _completed_jobs, _active_jobs
+    global _active_tool_name, _active_operation_id, _active_phase
     if _executor is not None:
         _executor.shutdown(wait=wait, cancel_futures=True)
         _executor = None
@@ -173,7 +198,36 @@ def shutdown(wait: bool = True) -> None:
         _submitted_jobs = 0
         _completed_jobs = 0
         _active_jobs = 0
-        publish_write_queue_state(active_jobs=0, pending_jobs=0)
+        _active_tool_name = None
+        _active_operation_id = None
+        _active_phase = None
+        publish_write_queue_state(
+            active_jobs=0,
+            pending_jobs=0,
+            active_tool_name=None,
+            active_operation_id=None,
+            active_phase=None,
+        )
+        _state_cond.notify_all()
+
+
+def _handle_operation_registry_update(snapshot: dict[str, Any]) -> None:
+    global _active_operation_id, _active_phase
+    if not threading.current_thread().name.startswith("model-write-queue"):
+        return
+    with _state_cond:
+        if _active_jobs <= 0:
+            return
+        _active_operation_id = snapshot.get("operation_id")
+        phase = snapshot.get("phase")
+        _active_phase = phase if isinstance(phase, str) else _active_phase
+        publish_write_queue_state(
+            active_jobs=_active_jobs,
+            pending_jobs=max(_submitted_jobs - _completed_jobs - _active_jobs, 0),
+            active_tool_name=_active_tool_name,
+            active_operation_id=_active_operation_id,
+            active_phase=_active_phase,
+        )
         _state_cond.notify_all()
 
 
@@ -195,3 +249,4 @@ def _shutdown_atexit() -> None:
 
 
 atexit.register(_shutdown_atexit)
+operation_registry.subscribe(_handle_operation_registry_update)

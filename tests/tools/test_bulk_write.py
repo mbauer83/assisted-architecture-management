@@ -10,14 +10,20 @@ dry-run coherence.
 from __future__ import annotations
 
 from pathlib import Path
+from typing import Any, cast
 
 import pytest
 
-from src.infrastructure.mcp.artifact_mcp.bulk_tools import artifact_bulk_delete, artifact_bulk_write
-from src.infrastructure.mcp import mcp_artifact_server as mcp
 from src.application.verification.artifact_verifier import ArtifactRegistry, ArtifactVerifier
 from src.infrastructure.artifact_index import shared_artifact_index
-
+from src.infrastructure.artifact_index.events import AuthoritativeIndexMutationCommitted, event_bus
+from src.infrastructure.mcp import mcp_artifact_server as mcp
+from src.infrastructure.mcp.artifact_mcp.bulk_tools import (
+    artifact_bulk_delete,
+    artifact_bulk_write,
+    artifact_get_operation,
+)
+from src.infrastructure.write import artifact_write_ops
 
 # ---------------------------------------------------------------------------
 # Fixtures and helpers
@@ -43,12 +49,40 @@ def _connect(repo: Path, src: str, tgt: str, conn_type: str) -> None:
                                 target_entity=tgt, dry_run=False, repo_root=str(repo))
 
 
-def _bulk(repo: Path, items, *, dry_run: bool = False):
-    return artifact_bulk_write(items=items, dry_run=dry_run, repo_root=str(repo))
+def _bulk(repo: Path, items, *, dry_run: bool = False, auto_sync_diagrams: bool = False):
+    return artifact_bulk_write(
+        items=items,
+        dry_run=dry_run,
+        repo_root=str(repo),
+        auto_sync_diagrams=auto_sync_diagrams,
+    )
 
 
-def _bulk_delete(repo: Path, items, *, dry_run: bool = False):
-    return artifact_bulk_delete(items=items, dry_run=dry_run, repo_root=str(repo))
+def _bulk_delete(repo: Path, items, *, dry_run: bool = False, auto_sync_diagrams: bool = False):
+    return artifact_bulk_delete(
+        items=items,
+        dry_run=dry_run,
+        repo_root=str(repo),
+        auto_sync_diagrams=auto_sync_diagrams,
+    )
+
+
+def _bulk_with_key(repo: Path, items, *, key: str, dry_run: bool = False):
+    return artifact_bulk_write(
+        items=items,
+        dry_run=dry_run,
+        repo_root=str(repo),
+        idempotency_key=key,
+    )
+
+
+def _bulk_delete_with_key(repo: Path, items, *, key: str, dry_run: bool = False):
+    return artifact_bulk_delete(
+        items=items,
+        dry_run=dry_run,
+        repo_root=str(repo),
+        idempotency_key=key,
+    )
 
 
 def _write(path: Path, content: str) -> None:
@@ -69,6 +103,8 @@ class TestBulkCreate:
         assert results[0]["wrote"] is True
         assert results[0]["op"] == "create_entity"
         assert Path(str(results[0]["path"])).exists()
+        registry = ArtifactRegistry(shared_artifact_index(repo))
+        assert str(results[0]["artifact_id"]) in registry.entity_ids()
 
     def test_multiple_entities_live(self, repo: Path) -> None:
         results = _bulk(repo, [
@@ -78,6 +114,9 @@ class TestBulkCreate:
         ])
         assert all(r["wrote"] is True for r in results)
         assert all(Path(str(r["path"])).exists() for r in results)
+        registry = ArtifactRegistry(shared_artifact_index(repo))
+        for result in results:
+            assert str(result["artifact_id"]) in registry.entity_ids()
 
     def test_dry_run_does_not_write_files(self, repo: Path) -> None:
         results = _bulk(repo, [
@@ -133,7 +172,7 @@ class TestRefSubstitution:
         assert results[0]["wrote"] is False  # entity dry_run, not written
         # Connection may fail because entity isn't in the model, but ref was resolved
         if "error" in results[1]:
-            assert "$ref:" not in results[1]["error"], "ref was not substituted"
+            assert "$ref:" not in cast(str, results[1]["error"]), "ref was not substituted"
 
     def test_unresolved_ref_returns_error_not_exception(self, repo: Path) -> None:
         results = _bulk(repo, [
@@ -141,7 +180,7 @@ class TestRefSubstitution:
              "connection_type": "archimate-serving", "target_entity": "$ref:also_missing"},
         ])
         assert "error" in results[0]
-        assert "missing" in results[0]["error"]
+        assert "missing" in cast(str, results[0]["error"])
 
 
 # ---------------------------------------------------------------------------
@@ -213,13 +252,24 @@ class TestErrorHandling:
         assert "error" in results[0]
         assert results[0]["wrote"] is False
 
-    def test_partial_failure_does_not_abort_later_items(self, repo: Path) -> None:
+    def test_partial_failure_aborts_batch_without_live_mutation(self, repo: Path) -> None:
+        repository = ArtifactRegistry(shared_artifact_index(repo))
+        before_ids = repository.entity_ids()
+        before_version = shared_artifact_index(repo).read_model_version()
+
         results = _bulk(repo, [
             {"op": "create_entity", "artifact_type": "not-a-real-type", "name": "Bad"},
             {"op": "create_entity", "artifact_type": "requirement", "name": "Good"},
         ])
         assert "error" in results[0] or results[0]["wrote"] is False
-        assert results[1]["wrote"] is True
+        assert results[1]["wrote"] is False
+        assert "Skipped because an earlier batch item failed" in cast(str, results[1]["error"])
+        assert not list((repo / "model").rglob("*.md"))
+
+        registry = ArtifactRegistry(shared_artifact_index(repo))
+        after_version = shared_artifact_index(repo).read_model_version()
+        assert registry.entity_ids() == before_ids
+        assert after_version == before_version
 
     def test_missing_required_name_field_returns_error(self, repo: Path) -> None:
         results = _bulk(repo, [
@@ -301,9 +351,13 @@ class TestConflictsAndDependencies:
              "connection_type": "archimate-realization", "target_entity": tgt},
         ])
         assert len(results) == 2
-        assert results[0]["wrote"] is True
-        # Second must not raise; outcome is idempotent success or graceful error
-        assert "wrote" in results[1] or "error" in results[1]
+        assert results[0]["wrote"] is False
+        assert "error" not in results[0]
+        assert "error" in results[1]
+
+        outgoing = Path(str(results[0]["path"]))
+        if outgoing.exists():
+            assert "archimate-realization" not in outgoing.read_text(encoding="utf-8")
 
     def test_same_ref_used_in_multiple_connections(self, repo: Path) -> None:
         """One entity can be both source and target of multiple connections via the same ref."""
@@ -318,6 +372,32 @@ class TestConflictsAndDependencies:
         ])
         assert all("error" not in res for res in results), results
         assert all(res["wrote"] is True for res in results)
+
+    def test_unrelated_broken_diagram_does_not_block_impacted_bulk_write(self, repo: Path) -> None:
+        _write(
+            repo / "diagram-catalog" / "diagrams" / "broken-unrelated.puml",
+            """\
+---
+artifact-id: broken-unrelated
+artifact-type: diagram
+diagram-type: archimate-application
+name: "Broken Unrelated"
+version: 0.1.0
+status: draft
+last-updated: '2026-04-28'
+---
+@startuml
+this is not valid plantuml
+@enduml
+""",
+        )
+
+        results = _bulk(repo, [
+            {"op": "create_entity", "artifact_type": "requirement", "name": "Independent"},
+        ])
+
+        assert len(results) == 1
+        assert results[0]["wrote"] is True
 
     def test_large_batch_all_succeed(self, repo: Path) -> None:
         """Batches larger than the old 8-item parallel limit should complete correctly."""
@@ -336,6 +416,227 @@ class TestConflictsAndDependencies:
         assert len(results) == 24
         errors = [r for r in results if "error" in r]
         assert not errors, errors
+
+    def test_load_style_batch_commits_and_indexes_consistently(self, repo: Path) -> None:
+        items = [
+            {"op": "create_entity", "artifact_type": "requirement",
+             "name": f"LoadReq{i}", "_ref": f"r{i}"}
+            for i in range(24)
+        ]
+        items += [
+            {"op": "add_connection", "source_entity": f"$ref:r{i}",
+             "connection_type": "archimate-association",
+             "target_entity": f"$ref:r{(i + 1) % 24}"}
+            for i in range(24)
+        ]
+
+        before = shared_artifact_index(repo).read_model_version()
+        results = _bulk(repo, items)
+        after = shared_artifact_index(repo).read_model_version()
+
+        assert all("error" not in r for r in results), results
+        assert all(r["wrote"] is True for r in results)
+        assert after.generation > before.generation
+
+        registry = ArtifactRegistry(shared_artifact_index(repo))
+        for result in results[:24]:
+            assert str(result["artifact_id"]) in registry.entity_ids()
+
+    def test_staged_bulk_write_publishes_only_live_paths(self, repo: Path) -> None:
+        events: list[AuthoritativeIndexMutationCommitted] = []
+        unsubscribe = event_bus.subscribe(AuthoritativeIndexMutationCommitted, events.append)
+        try:
+            results = _bulk(repo, [
+                {"op": "create_entity", "artifact_type": "requirement", "name": "LiveOnly"},
+            ])
+        finally:
+            unsubscribe()
+
+        assert results[0]["wrote"] is True
+        assert events, "expected an authoritative mutation event"
+        assert all(str(path).startswith(str(repo)) for event in events for path in event.changed_paths)
+        assert all("/tmp/artifact-batch-" not in path for event in events for path in event.changed_paths)
+
+    def test_failed_staged_bulk_write_emits_no_authoritative_mutation(self, repo: Path) -> None:
+        events: list[AuthoritativeIndexMutationCommitted] = []
+        unsubscribe = event_bus.subscribe(AuthoritativeIndexMutationCommitted, events.append)
+        try:
+            _bulk(repo, [
+                {"op": "create_entity", "artifact_type": "bad-type", "name": "Bad"},
+                {"op": "create_entity", "artifact_type": "requirement", "name": "Skipped"},
+            ])
+        finally:
+            unsubscribe()
+
+        assert events == []
+
+    def test_staged_bulk_write_verification_does_not_persist_incremental_state(
+        self,
+        repo: Path,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        state_dir = tmp_path / "verifier-state"
+        monkeypatch.setenv("ARCH_MODEL_VERIFY_STATE_DIR", str(state_dir))
+
+        results = _bulk(repo, [
+            {"op": "create_entity", "artifact_type": "requirement", "name": "NoVerifierState"},
+        ])
+
+        assert results[0]["wrote"] is True
+        assert not state_dir.exists() or not list(state_dir.rglob("*"))
+
+    def test_bulk_write_auto_sync_updates_diagram_after_entity_rename(self, repo: Path) -> None:
+        src = _make(repo, "requirement", "RenameSrc")
+        tgt = _make(repo, "outcome", "RenameTgt")
+        _connect(repo, src, tgt, "archimate-realization")
+        diag_id = "bulk-write-rename-sync"
+        _write(
+            repo / "diagram-catalog" / "diagrams" / f"{diag_id}.puml",
+            f"""\
+---
+artifact-id: {diag_id}
+artifact-type: diagram
+diagram-type: archimate-application
+name: "Bulk Write Rename Sync"
+entity-ids-used:
+  - {src}
+  - {tgt}
+connection-ids-used:
+  - {src}---{tgt}@@archimate-realization
+version: 0.1.0
+status: active
+last-updated: '2026-04-28'
+---
+@startuml
+Alice -> Bob
+@enduml
+""",
+        )
+
+        results = _bulk(
+            repo,
+            [{"op": "edit_entity", "artifact_id": src, "name": "Renamed Src"}],
+            auto_sync_diagrams=True,
+        )
+
+        new_src = str(results[0]["artifact_id"])
+        text = (repo / "diagram-catalog" / "diagrams" / f"{diag_id}.puml").read_text(encoding="utf-8")
+        assert results[0]["wrote"] is True
+        assert new_src in text
+        assert src not in text
+        assert f"{new_src}---{tgt}@@archimate-realization" in text
+
+    def test_bulk_write_auto_sync_updates_diagram_after_connection_remove(self, repo: Path) -> None:
+        src = _make(repo, "requirement", "ConnRemoveSrc")
+        tgt = _make(repo, "outcome", "ConnRemoveTgt")
+        _connect(repo, src, tgt, "archimate-realization")
+        diag_id = "bulk-write-connection-sync"
+        _write(
+            repo / "diagram-catalog" / "diagrams" / f"{diag_id}.puml",
+            f"""\
+---
+artifact-id: {diag_id}
+artifact-type: diagram
+diagram-type: archimate-application
+name: "Bulk Write Connection Sync"
+entity-ids-used:
+  - {src}
+  - {tgt}
+connection-ids-used:
+  - {src}---{tgt}@@archimate-realization
+version: 0.1.0
+status: active
+last-updated: '2026-04-28'
+---
+@startuml
+Alice -> Bob
+@enduml
+""",
+        )
+
+        results = _bulk(
+            repo,
+            [
+                {
+                    "op": "edit_connection",
+                    "source_entity": src,
+                    "target_entity": tgt,
+                    "connection_type": "archimate-realization",
+                    "operation": "remove",
+                }
+            ],
+            auto_sync_diagrams=True,
+        )
+
+        text = (repo / "diagram-catalog" / "diagrams" / f"{diag_id}.puml").read_text(encoding="utf-8")
+        assert results[0]["wrote"] is True
+        assert f"{src}---{tgt}@@archimate-realization" not in text
+
+
+class TestBulkOperationTracking:
+    def test_bulk_write_result_is_queryable_by_operation_id(self, repo: Path) -> None:
+        results = _bulk(repo, [
+            {"op": "create_entity", "artifact_type": "requirement", "name": "Tracked"},
+        ])
+
+        operation_id = cast(str, results[0]["operation_id"])
+        operation = artifact_get_operation(operation_id=operation_id)
+
+        assert operation["operation_id"] == operation_id
+        assert operation["tool_name"] == "artifact_bulk_write"
+        assert operation["status"] == "completed"
+        assert operation["phase"] == "done"
+        assert cast(list[dict[str, Any]], operation["result"])[0]["operation_id"] == operation_id
+
+    def test_bulk_write_idempotency_key_reuses_completed_result(self, repo: Path) -> None:
+        key = "bulk-write-idempotent-1"
+        before = shared_artifact_index(repo).read_model_version()
+
+        first = _bulk_with_key(
+            repo,
+            [{"op": "create_entity", "artifact_type": "requirement", "name": "Once"}],
+            key=key,
+        )
+        mid = shared_artifact_index(repo).read_model_version()
+        second = _bulk_with_key(
+            repo,
+            [{"op": "create_entity", "artifact_type": "requirement", "name": "Once"}],
+            key=key,
+        )
+        after = shared_artifact_index(repo).read_model_version()
+
+        assert first == second
+        assert mid.generation > before.generation
+        assert after == mid
+
+        registry = ArtifactRegistry(shared_artifact_index(repo))
+        assert len(registry.entity_ids()) == 1
+
+    def test_bulk_delete_idempotency_key_reuses_completed_result(self, repo: Path) -> None:
+        eid = _make(repo, "requirement", "Delete Once")
+        key = "bulk-delete-idempotent-1"
+        before = shared_artifact_index(repo).read_model_version()
+
+        first = _bulk_delete_with_key(
+            repo,
+            [{"op": "delete_entity", "artifact_id": eid}],
+            key=key,
+        )
+        mid = shared_artifact_index(repo).read_model_version()
+        second = _bulk_delete_with_key(
+            repo,
+            [{"op": "delete_entity", "artifact_id": eid}],
+            key=key,
+        )
+        after = shared_artifact_index(repo).read_model_version()
+
+        assert first == second
+        assert mid.generation > before.generation
+        assert after == mid
+
+        registry = ArtifactRegistry(shared_artifact_index(repo))
+        assert eid not in registry.entity_ids()
 
 
 # ---------------------------------------------------------------------------
@@ -409,10 +710,10 @@ Alice -> Bob
             ],
         )
 
-        results = payload["results"]
+        results = cast(list[dict[str, Any]], payload["results"])
         assert all("error" not in item for item in results), payload
         assert all(item["wrote"] is True for item in results)
-        assert payload["batch_verification"]["valid"] is True
+        assert cast(dict[str, Any], payload["batch_verification"])["valid"] is True
 
         verifier = ArtifactVerifier(ArtifactRegistry(shared_artifact_index(repo)))
         assert all(r.valid for r in verifier.verify_all(repo)), "repo should verify after batch delete"
@@ -441,8 +742,141 @@ Alice -> Bob
         )
 
         payload = _bulk_delete(repo, [{"op": "delete_entity", "artifact_id": eid}], dry_run=True)
-        assert payload["batch_verification"]["valid"] is False
-        assert "diagram must also be deleted" in payload["results"][0]["error"]
+        assert cast(dict[str, Any], payload["batch_verification"])["valid"] is False
+        assert "diagram must also be deleted" in cast(
+            str, cast(list[dict[str, Any]], payload["results"])[0]["error"]
+        )
+
+    def test_delete_connection_requires_diagram_delete_in_same_batch(self, repo: Path) -> None:
+        src = _make(repo, "requirement", "ConnDiagramSrc")
+        tgt = _make(repo, "outcome", "ConnDiagramTgt")
+        _connect(repo, src, tgt, "archimate-realization")
+        diag_id = "connection-diagram-blocker"
+        _write(
+            repo / "diagram-catalog" / "diagrams" / f"{diag_id}.puml",
+            f"""\
+---
+artifact-id: {diag_id}
+artifact-type: diagram
+diagram-type: archimate-application
+name: "Connection Diagram Blocker"
+connection-ids-used:
+  - {src} archimate-realization → {tgt}
+version: 0.1.0
+status: active
+last-updated: '2026-04-28'
+---
+@startuml
+Alice -> Bob
+@enduml
+""",
+        )
+
+        payload = _bulk_delete(
+            repo,
+            [
+                {
+                    "op": "delete_connection",
+                    "source_entity": src,
+                    "connection_type": "archimate-realization",
+                    "target_entity": tgt,
+                }
+            ],
+            dry_run=True,
+        )
+        assert cast(dict[str, Any], payload["batch_verification"])["valid"] is False
+        assert "diagram must also be deleted" in cast(
+            str, cast(list[dict[str, Any]], payload["results"])[0]["error"]
+        )
+
+    def test_bulk_delete_auto_sync_updates_diagram_after_connection_delete(self, repo: Path) -> None:
+        src = _make(repo, "requirement", "AutoSyncConnSrc")
+        tgt = _make(repo, "outcome", "AutoSyncConnTgt")
+        _connect(repo, src, tgt, "archimate-realization")
+        diag_id = "bulk-delete-auto-sync-connection"
+        _write(
+            repo / "diagram-catalog" / "diagrams" / f"{diag_id}.puml",
+            f"""\
+---
+artifact-id: {diag_id}
+artifact-type: diagram
+diagram-type: archimate-application
+name: "Bulk Delete Auto Sync Connection"
+entity-ids-used:
+  - {src}
+  - {tgt}
+connection-ids-used:
+  - {src}---{tgt}@@archimate-realization
+version: 0.1.0
+status: active
+last-updated: '2026-04-28'
+---
+@startuml
+Alice -> Bob
+@enduml
+""",
+        )
+
+        payload = _bulk_delete(
+            repo,
+            [
+                {
+                    "op": "delete_connection",
+                    "source_entity": src,
+                    "connection_type": "archimate-realization",
+                    "target_entity": tgt,
+                }
+            ],
+            auto_sync_diagrams=True,
+        )
+
+        results = cast(list[dict[str, Any]], payload["results"])
+        text = (repo / "diagram-catalog" / "diagrams" / f"{diag_id}.puml").read_text(encoding="utf-8")
+        assert all("error" not in item for item in results), payload
+        assert f"{src}---{tgt}@@archimate-realization" not in text
+        actions = cast(
+            list[dict[str, Any]],
+            cast(dict[str, Any], payload["batch_verification"])["auto_synced_diagrams"],
+        )
+        assert actions and actions[0]["artifact_id"] == diag_id
+
+    def test_bulk_delete_auto_sync_deletes_now_empty_diagram(self, repo: Path) -> None:
+        eid = _make(repo, "requirement", "AutoSyncDeleteMe")
+        diag_id = "bulk-delete-auto-sync-empty"
+        _write(
+            repo / "diagram-catalog" / "diagrams" / f"{diag_id}.puml",
+            f"""\
+---
+artifact-id: {diag_id}
+artifact-type: diagram
+diagram-type: archimate-application
+name: "Bulk Delete Auto Sync Empty"
+entity-ids-used:
+  - {eid}
+version: 0.1.0
+status: active
+last-updated: '2026-04-28'
+---
+@startuml
+Alice
+@enduml
+""",
+        )
+
+        payload = _bulk_delete(
+            repo,
+            [{"op": "delete_entity", "artifact_id": eid}],
+            auto_sync_diagrams=True,
+        )
+
+        results = cast(list[dict[str, Any]], payload["results"])
+        assert all("error" not in item for item in results), payload
+        assert not (repo / "diagram-catalog" / "diagrams" / f"{diag_id}.puml").exists()
+        actions = cast(
+            list[dict[str, Any]],
+            cast(dict[str, Any], payload["batch_verification"])["auto_synced_diagrams"],
+        )
+        assert actions and actions[0]["deleted_diagram"] is True
 
     def test_delete_entities_with_internal_cycle_succeeds_via_implicit_connection_cleanup(
         self, repo: Path
@@ -460,10 +894,14 @@ Alice -> Bob
             ],
         )
 
-        assert all("error" not in item for item in payload["results"]), payload
-        implicit = payload["batch_verification"]["implicit_connection_deletes"]
+        results = cast(list[dict[str, Any]], payload["results"])
+        assert all("error" not in item for item in results), payload
+        implicit = cast(
+            list[dict[str, Any]],
+            cast(dict[str, Any], payload["batch_verification"])["implicit_connection_deletes"],
+        )
         assert len(implicit) == 2
-        assert payload["batch_verification"]["valid"] is True
+        assert cast(dict[str, Any], payload["batch_verification"])["valid"] is True
 
     def test_delete_entity_blocked_by_external_incoming_connection(self, repo: Path) -> None:
         src = _make(repo, "goal", "ExternalSrc")
@@ -476,5 +914,115 @@ Alice -> Bob
             dry_run=True,
         )
 
-        assert payload["batch_verification"]["valid"] is False
-        assert "incoming connection must also be deleted" in payload["results"][0]["error"]
+        assert cast(dict[str, Any], payload["batch_verification"])["valid"] is False
+        assert "incoming connection must also be deleted" in cast(
+            str, cast(list[dict[str, Any]], payload["results"])[0]["error"]
+        )
+
+    def test_unrelated_broken_diagram_does_not_block_impacted_bulk_delete(self, repo: Path) -> None:
+        eid = _make(repo, "requirement", "DeleteMe")
+        _write(
+            repo / "diagram-catalog" / "diagrams" / "broken-unrelated-delete.puml",
+            """\
+---
+artifact-id: broken-unrelated-delete
+artifact-type: diagram
+diagram-type: archimate-application
+name: "Broken Unrelated Delete"
+version: 0.1.0
+status: draft
+last-updated: '2026-04-28'
+---
+@startuml
+this is not valid plantuml
+@enduml
+""",
+        )
+
+        payload = _bulk_delete(
+            repo,
+            [{"op": "delete_entity", "artifact_id": eid}],
+        )
+
+        results = cast(list[dict[str, Any]], payload["results"])
+        assert len(results) == 1
+        assert results[0]["wrote"] is True
+
+    def test_staged_bulk_delete_publishes_only_live_paths(self, repo: Path) -> None:
+        eid = _make(repo, "requirement", "DeleteLiveOnly")
+        events: list[AuthoritativeIndexMutationCommitted] = []
+        unsubscribe = event_bus.subscribe(AuthoritativeIndexMutationCommitted, events.append)
+        try:
+            payload = _bulk_delete(repo, [{"op": "delete_entity", "artifact_id": eid}])
+        finally:
+            unsubscribe()
+
+        results = cast(list[dict[str, Any]], payload["results"])
+        assert results[0]["wrote"] is True
+        assert len(events) == 1
+        assert all(str(path).startswith(str(repo)) for event in events for path in event.changed_paths)
+        assert all("/tmp/artifact-batch-" not in path for event in events for path in event.changed_paths)
+
+    def test_failed_staged_bulk_delete_emits_no_authoritative_mutation(self, repo: Path) -> None:
+        eid = _make(repo, "requirement", "DeleteFail")
+        doc_id = "ADR@1000000002.FailDoc.to-delete"
+        doc_path = repo / "docs" / "adr" / f"{doc_id}.md"
+        _write(
+            doc_path,
+            """\
+---
+artifact-id: ADR@1000000002.FailDoc.to-delete
+artifact-type: document
+doc-type: adr
+title: "Delete Fail"
+status: draft
+version: 0.1.0
+last-updated: '2026-04-28'
+---
+
+## Context
+
+Delete me.
+""",
+        )
+        events: list[AuthoritativeIndexMutationCommitted] = []
+        unsubscribe = event_bus.subscribe(AuthoritativeIndexMutationCommitted, events.append)
+        original = artifact_write_ops.delete_document
+
+        def fail_delete_document(*args: Any, **kwargs: Any):
+            raise RuntimeError("forced staged delete failure")
+
+        try:
+            artifact_write_ops.delete_document = fail_delete_document
+            payload = _bulk_delete(
+                repo,
+                [
+                    {"op": "delete_entity", "artifact_id": eid},
+                    {"op": "delete_document", "artifact_id": doc_id},
+                ],
+            )
+        finally:
+            artifact_write_ops.delete_document = original
+            unsubscribe()
+
+        results = cast(list[dict[str, Any]], payload["results"])
+        assert "error" in results[1]
+        assert events == []
+        assert eid in ArtifactRegistry(shared_artifact_index(repo)).entity_ids()
+        assert doc_path.exists()
+
+    def test_staged_bulk_delete_verification_does_not_persist_incremental_state(
+        self,
+        repo: Path,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        eid = _make(repo, "requirement", "DeleteNoVerifierState")
+        state_dir = tmp_path / "verifier-state"
+        monkeypatch.setenv("ARCH_MODEL_VERIFY_STATE_DIR", str(state_dir))
+
+        payload = _bulk_delete(repo, [{"op": "delete_entity", "artifact_id": eid}])
+
+        results = cast(list[dict[str, Any]], payload["results"])
+        assert results[0]["wrote"] is True
+        assert not state_dir.exists() or not list(state_dir.rglob("*"))

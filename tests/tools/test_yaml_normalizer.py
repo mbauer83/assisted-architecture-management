@@ -9,7 +9,6 @@ from __future__ import annotations
 
 import asyncio
 
-import pytest
 import yaml
 from mcp.server.fastmcp import FastMCP
 from mcp.types import CallToolRequest, CallToolRequestParams, TextContent
@@ -19,7 +18,6 @@ from src.infrastructure.mcp.artifact_mcp.name_normalization import (
     install_call_tool_normalizer,
     normalize_incoming_tool_name,
 )
-
 
 # ---------------------------------------------------------------------------
 # _dump_yaml_text — unit tests

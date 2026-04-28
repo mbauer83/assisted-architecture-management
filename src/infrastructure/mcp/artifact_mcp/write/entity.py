@@ -6,7 +6,7 @@ from src.infrastructure.mcp.artifact_mcp.tool_annotations import LOCAL_WRITE, RE
 from src.infrastructure.mcp.artifact_mcp.write._common import (
     _out,
     artifact_write_ops,
-    clear_caches_for_repo,
+    authoritative_callbacks_for,
     resolve_repo_roots,
     roots_key,
     verifier_for,
@@ -44,10 +44,12 @@ def artifact_create_entity(
         repo_preset=None,
         enterprise_root=None,
     )
+    mutation_context, clear_repo_caches, mark_macros_dirty = authoritative_callbacks_for(roots)
     result = artifact_write_ops.create_entity(
         repo_root=roots[0],
         verifier=verifier_for(roots_key(roots), include_registry=False),
-        clear_repo_caches=clear_caches_for_repo,
+        clear_repo_caches=clear_repo_caches,
+        mark_macros_dirty=mark_macros_dirty,
         artifact_type=artifact_type,
         name=name,
         summary=summary,
@@ -60,6 +62,8 @@ def artifact_create_entity(
         last_updated=None,
         dry_run=dry_run,
     )
+    if result.wrote and not dry_run:
+        mutation_context.finalize()
     return _out(result, dry_run=dry_run)
 
 

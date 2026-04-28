@@ -13,11 +13,13 @@ from __future__ import annotations
 import asyncio
 import inspect
 import threading
+import time
 from typing import Any
 
 import pytest
 
 from src.infrastructure.mcp.artifact_mcp.write_queue import queued, shutdown
+from src.infrastructure.write.operation_registry import operation_registry
 
 
 @pytest.fixture(autouse=True)
@@ -172,6 +174,43 @@ class TestSerialization:
                 assert str(r) == f"fail-{i}"
 
         asyncio.run(run_all())
+
+    def test_queue_state_includes_active_operation_metadata(self, monkeypatch: pytest.MonkeyPatch):
+        published: list[dict[str, Any]] = []
+
+        def capture_state(**kwargs: Any) -> None:
+            published.append(dict(kwargs))
+
+        monkeypatch.setattr(
+            "src.infrastructure.mcp.artifact_mcp.write_queue.publish_write_queue_state",
+            capture_state,
+        )
+
+        def tracked_write() -> str:
+            operation, reused = operation_registry.begin(
+                tool_name="artifact_bulk_write",
+                idempotency_key=None,
+            )
+            assert reused is None
+            operation_registry.set_phase(operation.operation_id, "apply")
+            time.sleep(0.01)
+            operation_registry.complete(operation.operation_id, {"ok": True})
+            return operation.operation_id
+
+        wrapped = queued(tracked_write)
+        operation_id = asyncio.run(wrapped())
+
+        active_snapshots = [
+            snapshot
+            for snapshot in published
+            if snapshot.get("active_operation_id") == operation_id
+        ]
+        assert active_snapshots, published
+        assert any(snapshot.get("active_tool_name") == "tracked_write" for snapshot in active_snapshots)
+        assert any(snapshot.get("active_phase") == "apply" for snapshot in active_snapshots)
+        assert published[-1]["active_jobs"] == 0
+        assert published[-1]["pending_jobs"] == 0
+        assert published[-1]["active_operation_id"] is None
 
 
 # ---------------------------------------------------------------------------

@@ -26,6 +26,7 @@ from .events import (
 from .versioning import ReadModelVersion
 
 __all__ = [
+    "get_write_queue_state_snapshot",
     "publish_authoritative_mutation",
     "publish_background_refresh_completed",
     "publish_write_queue_state",
@@ -34,10 +35,25 @@ __all__ = [
 ]
 
 
-def publish_write_queue_state(*, active_jobs: int, pending_jobs: int) -> None:
+def publish_write_queue_state(
+    *,
+    active_jobs: int,
+    pending_jobs: int,
+    active_tool_name: str | None = None,
+    active_operation_id: str | None = None,
+    active_phase: str | None = None,
+) -> None:
     """Publish the current write-queue occupancy."""
 
-    event_bus.publish(WriteQueueStateChanged(active_jobs=active_jobs, pending_jobs=pending_jobs))
+    event_bus.publish(
+        WriteQueueStateChanged(
+            active_jobs=active_jobs,
+            pending_jobs=pending_jobs,
+            active_tool_name=active_tool_name,
+            active_operation_id=active_operation_id,
+            active_phase=active_phase,
+        )
+    )
 
 
 def publish_authoritative_mutation(
@@ -94,6 +110,17 @@ def wait_for_write_queue_drain(timeout_s: float | None = None) -> bool:
     return True
 
 
+def get_write_queue_state_snapshot() -> dict[str, str | int | None]:
+    with _write_state_cond:
+        return {
+            "active_jobs": _active_write_jobs,
+            "pending_jobs": _pending_write_jobs,
+            "active_tool_name": _active_write_tool_name,
+            "active_operation_id": _active_write_operation_id,
+            "active_phase": _active_write_phase,
+        }
+
+
 def suppress_redundant_refresh_paths(
     root_or_roots: Path | list[Path],
     changed_paths: list[Path],
@@ -129,6 +156,9 @@ _SUPPRESSION_TTL_S = 300.0
 _write_state_cond = threading.Condition()
 _active_write_jobs = 0
 _pending_write_jobs = 0
+_active_write_tool_name: str | None = None
+_active_write_operation_id: str | None = None
+_active_write_phase: str | None = None
 _refresh_state_lock = threading.Lock()
 _refresh_state: dict[str, _RefreshSuppressionState] = {}
 
@@ -151,9 +181,13 @@ def _prune_suppression_paths(state: _RefreshSuppressionState, now: float) -> Non
 
 def _handle_write_queue_state_changed(event: WriteQueueStateChanged) -> None:
     global _active_write_jobs, _pending_write_jobs
+    global _active_write_tool_name, _active_write_operation_id, _active_write_phase
     with _write_state_cond:
         _active_write_jobs = event.active_jobs
         _pending_write_jobs = event.pending_jobs
+        _active_write_tool_name = event.active_tool_name
+        _active_write_operation_id = event.active_operation_id
+        _active_write_phase = event.active_phase
         _write_state_cond.notify_all()
 
 

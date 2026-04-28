@@ -349,6 +349,13 @@ export const WriteResultSchema = Schema.Struct({
 })
 export type WriteResult = typeof WriteResultSchema.Type
 
+export const SyncDiagramToModelResultSchema = Schema.Struct({
+  ...WriteResultSchema.fields,
+  removed_entity_ids: Schema.Array(Schema.String),
+  removed_connection_ids: Schema.Array(Schema.String),
+})
+export type SyncDiagramToModelResult = typeof SyncDiagramToModelResultSchema.Type
+
 // ── Ontology ──────────────────────────────────────────────────────────────────
 
 export const OntologyClassificationSchema = Schema.Struct({

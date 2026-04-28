@@ -7,7 +7,7 @@ from src.infrastructure.mcp.artifact_mcp.write._common import (
     DiagramConnectionInferenceMode,
     _out,
     artifact_write_ops,
-    clear_caches_for_repo,
+    authoritative_callbacks_for,
     registry_cached,
     resolve_repo_roots,
     roots_key,
@@ -35,11 +35,12 @@ def artifact_create_matrix(
         enterprise_root=None,
     )
     key = roots_key(roots)
+    mutation_context, clear_repo_caches, _mark_macros_dirty = authoritative_callbacks_for(roots)
     result = artifact_write_ops.create_matrix(
         repo_root=roots[0],
         registry=registry_cached(key),
         verifier=verifier_for(key, include_registry=True),
-        clear_repo_caches=clear_caches_for_repo,
+        clear_repo_caches=clear_repo_caches,
         name=name,
         matrix_markdown=matrix_markdown,
         artifact_id=artifact_id,
@@ -51,6 +52,8 @@ def artifact_create_matrix(
         auto_link_entity_ids=auto_link_entity_ids,
         dry_run=dry_run,
     )
+    if result.wrote and not dry_run:
+        mutation_context.finalize()
     return _out(result, dry_run=dry_run)
 
 
@@ -75,10 +78,11 @@ def artifact_create_diagram(
         enterprise_root=None,
     )
     key = roots_key(roots)
+    mutation_context, clear_repo_caches, _mark_macros_dirty = authoritative_callbacks_for(roots)
     result = artifact_write_ops.create_diagram(
         repo_root=roots[0],
         verifier=verifier_for(key, include_registry=True),
-        clear_repo_caches=clear_caches_for_repo,
+        clear_repo_caches=clear_repo_caches,
         diagram_type=diagram_type,
         name=name,
         puml=puml,
@@ -91,6 +95,8 @@ def artifact_create_diagram(
         auto_include_stereotypes=auto_include_stereotypes,
         dry_run=dry_run,
     )
+    if result.wrote and not dry_run:
+        mutation_context.finalize()
     return _out(result, dry_run=dry_run)
 
 

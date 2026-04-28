@@ -40,7 +40,7 @@ def test_read_server_tools_are_marked_read_only() -> None:
 def test_write_server_catalog_and_guidance_are_read_only_yaml_tools() -> None:
     tools = {tool.name: tool for tool in mcp_write._tool_manager.list_tools()}  # type: ignore[attr-defined]
 
-    for name in ("artifact_write_help", "artifact_write_modeling_guidance"):
+    for name in ("artifact_write_help", "artifact_write_modeling_guidance", "artifact_get_operation"):
         tool = tools[name]
         ann = tool.annotations
         assert ann is not None, name
@@ -48,7 +48,8 @@ def test_write_server_catalog_and_guidance_are_read_only_yaml_tools() -> None:
         assert ann.destructiveHint is False, name
         assert ann.idempotentHint is True, name
         assert ann.openWorldHint is False, name
-        assert tool.fn_metadata.output_schema is None, name
+        if name != "artifact_get_operation":
+            assert tool.fn_metadata.output_schema is None, name
 
 
 def test_write_server_mutation_tool_annotations_match_expected_intent() -> None:

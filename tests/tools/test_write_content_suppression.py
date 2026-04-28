@@ -12,9 +12,8 @@ from pathlib import Path
 
 import pytest
 
-from src.infrastructure.mcp.artifact_mcp.write._common import _out
 from src.infrastructure.mcp import mcp_artifact_server as mcp
-
+from src.infrastructure.mcp.artifact_mcp.write._common import _out
 
 # ---------------------------------------------------------------------------
 # Fake result dataclass for _out() unit tests

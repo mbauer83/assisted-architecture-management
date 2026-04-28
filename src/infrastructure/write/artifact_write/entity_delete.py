@@ -36,10 +36,11 @@ def _owned_connection_ids(artifact_id: str, outgoing_path: Path) -> list[str]:
     if not outgoing_path.exists():
         return []
     parsed = parse_outgoing_file(outgoing_path)
-    return [
-        f"{artifact_id} {conn['connection_type']} → {conn['target_entity']}"
-        for conn in parsed.connections
-    ]
+    ids: list[str] = []
+    for conn in parsed.connections:
+        ids.append(f"{artifact_id}---{conn['target_entity']}@@{conn['connection_type']}")
+        ids.append(f"{artifact_id} {conn['connection_type']} → {conn['target_entity']}")
+    return ids
 
 
 def _diagram_paths(repo_roots: list[Path]) -> list[Path]:
@@ -81,6 +82,7 @@ def _entity_ref_blockers(
     artifact_id: str,
     entity_file: Path,
     owned_connection_ids: set[str],
+    ignore_diagram_refs: bool = False,
 ) -> tuple[list[str], list[str], list[str]]:
     incoming_connections: list[str] = []
     diagram_refs: list[str] = []
@@ -112,12 +114,13 @@ def _entity_ref_blockers(
             ):
                 grf_refs.append(str(fm.get("artifact-id", other_entity.stem)))
 
-    for diagram_path in _diagram_paths(registry.repo_roots):
-        refs = parse_diagram_refs(diagram_path) or {}
-        entity_ids = set(refs.get("entity_ids", []))
-        conn_ids = set(refs.get("connection_ids", []))
-        if artifact_id in entity_ids or owned_connection_ids.intersection(conn_ids):
-            diagram_refs.append(diagram_path.stem)
+    if not ignore_diagram_refs:
+        for diagram_path in _diagram_paths(registry.repo_roots):
+            refs = parse_diagram_refs(diagram_path) or {}
+            entity_ids = set(refs.get("entity_ids", []))
+            conn_ids = set(refs.get("connection_ids", []))
+            if artifact_id in entity_ids or owned_connection_ids.intersection(conn_ids):
+                diagram_refs.append(diagram_path.stem)
 
     return incoming_connections, diagram_refs, grf_refs
 
@@ -127,7 +130,9 @@ def _delete_entity_core(
     repo_root: Path,
     registry: ArtifactRegistry,
     clear_repo_caches: Callable[[Path], None],
+    mark_macros_dirty: Callable[[Path], None] | None = None,
     artifact_id: str,
+    ignore_diagram_refs: bool = False,
     dry_run: bool,
 ) -> WriteResult:
     entity_file = registry.find_file_by_id(artifact_id)
@@ -145,6 +150,7 @@ def _delete_entity_core(
         artifact_id=artifact_id,
         entity_file=entity_file,
         owned_connection_ids=owned_connection_ids,
+        ignore_diagram_refs=ignore_diagram_refs,
     )
     if incoming_connections or diagram_refs or grf_refs:
         tree = _format_dependency_tree(
@@ -184,17 +190,16 @@ def _delete_entity_core(
         )
 
     entity_file.unlink(missing_ok=False)
+    deleted_paths: list[Path] = [entity_file]
     if outgoing_path.exists():
         outgoing_path.unlink()
+        deleted_paths.append(outgoing_path)
 
-    try:
-        from src.infrastructure.rendering.generate_macros import generate_macros
+    if mark_macros_dirty is not None:
+        mark_macros_dirty(repo_root)
 
-        generate_macros(repo_root)
-    except Exception:  # noqa: BLE001
-        warnings.append("Macro regeneration skipped after deletion")
-
-    clear_repo_caches(entity_file)
+    for changed_path in deleted_paths:
+        clear_repo_caches(changed_path)
     return WriteResult(
         wrote=True,
         path=entity_file,
@@ -210,7 +215,9 @@ def delete_entity(
     repo_root: Path,
     registry: ArtifactRegistry,
     clear_repo_caches: Callable[[Path], None],
+    mark_macros_dirty: Callable[[Path], None] | None = None,
     artifact_id: str,
+    ignore_diagram_refs: bool = False,
     dry_run: bool,
 ) -> WriteResult:
     assert_engagement_write_root(repo_root)
@@ -218,6 +225,8 @@ def delete_entity(
         repo_root=repo_root,
         registry=registry,
         clear_repo_caches=clear_repo_caches,
+        mark_macros_dirty=mark_macros_dirty,
         artifact_id=artifact_id,
+        ignore_diagram_refs=ignore_diagram_refs,
         dry_run=dry_run,
     )

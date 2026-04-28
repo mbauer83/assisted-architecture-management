@@ -21,6 +21,9 @@ class WriteQueueStateChanged:
 
     active_jobs: int
     pending_jobs: int
+    active_tool_name: str | None = None
+    active_operation_id: str | None = None
+    active_phase: str | None = None
 
 
 @dataclass(frozen=True)

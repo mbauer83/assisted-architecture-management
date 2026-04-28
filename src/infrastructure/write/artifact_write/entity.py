@@ -5,7 +5,6 @@ from src.application.modeling.artifact_write import ENTITY_TYPES, format_entity_
 from src.application.verification.artifact_verifier import ArtifactVerifier
 from src.config.repo_paths import MODEL
 from src.domain.archimate_types import ALL_ENTITY_TYPES
-from src.infrastructure.rendering.generate_macros import generate_macros
 
 from ._artifact_deduplication import (
     ensure_unique_entity_random_part,
@@ -35,6 +34,7 @@ def create_entity(
     repo_root: Path,
     verifier: ArtifactVerifier,
     clear_repo_caches: Callable[[Path], None],
+    mark_macros_dirty: Callable[[Path], None] | None = None,
     artifact_type: str,
     name: str,
     summary: str | None,
@@ -181,11 +181,8 @@ def create_entity(
             verification=verification_to_entity_dict(path, res),
         )
 
-    try:
-        generate_macros(repo_root)
-    except Exception:  # noqa: BLE001
-        pass
-
+    if mark_macros_dirty is not None:
+        mark_macros_dirty(repo_root)
     clear_repo_caches(path)
 
     return WriteResult(

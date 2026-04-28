@@ -18,6 +18,7 @@ import type {
   DiagramContext,
   DiagramEntityDiscovery,
   WriteResult,
+  SyncDiagramToModelResult,
   DiagramRefs,
   OntologyClassification,
   OntologyPair,
@@ -147,6 +148,9 @@ export interface ModelRepository {
   readonly deleteDiagram: (body: {
     artifact_id: string; dry_run?: boolean;
   }) => Effect.Effect<WriteResult, RepoError>
+  readonly syncDiagramToModel: (body: {
+    artifact_id: string; dry_run?: boolean;
+  }) => Effect.Effect<SyncDiagramToModelResult, RepoError>
   // ── Admin write methods (active only in --admin-mode) ───────────────────
   readonly adminCreateEntity: (body: {
     artifact_type: string; name: string; summary?: string;

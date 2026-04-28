@@ -2,8 +2,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from src.domain.artifact_types import ConnectionRecord, EntityRecord
 from src.domain.archimate_relation_rendering import format_cardinality_label
+from src.domain.artifact_types import ConnectionRecord, EntityRecord
 from src.infrastructure.mcp.artifact_mcp.query_scaffold_tools import artifact_diagram_scaffold
 from src.infrastructure.rendering.diagram_builder import generate_archimate_puml_body
 from src.infrastructure.rendering.generate_macros import generate_macros

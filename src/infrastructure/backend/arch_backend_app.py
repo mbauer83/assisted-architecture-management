@@ -14,12 +14,14 @@ from typing import TYPE_CHECKING, cast
 
 from mcp.server.fastmcp.server import StreamableHTTPASGIApp
 
+from src.infrastructure.artifact_index.coordination import get_write_queue_state_snapshot
 from src.infrastructure.gui.routers import state as gui_state
 from src.infrastructure.mcp.artifact_mcp import auto_start_default_watcher
 from src.infrastructure.mcp.mcp_artifact_server import mcp_read, mcp_write
 
 logger = logging.getLogger(__name__)
-_REQUEST_WATCHDOG_S = 5.0
+_REQUEST_SLOW_WARNING_S = 5.0
+_REQUEST_THREAD_DUMP_S = 20.0
 
 if TYPE_CHECKING:
     from src.infrastructure.git.git_sync import RepoSpec
@@ -60,6 +62,44 @@ def _log_thread_dump(*, reason: str) -> None:
         lines.append(f"--- thread ident={ident} name={name} ---")
         lines.extend(line.rstrip("\n") for line in traceback.format_stack(frame))
     logger.warning("\n".join(lines))
+
+
+def _log_slow_request_warning(*, method: str, path: str, threshold_s: float) -> None:
+    queue_state = get_write_queue_state_snapshot()
+    logger.warning(
+        "HTTP request still running method=%s path=%s threshold_s=%.1f "
+        "active_jobs=%s pending_jobs=%s active_tool=%s active_operation_id=%s active_phase=%s",
+        method,
+        path,
+        threshold_s,
+        queue_state["active_jobs"],
+        queue_state["pending_jobs"],
+        queue_state["active_tool_name"],
+        queue_state["active_operation_id"],
+        queue_state["active_phase"],
+    )
+
+
+def _log_structured_output_tool_inventory() -> None:
+    """Log structured-output tool counts at startup for observability."""
+    read_tools = mcp_read._tool_manager.list_tools()  # type: ignore[attr-defined]
+    write_tools = mcp_write._tool_manager.list_tools()  # type: ignore[attr-defined]
+    read_structured = [t.name for t in read_tools if t.output_schema is not None]
+    write_structured = [t.name for t in write_tools if t.output_schema is not None]
+    if read_structured:
+        logger.info(
+            "Read server: %d structured-output tools: %s",
+            len(read_structured),
+            ", ".join(read_structured),
+        )
+    else:
+        logger.warning("Read server has no structured-output tools — normalizer may not be installed")
+    if write_structured:
+        logger.info(
+            "Write server: %d structured-output tools: %s",
+            len(write_structured),
+            ", ".join(write_structured),
+        )
 
 
 def _build_app(git_ssh_passphrase: str | None = None):  # type: ignore[no-untyped-def]
@@ -110,6 +150,7 @@ def _build_app(git_ssh_passphrase: str | None = None):  # type: ignore[no-untype
             attach_event_loop(asyncio.get_running_loop())
             auto_start_default_watcher()
             logger.info("Default watcher auto-started")
+            _log_structured_output_tool_inventory()
 
             git_repos = _find_git_repos()
             sync_mgr = None
@@ -141,18 +182,29 @@ def _build_app(git_ssh_passphrase: str | None = None):  # type: ignore[no-untype
     @app.middleware("http")
     async def log_requests(request: Request, call_next):  # type: ignore[no-untyped-def]
         started = time.perf_counter()
-        watchdog = threading.Timer(
-            _REQUEST_WATCHDOG_S,
+        slow_watchdog = threading.Timer(
+            _REQUEST_SLOW_WARNING_S,
+            _log_slow_request_warning,
+            kwargs={
+                "method": request.method,
+                "path": request.url.path,
+                "threshold_s": _REQUEST_SLOW_WARNING_S,
+            },
+        )
+        dump_watchdog = threading.Timer(
+            _REQUEST_THREAD_DUMP_S,
             _log_thread_dump,
             kwargs={
                 "reason": (
-                    f"request still running after {_REQUEST_WATCHDOG_S:.1f}s"
+                    f"request still running after {_REQUEST_THREAD_DUMP_S:.1f}s"
                     f" method={request.method} path={request.url.path}"
                 )
             },
         )
-        watchdog.daemon = True
-        watchdog.start()
+        slow_watchdog.daemon = True
+        dump_watchdog.daemon = True
+        slow_watchdog.start()
+        dump_watchdog.start()
         logger.info("HTTP request started method=%s path=%s", request.method, request.url.path)
         try:
             response = await call_next(request)
@@ -166,7 +218,8 @@ def _build_app(git_ssh_passphrase: str | None = None):  # type: ignore[no-untype
             )
             raise
         finally:
-            watchdog.cancel()
+            slow_watchdog.cancel()
+            dump_watchdog.cancel()
         duration_ms = (time.perf_counter() - started) * 1000.0
         logger.info(
             "HTTP request completed method=%s path=%s status=%s duration_ms=%.1f",
@@ -183,6 +236,23 @@ def _build_app(git_ssh_passphrase: str | None = None):  # type: ignore[no-untype
         allow_methods=["*"],
         allow_headers=["*"],
     )
+    @app.get("/health", include_in_schema=False)
+    async def health_check():  # type: ignore[no-untyped-def]
+        from fastapi.responses import JSONResponse
+
+        read_tools = mcp_read._tool_manager.list_tools()  # type: ignore[attr-defined]
+        write_tools = mcp_write._tool_manager.list_tools()  # type: ignore[attr-defined]
+        structured = [t.name for t in read_tools if t.output_schema is not None]
+        return JSONResponse(
+            {
+                "status": "ok",
+                "read_tools": len(read_tools),
+                "write_tools": len(write_tools),
+                "structured_output_tools": len(structured),
+                "structured_output_tool_names": structured,
+            }
+        )
+
     app.include_router(entities_router)
     app.include_router(connections_router)
     app.include_router(diagrams_router)

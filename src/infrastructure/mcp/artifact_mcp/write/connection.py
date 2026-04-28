@@ -8,7 +8,7 @@ from src.infrastructure.mcp.artifact_mcp.tool_annotations import LOCAL_WRITE
 from src.infrastructure.mcp.artifact_mcp.write._common import (
     _out,
     artifact_write_ops,
-    clear_caches_for_repo,
+    authoritative_callbacks_for,
     registry_cached,
     repo_cached,
     resolve_repo_roots,
@@ -30,6 +30,8 @@ def _add_connection_impl(
     dry_run: bool,
     repo_root: str | None,
     provisional_ids: frozenset[str],
+    clear_repo_caches=None,
+    mark_macros_dirty=None,
 ) -> dict[str, object]:
     """Internal implementation shared by the MCP tool and bulk_write."""
     scope: Literal["engagement", "both"] = "engagement" if repo_root else "both"
@@ -43,6 +45,8 @@ def _add_connection_impl(
     registry = registry_cached(both_key)
     verifier = verifier_for(both_key, include_registry=True)
     eng_root = both_roots[0]
+    if clear_repo_caches is None or mark_macros_dirty is None:
+        _context, clear_repo_caches, mark_macros_dirty = authoritative_callbacks_for(eng_root)
 
     effective_source = source_entity
     effective_target = target_entity
@@ -65,7 +69,8 @@ def _add_connection_impl(
             engagement_repo=eng_repo,
             engagement_root=eng_root,
             verifier=verifier,
-            clear_repo_caches=clear_caches_for_repo,
+            clear_repo_caches=clear_repo_caches,
+            mark_macros_dirty=mark_macros_dirty,
             global_artifact_id=global_id,
             global_artifact_name=name,
             global_artifact_type="entity",
@@ -74,7 +79,6 @@ def _add_connection_impl(
         )
         if gar_result.wrote:
             warnings.append(f"Created GAR proxy {gar_result.artifact_id} for {global_id}")
-            clear_caches_for_repo(eng_root)
         else:
             warnings.append(f"Routed via existing GAR proxy {gar_result.artifact_id}")
         full_repo.refresh()
@@ -95,7 +99,7 @@ def _add_connection_impl(
         repo_root=eng_root,
         registry=registry,
         verifier=verifier,
-        clear_repo_caches=clear_caches_for_repo,
+        clear_repo_caches=clear_repo_caches,
         source_entity=effective_source,
         connection_type=connection_type,
         target_entity=effective_target,
@@ -141,7 +145,15 @@ def artifact_add_connection(
     global-entity-reference proxy is created or reused automatically so all
     connection endpoints are represented in the engagement repo.
     """
-    return _add_connection_impl(
+    mutation_context, clear_repo_caches, mark_macros_dirty = authoritative_callbacks_for(
+        resolve_repo_roots(
+            repo_scope="engagement" if repo_root else "both",
+            repo_root=repo_root,
+            repo_preset=None,
+            enterprise_root=None,
+        )[0]
+    )
+    out = _add_connection_impl(
         source_entity=source_entity,
         connection_type=connection_type,
         target_entity=target_entity,
@@ -153,7 +165,12 @@ def artifact_add_connection(
         dry_run=dry_run,
         repo_root=repo_root,
         provisional_ids=frozenset(),
+        clear_repo_caches=clear_repo_caches,
+        mark_macros_dirty=mark_macros_dirty,
     )
+    if not dry_run and (mutation_context.changed_paths or mutation_context.macro_roots):
+        mutation_context.finalize()
+    return out
 
 
 def register(mcp: FastMCP) -> None:

@@ -6,7 +6,7 @@ from src.infrastructure.mcp.artifact_mcp.tool_annotations import LOCAL_WRITE
 from src.infrastructure.mcp.artifact_mcp.write._common import (
     _out,
     artifact_write_ops,
-    clear_caches_for_repo,
+    authoritative_callbacks_for,
     resolve_repo_roots,
     roots_key,
     verifier_for,
@@ -32,10 +32,11 @@ def artifact_create_document(
         repo_preset=None,
         enterprise_root=None,
     )
+    mutation_context, clear_repo_caches, _mark_macros_dirty = authoritative_callbacks_for(roots)
     result = artifact_write_ops.create_document(
         repo_root=roots[0],
         verifier=verifier_for(roots_key(roots), include_registry=False),
-        clear_repo_caches=clear_caches_for_repo,
+        clear_repo_caches=clear_repo_caches,
         doc_type=doc_type,
         title=title,
         body=body,
@@ -47,6 +48,8 @@ def artifact_create_document(
         last_updated=None,
         dry_run=dry_run,
     )
+    if result.wrote and not dry_run:
+        mutation_context.finalize()
     return _out(result, dry_run=dry_run)
 
 
@@ -68,10 +71,11 @@ def artifact_edit_document(
         repo_preset=None,
         enterprise_root=None,
     )
+    mutation_context, clear_repo_caches, _mark_macros_dirty = authoritative_callbacks_for(roots)
     result = artifact_write_ops.edit_document(
         repo_root=roots[0],
         verifier=verifier_for(roots_key(roots), include_registry=False),
-        clear_repo_caches=clear_caches_for_repo,
+        clear_repo_caches=clear_repo_caches,
         artifact_id=artifact_id,
         title=title,
         body=body,
@@ -82,6 +86,8 @@ def artifact_edit_document(
         last_updated=None,
         dry_run=dry_run,
     )
+    if result.wrote and not dry_run:
+        mutation_context.finalize()
     return _out(result, dry_run=dry_run)
 
 
@@ -97,12 +103,15 @@ def artifact_delete_document(
         repo_preset=None,
         enterprise_root=None,
     )
+    mutation_context, clear_repo_caches, _mark_macros_dirty = authoritative_callbacks_for(roots)
     result = artifact_write_ops.delete_document(
         repo_root=roots[0],
-        clear_repo_caches=clear_caches_for_repo,
+        clear_repo_caches=clear_repo_caches,
         artifact_id=artifact_id,
         dry_run=dry_run,
     )
+    if result.wrote and not dry_run:
+        mutation_context.finalize()
     return _out(result, dry_run=dry_run)
 
 

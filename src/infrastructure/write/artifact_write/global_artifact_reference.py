@@ -17,7 +17,6 @@ from src.application.modeling.artifact_write import ENTITY_TYPES, generate_entit
 from src.application.modeling.artifact_write_formatting import format_entity_markdown
 from src.application.verification.artifact_verifier import ArtifactVerifier
 from src.config.repo_paths import MODEL
-from src.infrastructure.rendering.generate_macros import generate_macros
 
 from .boundary import assert_engagement_write_root, today_iso
 from .types import WriteResult
@@ -42,6 +41,7 @@ def ensure_global_artifact_reference(
     engagement_root: Path,
     verifier: ArtifactVerifier,
     clear_repo_caches: Callable[[Path], None],
+    mark_macros_dirty: Callable[[Path], None] | None = None,
     global_artifact_id: str,
     global_artifact_name: str,
     global_artifact_type: str,  # "entity" | "document" | "diagram"
@@ -130,10 +130,8 @@ def ensure_global_artifact_reference(
             },
         )
 
-    try:
-        generate_macros(engagement_root)
-    except Exception:  # noqa: BLE001
-        pass
+    if mark_macros_dirty is not None:
+        mark_macros_dirty(engagement_root)
     clear_repo_caches(path)
 
     return WriteResult(

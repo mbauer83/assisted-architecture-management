@@ -9,6 +9,7 @@ from .connection_edit import edit_connection, edit_connection_associations, remo
 from .diagram import create_diagram
 from .diagram_delete import delete_diagram
 from .diagram_edit import edit_diagram
+from .diagram_sync import sync_diagram_to_model
 from .document import create_document, delete_document, edit_document
 from .entity import create_entity
 from .entity_delete import delete_entity
@@ -16,9 +17,10 @@ from .entity_edit import edit_entity, promote_entity
 from .help import write_help
 from .matrix import create_matrix
 from .type_guidance import get_type_guidance
-from .types import WriteResult
+from .types import SyncDiagramToModelResult, WriteResult
 
 __all__ = [
+    "SyncDiagramToModelResult",
     "WriteResult",
     "write_help",
     "create_entity",
@@ -31,6 +33,7 @@ __all__ = [
     "remove_connection",
     "create_diagram",
     "edit_diagram",
+    "sync_diagram_to_model",
     "delete_diagram",
     "create_matrix",
     "get_type_guidance",

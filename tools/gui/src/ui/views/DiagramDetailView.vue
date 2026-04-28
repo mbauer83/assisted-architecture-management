@@ -5,7 +5,7 @@ import { Effect, Exit } from 'effect'
 import { marked } from 'marked'
 import DOMPurify from 'dompurify'
 import { modelServiceKey } from '../keys'
-import type { DiagramContext, EntityDetail, DiagramConnection, WriteResult } from '../../domain'
+import type { DiagramContext, EntityDetail, DiagramConnection, WriteResult, SyncDiagramToModelResult } from '../../domain'
 import type { RepoError } from '../../ports/ModelRepository'
 import type { NotFoundError } from '../../domain'
 import type { MarkdownError } from '../../application/MarkdownService'
@@ -27,6 +27,7 @@ const contextQuery = useQuery<DiagramContext, RepoError | NotFoundError>()
 const svgQuery = useQuery<string, RepoError>()
 const entityQuery = useQuery<EntityDetail, RepoError | NotFoundError | MarkdownError>()
 const deleteMutation = useMutation<WriteResult, RepoError>()
+const syncMutation = useMutation<SyncDiagramToModelResult, RepoError>()
 
 const detail = computed(() => contextQuery.data.value?.diagram ?? null)
 const diagramEntities = computed(() =>
@@ -66,6 +67,14 @@ const deleteError = computed(() => {
   const r = deleteMutation.result.value
   if (r && !r.wrote) return r.content ?? 'Delete failed'
   return deleteMutation.errorMessage.value
+})
+
+const confirmSync = ref(false)
+const syncPreview = ref<SyncDiagramToModelResult | null>(null)
+const syncError = computed(() => {
+  const r = syncMutation.result.value
+  if (r && !r.wrote) return r.content ?? 'Sync failed'
+  return syncMutation.errorMessage.value
 })
 
 // ── SVG rendering ─────────────────────────────────────────────────────────────
@@ -375,6 +384,41 @@ const executeDelete = () => {
     }))
 }
 
+// ── Sync to model ─────────────────────────────────────────────────────────────
+
+const previewSync = () => {
+  if (!diagramId.value) return
+  confirmSync.value = true
+  syncPreview.value = null
+  syncMutation.reset()
+  void syncMutation.run(svc.syncDiagramToModel({ artifact_id: diagramId.value, dry_run: true }))
+    .then((exit) => Exit.match(exit, {
+      onSuccess: (r) => { syncPreview.value = r },
+      onFailure: () => {},
+    }))
+}
+
+const cancelSync = () => {
+  confirmSync.value = false
+  syncPreview.value = null
+  syncMutation.reset()
+}
+
+const executeSync = () => {
+  if (!diagramId.value) return
+  void syncMutation.run(svc.syncDiagramToModel({ artifact_id: diagramId.value, dry_run: false }))
+    .then((exit) => Exit.match(exit, {
+      onSuccess: (r) => {
+        if (r.wrote) {
+          confirmSync.value = false
+          syncPreview.value = null
+          load()
+        }
+      },
+      onFailure: () => {},
+    }))
+}
+
 watch(containerRef, (el, prev) => {
   prev?.removeEventListener('wheel', onWheel)
   el?.addEventListener('wheel', onWheel, { passive: false })
@@ -431,6 +475,13 @@ onUnmounted(() => {
       >
         Edit
       </RouterLink>
+      <button
+        v-if="detail && !isGlobalDiagram"
+        class="sync-btn"
+        @click="previewSync"
+      >
+        Sync to model
+      </button>
       <button
         v-if="detail && (!isGlobalDiagram || adminMode)"
         class="delete-btn"
@@ -622,6 +673,71 @@ onUnmounted(() => {
       </div>
 
       <div
+        v-if="confirmSync"
+        class="sync-panel"
+      >
+        <div class="sync-title">
+          Sync diagram to model
+        </div>
+        <div class="sync-text">
+          Entities and connections no longer in the model will be removed; names will be refreshed.
+        </div>
+        <template v-if="syncPreview">
+          <div
+            v-if="syncPreview.removed_entity_ids.length || syncPreview.removed_connection_ids.length"
+            class="sync-removed"
+          >
+            <span v-if="syncPreview.removed_entity_ids.length">
+              {{ syncPreview.removed_entity_ids.length }} stale
+              {{ syncPreview.removed_entity_ids.length === 1 ? 'entity' : 'entities' }} will be removed.
+            </span>
+            <span v-if="syncPreview.removed_connection_ids.length">
+              {{ syncPreview.removed_connection_ids.length }} stale
+              {{ syncPreview.removed_connection_ids.length === 1 ? 'connection' : 'connections' }} will be removed.
+            </span>
+          </div>
+          <div
+            v-else
+            class="sync-uptodate"
+          >
+            Diagram is already up to date — no stale references found.
+          </div>
+          <div
+            v-if="syncPreview.warnings.length"
+            class="preview-warnings"
+          >
+            <div
+              v-for="w in syncPreview.warnings"
+              :key="w"
+              class="preview-warn"
+            >
+              {{ w }}
+            </div>
+          </div>
+        </template>
+        <pre
+          v-if="syncError"
+          class="state err state-block"
+        >{{ syncError }}</pre>
+        <div class="sync-actions">
+          <button
+            class="toggle-btn"
+            :disabled="syncMutation.running.value"
+            @click="cancelSync"
+          >
+            Cancel
+          </button>
+          <button
+            class="sync-confirm-btn"
+            :disabled="syncMutation.running.value || !syncPreview"
+            @click="executeSync"
+          >
+            {{ syncMutation.running.value ? 'Syncing…' : 'Apply sync' }}
+          </button>
+        </div>
+      </div>
+
+      <div
         v-if="confirmDelete"
         class="delete-panel"
       >
@@ -745,6 +861,17 @@ onUnmounted(() => {
 .zoom-hint { position: absolute; bottom: 6px; left: 50%; transform: translateX(-50%); font-size: 11px; color: #9ca3af; background: rgba(255,255,255,.8); padding: 2px 8px; border-radius: 4px; pointer-events: none; white-space: nowrap; }
 
 .card { background: white; border-radius: 8px; border: 1px solid #e5e7eb; }
+.sync-btn { padding: 5px 16px; background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 6px; font-size: 13px; font-weight: 600; color: #1d4ed8; cursor: pointer; flex-shrink: 0; }
+.sync-btn:hover { background: #dbeafe; }
+.sync-panel { margin-top: 16px; padding: 16px; background: #f0f9ff; border: 1px solid #bae6fd; border-radius: 8px; }
+.sync-title { font-size: 14px; font-weight: 700; color: #0c4a6e; margin-bottom: 6px; }
+.sync-text { font-size: 13px; color: #0369a1; margin-bottom: 10px; }
+.sync-removed { font-size: 13px; color: #b45309; background: #fffbeb; border: 1px solid #fde68a; border-radius: 6px; padding: 8px 10px; margin-bottom: 10px; display: flex; flex-direction: column; gap: 2px; }
+.sync-uptodate { font-size: 13px; color: #166534; background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 6px; padding: 8px 10px; margin-bottom: 10px; }
+.sync-actions { display: flex; gap: 8px; justify-content: flex-end; }
+.sync-confirm-btn { padding: 5px 16px; background: #2563eb; border: none; border-radius: 6px; font-size: 13px; font-weight: 600; color: white; cursor: pointer; }
+.sync-confirm-btn:hover:not(:disabled) { background: #1d4ed8; }
+.sync-confirm-btn:disabled { opacity: .5; cursor: not-allowed; }
 .delete-panel { margin-top: 16px; padding: 16px; background: #fff7f7; border: 1px solid #fecaca; border-radius: 8px; }
 .delete-title { font-size: 14px; font-weight: 700; color: #991b1b; margin-bottom: 6px; }
 .delete-text { font-size: 13px; color: #7f1d1d; margin-bottom: 10px; }

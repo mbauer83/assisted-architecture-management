@@ -8,7 +8,7 @@ from src.infrastructure.artifact_index.coordination import suppress_redundant_re
 from src.infrastructure.mcp.artifact_mcp.context import (
     RepoPreset,
     RepoScope,
-    enqueue_refresh_for_roots,
+    enqueue_background_refresh,
     resolve_repo_roots,
 )
 
@@ -96,9 +96,13 @@ def _watcher_loop(
             force = periodic_refresh_s is not None and (now - last_periodic) >= periodic_refresh_s
             if changed_paths or force or must_full_refresh:
                 if force or must_full_refresh or len(changed_paths) > 64:
-                    enqueue_refresh_for_roots(roots, full_refresh=True)
+                    enqueue_background_refresh(roots, full_refresh=True)
                 else:
-                    enqueue_refresh_for_roots(roots, changed_paths=changed_paths)
+                    enqueue_background_refresh(
+                        roots,
+                        changed_paths=changed_paths,
+                        full_refresh=False,
+                    )
                 last_snapshot = snapshot
                 if force:
                     last_periodic = now

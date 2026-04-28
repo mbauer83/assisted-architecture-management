@@ -288,6 +288,35 @@ def edit_matrix_gui(body: EditMatrixBody) -> dict[str, Any]:
     return s.write_result_to_dict(result)
 
 
+class SyncDiagramToModelBody(BaseModel):
+    artifact_id: str
+    dry_run: bool = True
+
+
+@router.post("/api/diagram/sync")
+def sync_diagram_to_model_gui(body: SyncDiagramToModelBody) -> dict[str, Any]:
+    from src.infrastructure.write.artifact_write.diagram_sync import sync_diagram_to_model
+
+    repo = s.get_repo()
+    repo_root, _, verifier = s.get_write_deps()
+    try:
+        result = s.run_serialized_write(
+            sync_diagram_to_model,
+            repo_root=repo_root,
+            store=repo,
+            verifier=verifier,
+            clear_repo_caches=s.clear_caches,
+            artifact_id=body.artifact_id,
+            dry_run=body.dry_run,
+        )
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+    d = s.write_result_to_dict(result)
+    d["removed_entity_ids"] = result.removed_entity_ids
+    d["removed_connection_ids"] = result.removed_connection_ids
+    return d
+
+
 @router.post("/api/diagram/remove")
 def delete_diagram_gui(body: DeleteDiagramBody) -> dict[str, Any]:
     from src.infrastructure.write.artifact_write.diagram_delete import delete_diagram

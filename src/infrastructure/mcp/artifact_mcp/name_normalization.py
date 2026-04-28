@@ -44,7 +44,33 @@ def install_call_tool_normalizer(mcp: FastMCP) -> None:
         if normalized != name:
             logger.info("Normalized incoming tool name %r -> %r", name, normalized)
         context = mcp.get_context()
-        # Get raw Python result; convert dict/list to compact YAML for token efficiency
+        tool = mcp._tool_manager.get_tool(normalized)  # type: ignore[attr-defined]
+
+        if tool is not None and tool.output_schema is not None:
+            # Structured-output tool: use convert_result=True to get the
+            # (content_list, structured_dict) tuple, then replace the JSON
+            # text content with compact YAML for token efficiency while
+            # preserving the structured dict required by outputSchema.
+            result = await mcp._tool_manager.call_tool(  # type: ignore[attr-defined]
+                normalized, arguments, context=context, convert_result=True
+            )
+            if isinstance(result, tuple) and len(result) == 2:
+                _, structured = result
+                yaml_text = _dump_yaml_text(structured)
+                return ([TextContent(type="text", text=yaml_text)], structured)
+            # MCP contract violation: outputSchema tools must return (list, dict).
+            # Returning a bare list here will cause "outputSchema defined but no
+            # structured output returned" deep in the MCP stack.
+            logger.error(
+                "Structured-output tool %r returned %r instead of (list, dict) tuple; "
+                "MCP will reject this response. Check that convert_result=True is used "
+                "and that the tool function returns a dict.",
+                normalized,
+                type(result).__name__,
+            )
+            return result
+
+        # Non-structured tool: get raw Python result and convert to compact YAML.
         result = await mcp._tool_manager.call_tool(  # type: ignore[attr-defined]
             normalized,
             arguments,
@@ -55,7 +81,6 @@ def install_call_tool_normalizer(mcp: FastMCP) -> None:
             yaml_text = _dump_yaml_text(result)
             return [TextContent(type="text", text=yaml_text)]
         # Fall back to FastMCP normal conversion for strings, ContentBlocks, etc.
-        tool = mcp._tool_manager.get_tool(normalized)  # type: ignore[attr-defined]
         if tool is None:
             return [TextContent(type="text", text=str(result))]
         return tool.fn_metadata.convert_result(result)

@@ -1,15 +1,16 @@
 """MCP tool definitions for editing entities, connections, and diagrams."""
 
 from pathlib import Path
-from typing import Any
+from typing import Any, Final, Literal
 
 from mcp.server.fastmcp import FastMCP  # type: ignore[import-not-found]
 
 from src.application.verification.artifact_verifier import ArtifactVerifier
 from src.application.verification.artifact_verifier_registry import ArtifactRegistry
 from src.infrastructure.mcp.artifact_mcp.context import (
-    clear_caches_for_repo,
+    authoritative_callbacks_for,
     registry_cached,
+    repo_cached,
     resolve_repo_roots,
     roots_key,
     verifier_for,
@@ -17,6 +18,8 @@ from src.infrastructure.mcp.artifact_mcp.context import (
 from src.infrastructure.mcp.artifact_mcp.tool_annotations import DESTRUCTIVE_LOCAL_WRITE, LOCAL_WRITE
 from src.infrastructure.mcp.artifact_mcp.write._common import _out
 from src.infrastructure.write import artifact_write_ops
+
+PUML_AUTO_SYNC: Final[Literal["auto-sync"]] = "auto-sync"
 
 
 def _result_dict(dry_run: bool, result: artifact_write_ops.WriteResult) -> dict[str, object]:
@@ -44,6 +47,16 @@ def _require_registry(registry: ArtifactRegistry | None) -> ArtifactRegistry:
     return registry
 
 
+def _finalize_authoritative_write(
+    dry_run: bool,
+    result: artifact_write_ops.WriteResult,
+    mutation_context,
+) -> dict[str, object]:
+    if result.wrote and not dry_run:
+        mutation_context.finalize()
+    return _result_dict(dry_run, result)
+
+
 def artifact_edit_entity(
     *,
     artifact_id: str,
@@ -59,6 +72,7 @@ def artifact_edit_entity(
 ) -> dict[str, object]:
     root, registry, verifier = _resolve(repo_root, need_registry=True)
     registry = _require_registry(registry)
+    mutation_context, clear_repo_caches, mark_macros_dirty = authoritative_callbacks_for(root)
 
     kwargs: dict[str, Any] = {}
     if name is not None:
@@ -80,12 +94,13 @@ def artifact_edit_entity(
         repo_root=root,
         registry=registry,
         verifier=verifier,
-        clear_repo_caches=clear_caches_for_repo,
+        clear_repo_caches=clear_repo_caches,
+        mark_macros_dirty=mark_macros_dirty,
         artifact_id=artifact_id,
         dry_run=dry_run,
         **kwargs,
     )
-    return _result_dict(dry_run, result)
+    return _finalize_authoritative_write(dry_run, result, mutation_context)
 
 
 _EDIT_CONN_UNSET = object()
@@ -110,13 +125,14 @@ def artifact_edit_connection(
     """
     root, registry, verifier = _resolve(repo_root, need_registry=True)
     registry = _require_registry(registry)
+    mutation_context, clear_repo_caches, _mark_macros_dirty = authoritative_callbacks_for(root)
 
     if operation == "remove":
         result = artifact_write_ops.remove_connection(
             repo_root=root,
             registry=registry,
             verifier=verifier,
-            clear_repo_caches=clear_caches_for_repo,
+            clear_repo_caches=clear_repo_caches,
             source_entity=source_entity,
             target_entity=target_entity,
             connection_type=connection_type,
@@ -129,7 +145,7 @@ def artifact_edit_connection(
             repo_root=root,
             registry=registry,
             verifier=verifier,
-            clear_repo_caches=clear_caches_for_repo,
+            clear_repo_caches=clear_repo_caches,
             source_entity=source_entity,
             target_entity=target_entity,
             connection_type=connection_type,
@@ -138,13 +154,13 @@ def artifact_edit_connection(
             tgt_cardinality=tgt_cardinality if tgt_cardinality is not None else _UNSET,
             dry_run=dry_run,
         )
-    return _result_dict(dry_run, result)
+    return _finalize_authoritative_write(dry_run, result, mutation_context)
 
 
 def artifact_edit_diagram(
     *,
     artifact_id: str,
-    puml: str | None = None,
+    puml: str | Literal["auto-sync"] | None = None,
     name: str | None = None,
     keywords: list[str] | None = None,
     version: str | None = None,
@@ -152,7 +168,29 @@ def artifact_edit_diagram(
     dry_run: bool = True,
     repo_root: str | None = None,
 ) -> dict[str, object]:
-    root, _registry, verifier = _resolve(repo_root, need_registry=True)
+    roots = resolve_repo_roots(
+        repo_scope="engagement", repo_root=repo_root, repo_preset=None, enterprise_root=None
+    )
+    key = roots_key(roots)
+    root = roots[0]
+    verifier = verifier_for(key, include_registry=False)
+    mutation_context, clear_repo_caches, _mark_macros_dirty = authoritative_callbacks_for(roots)
+
+    if puml == PUML_AUTO_SYNC:
+        store = repo_cached(key)
+        result = artifact_write_ops.sync_diagram_to_model(
+            repo_root=root,
+            store=store,
+            verifier=verifier,
+            clear_repo_caches=clear_repo_caches,
+            artifact_id=artifact_id,
+            dry_run=dry_run,
+        )
+        out = _finalize_authoritative_write(dry_run, result, mutation_context)
+        out["removed_entity_ids"] = result.removed_entity_ids
+        out["removed_connection_ids"] = result.removed_connection_ids
+        out["deleted_diagram"] = result.deleted_diagram
+        return out
 
     kwargs: dict[str, Any] = {}
     if puml is not None:
@@ -169,12 +207,12 @@ def artifact_edit_diagram(
     result = artifact_write_ops.edit_diagram(
         repo_root=root,
         verifier=verifier,
-        clear_repo_caches=clear_caches_for_repo,
+        clear_repo_caches=clear_repo_caches,
         artifact_id=artifact_id,
         dry_run=dry_run,
         **kwargs,
     )
-    return _result_dict(dry_run, result)
+    return _finalize_authoritative_write(dry_run, result, mutation_context)
 
 
 def artifact_edit_connection_associations(
@@ -190,13 +228,14 @@ def artifact_edit_connection_associations(
     """Add or remove second-order association entity IDs from a connection."""
     root, registry, verifier = _resolve(repo_root, need_registry=True)
     registry = _require_registry(registry)
+    mutation_context, clear_repo_caches, _mark_macros_dirty = authoritative_callbacks_for(root)
     from src.infrastructure.write.artifact_write.connection_edit import edit_connection_associations
 
     result = edit_connection_associations(
         repo_root=root,
         registry=registry,
         verifier=verifier,
-        clear_repo_caches=clear_caches_for_repo,
+        clear_repo_caches=clear_repo_caches,
         source_entity=source_entity,
         connection_type=connection_type,
         target_entity=target_entity,
@@ -204,7 +243,7 @@ def artifact_edit_connection_associations(
         remove_entities=remove_entities,
         dry_run=dry_run,
     )
-    return _result_dict(dry_run, result)
+    return _finalize_authoritative_write(dry_run, result, mutation_context)
 
 
 def artifact_delete_entity(
@@ -215,14 +254,16 @@ def artifact_delete_entity(
 ) -> dict[str, object]:
     root, registry, _verifier = _resolve(repo_root, need_registry=True)
     registry = _require_registry(registry)
+    mutation_context, clear_repo_caches, mark_macros_dirty = authoritative_callbacks_for(root)
     result = artifact_write_ops.delete_entity(
         repo_root=root,
         registry=registry,
-        clear_repo_caches=clear_caches_for_repo,
+        clear_repo_caches=clear_repo_caches,
+        mark_macros_dirty=mark_macros_dirty,
         artifact_id=artifact_id,
         dry_run=dry_run,
     )
-    return _result_dict(dry_run, result)
+    return _finalize_authoritative_write(dry_run, result, mutation_context)
 
 
 def artifact_delete_diagram(
@@ -232,13 +273,14 @@ def artifact_delete_diagram(
     repo_root: str | None = None,
 ) -> dict[str, object]:
     root, _registry, _verifier = _resolve(repo_root, need_registry=False)
+    mutation_context, clear_repo_caches, _mark_macros_dirty = authoritative_callbacks_for(root)
     result = artifact_write_ops.delete_diagram(
         repo_root=root,
-        clear_repo_caches=clear_caches_for_repo,
+        clear_repo_caches=clear_repo_caches,
         artifact_id=artifact_id,
         dry_run=dry_run,
     )
-    return _result_dict(dry_run, result)
+    return _finalize_authoritative_write(dry_run, result, mutation_context)
 
 
 def register_edit_tools(mcp: FastMCP) -> None:
@@ -274,9 +316,14 @@ def register_edit_tools(mcp: FastMCP) -> None:
         name="artifact_edit_diagram",
         title="Artifact Write: Edit Diagram",
         description=(
-            "Edit an existing diagram. If puml is provided, replaces PUML body with "
-            "auto-layout re-applied. Frontmatter fields (name, keywords, version, status) "
-            "updated if provided. Re-verifies and re-renders PNG."
+            "Edit an existing diagram. "
+            "Pass puml='auto-sync' to reconcile the diagram against the current model: "
+            "entities and connections no longer present in the repository are removed, "
+            "names are refreshed, and PUML is regenerated. The response then includes "
+            "removed_entity_ids and removed_connection_ids. "
+            "Pass an explicit PUML string to replace the body with auto-layout re-applied. "
+            "Frontmatter fields (name, keywords, version, status) updated if provided. "
+            "Re-verifies and re-renders PNG on every write."
         ),
         annotations=LOCAL_WRITE,
         structured_output=True,

@@ -6,7 +6,6 @@ from pathlib import Path
 from src.application.modeling.artifact_write import format_entity_markdown, slugify
 from src.application.verification.artifact_verifier import ArtifactRegistry, ArtifactVerifier
 from src.config.repo_paths import MODEL
-from src.infrastructure.rendering.generate_macros import generate_macros
 
 from ._artifact_deduplication import get_repository, validate_entity_unique
 from .boundary import assert_engagement_write_root, today_iso
@@ -60,6 +59,7 @@ def edit_entity(
     registry: ArtifactRegistry,
     verifier: ArtifactVerifier,
     clear_repo_caches: Callable[[Path], None],
+    mark_macros_dirty: Callable[[Path], None] | None = None,
     artifact_id: str,
     name: str | None = None,
     summary: object = _UNSET,
@@ -207,11 +207,8 @@ def edit_entity(
             verification=verification_to_entity_dict(target_entity_file, res),
         )
 
-    if name is not None:
-        try:
-            generate_macros(repo_root)
-        except Exception:  # noqa: BLE001
-            pass
+    if name is not None and mark_macros_dirty is not None:
+        mark_macros_dirty(repo_root)
 
     if target_entity_file != entity_file:
         for changed_path in [entity_file, target_entity_file, *renamed_paths]:
@@ -234,6 +231,7 @@ def promote_entity(
     registry: ArtifactRegistry,
     verifier: ArtifactVerifier,
     clear_repo_caches: Callable[[Path], None],
+    mark_macros_dirty: Callable[[Path], None] | None = None,
     artifact_id: str,
     dry_run: bool,
 ) -> WriteResult:
@@ -272,6 +270,7 @@ def promote_entity(
         registry=registry,
         verifier=verifier,
         clear_repo_caches=clear_repo_caches,
+        mark_macros_dirty=mark_macros_dirty,
         artifact_id=artifact_id,
         status=next_status,
         version=new_version,
