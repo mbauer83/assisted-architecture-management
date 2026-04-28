@@ -12,22 +12,13 @@ entity-ids-used:
 - ASS@1776628142.9YWsDh.implicit-system-interdependencies-are-unmaintainable-without-explicit-models
 - DRV@1712870400.Rt6Yu2.increasing-demand-for-more-autonomy-of-teams-systems
 - ASS@1776628140.s68vVo.llm-based-agents-cannot-effectively-use-unstructured-architectural-knowledge
-- DRV@1776760327.CuhLPB.need-to-balance-organizational-differentiation-with-integration
-- DRV@1712870400.Ui5Op3.rising-complexity-and-interdependence
 connection-ids-used:
-- DRV@1712870400.Ui5Op3.rising-complexity-and-interdependence---ASS@1776628142.9YWsDh.implicit-system-interdependencies-are-unmaintainable-without-explicit-models@@archimate-influence
-- DRV@1776760327.CuhLPB.need-to-balance-organizational-differentiation-with-integration---DRV@1712870400.Ui5Op3.rising-complexity-and-interdependence@@archimate-association
-- DRV@1776760327.CuhLPB.need-to-balance-organizational-differentiation-with-integration---ASS@1776628134.EI3FpR.ai-code-generation-volume-outpaces-sequential-architectural-review-capacity@@archimate-influence
-- DRV@1776760327.CuhLPB.need-to-balance-organizational-differentiation-with-integration---DRV@1776628131.GR9prv.ai-assisted-development-as-dominant-production-mode@@archimate-association
 - DRV@1712870400.Rt6Yu2.increasing-demand-for-more-autonomy-of-teams-systems---ASS@1776628138.a6vxyj.centralized-governance-cannot-scale-to-concurrent-development-contexts@@archimate-influence
 - DRV@1776628131.GR9prv.ai-assisted-development-as-dominant-production-mode---DRV@1712870400.Rt6Yu2.increasing-demand-for-more-autonomy-of-teams-systems@@archimate-association
 - DRV@1776628131.GR9prv.ai-assisted-development-as-dominant-production-mode---ASS@1776628134.EI3FpR.ai-code-generation-volume-outpaces-sequential-architectural-review-capacity@@archimate-influence
 - DRV@1776628131.GR9prv.ai-assisted-development-as-dominant-production-mode---ASS@1776628138.a6vxyj.centralized-governance-cannot-scale-to-concurrent-development-contexts@@archimate-influence
 - DRV@1776628131.GR9prv.ai-assisted-development-as-dominant-production-mode---ASS@1776628140.s68vVo.llm-based-agents-cannot-effectively-use-unstructured-architectural-knowledge@@archimate-influence
-- DRV@1776628131.GR9prv.ai-assisted-development-as-dominant-production-mode---DRV@1712870400.Ui5Op3.rising-complexity-and-interdependence@@archimate-association
-- DRV@1712870400.Rt6Yu2.increasing-demand-for-more-autonomy-of-teams-systems---DRV@1712870400.Ui5Op3.rising-complexity-and-interdependence@@archimate-association
-- DRV@1712870400.Rt6Yu2.increasing-demand-for-more-autonomy-of-teams-systems---DRV@1776760327.CuhLPB.need-to-balance-organizational-differentiation-with-integration@@archimate-association
-last-updated: '2026-04-21'
+last-updated: '2026-04-28'
 ---
 @startuml drivers-and-assessments
 !include ../_archimate-stereotypes.puml
@@ -39,12 +30,8 @@ title Drivers and Assessments
 rectangle "Drivers" <<MotivationGrouping>> {
   rectangle "<$archimate_Driver{scale=1.5}> AI-Assisted Development as Dominant Production Mode" <<Driver>> as DRV_GR9prv
   rectangle "<$archimate_Driver{scale=1.5}> Increasing Demand for More Autonomy of Teams & Systems" <<Driver>> as DRV_Rt6Yu2
-  rectangle "<$archimate_Driver{scale=1.5}> Need to Balance Organizational Differentiation with Integration" <<Driver>> as DRV_CuhLPB
-  rectangle "<$archimate_Driver{scale=1.5}> Rising Complexity and Interdependence" <<Driver>> as DRV_Ui5Op3
 }
 DRV_GR9prv -[hidden]right- DRV_Rt6Yu2
-DRV_Rt6Yu2 -[hidden]right- DRV_CuhLPB
-DRV_CuhLPB -[hidden]right- DRV_Ui5Op3
 
 rectangle "Assessments" <<MotivationGrouping>> {
   rectangle "<$archimate_Assessment{scale=1.5}> AI Code Generation Volume Outpaces Architectural Planning and Review Capacity" <<Assessment>> as ASS_EI3FpR
@@ -55,20 +42,13 @@ rectangle "Assessments" <<MotivationGrouping>> {
 ASS_EI3FpR -[hidden]down- ASS_a6vxyj
 ASS_a6vxyj -[hidden]down- ASS_9YWsDh
 ASS_9YWsDh -[hidden]down- ASS_s68vVo
-DRV_Ui5Op3 -[hidden]down- ASS_EI3FpR
+DRV_Rt6Yu2 -[hidden]down- ASS_EI3FpR
 
 ' Connections
-Rel_Influence_Down(DRV_Ui5Op3, ASS_9YWsDh, "")
-Rel_Association(DRV_CuhLPB, DRV_Ui5Op3, "")
-Rel_Influence_Down(DRV_CuhLPB, ASS_EI3FpR, "")
-Rel_Association(DRV_CuhLPB, DRV_GR9prv, "")
 Rel_Influence_Down(DRV_Rt6Yu2, ASS_a6vxyj, "")
 Rel_Association(DRV_GR9prv, DRV_Rt6Yu2, "")
 Rel_Influence_Down(DRV_GR9prv, ASS_EI3FpR, "")
 Rel_Influence_Down(DRV_GR9prv, ASS_a6vxyj, "")
 Rel_Influence_Down(DRV_GR9prv, ASS_s68vVo, "")
-Rel_Association(DRV_GR9prv, DRV_Ui5Op3, "")
-Rel_Association(DRV_Rt6Yu2, DRV_Ui5Op3, "")
-Rel_Association(DRV_Rt6Yu2, DRV_CuhLPB, "")
 
 @enduml
