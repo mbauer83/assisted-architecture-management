@@ -292,8 +292,17 @@
 !procedure $DECL_PRC_U4aAdh()
   rectangle "<$archimate_Process{scale=1.5}> Architecture Modelling & Planning" <<Process>> as PRC_U4aAdh
 !endprocedure
+!procedure $DECL_PRC_gtgYvQ()
+  rectangle "<$archimate_Process{scale=1.5}> Execute Staged Bulk Operation" <<Process>> as PRC_gtgYvQ
+!endprocedure
+!procedure $DECL_PRC_tEdRzw()
+  rectangle "<$archimate_Process{scale=1.5}> Synchronize With Remote Repository" <<Process>> as PRC_tEdRzw
+!endprocedure
 !procedure $DECL_PRC_vlE_5j()
   rectangle "<$archimate_Process{scale=1.5}> Architecture Conformance Review" <<Process>> as PRC_vlE_5j
+!endprocedure
+!procedure $DECL_PRC_wqtZ0P()
+  rectangle "<$archimate_Process{scale=1.5}> Coordinate Repository State" <<Process>> as PRC_wqtZ0P
 !endprocedure
 !procedure $DECL_FNC_3ZsfnT()
   rectangle "<$archimate_Function{scale=1.5}> Broadcast Model Update" <<Function>> as FNC_3ZsfnT
@@ -304,14 +313,23 @@
 !procedure $DECL_FNC_3seqIw()
   rectangle "<$archimate_Function{scale=1.5}> Retrieve Architectural Context" <<Function>> as FNC_3seqIw
 !endprocedure
+!procedure $DECL_FNC_4LZhtI()
+  rectangle "<$archimate_Function{scale=1.5}> Implement the Change" <<Function>> as FNC_4LZhtI
+!endprocedure
 !procedure $DECL_FNC_4ce2Qt()
   rectangle "<$archimate_Function{scale=1.5}> Synthesize Implementation Guidance" <<Function>> as FNC_4ce2Qt
 !endprocedure
 !procedure $DECL_FNC_54UnNB()
   rectangle "<$archimate_Function{scale=1.5}> Validate Promotion Selection" <<Function>> as FNC_54UnNB
 !endprocedure
+!procedure $DECL_FNC_6PI0kV()
+  rectangle "<$archimate_Function{scale=1.5}> Verify Staged Repository" <<Function>> as FNC_6PI0kV
+!endprocedure
 !procedure $DECL_FNC_6xjXsw()
   rectangle "<$archimate_Function{scale=1.5}> Execute Promotion" <<Function>> as FNC_6xjXsw
+!endprocedure
+!procedure $DECL_FNC_91ddSi()
+  rectangle "<$archimate_Function{scale=1.5}> Check Repository Workspace Status" <<Function>> as FNC_91ddSi
 !endprocedure
 !procedure $DECL_FNC_9nd3Kk()
   rectangle "<$archimate_Function{scale=1.5}> Deliver Implementation Guidance" <<Function>> as FNC_9nd3Kk
@@ -328,14 +346,29 @@
 !procedure $DECL_FNC_BdEMPx()
   rectangle "<$archimate_Function{scale=1.5}> Graph Traversal" <<Function>> as FNC_BdEMPx
 !endprocedure
+!procedure $DECL_FNC_DGBZ9H()
+  rectangle "<$archimate_Function{scale=1.5}> Pull Repository Changes" <<Function>> as FNC_DGBZ9H
+!endprocedure
+!procedure $DECL_FNC_DrKMhV()
+  rectangle "<$archimate_Function{scale=1.5}> Resolve Operation Idempotency" <<Function>> as FNC_DrKMhV
+!endprocedure
+!procedure $DECL_FNC_ErTqVT()
+  rectangle "<$archimate_Function{scale=1.5}> Scope & Formulate Modelling Task" <<Function>> as FNC_ErTqVT
+!endprocedure
 !procedure $DECL_FNC_KM1fxQ()
   rectangle "<$archimate_Function{scale=1.5}> Receive Implementation Query" <<Function>> as FNC_KM1fxQ
+!endprocedure
+!procedure $DECL_FNC_LxeSn1()
+  rectangle "<$archimate_Function{scale=1.5}> Record Implementation Decisions" <<Function>> as FNC_LxeSn1
 !endprocedure
 !procedure $DECL_FNC_NGjUCa()
   rectangle "<$archimate_Function{scale=1.5}> Verify Model" <<Function>> as FNC_NGjUCa
 !endprocedure
 !procedure $DECL_FNC_SXt2mM()
   rectangle "<$archimate_Function{scale=1.5}> Check Model Coverage" <<Function>> as FNC_SXt2mM
+!endprocedure
+!procedure $DECL_FNC_TSs7wk()
+  rectangle "<$archimate_Function{scale=1.5}> Plan Implementation Approach" <<Function>> as FNC_TSs7wk
 !endprocedure
 !procedure $DECL_FNC_YD31f3()
   rectangle "<$archimate_Function{scale=1.5}> Enqueue Write Commands" <<Function>> as FNC_YD31f3
@@ -364,6 +397,12 @@
 !procedure $DECL_FNC_erPw5B()
   rectangle "<$archimate_Function{scale=1.5}> Explore System Structure" <<Function>> as FNC_erPw5B
 !endprocedure
+!procedure $DECL_FNC_g3H3mK()
+  rectangle "<$archimate_Function{scale=1.5}> Apply Operations to Staging" <<Function>> as FNC_g3H3mK
+!endprocedure
+!procedure $DECL_FNC_hbgFU3()
+  rectangle "<$archimate_Function{scale=1.5}> Create Staging Repository" <<Function>> as FNC_hbgFU3
+!endprocedure
 !procedure $DECL_FNC_lLdx12()
   rectangle "<$archimate_Function{scale=1.5}> Query Model" <<Function>> as FNC_lLdx12
 !endprocedure
@@ -382,8 +421,17 @@
 !procedure $DECL_FNC_omV6nu()
   rectangle "<$archimate_Function{scale=1.5}> Report Architecture Deviations" <<Function>> as FNC_omV6nu
 !endprocedure
+!procedure $DECL_FNC_rkx32U()
+  rectangle "<$archimate_Function{scale=1.5}> Plan Modelling Changes" <<Function>> as FNC_rkx32U
+!endprocedure
+!procedure $DECL_FNC_saMRQ0()
+  rectangle "<$archimate_Function{scale=1.5}> Author Architecture Documents" <<Function>> as FNC_saMRQ0
+!endprocedure
 !procedure $DECL_FNC_tFTeOT()
   rectangle "<$archimate_Function{scale=1.5}> Assess Implementation Against Model" <<Function>> as FNC_tFTeOT
+!endprocedure
+!procedure $DECL_FNC_tRAV0x()
+  rectangle "<$archimate_Function{scale=1.5}> Commit Staged Repository" <<Function>> as FNC_tRAV0x
 !endprocedure
 !procedure $DECL_FNC_uzJGYp()
   rectangle "<$archimate_Function{scale=1.5}> Author Diagrams" <<Function>> as FNC_uzJGYp
@@ -397,6 +445,9 @@
 !procedure $DECL_FNC_yuFXVJ()
   rectangle "<$archimate_Function{scale=1.5}> Author Model Artifacts" <<Function>> as FNC_yuFXVJ
 !endprocedure
+!procedure $DECL_EVT_BKj6NZ()
+  rectangle "<$archimate_Event{scale=1.5}> Staged Repository Committed" <<Event>> as EVT_BKj6NZ
+!endprocedure
 !procedure $DECL_EVT_Dm0CyE()
   rectangle "<$archimate_Event{scale=1.5}> Promotion Plan Prepared" <<Event>> as EVT_Dm0CyE
 !endprocedure
@@ -409,11 +460,20 @@
 !procedure $DECL_EVT_b6XB2D()
   rectangle "<$archimate_Event{scale=1.5}> Repository Indexed" <<Event>> as EVT_b6XB2D
 !endprocedure
+!procedure $DECL_EVT_diAYsj()
+  rectangle "<$archimate_Event{scale=1.5}> Bulk Write Requested" <<Event>> as EVT_diAYsj
+!endprocedure
 !procedure $DECL_EVT_fWpwu5()
   rectangle "<$archimate_Event{scale=1.5}> Promotion Conflicts Detected" <<Event>> as EVT_fWpwu5
 !endprocedure
 !procedure $DECL_EVT_hDF1Qz()
   rectangle "<$archimate_Event{scale=1.5}> Artifacts Promoted" <<Event>> as EVT_hDF1Qz
+!endprocedure
+!procedure $DECL_EVT_iqz9jG()
+  rectangle "<$archimate_Event{scale=1.5}> Workspace Conflict Detected" <<Event>> as EVT_iqz9jG
+!endprocedure
+!procedure $DECL_EVT_m_E9P1()
+  rectangle "<$archimate_Event{scale=1.5}> Bulk Delete Requested" <<Event>> as EVT_m_E9P1
 !endprocedure
 !procedure $DECL_EVT_rBpGoc()
   rectangle "<$archimate_Event{scale=1.5}> Artifact Write Completed" <<Event>> as EVT_rBpGoc
@@ -534,8 +594,14 @@
 !procedure $DECL_APP_27nbQ9()
   rectangle "<$archimate_ApplicationComponent{scale=1.5}> Agentic LLM Web Application" <<ApplicationComponent>> as APP_27nbQ9
 !endprocedure
+!procedure $DECL_APP_5n_KQJ()
+  rectangle "<$archimate_ApplicationComponent{scale=1.5}> Bulk Write Handler" <<ApplicationComponent>> as APP_5n_KQJ
+!endprocedure
 !procedure $DECL_APP_AUw6Qr()
   rectangle "<$archimate_ApplicationComponent{scale=1.5}> Agentic LLM Desktop Application" <<ApplicationComponent>> as APP_AUw6Qr
+!endprocedure
+!procedure $DECL_APP_HOOYAQ()
+  rectangle "<$archimate_ApplicationComponent{scale=1.5}> Batch Transaction Manager" <<ApplicationComponent>> as APP_HOOYAQ
 !endprocedure
 !procedure $DECL_APP_JOmFWy()
   rectangle "<$archimate_ApplicationComponent{scale=1.5}> SQLite Indexer" <<ApplicationComponent>> as APP_JOmFWy
@@ -546,11 +612,17 @@
 !procedure $DECL_APP_OYEmP1()
   rectangle "<$archimate_ApplicationComponent{scale=1.5}> Architecture Backend" <<ApplicationComponent>> as APP_OYEmP1
 !endprocedure
+!procedure $DECL_APP_PDJI8F()
+  rectangle "<$archimate_ApplicationComponent{scale=1.5}> Operation Registry" <<ApplicationComponent>> as APP_PDJI8F
+!endprocedure
 !procedure $DECL_APP_PaedDQ()
   rectangle "<$archimate_ApplicationComponent{scale=1.5}> Agentic LLM IDE Plugin" <<ApplicationComponent>> as APP_PaedDQ
 !endprocedure
 !procedure $DECL_APP_SCKD2U()
   rectangle "<$archimate_ApplicationComponent{scale=1.5}> Diagram Scaffolder" <<ApplicationComponent>> as APP_SCKD2U
+!endprocedure
+!procedure $DECL_APP_WK_78v()
+  rectangle "<$archimate_ApplicationComponent{scale=1.5}> Bulk Delete Handler" <<ApplicationComponent>> as APP_WK_78v
 !endprocedure
 !procedure $DECL_APP_YOOEbL()
   rectangle "<$archimate_ApplicationComponent{scale=1.5}> Frontmatter Parser" <<ApplicationComponent>> as APP_YOOEbL
@@ -629,6 +701,12 @@
 !endprocedure
 !procedure $DECL_DOB_V_MgY1()
   rectangle "<$archimate_DataObject{scale=1.5}> YAML Artifact Frontmatter" <<DataObject>> as DOB_V_MgY1
+!endprocedure
+!procedure $DECL_DOB_hExrX3()
+  rectangle "<$archimate_DataObject{scale=1.5}> Operation Record" <<DataObject>> as DOB_hExrX3
+!endprocedure
+!procedure $DECL_DOB_hhYsiw()
+  rectangle "<$archimate_DataObject{scale=1.5}> Staged Repository" <<DataObject>> as DOB_hhYsiw
 !endprocedure
 !procedure $DECL_DOB_mYDZot()
   rectangle "<$archimate_DataObject{scale=1.5}> Markdown Model Description" <<DataObject>> as DOB_mYDZot
