@@ -1,0 +1,110 @@
+---
+artifact-id: ARC@1777473085.eVg5bD.architecture-modelling-planning
+artifact-type: diagram
+name: Architecture Modelling & Planning
+version: 0.1.0
+status: draft
+diagram-type: archimate-layered
+entity-ids-used:
+- PRC@1776635640.U4aAdh.architecture-modelling-planning
+- FNC@1777409722.saMRQ0.author-architecture-documents
+- FNC@1777390449.uzJGYp.author-diagrams
+- FNC@1777390448.yuFXVJ.author-model-artifacts
+- FNC@1777472861.HgWMdN.decide-changes-to-plan-or-implement
+- FNC@1777409722.rkx32U.determine-required-changes-to-architecture-content
+- FNC@1777390444.lLdx12.discover-relevant-architecture-content
+- FNC@1777409722.ErTqVT.scope-formulate-modelling-task
+- FNC@1777390445.NGjUCa.verify-artifact-integrity-coherence
+- JNO@1777467627.chqH1_.inclusive-or-for-architecture-work
+connection-ids-used:
+- PRC@1776635640.U4aAdh.architecture-modelling-planning---FNC@1777409722.saMRQ0.author-architecture-documents@@archimate-aggregation
+- PRC@1776635640.U4aAdh.architecture-modelling-planning---FNC@1777390449.uzJGYp.author-diagrams@@archimate-aggregation
+- PRC@1776635640.U4aAdh.architecture-modelling-planning---FNC@1777390448.yuFXVJ.author-model-artifacts@@archimate-aggregation
+- PRC@1776635640.U4aAdh.architecture-modelling-planning---FNC@1777472861.HgWMdN.decide-changes-to-plan-or-implement@@archimate-aggregation
+- FNC@1777472861.HgWMdN.decide-changes-to-plan-or-implement---FNC@1777409722.rkx32U.determine-required-changes-to-architecture-content@@archimate-triggering
+- PRC@1776635640.U4aAdh.architecture-modelling-planning---FNC@1777409722.rkx32U.determine-required-changes-to-architecture-content@@archimate-aggregation
+- PRC@1776635640.U4aAdh.architecture-modelling-planning---FNC@1777390444.lLdx12.discover-relevant-architecture-content@@archimate-aggregation
+- FNC@1777390444.lLdx12.discover-relevant-architecture-content---FNC@1777472861.HgWMdN.decide-changes-to-plan-or-implement@@archimate-triggering
+- FNC@1777409722.ErTqVT.scope-formulate-modelling-task---FNC@1777390444.lLdx12.discover-relevant-architecture-content@@archimate-triggering
+- PRC@1776635640.U4aAdh.architecture-modelling-planning---FNC@1777409722.ErTqVT.scope-formulate-modelling-task@@archimate-aggregation
+- FNC@1777390448.yuFXVJ.author-model-artifacts---FNC@1777390445.NGjUCa.verify-artifact-integrity-coherence@@archimate-triggering
+- FNC@1777390449.uzJGYp.author-diagrams---FNC@1777390445.NGjUCa.verify-artifact-integrity-coherence@@archimate-triggering
+- FNC@1777409722.saMRQ0.author-architecture-documents---FNC@1777390445.NGjUCa.verify-artifact-integrity-coherence@@archimate-triggering
+- PRC@1776635640.U4aAdh.architecture-modelling-planning---FNC@1777390445.NGjUCa.verify-artifact-integrity-coherence@@archimate-aggregation
+- FNC@1777409722.rkx32U.determine-required-changes-to-architecture-content---JNO@1777467627.chqH1_.inclusive-or-for-architecture-work@@archimate-triggering
+- JNO@1777467627.chqH1_.inclusive-or-for-architecture-work---FNC@1777390448.yuFXVJ.author-model-artifacts@@archimate-triggering
+- JNO@1777467627.chqH1_.inclusive-or-for-architecture-work---FNC@1777390449.uzJGYp.author-diagrams@@archimate-triggering
+- JNO@1777467627.chqH1_.inclusive-or-for-architecture-work---FNC@1777409722.saMRQ0.author-architecture-documents@@archimate-triggering
+last-updated: '2026-04-29'
+---
+@startuml architecture-modelling---planning
+!define ARCHIMATE_VERSION 3.2
+!include <archimate/Archimate>
+hide stereotype
+
+skinparam defaultFontName "Helvetica Neue, Helvetica, Arial, sans-serif"
+skinparam defaultFontSize 12
+skinparam shadowing false
+skinparam roundcorner 4
+skinparam backgroundColor #FAFAFA
+
+skinparam linetype ortho
+skinparam nodesep 60
+skinparam ranksep 80
+skinparam rectangle<<CommonGrouping>> {
+  BackgroundColor #EDE8E1
+  BorderColor #8C7E6A
+}
+skinparam rectangle<<Function>> {
+  BackgroundColor #E0D8CC
+  BorderColor #8C7E6A
+}
+skinparam rectangle<<Process>> {
+  BackgroundColor #E0D8CC
+  BorderColor #8C7E6A
+}
+sprite $archimate_Function <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><path d="M2.9 11.7V5.4L8 3.1l5.1 2.3v6.3L8 9.2z"  fill="#252327" stroke="none"/></svg>
+sprite $archimate_Process <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><path d="M2.6 4.1h6.3V2.8l4.5 5.2-4.5 5.2v-1.3H2.6z"  fill="#252327" stroke="none"/></svg>
+
+top to bottom direction
+
+title Architecture Modelling & Planning
+
+rectangle "Processes" <<CommonGrouping>> {
+  rectangle "<$archimate_Process{scale=1.5}> Architecture Modelling & Planning" <<Process>> as PRC_U4aAdh {
+    rectangle "<$archimate_Function{scale=1.5}> Author Architecture Documents" <<Function>> as FNC_saMRQ0
+    rectangle "<$archimate_Function{scale=1.5}> Author Diagrams" <<Function>> as FNC_uzJGYp
+    rectangle "<$archimate_Function{scale=1.5}> Author Model Artifacts" <<Function>> as FNC_yuFXVJ
+    rectangle "<$archimate_Function{scale=1.5}> Decide Changes to Plan or Implement" <<Function>> as FNC_HgWMdN
+    rectangle "<$archimate_Function{scale=1.5}> Determine Required Changes to Architecture Content" <<Function>> as FNC_rkx32U
+    rectangle "<$archimate_Function{scale=1.5}> Discover Relevant Architecture Content" <<Function>> as FNC_lLdx12
+    rectangle "<$archimate_Function{scale=1.5}> Scope & Formulate Modelling Task" <<Function>> as FNC_ErTqVT
+    rectangle "<$archimate_Function{scale=1.5}> Verify Artifact Integrity & Coherence" <<Function>> as FNC_NGjUCa
+    circle " " as JNO_chqH1_
+    FNC_ErTqVT -[hidden]down- FNC_lLdx12
+    FNC_lLdx12 -[hidden]down- FNC_HgWMdN
+    FNC_HgWMdN -[hidden]down- FNC_rkx32U
+    FNC_rkx32U -[hidden]down- JNO_chqH1_
+    JNO_chqH1_ -[hidden]down- FNC_saMRQ0
+    FNC_saMRQ0 -[hidden]right- FNC_uzJGYp
+    FNC_uzJGYp -[hidden]right- FNC_yuFXVJ
+    FNC_yuFXVJ -[hidden]down- FNC_NGjUCa
+    JNO_chqH1_ -[hidden]down- FNC_saMRQ0
+    JNO_chqH1_ -[hidden]down- FNC_uzJGYp
+    JNO_chqH1_ -[hidden]down- FNC_yuFXVJ
+  }
+}
+
+' Connections
+Rel_Triggering(FNC_HgWMdN, FNC_rkx32U, "")
+Rel_Triggering(FNC_lLdx12, FNC_HgWMdN, "")
+Rel_Triggering(FNC_ErTqVT, FNC_lLdx12, "")
+Rel_Triggering(FNC_yuFXVJ, FNC_NGjUCa, "")
+Rel_Triggering(FNC_uzJGYp, FNC_NGjUCa, "")
+Rel_Triggering(FNC_saMRQ0, FNC_NGjUCa, "")
+Rel_Triggering(FNC_rkx32U, JNO_chqH1_, "")
+Rel_Triggering(JNO_chqH1_, FNC_yuFXVJ, "")
+Rel_Triggering(JNO_chqH1_, FNC_uzJGYp, "")
+Rel_Triggering(JNO_chqH1_, FNC_saMRQ0, "")
+
+@enduml

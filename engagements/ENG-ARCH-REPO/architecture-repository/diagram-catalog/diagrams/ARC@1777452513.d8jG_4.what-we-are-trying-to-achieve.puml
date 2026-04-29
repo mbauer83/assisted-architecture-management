@@ -1,0 +1,114 @@
+---
+artifact-id: ARC@1777452513.d8jG_4.what-we-are-trying-to-achieve
+artifact-type: diagram
+name: What We Are Trying to Achieve
+version: 0.1.0
+status: draft
+keywords:
+- motivation
+- goals
+- outcomes
+- stakeholders
+- realization
+- why
+diagram-type: archimate-motivation
+last-updated: '2026-04-29'
+---
+@startuml ARC@1777452513.d8jG_4.what-we-are-trying-to-achieve
+!include ../_archimate-stereotypes.puml
+!include ../_archimate-glyphs.puml
+top to bottom direction
+
+title What We Are Trying to Achieve — Goals & Outcomes
+
+rectangle "Goals" <<MotivationGrouping>> {
+  rectangle "Human Stakeholder Goals" <<MotivationGrouping>> as GOL_GRP_H {
+    rectangle "<$archimate_Goal{scale=1.5}> Support Architecture Planning for Humans" <<Goal>> as GOL_5Fk9di
+    rectangle "<$archimate_Goal{scale=1.5}> Provide Development Guidance for Humans" <<Goal>> as GOL_Gh3Jk1
+    rectangle "<$archimate_Goal{scale=1.5}> Support Technology Design for Humans" <<Goal>> as GOL_W6Z8pa
+    rectangle "<$archimate_Goal{scale=1.5}> Support Product Design for Humans" <<Goal>> as GOL_hEEWS8
+  }
+  rectangle "AI Agent Goals" <<MotivationGrouping>> as GOL_GRP_AI {
+    rectangle "<$archimate_Goal{scale=1.5}> Support Architecture Planning for AI" <<Goal>> as GOL_Iwha3
+    rectangle "<$archimate_Goal{scale=1.5}> Provide Development Guidance for AI" <<Goal>> as GOL_e3nCpO
+    rectangle "<$archimate_Goal{scale=1.5}> Support Technology Design for AI" <<Goal>> as GOL_B6G__P
+    rectangle "<$archimate_Goal{scale=1.5}> Support Product Design for AI" <<Goal>> as GOL_zBPs_y
+  }
+  rectangle "Platform & System Goals" <<MotivationGrouping>> as GOL_GRP_P {
+    rectangle "<$archimate_Goal{scale=1.5}> Enable Cross-Stakeholder Validation" <<Goal>> as GOL_Lm2Bn2
+    rectangle "<$archimate_Goal{scale=1.5}> Enable Architecture Management at Scale" <<Goal>> as GOL_Zx9Cv4
+    rectangle "<$archimate_Goal{scale=1.5}> Maintain Coherence and Traceability" <<Goal>> as GOL_Po1Qw3
+    rectangle "<$archimate_Goal{scale=1.5}> Enable Cross-Engagement Architectural Reuse" <<Goal>> as GOL_kCcPph
+  }
+}
+
+' Hidden layout within goal rows
+GOL_5Fk9di -[hidden]right- GOL_Gh3Jk1
+GOL_Gh3Jk1 -[hidden]right- GOL_W6Z8pa
+GOL_W6Z8pa -[hidden]right- GOL_hEEWS8
+GOL_Iwha3 -[hidden]right- GOL_e3nCpO
+GOL_e3nCpO -[hidden]right- GOL_B6G__P
+GOL_B6G__P -[hidden]right- GOL_zBPs_y
+GOL_Lm2Bn2 -[hidden]right- GOL_Zx9Cv4
+GOL_Zx9Cv4 -[hidden]right- GOL_Po1Qw3
+GOL_Po1Qw3 -[hidden]right- GOL_kCcPph
+
+' Hidden layout between goal rows
+GOL_GRP_H -[hidden]down- GOL_GRP_AI
+GOL_GRP_AI -[hidden]down- GOL_GRP_P
+
+rectangle "Outcomes" <<MotivationGrouping>> {
+  rectangle "Human Stakeholder Outcomes" <<MotivationGrouping>> as OUT_GRP_H {
+    rectangle "<$archimate_Outcome{scale=1.5}> Reduced Planning Overhead" <<Outcome>> as OUT_AlZjX8
+    rectangle "<$archimate_Outcome{scale=1.5}> Architectural Guidance Available Without Specialist Dependency" <<Outcome>> as OUT_FXFGrO
+    rectangle "<$archimate_Outcome{scale=1.5}> Technology Changes Validated Before Implementation" <<Outcome>> as OUT_a5mNob
+    rectangle "<$archimate_Outcome{scale=1.5}> Product Requirements Traceable to Realized Components" <<Outcome>> as OUT_9jS0BB
+  }
+  rectangle "AI Agent Outcomes" <<MotivationGrouping>> as OUT_GRP_AI {
+    rectangle "<$archimate_Outcome{scale=1.5}> AI Agents Efficiently Discover and Edit Architecture Artifacts" <<Outcome>> as OUT_JZMIk3
+    rectangle "<$archimate_Outcome{scale=1.5}> AI Agents Produce Fewer Architecture-Drift Corrections" <<Outcome>> as OUT__AzP1Q
+    rectangle "<$archimate_Outcome{scale=1.5}> AI Agents Query Technology Architecture to Identify Constraints" <<Outcome>> as OUT_i_3Bi_
+    rectangle "<$archimate_Outcome{scale=1.5}> AI Agents Traverse Product-Architecture Traceability Chains" <<Outcome>> as OUT_Cn_CVI
+  }
+  rectangle "Platform & System Outcomes" <<MotivationGrouping>> as OUT_GRP_P {
+    rectangle "<$archimate_Outcome{scale=1.5}> Stakeholder Concerns and Hand-Off Points Explicitly Verifiable" <<Outcome>> as OUT_YSRwR0
+    rectangle "<$archimate_Outcome{scale=1.5}> Architecture Governance Scales Without Proportional Overhead" <<Outcome>> as OUT_aOcRl9
+    rectangle "<$archimate_Outcome{scale=1.5}> Increased Architectural Coherence" <<Outcome>> as OUT_LrpdG0
+    rectangle "<$archimate_Outcome{scale=1.5}> Proven Patterns Promoted and Adopted Across Engagements" <<Outcome>> as OUT_edEkJa
+  }
+}
+
+' Hidden layout within outcome rows
+OUT_AlZjX8 -[hidden]right- OUT_FXFGrO
+OUT_FXFGrO -[hidden]right- OUT_a5mNob
+OUT_a5mNob -[hidden]right- OUT_9jS0BB
+OUT_JZMIk3 -[hidden]right- OUT__AzP1Q
+OUT__AzP1Q -[hidden]right- OUT_i_3Bi_
+OUT_i_3Bi_ -[hidden]right- OUT_Cn_CVI
+OUT_YSRwR0 -[hidden]right- OUT_aOcRl9
+OUT_aOcRl9 -[hidden]right- OUT_LrpdG0
+OUT_LrpdG0 -[hidden]right- OUT_edEkJa
+
+' Hidden layout between outcome rows
+OUT_GRP_H -[hidden]down- OUT_GRP_AI
+OUT_GRP_AI -[hidden]down- OUT_GRP_P
+
+' Inter-layer anchor
+GOL_GRP_P -[hidden]down- OUT_GRP_H
+
+' Realization: outcome realizes goal (arrowhead at abstract goal)
+Rel_Realization_Up(OUT_AlZjX8, GOL_5Fk9di, "")
+Rel_Realization_Up(OUT_FXFGrO, GOL_Gh3Jk1, "")
+Rel_Realization_Up(OUT_a5mNob, GOL_W6Z8pa, "")
+Rel_Realization_Up(OUT_9jS0BB, GOL_hEEWS8, "")
+Rel_Realization_Up(OUT_JZMIk3, GOL_Iwha3, "")
+Rel_Realization_Up(OUT__AzP1Q, GOL_e3nCpO, "")
+Rel_Realization_Up(OUT_i_3Bi_, GOL_B6G__P, "")
+Rel_Realization_Up(OUT_Cn_CVI, GOL_zBPs_y, "")
+Rel_Realization_Up(OUT_YSRwR0, GOL_Lm2Bn2, "")
+Rel_Realization_Up(OUT_aOcRl9, GOL_Zx9Cv4, "")
+Rel_Realization_Up(OUT_LrpdG0, GOL_Po1Qw3, "")
+Rel_Realization_Up(OUT_edEkJa, GOL_kCcPph, "")
+Rel_Realization_Up(OUT_AlZjX8, GOL_Iwha3, "")
+
+@enduml

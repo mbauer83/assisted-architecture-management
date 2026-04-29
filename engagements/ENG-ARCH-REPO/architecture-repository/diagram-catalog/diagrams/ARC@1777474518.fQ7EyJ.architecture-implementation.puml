@@ -1,0 +1,86 @@
+---
+artifact-id: ARC@1777474518.fQ7EyJ.architecture-implementation
+artifact-type: diagram
+name: Architecture Implementation
+version: 0.1.0
+status: draft
+diagram-type: archimate-layered
+entity-ids-used:
+- PRC@1776635645.GHVpDA.provide-implementation-guidance
+- FNC@1777390444.lLdx12.discover-relevant-architecture-content
+- FNC@1777409722.4LZhtI.implement-the-change
+- FNC@1777409722.TSs7wk.plan-implementation-approach
+- FNC@1777409722.LxeSn1.record-implementation-decisions
+- FNC@1777390454.4ce2Qt.synthesize-deliver-implementation-guidance
+- FNC@1777474430.fCdnJ2.refine-architecture-content-after-implementation
+connection-ids-used:
+- PRC@1776635645.GHVpDA.provide-implementation-guidance---FNC@1777390444.lLdx12.discover-relevant-architecture-content@@archimate-aggregation
+- PRC@1776635645.GHVpDA.provide-implementation-guidance---FNC@1777409722.4LZhtI.implement-the-change@@archimate-aggregation
+- FNC@1777390444.lLdx12.discover-relevant-architecture-content---FNC@1777409722.TSs7wk.plan-implementation-approach@@archimate-triggering
+- PRC@1776635645.GHVpDA.provide-implementation-guidance---FNC@1777409722.TSs7wk.plan-implementation-approach@@archimate-aggregation
+- FNC@1777409722.4LZhtI.implement-the-change---FNC@1777409722.LxeSn1.record-implementation-decisions@@archimate-triggering
+- PRC@1776635645.GHVpDA.provide-implementation-guidance---FNC@1777409722.LxeSn1.record-implementation-decisions@@archimate-aggregation
+- FNC@1777409722.TSs7wk.plan-implementation-approach---FNC@1777390454.4ce2Qt.synthesize-deliver-implementation-guidance@@archimate-triggering
+- PRC@1776635645.GHVpDA.provide-implementation-guidance---FNC@1777390454.4ce2Qt.synthesize-deliver-implementation-guidance@@archimate-aggregation
+- FNC@1777390454.4ce2Qt.synthesize-deliver-implementation-guidance---FNC@1777409722.4LZhtI.implement-the-change@@archimate-triggering
+- FNC@1777409722.LxeSn1.record-implementation-decisions---FNC@1777474430.fCdnJ2.refine-architecture-content-after-implementation@@archimate-triggering
+- PRC@1776635645.GHVpDA.provide-implementation-guidance---FNC@1777474430.fCdnJ2.refine-architecture-content-after-implementation@@archimate-aggregation
+last-updated: '2026-04-29'
+---
+@startuml architecture-implementation
+!define ARCHIMATE_VERSION 3.2
+!include <archimate/Archimate>
+hide stereotype
+
+skinparam defaultFontName "Helvetica Neue, Helvetica, Arial, sans-serif"
+skinparam defaultFontSize 12
+skinparam shadowing false
+skinparam roundcorner 4
+skinparam backgroundColor #FAFAFA
+
+skinparam linetype ortho
+skinparam nodesep 60
+skinparam ranksep 80
+skinparam rectangle<<CommonGrouping>> {
+  BackgroundColor #EDE8E1
+  BorderColor #8C7E6A
+}
+skinparam rectangle<<Function>> {
+  BackgroundColor #E0D8CC
+  BorderColor #8C7E6A
+}
+skinparam rectangle<<Process>> {
+  BackgroundColor #E0D8CC
+  BorderColor #8C7E6A
+}
+sprite $archimate_Function <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><path d="M2.9 11.7V5.4L8 3.1l5.1 2.3v6.3L8 9.2z"  fill="#252327" stroke="none"/></svg>
+sprite $archimate_Process <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><path d="M2.6 4.1h6.3V2.8l4.5 5.2-4.5 5.2v-1.3H2.6z"  fill="#252327" stroke="none"/></svg>
+
+top to bottom direction
+
+title Architecture Implementation
+
+rectangle "Processes" <<CommonGrouping>> {
+  rectangle "<$archimate_Process{scale=1.5}> Architecture Implementation" <<Process>> as PRC_GHVpDA {
+    rectangle "<$archimate_Function{scale=1.5}> Discover Relevant Architecture Content" <<Function>> as FNC_lLdx12
+    rectangle "<$archimate_Function{scale=1.5}> Implement the Change" <<Function>> as FNC_4LZhtI
+    rectangle "<$archimate_Function{scale=1.5}> Plan Implementation Approach" <<Function>> as FNC_TSs7wk
+    rectangle "<$archimate_Function{scale=1.5}> Record Implementation Decisions" <<Function>> as FNC_LxeSn1
+    rectangle "<$archimate_Function{scale=1.5}> Synthesize & Deliver Implementation Guidance" <<Function>> as FNC_4ce2Qt
+    rectangle "<$archimate_Function{scale=1.5}> Refine Architecture Content after Implementation" <<Function>> as FNC_fCdnJ2
+    FNC_lLdx12 -[hidden]down- FNC_TSs7wk
+    FNC_TSs7wk -[hidden]down- FNC_4ce2Qt
+    FNC_4ce2Qt -[hidden]down- FNC_4LZhtI
+    FNC_4LZhtI -[hidden]down- FNC_LxeSn1
+    FNC_LxeSn1 -[hidden]down- FNC_fCdnJ2
+  }
+}
+
+' Connections
+Rel_Triggering(FNC_lLdx12, FNC_TSs7wk, "")
+Rel_Triggering(FNC_4LZhtI, FNC_LxeSn1, "")
+Rel_Triggering(FNC_TSs7wk, FNC_4ce2Qt, "")
+Rel_Triggering(FNC_4ce2Qt, FNC_4LZhtI, "")
+Rel_Triggering(FNC_LxeSn1, FNC_fCdnJ2, "")
+
+@enduml

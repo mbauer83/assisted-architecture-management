@@ -1,0 +1,80 @@
+---
+artifact-id: ARC@1777452513.R4UzcD.from-write-to-consistent-state
+artifact-type: diagram
+name: From Write to Consistent State
+version: 0.1.0
+status: draft
+keywords:
+- workflow
+- write
+- consistency
+- indexing
+- pipeline
+- events
+diagram-type: archimate-application
+last-updated: '2026-04-29'
+---
+@startuml ARC@1777452513.R4UzcD.from-write-to-consistent-state
+!include ../_archimate-stereotypes.puml
+!include ../_archimate-glyphs.puml
+top to bottom direction
+
+title From Write to Consistent State
+
+rectangle "Write Requests" <<CommonGrouping>> as GRP_WRITE {
+  rectangle "<$archimate_Event{scale=1.5}> Artifact Write Requested" <<Event>> as EVT_tTktu8
+  rectangle "<$archimate_Event{scale=1.5}> Bulk Write Requested" <<Event>> as EVT_diAYsj
+  rectangle "<$archimate_Event{scale=1.5}> Bulk Delete Requested" <<Event>> as EVT_m_E9P1
+  EVT_tTktu8 -[hidden]right- EVT_diAYsj
+  EVT_diAYsj -[hidden]right- EVT_m_E9P1
+}
+
+rectangle "Change Events" <<CommonGrouping>> as GRP_CHANGE {
+  rectangle "<$archimate_Event{scale=1.5}> Artifacts Promoted" <<Event>> as EVT_hDF1Qz
+  rectangle "<$archimate_Event{scale=1.5}> Architecture Repository Change Detected" <<Event>> as EVT_UCrh3V
+  EVT_hDF1Qz -[hidden]right- EVT_UCrh3V
+}
+
+GRP_WRITE -[hidden]right- GRP_CHANGE
+
+rectangle "<$archimate_Process{scale=1.5}> Coordinate Repository State" <<Process>> as PRC_wqtZ0P {
+  rectangle "<$archimate_Function{scale=1.5}> Enqueue Write Commands" <<Function>> as FNC_YD31f3
+  rectangle "<$archimate_Process{scale=1.5}> Execute Staged Bulk Operation" <<Process>> as PRC_gtgYvQ
+  rectangle "<$archimate_Event{scale=1.5}> Staged Repository Committed" <<Event>> as EVT_BKj6NZ
+  rectangle "<$archimate_Function{scale=1.5}> Index Repository" <<Function>> as FNC_dxb6ru {
+    rectangle "<$archimate_Function{scale=1.5}> Build Connection Graph" <<Function>> as FNC_b3mOTJ
+    rectangle "<$archimate_Function{scale=1.5}> Alias Resolution" <<Function>> as FNC_nJYA2
+    FNC_b3mOTJ -[hidden]right- FNC_nJYA2
+  }
+  rectangle "<$archimate_Event{scale=1.5}> Repository Indexed" <<Event>> as EVT_b6XB2D
+  rectangle "<$archimate_Function{scale=1.5}> Broadcast Model Update" <<Function>> as FNC_3ZsfnT
+  FNC_YD31f3 -[hidden]down- PRC_gtgYvQ
+  PRC_gtgYvQ -[hidden]down- EVT_BKj6NZ
+  EVT_BKj6NZ -[hidden]down- FNC_dxb6ru
+  FNC_dxb6ru -[hidden]down- EVT_b6XB2D
+  EVT_b6XB2D -[hidden]down- FNC_3ZsfnT
+}
+
+rectangle "<$archimate_ApplicationComponent{scale=1.5}> GUI Authoring Tool" <<ApplicationComponent>> as APP_lmO0mp
+
+GRP_WRITE -[hidden]down- PRC_wqtZ0P
+PRC_wqtZ0P -[hidden]down- APP_lmO0mp
+
+' Write request path
+Rel_Triggering(EVT_tTktu8, FNC_YD31f3, "")
+Rel_Triggering(EVT_diAYsj, FNC_YD31f3, "")
+Rel_Triggering(EVT_m_E9P1, FNC_YD31f3, "")
+Rel_Triggering(FNC_YD31f3, PRC_gtgYvQ, "")
+Rel_Triggering(PRC_gtgYvQ, EVT_BKj6NZ, "")
+Rel_Triggering(EVT_BKj6NZ, FNC_dxb6ru, "")
+
+' Direct change path (skip enqueue, go straight to index)
+Rel_Triggering(EVT_hDF1Qz, FNC_dxb6ru, "")
+Rel_Triggering(EVT_UCrh3V, FNC_dxb6ru, "")
+
+' Index and broadcast pipeline
+Rel_Triggering(FNC_dxb6ru, EVT_b6XB2D, "")
+Rel_Triggering(EVT_b6XB2D, FNC_3ZsfnT, "")
+Rel_Serving(FNC_3ZsfnT, APP_lmO0mp, "")
+
+@enduml

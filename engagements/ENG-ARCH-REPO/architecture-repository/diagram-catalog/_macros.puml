@@ -317,7 +317,7 @@
   rectangle "<$archimate_Function{scale=1.5}> Implement the Change" <<Function>> as FNC_4LZhtI
 !endprocedure
 !procedure $DECL_FNC_4ce2Qt()
-  rectangle "<$archimate_Function{scale=1.5}> Synthesize Implementation Guidance" <<Function>> as FNC_4ce2Qt
+  rectangle "<$archimate_Function{scale=1.5}> Synthesize & Deliver Implementation Guidance" <<Function>> as FNC_4ce2Qt
 !endprocedure
 !procedure $DECL_FNC_54UnNB()
   rectangle "<$archimate_Function{scale=1.5}> Validate Promotion Selection" <<Function>> as FNC_54UnNB
@@ -330,9 +330,6 @@
 !endprocedure
 !procedure $DECL_FNC_91ddSi()
   rectangle "<$archimate_Function{scale=1.5}> Check Repository Workspace Status" <<Function>> as FNC_91ddSi
-!endprocedure
-!procedure $DECL_FNC_9nd3Kk()
-  rectangle "<$archimate_Function{scale=1.5}> Deliver Implementation Guidance" <<Function>> as FNC_9nd3Kk
 !endprocedure
 !procedure $DECL_FNC_A0dOFm()
   rectangle "<$archimate_Function{scale=1.5}> Resolve Promotion Conflicts" <<Function>> as FNC_A0dOFm
@@ -355,14 +352,14 @@
 !procedure $DECL_FNC_ErTqVT()
   rectangle "<$archimate_Function{scale=1.5}> Scope & Formulate Modelling Task" <<Function>> as FNC_ErTqVT
 !endprocedure
-!procedure $DECL_FNC_KM1fxQ()
-  rectangle "<$archimate_Function{scale=1.5}> Receive Implementation Query" <<Function>> as FNC_KM1fxQ
+!procedure $DECL_FNC_HgWMdN()
+  rectangle "<$archimate_Function{scale=1.5}> Decide Changes to Plan or Implement" <<Function>> as FNC_HgWMdN
 !endprocedure
 !procedure $DECL_FNC_LxeSn1()
   rectangle "<$archimate_Function{scale=1.5}> Record Implementation Decisions" <<Function>> as FNC_LxeSn1
 !endprocedure
 !procedure $DECL_FNC_NGjUCa()
-  rectangle "<$archimate_Function{scale=1.5}> Verify Model" <<Function>> as FNC_NGjUCa
+  rectangle "<$archimate_Function{scale=1.5}> Verify Artifact Integrity & Coherence" <<Function>> as FNC_NGjUCa
 !endprocedure
 !procedure $DECL_FNC_SXt2mM()
   rectangle "<$archimate_Function{scale=1.5}> Check Model Coverage" <<Function>> as FNC_SXt2mM
@@ -397,6 +394,9 @@
 !procedure $DECL_FNC_erPw5B()
   rectangle "<$archimate_Function{scale=1.5}> Explore System Structure" <<Function>> as FNC_erPw5B
 !endprocedure
+!procedure $DECL_FNC_fCdnJ2()
+  rectangle "<$archimate_Function{scale=1.5}> Refine Architecture Content after Implementation" <<Function>> as FNC_fCdnJ2
+!endprocedure
 !procedure $DECL_FNC_g3H3mK()
   rectangle "<$archimate_Function{scale=1.5}> Apply Operations to Staging" <<Function>> as FNC_g3H3mK
 !endprocedure
@@ -404,7 +404,7 @@
   rectangle "<$archimate_Function{scale=1.5}> Create Staging Repository" <<Function>> as FNC_hbgFU3
 !endprocedure
 !procedure $DECL_FNC_lLdx12()
-  rectangle "<$archimate_Function{scale=1.5}> Query Model" <<Function>> as FNC_lLdx12
+  rectangle "<$archimate_Function{scale=1.5}> Discover Relevant Architecture Content" <<Function>> as FNC_lLdx12
 !endprocedure
 !procedure $DECL_FNC_n_JYA2()
   rectangle "<$archimate_Function{scale=1.5}> Alias Resolution" <<Function>> as FNC_n_JYA2
@@ -422,7 +422,7 @@
   rectangle "<$archimate_Function{scale=1.5}> Report Architecture Deviations" <<Function>> as FNC_omV6nu
 !endprocedure
 !procedure $DECL_FNC_rkx32U()
-  rectangle "<$archimate_Function{scale=1.5}> Plan Modelling Changes" <<Function>> as FNC_rkx32U
+  rectangle "<$archimate_Function{scale=1.5}> Determine Required Changes to Architecture Content" <<Function>> as FNC_rkx32U
 !endprocedure
 !procedure $DECL_FNC_saMRQ0()
   rectangle "<$archimate_Function{scale=1.5}> Author Architecture Documents" <<Function>> as FNC_saMRQ0
@@ -487,6 +487,9 @@
 !procedure $DECL_ROL_6VGCvh()
   rectangle "<$archimate_Role{scale=1.5}> Reviewer" <<Role>> as ROL_6VGCvh
 !endprocedure
+!procedure $DECL_ROL_d9VJu9()
+  rectangle "<$archimate_Role{scale=1.5}> Planner" <<Role>> as ROL_d9VJu9
+!endprocedure
 !procedure $DECL_ROL_deMuTj()
   rectangle "<$archimate_Role{scale=1.5}> Author" <<Role>> as ROL_deMuTj
 !endprocedure
@@ -496,11 +499,20 @@
 !procedure $DECL_ROL_udXPfB()
   rectangle "<$archimate_Role{scale=1.5}> AI Agent" <<Role>> as ROL_udXPfB
 !endprocedure
+!procedure $DECL_JNA_Ps7rVy()
+  rectangle "<$archimate_AndJunction{scale=1.5}> reverse architecture join parallel model discovery archimate mapping" <<AndJunction>> as JNA_Ps7rVy
+!endprocedure
+!procedure $DECL_JNA_zGOowi()
+  rectangle "<$archimate_AndJunction{scale=1.5}> reverse architecture fork parallel model discovery archimate mapping" <<AndJunction>> as JNA_zGOowi
+!endprocedure
 !procedure $DECL_JNO_SdKRyp()
   rectangle "<$archimate_OrJunction{scale=1.5}> Human Author or AI Agent" <<OrJunction>> as JNO_SdKRyp
 !endprocedure
 !procedure $DECL_JNO_UkYEkI()
   rectangle "<$archimate_OrJunction{scale=1.5}> Human Developer or AI Agent" <<OrJunction>> as JNO_UkYEkI
+!endprocedure
+!procedure $DECL_JNO_chqH1_()
+  rectangle "<$archimate_OrJunction{scale=1.5}> Inclusive OR for architecture work" <<OrJunction>> as JNO_chqH1_
 !endprocedure
 !procedure $DECL_JNO_kGygUO()
   rectangle "<$archimate_OrJunction{scale=1.5}> Human Reviewer or AI Agent" <<OrJunction>> as JNO_kGygUO

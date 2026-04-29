@@ -1,0 +1,116 @@
+---
+artifact-id: ARC@1777455142.cFB8Hs.the-forces-shaping-this-system
+artifact-type: diagram
+name: The Forces Shaping this System
+version: 0.1.0
+status: draft
+diagram-type: archimate-motivation
+entity-ids-used:
+- ASS@1776628134.EI3FpR.ai-code-generation-volume-outpaces-sequential-architectural-review-capacity
+- DRV@1776628131.GR9prv.ai-assisted-development-as-dominant-production-mode
+- STK@1712870400.aB3dE1.architect
+- ASS@1776628138.a6vxyj.centralized-governance-cannot-scale-to-concurrent-development-contexts
+- STK@1712870400.4oprPM.devops-engineer
+- STK@1712870400.K9xTq2.developer
+- ASS@1776628142.9YWsDh.implicit-system-interdependencies-are-unmaintainable-without-explicit-models
+- DRV@1712870400.Rt6Yu2.increasing-demand-for-more-autonomy-of-teams-systems
+- ASS@1776628140.s68vVo.llm-based-agents-cannot-effectively-use-unstructured-architectural-knowledge
+- DRV@1776760327.CuhLPB.need-to-balance-increased-autonomy-with-integration
+- STK@1712870400.Zp8Lm4.product-owner
+- DRV@1712870400.Ui5Op3.rising-software-complexity-interdependence
+- STK@1712870400.Rr9Ss9.upper-technical-management
+connection-ids-used:
+- STK@1712870400.K9xTq2.developer---DRV@1776628131.GR9prv.ai-assisted-development-as-dominant-production-mode@@archimate-association
+- STK@1712870400.aB3dE1.architect---DRV@1776628131.GR9prv.ai-assisted-development-as-dominant-production-mode@@archimate-association
+- DRV@1776628131.GR9prv.ai-assisted-development-as-dominant-production-mode---DRV@1712870400.Rt6Yu2.increasing-demand-for-more-autonomy-of-teams-systems@@archimate-association
+- STK@1712870400.4oprPM.devops-engineer---DRV@1712870400.Rt6Yu2.increasing-demand-for-more-autonomy-of-teams-systems@@archimate-association
+- STK@1712870400.Rr9Ss9.upper-technical-management---DRV@1712870400.Rt6Yu2.increasing-demand-for-more-autonomy-of-teams-systems@@archimate-association
+- STK@1712870400.Zp8Lm4.product-owner---DRV@1712870400.Rt6Yu2.increasing-demand-for-more-autonomy-of-teams-systems@@archimate-association
+- STK@1712870400.aB3dE1.architect---DRV@1712870400.Rt6Yu2.increasing-demand-for-more-autonomy-of-teams-systems@@archimate-association
+- DRV@1712870400.Rt6Yu2.increasing-demand-for-more-autonomy-of-teams-systems---DRV@1776760327.CuhLPB.need-to-balance-increased-autonomy-with-integration@@archimate-association
+- DRV@1776760327.CuhLPB.need-to-balance-increased-autonomy-with-integration---DRV@1776628131.GR9prv.ai-assisted-development-as-dominant-production-mode@@archimate-association
+- STK@1712870400.4oprPM.devops-engineer---DRV@1776760327.CuhLPB.need-to-balance-increased-autonomy-with-integration@@archimate-association
+- STK@1712870400.Rr9Ss9.upper-technical-management---DRV@1776760327.CuhLPB.need-to-balance-increased-autonomy-with-integration@@archimate-association
+- STK@1712870400.Zp8Lm4.product-owner---DRV@1776760327.CuhLPB.need-to-balance-increased-autonomy-with-integration@@archimate-association
+- STK@1712870400.aB3dE1.architect---DRV@1776760327.CuhLPB.need-to-balance-increased-autonomy-with-integration@@archimate-association
+- DRV@1712870400.Rt6Yu2.increasing-demand-for-more-autonomy-of-teams-systems---DRV@1712870400.Ui5Op3.rising-software-complexity-interdependence@@archimate-association
+- DRV@1776628131.GR9prv.ai-assisted-development-as-dominant-production-mode---DRV@1712870400.Ui5Op3.rising-software-complexity-interdependence@@archimate-association
+- DRV@1776760327.CuhLPB.need-to-balance-increased-autonomy-with-integration---DRV@1712870400.Ui5Op3.rising-software-complexity-interdependence@@archimate-association
+- STK@1712870400.4oprPM.devops-engineer---DRV@1712870400.Ui5Op3.rising-software-complexity-interdependence@@archimate-association
+- STK@1712870400.aB3dE1.architect---DRV@1712870400.Ui5Op3.rising-software-complexity-interdependence@@archimate-association
+- DRV@1776628131.GR9prv.ai-assisted-development-as-dominant-production-mode---ASS@1776628134.EI3FpR.ai-code-generation-volume-outpaces-sequential-architectural-review-capacity@@archimate-influence
+- DRV@1776760327.CuhLPB.need-to-balance-increased-autonomy-with-integration---ASS@1776628134.EI3FpR.ai-code-generation-volume-outpaces-sequential-architectural-review-capacity@@archimate-influence
+- DRV@1712870400.Rt6Yu2.increasing-demand-for-more-autonomy-of-teams-systems---ASS@1776628138.a6vxyj.centralized-governance-cannot-scale-to-concurrent-development-contexts@@archimate-influence
+- DRV@1776628131.GR9prv.ai-assisted-development-as-dominant-production-mode---ASS@1776628138.a6vxyj.centralized-governance-cannot-scale-to-concurrent-development-contexts@@archimate-influence
+- DRV@1712870400.Ui5Op3.rising-software-complexity-interdependence---ASS@1776628142.9YWsDh.implicit-system-interdependencies-are-unmaintainable-without-explicit-models@@archimate-influence
+- DRV@1776628131.GR9prv.ai-assisted-development-as-dominant-production-mode---ASS@1776628140.s68vVo.llm-based-agents-cannot-effectively-use-unstructured-architectural-knowledge@@archimate-influence
+last-updated: '2026-04-29'
+---
+@startuml the-forces-shaping-this-system
+!include ../_archimate-stereotypes.puml
+
+top to bottom direction
+
+title The Forces Shaping this System
+
+rectangle "Stakeholders" <<MotivationGrouping>> {
+  rectangle "<$archimate_Stakeholder{scale=1.5}> Architect" <<Stakeholder>> as STK_aB3dE1
+  rectangle "<$archimate_Stakeholder{scale=1.5}> DevOps Engineer" <<Stakeholder>> as STK_4oprPM
+  rectangle "<$archimate_Stakeholder{scale=1.5}> Developer" <<Stakeholder>> as STK_K9xTq2
+  rectangle "<$archimate_Stakeholder{scale=1.5}> Product Owner" <<Stakeholder>> as STK_Zp8Lm4
+  rectangle "<$archimate_Stakeholder{scale=1.5}> Upper Technical Management" <<Stakeholder>> as STK_Rr9Ss9
+}
+STK_aB3dE1 -[hidden]right- STK_4oprPM
+STK_4oprPM -[hidden]right- STK_K9xTq2
+STK_K9xTq2 -[hidden]right- STK_Zp8Lm4
+STK_Zp8Lm4 -[hidden]right- STK_Rr9Ss9
+
+rectangle "Drivers" <<MotivationGrouping>> {
+  rectangle "<$archimate_Driver{scale=1.5}> AI-Assisted Development as Dominant Production Mode" <<Driver>> as DRV_GR9prv
+  rectangle "<$archimate_Driver{scale=1.5}> Increasing Demand for More Autonomy of Teams & Systems" <<Driver>> as DRV_Rt6Yu2
+  rectangle "<$archimate_Driver{scale=1.5}> Need to Balance Increased Autonomy with Integration" <<Driver>> as DRV_CuhLPB
+  rectangle "<$archimate_Driver{scale=1.5}> Rising Software Complexity & Interdependence" <<Driver>> as DRV_Ui5Op3
+}
+DRV_GR9prv -[hidden]down- DRV_Rt6Yu2
+DRV_Rt6Yu2 -[hidden]down- DRV_CuhLPB
+DRV_CuhLPB -[hidden]down- DRV_Ui5Op3
+STK_Rr9Ss9 -[hidden]down- DRV_GR9prv
+
+rectangle "Assessments" <<MotivationGrouping>> {
+  rectangle "<$archimate_Assessment{scale=1.5}> AI Code Generation Volume Outpaces Architectural Planning and Review Capacity" <<Assessment>> as ASS_EI3FpR
+  rectangle "<$archimate_Assessment{scale=1.5}> Centralized Governance Cannot Scale to Concurrent Development Contexts" <<Assessment>> as ASS_a6vxyj
+  rectangle "<$archimate_Assessment{scale=1.5}> Implicit System Interdependencies Are Unmaintainable Without Explicit Models" <<Assessment>> as ASS_9YWsDh
+  rectangle "<$archimate_Assessment{scale=1.5}> LLM-Based Agents Cannot Effectively Use Unstructured Architectural Knowledge" <<Assessment>> as ASS_s68vVo
+}
+ASS_EI3FpR -[hidden]right- ASS_a6vxyj
+ASS_a6vxyj -[hidden]right- ASS_9YWsDh
+ASS_9YWsDh -[hidden]right- ASS_s68vVo
+DRV_Ui5Op3 -[hidden]down- ASS_EI3FpR
+
+' Connections
+Rel_Association_Down(STK_K9xTq2, DRV_GR9prv, "")
+Rel_Association_Down(STK_aB3dE1, DRV_GR9prv, "")
+Rel_Association(DRV_GR9prv, DRV_Rt6Yu2, "")
+Rel_Association_Down(STK_4oprPM, DRV_Rt6Yu2, "")
+Rel_Association_Down(STK_Rr9Ss9, DRV_Rt6Yu2, "")
+Rel_Association_Down(STK_Zp8Lm4, DRV_Rt6Yu2, "")
+Rel_Association_Down(STK_aB3dE1, DRV_Rt6Yu2, "")
+Rel_Association(DRV_Rt6Yu2, DRV_CuhLPB, "")
+Rel_Association(DRV_CuhLPB, DRV_GR9prv, "")
+Rel_Association_Down(STK_4oprPM, DRV_CuhLPB, "")
+Rel_Association_Down(STK_Rr9Ss9, DRV_CuhLPB, "")
+Rel_Association_Down(STK_Zp8Lm4, DRV_CuhLPB, "")
+Rel_Association_Down(STK_aB3dE1, DRV_CuhLPB, "")
+Rel_Association(DRV_Rt6Yu2, DRV_Ui5Op3, "")
+Rel_Association(DRV_GR9prv, DRV_Ui5Op3, "")
+Rel_Association(DRV_CuhLPB, DRV_Ui5Op3, "")
+Rel_Association_Down(STK_4oprPM, DRV_Ui5Op3, "")
+Rel_Association_Down(STK_aB3dE1, DRV_Ui5Op3, "")
+Rel_Influence_Down(DRV_GR9prv, ASS_EI3FpR, "")
+Rel_Influence_Down(DRV_CuhLPB, ASS_EI3FpR, "")
+Rel_Influence_Down(DRV_Rt6Yu2, ASS_a6vxyj, "")
+Rel_Influence_Down(DRV_GR9prv, ASS_a6vxyj, "")
+Rel_Influence_Down(DRV_Ui5Op3, ASS_9YWsDh, "")
+Rel_Influence_Down(DRV_GR9prv, ASS_s68vVo, "")
+
+@enduml
