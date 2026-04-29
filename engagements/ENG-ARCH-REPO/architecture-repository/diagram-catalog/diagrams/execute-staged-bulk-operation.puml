@@ -1,0 +1,76 @@
+---
+artifact-id: execute-staged-bulk-operation
+artifact-type: diagram
+name: Execute Staged Bulk Operation
+version: 0.1.0
+status: draft
+keywords:
+- workflow
+- bulk-write
+- bulk-delete
+- transactional
+- staging
+- process
+diagram-type: archimate-application
+last-updated: '2026-04-28'
+---
+@startuml execute-staged-bulk-operation
+!include ../_archimate-stereotypes.puml
+!include ../_archimate-glyphs.puml
+top to bottom direction
+
+title Execute Staged Bulk Operation
+
+rectangle "Application" <<ApplicationGrouping>> {
+  rectangle "<$archimate_ApplicationComponent{scale=1.5}> Bulk Write Handler" <<ApplicationComponent>> as APP_5n_KQJ
+  rectangle "<$archimate_ApplicationComponent{scale=1.5}> Bulk Delete Handler" <<ApplicationComponent>> as APP_WK_78v
+  rectangle "<$archimate_ApplicationComponent{scale=1.5}> Batch Transaction Manager" <<ApplicationComponent>> as APP_HOOYAQ
+  rectangle "<$archimate_ApplicationComponent{scale=1.5}> Operation Registry" <<ApplicationComponent>> as APP_PDJI8F
+  APP_5n_KQJ -[hidden]right- APP_WK_78v
+  APP_WK_78v -[hidden]right- APP_HOOYAQ
+  APP_HOOYAQ -[hidden]right- APP_PDJI8F
+}
+
+rectangle "Process" <<CommonGrouping>> {
+  rectangle "<$archimate_Process{scale=1.5}> Execute Staged Bulk Operation" <<Process>> as PRC_gtgYvQ {
+    rectangle "<$archimate_Function{scale=1.5}> Resolve Operation Idempotency" <<Function>> as FNC_DrKMhV
+    rectangle "<$archimate_Function{scale=1.5}> Create Staging Repository" <<Function>> as FNC_hbgFU3
+    rectangle "<$archimate_Function{scale=1.5}> Apply Operations to Staging" <<Function>> as FNC_g3H3mK
+    rectangle "<$archimate_Function{scale=1.5}> Verify Staged Repository" <<Function>> as FNC_6PI0kV
+    rectangle "<$archimate_Function{scale=1.5}> Commit Staged Repository" <<Function>> as FNC_tRAV0x
+    FNC_DrKMhV -[hidden]right- FNC_hbgFU3
+    FNC_hbgFU3 -[hidden]right- FNC_g3H3mK
+    FNC_g3H3mK -[hidden]right- FNC_6PI0kV
+    FNC_6PI0kV -[hidden]right- FNC_tRAV0x
+  }
+  rectangle "<$archimate_DataObject{scale=1.5}> Operation Record" <<DataObject>> as DOB_hExrX3
+  rectangle "<$archimate_DataObject{scale=1.5}> Staged Repository" <<DataObject>> as DOB_hhYsiw
+  rectangle "<$archimate_Event{scale=1.5}> Staged Repository Committed" <<Event>> as EVT_BKj6NZ
+  PRC_gtgYvQ -[hidden]right- DOB_hExrX3
+  DOB_hExrX3 -[hidden]right- DOB_hhYsiw
+  DOB_hhYsiw -[hidden]right- EVT_BKj6NZ
+}
+
+' Inter-layer anchor
+APP_PDJI8F -[hidden]down- PRC_gtgYvQ
+
+' Realization: components -> process
+Rel_Realization(APP_5n_KQJ, PRC_gtgYvQ, "")
+Rel_Realization(APP_WK_78v, PRC_gtgYvQ, "")
+
+' Serving: supporting components -> process
+Rel_Serving(APP_HOOYAQ, PRC_gtgYvQ, "")
+Rel_Serving(APP_PDJI8F, PRC_gtgYvQ, "")
+
+' Triggering: function sequence
+Rel_Triggering(FNC_DrKMhV, FNC_hbgFU3, "")
+Rel_Triggering(FNC_hbgFU3, FNC_g3H3mK, "")
+Rel_Triggering(FNC_g3H3mK, FNC_6PI0kV, "")
+Rel_Triggering(FNC_6PI0kV, FNC_tRAV0x, "")
+Rel_Triggering(FNC_tRAV0x, EVT_BKj6NZ, "")
+
+' Access: functions -> data objects
+Rel_Access(FNC_DrKMhV, DOB_hExrX3, "")
+Rel_Access(FNC_hbgFU3, DOB_hhYsiw, "")
+
+@enduml

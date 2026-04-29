@@ -90,6 +90,49 @@ watch(containerRef, (el, prev) => {
   el?.addEventListener('wheel', onWheel, { passive: false })
 })
 
+// ── Preview pan+zoom ─────────────────────────────────────────────────────────
+const prevContainerRef = ref<HTMLElement | null>(null)
+const prevScale = ref(1); const prevTx = ref(0); const prevTy = ref(0)
+let prevDragging = false; let prevDrag = { x: 0, y: 0, tx: 0, ty: 0 }
+
+const prevCanvasStyle = computed(() => ({
+  transform: `translate(${prevTx.value}px, ${prevTy.value}px) scale(${prevScale.value})`,
+  transformOrigin: '0 0', willChange: 'transform', display: 'inline-block',
+}))
+const prevIsTransformed = computed(() => prevScale.value !== 1 || prevTx.value !== 0 || prevTy.value !== 0)
+
+const prevOnWheel = (e: WheelEvent) => {
+  e.preventDefault()
+  const f = e.deltaY < 0 ? 1.15 : 1 / 1.15
+  const ns = Math.min(8, Math.max(0.2, prevScale.value * f))
+  const r = ns / prevScale.value
+  const rect = prevContainerRef.value!.getBoundingClientRect()
+  prevTx.value = (e.clientX - rect.left) * (1 - r) + prevTx.value * r
+  prevTy.value = (e.clientY - rect.top) * (1 - r) + prevTy.value * r
+  prevScale.value = ns
+}
+const prevOnMouseDown = (e: MouseEvent) => {
+  e.preventDefault()
+  prevDragging = true
+  prevDrag = { x: e.clientX, y: e.clientY, tx: prevTx.value, ty: prevTy.value }
+  window.addEventListener('mousemove', prevOnMouseMove)
+  window.addEventListener('mouseup', prevOnMouseUp)
+}
+const prevOnMouseMove = (e: MouseEvent) => {
+  if (prevDragging) { prevTx.value = prevDrag.tx + e.clientX - prevDrag.x; prevTy.value = prevDrag.ty + e.clientY - prevDrag.y }
+}
+const prevOnMouseUp = () => {
+  prevDragging = false
+  window.removeEventListener('mousemove', prevOnMouseMove)
+  window.removeEventListener('mouseup', prevOnMouseUp)
+}
+const prevResetView = () => { prevScale.value = 1; prevTx.value = 0; prevTy.value = 0 }
+watch(prevContainerRef, (el, old) => {
+  old?.removeEventListener('wheel', prevOnWheel)
+  el?.addEventListener('wheel', prevOnWheel, { passive: false })
+})
+watch(() => previewMutation.result.value, () => prevResetView())
+
 // ── Diagram entity / connection state ─────────────────────────────────────────
 
 const diagramEntities = ref<EntitySummary[]>([])
@@ -387,6 +430,9 @@ onUnmounted(() => {
   containerRef.value?.removeEventListener('wheel', onWheel)
   window.removeEventListener('mousemove', onMouseMove)
   window.removeEventListener('mouseup', onMouseUp)
+  prevContainerRef.value?.removeEventListener('wheel', prevOnWheel)
+  window.removeEventListener('mousemove', prevOnMouseMove)
+  window.removeEventListener('mouseup', prevOnMouseUp)
 })
 </script>
 
@@ -597,12 +643,32 @@ onUnmounted(() => {
         >
           {{ w }}
         </div>
-        <img
+        <div
           v-if="previewMutation.result.value.image"
-          :src="previewMutation.result.value.image"
-          class="preview-img"
-          alt="Preview"
+          ref="prevContainerRef"
+          class="prev-container"
+          @mousedown="prevOnMouseDown"
+          @dblclick="prevResetView"
         >
+          <div :style="prevCanvasStyle">
+            <img
+              :src="previewMutation.result.value.image"
+              class="preview-img"
+              alt="Preview"
+              draggable="false"
+            >
+          </div>
+          <button
+            v-if="prevIsTransformed"
+            class="prev-reset-btn"
+            @click.stop="prevResetView"
+          >
+            ⊙ Reset
+          </button>
+          <div class="prev-zoom-hint">
+            Scroll to zoom · Drag to pan · Double-click to reset
+          </div>
+        </div>
         <div
           v-else
           class="state-msg"
@@ -694,7 +760,15 @@ onUnmounted(() => {
 .state-msg { font-size: 13px; color: #6b7280; }
 .state-err { font-size: 13px; color: #dc2626; margin-top: 6px; }
 .warn-msg { font-size: 12px; color: #b45309; margin-bottom: 4px; }
-.preview-img { max-width: 100%; border-radius: 8px; border: 1px solid #e5e7eb; display: block; }
+.prev-container {
+  position: relative; overflow: hidden; cursor: grab; user-select: none;
+  background: #f8fafc; border: 1px solid #e5e7eb; border-radius: 8px; min-height: 200px;
+}
+.prev-container:active { cursor: grabbing; }
+.preview-img { max-width: none; display: block; }
+.prev-reset-btn { position: absolute; top: 8px; right: 8px; padding: 4px 10px; background: rgba(255,255,255,.92); border: 1px solid #d1d5db; border-radius: 5px; font-size: 12px; cursor: pointer; color: #374151; }
+.prev-reset-btn:hover { background: white; }
+.prev-zoom-hint { position: absolute; bottom: 6px; left: 50%; transform: translateX(-50%); font-size: 11px; color: #9ca3af; background: rgba(255,255,255,.8); padding: 2px 8px; border-radius: 4px; pointer-events: none; white-space: nowrap; }
 .toggle-src { margin-top: 10px; font-size: 12px; color: #2563eb; background: none; border: none; cursor: pointer; padding: 0; }
 .puml-src { font-size: 11px; font-family: monospace; white-space: pre-wrap; margin-top: 8px; background: #f9fafb; border: 1px solid #e5e7eb; border-radius: 6px; padding: 10px; max-height: 400px; overflow-y: auto; }
 </style>

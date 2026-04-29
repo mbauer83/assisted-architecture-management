@@ -912,9 +912,50 @@ onUnmounted(() => {
 .src-row { margin-top: 16px; }
 .toggle-btn { padding: 5px 14px; border-radius: 6px; border: 1px solid #d1d5db; background: white; font-size: 13px; cursor: pointer; color: #374151; margin-bottom: 8px; } .toggle-btn:hover { background: #f9fafb; }
 .puml-src { background: #1e293b; color: #e2e8f0; padding: 16px; border-radius: 8px; font-size: 12px; line-height: 1.5; overflow-x: auto; white-space: pre; }
-.matrix-view { overflow-x: auto; padding: 16px; background: white; border-radius: 8px; border: 1px solid #e5e7eb; }
-.matrix-view :deep(th) { writing-mode: vertical-rl; transform: rotate(180deg); min-width: 2rem; padding: 8px 4px; font-size: 11px; }
-.matrix-view :deep(td), .matrix-view :deep(th) { border: 1px solid #e2e8f0; padding: 4px 8px; }
+.matrix-view {
+  overflow: auto;
+  max-height: clamp(420px, 72vh, 880px);
+  padding: 16px;
+  background: white;
+  border-radius: 8px;
+  border: 1px solid #e5e7eb;
+}
 .matrix-view :deep(table) { border-collapse: collapse; margin-bottom: 20px; }
+.matrix-view :deep(th) {
+  border: 1px solid #e2e8f0;
+  padding: 6px 8px;
+  font-size: 11px;
+  font-weight: 600;
+  min-width: 5rem;
+  max-width: 9rem;
+  text-align: center;
+  vertical-align: bottom;
+  white-space: normal;
+  word-break: break-word;
+}
+.matrix-view :deep(th:first-child) {
+  position: sticky;
+  left: 0;
+  z-index: 2;
+  text-align: left;
+  min-width: 11rem;
+  max-width: 18rem;
+  background: white;
+  border-right: 2px solid #d1d5db;
+}
+.matrix-view :deep(td) { border: 1px solid #e2e8f0; padding: 4px 8px; font-size: 12px; }
+.matrix-view :deep(td:first-child) {
+  position: sticky;
+  left: 0;
+  z-index: 1;
+  background: white;
+  font-size: 11px;
+  font-weight: 500;
+  min-width: 11rem;
+  max-width: 18rem;
+  word-break: break-word;
+  border-right: 2px solid #d1d5db;
+}
+.matrix-view :deep(td:not(:first-child)) { text-align: center; }
 .matrix-view :deep(h2) { font-size: 13px; font-weight: 700; margin: 16px 0 6px; color: #374151; }
 </style>

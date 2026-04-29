@@ -11,7 +11,7 @@
 
 !define ARCHIMATE_VERSION 3.2
 !include <archimate/Archimate>
-!include _archimate-glyphs.puml
+hide stereotype
 
 skinparam defaultFontName "Helvetica Neue, Helvetica, Arial, sans-serif"
 skinparam defaultFontSize 12

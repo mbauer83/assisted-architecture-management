@@ -1,0 +1,64 @@
+---
+artifact-id: reverse-architecture-and-conformance-review
+artifact-type: diagram
+name: Reverse Architecture & Architecture Conformance Review
+version: 0.1.0
+status: draft
+keywords:
+- workflow
+- reverse-architecture
+- conformance
+- process
+diagram-type: archimate-business
+last-updated: '2026-04-28'
+---
+@startuml reverse-architecture-and-conformance-review
+!include ../_archimate-stereotypes.puml
+!include ../_archimate-glyphs.puml
+top to bottom direction
+
+title Reverse Architecture & Architecture Conformance Review
+
+rectangle "Services" <<CommonGrouping>> {
+  rectangle "<$archimate_Service{scale=1.5}> Model Authoring Service" <<Service>> as SRV_GsUtNL
+  rectangle "<$archimate_Service{scale=1.5}> Verification Service" <<Service>> as SRV_Ij6Kl6
+  rectangle "<$archimate_Service{scale=1.5}> Discovery, Querying & Stats Service" <<Service>> as SRV_Qr8St8
+  SRV_GsUtNL -[hidden]right- SRV_Ij6Kl6
+  SRV_Ij6Kl6 -[hidden]right- SRV_Qr8St8
+}
+
+rectangle "Processes" <<CommonGrouping>> {
+  rectangle "<$archimate_Process{scale=1.5}> Reverse Architecture" <<Process>> as PRC_CYgU64 {
+    rectangle "<$archimate_Function{scale=1.5}> Explore System Structure" <<Function>> as FNC_erPw5B
+    rectangle "<$archimate_Function{scale=1.5}> Map Elements to Architecture Concepts" <<Function>> as FNC_oRz6Qe
+    rectangle "<$archimate_Function{scale=1.5}> Check Model Coverage" <<Function>> as FNC_SXt2mM
+    FNC_erPw5B -[hidden]right- FNC_oRz6Qe
+    FNC_oRz6Qe -[hidden]right- FNC_SXt2mM
+  }
+  rectangle "<$archimate_Process{scale=1.5}> Architecture Conformance Review" <<Process>> as PRC_vlE_5j {
+    rectangle "<$archimate_Function{scale=1.5}> Extract Architecture Baseline" <<Function>> as FNC_ns4pWw
+    rectangle "<$archimate_Function{scale=1.5}> Assess Implementation Against Model" <<Function>> as FNC_tFTeOT
+    rectangle "<$archimate_Function{scale=1.5}> Report Architecture Deviations" <<Function>> as FNC_omV6nu
+    FNC_ns4pWw -[hidden]right- FNC_tFTeOT
+    FNC_tFTeOT -[hidden]right- FNC_omV6nu
+  }
+  PRC_CYgU64 -[hidden]right- PRC_vlE_5j
+}
+
+' Inter-layer anchor
+SRV_GsUtNL -[hidden]down- PRC_CYgU64
+
+' Serving: services provide capabilities to the processes that use them
+Rel_Serving(SRV_GsUtNL, PRC_CYgU64, "")
+Rel_Serving(SRV_Ij6Kl6, PRC_vlE_5j, "")
+Rel_Serving(SRV_Qr8St8, PRC_vlE_5j, "")
+
+' Triggering: Reverse Architecture function sequence
+Rel_Triggering(FNC_erPw5B, FNC_oRz6Qe, "")
+Rel_Triggering(FNC_oRz6Qe, FNC_SXt2mM, "")
+
+' Triggering: Conformance Review function sequence
+Rel_Triggering(FNC_ns4pWw, FNC_tFTeOT, "")
+Rel_Triggering(FNC_tFTeOT, FNC_omV6nu, "")
+
+@enduml

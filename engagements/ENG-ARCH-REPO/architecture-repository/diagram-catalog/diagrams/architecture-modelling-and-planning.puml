@@ -1,0 +1,88 @@
+---
+artifact-id: architecture-modelling-and-planning
+artifact-type: diagram
+name: Architecture Modelling & Planning
+version: 0.1.0
+status: draft
+keywords:
+- workflow
+- modelling
+- planning
+- authoring
+- process
+diagram-type: archimate-business
+last-updated: '2026-04-28'
+---
+@startuml architecture-modelling-and-planning
+!include ../_archimate-stereotypes.puml
+!include ../_archimate-glyphs.puml
+top to bottom direction
+
+title Architecture Modelling & Planning
+
+rectangle "Services" <<CommonGrouping>> {
+  rectangle "<$archimate_Service{scale=1.5}> Authoring Service" <<Service>> as SRV_Au1Th1
+  rectangle "<$archimate_Service{scale=1.5}> Verification Service" <<Service>> as SRV_Ij6Kl6
+  rectangle "<$archimate_Service{scale=1.5}> Discovery, Querying & Stats Service" <<Service>> as SRV_Qr8St8
+  rectangle "<$archimate_Service{scale=1.5}> Diagram Authoring Service" <<Service>> as SRV_AIGnSY
+  SRV_Au1Th1 -[hidden]right- SRV_Ij6Kl6
+  SRV_Ij6Kl6 -[hidden]right- SRV_Qr8St8
+  SRV_Qr8St8 -[hidden]right- SRV_AIGnSY
+}
+
+rectangle "Process" <<CommonGrouping>> {
+  rectangle "<$archimate_Process{scale=1.5}> Architecture Modelling & Planning" <<Process>> as PRC_U4aAdh {
+    rectangle "<$archimate_Function{scale=1.5}> Scope & Formulate Modelling Task" <<Function>> as FNC_ErTqVT
+    rectangle "<$archimate_Function{scale=1.5}> Plan Modelling Changes" <<Function>> as FNC_rkx32U
+    rectangle "<$archimate_Function{scale=1.5}> Query Model" <<Function>> as FNC_lLdx12
+    rectangle "<$archimate_Function{scale=1.5}> Author Model Artifacts" <<Function>> as FNC_yuFXVJ
+    rectangle "<$archimate_Function{scale=1.5}> Verify Model" <<Function>> as FNC_NGjUCa
+    rectangle "<$archimate_Function{scale=1.5}> Author Diagrams" <<Function>> as FNC_uzJGYp
+    rectangle "<$archimate_Function{scale=1.5}> Author Architecture Documents" <<Function>> as FNC_saMRQ0
+    FNC_ErTqVT -[hidden]right- FNC_rkx32U
+    FNC_rkx32U -[hidden]right- FNC_lLdx12
+    FNC_lLdx12 -[hidden]right- FNC_yuFXVJ
+    FNC_yuFXVJ -[hidden]right- FNC_NGjUCa
+    FNC_NGjUCa -[hidden]right- FNC_uzJGYp
+    FNC_uzJGYp -[hidden]right- FNC_saMRQ0
+  }
+}
+
+rectangle "Roles" <<CommonGrouping>> {
+  rectangle "<$archimate_Role{scale=1.5}> Author" <<Role>> as ROL_deMuTj
+  rectangle "<$archimate_Role{scale=1.5}> AI Agent" <<Role>> as ROL_udXPfB
+  ROL_deMuTj -[hidden]right- ROL_udXPfB
+}
+
+' Inter-layer anchors
+SRV_AIGnSY -[hidden]down- PRC_U4aAdh
+PRC_U4aAdh -[hidden]down- ROL_deMuTj
+
+' Realization: process -> services
+Rel_Realization_Up(PRC_U4aAdh, SRV_Au1Th1, "")
+Rel_Realization_Up(PRC_U4aAdh, SRV_Ij6Kl6, "")
+Rel_Realization_Up(PRC_U4aAdh, SRV_Qr8St8, "")
+Rel_Realization_Up(PRC_U4aAdh, SRV_AIGnSY, "")
+
+' Serving: services provide capabilities to functions that use them
+Rel_Serving(SRV_Au1Th1, FNC_yuFXVJ, "")
+Rel_Serving(SRV_Qr8St8, FNC_lLdx12, "")
+Rel_Serving(SRV_Ij6Kl6, FNC_NGjUCa, "")
+Rel_Serving(SRV_AIGnSY, FNC_uzJGYp, "")
+
+' Triggering sequence (verified in model)
+Rel_Triggering(FNC_ErTqVT, FNC_rkx32U, "")
+Rel_Triggering(FNC_rkx32U, FNC_lLdx12, "")
+Rel_Triggering(FNC_lLdx12, FNC_yuFXVJ, "")
+Rel_Triggering(FNC_yuFXVJ, FNC_NGjUCa, "")
+Rel_Triggering(FNC_NGjUCa, FNC_uzJGYp, "")
+Rel_Triggering(FNC_uzJGYp, FNC_saMRQ0, "")
+
+' Service specialization
+Rel_Specialization(SRV_AIGnSY, SRV_Au1Th1, "")
+
+' Assignment: roles -> process
+Rel_Assignment_Up(ROL_deMuTj, PRC_U4aAdh, "")
+Rel_Assignment_Up(ROL_udXPfB, PRC_U4aAdh, "")
+
+@enduml

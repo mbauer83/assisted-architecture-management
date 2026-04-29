@@ -166,6 +166,7 @@ def _execute_staged_delete_batch(
         staged_root=staged_root,
         live_root=live_root,
         changed_paths=changed_paths,
+        directly_changed_paths=changed_paths,
         operation_id=operation_id,
     )
     committed = False
@@ -215,6 +216,7 @@ def _staged_delete_verification(
     staged_root: Path,
     live_root: Path,
     changed_paths: set[Path],
+    directly_changed_paths: set[Path] | None = None,
     operation_id: str,
 ) -> dict[str, object]:
     if skipped:
@@ -226,7 +228,12 @@ def _staged_delete_verification(
             "repo_root": str(live_root),
         }
     operation_registry.set_phase(operation_id, "verify")
-    verification = stage_batch_verification(staged_root, changed_paths=changed_paths)
+    verification = stage_batch_verification(
+        staged_root,
+        changed_paths=changed_paths,
+        directly_changed_paths=directly_changed_paths,
+        live_root=live_root,
+    )
     return normalize_staged_verification(
         verification,
         staged_root=staged_root,

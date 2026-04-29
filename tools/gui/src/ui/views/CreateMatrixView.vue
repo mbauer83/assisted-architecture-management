@@ -282,9 +282,23 @@ const doCreate = async () => {
 .btn-secondary { padding: 8px 20px; background: white; color: #374151; border: 1px solid #d1d5db; border-radius: 6px; font-size: 13px; font-weight: 500; cursor: pointer; }
 .btn-secondary:hover:not(:disabled) { background: #f9fafb; }
 .btn-secondary:disabled { opacity: .5; cursor: not-allowed; }
-.matrix-preview { padding: 16px; overflow-x: auto; }
-.matrix-preview :deep(th) { writing-mode: vertical-rl; transform: rotate(180deg); min-width: 2rem; max-width: 2.5rem; padding: 8px 4px; font-size: 11px; }
-.matrix-preview :deep(td), .matrix-preview :deep(th) { border: 1px solid #e2e8f0; padding: 4px 8px; }
+.matrix-preview { padding: 16px; overflow: auto; max-height: clamp(300px, 60vh, 700px); }
 .matrix-preview :deep(table) { border-collapse: collapse; margin-bottom: 20px; }
+.matrix-preview :deep(th) {
+  border: 1px solid #e2e8f0; padding: 6px 8px; font-size: 11px; font-weight: 600;
+  min-width: 5rem; max-width: 9rem;
+  text-align: center; vertical-align: bottom; white-space: normal; word-break: break-word;
+}
+.matrix-preview :deep(th:first-child) {
+  position: sticky; left: 0; z-index: 2; background: white;
+  text-align: left; min-width: 10rem; max-width: 16rem; border-right: 2px solid #d1d5db;
+}
+.matrix-preview :deep(td) { border: 1px solid #e2e8f0; padding: 4px 8px; font-size: 12px; }
+.matrix-preview :deep(td:first-child) {
+  position: sticky; left: 0; z-index: 1; background: white;
+  font-size: 11px; font-weight: 500; min-width: 10rem; max-width: 16rem;
+  word-break: break-word; border-right: 2px solid #d1d5db;
+}
+.matrix-preview :deep(td:not(:first-child)) { text-align: center; }
 .matrix-preview :deep(h2) { font-size: 13px; font-weight: 700; margin: 16px 0 6px; color: #374151; }
 </style>

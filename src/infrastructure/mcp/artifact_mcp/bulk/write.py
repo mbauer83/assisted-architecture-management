@@ -212,7 +212,12 @@ def _sync_verify_and_commit(
         )
 
     operation_registry.set_phase(operation_id, "verify")
-    verification = stage_batch_verification(staged_root, changed_paths=changed_paths)
+    verification = stage_batch_verification(
+        staged_root,
+        changed_paths=changed_paths,
+        directly_changed_paths=changed_paths,
+        live_root=live_root,
+    )
     if not verification["valid"]:
         _mark_verification_failure(indexed=indexed, results=results, dry_run=dry_run, operation_id=operation_id)
         return False

@@ -81,7 +81,11 @@ def normalize_staged_result(
         out["path"] = map_path_to_live(out["path"], staged_root=staged_root, live_root=live_root)
     if dry_run or not committed:
         out["wrote"] = False
-        out["dry_run"] = dry_run
+    out.pop("dry_run", None)
+    # Strip per-item verification when passing — batch-level verification covers this
+    verification = out.get("verification")
+    if isinstance(verification, dict) and verification.get("valid") and not verification.get("issues"):
+        del out["verification"]
     return out
 
 
@@ -116,10 +120,21 @@ def _verification_payload(
     registry: ArtifactRegistry,
     results: list,
     executed: bool,
+    preexisting_invalid_paths: set[Path] | None = None,
 ) -> dict[str, object]:
     invalid = [result for result in results if not result.valid]
+    # When preexisting_invalid_paths is provided, neighbour files whose invalidity
+    # predates this batch are non-blocking.  Only files that are newly invalid
+    # (i.e. not already broken in the live repo) block the commit.
+    if preexisting_invalid_paths is not None:
+        blocking_invalid = [
+            result for result in invalid
+            if result.path.resolve() not in preexisting_invalid_paths
+        ]
+    else:
+        blocking_invalid = invalid
     return {
-        "valid": not invalid,
+        "valid": not blocking_invalid,
         "executed": executed,
         "counts": {
             "files": len(results),
@@ -150,7 +165,92 @@ def _verification_payload(
     }
 
 
-def stage_batch_verification(repo_root: Path, *, changed_paths: set[Path]) -> dict[str, object]:
+_PUML_SYNTAX_CODES: frozenset[str] = frozenset({"E350", "W350", "W351", "W352"})
+
+
+def _preexisting_invalid_paths(
+    *,
+    invalid_neighbor_staged_results: list,
+    staged_root: Path,
+    live_root: Path,
+) -> set[Path]:
+    """Return the subset of invalid neighbour staged paths whose invalidity
+    predates this batch (i.e. they were already invalid in the live repo).
+
+    Performance contract: no PlantUML subprocess is spawned.
+
+    Strategy per neighbour file:
+    1. Map staged path → live path.  If live path does not exist the file is
+       new (batch created it) → not pre-existing.
+    2. Re-verify the live file without the PlantUML syntax check (pure
+       structural/reference rules, all in-process).
+       - If the live result is invalid → pre-existing regardless of cause.
+       - If the live result is valid, inspect the *staged* issues:
+         · If every staged issue has a PlantUML syntax code (E350/W350/W351/
+           W352) the file body was already broken before the batch — the batch
+           never rewrites neighbour diagram bodies — so it is pre-existing.
+         · Otherwise at least one staged issue is a reference/structural error
+           that didn't exist in the live repo, meaning the batch caused it →
+           not pre-existing → blocking.
+    """
+    if not invalid_neighbor_staged_results:
+        return set()
+
+    from src.application.verification.artifact_verifier_incremental import inventory_files
+
+    live_registry = ArtifactRegistry(shared_artifact_index([live_root]))
+    # check_puml_syntax=False: avoid spawning any subprocess in this path.
+    live_verifier = ArtifactVerifier(live_registry, check_puml_syntax=False)
+    # Build the live inventory once to get authoritative file-type mappings.
+    live_inv = inventory_files(live_root, include_diagrams=True)
+
+    staged_root_resolved = staged_root.resolve()
+    preexisting: set[Path] = set()
+
+    for staged_result in invalid_neighbor_staged_results:
+        staged_path = staged_result.path
+        try:
+            rel = staged_path.resolve().relative_to(staged_root_resolved)
+        except ValueError:
+            continue
+        live_path = (live_root / rel).resolve()
+        if not live_path.exists():
+            # File is new — created by this batch.  Never pre-existing.
+            continue
+        rel_str = str(rel)
+        file_type = live_inv.file_type_by_relpath.get(rel_str)
+        if file_type is None:
+            # Not tracked (e.g. a docs/ file); cannot determine — skip.
+            continue
+        if file_type == "entity":
+            live_result = live_verifier.verify_entity_file(live_path)
+        elif file_type == "connection":
+            live_result = live_verifier.verify_connection_file(live_path)
+        else:
+            live_result = live_verifier.verify_diagram_file(live_path)
+
+        if not live_result.valid:
+            # Already broken in live repo → pre-existing.
+            preexisting.add(staged_path.resolve())
+        elif all(issue.code in _PUML_SYNTAX_CODES for issue in staged_result.issues):
+            # Live structural/reference checks pass, but the staged result has
+            # only PlantUML syntax issues.  The batch never rewrites diagram
+            # bodies, so those syntax errors were already in the file →
+            # pre-existing.
+            preexisting.add(staged_path.resolve())
+        # else: live is valid but staged has non-syntax errors → batch caused
+        # them → blocking (do not add to preexisting).
+
+    return preexisting
+
+
+def stage_batch_verification(
+    repo_root: Path,
+    *,
+    changed_paths: set[Path],
+    directly_changed_paths: set[Path] | None = None,
+    live_root: Path | None = None,
+) -> dict[str, object]:
     registry = ArtifactRegistry(shared_artifact_index([repo_root]))
     verifier = ArtifactVerifier(registry)
     results = verifier.verify_paths(
@@ -159,11 +259,30 @@ def stage_batch_verification(repo_root: Path, *, changed_paths: set[Path]) -> di
         verification_scope="impacted",
         include_diagrams=True,
     )
+
+    preexisting: set[Path] | None = None
+    if directly_changed_paths is not None and live_root is not None:
+        # Identify invalid neighbour files — those not directly written by this
+        # batch.  For each, check whether they were already invalid before the
+        # batch by re-verifying against the live repo.
+        directly_changed_resolved = {p.resolve() for p in directly_changed_paths}
+        invalid_neighbor_results = [
+            result
+            for result in results
+            if not result.valid and result.path.resolve() not in directly_changed_resolved
+        ]
+        preexisting = _preexisting_invalid_paths(
+            invalid_neighbor_staged_results=invalid_neighbor_results,
+            staged_root=repo_root,
+            live_root=live_root,
+        )
+
     return _verification_payload(
         repo_root=repo_root,
         registry=registry,
         results=results,
         executed=True,
+        preexisting_invalid_paths=preexisting,
     )
 
 

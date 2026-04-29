@@ -21,8 +21,8 @@ def extract_random_part(artifact_id: str) -> str:
 
 def get_repository(repo_root: Path) -> ArtifactRepository:
   """Get or create an ArtifactRepository for the given repo root."""
-  from src.infrastructure.artifact_index.service import ArtifactIndex
-  return ArtifactRepository(ArtifactIndex(repo_root))
+  from src.infrastructure.artifact_index import shared_artifact_index
+  return ArtifactRepository(shared_artifact_index([repo_root]))
 
 
 def check_entity_duplicate(

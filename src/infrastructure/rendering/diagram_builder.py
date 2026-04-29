@@ -36,6 +36,81 @@ from src.domain.ontology_loader import (
 )
 
 
+def _load_sprite_map(repo_root: Path) -> dict[str, str]:
+    """Return {element_type_name: full_sprite_line} from _archimate-glyphs.puml."""
+    glyphs_path = repo_root / DIAGRAM_CATALOG / "_archimate-glyphs.puml"
+    sprites: dict[str, str] = {}
+    try:
+        for line in glyphs_path.read_text(encoding="utf-8").splitlines():
+            if line.startswith("sprite $archimate_"):
+                m = re.match(r"sprite \$archimate_(\w+)", line)
+                if m:
+                    sprites[m.group(1)] = line
+    except OSError:
+        pass
+    return sprites
+
+
+def _load_stereotype_map(repo_root: Path) -> tuple[str, dict[str, str]]:
+    """Parse _archimate-stereotypes.puml into (header, {TypeName: skinparam_block}).
+
+    The header is all content before the first ``skinparam rectangle<<`` — it
+    contains the Archimate stdlib include, hide stereotype, global skinparams,
+    and layout directives that every diagram needs.  Each block map entry is the
+    complete ``skinparam rectangle<<Type>> { ... }`` text for one element type.
+    """
+    stereo_path = repo_root / DIAGRAM_CATALOG / "_archimate-stereotypes.puml"
+    try:
+        content = stereo_path.read_text(encoding="utf-8")
+    except OSError:
+        return "", {}
+    first = content.find("skinparam rectangle<<")
+    if first == -1:
+        return content, {}
+    header = content[:first].rstrip("\n") + "\n"
+    blocks: dict[str, str] = {}
+    for m in re.finditer(r"(skinparam rectangle<<(\w+)>>\s*\{[^}]+\})", content[first:]):
+        blocks[m.group(2)] = m.group(1)
+    return header, blocks
+
+
+def inject_archimate_includes(puml_body: str, repo_root: Path) -> str:
+    """Replace Archimate !include directives with selective inline content.
+
+    Replaces ``!include ../_archimate-stereotypes.puml`` with the base header
+    (always-needed directives) plus only the ``skinparam rectangle<<Type>>``
+    blocks and ``sprite $archimate_XXX`` definitions actually referenced in the
+    diagram.  Also strips any explicit ``!include ../_archimate-glyphs.puml``
+    line since sprites are now injected inline.
+
+    Idempotent: returns *puml_body* unchanged when the stereotypes include is
+    absent (e.g. already-expanded files).
+    """
+    if "_archimate-stereotypes.puml" not in puml_body:
+        return puml_body
+
+    needed_types = set(re.findall(r"<<(\w+)>>", puml_body))
+    needed_sprites = set(re.findall(r"<\$archimate_(\w+)", puml_body))
+    already_sprites = set(re.findall(r"^sprite \$archimate_(\w+)", puml_body, re.MULTILINE))
+    sprites_to_inject = needed_sprites - already_sprites
+
+    header, stereo_map = _load_stereotype_map(repo_root)
+    sprite_map = _load_sprite_map(repo_root)
+
+    parts: list[str] = [header.rstrip("\n")]
+    for name in sorted(needed_types):
+        if name in stereo_map:
+            parts.append(stereo_map[name])
+    for name in sorted(sprites_to_inject):
+        if name in sprite_map:
+            parts.append(sprite_map[name])
+
+    replacement = "\n".join(parts) + "\n"
+    result = puml_body.replace("!include ../_archimate-stereotypes.puml\n", replacement, 1)
+    result = result.replace("!include ../_archimate-glyphs.puml\n", "")
+    return result
+
+
 def _parse_archimate_block(raw: str) -> dict:
     """Parse the archimate display block, stripping markdown code fences first.
 
@@ -315,14 +390,11 @@ def _render_puml(puml_body: str, repo_root: Path, fmt: str) -> tuple[str | None,
         return None, [f"Diagram directory not found: {diag_dir}"]
 
     render_body = re.sub(r"@startuml\s+\S+", "@startuml", puml_body, count=1)
-    includes: list[str] = []
     if "_archimate-stereotypes.puml" not in render_body:
-        includes.append("!include ../_archimate-stereotypes.puml")
-    if "_archimate-glyphs.puml" not in render_body:
-        includes.append("!include ../_archimate-glyphs.puml")
-    if includes:
-        insert = "\n".join(includes) + "\n"
-        render_body = re.sub(r"(@startuml)\n", r"\1\n" + insert, render_body, count=1)
+        render_body = re.sub(
+            r"(@startuml)\n", r"\1\n!include ../_archimate-stereotypes.puml\n", render_body, count=1
+        )
+    render_body = inject_archimate_includes(render_body, repo_root)
 
     tmp_path: Path | None = None
     try:

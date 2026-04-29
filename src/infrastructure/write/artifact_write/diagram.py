@@ -225,19 +225,10 @@ def create_diagram(
             count=1,
         )
 
-    glyphs_path = repo_root / DIAGRAM_CATALOG / "_archimate-glyphs.puml"
-    if (
-        auto_include_stereotypes
-        and "archimate" in diagram_type.lower()
-        and glyphs_path.exists()
-        and "_archimate-glyphs.puml" not in puml_body
-    ):
-        puml_body = re.sub(
-            r"(!include \.\./\_archimate-stereotypes\.puml)\n",
-            r"\1\n!include ../_archimate-glyphs.puml\n",
-            puml_body,
-            count=1,
-        )
+    if auto_include_stereotypes and "archimate" in diagram_type.lower():
+        from src.infrastructure.rendering.diagram_builder import inject_archimate_includes
+
+        puml_body = inject_archimate_includes(puml_body, repo_root)
 
     # Auto-layout: insert hidden links and arrow direction hints
     puml_body = optimize_puml_layout(puml_body)

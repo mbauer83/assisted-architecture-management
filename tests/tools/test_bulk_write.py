@@ -399,6 +399,57 @@ this is not valid plantuml
         assert len(results) == 1
         assert results[0]["wrote"] is True
 
+    def test_preexisting_broken_diagram_referencing_changed_entity_does_not_block_write(
+        self, repo: Path
+    ) -> None:
+        """Regression: a diagram that already references the modified entity AND is
+        already broken (references a ghost entity) must not block the batch.
+
+        The impacted-scope verifier pulls the diagram in because it uses the entity
+        being edited.  Without the pre-existing check the batch fails even though
+        *it* did not break the diagram.
+
+        The batch should succeed (wrote=True) while the broken diagram still
+        appears as an invalid result in the batch_verification payload.
+        """
+        eid = _make(repo, "requirement", "TouchedEntity")
+
+        # Write a diagram that (a) references the entity we will edit and
+        # (b) is already broken because it also references a ghost entity.
+        ghost = "REQ@0000000000.XXXXXX.ghost-entity"
+        diag_id = "broken-references-changed-entity"
+        _write(
+            repo / "diagram-catalog" / "diagrams" / f"{diag_id}.puml",
+            f"""\
+---
+artifact-id: {diag_id}
+artifact-type: diagram
+diagram-type: archimate-application
+name: "Broken references changed entity"
+entity-ids-used:
+  - {eid}
+  - {ghost}
+version: 0.1.0
+status: draft
+last-updated: '2026-04-28'
+---
+@startuml
+Alice -> Bob
+@enduml
+""",
+        )
+
+        # Edit the entity — the diagram is in the impacted scope.
+        results = _bulk(repo, [
+            {"op": "edit_entity", "artifact_id": eid, "summary": "Touched by batch"},
+        ])
+
+        assert len(results) == 1
+        assert results[0]["wrote"] is True, (
+            "Batch was blocked by a pre-existing broken diagram that referenced the "
+            "changed entity — the pre-existing invalidity must not block the commit."
+        )
+
     def test_large_batch_all_succeed(self, repo: Path) -> None:
         """Batches larger than the old 8-item parallel limit should complete correctly."""
         items = [
@@ -947,6 +998,55 @@ this is not valid plantuml
         results = cast(list[dict[str, Any]], payload["results"])
         assert len(results) == 1
         assert results[0]["wrote"] is True
+
+    def test_preexisting_broken_diagram_referencing_deleted_entity_does_not_block_delete(
+        self, repo: Path
+    ) -> None:
+        """Regression: deleting an entity that a pre-existing broken diagram also
+        references must not block the batch (auto_sync_diagrams=True removes the
+        reference; without auto-sync the diagram is a neighbour pulled into impacted
+        scope but its prior invalidity must not block the commit).
+
+        We use auto_sync_diagrams=True so the diagram is cleaned up and the
+        structural delete succeeds; the pre-existing ghost-entity reference error
+        is what we are testing does not block.
+        """
+        eid = _make(repo, "requirement", "DeleteTouchedEntity")
+        ghost = "REQ@0000000000.YYYYYY.ghost-entity"
+        diag_id = "broken-references-deleted-entity"
+        _write(
+            repo / "diagram-catalog" / "diagrams" / f"{diag_id}.puml",
+            f"""\
+---
+artifact-id: {diag_id}
+artifact-type: diagram
+diagram-type: archimate-application
+name: "Broken references deleted entity"
+entity-ids-used:
+  - {eid}
+  - {ghost}
+version: 0.1.0
+status: draft
+last-updated: '2026-04-28'
+---
+@startuml
+Alice -> Bob
+@enduml
+""",
+        )
+
+        payload = _bulk_delete(
+            repo,
+            [{"op": "delete_entity", "artifact_id": eid}],
+            auto_sync_diagrams=True,
+        )
+
+        results = cast(list[dict[str, Any]], payload["results"])
+        assert len(results) == 1
+        assert results[0]["wrote"] is True, (
+            "Batch was blocked by a pre-existing broken diagram that referenced the "
+            "deleted entity — the pre-existing invalidity must not block the commit."
+        )
 
     def test_staged_bulk_delete_publishes_only_live_paths(self, repo: Path) -> None:
         eid = _make(repo, "requirement", "DeleteLiveOnly")
