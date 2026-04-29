@@ -17,6 +17,7 @@ from pathlib import Path
 import pytest
 from pytest_bdd import given, scenarios, then, when
 
+from src.application.modeling.artifact_write import generate_diagram_id, prefix_for_diagram_type
 from src.application.verification.artifact_verifier import ArtifactRegistry, ArtifactVerifier
 from src.infrastructure.artifact_index import shared_artifact_index
 from src.infrastructure.mcp import mcp_artifact_server as tools
@@ -121,6 +122,7 @@ def create_archimate_diagram(
     repo_with_entities_and_connection: tuple[Path, str, str],
 ) -> dict[str, object]:
     repo_root, e1_id, e2_id = repo_with_entities_and_connection
+    artifact_id = generate_diagram_id("archimate-application", "Test Diagram")
 
     # Derive aliases from entity IDs: TYPE_randompart
     e1_parts = e1_id.split(".")
@@ -128,7 +130,7 @@ def create_archimate_diagram(
     e1_alias = f"{e1_parts[0].split('@')[0]}_{e1_parts[1]}"
     e2_alias = f"{e2_parts[0].split('@')[0]}_{e2_parts[1]}"
 
-    puml = f"""@startuml test-diagram-archimate-application
+    puml = f"""@startuml {artifact_id}
 !include ../_macros.puml
 
 $DECL_{e1_alias}()
@@ -141,7 +143,7 @@ $DECL_{e2_alias}()
         diagram_type="archimate-application",
         name="Test Diagram",
         puml=puml,
-        artifact_id="test-diagram-archimate-application",
+        artifact_id=artifact_id,
         dry_run=False,
         repo_root=str(repo_root),
         connection_inference="strict",
@@ -178,7 +180,7 @@ def test_model_create_matrix_writes_valid_matrix(repo_root: Path) -> None:
             "|---|---|---|\n"
             "| EventStore | Orchestrator | serving |\n"
         ),
-        artifact_id="matrix-test-v1",
+        artifact_id=generate_diagram_id("matrix", "Connection Matrix"),
         dry_run=False,
         repo_root=str(repo_root),
     )
@@ -187,3 +189,86 @@ def test_model_create_matrix_writes_valid_matrix(repo_root: Path) -> None:
     verification = result.get("verification")
     assert isinstance(verification, dict)
     assert verification.get("valid") is True
+
+
+def test_diagram_prefixes_are_family_specific() -> None:
+    assert prefix_for_diagram_type("archimate-business") == "ARC"
+    assert prefix_for_diagram_type("matrix") == "MAT"
+    assert prefix_for_diagram_type("sequence") == "SEQ"
+    assert prefix_for_diagram_type("activity-bpmn") == "ACT"
+    assert prefix_for_diagram_type("er") == "ERD"
+    assert generate_diagram_id("matrix", "Connection Matrix").startswith("MAT@")
+
+
+def test_model_create_matrix_generates_typed_id_when_omitted(repo_root: Path) -> None:
+    result = tools.artifact_create_matrix(
+        name="Generated Matrix",
+        matrix_markdown="| Source | Target | Type |\n|---|---|---|\n",
+        artifact_id=None,
+        dry_run=False,
+        repo_root=str(repo_root),
+    )
+
+    assert result.get("wrote") is True
+    artifact_id = str(result.get("artifact_id"))
+    assert artifact_id.startswith("MAT@")
+    assert artifact_id.endswith(".generated-matrix")
+    assert Path(str(result["path"])).name == f"{artifact_id}.md"
+
+
+def test_model_create_diagram_dry_run_accepts_inlined_archimate_stereotypes(
+    repo_root: Path,
+) -> None:
+    (repo_root / "diagram-catalog").mkdir(parents=True, exist_ok=True)
+    (repo_root / "diagram-catalog" / "_archimate-stereotypes.puml").write_text(
+        """\
+!include <archimate/Archimate>
+hide stereotype
+skinparam rectangle<<ApplicationComponent>> {
+  BackgroundColor #E8F8FF
+  BorderColor #0078A0
+}
+""",
+        encoding="utf-8",
+    )
+    e1 = _write_entity(repo_root, "application-component", "EventStore")
+    e2 = _write_entity(repo_root, "application-component", "LangGraph Orchestrator")
+    e1_id = str(e1["artifact_id"])
+    e2_id = str(e2["artifact_id"])
+    conn = tools.artifact_add_connection(
+        connection_type="archimate-serving",
+        source_entity=e1_id,
+        target_entity=e2_id,
+        dry_run=False,
+        repo_root=str(repo_root),
+    )
+    assert conn.get("wrote") is True
+
+    e1_parts = e1_id.split(".")
+    e2_parts = e2_id.split(".")
+    e1_alias = f"{e1_parts[0].split('@')[0]}_{e1_parts[1]}"
+    e2_alias = f"{e2_parts[0].split('@')[0]}_{e2_parts[1]}"
+
+    puml = f"""@startuml inlined-archimate-save
+!include ../_archimate-stereotypes.puml
+
+title Test Diagram
+
+rectangle "Left" <<ApplicationComponent>> as {e1_alias}
+rectangle "Right" <<ApplicationComponent>> as {e2_alias}
+Rel_Serving({e1_alias}, {e2_alias}, "")
+@enduml
+"""
+    result = tools.artifact_create_diagram(
+        diagram_type="archimate-application",
+        name="Test Diagram",
+        puml=puml,
+        artifact_id=None,
+        dry_run=True,
+        repo_root=str(repo_root),
+        connection_inference="none",
+    )
+
+    verification = result.get("verification")
+    assert isinstance(verification, dict)
+    assert verification.get("valid") is True, verification

@@ -35,9 +35,7 @@ def artifact_verify(
             p = engagement_root / p
         inferred = file_type
         if inferred is None:
-            if p.suffix == ".puml" or (
-                p.suffix == ".md" and DIAGRAM_CATALOG in p.parts and DIAGRAMS in p.parts
-            ):
+            if p.suffix == ".puml" or (p.suffix == ".md" and DIAGRAM_CATALOG in p.parts and DIAGRAMS in p.parts):
                 inferred = "diagram"
             elif p.suffix == ".md" and DOCS in p.parts:
                 inferred = "document"
@@ -50,9 +48,7 @@ def artifact_verify(
                 result = verifier.verify_connection_file(p)
             case "diagram":
                 result = (
-                    verifier.verify_matrix_diagram_file(p)
-                    if p.suffix == ".md"
-                    else verifier.verify_diagram_file(p)
+                    verifier.verify_matrix_diagram_file(p) if p.suffix == ".md" else verifier.verify_diagram_file(p)
                 )
             case "document":
                 result = verifier.verify_document_file(p)

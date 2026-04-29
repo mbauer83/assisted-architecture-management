@@ -64,9 +64,7 @@ def edit_connection(
             break
 
     if not found:
-        raise ValueError(
-            f"Connection '{connection_type} -> {target_entity}' not found in {outgoing_path.name}"
-        )
+        raise ValueError(f"Connection '{connection_type} -> {target_entity}' not found in {outgoing_path.name}")
 
     content = format_outgoing_markdown(
         source_entity=source_entity,
@@ -242,9 +240,7 @@ def edit_connection_associations(
             break
 
     if not found:
-        raise ValueError(
-            f"Connection '{connection_type} -> {target_entity}' not found in {outgoing_path.name}"
-        )
+        raise ValueError(f"Connection '{connection_type} -> {target_entity}' not found in {outgoing_path.name}")
 
     content = format_outgoing_markdown(
         source_entity=source_entity,
@@ -265,9 +261,7 @@ def edit_connection_associations(
             verification=None,
         )
 
-    return _write_verify_clear(
-        outgoing_path, content, verifier, conn_id, clear_repo_caches, repo_root
-    )
+    return _write_verify_clear(outgoing_path, content, verifier, conn_id, clear_repo_caches, repo_root)
 
 
 def _write_verify_clear(

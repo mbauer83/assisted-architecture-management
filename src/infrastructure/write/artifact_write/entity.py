@@ -23,8 +23,7 @@ def verification_to_entity_dict(path: Path, res) -> dict[str, object]:
         "file_type": "entity",
         "valid": res.valid,
         "issues": [
-            {"severity": i.severity, "code": i.code, "message": i.message, "location": i.location}
-            for i in res.issues
+            {"severity": i.severity, "code": i.code, "message": i.message, "location": i.location} for i in res.issues
         ],
     }
 

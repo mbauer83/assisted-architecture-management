@@ -66,13 +66,8 @@ def search_fts(
 
 
 def all_connection_stats(conn: sqlite3.Connection) -> dict[str, tuple[int, int, int]]:
-    rows = conn.execute(
-        "SELECT entity_id, conn_in, conn_sym, conn_out FROM entity_context_stats"
-    ).fetchall()
-    return {
-        str(r["entity_id"]): (int(r["conn_in"]), int(r["conn_sym"]), int(r["conn_out"]))
-        for r in rows
-    }
+    rows = conn.execute("SELECT entity_id, conn_in, conn_sym, conn_out FROM entity_context_stats").fetchall()
+    return {str(r["entity_id"]): (int(r["conn_in"]), int(r["conn_sym"]), int(r["conn_out"])) for r in rows}
 
 
 def connection_stats_for(conn: sqlite3.Connection, entity_id: str) -> tuple[int, int, int]:
@@ -85,9 +80,7 @@ def connection_stats_for(conn: sqlite3.Connection, entity_id: str) -> tuple[int,
     return (int(row["conn_in"]), int(row["conn_sym"]), int(row["conn_out"]))
 
 
-def connection_stats_for_set(
-    conn: sqlite3.Connection, entity_ids: frozenset[str]
-) -> dict[str, tuple[int, int, int]]:
+def connection_stats_for_set(conn: sqlite3.Connection, entity_ids: frozenset[str]) -> dict[str, tuple[int, int, int]]:
     if not entity_ids:
         return {}
     placeholders = ",".join("?" * len(entity_ids))
@@ -98,20 +91,14 @@ def connection_stats_for_set(
         ),
         tuple(entity_ids),
     ).fetchall()
-    return {
-        str(r["entity_id"]): (int(r["conn_in"]), int(r["conn_sym"]), int(r["conn_out"]))
-        for r in rows
-    }
+    return {str(r["entity_id"]): (int(r["conn_in"]), int(r["conn_sym"]), int(r["conn_out"])) for r in rows}
 
 
 def connection_ids_by_types(conn: sqlite3.Connection, types: frozenset[str]) -> list[str]:
     if not types:
         return []
     placeholders = ",".join("?" * len(types))
-    sql = (
-        f"SELECT artifact_id FROM connections WHERE conn_type IN ({placeholders})"
-        " ORDER BY artifact_id"
-    )
+    sql = f"SELECT artifact_id FROM connections WHERE conn_type IN ({placeholders}) ORDER BY artifact_id"
     rows = conn.execute(sql, tuple(types)).fetchall()
     return [str(row["artifact_id"]) for row in rows]
 

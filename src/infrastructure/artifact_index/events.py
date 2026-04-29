@@ -55,9 +55,7 @@ class IndexEventBus:
         self._lock = threading.RLock()
         self._subscribers: dict[type[object], list[Callable[[object], None]]] = {}
 
-    def subscribe(
-        self, event_type: type[_EventT], handler: Callable[[_EventT], None]
-    ) -> Callable[[], None]:
+    def subscribe(self, event_type: type[_EventT], handler: Callable[[_EventT], None]) -> Callable[[], None]:
         with self._lock:
             handlers = self._subscribers.setdefault(event_type, [])
             handlers.append(handler)  # type: ignore[arg-type]

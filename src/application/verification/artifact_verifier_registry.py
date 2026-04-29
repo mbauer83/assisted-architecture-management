@@ -61,7 +61,5 @@ class ArtifactRegistry:
     def scope_of_entity(self, artifact_id: str) -> Literal["enterprise", "engagement", "unknown"]:
         return self._store.scope_of_entity(artifact_id)
 
-    def scope_of_connection(
-        self, artifact_id: str
-    ) -> Literal["enterprise", "engagement", "unknown"]:
+    def scope_of_connection(self, artifact_id: str) -> Literal["enterprise", "engagement", "unknown"]:
         return self._store.scope_of_connection(artifact_id)

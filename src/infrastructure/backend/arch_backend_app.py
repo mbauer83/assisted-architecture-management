@@ -236,6 +236,7 @@ def _build_app(git_ssh_passphrase: str | None = None):  # type: ignore[no-untype
         allow_methods=["*"],
         allow_headers=["*"],
     )
+
     @app.get("/health", include_in_schema=False)
     async def health_check():  # type: ignore[no-untyped-def]
         from fastapi.responses import JSONResponse

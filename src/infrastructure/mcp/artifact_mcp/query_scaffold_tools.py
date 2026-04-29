@@ -22,12 +22,11 @@ from src.infrastructure.mcp.artifact_mcp.context import (
     roots_key,
 )
 from src.infrastructure.mcp.artifact_mcp.tool_annotations import READ_ONLY
+from src.infrastructure.rendering._diagram_layout import build_nested_layout_lines, build_visual_nesting
 
 # conn_short_name → PUML arrow (archimate connections only)
 _ARROW: dict[str, str] = {
-    ct.artifact_type.split("-", 1)[1]: ct.puml_arrow
-    for ct in CONNECTION_TYPES.values()
-    if ct.conn_lang == "archimate"
+    ct.artifact_type.split("-", 1)[1]: ct.puml_arrow for ct in CONNECTION_TYPES.values() if ct.conn_lang == "archimate"
 }
 
 # conn_dir → PUML stereotype label (absent → no label)
@@ -62,6 +61,8 @@ def _domain(artifact_type: str) -> str:
 
 
 _JUNCTION_TYPES = frozenset({"and-junction", "or-junction"})
+_STRUCTURAL_CONNECTION_TYPES = frozenset({"composition", "aggregation"})
+_LAYOUT_FLOW_CONNECTION_TYPES = frozenset({"triggering", "flow"})
 
 
 def _entity_decl(artifact_type: str, label: str, alias: str) -> str:
@@ -137,20 +138,43 @@ def _emit_entity(
     children: list[dict],
     indent: str,
     children_map: dict[str, list[dict]],
+    connections: list[dict],
+    *,
+    main_axis: str,
+    branch_axis: str,
 ) -> list[str]:
     """Return PUML lines for one entity, recursively nesting composition children."""
     decl = _entity_decl(e["artifact_type"], e["display_label"], e["display_alias"])
     if not children:
         return [f"{indent}{decl}"]
-    child_aliases = [c["display_alias"] for c in children]
     lines = [f"{indent}{decl} {{"]
     inner = indent + "  "
     for child in children:
         lines.extend(
-            _emit_entity(child, children_map.get(child["display_alias"], []), inner, children_map)
+            _emit_entity(
+                child,
+                children_map.get(child["display_alias"], []),
+                inner,
+                children_map,
+                connections,
+                main_axis=main_axis,
+                branch_axis=branch_axis,
+            )
         )
-    for i in range(len(child_aliases) - 1):
-        lines.append(f"{inner}{child_aliases[i]} -[hidden]right- {child_aliases[i + 1]}")
+    lines.extend(
+        build_nested_layout_lines(
+            child_aliases=[child["display_alias"] for child in children],
+            flow_edges=[
+                (str(conn["source_alias"]), str(conn["target_alias"]))
+                for conn in connections
+                if conn["conn_dir"] in _LAYOUT_FLOW_CONNECTION_TYPES
+            ],
+            junction_aliases={child["display_alias"] for child in children if child["artifact_type"] in _JUNCTION_TYPES},
+            main_axis=main_axis,
+            branch_axis=branch_axis,
+            indent=inner,
+        )
+    )
     lines.append(f"{indent}}}")
     return lines
 
@@ -162,19 +186,22 @@ def _build_puml(
     name: str,
     direction: str,
 ) -> str:
+    # Build structural nesting, then keep junction components inside the same
+    # container when they connect only nested siblings.
     alias_to_entity = {e["display_alias"]: e for e in entities}
-
-    # Build composition/aggregation hierarchy for visual nesting
-    children_map: dict[str, list[dict]] = {}
-    comp_children: set[str] = set()
-    for conn in connections:
-        if conn["conn_dir"] in ("composition", "aggregation"):
-            child_alias = conn["target_alias"]
-            if child_alias in alias_to_entity:
-                children_map.setdefault(conn["source_alias"], []).append(
-                    alias_to_entity[child_alias]
-                )
-                comp_children.add(child_alias)
+    entity_order = {e["display_alias"]: index for index, e in enumerate(entities)}
+    children_map, comp_children = build_visual_nesting(
+        item_by_alias=alias_to_entity,
+        structural_edges=[
+            (str(conn["source_alias"]), str(conn["target_alias"]))
+            for conn in connections
+            if conn["conn_dir"] in _STRUCTURAL_CONNECTION_TYPES
+        ],
+        neighbor_edges=[(str(conn["source_alias"]), str(conn["target_alias"])) for conn in connections],
+        junction_aliases={alias for alias, entity in alias_to_entity.items() if entity["artifact_type"] in _JUNCTION_TYPES},
+    )
+    for parent_alias, children in children_map.items():
+        children.sort(key=lambda entity: entity_order.get(str(entity["display_alias"]), len(entity_order)))
 
     # Top-level per domain — exclude direct composition children
     by_domain: dict[str, list[dict]] = {}
@@ -184,9 +211,7 @@ def _build_puml(
 
     dir_kw = "top to bottom" if direction == "top_to_bottom" else "left to right"
     multi = len(by_domain) > 1
-    ordered = [d for d in _DOMAIN_ORDER if d in by_domain] + [
-        d for d in by_domain if d not in _DOMAIN_ORDER
-    ]
+    ordered = [d for d in _DOMAIN_ORDER if d in by_domain] + [d for d in by_domain if d not in _DOMAIN_ORDER]
 
     lines: list[str] = [
         f"@startuml {name.lower().replace(' ', '-')}",
@@ -204,6 +229,8 @@ def _build_puml(
         domain = ordered[0]
         grouping = DOMAIN_GROUPING.get(domain.lower(), "Grouping")
         lines[3] = "top to bottom direction"
+        nested_main_axis = "down"
+        nested_branch_axis = "right"
         type_groups: dict[str, list[dict]] = {}
         for e in by_domain[domain]:
             type_groups.setdefault(e["artifact_type"], []).append(e)
@@ -217,7 +244,15 @@ def _build_puml(
             lines.append(f'rectangle "{_type_group_label(artifact_type)}" <<{grouping}>> {{')
             for e in elems:
                 lines.extend(
-                    _emit_entity(e, children_map.get(e["display_alias"], []), "  ", children_map)
+                    _emit_entity(
+                        e,
+                        children_map.get(e["display_alias"], []),
+                        "  ",
+                        children_map,
+                        connections,
+                        main_axis=nested_main_axis,
+                        branch_axis=nested_branch_axis,
+                    )
                 )
                 group_index_by_alias[e["display_alias"]] = idx
             lines.append("}")
@@ -231,6 +266,8 @@ def _build_puml(
                 prev_anchor_alias = tl_aliases[-1]
             lines.append("")
     else:
+        nested_main_axis = "right"
+        nested_branch_axis = "down"
         for domain in ordered:
             elems = by_domain[domain]
             indent = "  " if multi else ""
@@ -239,7 +276,15 @@ def _build_puml(
                 lines.append(f'rectangle "{domain}" <<{grouping}>> {{')
             for e in elems:
                 lines.extend(
-                    _emit_entity(e, children_map.get(e["display_alias"], []), indent, children_map)
+                    _emit_entity(
+                        e,
+                        children_map.get(e["display_alias"], []),
+                        indent,
+                        children_map,
+                        connections,
+                        main_axis=nested_main_axis,
+                        branch_axis=nested_branch_axis,
+                    )
                 )
             if multi:
                 lines.append("}")
@@ -256,7 +301,7 @@ def _build_puml(
         lines.append("")
 
     # Non-structural connections (composition/aggregation shown via nesting)
-    non_comp = [c for c in connections if c["conn_dir"] not in ("composition", "aggregation")]
+    non_comp = [c for c in connections if c["conn_dir"] not in _STRUCTURAL_CONNECTION_TYPES]
     if non_comp:
         lines.append("' --- Connections ---")
         for c in non_comp:
@@ -294,9 +339,7 @@ def _build_puml(
                     label_text="",
                 )
                 if line is None:
-                    line = _conn_line(
-                        c["source_alias"], c["conn_dir"], c["target_alias"], c.get("description")
-                    )
+                    line = _conn_line(c["source_alias"], c["conn_dir"], c["target_alias"], c.get("description"))
                     lines.append(line)
                     continue
                 if c.get("description"):

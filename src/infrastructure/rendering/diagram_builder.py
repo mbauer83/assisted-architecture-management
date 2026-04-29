@@ -12,6 +12,7 @@ code from ``src.common``).
 from __future__ import annotations
 
 import base64
+import os
 import re
 import subprocess
 import tempfile
@@ -33,6 +34,11 @@ from src.domain.ontology_loader import (
     DOMAIN_ORDER,
     ELEMENT_TYPE_HAS_SPRITE,
     ENTITY_TYPES,
+)
+from src.infrastructure.rendering._diagram_layout import (
+    build_branch_direction_hints,
+    build_nested_layout_lines,
+    build_visual_nesting,
 )
 
 
@@ -74,6 +80,11 @@ def _load_stereotype_map(repo_root: Path) -> tuple[str, dict[str, str]]:
     return header, blocks
 
 
+def _strip_puml_comments(text: str) -> str:
+    lines = [line for line in text.splitlines() if not line.lstrip().startswith("'")]
+    return "\n".join(lines).strip("\n")
+
+
 def inject_archimate_includes(puml_body: str, repo_root: Path) -> str:
     """Replace Archimate !include directives with selective inline content.
 
@@ -97,7 +108,8 @@ def inject_archimate_includes(puml_body: str, repo_root: Path) -> str:
     header, stereo_map = _load_stereotype_map(repo_root)
     sprite_map = _load_sprite_map(repo_root)
 
-    parts: list[str] = [header.rstrip("\n")]
+    clean_header = _strip_puml_comments(header)
+    parts: list[str] = [clean_header] if clean_header else []
     for name in sorted(needed_types):
         if name in stereo_map:
             parts.append(stereo_map[name])
@@ -129,6 +141,8 @@ def _parse_archimate_block(raw: str) -> dict:
 
 _JUNCTION_TYPES = frozenset({"and-junction", "or-junction"})
 _ENTITY_TYPE_ORDER = list(ENTITY_TYPES)
+_STRUCTURAL_CONNECTION_TYPES = frozenset({"archimate-composition", "archimate-aggregation"})
+_LAYOUT_FLOW_CONNECTION_TYPES = frozenset({"archimate-triggering", "archimate-flow"})
 
 
 def _entity_archimate_element_type(entity: EntityRecord) -> str:
@@ -191,6 +205,43 @@ def _ordered_type_groups(entities: list[EntityRecord]) -> list[tuple[str, list[E
     return [(labels[artifact_type], grouped[artifact_type]) for artifact_type in ordered_types]
 
 
+def _build_visual_nesting(
+    entity_records: list[EntityRecord],
+    connection_records: list[ConnectionRecord],
+    alias_by_id: dict[str, str],
+    entity_by_alias: dict[str, EntityRecord],
+) -> tuple[dict[str, list[EntityRecord]], set[str]]:
+    entity_order = {
+        normalize_puml_alias(entity.display_alias): index
+        for index, entity in enumerate(entity_records)
+        if entity.display_alias
+    }
+    structural_edges: list[tuple[str, str]] = []
+    neighbor_edges: list[tuple[str, str]] = []
+    for conn in connection_records:
+        src_alias = alias_by_id.get(conn.source)
+        tgt_alias = alias_by_id.get(conn.target)
+        if not src_alias or not tgt_alias:
+            continue
+        ct = CONNECTION_TYPES.get(conn.conn_type)
+        if ct and ct.artifact_type in _STRUCTURAL_CONNECTION_TYPES and tgt_alias in entity_by_alias:
+            structural_edges.append((src_alias, tgt_alias))
+            continue
+        neighbor_edges.append((src_alias, tgt_alias))
+
+    children_map, nested_aliases = build_visual_nesting(
+        item_by_alias=entity_by_alias,
+        structural_edges=structural_edges,
+        neighbor_edges=neighbor_edges,
+        junction_aliases={alias for alias, entity in entity_by_alias.items() if entity.artifact_type in _JUNCTION_TYPES},
+    )
+    for parent_alias, children in children_map.items():
+        children.sort(
+            key=lambda entity: entity_order.get(normalize_puml_alias(entity.display_alias), len(entity_order))
+        )
+    return children_map, nested_aliases
+
+
 def generate_archimate_puml_body(
     name: str,
     entity_records: list[EntityRecord],
@@ -220,26 +271,47 @@ def generate_archimate_puml_body(
     lines.append(f"title {name}")
     lines.append("")
 
-    alias_by_id = {
-        e.artifact_id: normalize_puml_alias(e.display_alias)
-        for e in entity_records
-        if e.display_alias
-    }
-    entity_by_alias = {
-        normalize_puml_alias(e.display_alias): e for e in entity_records if e.display_alias
-    }
+    alias_by_id = {e.artifact_id: normalize_puml_alias(e.display_alias) for e in entity_records if e.display_alias}
+    entity_by_alias = {normalize_puml_alias(e.display_alias): e for e in entity_records if e.display_alias}
 
-    # Build composition/aggregation hierarchy for visual nesting
-    children_map: dict[str, list[EntityRecord]] = defaultdict(list)
-    comp_children: set[str] = set()
-    for conn in connection_records:
-        ct = CONNECTION_TYPES.get(conn.conn_type)
-        if ct and ct.artifact_type in ("archimate-composition", "archimate-aggregation"):
-            src_alias = alias_by_id.get(conn.source)
-            tgt_alias = alias_by_id.get(conn.target)
-            if src_alias and tgt_alias and tgt_alias in entity_by_alias:
-                children_map[src_alias].append(entity_by_alias[tgt_alias])
-                comp_children.add(tgt_alias)
+    domain_entities: dict[str, list[EntityRecord]] = defaultdict(list)
+    for entity in entity_records:
+        alias = normalize_puml_alias(entity.display_alias)
+        if alias:
+            domain_entities[(entity.domain or "").lower()].append(entity)
+
+    ordered_domains = [d for d in DOMAIN_ORDER if d in domain_entities]
+    for d in sorted(domain_entities):
+        if d not in DOMAIN_ORDER:
+            ordered_domains.append(d)
+
+    single_domain = len(ordered_domains) == 1
+    nested_main_axis = "down" if single_domain else "right"
+    nested_branch_axis = "right" if single_domain else "down"
+    flow_edges = [
+        (src_alias, tgt_alias)
+        for conn in connection_records
+        if conn.conn_type in _LAYOUT_FLOW_CONNECTION_TYPES
+        and (src_alias := alias_by_id.get(conn.source))
+        and (tgt_alias := alias_by_id.get(conn.target))
+    ]
+    junction_aliases = {alias for alias, child in entity_by_alias.items() if child.artifact_type in _JUNCTION_TYPES}
+    layout_direction_hints: dict[tuple[str, str], str] = {}
+
+    # Build composition/aggregation hierarchy for visual nesting, then pull
+    # junctions inside the same parent when they only connect nested siblings.
+    children_map, nested_aliases = _build_visual_nesting(
+        entity_records,
+        connection_records,
+        alias_by_id,
+        entity_by_alias,
+    )
+    for domain in list(domain_entities):
+        domain_entities[domain] = [
+            entity
+            for entity in domain_entities[domain]
+            if normalize_puml_alias(entity.display_alias) not in nested_aliases
+        ]
 
     def _render_entity(entity: EntityRecord, indent: str) -> list[str]:
         alias = normalize_puml_alias(entity.display_alias)
@@ -252,10 +324,7 @@ def generate_archimate_puml_body(
         label = arch_data.get("label", entity.name).replace('"', "'")
         children = children_map.get(alias, [])
         if element_type and ELEMENT_TYPE_HAS_SPRITE.get(element_type, False):
-            decl = (
-                f'{indent}rectangle "<$archimate_{element_type}{{scale=1.5}}> {label}"'
-                f" <<{element_type}>> as {alias}"
-            )
+            decl = f'{indent}rectangle "<$archimate_{element_type}{{scale=1.5}}> {label}" <<{element_type}>> as {alias}'
         elif element_type:
             decl = f'{indent}rectangle "{label}" <<{element_type}>> as {alias}'
         else:
@@ -264,26 +333,28 @@ def generate_archimate_puml_body(
             return [decl]
         inner = indent + "  "
         result = [f"{decl} {{"]
-        child_aliases = [normalize_puml_alias(c.display_alias) for c in children if c.display_alias]
         for child in children:
             result.extend(_render_entity(child, inner))
-        for i in range(len(child_aliases) - 1):
-            result.append(f"{inner}{child_aliases[i]} -[hidden]right- {child_aliases[i + 1]}")
+        layout_direction_hints.update(
+            build_branch_direction_hints(
+                child_aliases=[normalize_puml_alias(child.display_alias) for child in children if child.display_alias],
+                flow_edges=flow_edges,
+                junction_aliases=junction_aliases,
+                branch_axis=nested_branch_axis,
+            )
+        )
+        result.extend(
+            build_nested_layout_lines(
+                child_aliases=[normalize_puml_alias(child.display_alias) for child in children if child.display_alias],
+                flow_edges=flow_edges,
+                junction_aliases=junction_aliases,
+                main_axis=nested_main_axis,
+                branch_axis=nested_branch_axis,
+                indent=inner,
+            )
+        )
         result.append(f"{indent}}}")
         return result
-
-    domain_entities: dict[str, list[EntityRecord]] = defaultdict(list)
-    for entity in entity_records:
-        alias = normalize_puml_alias(entity.display_alias)
-        if alias and alias not in comp_children:
-            domain_entities[(entity.domain or "").lower()].append(entity)
-
-    ordered_domains = [d for d in DOMAIN_ORDER if d in domain_entities]
-    for d in sorted(domain_entities):
-        if d not in DOMAIN_ORDER:
-            ordered_domains.append(d)
-
-    single_domain = len(ordered_domains) == 1
     group_index_by_alias: dict[str, int] = {}
 
     if single_domain and ordered_domains:
@@ -305,9 +376,7 @@ def generate_archimate_puml_body(
             lines.append("}")
 
             top_aliases = [
-                normalize_puml_alias(entity.display_alias)
-                for entity in entities_in_group
-                if entity.display_alias
+                normalize_puml_alias(entity.display_alias) for entity in entities_in_group if entity.display_alias
             ]
             axis = "right" if idx % 2 == 0 else "down"
             for i in range(len(top_aliases) - 1):
@@ -336,21 +405,19 @@ def generate_archimate_puml_body(
     for conn in connection_records:
         ct = CONNECTION_TYPES.get(conn.conn_type)
         # Composition/aggregation shown structurally via nesting — skip as connection lines
-        if ct and ct.artifact_type in ("archimate-composition", "archimate-aggregation"):
+        if ct and ct.artifact_type in _STRUCTURAL_CONNECTION_TYPES:
             continue
         src = alias_by_id.get(conn.source)
         tgt = alias_by_id.get(conn.target)
         if src and tgt:
-            direction: str | None = None
+            direction: str | None = layout_direction_hints.get((src, tgt))
             if single_domain:
                 src_group = group_index_by_alias.get(src)
                 tgt_group = group_index_by_alias.get(tgt)
-                if src_group is not None and tgt_group is not None and src_group != tgt_group:
+                if direction is None and src_group is not None and tgt_group is not None and src_group != tgt_group:
                     direction = "down" if src_group < tgt_group else "up"
             card_label = format_cardinality_label(conn.src_cardinality, conn.tgt_cardinality)
-            macro_line = render_archimate_relation(
-                src, tgt, conn.conn_type, direction=direction, label_text=card_label
-            )
+            macro_line = render_archimate_relation(src, tgt, conn.conn_type, direction=direction, label_text=card_label)
             if macro_line is not None:
                 conn_lines.append(macro_line)
                 continue
@@ -377,7 +444,7 @@ def _render_puml(puml_body: str, repo_root: Path, fmt: str) -> tuple[str | None,
     *result* is a ``data:image/png;base64,…`` data-URL for PNG, raw SVG text
     for SVG, or ``None`` on failure.  No files are written to the model.
     """
-    from src.application.verification.artifact_verifier_syntax import find_plantuml_jar
+    from src.application.verification.artifact_verifier_syntax import find_graphviz_dot, find_plantuml_jar
     from src.config.settings import plantuml_limit_size, render_dpi
 
     warnings: list[str] = []
@@ -391,20 +458,20 @@ def _render_puml(puml_body: str, repo_root: Path, fmt: str) -> tuple[str | None,
 
     render_body = re.sub(r"@startuml\s+\S+", "@startuml", puml_body, count=1)
     if "_archimate-stereotypes.puml" not in render_body:
-        render_body = re.sub(
-            r"(@startuml)\n", r"\1\n!include ../_archimate-stereotypes.puml\n", render_body, count=1
-        )
+        render_body = re.sub(r"(@startuml)\n", r"\1\n!include ../_archimate-stereotypes.puml\n", render_body, count=1)
     render_body = inject_archimate_includes(render_body, repo_root)
 
     tmp_path: Path | None = None
     try:
-        with tempfile.NamedTemporaryFile(
-            mode="w", suffix=".puml", dir=diag_dir, delete=False, encoding="utf-8"
-        ) as tmp:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".puml", dir=diag_dir, delete=False, encoding="utf-8") as tmp:
             tmp.write(render_body)
             tmp_path = Path(tmp.name)
 
         with tempfile.TemporaryDirectory() as out_dir:
+            env = None
+            dot = find_graphviz_dot()
+            if dot is not None:
+                env = {**os.environ, "GRAPHVIZ_DOT": str(dot)}
             cmd = [
                 "java",
                 "-Djava.awt.headless=true",
@@ -422,6 +489,7 @@ def _render_puml(puml_body: str, repo_root: Path, fmt: str) -> tuple[str | None,
                 capture_output=True,
                 text=True,
                 timeout=60,
+                env=env,
             )
             if proc.returncode != 0:
                 warnings.append(f"PlantUML render failed: {proc.stderr[:300]}")

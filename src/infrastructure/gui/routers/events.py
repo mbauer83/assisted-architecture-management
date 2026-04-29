@@ -31,17 +31,11 @@ class EventBus:
         return None
 
     @staticmethod
-    def _coalesce_queue(
-        queue: asyncio.Queue[dict[str, Any]], key: tuple[str, str | None]
-    ) -> None:
+    def _coalesce_queue(queue: asyncio.Queue[dict[str, Any]], key: tuple[str, str | None]) -> None:
         raw_queue = getattr(queue, "_queue", None)
         if not isinstance(raw_queue, deque):
             return
-        filtered = deque(
-            item
-            for item in raw_queue
-            if EventBus._coalesce_key(item) != key
-        )
+        filtered = deque(item for item in raw_queue if EventBus._coalesce_key(item) != key)
         if len(filtered) != len(raw_queue):
             raw_queue.clear()
             raw_queue.extend(filtered)

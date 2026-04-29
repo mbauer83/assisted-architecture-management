@@ -2,7 +2,6 @@
 import { inject, onMounted, onUnmounted, watch, computed, ref, nextTick } from 'vue'
 import { useRoute, useRouter, RouterLink } from 'vue-router'
 import { Effect, Exit } from 'effect'
-import { marked } from 'marked'
 import DOMPurify from 'dompurify'
 import { modelServiceKey } from '../keys'
 import type { DiagramContext, EntityDetail, DiagramConnection, WriteResult, SyncDiagramToModelResult } from '../../domain'
@@ -15,6 +14,7 @@ import DownloadMenu from '../components/DownloadMenu.vue'
 import { useQuery } from '../composables/useQuery'
 import { useMutation } from '../composables/useMutation'
 import { toGlyphKey } from '../lib/glyphKey'
+import { renderMatrixMarkdown } from '../lib/matrixMarkdown'
 
 const svc = inject(modelServiceKey)!
 const route = useRoute()
@@ -49,7 +49,7 @@ const svgHtml = computed(() =>
 const matrixHtml = computed(() => {
   const body = (detail.value as Record<string, unknown> | null)?.matrix_body
   if (!body || detail.value?.diagram_type !== 'matrix') return null
-  return DOMPurify.sanitize(marked.parse(body as string) as string)
+  return renderMatrixMarkdown(body as string)
 })
 
 const editPath = computed(() =>
@@ -59,6 +59,8 @@ const editPath = computed(() =>
 const showSource = ref(false)
 const deletePreview = ref<{ content: string | null; warnings: string[] } | null>(null)
 const confirmDelete = ref(false)
+const mainGridRef = ref<HTMLElement | null>(null)
+const sidebarWidth = ref(320)
 const isGlobalDiagram = computed(() => detail.value?.is_global ?? false)
 const deleteFn = computed(() =>
   (isGlobalDiagram.value && adminMode.value) ? svc.adminDeleteDiagram : svc.deleteDiagram,
@@ -75,6 +77,24 @@ const syncError = computed(() => {
   const r = syncMutation.result.value
   if (r && !r.wrote) return r.content ?? 'Sync failed'
   return syncMutation.errorMessage.value
+})
+
+const selectedEntityDetailHtml = computed(() => {
+  const entity = entityQuery.data.value
+  const html = entity?.content_html
+  if (!entity || !html) return null
+  if (typeof window === 'undefined') return html
+
+  const doc = new DOMParser().parseFromString(`<div>${html}</div>`, 'text/html')
+  const wrapper = doc.body.firstElementChild
+  if (!wrapper) return html
+  const firstHeading = wrapper.querySelector('h1, h2, h3, h4, h5, h6')
+  if (!firstHeading) return html
+
+  const headingText = firstHeading.textContent?.trim().replace(/\s+/g, ' ') ?? ''
+  const entityName = entity.name.trim().replace(/\s+/g, ' ')
+  if (headingText === entityName) firstHeading.remove()
+  return wrapper.innerHTML
 })
 
 // ── SVG rendering ─────────────────────────────────────────────────────────────
@@ -250,6 +270,45 @@ const selectEntity = (id: string) => {
   }
   selectedId.value = id
   entityQuery.run(svc.getEntity(id))
+}
+
+// ── Sidebar resize ────────────────────────────────────────────────────────────
+
+const mainGridStyle = computed(() => ({
+  '--sidebar-width': `${sidebarWidth.value}px`,
+}))
+
+const clampSidebarWidth = (nextWidth: number): number => {
+  const gridWidth = mainGridRef.value?.getBoundingClientRect().width ?? window.innerWidth
+  const minWidth = 260
+  const maxWidth = Math.min(520, Math.max(minWidth, Math.floor(gridWidth * 0.45)))
+  return Math.min(maxWidth, Math.max(minWidth, nextWidth))
+}
+
+let resizingSidebar = false
+
+const onSidebarResizeMove = (e: MouseEvent) => {
+  if (!resizingSidebar || !mainGridRef.value) return
+  const rect = mainGridRef.value.getBoundingClientRect()
+  sidebarWidth.value = clampSidebarWidth(rect.right - e.clientX)
+}
+
+const stopSidebarResize = () => {
+  resizingSidebar = false
+  document.body.classList.remove('diagram-split-resizing')
+  window.removeEventListener('mousemove', onSidebarResizeMove)
+  window.removeEventListener('mouseup', stopSidebarResize)
+}
+
+const startSidebarResize = (e: MouseEvent) => {
+  if (!mainGridRef.value) return
+  const rect = mainGridRef.value.getBoundingClientRect()
+  if (rect.width < 900) return
+  e.preventDefault()
+  resizingSidebar = true
+  document.body.classList.add('diagram-split-resizing')
+  window.addEventListener('mousemove', onSidebarResizeMove)
+  window.addEventListener('mouseup', stopSidebarResize)
 }
 
 
@@ -437,6 +496,7 @@ onUnmounted(() => {
   containerRef.value?.removeEventListener('wheel', onWheel)
   window.removeEventListener('mousemove', onMouseMove)
   window.removeEventListener('mouseup', onMouseUp)
+  stopSidebarResize()
   _interactivityController?.abort()
 })
 </script>
@@ -514,7 +574,11 @@ onUnmounted(() => {
         <span class="mono faded">v{{ detail.version }} · {{ detail.artifact_id }}</span>
       </div>
 
-      <div class="main-grid">
+      <div
+        ref="mainGridRef"
+        class="main-grid"
+        :style="mainGridStyle"
+      >
         <!-- Matrix: rendered markdown tables -->
         <div
           v-if="detail?.diagram_type === 'matrix' && matrixHtml"
@@ -567,6 +631,14 @@ onUnmounted(() => {
             Scroll to zoom · Drag to pan · Click entity to inspect · Double-click to reset
           </div>
         </div>
+
+        <div
+          class="sidebar-splitter"
+          role="separator"
+          aria-orientation="vertical"
+          aria-label="Resize sidebar"
+          @mousedown="startSidebarResize"
+        />
 
         <!-- Sidebar: entity list + inline detail -->
         <aside class="sidebar card">
@@ -658,9 +730,9 @@ onUnmounted(() => {
               <span class="chip chip-type">{{ entityQuery.data.value.artifact_type }}</span>
             </div>
             <div
-              v-if="entityQuery.data.value.content_html"
+              v-if="selectedEntityDetailHtml"
               class="det-content markdown-body"
-              v-html="entityQuery.data.value.content_html"
+              v-html="selectedEntityDetailHtml"
             />
             <RouterLink
               :to="{ path: '/graph', query: { id: entityQuery.data.value.artifact_id } }"
@@ -823,7 +895,7 @@ onUnmounted(() => {
 .state-block { white-space: pre-wrap; overflow-x: auto; }
 .type-badge { padding: 2px 8px; border-radius: 4px; font-size: 11px; background: #dbeafe; color: #1e40af; font-weight: 500; }
 
-.main-grid { display: grid; grid-template-columns: 1fr 260px; gap: 16px; align-items: start; }
+.main-grid { --sidebar-width: 320px; display: grid; grid-template-columns: minmax(0, 1fr) 12px var(--sidebar-width); gap: 0; align-items: start; }
 @media (max-width: 800px) { .main-grid { grid-template-columns: 1fr; } }
 
 .img-container {
@@ -885,7 +957,29 @@ onUnmounted(() => {
 }
 .delete-confirm-btn:hover:not(:disabled) { background: #b91c1c; }
 .delete-confirm-btn:disabled { opacity: .5; cursor: not-allowed; }
-.sidebar { display: flex; flex-direction: column; position: sticky; top: 16px; }
+.sidebar { display: flex; flex-direction: column; position: sticky; top: 16px; margin-left: 16px; min-width: 0; }
+.sidebar-splitter {
+  position: sticky;
+  top: 16px;
+  height: clamp(420px, 78vh, 980px);
+  cursor: col-resize;
+  background: transparent;
+}
+.sidebar-splitter::before {
+  content: '';
+  display: block;
+  width: 4px;
+  height: 100%;
+  margin: 0 auto;
+  border-radius: 999px;
+  background: #e5e7eb;
+  transition: background-color 0.15s ease;
+}
+.sidebar-splitter:hover::before { background: #93c5fd; }
+@media (max-width: 800px) {
+  .sidebar { margin-left: 0; margin-top: 16px; position: static; }
+  .sidebar-splitter { display: none; }
+}
 .sb-hdr { display: flex; align-items: center; justify-content: space-between; padding: 10px 12px 8px; border-bottom: 1px solid #f3f4f6; }
 .sb-title { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; color: #6b7280; }
 .sb-count { font-size: 11px; color: #9ca3af; }
@@ -900,14 +994,17 @@ onUnmounted(() => {
 .ent-det { padding: 10px 12px 12px; border-top: 1px solid #e5e7eb; }
 .conn-flow { font-size: 12px; color: #374151; margin-bottom: 6px; }
 .ent-det--loading { color: #9ca3af; font-size: 12px; }
-.det-hdr { display: flex; align-items: flex-start; gap: 4px; margin-bottom: 6px; }
-.det-name { font-size: 13px; font-weight: 600; color: #1e293b; flex: 1; line-height: 1.3; }
+.det-hdr { display: flex; align-items: flex-start; gap: 4px; margin-bottom: 12px; }
+.det-name { font-size: 18px; font-weight: 700; color: #1d4ed8; flex: 1; line-height: 1.25; text-decoration: none; }
 .det-name:hover { text-decoration: underline; }
 .det-close { background: none; border: none; font-size: 16px; cursor: pointer; color: #9ca3af; line-height: 1; padding: 0 2px; flex-shrink: 0; } .det-close:hover { color: #374151; }
 .det-chips { display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 8px; }
 .chip { font-size: 10px; padding: 2px 6px; border-radius: 3px; font-weight: 500; background: #f3f4f6; color: #374151; }
 .det-content { font-size: 12px; line-height: 1.5; color: #374151; margin-bottom: 8px; max-height: 220px; overflow-y: auto; }
 .det-content :deep(p) { margin: 0.35rem 0; }
+.det-content :deep(h1),
+.det-content :deep(h2),
+.det-content :deep(h3) { margin-top: 0; }
 .explore-lnk { font-size: 12px; color: #2563eb; } .explore-lnk:hover { text-decoration: underline; }
 .src-row { margin-top: 16px; }
 .toggle-btn { padding: 5px 14px; border-radius: 6px; border: 1px solid #d1d5db; background: white; font-size: 13px; cursor: pointer; color: #374151; margin-bottom: 8px; } .toggle-btn:hover { background: #f9fafb; }

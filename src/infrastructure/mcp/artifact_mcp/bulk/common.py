@@ -10,9 +10,7 @@ from src.application.verification.artifact_verifier import ArtifactRegistry, Art
 from src.infrastructure.artifact_index import shared_artifact_index
 from src.infrastructure.mcp.artifact_mcp.edit_tools import _require_registry, _resolve
 
-KNOWN_DELETE_OPS = frozenset(
-    {"delete_entity", "delete_connection", "delete_document", "delete_diagram"}
-)
+KNOWN_DELETE_OPS = frozenset({"delete_entity", "delete_connection", "delete_document", "delete_diagram"})
 KNOWN_OPS = frozenset({"create_entity", "add_connection", "edit_entity", "edit_connection"})
 
 
@@ -21,9 +19,7 @@ def resolve_ref(value: str, ref_map: dict[str, str]) -> str:
         key = value[5:]
         resolved = ref_map.get(key)
         if resolved is None:
-            raise ValueError(
-                f"Unresolved $ref '{key}' — no create_entity item with _ref='{key}' succeeded"
-            )
+            raise ValueError(f"Unresolved $ref '{key}' — no create_entity item with _ref='{key}' succeeded")
         return resolved
     return value
 
@@ -127,10 +123,7 @@ def _verification_payload(
     # predates this batch are non-blocking.  Only files that are newly invalid
     # (i.e. not already broken in the live repo) block the commit.
     if preexisting_invalid_paths is not None:
-        blocking_invalid = [
-            result for result in invalid
-            if result.path.resolve() not in preexisting_invalid_paths
-        ]
+        blocking_invalid = [result for result in invalid if result.path.resolve() not in preexisting_invalid_paths]
     else:
         blocking_invalid = invalid
     return {
@@ -267,9 +260,7 @@ def stage_batch_verification(
         # batch by re-verifying against the live repo.
         directly_changed_resolved = {p.resolve() for p in directly_changed_paths}
         invalid_neighbor_results = [
-            result
-            for result in results
-            if not result.valid and result.path.resolve() not in directly_changed_resolved
+            result for result in results if not result.valid and result.path.resolve() not in directly_changed_resolved
         ]
         preexisting = _preexisting_invalid_paths(
             invalid_neighbor_staged_results=invalid_neighbor_results,

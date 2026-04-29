@@ -69,15 +69,12 @@ def execute_promotion(
         for conflict in plan.conflicts:
             res = resolutions.get(conflict.engagement_id)
             if res is None:
-                result.plan.warnings.append(
-                    f"No resolution for conflict {conflict.engagement_id} — skipped"
-                )
+                result.plan.warnings.append(f"No resolution for conflict {conflict.engagement_id} — skipped")
                 continue
             handler = build_handler(res)
             if handler is None:
                 result.plan.warnings.append(
-                    f"Unrecognised resolution strategy {res.strategy!r}"
-                    f" for {conflict.engagement_id} — skipped"
+                    f"Unrecognised resolution strategy {res.strategy!r} for {conflict.engagement_id} — skipped"
                 )
                 continue
             handler.handle(
@@ -92,9 +89,7 @@ def execute_promotion(
             )
 
         for did in plan.documents_to_add:
-            copy_simple(
-                did, engagement_root, enterprise_root, registry, result, ent_copied, ent_backups
-            )
+            copy_simple(did, engagement_root, enterprise_root, registry, result, ent_copied, ent_backups)
         for dc in plan.doc_conflicts:
             _resolve_simple_conflict(
                 dc,
@@ -108,9 +103,7 @@ def execute_promotion(
             )
 
         for did in plan.diagrams_to_add:
-            copy_simple(
-                did, engagement_root, enterprise_root, registry, result, ent_copied, ent_backups
-            )
+            copy_simple(did, engagement_root, enterprise_root, registry, result, ent_copied, ent_backups)
         for diag_dc in plan.diagram_conflicts:
             _resolve_simple_conflict(
                 diag_dc,
@@ -132,9 +125,7 @@ def execute_promotion(
         ent_registry = ArtifactRegistry(shared_artifact_index(enterprise_root))
         errors = [
             f"{i.code}: {i.message} ({i.location})"
-            for r in ArtifactVerifier(ent_registry).verify_all(
-                enterprise_root, include_diagrams=False
-            )
+            for r in ArtifactVerifier(ent_registry).verify_all(enterprise_root, include_diagrams=False)
             for i in r.issues
             if i.severity == "error"
         ]
@@ -154,8 +145,7 @@ def execute_promotion(
             return [
                 c.engagement_id
                 for c in confs
-                if resolutions.get(c.engagement_id)
-                and resolutions[c.engagement_id].strategy == "accept_engagement"
+                if resolutions.get(c.engagement_id) and resolutions[c.engagement_id].strategy == "accept_engagement"
             ]
 
         for did in plan.documents_to_add + _accepted(plan.doc_conflicts):
@@ -212,9 +202,7 @@ def _resolve_simple_conflict(
         if not eng_path or not ent_path:
             result.plan.warnings.append(f"Could not find files for conflict {dc.engagement_id}")
             return
-        content = eng_path.read_text(encoding="utf-8").replace(
-            dc.engagement_id, dc.enterprise_id, 1
-        )
+        content = eng_path.read_text(encoding="utf-8").replace(dc.engagement_id, dc.enterprise_id, 1)
         backups.append((ent_path, ent_path.read_bytes()))
         ent_path.write_text(content, encoding="utf-8")
         result.updated_files.append(str(ent_path.relative_to(ent_root)))

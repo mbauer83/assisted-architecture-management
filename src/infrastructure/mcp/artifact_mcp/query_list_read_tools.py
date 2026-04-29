@@ -50,8 +50,7 @@ def register_query_list_read_tools(mcp: FastMCP) -> None:
         artifact_type: str | list[str] | None = None,
         domain: str | list[str] | None = None,
         status: str | list[str] | None = None,
-        include_record_types: list[Literal["entities", "connections", "diagrams", "documents"]]
-        | None = None,
+        include_record_types: list[Literal["entities", "connections", "diagrams", "documents"]] | None = None,
         fields: list[str] | None = None,
     ) -> list[dict[str, object]]:
         roots = resolve_repo_roots(

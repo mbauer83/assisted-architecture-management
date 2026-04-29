@@ -115,8 +115,7 @@ def update_body_references(old_id: str, eng_root: Path, result: Any) -> None:
         _, n = pat.subn(f"](GAR-proxy-for-{old_id})", content)
         if n > 0:
             result.updated_files.append(
-                f"[link-stale ×{n}] {f.relative_to(eng_root)}"
-                f" — links to promoted artifact {old_id} may need updating"
+                f"[link-stale ×{n}] {f.relative_to(eng_root)} — links to promoted artifact {old_id} may need updating"
             )
 
 
@@ -143,17 +142,14 @@ def rewrite_outgoing(
         m = _CONN_HEADER.match(stripped)
         if m:
             conn_type, target_id = m.group(1).strip(), m.group(2).strip()
-            conn_aid = (
-                f"{source_entity_id}---{target_id}@@{conn_type}" if source_entity_id else None
-            )
+            conn_aid = f"{source_entity_id}---{target_id}@@{conn_type}" if source_entity_id else None
             if conn_ids is not None and conn_aid is not None and conn_aid not in conn_ids:
                 drop_section = True
                 continue
             resolved = resolve_target(target_id)
             if resolved is None:
                 result.plan.warnings.append(
-                    f"Dropped connection → {target_id!r}:"
-                    " engagement-only entity not in promotion set"
+                    f"Dropped connection → {target_id!r}: engagement-only entity not in promotion set"
                 )
                 drop_section = True
                 continue

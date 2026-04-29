@@ -56,9 +56,7 @@ def _extra_frontmatter_fields(schema: dict[str, Any]) -> list[dict[str, Any]]:
         {
             "name": k,
             "field_type": v.get("type", "string"),
-            "array_items_type": v.get("items", {}).get("type")
-            if v.get("type") == "array"
-            else None,
+            "array_items_type": v.get("items", {}).get("type") if v.get("type") == "array" else None,
             "required": k in required,
         }
         for k, v in props.items()
@@ -79,9 +77,7 @@ def list_document_types() -> list[dict[str, object]]:
             "required_sections": schema.get("required_sections", []),
             "extra_frontmatter_fields": _extra_frontmatter_fields(schema),
             "required_entity_type_connections": schema.get("required_entity_type_connections", []),
-            "suggested_entity_type_connections": schema.get(
-                "suggested_entity_type_connections", []
-            ),
+            "suggested_entity_type_connections": schema.get("suggested_entity_type_connections", []),
         }
         for doc_type, schema in sorted(schemata.items())
     ]

@@ -2,14 +2,13 @@
 import { ref, computed, inject } from 'vue'
 import { useRouter, RouterLink } from 'vue-router'
 import { Effect, Exit } from 'effect'
-import { marked } from 'marked'
-import DOMPurify from 'dompurify'
 import { modelServiceKey } from '../keys'
 import { useMatrixEditor } from '../composables/useMatrixEditor'
 import MatrixEntityList from '../components/MatrixEntityList.vue'
 import MatrixConnTypeList from '../components/MatrixConnTypeList.vue'
 import EntityPickerInput from '../components/EntityPickerInput.vue'
 import type { EntityDisplayInfo } from '../../domain'
+import { renderMatrixMarkdown } from '../lib/matrixMarkdown'
 
 const svc = inject(modelServiceKey)!
 const router = useRouter()
@@ -76,7 +75,7 @@ const doPreview = async () => {
   }))
   busy.value = false
   if (Exit.isSuccess(exit)) {
-    previewHtml.value = DOMPurify.sanitize(await marked.parse(exit.value.markdown))
+    previewHtml.value = renderMatrixMarkdown(exit.value.markdown)
     return
   }
   error.value = String(exit.cause)

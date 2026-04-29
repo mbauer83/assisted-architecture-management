@@ -191,12 +191,8 @@ def main(argv: list[str] | None = None) -> None:
             "Default is dry-run; pass --execute to apply changes."
         ),
     )
-    parser.add_argument(
-        "--repo-root", default=None, help="Engagement repo root (default: from arch-init)"
-    )
-    parser.add_argument(
-        "--enterprise-root", default=None, help="Enterprise repo root (default: from arch-init)"
-    )
+    parser.add_argument("--repo-root", default=None, help="Engagement repo root (default: from arch-init)")
+    parser.add_argument("--enterprise-root", default=None, help="Enterprise repo root (default: from arch-init)")
     parser.add_argument(
         "--execute",
         action="store_true",
@@ -226,9 +222,7 @@ def main(argv: list[str] | None = None) -> None:
         else (Path(ws["enterprise_root"]) if ws and "enterprise_root" in ws else None)
     )
     if eng_root is None or ent_root is None:
-        parser.error(
-            "Could not resolve repo roots. Pass --repo-root and --enterprise-root or run arch-init."
-        )
+        parser.error("Could not resolve repo roots. Pass --repo-root and --enterprise-root or run arch-init.")
 
     report = cleanup_broken_refs(eng_root, ent_root, dry_run=not args.execute)
 

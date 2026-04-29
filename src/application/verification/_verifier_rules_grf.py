@@ -71,10 +71,7 @@ def check_global_artifact_reference(
                 Issue(
                     Severity.WARNING,
                     "W141",
-                    (
-                        f"Cannot verify global-artifact-id '{global_id}': "
-                        "no enterprise entities in registry"
-                    ),
+                    (f"Cannot verify global-artifact-id '{global_id}': no enterprise entities in registry"),
                     loc,
                 )
             )
@@ -95,10 +92,7 @@ def check_global_artifact_reference(
                 Issue(
                     Severity.WARNING,
                     "W143",
-                    (
-                        f"Cannot verify global-artifact-id '{global_id}': "
-                        "no enterprise documents in registry"
-                    ),
+                    (f"Cannot verify global-artifact-id '{global_id}': no enterprise documents in registry"),
                     loc,
                 )
             )
@@ -108,10 +102,7 @@ def check_global_artifact_reference(
                 Issue(
                     Severity.ERROR,
                     "E143",
-                    (
-                        f"global-artifact-id '{global_id}' does not exist in "
-                        "the enterprise repository (document)"
-                    ),
+                    (f"global-artifact-id '{global_id}' does not exist in the enterprise repository (document)"),
                     loc,
                 )
             )
@@ -122,10 +113,7 @@ def check_global_artifact_reference(
                 Issue(
                     Severity.WARNING,
                     "W144",
-                    (
-                        f"Cannot verify global-artifact-id '{global_id}': "
-                        "no enterprise diagrams in registry"
-                    ),
+                    (f"Cannot verify global-artifact-id '{global_id}': no enterprise diagrams in registry"),
                     loc,
                 )
             )
@@ -135,10 +123,7 @@ def check_global_artifact_reference(
                 Issue(
                     Severity.ERROR,
                     "E144",
-                    (
-                        f"global-artifact-id '{global_id}' does not exist in "
-                        "the enterprise repository (diagram)"
-                    ),
+                    (f"global-artifact-id '{global_id}' does not exist in the enterprise repository (diagram)"),
                     loc,
                 )
             )

@@ -7,6 +7,7 @@ from typing import Any
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
+from src.infrastructure.gui.routers._diagram_selection import resolve_diagram_selection
 from src.infrastructure.gui.routers import state as s
 
 router = APIRouter()
@@ -54,28 +55,26 @@ def preview_diagram(body: DiagramPreviewBody) -> dict[str, Any]:
     from src.infrastructure.rendering.diagram_builder import generate_archimate_puml_body, render_puml_preview
 
     repo = s.get_repo()
-    entities = [e for eid in body.entity_ids if (e := repo.get_entity(eid)) is not None]
-    connections = [c for cid in body.connection_ids if (c := repo.get_connection(cid)) is not None]
-    puml = generate_archimate_puml_body(
-        body.name, entities, connections, diagram_type=body.diagram_type
-    )
+    entities, connections, _, _ = resolve_diagram_selection(repo, body.entity_ids, body.connection_ids)
+    puml = generate_archimate_puml_body(body.name, entities, connections, diagram_type=body.diagram_type)
     image, warnings = render_puml_preview(puml, repo_root)
     return {"puml": puml, "image": image, "warnings": warnings}
 
 
 @router.post("/api/diagram")
 def create_diagram_gui(body: CreateDiagramGuiBody) -> dict[str, Any]:
-    from src.application.modeling.artifact_write import generate_entity_id
+    from src.application.modeling.artifact_write import generate_diagram_id
     from src.infrastructure.rendering.diagram_builder import generate_archimate_puml_body
     from src.infrastructure.write.artifact_write.diagram import create_diagram
 
     repo = s.get_repo()
     repo_root, _, verifier = s.get_write_deps()
-    entities = [e for eid in body.entity_ids if (e := repo.get_entity(eid)) is not None]
-    connections = [c for cid in body.connection_ids if (c := repo.get_connection(cid)) is not None]
-    puml = generate_archimate_puml_body(
-        body.name, entities, connections, diagram_type=body.diagram_type
+    entities, connections, entity_ids_used, connection_ids_used = resolve_diagram_selection(
+        repo,
+        body.entity_ids,
+        body.connection_ids,
     )
+    puml = generate_archimate_puml_body(body.name, entities, connections, diagram_type=body.diagram_type)
     try:
         result = s.run_serialized_write(
             create_diagram,
@@ -85,10 +84,10 @@ def create_diagram_gui(body: CreateDiagramGuiBody) -> dict[str, Any]:
             diagram_type=body.diagram_type,
             name=body.name,
             puml=puml,
-            artifact_id=generate_entity_id("DIA", body.name),
+            artifact_id=generate_diagram_id(body.diagram_type, body.name),
             keywords=body.keywords,
-            entity_ids_used=body.entity_ids,
-            connection_ids_used=body.connection_ids,
+            entity_ids_used=entity_ids_used,
+            connection_ids_used=connection_ids_used,
             version=body.version,
             status=body.status,
             last_updated=None,
@@ -107,11 +106,12 @@ def edit_diagram_gui(body: EditDiagramGuiBody) -> dict[str, Any]:
 
     repo = s.get_repo()
     repo_root, _, verifier = s.get_write_deps()
-    entities = [e for eid in body.entity_ids if (e := repo.get_entity(eid)) is not None]
-    connections = [c for cid in body.connection_ids if (c := repo.get_connection(cid)) is not None]
-    puml = generate_archimate_puml_body(
-        body.name, entities, connections, diagram_type=body.diagram_type
+    entities, connections, entity_ids_used, connection_ids_used = resolve_diagram_selection(
+        repo,
+        body.entity_ids,
+        body.connection_ids,
     )
+    puml = generate_archimate_puml_body(body.name, entities, connections, diagram_type=body.diagram_type)
     try:
         result = s.run_serialized_write(
             edit_diagram,
@@ -122,8 +122,8 @@ def edit_diagram_gui(body: EditDiagramGuiBody) -> dict[str, Any]:
             puml=puml,
             name=body.name,
             keywords=...,
-            entity_ids_used=body.entity_ids,
-            connection_ids_used=body.connection_ids,
+            entity_ids_used=entity_ids_used,
+            connection_ids_used=connection_ids_used,
             version=body.version,
             status=body.status,
             dry_run=body.dry_run,
@@ -185,8 +185,7 @@ def _build_matrix_markdown(
 
     connections = repo.candidate_connections_for_entities(all_ids)
     configs = [
-        ConnTypeConfig(conn_type=str(c["conn_type"]), active=bool(c.get("active", True)))
-        for c in conn_type_configs
+        ConnTypeConfig(conn_type=str(c["conn_type"]), active=bool(c.get("active", True))) for c in conn_type_configs
     ]
     return build_matrix_tables(
         entity_ids=entity_ids,
@@ -204,28 +203,38 @@ def preview_matrix(body: MatrixPreviewBody) -> dict[str, Any]:
     repo = s.get_repo()
     repo_root, registry, _ = s.get_write_deps()
     from src.infrastructure.write.artifact_write.matrix import _linkify_matrix_ids
+
     md = _build_matrix_markdown(
-        body.entity_ids, body.conn_type_configs, body.combined, repo,
-        from_entity_ids=body.from_entity_ids, to_entity_ids=body.to_entity_ids,
+        body.entity_ids,
+        body.conn_type_configs,
+        body.combined,
+        repo,
+        from_entity_ids=body.from_entity_ids,
+        to_entity_ids=body.to_entity_ids,
     )
     all_ids = list(set(body.from_entity_ids or body.entity_ids) | set(body.to_entity_ids or body.entity_ids))
     linked, _ = _linkify_matrix_ids(
-        repo_root=repo_root, registry=registry,
-        matrix_markdown=md, candidate_entity_ids=all_ids,
+        repo_root=repo_root,
+        registry=registry,
+        matrix_markdown=md,
+        candidate_entity_ids=all_ids,
     )
     return {"markdown": linked}
 
 
 @router.post("/api/matrix")
 def create_matrix_gui(body: CreateMatrixBody) -> dict[str, Any]:
-    from src.application.modeling.artifact_write import generate_entity_id
     from src.infrastructure.write.artifact_write.matrix import create_matrix
 
     repo = s.get_repo()
     repo_root, registry, verifier = s.get_write_deps()
     md = _build_matrix_markdown(
-        body.entity_ids, body.conn_type_configs, body.combined, repo,
-        from_entity_ids=body.from_entity_ids, to_entity_ids=body.to_entity_ids,
+        body.entity_ids,
+        body.conn_type_configs,
+        body.combined,
+        repo,
+        from_entity_ids=body.from_entity_ids,
+        to_entity_ids=body.to_entity_ids,
     )
     try:
         result = s.run_serialized_write(
@@ -236,7 +245,7 @@ def create_matrix_gui(body: CreateMatrixBody) -> dict[str, Any]:
             clear_repo_caches=s.clear_caches,
             name=body.name,
             matrix_markdown=md,
-            artifact_id=generate_entity_id("MAT", body.name),
+            artifact_id=None,
             keywords=body.keywords,
             version=body.version,
             status=body.status,
@@ -259,8 +268,12 @@ def edit_matrix_gui(body: EditMatrixBody) -> dict[str, Any]:
     repo = s.get_repo()
     repo_root, registry, verifier = s.get_write_deps()
     md = _build_matrix_markdown(
-        body.entity_ids, body.conn_type_configs, body.combined, repo,
-        from_entity_ids=body.from_entity_ids, to_entity_ids=body.to_entity_ids,
+        body.entity_ids,
+        body.conn_type_configs,
+        body.combined,
+        repo,
+        from_entity_ids=body.from_entity_ids,
+        to_entity_ids=body.to_entity_ids,
     )
     diag = repo.get_diagram(body.artifact_id)
     try:

@@ -74,10 +74,7 @@ def check_attribute_schema(
                 Issue(
                     Severity.WARNING,
                     "W042",
-                    (
-                        f"Attribute schema ({artifact_type}): no Properties "
-                        f"table found but schema requires: {required}"
-                    ),
+                    (f"Attribute schema ({artifact_type}): no Properties table found but schema requires: {required}"),
                     loc,
                 )
             )

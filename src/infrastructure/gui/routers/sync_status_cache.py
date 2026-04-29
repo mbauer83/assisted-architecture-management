@@ -55,9 +55,7 @@ async def _compute_sync_status() -> dict[str, Any]:
             "has_uncommitted_changes": dirty,
         }
         if sync_state.is_accumulating():
-            info["commits_ahead"] = await asyncio.to_thread(
-                enterprise_git_ops.commits_ahead_of_main, ent_root
-            )
+            info["commits_ahead"] = await asyncio.to_thread(enterprise_git_ops.commits_ahead_of_main, ent_root)
         out["enterprise"] = info
 
     return out

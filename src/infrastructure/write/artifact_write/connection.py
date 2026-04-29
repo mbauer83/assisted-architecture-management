@@ -19,8 +19,7 @@ def verification_to_conn_dict(path: Path, res) -> dict[str, object]:
         "file_type": "connection",
         "valid": res.valid,
         "issues": [
-            {"severity": i.severity, "code": i.code, "message": i.message, "location": i.location}
-            for i in res.issues
+            {"severity": i.severity, "code": i.code, "message": i.message, "location": i.location} for i in res.issues
         ],
     }
 
@@ -69,9 +68,7 @@ def _check_junction_homogeneity(
         if not out_file.exists():
             continue
         existing_types = {
-            m
-            for m in _CONN_TYPE_RE.findall(out_file.read_text(encoding="utf-8"))
-            if m != connection_type
+            m for m in _CONN_TYPE_RE.findall(out_file.read_text(encoding="utf-8")) if m != connection_type
         }
         if existing_types:
             locked = sorted(existing_types)[0]
@@ -239,9 +236,7 @@ def add_connection(
 ) -> WriteResult:
     """Add a connection to the source entity's .outgoing.md file."""
     assert_engagement_write_root(repo_root)
-    _validate_inputs(
-        registry, connection_type, source_entity, target_entity, extra_known_ids
-    )
+    _validate_inputs(registry, connection_type, source_entity, target_entity, extra_known_ids)
 
     if src_cardinality or tgt_cardinality:
         for eid, label in ((source_entity, "source"), (target_entity, "target")):
@@ -252,9 +247,7 @@ def add_connection(
                 )
 
     last = last_updated or today_iso()
-    outgoing_path = _resolve_outgoing_path(
-        registry, source_entity, dry_run=dry_run, extra_known_ids=extra_known_ids
-    )
+    outgoing_path = _resolve_outgoing_path(registry, source_entity, dry_run=dry_run, extra_known_ids=extra_known_ids)
     conn_id = f"{source_entity}---{target_entity}@@{connection_type}"
 
     content = _build_content(
@@ -280,9 +273,7 @@ def add_connection(
             verification=None,
         )
 
-    result = _write_and_verify(
-        outgoing_path, content, verifier, source_entity, connection_type, target_entity
-    )
+    result = _write_and_verify(outgoing_path, content, verifier, source_entity, connection_type, target_entity)
     if result.wrote:
         clear_repo_caches(outgoing_path)
     return result

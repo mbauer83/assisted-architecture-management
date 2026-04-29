@@ -47,8 +47,7 @@ def register_query_search_tools(mcp: FastMCP) -> None:
         limit: int = 10,
         domain: str | list[str] | None = None,
         artifact_type: str | list[str] | None = None,
-        include_record_types: list[Literal["entities", "connections", "diagrams", "documents"]]
-        | None = None,
+        include_record_types: list[Literal["entities", "connections", "diagrams", "documents"]] | None = None,
         prefer_record_type: Literal["entity", "connection", "diagram", "document"] | None = None,
         strict_record_type: bool = False,
         fields: list[str] | None = None,

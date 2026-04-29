@@ -37,6 +37,7 @@ from src.application.verification.artifact_verifier_rules import (
     check_artifact_type,
     check_diagram_artifact_type,
     check_diagram_references_scoped,
+    check_diagram_relation_references,
     check_enum,
     check_puml_structure,
     check_required_fields,
@@ -97,9 +98,7 @@ def _parse_conn_header(header: str) -> tuple[str, str, str, str] | None:
 
 
 class ArtifactVerifier:
-    def __init__(
-        self, registry: ArtifactRegistry | None = None, *, check_puml_syntax: bool = True
-    ) -> None:
+    def __init__(self, registry: ArtifactRegistry | None = None, *, check_puml_syntax: bool = True) -> None:
         self.registry = registry
         self.check_puml_syntax = check_puml_syntax
 
@@ -196,9 +195,7 @@ class ArtifactVerifier:
         # Scope-aware entity sets for target validation
         if self.registry is not None:
             allowed_entities = (
-                self.registry.enterprise_entity_ids()
-                if file_scope == "enterprise"
-                else self.registry.entity_ids()
+                self.registry.enterprise_entity_ids() if file_scope == "enterprise" else self.registry.entity_ids()
             )
             all_entities_for_scope = self.registry.entity_ids()
         else:
@@ -247,10 +244,7 @@ class ArtifactVerifier:
                             Issue(
                                 Severity.ERROR,
                                 "E130",
-                                (
-                                    "enterprise connection references "
-                                    f"non-enterprise entity '{target_id}'"
-                                ),
+                                (f"enterprise connection references non-enterprise entity '{target_id}'"),
                                 loc,
                             )
                         )
@@ -318,6 +312,7 @@ class ArtifactVerifier:
         scope = self._scope_for_path(path)
         if self.registry is not None:
             check_diagram_references_scoped(fm, self.registry, scope, result, loc)
+            check_diagram_relation_references(content, fm, self.registry, scope, result, loc)
         else:
             result.issues.append(
                 Issue(
@@ -370,10 +365,7 @@ class ArtifactVerifier:
                 Issue(
                     Severity.WARNING,
                     "W321",
-                    (
-                        "Markdown diagram file under diagram-catalog/diagrams "
-                        "should use diagram-type: matrix"
-                    ),
+                    ("Markdown diagram file under diagram-catalog/diagrams should use diagram-type: matrix"),
                     loc,
                 )
             )
@@ -382,23 +374,16 @@ class ArtifactVerifier:
                 Issue(
                     Severity.WARNING,
                     "W322",
-                    (
-                        "Matrix diagram markdown has no table markup; "
-                        "expected at least one matrix table"
-                    ),
+                    ("Matrix diagram markdown has no table markup; expected at least one matrix table"),
                     loc,
                 )
             )
         return result
 
-    def verify_all(
-        self, repo_path: Path, *, include_diagrams: bool = True
-    ) -> list[VerificationResult]:
+    def verify_all(self, repo_path: Path, *, include_diagrams: bool = True) -> list[VerificationResult]:
         cfg = load_runtime_config()
         if cfg.mode == "incremental":
-            return self._verify_all_incremental(
-                repo_path, include_diagrams=include_diagrams, cfg=cfg
-            )
+            return self._verify_all_incremental(repo_path, include_diagrams=include_diagrams, cfg=cfg)
         return self._verify_all_full(repo_path, include_diagrams=include_diagrams)
 
     def verify_paths(
@@ -413,11 +398,7 @@ class ArtifactVerifier:
             return self._verify_all_full(repo_path, include_diagrams=include_diagrams)
 
         inv = inventory_files(repo_path, include_diagrams=include_diagrams)
-        relpaths = {
-            inv.path_to_rel[path.resolve()]
-            for path in changed_paths
-            if path.resolve() in inv.path_to_rel
-        }
+        relpaths = {inv.path_to_rel[path.resolve()] for path in changed_paths if path.resolve() in inv.path_to_rel}
         if not relpaths:
             return []
 
@@ -432,14 +413,10 @@ class ArtifactVerifier:
                 if path.suffix == ".md" and path.exists() and docs_root in path.resolve().parents
             ]
             worker_count = resolve_worker_count()
-            results.extend(
-                _verify_paths(doc_files, self.verify_document_file, workers=worker_count)
-            )
+            results.extend(_verify_paths(doc_files, self.verify_document_file, workers=worker_count))
         return results
 
-    def _verify_all_full(
-        self, repo_path: Path, *, include_diagrams: bool
-    ) -> list[VerificationResult]:
+    def _verify_all_full(self, repo_path: Path, *, include_diagrams: bool) -> list[VerificationResult]:
         inv = inventory_files(repo_path, include_diagrams=include_diagrams)
         results = self._verify_inventory_subset(inv, set(inv.ordered_paths))
         # Verify docs/ directory — not tracked by FileInventory
@@ -447,9 +424,7 @@ class ArtifactVerifier:
         if docs_root.exists():
             doc_files = sorted(docs_root.rglob("*.md"))
             worker_count = resolve_worker_count()
-            results.extend(
-                _verify_paths(doc_files, self.verify_document_file, workers=worker_count)
-            )
+            results.extend(_verify_paths(doc_files, self.verify_document_file, workers=worker_count))
         return results
 
     def _verify_all_incremental(
@@ -460,16 +435,12 @@ class ArtifactVerifier:
         cfg: VerifierRuntimeConfig,
     ) -> list[VerificationResult]:
         inv = inventory_files(repo_path, include_diagrams=include_diagrams)
-        state_path = state_file_path(
-            repo_path, include_diagrams=include_diagrams, state_dir=cfg.state_dir
-        )
+        state_path = state_file_path(repo_path, include_diagrams=include_diagrams, state_dir=cfg.state_dir)
         prev = load_incremental_state(state_path)
         head = git_head(repo_path)
         engine_sig = verifier_engine_signature()
 
-        if self._incremental_requires_full(
-            prev, include_diagrams=include_diagrams, head=head, engine_sig=engine_sig
-        ):
+        if self._incremental_requires_full(prev, include_diagrams=include_diagrams, head=head, engine_sig=engine_sig):
             mode = "full"
             results = self._verify_all_full(repo_path, include_diagrams=include_diagrams)
         else:
@@ -487,9 +458,7 @@ class ArtifactVerifier:
         if docs_root.exists():
             doc_files = sorted(docs_root.rglob("*.md"))
             worker_count = resolve_worker_count()
-            results.extend(
-                _verify_paths(doc_files, self.verify_document_file, workers=worker_count)
-            )
+            results.extend(_verify_paths(doc_files, self.verify_document_file, workers=worker_count))
 
         state = IncrementalState(
             schema_version=1,
@@ -497,21 +466,13 @@ class ArtifactVerifier:
             include_diagrams=include_diagrams,
             git_head=head,
             snapshots=inv.snapshots,
-            results={
-                inv.path_to_rel[r.path]: serialize_result(r)
-                for r in results
-                if r.path in inv.path_to_rel
-            },
+            results={inv.path_to_rel[r.path]: serialize_result(r) for r in results if r.path in inv.path_to_rel},
             include_registry=(self.registry is not None),
         )
         save_incremental_state(state_path, state)
 
         if cfg.log_mode:
-            print(
-                "[ArtifactVerifier] "
-                f"mode={mode} include_diagrams={include_diagrams} "
-                f"files={len(results)}"
-            )
+            print(f"[ArtifactVerifier] mode={mode} include_diagrams={include_diagrams} files={len(results)}")
         return results
 
     def _incremental_requires_full(
@@ -564,14 +525,9 @@ class ArtifactVerifier:
     ) -> bool:
         total = len(inv.ordered_paths)
         changed_ratio = (len(changed) / total) if total > 0 else 1.0
-        return (
-            changed_ratio >= cfg.changed_ratio_threshold
-            or len(changed) >= cfg.changed_count_threshold
-        )
+        return changed_ratio >= cfg.changed_ratio_threshold or len(changed) >= cfg.changed_count_threshold
 
-    def _verify_inventory_subset(
-        self, inv: FileInventory, relpaths: set[str]
-    ) -> list[VerificationResult]:
+    def _verify_inventory_subset(self, inv: FileInventory, relpaths: set[str]) -> list[VerificationResult]:
         worker_count = resolve_worker_count()
         if self.registry is not None:
             _ = self.registry.entity_ids()
@@ -583,9 +539,7 @@ class ArtifactVerifier:
 
         out: list[VerificationResult] = []
         out.extend(_verify_paths(entity_files, self.verify_entity_file, workers=worker_count))
-        out.extend(
-            _verify_paths(connection_files, self.verify_connection_file, workers=worker_count)
-        )
+        out.extend(_verify_paths(connection_files, self.verify_connection_file, workers=worker_count))
 
         diagram_results = _verify_paths(
             diagram_files,
@@ -598,15 +552,11 @@ class ArtifactVerifier:
                 d.issues.extend(issues_by_path.get(d.path, []))
         out.extend(diagram_results)
 
-        out.extend(
-            _verify_paths(matrix_files, self.verify_matrix_diagram_file, workers=worker_count)
-        )
+        out.extend(_verify_paths(matrix_files, self.verify_matrix_diagram_file, workers=worker_count))
 
         by_path = {r.path: r for r in out}
         return [
-            by_path[inv.rel_to_path[r]]
-            for r in inv.ordered_paths
-            if r in relpaths and inv.rel_to_path[r] in by_path
+            by_path[inv.rel_to_path[r]] for r in inv.ordered_paths if r in relpaths and inv.rel_to_path[r] in by_path
         ]
 
     def verify_document_file(self, path: Path) -> VerificationResult:  # noqa: C901
@@ -622,9 +572,7 @@ class ArtifactVerifier:
         # E153: frontmatter schema validation against .arch-repo/documents/{doc_type}.json
         doc_type = str(fm.get("doc-type", "")).strip()
         if not doc_type:
-            result.issues.append(
-                Issue(Severity.ERROR, "E153", "Missing required frontmatter field 'doc-type'", loc)
-            )
+            result.issues.append(Issue(Severity.ERROR, "E153", "Missing required frontmatter field 'doc-type'", loc))
         else:
             repo_root = self._repo_root_for_path(path) or _infer_repo_root_for_document(path)
             if repo_root is not None:
@@ -636,10 +584,7 @@ class ArtifactVerifier:
                         Issue(
                             Severity.ERROR,
                             "E153",
-                            (
-                                f"Unknown doc-type '{doc_type}': no schema at "
-                                f".arch-repo/documents/{doc_type}.json"
-                            ),
+                            (f"Unknown doc-type '{doc_type}': no schema at .arch-repo/documents/{doc_type}.json"),
                             loc,
                         )
                     )
@@ -662,10 +607,7 @@ class ArtifactVerifier:
                     required_sections: list[str] = schema.get("required_sections") or []
                     if required_sections:
                         body = re.sub(r"^---\n.*?\n---\n", "", content, count=1, flags=re.DOTALL)
-                        present = {
-                            m.group(1).strip()
-                            for m in re.finditer(r"^##\s+(.+)$", body, re.MULTILINE)
-                        }
+                        present = {m.group(1).strip() for m in re.finditer(r"^##\s+(.+)$", body, re.MULTILINE)}
                         for section in required_sections:
                             if section not in present:
                                 result.issues.append(
@@ -677,9 +619,7 @@ class ArtifactVerifier:
                                     )
                                 )
                     # E155: required entity-type connections
-                    required_entity_types: list[str] = (
-                        schema.get("required_entity_type_connections") or []
-                    )
+                    required_entity_types: list[str] = schema.get("required_entity_type_connections") or []
                     if required_entity_types:
                         from src.domain.ontology_loader import (
                             entity_type_term_matches,
@@ -695,10 +635,7 @@ class ArtifactVerifier:
                                     Issue(
                                         Severity.ERROR,
                                         "E155",
-                                        (
-                                            "Unknown required entity-type "
-                                            f"connection term: {label} ({etype})"
-                                        ),
+                                        (f"Unknown required entity-type connection term: {label} ({etype})"),
                                         loc,
                                     )
                                 )
@@ -707,10 +644,7 @@ class ArtifactVerifier:
                                     Issue(
                                         Severity.ERROR,
                                         "E155",
-                                        (
-                                            "Required entity-type connection "
-                                            f"missing: link at least one {label}"
-                                        ),
+                                        (f"Required entity-type connection missing: link at least one {label}"),
                                         loc,
                                     )
                                 )
@@ -774,9 +708,7 @@ def _linked_entity_types(doc_path: Path, content: str) -> set[str]:
             target_content = target.read_text(encoding="utf-8")
         except OSError:
             continue
-        fm = parse_frontmatter(
-            target_content, VerificationResult(path=target, file_type="entity"), str(target)
-        )
+        fm = parse_frontmatter(target_content, VerificationResult(path=target, file_type="entity"), str(target))
         if fm:
             etype = fm.get("artifact-type", "")
             if etype:
@@ -795,9 +727,7 @@ def _infer_repo_root_for_document(path: Path) -> Path | None:
 
 
 def _is_absolute_markdown_link(href: str) -> bool:
-    return (
-        href.startswith("/") or href.startswith("file://") or bool(_WINDOWS_ABS_PATH_RE.match(href))
-    )
+    return href.startswith("/") or href.startswith("file://") or bool(_WINDOWS_ABS_PATH_RE.match(href))
 
 
 def _verify_paths(
@@ -814,9 +744,7 @@ def _verify_paths(
         return list(executor.map(verifier_fn, paths))
 
 
-def _results_from_state(
-    prev: IncrementalState, inv: FileInventory
-) -> list[VerificationResult] | None:
+def _results_from_state(prev: IncrementalState, inv: FileInventory) -> list[VerificationResult] | None:
     out: list[VerificationResult] = []
     for rel in inv.ordered_paths:
         raw = prev.results.get(rel)
@@ -867,9 +795,7 @@ def _deserialize_result(path: Path, data: dict) -> VerificationResult | None:
         location = item.get("location")
         if not all(isinstance(v, str) for v in [code, message, location]):
             return None
-        issues.append(
-            Issue(severity=severity, code=str(code), message=str(message), location=str(location))
-        )
+        issues.append(Issue(severity=severity, code=str(code), message=str(message), location=str(location)))
     return VerificationResult(path=path, file_type=file_type, issues=issues)
 
 

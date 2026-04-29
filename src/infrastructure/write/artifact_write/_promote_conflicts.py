@@ -53,9 +53,7 @@ class _AcceptEngagementHandler:
         resolve_target: Any,
         conn_ids: Any,
     ) -> None:
-        replace_enterprise_content(
-            conflict, eng_root, ent_root, registry, result, backups, resolve_target, conn_ids
-        )
+        replace_enterprise_content(conflict, eng_root, ent_root, registry, result, backups, resolve_target, conn_ids)
 
 
 @dataclass
@@ -103,9 +101,7 @@ def replace_enterprise_content(
     if not ent_path or not eng_path:
         result.plan.warnings.append(f"Could not find files for conflict {conflict.engagement_id}")
         return
-    content = eng_path.read_text(encoding="utf-8").replace(
-        conflict.engagement_id, conflict.enterprise_id, 1
-    )
+    content = eng_path.read_text(encoding="utf-8").replace(conflict.engagement_id, conflict.enterprise_id, 1)
     backups.append((ent_path, ent_path.read_bytes()))
     ent_path.write_text(content, encoding="utf-8")
     result.updated_files.append(str(ent_path.relative_to(ent_root)))
@@ -137,9 +133,7 @@ def apply_merge(
 
     ent_path = registry.find_file_by_id(conflict.enterprise_id)
     if not ent_path:
-        result.plan.warnings.append(
-            f"Enterprise file not found for merge: {conflict.enterprise_id}"
-        )
+        result.plan.warnings.append(f"Enterprise file not found for merge: {conflict.enterprise_id}")
         return
     parsed = parse_entity_file(ent_path)
     fm = dict(parsed.frontmatter)

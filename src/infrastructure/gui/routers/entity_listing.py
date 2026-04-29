@@ -66,10 +66,7 @@ def hierarchy_meta(entities: list[EntityRecord], repo) -> dict[str, dict[str, ob
         meta: dict[str, object] = {
             "hierarchy_depth": depth_for(e.artifact_id),
             "specialization_depth": depth_for(e.artifact_id),
-            "all_parents": [
-                {"parent_id": pid, "relation_type": _HIERARCHY_LABEL[ct]}
-                for pid, ct in parents
-            ],
+            "all_parents": [{"parent_id": pid, "relation_type": _HIERARCHY_LABEL[ct]} for pid, ct in parents],
         }
         if primary:
             pid, ct = primary

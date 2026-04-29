@@ -54,11 +54,11 @@ _PORT = int(os.getenv("ARCH_MCP_PORT", "8000"))
 _LOG_LEVEL = os.getenv("ARCH_MCP_LOG_LEVEL", "INFO")
 _READ_SERVER_NAME = os.getenv("ARCH_MCP_READ_SERVER_NAME", "arch_artifacts_read")
 _WRITE_SERVER_NAME = os.getenv("ARCH_MCP_WRITE_SERVER_NAME", "arch_artifacts_write")
-_JSON_RESPONSE = os.getenv("ARCH_MCP_JSON_RESPONSE", "1") in {"1", "true", "TRUE", "yes", "YES"}
+_JSON_RESPONSE = os.getenv("ARCH_MCP_JSON_RESPONSE", "0") in {"1", "true", "TRUE", "yes", "YES"}
 _STATELESS_HTTP = os.getenv("ARCH_MCP_STATELESS_HTTP", "1") in {"1", "true", "TRUE", "yes", "YES"}
 
 _READ_INSTRUCTIONS = (
-    "Architecture repository read-only tools (query + verify). "
+    "Architecture repository read-only tools (explore, query + verify). "
     "Safe for read-only contexts and agents without write permissions."
 )
 _WRITE_INSTRUCTIONS = (

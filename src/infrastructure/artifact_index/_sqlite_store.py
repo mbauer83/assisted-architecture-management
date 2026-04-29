@@ -1,9 +1,12 @@
 from __future__ import annotations
 
 import json
+import os
+import queue
 import sqlite3
+from contextlib import contextmanager
 from pathlib import Path
-from typing import Callable
+from typing import Callable, Generator
 
 from src.domain.artifact_types import ConnectionRecord, DiagramRecord, DocumentRecord, EntityRecord
 from src.domain.ontology_loader import SYMMETRIC_CONNECTIONS
@@ -43,26 +46,18 @@ _INS_EFTS = (
     "(artifact_id,name,artifact_type,domain,subdomain,keywords,content_text,display_label)"
     " VALUES (?,?,?,?,?,?,?,?)"
 )
-_INS_CFTS = (
-    "INSERT INTO connections_fts (artifact_id,source,target,conn_type,content_text)"
-    " VALUES (?,?,?,?,?)"
-)
-_INS_DFTS = (
-    "INSERT INTO diagrams_fts (artifact_id,name,diagram_type,artifact_type) VALUES (?,?,?,?)"
-)
-_INS_DOCFTS = (
-    "INSERT INTO documents_fts (artifact_id,title,doc_type,keywords,content_text)"
-    " VALUES (?,?,?,?,?)"
-)
+_INS_CFTS = "INSERT INTO connections_fts (artifact_id,source,target,conn_type,content_text) VALUES (?,?,?,?,?)"
+_INS_DFTS = "INSERT INTO diagrams_fts (artifact_id,name,diagram_type,artifact_type) VALUES (?,?,?,?)"
+_INS_DOCFTS = "INSERT INTO documents_fts (artifact_id,title,doc_type,keywords,content_text) VALUES (?,?,?,?,?)"
+
+
+_READ_POOL_SIZE = min(max(os.cpu_count() or 4, 4), 8)
 
 
 class _SqliteStore:
     def __init__(self, name_hash: str, mem: _MemStore, scope_fn: Callable[[Path], str]) -> None:
-        self._conn = sqlite3.connect(
-            f"file:arch-artifact-index-{name_hash}?mode=memory&cache=shared",
-            uri=True,
-            check_same_thread=False,
-        )
+        self._uri = f"file:arch-artifact-index-{name_hash}?mode=memory&cache=shared"
+        self._conn = sqlite3.connect(self._uri, uri=True, check_same_thread=False)
         self._conn.row_factory = sqlite3.Row
         self._mem = mem
         self._scope = scope_fn
@@ -74,10 +69,28 @@ class _SqliteStore:
                 self._conn.executescript(FTS_SQL)
         except sqlite3.OperationalError:
             self._fts_enabled = False
+        # Read connection pool: each caller gets its own connection so SQLite
+        # SHARED locks can coexist and reads truly parallelise up to pool size.
+        # Pool connections share the same in-memory cache as self._conn and
+        # always see its committed writes automatically.
+        self._read_pool: queue.Queue[sqlite3.Connection] = queue.Queue()
+        for _ in range(_READ_POOL_SIZE):
+            c = sqlite3.connect(self._uri, uri=True, check_same_thread=False)
+            c.row_factory = sqlite3.Row
+            self._read_pool.put(c)
 
-    @property
-    def conn(self) -> sqlite3.Connection:
-        return self._conn
+    @contextmanager
+    def reader(self) -> Generator[sqlite3.Connection, None, None]:
+        """Check out a read connection from the pool and yield it.
+
+        Must be called inside _lock.reading() so the write connection cannot
+        be modifying tables while a pool connection is reading them.
+        """
+        conn = self._read_pool.get()
+        try:
+            yield conn
+        finally:
+            self._read_pool.put(conn)
 
     @property
     def fts_enabled(self) -> bool:
@@ -92,9 +105,7 @@ class _SqliteStore:
             self._conn.execute("DELETE FROM entities WHERE artifact_id=?", (rec.artifact_id,))
             self._conn.execute(_INS_ENTITY, self._entity_row(rec))
             if self._fts_enabled:
-                self._conn.execute(
-                    "DELETE FROM entities_fts WHERE artifact_id=?", (rec.artifact_id,)
-                )
+                self._conn.execute("DELETE FROM entities_fts WHERE artifact_id=?", (rec.artifact_id,))
                 self._conn.execute(
                     _INS_EFTS,
                     (
@@ -123,13 +134,13 @@ class _SqliteStore:
     def upsert_connection(self, rec: ConnectionRecord) -> None:
         self._mem.connections[rec.artifact_id] = rec
         self._mem.connections_by_path.setdefault(rec.path.resolve(), set()).add(rec.artifact_id)
+        self._mem.connections_by_entity.setdefault(rec.source, set()).add(rec.artifact_id)
+        self._mem.connections_by_entity.setdefault(rec.target, set()).add(rec.artifact_id)
         with self._conn:
             self._conn.execute("DELETE FROM connections WHERE artifact_id=?", (rec.artifact_id,))
             self._conn.execute(_INS_CONNECTION, self._connection_row(rec))
             if self._fts_enabled:
-                self._conn.execute(
-                    "DELETE FROM connections_fts WHERE artifact_id=?", (rec.artifact_id,)
-                )
+                self._conn.execute("DELETE FROM connections_fts WHERE artifact_id=?", (rec.artifact_id,))
                 self._conn.execute(
                     _INS_CFTS,
                     (rec.artifact_id, rec.source, rec.target, rec.conn_type, rec.content_text),
@@ -144,15 +155,17 @@ class _SqliteStore:
                 ps.discard(artifact_id)
                 if not ps:
                     del self._mem.connections_by_path[key]
+            for eid in (old.source, old.target):
+                es = self._mem.connections_by_entity.get(eid)
+                if es:
+                    es.discard(artifact_id)
+                    if not es:
+                        del self._mem.connections_by_entity[eid]
         with self._conn:
             self._conn.execute("DELETE FROM connections WHERE artifact_id=?", (artifact_id,))
-            self._conn.execute(
-                "DELETE FROM entity_context_edges WHERE connection_id=?", (artifact_id,)
-            )
+            self._conn.execute("DELETE FROM entity_context_edges WHERE connection_id=?", (artifact_id,))
             if self._fts_enabled:
-                self._conn.execute(
-                    "DELETE FROM connections_fts WHERE artifact_id=?", (artifact_id,)
-                )
+                self._conn.execute("DELETE FROM connections_fts WHERE artifact_id=?", (artifact_id,))
 
     def upsert_diagram(self, rec: DiagramRecord) -> None:
         self._mem.diagrams[rec.artifact_id] = rec
@@ -161,12 +174,8 @@ class _SqliteStore:
             self._conn.execute("DELETE FROM diagrams WHERE artifact_id=?", (rec.artifact_id,))
             self._conn.execute(_INS_DIAGRAM, self._diagram_row(rec))
             if self._fts_enabled:
-                self._conn.execute(
-                    "DELETE FROM diagrams_fts WHERE artifact_id=?", (rec.artifact_id,)
-                )
-                self._conn.execute(
-                    _INS_DFTS, (rec.artifact_id, rec.name, rec.diagram_type, rec.artifact_type)
-                )
+                self._conn.execute("DELETE FROM diagrams_fts WHERE artifact_id=?", (rec.artifact_id,))
+                self._conn.execute(_INS_DFTS, (rec.artifact_id, rec.name, rec.diagram_type, rec.artifact_type))
 
     def delete_diagram(self, artifact_id: str) -> None:
         old = self._mem.diagrams.pop(artifact_id, None)
@@ -184,9 +193,7 @@ class _SqliteStore:
             self._conn.execute("DELETE FROM documents WHERE artifact_id=?", (rec.artifact_id,))
             self._conn.execute(_INS_DOCUMENT, self._document_row(rec))
             if self._fts_enabled:
-                self._conn.execute(
-                    "DELETE FROM documents_fts WHERE artifact_id=?", (rec.artifact_id,)
-                )
+                self._conn.execute("DELETE FROM documents_fts WHERE artifact_id=?", (rec.artifact_id,))
                 self._conn.execute(
                     _INS_DOCFTS,
                     (
@@ -223,18 +230,10 @@ class _SqliteStore:
             if self._fts_enabled:
                 for t in ("entities_fts", "connections_fts", "diagrams_fts", "documents_fts"):
                     self._conn.execute(f"DELETE FROM {t}")  # noqa: S608
-            self._conn.executemany(
-                _INS_ENTITY, [self._entity_row(r) for r in self._mem.entities.values()]
-            )
-            self._conn.executemany(
-                _INS_CONNECTION, [self._connection_row(r) for r in self._mem.connections.values()]
-            )
-            self._conn.executemany(
-                _INS_DIAGRAM, [self._diagram_row(r) for r in self._mem.diagrams.values()]
-            )
-            self._conn.executemany(
-                _INS_DOCUMENT, [self._document_row(r) for r in self._mem.documents.values()]
-            )
+            self._conn.executemany(_INS_ENTITY, [self._entity_row(r) for r in self._mem.entities.values()])
+            self._conn.executemany(_INS_CONNECTION, [self._connection_row(r) for r in self._mem.connections.values()])
+            self._conn.executemany(_INS_DIAGRAM, [self._diagram_row(r) for r in self._mem.diagrams.values()])
+            self._conn.executemany(_INS_DOCUMENT, [self._document_row(r) for r in self._mem.documents.values()])
             if self._fts_enabled:
                 self._conn.executemany(
                     _INS_EFTS,
@@ -261,10 +260,7 @@ class _SqliteStore:
                 )
                 self._conn.executemany(
                     _INS_DFTS,
-                    [
-                        (r.artifact_id, r.name, r.diagram_type, r.artifact_type)
-                        for r in self._mem.diagrams.values()
-                    ],
+                    [(r.artifact_id, r.name, r.diagram_type, r.artifact_type) for r in self._mem.diagrams.values()],
                 )
                 self._conn.executemany(
                     _INS_DOCFTS,
@@ -290,14 +286,17 @@ class _SqliteStore:
             )
 
     def rebuild_context_for(self, entity_id: str) -> None:
+        # Use the entity→connections secondary index for O(K) lookup instead of O(N).
+        relevant_ids = self._mem.connections_by_entity.get(entity_id, set())
+        rows = [
+            row
+            for cid in relevant_ids
+            if (rec := self._mem.connections.get(cid)) is not None
+            for row in self._context_rows(rec)
+            if row[0] == entity_id
+        ]
         with self._conn:
             self._conn.execute("DELETE FROM entity_context_edges WHERE entity_id=?", (entity_id,))
-            rows = [
-                row
-                for rec in self._mem.connections.values()
-                for row in self._context_rows(rec)
-                if row[0] == entity_id
-            ]
             if rows:
                 self._conn.executemany(_INS_EDGE, rows)
             self._conn.execute("DELETE FROM entity_context_stats WHERE entity_id=?", (entity_id,))
@@ -398,9 +397,7 @@ class _SqliteStore:
             rec.tgt_cardinality,
         )
         if rec.conn_type in SYMMETRIC_CONNECTIONS:
-            rows: list[tuple[str, ...]] = [
-                (rec.source, rec.artifact_id, "symmetric", rec.target, *shared)
-            ]
+            rows: list[tuple[str, ...]] = [(rec.source, rec.artifact_id, "symmetric", rec.target, *shared)]
             if rec.target != rec.source:
                 rows.append((rec.target, rec.artifact_id, "symmetric", rec.source, *shared))
             return rows

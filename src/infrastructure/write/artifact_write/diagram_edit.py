@@ -10,7 +10,7 @@ from src.config.repo_paths import DIAGRAM_CATALOG, DIAGRAMS
 
 from .boundary import assert_engagement_write_root, today_iso
 from .coerce import as_optional_str_list
-from .diagram import _render_diagram_png, _render_diagram_svg
+from .diagram import _prepare_archimate_puml_body, _render_diagram_png, _render_diagram_svg
 from .parse_existing import parse_diagram_file
 from .types import WriteResult
 from .verify import verify_content_in_temp_path
@@ -22,8 +22,7 @@ def _verification_to_dict(path: Path, res) -> dict[str, object]:
         "file_type": "diagram",
         "valid": res.valid,
         "issues": [
-            {"severity": i.severity, "code": i.code, "message": i.message, "location": i.location}
-            for i in res.issues
+            {"severity": i.severity, "code": i.code, "message": i.message, "location": i.location} for i in res.issues
         ],
     }
 
@@ -68,6 +67,7 @@ def edit_diagram(
     # Determine PUML body
     if puml is not None:
         puml_body = puml.strip("\n") + "\n"
+        puml_body = _prepare_archimate_puml_body(puml_body, repo_root, diagram_type)
         # optimize_puml_layout is idempotent: it skips when [hidden] links are
         # already present, so user-provided explicit hidden chains are preserved.
         puml_body = optimize_puml_layout(puml_body)

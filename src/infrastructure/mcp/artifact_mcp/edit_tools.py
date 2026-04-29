@@ -26,9 +26,7 @@ def _result_dict(dry_run: bool, result: artifact_write_ops.WriteResult) -> dict[
     return _out(result, dry_run=dry_run)
 
 
-def _resolve(
-    repo_root: str | None, *, need_registry: bool
-) -> tuple[Path, ArtifactRegistry | None, ArtifactVerifier]:
+def _resolve(repo_root: str | None, *, need_registry: bool) -> tuple[Path, ArtifactRegistry | None, ArtifactVerifier]:
     roots = resolve_repo_roots(
         repo_scope="engagement",
         repo_root=repo_root,
@@ -168,12 +166,10 @@ def artifact_edit_diagram(
     dry_run: bool = True,
     repo_root: str | None = None,
 ) -> dict[str, object]:
-    roots = resolve_repo_roots(
-        repo_scope="engagement", repo_root=repo_root, repo_preset=None, enterprise_root=None
-    )
+    roots = resolve_repo_roots(repo_scope="engagement", repo_root=repo_root, repo_preset=None, enterprise_root=None)
     key = roots_key(roots)
     root = roots[0]
-    verifier = verifier_for(key, include_registry=False)
+    verifier = verifier_for(key, include_registry=True)
     mutation_context, clear_repo_caches, _mark_macros_dirty = authoritative_callbacks_for(roots)
 
     if puml == PUML_AUTO_SYNC:

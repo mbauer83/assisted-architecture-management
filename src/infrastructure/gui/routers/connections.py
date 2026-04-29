@@ -19,6 +19,7 @@ def _check_cardinality(v: str | None) -> str | None:
         raise ValueError(f"Invalid cardinality '{v}': accepted forms are n, n..m, n..*, or *")
     return v
 
+
 router = APIRouter()
 
 
@@ -46,9 +47,7 @@ def search(q: str, limit: int = 20) -> dict[str, Any]:
     hits = []
     for h in result.hits:
         rec = h.record
-        artifact_type = getattr(rec, "artifact_type", None) or getattr(
-            rec, "conn_type", "connection"
-        )
+        artifact_type = getattr(rec, "artifact_type", None) or getattr(rec, "conn_type", "connection")
         hit: dict[str, Any] = {
             "score": h.score,
             "record_type": h.record_type,
@@ -106,9 +105,7 @@ def get_ontology(
     )
 
     effective_source, source_is_non_entity_gar = _resolve_effective_type(source_id, source_type)
-    effective_target, target_is_non_entity_gar = _resolve_effective_type(
-        target_id, target_type or ""
-    )
+    effective_target, target_is_non_entity_gar = _resolve_effective_type(target_id, target_type or "")
 
     if source_is_non_entity_gar or target_is_non_entity_gar:
         return {
@@ -164,13 +161,8 @@ def _reject_if_non_entity_gar(artifact_id: str, role: str) -> None:
     rec = repo.get_entity(artifact_id) if repo is not None else None
     if rec is None:
         return
-    if (
-        rec.artifact_type == "global-artifact-reference"
-        and rec.extra.get("global-artifact-type") != "entity"
-    ):
-        raise HTTPException(
-            400, f"Cannot use a document/diagram global-artifact-reference as a connection {role}"
-        )
+    if rec.artifact_type == "global-artifact-reference" and rec.extra.get("global-artifact-type") != "entity":
+        raise HTTPException(400, f"Cannot use a document/diagram global-artifact-reference as a connection {role}")
 
 
 @router.post("/api/connection")
@@ -210,9 +202,7 @@ def add_connection(body: AddConnectionBody) -> dict[str, Any]:
             gar_warnings.append(f"Created global-artifact-reference proxy {gar_result.artifact_id}")
             _, registry, verifier = s.get_write_deps()
         else:
-            gar_warnings.append(
-                f"Routed via existing global-artifact-reference {gar_result.artifact_id}"
-            )
+            gar_warnings.append(f"Routed via existing global-artifact-reference {gar_result.artifact_id}")
         return gar_result.artifact_id
 
     # Reject document/diagram GAR endpoints
@@ -220,17 +210,11 @@ def add_connection(body: AddConnectionBody) -> dict[str, Any]:
     _reject_if_non_entity_gar(body.target_entity, "target")
 
     _enterprise_root = s.maybe_enterprise_root()
-    if (
-        _enterprise_root is not None
-        and registry.scope_of_entity(body.source_entity) == "enterprise"
-    ):
+    if _enterprise_root is not None and registry.scope_of_entity(body.source_entity) == "enterprise":
         gar_source_id = _ensure_gar(body.source_entity)
         effective_source = gar_source_id
 
-    if (
-        _enterprise_root is not None
-        and registry.scope_of_entity(body.target_entity) == "enterprise"
-    ):
+    if _enterprise_root is not None and registry.scope_of_entity(body.target_entity) == "enterprise":
         gar_artifact_id = _ensure_gar(body.target_entity)
         effective_target = gar_artifact_id
 

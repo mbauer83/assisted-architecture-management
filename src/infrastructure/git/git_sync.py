@@ -63,9 +63,7 @@ class GitSyncManager:
 
             git_env.set_ssh_env(self._ssh_env())
         self._task = asyncio.create_task(self._poll_loop(), name="git-sync")
-        logger.info(
-            "git-sync started for %d repo(s) (poll %.1fs)", len(self._repos), self._poll_interval_s
-        )
+        logger.info("git-sync started for %d repo(s) (poll %.1fs)", len(self._repos), self._poll_interval_s)
 
     async def stop(self) -> None:
         if self._task:
@@ -187,9 +185,7 @@ class GitSyncManager:
             from src.infrastructure.workspace.write_block_manager import unblock_repo
 
             unblock_repo(repo)
-            await event_bus.publish(
-                {"type": "write_block_changed", "repo": str(repo), "blocked": False}
-            )
+            await event_bus.publish({"type": "write_block_changed", "repo": str(repo), "blocked": False})
             logger.info("auto-unblock completed for %s", repo)
 
     # ------------------------------------------------------------------
@@ -233,8 +229,12 @@ class GitSyncManager:
         except Exception as exc:
             logger.exception("pull error for engagement %s", repo)
             await event_bus.publish(
-                {"type": "sync_pull_failed", "repo": repo_label, "error": str(exc),
-                 "auto_unblock_in_seconds": int(_AUTO_UNBLOCK_S)}
+                {
+                    "type": "sync_pull_failed",
+                    "repo": repo_label,
+                    "error": str(exc),
+                    "auto_unblock_in_seconds": int(_AUTO_UNBLOCK_S),
+                }
             )
             asyncio.create_task(self._auto_unblock(repo, _AUTO_UNBLOCK_S, was_blocked))
             return
@@ -242,20 +242,20 @@ class GitSyncManager:
         if rc == 0:
             if not was_blocked:
                 unblock_repo(repo)
-            await event_bus.publish(
-                {"type": "sync_pull_completed", "repo": repo_label, "commits_pulled": behind}
-            )
+            await event_bus.publish({"type": "sync_pull_completed", "repo": repo_label, "commits_pulled": behind})
             await self._notify_changed(repo)
         else:
             if "--rebase" in pull_args and "CONFLICT" in err:
                 await self._git(repo, "rebase", "--abort")
-                await event_bus.publish(
-                    {"type": "sync_conflict", "repo": repo_label, "error": err.strip()}
-                )
+                await event_bus.publish({"type": "sync_conflict", "repo": repo_label, "error": err.strip()})
             else:
                 await event_bus.publish(
-                    {"type": "sync_pull_failed", "repo": repo_label, "error": err.strip(),
-                     "auto_unblock_in_seconds": int(_AUTO_UNBLOCK_S)}
+                    {
+                        "type": "sync_pull_failed",
+                        "repo": repo_label,
+                        "error": err.strip(),
+                        "auto_unblock_in_seconds": int(_AUTO_UNBLOCK_S),
+                    }
                 )
             asyncio.create_task(self._auto_unblock(repo, _AUTO_UNBLOCK_S, was_blocked))
 
@@ -293,8 +293,12 @@ class GitSyncManager:
             rc, _, err = await self._git(root, "pull", "--ff-only", timeout=_PULL_TIMEOUT_S)
         except Exception as exc:
             await event_bus.publish(
-                {"type": "sync_pull_failed", "repo": root_label, "error": str(exc),
-                 "auto_unblock_in_seconds": int(_AUTO_UNBLOCK_S)}
+                {
+                    "type": "sync_pull_failed",
+                    "repo": root_label,
+                    "error": str(exc),
+                    "auto_unblock_in_seconds": int(_AUTO_UNBLOCK_S),
+                }
             )
             asyncio.create_task(self._auto_unblock(root, _AUTO_UNBLOCK_S, was_blocked))
             return
@@ -302,14 +306,16 @@ class GitSyncManager:
         if rc == 0:
             if not was_blocked:
                 unblock_repo(root)
-            await event_bus.publish(
-                {"type": "sync_pull_completed", "repo": root_label, "commits_pulled": behind}
-            )
+            await event_bus.publish({"type": "sync_pull_completed", "repo": root_label, "commits_pulled": behind})
             await self._notify_changed(root)
         else:
             await event_bus.publish(
-                {"type": "sync_pull_failed", "repo": root_label, "error": err.strip(),
-                 "auto_unblock_in_seconds": int(_AUTO_UNBLOCK_S)}
+                {
+                    "type": "sync_pull_failed",
+                    "repo": root_label,
+                    "error": err.strip(),
+                    "auto_unblock_in_seconds": int(_AUTO_UNBLOCK_S),
+                }
             )
             asyncio.create_task(self._auto_unblock(root, _AUTO_UNBLOCK_S, was_blocked))
 
@@ -325,9 +331,7 @@ class GitSyncManager:
             state.commits_behind = behind
             enterprise_sync_state.save(root, state)
         if behind > 0:
-            await event_bus.publish(
-                {"type": "sync_enterprise_diverged", "repo": str(root), "commits_behind": behind}
-            )
+            await event_bus.publish({"type": "sync_enterprise_diverged", "repo": str(root), "commits_behind": behind})
 
     async def _ent_pending(
         self,
@@ -362,6 +366,4 @@ class GitSyncManager:
         except Exception as exc:
             logger.exception("enterprise merge transition failed for %s", root)
             unblock_repo(root)
-            await event_bus.publish(
-                {"type": "sync_enterprise_merge_failed", "repo": root_label, "error": str(exc)}
-            )
+            await event_bus.publish({"type": "sync_enterprise_merge_failed", "repo": root_label, "error": str(exc)})

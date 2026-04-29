@@ -178,11 +178,7 @@ def admin_edit_entity(
     eff_status = status if status is not None else str(fm.get("status", "draft"))
     eff_keywords = as_optional_str_list(keywords if keywords is not _UNSET else fm.get("keywords"))
     eff_summary = as_optional_str(summary) if summary is not _UNSET else parsed.summary
-    eff_properties = (
-        as_optional_str_dict(properties)
-        if properties is not _UNSET
-        else (parsed.properties or None)
-    )
+    eff_properties = as_optional_str_dict(properties) if properties is not _UNSET else (parsed.properties or None)
     eff_notes = as_optional_str(notes) if notes is not _UNSET else parsed.notes
 
     display = dict(parsed.display_archimate)
@@ -491,10 +487,7 @@ def _write_diagram_to_enterprise(
             verification={
                 "file_type": "diagram",
                 "valid": False,
-                "issues": [
-                    {"severity": i.severity, "code": i.code, "message": i.message}
-                    for i in res.issues
-                ],
+                "issues": [{"severity": i.severity, "code": i.code, "message": i.message} for i in res.issues],
             },
         )
 

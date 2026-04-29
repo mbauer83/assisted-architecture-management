@@ -72,8 +72,7 @@ def _verification_to_document_dict(path: Path, res) -> dict[str, object]:
         "file_type": "document",
         "valid": res.valid,
         "issues": [
-            {"severity": i.severity, "code": i.code, "message": i.message, "location": i.location}
-            for i in res.issues
+            {"severity": i.severity, "code": i.code, "message": i.message, "location": i.location} for i in res.issues
         ],
     }
 
@@ -102,10 +101,7 @@ def create_document(
 
     schema = get_document_schema(repo_root, doc_type)
     if schema is None:
-        raise ValueError(
-            f"Unknown doc-type: {doc_type!r}. "
-            f"No schema found at .arch-repo/documents/{doc_type}.json"
-        )
+        raise ValueError(f"Unknown doc-type: {doc_type!r}. No schema found at .arch-repo/documents/{doc_type}.json")
 
     abbreviation: str = schema.get("abbreviation") or doc_type.upper()
     doc_subdirectory = get_document_subdirectory(schema, doc_type)

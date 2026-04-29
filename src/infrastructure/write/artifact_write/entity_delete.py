@@ -17,9 +17,7 @@ from .parse_existing import parse_outgoing_file
 from .types import WriteResult
 
 
-def _verification(
-    path: Path, *, valid: bool, issues: list[dict[str, object]] | None = None
-) -> dict[str, object]:
+def _verification(path: Path, *, valid: bool, issues: list[dict[str, object]] | None = None) -> dict[str, object]:
     return {
         "path": str(path),
         "file_type": "entity",
@@ -101,9 +99,7 @@ def _entity_ref_blockers(
                 continue
             for conn in parsed.connections:
                 if conn["target_entity"] == artifact_id:
-                    incoming_connections.append(
-                        f"{source_entity} {conn['connection_type']} → {artifact_id}"
-                    )
+                    incoming_connections.append(f"{source_entity} {conn['connection_type']} → {artifact_id}")
         for other_entity in sorted(model_root.rglob("*.md")):
             if other_entity.name.endswith(".outgoing.md") or other_entity == entity_file:
                 continue
@@ -173,11 +169,7 @@ def _delete_entity_core(
         preview = "\n".join(
             [
                 f"Would delete entity: {entity_file}",
-                *(
-                    [f"Would delete outgoing file: {outgoing_path}"]
-                    if outgoing_path.exists()
-                    else []
-                ),
+                *([f"Would delete outgoing file: {outgoing_path}"] if outgoing_path.exists() else []),
             ]
         )
         return WriteResult(

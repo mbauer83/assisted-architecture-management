@@ -170,11 +170,7 @@ def _roots_key_for(root_or_roots: Path | list[Path]) -> str:
 
 
 def _prune_suppression_paths(state: _RefreshSuppressionState, now: float) -> None:
-    expired = [
-        path
-        for path, timestamp in state.pending_paths.items()
-        if (now - timestamp) > _SUPPRESSION_TTL_S
-    ]
+    expired = [path for path, timestamp in state.pending_paths.items() if (now - timestamp) > _SUPPRESSION_TTL_S]
     for path in expired:
         state.pending_paths.pop(path, None)
 

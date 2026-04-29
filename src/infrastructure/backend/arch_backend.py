@@ -129,12 +129,7 @@ def _run_status(resolved_port: int) -> None:
         print(f"backend is running on port {result.get('port')} (pid {result.get('pid')})")
         _print_status_details(result)
     elif reason == "unmanaged_backend":
-        print(
-            (
-                "backend is responding on port "
-                f"{result.get('port')} but is not managed by this workspace"
-            )
-        )
+        print((f"backend is responding on port {result.get('port')} but is not managed by this workspace"))
         _print_status_details(result)
     elif reason == "port_in_use":
         print(f"port {result.get('port')} is in use by another process")
@@ -145,12 +140,7 @@ def _run_status(resolved_port: int) -> None:
         print(f"backend process pid {result.get('pid')} is stopped on port {result.get('port')}")
         _print_status_details(result)
     elif reason == "unhealthy_backend":
-        print(
-            (
-                f"backend process pid {result.get('pid')} is not responding "
-                f"on port {result.get('port')}"
-            )
-        )
+        print((f"backend process pid {result.get('pid')} is not responding on port {result.get('port')}"))
         _print_status_details(result)
     elif reason == "stale_pid":
         print(f"removed stale backend pid {result.get('pid')}")
@@ -176,9 +166,7 @@ def _run_stop(args: argparse.Namespace, resolved_port: int) -> None:
             raise SystemExit("failed to determine backend pid")
         pid = pid_obj
         other_port = result.get("port")
-        if _confirm_stop_other_instance(
-            expected_port=resolved_port, pid=pid, actual_port=other_port
-        ):
+        if _confirm_stop_other_instance(expected_port=resolved_port, pid=pid, actual_port=other_port):
             follow_up = stop_backend(port=int(other_port) if isinstance(other_port, int) else None)
             if follow_up.get("stopped"):
                 _print_stopped(follow_up)
@@ -223,11 +211,7 @@ def _guard_prestart(resolved_port: int, *, for_daemon: bool, restart: bool) -> b
                     )
                 )
         else:
-            suffix = (
-                " or 'arch-backend --restart --daemon'"
-                if for_daemon
-                else " or 'arch-backend --restart'"
-            )
+            suffix = " or 'arch-backend --restart --daemon'" if for_daemon else " or 'arch-backend --restart'"
             raise SystemExit(
                 (
                     f"arch-backend pid {status.get('pid')} is on port "
@@ -236,12 +220,7 @@ def _guard_prestart(resolved_port: int, *, for_daemon: bool, restart: bool) -> b
                 )
             )
     if status.get("reason") == "unmanaged_backend":
-        print(
-            (
-                f"backend already responding on port {resolved_port} but is "
-                "not managed by this workspace"
-            )
-        )
+        print((f"backend already responding on port {resolved_port} but is not managed by this workspace"))
         return False
     if status.get("reason") == "port_in_use":
         raise SystemExit(f"port {resolved_port} is already in use by another process")
@@ -262,19 +241,14 @@ def _run_daemon(args: argparse.Namespace, resolved_port: int, argv: list[str] | 
     raise SystemExit(f"timed out waiting for backend on port {resolved_port}; see {log_path}")
 
 
-def _run_foreground(
-    args: argparse.Namespace, parser: argparse.ArgumentParser, resolved_port: int
-) -> None:
+def _run_foreground(args: argparse.Namespace, parser: argparse.ArgumentParser, resolved_port: int) -> None:
     if not _guard_prestart(resolved_port, for_daemon=False, restart=False):
         return
 
-    repo_root_path, enterprise_root_path = gui_server.resolve_server_roots(
-        args.repo_root, args.enterprise_root
-    )
+    repo_root_path, enterprise_root_path = gui_server.resolve_server_roots(args.repo_root, args.enterprise_root)
     if repo_root_path is None:
         parser.error(
-            "No --repo-root given, ARCH_REPO_ROOT not set, and no .arch/init-state.yaml found. "
-            "Run arch-init first."
+            "No --repo-root given, ARCH_REPO_ROOT not set, and no .arch/init-state.yaml found. Run arch-init first."
         )
 
     roots: list[Path] = [repo_root_path]
@@ -285,10 +259,7 @@ def _run_foreground(
     from src.infrastructure.artifact_index import shared_artifact_index
 
     logger.info(
-        (
-            "Initializing backend for repo_root=%s enterprise_root=%s "
-            "admin_mode=%s read_only=%s host=%s port=%s"
-        ),
+        ("Initializing backend for repo_root=%s enterprise_root=%s admin_mode=%s read_only=%s host=%s port=%s"),
         repo_root_path,
         enterprise_root_path,
         args.admin_mode,
@@ -340,10 +311,7 @@ def _build_parser() -> argparse.ArgumentParser:
     p.add_argument(
         "--enterprise-root",
         default=None,
-        help=(
-            "Enterprise repository root (default: ARCH_ENTERPRISE_ROOT env var "
-            "or arch-init state)"
-        ),
+        help=("Enterprise repository root (default: ARCH_ENTERPRISE_ROOT env var or arch-init state)"),
     )
     p.add_argument(
         "--admin-mode",
@@ -379,10 +347,7 @@ def _build_parser() -> argparse.ArgumentParser:
         "--daemon",
         action="store_true",
         default=False,
-        help=(
-            "Start arch-backend detached with stdin from /dev/null and output "
-            "in .arch/backend.log"
-        ),
+        help=("Start arch-backend detached with stdin from /dev/null and output in .arch/backend.log"),
     )
     p.add_argument("--host", default="127.0.0.1")
     p.add_argument("--port", type=int, default=None)

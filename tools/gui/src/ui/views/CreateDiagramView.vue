@@ -3,7 +3,7 @@ import { inject, ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { Effect } from 'effect'
 import { modelServiceKey } from '../keys'
-import type { EntityDisplayInfo, EntityContextConnection, DiagramPreviewResult } from '../../domain'
+import type { EntityDisplayInfo, EntityContextConnection, DiagramPreviewResult, WriteResult } from '../../domain'
 import EntitySelectionList from '../components/EntitySelectionList.vue'
 import EntityPickerInput from '../components/EntityPickerInput.vue'
 
@@ -234,6 +234,13 @@ const doPreview = () => {
 const createBusy = ref(false)
 const createError = ref<string | null>(null)
 
+const writeFailureMessage = (result: WriteResult): string => {
+  const verification = result.verification as { issues?: Array<{ message?: string }> } | null
+  const issues = verification?.issues?.map((issue) => issue.message).filter((m): m is string => Boolean(m)) ?? []
+  if (issues.length) return issues.join(' | ')
+  return result.content ?? 'Verification failed — check warnings'
+}
+
 const doCreate = () => {
   createBusy.value = true
   createError.value = null
@@ -249,7 +256,7 @@ const doCreate = () => {
     .then((r) => {
       createBusy.value = false
       if (r.wrote) void router.push({ path: '/diagram', query: { id: r.artifact_id } })
-      else createError.value = r.content ?? 'Verification failed — check warnings'
+      else createError.value = writeFailureMessage(r)
     })
     .catch((e) => { createBusy.value = false; createError.value = String(e) })
 }

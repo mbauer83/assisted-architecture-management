@@ -73,6 +73,12 @@ top to bottom direction
     return artifact_id
 
 
+def _std_alias(artifact_id: str) -> str:
+    prefix_part, random_part, *_ = artifact_id.split(".")
+    prefix = prefix_part.split("@", 1)[0]
+    return f"{prefix}_{random_part}"
+
+
 def _delete_entity(repo: Path, artifact_id: str) -> None:
     """Delete an entity that is NOT referenced by any diagram (no dependency conflict)."""
     result = mcp.artifact_bulk_delete(
@@ -225,6 +231,118 @@ class TestSyncDiagramToModel:
         ids_in_fm = _read_entity_ids_used(repo, diag_id)
         assert e1_new in ids_in_fm
         assert e1_old not in ids_in_fm
+
+    def test_visible_stale_relation_is_removed_even_without_frontmatter_connection_id(
+        self, repo: Path
+    ) -> None:
+        src = _make_entity(repo, "Source")
+        tgt = _make_entity(repo, "Target")
+        _ = mcp.artifact_add_connection(
+            source_entity=src,
+            connection_type="archimate-realization",
+            target_entity=tgt,
+            dry_run=False,
+            repo_root=str(repo),
+        )
+        result = mcp.artifact_bulk_delete(
+            items=[
+                {
+                    "op": "delete_connection",
+                    "source_entity": src,
+                    "connection_type": "archimate-realization",
+                    "target_entity": tgt,
+                }
+            ],
+            dry_run=False,
+            repo_root=str(repo),
+        )
+        assert result.get("results"), result
+
+        src_alias = _std_alias(src)
+        tgt_alias = _std_alias(tgt)
+        diag_id = "DIA@1777000000.tstXX.visible-stale-relation"
+        path = repo / "diagram-catalog" / "diagrams" / f"{diag_id}.puml"
+        path.write_text(
+            f"""\
+---
+artifact-id: {diag_id}
+artifact-type: diagram
+diagram-type: archimate-motivation
+name: "Visible Stale Relation"
+version: 0.1.0
+status: draft
+last-updated: '2026-01-01'
+entity-ids-used: [{src}, {tgt}]
+connection-ids-used: []
+---
+@startuml {diag_id}
+rectangle "Source" <<Requirement>> as {src_alias}
+rectangle "Target" <<Requirement>> as {tgt_alias}
+Rel_Realization({src_alias}, {tgt_alias}, "")
+@enduml
+""",
+            encoding="utf-8",
+        )
+
+        store = _fresh_store(repo)
+        verifier, clear_caches = _make_context(repo)
+        sync_result = sync_diagram_to_model(
+            repo_root=repo,
+            store=store,
+            verifier=verifier,
+            clear_repo_caches=clear_caches,
+            artifact_id=diag_id,
+            dry_run=False,
+        )
+
+        assert sync_result.deleted_diagram is False
+        assert f"{src}---{tgt}@@archimate-realization" in sync_result.removed_connection_ids
+        text = path.read_text(encoding="utf-8")
+        assert "Rel_Realization(" not in text
+
+    def test_sync_does_not_delete_diagram_when_puml_entities_still_exist(self, repo: Path) -> None:
+        src = _make_entity(repo, "Alive Source")
+        tgt = _make_entity(repo, "Alive Target")
+        src_alias = _std_alias(src)
+        tgt_alias = _std_alias(tgt)
+        diag_id = "DIA@1777000000.tstXX.puml-entities-survive"
+        path = repo / "diagram-catalog" / "diagrams" / f"{diag_id}.puml"
+        path.write_text(
+            f"""\
+---
+artifact-id: {diag_id}
+artifact-type: diagram
+diagram-type: archimate-motivation
+name: "PUML Entities Survive"
+version: 0.1.0
+status: draft
+last-updated: '2026-01-01'
+entity-ids-used: []
+connection-ids-used: []
+---
+@startuml {diag_id}
+rectangle "Source" <<Requirement>> as {src_alias}
+rectangle "Target" <<Requirement>> as {tgt_alias}
+Rel_Influence({src_alias}, {tgt_alias}, "")
+@enduml
+""",
+            encoding="utf-8",
+        )
+
+        store = _fresh_store(repo)
+        verifier, clear_caches = _make_context(repo)
+        sync_result = sync_diagram_to_model(
+            repo_root=repo,
+            store=store,
+            verifier=verifier,
+            clear_repo_caches=clear_caches,
+            artifact_id=diag_id,
+            dry_run=False,
+        )
+
+        assert sync_result.deleted_diagram is False
+        assert path.exists()
+        assert sync_result.removed_connection_ids == [f"{src}---{tgt}@@archimate-influence"]
 
 
 # ---------------------------------------------------------------------------

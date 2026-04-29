@@ -88,9 +88,7 @@ def ensure_backend_running(
             return effective_port
         time.sleep(0.25)
 
-    raise RuntimeError(
-        f"Timed out waiting for unified backend on port {resolved_port}. See {log_path}."
-    )
+    raise RuntimeError(f"Timed out waiting for unified backend on port {resolved_port}. See {log_path}.")
 
 
 def _instance_status(instance: BackendInstance, port: int, log_path: object) -> dict[str, object]:
@@ -107,9 +105,7 @@ def _instance_status(instance: BackendInstance, port: int, log_path: object) -> 
         "log_path": str(log_path),
     }
     if process_state in {"T", "t"}:
-        logger.warning(
-            "arch-backend pid %s is stopped/suspended while still holding port %s", pid, port
-        )
+        logger.warning("arch-backend pid %s is stopped/suspended while still holding port %s", pid, port)
         return {"running": False, "reason": "stopped_backend", **base}
     if not probe_backend(port):
         logger.warning("arch-backend pid %s matched port %s but backend probe failed", pid, port)
@@ -134,9 +130,7 @@ def backend_status(*, cwd: Path | None = None, port: int | None = None) -> dict[
             )
             return {"running": False, "reason": "unmanaged_backend", "port": resolved_port}
         if port_in_use(port=resolved_port):
-            logger.warning(
-                "Port %s is in use by a non-backend or unidentifiable process", resolved_port
-            )
+            logger.warning("Port %s is in use by a non-backend or unidentifiable process", resolved_port)
             return {"running": False, "reason": "port_in_use", "port": resolved_port}
         logger.info("No backend is running on port %s", resolved_port)
         return {"running": False, "reason": "not_running"}
@@ -242,9 +236,7 @@ def _stop_pid(
     return {"stopped": False, "reason": "timeout", "pid": pid, "port": port}
 
 
-def stop_backend(
-    *, cwd: Path | None = None, timeout_s: float = 5.0, port: int | None = None
-) -> dict[str, object]:
+def stop_backend(*, cwd: Path | None = None, timeout_s: float = 5.0, port: int | None = None) -> dict[str, object]:
     resolved_port = resolve_backend_port(start=cwd, explicit_port=port)
     logger.info("Stop request for backend on port %s (cwd=%s)", resolved_port, cwd or Path.cwd())
     state = read_backend_state(cwd)
@@ -308,9 +300,7 @@ def stop_backend(
             return result
         # Genuinely multiple backend instances on the same port — stop all.
         pids = [m["pid"] for m in (socket_owners or matches)]
-        logger.warning(
-            "Stopping all %d arch-backend instances on port %s: %s", len(pids), resolved_port, pids
-        )
+        logger.warning("Stopping all %d arch-backend instances on port %s: %s", len(pids), resolved_port, pids)
         stopped_pids: list[int] = []
         for pid in pids:
             r = _stop_pid(pid, cwd=cwd, timeout_s=timeout_s, port=resolved_port)

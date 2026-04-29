@@ -25,14 +25,15 @@ RUN apt-get update \
 # Install Python deps only (no project code yet).
 # Copy just pyproject.toml + a minimal src/ stub so pip can resolve the package.
 COPY pyproject.toml ./
-RUN mkdir -p src/tools && \
+RUN mkdir -p src/infrastructure/bootstrap && \
     echo '' > src/__init__.py && \
-    echo '' > src/tools/__init__.py && \
-    echo 'def main(): pass' > src/tools/get_plantuml.py && \
+    echo '' > src/infrastructure/__init__.py && \
+    echo '' > src/infrastructure/bootstrap/__init__.py && \
+    echo 'def main(): pass' > src/infrastructure/bootstrap/get_plantuml.py && \
     pip install --no-cache-dir -e ".[gui]"
 
 # Now copy the real get_plantuml to download the jar.
-COPY src/tools/get_plantuml.py src/tools/get_plantuml.py
+COPY src/infrastructure/bootstrap/get_plantuml.py src/infrastructure/bootstrap/get_plantuml.py
 RUN get-plantuml
 
 # ── Stage 3: Final image with project code ───────────────────────────────────
@@ -42,6 +43,7 @@ FROM deps AS runtime
 # pointing at /app/src, so new files are picked up automatically).
 COPY config/ config/
 COPY src/ src/
+RUN get-diagram-runtime --graphviz-mode system
 
 # Embed the pre-built SPA so the server can serve it at /
 COPY --from=frontend /build/dist/ tools/gui/dist/

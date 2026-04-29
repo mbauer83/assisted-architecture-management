@@ -56,9 +56,7 @@ def matches_connection(
 
 
 def matches_diagram(rec: DiagramRecord, *, diagram_type: str | None, status: str | None) -> bool:
-    return (diagram_type is None or rec.diagram_type == diagram_type) and (
-        status is None or rec.status == status
-    )
+    return (diagram_type is None or rec.diagram_type == diagram_type) and (status is None or rec.status == status)
 
 
 # ---------------------------------------------------------------------------
@@ -66,9 +64,7 @@ def matches_diagram(rec: DiagramRecord, *, diagram_type: str | None, status: str
 # ---------------------------------------------------------------------------
 
 
-def matches_entity_sets(
-    rec: EntityRecord, types: set[str], domains: set[str], statuses: set[str]
-) -> bool:
+def matches_entity_sets(rec: EntityRecord, types: set[str], domains: set[str], statuses: set[str]) -> bool:
     return (
         (not types or rec.artifact_type in types)
         and (not domains or rec.domain in domains)
@@ -169,9 +165,7 @@ def read_entity(rec: EntityRecord, *, mode: Literal["summary", "full"]) -> dict[
     return data
 
 
-def read_connection(
-    rec: ConnectionRecord, *, mode: Literal["summary", "full"]
-) -> dict[str, object]:
+def read_connection(rec: ConnectionRecord, *, mode: Literal["summary", "full"]) -> dict[str, object]:
     data: dict[str, object] = {
         "artifact_id": rec.artifact_id,
         "source": rec.source,

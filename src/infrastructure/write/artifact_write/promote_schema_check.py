@@ -24,9 +24,7 @@ def _schema_superset_errors(
 ) -> list[str]:
     """Return error strings if *eng_schema* is not a superset of *ent_schema*."""
     errors: list[str] = []
-    missing_props = set(ent_schema.get("properties", {}).keys()) - set(
-        eng_schema.get("properties", {}).keys()
-    )
+    missing_props = set(ent_schema.get("properties", {}).keys()) - set(eng_schema.get("properties", {}).keys())
     if missing_props:
         errors.append(
             f"{scope}: engagement schema is missing properties required by enterprise: "
@@ -85,9 +83,7 @@ def check_promotion_schema_compatibility(
         errors.extend(_schema_superset_errors(eng_s, ent_s, f"attribute profile '{atype}'"))
 
     # Frontmatter schemas for entities and diagrams
-    for file_type in (["entity", "outgoing"] if has_entities else []) + (
-        ["diagram"] if has_diagrams else []
-    ):
+    for file_type in (["entity", "outgoing"] if has_entities else []) + (["diagram"] if has_diagrams else []):
         ent_s = load_frontmatter_schema(ent_root, file_type)
         if ent_s is None:
             continue
@@ -123,12 +119,8 @@ def check_promotion_schema_compatibility(
             ent_fm: dict[str, object] = ent_ds.get("frontmatter_schema") or {}
             eng_fm: dict[str, object] = eng_ds.get("frontmatter_schema") or {}
             if ent_fm:
-                errors.extend(
-                    _schema_superset_errors(eng_fm, ent_fm, f"document frontmatter '{doc_type}'")
-                )
-            missing_sections = set(ent_ds.get("required_sections", [])) - set(
-                eng_ds.get("required_sections", [])
-            )
+                errors.extend(_schema_superset_errors(eng_fm, ent_fm, f"document frontmatter '{doc_type}'"))
+            missing_sections = set(ent_ds.get("required_sections", [])) - set(eng_ds.get("required_sections", []))
             if missing_sections:
                 errors.append(
                     f"document schema '{doc_type}': engagement schema missing required sections: "

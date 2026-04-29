@@ -19,7 +19,7 @@ def artifact_create_matrix(
     *,
     name: str,
     matrix_markdown: str,
-    artifact_id: str,
+    artifact_id: str | None = None,
     keywords: list[str] | None = None,
     version: str = "0.1.0",
     status: str = "draft",

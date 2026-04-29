@@ -165,9 +165,7 @@ def push_enterprise_branch(enterprise_root: Path) -> str:
     if not branch:
         raise RuntimeError("Enterprise repo is in detached HEAD state")
     if has_uncommitted_changes(enterprise_root):
-        raise ValueError(
-            "Enterprise repository has unsaved changes. Save your work before submitting for review."
-        )
+        raise ValueError("Enterprise repository has unsaved changes. Save your work before submitting for review.")
     rc, _, stderr = _run(enterprise_root, "push", "-u", "origin", branch, timeout=_PUSH_TIMEOUT)
     if rc != 0:
         raise RuntimeError(f"Failed to push enterprise branch '{branch}': {stderr}")

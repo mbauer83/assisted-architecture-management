@@ -33,11 +33,7 @@ def _diagram_domain(diagram_type: str) -> str | None:
         return None
     suffix = diagram_type.removeprefix("archimate-")
     domain = suffix.split("-", 1)[0]
-    return (
-        domain
-        if domain in {"motivation", "strategy", "business", "application", "technology", "common"}
-        else None
-    )
+    return domain if domain in {"motivation", "strategy", "business", "application", "technology", "common"} else None
 
 
 @router.get("/api/stats")
@@ -59,11 +55,7 @@ def list_entities(
     if scope == "global":
         entities = [e for e in entities if s.is_global(e.path)]
     elif scope == "engagement":
-        entities = [
-            e
-            for e in entities
-            if not s.is_global(e.path) and e.artifact_type != "global-artifact-reference"
-        ]
+        entities = [e for e in entities if not s.is_global(e.path) and e.artifact_type != "global-artifact-reference"]
     else:
         entities = [e for e in entities if e.artifact_type != "global-artifact-reference"]
     page = entities[offset : offset + limit]
@@ -258,12 +250,8 @@ def search_reference_artifacts(
     limit: int = Query(default=30, le=100),
 ) -> dict[str, Any]:
     repo = s.get_repo()
-    selected_domains = {
-        value.strip().lower() for value in (domains or "").split(",") if value.strip()
-    }
-    selected_entity_types = {
-        value.strip() for value in (entity_types or "").split(",") if value.strip()
-    }
+    selected_domains = {value.strip().lower() for value in (domains or "").split(",") if value.strip()}
+    selected_entity_types = {value.strip() for value in (entity_types or "").split(",") if value.strip()}
     selected_doc_types = {value.strip() for value in (doc_types or "").split(",") if value.strip()}
     q_lc = q.strip().lower()
 
@@ -297,11 +285,7 @@ def search_reference_artifacts(
             domain = _diagram_domain(diagram.diagram_type)
             if selected_domains and (domain is None or domain not in selected_domains):
                 continue
-            if (
-                q_lc
-                and q_lc not in diagram.name.lower()
-                and q_lc not in diagram.artifact_id.lower()
-            ):
+            if q_lc and q_lc not in diagram.name.lower() and q_lc not in diagram.artifact_id.lower():
                 continue
             hits.append(
                 {
@@ -319,11 +303,7 @@ def search_reference_artifacts(
         for document in repo.list_documents():
             if selected_doc_types and document.doc_type not in selected_doc_types:
                 continue
-            if (
-                q_lc
-                and q_lc not in document.title.lower()
-                and q_lc not in document.artifact_id.lower()
-            ):
+            if q_lc and q_lc not in document.title.lower() and q_lc not in document.artifact_id.lower():
                 continue
             hits.append(
                 {

@@ -5,8 +5,9 @@ from pathlib import Path
 from src.domain.archimate_relation_rendering import format_cardinality_label
 from src.domain.artifact_types import ConnectionRecord, EntityRecord
 from src.infrastructure.mcp.artifact_mcp.query_scaffold_tools import artifact_diagram_scaffold
-from src.infrastructure.rendering.diagram_builder import generate_archimate_puml_body
+from src.infrastructure.rendering.diagram_builder import generate_archimate_puml_body, inject_archimate_includes
 from src.infrastructure.rendering.generate_macros import generate_macros
+from src.infrastructure.write.artifact_write.diagram import _prepare_archimate_puml_body
 
 
 def _entity(
@@ -116,6 +117,70 @@ def test_generate_archimate_puml_body_single_domain_uses_type_groupings() -> Non
     assert "DRV_A -[hidden]right- DRV_B" in puml
     assert "DRV_B -[hidden]down- ASS_A" in puml
     assert 'Rel_Influence_Down(DRV_A, ASS_A, "")' in puml
+
+
+def test_inject_archimate_includes_strips_comment_header_text(tmp_path: Path) -> None:
+    repo_root = tmp_path / "repo"
+    catalog = repo_root / "diagram-catalog"
+    catalog.mkdir(parents=True, exist_ok=True)
+    (catalog / "_archimate-stereotypes.puml").write_text(
+        """\
+' Grouping containers.
+' Use the layer-specific stereotype when all contained elements belong to one layer.
+!include <archimate/Archimate>
+hide stereotype
+skinparam rectangle<<Requirement>> {
+  BackgroundColor #EDD6F0
+  BorderColor #7B3F9A
+}
+""",
+        encoding="utf-8",
+    )
+
+    puml = """\
+@startuml test
+!include ../_archimate-stereotypes.puml
+rectangle "Req" <<Requirement>> as REQ_A
+@enduml
+"""
+    result = inject_archimate_includes(puml, repo_root)
+
+    assert "Grouping containers" not in result
+    assert "Use the layer-specific stereotype" not in result
+    assert "hide stereotype" in result
+    assert "skinparam rectangle<<Requirement>>" in result
+
+
+def test_prepare_archimate_puml_body_injects_glyph_sprites(tmp_path: Path) -> None:
+    repo_root = tmp_path / "repo"
+    catalog = repo_root / "diagram-catalog"
+    catalog.mkdir(parents=True, exist_ok=True)
+    (catalog / "_archimate-stereotypes.puml").write_text(
+        """\
+!include <archimate/Archimate>
+hide stereotype
+skinparam rectangle<<Process>> {
+  BackgroundColor #E0D8CC
+  BorderColor #8C7E6A
+}
+""",
+        encoding="utf-8",
+    )
+    (catalog / "_archimate-glyphs.puml").write_text(
+        "sprite $archimate_Process <svg xmlns=\"http://www.w3.org/2000/svg\"></svg>\n",
+        encoding="utf-8",
+    )
+
+    puml = """\
+@startuml test
+rectangle "<$archimate_Process{scale=1.5}> Proc" <<Process>> as PROC_A
+@enduml
+"""
+    result = _prepare_archimate_puml_body(puml, repo_root, "archimate-layered")
+
+    assert "!include ../_archimate-stereotypes.puml" not in result
+    assert "sprite $archimate_Process" in result
+    assert 'rectangle "<$archimate_Process{scale=1.5}> Proc" <<Process>> as PROC_A' in result
 
 
 def test_generate_macros_normalizes_aliases(tmp_path: Path) -> None:
@@ -416,3 +481,73 @@ def test_generate_archimate_puml_body_no_cardinality_keeps_empty_label() -> None
     puml = generate_archimate_puml_body("Test", [goal, outcome], [conn])
 
     assert 'Rel_Realization_Up(OUT_A, GOL_A, "")' in puml
+
+
+def test_generate_archimate_puml_body_nests_junction_with_nested_siblings() -> None:
+    process = _entity("PRC@1.a.process-a", "process", "Process A", "PRC_A", domain="business", subdomain="processes")
+    function_a = _entity(
+        "FNC@1.a.function-a", "function", "Function A", "FNC_A", domain="business", subdomain="functions"
+    )
+    function_b = _entity(
+        "FNC@1.b.function-b", "function", "Function B", "FNC_B", domain="business", subdomain="functions"
+    )
+    junction = _entity("JCN@1.a.and-a", "and-junction", "AND A", "JCN_A", domain="business", subdomain="junctions")
+
+    puml = generate_archimate_puml_body(
+        "Nested Junction",
+        [process, function_a, function_b, junction],
+        [
+            _conn(process.artifact_id, function_a.artifact_id, "archimate-composition"),
+            _conn(process.artifact_id, function_b.artifact_id, "archimate-composition"),
+            _conn(function_a.artifact_id, junction.artifact_id, "archimate-flow"),
+            _conn(junction.artifact_id, function_b.artifact_id, "archimate-flow"),
+        ],
+        diagram_type="archimate-business",
+    )
+
+    assert 'rectangle "Process A" as PRC_A {' in puml
+    assert 'rectangle "Function A" as FNC_A' in puml
+    assert 'rectangle "Function B" as FNC_B' in puml
+    assert 'circle " " as JCN_A' in puml
+    process_start = puml.index('rectangle "Process A" as PRC_A {')
+    process_end = puml.index("}", process_start)
+    process_block = puml[process_start:process_end]
+    assert 'circle " " as JCN_A' in process_block
+    assert 'Rel_Flow(FNC_A, JCN_A, "")' in puml
+    assert 'Rel_Flow(JCN_A, FNC_B, "")' in puml
+
+
+def test_generate_archimate_puml_body_layouts_branch_step_perpendicular_to_main_flow() -> None:
+    process = _entity("PRC@1.a.process-a", "process", "Process A", "PRC_A", domain="business", subdomain="processes")
+    start = _entity("FNC@1.a.start", "function", "Start", "FNC_START", domain="business", subdomain="functions")
+    branch_a = _entity("FNC@1.b.branch-a", "function", "Branch A", "FNC_A", domain="business", subdomain="functions")
+    branch_b = _entity("FNC@1.c.branch-b", "function", "Branch B", "FNC_B", domain="business", subdomain="functions")
+    end = _entity("FNC@1.d.end", "function", "End", "FNC_END", domain="business", subdomain="functions")
+    fork = _entity("JNA@1.a.fork", "and-junction", "Fork", "JNA_FORK", domain="business", subdomain="junctions")
+    join = _entity("JNA@1.b.join", "and-junction", "Join", "JNA_JOIN", domain="business", subdomain="junctions")
+
+    puml = generate_archimate_puml_body(
+        "Branch Step",
+        [process, start, branch_a, branch_b, end, fork, join],
+        [
+            _conn(process.artifact_id, start.artifact_id, "archimate-composition"),
+            _conn(process.artifact_id, branch_a.artifact_id, "archimate-composition"),
+            _conn(process.artifact_id, branch_b.artifact_id, "archimate-composition"),
+            _conn(process.artifact_id, end.artifact_id, "archimate-composition"),
+            _conn(start.artifact_id, fork.artifact_id, "archimate-triggering"),
+            _conn(fork.artifact_id, branch_a.artifact_id, "archimate-triggering"),
+            _conn(fork.artifact_id, branch_b.artifact_id, "archimate-triggering"),
+            _conn(branch_a.artifact_id, join.artifact_id, "archimate-triggering"),
+            _conn(branch_b.artifact_id, join.artifact_id, "archimate-triggering"),
+            _conn(join.artifact_id, end.artifact_id, "archimate-triggering"),
+        ],
+        diagram_type="archimate-business",
+    )
+
+    assert "FNC_START -[hidden]down- JNA_FORK" in puml
+    assert "FNC_A -[hidden]right- FNC_B" in puml
+    assert "JNA_FORK -[hidden]down- FNC_A" in puml
+    assert "JNA_FORK -[hidden]down- FNC_B" in puml
+    assert "FNC_A -[hidden]down- JNA_JOIN" in puml
+    assert "FNC_B -[hidden]down- JNA_JOIN" in puml
+    assert "JNA_JOIN -[hidden]down- FNC_END" in puml

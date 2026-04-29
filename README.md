@@ -214,6 +214,12 @@ uv sync --dev --extra gui      # full local developer setup
 
 # Download and verify plantuml.jar from Maven Central
 get-plantuml                   # → tools/plantuml.jar (gitignored)
+
+# Pull the supported local diagram runtime
+get-diagram-runtime            # PlantUML + Graphviz runtime for this repo
+
+# Verify local Graphviz/PlantUML compatibility for rendering
+check-diagram-runtime          # requires Graphviz >= 2.49.0
 ```
 
 ### 2. Initialise Workspace

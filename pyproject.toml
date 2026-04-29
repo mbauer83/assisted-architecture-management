@@ -33,6 +33,8 @@ arch-mcp-stdio-read = "src.infrastructure.mcp.arch_mcp_stdio:main"
 arch-mcp-stdio-write = "src.infrastructure.mcp.arch_mcp_stdio_write:main_write"
 arch-init = "src.infrastructure.workspace.workspace_init:main"
 get-plantuml = "src.infrastructure.bootstrap.get_plantuml:main"
+get-diagram-runtime = "src.infrastructure.bootstrap.get_diagram_runtime:main"
+check-diagram-runtime = "src.infrastructure.bootstrap.check_diagram_runtime:main"
 arch-model-write = "src.infrastructure.write.artifact_write_cli:main"
 
 [build-system]

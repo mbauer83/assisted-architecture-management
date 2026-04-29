@@ -193,11 +193,7 @@ def _cmd_get(registry: Any, args: list[str]) -> int:
         print("Usage: get ID", file=sys.stderr)
         return 1
     artifact_id = args[0]
-    rec = (
-        registry.get_entity(artifact_id)
-        or registry.get_connection(artifact_id)
-        or registry.get_diagram(artifact_id)
-    )
+    rec = registry.get_entity(artifact_id) or registry.get_connection(artifact_id) or registry.get_diagram(artifact_id)
     if rec is None:
         print(f"Not found: {artifact_id}")
         return 1
@@ -247,9 +243,7 @@ def _format_connection_edge(conn: ConnectionRecord, *, entity_id: str) -> str:
     return f"  [{direction}] {conn.conn_type:20s} → {other}"
 
 
-def _print_neighbors(
-    registry: Any, *, entity_id: str, max_hops: int, conn_type: str | None
-) -> None:
+def _print_neighbors(registry: Any, *, entity_id: str, max_hops: int, conn_type: str | None) -> None:
     neighbors = registry.find_neighbors(entity_id, max_hops=max_hops, conn_type=conn_type)
     for hop, nids in sorted(neighbors.items(), key=lambda x: int(x[0])):
         print(f"\nHop {hop} neighbors:")

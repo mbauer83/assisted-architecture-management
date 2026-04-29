@@ -43,9 +43,7 @@ def get_type_guidance(
             # Treat as domain filter (case-insensitive match on domain_dir)
             unknown_types = [n for n in filter if n not in all_infos]
             domain_set = {d.lower() for d in filter}
-            selected = [
-                info for info in all_infos.values() if info.domain_dir.lower() in domain_set
-            ]
+            selected = [info for info in all_infos.values() if info.domain_dir.lower() in domain_set]
             if not selected:
                 return {
                     "error": (

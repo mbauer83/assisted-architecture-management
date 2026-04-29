@@ -5,16 +5,14 @@ from pathlib import Path
 
 import yaml
 
-from src.application.modeling.artifact_write import format_matrix_markdown
+from src.application.modeling.artifact_write import format_matrix_markdown, generate_diagram_id
 from src.application.verification.artifact_verifier import ArtifactRegistry, ArtifactVerifier
 from src.config.repo_paths import DIAGRAM_CATALOG, DIAGRAMS
 
 from .boundary import assert_engagement_write_root, today_iso
 from .types import WriteResult
 
-_ENTITY_ID_PATTERN = re.compile(
-    r"\b([A-Z]{2,6}@\d+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+(?:\.[A-Za-z0-9_-]+)*)\b"
-)
+_ENTITY_ID_PATTERN = re.compile(r"\b([A-Z]{2,6}@\d+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+(?:\.[A-Za-z0-9_-]+)*)\b")
 
 
 def _verification_to_dict(path: Path, res) -> dict[str, object]:
@@ -23,8 +21,7 @@ def _verification_to_dict(path: Path, res) -> dict[str, object]:
         "file_type": "diagram",
         "valid": res.valid,
         "issues": [
-            {"severity": i.severity, "code": i.code, "message": i.message, "location": i.location}
-            for i in res.issues
+            {"severity": i.severity, "code": i.code, "message": i.message, "location": i.location} for i in res.issues
         ],
     }
 
@@ -105,9 +102,7 @@ def _linkify_matrix_ids(
     return "\n".join(out_lines), replaced
 
 
-def _build_diagram_id_to_relpath(
-    *, diagrams_dir: Path, registry: ArtifactRegistry
-) -> dict[str, str]:
+def _build_diagram_id_to_relpath(*, diagrams_dir: Path, registry: ArtifactRegistry) -> dict[str, str]:
     diagram_map: dict[str, str] = {}
     _ = registry
 
@@ -173,7 +168,7 @@ def create_matrix(
     clear_repo_caches: Callable[[Path], None],
     name: str,
     matrix_markdown: str,
-    artifact_id: str,
+    artifact_id: str | None,
     keywords: list[str] | None = None,
     version: str = "0.1.0",
     status: str = "draft",
@@ -188,6 +183,7 @@ def create_matrix(
     dry_run: bool = True,
 ) -> WriteResult:
     assert_engagement_write_root(repo_root)
+    effective_id = artifact_id or generate_diagram_id("matrix", name)
 
     last = last_updated or today_iso()
 
@@ -198,11 +194,7 @@ def create_matrix(
 
     body_markdown = matrix_markdown
     if auto_link_entity_ids:
-        ids_for_links = (
-            inferred_entities
-            if inferred_entities
-            else _infer_entity_ids_from_matrix(matrix_markdown)
-        )
+        ids_for_links = inferred_entities if inferred_entities else _infer_entity_ids_from_matrix(matrix_markdown)
         body_markdown, replaced_count = _linkify_matrix_ids(
             repo_root=repo_root,
             registry=registry,
@@ -221,7 +213,7 @@ def create_matrix(
         )
 
     content = format_matrix_markdown(
-        artifact_id=artifact_id,
+        artifact_id=effective_id,
         name=name,
         version=version,
         status=status,
@@ -235,7 +227,7 @@ def create_matrix(
         combined=combined,
     )
 
-    path = repo_root / DIAGRAM_CATALOG / DIAGRAMS / f"{artifact_id}.md"
+    path = repo_root / DIAGRAM_CATALOG / DIAGRAMS / f"{effective_id}.md"
 
     if dry_run:
         from tempfile import TemporaryDirectory
@@ -247,7 +239,7 @@ def create_matrix(
         return WriteResult(
             wrote=False,
             path=path,
-            artifact_id=artifact_id,
+            artifact_id=effective_id,
             content=content,
             warnings=warnings,
             verification=_verification_to_dict(path, res),
@@ -269,7 +261,7 @@ def create_matrix(
         return WriteResult(
             wrote=False,
             path=path,
-            artifact_id=artifact_id,
+            artifact_id=effective_id,
             content=content,
             warnings=warnings,
             verification=_verification_to_dict(path, res),
@@ -280,7 +272,7 @@ def create_matrix(
     return WriteResult(
         wrote=True,
         path=path,
-        artifact_id=artifact_id,
+        artifact_id=effective_id,
         content=None,
         warnings=warnings,
         verification=_verification_to_dict(path, res),

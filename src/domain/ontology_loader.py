@@ -71,15 +71,11 @@ ALL_ENTITY_TYPE_NAMES: list[str] = sorted(ENTITY_TYPES)
 # ── Domain ordering & display (derived from entity_ontology.yaml insertion order) ──
 #: Unique domain_dir values in the order they first appear in the YAML.
 #: Internal types (e.g. global-entity-reference) are excluded.
-DOMAIN_ORDER: list[str] = list(
-    dict.fromkeys(et.domain_dir for et in ENTITY_TYPES.values() if not et.internal)
-)
+DOMAIN_ORDER: list[str] = list(dict.fromkeys(et.domain_dir for et in ENTITY_TYPES.values() if not et.internal))
 
 #: domain_dir → grouping stereotype name (e.g. "motivation" → "MotivationGrouping")
 DOMAIN_GROUPING: dict[str, str] = {
-    et.domain_dir: et.domain_dir.capitalize() + "Grouping"
-    for et in ENTITY_TYPES.values()
-    if not et.internal
+    et.domain_dir: et.domain_dir.capitalize() + "Grouping" for et in ENTITY_TYPES.values() if not et.internal
 }
 
 #: domain_dir → display name (capitalized) as it appears in diagrams
@@ -89,15 +85,11 @@ DOMAIN_DISPLAY: dict[str, str] = {
 
 #: archimate_element_type → has_sprite bool
 ELEMENT_TYPE_HAS_SPRITE: dict[str, bool] = {
-    et.archimate_element_type: et.has_sprite
-    for et in ENTITY_TYPES.values()
-    if et.archimate_element_type
+    et.archimate_element_type: et.has_sprite for et in ENTITY_TYPES.values() if et.archimate_element_type
 }
 
 # ── Symmetric connections ────────────────────────────────────────────────
-SYMMETRIC_CONNECTIONS: frozenset[str] = frozenset(
-    n for n, ct in CONNECTION_TYPES.items() if ct.symmetric
-)
+SYMMETRIC_CONNECTIONS: frozenset[str] = frozenset(n for n, ct in CONNECTION_TYPES.items() if ct.symmetric)
 
 # ── Matrix abbreviations (abbreviation → conn_type, then inverted) ───────
 #: abbreviation → conn_type as declared in the YAML (uniqueness enforced by dict keys)
@@ -163,9 +155,7 @@ def _build_rules() -> dict[tuple[str, str], set[str]]:
 
 # ── PERMITTED_RELATIONSHIPS ──────────────────────────────────────────────
 #: (source_type, target_type) → frozenset of permitted archimate connection types
-PERMITTED_RELATIONSHIPS: dict[tuple[str, str], frozenset[str]] = {
-    k: frozenset(v) for k, v in _build_rules().items()
-}
+PERMITTED_RELATIONSHIPS: dict[tuple[str, str], frozenset[str]] = {k: frozenset(v) for k, v in _build_rules().items()}
 
 # ── Indexed lookups ──────────────────────────────────────────────────────
 #: source_type → [(target_type, frozenset[conn_types])]

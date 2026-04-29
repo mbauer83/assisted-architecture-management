@@ -80,6 +80,21 @@ last-updated: '2026-04-17'
 """
 
 
+def _diagram(name: str, body: str) -> str:
+    return f"""\
+---
+artifact-id: {name}
+artifact-type: diagram
+name: "Test Diagram"
+version: 0.1.0
+status: draft
+diagram-type: archimate-application
+last-updated: '2026-04-29'
+---
+{body}
+"""
+
+
 @pytest.fixture()
 def repo(tmp_path: Path) -> Path:
     root = tmp_path / "engagements" / "ENG-T" / "architecture-repository"
@@ -258,6 +273,104 @@ class TestVerifyOutgoingFile:
         result = ArtifactVerifier(registry).verify_outgoing_file(out_path)
         assert not result.valid
         assert any(i.code == "E124" for i in result.issues)
+
+
+class TestVerifyDiagramFile:
+    def _setup_entities(self, repo: Path, *eids_and_types) -> None:
+        from src.domain.ontology_loader import ENTITY_TYPES
+
+        for eid, etype in eids_and_types:
+            info = ENTITY_TYPES[etype]
+            path = repo / "model" / info.domain_dir / info.subdir / f"{eid}.md"
+            _write(path, _entity(eid, etype))
+
+    def test_hallucinated_relation_macro_fails(self, repo: Path) -> None:
+        src = "SRV@1000000000.SrcAaa.authoring-service"
+        tgt = "ROL@1000000001.TgtBbb.author"
+        self._setup_entities(repo, (src, "service"), (tgt, "role"))
+
+        diagram_path = repo / "diagram-catalog" / "diagrams" / "service-landscape.puml"
+        _write(
+            diagram_path,
+            _diagram(
+                "service-landscape",
+                """\
+@startuml service-landscape
+!include ../_archimate-stereotypes.puml
+title Test Diagram
+rectangle "Authoring Service" <<Service>> as SRV_SrcAaa
+rectangle "Author" <<Role>> as ROL_TgtBbb
+Rel_Serving(SRV_SrcAaa, ROL_TgtBbb, "")
+@enduml
+""",
+            ),
+        )
+
+        registry = ArtifactRegistry(shared_artifact_index(repo))
+        result = ArtifactVerifier(registry, check_puml_syntax=False).verify_diagram_file(diagram_path)
+
+        assert not result.valid
+        assert any(i.code == "E312" for i in result.issues)
+
+    def test_reversed_realization_macro_is_accepted(self, repo: Path) -> None:
+        service = "SRV@1000000000.SrcAaa.authoring-service"
+        component = "APP@1000000001.TgtBbb.cli-tool"
+        self._setup_entities(repo, (service, "service"), (component, "application-component"))
+
+        out_path = repo / "model" / "common" / "services" / f"{service}.outgoing.md"
+        _write(out_path, _outgoing(service, [("archimate-realization", component)]))
+
+        diagram_path = repo / "diagram-catalog" / "diagrams" / "realization-view.puml"
+        _write(
+            diagram_path,
+            _diagram(
+                "realization-view",
+                """\
+@startuml realization-view
+!include ../_archimate-stereotypes.puml
+title Test Diagram
+rectangle "CLI Tool" <<ApplicationComponent>> as APP_TgtBbb
+rectangle "Authoring Service" <<Service>> as SRV_SrcAaa
+Rel_Realization_Up(APP_TgtBbb, SRV_SrcAaa, "")
+@enduml
+""",
+            ),
+        )
+
+        registry = ArtifactRegistry(shared_artifact_index(repo))
+        result = ArtifactVerifier(registry, check_puml_syntax=False).verify_diagram_file(diagram_path)
+
+        assert result.valid, [i.message for i in result.issues]
+
+    def test_inlined_archimate_stereotypes_are_accepted(self, repo: Path) -> None:
+        src = "REQ@1000000000.SrcAaa.src"
+        tgt = "REQ@1000000001.TgtBbb.tgt"
+        self._setup_entities(repo, (src, "requirement"), (tgt, "requirement"))
+
+        diagram_path = repo / "diagram-catalog" / "diagrams" / "inline-archimate.puml"
+        _write(
+            diagram_path,
+            _diagram(
+                "inline-archimate",
+                """\
+@startuml inline-archimate
+hide stereotype
+skinparam rectangle<<Requirement>> {
+  BackgroundColor #EDD6F0
+  BorderColor #7B3F9A
+}
+title Test Diagram
+rectangle "Source" <<Requirement>> as REQ_SrcAaa
+rectangle "Target" <<Requirement>> as REQ_TgtBbb
+@enduml
+""",
+            ),
+        )
+
+        registry = ArtifactRegistry(shared_artifact_index(repo))
+        result = ArtifactVerifier(registry, check_puml_syntax=False).verify_diagram_file(diagram_path)
+
+        assert result.valid, [i.message for i in result.issues]
 
     def test_unknown_connection_type(self, repo: Path) -> None:
         src = "REQ@1000000000.SrcAaa.src"

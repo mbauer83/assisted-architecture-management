@@ -88,11 +88,7 @@ def ensure_global_artifact_reference(
         extra_frontmatter={
             _GAR_ID_KEY: global_artifact_id,
             _GAR_TYPE_KEY: global_artifact_type,
-            **(
-                {_GAR_ENTITY_TYPE_KEY: global_artifact_entity_type}
-                if global_artifact_entity_type
-                else {}
-            ),
+            **({_GAR_ENTITY_TYPE_KEY: global_artifact_entity_type} if global_artifact_entity_type else {}),
         },
     )
 
@@ -123,10 +119,7 @@ def ensure_global_artifact_reference(
             warnings=[],
             verification={
                 "valid": False,
-                "issues": [
-                    {"severity": i.severity, "code": i.code, "message": i.message}
-                    for i in res.issues
-                ],
+                "issues": [{"severity": i.severity, "code": i.code, "message": i.message} for i in res.issues],
             },
         )
 

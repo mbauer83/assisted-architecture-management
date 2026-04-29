@@ -224,6 +224,7 @@ watch([selectedDomains, selectedEntityTypes], scheduleSearch)
       v-if="open"
       class="ep-drop"
       :style="dropStyle"
+      @mousedown.prevent
     >
       <!-- Filter stage -->
       <div

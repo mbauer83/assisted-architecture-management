@@ -86,16 +86,10 @@ def _seg_to_path(p1: tuple[float, float], p2: tuple[float, float]) -> str | None
     hw = _LINE_HALF_W
     if abs(dy) < 0.05:
         xm = min(x1, x2)
-        return (
-            f'<path d="M{xm:.2f} {y1 - hw:.2f}h{length:.2f}v{hw * 2:.2f}H{xm:.2f}z"'
-            f' fill="{_SPRITE_STROKE}"/>'
-        )
+        return f'<path d="M{xm:.2f} {y1 - hw:.2f}h{length:.2f}v{hw * 2:.2f}H{xm:.2f}z" fill="{_SPRITE_STROKE}"/>'
     if abs(dx) < 0.05:
         ym = min(y1, y2)
-        return (
-            f'<path d="M{x1 - hw:.2f} {ym:.2f}v{length:.2f}h{hw * 2:.2f}V{ym:.2f}z"'
-            f' fill="{_SPRITE_STROKE}"/>'
-        )
+        return f'<path d="M{x1 - hw:.2f} {ym:.2f}v{length:.2f}h{hw * 2:.2f}V{ym:.2f}z" fill="{_SPRITE_STROKE}"/>'
     nx, ny = (-dy / length) * hw, (dx / length) * hw
     ax, ay = x1 + nx, y1 + ny
     bx, by = x1 - nx, y1 - ny
@@ -124,10 +118,7 @@ def _open_path_to_elements(d: str) -> str:
         y_min, y_max = min(all_y), max(all_y)
         w, h = x_max - x_min, y_max - y_min
         if w > 0.5 and h > 0.5 and (abs(sy - ey) < 0.1 or abs(sx - ex) < 0.1):
-            return (
-                f'<path d="M{x_min:.2f} {y_min:.2f}h{w:.2f}v{h:.2f}H{x_min:.2f}z"'
-                f' fill="{_SPRITE_STROKE}"/>'
-            )
+            return f'<path d="M{x_min:.2f} {y_min:.2f}h{w:.2f}v{h:.2f}H{x_min:.2f}z" fill="{_SPRITE_STROKE}"/>'
     return "".join(r for s in segs if (r := _seg_to_path(*s)))
 
 
@@ -149,9 +140,7 @@ def _rect_to_outline_paths(attrs: str) -> str:
     ]
     inner_h = h - 2 * t
     if inner_h > 0.1:
-        parts.append(
-            f'<path d="M{x:.2f} {y + t:.2f}v{inner_h:.2f}h{t:.2f}V{y + t:.2f}z" fill="{_SPRITE_STROKE}"/>'
-        )
+        parts.append(f'<path d="M{x:.2f} {y + t:.2f}v{inner_h:.2f}h{t:.2f}V{y + t:.2f}z" fill="{_SPRITE_STROKE}"/>')
         parts.append(
             f'<path d="M{x + w - t:.2f} {y + t:.2f}v{inner_h:.2f}h{t:.2f}V{y + t:.2f}z" fill="{_SPRITE_STROKE}"/>'
         )
@@ -167,9 +156,7 @@ def browser_markup_to_plantuml_svg(markup: str) -> str:
         attrs = m.group("attrs")
         close = m.group("close")
         if tag == "path":
-            d_val = (
-                re.search(r'\bd="([^"]*)"', attrs) or type("", (), {"group": lambda *_: ""})()
-            ).group(1)
+            d_val = (re.search(r'\bd="([^"]*)"', attrs) or type("", (), {"group": lambda *_: ""})()).group(1)
             if re.search(r"[Zz]", d_val):
                 attrs = _ensure_attr(_ensure_attr(attrs, "fill", _SPRITE_STROKE), "stroke", "none")
                 return f"<{tag}{attrs}{close}"

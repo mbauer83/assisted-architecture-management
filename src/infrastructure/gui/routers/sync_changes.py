@@ -29,9 +29,7 @@ def list_changes(repo_root: Path) -> list[dict]:
     rc, top_out = _run(repo, "rev-parse", "--show-toplevel")
     git_top = Path(top_out.strip()).resolve() if rc == 0 else repo
     try:
-        prefix = repo.relative_to(
-            git_top
-        )  # e.g. "engagements/ENG-ARCH-REPO/architecture-repository"
+        prefix = repo.relative_to(git_top)  # e.g. "engagements/ENG-ARCH-REPO/architecture-repository"
     except ValueError:
         prefix = Path(".")
 

@@ -130,9 +130,7 @@ def build_conn_counts(repo: ArtifactRepository) -> dict[str, tuple[int, int, int
     return repo.connection_counts()
 
 
-def build_conn_counts_for_entities(
-    repo: ArtifactRepository, entity_ids: list[str]
-) -> dict[str, tuple[int, int, int]]:
+def build_conn_counts_for_entities(repo: ArtifactRepository, entity_ids: list[str]) -> dict[str, tuple[int, int, int]]:
     return repo.connection_counts_for_entities(entity_ids)
 
 
@@ -263,9 +261,7 @@ def run_serialized_write(fn: Any, /, *args: Any, **kwargs: Any) -> Any:
     # Check write-block state before passing to queue
     target_root = kwargs.get("repo_root") or (args[0] if args else None)
     if target_root is not None and is_blocked(Path(str(target_root))):
-        raise HTTPException(
-            503, "Writes are temporarily blocked (sync in progress or read-only mode)"
-        )
+        raise HTTPException(503, "Writes are temporarily blocked (sync in progress or read-only mode)")
 
     return run_sync(fn, *args, **kwargs)
 

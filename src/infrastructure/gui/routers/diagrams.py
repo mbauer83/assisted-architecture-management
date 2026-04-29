@@ -31,12 +31,15 @@ def _rendered_name(d: DiagramRecord, suffix: str) -> str | None:
     if repo_root is None:
         return None
     rendered_dir = repo_root / DIAGRAM_CATALOG / RENDERED
-    parts = d.artifact_id.split(".")
-    if len(parts) >= 3:
-        candidate = rendered_dir / f"{'.'.join(parts[2:])}{suffix}"
-        if candidate.exists():
-            return candidate.name
+    candidate = rendered_dir / f"{d.artifact_id}{suffix}"
+    if candidate.exists():
+        return candidate.name
     if rendered_dir.exists():
+        parts = d.artifact_id.split(".")
+        if len(parts) >= 3:
+            legacy = rendered_dir / f"{'.'.join(parts[2:])}{suffix}"
+            if legacy.exists():
+                return legacy.name
         for f in rendered_dir.iterdir():
             if f.suffix == suffix and f.stem in d.artifact_id:
                 return f.name
@@ -91,11 +94,15 @@ def get_matrix_config(id: str) -> dict[str, Any]:
     raw_to = fm.get("to-entity-ids")
     to_entity_ids = [str(x) for x in raw_to] if isinstance(raw_to, list) else None
     raw_configs = fm.get("conn-type-configs")
-    conn_type_configs = [
-        {"conn_type": str(c.get("conn_type", "")), "active": bool(c.get("active", True))}
-        for c in raw_configs
-        if isinstance(c, dict)
-    ] if isinstance(raw_configs, list) else []
+    conn_type_configs = (
+        [
+            {"conn_type": str(c.get("conn_type", "")), "active": bool(c.get("active", True))}
+            for c in raw_configs
+            if isinstance(c, dict)
+        ]
+        if isinstance(raw_configs, list)
+        else []
+    )
     raw_kws = fm.get("keywords")
     keywords = [str(k) for k in raw_kws] if isinstance(raw_kws, list) else []
     return {
@@ -259,16 +266,10 @@ def diagram_entity_discovery(
         if entity_id.strip() and repo.get_entity(entity_id.strip()) is not None
     ]
     excluded = set(included)
-    search_results: list[dict[str, Any]] = (
-        entity_display_search(q or "", limit=limit) if (q or "").strip() else []
-    )
-    search_results = [item for item in search_results if str(item["artifact_id"]) not in excluded][
-        :limit
-    ]
+    search_results: list[dict[str, Any]] = entity_display_search(q or "", limit=limit) if (q or "").strip() else []
+    search_results = [item for item in search_results if str(item["artifact_id"]) not in excluded][:limit]
     return {
         "search_results": search_results,
         "candidate_connections": candidate_connections_for_entities(repo, included),
-        "suggested_entities": hop_suggestions(
-            repo, included, max_hops=max_hops, limit_per_hop=limit
-        ),
+        "suggested_entities": hop_suggestions(repo, included, max_hops=max_hops, limit_per_hop=limit),
     }

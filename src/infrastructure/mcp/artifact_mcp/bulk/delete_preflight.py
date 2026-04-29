@@ -59,8 +59,8 @@ def preflight_bulk_delete(
     grf_refs = scan_grf_refs(root)
     diagram_refs = scan_diagram_refs(root)
 
-    explicit_connection_deletes, entity_deletes, document_deletes, diagram_deletes, duplicate_errors = (
-        collect_requests(indexed)
+    explicit_connection_deletes, entity_deletes, document_deletes, diagram_deletes, duplicate_errors = collect_requests(
+        indexed
     )
     if duplicate_errors:
         for index, op, message in duplicate_errors:
@@ -124,6 +124,7 @@ def preflight_bulk_delete(
         entity_order,
         sorted(auto_sync_diagram_ids),
     )
+
 
 def _validate_entity_deletes(
     *,
@@ -291,9 +292,6 @@ def _validate_connection_deletes(
             (
                 f"Cannot delete connection '{key[1]} -> {key[2]}' in this batch because "
                 "dependent diagrams remain:\n"
-                + "\n".join(
-                    f"- diagram must also be deleted: {diagram_id}"
-                    for diagram_id in blocking_diagrams
-                )
+                + "\n".join(f"- diagram must also be deleted: {diagram_id}" for diagram_id in blocking_diagrams)
             ),
         )

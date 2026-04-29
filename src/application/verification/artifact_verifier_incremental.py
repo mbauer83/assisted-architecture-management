@@ -210,15 +210,11 @@ def _index_diagram_files(inventory: FileInventory) -> None:
     for path in sorted(diagrams_dir.rglob("*.puml")):
         rel = _add_indexed_file(inventory, path, "diagram")
         inventory.diagram_puml_relpaths.append(rel)
-        _add_diagram_refs(
-            path, rel, inventory.diagram_paths_by_entity, inventory.diagram_paths_by_connection_id
-        )
+        _add_diagram_refs(path, rel, inventory.diagram_paths_by_entity, inventory.diagram_paths_by_connection_id)
     for path in sorted(diagrams_dir.rglob("*.md")):
         rel = _add_indexed_file(inventory, path, "diagram")
         inventory.diagram_matrix_relpaths.append(rel)
-        _add_diagram_refs(
-            path, rel, inventory.diagram_paths_by_entity, inventory.diagram_paths_by_connection_id
-        )
+        _add_diagram_refs(path, rel, inventory.diagram_paths_by_entity, inventory.diagram_paths_by_connection_id)
 
 
 def _add_indexed_file(
@@ -309,9 +305,7 @@ def save_incremental_state(path: Path, state: IncrementalState) -> None:
     }
     tmp = path.with_suffix(path.suffix + ".tmp")
     try:
-        tmp.write_text(
-            json.dumps(payload, separators=(",", ":"), ensure_ascii=True), encoding="utf-8"
-        )
+        tmp.write_text(json.dumps(payload, separators=(",", ":"), ensure_ascii=True), encoding="utf-8")
         tmp.replace(path)
     except OSError:
         return
@@ -325,9 +319,7 @@ def detect_changed_paths(inv: FileInventory, prev: IncrementalState) -> tuple[se
         if prev_item is None:
             changed.add(rel)
             continue
-        if prev_item.get("mtime_ns") != curr.get("mtime_ns") or prev_item.get("size") != curr.get(
-            "size"
-        ):
+        if prev_item.get("mtime_ns") != curr.get("mtime_ns") or prev_item.get("size") != curr.get("size"):
             changed.add(rel)
     return changed, deleted
 
@@ -357,9 +349,7 @@ def _expand_for_entity(inv: FileInventory, impacted: set[str], entity_id: str) -
             impacted.add(neighbor_path)
 
 
-def _expand_for_connection(
-    inv: FileInventory, impacted: set[str], rel: str, connection_id: str
-) -> None:
+def _expand_for_connection(inv: FileInventory, impacted: set[str], rel: str, connection_id: str) -> None:
     impacted |= inv.diagram_paths_by_connection_id.get(connection_id, set())
     refs = inv.connection_refs_by_path.get(rel)
     if refs is None:

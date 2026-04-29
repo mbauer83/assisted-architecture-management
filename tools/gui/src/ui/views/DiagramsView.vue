@@ -4,7 +4,7 @@ import { useRoute, useRouter, RouterLink } from 'vue-router'
 import type { RepoScope, RepoError } from '../../ports/ModelRepository'
 import { modelServiceKey } from '../keys'
 import { useQuery } from '../composables/useQuery'
-import type { DiagramList } from '../../domain'
+import type { DiagramList, DiagramSummary } from '../../domain'
 import DownloadMenu from '../components/DownloadMenu.vue'
 
 const props = defineProps<{ scope?: RepoScope }>()
@@ -16,14 +16,17 @@ const route = useRoute()
 const router = useRouter()
 const diagramsState = useQuery<DiagramList, RepoError>()
 
-const DIAGRAM_TYPES = [
+const DIAGRAM_FILTERS = [
   { key: '', label: 'All' },
+  { key: 'archimate-all', label: 'ArchiMate' },
+  { key: 'matrix', label: 'Matrix' },
   { key: 'archimate-motivation', label: 'Motivation' },
   { key: 'archimate-strategy', label: 'Strategy' },
   { key: 'archimate-business', label: 'Business' },
   { key: 'archimate-application', label: 'Application' },
   { key: 'archimate-technology', label: 'Technology' },
   { key: 'archimate-layered', label: 'Layered' },
+  { key: 'other', label: 'Other' },
 ]
 
 const selectedType = ref((route.query.type as string) ?? '')
@@ -40,7 +43,27 @@ const keepCreateMenu = () => {
 
 const load = () => {
   if (isGlobal.value) return
-  diagramsState.run(svc.listDiagrams(selectedType.value || undefined))
+  diagramsState.run(svc.listDiagrams(undefined))
+}
+
+const matchesFilter = (diagram: DiagramSummary, filterKey: string): boolean => {
+  if (!filterKey) return true
+  if (filterKey === 'archimate-all') return diagram.diagram_type === 'archimate' || diagram.diagram_type.startsWith('archimate-')
+  if (filterKey === 'matrix') return diagram.diagram_type === 'matrix'
+  if (filterKey === 'other') return diagram.diagram_type !== 'matrix' && diagram.diagram_type !== 'archimate' && !diagram.diagram_type.startsWith('archimate-')
+  return diagram.diagram_type === filterKey
+}
+
+const filteredItems = computed(() => {
+  const items = diagramsState.data.value?.items ?? []
+  return items.filter((diagram) => matchesFilter(diagram, selectedType.value))
+})
+
+const diagramTypeLabel = (diagramType: string): string => {
+  if (diagramType === 'matrix') return 'matrix'
+  if (diagramType === 'archimate') return 'archimate'
+  if (diagramType.startsWith('archimate-')) return diagramType.replace('archimate-', '')
+  return diagramType
 }
 
 const selectType = (key: string) => {
@@ -109,7 +132,7 @@ watch(() => route.query.type, (t) => {
     <template v-else>
       <div class="filter-bar">
         <button
-          v-for="dt in DIAGRAM_TYPES"
+          v-for="dt in DIAGRAM_FILTERS"
           :key="dt.key"
           class="filter-btn"
           :class="{ 'filter-btn--active': selectedType === dt.key }"
@@ -134,12 +157,12 @@ watch(() => route.query.type, (t) => {
 
       <template v-else-if="diagramsState.data.value">
         <p class="result-count">
-          {{ diagramsState.data.value.total }} diagram{{ diagramsState.data.value.total !== 1 ? 's' : '' }}
+          {{ filteredItems.length }} diagram{{ filteredItems.length !== 1 ? 's' : '' }}
         </p>
 
         <div class="diagram-grid">
           <div
-            v-for="d in diagramsState.data.value.items"
+            v-for="d in filteredItems"
             :key="d.artifact_id"
             class="diagram-card card"
           >
@@ -151,7 +174,7 @@ watch(() => route.query.type, (t) => {
                 {{ d.name }}
               </div>
               <div class="diagram-meta">
-                <span class="diagram-type-badge">{{ d.diagram_type.replace('archimate-', '') }}</span>
+                <span class="diagram-type-badge">{{ diagramTypeLabel(d.diagram_type) }}</span>
                 <span
                   class="status-badge"
                   :class="`status--${d.status}`"

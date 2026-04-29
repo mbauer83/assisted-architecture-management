@@ -18,10 +18,7 @@ def assert_engagement_write_root(repo_root: Path) -> None:
     """
     p = repo_root.resolve()
     if infer_repo_scope(p) == "enterprise":
-        raise ValueError(
-            "Refusing to write to enterprise repository. "
-            "Point repo_root at an engagement repository."
-        )
+        raise ValueError("Refusing to write to enterprise repository. Point repo_root at an engagement repository.")
 
 
 def assert_enterprise_write_root(repo_root: Path) -> None:

@@ -67,9 +67,7 @@ def artifact_save_changes(
                 "commit": commit,
                 "pushed": False,
                 "message": message,
-                "next_step": (
-                    "Use artifact_submit_for_review to push this branch for team review."
-                ),
+                "next_step": ("Use artifact_submit_for_review to push this branch for team review."),
             }
     except ValueError as exc:
         return {"ok": False, "error": str(exc)}
@@ -101,17 +99,13 @@ def artifact_submit_for_review() -> dict[str, object]:
             "branch": state.branch,
             "pushed_at": state.pushed_at,
             "message": (
-                "Branch was already submitted. Waiting for team review. "
-                "The system will detect when it is merged."
+                "Branch was already submitted. Waiting for team review. The system will detect when it is merged."
             ),
         }
     if state.is_synced():
         return {
             "ok": False,
-            "error": (
-                "No enterprise changes to submit. "
-                "Make and save some changes first, then submit for review."
-            ),
+            "error": ("No enterprise changes to submit. Make and save some changes first, then submit for review."),
         }
 
     try:

@@ -247,7 +247,8 @@ def admin_create_diagram(body: AdminCreateDiagramBody) -> dict[str, Any]:
     """
     _require_admin()
     ent_root, _, verifier = s.get_admin_write_deps()
-    from src.application.modeling.artifact_write import generate_entity_id
+    from src.application.modeling.artifact_write import generate_diagram_id
+    from src.infrastructure.gui.routers._diagram_selection import resolve_diagram_selection
     from src.infrastructure.rendering.diagram_builder import generate_archimate_puml_body
 
     # Import the core diagram writing helper that wraps format + write + render
@@ -256,11 +257,8 @@ def admin_create_diagram(body: AdminCreateDiagramBody) -> dict[str, Any]:
 
     assert_enterprise_write_root(ent_root)
     repo = s.get_repo()
-    entities = [e for eid in body.entity_ids if (e := repo.get_entity(eid)) is not None]
-    connections = [c for cid in body.connection_ids if (c := repo.get_connection(cid)) is not None]
-    puml = generate_archimate_puml_body(
-        body.name, entities, connections, diagram_type=body.diagram_type
-    )
+    entities, connections, _, _ = resolve_diagram_selection(repo, body.entity_ids, body.connection_ids)
+    puml = generate_archimate_puml_body(body.name, entities, connections, diagram_type=body.diagram_type)
     try:
         result = s.run_serialized_write(
             _write_diagram_to_enterprise,
@@ -270,7 +268,7 @@ def admin_create_diagram(body: AdminCreateDiagramBody) -> dict[str, Any]:
             diagram_type=body.diagram_type,
             name=body.name,
             puml=puml,
-            artifact_id=generate_entity_id("DIA", body.name),
+            artifact_id=generate_diagram_id(body.diagram_type, body.name),
             keywords=body.keywords,
             version=body.version,
             status=body.status,

@@ -1,3 +1,4 @@
+import os
 import re
 import subprocess
 import tempfile
@@ -7,10 +8,11 @@ from pathlib import Path
 from src.application.modeling.artifact_write import (
     DiagramConnectionInferenceMode,
     format_diagram_puml,
+    generate_diagram_id,
 )
 from src.application.modeling.artifact_write_layout import optimize_puml_layout
 from src.application.verification.artifact_verifier import ArtifactVerifier
-from src.application.verification.artifact_verifier_syntax import find_plantuml_jar
+from src.application.verification.artifact_verifier_syntax import find_graphviz_dot, find_plantuml_jar
 from src.config.repo_paths import DIAGRAM_CATALOG, DIAGRAMS, RENDERED
 from src.config.settings import plantuml_limit_size, render_dpi
 
@@ -26,10 +28,28 @@ def _verification_to_dict(path: Path, res) -> dict[str, object]:
         "file_type": "diagram",
         "valid": res.valid,
         "issues": [
-            {"severity": i.severity, "code": i.code, "message": i.message, "location": i.location}
-            for i in res.issues
+            {"severity": i.severity, "code": i.code, "message": i.message, "location": i.location} for i in res.issues
         ],
     }
+
+
+def _prepare_archimate_puml_body(puml_body: str, repo_root: Path, diagram_type: str) -> str:
+    if "archimate" not in diagram_type.lower():
+        return puml_body
+
+    stereotypes_path = repo_root / DIAGRAM_CATALOG / "_archimate-stereotypes.puml"
+    prepared = puml_body
+    if stereotypes_path.exists() and "_archimate-stereotypes.puml" not in prepared:
+        prepared = re.sub(
+            r"(@startuml\s+\S+\s*)\n",
+            r"\1\n!include ../_archimate-stereotypes.puml\n",
+            prepared,
+            count=1,
+        )
+
+    from src.infrastructure.rendering.diagram_builder import inject_archimate_includes
+
+    return inject_archimate_includes(prepared, repo_root)
 
 
 def _render_diagram_png(puml_path: Path, warnings: list[str]) -> Path | None:
@@ -48,6 +68,8 @@ def _render_diagram_png(puml_path: Path, warnings: list[str]) -> Path | None:
         return None
 
     puml_body = content[start : end + len("@enduml")]
+    repo_root = puml_path.parent.parent.parent
+    puml_body = _prepare_archimate_puml_body(puml_body, repo_root, "archimate")
 
     # Strip the diagram name so PlantUML uses the temp-file stem as the output filename.
     # When @startuml carries a name PlantUML uses that name instead, which breaks the
@@ -67,6 +89,10 @@ def _render_diagram_png(puml_path: Path, warnings: list[str]) -> Path | None:
         return None
 
     try:
+        env = None
+        dot = find_graphviz_dot()
+        if dot is not None:
+            env = {**os.environ, "GRAPHVIZ_DOT": str(dot)}
         # Run java from the diagrams/ directory (same directory as the temp input file).
         # PlantUML relativises the -o path against the Java process's initial CWD and
         # then re-applies that relative form against the input file's directory.  When
@@ -90,6 +116,7 @@ def _render_diagram_png(puml_path: Path, warnings: list[str]) -> Path | None:
             capture_output=True,
             text=True,
             timeout=60,
+            env=env,
         )
         if result.returncode != 0:
             warnings.append(f"PlantUML render failed: {result.stderr[:200]}")
@@ -97,10 +124,7 @@ def _render_diagram_png(puml_path: Path, warnings: list[str]) -> Path | None:
 
         rendered = rendered_dir / f"{tmp_path.stem}.png"
         if rendered.exists():
-            stem = puml_path.stem
-            parts = stem.split(".", 2)
-            friendly_name = parts[2] if len(parts) >= 3 else stem
-            final = rendered_dir / f"{friendly_name}.png"
+            final = rendered_dir / f"{puml_path.stem}.png"
             rendered.rename(final)
             return final
         return None
@@ -126,6 +150,8 @@ def _render_diagram_svg(puml_path: Path, warnings: list[str]) -> Path | None:
         return None
 
     puml_body = content[start : end + len("@enduml")]
+    repo_root = puml_path.parent.parent.parent
+    puml_body = _prepare_archimate_puml_body(puml_body, repo_root, "archimate")
     puml_body_for_render = re.sub(r"@startuml\s+\S+", "@startuml", puml_body, count=1)
 
     with tempfile.NamedTemporaryFile(
@@ -140,6 +166,10 @@ def _render_diagram_svg(puml_path: Path, warnings: list[str]) -> Path | None:
         return None
 
     try:
+        env = None
+        dot = find_graphviz_dot()
+        if dot is not None:
+            env = {**os.environ, "GRAPHVIZ_DOT": str(dot)}
         result = subprocess.run(
             [
                 "java",
@@ -156,16 +186,14 @@ def _render_diagram_svg(puml_path: Path, warnings: list[str]) -> Path | None:
             capture_output=True,
             text=True,
             timeout=60,
+            env=env,
         )
         if result.returncode != 0:
             return None
 
         rendered = rendered_dir / f"{tmp_path.stem}.svg"
         if rendered.exists():
-            stem = puml_path.stem
-            parts = stem.split(".", 2)
-            friendly_name = parts[2] if len(parts) >= 3 else stem
-            final = rendered_dir / f"{friendly_name}.svg"
+            final = rendered_dir / f"{puml_path.stem}.svg"
             rendered.rename(final)
             return final
         return None
@@ -205,30 +233,13 @@ def create_diagram(
         if m:
             effective_id = m.group(1).strip()
     if effective_id is None:
-        raise ValueError("artifact_id is required, or puml must contain '@startuml <artifact-id>'")
+        effective_id = generate_diagram_id(diagram_type, name)
 
     puml_body = puml.strip("\n") + "\n"
     warnings: list[str] = []
 
-    # Auto-include stereotypes + glyphs for archimate diagrams
-    stereotypes_path = repo_root / DIAGRAM_CATALOG / "_archimate-stereotypes.puml"
-    if (
-        auto_include_stereotypes
-        and "archimate" in diagram_type.lower()
-        and stereotypes_path.exists()
-        and "_archimate-stereotypes.puml" not in puml_body
-    ):
-        puml_body = re.sub(
-            r"(@startuml\s+\S+\s*)\n",
-            r"\1\n!include ../_archimate-stereotypes.puml\n",
-            puml_body,
-            count=1,
-        )
-
-    if auto_include_stereotypes and "archimate" in diagram_type.lower():
-        from src.infrastructure.rendering.diagram_builder import inject_archimate_includes
-
-        puml_body = inject_archimate_includes(puml_body, repo_root)
+    if auto_include_stereotypes:
+        puml_body = _prepare_archimate_puml_body(puml_body, repo_root, diagram_type)
 
     # Auto-layout: insert hidden links and arrow direction hints
     puml_body = optimize_puml_layout(puml_body)

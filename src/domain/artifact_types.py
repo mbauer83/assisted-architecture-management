@@ -43,9 +43,7 @@ def infer_engagement_label(root: Path, *, scope: MountScope) -> str:
 def infer_mount(root: Path) -> RepoMount:
     resolved = root.resolve()
     scope: MountScope = "enterprise" if infer_repo_scope(resolved) == "enterprise" else "engagement"
-    return RepoMount(
-        root=resolved, scope=scope, engagement_label=infer_engagement_label(resolved, scope=scope)
-    )
+    return RepoMount(root=resolved, scope=scope, engagement_label=infer_engagement_label(resolved, scope=scope))
 
 
 @dataclass(frozen=True)
@@ -100,10 +98,7 @@ class ConnectionRecord:
         return entity_id in self.source_ids or entity_id in self.target_ids
 
     def __str__(self) -> str:
-        return (
-            f"[{self.artifact_id}]  {self.source} --{self.conn_type}--> {self.target}  "
-            f"(status={self.status})"
-        )
+        return f"[{self.artifact_id}]  {self.source} --{self.conn_type}--> {self.target}  (status={self.status})"
 
 
 @dataclass(frozen=True)
@@ -196,11 +191,7 @@ class ArtifactSummary:
 
     def __str__(self) -> str:
         label = f" {self.name}" if self.name else ""
-        return (
-            f"[{self.artifact_id}]{label}  "
-            f"({self.artifact_type} · {self.record_type} · "
-            f"status={self.status})"
-        )
+        return f"[{self.artifact_id}]{label}  ({self.artifact_type} · {self.record_type} · status={self.status})"
 
 
 def summary_from_entity(rec: EntityRecord) -> ArtifactSummary:

@@ -63,10 +63,7 @@ def default_engagement_repo_root() -> Path:
 def default_enterprise_repo_root() -> Path:
     roots = _workspace_repo_roots()
     if roots is None:
-        raise RuntimeError(
-            "Could not resolve enterprise repo root. "
-            "Run `arch-init` or provide arch-workspace.yaml."
-        )
+        raise RuntimeError("Could not resolve enterprise repo root. Run `arch-init` or provide arch-workspace.yaml.")
     return roots[1]
 
 
@@ -74,8 +71,7 @@ def repo_root_from_preset(preset: RepoPreset) -> Path:
     roots = _workspace_repo_roots()
     if roots is None:
         raise RuntimeError(
-            "Could not resolve workspace repo roots for repo_preset. "
-            "Run `arch-init` or provide arch-workspace.yaml."
+            "Could not resolve workspace repo roots for repo_preset. Run `arch-init` or provide arch-workspace.yaml."
         )
     match preset:
         case "engagement":
@@ -166,30 +162,18 @@ def verifier_for(roots_key_str: str, *, include_registry: bool) -> ArtifactVerif
 
 
 def _refresh_repo_now(roots: list[Path]) -> ReadModelVersion:
-    from src.infrastructure.artifact_index import shared_artifact_index
-
-    key = roots_key(roots)
-    shared = _shared_state_repo_for_roots(roots)
-    if shared is not None:
-        shared.refresh()
-        version = shared.read_model_version()
-    else:
-        repo = repo_cached(key)
-        repo.refresh()
-        version = repo.read_model_version()
-    shared_artifact_index(roots).refresh()
+    # Operate directly on the shared index — the ArtifactRepository is a thin
+    # wrapper and both would resolve to the same ArtifactIndex instance, so
+    # calling through both used to trigger two full refreshes under the lock.
+    index = shared_artifact_index(roots)
+    index.refresh()
     registry_cached.cache_clear()
-    return version
+    return index.read_model_version()
 
 
 def _apply_paths_now(roots: list[Path], paths: list[Path]) -> ReadModelVersion:
-    from src.infrastructure.artifact_index import shared_artifact_index
-
-    key = roots_key(roots)
-    shared = _shared_state_repo_for_roots(roots)
-    repo = shared if shared is not None else repo_cached(key)
-    version = repo.apply_file_changes(paths)
-    shared_artifact_index(roots).apply_file_changes(paths)
+    index = shared_artifact_index(roots)
+    version = index.apply_file_changes(paths)
     registry_cached.cache_clear()
     return version
 
@@ -340,9 +324,7 @@ def _refresh_worker(roots: list[Path], queue: _RefreshQueue) -> None:
         wait_for_write_queue_drain()
         if pending_full:
             version = _refresh_repo_now(roots)
-            publish_background_refresh_completed(
-                roots, full_refresh=True, changed_paths=[], version=version
-            )
+            publish_background_refresh_completed(roots, full_refresh=True, changed_paths=[], version=version)
             _regenerate_macros(roots)
             continue
         if pending_paths:
@@ -361,9 +343,7 @@ def sync_refresh_for_roots(root_or_roots: Path | list[Path]) -> None:
     wait_for_write_queue_drain()
     version = _refresh_repo_now(roots)
     _regenerate_macros(roots)
-    publish_background_refresh_completed(
-        roots, full_refresh=True, changed_paths=[], version=version
-    )
+    publish_background_refresh_completed(roots, full_refresh=True, changed_paths=[], version=version)
 
 
 def refresh_caches_for_repo(root_or_roots: Path | list[Path]) -> None:

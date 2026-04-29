@@ -29,9 +29,7 @@ _services: dict[str, "ArtifactIndex"] = {}
 _services_mu = threading.Lock()
 
 
-def get_shared_index(
-    factory: type["ArtifactIndex"], repo_root: Path | list[Path] | list[RepoMount]
-) -> "ArtifactIndex":
+def get_shared_index(factory: type["ArtifactIndex"], repo_root: Path | list[Path] | list[RepoMount]) -> "ArtifactIndex":
     mounts = normalize_mounts(repo_root)
     key = service_key(mounts)
     with _services_mu:
@@ -53,8 +51,6 @@ def notify_paths_changed(paths: list[Path]) -> None:
         active = list(_services.values())
     for idx in active:
         roots = [m.root.resolve() for m in idx.repo_mounts]
-        relevant = [
-            p for p in resolved if any(p == r or str(p).startswith(str(r) + "/") for r in roots)
-        ]
+        relevant = [p for p in resolved if any(p == r or str(p).startswith(str(r) + "/") for r in roots)]
         if relevant:
             idx.apply_file_changes(relevant)

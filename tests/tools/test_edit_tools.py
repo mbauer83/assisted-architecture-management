@@ -11,6 +11,7 @@ from pathlib import Path
 
 import pytest
 
+from src.application.modeling.artifact_write import generate_diagram_id
 from src.application.verification.artifact_verifier_registry import ArtifactRegistry
 from src.infrastructure.artifact_index import shared_artifact_index
 from src.infrastructure.mcp import mcp_artifact_server as mcp
@@ -274,8 +275,9 @@ class TestRemoveConnection:
 class TestEditDiagram:
     def _make_diagram(self, repo: Path, name: str) -> str:
         # Use activity diagram type — no archimate !include required
+        artifact_id = generate_diagram_id("activity-bpmn", name)
         puml = f"""\
-@startuml test-diagram-{name.lower().replace(' ', '-')}
+@startuml {artifact_id}
 
 title {name}
 
@@ -287,7 +289,7 @@ title {name}
         result = mcp.artifact_create_diagram(
             diagram_type="activity-bpmn",
             name=name, puml=puml,
-            artifact_id=f"test-diagram-{name.lower().replace(' ', '-')}",
+            artifact_id=artifact_id,
             dry_run=False, repo_root=str(repo),
         )
         assert result["wrote"], result

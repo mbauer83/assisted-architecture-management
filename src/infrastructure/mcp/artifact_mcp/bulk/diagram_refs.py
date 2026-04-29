@@ -208,9 +208,7 @@ def collect_bulk_write_auto_sync_diagram_ids(
     return sorted(diagram_ids)
 
 
-def entity_owned_connection_ids(
-    entity_id: str, connection_paths: dict[tuple[str, str, str], Path]
-) -> set[str]:
+def entity_owned_connection_ids(entity_id: str, connection_paths: dict[tuple[str, str, str], Path]) -> set[str]:
     return {
         connection_id
         for (src, conn_type, target) in connection_paths
@@ -234,10 +232,7 @@ def toposort_entities(entity_ids: set[str], grf_refs: dict[str, list[str]]) -> l
         ready = sorted(entity_id for entity_id, blockers in remaining.items() if not blockers)
         if not ready:
             cycle = ", ".join(sorted(remaining))
-            raise ValueError(
-                "Cannot resolve entity delete order because of cyclic inter-entity dependencies: "
-                f"{cycle}"
-            )
+            raise ValueError(f"Cannot resolve entity delete order because of cyclic inter-entity dependencies: {cycle}")
         for entity_id in ready:
             ordered.append(entity_id)
             remaining.pop(entity_id)

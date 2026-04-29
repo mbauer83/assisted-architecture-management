@@ -94,13 +94,7 @@ def format_entity_markdown(
     ]
     frontmatter_text = _dump_yaml_text(fm_out)
     return (
-        "---\n"
-        + frontmatter_text
-        + "\n---\n\n"
-        + "\n".join(content_lines)
-        + "\n\n"
-        + "\n".join(display_lines)
-        + "\n"
+        "---\n" + frontmatter_text + "\n---\n\n" + "\n".join(content_lines) + "\n\n" + "\n".join(display_lines) + "\n"
     )
 
 
@@ -210,8 +204,7 @@ def _ensure_visible_title(puml_body: str, title_text: str) -> str:
         return puml_body.strip("\n") + "\n"
 
     has_title = any(
-        (not line.lstrip().startswith("'"))
-        and re.match(r"^\s*title(\s|$)", line, flags=re.IGNORECASE)
+        (not line.lstrip().startswith("'")) and re.match(r"^\s*title(\s|$)", line, flags=re.IGNORECASE)
         for line in lines
     )
     if has_title:

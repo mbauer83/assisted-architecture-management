@@ -1,5 +1,6 @@
 import os
 import re
+import shutil
 import subprocess
 import tempfile
 from functools import lru_cache
@@ -20,6 +21,29 @@ def find_plantuml_jar() -> Path | None:
                     return jar
             return None
     return None
+
+
+@lru_cache(maxsize=1)
+def find_graphviz_dot() -> Path | None:
+    env_dot = os.environ.get("GRAPHVIZ_DOT", "").strip()
+    if env_dot:
+        candidate = Path(env_dot)
+        if candidate.exists():
+            return candidate
+
+    candidate = Path(__file__).resolve()
+    for _ in range(6):
+        candidate = candidate.parent
+        if (candidate / "pyproject.toml").exists():
+            local_names = ("dot.exe", "dot") if os.name == "nt" else ("dot",)
+            for name in local_names:
+                bundled = candidate / "tools" / "graphviz" / "bin" / name
+                if bundled.exists():
+                    return bundled
+            break
+
+    which_dot = shutil.which("dot")
+    return Path(which_dot) if which_dot else None
 
 
 def resolve_worker_count() -> int:
@@ -44,21 +68,32 @@ def check_puml_syntax(path: Path, loc: str) -> list[Issue]:
 
     java = os.environ.get("JAVA_HOME", "")
     java_exe = (Path(java) / "bin" / "java") if java else Path("java")
+    env = os.environ.copy()
+    dot = find_graphviz_dot()
+    if dot is not None:
+        env["GRAPHVIZ_DOT"] = str(dot)
 
     try:
         with tempfile.TemporaryDirectory() as tmp_out:
             proc = subprocess.run(
-                [str(java_exe), "-jar", str(jar), "-tsvg", "-verbose", "-o", tmp_out, str(path)],
+                [
+                    str(java_exe),
+                    "-Djava.awt.headless=true",
+                    "-jar",
+                    str(jar),
+                    "-tsvg",
+                    "-verbose",
+                    "-o",
+                    tmp_out,
+                    str(path),
+                ],
                 capture_output=True,
                 text=True,
                 timeout=30,
+                env=env,
             )
     except FileNotFoundError:
-        return [
-            Issue(
-                Severity.WARNING, "W351", "java not found on PATH; PUML syntax check skipped", loc
-            )
-        ]
+        return [Issue(Severity.WARNING, "W351", "java not found on PATH; PUML syntax check skipped", loc)]
     except subprocess.TimeoutExpired:
         return [Issue(Severity.WARNING, "W352", "plantuml render timed out after 30 s", loc)]
 
@@ -87,9 +122,7 @@ def check_puml_syntax(path: Path, loc: str) -> list[Issue]:
         and ln.strip() not in ("Some diagram description contains errors",)
     ]
     msg = signal_lines[0] if signal_lines else f"exit {proc.returncode}"
-    return [
-        Issue(Severity.ERROR, "E350", f"PlantUML error (exit {proc.returncode}): {msg[:200]}", loc)
-    ]
+    return [Issue(Severity.ERROR, "E350", f"PlantUML error (exit {proc.returncode}): {msg[:200]}", loc)]
 
 
 def check_puml_syntax_batch(paths: list[Path], *, chunk_size: int = 120) -> dict[Path, list[Issue]]:
@@ -112,6 +145,10 @@ def check_puml_syntax_batch(paths: list[Path], *, chunk_size: int = 120) -> dict
 
     java = os.environ.get("JAVA_HOME", "")
     java_exe = (Path(java) / "bin" / "java") if java else Path("java")
+    env = os.environ.copy()
+    dot = find_graphviz_dot()
+    if dot is not None:
+        env["GRAPHVIZ_DOT"] = str(dot)
 
     for i in range(0, len(paths), chunk_size):
         path_chunk = paths[i : i + chunk_size]
@@ -120,6 +157,7 @@ def check_puml_syntax_batch(paths: list[Path], *, chunk_size: int = 120) -> dict
                 proc = subprocess.run(
                     [
                         str(java_exe),
+                        "-Djava.awt.headless=true",
                         "-jar",
                         str(jar),
                         "-tsvg",
@@ -131,6 +169,7 @@ def check_puml_syntax_batch(paths: list[Path], *, chunk_size: int = 120) -> dict
                     capture_output=True,
                     text=True,
                     timeout=120,
+                    env=env,
                 )
         except FileNotFoundError:
             for path in path_chunk:

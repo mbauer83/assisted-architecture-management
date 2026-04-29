@@ -87,9 +87,7 @@ class ArtifactRepository:
     def get_document(self, artifact_id: str) -> DocumentRecord | None:
         return self._store.get_document(artifact_id)
 
-    def list_documents(
-        self, *, doc_type: str | None = None, status: str | None = None
-    ) -> list[DocumentRecord]:
+    def list_documents(self, *, doc_type: str | None = None, status: str | None = None) -> list[DocumentRecord]:
         return self._store.list_documents(doc_type=doc_type, status=status)
 
     def list_entities(
@@ -115,13 +113,9 @@ class ArtifactRepository:
         target: str | None = None,
         status: str | None = None,
     ) -> list[ConnectionRecord]:
-        return self._store.list_connections(
-            conn_type=conn_type, source=source, target=target, status=status
-        )
+        return self._store.list_connections(conn_type=conn_type, source=source, target=target, status=status)
 
-    def list_diagrams(
-        self, *, diagram_type: str | None = None, status: str | None = None
-    ) -> list[DiagramRecord]:
+    def list_diagrams(self, *, diagram_type: str | None = None, status: str | None = None) -> list[DiagramRecord]:
         return self._store.list_diagrams(diagram_type=diagram_type, status=status)
 
     def list_artifacts(

@@ -23,7 +23,7 @@ from pathlib import Path
 
 # ── Pinned release ────────────────────────────────────────────────────────────
 
-PLANTUML_VERSION = "1.2025.2"
+PLANTUML_VERSION = "1.2026.2"
 
 _MAVEN_BASE = "https://repo1.maven.org/maven2/net/sourceforge/plantuml/plantuml"
 

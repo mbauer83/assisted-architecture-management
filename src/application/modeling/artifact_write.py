@@ -39,9 +39,11 @@ __all__ = [
     "format_entity_markdown",
     "format_matrix_markdown",
     "format_outgoing_markdown",
+    "generate_diagram_id",
     "generate_entity_id",
     "infer_archimate_connection_ids_from_puml",
     "infer_entity_ids_from_puml",
+    "prefix_for_diagram_type",
     "slugify",
 ]
 
@@ -67,6 +69,50 @@ def generate_entity_id(prefix: str, friendly_name: str, *, random_length: int = 
     return f"{prefix}@{epoch}.{random_part}.{slug}"
 
 
+_DIAGRAM_TYPE_PREFIXES: dict[str, str] = {
+    "matrix": "MAT",
+    "sequence": "SEQ",
+    "er": "ERD",
+    "erd": "ERD",
+    "entity-relationship": "ERD",
+    "activity": "ACT",
+    "activity-bpmn": "ACT",
+    "bpmn": "BPMN",
+}
+
+
+def prefix_for_diagram_type(diagram_type: str) -> str:
+    """Return a stable artifact-id prefix for a diagram type."""
+    normalized = diagram_type.strip().lower()
+    if normalized.startswith("archimate"):
+        return "ARC"
+    if normalized in _DIAGRAM_TYPE_PREFIXES:
+        return _DIAGRAM_TYPE_PREFIXES[normalized]
+
+    parts = [part for part in re.split(r"[^a-z0-9]+", normalized) if part]
+    if not parts:
+        return "DGM"
+
+    letters = "".join(part[0] for part in parts[:6]).upper()
+    if len(letters) >= 2:
+        return letters[:6]
+
+    compact = "".join(parts).upper()
+    if len(compact) >= 2:
+        return compact[:6]
+
+    return "DGM"
+
+
+def generate_diagram_id(diagram_type: str, friendly_name: str, *, random_length: int = 6) -> str:
+    """Generate a typed diagram artifact-id from diagram_type + friendly name."""
+    return generate_entity_id(
+        prefix_for_diagram_type(diagram_type),
+        friendly_name,
+        random_length=random_length,
+    )
+
+
 # ---------------------------------------------------------------------------
 # PUML inference
 # ---------------------------------------------------------------------------
@@ -89,8 +135,7 @@ def infer_entity_ids_from_puml(puml: str) -> tuple[set[str], list[str]]:
 
     if not ids:
         warnings.append(
-            "No entity aliases found in PUML. "
-            "For best discoverability, use standard aliases like DRV_Qw7Er1."
+            "No entity aliases found in PUML. For best discoverability, use standard aliases like DRV_Qw7Er1."
         )
 
     return ids, warnings

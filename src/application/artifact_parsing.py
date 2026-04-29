@@ -187,9 +187,7 @@ def parse_entity(path: Path, model_root: Path) -> EntityRecord | None:
         subdomain=subdomain,
         keywords=keywords,
         path=path,
-        extra={
-            key: value for key, value in frontmatter.items() if key not in STANDARD_ENTITY_FIELDS
-        },
+        extra={key: value for key, value in frontmatter.items() if key not in STANDARD_ENTITY_FIELDS},
         content_text=extract_section(content, "content"),
         display_blocks=display_blocks,
         display_label=display_label,
@@ -275,9 +273,7 @@ def parse_diagram(path: Path) -> DiagramRecord | None:
         version=str(frontmatter.get("version", "")),
         status=str(frontmatter.get("status", "draft")),
         path=path,
-        extra={
-            key: value for key, value in frontmatter.items() if key not in STANDARD_DIAGRAM_FIELDS
-        },
+        extra={key: value for key, value in frontmatter.items() if key not in STANDARD_DIAGRAM_FIELDS},
     )
 
 

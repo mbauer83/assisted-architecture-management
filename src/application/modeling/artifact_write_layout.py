@@ -207,15 +207,7 @@ def optimize_puml_layout(puml_body: str) -> str:
             hint = flow_dir if src_group < tgt_group else reverse_dir
             new_arrow = _insert_arrow_direction(arrow, hint)
             if new_arrow != arrow:
-                lines[i] = (
-                    m.group(1)
-                    + m.group(2)
-                    + m.group(3)
-                    + new_arrow
-                    + m.group(5)
-                    + m.group(6)
-                    + m.group(7)
-                )
+                lines[i] = m.group(1) + m.group(2) + m.group(3) + new_arrow + m.group(5) + m.group(6) + m.group(7)
             continue
 
         macro = _MACRO_CONN_RE.match(line)

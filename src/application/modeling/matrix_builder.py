@@ -1,4 +1,5 @@
 """Generate markdown matrix tables from entity IDs and connection-type configs."""
+
 from __future__ import annotations
 
 from collections.abc import Mapping
@@ -50,10 +51,7 @@ def build_matrix_tables(
 
     if combined:
         return _combined_table(row_ids, col_ids, entity_names, active, conn_set)
-    return "\n\n".join(
-        _single_table(row_ids, col_ids, entity_names, cfg.conn_type, conn_set)
-        for cfg in active
-    )
+    return "\n\n".join(_single_table(row_ids, col_ids, entity_names, cfg.conn_type, conn_set) for cfg in active)
 
 
 def _header_cell(entity_id: str) -> str:
@@ -77,10 +75,7 @@ def _single_table(
     sep = "|---|" + "---|" * len(col_ids)
     rows = [f"## {conn_type}", "", header, sep]
     for row_id in row_ids:
-        cells = [
-            "✓" if (row_id, col_id) in pairs else "&nbsp;"
-            for col_id in col_ids
-        ]
+        cells = ["✓" if (row_id, col_id) in pairs else "&nbsp;" for col_id in col_ids]
         rows.append("| " + _row_cell(row_id) + " | " + " | ".join(cells) + " |")
     return "\n".join(rows)
 
@@ -102,7 +97,7 @@ def _abbreviations(active: list[ConnTypeConfig]) -> dict[str, str]:
             name = ct
             for pfx in _LANG_PREFIXES:
                 if name.startswith(pfx):
-                    name = name[len(pfx):]
+                    name = name[len(pfx) :]
                     break
             candidate = name[0].upper()
             suffix = 2
@@ -132,10 +127,11 @@ def _combined_table(
             marks = [abbrevs[cfg.conn_type] for cfg in active if (row_id, col_id) in conn_set.get(cfg.conn_type, set())]
             cells.append(", ".join(marks) if marks else "&nbsp;")
         rows.append("| " + _row_cell(row_id) + " | " + " | ".join(cells) + " |")
+
     def _strip_prefix(ct: str) -> str:
         for pfx in _LANG_PREFIXES:
             if ct.startswith(pfx):
-                return ct[len(pfx):]
+                return ct[len(pfx) :]
         return ct
 
     legend = "*Legend: " + ", ".join(f"{abbrevs[cfg.conn_type]}={_strip_prefix(cfg.conn_type)}" for cfg in active) + "*"

@@ -108,9 +108,7 @@ def _watcher_loop(
                     last_periodic = now
                 with _watch_lock:
                     st = _watch_state.get(repo_key, {})
-                    st["last_fingerprint"] = (
-                        f"{sum(len(files) for files in snapshot.values())} files"
-                    )
+                    st["last_fingerprint"] = f"{sum(len(files) for files in snapshot.values())} files"
                     st["last_refresh_time"] = time.time()
                     prev = st.get("refresh_count", 0)
                     st["refresh_count"] = (prev + 1) if isinstance(prev, int) else 1

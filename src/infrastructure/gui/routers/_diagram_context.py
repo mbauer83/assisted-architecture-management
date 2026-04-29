@@ -47,9 +47,7 @@ def entity_display_item(rec: EntityRecord) -> dict[str, Any]:
     }
 
 
-def diagram_entities_and_puml(
-    repo: Any, diag_rec: DiagramRecord
-) -> tuple[list[dict[str, Any]], str]:
+def diagram_entities_and_puml(repo: Any, diag_rec: DiagramRecord) -> tuple[list[dict[str, Any]], str]:
     try:
         puml = diag_rec.path.read_text(encoding="utf-8")
     except OSError:
@@ -145,9 +143,7 @@ def diagram_context_payload(repo: Any, diag_rec: DiagramRecord) -> dict[str, Any
     }
 
 
-def hop_suggestions(
-    repo: Any, entity_ids: list[str], *, max_hops: int, limit_per_hop: int
-) -> list[dict[str, Any]]:
+def hop_suggestions(repo: Any, entity_ids: list[str], *, max_hops: int, limit_per_hop: int) -> list[dict[str, Any]]:
     frontier = set(entity_ids)
     visited = set(entity_ids)
     groups: list[dict[str, Any]] = []
@@ -168,8 +164,7 @@ def hop_suggestions(
         items = [
             entity_display_item(rec)
             for entity_id in sorted(next_frontier)
-            if (rec := repo.get_entity(entity_id)) is not None
-            and rec.artifact_type != "global-artifact-reference"
+            if (rec := repo.get_entity(entity_id)) is not None and rec.artifact_type != "global-artifact-reference"
         ]
         items.sort(
             key=lambda item: (
@@ -192,9 +187,7 @@ def fuzzy_entity_hits(repo: Any, q: str, limit: int, excluded: set[str]) -> list
     for rec in repo.list_entities():
         if rec.artifact_type == "global-artifact-reference" or rec.artifact_id in excluded:
             continue
-        haystack = " ".join(
-            (rec.name, rec.artifact_type, rec.domain, rec.subdomain, rec.content_text[:400])
-        )
+        haystack = " ".join((rec.name, rec.artifact_type, rec.domain, rec.subdomain, rec.content_text[:400]))
         score = SequenceMatcher(None, query, haystack.lower()).ratio()
         if score >= 0.35:
             scored.append((score, rec))

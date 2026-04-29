@@ -33,9 +33,7 @@ def _rename_entity_identity(
     changed_paths: list[Path] = []
 
     if old_outgoing.exists():
-        outgoing_text = old_outgoing.read_text(encoding="utf-8").replace(
-            old_artifact_id, new_artifact_id
-        )
+        outgoing_text = old_outgoing.read_text(encoding="utf-8").replace(old_artifact_id, new_artifact_id)
         new_outgoing.write_text(outgoing_text, encoding="utf-8")
         if new_outgoing != old_outgoing:
             old_outgoing.unlink()
@@ -96,11 +94,7 @@ def edit_entity(
     eff_status = status if status is not None else str(fm.get("status", "draft"))
     eff_keywords = as_optional_str_list(keywords if keywords is not _UNSET else fm.get("keywords"))
     eff_summary = as_optional_str(summary) if summary is not _UNSET else parsed.summary
-    eff_properties = (
-        as_optional_str_dict(properties)
-        if properties is not _UNSET
-        else (parsed.properties or None)
-    )
+    eff_properties = as_optional_str_dict(properties) if properties is not _UNSET else (parsed.properties or None)
     eff_notes = as_optional_str(notes) if notes is not _UNSET else parsed.notes
     if name is not None:
         current_slug = slugify(current_name)
@@ -250,8 +244,7 @@ def promote_entity(
     errors = [i for i in pre_check.issues if i.severity == "error"]
     if errors:
         raise ValueError(
-            f"Cannot promote: {len(errors)} verification error(s): "
-            + "; ".join(i.message for i in errors[:3])
+            f"Cannot promote: {len(errors)} verification error(s): " + "; ".join(i.message for i in errors[:3])
         )
 
     parsed = parse_entity_file(entity_file)

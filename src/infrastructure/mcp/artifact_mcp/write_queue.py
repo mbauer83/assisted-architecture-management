@@ -149,14 +149,10 @@ def queued(fn: _F) -> _F:
             from src.infrastructure.workspace.write_block_manager import is_blocked
 
             if is_blocked(Path(repo_root_str)):
-                raise RuntimeError(
-                    "Writes are temporarily blocked (sync in progress or read-only mode)"
-                )
+                raise RuntimeError("Writes are temporarily blocked (sync in progress or read-only mode)")
 
         future = _submit(fn.__name__, fn, *args, **kwargs)
-        while not future.done():
-            await asyncio.sleep(0.001)
-        return future.result()
+        return await asyncio.wrap_future(future)
 
     return wrapper  # type: ignore[return-value]
 

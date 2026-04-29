@@ -79,13 +79,9 @@ def search_artifacts(
     prefer_record_type: _RecordType | None = None,
     strict_record_type: bool = False,
 ) -> SearchResult:
-    domains: set[str] = {
-        d.lower() for d in (domain if isinstance(domain, list) else ([domain] if domain else []))
-    }
+    domains: set[str] = {d.lower() for d in (domain if isinstance(domain, list) else ([domain] if domain else []))}
     types: set[str] = set(
-        artifact_type
-        if isinstance(artifact_type, list)
-        else ([artifact_type] if artifact_type else [])
+        artifact_type if isinstance(artifact_type, list) else ([artifact_type] if artifact_type else [])
     )
     return search(
         store,
@@ -177,9 +173,7 @@ def search(
     if strict_record_type and prefer_record_type is not None:
         hits = [h for h in hits if h.record_type == prefer_record_type]
     hits.sort(
-        key=lambda h: (
-            (h.record_type == prefer_record_type, h.score) if prefer_record_type else h.score
-        ),
+        key=lambda h: (h.record_type == prefer_record_type, h.score) if prefer_record_type else h.score,
         reverse=True,
     )
     return SearchResult(query=query, hits=hits[:limit])
@@ -203,9 +197,7 @@ def _search_entities(
     return hits
 
 
-def _search_connections(
-    store: ArtifactStorePort, query_lc: str, tokens: list[str]
-) -> list[SearchHit]:
+def _search_connections(store: ArtifactStorePort, query_lc: str, tokens: list[str]) -> list[SearchHit]:
     return [
         SearchHit(score=s, record_type="connection", record=r)
         for r in store.list_connections()
@@ -221,9 +213,7 @@ def _search_diagrams(store: ArtifactStorePort, query_lc: str, tokens: list[str])
     ]
 
 
-def _search_documents(
-    store: ArtifactStorePort, query_lc: str, tokens: list[str]
-) -> list[SearchHit]:
+def _search_documents(store: ArtifactStorePort, query_lc: str, tokens: list[str]) -> list[SearchHit]:
     return [
         SearchHit(score=s, record_type="document", record=r)
         for r in store.list_documents()

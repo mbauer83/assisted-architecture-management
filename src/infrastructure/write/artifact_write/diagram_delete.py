@@ -38,9 +38,10 @@ def _find_diagram_file(repo_root: Path, artifact_id: str) -> Path | None:
 def _rendered_paths(diagram_path: Path) -> list[Path]:
     rendered_dir = diagram_path.parent.parent / RENDERED
     stem = diagram_path.stem
+    candidates = {stem}
     parts = stem.split(".", 2)
-    friendly_name = parts[2] if len(parts) >= 3 else stem
-    candidates = {stem, friendly_name}
+    if len(parts) >= 3:
+        candidates.add(parts[2])
     paths: list[Path] = []
     for name in candidates:
         paths.append(rendered_dir / f"{name}.png")
