@@ -51,7 +51,7 @@ def create_entity(
     if artifact_type == "global-artifact-reference":
         raise ValueError(
             "global-artifact-reference entities may not be created directly. "
-            "Use model_ensure_global_entity_reference (MCP) or "
+            "Use ensure_global_artifact_reference (MCP) or "
             "POST /api/global-entity-reference (GUI) instead."
         )
 

@@ -128,7 +128,6 @@ def artifact_promote_to_enterprise(
             plan,
             eng_root,
             ent_root,
-            verifier_for(both_key, include_registry=True),
             registry,
             conflict_resolutions=resolutions,
         )

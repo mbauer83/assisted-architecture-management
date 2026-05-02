@@ -743,13 +743,12 @@ class TestPromotionExecuteFullRoundTrip:
         from src.infrastructure.write.artifact_write.promote_execute import execute_promotion
         from src.infrastructure.write.artifact_write.promote_to_enterprise import plan_promotion
 
-        eng_id, gar_id, glo_id = self._setup(engagement_root, enterprise_root)
+        eng_id, _, _ = self._setup(engagement_root, enterprise_root)
         registry = ArtifactRegistry(shared_artifact_index([engagement_root, enterprise_root]))
         repo = ArtifactRepository(shared_artifact_index([engagement_root, enterprise_root]))
-        verifier = ArtifactVerifier(registry)
 
         plan = plan_promotion(eng_id, registry, repo)
-        result = execute_promotion(plan, engagement_root, enterprise_root, verifier, registry)
+        result = execute_promotion(plan, engagement_root, enterprise_root, registry)
 
         assert result.executed, result.verification_errors
         ent_file = enterprise_root / "model" / "strategy" / "capabilities" / f"{eng_id}.md"
@@ -764,10 +763,9 @@ class TestPromotionExecuteFullRoundTrip:
         eng_id, gar_id, glo_id = self._setup(engagement_root, enterprise_root)
         registry = ArtifactRegistry(shared_artifact_index([engagement_root, enterprise_root]))
         repo = ArtifactRepository(shared_artifact_index([engagement_root, enterprise_root]))
-        verifier = ArtifactVerifier(registry)
 
         plan = plan_promotion(eng_id, registry, repo)
-        result = execute_promotion(plan, engagement_root, enterprise_root, verifier, registry)
+        result = execute_promotion(plan, engagement_root, enterprise_root, registry)
 
         assert result.executed, result.verification_errors
         ent_outgoing = (
@@ -785,16 +783,15 @@ class TestPromotionExecuteFullRoundTrip:
         from src.infrastructure.write.artifact_write.promote_execute import execute_promotion
         from src.infrastructure.write.artifact_write.promote_to_enterprise import plan_promotion
 
-        eng_id, gar_id, glo_id = self._setup(engagement_root, enterprise_root)
+        eng_id, _, _ = self._setup(engagement_root, enterprise_root)
         orig_eng_file = (
             engagement_root / "model" / "strategy" / "capabilities" / f"{eng_id}.md"
         )
         registry = ArtifactRegistry(shared_artifact_index([engagement_root, enterprise_root]))
         repo = ArtifactRepository(shared_artifact_index([engagement_root, enterprise_root]))
-        verifier = ArtifactVerifier(registry)
 
         plan = plan_promotion(eng_id, registry, repo)
-        result = execute_promotion(plan, engagement_root, enterprise_root, verifier, registry)
+        result = execute_promotion(plan, engagement_root, enterprise_root, registry)
 
         assert result.executed, result.verification_errors
         # Original engagement entity file removed
@@ -813,7 +810,7 @@ class TestPromotionExecuteFullRoundTrip:
         from src.infrastructure.write.artifact_write.promote_execute import execute_promotion
         from src.infrastructure.write.artifact_write.promote_to_enterprise import plan_promotion
 
-        eng_id, gar_id, glo_id = self._setup(engagement_root, enterprise_root)
+        eng_id, _, _= self._setup(engagement_root, enterprise_root)
 
         # Add a second engagement entity that connects TO eng_id
         other_eng = "CAP@1000000099.EngEEE.other-cap"
@@ -829,10 +826,9 @@ class TestPromotionExecuteFullRoundTrip:
 
         registry = ArtifactRegistry(shared_artifact_index([engagement_root, enterprise_root]))
         repo = ArtifactRepository(shared_artifact_index([engagement_root, enterprise_root]))
-        verifier = ArtifactVerifier(registry)
 
         plan = plan_promotion(eng_id, registry, repo)
-        result = execute_promotion(plan, engagement_root, enterprise_root, verifier, registry)
+        result = execute_promotion(plan, engagement_root, enterprise_root, registry)
 
         assert result.executed, result.verification_errors
         # The other engagement entity's outgoing should now reference the new GAR

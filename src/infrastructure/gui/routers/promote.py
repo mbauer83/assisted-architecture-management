@@ -161,7 +161,6 @@ def promotion_execute(body: PromotionExecuteBody) -> dict[str, Any]:
         plan,
         eng_root,
         ent_root,
-        ArtifactVerifier(registry),
         registry,
         conflict_resolutions=resolutions,
     )

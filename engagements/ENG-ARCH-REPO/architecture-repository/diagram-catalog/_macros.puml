@@ -268,6 +268,9 @@
 !procedure $DECL_SRV_Qr8St8()
   rectangle "<$archimate_Service{scale=1.5}> Discovery, Querying & Stats Service" <<Service>> as SRV_Qr8St8
 !endprocedure
+!procedure $DECL_SRV_TroaoZ()
+  rectangle "<$archimate_Service{scale=1.5}> Document Authoring Service" <<Service>> as SRV_TroaoZ
+!endprocedure
 !procedure $DECL_SRV_Uv9Wx9()
   rectangle "<$archimate_Service{scale=1.5}> Repository Promotion Service" <<Service>> as SRV_Uv9Wx9
 !endprocedure
@@ -452,7 +455,7 @@
   rectangle "<$archimate_Event{scale=1.5}> Promotion Plan Prepared" <<Event>> as EVT_Dm0CyE
 !endprocedure
 !procedure $DECL_EVT_JXFmQ()
-  rectangle "<$archimate_Event{scale=1.5}> Model Verified" <<Event>> as EVT_JXFmQ
+  rectangle "<$archimate_Event{scale=1.5}> Model Verification Completed" <<Event>> as EVT_JXFmQ
 !endprocedure
 !procedure $DECL_EVT_UCrh3V()
   rectangle "<$archimate_Event{scale=1.5}> Architecture Repository Change Detected" <<Event>> as EVT_UCrh3V

@@ -31,7 +31,6 @@ def execute_promotion(
     plan: PromotionPlan,
     engagement_root: Path,
     enterprise_root: Path,
-    verifier: ArtifactVerifier,
     registry: ArtifactRegistry,
     *,
     conflict_resolutions: list[ConflictResolution] | None = None,
