@@ -1,10 +1,16 @@
 from __future__ import annotations
 
+from functools import lru_cache
 from typing import Any
 
 from src.domain.artifact_types import ConnectionRecord, EntityRecord
+from src.domain.module_types import ElementClassName
 
-_JUNCTION_ENTITY_TYPES = frozenset({"and-junction", "or-junction"})
+
+@lru_cache(maxsize=None)
+def _junction_types() -> frozenset[str]:
+    from src.infrastructure.app_bootstrap import get_module_registry  # noqa: PLC0415
+    return frozenset(get_module_registry().entity_types_with_class(ElementClassName("junction")))
 
 
 def _unique_ids(values: list[str]) -> list[str]:
@@ -28,17 +34,17 @@ def resolve_diagram_selection(
             target_id = str(conn["target"])
             if source_id not in entity_set:
                 source_rec = repo.get_entity(source_id)
-                if source_rec is not None and source_rec.artifact_type in _JUNCTION_ENTITY_TYPES:
+                if source_rec is not None and source_rec.artifact_type in _junction_types():
                     candidate_junction_ids.add(source_id)
             if target_id not in entity_set:
                 target_rec = repo.get_entity(target_id)
-                if target_rec is not None and target_rec.artifact_type in _JUNCTION_ENTITY_TYPES:
+                if target_rec is not None and target_rec.artifact_type in _junction_types():
                     candidate_junction_ids.add(target_id)
 
         added_entity = False
         for junction_id in sorted(candidate_junction_ids):
             junction_rec = repo.get_entity(junction_id)
-            if junction_rec is None or junction_rec.artifact_type not in _JUNCTION_ENTITY_TYPES:
+            if junction_rec is None or junction_rec.artifact_type not in _junction_types():
                 continue
             junction_connections = repo.find_connections_for(junction_id, direction="any")
             if not junction_connections:

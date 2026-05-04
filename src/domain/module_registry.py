@@ -7,6 +7,7 @@ from collections.abc import Mapping
 from src.domain.module_types import ConnectionTypeName, ElementClassName, EntityTypeName
 from src.domain.ontology_protocol import DiagramKindModule, OntologyModule
 from src.domain.ontology_types import ConnectionTypeInfo, EntityTypeInfo
+from src.domain.permitted_relationships import PermittedRelationshipSet
 
 
 class ModuleRegistry:
@@ -127,6 +128,12 @@ class ModuleRegistry:
             if name in om.entity_types:
                 return om
         return None
+
+    def aggregated_permitted_relationships(self) -> PermittedRelationshipSet:
+        result = PermittedRelationshipSet.empty()
+        for om in self._ontologies.values():
+            result = result | om.permitted_relationships
+        return result
 
     # ── Domain ordering ───────────────────────────────────────────────────────
 

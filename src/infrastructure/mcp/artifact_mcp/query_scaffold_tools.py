@@ -7,12 +7,14 @@ groupings for 90° routing, and hidden layout chains within each group.
 
 from __future__ import annotations
 
+from functools import lru_cache
 from typing import Literal
 
 from mcp.server.fastmcp import FastMCP  # type: ignore[import-not-found]
 
 from src.application.artifact_parsing import extract_archimate_label_alias
 from src.domain.archimate_relation_rendering import render_archimate_relation
+from src.domain.module_types import ElementClassName
 from src.domain.ontology_loader import CONNECTION_TYPES, DOMAIN_GROUPING, ENTITY_TYPES
 from src.domain.ontology_loader import DOMAIN_ORDER as _DOMAIN_ORDER_LOWER
 from src.infrastructure.mcp.artifact_mcp.context import (
@@ -23,6 +25,33 @@ from src.infrastructure.mcp.artifact_mcp.context import (
 )
 from src.infrastructure.mcp.artifact_mcp.tool_annotations import READ_ONLY
 from src.infrastructure.rendering._diagram_layout import build_nested_layout_lines, build_visual_nesting
+
+
+@lru_cache(maxsize=1)
+def _registry():
+    from src.infrastructure.app_bootstrap import get_module_registry  # noqa: PLC0415
+    return get_module_registry()
+
+
+@lru_cache(maxsize=None)
+def _junction_types() -> frozenset[str]:
+    return frozenset(_registry().entity_types_with_class(ElementClassName("junction")))
+
+
+@lru_cache(maxsize=None)
+def _nesting_conn_dirs() -> frozenset[str]:
+    return frozenset(
+        n.removeprefix("archimate-")
+        for n in _registry().connection_types_with_classification("nesting")
+    )
+
+
+@lru_cache(maxsize=None)
+def _flow_conn_dirs() -> frozenset[str]:
+    return frozenset(
+        n.removeprefix("archimate-")
+        for n in _registry().connection_types_with_classification("flow")
+    )
 
 # conn_short_name → PUML arrow (archimate connections only)
 _ARROW: dict[str, str] = {
@@ -60,13 +89,10 @@ def _domain(artifact_type: str) -> str:
     return info.domain_dir.capitalize() if info else "Common"
 
 
-_JUNCTION_TYPES = frozenset({"and-junction", "or-junction"})
-_STRUCTURAL_CONNECTION_TYPES = frozenset({"composition", "aggregation"})
-_LAYOUT_FLOW_CONNECTION_TYPES = frozenset({"triggering", "flow"})
 
 
 def _entity_decl(artifact_type: str, label: str, alias: str) -> str:
-    if artifact_type in _JUNCTION_TYPES:
+    if artifact_type in _junction_types():
         return f'circle " " as {alias}'
     info = ENTITY_TYPES.get(artifact_type)
     if not info or not info.archimate_element_type:
@@ -167,9 +193,12 @@ def _emit_entity(
             flow_edges=[
                 (str(conn["source_alias"]), str(conn["target_alias"]))
                 for conn in connections
-                if conn["conn_dir"] in _LAYOUT_FLOW_CONNECTION_TYPES
+                if conn["conn_dir"] in _flow_conn_dirs()
             ],
-            junction_aliases={child["display_alias"] for child in children if child["artifact_type"] in _JUNCTION_TYPES},
+            junction_aliases={
+                child["display_alias"] for child in children
+                if child["artifact_type"] in _junction_types()
+            },
             main_axis=main_axis,
             branch_axis=branch_axis,
             indent=inner,
@@ -195,10 +224,13 @@ def _build_puml(
         structural_edges=[
             (str(conn["source_alias"]), str(conn["target_alias"]))
             for conn in connections
-            if conn["conn_dir"] in _STRUCTURAL_CONNECTION_TYPES
+            if conn["conn_dir"] in _nesting_conn_dirs()
         ],
         neighbor_edges=[(str(conn["source_alias"]), str(conn["target_alias"])) for conn in connections],
-        junction_aliases={alias for alias, entity in alias_to_entity.items() if entity["artifact_type"] in _JUNCTION_TYPES},
+        junction_aliases={
+            alias for alias, entity in alias_to_entity.items()
+            if entity["artifact_type"] in _junction_types()
+        },
     )
     for parent_alias, children in children_map.items():
         children.sort(key=lambda entity: entity_order.get(str(entity["display_alias"]), len(entity_order)))
@@ -301,7 +333,7 @@ def _build_puml(
         lines.append("")
 
     # Non-structural connections (composition/aggregation shown via nesting)
-    non_comp = [c for c in connections if c["conn_dir"] not in _STRUCTURAL_CONNECTION_TYPES]
+    non_comp = [c for c in connections if c["conn_dir"] not in _nesting_conn_dirs()]
     if non_comp:
         lines.append("' --- Connections ---")
         for c in non_comp:

@@ -106,45 +106,9 @@ def expand_tokens(tokens: list[str]) -> list[str]:
 
 
 def archimate_prefix_to_type() -> dict[str, str]:
-    """Return the canonical mapping of artifact-id prefix → ArchiMate element type.
+    """Return the canonical mapping of artifact-id prefix → entity type name.
 
     Used for display, reporting, and filter-hint generation.
     """
-    return {
-        "STK": "stakeholder",
-        "DRV": "driver",
-        "ASS": "assessment",
-        "GOL": "goal",
-        "OUT": "outcome",
-        "PRI": "principle",
-        "REQ": "requirement",
-        "MEA": "meaning",
-        "VAL": "value",
-        "CAP": "capability",
-        "VS": "value-stream",
-        "RES": "resource",
-        "COA": "course-of-action",
-        "ACT": "business-actor",
-        "ROL": "role",
-        "PRC": "process",
-        "FNC": "function",
-        "CLB": "collaboration",
-        "SRV": "service",
-        "EVT": "event",
-        "BOB": "business-object",
-        "BIF": "business-interface",
-        "PRD": "product",
-        "APP": "application-component",
-        "AIF": "application-interface",
-        "DOB": "data-object",
-        "NOD": "node",
-        "DEV": "device",
-        "SSW": "system-software",
-        "TSV": "technology-service",
-        "ART": "artifact",
-        "NET": "network",
-        "TIF": "technology-interface",
-        "WP": "work-package",
-        "DEL": "deliverable",
-        "PLT": "plateau",
-    }
+    from src.infrastructure.app_bootstrap import get_module_registry  # noqa: PLC0415
+    return {info.prefix: name for name, info in get_module_registry().all_entity_types().items()}

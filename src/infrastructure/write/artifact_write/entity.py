@@ -1,10 +1,10 @@
 from collections.abc import Callable
 from pathlib import Path
 
-from src.application.modeling.artifact_write import ENTITY_TYPES, format_entity_markdown, generate_entity_id
+from src.application.modeling.artifact_write import format_entity_markdown, generate_entity_id
 from src.application.verification.artifact_verifier import ArtifactVerifier
 from src.config.repo_paths import MODEL
-from src.domain.archimate_types import ALL_ENTITY_TYPES
+from src.domain.module_types import EntityTypeName
 
 from ._artifact_deduplication import (
     ensure_unique_entity_random_part,
@@ -55,13 +55,10 @@ def create_entity(
             "POST /api/global-entity-reference (GUI) instead."
         )
 
-    if artifact_type not in ALL_ENTITY_TYPES:
-        raise ValueError(f"Unknown entity artifact_type: {artifact_type!r}")
-    info = ENTITY_TYPES.get(artifact_type)
+    from src.infrastructure.app_bootstrap import get_module_registry  # noqa: PLC0415
+    info = get_module_registry().find_entity_type(EntityTypeName(artifact_type))
     if info is None:
-        raise ValueError(
-            f"Entity artifact_type '{artifact_type}' is supported by the verifier but is missing a writer mapping"
-        )
+        raise ValueError(f"Unknown entity artifact_type: {artifact_type!r}")
 
     last = last_updated or today_iso()
 

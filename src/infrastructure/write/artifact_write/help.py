@@ -4,11 +4,16 @@ Progressive discovery pattern: agents call this to learn valid entity/connection
 types before calling create/edit tools.  Grouped by domain for quick scanning.
 """
 
-from src.application.modeling.artifact_write import (
-    ARCHIMATE_STEREOTYPE_TO_CONNECTION_TYPE,
-    CONNECTION_TYPES,
-    ENTITY_TYPES,
-)
+from functools import lru_cache
+
+from src.application.modeling.artifact_write import ARCHIMATE_STEREOTYPE_TO_CONNECTION_TYPE
+from src.domain.module_types import ElementClassName
+
+
+@lru_cache(maxsize=1)
+def _registry():
+    from src.infrastructure.app_bootstrap import get_module_registry  # noqa: PLC0415
+    return get_module_registry()
 
 
 def write_help() -> dict[str, object]:
@@ -28,22 +33,20 @@ def write_help() -> dict[str, object]:
     }
 
 
-_INTERNAL_TYPES: frozenset[str] = frozenset({"global-artifact-reference"})
-
-
 def _entity_types_by_domain() -> dict[str, list[str]]:
+    internal = _registry().entity_types_with_class(ElementClassName("internal"))
     grouped: dict[str, list[str]] = {}
-    for type_name, info in ENTITY_TYPES.items():
-        if type_name in _INTERNAL_TYPES:
+    for type_name, info in _registry().all_entity_types().items():
+        if type_name in internal:
             continue
         domain = info.domain_dir
-        grouped.setdefault(domain, []).append(type_name)
+        grouped.setdefault(domain, []).append(str(type_name))
     return grouped
 
 
 def _entity_type_catalog() -> dict[str, dict[str, object]]:
     return {
-        type_name: {
+        str(type_name): {
             "prefix": info.prefix,
             "domain": info.domain_dir,
             "subdir": info.subdir,
@@ -51,25 +54,25 @@ def _entity_type_catalog() -> dict[str, dict[str, object]]:
             "archimate_element_type": info.archimate_element_type,
             "element_classes": list(info.element_classes),
         }
-        for type_name, info in ENTITY_TYPES.items()
+        for type_name, info in _registry().all_entity_types().items()
     }
 
 
 def _connection_types_by_language() -> dict[str, list[str]]:
     grouped: dict[str, list[str]] = {}
-    for type_name, info in CONNECTION_TYPES.items():
+    for type_name, info in _registry().all_connection_types().items():
         lang = info.conn_lang
-        grouped.setdefault(lang, []).append(type_name)
+        grouped.setdefault(lang, []).append(str(type_name))
     return grouped
 
 
 def _connection_type_catalog() -> dict[str, dict[str, object]]:
     return {
-        type_name: {
+        str(type_name): {
             "language": info.conn_lang,
             "archimate_relationship_type": info.archimate_relationship_type,
             "symmetric": info.symmetric,
             "puml_arrow": info.puml_arrow,
         }
-        for type_name, info in CONNECTION_TYPES.items()
+        for type_name, info in _registry().all_connection_types().items()
     }

@@ -17,11 +17,11 @@ from __future__ import annotations
 from collections.abc import Callable
 from pathlib import Path
 
-from src.application.modeling.artifact_write import ENTITY_TYPES, format_outgoing_markdown, generate_entity_id
+from src.application.modeling.artifact_write import format_outgoing_markdown, generate_entity_id
 from src.application.modeling.artifact_write_formatting import format_entity_markdown
 from src.application.verification.artifact_verifier import ArtifactRegistry, ArtifactVerifier
 from src.config.repo_paths import DIAGRAM_CATALOG, DIAGRAMS, MODEL
-from src.domain.archimate_types import ALL_ENTITY_TYPES
+from src.domain.module_types import EntityTypeName
 from src.infrastructure.rendering.generate_macros import generate_macros
 
 from .boundary import assert_enterprise_write_root, today_iso
@@ -69,11 +69,10 @@ def admin_create_entity(
 ) -> WriteResult:
     assert_enterprise_write_root(repo_root)
 
-    if artifact_type not in ALL_ENTITY_TYPES:
-        raise ValueError(f"Unknown entity artifact_type: {artifact_type!r}")
-    info = ENTITY_TYPES.get(artifact_type)
+    from src.infrastructure.app_bootstrap import get_module_registry  # noqa: PLC0415
+    info = get_module_registry().find_entity_type(EntityTypeName(artifact_type))
     if info is None:
-        raise ValueError(f"No writer mapping for artifact_type '{artifact_type}'")
+        raise ValueError(f"Unknown entity artifact_type: {artifact_type!r}")
 
     last = last_updated or today_iso()
     eid = artifact_id or generate_entity_id(info.prefix, name)

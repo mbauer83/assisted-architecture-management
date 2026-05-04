@@ -1,19 +1,10 @@
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Literal, Protocol, runtime_checkable
+from typing import Literal, Protocol, TypeAlias, runtime_checkable
 
 from src.config.workspace_paths import infer_repo_scope
 
-Domain = Literal[
-    "motivation",
-    "strategy",
-    "common",
-    "business",
-    "application",
-    "technology",
-    "implementation",
-    "unknown",
-]
+Domain: TypeAlias = str
 
 MountScope = Literal["engagement", "enterprise"]
 
@@ -269,6 +260,9 @@ STANDARD_DIAGRAM_FIELDS = frozenset(
     }
 )
 
-DOMAIN_NAMES: frozenset[str] = frozenset(
-    {"motivation", "strategy", "common", "business", "application", "technology", "implementation"}
-)
+def _derive_domain_names() -> frozenset[str]:
+    from src.infrastructure.app_bootstrap import get_module_registry  # noqa: PLC0415
+    return frozenset(info.domain_dir for info in get_module_registry().all_entity_types().values()) | {"unknown"}
+
+DOMAIN_NAMES: frozenset[str] = _derive_domain_names()
+del _derive_domain_names

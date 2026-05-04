@@ -9,7 +9,7 @@ from pathlib import Path
 from typing import Callable, Generator
 
 from src.domain.artifact_types import ConnectionRecord, DiagramRecord, DocumentRecord, EntityRecord
-from src.domain.ontology_loader import SYMMETRIC_CONNECTIONS
+from src.domain.connection_ontology import is_symmetric as _is_symmetric_conn
 
 from ._mem_store import _MemStore
 from ._sqlite_schema import FTS_SQL, SCHEMA_SQL
@@ -396,7 +396,7 @@ class _SqliteStore:
             rec.src_cardinality,
             rec.tgt_cardinality,
         )
-        if rec.conn_type in SYMMETRIC_CONNECTIONS:
+        if _is_symmetric_conn(rec.conn_type):
             rows: list[tuple[str, ...]] = [(rec.source, rec.artifact_id, "symmetric", rec.target, *shared)]
             if rec.target != rec.source:
                 rows.append((rec.target, rec.artifact_id, "symmetric", rec.source, *shared))

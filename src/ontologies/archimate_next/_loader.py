@@ -102,6 +102,7 @@ def _load_connection_types(data: dict[str, Any]) -> dict[ConnectionTypeName, Con
     for lang, types in data["connection_types"].items():
         for name, info in (types or {}).items():
             raw = info or {}
+            hp_raw = raw.get("hierarchy_priority")
             out[ConnectionTypeName(name)] = ConnectionTypeInfo(
                 artifact_type=name,
                 conn_lang=lang,
@@ -109,6 +110,7 @@ def _load_connection_types(data: dict[str, Any]) -> dict[ConnectionTypeName, Con
                 symmetric=bool(raw.get("symmetric", False)),
                 puml_arrow=raw.get("puml_arrow", "-->"),
                 classifications=tuple(raw.get("classifications", ())),
+                hierarchy_priority=int(hp_raw) if hp_raw is not None else None,
             )
     return out
 

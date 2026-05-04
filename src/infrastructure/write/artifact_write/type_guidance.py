@@ -6,8 +6,15 @@ for a selectable subset of ArchiMate domains or entity types.
 
 from __future__ import annotations
 
+from functools import lru_cache
+
 from src.domain.connection_ontology import classify_connections
-from src.domain.ontology_loader import ENTITY_TYPES
+
+
+@lru_cache(maxsize=1)
+def _registry():
+    from src.infrastructure.app_bootstrap import get_module_registry  # noqa: PLC0415
+    return get_module_registry()
 
 
 def get_type_guidance(
@@ -25,22 +32,19 @@ def get_type_guidance(
     - Domain filter → ``archimate_domain`` omitted (it equals the requested domain).
     - No filter → ``archimate_domain`` included (types span all domains).
     """
-    all_infos = ENTITY_TYPES
+    all_infos = _registry().all_entity_types()
 
     if filter is None:
         selected = list(all_infos.values())
         include_domain = True
         domain_context: list[str] | None = None
     else:
-        # Determine mode: entity-type names or domain names?
         entity_type_hits = [n for n in filter if n in all_infos]
         if len(entity_type_hits) == len(filter):
-            # Every name is a known entity type
             selected = [all_infos[n] for n in filter]
             include_domain = True
             domain_context = None
         else:
-            # Treat as domain filter (case-insensitive match on domain_dir)
             unknown_types = [n for n in filter if n not in all_infos]
             domain_set = {d.lower() for d in filter}
             selected = [info for info in all_infos.values() if info.domain_dir.lower() in domain_set]

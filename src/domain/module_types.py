@@ -4,7 +4,6 @@ from __future__ import annotations
 
 from typing import ClassVar, Final, NewType, final
 
-
 EntityTypeName = NewType("EntityTypeName", str)
 ConnectionTypeName = NewType("ConnectionTypeName", str)
 DiagramKindName = NewType("DiagramKindName", str)

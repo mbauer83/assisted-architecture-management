@@ -13,6 +13,7 @@
 # classifications: semantic tags used by registry queries:
 #   structural   — composition / aggregation / assignment / realization etc.
 #   hierarchy    — relationship types that also express containment hierarchy
+#   nesting      — relationship types rendered as visual containment (composition / aggregation only)
 #   flow         — triggering / flow (left→right layout direction hints)
 
 # ── Matrix diagram abbreviations ──────────────────────────────────────────
@@ -37,12 +38,14 @@ connection_types:
       archimate_relationship_type: Composition
       puml_arrow: "-->"
       symmetric: false
-      classifications: [structural, hierarchy]
+      classifications: [structural, hierarchy, nesting]
+      hierarchy_priority: 1
     archimate-aggregation:
       archimate_relationship_type: Aggregation
       puml_arrow: "-->"
       symmetric: false
-      classifications: [structural, hierarchy]
+      classifications: [structural, hierarchy, nesting]
+      hierarchy_priority: 2
     archimate-assignment:
       archimate_relationship_type: Assignment
       puml_arrow: "-->"
@@ -78,6 +81,7 @@ connection_types:
       puml_arrow: "--|>"
       symmetric: false
       classifications: [structural, hierarchy]
+      hierarchy_priority: 0
     archimate-flow:
       archimate_relationship_type: Flow
       puml_arrow: "..>"

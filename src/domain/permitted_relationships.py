@@ -45,6 +45,12 @@ class PermittedRelationshipSet:
             out.setdefault(r.source_type, []).append((r.target_type, r.connection_type))
         return out
 
+    def by_target(self) -> dict[EntityTypeName, list[tuple[EntityTypeName, ConnectionTypeName]]]:
+        out: dict[EntityTypeName, list[tuple[EntityTypeName, ConnectionTypeName]]] = {}
+        for r in self._rules:
+            out.setdefault(r.target_type, []).append((r.source_type, r.connection_type))
+        return out
+
     def filter_to(
         self,
         entity_types: frozenset[EntityTypeName],

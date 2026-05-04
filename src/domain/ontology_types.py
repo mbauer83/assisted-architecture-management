@@ -31,3 +31,4 @@ class ConnectionTypeInfo:
     symmetric: bool = False
     puml_arrow: str = "-->"
     classifications: tuple[str, ...] = ()
+    hierarchy_priority: int | None = None

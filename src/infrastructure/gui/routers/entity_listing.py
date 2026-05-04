@@ -2,17 +2,32 @@
 
 from __future__ import annotations
 
+from functools import lru_cache
 from typing import Any
 
 from src.domain.artifact_types import EntityRecord
 from src.infrastructure.gui.routers import state as s
 
-_HIERARCHY_PRIORITY = {
-    "archimate-specialization": 0,
-    "archimate-composition": 1,
-    "archimate-aggregation": 2,
-}
-_HIERARCHY_TYPES = frozenset(_HIERARCHY_PRIORITY)
+
+@lru_cache(maxsize=1)
+def _registry():
+    from src.infrastructure.app_bootstrap import get_module_registry  # noqa: PLC0415
+    return get_module_registry()
+
+
+@lru_cache(maxsize=None)
+def _hierarchy_priority() -> dict[str, int]:
+    out: dict[str, int] = {}
+    for name, info in _registry().all_connection_types().items():
+        if info.hierarchy_priority is not None:
+            out[str(name)] = info.hierarchy_priority
+    return out
+
+
+@lru_cache(maxsize=None)
+def _hierarchy_types() -> frozenset[str]:
+    return frozenset(_hierarchy_priority())
+
 
 _HIERARCHY_LABEL = {
     "archimate-specialization": "specialization",
@@ -23,9 +38,11 @@ _HIERARCHY_LABEL = {
 
 def hierarchy_meta(entities: list[EntityRecord], repo) -> dict[str, dict[str, object]]:
     entity_ids = {e.artifact_id for e in entities}
+    hp = _hierarchy_priority()
+    ht = _hierarchy_types()
     parents_by_child: dict[str, list[tuple[str, str]]] = {}
-    for conn in repo.list_connections_by_types_for_entities(_HIERARCHY_TYPES, entity_ids):
-        if conn.conn_type not in _HIERARCHY_PRIORITY:
+    for conn in repo.list_connections_by_types_for_entities(ht, entity_ids):
+        if conn.conn_type not in hp:
             continue
         if conn.conn_type == "archimate-specialization":
             child_id = conn.source
@@ -40,7 +57,7 @@ def hierarchy_meta(entities: list[EntityRecord], repo) -> dict[str, dict[str, ob
         parents_by_child[child_id].append((parent_id, conn.conn_type))
 
     for child_id in parents_by_child:
-        parents_by_child[child_id].sort(key=lambda p: (_HIERARCHY_PRIORITY[p[1]], p[0]))
+        parents_by_child[child_id].sort(key=lambda p: (hp[p[1]], p[0]))
 
     depth_cache: dict[str, int] = {}
 
@@ -66,13 +83,13 @@ def hierarchy_meta(entities: list[EntityRecord], repo) -> dict[str, dict[str, ob
         meta: dict[str, object] = {
             "hierarchy_depth": depth_for(e.artifact_id),
             "specialization_depth": depth_for(e.artifact_id),
-            "all_parents": [{"parent_id": pid, "relation_type": _HIERARCHY_LABEL[ct]} for pid, ct in parents],
+            "all_parents": [{"parent_id": pid, "relation_type": _HIERARCHY_LABEL.get(ct, ct)} for pid, ct in parents],
         }
         if primary:
             pid, ct = primary
             meta["parent_entity_id"] = pid
             meta["parent_specialization_id"] = pid
-            meta["hierarchy_relation_type"] = _HIERARCHY_LABEL[ct]
+            meta["hierarchy_relation_type"] = _HIERARCHY_LABEL.get(ct, ct)
         result[e.artifact_id] = meta
     return result
 

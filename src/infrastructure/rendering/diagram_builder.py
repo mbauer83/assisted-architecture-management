@@ -17,6 +17,7 @@ import re
 import subprocess
 import tempfile
 from collections import defaultdict
+from functools import lru_cache
 from pathlib import Path
 
 from src.application.artifact_parsing import normalize_puml_alias
@@ -27,6 +28,7 @@ from src.domain.archimate_relation_rendering import (
     render_archimate_relation,
 )
 from src.domain.artifact_types import ConnectionRecord, EntityRecord
+from src.domain.module_types import ElementClassName
 from src.domain.ontology_loader import (
     CONNECTION_TYPES,
     DOMAIN_DISPLAY,
@@ -40,6 +42,27 @@ from src.infrastructure.rendering._diagram_layout import (
     build_nested_layout_lines,
     build_visual_nesting,
 )
+
+
+@lru_cache(maxsize=1)
+def _registry():
+    from src.infrastructure.app_bootstrap import get_module_registry  # noqa: PLC0415
+    return get_module_registry()
+
+
+@lru_cache(maxsize=None)
+def _junction_types() -> frozenset[str]:
+    return frozenset(_registry().entity_types_with_class(ElementClassName("junction")))
+
+
+@lru_cache(maxsize=None)
+def _nesting_conn_types() -> frozenset[str]:
+    return frozenset(_registry().connection_types_with_classification("nesting"))
+
+
+@lru_cache(maxsize=None)
+def _flow_conn_types() -> frozenset[str]:
+    return frozenset(_registry().connection_types_with_classification("flow"))
 
 
 def _load_sprite_map(repo_root: Path) -> dict[str, str]:
@@ -139,10 +162,7 @@ def _parse_archimate_block(raw: str) -> dict:
         return {}
 
 
-_JUNCTION_TYPES = frozenset({"and-junction", "or-junction"})
 _ENTITY_TYPE_ORDER = list(ENTITY_TYPES)
-_STRUCTURAL_CONNECTION_TYPES = frozenset({"archimate-composition", "archimate-aggregation"})
-_LAYOUT_FLOW_CONNECTION_TYPES = frozenset({"archimate-triggering", "archimate-flow"})
 
 
 def _entity_archimate_element_type(entity: EntityRecord) -> str:
@@ -224,7 +244,7 @@ def _build_visual_nesting(
         if not src_alias or not tgt_alias:
             continue
         ct = CONNECTION_TYPES.get(conn.conn_type)
-        if ct and ct.artifact_type in _STRUCTURAL_CONNECTION_TYPES and tgt_alias in entity_by_alias:
+        if ct and ct.artifact_type in _nesting_conn_types() and tgt_alias in entity_by_alias:
             structural_edges.append((src_alias, tgt_alias))
             continue
         neighbor_edges.append((src_alias, tgt_alias))
@@ -233,7 +253,10 @@ def _build_visual_nesting(
         item_by_alias=entity_by_alias,
         structural_edges=structural_edges,
         neighbor_edges=neighbor_edges,
-        junction_aliases={alias for alias, entity in entity_by_alias.items() if entity.artifact_type in _JUNCTION_TYPES},
+        junction_aliases={
+            alias for alias, entity in entity_by_alias.items()
+            if entity.artifact_type in _junction_types()
+        },
     )
     for parent_alias, children in children_map.items():
         children.sort(
@@ -291,11 +314,11 @@ def generate_archimate_puml_body(
     flow_edges = [
         (src_alias, tgt_alias)
         for conn in connection_records
-        if conn.conn_type in _LAYOUT_FLOW_CONNECTION_TYPES
+        if conn.conn_type in _flow_conn_types()
         and (src_alias := alias_by_id.get(conn.source))
         and (tgt_alias := alias_by_id.get(conn.target))
     ]
-    junction_aliases = {alias for alias, child in entity_by_alias.items() if child.artifact_type in _JUNCTION_TYPES}
+    junction_aliases = {alias for alias, child in entity_by_alias.items() if child.artifact_type in _junction_types()}
     layout_direction_hints: dict[tuple[str, str], str] = {}
 
     # Build composition/aggregation hierarchy for visual nesting, then pull
@@ -317,7 +340,7 @@ def generate_archimate_puml_body(
         alias = normalize_puml_alias(entity.display_alias)
         if not alias:
             return []
-        if entity.artifact_type in _JUNCTION_TYPES:
+        if entity.artifact_type in _junction_types():
             return [f'{indent}circle " " as {alias}']
         arch_data = _parse_archimate_block(entity.display_blocks.get("archimate", ""))
         element_type = arch_data.get("element-type", "")
@@ -405,7 +428,7 @@ def generate_archimate_puml_body(
     for conn in connection_records:
         ct = CONNECTION_TYPES.get(conn.conn_type)
         # Composition/aggregation shown structurally via nesting — skip as connection lines
-        if ct and ct.artifact_type in _STRUCTURAL_CONNECTION_TYPES:
+        if ct and ct.artifact_type in _nesting_conn_types():
             continue
         src = alias_by_id.get(conn.source)
         tgt = alias_by_id.get(conn.target)

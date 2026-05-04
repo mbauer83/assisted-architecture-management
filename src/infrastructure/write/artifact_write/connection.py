@@ -1,15 +1,20 @@
 import re
 from collections.abc import Callable
+from functools import lru_cache
 from pathlib import Path
 
 from src.application.modeling.artifact_write import format_outgoing_markdown
 from src.application.verification.artifact_verifier import ArtifactRegistry, ArtifactVerifier
-from src.domain.archimate_types import ALL_CONNECTION_TYPES
+from src.domain.module_types import ConnectionTypeName, ElementClassName
 
 from .boundary import assert_engagement_write_root, today_iso
 from .types import WriteResult
 
-_JUNCTION_ENTITY_TYPES = frozenset({"and-junction", "or-junction"})
+
+@lru_cache(maxsize=None)
+def _junction_types() -> frozenset[str]:
+    from src.infrastructure.app_bootstrap import get_module_registry  # noqa: PLC0415
+    return frozenset(get_module_registry().entity_types_with_class(ElementClassName("junction")))
 _CONN_TYPE_RE = re.compile(r"^### (\S+)", re.MULTILINE)
 
 
@@ -59,7 +64,7 @@ def _check_junction_homogeneity(
     whenever a connection involving a junction is written.
     """
     for entity_id in (source_entity, target_entity):
-        if _entity_artifact_type(registry, entity_id) not in _JUNCTION_ENTITY_TYPES:
+        if _entity_artifact_type(registry, entity_id) not in _junction_types():
             continue
         junc_file = registry.find_file_by_id(entity_id)
         if junc_file is None:
@@ -86,7 +91,8 @@ def _validate_inputs(
     target_entity: str,
     extra_known_ids: frozenset[str] = frozenset(),
 ) -> None:
-    if connection_type not in ALL_CONNECTION_TYPES:
+    from src.infrastructure.app_bootstrap import get_module_registry  # noqa: PLC0415
+    if get_module_registry().find_connection_type(ConnectionTypeName(connection_type)) is None:
         raise ValueError(f"Unknown connection type: {connection_type!r}")
     known_ids = registry.entity_ids() | extra_known_ids
     if source_entity not in known_ids:
@@ -240,7 +246,7 @@ def add_connection(
 
     if src_cardinality or tgt_cardinality:
         for eid, label in ((source_entity, "source"), (target_entity, "target")):
-            if _entity_artifact_type(registry, eid) in _JUNCTION_ENTITY_TYPES:
+            if _entity_artifact_type(registry, eid) in _junction_types():
                 raise ValueError(
                     f"Cardinalities are not permitted at junction connection-ends "
                     f"(the {label} entity '{eid}' is a junction)."

@@ -1,6 +1,8 @@
 from __future__ import annotations
 
-from src.domain.ontology_loader import CONNECTION_TYPES
+from functools import lru_cache
+
+from src.domain.module_types import ConnectionTypeName
 
 _DIRECTION_SUFFIX = {
     "up": "Up",
@@ -8,6 +10,12 @@ _DIRECTION_SUFFIX = {
     "left": "Left",
     "right": "Right",
 }
+
+
+@lru_cache(maxsize=1)
+def _registry():
+    from src.infrastructure.app_bootstrap import get_module_registry  # noqa: PLC0415
+    return get_module_registry()
 
 
 def display_connection_label(conn_type: str) -> str:
@@ -35,7 +43,7 @@ def render_archimate_relation(
     direction: str | None = None,
     label_text: str = "",
 ) -> str | None:
-    ct = CONNECTION_TYPES.get(conn_type)
+    ct = _registry().find_connection_type(ConnectionTypeName(conn_type))
     if ct is None or ct.conn_lang != "archimate" or not ct.archimate_relationship_type:
         return None
     macro = f"Rel_{ct.archimate_relationship_type}"
