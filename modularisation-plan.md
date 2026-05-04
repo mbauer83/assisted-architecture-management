@@ -29,6 +29,11 @@ incremental and backward-compatible during the migration.
 
 - **The ontology is the domain.** All entity types, connection types, and permitted
   relationships live inside module packages. Nothing outside a module declares type names.
+- **Attribute profiles are repo-local policy, not ontology metadata.** Per-entity-type
+  attribute profiles remain in each repo under
+  `.arch-repo/schemata/attributes.{entity-type}.schema.json` as full JSON Schema
+  documents. They are custom by nature, may vary by repo, and are not copied into a
+  global `entities.yaml`. Authoring and scaffold order follows JSON Schema property order.
 - **YAML carries data; code carries behaviour.** Type names, prefixes, and permitted
   relationship rules live in YAML within the module. Filter predicates, rendering logic,
   and validation hooks live in Python within the same module.
@@ -45,6 +50,11 @@ incremental and backward-compatible during the migration.
   tool — MCP, GUI API, or CLI — maintains its own closed list of types. Registering a
   new ontology or diagram kind automatically makes all its types valid, creatable,
   queryable, and renderable without touching any tool code.
+- **Repo compatibility is discovered, not declared.** The system already indexes repo
+  content and schemata; startup compatibility checks should derive used entity types,
+  connection types, and diagram kinds from those indexed repos and compare them against
+  the registry. Repos do not carry a single declarative `ontology = ...` field because
+  a workspace may legitimately contain content from multiple ontologies.
 - **Rendering is generic by default; code is the escape hatch.** A single generic PUML
   renderer handles all diagram kinds through YAML-declared config (includes, grouping,
   layout hints, element-class rendering patterns). A diagram kind module needs no
@@ -616,7 +626,7 @@ automatically.
 
 ```yaml
 # src/diagram_kinds/archimate_business/config.yaml
-primary_ontology: archimate-next-snapshot1   # validated against registry at startup
+primary_ontology: archimate-next-snapshot1   # must name a registered ontology module
 accepted_domains: [business, common]         # entity filter: domain_dir must be in this list
 
 grouping:
@@ -805,6 +815,33 @@ Infrastructure adapters (MCP tools, CLI) that currently import directly from
 `ontology_loader` are migrated to accept the registry as a parameter, obtained from
 the same bootstrapped instance.
 
+### Startup compatibility validation for indexed repos
+
+Module registration alone is not enough. After the registry is built and the configured
+repo roots are indexed, startup performs a compatibility pass over discovered usage.
+
+This validation is discovery-driven rather than declarative:
+
+- used entity types are derived from indexed entity records and from repo-local
+  `attributes.{entity-type}.schema.json` filenames
+- used connection types are derived from indexed connection records and from repo-local
+  `connection-metadata.{connection-type}.schema.json` filenames
+- used diagram kinds are derived from indexed diagram records
+
+Those discovered sets are compared to:
+
+- `registry.all_entity_types()`
+- `registry.all_connection_types()`
+- `registry.all_diagram_kinds()`
+
+If any indexed repo uses an unsupported entity type, connection type, or diagram kind,
+startup aborts with a discrepancy report that lists unsupported names by category and,
+where available, example artifact ids or file paths that triggered each discrepancy.
+
+This check is distinct from frontmatter schema validation. Frontmatter schemata remain
+generic per file class; the compatibility check here is specifically about ontology and
+diagram vocabulary discovered in repo contents and per-type attribute/connection schemata.
+
 ---
 
 ## Migration Strategy
@@ -919,16 +956,21 @@ from any registered ontology are accepted without code changes.
       `registry.all_connection_types()`
 - [x] `type_guidance.py:28` — replaced with `registry.all_entity_types()`
 
-**Entity creation template enrichment** (deferred to Phase 2b)
+**Entity creation scaffolding and attribute-profile remediation**
 
-Entity creation (`format_entity_markdown`) currently infers required fields from
-`EntityTypeInfo.create_when` (free text). To support generic template generation for
-any registered ontology's types, add structured fields to `entities.yaml`:
+The first Phase 2b implementation moved attribute template hints into ontology metadata
+via `required_fields` / `optional_fields`. That was the wrong abstraction: attribute
+profiles are repo-local, custom, and must remain full JSON Schema documents.
 
-- [x] Add `required_fields: [field-name, ...]` and `optional_fields: [field-name, ...]`
-      to each entity type entry in `archimate_next/entities.yaml`
-- [x] Update `format_entity_markdown` to read these fields from `EntityTypeInfo`
-      (add corresponding typed fields to `EntityTypeInfo` dataclass)
+- [ ] Remove `required_fields` / `optional_fields` from ontology YAML and from
+      `EntityTypeInfo` as scaffold-authority fields
+- [ ] Update `format_entity_markdown` and its callers to derive attribute scaffolds
+      from repo-local `attributes.{artifact-type}.schema.json`, using the schema's
+      `properties` order as the canonical field order
+- [ ] Derive required vs optional scaffold prompts from the JSON Schema `required`
+      list rather than ontology metadata
+- [ ] Preserve current behaviour for repos with no attribute schema: emit an empty
+      attributes block rather than inventing ontology-level field lists
 - [x] `global_artifact_reference.py:66` — replace direct `ENTITY_TYPES[_GAR_TYPE]`
       lookup with `registry.get_entity_type(EntityTypeName(_GAR_TYPE))`
 
@@ -1020,6 +1062,16 @@ Prerequisites: Phases 1–3 fully migrated and all tests green.
 
 ### Phase 6 — Cleanup and hardening
 
+- [ ] Add startup compatibility validation for indexed repos in the bootstrap/runtime
+      path: discover used entity types, connection types, and diagram kinds from
+      indexed content and per-type schema filenames; compare against the registered
+      ontology/diagram modules and abort startup on unsupported usage
+- [ ] Include actionable discrepancy reports in startup failures: list unsupported
+      entity types, connection types, and diagram kinds separately, with example
+      artifact ids or file paths where they were found
+- [ ] Add tests covering multi-repo and multi-ontology workspaces:
+      supported mixed-ontology content starts successfully; unsupported types in repo
+      content or repo-local schemata block startup with the expected report
 - [ ] Audit all `global-artifact-reference` special-case sites now gated behind
       `entity_types_with_class("internal")` — consolidate duplicated guard logic into
       shared predicate functions in the application layer
@@ -1057,12 +1109,13 @@ their loaders produce a valid `PermittedRelationshipSet`.
 Modules are registered at startup. Changing an ontology or diagram kind requires a
 server restart. This is acceptable for the current deployment model.
 
-**Cross-ontology diagrams are not supported.**
-A diagram with `primary_ontology = FreeOntology` can display entities from any
-ontology, but has no structural connection rules. A diagram with a specific primary
-ontology may only contain entities from that ontology. Mixing ArchiMate and SysML
-entities in one constrained diagram is out of scope; it would require a third
-"composed ontology" module with explicitly declared cross-module connection rules.
+**Multiple ontologies across repos are supported; constrained diagrams still bind to one.**
+The workspace may legitimately contain entities from multiple registered ontologies
+across one or more indexed repos. `FreeOntology` diagram kinds may display such mixed
+content, but contribute no structural connection rules. A diagram kind with a specific
+`primary_ontology` remains constrained to that ontology's vocabulary. Mixing ArchiMate
+and SysML entities in one constrained diagram is out of scope; it would require a
+composed ontology module with explicitly declared cross-module connection rules.
 
 ---
 
