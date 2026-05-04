@@ -22,7 +22,6 @@ from pathlib import Path
 
 from src.application.artifact_parsing import normalize_puml_alias
 from src.config.repo_paths import DIAGRAM_CATALOG, DIAGRAMS
-from src.domain.module_types import DiagramKindName
 from src.domain.archimate_relation_rendering import (
     display_connection_label,
     format_cardinality_label,
@@ -30,19 +29,13 @@ from src.domain.archimate_relation_rendering import (
 )
 from src.domain.artifact_types import ConnectionRecord, EntityRecord
 from src.domain.module_types import ElementClassName
-from src.domain.ontology_loader import (
-    CONNECTION_TYPES,
-    DOMAIN_DISPLAY,
-    DOMAIN_GROUPING,
-    DOMAIN_ORDER,
-    ELEMENT_TYPE_HAS_SPRITE,
-    ENTITY_TYPES,
-)
+from src.domain.ontology_catalog import all_connection_types, all_entity_types
 from src.infrastructure.rendering._diagram_layout import (
     build_branch_direction_hints,
     build_nested_layout_lines,
     build_visual_nesting,
 )
+from src.infrastructure.diagram_kinds import get_diagram_kind
 
 
 @lru_cache(maxsize=1)
@@ -131,7 +124,7 @@ def _parse_archimate_block(raw: str) -> dict:
         return {}
 
 
-_ENTITY_TYPE_ORDER = list(ENTITY_TYPES)
+_ENTITY_TYPE_ORDER = list(all_entity_types())
 
 
 def _entity_archimate_element_type(entity: EntityRecord) -> str:
@@ -139,7 +132,7 @@ def _entity_archimate_element_type(entity: EntityRecord) -> str:
     element_type = str(arch_data.get("element-type") or "").strip()
     if element_type:
         return element_type
-    info = ENTITY_TYPES.get(entity.artifact_type)
+    info = all_entity_types().get(entity.artifact_type)
     return info.archimate_element_type if info else ""
 
 
@@ -212,7 +205,7 @@ def _build_visual_nesting(
         tgt_alias = alias_by_id.get(conn.target)
         if not src_alias or not tgt_alias:
             continue
-        ct = CONNECTION_TYPES.get(conn.conn_type)
+        ct = all_connection_types().get(conn.conn_type)
         if ct and ct.artifact_type in _nesting_conn_types() and tgt_alias in entity_by_alias:
             structural_edges.append((src_alias, tgt_alias))
             continue
@@ -241,11 +234,7 @@ def generate_archimate_puml_body(
     *,
     diagram_type: str = "archimate-business",
 ) -> str:
-    kind = _registry().find_diagram_kind(diagram_type)
-    if kind is None and diagram_type.startswith("archimate-"):
-        kind = _registry().get_diagram_kind(DiagramKindName("archimate-layered"))
-    if kind is None:
-        raise ValueError(f"Unknown diagram kind: {diagram_type}")
+    kind = get_diagram_kind(diagram_type)
     return kind.renderer.render_body(
         name,
         entity_records,

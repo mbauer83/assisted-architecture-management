@@ -977,19 +977,19 @@ registry and each kind's `renderer`.
 - [ ] Replace `if diagram_type == "matrix"` and `if "archimate" in diagram_type`
       dispatch in routers and `diagram_builder.py` with
       `registry.get_diagram_kind(name).renderer.render_body(...)`
-- [ ] Replace `startswith("archimate-")` checks in `entities.py`, `diagrams.py`,
+- [x] Replace `startswith("archimate-")` checks in `entities.py`, `diagrams.py`,
       `_diagram_context.py` with `registry.find_diagram_kind(name) is not None` or
       `isinstance(registry.get_diagram_kind(name).primary_ontology, _FreeOntologyType)`
 
 **Scaffold tool and GUI selection**
-- [ ] Migrate `query_scaffold_tools.py` to call
+- [x] Migrate `query_scaffold_tools.py` to call
       `registry.get_diagram_kind(diagram_type).renderer.render_body(entities, connections, ...)`
       instead of building PUML declarations directly; remove hardcoded `_ARROW`, `_LABEL`,
       `_entity_decl` — these are now in `GenericPumlRenderer` driven by module config
-- [ ] Migrate `_diagram_context.py` entity/connection selection lists to call
+- [x] Migrate `_diagram_context.py` entity/connection selection lists to call
       `registry.get_diagram_kind(diagram_type).effective_entity_types()` and
       `effective_connection_types()` instead of hardcoded domain lists
-- [ ] Expose a `/diagram-kinds/{name}/entity-types` and `/connection-types` read-only
+- [x] Expose a `/diagram-kinds/{name}/entity-types` and `/connection-types` read-only
       API endpoint (or extend the existing entities endpoint) that returns the effective
       vocabulary for a given diagram kind — this is the API surface the future GUI canvas
       will call; no new write tools needed
@@ -998,13 +998,13 @@ registry and each kind's `renderer`.
 
 Prerequisites: Phases 1–3 fully migrated and all tests green.
 
-- [ ] Delete `src/domain/ontology_loader.py`
-- [ ] Delete `src/domain/archimate_types.py` (all consumers now use registry)
-- [ ] Delete `src/domain/domain_vocabulary.py` (prefix map derived from registry)
-- [ ] Remove `DOMAIN_NAMES` constant from `artifact_types.py`
-- [ ] Delete `config/entity_ontology.yaml` and `config/connection_ontology.yaml`
+- [x] Delete `src/domain/ontology_loader.py`
+- [x] Delete `src/domain/archimate_types.py` (all consumers now use registry)
+- [x] Delete `src/domain/domain_vocabulary.py` (prefix map derived from registry)
+- [x] Remove `DOMAIN_NAMES` constant from `artifact_types.py`
+- [x] Delete `config/entity_ontology.yaml` and `config/connection_ontology.yaml`
       (data now lives in the module package)
-- [ ] Remove any remaining `from src.domain.ontology_loader import` statements
+- [x] Remove any remaining `from src.domain.ontology_loader import` statements
 
 ### Phase 5 — TypeScript type generation
 

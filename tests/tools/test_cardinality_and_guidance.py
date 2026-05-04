@@ -471,22 +471,22 @@ class TestConnectionBodyCardinality:
 
 class TestElementCategoryRemoved:
     def test_entity_type_info_has_no_element_category(self) -> None:
-        from src.domain.ontology_loader import ENTITY_TYPES
-        info = ENTITY_TYPES["requirement"]
+        from src.domain.ontology_catalog import all_entity_types
+        info = all_entity_types()["requirement"]
         assert not hasattr(info, "element_category"), (
             "element_category should have been removed from EntityTypeInfo"
         )
 
     def test_entity_type_info_still_has_element_classes(self) -> None:
-        from src.domain.ontology_loader import ENTITY_TYPES
-        info = ENTITY_TYPES["requirement"]
+        from src.domain.ontology_catalog import all_entity_types
+        info = all_entity_types()["requirement"]
         assert hasattr(info, "element_classes")
         assert "motivation-element" in info.element_classes
 
     def test_category_map_not_exported(self) -> None:
-        import src.domain.ontology_loader as ol
+        import src.domain.ontology_catalog as ol
         assert not hasattr(ol, "CATEGORY_MAP"), (
-            "CATEGORY_MAP should have been removed from ontology_loader"
+            "CATEGORY_MAP should have been removed from the ontology catalog"
         )
 
 
@@ -496,9 +496,9 @@ class TestElementCategoryRemoved:
 
 class TestGetTypeGuidance:
     def test_all_types_returned_when_no_filter(self) -> None:
-        from src.domain.ontology_loader import ENTITY_TYPES
+        from src.domain.ontology_catalog import all_entity_types
         result = get_type_guidance()
-        assert result["total"] == len(ENTITY_TYPES)
+        assert result["total"] == len(all_entity_types())
         assert isinstance(result["entity_types"], list)
 
     def test_all_types_include_archimate_domain(self) -> None:

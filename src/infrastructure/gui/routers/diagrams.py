@@ -13,6 +13,8 @@ from src.domain.artifact_types import DiagramRecord, EntityRecord
 from src.infrastructure.gui.routers import state as s
 from src.infrastructure.gui.routers._diagram_context import (
     candidate_connections_for_entities,
+    diagram_kind_connection_type_items,
+    diagram_kind_entity_type_items,
     diagram_context_payload,
     diagram_entities_and_puml,
     entity_display_item,
@@ -173,6 +175,22 @@ def get_diagram_context(id: str) -> dict[str, Any]:
     if diag_rec is None:
         raise HTTPException(404, f"Diagram not found: {id!r}")
     return diagram_context_payload(repo, diag_rec)
+
+
+@router.get("/api/diagram-kinds/{name}/entity-types")
+def get_diagram_kind_entity_types(name: str) -> list[dict[str, Any]]:
+    try:
+        return diagram_kind_entity_type_items(name)
+    except KeyError:
+        raise HTTPException(404, f"Diagram kind not found: {name!r}")
+
+
+@router.get("/api/diagram-kinds/{name}/connection-types")
+def get_diagram_kind_connection_types(name: str) -> list[dict[str, Any]]:
+    try:
+        return diagram_kind_connection_type_items(name)
+    except KeyError:
+        raise HTTPException(404, f"Diagram kind not found: {name!r}")
 
 
 @router.get("/api/diagram-svg")

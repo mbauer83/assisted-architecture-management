@@ -259,10 +259,3 @@ STANDARD_DIAGRAM_FIELDS = frozenset(
         "keywords",
     }
 )
-
-def _derive_domain_names() -> frozenset[str]:
-    from src.infrastructure.app_bootstrap import get_module_registry  # noqa: PLC0415
-    return frozenset(info.domain_dir for info in get_module_registry().all_entity_types().values()) | {"unknown"}
-
-DOMAIN_NAMES: frozenset[str] = _derive_domain_names()
-del _derive_domain_names

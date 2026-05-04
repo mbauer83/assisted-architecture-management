@@ -8,14 +8,14 @@ unwriteable.
 from __future__ import annotations
 
 from src.application.modeling.artifact_write import CONNECTION_TYPES, ENTITY_TYPES
-from src.domain.archimate_types import ALL_CONNECTION_TYPES, ALL_ENTITY_TYPES
+from src.domain.ontology_catalog import all_connection_type_names, all_entity_type_names
 
 
 def test_writer_entity_type_mapping_covers_all() -> None:
-    missing = sorted([t for t in ALL_ENTITY_TYPES if t not in ENTITY_TYPES])
+    missing = sorted([t for t in all_entity_type_names() if t not in ENTITY_TYPES])
     assert missing == [], f"Missing entity mappings for: {missing}"
 
 
 def test_writer_connection_type_mapping_covers_all() -> None:
-    missing = sorted([t for t in ALL_CONNECTION_TYPES if t not in CONNECTION_TYPES])
+    missing = sorted([t for t in all_connection_type_names() if t not in CONNECTION_TYPES])
     assert missing == [], f"Missing connection mappings for: {missing}"

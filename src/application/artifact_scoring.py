@@ -2,7 +2,7 @@ import math
 import re
 
 from src.domain.artifact_types import ConnectionRecord, DiagramRecord, DocumentRecord, EntityRecord
-from src.domain.domain_vocabulary import expand_tokens
+from src.domain.search_terms import expand_tokens
 
 
 def tokenize(text: str) -> list[str]:

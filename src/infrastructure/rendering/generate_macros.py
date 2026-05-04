@@ -23,8 +23,7 @@ import yaml
 from src.application.artifact_parsing import normalize_puml_alias
 from src.config.repo_paths import DIAGRAM_CATALOG, MODEL
 from src.config.settings import archimate_type_markers, sprite_scale
-from src.domain.ontology_loader import DOMAIN_ORDER as _DOMAIN_ORDER_LIST
-from src.domain.ontology_loader import ENTITY_TYPES
+from src.domain.ontology_catalog import all_entity_types, domain_order
 from src.infrastructure.rendering._svg_sprite_convert import (
     browser_markup_to_plantuml_svg as _browser_markup_to_plantuml_svg,
 )
@@ -59,7 +58,7 @@ def _extract_archimate_block(content: str) -> dict | None:
         return None
 
 
-_DOMAIN_ORDER = {d: i for i, d in enumerate(_DOMAIN_ORDER_LIST)}
+_DOMAIN_ORDER = {d: i for i, d in enumerate(domain_order())}
 
 _PREFIX_ORDER = [
     "STK",
@@ -131,7 +130,7 @@ def _generate_glyph_include(repo_root: Path) -> Path:
         lines.append("hide stereotype")
         lines.append("")
         for info in sorted(
-            (et for et in ENTITY_TYPES.values() if et.archimate_element_type),
+            (et for et in all_entity_types().values() if et.archimate_element_type),
             key=lambda item: item.archimate_element_type,
         ):
             kind = glyphs["types"].get(info.artifact_type)

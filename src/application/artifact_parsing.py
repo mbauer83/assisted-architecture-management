@@ -6,7 +6,6 @@ import yaml  # type: ignore[import-untyped]
 
 from src.application.verification.artifact_verifier_types import entity_id_from_path
 from src.domain.artifact_types import (
-    DOMAIN_NAMES,
     STANDARD_DIAGRAM_FIELDS,
     STANDARD_DOCUMENT_FIELDS,
     STANDARD_ENTITY_FIELDS,
@@ -17,6 +16,7 @@ from src.domain.artifact_types import (
     Domain,
     EntityRecord,
 )
+from src.domain.ontology_catalog import known_domain_names
 
 
 def extract_yaml_block(content: str) -> dict | None:
@@ -125,7 +125,8 @@ def derive_domain(path: Path, root: Path) -> tuple[Domain, str]:
         parts = rel.parts
         domain_raw = parts[0] if len(parts) > 0 else "unknown"
         subdomain = parts[1] if len(parts) > 1 else ""
-        domain: Domain = domain_raw if domain_raw in DOMAIN_NAMES else "unknown"  # type: ignore[assignment]
+        domain_names = known_domain_names()
+        domain: Domain = domain_raw if domain_raw in domain_names else "unknown"  # type: ignore[assignment]
         return domain, subdomain
     except ValueError:
         return "unknown", ""

@@ -259,6 +259,12 @@ def test_ensure_backend_running_starts_backend_in_workspace_using_project_launch
     assert probe_ports == [8123, 8123]
 
 
+def test_module_registry_registers_matrix_diagram_kind() -> None:
+    registry = module_registry_from_app(_build_app())
+
+    assert registry.find_diagram_kind("matrix") is not None
+
+
 def test_matches_arch_backend_process_for_console_script_path() -> None:
     argv = [
         "/home/user/project/.venv/bin/python3",

@@ -8,7 +8,7 @@ from typing import Any
 
 from src.application.artifact_parsing import extract_declared_puml_aliases, normalize_puml_alias
 from src.domain.artifact_types import DiagramRecord, EntityRecord
-from src.domain.ontology_loader import DOMAIN_ORDER as _DOMAIN_ORDER
+from src.infrastructure.diagram_kinds import domain_order, get_diagram_kind
 from src.infrastructure.gui.routers import state as s
 
 
@@ -59,9 +59,10 @@ def diagram_entities_and_puml(repo: Any, diag_rec: DiagramRecord) -> tuple[list[
             row = s.entity_to_summary(rec)
             row["display_alias"] = rec.display_alias
             entities.append(row)
+    ordered_domains = domain_order()
     entities.sort(
         key=lambda e: (
-            _DOMAIN_ORDER.index(e["domain"]) if e["domain"] in _DOMAIN_ORDER else 99,
+            ordered_domains.index(e["domain"]) if e["domain"] in ordered_domains else 99,
             e["name"],
         )
     )
@@ -144,6 +145,7 @@ def diagram_context_payload(repo: Any, diag_rec: DiagramRecord) -> dict[str, Any
 
 
 def hop_suggestions(repo: Any, entity_ids: list[str], *, max_hops: int, limit_per_hop: int) -> list[dict[str, Any]]:
+    ordered_domains = domain_order()
     frontier = set(entity_ids)
     visited = set(entity_ids)
     groups: list[dict[str, Any]] = []
@@ -168,7 +170,7 @@ def hop_suggestions(repo: Any, entity_ids: list[str], *, max_hops: int, limit_pe
         ]
         items.sort(
             key=lambda item: (
-                _DOMAIN_ORDER.index(item["domain"]) if item["domain"] in _DOMAIN_ORDER else 99,
+                ordered_domains.index(item["domain"]) if item["domain"] in ordered_domains else 99,
                 item["name"],
             )
         )
@@ -193,3 +195,42 @@ def fuzzy_entity_hits(repo: Any, q: str, limit: int, excluded: set[str]) -> list
             scored.append((score, rec))
     scored.sort(key=lambda item: item[0], reverse=True)
     return [entity_display_item(rec) for _, rec in scored[:limit]]
+
+
+def diagram_kind_entity_type_items(diagram_type: str) -> list[dict[str, Any]]:
+    kind = get_diagram_kind(diagram_type)
+    ordered_domains = domain_order()
+    items = [
+        {
+            "artifact_type": artifact_type,
+            "prefix": info.prefix,
+            "domain": info.domain_dir,
+            "subdomain": info.subdir,
+            "element_type": info.archimate_element_type,
+            "element_classes": list(info.element_classes),
+        }
+        for artifact_type, info in kind.effective_entity_types().items()
+        if not info.internal
+    ]
+    items.sort(
+        key=lambda item: (
+            ordered_domains.index(item["domain"]) if item["domain"] in ordered_domains else 99,
+            item["artifact_type"],
+        )
+    )
+    return items
+
+
+def diagram_kind_connection_type_items(diagram_type: str) -> list[dict[str, Any]]:
+    kind = get_diagram_kind(diagram_type)
+    items = [
+        {
+            "connection_type": connection_type,
+            "conn_lang": info.conn_lang,
+            "symmetric": info.symmetric,
+            "classifications": list(info.classifications),
+        }
+        for connection_type, info in kind.effective_connection_types().items()
+    ]
+    items.sort(key=lambda item: item["connection_type"])
+    return items

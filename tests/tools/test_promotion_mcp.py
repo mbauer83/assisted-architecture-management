@@ -87,8 +87,8 @@ def enterprise_root(tmp_path: Path) -> Path:
 
 
 def _make_entity(root: Path, artifact_id: str, artifact_type: str, name: str) -> None:
-    from src.domain.ontology_loader import ENTITY_TYPES
-    info = ENTITY_TYPES[artifact_type]
+    from src.domain.ontology_catalog import all_entity_types
+    info = all_entity_types()[artifact_type]
     path = root / "model" / info.domain_dir / info.subdir / f"{artifact_id}.md"
     _write(path, _entity_md(artifact_id, artifact_type, name))
 

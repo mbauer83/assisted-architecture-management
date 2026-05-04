@@ -238,8 +238,8 @@ Consequences.
 class TestVerifyOutgoingFile:
     def _setup_entities(self, repo: Path, *eids_and_types) -> None:
         for eid, etype in eids_and_types:
-            from src.domain.ontology_loader import ENTITY_TYPES
-            info = ENTITY_TYPES[etype]
+            from src.domain.ontology_catalog import all_entity_types
+            info = all_entity_types()[etype]
             path = repo / "model" / info.domain_dir / info.subdir / f"{eid}.md"
             _write(path, _entity(eid, etype))
 
@@ -277,10 +277,10 @@ class TestVerifyOutgoingFile:
 
 class TestVerifyDiagramFile:
     def _setup_entities(self, repo: Path, *eids_and_types) -> None:
-        from src.domain.ontology_loader import ENTITY_TYPES
+        from src.domain.ontology_catalog import all_entity_types
 
         for eid, etype in eids_and_types:
-            info = ENTITY_TYPES[etype]
+            info = all_entity_types()[etype]
             path = repo / "model" / info.domain_dir / info.subdir / f"{eid}.md"
             _write(path, _entity(eid, etype))
 
@@ -467,9 +467,9 @@ class TestVerifyDocumentFile:
             ),
             encoding="utf-8",
         )
-        from src.domain.ontology_loader import ENTITY_TYPES
+        from src.domain.ontology_catalog import all_entity_types
         entity_id = "FNC@1000000002.AbcDef.function"
-        info = ENTITY_TYPES["function"]
+        info = all_entity_types()["function"]
         entity_path = repo / "model" / info.domain_dir / info.subdir / f"{entity_id}.md"
         _write(entity_path, _entity(entity_id, "function"))
 
@@ -514,9 +514,9 @@ class TestVerifyDocumentFile:
             ),
             encoding="utf-8",
         )
-        from src.domain.ontology_loader import ENTITY_TYPES
+        from src.domain.ontology_catalog import all_entity_types
         entity_id = "REQ@1000000003.AbcDef.req"
-        info = ENTITY_TYPES["requirement"]
+        info = all_entity_types()["requirement"]
         entity_path = repo / "model" / info.domain_dir / info.subdir / f"{entity_id}.md"
         _write(entity_path, _entity(entity_id, "requirement"))
 

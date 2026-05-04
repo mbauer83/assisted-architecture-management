@@ -9,6 +9,7 @@ from pydantic import BaseModel
 
 from src.application.artifact_parsing import parse_entity_content_sections
 from src.application.read_models import EntityContextReadModel
+from src.infrastructure.diagram_kinds import diagram_kind_domain
 from src.infrastructure.gui.routers import state as s
 from src.infrastructure.gui.routers.entity_listing import build_entity_summary_rows
 
@@ -26,14 +27,6 @@ def _score_reference_hit(name: str, artifact_id: str, query: str) -> tuple[int, 
     if name_lc.startswith(q) or id_lc.startswith(q):
         return (1, name_lc, id_lc)
     return (2, name_lc, id_lc)
-
-
-def _diagram_domain(diagram_type: str) -> str | None:
-    if not diagram_type.startswith("archimate-"):
-        return None
-    suffix = diagram_type.removeprefix("archimate-")
-    domain = suffix.split("-", 1)[0]
-    return domain if domain in {"motivation", "strategy", "business", "application", "technology", "common"} else None
 
 
 @router.get("/api/stats")
@@ -282,7 +275,7 @@ def search_reference_artifacts(
 
     if kind in (None, "diagram"):
         for diagram in repo.list_diagrams():
-            domain = _diagram_domain(diagram.diagram_type)
+            domain = diagram_kind_domain(diagram.diagram_type)
             if selected_domains and (domain is None or domain not in selected_domains):
                 continue
             if q_lc and q_lc not in diagram.name.lower() and q_lc not in diagram.artifact_id.lower():

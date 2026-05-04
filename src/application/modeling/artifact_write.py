@@ -24,11 +24,11 @@ from src.application.modeling.artifact_write_formatting import (
 from src.application.modeling.types import (
     DiagramConnectionInferenceMode,
 )
-from src.domain.ontology_loader import (
-    ARCHIMATE_STEREOTYPE_TO_CONNECTION_TYPE,
-    CONNECTION_TYPES,
-    ENTITY_TYPES,
-)
+from src.domain.ontology_catalog import all_connection_types, all_entity_types, archimate_stereotype_to_connection_type
+
+ENTITY_TYPES = all_entity_types()
+CONNECTION_TYPES = all_connection_types()
+ARCHIMATE_STEREOTYPE_TO_CONNECTION_TYPE = archimate_stereotype_to_connection_type()
 
 __all__ = [
     "ARCHIMATE_STEREOTYPE_TO_CONNECTION_TYPE",

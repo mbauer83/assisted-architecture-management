@@ -621,7 +621,7 @@ class ArtifactVerifier:
                     # E155: required entity-type connections
                     required_entity_types: list[str] = schema.get("required_entity_type_connections") or []
                     if required_entity_types:
-                        from src.domain.ontology_loader import (
+                        from src.domain.ontology_catalog import (
                             entity_type_term_matches,
                             expand_entity_type_term,
                             format_entity_type_term,

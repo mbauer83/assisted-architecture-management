@@ -3,7 +3,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Final, Literal, TypeAlias
 
-from src.domain.archimate_types import ALL_CONNECTION_TYPES, ALL_ENTITY_TYPES
+from src.domain.ontology_catalog import all_connection_type_names, all_entity_type_names
 
 
 class Severity:
@@ -91,8 +91,8 @@ def connection_header_matches_shape(header: str) -> bool:
     return len(parts) == 2 and bool(parts[0].strip()) and bool(parts[1].strip())
 
 
-ENTITY_TYPES: frozenset[str] = ALL_ENTITY_TYPES
-CONNECTION_TYPES: frozenset[str] = ALL_CONNECTION_TYPES
+ENTITY_TYPES: frozenset[str] = all_entity_type_names()
+CONNECTION_TYPES: frozenset[str] = all_connection_type_names()
 
 VALID_STATUSES: frozenset[str] = frozenset({"draft", "active", "deprecated"})
 

@@ -9,6 +9,7 @@ from src.diagram_kinds.archimate_layered import module as archimate_layered
 from src.diagram_kinds.archimate_motivation import module as archimate_motivation
 from src.diagram_kinds.archimate_strategy import module as archimate_strategy
 from src.diagram_kinds.archimate_technology import module as archimate_technology
+from src.diagram_kinds.matrix import module as matrix
 from src.domain.module_registry import ModuleRegistry
 from src.domain.ontology_protocol import DiagramKindModule
 
@@ -20,6 +21,7 @@ DEFAULT_DIAGRAM_KINDS: tuple[DiagramKindModule, ...] = (
     archimate_technology,
     archimate_implementation,
     archimate_layered,
+    matrix,
 )
 
 
