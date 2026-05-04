@@ -13,7 +13,7 @@ class EntityTypeInfo:
     prefix: str
     domain_dir: str
     subdir: str
-    archimate_element_type: str
+    archimate_element_type: str | None
     element_classes: tuple[str, ...]
     create_when: str
     never_create_when: str
@@ -30,3 +30,4 @@ class ConnectionTypeInfo:
     archimate_relationship_type: str | None = None
     symmetric: bool = False
     puml_arrow: str = "-->"
+    classifications: tuple[str, ...] = ()

@@ -130,7 +130,10 @@ def _generate_glyph_include(repo_root: Path) -> Path:
     if mode == "icons":
         lines.append("hide stereotype")
         lines.append("")
-        for info in sorted(ENTITY_TYPES.values(), key=lambda item: item.archimate_element_type):
+        for info in sorted(
+            (et for et in ENTITY_TYPES.values() if et.archimate_element_type),
+            key=lambda item: item.archimate_element_type,
+        ):
             kind = glyphs["types"].get(info.artifact_type)
             if not kind:
                 continue

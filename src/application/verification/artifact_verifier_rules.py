@@ -361,7 +361,10 @@ def check_puml_structure(content: str, fm: dict, result: VerificationResult, loc
     if "archimate" in diagram_type or "usecase" in diagram_type:
         has_macros = "_macros.puml" in content
         has_stereotypes = "_archimate-stereotypes.puml" in content
-        has_inlined_archimate = "skinparam rectangle<<" in content and "hide stereotype" in content
+        has_inlined_archimate = (
+            ("skinparam rectangle<<" in content and "hide stereotype" in content)
+            or "sprite $archimate_" in content
+        )
         if not has_macros and not has_stereotypes and not has_inlined_archimate:
             result.issues.append(
                 Issue(
