@@ -269,6 +269,16 @@ def _run_foreground(args: argparse.Namespace, parser: argparse.ArgumentParser, r
     )
     repo = ArtifactRepository(shared_artifact_index(roots))
     repo.refresh()
+
+    from src.application.startup_validation import RepoCompatibilityError, validate_repo_compatibility
+    from src.infrastructure.app_bootstrap import get_module_registry
+
+    try:
+        validate_repo_compatibility(repo, get_module_registry())
+    except RepoCompatibilityError as exc:
+        logger.error("Startup aborted — repository uses types not in the module registry:\n%s", exc)
+        sys.exit(1)
+
     from src.infrastructure.gui.routers import state as gui_state
 
     gui_state.init_state(

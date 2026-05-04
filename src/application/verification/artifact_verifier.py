@@ -6,6 +6,7 @@ from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from typing import Literal
 
+from src.application.entity_type_predicates import is_internal_entity_type
 from src.application.verification._verifier_rules_grf import (
     check_global_artifact_reference,
 )
@@ -132,7 +133,7 @@ class ArtifactVerifier:
         check_section(content, "§content", required=True, result=result, loc=loc)
         check_section(content, "§display", required=True, result=result, loc=loc)
 
-        if str(fm.get("artifact-type", "")) == "global-artifact-reference":
+        if is_internal_entity_type(str(fm.get("artifact-type", ""))):
             check_global_artifact_reference(fm, self.registry, result, loc)
 
         repo_root = self._repo_root_for_path(path)

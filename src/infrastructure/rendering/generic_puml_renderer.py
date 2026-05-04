@@ -115,9 +115,14 @@ class GenericPumlRenderer:
             rendered = [f"{indent}{decl} {{"]
             for child in children:
                 rendered.extend(render_entity(child, inner))
+            child_als = [
+                normalize_puml_alias(child.display_alias)
+                for child in children
+                if child.display_alias
+            ]
             layout_direction_hints.update(
                 build_branch_direction_hints(
-                    child_aliases=[normalize_puml_alias(child.display_alias) for child in children if child.display_alias],
+                    child_aliases=child_als,
                     flow_edges=flow_edges,
                     junction_aliases=junction_aliases,
                     branch_axis=nested_branch_axis,
@@ -125,7 +130,7 @@ class GenericPumlRenderer:
             )
             rendered.extend(
                 build_nested_layout_lines(
-                    child_aliases=[normalize_puml_alias(child.display_alias) for child in children if child.display_alias],
+                    child_aliases=child_als,
                     flow_edges=flow_edges,
                     junction_aliases=junction_aliases,
                     main_axis=nested_main_axis,

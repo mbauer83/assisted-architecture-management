@@ -207,7 +207,9 @@ const relatedEntitiesById = computed<Record<string, EntityDisplayInfo[]>>(() => 
       seen.add(otherId)
       seenByEntity.set(ownerId, seen)
       related[ownerId].push({
-        artifact_id: otherId, name, artifact_type: artifactType, domain,
+        artifact_id: otherId, name,
+        artifact_type: artifactType as EntityDisplayInfo['artifact_type'],
+        domain: domain as EntityDisplayInfo['domain'],
         subdomain: '', status: scope, display_alias: '',
         element_type: artifactType, element_label: name,
       })

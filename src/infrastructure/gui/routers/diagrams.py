@@ -8,15 +8,16 @@ from fastapi import APIRouter, HTTPException, Query
 from fastapi.responses import FileResponse, Response
 
 from src.application.artifact_parsing import parse_diagram_source
+from src.application.entity_type_predicates import is_internal_entity_type
 from src.config.repo_paths import DIAGRAM_CATALOG, DIAGRAMS, RENDERED
 from src.domain.artifact_types import DiagramRecord, EntityRecord
 from src.infrastructure.gui.routers import state as s
 from src.infrastructure.gui.routers._diagram_context import (
     candidate_connections_for_entities,
-    diagram_kind_connection_type_items,
-    diagram_kind_entity_type_items,
     diagram_context_payload,
     diagram_entities_and_puml,
+    diagram_kind_connection_type_items,
+    diagram_kind_entity_type_items,
     entity_display_item,
     fuzzy_entity_hits,
     hop_suggestions,
@@ -259,7 +260,7 @@ def entity_display_search(q: str, limit: int = Query(default=20, le=50)) -> list
         if h.record_type != "entity" or not isinstance(h.record, EntityRecord):
             continue
         rec = h.record
-        if rec.artifact_type == "global-artifact-reference":
+        if is_internal_entity_type(rec.artifact_type):
             continue
         items.append(entity_display_item(rec))
         if len(items) >= limit:

@@ -111,7 +111,6 @@ def promotion_plan(body: PromotionPlanBody) -> dict[str, Any]:
 @router.post("/api/promote/execute")
 def promotion_execute(body: PromotionExecuteBody) -> dict[str, Any]:
     """Execute a promotion plan built from an explicit selection of entities and connections."""
-    from src.application.verification.artifact_verifier import ArtifactVerifier
     from src.application.verification.artifact_verifier_registry import ArtifactRegistry
     from src.infrastructure.artifact_index import shared_artifact_index
     from src.infrastructure.write.artifact_write.promote_execute import execute_promotion

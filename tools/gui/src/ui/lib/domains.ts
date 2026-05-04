@@ -1,26 +1,34 @@
 import type { EntitySummary } from '../../domain'
+import { DOMAIN_NAMES, type DomainName } from '../../domain/types.generated'
 
-export const DOMAIN_COLORS = {
-  motivation: '#d8c1e4',
-  strategy: '#efbd5d',
-  common: '#e8e5d3',
-  business: '#f4de7f',
-  application: '#b6d7e1',
-  technology: '#c3e1b4',
-} as const
+type DomainDisplayConfig = { color: string; label: string }
+
+const DOMAIN_CONFIG: Partial<Record<DomainName, DomainDisplayConfig>> = {
+  motivation:     { color: '#d8c1e4', label: 'Motivation' },
+  strategy:       { color: '#efbd5d', label: 'Strategy' },
+  common:         { color: '#e8e5d3', label: 'Common' },
+  business:       { color: '#f4de7f', label: 'Business' },
+  application:    { color: '#b6d7e1', label: 'Application' },
+  technology:     { color: '#c3e1b4', label: 'Technology' },
+  implementation: { color: '#f4c896', label: 'Implementation' },
+}
+
+export const DOMAIN_COLORS: Partial<Record<DomainName, string>> = Object.fromEntries(
+  (Object.entries(DOMAIN_CONFIG) as [DomainName, DomainDisplayConfig][]).map(([k, v]) => [k, v.color]),
+)
 
 export const DOMAIN_OPTIONS = [
-  { key: '', label: 'All' },
-  { key: 'motivation', label: 'Motivation' },
-  { key: 'strategy', label: 'Strategy' },
-  { key: 'common', label: 'Common' },
-  { key: 'business', label: 'Business' },
-  { key: 'application', label: 'Application' },
-  { key: 'technology', label: 'Technology' },
-] as const
+  { key: '' as string, label: 'All' },
+  ...DOMAIN_NAMES
+    .filter(n => n !== 'unknown')
+    .map(name => ({
+      key: name as string,
+      label: DOMAIN_CONFIG[name]?.label ?? (name.charAt(0).toUpperCase() + name.slice(1)),
+    })),
+]
 
 export const getDomainColor = (domain?: string) =>
-  (domain && DOMAIN_COLORS[domain as keyof typeof DOMAIN_COLORS]) || '#cbd5e1'
+  (domain ? DOMAIN_COLORS[domain as DomainName] : undefined) ?? '#cbd5e1'
 
 export const getDomainLabel = (domain: string) =>
   DOMAIN_OPTIONS.find(option => option.key === domain)?.label ?? domain

@@ -1,6 +1,7 @@
 from collections.abc import Callable
 from pathlib import Path
 
+from src.application.entity_type_predicates import is_internal_entity_type
 from src.application.modeling.artifact_write import format_entity_markdown, generate_entity_id
 from src.application.verification.artifact_verifier import ArtifactVerifier
 from src.config.repo_paths import MODEL
@@ -48,7 +49,7 @@ def create_entity(
 ) -> WriteResult:
     assert_engagement_write_root(repo_root)
 
-    if artifact_type == "global-artifact-reference":
+    if is_internal_entity_type(artifact_type):
         raise ValueError(
             "global-artifact-reference entities may not be created directly. "
             "Use ensure_global_artifact_reference (MCP) or "

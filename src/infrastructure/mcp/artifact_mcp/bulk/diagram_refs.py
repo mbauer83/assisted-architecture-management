@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import Any
 
 from src.application.artifact_repository import ArtifactRepository
+from src.application.entity_type_predicates import is_internal_entity_type
 from src.application.verification.artifact_verifier import ArtifactVerifier
 from src.application.verification.artifact_verifier_parsing import (
     parse_diagram_refs,
@@ -120,7 +121,7 @@ def scan_grf_refs(repo_root: Path) -> dict[str, list[str]]:
         if path.name.endswith(".outgoing.md"):
             continue
         fm = parse_frontmatter_from_path(path) or {}
-        if str(fm.get("artifact-type", "")) != "global-artifact-reference":
+        if not is_internal_entity_type(str(fm.get("artifact-type", ""))):
             continue
         target = str(fm.get("global-artifact-id", "")).strip()
         gar_id = str(fm.get("artifact-id", path.stem)).strip()

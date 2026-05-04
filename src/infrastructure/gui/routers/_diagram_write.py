@@ -7,8 +7,8 @@ from typing import Any
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
-from src.infrastructure.gui.routers._diagram_selection import resolve_diagram_selection
 from src.infrastructure.gui.routers import state as s
+from src.infrastructure.gui.routers._diagram_selection import resolve_diagram_selection
 
 router = APIRouter()
 

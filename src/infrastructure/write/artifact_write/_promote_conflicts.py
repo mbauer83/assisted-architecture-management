@@ -139,7 +139,7 @@ def apply_merge(
         return
     parsed = parse_entity_file(ent_path)
     fm = dict(parsed.frontmatter)
-    info = get_module_registry().get_entity_type(EntityTypeName(conflict.artifact_type))
+    get_module_registry().get_entity_type(EntityTypeName(conflict.artifact_type))
     content = format_entity_markdown(
         artifact_id=conflict.enterprise_id,
         artifact_type=conflict.artifact_type,

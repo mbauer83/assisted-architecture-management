@@ -272,13 +272,10 @@ permitted_relationships:
   # ── Implementation & Migration (internal) ──────────────────────────────
   - [work-package, work-package, [triggering, flow]]
   - [work-package, deliverable, [access, realization]]
-  - [work-package, [event, implementation-event], [triggering, flow]]
+  - [work-package, event, [triggering, flow]]
   - [deliverable, plateau, [realization]]
   - [plateau, plateau, [triggering]]
-  - [plateau, [event, implementation-event], [triggering]]
-  - [implementation-event, work-package, [triggering, flow]]
-  - [implementation-event, deliverable, [access]]
-  - [implementation-event, plateau, [triggering]]
+  - [plateau, event, [triggering]]
 
   # ── Implementation → Common ────────────────────────────────────────────
   - [[deliverable, work-package], [event, function, path, process, role, service], [realization]]

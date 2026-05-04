@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-import pytest
-
 from src.domain.module_types import ConnectionTypeName, EntityTypeName
 from src.domain.permitted_relationships import PermittedRelationship, PermittedRelationshipSet
 

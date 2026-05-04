@@ -511,36 +511,21 @@ Each repository (engagement and enterprise) may contain a `.arch-repo/schemata/`
 
 **Promotion superset rule**: an engagement repo's schemata must be *supersets* of the enterprise repo's schemata. That is, every property and required field defined in an enterprise schema must also appear in the corresponding engagement schema. Promotion is blocked — with a per-violation error message — if this invariant is not met. This ensures promoted entities always satisfy the enterprise constraints after transfer.
 
-### Entity Types (`config/entity_ontology.yaml`)
+### Entity Types and Connection Types
 
-Each entry defines one ArchiMate NEXT entity type:
+Entity types, connection types, and permitted relationship rules are defined in *ontology modules* under `src/ontologies/`. The shipped module is `src/ontologies/archimate_next/` (ArchiMate NEXT Snapshot 1). Each module consists of:
 
-```yaml
-requirement:
-  prefix: REQ           # short ID prefix, e.g. REQ@epoch.random.slug
-  domain: motivation    # filesystem domain directory under model/
-  subdir: requirements  # subdirectory within the domain
-  archimate_element_type: Requirement   # CamelCase element type for diagram blocks
-  element_classes: [motivation-element] # ArchiMate classification classes
-  has_sprite: true      # whether a diagram sprite exists for this type
-  create_when: "…"      # guidance on when to use this type
-  never_create_when: "…"
-```
+- `entities.yaml` — one entry per entity type with `prefix`, `domain`, `subdir`, `element_classes`, `create_when`, `never_create_when`
+- `connections.yaml` — one entry per connection type, plus `permitted_relationships` rules using `[source, target, [conn-short-names]]` with `@class` / `@all` wildcards
+- `__init__.py` — exposes a `module` object satisfying the `OntologyModule` protocol
 
-Internal/meta types that should not appear in domain groupings or catalogs carry `internal: true`.
+New ontologies (SysML, TOGAF, domain-specific languages) can be added without touching the core. See `src/ontologies/README.md` for the full extension contract and a SysML skeleton example.
 
-### Connection Types (`config/connection_ontology.yaml`)
+### Diagram Kinds
 
-Each entry defines one connection type, grouped by diagram language (`archimate`, `er`, `sequence`, `activity`, `usecase`):
+Diagram views are declared as *diagram kind modules* under `src/diagram_kinds/`. Each kind has a `config.yaml` declaring its name, accepted entity type domains, PlantUML includes, grouping, and layout hints. The `GenericPumlRenderer` handles rendering for all standard ArchiMate-style views. Custom renderers are only needed for non-PlantUML diagram formats (e.g. the matrix kind).
 
-```yaml
-archimate-realization:
-  archimate_relationship_type: Realization  # ArchiMate stereotype name
-  puml_arrow: "..|>"    # PlantUML arrow syntax
-  symmetric: false      # true for bidirectional relationships (e.g. association)
-```
-
-Permitted relationships between entity types are defined in the `permitted_relationships:` section using `[source, target, [connection-short-names]]` rules with `@class` and `@all` wildcards.
+See `src/diagram_kinds/README.md` for the full `config.yaml` schema and extension guide.
 
 ### Document Types (`.arch-repo/documents/*.json`)
 
@@ -579,5 +564,6 @@ Each file defines one document type. The filename (without `.json`) is the `doc-
 
 - **[ArchiMate Forum](https://www.opengroup.org/archimate-forum)** — the modelling language
 - **`engagements/ENG-ARCH-REPO/`** — a self-describing model of this system's own architecture
-- **`src/common/ontology_loader.py`** — entity types, connection types, and domain definitions
+- **`src/ontologies/README.md`** — how to add a new ontology module (extension contract + SysML skeleton)
+- **`src/diagram_kinds/README.md`** — how to add a new diagram kind (`config.yaml` schema + extension guide)
 - **`.arch-repo/documents/`** — structured documentation templates (ADR, Standard, Specification)

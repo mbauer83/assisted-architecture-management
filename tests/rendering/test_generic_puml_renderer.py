@@ -100,8 +100,14 @@ def test_render_body_uses_includes_and_single_domain_type_groupings(tmp_path: Pa
 def test_render_body_renders_junction_inside_nested_parent(tmp_path: Path) -> None:
     renderer = GenericPumlRenderer(_ARCHIMATE_CONFIG)
     process = _entity("PRC@1.a.process-a", "process", "Process A", "PRC_A", domain="business", subdomain="processes")
-    function_a = _entity("FNC@1.a.function-a", "function", "Function A", "FNC_A", domain="business", subdomain="functions")
-    function_b = _entity("FNC@1.b.function-b", "function", "Function B", "FNC_B", domain="business", subdomain="functions")
+    function_a = _entity(
+        "FNC@1.a.function-a", "function", "Function A", "FNC_A",
+        domain="business", subdomain="functions",
+    )
+    function_b = _entity(
+        "FNC@1.b.function-b", "function", "Function B", "FNC_B",
+        domain="business", subdomain="functions",
+    )
     junction = _entity("JNA@1.a.and-a", "and-junction", "AND A", "JNA_A", domain="business", subdomain="junctions")
 
     puml = renderer.render_body(

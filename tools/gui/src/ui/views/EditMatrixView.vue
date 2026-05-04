@@ -68,7 +68,9 @@ const setMode = (twoSets: boolean) => {
 }
 
 const stub = (id: string): EntityDisplayInfo => ({
-  artifact_id: id, name: id, artifact_type: '', domain: '',
+  artifact_id: id, name: id,
+  artifact_type: '' as EntityDisplayInfo['artifact_type'],
+  domain: '' as EntityDisplayInfo['domain'],
   subdomain: '', status: '', display_alias: '',
   element_type: '', element_label: id,
 })

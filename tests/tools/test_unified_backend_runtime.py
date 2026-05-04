@@ -6,9 +6,9 @@ import yaml
 
 from src.config import settings
 from src.domain.module_registry import ModuleRegistry
+from src.infrastructure.app_bootstrap import module_registry_dependency, module_registry_from_app
 from src.infrastructure.backend import arch_backend, backend_control, backend_probe, backend_process, backend_state
 from src.infrastructure.backend.arch_backend_app import _build_app
-from src.infrastructure.app_bootstrap import module_registry_dependency, module_registry_from_app
 from src.infrastructure.mcp import arch_mcp_stdio
 
 

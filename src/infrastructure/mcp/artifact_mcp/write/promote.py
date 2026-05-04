@@ -9,7 +9,6 @@ from src.infrastructure.mcp.artifact_mcp.write._common import (
     repo_cached,
     resolve_repo_roots,
     roots_key,
-    verifier_for,
 )
 
 

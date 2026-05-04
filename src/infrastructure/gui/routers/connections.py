@@ -8,6 +8,7 @@ from typing import Any, Literal
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, field_validator
 
+from src.application.entity_type_predicates import is_internal_entity_type
 from src.infrastructure.gui.routers import state as s
 
 # Accepted cardinality formats: n  |  n..m  |  n..*  |  *
@@ -83,7 +84,7 @@ def _resolve_effective_type(artifact_id: str | None, declared_type: str) -> tupl
     if repo is None:
         return declared_type, False
     rec = repo.get_entity(artifact_id)
-    if rec is None or rec.artifact_type != "global-artifact-reference":
+    if rec is None or not is_internal_entity_type(rec.artifact_type):
         return declared_type, False
     if rec.extra.get("global-artifact-type") != "entity":
         return declared_type, True
@@ -161,7 +162,7 @@ def _reject_if_non_entity_gar(artifact_id: str, role: str) -> None:
     rec = repo.get_entity(artifact_id) if repo is not None else None
     if rec is None:
         return
-    if rec.artifact_type == "global-artifact-reference" and rec.extra.get("global-artifact-type") != "entity":
+    if is_internal_entity_type(rec.artifact_type) and rec.extra.get("global-artifact-type") != "entity":
         raise HTTPException(400, f"Cannot use a document/diagram global-artifact-reference as a connection {role}")
 
 

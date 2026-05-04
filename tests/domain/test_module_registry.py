@@ -12,7 +12,6 @@ from src.domain.module_types import ConnectionTypeName, ElementClassName, Entity
 from src.domain.ontology_types import ConnectionTypeInfo, EntityTypeInfo
 from src.domain.permitted_relationships import PermittedRelationshipSet
 
-
 # ── Minimal stub implementations ─────────────────────────────────────────────
 
 def _entity_type(name: str, domain: str = "test", classes: tuple[str, ...] = ()) -> EntityTypeInfo:

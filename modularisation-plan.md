@@ -1007,12 +1007,11 @@ registry and each kind's `renderer`.
       - `config.yaml`: full rendering config (accepted_domains, grouping, includes, layout)
       - `__init__.py`: minimal — load config, declare accepted domains, expose module
       - No `renderer.py` — `DiagramKindBase.renderer` handles it
-- [ ] Create `src/diagram_kinds/matrix/` with `FreeOntology` primary:
+- [x] Create `src/diagram_kinds/matrix/` with `FreeOntology` primary:
       - `config.yaml`: no grouping, no includes, no layout hints
       - `__init__.py`: accepts all entity types, no connection rules
-      - Matrix layout logic (currently in `matrix_builder.py`) folds into
-        `GenericPumlRenderer` as a layout mode, or matrix keeps its own renderer.py
-        if the layout logic is sufficiently distinct — decide during implementation
+      - Matrix keeps its own `_MatrixRenderer` (raises on `render_body` since matrix
+        diagrams use the markdown renderer, not PUML); registered in `register_default_diagram_kinds`
 
 **Registry wiring and dispatch migration**
 - [x] Register all diagram kinds in `app_bootstrap.py`
@@ -1052,43 +1051,47 @@ Prerequisites: Phases 1–3 fully migrated and all tests green.
 
 ### Phase 5 — TypeScript type generation
 
-- [ ] Write `tools/generate_types.py`: queries the registry, emits
+- [x] Write `tools/generate_types.py`: queries the registry, emits
       `tools/gui/src/domain/types.generated.ts` containing string literal unions
       for entity type names, connection type names, domain names, and diagram kind names
-- [ ] Add generation step to the frontend build (`package.json` `prebuild` or similar)
-- [ ] Replace hardcoded domain colour map and option lists in `tools/gui/src/ui/lib/domains.ts`
-      with imports from `types.generated.ts` (domain names) plus a config file for
-      UI-specific display properties (colours, icons) keyed on those generated names
-- [ ] Remove `artifact_type: Schema.String` / `domain: Schema.String` in `schemas.ts`
-      and replace with generated literal union schemas where appropriate
+- [x] Add generation step to the frontend build (`package.json` `prebuild` + `generate-types` scripts)
+- [x] Replace hardcoded domain colour map and option lists in `tools/gui/src/ui/lib/domains.ts`
+      with imports from `types.generated.ts` (domain names) plus `DOMAIN_CONFIG` for
+      UI-specific display properties (colours, labels) keyed on those generated names;
+      added `implementation` domain with colour `#f4c896`
+- [x] Replace `artifact_type: Schema.String` / `domain: Schema.String` in `schemas.ts`
+      with `EntityTypeNameSchema` / `DomainNameSchema` in `EntitySummarySchema`,
+      `EntityDetailSchema`, `EntityDisplayInfoSchema`; callsites that construct these
+      structs from connection context data use `as EntityDisplayInfo['artifact_type']`
+      type assertions
 
 ### Phase 6 — Cleanup and hardening
 
-- [ ] Add startup compatibility validation for indexed repos in the bootstrap/runtime
+- [x] Add startup compatibility validation for indexed repos in the bootstrap/runtime
       path: discover used entity types, connection types, and diagram kinds from
       indexed content and per-type schema filenames; compare against the registered
       ontology/diagram modules and abort startup on unsupported usage
-- [ ] Include actionable discrepancy reports in startup failures: list unsupported
+- [x] Include actionable discrepancy reports in startup failures: list unsupported
       entity types, connection types, and diagram kinds separately, with example
       artifact ids or file paths where they were found
-- [ ] Add tests covering multi-repo and multi-ontology workspaces:
+- [x] Add tests covering multi-repo and multi-ontology workspaces:
       supported mixed-ontology content starts successfully; unsupported types in repo
       content or repo-local schemata block startup with the expected report
-- [ ] Audit all `global-artifact-reference` special-case sites now gated behind
+- [x] Audit all `global-artifact-reference` special-case sites now gated behind
       `entity_types_with_class("internal")` — consolidate duplicated guard logic into
       shared predicate functions in the application layer
-- [ ] Add protocol compliance tests: each registered `OntologyModule` and
+- [x] Add protocol compliance tests: each registered `OntologyModule` and
       `DiagramKindModule` is checked with `isinstance(m, OntologyModule)` / `isinstance(m, DiagramKindModule)`
       (using `runtime_checkable`) and a suite of contract assertions (e.g. that
       `effective_permitted_relationships` only references type names present in the
       module's entity/connection vocabulary)
-- [ ] Document the extension contract in `src/ontologies/README.md`: how to add a new
+- [x] Document the extension contract in `src/ontologies/README.md`: how to add a new
       ontology module (SysML v2 example skeleton), how to register it, what the YAML
       schema must contain
-- [ ] Document the diagram kind extension contract in `src/diagram_kinds/README.md`:
+- [x] Document the diagram kind extension contract in `src/diagram_kinds/README.md`:
       the full config.yaml schema, when `renderer.py` is and is not needed, the
       element-class pattern table and how to extend it for a new element class
-- [ ] Update project README to reflect new structure
+- [x] Update project README to reflect new structure
 
 ---
 

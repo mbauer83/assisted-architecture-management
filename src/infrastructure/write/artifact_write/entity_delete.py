@@ -5,6 +5,7 @@ from __future__ import annotations
 from collections.abc import Callable
 from pathlib import Path
 
+from src.application.entity_type_predicates import is_internal_entity_type
 from src.application.verification.artifact_verifier import ArtifactRegistry
 from src.application.verification.artifact_verifier_parsing import (
     parse_diagram_refs,
@@ -105,7 +106,7 @@ def _entity_ref_blockers(
                 continue
             fm = parse_frontmatter_from_path(other_entity) or {}
             if (
-                str(fm.get("artifact-type", "")) == "global-artifact-reference"
+                is_internal_entity_type(str(fm.get("artifact-type", "")))
                 and str(fm.get("global-artifact-id", "")) == artifact_id
             ):
                 grf_refs.append(str(fm.get("artifact-id", other_entity.stem)))

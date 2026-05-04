@@ -210,8 +210,14 @@ def build_branch_direction_hints(
         if junction_alias not in junction_aliases:
             continue
         for group in (
-            sorted([alias for alias in outgoing.get(junction_alias, ()) if alias in child_alias_set], key=_original_position),
-            sorted([alias for alias in incoming.get(junction_alias, ()) if alias in child_alias_set], key=_original_position),
+            sorted(
+                [a for a in outgoing.get(junction_alias, ()) if a in child_alias_set],
+                key=_original_position,
+            ),
+            sorted(
+                [a for a in incoming.get(junction_alias, ()) if a in child_alias_set],
+                key=_original_position,
+            ),
         ):
             if len(group) < 2:
                 continue

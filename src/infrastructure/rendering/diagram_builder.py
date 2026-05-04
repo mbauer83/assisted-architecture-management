@@ -22,20 +22,13 @@ from pathlib import Path
 
 from src.application.artifact_parsing import normalize_puml_alias
 from src.config.repo_paths import DIAGRAM_CATALOG, DIAGRAMS
-from src.domain.archimate_relation_rendering import (
-    display_connection_label,
-    format_cardinality_label,
-    render_archimate_relation,
-)
 from src.domain.artifact_types import ConnectionRecord, EntityRecord
 from src.domain.module_types import ElementClassName
 from src.domain.ontology_catalog import all_connection_types, all_entity_types
+from src.infrastructure.diagram_kinds import get_diagram_kind
 from src.infrastructure.rendering._diagram_layout import (
-    build_branch_direction_hints,
-    build_nested_layout_lines,
     build_visual_nesting,
 )
-from src.infrastructure.diagram_kinds import get_diagram_kind
 
 
 @lru_cache(maxsize=1)

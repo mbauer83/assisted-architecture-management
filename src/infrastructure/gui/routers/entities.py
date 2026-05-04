@@ -8,6 +8,7 @@ from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel
 
 from src.application.artifact_parsing import parse_entity_content_sections
+from src.application.entity_type_predicates import is_internal_entity_type
 from src.application.read_models import EntityContextReadModel
 from src.infrastructure.diagram_kinds import diagram_kind_domain
 from src.infrastructure.gui.routers import state as s
@@ -48,9 +49,9 @@ def list_entities(
     if scope == "global":
         entities = [e for e in entities if s.is_global(e.path)]
     elif scope == "engagement":
-        entities = [e for e in entities if not s.is_global(e.path) and e.artifact_type != "global-artifact-reference"]
+        entities = [e for e in entities if not s.is_global(e.path) and not is_internal_entity_type(e.artifact_type)]
     else:
-        entities = [e for e in entities if e.artifact_type != "global-artifact-reference"]
+        entities = [e for e in entities if not is_internal_entity_type(e.artifact_type)]
     page = entities[offset : offset + limit]
     return {"total": len(entities), "items": build_entity_summary_rows(page, repo)}
 
@@ -144,7 +145,7 @@ class DeleteEntityBody(BaseModel):
 
 @router.post("/api/entity")
 def create_entity(body: CreateEntityBody) -> dict[str, Any]:
-    if body.artifact_type == "global-artifact-reference":
+    if is_internal_entity_type(body.artifact_type):
         raise HTTPException(400, "global-artifact-reference entities cannot be created directly")
     repo_root, _registry, verifier = s.get_write_deps()
     from src.infrastructure.write.artifact_write.entity import create_entity as _create
@@ -252,7 +253,7 @@ def search_reference_artifacts(
 
     if kind in (None, "entity"):
         for entity in repo.list_entities():
-            if entity.artifact_type == "global-artifact-reference":
+            if is_internal_entity_type(entity.artifact_type):
                 continue
             if selected_domains and entity.domain not in selected_domains:
                 continue

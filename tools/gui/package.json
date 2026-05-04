@@ -5,9 +5,11 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "generate-types": "cd ../.. && uv run tools/generate_types.py",
     "typecheck": "vue-tsc --noEmit -p tsconfig.json && tsc --noEmit -p tsconfig.node.json",
     "lint": "eslint . --cache --cache-location node_modules/.cache/eslint/.eslintcache --max-warnings=0 --ext .js,.ts,.vue",
     "lint:fix": "npm run lint -- --fix",
+    "prebuild": "npm run generate-types",
     "build": "npm run typecheck && vite build",
     "preview": "vite preview"
   },

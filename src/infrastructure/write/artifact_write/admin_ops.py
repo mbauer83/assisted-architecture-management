@@ -173,7 +173,7 @@ def admin_edit_entity(
     fm = parsed.frontmatter
     artifact_type = str(fm.get("artifact-type", ""))
     from src.infrastructure.app_bootstrap import get_module_registry  # noqa: PLC0415
-    info = get_module_registry().get_entity_type(EntityTypeName(artifact_type))
+    get_module_registry().get_entity_type(EntityTypeName(artifact_type))
 
     eff_name = name if name is not None else str(fm.get("name", ""))
     eff_version = version if version is not None else str(fm.get("version", "0.1.0"))

@@ -1,4 +1,8 @@
 import { Schema } from 'effect'
+import { DOMAIN_NAMES, ENTITY_TYPE_NAMES } from './types.generated'
+
+const EntityTypeNameSchema = Schema.Literal(...ENTITY_TYPE_NAMES)
+const DomainNameSchema = Schema.Literal(...DOMAIN_NAMES)
 
 // ── Stats ────────────────────────────────────────────────────────────────────
 
@@ -17,11 +21,11 @@ export type Stats = typeof StatsSchema.Type
 
 export const EntitySummarySchema = Schema.Struct({
   artifact_id: Schema.String,
-  artifact_type: Schema.String,
+  artifact_type: EntityTypeNameSchema,
   name: Schema.String,
   version: Schema.String,
   status: Schema.String,
-  domain: Schema.String,
+  domain: DomainNameSchema,
   subdomain: Schema.String,
   path: Schema.String,
   is_global: Schema.optional(Schema.Boolean),
@@ -51,11 +55,11 @@ export type EntityList = typeof EntityListSchema.Type
 
 export const EntityDetailSchema = Schema.Struct({
   artifact_id: Schema.String,
-  artifact_type: Schema.String,
+  artifact_type: EntityTypeNameSchema,
   name: Schema.String,
   version: Schema.String,
   status: Schema.String,
-  domain: Schema.String,
+  domain: DomainNameSchema,
   subdomain: Schema.String,
   record_type: Schema.Literal('entity'),
   path: Schema.String,
@@ -390,8 +394,8 @@ export type DiagramRefs = typeof DiagramRefsSchema.Type
 export const EntityDisplayInfoSchema = Schema.Struct({
   artifact_id: Schema.String,
   name: Schema.String,
-  artifact_type: Schema.String,
-  domain: Schema.String,
+  artifact_type: EntityTypeNameSchema,
+  domain: DomainNameSchema,
   subdomain: Schema.String,
   status: Schema.String,
   display_alias: Schema.String,

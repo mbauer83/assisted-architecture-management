@@ -21,6 +21,7 @@ else:
 
 
 from src.application.artifact_query import ArtifactRepository
+from src.application.entity_type_predicates import is_internal_entity_type
 from src.domain.artifact_types import ConnectionRecord, DiagramRecord, EntityRecord
 from src.infrastructure.artifact_index.coordination import publish_authoritative_mutation
 
@@ -141,7 +142,7 @@ def resolve_gar(artifact_id: str) -> tuple[str, bool]:
     if repo is None:
         return artifact_id, False
     rec = repo.get_entity(artifact_id)
-    if rec is not None and rec.artifact_type == "global-artifact-reference":
+    if rec is not None and is_internal_entity_type(rec.artifact_type):
         gaid = rec.extra.get("global-artifact-id")
         if isinstance(gaid, str) and gaid:
             return gaid, True

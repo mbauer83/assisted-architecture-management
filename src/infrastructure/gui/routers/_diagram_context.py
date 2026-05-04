@@ -7,6 +7,7 @@ from difflib import SequenceMatcher
 from typing import Any
 
 from src.application.artifact_parsing import extract_declared_puml_aliases, normalize_puml_alias
+from src.application.entity_type_predicates import is_internal_entity_type
 from src.domain.artifact_types import DiagramRecord, EntityRecord
 from src.infrastructure.diagram_kinds import domain_order, get_diagram_kind
 from src.infrastructure.gui.routers import state as s
@@ -166,7 +167,7 @@ def hop_suggestions(repo: Any, entity_ids: list[str], *, max_hops: int, limit_pe
         items = [
             entity_display_item(rec)
             for entity_id in sorted(next_frontier)
-            if (rec := repo.get_entity(entity_id)) is not None and rec.artifact_type != "global-artifact-reference"
+            if (rec := repo.get_entity(entity_id)) is not None and not is_internal_entity_type(rec.artifact_type)
         ]
         items.sort(
             key=lambda item: (
@@ -187,7 +188,7 @@ def fuzzy_entity_hits(repo: Any, q: str, limit: int, excluded: set[str]) -> list
         return []
     scored: list[tuple[float, EntityRecord]] = []
     for rec in repo.list_entities():
-        if rec.artifact_type == "global-artifact-reference" or rec.artifact_id in excluded:
+        if is_internal_entity_type(rec.artifact_type) or rec.artifact_id in excluded:
             continue
         haystack = " ".join((rec.name, rec.artifact_type, rec.domain, rec.subdomain, rec.content_text[:400]))
         score = SequenceMatcher(None, query, haystack.lower()).ratio()
