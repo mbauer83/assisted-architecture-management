@@ -6,6 +6,7 @@ from pathlib import Path
 from src.application.modeling.artifact_write import format_entity_markdown, slugify
 from src.application.verification.artifact_verifier import ArtifactRegistry, ArtifactVerifier
 from src.config.repo_paths import MODEL
+from src.domain.module_types import EntityTypeName
 
 from ._artifact_deduplication import get_repository, validate_entity_unique
 from .boundary import assert_engagement_write_root, today_iso
@@ -83,6 +84,8 @@ def edit_entity(
     parsed = parse_entity_file(entity_file)
     fm = parsed.frontmatter
     artifact_type = str(fm.get("artifact-type", ""))
+    from src.infrastructure.app_bootstrap import get_module_registry  # noqa: PLC0415
+    info = get_module_registry().get_entity_type(EntityTypeName(artifact_type))
     current_name = str(fm.get("name", ""))
     effective_artifact_id = artifact_id
     target_entity_file = entity_file
@@ -124,6 +127,8 @@ def edit_entity(
         properties=eff_properties,
         notes=eff_notes,
         display_archimate=display,
+        required_fields=info.required_fields,
+        optional_fields=info.optional_fields,
     )
 
     preview_res = verify_content_in_temp_path(

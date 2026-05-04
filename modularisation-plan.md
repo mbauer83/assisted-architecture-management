@@ -872,7 +872,7 @@ existing import sites.
       - `global-artifact-reference` → `element_classes: [internal]` (already `internal: true`)
 - [x] Replace `src/domain/ontology_loader.py` with the shim described above
 - [x] Add `src/infrastructure/app_bootstrap.py` with `build_module_registry()`
-- [ ] Wire registry into FastAPI app factory; expose as dependency
+- [x] Wire registry into FastAPI app factory; expose as dependency
 - [x] All existing tests pass unchanged (shim ensures backward compat)
 
 ### Phase 2 — Derived constants and validation → registry queries
@@ -925,15 +925,16 @@ Entity creation (`format_entity_markdown`) currently infers required fields from
 `EntityTypeInfo.create_when` (free text). To support generic template generation for
 any registered ontology's types, add structured fields to `entities.yaml`:
 
-- [ ] Add `required_fields: [field-name, ...]` and `optional_fields: [field-name, ...]`
+- [x] Add `required_fields: [field-name, ...]` and `optional_fields: [field-name, ...]`
       to each entity type entry in `archimate_next/entities.yaml`
-- [ ] Update `format_entity_markdown` to read these fields from `EntityTypeInfo`
+- [x] Update `format_entity_markdown` to read these fields from `EntityTypeInfo`
       (add corresponding typed fields to `EntityTypeInfo` dataclass)
-- [ ] `global_artifact_reference.py:66` — replace direct `ENTITY_TYPES[_GAR_TYPE]`
+- [x] `global_artifact_reference.py:66` — replace direct `ENTITY_TYPES[_GAR_TYPE]`
       lookup with `registry.get_entity_type(EntityTypeName(_GAR_TYPE))`
 
 - [x] All existing tests pass; add regression tests for each replaced lookup
-      (443 tests passing, including 25 new domain unit tests from Phase 0)
+      (446 tests passing, including regression coverage for app-state registry wiring
+      and ontology-driven entity template scaffolding)
 
 ### Phase 3 — Diagram kind modules and generic renderer
 

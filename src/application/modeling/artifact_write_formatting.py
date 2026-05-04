@@ -30,6 +30,8 @@ def format_entity_markdown(
     properties: dict[str, str] | None,
     notes: str | None,
     display_archimate: dict[str, str],
+    required_fields: tuple[str, ...] | list[str] = (),
+    optional_fields: tuple[str, ...] | list[str] = (),
     repo_root: Path | None = None,
     extra_frontmatter: dict[str, object] | None = None,
 ) -> str:
@@ -64,16 +66,20 @@ def format_entity_markdown(
 
     content_lines.extend(["## Properties", "", "| Attribute | Value |", "|---|---|"])
     props = properties or {}
-    schema_keys = _scaffold_keys_from_schema(repo_root, artifact_type) if repo_root else []
+    scaffold_keys = _ordered_scaffold_keys(
+        artifact_type=artifact_type,
+        required_fields=required_fields,
+        optional_fields=optional_fields,
+        repo_root=repo_root,
+    )
     if props:
         for key in sorted(props.keys()):
             content_lines.append(f"| {key} | {props[key]} |")
-        # Append any schema-required keys not already provided
-        for key in schema_keys:
+        for key in scaffold_keys:
             if key not in props:
                 content_lines.append(f"| {key} | |")
-    elif schema_keys:
-        for key in schema_keys:
+    elif scaffold_keys:
+        for key in scaffold_keys:
             content_lines.append(f"| {key} | |")
     else:
         content_lines.append("| (none) | (none) |")
@@ -282,12 +288,27 @@ def format_matrix_markdown(
     return f"---\n{yaml_text}\n---\n\n{body}"
 
 
-def _scaffold_keys_from_schema(repo_root: Path | None, artifact_type: str) -> list[str]:
-    """Return ordered attribute keys from the attribute schema for scaffolding.
+def _ordered_scaffold_keys(
+    *,
+    artifact_type: str,
+    required_fields: tuple[str, ...] | list[str],
+    optional_fields: tuple[str, ...] | list[str],
+    repo_root: Path | None,
+) -> list[str]:
+    """Return ordered attribute keys for entity property scaffolding.
 
-    Required keys come first, then optional keys.  Returns an empty list
-    when no schema is configured (free schema).
+    Preferred source is the ontology metadata carried by ``EntityTypeInfo``.
+    During migration, attribute schemas remain as a fallback for call sites
+    that do not yet provide the structured field lists.
     """
+    ordered = [*required_fields, *optional_fields]
+    if ordered:
+        return list(dict.fromkeys(ordered))
+    return _scaffold_keys_from_schema(repo_root, artifact_type)
+
+
+def _scaffold_keys_from_schema(repo_root: Path | None, artifact_type: str) -> list[str]:
+    """Return ordered attribute keys from the attribute schema for scaffolding."""
     if repo_root is None:
         return []
     schema = load_attribute_schema(repo_root, artifact_type)
@@ -295,5 +316,5 @@ def _scaffold_keys_from_schema(repo_root: Path | None, artifact_type: str) -> li
         return []
     required = schema_required_properties(schema)
     all_props = schema_all_properties(schema)
-    optional = [k for k in all_props if k not in required]
+    optional = [key for key in all_props if key not in required]
     return required + optional

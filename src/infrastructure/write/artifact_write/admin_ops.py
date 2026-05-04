@@ -95,6 +95,8 @@ def admin_create_entity(
         properties=properties,
         notes=notes,
         display_archimate=display,
+        required_fields=info.required_fields,
+        optional_fields=info.optional_fields,
     )
 
     if dry_run:
@@ -171,6 +173,8 @@ def admin_edit_entity(
     parsed = parse_entity_file(entity_file)
     fm = parsed.frontmatter
     artifact_type = str(fm.get("artifact-type", ""))
+    from src.infrastructure.app_bootstrap import get_module_registry  # noqa: PLC0415
+    info = get_module_registry().get_entity_type(EntityTypeName(artifact_type))
 
     eff_name = name if name is not None else str(fm.get("name", ""))
     eff_version = version if version is not None else str(fm.get("version", "0.1.0"))
@@ -196,6 +200,8 @@ def admin_edit_entity(
         properties=eff_properties,
         notes=eff_notes,
         display_archimate=display,
+        required_fields=info.required_fields,
+        optional_fields=info.optional_fields,
     )
 
     if dry_run:

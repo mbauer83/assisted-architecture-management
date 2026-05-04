@@ -13,10 +13,11 @@ from collections.abc import Callable
 from pathlib import Path
 
 from src.application.artifact_query import ArtifactRepository
-from src.application.modeling.artifact_write import ENTITY_TYPES, generate_entity_id
+from src.application.modeling.artifact_write import generate_entity_id
 from src.application.modeling.artifact_write_formatting import format_entity_markdown
 from src.application.verification.artifact_verifier import ArtifactVerifier
 from src.config.repo_paths import MODEL
+from src.domain.module_types import EntityTypeName
 
 from .boundary import assert_engagement_write_root, today_iso
 from .types import WriteResult
@@ -63,7 +64,9 @@ def ensure_global_artifact_reference(
             verification=None,
         )
 
-    info = ENTITY_TYPES[_GAR_TYPE]
+    from src.infrastructure.app_bootstrap import get_module_registry  # noqa: PLC0415
+
+    info = get_module_registry().get_entity_type(EntityTypeName(_GAR_TYPE))
     eid = generate_entity_id(info.prefix, global_artifact_name)
     path = engagement_root / MODEL / info.domain_dir / info.subdir / f"{eid}.md"
 
@@ -85,6 +88,8 @@ def ensure_global_artifact_reference(
         properties=None,
         notes=None,
         display_archimate=display,
+        required_fields=info.required_fields,
+        optional_fields=info.optional_fields,
         extra_frontmatter={
             _GAR_ID_KEY: global_artifact_id,
             _GAR_TYPE_KEY: global_artifact_type,

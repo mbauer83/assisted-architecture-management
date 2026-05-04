@@ -129,6 +129,8 @@ def apply_merge(
     backups: list[Any],
 ) -> None:
     from src.application.modeling.artifact_write_formatting import format_entity_markdown
+    from src.domain.module_types import EntityTypeName
+    from src.infrastructure.app_bootstrap import get_module_registry  # noqa: PLC0415
     from src.infrastructure.write.artifact_write.boundary import today_iso
 
     ent_path = registry.find_file_by_id(conflict.enterprise_id)
@@ -137,6 +139,7 @@ def apply_merge(
         return
     parsed = parse_entity_file(ent_path)
     fm = dict(parsed.frontmatter)
+    info = get_module_registry().get_entity_type(EntityTypeName(conflict.artifact_type))
     content = format_entity_markdown(
         artifact_id=conflict.enterprise_id,
         artifact_type=conflict.artifact_type,
@@ -149,6 +152,8 @@ def apply_merge(
         properties=merged_fields.get("properties", parsed.properties),
         notes=merged_fields.get("notes", parsed.notes),
         display_archimate=dict(parsed.display_archimate),
+        required_fields=info.required_fields,
+        optional_fields=info.optional_fields,
     )
     backups.append((ent_path, ent_path.read_bytes()))
     ent_path.write_text(content, encoding="utf-8")

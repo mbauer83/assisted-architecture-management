@@ -5,8 +5,10 @@ from pathlib import Path
 import yaml
 
 from src.config import settings
+from src.domain.module_registry import ModuleRegistry
 from src.infrastructure.backend import arch_backend, backend_control, backend_probe, backend_process, backend_state
 from src.infrastructure.backend.arch_backend_app import _build_app
+from src.infrastructure.app_bootstrap import module_registry_dependency, module_registry_from_app
 from src.infrastructure.mcp import arch_mcp_stdio
 
 
@@ -437,6 +439,27 @@ def test_unified_backend_routes_split_mcp_paths() -> None:
     assert "/mcp/read/" in actual_paths
     assert "/mcp/write" in actual_paths
     assert "/mcp/write/" in actual_paths
+
+
+def test_unified_backend_installs_module_registry_on_app_state() -> None:
+    app = _build_app()
+
+    registry = module_registry_from_app(app)
+
+    assert isinstance(registry, ModuleRegistry)
+    assert registry.find_ontology("archimate-next-snapshot1") is not None
+
+
+def test_module_registry_dependency_reads_installed_app_state() -> None:
+    app = _build_app()
+
+    class _Request:
+        def __init__(self, app_obj) -> None:
+            self.app = app_obj
+
+    registry = module_registry_dependency(_Request(app))
+
+    assert registry is module_registry_from_app(app)
 
 
 def test_stop_backend_returns_not_running_when_no_state(monkeypatch) -> None:

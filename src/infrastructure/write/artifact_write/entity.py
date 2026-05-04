@@ -137,6 +137,8 @@ def create_entity(
         properties=properties,
         notes=notes,
         display_archimate=display,
+        required_fields=info.required_fields,
+        optional_fields=info.optional_fields,
     )
 
     if dry_run:

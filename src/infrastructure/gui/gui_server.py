@@ -21,6 +21,7 @@ def _make_app():  # type: ignore[no-untyped-def]
     from fastapi import FastAPI
     from fastapi.middleware.cors import CORSMiddleware
 
+    from src.infrastructure.app_bootstrap import install_module_registry
     from src.infrastructure.gui.routers.admin import router as admin_router
     from src.infrastructure.gui.routers.connections import router as connections_router
     from src.infrastructure.gui.routers.diagrams import router as diagrams_router
@@ -29,6 +30,7 @@ def _make_app():  # type: ignore[no-untyped-def]
     from src.infrastructure.gui.routers.sync import router as sync_router
 
     app = FastAPI(title="Architecture Repository GUI", version="0.2.0")
+    install_module_registry(app)
     app.add_middleware(
         CORSMiddleware,
         allow_origins=["http://localhost:5173", "http://localhost:4173"],

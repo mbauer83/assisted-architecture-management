@@ -107,6 +107,7 @@ def _build_app(git_ssh_passphrase: str | None = None):  # type: ignore[no-untype
     from fastapi.middleware.cors import CORSMiddleware
     from fastapi.staticfiles import StaticFiles
 
+    from src.infrastructure.app_bootstrap import install_module_registry
     from src.infrastructure.gui.routers.admin import router as admin_router
     from src.infrastructure.gui.routers.connections import router as connections_router
     from src.infrastructure.gui.routers.diagrams import router as diagrams_router
@@ -178,6 +179,7 @@ def _build_app(git_ssh_passphrase: str | None = None):  # type: ignore[no-untype
             logger.info("Backend lifespan shutdown complete")
 
     app = FastAPI(title="Architecture Repository Backend", version="0.3.0", lifespan=lifespan)
+    install_module_registry(app)
 
     @app.middleware("http")
     async def log_requests(request: Request, call_next):  # type: ignore[no-untyped-def]

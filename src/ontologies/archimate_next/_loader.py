@@ -91,6 +91,8 @@ def _load_entity_types(data: dict[str, Any]) -> dict[EntityTypeName, EntityTypeI
             element_classes=tuple(info.get("element_classes", ())),
             create_when=info.get("create_when", ""),
             never_create_when=info.get("never_create_when", ""),
+            required_fields=tuple(info.get("required_fields", ())),
+            optional_fields=tuple(info.get("optional_fields", ())),
             has_sprite=bool(info.get("has_sprite", False)),
             internal=bool(info.get("internal", False)),
         )

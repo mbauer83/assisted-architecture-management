@@ -58,6 +58,21 @@ def dry_run_result_valid(dry_run_result: dict[str, object]) -> None:
     assert verification["valid"] is True
 
 
+def test_dry_run_entity_template_uses_ontology_scaffold_fields(repo_root: Path) -> None:
+    result = tools.artifact_create_entity(
+        artifact_type="capability",
+        name="Capability With Scaffold",
+        summary="A short description.",
+        dry_run=True,
+        repo_root=str(repo_root),
+    )
+
+    content = str(result["content"])
+
+    assert "| Maturity | |" in content
+    assert "| Realizes | |" in content
+
+
 @when("I attempt to add a connection referencing unknown entities", target_fixture="conn_error")
 def add_connection_unknown_entities(repo_root: Path) -> Exception:
     with pytest.raises(Exception) as exc:
