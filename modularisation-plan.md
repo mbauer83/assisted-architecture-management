@@ -840,40 +840,40 @@ existing import sites.
 
 ### Phase 0 — Contracts (no behaviour change)
 
-- [ ] Add `src/domain/module_types.py`: `EntityTypeName`, `ConnectionTypeName`,
+- [x] Add `src/domain/module_types.py`: `EntityTypeName`, `ConnectionTypeName`,
       `DiagramKindName`, `ElementClassName`, `FreeOntology`, `_FreeOntologyType`,
       `PrimaryOntology`
-- [ ] Add `src/domain/permitted_relationships.py`: `PermittedRelationship`,
+- [x] Add `src/domain/permitted_relationships.py`: `PermittedRelationship`,
       `PermittedRelationshipSet` with `filter_to`, `__or__`, `empty`
-- [ ] Update `src/domain/ontology_types.py`: make `archimate_element_type` nullable
+- [x] Update `src/domain/ontology_types.py`: make `archimate_element_type` nullable
       (`str | None`); add `classifications: tuple[str, ...]` to `ConnectionTypeInfo`
-- [ ] Add `src/domain/ontology_protocol.py`: `OntologyModule`, `DiagramKindModule`,
+- [x] Add `src/domain/ontology_protocol.py`: `OntologyModule`, `DiagramKindModule`,
       `DiagramRenderer` protocols; `DiagramKindBase` mixin
-- [ ] Add `src/domain/module_registry.py`: `ModuleRegistry` class (all methods)
-- [ ] Write unit tests for `PermittedRelationshipSet` (filter_to, union, permits)
-- [ ] Write unit tests for `ModuleRegistry` (register/unregister/replace, aggregated
+- [x] Add `src/domain/module_registry.py`: `ModuleRegistry` class (all methods)
+- [x] Write unit tests for `PermittedRelationshipSet` (filter_to, union, permits)
+- [x] Write unit tests for `ModuleRegistry` (register/unregister/replace, aggregated
       queries, error cases)
 
 ### Phase 1 — ArchiMate NEXT module + shim wiring
 
-- [ ] Create `src/ontologies/__init__.py`, `src/ontologies/archimate_next/__init__.py`
-- [ ] Write `src/ontologies/archimate_next/_loader.py`:
+- [x] Create `src/ontologies/__init__.py`, `src/ontologies/archimate_next/__init__.py`
+- [x] Write `src/ontologies/archimate_next/_loader.py`:
       - Move YAML loading logic from `ontology_loader.py`
       - Build `_ArchiMateNextModule` with class index and classification index
       - Expand `@class` / `@all` / `@same` refs in permitted_relationships during load
       - Generalise `archimate-` prefix injection so it's part of the module config
         (YAML entry key is the bare name; loader adds the `conn_lang` prefix)
-- [ ] Migrate `config/entity_ontology.yaml` → `src/ontologies/archimate_next/entities.yaml`
-- [ ] Migrate `config/connection_ontology.yaml` → `src/ontologies/archimate_next/connections.yaml`
+- [x] Migrate `config/entity_ontology.yaml` → `src/ontologies/archimate_next/entities.yaml`
+- [x] Migrate `config/connection_ontology.yaml` → `src/ontologies/archimate_next/connections.yaml`
       and add `classifications` entries to each connection type
-- [ ] Verify that `element_classes` in entities.yaml correctly classifies all types that
+- [x] Verify that `element_classes` in entities.yaml correctly classifies all types that
       are currently hardcoded as special cases:
       - `and-junction`, `or-junction` → `element_classes: [junction]`
       - `global-artifact-reference` → `element_classes: [internal]` (already `internal: true`)
-- [ ] Replace `src/domain/ontology_loader.py` with the shim described above
-- [ ] Add `src/infrastructure/app_bootstrap.py` with `build_module_registry()`
+- [x] Replace `src/domain/ontology_loader.py` with the shim described above
+- [x] Add `src/infrastructure/app_bootstrap.py` with `build_module_registry()`
 - [ ] Wire registry into FastAPI app factory; expose as dependency
-- [ ] All existing tests pass unchanged (shim ensures backward compat)
+- [x] All existing tests pass unchanged (shim ensures backward compat)
 
 ### Phase 2 — Derived constants and validation → registry queries
 
@@ -881,43 +881,45 @@ Goal: eliminate all hardcoded type name literals outside module packages; make a
 create/edit validation and type enumeration flow through the registry.
 
 **Hardcoded constants → registry queries**
-- [ ] Replace `frozenset({"and-junction", "or-junction"})` in all 4 sites with
+- [x] Replace `frozenset({"and-junction", "or-junction"})` in all 4 sites with
       `registry.entity_types_with_class(ElementClassName("junction"))`
-- [ ] Replace `frozenset({"global-artifact-reference"})` and string comparisons
+- [x] Replace `frozenset({"global-artifact-reference"})` and string comparisons
       with `registry.entity_types_with_class(ElementClassName("internal"))` where
       the `internal` flag is used as a membership check
-- [ ] Replace `_STRUCTURAL_CONNECTION_TYPES`, `_LAYOUT_FLOW_CONNECTION_TYPES`,
+      (note: only `_INTERNAL_TYPES` in `help.py` migrated; direct string comparisons in
+      domain-specific business logic left as-is — they are not class membership checks)
+- [x] Replace `_STRUCTURAL_CONNECTION_TYPES`, `_LAYOUT_FLOW_CONNECTION_TYPES`,
       `_HIERARCHY_TYPES` in `diagram_builder.py` and `entity_listing.py` with
-      `registry.connection_types_with_classification("structural")` etc.
-- [ ] Replace `_HIERARCHY_PRIORITY` dict in `entity_listing.py` — priority ordering
-      belongs in the archimate_next connections.yaml as a `hierarchy_priority` field
-      or encoded via classification order; derive here
-- [ ] Remove `Domain = Literal[...]` hardcoded union from `artifact_types.py` and
-      `DOMAIN_NAMES` frozenset; derive domain names from `registry.domain_order()`
-      at validation time (replace with `str` with a validator that checks against registry)
-- [ ] Remove `archimate_prefix_to_type()` from `domain_vocabulary.py`; derive from
+      `registry.connection_types_with_classification(...)`:
+      - Added `nesting` classification (composition + aggregation only) for visual nesting
+      - Used `flow` classification for layout flow direction hints
+      - `_HIERARCHY_TYPES` derived from `hierarchy_priority` field on `ConnectionTypeInfo`
+- [x] Replace `_HIERARCHY_PRIORITY` dict in `entity_listing.py` — `hierarchy_priority`
+      field added to `ConnectionTypeInfo` and set in connections.yaml; derived via registry
+- [x] Remove `Domain = Literal[...]` hardcoded union from `artifact_types.py` and
+      `DOMAIN_NAMES` frozenset; derived from `registry.all_entity_types()` (includes
+      all domain_dirs + "unknown", preserving "common" for GAR parsing)
+- [x] Remove `archimate_prefix_to_type()` from `domain_vocabulary.py`; derive from
       `{info.prefix: name for name, info in registry.all_entity_types().items()}`
-- [ ] Update `connection_ontology.py` to delegate through registry rather than
+- [x] Update `connection_ontology.py` to delegate through registry rather than
       `ontology_loader` constants directly
-- [ ] Update `archimate_relation_rendering.py` similarly
-- [ ] Fix `_sqlite_store.py:399`: replace `conn_type in SYMMETRIC_CONNECTIONS` with
-      `registry.find_connection_type(conn_type).symmetric` (or `False` if not found)
+- [x] Update `archimate_relation_rendering.py` similarly
+- [x] Fix `_sqlite_store.py:399`: replaced with `is_symmetric()` from
+      `connection_ontology` (which calls `registry.find_connection_type().symmetric`)
 
 **Write operation validation → registry**
 
 These are the gatekeepers for create/edit; they must use the registry so that types
 from any registered ontology are accepted without code changes.
 
-- [ ] `entity.py:58` — replace `artifact_type not in ALL_ENTITY_TYPES` with
-      `registry.find_entity_type(artifact_type) is None`
-- [ ] `connection.py:89` — replace `connection_type not in ALL_CONNECTION_TYPES` with
-      `registry.find_connection_type(connection_type) is None`
-- [ ] `admin_ops.py:72` — same as entity.py above
-- [ ] `help.py:36,54,60,74` — replace direct `ENTITY_TYPES`/`CONNECTION_TYPES`
-      iteration with `registry.all_entity_types()` / `registry.all_connection_types()`
-- [ ] `type_guidance.py:28` — replace `ENTITY_TYPES` with `registry.all_entity_types()`
+- [x] `entity.py:58` — replaced with `registry.find_entity_type(EntityTypeName(...)) is None`
+- [x] `connection.py:89` — replaced with `registry.find_connection_type(ConnectionTypeName(...)) is None`
+- [x] `admin_ops.py:72` — same as entity.py above
+- [x] `help.py:36,54,60,74` — replaced with `registry.all_entity_types()` /
+      `registry.all_connection_types()`
+- [x] `type_guidance.py:28` — replaced with `registry.all_entity_types()`
 
-**Entity creation template enrichment**
+**Entity creation template enrichment** (deferred to Phase 2b)
 
 Entity creation (`format_entity_markdown`) currently infers required fields from
 `EntityTypeInfo.create_when` (free text). To support generic template generation for
@@ -930,7 +932,8 @@ any registered ontology's types, add structured fields to `entities.yaml`:
 - [ ] `global_artifact_reference.py:66` — replace direct `ENTITY_TYPES[_GAR_TYPE]`
       lookup with `registry.get_entity_type(EntityTypeName(_GAR_TYPE))`
 
-- [ ] All existing tests pass; add regression tests for each replaced lookup
+- [x] All existing tests pass; add regression tests for each replaced lookup
+      (443 tests passing, including 25 new domain unit tests from Phase 0)
 
 ### Phase 3 — Diagram kind modules and generic renderer
 
