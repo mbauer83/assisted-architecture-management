@@ -943,7 +943,7 @@ tools or API routes for new diagram kinds — the generic tooling routes through
 registry and each kind's `renderer`.
 
 **Generic renderer**
-- [ ] Implement `src/infrastructure/rendering/generic_puml_renderer.py`:
+- [x] Implement `src/infrastructure/rendering/generic_puml_renderer.py`:
       - Constructor accepts a diagram kind config dict (loaded from config.yaml)
       - `render_body`: groups entities by `grouping.by_field`, emits grouping
         stereotypes per `grouping.stereotype_pattern`, renders entity declarations
@@ -953,15 +953,15 @@ registry and each kind's `renderer`.
         paths using the same convention as the current `inject_archimate_includes`
       - Element-class pattern table is a module-level constant in this file; adding
         support for a new element class (e.g. `sysml-block`) is a one-line addition here
-- [ ] Write unit tests for `GenericPumlRenderer` covering: grouping, include injection,
+- [x] Write unit tests for `GenericPumlRenderer` covering: grouping, include injection,
       each element-class rendering pattern, nesting hints
 
 **Diagram kind packages**
-- [ ] Create `src/diagram_kinds/__init__.py`
-- [ ] For each ArchiMate domain view, create a diagram kind package
+- [x] Create `src/diagram_kinds/__init__.py`
+- [x] For each ArchiMate domain view, create a diagram kind package
       (`archimate_motivation`, `archimate_strategy`, `archimate_business`,
       `archimate_application`, `archimate_technology`, `archimate_implementation`,
-      `archimate_full`) containing:
+      `archimate_full` / current compatibility kind `archimate_layered`) containing:
       - `config.yaml`: full rendering config (accepted_domains, grouping, includes, layout)
       - `__init__.py`: minimal — load config, declare accepted domains, expose module
       - No `renderer.py` — `DiagramKindBase.renderer` handles it

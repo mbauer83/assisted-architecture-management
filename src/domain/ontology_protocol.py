@@ -61,6 +61,7 @@ class OntologyModule(Protocol):
 class DiagramRenderer(Protocol):
     def render_body(
         self,
+        name: str,
         entities: Sequence[EntityRecord],
         connections: Sequence[ConnectionRecord],
         diagram_type: str,
