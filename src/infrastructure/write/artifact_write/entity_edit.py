@@ -127,8 +127,7 @@ def edit_entity(
         properties=eff_properties,
         notes=eff_notes,
         display_archimate=display,
-        required_fields=info.required_fields,
-        optional_fields=info.optional_fields,
+        repo_root=repo_root,
     )
 
     preview_res = verify_content_in_temp_path(

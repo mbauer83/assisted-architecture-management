@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 import yaml  # type: ignore[import-untyped]
 
@@ -91,8 +91,6 @@ def _load_entity_types(data: dict[str, Any]) -> dict[EntityTypeName, EntityTypeI
             element_classes=tuple(info.get("element_classes", ())),
             create_when=info.get("create_when", ""),
             never_create_when=info.get("never_create_when", ""),
-            required_fields=tuple(info.get("required_fields", ())),
-            optional_fields=tuple(info.get("optional_fields", ())),
             has_sprite=bool(info.get("has_sprite", False)),
             internal=bool(info.get("internal", False)),
         )
@@ -102,8 +100,8 @@ def _load_entity_types(data: dict[str, Any]) -> dict[EntityTypeName, EntityTypeI
 def _load_connection_types(data: dict[str, Any]) -> dict[ConnectionTypeName, ConnectionTypeInfo]:
     out: dict[ConnectionTypeName, ConnectionTypeInfo] = {}
     for lang, types in data["connection_types"].items():
-        for name, info in (types or {}).items():
-            raw = info or {}
+        for name, info in cast(dict[str, Any | None], types or {}).items():
+            raw: dict[str, Any] = info or {}
             hp_raw = raw.get("hierarchy_priority")
             out[ConnectionTypeName(name)] = ConnectionTypeInfo(
                 artifact_type=name,
@@ -138,12 +136,12 @@ def _build_permitted_relationships(
     data: dict[str, Any],
     entity_types: dict[EntityTypeName, EntityTypeInfo],
 ) -> PermittedRelationshipSet:
-    all_types = list(entity_types.keys())
+    all_types: list[str] = [str(k) for k in entity_types.keys()]
 
     class_members: dict[str, list[str]] = {}
     for ename, info in entity_types.items():
         for cls in info.element_classes:
-            class_members.setdefault(cls, []).append(ename)
+            class_members.setdefault(cls, []).append(str(ename))
 
     rules: set[PermittedRelationship] = set()
 

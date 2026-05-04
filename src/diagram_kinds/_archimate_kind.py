@@ -55,5 +55,5 @@ def load_archimate_diagram_kind(package_dir: Path) -> DiagramKindModule:
     """Load one config-backed ArchiMate diagram kind module."""
     config_path = package_dir / "config.yaml"
     with config_path.open(encoding="utf-8") as handle:
-        config = yaml.safe_load(handle) or {}
+        config: dict[str, Any] = yaml.safe_load(handle) or {}
     return _ConfiguredArchimateDiagramKind(config)

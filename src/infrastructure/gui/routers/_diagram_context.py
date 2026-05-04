@@ -214,7 +214,7 @@ def diagram_kind_entity_type_items(diagram_type: str) -> list[dict[str, Any]]:
     ]
     items.sort(
         key=lambda item: (
-            ordered_domains.index(item["domain"]) if item["domain"] in ordered_domains else 99,
+            ordered_domains.index(str(item["domain"])) if item["domain"] in ordered_domains else 99,
             item["artifact_type"],
         )
     )

@@ -131,7 +131,7 @@ def _generate_glyph_include(repo_root: Path) -> Path:
         lines.append("")
         for info in sorted(
             (et for et in all_entity_types().values() if et.archimate_element_type),
-            key=lambda item: item.archimate_element_type,
+            key=lambda item: item.archimate_element_type or "",
         ):
             kind = glyphs["types"].get(info.artifact_type)
             if not kind:

@@ -17,8 +17,6 @@ class EntityTypeInfo:
     element_classes: tuple[str, ...]
     create_when: str
     never_create_when: str
-    required_fields: tuple[str, ...] = ()
-    optional_fields: tuple[str, ...] = ()
     has_sprite: bool = False
     internal: bool = False
 

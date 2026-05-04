@@ -9,6 +9,7 @@ from __future__ import annotations
 from functools import lru_cache
 
 from src.domain.connection_ontology import classify_connections
+from src.domain.module_types import EntityTypeName
 
 
 @lru_cache(maxsize=1)
@@ -41,7 +42,7 @@ def get_type_guidance(
     else:
         entity_type_hits = [n for n in filter if n in all_infos]
         if len(entity_type_hits) == len(filter):
-            selected = [all_infos[n] for n in filter]
+            selected = [all_infos[EntityTypeName(n)] for n in filter]
             include_domain = True
             domain_context = None
         else:

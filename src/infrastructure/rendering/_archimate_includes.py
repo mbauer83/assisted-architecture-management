@@ -13,7 +13,7 @@ def parse_archimate_display_block(raw: str) -> dict[str, Any]:
     text = re.sub(r"^```(?:yaml)?\n", "", raw.strip(), count=1)
     text = re.sub(r"\n```$", "", text, count=1)
     try:
-        loaded = _yaml.safe_load(text) or {}
+        loaded: Any = _yaml.safe_load(text) or {}
     except Exception:  # noqa: BLE001
         return {}
     return loaded if isinstance(loaded, dict) else {}

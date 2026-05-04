@@ -133,7 +133,7 @@ def _entity_archimate_element_type(entity: EntityRecord) -> str:
     if element_type:
         return element_type
     info = all_entity_types().get(entity.artifact_type)
-    return info.archimate_element_type if info else ""
+    return (info.archimate_element_type or "") if info else ""
 
 
 def _pluralize_label(label: str) -> str:

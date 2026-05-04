@@ -6,7 +6,7 @@ from functools import lru_cache
 
 from src.domain.module_types import ElementClassName
 from src.domain.ontology_types import ConnectionTypeInfo, EntityTypeInfo
-from src.ontologies.archimate_next import module as archimate_next
+from src.ontologies.archimate_next import matrix_abbreviations as _archimate_matrix_abbreviations
 
 
 @lru_cache(maxsize=1)
@@ -95,7 +95,7 @@ def entity_type_prefixes() -> dict[str, str]:
 
 @lru_cache(maxsize=1)
 def matrix_abbreviations_by_connection_type() -> dict[str, str]:
-    return dict(archimate_next.matrix_abbreviations)
+    return dict(_archimate_matrix_abbreviations)
 
 
 @lru_cache(maxsize=1)

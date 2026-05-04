@@ -79,7 +79,7 @@ def admin_create_entity(
     path = repo_root / MODEL / info.domain_dir / info.subdir / f"{eid}.md"
     display = {
         "domain": info.domain_dir.capitalize(),
-        "element-type": info.archimate_element_type,
+        "element-type": info.archimate_element_type or "",
         "label": name,
         "alias": f"{info.prefix}_{eid.split('.')[1]}" if "." in eid else eid.replace("-", "_"),
     }
@@ -95,8 +95,7 @@ def admin_create_entity(
         properties=properties,
         notes=notes,
         display_archimate=display,
-        required_fields=info.required_fields,
-        optional_fields=info.optional_fields,
+        repo_root=repo_root,
     )
 
     if dry_run:
@@ -200,8 +199,7 @@ def admin_edit_entity(
         properties=eff_properties,
         notes=eff_notes,
         display_archimate=display,
-        required_fields=info.required_fields,
-        optional_fields=info.optional_fields,
+        repo_root=repo_root,
     )
 
     if dry_run:

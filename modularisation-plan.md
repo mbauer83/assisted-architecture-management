@@ -962,14 +962,14 @@ The first Phase 2b implementation moved attribute template hints into ontology m
 via `required_fields` / `optional_fields`. That was the wrong abstraction: attribute
 profiles are repo-local, custom, and must remain full JSON Schema documents.
 
-- [ ] Remove `required_fields` / `optional_fields` from ontology YAML and from
+- [x] Remove `required_fields` / `optional_fields` from ontology YAML and from
       `EntityTypeInfo` as scaffold-authority fields
-- [ ] Update `format_entity_markdown` and its callers to derive attribute scaffolds
+- [x] Update `format_entity_markdown` and its callers to derive attribute scaffolds
       from repo-local `attributes.{artifact-type}.schema.json`, using the schema's
       `properties` order as the canonical field order
-- [ ] Derive required vs optional scaffold prompts from the JSON Schema `required`
+- [x] Derive required vs optional scaffold prompts from the JSON Schema `required`
       list rather than ontology metadata
-- [ ] Preserve current behaviour for repos with no attribute schema: emit an empty
+- [x] Preserve current behaviour for repos with no attribute schema: emit an empty
       attributes block rather than inventing ontology-level field lists
 - [x] `global_artifact_reference.py:66` — replace direct `ENTITY_TYPES[_GAR_TYPE]`
       lookup with `registry.get_entity_type(EntityTypeName(_GAR_TYPE))`
@@ -1015,10 +1015,12 @@ registry and each kind's `renderer`.
         if the layout logic is sufficiently distinct — decide during implementation
 
 **Registry wiring and dispatch migration**
-- [ ] Register all diagram kinds in `app_bootstrap.py`
-- [ ] Replace `if diagram_type == "matrix"` and `if "archimate" in diagram_type`
-      dispatch in routers and `diagram_builder.py` with
-      `registry.get_diagram_kind(name).renderer.render_body(...)`
+- [x] Register all diagram kinds in `app_bootstrap.py`
+- [x] Replace render dispatch in `diagram_builder.py` with
+      `registry.get_diagram_kind(name).renderer.render_body(...)`;
+      remaining `diagram_type == "matrix"` checks in routers are response-shaping
+      (extracting matrix body from frontmatter) and verification logic — not render
+      dispatch, so they are intentionally left as string comparisons
 - [x] Replace `startswith("archimate-")` checks in `entities.py`, `diagrams.py`,
       `_diagram_context.py` with `registry.find_diagram_kind(name) is not None` or
       `isinstance(registry.get_diagram_kind(name).primary_ontology, _FreeOntologyType)`

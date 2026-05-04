@@ -30,8 +30,6 @@ def format_entity_markdown(
     properties: dict[str, str] | None,
     notes: str | None,
     display_archimate: dict[str, str],
-    required_fields: tuple[str, ...] | list[str] = (),
-    optional_fields: tuple[str, ...] | list[str] = (),
     repo_root: Path | None = None,
     extra_frontmatter: dict[str, object] | None = None,
 ) -> str:
@@ -66,12 +64,7 @@ def format_entity_markdown(
 
     content_lines.extend(["## Properties", "", "| Attribute | Value |", "|---|---|"])
     props = properties or {}
-    scaffold_keys = _ordered_scaffold_keys(
-        artifact_type=artifact_type,
-        required_fields=required_fields,
-        optional_fields=optional_fields,
-        repo_root=repo_root,
-    )
+    scaffold_keys = _scaffold_keys_from_schema(repo_root, artifact_type)
     if props:
         for key in sorted(props.keys()):
             content_lines.append(f"| {key} | {props[key]} |")
@@ -286,25 +279,6 @@ def format_matrix_markdown(
     yaml_text = _dump_yaml_text(fm_out)
     body = matrix_markdown.strip("\n") + "\n"
     return f"---\n{yaml_text}\n---\n\n{body}"
-
-
-def _ordered_scaffold_keys(
-    *,
-    artifact_type: str,
-    required_fields: tuple[str, ...] | list[str],
-    optional_fields: tuple[str, ...] | list[str],
-    repo_root: Path | None,
-) -> list[str]:
-    """Return ordered attribute keys for entity property scaffolding.
-
-    Preferred source is the ontology metadata carried by ``EntityTypeInfo``.
-    During migration, attribute schemas remain as a fallback for call sites
-    that do not yet provide the structured field lists.
-    """
-    ordered = [*required_fields, *optional_fields]
-    if ordered:
-        return list(dict.fromkeys(ordered))
-    return _scaffold_keys_from_schema(repo_root, artifact_type)
 
 
 def _scaffold_keys_from_schema(repo_root: Path | None, artifact_type: str) -> list[str]:

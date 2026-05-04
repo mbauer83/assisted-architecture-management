@@ -1,10 +1,12 @@
 from __future__ import annotations
 
+from collections.abc import Sequence
 from pathlib import Path
 from typing import Any
 
 import yaml  # type: ignore[import-untyped]
 
+from src.domain.artifact_types import ConnectionRecord, EntityRecord
 from src.domain.module_types import ConnectionTypeName, DiagramKindName, EntityTypeName, FreeOntology
 from src.domain.ontology_protocol import DiagramKindBase, DiagramKindModule, DiagramRenderer
 from src.domain.ontology_types import ConnectionTypeInfo, EntityTypeInfo
@@ -18,8 +20,8 @@ class _MatrixRenderer:
     def render_body(
         self,
         name: str,
-        entities: list[object],
-        connections: list[object],
+        entities: Sequence[EntityRecord],
+        connections: Sequence[ConnectionRecord],
         diagram_type: str,
         repo_root: Path,
     ) -> str:

@@ -88,8 +88,7 @@ def ensure_global_artifact_reference(
         properties=None,
         notes=None,
         display_archimate=display,
-        required_fields=info.required_fields,
-        optional_fields=info.optional_fields,
+        repo_root=engagement_root,
         extra_frontmatter={
             _GAR_ID_KEY: global_artifact_id,
             _GAR_TYPE_KEY: global_artifact_type,

@@ -58,7 +58,36 @@ def dry_run_result_valid(dry_run_result: dict[str, object]) -> None:
     assert verification["valid"] is True
 
 
-def test_dry_run_entity_template_uses_ontology_scaffold_fields(repo_root: Path) -> None:
+def test_dry_run_entity_template_empty_attrs_without_schema(repo_root: Path) -> None:
+    result = tools.artifact_create_entity(
+        artifact_type="capability",
+        name="Capability With Scaffold",
+        summary="A short description.",
+        dry_run=True,
+        repo_root=str(repo_root),
+    )
+
+    content = str(result["content"])
+
+    # No attribute schema in this fixture repo → empty properties table
+    assert "| (none) | (none) |" in content
+
+
+def test_dry_run_entity_template_scaffold_from_schema(repo_root: Path) -> None:
+    import json
+
+    schema_dir = repo_root / ".arch-repo" / "schemata"
+    schema_dir.mkdir(parents=True, exist_ok=True)
+    schema = {
+        "type": "object",
+        "required": ["Maturity"],
+        "properties": {
+            "Maturity": {"type": "string"},
+            "Realizes": {"type": "string"},
+        },
+    }
+    (schema_dir / "attributes.capability.schema.json").write_text(json.dumps(schema))
+
     result = tools.artifact_create_entity(
         artifact_type="capability",
         name="Capability With Scaffold",

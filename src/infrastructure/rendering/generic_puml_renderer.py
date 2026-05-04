@@ -6,6 +6,7 @@ import re
 from collections import defaultdict
 from collections.abc import Mapping, Sequence
 from pathlib import Path
+from typing import Any
 
 from src.application.artifact_parsing import normalize_puml_alias
 from src.domain.archimate_relation_rendering import (
@@ -37,8 +38,8 @@ def _registry():
 class GenericPumlRenderer:
     """Renderer for config-backed ArchiMate-style PlantUML diagrams."""
 
-    def __init__(self, config: Mapping[str, object]) -> None:
-        self._config = dict(config)
+    def __init__(self, config: Mapping[str, Any]) -> None:
+        self._config: dict[str, Any] = dict(config)
 
     def render_body(
         self,
@@ -299,8 +300,8 @@ class GenericPumlRenderer:
         for entity in entities:
             grouped[entity.artifact_type].append(entity)
             labels.setdefault(entity.artifact_type, self._type_group_label(entity))
-        type_order = list(_registry().all_entity_types())
-        ordered_types = [artifact_type for artifact_type in type_order if artifact_type in grouped]
+        type_order: list[str] = [str(k) for k in _registry().all_entity_types()]
+        ordered_types: list[str] = [artifact_type for artifact_type in type_order if artifact_type in grouped]
         for artifact_type in grouped:
             if artifact_type not in ordered_types:
                 ordered_types.append(artifact_type)
@@ -330,7 +331,7 @@ class GenericPumlRenderer:
                 continue
             neighbor_edges.append((src_alias, tgt_alias))
         children_map, nested_aliases = build_visual_nesting(
-            item_by_alias=entity_by_alias,
+            item_by_alias=dict(entity_by_alias),
             structural_edges=structural_edges,
             neighbor_edges=neighbor_edges,
             junction_aliases={
