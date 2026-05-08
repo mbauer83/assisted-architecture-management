@@ -142,7 +142,8 @@ class ModuleRegistry:
         result: list[str] = []
         for om in self._ontologies.values():
             for et in om.entity_types.values():
-                if not et.internal and et.domain_dir not in seen:
-                    seen.add(et.domain_dir)
-                    result.append(et.domain_dir)
+                domain = et.hierarchy[0] if et.hierarchy else ""
+                if not et.internal and domain and domain not in seen:
+                    seen.add(domain)
+                    result.append(domain)
         return result

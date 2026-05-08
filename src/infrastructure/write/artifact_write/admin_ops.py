@@ -20,7 +20,7 @@ from pathlib import Path
 from src.application.modeling.artifact_write import format_outgoing_markdown, generate_entity_id
 from src.application.modeling.artifact_write_formatting import format_entity_markdown
 from src.application.verification.artifact_verifier import ArtifactRegistry, ArtifactVerifier
-from src.config.repo_paths import DIAGRAM_CATALOG, DIAGRAMS, MODEL
+from src.config.repo_paths import DIAGRAM_CATALOG, DIAGRAMS
 from src.domain.module_types import EntityTypeName
 from src.infrastructure.rendering.generate_macros import generate_macros
 
@@ -76,13 +76,12 @@ def admin_create_entity(
 
     last = last_updated or today_iso()
     eid = artifact_id or generate_entity_id(info.prefix, name)
-    path = repo_root / MODEL / info.domain_dir / info.subdir / f"{eid}.md"
-    display = {
-        "domain": info.domain_dir.capitalize(),
-        "element-type": info.archimate_element_type or "",
-        "label": name,
-        "alias": f"{info.prefix}_{eid.split('.')[1]}" if "." in eid else eid.replace("-", "_"),
-    }
+    from src.infrastructure.write.artifact_write.entity import (  # noqa: PLC0415
+        _render_display,
+        entity_path,
+    )
+    path = entity_path(repo_root, info, eid)
+    display_section_id, display_content = _render_display(info, name, eid)
     content = format_entity_markdown(
         artifact_id=eid,
         artifact_type=artifact_type,
@@ -94,7 +93,8 @@ def admin_create_entity(
         summary=summary,
         properties=properties,
         notes=notes,
-        display_archimate=display,
+        display_section_id=display_section_id,
+        display_content=display_content,
         repo_root=repo_root,
     )
 
@@ -183,9 +183,10 @@ def admin_edit_entity(
     eff_properties = as_optional_str_dict(properties) if properties is not _UNSET else (parsed.properties or None)
     eff_notes = as_optional_str(notes) if notes is not _UNSET else parsed.notes
 
-    display = dict(parsed.display_archimate)
-    if name is not None and display:
-        display["label"] = eff_name
+    display_content = parsed.display_content
+    if name is not None and display_content:
+        import re as _re  # noqa: PLC0415
+        display_content = _re.sub(r"(?m)^(label:\s*).*$", rf"\g<1>{eff_name}", display_content, count=1)
 
     content = format_entity_markdown(
         artifact_id=artifact_id,
@@ -198,7 +199,8 @@ def admin_edit_entity(
         summary=eff_summary,
         properties=eff_properties,
         notes=eff_notes,
-        display_archimate=display,
+        display_section_id=parsed.display_section_id,
+        display_content=display_content,
         repo_root=repo_root,
     )
 

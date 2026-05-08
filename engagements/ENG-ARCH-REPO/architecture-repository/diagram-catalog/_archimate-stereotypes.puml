@@ -76,31 +76,31 @@ skinparam rectangle<<ImplementationGrouping>> {
 ' Motivation aspect  (#EDD6F0 — light lavender purple)
 ' All motivation element types share this background.
 ' ---------------------------------------------------------------------------
-skinparam rectangle<<Stakeholder>> {
+skinparam rectangle<<stakeholder>> {
   BackgroundColor #EDD6F0
   BorderColor #7B3F9A
 }
-skinparam rectangle<<Driver>> {
+skinparam rectangle<<driver>> {
   BackgroundColor #EDD6F0
   BorderColor #7B3F9A
 }
-skinparam rectangle<<Assessment>> {
+skinparam rectangle<<assessment>> {
   BackgroundColor #EDD6F0
   BorderColor #7B3F9A
 }
-skinparam rectangle<<Goal>> {
+skinparam rectangle<<goal>> {
   BackgroundColor #EDD6F0
   BorderColor #7B3F9A
 }
-skinparam rectangle<<Outcome>> {
+skinparam rectangle<<outcome>> {
   BackgroundColor #EDD6F0
   BorderColor #7B3F9A
 }
-skinparam rectangle<<Principle>> {
+skinparam rectangle<<principle>> {
   BackgroundColor #EDD6F0
   BorderColor #7B3F9A
 }
-skinparam rectangle<<Requirement>> {
+skinparam rectangle<<requirement>> {
   BackgroundColor #EDD6F0
   BorderColor #7B3F9A
 }
@@ -108,7 +108,7 @@ skinparam rectangle<<Meaning>> {
   BackgroundColor #EDD6F0
   BorderColor #7B3F9A
 }
-skinparam rectangle<<Value>> {
+skinparam rectangle<<value>> {
   BackgroundColor #EDD6F0
   BorderColor #7B3F9A
 }
@@ -116,19 +116,19 @@ skinparam rectangle<<Value>> {
 ' ---------------------------------------------------------------------------
 ' Strategy layer  (#F5DEB3 — wheat / tan)
 ' ---------------------------------------------------------------------------
-skinparam rectangle<<Capability>> {
+skinparam rectangle<<capability>> {
   BackgroundColor #F5DEB3
   BorderColor #8B6914
 }
-skinparam rectangle<<ValueStream>> {
+skinparam rectangle<<value_stream>> {
   BackgroundColor #F5DEB3
   BorderColor #8B6914
 }
-skinparam rectangle<<Resource>> {
+skinparam rectangle<<resource>> {
   BackgroundColor #F5DEB3
   BorderColor #8B6914
 }
-skinparam rectangle<<CourseOfAction>> {
+skinparam rectangle<<course_of_action>> {
   BackgroundColor #F5DEB3
   BorderColor #8B6914
 }
@@ -142,15 +142,15 @@ skinparam rectangle<<CommonGrouping>> {
   BackgroundColor #EDE8E1
   BorderColor #8C7E6A
 }
-skinparam rectangle<<Service>> {
+skinparam rectangle<<service>> {
   BackgroundColor #E0D8CC
   BorderColor #8C7E6A
 }
-skinparam rectangle<<Process>> {
+skinparam rectangle<<process>> {
   BackgroundColor #E0D8CC
   BorderColor #8C7E6A
 }
-skinparam rectangle<<Function>> {
+skinparam rectangle<<function>> {
   BackgroundColor #E0D8CC
   BorderColor #8C7E6A
 }
@@ -158,11 +158,11 @@ skinparam rectangle<<Collaboration>> {
   BackgroundColor #E0D8CC
   BorderColor #8C7E6A
 }
-skinparam rectangle<<Event>> {
+skinparam rectangle<<event>> {
   BackgroundColor #E0D8CC
   BorderColor #8C7E6A
 }
-skinparam rectangle<<Role>> {
+skinparam rectangle<<role>> {
   BackgroundColor #E0D8CC
   BorderColor #8C7E6A
 }
@@ -170,7 +170,7 @@ skinparam rectangle<<Role>> {
 ' ---------------------------------------------------------------------------
 ' Business layer  (#FFFAC8 — warm yellow)
 ' ---------------------------------------------------------------------------
-skinparam rectangle<<BusinessActor>> {
+skinparam rectangle<<business_actor>> {
   BackgroundColor #FFFAC8
   BorderColor #B8860B
 }
@@ -178,7 +178,7 @@ skinparam rectangle<<BusinessRole>> {
   BackgroundColor #FFFAC8
   BorderColor #B8860B
 }
-skinparam rectangle<<BusinessInterface>> {
+skinparam rectangle<<business_interface>> {
   BackgroundColor #FFFAC8
   BorderColor #B8860B
 }
@@ -198,11 +198,11 @@ skinparam rectangle<<BusinessService>> {
   BackgroundColor #FFFAC8
   BorderColor #B8860B
 }
-skinparam rectangle<<BusinessObject>> {
+skinparam rectangle<<business_object>> {
   BackgroundColor #FFFAC8
   BorderColor #B8860B
 }
-skinparam rectangle<<Product>> {
+skinparam rectangle<<product>> {
   BackgroundColor #FFFAC8
   BorderColor #B8860B
 }
@@ -210,7 +210,7 @@ skinparam rectangle<<Product>> {
 ' ---------------------------------------------------------------------------
 ' Application layer  (#CCF2FF — light cyan / sky blue)
 ' ---------------------------------------------------------------------------
-skinparam rectangle<<ApplicationComponent>> {
+skinparam rectangle<<application_component>> {
   BackgroundColor #CCF2FF
   BorderColor #0078A0
 }
@@ -218,7 +218,7 @@ skinparam rectangle<<ApplicationCollaboration>> {
   BackgroundColor #CCF2FF
   BorderColor #0078A0
 }
-skinparam rectangle<<ApplicationInterface>> {
+skinparam rectangle<<application_interface>> {
   BackgroundColor #CCF2FF
   BorderColor #0078A0
 }
@@ -238,7 +238,7 @@ skinparam rectangle<<ApplicationService>> {
   BackgroundColor #CCF2FF
   BorderColor #0078A0
 }
-skinparam rectangle<<DataObject>> {
+skinparam rectangle<<data_object>> {
   BackgroundColor #CCF2FF
   BorderColor #0078A0
 }
@@ -246,15 +246,15 @@ skinparam rectangle<<DataObject>> {
 ' ---------------------------------------------------------------------------
 ' Technology layer  (#CCFFCC — light green)
 ' ---------------------------------------------------------------------------
-skinparam rectangle<<Node>> {
+skinparam rectangle<<node>> {
   BackgroundColor #CCFFCC
   BorderColor #2E7D32
 }
-skinparam rectangle<<Device>> {
+skinparam rectangle<<device>> {
   BackgroundColor #CCFFCC
   BorderColor #2E7D32
 }
-skinparam rectangle<<SystemSoftware>> {
+skinparam rectangle<<system_software>> {
   BackgroundColor #CCFFCC
   BorderColor #2E7D32
 }
@@ -262,11 +262,11 @@ skinparam rectangle<<TechnologyCollaboration>> {
   BackgroundColor #CCFFCC
   BorderColor #2E7D32
 }
-skinparam rectangle<<TechnologyInterface>> {
+skinparam rectangle<<technology_interface>> {
   BackgroundColor #CCFFCC
   BorderColor #2E7D32
 }
-skinparam rectangle<<Path>> {
+skinparam rectangle<<path>> {
   BackgroundColor #CCFFCC
   BorderColor #2E7D32
 }
@@ -290,23 +290,23 @@ skinparam rectangle<<TechnologyService>> {
   BackgroundColor #CCFFCC
   BorderColor #2E7D32
 }
-skinparam rectangle<<Artifact>> {
+skinparam rectangle<<artifact>> {
   BackgroundColor #CCFFCC
   BorderColor #2E7D32
 }
-skinparam rectangle<<Equipment>> {
+skinparam rectangle<<equipment>> {
   BackgroundColor #CCFFCC
   BorderColor #2E7D32
 }
-skinparam rectangle<<Facility>> {
+skinparam rectangle<<facility>> {
   BackgroundColor #CCFFCC
   BorderColor #2E7D32
 }
-skinparam rectangle<<DistributionNetwork>> {
+skinparam rectangle<<distribution_network>> {
   BackgroundColor #CCFFCC
   BorderColor #2E7D32
 }
-skinparam rectangle<<Material>> {
+skinparam rectangle<<material>> {
   BackgroundColor #CCFFCC
   BorderColor #2E7D32
 }
@@ -314,11 +314,11 @@ skinparam rectangle<<Material>> {
 ' ---------------------------------------------------------------------------
 ' Implementation & Migration layer  (#FFE4C4 — bisque)
 ' ---------------------------------------------------------------------------
-skinparam rectangle<<WorkPackage>> {
+skinparam rectangle<<work_package>> {
   BackgroundColor #FFE4C4
   BorderColor #8D4E00
 }
-skinparam rectangle<<Deliverable>> {
+skinparam rectangle<<deliverable>> {
   BackgroundColor #FFE4C4
   BorderColor #8D4E00
 }
@@ -326,7 +326,7 @@ skinparam rectangle<<ImplementationEvent>> {
   BackgroundColor #FFE4C4
   BorderColor #8D4E00
 }
-skinparam rectangle<<Plateau>> {
+skinparam rectangle<<plateau>> {
   BackgroundColor #FFE4C4
   BorderColor #8D4E00
 }

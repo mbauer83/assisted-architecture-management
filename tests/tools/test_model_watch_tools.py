@@ -24,8 +24,8 @@ def test_roots_fingerprint_detects_non_max_repo_change(tmp_path: Path) -> None:
     repo_a = tmp_path / "repo-a"
     repo_b = tmp_path / "repo-b"
 
-    file_a = repo_a / "model" / "application" / "components" / "APP@1712870400.kRZYOA.event-store.md"
-    file_b = repo_b / "model" / "motivation" / "drivers" / "DRV@1712870400.Qw7Er1.codegen-velocity.outgoing.md"
+    file_a = repo_a / "model" / "application" / "application-component" / "APP@1712870400.kRZYOA.event-store.md"
+    file_b = repo_b / "model" / "motivation" / "driver" / "DRV@1712870400.Qw7Er1.codegen-velocity.outgoing.md"
 
     _write(file_a, "a")
     _write(file_b, "b")

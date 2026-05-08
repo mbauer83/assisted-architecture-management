@@ -89,7 +89,7 @@ def enterprise_root(tmp_path: Path) -> Path:
 def _make_entity(root: Path, artifact_id: str, artifact_type: str, name: str) -> None:
     from src.domain.ontology_catalog import all_entity_types
     info = all_entity_types()[artifact_type]
-    path = root / "model" / info.domain_dir / info.subdir / f"{artifact_id}.md"
+    path = root / "model" / Path(*info.hierarchy) / f"{artifact_id}.md"
     _write(path, _entity_md(artifact_id, artifact_type, name))
 
 
@@ -188,7 +188,7 @@ class TestPromotionExecute:
 
         assert result["executed"] is True
         assert not result["rolled_back"]
-        ent_file = enterprise_root / "model" / "motivation" / "requirements" / f"{eng_id}.md"
+        ent_file = enterprise_root / "model" / "motivation" / "requirement" / f"{eng_id}.md"
         assert ent_file.exists()
 
     def test_engagement_entity_replaced_by_grf(
@@ -198,7 +198,7 @@ class TestPromotionExecute:
         _make_entity(engagement_root, eng_id, "requirement", "To Replace")
 
         orig_path = (
-            engagement_root / "model" / "motivation" / "requirements" / f"{eng_id}.md"
+            engagement_root / "model" / "motivation" / "requirement" / f"{eng_id}.md"
         )
         assert orig_path.exists()
 
@@ -211,7 +211,7 @@ class TestPromotionExecute:
 
         assert result["executed"] is True
         assert not orig_path.exists(), "Original entity should be replaced by GRF"
-        grf_dir = engagement_root / "model" / "common" / "global-references"
+        grf_dir = engagement_root / "model" / "common" / "global-artifact-reference"
         grfs = list(grf_dir.rglob("GAR@*.md")) if grf_dir.exists() else []
         assert grfs, "A GAR proxy should have been created"
         assert any(eng_id in f.read_text() for f in grfs)
@@ -238,7 +238,7 @@ class TestPromotionExecute:
         assert result["executed"] is True
         # Enterprise file should be unchanged
         ent_content = (
-            enterprise_root / "model" / "motivation" / "requirements" / f"{ent_id}.md"
+            enterprise_root / "model" / "motivation" / "requirement" / f"{ent_id}.md"
         ).read_text()
         assert ent_id in ent_content
 
@@ -253,7 +253,7 @@ class TestPromotionExecute:
         _make_entity(enterprise_root, glo_id, "requirement", "Global Req")
         # GAR proxy
         grf_path = (
-            engagement_root / "model" / "common" / "global-references" / f"{grf_id}.md"
+            engagement_root / "model" / "common" / "global-artifact-reference" / f"{grf_id}.md"
         )
         _write(grf_path, f"""\
 ---
@@ -283,7 +283,7 @@ alias: GAR_GrfFff
 ```
 """)
         outgoing_path = (
-            engagement_root / "model" / "motivation" / "requirements"
+            engagement_root / "model" / "motivation" / "requirement"
             / f"{eng_id}.outgoing.md"
         )
         _write(outgoing_path, f"""\
@@ -308,7 +308,7 @@ last-updated: '2026-04-17'
 
         assert result["executed"] is True
         ent_outgoing = (
-            enterprise_root / "model" / "motivation" / "requirements"
+            enterprise_root / "model" / "motivation" / "requirement"
             / f"{eng_id}.outgoing.md"
         )
         assert ent_outgoing.exists()

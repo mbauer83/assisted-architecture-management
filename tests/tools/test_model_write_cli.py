@@ -47,7 +47,7 @@ alias: REQ_TEST
 def test_cli_delete_entity_dry_run(tmp_path: Path, capsys) -> None:
     repo = tmp_path / "engagements" / "ENG" / "architecture-repository"
     eid = "REQ@1000000000.TestAa.delete-me"
-    _write(repo / "model" / "motivation" / "requirements" / f"{eid}.md", _entity_md(eid, "Delete Me"))
+    _write(repo / "model" / "motivation" / "requirement" / f"{eid}.md", _entity_md(eid, "Delete Me"))
 
     rc = main(["--repo-root", str(repo), "delete-entity", eid, "--dry-run"])
     captured = capsys.readouterr()

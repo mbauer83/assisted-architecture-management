@@ -19,7 +19,7 @@ logger = logging.getLogger(__name__)
 
 
 def _project_directory() -> Path:
-    return Path(__file__).resolve().parents[2]
+    return Path(__file__).resolve().parents[3]
 
 
 async def _pump_reader_to_writer(
@@ -29,7 +29,8 @@ async def _pump_reader_to_writer(
     async with read_stream, write_stream:
         async for message in read_stream:
             if isinstance(message, Exception):
-                raise message
+                logger.warning("MCP bridge: ignoring parse error from stream: %s", message)
+                continue
             await write_stream.send(message)
 
 

@@ -22,26 +22,26 @@ top to bottom direction
 title Application Components & Technology
 
 rectangle "Consumers" <<ApplicationGrouping>> as GRP_CONS {
-  rectangle "<$archimate_ApplicationComponent{scale=1.5}> GUI Authoring Tool" <<ApplicationComponent>> as APP_lmO0mp
-  rectangle "<$archimate_ApplicationComponent{scale=1.5}> Agentic LLM CLI Application" <<ApplicationComponent>> as APP_N96vdO
-  rectangle "<$archimate_ApplicationComponent{scale=1.5}> Agentic LLM Desktop Application" <<ApplicationComponent>> as APP_AUw6Qr
-  rectangle "<$archimate_ApplicationComponent{scale=1.5}> Agentic LLM IDE Plugin" <<ApplicationComponent>> as APP_PaedDQ
-  rectangle "<$archimate_ApplicationComponent{scale=1.5}> Agentic LLM Web Application" <<ApplicationComponent>> as APP_27nbQ9
+  rectangle "<$archimate_application_component{scale=1.5}> GUI Authoring Tool" <<application_component>> as APP_lmO0mp
+  rectangle "<$archimate_application_component{scale=1.5}> Agentic LLM CLI Application" <<application_component>> as APP_N96vdO
+  rectangle "<$archimate_application_component{scale=1.5}> Agentic LLM Desktop Application" <<application_component>> as APP_AUw6Qr
+  rectangle "<$archimate_application_component{scale=1.5}> Agentic LLM IDE Plugin" <<application_component>> as APP_PaedDQ
+  rectangle "<$archimate_application_component{scale=1.5}> Agentic LLM Web Application" <<application_component>> as APP_27nbQ9
   APP_lmO0mp -[hidden]right- APP_N96vdO
   APP_N96vdO -[hidden]right- APP_AUw6Qr
   APP_AUw6Qr -[hidden]right- APP_PaedDQ
   APP_PaedDQ -[hidden]right- APP_27nbQ9
 }
 
-rectangle "<$archimate_ApplicationComponent{scale=1.5}> Architecture Backend" <<ApplicationComponent>> as APP_OYEmP1 {
-  rectangle "<$archimate_ApplicationComponent{scale=1.5}> MCP Model Server" <<ApplicationComponent>> as APP_kRZYOA
-  rectangle "<$archimate_ApplicationComponent{scale=1.5}> Write Request Queue" <<ApplicationComponent>> as APP_a9k_mJ
-  rectangle "<$archimate_ApplicationComponent{scale=1.5}> Promotion Engine" <<ApplicationComponent>> as APP_tIMxjr
-  rectangle "<$archimate_ApplicationComponent{scale=1.5}> Git Sync Service" <<ApplicationComponent>> as APP_tY3JIK
-  rectangle "<$archimate_ApplicationComponent{scale=1.5}> Bulk Write Handler" <<ApplicationComponent>> as APP_5n_KQJ
-  rectangle "<$archimate_ApplicationComponent{scale=1.5}> Bulk Delete Handler" <<ApplicationComponent>> as APP_WK_78v
-  rectangle "<$archimate_ApplicationComponent{scale=1.5}> Batch Transaction Manager" <<ApplicationComponent>> as APP_HOOYAQ
-  rectangle "<$archimate_ApplicationComponent{scale=1.5}> Operation Registry" <<ApplicationComponent>> as APP_PDJI8F
+rectangle "<$archimate_application_component{scale=1.5}> Architecture Backend" <<application_component>> as APP_OYEmP1 {
+  rectangle "<$archimate_application_component{scale=1.5}> MCP Model Server" <<application_component>> as APP_kRZYOA
+  rectangle "<$archimate_application_component{scale=1.5}> Write Request Queue" <<application_component>> as APP_a9k_mJ
+  rectangle "<$archimate_application_component{scale=1.5}> Promotion Engine" <<application_component>> as APP_tIMxjr
+  rectangle "<$archimate_application_component{scale=1.5}> Git Sync Service" <<application_component>> as APP_tY3JIK
+  rectangle "<$archimate_application_component{scale=1.5}> Bulk Write Handler" <<application_component>> as APP_5n_KQJ
+  rectangle "<$archimate_application_component{scale=1.5}> Bulk Delete Handler" <<application_component>> as APP_WK_78v
+  rectangle "<$archimate_application_component{scale=1.5}> Batch Transaction Manager" <<application_component>> as APP_HOOYAQ
+  rectangle "<$archimate_application_component{scale=1.5}> Operation Registry" <<application_component>> as APP_PDJI8F
   APP_kRZYOA -[hidden]right- APP_a9k_mJ
   APP_a9k_mJ -[hidden]right- APP_tIMxjr
   APP_tIMxjr -[hidden]right- APP_tY3JIK
@@ -53,28 +53,28 @@ rectangle "<$archimate_ApplicationComponent{scale=1.5}> Architecture Backend" <<
 
 rectangle "Supporting Components" <<ApplicationGrouping>> as GRP_SUP {
   rectangle "Query & Index" <<CommonGrouping>> as GRP_SUP_A {
-    rectangle "<$archimate_ApplicationComponent{scale=1.5}> Query Engine" <<ApplicationComponent>> as APP_v9LvfK
-    rectangle "<$archimate_ApplicationComponent{scale=1.5}> SQLite Indexer" <<ApplicationComponent>> as APP_JOmFWy
+    rectangle "<$archimate_application_component{scale=1.5}> Query Engine" <<application_component>> as APP_v9LvfK
+    rectangle "<$archimate_application_component{scale=1.5}> SQLite Indexer" <<application_component>> as APP_JOmFWy
     APP_v9LvfK -[hidden]down- APP_JOmFWy
   }
   rectangle "Authoring & Rendering" <<CommonGrouping>> as GRP_SUP_B {
-    rectangle "<$archimate_ApplicationComponent{scale=1.5}> CLI Tool" <<ApplicationComponent>> as APP_kjC6ex
-    rectangle "<$archimate_ApplicationComponent{scale=1.5}> Diagram Scaffolder" <<ApplicationComponent>> as APP_SCKD2U
-    rectangle "<$archimate_ApplicationComponent{scale=1.5}> PlantUML Renderer" <<ApplicationComponent>> as APP_yaxrWl
+    rectangle "<$archimate_application_component{scale=1.5}> CLI Tool" <<application_component>> as APP_kjC6ex
+    rectangle "<$archimate_application_component{scale=1.5}> Diagram Scaffolder" <<application_component>> as APP_SCKD2U
+    rectangle "<$archimate_application_component{scale=1.5}> PlantUML Renderer" <<application_component>> as APP_yaxrWl
     APP_kjC6ex -[hidden]down- APP_SCKD2U
     APP_SCKD2U -[hidden]down- APP_yaxrWl
   }
   rectangle "Verification" <<CommonGrouping>> as GRP_SUP_C {
-    rectangle "<$archimate_ApplicationComponent{scale=1.5}> Model Verifier" <<ApplicationComponent>> as APP_ca3vm7
+    rectangle "<$archimate_application_component{scale=1.5}> Model Verifier" <<application_component>> as APP_ca3vm7
   }
   GRP_SUP_A -[hidden]right- GRP_SUP_B
   GRP_SUP_B -[hidden]right- GRP_SUP_C
 }
 
 rectangle "Technology" <<TechnologyGrouping>> as GRP_TECH {
-  rectangle "<$archimate_Node{scale=1.5}> Developer Workstation" <<Node>> as NOD_4EFX7z {
-    rectangle "<$archimate_Artifact{scale=1.5}> Git Repository" <<Artifact>> as ART_YsLpM8
-    rectangle "<$archimate_SystemSoftware{scale=1.5}> Git VCS" <<SystemSoftware>> as SSW_TzzVd
+  rectangle "<$archimate_node{scale=1.5}> Developer Workstation" <<node>> as NOD_4EFX7z {
+    rectangle "<$archimate_artifact{scale=1.5}> Git Repository" <<artifact>> as ART_YsLpM8
+    rectangle "<$archimate_system_software{scale=1.5}> Git VCS" <<system_software>> as SSW_TzzVd
     ART_YsLpM8 -[hidden]right- SSW_TzzVd
   }
 }

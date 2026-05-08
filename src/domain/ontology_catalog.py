@@ -40,7 +40,7 @@ def all_connection_type_names() -> frozenset[str]:
 
 @lru_cache(maxsize=1)
 def known_domain_names() -> frozenset[str]:
-    domains = {info.domain_dir for info in all_entity_types().values()}
+    domains = {info.hierarchy[0] for info in all_entity_types().values() if info.hierarchy}
     return frozenset(domains | {"unknown"})
 
 

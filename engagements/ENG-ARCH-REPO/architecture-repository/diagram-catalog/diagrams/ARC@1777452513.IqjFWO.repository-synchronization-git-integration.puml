@@ -22,24 +22,24 @@ top to bottom direction
 title Repository Synchronization & Git Integration
 
 rectangle "Application" <<ApplicationGrouping>> {
-  rectangle "<$archimate_ApplicationComponent{scale=1.5}> Git Sync Service" <<ApplicationComponent>> as APP_tY3JIK
+  rectangle "<$archimate_application_component{scale=1.5}> Git Sync Service" <<application_component>> as APP_tY3JIK
 }
 
-rectangle "<$archimate_Process{scale=1.5}> Synchronize With Remote Repository" <<Process>> as PRC_tEdRzw {
-  rectangle "<$archimate_Function{scale=1.5}> Check Repository Workspace Status" <<Function>> as FNC_91ddSi
-  rectangle "<$archimate_Function{scale=1.5}> Pull Repository Changes" <<Function>> as FNC_DGBZ9H
+rectangle "<$archimate_process{scale=1.5}> Synchronize With Remote Repository" <<process>> as PRC_tEdRzw {
+  rectangle "<$archimate_function{scale=1.5}> Check Repository Workspace Status" <<function>> as FNC_91ddSi
+  rectangle "<$archimate_function{scale=1.5}> Pull Repository Changes" <<function>> as FNC_DGBZ9H
   FNC_91ddSi -[hidden]right- FNC_DGBZ9H
 }
 
 rectangle "Outcomes" <<CommonGrouping>> as GRP_EVTS {
-  rectangle "<$archimate_Event{scale=1.5}> Architecture Repository Change Detected" <<Event>> as EVT_UCrh3V
-  rectangle "<$archimate_Event{scale=1.5}> Workspace Conflict Detected" <<Event>> as EVT_iqz9jG
+  rectangle "<$archimate_event{scale=1.5}> Architecture Repository Change Detected" <<event>> as EVT_UCrh3V
+  rectangle "<$archimate_event{scale=1.5}> Workspace Conflict Detected" <<event>> as EVT_iqz9jG
   EVT_UCrh3V -[hidden]right- EVT_iqz9jG
 }
 
-rectangle "<$archimate_Function{scale=1.5}> Index Repository" <<Function>> as FNC_dxb6ru
+rectangle "<$archimate_function{scale=1.5}> Index Repository" <<function>> as FNC_dxb6ru
 
-rectangle "<$archimate_ApplicationComponent{scale=1.5}> GUI Authoring Tool" <<ApplicationComponent>> as APP_lmO0mp
+rectangle "<$archimate_application_component{scale=1.5}> GUI Authoring Tool" <<application_component>> as APP_lmO0mp
 
 ' Inter-layer anchors
 APP_tY3JIK -[hidden]down- PRC_tEdRzw

@@ -93,7 +93,7 @@ last-updated: '2026-04-27'
 
 def _build_test_app(repo_root: Path) -> tuple[FastAPI, list[str]]:
     """Populate a repo, build a minimal FastAPI app, return (app, entity_ids)."""
-    model_root = repo_root / "model" / "motivation" / "requirements"
+    model_root = repo_root / "model" / "motivation" / "requirement"
     entity_ids: list[str] = []
 
     for idx in range(60):

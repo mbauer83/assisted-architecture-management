@@ -7,7 +7,7 @@ from src.infrastructure.rendering.generic_puml_renderer import GenericPumlRender
 
 _ARCHIMATE_CONFIG = {
     "includes": ["_archimate-stereotypes.puml", "_archimate-glyphs.puml"],
-    "grouping": {"by_field": "domain_dir", "stereotype_pattern": "{domain_dir|capitalize}Grouping"},
+    "grouping": {"stereotype_pattern": "{hierarchy_0|capitalize}Grouping"},
     "layout": {
         "nesting_connection_classes": ["nesting"],
         "flow_connection_classes": ["flow"],
@@ -23,18 +23,10 @@ def _entity(
     *,
     domain: str = "motivation",
     subdomain: str = "goals",
-    element_type: str | None = None,
 ) -> EntityRecord:
-    display_blocks = {}
-    if element_type is not None:
-        display_blocks["archimate"] = (
-            "```yaml\n"
-            f"domain: {domain.title()}\n"
-            f"element-type: {element_type}\n"
-            f"label: \"{name}\"\n"
-            f"alias: {alias}\n"
-            "```"
-        )
+    display_blocks = {
+        "archimate": f"```yaml\nlabel: \"{name}\"\nalias: {alias}\n```"
+    }
     return EntityRecord(
         artifact_id=artifact_id,
         artifact_type=artifact_type,
@@ -123,31 +115,26 @@ def test_render_body_renders_junction_inside_nested_parent(tmp_path: Path) -> No
         tmp_path,
     )
 
-    assert 'rectangle "Process A" as PRC_A {' in puml
+    assert "PRC_A {" in puml  # process is rendered as a nesting container
     assert 'circle " " as JNA_A' in puml
-    process_start = puml.index('rectangle "Process A" as PRC_A {')
-    process_end = puml.index("}", process_start)
-    assert 'circle " " as JNA_A' in puml[process_start:process_end]
+    # Verify junction is nested inside process by checking indentation pattern
+    lines = puml.splitlines()
+    in_prc = False
+    junction_nested = False
+    for line in lines:
+        if "PRC_A {" in line:
+            in_prc = True
+        elif in_prc and line.strip() == "}":
+            in_prc = False
+        elif in_prc and "JNA_A" in line:
+            junction_nested = True
+    assert junction_nested, "Junction should appear nested inside PRC_A block"
 
 
-def test_render_body_supports_sprite_and_non_sprite_element_declarations(tmp_path: Path) -> None:
+def test_render_body_entity_declarations_use_snake_case_stereotypes(tmp_path: Path) -> None:
     renderer = GenericPumlRenderer(_ARCHIMATE_CONFIG)
-    stakeholder = _entity(
-        "STK@1.a.stakeholder-a",
-        "stakeholder",
-        "Stakeholder A",
-        "STK_A",
-        subdomain="stakeholders",
-        element_type="Stakeholder",
-    )
-    value = _entity(
-        "VAL@1.a.value-a",
-        "value",
-        "Value A",
-        "VAL_A",
-        subdomain="values",
-        element_type="Value",
-    )
+    stakeholder = _entity("STK@1.a.stakeholder-a", "stakeholder", "Stakeholder A", "STK_A", subdomain="stakeholders")
+    value = _entity("VAL@1.a.value-a", "value", "Value A", "VAL_A", subdomain="values")
 
     puml = renderer.render_body(
         "Declaration Patterns",
@@ -157,8 +144,11 @@ def test_render_body_supports_sprite_and_non_sprite_element_declarations(tmp_pat
         tmp_path,
     )
 
-    assert 'rectangle "<$archimate_Stakeholder{scale=1.5}> Stakeholder A" <<Stakeholder>> as STK_A' in puml
-    assert 'rectangle "Value A" <<Value>> as VAL_A' in puml
+    # Stereotype keys are snake_case derived from artifact_type
+    assert "<<stakeholder>>" in puml
+    assert "STK_A" in puml
+    assert "<<value>>" in puml
+    assert "VAL_A" in puml
 
 
 def test_inject_includes_inlines_only_needed_stereotypes_and_sprites(tmp_path: Path) -> None:

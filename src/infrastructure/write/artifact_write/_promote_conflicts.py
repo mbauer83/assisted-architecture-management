@@ -151,7 +151,8 @@ def apply_merge(
         summary=merged_fields.get("summary", parsed.summary),
         properties=merged_fields.get("properties", parsed.properties),
         notes=merged_fields.get("notes", parsed.notes),
-        display_archimate=dict(parsed.display_archimate),
+        display_section_id=parsed.display_section_id,
+        display_content=parsed.display_content,
         repo_root=ent_root,
     )
     backups.append((ent_path, ent_path.read_bytes()))

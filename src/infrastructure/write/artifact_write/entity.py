@@ -6,6 +6,7 @@ from src.application.modeling.artifact_write import format_entity_markdown, gene
 from src.application.verification.artifact_verifier import ArtifactVerifier
 from src.config.repo_paths import MODEL
 from src.domain.module_types import EntityTypeName
+from src.domain.ontology_types import EntityTypeInfo
 
 from ._artifact_deduplication import (
     ensure_unique_entity_random_part,
@@ -27,6 +28,25 @@ def verification_to_entity_dict(path: Path, res) -> dict[str, object]:
             {"severity": i.severity, "code": i.code, "message": i.message, "location": i.location} for i in res.issues
         ],
     }
+
+
+def entity_path(repo_root: Path, info: EntityTypeInfo, eid: str) -> Path:
+    return repo_root / MODEL / Path(*info.hierarchy) / f"{eid}.md"
+
+
+def _alias_for(info: EntityTypeInfo, eid: str) -> str:
+    return f"{info.prefix}_{eid.split('.')[1]}" if "." in eid else eid.replace("-", "_")
+
+
+def _render_display(info: EntityTypeInfo, name: str, eid: str) -> tuple[str, str]:
+    """Return ``(display_section_id, display_content)`` for a new entity."""
+    from src.infrastructure.app_bootstrap import get_module_registry  # noqa: PLC0415
+    ontology = get_module_registry().ontology_for_entity_type(EntityTypeName(info.artifact_type))
+    if ontology is None:
+        return "archimate", f"label: {name}\nalias: {_alias_for(info, eid)}"
+    return ontology.display_section_id, ontology.render_display_section(
+        info.artifact_type, name, _alias_for(info, eid)
+    )
 
 
 def create_entity(
@@ -66,12 +86,11 @@ def create_entity(
     eid = artifact_id or generate_entity_id(info.prefix, name)
     repo = get_repository(repo_root)
 
-    # Ensure random part is unique within this type (prevents sharing same random part)
     try:
         eid = ensure_unique_entity_random_part(eid, artifact_type, repo, info.prefix, name)
     except ValueError as e:
         error_msg = str(e)
-        path = repo_root / MODEL / info.domain_dir / info.subdir / f"{eid}.md"
+        path = entity_path(repo_root, info, eid)
         return WriteResult(
             wrote=False,
             path=path,
@@ -91,14 +110,12 @@ def create_entity(
             },
         )
 
-    # Ensure type + friendly-name is unique (prevents semantic duplicates)
     friendly_slug = extract_friendly_slug(eid)
     try:
         validate_entity_unique(repo, artifact_type, friendly_slug)
     except ValueError as e:
-        # Report validation error in preview/dry_run
         error_msg = str(e)
-        path = repo_root / MODEL / info.domain_dir / info.subdir / f"{eid}.md"
+        path = entity_path(repo_root, info, eid)
         return WriteResult(
             wrote=False,
             path=path,
@@ -117,14 +134,9 @@ def create_entity(
                 ],
             },
         )
-    path = repo_root / MODEL / info.domain_dir / info.subdir / f"{eid}.md"
 
-    display = {
-        "domain": info.domain_dir.capitalize(),
-        "element-type": info.archimate_element_type or "",
-        "label": name,
-        "alias": f"{info.prefix}_{eid.split('.')[1]}" if "." in eid else eid.replace("-", "_"),
-    }
+    path = entity_path(repo_root, info, eid)
+    display_section_id, display_content = _render_display(info, name, eid)
 
     content = format_entity_markdown(
         artifact_id=eid,
@@ -137,7 +149,8 @@ def create_entity(
         summary=summary,
         properties=properties,
         notes=notes,
-        display_archimate=display,
+        display_section_id=display_section_id,
+        display_content=display_content,
         repo_root=repo_root,
     )
 

@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import json
+import re
 from pathlib import Path
 from typing import Any, cast
 
@@ -14,9 +16,28 @@ from src.domain.permitted_relationships import (
     PermittedRelationshipSet,
 )
 
+_PACKAGE_DIR = Path(__file__).parent
+_GLYPHS_PATH = (
+    _PACKAGE_DIR.parent.parent.parent / "tools" / "gui" / "src" / "ui" / "lib" / "archimateGlyphs.json"
+)
+
+DISPLAY_SECTION_ID = "archimate"
+
+
+def _sprite_key(artifact_type: str) -> str:
+    return artifact_type.replace("-", "_")
+
+
+def _load_glyphs() -> dict[str, Any]:
+    try:
+        return cast(dict[str, Any], json.loads(_GLYPHS_PATH.read_text(encoding="utf-8")))
+    except OSError:
+        return {}
+
 
 class _ArchiMateNextModule:
     name = "archimate-next-snapshot1"
+    display_section_id = DISPLAY_SECTION_ID
 
     def __init__(
         self,
@@ -43,6 +64,14 @@ class _ArchiMateNextModule:
             for clf in info.classifications:
                 _clf_build.setdefault(clf, set()).add(cname)
         self._classification_index = {k: frozenset(v) for k, v in _clf_build.items()}
+
+        self._glyphs: dict[str, Any] = {}
+        self._glyphs_loaded = False
+
+    def _ensure_glyphs(self) -> None:
+        if not self._glyphs_loaded:
+            self._glyphs = _load_glyphs()
+            self._glyphs_loaded = True
 
     @property
     def entity_types(self) -> dict[EntityTypeName, EntityTypeInfo]:
@@ -76,22 +105,53 @@ class _ArchiMateNextModule:
     ) -> bool:
         return self._permitted_relationships.permits(src, tgt, conn)
 
+    def render_display_section(
+        self,
+        artifact_type: str,
+        name: str,
+        alias: str,
+    ) -> str:
+        label = name.replace('"', "'")
+        return f"label: {label}\nalias: {alias}"
+
+    def extract_display_section(self, section_content: str) -> dict | None:
+        text = re.sub(r"^```(?:yaml)?\n", "", section_content.strip(), count=1)
+        text = re.sub(r"\n```$", "", text, count=1)
+        try:
+            loaded: Any = yaml.safe_load(text) or {}
+        except Exception:  # noqa: BLE001
+            return None
+        return loaded if isinstance(loaded, dict) else None
+
+    def sprite_for(self, artifact_type: str) -> str | None:
+        self._ensure_glyphs()
+        if not self._glyphs:
+            return None
+        kind = self._glyphs.get("types", {}).get(artifact_type)
+        if not kind:
+            return None
+        markup = self._glyphs.get("kinds", {}).get(kind)
+        if not markup:
+            return None
+        from src.infrastructure.rendering._svg_sprite_convert import (  # noqa: PLC0415
+            browser_markup_to_plantuml_svg as _convert,
+        )
+        key = _sprite_key(artifact_type)
+        return f"sprite $archimate_{key} {_convert(markup)}"
+
 
 def _load_entity_types(data: dict[str, Any]) -> dict[EntityTypeName, EntityTypeInfo]:
     out: dict[EntityTypeName, EntityTypeInfo] = {}
-    for name, info in data["entity_types"].items():
-        raw_et = info.get("archimate_element_type")
-        archimate_element_type: str | None = raw_et if raw_et else None
-        out[EntityTypeName(name)] = EntityTypeInfo(
-            artifact_type=name,
+    for artifact_type, info in data["entity_types"].items():
+        raw_hierarchy = info.get("hierarchy", [])
+        hierarchy = tuple(raw_hierarchy) + (artifact_type,)
+        out[EntityTypeName(artifact_type)] = EntityTypeInfo(
+            artifact_type=artifact_type,
             prefix=info["prefix"],
-            domain_dir=info["domain"],
-            subdir=info["subdir"],
-            archimate_element_type=archimate_element_type,
+            hierarchy=hierarchy,
             element_classes=tuple(info.get("element_classes", ())),
             create_when=info.get("create_when", ""),
             never_create_when=info.get("never_create_when", ""),
-            has_sprite=bool(info.get("has_sprite", False)),
             internal=bool(info.get("internal", False)),
         )
     return out
@@ -151,10 +211,7 @@ def _build_permitted_relationships(
         sources = _expand_ref(raw_src, all_types, class_members)
 
         for src in sources:
-            if raw_tgt == "@same":
-                targets = [src]
-            else:
-                targets = _expand_ref(raw_tgt, all_types, class_members)
+            targets = [src] if raw_tgt == "@same" else _expand_ref(raw_tgt, all_types, class_members)
             for tgt in targets:
                 for ct in conn_types:
                     rules.add(PermittedRelationship(

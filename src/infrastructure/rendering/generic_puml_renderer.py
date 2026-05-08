@@ -31,8 +31,11 @@ from src.infrastructure.rendering._diagram_text import insert_arrow_direction, p
 
 def _registry():
     from src.infrastructure.app_bootstrap import get_module_registry  # noqa: PLC0415
-
     return get_module_registry()
+
+
+def _stereotype_key(artifact_type: str) -> str:
+    return artifact_type.replace("-", "_")
 
 
 class GenericPumlRenderer:
@@ -71,7 +74,7 @@ class GenericPumlRenderer:
         for entity in entities:
             alias = normalize_puml_alias(entity.display_alias)
             if alias:
-                domain_entities[self._domain_dir(entity)] .append(entity)
+                domain_entities[self._grouping_key(entity)].append(entity)
 
         ordered_domains = self._ordered_domains(domain_entities)
         single_domain = len(ordered_domains) == 1
@@ -245,10 +248,10 @@ class GenericPumlRenderer:
     def _flow_conn_types(self) -> frozenset[str]:
         return self._classified_conn_types("flow_connection_classes", "flow")
 
-    def _domain_dir(self, entity: EntityRecord) -> str:
+    def _grouping_key(self, entity: EntityRecord) -> str:
         info = self._entity_info(entity.artifact_type)
-        if info is not None:
-            return info.domain_dir
+        if info is not None and info.hierarchy:
+            return info.hierarchy[0]
         return (entity.domain or "common").lower()
 
     def _ordered_domains(self, domain_entities: Mapping[str, list[EntityRecord]]) -> list[str]:
@@ -261,42 +264,57 @@ class GenericPumlRenderer:
                 ordered.append(domain)
         return ordered
 
-    def _grouping_stereotype(self, domain_dir: str) -> str:
+    def _grouping_stereotype(self, grouping_key: str) -> str:
         grouping = self._config.get("grouping", {})
         if not isinstance(grouping, dict):
-            return domain_dir.capitalize() + "Grouping"
-        pattern = str(grouping.get("stereotype_pattern", "{domain_dir|capitalize}Grouping"))
-        return pattern.replace("{domain_dir|capitalize}", domain_dir.capitalize()).replace("{domain_dir}", domain_dir)
+            return grouping_key.capitalize() + "Grouping"
+        pattern = str(grouping.get("stereotype_pattern", "{hierarchy_0|capitalize}Grouping"))
+        return (
+            pattern
+            .replace("{hierarchy_0|capitalize}", grouping_key.capitalize())
+            .replace("{hierarchy_0}", grouping_key)
+            # legacy pattern names kept for any hand-authored configs
+            .replace("{domain_dir|capitalize}", grouping_key.capitalize())
+            .replace("{domain_dir}", grouping_key)
+        )
 
-    def _entity_label_and_type(
+    def _display_section_id(self, entity: EntityRecord) -> str:
+        ontology = _registry().ontology_for_entity_type(EntityTypeName(entity.artifact_type))
+        if ontology is not None:
+            return ontology.display_section_id
+        return "archimate"
+
+    def _entity_label_and_stereotype(
         self,
         entity: EntityRecord,
-        *,
-        fallback_to_ontology: bool,
     ) -> tuple[str, str | None]:
-        archimate_block = parse_archimate_display_block(entity.display_blocks.get("archimate", ""))
+        section_id = self._display_section_id(entity)
+        raw_block = entity.display_blocks.get(section_id, "")
+        archimate_block = parse_archimate_display_block(raw_block)
         label = str(archimate_block.get("label") or entity.display_label or entity.name).replace('"', "'")
-        element_type = str(archimate_block.get("element-type") or "").strip() or None
         info = self._entity_info(entity.artifact_type)
-        if fallback_to_ontology and element_type is None and info is not None:
-            element_type = info.archimate_element_type
-        return label, element_type
+        stereotype = _stereotype_key(info.artifact_type) if info else None
+        return label, stereotype
+
+    def _entity_has_sprite(self, entity: EntityRecord) -> bool:
+        ontology = _registry().ontology_for_entity_type(EntityTypeName(entity.artifact_type))
+        return ontology is not None and ontology.sprite_for(entity.artifact_type) is not None
 
     def _entity_declaration(self, entity: EntityRecord, alias: str) -> str:
         if entity.artifact_type in self._junction_types():
             return f'circle " " as {alias}'
-        label, element_type = self._entity_label_and_type(entity, fallback_to_ontology=False)
-        info = self._entity_info(entity.artifact_type)
-        if element_type and info is not None and info.has_sprite:
-            return f'rectangle "<$archimate_{element_type}{{scale=1.5}}> {label}" <<{element_type}>> as {alias}'
-        if element_type:
-            return f'rectangle "{label}" <<{element_type}>> as {alias}'
+        label, stereotype = self._entity_label_and_stereotype(entity)
+        if stereotype and self._entity_has_sprite(entity):
+            key = _stereotype_key(entity.artifact_type)
+            return f'rectangle "<$archimate_{key}{{scale=1.5}}> {label}" <<{stereotype}>> as {alias}'
+        if stereotype:
+            return f'rectangle "{label}" <<{stereotype}>> as {alias}'
         return f'rectangle "{label}" as {alias}'
 
     def _type_group_label(self, entity: EntityRecord) -> str:
-        _label, element_type = self._entity_label_and_type(entity, fallback_to_ontology=True)
-        if element_type:
-            return pluralize_label(element_type)
+        info = self._entity_info(entity.artifact_type)
+        if info:
+            return pluralize_label(info.artifact_type.replace("-", " ").title())
         return pluralize_label(entity.artifact_type.replace("-", " ").title())
 
     def _ordered_type_groups(self, entities: list[EntityRecord]) -> list[tuple[str, list[EntityRecord]]]:

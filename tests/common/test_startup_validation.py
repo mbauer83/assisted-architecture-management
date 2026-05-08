@@ -21,9 +21,7 @@ def _entity_type(name: str) -> EntityTypeInfo:
     return EntityTypeInfo(
         artifact_type=name,
         prefix=name[:3].upper(),
-        domain_dir="test",
-        subdir=name,
-        archimate_element_type=name.title(),
+        hierarchy=("test", name),
         element_classes=(),
         create_when="",
         never_create_when="",

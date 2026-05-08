@@ -29,10 +29,17 @@ def format_entity_markdown(
     summary: str | None,
     properties: dict[str, str] | None,
     notes: str | None,
-    display_archimate: dict[str, str],
+    display_section_id: str,
+    display_content: str,
     repo_root: Path | None = None,
     extra_frontmatter: dict[str, object] | None = None,
 ) -> str:
+    """Format a complete entity markdown file.
+
+    ``display_section_id`` and ``display_content`` are provided by the owning
+    ontology module via ``render_display_section``.  The content is embedded
+    under ``### {display_section_id}`` inside the ``<!-- §display -->`` block.
+    """
     frontmatter: dict[str, object] = {
         "artifact-id": artifact_id,
         "artifact-type": artifact_type,
@@ -81,19 +88,20 @@ def format_entity_markdown(
     if notes and notes.strip():
         content_lines.extend(["## Notes", "", notes.strip(), ""])
 
-    display_yaml = _dump_yaml_text(display_archimate)
     display_lines = [
         "<!-- §display -->",
         "",
-        "### archimate",
+        f"### {display_section_id}",
         "",
         "```yaml",
-        display_yaml,
+        display_content.strip(),
         "```",
     ]
     frontmatter_text = _dump_yaml_text(fm_out)
     return (
-        "---\n" + frontmatter_text + "\n---\n\n" + "\n".join(content_lines) + "\n\n" + "\n".join(display_lines) + "\n"
+        "---\n" + frontmatter_text + "\n---\n\n"
+        + "\n".join(content_lines) + "\n\n"
+        + "\n".join(display_lines) + "\n"
     )
 
 

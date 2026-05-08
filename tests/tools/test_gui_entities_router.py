@@ -111,11 +111,11 @@ def test_global_scope_listing_survives_root_entities_without_specialization_pare
     engagement_req = "REQ@1000000000.EngAAA.eng-req"
 
     _write(
-        enterprise_root / "model" / "motivation" / "requirements" / f"{global_req}.md",
+        enterprise_root / "model" / "motivation" / "requirement" / f"{global_req}.md",
         _entity_md(global_req, "Global Req"),
     )
     _write(
-        engagement_root / "model" / "motivation" / "requirements" / f"{engagement_req}.md",
+        engagement_root / "model" / "motivation" / "requirement" / f"{engagement_req}.md",
         _entity_md(engagement_req, "Engagement Req"),
     )
 
@@ -154,27 +154,27 @@ def test_entity_rows_emit_hierarchy_metadata_for_specialization_composition_and_
     global_req = "REQ@2000000000.GloAAA.global-req"
 
     _write(
-        engagement_root / "model" / "motivation" / "requirements" / f"{parent_id}.md",
+        engagement_root / "model" / "motivation" / "requirement" / f"{parent_id}.md",
         _entity_md(parent_id, "Parent Req"),
     )
     _write(
-        engagement_root / "model" / "motivation" / "requirements" / f"{specialization_child_id}.md",
+        engagement_root / "model" / "motivation" / "requirement" / f"{specialization_child_id}.md",
         _entity_md(specialization_child_id, "Specialized Child"),
     )
     _write(
-        engagement_root / "model" / "motivation" / "requirements" / f"{composition_child_id}.md",
+        engagement_root / "model" / "motivation" / "requirement" / f"{composition_child_id}.md",
         _entity_md(composition_child_id, "Composed Child"),
     )
     _write(
-        engagement_root / "model" / "motivation" / "requirements" / f"{aggregation_child_id}.md",
+        engagement_root / "model" / "motivation" / "requirement" / f"{aggregation_child_id}.md",
         _entity_md(aggregation_child_id, "Aggregated Child"),
     )
     _write(
-        engagement_root / "model" / "motivation" / "requirements" / f"{specialization_child_id}.outgoing.md",
+        engagement_root / "model" / "motivation" / "requirement" / f"{specialization_child_id}.outgoing.md",
         _outgoing_md(specialization_child_id, [("archimate-specialization", parent_id)]),
     )
     _write(
-        engagement_root / "model" / "motivation" / "requirements" / f"{parent_id}.outgoing.md",
+        engagement_root / "model" / "motivation" / "requirement" / f"{parent_id}.outgoing.md",
         _outgoing_md(
             parent_id,
             [
@@ -184,7 +184,7 @@ def test_entity_rows_emit_hierarchy_metadata_for_specialization_composition_and_
         ),
     )
     _write(
-        enterprise_root / "model" / "motivation" / "requirements" / f"{global_req}.md",
+        enterprise_root / "model" / "motivation" / "requirement" / f"{global_req}.md",
         _entity_md(global_req, "Global Req"),
     )
 
@@ -234,15 +234,15 @@ def test_entity_rows_emit_all_parents_for_multi_parent_entity(
 
     for eid, name in [(parent_a, "Parent A"), (parent_b, "Parent B"), (child_id, "Multi-Parent Child")]:
         _write(
-            engagement_root / "model" / "motivation" / "requirements" / f"{eid}.md",
+            engagement_root / "model" / "motivation" / "requirement" / f"{eid}.md",
             _entity_md(eid, name),
         )
     _write(
-        engagement_root / "model" / "motivation" / "requirements" / f"{parent_a}.outgoing.md",
+        engagement_root / "model" / "motivation" / "requirement" / f"{parent_a}.outgoing.md",
         _outgoing_md(parent_a, [("archimate-composition", child_id)]),
     )
     _write(
-        engagement_root / "model" / "motivation" / "requirements" / f"{parent_b}.outgoing.md",
+        engagement_root / "model" / "motivation" / "requirement" / f"{parent_b}.outgoing.md",
         _outgoing_md(parent_b, [("archimate-aggregation", child_id)]),
     )
 
@@ -266,15 +266,15 @@ def test_connection_to_dict_resolves_live_endpoint_names(engagement_root: Path, 
     src_id = "REQ@1000000000.SrcAAA.source-name"
     tgt_id = "REQ@1000000001.TgtAAA.target-name"
     _write(
-        engagement_root / "model" / "motivation" / "requirements" / f"{src_id}.md",
+        engagement_root / "model" / "motivation" / "requirement" / f"{src_id}.md",
         _entity_md(src_id, "Source Display Name"),
     )
     _write(
-        engagement_root / "model" / "motivation" / "requirements" / f"{tgt_id}.md",
+        engagement_root / "model" / "motivation" / "requirement" / f"{tgt_id}.md",
         _entity_md(tgt_id, "Target Display Name"),
     )
     _write(
-        engagement_root / "model" / "motivation" / "requirements" / f"{src_id}.outgoing.md",
+        engagement_root / "model" / "motivation" / "requirement" / f"{src_id}.outgoing.md",
         _outgoing_md(src_id, [("archimate-association", tgt_id)]),
     )
 
@@ -295,15 +295,15 @@ def test_entity_context_read_model_groups_connections_and_counts(
     src_id = "REQ@1000000000.SrcAAA.source"
     tgt_id = "REQ@1000000001.TgtAAA.target"
     peer_id = "REQ@1000000002.PeerAA.peer"
-    _write(engagement_root / "model" / "motivation" / "requirements" / f"{src_id}.md", _entity_md(src_id, "Source"))
-    _write(engagement_root / "model" / "motivation" / "requirements" / f"{tgt_id}.md", _entity_md(tgt_id, "Target"))
-    _write(engagement_root / "model" / "motivation" / "requirements" / f"{peer_id}.md", _entity_md(peer_id, "Peer"))
+    _write(engagement_root / "model" / "motivation" / "requirement" / f"{src_id}.md", _entity_md(src_id, "Source"))
+    _write(engagement_root / "model" / "motivation" / "requirement" / f"{tgt_id}.md", _entity_md(tgt_id, "Target"))
+    _write(engagement_root / "model" / "motivation" / "requirement" / f"{peer_id}.md", _entity_md(peer_id, "Peer"))
     _write(
-        engagement_root / "model" / "motivation" / "requirements" / f"{src_id}.outgoing.md",
+        engagement_root / "model" / "motivation" / "requirement" / f"{src_id}.outgoing.md",
         _outgoing_md(src_id, [("archimate-association", tgt_id), ("archimate-flow", peer_id)]),
     )
     _write(
-        engagement_root / "model" / "motivation" / "requirements" / f"{peer_id}.outgoing.md",
+        engagement_root / "model" / "motivation" / "requirement" / f"{peer_id}.outgoing.md",
         _outgoing_md(peer_id, [("archimate-association", src_id)]),
     )
 
@@ -335,10 +335,10 @@ def test_clear_caches_applies_incremental_outgoing_changes(
     tgt_b = "REQ@1000000002.TgtBBB.target-b"
     for artifact_id, name in ((src_id, "Source"), (tgt_a, "Target A"), (tgt_b, "Target B")):
         _write(
-            engagement_root / "model" / "motivation" / "requirements" / f"{artifact_id}.md",
+            engagement_root / "model" / "motivation" / "requirement" / f"{artifact_id}.md",
             _entity_md(artifact_id, name),
         )
-    outgoing_path = engagement_root / "model" / "motivation" / "requirements" / f"{src_id}.outgoing.md"
+    outgoing_path = engagement_root / "model" / "motivation" / "requirement" / f"{src_id}.outgoing.md"
     _write(outgoing_path, _outgoing_md(src_id, [("archimate-flow", tgt_a)]))
 
     repo = ArtifactRepository(shared_artifact_index([engagement_root, enterprise_root]))

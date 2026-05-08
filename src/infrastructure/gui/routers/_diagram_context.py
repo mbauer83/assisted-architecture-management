@@ -26,25 +26,25 @@ def puml_contains(d: DiagramRecord, *aliases: str) -> bool:
 
 
 def entity_display_item(rec: EntityRecord) -> dict[str, Any]:
-    import yaml as _yaml
+    from src.domain.module_types import EntityTypeName  # noqa: PLC0415
+    from src.infrastructure.app_bootstrap import get_module_registry  # noqa: PLC0415
 
+    ontology = get_module_registry().ontology_for_entity_type(EntityTypeName(rec.artifact_type))
+    section_id = ontology.display_section_id if ontology else "archimate"
     arch_data: dict[str, Any] = {}
-    arch_block = rec.display_blocks.get("archimate", "")
-    if arch_block:
-        try:
-            arch_data = _yaml.safe_load(arch_block) or {}
-        except Exception:  # noqa: BLE001
-            arch_data = {}
+    raw_block = rec.display_blocks.get(section_id, "")
+    if raw_block and ontology:
+        parsed = ontology.extract_display_section(raw_block)
+        if parsed:
+            arch_data = parsed
     return {
         "artifact_id": rec.artifact_id,
         "name": rec.name,
         "artifact_type": rec.artifact_type,
         "domain": rec.domain,
-        "subdomain": rec.subdomain,
         "status": rec.status,
         "display_alias": rec.display_alias,
-        "element_type": arch_data.get("element-type", ""),
-        "element_label": arch_data.get("label", rec.name),
+        "element_label": str(arch_data.get("label") or rec.name),
     }
 
 
@@ -205,9 +205,7 @@ def diagram_kind_entity_type_items(diagram_type: str) -> list[dict[str, Any]]:
         {
             "artifact_type": artifact_type,
             "prefix": info.prefix,
-            "domain": info.domain_dir,
-            "subdomain": info.subdir,
-            "element_type": info.archimate_element_type,
+            "domain": info.hierarchy[0] if info.hierarchy else "",
             "element_classes": list(info.element_classes),
         }
         for artifact_type, info in kind.effective_entity_types().items()

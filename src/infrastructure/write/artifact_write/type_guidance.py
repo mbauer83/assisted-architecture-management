@@ -48,20 +48,23 @@ def get_type_guidance(
         else:
             unknown_types = [n for n in filter if n not in all_infos]
             domain_set = {d.lower() for d in filter}
-            selected = [info for info in all_infos.values() if info.domain_dir.lower() in domain_set]
+            selected = [
+                info for info in all_infos.values()
+                if info.hierarchy and info.hierarchy[0].lower() in domain_set
+            ]
             if not selected:
                 return {
                     "error": (
                         f"No matches found for filter {filter!r}. "
                         "Provide known entity-type names (e.g. 'requirement') "
-                        "or domain names (e.g. 'Motivation')."
+                        "or domain names (e.g. 'motivation')."
                     ),
                     "unknown": unknown_types,
                 }
             include_domain = False
             domain_context = filter
 
-    selected = sorted(selected, key=lambda x: (x.domain_dir, x.artifact_type))
+    selected = sorted(selected, key=lambda x: (x.hierarchy[0] if x.hierarchy else "", x.artifact_type))
 
     entries: list[dict[str, object]] = []
     for info in selected:
@@ -71,7 +74,7 @@ def get_type_guidance(
             "prefix": info.prefix,
         }
         if include_domain:
-            entry["archimate_domain"] = info.domain_dir.capitalize()
+            entry["domain"] = info.hierarchy[0] if info.hierarchy else ""
         entry["element_classes"] = list(info.element_classes)
         entry["create_when"] = info.create_when
         entry["never_create_when"] = info.never_create_when

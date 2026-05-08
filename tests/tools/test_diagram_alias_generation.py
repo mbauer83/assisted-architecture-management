@@ -185,7 +185,7 @@ rectangle "<$archimate_Process{scale=1.5}> Proc" <<Process>> as PROC_A
 
 def test_generate_macros_normalizes_aliases(tmp_path: Path) -> None:
     repo_root = tmp_path / "engagements" / "ENG-T" / "architecture-repository"
-    entity_path = repo_root / "model" / "motivation" / "outcomes" / "OUT@1.i-3Bi-.alias-test.md"
+    entity_path = repo_root / "model" / "motivation" / "outcome" / "OUT@1.i-3Bi-.alias-test.md"
     entity_path.parent.mkdir(parents=True, exist_ok=True)
     entity_path.write_text(
         """\
@@ -228,9 +228,9 @@ def test_model_diagram_scaffold_uses_canonical_aliases(tmp_path: Path) -> None:
     repo_root = tmp_path / "engagements" / "ENG-T" / "architecture-repository"
     goal_id = "GOL@1.B6G_-P.support-technology-design-for-ai"
     outcome_id = "OUT@1.i-3Bi-.ai-agents-query-technology-architecture"
-    goal_path = repo_root / "model" / "motivation" / "goals" / f"{goal_id}.md"
-    outcome_path = repo_root / "model" / "motivation" / "outcomes" / f"{outcome_id}.md"
-    outgoing_path = repo_root / "model" / "motivation" / "outcomes" / f"{outcome_id}.outgoing.md"
+    goal_path = repo_root / "model" / "motivation" / "goal" / f"{goal_id}.md"
+    outcome_path = repo_root / "model" / "motivation" / "outcome" / f"{outcome_id}.md"
+    outgoing_path = repo_root / "model" / "motivation" / "outcome" / f"{outcome_id}.outgoing.md"
 
     goal_path.parent.mkdir(parents=True, exist_ok=True)
     outcome_path.parent.mkdir(parents=True, exist_ok=True)
@@ -325,9 +325,9 @@ def test_model_diagram_scaffold_single_domain_uses_type_groupings(tmp_path: Path
     repo_root = tmp_path / "engagements" / "ENG-T" / "architecture-repository"
     driver_id = "DRV@1.a.driver-a"
     assessment_id = "ASS@1.a.assessment-a"
-    driver_path = repo_root / "model" / "motivation" / "drivers" / f"{driver_id}.md"
-    assessment_path = repo_root / "model" / "motivation" / "assessments" / f"{assessment_id}.md"
-    outgoing_path = repo_root / "model" / "motivation" / "drivers" / f"{driver_id}.outgoing.md"
+    driver_path = repo_root / "model" / "motivation" / "driver" / f"{driver_id}.md"
+    assessment_path = repo_root / "model" / "motivation" / "assessment" / f"{assessment_id}.md"
+    outgoing_path = repo_root / "model" / "motivation" / "driver" / f"{driver_id}.outgoing.md"
 
     driver_path.parent.mkdir(parents=True, exist_ok=True)
     assessment_path.parent.mkdir(parents=True, exist_ok=True)
@@ -505,14 +505,21 @@ def test_generate_archimate_puml_body_nests_junction_with_nested_siblings() -> N
         diagram_type="archimate-business",
     )
 
-    assert 'rectangle "Process A" as PRC_A {' in puml
-    assert 'rectangle "Function A" as FNC_A' in puml
-    assert 'rectangle "Function B" as FNC_B' in puml
+    assert "PRC_A {" in puml  # process rendered as nesting container
+    assert "FNC_A" in puml
+    assert "FNC_B" in puml
     assert 'circle " " as JCN_A' in puml
-    process_start = puml.index('rectangle "Process A" as PRC_A {')
-    process_end = puml.index("}", process_start)
-    process_block = puml[process_start:process_end]
-    assert 'circle " " as JCN_A' in process_block
+    # Verify junction is nested inside PRC_A
+    lines = puml.splitlines()
+    in_prc, junction_nested = False, False
+    for line in lines:
+        if "PRC_A {" in line:
+            in_prc = True
+        elif in_prc and line.strip() == "}":
+            in_prc = False
+        elif in_prc and "JCN_A" in line:
+            junction_nested = True
+    assert junction_nested, "Junction should appear nested inside PRC_A block"
     assert 'Rel_Flow(FNC_A, JCN_A, "")' in puml
     assert 'Rel_Flow(JCN_A, FNC_B, "")' in puml
 

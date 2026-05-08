@@ -21,7 +21,7 @@ def _write(path: Path, content: str) -> None:
 
 def _build_repo(root: Path) -> Path:
     _write(
-        root / "model" / "application" / "components" / "APP@1712870400.kRZYOA.event-store.md",
+        root / "model" / "application" / "application-component" / "APP@1712870400.kRZYOA.event-store.md",
         """---
 artifact-id: APP@1712870400.kRZYOA.event-store
 artifact-type: application-component

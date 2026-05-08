@@ -286,7 +286,7 @@ class TestGrfCreation:
     def test_build_grf_map(self, engagement_root: Path) -> None:
         from src.infrastructure.write.artifact_write.global_artifact_reference import build_gar_map
 
-        gar_dir = engagement_root / "model" / "common" / "global-references"
+        gar_dir = engagement_root / "model" / "common" / "global-artifact-reference"
         _write(
             gar_dir / "GAR@1000000001.AbcDef.global-req.md",
             _grf_md(
@@ -315,7 +315,7 @@ class TestGrfVerifierRules:
             _entity_md(global_id, "requirement", "Global Req"),
         )
         gar_id = "GAR@1000000001.AbcDef.global-req"
-        gar_path = engagement_root / "model" / "common" / "global-references" / f"{gar_id}.md"
+        gar_path = engagement_root / "model" / "common" / "global-artifact-reference" / f"{gar_id}.md"
         _write(gar_path, _grf_md(gar_id, "Global Req", global_id))
 
         registry = ArtifactRegistry(shared_artifact_index([engagement_root, enterprise_root]))
@@ -328,7 +328,7 @@ class TestGrfVerifierRules:
         self, engagement_root: Path
     ) -> None:
         gar_id = "GAR@1000000001.AbcDef.bad-gar"
-        gar_path = engagement_root / "model" / "common" / "global-references" / f"{gar_id}.md"
+        gar_path = engagement_root / "model" / "common" / "global-artifact-reference" / f"{gar_id}.md"
         # Write a GAR without global-artifact-id
         _write(gar_path, _entity_md(gar_id, "global-artifact-reference", "Bad GAR"))
 
@@ -341,7 +341,7 @@ class TestGrfVerifierRules:
         self, engagement_root: Path, enterprise_root: Path
     ) -> None:
         gar_id = "GAR@1000000001.AbcDef.ghost-ref"
-        gar_path = engagement_root / "model" / "common" / "global-references" / f"{gar_id}.md"
+        gar_path = engagement_root / "model" / "common" / "global-artifact-reference" / f"{gar_id}.md"
         _write(
             gar_path,
             _grf_md(gar_id, "Ghost Ref", "REQ@9999999999.NoExist.nonexistent"),
@@ -360,7 +360,7 @@ class TestGrfVerifierRules:
 
     def test_grf_w141_no_enterprise_repo(self, engagement_root: Path) -> None:
         gar_id = "GAR@1000000001.AbcDef.no-ent"
-        gar_path = engagement_root / "model" / "common" / "global-references" / f"{gar_id}.md"
+        gar_path = engagement_root / "model" / "common" / "global-artifact-reference" / f"{gar_id}.md"
         _write(gar_path, _grf_md(gar_id, "Some Ref", "REQ@2000000000.GloAAA.unknown"))
         verifier = ArtifactVerifier(None)
         result = verifier.verify_entity_file(gar_path)
@@ -413,7 +413,7 @@ class TestAddConnectionGrfRouting:
 
         # GAR file should exist in engagement repo
         gar_id = result["gar_artifact_id"]
-        gar_dir = engagement_root / "model" / "common" / "global-references"
+        gar_dir = engagement_root / "model" / "common" / "global-artifact-reference"
         gar_files = list(gar_dir.rglob("*.md"))
         assert any(gar_id in str(f) for f in gar_files)
 
@@ -495,7 +495,7 @@ class TestAddConnectionGrfRouting:
         assert "gar_artifact_id" not in result  # target was engagement, no target GAR
 
         gar_id = result["gar_source_id"]
-        gar_dir = engagement_root / "model" / "common" / "global-references"
+        gar_dir = engagement_root / "model" / "common" / "global-artifact-reference"
         assert any(gar_id in str(f) for f in gar_dir.rglob("*.md"))
 
         # Connection stored in GAR's outgoing file, pointing to engagement entity
@@ -583,7 +583,7 @@ class TestPromotionPlan:
             _entity_md(eng_id, "capability", "My Cap"),
         )
         _write(
-            engagement_root / "model" / "common" / "global-references" / f"{gar_id}.md",
+            engagement_root / "model" / "common" / "global-artifact-reference" / f"{gar_id}.md",
             _grf_md(gar_id, "Global Req Ref", glo_id),
         )
         _write(
@@ -724,7 +724,7 @@ class TestPromotionExecuteFullRoundTrip:
             _entity_md(eng_id, "capability", "My Cap"),
         )
         _write(
-            engagement_root / "model" / "common" / "global-references" / f"{gar_id}.md",
+            engagement_root / "model" / "common" / "global-artifact-reference" / f"{gar_id}.md",
             _grf_md(gar_id, "Global Req Ref", glo_id),
         )
         _write(
@@ -797,7 +797,7 @@ class TestPromotionExecuteFullRoundTrip:
         # Original engagement entity file removed
         assert not orig_eng_file.exists(), "Original engagement entity should be replaced by GAR"
         # A new GAR for the promoted entity should exist
-        gar_dir = engagement_root / "model" / "common" / "global-references"
+        gar_dir = engagement_root / "model" / "common" / "global-artifact-reference"
         new_gars = [
             f for f in gar_dir.rglob("GAR@*.md")
             if eng_id in f.read_text()

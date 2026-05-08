@@ -54,17 +54,17 @@ top to bottom direction
 title Reverse Architecture
 
 rectangle "Processes" <<CommonGrouping>> {
-  rectangle "<$archimate_Process{scale=1.5}> Reverse Architecture" <<Process>> as PRC_CYgU64 {
-    rectangle "<$archimate_Function{scale=1.5}> Author Architecture Documents" <<Function>> as FNC_saMRQ0
-    rectangle "<$archimate_Function{scale=1.5}> Author Diagrams" <<Function>> as FNC_uzJGYp
-    rectangle "<$archimate_Function{scale=1.5}> Author Model Artifacts" <<Function>> as FNC_yuFXVJ
-    rectangle "<$archimate_Function{scale=1.5}> Check Model Coverage" <<Function>> as FNC_SXt2mM
-    rectangle "<$archimate_Function{scale=1.5}> Determine Required Changes to Architecture Content" <<Function>> as FNC_rkx32U
-    rectangle "<$archimate_Function{scale=1.5}> Discover Relevant Architecture Content" <<Function>> as FNC_lLdx12
-    rectangle "<$archimate_Function{scale=1.5}> Explore System Structure" <<Function>> as FNC_erPw5B
+  rectangle "<$archimate_process{scale=1.5}> Reverse Architecture" <<process>> as PRC_CYgU64 {
+    rectangle "<$archimate_function{scale=1.5}> Author Architecture Documents" <<function>> as FNC_saMRQ0
+    rectangle "<$archimate_function{scale=1.5}> Author Diagrams" <<function>> as FNC_uzJGYp
+    rectangle "<$archimate_function{scale=1.5}> Author Model Artifacts" <<function>> as FNC_yuFXVJ
+    rectangle "<$archimate_function{scale=1.5}> Check Model Coverage" <<function>> as FNC_SXt2mM
+    rectangle "<$archimate_function{scale=1.5}> Determine Required Changes to Architecture Content" <<function>> as FNC_rkx32U
+    rectangle "<$archimate_function{scale=1.5}> Discover Relevant Architecture Content" <<function>> as FNC_lLdx12
+    rectangle "<$archimate_function{scale=1.5}> Explore System Structure" <<function>> as FNC_erPw5B
     circle " " as JNO_chqH1_
-    rectangle "<$archimate_Function{scale=1.5}> Map Elements to Architecture Concepts" <<Function>> as FNC_oRz6Qe
-    rectangle "<$archimate_Function{scale=1.5}> Verify Artifact Integrity & Coherence" <<Function>> as FNC_NGjUCa
+    rectangle "<$archimate_function{scale=1.5}> Map Elements to Architecture Concepts" <<function>> as FNC_oRz6Qe
+    rectangle "<$archimate_function{scale=1.5}> Verify Artifact Integrity & Coherence" <<function>> as FNC_NGjUCa
     circle " " as JNA_zGOowi
     circle " " as JNA_Ps7rVy
     FNC_erPw5B -[hidden]down- JNA_zGOowi

@@ -16,7 +16,6 @@ from src.application.artifact_query import ArtifactRepository
 from src.application.modeling.artifact_write import generate_entity_id
 from src.application.modeling.artifact_write_formatting import format_entity_markdown
 from src.application.verification.artifact_verifier import ArtifactVerifier
-from src.config.repo_paths import MODEL
 from src.domain.module_types import EntityTypeName
 
 from .boundary import assert_engagement_write_root, today_iso
@@ -54,7 +53,10 @@ def ensure_global_artifact_reference(
 
     existing = find_existing_gar(engagement_repo, global_artifact_id)
     if existing is not None:
-        path = engagement_root / MODEL / "common" / "global-references" / f"{existing}.md"
+        from src.infrastructure.app_bootstrap import get_module_registry  # noqa: PLC0415
+        from src.infrastructure.write.artifact_write.entity import entity_path  # noqa: PLC0415
+        gar_info = get_module_registry().get_entity_type(EntityTypeName(_GAR_TYPE))
+        path = entity_path(engagement_root, gar_info, existing)
         return WriteResult(
             wrote=False,
             path=path,
@@ -68,14 +70,12 @@ def ensure_global_artifact_reference(
 
     info = get_module_registry().get_entity_type(EntityTypeName(_GAR_TYPE))
     eid = generate_entity_id(info.prefix, global_artifact_name)
-    path = engagement_root / MODEL / info.domain_dir / info.subdir / f"{eid}.md"
-
-    display = {
-        "domain": "",
-        "element-type": "",
-        "label": global_artifact_name,
-        "alias": f"GAR_{eid.split('.')[1]}" if "." in eid else eid.replace("-", "_"),
-    }
+    from src.infrastructure.write.artifact_write.entity import (  # noqa: PLC0415
+        _alias_for,
+        entity_path,
+    )
+    path = entity_path(engagement_root, info, eid)
+    alias = _alias_for(info, eid)
 
     content = format_entity_markdown(
         artifact_id=eid,
@@ -87,7 +87,8 @@ def ensure_global_artifact_reference(
         summary=f"Engagement-repo proxy for promoted {global_artifact_type} `{global_artifact_id}`.",
         properties=None,
         notes=None,
-        display_archimate=display,
+        display_section_id="archimate",
+        display_content=f"label: {global_artifact_name}\nalias: {alias}",
         repo_root=engagement_root,
         extra_frontmatter={
             _GAR_ID_KEY: global_artifact_id,

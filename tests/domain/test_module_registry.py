@@ -18,9 +18,7 @@ def _entity_type(name: str, domain: str = "test", classes: tuple[str, ...] = ())
     return EntityTypeInfo(
         artifact_type=name,
         prefix=name[:3].upper(),
-        domain_dir=domain,
-        subdir=name,
-        archimate_element_type=name.title(),
+        hierarchy=(domain, name),
         element_classes=classes,
         create_when="",
         never_create_when="",
@@ -170,8 +168,8 @@ class TestQueries:
     def test_entity_types_with_class_aggregates(self) -> None:
         reg = ModuleRegistry()
 
-        et1 = EntityTypeInfo("et-1", "ET1", "d", "s", None, ("my-class",), "", "")
-        et2 = EntityTypeInfo("et-2", "ET2", "d", "s", None, (), "", "")
+        et1 = EntityTypeInfo("et-1", "ET1", ("d", "et-1"), ("my-class",), "", "")
+        et2 = EntityTypeInfo("et-2", "ET2", ("d", "et-2"), (), "", "")
 
         class _O(_StubOntology):
             @property
@@ -205,9 +203,9 @@ class TestQueries:
     def test_domain_order_excludes_internal(self) -> None:
         reg = ModuleRegistry()
 
-        et_a = EntityTypeInfo("e-a", "EA", "motivation", "s", None, (), "", "")
-        et_b = EntityTypeInfo("e-b", "EB", "strategy", "s", None, (), "", "", internal=False)
-        et_c = EntityTypeInfo("e-c", "EC", "common", "s", None, (), "", "", internal=True)
+        et_a = EntityTypeInfo("e-a", "EA", ("motivation", "e-a"), (), "", "")
+        et_b = EntityTypeInfo("e-b", "EB", ("strategy", "e-b"), (), "", "", internal=False)
+        et_c = EntityTypeInfo("e-c", "EC", ("common", "e-c"), (), "", "", internal=True)
 
         class _O(_StubOntology):
             @property

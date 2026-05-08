@@ -120,13 +120,12 @@ def _parse_archimate_block(raw: str) -> dict:
 _ENTITY_TYPE_ORDER = list(all_entity_types())
 
 
-def _entity_archimate_element_type(entity: EntityRecord) -> str:
-    arch_data = _parse_archimate_block(entity.display_blocks.get("archimate", ""))
-    element_type = str(arch_data.get("element-type") or "").strip()
-    if element_type:
-        return element_type
-    info = all_entity_types().get(entity.artifact_type)
-    return (info.archimate_element_type or "") if info else ""
+def _entity_stereotype_key(entity: EntityRecord) -> str:
+    """Return the PlantUML stereotype key for *entity*.
+
+    Derived from ``artifact_type`` using snake_case convention.
+    """
+    return entity.artifact_type.replace("-", "_")
 
 
 def _pluralize_label(label: str) -> str:
@@ -146,9 +145,6 @@ def _pluralize_label(label: str) -> str:
 
 
 def _type_group_label(entity: EntityRecord) -> str:
-    element_type = _entity_archimate_element_type(entity)
-    if element_type:
-        return _pluralize_label(element_type)
     return _pluralize_label(entity.artifact_type.replace("-", " ").title())
 
 

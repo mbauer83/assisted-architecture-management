@@ -1,4 +1,4 @@
-"""Shared ArchiMate display-block parsing and include expansion helpers."""
+"""Shared display-block parsing and ArchiMate include expansion helpers."""
 
 from __future__ import annotations
 
@@ -47,6 +47,10 @@ def inject_archimate_includes(body: str, repo_root: Path) -> str:
 
 
 def _load_sprite_map(repo_root: Path) -> dict[str, str]:
+    """Return {sprite_key: full_sprite_line} from _archimate-glyphs.puml.
+
+    Sprite keys use snake_case (e.g. ``stakeholder``, ``system_software``).
+    """
     glyphs_path = repo_root / "diagram-catalog" / "_archimate-glyphs.puml"
     sprites: dict[str, str] = {}
     try:

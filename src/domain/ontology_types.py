@@ -7,17 +7,21 @@ from dataclasses import dataclass
 
 @dataclass(frozen=True)
 class EntityTypeInfo:
-    """Canonical metadata for a single entity type."""
+    """Canonical metadata for a single entity type.
+
+    ``hierarchy`` is the full path from ``model/`` to the type-specific directory,
+    e.g. ``("motivation", "stakeholder")``.  ``hierarchy[0]`` is the domain (layer)
+    used for grouping and filtering; ``hierarchy[-1]`` is the type-specific leaf
+    directory.  The loader derives the leaf from ``artifact_type`` so YAML only
+    needs to specify the domain-level segments.
+    """
 
     artifact_type: str
     prefix: str
-    domain_dir: str
-    subdir: str
-    archimate_element_type: str | None
+    hierarchy: tuple[str, ...]
     element_classes: tuple[str, ...]
     create_when: str
     never_create_when: str
-    has_sprite: bool = False
     internal: bool = False
 
 

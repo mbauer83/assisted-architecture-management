@@ -110,13 +110,13 @@ def repo(tmp_path: Path) -> Path:
 class TestVerifyEntityFile:
     def test_valid_entity_passes(self, repo: Path) -> None:
         eid = "REQ@1000000000.AbcDef.my-req"
-        path = repo / "model" / "motivation" / "requirements" / f"{eid}.md"
+        path = repo / "model" / "motivation" / "requirement" / f"{eid}.md"
         _write(path, _entity(eid))
         result = ArtifactVerifier().verify_entity_file(path)
         assert result.valid, [i.message for i in result.issues]
 
     def test_missing_artifact_id_field(self, repo: Path) -> None:
-        path = repo / "model" / "motivation" / "requirements" / "REQ@1000000001.XxXxXx.bad.md"
+        path = repo / "model" / "motivation" / "requirement" / "REQ@1000000001.XxXxXx.bad.md"
         _write(path, """\
 ---
 artifact-type: requirement
@@ -143,7 +143,7 @@ alias: REQ_XxXxXx
 
     def test_invalid_artifact_type(self, repo: Path) -> None:
         eid = "REQ@1000000002.AbcDef.bad-type"
-        path = repo / "model" / "motivation" / "requirements" / f"{eid}.md"
+        path = repo / "model" / "motivation" / "requirement" / f"{eid}.md"
         content = _entity(eid, artifact_type="not-a-real-type")
         _write(path, content)
         result = ArtifactVerifier().verify_entity_file(path)
@@ -152,7 +152,7 @@ alias: REQ_XxXxXx
 
     def test_missing_content_section(self, repo: Path) -> None:
         eid = "REQ@1000000003.AbcDef.no-content"
-        path = repo / "model" / "motivation" / "requirements" / f"{eid}.md"
+        path = repo / "model" / "motivation" / "requirement" / f"{eid}.md"
         _write(path, _entity(eid, no_content_section=True))
         result = ArtifactVerifier().verify_entity_file(path)
         assert not result.valid
@@ -161,7 +161,7 @@ alias: REQ_XxXxXx
     def test_artifact_id_mismatch(self, repo: Path) -> None:
         eid = "REQ@1000000004.AbcDef.correct-name"
         wrong_id = "REQ@1000000004.AbcDef.wrong-name"
-        path = repo / "model" / "motivation" / "requirements" / f"{eid}.md"
+        path = repo / "model" / "motivation" / "requirement" / f"{eid}.md"
         _write(path, _entity(wrong_id))  # frontmatter id ≠ filename
         result = ArtifactVerifier().verify_entity_file(path)
         assert not result.valid
@@ -169,7 +169,7 @@ alias: REQ_XxXxXx
 
     def test_invalid_status_value(self, repo: Path) -> None:
         eid = "REQ@1000000005.AbcDef.bad-status"
-        path = repo / "model" / "motivation" / "requirements" / f"{eid}.md"
+        path = repo / "model" / "motivation" / "requirement" / f"{eid}.md"
         _write(path, _entity(eid, extra_fm="\nbad-status: yes").replace(
             "status: draft", "status: invalid-value"
         ))
@@ -240,14 +240,14 @@ class TestVerifyOutgoingFile:
         for eid, etype in eids_and_types:
             from src.domain.ontology_catalog import all_entity_types
             info = all_entity_types()[etype]
-            path = repo / "model" / info.domain_dir / info.subdir / f"{eid}.md"
+            path = repo / "model" / Path(*info.hierarchy) / f"{eid}.md"
             _write(path, _entity(eid, etype))
 
     def test_valid_outgoing_passes(self, repo: Path) -> None:
         src = "REQ@1000000000.SrcAaa.src"
         tgt = "REQ@1000000001.TgtBbb.tgt"
         self._setup_entities(repo, (src, "requirement"), (tgt, "requirement"))
-        out_path = repo / "model" / "motivation" / "requirements" / f"{src}.outgoing.md"
+        out_path = repo / "model" / "motivation" / "requirement" / f"{src}.outgoing.md"
         _write(out_path, _outgoing(src, [("archimate-association", tgt)]))
         registry = ArtifactRegistry(shared_artifact_index(repo))
         result = ArtifactVerifier(registry).verify_outgoing_file(out_path)
@@ -257,7 +257,7 @@ class TestVerifyOutgoingFile:
         tgt = "REQ@1000000001.TgtBbb.tgt"
         self._setup_entities(repo, (tgt, "requirement"))
         ghost_src = "REQ@9999999999.GhostX.ghost"
-        out_path = repo / "model" / "motivation" / "requirements" / f"{ghost_src}.outgoing.md"
+        out_path = repo / "model" / "motivation" / "requirement" / f"{ghost_src}.outgoing.md"
         _write(out_path, _outgoing(ghost_src, [("archimate-association", tgt)]))
         registry = ArtifactRegistry(shared_artifact_index(repo))
         result = ArtifactVerifier(registry).verify_outgoing_file(out_path)
@@ -267,7 +267,7 @@ class TestVerifyOutgoingFile:
     def test_unknown_target_entity(self, repo: Path) -> None:
         src = "REQ@1000000000.SrcAaa.src"
         self._setup_entities(repo, (src, "requirement"))
-        out_path = repo / "model" / "motivation" / "requirements" / f"{src}.outgoing.md"
+        out_path = repo / "model" / "motivation" / "requirement" / f"{src}.outgoing.md"
         _write(out_path, _outgoing(src, [("archimate-association", "REQ@9999999999.GhostX.ghost")]))
         registry = ArtifactRegistry(shared_artifact_index(repo))
         result = ArtifactVerifier(registry).verify_outgoing_file(out_path)
@@ -281,7 +281,7 @@ class TestVerifyDiagramFile:
 
         for eid, etype in eids_and_types:
             info = all_entity_types()[etype]
-            path = repo / "model" / info.domain_dir / info.subdir / f"{eid}.md"
+            path = repo / "model" / Path(*info.hierarchy) / f"{eid}.md"
             _write(path, _entity(eid, etype))
 
     def test_hallucinated_relation_macro_fails(self, repo: Path) -> None:
@@ -376,7 +376,7 @@ rectangle "Target" <<Requirement>> as REQ_TgtBbb
         src = "REQ@1000000000.SrcAaa.src"
         tgt = "REQ@1000000001.TgtBbb.tgt"
         self._setup_entities(repo, (src, "requirement"), (tgt, "requirement"))
-        out_path = repo / "model" / "motivation" / "requirements" / f"{src}.outgoing.md"
+        out_path = repo / "model" / "motivation" / "requirement" / f"{src}.outgoing.md"
         _write(out_path, _outgoing(src, [("not-a-real-connection-type", tgt)]))
         registry = ArtifactRegistry(shared_artifact_index(repo))
         result = ArtifactVerifier(registry).verify_outgoing_file(out_path)
@@ -387,7 +387,7 @@ rectangle "Target" <<Requirement>> as REQ_TgtBbb
         src = "REQ@1000000000.SrcAaa.src"
         tgt = "REQ@1000000001.TgtBbb.tgt"
         self._setup_entities(repo, (src, "requirement"), (tgt, "requirement"))
-        out_path = repo / "model" / "motivation" / "requirements" / f"{src}.outgoing.md"
+        out_path = repo / "model" / "motivation" / "requirement" / f"{src}.outgoing.md"
         content = _outgoing(src, [("archimate-association", tgt)]).replace("<!-- §connections -->", "")
         _write(out_path, content)
         registry = ArtifactRegistry(shared_artifact_index(repo))
@@ -406,15 +406,15 @@ rectangle "Target" <<Requirement>> as REQ_TgtBbb
         eng_id = "REQ@1000000000.EngAaa.eng-req"
         ent_id = "REQ@2000000000.EntBbb.ent-req"
         _write(
-            eng_root / "model" / "motivation" / "requirements" / f"{eng_id}.md",
+            eng_root / "model" / "motivation" / "requirement" / f"{eng_id}.md",
             _entity(eng_id),
         )
         _write(
-            ent_root / "model" / "motivation" / "requirements" / f"{ent_id}.md",
+            ent_root / "model" / "motivation" / "requirement" / f"{ent_id}.md",
             _entity(ent_id),
         )
         # Enterprise outgoing targeting engagement entity → error
-        out_path = ent_root / "model" / "motivation" / "requirements" / f"{ent_id}.outgoing.md"
+        out_path = ent_root / "model" / "motivation" / "requirement" / f"{ent_id}.outgoing.md"
         _write(out_path, _outgoing(ent_id, [("archimate-association", eng_id)]))
         registry = ArtifactRegistry(shared_artifact_index([eng_root, ent_root]))
         result = ArtifactVerifier(registry).verify_outgoing_file(out_path)
@@ -470,12 +470,12 @@ class TestVerifyDocumentFile:
         from src.domain.ontology_catalog import all_entity_types
         entity_id = "FNC@1000000002.AbcDef.function"
         info = all_entity_types()["function"]
-        entity_path = repo / "model" / info.domain_dir / info.subdir / f"{entity_id}.md"
+        entity_path = repo / "model" / Path(*info.hierarchy) / f"{entity_id}.md"
         _write(entity_path, _entity(entity_id, "function"))
 
         doc_id = "ADR@1000000000.AbcDef.source"
         doc_path = repo / "documents" / "adr" / f"{doc_id}.md"
-        _write(doc_path, _document(doc_id, f"[Function](../../model/{info.domain_dir}/{info.subdir}/{entity_id}.md)"))
+        _write(doc_path, _document(doc_id, f"[Function](../../model/{'/'.join(info.hierarchy)}/{entity_id}.md)"))
 
         result = ArtifactVerifier(ArtifactRegistry(shared_artifact_index(repo))).verify_document_file(doc_path)
 
@@ -517,7 +517,7 @@ class TestVerifyDocumentFile:
         from src.domain.ontology_catalog import all_entity_types
         entity_id = "REQ@1000000003.AbcDef.req"
         info = all_entity_types()["requirement"]
-        entity_path = repo / "model" / info.domain_dir / info.subdir / f"{entity_id}.md"
+        entity_path = repo / "model" / Path(*info.hierarchy) / f"{entity_id}.md"
         _write(entity_path, _entity(entity_id, "requirement"))
 
         doc_id = "ADR@1000000000.AbcDef.source"
@@ -526,7 +526,7 @@ class TestVerifyDocumentFile:
             doc_path,
             _document(
                 doc_id,
-                f"[Requirement](../../model/{info.domain_dir}/{info.subdir}/{entity_id}.md#details)",
+                f"[Requirement](../../model/{'/'.join(info.hierarchy)}/{entity_id}.md#details)",
             ),
         )
 
@@ -543,7 +543,7 @@ class TestVerifyAll:
     def test_verify_all_passes_clean_repo(self, repo: Path) -> None:
         eid = "REQ@1000000000.AbcDef.clean"
         _write(
-            repo / "model" / "motivation" / "requirements" / f"{eid}.md",
+            repo / "model" / "motivation" / "requirement" / f"{eid}.md",
             _entity(eid),
         )
         registry = ArtifactRegistry(shared_artifact_index(repo))
@@ -554,7 +554,7 @@ class TestVerifyAll:
 
     def test_verify_all_finds_errors_in_bad_entity(self, repo: Path) -> None:
         eid = "REQ@1000000000.AbcDef.bad"
-        path = repo / "model" / "motivation" / "requirements" / f"{eid}.md"
+        path = repo / "model" / "motivation" / "requirement" / f"{eid}.md"
         _write(path, _entity(eid, no_content_section=True))
         registry = ArtifactRegistry(shared_artifact_index(repo))
         results = ArtifactVerifier(registry).verify_all(repo, include_diagrams=False)
@@ -568,8 +568,8 @@ class TestVerifyAll:
 
         eng_id = "REQ@1000000000.EngAaa.eng"
         ent_id = "REQ@2000000000.EntBbb.ent"
-        _write(eng_root / "model" / "motivation" / "requirements" / f"{eng_id}.md", _entity(eng_id))
-        _write(ent_root / "model" / "motivation" / "requirements" / f"{ent_id}.md", _entity(ent_id))
+        _write(eng_root / "model" / "motivation" / "requirement" / f"{eng_id}.md", _entity(eng_id))
+        _write(ent_root / "model" / "motivation" / "requirement" / f"{ent_id}.md", _entity(ent_id))
 
         registry = ArtifactRegistry(shared_artifact_index([eng_root, ent_root]))
         # verify_all for each root independently

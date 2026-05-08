@@ -30,9 +30,9 @@ def diagram_kind_domain(name: str) -> str | None:
     if kind is None:
         return None
     domains = {
-        info.domain_dir
+        info.hierarchy[0]
         for info in kind.effective_entity_types().values()
-        if not info.internal
+        if not info.internal and info.hierarchy
     }
     non_common = {domain for domain in domains if domain != "common"}
     if len(non_common) == 1:

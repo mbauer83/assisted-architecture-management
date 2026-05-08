@@ -20,25 +20,25 @@ top to bottom direction
 title Reverse Architecture & Architecture Conformance Review
 
 rectangle "Services" <<CommonGrouping>> {
-  rectangle "<$archimate_Service{scale=1.5}> Model Authoring Service" <<Service>> as SRV_GsUtNL
-  rectangle "<$archimate_Service{scale=1.5}> Verification Service" <<Service>> as SRV_Ij6Kl6
-  rectangle "<$archimate_Service{scale=1.5}> Discovery, Querying & Stats Service" <<Service>> as SRV_Qr8St8
+  rectangle "<$archimate_service{scale=1.5}> Model Authoring Service" <<service>> as SRV_GsUtNL
+  rectangle "<$archimate_service{scale=1.5}> Verification Service" <<service>> as SRV_Ij6Kl6
+  rectangle "<$archimate_service{scale=1.5}> Discovery, Querying & Stats Service" <<service>> as SRV_Qr8St8
   SRV_GsUtNL -[hidden]right- SRV_Ij6Kl6
   SRV_Ij6Kl6 -[hidden]right- SRV_Qr8St8
 }
 
 rectangle "Processes" <<CommonGrouping>> {
-  rectangle "<$archimate_Process{scale=1.5}> Reverse Architecture" <<Process>> as PRC_CYgU64 {
-    rectangle "<$archimate_Function{scale=1.5}> Explore System Structure" <<Function>> as FNC_erPw5B
-    rectangle "<$archimate_Function{scale=1.5}> Map Elements to Architecture Concepts" <<Function>> as FNC_oRz6Qe
-    rectangle "<$archimate_Function{scale=1.5}> Check Model Coverage" <<Function>> as FNC_SXt2mM
+  rectangle "<$archimate_process{scale=1.5}> Reverse Architecture" <<process>> as PRC_CYgU64 {
+    rectangle "<$archimate_function{scale=1.5}> Explore System Structure" <<function>> as FNC_erPw5B
+    rectangle "<$archimate_function{scale=1.5}> Map Elements to Architecture Concepts" <<function>> as FNC_oRz6Qe
+    rectangle "<$archimate_function{scale=1.5}> Check Model Coverage" <<function>> as FNC_SXt2mM
     FNC_erPw5B -[hidden]right- FNC_oRz6Qe
     FNC_oRz6Qe -[hidden]right- FNC_SXt2mM
   }
-  rectangle "<$archimate_Process{scale=1.5}> Architecture Conformance Review" <<Process>> as PRC_vlE_5j {
-    rectangle "<$archimate_Function{scale=1.5}> Extract Architecture Baseline" <<Function>> as FNC_ns4pWw
-    rectangle "<$archimate_Function{scale=1.5}> Assess Implementation Against Model" <<Function>> as FNC_tFTeOT
-    rectangle "<$archimate_Function{scale=1.5}> Report Architecture Deviations" <<Function>> as FNC_omV6nu
+  rectangle "<$archimate_process{scale=1.5}> Architecture Conformance Review" <<process>> as PRC_vlE_5j {
+    rectangle "<$archimate_function{scale=1.5}> Extract Architecture Baseline" <<function>> as FNC_ns4pWw
+    rectangle "<$archimate_function{scale=1.5}> Assess Implementation Against Model" <<function>> as FNC_tFTeOT
+    rectangle "<$archimate_function{scale=1.5}> Report Architecture Deviations" <<function>> as FNC_omV6nu
     FNC_ns4pWw -[hidden]right- FNC_tFTeOT
     FNC_tFTeOT -[hidden]right- FNC_omV6nu
   }

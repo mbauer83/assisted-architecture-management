@@ -17,11 +17,39 @@ _EMPTY_ENTITY_TYPES: dict[EntityTypeName, EntityTypeInfo] = {}
 _EMPTY_CONNECTION_TYPES: dict[ConnectionTypeName, ConnectionTypeInfo] = {}
 
 
+def _build_entity_filter(filter_cfg: dict[str, Any]):
+    """Return a predicate that tests whether an EntityTypeInfo matches the filter config.
+
+    Supported filter clauses (all present clauses are ANDed):
+    - ``hierarchy_level``: ``{index: int, values: [str]}`` — hierarchy[index] must be in values
+    - ``element_classes``: ``[str]`` — entity must have at least one listed class
+    - ``entity_types``: ``[str]`` — entity artifact_type must be in the explicit list
+    """
+    hierarchy_cfg = filter_cfg.get("hierarchy_level")
+    class_set = frozenset(str(c) for c in filter_cfg.get("element_classes", ()))
+    type_set = frozenset(str(t) for t in filter_cfg.get("entity_types", ()))
+
+    def _matches(info: EntityTypeInfo) -> bool:
+        if hierarchy_cfg:
+            idx = int(hierarchy_cfg["index"])
+            values = frozenset(str(v) for v in hierarchy_cfg.get("values", ()))
+            if idx >= len(info.hierarchy) or info.hierarchy[idx] not in values:
+                return False
+        if class_set and not class_set.intersection(info.element_classes):
+            return False
+        if type_set and info.artifact_type not in type_set:
+            return False
+        return True
+
+    return _matches
+
+
 class _ConfiguredArchimateDiagramKind(DiagramKindBase):
     def __init__(self, config: dict[str, Any]) -> None:
         self._config = config
         self._name = DiagramKindName(str(config["name"]))
-        self._accepted_domains = frozenset(str(value) for value in config.get("accepted_domains", ()))
+        filter_cfg: dict[str, Any] = config.get("filter", {})
+        self._entity_filter = _build_entity_filter(filter_cfg)
 
     @property
     def name(self) -> DiagramKindName:
@@ -33,7 +61,7 @@ class _ConfiguredArchimateDiagramKind(DiagramKindBase):
 
     def accepts_entity_type(self, t: EntityTypeName) -> bool:
         info = archimate_next.entity_types.get(t)
-        return info is not None and info.domain_dir in self._accepted_domains
+        return info is not None and self._entity_filter(info)
 
     def accepts_connection_type(self, t: ConnectionTypeName) -> bool:
         return t in archimate_next.connection_types

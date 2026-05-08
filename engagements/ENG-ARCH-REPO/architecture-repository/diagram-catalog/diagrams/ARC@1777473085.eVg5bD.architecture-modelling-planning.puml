@@ -55,31 +55,31 @@ skinparam rectangle<<CommonGrouping>> {
   BackgroundColor #EDE8E1
   BorderColor #8C7E6A
 }
-skinparam rectangle<<Function>> {
+skinparam rectangle<<function>> {
   BackgroundColor #E0D8CC
   BorderColor #8C7E6A
 }
-skinparam rectangle<<Process>> {
+skinparam rectangle<<process>> {
   BackgroundColor #E0D8CC
   BorderColor #8C7E6A
 }
-sprite $archimate_Function <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><path d="M2.9 11.7V5.4L8 3.1l5.1 2.3v6.3L8 9.2z"  fill="#252327" stroke="none"/></svg>
-sprite $archimate_Process <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><path d="M2.6 4.1h6.3V2.8l4.5 5.2-4.5 5.2v-1.3H2.6z"  fill="#252327" stroke="none"/></svg>
+sprite $archimate_function <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><path d="M2.9 11.7V5.4L8 3.1l5.1 2.3v6.3L8 9.2z"  fill="#252327" stroke="none"/></svg>
+sprite $archimate_process <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><path d="M2.6 4.1h6.3V2.8l4.5 5.2-4.5 5.2v-1.3H2.6z"  fill="#252327" stroke="none"/></svg>
 
 top to bottom direction
 
 title Architecture Modelling & Planning
 
 rectangle "Processes" <<CommonGrouping>> {
-  rectangle "<$archimate_Process{scale=1.5}> Architecture Modelling & Planning" <<Process>> as PRC_U4aAdh {
-    rectangle "<$archimate_Function{scale=1.5}> Author Architecture Documents" <<Function>> as FNC_saMRQ0
-    rectangle "<$archimate_Function{scale=1.5}> Author Diagrams" <<Function>> as FNC_uzJGYp
-    rectangle "<$archimate_Function{scale=1.5}> Author Model Artifacts" <<Function>> as FNC_yuFXVJ
-    rectangle "<$archimate_Function{scale=1.5}> Decide Changes to Plan or Implement" <<Function>> as FNC_HgWMdN
-    rectangle "<$archimate_Function{scale=1.5}> Determine Required Changes to Architecture Content" <<Function>> as FNC_rkx32U
-    rectangle "<$archimate_Function{scale=1.5}> Discover Relevant Architecture Content" <<Function>> as FNC_lLdx12
-    rectangle "<$archimate_Function{scale=1.5}> Scope & Formulate Modelling Task" <<Function>> as FNC_ErTqVT
-    rectangle "<$archimate_Function{scale=1.5}> Verify Artifact Integrity & Coherence" <<Function>> as FNC_NGjUCa
+  rectangle "<$archimate_process{scale=1.5}> Architecture Modelling & Planning" <<process>> as PRC_U4aAdh {
+    rectangle "<$archimate_function{scale=1.5}> Author Architecture Documents" <<function>> as FNC_saMRQ0
+    rectangle "<$archimate_function{scale=1.5}> Author Diagrams" <<function>> as FNC_uzJGYp
+    rectangle "<$archimate_function{scale=1.5}> Author Model Artifacts" <<function>> as FNC_yuFXVJ
+    rectangle "<$archimate_function{scale=1.5}> Decide Changes to Plan or Implement" <<function>> as FNC_HgWMdN
+    rectangle "<$archimate_function{scale=1.5}> Determine Required Changes to Architecture Content" <<function>> as FNC_rkx32U
+    rectangle "<$archimate_function{scale=1.5}> Discover Relevant Architecture Content" <<function>> as FNC_lLdx12
+    rectangle "<$archimate_function{scale=1.5}> Scope & Formulate Modelling Task" <<function>> as FNC_ErTqVT
+    rectangle "<$archimate_function{scale=1.5}> Verify Artifact Integrity & Coherence" <<function>> as FNC_NGjUCa
     circle " " as JNO_chqH1_
     FNC_ErTqVT -[hidden]down- FNC_lLdx12
     FNC_lLdx12 -[hidden]down- FNC_HgWMdN

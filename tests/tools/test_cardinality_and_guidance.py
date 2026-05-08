@@ -74,7 +74,7 @@ last-updated: '2026-04-17'
 @pytest.fixture
 def repo(tmp_path: Path) -> Path:
     root = tmp_path / "architecture-repository"
-    (root / "model" / "motivation" / "requirements").mkdir(parents=True)
+    (root / "model" / "motivation" / "requirement").mkdir(parents=True)
     (root / "diagram-catalog" / "diagrams").mkdir(parents=True)
     return root
 
@@ -501,10 +501,10 @@ class TestGetTypeGuidance:
         assert result["total"] == len(all_entity_types())
         assert isinstance(result["entity_types"], list)
 
-    def test_all_types_include_archimate_domain(self) -> None:
+    def test_all_types_include_domain(self) -> None:
         result = get_type_guidance()
         for entry in result["entity_types"]:
-            assert "archimate_domain" in entry
+            assert "domain" in entry
 
     def test_filter_by_entity_type_names(self) -> None:
         result = get_type_guidance(filter=["requirement", "goal"])
@@ -512,17 +512,17 @@ class TestGetTypeGuidance:
         names = {e["name"] for e in result["entity_types"]}
         assert names == {"requirement", "goal"}
 
-    def test_filter_by_entity_type_includes_archimate_domain(self) -> None:
+    def test_filter_by_entity_type_includes_domain(self) -> None:
         result = get_type_guidance(filter=["requirement"])
         entry = result["entity_types"][0]
-        assert "archimate_domain" in entry
-        assert entry["archimate_domain"] == "Motivation"
+        assert "domain" in entry
+        assert entry["domain"] == "motivation"
 
     def test_filter_by_domain_name(self) -> None:
         result = get_type_guidance(filter=["Motivation"])
         assert result["total"] > 0
         for entry in result["entity_types"]:
-            assert "archimate_domain" not in entry  # omitted when filtering by domain
+            assert "domain" not in entry  # omitted when filtering by domain
 
     def test_filter_by_domain_dir_name(self) -> None:
         result = get_type_guidance(filter=["motivation"])

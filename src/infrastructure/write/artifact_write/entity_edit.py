@@ -1,5 +1,6 @@
 """Entity editing and promotion operations."""
 
+import re
 from collections.abc import Callable
 from pathlib import Path
 
@@ -110,10 +111,10 @@ def edit_entity(
             repo = get_repository(repo_root)
             validate_entity_unique(repo, artifact_type, next_slug, exclude_artifact_id=artifact_id)
 
-    # Update display block — keep existing, update label if name changed
-    display = dict(parsed.display_archimate)
-    if name is not None and display:
-        display["label"] = eff_name
+    # Update display block — keep existing content, update label if name changed
+    display_content = parsed.display_content
+    if name is not None and display_content:
+        display_content = re.sub(r"(?m)^(label:\s*).*$", rf"\g<1>{eff_name}", display_content, count=1)
 
     content = format_entity_markdown(
         artifact_id=effective_artifact_id,
@@ -126,7 +127,8 @@ def edit_entity(
         summary=eff_summary,
         properties=eff_properties,
         notes=eff_notes,
-        display_archimate=display,
+        display_section_id=parsed.display_section_id,
+        display_content=display_content,
         repo_root=repo_root,
     )
 

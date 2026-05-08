@@ -19,7 +19,8 @@ class ParsedEntity:
     summary: str | None
     properties: dict[str, str]
     notes: str | None
-    display_archimate: dict[str, str]
+    display_section_id: str
+    display_content: str  # raw YAML string from the display block
     raw_text: str  # original file content for fallback
 
 
@@ -55,14 +56,15 @@ def parse_entity_file(path: Path) -> ParsedEntity:
     summary = _extract_summary(content_section, frontmatter.get("name", ""))
     properties = _extract_properties(content_section)
     notes = _extract_notes(content_section)
-    display_archimate = _extract_display_archimate(display_section)
+    display_section_id, display_content = _extract_display_block(display_section)
 
     return ParsedEntity(
         frontmatter=frontmatter,
         summary=summary,
         properties=properties,
         notes=notes,
-        display_archimate=display_archimate,
+        display_section_id=display_section_id,
+        display_content=display_content,
         raw_text=text,
     )
 
@@ -196,13 +198,20 @@ def _extract_notes(content_section: str) -> str | None:
     return text if text else None
 
 
-def _extract_display_archimate(display_section: str) -> dict[str, str]:
-    """Extract the archimate display YAML block."""
-    m = re.search(r"```yaml\n(.*?)```", display_section, re.DOTALL)
-    if not m:
-        return {}
-    parsed = yaml.safe_load(m.group(1))
-    return {str(k): str(v) for k, v in parsed.items()} if parsed else {}
+def _extract_display_block(display_section: str) -> tuple[str, str]:
+    """Extract section_id and raw YAML content from the §display block.
+
+    Parses the ``### section_id`` header then the fenced YAML block beneath it.
+    Returns ``("archimate", "")`` when no recognisable structure is found so that
+    callers always receive a usable pair.
+    """
+    section_id = "archimate"
+    h3 = re.search(r"^###\s+(\S+)", display_section, re.MULTILINE)
+    if h3:
+        section_id = h3.group(1)
+    m = re.search(r"```ya?ml\n(.*?)```", display_section, re.DOTALL)
+    content = m.group(1).strip() if m else ""
+    return section_id, content
 
 
 # Connection header: "conn-type [[src_card]] → [[tgt_card] ]target_id"

@@ -41,6 +41,11 @@ class OntologyModule(Protocol):
     @property
     def permitted_relationships(self) -> PermittedRelationshipSet: ...
 
+    @property
+    def display_section_id(self) -> str:
+        """Section name used as the ``### <id>`` header in entity markdown display blocks."""
+        ...
+
     def entity_types_with_class(self, cls: ElementClassName) -> frozenset[EntityTypeName]: ...
 
     def connection_types_with_classification(
@@ -53,6 +58,26 @@ class OntologyModule(Protocol):
         tgt: EntityTypeName,
         conn: ConnectionTypeName,
     ) -> bool: ...
+
+    def render_display_section(
+        self,
+        artifact_type: str,
+        name: str,
+        alias: str,
+    ) -> str:
+        """Generate the YAML content for the display block of a new entity.
+
+        Returns the raw YAML string to be embedded under ``### {display_section_id}``.
+        """
+        ...
+
+    def extract_display_section(self, section_content: str) -> dict | None:
+        """Parse a display block string back into a dict, or ``None`` on failure."""
+        ...
+
+    def sprite_for(self, artifact_type: str) -> str | None:
+        """Return a PlantUML sprite line (``sprite $name <svg...>``) or ``None``."""
+        ...
 
 
 # ── DiagramRenderer protocol ─────────────────────────────────────────────────

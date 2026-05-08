@@ -218,7 +218,7 @@ class TestBoundaryGuards:
 
         entity_id = "REQ@2000000000.GloAAA.global-req"
         _write(
-            enterprise_root / "model" / "motivation" / "requirements" / f"{entity_id}.md",
+            enterprise_root / "model" / "motivation" / "requirement" / f"{entity_id}.md",
             _entity_md(entity_id, "requirement", "Global Req"),
         )
 
@@ -290,16 +290,16 @@ class TestCleanupBrokenRefs:
         glo_id_deleted = "REQ@2000000001.DelCcc.deleted-req"
 
         _write(
-            engagement_root / "model" / "motivation" / "requirements" / f"{eng_id}.md",
+            engagement_root / "model" / "motivation" / "requirement" / f"{eng_id}.md",
             _entity_md(eng_id, "requirement", "Eng Req"),
         )
         _write(
-            engagement_root / "model" / "common" / "global-references" / f"{grf_id}.md",
+            engagement_root / "model" / "common" / "global-artifact-reference" / f"{grf_id}.md",
             _grf_md(grf_id, "Broken Ref", glo_id_deleted),
         )
         # Connection from eng entity to the broken GRF
         _write(
-            engagement_root / "model" / "motivation" / "requirements" / f"{eng_id}.outgoing.md",
+            engagement_root / "model" / "motivation" / "requirement" / f"{eng_id}.outgoing.md",
             _outgoing_md(eng_id, [("archimate-association", grf_id)]),
         )
         # Enterprise repo does NOT contain glo_id_deleted
@@ -327,9 +327,9 @@ class TestCleanupBrokenRefs:
         from src.infrastructure.write.artifact_write.cleanup_broken_refs import cleanup_broken_refs
 
         eng_id, grf_id, _ = self._setup(engagement_root, enterprise_root)
-        grf_path = engagement_root / "model" / "common" / "global-references" / f"{grf_id}.md"
+        grf_path = engagement_root / "model" / "common" / "global-artifact-reference" / f"{grf_id}.md"
         outgoing_path = (
-            engagement_root / "model" / "motivation" / "requirements"
+            engagement_root / "model" / "motivation" / "requirement"
             / f"{eng_id}.outgoing.md"
         )
 
@@ -344,9 +344,9 @@ class TestCleanupBrokenRefs:
         from src.infrastructure.write.artifact_write.cleanup_broken_refs import cleanup_broken_refs
 
         eng_id, grf_id, _ = self._setup(engagement_root, enterprise_root)
-        grf_path = engagement_root / "model" / "common" / "global-references" / f"{grf_id}.md"
+        grf_path = engagement_root / "model" / "common" / "global-artifact-reference" / f"{grf_id}.md"
         outgoing_path = (
-            engagement_root / "model" / "motivation" / "requirements"
+            engagement_root / "model" / "motivation" / "requirement"
             / f"{eng_id}.outgoing.md"
         )
 
@@ -369,22 +369,22 @@ class TestCleanupBrokenRefs:
         glo_id = "REQ@2000000002.EntFff.real-req"
 
         _write(
-            engagement_root / "model" / "motivation" / "requirements" / f"{eng_id}.md",
+            engagement_root / "model" / "motivation" / "requirement" / f"{eng_id}.md",
             _entity_md(eng_id),
         )
         _write(
-            engagement_root / "model" / "common" / "global-references" / f"{grf_id}.md",
+            engagement_root / "model" / "common" / "global-artifact-reference" / f"{grf_id}.md",
             _grf_md(grf_id, "Valid Ref", glo_id),
         )
         _write(
-            enterprise_root / "model" / "motivation" / "requirements" / f"{glo_id}.md",
+            enterprise_root / "model" / "motivation" / "requirement" / f"{glo_id}.md",
             _entity_md(glo_id, "requirement", "Real Global Req"),
         )
 
         report = cleanup_broken_refs(engagement_root, enterprise_root, dry_run=False)
 
         assert grf_id not in report.broken_grfs
-        grf_path = engagement_root / "model" / "common" / "global-references" / f"{grf_id}.md"
+        grf_path = engagement_root / "model" / "common" / "global-artifact-reference" / f"{grf_id}.md"
         assert grf_path.exists(), "Valid GRF should not be touched"
 
     def test_no_broken_grfs_reports_empty(

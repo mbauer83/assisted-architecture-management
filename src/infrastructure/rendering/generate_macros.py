@@ -1,11 +1,11 @@
 """
-generate_macros.py — Regenerate _macros.puml from entity §display ###archimate blocks.
+generate_macros.py — Regenerate _macros.puml from entity §display blocks.
 
 Usage:
     uv run python -m src.infrastructure.rendering.generate_macros [REPO_ROOT]
 
-The script scans every .md entity file under <REPO_ROOT>/model/ for a
-§display ###archimate block, extracts domain/element-type/label/alias fields,
+Scans every .md entity file under <REPO_ROOT>/model/ for a §display block,
+extracts label/alias, derives the stereotype key from the entity's artifact_type,
 and writes <REPO_ROOT>/diagram-catalog/_macros.puml.
 
 Alias convention (PlantUML):
@@ -13,7 +13,6 @@ Alias convention (PlantUML):
     In diagram source files, reference elements by their alias.
 """
 
-import json
 import re
 import sys
 from pathlib import Path
@@ -23,135 +22,105 @@ import yaml
 from src.application.artifact_parsing import normalize_puml_alias
 from src.config.repo_paths import DIAGRAM_CATALOG, MODEL
 from src.config.settings import archimate_type_markers, sprite_scale
-from src.domain.ontology_catalog import all_entity_types, domain_order
-from src.infrastructure.rendering._svg_sprite_convert import (
-    browser_markup_to_plantuml_svg as _browser_markup_to_plantuml_svg,
-)
 
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
 
 _DISPLAY_SECTION = re.compile(r"<!--\s*§display\s*-->", re.IGNORECASE)
-_ARCHIMATE_H3 = re.compile(r"###\s*archimate\b", re.IGNORECASE)
+_H3_SECTION = re.compile(r"###\s+(\S+)", re.IGNORECASE)
 _YAML_FENCE = re.compile(r"```ya?ml\s*\n(.*?)```", re.DOTALL)
-_PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent.parent
-_GLYPHS_PATH = _PROJECT_ROOT / "tools" / "gui" / "src" / "ui" / "lib" / "archimateGlyphs.json"
+_FRONTMATTER = re.compile(r"^---\n(.*?)\n---", re.DOTALL)
 
 
-def _extract_archimate_block(content: str) -> dict | None:
-    """Return the parsed archimate YAML block from §display, or None."""
+def _extract_frontmatter(content: str) -> dict:
+    m = _FRONTMATTER.match(content)
+    if not m:
+        return {}
+    try:
+        result: object = yaml.safe_load(m.group(1)) or {}
+        return result if isinstance(result, dict) else {}
+    except yaml.YAMLError:
+        return {}
+
+
+def _extract_display_section_for_id(content: str, section_id: str) -> dict | None:
     m = _DISPLAY_SECTION.search(content)
     if not m:
         return None
-    display_text = content[m.end() :]
-    h3 = _ARCHIMATE_H3.search(display_text)
-    if not h3:
-        return None
-    after_h3 = display_text[h3.end() :]
-    fence = _YAML_FENCE.search(after_h3)
-    if not fence:
-        return None
-    try:
-        return yaml.safe_load(fence.group(1)) or {}
-    except yaml.YAMLError:
-        return None
+    display_text = content[m.end():]
+    for h3_match in _H3_SECTION.finditer(display_text):
+        if h3_match.group(1).lower() == section_id.lower():
+            after_h3 = display_text[h3_match.end():]
+            fence = _YAML_FENCE.search(after_h3)
+            if not fence:
+                return None
+            try:
+                result: object = yaml.safe_load(fence.group(1)) or {}
+                return result if isinstance(result, dict) else None
+            except yaml.YAMLError:
+                return None
+    return None
 
 
-_DOMAIN_ORDER = {d: i for i, d in enumerate(domain_order())}
-
-_PREFIX_ORDER = [
-    "STK",
-    "DRV",
-    "ASM",
-    "GOL",
-    "OUT",
-    "PRI",
-    "REQ",
-    "CST",
-    "MEA",
-    "VAL",
-    "CAP",
-    "VS",
-    "RES",
-    "COA",
-    "SRV",
-    "PRC",
-    "FNC",
-    "INT",
-    "EVT",
-    "ROL",
-    "ACT",
-    "BIF",
-    "BOB",
-    "APP",
-    "AIF",
-    "DOB",
-    "NOD",
-    "DEV",
-    "SSW",
-    "TIF",
-    "PTH",
-    "NET",
-    "ART",
-    "EQP",
-    "FAC",
-    "DIS",
-    "MAT",
-    "WP",
-    "DEL",
-    "PLT",
-]
+def _sprite_key(artifact_type: str) -> str:
+    return artifact_type.replace("-", "_")
 
 
-def _sort_key(entry: tuple[str, str, str]) -> tuple[int, int, str]:
-    """Sort by domain → prefix → alias."""
-    domain, _, alias = entry
-    prefix = alias.split("_")[0] if "_" in alias else alias
-    domain_idx = _DOMAIN_ORDER.get(domain.lower(), 99)
-    prefix_idx = _PREFIX_ORDER.index(prefix) if prefix in _PREFIX_ORDER else 99
-    return domain_idx, prefix_idx, alias
-
-
-def _load_glyphs() -> dict:
-    return json.loads(_GLYPHS_PATH.read_text(encoding="utf-8"))
+def _macro_label(label: str, artifact_type: str) -> str:
+    if archimate_type_markers() != "icons":
+        return label
+    scale = sprite_scale()
+    key = _sprite_key(artifact_type)
+    return f"<$archimate_{key}{{scale={scale}}}> {label}"
 
 
 def _generate_glyph_include(repo_root: Path) -> Path:
-    glyphs = _load_glyphs()
+    """Write _archimate-glyphs.puml using ontology sprite_for() methods."""
+    from src.infrastructure.app_bootstrap import get_module_registry  # noqa: PLC0415
+    registry = get_module_registry()
     mode = archimate_type_markers()
     lines = [
         "' _archimate-glyphs.puml — generated ArchiMate glyph sprites",
-        "' Auto-generated from tools/gui/src/ui/lib/archimateGlyphs.json.",
-        "' Do not edit manually.",
+        "' Auto-generated — do not edit manually.",
         "",
     ]
     if mode == "icons":
         lines.append("hide stereotype")
         lines.append("")
-        for info in sorted(
-            (et for et in all_entity_types().values() if et.archimate_element_type),
-            key=lambda item: item.archimate_element_type or "",
-        ):
-            kind = glyphs["types"].get(info.artifact_type)
-            if not kind:
-                continue
-            markup = glyphs["kinds"].get(kind)
-            if not markup:
-                continue
-            sprite_name = f"$archimate_{info.archimate_element_type}"
-            lines.append(f"sprite {sprite_name} {_browser_markup_to_plantuml_svg(markup)}")
+        for om in registry.all_ontologies().values():
+            for artifact_type in sorted(om.entity_types):
+                sprite_line = om.sprite_for(str(artifact_type))
+                if sprite_line:
+                    lines.append(sprite_line)
     out_path = repo_root / DIAGRAM_CATALOG / "_archimate-glyphs.puml"
     out_path.parent.mkdir(parents=True, exist_ok=True)
     out_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
     return out_path
 
 
-def _macro_label(label: str, element_type: str) -> str:
-    if archimate_type_markers() != "icons":
-        return label
-    scale = sprite_scale()
-    return f"<$archimate_{element_type}{{scale={scale}}}> {label}"
+def _domain_order_index() -> dict[str, int]:
+    from src.domain.ontology_catalog import domain_order  # noqa: PLC0415
+    return {d: i for i, d in enumerate(domain_order())}
+
+
+_PREFIX_ORDER = [
+    "STK", "DRV", "ASS", "GOL", "OUT", "PRI", "REQ", "MEA", "VAL",
+    "CAP", "VS", "RES", "COA",
+    "SRV", "PRC", "FNC", "EVT", "ROL", "PTH", "JNA", "JNO",
+    "ACT", "BIF", "BOB", "PRD",
+    "APP", "AIF", "DOB",
+    "NOD", "DEV", "SSW", "TIF", "NET", "ART", "EQP", "FAC", "DIS", "MAT",
+    "WP", "DEL", "PLT",
+]
+
+
+def _sort_key(entry: tuple[str, str, str]) -> tuple[int, int, str]:
+    domain, _, alias = entry
+    prefix = alias.split("_")[0] if "_" in alias else alias
+    domain_idx = _domain_order_index().get(domain.lower(), 99)
+    prefix_idx = _PREFIX_ORDER.index(prefix) if prefix in _PREFIX_ORDER else 99
+    return domain_idx, prefix_idx, alias
 
 
 # ---------------------------------------------------------------------------
@@ -168,6 +137,9 @@ def generate_macros(repo_root: Path, *, enterprise_root: Path | None = None) -> 
 
     Returns the path to the written file.
     """
+    from src.infrastructure.app_bootstrap import get_module_registry  # noqa: PLC0415
+    registry = get_module_registry()
+
     roots_to_scan: list[Path] = []
     if enterprise_root and (enterprise_root / MODEL).is_dir():
         roots_to_scan.append(enterprise_root)
@@ -186,31 +158,43 @@ def generate_macros(repo_root: Path, *, enterprise_root: Path | None = None) -> 
             if md_file.name.endswith(".outgoing.md"):
                 continue
             content = md_file.read_text(encoding="utf-8")
-            archimate = _extract_archimate_block(content)
-            if not archimate:
+            fm = _extract_frontmatter(content)
+            artifact_type = str(fm.get("artifact-type", ""))
+            if not artifact_type:
                 continue
 
-            label = archimate.get("label", "")
-            element_type = archimate.get("element-type", "")
-            alias_raw = archimate.get("alias", "")
+            entity_info = registry.find_entity_type(
+                __import__("src.domain.module_types", fromlist=["EntityTypeName"]).EntityTypeName(artifact_type)
+            )
+            ontology = registry.ontology_for_entity_type(
+                __import__("src.domain.module_types", fromlist=["EntityTypeName"]).EntityTypeName(artifact_type)
+            ) if entity_info else None
 
-            if not (label and element_type and alias_raw):
+            section_id = ontology.display_section_id if ontology else "archimate"
+            block = _extract_display_section_for_id(content, section_id)
+            if not block:
                 continue
 
-            alias = normalize_puml_alias(str(alias_raw))
+            label = str(block.get("label", "")).strip()
+            alias_raw = str(block.get("alias", "")).strip()
+            if not (label and alias_raw):
+                continue
+
+            alias = normalize_puml_alias(alias_raw)
             if alias in seen_aliases:
                 continue
             seen_aliases.add(alias)
 
-            domain = archimate.get("domain", "")
+            domain = entity_info.hierarchy[0] if entity_info and entity_info.hierarchy else ""
             if not domain:
                 rel = md_file.relative_to(model_dir)
                 domain = rel.parts[0] if rel.parts else "unknown"
 
+            stereotype = _sprite_key(artifact_type) if artifact_type else ""
             proc_name = f"$DECL_{alias}"
             macro_line = (
                 f"!procedure {proc_name}()\n"
-                f'  rectangle "{_macro_label(label, element_type)}" <<{element_type}>> as {alias}\n'
+                f'  rectangle "{_macro_label(label, artifact_type)}" <<{stereotype}>> as {alias}\n'
                 f"!endprocedure"
             )
             entries.append((domain, macro_line, alias))
@@ -219,7 +203,7 @@ def generate_macros(repo_root: Path, *, enterprise_root: Path | None = None) -> 
 
     lines: list[str] = [
         "' _macros.puml — ArchiMate element procedure library",
-        "' Auto-generated from entity §display ###archimate blocks.",
+        "' Auto-generated from entity §display blocks.",
         "' Do not edit manually — regenerated by generate_macros().",
         "'",
         "' USAGE CONVENTION:",

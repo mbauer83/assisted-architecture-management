@@ -23,22 +23,22 @@ title What We Are Trying to Achieve — Goals & Outcomes
 
 rectangle "Goals" <<MotivationGrouping>> {
   rectangle "Human Stakeholder Goals" <<MotivationGrouping>> as GOL_GRP_H {
-    rectangle "<$archimate_Goal{scale=1.5}> Support Architecture Planning for Humans" <<Goal>> as GOL_5Fk9di
-    rectangle "<$archimate_Goal{scale=1.5}> Provide Development Guidance for Humans" <<Goal>> as GOL_Gh3Jk1
-    rectangle "<$archimate_Goal{scale=1.5}> Support Technology Design for Humans" <<Goal>> as GOL_W6Z8pa
-    rectangle "<$archimate_Goal{scale=1.5}> Support Product Design for Humans" <<Goal>> as GOL_hEEWS8
+    rectangle "<$archimate_goal{scale=1.5}> Support Architecture Planning for Humans" <<goal>> as GOL_5Fk9di
+    rectangle "<$archimate_goal{scale=1.5}> Provide Development Guidance for Humans" <<goal>> as GOL_Gh3Jk1
+    rectangle "<$archimate_goal{scale=1.5}> Support Technology Design for Humans" <<goal>> as GOL_W6Z8pa
+    rectangle "<$archimate_goal{scale=1.5}> Support Product Design for Humans" <<goal>> as GOL_hEEWS8
   }
   rectangle "AI Agent Goals" <<MotivationGrouping>> as GOL_GRP_AI {
-    rectangle "<$archimate_Goal{scale=1.5}> Support Architecture Planning for AI" <<Goal>> as GOL_Iwha3
-    rectangle "<$archimate_Goal{scale=1.5}> Provide Development Guidance for AI" <<Goal>> as GOL_e3nCpO
-    rectangle "<$archimate_Goal{scale=1.5}> Support Technology Design for AI" <<Goal>> as GOL_B6G__P
-    rectangle "<$archimate_Goal{scale=1.5}> Support Product Design for AI" <<Goal>> as GOL_zBPs_y
+    rectangle "<$archimate_goal{scale=1.5}> Support Architecture Planning for AI" <<goal>> as GOL_Iwha3
+    rectangle "<$archimate_goal{scale=1.5}> Provide Development Guidance for AI" <<goal>> as GOL_e3nCpO
+    rectangle "<$archimate_goal{scale=1.5}> Support Technology Design for AI" <<goal>> as GOL_B6G__P
+    rectangle "<$archimate_goal{scale=1.5}> Support Product Design for AI" <<goal>> as GOL_zBPs_y
   }
   rectangle "Platform & System Goals" <<MotivationGrouping>> as GOL_GRP_P {
-    rectangle "<$archimate_Goal{scale=1.5}> Enable Cross-Stakeholder Validation" <<Goal>> as GOL_Lm2Bn2
-    rectangle "<$archimate_Goal{scale=1.5}> Enable Architecture Management at Scale" <<Goal>> as GOL_Zx9Cv4
-    rectangle "<$archimate_Goal{scale=1.5}> Maintain Coherence and Traceability" <<Goal>> as GOL_Po1Qw3
-    rectangle "<$archimate_Goal{scale=1.5}> Enable Cross-Engagement Architectural Reuse" <<Goal>> as GOL_kCcPph
+    rectangle "<$archimate_goal{scale=1.5}> Enable Cross-Stakeholder Validation" <<goal>> as GOL_Lm2Bn2
+    rectangle "<$archimate_goal{scale=1.5}> Enable Architecture Management at Scale" <<goal>> as GOL_Zx9Cv4
+    rectangle "<$archimate_goal{scale=1.5}> Maintain Coherence and Traceability" <<goal>> as GOL_Po1Qw3
+    rectangle "<$archimate_goal{scale=1.5}> Enable Cross-Engagement Architectural Reuse" <<goal>> as GOL_kCcPph
   }
 }
 
@@ -59,22 +59,22 @@ GOL_GRP_AI -[hidden]down- GOL_GRP_P
 
 rectangle "Outcomes" <<MotivationGrouping>> {
   rectangle "Human Stakeholder Outcomes" <<MotivationGrouping>> as OUT_GRP_H {
-    rectangle "<$archimate_Outcome{scale=1.5}> Reduced Planning Overhead" <<Outcome>> as OUT_AlZjX8
-    rectangle "<$archimate_Outcome{scale=1.5}> Architectural Guidance Available Without Specialist Dependency" <<Outcome>> as OUT_FXFGrO
-    rectangle "<$archimate_Outcome{scale=1.5}> Technology Changes Validated Before Implementation" <<Outcome>> as OUT_a5mNob
-    rectangle "<$archimate_Outcome{scale=1.5}> Product Requirements Traceable to Realized Components" <<Outcome>> as OUT_9jS0BB
+    rectangle "<$archimate_outcome{scale=1.5}> Reduced Planning Overhead" <<outcome>> as OUT_AlZjX8
+    rectangle "<$archimate_outcome{scale=1.5}> Architectural Guidance Available Without Specialist Dependency" <<outcome>> as OUT_FXFGrO
+    rectangle "<$archimate_outcome{scale=1.5}> Technology Changes Validated Before Implementation" <<outcome>> as OUT_a5mNob
+    rectangle "<$archimate_outcome{scale=1.5}> Product Requirements Traceable to Realized Components" <<outcome>> as OUT_9jS0BB
   }
   rectangle "AI Agent Outcomes" <<MotivationGrouping>> as OUT_GRP_AI {
-    rectangle "<$archimate_Outcome{scale=1.5}> AI Agents Efficiently Discover and Edit Architecture Artifacts" <<Outcome>> as OUT_JZMIk3
-    rectangle "<$archimate_Outcome{scale=1.5}> AI Agents Produce Fewer Architecture-Drift Corrections" <<Outcome>> as OUT__AzP1Q
-    rectangle "<$archimate_Outcome{scale=1.5}> AI Agents Query Technology Architecture to Identify Constraints" <<Outcome>> as OUT_i_3Bi_
-    rectangle "<$archimate_Outcome{scale=1.5}> AI Agents Traverse Product-Architecture Traceability Chains" <<Outcome>> as OUT_Cn_CVI
+    rectangle "<$archimate_outcome{scale=1.5}> AI Agents Efficiently Discover and Edit Architecture Artifacts" <<outcome>> as OUT_JZMIk3
+    rectangle "<$archimate_outcome{scale=1.5}> AI Agents Produce Fewer Architecture-Drift Corrections" <<outcome>> as OUT__AzP1Q
+    rectangle "<$archimate_outcome{scale=1.5}> AI Agents Query Technology Architecture to Identify Constraints" <<outcome>> as OUT_i_3Bi_
+    rectangle "<$archimate_outcome{scale=1.5}> AI Agents Traverse Product-Architecture Traceability Chains" <<outcome>> as OUT_Cn_CVI
   }
   rectangle "Platform & System Outcomes" <<MotivationGrouping>> as OUT_GRP_P {
-    rectangle "<$archimate_Outcome{scale=1.5}> Stakeholder Concerns and Hand-Off Points Explicitly Verifiable" <<Outcome>> as OUT_YSRwR0
-    rectangle "<$archimate_Outcome{scale=1.5}> Architecture Governance Scales Without Proportional Overhead" <<Outcome>> as OUT_aOcRl9
-    rectangle "<$archimate_Outcome{scale=1.5}> Increased Architectural Coherence" <<Outcome>> as OUT_LrpdG0
-    rectangle "<$archimate_Outcome{scale=1.5}> Proven Patterns Promoted and Adopted Across Engagements" <<Outcome>> as OUT_edEkJa
+    rectangle "<$archimate_outcome{scale=1.5}> Stakeholder Concerns and Hand-Off Points Explicitly Verifiable" <<outcome>> as OUT_YSRwR0
+    rectangle "<$archimate_outcome{scale=1.5}> Architecture Governance Scales Without Proportional Overhead" <<outcome>> as OUT_aOcRl9
+    rectangle "<$archimate_outcome{scale=1.5}> Increased Architectural Coherence" <<outcome>> as OUT_LrpdG0
+    rectangle "<$archimate_outcome{scale=1.5}> Proven Patterns Promoted and Adopted Across Engagements" <<outcome>> as OUT_edEkJa
   }
 }
 

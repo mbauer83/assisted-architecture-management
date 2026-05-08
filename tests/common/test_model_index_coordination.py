@@ -57,9 +57,9 @@ def test_apply_file_changes_batches_generation_and_refresh_suppression(tmp_path:
     target_id = "REQ@1000000001.TestBB.target"
     diagram_id = "DIA@1000000002.TestCC.sample-diagram"
 
-    entity_path = root / "model" / "motivation" / "requirements" / f"{entity_id}.md"
-    target_path = root / "model" / "motivation" / "requirements" / f"{target_id}.md"
-    outgoing_path = root / "model" / "motivation" / "requirements" / f"{entity_id}.outgoing.md"
+    entity_path = root / "model" / "motivation" / "requirement" / f"{entity_id}.md"
+    target_path = root / "model" / "motivation" / "requirement" / f"{target_id}.md"
+    outgoing_path = root / "model" / "motivation" / "requirement" / f"{entity_id}.outgoing.md"
     diagram_path = root / "diagram-catalog" / "diagrams" / f"{diagram_id}.puml"
 
     _write(entity_path, _entity_md(entity_id, "Sample", "REQ_TestAA"))
