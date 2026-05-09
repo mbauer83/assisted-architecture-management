@@ -29,6 +29,7 @@ from src.infrastructure.artifact_index import ArtifactIndex, ReadModelVersion
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
+
 def _entity(
     artifact_id: str,
     *,
@@ -56,9 +57,7 @@ def _entity(
     )
 
 
-def _conn(
-    artifact_id: str, source: str, target: str, *, conn_type: str = "uses"
-) -> ConnectionRecord:
+def _conn(artifact_id: str, source: str, target: str, *, conn_type: str = "uses") -> ConnectionRecord:
     return ConnectionRecord(
         artifact_id=artifact_id,
         source=source,
@@ -101,6 +100,7 @@ def _document(artifact_id: str, *, doc_type: str = "adr") -> DocumentRecord:
 
 # ── FakeStore ─────────────────────────────────────────────────────────────────
 
+
 class FakeStore:
     """Minimal ArtifactStorePort implementation backed by plain dicts."""
 
@@ -117,77 +117,92 @@ class FakeStore:
         self._documents = {d.artifact_id: d for d in (documents or [])}
 
     # Lifecycle
-    def refresh(self) -> None: pass
+    def refresh(self) -> None:
+        pass
+
     def read_model_version(self) -> ReadModelVersion:
         return ReadModelVersion(generation=0, etag="fake")
+
     def apply_file_changes(self, paths: list[Path]) -> ReadModelVersion:
         return self.read_model_version()
 
     # Point lookups
     def get_entity(self, artifact_id: str) -> EntityRecord | None:
         return self._entities.get(artifact_id)
+
     def get_connection(self, artifact_id: str) -> ConnectionRecord | None:
         return self._connections.get(artifact_id)
+
     def get_diagram(self, artifact_id: str) -> DiagramRecord | None:
         return self._diagrams.get(artifact_id)
+
     def get_document(self, artifact_id: str) -> DocumentRecord | None:
         return self._documents.get(artifact_id)
 
     # Filtered list queries
     def list_entities(
-        self, *,
+        self,
+        *,
         artifact_type: str | None = None,
         domain: str | None = None,
         subdomain: str | None = None,
         status: str | None = None,
     ) -> list[EntityRecord]:
         return sorted(
-            (r for r in self._entities.values()
-             if (artifact_type is None or r.artifact_type == artifact_type)
-             and (domain is None or r.domain == domain)
-             and (subdomain is None or r.subdomain == subdomain)
-             and (status is None or r.status == status)),
+            (
+                r
+                for r in self._entities.values()
+                if (artifact_type is None or r.artifact_type == artifact_type)
+                and (domain is None or r.domain == domain)
+                and (subdomain is None or r.subdomain == subdomain)
+                and (status is None or r.status == status)
+            ),
             key=lambda r: r.artifact_id,
         )
 
     def list_connections(
-        self, *,
+        self,
+        *,
         conn_type: str | None = None,
         source: str | None = None,
         target: str | None = None,
         status: str | None = None,
     ) -> list[ConnectionRecord]:
         return sorted(
-            (r for r in self._connections.values()
-             if (conn_type is None or r.conn_type == conn_type)
-             and (source is None or r.source == source)
-             and (target is None or r.target == target)
-             and (status is None or r.status == status)),
+            (
+                r
+                for r in self._connections.values()
+                if (conn_type is None or r.conn_type == conn_type)
+                and (source is None or r.source == source)
+                and (target is None or r.target == target)
+                and (status is None or r.status == status)
+            ),
             key=lambda r: r.artifact_id,
         )
 
-    def list_diagrams(
-        self, *, diagram_type: str | None = None, status: str | None = None
-    ) -> list[DiagramRecord]:
+    def list_diagrams(self, *, diagram_type: str | None = None, status: str | None = None) -> list[DiagramRecord]:
         return sorted(
-            (r for r in self._diagrams.values()
-             if (diagram_type is None or r.diagram_type == diagram_type)
-             and (status is None or r.status == status)),
+            (
+                r
+                for r in self._diagrams.values()
+                if (diagram_type is None or r.diagram_type == diagram_type) and (status is None or r.status == status)
+            ),
             key=lambda r: r.artifact_id,
         )
 
-    def list_documents(
-        self, *, doc_type: str | None = None, status: str | None = None
-    ) -> list[DocumentRecord]:
+    def list_documents(self, *, doc_type: str | None = None, status: str | None = None) -> list[DocumentRecord]:
         return sorted(
-            (r for r in self._documents.values()
-             if (doc_type is None or r.doc_type == doc_type)
-             and (status is None or r.status == status)),
+            (
+                r
+                for r in self._documents.values()
+                if (doc_type is None or r.doc_type == doc_type) and (status is None or r.status == status)
+            ),
             key=lambda r: r.artifact_id,
         )
 
     def list_artifacts(
-        self, *,
+        self,
+        *,
         artifact_type: str | list[str] | None = None,
         domain: str | list[str] | None = None,
         status: str | list[str] | None = None,
@@ -195,38 +210,38 @@ class FakeStore:
         include_diagrams: bool = False,
         include_documents: bool = False,
     ) -> list[ArtifactSummary]:
-        _types = artifact_type if isinstance(artifact_type, list) else (
-            [artifact_type] if artifact_type else []
-        )
+        _types = artifact_type if isinstance(artifact_type, list) else ([artifact_type] if artifact_type else [])
         types = set(_types)
-        _doms = domain if isinstance(domain, list) else (
-            [domain] if domain else []
-        )
+        _doms = domain if isinstance(domain, list) else ([domain] if domain else [])
         domains = {d.lower() for d in _doms}
         statuses = set(status if isinstance(status, list) else ([status] if status else []))
         out: list[ArtifactSummary] = [
-            summary_from_entity(r) for r in self._entities.values()
+            summary_from_entity(r)
+            for r in self._entities.values()
             if (not types or r.artifact_type in types)
             and (not domains or r.domain.lower() in domains)
             and (not statuses or r.status in statuses)
         ]
         if include_connections:
-            out.extend(summary_from_connection(r) for r in self._connections.values()
-                       if not statuses or r.status in statuses)
+            out.extend(
+                summary_from_connection(r) for r in self._connections.values() if not statuses or r.status in statuses
+            )
         if include_diagrams:
             out.extend(
-                summary_from_diagram(r) for r in self._diagrams.values()
-                if (not types or r.artifact_type in types)
-                and (not statuses or r.status in statuses)
+                summary_from_diagram(r)
+                for r in self._diagrams.values()
+                if (not types or r.artifact_type in types) and (not statuses or r.status in statuses)
             )
         if include_documents:
-            out.extend(summary_from_document(r) for r in self._documents.values()
-                       if not statuses or r.status in statuses)
+            out.extend(
+                summary_from_document(r) for r in self._documents.values() if not statuses or r.status in statuses
+            )
         return sorted(out, key=lambda s: s.artifact_id)
 
     # Richer reads
-    def read_artifact(self, artifact_id: str, *, mode: Literal["summary", "full"] = "summary",
-                      section: str | None = None) -> dict[str, object] | None:
+    def read_artifact(
+        self, artifact_id: str, *, mode: Literal["summary", "full"] = "summary", section: str | None = None
+    ) -> dict[str, object] | None:
         r = self._entities.get(artifact_id)
         return {"artifact_id": artifact_id, "name": r.name} if r else None
 
@@ -246,14 +261,18 @@ class FakeStore:
     # Connection queries (minimal stubs)
     def connection_counts(self) -> dict[str, tuple[int, int, int]]:
         return {}
+
     def connection_counts_for(self, entity_id: str) -> tuple[int, int, int]:
         return (0, 0, 0)
+
     def connection_counts_for_entities(
         self, entity_ids: list[str] | set[str] | frozenset[str]
     ) -> dict[str, tuple[int, int, int]]:
         return {entity_id: (0, 0, 0) for entity_id in entity_ids}
+
     def list_connections_by_types(self, types: frozenset[str]) -> list[ConnectionRecord]:
         return [r for r in self._connections.values() if r.conn_type in types]
+
     def list_connections_by_types_for_entities(
         self,
         types: frozenset[str],
@@ -265,61 +284,94 @@ class FakeStore:
             for r in self._connections.values()
             if r.conn_type in types and (r.source in entity_set or r.target in entity_set)
         ]
-    def find_connections_for(self, entity_id: str, *,
-                              direction: Literal["any", "outbound", "inbound"] = "any",
-                              conn_type: str | None = None) -> list[ConnectionRecord]:
+
+    def find_connections_for(
+        self, entity_id: str, *, direction: Literal["any", "outbound", "inbound"] = "any", conn_type: str | None = None
+    ) -> list[ConnectionRecord]:
         return []
-    def find_neighbors(self, entity_id: str, *, max_hops: int = 1,
-                       conn_type: str | None = None) -> dict[str, set[str]]:
+
+    def find_neighbors(self, entity_id: str, *, max_hops: int = 1, conn_type: str | None = None) -> dict[str, set[str]]:
         return {}
+
     def search_fts(
-        self, query: str, *, limit: int, include_connections: bool,
-        include_diagrams: bool, include_documents: bool,
-        prefer_record_type: str | None, strict_record_type: bool,
+        self,
+        query: str,
+        *,
+        limit: int,
+        include_connections: bool,
+        include_diagrams: bool,
+        include_documents: bool,
+        prefer_record_type: str | None,
+        strict_record_type: bool,
     ) -> list[tuple[str, str, float]]:
         return []
 
     # Scope
     def scope_for_path(self, path: Path) -> Literal["enterprise", "engagement", "unknown"]:
         return "unknown"
+
     def scope_of_entity(self, artifact_id: str) -> Literal["enterprise", "engagement", "unknown"]:
         return "unknown"
-    def scope_of_connection(
-        self, artifact_id: str
-    ) -> Literal["enterprise", "engagement", "unknown"]:
+
+    def scope_of_connection(self, artifact_id: str) -> Literal["enterprise", "engagement", "unknown"]:
         return "unknown"
 
     # Registry
-    def entity_ids(self) -> set[str]: return set(self._entities)
-    def connection_ids(self) -> set[str]: return set(self._connections)
-    def enterprise_entity_ids(self) -> set[str]: return set()
-    def engagement_entity_ids(self) -> set[str]: return set(self._entities)
-    def enterprise_connection_ids(self) -> set[str]: return set()
-    def engagement_connection_ids(self) -> set[str]: return set(self._connections)
-    def enterprise_document_ids(self) -> set[str]: return set()
-    def enterprise_diagram_ids(self) -> set[str]: return set()
+    def entity_ids(self) -> set[str]:
+        return set(self._entities)
+
+    def connection_ids(self) -> set[str]:
+        return set(self._connections)
+
+    def enterprise_entity_ids(self) -> set[str]:
+        return set()
+
+    def engagement_entity_ids(self) -> set[str]:
+        return set(self._entities)
+
+    def enterprise_connection_ids(self) -> set[str]:
+        return set()
+
+    def engagement_connection_ids(self) -> set[str]:
+        return set(self._connections)
+
+    def enterprise_document_ids(self) -> set[str]:
+        return set()
+
+    def enterprise_diagram_ids(self) -> set[str]:
+        return set()
+
     def entity_status(self, artifact_id: str) -> str | None:
         r = self._entities.get(artifact_id)
         return r.status if r else None
+
     def entity_statuses(self) -> dict[str, str]:
         return {aid: r.status for aid, r in self._entities.items()}
+
     def connection_status(self, artifact_id: str) -> str | None:
         r = self._connections.get(artifact_id)
         return r.status if r else None
+
     def find_file_by_id(self, artifact_id: str) -> Path | None:
         r = self._entities.get(artifact_id)
         return r.path if r else None
 
     # Mount properties
     @property
-    def repo_mounts(self) -> list[RepoMount]: return []
+    def repo_mounts(self) -> list[RepoMount]:
+        return []
+
     @property
-    def repo_roots(self) -> list[Path]: return []
+    def repo_roots(self) -> list[Path]:
+        return []
+
     @property
-    def repo_root(self) -> Path: return Path("/tmp/fake")
+    def repo_root(self) -> Path:
+        return Path("/tmp/fake")
 
 
 # ── Protocol conformance check ────────────────────────────────────────────────
+
 
 def test_artifact_index_satisfies_store_port(tmp_path: Path) -> None:
     index = ArtifactIndex(tmp_path)
@@ -332,34 +384,41 @@ def test_fake_store_satisfies_store_port() -> None:
 
 # ── count_artifacts_by ────────────────────────────────────────────────────────
 
+
 def test_count_artifacts_by_artifact_type() -> None:
-    store = FakeStore(entities=[
-        _entity("e1", artifact_type="system"),
-        _entity("e2", artifact_type="system"),
-        _entity("e3", artifact_type="service"),
-    ])
+    store = FakeStore(
+        entities=[
+            _entity("e1", artifact_type="system"),
+            _entity("e2", artifact_type="system"),
+            _entity("e3", artifact_type="service"),
+        ]
+    )
     repo = ArtifactRepository(store)
     counts = repo.count_artifacts_by("artifact_type")
     assert counts == {"service": 1, "system": 2}
 
 
 def test_count_artifacts_by_domain() -> None:
-    store = FakeStore(entities=[
-        _entity("e1", domain="technology"),
-        _entity("e2", domain="technology"),
-        _entity("e3", domain="business"),
-    ])
+    store = FakeStore(
+        entities=[
+            _entity("e1", domain="technology"),
+            _entity("e2", domain="technology"),
+            _entity("e3", domain="business"),
+        ]
+    )
     repo = ArtifactRepository(store)
     counts = repo.count_artifacts_by("domain")
     assert counts == {"business": 1, "technology": 2}
 
 
 def test_count_artifacts_by_diagram_type() -> None:
-    store = FakeStore(diagrams=[
-        _diagram("d1", diagram_type="context"),
-        _diagram("d2", diagram_type="context"),
-        _diagram("d3", diagram_type="sequence"),
-    ])
+    store = FakeStore(
+        diagrams=[
+            _diagram("d1", diagram_type="context"),
+            _diagram("d2", diagram_type="context"),
+            _diagram("d3", diagram_type="sequence"),
+        ]
+    )
     repo = ArtifactRepository(store)
     counts = repo.count_artifacts_by("diagram_type")
     assert counts == {"context": 2, "sequence": 1}
@@ -379,10 +438,12 @@ def test_count_artifacts_by_includes_connections_when_requested() -> None:
 
 
 def test_count_artifacts_by_filters_by_domain() -> None:
-    store = FakeStore(entities=[
-        _entity("e1", artifact_type="system", domain="technology"),
-        _entity("e2", artifact_type="service", domain="business"),
-    ])
+    store = FakeStore(
+        entities=[
+            _entity("e1", artifact_type="system", domain="technology"),
+            _entity("e2", artifact_type="service", domain="business"),
+        ]
+    )
     repo = ArtifactRepository(store)
     counts = repo.count_artifacts_by("artifact_type", domain="technology")
     assert counts == {"system": 1}
@@ -391,11 +452,14 @@ def test_count_artifacts_by_filters_by_domain() -> None:
 
 # ── search fallback ───────────────────────────────────────────────────────────
 
+
 def test_search_falls_back_to_python_scoring_when_fts_empty() -> None:
-    store = FakeStore(entities=[
-        _entity("e1", name="Payment Gateway", artifact_type="system"),
-        _entity("e2", name="Auth Service", artifact_type="system"),
-    ])
+    store = FakeStore(
+        entities=[
+            _entity("e1", name="Payment Gateway", artifact_type="system"),
+            _entity("e2", name="Auth Service", artifact_type="system"),
+        ]
+    )
     repo = ArtifactRepository(store)
     result = repo.search("payment")
     assert len(result.hits) >= 1
@@ -403,10 +467,12 @@ def test_search_falls_back_to_python_scoring_when_fts_empty() -> None:
 
 
 def test_search_respects_entity_type_filter() -> None:
-    store = FakeStore(entities=[
-        _entity("e1", name="Payment System", artifact_type="system"),
-        _entity("e2", name="Payment Service", artifact_type="service"),
-    ])
+    store = FakeStore(
+        entities=[
+            _entity("e1", name="Payment System", artifact_type="system"),
+            _entity("e2", name="Payment Service", artifact_type="service"),
+        ]
+    )
     repo = ArtifactRepository(store)
     result = repo.search("payment", entity_types=["system"])
     ids = {h.record.artifact_id for h in result.hits}
@@ -415,10 +481,12 @@ def test_search_respects_entity_type_filter() -> None:
 
 
 def test_search_respects_domain_filter() -> None:
-    store = FakeStore(entities=[
-        _entity("e1", name="Payment", domain="technology"),
-        _entity("e2", name="Payment", domain="business"),
-    ])
+    store = FakeStore(
+        entities=[
+            _entity("e1", name="Payment", domain="technology"),
+            _entity("e2", name="Payment", domain="business"),
+        ]
+    )
     repo = ArtifactRepository(store)
     result = repo.search("payment", domains=["technology"])
     ids = {h.record.artifact_id for h in result.hits}
@@ -442,24 +510,25 @@ def test_search_includes_connections_when_requested() -> None:
 
 
 def test_search_strict_record_type_filters_results() -> None:
-    store = FakeStore(entities=[
-        _entity("e1", name="Invoice Service"),
-    ])
+    store = FakeStore(
+        entities=[
+            _entity("e1", name="Invoice Service"),
+        ]
+    )
     repo = ArtifactRepository(store)
     result = repo.search("invoice", prefer_record_type="entity", strict_record_type=True)
     assert all(h.record_type == "entity" for h in result.hits)
 
 
 def test_search_limit_respected() -> None:
-    store = FakeStore(entities=[
-        _entity(f"e{i}", name=f"Service {i}") for i in range(20)
-    ])
+    store = FakeStore(entities=[_entity(f"e{i}", name=f"Service {i}") for i in range(20)])
     repo = ArtifactRepository(store)
     result = repo.search("service", limit=5)
     assert len(result.hits) <= 5
 
 
 # ── semantic supplement ───────────────────────────────────────────────────────
+
 
 class _FakeSemantic(SemanticSearchProvider):
     def __init__(self, hits: list[tuple[float, str]]) -> None:
@@ -475,9 +544,7 @@ def test_semantic_supplement_adds_hit_not_in_fts_results() -> None:
     sem = _FakeSemantic([(0.9, "e50")])
     repo = ArtifactRepository(store, semantic_provider=sem)
     result = repo.search("something entirely unrelated to any name")
-    sem_hits = [
-        h for h in result.hits if h.record_type == "entity" and h.record.artifact_id == "e50"
-    ]
+    sem_hits = [h for h in result.hits if h.record_type == "entity" and h.record.artifact_id == "e50"]
     assert len(sem_hits) == 1
 
 

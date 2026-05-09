@@ -99,9 +99,7 @@ def format_entity_markdown(
     ]
     frontmatter_text = _dump_yaml_text(fm_out)
     return (
-        "---\n" + frontmatter_text + "\n---\n\n"
-        + "\n".join(content_lines) + "\n\n"
-        + "\n".join(display_lines) + "\n"
+        "---\n" + frontmatter_text + "\n---\n\n" + "\n".join(content_lines) + "\n\n" + "\n".join(display_lines) + "\n"
     )
 
 
@@ -169,6 +167,8 @@ def format_diagram_puml(
     entity_ids_used: list[str] | None = None,
     connection_ids_used: list[str] | None = None,
     puml_body: str,
+    diagram_entities: dict[str, object] | None = None,
+    diagram_connections: list[dict[str, object]] | None = None,
 ) -> str:
     frontmatter: dict[str, object] = {
         "artifact-id": artifact_id,
@@ -184,6 +184,10 @@ def format_diagram_puml(
         frontmatter["entity-ids-used"] = entity_ids_used
     if connection_ids_used:
         frontmatter["connection-ids-used"] = connection_ids_used
+    if diagram_entities is not None:
+        frontmatter["diagram-entities"] = diagram_entities
+    if diagram_connections is not None:
+        frontmatter["connections"] = diagram_connections
     frontmatter["last-updated"] = last_updated
 
     ordered_keys = [
@@ -196,6 +200,8 @@ def format_diagram_puml(
         "diagram-type",
         "entity-ids-used",
         "connection-ids-used",
+        "diagram-entities",
+        "connections",
         "last-updated",
     ]
     fm_out = {key: frontmatter[key] for key in ordered_keys if key in frontmatter}

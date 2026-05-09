@@ -32,13 +32,15 @@ def register_query_list_read_tools(mcp: FastMCP) -> None:
         title="Artifact Query: List Artifacts",
         description=(
             "List artifacts (metadata-only) with AND-semantics filters. "
-            "Returns lightweight summaries; use artifact_type, domain, "
-            "or status to narrow results. "
-            "Pass fields=[...] to project only the keys you need. "
             "include_record_types defaults to ['entities']. "
-            "Domain filter is case-insensitive; canonical lowercase values: "
-            '"common", "motivation", "strategy", "business", "application", "technology", "implementation".'
-            "\n\nRepo selection: repo_scope defaults to both (engagement + enterprise)."
+            "Pass fields=[...] to project only the keys you need. "
+            "Domain values (case-insensitive): 'common', 'motivation', 'strategy', 'business', "
+            "'application', 'technology', 'implementation'; "
+            "for diagram-only types, domain = diagram type name (e.g. 'activity')."
+            "\n\nhost_diagram_id in results: null = model entity (standalone file, shareable). "
+            "non-null = diagram-only entity (no file; lives in that diagram's diagram-entities; "
+            "path → diagram file; edit via artifact_edit_diagram)."
+            "\n\nrepo_scope defaults to both (engagement + enterprise)."
         ),
         annotations=READ_ONLY,
         structured_output=True,
@@ -86,11 +88,13 @@ def register_query_list_read_tools(mcp: FastMCP) -> None:
         title="Artifact Query: Read Artifact",
         description=(
             "Read one artifact by artifact_id. "
-            "mode='summary' returns frontmatter + a short content snippet; "
-            "mode='full' returns full content and display blocks. "
-            "For documents, supply section= to return only the content "
-            "of a specific ## section (e.g. section='Context')."
-            "\n\nRepo selection: repo_scope defaults to both (engagement + enterprise)."
+            "mode='summary': frontmatter + content snippet. "
+            "mode='full': full content and display blocks. "
+            "section= (documents only): return a specific ## section."
+            "\n\nDiagram-only entities (host_diagram_id present): no standalone file; "
+            "lives inside that diagram's diagram-entities only. "
+            "Edit via artifact_edit_diagram on the owning diagram."
+            "\n\nrepo_scope defaults to both (engagement + enterprise)."
         ),
         annotations=READ_ONLY,
         structured_output=True,
@@ -114,6 +118,10 @@ def register_query_list_read_tools(mcp: FastMCP) -> None:
         result = repo.read_artifact(artifact_id, mode=mode, section=section)
         if result is None:
             return None
+        if result.get("record_type") == "diagram":
+            extra = result.get("extra")
+            if isinstance(extra, dict):
+                result["diagram_entities"] = extra.get("diagram-entities")
         result["repo_roots"] = [str(p) for p in roots]
         result["repo_scope"] = repo_scope
         return result

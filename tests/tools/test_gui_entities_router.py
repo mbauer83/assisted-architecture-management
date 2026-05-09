@@ -218,10 +218,7 @@ def test_entity_rows_emit_hierarchy_metadata_for_specialization_composition_and_
     assert rows[aggregation_child_id]["specialization_depth"] == 1
     assert rows[aggregation_child_id]["all_parents"] == [{"parent_id": parent_id, "relation_type": "aggregation"}]
 
-    assert all(
-        ("parent_entity_id" not in row) or isinstance(row["parent_entity_id"], str)
-        for row in rows.values()
-    )
+    assert all(("parent_entity_id" not in row) or isinstance(row["parent_entity_id"], str) for row in rows.values())
 
 
 def test_entity_rows_emit_all_parents_for_multi_parent_entity(
@@ -405,7 +402,7 @@ def test_document_detail_view_keeps_reference_insert_near_editor_and_confirms_sa
     content = view_path.read_text(encoding="utf-8")
 
     assert content.count("Insert Reference") == 1
-    assert "class=\"bottom-actions\"" in content
+    assert 'class="bottom-actions"' in content
     assert "addToast('Document saved')" in content
 
 
@@ -413,15 +410,13 @@ def test_edit_diagram_view_shows_header_save_actions_and_confirms_save() -> None
     view_path = Path("tools/gui/src/ui/views/EditDiagramView.vue")
     content = view_path.read_text(encoding="utf-8")
 
-    assert "class=\"hdr-actions\"" in content
+    assert 'class="hdr-actions"' in content
     assert "addToast('Diagram saved')" in content
 
 
 def test_promote_view_supports_document_and_diagram_promotion() -> None:
     view_content = Path("tools/gui/src/ui/views/PromoteView.vue").read_text(encoding="utf-8")
-    workflow_content = Path(
-        "tools/gui/src/ui/composables/usePromotionWorkflow.ts"
-    ).read_text(encoding="utf-8")
+    workflow_content = Path("tools/gui/src/ui/composables/usePromotionWorkflow.ts").read_text(encoding="utf-8")
 
     assert "initializeFromRoute" in view_content
     assert "document_ids:" in workflow_content

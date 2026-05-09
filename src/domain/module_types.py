@@ -6,13 +6,13 @@ from typing import ClassVar, Final, NewType, final
 
 EntityTypeName = NewType("EntityTypeName", str)
 ConnectionTypeName = NewType("ConnectionTypeName", str)
-DiagramKindName = NewType("DiagramKindName", str)
+DiagramTypeName = NewType("DiagramTypeName", str)
 ElementClassName = NewType("ElementClassName", str)
 
 
 @final
 class _FreeOntologyType:
-    """Singleton sentinel. Diagram kinds bound here accept entities from any registered ontology."""
+    """Singleton sentinel. Diagram types bound here accept entities from any registered ontology."""
 
     _instance: ClassVar[_FreeOntologyType | None] = None
 

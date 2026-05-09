@@ -86,6 +86,7 @@ def edit_entity(
     fm = parsed.frontmatter
     artifact_type = str(fm.get("artifact-type", ""))
     from src.infrastructure.app_bootstrap import get_module_registry  # noqa: PLC0415
+
     get_module_registry().get_entity_type(EntityTypeName(artifact_type))
     current_name = str(fm.get("name", ""))
     effective_artifact_id = artifact_id

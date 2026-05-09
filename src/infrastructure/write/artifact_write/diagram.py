@@ -15,6 +15,7 @@ from src.application.verification.artifact_verifier import ArtifactVerifier
 from src.application.verification.artifact_verifier_syntax import find_graphviz_dot, find_plantuml_jar
 from src.config.repo_paths import DIAGRAM_CATALOG, DIAGRAMS, RENDERED
 from src.config.settings import plantuml_limit_size, render_dpi
+from src.infrastructure.rendering.puml_safety import strip_leading_puml_frontmatter
 
 from ._artifact_deduplication import extract_friendly_slug, get_repository, validate_diagram_unique
 from .boundary import assert_engagement_write_root
@@ -31,6 +32,27 @@ def _verification_to_dict(path: Path, res) -> dict[str, object]:
             {"severity": i.severity, "code": i.code, "message": i.message, "location": i.location} for i in res.issues
         ],
     }
+
+
+def _render_diagram_entities_puml(
+    diagram_type: str,
+    name: str,
+    diagram_entities: dict[str, object],
+    diagram_connections: list[dict[str, object]] | None,
+    repo_root: Path,
+) -> str:
+    from src.infrastructure.diagram_types import get_diagram_type  # noqa: PLC0415
+
+    diagram_type_mod = get_diagram_type(diagram_type)
+    return diagram_type_mod.renderer.render_body(
+        name,
+        [],
+        [],
+        diagram_type,
+        repo_root,
+        diagram_entities=diagram_entities,
+        diagram_connections=diagram_connections,
+    )
 
 
 def _prepare_archimate_puml_body(puml_body: str, repo_root: Path, diagram_type: str) -> str:
@@ -60,7 +82,7 @@ def _render_diagram_png(puml_path: Path, warnings: list[str]) -> Path | None:
     rendered_dir.mkdir(parents=True, exist_ok=True)
 
     # Extract @startuml..@enduml into a temp file (skip YAML frontmatter)
-    content = puml_path.read_text(encoding="utf-8")
+    content = strip_leading_puml_frontmatter(puml_path.read_text(encoding="utf-8"))
     start = content.find("@startuml")
     end = content.find("@enduml")
     if start == -1 or end == -1:
@@ -143,7 +165,7 @@ def _render_diagram_svg(puml_path: Path, warnings: list[str]) -> Path | None:
     rendered_dir = puml_path.parent.parent / RENDERED
     rendered_dir.mkdir(parents=True, exist_ok=True)
 
-    content = puml_path.read_text(encoding="utf-8")
+    content = strip_leading_puml_frontmatter(puml_path.read_text(encoding="utf-8"))
     start = content.find("@startuml")
     end = content.find("@enduml")
     if start == -1 or end == -1:
@@ -216,6 +238,8 @@ def create_diagram(
     puml: str,
     artifact_id: str | None,
     keywords: list[str] | None = None,
+    diagram_entities: dict[str, object] | None = None,
+    diagram_connections: list[dict[str, object]] | None = None,
     entity_ids_used: list[str] | None = None,
     connection_ids_used: list[str] | None = None,
     version: str,
@@ -228,25 +252,28 @@ def create_diagram(
     assert_engagement_write_root(repo_root)
 
     effective_id = artifact_id
-    if effective_id is None:
-        m = re.search(r"@startuml\s+(\S+)", puml)
-        if m:
-            effective_id = m.group(1).strip()
-    if effective_id is None:
-        effective_id = generate_diagram_id(diagram_type, name)
-
-    puml_body = puml.strip("\n") + "\n"
     warnings: list[str] = []
-
-    if auto_include_stereotypes:
-        puml_body = _prepare_archimate_puml_body(puml_body, repo_root, diagram_type)
-
-    # Auto-layout: insert hidden links and arrow direction hints
-    puml_body = optimize_puml_layout(puml_body)
 
     from .boundary import today_iso
 
     last = last_updated or today_iso()
+
+    if diagram_entities is not None:
+        # Kind-data diagram: generate PUML from the renderer; puml parameter is ignored.
+        puml_body = _render_diagram_entities_puml(diagram_type, name, diagram_entities, diagram_connections, repo_root)
+        if effective_id is None:
+            effective_id = generate_diagram_id(diagram_type, name)
+    else:
+        if effective_id is None:
+            m = re.search(r"@startuml\s+(\S+)", puml)
+            if m:
+                effective_id = m.group(1).strip()
+        if effective_id is None:
+            effective_id = generate_diagram_id(diagram_type, name)
+        puml_body = puml.strip("\n") + "\n"
+        if auto_include_stereotypes:
+            puml_body = _prepare_archimate_puml_body(puml_body, repo_root, diagram_type)
+        puml_body = optimize_puml_layout(puml_body)
 
     content = format_diagram_puml(
         artifact_id=effective_id,
@@ -256,6 +283,8 @@ def create_diagram(
         status=status,
         last_updated=last,
         keywords=keywords,
+        diagram_entities=diagram_entities,
+        diagram_connections=diagram_connections,
         entity_ids_used=entity_ids_used,
         connection_ids_used=connection_ids_used,
         puml_body=puml_body,

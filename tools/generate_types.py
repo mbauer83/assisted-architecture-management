@@ -33,13 +33,13 @@ def main() -> None:
     entity_types = sorted(registry.all_entity_types().keys())
     connection_types = sorted(registry.all_connection_types().keys())
     domain_names = registry.domain_order() + ["unknown"]
-    diagram_kinds = sorted(registry.all_diagram_kinds().keys())
+    diagram_types = sorted(registry.all_diagram_types().keys())
 
     out = _HEADER
     out += _const_array("ENTITY_TYPE_NAMES", "EntityTypeName", entity_types)
     out += _const_array("CONNECTION_TYPE_NAMES", "ConnectionTypeName", connection_types)
     out += _const_array("DOMAIN_NAMES", "DomainName", domain_names)
-    out += _const_array("DIAGRAM_KIND_NAMES", "DiagramKindName", diagram_kinds)
+    out += _const_array("DIAGRAM_TYPE_NAMES", "DiagramTypeName", diagram_types)
 
     _OUTPUT.write_text(out, encoding="utf-8")
     print(f"Generated {_OUTPUT}")

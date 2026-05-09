@@ -25,7 +25,7 @@ def _default_repo_root() -> Path | None:
 
 
 def _build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(prog="arch-model-write")
+    parser = argparse.ArgumentParser(prog="arch-write-cli")
     parser.add_argument(
         "--repo-root",
         default=str(_default_repo_root()) if _default_repo_root() else None,

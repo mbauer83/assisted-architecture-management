@@ -22,7 +22,8 @@ def _schema(repo: Path, *, subdirectory: str | None = None) -> None:
   "name": "Architecture Decision Record"%s,
   "required_sections": ["Context", "Decision", "Consequences"]
 }
-""" % subdirectory_field,
+"""
+        % subdirectory_field,
     )
 
 

@@ -19,6 +19,7 @@ from src.infrastructure.artifact_index import shared_artifact_index
 # Helpers
 # ---------------------------------------------------------------------------
 
+
 def _write(path: Path, content: str) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(content, encoding="utf-8")
@@ -107,6 +108,7 @@ def repo(tmp_path: Path) -> Path:
 # verify_entity_file
 # ---------------------------------------------------------------------------
 
+
 class TestVerifyEntityFile:
     def test_valid_entity_passes(self, repo: Path) -> None:
         eid = "REQ@1000000000.AbcDef.my-req"
@@ -117,7 +119,9 @@ class TestVerifyEntityFile:
 
     def test_missing_artifact_id_field(self, repo: Path) -> None:
         path = repo / "model" / "motivation" / "requirement" / "REQ@1000000001.XxXxXx.bad.md"
-        _write(path, """\
+        _write(
+            path,
+            """\
 ---
 artifact-type: requirement
 name: "Bad"
@@ -135,7 +139,8 @@ element-type: Requirement
 label: "Bad"
 alias: REQ_XxXxXx
 ```
-""")
+""",
+        )
         result = ArtifactVerifier().verify_entity_file(path)
         assert not result.valid
         codes = {i.code for i in result.issues if i.severity == "error"}
@@ -170,9 +175,7 @@ alias: REQ_XxXxXx
     def test_invalid_status_value(self, repo: Path) -> None:
         eid = "REQ@1000000005.AbcDef.bad-status"
         path = repo / "model" / "motivation" / "requirement" / f"{eid}.md"
-        _write(path, _entity(eid, extra_fm="\nbad-status: yes").replace(
-            "status: draft", "status: invalid-value"
-        ))
+        _write(path, _entity(eid, extra_fm="\nbad-status: yes").replace("status: draft", "status: invalid-value"))
         result = ArtifactVerifier().verify_entity_file(path)
         assert not result.valid
         assert any(i.code == "E022" for i in result.issues)
@@ -235,10 +238,12 @@ Consequences.
 # verify_outgoing_file
 # ---------------------------------------------------------------------------
 
+
 class TestVerifyOutgoingFile:
     def _setup_entities(self, repo: Path, *eids_and_types) -> None:
         for eid, etype in eids_and_types:
             from src.domain.ontology_catalog import all_entity_types
+
             info = all_entity_types()[etype]
             path = repo / "model" / Path(*info.hierarchy) / f"{eid}.md"
             _write(path, _entity(eid, etype))
@@ -395,9 +400,7 @@ rectangle "Target" <<Requirement>> as REQ_TgtBbb
         assert not result.valid
         assert any(i.code == "E121" for i in result.issues)
 
-    def test_enterprise_outgoing_cannot_target_engagement_entity(
-        self, tmp_path: Path
-    ) -> None:
+    def test_enterprise_outgoing_cannot_target_engagement_entity(self, tmp_path: Path) -> None:
         eng_root = tmp_path / "engagements" / "ENG-T" / "architecture-repository"
         ent_root = tmp_path / "enterprise-repository"
         (eng_root / "model").mkdir(parents=True)
@@ -468,6 +471,7 @@ class TestVerifyDocumentFile:
             encoding="utf-8",
         )
         from src.domain.ontology_catalog import all_entity_types
+
         entity_id = "FNC@1000000002.AbcDef.function"
         info = all_entity_types()["function"]
         entity_path = repo / "model" / Path(*info.hierarchy) / f"{entity_id}.md"
@@ -499,9 +503,7 @@ class TestVerifyDocumentFile:
         result = ArtifactVerifier(ArtifactRegistry(shared_artifact_index(repo))).verify_document_file(doc_path)
 
         e155_messages = [i.message for i in result.issues if i.code == "E155"]
-        assert e155_messages == [
-            "Required entity-type connection missing: link at least one internal behavior element"
-        ]
+        assert e155_messages == ["Required entity-type connection missing: link at least one internal behavior element"]
 
     def test_required_entity_connection_accepts_all_term(self, repo: Path) -> None:
         _document_schema(repo)
@@ -515,6 +517,7 @@ class TestVerifyDocumentFile:
             encoding="utf-8",
         )
         from src.domain.ontology_catalog import all_entity_types
+
         entity_id = "REQ@1000000003.AbcDef.req"
         info = all_entity_types()["requirement"]
         entity_path = repo / "model" / Path(*info.hierarchy) / f"{entity_id}.md"
@@ -538,6 +541,7 @@ class TestVerifyDocumentFile:
 # ---------------------------------------------------------------------------
 # verify_all
 # ---------------------------------------------------------------------------
+
 
 class TestVerifyAll:
     def test_verify_all_passes_clean_repo(self, repo: Path) -> None:

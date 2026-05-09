@@ -39,14 +39,15 @@ from src.infrastructure.mcp.artifact_mcp.write import sync_ops as _sync_ops
 # Re-export tool functions for direct calling in tests.
 from src.infrastructure.mcp.artifact_mcp.write_tools import (  # noqa: F401
     artifact_add_connection,
+    artifact_authoring_guidance,
     artifact_bulk_delete,
     artifact_create_diagram,
     artifact_create_document,
     artifact_create_entity,
     artifact_create_matrix,
     artifact_edit_document,
+    artifact_help,
     artifact_promote_to_enterprise,
-    artifact_write_help,
 )
 
 _HOST = os.getenv("ARCH_MCP_HOST", "127.0.0.1")

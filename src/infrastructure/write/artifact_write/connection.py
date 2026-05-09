@@ -14,7 +14,10 @@ from .types import WriteResult
 @lru_cache(maxsize=None)
 def _junction_types() -> frozenset[str]:
     from src.infrastructure.app_bootstrap import get_module_registry  # noqa: PLC0415
+
     return frozenset(get_module_registry().entity_types_with_class(ElementClassName("junction")))
+
+
 _CONN_TYPE_RE = re.compile(r"^### (\S+)", re.MULTILINE)
 
 
@@ -92,6 +95,7 @@ def _validate_inputs(
     extra_known_ids: frozenset[str] = frozenset(),
 ) -> None:
     from src.infrastructure.app_bootstrap import get_module_registry  # noqa: PLC0415
+
     if get_module_registry().find_connection_type(ConnectionTypeName(connection_type)) is None:
         raise ValueError(f"Unknown connection type: {connection_type!r}")
     known_ids = registry.entity_ids() | extra_known_ids

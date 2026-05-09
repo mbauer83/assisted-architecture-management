@@ -17,6 +17,7 @@ from src.infrastructure.mcp import mcp_artifact_server as mcp
 # Helpers
 # ---------------------------------------------------------------------------
 
+
 def _write(path: Path, content: str) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(content, encoding="utf-8")
@@ -59,6 +60,7 @@ alias: {prefix}_{rand}
 ```
 """
 
+
 def _git_init(path: Path) -> None:
     path.mkdir(parents=True, exist_ok=True)
     subprocess.run(["git", "init", "-b", "main"], cwd=path, check=True, capture_output=True)
@@ -88,6 +90,7 @@ def enterprise_root(tmp_path: Path) -> Path:
 
 def _make_entity(root: Path, artifact_id: str, artifact_type: str, name: str) -> None:
     from src.domain.ontology_catalog import all_entity_types
+
     info = all_entity_types()[artifact_type]
     path = root / "model" / Path(*info.hierarchy) / f"{artifact_id}.md"
     _write(path, _entity_md(artifact_id, artifact_type, name))
@@ -97,10 +100,9 @@ def _make_entity(root: Path, artifact_id: str, artifact_type: str, name: str) ->
 # Dry-run plan
 # ---------------------------------------------------------------------------
 
+
 class TestPromotionDryRun:
-    def test_dry_run_returns_entities_to_add(
-        self, engagement_root: Path, enterprise_root: Path
-    ) -> None:
+    def test_dry_run_returns_entities_to_add(self, engagement_root: Path, enterprise_root: Path) -> None:
         eng_id = "REQ@1000000001.EngAaa.eng-req"
         _make_entity(engagement_root, eng_id, "requirement", "Eng Req")
 
@@ -115,9 +117,7 @@ class TestPromotionDryRun:
         assert eng_id in result["entities_to_add"]
         assert not result.get("executed")
 
-    def test_dry_run_detects_conflict(
-        self, engagement_root: Path, enterprise_root: Path
-    ) -> None:
+    def test_dry_run_detects_conflict(self, engagement_root: Path, enterprise_root: Path) -> None:
         eng_id = "REQ@1000000001.EngAaa.shared-req"
         ent_id = "REQ@2000000001.EntBbb.shared-req"
         _make_entity(engagement_root, eng_id, "requirement", "Shared Req")
@@ -132,9 +132,7 @@ class TestPromotionDryRun:
 
         assert any(c["engagement_id"] == eng_id for c in result["conflicts"])
 
-    def test_explicit_enterprise_selection_is_reported(
-        self, engagement_root: Path, enterprise_root: Path
-    ) -> None:
+    def test_explicit_enterprise_selection_is_reported(self, engagement_root: Path, enterprise_root: Path) -> None:
         eng_id = "REQ@1000000010.EngAaa.root-req"
         ent_id = "REQ@2000000001.EntBbb.global-req"
         _make_entity(engagement_root, eng_id, "requirement", "Root Req")
@@ -149,9 +147,7 @@ class TestPromotionDryRun:
         )
         assert ent_id in result["already_in_enterprise"]
 
-    def test_exclude_entities_prunes_plan(
-        self, engagement_root: Path, enterprise_root: Path
-    ) -> None:
+    def test_exclude_entities_prunes_plan(self, engagement_root: Path, enterprise_root: Path) -> None:
         eng_id1 = "REQ@1000000001.EngAaa.req1"
         eng_id2 = "REQ@1000000002.EngBbb.req2"
         _make_entity(engagement_root, eng_id1, "requirement", "Req 1")
@@ -172,10 +168,9 @@ class TestPromotionDryRun:
 # Live execution
 # ---------------------------------------------------------------------------
 
+
 class TestPromotionExecute:
-    def test_entity_copied_to_enterprise(
-        self, engagement_root: Path, enterprise_root: Path
-    ) -> None:
+    def test_entity_copied_to_enterprise(self, engagement_root: Path, enterprise_root: Path) -> None:
         eng_id = "REQ@1000000001.EngAaa.live-req"
         _make_entity(engagement_root, eng_id, "requirement", "Live Req")
 
@@ -191,15 +186,11 @@ class TestPromotionExecute:
         ent_file = enterprise_root / "model" / "motivation" / "requirement" / f"{eng_id}.md"
         assert ent_file.exists()
 
-    def test_engagement_entity_replaced_by_grf(
-        self, engagement_root: Path, enterprise_root: Path
-    ) -> None:
+    def test_engagement_entity_replaced_by_grf(self, engagement_root: Path, enterprise_root: Path) -> None:
         eng_id = "REQ@1000000002.EngBbb.to-replace"
         _make_entity(engagement_root, eng_id, "requirement", "To Replace")
 
-        orig_path = (
-            engagement_root / "model" / "motivation" / "requirement" / f"{eng_id}.md"
-        )
+        orig_path = engagement_root / "model" / "motivation" / "requirement" / f"{eng_id}.md"
         assert orig_path.exists()
 
         result = mcp.artifact_promote_to_enterprise(
@@ -216,9 +207,7 @@ class TestPromotionExecute:
         assert grfs, "A GAR proxy should have been created"
         assert any(eng_id in f.read_text() for f in grfs)
 
-    def test_accept_enterprise_conflict_resolution(
-        self, engagement_root: Path, enterprise_root: Path
-    ) -> None:
+    def test_accept_enterprise_conflict_resolution(self, engagement_root: Path, enterprise_root: Path) -> None:
         eng_id = "REQ@1000000003.EngCcc.conflict-req"
         ent_id = "REQ@2000000003.EntDdd.conflict-req"
         _make_entity(engagement_root, eng_id, "requirement", "Conflict Req")
@@ -227,24 +216,22 @@ class TestPromotionExecute:
         result = mcp.artifact_promote_to_enterprise(
             entity_id=eng_id,
             dry_run=False,
-            conflict_resolutions=[{
-                "engagement_id": eng_id,
-                "strategy": "accept_enterprise",
-            }],
+            conflict_resolutions=[
+                {
+                    "engagement_id": eng_id,
+                    "strategy": "accept_enterprise",
+                }
+            ],
             repo_root=str(engagement_root),
             enterprise_root=str(enterprise_root),
         )
 
         assert result["executed"] is True
         # Enterprise file should be unchanged
-        ent_content = (
-            enterprise_root / "model" / "motivation" / "requirement" / f"{ent_id}.md"
-        ).read_text()
+        ent_content = (enterprise_root / "model" / "motivation" / "requirement" / f"{ent_id}.md").read_text()
         assert ent_id in ent_content
 
-    def test_grf_targets_rewritten_in_enterprise_outgoing(
-        self, engagement_root: Path, enterprise_root: Path
-    ) -> None:
+    def test_grf_targets_rewritten_in_enterprise_outgoing(self, engagement_root: Path, enterprise_root: Path) -> None:
         eng_id = "REQ@1000000004.EngEee.main-req"
         grf_id = "GAR@1000000005.GrfFff.grf-ref"
         glo_id = "REQ@2000000005.EntGgg.global-req"
@@ -252,10 +239,10 @@ class TestPromotionExecute:
         _make_entity(engagement_root, eng_id, "requirement", "Main Req")
         _make_entity(enterprise_root, glo_id, "requirement", "Global Req")
         # GAR proxy
-        grf_path = (
-            engagement_root / "model" / "common" / "global-artifact-reference" / f"{grf_id}.md"
-        )
-        _write(grf_path, f"""\
+        grf_path = engagement_root / "model" / "common" / "global-artifact-reference" / f"{grf_id}.md"
+        _write(
+            grf_path,
+            f"""\
 ---
 artifact-id: {grf_id}
 artifact-type: global-artifact-reference
@@ -281,12 +268,12 @@ element-type: ""
 label: "Global Req Ref"
 alias: GAR_GrfFff
 ```
-""")
-        outgoing_path = (
-            engagement_root / "model" / "motivation" / "requirement"
-            / f"{eng_id}.outgoing.md"
+""",
         )
-        _write(outgoing_path, f"""\
+        outgoing_path = engagement_root / "model" / "motivation" / "requirement" / f"{eng_id}.outgoing.md"
+        _write(
+            outgoing_path,
+            f"""\
 ---
 source-entity: {eng_id}
 version: 0.1.0
@@ -297,7 +284,8 @@ last-updated: '2026-04-17'
 <!-- §connections -->
 
 ### archimate-association → {grf_id}
-""")
+""",
+        )
 
         result = mcp.artifact_promote_to_enterprise(
             entity_id=eng_id,
@@ -307,10 +295,7 @@ last-updated: '2026-04-17'
         )
 
         assert result["executed"] is True
-        ent_outgoing = (
-            enterprise_root / "model" / "motivation" / "requirement"
-            / f"{eng_id}.outgoing.md"
-        )
+        ent_outgoing = enterprise_root / "model" / "motivation" / "requirement" / f"{eng_id}.outgoing.md"
         assert ent_outgoing.exists()
         content = ent_outgoing.read_text()
         assert grf_id not in content, "GRF should be rewritten to global entity"

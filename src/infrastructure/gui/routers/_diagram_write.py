@@ -13,11 +13,25 @@ from src.infrastructure.gui.routers._diagram_selection import resolve_diagram_se
 router = APIRouter()
 
 
+def _split_diagram_entities(
+    diagram_entities: dict[str, Any] | None,
+) -> tuple[dict[str, Any] | None, list[dict[str, Any]] | None]:
+    """Separate the transport-only `_connections` key from entity data."""
+    if diagram_entities is None:
+        return None, None
+    conns = diagram_entities.get("_connections")
+    if conns is None:
+        return diagram_entities, None
+    clean = {k: v for k, v in diagram_entities.items() if k != "_connections"}
+    return clean or None, conns if isinstance(conns, list) else None
+
+
 class DiagramPreviewBody(BaseModel):
     diagram_type: str
     name: str
     entity_ids: list[str]
     connection_ids: list[str]
+    diagram_entities: dict[str, Any] | None = None
 
 
 class CreateDiagramGuiBody(BaseModel):
@@ -26,6 +40,7 @@ class CreateDiagramGuiBody(BaseModel):
     entity_ids: list[str]
     connection_ids: list[str]
     keywords: list[str] | None = None
+    diagram_entities: dict[str, Any] | None = None
     version: str = "0.1.0"
     status: str = "draft"
     dry_run: bool = True
@@ -37,6 +52,7 @@ class EditDiagramGuiBody(BaseModel):
     name: str
     entity_ids: list[str]
     connection_ids: list[str]
+    diagram_entities: dict[str, Any] | None = None
     version: str | None = None
     status: str | None = None
     dry_run: bool = True
@@ -56,8 +72,17 @@ def preview_diagram(body: DiagramPreviewBody) -> dict[str, Any]:
 
     repo = s.get_repo()
     entities, connections, _, _ = resolve_diagram_selection(repo, body.entity_ids, body.connection_ids)
-    puml = generate_archimate_puml_body(body.name, entities, connections, diagram_type=body.diagram_type)
-    image, warnings = render_puml_preview(puml, repo_root)
+    de, dc = _split_diagram_entities(body.diagram_entities)
+    puml = generate_archimate_puml_body(
+        body.name,
+        entities,
+        connections,
+        diagram_type=body.diagram_type,
+        repo_root=repo_root,
+        diagram_entities=de,
+        diagram_connections=dc,
+    )
+    image, warnings = render_puml_preview(puml, repo_root, body.diagram_type)
     return {"puml": puml, "image": image, "warnings": warnings}
 
 
@@ -74,7 +99,16 @@ def create_diagram_gui(body: CreateDiagramGuiBody) -> dict[str, Any]:
         body.entity_ids,
         body.connection_ids,
     )
-    puml = generate_archimate_puml_body(body.name, entities, connections, diagram_type=body.diagram_type)
+    de, dc = _split_diagram_entities(body.diagram_entities)
+    puml = generate_archimate_puml_body(
+        body.name,
+        entities,
+        connections,
+        diagram_type=body.diagram_type,
+        repo_root=repo_root,
+        diagram_entities=de,
+        diagram_connections=dc,
+    )
     try:
         result = s.run_serialized_write(
             create_diagram,
@@ -86,6 +120,8 @@ def create_diagram_gui(body: CreateDiagramGuiBody) -> dict[str, Any]:
             puml=puml,
             artifact_id=generate_diagram_id(body.diagram_type, body.name),
             keywords=body.keywords,
+            diagram_entities=de,
+            diagram_connections=dc,
             entity_ids_used=entity_ids_used,
             connection_ids_used=connection_ids_used,
             version=body.version,
@@ -111,7 +147,16 @@ def edit_diagram_gui(body: EditDiagramGuiBody) -> dict[str, Any]:
         body.entity_ids,
         body.connection_ids,
     )
-    puml = generate_archimate_puml_body(body.name, entities, connections, diagram_type=body.diagram_type)
+    de, dc = _split_diagram_entities(body.diagram_entities)
+    puml = generate_archimate_puml_body(
+        body.name,
+        entities,
+        connections,
+        diagram_type=body.diagram_type,
+        repo_root=repo_root,
+        diagram_entities=de,
+        diagram_connections=dc,
+    )
     try:
         result = s.run_serialized_write(
             edit_diagram,
@@ -122,6 +167,8 @@ def edit_diagram_gui(body: EditDiagramGuiBody) -> dict[str, Any]:
             puml=puml,
             name=body.name,
             keywords=...,
+            diagram_entities=de,
+            diagram_connections=dc,
             entity_ids_used=entity_ids_used,
             connection_ids_used=connection_ids_used,
             version=body.version,

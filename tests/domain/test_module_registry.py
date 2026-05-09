@@ -14,6 +14,7 @@ from src.domain.permitted_relationships import PermittedRelationshipSet
 
 # ── Minimal stub implementations ─────────────────────────────────────────────
 
+
 def _entity_type(name: str, domain: str = "test", classes: tuple[str, ...] = ()) -> EntityTypeInfo:
     return EntityTypeInfo(
         artifact_type=name,
@@ -69,7 +70,7 @@ class _StubOntology:
         return False
 
 
-class _StubDiagramKind:
+class _StubDiagramType:
     def __init__(self, name: str) -> None:
         self._name = name
 
@@ -78,26 +79,45 @@ class _StubDiagramKind:
         return self._name
 
     # Protocol methods — minimal stubs
-    def accepts_entity_type(self, t: Any) -> bool: return True
-    def accepts_connection_type(self, t: Any) -> bool: return True
-    def effective_entity_types(self) -> dict: return {}
-    def effective_connection_types(self) -> dict: return {}
+    def accepts_entity_type(self, t: Any) -> bool:
+        return True
+
+    def accepts_connection_type(self, t: Any) -> bool:
+        return True
+
+    def effective_entity_types(self) -> dict:
+        return {}
+
+    def effective_connection_types(self) -> dict:
+        return {}
 
     @property
-    def own_entity_types(self) -> dict: return {}
+    def own_entity_types(self) -> dict:
+        return {}
+
     @property
-    def own_connection_types(self) -> dict: return {}
+    def own_connection_types(self) -> dict:
+        return {}
+
     @property
-    def own_permitted_relationships(self) -> PermittedRelationshipSet: return PermittedRelationshipSet.empty()
+    def own_permitted_relationships(self) -> PermittedRelationshipSet:
+        return PermittedRelationshipSet.empty()
+
     @property
-    def effective_permitted_relationships(self) -> PermittedRelationshipSet: return PermittedRelationshipSet.empty()
+    def effective_permitted_relationships(self) -> PermittedRelationshipSet:
+        return PermittedRelationshipSet.empty()
+
     @property
-    def primary_ontology(self) -> Any: return None
+    def primary_ontology(self) -> Any:
+        return None
+
     @property
-    def renderer(self) -> Any: return None
+    def renderer(self) -> Any:
+        return None
 
 
 # ── Registration tests ────────────────────────────────────────────────────────
+
 
 class TestRegistration:
     def test_register_and_get_ontology(self) -> None:
@@ -132,20 +152,21 @@ class TestRegistration:
         with pytest.raises(KeyError):
             reg.unregister_ontology("no-such")
 
-    def test_register_and_get_diagram_kind(self) -> None:
+    def test_register_and_get_diagram_type(self) -> None:
         reg = ModuleRegistry()
-        dk = _StubDiagramKind("dk-a")
-        reg.register_diagram_kind(dk)
-        assert reg.get_diagram_kind("dk-a") is dk
+        dk = _StubDiagramType("dk-a")
+        reg.register_diagram_type(dk)
+        assert reg.get_diagram_type("dk-a") is dk
 
     def test_register_duplicate_diagram_kind_raises(self) -> None:
         reg = ModuleRegistry()
-        reg.register_diagram_kind(_StubDiagramKind("dk-a"))
+        reg.register_diagram_type(_StubDiagramType("dk-a"))
         with pytest.raises(ValueError, match="already registered"):
-            reg.register_diagram_kind(_StubDiagramKind("dk-a"))
+            reg.register_diagram_type(_StubDiagramType("dk-a"))
 
 
 # ── Query tests ───────────────────────────────────────────────────────────────
+
 
 class TestQueries:
     def test_get_unknown_ontology_raises(self) -> None:
@@ -156,7 +177,7 @@ class TestQueries:
     def test_find_unknown_returns_none(self) -> None:
         reg = ModuleRegistry()
         assert reg.find_ontology("x") is None
-        assert reg.find_diagram_kind("x") is None
+        assert reg.find_diagram_type("x") is None
 
     def test_all_entity_types_merges_across_ontologies(self) -> None:
         reg = ModuleRegistry()
@@ -175,6 +196,7 @@ class TestQueries:
             @property
             def entity_types(self):
                 return {EntityTypeName("et-1"): et1, EntityTypeName("et-2"): et2}
+
             def entity_types_with_class(self, cls):
                 return frozenset(n for n, info in self.entity_types.items() if cls in info.element_classes)
 
@@ -193,6 +215,7 @@ class TestQueries:
             @property
             def connection_types(self):
                 return {ConnectionTypeName("ct-1"): ct1, ConnectionTypeName("ct-2"): ct2}
+
             def connection_types_with_classification(self, clf):
                 return frozenset(n for n, info in self.connection_types.items() if clf in info.classifications)
 

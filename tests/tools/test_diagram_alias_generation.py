@@ -167,7 +167,7 @@ skinparam rectangle<<Process>> {
         encoding="utf-8",
     )
     (catalog / "_archimate-glyphs.puml").write_text(
-        "sprite $archimate_Process <svg xmlns=\"http://www.w3.org/2000/svg\"></svg>\n",
+        'sprite $archimate_Process <svg xmlns="http://www.w3.org/2000/svg"></svg>\n',
         encoding="utf-8",
     )
 
@@ -454,7 +454,7 @@ def test_generate_archimate_puml_body_renders_cardinality_both_ends() -> None:
 
     puml = generate_archimate_puml_body("Test", [goal, outcome], [conn])
 
-    assert '1 -> 0..*' in puml
+    assert "1 -> 0..*" in puml
     assert 'Rel_Realization_Up(OUT_A, GOL_A, "1 -> 0..*")' in puml
 
 

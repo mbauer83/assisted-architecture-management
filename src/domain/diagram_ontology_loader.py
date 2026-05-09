@@ -1,0 +1,137 @@
+"""Loader for diagram type ontology.yaml files."""
+
+from __future__ import annotations
+
+from dataclasses import dataclass
+from pathlib import Path
+from typing import Any
+
+import yaml  # type: ignore[import-untyped]
+
+from src.domain.module_types import ConnectionTypeName, EntityTypeName
+from src.domain.ontology_types import (
+    ConnectionTypeInfo,
+    EntityTypeInfo,
+    PermittedMappingSpec,
+    RequiredConnection,
+)
+from src.domain.permitted_relationships import PermittedRelationshipSet, permitted_connections_from_config
+
+
+@dataclass(frozen=True)
+class DiagramOntology:
+    """Parsed content of a diagram type's ontology.yaml."""
+
+    entity_types: dict[EntityTypeName, EntityTypeInfo]
+    entity_type_properties: dict[str, dict[str, Any]]  # raw properties per entity type
+    connection_types: dict[ConnectionTypeName, ConnectionTypeInfo]
+    permitted_relationships: PermittedRelationshipSet
+
+
+def load_diagram_ontology(path: Path) -> DiagramOntology:
+    with path.open(encoding="utf-8") as fh:
+        raw: dict[str, Any] = yaml.safe_load(fh) or {}
+
+    raw_entity_types: dict[str, Any] = raw.get("entity_types") or {}
+    entity_types = _parse_entity_types(raw_entity_types)
+    entity_type_properties = {
+        name: dict(cfg.get("properties") or {}) for name, cfg in raw_entity_types.items() if isinstance(cfg, dict)
+    }
+    connection_types = _parse_connection_types(raw.get("connection_types") or {})
+    permitted = _parse_permitted_relationships(
+        raw.get("permitted_relationships") or [],
+        entity_types,
+        connection_types,
+    )
+    return DiagramOntology(
+        entity_types=entity_types,
+        entity_type_properties=entity_type_properties,
+        connection_types=connection_types,
+        permitted_relationships=permitted,
+    )
+
+
+def _parse_entity_types(raw: dict[str, Any]) -> dict[EntityTypeName, EntityTypeInfo]:
+    out: dict[EntityTypeName, EntityTypeInfo] = {}
+    for name, info in raw.items():
+        cfg: dict[str, Any] = info or {}
+        req_conns = tuple(
+            _parse_required_connection(rc) for rc in (cfg.get("required_connections") or []) if isinstance(rc, dict)
+        )
+        pm_raw: dict[str, Any] = cfg.get("permitted_mappings") or {}
+        pm_cfg: dict[str, Any] = pm_raw if isinstance(pm_raw, dict) else {}
+        max_val = cfg.get("max")
+        out[EntityTypeName(name)] = EntityTypeInfo(
+            artifact_type=str(name),
+            prefix="",
+            hierarchy=(),
+            element_classes=tuple(str(c) for c in cfg.get("element_classes", ())),
+            create_when=str(cfg.get("create_when") or ""),
+            never_create_when=str(cfg.get("never_create_when") or ""),
+            required_connections=req_conns,
+            min=int(cfg.get("min", 0)),
+            max=None if max_val is None else int(max_val),
+            permitted_mappings=PermittedMappingSpec(
+                entity_types=tuple(str(v) for v in pm_cfg.get("entity_types", ())),
+                entity_classes=tuple(str(v) for v in pm_cfg.get("entity_classes", ())),
+            ),
+            mapping_required=bool(cfg.get("mapping_required", False)),
+        )
+    return out
+
+
+def _parse_required_connection(cfg: dict[str, Any]) -> RequiredConnection:
+    raw_card = cfg.get("cardinality") or [1, 1]
+    card_min = int(raw_card[0]) if raw_card else 1
+    card_max: int | None = int(raw_card[1]) if len(raw_card) > 1 and raw_card[1] is not None else None
+    return RequiredConnection(
+        connection_type=str(cfg["connection_type"]),
+        target=str(cfg["target"]),
+        cardinality_min=card_min,
+        cardinality_max=card_max,
+    )
+
+
+def _parse_connection_types(raw: dict[str, Any]) -> dict[ConnectionTypeName, ConnectionTypeInfo]:
+    out: dict[ConnectionTypeName, ConnectionTypeInfo] = {}
+    for name, info in raw.items():
+        cfg: dict[str, Any] = info or {}
+        embedding = str(cfg.get("embedding") or "none")
+        out[ConnectionTypeName(name)] = ConnectionTypeInfo(
+            artifact_type=str(name),
+            conn_lang="diagram",
+            embedding=embedding,  # type: ignore[arg-type]
+            embed_key=str(cfg["embed_key"]) if cfg.get("embed_key") else None,
+            cascade_delete_source=bool(cfg.get("cascade_delete_source", False)),
+        )
+    return out
+
+
+def _parse_permitted_relationships(
+    rules: list[Any],
+    entity_types: dict[EntityTypeName, EntityTypeInfo],
+    connection_types: dict[ConnectionTypeName, ConnectionTypeInfo],
+) -> PermittedRelationshipSet:
+    class_members: dict[str, list[str]] = {}
+    for ename, info in entity_types.items():
+        for cls in info.element_classes:
+            class_members.setdefault(cls, []).append(str(ename))
+
+    expanded: list[list[Any]] = []
+    for rule in rules:
+        if not isinstance(rule, list) or len(rule) < 3:
+            continue
+        src_raw, tgt_raw, conn_list = rule[0], rule[1], rule[2]
+        sources = _expand_class_ref(src_raw, class_members)
+        targets = _expand_class_ref(tgt_raw, class_members)
+        for src in sources:
+            for tgt in targets:
+                expanded.append([src, tgt, conn_list])
+
+    return permitted_connections_from_config(expanded)  # type: ignore[arg-type]
+
+
+def _expand_class_ref(ref: str, class_members: dict[str, list[str]]) -> list[str]:
+    if isinstance(ref, str) and ref.startswith("@"):
+        return list(class_members.get(ref[1:], []))
+    return [str(ref)]

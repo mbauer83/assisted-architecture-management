@@ -110,6 +110,7 @@ def _build_app(git_ssh_passphrase: str | None = None):  # type: ignore[no-untype
     from src.infrastructure.app_bootstrap import install_module_registry
     from src.infrastructure.gui.routers.admin import router as admin_router
     from src.infrastructure.gui.routers.connections import router as connections_router
+    from src.infrastructure.gui.routers.diagram_types import router as diagram_types_router
     from src.infrastructure.gui.routers.diagrams import router as diagrams_router
     from src.infrastructure.gui.routers.documents import router as documents_router
     from src.infrastructure.gui.routers.entities import router as entities_router
@@ -258,6 +259,7 @@ def _build_app(git_ssh_passphrase: str | None = None):  # type: ignore[no-untype
 
     app.include_router(entities_router)
     app.include_router(connections_router)
+    app.include_router(diagram_types_router)
     app.include_router(diagrams_router)
     app.include_router(documents_router)
     app.include_router(promote_router)

@@ -291,6 +291,39 @@ export const DiagramListSchema = Schema.Struct({
 })
 export type DiagramList = typeof DiagramListSchema.Type
 
+export const DiagramTypeSummarySchema = Schema.Struct({
+  key: Schema.String,
+  label: Schema.String,
+  description: Schema.String,
+})
+export type DiagramTypeSummary = typeof DiagramTypeSummarySchema.Type
+
+export const PermittedMappingSpecSchema = Schema.Struct({
+  entity_types: Schema.Array(Schema.String),
+  entity_classes: Schema.Array(Schema.String),
+})
+export type PermittedMappingSpec = typeof PermittedMappingSpecSchema.Type
+
+export const DiagramOwnEntityTypeUiConfigSchema = Schema.Struct({
+  entity_type: Schema.String,
+  label: Schema.String,
+  plural: Schema.String,
+  min: Schema.Number,
+  max: Schema.NullOr(Schema.Number),
+  permitted_mappings: PermittedMappingSpecSchema,
+  mapping_required: Schema.Boolean,
+})
+export type DiagramOwnEntityTypeUiConfig = typeof DiagramOwnEntityTypeUiConfigSchema.Type
+
+export const DiagramTypeUiConfigSchema = Schema.Struct({
+  label: Schema.String,
+  description: Schema.String,
+  entity_search_filter: Schema.Boolean,
+  diagram_only_types: Schema.Array(DiagramOwnEntityTypeUiConfigSchema),
+  type_ui_slots: Schema.Record({ key: Schema.String, value: Schema.String }),
+})
+export type DiagramTypeUiConfig = typeof DiagramTypeUiConfigSchema.Type
+
 // ── Diagram detail ───────────────────────────────────────────────────────────
 
 export const DiagramDetailSchema = Schema.Struct({
@@ -308,6 +341,7 @@ export const DiagramDetailSchema = Schema.Struct({
   rendered_filename: Schema.optional(Schema.NullOr(Schema.String)),
   entity_ids_used: Schema.optional(Schema.Array(Schema.String)),
   connection_ids_used: Schema.optional(Schema.Array(Schema.String)),
+  diagram_entities: Schema.optional(Schema.Unknown),
   matrix_body: Schema.optional(Schema.String),
   extra: Schema.optional(Schema.Unknown),
 })

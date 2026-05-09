@@ -12,7 +12,8 @@ CREATE TABLE IF NOT EXISTS entities (
     status TEXT NOT NULL, domain TEXT NOT NULL, subdomain TEXT NOT NULL,
     path TEXT NOT NULL, scope TEXT NOT NULL, keywords_json TEXT NOT NULL,
     extra_json TEXT NOT NULL, content_text TEXT NOT NULL,
-    display_blocks_json TEXT NOT NULL, display_label TEXT NOT NULL, display_alias TEXT NOT NULL
+    display_blocks_json TEXT NOT NULL, display_label TEXT NOT NULL, display_alias TEXT NOT NULL,
+    host_diagram_id TEXT
 );
 CREATE TABLE IF NOT EXISTS connections (
     artifact_id TEXT PRIMARY KEY,
@@ -58,6 +59,7 @@ CREATE TABLE IF NOT EXISTS entity_context_stats (
 CREATE INDEX IF NOT EXISTS idx_entities_type ON entities(artifact_type);
 CREATE INDEX IF NOT EXISTS idx_entities_domain ON entities(domain);
 CREATE INDEX IF NOT EXISTS idx_entities_status ON entities(status);
+CREATE INDEX IF NOT EXISTS idx_entities_host_diagram ON entities(host_diagram_id) WHERE host_diagram_id IS NOT NULL;
 CREATE INDEX IF NOT EXISTS idx_connections_source ON connections(source);
 CREATE INDEX IF NOT EXISTS idx_connections_target ON connections(target);
 CREATE INDEX IF NOT EXISTS idx_connections_type ON connections(conn_type);

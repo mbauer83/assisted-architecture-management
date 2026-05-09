@@ -22,15 +22,15 @@ def repo(tmp_path: Path) -> Path:
 
 
 def _make(repo: Path, artifact_type: str, name: str) -> str:
-    r = mcp.artifact_create_entity(artifact_type=artifact_type, name=name,
-                                   dry_run=False, repo_root=str(repo))
+    r = mcp.artifact_create_entity(artifact_type=artifact_type, name=name, dry_run=False, repo_root=str(repo))
     assert r["wrote"], r
     return str(r["artifact_id"])
 
 
 def _connect(repo: Path, src: str, tgt: str, conn_type: str) -> None:
-    mcp.artifact_add_connection(source_entity=src, connection_type=conn_type,
-                                target_entity=tgt, dry_run=False, repo_root=str(repo))
+    mcp.artifact_add_connection(
+        source_entity=src, connection_type=conn_type, target_entity=tgt, dry_run=False, repo_root=str(repo)
+    )
 
 
 def _find(entity_id: str, repo: Path, **kwargs):

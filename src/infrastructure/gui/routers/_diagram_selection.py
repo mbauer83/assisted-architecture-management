@@ -10,6 +10,7 @@ from src.domain.module_types import ElementClassName
 @lru_cache(maxsize=None)
 def _junction_types() -> frozenset[str]:
     from src.infrastructure.app_bootstrap import get_module_registry  # noqa: PLC0415
+
     return frozenset(get_module_registry().entity_types_with_class(ElementClassName("junction")))
 
 

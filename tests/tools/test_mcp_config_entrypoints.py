@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+import tomllib
 
 from src.infrastructure.mcp.mcp_artifact_server import mcp_read, mcp_write
 
@@ -10,6 +11,14 @@ ROOT = Path(__file__).resolve().parents[2]
 
 def _load_json(relative_path: str) -> dict:
     return json.loads((ROOT / relative_path).read_text(encoding="utf-8"))
+
+
+def test_project_scripts_do_not_expose_legacy_arch_model_stdio_aliases() -> None:
+    project = tomllib.loads((ROOT / "pyproject.toml").read_text(encoding="utf-8"))
+    scripts = project["project"]["scripts"]
+
+    assert "arch-model-read" not in scripts
+    assert "arch-model-write" not in scripts
 
 
 def test_checked_in_mcp_configs_use_supported_stdio_entrypoints() -> None:
@@ -40,7 +49,7 @@ def test_read_server_tools_are_marked_read_only() -> None:
 def test_write_server_catalog_and_guidance_are_read_only_yaml_tools() -> None:
     tools = {tool.name: tool for tool in mcp_write._tool_manager.list_tools()}  # type: ignore[attr-defined]
 
-    for name in ("artifact_write_help", "artifact_write_modeling_guidance", "artifact_get_operation"):
+    for name in ("artifact_help", "artifact_authoring_guidance", "artifact_get_operation"):
         tool = tools[name]
         ann = tool.annotations
         assert ann is not None, name

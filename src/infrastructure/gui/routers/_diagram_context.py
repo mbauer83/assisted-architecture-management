@@ -9,7 +9,7 @@ from typing import Any
 from src.application.artifact_parsing import extract_declared_puml_aliases, normalize_puml_alias
 from src.application.entity_type_predicates import is_internal_entity_type
 from src.domain.artifact_types import DiagramRecord, EntityRecord
-from src.infrastructure.diagram_kinds import domain_order, get_diagram_kind
+from src.infrastructure.diagram_types import domain_order, get_diagram_type
 from src.infrastructure.gui.routers import state as s
 
 
@@ -42,8 +42,10 @@ def entity_display_item(rec: EntityRecord) -> dict[str, Any]:
         "name": rec.name,
         "artifact_type": rec.artifact_type,
         "domain": rec.domain,
+        "subdomain": rec.subdomain,
         "status": rec.status,
         "display_alias": rec.display_alias,
+        "element_type": rec.artifact_type,
         "element_label": str(arch_data.get("label") or rec.name),
     }
 
@@ -182,13 +184,21 @@ def hop_suggestions(repo: Any, entity_ids: list[str], *, max_hops: int, limit_pe
     return groups
 
 
-def fuzzy_entity_hits(repo: Any, q: str, limit: int, excluded: set[str]) -> list[dict[str, Any]]:
+def fuzzy_entity_hits(
+    repo: Any,
+    q: str,
+    limit: int,
+    excluded: set[str],
+    accepted_entity_types: set[str] | None = None,
+) -> list[dict[str, Any]]:
     query = q.strip().lower()
     if not query or limit <= 0:
         return []
     scored: list[tuple[float, EntityRecord]] = []
     for rec in repo.list_entities():
         if is_internal_entity_type(rec.artifact_type) or rec.artifact_id in excluded:
+            continue
+        if accepted_entity_types is not None and rec.artifact_type not in accepted_entity_types:
             continue
         haystack = " ".join((rec.name, rec.artifact_type, rec.domain, rec.subdomain, rec.content_text[:400]))
         score = SequenceMatcher(None, query, haystack.lower()).ratio()
@@ -199,7 +209,7 @@ def fuzzy_entity_hits(repo: Any, q: str, limit: int, excluded: set[str]) -> list
 
 
 def diagram_kind_entity_type_items(diagram_type: str) -> list[dict[str, Any]]:
-    kind = get_diagram_kind(diagram_type)
+    kind = get_diagram_type(diagram_type)
     ordered_domains = domain_order()
     items = [
         {
@@ -221,7 +231,7 @@ def diagram_kind_entity_type_items(diagram_type: str) -> list[dict[str, Any]]:
 
 
 def diagram_kind_connection_type_items(diagram_type: str) -> list[dict[str, Any]]:
-    kind = get_diagram_kind(diagram_type)
+    kind = get_diagram_type(diagram_type)
     items = [
         {
             "connection_type": connection_type,

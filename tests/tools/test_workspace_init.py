@@ -23,6 +23,7 @@ class TestParseConfig:
     def test_valid_local_config(self, tmp_path: Path) -> None:
         cfg = {"engagement": {"local": "eng"}, "enterprise": {"local": "ent"}}
         import yaml
+
         f = tmp_path / "arch-workspace.yaml"
         f.write_text(yaml.safe_dump(cfg))
         result = _parse_config(f)
@@ -30,6 +31,7 @@ class TestParseConfig:
 
     def test_missing_enterprise_key_raises(self, tmp_path: Path) -> None:
         import yaml
+
         f = tmp_path / "arch-workspace.yaml"
         f.write_text(yaml.safe_dump({"engagement": {"local": "eng"}}))
         with pytest.raises(SystemExit, match="enterprise"):
@@ -37,6 +39,7 @@ class TestParseConfig:
 
     def test_missing_engagement_key_raises(self, tmp_path: Path) -> None:
         import yaml
+
         f = tmp_path / "arch-workspace.yaml"
         f.write_text(yaml.safe_dump({"enterprise": {"local": "ent"}}))
         with pytest.raises(SystemExit, match="engagement"):
@@ -105,6 +108,7 @@ class TestWriteAndLoadState:
 # resolve_server_roots — env var / init-state priority chain
 # ---------------------------------------------------------------------------
 
+
 class TestResolveServerRoots:
     """Regression tests for the root resolution priority in gui_server.
 
@@ -115,6 +119,7 @@ class TestResolveServerRoots:
 
     def test_explicit_args_take_priority(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         from src.infrastructure.gui.gui_server import resolve_server_roots
+
         eng = tmp_path / "eng-arg"
         ent = tmp_path / "ent-arg"
         monkeypatch.setenv("ARCH_REPO_ROOT", str(tmp_path / "eng-env"))
@@ -127,6 +132,7 @@ class TestResolveServerRoots:
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         from src.infrastructure.gui.gui_server import resolve_server_roots
+
         eng = tmp_path / "eng-env"
         ent = tmp_path / "ent-env"
         monkeypatch.setenv("ARCH_REPO_ROOT", str(eng))
@@ -142,6 +148,7 @@ class TestResolveServerRoots:
     ) -> None:
         """Mirrors the Docker scenario: --repo-root /repo set, ARCH_ENTERPRISE_ROOT=/enterprise-repo."""
         from src.infrastructure.gui.gui_server import resolve_server_roots
+
         ent = tmp_path / "enterprise-repo"
         monkeypatch.setenv("ARCH_ENTERPRISE_ROOT", str(ent))
         monkeypatch.delenv("ARCH_REPO_ROOT", raising=False)
@@ -154,6 +161,7 @@ class TestResolveServerRoots:
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         from src.infrastructure.gui.gui_server import resolve_server_roots
+
         eng = tmp_path / "eng-state"
         ent = tmp_path / "ent-state"
         _write_state(tmp_path, eng, ent)
@@ -164,10 +172,9 @@ class TestResolveServerRoots:
         assert eng_result == eng
         assert ent_result == ent
 
-    def test_returns_none_when_nothing_configured(
-        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
+    def test_returns_none_when_nothing_configured(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         from src.infrastructure.gui.gui_server import resolve_server_roots
+
         monkeypatch.delenv("ARCH_REPO_ROOT", raising=False)
         monkeypatch.delenv("ARCH_ENTERPRISE_ROOT", raising=False)
         monkeypatch.chdir(tmp_path)

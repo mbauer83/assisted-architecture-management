@@ -1,0 +1,325 @@
+# Diagram Type Modules
+
+Each subdirectory is a *diagram type module* — a unit that declares which entity and connection types a diagram view accepts, and how those diagrams are rendered. The system loads all registered kinds at startup and exposes them via the `ModuleRegistry`.
+
+## Structure
+
+```
+src/diagram_types/
+  archimate_application/   ← one domain view
+    __init__.py
+    config.yaml
+  archimate_layered/       ← multi-domain view
+    __init__.py
+    config.yaml
+  activity/                ← UML activity view with swimlane diagram-entities
+    __init__.py
+    config.yaml
+    ontology.yaml          ← activity-specific entity/connection type ontology
+    renderer.py
+  matrix/                  ← free-ontology (accepts all entity types)
+    __init__.py
+    config.yaml
+  _archimate_kind.py       ← config-backed loader for ArchiMate views
+  __init__.py              ← register_default_diagram_types()
+```
+
+## `config.yaml` schema
+
+```yaml
+name: archimate-application          # (required) registry key; matches diagram_type in artifacts
+
+filter:
+  hierarchy_level:
+    index: 0
+    values: [application, common]
+# EntityTypeInfo.hierarchy[0] is the domain/layer segment under model/.
+# Omit filter entirely for free-ontology kinds that accept everything.
+
+includes:
+  - _archimate-stereotypes.puml      # PlantUML include files injected into every rendered diagram
+  - _archimate-glyphs.puml           # relative to the diagram-catalog/ include root
+
+grouping:
+  by_field: hierarchy_0              # groups entities by EntityTypeInfo.hierarchy[0]
+  stereotype_pattern: "{hierarchy_0|capitalize}Grouping"
+  # PlantUML stereotype for the frame; {hierarchy_0|capitalize} → "ApplicationGrouping"
+
+layout:
+  nesting_connection_classes: [nesting]
+  # Connection classes (from element_classes in entities.yaml) that produce visual nesting in the
+  # rendered diagram. Connections of these classes draw child entities inside parent frames.
+
+  flow_connection_classes: [flow]
+  # Connection classes that produce directed flow arrows (as opposed to structural lines).
+
+guidance:
+  when_to_use: >-
+    Human-readable prose: when an author should choose this diagram type.
+  when_not_to_use: >-
+    Human-readable prose: when to prefer another diagram type instead.
+  # Consumed by write_guidance() and returned to AI agents via artifact_authoring_guidance().
+
+element_classes:                     # element class vocabulary for this diagram type
+  step:
+    description: An entity type that can appear in a steps/sequence array
+  grouping:
+    description: A grouping or partitioning entity
+
+ui:
+  label: "Application View"
+  description: "Application-layer ArchiMate view"
+  entity_search_filter: true
+  diagram_only_types: []             # see "Diagram-only entity types" below
+  type_ui_slots: {}
+```
+
+All fields except `name` are optional. Omitting a field uses the built-in default (empty lists, no grouping, no layout hints).
+
+## Diagram-only entity types
+
+Some diagram types own entity types that exist only within the diagram's `diagram-entities:` frontmatter — they are never written to the model entity store. Each such entity type is declared in two places:
+
+- **`ontology.yaml`** — the authoritative source for all structural and semantic fields: element classes, properties, connection types, cardinality constraints, permitted mappings, and authoring guidance.
+- **`config.yaml`** — UI metadata only: the display label and plural form.
+
+### `config.yaml` entries (UI metadata only)
+
+```yaml
+ui:
+  diagram_only_types:
+    - entity_type: swimlane   # must match an entity_type declared in ontology.yaml
+      label: Swimlane         # display label shown in the UI
+      plural: Swimlanes       # plural form (for UI lists)
+```
+
+The `config.yaml` entry intentionally contains **only** `entity_type`, `label`, and `plural`. All other fields (`min`, `max`, `create_when`, `never_create_when`, `permitted_mappings`, `mapping_required`, `element_classes`, `properties`, `required_connections`) belong in `ontology.yaml` and are merged in at load time.
+
+## `ontology.yaml` schema
+
+Diagram types with custom entity types declare an `ontology.yaml` alongside `config.yaml`. This file is the authoritative source for diagram-owned entity types and connection types.
+
+```yaml
+connection_types:
+  step-note-of:
+    embedding: property        # "property": annotation entities embed their schema in host $defs
+    embed_key: note            # the property name injected into the host's schema
+    cascade_delete_source: true  # host deleted → annotation deleted
+
+  swimlane-maps-to: {}         # plain reference connection; no structural effect
+
+entity_types:
+  swimlane:
+    element_classes: [grouping]
+    min: 2                     # minimum cardinality (0 = optional)
+    max: null                  # maximum cardinality (null = unlimited)
+    create_when: >-
+      Represents one parallel track in the process.
+    never_create_when: >-
+      Do not create when the process has only one actor.
+    permitted_mappings:
+      entity_types: [role, business-actor, application-component]
+      entity_classes: []
+    mapping_required: false
+    properties: {}
+
+  action:
+    element_classes: [control-flow, step]
+    create_when: "Use for a single task performed by one actor in one lane."
+    never_create_when: "Do not use for branching logic."
+    required_connections:
+      - connection_type: step-in-lane
+        target: swimlane
+        cardinality: [0, 1]
+    properties:
+      link: {type: string, required: false}
+
+  note:
+    element_classes: [annotation]
+    required_connections:
+      - connection_type: step-note-of
+        target: "@step"       # @class-name or concrete entity type name
+        cardinality: [1, 1]   # [min, max]; null max = unbounded
+    properties:
+      side: {type: string, enum: [left, right], required: false}
+      text: {type: string, required: true}
+
+permitted_relationships:
+  - [swimlane, business-actor, [swimlane-maps-to]]
+  - [swimlane, role,           [swimlane-maps-to]]
+```
+
+### `connection_types`
+
+`embedding` values: `property` | `array` | `none` (default). When `embedding: property`, the annotation entity type's schema is injected as a named property (using `embed_key`) into the `$defs` of each host entity type in the generated diagram-entities schema. Connection types without `embedding` are plain reference connections.
+
+### `entity_types`
+
+| Field | Purpose |
+|---|---|
+| `element_classes` | Classification tags; control which diagram type filters include this type |
+| `min` / `max` | Cardinality bounds across the whole diagram |
+| `create_when` / `never_create_when` | AI and human authoring guidance |
+| `permitted_mappings` | Which model entity types/classes this diagram entity may reference via `entity_id` |
+| `mapping_required` | Whether a model-entity link is mandatory |
+| `required_connections` | Mandatory connections; drives annotation schema injection |
+| `properties` | Domain-specific JSON Schema fragments; `required: false` omits from `required` array |
+
+### Kind-data array keys
+
+Each entity type declared in `ontology.yaml` gets **its own top-level array in the diagram-entities**, keyed by the entity type name:
+
+```yaml
+# diagram-entities: frontmatter in a diagram artifact
+diagram-entities:
+  swimlane:
+    - {id: sw-1, label: Customer}
+    - {id: sw-2, label: System}
+  action:
+    - {id: a1, label: Submit}
+    - {id: a2, label: Process}
+  note:
+    - {id: n1, text: Review required, side: right}
+```
+
+Structural relationships between diagram entities are **not** stored as properties on the entity. They are stored in `connections:` as a flat list of connection objects, parallel to `diagram-entities:`:
+
+```yaml
+# connections: frontmatter in a diagram artifact
+connections:
+  - id: kc-1
+    conn_type: step-in-lane
+    source: a1
+    target: sw-1
+  - id: kc-2
+    conn_type: step-in-lane
+    source: a2
+    target: sw-2
+  - id: kc-3
+    conn_type: step-note-of
+    source: n1
+    target: a1
+```
+
+Each entry has `id` (unique within the diagram), `conn_type`, `source`, and `target` — all local IDs within `diagram-entities:`. At render time these are loaded as `ConnectionRecord` objects and passed to the renderer alongside the diagram's model-level connections. Renderers build lookup indexes (step→lane, step→note) from them.
+
+`connections` entries exist only within the diagram file. They are never written to the model connection store and have no standalone artifact file.
+
+### `$defs` in schemas
+
+The schema generator produces one `$defs/<entity_type>` entry per entity type, built from its declared `properties`. For annotation types with `embedding: property`, the annotation's schema is additionally injected under `$defs/<host_entity_type>.properties.<embed_key>`.
+
+### Element class declarations
+
+Element classes must be declared in `config.yaml` under `element_classes:` before use in `ontology.yaml`. Unknown class references abort startup validation.
+
+## Element-class filter table
+
+For ArchiMate-style domain views, `filter.hierarchy_level` selects entity types by a hierarchy segment. The common domain filter uses `index: 0`, which compares `EntityTypeInfo.hierarchy[0]` against the configured values. Only matching entity types are included in `effective_entity_types()` and shown in the entity picker.
+
+| Domain | `filter.hierarchy_level.values` value |
+|---|---|
+| Motivation | `motivation` |
+| Strategy | `strategy` |
+| Business | `business` |
+| Application | `application` |
+| Technology | `technology` |
+| Implementation | `implementation` |
+| Common (cross-domain) | `common` |
+
+The `archimate-layered` kind accepts all domains and therefore lists the full vocabulary.
+
+## When a custom `renderer.py` is needed
+
+The `GenericPumlRenderer` (in `src/infrastructure/rendering/generic_puml_renderer.py`) handles all standard ArchiMate-style views using only `config.yaml`. You do **not** need a custom renderer for:
+- Any domain view (motivation, strategy, business, application, technology, implementation, layered)
+- Views that add or remove hierarchy filter values
+- Views with different `includes`, `grouping`, or `layout` settings
+
+You **do** need a custom renderer (implementing the `DiagramRenderer` protocol) when:
+- The diagram format is not PlantUML ArchiMate (e.g. ER diagrams, sequence diagrams, matrix tables)
+- The rendering logic requires entity-specific logic that cannot be expressed via config
+- You are building a diagram type for a non-ArchiMate ontology with its own notation
+- The diagram type owns diagram-scoped state in `diagram-entities` that affects rendering, such as activity swimlanes
+
+The `matrix` diagram type is an example: it uses `_MatrixRenderer` that raises `ValueError` on `render_body` because matrix diagrams use a separate Markdown rendering path, not PlantUML. See `src/diagram_types/matrix/__init__.py`.
+
+## Adding a new diagram type
+
+### Step 1 — Create the package directory
+
+```
+src/diagram_types/my_view/
+  __init__.py
+  config.yaml
+```
+
+### Step 2 — Write `config.yaml`
+
+```yaml
+name: my-view
+filter:
+  hierarchy_level:
+    index: 0
+    values: [application, technology]
+includes:
+  - _archimate-stereotypes.puml
+  - _archimate-glyphs.puml
+grouping:
+  by_field: hierarchy_0
+  stereotype_pattern: "{hierarchy_0|capitalize}Grouping"
+layout:
+  nesting_connection_classes: [nesting]
+  flow_connection_classes: [flow]
+guidance:
+  when_to_use: "Use when ..."
+  when_not_to_use: "Do not use when ..."
+ui:
+  label: "My View"
+  description: "A concise label for the diagram type picker"
+  entity_search_filter: true
+  diagram_only_types: []
+  type_ui_slots: {}
+```
+
+### Step 3 — Implement `__init__.py`
+
+For standard ArchiMate-style views, re-use the built-in loader:
+
+```python
+# src/diagram_types/my_view/__init__.py
+from __future__ import annotations
+
+from pathlib import Path
+from src.diagram_types._archimate_type import load_archimate_diagram_type
+from src.domain.ontology_protocol import DiagramTypeModule
+
+module: DiagramTypeModule = load_archimate_diagram_type(Path(__file__).parent)
+```
+
+### Step 4 — Register the module
+
+In `src/diagram_types/__init__.py`, add the import and register call:
+
+```python
+from src.diagram_types.my_view import module as my_view
+
+def register_default_diagram_types(registry: ModuleRegistry) -> None:
+    for module in [..., my_view]:
+        registry.register_diagram_type(module)
+```
+
+### Step 5 — Verify
+
+The protocol compliance test in `tests/domain/test_protocol_compliance.py` automatically checks every registered diagram type. Run `uv run pytest tests/` — the new kind must pass all checks without modification.
+
+## Protocol contract
+
+Every diagram type must satisfy the `DiagramTypeModule` protocol (`src/domain/ontology_protocol.py`). Compliance is verified automatically on every test run:
+
+- `isinstance(module, DiagramTypeModule)` must return `True`
+- `module.name` must equal the key under which the module is registered
+- `effective_entity_types()` must only return types present in the global registry
+- `effective_connection_types()` must only return types present in the global registry
+- `accepts_entity_type(t)` must return `True` for every `t` in `effective_entity_types()`
+- `accepts_connection_type(t)` must return `True` for every `t` in `effective_connection_types()`

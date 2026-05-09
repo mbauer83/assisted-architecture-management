@@ -24,9 +24,7 @@ def _entity(
     domain: str = "motivation",
     subdomain: str = "goals",
 ) -> EntityRecord:
-    display_blocks = {
-        "archimate": f"```yaml\nlabel: \"{name}\"\nalias: {alias}\n```"
-    }
+    display_blocks = {"archimate": f'```yaml\nlabel: "{name}"\nalias: {alias}\n```'}
     return EntityRecord(
         artifact_id=artifact_id,
         artifact_type=artifact_type,
@@ -93,12 +91,20 @@ def test_render_body_renders_junction_inside_nested_parent(tmp_path: Path) -> No
     renderer = GenericPumlRenderer(_ARCHIMATE_CONFIG)
     process = _entity("PRC@1.a.process-a", "process", "Process A", "PRC_A", domain="business", subdomain="processes")
     function_a = _entity(
-        "FNC@1.a.function-a", "function", "Function A", "FNC_A",
-        domain="business", subdomain="functions",
+        "FNC@1.a.function-a",
+        "function",
+        "Function A",
+        "FNC_A",
+        domain="business",
+        subdomain="functions",
     )
     function_b = _entity(
-        "FNC@1.b.function-b", "function", "Function B", "FNC_B",
-        domain="business", subdomain="functions",
+        "FNC@1.b.function-b",
+        "function",
+        "Function B",
+        "FNC_B",
+        domain="business",
+        subdomain="functions",
     )
     junction = _entity("JNA@1.a.and-a", "and-junction", "AND A", "JNA_A", domain="business", subdomain="junctions")
 
@@ -168,7 +174,7 @@ skinparam rectangle<<Process>> {
         encoding="utf-8",
     )
     (catalog / "_archimate-glyphs.puml").write_text(
-        "sprite $archimate_Process <svg xmlns=\"http://www.w3.org/2000/svg\"></svg>\n",
+        'sprite $archimate_Process <svg xmlns="http://www.w3.org/2000/svg"></svg>\n',
         encoding="utf-8",
     )
     renderer = GenericPumlRenderer(_ARCHIMATE_CONFIG)

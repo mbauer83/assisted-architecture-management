@@ -10,7 +10,12 @@ from src.config.repo_paths import DIAGRAM_CATALOG, DIAGRAMS
 
 from .boundary import assert_engagement_write_root, today_iso
 from .coerce import as_optional_str_list
-from .diagram import _prepare_archimate_puml_body, _render_diagram_png, _render_diagram_svg
+from .diagram import (
+    _prepare_archimate_puml_body,
+    _render_diagram_entities_puml,
+    _render_diagram_png,
+    _render_diagram_svg,
+)
 from .parse_existing import parse_diagram_file
 from .types import WriteResult
 from .verify import verify_content_in_temp_path
@@ -36,6 +41,8 @@ def edit_diagram(
     puml: str | None = None,
     name: str | None = None,
     keywords: list[str] | None = ...,  # type: ignore[assignment]
+    diagram_entities: dict[str, object] | None = None,
+    diagram_connections: list[dict[str, object]] | None = None,
     entity_ids_used: list[str] | None = None,
     connection_ids_used: list[str] | None = None,
     version: str | None = None,
@@ -62,10 +69,20 @@ def edit_diagram(
     eff_version = version if version is not None else str(fm.get("version", "0.1.0"))
     eff_status = status if status is not None else str(fm.get("status", "draft"))
     eff_keywords = keywords if keywords is not ... else as_optional_str_list(fm.get("keywords"))
+    eff_diagram_entities = diagram_entities if diagram_entities is not None else fm.get("diagram-entities")
+    eff_diagram_connections = diagram_connections if diagram_connections is not None else fm.get("connections")
     diagram_type = str(fm.get("diagram-type", "archimate"))
 
     # Determine PUML body
-    if puml is not None:
+    if eff_diagram_entities is not None and isinstance(eff_diagram_entities, dict) and puml is None:
+        puml_body = _render_diagram_entities_puml(
+            diagram_type,
+            eff_name,
+            eff_diagram_entities,
+            eff_diagram_connections if isinstance(eff_diagram_connections, list) else None,
+            repo_root,
+        )
+    elif puml is not None:
         puml_body = puml.strip("\n") + "\n"
         puml_body = _prepare_archimate_puml_body(puml_body, repo_root, diagram_type)
         # optimize_puml_layout is idempotent: it skips when [hidden] links are
@@ -82,6 +99,8 @@ def edit_diagram(
         status=eff_status,
         last_updated=today_iso(),
         keywords=eff_keywords,
+        diagram_entities=eff_diagram_entities if isinstance(eff_diagram_entities, dict) else None,
+        diagram_connections=eff_diagram_connections if isinstance(eff_diagram_connections, list) else None,
         entity_ids_used=entity_ids_used
         if entity_ids_used is not None
         else as_optional_str_list(fm.get("entity-ids-used")),

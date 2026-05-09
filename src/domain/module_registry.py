@@ -1,19 +1,19 @@
-"""ModuleRegistry — single authority for all registered ontologies and diagram kinds."""
+"""ModuleRegistry — single authority for all registered ontologies and diagram types."""
 
 from __future__ import annotations
 
 from collections.abc import Mapping
 
 from src.domain.module_types import ConnectionTypeName, ElementClassName, EntityTypeName
-from src.domain.ontology_protocol import DiagramKindModule, OntologyModule
-from src.domain.ontology_types import ConnectionTypeInfo, EntityTypeInfo
+from src.domain.ontology_protocol import DiagramTypeModule, OntologyModule
+from src.domain.ontology_types import ConnectionTypeInfo, ElementClassInfo, EntityTypeInfo
 from src.domain.permitted_relationships import PermittedRelationshipSet
 
 
 class ModuleRegistry:
     def __init__(self) -> None:
         self._ontologies: dict[str, OntologyModule] = {}
-        self._diagram_kinds: dict[str, DiagramKindModule] = {}
+        self._diagram_types: dict[str, DiagramTypeModule] = {}
 
     # ── Registration ─────────────────────────────────────────────────────────
 
@@ -30,18 +30,18 @@ class ModuleRegistry:
     def replace_ontology(self, module: OntologyModule) -> None:
         self._ontologies[module.name] = module
 
-    def register_diagram_kind(self, module: DiagramKindModule) -> None:
-        if module.name in self._diagram_kinds:
-            raise ValueError(f"DiagramKind '{module.name}' already registered; use replace_diagram_kind")
-        self._diagram_kinds[module.name] = module
+    def register_diagram_type(self, module: DiagramTypeModule) -> None:
+        if module.name in self._diagram_types:
+            raise ValueError(f"DiagramType '{module.name}' already registered; use replace_diagram_type")
+        self._diagram_types[module.name] = module
 
-    def unregister_diagram_kind(self, name: str) -> None:
-        if name not in self._diagram_kinds:
+    def unregister_diagram_type(self, name: str) -> None:
+        if name not in self._diagram_types:
             raise KeyError(name)
-        del self._diagram_kinds[name]
+        del self._diagram_types[name]
 
-    def replace_diagram_kind(self, module: DiagramKindModule) -> None:
-        self._diagram_kinds[module.name] = module
+    def replace_diagram_type(self, module: DiagramTypeModule) -> None:
+        self._diagram_types[module.name] = module
 
     # ── Ontology queries ──────────────────────────────────────────────────────
 
@@ -57,19 +57,19 @@ class ModuleRegistry:
     def all_ontologies(self) -> Mapping[str, OntologyModule]:
         return dict(self._ontologies)
 
-    # ── Diagram kind queries ──────────────────────────────────────────────────
+    # ── Diagram type queries ──────────────────────────────────────────────────
 
-    def get_diagram_kind(self, name: str) -> DiagramKindModule:
+    def get_diagram_type(self, name: str) -> DiagramTypeModule:
         try:
-            return self._diagram_kinds[name]
+            return self._diagram_types[name]
         except KeyError:
-            raise KeyError(f"No diagram kind registered with name '{name}'")
+            raise KeyError(f"No diagram type registered with name '{name}'")
 
-    def find_diagram_kind(self, name: str) -> DiagramKindModule | None:
-        return self._diagram_kinds.get(name)
+    def find_diagram_type(self, name: str) -> DiagramTypeModule | None:
+        return self._diagram_types.get(name)
 
-    def all_diagram_kinds(self) -> Mapping[str, DiagramKindModule]:
-        return dict(self._diagram_kinds)
+    def all_diagram_types(self) -> Mapping[str, DiagramTypeModule]:
+        return dict(self._diagram_types)
 
     # ── Aggregated type queries ───────────────────────────────────────────────
 
@@ -115,9 +115,7 @@ class ModuleRegistry:
             result.update(om.entity_types_with_class(cls))
         return frozenset(result)
 
-    def connection_types_with_classification(
-        self, classification: str
-    ) -> frozenset[ConnectionTypeName]:
+    def connection_types_with_classification(self, classification: str) -> frozenset[ConnectionTypeName]:
         result: set[ConnectionTypeName] = set()
         for om in self._ontologies.values():
             result.update(om.connection_types_with_classification(classification))
@@ -133,6 +131,39 @@ class ModuleRegistry:
         result = PermittedRelationshipSet.empty()
         for om in self._ontologies.values():
             result = result | om.permitted_relationships
+        return result
+
+    def all_diagram_entity_types(self) -> frozenset[EntityTypeName]:
+        """Return every entity type name that belongs to a diagram type (not the model ontology)."""
+        names: set[EntityTypeName] = set()
+        for dk in self._diagram_types.values():
+            for oe in dk.ui_config.diagram_only_types:
+                names.add(EntityTypeName(oe.entity_type))
+        return frozenset(names)
+
+    def is_diagram_entity_type(self, name: EntityTypeName) -> bool:
+        """Return True if ``name`` is an entity type owned by any registered diagram type."""
+        return name in self.all_diagram_entity_types()
+
+    def all_element_classes(self) -> dict[str, ElementClassInfo]:
+        """Merge element class declarations from all ontology and diagram type modules.
+
+        Raises ValueError on duplicate class name declared by different sources.
+        """
+        result: dict[str, ElementClassInfo] = {}
+        for om in self._ontologies.values():
+            for name, info in om.element_classes.items():
+                if name in result:
+                    raise ValueError(f"Duplicate element class {name!r} declared by multiple ontology modules")
+                result[name] = info
+        for dk in self._diagram_types.values():
+            for name, info in dk.element_classes.items():
+                if name in result:
+                    raise ValueError(
+                        f"Duplicate element class {name!r} declared by module {dk.name!r} "
+                        f"conflicts with an existing declaration"
+                    )
+                result[name] = info
         return result
 
     # ── Domain ordering ───────────────────────────────────────────────────────

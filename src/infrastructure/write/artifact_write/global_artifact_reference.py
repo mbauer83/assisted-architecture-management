@@ -55,6 +55,7 @@ def ensure_global_artifact_reference(
     if existing is not None:
         from src.infrastructure.app_bootstrap import get_module_registry  # noqa: PLC0415
         from src.infrastructure.write.artifact_write.entity import entity_path  # noqa: PLC0415
+
         gar_info = get_module_registry().get_entity_type(EntityTypeName(_GAR_TYPE))
         path = entity_path(engagement_root, gar_info, existing)
         return WriteResult(
@@ -74,6 +75,7 @@ def ensure_global_artifact_reference(
         _alias_for,
         entity_path,
     )
+
     path = entity_path(engagement_root, info, eid)
     alias = _alias_for(info, eid)
 

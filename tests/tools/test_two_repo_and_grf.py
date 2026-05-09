@@ -29,6 +29,7 @@ from src.infrastructure.mcp import mcp_artifact_server as mcp_tools
 # Fixtures
 # ---------------------------------------------------------------------------
 
+
 def _write(path: Path, content: str) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(content, encoding="utf-8")
@@ -83,7 +84,7 @@ Test entity.
 domain: Motivation
 element-type: Requirement
 label: "{name}"
-alias: {prefix}_{artifact_id.split('.')[1] if '.' in artifact_id else 'TEST'}
+alias: {prefix}_{artifact_id.split(".")[1] if "." in artifact_id else "TEST"}
 ```
 """
 
@@ -123,9 +124,7 @@ alias: GAR_{rand}
 
 def _outgoing_md(source_entity: str, connections: list[tuple[str, str]]) -> str:
     """connections: list of (conn_type, target_id)"""
-    sections = "\n".join(
-        f"### {ctype} → {tid}\n" for ctype, tid in connections
-    )
+    sections = "\n".join(f"### {ctype} → {tid}\n" for ctype, tid in connections)
     return f"""\
 ---
 source-entity: {source_entity}
@@ -159,18 +158,15 @@ def enterprise_root(tmp_path: Path) -> Path:
 # Two-repo loading
 # ---------------------------------------------------------------------------
 
+
 class TestTwoRepoLoading:
-    def test_entities_from_both_repos_visible(
-        self, engagement_root: Path, enterprise_root: Path
-    ) -> None:
+    def test_entities_from_both_repos_visible(self, engagement_root: Path, enterprise_root: Path) -> None:
         _write(
-            engagement_root / "model" / "motivation" / "requirements"
-            / "REQ@1000000000.EngAAA.eng-req.md",
+            engagement_root / "model" / "motivation" / "requirements" / "REQ@1000000000.EngAAA.eng-req.md",
             _entity_md("REQ@1000000000.EngAAA.eng-req", "requirement", "Eng Req"),
         )
         _write(
-            enterprise_root / "model" / "motivation" / "requirements"
-            / "REQ@2000000000.GloAAA.global-req.md",
+            enterprise_root / "model" / "motivation" / "requirements" / "REQ@2000000000.GloAAA.global-req.md",
             _entity_md("REQ@2000000000.GloAAA.global-req", "requirement", "Global Req"),
         )
 
@@ -179,17 +175,9 @@ class TestTwoRepoLoading:
         assert "REQ@1000000000.EngAAA.eng-req" in ids
         assert "REQ@2000000000.GloAAA.global-req" in ids
 
-    def test_is_global_via_path(
-        self, engagement_root: Path, enterprise_root: Path
-    ) -> None:
-        eng_file = (
-            engagement_root / "model" / "motivation" / "requirements"
-            / "REQ@1000000000.EngAAA.eng-req.md"
-        )
-        ent_file = (
-            enterprise_root / "model" / "motivation" / "requirements"
-            / "REQ@2000000000.GloAAA.global-req.md"
-        )
+    def test_is_global_via_path(self, engagement_root: Path, enterprise_root: Path) -> None:
+        eng_file = engagement_root / "model" / "motivation" / "requirements" / "REQ@1000000000.EngAAA.eng-req.md"
+        ent_file = enterprise_root / "model" / "motivation" / "requirements" / "REQ@2000000000.GloAAA.global-req.md"
         _write(eng_file, _entity_md("REQ@1000000000.EngAAA.eng-req", "requirement", "E"))
         _write(ent_file, _entity_md("REQ@2000000000.GloAAA.global-req", "requirement", "G"))
 
@@ -200,17 +188,13 @@ class TestTwoRepoLoading:
         assert not eng_rec.path.is_relative_to(enterprise_root)
         assert ent_rec.path.is_relative_to(enterprise_root)
 
-    def test_registry_scope_classification(
-        self, engagement_root: Path, enterprise_root: Path
-    ) -> None:
+    def test_registry_scope_classification(self, engagement_root: Path, enterprise_root: Path) -> None:
         _write(
-            engagement_root / "model" / "motivation" / "requirements"
-            / "REQ@1000000000.EngAAA.eng-req.md",
+            engagement_root / "model" / "motivation" / "requirements" / "REQ@1000000000.EngAAA.eng-req.md",
             _entity_md("REQ@1000000000.EngAAA.eng-req", "requirement", "E"),
         )
         _write(
-            enterprise_root / "model" / "motivation" / "requirements"
-            / "REQ@2000000000.GloAAA.global-req.md",
+            enterprise_root / "model" / "motivation" / "requirements" / "REQ@2000000000.GloAAA.global-req.md",
             _entity_md("REQ@2000000000.GloAAA.global-req", "requirement", "G"),
         )
         registry = ArtifactRegistry(shared_artifact_index([engagement_root, enterprise_root]))
@@ -222,10 +206,9 @@ class TestTwoRepoLoading:
 # GAR creation
 # ---------------------------------------------------------------------------
 
+
 class TestGrfCreation:
-    def test_ensure_creates_new_grf(
-        self, engagement_root: Path, enterprise_root: Path
-    ) -> None:
+    def test_ensure_creates_new_grf(self, engagement_root: Path, enterprise_root: Path) -> None:
         from src.infrastructure.write.artifact_write.global_artifact_reference import ensure_global_artifact_reference
 
         repo = ArtifactRepository(shared_artifact_index(engagement_root))
@@ -245,9 +228,7 @@ class TestGrfCreation:
         content = result.path.read_text()
         assert "global-artifact-id: REQ@2000000000.GloAAA.global-req" in content
 
-    def test_ensure_reuses_existing_grf(
-        self, engagement_root: Path
-    ) -> None:
+    def test_ensure_reuses_existing_grf(self, engagement_root: Path) -> None:
         from src.infrastructure.artifact_index import notify_paths_changed
         from src.infrastructure.write.artifact_write.global_artifact_reference import ensure_global_artifact_reference
 
@@ -304,14 +285,14 @@ class TestGrfCreation:
 # Verifier GAR rules
 # ---------------------------------------------------------------------------
 
+
 class TestGrfVerifierRules:
     def test_grf_valid_with_enterprise_registry(
         self, engagement_root: Path, enterprise_root: Path, tmp_path: Path
     ) -> None:
         global_id = "REQ@2000000000.GloAAA.global-req"
         _write(
-            enterprise_root / "model" / "motivation" / "requirements"
-            / f"{global_id}.md",
+            enterprise_root / "model" / "motivation" / "requirements" / f"{global_id}.md",
             _entity_md(global_id, "requirement", "Global Req"),
         )
         gar_id = "GAR@1000000001.AbcDef.global-req"
@@ -324,9 +305,7 @@ class TestGrfVerifierRules:
         errors = [i for i in result.issues if i.severity == "error"]
         assert not errors, [i.message for i in errors]
 
-    def test_grf_e140_missing_global_entity_id(
-        self, engagement_root: Path
-    ) -> None:
+    def test_grf_e140_missing_global_entity_id(self, engagement_root: Path) -> None:
         gar_id = "GAR@1000000001.AbcDef.bad-gar"
         gar_path = engagement_root / "model" / "common" / "global-artifact-reference" / f"{gar_id}.md"
         # Write a GAR without global-artifact-id
@@ -337,9 +316,7 @@ class TestGrfVerifierRules:
         codes = {i.code for i in result.issues if i.severity == "error"}
         assert "E140" in codes
 
-    def test_grf_e141_nonexistent_global_entity(
-        self, engagement_root: Path, enterprise_root: Path
-    ) -> None:
+    def test_grf_e141_nonexistent_global_entity(self, engagement_root: Path, enterprise_root: Path) -> None:
         gar_id = "GAR@1000000001.AbcDef.ghost-ref"
         gar_path = engagement_root / "model" / "common" / "global-artifact-reference" / f"{gar_id}.md"
         _write(
@@ -348,8 +325,7 @@ class TestGrfVerifierRules:
         )
         # Enterprise repo has real entities but not the referenced one
         _write(
-            enterprise_root / "model" / "motivation" / "requirements"
-            / "REQ@2000000000.GloAAA.other.md",
+            enterprise_root / "model" / "motivation" / "requirements" / "REQ@2000000000.GloAAA.other.md",
             _entity_md("REQ@2000000000.GloAAA.other", "requirement", "Other"),
         )
         registry = ArtifactRegistry(shared_artifact_index([engagement_root, enterprise_root]))
@@ -374,10 +350,9 @@ class TestGrfVerifierRules:
 # Transparent GRF routing in model_add_connection
 # ---------------------------------------------------------------------------
 
+
 class TestAddConnectionGrfRouting:
-    def _setup_repos(
-        self, engagement_root: Path, enterprise_root: Path
-    ) -> tuple[str, str]:
+    def _setup_repos(self, engagement_root: Path, enterprise_root: Path) -> tuple[str, str]:
         """Returns (engagement_entity_id, global_entity_id)."""
         eng_id = "CAP@1000000001.EngBBB.my-cap"
         glo_id = "REQ@2000000000.GloAAA.global-req"
@@ -435,8 +410,10 @@ class TestAddConnectionGrfRouting:
 
         # First connection creates GRF
         r1 = mcp_tools.artifact_add_connection(
-            source_entity=eng_id, connection_type="archimate-realization",
-            target_entity=glo_id, dry_run=False,
+            source_entity=eng_id,
+            connection_type="archimate-realization",
+            target_entity=glo_id,
+            dry_run=False,
         )
         gar_id_1 = r1["gar_artifact_id"]
 
@@ -447,8 +424,10 @@ class TestAddConnectionGrfRouting:
             _entity_md(eng_id2, "capability", "My Cap 2"),
         )
         r2 = mcp_tools.artifact_add_connection(
-            source_entity=eng_id2, connection_type="archimate-serving",
-            target_entity=glo_id, dry_run=False,
+            source_entity=eng_id2,
+            connection_type="archimate-serving",
+            target_entity=glo_id,
+            dry_run=False,
         )
         assert r2["gar_artifact_id"] == gar_id_1  # same GAR reused
 
@@ -466,8 +445,11 @@ class TestAddConnectionGrfRouting:
             _entity_md(eng_id2, "capability", "Cap 2"),
         )
         result = mcp_tools.artifact_add_connection(
-            source_entity=eng_id1, connection_type="archimate-aggregation",
-            target_entity=eng_id2, dry_run=False, repo_root=str(engagement_root),
+            source_entity=eng_id1,
+            connection_type="archimate-aggregation",
+            target_entity=eng_id2,
+            dry_run=False,
+            repo_root=str(engagement_root),
         )
         assert result.get("wrote") is True
         assert "grf_artifact_id" not in result
@@ -483,7 +465,7 @@ class TestAddConnectionGrfRouting:
         eng_id, glo_id = self._setup_repos(engagement_root, enterprise_root)
 
         result = mcp_tools.artifact_add_connection(
-            source_entity=glo_id,          # enterprise → engagement direction
+            source_entity=glo_id,  # enterprise → engagement direction
             connection_type="archimate-influence",
             target_entity=eng_id,
             dry_run=False,
@@ -499,9 +481,7 @@ class TestAddConnectionGrfRouting:
         assert any(gar_id in str(f) for f in gar_dir.rglob("*.md"))
 
         # Connection stored in GAR's outgoing file, pointing to engagement entity
-        gar_outgoing = next(
-            f for f in gar_dir.rglob("*.outgoing.md") if gar_id in str(f)
-        )
+        gar_outgoing = next(f for f in gar_dir.rglob("*.outgoing.md") if gar_id in str(f))
         content = gar_outgoing.read_text()
         assert eng_id in content
         assert glo_id not in content
@@ -528,10 +508,7 @@ class TestAddConnectionGrfRouting:
         assert result.get("original_target") == glo_id
 
         gar_id = result["gar_artifact_id"]
-        outgoing = (
-            engagement_root / "model" / "strategy" / "capabilities"
-            / f"{eng_id}.outgoing.md"
-        )
+        outgoing = engagement_root / "model" / "strategy" / "capabilities" / f"{eng_id}.outgoing.md"
         content = outgoing.read_text()
         assert gar_id in content
         assert glo_id not in content
@@ -552,14 +529,18 @@ class TestAddConnectionGrfRouting:
         )
 
         r1 = mcp_tools.artifact_add_connection(
-            source_entity=glo_id, connection_type="archimate-influence",
-            target_entity=eng_id, dry_run=False,
+            source_entity=glo_id,
+            connection_type="archimate-influence",
+            target_entity=eng_id,
+            dry_run=False,
         )
         gar_id_1 = r1["gar_source_id"]
 
         r2 = mcp_tools.artifact_add_connection(
-            source_entity=glo_id, connection_type="archimate-influence",
-            target_entity=eng_id2, dry_run=False,
+            source_entity=glo_id,
+            connection_type="archimate-influence",
+            target_entity=eng_id2,
+            dry_run=False,
         )
         assert r2["gar_source_id"] == gar_id_1
 
@@ -568,10 +549,9 @@ class TestAddConnectionGrfRouting:
 # Promotion: plan excludes GRFs
 # ---------------------------------------------------------------------------
 
+
 class TestPromotionPlan:
-    def test_plan_excludes_grf_entities(
-        self, engagement_root: Path, enterprise_root: Path
-    ) -> None:
+    def test_plan_excludes_grf_entities(self, engagement_root: Path, enterprise_root: Path) -> None:
         from src.infrastructure.write.artifact_write.promote_to_enterprise import plan_promotion
 
         eng_id = "CAP@1000000001.EngBBB.my-cap"
@@ -604,9 +584,7 @@ class TestPromotionPlan:
         assert gar_id not in plan.entities_to_add
         assert gar_id not in plan.already_in_enterprise
 
-    def test_plan_exclude_params(
-        self, engagement_root: Path, enterprise_root: Path
-    ) -> None:
+    def test_plan_exclude_params(self, engagement_root: Path, enterprise_root: Path) -> None:
         from src.infrastructure.write.artifact_write.promote_to_enterprise import plan_promotion
 
         eng_id1 = "CAP@1000000001.EngBBB.cap1"
@@ -624,7 +602,9 @@ class TestPromotionPlan:
         registry = ArtifactRegistry(shared_artifact_index([engagement_root, enterprise_root]))
         repo = ArtifactRepository(shared_artifact_index([engagement_root, enterprise_root]))
         plan = plan_promotion(
-            eng_id1, registry, repo,
+            eng_id1,
+            registry,
+            repo,
             entity_ids=[eng_id1, eng_id2],
             exclude_entity_ids={eng_id2},
         )
@@ -636,10 +616,9 @@ class TestPromotionPlan:
 # Promotion execute: outgoing rewrite
 # ---------------------------------------------------------------------------
 
+
 class TestPromotionExecuteOutgoingRewrite:
-    def test_grf_targets_rewritten_to_enterprise_ids(
-        self, engagement_root: Path, enterprise_root: Path
-    ) -> None:
+    def test_grf_targets_rewritten_to_enterprise_ids(self, engagement_root: Path, enterprise_root: Path) -> None:
         from src.infrastructure.write.artifact_write._promote_file_ops import make_target_resolver
         from src.infrastructure.write.artifact_write._promote_file_ops import rewrite_outgoing as _rewrite_outgoing
         from src.infrastructure.write.artifact_write.promote_to_enterprise import PromotionPlan, PromotionResult
@@ -648,14 +627,21 @@ class TestPromotionExecuteOutgoingRewrite:
         glo_id = "REQ@2000000000.GloAAA.global-req"
         eng_id = "CAP@1000000001.EngBBB.my-cap"
 
-        content = _outgoing_md(eng_id, [
-            ("archimate-realization", gar_id),
-            ("archimate-serving", glo_id),  # already enterprise
-        ])
+        content = _outgoing_md(
+            eng_id,
+            [
+                ("archimate-realization", gar_id),
+                ("archimate-serving", glo_id),  # already enterprise
+            ],
+        )
 
         plan = PromotionPlan(
-            root_entity=eng_id, entities_to_add=[eng_id], conflicts=[],
-            connection_ids=[], already_in_enterprise=[], warnings=[],
+            root_entity=eng_id,
+            entities_to_add=[eng_id],
+            conflicts=[],
+            connection_ids=[],
+            already_in_enterprise=[],
+            warnings=[],
         )
         result = PromotionResult(plan=plan, executed=False)
 
@@ -676,9 +662,7 @@ class TestPromotionExecuteOutgoingRewrite:
         assert "archimate-realization" in rewritten
         assert "archimate-serving" not in rewritten
 
-    def test_stranded_targets_dropped_with_warning(
-        self, engagement_root: Path, enterprise_root: Path
-    ) -> None:
+    def test_stranded_targets_dropped_with_warning(self, engagement_root: Path, enterprise_root: Path) -> None:
         from src.infrastructure.write.artifact_write._promote_file_ops import make_target_resolver
         from src.infrastructure.write.artifact_write._promote_file_ops import rewrite_outgoing as _rewrite_outgoing
         from src.infrastructure.write.artifact_write.promote_to_enterprise import PromotionPlan, PromotionResult
@@ -686,12 +670,19 @@ class TestPromotionExecuteOutgoingRewrite:
         eng_id = "CAP@1000000001.EngBBB.my-cap"
         other_eng = "CAP@1000000003.EngDDD.other"
 
-        content = _outgoing_md(eng_id, [
-            ("archimate-serving", other_eng),
-        ])
+        content = _outgoing_md(
+            eng_id,
+            [
+                ("archimate-serving", other_eng),
+            ],
+        )
         plan = PromotionPlan(
-            root_entity=eng_id, entities_to_add=[eng_id], conflicts=[],
-            connection_ids=[], already_in_enterprise=[], warnings=[],
+            root_entity=eng_id,
+            entities_to_add=[eng_id],
+            conflicts=[],
+            connection_ids=[],
+            already_in_enterprise=[],
+            warnings=[],
         )
         result = PromotionResult(plan=plan, executed=False)
         resolver = make_target_resolver({}, promoted_ids={eng_id}, enterprise_ids=set())
@@ -710,10 +701,9 @@ class TestPromotionExecuteOutgoingRewrite:
 # Promotion execute: full round-trip (enterprise copy + engagement GRF replacement)
 # ---------------------------------------------------------------------------
 
+
 class TestPromotionExecuteFullRoundTrip:
-    def _setup(
-        self, engagement_root: Path, enterprise_root: Path
-    ) -> tuple[str, str, str]:
+    def _setup(self, engagement_root: Path, enterprise_root: Path) -> tuple[str, str, str]:
         """Create eng entity with GAR connection. Returns (eng_id, gar_id, glo_id)."""
         eng_id = "CAP@1000000001.EngBBB.my-cap"
         gar_id = "GAR@1000000002.GarCCC.gar-ref"
@@ -737,9 +727,7 @@ class TestPromotionExecuteFullRoundTrip:
         )
         return eng_id, gar_id, glo_id
 
-    def test_entity_copied_to_enterprise(
-        self, engagement_root: Path, enterprise_root: Path
-    ) -> None:
+    def test_entity_copied_to_enterprise(self, engagement_root: Path, enterprise_root: Path) -> None:
         from src.infrastructure.write.artifact_write.promote_execute import execute_promotion
         from src.infrastructure.write.artifact_write.promote_to_enterprise import plan_promotion
 
@@ -754,9 +742,7 @@ class TestPromotionExecuteFullRoundTrip:
         ent_file = enterprise_root / "model" / "strategy" / "capabilities" / f"{eng_id}.md"
         assert ent_file.exists()
 
-    def test_grf_target_rewritten_in_enterprise_outgoing(
-        self, engagement_root: Path, enterprise_root: Path
-    ) -> None:
+    def test_grf_target_rewritten_in_enterprise_outgoing(self, engagement_root: Path, enterprise_root: Path) -> None:
         from src.infrastructure.write.artifact_write.promote_execute import execute_promotion
         from src.infrastructure.write.artifact_write.promote_to_enterprise import plan_promotion
 
@@ -768,25 +754,18 @@ class TestPromotionExecuteFullRoundTrip:
         result = execute_promotion(plan, engagement_root, enterprise_root, registry)
 
         assert result.executed, result.verification_errors
-        ent_outgoing = (
-            enterprise_root / "model" / "strategy" / "capabilities"
-            / f"{eng_id}.outgoing.md"
-        )
+        ent_outgoing = enterprise_root / "model" / "strategy" / "capabilities" / f"{eng_id}.outgoing.md"
         assert ent_outgoing.exists()
         content = ent_outgoing.read_text()
         assert gar_id not in content, "GAR should be rewritten to enterprise entity"
         assert glo_id in content, "Real enterprise entity should appear in outgoing"
 
-    def test_promoted_engagement_entity_replaced_by_grf(
-        self, engagement_root: Path, enterprise_root: Path
-    ) -> None:
+    def test_promoted_engagement_entity_replaced_by_grf(self, engagement_root: Path, enterprise_root: Path) -> None:
         from src.infrastructure.write.artifact_write.promote_execute import execute_promotion
         from src.infrastructure.write.artifact_write.promote_to_enterprise import plan_promotion
 
         eng_id, _, _ = self._setup(engagement_root, enterprise_root)
-        orig_eng_file = (
-            engagement_root / "model" / "strategy" / "capabilities" / f"{eng_id}.md"
-        )
+        orig_eng_file = engagement_root / "model" / "strategy" / "capabilities" / f"{eng_id}.md"
         registry = ArtifactRegistry(shared_artifact_index([engagement_root, enterprise_root]))
         repo = ArtifactRepository(shared_artifact_index([engagement_root, enterprise_root]))
 
@@ -798,19 +777,14 @@ class TestPromotionExecuteFullRoundTrip:
         assert not orig_eng_file.exists(), "Original engagement entity should be replaced by GAR"
         # A new GAR for the promoted entity should exist
         gar_dir = engagement_root / "model" / "common" / "global-artifact-reference"
-        new_gars = [
-            f for f in gar_dir.rglob("GAR@*.md")
-            if eng_id in f.read_text()
-        ]
+        new_gars = [f for f in gar_dir.rglob("GAR@*.md") if eng_id in f.read_text()]
         assert new_gars, "A GAR pointing to the promoted entity should be created"
 
-    def test_outgoing_references_updated_after_replacement(
-        self, engagement_root: Path, enterprise_root: Path
-    ) -> None:
+    def test_outgoing_references_updated_after_replacement(self, engagement_root: Path, enterprise_root: Path) -> None:
         from src.infrastructure.write.artifact_write.promote_execute import execute_promotion
         from src.infrastructure.write.artifact_write.promote_to_enterprise import plan_promotion
 
-        eng_id, _, _= self._setup(engagement_root, enterprise_root)
+        eng_id, _, _ = self._setup(engagement_root, enterprise_root)
 
         # Add a second engagement entity that connects TO eng_id
         other_eng = "CAP@1000000099.EngEEE.other-cap"
@@ -832,10 +806,7 @@ class TestPromotionExecuteFullRoundTrip:
 
         assert result.executed, result.verification_errors
         # The other engagement entity's outgoing should now reference the new GAR
-        other_outgoing = (
-            engagement_root / "model" / "strategy" / "capabilities"
-            / f"{other_eng}.outgoing.md"
-        )
+        other_outgoing = engagement_root / "model" / "strategy" / "capabilities" / f"{other_eng}.outgoing.md"
         content = other_outgoing.read_text()
         assert eng_id not in content, "Old entity ID should be replaced in cross-references"
         assert "GAR@" in content, "Reference should point to new GAR"

@@ -29,6 +29,8 @@ export const makeModelService = (repo: ModelRepository) =>
       repo.searchReferenceArtifacts(params),
     listDiagrams: (diagramType?: string, status?: string) =>
       repo.listDiagrams(diagramType, status),
+    listDiagramTypes: () => repo.listDiagramTypes(),
+    getDiagramTypeUiConfig: (type: string) => repo.getDiagramTypeUiConfig(type),
     getDiagram: (id: string) => repo.getDiagram(id),
     getDiagramContext: (id: string) => repo.getDiagramContext(id),
     diagramImageUrl: (filename: string) => repo.diagramImageUrl(filename),
@@ -53,7 +55,8 @@ export const makeModelService = (repo: ModelRepository) =>
     getDiagramConnections: (diagramId: string) => repo.getDiagramConnections(diagramId),
     getDiagramSvg: (diagramId: string) => repo.getDiagramSvg(diagramId),
     getEntityDisplayItem: (artifactId: string) => repo.getEntityDisplayItem(artifactId),
-    searchEntityDisplay: (query: string, limit?: number) => repo.searchEntityDisplay(query, limit),
+    searchEntityDisplay: (query: string, limit?: number, diagramType?: string) =>
+      repo.searchEntityDisplay(query, limit, diagramType),
     discoverDiagramEntities: (params: Parameters<ModelRepository['discoverDiagramEntities']>[0]) =>
       repo.discoverDiagramEntities(params),
     previewDiagram: (body: Parameters<ModelRepository['previewDiagram']>[0]) => repo.previewDiagram(body),

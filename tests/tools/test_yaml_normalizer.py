@@ -23,6 +23,7 @@ from src.infrastructure.mcp.artifact_mcp.name_normalization import (
 # _dump_yaml_text — unit tests
 # ---------------------------------------------------------------------------
 
+
 class TestDumpYamlText:
     def test_dict_round_trips(self):
         data = {"name": "Alice", "count": 3, "active": True}
@@ -50,6 +51,7 @@ class TestDumpYamlText:
 # ---------------------------------------------------------------------------
 # normalize_incoming_tool_name — unit tests
 # ---------------------------------------------------------------------------
+
 
 class TestNormalizeToolName:
     def test_known_name_passthrough(self):
@@ -82,6 +84,7 @@ class TestNormalizeToolName:
 # install_call_tool_normalizer — end-to-end tests
 # ---------------------------------------------------------------------------
 
+
 def _build_test_mcp() -> FastMCP:
     m = FastMCP(name="test-normalizer")
 
@@ -103,8 +106,7 @@ def _build_test_mcp() -> FastMCP:
 
 def _invoke(m: FastMCP, tool_name: str):
     handler = m._mcp_server.request_handlers[CallToolRequest]
-    req = CallToolRequest(method="tools/call",
-                          params=CallToolRequestParams(name=tool_name, arguments={}))
+    req = CallToolRequest(method="tools/call", params=CallToolRequestParams(name=tool_name, arguments={}))
     return asyncio.run(handler(req)).root
 
 
@@ -144,5 +146,6 @@ class TestNormalizerEndToEnd:
     def test_mcp_read_server_has_normalizer_installed(self):
         """The production read server should respond with YAML text for dict-returning tools."""
         from src.infrastructure.mcp import mcp_artifact_server
+
         srv = mcp_artifact_server.mcp_read._mcp_server
         assert CallToolRequest in srv.request_handlers

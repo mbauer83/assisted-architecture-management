@@ -8,6 +8,7 @@ from src.domain.module_types import ElementClassName, EntityTypeName
 @lru_cache(maxsize=1)
 def _internal_types() -> frozenset[EntityTypeName]:
     from src.infrastructure.app_bootstrap import get_module_registry  # noqa: PLC0415
+
     return get_module_registry().entity_types_with_class(ElementClassName("internal"))
 
 

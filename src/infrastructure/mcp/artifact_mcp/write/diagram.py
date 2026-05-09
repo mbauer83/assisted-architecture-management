@@ -21,6 +21,7 @@ def artifact_create_matrix(
     matrix_markdown: str,
     artifact_id: str | None = None,
     keywords: list[str] | None = None,
+    diagram_entities: dict[str, object] | None = None,
     version: str = "0.1.0",
     status: str = "draft",
     infer_entity_ids: bool = True,
@@ -61,9 +62,11 @@ def artifact_create_diagram(
     *,
     diagram_type: str,
     name: str,
-    puml: str,
+    puml: str = "",
     artifact_id: str | None = None,
     keywords: list[str] | None = None,
+    diagram_entities: dict[str, object] | None = None,
+    diagram_connections: list[dict[str, object]] | None = None,
     version: str = "0.1.0",
     status: str = "draft",
     connection_inference: DiagramConnectionInferenceMode = "none",
@@ -88,6 +91,8 @@ def artifact_create_diagram(
         puml=puml,
         artifact_id=artifact_id,
         keywords=keywords,
+        diagram_entities=diagram_entities,
+        diagram_connections=diagram_connections,
         version=version,
         status=status,
         last_updated=None,
@@ -118,10 +123,15 @@ def register(mcp: FastMCP) -> None:
         name="artifact_create_diagram",
         title="Artifact Write: Create Diagram",
         description=(
-            "Create an ArchiMate diagram from a complete PlantUML body. "
-            "Defaults to engagement repo from arch-init config. "
-            "Read each entity with artifact_query_read_artifact(mode='full') to get display_alias. "
-            "auto_include_stereotypes=true injects !include directives automatically. "
+            "Create a diagram. Call artifact_authoring_guidance(diagram_type=...) first — "
+            "it returns authoring guidance and, for diagram-entities kinds, the diagram_entities schema.\n\n"
+            "ArchiMate: supply puml using entity display_alias values "
+            "(artifact_query_read_artifact mode='full'). "
+            "auto_include_stereotypes=true injects !include lines. "
+            "connection_inference: 'none' | 'auto' (warn) | 'strict' (error) on unknown stereotypes.\n\n"
+            "Kind-data kinds (e.g. activity): omit puml; pass diagram_entities and diagram_connections "
+            "per the schema from authoring_guidance. PUML is generated from diagram_entities + diagram_connections; "
+            "both are persisted in frontmatter for round-trip editing and graph traversal.\n\n"
             "dry_run=true validates without writing."
         ),
         annotations=LOCAL_WRITE,

@@ -14,6 +14,8 @@ const props = defineProps<{
   placeholder?: string
   fixedDomains?: string[]
   fixedEntityTypes?: string[]
+  acceptedTypes?: Set<string>
+  diagramType?: string
 }>()
 const emit = defineEmits<{ select: [entity: EntityDisplayInfo] }>()
 
@@ -38,10 +40,12 @@ const dropStyle = ref<Record<string, string>>({})
 const computeDropPos = () => {
   const rect = inputRef.value?.getBoundingClientRect()
   if (!rect) return
+  const minW = Math.max(280, rect.width)
+  const left = Math.min(rect.left, window.innerWidth - minW - 12)
   dropStyle.value = {
     top: `${rect.bottom + 3}px`,
-    left: `${rect.left}px`,
-    width: `${rect.width}px`,
+    left: `${Math.max(0, left)}px`,
+    minWidth: `${minW}px`,
     maxHeight: `${Math.max(120, window.innerHeight - rect.bottom - 12)}px`,
   }
 }
@@ -88,6 +92,28 @@ const summaryParts = computed(() => {
 
 const doSearch = async () => {
   busy.value = true
+  if (props.diagramType) {
+    const exit = await Effect.runPromiseExit(svc.searchEntityDisplay(query.value.trim() || '', 30, props.diagramType))
+    busy.value = false
+    if (Exit.isSuccess(exit)) {
+      const hits: ReferenceSearchHit[] = exit.value.map((entity) => ({
+        artifact_id: entity.artifact_id,
+        record_type: 'entity',
+        name: entity.name,
+        status: entity.status,
+        path: '',
+        artifact_type: entity.artifact_type,
+        domain: entity.domain,
+      }))
+      results.value = hits.filter(r =>
+        !props.excludedIds?.has(r.artifact_id)
+        && (!props.acceptedTypes || props.acceptedTypes.has(String(r.artifact_type))),
+      )
+      activeResultIdx.value = -1
+    }
+    return
+  }
+
   const exit = await Effect.runPromiseExit(
     svc.searchReferenceArtifacts({
       q: query.value.trim() || undefined,
@@ -99,7 +125,10 @@ const doSearch = async () => {
   )
   busy.value = false
   if (Exit.isSuccess(exit)) {
-    results.value = exit.value.hits.filter(r => !props.excludedIds?.has(r.artifact_id))
+    results.value = exit.value.hits.filter(r =>
+      !props.excludedIds?.has(r.artifact_id)
+      && (!props.acceptedTypes || props.acceptedTypes.has(String(r.artifact_type))),
+    )
     activeResultIdx.value = -1
   }
 }

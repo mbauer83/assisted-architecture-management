@@ -1,27 +1,40 @@
 <script setup lang="ts">
-import { inject, ref, computed, onMounted, onUnmounted, watch } from 'vue'
-import { useRouter } from 'vue-router'
+import { inject, ref, computed, onMounted, watch } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import { Effect } from 'effect'
 import { modelServiceKey } from '../keys'
-import type { EntityDisplayInfo, EntityContextConnection, DiagramPreviewResult, WriteResult } from '../../domain'
+import type {
+  EntityDisplayInfo, EntityContextConnection, DiagramPreviewResult, WriteResult,
+  DiagramTypeUiConfig,
+} from '../../domain'
 import EntitySelectionList from '../components/EntitySelectionList.vue'
 import EntityPickerInput from '../components/EntityPickerInput.vue'
+import DiagramTypeSelect from '../components/DiagramTypeSelect.vue'
+import DiagramTypeConfigPanel from '../components/DiagramTypeConfigPanel.vue'
+import { usePanZoom } from '../composables/usePanZoom'
 
 const svc = inject(modelServiceKey)!
+const route = useRoute()
 const router = useRouter()
 
 const name = ref('')
-const diagramType = ref('archimate-business')
+const diagramType = ref((route.query.type as string | undefined) ?? 'archimate-business')
+const uiConfig = ref<DiagramTypeUiConfig | null>(null)
+const diagramEntities = ref<Record<string, unknown>>({})
 
-const DIAGRAM_TYPES = [
-  { key: 'archimate-motivation', label: 'Motivation' },
-  { key: 'archimate-strategy', label: 'Strategy' },
-  { key: 'archimate-business', label: 'Business' },
-  { key: 'archimate-application', label: 'Application' },
-  { key: 'archimate-technology', label: 'Technology' },
-  { key: 'archimate-layered', label: 'Layered' },
-]
+const mergeDiagramEntities = (patch: Record<string, unknown>) => {
+  diagramEntities.value = { ...diagramEntities.value, ...patch }
+  preview.value = null
+  previewClean.value = false
+}
 
+const loadUiConfig = async () => {
+  uiConfig.value = await Effect.runPromise(svc.getDiagramTypeUiConfig(diagramType.value)).catch(() => null)
+}
+
+const selectDiagramType = () => {
+  void loadUiConfig()
+}
 
 const includedEntities = ref<EntityDisplayInfo[]>([])
 const highlightedEntityIds = ref<Set<string>>(new Set())
@@ -84,6 +97,7 @@ const refreshDiscovery = async () => {
   const discovery = await Effect.runPromise(
     svc.discoverDiagramEntities({
       includedEntityIds: includedEntities.value.map((e) => e.artifact_id),
+      diagramType: diagramType.value,
       maxHops: 1,
       limit: 20,
     }),
@@ -161,54 +175,18 @@ const previewClean = ref(false)
 const previewIssues = ref<string[]>([])
 const showPuml = ref(false)
 
-// ── Preview pan+zoom ─────────────────────────────────────────────────────────
-const prevContainerRef = ref<HTMLElement | null>(null)
-const prevScale = ref(1); const prevTx = ref(0); const prevTy = ref(0)
-let prevDragging = false; let prevDrag = { x: 0, y: 0, tx: 0, ty: 0 }
+const previewViewport = usePanZoom(preview)
+const prevContainerRef = previewViewport.containerRef
+const prevCanvasStyle = previewViewport.canvasStyle
+const prevIsTransformed = previewViewport.isTransformed
+const prevOnMouseDown = previewViewport.startDrag
+const prevResetView = previewViewport.resetView
 
-const prevCanvasStyle = computed(() => ({
-  transform: `translate(${prevTx.value}px, ${prevTy.value}px) scale(${prevScale.value})`,
-  transformOrigin: '0 0', willChange: 'transform', display: 'inline-block',
-}))
-const prevIsTransformed = computed(() => prevScale.value !== 1 || prevTx.value !== 0 || prevTy.value !== 0)
-
-const prevOnWheel = (e: WheelEvent) => {
-  e.preventDefault()
-  const f = e.deltaY < 0 ? 1.15 : 1 / 1.15
-  const ns = Math.min(8, Math.max(0.2, prevScale.value * f))
-  const r = ns / prevScale.value
-  const rect = prevContainerRef.value!.getBoundingClientRect()
-  prevTx.value = (e.clientX - rect.left) * (1 - r) + prevTx.value * r
-  prevTy.value = (e.clientY - rect.top) * (1 - r) + prevTy.value * r
-  prevScale.value = ns
+const mergedEntityIds = () => {
+  const base = includedEntities.value.map((e) => e.artifact_id)
+  const mapped = (diagramEntities.value.entity_ids_mapped as string[] | undefined) ?? []
+  return [...new Set([...base, ...mapped])]
 }
-const prevOnMouseDown = (e: MouseEvent) => {
-  e.preventDefault()
-  prevDragging = true
-  prevDrag = { x: e.clientX, y: e.clientY, tx: prevTx.value, ty: prevTy.value }
-  window.addEventListener('mousemove', prevOnMouseMove)
-  window.addEventListener('mouseup', prevOnMouseUp)
-}
-const prevOnMouseMove = (e: MouseEvent) => {
-  if (prevDragging) { prevTx.value = prevDrag.tx + e.clientX - prevDrag.x; prevTy.value = prevDrag.ty + e.clientY - prevDrag.y }
-}
-const prevOnMouseUp = () => {
-  prevDragging = false
-  window.removeEventListener('mousemove', prevOnMouseMove)
-  window.removeEventListener('mouseup', prevOnMouseUp)
-}
-const prevResetView = () => { prevScale.value = 1; prevTx.value = 0; prevTy.value = 0 }
-watch(prevContainerRef, (el, old) => {
-  old?.removeEventListener('wheel', prevOnWheel)
-  el?.addEventListener('wheel', prevOnWheel, { passive: false })
-})
-watch(preview, () => prevResetView())
-
-onUnmounted(() => {
-  prevContainerRef.value?.removeEventListener('wheel', prevOnWheel)
-  window.removeEventListener('mousemove', prevOnMouseMove)
-  window.removeEventListener('mouseup', prevOnMouseUp)
-})
 
 const doPreview = () => {
   previewBusy.value = true
@@ -218,8 +196,9 @@ const doPreview = () => {
     svc.previewDiagram({
       diagram_type: diagramType.value,
       name: name.value,
-      entity_ids: includedEntities.value.map((e) => e.artifact_id),
+      entity_ids: mergedEntityIds(),
       connection_ids: [...includedConnIds.value],
+      diagram_entities: diagramEntities.value,
     }),
   )
     .then((r) => {
@@ -248,8 +227,9 @@ const doCreate = () => {
     svc.createDiagram({
       diagram_type: diagramType.value,
       name: name.value,
-      entity_ids: includedEntities.value.map((e) => e.artifact_id),
+      entity_ids: mergedEntityIds(),
       connection_ids: [...includedConnIds.value],
+      diagram_entities: diagramEntities.value,
       dry_run: false,
     }),
   )
@@ -263,6 +243,13 @@ const doCreate = () => {
 
 
 onMounted(() => { void refreshDiscovery() })
+watch(diagramType, () => {
+  diagramEntities.value = {}
+  preview.value = null
+  previewClean.value = false
+  void loadUiConfig()
+  void refreshDiscovery()
+})
 </script>
 
 <template>
@@ -292,24 +279,24 @@ onMounted(() => { void refreshDiscovery() })
 
         <div class="form-row">
           <label class="lbl">Diagram Type</label>
-          <select
+          <DiagramTypeSelect
             v-model="diagramType"
-            class="inp"
-          >
-            <option
-              v-for="dt in DIAGRAM_TYPES"
-              :key="dt.key"
-              :value="dt.key"
-            >
-              {{ dt.label }}
-            </option>
-          </select>
+            @select="selectDiagramType"
+          />
         </div>
+
+        <DiagramTypeConfigPanel
+          :ui-config="uiConfig"
+          :diagram-entities="diagramEntities"
+          :entities="includedEntities"
+          @diagram-entities-change="mergeDiagramEntities"
+        />
 
         <div class="form-row">
           <label class="lbl">Add Entities</label>
           <EntityPickerInput
             :excluded-ids="includedEntityIds"
+            :diagram-type="diagramType"
             @select="addEntity"
           />
         </div>
@@ -345,7 +332,7 @@ onMounted(() => { void refreshDiscovery() })
         <div class="actions">
           <button
             class="btn-preview"
-            :disabled="previewBusy || !name.trim() || !includedEntities.length"
+            :disabled="previewBusy || !name.trim() || (uiConfig?.entity_search_filter !== false && !includedEntities.length)"
             @click="doPreview"
           >
             {{ previewBusy ? 'Rendering…' : 'Preview' }}
@@ -366,7 +353,8 @@ onMounted(() => { void refreshDiscovery() })
           v-if="!preview && !previewBusy && !previewError"
           class="preview-hint"
         >
-          Select entities and connections, then click <strong>Preview</strong>.
+          {{ uiConfig?.entity_search_filter !== false ? 'Select entities and connections, then click' : 'Configure the diagram, then click' }}
+          <strong>Preview</strong>.
         </div>
         <div
           v-if="previewBusy"
@@ -433,6 +421,17 @@ onMounted(() => { void refreshDiscovery() })
             class="state-msg"
           >
             No image could be rendered.
+            <ul
+              v-if="preview.warnings.length"
+              class="render-warnings"
+            >
+              <li
+                v-for="w in preview.warnings"
+                :key="w"
+              >
+                {{ w }}
+              </li>
+            </ul>
           </div>
           <button
             class="toggle-src"
@@ -489,4 +488,5 @@ onMounted(() => { void refreshDiscovery() })
 .toggle-src { margin-top: 10px; font-size: 12px; color: #2563eb; background: none; border: none; cursor: pointer; padding: 0; }
 .toggle-src:hover { text-decoration: underline; }
 .puml-src { font-size: 11px; font-family: monospace; white-space: pre-wrap; margin-top: 8px; background: #f9fafb; border: 1px solid #e5e7eb; border-radius: 6px; padding: 10px; max-height: 400px; overflow-y: auto; }
+.render-warnings { margin: 6px 0 0 0; padding-left: 18px; font-size: 12px; color: #b45309; }
 </style>

@@ -35,8 +35,11 @@ def repo(tmp_path: Path) -> Path:
 
 def _make_entity(repo: Path, name: str) -> str:
     result = mcp.artifact_create_entity(
-        artifact_type="requirement", name=name,
-        summary=f"Summary for {name}", dry_run=False, repo_root=str(repo),
+        artifact_type="requirement",
+        name=name,
+        summary=f"Summary for {name}",
+        dry_run=False,
+        repo_root=str(repo),
     )
     assert result["wrote"], result
     return str(result["artifact_id"])
@@ -83,7 +86,8 @@ def _delete_entity(repo: Path, artifact_id: str) -> None:
     """Delete an entity that is NOT referenced by any diagram (no dependency conflict)."""
     result = mcp.artifact_bulk_delete(
         items=[{"op": "delete_entity", "artifact_id": artifact_id}],
-        dry_run=False, repo_root=str(repo),
+        dry_run=False,
+        repo_root=str(repo),
     )
     results = result.get("results", [])
     assert results and results[0].get("wrote"), result
@@ -108,9 +112,12 @@ def _make_context(repo: Path):  # type: ignore[return]
         roots_key,
         verifier_for,
     )
+
     roots = resolve_repo_roots(
-        repo_scope="engagement", repo_root=str(repo),
-        repo_preset=None, enterprise_root=None,
+        repo_scope="engagement",
+        repo_root=str(repo),
+        repo_preset=None,
+        enterprise_root=None,
     )
     verifier = verifier_for(roots_key(roots), include_registry=False)
     return verifier, clear_caches_for_repo
@@ -134,9 +141,12 @@ class TestSyncDiagramToModel:
         verifier, clear_caches = _make_context(repo)
 
         result = sync_diagram_to_model(
-            repo_root=repo, store=store, verifier=verifier,
+            repo_root=repo,
+            store=store,
+            verifier=verifier,
             clear_repo_caches=clear_caches,
-            artifact_id=diag_id, dry_run=True,
+            artifact_id=diag_id,
+            dry_run=True,
         )
 
         assert e2 in result.removed_entity_ids
@@ -153,9 +163,12 @@ class TestSyncDiagramToModel:
         verifier, clear_caches = _make_context(repo)
 
         result = sync_diagram_to_model(
-            repo_root=repo, store=store, verifier=verifier,
+            repo_root=repo,
+            store=store,
+            verifier=verifier,
             clear_repo_caches=clear_caches,
-            artifact_id=diag_id, dry_run=False,
+            artifact_id=diag_id,
+            dry_run=False,
         )
 
         assert result.wrote is True
@@ -174,9 +187,12 @@ class TestSyncDiagramToModel:
         before = (repo / "diagram-catalog" / "diagrams" / f"{diag_id}.puml").read_text()
 
         result = sync_diagram_to_model(
-            repo_root=repo, store=store, verifier=verifier,
+            repo_root=repo,
+            store=store,
+            verifier=verifier,
             clear_repo_caches=clear_caches,
-            artifact_id=diag_id, dry_run=True,
+            artifact_id=diag_id,
+            dry_run=True,
         )
 
         after = (repo / "diagram-catalog" / "diagrams" / f"{diag_id}.puml").read_text()
@@ -192,9 +208,12 @@ class TestSyncDiagramToModel:
         verifier, clear_caches = _make_context(repo)
 
         result = sync_diagram_to_model(
-            repo_root=repo, store=store, verifier=verifier,
+            repo_root=repo,
+            store=store,
+            verifier=verifier,
             clear_repo_caches=clear_caches,
-            artifact_id=diag_id, dry_run=True,
+            artifact_id=diag_id,
+            dry_run=True,
         )
 
         assert result.removed_entity_ids == []
@@ -209,7 +228,10 @@ class TestSyncDiagramToModel:
 
         # Rename via MCP — produces a new artifact_id with a different slug
         rename_result = mcp.artifact_edit_entity(
-            artifact_id=e1_old, name="New Name", dry_run=False, repo_root=str(repo),
+            artifact_id=e1_old,
+            name="New Name",
+            dry_run=False,
+            repo_root=str(repo),
         )
         assert rename_result["wrote"], rename_result
         e1_new = str(rename_result["artifact_id"])
@@ -219,9 +241,12 @@ class TestSyncDiagramToModel:
         verifier, clear_caches = _make_context(repo)
 
         result = sync_diagram_to_model(
-            repo_root=repo, store=store, verifier=verifier,
+            repo_root=repo,
+            store=store,
+            verifier=verifier,
             clear_repo_caches=clear_caches,
-            artifact_id=diag_id, dry_run=False,
+            artifact_id=diag_id,
+            dry_run=False,
         )
 
         # The entity must NOT appear in removed_entity_ids
@@ -232,9 +257,7 @@ class TestSyncDiagramToModel:
         assert e1_new in ids_in_fm
         assert e1_old not in ids_in_fm
 
-    def test_visible_stale_relation_is_removed_even_without_frontmatter_connection_id(
-        self, repo: Path
-    ) -> None:
+    def test_visible_stale_relation_is_removed_even_without_frontmatter_connection_id(self, repo: Path) -> None:
         src = _make_entity(repo, "Source")
         tgt = _make_entity(repo, "Target")
         _ = mcp.artifact_add_connection(
@@ -358,8 +381,10 @@ class TestMcpAutoSyncDispatch:
         diag_id = _make_diagram(repo, "MCP Sync Diagram", [e1, e2])
 
         result = mcp.artifact_edit_diagram(
-            artifact_id=diag_id, puml="auto-sync",
-            dry_run=False, repo_root=str(repo),
+            artifact_id=diag_id,
+            puml="auto-sync",
+            dry_run=False,
+            repo_root=str(repo),
         )
 
         assert result["wrote"] is True
@@ -376,8 +401,10 @@ class TestMcpAutoSyncDispatch:
         before = (repo / "diagram-catalog" / "diagrams" / f"{diag_id}.puml").read_text()
 
         result = mcp.artifact_edit_diagram(
-            artifact_id=diag_id, puml="auto-sync",
-            dry_run=True, repo_root=str(repo),
+            artifact_id=diag_id,
+            puml="auto-sync",
+            dry_run=True,
+            repo_root=str(repo),
         )
 
         after = (repo / "diagram-catalog" / "diagrams" / f"{diag_id}.puml").read_text()
@@ -390,8 +417,10 @@ class TestMcpAutoSyncDispatch:
         diag_id = _make_diagram(repo, "Keys Check", [e1])
 
         result = mcp.artifact_edit_diagram(
-            artifact_id=diag_id, puml="auto-sync",
-            dry_run=True, repo_root=str(repo),
+            artifact_id=diag_id,
+            puml="auto-sync",
+            dry_run=True,
+            repo_root=str(repo),
         )
 
         assert "removed_entity_ids" in result

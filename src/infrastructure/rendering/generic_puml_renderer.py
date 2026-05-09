@@ -1,4 +1,4 @@
-"""Config-backed PlantUML renderer for diagram kinds."""
+"""Config-backed PlantUML renderer for diagram types."""
 
 from __future__ import annotations
 
@@ -24,13 +24,21 @@ from src.infrastructure.rendering._archimate_includes import (
 from src.infrastructure.rendering._diagram_layout import (
     build_branch_direction_hints,
     build_nested_layout_lines,
-    build_visual_nesting,
 )
 from src.infrastructure.rendering._diagram_text import insert_arrow_direction, pluralize_label
+from src.infrastructure.rendering.generic_puml_layout import (
+    build_generic_visual_nesting,
+    ordered_type_groups,
+)
+from src.infrastructure.rendering.puml_safety import (
+    configured_puml_size_warning_threshold,
+    warn_when_puml_exceeds_threshold,
+)
 
 
 def _registry():
     from src.infrastructure.app_bootstrap import get_module_registry  # noqa: PLC0415
+
     return get_module_registry()
 
 
@@ -51,8 +59,11 @@ class GenericPumlRenderer:
         connections: Sequence[ConnectionRecord],
         diagram_type: str,
         repo_root: Path,
+        *,
+        diagram_entities: Mapping[str, object] | None = None,
+        diagram_connections: list[dict[str, object]] | None = None,
     ) -> str:
-        del repo_root
+        del repo_root, diagram_entities, diagram_connections
         diagram_name = re.sub(r"[^a-zA-Z0-9_-]", "-", name.lower()).strip("-") or "diagram"
         lines: list[str] = [f"@startuml {diagram_name}"]
         for include in self._includes():
@@ -65,9 +76,7 @@ class GenericPumlRenderer:
             if entity.display_alias
         }
         entity_by_alias = {
-            normalize_puml_alias(entity.display_alias): entity
-            for entity in entities
-            if entity.display_alias
+            normalize_puml_alias(entity.display_alias): entity for entity in entities if entity.display_alias
         }
 
         domain_entities: dict[str, list[EntityRecord]] = defaultdict(list)
@@ -88,8 +97,7 @@ class GenericPumlRenderer:
             and (tgt_alias := alias_by_id.get(conn.target))
         ]
         junction_aliases = {
-            alias for alias, entity in entity_by_alias.items()
-            if entity.artifact_type in self._junction_types()
+            alias for alias, entity in entity_by_alias.items() if entity.artifact_type in self._junction_types()
         }
         layout_direction_hints: dict[tuple[str, str], str] = {}
 
@@ -118,11 +126,7 @@ class GenericPumlRenderer:
             rendered = [f"{indent}{decl} {{"]
             for child in children:
                 rendered.extend(render_entity(child, inner))
-            child_als = [
-                normalize_puml_alias(child.display_alias)
-                for child in children
-                if child.display_alias
-            ]
+            child_als = [normalize_puml_alias(child.display_alias) for child in children if child.display_alias]
             layout_direction_hints.update(
                 build_branch_direction_hints(
                     child_aliases=child_als,
@@ -211,7 +215,10 @@ class GenericPumlRenderer:
             lines.append("")
 
         lines.append("@enduml")
-        return "\n".join(lines)
+        body = "\n".join(lines)
+        threshold = configured_puml_size_warning_threshold(self._config)
+        warn_when_puml_exceeds_threshold(body, threshold=threshold)
+        return body
 
     def inject_includes(self, body: str, repo_root: Path) -> str:
         if "_archimate-stereotypes.puml" not in "\n".join(self._includes()):
@@ -270,8 +277,7 @@ class GenericPumlRenderer:
             return grouping_key.capitalize() + "Grouping"
         pattern = str(grouping.get("stereotype_pattern", "{hierarchy_0|capitalize}Grouping"))
         return (
-            pattern
-            .replace("{hierarchy_0|capitalize}", grouping_key.capitalize())
+            pattern.replace("{hierarchy_0|capitalize}", grouping_key.capitalize())
             .replace("{hierarchy_0}", grouping_key)
             # legacy pattern names kept for any hand-authored configs
             .replace("{domain_dir|capitalize}", grouping_key.capitalize())
@@ -311,24 +317,17 @@ class GenericPumlRenderer:
             return f'rectangle "{label}" <<{stereotype}>> as {alias}'
         return f'rectangle "{label}" as {alias}'
 
-    def _type_group_label(self, entity: EntityRecord) -> str:
-        info = self._entity_info(entity.artifact_type)
-        if info:
-            return pluralize_label(info.artifact_type.replace("-", " ").title())
-        return pluralize_label(entity.artifact_type.replace("-", " ").title())
-
     def _ordered_type_groups(self, entities: list[EntityRecord]) -> list[tuple[str, list[EntityRecord]]]:
-        grouped: dict[str, list[EntityRecord]] = defaultdict(list)
-        labels: dict[str, str] = {}
-        for entity in entities:
-            grouped[entity.artifact_type].append(entity)
-            labels.setdefault(entity.artifact_type, self._type_group_label(entity))
-        type_order: list[str] = [str(k) for k in _registry().all_entity_types()]
-        ordered_types: list[str] = [artifact_type for artifact_type in type_order if artifact_type in grouped]
-        for artifact_type in grouped:
-            if artifact_type not in ordered_types:
-                ordered_types.append(artifact_type)
-        return [(labels[artifact_type], grouped[artifact_type]) for artifact_type in ordered_types]
+        return ordered_type_groups(
+            entities,
+            type_order=[str(k) for k in _registry().all_entity_types()],
+            label_by_type={
+                entity.artifact_type: pluralize_label(
+                    (self._entity_info(entity.artifact_type) or entity).artifact_type.replace("-", " ").title()
+                )
+                for entity in entities
+            },
+        )
 
     def _build_visual_nesting(
         self,
@@ -337,33 +336,11 @@ class GenericPumlRenderer:
         alias_by_id: Mapping[str, str],
         entity_by_alias: Mapping[str, EntityRecord],
     ) -> tuple[dict[str, list[EntityRecord]], set[str]]:
-        entity_order = {
-            normalize_puml_alias(entity.display_alias): index
-            for index, entity in enumerate(entities)
-            if entity.display_alias
-        }
-        structural_edges: list[tuple[str, str]] = []
-        neighbor_edges: list[tuple[str, str]] = []
-        for conn in connections:
-            src_alias = alias_by_id.get(conn.source)
-            tgt_alias = alias_by_id.get(conn.target)
-            if not src_alias or not tgt_alias:
-                continue
-            if conn.conn_type in self._nesting_conn_types() and tgt_alias in entity_by_alias:
-                structural_edges.append((src_alias, tgt_alias))
-                continue
-            neighbor_edges.append((src_alias, tgt_alias))
-        children_map, nested_aliases = build_visual_nesting(
-            item_by_alias=dict(entity_by_alias),
-            structural_edges=structural_edges,
-            neighbor_edges=neighbor_edges,
-            junction_aliases={
-                alias for alias, entity in entity_by_alias.items()
-                if entity.artifact_type in self._junction_types()
-            },
+        return build_generic_visual_nesting(
+            entities=entities,
+            connections=connections,
+            alias_by_id=alias_by_id,
+            entity_by_alias=entity_by_alias,
+            nesting_connection_types=self._nesting_conn_types(),
+            junction_entity_types=self._junction_types(),
         )
-        for parent_alias, children in children_map.items():
-            children.sort(
-                key=lambda entity: entity_order.get(normalize_puml_alias(entity.display_alias), len(entity_order))
-            )
-        return children_map, nested_aliases

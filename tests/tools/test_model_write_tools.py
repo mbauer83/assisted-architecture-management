@@ -219,11 +219,7 @@ def test_model_create_matrix_writes_valid_matrix(repo_root: Path) -> None:
 
     result = tools.artifact_create_matrix(
         name="Connection Matrix",
-        matrix_markdown=(
-            "| Source | Target | Type |\n"
-            "|---|---|---|\n"
-            "| EventStore | Orchestrator | serving |\n"
-        ),
+        matrix_markdown=("| Source | Target | Type |\n|---|---|---|\n| EventStore | Orchestrator | serving |\n"),
         artifact_id=generate_diagram_id("matrix", "Connection Matrix"),
         dry_run=False,
         repo_root=str(repo_root),

@@ -17,7 +17,7 @@ from ._sqlite_schema import FTS_SQL, SCHEMA_SQL
 _INS_ENTITY = (
     "INSERT INTO entities (artifact_id,artifact_type,name,version,status,domain,"
     "subdomain,path,scope,keywords_json,extra_json,content_text,"
-    "display_blocks_json,display_label,display_alias) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)"
+    "display_blocks_json,display_label,display_alias,host_diagram_id) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)"
 )
 _INS_CONNECTION = (
     "INSERT INTO connections (artifact_id,source,target,conn_type,version,status,"
@@ -52,6 +52,13 @@ _INS_DOCFTS = "INSERT INTO documents_fts (artifact_id,title,doc_type,keywords,co
 
 
 _READ_POOL_SIZE = min(max(os.cpu_count() or 4, 4), 8)
+
+
+def _discard_from(d: dict, key: object, val: str) -> None:
+    if s := d.get(key):
+        s.discard(val)
+        if not s:
+            del d[key]
 
 
 class _SqliteStore:
@@ -100,7 +107,10 @@ class _SqliteStore:
 
     def upsert_entity(self, rec: EntityRecord) -> None:
         self._mem.entities[rec.artifact_id] = rec
-        self._mem.entity_by_path[rec.path.resolve()] = rec.artifact_id
+        if rec.host_diagram_id is None:
+            self._mem.entity_by_path[rec.path.resolve()] = rec.artifact_id
+        else:
+            self._mem.entities_by_diagram.setdefault(rec.host_diagram_id, set()).add(rec.artifact_id)
         with self._conn:
             self._conn.execute("DELETE FROM entities WHERE artifact_id=?", (rec.artifact_id,))
             self._conn.execute(_INS_ENTITY, self._entity_row(rec))
@@ -123,7 +133,12 @@ class _SqliteStore:
     def delete_entity(self, artifact_id: str) -> None:
         old = self._mem.entities.pop(artifact_id, None)
         if old is not None:
-            self._mem.entity_by_path.pop(old.path.resolve(), None)
+            if old.host_diagram_id is None:
+                self._mem.entity_by_path.pop(old.path.resolve(), None)
+            else:
+                eids = self._mem.entities_by_diagram.get(old.host_diagram_id)
+                if eids:
+                    eids.discard(artifact_id)
         with self._conn:
             self._conn.execute("DELETE FROM entities WHERE artifact_id=?", (artifact_id,))
             self._conn.execute("DELETE FROM entity_context_edges WHERE entity_id=?", (artifact_id,))
@@ -136,6 +151,8 @@ class _SqliteStore:
         self._mem.connections_by_path.setdefault(rec.path.resolve(), set()).add(rec.artifact_id)
         self._mem.connections_by_entity.setdefault(rec.source, set()).add(rec.artifact_id)
         self._mem.connections_by_entity.setdefault(rec.target, set()).add(rec.artifact_id)
+        if "#conn/" in rec.artifact_id:
+            self._mem.connections_by_diagram.setdefault(rec.artifact_id.split("#conn/")[0], set()).add(rec.artifact_id)
         with self._conn:
             self._conn.execute("DELETE FROM connections WHERE artifact_id=?", (rec.artifact_id,))
             self._conn.execute(_INS_CONNECTION, self._connection_row(rec))
@@ -149,18 +166,11 @@ class _SqliteStore:
     def delete_connection(self, artifact_id: str) -> None:
         old = self._mem.connections.pop(artifact_id, None)
         if old is not None:
-            key = old.path.resolve()
-            ps = self._mem.connections_by_path.get(key)
-            if ps:
-                ps.discard(artifact_id)
-                if not ps:
-                    del self._mem.connections_by_path[key]
+            _discard_from(self._mem.connections_by_path, old.path.resolve(), artifact_id)
             for eid in (old.source, old.target):
-                es = self._mem.connections_by_entity.get(eid)
-                if es:
-                    es.discard(artifact_id)
-                    if not es:
-                        del self._mem.connections_by_entity[eid]
+                _discard_from(self._mem.connections_by_entity, eid, artifact_id)
+            if "#conn/" in artifact_id:
+                _discard_from(self._mem.connections_by_diagram, artifact_id.split("#conn/")[0], artifact_id)
         with self._conn:
             self._conn.execute("DELETE FROM connections WHERE artifact_id=?", (artifact_id,))
             self._conn.execute("DELETE FROM entity_context_edges WHERE connection_id=?", (artifact_id,))
@@ -310,7 +320,7 @@ class _SqliteStore:
 
     # ── Row builders ─────────────────────────────────────────────────────────
 
-    def _entity_row(self, r: EntityRecord) -> tuple[str, ...]:
+    def _entity_row(self, r: EntityRecord) -> tuple[object, ...]:
         return (
             r.artifact_id,
             r.artifact_type,
@@ -327,6 +337,7 @@ class _SqliteStore:
             json.dumps(r.display_blocks, sort_keys=True),
             r.display_label,
             r.display_alias,
+            r.host_diagram_id,
         )
 
     def _connection_row(self, r: ConnectionRecord) -> tuple[str, ...]:

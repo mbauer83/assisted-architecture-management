@@ -35,6 +35,7 @@ def _parse_artifact_type(text: str) -> str | None:
     if not m:
         return None
     import yaml as _yaml
+
     try:
         fm: dict[str, object] = _yaml.safe_load(m.group(1)) or {}
         return str(fm.get("artifact-type", "")) or None
@@ -51,7 +52,7 @@ def _strip_display_deprecated(text: str) -> tuple[str, bool]:
     if not disp_start:
         return text, False
     before = text[: disp_start.start()]
-    display_part = text[disp_start.start():]
+    display_part = text[disp_start.start() :]
     fence_m = _YAML_FENCE_RE.search(display_part)
     if not fence_m:
         return text, False
@@ -59,7 +60,7 @@ def _strip_display_deprecated(text: str) -> tuple[str, bool]:
     cleaned_yaml = _DEPRECATED_KEYS_RE.sub("", original_yaml)
     if cleaned_yaml == original_yaml:
         return text, False
-    updated_display = display_part[: fence_m.start(2)] + cleaned_yaml + display_part[fence_m.end(2):]
+    updated_display = display_part[: fence_m.start(2)] + cleaned_yaml + display_part[fence_m.end(2) :]
     return before + updated_display, True
 
 

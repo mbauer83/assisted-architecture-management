@@ -20,8 +20,9 @@ def test_arch_mcp_stdio_read_connects_to_read_path(monkeypatch) -> None:
         urls.append(url)
 
     monkeypatch.setattr(arch_mcp_stdio.anyio, "run", fake_anyio_run)
-    monkeypatch.setattr(arch_mcp_stdio, "ensure_backend_running",
-                        lambda port, start_if_missing, cwd=None, project_dir=None: port)
+    monkeypatch.setattr(
+        arch_mcp_stdio, "ensure_backend_running", lambda port, start_if_missing, cwd=None, project_dir=None: port
+    )
     monkeypatch.setattr(arch_mcp_stdio, "configured_backend_url", lambda: None)
 
     arch_mcp_stdio.main([])
@@ -37,8 +38,9 @@ def test_arch_mcp_stdio_write_connects_to_write_path(monkeypatch) -> None:
         urls.append(url)
 
     monkeypatch.setattr(arch_mcp_stdio.anyio, "run", fake_anyio_run)
-    monkeypatch.setattr(arch_mcp_stdio, "ensure_backend_running",
-                        lambda port, start_if_missing, cwd=None, project_dir=None: port)
+    monkeypatch.setattr(
+        arch_mcp_stdio, "ensure_backend_running", lambda port, start_if_missing, cwd=None, project_dir=None: port
+    )
     monkeypatch.setattr(arch_mcp_stdio, "configured_backend_url", lambda: None)
 
     arch_mcp_stdio.main(["--server", "write"])
@@ -184,9 +186,7 @@ def test_backend_start_command_prefers_current_python_when_backend_deps_exist(mo
     assert cmd == [backend_probe.sys.executable, "-m", "src.infrastructure.backend.arch_backend", "--port", "8123"]
 
 
-def test_backend_start_command_uses_uv_with_explicit_project_when_deps_missing(
-    monkeypatch, tmp_path: Path
-) -> None:
+def test_backend_start_command_uses_uv_with_explicit_project_when_deps_missing(monkeypatch, tmp_path: Path) -> None:
     project_dir = tmp_path / "tooling"
     project_dir.mkdir()
     (project_dir / "pyproject.toml").write_text("[project]\nname = 'tooling'\n", encoding="utf-8")
@@ -209,9 +209,7 @@ def test_backend_start_command_uses_uv_with_explicit_project_when_deps_missing(
     ]
 
 
-def test_ensure_backend_running_starts_backend_in_workspace_using_project_launcher(
-    monkeypatch, tmp_path: Path
-) -> None:
+def test_ensure_backend_running_starts_backend_in_workspace_using_project_launcher(monkeypatch, tmp_path: Path) -> None:
     workspace_dir = tmp_path / "workspace"
     project_dir = tmp_path / "tooling"
     workspace_dir.mkdir()
@@ -262,7 +260,7 @@ def test_ensure_backend_running_starts_backend_in_workspace_using_project_launch
 def test_module_registry_registers_matrix_diagram_kind() -> None:
     registry = module_registry_from_app(_build_app())
 
-    assert registry.find_diagram_kind("matrix") is not None
+    assert registry.find_diagram_type("matrix") is not None
 
 
 def test_matches_arch_backend_process_for_console_script_path() -> None:
@@ -281,28 +279,32 @@ def test_matches_arch_backend_process_for_direct_binary() -> None:
 
 
 def test_matches_arch_backend_process_for_module_invocation() -> None:
-    assert backend_process._matches_arch_backend_process(
-        ["python3", "-m", "src.infrastructure.backend.arch_backend", "--port", "8000"]
-    ) is True
+    assert (
+        backend_process._matches_arch_backend_process(
+            ["python3", "-m", "src.infrastructure.backend.arch_backend", "--port", "8000"]
+        )
+        is True
+    )
 
 
 def test_matches_arch_backend_process_does_not_match_uv_launcher() -> None:
     # ``uv run ... arch-backend ...`` is the launcher, not the backend itself.
-    assert backend_process._matches_arch_backend_process(
-        ["/home/user/.local/bin/uv", "run", "--extra", "gui", "arch-backend", "--port", "8000"]
-    ) is False
+    assert (
+        backend_process._matches_arch_backend_process(
+            ["/home/user/.local/bin/uv", "run", "--extra", "gui", "arch-backend", "--port", "8000"]
+        )
+        is False
+    )
 
 
 def test_matches_arch_backend_process_does_not_match_bash_invoker() -> None:
-    assert backend_process._matches_arch_backend_process(
-        ["/bin/bash", "-c", "arch-backend --port 8000"]
-    ) is False
+    assert backend_process._matches_arch_backend_process(["/bin/bash", "-c", "arch-backend --port 8000"]) is False
 
 
 def test_stop_backend_resolves_multiple_to_socket_owner(monkeypatch) -> None:
     """When multiple processes declare the same port, prefer the one with the actual socket."""
     socket_owner = {"pid": 1001, "ports": [8000], "declared_port": 8000}
-    no_socket    = {"pid": 1002, "ports": [],     "declared_port": 8000}
+    no_socket = {"pid": 1002, "ports": [], "declared_port": 8000}
 
     monkeypatch.setattr(backend_control, "read_backend_state", lambda start=None: None)
     monkeypatch.setattr(backend_control, "find_arch_backend_instances", lambda: [socket_owner, no_socket])
@@ -326,7 +328,7 @@ def test_stop_backend_cleans_up_non_socket_declarants(monkeypatch) -> None:
     import signal as signal_module
 
     socket_owner = {"pid": 1001, "ports": [8000], "declared_port": 8000}
-    declarant    = {"pid": 1002, "ports": [],     "declared_port": 8000}
+    declarant = {"pid": 1002, "ports": [], "declared_port": 8000}
 
     monkeypatch.setattr(backend_control, "read_backend_state", lambda start=None: None)
     monkeypatch.setattr(backend_control, "find_arch_backend_instances", lambda: [socket_owner, declarant])
@@ -367,9 +369,13 @@ def test_restart_daemon_cleans_up_leftover_unhealthy_process(monkeypatch, tmp_pa
     monkeypatch.setattr(arch_backend, "resolve_backend_port", lambda start=None, explicit_port=None: 8000)
     monkeypatch.setattr(arch_backend, "read_backend_state", lambda: None)
     monkeypatch.setattr(
-        arch_backend, "backend_status",
+        arch_backend,
+        "backend_status",
         lambda port=None, cwd=None: {
-            "running": False, "reason": "unhealthy_backend", "pid": 1002, "port": 8000,
+            "running": False,
+            "reason": "unhealthy_backend",
+            "pid": 1002,
+            "port": 8000,
         },
     )
     monkeypatch.setattr(arch_backend, "backend_log_path", lambda start=None: tmp_path / "backend.log")
@@ -423,9 +429,13 @@ def test_daemon_argv_strips_restart_and_stop_flags() -> None:
 
 def test_stop_outputs_all_pids_when_multiple_stopped(monkeypatch, capsys) -> None:
     monkeypatch.setattr(
-        arch_backend, "stop_backend",
+        arch_backend,
+        "stop_backend",
         lambda port=None, cwd=None, timeout_s=5.0: {
-            "stopped": True, "pid": 657, "pids": [657, 658], "port": 8000,
+            "stopped": True,
+            "pid": 657,
+            "pids": [657, 658],
+            "port": 8000,
         },
     )
     monkeypatch.setattr(arch_backend, "resolve_backend_port", lambda start=None, explicit_port=None: 8000)
@@ -454,8 +464,8 @@ def test_unified_backend_installs_module_registry_on_app_state() -> None:
 
     assert isinstance(registry, ModuleRegistry)
     assert registry.find_ontology("archimate-next-snapshot1") is not None
-    assert registry.find_diagram_kind("archimate-business") is not None
-    assert registry.find_diagram_kind("archimate-layered") is not None
+    assert registry.find_diagram_type("archimate-business") is not None
+    assert registry.find_diagram_type("archimate-layered") is not None
 
 
 def test_module_registry_dependency_reads_installed_app_state() -> None:
@@ -757,6 +767,7 @@ def test_stop_pid_continues_stopped_process_before_terminating(monkeypatch) -> N
 
     assert result == {"stopped": True, "pid": 123, "port": 8000}
     import signal as signal_module
+
     assert signals[:2] == [signal_module.SIGCONT, signal_module.SIGTERM]
 
 

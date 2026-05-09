@@ -53,6 +53,8 @@ class EntityRecord:
     display_blocks: dict[str, str]
     display_label: str
     display_alias: str
+    host_diagram_id: str | None = None
+    """None for model entities; the owning diagram's artifact_id for diagram-only entities."""
 
     def __str__(self) -> str:
         return (
@@ -179,10 +181,18 @@ class ArtifactSummary:
     status: str
     record_type: Literal["entity", "connection", "diagram", "document"]
     path: Path
+    host_diagram_id: str | None = None
+    """None for model entities; the owning diagram's artifact_id for diagram-only entities.
+
+    When present, this entity exists only within that diagram's diagram-entities frontmatter.
+    It has no standalone file. The ``path`` field points to the diagram file, not an entity
+    file. To author or edit this entity, open the owning diagram.
+    """
 
     def __str__(self) -> str:
         label = f" {self.name}" if self.name else ""
-        return f"[{self.artifact_id}]{label}  ({self.artifact_type} · {self.record_type} · status={self.status})"
+        scope = f" [diagram-only:{self.host_diagram_id}]" if self.host_diagram_id else ""
+        return f"[{self.artifact_id}]{label}  ({self.artifact_type} · {self.record_type} · status={self.status}){scope}"
 
 
 def summary_from_entity(rec: EntityRecord) -> ArtifactSummary:
@@ -194,6 +204,7 @@ def summary_from_entity(rec: EntityRecord) -> ArtifactSummary:
         status=rec.status,
         record_type="entity",
         path=rec.path,
+        host_diagram_id=rec.host_diagram_id,
     )
 
 

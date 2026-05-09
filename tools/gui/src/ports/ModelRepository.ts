@@ -15,6 +15,8 @@ import type {
   ReferenceSearchResult,
   DiagramList,
   DiagramDetail,
+  DiagramTypeSummary,
+  DiagramTypeUiConfig,
   DiagramContext,
   DiagramEntityDiscovery,
   WriteResult,
@@ -74,6 +76,8 @@ export interface ModelRepository {
   readonly listDiagrams: (
     diagramType?: string, status?: string,
   ) => Effect.Effect<DiagramList, RepoError>
+  readonly listDiagramTypes: () => Effect.Effect<DiagramTypeSummary[], RepoError>
+  readonly getDiagramTypeUiConfig: (type: string) => Effect.Effect<DiagramTypeUiConfig, RepoError | NotFoundError>
   readonly getDiagram: (id: string) => Effect.Effect<DiagramDetail, RepoError | NotFoundError>
   readonly getDiagramContext: (id: string) => Effect.Effect<DiagramContext, RepoError | NotFoundError>
   readonly diagramImageUrl: (filename: string) => string
@@ -123,26 +127,30 @@ export interface ModelRepository {
   readonly getDiagramSvg: (diagramId: string) => Effect.Effect<string, RepoError>
   readonly getEntityDisplayItem: (artifactId: string) => Effect.Effect<EntityDisplayInfo, RepoError>
   readonly searchEntityDisplay: (
-    query: string, limit?: number,
+    query: string, limit?: number, diagramType?: string,
   ) => Effect.Effect<EntityDisplayInfo[], RepoError>
   readonly discoverDiagramEntities: (params: {
     includedEntityIds?: string[]
     query?: string
+    diagramType?: string
     maxHops?: number
     limit?: number
   }) => Effect.Effect<DiagramEntityDiscovery, RepoError>
   readonly previewDiagram: (body: {
     diagram_type: string; name: string;
     entity_ids: string[]; connection_ids: string[];
+    diagram_entities?: Record<string, unknown>;
   }) => Effect.Effect<DiagramPreviewResult, RepoError>
   readonly createDiagram: (body: {
     diagram_type: string; name: string;
     entity_ids: string[]; connection_ids: string[];
+    diagram_entities?: Record<string, unknown>;
     keywords?: string[]; version?: string; status?: string; dry_run?: boolean;
   }) => Effect.Effect<WriteResult, RepoError>
   readonly editDiagram: (body: {
     artifact_id: string; diagram_type: string; name: string;
     entity_ids: string[]; connection_ids: string[];
+    diagram_entities?: Record<string, unknown>;
     version?: string; status?: string; dry_run?: boolean;
   }) => Effect.Effect<WriteResult, RepoError>
   readonly deleteDiagram: (body: {

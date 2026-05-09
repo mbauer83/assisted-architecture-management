@@ -521,11 +521,11 @@ Entity types, connection types, and permitted relationship rules are defined in 
 
 New ontologies (SysML, TOGAF, domain-specific languages) can be added without touching the core. See `src/ontologies/README.md` for the full extension contract and a SysML skeleton example.
 
-### Diagram Kinds
+### Diagram Types
 
-Diagram views are declared as *diagram kind modules* under `src/diagram_kinds/`. Each kind has a `config.yaml` declaring its name, accepted entity type domains, PlantUML includes, grouping, and layout hints. The `GenericPumlRenderer` handles rendering for all standard ArchiMate-style views. Custom renderers are only needed for non-PlantUML diagram formats (e.g. the matrix kind).
+Diagram views are declared as *diagram type modules* under `src/diagram_types/`. Each kind has a `config.yaml` declaring its name, accepted entity type domains, PlantUML includes, grouping, and layout hints. The `GenericPumlRenderer` handles rendering for all standard ArchiMate-style views. Custom renderers are only needed for non-PlantUML diagram formats (e.g. the matrix kind).
 
-See `src/diagram_kinds/README.md` for the full `config.yaml` schema and extension guide.
+See `src/diagram_types/README.md` for the full `config.yaml` schema and extension guide.
 
 ### Document Types (`.arch-repo/documents/*.json`)
 
@@ -565,5 +565,5 @@ Each file defines one document type. The filename (without `.json`) is the `doc-
 - **[ArchiMate Forum](https://www.opengroup.org/archimate-forum)** — the modelling language
 - **`engagements/ENG-ARCH-REPO/`** — a self-describing model of this system's own architecture
 - **`src/ontologies/README.md`** — how to add a new ontology module (extension contract + SysML skeleton)
-- **`src/diagram_kinds/README.md`** — how to add a new diagram kind (`config.yaml` schema + extension guide)
+- **`src/diagram_types/README.md`** — how to add a new diagram type (`config.yaml` schema + extension guide)
 - **`.arch-repo/documents/`** — structured documentation templates (ADR, Standard, Specification)

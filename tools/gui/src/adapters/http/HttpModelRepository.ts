@@ -16,6 +16,8 @@ import {
   ReferenceSearchResultSchema,
   DiagramListSchema,
   DiagramDetailSchema,
+  DiagramTypeSummarySchema,
+  DiagramTypeUiConfigSchema,
   DiagramContextSchema,
   DiagramEntityDiscoverySchema,
   WriteResultSchema,
@@ -273,6 +275,13 @@ export const makeHttpModelRepository = (): ModelRepository => ({
   listDiagrams: (diagramType?: string, status?: string) =>
     fetchJson(buildUrl('/diagrams', { diagram_type: diagramType, status }), DiagramListSchema),
 
+  listDiagramTypes: () =>
+    fetchJson(buildUrl('/diagram-types'), Schema.Array(DiagramTypeSummarySchema))
+      .pipe(Effect.map((arr) => [...arr])),
+
+  getDiagramTypeUiConfig: (type: string) =>
+    fetchJsonNotFound(buildUrl(`/diagram-types/${encodeURIComponent(type)}/ui-config`), DiagramTypeUiConfigSchema, type),
+
   getDiagram: (id: string) =>
     fetchJsonNotFound(buildUrl('/diagram', { id }), DiagramDetailSchema, id),
 
@@ -324,12 +333,16 @@ export const makeHttpModelRepository = (): ModelRepository => ({
   getEntityDisplayItem: (artifactId: string) =>
     fetchJson(buildUrl('/entity-display-item', { id: artifactId }), EntityDisplayInfoSchema),
 
-  searchEntityDisplay: (query: string, limit = 20) =>
-    fetchJson(buildUrl('/entity-display-search', { q: query, limit }), Schema.Array(EntityDisplayInfoSchema))
+  searchEntityDisplay: (query: string, limit = 20, diagramType?: string) =>
+    fetchJson(
+      buildUrl('/entity-display-search', { q: query, limit, diagram_type: diagramType }),
+      Schema.Array(EntityDisplayInfoSchema),
+    )
       .pipe(Effect.map((arr) => arr as import('../../domain').EntityDisplayInfo[])),
-  discoverDiagramEntities: ({ includedEntityIds = [], query, maxHops = 2, limit = 20 }) =>
+  discoverDiagramEntities: ({ includedEntityIds = [], query, diagramType, maxHops = 2, limit = 20 }) =>
     fetchJson(buildUrl('/diagram-entity-discovery', {
-      q: query, max_hops: maxHops, limit, included_entity_ids: includedEntityIds.join(','),
+      q: query, diagram_type: diagramType, max_hops: maxHops, limit,
+      included_entity_ids: includedEntityIds.join(','),
     }), DiagramEntityDiscoverySchema),
 
   previewDiagram: (body) =>

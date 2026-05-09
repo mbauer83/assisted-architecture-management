@@ -16,9 +16,9 @@ This works well for a single fixed ontology, but has two compounding problems:
    literal. The YAML is the nominal source of truth but in practice is mirrored ad hoc.
 
 2. **No extension mechanism.** Adding a second ontology (e.g. ArchiMate 3.2, SysML v2)
-   or a new diagram kind (e.g. activity diagrams rendered with smetana) requires changes
+   or a new diagram type (e.g. activity diagrams rendered with smetana) requires changes
    across multiple layers because there is no registry or contract for what a
-   well-formed ontology or diagram kind looks like.
+   well-formed ontology or diagram type looks like.
 
 This plan introduces a module system that resolves both problems while keeping changes
 incremental and backward-compatible during the migration.
@@ -39,7 +39,7 @@ incremental and backward-compatible during the migration.
   and validation hooks live in Python within the same module.
 - **Entity-ontology and connection-ontology are inseparable.** A single `OntologyModule`
   owns both. Permitted relationships reference entity types from the same module.
-- **Diagram kinds bind to exactly one ontology.** A diagram kind may filter and extend
+- **Diagram types bind to exactly one ontology.** A diagram type may filter and extend
   its primary ontology, but it does not mix entity types from two different ontologies.
   The only exception is `FreeOntology` — a typed sentinel for ontology-agnostic diagram
   kinds (e.g. matrices) that carry no structural connection rules of their own.
@@ -48,16 +48,16 @@ incremental and backward-compatible during the migration.
 - **The registry is the sole authority for all type enumerations.** Validation, listing,
   guidance, and rendering all route through the registry and its modules. No generic
   tool — MCP, GUI API, or CLI — maintains its own closed list of types. Registering a
-  new ontology or diagram kind automatically makes all its types valid, creatable,
+  new ontology or diagram type automatically makes all its types valid, creatable,
   queryable, and renderable without touching any tool code.
 - **Repo compatibility is discovered, not declared.** The system already indexes repo
   content and schemata; startup compatibility checks should derive used entity types,
-  connection types, and diagram kinds from those indexed repos and compare them against
+  connection types, and diagram types from those indexed repos and compare them against
   the registry. Repos do not carry a single declarative `ontology = ...` field because
   a workspace may legitimately contain content from multiple ontologies.
 - **Rendering is generic by default; code is the escape hatch.** A single generic PUML
-  renderer handles all diagram kinds through YAML-declared config (includes, grouping,
-  layout hints, element-class rendering patterns). A diagram kind module needs no
+  renderer handles all diagram types through YAML-declared config (includes, grouping,
+  layout hints, element-class rendering patterns). A diagram type module needs no
   `renderer.py` unless it genuinely requires non-generic behaviour (a different engine,
   a non-PUML output format, or a novel layout algorithm). Most modules contain only YAML
   and `__init__.py`.
@@ -84,7 +84,7 @@ ElementClassName   = NewType("ElementClassName",   str)
 
 ### 2. FreeOntology Sentinel
 
-`FreeOntology` is the only value of `_FreeOntologyType`. Diagram kinds that genuinely
+`FreeOntology` is the only value of `_FreeOntologyType`. Diagram types that genuinely
 have no structural ontology bind to it. It is never `None`; callers pattern-match on
 the union type.
 
@@ -94,7 +94,7 @@ from typing import Final, final
 
 @final
 class _FreeOntologyType:
-    """Singleton. Diagram kinds bound here accept entities from any registered ontology."""
+    """Singleton. Diagram types bound here accept entities from any registered ontology."""
     _instance: ClassVar[_FreeOntologyType | None] = None
     def __new__(cls) -> _FreeOntologyType:
         if cls._instance is None:
@@ -288,12 +288,12 @@ class DiagramRenderer(Protocol):
 The concrete default implementation is `GenericPumlRenderer` in
 `src/infrastructure/rendering/generic_puml_renderer.py`. It reads all rendering
 decisions — grouping strategy, layout hints, includes, element-class declaration
-templates — from the diagram kind's YAML config. Diagram kind modules do not provide
+templates — from the diagram type's YAML config. Diagram type modules do not provide
 a renderer unless they need to override this default.
 
-### 7. DiagramKindModule Protocol and Base
+### 7. DiagramTypeModule Protocol and Base
 
-The protocol is the public contract. `DiagramKindBase` provides default implementations
+The protocol is the public contract. `DiagramTypeBase` provides default implementations
 for `effective_permitted_relationships`, the two enumeration methods, and `renderer`
 (wired to `GenericPumlRenderer` from the module's YAML config). Subclasses override
 only when they need non-generic behaviour.
@@ -303,7 +303,7 @@ only when they need non-generic behaviour.
 from src.domain.module_types import DiagramKindName, PrimaryOntology, _FreeOntologyType
 
 @runtime_checkable
-class DiagramKindModule(Protocol):
+class DiagramTypeModule(Protocol):
     @property
     def name(self) -> DiagramKindName: ...
 
@@ -334,8 +334,8 @@ class DiagramKindModule(Protocol):
     def renderer(self) -> DiagramRenderer: ...
 
 
-class DiagramKindBase:
-    """Mixin providing default implementations for DiagramKindModule.
+class DiagramTypeBase:
+    """Mixin providing default implementations for DiagramTypeModule.
 
     Subclasses must declare: name, primary_ontology, accepts_entity_type,
     accepts_connection_type, own_entity_types, own_connection_types,
@@ -372,7 +372,7 @@ class DiagramKindBase:
         return inherited | self.own_permitted_relationships  # type: ignore[attr-defined]
 
     def effective_entity_types(self) -> Mapping[EntityTypeName, EntityTypeInfo]:
-        """Merged entity type vocabulary available in this diagram kind.
+        """Merged entity type vocabulary available in this diagram type.
 
         Combines filtered base ontology types with own extensions. Used by tool
         metadata, GUI selection lists, and the scaffold tool.
@@ -390,7 +390,7 @@ class DiagramKindBase:
         return out
 
     def effective_connection_types(self) -> Mapping[ConnectionTypeName, ConnectionTypeInfo]:
-        """Merged connection type vocabulary available in this diagram kind."""
+        """Merged connection type vocabulary available in this diagram type."""
         if isinstance(self.primary_ontology, _FreeOntologyType):  # type: ignore[attr-defined]
             return dict(self.own_connection_types)  # type: ignore[attr-defined]
 
@@ -418,12 +418,12 @@ It is not a module-level singleton; it is a dependency.
 from typing import Mapping
 from src.domain.module_types import EntityTypeName, ConnectionTypeName, ElementClassName
 from src.domain.ontology_types import EntityTypeInfo, ConnectionTypeInfo
-from src.domain.ontology_protocol import OntologyModule, DiagramKindModule
+from src.domain.ontology_protocol import OntologyModule, DiagramTypeModule
 
 class ModuleRegistry:
     def __init__(self) -> None:
         self._ontologies: dict[str, OntologyModule] = {}
-        self._diagram_kinds: dict[str, DiagramKindModule] = {}
+        self._diagram_types: dict[str, DiagramTypeModule] = {}
 
     # ── Registration ────────────────────────────────────────────────────────
 
@@ -440,18 +440,18 @@ class ModuleRegistry:
     def replace_ontology(self, module: OntologyModule) -> None:
         self._ontologies[module.name] = module
 
-    def register_diagram_kind(self, module: DiagramKindModule) -> None:
-        if module.name in self._diagram_kinds:
-            raise ValueError(f"DiagramKind '{module.name}' already registered; use replace_diagram_kind")
-        self._diagram_kinds[module.name] = module
+    def register_diagram_type(self, module: DiagramTypeModule) -> None:
+        if module.name in self._diagram_types:
+            raise ValueError(f"DiagramType '{module.name}' already registered; use replace_diagram_type")
+        self._diagram_types[module.name] = module
 
-    def unregister_diagram_kind(self, name: str) -> None:
-        if name not in self._diagram_kinds:
+    def unregister_diagram_type(self, name: str) -> None:
+        if name not in self._diagram_types:
             raise KeyError(name)
-        del self._diagram_kinds[name]
+        del self._diagram_types[name]
 
-    def replace_diagram_kind(self, module: DiagramKindModule) -> None:
-        self._diagram_kinds[module.name] = module
+    def replace_diagram_type(self, module: DiagramTypeModule) -> None:
+        self._diagram_types[module.name] = module
 
     # ── Ontology queries ────────────────────────────────────────────────────
 
@@ -467,19 +467,19 @@ class ModuleRegistry:
     def all_ontologies(self) -> Mapping[str, OntologyModule]:
         return dict(self._ontologies)
 
-    # ── Diagram kind queries ─────────────────────────────────────────────────
+    # ── Diagram type queries ─────────────────────────────────────────────────
 
-    def get_diagram_kind(self, name: str) -> DiagramKindModule:
+    def get_diagram_kind(self, name: str) -> DiagramTypeModule:
         try:
-            return self._diagram_kinds[name]
+            return self._diagram_types[name]
         except KeyError:
-            raise KeyError(f"No diagram kind registered with name '{name}'")
+            raise KeyError(f"No diagram type registered with name '{name}'")
 
-    def find_diagram_kind(self, name: str) -> DiagramKindModule | None:
-        return self._diagram_kinds.get(name)
+    def find_diagram_kind(self, name: str) -> DiagramTypeModule | None:
+        return self._diagram_types.get(name)
 
-    def all_diagram_kinds(self) -> Mapping[str, DiagramKindModule]:
-        return dict(self._diagram_kinds)
+    def all_diagram_types(self) -> Mapping[str, DiagramTypeModule]:
+        return dict(self._diagram_types)
 
     # ── Aggregated entity/connection type queries ────────────────────────────
     # These merge across all registered ontologies; for entity-type-specific
@@ -554,7 +554,7 @@ implementation code. The module is self-contained: it loads its own YAML and exp
 an instantiated module object.
 
 Ontology modules require a `_loader.py` because loading YAML into the protocol types
-is non-trivial. Diagram kind modules typically contain only YAML and `__init__.py`;
+is non-trivial. Diagram type modules typically contain only YAML and `__init__.py`;
 `renderer.py` is present only when the generic renderer is insufficient.
 
 ```
@@ -562,7 +562,7 @@ src/
   domain/
     module_types.py              # EntityTypeName, ConnectionTypeName, FreeOntology, etc.
     permitted_relationships.py   # PermittedRelationship, PermittedRelationshipSet
-    ontology_protocol.py         # OntologyModule, DiagramKindModule, DiagramRenderer, DiagramKindBase
+    ontology_protocol.py         # OntologyModule, DiagramTypeModule, DiagramRenderer, DiagramTypeBase
     module_registry.py           # ModuleRegistry
     ontology_types.py            # EntityTypeInfo, ConnectionTypeInfo (updated)
     artifact_types.py            # EntityRecord etc. (Domain literal derived from registry)
@@ -573,7 +573,7 @@ src/
 
   infrastructure/
     rendering/
-      generic_puml_renderer.py   # GenericPumlRenderer: reads diagram kind config.yaml;
+      generic_puml_renderer.py   # GenericPumlRenderer: reads diagram type config.yaml;
                                  # handles all known element-class rendering patterns,
                                  # grouping, layout nesting, and include injection
       diagram_builder.py         # retained during migration; gutted in Phase 3
@@ -587,10 +587,10 @@ src/
       connections.yaml           # migrated from config/connection_ontology.yaml
       _loader.py                 # private: YAML → EntityTypeInfo/ConnectionTypeInfo/PermittedRelationshipSet
 
-  diagram_kinds/                 # concrete DiagramKindModule implementations
+  diagram_types/                 # concrete DiagramTypeModule implementations
     __init__.py
     archimate_motivation/
-      __init__.py                # exports: module: DiagramKindModule
+      __init__.py                # exports: module: DiagramTypeModule
       config.yaml                # rendering config + filter (see schema below)
                                  # no renderer.py needed — GenericPumlRenderer handles this
     archimate_strategy/
@@ -617,15 +617,15 @@ src/
       # no renderer.py — GenericPumlRenderer with minimal config handles matrix layout
 ```
 
-### Diagram kind config.yaml schema
+### Diagram type config.yaml schema
 
 All rendering decisions are declared in config.yaml. `GenericPumlRenderer` reads
-this at construction time. A diagram kind module never needs to know which renderer
-will execute it; `DiagramKindBase.renderer` constructs `GenericPumlRenderer(self._config)`
+this at construction time. A diagram type module never needs to know which renderer
+will execute it; `DiagramTypeBase.renderer` constructs `GenericPumlRenderer(self._config)`
 automatically.
 
 ```yaml
-# src/diagram_kinds/archimate_business/config.yaml
+# src/diagram_types/archimate_business/config.yaml
 primary_ontology: archimate-next-snapshot1   # must name a registered ontology module
 accepted_domains: [business, common]         # entity filter: domain_dir must be in this list
 
@@ -726,17 +726,17 @@ def load_archimate_next_module(package_dir: Path) -> _ArchiMateNextModule:
     # ... load entities.yaml, connections.yaml, build types and rules ...
 ```
 
-### Example: archimate_business diagram kind
+### Example: archimate_business diagram type
 
-No `renderer.py` — `DiagramKindBase.renderer` constructs `GenericPumlRenderer(_config)`
+No `renderer.py` — `DiagramTypeBase.renderer` constructs `GenericPumlRenderer(_config)`
 automatically. The `__init__.py` is minimal: load config, declare accepted domains,
 expose the module instance.
 
 ```python
-# src/diagram_kinds/archimate_business/__init__.py
+# src/diagram_types/archimate_business/__init__.py
 from pathlib import Path
 import yaml
-from src.domain.ontology_protocol import DiagramKindBase, DiagramKindModule
+from src.domain.ontology_protocol import DiagramTypeBase, DiagramTypeModule
 from src.domain.module_types import DiagramKindName
 from src.domain.permitted_relationships import PermittedRelationshipSet
 from src.ontologies.archimate_next import module as archimate_next
@@ -744,13 +744,13 @@ from src.ontologies.archimate_next import module as archimate_next
 _config = yaml.safe_load((Path(__file__).parent / "config.yaml").read_text())
 _accepted_domains = frozenset(_config["accepted_domains"])
 
-class _ArchiMateBusinessDiagramKind(DiagramKindBase):
+class _ArchiMateBusinessDiagramType(DiagramTypeBase):
     name = DiagramKindName("archimate-business")
     primary_ontology = archimate_next
     own_entity_types = {}
     own_connection_types = {}
     own_permitted_relationships = PermittedRelationshipSet.empty()
-    _config = _config  # DiagramKindBase.renderer reads this
+    _config = _config  # DiagramTypeBase.renderer reads this
 
     def accepts_entity_type(self, t):
         info = archimate_next.entity_types.get(t)
@@ -759,22 +759,22 @@ class _ArchiMateBusinessDiagramKind(DiagramKindBase):
     def accepts_connection_type(self, t):
         return t in archimate_next.connection_types
 
-module: DiagramKindModule = _ArchiMateBusinessDiagramKind()
+module: DiagramTypeModule = _ArchiMateBusinessDiagramType()
 ```
 
-The full config.yaml is shown in the schema section above. A diagram kind that needs
+The full config.yaml is shown in the schema section above. A diagram type that needs
 a custom renderer — say, one targeting smetana or SVG output — overrides the `renderer`
 property and provides a `renderer.py`:
 
 ```python
-# src/diagram_kinds/some_custom_kind/renderer.py
+# src/diagram_types/some_custom_kind/renderer.py
 from src.domain.ontology_protocol import DiagramRenderer
 class CustomRenderer:
     def render_body(self, entities, connections, diagram_type, repo_root): ...
     def inject_includes(self, body, repo_root): ...
 
-# src/diagram_kinds/some_custom_kind/__init__.py  (excerpt)
-class _CustomDiagramKind(DiagramKindBase):
+# src/diagram_types/some_custom_kind/__init__.py  (excerpt)
+class _CustomDiagramType(DiagramTypeBase):
     ...
     @property
     def renderer(self) -> DiagramRenderer:
@@ -791,16 +791,16 @@ The registry is built once and injected as a FastAPI dependency (or equivalent):
 # src/infrastructure/app_bootstrap.py
 from src.domain.module_registry import ModuleRegistry
 from src.ontologies.archimate_next import module as archimate_next_module
-from src.diagram_kinds.archimate_business import module as archimate_business_kind
-# ... other diagram kind imports ...
-from src.diagram_kinds.matrix import module as matrix_kind
+from src.diagram_types.archimate_business import module as archimate_business_type
+# ... other diagram type imports ...
+from src.diagram_types.matrix import module as matrix_type
 
 def build_module_registry() -> ModuleRegistry:
     registry = ModuleRegistry()
     registry.register_ontology(archimate_next_module)
-    registry.register_diagram_kind(archimate_business_kind)
-    # ... register all diagram kinds ...
-    registry.register_diagram_kind(matrix_kind)
+    registry.register_diagram_type(archimate_business_type)
+    # ... register all diagram types ...
+    registry.register_diagram_type(matrix_type)
     return registry
 
 # FastAPI dependency
@@ -826,15 +826,15 @@ This validation is discovery-driven rather than declarative:
   `attributes.{entity-type}.schema.json` filenames
 - used connection types are derived from indexed connection records and from repo-local
   `connection-metadata.{connection-type}.schema.json` filenames
-- used diagram kinds are derived from indexed diagram records
+- used diagram types are derived from indexed diagram records
 
 Those discovered sets are compared to:
 
 - `registry.all_entity_types()`
 - `registry.all_connection_types()`
-- `registry.all_diagram_kinds()`
+- `registry.all_diagram_types()`
 
-If any indexed repo uses an unsupported entity type, connection type, or diagram kind,
+If any indexed repo uses an unsupported entity type, connection type, or diagram type,
 startup aborts with a discrepancy report that lists unsupported names by category and,
 where available, example artifact ids or file paths that triggered each discrepancy.
 
@@ -884,8 +884,8 @@ existing import sites.
       `PermittedRelationshipSet` with `filter_to`, `__or__`, `empty`
 - [x] Update `src/domain/ontology_types.py`: make `archimate_element_type` nullable
       (`str | None`); add `classifications: tuple[str, ...]` to `ConnectionTypeInfo`
-- [x] Add `src/domain/ontology_protocol.py`: `OntologyModule`, `DiagramKindModule`,
-      `DiagramRenderer` protocols; `DiagramKindBase` mixin
+- [x] Add `src/domain/ontology_protocol.py`: `OntologyModule`, `DiagramTypeModule`,
+      `DiagramRenderer` protocols; `DiagramTypeBase` mixin
 - [x] Add `src/domain/module_registry.py`: `ModuleRegistry` class (all methods)
 - [x] Write unit tests for `PermittedRelationshipSet` (filter_to, union, permits)
 - [x] Write unit tests for `ModuleRegistry` (register/unregister/replace, aggregated
@@ -978,15 +978,15 @@ profiles are repo-local, custom, and must remain full JSON Schema documents.
       (446 tests passing, including regression coverage for app-state registry wiring
       and ontology-driven entity template scaffolding)
 
-### Phase 3 — Diagram kind modules and generic renderer
+### Phase 3 — Diagram type modules and generic renderer
 
 Goal: eliminate all diagram-type string dispatch outside the registry; no new MCP
-tools or API routes for new diagram kinds — the generic tooling routes through the
+tools or API routes for new diagram types — the generic tooling routes through the
 registry and each kind's `renderer`.
 
 **Generic renderer**
 - [x] Implement `src/infrastructure/rendering/generic_puml_renderer.py`:
-      - Constructor accepts a diagram kind config dict (loaded from config.yaml)
+      - Constructor accepts a diagram type config dict (loaded from config.yaml)
       - `render_body`: groups entities by `grouping.by_field`, emits grouping
         stereotypes per `grouping.stereotype_pattern`, renders entity declarations
         from the element-class pattern table, renders connection lines from
@@ -998,23 +998,23 @@ registry and each kind's `renderer`.
 - [x] Write unit tests for `GenericPumlRenderer` covering: grouping, include injection,
       each element-class rendering pattern, nesting hints
 
-**Diagram kind packages**
-- [x] Create `src/diagram_kinds/__init__.py`
-- [x] For each ArchiMate domain view, create a diagram kind package
+**Diagram type packages**
+- [x] Create `src/diagram_types/__init__.py`
+- [x] For each ArchiMate domain view, create a diagram type package
       (`archimate_motivation`, `archimate_strategy`, `archimate_business`,
       `archimate_application`, `archimate_technology`, `archimate_implementation`,
       `archimate_full` / current compatibility kind `archimate_layered`) containing:
       - `config.yaml`: full rendering config (accepted_domains, grouping, includes, layout)
       - `__init__.py`: minimal — load config, declare accepted domains, expose module
-      - No `renderer.py` — `DiagramKindBase.renderer` handles it
-- [x] Create `src/diagram_kinds/matrix/` with `FreeOntology` primary:
+      - No `renderer.py` — `DiagramTypeBase.renderer` handles it
+- [x] Create `src/diagram_types/matrix/` with `FreeOntology` primary:
       - `config.yaml`: no grouping, no includes, no layout hints
       - `__init__.py`: accepts all entity types, no connection rules
       - Matrix keeps its own `_MatrixRenderer` (raises on `render_body` since matrix
-        diagrams use the markdown renderer, not PUML); registered in `register_default_diagram_kinds`
+        diagrams use the markdown renderer, not PUML); registered in `register_default_diagram_types`
 
 **Registry wiring and dispatch migration**
-- [x] Register all diagram kinds in `app_bootstrap.py`
+- [x] Register all diagram types in `app_bootstrap.py`
 - [x] Replace render dispatch in `diagram_builder.py` with
       `registry.get_diagram_kind(name).renderer.render_body(...)`;
       remaining `diagram_type == "matrix"` checks in routers are response-shaping
@@ -1032,9 +1032,9 @@ registry and each kind's `renderer`.
 - [x] Migrate `_diagram_context.py` entity/connection selection lists to call
       `registry.get_diagram_kind(diagram_type).effective_entity_types()` and
       `effective_connection_types()` instead of hardcoded domain lists
-- [x] Expose a `/diagram-kinds/{name}/entity-types` and `/connection-types` read-only
+- [x] Expose a `/diagram-types/{name}/entity-types` and `/connection-types` read-only
       API endpoint (or extend the existing entities endpoint) that returns the effective
-      vocabulary for a given diagram kind — this is the API surface the future GUI canvas
+      vocabulary for a given diagram type — this is the API surface the future GUI canvas
       will call; no new write tools needed
 
 ### Phase 4 — Remove legacy shims
@@ -1053,7 +1053,7 @@ Prerequisites: Phases 1–3 fully migrated and all tests green.
 
 - [x] Write `tools/generate_types.py`: queries the registry, emits
       `tools/gui/src/domain/types.generated.ts` containing string literal unions
-      for entity type names, connection type names, domain names, and diagram kind names
+      for entity type names, connection type names, domain names, and diagram type names
 - [x] Add generation step to the frontend build (`package.json` `prebuild` + `generate-types` scripts)
 - [x] Replace hardcoded domain colour map and option lists in `tools/gui/src/ui/lib/domains.ts`
       with imports from `types.generated.ts` (domain names) plus `DOMAIN_CONFIG` for
@@ -1068,11 +1068,11 @@ Prerequisites: Phases 1–3 fully migrated and all tests green.
 ### Phase 6 — Cleanup and hardening
 
 - [x] Add startup compatibility validation for indexed repos in the bootstrap/runtime
-      path: discover used entity types, connection types, and diagram kinds from
+      path: discover used entity types, connection types, and diagram types from
       indexed content and per-type schema filenames; compare against the registered
       ontology/diagram modules and abort startup on unsupported usage
 - [x] Include actionable discrepancy reports in startup failures: list unsupported
-      entity types, connection types, and diagram kinds separately, with example
+      entity types, connection types, and diagram types separately, with example
       artifact ids or file paths where they were found
 - [x] Add tests covering multi-repo and multi-ontology workspaces:
       supported mixed-ontology content starts successfully; unsupported types in repo
@@ -1081,14 +1081,14 @@ Prerequisites: Phases 1–3 fully migrated and all tests green.
       `entity_types_with_class("internal")` — consolidate duplicated guard logic into
       shared predicate functions in the application layer
 - [x] Add protocol compliance tests: each registered `OntologyModule` and
-      `DiagramKindModule` is checked with `isinstance(m, OntologyModule)` / `isinstance(m, DiagramKindModule)`
+      `DiagramTypeModule` is checked with `isinstance(m, OntologyModule)` / `isinstance(m, DiagramTypeModule)`
       (using `runtime_checkable`) and a suite of contract assertions (e.g. that
       `effective_permitted_relationships` only references type names present in the
       module's entity/connection vocabulary)
 - [x] Document the extension contract in `src/ontologies/README.md`: how to add a new
       ontology module (SysML v2 example skeleton), how to register it, what the YAML
       schema must contain
-- [x] Document the diagram kind extension contract in `src/diagram_kinds/README.md`:
+- [x] Document the diagram type extension contract in `src/diagram_types/README.md`:
       the full config.yaml schema, when `renderer.py` is and is not needed, the
       element-class pattern table and how to extend it for a new element class
 - [x] Update project README to reflect new structure
@@ -1111,13 +1111,13 @@ ontology modules may use different YAML schemas for their connection rules as lo
 their loaders produce a valid `PermittedRelationshipSet`.
 
 **No hot-reload.**
-Modules are registered at startup. Changing an ontology or diagram kind requires a
+Modules are registered at startup. Changing an ontology or diagram type requires a
 server restart. This is acceptable for the current deployment model.
 
 **Multiple ontologies across repos are supported; constrained diagrams still bind to one.**
 The workspace may legitimately contain entities from multiple registered ontologies
-across one or more indexed repos. `FreeOntology` diagram kinds may display such mixed
-content, but contribute no structural connection rules. A diagram kind with a specific
+across one or more indexed repos. `FreeOntology` diagram types may display such mixed
+content, but contribute no structural connection rules. A diagram type with a specific
 `primary_ontology` remains constrained to that ontology's vocabulary. Mixing ArchiMate
 and SysML entities in one constrained diagram is out of scope; it would require a
 composed ontology module with explicitly declared cross-module connection rules.
@@ -1129,6 +1129,6 @@ composed ontology module with explicitly declared cross-module connection rules.
 - SysML v2 ontology implementation (the architecture accommodates it; implementation is future work)
 - Activity diagram renderer with smetana (the `DiagramRenderer` protocol accommodates it)
 - Interactive GUI canvas diagram builder (the `accepts_entity_type` / `accepts_connection_type`
-  contract on `DiagramKindModule` provides the API surface this feature needs; the GUI
+  contract on `DiagramTypeModule` provides the API surface this feature needs; the GUI
   work itself is out of scope here)
 - Hot-reload or runtime module replacement

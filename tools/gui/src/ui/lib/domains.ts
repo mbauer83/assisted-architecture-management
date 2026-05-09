@@ -22,7 +22,7 @@ export const DOMAIN_OPTIONS = [
   ...DOMAIN_NAMES
     .filter(n => n !== 'unknown')
     .map(name => ({
-      key: name as string,
+      key: name,
       label: DOMAIN_CONFIG[name]?.label ?? (name.charAt(0).toUpperCase() + name.slice(1)),
     })),
 ]

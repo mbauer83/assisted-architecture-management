@@ -7,7 +7,7 @@ from pathlib import Path
 from typing import Literal
 
 from src.domain.artifact_types import ConnectionRecord, EntityRecord
-from src.infrastructure.diagram_kinds import find_diagram_kind, get_diagram_kind
+from src.infrastructure.diagram_types import find_diagram_type, get_diagram_type
 from src.infrastructure.mcp.artifact_mcp.context import (
     RepoScope,
     repo_cached,
@@ -49,7 +49,7 @@ def build_diagram_scaffold(
 
     connections = _selected_connections(repo=repo, entity_ids=id_set)
     kind_name = _scaffold_diagram_kind_name(entities)
-    puml = get_diagram_kind(kind_name).renderer.render_body(
+    puml = get_diagram_type(kind_name).renderer.render_body(
         diagram_name,
         entities,
         connections,
@@ -98,7 +98,7 @@ def _scaffold_diagram_kind_name(entities: list[EntityRecord]) -> str:
     domains = {entity.domain for entity in entities if entity.domain and entity.domain != "common"}
     if len(domains) == 1:
         candidate = f"archimate-{next(iter(domains))}"
-        if find_diagram_kind(candidate) is not None:
+        if find_diagram_type(candidate) is not None:
             return candidate
     return "archimate-layered"
 

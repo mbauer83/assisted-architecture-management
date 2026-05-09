@@ -13,15 +13,15 @@ from src.infrastructure.mcp.artifact_mcp.write._common import (
 )
 
 
-def artifact_write_help() -> dict[str, object]:
+def artifact_help() -> dict[str, object]:
     return artifact_write_ops.write_help()
 
 
-def artifact_write_modeling_guidance(
+def artifact_authoring_guidance(
     filter: list[str] | None = None,  # noqa: A002
+    diagram_type: str | None = None,
 ) -> dict[str, object]:
-    """Return focused modeling guidelines for the specified entity types or domains."""
-    return artifact_write_ops.get_type_guidance(filter=filter)
+    return artifact_write_ops.get_type_guidance(filter=filter, diagram_type=diagram_type)
 
 
 def artifact_create_entity(
@@ -71,33 +71,34 @@ def register(mcp: FastMCP) -> None:
     from src.infrastructure.mcp.artifact_mcp.write_queue import queued
 
     mcp.tool(
-        name="artifact_write_help",
-        title="Artifact Write: Type Catalog",
+        name="artifact_help",
+        title="Artifact: Type Catalog",
         description=(
-            "Return the full catalog of valid artifact_type and connection_type values. "
-            "Call this before artifact_create_entity or artifact_add_connection — type names "
-            "are non-obvious identifiers and guessing them causes validation errors."
+            "Return the full catalog of artifact types, entity types (by domain), connection types "
+            "(by language), and diagram types (with accepted domains). "
+            "Call this first to discover valid type names — guessing them causes validation errors. "
+            "For detailed authoring guidance call artifact_authoring_guidance."
         ),
         annotations=READ_ONLY,
         structured_output=False,
-    )(artifact_write_help)
+    )(artifact_help)
 
     mcp.tool(
-        name="artifact_write_modeling_guidance",
-        title="Artifact Write: Modeling Guidelines",
+        name="artifact_authoring_guidance",
+        title="Artifact: Authoring Guidance",
         description=(
-            "Return focused modeling guidelines for a selectable subset of ArchiMate entity "
-            "types or domains. Includes for each type: name, prefix, archimate_domain "
-            "(omitted when filtering by domain), element_classes, create_when, "
-            "never_create_when, and permitted_connections (outgoing/incoming/symmetric "
-            "classified by connection type and counterpart entity type). "
-            "filter accepts either entity-type names (e.g. ['requirement', 'goal']) or "
-            "domain names (e.g. ['Motivation', 'Strategy']) — never mixed. "
-            "Omit filter to return guidance for all entity types."
+            "Return authoring guidance before creating entities or diagrams. "
+            "Two independent params (usable separately or together):\n"
+            "• diagram_type (str): diagram type block — when_to_use, when_not_to_use, "
+            "accepted_domains, own entity types, diagram_entities schema.\n"
+            "• filter (list[str]): entity type guidance — create_when, never_create_when, "
+            "permitted_connections. Pass type names (e.g. ['requirement', 'goal']) "
+            "or domain names (e.g. ['motivation', 'strategy']) — not mixed.\n"
+            "Omit both to return all entity type guidance (large; prefer filtering)."
         ),
         annotations=READ_ONLY,
         structured_output=False,
-    )(artifact_write_modeling_guidance)
+    )(artifact_authoring_guidance)
 
     mcp.tool(
         name="artifact_create_entity",

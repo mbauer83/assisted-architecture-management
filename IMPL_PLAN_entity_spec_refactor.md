@@ -5,7 +5,7 @@
 **Constraints:** no backwards compatibility; migrate everything; ruff + zuban + tests green.
 
 **Phase 1 status: COMPLETE** — all steps ✅, tests green, entities and PUML files migrated.  
-**Phase 2 design: COMPLETE** — full design in `diagram-kind-ui-authoring-rfc.md` (approved).  
+**Phase 2 design: COMPLETE** — full design in `diagram-type-ui-authoring-rfc.md` (approved).  
 **Next action:** implement Phase 2 starting at Step 2.1.
 
 ---
@@ -111,12 +111,12 @@ sprite_for(artifact_type) -> str | None                     # PlantUML sprite li
 - Implement `sprite_for`: reads glyph data via `_load_archimate_sprites()` helper; returns PlantUML sprite line or None. Sprite key: `$archimate_{artifact_type.replace("-", "_")}`.
 
 ### Step 1.8 — Diagram-kind `config.yaml` files ✅
-- **Files:** `src/diagram_kinds/archimate_*/config.yaml`, `src/diagram_kinds/matrix/config.yaml`
+- **Files:** `src/diagram_types/archimate_*/config.yaml`, `src/diagram_types/matrix/config.yaml`
 - Replace `accepted_domains: [...]` with `filter:\n  hierarchy_level:\n    index: 0\n    values: [...]`.
-- Matrix diagram kind: no filter (accepts all, via `_FreeOntologyType`).
+- Matrix diagram type: no filter (accepts all, via `_FreeOntologyType`).
 
 ### Step 1.9 — `_archimate_kind.py` loader ✅
-- **File:** `src/diagram_kinds/_archimate_kind.py`
+- **File:** `src/diagram_types/_archimate_kind.py`
 - Update `accepts_entity_type()` to evaluate `filter.hierarchy_level`.
 - Support `element_classes` and `entity_types` filter clauses (conjunctive).
 
@@ -134,8 +134,8 @@ sprite_for(artifact_type) -> str | None                     # PlantUML sprite li
 - `_domain_dir(entity)` → `_grouping_key(entity)`: uses `info.hierarchy[0]`.
 - `_entity_declaration`: sprite via registry's ontology `sprite_for()` result; stereotype key `artifact_type.replace("-", "_")`.
 - Remove `info.has_sprite` and `info.archimate_element_type` references.
-- Remove hardcoded `"archimate"` display section key → use `entity.display_blocks.get(display_section_id)` where `display_section_id` comes from the diagram kind's primary ontology.
-- Refactor: renderer receives `display_section_id` via constructor (from diagram kind config) or fetches from ontology in context.
+- Remove hardcoded `"archimate"` display section key → use `entity.display_blocks.get(display_section_id)` where `display_section_id` comes from the diagram type's primary ontology.
+- Refactor: renderer receives `display_section_id` via constructor (from diagram type config) or fetches from ontology in context.
 
 ### Step 1.12 — `diagram_builder.py` (GUI) ✅
 - **File:** `src/infrastructure/rendering/diagram_builder.py`
@@ -167,8 +167,8 @@ sprite_for(artifact_type) -> str | None                     # PlantUML sprite li
 - Add: `hierarchy: list` (full tuple as list), `ontology: str`.
 - `type_guidance.py`: filter by `info.hierarchy[0]` instead of `domain_dir`.
 
-### Step 1.17 — `diagram_kinds.py` infrastructure helper ✅
-- **File:** `src/infrastructure/diagram_kinds.py`
+### Step 1.17 — `diagram_types.py` infrastructure helper ✅
+- **File:** `src/infrastructure/diagram_types.py`
 - Fix any `domain_dir` references.
 
 ### Step 1.18 — Generate updated stereotype + glyph files ✅
@@ -199,7 +199,7 @@ sprite_for(artifact_type) -> str | None                     # PlantUML sprite li
 
 ## Phase 2: Diagram-Kind UI Authoring + Activity Diagrams
 
-> Full design in `diagram-kind-ui-authoring-rfc.md`. Implement the RFC's Groups A–I in order.
+> Full design in `diagram-type-ui-authoring-rfc.md`. Implement the RFC's Groups A–I in order.
 > Each group below maps directly to the checklist in RFC §10.
 
 ### Step 2.1 — Protocol + config infrastructure (RFC Group A)
@@ -207,28 +207,28 @@ sprite_for(artifact_type) -> str | None                     # PlantUML sprite li
   - Add `PermittedMappingSpec` dataclass (fields: `entity_types: tuple[str,...]`, `entity_classes: tuple[str,...]`).
   - Add `DiagramOwnEntityTypeUiConfig` dataclass (fields: `entity_type`, `label`, `plural`, `min`, `max`, `permitted_mappings`, `mapping_required`).
   - Add `DiagramKindUiConfig` dataclass (fields: `label`, `description`, `entity_search_filter`, `diagram_only_types`, `kind_ui_slots`).
-  - Add `ui_config` property to `DiagramKindModule` protocol.
-- **File:** `src/diagram_kinds/_archimate_kind.py`
+  - Add `ui_config` property to `DiagramTypeModule` protocol.
+- **File:** `src/diagram_types/_archimate_kind.py`
   - Add `ui_config` default property to `DiagramKindBase` returning `DiagramKindUiConfig(label=..., entity_search_filter=True)`.
   - Extend YAML config loading to parse the optional `ui:` section into `DiagramKindUiConfig`.
 - **File:** `src/infrastructure/rendering/generic_puml_renderer.py`
   - Before calling PlantUML: strip any leading `---…---` YAML block from the `.puml` content string.
   - Add configurable output size warning (default threshold 8 000 chars).
 
-### Step 2.2 — New diagram-kind API endpoints (RFC Group B)
-- **New file:** `src/infrastructure/gui/routers/diagram_kinds.py`
-  - `GET /api/diagram-kinds` — iterate `get_module_registry().all_diagram_kinds()`; return `[{key, label, description}]`.
-  - `GET /api/diagram-kinds/{diagram_type}/ui-config` — look up kind; serialise `kind.ui_config` to JSON.
+### Step 2.2 — New diagram-type API endpoints (RFC Group B)
+- **New file:** `src/infrastructure/gui/routers/diagram_types.py`
+  - `GET /api/diagram-types` — iterate `get_module_registry().all_diagram_types()`; return `[{key, label, description}]`.
+  - `GET /api/diagram-types/{diagram_type}/ui-config` — look up kind; serialise `kind.ui_config` to JSON.
 - **File:** `src/infrastructure/gui/routers/__init__.py` — include the new router.
 
-### Step 2.3 — `kind_data` in diagram read/write (RFC Group C)
+### Step 2.3 — `diagram_entities` in diagram read/write (RFC Group C)
 - **File:** `src/infrastructure/gui/routers/diagrams.py`
-  - Diagram detail response: add `kind_data: rec.extra.get("kind-data")` as a top-level JSON field. `DiagramRecord.extra` is **not** modified.
+  - Diagram detail response: add `diagram_entities: rec.extra.get("diagram-entities")` as a top-level JSON field. `DiagramRecord.extra` is **not** modified.
 - **File:** `src/infrastructure/gui/routers/_diagram_write.py`
-  - Add `kind_data: dict | None = None` to `CreateDiagramGuiBody` and `EditDiagramGuiBody`.
-  - Pass `kind_data` through to the write-layer functions.
+  - Add `diagram_entities: dict | None = None` to `CreateDiagramGuiBody` and `EditDiagramGuiBody`.
+  - Pass `diagram_entities` through to the write-layer functions.
 - **File:** `src/infrastructure/write/artifact_write/diagram.py`
-  - Accept `kind_data` param; write as `kind-data:` frontmatter key; trigger PUML regeneration after write.
+  - Accept `diagram_entities` param; write as `diagram-entities:` frontmatter key; trigger PUML regeneration after write.
 - **File:** `src/infrastructure/write/artifact_write/diagram_edit.py` — same for edit.
 
 ### Step 2.4 — Kind-scoped entity search (RFC Group D)
@@ -239,39 +239,39 @@ sprite_for(artifact_type) -> str | None                     # PlantUML sprite li
 
 ### Step 2.5 — MCP tool updates (RFC Group E)
 - **File:** `src/infrastructure/mcp/artifact_mcp/write/diagram.py`
-  - Add optional `kind_data: dict | None` param to `artifact_create_diagram` and `artifact_edit_diagram`; pass to write layer.
-- **File:** `src/infrastructure/mcp/artifact_mcp/write_tools.py` — update tool description strings to document `kind_data`.
-- **File:** `src/infrastructure/mcp/artifact_mcp/query_list_read_tools.py` — confirm `kind_data` appears in diagram read responses.
+  - Add optional `diagram_entities: dict | None` param to `artifact_create_diagram` and `artifact_edit_diagram`; pass to write layer.
+- **File:** `src/infrastructure/mcp/artifact_mcp/write_tools.py` — update tool description strings to document `diagram_entities`.
+- **File:** `src/infrastructure/mcp/artifact_mcp/query_list_read_tools.py` — confirm `diagram_entities` appears in diagram read responses.
 
-### Step 2.6 — Activity diagram kind (RFC Group F)
-- **New dir:** `src/diagram_kinds/activity/`
+### Step 2.6 — Activity diagram type (RFC Group F)
+- **New dir:** `src/diagram_types/activity/`
   - `config.yaml`: per RFC §8 (all domains; `ui:` section with `swimlane` entity type, `permitted_mappings`, `kind_ui_slots: {entity_context_panel: swimlane-assignment}`).
   - `__init__.py`: register the kind.
   - `renderer.py`: `ActivityPumlRenderer` — swimlane `|Lane label|` partitions; unassigned entities in trailing "Unassigned" lane; resolve `model_entity_id` entity name from repo when available; render model connections between included entities; compact output.
-- **File:** `src/diagram_kinds/__init__.py` — add `activity` to the registry.
+- **File:** `src/diagram_types/__init__.py` — add `activity` to the registry.
 
 ### Step 2.7 — Tests (RFC Group G)
-- **File:** `tests/tools/test_diagram_kind_routes.py` — extend: ui_config endpoint shape; `fuzzy_entity_hits` `accepted_entity_types` filter; `kind_data` round-trips create→read and edit→read.
+- **File:** `tests/tools/test_diagram_type_routes.py` — extend: ui_config endpoint shape; `fuzzy_entity_hits` `accepted_entity_types` filter; `diagram_entities` round-trips create→read and edit→read.
 - **New file:** `tests/rendering/test_activity_renderer.py` — swimlane partitions; unassigned fallback; frontmatter stripped; size warning fires at threshold.
 - **File:** `tests/domain/test_protocol_compliance.py` — add `activity` kind to compliance checks.
 
 ### Step 2.8 — Frontend (RFC Group H)
 Work through the frontend in dependency order:
-1. **`tools/gui/src/domain/schemas.ts`** — add `PermittedMappingSpecSchema`, `DiagramOwnEntityTypeUiConfigSchema`, `DiagramKindUiConfigSchema`; add `kind_data: Schema.optional(Schema.Unknown)` to `DiagramDetailSchema`; remove `extra` if unused in views.
+1. **`tools/gui/src/domain/schemas.ts`** — add `PermittedMappingSpecSchema`, `DiagramOwnEntityTypeUiConfigSchema`, `DiagramKindUiConfigSchema`; add `diagram_entities: Schema.optional(Schema.Unknown)` to `DiagramDetailSchema`; remove `extra` if unused in views.
 2. **`tools/gui/src/ports/ModelRepository.ts`** — add `listDiagramKinds()` and `getDiagramKindUiConfig(type)` methods.
 3. **`tools/gui/src/adapters/http/HttpModelRepository.ts`** — implement the two new port methods.
 4. **`tools/gui/src/ui/lib/diagramAuthoringExtensions.ts`** (NEW) — `Map<string, Component>` singleton; `registerExtension(key, component)` and `lookupExtension(key)`.
-5. **`tools/gui/src/ui/components/DiagramTypeSelect.vue`** (NEW) — fetches `/api/diagram-kinds`; emits selected key + full summary.
+5. **`tools/gui/src/ui/components/DiagramTypeSelect.vue`** (NEW) — fetches `/api/diagram-types`; emits selected key + full summary.
 6. **`tools/gui/src/ui/components/DiagramOwnEntityTypeSection.vue`** (NEW) — add/remove instances of one diagram-only entity type; `permitted_mappings` picker; min/max enforcement; `mapping_required` validation.
 7. **`tools/gui/src/ui/components/KindConfigPanel.vue`** (NEW) — receives `uiConfig` and `kindData`; renders `DiagramOwnEntityTypeSection` per `diagram_only_types` entry; mounts slot component per `kind_ui_slots` entry via `lookupExtension`; emits `kindDataChange` patch.
 8. **`tools/gui/src/ui/components/EntityPickerInput.vue`** — add `acceptedTypes: Set<string>` prop; client-side filter; pass `diagram_type` param to search endpoint.
-9. **`tools/gui/src/ui/views/CreateDiagramView.vue`** — replace hardcoded `DIAGRAM_TYPES` with `DiagramTypeSelect`; fetch `ui-config` on type change; pass to `KindConfigPanel`; include `kind_data` in create payload.
-10. **`tools/gui/src/ui/views/EditDiagramView.vue`** — fetch `ui-config` on load; integrate `KindConfigPanel`; hold `kindDataPatch: ref<Record<string, unknown>>`; deep-merge onto base `kind_data` on save.
+9. **`tools/gui/src/ui/views/CreateDiagramView.vue`** — replace hardcoded `DIAGRAM_TYPES` with `DiagramTypeSelect`; fetch `ui-config` on type change; pass to `KindConfigPanel`; include `diagram_entities` in create payload.
+10. **`tools/gui/src/ui/views/EditDiagramView.vue`** — fetch `ui-config` on load; integrate `KindConfigPanel`; hold `kindDataPatch: ref<Record<string, unknown>>`; deep-merge onto base `diagram_entities` on save.
 11. **`tools/gui/src/ui/components/SwimlaneAssignmentPanel.vue`** (NEW) — slot component; shows lane assignment for focused entity; reassign dropdown; emits `kindDataChange`.
 12. **`tools/gui/src/main.ts`** — register slot components into `DiagramAuthoringExtensions` at startup.
 
 ### Step 2.9 — Docs + quality gate (RFC Group I)
-- [ ] `src/diagram_kinds/README.md` — replace `domain_dir` → `hierarchy[0]`; document `ui:` section and `DiagramAuthoringExtensions` pattern.
+- [ ] `src/diagram_types/README.md` — replace `domain_dir` → `hierarchy[0]`; document `ui:` section and `DiagramAuthoringExtensions` pattern.
 - [ ] `uv run ruff check src/ tests/`
 - [ ] `uv run zuban check`
 - [ ] `uv run pytest -x`
@@ -301,8 +301,8 @@ Work through the frontend in dependency order:
 | `src/application/modeling/artifact_write_formatting.py` | Injectable display section |
 | `src/ontologies/archimate_next/entities.yaml` | Replace domain/subdir/archimate_element_type/has_sprite |
 | `src/ontologies/archimate_next/_loader.py` | Parse hierarchy; implement new protocol methods |
-| `src/diagram_kinds/archimate_*/config.yaml` | Replace accepted_domains with filter block |
-| `src/diagram_kinds/_archimate_kind.py` | New filter logic |
+| `src/diagram_types/archimate_*/config.yaml` | Replace accepted_domains with filter block |
+| `src/diagram_types/_archimate_kind.py` | New filter logic |
 | `src/infrastructure/write/artifact_write/entity.py` | New path; call render_display_section |
 | `src/infrastructure/write/artifact_write/admin_ops.py` | New path; call render_display_section |
 | `src/infrastructure/write/artifact_write/global_artifact_reference.py` | New path |
@@ -313,6 +313,6 @@ Work through the frontend in dependency order:
 | `src/infrastructure/rendering/generate_macros.py` | Delegate to ontology modules |
 | `src/infrastructure/rendering/_archimate_includes.py` | snake_case sprite/stereotype names |
 | `src/infrastructure/gui/routers/_diagram_context.py` | hierarchy[0], hierarchy[-1] |
-| `src/infrastructure/diagram_kinds.py` | Fix domain_dir refs |
+| `src/infrastructure/diagram_types.py` | Fix domain_dir refs |
 | `src/infrastructure/migration/entity_spec_v2_migration.py` | NEW — migration script |
 | `tests/**` | Update EntityTypeInfo construction; path assertions |

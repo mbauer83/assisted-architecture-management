@@ -138,9 +138,7 @@ def test_concurrent_tab_reads_are_not_serialized(tmp_path: Path) -> None:
 
             # 16 concurrent requests — simulate 16 open tabs.
             t1 = time.perf_counter()
-            await asyncio.gather(
-                *[client.get("/api/entities") for _ in range(16)]
-            )
+            await asyncio.gather(*[client.get("/api/entities") for _ in range(16)])
             wall = time.perf_counter() - t1
 
         return single, wall
@@ -150,8 +148,7 @@ def test_concurrent_tab_reads_are_not_serialized(tmp_path: Path) -> None:
     # With concurrent reads the total wall time should be close to a single
     # request, not 16×.  Allow 4× headroom for CI variance.
     assert wall < max(single * 4, 0.5), (
-        f"Concurrent reads appear serialized: 16 requests took {wall:.3f}s "
-        f"but single request took {single:.3f}s"
+        f"Concurrent reads appear serialized: 16 requests took {wall:.3f}s but single request took {single:.3f}s"
     )
 
 
@@ -179,8 +176,7 @@ def test_entity_context_reads_are_not_serialized(tmp_path: Path) -> None:
 
     single, wall = asyncio.run(_run())
     assert wall < max(single * 4, 0.5), (
-        f"Entity-context reads appear serialized: 12 requests took {wall:.3f}s "
-        f"but single request took {single:.3f}s"
+        f"Entity-context reads appear serialized: 12 requests took {wall:.3f}s but single request took {single:.3f}s"
     )
 
 
@@ -220,10 +216,7 @@ def test_reads_resume_promptly_after_index_refresh(tmp_path: Path) -> None:
             time.sleep(REFRESH_HOLD_S)
 
     refresh_thread = threading.Thread(target=_slow_refresh)
-    read_threads = [
-        threading.Thread(target=_reader, args=("/api/entities?domain=motivation",))
-        for _ in range(6)
-    ]
+    read_threads = [threading.Thread(target=_reader, args=("/api/entities?domain=motivation",)) for _ in range(6)]
 
     # Start the "refresh" first so it holds the write lock, then immediately
     # launch reader threads that will queue behind it.

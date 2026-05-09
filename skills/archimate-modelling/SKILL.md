@@ -164,7 +164,7 @@ the right tool without guessing.
 - `arch-repo-read` exposes query and verification tools only. They are read-only.
 - `arch-repo-write` exposes creation, editing, promotion, save/review, and bulk
   deletion tools.
-- `artifact_write_help` and `artifact_write_modeling_guidance` are exposed on the
+- `artifact_help` and `artifact_authoring_guidance` are exposed on the
   write server but are still read-only. They return YAML text, not structured JSON.
 - The single-item delete MCP tools are intentionally not part of the exposed MCP
   surface anymore. Use `artifact_bulk_delete`, even for a single delete.
@@ -173,7 +173,7 @@ the right tool without guessing.
 | Tool | When to use |
 |---|---|
 | `artifact_query_stats` | When you need broad orientation — confirms server connection, shows counts by domain/type. Use at the start of a fresh session or when the scope of existing content is genuinely unclear. Skip when the user's request is specific enough to go straight to targeted search. |
-| `artifact_write_help` | When uncertain about a type or connection identifier — returns the full catalog of valid `artifact_type` and `connection_type` names as YAML text. Call once; names are non-obvious and guessing causes validation errors. |
+| `artifact_help` | When uncertain about a type, connection, or diagram type identifier — returns the full catalog of valid names and diagram types as YAML text. Call once; names are non-obvious and guessing causes validation errors. Also lists diagram types with accepted domains. |
 
 ### Reading and searching
 | Tool | When to use |
@@ -188,7 +188,7 @@ the right tool without guessing.
 ### Type and connection guidance
 | Tool | When to use |
 |---|---|
-| `artifact_write_modeling_guidance` | Call when the right type or connection is unclear, or before creating elements in a domain you haven't modeled yet in this session. Returns YAML text covering `create_when`, `never_create_when`, and `permitted_connections` (outgoing/incoming/symmetric). The baked-in tables below cover quick orientation; this tool is authoritative and returns `permitted_connections` which the tables don't fully capture. `filter` accepts entity-type names (e.g. `["requirement", "goal"]`) OR domain names (e.g. `["Motivation"]`) — never mixed. Omit for all types. |
+| `artifact_authoring_guidance` | Call before creating entities, connections, or diagrams. Returns YAML text. **Entity types** (`filter=[...]`): covers `create_when`, `never_create_when`, and `permitted_connections` (outgoing/incoming/symmetric). `filter` accepts entity-type names (e.g. `["requirement", "goal"]`) OR domain names (e.g. `["motivation"]`) — never mixed. **Diagram types** (`diagram_type="..."`): covers `when_to_use`, `when_not_to_use`, `key_elements`, `accepted_domains`, `puml_notes`, and (for activity) a full `diagram_entities_schema`. Pass both parameters to get diagram type guidance alongside entity type detail. |
 
 ### Creating
 | Tool | When to use |
@@ -248,7 +248,7 @@ artifact_query_search_artifacts(query="<key concept>", limit=10)
 If the request is broad enough that you genuinely need a count overview first, call `artifact_query_stats` — but don't load broad stats before you know what you're looking for.
 
 **Step 2 — Resolve type and connection choices.**
-When the right entity type or connection is unclear, call `artifact_write_modeling_guidance(filter=[...])`. When the type is already obvious from context and the baked-in reference, skip this call. If you're working in a domain you haven't touched this session, call it once for that domain as a warm-up.
+When the right entity type or connection is unclear, call `artifact_authoring_guidance(filter=[...])`. When the type is already obvious from context and the baked-in reference, skip this call. If you're working in a domain you haven't touched this session, call it once for that domain as a warm-up.
 
 **Step 3 — Check for duplicates.**
 If Step 1 didn't already surface candidates, do a focused check before creating:
@@ -285,7 +285,7 @@ The `summary` parameter is the most important free-text field — it's what make
 
 ## Entity Type Quick Reference
 
-Use this table for quick orientation. Always confirm with `artifact_write_modeling_guidance`
+Use this table for quick orientation. Always confirm with `artifact_authoring_guidance`
 before committing to a type — it provides the full guidance and permitted connections.
 
 ### Motivation Domain
@@ -400,7 +400,7 @@ before committing to a type — it provides the full guidance and permitted conn
 - **Universal:** `archimate-association` (symmetric, always valid between any two types)
 - **Same type:** `archimate-aggregation`, `archimate-specialization` (always valid)
 
-When uncertain whether a connection is permitted, call `artifact_write_modeling_guidance`
+When uncertain whether a connection is permitted, call `artifact_authoring_guidance`
 with the source type — its `permitted_connections` field is authoritative.
 
 ---

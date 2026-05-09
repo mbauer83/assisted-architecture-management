@@ -13,10 +13,11 @@ _Y = ConnectionTypeName("conn-y")
 
 
 def _make(*triples: tuple[str, str, str]) -> PermittedRelationshipSet:
-    return PermittedRelationshipSet(frozenset(
-        PermittedRelationship(EntityTypeName(s), EntityTypeName(t), ConnectionTypeName(c))
-        for s, t, c in triples
-    ))
+    return PermittedRelationshipSet(
+        frozenset(
+            PermittedRelationship(EntityTypeName(s), EntityTypeName(t), ConnectionTypeName(c)) for s, t, c in triples
+        )
+    )
 
 
 class TestPermits:

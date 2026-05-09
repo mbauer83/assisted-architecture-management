@@ -41,12 +41,11 @@ def _alias_for(info: EntityTypeInfo, eid: str) -> str:
 def _render_display(info: EntityTypeInfo, name: str, eid: str) -> tuple[str, str]:
     """Return ``(display_section_id, display_content)`` for a new entity."""
     from src.infrastructure.app_bootstrap import get_module_registry  # noqa: PLC0415
+
     ontology = get_module_registry().ontology_for_entity_type(EntityTypeName(info.artifact_type))
     if ontology is None:
         return "archimate", f"label: {name}\nalias: {_alias_for(info, eid)}"
-    return ontology.display_section_id, ontology.render_display_section(
-        info.artifact_type, name, _alias_for(info, eid)
-    )
+    return ontology.display_section_id, ontology.render_display_section(info.artifact_type, name, _alias_for(info, eid))
 
 
 def create_entity(
@@ -77,6 +76,7 @@ def create_entity(
         )
 
     from src.infrastructure.app_bootstrap import get_module_registry  # noqa: PLC0415
+
     info = get_module_registry().find_entity_type(EntityTypeName(artifact_type))
     if info is None:
         raise ValueError(f"Unknown entity artifact_type: {artifact_type!r}")

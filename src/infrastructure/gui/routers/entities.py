@@ -10,7 +10,7 @@ from pydantic import BaseModel
 from src.application.artifact_parsing import parse_entity_content_sections
 from src.application.entity_type_predicates import is_internal_entity_type
 from src.application.read_models import EntityContextReadModel
-from src.infrastructure.diagram_kinds import diagram_kind_domain
+from src.infrastructure.diagram_types import diagram_type_domain
 from src.infrastructure.gui.routers import state as s
 from src.infrastructure.gui.routers.entity_listing import build_entity_summary_rows
 
@@ -276,7 +276,7 @@ def search_reference_artifacts(
 
     if kind in (None, "diagram"):
         for diagram in repo.list_diagrams():
-            domain = diagram_kind_domain(diagram.diagram_type)
+            domain = diagram_type_domain(diagram.diagram_type)
             if selected_domains and (domain is None or domain not in selected_domains):
                 continue
             if q_lc and q_lc not in diagram.name.lower() and q_lc not in diagram.artifact_id.lower():

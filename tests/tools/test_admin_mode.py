@@ -20,6 +20,7 @@ from src.infrastructure.artifact_index import shared_artifact_index
 # Fixtures
 # ---------------------------------------------------------------------------
 
+
 def _write(path: Path, content: str) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(content, encoding="utf-8")
@@ -128,79 +129,97 @@ def enterprise_root(tmp_path: Path) -> Path:
 # Boundary guard tests
 # ---------------------------------------------------------------------------
 
+
 class TestBoundaryGuards:
-    def test_standard_create_entity_rejects_enterprise_root(
-        self, engagement_root: Path, enterprise_root: Path
-    ) -> None:
+    def test_standard_create_entity_rejects_enterprise_root(self, engagement_root: Path, enterprise_root: Path) -> None:
         from src.application.verification.artifact_verifier import ArtifactVerifier
         from src.infrastructure.write.artifact_write.entity import create_entity
+
         with pytest.raises(ValueError, match="enterprise"):
             create_entity(
                 repo_root=enterprise_root,
                 verifier=ArtifactVerifier(None),
                 clear_repo_caches=lambda _: None,
-                artifact_type="requirement", name="Should Fail",
-                summary=None, properties=None, notes=None,
-                artifact_id=None, version="0.1.0", status="draft",
-                last_updated=None, dry_run=True,
+                artifact_type="requirement",
+                name="Should Fail",
+                summary=None,
+                properties=None,
+                notes=None,
+                artifact_id=None,
+                version="0.1.0",
+                status="draft",
+                last_updated=None,
+                dry_run=True,
             )
 
-    def test_standard_add_connection_rejects_enterprise_root(
-        self, enterprise_root: Path
-    ) -> None:
+    def test_standard_add_connection_rejects_enterprise_root(self, enterprise_root: Path) -> None:
         from src.application.verification.artifact_verifier import ArtifactRegistry, ArtifactVerifier
         from src.infrastructure.write.artifact_write.connection import add_connection
+
         with pytest.raises(ValueError, match="enterprise"):
             add_connection(
                 repo_root=enterprise_root,
                 registry=ArtifactRegistry(shared_artifact_index(enterprise_root)),
                 verifier=ArtifactVerifier(None),
                 clear_repo_caches=lambda _: None,
-                source_entity="X", connection_type="archimate-association",
-                target_entity="Y", description=None,
-                version="0.1.0", status="active",
-                last_updated=None, dry_run=True,
+                source_entity="X",
+                connection_type="archimate-association",
+                target_entity="Y",
+                description=None,
+                version="0.1.0",
+                status="active",
+                last_updated=None,
+                dry_run=True,
             )
 
-    def test_admin_create_entity_rejects_engagement_root(
-        self, engagement_root: Path
-    ) -> None:
+    def test_admin_create_entity_rejects_engagement_root(self, engagement_root: Path) -> None:
         from src.application.verification.artifact_verifier import ArtifactVerifier
         from src.infrastructure.write.artifact_write.admin_ops import admin_create_entity
+
         with pytest.raises(ValueError, match="enterprise"):
             admin_create_entity(
                 repo_root=engagement_root,  # wrong root → should be rejected
                 verifier=ArtifactVerifier(None),
                 clear_repo_caches=lambda _: None,
-                artifact_type="requirement", name="Should Fail",
-                summary=None, properties=None, notes=None,
-                artifact_id=None, version="0.1.0", status="draft",
-                last_updated=None, dry_run=True,
+                artifact_type="requirement",
+                name="Should Fail",
+                summary=None,
+                properties=None,
+                notes=None,
+                artifact_id=None,
+                version="0.1.0",
+                status="draft",
+                last_updated=None,
+                dry_run=True,
             )
 
-    def test_admin_create_entity_accepts_enterprise_root(
-        self, enterprise_root: Path
-    ) -> None:
+    def test_admin_create_entity_accepts_enterprise_root(self, enterprise_root: Path) -> None:
         from src.application.verification.artifact_verifier import ArtifactVerifier
         from src.infrastructure.write.artifact_write.admin_ops import admin_create_entity
+
         # dry_run=True — no files written, just verifies the guard passes
         result = admin_create_entity(
             repo_root=enterprise_root,
             verifier=ArtifactVerifier(None),
             clear_repo_caches=lambda _: None,
-            artifact_type="requirement", name="Enterprise Entity",
-            summary=None, properties=None, notes=None,
-            artifact_id=None, version="0.1.0", status="active",
-            last_updated=None, dry_run=True,
+            artifact_type="requirement",
+            name="Enterprise Entity",
+            summary=None,
+            properties=None,
+            notes=None,
+            artifact_id=None,
+            version="0.1.0",
+            status="active",
+            last_updated=None,
+            dry_run=True,
         )
         assert result.wrote is False  # dry_run
         # No exception means the enterprise boundary check passed
 
-    def test_standard_delete_entity_rejects_enterprise_root(
-        self, enterprise_root: Path
-    ) -> None:
+    def test_standard_delete_entity_rejects_enterprise_root(self, enterprise_root: Path) -> None:
         from src.application.verification.artifact_verifier import ArtifactRegistry
         from src.infrastructure.write.artifact_write.entity_delete import delete_entity
+
         with pytest.raises(ValueError, match="enterprise"):
             delete_entity(
                 repo_root=enterprise_root,
@@ -210,9 +229,7 @@ class TestBoundaryGuards:
                 dry_run=True,
             )
 
-    def test_admin_delete_entity_accepts_enterprise_root(
-        self, enterprise_root: Path
-    ) -> None:
+    def test_admin_delete_entity_accepts_enterprise_root(self, enterprise_root: Path) -> None:
         from src.application.verification.artifact_verifier import ArtifactRegistry
         from src.infrastructure.write.artifact_write.admin_ops import admin_delete_entity
 
@@ -231,10 +248,9 @@ class TestBoundaryGuards:
         )
         assert result.wrote is False
 
-    def test_standard_delete_diagram_rejects_enterprise_root(
-        self, enterprise_root: Path
-    ) -> None:
+    def test_standard_delete_diagram_rejects_enterprise_root(self, enterprise_root: Path) -> None:
         from src.infrastructure.write.artifact_write.diagram_delete import delete_diagram
+
         with pytest.raises(ValueError, match="enterprise"):
             delete_diagram(
                 repo_root=enterprise_root,
@@ -243,9 +259,7 @@ class TestBoundaryGuards:
                 dry_run=True,
             )
 
-    def test_admin_delete_diagram_accepts_enterprise_root(
-        self, enterprise_root: Path
-    ) -> None:
+    def test_admin_delete_diagram_accepts_enterprise_root(self, enterprise_root: Path) -> None:
         from src.infrastructure.write.artifact_write.admin_ops import admin_delete_diagram
 
         diag_id = "diag-1"
@@ -280,10 +294,9 @@ last-updated: '2026-04-20'
 # Broken-reference cleanup
 # ---------------------------------------------------------------------------
 
+
 class TestCleanupBrokenRefs:
-    def _setup(
-        self, engagement_root: Path, enterprise_root: Path
-    ) -> tuple[str, str, str]:
+    def _setup(self, engagement_root: Path, enterprise_root: Path) -> tuple[str, str, str]:
         """Returns (eng_id, grf_id, glo_id_that_no_longer_exists)."""
         eng_id = "REQ@1000000001.EngAaa.eng-req"
         grf_id = "GAR@1000000002.GrfBbb.broken-ref"
@@ -305,9 +318,7 @@ class TestCleanupBrokenRefs:
         # Enterprise repo does NOT contain glo_id_deleted
         return eng_id, grf_id, glo_id_deleted
 
-    def test_dry_run_reports_broken_grf(
-        self, engagement_root: Path, enterprise_root: Path
-    ) -> None:
+    def test_dry_run_reports_broken_grf(self, engagement_root: Path, enterprise_root: Path) -> None:
         from src.infrastructure.write.artifact_write.cleanup_broken_refs import cleanup_broken_refs
 
         _, grf_id, _ = self._setup(engagement_root, enterprise_root)
@@ -321,34 +332,24 @@ class TestCleanupBrokenRefs:
         assert "remove_connection" in kinds
         assert "delete_grf" in kinds
 
-    def test_dry_run_does_not_modify_files(
-        self, engagement_root: Path, enterprise_root: Path
-    ) -> None:
+    def test_dry_run_does_not_modify_files(self, engagement_root: Path, enterprise_root: Path) -> None:
         from src.infrastructure.write.artifact_write.cleanup_broken_refs import cleanup_broken_refs
 
         eng_id, grf_id, _ = self._setup(engagement_root, enterprise_root)
         grf_path = engagement_root / "model" / "common" / "global-artifact-reference" / f"{grf_id}.md"
-        outgoing_path = (
-            engagement_root / "model" / "motivation" / "requirement"
-            / f"{eng_id}.outgoing.md"
-        )
+        outgoing_path = engagement_root / "model" / "motivation" / "requirement" / f"{eng_id}.outgoing.md"
 
         cleanup_broken_refs(engagement_root, enterprise_root, dry_run=True)
 
         assert grf_path.exists(), "Dry run must not delete GRF"
         assert outgoing_path.exists(), "Dry run must not modify outgoing file"
 
-    def test_execute_removes_broken_grf_and_connections(
-        self, engagement_root: Path, enterprise_root: Path
-    ) -> None:
+    def test_execute_removes_broken_grf_and_connections(self, engagement_root: Path, enterprise_root: Path) -> None:
         from src.infrastructure.write.artifact_write.cleanup_broken_refs import cleanup_broken_refs
 
         eng_id, grf_id, _ = self._setup(engagement_root, enterprise_root)
         grf_path = engagement_root / "model" / "common" / "global-artifact-reference" / f"{grf_id}.md"
-        outgoing_path = (
-            engagement_root / "model" / "motivation" / "requirement"
-            / f"{eng_id}.outgoing.md"
-        )
+        outgoing_path = engagement_root / "model" / "motivation" / "requirement" / f"{eng_id}.outgoing.md"
 
         report = cleanup_broken_refs(engagement_root, enterprise_root, dry_run=False)
 
@@ -358,9 +359,7 @@ class TestCleanupBrokenRefs:
         # Outgoing file removed (only connection was to the GRF)
         assert not outgoing_path.exists(), "Outgoing file should be deleted (no connections left)"
 
-    def test_non_broken_grf_not_touched(
-        self, engagement_root: Path, enterprise_root: Path
-    ) -> None:
+    def test_non_broken_grf_not_touched(self, engagement_root: Path, enterprise_root: Path) -> None:
         from src.infrastructure.write.artifact_write.cleanup_broken_refs import cleanup_broken_refs
 
         # Create a VALID GRF pointing to an enterprise entity that exists
@@ -387,9 +386,7 @@ class TestCleanupBrokenRefs:
         grf_path = engagement_root / "model" / "common" / "global-artifact-reference" / f"{grf_id}.md"
         assert grf_path.exists(), "Valid GRF should not be touched"
 
-    def test_no_broken_grfs_reports_empty(
-        self, engagement_root: Path, enterprise_root: Path
-    ) -> None:
+    def test_no_broken_grfs_reports_empty(self, engagement_root: Path, enterprise_root: Path) -> None:
         from src.infrastructure.write.artifact_write.cleanup_broken_refs import cleanup_broken_refs
 
         report = cleanup_broken_refs(engagement_root, enterprise_root, dry_run=True)

@@ -90,7 +90,8 @@ export const DOMAIN_NAMES = [
 ] as const
 export type DomainName = typeof DOMAIN_NAMES[number]
 
-export const DIAGRAM_KIND_NAMES = [
+export const DIAGRAM_TYPE_NAMES = [
+  "activity",
   "archimate-application",
   "archimate-business",
   "archimate-implementation",
@@ -100,5 +101,5 @@ export const DIAGRAM_KIND_NAMES = [
   "archimate-technology",
   "matrix",
 ] as const
-export type DiagramKindName = typeof DIAGRAM_KIND_NAMES[number]
+export type DiagramTypeName = typeof DIAGRAM_TYPE_NAMES[number]
 

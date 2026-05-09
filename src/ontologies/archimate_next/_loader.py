@@ -10,16 +10,14 @@ from typing import Any, cast
 import yaml  # type: ignore[import-untyped]
 
 from src.domain.module_types import ConnectionTypeName, ElementClassName, EntityTypeName
-from src.domain.ontology_types import ConnectionTypeInfo, EntityTypeInfo
+from src.domain.ontology_types import ConnectionTypeInfo, ElementClassInfo, EntityTypeInfo
 from src.domain.permitted_relationships import (
     PermittedRelationship,
     PermittedRelationshipSet,
 )
 
 _PACKAGE_DIR = Path(__file__).parent
-_GLYPHS_PATH = (
-    _PACKAGE_DIR.parent.parent.parent / "tools" / "gui" / "src" / "ui" / "lib" / "archimateGlyphs.json"
-)
+_GLYPHS_PATH = _PACKAGE_DIR.parent.parent.parent / "tools" / "gui" / "src" / "ui" / "lib" / "archimateGlyphs.json"
 
 DISPLAY_SECTION_ID = "archimate"
 
@@ -45,11 +43,13 @@ class _ArchiMateNextModule:
         connection_types: dict[ConnectionTypeName, ConnectionTypeInfo],
         permitted_relationships: PermittedRelationshipSet,
         matrix_abbreviations: dict[str, str],
+        element_classes: dict[str, ElementClassInfo] | None = None,
     ) -> None:
         self._entity_types = entity_types
         self._connection_types = connection_types
         self._permitted_relationships = permitted_relationships
         self._matrix_abbreviations = matrix_abbreviations
+        self._element_classes: dict[str, ElementClassInfo] = element_classes or {}
 
         self._class_index: dict[ElementClassName, frozenset[EntityTypeName]] = {}
         _class_build: dict[ElementClassName, set[EntityTypeName]] = {}
@@ -89,12 +89,14 @@ class _ArchiMateNextModule:
     def matrix_abbreviations(self) -> dict[str, str]:
         return self._matrix_abbreviations
 
+    @property
+    def element_classes(self) -> dict[str, ElementClassInfo]:
+        return self._element_classes
+
     def entity_types_with_class(self, cls: ElementClassName) -> frozenset[EntityTypeName]:
         return self._class_index.get(ElementClassName(cls), frozenset())
 
-    def connection_types_with_classification(
-        self, classification: str
-    ) -> frozenset[ConnectionTypeName]:
+    def connection_types_with_classification(self, classification: str) -> frozenset[ConnectionTypeName]:
         return self._classification_index.get(classification, frozenset())
 
     def permits_connection(
@@ -136,6 +138,7 @@ class _ArchiMateNextModule:
         from src.infrastructure.rendering._svg_sprite_convert import (  # noqa: PLC0415
             browser_markup_to_plantuml_svg as _convert,
         )
+
         key = _sprite_key(artifact_type)
         return f"sprite $archimate_{key} {_convert(markup)}"
 
@@ -214,13 +217,27 @@ def _build_permitted_relationships(
             targets = [src] if raw_tgt == "@same" else _expand_ref(raw_tgt, all_types, class_members)
             for tgt in targets:
                 for ct in conn_types:
-                    rules.add(PermittedRelationship(
-                        source_type=EntityTypeName(src),
-                        target_type=EntityTypeName(tgt),
-                        connection_type=ct,
-                    ))
+                    rules.add(
+                        PermittedRelationship(
+                            source_type=EntityTypeName(src),
+                            target_type=EntityTypeName(tgt),
+                            connection_type=ct,
+                        )
+                    )
 
     return PermittedRelationshipSet(frozenset(rules))
+
+
+def _load_element_classes(data: dict[str, Any]) -> dict[str, ElementClassInfo]:
+    raw_classes: dict[str, Any] = data.get("element_classes") or {}
+    out: dict[str, ElementClassInfo] = {}
+    for ec_name, ec_info in raw_classes.items():
+        raw: dict[str, Any] = ec_info or {}
+        out[str(ec_name)] = ElementClassInfo(
+            name=str(ec_name),
+            description=str(raw.get("description") or ""),
+        )
+    return out
 
 
 def load_archimate_next_module(package_dir: Path) -> _ArchiMateNextModule:
@@ -233,10 +250,12 @@ def load_archimate_next_module(package_dir: Path) -> _ArchiMateNextModule:
     connection_types = _load_connection_types(conn_data)
     permitted = _build_permitted_relationships(conn_data, entity_types)
     matrix_abbreviations: dict[str, str] = dict(conn_data.get("matrix_abbreviations", {}))
+    element_classes = _load_element_classes(entity_data)
 
     return _ArchiMateNextModule(
         entity_types=entity_types,
         connection_types=connection_types,
         permitted_relationships=permitted,
         matrix_abbreviations=matrix_abbreviations,
+        element_classes=element_classes,
     )

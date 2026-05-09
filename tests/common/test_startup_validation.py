@@ -17,6 +17,7 @@ from src.domain.permitted_relationships import PermittedRelationshipSet
 
 # ── Stub helpers ──────────────────────────────────────────────────────────────
 
+
 def _entity_type(name: str) -> EntityTypeInfo:
     return EntityTypeInfo(
         artifact_type=name,
@@ -58,19 +59,21 @@ class _StubOntology:
     def permitted_relationships(self) -> PermittedRelationshipSet:
         return PermittedRelationshipSet.empty()
 
+    @property
+    def element_classes(self) -> dict:
+        return {}
+
     def entity_types_with_class(self, cls: ElementClassName) -> frozenset[EntityTypeName]:
         return frozenset(n for n, info in self._entity_types.items() if cls in info.element_classes)
 
     def connection_types_with_classification(self, c: str) -> frozenset[ConnectionTypeName]:
-        return frozenset(
-            n for n, info in self._connection_types.items() if c in info.classifications
-        )
+        return frozenset(n for n, info in self._connection_types.items() if c in info.classifications)
 
     def permits_connection(self, src: Any, tgt: Any, conn: Any) -> bool:
         return False
 
 
-class _StubDiagramKind:
+class _StubDiagramType:
     def __init__(self, name: str) -> None:
         self._name = name
 
@@ -107,12 +110,27 @@ class _StubDiagramKind:
         return PermittedRelationshipSet.empty()
 
     @property
+    def element_classes(self) -> dict:
+        return {}
+
+    @property
     def primary_ontology(self) -> Any:
         return None
 
     @property
     def renderer(self) -> Any:
         return None
+
+    @property
+    def ui_config(self) -> Any:
+        from src.domain.ontology_protocol import DiagramTypeUiConfig  # noqa: PLC0415
+
+        return DiagramTypeUiConfig(label="Stub")
+
+    def write_guidance(self) -> Any:
+        from src.domain.ontology_protocol import DiagramTypeWriteGuidance  # noqa: PLC0415
+
+        return DiagramTypeWriteGuidance(when_to_use="", when_not_to_use="")
 
 
 def _make_registry(
@@ -123,7 +141,7 @@ def _make_registry(
     reg = ModuleRegistry()
     reg.register_ontology(_StubOntology(entity_names, conn_names))
     for dk in diagram_kind_names:
-        reg.register_diagram_kind(_StubDiagramKind(dk))
+        reg.register_diagram_type(_StubDiagramType(dk))
     return reg
 
 
@@ -209,6 +227,7 @@ class _FakeRepo:
 
 # ── Tests ─────────────────────────────────────────────────────────────────────
 
+
 class TestCompatibleRepo:
     def test_empty_repo_passes(self) -> None:
         reg = _make_registry(["driver"], ["uses"], ["archimate-application"])
@@ -236,10 +255,12 @@ class TestUnknownEntityType:
 
     def test_deduplicates_per_type(self) -> None:
         reg = _make_registry(["driver"], [], [])
-        repo = _FakeRepo(entities=[
-            _entity("e1", "bad-type"),
-            _entity("e2", "bad-type"),
-        ])
+        repo = _FakeRepo(
+            entities=[
+                _entity("e1", "bad-type"),
+                _entity("e2", "bad-type"),
+            ]
+        )
         with pytest.raises(RepoCompatibilityError) as exc_info:
             validate_repo_compatibility(repo, reg)
         assert len([e for e in exc_info.value.errors if "bad-type" in e]) == 1
@@ -260,7 +281,7 @@ class TestUnknownConnectionType:
         assert "c1" in exc_info.value.errors[0]
 
 
-class TestUnknownDiagramKind:
+class TestUnknownDiagramType:
     def test_reports_unknown_diagram_kind(self) -> None:
         reg = _make_registry([], [], ["archimate-application"])
         repo = _FakeRepo(diagrams=[_diagram("d1", "legacy-view")])
@@ -318,7 +339,7 @@ class TestMultiRepoMultiOntology:
         reg = ModuleRegistry()
         reg.register_ontology(_StubOntology(["driver"], ["uses"], name="archimate"))
         reg.register_ontology(_StubOntology(["block"], ["connects"], name="sysml"))
-        reg.register_diagram_kind(_StubDiagramKind("archimate-application"))
+        reg.register_diagram_type(_StubDiagramType("archimate-application"))
         repo = _FakeRepo(
             entities=[_entity("e1", "driver"), _entity("e2", "block")],
             connections=[_conn("c1", "uses"), _conn("c2", "connects")],
@@ -353,6 +374,7 @@ class TestMultiRepoMultiOntology:
     def test_real_registry_accepts_archimate_types(self) -> None:
         """The real archimate_next module registry passes with known entity/connection types."""
         from src.infrastructure.app_bootstrap import build_module_registry
+
         reg = build_module_registry()
         repo = _FakeRepo(
             entities=[_entity("e1", "driver"), _entity("e2", "application-component")],

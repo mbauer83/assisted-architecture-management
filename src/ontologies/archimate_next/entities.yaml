@@ -11,6 +11,34 @@
 #   create_when         - A brief description for when to model something as this type
 #   never_create_when   - A brief description for when never to model something as this type
 
+element_classes:
+  motivation-element:
+    description: ArchiMate motivation layer element
+  structure-element:
+    description: Static structural element (ArchiMate)
+  behavior-element:
+    description: Dynamic/behavioral element (ArchiMate)
+  strategy-behavior-element:
+    description: Strategy-layer behavioral element
+  active-structure-element:
+    description: Active structure element that can perform behavior
+  internal-active-structure-element:
+    description: Active structure element that is internal to the enterprise
+  external-active-structure-element:
+    description: Active structure element that is external (interface)
+  technology-internal-active-structure-element:
+    description: Technology-layer internal active structure element
+  passive-structure-element:
+    description: Passive structure element (data, objects, artifacts)
+  composite-element:
+    description: Composite element that aggregates others (products, plateaus)
+  internal-behavior-element:
+    description: Behavioral element representing internal behavior
+  junction:
+    description: Junction element for combining or splitting relationships
+  internal:
+    description: Internal system element not directly modelable by users
+
 entity_types:
 
   # ── Motivation Domain ────────────────────────────────────────────────────

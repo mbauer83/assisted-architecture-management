@@ -16,6 +16,7 @@ from src.domain.permitted_relationships import PermittedRelationshipSet
 @lru_cache(maxsize=1)
 def _registry():
     from src.infrastructure.app_bootstrap import get_module_registry  # noqa: PLC0415
+
     return get_module_registry()
 
 

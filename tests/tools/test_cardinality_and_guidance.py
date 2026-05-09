@@ -20,6 +20,7 @@ from src.infrastructure.write.artifact_write.type_guidance import get_type_guida
 # Helpers
 # ---------------------------------------------------------------------------
 
+
 def _write(path: Path, content: str) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(content, encoding="utf-8")
@@ -91,6 +92,7 @@ def _setup_two_entities(repo: Path) -> tuple[str, str]:
 # Feature i: Cardinality support
 # ===========================================================================
 
+
 class TestFormatOutgoingWithCardinality:
     """Unit tests for the formatter — no file I/O."""
 
@@ -110,11 +112,13 @@ class TestFormatOutgoingWithCardinality:
             version="0.1.0",
             status="draft",
             last_updated="2026-04-17",
-            connections=[{
-                "connection_type": "archimate-realization",
-                "target_entity": "REQ@2.B.tgt",
-                "src_cardinality": "1",
-            }],
+            connections=[
+                {
+                    "connection_type": "archimate-realization",
+                    "target_entity": "REQ@2.B.tgt",
+                    "src_cardinality": "1",
+                }
+            ],
         )
         assert "### archimate-realization [1] → REQ@2.B.tgt" in content
 
@@ -124,11 +128,13 @@ class TestFormatOutgoingWithCardinality:
             version="0.1.0",
             status="draft",
             last_updated="2026-04-17",
-            connections=[{
-                "connection_type": "archimate-realization",
-                "target_entity": "REQ@2.B.tgt",
-                "tgt_cardinality": "0..*",
-            }],
+            connections=[
+                {
+                    "connection_type": "archimate-realization",
+                    "target_entity": "REQ@2.B.tgt",
+                    "tgt_cardinality": "0..*",
+                }
+            ],
         )
         assert "### archimate-realization → [0..*] REQ@2.B.tgt" in content
 
@@ -138,12 +144,14 @@ class TestFormatOutgoingWithCardinality:
             version="0.1.0",
             status="draft",
             last_updated="2026-04-17",
-            connections=[{
-                "connection_type": "archimate-realization",
-                "target_entity": "REQ@2.B.tgt",
-                "src_cardinality": "1",
-                "tgt_cardinality": "0..*",
-            }],
+            connections=[
+                {
+                    "connection_type": "archimate-realization",
+                    "target_entity": "REQ@2.B.tgt",
+                    "src_cardinality": "1",
+                    "tgt_cardinality": "0..*",
+                }
+            ],
         )
         assert "### archimate-realization [1] → [0..*] REQ@2.B.tgt" in content
 
@@ -153,11 +161,13 @@ class TestFormatOutgoingWithCardinality:
             version="0.1.0",
             status="draft",
             last_updated="2026-04-17",
-            connections=[{
-                "connection_type": "archimate-association",
-                "target_entity": "REQ@2.B.tgt",
-                "src_cardinality": "*",
-            }],
+            connections=[
+                {
+                    "connection_type": "archimate-association",
+                    "target_entity": "REQ@2.B.tgt",
+                    "src_cardinality": "*",
+                }
+            ],
         )
         assert "### archimate-association [*] → REQ@2.B.tgt" in content
 
@@ -167,12 +177,14 @@ class TestFormatOutgoingWithCardinality:
             version="0.1.0",
             status="draft",
             last_updated="2026-04-17",
-            connections=[{
-                "connection_type": "archimate-realization",
-                "target_entity": "REQ@2.B.tgt",
-                "src_cardinality": "1..5",
-                "tgt_cardinality": "1..*",
-            }],
+            connections=[
+                {
+                    "connection_type": "archimate-realization",
+                    "target_entity": "REQ@2.B.tgt",
+                    "src_cardinality": "1..5",
+                    "tgt_cardinality": "1..*",
+                }
+            ],
         )
         assert "### archimate-realization [1..5] → [1..*] REQ@2.B.tgt" in content
 
@@ -300,6 +312,7 @@ class TestAddConnectionWithCardinality:
 
     def test_add_connection_with_src_cardinality(self, repo: Path) -> None:
         from src.infrastructure.write.artifact_write.connection import add_connection
+
         src, tgt = _setup_two_entities(repo)
         registry = ArtifactRegistry(shared_artifact_index(repo))
         verifier = ArtifactVerifier(registry)
@@ -329,6 +342,7 @@ class TestAddConnectionWithCardinality:
 
     def test_add_connection_with_both_cardinalities(self, repo: Path) -> None:
         from src.infrastructure.write.artifact_write.connection import add_connection
+
         src, tgt = _setup_two_entities(repo)
         registry = ArtifactRegistry(shared_artifact_index(repo))
         verifier = ArtifactVerifier(registry)
@@ -361,6 +375,7 @@ class TestAddConnectionWithCardinality:
 # ===========================================================================
 # Feature i (extended): API body cardinality validation (Pydantic)
 # ===========================================================================
+
 
 class TestConnectionBodyCardinality:
     """Pydantic-level validation of cardinality fields on Add/Edit request bodies."""
@@ -469,34 +484,36 @@ class TestConnectionBodyCardinality:
 # Feature ii: element_category removed from EntityTypeInfo
 # ===========================================================================
 
+
 class TestElementCategoryRemoved:
     def test_entity_type_info_has_no_element_category(self) -> None:
         from src.domain.ontology_catalog import all_entity_types
+
         info = all_entity_types()["requirement"]
-        assert not hasattr(info, "element_category"), (
-            "element_category should have been removed from EntityTypeInfo"
-        )
+        assert not hasattr(info, "element_category"), "element_category should have been removed from EntityTypeInfo"
 
     def test_entity_type_info_still_has_element_classes(self) -> None:
         from src.domain.ontology_catalog import all_entity_types
+
         info = all_entity_types()["requirement"]
         assert hasattr(info, "element_classes")
         assert "motivation-element" in info.element_classes
 
     def test_category_map_not_exported(self) -> None:
         import src.domain.ontology_catalog as ol
-        assert not hasattr(ol, "CATEGORY_MAP"), (
-            "CATEGORY_MAP should have been removed from the ontology catalog"
-        )
+
+        assert not hasattr(ol, "CATEGORY_MAP"), "CATEGORY_MAP should have been removed from the ontology catalog"
 
 
 # ===========================================================================
-# Feature iii: artifact_write_modeling_guidance MCP tool
+# Feature iii: artifact_authoring_guidance MCP tool
 # ===========================================================================
+
 
 class TestGetTypeGuidance:
     def test_all_types_returned_when_no_filter(self) -> None:
         from src.domain.ontology_catalog import all_entity_types
+
         result = get_type_guidance()
         assert result["total"] == len(all_entity_types())
         assert isinstance(result["entity_types"], list)
@@ -540,8 +557,7 @@ class TestGetTypeGuidance:
     def test_each_entry_has_required_fields(self) -> None:
         result = get_type_guidance(filter=["requirement"])
         entry = result["entity_types"][0]
-        for field in ("name", "prefix", "element_classes", "create_when",
-                      "never_create_when", "permitted_connections"):
+        for field in ("name", "prefix", "element_classes", "create_when", "never_create_when", "permitted_connections"):
             assert field in entry, f"Missing field: {field}"
 
     def test_permitted_connections_structure(self) -> None:
@@ -571,7 +587,8 @@ class TestGetTypeGuidance:
         assert r_both["total"] == r_mot["total"] + r_str["total"]
 
     def test_mcp_tool_function_reachable(self) -> None:
-        from src.infrastructure.mcp.artifact_mcp.write.entity import artifact_write_modeling_guidance
-        result = artifact_write_modeling_guidance(filter=["stakeholder"])
+        from src.infrastructure.mcp.artifact_mcp.write.entity import artifact_authoring_guidance
+
+        result = artifact_authoring_guidance(filter=["stakeholder"])
         assert result["total"] == 1
         assert result["entity_types"][0]["name"] == "stakeholder"

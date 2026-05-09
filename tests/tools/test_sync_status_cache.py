@@ -19,9 +19,7 @@ def test_sync_status_cache_coalesces_concurrent_refreshes(monkeypatch) -> None:
     monkeypatch.setattr(sync_status_cache, "_compute_sync_status", fake_compute)
 
     async def run() -> list[dict[str, object]]:
-        return await asyncio.gather(
-            *[sync_status_cache.get_sync_status() for _ in range(25)]
-        )
+        return await asyncio.gather(*[sync_status_cache.get_sync_status() for _ in range(25)])
 
     results = asyncio.run(run())
 

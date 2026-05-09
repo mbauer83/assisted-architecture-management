@@ -88,9 +88,14 @@ def convert_repos(*repo_roots: Path) -> None:
 
 if __name__ == "__main__":
     import sys
+
     workspace = Path.cwd()
-    paths = [Path(a).resolve() for a in sys.argv[1:]] if sys.argv[1:] else [
-        workspace / "enterprise-repository",
-        *(workspace.glob("engagements/*/architecture-repository")),
-    ]
+    paths = (
+        [Path(a).resolve() for a in sys.argv[1:]]
+        if sys.argv[1:]
+        else [
+            workspace / "enterprise-repository",
+            *(workspace.glob("engagements/*/architecture-repository")),
+        ]
+    )
     convert_repos(*paths)

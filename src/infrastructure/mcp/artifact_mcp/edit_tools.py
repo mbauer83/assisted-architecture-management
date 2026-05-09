@@ -161,6 +161,8 @@ def artifact_edit_diagram(
     puml: str | Literal["auto-sync"] | None = None,
     name: str | None = None,
     keywords: list[str] | None = None,
+    diagram_entities: dict[str, object] | None = None,
+    diagram_connections: list[dict[str, object]] | None = None,
     version: str | None = None,
     status: str | None = None,
     dry_run: bool = True,
@@ -195,6 +197,10 @@ def artifact_edit_diagram(
         kwargs["name"] = name
     if keywords is not None:
         kwargs["keywords"] = keywords
+    if diagram_entities is not None:
+        kwargs["diagram_entities"] = diagram_entities
+    if diagram_connections is not None:
+        kwargs["diagram_connections"] = diagram_connections
     if version is not None:
         kwargs["version"] = version
     if status is not None:
@@ -318,7 +324,8 @@ def register_edit_tools(mcp: FastMCP) -> None:
             "names are refreshed, and PUML is regenerated. The response then includes "
             "removed_entity_ids and removed_connection_ids. "
             "Pass an explicit PUML string to replace the body with auto-layout re-applied. "
-            "Frontmatter fields (name, keywords, version, status) updated if provided. "
+            "Frontmatter fields (name, keywords, diagram_entities, diagram_connections, "
+            "version, status) updated if provided. "
             "Re-verifies and re-renders PNG on every write."
         ),
         annotations=LOCAL_WRITE,

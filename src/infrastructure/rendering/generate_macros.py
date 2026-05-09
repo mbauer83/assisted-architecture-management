@@ -48,10 +48,10 @@ def _extract_display_section_for_id(content: str, section_id: str) -> dict | Non
     m = _DISPLAY_SECTION.search(content)
     if not m:
         return None
-    display_text = content[m.end():]
+    display_text = content[m.end() :]
     for h3_match in _H3_SECTION.finditer(display_text):
         if h3_match.group(1).lower() == section_id.lower():
-            after_h3 = display_text[h3_match.end():]
+            after_h3 = display_text[h3_match.end() :]
             fence = _YAML_FENCE.search(after_h3)
             if not fence:
                 return None
@@ -78,6 +78,7 @@ def _macro_label(label: str, artifact_type: str) -> str:
 def _generate_glyph_include(repo_root: Path) -> Path:
     """Write _archimate-glyphs.puml using ontology sprite_for() methods."""
     from src.infrastructure.app_bootstrap import get_module_registry  # noqa: PLC0415
+
     registry = get_module_registry()
     mode = archimate_type_markers()
     lines = [
@@ -101,17 +102,52 @@ def _generate_glyph_include(repo_root: Path) -> Path:
 
 def _domain_order_index() -> dict[str, int]:
     from src.domain.ontology_catalog import domain_order  # noqa: PLC0415
+
     return {d: i for i, d in enumerate(domain_order())}
 
 
 _PREFIX_ORDER = [
-    "STK", "DRV", "ASS", "GOL", "OUT", "PRI", "REQ", "MEA", "VAL",
-    "CAP", "VS", "RES", "COA",
-    "SRV", "PRC", "FNC", "EVT", "ROL", "PTH", "JNA", "JNO",
-    "ACT", "BIF", "BOB", "PRD",
-    "APP", "AIF", "DOB",
-    "NOD", "DEV", "SSW", "TIF", "NET", "ART", "EQP", "FAC", "DIS", "MAT",
-    "WP", "DEL", "PLT",
+    "STK",
+    "DRV",
+    "ASS",
+    "GOL",
+    "OUT",
+    "PRI",
+    "REQ",
+    "MEA",
+    "VAL",
+    "CAP",
+    "VS",
+    "RES",
+    "COA",
+    "SRV",
+    "PRC",
+    "FNC",
+    "EVT",
+    "ROL",
+    "PTH",
+    "JNA",
+    "JNO",
+    "ACT",
+    "BIF",
+    "BOB",
+    "PRD",
+    "APP",
+    "AIF",
+    "DOB",
+    "NOD",
+    "DEV",
+    "SSW",
+    "TIF",
+    "NET",
+    "ART",
+    "EQP",
+    "FAC",
+    "DIS",
+    "MAT",
+    "WP",
+    "DEL",
+    "PLT",
 ]
 
 
@@ -138,6 +174,7 @@ def generate_macros(repo_root: Path, *, enterprise_root: Path | None = None) -> 
     Returns the path to the written file.
     """
     from src.infrastructure.app_bootstrap import get_module_registry  # noqa: PLC0415
+
     registry = get_module_registry()
 
     roots_to_scan: list[Path] = []
@@ -166,9 +203,13 @@ def generate_macros(repo_root: Path, *, enterprise_root: Path | None = None) -> 
             entity_info = registry.find_entity_type(
                 __import__("src.domain.module_types", fromlist=["EntityTypeName"]).EntityTypeName(artifact_type)
             )
-            ontology = registry.ontology_for_entity_type(
-                __import__("src.domain.module_types", fromlist=["EntityTypeName"]).EntityTypeName(artifact_type)
-            ) if entity_info else None
+            ontology = (
+                registry.ontology_for_entity_type(
+                    __import__("src.domain.module_types", fromlist=["EntityTypeName"]).EntityTypeName(artifact_type)
+                )
+                if entity_info
+                else None
+            )
 
             section_id = ontology.display_section_id if ontology else "archimate"
             block = _extract_display_section_for_id(content, section_id)

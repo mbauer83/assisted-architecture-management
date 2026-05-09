@@ -62,7 +62,7 @@ Required fields for each entity type:
 | `subdir` | string | Subdirectory within the domain |
 | `archimate_element_type` | string or `~` | CamelCase ArchiMate type name; `~` for non-ArchiMate ontologies |
 | `has_sprite` | bool | Whether a diagram sprite exists (only meaningful for ArchiMate rendering) |
-| `element_classes` | list of strings | Classification classes used by diagram kind filters and connection rules |
+| `element_classes` | list of strings | Classification classes used by diagram type filters and connection rules |
 | `create_when` | string | Agent/user guidance — when to create this type |
 | `never_create_when` | string | Agent/user guidance — when not to create this type |
 
@@ -170,15 +170,33 @@ def build_module_registry() -> ModuleRegistry:
     registry = ModuleRegistry()
     registry.register_ontology(archimate_next_module)
     registry.register_ontology(my_ontology_module)   # ← add this line
-    register_default_diagram_kinds(registry)
+    register_default_diagram_types(registry)
     return registry
 ```
 
 The registry merges all ontologies: `registry.all_entity_types()` returns the union of every registered ontology's entity vocabulary. Type names must be globally unique across all registered ontologies.
 
-### Step 6 — Add a diagram kind (optional)
+### Step 6 — Add a diagram type (optional)
 
-If the new ontology needs a purpose-built diagram view, add a diagram kind package under `src/diagram_kinds/`. See `src/diagram_kinds/README.md` for the extension contract.
+If the new ontology needs a purpose-built diagram view, add a diagram type package under `src/diagram_types/`. See `src/diagram_types/README.md` for the extension contract.
+
+## Cross-ontology connection rules and ownership
+
+Connection rules are globally unique: entity type names must not collide across registered ontologies (enforced at startup). This means an ArchiMate `permitted_relationships` rule referencing a `business-actor` source unambiguously identifies the same type regardless of which ontology contributed it.
+
+Connections fall into two ownership categories:
+
+| Category | Who declares the rule | Who owns the connection instance |
+|---|---|---|
+| **Model-to-model** | `permitted_relationships` in any `OntologyModule` | The model; stored as `ConnectionRecord` in the model store |
+| **Diagram-owned** | `permitted_connections` on a `DiagramOwnEntityTypeUiConfig` | The diagram; stored in `diagram-entities:` frontmatter |
+
+A connection between two model entity types is always model-owned. A connection that involves at least one diagram-only entity type (a type declared in `diagram_only_types` of some diagram type) must be declared as a diagram-owned rule. Use `ModuleRegistry.is_diagram_entity_type(name)` to classify a type at runtime.
+
+`DiagramKindBase.effective_permitted_relationships` automatically merges:
+1. Ontology `permitted_relationships` filtered to accepted entity/connection types
+2. The diagram type's `own_permitted_relationships`
+3. All `permitted_connections` rules from every `diagram_only_types` entry
 
 ## Protocol contract
 
@@ -189,6 +207,35 @@ Every ontology module must satisfy the `OntologyModule` protocol defined in `src
 - `permitted_relationships._rules` must only reference connection type names present in `connection_types`
 - `entity_types_with_class(cls)` must return a subset of `entity_types`
 
+## Required connections and owned entity types
+
+`EntityTypeInfo` supports a `required_connections` field (tuple of `RequiredConnection`). This is primarily used by diagram types for annotation/owned entity types (e.g. `note` entities that must always be attached to a host step). Non-ArchiMate model ontologies with owned member entities (class diagrams, SysML block-and-part diagrams) may also use `required_connections` to declare mandatory structural relationships.
+
+`RequiredConnection` fields:
+- `connection_type` — name of the connection type
+- `target` — entity type name or `@class-name` reference
+- `cardinality_min`, `cardinality_max` — bounds (`None` max = unbounded)
+
+For diagram types, `required_connections` on diagram-owned entity types drives annotation schema injection: when a connection type has `embedding: property`, the annotation entity's schema is injected as a named property (under `embed_key`) into the `$defs` of each matching host entity type in the generated diagram-entities JSON Schema.
+
+At runtime, note→step relationships are stored as `ConnectionRecord` objects (with the declared `conn_type`), not as properties on the note entity. Renderers receive the `connections` sequence alongside `diagram-entities` and build a step-id → note index from connections of the relevant type.
+
+## Element class declarations
+
+Every element class referenced in `element_classes` of any entity type must be declared in the originating module. Model ontologies declare them in `entities.yaml` under a top-level `element_classes:` block:
+
+```yaml
+element_classes:
+  structure-element:
+    description: Static structural element (ArchiMate)
+  behavior-element:
+    description: Dynamic/behavioral element (ArchiMate)
+```
+
+Diagram types declare their element classes in `config.yaml` under `element_classes:`. The `ModuleRegistry.all_element_classes()` method merges all declared classes; startup validation aborts if any entity type references an undeclared class.
+
 ## Startup validation
 
-At backend startup, `src/application/startup_validation.py` compares every entity type, connection type, and diagram kind found in indexed repo content against the registered modules. Startup is aborted if any unsupported type is found, with a report listing each unknown type and an example artifact ID. This prevents silent data corruption when an ontology module is removed or renamed while repos still contain artifacts of that type.
+At backend startup, `src/application/startup_validation.py` compares every entity type, connection type, and diagram type found in indexed repo content against the registered modules. Startup is aborted if any unsupported type is found, with a report listing each unknown type and an example artifact ID. This prevents silent data corruption when an ontology module is removed or renamed while repos still contain artifacts of that type.
+
+The validator also checks element class declarations: every `element_classes` value on every registered entity type and diagram-only entity type must be present in `registry.all_element_classes()`. Unknown class references are reported as errors.

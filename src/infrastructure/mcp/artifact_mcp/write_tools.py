@@ -14,9 +14,9 @@ from src.infrastructure.mcp.artifact_mcp.write.document import (
     artifact_edit_document,
 )
 from src.infrastructure.mcp.artifact_mcp.write.entity import (
+    artifact_authoring_guidance,
     artifact_create_entity,
-    artifact_write_help,
-    artifact_write_modeling_guidance,
+    artifact_help,
 )
 from src.infrastructure.mcp.artifact_mcp.write.promote import artifact_promote_to_enterprise
 
@@ -24,15 +24,15 @@ __all__ = [
     "DiagramConnectionInferenceMode",
     "WriteRepoScope",
     "artifact_add_connection",
+    "artifact_authoring_guidance",
     "artifact_bulk_delete",
     "artifact_create_diagram",
     "artifact_create_document",
     "artifact_create_entity",
     "artifact_create_matrix",
     "artifact_edit_document",
+    "artifact_help",
     "artifact_promote_to_enterprise",
-    "artifact_write_help",
-    "artifact_write_modeling_guidance",
 ]
 
 

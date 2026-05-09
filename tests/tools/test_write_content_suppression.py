@@ -19,6 +19,7 @@ from src.infrastructure.mcp.artifact_mcp.write._common import _out
 # Fake result dataclass for _out() unit tests
 # ---------------------------------------------------------------------------
 
+
 @dataclass
 class _FakeResult:
     wrote: bool = True
@@ -40,6 +41,7 @@ def repo(tmp_path: Path) -> Path:
 # ---------------------------------------------------------------------------
 # _out() unit tests
 # ---------------------------------------------------------------------------
+
 
 class TestOutHelper:
     def test_dry_run_includes_content(self):
@@ -85,11 +87,14 @@ class TestOutHelper:
 # Integration: artifact_create_entity
 # ---------------------------------------------------------------------------
 
+
 class TestCreateEntityContentSuppression:
     def test_dry_run_includes_content(self, repo: Path) -> None:
         result = mcp.artifact_create_entity(
-            artifact_type="requirement", name="DryRunContent",
-            dry_run=True, repo_root=str(repo),
+            artifact_type="requirement",
+            name="DryRunContent",
+            dry_run=True,
+            repo_root=str(repo),
         )
         assert result["wrote"] is False
         assert "content" in result
@@ -97,16 +102,20 @@ class TestCreateEntityContentSuppression:
 
     def test_live_write_omits_content(self, repo: Path) -> None:
         result = mcp.artifact_create_entity(
-            artifact_type="requirement", name="LiveWriteNoContent",
-            dry_run=False, repo_root=str(repo),
+            artifact_type="requirement",
+            name="LiveWriteNoContent",
+            dry_run=False,
+            repo_root=str(repo),
         )
         assert result["wrote"] is True
         assert "content" not in result
 
     def test_live_write_still_has_path_and_artifact_id(self, repo: Path) -> None:
         result = mcp.artifact_create_entity(
-            artifact_type="outcome", name="PathCheck",
-            dry_run=False, repo_root=str(repo),
+            artifact_type="outcome",
+            name="PathCheck",
+            dry_run=False,
+            repo_root=str(repo),
         )
         assert Path(str(result["path"])).exists()
         assert result["artifact_id"]
@@ -116,17 +125,19 @@ class TestCreateEntityContentSuppression:
 # Integration: artifact_edit_entity
 # ---------------------------------------------------------------------------
 
+
 class TestEditEntityContentSuppression:
     def _make(self, repo: Path, name: str) -> str:
-        r = mcp.artifact_create_entity(artifact_type="requirement", name=name,
-                                       dry_run=False, repo_root=str(repo))
+        r = mcp.artifact_create_entity(artifact_type="requirement", name=name, dry_run=False, repo_root=str(repo))
         return str(r["artifact_id"])
 
     def test_dry_run_edit_includes_content(self, repo: Path) -> None:
         eid = self._make(repo, "Edit Dry")
         result = mcp.artifact_edit_entity(
-            artifact_id=eid, summary="Preview summary",
-            dry_run=True, repo_root=str(repo),
+            artifact_id=eid,
+            summary="Preview summary",
+            dry_run=True,
+            repo_root=str(repo),
         )
         assert result["wrote"] is False
         assert "content" in result
@@ -135,8 +146,10 @@ class TestEditEntityContentSuppression:
     def test_live_edit_omits_content(self, repo: Path) -> None:
         eid = self._make(repo, "Edit Live")
         result = mcp.artifact_edit_entity(
-            artifact_id=eid, summary="Updated summary",
-            dry_run=False, repo_root=str(repo),
+            artifact_id=eid,
+            summary="Updated summary",
+            dry_run=False,
+            repo_root=str(repo),
         )
         assert result["wrote"] is True
         assert "content" not in result
@@ -144,8 +157,10 @@ class TestEditEntityContentSuppression:
     def test_live_edit_change_is_on_disk(self, repo: Path) -> None:
         eid = self._make(repo, "On Disk Check")
         result = mcp.artifact_edit_entity(
-            artifact_id=eid, summary="Persisted summary",
-            dry_run=False, repo_root=str(repo),
+            artifact_id=eid,
+            summary="Persisted summary",
+            dry_run=False,
+            repo_root=str(repo),
         )
         assert "Persisted summary" in Path(str(result["path"])).read_text()
 
@@ -154,18 +169,21 @@ class TestEditEntityContentSuppression:
 # Integration: artifact_add_connection
 # ---------------------------------------------------------------------------
 
+
 class TestAddConnectionContentSuppression:
     def _make(self, repo: Path, artifact_type: str, name: str) -> str:
-        r = mcp.artifact_create_entity(artifact_type=artifact_type, name=name,
-                                       dry_run=False, repo_root=str(repo))
+        r = mcp.artifact_create_entity(artifact_type=artifact_type, name=name, dry_run=False, repo_root=str(repo))
         return str(r["artifact_id"])
 
     def test_dry_run_connection_includes_content(self, repo: Path) -> None:
         src = self._make(repo, "goal", "Src")
         tgt = self._make(repo, "requirement", "Tgt")
         result = mcp.artifact_add_connection(
-            source_entity=src, connection_type="archimate-influence",
-            target_entity=tgt, dry_run=True, repo_root=str(repo),
+            source_entity=src,
+            connection_type="archimate-influence",
+            target_entity=tgt,
+            dry_run=True,
+            repo_root=str(repo),
         )
         assert result["wrote"] is False
         assert "content" in result
@@ -174,8 +192,11 @@ class TestAddConnectionContentSuppression:
         src = self._make(repo, "goal", "ConnSrc")
         tgt = self._make(repo, "requirement", "ConnTgt")
         result = mcp.artifact_add_connection(
-            source_entity=src, connection_type="archimate-influence",
-            target_entity=tgt, dry_run=False, repo_root=str(repo),
+            source_entity=src,
+            connection_type="archimate-influence",
+            target_entity=tgt,
+            dry_run=False,
+            repo_root=str(repo),
         )
         assert result["wrote"] is True
         assert "content" not in result

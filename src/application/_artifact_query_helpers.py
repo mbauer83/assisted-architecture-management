@@ -158,6 +158,8 @@ def read_entity(rec: EntityRecord, *, mode: Literal["summary", "full"]) -> dict[
         "content_snippet": rec.content_text[:400] + ("…" if len(rec.content_text) > 400 else ""),
         "keywords": list(rec.keywords),
     }
+    if rec.host_diagram_id is not None:
+        data["host_diagram_id"] = rec.host_diagram_id
     if mode == "full":
         data["content_text"] = rec.content_text
         data["display_blocks"] = rec.display_blocks

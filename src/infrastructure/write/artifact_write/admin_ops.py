@@ -70,6 +70,7 @@ def admin_create_entity(
     assert_enterprise_write_root(repo_root)
 
     from src.infrastructure.app_bootstrap import get_module_registry  # noqa: PLC0415
+
     info = get_module_registry().find_entity_type(EntityTypeName(artifact_type))
     if info is None:
         raise ValueError(f"Unknown entity artifact_type: {artifact_type!r}")
@@ -80,6 +81,7 @@ def admin_create_entity(
         _render_display,
         entity_path,
     )
+
     path = entity_path(repo_root, info, eid)
     display_section_id, display_content = _render_display(info, name, eid)
     content = format_entity_markdown(
@@ -173,6 +175,7 @@ def admin_edit_entity(
     fm = parsed.frontmatter
     artifact_type = str(fm.get("artifact-type", ""))
     from src.infrastructure.app_bootstrap import get_module_registry  # noqa: PLC0415
+
     get_module_registry().get_entity_type(EntityTypeName(artifact_type))
 
     eff_name = name if name is not None else str(fm.get("name", ""))
@@ -186,6 +189,7 @@ def admin_edit_entity(
     display_content = parsed.display_content
     if name is not None and display_content:
         import re as _re  # noqa: PLC0415
+
         display_content = _re.sub(r"(?m)^(label:\s*).*$", rf"\g<1>{eff_name}", display_content, count=1)
 
     content = format_entity_markdown(

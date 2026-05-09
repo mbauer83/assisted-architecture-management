@@ -34,6 +34,7 @@ def reset_executor():
 # Basic contract
 # ---------------------------------------------------------------------------
 
+
 class TestQueuedDecorator:
     def test_returns_coroutine_function(self):
         def sync_fn(x: int) -> int:
@@ -89,6 +90,7 @@ class TestQueuedDecorator:
 # Serialization
 # ---------------------------------------------------------------------------
 
+
 class TestSerialization:
     def test_concurrent_calls_are_serialized(self):
         """At most one queued write should run at a time."""
@@ -101,6 +103,7 @@ class TestSerialization:
                 active.append(task_id)
                 peak_concurrency.append(len(active))
             import time
+
             time.sleep(0.01)
             with lock:
                 active.remove(task_id)
@@ -114,9 +117,7 @@ class TestSerialization:
 
         results = asyncio.run(run_all())
         assert sorted(results) == list(range(8))
-        assert max(peak_concurrency) == 1, (
-            f"Expected max concurrency of 1, got {max(peak_concurrency)}"
-        )
+        assert max(peak_concurrency) == 1, f"Expected max concurrency of 1, got {max(peak_concurrency)}"
 
     def test_ordering_is_fifo(self):
         """Results should complete in the order submitted (FIFO queue)."""
@@ -161,6 +162,7 @@ class TestSerialization:
 
     def test_multiple_concurrent_exceptions_do_not_block(self):
         """Multiple concurrent failures should each propagate without deadlock."""
+
         def always_fail(task_id: int) -> None:
             raise ValueError(f"fail-{task_id}")
 
@@ -200,11 +202,7 @@ class TestSerialization:
         wrapped = queued(tracked_write)
         operation_id = asyncio.run(wrapped())
 
-        active_snapshots = [
-            snapshot
-            for snapshot in published
-            if snapshot.get("active_operation_id") == operation_id
-        ]
+        active_snapshots = [snapshot for snapshot in published if snapshot.get("active_operation_id") == operation_id]
         assert active_snapshots, published
         assert any(snapshot.get("active_tool_name") == "tracked_write" for snapshot in active_snapshots)
         assert any(snapshot.get("active_phase") == "apply" for snapshot in active_snapshots)
@@ -217,9 +215,11 @@ class TestSerialization:
 # Shutdown / reset
 # ---------------------------------------------------------------------------
 
+
 class TestShutdown:
     def test_shutdown_and_restart(self):
         """After shutdown, a new executor is created on the next call."""
+
         def sync_fn() -> str:
             return "alive"
 

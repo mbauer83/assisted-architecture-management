@@ -25,15 +25,17 @@ from src.config.repo_paths import DIAGRAM_CATALOG, DIAGRAMS
 from src.domain.artifact_types import ConnectionRecord, EntityRecord
 from src.domain.module_types import ElementClassName
 from src.domain.ontology_catalog import all_connection_types, all_entity_types
-from src.infrastructure.diagram_kinds import get_diagram_kind
+from src.infrastructure.diagram_types import get_diagram_type
 from src.infrastructure.rendering._diagram_layout import (
     build_visual_nesting,
 )
+from src.infrastructure.rendering.puml_safety import strip_leading_puml_frontmatter
 
 
 @lru_cache(maxsize=1)
 def _registry():
     from src.infrastructure.app_bootstrap import get_module_registry  # noqa: PLC0415
+
     return get_module_registry()
 
 
@@ -205,8 +207,7 @@ def _build_visual_nesting(
         structural_edges=structural_edges,
         neighbor_edges=neighbor_edges,
         junction_aliases={
-            alias for alias, entity in entity_by_alias.items()
-            if entity.artifact_type in _junction_types()
+            alias for alias, entity in entity_by_alias.items() if entity.artifact_type in _junction_types()
         },
     )
     for parent_alias, children in children_map.items():
@@ -222,18 +223,34 @@ def generate_archimate_puml_body(
     connection_records: list[ConnectionRecord],
     *,
     diagram_type: str = "archimate-business",
+    repo_root: Path = Path("."),
+    diagram_entities: dict[str, object] | None = None,
+    diagram_connections: list[dict[str, object]] | None = None,
 ) -> str:
-    kind = get_diagram_kind(diagram_type)
-    return kind.renderer.render_body(
+    diagram_type_mod = get_diagram_type(diagram_type)
+    return diagram_type_mod.renderer.render_body(
         name,
         entity_records,
         connection_records,
         diagram_type,
-        Path("."),
+        repo_root,
+        diagram_entities=diagram_entities,
+        diagram_connections=diagram_connections,
     )
 
 
-def _render_puml(puml_body: str, repo_root: Path, fmt: str) -> tuple[str | None, list[str]]:
+def _needs_archimate_includes(diagram_type: str | None) -> bool:
+    if diagram_type is None:
+        return True  # unknown type — preserve existing behavior
+    return diagram_type.startswith("archimate") or diagram_type == "matrix"
+
+
+def _render_puml(
+    puml_body: str,
+    repo_root: Path,
+    fmt: str,
+    diagram_type: str | None = None,
+) -> tuple[str | None, list[str]]:
     """Core PlantUML render pipeline.
 
     *fmt* is ``"png"`` or ``"svg"``.  Returns ``(result, warnings)`` where
@@ -252,10 +269,13 @@ def _render_puml(puml_body: str, repo_root: Path, fmt: str) -> tuple[str | None,
     if not diag_dir.exists():
         return None, [f"Diagram directory not found: {diag_dir}"]
 
-    render_body = re.sub(r"@startuml\s+\S+", "@startuml", puml_body, count=1)
-    if "_archimate-stereotypes.puml" not in render_body:
-        render_body = re.sub(r"(@startuml)\n", r"\1\n!include ../_archimate-stereotypes.puml\n", render_body, count=1)
-    render_body = inject_archimate_includes(render_body, repo_root)
+    render_body = strip_leading_puml_frontmatter(puml_body)
+    render_body = re.sub(r"@startuml\s+\S+", "@startuml", render_body, count=1)
+    if _needs_archimate_includes(diagram_type):
+        if "_archimate-stereotypes.puml" not in render_body:
+            _inc = r"\1\n!include ../_archimate-stereotypes.puml\n"
+            render_body = re.sub(r"(@startuml)\n", _inc, render_body, count=1)
+        render_body = inject_archimate_includes(render_body, repo_root)
 
     tmp_path: Path | None = None
     try:
@@ -309,11 +329,19 @@ def _render_puml(puml_body: str, repo_root: Path, fmt: str) -> tuple[str | None,
             tmp_path.unlink(missing_ok=True)
 
 
-def render_puml_preview(puml_body: str, repo_root: Path) -> tuple[str | None, list[str]]:
+def render_puml_preview(
+    puml_body: str,
+    repo_root: Path,
+    diagram_type: str | None = None,
+) -> tuple[str | None, list[str]]:
     """Render *puml_body* to PNG. Returns ``(data:image/png;base64,…, warnings)``."""
-    return _render_puml(puml_body, repo_root, "png")
+    return _render_puml(puml_body, repo_root, "png", diagram_type)
 
 
-def render_puml_svg(puml_body: str, repo_root: Path) -> tuple[str | None, list[str]]:
+def render_puml_svg(
+    puml_body: str,
+    repo_root: Path,
+    diagram_type: str | None = None,
+) -> tuple[str | None, list[str]]:
     """Render *puml_body* to SVG. Returns ``(svg_text, warnings)``."""
-    return _render_puml(puml_body, repo_root, "svg")
+    return _render_puml(puml_body, repo_root, "svg", diagram_type)

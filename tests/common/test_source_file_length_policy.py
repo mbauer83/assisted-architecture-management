@@ -16,8 +16,7 @@ def test_non_test_source_files_do_not_exceed_length_policy() -> None:
         return
 
     details = "\n".join(
-        f"- {item.path}: {item.counted_lines} lines ({item.reason}; limit={item.limit})"
-        for item in violations
+        f"- {item.path}: {item.counted_lines} lines ({item.reason}; limit={item.limit})" for item in violations
     )
     baseline = "\n".join(
         f"- {path}: {limit}"

@@ -1,10 +1,11 @@
 <script setup lang="ts">
 import { computed, inject, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter, RouterLink } from 'vue-router'
+import { Effect } from 'effect'
 import type { RepoScope, RepoError } from '../../ports/ModelRepository'
 import { modelServiceKey } from '../keys'
 import { useQuery } from '../composables/useQuery'
-import type { DiagramList, DiagramSummary } from '../../domain'
+import type { DiagramTypeSummary, DiagramList, DiagramSummary } from '../../domain'
 import DownloadMenu from '../components/DownloadMenu.vue'
 
 const props = defineProps<{ scope?: RepoScope }>()
@@ -15,23 +16,29 @@ const svc = inject(modelServiceKey)!
 const route = useRoute()
 const router = useRouter()
 const diagramsState = useQuery<DiagramList, RepoError>()
-
-const DIAGRAM_FILTERS = [
-  { key: '', label: 'All' },
-  { key: 'archimate-all', label: 'ArchiMate' },
-  { key: 'matrix', label: 'Matrix' },
-  { key: 'archimate-motivation', label: 'Motivation' },
-  { key: 'archimate-strategy', label: 'Strategy' },
-  { key: 'archimate-business', label: 'Business' },
-  { key: 'archimate-application', label: 'Application' },
-  { key: 'archimate-technology', label: 'Technology' },
-  { key: 'archimate-layered', label: 'Layered' },
-  { key: 'other', label: 'Other' },
-]
+const diagramKinds = ref<DiagramTypeSummary[]>([])
 
 const selectedType = ref((route.query.type as string) ?? '')
 
 const basePath = computed(() => isGlobal.value ? '/global/diagrams' : '/diagrams')
+const diagramFilters = computed(() => {
+  const seen = new Set<string>(['', 'archimate-all'])
+  const filters = [
+    { key: '', label: 'All' },
+    { key: 'archimate-all', label: 'ArchiMate' },
+  ]
+  for (const kind of diagramKinds.value) {
+    if (seen.has(kind.key)) continue
+    seen.add(kind.key)
+    filters.push({ key: kind.key, label: kind.label.replace(/\s+Diagram$/i, '') })
+  }
+  filters.push({ key: 'other', label: 'Other' })
+  return filters
+})
+const createDiagramRoute = (kind: DiagramTypeSummary) => {
+  if (kind.key === 'matrix') return { path: '/diagram/create/matrix' }
+  return { path: '/diagram/create', query: { type: kind.key } }
+}
 const showCreateMenu = ref(false)
 let _closeMenuTimer: ReturnType<typeof setTimeout> | null = null
 const closeCreateMenu = () => {
@@ -44,6 +51,13 @@ const keepCreateMenu = () => {
 const load = () => {
   if (isGlobal.value) return
   diagramsState.run(svc.listDiagrams(undefined))
+}
+
+const loadDiagramTypes = () => {
+  if (isGlobal.value) return
+  void Effect.runPromise(svc.listDiagramTypes())
+    .then((kinds) => { diagramKinds.value = kinds })
+    .catch(() => { diagramKinds.value = [] })
 }
 
 const matchesFilter = (diagram: DiagramSummary, filterKey: string): boolean => {
@@ -72,7 +86,10 @@ const selectType = (key: string) => {
   load()
 }
 
-onMounted(load)
+onMounted(() => {
+  loadDiagramTypes()
+  load()
+})
 watch(() => route.query.type, (t) => {
   selectedType.value = (t as string) ?? ''
   load()
@@ -107,18 +124,13 @@ watch(() => route.query.type, (t) => {
           @mouseenter="keepCreateMenu"
         >
           <RouterLink
-            to="/diagram/create"
+            v-for="kind in diagramKinds"
+            :key="kind.key"
+            :to="createDiagramRoute(kind)"
             class="create-opt"
             @click="showCreateMenu = false"
           >
-            ArchiMate Diagram
-          </RouterLink>
-          <RouterLink
-            to="/diagram/create/matrix"
-            class="create-opt"
-            @click="showCreateMenu = false"
-          >
-            Matrix Diagram
+            {{ kind.label }}
           </RouterLink>
         </div>
       </div>
@@ -132,7 +144,7 @@ watch(() => route.query.type, (t) => {
     <template v-else>
       <div class="filter-bar">
         <button
-          v-for="dt in DIAGRAM_FILTERS"
+          v-for="dt in diagramFilters"
           :key="dt.key"
           class="filter-btn"
           :class="{ 'filter-btn--active': selectedType === dt.key }"

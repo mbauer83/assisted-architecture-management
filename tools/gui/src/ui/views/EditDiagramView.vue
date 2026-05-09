@@ -7,14 +7,17 @@ import { modelServiceKey, toastKey } from '../keys'
 import type {
   DiagramContext, EntitySummary, DiagramConnection,
   EntityDisplayInfo, EntityContextConnection, DiagramPreviewResult, WriteResult,
+  DiagramTypeUiConfig,
 } from '../../domain'
 import type { RepoError } from '../../ports/ModelRepository'
 import type { NotFoundError } from '../../domain'
 import ArchimateTypeGlyph from '../components/ArchimateTypeGlyph.vue'
 import EntitySelectionList from '../components/EntitySelectionList.vue'
 import EntityPickerInput from '../components/EntityPickerInput.vue'
+import DiagramTypeConfigPanel from '../components/DiagramTypeConfigPanel.vue'
 import { useQuery } from '../composables/useQuery'
 import { useMutation } from '../composables/useMutation'
+import { usePanZoom } from '../composables/usePanZoom'
 import { toGlyphKey } from '../lib/glyphKey'
 
 const svc = inject(modelServiceKey)!
@@ -30,6 +33,16 @@ const previewMutation = useMutation<DiagramPreviewResult, RepoError>()
 const saveMutation = useMutation<WriteResult, RepoError>()
 
 const diagramDetail = computed(() => contextQuery.data.value?.diagram ?? null)
+const uiConfig = ref<DiagramTypeUiConfig | null>(null)
+const baseTypeEntityData = ref<Record<string, unknown>>({})
+const kindDataPatch = ref<Record<string, unknown>>({})
+const typeEntityData = computed(() => ({ ...baseTypeEntityData.value, ...kindDataPatch.value }))
+const asRecord = (value: unknown): Record<string, unknown> =>
+  value && typeof value === 'object' && !Array.isArray(value) ? value as Record<string, unknown> : {}
+const mergeTypeEntityData = (patch: Record<string, unknown>) => {
+  kindDataPatch.value = { ...kindDataPatch.value, ...patch }
+  previewMutation.reset()
+}
 
 watch(diagramDetail, (d) => {
   if (d?.diagram_type === 'matrix') {
@@ -90,48 +103,12 @@ watch(containerRef, (el, prev) => {
   el?.addEventListener('wheel', onWheel, { passive: false })
 })
 
-// ── Preview pan+zoom ─────────────────────────────────────────────────────────
-const prevContainerRef = ref<HTMLElement | null>(null)
-const prevScale = ref(1); const prevTx = ref(0); const prevTy = ref(0)
-let prevDragging = false; let prevDrag = { x: 0, y: 0, tx: 0, ty: 0 }
-
-const prevCanvasStyle = computed(() => ({
-  transform: `translate(${prevTx.value}px, ${prevTy.value}px) scale(${prevScale.value})`,
-  transformOrigin: '0 0', willChange: 'transform', display: 'inline-block',
-}))
-const prevIsTransformed = computed(() => prevScale.value !== 1 || prevTx.value !== 0 || prevTy.value !== 0)
-
-const prevOnWheel = (e: WheelEvent) => {
-  e.preventDefault()
-  const f = e.deltaY < 0 ? 1.15 : 1 / 1.15
-  const ns = Math.min(8, Math.max(0.2, prevScale.value * f))
-  const r = ns / prevScale.value
-  const rect = prevContainerRef.value!.getBoundingClientRect()
-  prevTx.value = (e.clientX - rect.left) * (1 - r) + prevTx.value * r
-  prevTy.value = (e.clientY - rect.top) * (1 - r) + prevTy.value * r
-  prevScale.value = ns
-}
-const prevOnMouseDown = (e: MouseEvent) => {
-  e.preventDefault()
-  prevDragging = true
-  prevDrag = { x: e.clientX, y: e.clientY, tx: prevTx.value, ty: prevTy.value }
-  window.addEventListener('mousemove', prevOnMouseMove)
-  window.addEventListener('mouseup', prevOnMouseUp)
-}
-const prevOnMouseMove = (e: MouseEvent) => {
-  if (prevDragging) { prevTx.value = prevDrag.tx + e.clientX - prevDrag.x; prevTy.value = prevDrag.ty + e.clientY - prevDrag.y }
-}
-const prevOnMouseUp = () => {
-  prevDragging = false
-  window.removeEventListener('mousemove', prevOnMouseMove)
-  window.removeEventListener('mouseup', prevOnMouseUp)
-}
-const prevResetView = () => { prevScale.value = 1; prevTx.value = 0; prevTy.value = 0 }
-watch(prevContainerRef, (el, old) => {
-  old?.removeEventListener('wheel', prevOnWheel)
-  el?.addEventListener('wheel', prevOnWheel, { passive: false })
-})
-watch(() => previewMutation.result.value, () => prevResetView())
+const previewViewport = usePanZoom(computed(() => previewMutation.result.value))
+const prevContainerRef = previewViewport.containerRef
+const prevCanvasStyle = previewViewport.canvasStyle
+const prevIsTransformed = previewViewport.isTransformed
+const prevOnMouseDown = previewViewport.startDrag
+const prevResetView = previewViewport.resetView
 
 // ── Diagram entity / connection state ─────────────────────────────────────────
 
@@ -334,6 +311,7 @@ const refreshDiscovery = async () => {
   const exit = await Effect.runPromiseExit(
     svc.discoverDiagramEntities({
       includedEntityIds: [...effectiveEntityIds.value],
+      diagramType: diagramDetail.value?.diagram_type,
       maxHops: 1, limit: 20,
     }),
   )
@@ -385,6 +363,11 @@ const load = async () => {
       }
       for (const conn of context.connections) inc.add(conn.artifact_id)
       includedConnIds.value = inc
+      baseTypeEntityData.value = asRecord(context.diagram.diagram_entities)
+      kindDataPatch.value = {}
+      void Effect.runPromise(svc.getDiagramTypeUiConfig(context.diagram.diagram_type))
+        .then((config) => { uiConfig.value = config })
+        .catch(() => { uiConfig.value = null })
       void refreshDiscovery()
     },
     onFailure: () => {},
@@ -398,10 +381,14 @@ watch(diagramId, load)
 
 const showPuml = ref(false)
 
-const finalEntityIds = computed(() => [
-  ...includedEntities.value.filter(e => !toRemoveEntityIds.value.has(e.artifact_id)).map(e => e.artifact_id),
-  ...entitiesToAdd.value.map(e => e.artifact_id),
-])
+const finalEntityIds = computed(() => {
+  const base = [
+    ...includedEntities.value.filter(e => !toRemoveEntityIds.value.has(e.artifact_id)).map(e => e.artifact_id),
+    ...entitiesToAdd.value.map(e => e.artifact_id),
+  ]
+  const mapped = (typeEntityData.value.entity_ids_mapped as string[] | undefined) ?? []
+  return [...new Set([...base, ...mapped])]
+})
 
 const doPreview = () => {
   if (!diagramDetail.value) return
@@ -410,6 +397,7 @@ const doPreview = () => {
     name: diagramDetail.value.name,
     entity_ids: finalEntityIds.value,
     connection_ids: finalConnIds.value,
+    diagram_entities: typeEntityData.value,
   }))
 }
 
@@ -421,6 +409,7 @@ const doSave = async () => {
     name: diagramDetail.value.name,
     entity_ids: finalEntityIds.value,
     connection_ids: finalConnIds.value,
+    diagram_entities: typeEntityData.value,
     dry_run: false,
   }))
   if (!Exit.isSuccess(exit) || !exit.value.wrote) return
@@ -432,9 +421,6 @@ onUnmounted(() => {
   containerRef.value?.removeEventListener('wheel', onWheel)
   window.removeEventListener('mousemove', onMouseMove)
   window.removeEventListener('mouseup', onMouseUp)
-  prevContainerRef.value?.removeEventListener('wheel', prevOnWheel)
-  window.removeEventListener('mousemove', prevOnMouseMove)
-  window.removeEventListener('mouseup', prevOnMouseUp)
 })
 </script>
 
@@ -530,11 +516,19 @@ onUnmounted(() => {
         <div class="sb-search">
           <EntityPickerInput
             :excluded-ids="effectiveEntityIds"
+            :diagram-type="diagramDetail?.diagram_type"
             @select="addEntity"
           />
         </div>
 
         <div class="sb-scroll">
+          <DiagramTypeConfigPanel
+            :ui-config="uiConfig"
+            :diagram-entities="typeEntityData"
+            :entities="effectiveEntitiesList"
+            @diagram-entities-change="mergeTypeEntityData"
+          />
+
           <div
             v-if="effectiveEntitiesList.length"
             class="sb-section"
