@@ -119,12 +119,11 @@ class GenericPumlRenderer:
             alias = normalize_puml_alias(entity.display_alias)
             if not alias:
                 return []
-            decl = self._entity_declaration(entity, alias)
             children = children_map.get(alias, [])
             if not children:
-                return [f"{indent}{decl}"]
+                return [f"{indent}{self._entity_declaration(entity, alias)}"]
             inner = indent + "  "
-            rendered = [f"{indent}{decl} {{"]
+            rendered = [f"{indent}{self._entity_nest_declaration(entity, alias)}"]
             for child in children:
                 rendered.extend(render_entity(child, inner))
             child_als = [normalize_puml_alias(child.display_alias) for child in children if child.display_alias]
@@ -331,13 +330,12 @@ class GenericPumlRenderer:
     def _entity_declaration(self, entity: EntityRecord, alias: str) -> str:
         if entity.artifact_type in self._junction_types():
             return f'circle " " as {alias}'
-        label, stereotype = self._entity_label_and_stereotype(entity)
-        if stereotype and self._entity_has_sprite(entity):
-            key = _stereotype_key(entity.artifact_type)
-            return f'rectangle "<$archimate_{key}{{scale=1.5}}> {label}" <<{stereotype}>> as {alias}'
-        if stereotype:
-            return f'rectangle "{label}" <<{stereotype}>> as {alias}'
-        return f'rectangle "{label}" as {alias}'
+        return f"$DECL_{alias}()"
+
+    def _entity_nest_declaration(self, entity: EntityRecord, alias: str) -> str:
+        if entity.artifact_type in self._junction_types():
+            return f'circle " " as {alias}'
+        return f"$NEST_{alias}()"
 
     def _ordered_type_groups(self, entities: list[EntityRecord]) -> list[tuple[str, list[EntityRecord]]]:
         return ordered_type_groups(
