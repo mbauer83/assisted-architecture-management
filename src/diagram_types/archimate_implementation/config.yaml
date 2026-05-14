@@ -1,17 +1,17 @@
 name: archimate-implementation
+ontology: archimate_next
 filter:
   hierarchy_level:
     index: 0
     values: [implementation]
 includes:
-  - _archimate-stereotypes.puml
-  - _archimate-glyphs.puml
+  - _macros.puml
 grouping:
   by_field: hierarchy_0
   stereotype_pattern: "{hierarchy_0|capitalize}Grouping"
 layout:
   nesting_connection_classes: [nesting]
-  flow_connection_classes: [flow]
+  flow_connection_classes: [dynamic]
 guidance:
   when_to_use: >-
     Use when modeling planned change: work packages, deliverables, implementation events, and
