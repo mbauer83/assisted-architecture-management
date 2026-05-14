@@ -221,14 +221,24 @@ class GenericPumlRenderer:
         return body
 
     def inject_includes(self, body: str, repo_root: Path) -> str:
-        prepared = body
-        missing_includes = [include for include in self._includes() if f"!include ../{include}" not in prepared]
-        if missing_includes:
-            include_block = "".join(f"!include ../{include}\n" for include in missing_includes)
-            prepared = re.sub(r"(@startuml(?:\s+\S+)?)\n", rf"\1\n{include_block}", prepared, count=1)
-        if "_archimate-stereotypes.puml" not in "\n".join(self._includes()):
-            return prepared
-        return inject_archimate_includes(prepared, repo_root)
+        _OLD_STEREO = "!include ../_archimate-stereotypes.puml"
+        _OLD_GLYPH = "!include ../_archimate-glyphs.puml"
+        _MACROS = "!include ../_macros.puml"
+
+        # Old-style direct-declaration diagrams: body already has stereo/glyph includes.
+        if _OLD_STEREO in body or _OLD_GLYPH in body:
+            for inc in (_OLD_STEREO, _OLD_GLYPH):
+                if inc not in body:
+                    body = re.sub(r"(@startuml(?:\s+\S+)?)\n", rf"\1\n{inc}\n", body, count=1)
+            return inject_archimate_includes(body, repo_root)
+
+        # New-style macro-based diagrams: add _macros.puml, then inject selectively.
+        if _MACROS not in body:
+            body = re.sub(r"(@startuml(?:\s+\S+)?)\n", rf"\1\n{_MACROS}\n", body, count=1)
+        # Add stereo include as marker so inject_archimate_includes() replaces it with
+        # selective content for the aliases called in this diagram.
+        body = re.sub(r"(@startuml(?:\s+\S+)?)\n", rf"\1\n{_OLD_STEREO}\n", body, count=1)
+        return inject_archimate_includes(body, repo_root)
 
     def collect_references(
         self,
