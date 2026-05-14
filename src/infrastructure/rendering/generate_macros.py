@@ -100,6 +100,122 @@ def _generate_glyph_include(repo_root: Path) -> Path:
     return out_path
 
 
+_DOMAIN_COLORS: dict[str, dict[str, str]] = {
+    "motivation": {
+        "bg": "#EDD6F0",
+        "border": "#7B3F9A",
+        "grouping_bg": "#F7EEF9",
+        "grouping_name": "MotivationGrouping",
+    },
+    "strategy": {
+        "bg": "#F5DEB3",
+        "border": "#8B6914",
+        "grouping_bg": "#FAF0D9",
+        "grouping_name": "StrategyGrouping",
+    },
+    "common": {
+        "bg": "#E0D8CC",
+        "border": "#8C7E6A",
+        "grouping_bg": "#EDE8E1",
+        "grouping_name": "CommonGrouping",
+    },
+    "business": {
+        "bg": "#FFFAC8",
+        "border": "#B8860B",
+        "grouping_bg": "#FFFDEC",
+        "grouping_name": "BusinessGrouping",
+    },
+    "application": {
+        "bg": "#CCF2FF",
+        "border": "#0078A0",
+        "grouping_bg": "#E8F8FF",
+        "grouping_name": "ApplicationGrouping",
+    },
+    "technology": {
+        "bg": "#CCFFCC",
+        "border": "#2E7D32",
+        "grouping_bg": "#E8FFEE",
+        "grouping_name": "TechnologyGrouping",
+    },
+    "implementation": {
+        "bg": "#FFE4C4",
+        "border": "#8D4E00",
+        "grouping_bg": "#FFF3E8",
+        "grouping_name": "ImplementationGrouping",
+    },
+}
+
+_STEREOTYPE_HEADER = """\
+hide stereotype
+
+skinparam defaultFontName "Helvetica Neue, Helvetica, Arial, sans-serif"
+skinparam defaultFontSize 12
+skinparam shadowing false
+skinparam roundcorner 4
+skinparam backgroundColor #FAFAFA
+
+skinparam linetype ortho
+skinparam nodesep 60
+skinparam ranksep 80
+
+skinparam rectangle<<Grouping>> {
+  BackgroundColor #FFFFFF
+  BorderColor #9E9E9E
+}
+"""
+
+
+def _stereotype_block(name: str, bg: str, border: str) -> str:
+    return f"skinparam rectangle<<{name}>> {{\n  BackgroundColor {bg}\n  BorderColor {border}\n}}"
+
+
+def _generate_stereotype_include(repo_root: Path) -> Path:
+    """Write _archimate-stereotypes.puml with domain colors and skinparam blocks."""
+    from src.infrastructure.app_bootstrap import get_module_registry  # noqa: PLC0415
+
+    registry = get_module_registry()
+
+    lines: list[str] = [
+        "' _archimate-stereotypes.puml — ArchiMate skinparam definitions",
+        "' Auto-generated — do not edit manually.",
+        "",
+        _STEREOTYPE_HEADER,
+    ]
+
+    # Group entity types by domain (first hierarchy element).
+    domain_types: dict[str, list[str]] = {}
+    for om in registry.all_ontologies().values():
+        for artifact_type, info in om.entity_types.items():
+            domain = info.hierarchy[0] if info.hierarchy else "common"
+            domain_types.setdefault(domain, []).append(str(artifact_type))
+
+    from src.domain.ontology_catalog import domain_order  # noqa: PLC0415
+
+    ordered_domains = domain_order()
+
+    for domain in ordered_domains:
+        colors = _DOMAIN_COLORS.get(domain)
+        if not colors:
+            continue
+        types_in_domain = sorted(domain_types.get(domain, []))
+        if not types_in_domain:
+            continue
+
+        lines.append(f"' {'-' * 75}")
+        lines.append(f"' {domain.capitalize()} layer")
+        lines.append(f"' {'-' * 75}")
+        lines.append(_stereotype_block(colors["grouping_name"], colors["grouping_bg"], colors["border"]))
+        for artifact_type in types_in_domain:
+            key = _sprite_key(artifact_type)
+            lines.append(_stereotype_block(key, colors["bg"], colors["border"]))
+        lines.append("")
+
+    out_path = repo_root / DIAGRAM_CATALOG / "_archimate-stereotypes.puml"
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    out_path.write_text("\n".join(lines), encoding="utf-8")
+    return out_path
+
+
 def _domain_order_index() -> dict[str, int]:
     from src.domain.ontology_catalog import domain_order  # noqa: PLC0415
 
@@ -186,6 +302,7 @@ def generate_macros(repo_root: Path, *, enterprise_root: Path | None = None) -> 
     roots_to_scan.append(repo_root)
 
     _generate_glyph_include(repo_root)
+    _generate_stereotype_include(repo_root)
     entries: list[tuple[str, str, str]] = []  # (domain, macro_line, alias)
     seen_aliases: set[str] = set()
 
