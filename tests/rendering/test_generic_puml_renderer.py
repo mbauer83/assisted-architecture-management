@@ -6,7 +6,7 @@ from src.domain.artifact_types import ConnectionRecord, EntityRecord
 from src.infrastructure.rendering.generic_puml_renderer import GenericPumlRenderer
 
 _ARCHIMATE_CONFIG = {
-    "includes": ["_archimate-stereotypes.puml", "_archimate-glyphs.puml"],
+    "includes": ["_macros.puml"],
     "grouping": {"stereotype_pattern": "{hierarchy_0|capitalize}Grouping"},
     "layout": {
         "nesting_connection_classes": ["nesting"],
@@ -79,8 +79,7 @@ def test_render_body_uses_includes_and_single_domain_type_groupings(tmp_path: Pa
         tmp_path,
     )
 
-    assert "!include ../_archimate-stereotypes.puml" in puml
-    assert "!include ../_archimate-glyphs.puml" in puml
+    assert "!include ../_macros.puml" in puml
     assert 'rectangle "Drivers" <<MotivationGrouping>> {' in puml
     assert 'rectangle "Assessments" <<MotivationGrouping>> {' in puml
     assert "top to bottom direction" in puml
@@ -121,14 +120,14 @@ def test_render_body_renders_junction_inside_nested_parent(tmp_path: Path) -> No
         tmp_path,
     )
 
-    assert "PRC_A {" in puml  # process is rendered as a nesting container
+    assert "$NEST_PRC_A()" in puml  # process is rendered as a nesting container via macro
     assert 'circle " " as JNA_A' in puml
     # Verify junction is nested inside process by checking indentation pattern
     lines = puml.splitlines()
     in_prc = False
     junction_nested = False
     for line in lines:
-        if "PRC_A {" in line:
+        if "$NEST_PRC_A()" in line:
             in_prc = True
         elif in_prc and line.strip() == "}":
             in_prc = False
@@ -150,11 +149,9 @@ def test_render_body_entity_declarations_use_snake_case_stereotypes(tmp_path: Pa
         tmp_path,
     )
 
-    # Stereotype keys are snake_case derived from artifact_type
-    assert "<<stakeholder>>" in puml
-    assert "STK_A" in puml
-    assert "<<value>>" in puml
-    assert "VAL_A" in puml
+    # Declarations are macro calls — stereotype lives inside the macro body
+    assert "$DECL_STK_A()" in puml
+    assert "$DECL_VAL_A()" in puml
 
 
 def test_inject_includes_inlines_only_needed_stereotypes_and_sprites(tmp_path: Path) -> None:
