@@ -16,6 +16,7 @@ from src.domain.archimate_relation_rendering import (
 )
 from src.domain.artifact_types import ConnectionRecord, EntityRecord
 from src.domain.module_types import ConnectionTypeName, ElementClassName, EntityTypeName
+from src.domain.ontology_protocol import DiagramRendererReferences
 from src.domain.ontology_types import ConnectionTypeInfo, EntityTypeInfo
 from src.infrastructure.rendering._archimate_includes import (
     inject_archimate_includes,
@@ -221,12 +222,33 @@ class GenericPumlRenderer:
         return body
 
     def inject_includes(self, body: str, repo_root: Path) -> str:
+        prepared = body
+        missing_includes = [include for include in self._includes() if f"!include ../{include}" not in prepared]
+        if missing_includes:
+            include_block = "".join(f"!include ../{include}\n" for include in missing_includes)
+            prepared = re.sub(r"(@startuml(?:\s+\S+)?)\n", rf"\1\n{include_block}", prepared, count=1)
         if "_archimate-stereotypes.puml" not in "\n".join(self._includes()):
-            return body
-        return inject_archimate_includes(body, repo_root)
+            return prepared
+        return inject_archimate_includes(prepared, repo_root)
+
+    def collect_references(
+        self,
+        diagram_type: str,
+        repo_root: Path,
+        *,
+        diagram_entities: Mapping[str, object] | None = None,
+        diagram_connections: list[dict[str, object]] | None = None,
+    ) -> DiagramRendererReferences:
+        del diagram_type, repo_root, diagram_entities, diagram_connections
+        return DiagramRendererReferences()
 
     def _includes(self) -> list[str]:
-        return [str(value) for value in self._config.get("includes", ())]
+        includes = [str(value) for value in self._config.get("includes", ())]
+        if "_macros.puml" not in includes and (
+            "_archimate-stereotypes.puml" in includes or "_archimate-glyphs.puml" in includes
+        ):
+            return ["_macros.puml"]
+        return includes
 
     def _entity_info(self, artifact_type: str) -> EntityTypeInfo | None:
         return _registry().find_entity_type(EntityTypeName(artifact_type))
@@ -253,7 +275,7 @@ class GenericPumlRenderer:
         return self._classified_conn_types("nesting_connection_classes", "nesting")
 
     def _flow_conn_types(self) -> frozenset[str]:
-        return self._classified_conn_types("flow_connection_classes", "flow")
+        return self._classified_conn_types("flow_connection_classes", "dynamic")
 
     def _grouping_key(self, entity: EntityRecord) -> str:
         info = self._entity_info(entity.artifact_type)
