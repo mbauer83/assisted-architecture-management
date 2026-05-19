@@ -7,7 +7,7 @@ from src.domain.artifact_types import ConnectionRecord, EntityRecord
 from src.infrastructure.mcp.artifact_mcp.query_scaffold_tools import artifact_diagram_scaffold
 from src.infrastructure.rendering.diagram_builder import generate_archimate_puml_body, inject_archimate_includes
 from src.infrastructure.rendering.generate_macros import generate_macros
-from src.infrastructure.write.artifact_write.diagram import _prepare_archimate_puml_body
+from src.infrastructure.write.artifact_write.diagram import _prepare_diagram_puml_body
 
 
 def _entity(
@@ -82,8 +82,8 @@ def test_generate_archimate_puml_body_normalizes_aliases_in_entities_and_connect
         diagram_type="archimate-motivation",
     )
 
-    assert " as GOL_B6G__P" in puml
-    assert " as OUT_i_3Bi_" in puml
+    assert "$DECL_GOL_B6G__P()" in puml
+    assert "$DECL_OUT_i_3Bi_()" in puml
     assert 'Rel_Realization_Up(OUT_i_3Bi_, GOL_B6G__P, "")' in puml
     assert "GOL_B6G_-P" not in puml
     assert "OUT_i-3Bi-" not in puml
@@ -151,7 +151,7 @@ rectangle "Req" <<Requirement>> as REQ_A
     assert "skinparam rectangle<<Requirement>>" in result
 
 
-def test_prepare_archimate_puml_body_injects_glyph_sprites(tmp_path: Path) -> None:
+def test_prepare_diagram_puml_body_injects_renderer_assets(tmp_path: Path) -> None:
     repo_root = tmp_path / "repo"
     catalog = repo_root / "diagram-catalog"
     catalog.mkdir(parents=True, exist_ok=True)
@@ -176,7 +176,7 @@ skinparam rectangle<<Process>> {
 rectangle "<$archimate_Process{scale=1.5}> Proc" <<Process>> as PROC_A
 @enduml
 """
-    result = _prepare_archimate_puml_body(puml, repo_root, "archimate-layered")
+    result = _prepare_diagram_puml_body(puml, repo_root, "archimate-layered")
 
     assert "!include ../_archimate-stereotypes.puml" not in result
     assert "sprite $archimate_Process" in result
@@ -314,8 +314,8 @@ last-updated: '2026-04-20'
     )
     puml = str(result["puml"])
 
-    assert " as GOL_B6G__P" in puml
-    assert " as OUT_i_3Bi_" in puml
+    assert "$DECL_GOL_B6G__P()" in puml
+    assert "$DECL_OUT_i_3Bi_()" in puml
     assert 'Rel_Realization_Up(OUT_i_3Bi_, GOL_B6G__P, "")' in puml
     assert "GOL_B6G_-P" not in puml
     assert "OUT_i-3Bi-" not in puml
@@ -505,15 +505,15 @@ def test_generate_archimate_puml_body_nests_junction_with_nested_siblings() -> N
         diagram_type="archimate-business",
     )
 
-    assert "PRC_A {" in puml  # process rendered as nesting container
+    assert "$NEST_PRC_A()" in puml  # process rendered as nesting container (macro form)
     assert "FNC_A" in puml
     assert "FNC_B" in puml
     assert 'circle " " as JCN_A' in puml
-    # Verify junction is nested inside PRC_A
+    # Verify junction is nested inside PRC_A block (follows $NEST_PRC_A() before closing "}")
     lines = puml.splitlines()
     in_prc, junction_nested = False, False
     for line in lines:
-        if "PRC_A {" in line:
+        if "$NEST_PRC_A()" in line:
             in_prc = True
         elif in_prc and line.strip() == "}":
             in_prc = False

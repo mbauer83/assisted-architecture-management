@@ -67,8 +67,8 @@ def _sprite_key(artifact_type: str) -> str:
     return artifact_type.replace("-", "_")
 
 
-def _macro_label(label: str, artifact_type: str) -> str:
-    if archimate_type_markers() != "icons":
+def _macro_label(label: str, artifact_type: str, *, has_sprite: bool = True) -> str:
+    if archimate_type_markers() != "icons" or not has_sprite:
         return label
     scale = sprite_scale()
     key = _sprite_key(artifact_type)
@@ -244,6 +244,8 @@ _PREFIX_ORDER = [
     "PTH",
     "JNA",
     "JNO",
+    "GRP",
+    "LOC",
     "ACT",
     "BIF",
     "BOB",
@@ -348,8 +350,9 @@ def generate_macros(repo_root: Path, *, enterprise_root: Path | None = None) -> 
                 rel = md_file.relative_to(model_dir)
                 domain = rel.parts[0] if rel.parts else "unknown"
 
+            has_sprite = ontology is not None and ontology.sprite_for(artifact_type) is not None
             stereotype = _sprite_key(artifact_type) if artifact_type else ""
-            rect_decl = f'  rectangle "{_macro_label(label, artifact_type)}" <<{stereotype}>> as {alias}'
+            rect_decl = f'  rectangle "{_macro_label(label, artifact_type, has_sprite=has_sprite)}" <<{stereotype}>> as {alias}'
             macro_line = (
                 f"!procedure $DECL_{alias}()\n"
                 f"{rect_decl}\n"

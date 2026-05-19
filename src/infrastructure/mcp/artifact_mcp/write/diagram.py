@@ -1,5 +1,7 @@
 """MCP write tools: matrix and diagram creation."""
 
+from typing import Literal
+
 from mcp.server.fastmcp import FastMCP  # type: ignore[import-not-found]
 
 from src.infrastructure.mcp.artifact_mcp.tool_annotations import LOCAL_WRITE
@@ -63,6 +65,8 @@ def artifact_create_diagram(
     diagram_type: str,
     name: str,
     puml: str = "",
+    entity_ids: list[str] | None = None,
+    direction: Literal["top_to_bottom", "left_to_right"] = "top_to_bottom",
     artifact_id: str | None = None,
     keywords: list[str] | None = None,
     diagram_entities: dict[str, object] | None = None,
@@ -74,6 +78,19 @@ def artifact_create_diagram(
     dry_run: bool = True,
     repo_root: str | None = None,
 ) -> dict[str, object]:
+    if entity_ids and not puml:
+        from src.infrastructure.mcp.artifact_mcp._diagram_scaffold import build_diagram_scaffold  # noqa: PLC0415
+        from src.infrastructure.mcp.artifact_mcp.context import RepoScope  # noqa: PLC0415
+
+        scaffold = build_diagram_scaffold(
+            entity_ids=entity_ids,
+            diagram_name=name,
+            direction=direction,
+            repo_root=repo_root,
+            repo_scope="engagement",
+        )
+        puml = str(scaffold.get("puml", ""))
+
     roots = resolve_repo_roots(
         repo_scope="engagement",
         repo_root=repo_root,
@@ -102,6 +119,19 @@ def artifact_create_diagram(
     )
     if result.wrote and not dry_run:
         mutation_context.finalize()
+        if diagram_entities is not None:
+            from src.infrastructure.write.artifact_write.scope_connections import (
+                apply_scope_connections,  # noqa: PLC0415
+            )
+
+            apply_scope_connections(
+                diagram_type,
+                dict(diagram_entities),
+                roots[0],
+                registry_cached(key),
+                verifier_for(key, include_registry=True),
+                clear_repo_caches,
+            )
     return _out(result, dry_run=dry_run)
 
 
@@ -123,15 +153,21 @@ def register(mcp: FastMCP) -> None:
         name="artifact_create_diagram",
         title="Artifact Write: Create Diagram",
         description=(
-            "Create a diagram. Call artifact_authoring_guidance(diagram_type=...) first — "
-            "it returns authoring guidance and, for diagram-entities kinds, the diagram_entities schema.\n\n"
-            "ArchiMate: supply puml using entity display_alias values "
-            "(artifact_query_read_artifact mode='full'). "
+            "Create a diagram. Always call artifact_authoring_guidance(diagram_type=...) first — "
+            "it returns when_to_use guidance, the diagram_entities schema, and per-type authoring notes.\n\n"
+            "ArchiMate views — two authoring modes:\n"
+            "  1. entity_ids=[...]: pass a list of artifact_ids; PUML is auto-generated via render_body() "
+            "using existing model connections. Fastest path for new diagrams — no manual PUML needed.\n"
+            "  2. puml=...: supply PUML manually using entity display_alias values "
+            "(artifact_query_read_artifact mode='full') for custom layouts.\n"
+            "direction='left_to_right' | 'top_to_bottom' (default). "
             "auto_include_stereotypes=true injects !include lines. "
             "connection_inference: 'none' | 'auto' (warn) | 'strict' (error) on unknown stereotypes.\n\n"
-            "Kind-data kinds (e.g. activity): omit puml; pass diagram_entities and diagram_connections "
-            "per the schema from authoring_guidance. PUML is generated from diagram_entities + diagram_connections; "
-            "both are persisted in frontmatter for round-trip editing and graph traversal.\n\n"
+            "Diagram-owned views (activity, C4): omit puml and entity_ids; pass diagram_entities per the schema. "
+            "PUML is generated automatically; diagram_entities is persisted for round-trip editing.\n\n"
+            "C4 views: create all referenced model entities first (application-component/service for systems "
+            "and containers, business-actor/role for persons). In diagram_entities set _scope_entity_id to "
+            "the scope entity's artifact_id. c4-contains connections are auto-created on write.\n\n"
             "dry_run=true validates without writing."
         ),
         annotations=LOCAL_WRITE,

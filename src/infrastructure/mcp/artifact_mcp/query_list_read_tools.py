@@ -6,11 +6,32 @@ from mcp.server.fastmcp import FastMCP  # type: ignore[import-not-found]
 from src.infrastructure.mcp.artifact_mcp.context import RepoScope, repo_cached, resolve_repo_roots, roots_key
 from src.infrastructure.mcp.artifact_mcp.tool_annotations import READ_ONLY
 
+_FIELD_ALIASES = {"id": "artifact_id"}
+
 
 def _project(record: dict[str, object], fields: list[str] | None) -> dict[str, object]:
     if not fields:
         return record
-    return {field: record[field] for field in fields if field in record}
+    resolved = [_FIELD_ALIASES.get(f, f) for f in fields]
+    return {field: record[field] for field in resolved if field in record}
+
+
+def _resolve_artifact_id(repo, artifact_id: str) -> str:
+    """Return full-form artifact_id for short-form inputs (PREFIX@epoch.random).
+
+    Full-form IDs (four dot-separated segments) are returned unchanged.
+    """
+    parts = artifact_id.split(".")
+    if len(parts) >= 3:
+        return artifact_id
+    prefix = f"{artifact_id}."
+    for candidate in repo.entity_ids():
+        if candidate.startswith(prefix):
+            return candidate
+    for candidate in repo.connection_ids():
+        if candidate.startswith(prefix):
+            return candidate
+    return artifact_id
 
 
 def _include_flags(
@@ -34,6 +55,8 @@ def register_query_list_read_tools(mcp: FastMCP) -> None:
             "List artifacts (metadata-only) with AND-semantics filters. "
             "include_record_types defaults to ['entities']. "
             "Pass fields=[...] to project only the keys you need. "
+            "Canonical field names: artifact_id (also accepts 'id'), artifact_type, name, version, "
+            "status, record_type, path, host_diagram_id. "
             "Domain values (case-insensitive): 'common', 'motivation', 'strategy', 'business', "
             "'application', 'technology', 'implementation'; "
             "for diagram-only types, domain = diagram type name (e.g. 'activity')."
@@ -88,6 +111,7 @@ def register_query_list_read_tools(mcp: FastMCP) -> None:
         title="Artifact Query: Read Artifact",
         description=(
             "Read one artifact by artifact_id. "
+            "Accepts both full form (PREFIX@epoch.random.slug) and short form (PREFIX@epoch.random). "
             "mode='summary': frontmatter + content snippet. "
             "mode='full': full content and display blocks. "
             "section= (documents only): return a specific ## section."
@@ -115,7 +139,8 @@ def register_query_list_read_tools(mcp: FastMCP) -> None:
         )
         key = roots_key(roots)
         repo = repo_cached(key)
-        result = repo.read_artifact(artifact_id, mode=mode, section=section)
+        resolved_id = _resolve_artifact_id(repo, artifact_id)
+        result = repo.read_artifact(resolved_id, mode=mode, section=section)
         if result is None:
             return None
         if result.get("record_type") == "diagram":

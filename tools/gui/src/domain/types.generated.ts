@@ -24,6 +24,8 @@ export const ENTITY_TYPE_NAMES = [
   "function",
   "global-artifact-reference",
   "goal",
+  "grouping",
+  "location",
   "material",
   "meaning",
   "or-junction",
@@ -63,6 +65,8 @@ export const CONNECTION_TYPE_NAMES = [
   "archimate-serving",
   "archimate-specialization",
   "archimate-triggering",
+  "c4-contains",
+  "c4-uses",
   "er-many-to-many",
   "er-one-to-many",
   "er-one-to-one",
@@ -99,6 +103,9 @@ export const DIAGRAM_TYPE_NAMES = [
   "archimate-motivation",
   "archimate-strategy",
   "archimate-technology",
+  "c4-component",
+  "c4-container",
+  "c4-system-context",
   "matrix",
 ] as const
 export type DiagramTypeName = typeof DIAGRAM_TYPE_NAMES[number]

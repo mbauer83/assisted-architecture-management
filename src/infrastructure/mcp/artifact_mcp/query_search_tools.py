@@ -7,10 +7,14 @@ from src.infrastructure.mcp.artifact_mcp.context import RepoScope, repo_cached, 
 from src.infrastructure.mcp.artifact_mcp.tool_annotations import READ_ONLY
 
 
+_FIELD_ALIASES = {"id": "artifact_id"}
+
+
 def _project(record: dict[str, object], fields: list[str] | None) -> dict[str, object]:
     if not fields:
         return record
-    return {field: record[field] for field in fields if field in record}
+    resolved = [_FIELD_ALIASES.get(f, f) for f in fields]
+    return {field: record[field] for field in resolved if field in record}
 
 
 def _include_flags(

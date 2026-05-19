@@ -1,6 +1,7 @@
 import re
 from typing import Literal
 
+from src.application.artifact_parsing import extract_declared_puml_aliases as _extract_declared_puml_aliases_shared
 from src.application.modeling.artifact_write import ARCHIMATE_STEREOTYPE_TO_CONNECTION_TYPE
 from src.application.verification.artifact_verifier_registry import ArtifactRegistry
 from src.application.verification.artifact_verifier_types import (
@@ -417,15 +418,7 @@ def _normalize_puml_alias(alias: str) -> str:
 
 
 def _extract_declared_puml_aliases(content: str) -> set[str]:
-    aliases: set[str] = set()
-    for line in content.splitlines():
-        stripped = line.strip()
-        if not stripped or stripped.startswith("'"):
-            continue
-        m = re.search(r"\bas\s+([A-Za-z0-9_-]+)\s*\{?\s*$", stripped)
-        if m:
-            aliases.add(_normalize_puml_alias(m.group(1)))
-    return aliases
+    return _extract_declared_puml_aliases_shared(content)
 
 
 def _extract_entity_display_alias(entity_text: str) -> str:

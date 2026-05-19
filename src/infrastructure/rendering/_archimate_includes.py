@@ -10,7 +10,7 @@ _CALLED_MACRO_RE = re.compile(r'\$(?:DECL|NEST)_([A-Za-z0-9_]+)\(\)')
 
 
 def _load_macro_alias_map(repo_root: Path) -> dict[str, str]:
-    """Return {alias: procedure_body} for every $DECL_ALIAS() in _macros.puml."""
+    """Return {alias: procedure_body} for every $DECL_ALIAS() and $NEST_ALIAS() in _macros.puml."""
     macros_path = repo_root / "diagram-catalog" / "_macros.puml"
     try:
         text = macros_path.read_text(encoding="utf-8")
@@ -18,7 +18,7 @@ def _load_macro_alias_map(repo_root: Path) -> dict[str, str]:
         return {}
     alias_map: dict[str, str] = {}
     for m in re.finditer(
-        r"!procedure \$DECL_([A-Za-z0-9_]+)\(\)\n(.*?)!endprocedure",
+        r"!procedure \$(?:DECL|NEST)_([A-Za-z0-9_]+)\(\)\n(.*?)!endprocedure",
         text,
         re.DOTALL,
     ):

@@ -13,8 +13,9 @@ def register_query_graph_tools(mcp: FastMCP) -> None:
         description=(
             "Find connection records that touch a given entity_id. "
             "direction: any|outbound|inbound; optionally filter by conn_type. "
-            "fields: optional list of keys to include in each result — e.g. "
-            "['source_entity','target_entity','connection_type'] for fast dedup checks."
+            "Results include source_name and target_name alongside source/target artifact_ids. "
+            "fields: optional list of keys to project — e.g. "
+            "['source','target','source_name','target_name','conn_type'] for fast dedup checks."
             "\n\nRepo selection: repo_scope defaults to both (engagement + enterprise)."
         ),
         annotations=READ_ONLY,
@@ -49,6 +50,12 @@ def register_query_graph_tools(mcp: FastMCP) -> None:
         for c in conns:
             d = repo.read_artifact(c.artifact_id, mode="summary")
             if d is not None:
+                src_summary = repo.summarize_artifact(c.source)
+                tgt_summary = repo.summarize_artifact(c.target)
+                if src_summary is not None:
+                    d["source_name"] = src_summary.name
+                if tgt_summary is not None:
+                    d["target_name"] = tgt_summary.name
                 if fields_set:
                     d = {k: v for k, v in d.items() if k in fields_set}
                 out.append(d)
