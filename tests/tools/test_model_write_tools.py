@@ -175,12 +175,13 @@ def create_archimate_diagram(
     e2_alias = f"{e2_parts[0].split('@')[0]}_{e2_parts[1]}"
 
     puml = f"""@startuml {artifact_id}
-!include ../_macros.puml
+!include ../_archimate-stereotypes.puml
+!include ../_archimate-glyphs.puml
 
-$DECL_{e1_alias}()
-$DECL_{e2_alias}()
+rectangle "Component A" <<application_component>> as {e1_alias}
+rectangle "Component B" <<application_component>> as {e2_alias}
 
-{e1_alias} -[#0078A0]-> {e2_alias} : <<serving>>
+{e1_alias} --> {e2_alias} : <<serving>>
 @enduml
 """
     return tools.artifact_create_diagram(
@@ -235,7 +236,7 @@ def test_diagram_prefixes_are_family_specific() -> None:
     assert prefix_for_diagram_type("archimate-business") == "ARC"
     assert prefix_for_diagram_type("matrix") == "MAT"
     assert prefix_for_diagram_type("sequence") == "SEQ"
-    assert prefix_for_diagram_type("activity-bpmn") == "ACT"
+    assert prefix_for_diagram_type("activity") == "ACT"
     assert prefix_for_diagram_type("er") == "ERD"
     assert generate_diagram_id("matrix", "Connection Matrix").startswith("MAT@")
 
@@ -259,18 +260,6 @@ def test_model_create_matrix_generates_typed_id_when_omitted(repo_root: Path) ->
 def test_model_create_diagram_dry_run_accepts_inlined_archimate_stereotypes(
     repo_root: Path,
 ) -> None:
-    (repo_root / "diagram-catalog").mkdir(parents=True, exist_ok=True)
-    (repo_root / "diagram-catalog" / "_archimate-stereotypes.puml").write_text(
-        """\
-!include <archimate/Archimate>
-hide stereotype
-skinparam rectangle<<ApplicationComponent>> {
-  BackgroundColor #E8F8FF
-  BorderColor #0078A0
-}
-""",
-        encoding="utf-8",
-    )
     e1 = _write_entity(repo_root, "application-component", "EventStore")
     e2 = _write_entity(repo_root, "application-component", "LangGraph Orchestrator")
     e1_id = str(e1["artifact_id"])
@@ -294,8 +283,8 @@ skinparam rectangle<<ApplicationComponent>> {
 
 title Test Diagram
 
-rectangle "Left" <<ApplicationComponent>> as {e1_alias}
-rectangle "Right" <<ApplicationComponent>> as {e2_alias}
+rectangle "Left" <<application_component>> as {e1_alias}
+rectangle "Right" <<application_component>> as {e2_alias}
 Rel_Serving({e1_alias}, {e2_alias}, "")
 @enduml
 """
@@ -312,3 +301,85 @@ Rel_Serving({e1_alias}, {e2_alias}, "")
     verification = result.get("verification")
     assert isinstance(verification, dict)
     assert verification.get("valid") is True, verification
+
+
+def test_model_create_diagram_dry_run_infers_reference_ids_from_rel_macro(repo_root: Path) -> None:
+    e1 = _write_entity(repo_root, "application-component", "Frontend")
+    e2 = _write_entity(repo_root, "application-component", "Backend")
+    e1_id = str(e1["artifact_id"])
+    e2_id = str(e2["artifact_id"])
+    conn = tools.artifact_add_connection(
+        connection_type="archimate-serving",
+        source_entity=e1_id,
+        target_entity=e2_id,
+        dry_run=False,
+        repo_root=str(repo_root),
+    )
+    assert conn.get("wrote") is True
+
+    e1_alias = f"{e1_id.split('.')[0].split('@')[0]}_{e1_id.split('.')[1]}"
+    e2_alias = f"{e2_id.split('.')[0].split('@')[0]}_{e2_id.split('.')[1]}"
+    puml = f"""@startuml inferred-rel-macro
+!include ../_archimate-stereotypes.puml
+!include ../_archimate-glyphs.puml
+
+rectangle "Frontend" <<application_component>> as {e1_alias}
+rectangle "Backend" <<application_component>> as {e2_alias}
+Rel_Serving({e1_alias}, {e2_alias}, "HTTPS 443")
+@enduml
+"""
+
+    result = tools.artifact_create_diagram(
+        diagram_type="archimate-application",
+        name="Inferred Rel Macro Diagram",
+        puml=puml,
+        artifact_id="ARC@1777000000.tstxx.inferred-rel-macro-diagram",
+        dry_run=True,
+        repo_root=str(repo_root),
+    )
+
+    content = str(result.get("content", ""))
+    assert e1_id in content
+    assert e2_id in content
+    assert f"{e1_id}---{e2_id}@@archimate-serving" in content
+
+
+def test_model_create_diagram_entity_ids_uses_renderer_and_connection_labels(repo_root: Path) -> None:
+    e1 = _write_entity(repo_root, "application-component", "Frontend")
+    e2 = _write_entity(repo_root, "application-component", "Backend")
+    e1_id = str(e1["artifact_id"])
+    e2_id = str(e2["artifact_id"])
+    conn = tools.artifact_add_connection(
+        connection_type="archimate-serving",
+        source_entity=e1_id,
+        target_entity=e2_id,
+        description="HTTPS 443",
+        dry_run=False,
+        repo_root=str(repo_root),
+    )
+    assert conn.get("wrote") is True
+
+    result = tools.artifact_create_diagram(
+        diagram_type="archimate-application",
+        name="Renderer-backed Diagram",
+        entity_ids=[e1_id, e2_id],
+        artifact_id="ARC@1777000000.tstxx.renderer-backed-diagram",
+        dry_run=True,
+        repo_root=str(repo_root),
+        diagram_connections=[
+            {
+                "artifact_id": f"{e1_id}---{e2_id}@@archimate-serving",
+                "include_description": True,
+                "label": "TLS",
+            }
+        ],
+    )
+
+    verification = result.get("verification")
+    assert isinstance(verification, dict)
+    assert verification.get("valid") is True, verification
+    content = str(result.get("content", ""))
+    assert 'Rel_Serving(' in content
+    assert 'Rel_Serving(APP_' in content or 'Rel_Serving(' in content
+    assert 'HTTPS 443 | TLS' in content
+    assert f"{e1_id}---{e2_id}@@archimate-serving" in content

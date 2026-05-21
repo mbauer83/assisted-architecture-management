@@ -148,24 +148,15 @@ def normalize_puml_alias(alias: str) -> str:
     return alias.strip().replace("-", "_")
 
 
-_DECL_MACRO_RE = re.compile(r"^\s*\$(DECL|NEST)_([A-Za-z0-9_]+)\(\)")
-
-
 def extract_declared_puml_aliases(content: str) -> set[str]:
     aliases: set[str] = set()
     for line in content.splitlines():
         stripped = line.strip()
         if not stripped or stripped.startswith("'"):
             continue
-        # Match "as ALIAS" optionally followed by "{" (composite/container entity declarations)
         m = re.search(r"\bas\s+([A-Za-z0-9_-]+)\s*\{?\s*$", stripped)
         if m:
             aliases.add(normalize_puml_alias(m.group(1)))
-            continue
-        # Match $DECL_ALIAS() and $NEST_ALIAS() macro calls (macro-based format)
-        dm = _DECL_MACRO_RE.match(line)
-        if dm:
-            aliases.add(dm.group(2))
     return aliases
 
 
