@@ -64,7 +64,7 @@ class GenericPumlRenderer:
         diagram_entities: Mapping[str, object] | None = None,
         diagram_connections: list[dict[str, object]] | None = None,
     ) -> str:
-        del repo_root, diagram_entities, diagram_connections
+        del repo_root, diagram_entities
         diagram_name = re.sub(r"[^a-zA-Z0-9_-]", "-", name.lower()).strip("-") or "diagram"
         lines: list[str] = [f"@startuml {diagram_name}"]
         for include in self._includes():
@@ -197,18 +197,31 @@ class GenericPumlRenderer:
                 tgt_group = group_index_by_alias.get(tgt)
                 if direction is None and src_group is not None and tgt_group is not None and src_group != tgt_group:
                     direction = "down" if src_group < tgt_group else "up"
-            card_label = format_cardinality_label(conn.src_cardinality, conn.tgt_cardinality)
-            macro_line = render_archimate_relation(src, tgt, conn.conn_type, direction=direction, label_text=card_label)
+            visible_label = self.visible_connection_label(conn, diagram_connections)
+            macro_line = render_archimate_relation(
+                src,
+                tgt,
+                conn.conn_type,
+                direction=direction,
+                label_text=visible_label,
+            )
             if macro_line is not None:
                 conn_lines.append(macro_line)
                 continue
             arrow = conn_info.puml_arrow if conn_info else "-->"
             if direction:
                 arrow = insert_arrow_direction(arrow, direction)
-            label = f"<<{display_connection_label(conn.conn_type)}>>"
-            if card_label:
-                label = f"{label} {card_label}"
-            conn_lines.append(f"{src} {arrow} {tgt} : {label}")
+            show_stereo = conn_info.show_stereotype if conn_info is not None else True
+            if show_stereo:
+                label = f"<<{display_connection_label(conn.conn_type)}>>"
+                if visible_label:
+                    label = f"{label} {visible_label}"
+            else:
+                label = visible_label
+            if label:
+                conn_lines.append(f"{src} {arrow} {tgt} : {label}")
+            else:
+                conn_lines.append(f"{src} {arrow} {tgt}")
         if conn_lines:
             lines.append("' Connections")
             lines.extend(conn_lines)
@@ -221,23 +234,11 @@ class GenericPumlRenderer:
         return body
 
     def inject_includes(self, body: str, repo_root: Path) -> str:
-        _OLD_STEREO = "!include ../_archimate-stereotypes.puml"
-        _OLD_GLYPH = "!include ../_archimate-glyphs.puml"
-        _MACROS = "!include ../_macros.puml"
-
-        # Old-style direct-declaration diagrams: body already has stereo/glyph includes.
-        if _OLD_STEREO in body or _OLD_GLYPH in body:
-            for inc in (_OLD_STEREO, _OLD_GLYPH):
-                if inc not in body:
-                    body = re.sub(r"(@startuml(?:\s+\S+)?)\n", rf"\1\n{inc}\n", body, count=1)
-            return inject_archimate_includes(body, repo_root)
-
-        # New-style macro-based diagrams: add _macros.puml, then inject selectively.
-        if _MACROS not in body:
-            body = re.sub(r"(@startuml(?:\s+\S+)?)\n", rf"\1\n{_MACROS}\n", body, count=1)
-        # Add stereo include as marker so inject_archimate_includes() replaces it with
-        # selective content for the aliases called in this diagram.
-        body = re.sub(r"(@startuml(?:\s+\S+)?)\n", rf"\1\n{_OLD_STEREO}\n", body, count=1)
+        _STEREO = "!include ../_archimate-stereotypes.puml"
+        _GLYPH = "!include ../_archimate-glyphs.puml"
+        for marker in (_STEREO, _GLYPH):
+            if marker not in body:
+                body = re.sub(r"(@startuml(?:\s+\S+)?)\n", rf"\1\n{marker}\n", body, count=1)
         return inject_archimate_includes(body, repo_root)
 
     def collect_references(
@@ -251,13 +252,16 @@ class GenericPumlRenderer:
         del diagram_type, repo_root, diagram_entities, diagram_connections
         return DiagramRendererReferences()
 
+    def visible_connection_label(
+        self,
+        conn: ConnectionRecord,
+        diagram_connections: list[dict[str, object]] | None = None,
+    ) -> str:
+        del diagram_connections
+        return format_cardinality_label(conn.src_cardinality, conn.tgt_cardinality)
+
     def _includes(self) -> list[str]:
-        includes = [str(value) for value in self._config.get("includes", ())]
-        if "_macros.puml" not in includes and (
-            "_archimate-stereotypes.puml" in includes or "_archimate-glyphs.puml" in includes
-        ):
-            return ["_macros.puml"]
-        return includes
+        return [str(value) for value in self._config.get("includes", ())]
 
     def _entity_info(self, artifact_type: str) -> EntityTypeInfo | None:
         return _registry().find_entity_type(EntityTypeName(artifact_type))
@@ -340,12 +344,22 @@ class GenericPumlRenderer:
     def _entity_declaration(self, entity: EntityRecord, alias: str) -> str:
         if entity.artifact_type in self._junction_types():
             return f'circle " " as {alias}'
-        return f"$DECL_{alias}()"
+        label, stereotype = self._entity_label_and_stereotype(entity)
+        if stereotype and self._entity_has_sprite(entity):
+            return f'rectangle "<$archimate_{stereotype}{{scale=1.5}}> {label}" <<{stereotype}>> as {alias}'
+        if stereotype:
+            return f'rectangle "{label}" <<{stereotype}>> as {alias}'
+        return f'rectangle "{label}" as {alias}'
 
     def _entity_nest_declaration(self, entity: EntityRecord, alias: str) -> str:
         if entity.artifact_type in self._junction_types():
             return f'circle " " as {alias}'
-        return f"$NEST_{alias}()"
+        label, stereotype = self._entity_label_and_stereotype(entity)
+        if stereotype and self._entity_has_sprite(entity):
+            return f'rectangle "<$archimate_{stereotype}{{scale=1.5}}> {label}" <<{stereotype}>> as {alias} {{'
+        if stereotype:
+            return f'rectangle "{label}" <<{stereotype}>> as {alias} {{'
+        return f'rectangle "{label}" as {alias} {{'
 
     def _ordered_type_groups(self, entities: list[EntityRecord]) -> list[tuple[str, list[EntityRecord]]]:
         return ordered_type_groups(

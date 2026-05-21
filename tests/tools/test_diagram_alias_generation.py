@@ -82,8 +82,8 @@ def test_generate_archimate_puml_body_normalizes_aliases_in_entities_and_connect
         diagram_type="archimate-motivation",
     )
 
-    assert "$DECL_GOL_B6G__P()" in puml
-    assert "$DECL_OUT_i_3Bi_()" in puml
+    assert '<<goal>> as GOL_B6G__P' in puml
+    assert '<<outcome>> as OUT_i_3Bi_' in puml
     assert 'Rel_Realization_Up(OUT_i_3Bi_, GOL_B6G__P, "")' in puml
     assert "GOL_B6G_-P" not in puml
     assert "OUT_i-3Bi-" not in puml
@@ -314,8 +314,8 @@ last-updated: '2026-04-20'
     )
     puml = str(result["puml"])
 
-    assert "$DECL_GOL_B6G__P()" in puml
-    assert "$DECL_OUT_i_3Bi_()" in puml
+    assert '<<goal>> as GOL_B6G__P' in puml
+    assert '<<outcome>> as OUT_i_3Bi_' in puml
     assert 'Rel_Realization_Up(OUT_i_3Bi_, GOL_B6G__P, "")' in puml
     assert "GOL_B6G_-P" not in puml
     assert "OUT_i-3Bi-" not in puml
@@ -505,15 +505,15 @@ def test_generate_archimate_puml_body_nests_junction_with_nested_siblings() -> N
         diagram_type="archimate-business",
     )
 
-    assert "$NEST_PRC_A()" in puml  # process rendered as nesting container (macro form)
+    assert '<<process>> as PRC_A {' in puml  # process rendered as inline nesting container
     assert "FNC_A" in puml
     assert "FNC_B" in puml
     assert 'circle " " as JCN_A' in puml
-    # Verify junction is nested inside PRC_A block (follows $NEST_PRC_A() before closing "}")
+    # Verify junction is nested inside PRC_A block
     lines = puml.splitlines()
     in_prc, junction_nested = False, False
     for line in lines:
-        if "$NEST_PRC_A()" in line:
+        if '<<process>> as PRC_A {' in line:
             in_prc = True
         elif in_prc and line.strip() == "}":
             in_prc = False

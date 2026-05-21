@@ -4,8 +4,7 @@ filter:
   hierarchy_level:
     index: 0
     values: [strategy, common]
-includes:
-  - _macros.puml
+includes: []
 grouping:
   by_field: hierarchy_0
   stereotype_pattern: "{hierarchy_0|capitalize}Grouping"

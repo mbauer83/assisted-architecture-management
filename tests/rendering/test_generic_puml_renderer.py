@@ -3,10 +3,11 @@ from __future__ import annotations
 from pathlib import Path
 
 from src.domain.artifact_types import ConnectionRecord, EntityRecord
+from src.infrastructure.rendering.archimate_puml_renderer import ArchimatePumlRenderer
 from src.infrastructure.rendering.generic_puml_renderer import GenericPumlRenderer
 
 _ARCHIMATE_CONFIG = {
-    "includes": ["_macros.puml"],
+    "includes": [],   # was: ["_macros.puml"]
     "grouping": {"stereotype_pattern": "{hierarchy_0|capitalize}Grouping"},
     "layout": {
         "nesting_connection_classes": ["nesting"],
@@ -48,6 +49,7 @@ def _conn(
     target: str,
     conn_type: str = "archimate-realization",
     *,
+    content_text: str = "",
     src_cardinality: str = "",
     tgt_cardinality: str = "",
 ) -> ConnectionRecord:
@@ -60,7 +62,7 @@ def _conn(
         status="draft",
         path=Path("/tmp/test.outgoing.md"),
         extra={},
-        content_text="",
+        content_text=content_text,
         src_cardinality=src_cardinality,
         tgt_cardinality=tgt_cardinality,
     )
@@ -79,32 +81,155 @@ def test_render_body_uses_includes_and_single_domain_type_groupings(tmp_path: Pa
         tmp_path,
     )
 
-    assert "!include ../_macros.puml" in puml
+    assert "!include ../_macros.puml" not in puml
     assert 'rectangle "Drivers" <<MotivationGrouping>> {' in puml
     assert 'rectangle "Assessments" <<MotivationGrouping>> {' in puml
     assert "top to bottom direction" in puml
     assert 'Rel_Influence_Down(DRV_A, ASS_A, "")' in puml
 
 
+def test_render_body_keeps_serving_macro_unsuffixed_for_cross_group_layout(tmp_path: Path) -> None:
+    renderer = GenericPumlRenderer(_ARCHIMATE_CONFIG)
+    source = _entity(
+        "SSW@1.a.registry",
+        "system-software",
+        "Registry",
+        "SSW_REG",
+        domain="technology",
+        subdomain="system-software",
+    )
+    target = _entity(
+        "NOD@1.a.cluster",
+        "technology-node",
+        "Cluster",
+        "NOD_CLU",
+        domain="technology",
+        subdomain="technology-nodes",
+    )
+
+    puml = renderer.render_body(
+        "Registry Access",
+        [source, target],
+        [_conn(source.artifact_id, target.artifact_id, "archimate-serving")],
+        "archimate-technology",
+        tmp_path,
+    )
+
+    assert 'Rel_Serving(SSW_REG, NOD_CLU, "")' in puml
+    assert "Rel_Serving_Up(" not in puml
+
+
+def test_archimate_renderer_keeps_connection_text_hidden_by_default(tmp_path: Path) -> None:
+    renderer = ArchimatePumlRenderer(_ARCHIMATE_CONFIG)
+    source = _entity(
+        "SSW@1.a.registry",
+        "system-software",
+        "Registry",
+        "SSW_REG",
+        domain="technology",
+        subdomain="system-software",
+    )
+    target = _entity(
+        "NOD@1.a.cluster",
+        "technology-node",
+        "Cluster",
+        "NOD_CLU",
+        domain="technology",
+        subdomain="technology-nodes",
+    )
+
+    puml = renderer.render_body(
+        "Registry Access",
+        [source, target],
+        [_conn(source.artifact_id, target.artifact_id, "archimate-serving", content_text="HTTPS 443")],
+        "archimate-technology",
+        tmp_path,
+    )
+
+    assert 'Rel_Serving(SSW_REG, NOD_CLU, "")' in puml
+    assert "HTTPS 443" not in puml
+
+
+def test_archimate_renderer_renders_only_selected_connection_annotation_content(tmp_path: Path) -> None:
+    renderer = ArchimatePumlRenderer(_ARCHIMATE_CONFIG)
+    source = _entity(
+        "SSW@1.a.registry",
+        "system-software",
+        "Registry",
+        "SSW_REG",
+        domain="technology",
+        subdomain="system-software",
+    )
+    target = _entity(
+        "NOD@1.a.cluster",
+        "technology-node",
+        "Cluster",
+        "NOD_CLU",
+        domain="technology",
+        subdomain="technology-nodes",
+    )
+    connection = _conn(
+        source.artifact_id,
+        target.artifact_id,
+        "archimate-serving",
+        content_text="Registry pulls over HTTPS 443",
+        src_cardinality="1",
+        tgt_cardinality="0..*",
+    )
+
+    puml = renderer.render_body(
+        "Registry Access",
+        [source, target],
+        [connection],
+        "archimate-technology",
+        tmp_path,
+        diagram_connections=[
+            {
+                "artifact_id": connection.artifact_id,
+                "include_description": True,
+                "label": "Outbound TCP",
+            }
+        ],
+    )
+
+    assert 'Rel_Serving(SSW_REG, NOD_CLU, "Registry pulls over HTTPS 443 | Outbound TCP")' in puml
+
+
+def test_archimate_renderer_can_opt_in_cardinality_for_annotated_connections(tmp_path: Path) -> None:
+    renderer = ArchimatePumlRenderer(_ARCHIMATE_CONFIG)
+    source = _entity("OUT@1.a.outcome", "outcome", "Outcome A", "OUT_A")
+    target = _entity("GOL@1.a.goal", "goal", "Goal A", "GOL_A", subdomain="goals")
+    connection = _conn(
+        source.artifact_id,
+        target.artifact_id,
+        "archimate-realization",
+        src_cardinality="1",
+        tgt_cardinality="0..*",
+    )
+
+    puml = renderer.render_body(
+        "Outcome Mapping",
+        [source, target],
+        [connection],
+        "archimate-motivation",
+        tmp_path,
+        diagram_connections=[
+            {
+                "artifact_id": connection.artifact_id,
+                "include_cardinality": True,
+                "label": "Required path",
+            }
+        ],
+    )
+
+    assert 'Rel_Realization_Up(OUT_A, GOL_A, "1 -> 0..* | Required path")' in puml
+
+
 def test_render_body_renders_junction_inside_nested_parent(tmp_path: Path) -> None:
     renderer = GenericPumlRenderer(_ARCHIMATE_CONFIG)
     process = _entity("PRC@1.a.process-a", "process", "Process A", "PRC_A", domain="business", subdomain="processes")
-    function_a = _entity(
-        "FNC@1.a.function-a",
-        "function",
-        "Function A",
-        "FNC_A",
-        domain="business",
-        subdomain="functions",
-    )
-    function_b = _entity(
-        "FNC@1.b.function-b",
-        "function",
-        "Function B",
-        "FNC_B",
-        domain="business",
-        subdomain="functions",
-    )
+    function_a = _entity("FNC@1.a.function-a", "function", "Function A", "FNC_A", domain="business", subdomain="functions")
+    function_b = _entity("FNC@1.b.function-b", "function", "Function B", "FNC_B", domain="business", subdomain="functions")
     junction = _entity("JNA@1.a.and-a", "and-junction", "AND A", "JNA_A", domain="business", subdomain="junctions")
 
     puml = renderer.render_body(
@@ -120,14 +245,16 @@ def test_render_body_renders_junction_inside_nested_parent(tmp_path: Path) -> No
         tmp_path,
     )
 
-    assert "$NEST_PRC_A()" in puml  # process is rendered as a nesting container via macro
+    # Process rendered as inline opening rectangle with brace
+    assert '<<process>> as PRC_A {' in puml
     assert 'circle " " as JNA_A' in puml
-    # Verify junction is nested inside process by checking indentation pattern
+    assert "$NEST_PRC_A()" not in puml
+    # Verify junction is nested inside process by checking indentation
     lines = puml.splitlines()
     in_prc = False
     junction_nested = False
     for line in lines:
-        if "$NEST_PRC_A()" in line:
+        if '<<process>> as PRC_A {' in line:
             in_prc = True
         elif in_prc and line.strip() == "}":
             in_prc = False
@@ -149,9 +276,29 @@ def test_render_body_entity_declarations_use_snake_case_stereotypes(tmp_path: Pa
         tmp_path,
     )
 
-    # Declarations are macro calls — stereotype lives inside the macro body
-    assert "$DECL_STK_A()" in puml
-    assert "$DECL_VAL_A()" in puml
+    # Inline rectangle declarations with stereotype — not macro calls
+    assert '<<stakeholder>> as STK_A' in puml
+    assert '<<value>> as VAL_A' in puml
+    assert "$DECL_" not in puml
+    assert "$NEST_" not in puml
+
+
+def test_render_body_multi_domain_with_connections_does_not_crash(tmp_path: Path) -> None:
+    renderer = GenericPumlRenderer(_ARCHIMATE_CONFIG)
+    app = _entity("APP@1.a.app-a", "application-component", "App A", "APP_A", domain="application", subdomain="components")
+    node = _entity("NOD@1.a.node-a", "technology-node", "Node A", "NOD_A", domain="technology", subdomain="nodes")
+
+    # Multi-domain scenario — must not raise UnboundLocalError
+    puml = renderer.render_body(
+        "Multi Domain",
+        [app, node],
+        [_conn(app.artifact_id, node.artifact_id, "archimate-serving")],
+        "archimate-layered",
+        tmp_path,
+    )
+
+    assert "APP_A" in puml
+    assert "NOD_A" in puml
 
 
 def test_inject_includes_inlines_only_needed_stereotypes_and_sprites(tmp_path: Path) -> None:
