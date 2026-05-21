@@ -6,7 +6,7 @@ This module is the stable import surface used by the write layer. It exposes:
 - deterministic formatting helpers for entity, connection, diagram, and matrix artifacts
 - best-effort inference of referenced IDs from PUML
 
-I/O (writing files, cache invalidation, macro regeneration, verifier execution)
+I/O (writing files, cache invalidation, verifier execution)
 belongs in infrastructure adapters (see ``src/infrastructure/write/artifact_write_ops.py``).
 """
 
@@ -76,7 +76,6 @@ _DIAGRAM_TYPE_PREFIXES: dict[str, str] = {
     "erd": "ERD",
     "entity-relationship": "ERD",
     "activity": "ACT",
-    "activity-bpmn": "ACT",
     "bpmn": "BPMN",
 }
 

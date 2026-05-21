@@ -1,6 +1,6 @@
 # Diagram Type Modules
 
-Each subdirectory is a *diagram type module* — a unit that declares which entity and connection types a diagram view accepts, and how those diagrams are rendered. The system loads all registered kinds at startup and exposes them via the `ModuleRegistry`.
+Each subdirectory is a *diagram type module* — a unit that declares which entity and connection types a diagram view accepts, and how those diagrams are rendered. The system loads all registered diagram types at startup and exposes them via the `ModuleRegistry`.
 
 ## Structure
 
@@ -17,10 +17,23 @@ src/diagram_types/
     config.yaml
     ontology.yaml          ← activity-specific entity/connection type ontology
     renderer.py
+  c4_system_context/       ← C4 level 1 view with mapped diagram-owned entities
+    __init__.py
+    config.yaml
+    ontology.yaml
+  c4_container/            ← C4 level 2 view
+    __init__.py
+    config.yaml
+    ontology.yaml
+  c4_component/            ← C4 level 3 view
+    __init__.py
+    config.yaml
+    ontology.yaml
   matrix/                  ← free-ontology (accepts all entity types)
     __init__.py
     config.yaml
-  _archimate_kind.py       ← config-backed loader for ArchiMate views
+  _config_type.py          ← config-backed loader for ontology-bound views
+  _c4_type.py              ← shared loader for the built-in C4 view family
   __init__.py              ← register_default_diagram_types()
 ```
 
@@ -28,6 +41,7 @@ src/diagram_types/
 
 ```yaml
 name: archimate-application          # (required) registry key; matches diagram_type in artifacts
+ontology: archimate_next             # ontology package under src/ontologies/
 
 filter:
   hierarchy_level:
@@ -36,9 +50,10 @@ filter:
 # EntityTypeInfo.hierarchy[0] is the domain/layer segment under model/.
 # Omit filter entirely for free-ontology kinds that accept everything.
 
-includes:
-  - _archimate-stereotypes.puml      # PlantUML include files injected into every rendered diagram
-  - _archimate-glyphs.puml           # relative to the diagram-catalog/ include root
+includes: []
+# ArchiMate diagram types use selective injection at render time: _archimate-stereotypes.puml
+# and _archimate-glyphs.puml are inlined automatically via inject_includes(). Do not list
+# them here — they are not included as static !include directives.
 
 grouping:
   by_field: hierarchy_0              # groups entities by EntityTypeInfo.hierarchy[0]
@@ -50,7 +65,7 @@ layout:
   # Connection classes (from element_classes in entities.yaml) that produce visual nesting in the
   # rendered diagram. Connections of these classes draw child entities inside parent frames.
 
-  flow_connection_classes: [flow]
+  flow_connection_classes: [dynamic]
   # Connection classes that produce directed flow arrows (as opposed to structural lines).
 
 guidance:
@@ -74,7 +89,7 @@ ui:
   type_ui_slots: {}
 ```
 
-All fields except `name` are optional. Omitting a field uses the built-in default (empty lists, no grouping, no layout hints).
+All fields except `name` are optional. Omitting a field uses the built-in default (empty lists, no grouping, no layout hints). `ontology` names the ontology package that supplies the base entity and connection vocabulary.
 
 ## Diagram-only entity types
 
@@ -120,6 +135,10 @@ entity_types:
     permitted_mappings:
       entity_types: [role, business-actor, application-component]
       entity_classes: []
+      sources:
+        - ontology: archimate_next
+          entity_type: role
+          transparent: false
     mapping_required: false
     properties: {}
 
@@ -165,7 +184,9 @@ permitted_relationships:
 | `required_connections` | Mandatory connections; drives annotation schema injection |
 | `properties` | Domain-specific JSON Schema fragments; `required: false` omits from `required` array |
 
-### Kind-data array keys
+`permitted_mappings.sources` is the extensible form for cross-ontology reuse. Each source entry names an ontology package plus either `entity_type` or `entity_class`. This is the preferred mechanism when a diagram-owned type can transparently reuse model entities from multiple ontologies.
+
+### Diagram-entity array keys
 
 Each entity type declared in `ontology.yaml` gets **its own top-level array in the diagram-entities**, keyed by the entity type name:
 
@@ -215,7 +236,7 @@ Element classes must be declared in `config.yaml` under `element_classes:` befor
 
 ## Element-class filter table
 
-For ArchiMate-style domain views, `filter.hierarchy_level` selects entity types by a hierarchy segment. The common domain filter uses `index: 0`, which compares `EntityTypeInfo.hierarchy[0]` against the configured values. Only matching entity types are included in `effective_entity_types()` and shown in the entity picker.
+For ontology-bound domain views, `filter.hierarchy_level` selects entity types by a hierarchy segment. The common domain filter uses `index: 0`, which compares `EntityTypeInfo.hierarchy[0]` against the configured values. Only matching entity types are included in `effective_entity_types()` and shown in the entity picker.
 
 | Domain | `filter.hierarchy_level.values` value |
 |---|---|
@@ -231,7 +252,7 @@ The `archimate-layered` kind accepts all domains and therefore lists the full vo
 
 ## When a custom `renderer.py` is needed
 
-The `GenericPumlRenderer` (in `src/infrastructure/rendering/generic_puml_renderer.py`) handles all standard ArchiMate-style views using only `config.yaml`. You do **not** need a custom renderer for:
+The `GenericPumlRenderer` (in `src/infrastructure/rendering/generic_puml_renderer.py`) handles baseline config-backed PlantUML rendering. Standard ArchiMate views are layered on top of it through the shared `ArchimatePumlRenderer` in `src/infrastructure/rendering/archimate_puml_renderer.py`. You do **not** need a per-diagram-type custom renderer for:
 - Any domain view (motivation, strategy, business, application, technology, implementation, layered)
 - Views that add or remove hierarchy filter values
 - Views with different `includes`, `grouping`, or `layout` settings
@@ -242,7 +263,19 @@ You **do** need a custom renderer (implementing the `DiagramRenderer` protocol) 
 - You are building a diagram type for a non-ArchiMate ontology with its own notation
 - The diagram type owns diagram-scoped state in `diagram-entities` that affects rendering, such as activity swimlanes
 
+ArchiMate-specific note:
+- The shared ArchiMate renderer is the correct place for ArchiMate-only behavior such as selective connection-label rendering from model connection data.
+- Connection descriptions must remain hidden by default. Only explicit per-diagram opt-in metadata should surface connection description text or cardinalities.
+- For ArchiMate diagrams, `diagram_connections` can be used as per-diagram connection annotation metadata keyed by model connection `artifact_id`. This metadata does not create diagram-owned connections. Supported keys are `artifact_id` (or `connection_id`), `include_description`, `include_cardinality`, and `label`.
+
 The `matrix` diagram type is an example: it uses `_MatrixRenderer` that raises `ValueError` on `render_body` because matrix diagrams use a separate Markdown rendering path, not PlantUML. See `src/diagram_types/matrix/__init__.py`.
+
+Custom renderers also own two extension hooks beyond `render_body(...)`:
+
+- `inject_includes(body, repo_root)` adds stereotype marker includes if absent and rewrites them to selectively inline only the skinparam blocks and SVG sprites that the diagram actually uses. No external `_macros.puml` file is used. Activity and C4 renderers return the body unchanged.
+- `collect_references(diagram_type, repo_root, *, diagram_entities, diagram_connections)` returns model `entity_ids` and `connection_ids` implied by diagram-owned data or annotation metadata. The shared write path persists those references into frontmatter without any diagram-type-specific branching.
+
+Generic infrastructure must call these hooks through the renderer protocol. It must not inspect diagram type names to decide how to prepare or analyze a diagram.
 
 ## Adding a new diagram type
 
@@ -262,15 +295,13 @@ filter:
   hierarchy_level:
     index: 0
     values: [application, technology]
-includes:
-  - _archimate-stereotypes.puml
-  - _archimate-glyphs.puml
+includes: []
 grouping:
   by_field: hierarchy_0
   stereotype_pattern: "{hierarchy_0|capitalize}Grouping"
 layout:
   nesting_connection_classes: [nesting]
-  flow_connection_classes: [flow]
+  flow_connection_classes: [dynamic]
 guidance:
   when_to_use: "Use when ..."
   when_not_to_use: "Do not use when ..."
@@ -284,7 +315,7 @@ ui:
 
 ### Step 3 — Implement `__init__.py`
 
-For standard ArchiMate-style views, re-use the built-in loader:
+For standard ontology-bound ArchiMate views, re-use the ArchiMate-aware loader:
 
 ```python
 # src/diagram_types/my_view/__init__.py
@@ -296,6 +327,8 @@ from src.domain.ontology_protocol import DiagramTypeModule
 
 module: DiagramTypeModule = load_archimate_diagram_type(Path(__file__).parent)
 ```
+
+For a non-ArchiMate diagram-owned family with shared behavior, provide a custom loader instead. The built-in C4 packages use `load_c4_diagram_type(...)` in `_c4_type.py` as the reference pattern.
 
 ### Step 4 — Register the module
 
@@ -312,6 +345,72 @@ def register_default_diagram_types(registry: ModuleRegistry) -> None:
 ### Step 5 — Verify
 
 The protocol compliance test in `tests/domain/test_protocol_compliance.py` automatically checks every registered diagram type. Run `uv run pytest tests/` — the new kind must pass all checks without modification.
+
+## Diagram-type-owned connection types
+
+A diagram type can declare connection types that belong to it exclusively — types that are not defined in any ontology YAML but are globally queryable and validatable through the registry.
+
+Declare them by overriding `own_connection_types` in the diagram type class:
+
+```python
+_MY_OWN_CONNECTION_TYPES: dict[ConnectionTypeName, ConnectionTypeInfo] = {
+    ConnectionTypeName("c4-contains"): ConnectionTypeInfo(
+        artifact_type="c4-contains",
+        conn_lang="c4",
+        symmetric=False,
+        puml_arrow="-->",
+        classifications=("containment",),
+        hierarchy_priority=0,
+        hierarchy_label="contains",
+    ),
+}
+
+@property
+def own_connection_types(self) -> dict[ConnectionTypeName, ConnectionTypeInfo]:
+    return _MY_OWN_CONNECTION_TYPES
+```
+
+`ModuleRegistry` merges `own_connection_types` from all registered diagram types into the global lookup:
+
+- `registry.all_connection_types()` — includes all diagram-type-owned types
+- `registry.find_connection_type(name)` — finds ontology and diagram-type-owned types
+- `registry.connection_types_with_classification(cls)` — searches both sources
+
+This ensures the write pipeline can validate and create connections of any diagram-type-owned type without the generic registry needing to know about diagram-specific concepts.
+
+The `c4-contains` connection type (in `_c4_type.py`) is the reference example. It is exclusively a C4 concept and would be a modularity violation if placed in `connections.yaml` or any ontology module.
+
+## Scope connections hook
+
+Some diagram types need to auto-create model-level connections that reflect the diagram's structural intent. The `build_scope_connections` hook supports this:
+
+```python
+def build_scope_connections(
+    self, diagram_entities: dict[str, Any]
+) -> list[tuple[str, str, str]]:
+    # return list of (source_entity_id, target_entity_id, conn_type)
+    ...
+```
+
+`DiagramTypeBase` provides a no-op default (`return []`). Diagram types override it when they have structural scope semantics. After a diagram write the `apply_scope_connections` helper calls this hook and idempotently creates any returned connections as model-level artifacts.
+
+The C4 types use `_scope_entity_id` as the scope-identification mechanism: a top-level key in `diagram_entities` that holds the `entity_id` of the model entity the diagram documents. `build_scope_connections` reads it along with the `c4:` config block to produce `(scope_entity_id, internal_entity_id, "c4-contains")` pairs for each internal element.
+
+Authors never set a per-item `scope: true` flag. The GUI scope picker and MCP tool guidance both use `_scope_entity_id` as the only scope input.
+
+### `c4:` config block
+
+C4 diagram types declare their scope semantics in `config.yaml`:
+
+```yaml
+c4:
+  scope_entity_type: software-system   # entity type that acts as the scope
+  scope_render_mode: boundary          # "boundary" = outer frame; "node" = regular node
+  internal_entity_types:               # entity types whose items get c4-contains connections
+    - container
+```
+
+`_C4DiagramType` reads this block in both `build_scope_connections` (to generate connections) and the renderer (to choose the outer boundary style).
 
 ## Protocol contract
 
