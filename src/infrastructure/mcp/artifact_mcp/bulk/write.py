@@ -117,7 +117,7 @@ def _execute_staged(
     operation_registry.set_phase(operation_id, "apply")
     from .common import temp_repo_callbacks
 
-    clear_repo_caches, mark_macros_dirty, macros_dirty, changed_paths = temp_repo_callbacks(staged_root)
+    clear_repo_caches, changed_paths = temp_repo_callbacks(staged_root)
     ref_map: dict[str, str] = {}
     results: dict[int, dict[str, object]] = {}
     skipped = apply_create_entities(
@@ -125,7 +125,6 @@ def _execute_staged(
         ref_map=ref_map,
         results=results,
         clear_repo_caches=clear_repo_caches,
-        mark_macros_dirty=mark_macros_dirty,
         staged_root=staged_root,
         dry_run=dry_run,
         operation_id=operation_id,
@@ -135,7 +134,6 @@ def _execute_staged(
         ref_map=ref_map,
         results=results,
         clear_repo_caches=clear_repo_caches,
-        mark_macros_dirty=mark_macros_dirty,
         staged_root=staged_root,
         dry_run=dry_run,
         operation_id=operation_id,
@@ -145,7 +143,6 @@ def _execute_staged(
         edits,
         results=results,
         clear_repo_caches=clear_repo_caches,
-        mark_macros_dirty=mark_macros_dirty,
         staged_root=staged_root,
         dry_run=dry_run,
         operation_id=operation_id,
@@ -164,7 +161,6 @@ def _execute_staged(
             auto_sync_enabled=auto_sync_enabled,
             clear_repo_caches=clear_repo_caches,
             changed_paths=changed_paths,
-            macros_dirty=macros_dirty,
             operation_id=operation_id,
         )
 
@@ -193,7 +189,6 @@ def _sync_verify_and_commit(
     auto_sync_enabled: bool,
     clear_repo_caches,
     changed_paths: set[Path],
-    macros_dirty: set[Path],
     operation_id: str,
 ) -> bool:
     if auto_sync_enabled:
@@ -226,11 +221,9 @@ def _sync_verify_and_commit(
 
     operation_registry.set_phase(operation_id, "update_index")
     commit_result = commit_staged_repo(live_root=live_root, staged_root=staged_root)
-    mutation_context, _live_clear, live_mark_macros_dirty = authoritative_callbacks_for(live_root)
+    mutation_context, _live_clear = authoritative_callbacks_for(live_root)
     for path in [*commit_result.changed_paths, *commit_result.deleted_paths]:
         mutation_context.record_changed(path)
-    if macros_dirty:
-        live_mark_macros_dirty(live_root)
     mutation_context.finalize()
     return True
 

@@ -48,7 +48,6 @@ def apply_create_entities(
     ref_map: dict[str, str],
     results: dict[int, dict[str, object]],
     clear_repo_caches: Callable[[Path], None],
-    mark_macros_dirty: Callable[[Path], None],
     staged_root: Path,
     dry_run: bool,
     operation_id: str,
@@ -64,7 +63,6 @@ def apply_create_entities(
                 repo_root=staged_root,
                 verifier=ArtifactVerifier(None),
                 clear_repo_caches=clear_repo_caches,
-                mark_macros_dirty=mark_macros_dirty,
                 artifact_type=item["artifact_type"],
                 name=item["name"],
                 summary=item.get("summary"),
@@ -95,7 +93,6 @@ def apply_add_connections(
     ref_map: dict[str, str],
     results: dict[int, dict[str, object]],
     clear_repo_caches: Callable[[Path], None],
-    mark_macros_dirty: Callable[[Path], None],
     staged_root: Path,
     dry_run: bool,
     operation_id: str,
@@ -123,7 +120,6 @@ def apply_add_connections(
                     repo_root=str(staged_root),
                     provisional_ids=provisional_ids,
                     clear_repo_caches=clear_repo_caches,
-                    mark_macros_dirty=mark_macros_dirty,
                 )
             )
             out["op"] = "add_connection"
@@ -140,7 +136,6 @@ def apply_edits(
     *,
     results: dict[int, dict[str, object]],
     clear_repo_caches: Callable[[Path], None],
-    mark_macros_dirty: Callable[[Path], None],
     staged_root: Path,
     dry_run: bool,
     operation_id: str,
@@ -161,7 +156,6 @@ def apply_edits(
                 registry=registry,
                 verifier=verifier,
                 clear_repo_caches=clear_repo_caches,
-                mark_macros_dirty=mark_macros_dirty,
                 staged_root=staged_root,
             )
             out = strip_content(_out(result, dry_run=False))
@@ -181,7 +175,6 @@ def _apply_single_edit(
     registry: ArtifactRegistry,
     verifier: ArtifactVerifier,
     clear_repo_caches: Callable[[Path], None],
-    mark_macros_dirty: Callable[[Path], None],
     staged_root: Path,
 ):
     if op == "edit_entity":
@@ -190,7 +183,6 @@ def _apply_single_edit(
             registry=registry,
             verifier=verifier,
             clear_repo_caches=clear_repo_caches,
-            mark_macros_dirty=mark_macros_dirty,
             artifact_id=item["artifact_id"],
             name=item.get("name"),
             summary=item["summary"] if "summary" in item else _ENTITY_UNSET,

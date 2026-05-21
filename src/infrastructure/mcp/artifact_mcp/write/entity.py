@@ -44,12 +44,11 @@ def artifact_create_entity(
         repo_preset=None,
         enterprise_root=None,
     )
-    mutation_context, clear_repo_caches, mark_macros_dirty = authoritative_callbacks_for(roots)
+    mutation_context, clear_repo_caches = authoritative_callbacks_for(roots)
     result = artifact_write_ops.create_entity(
         repo_root=roots[0],
         verifier=verifier_for(roots_key(roots), include_registry=False),
         clear_repo_caches=clear_repo_caches,
-        mark_macros_dirty=mark_macros_dirty,
         artifact_type=artifact_type,
         name=name,
         summary=summary,
@@ -90,7 +89,7 @@ def register(mcp: FastMCP) -> None:
             "Return authoring guidance before creating entities or diagrams. "
             "Two independent params (usable separately or together):\n"
             "• diagram_type (str): diagram type block — when_to_use, when_not_to_use, "
-            "accepted_domains, own entity types, diagram_entities schema.\n"
+            "accepted_domains, own entity types, diagram_entities schema, and optional puml_notes.\n"
             "• filter (list[str]): entity type guidance — create_when, never_create_when, "
             "permitted_connections. Pass type names (e.g. ['requirement', 'goal']) "
             "or domain names (e.g. ['motivation', 'strategy']) — not mixed.\n"

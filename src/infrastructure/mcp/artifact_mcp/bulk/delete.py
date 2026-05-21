@@ -127,7 +127,7 @@ def _execute_staged_delete_batch(
     operation_id: str,
 ) -> dict[str, Any]:
     results: dict[int, dict[str, object]] = {}
-    clear_repo_caches, mark_macros_dirty, macros_dirty, changed_paths = temp_repo_callbacks(staged_root)
+    clear_repo_caches, changed_paths = temp_repo_callbacks(staged_root)
     registry = ArtifactRegistry(shared_artifact_index([staged_root]))
     verifier = ArtifactVerifier(registry)
     operation_registry.set_phase(operation_id, "apply")
@@ -145,7 +145,6 @@ def _execute_staged_delete_batch(
         registry=registry,
         verifier=verifier,
         clear_repo_caches=clear_repo_caches,
-        mark_macros_dirty=mark_macros_dirty,
         operation_id=operation_id,
         results=results,
     )
@@ -173,11 +172,9 @@ def _execute_staged_delete_batch(
     if verification["valid"] and not dry_run:
         operation_registry.set_phase(operation_id, "update_index")
         commit_result = commit_staged_repo(live_root=live_root, staged_root=staged_root)
-        mutation_context, _live_clear, live_mark_macros_dirty = authoritative_callbacks_for(live_root)
+        mutation_context, _live_clear = authoritative_callbacks_for(live_root)
         for path in [*commit_result.changed_paths, *commit_result.deleted_paths]:
             mutation_context.record_changed(path)
-        if macros_dirty:
-            live_mark_macros_dirty(live_root)
         mutation_context.finalize()
         committed = True
     elif not verification["valid"]:

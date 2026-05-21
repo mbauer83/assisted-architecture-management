@@ -32,7 +32,7 @@ def artifact_create_document(
         repo_preset=None,
         enterprise_root=None,
     )
-    mutation_context, clear_repo_caches, _mark_macros_dirty = authoritative_callbacks_for(roots)
+    mutation_context, clear_repo_caches = authoritative_callbacks_for(roots)
     result = artifact_write_ops.create_document(
         repo_root=roots[0],
         verifier=verifier_for(roots_key(roots), include_registry=False),
@@ -71,7 +71,7 @@ def artifact_edit_document(
         repo_preset=None,
         enterprise_root=None,
     )
-    mutation_context, clear_repo_caches, _mark_macros_dirty = authoritative_callbacks_for(roots)
+    mutation_context, clear_repo_caches = authoritative_callbacks_for(roots)
     result = artifact_write_ops.edit_document(
         repo_root=roots[0],
         verifier=verifier_for(roots_key(roots), include_registry=False),
@@ -103,7 +103,7 @@ def artifact_delete_document(
         repo_preset=None,
         enterprise_root=None,
     )
-    mutation_context, clear_repo_caches, _mark_macros_dirty = authoritative_callbacks_for(roots)
+    mutation_context, clear_repo_caches = authoritative_callbacks_for(roots)
     result = artifact_write_ops.delete_document(
         repo_root=roots[0],
         clear_repo_caches=clear_repo_caches,

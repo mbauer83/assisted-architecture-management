@@ -10,6 +10,7 @@ from src.infrastructure.mcp.artifact_mcp.write._common import (
     _out,
     artifact_write_ops,
     authoritative_callbacks_for,
+    repo_cached,
     registry_cached,
     resolve_repo_roots,
     roots_key,
@@ -38,7 +39,7 @@ def artifact_create_matrix(
         enterprise_root=None,
     )
     key = roots_key(roots)
-    mutation_context, clear_repo_caches, _mark_macros_dirty = authoritative_callbacks_for(roots)
+    mutation_context, clear_repo_caches = authoritative_callbacks_for(roots)
     result = artifact_write_ops.create_matrix(
         repo_root=roots[0],
         registry=registry_cached(key),
@@ -78,18 +79,40 @@ def artifact_create_diagram(
     dry_run: bool = True,
     repo_root: str | None = None,
 ) -> dict[str, object]:
+    entity_ids_used: list[str] | None = None
+    connection_ids_used: list[str] | None = None
     if entity_ids and not puml:
-        from src.infrastructure.mcp.artifact_mcp._diagram_scaffold import build_diagram_scaffold  # noqa: PLC0415
-        from src.infrastructure.mcp.artifact_mcp.context import RepoScope  # noqa: PLC0415
+        from src.infrastructure.gui.routers._diagram_selection import resolve_diagram_selection  # noqa: PLC0415
+        from src.infrastructure.rendering.diagram_builder import generate_archimate_puml_body  # noqa: PLC0415
 
-        scaffold = build_diagram_scaffold(
-            entity_ids=entity_ids,
-            diagram_name=name,
-            direction=direction,
-            repo_root=repo_root,
+        roots = resolve_repo_roots(
             repo_scope="engagement",
+            repo_root=repo_root,
+            repo_preset=None,
+            enterprise_root=None,
         )
-        puml = str(scaffold.get("puml", ""))
+        key = roots_key(roots)
+        repo = repo_cached(key)
+        entity_id_set = set(entity_ids)
+        auto_connection_ids = [
+            str(conn["artifact_id"])
+            for conn in repo.candidate_connections_for_entities(entity_ids)
+            if str(conn["source"]) in entity_id_set and str(conn["target"]) in entity_id_set
+        ]
+        entities, connections, entity_ids_used, connection_ids_used = resolve_diagram_selection(
+            repo,
+            entity_ids,
+            auto_connection_ids,
+        )
+        puml = generate_archimate_puml_body(
+            name,
+            entities,
+            connections,
+            diagram_type=diagram_type,
+            repo_root=roots[0],
+            diagram_entities=diagram_entities,
+            diagram_connections=diagram_connections,
+        )
 
     roots = resolve_repo_roots(
         repo_scope="engagement",
@@ -98,7 +121,7 @@ def artifact_create_diagram(
         enterprise_root=None,
     )
     key = roots_key(roots)
-    mutation_context, clear_repo_caches, _mark_macros_dirty = authoritative_callbacks_for(roots)
+    mutation_context, clear_repo_caches = authoritative_callbacks_for(roots)
     result = artifact_write_ops.create_diagram(
         repo_root=roots[0],
         verifier=verifier_for(key, include_registry=True),
@@ -110,6 +133,8 @@ def artifact_create_diagram(
         keywords=keywords,
         diagram_entities=diagram_entities,
         diagram_connections=diagram_connections,
+        entity_ids_used=entity_ids_used,
+        connection_ids_used=connection_ids_used,
         version=version,
         status=status,
         last_updated=None,
@@ -160,6 +185,9 @@ def register(mcp: FastMCP) -> None:
             "using existing model connections. Fastest path for new diagrams — no manual PUML needed.\n"
             "  2. puml=...: supply PUML manually using entity display_alias values "
             "(artifact_query_read_artifact mode='full') for custom layouts.\n"
+            "For ArchiMate views, diagram_connections is optional per-diagram connection annotation metadata keyed by "
+            "model connection artifact_id. It does not create diagram-owned connections. Supported opt-in keys are "
+            "artifact_id (or connection_id), include_description, include_cardinality, and label.\n"
             "direction='left_to_right' | 'top_to_bottom' (default). "
             "auto_include_stereotypes=true injects !include lines. "
             "connection_inference: 'none' | 'auto' (warn) | 'strict' (error) on unknown stereotypes.\n\n"

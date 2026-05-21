@@ -178,9 +178,6 @@ def _apply_paths_now(roots: list[Path], paths: list[Path]) -> ReadModelVersion:
     return version
 
 
-def _regenerate_macros(roots: list[Path]) -> None:
-    return  # removed: static includes no longer regenerated on entity write
-
 
 def _normalize_roots(root_or_roots: Path | list[Path]) -> list[Path]:
     roots = root_or_roots if isinstance(root_or_roots, list) else [root_or_roots]
@@ -244,18 +241,12 @@ def enqueue_background_refresh(
 class AuthoritativeMutationContext:
     repo_roots: list[Path]
     changed_paths: set[Path] = field(default_factory=set)
-    macro_roots: set[Path] = field(default_factory=set)
 
     def record_changed(self, path: Path) -> None:
         self.changed_paths.add(path.resolve())
 
-    def mark_macros_dirty(self, repo_root: Path) -> None:
-        self.macro_roots.add(repo_root.resolve())
-
     def finalize(self) -> ReadModelVersion | None:
         roots = _normalize_roots(self.repo_roots)
-        if self.macro_roots:
-            _regenerate_macros(sorted(self.macro_roots))
         if not self.changed_paths:
             return None
         return apply_authoritative_changes(sorted(self.changed_paths), roots)
@@ -269,9 +260,9 @@ def mutation_context_for(
 
 def authoritative_callbacks_for(
     root_or_roots: Path | list[Path],
-) -> tuple[AuthoritativeMutationContext, Callable[[Path], None], Callable[[Path], None]]:
+) -> tuple[AuthoritativeMutationContext, Callable[[Path], None]]:
     context = mutation_context_for(root_or_roots)
-    return context, context.record_changed, context.mark_macros_dirty
+    return context, context.record_changed
 
 
 @dataclass
@@ -316,7 +307,6 @@ def _refresh_worker(roots: list[Path], queue: _RefreshQueue) -> None:
         if pending_full:
             version = _refresh_repo_now(roots)
             publish_background_refresh_completed(roots, full_refresh=True, changed_paths=[], version=version)
-            _regenerate_macros(roots)
             continue
         if pending_paths:
             version = _apply_paths_now(roots, pending_paths)
@@ -326,14 +316,12 @@ def _refresh_worker(roots: list[Path], queue: _RefreshQueue) -> None:
                 changed_paths=pending_paths,
                 version=version,
             )
-            _regenerate_macros(roots)
 
 
 def sync_refresh_for_roots(root_or_roots: Path | list[Path]) -> None:
     roots = _normalize_roots(root_or_roots)
     wait_for_write_queue_drain()
     version = _refresh_repo_now(roots)
-    _regenerate_macros(roots)
     publish_background_refresh_completed(roots, full_refresh=True, changed_paths=[], version=version)
 
 

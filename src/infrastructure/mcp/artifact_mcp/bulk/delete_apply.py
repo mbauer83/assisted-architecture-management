@@ -40,7 +40,6 @@ def apply_planned_deletes(
     registry: ArtifactRegistry,
     verifier: ArtifactVerifier,
     clear_repo_caches,
-    mark_macros_dirty,
     operation_id: str,
     results: dict[int, dict[str, object]],
 ) -> bool:
@@ -60,7 +59,6 @@ def apply_planned_deletes(
                 registry=registry,
                 verifier=verifier,
                 clear_repo_caches=clear_repo_caches,
-                mark_macros_dirty=mark_macros_dirty,
             )
             out = strip_content(_out(result, dry_run=False))
             out["op"] = op
@@ -86,7 +84,6 @@ def apply_single_delete(
     registry: ArtifactRegistry,
     verifier: ArtifactVerifier,
     clear_repo_caches,
-    mark_macros_dirty,
 ):
     if op == "delete_connection":
         return artifact_write_ops.remove_connection(
@@ -117,7 +114,6 @@ def apply_single_delete(
         repo_root=root,
         registry=registry,
         clear_repo_caches=clear_repo_caches,
-        mark_macros_dirty=mark_macros_dirty,
         artifact_id=str(item["artifact_id"]),
         ignore_diagram_refs=True,
         dry_run=False,

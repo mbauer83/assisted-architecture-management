@@ -18,7 +18,7 @@ def verify_content_in_temp_path(
     """Verify *content* by writing it to a temp location.
 
     For diagrams, create a minimal diagram-catalog structure so relative includes
-    (../_macros.puml) can resolve during PlantUML checks.
+    can resolve during PlantUML checks.
     """
 
     tmp_root = Path(tempfile.mkdtemp(prefix=f"model-write-verify-{file_type}-"))
@@ -30,7 +30,6 @@ def verify_content_in_temp_path(
 
         if support_repo_root is not None:
             for support in (
-                "_macros.puml",
                 "_archimate-stereotypes.puml",
                 "_archimate-glyphs.puml",
             ):

@@ -31,7 +31,6 @@ def _add_connection_impl(
     repo_root: str | None,
     provisional_ids: frozenset[str],
     clear_repo_caches=None,
-    mark_macros_dirty=None,
 ) -> dict[str, object]:
     """Internal implementation shared by the MCP tool and bulk_write."""
     scope: Literal["engagement", "both"] = "engagement" if repo_root else "both"
@@ -45,8 +44,8 @@ def _add_connection_impl(
     registry = registry_cached(both_key)
     verifier = verifier_for(both_key, include_registry=True)
     eng_root = both_roots[0]
-    if clear_repo_caches is None or mark_macros_dirty is None:
-        _context, clear_repo_caches, mark_macros_dirty = authoritative_callbacks_for(eng_root)
+    if clear_repo_caches is None:
+        _context, clear_repo_caches = authoritative_callbacks_for(eng_root)
 
     effective_source = source_entity
     effective_target = target_entity
@@ -70,7 +69,6 @@ def _add_connection_impl(
             engagement_root=eng_root,
             verifier=verifier,
             clear_repo_caches=clear_repo_caches,
-            mark_macros_dirty=mark_macros_dirty,
             global_artifact_id=global_id,
             global_artifact_name=name,
             global_artifact_type="entity",
@@ -145,7 +143,7 @@ def artifact_add_connection(
     global-entity-reference proxy is created or reused automatically so all
     connection endpoints are represented in the engagement repo.
     """
-    mutation_context, clear_repo_caches, mark_macros_dirty = authoritative_callbacks_for(
+    mutation_context, clear_repo_caches = authoritative_callbacks_for(
         resolve_repo_roots(
             repo_scope="engagement" if repo_root else "both",
             repo_root=repo_root,
@@ -166,9 +164,8 @@ def artifact_add_connection(
         repo_root=repo_root,
         provisional_ids=frozenset(),
         clear_repo_caches=clear_repo_caches,
-        mark_macros_dirty=mark_macros_dirty,
     )
-    if not dry_run and (mutation_context.changed_paths or mutation_context.macro_roots):
+    if not dry_run and mutation_context.changed_paths:
         mutation_context.finalize()
     return out
 

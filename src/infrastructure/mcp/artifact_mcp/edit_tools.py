@@ -70,7 +70,7 @@ def artifact_edit_entity(
 ) -> dict[str, object]:
     root, registry, verifier = _resolve(repo_root, need_registry=True)
     registry = _require_registry(registry)
-    mutation_context, clear_repo_caches, mark_macros_dirty = authoritative_callbacks_for(root)
+    mutation_context, clear_repo_caches = authoritative_callbacks_for(root)
 
     kwargs: dict[str, Any] = {}
     if name is not None:
@@ -93,7 +93,6 @@ def artifact_edit_entity(
         registry=registry,
         verifier=verifier,
         clear_repo_caches=clear_repo_caches,
-        mark_macros_dirty=mark_macros_dirty,
         artifact_id=artifact_id,
         dry_run=dry_run,
         **kwargs,
@@ -123,7 +122,7 @@ def artifact_edit_connection(
     """
     root, registry, verifier = _resolve(repo_root, need_registry=True)
     registry = _require_registry(registry)
-    mutation_context, clear_repo_caches, _mark_macros_dirty = authoritative_callbacks_for(root)
+    mutation_context, clear_repo_caches = authoritative_callbacks_for(root)
 
     if operation == "remove":
         result = artifact_write_ops.remove_connection(
@@ -172,7 +171,7 @@ def artifact_edit_diagram(
     key = roots_key(roots)
     root = roots[0]
     verifier = verifier_for(key, include_registry=True)
-    mutation_context, clear_repo_caches, _mark_macros_dirty = authoritative_callbacks_for(roots)
+    mutation_context, clear_repo_caches = authoritative_callbacks_for(roots)
 
     if puml == PUML_AUTO_SYNC:
         store = repo_cached(key)
@@ -214,6 +213,19 @@ def artifact_edit_diagram(
         dry_run=dry_run,
         **kwargs,
     )
+    if result.wrote and not dry_run and diagram_entities is not None:
+        from src.infrastructure.write.artifact_write.scope_connections import apply_scope_connections  # noqa: PLC0415
+
+        diag = repo_cached(key).get_diagram(artifact_id)
+        if diag is not None:
+            apply_scope_connections(
+                diag.diagram_type,
+                dict(diagram_entities),
+                root,
+                registry_cached(key),
+                verifier_for(key, include_registry=True),
+                clear_repo_caches,
+            )
     return _finalize_authoritative_write(dry_run, result, mutation_context)
 
 
@@ -230,7 +242,7 @@ def artifact_edit_connection_associations(
     """Add or remove second-order association entity IDs from a connection."""
     root, registry, verifier = _resolve(repo_root, need_registry=True)
     registry = _require_registry(registry)
-    mutation_context, clear_repo_caches, _mark_macros_dirty = authoritative_callbacks_for(root)
+    mutation_context, clear_repo_caches = authoritative_callbacks_for(root)
     from src.infrastructure.write.artifact_write.connection_edit import edit_connection_associations
 
     result = edit_connection_associations(
@@ -256,12 +268,11 @@ def artifact_delete_entity(
 ) -> dict[str, object]:
     root, registry, _verifier = _resolve(repo_root, need_registry=True)
     registry = _require_registry(registry)
-    mutation_context, clear_repo_caches, mark_macros_dirty = authoritative_callbacks_for(root)
+    mutation_context, clear_repo_caches = authoritative_callbacks_for(root)
     result = artifact_write_ops.delete_entity(
         repo_root=root,
         registry=registry,
         clear_repo_caches=clear_repo_caches,
-        mark_macros_dirty=mark_macros_dirty,
         artifact_id=artifact_id,
         dry_run=dry_run,
     )
@@ -275,7 +286,7 @@ def artifact_delete_diagram(
     repo_root: str | None = None,
 ) -> dict[str, object]:
     root, _registry, _verifier = _resolve(repo_root, need_registry=False)
-    mutation_context, clear_repo_caches, _mark_macros_dirty = authoritative_callbacks_for(root)
+    mutation_context, clear_repo_caches = authoritative_callbacks_for(root)
     result = artifact_write_ops.delete_diagram(
         repo_root=root,
         clear_repo_caches=clear_repo_caches,
@@ -325,7 +336,10 @@ def register_edit_tools(mcp: FastMCP) -> None:
             "removed_entity_ids and removed_connection_ids. "
             "Pass an explicit PUML string to replace the body with auto-layout re-applied. "
             "Frontmatter fields (name, keywords, diagram_entities, diagram_connections, "
-            "version, status) updated if provided. "
+            "version, status) updated if provided. For ArchiMate diagrams, diagram_connections may hold "
+            "per-diagram connection annotation metadata keyed by model connection artifact_id; it does not "
+            "create diagram-owned connections. Supported opt-in keys are artifact_id (or connection_id), "
+            "include_description, include_cardinality, and label. "
             "Re-verifies and re-renders PNG on every write."
         ),
         annotations=LOCAL_WRITE,

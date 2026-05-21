@@ -41,7 +41,6 @@ def ensure_global_artifact_reference(
     engagement_root: Path,
     verifier: ArtifactVerifier,
     clear_repo_caches: Callable[[Path], None],
-    mark_macros_dirty: Callable[[Path], None] | None = None,
     global_artifact_id: str,
     global_artifact_name: str,
     global_artifact_type: str,  # "entity" | "document" | "diagram"
@@ -130,8 +129,6 @@ def ensure_global_artifact_reference(
             },
         )
 
-    if mark_macros_dirty is not None:
-        mark_macros_dirty(engagement_root)
     clear_repo_caches(path)
 
     return WriteResult(

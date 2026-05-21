@@ -10,12 +10,13 @@ from src.config.repo_paths import DIAGRAM_CATALOG, DIAGRAMS
 
 from .boundary import assert_engagement_write_root, today_iso
 from .coerce import as_optional_str_list
-from .diagram import (
-    _prepare_archimate_puml_body,
-    _render_diagram_entities_puml,
-    _render_diagram_png,
-    _render_diagram_svg,
+from .diagram_references import (
+    _collect_diagram_renderer_references,
+    _infer_reference_ids_from_puml,
+    _merge_reference_ids,
+    _prepare_diagram_puml_body,
 )
+from .diagram_render import _render_diagram_entities_puml, _render_diagram_png, _render_diagram_svg
 from .parse_existing import parse_diagram_file
 from .types import WriteResult
 from .verify import verify_content_in_temp_path
@@ -72,6 +73,12 @@ def edit_diagram(
     eff_diagram_entities = diagram_entities if diagram_entities is not None else fm.get("diagram-entities")
     eff_diagram_connections = diagram_connections if diagram_connections is not None else fm.get("connections")
     diagram_type = str(fm.get("diagram-type", "archimate"))
+    eff_entity_ids_used = (
+        entity_ids_used if entity_ids_used is not None else as_optional_str_list(fm.get("entity-ids-used"))
+    )
+    eff_connection_ids_used = (
+        connection_ids_used if connection_ids_used is not None else as_optional_str_list(fm.get("connection-ids-used"))
+    )
 
     # Determine PUML body
     if eff_diagram_entities is not None and isinstance(eff_diagram_entities, dict) and puml is None:
@@ -82,12 +89,23 @@ def edit_diagram(
             eff_diagram_connections if isinstance(eff_diagram_connections, list) else None,
             repo_root,
         )
+        collected_entity_ids, collected_connection_ids = _collect_diagram_renderer_references(
+            diagram_type,
+            repo_root,
+            eff_diagram_entities,
+            eff_diagram_connections if isinstance(eff_diagram_connections, list) else None,
+        )
+        eff_entity_ids_used = _merge_reference_ids(eff_entity_ids_used, collected_entity_ids)
+        eff_connection_ids_used = _merge_reference_ids(eff_connection_ids_used, collected_connection_ids)
     elif puml is not None:
         puml_body = puml.strip("\n") + "\n"
-        puml_body = _prepare_archimate_puml_body(puml_body, repo_root, diagram_type)
+        puml_body = _prepare_diagram_puml_body(puml_body, repo_root, diagram_type)
         # optimize_puml_layout is idempotent: it skips when [hidden] links are
         # already present, so user-provided explicit hidden chains are preserved.
         puml_body = optimize_puml_layout(puml_body)
+        inferred_entity_ids, inferred_connection_ids = _infer_reference_ids_from_puml(repo_root, puml_body)
+        eff_entity_ids_used = _merge_reference_ids(eff_entity_ids_used, inferred_entity_ids)
+        eff_connection_ids_used = _merge_reference_ids(eff_connection_ids_used, inferred_connection_ids)
     else:
         puml_body = parsed.puml_body
 
@@ -101,14 +119,8 @@ def edit_diagram(
         keywords=eff_keywords,
         diagram_entities=eff_diagram_entities if isinstance(eff_diagram_entities, dict) else None,
         diagram_connections=eff_diagram_connections if isinstance(eff_diagram_connections, list) else None,
-        entity_ids_used=entity_ids_used
-        if entity_ids_used is not None
-        else as_optional_str_list(fm.get("entity-ids-used")),
-        connection_ids_used=(
-            connection_ids_used
-            if connection_ids_used is not None
-            else as_optional_str_list(fm.get("connection-ids-used"))
-        ),
+        entity_ids_used=eff_entity_ids_used,
+        connection_ids_used=eff_connection_ids_used,
         puml_body=puml_body,
     )
 

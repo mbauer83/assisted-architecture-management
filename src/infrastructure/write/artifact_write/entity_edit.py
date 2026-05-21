@@ -59,7 +59,6 @@ def edit_entity(
     registry: ArtifactRegistry,
     verifier: ArtifactVerifier,
     clear_repo_caches: Callable[[Path], None],
-    mark_macros_dirty: Callable[[Path], None] | None = None,
     artifact_id: str,
     name: str | None = None,
     summary: object = _UNSET,
@@ -73,8 +72,7 @@ def edit_entity(
     """Edit an existing entity file by merging partial updates.
 
     Only provided fields are changed; omitted fields keep their current value.
-    ``last-updated`` is always bumped to today.  If the display block label
-    changes (because ``name`` changed), macros are regenerated.
+    ``last-updated`` is always bumped to today.
     """
     assert_engagement_write_root(repo_root)
 
@@ -208,9 +206,6 @@ def edit_entity(
             verification=verification_to_entity_dict(target_entity_file, res),
         )
 
-    if name is not None and mark_macros_dirty is not None:
-        mark_macros_dirty(repo_root)
-
     if target_entity_file != entity_file:
         for changed_path in [entity_file, target_entity_file, *renamed_paths]:
             clear_repo_caches(changed_path)
@@ -232,7 +227,6 @@ def promote_entity(
     registry: ArtifactRegistry,
     verifier: ArtifactVerifier,
     clear_repo_caches: Callable[[Path], None],
-    mark_macros_dirty: Callable[[Path], None] | None = None,
     artifact_id: str,
     dry_run: bool,
 ) -> WriteResult:
@@ -270,7 +264,6 @@ def promote_entity(
         registry=registry,
         verifier=verifier,
         clear_repo_caches=clear_repo_caches,
-        mark_macros_dirty=mark_macros_dirty,
         artifact_id=artifact_id,
         status=next_status,
         version=new_version,

@@ -53,7 +53,6 @@ def create_entity(
     repo_root: Path,
     verifier: ArtifactVerifier,
     clear_repo_caches: Callable[[Path], None],
-    mark_macros_dirty: Callable[[Path], None] | None = None,
     artifact_type: str,
     name: str,
     summary: str | None,
@@ -192,8 +191,6 @@ def create_entity(
             verification=verification_to_entity_dict(path, res),
         )
 
-    if mark_macros_dirty is not None:
-        mark_macros_dirty(repo_root)
     clear_repo_caches(path)
 
     return WriteResult(

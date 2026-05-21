@@ -127,7 +127,6 @@ def _delete_entity_core(
     repo_root: Path,
     registry: ArtifactRegistry,
     clear_repo_caches: Callable[[Path], None],
-    mark_macros_dirty: Callable[[Path], None] | None = None,
     artifact_id: str,
     ignore_diagram_refs: bool = False,
     dry_run: bool,
@@ -188,9 +187,6 @@ def _delete_entity_core(
         outgoing_path.unlink()
         deleted_paths.append(outgoing_path)
 
-    if mark_macros_dirty is not None:
-        mark_macros_dirty(repo_root)
-
     for changed_path in deleted_paths:
         clear_repo_caches(changed_path)
     return WriteResult(
@@ -208,7 +204,6 @@ def delete_entity(
     repo_root: Path,
     registry: ArtifactRegistry,
     clear_repo_caches: Callable[[Path], None],
-    mark_macros_dirty: Callable[[Path], None] | None = None,
     artifact_id: str,
     ignore_diagram_refs: bool = False,
     dry_run: bool,
@@ -218,7 +213,6 @@ def delete_entity(
         repo_root=repo_root,
         registry=registry,
         clear_repo_caches=clear_repo_caches,
-        mark_macros_dirty=mark_macros_dirty,
         artifact_id=artifact_id,
         ignore_diagram_refs=ignore_diagram_refs,
         dry_run=dry_run,

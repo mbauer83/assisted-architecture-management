@@ -39,18 +39,14 @@ def local_apply_paths(repo_root: Path, paths: list[Path]) -> None:
 
 def temp_repo_callbacks(
     repo_root: Path,
-) -> tuple[Callable[[Path], None], Callable[[Path], None], set[Path], set[Path]]:
-    macros_dirty: set[Path] = set()
+) -> tuple[Callable[[Path], None], set[Path]]:
     changed_paths: set[Path] = set()
 
     def clear_repo_caches(path: Path) -> None:
         changed_paths.add(path.resolve())
         local_apply_paths(repo_root, [path])
 
-    def mark_macros_dirty(path: Path) -> None:
-        macros_dirty.add(path.resolve())
-
-    return clear_repo_caches, mark_macros_dirty, macros_dirty, changed_paths
+    return clear_repo_caches, changed_paths
 
 
 def map_path_to_live(path_value: object, *, staged_root: Path, live_root: Path) -> object:
