@@ -22,8 +22,6 @@ from src.application.modeling.artifact_write_formatting import format_entity_mar
 from src.application.verification.artifact_verifier import ArtifactRegistry, ArtifactVerifier
 from src.config.repo_paths import DIAGRAM_CATALOG, DIAGRAMS
 from src.domain.module_types import EntityTypeName
-from src.infrastructure.rendering.generate_macros import generate_macros
-
 from .boundary import assert_enterprise_write_root, today_iso
 from .coerce import as_optional_str, as_optional_str_dict, as_optional_str_list
 from .connection import (
@@ -131,10 +129,6 @@ def admin_create_entity(
             verification=verification_to_entity_dict(path, res),
         )
 
-    try:
-        generate_macros(repo_root)
-    except Exception:  # noqa: BLE001
-        pass
     clear_repo_caches(path)
     return WriteResult(
         wrote=True,
@@ -235,11 +229,6 @@ def admin_edit_entity(
             verification=verification_to_entity_dict(entity_file, res),
         )
 
-    if name is not None:
-        try:
-            generate_macros(repo_root)
-        except Exception:  # noqa: BLE001
-            pass
     clear_repo_caches(entity_file)
     return WriteResult(
         wrote=True,

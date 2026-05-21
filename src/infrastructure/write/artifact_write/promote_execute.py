@@ -9,7 +9,6 @@ from src.application.artifact_query import ArtifactRepository
 from src.application.verification.artifact_verifier import ArtifactRegistry, ArtifactVerifier
 from src.config.repo_paths import MODEL
 from src.infrastructure.artifact_index import shared_artifact_index
-from src.infrastructure.rendering.generate_macros import generate_macros
 from src.infrastructure.write.artifact_write._promote_conflicts import build_handler
 from src.infrastructure.write.artifact_write._promote_file_ops import (
     copy_entity,
@@ -115,12 +114,6 @@ def execute_promotion(
                 resolutions,
             )
 
-        if (enterprise_root / MODEL).is_dir():
-            try:
-                generate_macros(enterprise_root)
-            except Exception:  # noqa: BLE001
-                pass
-
         ent_registry = ArtifactRegistry(shared_artifact_index(enterprise_root))
         errors = [
             f"{i.code}: {i.message} ({i.location})"
@@ -169,11 +162,6 @@ def execute_promotion(
                 "diagram",
                 name=diag.name if diag else did,
             )
-
-        try:
-            generate_macros(engagement_root)
-        except Exception:  # noqa: BLE001
-            pass
 
     except Exception as exc:
         rollback(ent_copied, ent_backups)

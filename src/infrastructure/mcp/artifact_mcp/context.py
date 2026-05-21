@@ -179,16 +179,7 @@ def _apply_paths_now(roots: list[Path], paths: list[Path]) -> ReadModelVersion:
 
 
 def _regenerate_macros(roots: list[Path]) -> None:
-    try:
-        from src.infrastructure.rendering.generate_macros import generate_macros
-    except Exception:  # noqa: BLE001
-        return
-    for root in roots:
-        if (root / MODEL).is_dir():
-            try:
-                generate_macros(root)
-            except Exception:  # noqa: BLE001
-                pass
+    return  # removed: static includes no longer regenerated on entity write
 
 
 def _normalize_roots(root_or_roots: Path | list[Path]) -> list[Path]:

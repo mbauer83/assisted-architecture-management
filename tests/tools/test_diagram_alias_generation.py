@@ -6,7 +6,7 @@ from src.domain.archimate_relation_rendering import format_cardinality_label
 from src.domain.artifact_types import ConnectionRecord, EntityRecord
 from src.infrastructure.mcp.artifact_mcp.query_scaffold_tools import artifact_diagram_scaffold
 from src.infrastructure.rendering.diagram_builder import generate_archimate_puml_body, inject_archimate_includes
-from src.infrastructure.rendering.generate_macros import generate_macros
+from src.infrastructure.rendering.generate_static_includes import generate_static_includes
 from src.infrastructure.write.artifact_write.diagram import _prepare_diagram_puml_body
 
 
@@ -183,45 +183,18 @@ rectangle "<$archimate_Process{scale=1.5}> Proc" <<Process>> as PROC_A
     assert 'rectangle "<$archimate_Process{scale=1.5}> Proc" <<Process>> as PROC_A' in result
 
 
-def test_generate_macros_normalizes_aliases(tmp_path: Path) -> None:
-    repo_root = tmp_path / "engagements" / "ENG-T" / "architecture-repository"
-    entity_path = repo_root / "model" / "motivation" / "outcome" / "OUT@1.i-3Bi-.alias-test.md"
-    entity_path.parent.mkdir(parents=True, exist_ok=True)
-    entity_path.write_text(
-        """\
----
-artifact-id: OUT@1.i-3Bi-.alias-test
-artifact-type: outcome
-name: "Alias Test"
-version: 0.1.0
-status: draft
-last-updated: '2026-04-20'
----
+def test_generate_static_includes_writes_glyph_and_stereotype_files(tmp_path: Path) -> None:
+    repo_root = tmp_path / "repo"
+    (repo_root / "diagram-catalog").mkdir(parents=True)
+    (repo_root / "model").mkdir()
 
-<!-- §content -->
+    generate_static_includes(repo_root)
 
-## Alias Test
-
-<!-- §display -->
-
-### archimate
-
-```yaml
-domain: Motivation
-element-type: Outcome
-label: "Alias Test"
-alias: OUT_i-3Bi-
-```
-""",
-        encoding="utf-8",
-    )
-
-    out_path = generate_macros(repo_root)
-    content = out_path.read_text(encoding="utf-8")
-
-    assert "$DECL_OUT_i_3Bi_" in content
-    assert " as OUT_i_3Bi_" in content
-    assert "OUT_i-3Bi-" not in content
+    stereo = (repo_root / "diagram-catalog" / "_archimate-stereotypes.puml").read_text()
+    glyphs = (repo_root / "diagram-catalog" / "_archimate-glyphs.puml").read_text()
+    assert "skinparam rectangle<<driver>>" in stereo
+    assert "skinparam rectangle<<goal>>" in stereo
+    assert "hide stereotype" in stereo or "hide stereotype" in glyphs
 
 
 def test_model_diagram_scaffold_uses_canonical_aliases(tmp_path: Path) -> None:

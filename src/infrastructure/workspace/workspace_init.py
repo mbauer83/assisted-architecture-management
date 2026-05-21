@@ -25,6 +25,10 @@ from typing import TypedDict
 import yaml
 
 from src.config.repo_paths import MODEL
+from src.config.settings import (
+    repo_init_commit_author_email,
+    repo_init_commit_author_name,
+)
 from src.config.workspace_paths import (
     CONFIG_FILENAME,
     STATE_DIR,
@@ -39,6 +43,7 @@ from src.config.workspace_paths import (
 from src.config.workspace_paths import (
     parse_workspace_config as _parse_config,
 )
+from src.infrastructure.workspace.engagement_repo_template import create_engagement_repo
 
 # ---------------------------------------------------------------------------
 # Git helpers
@@ -61,12 +66,28 @@ def _is_git_repo(path: Path) -> bool:
 
 def _current_branch(repo: Path) -> str | None:
     r = _run_git(["rev-parse", "--abbrev-ref", "HEAD"], cwd=repo)
-    return r.stdout.strip() if r.returncode == 0 else None
+    if r.returncode == 0:
+        branch = r.stdout.strip()
+        if branch and branch != "HEAD":
+            return branch
+
+    # Freshly initialized repositories may have an unborn HEAD, in which case
+    # rev-parse fails even though the configured branch is already selected.
+    fallback = _run_git(["symbolic-ref", "--quiet", "--short", "HEAD"], cwd=repo)
+    if fallback.returncode == 0:
+        branch = fallback.stdout.strip()
+        return branch or None
+    return None
 
 
 def _is_dirty(repo: Path) -> bool:
     r = _run_git(["status", "--porcelain"], cwd=repo)
     return bool(r.stdout.strip())
+
+
+def _has_commits(repo: Path) -> bool:
+    r = _run_git(["rev-parse", "--verify", "HEAD"], cwd=repo)
+    return r.returncode == 0
 
 
 def _clone(url: str, branch: str, dest: Path) -> None:
@@ -85,6 +106,10 @@ def _resolve_repo(
     label: str,
     spec: dict,
     workspace_root: Path,
+    *,
+    allow_dirty_git_repo: bool = False,
+    allow_dirty_uncommitted_git_repo: bool = False,
+    initialize_if_empty: bool = False,
 ) -> Path:
     """Resolve a repo spec to an absolute path, cloning if needed."""
     if "local" in spec:
@@ -114,6 +139,15 @@ def _resolve_repo(
             if not _is_git_repo(dest):
                 raise SystemExit(f"ERROR: {label} path exists but is not a git repo: {dest}")
             actual_branch = _current_branch(dest)
+            if actual_branch is None and initialize_if_empty and not _has_commits(dest):
+                create_engagement_repo(
+                    dest,
+                    git_url=str(url),
+                    branch=str(branch),
+                    commit_author_name=repo_init_commit_author_name(label),
+                    commit_author_email=repo_init_commit_author_email(label),
+                )
+                actual_branch = _current_branch(dest)
             if actual_branch != branch:
                 raise SystemExit(
                     f"ERROR: {label} repo at {dest} is on branch "
@@ -121,14 +155,30 @@ def _resolve_repo(
                     f"Switch branch manually or remove the directory."
                 )
             if _is_dirty(dest):
-                raise SystemExit(
-                    f"ERROR: {label} repo at {dest} has uncommitted changes. "
-                    f"Commit or stash them before running arch-init."
-                )
-            print(f"  {label}: existing clone OK ({dest}, branch={branch})")
+                if allow_dirty_git_repo:
+                    print(f"  {label}: using existing dirty git repo ({dest}, branch={branch})")
+                elif allow_dirty_uncommitted_git_repo and not _has_commits(dest):
+                    print(f"  {label}: using newly scaffolded git repo ({dest}, branch={branch}, no commits yet)")
+                else:
+                    raise SystemExit(
+                        f"ERROR: {label} repo at {dest} has uncommitted changes. "
+                        f"Commit or stash them before running arch-init."
+                    )
+            else:
+                print(f"  {label}: existing clone OK ({dest}, branch={branch})")
         else:
-            print(f"  {label}: cloning {url} (branch={branch}) → {dest}")
-            _clone(url, branch, dest)
+            if initialize_if_empty:
+                print(f"  {label}: initializing empty git repo at {dest} (branch={branch})")
+                create_engagement_repo(
+                    dest,
+                    git_url=str(url),
+                    branch=str(branch),
+                    commit_author_name=repo_init_commit_author_name(label),
+                    commit_author_email=repo_init_commit_author_email(label),
+                )
+            else:
+                print(f"  {label}: cloning {url} (branch={branch}) → {dest}")
+                _clone(url, branch, dest)
 
         model_dir = dest / MODEL
         if not model_dir.is_dir():
@@ -210,6 +260,18 @@ def main(argv: list[str] | None = None) -> None:
         default=None,
         help="Path to arch-workspace.yaml (default: search from CWD upward)",
     )
+    parser.add_argument(
+        "--initialize-engagement-repo-if-empty",
+        action="store_true",
+        default=False,
+        help="Initialize an existing empty git engagement repo if the configured branch does not exist yet",
+    )
+    parser.add_argument(
+        "--initialize-enterprise-repo-if-empty",
+        action="store_true",
+        default=False,
+        help="Initialize an existing empty git enterprise repo if the configured branch does not exist yet",
+    )
     args = parser.parse_args(argv)
 
     if args.config:
@@ -227,10 +289,30 @@ def main(argv: list[str] | None = None) -> None:
 
     cfg = _parse_config(config_path)
 
-    engagement_root = _resolve_repo("engagement", cfg["engagement"], workspace_root)
-    enterprise_root = _resolve_repo("enterprise", cfg["enterprise"], workspace_root)
+    engagement_root = _resolve_repo(
+        "engagement",
+        cfg["engagement"],
+        workspace_root,
+        initialize_if_empty=args.initialize_engagement_repo_if_empty,
+    )
+    enterprise_root = _resolve_repo(
+        "enterprise",
+        cfg["enterprise"],
+        workspace_root,
+        initialize_if_empty=args.initialize_enterprise_repo_if_empty,
+    )
 
     state_path = _write_state(workspace_root, engagement_root, enterprise_root)
+
+    # Regenerate static ArchiMate include files for both repos
+    try:
+        from src.infrastructure.rendering.generate_static_includes import generate_static_includes  # noqa: PLC0415
+        for root in (engagement_root, enterprise_root):
+            generate_static_includes(root)
+        print("  static includes: regenerated")
+    except Exception as exc:  # noqa: BLE001
+        print(f"  static includes: skipped ({exc})")
+
     print("\narch-init: success")
     print(f"  engagement: {engagement_root}")
     print(f"  enterprise: {enterprise_root}")
