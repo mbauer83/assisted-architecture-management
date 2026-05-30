@@ -1243,7 +1243,7 @@ Phase 3 → `SPEC-phase-3-...`; Phase 4 → `SPEC-phase-4-...`; property tests �
 - [x] **13.** `connection_path` target (`{id, reversed}`) + `path-projection/v1` +
   refresh/equivalence. SPEC-phase-3 §1. — 2026-05-30, 0d1eef7, E409/E410 verifier + path-projection/v1 BFS/DFS + drifted/broken path diff + included/excluded_paths selection; 26 tests; 895 total green, zuban clean
 - [x] **14.** `scope-projection/v1` + `c4.scope-projection/v1` tables. SPEC-phase-3 §2. — 2026-05-30, c092279, scope_projection.py (generic dispatcher + module projection registry) + c4_scope_projection.py (3 C4 levels, nesting via archimate-composition/aggregation); 20 tests; 915 total green, zuban clean
-- [x] **15.** Materialization atomic transaction (entity + connection). SPEC-phase-3 §3. — 2026-05-30, <sha>, materialization.py + from_diagram_element on artifact_create_entity/artifact_add_connection; entity rollback on diagram update failure; 18 tests; 933 total green, zuban clean
+- [x] **15.** Materialization atomic transaction (entity + connection). SPEC-phase-3 §3. — 2026-05-30, 7b7c66e, materialization.py + from_diagram_element on artifact_create_entity/artifact_add_connection; entity rollback on diagram update failure; 18 tests; 933 total green, zuban clean
 
 ### Phase 4 — New ontologies and coherence (specs complete)
 - [ ] **16.** Activity clarification + sequence diagram module. SPEC-phase-4 §1.
