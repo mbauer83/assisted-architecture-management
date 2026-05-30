@@ -9,7 +9,7 @@ from typing import Any
 from src.application.artifact_parsing import extract_declared_puml_aliases, normalize_puml_alias
 from src.application.entity_type_predicates import is_internal_entity_type
 from src.domain.artifact_types import DiagramRecord, EntityRecord
-from src.infrastructure.diagram_types import domain_order, get_diagram_type
+from src.infrastructure.diagram_types import domain_order, find_diagram_type, get_diagram_type
 from src.infrastructure.gui.routers import state as s
 
 
@@ -135,6 +135,10 @@ def diagram_context_payload(repo: Any, diag_rec: DiagramRecord) -> dict[str, Any
         d["target_alias"] = ta
         connections.append(d)
         seen.add(conn.artifact_id)
+    raw_de = diag_rec.extra.get("diagram-entities") if diag_rec.extra else None
+    diagram_entities: dict[str, Any] = raw_de if isinstance(raw_de, dict) else {}
+    dt = find_diagram_type(diag_rec.diagram_type)
+    type_extras = dt.build_context_extras(repo, diag_rec.artifact_id, diagram_entities) if dt else {}
     return {
         "diagram": diagram,
         "entities": entities,
@@ -144,6 +148,7 @@ def diagram_context_payload(repo: Any, diag_rec: DiagramRecord) -> dict[str, Any
         "explicit_connection_pairs": [list(pair) for pair in sorted(explicit_pairs)],
         "generation": version.generation,
         "etag": version.etag,
+        **type_extras,
     }
 
 

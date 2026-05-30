@@ -4,6 +4,7 @@ Import these instead of bare string literals so that a directory rename is a
 one-line change rather than a grep-and-replace across the entire codebase.
 """
 
+ENGAGEMENT_REPO = "architecture-repository"
 MODEL = "model"
 DOCS = "docs"
 DIAGRAM_CATALOG = "diagram-catalog"

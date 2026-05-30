@@ -3,104 +3,37 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any
 
-import yaml  # type: ignore[import-untyped]
-
-from src.domain.module_types import ConnectionTypeName, DiagramTypeName, EntityTypeName
-from src.domain.ontology_protocol import (
-    DiagramTypeBase,
-    DiagramTypeModule,
-    DiagramTypeWriteGuidance,
-    diagram_type_ui_config_from_mapping,
-)
-from src.domain.ontology_types import ConnectionTypeInfo, EntityTypeInfo
-from src.domain.permitted_relationships import PermittedRelationshipSet
-from src.ontologies.archimate_next import module as archimate_next
-
-_EMPTY_ENTITY_TYPES: dict[EntityTypeName, EntityTypeInfo] = {}
-_EMPTY_CONNECTION_TYPES: dict[ConnectionTypeName, ConnectionTypeInfo] = {}
+from src.diagram_types._config_type import _ConfiguredOntologyDiagramType, _load_config, _load_ontology_module
+from src.domain.ontology_protocol import DiagramRenderer, DiagramTypeModule, DiagramTypeWriteGuidance
 
 
-def _build_entity_filter(filter_cfg: dict[str, Any]):
-    """Return a predicate that tests whether an EntityTypeInfo matches the filter config.
-
-    Supported filter clauses (all present clauses are ANDed):
-    - ``hierarchy_level``: ``{index: int, values: [str]}`` — hierarchy[index] must be in values
-    - ``element_classes``: ``[str]`` — entity must have at least one listed class
-    - ``entity_types``: ``[str]`` — entity artifact_type must be in the explicit list
-    """
-    hierarchy_cfg = filter_cfg.get("hierarchy_level")
-    class_set = frozenset(str(c) for c in filter_cfg.get("element_classes", ()))
-    type_set = frozenset(str(t) for t in filter_cfg.get("entity_types", ()))
-
-    def _matches(info: EntityTypeInfo) -> bool:
-        if hierarchy_cfg:
-            idx = int(hierarchy_cfg["index"])
-            values = frozenset(str(v) for v in hierarchy_cfg.get("values", ()))
-            if idx >= len(info.hierarchy) or info.hierarchy[idx] not in values:
-                return False
-        if class_set and not class_set.intersection(info.element_classes):
-            return False
-        if type_set and info.artifact_type not in type_set:
-            return False
-        return True
-
-    return _matches
-
-
-class _ConfiguredArchimateDiagramType(DiagramTypeBase):
-    def __init__(self, config: dict[str, Any]) -> None:
-        self._config = config
-        self._name = DiagramTypeName(str(config["name"]))
-        self._ui_config = diagram_type_ui_config_from_mapping(
-            config,
-            default_label=str(self._name).replace("-", " ").title(),
-        )
-        filter_cfg: dict[str, Any] = config.get("filter", {})
-        self._entity_filter = _build_entity_filter(filter_cfg)
-        hierarchy_values = filter_cfg.get("hierarchy_level", {}).get("values", [])
-        self._accepted_domains: tuple[str, ...] = tuple(str(v) for v in hierarchy_values)
-
+class _ConfiguredArchimateDiagramType(_ConfiguredOntologyDiagramType):
     @property
-    def name(self) -> DiagramTypeName:
-        return self._name
+    def renderer(self) -> DiagramRenderer:
+        from src.infrastructure.rendering.archimate_puml_renderer import ArchimatePumlRenderer  # noqa: PLC0415
 
-    @property
-    def primary_ontology(self):  # type: ignore[override]
-        return archimate_next
-
-    def accepts_entity_type(self, t: EntityTypeName) -> bool:
-        info = archimate_next.entity_types.get(t)
-        return info is not None and self._entity_filter(info)
-
-    def accepts_connection_type(self, t: ConnectionTypeName) -> bool:
-        return t in archimate_next.connection_types
-
-    @property
-    def own_entity_types(self) -> dict[EntityTypeName, EntityTypeInfo]:
-        return _EMPTY_ENTITY_TYPES
-
-    @property
-    def own_connection_types(self) -> dict[ConnectionTypeName, ConnectionTypeInfo]:
-        return _EMPTY_CONNECTION_TYPES
-
-    @property
-    def own_permitted_relationships(self) -> PermittedRelationshipSet:
-        return PermittedRelationshipSet.empty()
+        return ArchimatePumlRenderer(self._config)
 
     def write_guidance(self) -> DiagramTypeWriteGuidance:
-        g: dict[str, Any] = self._config.get("guidance") or {}
+        base = super().write_guidance()
         return DiagramTypeWriteGuidance(
-            when_to_use=str(g.get("when_to_use") or ""),
-            when_not_to_use=str(g.get("when_not_to_use") or ""),
-            accepted_domains=self._accepted_domains,
+            when_to_use=base.when_to_use,
+            when_not_to_use=base.when_not_to_use,
+            accepted_domains=base.accepted_domains,
+            diagram_entities_schema=base.diagram_entities_schema,
+            own_entity_types=base.own_entity_types,
+            puml_notes=(
+                "ArchiMate connection descriptions are hidden by default. Only render selected connection text when the diagram explicitly opts in.",
+                "For manual PUML, keep model selectability by using real model entity aliases as arrow endpoints. Explicit arrows are selectable based on endpoint alias matching regardless of label text — stereotype prefixes like <<serving>> are not required and should be omitted for cleaner diagrams. Use --> for serving relations and -- for association relations.",
+                "For ArchiMate diagrams, diagram_connections may be used as per-diagram connection annotation metadata keyed by model connection artifact_id. Supported opt-in keys are artifact_id (or connection_id), include_description, include_cardinality, and label. The show_stereotype key is not needed since stereotype text is not required for selectability.",
+            ),
         )
 
 
 def load_archimate_diagram_type(package_dir: Path) -> DiagramTypeModule:
-    """Load one config-backed ArchiMate diagram type module."""
-    config_path = package_dir / "config.yaml"
-    with config_path.open(encoding="utf-8") as handle:
-        config: dict[str, Any] = yaml.safe_load(handle) or {}
-    return _ConfiguredArchimateDiagramType(config)
+    config = _load_config(package_dir)
+    ontology_name = str(config.get("ontology") or "").strip()
+    if not ontology_name:
+        raise ValueError(f"Diagram type config at {package_dir / 'config.yaml'} must define an 'ontology' package")
+    return _ConfiguredArchimateDiagramType(config, _load_ontology_module(ontology_name))

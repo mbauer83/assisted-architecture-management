@@ -240,7 +240,7 @@ class TestDeleteEntity:
 ---
 artifact-id: ref-diagram
 artifact-type: diagram
-diagram-type: activity-bpmn
+diagram-type: activity
 name: "Ref Diagram"
 entity-ids-used:
   - {eid}
@@ -324,7 +324,7 @@ class TestRemoveConnection:
 class TestEditDiagram:
     def _make_diagram(self, repo: Path, name: str) -> str:
         # Use activity diagram type — no archimate !include required
-        artifact_id = generate_diagram_id("activity-bpmn", name)
+        artifact_id = generate_diagram_id("activity", name)
         puml = f"""\
 @startuml {artifact_id}
 
@@ -336,7 +336,7 @@ title {name}
 @enduml
 """
         result = mcp.artifact_create_diagram(
-            diagram_type="activity-bpmn",
+            diagram_type="activity",
             name=name,
             puml=puml,
             artifact_id=artifact_id,

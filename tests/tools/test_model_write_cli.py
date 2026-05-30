@@ -65,7 +65,7 @@ def test_cli_delete_diagram_dry_run(tmp_path: Path, capsys) -> None:
 ---
 artifact-id: {did}
 artifact-type: diagram
-diagram-type: activity-bpmn
+diagram-type: activity
 name: "Diag"
 version: 0.1.0
 status: active

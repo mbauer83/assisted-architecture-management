@@ -2,8 +2,9 @@
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import dataclass, field
-from typing import Literal
+from typing import Any, Literal
 
 
 @dataclass(frozen=True)
@@ -25,11 +26,48 @@ class RequiredConnection:
 
 
 @dataclass(frozen=True)
+class MappingSourceSpec:
+    """One model-side source that a diagram-owned entity type may map from."""
+
+    ontology: str
+    entity_type: str | None = None
+    entity_class: str | None = None
+    transparent: bool = False
+
+
+@dataclass(frozen=True)
 class PermittedMappingSpec:
     """Which model entities a diagram-owned entity may reference."""
 
     entity_types: tuple[str, ...] = ()
     entity_classes: tuple[str, ...] = ()
+    sources: tuple[MappingSourceSpec, ...] = ()
+
+    def has_any(self) -> bool:
+        return bool(self.entity_types or self.entity_classes or self.sources)
+
+
+def mapping_spec_from_config(raw: object) -> PermittedMappingSpec:
+    """Parse a mapping spec from YAML/JSON-like configuration data."""
+    cfg: Mapping[str, Any] = raw if isinstance(raw, Mapping) else {}
+    return PermittedMappingSpec(
+        entity_types=tuple(str(v) for v in cfg.get("entity_types", ())),
+        entity_classes=tuple(str(v) for v in cfg.get("entity_classes", ())),
+        sources=tuple(
+            _mapping_source_from_config(item)
+            for item in cfg.get("sources", ())
+            if isinstance(item, Mapping)
+        ),
+    )
+
+
+def _mapping_source_from_config(raw: Mapping[str, Any]) -> MappingSourceSpec:
+    return MappingSourceSpec(
+        ontology=str(raw["ontology"]),
+        entity_type=str(raw["entity_type"]) if raw.get("entity_type") else None,
+        entity_class=str(raw["entity_class"]) if raw.get("entity_class") else None,
+        transparent=bool(raw.get("transparent", False)),
+    )
 
 
 @dataclass(frozen=True)
@@ -66,8 +104,11 @@ class ConnectionTypeInfo:
     archimate_relationship_type: str | None = None
     symmetric: bool = False
     puml_arrow: str = "-->"
+    show_stereotype: bool = True
     classifications: tuple[str, ...] = ()
     hierarchy_priority: int | None = None
+    hierarchy_label: str | None = None
+    bidirectional_sync: bool = False
     embedding: Literal["none", "array", "property"] = "none"
     embed_key: str | None = None
     cascade_delete_source: bool = False

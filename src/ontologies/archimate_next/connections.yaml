@@ -11,10 +11,10 @@
 #   Connection short names are prefixed with "archimate-" at load time.
 #
 # classifications: semantic tags used by registry queries:
-#   structural   — composition / aggregation / assignment / realization etc.
-#   hierarchy    — relationship types that also express containment hierarchy
-#   nesting      — relationship types rendered as visual containment (composition / aggregation only)
-#   flow         — triggering / flow (left→right layout direction hints)
+#   containment   — source is the owning container, target is the child (composition, aggregation)
+#   generalization — source specialises/extends target, so target is the parent (specialization)
+#   nesting       — children are rendered visually nested inside the parent boundary (composition, aggregation)
+#   dynamic       — runtime / dynamic relationships; layout engine treats these left→right (triggering, flow)
 
 # ── Matrix diagram abbreviations ──────────────────────────────────────────
 matrix_abbreviations:
@@ -38,34 +38,37 @@ connection_types:
       archimate_relationship_type: Composition
       puml_arrow: "-->"
       symmetric: false
-      classifications: [structural, hierarchy, nesting]
+      classifications: [containment, nesting]
       hierarchy_priority: 1
+      hierarchy_label: composition
     archimate-aggregation:
       archimate_relationship_type: Aggregation
       puml_arrow: "-->"
       symmetric: false
-      classifications: [structural, hierarchy, nesting]
+      classifications: [containment, nesting]
       hierarchy_priority: 2
+      hierarchy_label: aggregation
     archimate-assignment:
       archimate_relationship_type: Assignment
       puml_arrow: "-->"
       symmetric: false
-      classifications: [structural]
+      classifications: []
     archimate-realization:
       archimate_relationship_type: Realization
       puml_arrow: "..|>"
       symmetric: false
-      classifications: [structural]
+      classifications: []
+      bidirectional_sync: true
     archimate-serving:
       archimate_relationship_type: Serving
       puml_arrow: "-->"
       symmetric: false
-      classifications: [structural]
+      classifications: []
     archimate-access:
       archimate_relationship_type: Access
       puml_arrow: "-->"
       symmetric: false
-      classifications: [structural]
+      classifications: []
     archimate-influence:
       archimate_relationship_type: Influence
       puml_arrow: "..>"
@@ -80,18 +83,19 @@ connection_types:
       archimate_relationship_type: Specialization
       puml_arrow: "--|>"
       symmetric: false
-      classifications: [structural, hierarchy]
+      classifications: [generalization]
       hierarchy_priority: 0
+      hierarchy_label: specialization
     archimate-flow:
       archimate_relationship_type: Flow
       puml_arrow: "..>"
       symmetric: false
-      classifications: [flow]
+      classifications: [dynamic]
     archimate-triggering:
       archimate_relationship_type: Triggering
       puml_arrow: "-->"
       symmetric: false
-      classifications: [flow]
+      classifications: [dynamic]
 
   er:
     er-one-to-many:    {}
@@ -300,3 +304,8 @@ permitted_relationships:
   # ── Implementation → Technology ────────────────────────────────────────
   - [[deliverable, work-package], [artifact, communication-network, device, distribution-network, equipment, facility, material, technology-node, system-software, technology-interface], [realization]]
   - [plateau, [artifact, communication-network, device, distribution-network, equipment, facility, material, technology-node, system-software, technology-interface], [aggregation, realization]]
+
+  # ── Grouping & Location (cross-domain composite elements) ──────────────
+  - [grouping, "@all", [composition, aggregation, assignment, realization, serving, access, influence, association, specialization, flow, triggering]]
+  - ["@all", grouping, [composition, aggregation, assignment, realization, serving, access, influence, association, specialization, flow, triggering]]
+  - [location, "@all", [aggregation, association]]

@@ -26,6 +26,7 @@ from pathlib import Path
 from typing import Any
 
 from src.domain.artifact_types import ConnectionRecord, EntityRecord
+from src.domain.ontology_protocol import DiagramRendererReferences
 from src.infrastructure.rendering.puml_safety import (
     configured_puml_size_warning_threshold,
     warn_when_puml_exceeds_threshold,
@@ -102,6 +103,17 @@ class ActivityPumlRenderer:
     def inject_includes(self, body: str, repo_root: Path) -> str:
         del repo_root
         return body
+
+    def collect_references(
+        self,
+        diagram_type: str,
+        repo_root: Path,
+        *,
+        diagram_entities: Mapping[str, object] | None = None,
+        diagram_connections: list[dict[str, object]] | None = None,
+    ) -> DiagramRendererReferences:
+        del diagram_type, repo_root, diagram_entities, diagram_connections
+        return DiagramRendererReferences()
 
 
 # ── Context type alias ────────────────────────────────────────────────────────

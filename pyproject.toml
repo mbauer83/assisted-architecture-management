@@ -14,17 +14,6 @@ dependencies = [
     "jsonschema>=4.0",
 ]
 
-[project.optional-dependencies]
-dev = [
-    "pytest>=8.3",
-    "pytest-bdd>=7.3",
-    "ruff>=0.15.11",
-    "zuban>=0.7.0",
-]
-gui = [
-    "fastapi>=0.115.0",
-    "uvicorn[standard]>=0.32.0",
-]
 
 [project.scripts]
 arch-gui-server = "src.infrastructure.gui.gui_server:main"
@@ -32,6 +21,7 @@ arch-backend = "src.infrastructure.backend.arch_backend:main"
 arch-mcp-stdio-read = "src.infrastructure.mcp.arch_mcp_stdio:main"
 arch-mcp-stdio-write = "src.infrastructure.mcp.arch_mcp_stdio_write:main_write"
 arch-init = "src.infrastructure.workspace.workspace_init:main"
+arch-switch-engagement = "src.infrastructure.workspace.switch_engagement:main"
 get-plantuml = "src.infrastructure.bootstrap.get_plantuml:main"
 get-diagram-runtime = "src.infrastructure.bootstrap.get_diagram_runtime:main"
 check-diagram-runtime = "src.infrastructure.bootstrap.check_diagram_runtime:main"
@@ -82,4 +72,8 @@ dev = [
     "pytest-bdd>=7.3",
     "ruff>=0.15.11",
     "zuban>=0.7.0",
+]
+gui = [
+    "fastapi>=0.115.0",
+    "uvicorn[standard]>=0.32.0",
 ]

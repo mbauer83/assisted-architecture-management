@@ -62,7 +62,7 @@ alias: APP_kRZYOA
 artifact-id: DIA@1712870400.DFgOaO.event-activity-overview
 artifact-type: diagram
 name: "Event Activity Overview"
-diagram-type: activity-bpmn
+diagram-type: activity
 version: 0.1.0
 status: draft
 last-updated: '2026-04-14'
@@ -100,7 +100,7 @@ def test_model_repository_search_priority_and_counts(tmp_path: Path) -> None:
     assert preferred.hits[0].record_type == "diagram"
 
     counts = repo.count_artifacts_by("diagram_type", include_connections=False, include_diagrams=True)
-    assert counts["activity-bpmn"] == 1
+    assert counts["activity"] == 1
 
 
 def test_model_query_mcp_projection_and_aggregate_tool(tmp_path: Path) -> None:
@@ -132,4 +132,4 @@ def test_model_query_mcp_projection_and_aggregate_tool(tmp_path: Path) -> None:
         repo_root=str(repo_root),
         repo_scope="engagement",
     )
-    assert grouped["counts"]["activity-bpmn"] == 1
+    assert grouped["counts"]["activity"] == 1

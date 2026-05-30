@@ -132,6 +132,9 @@ def create_diagram_gui(body: CreateDiagramGuiBody) -> dict[str, Any]:
         )
     except ValueError as e:
         raise HTTPException(400, str(e))
+    if result.wrote and not body.dry_run and de is not None:
+        from src.infrastructure.write.artifact_write.scope_connections import apply_scope_connections  # noqa: PLC0415
+        apply_scope_connections(body.diagram_type, de, *s.get_write_deps(), s.clear_caches)
     return s.write_result_to_dict(result)
 
 
@@ -177,6 +180,9 @@ def edit_diagram_gui(body: EditDiagramGuiBody) -> dict[str, Any]:
         )
     except ValueError as e:
         raise HTTPException(400, str(e))
+    if result.wrote and not body.dry_run and de is not None:
+        from src.infrastructure.write.artifact_write.scope_connections import apply_scope_connections  # noqa: PLC0415
+        apply_scope_connections(body.diagram_type, de, *s.get_write_deps(), s.clear_caches)
     return s.write_result_to_dict(result)
 
 

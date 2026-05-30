@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from src.config.repo_paths import ENGAGEMENT_REPO
+
 PASCAL_TO_SNAKE: dict[str, str] = {
     "Stakeholder": "stakeholder",
     "Driver": "driver",
@@ -95,7 +97,7 @@ if __name__ == "__main__":
         if sys.argv[1:]
         else [
             workspace / "enterprise-repository",
-            *(workspace.glob("engagements/*/architecture-repository")),
+            *(workspace.glob(f"engagements/*/{ENGAGEMENT_REPO}")),
         ]
     )
     convert_repos(*paths)

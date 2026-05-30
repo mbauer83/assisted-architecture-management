@@ -8,3 +8,9 @@ diagrams:
   sprite_scale: 1.5
   render_dpi: 150
   plantuml_limit_size: 16384
+
+repo_init:
+  default_branch: main
+  commit_author_name: Michael Bauer # Change to your name. @TODO: Make env-configurable
+  commit_author_email: mbauer.mphil@googlemail.com # Change to your email. @TODO: Make env-configurable
+  engagement: {}

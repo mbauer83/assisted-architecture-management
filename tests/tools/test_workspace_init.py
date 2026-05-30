@@ -6,7 +6,13 @@ from pathlib import Path
 
 import pytest
 
-from src.infrastructure.workspace.workspace_init import _parse_config, _resolve_repo, _write_state, load_init_state
+from src.infrastructure.workspace.workspace_init import (
+    _current_branch,
+    _parse_config,
+    _resolve_repo,
+    _write_state,
+    load_init_state,
+)
 
 
 @pytest.fixture()
@@ -45,6 +51,49 @@ class TestParseConfig:
         with pytest.raises(SystemExit, match="engagement"):
             _parse_config(f)
 
+    def test_engagement_catalog_selects_active_entry(self, tmp_path: Path) -> None:
+        import yaml
+
+        f = tmp_path / "arch-workspace.yaml"
+        f.write_text(
+            yaml.safe_dump(
+                {
+                    "engagements": {
+                        "active": "eng-b",
+                        "available": {
+                            "eng-a": {"local": "eng-a"},
+                            "eng-b": {"local": "eng-b"},
+                        },
+                    },
+                    "enterprise": {"local": "ent"},
+                }
+            )
+        )
+        result = _parse_config(f)
+        assert result["engagement"]["local"] == "eng-b"
+
+    def test_conflicting_top_level_engagement_and_catalog_raises(self, tmp_path: Path) -> None:
+        import yaml
+
+        f = tmp_path / "arch-workspace.yaml"
+        f.write_text(
+            yaml.safe_dump(
+                {
+                    "engagement": {"local": "eng-a"},
+                    "engagements": {
+                        "active": "eng-b",
+                        "available": {
+                            "eng-a": {"local": "eng-a"},
+                            "eng-b": {"local": "eng-b"},
+                        },
+                    },
+                    "enterprise": {"local": "ent"},
+                }
+            )
+        )
+        with pytest.raises(SystemExit, match="conflicts"):
+            _parse_config(f)
+
 
 class TestResolveRepo:
     def test_local_path_resolved(self, tmp_path: Path) -> None:
@@ -70,6 +119,105 @@ class TestResolveRepo:
     def test_missing_spec_raises(self, tmp_path: Path) -> None:
         with pytest.raises(SystemExit, match="local.*git"):
             _resolve_repo("test", {}, tmp_path)
+
+    def test_current_branch_accepts_unborn_head(self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+        class Result:
+            def __init__(self, returncode: int, stdout: str = "") -> None:
+                self.returncode = returncode
+                self.stdout = stdout
+
+        calls: list[list[str]] = []
+
+        def fake_run_git(args: list[str], cwd: Path | None = None) -> Result:
+            calls.append(args)
+            if args == ["rev-parse", "--abbrev-ref", "HEAD"]:
+                return Result(128, "")
+            if args == ["symbolic-ref", "--quiet", "--short", "HEAD"]:
+                return Result(0, "main\n")
+            raise AssertionError(args)
+
+        monkeypatch.setattr("src.infrastructure.workspace.workspace_init._run_git", fake_run_git)
+
+        branch = _current_branch(tmp_path)
+
+        assert branch == "main"
+        assert calls == [
+            ["rev-parse", "--abbrev-ref", "HEAD"],
+            ["symbolic-ref", "--quiet", "--short", "HEAD"],
+        ]
+
+    def test_git_repo_can_be_initialized_if_empty(self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+        repo = tmp_path / "eng-git"
+        repo.mkdir()
+        (repo / ".git").mkdir()
+
+        def fake_current_branch(path: Path) -> str | None:
+            return "main" if (path / "model").is_dir() else None
+
+        monkeypatch.setattr("src.infrastructure.workspace.workspace_init._current_branch", fake_current_branch)
+        monkeypatch.setattr("src.infrastructure.workspace.workspace_init._has_commits", lambda path: False)
+
+        create_calls: list[dict[str, object]] = []
+
+        def fake_create_repo(path: Path, **kwargs) -> Path:
+            create_calls.append({"path": path, **kwargs})
+            (path / "model").mkdir(parents=True, exist_ok=True)
+            return path
+
+        monkeypatch.setattr("src.infrastructure.workspace.workspace_init.create_engagement_repo", fake_create_repo)
+
+        result = _resolve_repo(
+            "engagement",
+            {"git": {"url": "git@example.com:org/eng.git", "branch": "main", "path": "eng-git"}},
+            tmp_path,
+            initialize_if_empty=True,
+        )
+
+        assert result == repo.resolve()
+        assert create_calls
+        assert create_calls[0]["branch"] == "main"
+
+    def test_missing_git_repo_can_be_initialized_if_flag_is_set(
+        self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+    ) -> None:
+        repo = tmp_path / "ent-git"
+
+        create_calls: list[dict[str, object]] = []
+
+        def fake_create_repo(path: Path, **kwargs) -> Path:
+            create_calls.append({"path": path, **kwargs})
+            (path / ".git").mkdir(parents=True, exist_ok=True)
+            (path / "model").mkdir(parents=True, exist_ok=True)
+            return path
+
+        monkeypatch.setattr("src.infrastructure.workspace.workspace_init.create_engagement_repo", fake_create_repo)
+
+        result = _resolve_repo(
+            "enterprise",
+            {"git": {"url": "git@example.com:org/ent.git", "branch": "main", "path": "ent-git"}},
+            tmp_path,
+            initialize_if_empty=True,
+        )
+
+        assert result == repo.resolve()
+        assert create_calls
+        assert create_calls[0]["path"] == repo
+        assert create_calls[0]["branch"] == "main"
+
+    def test_git_repo_without_branch_still_raises_without_initialize_flag(
+        self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+    ) -> None:
+        repo = tmp_path / "eng-git"
+        repo.mkdir()
+        (repo / ".git").mkdir()
+        monkeypatch.setattr("src.infrastructure.workspace.workspace_init._current_branch", lambda path: None)
+
+        with pytest.raises(SystemExit, match="expected 'main'"):
+            _resolve_repo(
+                "engagement",
+                {"git": {"url": "git@example.com:org/eng.git", "branch": "main", "path": "eng-git"}},
+                tmp_path,
+            )
 
 
 class TestWriteAndLoadState:
@@ -102,6 +250,52 @@ class TestWriteAndLoadState:
     def test_load_returns_none_when_not_found(self, tmp_path: Path) -> None:
         result = load_init_state(tmp_path / "no-state-here")
         assert result is None
+
+
+class TestArchInitFlags:
+    def test_initialize_flags_are_passed_to_repo_resolution(
+        self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        import yaml
+
+        from src.infrastructure.workspace import workspace_init
+
+        config_path = tmp_path / "arch-workspace.yaml"
+        config_path.write_text(
+            yaml.safe_dump(
+                {
+                    "engagement": {"git": {"url": "git@example.com:org/eng.git", "branch": "main", "path": "eng"}},
+                    "enterprise": {
+                        "git": {"url": "git@example.com:org/ent.git", "branch": "main", "path": "ent"}
+                    },
+                }
+            ),
+            encoding="utf-8",
+        )
+
+        calls: list[tuple[str, bool]] = []
+
+        def fake_resolve_repo(label: str, spec: dict, workspace_root: Path, **kwargs) -> Path:
+            calls.append((label, bool(kwargs.get("initialize_if_empty"))))
+            resolved = workspace_root / ("eng" if label == "engagement" else "ent")
+            resolved.mkdir(parents=True, exist_ok=True)
+            return resolved
+
+        monkeypatch.setattr(workspace_init, "_resolve_repo", fake_resolve_repo)
+
+        workspace_init.main(
+            [
+                "--config",
+                str(config_path),
+                "--initialize-engagement-repo-if-empty",
+                "--initialize-enterprise-repo-if-empty",
+            ]
+        )
+
+        assert ("engagement", True) in calls
+        assert ("enterprise", True) in calls
+        out = capsys.readouterr().out
+        assert "arch-init: success" in out
 
 
 # ---------------------------------------------------------------------------

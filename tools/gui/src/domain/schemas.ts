@@ -298,11 +298,27 @@ export const DiagramTypeSummarySchema = Schema.Struct({
 })
 export type DiagramTypeSummary = typeof DiagramTypeSummarySchema.Type
 
+export const MappingSourceSpecSchema = Schema.Struct({
+  ontology: Schema.String,
+  entity_type: Schema.optional(Schema.NullOr(Schema.String)),
+  entity_class: Schema.optional(Schema.NullOr(Schema.String)),
+  transparent: Schema.Boolean,
+})
+export type MappingSourceSpec = typeof MappingSourceSpecSchema.Type
+
 export const PermittedMappingSpecSchema = Schema.Struct({
   entity_types: Schema.Array(Schema.String),
   entity_classes: Schema.Array(Schema.String),
+  sources: Schema.Array(MappingSourceSpecSchema),
 })
 export type PermittedMappingSpec = typeof PermittedMappingSpecSchema.Type
+
+export const DiagramOwnEntityTypePropertySpecSchema = Schema.Struct({
+  name: Schema.String,
+  schema: Schema.Unknown,
+  required: Schema.Boolean,
+})
+export type DiagramOwnEntityTypePropertySpec = typeof DiagramOwnEntityTypePropertySpecSchema.Type
 
 export const DiagramOwnEntityTypeUiConfigSchema = Schema.Struct({
   entity_type: Schema.String,
@@ -312,6 +328,7 @@ export const DiagramOwnEntityTypeUiConfigSchema = Schema.Struct({
   max: Schema.NullOr(Schema.Number),
   permitted_mappings: PermittedMappingSpecSchema,
   mapping_required: Schema.Boolean,
+  properties: Schema.Array(DiagramOwnEntityTypePropertySpecSchema),
 })
 export type DiagramOwnEntityTypeUiConfig = typeof DiagramOwnEntityTypeUiConfigSchema.Type
 
@@ -456,6 +473,23 @@ export const DiagramConnectionSchema = Schema.Struct({
 })
 export type DiagramConnection = typeof DiagramConnectionSchema.Type
 
+export const C4NavLinkSchema = Schema.Struct({
+  diagram_id: Schema.String,
+  diagram_name: Schema.String,
+  diagram_type: Schema.String,
+  scope_entity_id: Schema.optional(Schema.NullOr(Schema.String)),
+})
+export type C4NavLink = typeof C4NavLinkSchema.Type
+
+export const C4NavigationSchema = Schema.Struct({
+  current_level: Schema.Number,
+  scope_entity_id: Schema.NullOr(Schema.String),
+  scope_entity_name: Schema.NullOr(Schema.String),
+  parent_diagrams: Schema.Array(C4NavLinkSchema),
+  child_diagrams: Schema.Array(C4NavLinkSchema),
+})
+export type C4Navigation = typeof C4NavigationSchema.Type
+
 export const DiagramContextSchema = Schema.Struct({
   diagram: DiagramDetailSchema,
   entities: Schema.Array(EntitySummarySchema),
@@ -470,6 +504,7 @@ export const DiagramContextSchema = Schema.Struct({
   explicit_connection_pairs: Schema.Array(Schema.Array(Schema.String)),
   generation: Schema.Number,
   etag: Schema.String,
+  c4_navigation: Schema.optional(Schema.NullOr(C4NavigationSchema)),
 })
 export type DiagramContext = typeof DiagramContextSchema.Type
 

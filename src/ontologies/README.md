@@ -184,6 +184,8 @@ If the new ontology needs a purpose-built diagram view, add a diagram type packa
 
 Connection rules are globally unique: entity type names must not collide across registered ontologies (enforced at startup). This means an ArchiMate `permitted_relationships` rule referencing a `business-actor` source unambiguously identifies the same type regardless of which ontology contributed it.
 
+Cross-ontology reuse inside diagram types is handled separately from canonical model ownership. Diagram-owned entity types may declare `permitted_mappings.sources` to transparently reuse model entity types or element classes from one or more ontologies. Keep those mappings in the diagram type module rather than duplicating canonical entity types across ontologies.
+
 Connections fall into two ownership categories:
 
 | Category | Who declares the rule | Who owns the connection instance |

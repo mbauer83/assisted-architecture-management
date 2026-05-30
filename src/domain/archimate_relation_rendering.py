@@ -11,6 +11,12 @@ _DIRECTION_SUFFIX = {
     "right": "Right",
 }
 
+# PlantUML's ArchiMate stdlib reliably supports direction suffixes for only a
+# subset of relation macros in this codebase. Unsupported suffixed macros such
+# as Rel_Serving_Up(...) fail verification, so we only emit suffixes for the
+# relation families we know are exercised successfully by tests.
+_DIRECTIONAL_MACRO_RELATION_TYPES = frozenset({"Influence", "Realization"})
+
 
 @lru_cache(maxsize=1)
 def _registry():
@@ -49,7 +55,7 @@ def render_archimate_relation(
         return None
     macro = f"Rel_{ct.archimate_relationship_type}"
     suffix = _DIRECTION_SUFFIX.get((direction or "").lower())
-    if suffix:
+    if suffix and ct.archimate_relationship_type in _DIRECTIONAL_MACRO_RELATION_TYPES:
         macro = f"{macro}_{suffix}"
     escaped = label_text.replace('"', "'")
     return f'{macro}({source_alias}, {target_alias}, "{escaped}")'

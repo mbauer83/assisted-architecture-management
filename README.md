@@ -4,7 +4,7 @@ A system for managing software architecture in a structured, git-versioned, and 
 
 ## Purpose and Goals
 
-Architecture knowledge typically lives in slide decks, Confluence pages, or siloed modelling tools. This project treats architecture as **code**: structured, version-controlled, queryable, and verifiable — using [ArchiMate NEXT](https://www.opengroup.org/archimate-forum) as the modelling language.
+Architecture knowledge typically lives in slide decks, Confluence pages, or siloed modelling tools. This project treats architecture as **code**: structured, version-controlled, queryable, and verifiable. The built-in canonical model ontology is currently [ArchiMate NEXT](https://www.opengroup.org/archimate-forum), while the extension model also supports additional ontologies and diagram-type families such as UML activity views and C4 zoomed architecture views.
 
 The key ideas:
 
@@ -39,7 +39,7 @@ engagements/
 
 ### Workspace Configuration
 
-An `arch-workspace.yaml` at the workspace root declares the two repositories:
+An `arch-workspace.yaml` at the workspace root declares the two repositories. The simplest form keeps a single explicit engagement:
 
 ```yaml
 engagement:
@@ -49,6 +49,24 @@ engagement:
 enterprise:
   local: enterprise-repository
   # or git: { url: "https://...", branch: main, path: .arch/repos/enterprise }
+```
+
+For workspaces that need to hop between multiple engagement repositories, use an engagement catalog with an active selector:
+
+```yaml
+engagements:
+  active: ENG-ARCH-REPO
+  available:
+    ENG-ARCH-REPO:
+      local: engagements/ENG-ARCH-REPO/architecture-repository
+    CLIENT-B:
+      git:
+        url: "git@github.com:your-org/client-b-architecture.git"
+        branch: main
+        path: ../client-b-architecture
+
+enterprise:
+  local: enterprise-repository
 ```
 
 Run `arch-init` to validate paths (or clone git repos) and write `.arch/init-state.yaml` with resolved absolute paths. All tooling reads this state file on startup.
@@ -111,6 +129,7 @@ AI agents receive verification results in structured form (error codes, location
 - **Form-driven entity creation**: schema-aware form fields with guided property entry
 - **Inline connection editing**: drag-and-drop connection pickers with ontology-guided relationship types
 - **Diagram authoring**: visual entity picker with related-entity expansion, side-by-side connection management, live PUML preview
+- **Extensible view families**: diagram types may be ontology-bound or diagram-owned, so teams can add notation-specific views without changing the canonical model store
 - **Document authoring**: type-specific templates with required sections and frontmatter fields pre-populated
 - **Preview before commit**: dry-run every write operation to see validation results before saving
 - **Interactive SVG diagrams**: click into entities from diagram views, follow relationships visually
@@ -228,6 +247,22 @@ check-diagram-runtime          # requires Graphviz >= 2.49.0
 # Create or validate arch-workspace.yaml (see Two-Tiered Architecture section above)
 # Then run:
 arch-init                      # reads arch-workspace.yaml, writes .arch/init-state.yaml
+
+# If a configured git repo already exists locally but is still empty / uninitialized
+arch-init --initialize-engagement-repo-if-empty
+arch-init --initialize-enterprise-repo-if-empty
+
+# Switch to another configured engagement and restart the backend if it is running
+arch-switch-engagement CLIENT-B
+
+# Register a new git-backed engagement; by default place it beside the current engagement
+arch-switch-engagement CLIENT-C --url git@github.com:your-org/client-c-architecture.git
+
+# Create a brand-new local engagement repo with default schemata and document types
+arch-switch-engagement CLIENT-D --local ../client-d-architecture --create
+
+# Create a brand-new git-backed engagement repo locally and attach origin
+arch-switch-engagement CLIENT-E --url git@github.com:your-org/client-e-architecture.git --create
 ```
 
 ### 3. Start the Backend
@@ -489,9 +524,21 @@ diagrams:
   sprite_scale: 1.5
   render_dpi: 150
   plantuml_limit_size: 16384
+
+repo_init:
+  default_branch: main
+  commit_author_name: arch-switch-engagement
+  commit_author_email: arch-switch-engagement@local.invalid
+  engagement:
+    # optional per-repo-kind overrides used by arch-switch-engagement --create
+    default_branch: main
+    commit_author_name: Architecture Bot
+    commit_author_email: architecture-bot@example.com
 ```
 
 These settings apply globally and are read by `arch-backend` at startup. They are **not** configurable via `arch-workspace.yaml`.
+
+`repo_init` controls git defaults used when scaffolding a new engagement repository via `arch-switch-engagement --create`. `default_branch`, `commit_author_name`, and `commit_author_email` may be set globally or overridden for `engagement`.
 
 ### Per-Repository Schemata (`.arch-repo/schemata/`)
 
@@ -510,6 +557,24 @@ Each repository (engagement and enterprise) may contain a `.arch-repo/schemata/`
 **Frontmatter schemas** (`frontmatter.{entity|outgoing|diagram}.schema.json`) constrain the YAML frontmatter fields common to all entities, connections, or diagrams in the repo.
 
 **Promotion superset rule**: an engagement repo's schemata must be *supersets* of the enterprise repo's schemata. That is, every property and required field defined in an enterprise schema must also appear in the corresponding engagement schema. Promotion is blocked — with a per-violation error message — if this invariant is not met. This ensures promoted entities always satisfy the enterprise constraints after transfer.
+
+### Multi-Engagement Workspace Switching
+
+`arch-workspace.yaml` may define either:
+
+- `engagement:` — a single active engagement repo, or
+- `engagements.active` + `engagements.available` — a named catalog of engagement repos
+
+`arch-switch-engagement <name>` updates the active entry, rewrites the derived workspace state in `.arch/init-state.yaml`, and restarts a running backend so the GUI, REST API, and MCP servers all rebuild against the new engagement root.
+
+When registering a new git-backed engagement with `--url`, the default clone destination is a sibling directory of the current workspace (for example `../client-b-architecture`). Passing `--create` scaffolds a new engagement repository in place instead of cloning. New repos are created with:
+
+- the standard directory structure (`model/`, `docs/`, `diagram-catalog/`, `.arch-repo/`)
+- a git repository initialized on the configured branch (`main` by default)
+- an initial scaffold commit
+- default frontmatter schemata
+- default attribute-profile schemata for key motivation and strategy entities
+- default document-type specifications for ADRs, standards, and specifications
 
 ### Entity Types and Connection Types
 

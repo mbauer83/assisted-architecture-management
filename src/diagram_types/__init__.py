@@ -10,6 +10,9 @@ from src.diagram_types.archimate_layered import module as archimate_layered
 from src.diagram_types.archimate_motivation import module as archimate_motivation
 from src.diagram_types.archimate_strategy import module as archimate_strategy
 from src.diagram_types.archimate_technology import module as archimate_technology
+from src.diagram_types.c4_component import module as c4_component
+from src.diagram_types.c4_container import module as c4_container
+from src.diagram_types.c4_system_context import module as c4_system_context
 from src.diagram_types.matrix import module as matrix
 from src.domain.module_registry import ModuleRegistry
 from src.domain.ontology_protocol import DiagramTypeModule
@@ -23,6 +26,9 @@ DEFAULT_DIAGRAM_KINDS: tuple[DiagramTypeModule, ...] = (
     archimate_technology,
     archimate_implementation,
     archimate_layered,
+    c4_system_context,
+    c4_container,
+    c4_component,
     matrix,
 )
 

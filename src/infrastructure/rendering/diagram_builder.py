@@ -51,7 +51,7 @@ def _nesting_conn_types() -> frozenset[str]:
 
 @lru_cache(maxsize=None)
 def _flow_conn_types() -> frozenset[str]:
-    return frozenset(_registry().connection_types_with_classification("flow"))
+    return frozenset(_registry().connection_types_with_classification("dynamic"))
 
 
 def _load_sprite_map(repo_root: Path) -> dict[str, str]:
@@ -239,10 +239,14 @@ def generate_archimate_puml_body(
     )
 
 
-def _needs_archimate_includes(diagram_type: str | None) -> bool:
+def _prepare_preview_body(
+    puml_body: str,
+    repo_root: Path,
+    diagram_type: str | None,
+) -> str:
     if diagram_type is None:
-        return True  # unknown type — preserve existing behavior
-    return diagram_type.startswith("archimate") or diagram_type == "matrix"
+        return puml_body
+    return get_diagram_type(diagram_type).renderer.inject_includes(puml_body, repo_root)
 
 
 def _render_puml(
@@ -271,11 +275,7 @@ def _render_puml(
 
     render_body = strip_leading_puml_frontmatter(puml_body)
     render_body = re.sub(r"@startuml\s+\S+", "@startuml", render_body, count=1)
-    if _needs_archimate_includes(diagram_type):
-        if "_archimate-stereotypes.puml" not in render_body:
-            _inc = r"\1\n!include ../_archimate-stereotypes.puml\n"
-            render_body = re.sub(r"(@startuml)\n", _inc, render_body, count=1)
-        render_body = inject_archimate_includes(render_body, repo_root)
+    render_body = _prepare_preview_body(render_body, repo_root, diagram_type)
 
     tmp_path: Path | None = None
     try:

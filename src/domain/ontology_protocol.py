@@ -20,6 +20,7 @@ from src.domain.ontology_types import (
     EntityTypeInfo,
     PermittedMappingSpec,
     RequiredConnection,
+    mapping_spec_from_config,
 )
 from src.domain.permitted_relationships import PermittedRelationshipSet, permitted_connections_from_config
 
@@ -53,6 +54,7 @@ class DiagramOwnEntityTypeUiConfig:
     properties: tuple[DiagramOwnEntityTypePropertySpec, ...] = ()
     permitted_connections: PermittedRelationshipSet = field(default_factory=PermittedRelationshipSet.empty)
     required_connections: tuple[RequiredConnection, ...] = ()
+    managed_fields: tuple[tuple[str, str], ...] | None = None
 
 
 @dataclass(frozen=True)
@@ -86,12 +88,7 @@ def diagram_type_ui_config_from_mapping(
 
 
 def _own_entity_ui_config_from_mapping(config: Mapping[str, Any]) -> DiagramOwnEntityTypeUiConfig:
-    pm = config.get("permitted_mappings")
-    pm_cfg: Mapping[str, Any] = pm if isinstance(pm, Mapping) else {}
-    mapping_spec = PermittedMappingSpec(
-        entity_types=tuple(str(v) for v in pm_cfg.get("entity_types", ())),
-        entity_classes=tuple(str(v) for v in pm_cfg.get("entity_classes", ())),
-    )
+    mapping_spec = mapping_spec_from_config(config.get("permitted_mappings"))
     raw_props: object = config.get("properties") or {}
     props = tuple(
         DiagramOwnEntityTypePropertySpec(
@@ -123,7 +120,14 @@ def _own_entity_ui_config_from_mapping(config: Mapping[str, Any]) -> DiagramOwnE
             else PermittedRelationshipSet.empty()
         ),
         required_connections=tuple(_required_connection_from_mapping(rc) for rc in raw_req if isinstance(rc, Mapping)),
+        managed_fields=_parse_managed_fields(config.get("managed_fields")),
     )
+
+
+def _parse_managed_fields(raw: object) -> tuple[tuple[str, str], ...] | None:
+    if not isinstance(raw, Mapping) or not raw:
+        return None
+    return tuple((str(k), str(v)) for k, v in raw.items())
 
 
 def _required_connection_from_mapping(config: Mapping[str, Any]) -> RequiredConnection:
@@ -147,6 +151,15 @@ class DiagramTypeWriteGuidance:
     accepted_domains: tuple[str, ...] = ()
     diagram_entities_schema: dict[str, object] | None = None
     own_entity_types: tuple[DiagramOwnEntityTypeUiConfig, ...] = ()
+    puml_notes: tuple[str, ...] = ()
+
+
+@dataclass(frozen=True)
+class DiagramRendererReferences:
+    """Model artifact references discovered by a renderer from diagram-owned data."""
+
+    entity_ids: tuple[str, ...] = ()
+    connection_ids: tuple[str, ...] = ()
 
 
 @runtime_checkable
@@ -203,6 +216,15 @@ class DiagramRenderer(Protocol):
 
     def inject_includes(self, body: str, repo_root: Path) -> str: ...
 
+    def collect_references(
+        self,
+        diagram_type: str,
+        repo_root: Path,
+        *,
+        diagram_entities: Mapping[str, object] | None = None,
+        diagram_connections: list[dict[str, object]] | None = None,
+    ) -> DiagramRendererReferences: ...
+
 
 @runtime_checkable
 class DiagramTypeModule(Protocol):
@@ -240,6 +262,20 @@ class DiagramTypeModule(Protocol):
     def renderer(self) -> DiagramRenderer: ...
 
     def write_guidance(self) -> DiagramTypeWriteGuidance: ...
+
+    def build_context_extras(
+        self,
+        repo: Any,
+        diagram_id: str,
+        diagram_entities: dict[str, Any],
+    ) -> dict[str, Any]: ...
+
+    def read_diagram_extras(self, parsed_source: dict[str, Any]) -> dict[str, Any]: ...
+
+    def build_scope_connections(
+        self,
+        diagram_entities: dict[str, Any],
+    ) -> list[tuple[str, str, str]]: ...
 
 
 class DiagramTypeBase:
@@ -321,3 +357,20 @@ class DiagramTypeBase:
 
     def write_guidance(self) -> DiagramTypeWriteGuidance:
         return DiagramTypeWriteGuidance(when_to_use="", when_not_to_use="")
+
+    def build_context_extras(
+        self,
+        repo: Any,
+        diagram_id: str,
+        diagram_entities: dict[str, Any],
+    ) -> dict[str, Any]:
+        return {}
+
+    def read_diagram_extras(self, parsed_source: dict[str, Any]) -> dict[str, Any]:
+        return {}
+
+    def build_scope_connections(
+        self,
+        diagram_entities: dict[str, Any],
+    ) -> list[tuple[str, str, str]]:
+        return []

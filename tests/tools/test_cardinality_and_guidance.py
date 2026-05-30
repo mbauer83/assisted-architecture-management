@@ -6,6 +6,7 @@ Also covers the removal of element_category from EntityTypeInfo (feature ii).
 from __future__ import annotations
 
 from pathlib import Path
+from typing import cast
 
 import pytest
 
@@ -70,6 +71,25 @@ last-updated: '2026-04-17'
 
 {sections}
 """
+
+
+def _guidance_entries(result: dict[str, object]) -> list[dict[str, object]]:
+    entries = result["entity_types"]
+    assert isinstance(entries, list)
+    return [cast(dict[str, object], entry) for entry in entries]
+
+
+def _guidance_total(result: dict[str, object]) -> int:
+    total = result["total"]
+    assert isinstance(total, int)
+    return total
+
+
+def _diagram_own_types(result: dict[str, object]) -> list[dict[str, object]]:
+    diagram_guidance = cast(dict[str, object], result["diagram_type_guidance"])
+    own_types = diagram_guidance["own_entity_types"]
+    assert isinstance(own_types, list)
+    return [cast(dict[str, object], entry) for entry in own_types]
 
 
 @pytest.fixture
@@ -515,40 +535,40 @@ class TestGetTypeGuidance:
         from src.domain.ontology_catalog import all_entity_types
 
         result = get_type_guidance()
-        assert result["total"] == len(all_entity_types())
+        assert _guidance_total(result) == len(all_entity_types())
         assert isinstance(result["entity_types"], list)
 
     def test_all_types_include_domain(self) -> None:
         result = get_type_guidance()
-        for entry in result["entity_types"]:
+        for entry in _guidance_entries(result):
             assert "domain" in entry
 
     def test_filter_by_entity_type_names(self) -> None:
         result = get_type_guidance(filter=["requirement", "goal"])
-        assert result["total"] == 2
-        names = {e["name"] for e in result["entity_types"]}
+        assert _guidance_total(result) == 2
+        names = {cast(str, e["name"]) for e in _guidance_entries(result)}
         assert names == {"requirement", "goal"}
 
     def test_filter_by_entity_type_includes_domain(self) -> None:
         result = get_type_guidance(filter=["requirement"])
-        entry = result["entity_types"][0]
+        entry = _guidance_entries(result)[0]
         assert "domain" in entry
         assert entry["domain"] == "motivation"
 
     def test_filter_by_domain_name(self) -> None:
         result = get_type_guidance(filter=["Motivation"])
-        assert result["total"] > 0
-        for entry in result["entity_types"]:
+        assert _guidance_total(result) > 0
+        for entry in _guidance_entries(result):
             assert "domain" not in entry  # omitted when filtering by domain
 
     def test_filter_by_domain_dir_name(self) -> None:
         result = get_type_guidance(filter=["motivation"])
-        assert result["total"] > 0
+        assert _guidance_total(result) > 0
 
     def test_filter_by_domain_case_insensitive(self) -> None:
         r1 = get_type_guidance(filter=["MOTIVATION"])
         r2 = get_type_guidance(filter=["Motivation"])
-        assert r1["total"] == r2["total"]
+        assert _guidance_total(r1) == _guidance_total(r2)
 
     def test_unknown_filter_returns_error(self) -> None:
         result = get_type_guidance(filter=["nonexistent-thing"])
@@ -556,26 +576,26 @@ class TestGetTypeGuidance:
 
     def test_each_entry_has_required_fields(self) -> None:
         result = get_type_guidance(filter=["requirement"])
-        entry = result["entity_types"][0]
+        entry = _guidance_entries(result)[0]
         for field in ("name", "prefix", "element_classes", "create_when", "never_create_when", "permitted_connections"):
             assert field in entry, f"Missing field: {field}"
 
     def test_permitted_connections_structure(self) -> None:
         result = get_type_guidance(filter=["requirement"])
-        conns = result["entity_types"][0]["permitted_connections"]
+        conns = cast(dict[str, list[object]], _guidance_entries(result)[0]["permitted_connections"])
         assert isinstance(conns, dict)
         for key in ("outgoing", "incoming", "symmetric"):
             assert key in conns
 
     def test_permitted_connections_non_empty(self) -> None:
         result = get_type_guidance(filter=["requirement"])
-        conns = result["entity_types"][0]["permitted_connections"]
+        conns = cast(dict[str, list[object]], _guidance_entries(result)[0]["permitted_connections"])
         total = sum(len(v) for v in conns.values())
         assert total > 0, "requirement should have at least some permitted connections"
 
     def test_create_when_and_never_create_when_are_strings(self) -> None:
         result = get_type_guidance(filter=["capability"])
-        entry = result["entity_types"][0]
+        entry = _guidance_entries(result)[0]
         assert isinstance(entry["create_when"], str)
         assert isinstance(entry["never_create_when"], str)
         assert len(entry["create_when"]) > 0
@@ -584,11 +604,33 @@ class TestGetTypeGuidance:
         r_mot = get_type_guidance(filter=["Motivation"])
         r_str = get_type_guidance(filter=["Strategy"])
         r_both = get_type_guidance(filter=["Motivation", "Strategy"])
-        assert r_both["total"] == r_mot["total"] + r_str["total"]
+        assert _guidance_total(r_both) == _guidance_total(r_mot) + _guidance_total(r_str)
 
     def test_mcp_tool_function_reachable(self) -> None:
         from src.infrastructure.mcp.artifact_mcp.write.entity import artifact_authoring_guidance
 
         result = artifact_authoring_guidance(filter=["stakeholder"])
-        assert result["total"] == 1
-        assert result["entity_types"][0]["name"] == "stakeholder"
+        assert _guidance_total(result) == 1
+        assert _guidance_entries(result)[0]["name"] == "stakeholder"
+
+    def test_activity_guidance_exposes_structured_mapping_sources(self) -> None:
+        result = get_type_guidance(diagram_type="activity")
+
+        own_types = _diagram_own_types(result)
+        swimlane = next(entry for entry in own_types if entry["entity_type"] == "swimlane")
+        mappings = cast(dict[str, object], swimlane["permitted_mappings"])
+
+        assert mappings["entity_types"] == ["role", "business-actor", "application-component"]
+        sources = cast(list[dict[str, object]], mappings["sources"])
+        assert sources[0]["ontology"] == "archimate_next"
+        assert sources[0]["entity_type"] == "role"
+
+    def test_archimate_guidance_exposes_connection_annotation_notes(self) -> None:
+        result = get_type_guidance(diagram_type="archimate-technology")
+
+        diagram_guidance = cast(dict[str, object], result["diagram_type_guidance"])
+        notes = cast(list[str], diagram_guidance["puml_notes"])
+
+        assert any("hidden by default" in note for note in notes)
+        assert any("diagram_connections" in note for note in notes)
+        assert any("include_description" in note for note in notes)

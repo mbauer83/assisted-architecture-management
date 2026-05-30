@@ -73,7 +73,8 @@ def read_diagram(id: str) -> dict[str, Any]:
         raise HTTPException(404, f"Diagram not found: {id!r}")
     diag_rec = s.get_repo().get_diagram(id)
     if diag_rec:
-        diagram_entities = diag_rec.extra.get("diagram-entities") or {}
+        raw_diagram_entities = diag_rec.extra.get("diagram-entities")
+        diagram_entities = raw_diagram_entities if isinstance(raw_diagram_entities, dict) else {}
         local_connections = diag_rec.extra.get("connections")
         if local_connections:
             diagram_entities = {**diagram_entities, "_connections": local_connections}
@@ -88,8 +89,9 @@ def read_diagram(id: str) -> dict[str, Any]:
             result["entity_ids_used"] = [str(x) for x in entity_ids_used]
         if isinstance(connection_ids_used, list):
             result["connection_ids_used"] = [str(x) for x in connection_ids_used]
-        if diag_rec.diagram_type == "matrix":
-            result["matrix_body"] = str(parsed["puml_body"]).strip()
+        dt = find_diagram_type(diag_rec.diagram_type)
+        if dt:
+            result.update(dt.read_diagram_extras(parsed))
     return result
 
 

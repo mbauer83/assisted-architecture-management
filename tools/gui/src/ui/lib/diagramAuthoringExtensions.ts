@@ -15,6 +15,7 @@ export interface DiagramTypeUiSlotProps {
 type DiagramAuthoringExtension = {
   component: Component
   managedOwnTypes: string[]
+  config: Record<string, unknown>
 }
 
 const extensions = new Map<string, DiagramAuthoringExtension>()
@@ -22,10 +23,15 @@ const extensions = new Map<string, DiagramAuthoringExtension>()
 export const registerExtension = (
   key: string,
   component: Component,
-  options?: { managedOwnTypes?: string[] },
+  options?: { managedOwnTypes?: string[]; config?: Record<string, unknown> },
 ) => {
-  extensions.set(key, { component, managedOwnTypes: options?.managedOwnTypes ?? [] })
+  extensions.set(key, {
+    component,
+    managedOwnTypes: options?.managedOwnTypes ?? [],
+    config: options?.config ?? {},
+  })
 }
 
 export const lookupExtension = (key: string): Component | undefined => extensions.get(key)?.component
 export const lookupExtensionManagedOwnTypes = (key: string): string[] => extensions.get(key)?.managedOwnTypes ?? []
+export const lookupExtensionConfig = (key: string): Record<string, unknown> => extensions.get(key)?.config ?? {}

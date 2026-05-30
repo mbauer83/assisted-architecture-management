@@ -2,7 +2,8 @@
 
 Returns create_when / never_create_when guidance plus permitted relationships for a
 selectable subset of ArchiMate domains or entity types; or when_to_use / when_not_to_use,
-diagram_entities_schema, and own_entity_types guidance for a specific diagram type.
+diagram_entities_schema, own_entity_types, and optional puml_notes guidance for a
+specific diagram type.
 
 Progressive discovery:
   - Pass diagram_type to get authoring guidance for one diagram type.
@@ -39,7 +40,7 @@ def get_type_guidance(
 
     ``diagram_type`` selects one diagram type (e.g. ``"archimate-motivation"`` or ``"activity"``).
     When provided, the response includes a ``diagram_type_guidance`` block with when_to_use,
-    when_not_to_use, key_elements, accepted_domains, own entity type guidance, and puml_notes.
+    when_not_to_use, accepted_domains, own entity type guidance, and puml_notes.
 
     Passing both ``diagram_type`` and ``filter`` returns the diagram type block plus entity type
     guidance for the filtered subset.  Omit both to return guidance for all entity types.
@@ -73,12 +74,15 @@ def _serialize_diagram_type_guidance(
         "name": name,
         "when_to_use": g.when_to_use,
         "when_not_to_use": g.when_not_to_use,
-        "accepted_domains": list(g.accepted_domains),
     }
+    if g.accepted_domains:
+        out["accepted_domains"] = list(g.accepted_domains)
     if g.diagram_entities_schema is not None:
         out["diagram_entities_schema"] = g.diagram_entities_schema
     if g.own_entity_types:
         out["own_entity_types"] = [_serialize_own_entity_type(oe) for oe in g.own_entity_types]
+    if g.puml_notes:
+        out["puml_notes"] = list(g.puml_notes)
     return out
 
 
@@ -92,21 +96,31 @@ def _serialize_own_entity_type(oe) -> dict[str, object]:  # type: ignore[no-unty
         "create_when": oe.create_when,
         "never_create_when": oe.never_create_when,
     }
-    if oe.permitted_mappings.entity_types or oe.permitted_mappings.entity_classes:
-        entry["permitted_mappings"] = {
+    if oe.permitted_mappings.has_any():
+        mapping_entry: dict[str, object] = {
             "entity_types": list(oe.permitted_mappings.entity_types),
             "entity_classes": list(oe.permitted_mappings.entity_classes),
         }
-    is_step = "step" in oe.element_classes
-    if is_step:
-        entry["managed_fields"] = {
-            "id": "required",
-            "type": "required — auto-set to entity_type",
-            "label": "optional",
-            "entity_id": "optional — model entity linkage",
-        }
+        if oe.permitted_mappings.sources:
+            mapping_entry["sources"] = [
+                {
+                    "ontology": source.ontology,
+                    "entity_type": source.entity_type,
+                    "entity_class": source.entity_class,
+                    "transparent": source.transparent,
+                }
+                for source in oe.permitted_mappings.sources
+            ]
+        entry["permitted_mappings"] = mapping_entry
+    managed: dict[str, str] = {"id": "required"}
+    if oe.managed_fields is not None:
+        managed.update(dict(oe.managed_fields))
+    elif oe.permitted_mappings.has_any():
+        managed["label"] = "optional — falls back to linked model entity name"
+        managed["entity_id"] = "required" if oe.mapping_required else "optional — links to a model entity"
     else:
-        entry["managed_fields"] = {"id": "required", "label": "required"}
+        managed["label"] = "required"
+    entry["managed_fields"] = managed
     if oe.properties:
         entry["domain_properties"] = {p.name: {"required": p.required, **p.schema} for p in oe.properties}
     return entry

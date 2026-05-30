@@ -178,6 +178,37 @@ def test_backend_min_log_level_rejects_invalid_values(monkeypatch) -> None:
     assert settings.backend_min_log_level() == "INFO"
 
 
+def test_repo_init_defaults(monkeypatch) -> None:
+    monkeypatch.setattr(settings, "load_settings", lambda: {"repo_init": {}})
+
+    assert settings.repo_init_default_branch() == "main"
+    assert settings.repo_init_commit_author_name() == "arch-switch-engagement"
+    assert settings.repo_init_commit_author_email() == "arch-switch-engagement@local.invalid"
+
+
+def test_repo_init_engagement_overrides(monkeypatch) -> None:
+    monkeypatch.setattr(
+        settings,
+        "load_settings",
+        lambda: {
+            "repo_init": {
+                "default_branch": "main",
+                "commit_author_name": "Global Bot",
+                "commit_author_email": "global@example.com",
+                "engagement": {
+                    "default_branch": "trunk",
+                    "commit_author_name": "Engagement Bot",
+                    "commit_author_email": "engagement@example.com",
+                },
+            }
+        },
+    )
+
+    assert settings.repo_init_default_branch("engagement") == "trunk"
+    assert settings.repo_init_commit_author_name("engagement") == "Engagement Bot"
+    assert settings.repo_init_commit_author_email("engagement") == "engagement@example.com"
+
+
 def test_backend_start_command_prefers_current_python_when_backend_deps_exist(monkeypatch) -> None:
     monkeypatch.setattr(backend_probe.importlib.util, "find_spec", lambda name: object())
 

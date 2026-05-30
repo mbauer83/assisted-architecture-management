@@ -42,11 +42,22 @@ entity_types:
     permitted_mappings:
       entity_types: [role, business-actor, application-component]
       entity_classes: []
+      sources:
+        - ontology: archimate_next
+          entity_type: role
+        - ontology: archimate_next
+          entity_type: business-actor
+        - ontology: archimate_next
+          entity_type: application-component
     mapping_required: false
     properties: {}
 
   action:
     element_classes: [control-flow, step]
+    managed_fields:
+      type: "required — auto-set to entity_type"
+      label: "optional"
+      entity_id: "optional — links to a model entity for traceability"
     create_when: >-
       Use for a single task or operation performed by one actor or system in one lane.
       Provide a meaningful label. Add a step-in-lane connection to the owning swimlane.
@@ -66,6 +77,10 @@ entity_types:
 
   decision:
     element_classes: [control-flow, step]
+    managed_fields:
+      type: "required — auto-set to entity_type"
+      label: "optional"
+      entity_id: "optional — links to a model entity for traceability"
     create_when: >-
       Use when the flow branches on a condition. Connect one step-then and one step-else
       to the first steps of each branch. Add a step-in-lane connection to the owning
@@ -90,6 +105,9 @@ entity_types:
 
   fork:
     element_classes: [control-flow, step]
+    managed_fields:
+      type: "required — auto-set to entity_type"
+      label: "optional"
     create_when: >-
       Use when two or more steps execute concurrently. All branches run simultaneously
       and are joined before the flow continues. Add a step-in-lane connection to the
@@ -107,6 +125,9 @@ entity_types:
 
   partition:
     element_classes: [step]
+    managed_fields:
+      type: "required — auto-set to entity_type"
+      label: "optional"
     create_when: >-
       Use to group a named set of steps into a visual partition block within the diagram.
       Connect the first contained step via step-contains. Subsequent contained steps are

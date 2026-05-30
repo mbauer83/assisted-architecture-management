@@ -192,6 +192,20 @@ entity_types:
     create_when: "Create OR-junctions to model a point where ANY ONE of the incoming relationships is sufficient to produce the outgoing relationships (logical OR / decision / merge). The same type-homogeneity and permission rules apply as for AND-junctions: all connections at the junction must be the same type, the type must be permitted between actual source and target elements, and cardinalities are not permitted at junction connection-ends. Use naming to distinguish inclusive OR (default — name freely) from exclusive OR (XOR — prefix the entity name with 'XOR', e.g. 'XOR Process Branch')."
     never_create_when: "Don't use a junction when a direct relationship between elements suffices. Don't use to circumvent relationship permission rules. Don't mix relationship types at one junction."
 
+  grouping:
+    prefix: GRP
+    hierarchy: [common]
+    element_classes: [composite-element]
+    create_when: "Create groupings to aggregate arbitrary collections of concepts (elements and/or relationships of the same or different types) that belong together based on a common characteristic. Groupings provide additional structure and visual clarity in architecture views without implying strict ownership. Use for: logical boundaries (e.g. Azure Resource Groups, cloud environments, IAM perimeters), domains, ABBs/SBBs clusters, and any cross-cutting collection that benefits from an explicit boundary. Link the grouping to its contents via aggregation. Groupings may participate in any relationship with any element, subject to the normal rules for the actual source and target types."
+    never_create_when: "Don't create a grouping if a more specific type already applies: use location for geographic or logical places, product for coherent offerings to customers, plateau for temporal architecture snapshots. Don't use grouping to replace properly typed relationships — it adds structural clarity, not a substitute for typed connections."
+
+  location:
+    prefix: LOC
+    hierarchy: [common]
+    element_classes: [composite-element]
+    create_when: "Create locations to model physical or logical places where structure elements are situated or behavior is performed. This includes geographic locations (data centres, countries), logical cloud infrastructure regions (e.g. West Europe, Central US), and organisational places (offices, sites). Aggregate structure and behavior elements into the location via aggregation to indicate that they reside or execute there. Only create when the place itself is a meaningful architectural boundary — e.g. for data-residency compliance, latency zones, or disaster-recovery topology."
+    never_create_when: "Don't create a location if a region or place is only a property value and carries no architectural significance. Don't model every administrative subdivision or availability zone as a separate location unless the boundary matters for architectural decisions (compliance, DR, data sovereignty). Prefer a single location entity that groups all resources in a region rather than per-resource location entities."
+
 
   # ── Business Domain ──────────────────────────────────────────────────────
   business-actor:

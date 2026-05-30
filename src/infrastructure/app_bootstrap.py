@@ -5,6 +5,7 @@ from __future__ import annotations
 from functools import lru_cache
 from typing import TYPE_CHECKING, Any
 
+from src.application.startup_validation import validate_registry_consistency
 from src.diagram_types import register_default_diagram_types
 from src.domain.module_registry import ModuleRegistry
 from src.ontologies.archimate_next import module as archimate_next_module
@@ -19,6 +20,7 @@ def build_module_registry() -> ModuleRegistry:
     registry = ModuleRegistry()
     registry.register_ontology(archimate_next_module)
     register_default_diagram_types(registry)
+    validate_registry_consistency(registry)
     return registry
 
 

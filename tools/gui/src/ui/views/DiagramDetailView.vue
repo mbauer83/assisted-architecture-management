@@ -15,6 +15,7 @@ import { useQuery } from '../composables/useQuery'
 import { useMutation } from '../composables/useMutation'
 import { toGlyphKey } from '../lib/glyphKey'
 import { renderMatrixMarkdown } from '../lib/matrixMarkdown'
+import type { C4Navigation } from '../../domain'
 
 const svc = inject(modelServiceKey)!
 const route = useRoute()
@@ -30,6 +31,7 @@ const deleteMutation = useMutation<WriteResult, RepoError>()
 const syncMutation = useMutation<SyncDiagramToModelResult, RepoError>()
 
 const detail = computed(() => contextQuery.data.value?.diagram ?? null)
+const c4Nav = computed<C4Navigation | null>(() => contextQuery.data.value?.c4_navigation ?? null)
 const diagramEntities = computed(() =>
   (contextQuery.data.value?.entities ?? [])
     .slice()
@@ -159,6 +161,7 @@ const attachInteractivity = async () => {
   if (!svgEl || !diagramEntities.value.length) return
 
   const aliasToId = new Map<string, string>()
+  const svgNodeIdToAlias = new Map<string, string>()
   for (const e of diagramEntities.value) {
     if (e.display_alias) {
       aliasToId.set(e.display_alias, e.artifact_id)
@@ -169,6 +172,7 @@ const attachInteractivity = async () => {
 
   for (const g of Array.from(svgEl.querySelectorAll<SVGGElement>('g'))) {
     let alias: string | null = null
+    // Old PlantUML format: data-entity="ALIAS"
     const de = g.getAttribute('data-entity')
     if (de && aliasToId.has(de)) alias = de
     if (!alias && g.id.startsWith('entity_') && aliasToId.has(g.id.slice(7))) alias = g.id.slice(7)
@@ -178,9 +182,18 @@ const attachInteractivity = async () => {
       if (aliasToId.has(t)) alias = t
     }
     if (!alias && g.id.startsWith('cluster_') && aliasToId.has(g.id.slice(8))) alias = g.id.slice(8)
+    // New PlantUML format (1.2026+): data-qualified-name="CONTAINER.ALIAS" or "ALIAS"
+    if (!alias) {
+      const qn = g.getAttribute('data-qualified-name') ?? ''
+      if (qn) {
+        const last = qn.split('.').pop() ?? ''
+        if (last && aliasToId.has(last)) alias = last
+      }
+    }
     if (!alias) continue
 
     const artifactId = aliasToId.get(alias)!
+    if (g.id) svgNodeIdToAlias.set(g.id, alias)
     g.setAttribute('data-entity-id', artifactId)
     svgNodeElems.value.set(artifactId, g)
     g.addEventListener('click', (ev) => { ev.stopPropagation(); selectEntity(artifactId) }, { signal })
@@ -206,10 +219,12 @@ const attachInteractivity = async () => {
     g.addEventListener('click', (ev) => { ev.stopPropagation(); selectConnection(conn, g) }, { signal })
   }
 
-  // Primary: attribute-based (works when DOMPurify preserves data-entity-1/2)
+  // Primary: attribute-based (old PlantUML: data-entity-1/2 hold aliases)
   for (const g of Array.from(svgEl.querySelectorAll<SVGGElement>('g[data-entity-1]'))) {
-    const a1 = g.getAttribute('data-entity-1') ?? ''
-    const a2 = g.getAttribute('data-entity-2') ?? ''
+    const a1raw = g.getAttribute('data-entity-1') ?? ''
+    const a2raw = g.getAttribute('data-entity-2') ?? ''
+    const a1 = svgNodeIdToAlias.get(a1raw) ?? a1raw
+    const a2 = svgNodeIdToAlias.get(a2raw) ?? a2raw
     const forwardKey = `${a1}:${a2}`
     const reverseKey = `${a2}:${a1}`
     const conn = aliasToConnQueue.get(forwardKey)?.shift()
@@ -220,12 +235,19 @@ const attachInteractivity = async () => {
     attachConnGroup(g, conn)
   }
 
-  // Fallback: id-based lookup via PlantUML's link_SOURCE_TARGET convention
+  // Fallback: id-based lookup via PlantUML's link_SOURCE_TARGET convention (old)
+  // and SOURCE-TARGET path id convention (new PlantUML 1.2026+)
   for (const conn of diagramConnections.value) {
     if (!conn.source_alias || !conn.target_alias) continue
     const fwdId = `link_${conn.source_alias}_${conn.target_alias}`
     const revId = `link_${conn.target_alias}_${conn.source_alias}`
-    const g = (svgEl.getElementById(fwdId) ?? svgEl.getElementById(revId)) as SVGGElement | null
+    let g = (svgEl.getElementById(fwdId) ?? svgEl.getElementById(revId)) as SVGGElement | null
+    if (g) { attachConnGroup(g, conn); continue }
+    // New format: find g.link whose child path has id="SRC-TGT"
+    const pathFwd = svgEl.getElementById(`${conn.source_alias}-${conn.target_alias}`)
+    const pathRev = svgEl.getElementById(`${conn.target_alias}-${conn.source_alias}`)
+    const pathEl = pathFwd ?? pathRev
+    g = pathEl?.closest('g') as SVGGElement | null
     if (g) attachConnGroup(g, conn)
   }
 }
@@ -572,6 +594,62 @@ onUnmounted(() => {
           :class="`status--${detail.status}`"
         >{{ detail.status }}</span>
         <span class="mono faded">v{{ detail.version }} · {{ detail.artifact_id }}</span>
+      </div>
+
+      <!-- C4 navigation panel -->
+      <div
+        v-if="c4Nav"
+        class="c4-nav"
+      >
+        <div class="c4-nav-hdr">
+          <span class="c4-level-badge">L{{ c4Nav.current_level }}</span>
+          <span class="c4-nav-title">
+            {{ ['System Landscape', 'System Context', 'Container', 'Component'][c4Nav.current_level] ?? '' }} Diagram
+          </span>
+          <span
+            v-if="c4Nav.scope_entity_name"
+            class="c4-scope-label"
+          >Scope: {{ c4Nav.scope_entity_name }}</span>
+        </div>
+        <div
+          v-if="c4Nav.parent_diagrams.length || c4Nav.child_diagrams.length"
+          class="c4-nav-links"
+        >
+          <div
+            v-if="c4Nav.parent_diagrams.length"
+            class="c4-nav-group"
+          >
+            <span class="c4-nav-dir">↑ Higher level</span>
+            <RouterLink
+              v-for="link in c4Nav.parent_diagrams"
+              :key="link.diagram_id"
+              :to="{ path: '/diagram', query: { id: link.diagram_id } }"
+              class="c4-nav-link"
+            >
+              {{ link.diagram_name }}
+            </RouterLink>
+          </div>
+          <div
+            v-if="c4Nav.child_diagrams.length"
+            class="c4-nav-group"
+          >
+            <span class="c4-nav-dir">↓ Drill down</span>
+            <RouterLink
+              v-for="link in c4Nav.child_diagrams"
+              :key="link.diagram_id"
+              :to="{ path: '/diagram', query: { id: link.diagram_id } }"
+              class="c4-nav-link"
+            >
+              {{ link.diagram_name }}
+            </RouterLink>
+          </div>
+        </div>
+        <div
+          v-else
+          class="c4-nav-empty"
+        >
+          No linked C4 diagrams found at adjacent levels.
+        </div>
       </div>
 
       <div
@@ -1055,4 +1133,19 @@ onUnmounted(() => {
 }
 .matrix-view :deep(td:not(:first-child)) { text-align: center; }
 .matrix-view :deep(h2) { font-size: 13px; font-weight: 700; margin: 16px 0 6px; color: #374151; }
+
+.c4-nav {
+  margin-bottom: 12px; padding: 10px 14px; background: #f0f9ff;
+  border: 1px solid #bae6fd; border-radius: 8px; display: flex; flex-direction: column; gap: 8px;
+}
+.c4-nav-hdr { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.c4-level-badge { padding: 2px 8px; border-radius: 4px; background: #0ea5e9; color: white; font-size: 11px; font-weight: 700; }
+.c4-nav-title { font-size: 13px; font-weight: 600; color: #0c4a6e; }
+.c4-scope-label { font-size: 12px; color: #0369a1; margin-left: 4px; }
+.c4-nav-links { display: flex; gap: 16px; flex-wrap: wrap; }
+.c4-nav-group { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.c4-nav-dir { font-size: 11px; font-weight: 700; color: #6b7280; white-space: nowrap; }
+.c4-nav-link { font-size: 12px; color: #0369a1; text-decoration: none; padding: 2px 8px; border: 1px solid #bae6fd; border-radius: 4px; background: white; }
+.c4-nav-link:hover { background: #e0f2fe; text-decoration: none; }
+.c4-nav-empty { font-size: 12px; color: #9ca3af; }
 </style>

@@ -35,12 +35,12 @@ const saveMutation = useMutation<WriteResult, RepoError>()
 const diagramDetail = computed(() => contextQuery.data.value?.diagram ?? null)
 const uiConfig = ref<DiagramTypeUiConfig | null>(null)
 const baseTypeEntityData = ref<Record<string, unknown>>({})
-const kindDataPatch = ref<Record<string, unknown>>({})
-const typeEntityData = computed(() => ({ ...baseTypeEntityData.value, ...kindDataPatch.value }))
+const typeEntityPatch = ref<Record<string, unknown>>({})
+const typeEntityData = computed(() => ({ ...baseTypeEntityData.value, ...typeEntityPatch.value }))
 const asRecord = (value: unknown): Record<string, unknown> =>
   value && typeof value === 'object' && !Array.isArray(value) ? value as Record<string, unknown> : {}
 const mergeTypeEntityData = (patch: Record<string, unknown>) => {
-  kindDataPatch.value = { ...kindDataPatch.value, ...patch }
+  typeEntityPatch.value = { ...typeEntityPatch.value, ...patch }
   previewMutation.reset()
 }
 
@@ -268,7 +268,12 @@ const attachInteractivity = () => {
   if (!svgEl || !diagramEntities.value.length) return
 
   const aliasToId = new Map<string, string>()
-  for (const e of diagramEntities.value) if (e.display_alias) aliasToId.set(e.display_alias, e.artifact_id)
+  const svgNodeIdToAlias = new Map<string, string>()
+  for (const e of diagramEntities.value) {
+    if (!e.display_alias) continue
+    aliasToId.set(e.display_alias, e.artifact_id)
+    aliasToId.set(e.display_alias.replace(/[^a-zA-Z0-9_]/g, '_'), e.artifact_id)
+  }
   if (!aliasToId.size) return
 
   for (const g of Array.from(svgEl.querySelectorAll<SVGGElement>('g'))) {
@@ -281,8 +286,16 @@ const attachInteractivity = () => {
       const t = g.querySelector(':scope > title')?.textContent?.trim() ?? ''
       if (aliasToId.has(t)) alias = t
     }
+    if (!alias) {
+      const qn = g.getAttribute('data-qualified-name') ?? ''
+      if (qn) {
+        const last = qn.split('.').pop() ?? ''
+        if (last && aliasToId.has(last)) alias = last
+      }
+    }
     if (!alias) continue
     const artifactId = aliasToId.get(alias)!
+    if (g.id) svgNodeIdToAlias.set(g.id, alias)
     g.setAttribute('data-entity-id', artifactId)
     svgEntityElems.set(artifactId, g)
     g.addEventListener('click', (ev) => { ev.stopPropagation(); toggleEntityRemoval(artifactId) })
@@ -292,7 +305,9 @@ const attachInteractivity = () => {
   for (const c of diagramConnections.value)
     if (c.source_alias && c.target_alias) aliasToConn.set(`${c.source_alias}:${c.target_alias}`, c)
   for (const g of Array.from(svgEl.querySelectorAll<SVGGElement>('g[data-entity-1]'))) {
-    const a1 = g.getAttribute('data-entity-1') ?? ''; const a2 = g.getAttribute('data-entity-2') ?? ''
+    const a1raw = g.getAttribute('data-entity-1') ?? ''; const a2raw = g.getAttribute('data-entity-2') ?? ''
+    const a1 = svgNodeIdToAlias.get(a1raw) ?? a1raw
+    const a2 = svgNodeIdToAlias.get(a2raw) ?? a2raw
     const conn = aliasToConn.get(`${a1}:${a2}`) ?? aliasToConn.get(`${a2}:${a1}`)
     if (!conn) continue
     g.setAttribute('data-conn-id', conn.artifact_id)
@@ -364,7 +379,7 @@ const load = async () => {
       for (const conn of context.connections) inc.add(conn.artifact_id)
       includedConnIds.value = inc
       baseTypeEntityData.value = asRecord(context.diagram.diagram_entities)
-      kindDataPatch.value = {}
+      typeEntityPatch.value = {}
       void Effect.runPromise(svc.getDiagramTypeUiConfig(context.diagram.diagram_type))
         .then((config) => { uiConfig.value = config })
         .catch(() => { uiConfig.value = null })
@@ -513,7 +528,10 @@ onUnmounted(() => {
       </div>
 
       <aside class="sidebar card">
-        <div class="sb-search">
+        <div
+          v-if="uiConfig?.entity_search_filter !== false"
+          class="sb-search"
+        >
           <EntityPickerInput
             :excluded-ids="effectiveEntityIds"
             :diagram-type="diagramDetail?.diagram_type"
@@ -526,11 +544,13 @@ onUnmounted(() => {
             :ui-config="uiConfig"
             :diagram-entities="typeEntityData"
             :entities="effectiveEntitiesList"
+            :diagram-connections="diagramConnections"
             @diagram-entities-change="mergeTypeEntityData"
+            @diagram-connections-change="diagramConnections = $event"
           />
 
           <div
-            v-if="effectiveEntitiesList.length"
+            v-if="uiConfig?.entity_search_filter !== false && effectiveEntitiesList.length"
             class="sb-section"
           >
             <div class="sb-sec-hdr">

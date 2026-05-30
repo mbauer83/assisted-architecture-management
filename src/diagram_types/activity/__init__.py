@@ -98,14 +98,28 @@ def _apply_ontology_fields(
     entry["max"] = ont_et.max
     entry["mapping_required"] = ont_et.mapping_required
     pm = ont_et.permitted_mappings
-    if pm.entity_types or pm.entity_classes:
-        entry["permitted_mappings"] = {
+    if pm.has_any():
+        mapping_entry: dict[str, Any] = {
             "entity_types": list(pm.entity_types),
             "entity_classes": list(pm.entity_classes),
         }
+        if pm.sources:
+            mapping_entry["sources"] = [
+                {
+                    "ontology": source.ontology,
+                    "entity_type": source.entity_type,
+                    "entity_class": source.entity_class,
+                    "transparent": source.transparent,
+                }
+                for source in pm.sources
+            ]
+        entry["permitted_mappings"] = mapping_entry
     raw_props = ontology.entity_type_properties.get(str(ont_et.artifact_type))
     if raw_props:
         entry["properties"] = raw_props
+    raw_mf = ontology.entity_type_managed_fields.get(str(ont_et.artifact_type))
+    if raw_mf:
+        entry["managed_fields"] = raw_mf
     if ont_et.required_connections:
         entry["required_connections"] = [
             {

@@ -1,15 +1,19 @@
 <script setup lang="ts">
 import { computed } from 'vue'
-import type { DiagramTypeUiConfig, EntityDisplayInfo } from '../../domain'
-import { lookupExtension, lookupExtensionManagedOwnTypes } from '../lib/diagramAuthoringExtensions'
+import type { DiagramTypeUiConfig, EntityDisplayInfo, DiagramConnection } from '../../domain'
+import { lookupExtension, lookupExtensionConfig, lookupExtensionManagedOwnTypes } from '../lib/diagramAuthoringExtensions'
 import DiagramOwnEntityTypeSection from './DiagramOwnEntityTypeSection.vue'
 
 const props = defineProps<{
   uiConfig: DiagramTypeUiConfig | null
   diagramEntities: Record<string, unknown>
   entities?: EntityDisplayInfo[]
+  diagramConnections?: DiagramConnection[]
 }>()
-const emit = defineEmits<{ diagramEntitiesChange: [patch: Record<string, unknown>] }>()
+const emit = defineEmits<{
+  diagramEntitiesChange: [patch: Record<string, unknown>]
+  diagramConnectionsChange: [connections: DiagramConnection[]]
+}>()
 
 const slots = computed(() => Object.entries(props.uiConfig?.type_ui_slots ?? {})
   .map(([slotName, componentKey]) => ({
@@ -17,6 +21,7 @@ const slots = computed(() => Object.entries(props.uiConfig?.type_ui_slots ?? {})
     componentKey,
     component: lookupExtension(componentKey),
     managedOwnTypes: lookupExtensionManagedOwnTypes(componentKey),
+    config: lookupExtensionConfig(componentKey),
   }))
   .filter((slot) => slot.component))
 
@@ -47,7 +52,10 @@ const ownTypes = computed(() => {
       :ui-config="uiConfig"
       :diagram-entities="diagramEntities"
       :entities="entities ?? []"
+      :diagram-connections="diagramConnections ?? []"
+      v-bind="slot.config"
       @diagram-entities-change="emit('diagramEntitiesChange', $event)"
+      @diagram-connections-change="emit('diagramConnectionsChange', $event)"
     />
   </section>
 </template>

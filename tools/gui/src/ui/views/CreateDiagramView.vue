@@ -21,9 +21,19 @@ const name = ref('')
 const diagramType = ref((route.query.type as string | undefined) ?? 'archimate-business')
 const uiConfig = ref<DiagramTypeUiConfig | null>(null)
 const diagramEntities = ref<Record<string, unknown>>({})
+let _lastSuggestedName = ''
 
 const mergeDiagramEntities = (patch: Record<string, unknown>) => {
   diagramEntities.value = { ...diagramEntities.value, ...patch }
+  // Auto-suggest name when scope entity is set for C4 diagrams
+  const scopeName = typeof patch._scope_entity_name === 'string' ? patch._scope_entity_name : ''
+  if (scopeName && uiConfig.value?.label) {
+    const suggested = `${scopeName} — ${uiConfig.value.label}`
+    if (!name.value || name.value === _lastSuggestedName) {
+      name.value = suggested
+      _lastSuggestedName = suggested
+    }
+  }
   preview.value = null
   previewClean.value = false
 }
@@ -292,7 +302,10 @@ watch(diagramType, () => {
           @diagram-entities-change="mergeDiagramEntities"
         />
 
-        <div class="form-row">
+        <div
+          v-if="uiConfig?.entity_search_filter !== false"
+          class="form-row"
+        >
           <label class="lbl">Add Entities</label>
           <EntityPickerInput
             :excluded-ids="includedEntityIds"
@@ -302,7 +315,7 @@ watch(diagramType, () => {
         </div>
 
         <div
-          v-if="includedEntities.length"
+          v-if="uiConfig?.entity_search_filter !== false && includedEntities.length"
           class="form-row"
         >
           <label class="lbl">Included Entities ({{ includedEntities.length }})</label>

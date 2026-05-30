@@ -8,7 +8,13 @@ import yaml  # type: ignore[import-untyped]
 
 from src.domain.artifact_types import ConnectionRecord, EntityRecord
 from src.domain.module_types import ConnectionTypeName, DiagramTypeName, EntityTypeName, FreeOntology
-from src.domain.ontology_protocol import DiagramRenderer, DiagramTypeBase, DiagramTypeModule, DiagramTypeWriteGuidance
+from src.domain.ontology_protocol import (
+    DiagramRenderer,
+    DiagramRendererReferences,
+    DiagramTypeBase,
+    DiagramTypeModule,
+    DiagramTypeWriteGuidance,
+)
 from src.domain.ontology_types import ConnectionTypeInfo, EntityTypeInfo
 from src.domain.permitted_relationships import PermittedRelationshipSet
 
@@ -34,6 +40,17 @@ class _MatrixRenderer:
     def inject_includes(self, body: str, repo_root: Path) -> str:
         del repo_root
         return body
+
+    def collect_references(
+        self,
+        diagram_type: str,
+        repo_root: Path,
+        *,
+        diagram_entities: Mapping[str, object] | None = None,
+        diagram_connections: list[dict[str, object]] | None = None,
+    ) -> DiagramRendererReferences:
+        del diagram_type, repo_root, diagram_entities, diagram_connections
+        return DiagramRendererReferences()
 
 
 class _MatrixDiagramType(DiagramTypeBase):
@@ -81,6 +98,9 @@ class _MatrixDiagramType(DiagramTypeBase):
     @property
     def renderer(self) -> DiagramRenderer:
         return _MatrixRenderer()
+
+    def read_diagram_extras(self, parsed_source: dict[str, Any]) -> dict[str, Any]:
+        return {"matrix_body": str(parsed_source.get("puml_body") or "").strip()}
 
     def write_guidance(self) -> DiagramTypeWriteGuidance:
         return DiagramTypeWriteGuidance(

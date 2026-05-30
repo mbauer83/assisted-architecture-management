@@ -1,8 +1,14 @@
-"""Startup compatibility validation: repo content vs. registered ontology/diagram modules.
+"""Startup validation: registry internal consistency and repo/registry compatibility.
 
-Scans indexed entities, connections, diagrams, and per-type schema files in each
-repo root and compares the types found against the module registry.  Any type
-present in the repo but absent from the registry is reported as an error.
+Two independent checks:
+
+- ``validate_registry_consistency`` — pure in-memory check that every type referenced
+  in permitted_relationships is actually declared in the same module.  Fast, no I/O,
+  runs inside ``build_module_registry`` so broken YAML is caught at startup.
+
+- ``validate_repo_compatibility`` — scans indexed repo content and compares types found
+  against the module registry.  Any type present in the repo but absent from the registry
+  is reported as an error.
 """
 
 from __future__ import annotations
@@ -12,6 +18,83 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from src.application.artifact_repository import ArtifactRepository
     from src.domain.module_registry import ModuleRegistry
+
+
+# ── Registry consistency ──────────────────────────────────────────────────────
+
+
+class RegistryConsistencyError(Exception):
+    """Raised when a module's permitted_relationships reference undeclared types."""
+
+    def __init__(self, errors: list[str]) -> None:
+        self.errors = list(errors)
+        super().__init__("\n".join(errors))
+
+
+def validate_registry_consistency(registry: "ModuleRegistry") -> None:
+    """Raise RegistryConsistencyError if any module has internal type drift.
+
+    Checks for each registered ontology and diagram type that every entity type
+    and connection type referenced in permitted_relationships is actually declared
+    in that module's own types (or, for diagram types, in effective_entity/connection_types).
+    """
+    errors = _collect_consistency_errors(registry)
+    if errors:
+        raise RegistryConsistencyError(errors)
+
+
+def _collect_consistency_errors(registry: "ModuleRegistry") -> list[str]:
+    errors: list[str] = []
+    seen: set[str] = set()
+
+    def _add(msg: str) -> None:
+        if msg not in seen:
+            seen.add(msg)
+            errors.append(msg)
+
+    # Ontology modules: every entity type and connection type referenced in
+    # permitted_relationships must be declared in that same module.
+    for om_name, om in registry.all_ontologies().items():
+        known_entity = set(om.entity_types.keys())
+        known_conn = set(om.connection_types.keys())
+        for src, targets in om.permitted_relationships.by_source().items():
+            if src not in known_entity:
+                _add(f"Ontology {om_name!r}: permitted_relationships source {str(src)!r} is not a declared entity type")
+            for tgt, conn in targets:
+                if tgt not in known_entity:
+                    _add(f"Ontology {om_name!r}: permitted_relationships target {str(tgt)!r}"
+                         " is not a declared entity type")
+                if conn not in known_conn:
+                    _add(f"Ontology {om_name!r}: permitted_relationships connection {str(conn)!r}"
+                         " is not a declared connection type")
+
+    # Diagram types: entity types in own_permitted_relationships must be either a
+    # diagram_only_type or a model entity type declared in a registered ontology.
+    # The latter covers cross-references such as activity swimlane-maps-to rules that
+    # point at ArchiMate entity types.  Diagram types backed entirely by an external
+    # ontology (no diagram_only_types) are skipped.  Connection type vocabulary lives
+    # inside the internal DiagramOntology and is not re-checked here.
+    # NOTE: effective_entity_types() is intentionally avoided; for model-backed diagram
+    # types (e.g. C4) it calls get_module_registry(), which would recurse during build.
+    all_ontology_entity_names = frozenset(str(k) for k in registry.all_entity_types().keys())
+    for dt_name, dt in registry.all_diagram_types().items():
+        diagram_entity_names = frozenset(oe.entity_type for oe in dt.ui_config.diagram_only_types)
+        if not diagram_entity_names:
+            continue
+        all_valid = diagram_entity_names | all_ontology_entity_names
+        for src, targets in dt.own_permitted_relationships.by_source().items():
+            if str(src) not in all_valid:
+                _add(f"Diagram type {dt_name!r}: permitted_relationships source {str(src)!r}"
+                     " is not a known entity type")
+            for tgt, conn in targets:
+                if str(tgt) not in all_valid:
+                    _add(f"Diagram type {dt_name!r}: permitted_relationships target {str(tgt)!r}"
+                         " is not a known entity type")
+
+    return errors
+
+
+# ── Repo compatibility ────────────────────────────────────────────────────────
 
 
 class RepoCompatibilityError(Exception):
@@ -45,7 +128,7 @@ def _collect_errors(
     registry: "ModuleRegistry",
 ) -> list[str]:
     errors: list[str] = []
-    known_entity_types = set(registry.all_entity_types().keys())
+    known_entity_types = set(registry.all_entity_types().keys()) | set(registry.all_diagram_entity_types())
     known_connection_types = set(registry.all_connection_types().keys())
     known_diagram_types = set(registry.all_diagram_types().keys())
 

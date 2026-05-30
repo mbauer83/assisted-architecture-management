@@ -269,7 +269,7 @@ class TestBoundaryGuards:
 ---
 artifact-id: {diag_id}
 artifact-type: diagram
-diagram-type: activity-bpmn
+diagram-type: activity
 name: "Diag"
 version: 0.1.0
 status: active

@@ -12,8 +12,8 @@ from src.domain.module_types import ConnectionTypeName, EntityTypeName
 from src.domain.ontology_types import (
     ConnectionTypeInfo,
     EntityTypeInfo,
-    PermittedMappingSpec,
     RequiredConnection,
+    mapping_spec_from_config,
 )
 from src.domain.permitted_relationships import PermittedRelationshipSet, permitted_connections_from_config
 
@@ -24,6 +24,7 @@ class DiagramOntology:
 
     entity_types: dict[EntityTypeName, EntityTypeInfo]
     entity_type_properties: dict[str, dict[str, Any]]  # raw properties per entity type
+    entity_type_managed_fields: dict[str, dict[str, str]]  # explicit managed-field descriptions per entity type
     connection_types: dict[ConnectionTypeName, ConnectionTypeInfo]
     permitted_relationships: PermittedRelationshipSet
 
@@ -37,6 +38,11 @@ def load_diagram_ontology(path: Path) -> DiagramOntology:
     entity_type_properties = {
         name: dict(cfg.get("properties") or {}) for name, cfg in raw_entity_types.items() if isinstance(cfg, dict)
     }
+    entity_type_managed_fields = {
+        name: {str(k): str(v) for k, v in cfg["managed_fields"].items()}
+        for name, cfg in raw_entity_types.items()
+        if isinstance(cfg, dict) and isinstance(cfg.get("managed_fields"), dict)
+    }
     connection_types = _parse_connection_types(raw.get("connection_types") or {})
     permitted = _parse_permitted_relationships(
         raw.get("permitted_relationships") or [],
@@ -46,6 +52,7 @@ def load_diagram_ontology(path: Path) -> DiagramOntology:
     return DiagramOntology(
         entity_types=entity_types,
         entity_type_properties=entity_type_properties,
+        entity_type_managed_fields=entity_type_managed_fields,
         connection_types=connection_types,
         permitted_relationships=permitted,
     )
@@ -58,8 +65,6 @@ def _parse_entity_types(raw: dict[str, Any]) -> dict[EntityTypeName, EntityTypeI
         req_conns = tuple(
             _parse_required_connection(rc) for rc in (cfg.get("required_connections") or []) if isinstance(rc, dict)
         )
-        pm_raw: dict[str, Any] = cfg.get("permitted_mappings") or {}
-        pm_cfg: dict[str, Any] = pm_raw if isinstance(pm_raw, dict) else {}
         max_val = cfg.get("max")
         out[EntityTypeName(name)] = EntityTypeInfo(
             artifact_type=str(name),
@@ -71,10 +76,7 @@ def _parse_entity_types(raw: dict[str, Any]) -> dict[EntityTypeName, EntityTypeI
             required_connections=req_conns,
             min=int(cfg.get("min", 0)),
             max=None if max_val is None else int(max_val),
-            permitted_mappings=PermittedMappingSpec(
-                entity_types=tuple(str(v) for v in pm_cfg.get("entity_types", ())),
-                entity_classes=tuple(str(v) for v in pm_cfg.get("entity_classes", ())),
-            ),
+            permitted_mappings=mapping_spec_from_config(cfg.get("permitted_mappings")),
             mapping_required=bool(cfg.get("mapping_required", False)),
         )
     return out

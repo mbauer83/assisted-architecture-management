@@ -83,6 +83,8 @@ class ModuleRegistry:
         out: dict[ConnectionTypeName, ConnectionTypeInfo] = {}
         for om in self._ontologies.values():
             out.update(om.connection_types)
+        for dt in self._diagram_types.values():
+            out.update(dt.own_connection_types)
         return out
 
     def get_entity_type(self, name: EntityTypeName) -> EntityTypeInfo:
@@ -101,12 +103,18 @@ class ModuleRegistry:
         for om in self._ontologies.values():
             if name in om.connection_types:
                 return om.connection_types[name]
-        raise KeyError(f"Connection type '{name}' not found in any registered ontology")
+        for dt in self._diagram_types.values():
+            if name in dt.own_connection_types:
+                return dt.own_connection_types[name]
+        raise KeyError(f"Connection type '{name}' not found in any registered ontology or diagram type")
 
     def find_connection_type(self, name: ConnectionTypeName) -> ConnectionTypeInfo | None:
         for om in self._ontologies.values():
             if name in om.connection_types:
                 return om.connection_types[name]
+        for dt in self._diagram_types.values():
+            if name in dt.own_connection_types:
+                return dt.own_connection_types[name]
         return None
 
     def entity_types_with_class(self, cls: ElementClassName) -> frozenset[EntityTypeName]:
@@ -119,6 +127,10 @@ class ModuleRegistry:
         result: set[ConnectionTypeName] = set()
         for om in self._ontologies.values():
             result.update(om.connection_types_with_classification(classification))
+        for dt in self._diagram_types.values():
+            for ct_name, ct_info in dt.own_connection_types.items():
+                if classification in ct_info.classifications:
+                    result.add(ct_name)
         return frozenset(result)
 
     def ontology_for_entity_type(self, name: EntityTypeName) -> OntologyModule | None:

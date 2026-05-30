@@ -1,0 +1,61 @@
+entity_types:
+  person:
+    create_when: Use for human users, actors, or roles interacting with the system in scope.
+    never_create_when: Do not use for deployable software or internal application building blocks.
+    permitted_mappings:
+      entity_types:
+        - business-actor
+        - role
+      sources:
+        - ontology: archimate-next-snapshot1
+          entity_type: business-actor
+          transparent: true
+        - ontology: archimate-next-snapshot1
+          entity_type: role
+          transparent: true
+    properties:
+      description:
+        type: string
+        required: false
+      external:
+        type: boolean
+        required: false
+  software-system:
+    create_when: >-
+      Use for the software system in scope (set _scope_entity_id at diagram level and link entity_id to an
+      application-component or service model entity — required for cross-diagram navigation and c4-contains graph
+      connections) and for peer or external software systems around it (entity_id optional for third-party systems you
+      do not manage).
+    never_create_when: Do not use for finer-grained deployable units inside a system when a container or component view is needed.
+    permitted_mappings:
+      entity_types:
+        - application-component
+        - service
+      sources:
+        - ontology: archimate-next-snapshot1
+          entity_type: application-component
+          transparent: true
+        - ontology: archimate-next-snapshot1
+          entity_type: service
+          transparent: true
+    properties:
+      description:
+        type: string
+        required: false
+      technology:
+        type: string
+        required: false
+      external:
+        type: boolean
+        required: false
+
+connection_types:
+  c4-uses:
+    embedding: none
+    cascade_delete_source: false
+
+permitted_relationships:
+  - [person, software-system, [c4-uses]]
+  - [software-system, person, [c4-uses]]
+  - [software-system, software-system, [c4-uses]]
+  - [person, person, [c4-uses]]

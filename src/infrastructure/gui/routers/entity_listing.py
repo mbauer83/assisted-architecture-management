@@ -6,6 +6,7 @@ from functools import lru_cache
 from typing import Any
 
 from src.domain.artifact_types import EntityRecord
+from src.domain.module_types import ConnectionTypeName
 from src.infrastructure.gui.routers import state as s
 
 
@@ -30,22 +31,17 @@ def _hierarchy_types() -> frozenset[str]:
     return frozenset(_hierarchy_priority())
 
 
-_HIERARCHY_LABEL = {
-    "archimate-specialization": "specialization",
-    "archimate-composition": "composition",
-    "archimate-aggregation": "aggregation",
-}
-
-
 def hierarchy_meta(entities: list[EntityRecord], repo) -> dict[str, dict[str, object]]:
     entity_ids = {e.artifact_id for e in entities}
     hp = _hierarchy_priority()
     ht = _hierarchy_types()
+    all_conn_types = _registry().all_connection_types()
     parents_by_child: dict[str, list[tuple[str, str]]] = {}
     for conn in repo.list_connections_by_types_for_entities(ht, entity_ids):
         if conn.conn_type not in hp:
             continue
-        if conn.conn_type == "archimate-specialization":
+        ct_info = all_conn_types.get(ConnectionTypeName(conn.conn_type))
+        if ct_info is not None and "generalization" in ct_info.classifications:
             child_id = conn.source
             parent_id = conn.target
         else:
@@ -77,6 +73,10 @@ def hierarchy_meta(entities: list[EntityRecord], repo) -> dict[str, dict[str, ob
         depth_cache[entity_id] = min_depth + 1
         return depth_cache[entity_id]
 
+    def _label(ct: str) -> str:
+        info = all_conn_types.get(ConnectionTypeName(ct))
+        return info.hierarchy_label if info and info.hierarchy_label else ct
+
     result: dict[str, dict[str, object]] = {}
     for e in entities:
         parents = parents_by_child.get(e.artifact_id, [])
@@ -84,13 +84,13 @@ def hierarchy_meta(entities: list[EntityRecord], repo) -> dict[str, dict[str, ob
         meta: dict[str, object] = {
             "hierarchy_depth": depth_for(e.artifact_id),
             "specialization_depth": depth_for(e.artifact_id),
-            "all_parents": [{"parent_id": pid, "relation_type": _HIERARCHY_LABEL.get(ct, ct)} for pid, ct in parents],
+            "all_parents": [{"parent_id": pid, "relation_type": _label(ct)} for pid, ct in parents],
         }
         if primary:
             pid, ct = primary
             meta["parent_entity_id"] = pid
             meta["parent_specialization_id"] = pid
-            meta["hierarchy_relation_type"] = _HIERARCHY_LABEL.get(ct, ct)
+            meta["hierarchy_relation_type"] = _label(ct)
         result[e.artifact_id] = meta
     return result
 

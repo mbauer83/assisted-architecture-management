@@ -217,7 +217,11 @@ def _resolve_relation_connection(
     direct = _resolve_connection_by_parts(f"{src_id}---{tgt_id}@@{conn_type}", connections)
     if direct is not None:
         return direct
-    if conn_type == "archimate-realization":
+    from src.domain.module_types import ConnectionTypeName  # noqa: PLC0415
+    from src.infrastructure.app_bootstrap import get_module_registry  # noqa: PLC0415
+
+    ct_info = get_module_registry().find_connection_type(ConnectionTypeName(conn_type))
+    if ct_info is not None and ct_info.bidirectional_sync:
         return _resolve_connection_by_parts(f"{tgt_id}---{src_id}@@{conn_type}", connections)
     return None
 

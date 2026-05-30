@@ -172,8 +172,11 @@ def _load_connection_types(data: dict[str, Any]) -> dict[ConnectionTypeName, Con
                 archimate_relationship_type=raw.get("archimate_relationship_type"),
                 symmetric=bool(raw.get("symmetric", False)),
                 puml_arrow=raw.get("puml_arrow", "-->"),
+                show_stereotype=bool(raw.get("show_stereotype", "puml_arrow" not in raw)),
                 classifications=tuple(raw.get("classifications", ())),
                 hierarchy_priority=int(hp_raw) if hp_raw is not None else None,
+                hierarchy_label=str(raw["hierarchy_label"]) if raw.get("hierarchy_label") else None,
+                bidirectional_sync=bool(raw.get("bidirectional_sync", False)),
             )
     return out
 
