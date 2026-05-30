@@ -1269,11 +1269,11 @@ domain is now in `DOMAIN_NAMES` (via `types.generated.ts`) but has no display en
 renders with a fallback grey and the raw string "sysml". Task 20 addresses this and establishes
 the convention that must be followed when future ontology modules introduce new domain names.
 
-- [ ] **20.** Add `sysml` domain display entry (colour + label) to
+- [x] **20.** Add `sysml` domain display entry (colour + label) to
   `tools/gui/src/ui/lib/domains.ts`; document the convention in `src/ontologies/README.md`:
   every ontology module that introduces a new `hierarchy[0]` domain **must** add a
   `DOMAIN_CONFIG` entry to `domains.ts` so the domain chip renders correctly. No other frontend
-  structural change is needed for the current multi-ontology state.
+  structural change is needed for the current multi-ontology state. — 2026-05-30, TBD, sysml #c0d4ee/'SysML v2'; README example fixed (domain→hierarchy, removed stale fields); domains.ts convention documented
 - [ ] **21.** *(after #17, #18, #19)* Final documentation and consistency pass:
   (a) update `src/ontologies/README.md` — multi-module conventions: element-class uniqueness
   (no cross-module redeclaration), per-module domain-naming convention, and the `domains.ts`

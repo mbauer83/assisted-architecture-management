@@ -11,6 +11,7 @@ const DOMAIN_CONFIG: Partial<Record<DomainName, DomainDisplayConfig>> = {
   application:    { color: '#b6d7e1', label: 'Application' },
   technology:     { color: '#c3e1b4', label: 'Technology' },
   implementation: { color: '#f4c896', label: 'Implementation' },
+  sysml:          { color: '#c0d4ee', label: 'SysML v2' },
 }
 
 export const DOMAIN_COLORS: Partial<Record<DomainName, string>> = Object.fromEntries(

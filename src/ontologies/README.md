@@ -32,24 +32,18 @@ src/ontologies/my_ontology/
 ```yaml
 # entities.yaml
 entity_types:
-  block:
-    prefix: BLK
-    domain: system
-    subdir: blocks
-    archimate_element_type: ~          # null if not an ArchiMate element
-    has_sprite: false
-    classes: [structure-element]
-    create_when: "Create blocks to model physical or logical components of a system."
-    never_create_when: "Don't use blocks for behavioural elements; use activities instead."
+  part-definition:
+    prefix: PDF
+    hierarchy: [my-domain]
+    classes: [definition, structure-element]
+    create_when: "Create a part-definition to model a structural type."
+    never_create_when: "Don't use for behavioural elements; use action-definition instead."
 
-  activity:
-    prefix: ACT
-    domain: system
-    subdir: activities
-    archimate_element_type: ~
-    has_sprite: false
-    classes: [behavior-element]
-    create_when: "Create activities to model what a block does."
+  action-definition:
+    prefix: ADF
+    hierarchy: [my-domain]
+    classes: [definition, behavior-element]
+    create_when: "Create an action-definition to model a behavioral type."
     never_create_when: ""
 ```
 
@@ -57,16 +51,21 @@ Required fields for each entity type:
 
 | Field | Type | Purpose |
 |---|---|---|
-| `prefix` | string | Short uppercase prefix used in generated artifact IDs (e.g. `BLK@...`) |
-| `domain` | string | Filesystem domain directory under `model/` |
-| `subdir` | string | Subdirectory within the domain |
-| `archimate_element_type` | string or `~` | CamelCase ArchiMate type name; `~` for non-ArchiMate ontologies |
-| `has_sprite` | bool | Whether a diagram sprite exists (only meaningful for ArchiMate rendering) |
-| `classes` | list of strings | Classification classes used by diagram type filters and connection rules |
+| `prefix` | string | Short uppercase prefix used in generated artifact IDs (e.g. `PDF@...`) |
+| `hierarchy` | list of strings | Domain path segments under `model/`; `hierarchy[0]` is the grouping domain used by the frontend and filters |
+| `classes` | list of strings | Element classes used by diagram type filters and connection rules |
 | `create_when` | string | Agent/user guidance — when to create this type |
 | `never_create_when` | string | Agent/user guidance — when not to create this type |
 
 The special `internal: true` flag marks an entity type as system-managed (e.g. `global-artifact-reference`). Internal types are excluded from all user-facing type catalogs and domain listings.
+
+**Frontend domain chip convention:** every new `hierarchy[0]` domain name introduced by an ontology module **must** have a display entry added to `tools/gui/src/ui/lib/domains.ts` under `DOMAIN_CONFIG`. Without it the domain chip renders with a fallback grey and the raw domain string. The entry format is:
+
+```typescript
+my_domain: { color: '#rrggbb', label: 'Human-Readable Name' },
+```
+
+The domain name in `DOMAIN_CONFIG` must exactly match the string used as `hierarchy[0]` in `entities.yaml` (and as emitted in `DOMAIN_NAMES` in `types.generated.ts`). Choose a colour that is visually distinct from the existing ArchiMate domain colours (motivation `#d8c1e4`, strategy `#efbd5d`, common `#e8e5d3`, business `#f4de7f`, application `#b6d7e1`, technology `#c3e1b4`, implementation `#f4c896`).
 
 ### Step 3 — Define connection types and rules in `connections.yaml` (optional)
 
