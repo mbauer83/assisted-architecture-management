@@ -62,7 +62,7 @@ grouping:
 
 layout:
   nesting_connection_classes: [nesting]
-  # Connection classes (from element_classes in entities.yaml) that produce visual nesting in the
+  # Connection classes (from `classes` in entities.yaml) that produce visual nesting in the
   # rendered diagram. Connections of these classes draw child entities inside parent frames.
 
   flow_connection_classes: [dynamic]
@@ -108,7 +108,7 @@ ui:
       plural: Swimlanes       # plural form (for UI lists)
 ```
 
-The `config.yaml` entry intentionally contains **only** `entity_type`, `label`, and `plural`. All other fields (`min`, `max`, `create_when`, `never_create_when`, `permitted_mappings`, `mapping_required`, `element_classes`, `properties`, `required_connections`) belong in `ontology.yaml` and are merged in at load time.
+The `config.yaml` entry intentionally contains **only** `entity_type`, `label`, and `plural`. All other fields (`min`, `max`, `create_when`, `never_create_when`, `permitted_mappings`, `mapping_required`, `classes`, `properties`, `required_connections`) belong in `ontology.yaml` and are merged in at load time.
 
 ## `ontology.yaml` schema
 
@@ -125,7 +125,7 @@ connection_types:
 
 entity_types:
   swimlane:
-    element_classes: [grouping]
+    classes: [grouping]
     min: 2                     # minimum cardinality (0 = optional)
     max: null                  # maximum cardinality (null = unlimited)
     create_when: >-
@@ -143,7 +143,7 @@ entity_types:
     properties: {}
 
   action:
-    element_classes: [control-flow, step]
+    classes: [control-flow, step]
     create_when: "Use for a single task performed by one actor in one lane."
     never_create_when: "Do not use for branching logic."
     required_connections:
@@ -154,7 +154,7 @@ entity_types:
       link: {type: string, required: false}
 
   note:
-    element_classes: [annotation]
+    classes: [annotation]
     required_connections:
       - connection_type: step-note-of
         target: "@step"       # @class-name or concrete entity type name
@@ -176,7 +176,7 @@ permitted_relationships:
 
 | Field | Purpose |
 |---|---|
-| `element_classes` | Classification tags; control which diagram type filters include this type |
+| `classes` | Classification tags; control which diagram type filters include this type |
 | `min` / `max` | Cardinality bounds across the whole diagram |
 | `create_when` / `never_create_when` | AI and human authoring guidance |
 | `permitted_mappings` | Which model entity types/classes this diagram entity may reference via `entity_id` |
@@ -232,7 +232,7 @@ The schema generator produces one `$defs/<entity_type>` entry per entity type, b
 
 ### Element class declarations
 
-Element classes must be declared in `config.yaml` under `element_classes:` before use in `ontology.yaml`. Unknown class references abort startup validation.
+Element classes must be declared in `config.yaml` under `element_classes:` before use in `ontology.yaml` (as `classes:`). Unknown class references abort startup validation.
 
 ## Element-class filter table
 
@@ -359,7 +359,7 @@ _MY_OWN_CONNECTION_TYPES: dict[ConnectionTypeName, ConnectionTypeInfo] = {
         conn_lang="c4",
         symmetric=False,
         puml_arrow="-->",
-        classifications=("containment",),
+        classes=("containment",),
         hierarchy_priority=0,
         hierarchy_label="contains",
     ),

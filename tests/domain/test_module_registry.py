@@ -20,17 +20,17 @@ def _entity_type(name: str, domain: str = "test", classes: tuple[str, ...] = ())
         artifact_type=name,
         prefix=name[:3].upper(),
         hierarchy=(domain, name),
-        element_classes=classes,
+        classes=classes,
         create_when="",
         never_create_when="",
     )
 
 
-def _conn_type(name: str, classifications: tuple[str, ...] = ()) -> ConnectionTypeInfo:
+def _conn_type(name: str, classes: tuple[str, ...] = ()) -> ConnectionTypeInfo:
     return ConnectionTypeInfo(
         artifact_type=name,
         conn_lang="test",
-        classifications=classifications,
+        classes=classes,
     )
 
 
@@ -61,10 +61,10 @@ class _StubOntology:
         return PermittedRelationshipSet.empty()
 
     def entity_types_with_class(self, cls: ElementClassName) -> frozenset[EntityTypeName]:
-        return frozenset(n for n, info in self._entity_types.items() if cls in info.element_classes)
+        return frozenset(n for n, info in self._entity_types.items() if cls in info.classes)
 
-    def connection_types_with_classification(self, classification: str) -> frozenset[ConnectionTypeName]:
-        return frozenset(n for n, info in self._connection_types.items() if classification in info.classifications)
+    def connection_types_with_class(self, cls: str) -> frozenset[ConnectionTypeName]:
+        return frozenset(n for n, info in self._connection_types.items() if cls in info.classes)
 
     def permits_connection(self, src: Any, tgt: Any, conn: Any) -> bool:
         return False
@@ -198,30 +198,30 @@ class TestQueries:
                 return {EntityTypeName("et-1"): et1, EntityTypeName("et-2"): et2}
 
             def entity_types_with_class(self, cls):
-                return frozenset(n for n, info in self.entity_types.items() if cls in info.element_classes)
+                return frozenset(n for n, info in self.entity_types.items() if cls in info.classes)
 
         reg.register_ontology(_O("o", [], []))
         result = reg.entity_types_with_class(ElementClassName("my-class"))
         assert result == frozenset({EntityTypeName("et-1")})
         assert EntityTypeName("et-2") not in result
 
-    def test_connection_types_with_classification(self) -> None:
+    def test_connection_types_with_class(self) -> None:
         reg = ModuleRegistry()
 
-        ct1 = ConnectionTypeInfo("ct-1", "test", classifications=("flow",))
-        ct2 = ConnectionTypeInfo("ct-2", "test", classifications=())
+        ct1 = ConnectionTypeInfo("ct-1", "test", classes=("flow",))
+        ct2 = ConnectionTypeInfo("ct-2", "test", classes=())
 
         class _O(_StubOntology):
             @property
             def connection_types(self):
                 return {ConnectionTypeName("ct-1"): ct1, ConnectionTypeName("ct-2"): ct2}
 
-            def connection_types_with_classification(self, clf):
-                return frozenset(n for n, info in self.connection_types.items() if clf in info.classifications)
+            def connection_types_with_class(self, clf):
+                return frozenset(n for n, info in self.connection_types.items() if clf in info.classes)
 
         reg.register_ontology(_O("o", [], []))
-        assert reg.connection_types_with_classification("flow") == frozenset({ConnectionTypeName("ct-1")})
-        assert reg.connection_types_with_classification("structural") == frozenset()
+        assert reg.connection_types_with_class("flow") == frozenset({ConnectionTypeName("ct-1")})
+        assert reg.connection_types_with_class("structural") == frozenset()
 
     def test_domain_order_excludes_internal(self) -> None:
         reg = ModuleRegistry()

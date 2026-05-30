@@ -32,7 +32,7 @@ connection_types:
 
 entity_types:
   swimlane:
-    element_classes: [grouping]
+    classes: [grouping]
     min: 2
     create_when: >-
       Represents one parallel track in the process. Each lane maps to one actor,
@@ -53,7 +53,7 @@ entity_types:
     properties: {}
 
   action:
-    element_classes: [control-flow, step]
+    classes: [control-flow, step]
     managed_fields:
       type: "required — auto-set to entity_type"
       label: "optional"
@@ -76,7 +76,7 @@ entity_types:
         description: URL attached to the action label as a hyperlink
 
   decision:
-    element_classes: [control-flow, step]
+    classes: [control-flow, step]
     managed_fields:
       type: "required — auto-set to entity_type"
       label: "optional"
@@ -104,7 +104,7 @@ entity_types:
       else_label:  {type: string, required: true,  description: Label on no/false branch arrow}
 
   fork:
-    element_classes: [control-flow, step]
+    classes: [control-flow, step]
     managed_fields:
       type: "required — auto-set to entity_type"
       label: "optional"
@@ -124,7 +124,7 @@ entity_types:
     properties: {}
 
   partition:
-    element_classes: [step]
+    classes: [step]
     managed_fields:
       type: "required — auto-set to entity_type"
       label: "optional"
@@ -145,7 +145,7 @@ entity_types:
         description: Display label for the partition block
 
   note:
-    element_classes: [annotation]
+    classes: [annotation]
     required_connections:
       - connection_type: step-note-of
         target: "@step"

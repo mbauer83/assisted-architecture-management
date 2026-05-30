@@ -48,7 +48,7 @@ class DiagramOwnEntityTypeUiConfig:
     max: int | None = None
     permitted_mappings: PermittedMappingSpec = field(default_factory=PermittedMappingSpec)
     mapping_required: bool = False
-    element_classes: tuple[str, ...] = ()
+    classes: tuple[str, ...] = ()
     create_when: str = ""
     never_create_when: str = ""
     properties: tuple[DiagramOwnEntityTypePropertySpec, ...] = ()
@@ -110,7 +110,7 @@ def _own_entity_ui_config_from_mapping(config: Mapping[str, Any]) -> DiagramOwnE
         max=None if max_val is None else int(max_val),
         permitted_mappings=mapping_spec,
         mapping_required=bool(config.get("mapping_required", False)),
-        element_classes=tuple(str(c) for c in config.get("element_classes", ())),
+        classes=tuple(str(c) for c in config.get("classes", ())),
         create_when=str(config.get("create_when") or ""),
         never_create_when=str(config.get("never_create_when") or ""),
         properties=props,
@@ -184,7 +184,7 @@ class OntologyModule(Protocol):
 
     def entity_types_with_class(self, cls: ElementClassName) -> frozenset[EntityTypeName]: ...
 
-    def connection_types_with_classification(self, classification: str) -> frozenset[ConnectionTypeName]: ...
+    def connection_types_with_class(self, cls: str) -> frozenset[ConnectionTypeName]: ...
 
     def permits_connection(
         self,

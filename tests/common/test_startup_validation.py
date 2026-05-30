@@ -23,14 +23,14 @@ def _entity_type(name: str) -> EntityTypeInfo:
         artifact_type=name,
         prefix=name[:3].upper(),
         hierarchy=("test", name),
-        element_classes=(),
+        classes=(),
         create_when="",
         never_create_when="",
     )
 
 
 def _conn_type(name: str) -> ConnectionTypeInfo:
-    return ConnectionTypeInfo(artifact_type=name, conn_lang="test", classifications=())
+    return ConnectionTypeInfo(artifact_type=name, conn_lang="test", classes=())
 
 
 class _StubOntology:
@@ -64,10 +64,10 @@ class _StubOntology:
         return {}
 
     def entity_types_with_class(self, cls: ElementClassName) -> frozenset[EntityTypeName]:
-        return frozenset(n for n, info in self._entity_types.items() if cls in info.element_classes)
+        return frozenset(n for n, info in self._entity_types.items() if cls in info.classes)
 
-    def connection_types_with_classification(self, c: str) -> frozenset[ConnectionTypeName]:
-        return frozenset(n for n, info in self._connection_types.items() if c in info.classifications)
+    def connection_types_with_class(self, c: str) -> frozenset[ConnectionTypeName]:
+        return frozenset(n for n, info in self._connection_types.items() if c in info.classes)
 
     def permits_connection(self, src: Any, tgt: Any, conn: Any) -> bool:
         return False

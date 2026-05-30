@@ -84,7 +84,7 @@ class EntityTypeInfo:
     artifact_type: str
     prefix: str
     hierarchy: tuple[str, ...]
-    element_classes: tuple[str, ...]
+    classes: tuple[str, ...]
     create_when: str
     never_create_when: str
     internal: bool = False
@@ -105,7 +105,7 @@ class ConnectionTypeInfo:
     symmetric: bool = False
     puml_arrow: str = "-->"
     show_stereotype: bool = True
-    classifications: tuple[str, ...] = ()
+    classes: tuple[str, ...] = ()
     hierarchy_priority: int | None = None
     hierarchy_label: str | None = None
     bidirectional_sync: bool = False

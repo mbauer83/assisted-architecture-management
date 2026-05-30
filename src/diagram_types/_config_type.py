@@ -26,7 +26,7 @@ _EMPTY_CONNECTION_TYPES: dict[ConnectionTypeName, ConnectionTypeInfo] = {}
 def _build_entity_filter(filter_cfg: dict[str, Any]):
     """Return a predicate that tests whether an EntityTypeInfo matches the filter config."""
     hierarchy_cfg = filter_cfg.get("hierarchy_level")
-    class_set = frozenset(str(c) for c in filter_cfg.get("element_classes", ()))
+    class_set = frozenset(str(c) for c in filter_cfg.get("classes", ()))
     type_set = frozenset(str(t) for t in filter_cfg.get("entity_types", ()))
 
     def _matches(info: EntityTypeInfo) -> bool:
@@ -35,7 +35,7 @@ def _build_entity_filter(filter_cfg: dict[str, Any]):
             values = frozenset(str(v) for v in hierarchy_cfg.get("values", ()))
             if idx >= len(info.hierarchy) or info.hierarchy[idx] not in values:
                 return False
-        if class_set and not class_set.intersection(info.element_classes):
+        if class_set and not class_set.intersection(info.classes):
             return False
         return not type_set or info.artifact_type in type_set
 

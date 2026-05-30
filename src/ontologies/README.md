@@ -38,7 +38,7 @@ entity_types:
     subdir: blocks
     archimate_element_type: ~          # null if not an ArchiMate element
     has_sprite: false
-    element_classes: [structure-element]
+    classes: [structure-element]
     create_when: "Create blocks to model physical or logical components of a system."
     never_create_when: "Don't use blocks for behavioural elements; use activities instead."
 
@@ -48,7 +48,7 @@ entity_types:
     subdir: activities
     archimate_element_type: ~
     has_sprite: false
-    element_classes: [behavior-element]
+    classes: [behavior-element]
     create_when: "Create activities to model what a block does."
     never_create_when: ""
 ```
@@ -62,7 +62,7 @@ Required fields for each entity type:
 | `subdir` | string | Subdirectory within the domain |
 | `archimate_element_type` | string or `~` | CamelCase ArchiMate type name; `~` for non-ArchiMate ontologies |
 | `has_sprite` | bool | Whether a diagram sprite exists (only meaningful for ArchiMate rendering) |
-| `element_classes` | list of strings | Classification classes used by diagram type filters and connection rules |
+| `classes` | list of strings | Classification classes used by diagram type filters and connection rules |
 | `create_when` | string | Agent/user guidance — when to create this type |
 | `never_create_when` | string | Agent/user guidance — when not to create this type |
 
@@ -78,7 +78,7 @@ connection_types:
     archimate_relationship_type: ~
     puml_arrow: "-->"
     symmetric: false
-    classifications: [flow]
+    classes: [flow]
 
 permitted_relationships:
   - [block, block, [my-connects]]
@@ -88,7 +88,7 @@ permitted_relationships:
 
 The source/target columns accept:
 - A literal entity type name: `block`
-- `@<class>` — all entity types with that `element_classes` entry
+- `@<class>` — all entity types with that `classes` entry
 - `@all` — every entity type in this ontology
 - A list: `[block, activity]` — union of the listed types/classes
 - `@same` — the same entity type as the source (for self-referential rules)
@@ -133,12 +133,12 @@ class _MyOntologyModule:
         return self._permitted
 
     def entity_types_with_class(self, cls: ElementClassName) -> frozenset[EntityTypeName]:
-        return frozenset(n for n, info in self._entity_types.items() if cls in info.element_classes)
+        return frozenset(n for n, info in self._entity_types.items() if cls in info.classes)
 
-    def connection_types_with_classification(self, classification: str) -> frozenset[ConnectionTypeName]:
+    def connection_types_with_class(self, cls: str) -> frozenset[ConnectionTypeName]:
         return frozenset(
             n for n, info in self._connection_types.items()
-            if classification in info.classifications
+            if cls in info.classes
         )
 
     def permits_connection(
@@ -224,7 +224,7 @@ At runtime, note→step relationships are stored as `ConnectionRecord` objects (
 
 ## Element class declarations
 
-Every element class referenced in `element_classes` of any entity type must be declared in the originating module. Model ontologies declare them in `entities.yaml` under a top-level `element_classes:` block:
+Every element class referenced in the `classes` field of any entity type must be declared in the originating module. Model ontologies declare them in `entities.yaml` under a top-level `element_classes:` block:
 
 ```yaml
 element_classes:
@@ -234,10 +234,10 @@ element_classes:
     description: Dynamic/behavioral element (ArchiMate)
 ```
 
-Diagram types declare their element classes in `config.yaml` under `element_classes:`. The `ModuleRegistry.all_element_classes()` method merges all declared classes; startup validation aborts if any entity type references an undeclared class.
+Diagram types declare their element classes in `config.yaml` under `element_classes:`. The `ModuleRegistry.all_element_classes()` method merges all declared classes; startup validation aborts if any entity type's `classes` field references an undeclared class.
 
 ## Startup validation
 
 At backend startup, `src/application/startup_validation.py` compares every entity type, connection type, and diagram type found in indexed repo content against the registered modules. Startup is aborted if any unsupported type is found, with a report listing each unknown type and an example artifact ID. This prevents silent data corruption when an ontology module is removed or renamed while repos still contain artifacts of that type.
 
-The validator also checks element class declarations: every `element_classes` value on every registered entity type and diagram-only entity type must be present in `registry.all_element_classes()`. Unknown class references are reported as errors.
+The validator also checks element class declarations: every `classes` value on every registered entity type and diagram-only entity type must be present in `registry.all_element_classes()`. Unknown class references are reported as errors.

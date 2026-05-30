@@ -512,12 +512,12 @@ class TestElementCategoryRemoved:
         info = all_entity_types()["requirement"]
         assert not hasattr(info, "element_category"), "element_category should have been removed from EntityTypeInfo"
 
-    def test_entity_type_info_still_has_element_classes(self) -> None:
+    def test_entity_type_info_still_has_classes(self) -> None:
         from src.domain.ontology_catalog import all_entity_types
 
         info = all_entity_types()["requirement"]
-        assert hasattr(info, "element_classes")
-        assert "motivation-element" in info.element_classes
+        assert hasattr(info, "classes")
+        assert "motivation-element" in info.classes
 
     def test_category_map_not_exported(self) -> None:
         import src.domain.ontology_catalog as ol
@@ -577,7 +577,7 @@ class TestGetTypeGuidance:
     def test_each_entry_has_required_fields(self) -> None:
         result = get_type_guidance(filter=["requirement"])
         entry = _guidance_entries(result)[0]
-        for field in ("name", "prefix", "element_classes", "create_when", "never_create_when", "permitted_connections"):
+        for field in ("name", "prefix", "classes", "create_when", "never_create_when", "permitted_connections"):
             assert field in entry, f"Missing field: {field}"
 
     def test_permitted_connections_structure(self) -> None:

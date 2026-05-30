@@ -70,7 +70,7 @@ def _parse_entity_types(raw: dict[str, Any]) -> dict[EntityTypeName, EntityTypeI
             artifact_type=str(name),
             prefix="",
             hierarchy=(),
-            element_classes=tuple(str(c) for c in cfg.get("element_classes", ())),
+            classes=tuple(str(c) for c in cfg.get("classes", ())),
             create_when=str(cfg.get("create_when") or ""),
             never_create_when=str(cfg.get("never_create_when") or ""),
             required_connections=req_conns,
@@ -116,7 +116,7 @@ def _parse_permitted_relationships(
 ) -> PermittedRelationshipSet:
     class_members: dict[str, list[str]] = {}
     for ename, info in entity_types.items():
-        for cls in info.element_classes:
+        for cls in info.classes:
             class_members.setdefault(cls, []).append(str(ename))
 
     expanded: list[list[Any]] = []

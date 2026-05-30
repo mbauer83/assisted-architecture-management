@@ -221,7 +221,7 @@ def diagram_kind_entity_type_items(diagram_type: str) -> list[dict[str, Any]]:
             "artifact_type": artifact_type,
             "prefix": info.prefix,
             "domain": info.hierarchy[0] if info.hierarchy else "",
-            "element_classes": list(info.element_classes),
+            "classes": list(info.classes),
         }
         for artifact_type, info in kind.effective_entity_types().items()
         if not info.internal
@@ -242,7 +242,7 @@ def diagram_kind_connection_type_items(diagram_type: str) -> list[dict[str, Any]
             "connection_type": connection_type,
             "conn_lang": info.conn_lang,
             "symmetric": info.symmetric,
-            "classifications": list(info.classifications),
+            "classes": list(info.classes),
         }
         for connection_type, info in kind.effective_connection_types().items()
     ]

@@ -74,7 +74,7 @@ def _entity_type_catalog() -> dict[str, dict[str, object]]:
         str(type_name): {
             "prefix": info.prefix,
             "hierarchy": list(info.hierarchy),
-            "element_classes": list(info.element_classes),
+            "classes": list(info.classes),
         }
         for type_name, info in _registry().all_entity_types().items()
     }

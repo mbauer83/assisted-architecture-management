@@ -281,7 +281,7 @@ class GenericPumlRenderer:
             return frozenset()
         result: set[str] = set()
         for value in values:
-            result.update(_registry().connection_types_with_classification(str(value)))
+            result.update(_registry().connection_types_with_class(str(value)))
         return frozenset(result)
 
     def _nesting_conn_types(self) -> frozenset[str]:

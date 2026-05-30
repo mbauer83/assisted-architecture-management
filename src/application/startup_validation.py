@@ -182,13 +182,13 @@ def _collect_errors(
 
     for om in registry.all_ontologies().values():
         for etype, einfo in om.entity_types.items():
-            for cls in einfo.element_classes:
+            for cls in einfo.classes:
                 if cls not in known_element_classes:
                     errors.append(f"Entity type {etype!r} references undeclared element class {cls!r}")
 
     for dk in registry.all_diagram_types().values():
         for oe in dk.ui_config.diagram_only_types:
-            for cls in oe.element_classes:
+            for cls in oe.classes:
                 if cls not in known_element_classes:
                     errors.append(
                         f"Diagram type {dk.name!r} entity type {oe.entity_type!r} "

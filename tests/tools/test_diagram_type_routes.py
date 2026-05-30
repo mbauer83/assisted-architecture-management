@@ -119,7 +119,7 @@ def test_diagram_kind_connection_types_endpoint_exposes_effective_vocabulary() -
     flow_item = next(item for item in items if item["connection_type"] == "archimate-flow")
 
     assert flow_item["conn_lang"] == "archimate"
-    assert "dynamic" in flow_item["classifications"]
+    assert "dynamic" in flow_item["classes"]
 
 
 def test_diagram_kind_ui_config_endpoint_shape() -> None:

@@ -123,13 +123,13 @@ class ModuleRegistry:
             result.update(om.entity_types_with_class(cls))
         return frozenset(result)
 
-    def connection_types_with_classification(self, classification: str) -> frozenset[ConnectionTypeName]:
+    def connection_types_with_class(self, cls: str) -> frozenset[ConnectionTypeName]:
         result: set[ConnectionTypeName] = set()
         for om in self._ontologies.values():
-            result.update(om.connection_types_with_classification(classification))
+            result.update(om.connection_types_with_class(cls))
         for dt in self._diagram_types.values():
             for ct_name, ct_info in dt.own_connection_types.items():
-                if classification in ct_info.classifications:
+                if cls in ct_info.classes:
                     result.add(ct_name)
         return frozenset(result)
 

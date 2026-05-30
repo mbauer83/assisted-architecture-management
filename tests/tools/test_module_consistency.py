@@ -18,11 +18,11 @@ from src.domain.permitted_relationships import PermittedRelationship, PermittedR
 
 
 def _entity_type(name: str) -> EntityTypeInfo:
-    return EntityTypeInfo(artifact_type=name, prefix=name[:3].upper(), hierarchy=(name,), element_classes=(), create_when="", never_create_when="")
+    return EntityTypeInfo(artifact_type=name, prefix=name[:3].upper(), hierarchy=(name,), classes=(), create_when="", never_create_when="")
 
 
 def _conn_type(name: str) -> ConnectionTypeInfo:
-    return ConnectionTypeInfo(artifact_type=name, conn_lang="test", classifications=())
+    return ConnectionTypeInfo(artifact_type=name, conn_lang="test", classes=())
 
 
 def _prs(*triples: tuple[str, str, str]) -> PermittedRelationshipSet:
@@ -68,7 +68,7 @@ class _StubOntology:
     def entity_types_with_class(self, cls: ElementClassName) -> frozenset[EntityTypeName]:
         return frozenset()
 
-    def connection_types_with_classification(self, classification: str) -> frozenset[ConnectionTypeName]:
+    def connection_types_with_class(self, cls: str) -> frozenset[ConnectionTypeName]:
         return frozenset()
 
 

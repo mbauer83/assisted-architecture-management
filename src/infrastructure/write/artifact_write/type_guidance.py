@@ -92,7 +92,7 @@ def _serialize_own_entity_type(oe) -> dict[str, object]:  # type: ignore[no-unty
         "label": oe.label,
         "min": oe.min,
         "max": oe.max,
-        "element_classes": list(oe.element_classes),
+        "classes": list(oe.classes),
         "create_when": oe.create_when,
         "never_create_when": oe.never_create_when,
     }
@@ -173,7 +173,7 @@ def _entity_type_guidance(
         }
         if include_domain:
             entry["domain"] = info.hierarchy[0] if info.hierarchy else ""
-        entry["element_classes"] = list(info.element_classes)
+        entry["classes"] = list(info.classes)
         entry["create_when"] = info.create_when
         entry["never_create_when"] = info.never_create_when
         entry["permitted_connections"] = connections

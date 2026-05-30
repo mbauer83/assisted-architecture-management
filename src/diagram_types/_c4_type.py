@@ -31,7 +31,7 @@ _C4_OWN_CONNECTION_TYPES: dict[ConnectionTypeName, ConnectionTypeInfo] = {
         conn_lang="c4",
         symmetric=False,
         puml_arrow="-->",
-        classifications=("containment",),
+        classes=("containment",),
         hierarchy_priority=0,
         hierarchy_label="contains",
     ),
@@ -40,7 +40,7 @@ _C4_OWN_CONNECTION_TYPES: dict[ConnectionTypeName, ConnectionTypeInfo] = {
         conn_lang="c4",
         symmetric=False,
         puml_arrow="-->",
-        classifications=(),
+        classes=(),
         hierarchy_priority=None,
         hierarchy_label="uses",
     ),
@@ -77,7 +77,7 @@ def _apply_ontology_fields(
     ont_et: EntityTypeInfo,
     ontology: DiagramOntology,
 ) -> None:
-    entry["element_classes"] = list(ont_et.element_classes)
+    entry["classes"] = list(ont_et.classes)
     entry["create_when"] = ont_et.create_when
     entry["never_create_when"] = ont_et.never_create_when
     entry["min"] = ont_et.min

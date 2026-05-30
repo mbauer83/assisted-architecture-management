@@ -41,7 +41,7 @@ def hierarchy_meta(entities: list[EntityRecord], repo) -> dict[str, dict[str, ob
         if conn.conn_type not in hp:
             continue
         ct_info = all_conn_types.get(ConnectionTypeName(conn.conn_type))
-        if ct_info is not None and "generalization" in ct_info.classifications:
+        if ct_info is not None and "generalization" in ct_info.classes:
             child_id = conn.source
             parent_id = conn.target
         else:

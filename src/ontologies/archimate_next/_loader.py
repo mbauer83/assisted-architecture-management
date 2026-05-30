@@ -54,14 +54,14 @@ class _ArchiMateNextModule:
         self._class_index: dict[ElementClassName, frozenset[EntityTypeName]] = {}
         _class_build: dict[ElementClassName, set[EntityTypeName]] = {}
         for ename, info in entity_types.items():
-            for cls in info.element_classes:
+            for cls in info.classes:
                 _class_build.setdefault(ElementClassName(cls), set()).add(ename)
         self._class_index = {k: frozenset(v) for k, v in _class_build.items()}
 
         self._classification_index: dict[str, frozenset[ConnectionTypeName]] = {}
         _clf_build: dict[str, set[ConnectionTypeName]] = {}
         for cname, info in connection_types.items():
-            for clf in info.classifications:
+            for clf in info.classes:
                 _clf_build.setdefault(clf, set()).add(cname)
         self._classification_index = {k: frozenset(v) for k, v in _clf_build.items()}
 
@@ -96,8 +96,8 @@ class _ArchiMateNextModule:
     def entity_types_with_class(self, cls: ElementClassName) -> frozenset[EntityTypeName]:
         return self._class_index.get(ElementClassName(cls), frozenset())
 
-    def connection_types_with_classification(self, classification: str) -> frozenset[ConnectionTypeName]:
-        return self._classification_index.get(classification, frozenset())
+    def connection_types_with_class(self, cls: str) -> frozenset[ConnectionTypeName]:
+        return self._classification_index.get(cls, frozenset())
 
     def permits_connection(
         self,
@@ -152,7 +152,7 @@ def _load_entity_types(data: dict[str, Any]) -> dict[EntityTypeName, EntityTypeI
             artifact_type=artifact_type,
             prefix=info["prefix"],
             hierarchy=hierarchy,
-            element_classes=tuple(info.get("element_classes", ())),
+            classes=tuple(info.get("classes", ())),
             create_when=info.get("create_when", ""),
             never_create_when=info.get("never_create_when", ""),
             internal=bool(info.get("internal", False)),
@@ -173,7 +173,7 @@ def _load_connection_types(data: dict[str, Any]) -> dict[ConnectionTypeName, Con
                 symmetric=bool(raw.get("symmetric", False)),
                 puml_arrow=raw.get("puml_arrow", "-->"),
                 show_stereotype=bool(raw.get("show_stereotype", "puml_arrow" not in raw)),
-                classifications=tuple(raw.get("classifications", ())),
+                classes=tuple(raw.get("classes", ())),
                 hierarchy_priority=int(hp_raw) if hp_raw is not None else None,
                 hierarchy_label=str(raw["hierarchy_label"]) if raw.get("hierarchy_label") else None,
                 bidirectional_sync=bool(raw.get("bidirectional_sync", False)),
@@ -206,7 +206,7 @@ def _build_permitted_relationships(
 
     class_members: dict[str, list[str]] = {}
     for ename, info in entity_types.items():
-        for cls in info.element_classes:
+        for cls in info.classes:
             class_members.setdefault(cls, []).append(str(ename))
 
     rules: set[PermittedRelationship] = set()

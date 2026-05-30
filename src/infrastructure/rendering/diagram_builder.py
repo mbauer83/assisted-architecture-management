@@ -46,12 +46,12 @@ def _junction_types() -> frozenset[str]:
 
 @lru_cache(maxsize=None)
 def _nesting_conn_types() -> frozenset[str]:
-    return frozenset(_registry().connection_types_with_classification("nesting"))
+    return frozenset(_registry().connection_types_with_class("nesting"))
 
 
 @lru_cache(maxsize=None)
 def _flow_conn_types() -> frozenset[str]:
-    return frozenset(_registry().connection_types_with_classification("dynamic"))
+    return frozenset(_registry().connection_types_with_class("dynamic"))
 
 
 def _load_sprite_map(repo_root: Path) -> dict[str, str]:

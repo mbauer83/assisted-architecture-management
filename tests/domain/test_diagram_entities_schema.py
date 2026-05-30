@@ -12,7 +12,7 @@ from src.domain.ontology_types import RequiredConnection
 
 def _oe(
     entity_type: str,
-    element_classes: tuple[str, ...] = (),
+    classes: tuple[str, ...] = (),
     properties: tuple[DiagramOwnEntityTypePropertySpec, ...] = (),
     min: int = 0,
 ) -> DiagramOwnEntityTypeUiConfig:
@@ -20,7 +20,7 @@ def _oe(
         entity_type=entity_type,
         label=entity_type.title(),
         plural=entity_type.title() + "s",
-        element_classes=element_classes,
+        classes=classes,
         min=min,
         properties=properties,
     )
@@ -106,7 +106,7 @@ class TestSchemaGeneratorDefs:
             entity_type="note",
             label="Note",
             plural="Notes",
-            element_classes=("annotation",),
+            classes=("annotation",),
             properties=(),
             required_connections=(
                 RequiredConnection(

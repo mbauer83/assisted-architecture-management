@@ -91,7 +91,7 @@ def _apply_ontology_fields(
     ontology: DiagramOntology,
 ) -> None:
     """Copy all ontological fields from EntityTypeInfo into a config entry dict."""
-    entry["element_classes"] = list(ont_et.element_classes)
+    entry["classes"] = list(ont_et.classes)
     entry["create_when"] = ont_et.create_when
     entry["never_create_when"] = ont_et.never_create_when
     entry["min"] = ont_et.min
