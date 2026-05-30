@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from src.diagram_types.activity import module as activity
+from src.diagram_types.sequence import module as sequence
 from src.diagram_types.archimate_application import module as archimate_application
 from src.diagram_types.archimate_business import module as archimate_business
 from src.diagram_types.archimate_implementation import module as archimate_implementation
@@ -19,6 +20,7 @@ from src.domain.ontology_protocol import DiagramTypeModule
 
 DEFAULT_DIAGRAM_KINDS: tuple[DiagramTypeModule, ...] = (
     activity,
+    sequence,
     archimate_motivation,
     archimate_strategy,
     archimate_business,

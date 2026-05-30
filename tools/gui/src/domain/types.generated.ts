@@ -106,6 +106,7 @@ export const DIAGRAM_TYPE_NAMES = [
   "c4-container",
   "c4-system-context",
   "matrix",
+  "sequence",
 ] as const
 export type DiagramTypeName = typeof DIAGRAM_TYPE_NAMES[number]
 
