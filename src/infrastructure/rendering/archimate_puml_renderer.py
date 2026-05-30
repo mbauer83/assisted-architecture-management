@@ -40,8 +40,9 @@ class ArchimatePumlRenderer(GenericPumlRenderer):
         *,
         diagram_entities: Mapping[str, object] | None = None,
         diagram_connections: list[dict[str, object]] | None = None,
+        bindings: list[dict[str, object]] | None = None,
     ) -> DiagramRendererReferences:
-        del diagram_type, repo_root, diagram_entities
+        del diagram_type, repo_root, diagram_entities, bindings
         connection_ids: list[str] = []
         for item in diagram_connections or []:
             if not isinstance(item, dict):

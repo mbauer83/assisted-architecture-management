@@ -96,20 +96,34 @@ def edit_diagram(
         eff_diagram_entities if isinstance(eff_diagram_entities, dict) else None
     )
 
-    # Determine PUML body; render with original eff_diagram_entities (renderer reads entity_id)
+    norm_bindings_raw = bindings_to_raw(norm_bindings)
+
+    # Determine PUML body; inject _scope_entity_id from scoped-by binding so the
+    # C4 renderer uses model-backed mode for diagrams that previously used _scope_entity_id.
     if eff_diagram_entities is not None and isinstance(eff_diagram_entities, dict) and puml is None:
+        scope_eid = next(
+            (b.target.entity_id for b in norm_bindings
+             if b.correspondence_kind == "scoped-by" and b.subject.kind == "diagram"
+             and b.target.entity_id),
+            None,
+        )
+        render_entities: dict[str, object] = dict(eff_diagram_entities)
+        if scope_eid and "_scope_entity_id" not in render_entities:
+            render_entities["_scope_entity_id"] = scope_eid
+        eff_diagram_conns = eff_diagram_connections if isinstance(eff_diagram_connections, list) else None
         puml_body = _render_diagram_entities_puml(
             diagram_type,
             eff_name,
-            eff_diagram_entities,
-            eff_diagram_connections if isinstance(eff_diagram_connections, list) else None,
+            render_entities,
+            eff_diagram_conns,
             repo_root,
         )
         collected_entity_ids, collected_connection_ids = _collect_diagram_renderer_references(
             diagram_type,
             repo_root,
-            eff_diagram_entities,
-            eff_diagram_connections if isinstance(eff_diagram_connections, list) else None,
+            render_entities,
+            eff_diagram_conns,
+            bindings=norm_bindings_raw,
         )
         eff_entity_ids_used = _merge_reference_ids(eff_entity_ids_used, collected_entity_ids)
         eff_connection_ids_used = _merge_reference_ids(eff_connection_ids_used, collected_connection_ids)

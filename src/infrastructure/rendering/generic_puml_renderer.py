@@ -248,8 +248,9 @@ class GenericPumlRenderer:
         *,
         diagram_entities: Mapping[str, object] | None = None,
         diagram_connections: list[dict[str, object]] | None = None,
+        bindings: list[dict[str, object]] | None = None,
     ) -> DiagramRendererReferences:
-        del diagram_type, repo_root, diagram_entities, diagram_connections
+        del diagram_type, repo_root, diagram_entities, diagram_connections, bindings
         return DiagramRendererReferences()
 
     def visible_connection_label(

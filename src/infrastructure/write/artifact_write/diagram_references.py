@@ -15,6 +15,7 @@ def _collect_diagram_renderer_references(
     repo_root: Path,
     diagram_entities: dict[str, object],
     diagram_connections: list[dict[str, object]] | None,
+    bindings: list[dict[str, object]] | None = None,
 ) -> tuple[list[str] | None, list[str] | None]:
     from src.infrastructure.diagram_types import get_diagram_type  # noqa: PLC0415
 
@@ -24,6 +25,7 @@ def _collect_diagram_renderer_references(
         repo_root,
         diagram_entities=diagram_entities,
         diagram_connections=diagram_connections,
+        bindings=bindings,
     )
     entity_ids = list(refs.entity_ids) if getattr(refs, "entity_ids", None) else None
     connection_ids = list(refs.connection_ids) if getattr(refs, "connection_ids", None) else None

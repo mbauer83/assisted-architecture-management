@@ -111,9 +111,24 @@ class ActivityPumlRenderer:
         *,
         diagram_entities: Mapping[str, object] | None = None,
         diagram_connections: list[dict[str, object]] | None = None,
+        bindings: list[dict[str, object]] | None = None,
     ) -> DiagramRendererReferences:
         del diagram_type, repo_root, diagram_entities, diagram_connections
-        return DiagramRendererReferences()
+        entity_ids: list[str] = []
+        conn_ids: list[str] = []
+        for b in (bindings or []):
+            if not isinstance(b, dict):
+                continue
+            target = b.get("target")
+            if not isinstance(target, dict):
+                continue
+            eid = target.get("entity_id")
+            cid = target.get("connection_id")
+            if eid and str(eid) not in entity_ids:
+                entity_ids.append(str(eid))
+            if cid and str(cid) not in conn_ids:
+                conn_ids.append(str(cid))
+        return DiagramRendererReferences(entity_ids=tuple(entity_ids), connection_ids=tuple(conn_ids))
 
 
 # ── Context type alias ────────────────────────────────────────────────────────

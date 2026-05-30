@@ -134,15 +134,38 @@ class C4PumlRenderer:
         *,
         diagram_entities: Mapping[str, object] | None = None,
         diagram_connections: list[dict[str, object]] | None = None,
+        bindings: list[dict[str, object]] | None = None,
     ) -> DiagramRendererReferences:
+        # Model-backed diagrams (scope entity present) still query the model graph.
         state = resolve_c4_state(
             self._config, diagram_type, repo_root,
             diagram_entities or {}, diagram_connections or [],
             self._person_archimate_types,
         )
+        entity_ids: list[str] = list(state.entity_ids)
+        conn_ids: list[str] = list(state.connection_artifact_ids)
+        # Supplement with model targets from all bindings (represents, abstracts, etc.)
+        # so every referenced entity/connection appears in entity-ids-used / connection-ids-used.
+        for b in (bindings or []):
+            if not isinstance(b, dict):
+                continue
+            target = b.get("target")
+            if not isinstance(target, dict):
+                continue
+            eid = target.get("entity_id")
+            cid = target.get("connection_id")
+            cids = target.get("connection_ids")
+            if eid and str(eid) not in entity_ids:
+                entity_ids.append(str(eid))
+            if cid and str(cid) not in conn_ids:
+                conn_ids.append(str(cid))
+            if isinstance(cids, list):
+                for c in cids:
+                    if str(c) not in conn_ids:
+                        conn_ids.append(str(c))
         return DiagramRendererReferences(
-            entity_ids=state.entity_ids,
-            connection_ids=state.connection_artifact_ids,
+            entity_ids=tuple(entity_ids),
+            connection_ids=tuple(conn_ids),
         )
 
     def _render_item(self, item: _ResolvedItem) -> str:

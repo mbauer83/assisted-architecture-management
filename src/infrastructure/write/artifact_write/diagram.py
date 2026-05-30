@@ -71,18 +71,29 @@ def create_diagram(
 
     norm_bindings = normalize_bindings(diagram_entities, bindings)
     clean_entities = strip_diagram_shorthand(diagram_entities)
+    norm_bindings_raw = bindings_to_raw(norm_bindings)
 
     if diagram_entities is not None:
-        # Diagram-owned diagram: render with original entities (renderer reads entity_id);
-        # persist with clean_entities (shorthand stripped) + top-level bindings.
-        puml_body = _render_diagram_entities_puml(diagram_type, name, diagram_entities, diagram_connections, repo_root)
+        # Inject _scope_entity_id from scoped-by binding so the C4 renderer can
+        # switch to model-backed mode for diagrams that previously used _scope_entity_id.
+        scope_eid = next(
+            (b.target.entity_id for b in norm_bindings
+             if b.correspondence_kind == "scoped-by" and b.subject.kind == "diagram"
+             and b.target.entity_id),
+            None,
+        )
+        render_entities: dict[str, object] = dict(diagram_entities)
+        if scope_eid and "_scope_entity_id" not in render_entities:
+            render_entities["_scope_entity_id"] = scope_eid
+        puml_body = _render_diagram_entities_puml(diagram_type, name, render_entities, diagram_connections, repo_root)
         if effective_id is None:
             effective_id = generate_diagram_id(diagram_type, name)
         collected_entity_ids, collected_connection_ids = _collect_diagram_renderer_references(
             diagram_type,
             repo_root,
-            diagram_entities,
+            render_entities,
             diagram_connections,
+            bindings=norm_bindings_raw,
         )
         entity_ids_used = _merge_reference_ids(entity_ids_used, collected_entity_ids)
         connection_ids_used = _merge_reference_ids(connection_ids_used, collected_connection_ids)

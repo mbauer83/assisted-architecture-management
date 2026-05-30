@@ -223,6 +223,7 @@ class DiagramRenderer(Protocol):
         *,
         diagram_entities: Mapping[str, object] | None = None,
         diagram_connections: list[dict[str, object]] | None = None,
+        bindings: list[dict[str, object]] | None = None,
     ) -> DiagramRendererReferences: ...
 
 
