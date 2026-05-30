@@ -15,6 +15,7 @@ from src.domain.module_types import (
     _FreeOntologyType,
 )
 from src.domain.allowed_bindings import AllowedBindingsSpec
+from src.domain.bridges import BridgeDeclaration
 from src.domain.ontology_types import (
     ConnectionTypeInfo,
     ElementClassInfo,
@@ -262,6 +263,9 @@ class DiagramTypeModule(Protocol):
     def effective_permitted_relationships(self) -> PermittedRelationshipSet: ...
 
     @property
+    def bridges(self) -> tuple[BridgeDeclaration, ...]: ...
+
+    @property
     def renderer(self) -> DiagramRenderer: ...
 
     def write_guidance(self) -> DiagramTypeWriteGuidance: ...
@@ -283,6 +287,10 @@ class DiagramTypeBase:
     accepts_connection_type, own_entity_types, own_connection_types,
     own_permitted_relationships, and _config.
     """
+
+    @property
+    def bridges(self) -> tuple[BridgeDeclaration, ...]:
+        return ()
 
     @property
     def element_classes(self) -> Mapping[str, ElementClassInfo]:

@@ -10,6 +10,7 @@ from typing import Any
 import yaml  # type: ignore[import-untyped]
 
 from src.domain.allowed_bindings import AllowedBindingsSpec, allowed_bindings_from_config
+from src.domain.bridges import BridgeDeclaration, bridges_from_config
 from src.domain.module_types import ConnectionTypeName, EntityTypeName
 from src.domain.ontology_types import (
     ConnectionTypeInfo,
@@ -30,6 +31,7 @@ class DiagramOntology:
     connection_types: dict[ConnectionTypeName, ConnectionTypeInfo]
     permitted_relationships: PermittedRelationshipSet
     allowed_bindings: AllowedBindingsSpec = dataclasses.field(default_factory=AllowedBindingsSpec.empty)
+    bridges: tuple[BridgeDeclaration, ...] = dataclasses.field(default_factory=tuple)
 
 
 def load_diagram_ontology(path: Path) -> DiagramOntology:
@@ -53,6 +55,7 @@ def load_diagram_ontology(path: Path) -> DiagramOntology:
         connection_types,
     )
     allowed_bindings = allowed_bindings_from_config(raw.get("allowed_bindings"))
+    bridges = bridges_from_config(raw.get("bridges"))
     return DiagramOntology(
         entity_types=entity_types,
         entity_type_properties=entity_type_properties,
@@ -60,6 +63,7 @@ def load_diagram_ontology(path: Path) -> DiagramOntology:
         connection_types=connection_types,
         permitted_relationships=permitted,
         allowed_bindings=allowed_bindings,
+        bridges=bridges,
     )
 
 

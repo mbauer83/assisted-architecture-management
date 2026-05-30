@@ -94,6 +94,32 @@ permitted_relationships:
   - [container, container, [c4-uses]]
   - [container, person, [c4-uses]]
 
+bridges:
+  - name: c4-container-to-archimate-active
+    version: 1
+    from: {module: c4-container, type: container}
+    to:
+      module: archimate-next-snapshot1
+      types: [application-component]
+    preserves_classes: [active-structure-element]
+    correspondence_kind: represents
+  - name: c4-container-to-archimate-service
+    version: 1
+    from: {module: c4-container, type: container}
+    to:
+      module: archimate-next-snapshot1
+      types: [service]
+    preserves_classes: [behavior-element]
+    correspondence_kind: represents
+  - name: c4-container-to-archimate-data
+    version: 1
+    from: {module: c4-container, type: container}
+    to:
+      module: archimate-next-snapshot1
+      types: [data-object]
+    preserves_classes: [passive-structure-element]
+    correspondence_kind: represents
+
 allowed_bindings:
   entity:
     person:

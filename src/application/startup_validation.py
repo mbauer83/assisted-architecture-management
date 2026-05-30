@@ -15,8 +15,11 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+from src.domain.bindings import CORE_CORRESPONDENCE_KINDS
+
 if TYPE_CHECKING:
     from src.application.artifact_repository import ArtifactRepository
+    from src.domain.bridges import BridgeDeclaration
     from src.domain.module_registry import ModuleRegistry
 
 
@@ -91,7 +94,95 @@ def _collect_consistency_errors(registry: "ModuleRegistry") -> list[str]:
                     _add(f"Diagram type {dt_name!r}: permitted_relationships target {str(tgt)!r}"
                          " is not a known entity type")
 
+    errors.extend(_collect_bridge_errors(registry))
     return errors
+
+
+def _collect_bridge_errors(registry: "ModuleRegistry") -> list[str]:
+    """Validate bridge declarations from all registered diagram type modules.
+
+    Five checks per bridge (see SPEC-phase-4 §3.2):
+    1. from.type is a declared diagram-owned entity type in from.module.
+    2. to.module is a registered ontology.
+    3. every to.type exists in to.module.
+    4. correspondence_kind is a core or module-declared kind.
+    5. bridge to.types agree with the diagram type's permitted_mappings for from.type.
+    """
+    errors: list[str] = []
+    all_ontologies = dict(registry.all_ontologies())
+
+    for dt_name, dt in registry.all_diagram_types().items():
+        bridges = getattr(dt, "bridges", ())
+        if not bridges:
+            continue
+        diagram_entity_names = frozenset(oe.entity_type for oe in dt.ui_config.diagram_only_types)
+        permitted_mappings: dict[str, frozenset[str]] = {
+            oe.entity_type: frozenset(oe.permitted_mappings.entity_types)
+            for oe in dt.ui_config.diagram_only_types
+        }
+        for bridge in bridges:
+            _check_bridge(bridge, dt_name, diagram_entity_names, permitted_mappings, all_ontologies, errors)
+
+    return errors
+
+
+def _check_bridge(
+    bridge: "BridgeDeclaration",
+    dt_name: str,
+    diagram_entity_names: frozenset[str],
+    permitted_mappings: dict[str, frozenset[str]],
+    all_ontologies: dict,
+    errors: list[str],
+) -> None:
+    prefix = f"Bridge {bridge.name!r} in diagram type {dt_name!r}"
+
+    # 1. from.type must be a declared diagram-owned entity type
+    if bridge.from_type not in diagram_entity_names:
+        errors.append(f"{prefix}: from.type {bridge.from_type!r} is not a diagram-owned entity type")
+        return
+
+    # 2. to.module must be a registered ontology
+    ontology = all_ontologies.get(bridge.to_module)
+    if ontology is None:
+        errors.append(f"{prefix}: to.module {bridge.to_module!r} is not a registered ontology")
+        return
+
+    # 3. every to.type must exist in to.module
+    known_to_types = set(ontology.entity_types.keys())
+    missing_types = [t for t in bridge.to_types if t not in known_to_types]
+    if missing_types:
+        errors.append(
+            f"{prefix}: to.types {missing_types} not found in ontology {bridge.to_module!r}"
+        )
+
+    # 4. correspondence_kind must be a core kind
+    if bridge.correspondence_kind not in CORE_CORRESPONDENCE_KINDS:
+        errors.append(
+            f"{prefix}: correspondence_kind {bridge.correspondence_kind!r} is not a core kind; "
+            f"module-declared kinds are not yet supported"
+        )
+
+    # 5. class preservation: each preserves_class must be present on every to.type
+    for cls in bridge.preserves_classes:
+        lacking = [
+            t for t in bridge.to_types
+            if t in known_to_types and cls not in ontology.entity_types[t].classes
+        ]
+        if lacking:
+            errors.append(
+                f"{prefix}: preserves_classes claims {cls!r} but "
+                f"to.types {lacking} in {bridge.to_module!r} lack that class"
+            )
+
+    # 5b. descent-style overlap: bridge to.types must be a subset of permitted_mappings
+    allowed_targets = permitted_mappings.get(bridge.from_type, frozenset())
+    if allowed_targets:
+        extra = [t for t in bridge.to_types if t not in allowed_targets]
+        if extra:
+            errors.append(
+                f"{prefix}: to.types {extra} not in permitted_mappings for "
+                f"{bridge.from_type!r} — bridge contradicts allowed_bindings"
+            )
 
 
 # ── Repo compatibility ────────────────────────────────────────────────────────
