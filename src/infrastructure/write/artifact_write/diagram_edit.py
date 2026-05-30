@@ -48,6 +48,7 @@ def edit_diagram(
     connection_ids_used: list[str] | None = None,
     view_derivations: list[dict[str, object]] | None = None,
     bindings: list[dict[str, object]] | None = None,
+    replace_bindings: bool = False,
     version: str | None = None,
     status: str | None = None,
     dry_run: bool,
@@ -93,7 +94,7 @@ def edit_diagram(
     # Bindings: existing from file + new from caller, then normalize shorthand from entities
     _raw_b = fm.get("bindings")
     existing_raw_bindings = [b for b in _raw_b if isinstance(b, dict)] if isinstance(_raw_b, list) else []
-    merged_raw_bindings = existing_raw_bindings + list(bindings or [])
+    merged_raw_bindings = list(bindings or []) if replace_bindings else existing_raw_bindings + list(bindings or [])
     norm_bindings = normalize_bindings(
         eff_diagram_entities if isinstance(eff_diagram_entities, dict) else None,
         merged_raw_bindings,

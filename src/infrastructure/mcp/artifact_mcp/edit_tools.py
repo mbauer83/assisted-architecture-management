@@ -157,6 +157,7 @@ def artifact_edit_connection(
 def artifact_edit_diagram(
     *,
     artifact_id: str,
+    mode: str | None = None,
     puml: str | Literal["auto-sync"] | None = None,
     name: str | None = None,
     keywords: list[str] | None = None,
@@ -166,12 +167,28 @@ def artifact_edit_diagram(
     bindings: list[dict[str, object]] | None = None,
     version: str | None = None,
     status: str | None = None,
+    derivation_id: str | None = None,
+    diff: dict[str, object] | None = None,
+    base_revision: str | None = None,
+    entity_ids: list[str] | None = None,
+    connection_ids: list[str] | None = None,
+    binding_id: str | None = None,
     dry_run: bool = True,
     repo_root: str | None = None,
 ) -> dict[str, object]:
     roots = resolve_repo_roots(repo_scope="engagement", repo_root=repo_root, repo_preset=None, enterprise_root=None)
     key = roots_key(roots)
     root = roots[0]
+
+    if mode is not None:
+        from src.infrastructure.mcp.artifact_mcp._diagram_binding_modes import dispatch_binding_mode  # noqa: PLC0415
+        return dispatch_binding_mode(
+            mode=mode, artifact_id=artifact_id, root=root, key=key,
+            derivation_id=derivation_id, diff=diff, base_revision=base_revision,
+            entity_ids=entity_ids, connection_ids_param=connection_ids,
+            binding_id=binding_id, dry_run=dry_run,
+        )
+
     verifier = verifier_for(key, include_registry=True)
     mutation_context, clear_repo_caches = authoritative_callbacks_for(roots)
 
@@ -191,25 +208,14 @@ def artifact_edit_diagram(
         out["deleted_diagram"] = result.deleted_diagram
         return out
 
-    kwargs: dict[str, Any] = {}
-    if puml is not None:
-        kwargs["puml"] = puml
-    if name is not None:
-        kwargs["name"] = name
-    if keywords is not None:
-        kwargs["keywords"] = keywords
-    if diagram_entities is not None:
-        kwargs["diagram_entities"] = diagram_entities
-    if diagram_connections is not None:
-        kwargs["diagram_connections"] = diagram_connections
-    if view_derivations is not None:
-        kwargs["view_derivations"] = view_derivations
-    if bindings is not None:
-        kwargs["bindings"] = bindings
-    if version is not None:
-        kwargs["version"] = version
-    if status is not None:
-        kwargs["status"] = status
+    kwargs: dict[str, Any] = {
+        k: v for k, v in (
+            ("puml", puml), ("name", name), ("keywords", keywords),
+            ("diagram_entities", diagram_entities), ("diagram_connections", diagram_connections),
+            ("view_derivations", view_derivations), ("bindings", bindings),
+            ("version", version), ("status", status),
+        ) if v is not None
+    }
 
     result = artifact_write_ops.edit_diagram(
         repo_root=root,
@@ -323,18 +329,12 @@ def register_edit_tools(mcp: FastMCP) -> None:
         title="Artifact Write: Edit Diagram",
         description=(
             "Edit an existing diagram. "
-            "Pass puml='auto-sync' to reconcile the diagram against the current model: "
-            "entities and connections no longer present in the repository are removed, "
-            "names are refreshed, and PUML is regenerated. The response then includes "
-            "removed_entity_ids and removed_connection_ids. "
-            "Pass an explicit PUML string to replace the body with auto-layout re-applied. "
-            "Frontmatter fields (name, keywords, diagram_entities, diagram_connections, bindings, "
-            "version, status) updated if provided. bindings merges with existing bindings from the file; "
-            "shorthand (binding: on items, entity_id on items, _scope_entity_id) is normalized on write. "
-            "For ArchiMate diagrams, diagram_connections may hold "
-            "per-diagram connection annotation metadata keyed by model connection artifact_id; it does not "
-            "create diagram-owned connections. Supported opt-in keys are artifact_id (or connection_id), "
-            "include_description, include_cardinality, and label. "
+            "Binding modes (pass mode=): 'refresh-derivation' (requires derivation_id — runs strategy, returns diff + base_revision, no write); "
+            "'apply-diff' (requires diff + base_revision — applies diff with stale-write check); "
+            "'propose-bindings' (requires entity_ids/connection_ids — returns proposals, no write); "
+            "'detach-binding' (requires binding_id — removes binding). "
+            "Default (no mode): puml='auto-sync' reconciles; explicit puml replaces body; "
+            "frontmatter fields updated if provided; bindings merges + normalizes shorthand. "
             "Re-verifies and re-renders PNG on every write."
         ),
         annotations=LOCAL_WRITE,
