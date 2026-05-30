@@ -1235,7 +1235,7 @@ Phase 3 → `SPEC-phase-3-...`; Phase 4 → `SPEC-phase-4-...`; property tests �
 - [x] **9.** `view_derivations` frontmatter + validation. IMPL §2.2. — 2026-05-30, 71cf06e, ViewDerivation model + StrategyRegistry stub + E409–E413 verifier rules; full write/parse/MCP path; 799 tests green, zuban clean
 - [x] **10.** Strategy registry + `explicit-selection`/`local-neighborhood`/
   `incident-connections`; `abstracts` targets connection sets. IMPL §2.3. — 2026-05-30, b5c6165, CandidateSet + ModelQuery protocol; 3 strategies self-register; 44 tests; 843 total green, zuban clean
-- [ ] **11.** Refresh/diff with `base_revision` stale-write rule + `propose-bindings`. IMPL §2.4.
+- [x] **11.** Refresh/diff with `base_revision` stale-write rule + `propose-bindings`. IMPL §2.4. — 2026-05-30, 1b8fa70, compute_revision+DerivationDiff+SelectionDelta+4 modes on artifact_edit_diagram; replace_bindings param; 17 tests; 860 green, zuban clean
 - [ ] **12.** Enrich guidance/search/traversal to return binding proposals without
   persisting. IMPL §2.4.
 
