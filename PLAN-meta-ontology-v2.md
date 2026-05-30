@@ -1251,6 +1251,39 @@ Phase 3 → `SPEC-phase-3-...`; Phase 4 → `SPEC-phase-4-...`; property tests �
 - [ ] **18.** *(after #8, #17)* Bridge declaration + minimum bridge check. SPEC-phase-4 §3.
 - [ ] **19.** Cross-phase property/validation tests (F1–F4). FORMALIZATION.md.
 
+### Phase 5 — Frontend navigation and final consistency
+
+**Evaluation note — per-ontology entity-type grouping:**
+The `<optgroup>` mechanism in the entity-create dropdown and the domain filter chips in
+`ArtifactReferenceInput` already group entity types by `hierarchy[0]` (the domain). Because
+all 10 SysML v2 min types use `hierarchy: [sysml]`, they land in their own natural group with
+no ArchiMate collision — so **domain-level grouping is sufficient for the current SysML slice
+and no structural frontend redesign is needed now**. A two-level hierarchy (ontology → domain →
+types) is only warranted when a future ontology contributes types into an *existing* ArchiMate
+domain (e.g. `application`), which is not the case today. Defer explicit per-ontology grouping
+until that condition arises; add it as a frontend-only task at that time.
+
+The one concrete gap is cosmetic but affects usability: `tools/gui/src/ui/lib/domains.ts`
+hardcodes display configs (colour + label) for the 7 ArchiMate domains only. The `sysml`
+domain is now in `DOMAIN_NAMES` (via `types.generated.ts`) but has no display entry, so it
+renders with a fallback grey and the raw string "sysml". Task 20 addresses this and establishes
+the convention that must be followed when future ontology modules introduce new domain names.
+
+- [ ] **20.** Add `sysml` domain display entry (colour + label) to
+  `tools/gui/src/ui/lib/domains.ts`; document the convention in `src/ontologies/README.md`:
+  every ontology module that introduces a new `hierarchy[0]` domain **must** add a
+  `DOMAIN_CONFIG` entry to `domains.ts` so the domain chip renders correctly. No other frontend
+  structural change is needed for the current multi-ontology state.
+- [ ] **21.** *(after #17, #18, #19)* Final documentation and consistency pass:
+  (a) update `src/ontologies/README.md` — multi-module conventions: element-class uniqueness
+  (no cross-module redeclaration), per-module domain-naming convention, and the `domains.ts`
+  display-config requirement established in #20;
+  (b) verify `artifact_authoring_guidance` returns correct `allowed_bindings` for SysML entity
+  and connection types and for the sequence diagram module;
+  (c) run the verifier over the `ENG-ARCH-REPO` self-model to confirm no type drift after all
+  Phase 0–4 changes;
+  (d) confirm `zuban check` and the full test suite are green with all phases merged.
+
 ## References
 
 - ISO/IEC/IEEE 42010 architecture description correspondences and correspondence
