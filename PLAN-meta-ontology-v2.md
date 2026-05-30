@@ -1247,7 +1247,7 @@ Phase 3 → `SPEC-phase-3-...`; Phase 4 → `SPEC-phase-4-...`; property tests �
 
 ### Phase 4 — New ontologies and coherence (specs complete)
 - [x] **16.** Activity clarification + sequence diagram module. SPEC-phase-4 §1. — 2026-05-30, d73c6c7, activity managed_fields cleaned up; sequence module with 5 entity types, 4 conn types, PUML renderer, 13 tests; grouping/annotation reused from activity (no redeclaration); 946 total green, zuban clean
-- [ ] **17.** `sysml_v2_min` ontology module. SPEC-phase-4 §2.
+- [x] **17.** `sysml_v2_min` ontology module. SPEC-phase-4 §2. — 2026-05-30, 74f9431, 10 entity types, 6 conn types, 4 new element classes; 58 tests; 1004 total green, zuban clean; types.generated.ts updated
 - [ ] **18.** *(after #8, #17)* Bridge declaration + minimum bridge check. SPEC-phase-4 §3.
 - [ ] **19.** Cross-phase property/validation tests (F1–F4). FORMALIZATION.md.
 
