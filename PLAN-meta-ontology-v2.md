@@ -1230,8 +1230,8 @@ Phase 3 → `SPEC-phase-3-...`; Phase 4 → `SPEC-phase-4-...`; property tests �
   `types.generated.ts`; update GUI editors. IMPL §1.5. — 2026-05-30, 9bcec71, bindings param added to collect_references Protocol + all renderers; scope injection in diagram.py/edit.py; 14 tests; types.generated.ts unchanged
 
 ### Phase 2 — Module-declared bindings and id-only derivations
-- [ ] **8.** `allowed_bindings` (target types/classes, correspondence kinds, target forms,
-  required `default_correspondence_kind`) + `visual_roles`. IMPL §2.1.
+- [x] **8.** `allowed_bindings` (target types/classes, correspondence kinds, target forms,
+  required `default_correspondence_kind`) + `visual_roles`. IMPL §2.1. — 2026-05-30, d7ce3e9, AllowedBindingsSpec + parser + C4/activity YAML declarations; E406 uses module kinds per entity type; E408 respects visual_roles; 761 tests green, zuban clean
 - [ ] **9.** `view_derivations` frontmatter + validation. IMPL §2.2.
 - [ ] **10.** Strategy registry + `explicit-selection`/`local-neighborhood`/
   `incident-connections`; `abstracts` targets connection sets. IMPL §2.3.
