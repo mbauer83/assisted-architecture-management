@@ -354,14 +354,14 @@ Declare them by overriding `own_connection_types` in the diagram type class:
 
 ```python
 _MY_OWN_CONNECTION_TYPES: dict[ConnectionTypeName, ConnectionTypeInfo] = {
-    ConnectionTypeName("c4-contains"): ConnectionTypeInfo(
-        artifact_type="c4-contains",
+    ConnectionTypeName("c4-uses"): ConnectionTypeInfo(
+        artifact_type="c4-uses",
         conn_lang="c4",
         symmetric=False,
         puml_arrow="-->",
-        classes=("containment",),
-        hierarchy_priority=0,
-        hierarchy_label="contains",
+        classes=(),
+        hierarchy_priority=None,
+        hierarchy_label="uses",
     ),
 }
 
@@ -378,39 +378,19 @@ def own_connection_types(self) -> dict[ConnectionTypeName, ConnectionTypeInfo]:
 
 This ensures the write pipeline can validate and create connections of any diagram-type-owned type without the generic registry needing to know about diagram-specific concepts.
 
-The `c4-contains` connection type (in `_c4_type.py`) is the reference example. It is exclusively a C4 concept and would be a modularity violation if placed in `connections.yaml` or any ontology module.
-
-## Scope connections hook
-
-Some diagram types need to auto-create model-level connections that reflect the diagram's structural intent. The `build_scope_connections` hook supports this:
-
-```python
-def build_scope_connections(
-    self, diagram_entities: dict[str, Any]
-) -> list[tuple[str, str, str]]:
-    # return list of (source_entity_id, target_entity_id, conn_type)
-    ...
-```
-
-`DiagramTypeBase` provides a no-op default (`return []`). Diagram types override it when they have structural scope semantics. After a diagram write the `apply_scope_connections` helper calls this hook and idempotently creates any returned connections as model-level artifacts.
-
-The C4 types use `_scope_entity_id` as the scope-identification mechanism: a top-level key in `diagram_entities` that holds the `entity_id` of the model entity the diagram documents. `build_scope_connections` reads it along with the `c4:` config block to produce `(scope_entity_id, internal_entity_id, "c4-contains")` pairs for each internal element.
-
-Authors never set a per-item `scope: true` flag. The GUI scope picker and MCP tool guidance both use `_scope_entity_id` as the only scope input.
-
 ### `c4:` config block
 
-C4 diagram types declare their scope semantics in `config.yaml`:
+C4 diagram types declare their scope and rendering semantics in `config.yaml`:
 
 ```yaml
 c4:
   scope_entity_type: software-system   # entity type that acts as the scope
   scope_render_mode: boundary          # "boundary" = outer frame; "node" = regular node
-  internal_entity_types:               # entity types whose items get c4-contains connections
+  internal_entity_types:               # entity types rendered inside the scope boundary
     - container
 ```
 
-`_C4DiagramType` reads this block in both `build_scope_connections` (to generate connections) and the renderer (to choose the outer boundary style).
+`_C4DiagramType` reads this block in the renderer (to choose the outer boundary style).
 
 ## Protocol contract
 

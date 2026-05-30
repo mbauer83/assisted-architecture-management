@@ -50,9 +50,8 @@ entity_types:
   container:
     create_when: >-
       Use for the container in scope (set _scope_entity_id at diagram level and link entity_id to an
-      application-component, service, or data-object model entity — required for c4-contains connections and
-      cross-diagram navigation) and for nearby peer or external containers (entity_id optional for containers you do
-      not manage).
+      application-component, service, or data-object model entity — required for cross-diagram navigation)
+      and for nearby peer or external containers (entity_id optional for containers you do not manage).
     never_create_when: Do not use for a whole system boundary at container level or for fine-grained internal parts that belong as components.
     permitted_mappings:
       entity_types:

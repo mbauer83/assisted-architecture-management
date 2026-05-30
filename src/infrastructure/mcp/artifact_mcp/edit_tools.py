@@ -213,19 +213,6 @@ def artifact_edit_diagram(
         dry_run=dry_run,
         **kwargs,
     )
-    if result.wrote and not dry_run and diagram_entities is not None:
-        from src.infrastructure.write.artifact_write.scope_connections import apply_scope_connections  # noqa: PLC0415
-
-        diag = repo_cached(key).get_diagram(artifact_id)
-        if diag is not None:
-            apply_scope_connections(
-                diag.diagram_type,
-                dict(diagram_entities),
-                root,
-                registry_cached(key),
-                verifier_for(key, include_registry=True),
-                clear_repo_caches,
-            )
     return _finalize_authoritative_write(dry_run, result, mutation_context)
 
 

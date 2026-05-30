@@ -23,9 +23,8 @@ entity_types:
   software-system:
     create_when: >-
       Use for the software system in scope (set _scope_entity_id at diagram level and link entity_id to an
-      application-component or service model entity — required for cross-diagram navigation and c4-contains graph
-      connections) and for peer or external software systems around it (entity_id optional for third-party systems you
-      do not manage).
+      application-component or service model entity — required for cross-diagram navigation) and for peer or
+      external software systems around it (entity_id optional for third-party systems you do not manage).
     never_create_when: Do not use for finer-grained deployable units inside a system when a container or component view is needed.
     permitted_mappings:
       entity_types:

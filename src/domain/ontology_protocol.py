@@ -272,11 +272,6 @@ class DiagramTypeModule(Protocol):
 
     def read_diagram_extras(self, parsed_source: dict[str, Any]) -> dict[str, Any]: ...
 
-    def build_scope_connections(
-        self,
-        diagram_entities: dict[str, Any],
-    ) -> list[tuple[str, str, str]]: ...
-
 
 class DiagramTypeBase:
     """Mixin providing default DiagramTypeModule implementations.
@@ -368,9 +363,3 @@ class DiagramTypeBase:
 
     def read_diagram_extras(self, parsed_source: dict[str, Any]) -> dict[str, Any]:
         return {}
-
-    def build_scope_connections(
-        self,
-        diagram_entities: dict[str, Any],
-    ) -> list[tuple[str, str, str]]:
-        return []

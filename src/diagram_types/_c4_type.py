@@ -26,15 +26,6 @@ from src.domain.permitted_relationships import PermittedRelationshipSet
 _EMPTY_ENTITY_TYPES: dict[EntityTypeName, EntityTypeInfo] = {}
 
 _C4_OWN_CONNECTION_TYPES: dict[ConnectionTypeName, ConnectionTypeInfo] = {
-    ConnectionTypeName("c4-contains"): ConnectionTypeInfo(
-        artifact_type="c4-contains",
-        conn_lang="c4",
-        symmetric=False,
-        puml_arrow="-->",
-        classes=("containment",),
-        hierarchy_priority=0,
-        hierarchy_label="contains",
-    ),
     ConnectionTypeName("c4-uses"): ConnectionTypeInfo(
         artifact_type="c4-uses",
         conn_lang="c4",
@@ -260,31 +251,6 @@ class _C4DiagramType(DiagramTypeBase):
 
         nav = build_c4_navigation(repo, diagram_id, str(self._name), diagram_entities)
         return {"c4_navigation": nav} if nav is not None else {}
-
-    def build_scope_connections(
-        self,
-        diagram_entities: dict[str, Any],
-    ) -> list[tuple[str, str, str]]:
-        c4_cfg: dict[str, Any] = self._config.get("c4") or {}
-        internal_entity_types = [str(t) for t in (c4_cfg.get("internal_entity_types") or [])]
-        if not internal_entity_types:
-            return []
-
-        scope_entity_id = str(diagram_entities.get("_scope_entity_id") or "").strip()
-        if not scope_entity_id:
-            return []
-
-        connections: list[tuple[str, str, str]] = []
-        for internal_type in internal_entity_types:
-            raw_internal: object = diagram_entities.get(internal_type) or []
-            if not isinstance(raw_internal, list):
-                continue
-            internal_items: list[Any] = raw_internal
-            for item in internal_items:
-                if isinstance(item, dict) and item.get("entity_id"):
-                    connections.append((scope_entity_id, str(item["entity_id"]), "c4-contains"))
-        return connections
-
 
 def _person_archimate_types(ontology: DiagramOntology) -> frozenset[str]:
     person_et = ontology.entity_types.get(EntityTypeName("person"))

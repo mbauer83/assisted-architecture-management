@@ -1212,9 +1212,9 @@ Phase 3 → `SPEC-phase-3-...`; Phase 4 → `SPEC-phase-4-...`; property tests �
   `element_classes`/`classifications` → `classes` via scoped, validated regex (indentation
   separates the column-0 declaration block; word boundaries protect `ElementClass*`). Full
   recipe + gates: IMPL §0.0. *(Sonnet 4.6 / extended.)* — 2026-05-30, 7e9c547, 604 tests green, zuban clean; types.generated.ts unchanged (fields not in TS schema)
-- [ ] **2.** Delete `build_scope_connections`/`apply_scope_connections` and call sites (MCP
+- [x] **2.** Delete `build_scope_connections`/`apply_scope_connections` and call sites (MCP
   `write/diagram.py`, `edit_tools.py`, GUI `_diagram_write.py`); no diagram write may touch
-  a model connection. IMPL §0.1.
+  a model connection. IMPL §0.1. — 2026-05-30, TBD, 604 tests green, zuban clean; c4-contains removed from TS types
 - [ ] **3.** *(after #4)* Migration tool + run on engagement + enterprise repos: legacy
   `entity_id`→`represents`, `_scope_entity_id`→diagram-level `scoped-by`, report+remove
   auto-emitted `c4-contains`. IMPL §0.2.

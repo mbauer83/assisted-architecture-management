@@ -10,7 +10,6 @@ guidance:
     as needed; (4) call artifact_authoring_guidance(diagram_type="c4-component") for the schema;
     (5) create the diagram — set _scope_entity_id to the scope container's entity_id, add components
     in the component array each with their entity_id, reference other elements similarly.
-    c4-contains connections from scope → components are auto-created on diagram save.
   when_not_to_use: >-
     Do not use when container-level structure is enough, when the audience needs implementation-level
     code structure, when you need full ArchiMate cross-layer semantics, or when you need a process

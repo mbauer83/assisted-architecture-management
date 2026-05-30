@@ -65,7 +65,6 @@ export const CONNECTION_TYPE_NAMES = [
   "archimate-serving",
   "archimate-specialization",
   "archimate-triggering",
-  "c4-contains",
   "c4-uses",
   "er-many-to-many",
   "er-one-to-many",

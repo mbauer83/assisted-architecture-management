@@ -10,7 +10,6 @@ guidance:
     (4) call artifact_authoring_guidance(diagram_type="c4-container") for the diagram_entities schema;
     (5) create the diagram — set _scope_entity_id to the scope system's entity_id, add containers in the
     container array each with their entity_id, reference persons and external systems similarly.
-    c4-contains connections from scope → containers are auto-created on diagram save.
   when_not_to_use: >-
     Do not use when the question is still only about system context, when the internals of a single
     container are the focus, when you need full ArchiMate cross-layer semantics, or when you need a

@@ -144,19 +144,6 @@ def artifact_create_diagram(
     )
     if result.wrote and not dry_run:
         mutation_context.finalize()
-        if diagram_entities is not None:
-            from src.infrastructure.write.artifact_write.scope_connections import (
-                apply_scope_connections,  # noqa: PLC0415
-            )
-
-            apply_scope_connections(
-                diagram_type,
-                dict(diagram_entities),
-                roots[0],
-                registry_cached(key),
-                verifier_for(key, include_registry=True),
-                clear_repo_caches,
-            )
     return _out(result, dry_run=dry_run)
 
 
@@ -195,7 +182,7 @@ def register(mcp: FastMCP) -> None:
             "PUML is generated automatically; diagram_entities is persisted for round-trip editing.\n\n"
             "C4 views: create all referenced model entities first (application-component/service for systems "
             "and containers, business-actor/role for persons). In diagram_entities set _scope_entity_id to "
-            "the scope entity's artifact_id. c4-contains connections are auto-created on write.\n\n"
+            "the scope entity's artifact_id.\n\n"
             "dry_run=true validates without writing."
         ),
         annotations=LOCAL_WRITE,
