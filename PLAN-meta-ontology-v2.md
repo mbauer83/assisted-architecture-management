@@ -1240,8 +1240,8 @@ Phase 3 → `SPEC-phase-3-...`; Phase 4 → `SPEC-phase-4-...`; property tests �
   persisting. IMPL §2.4. — 2026-05-30, 8fe9ddc, binding_proposals.py; propose-bindings enriched with allowed_bindings+index; find_neighbors gains diagram_type param; 9 tests; 869 total green, zuban clean
 
 ### Phase 3 — Paths, scope projection, materialization (specs complete)
-- [ ] **13.** `connection_path` target (`{id, reversed}`) + `path-projection/v1` +
-  refresh/equivalence. SPEC-phase-3 §1.
+- [x] **13.** `connection_path` target (`{id, reversed}`) + `path-projection/v1` +
+  refresh/equivalence. SPEC-phase-3 §1. — 2026-05-30, 0d1eef7, E409/E410 verifier + path-projection/v1 BFS/DFS + drifted/broken path diff + included/excluded_paths selection; 26 tests; 895 total green, zuban clean
 - [ ] **14.** `scope-projection/v1` + `c4.scope-projection/v1` tables. SPEC-phase-3 §2.
 - [ ] **15.** Materialization atomic transaction (entity + connection). SPEC-phase-3 §3.
 
