@@ -1224,8 +1224,8 @@ Phase 3 → `SPEC-phase-3-...`; Phase 4 → `SPEC-phase-4-...`; property tests �
   accept nested `binding` shorthand normalized on write. IMPL §1.1–1.2. — 2026-05-30, 0e812c7, 654 tests green, zuban clean; bindings.py + binding_normalize.py; entity_id removed from entity schema guidance
 - [x] **5.** `entity_id`/`_scope_entity_id` are write-time input shorthand only; persisted
   output is always top-level `bindings`. IMPL §1.3. — 2026-05-30, fd5706e, 681 tests green, zuban clean; bindings wired through create/edit/parse; strip_diagram_shorthand added
-- [ ] **6.** Verifier rules (`_check_bindings`) per "Identity, Integrity, and Verifier
-  Rules". IMPL §1.4.
+- [x] **6.** Verifier rules (`_check_bindings`) per "Identity, Integrity, and Verifier
+  Rules". IMPL §1.4. — 2026-05-30, 318d224, _verifier_rules_bindings.py E401–E408; wired into check_diagram_references_scoped; 27 tests green
 - [ ] **7.** Rewire renderers + `collect_references` to read `represents` bindings; regen
   `types.generated.ts`; update GUI editors. IMPL §1.5.
 
