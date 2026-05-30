@@ -169,6 +169,7 @@ def format_diagram_puml(
     puml_body: str,
     diagram_entities: dict[str, object] | None = None,
     diagram_connections: list[dict[str, object]] | None = None,
+    view_derivations: list[dict[str, object]] | None = None,
     bindings: list[dict[str, object]] | None = None,
 ) -> str:
     frontmatter: dict[str, object] = {
@@ -189,6 +190,8 @@ def format_diagram_puml(
         frontmatter["diagram-entities"] = diagram_entities
     if diagram_connections is not None:
         frontmatter["connections"] = diagram_connections
+    if view_derivations:
+        frontmatter["view_derivations"] = view_derivations
     if bindings:
         frontmatter["bindings"] = bindings
     frontmatter["last-updated"] = last_updated
@@ -205,6 +208,7 @@ def format_diagram_puml(
         "connection-ids-used",
         "diagram-entities",
         "connections",
+        "view_derivations",
         "bindings",
         "last-updated",
     ]

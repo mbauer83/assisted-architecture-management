@@ -43,6 +43,7 @@ class ParsedDiagram:
     puml_body: str  # everything after the frontmatter closing ---
     raw_text: str
     bindings: list  # list[Binding] — typed bindings parsed from frontmatter
+    view_derivations: list  # list[ViewDerivation] — typed derivations parsed from frontmatter
 
 
 def parse_entity_file(path: Path) -> ParsedEntity:
@@ -88,6 +89,7 @@ def parse_outgoing_file(path: Path) -> ParsedOutgoing:
 def parse_diagram_file(path: Path) -> ParsedDiagram:
     """Parse a diagram .puml file into structured components."""
     from src.domain.bindings import parse_bindings
+    from src.domain.view_derivations import parse_view_derivations
 
     text = path.read_text(encoding="utf-8")
     frontmatter = _parse_frontmatter(text)
@@ -98,11 +100,15 @@ def parse_diagram_file(path: Path) -> ParsedDiagram:
     raw_bindings = frontmatter.get("bindings")
     bindings = parse_bindings(raw_bindings if isinstance(raw_bindings, list) else None)
 
+    raw_vds = frontmatter.get("view_derivations")
+    view_derivations = parse_view_derivations(raw_vds if isinstance(raw_vds, list) else None)
+
     return ParsedDiagram(
         frontmatter=frontmatter,
         puml_body=puml_body,
         raw_text=text,
         bindings=bindings,
+        view_derivations=view_derivations,
     )
 
 

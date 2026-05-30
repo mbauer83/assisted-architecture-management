@@ -49,6 +49,7 @@ def create_diagram(
     diagram_connections: list[dict[str, object]] | None = None,
     entity_ids_used: list[str] | None = None,
     connection_ids_used: list[str] | None = None,
+    view_derivations: list[dict[str, object]] | None = None,
     bindings: list[dict[str, object]] | None = None,
     version: str,
     status: str,
@@ -124,6 +125,7 @@ def create_diagram(
         diagram_connections=diagram_connections,
         entity_ids_used=entity_ids_used,
         connection_ids_used=connection_ids_used,
+        view_derivations=view_derivations,
         bindings=bindings_to_raw(norm_bindings) if norm_bindings else None,
         puml_body=puml_body,
     )

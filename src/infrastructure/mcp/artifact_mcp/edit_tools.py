@@ -162,6 +162,7 @@ def artifact_edit_diagram(
     keywords: list[str] | None = None,
     diagram_entities: dict[str, object] | None = None,
     diagram_connections: list[dict[str, object]] | None = None,
+    view_derivations: list[dict[str, object]] | None = None,
     bindings: list[dict[str, object]] | None = None,
     version: str | None = None,
     status: str | None = None,
@@ -201,6 +202,8 @@ def artifact_edit_diagram(
         kwargs["diagram_entities"] = diagram_entities
     if diagram_connections is not None:
         kwargs["diagram_connections"] = diagram_connections
+    if view_derivations is not None:
+        kwargs["view_derivations"] = view_derivations
     if bindings is not None:
         kwargs["bindings"] = bindings
     if version is not None:

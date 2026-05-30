@@ -46,6 +46,7 @@ def edit_diagram(
     diagram_connections: list[dict[str, object]] | None = None,
     entity_ids_used: list[str] | None = None,
     connection_ids_used: list[str] | None = None,
+    view_derivations: list[dict[str, object]] | None = None,
     bindings: list[dict[str, object]] | None = None,
     version: str | None = None,
     status: str | None = None,
@@ -83,6 +84,11 @@ def edit_diagram(
     eff_connection_ids_used = (
         connection_ids_used if connection_ids_used is not None else as_optional_str_list(fm.get("connection-ids-used"))
     )
+
+    # view_derivations: caller replaces; keep existing from file if caller omits
+    _raw_vd = fm.get("view_derivations")
+    existing_vd = [v for v in _raw_vd if isinstance(v, dict)] if isinstance(_raw_vd, list) else []
+    eff_view_derivations: list[dict[str, object]] | None = view_derivations if view_derivations is not None else (existing_vd or None)
 
     # Bindings: existing from file + new from caller, then normalize shorthand from entities
     _raw_b = fm.get("bindings")
@@ -151,6 +157,7 @@ def edit_diagram(
         diagram_connections=eff_diagram_connections if isinstance(eff_diagram_connections, list) else None,
         entity_ids_used=eff_entity_ids_used,
         connection_ids_used=eff_connection_ids_used,
+        view_derivations=eff_view_derivations,
         bindings=bindings_to_raw(norm_bindings) if norm_bindings else None,
         puml_body=puml_body,
     )
