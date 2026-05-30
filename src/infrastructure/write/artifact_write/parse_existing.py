@@ -42,6 +42,7 @@ class ParsedDiagram:
     frontmatter: dict[str, object]
     puml_body: str  # everything after the frontmatter closing ---
     raw_text: str
+    bindings: list  # list[Binding] — typed bindings parsed from frontmatter
 
 
 def parse_entity_file(path: Path) -> ParsedEntity:
@@ -86,17 +87,22 @@ def parse_outgoing_file(path: Path) -> ParsedOutgoing:
 
 def parse_diagram_file(path: Path) -> ParsedDiagram:
     """Parse a diagram .puml file into structured components."""
+    from src.domain.bindings import parse_bindings
+
     text = path.read_text(encoding="utf-8")
     frontmatter = _parse_frontmatter(text)
 
-    # PUML body is everything after the closing --- of frontmatter
     fm_end = _frontmatter_end_pos(text)
     puml_body = text[fm_end:] if fm_end else text
+
+    raw_bindings = frontmatter.get("bindings")
+    bindings = parse_bindings(raw_bindings if isinstance(raw_bindings, list) else None)
 
     return ParsedDiagram(
         frontmatter=frontmatter,
         puml_body=puml_body,
         raw_text=text,
+        bindings=bindings,
     )
 
 

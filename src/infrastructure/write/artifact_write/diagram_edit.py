@@ -46,6 +46,7 @@ def edit_diagram(
     diagram_connections: list[dict[str, object]] | None = None,
     entity_ids_used: list[str] | None = None,
     connection_ids_used: list[str] | None = None,
+    bindings: list[dict[str, object]] | None = None,
     version: str | None = None,
     status: str | None = None,
     dry_run: bool,
@@ -56,6 +57,9 @@ def edit_diagram(
     Other fields (name, keywords, version, status) update frontmatter only.
     Always re-verifies and re-renders PNG on successful write.
     """
+    from src.application.modeling.binding_normalize import normalize_bindings, strip_diagram_shorthand
+    from src.domain.bindings import bindings_to_raw
+
     assert_engagement_write_root(repo_root)
     warnings: list[str] = []
 
@@ -80,7 +84,19 @@ def edit_diagram(
         connection_ids_used if connection_ids_used is not None else as_optional_str_list(fm.get("connection-ids-used"))
     )
 
-    # Determine PUML body
+    # Bindings: existing from file + new from caller, then normalize shorthand from entities
+    _raw_b = fm.get("bindings")
+    existing_raw_bindings = [b for b in _raw_b if isinstance(b, dict)] if isinstance(_raw_b, list) else []
+    merged_raw_bindings = existing_raw_bindings + list(bindings or [])
+    norm_bindings = normalize_bindings(
+        eff_diagram_entities if isinstance(eff_diagram_entities, dict) else None,
+        merged_raw_bindings,
+    )
+    clean_entities = strip_diagram_shorthand(
+        eff_diagram_entities if isinstance(eff_diagram_entities, dict) else None
+    )
+
+    # Determine PUML body; render with original eff_diagram_entities (renderer reads entity_id)
     if eff_diagram_entities is not None and isinstance(eff_diagram_entities, dict) and puml is None:
         puml_body = _render_diagram_entities_puml(
             diagram_type,
@@ -117,10 +133,11 @@ def edit_diagram(
         status=eff_status,
         last_updated=today_iso(),
         keywords=eff_keywords,
-        diagram_entities=eff_diagram_entities if isinstance(eff_diagram_entities, dict) else None,
+        diagram_entities=clean_entities,
         diagram_connections=eff_diagram_connections if isinstance(eff_diagram_connections, list) else None,
         entity_ids_used=eff_entity_ids_used,
         connection_ids_used=eff_connection_ids_used,
+        bindings=bindings_to_raw(norm_bindings) if norm_bindings else None,
         puml_body=puml_body,
     )
 

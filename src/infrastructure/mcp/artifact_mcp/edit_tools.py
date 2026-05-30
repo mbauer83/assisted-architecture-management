@@ -162,6 +162,7 @@ def artifact_edit_diagram(
     keywords: list[str] | None = None,
     diagram_entities: dict[str, object] | None = None,
     diagram_connections: list[dict[str, object]] | None = None,
+    bindings: list[dict[str, object]] | None = None,
     version: str | None = None,
     status: str | None = None,
     dry_run: bool = True,
@@ -200,6 +201,8 @@ def artifact_edit_diagram(
         kwargs["diagram_entities"] = diagram_entities
     if diagram_connections is not None:
         kwargs["diagram_connections"] = diagram_connections
+    if bindings is not None:
+        kwargs["bindings"] = bindings
     if version is not None:
         kwargs["version"] = version
     if status is not None:
@@ -322,8 +325,10 @@ def register_edit_tools(mcp: FastMCP) -> None:
             "names are refreshed, and PUML is regenerated. The response then includes "
             "removed_entity_ids and removed_connection_ids. "
             "Pass an explicit PUML string to replace the body with auto-layout re-applied. "
-            "Frontmatter fields (name, keywords, diagram_entities, diagram_connections, "
-            "version, status) updated if provided. For ArchiMate diagrams, diagram_connections may hold "
+            "Frontmatter fields (name, keywords, diagram_entities, diagram_connections, bindings, "
+            "version, status) updated if provided. bindings merges with existing bindings from the file; "
+            "shorthand (binding: on items, entity_id on items, _scope_entity_id) is normalized on write. "
+            "For ArchiMate diagrams, diagram_connections may hold "
             "per-diagram connection annotation metadata keyed by model connection artifact_id; it does not "
             "create diagram-owned connections. Supported opt-in keys are artifact_id (or connection_id), "
             "include_description, include_cardinality, and label. "

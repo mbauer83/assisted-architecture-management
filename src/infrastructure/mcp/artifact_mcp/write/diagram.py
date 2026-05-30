@@ -72,6 +72,7 @@ def artifact_create_diagram(
     keywords: list[str] | None = None,
     diagram_entities: dict[str, object] | None = None,
     diagram_connections: list[dict[str, object]] | None = None,
+    bindings: list[dict[str, object]] | None = None,
     version: str = "0.1.0",
     status: str = "draft",
     connection_inference: DiagramConnectionInferenceMode = "none",
@@ -133,6 +134,7 @@ def artifact_create_diagram(
         keywords=keywords,
         diagram_entities=diagram_entities,
         diagram_connections=diagram_connections,
+        bindings=bindings,
         entity_ids_used=entity_ids_used,
         connection_ids_used=connection_ids_used,
         version=version,
@@ -180,9 +182,10 @@ def register(mcp: FastMCP) -> None:
             "connection_inference: 'none' | 'auto' (warn) | 'strict' (error) on unknown stereotypes.\n\n"
             "Diagram-owned views (activity, C4): omit puml and entity_ids; pass diagram_entities per the schema. "
             "PUML is generated automatically; diagram_entities is persisted for round-trip editing.\n\n"
-            "C4 views: create all referenced model entities first (application-component/service for systems "
-            "and containers, business-actor/role for persons). In diagram_entities set _scope_entity_id to "
-            "the scope entity's artifact_id.\n\n"
+            "Bindings: pass bindings=[...] for explicit top-level bindings, or put a nested binding: key on "
+            "diagram_entities items (single-target shorthand: entity_id, connection_id, or diagram_local). "
+            "Legacy entity_id on items and _scope_entity_id in diagram_entities are accepted as input shorthand "
+            "and normalized to top-level bindings on write.\n\n"
             "dry_run=true validates without writing."
         ),
         annotations=LOCAL_WRITE,

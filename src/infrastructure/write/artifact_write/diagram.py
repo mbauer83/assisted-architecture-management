@@ -49,6 +49,7 @@ def create_diagram(
     diagram_connections: list[dict[str, object]] | None = None,
     entity_ids_used: list[str] | None = None,
     connection_ids_used: list[str] | None = None,
+    bindings: list[dict[str, object]] | None = None,
     version: str,
     status: str,
     last_updated: str | None,
@@ -58,6 +59,9 @@ def create_diagram(
 ) -> WriteResult:
     assert_engagement_write_root(repo_root)
 
+    from src.application.modeling.binding_normalize import normalize_bindings, strip_diagram_shorthand
+    from src.domain.bindings import bindings_to_raw
+
     effective_id = artifact_id
     warnings: list[str] = []
 
@@ -65,8 +69,12 @@ def create_diagram(
 
     last = last_updated or today_iso()
 
+    norm_bindings = normalize_bindings(diagram_entities, bindings)
+    clean_entities = strip_diagram_shorthand(diagram_entities)
+
     if diagram_entities is not None:
-        # Diagram-owned diagram: generate PUML from the renderer; puml parameter is ignored.
+        # Diagram-owned diagram: render with original entities (renderer reads entity_id);
+        # persist with clean_entities (shorthand stripped) + top-level bindings.
         puml_body = _render_diagram_entities_puml(diagram_type, name, diagram_entities, diagram_connections, repo_root)
         if effective_id is None:
             effective_id = generate_diagram_id(diagram_type, name)
@@ -101,10 +109,11 @@ def create_diagram(
         status=status,
         last_updated=last,
         keywords=keywords,
-        diagram_entities=diagram_entities,
+        diagram_entities=clean_entities,
         diagram_connections=diagram_connections,
         entity_ids_used=entity_ids_used,
         connection_ids_used=connection_ids_used,
+        bindings=bindings_to_raw(norm_bindings) if norm_bindings else None,
         puml_body=puml_body,
     )
 
