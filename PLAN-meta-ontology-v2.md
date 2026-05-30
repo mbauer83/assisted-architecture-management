@@ -1208,10 +1208,10 @@ is mechanical and gate-fenced. Build-ready detail: Phases 0–2 → `IMPL-phases
 Phase 3 → `SPEC-phase-3-...`; Phase 4 → `SPEC-phase-4-...`; property tests → `FORMALIZATION.md`.
 
 ### Phase 0 — Groundwork
-- [ ] **1.** Unify `classes` (mechanical codemod) — rename per-type membership
+- [x] **1.** Unify `classes` (mechanical codemod) — rename per-type membership
   `element_classes`/`classifications` → `classes` via scoped, validated regex (indentation
   separates the column-0 declaration block; word boundaries protect `ElementClass*`). Full
-  recipe + gates: IMPL §0.0. *(Sonnet 4.6 / extended.)*
+  recipe + gates: IMPL §0.0. *(Sonnet 4.6 / extended.)* — 2026-05-30, 7e9c547, 604 tests green, zuban clean; types.generated.ts unchanged (fields not in TS schema)
 - [ ] **2.** Delete `build_scope_connections`/`apply_scope_connections` and call sites (MCP
   `write/diagram.py`, `edit_tools.py`, GUI `_diagram_write.py`); no diagram write may touch
   a model connection. IMPL §0.1.
