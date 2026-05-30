@@ -125,14 +125,15 @@ def _add_connection_impl(
 
 def artifact_add_connection(
     *,
-    source_entity: str,
+    source_entity: str = "",
     connection_type: str,
-    target_entity: str,
+    target_entity: str = "",
     description: str | None = None,
     src_cardinality: str | None = None,
     tgt_cardinality: str | None = None,
     version: str = "0.1.0",
     status: str = "draft",
+    from_diagram_element: dict[str, object] | None = None,
     dry_run: bool = True,
     repo_root: str | None = None,
 ) -> dict[str, object]:
@@ -142,15 +143,48 @@ def artifact_add_connection(
     When source_entity or target_entity is a global (enterprise) entity, a
     global-entity-reference proxy is created or reused automatically so all
     connection endpoints are represented in the engagement repo.
+    from_diagram_element: {diagram_id, diagram_element_id, diagram_element_kind='connection'} —
+    when provided, derives source/target from the diagram element's represents bindings and
+    atomically attaches a binding to the diagram connection (materialization).
     """
-    mutation_context, clear_repo_caches = authoritative_callbacks_for(
-        resolve_repo_roots(
-            repo_scope="engagement" if repo_root else "both",
-            repo_root=repo_root,
-            repo_preset=None,
-            enterprise_root=None,
-        )[0]
-    )
+    scope: Literal["engagement", "both"] = "engagement" if repo_root else "both"
+    roots = resolve_repo_roots(repo_scope=scope, repo_root=repo_root, repo_preset=None, enterprise_root=None)
+    mutation_context, clear_repo_caches = authoritative_callbacks_for(roots[0])
+
+    if from_diagram_element and str(from_diagram_element.get("diagram_element_kind", "connection")) == "connection":
+        from src.infrastructure.write.artifact_write.materialization import (  # noqa: PLC0415
+            DiagramElementRef, materialize_connection,
+        )
+        ref = DiagramElementRef(
+            diagram_id=str(from_diagram_element.get("diagram_id", "")),
+            diagram_element_id=str(from_diagram_element.get("diagram_element_id", "")),
+            diagram_element_kind="connection",
+        )
+        registry = registry_cached(roots_key(roots))
+        verifier = verifier_for(roots_key(roots), include_registry=True)
+        mat = materialize_connection(
+            repo_root=roots[0], registry=registry, verifier=verifier,
+            clear_repo_caches=clear_repo_caches, ref=ref,
+            connection_type=connection_type, description=description,
+            version=version, status=status, dry_run=dry_run,
+        )
+        if mat.wrote and not dry_run:
+            mutation_context.finalize()
+        return {
+            "dry_run": dry_run,
+            "wrote": mat.wrote,
+            "connection_id": mat.connection_id,
+            "proposed_connection_id": mat.proposed_connection_id,
+            "diagram_id": mat.diagram_id,
+            "diagram_element_id": mat.diagram_element_id,
+            "binding": mat.binding or mat.proposed_binding,
+            "warnings": mat.warnings,
+            "error": mat.error,
+        }
+
+    if not source_entity or not target_entity:
+        return {"error": "source_entity and target_entity are required when from_diagram_element is not provided"}
+
     out = _add_connection_impl(
         source_entity=source_entity,
         connection_type=connection_type,
