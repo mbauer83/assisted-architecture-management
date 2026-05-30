@@ -85,13 +85,14 @@ class TestSchemaGeneratorDefs:
         swimlane_def = schema["$defs"]["swimlane"]  # type: ignore[index]
         assert "id" in swimlane_def["required"]  # type: ignore[index]
 
-    def test_schema_includes_label_and_entity_id_properties(self) -> None:
+    def test_schema_includes_label_and_binding_properties(self) -> None:
         action = _oe("action", ("step",))
         schema = derive_diagram_entities_schema((action,))
         assert schema is not None
         action_def = schema["$defs"]["action"]  # type: ignore[index]
         assert "label" in action_def["properties"]  # type: ignore[index]
-        assert "entity_id" in action_def["properties"]  # type: ignore[index]
+        assert "binding" in action_def["properties"]  # type: ignore[index]
+        assert "entity_id" not in action_def["properties"]  # type: ignore[index]
 
     def test_domain_properties_included(self) -> None:
         props = (DiagramOwnEntityTypePropertySpec(name="lane_id", schema={"type": "string"}, required=False),)
