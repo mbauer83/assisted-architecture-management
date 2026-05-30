@@ -1,8 +1,16 @@
-# Architecture workspace configuration.
-# Run `arch-init` to validate repos and generate .arch/init-state.yaml.
-
-engagement:
-  local: engagements/ENG-ARCH-REPO/architecture-repository
-
 enterprise:
-  git: { url: "git@github.com-personal:mbauer83/global-architecture-repository.git", branch: main, path: ./enterprise-repository }
+  git:
+    url: git@github.com:mbauer83/global-architecture-repository.git
+    branch: main
+    path: enterprise-repository
+engagements:
+  active: ENG-ARCH-REPO
+  available:
+    ENG-ARCH-REPO: &id001
+      local: engagements/ENG-ARCH-REPO/architecture-repository
+    TECHNOLOGY_ARCHITECTURE:
+      git:
+        url: git@ssh.dev.azure.com:v3/BAMDigitalServices/Architecture/up2parts-technology-architecture
+        branch: main
+        path: engagements/TECHNOLOGY_ARCHITECTURE/architecture-repository
+engagement: *id001
