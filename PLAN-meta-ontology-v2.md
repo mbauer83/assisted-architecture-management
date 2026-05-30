@@ -1246,7 +1246,7 @@ Phase 3 → `SPEC-phase-3-...`; Phase 4 → `SPEC-phase-4-...`; property tests �
 - [x] **15.** Materialization atomic transaction (entity + connection). SPEC-phase-3 §3. — 2026-05-30, 7b7c66e, materialization.py + from_diagram_element on artifact_create_entity/artifact_add_connection; entity rollback on diagram update failure; 18 tests; 933 total green, zuban clean
 
 ### Phase 4 — New ontologies and coherence (specs complete)
-- [ ] **16.** Activity clarification + sequence diagram module. SPEC-phase-4 §1.
+- [x] **16.** Activity clarification + sequence diagram module. SPEC-phase-4 §1. — 2026-05-30, d73c6c7, activity managed_fields cleaned up; sequence module with 5 entity types, 4 conn types, PUML renderer, 13 tests; grouping/annotation reused from activity (no redeclaration); 946 total green, zuban clean
 - [ ] **17.** `sysml_v2_min` ontology module. SPEC-phase-4 §2.
 - [ ] **18.** *(after #8, #17)* Bridge declaration + minimum bridge check. SPEC-phase-4 §3.
 - [ ] **19.** Cross-phase property/validation tests (F1–F4). FORMALIZATION.md.
