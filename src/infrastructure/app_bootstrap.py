@@ -9,6 +9,7 @@ from src.application.startup_validation import validate_registry_consistency
 from src.diagram_types import register_default_diagram_types
 from src.domain.module_registry import ModuleRegistry
 from src.ontologies.archimate_next import module as archimate_next_module
+from src.ontologies.sysml_v2_min import module as sysml_v2_min_module
 
 if TYPE_CHECKING:
     from fastapi import Request
@@ -19,6 +20,7 @@ _MODULE_REGISTRY_STATE_KEY = "module_registry"
 def build_module_registry() -> ModuleRegistry:
     registry = ModuleRegistry()
     registry.register_ontology(archimate_next_module)
+    registry.register_ontology(sysml_v2_min_module)
     register_default_diagram_types(registry)
     validate_registry_consistency(registry)
     return registry
