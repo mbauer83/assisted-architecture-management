@@ -122,7 +122,7 @@ def _check_strategy(
     result: VerificationResult,
     loc: str,
 ) -> None:
-    from src.application.derivation.strategy_registry import lookup_strategy  # noqa: PLC0415
+    from src.application.derivation import lookup_strategy  # noqa: PLC0415
 
     if not strategy:
         return
