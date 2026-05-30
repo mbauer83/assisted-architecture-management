@@ -55,7 +55,7 @@ def dispatch_binding_mode(
     if mode == "apply-diff":
         return _apply_diff(artifact_id, diff, base_revision, path, root, key, dry_run)
     if mode == "propose-bindings":
-        return _propose_bindings(artifact_id, entity_ids, connection_ids_param, path)
+        return _propose_bindings(artifact_id, entity_ids, connection_ids_param, path, key)
     if mode == "detach-binding":
         return _detach_binding(artifact_id, binding_id, path, root, key, dry_run)
     raise ValueError(
@@ -171,25 +171,46 @@ def _propose_bindings(
     entity_ids: list[str] | None,
     connection_ids_param: list[str] | None,
     path: Path,
+    key: str,
 ) -> dict[str, object]:
     _require_exists(path, artifact_id)
 
+    from src.application.derivation.binding_proposals import build_connection_proposals, build_entity_proposals  # noqa: PLC0415
     from src.application.derivation.refresh import compute_revision  # noqa: PLC0415
+    from src.domain.allowed_bindings import AllowedBindingsSpec  # noqa: PLC0415
+    from src.infrastructure.app_bootstrap import get_module_registry  # noqa: PLC0415
+    from src.infrastructure.artifact_index.service import shared_artifact_index  # noqa: PLC0415
 
     base_revision = compute_revision(path)
-    entity_proposals = [
-        {"model_entity_id": eid, "suggested_correspondence_kind": "represents"}
-        for eid in (entity_ids or [])
-    ]
-    connection_proposals = [
-        {"model_connection_id": cid, "suggested_correspondence_kind": "represents"}
-        for cid in (connection_ids_param or [])
-    ]
-    return {
+    parsed = parse_diagram_file(path)
+    diagram_type_name = str(parsed.frontmatter.get("diagram-type", ""))
+
+    allowed_bindings: AllowedBindingsSpec | None = None
+    if diagram_type_name:
+        registry = get_module_registry()
+        mod = registry.find_diagram_type(diagram_type_name)
+        if mod is not None:
+            guidance = mod.write_guidance()
+            allowed_bindings = guidance.allowed_bindings
+
+    roots = [Path(p) for p in key.split("|") if p]
+    index = shared_artifact_index(roots)
+
+    if allowed_bindings is not None and not allowed_bindings.is_empty():
+        entity_proposals = build_entity_proposals(entity_ids or [], allowed_bindings, index)
+        connection_proposals = build_connection_proposals(connection_ids_param or [], allowed_bindings, index)
+    else:
+        entity_proposals = [{"model_entity_id": eid} for eid in (entity_ids or [])]
+        connection_proposals = [{"model_connection_id": cid} for cid in (connection_ids_param or [])]
+
+    result: dict[str, object] = {
         "base_revision": base_revision,
         "entity_proposals": entity_proposals,
         "connection_proposals": connection_proposals,
     }
+    if diagram_type_name:
+        result["diagram_type"] = diagram_type_name
+    return result
 
 
 # ---------------------------------------------------------------------------
