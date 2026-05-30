@@ -18,17 +18,21 @@ from src.application.derivation.strategy_registry import (
 from src.application.derivation.types import CandidateSet, DeriveFn, ModelQuery
 
 # Import strategy modules to trigger self-registration.
-from . import explicit_selection, incident_connections, local_neighborhood, path_projection  # noqa: E402, F401
+# c4_scope_projection must be imported after scope_projection (module projection registry).
+from . import explicit_selection, incident_connections, local_neighborhood, path_projection, scope_projection  # noqa: E402, F401
+from . import c4_scope_projection  # noqa: E402, F401
 
 __all__ = [
     "CandidateSet",
     "DeriveFn",
     "ModelQuery",
     "StrategySpec",
+    "c4_scope_projection",
     "explicit_selection",
     "incident_connections",
     "local_neighborhood",
     "path_projection",
+    "scope_projection",
     "lookup_derive_fn",
     "lookup_strategy",
     "register_strategy",
