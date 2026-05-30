@@ -158,3 +158,18 @@ permitted_relationships:
   - [swimlane, business-actor,         [swimlane-maps-to]]
   - [swimlane, role,                   [swimlane-maps-to]]
   - [swimlane, application-component,  [swimlane-maps-to]]
+
+allowed_bindings:
+  entity:
+    swimlane:
+      correspondence_kinds: [represents, traces-to]
+      default_correspondence_kind: represents
+      target_forms: [entity-id, diagram-local]
+    action:
+      correspondence_kinds: [represents, refines, traces-to]
+      default_correspondence_kind: represents
+      target_forms: [entity-id, diagram-local]
+    decision:
+      correspondence_kinds: [represents, refines, traces-to]
+      default_correspondence_kind: refines
+      target_forms: [entity-id, diagram-local]

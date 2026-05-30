@@ -14,6 +14,7 @@ from src.domain.module_types import (
     EntityTypeName,
     _FreeOntologyType,
 )
+from src.domain.allowed_bindings import AllowedBindingsSpec
 from src.domain.ontology_types import (
     ConnectionTypeInfo,
     ElementClassInfo,
@@ -152,6 +153,7 @@ class DiagramTypeWriteGuidance:
     diagram_entities_schema: dict[str, object] | None = None
     own_entity_types: tuple[DiagramOwnEntityTypeUiConfig, ...] = ()
     puml_notes: tuple[str, ...] = ()
+    allowed_bindings: AllowedBindingsSpec | None = None
 
 
 @dataclass(frozen=True)

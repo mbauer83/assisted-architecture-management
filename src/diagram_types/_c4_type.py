@@ -196,11 +196,13 @@ class _C4DiagramType(DiagramTypeBase):
         g: dict[str, Any] = self._config.get("guidance") or {}
         own_types = self._ui_config.diagram_only_types
         schema = self._augment_schema(derive_diagram_entities_schema(own_types))
+        ab = self._ontology.allowed_bindings
         return DiagramTypeWriteGuidance(
             when_to_use=str(g.get("when_to_use") or ""),
             when_not_to_use=str(g.get("when_not_to_use") or ""),
             diagram_entities_schema=schema,
             own_entity_types=own_types,
+            allowed_bindings=ab if not ab.is_empty() else None,
         )
 
     def _augment_schema(self, schema: dict[str, Any] | None) -> dict[str, Any]:

@@ -7,6 +7,7 @@ from __future__ import annotations
 
 from src.application.verification._verifier_rules_bindings import check_bindings_scoped
 from src.application.verification.artifact_verifier_types import VerificationResult
+from src.domain.allowed_bindings import allowed_bindings_from_config
 from pathlib import Path
 
 
@@ -27,7 +28,7 @@ def _result() -> VerificationResult:
 _SENTINEL = object()
 
 
-def _run(fm: dict, *, allowed_entities=_SENTINEL, allowed_connections=_SENTINEL, all_entities=_SENTINEL, all_connections=_SENTINEL, scope="engagement"):
+def _run(fm: dict, *, allowed_entities=_SENTINEL, allowed_connections=_SENTINEL, all_entities=_SENTINEL, all_connections=_SENTINEL, scope="engagement", allowed_bindings=None):
     r = _result()
     check_bindings_scoped(
         fm,
@@ -38,6 +39,7 @@ def _run(fm: dict, *, allowed_entities=_SENTINEL, allowed_connections=_SENTINEL,
         all_connections=all_connections if all_connections is not _SENTINEL else {_CONN_ID},
         result=r,
         loc=_LOC,
+        allowed_bindings=allowed_bindings,
     )
     return r
 
@@ -470,4 +472,142 @@ class TestE408DuplicateRepresentsTarget:
             ],
         }
         r = _run(fm, allowed_entities={_ENTITY_ID, other_entity}, all_entities={_ENTITY_ID, other_entity})
+        assert "E408" not in _codes(r)
+
+
+# ---------------------------------------------------------------------------
+# E406 — module-declared correspondence kinds
+# ---------------------------------------------------------------------------
+
+
+_CONTAINER_ALLOWED_BINDINGS = allowed_bindings_from_config({
+    "entity": {
+        "container": {
+            "correspondence_kinds": ["represents", "traces-to"],
+            "default_correspondence_kind": "represents",
+            "target_forms": ["entity-id"],
+        }
+    }
+})
+
+
+class TestE406WithModuleDeclaredKinds:
+    def test_core_kind_allowed_without_spec(self) -> None:
+        fm = _fm_with_entity({"correspondence_kind": "abstracts"})
+        r = _run(fm)
+        assert "E406" not in _codes(r)
+
+    def test_module_declared_kind_passes_for_that_entity_type(self) -> None:
+        fm = {
+            "diagram-entities": {"container": [{"id": "box1", "label": "App"}]},
+            "bindings": [{
+                "id": "bind-box1",
+                "subject": {"kind": "entity", "id": "box1"},
+                "correspondence_kind": "traces-to",
+                "target": {"entity_id": _ENTITY_ID},
+            }],
+        }
+        r = _run(fm, allowed_bindings=_CONTAINER_ALLOWED_BINDINGS)
+        assert "E406" not in _codes(r)
+
+    def test_kind_not_in_module_spec_raises_e406(self) -> None:
+        fm = {
+            "diagram-entities": {"container": [{"id": "box1", "label": "App"}]},
+            "bindings": [{
+                "id": "bind-box1",
+                "subject": {"kind": "entity", "id": "box1"},
+                "correspondence_kind": "abstracts",  # not in spec for container
+                "target": {"entity_id": _ENTITY_ID},
+            }],
+        }
+        r = _run(fm, allowed_bindings=_CONTAINER_ALLOWED_BINDINGS)
+        assert "E406" in _codes(r)
+
+    def test_unknown_entity_type_falls_back_to_core_five(self) -> None:
+        fm = {
+            "diagram-entities": {"person": [{"id": "actor1"}]},
+            "bindings": [{
+                "id": "bind-actor1",
+                "subject": {"kind": "entity", "id": "actor1"},
+                "correspondence_kind": "refines",  # core kind; person not in spec
+                "target": {"entity_id": _ENTITY_ID},
+            }],
+        }
+        r = _run(fm, allowed_bindings=_CONTAINER_ALLOWED_BINDINGS)
+        assert "E406" not in _codes(r)
+
+    def test_diagram_subject_uses_core_kinds(self) -> None:
+        fm = {
+            "diagram-entities": {},
+            "bindings": [{
+                "id": "bind-scope",
+                "subject": {"kind": "diagram"},
+                "correspondence_kind": "scoped-by",
+                "target": {"entity_id": _ENTITY_ID},
+            }],
+        }
+        r = _run(fm, allowed_bindings=_CONTAINER_ALLOWED_BINDINGS)
+        assert "E406" not in _codes(r)
+
+
+# ---------------------------------------------------------------------------
+# E408 — visual_roles allow duplicate represents
+# ---------------------------------------------------------------------------
+
+
+_VISUAL_ROLES_ALLOWED_BINDINGS = allowed_bindings_from_config({
+    "entity": {
+        "container": {
+            "correspondence_kinds": ["represents"],
+            "default_correspondence_kind": "represents",
+            "target_forms": ["entity-id"],
+            "visual_roles": ["primary", "replica"],
+        }
+    }
+})
+
+
+class TestE408WithVisualRoles:
+    def test_duplicate_represents_no_visual_roles_still_errors(self) -> None:
+        fm = {
+            "diagram-entities": {"container": [{"id": "box1"}, {"id": "box2"}]},
+            "bindings": [
+                {
+                    "id": "bind-box1",
+                    "subject": {"kind": "entity", "id": "box1"},
+                    "correspondence_kind": "represents",
+                    "target": {"entity_id": _ENTITY_ID},
+                },
+                {
+                    "id": "bind-box2",
+                    "subject": {"kind": "entity", "id": "box2"},
+                    "correspondence_kind": "represents",
+                    "target": {"entity_id": _ENTITY_ID},
+                },
+            ],
+        }
+        r = _run(fm)
+        assert "E408" in _codes(r)
+
+    def test_duplicate_represents_with_visual_roles_passes(self) -> None:
+        fm = {
+            "diagram-entities": {"container": [{"id": "box1"}, {"id": "box2"}]},
+            "bindings": [
+                {
+                    "id": "bind-box1",
+                    "subject": {"kind": "entity", "id": "box1"},
+                    "correspondence_kind": "represents",
+                    "target": {"entity_id": _ENTITY_ID},
+                    "visual_role": "primary",
+                },
+                {
+                    "id": "bind-box2",
+                    "subject": {"kind": "entity", "id": "box2"},
+                    "correspondence_kind": "represents",
+                    "target": {"entity_id": _ENTITY_ID},
+                    "visual_role": "replica",
+                },
+            ],
+        }
+        r = _run(fm, allowed_bindings=_VISUAL_ROLES_ALLOWED_BINDINGS)
         assert "E408" not in _codes(r)

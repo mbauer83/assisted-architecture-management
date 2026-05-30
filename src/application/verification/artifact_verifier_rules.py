@@ -3,7 +3,7 @@ from typing import Literal
 
 from src.application.artifact_parsing import extract_declared_puml_aliases as _extract_declared_puml_aliases_shared
 from src.application.modeling.artifact_write import ARCHIMATE_STEREOTYPE_TO_CONNECTION_TYPE
-from src.application.verification._verifier_rules_bindings import check_bindings_scoped
+from src.application.verification._verifier_rules_bindings import check_bindings_scoped, get_allowed_bindings
 from src.application.verification.artifact_verifier_registry import ArtifactRegistry
 from src.application.verification.artifact_verifier_types import (
     DIAGRAM_ARTIFACT_TYPES,
@@ -163,14 +163,11 @@ def check_diagram_references_scoped(
         loc,
     )
     check_bindings_scoped(
-        fm,
-        file_scope,
-        allowed_entities,
-        allowed_connections,
-        all_entities,
-        all_connections,
-        result,
-        loc,
+        fm, file_scope,
+        allowed_entities, allowed_connections,
+        all_entities, all_connections,
+        result, loc,
+        allowed_bindings=get_allowed_bindings(str(fm.get("diagram-type", ""))),
     )
 
 

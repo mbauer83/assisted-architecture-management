@@ -5,17 +5,43 @@ E402: binding target entity_id unknown or out of scope.
 E403: binding target connection_id unknown or out of scope.
 E404: duplicate 'represents' binding for the same subject element.
 E405: duplicate diagram-level 'scoped-by' binding.
-E406: correspondence_kind not in the core five (Phase 2 adds module-declared kinds).
+E406: correspondence_kind not in the allowed set (core five + module-declared kinds for the element type).
 E407: a member of target.connection_ids is unknown or out of scope.
-E408: duplicate 'represents' binding for the same model target (visual_roles not yet supported).
+E408: duplicate 'represents' binding for the same model target (without visual_roles).
 """
 
 from __future__ import annotations
 
+from functools import lru_cache
 from typing import Literal
 
-from src.domain.bindings import CORE_CORRESPONDENCE_KINDS
+from src.application.verification._verifier_rules_binding_targets import check_binding_target
 from src.application.verification.artifact_verifier_types import Issue, Severity, VerificationResult
+from src.domain.allowed_bindings import AllowedBindingsSpec
+from src.domain.bindings import CORE_CORRESPONDENCE_KINDS
+
+
+@lru_cache(maxsize=1)
+def _module_registry():
+    from src.infrastructure.app_bootstrap import get_module_registry  # noqa: PLC0415
+
+    return get_module_registry()
+
+
+def get_allowed_bindings(diagram_type: str) -> AllowedBindingsSpec | None:
+    """Return AllowedBindingsSpec for a diagram type, or None if unknown/not declared."""
+    if not diagram_type:
+        return None
+    try:
+        mod = _module_registry().find_diagram_type(diagram_type)
+    except Exception:  # noqa: BLE001
+        return None
+    if mod is None:
+        return None
+    guidance = mod.write_guidance()
+    ab = guidance.allowed_bindings
+    return ab if ab is not None and not ab.is_empty() else None
+
 
 # ---------------------------------------------------------------------------
 # Public entry point — called from check_diagram_references_scoped
@@ -31,10 +57,13 @@ def check_bindings_scoped(
     all_connections: set[str],
     result: VerificationResult,
     loc: str,
+    allowed_bindings: AllowedBindingsSpec | None = None,
 ) -> None:
     """Validate top-level bindings in a diagram's frontmatter.
 
-    Skips silently when there are no bindings.  Calls _check_bindings.
+    Skips silently when there are no bindings.
+    ``allowed_bindings`` is the diagram module's declared admissibility spec;
+    when None the verifier falls back to the core five correspondence kinds.
     """
     raw_bindings = fm.get("bindings")
     if not raw_bindings or not isinstance(raw_bindings, list):
@@ -42,11 +71,13 @@ def check_bindings_scoped(
 
     entity_element_ids = _collect_entity_element_ids(fm)
     connection_element_ids = _collect_connection_element_ids(fm)
+    entity_type_map = _build_entity_type_map(fm)
 
     _check_bindings(
         raw_bindings,
         entity_element_ids,
         connection_element_ids,
+        entity_type_map,
         file_scope,
         allowed_entities,
         allowed_connections,
@@ -54,11 +85,12 @@ def check_bindings_scoped(
         all_connections,
         result,
         loc,
+        allowed_bindings,
     )
 
 
 # ---------------------------------------------------------------------------
-# Private implementation
+# Private helpers
 # ---------------------------------------------------------------------------
 
 
@@ -86,10 +118,40 @@ def _collect_connection_element_ids(fm: dict) -> set[str]:
     return ids
 
 
+def _build_entity_type_map(fm: dict) -> dict[str, str]:
+    """Map entity element id → entity type from diagram-entities."""
+    mapping: dict[str, str] = {}
+    de = fm.get("diagram-entities")
+    if not isinstance(de, dict):
+        return mapping
+    for etype, items in de.items():
+        if isinstance(items, list):
+            for item in items:
+                if isinstance(item, dict) and item.get("id") is not None:
+                    mapping[str(item["id"])] = str(etype)
+    return mapping
+
+
+def _allowed_kinds_for_entity(
+    element_id: str,
+    entity_type_map: dict[str, str],
+    allowed_bindings: AllowedBindingsSpec | None,
+) -> frozenset[str]:
+    """Return allowed correspondence kinds for an entity subject."""
+    if allowed_bindings is None:
+        return CORE_CORRESPONDENCE_KINDS
+    etype = entity_type_map.get(element_id)
+    if etype is None:
+        return CORE_CORRESPONDENCE_KINDS
+    module_kinds = allowed_bindings.allowed_entity_kinds(etype)
+    return module_kinds if module_kinds is not None else CORE_CORRESPONDENCE_KINDS
+
+
 def _check_bindings(
     raw_bindings: list,
     entity_element_ids: set[str],
     connection_element_ids: set[str],
+    entity_type_map: dict[str, str],
     file_scope: Literal["enterprise", "engagement", "unknown"],
     allowed_entities: set[str],
     allowed_connections: set[str],
@@ -97,9 +159,10 @@ def _check_bindings(
     all_connections: set[str],
     result: VerificationResult,
     loc: str,
+    allowed_bindings: AllowedBindingsSpec | None,
 ) -> None:
-    represents_by_subject: dict[str, str] = {}  # subject_id → first binding id
-    represents_by_target: dict[str, str] = {}   # model_target → first binding id
+    represents_by_subject: dict[str, str] = {}   # subject_id → first binding id
+    represents_by_target: dict[str, str] = {}    # model_target → first binding id
     scoped_by_diagram_count = 0
 
     for raw in raw_bindings:
@@ -111,47 +174,26 @@ def _check_bindings(
         corr_kind = str(raw.get("correspondence_kind") or "")
         target = raw.get("target")
 
-        # --- correspondence_kind ---
-        if corr_kind not in CORE_CORRESPONDENCE_KINDS:
-            result.issues.append(
-                Issue(
-                    Severity.ERROR,
-                    "E406",
-                    (
-                        f"binding '{binding_id}': correspondence_kind '{corr_kind}' "
-                        "is not one of the core five "
-                        f"({', '.join(sorted(CORE_CORRESPONDENCE_KINDS))})"
-                    ),
-                    loc,
-                )
-            )
-
         # --- subject resolution ---
         if not isinstance(subject, dict):
             continue
         subject_kind = str(subject.get("kind") or "")
         subject_id = subject.get("id")
 
+        # --- E406: correspondence_kind check ---
+        _check_correspondence_kind(
+            binding_id, corr_kind, subject_kind, subject_id,
+            entity_type_map, allowed_bindings, result, loc,
+        )
+
         if subject_kind == "diagram":
-            if subject_id is not None:
-                result.issues.append(
-                    Issue(
-                        Severity.ERROR,
-                        "E401",
-                        (
-                            f"binding '{binding_id}': diagram-level binding must have no "
-                            f"subject.id (got '{subject_id}')"
-                        ),
-                        loc,
-                    )
-                )
+            _handle_diagram_subject(binding_id, subject_id, corr_kind, result, loc)
             if corr_kind == "scoped-by":
                 scoped_by_diagram_count += 1
                 if scoped_by_diagram_count > 1:
                     result.issues.append(
                         Issue(
-                            Severity.ERROR,
-                            "E405",
+                            Severity.ERROR, "E405",
                             f"binding '{binding_id}': diagram may have at most one diagram-level 'scoped-by' binding",
                             loc,
                         )
@@ -161,12 +203,8 @@ def _check_bindings(
             if not subject_id_str or subject_id_str not in entity_element_ids:
                 result.issues.append(
                     Issue(
-                        Severity.ERROR,
-                        "E401",
-                        (
-                            f"binding '{binding_id}': subject entity element '{subject_id_str}' "
-                            "not found in diagram-entities"
-                        ),
+                        Severity.ERROR, "E401",
+                        f"binding '{binding_id}': subject entity element '{subject_id_str}' not found in diagram-entities",
                         loc,
                     )
                 )
@@ -174,8 +212,7 @@ def _check_bindings(
                 if subject_id_str in represents_by_subject:
                     result.issues.append(
                         Issue(
-                            Severity.ERROR,
-                            "E404",
+                            Severity.ERROR, "E404",
                             (
                                 f"binding '{binding_id}': duplicate 'represents' binding for "
                                 f"subject element '{subject_id_str}' "
@@ -191,12 +228,8 @@ def _check_bindings(
             if not subject_id_str or subject_id_str not in connection_element_ids:
                 result.issues.append(
                     Issue(
-                        Severity.ERROR,
-                        "E401",
-                        (
-                            f"binding '{binding_id}': subject connection element '{subject_id_str}' "
-                            "not found in diagram connections"
-                        ),
+                        Severity.ERROR, "E401",
+                        f"binding '{binding_id}': subject connection element '{subject_id_str}' not found in diagram connections",
                         loc,
                     )
                 )
@@ -204,162 +237,67 @@ def _check_bindings(
         # --- target resolution ---
         if not isinstance(target, dict):
             continue
-        _check_binding_target(
-            binding_id,
-            corr_kind,
-            target,
-            entity_element_ids,
-            connection_element_ids,
-            file_scope,
-            allowed_entities,
-            allowed_connections,
-            all_entities,
-            all_connections,
-            represents_by_target,
-            result,
-            loc,
+
+        # Build visual_roles map for this binding's target entity (for E408)
+        visual_roles_for_target: dict[str, tuple[str, ...]] = {}
+        if subject_kind == "entity" and subject_id is not None:
+            etype = entity_type_map.get(str(subject_id))
+            if etype and allowed_bindings is not None:
+                roles = allowed_bindings.visual_roles_for(etype)
+                if "entity_id" in target and target["entity_id"] is not None:
+                    visual_roles_for_target[str(target["entity_id"])] = roles
+
+        check_binding_target(
+            binding_id, corr_kind, target,
+            entity_element_ids, connection_element_ids,
+            file_scope, allowed_entities, allowed_connections,
+            all_entities, all_connections,
+            represents_by_target, visual_roles_for_target,
+            result, loc,
         )
 
 
-def _check_binding_target(
+def _check_correspondence_kind(
     binding_id: str,
     corr_kind: str,
-    target: dict,
-    entity_element_ids: set[str],
-    connection_element_ids: set[str],
-    file_scope: Literal["enterprise", "engagement", "unknown"],
-    allowed_entities: set[str],
-    allowed_connections: set[str],
-    all_entities: set[str],
-    all_connections: set[str],
-    represents_by_target: dict[str, str],
+    subject_kind: str,
+    subject_id: object,
+    entity_type_map: dict[str, str],
+    allowed_bindings: AllowedBindingsSpec | None,
     result: VerificationResult,
     loc: str,
 ) -> None:
-    if "entity_id" in target:
-        eid = str(target["entity_id"]) if target["entity_id"] is not None else ""
-        _check_entity_target(binding_id, corr_kind, eid, file_scope, allowed_entities, all_entities, represents_by_target, result, loc)
+    if subject_kind == "entity" and subject_id is not None:
+        valid_kinds = _allowed_kinds_for_entity(str(subject_id), entity_type_map, allowed_bindings)
+    else:
+        valid_kinds = CORE_CORRESPONDENCE_KINDS
 
-    elif "connection_id" in target:
-        cid = str(target["connection_id"]) if target["connection_id"] is not None else ""
-        _check_single_connection_target(binding_id, cid, file_scope, allowed_connections, all_connections, result, loc)
-
-    elif "connection_ids" in target:
-        raw_cids = target["connection_ids"]
-        if isinstance(raw_cids, list):
-            for cid_raw in raw_cids:
-                cid = str(cid_raw)
-                _check_single_connection_target(binding_id, cid, file_scope, allowed_connections, all_connections, result, loc, code="E407")
-
-    elif "diagram_local" in target:
-        dl = target["diagram_local"]
-        if isinstance(dl, dict) and dl.get("diagram_id") is None:
-            element_id = str(dl.get("element_id") or "")
-            all_element_ids = entity_element_ids | connection_element_ids
-            if element_id and element_id not in all_element_ids:
-                result.issues.append(
-                    Issue(
-                        Severity.ERROR,
-                        "E401",
-                        (
-                            f"binding '{binding_id}': diagram_local target element_id "
-                            f"'{element_id}' not found in diagram elements"
-                        ),
-                        loc,
-                    )
-                )
-        # If diagram_id is set, it references another diagram — skip resolution (not in scope here)
-
-    # connection_path: Phase 3 — no resolution check yet
+    if corr_kind not in valid_kinds:
+        result.issues.append(
+            Issue(
+                Severity.ERROR, "E406",
+                (
+                    f"binding '{binding_id}': correspondence_kind '{corr_kind}' "
+                    f"is not allowed for this element "
+                    f"(allowed: {', '.join(sorted(valid_kinds))})"
+                ),
+                loc,
+            )
+        )
 
 
-def _check_entity_target(
+def _handle_diagram_subject(
     binding_id: str,
+    subject_id: object,
     corr_kind: str,
-    entity_id: str,
-    file_scope: Literal["enterprise", "engagement", "unknown"],
-    allowed_entities: set[str],
-    all_entities: set[str],
-    represents_by_target: dict[str, str],
     result: VerificationResult,
     loc: str,
 ) -> None:
-    if not entity_id:
-        return
-    if entity_id not in allowed_entities:
-        if entity_id in all_entities and file_scope == "enterprise":
-            result.issues.append(
-                Issue(
-                    Severity.ERROR,
-                    "E402",
-                    (
-                        f"binding '{binding_id}': target entity_id '{entity_id}' is not an "
-                        "enterprise entity — enterprise diagram bindings may only target enterprise entities"
-                    ),
-                    loc,
-                )
+    if subject_id is not None:
+        result.issues.append(
+            Issue(
+                Severity.ERROR, "E401",
+                f"binding '{binding_id}': diagram-level binding must have no subject.id (got '{subject_id}')",
+                loc,
             )
-        else:
-            result.issues.append(
-                Issue(
-                    Severity.ERROR,
-                    "E402",
-                    f"binding '{binding_id}': target entity_id '{entity_id}' does not exist in scope",
-                    loc,
-                )
-            )
-        return
-
-    if corr_kind == "represents":
-        if entity_id in represents_by_target:
-            result.issues.append(
-                Issue(
-                    Severity.ERROR,
-                    "E408",
-                    (
-                        f"binding '{binding_id}': model entity '{entity_id}' already has a "
-                        f"'represents' binding in this diagram "
-                        f"(first seen in binding '{represents_by_target[entity_id]}'). "
-                        "Use visual_roles in the diagram module to allow multiple occurrences."
-                    ),
-                    loc,
-                )
-            )
-        else:
-            represents_by_target[entity_id] = binding_id
-
-
-def _check_single_connection_target(
-    binding_id: str,
-    connection_id: str,
-    file_scope: Literal["enterprise", "engagement", "unknown"],
-    allowed_connections: set[str],
-    all_connections: set[str],
-    result: VerificationResult,
-    loc: str,
-    code: str = "E403",
-) -> None:
-    if not connection_id:
-        return
-    if connection_id not in allowed_connections:
-        if connection_id in all_connections and file_scope == "enterprise":
-            result.issues.append(
-                Issue(
-                    Severity.ERROR,
-                    code,
-                    (
-                        f"binding '{binding_id}': target connection '{connection_id}' is not an "
-                        "enterprise connection — enterprise diagram bindings may only target enterprise connections"
-                    ),
-                    loc,
-                )
-            )
-        else:
-            result.issues.append(
-                Issue(
-                    Severity.ERROR,
-                    code,
-                    f"binding '{binding_id}': target connection '{connection_id}' does not exist in scope",
-                    loc,
-                )
-            )
+        )

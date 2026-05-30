@@ -2,12 +2,14 @@
 
 from __future__ import annotations
 
+import dataclasses
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
 import yaml  # type: ignore[import-untyped]
 
+from src.domain.allowed_bindings import AllowedBindingsSpec, allowed_bindings_from_config
 from src.domain.module_types import ConnectionTypeName, EntityTypeName
 from src.domain.ontology_types import (
     ConnectionTypeInfo,
@@ -27,6 +29,7 @@ class DiagramOntology:
     entity_type_managed_fields: dict[str, dict[str, str]]  # explicit managed-field descriptions per entity type
     connection_types: dict[ConnectionTypeName, ConnectionTypeInfo]
     permitted_relationships: PermittedRelationshipSet
+    allowed_bindings: AllowedBindingsSpec = dataclasses.field(default_factory=AllowedBindingsSpec.empty)
 
 
 def load_diagram_ontology(path: Path) -> DiagramOntology:
@@ -49,12 +52,14 @@ def load_diagram_ontology(path: Path) -> DiagramOntology:
         entity_types,
         connection_types,
     )
+    allowed_bindings = allowed_bindings_from_config(raw.get("allowed_bindings"))
     return DiagramOntology(
         entity_types=entity_types,
         entity_type_properties=entity_type_properties,
         entity_type_managed_fields=entity_type_managed_fields,
         connection_types=connection_types,
         permitted_relationships=permitted,
+        allowed_bindings=allowed_bindings,
     )
 
 

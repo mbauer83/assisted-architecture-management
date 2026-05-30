@@ -16,6 +16,7 @@ from __future__ import annotations
 
 from functools import lru_cache
 
+from src.domain.allowed_bindings import serialize_allowed_bindings
 from src.domain.connection_ontology import classify_connections
 from src.domain.module_types import EntityTypeName
 from src.domain.ontology_protocol import DiagramTypeWriteGuidance
@@ -83,6 +84,8 @@ def _serialize_diagram_type_guidance(
         out["own_entity_types"] = [_serialize_own_entity_type(oe) for oe in g.own_entity_types]
     if g.puml_notes:
         out["puml_notes"] = list(g.puml_notes)
+    if g.allowed_bindings is not None:
+        out["allowed_bindings"] = serialize_allowed_bindings(g.allowed_bindings)
     return out
 
 
