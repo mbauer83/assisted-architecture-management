@@ -7,6 +7,7 @@ from typing import Any
 import yaml  # type: ignore[import-untyped]
 
 from src.diagram_types.activity.renderer import ActivityPumlRenderer
+from src.domain.bridges import BridgeDeclaration
 from src.domain.diagram_entities_schema import derive_diagram_entities_schema
 from src.domain.diagram_ontology_loader import DiagramOntology, load_diagram_ontology
 from src.domain.module_types import ConnectionTypeName, DiagramTypeName, EntityTypeName, FreeOntology
@@ -173,6 +174,10 @@ class _ActivityDiagramType(DiagramTypeBase):
     @property
     def own_permitted_relationships(self) -> PermittedRelationshipSet:
         return self._ontology.permitted_relationships
+
+    @property
+    def bridges(self) -> tuple[BridgeDeclaration, ...]:
+        return self._ontology.bridges
 
     @property
     def renderer(self) -> DiagramRenderer:
