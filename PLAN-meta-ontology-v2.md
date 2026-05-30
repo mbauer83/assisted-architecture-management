@@ -1274,7 +1274,7 @@ the convention that must be followed when future ontology modules introduce new 
   every ontology module that introduces a new `hierarchy[0]` domain **must** add a
   `DOMAIN_CONFIG` entry to `domains.ts` so the domain chip renders correctly. No other frontend
   structural change is needed for the current multi-ontology state. — 2026-05-30, 2f988c3, sysml #c0d4ee/'SysML v2'; README example fixed (domain→hierarchy, removed stale fields); domains.ts convention documented
-- [ ] **21.** *(after #17, #18, #19)* Final documentation and consistency pass:
+- [x] **21.** *(after #17, #18, #19)* Final documentation and consistency pass:
   (a) update `src/ontologies/README.md` — multi-module conventions: element-class uniqueness
   (no cross-module redeclaration), per-module domain-naming convention, and the `domains.ts`
   display-config requirement established in #20;
@@ -1282,7 +1282,7 @@ the convention that must be followed when future ontology modules introduce new 
   and connection types and for the sequence diagram module;
   (c) run the verifier over the `ENG-ARCH-REPO` self-model to confirm no type drift after all
   Phase 0–4 changes;
-  (d) confirm `zuban check` and the full test suite are green with all phases merged.
+  (d) confirm `zuban check` and the full test suite are green with all phases merged. — 2026-05-30, TBD, README: element-class uniqueness + 4-point multi-module conventions; 8 new guidance tests (SysML domain filter + sequence allowed_bindings); ENG-ARCH-REPO verifier: 0 type-drift/binding errors, pre-existing E011/E155/E312/E350 only; 1042 tests green, zuban clean
 
 ## References
 

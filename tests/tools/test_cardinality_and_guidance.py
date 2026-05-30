@@ -634,3 +634,74 @@ class TestGetTypeGuidance:
         assert any("hidden by default" in note for note in notes)
         assert any("diagram_connections" in note for note in notes)
         assert any("include_description" in note for note in notes)
+
+    # ---- SysML v2 min entity / connection type guidance --------------------
+
+    def test_sysml_domain_filter_returns_all_ten_types(self) -> None:
+        result = get_type_guidance(filter=["sysml"])
+        assert _guidance_total(result) == 10
+
+    def test_sysml_entity_types_have_required_fields(self) -> None:
+        result = get_type_guidance(filter=["sysml"])
+        for entry in _guidance_entries(result):
+            for field in ("name", "prefix", "classes", "create_when", "never_create_when"):
+                assert field in entry, f"{entry.get('name')!r} missing field {field!r}"
+
+    def test_sysml_entity_types_have_definition_or_usage_class(self) -> None:
+        result = get_type_guidance(filter=["sysml"])
+        for entry in _guidance_entries(result):
+            classes = cast(list[str], entry["classes"])
+            assert "definition" in classes or "usage" in classes, (
+                f"{entry['name']!r} must carry 'definition' or 'usage' class"
+            )
+
+    def test_sysml_connection_types_accessible_via_permitted_connections(self) -> None:
+        result = get_type_guidance(filter=["part-definition"])
+        entry = _guidance_entries(result)[0]
+        # permitted_connections: {direction: {target_type: [conn_type, ...]}}
+        conns = cast(dict[str, dict[str, list[str]]], entry["permitted_connections"])
+        all_conn_types = {
+            ct
+            for by_target in conns.values()
+            for conn_list in by_target.values()
+            for ct in conn_list
+        }
+        sysml_conn_types = {"feature-membership", "specialization"}
+        assert sysml_conn_types & all_conn_types, (
+            f"Expected at least one SysML connection type; got {sorted(all_conn_types)}"
+        )
+
+    # ---- Sequence diagram module allowed_bindings --------------------------
+
+    def test_sequence_guidance_has_allowed_bindings(self) -> None:
+        result = get_type_guidance(diagram_type="sequence")
+        guidance = cast(dict[str, object], result["diagram_type_guidance"])
+        assert "allowed_bindings" in guidance
+
+    def test_sequence_allowed_bindings_has_lifeline_and_message(self) -> None:
+        result = get_type_guidance(diagram_type="sequence")
+        guidance = cast(dict[str, object], result["diagram_type_guidance"])
+        ab = cast(dict[str, object], guidance["allowed_bindings"])
+        entity_ab = cast(dict[str, object], ab.get("entity", {}))
+        assert "lifeline" in entity_ab, "allowed_bindings.entity must have 'lifeline' entry"
+        assert "message" in entity_ab, "allowed_bindings.entity must have 'message' entry"
+
+    def test_sequence_lifeline_correspondence_kinds(self) -> None:
+        result = get_type_guidance(diagram_type="sequence")
+        guidance = cast(dict[str, object], result["diagram_type_guidance"])
+        ab = cast(dict[str, object], guidance["allowed_bindings"])
+        lifeline = cast(dict[str, object], cast(dict[str, object], ab["entity"])["lifeline"])
+        kinds = cast(list[str], lifeline["correspondence_kinds"])
+        assert "represents" in kinds
+        assert lifeline["default_correspondence_kind"] == "represents"
+        assert "entity-id" in cast(list[str], lifeline["target_forms"])
+
+    def test_sequence_message_correspondence_kinds(self) -> None:
+        result = get_type_guidance(diagram_type="sequence")
+        guidance = cast(dict[str, object], result["diagram_type_guidance"])
+        ab = cast(dict[str, object], guidance["allowed_bindings"])
+        message = cast(dict[str, object], cast(dict[str, object], ab["entity"])["message"])
+        kinds = cast(list[str], message["correspondence_kinds"])
+        assert "represents" in kinds
+        assert "abstracts" in kinds
+        assert "connection-id" in cast(list[str], message["target_forms"])

@@ -223,7 +223,9 @@ At runtime, note→step relationships are stored as `ConnectionRecord` objects (
 
 ## Element class declarations
 
-Every element class referenced in the `classes` field of any entity type must be declared in the originating module. Model ontologies declare them in `entities.yaml` under a top-level `element_classes:` block:
+Each element class must be declared by **exactly one** registered module. A module may freely *reference* element classes declared by other modules; it must **not redeclare** them. `ModuleRegistry.all_element_classes()` raises `ValueError` on any duplicate declaration, and startup validation aborts with an "Element class declaration conflict" error.
+
+Model ontologies declare their own classes in `entities.yaml` under a top-level `element_classes:` block:
 
 ```yaml
 element_classes:
@@ -233,7 +235,26 @@ element_classes:
     description: Dynamic/behavioral element (ArchiMate)
 ```
 
-Diagram types declare their element classes in `config.yaml` under `element_classes:`. The `ModuleRegistry.all_element_classes()` method merges all declared classes; startup validation aborts if any entity type's `classes` field references an undeclared class.
+Diagram types declare their element classes in `config.yaml` under `element_classes:`. To reuse a class from another module, simply list it in `classes:` without redeclaring it:
+
+```yaml
+# OK — sysml_v2_min reuses classes owned by archimate_next
+entity_types:
+  part-definition:
+    classes: [definition, structure-element]   # 'definition' declared here; 'structure-element' from archimate_next
+```
+
+## Multi-module conventions
+
+Follow these rules when adding any new ontology module alongside an existing one:
+
+**1. Domain name uniqueness.** Each ontology module must use a distinct `hierarchy[0]` domain name not used by any other module. Reusing another module's domain name mixes types from different ontologies into the same frontend group and makes `hierarchy[0]`-based filtering unreliable.
+
+**2. Element class ownership.** Declare only the element classes that belong to your module's vocabulary. If your entity types need a class already declared by another module, reference it directly in `classes:` — do not redeclare it. Startup validation enforces this by aborting on any duplicate.
+
+**3. Frontend domain chip.** Every new `hierarchy[0]` domain name must have a corresponding entry in `tools/gui/src/ui/lib/domains.ts` under `DOMAIN_CONFIG` (see the convention note in Step 2 above). Omitting it causes the domain chip to render with a fallback grey and the raw string.
+
+**4. Type name uniqueness.** Entity type names and connection type names must be globally unique across all registered ontologies (`ModuleRegistry` enforces this at startup with a `ValueError`).
 
 ## Startup validation
 
