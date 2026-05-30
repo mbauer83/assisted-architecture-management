@@ -60,7 +60,12 @@ def check_binding_target(
                         loc,
                     )
                 )
-    # connection_path: Phase 3 — no resolution check yet
+    elif "connection_path" in target:
+        cp_raw = target["connection_path"]
+        if isinstance(cp_raw, list):
+            _check_connection_path_target(
+                binding_id, cp_raw, allowed_connections, result, loc
+            )
 
 
 def _check_entity_target(
@@ -124,6 +129,59 @@ def _check_entity_target(
                 loc,
             )
         )
+
+
+def _conn_endpoints(conn_id: str) -> tuple[str, str] | None:
+    """Parse (source, target) entity ids from a canonical {src}---{tgt}@@{type} id."""
+    dash = conn_id.find("---")
+    if dash < 0:
+        return None
+    source = conn_id[:dash]
+    rest = conn_id[dash + 3:]
+    at = rest.find("@@")
+    target = rest[:at] if at >= 0 else rest
+    return source, target
+
+
+def _check_connection_path_target(
+    binding_id: str,
+    cp_raw: list,
+    allowed_connections: set[str],
+    result: VerificationResult,
+    loc: str,
+) -> None:
+    """E409: step id not in scope. E410: chain not contiguous under orientation."""
+    prev_to: str | None = None
+    for i, step in enumerate(cp_raw):
+        if not isinstance(step, dict):
+            continue
+        step_id = str(step.get("id") or "")
+        reversed_flag = bool(step.get("reversed", False))
+        if not step_id or step_id not in allowed_connections:
+            result.issues.append(Issue(
+                Severity.ERROR, "E409",
+                f"binding '{binding_id}': connection_path step {i} id '{step_id}' does not exist in scope",
+                loc,
+            ))
+            prev_to = None
+            continue
+        endpoints = _conn_endpoints(step_id)
+        if endpoints is None:
+            prev_to = None
+            continue
+        src, tgt = endpoints
+        step_from = tgt if reversed_flag else src
+        step_to = src if reversed_flag else tgt
+        if prev_to is not None and step_from != prev_to:
+            result.issues.append(Issue(
+                Severity.ERROR, "E410",
+                (
+                    f"binding '{binding_id}': connection_path is not contiguous at step {i}: "
+                    f"expected from='{prev_to}', got from='{step_from}' (id='{step_id}')"
+                ),
+                loc,
+            ))
+        prev_to = step_to
 
 
 def _check_single_connection_target(

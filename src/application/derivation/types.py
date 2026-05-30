@@ -11,10 +11,15 @@ from src.domain.view_derivations import SourceModelSnapshot
 
 @dataclass(frozen=True)
 class CandidateSet:
-    """Output of a derivation strategy: sets of model entity/connection artifact_ids."""
+    """Output of a derivation strategy: sets of model entity/connection artifact_ids.
+
+    path-projection adds ``paths`` — a frozenset of canonical path keys
+    (format: ``id1@fwd|id2@rev|...``) representing ordered connection paths.
+    """
 
     entity_ids: frozenset[str] = field(default_factory=frozenset)
     connection_ids: frozenset[str] = field(default_factory=frozenset)
+    paths: frozenset[str] = field(default_factory=frozenset)
 
 
 class ModelQuery(Protocol):

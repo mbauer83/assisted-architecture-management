@@ -27,6 +27,8 @@ class DerivationSelection:
     excluded_entity_ids: tuple[str, ...] = ()
     included_connection_ids: tuple[str, ...] = ()
     excluded_connection_ids: tuple[str, ...] = ()
+    included_paths: tuple[str, ...] = ()  # canonical path keys: id1@fwd|id2@rev|...
+    excluded_paths: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -70,6 +72,8 @@ VIEW_DERIVATIONS_SCHEMA: dict[str, object] = {
                     "excluded_entity_ids": {"type": "array", "items": {"type": "string"}},
                     "included_connection_ids": {"type": "array", "items": {"type": "string"}},
                     "excluded_connection_ids": {"type": "array", "items": {"type": "string"}},
+                    "included_paths": {"type": "array", "items": {"type": "string"}},
+                    "excluded_paths": {"type": "array", "items": {"type": "string"}},
                 },
             },
             "generated_at": {"type": "string"},
@@ -104,6 +108,8 @@ def _parse_selection(raw: dict[str, object]) -> DerivationSelection:
         excluded_entity_ids=_ids("excluded_entity_ids"),
         included_connection_ids=_ids("included_connection_ids"),
         excluded_connection_ids=_ids("excluded_connection_ids"),
+        included_paths=_ids("included_paths"),
+        excluded_paths=_ids("excluded_paths"),
     )
 
 
@@ -157,6 +163,10 @@ def _selection_to_dict(sel: DerivationSelection) -> dict[str, object]:
         result["included_connection_ids"] = list(sel.included_connection_ids)
     if sel.excluded_connection_ids:
         result["excluded_connection_ids"] = list(sel.excluded_connection_ids)
+    if sel.included_paths:
+        result["included_paths"] = list(sel.included_paths)
+    if sel.excluded_paths:
+        result["excluded_paths"] = list(sel.excluded_paths)
     return result
 
 

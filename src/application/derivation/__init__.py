@@ -18,7 +18,7 @@ from src.application.derivation.strategy_registry import (
 from src.application.derivation.types import CandidateSet, DeriveFn, ModelQuery
 
 # Import strategy modules to trigger self-registration.
-from . import explicit_selection, incident_connections, local_neighborhood  # noqa: E402, F401
+from . import explicit_selection, incident_connections, local_neighborhood, path_projection  # noqa: E402, F401
 
 __all__ = [
     "CandidateSet",
@@ -28,6 +28,7 @@ __all__ = [
     "explicit_selection",
     "incident_connections",
     "local_neighborhood",
+    "path_projection",
     "lookup_derive_fn",
     "lookup_strategy",
     "register_strategy",
