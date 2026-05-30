@@ -1282,7 +1282,7 @@ the convention that must be followed when future ontology modules introduce new 
   and connection types and for the sequence diagram module;
   (c) run the verifier over the `ENG-ARCH-REPO` self-model to confirm no type drift after all
   Phase 0–4 changes;
-  (d) confirm `zuban check` and the full test suite are green with all phases merged. — 2026-05-30, TBD, README: element-class uniqueness + 4-point multi-module conventions; 8 new guidance tests (SysML domain filter + sequence allowed_bindings); ENG-ARCH-REPO verifier: 0 type-drift/binding errors, pre-existing E011/E155/E312/E350 only; 1042 tests green, zuban clean
+  (d) confirm `zuban check` and the full test suite are green with all phases merged. — 2026-05-30, ab15449, README: element-class uniqueness + 4-point multi-module conventions; 8 new guidance tests (SysML domain filter + sequence allowed_bindings); ENG-ARCH-REPO verifier: 0 type-drift/binding errors, pre-existing E011/E155/E312/E350 only; 1042 tests green, zuban clean
 
 ## References
 
