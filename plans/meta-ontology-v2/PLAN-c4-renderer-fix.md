@@ -164,5 +164,6 @@ F is independent — run separately after A–E are done.
 - [x] B — SPEC-phase-3 §2.3 table update
 - [x] C — PLAN-meta-ontology-v2.md task #22
 - [x] D — SPEC-phase-3 §2.4 use-cases
-- [ ] E — GUI excluded_entity_ids checklist (deferred)
+- [x] E — GUI excluded_entity_ids checklist
 - [ ] F — `diagram_types/` family subdirectory restructure (standalone, do separately)
+- [ ] G — Replace `collect_derived_items` stopgap with `ViewDerivationRequest` + strategy dispatch — see `PLAN-diagram-view-derivation.md`
