@@ -83,7 +83,13 @@ def preview_diagram(body: DiagramPreviewBody) -> dict[str, Any]:
         diagram_connections=dc,
     )
     image, warnings = render_puml_preview(puml, repo_root, body.diagram_type)
-    return {"puml": puml, "image": image, "warnings": warnings}
+
+    from src.infrastructure.diagram_types import get_diagram_type
+    derived_entities = get_diagram_type(body.diagram_type).collect_derived_items(
+        body.diagram_type, repo_root, diagram_entities=de,
+    )
+
+    return {"puml": puml, "image": image, "warnings": warnings, "derived_entities": derived_entities}
 
 
 @router.post("/api/diagram")

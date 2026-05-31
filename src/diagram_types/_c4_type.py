@@ -259,6 +259,27 @@ class _C4DiagramType(DiagramTypeBase):
         nav = build_c4_navigation(repo, diagram_id, str(self._name), diagram_entities)
         return {"c4_navigation": nav} if nav is not None else {}
 
+    def collect_derived_items(
+        self,
+        diagram_type: str,
+        repo_root: Path,
+        *,
+        diagram_entities: Mapping[str, object] | None = None,
+    ) -> list[dict[str, str]] | None:
+        from src.diagram_types._c4_resolve import resolve_c4_state  # noqa: PLC0415
+
+        de = diagram_entities or {}
+        if not str(de.get("_scope_entity_id") or "").strip():
+            return None
+        state = resolve_c4_state(
+            self._config, diagram_type, repo_root,
+            de, [], self._renderer._person_archimate_types,
+        )
+        return [
+            {"id": item.local_id, "name": item.label, "item_type": item.item_type}
+            for item in state.outside_items + state.internal_items
+        ]
+
 def _person_archimate_types(ontology: DiagramOntology) -> frozenset[str]:
     person_et = ontology.entity_types.get(EntityTypeName("person"))
     if person_et is None:

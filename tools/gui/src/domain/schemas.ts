@@ -520,10 +520,18 @@ export const DiagramEntityDiscoverySchema = Schema.Struct({
 })
 export type DiagramEntityDiscovery = typeof DiagramEntityDiscoverySchema.Type
 
+export const DerivedEntitySchema = Schema.Struct({
+  id: Schema.String,
+  name: Schema.String,
+  item_type: Schema.String,
+})
+export type DerivedEntity = typeof DerivedEntitySchema.Type
+
 export const DiagramPreviewResultSchema = Schema.Struct({
   puml: Schema.String,
   image: Schema.NullOr(Schema.String),
   warnings: Schema.Array(Schema.String),
+  derived_entities: Schema.NullOr(Schema.Array(DerivedEntitySchema)),
 })
 export type DiagramPreviewResult = typeof DiagramPreviewResultSchema.Type
 
