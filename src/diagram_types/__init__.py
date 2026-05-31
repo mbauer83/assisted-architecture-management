@@ -4,16 +4,16 @@ from __future__ import annotations
 
 from src.diagram_types.activity import module as activity
 from src.diagram_types.sequence import module as sequence
-from src.diagram_types.archimate_application import module as archimate_application
-from src.diagram_types.archimate_business import module as archimate_business
-from src.diagram_types.archimate_implementation import module as archimate_implementation
-from src.diagram_types.archimate_layered import module as archimate_layered
-from src.diagram_types.archimate_motivation import module as archimate_motivation
-from src.diagram_types.archimate_strategy import module as archimate_strategy
-from src.diagram_types.archimate_technology import module as archimate_technology
-from src.diagram_types.c4_component import module as c4_component
-from src.diagram_types.c4_container import module as c4_container
-from src.diagram_types.c4_system_context import module as c4_system_context
+from src.diagram_types.archimate.application import module as archimate_application
+from src.diagram_types.archimate.business import module as archimate_business
+from src.diagram_types.archimate.implementation import module as archimate_implementation
+from src.diagram_types.archimate.layered import module as archimate_layered
+from src.diagram_types.archimate.motivation import module as archimate_motivation
+from src.diagram_types.archimate.strategy import module as archimate_strategy
+from src.diagram_types.archimate.technology import module as archimate_technology
+from src.diagram_types.c4.component import module as c4_component
+from src.diagram_types.c4.container import module as c4_container
+from src.diagram_types.c4.system_context import module as c4_system_context
 from src.diagram_types.matrix import module as matrix
 from src.domain.module_registry import ModuleRegistry
 from src.domain.ontology_protocol import DiagramTypeModule

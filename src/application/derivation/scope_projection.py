@@ -7,7 +7,7 @@ delegates to the registered module projection.
 
 To register a module projection:
     from src.application.derivation.scope_projection import register_module_projection
-    register_module_projection("c4", 1, my_derive_fn)
+    register_module_projection("my-module", 1, my_derive_fn)
 
 Supported pre_filters: repo_scope
 """

@@ -1,6 +1,6 @@
 # C4 Renderer Corrections
 
-**Status**: active  
+**Status**: done (implemented 2026-05-31)  
 **Root**: meta-ontology v2 post-implementation gap — discovered 2026-05-30 via browser testing.
 
 ## Background
@@ -114,6 +114,7 @@ src/diagram_types/
     _type.py          (was _c4_type.py)
     renderer.py       (was c4_renderer.py)
     _resolve.py       (was _c4_resolve.py)
+    _projection.py    (was _c4_projection.py)   ← added 2026-05-31
     _navigation.py    (was _c4_navigation.py)
     system_context/   (was c4_system_context/)
     container/        (was c4_container/)
@@ -147,7 +148,7 @@ src/diagram_types/
 - [ ] All files moved; no root-level `_c4_*`, `c4_renderer.py`, or `_archimate_type.py`
   remain.
 - [ ] All Python imports updated (src + tests); `grep -r "diagram_types\._c4\|diagram_types\.c4_\|diagram_types\._archimate"` returns nothing.
-- [ ] Full test suite green (≥ 1042 tests); `zuban check` clean.
+- [ ] Full test suite green (≥ 1072 tests); `zuban check` clean.
 - [ ] `src/diagram_types/README.md` updated to show new layout.
 - [ ] No changes to `config.yaml` `name:` fields, no changes to frontend, no logic edits.
 
@@ -165,5 +166,5 @@ F is independent — run separately after A–E are done.
 - [x] C — PLAN-meta-ontology-v2.md task #22
 - [x] D — SPEC-phase-3 §2.4 use-cases
 - [x] E — GUI excluded_entity_ids checklist
-- [ ] F — `diagram_types/` family subdirectory restructure (standalone, do separately)
-- [ ] G — Replace `collect_derived_items` stopgap with `ViewDerivationRequest` + strategy dispatch — see `PLAN-diagram-view-derivation.md`
+- [x] F — `diagram_types/` family subdirectory restructure (standalone, do separately)
+- [x] G — `collect_derived_items` removed (2026-05-31). Replaced by `ViewProjector.project_view` + unified `project_c4` engine. Preview endpoint now calls `project_view_for_preview` (generic service). Renderer (`_c4_resolve._resolve_model_backed`) converged onto the same engine. See `PLAN-diagram-view-derivation.md` (status: done).

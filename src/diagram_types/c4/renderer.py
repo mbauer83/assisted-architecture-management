@@ -7,7 +7,7 @@ from collections.abc import Mapping, Sequence
 from pathlib import Path
 from typing import Any
 
-from src.diagram_types._c4_resolve import _ResolvedItem, resolve_c4_state
+from src.diagram_types.c4._resolve import _ResolvedItem, resolve_c4_state
 from src.domain.artifact_types import ConnectionRecord, EntityRecord
 from src.domain.ontology_protocol import DiagramRendererReferences
 from src.infrastructure.rendering.puml_safety import (

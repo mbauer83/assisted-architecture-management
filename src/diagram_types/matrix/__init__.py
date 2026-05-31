@@ -54,6 +54,7 @@ class _MatrixRenderer:
         return DiagramRendererReferences()
 
 
+
 class _MatrixDiagramType(DiagramTypeBase):
     def __init__(self, config: dict[str, Any]) -> None:
         self._config = config

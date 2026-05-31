@@ -9,9 +9,9 @@ import pytest
 from src.domain.diagram_ontology_loader import load_diagram_ontology
 
 
-_C4_CONTAINER_DIR = Path("src/diagram_types/c4_container")
-_C4_CONTEXT_DIR = Path("src/diagram_types/c4_system_context")
-_C4_COMPONENT_DIR = Path("src/diagram_types/c4_component")
+_C4_CONTAINER_DIR = Path("src/diagram_types/c4/container")
+_C4_CONTEXT_DIR = Path("src/diagram_types/c4/system_context")
+_C4_COMPONENT_DIR = Path("src/diagram_types/c4/component")
 _ACTIVITY_DIR = Path("src/diagram_types/activity")
 
 

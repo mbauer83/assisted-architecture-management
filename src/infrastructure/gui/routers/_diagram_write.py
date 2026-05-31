@@ -7,6 +7,9 @@ from typing import Any
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
+from src.application.derivation.preview import project_view_for_preview
+from src.infrastructure.artifact_index import shared_artifact_index
+from src.infrastructure.diagram_types import get_diagram_type
 from src.infrastructure.gui.routers import state as s
 from src.infrastructure.gui.routers._diagram_selection import resolve_diagram_selection
 
@@ -73,6 +76,9 @@ def preview_diagram(body: DiagramPreviewBody) -> dict[str, Any]:
     repo = s.get_repo()
     entities, connections, _, _ = resolve_diagram_selection(repo, body.entity_ids, body.connection_ids)
     de, dc = _split_diagram_entities(body.diagram_entities)
+
+    query = shared_artifact_index([repo_root])
+
     puml = generate_archimate_puml_body(
         body.name,
         entities,
@@ -84,11 +90,8 @@ def preview_diagram(body: DiagramPreviewBody) -> dict[str, Any]:
     )
     image, warnings = render_puml_preview(puml, repo_root, body.diagram_type)
 
-    from src.infrastructure.diagram_types import get_diagram_type
-    derived_entities = get_diagram_type(body.diagram_type).collect_derived_items(
-        body.diagram_type, repo_root, diagram_entities=de,
-    )
-
+    items = project_view_for_preview(get_diagram_type(body.diagram_type), body.diagram_type, de or {}, query)
+    derived_entities = None if items is None else [{"id": i.entity_id, "name": i.name, "item_type": i.display_class, "role": i.role, "excluded": i.excluded} for i in items]  # noqa: E501
     return {"puml": puml, "image": image, "warnings": warnings, "derived_entities": derived_entities}
 
 

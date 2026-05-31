@@ -6,34 +6,63 @@ Each subdirectory is a *diagram type module* — a unit that declares which enti
 
 ```
 src/diagram_types/
-  archimate_application/   ← one domain view
+  c4/                      ← C4 diagram type family
     __init__.py
-    config.yaml
-  archimate_layered/       ← multi-domain view
+    _type.py               ← shared loader for the built-in C4 view family
+    renderer.py            ← PlantUML renderer
+    _resolve.py            ← C4 state resolution (model-backed + standalone)
+    _projection.py         ← C4 projection engine + strategy registration
+    _navigation.py         ← C4 parent/child diagram navigation
+    system_context/        ← C4 level 1 view with mapped diagram-owned entities
+      __init__.py
+      config.yaml
+      ontology.yaml
+    container/             ← C4 level 2 view
+      __init__.py
+      config.yaml
+      ontology.yaml
+    component/             ← C4 level 3 view
+      __init__.py
+      config.yaml
+      ontology.yaml
+  archimate/               ← ArchiMate diagram type family
     __init__.py
-    config.yaml
+    _type.py               ← shared loader for config-backed ArchiMate views
+    application/           ← one domain view
+      __init__.py
+      config.yaml
+    business/
+      __init__.py
+      config.yaml
+    implementation/
+      __init__.py
+      config.yaml
+    layered/               ← multi-domain view
+      __init__.py
+      config.yaml
+    motivation/
+      __init__.py
+      config.yaml
+    strategy/
+      __init__.py
+      config.yaml
+    technology/
+      __init__.py
+      config.yaml
   activity/                ← UML activity view with swimlane diagram-entities
     __init__.py
     config.yaml
     ontology.yaml          ← activity-specific entity/connection type ontology
     renderer.py
-  c4_system_context/       ← C4 level 1 view with mapped diagram-owned entities
+  sequence/                ← UML sequence view
     __init__.py
     config.yaml
     ontology.yaml
-  c4_container/            ← C4 level 2 view
-    __init__.py
-    config.yaml
-    ontology.yaml
-  c4_component/            ← C4 level 3 view
-    __init__.py
-    config.yaml
-    ontology.yaml
+    renderer.py
   matrix/                  ← free-ontology (accepts all entity types)
     __init__.py
     config.yaml
-  _config_type.py          ← config-backed loader for ontology-bound views
-  _c4_type.py              ← shared loader for the built-in C4 view family
+  _config_type.py          ← config-backed loader for ontology-bound views (shared)
   __init__.py              ← register_default_diagram_types()
 ```
 
@@ -322,13 +351,13 @@ For standard ontology-bound ArchiMate views, re-use the ArchiMate-aware loader:
 from __future__ import annotations
 
 from pathlib import Path
-from src.diagram_types._archimate_type import load_archimate_diagram_type
+from src.diagram_types.archimate._type import load_archimate_diagram_type
 from src.domain.ontology_protocol import DiagramTypeModule
 
 module: DiagramTypeModule = load_archimate_diagram_type(Path(__file__).parent)
 ```
 
-For a non-ArchiMate diagram-owned family with shared behavior, provide a custom loader instead. The built-in C4 packages use `load_c4_diagram_type(...)` in `_c4_type.py` as the reference pattern.
+For a non-ArchiMate diagram-owned family with shared behavior, provide a custom loader instead. The built-in C4 packages use `load_c4_diagram_type(...)` in `c4/_type.py` as the reference pattern.
 
 ### Step 4 — Register the module
 
@@ -402,3 +431,29 @@ Every diagram type must satisfy the `DiagramTypeModule` protocol (`src/domain/on
 - `effective_connection_types()` must only return types present in the global registry
 - `accepts_entity_type(t)` must return `True` for every `t` in `effective_entity_types()`
 - `accepts_connection_type(t)` must return `True` for every `t` in `effective_connection_types()`
+
+## `ViewProjector` capability — model-backed view projection
+
+Diagram types that derive their content from the ArchiMate graph may optionally implement the `ViewProjector` capability (`src/domain/view_projection.py`). C4 diagram types implement this.
+
+```python
+class ViewProjector(Protocol):
+    def project_view(
+        self,
+        diagram_type: str,
+        diagram_entities: Mapping[str, object],
+        query: ModelQuery,
+    ) -> ViewProjectionResult | None: ...
+```
+
+`project_view` runs **one** engine call and returns both:
+- `result.derivation` — normalized `ViewDerivation` (strategy name, params, snapshot, selection) for persistence and the refresh/diff path (Seam B).
+- `result.items` — classified `ProjectedViewItem` list for the preview checklist (Seam C).
+
+The generic preview service (`src/application/derivation/preview.py`) discovers `ViewProjector` at runtime via `isinstance` and stays diagram-type-agnostic: it forwards `display_class` and `role` as opaque strings. Selection (include/exclude) is applied at the generic layer from the normalized `DerivationSelection`, never from C4-specific keys.
+
+### Single-engine pattern (C4)
+
+`src/diagram_types/c4/_projection.py` is the **one** C4 projection algorithm. Both the preview path (`project_view → to_view_items()`) and the refresh/diff path (registered `c4.scope-projection` strategy → `to_candidate_set()`) are produced from a single `project_c4(...)` call. The renderer (`c4/_resolve._resolve_model_backed`) also calls `project_c4`, so preview and render are structurally identical.
+
+Registration (Seam B) runs as a module-level side effect when `c4/_projection.py` is imported. This happens automatically when any C4 diagram-type package loads (via `c4/_type.py`). Generic code never names C4 concepts.

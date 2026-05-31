@@ -4,11 +4,16 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from src.application.derivation.types import ModelQuery
+    from src.domain.view_derivations import DerivationSelection
+    from src.domain.view_projection import ViewProjectionResult
 
 import yaml  # type: ignore[import-untyped]
 
-from src.diagram_types.c4_renderer import C4PumlRenderer
+from src.diagram_types.c4.renderer import C4PumlRenderer
 from src.domain.bridges import BridgeDeclaration
 from src.domain.diagram_entities_schema import derive_diagram_entities_schema
 from src.domain.diagram_ontology_loader import DiagramOntology, load_diagram_ontology
@@ -23,6 +28,9 @@ from src.domain.ontology_protocol import (
 from src.domain.ontology_types import ConnectionTypeInfo, ElementClassInfo, EntityTypeInfo
 from src.domain.permitted_mappings import resolve_model_entity_types_for_diagram_only_types
 from src.domain.permitted_relationships import PermittedRelationshipSet
+
+# Import engine module to trigger strategy registration as a side effect.
+import src.diagram_types.c4._projection  # noqa: F401
 
 _EMPTY_ENTITY_TYPES: dict[EntityTypeName, EntityTypeInfo] = {}
 
@@ -254,31 +262,71 @@ class _C4DiagramType(DiagramTypeBase):
         diagram_id: str,
         diagram_entities: dict[str, Any],
     ) -> dict[str, Any]:
-        from src.diagram_types._c4_navigation import build_c4_navigation  # noqa: PLC0415
+        from src.diagram_types.c4._navigation import build_c4_navigation  # noqa: PLC0415
 
         nav = build_c4_navigation(repo, diagram_id, str(self._name), diagram_entities)
         return {"c4_navigation": nav} if nav is not None else {}
 
-    def collect_derived_items(
+    def project_view(
         self,
         diagram_type: str,
-        repo_root: Path,
-        *,
-        diagram_entities: Mapping[str, object] | None = None,
-    ) -> list[dict[str, str]] | None:
-        from src.diagram_types._c4_resolve import resolve_c4_state  # noqa: PLC0415
+        diagram_entities: Mapping[str, object],
+        query: ModelQuery,
+    ) -> ViewProjectionResult | None:
+        from src.diagram_types.c4._projection import project_c4  # noqa: PLC0415
+        from src.domain.view_derivations import SourceModelSnapshot, ViewDerivation  # noqa: PLC0415
+        from src.domain.view_projection import ViewProjectionResult  # noqa: PLC0415
 
-        de = diagram_entities or {}
-        if not str(de.get("_scope_entity_id") or "").strip():
+        scope_id = str(diagram_entities.get("_scope_entity_id") or "").strip()
+        if not scope_id:
             return None
-        state = resolve_c4_state(
-            self._config, diagram_type, repo_root,
-            de, [], self._renderer._person_archimate_types,
+
+        internal_c4_type = self._internal_c4_type()
+        scope_entity_type = self._scope_entity_type()
+        projection = project_c4(
+            diagram_type, scope_id, query,
+            internal_c4_type=internal_c4_type,
+            scope_entity_type=scope_entity_type,
+            person_archimate_types=self._renderer._person_archimate_types,
         )
-        return [
-            {"id": item.local_id, "name": item.label, "item_type": item.item_type}
-            for item in state.outside_items + state.internal_items
-        ]
+        derivation = ViewDerivation(
+            id="__preview__",
+            strategy="c4.scope-projection",
+            strategy_version=1,
+            source_model_snapshot=SourceModelSnapshot(repo_scope="both", root_entity_id=scope_id),
+            parameters={
+                "diagram_type": diagram_type,
+                "internal_c4_type": internal_c4_type,
+                "scope_entity_type": scope_entity_type,
+                "person_archimate_types": sorted(self._renderer._person_archimate_types),
+            },
+            selection=_selection_from_entities(diagram_entities),
+        )
+        return ViewProjectionResult(derivation=derivation, items=tuple(projection.to_view_items()))
+
+    def _c4_config(self) -> Mapping[str, Any]:
+        raw = self._config.get("c4")
+        return raw if isinstance(raw, Mapping) else {}
+
+    def _internal_c4_type(self) -> str:
+        internal_types = list(self._c4_config().get("internal_entity_types") or [])
+        return str(internal_types[0]) if internal_types else "container"
+
+    def _scope_entity_type(self) -> str:
+        return str(self._c4_config().get("scope_entity_type") or "software-system")
+
+
+def _selection_from_entities(entities: Mapping[str, object]) -> DerivationSelection | None:
+    from src.domain.view_derivations import DerivationSelection  # noqa: PLC0415
+
+    raw_included = entities.get("_included_entity_ids")
+    raw_excluded = entities.get("_excluded_entity_ids")
+    if isinstance(raw_included, list) and raw_included:
+        return DerivationSelection(included_entity_ids=tuple(str(x) for x in raw_included))
+    if isinstance(raw_excluded, list) and raw_excluded:
+        return DerivationSelection(excluded_entity_ids=tuple(str(x) for x in raw_excluded))
+    return None
+
 
 def _person_archimate_types(ontology: DiagramOntology) -> frozenset[str]:
     person_et = ontology.entity_types.get(EntityTypeName("person"))

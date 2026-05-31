@@ -1,43 +1,67 @@
 from __future__ import annotations
 
 from pathlib import Path
+from typing import Literal
 
-from src.diagram_types.c4_renderer import C4PumlRenderer
+from src.diagram_types.c4.renderer import C4PumlRenderer
+from src.domain.artifact_types import ConnectionRecord, EntityRecord
 
 
-class _Repo:
-    def __init__(self, entities: dict[str, object], connections: list[object]) -> None:
+class _FakeQuery:
+    """Minimal ModelQuery for renderer tests."""
+
+    def __init__(self, entities: dict[str, object], connections: list[ConnectionRecord]) -> None:
         self._entities = entities
-        self._connections = connections
+        self._connections = {c.artifact_id: c for c in connections}
 
-    def get_entity(self, entity_id: str):
-        return self._entities.get(entity_id)
+    def entity_ids(self) -> set[str]:
+        return set(self._entities)
 
-    def list_connections(self):
-        return list(self._connections)
+    def connection_ids(self) -> set[str]:
+        return set(self._connections)
 
+    def get_entity(self, artifact_id: str):
+        return self._entities.get(artifact_id)
 
-class _Entity:
-    def __init__(
+    def get_connection(self, artifact_id: str) -> ConnectionRecord | None:
+        return self._connections.get(artifact_id)
+
+    def find_connections_for(
         self,
         entity_id: str,
-        name: str,
-        artifact_type: str = "application-component",
-        display_alias: str = "",
-    ) -> None:
-        self.artifact_id = entity_id
-        self.name = name
-        self.artifact_type = artifact_type
-        self.display_alias = display_alias
+        *,
+        direction: Literal["any", "outbound", "inbound"] = "any",
+        conn_type: str | None = None,
+    ) -> list[ConnectionRecord]:
+        result = []
+        for conn in self._connections.values():
+            if conn_type is not None and conn.conn_type != conn_type:
+                continue
+            is_source = conn.source == entity_id
+            is_target = conn.target == entity_id
+            if direction == "outbound" and not is_source:
+                continue
+            if direction == "inbound" and not is_target:
+                continue
+            if direction == "any" and not (is_source or is_target):
+                continue
+            result.append(conn)
+        return result
 
 
-class _Connection:
-    def __init__(self, artifact_id: str, source: str, target: str, conn_type: str, content_text: str) -> None:
-        self.artifact_id = artifact_id
-        self.source = source
-        self.target = target
-        self.conn_type = conn_type
-        self.content_text = content_text
+def _entity(entity_id: str, name: str, artifact_type: str = "application-component", display_alias: str = "") -> object:
+    from tests.application.derivation._fixtures import _entity as _make  # noqa: PLC0415
+    e = _make(entity_id, artifact_type)
+    # Patch name and display_alias on the frozen record by creating a modified copy
+    import dataclasses  # noqa: PLC0415
+    return dataclasses.replace(e, name=name, display_alias=display_alias)
+
+
+def _connection(artifact_id: str, source: str, target: str, conn_type: str, content_text: str) -> ConnectionRecord:
+    from tests.application.derivation._fixtures import _connection as _make  # noqa: PLC0415
+    conn = _make(artifact_id, source, target, conn_type)
+    import dataclasses  # noqa: PLC0415
+    return dataclasses.replace(conn, content_text=content_text)
 
 
 def _renderer(
@@ -59,23 +83,23 @@ def _renderer(
 
 
 def test_system_context_renders_scope_and_model_relationship(monkeypatch) -> None:
-    repo = _Repo(
+    query = _FakeQuery(
         entities={
-            "BUS@1.user": _Entity("BUS@1.user", "Customer", artifact_type="business-actor", display_alias="P_Cust01"),
-            "APP@1.system": _Entity("APP@1.system", "Ordering System", display_alias="SS_Order1"),
-            "APP@1.payments": _Entity("APP@1.payments", "Payments", display_alias="SS_Paymt"),
+            "BUS@1.user": _entity("BUS@1.user", "Customer", artifact_type="business-actor", display_alias="P_Cust01"),
+            "APP@1.system": _entity("APP@1.system", "Ordering System", display_alias="SS_Order1"),
+            "APP@1.payments": _entity("APP@1.payments", "Payments", display_alias="SS_Paymt"),
         },
         connections=[
-            _Connection(
+            _connection(
                 "BUS@1.user---APP@1.system@@archimate-access",
                 "BUS@1.user",
                 "APP@1.system",
                 "archimate-access",
                 "Uses the ordering workflow",
-            )
+            ),
         ],
     )
-    monkeypatch.setattr("src.diagram_types._c4_resolve._repo", lambda repo_root: repo)
+    monkeypatch.setattr("src.infrastructure.artifact_index.shared_artifact_index", lambda roots: query)
 
     renderer = _renderer(
         "software-system", "node", [],

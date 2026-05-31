@@ -8,8 +8,6 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from src.application.derivation.c4_scope_projection import _NESTING_TYPES, _NEIGHBOR_TYPES
-
 # C4-appropriate fallback labels per ArchiMate interaction connection type.
 # Used when content_text is absent; never emits structural type names like "aggregation".
 _C4_CONN_LABELS: dict[str, str] = {
@@ -87,79 +85,70 @@ def _resolve_model_backed(
     internal_c4_type: str,
     person_archimate_types: frozenset[str],
 ) -> _ResolvedState:
-    repo = _repo(repo_root)
-    scope_entity = repo.get_entity(scope_entity_id)
+    from src.diagram_types.c4._projection import project_c4  # noqa: PLC0415
+    from src.infrastructure.artifact_index import shared_artifact_index  # noqa: PLC0415
+
+    query = shared_artifact_index([repo_root])
+    scope_entity = query.get_entity(scope_entity_id)
     if scope_entity is None:
         raise ValueError(f"{diagram_type!r}: scope entity {scope_entity_id!r} not found")
 
-    all_conns = list(repo.list_connections())
-
-    # System context shows the scope entity as a black box — no internal structure.
-    # Container/component show structural children (aggregation/composition) as internals.
-    if diagram_type == "c4-system-context":
-        internal_ids: frozenset[str] = frozenset()
-    else:
-        internal_ids = frozenset(
-            c.target for c in all_conns
-            if c.source == scope_entity_id and c.conn_type in _NESTING_TYPES
-        )
-
-    # Candidate external entities: those reached via interaction connections
-    # (serving/flow/triggering/access) from scope or internal entities.
-    # Structural connections (aggregation/composition) are never followed here —
-    # they denote containment, not external context.
-    scope_and_internal = {scope_entity_id} | internal_ids
-    candidate_ids: set[str] = set()
-    for c in all_conns:
-        if c.conn_type not in _NEIGHBOR_TYPES:
-            continue
-        if c.source in scope_and_internal:
-            candidate_ids.add(c.target)
-        if c.target in scope_and_internal:
-            candidate_ids.add(c.source)
-    candidate_ids -= scope_and_internal
+    projection = project_c4(
+        diagram_type, scope_entity_id, query,
+        internal_c4_type=internal_c4_type,
+        scope_entity_type=scope_entity_type,
+        person_archimate_types=person_archimate_types,
+    )
 
     raw_included = diagram_entities.get("_included_entity_ids")
     raw_excluded = diagram_entities.get("_excluded_entity_ids")
+    included_only: set[str] | None = None
+    excluded_ids: set[str] = set()
     if isinstance(raw_included, list) and raw_included:
-        candidate_ids &= set(str(x) for x in raw_included)
+        included_only = {str(x) for x in raw_included}
     elif isinstance(raw_excluded, list) and raw_excluded:
-        candidate_ids -= set(str(x) for x in raw_excluded)
+        excluded_ids = {str(x) for x in raw_excluded}
 
-    entity_cache: dict[str, Any] = {}
+    scope_item = _item_from_entity(scope_entity, scope_entity_id, scope_entity_type, external=False)
+    internal_items: list[_ResolvedItem] = []
+    outside_items: list[_ResolvedItem] = []
 
-    def _get(eid: str) -> Any:
-        if eid not in entity_cache:
-            entity_cache[eid] = repo.get_entity(eid)
-        return entity_cache[eid]
+    for proj_item in projection.items:
+        if proj_item.role == "scope":
+            continue
+        eid = proj_item.entity_id
+        if included_only is not None and eid not in included_only:
+            continue
+        if eid in excluded_ids:
+            continue
+        entity = query.get_entity(eid)
+        if entity is None:
+            continue
+        resolved = _item_from_entity(entity, eid, proj_item.item_type, external=(proj_item.role == "external"))
+        if proj_item.role == "internal":
+            internal_items.append(resolved)
+        else:
+            outside_items.append(resolved)
 
-    scope_item = _item_from_entity(_get(scope_entity_id), scope_entity_id, scope_entity_type, external=False)
-    internal_items = [
-        _item_from_entity(_get(eid), eid, internal_c4_type, external=False)
-        for eid in sorted(internal_ids)
-        if _get(eid) is not None
-    ]
-    outside_items = [
-        _item_from_entity(
-            _get(eid), eid,
-            "person" if (_get(eid) is not None and _get(eid).artifact_type in person_archimate_types)
-            else "software-system",
-            external=True,
-        )
-        for eid in sorted(candidate_ids)
-        if _get(eid) is not None
-    ]
-
-    all_displayed = {scope_entity_id} | internal_ids | candidate_ids
+    all_displayed = (
+        {scope_entity_id}
+        | {i.local_id for i in internal_items}
+        | {i.local_id for i in outside_items}
+    )
     alias_by_eid = {i.local_id: i.alias for i in [scope_item] + internal_items + outside_items}
 
-    # Only render interaction connections between displayed entities, not structural ones.
-    model_conns = [
-        c for c in all_conns
-        if c.conn_type in _NEIGHBOR_TYPES
-        and c.source in all_displayed and c.target in all_displayed
-        and c.source in alias_by_eid and c.target in alias_by_eid
-    ]
+    model_conns: list[Any] = []
+    for cid in projection.connection_ids:
+        conn = query.get_connection(cid)
+        if conn is None:
+            continue
+        if conn.source not in all_displayed or conn.target not in all_displayed:
+            continue
+        if conn.source not in alias_by_eid or conn.target not in alias_by_eid:
+            continue
+        model_conns.append(conn)
+    model_conns.sort(key=lambda x: x.artifact_id)
+
     connections = tuple(
         _C4Connection(
             src_alias=alias_by_eid[c.source],
@@ -167,7 +156,7 @@ def _resolve_model_backed(
             label=_conn_label(c),
             artifact_id=c.artifact_id,
         )
-        for c in sorted(model_conns, key=lambda x: x.artifact_id)
+        for c in model_conns
     )
 
     return _ResolvedState(
@@ -325,9 +314,3 @@ def _c4_settings(config: Mapping[str, Any]) -> Mapping[str, Any]:
     if not raw.get("scope_render_mode"):
         raise ValueError("C4 config must define c4.scope_render_mode")
     return raw
-
-
-def _repo(repo_root: Path) -> Any:
-    from src.application.artifact_repository import ArtifactRepository  # noqa: PLC0415
-    from src.infrastructure.artifact_index import shared_artifact_index  # noqa: PLC0415
-    return ArtifactRepository(shared_artifact_index([repo_root]))

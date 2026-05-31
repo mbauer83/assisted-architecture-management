@@ -279,14 +279,6 @@ class DiagramTypeModule(Protocol):
 
     def read_diagram_extras(self, parsed_source: dict[str, Any]) -> dict[str, Any]: ...
 
-    def collect_derived_items(
-        self,
-        diagram_type: str,
-        repo_root: Path,
-        *,
-        diagram_entities: Mapping[str, object] | None = None,
-    ) -> list[dict[str, str]] | None: ...
-
 
 class DiagramTypeBase:
     """Mixin providing default DiagramTypeModule implementations.
@@ -382,13 +374,3 @@ class DiagramTypeBase:
 
     def read_diagram_extras(self, parsed_source: dict[str, Any]) -> dict[str, Any]:
         return {}
-
-    def collect_derived_items(
-        self,
-        diagram_type: str,
-        repo_root: Path,
-        *,
-        diagram_entities: Mapping[str, object] | None = None,
-    ) -> list[dict[str, str]] | None:
-        del diagram_type, repo_root, diagram_entities
-        return None

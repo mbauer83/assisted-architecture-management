@@ -13,7 +13,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from src.diagram_types.c4_renderer import C4PumlRenderer
+from src.diagram_types.c4.renderer import C4PumlRenderer
 from src.diagram_types.activity.renderer import ActivityPumlRenderer
 
 _ENTITY_A = "APP@1000000000.AbcDef.entity-a"
@@ -68,7 +68,7 @@ class TestC4RendererCollectReferences:
     def _collect(self, bindings: list[dict], diagram_entities: dict | None = None) -> tuple[tuple, tuple]:
         renderer = self._renderer()
         # Patch resolve_c4_state to return empty model-backed state (no scope binding).
-        from src.diagram_types._c4_resolve import _ResolvedState, _ResolvedItem
+        from src.diagram_types.c4._resolve import _ResolvedState, _ResolvedItem
         empty_item = _ResolvedItem(
             local_id="_blank", item_type="software-system",
             alias="C4_blank", label="", description="", technology="", external=False,
@@ -78,7 +78,7 @@ class TestC4RendererCollectReferences:
             internal_items=[], outside_items=[], connections=(),
             entity_ids=(), connection_artifact_ids=(),
         )
-        with patch("src.diagram_types.c4_renderer.resolve_c4_state", return_value=empty_state):
+        with patch("src.diagram_types.c4.renderer.resolve_c4_state", return_value=empty_state):
             refs = renderer.collect_references(
                 "c4-container",
                 Path("/repo"),
@@ -141,7 +141,7 @@ class TestC4RendererCollectReferences:
     def test_model_backed_state_entity_ids_included(self) -> None:
         """Model-backed state entity_ids are merged with binding entity_ids."""
         renderer = self._renderer()
-        from src.diagram_types._c4_resolve import _ResolvedState, _ResolvedItem
+        from src.diagram_types.c4._resolve import _ResolvedState, _ResolvedItem
         scope_item = _ResolvedItem(
             local_id=_ENTITY_A, item_type="software-system",
             alias="APP_scope", label="App", description="", technology="", external=False,
@@ -152,7 +152,7 @@ class TestC4RendererCollectReferences:
             entity_ids=(_ENTITY_A,), connection_artifact_ids=(),
         )
         bindings = [_binding("box2", _ENTITY_B)]
-        with patch("src.diagram_types.c4_renderer.resolve_c4_state", return_value=model_state):
+        with patch("src.diagram_types.c4.renderer.resolve_c4_state", return_value=model_state):
             refs = renderer.collect_references(
                 "c4-container", Path("/repo"),
                 diagram_entities={}, diagram_connections=[],
@@ -163,7 +163,7 @@ class TestC4RendererCollectReferences:
 
     def test_no_duplicates_between_state_and_bindings(self) -> None:
         renderer = self._renderer()
-        from src.diagram_types._c4_resolve import _ResolvedState, _ResolvedItem
+        from src.diagram_types.c4._resolve import _ResolvedState, _ResolvedItem
         scope_item = _ResolvedItem(
             local_id=_ENTITY_A, item_type="software-system",
             alias="APP_scope", label="App", description="", technology="", external=False,
@@ -174,7 +174,7 @@ class TestC4RendererCollectReferences:
             entity_ids=(_ENTITY_A,), connection_artifact_ids=(),
         )
         bindings = [_binding("box1", _ENTITY_A)]  # same as model state
-        with patch("src.diagram_types.c4_renderer.resolve_c4_state", return_value=model_state):
+        with patch("src.diagram_types.c4.renderer.resolve_c4_state", return_value=model_state):
             refs = renderer.collect_references(
                 "c4-container", Path("/repo"),
                 diagram_entities={}, diagram_connections=[],
