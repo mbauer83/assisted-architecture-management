@@ -184,7 +184,7 @@ def test_c4_diagram_auto_populates_model_references(repo_root: Path) -> None:
         verifier=_verifier(repo_root),
         clear_repo_caches=lambda path: shared_artifact_index(repo_root).apply_file_changes([path]),
         source_entity=user_id,
-        connection_type="archimate-association",
+        connection_type="archimate-access",
         target_entity=system_id,
         description="Uses the ordering system",
         version="0.1.0",
@@ -219,7 +219,7 @@ def test_c4_diagram_auto_populates_model_references(repo_root: Path) -> None:
     detail = read_diagram(diagram_id)
 
     assert sorted(detail["entity_ids_used"]) == sorted([user_id, system_id])
-    assert detail["connection_ids_used"] == [f"{user_id}---{system_id}@@archimate-association"]
+    assert detail["connection_ids_used"] == [f"{user_id}---{system_id}@@archimate-access"]
 
 
 def test_diagram_entities_round_trips_create_read_edit_read(repo_root: Path) -> None:

@@ -175,13 +175,104 @@ represents): node projection application-component / function / service (interna
 above. Drill-down: none (code level is out of scope).
 
 **c4-system-context** (scope type `software-system`; `root` = the application-component or
-service): the `root` projects to the central in-scope `software-system` node; neighbors
-reachable by serving/flow within one hop → `software-system` (external, represents);
-business-actor / role → `person` (represents). Edge projection as above. Drill-down:
-`childDiagrams(in-scope system) = [(c4-container, root)]`.
+service): the `root` projects to the central in-scope `software-system` node (black box —
+no internal structure is shown at this level).
+
+| Source model entity | Role | → C4 node | kind |
+|---|---|---|---|
+| application-component / service (root) | scope | `software-system` (in-scope) | represents |
+| application-component / service reachable via serving/flow/triggering/access | neighbor | `software-system` (external) | represents |
+| business-actor / role reachable via serving/flow/triggering/access | neighbor | `person` | represents |
+| *any entity* reachable **only** via aggregation/composition | internal-only | *(excluded)* | — |
+
+The last row is critical: entities connected to `root` solely via structural
+(aggregation/composition) connections are internal sub-components of the system. They are
+**not** shown at context level. Showing them as `«C4External»` would invert the system
+boundary. If the goal is to show the system's internal composition, use a `c4-container`
+diagram instead.
+
+Edge projection: serving/flow/triggering/access connections between projected nodes →
+`c4-uses`. Connection label: use `content_text` if present; fall back to a C4-appropriate
+default per type (`serving`→"uses", `flow`→"flows to", `triggering`→"triggers",
+`access`→"accesses"). Never emit the raw ArchiMate type name as a C4 label.
+
+**Empty-neighbor case**: when `root` has zero serving/flow/triggering/access connections
+(e.g. only aggregation connections), the diagram renders as a single `«C4System»` node
+with no external context. This is a valid output — not an error — but the authoring surface
+should hint: *"No external interaction connections found. This entity's context may be
+better explored via a C4 Container diagram."*
+
+Drill-down: `childDiagrams(in-scope system) = [(c4-container, root)]`.
 
 These tables are the complete `c4.scope-projection/v1` definition; no further mapping
 decisions are required to implement it.
+
+---
+
+### 2.4 C4 creation use-cases
+
+Four concrete scenarios that serve as authoring guidance and test oracles.
+
+**Use-case 1 — Model-first, serving connections present (nominal)**
+
+Scope entity: `APP@…` (application-component "Ordering System").
+Model connections from/to scope:
+- `APP@….ordering ---archimate-serving--> APP@….payments` (content_text: "submits payment")
+- `BUS@….user ---archimate-access--> APP@….ordering` (no content_text)
+
+Expected system-context output:
+- Central node: `«C4System» Ordering System`
+- External nodes: `«C4External» Payments` (software-system), `«person» Customer` (person)
+- Edges: `Ordering System --> Payments : "submits payment"`, `Customer --> Ordering System : "accesses"`
+- Connection label falls back to "accesses" (not `<<access>>`) when content_text absent.
+
+**Use-case 2 — Model-first, only structural connections (AMS case)**
+
+Scope entity: `SRV@….architecture-management-system` (service).
+Model connections: five outgoing `archimate-aggregation` to sub-services only.
+
+Expected output: single `«C4System» Architecture Management System` node, no external nodes,
+no edges. Authoring surface should display a hint suggesting C4 Container instead.
+
+Incorrect output that must not occur: sub-services appearing as `«C4External»` nodes with
+`<<aggregation>>` edge labels.
+
+**Use-case 3 — Mixed auto-derived + manually added diagram-local entity**
+
+Start: model-backed system-context scoped to `APP@….ordering`. Auto-derived: one external
+system (Payments) and one person (Customer).
+
+User action: manually adds a diagram-local `person` entity "Finance Team" (not yet in
+model) via the standalone entity section.
+
+Expected binding state:
+- Auto-derived nodes: `represents` bindings with `derived_from: derive-main`.
+- Manual "Finance Team" node: no binding (diagram-local only).
+- `view_derivations.selection`: `excluded_entity_ids: []` (nothing excluded yet).
+
+On refresh: "Finance Team" is not a refresh candidate (it has no model target) — it
+persists unchanged. New model entities added to the model that qualify as neighbors will
+appear as proposed additions.
+
+If user later materializes "Finance Team" → `BUS@….finance-team`: the diagram element
+receives a `represents` binding atomically; `derived_from` is absent (it was never
+auto-derived).
+
+**Use-case 4 — Standalone sketch → model binding**
+
+User creates a `c4-system-context` in standalone mode (no `_scope_entity_id`):
+- Adds `software-system` "Ordering System" (diagram-local, no binding, marked `scope: true`)
+- Adds `person` "Customer" (diagram-local, no binding)
+- Adds `c4-uses` connection Customer → Ordering System
+
+Later, user runs `propose-bindings` against the model. The tool finds:
+- `APP@….ordering` (application-component) matches "Ordering System" by name → candidate
+  `represents` binding for the scope node.
+- `BUS@….user` (business-actor) matches "Customer" → candidate `represents` binding.
+
+User accepts both. The diagram now has explicit bindings; the `c4-uses` edge remains
+diagram-local (no model connection materialized yet). If the user wants a model connection
+they trigger the materialization path explicitly.
 
 ---
 

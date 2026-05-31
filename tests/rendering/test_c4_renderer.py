@@ -67,10 +67,10 @@ def test_system_context_renders_scope_and_model_relationship(monkeypatch) -> Non
         },
         connections=[
             _Connection(
-                "BUS@1.user---APP@1.system@@archimate-association",
+                "BUS@1.user---APP@1.system@@archimate-access",
                 "BUS@1.user",
                 "APP@1.system",
-                "archimate-association",
+                "archimate-access",
                 "Uses the ordering workflow",
             )
         ],

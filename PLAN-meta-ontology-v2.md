@@ -1274,6 +1274,14 @@ the convention that must be followed when future ontology modules introduce new 
   every ontology module that introduces a new `hierarchy[0]` domain **must** add a
   `DOMAIN_CONFIG` entry to `domains.ts` so the domain chip renders correctly. No other frontend
   structural change is needed for the current multi-ontology state. — 2026-05-30, 2f988c3, sysml #c0d4ee/'SysML v2'; README example fixed (domain→hierarchy, removed stale fields); domains.ts convention documented
+- [x] **22.** Retire `_c4_resolve.py` all-connections scan; wire `c4.scope-projection/v1`
+  semantics into `_resolve_model_backed`: use `_NESTING_TYPES` for internal entities
+  (container/component only), `_NEIGHBOR_TYPES` for external neighbours, filter rendered
+  connections to `_NEIGHBOR_TYPES` only, and replace `_conn_label` fallback with
+  C4-appropriate defaults (`serving`→"uses", `flow`→"flows to", etc.). Update affected
+  tests (`archimate-association` → `archimate-access`). Gates: full suite green, zuban
+  clean. See `plans/meta-ontology-v2/PLAN-c4-renderer-fix.md` task A.
+
 - [x] **21.** *(after #17, #18, #19)* Final documentation and consistency pass:
   (a) update `src/ontologies/README.md` — multi-module conventions: element-class uniqueness
   (no cross-module redeclaration), per-module domain-naming convention, and the `domains.ts`

@@ -8,6 +8,17 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+from src.application.derivation.c4_scope_projection import _NESTING_TYPES, _NEIGHBOR_TYPES
+
+# C4-appropriate fallback labels per ArchiMate interaction connection type.
+# Used when content_text is absent; never emits structural type names like "aggregation".
+_C4_CONN_LABELS: dict[str, str] = {
+    "archimate-serving": "uses",
+    "archimate-flow": "flows to",
+    "archimate-triggering": "triggers",
+    "archimate-access": "accesses",
+}
+
 
 @dataclass(frozen=True)
 class _ResolvedItem:
@@ -83,21 +94,30 @@ def _resolve_model_backed(
 
     all_conns = list(repo.list_connections())
 
-    internal_ids = frozenset(
-        c.target for c in all_conns
-        if c.source == scope_entity_id and c.conn_type == "c4-contains"
-    )
+    # System context shows the scope entity as a black box — no internal structure.
+    # Container/component show structural children (aggregation/composition) as internals.
+    if diagram_type == "c4-system-context":
+        internal_ids: frozenset[str] = frozenset()
+    else:
+        internal_ids = frozenset(
+            c.target for c in all_conns
+            if c.source == scope_entity_id and c.conn_type in _NESTING_TYPES
+        )
 
+    # Candidate external entities: those reached via interaction connections
+    # (serving/flow/triggering/access) from scope or internal entities.
+    # Structural connections (aggregation/composition) are never followed here —
+    # they denote containment, not external context.
+    scope_and_internal = {scope_entity_id} | internal_ids
     candidate_ids: set[str] = set()
     for c in all_conns:
-        if c.conn_type == "c4-contains":
+        if c.conn_type not in _NEIGHBOR_TYPES:
             continue
-        if c.source == scope_entity_id or c.source in internal_ids:
+        if c.source in scope_and_internal:
             candidate_ids.add(c.target)
-        if c.target == scope_entity_id or c.target in internal_ids:
+        if c.target in scope_and_internal:
             candidate_ids.add(c.source)
-    candidate_ids.discard(scope_entity_id)
-    candidate_ids -= internal_ids
+    candidate_ids -= scope_and_internal
 
     raw_included = diagram_entities.get("_included_entity_ids")
     raw_excluded = diagram_entities.get("_excluded_entity_ids")
@@ -133,9 +153,10 @@ def _resolve_model_backed(
     all_displayed = {scope_entity_id} | internal_ids | candidate_ids
     alias_by_eid = {i.local_id: i.alias for i in [scope_item] + internal_items + outside_items}
 
+    # Only render interaction connections between displayed entities, not structural ones.
     model_conns = [
         c for c in all_conns
-        if c.conn_type != "c4-contains"
+        if c.conn_type in _NEIGHBOR_TYPES
         and c.source in all_displayed and c.target in all_displayed
         and c.source in alias_by_eid and c.target in alias_by_eid
     ]
@@ -279,11 +300,10 @@ def _scope_marked_id(diagram_entities: Mapping[str, object], scope_entity_type: 
 
 
 def _conn_label(conn: Any) -> str:
-    from src.domain.archimate_relation_rendering import display_connection_label  # noqa: PLC0415
     description = " ".join((conn.content_text or "").split())
     if description:
         return description
-    return f"<<{display_connection_label(conn.conn_type)}>>"
+    return _C4_CONN_LABELS.get(conn.conn_type, "uses")
 
 
 def _alias_for(item_type: str, local_id: str, index: int = 0) -> str:
