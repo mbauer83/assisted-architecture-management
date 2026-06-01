@@ -12,7 +12,6 @@ from src.application.artifact_parsing import normalize_puml_alias
 from src.domain.archimate_relation_rendering import (
     display_connection_label,
     format_cardinality_label,
-    render_archimate_relation,
 )
 from src.domain.artifact_types import ConnectionRecord, EntityRecord
 from src.domain.module_types import ConnectionTypeName, ElementClassName, EntityTypeName
@@ -198,16 +197,6 @@ class GenericPumlRenderer:
                 if direction is None and src_group is not None and tgt_group is not None and src_group != tgt_group:
                     direction = "down" if src_group < tgt_group else "up"
             visible_label = self.visible_connection_label(conn, diagram_connections)
-            macro_line = render_archimate_relation(
-                src,
-                tgt,
-                conn.conn_type,
-                direction=direction,
-                label_text=visible_label,
-            )
-            if macro_line is not None:
-                conn_lines.append(macro_line)
-                continue
             arrow = conn_info.puml_arrow if conn_info else "-->"
             if direction:
                 arrow = insert_arrow_direction(arrow, direction)

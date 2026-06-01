@@ -1,21 +1,7 @@
 from __future__ import annotations
 
+import re
 from functools import lru_cache
-
-from src.domain.module_types import ConnectionTypeName
-
-_DIRECTION_SUFFIX = {
-    "up": "Up",
-    "down": "Down",
-    "left": "Left",
-    "right": "Right",
-}
-
-# PlantUML's ArchiMate stdlib reliably supports direction suffixes for only a
-# subset of relation macros in this codebase. Unsupported suffixed macros such
-# as Rel_Serving_Up(...) fail verification, so we only emit suffixes for the
-# relation families we know are exercised successfully by tests.
-_DIRECTIONAL_MACRO_RELATION_TYPES = frozenset({"Influence", "Realization"})
 
 
 @lru_cache(maxsize=1)
@@ -29,6 +15,53 @@ def display_connection_label(conn_type: str) -> str:
     return conn_type.removeprefix("archimate-")
 
 
+def suppressed_stereotype_tokens() -> frozenset[str]:
+    """Stereotype label tokens whose relation type is fully conveyed by its arrow.
+
+    A connection type with ``show_stereotype == False`` declares a distinctive
+    ``puml_arrow``; the arrow alone identifies the relation, so an explicit
+    ``<<token>>`` edge label is redundant. The token is the label form the
+    renderer would emit, i.e. ``display_connection_label(conn_type)``.
+    """
+    reg = _registry()
+    return frozenset(
+        display_connection_label(str(name)).lower()
+        for name, info in reg.all_connection_types().items()
+        if not info.show_stereotype
+    )
+
+
+_STEREOTYPE_TOKEN_RE = re.compile(r"<<\s*([A-Za-z][A-Za-z0-9_-]*)\s*>>")
+_EDGE_LABEL_RE = re.compile(r"^(?P<head>.*?)(?P<sep>\s*:\s*)(?P<label>\S.*?)\s*$")
+
+
+def strip_suppressed_relation_labels(body: str) -> str:
+    """Remove redundant ``: <<reltype>>`` edge labels from an authored PUML body.
+
+    Mirrors the auto-renderer rule (``show_stereotype``): a stereotype label is
+    dropped only when the arrow style already encodes the relation. Labels for
+    relation types without a distinctive arrow (``show_stereotype == True`` —
+    e.g. sequence/activity/ER/use-case flows) and free-text/cardinality labels
+    are left untouched.
+    """
+    suppressed = suppressed_stereotype_tokens()
+    if not suppressed:
+        return body
+    out: list[str] = []
+    for line in body.split("\n"):
+        match = _EDGE_LABEL_RE.match(line)
+        if match and "<<" in match.group("label"):
+            def _drop(token: re.Match[str]) -> str:
+                return "" if token.group(1).lower() in suppressed else token.group(0)
+
+            new_label = _STEREOTYPE_TOKEN_RE.sub(_drop, match.group("label")).strip()
+            if new_label != match.group("label"):
+                head = match.group("head")
+                line = head if not new_label else f"{head}{match.group('sep')}{new_label}"
+        out.append(line)
+    return "\n".join(out)
+
+
 def format_cardinality_label(src_cardinality: str, tgt_cardinality: str) -> str:
     """Return a compact cardinality label for a connection, or '' when neither end is set."""
     has_src = bool(src_cardinality)
@@ -40,22 +73,3 @@ def format_cardinality_label(src_cardinality: str, tgt_cardinality: str) -> str:
     if has_tgt:
         return f"-> {tgt_cardinality}"
     return ""
-
-
-def render_archimate_relation(
-    source_alias: str,
-    target_alias: str,
-    conn_type: str,
-    *,
-    direction: str | None = None,
-    label_text: str = "",
-) -> str | None:
-    ct = _registry().find_connection_type(ConnectionTypeName(conn_type))
-    if ct is None or ct.conn_lang != "archimate" or not ct.archimate_relationship_type:
-        return None
-    macro = f"Rel_{ct.archimate_relationship_type}"
-    suffix = _DIRECTION_SUFFIX.get((direction or "").lower())
-    if suffix and ct.archimate_relationship_type in _DIRECTIONAL_MACRO_RELATION_TYPES:
-        macro = f"{macro}_{suffix}"
-    escaped = label_text.replace('"', "'")
-    return f'{macro}({source_alias}, {target_alias}, "{escaped}")'

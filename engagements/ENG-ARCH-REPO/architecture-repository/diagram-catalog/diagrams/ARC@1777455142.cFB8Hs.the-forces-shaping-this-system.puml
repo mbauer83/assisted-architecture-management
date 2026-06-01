@@ -34,9 +34,36 @@ connection-ids-used:
 - DRV@1776628131.GR9prv.ai-assisted-development-as-dominant-production-mode---ASS@1776628138.a6vxyj.centralized-governance-cannot-scale-to-concurrent-development-contexts@@archimate-influence
 - DRV@1712870400.Rt6Yu2.increasing-demand-for-more-autonomy-of-teams-systems---ASS@1776628138.a6vxyj.centralized-governance-cannot-scale-to-concurrent-development-contexts@@archimate-influence
 - DRV@1712870400.Ui5Op3.rising-software-complexity-interdependence---ASS@1776628142.9YWsDh.implicit-system-interdependencies-are-unmaintainable-without-explicit-models@@archimate-influence
-last-updated: '2026-05-31'
+last-updated: '2026-06-01'
 ---
 @startuml ARC@1777455142.cFB8Hs.the-forces-shaping-this-system
+hide stereotype
+
+skinparam defaultFontName "Helvetica Neue, Helvetica, Arial, sans-serif"
+skinparam defaultFontSize 12
+skinparam shadowing false
+skinparam roundcorner 4
+skinparam backgroundColor #FAFAFA
+
+skinparam linetype ortho
+skinparam nodesep 60
+skinparam ranksep 80
+skinparam rectangle<<MotivationGrouping>> {
+  BackgroundColor #F7EEF9
+  BorderColor #7B3F9A
+}
+skinparam rectangle<<assessment>> {
+  BackgroundColor #EDD6F0
+  BorderColor #7B3F9A
+}
+skinparam rectangle<<driver>> {
+  BackgroundColor #EDD6F0
+  BorderColor #7B3F9A
+}
+skinparam rectangle<<stakeholder>> {
+  BackgroundColor #EDD6F0
+  BorderColor #7B3F9A
+}
 hide stereotype
 
 skinparam defaultFontName "Helvetica Neue, Helvetica, Arial, sans-serif"
@@ -114,13 +141,13 @@ STK_Zp8Lm4 -- DRV_Rt6Yu2
 STK_Rr9Ss9 -- DRV_Rt6Yu2
 STK_Rr9Ss9 -- ASS_a6vxyj
 
-DRV_GR9prv ..> ASS_CK90bp : <<influence>>
-DRV_Rt6Yu2 ..> ASS_CK90bp : <<influence>>
-DRV_Ui5Op3 ..> ASS_CK90bp : <<influence>>
-DRV_GR9prv ..> ASS_EI3FpR : <<influence>>
-DRV_GR9prv ..> ASS_s68vVo : <<influence>>
-DRV_GR9prv ..> ASS_a6vxyj : <<influence>>
-DRV_Rt6Yu2 ..> ASS_a6vxyj : <<influence>>
-DRV_Ui5Op3 ..> ASS_9YWsDh : <<influence>>
+DRV_GR9prv ..> ASS_CK90bp
+DRV_Rt6Yu2 ..> ASS_CK90bp
+DRV_Ui5Op3 ..> ASS_CK90bp
+DRV_GR9prv ..> ASS_EI3FpR
+DRV_GR9prv ..> ASS_s68vVo
+DRV_GR9prv ..> ASS_a6vxyj
+DRV_Rt6Yu2 ..> ASS_a6vxyj
+DRV_Ui5Op3 ..> ASS_9YWsDh
 
 @enduml

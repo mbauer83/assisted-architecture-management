@@ -257,6 +257,47 @@ def test_model_create_matrix_generates_typed_id_when_omitted(repo_root: Path) ->
     assert Path(str(result["path"])).name == f"{artifact_id}.md"
 
 
+def test_model_create_diagram_mints_canonical_id_for_bare_startuml_label(repo_root: Path) -> None:
+    """A bare @startuml label must not leak into the artifact-id (W041); when no
+    artifact_id is given, a canonical id is minted regardless of the puml label."""
+    from src.application.verification.artifact_verifier_types import ENTITY_ID_RE
+
+    puml = "@startuml the-forces-shaping-this-system\ntitle Forces\nrectangle X\n@enduml\n"
+    result = tools.artifact_create_diagram(
+        diagram_type="archimate-motivation",
+        name="The Forces Shaping This System",
+        puml=puml,
+        artifact_id=None,
+        dry_run=True,
+        repo_root=str(repo_root),
+        connection_inference="none",
+    )
+
+    artifact_id = str(result.get("artifact_id"))
+    assert artifact_id != "the-forces-shaping-this-system"
+    assert ENTITY_ID_RE.match(artifact_id), artifact_id
+    assert artifact_id.startswith("ARC@")
+    assert artifact_id.endswith(".the-forces-shaping-this-system")
+    assert Path(str(result["path"])).name == f"{artifact_id}.puml"
+
+
+def test_model_create_diagram_preserves_canonical_startuml_id(repo_root: Path) -> None:
+    """A canonical id in @startuml (round-tripping a generated diagram) is kept."""
+    canonical = "ARC@1777455142.cFB8Hs.the-forces-shaping-this-system"
+    puml = f"@startuml {canonical}\ntitle Forces\nrectangle X\n@enduml\n"
+    result = tools.artifact_create_diagram(
+        diagram_type="archimate-motivation",
+        name="The Forces Shaping This System",
+        puml=puml,
+        artifact_id=None,
+        dry_run=True,
+        repo_root=str(repo_root),
+        connection_inference="none",
+    )
+
+    assert str(result.get("artifact_id")) == canonical
+
+
 def test_model_create_diagram_dry_run_accepts_inlined_archimate_stereotypes(
     repo_root: Path,
 ) -> None:
@@ -379,7 +420,6 @@ def test_model_create_diagram_entity_ids_uses_renderer_and_connection_labels(rep
     assert isinstance(verification, dict)
     assert verification.get("valid") is True, verification
     content = str(result.get("content", ""))
-    assert 'Rel_Serving(' in content
-    assert 'Rel_Serving(APP_' in content or 'Rel_Serving(' in content
-    assert 'HTTPS 443 | TLS' in content
+    assert " --> " in content  # serving arrow style from ontology puml_arrow
+    assert "HTTPS 443 | TLS" in content
     assert f"{e1_id}---{e2_id}@@archimate-serving" in content

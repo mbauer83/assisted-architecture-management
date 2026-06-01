@@ -71,6 +71,20 @@ class TestFindConnectionsNoFields:
         assert len(outbound) == 1
         assert len(inbound) == 0
 
+    def test_symmetric_connection_appears_in_outbound_for_source(self, repo: Path) -> None:
+        # archimate-association is symmetric; direction="outbound" must still return it
+        # from the source entity's perspective (regression for Bug 2 — symmetric
+        # connections were silently dropped by direction_bucket='symmetric' ≠ 'outbound').
+        src = _make(repo, "stakeholder", "SymSrc")
+        tgt = _make(repo, "driver", "SymTgt")
+        _connect(repo, src, tgt, "archimate-association")
+        assert _find(src, repo, direction="outbound") != []
+        assert _find(tgt, repo, direction="inbound") != []
+        assert _find(src, repo, direction="any") != []
+        # Source should NOT appear as inbound target, target should NOT appear as outbound source
+        assert _find(src, repo, direction="inbound") == []
+        assert _find(tgt, repo, direction="outbound") == []
+
 
 class TestFindConnectionsWithFields:
     def test_triple_field_projection(self, repo: Path) -> None:

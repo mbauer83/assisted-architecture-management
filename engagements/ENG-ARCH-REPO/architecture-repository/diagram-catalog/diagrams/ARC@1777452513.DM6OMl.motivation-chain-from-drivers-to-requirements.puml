@@ -56,9 +56,44 @@ connection-ids-used:
 - REQ@1712870400.Cc2Dd2.semantic-full-text-search---OUT@1776670379.JZMIk3.ai-agents-author-and-maintain-model-content-autonomously@@archimate-realization
 - REQ@1712870400.eBAa26.graph-based-relationship-discovery---OUT@1776670379.JZMIk3.ai-agents-author-and-maintain-model-content-autonomously@@archimate-realization
 - REQ@1712870400.s5B3gB.metadata-based-querying---OUT@1776670379.JZMIk3.ai-agents-author-and-maintain-model-content-autonomously@@archimate-realization
-last-updated: '2026-05-31'
+last-updated: '2026-06-01'
 ---
 @startuml ARC@1777452513.DM6OMl.motivation-chain-from-drivers-to-requirements
+hide stereotype
+
+skinparam defaultFontName "Helvetica Neue, Helvetica, Arial, sans-serif"
+skinparam defaultFontSize 12
+skinparam shadowing false
+skinparam roundcorner 4
+skinparam backgroundColor #FAFAFA
+
+skinparam linetype ortho
+skinparam nodesep 60
+skinparam ranksep 80
+skinparam rectangle<<MotivationGrouping>> {
+  BackgroundColor #F7EEF9
+  BorderColor #7B3F9A
+}
+skinparam rectangle<<assessment>> {
+  BackgroundColor #EDD6F0
+  BorderColor #7B3F9A
+}
+skinparam rectangle<<driver>> {
+  BackgroundColor #EDD6F0
+  BorderColor #7B3F9A
+}
+skinparam rectangle<<goal>> {
+  BackgroundColor #EDD6F0
+  BorderColor #7B3F9A
+}
+skinparam rectangle<<outcome>> {
+  BackgroundColor #EDD6F0
+  BorderColor #7B3F9A
+}
+skinparam rectangle<<requirement>> {
+  BackgroundColor #EDD6F0
+  BorderColor #7B3F9A
+}
 hide stereotype
 
 skinparam defaultFontName "Helvetica Neue, Helvetica, Arial, sans-serif"
@@ -160,13 +195,13 @@ ASS_a6vxyj -[hidden]down- GOL_FCfDuc
 GOL_Po1Qw3 -[hidden]down- OUT_AlZjX8
 OUT_LrpdG0 -[hidden]down- REQ_peinbQ
 
-DRV_GR9prv ..> ASS_CK90bp : <<influence>>
-DRV_Rt6Yu2 ..> ASS_CK90bp : <<influence>>
-DRV_Ui5Op3 ..> ASS_CK90bp : <<influence>>
-DRV_GR9prv ..> ASS_EI3FpR : <<influence>>
-DRV_GR9prv ..> ASS_s68vVo : <<influence>>
-DRV_GR9prv ..> ASS_a6vxyj : <<influence>>
-DRV_Rt6Yu2 ..> ASS_a6vxyj : <<influence>>
+DRV_GR9prv ..> ASS_CK90bp
+DRV_Rt6Yu2 ..> ASS_CK90bp
+DRV_Ui5Op3 ..> ASS_CK90bp
+DRV_GR9prv ..> ASS_EI3FpR
+DRV_GR9prv ..> ASS_s68vVo
+DRV_GR9prv ..> ASS_a6vxyj
+DRV_Rt6Yu2 ..> ASS_a6vxyj
 
 ASS_CK90bp -- GOL_FCfDuc
 ASS_EI3FpR -- GOL_5Fk9di
@@ -178,17 +213,17 @@ GOL_FCfDuc -- GOL_5Fk9di
 GOL_FCfDuc -- GOL_Xwvgpb
 GOL_Po1Qw3 -- GOL_FCfDuc
 
-OUT_AlZjX8 -up-|> GOL_5Fk9di : <<realization>>
-OUT_JZMIk3 -up-|> GOL_5Fk9di : <<realization>>
-OUT_g7PM4Y -up-|> GOL_Xwvgpb : <<realization>>
-OUT_aOcRl9 -up-|> GOL_FCfDuc : <<realization>>
-OUT_LrpdG0 -up-|> GOL_Po1Qw3 : <<realization>>
+OUT_AlZjX8 -up-|> GOL_5Fk9di
+OUT_JZMIk3 -up-|> GOL_5Fk9di
+OUT_g7PM4Y -up-|> GOL_Xwvgpb
+OUT_aOcRl9 -up-|> GOL_FCfDuc
+OUT_LrpdG0 -up-|> GOL_Po1Qw3
 
-REQ_peinbQ -up-|> OUT_AlZjX8 : <<realization>>
-REQ_peinbQ -up-|> OUT_JZMIk3 : <<realization>>
-REQ_m117_R -up-|> OUT_JZMIk3 : <<realization>>
-REQ_Cc2Dd2 -up-|> OUT_JZMIk3 : <<realization>>
-REQ_eBAa26 -up-|> OUT_JZMIk3 : <<realization>>
-REQ_s5B3gB -up-|> OUT_JZMIk3 : <<realization>>
+REQ_peinbQ -up-|> OUT_AlZjX8
+REQ_peinbQ -up-|> OUT_JZMIk3
+REQ_m117_R -up-|> OUT_JZMIk3
+REQ_Cc2Dd2 -up-|> OUT_JZMIk3
+REQ_eBAa26 -up-|> OUT_JZMIk3
+REQ_s5B3gB -up-|> OUT_JZMIk3
 
 @enduml

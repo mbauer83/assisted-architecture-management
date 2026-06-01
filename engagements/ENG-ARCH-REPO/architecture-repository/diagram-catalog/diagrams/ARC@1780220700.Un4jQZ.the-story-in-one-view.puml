@@ -32,9 +32,36 @@ connection-ids-used:
 - DRV@1776628131.GR9prv.ai-assisted-development-as-dominant-production-mode---ASS@1776628134.EI3FpR.ai-code-generation-volume-outpaces-sequential-architectural-review-capacity@@archimate-influence
 - DRV@1776628131.GR9prv.ai-assisted-development-as-dominant-production-mode---ASS@1776628138.a6vxyj.centralized-governance-cannot-scale-to-concurrent-development-contexts@@archimate-influence
 - DRV@1712870400.Rt6Yu2.increasing-demand-for-more-autonomy-of-teams-systems---ASS@1776628138.a6vxyj.centralized-governance-cannot-scale-to-concurrent-development-contexts@@archimate-influence
-last-updated: '2026-05-31'
+last-updated: '2026-06-01'
 ---
 @startuml ARC@1780220700.Un4jQZ.the-story-in-one-view
+hide stereotype
+
+skinparam defaultFontName "Helvetica Neue, Helvetica, Arial, sans-serif"
+skinparam defaultFontSize 12
+skinparam shadowing false
+skinparam roundcorner 4
+skinparam backgroundColor #FAFAFA
+
+skinparam linetype ortho
+skinparam nodesep 60
+skinparam ranksep 80
+skinparam rectangle<<MotivationGrouping>> {
+  BackgroundColor #F7EEF9
+  BorderColor #7B3F9A
+}
+skinparam rectangle<<assessment>> {
+  BackgroundColor #EDD6F0
+  BorderColor #7B3F9A
+}
+skinparam rectangle<<driver>> {
+  BackgroundColor #EDD6F0
+  BorderColor #7B3F9A
+}
+skinparam rectangle<<goal>> {
+  BackgroundColor #EDD6F0
+  BorderColor #7B3F9A
+}
 hide stereotype
 
 skinparam defaultFontName "Helvetica Neue, Helvetica, Arial, sans-serif"
@@ -103,12 +130,12 @@ DRV_Ui5Op3 -[hidden]down- ASS_CK90bp
 ASS_a6vxyj -[hidden]down- GOL_FCfDuc
 GOL_FCfDuc -[hidden]down- GOL_5Fk9di
 
-DRV_GR9prv ..> ASS_CK90bp : <<influence>>
-DRV_Rt6Yu2 ..> ASS_CK90bp : <<influence>>
-DRV_Ui5Op3 ..> ASS_CK90bp : <<influence>>
-DRV_GR9prv ..> ASS_EI3FpR : <<influence>>
-DRV_GR9prv ..> ASS_a6vxyj : <<influence>>
-DRV_Rt6Yu2 ..> ASS_a6vxyj : <<influence>>
+DRV_GR9prv ..> ASS_CK90bp
+DRV_Rt6Yu2 ..> ASS_CK90bp
+DRV_Ui5Op3 ..> ASS_CK90bp
+DRV_GR9prv ..> ASS_EI3FpR
+DRV_GR9prv ..> ASS_a6vxyj
+DRV_Rt6Yu2 ..> ASS_a6vxyj
 
 ASS_CK90bp -- GOL_FCfDuc
 ASS_EI3FpR -- GOL_FCfDuc

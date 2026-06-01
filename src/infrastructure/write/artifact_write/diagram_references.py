@@ -5,6 +5,7 @@ from pathlib import Path
 
 from src.application.artifact_parsing import extract_declared_puml_aliases, normalize_puml_alias
 from src.application.modeling.artifact_write import ARCHIMATE_STEREOTYPE_TO_CONNECTION_TYPE
+from src.domain.archimate_relation_rendering import strip_suppressed_relation_labels
 from src.domain.ontology_catalog import all_connection_types
 
 from ._artifact_deduplication import get_repository
@@ -147,5 +148,9 @@ def _infer_reference_ids_from_puml(
 def _prepare_diagram_puml_body(puml_body: str, repo_root: Path, diagram_type: str) -> str:
     from src.infrastructure.diagram_types import get_diagram_type  # noqa: PLC0415
 
+    # Drop relation-stereotype edge labels the arrow style already conveys. This
+    # is an ontology-global normalisation (keyed on ``show_stereotype`` across all
+    # connection types), not a per-diagram-type concern, so it applies uniformly.
+    puml_body = strip_suppressed_relation_labels(puml_body)
     diagram_type_mod = get_diagram_type(diagram_type)
     return diagram_type_mod.renderer.inject_includes(puml_body, repo_root)

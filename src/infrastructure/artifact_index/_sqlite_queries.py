@@ -133,9 +133,13 @@ def connection_ids_for(
     where = ["entity_id = ?"]
     params: list[str] = [entity_id]
     if direction == "outbound":
-        where.append("direction_bucket = 'outbound'")
+        # Include directed outbound + symmetric connections where this entity is the source.
+        where.append("(direction_bucket = 'outbound' OR (direction_bucket = 'symmetric' AND source_id = ?))")
+        params.append(entity_id)
     elif direction == "inbound":
-        where.append("direction_bucket = 'inbound'")
+        # Include directed inbound + symmetric connections where this entity is the target.
+        where.append("(direction_bucket = 'inbound' OR (direction_bucket = 'symmetric' AND target_id = ?))")
+        params.append(entity_id)
     elif direction != "any":
         raise ValueError(f"Unsupported direction: {direction!r}")
     if conn_type is not None:

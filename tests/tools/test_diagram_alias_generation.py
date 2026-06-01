@@ -84,7 +84,7 @@ def test_generate_archimate_puml_body_normalizes_aliases_in_entities_and_connect
 
     assert '<<goal>> as GOL_B6G__P' in puml
     assert '<<outcome>> as OUT_i_3Bi_' in puml
-    assert 'Rel_Realization_Up(OUT_i_3Bi_, GOL_B6G__P, "")' in puml
+    assert "OUT_i_3Bi_ .up.|> GOL_B6G__P" in puml
     assert "GOL_B6G_-P" not in puml
     assert "OUT_i-3Bi-" not in puml
 
@@ -116,7 +116,7 @@ def test_generate_archimate_puml_body_single_domain_uses_type_groupings() -> Non
     assert "top to bottom direction" in puml
     assert "DRV_A -[hidden]right- DRV_B" in puml
     assert "DRV_B -[hidden]down- ASS_A" in puml
-    assert 'Rel_Influence_Down(DRV_A, ASS_A, "")' in puml
+    assert "DRV_A .down.> ASS_A" in puml
 
 
 def test_inject_archimate_includes_strips_comment_header_text(tmp_path: Path) -> None:
@@ -289,7 +289,7 @@ last-updated: '2026-04-20'
 
     assert '<<goal>> as GOL_B6G__P' in puml
     assert '<<outcome>> as OUT_i_3Bi_' in puml
-    assert 'Rel_Realization_Up(OUT_i_3Bi_, GOL_B6G__P, "")' in puml
+    assert "OUT_i_3Bi_ .up.|> GOL_B6G__P" in puml
     assert "GOL_B6G_-P" not in puml
     assert "OUT_i-3Bi-" not in puml
 
@@ -389,7 +389,7 @@ last-updated: '2026-04-20'
     assert 'rectangle "Assessments" <<MotivationGrouping>> {' in puml
     assert "top to bottom direction" in puml
     assert "DRV_A -[hidden]down- ASS_A" in puml
-    assert 'Rel_Influence_Down(DRV_A, ASS_A, "")' in puml
+    assert "DRV_A .down.> ASS_A" in puml
 
 
 # ── format_cardinality_label unit tests ───────────────────────────────────────
@@ -428,7 +428,7 @@ def test_generate_archimate_puml_body_renders_cardinality_both_ends() -> None:
     puml = generate_archimate_puml_body("Test", [goal, outcome], [conn])
 
     assert "1 -> 0..*" in puml
-    assert 'Rel_Realization_Up(OUT_A, GOL_A, "1 -> 0..*")' in puml
+    assert "OUT_A .up.|> GOL_A : 1 -> 0..*" in puml
 
 
 def test_generate_archimate_puml_body_renders_cardinality_src_only() -> None:
@@ -443,7 +443,7 @@ def test_generate_archimate_puml_body_renders_cardinality_src_only() -> None:
 
     puml = generate_archimate_puml_body("Test", [goal, outcome], [conn])
 
-    assert 'Rel_Realization_Up(OUT_A, GOL_A, "1 ->")' in puml
+    assert "OUT_A .up.|> GOL_A : 1 ->" in puml
 
 
 def test_generate_archimate_puml_body_no_cardinality_keeps_empty_label() -> None:
@@ -453,7 +453,7 @@ def test_generate_archimate_puml_body_no_cardinality_keeps_empty_label() -> None
 
     puml = generate_archimate_puml_body("Test", [goal, outcome], [conn])
 
-    assert 'Rel_Realization_Up(OUT_A, GOL_A, "")' in puml
+    assert "OUT_A .up.|> GOL_A" in puml
 
 
 def test_generate_archimate_puml_body_nests_junction_with_nested_siblings() -> None:
@@ -493,8 +493,8 @@ def test_generate_archimate_puml_body_nests_junction_with_nested_siblings() -> N
         elif in_prc and "JCN_A" in line:
             junction_nested = True
     assert junction_nested, "Junction should appear nested inside PRC_A block"
-    assert 'Rel_Flow(FNC_A, JCN_A, "")' in puml
-    assert 'Rel_Flow(JCN_A, FNC_B, "")' in puml
+    assert "FNC_A ..> JCN_A" in puml
+    assert "JCN_A ..> FNC_B" in puml
 
 
 def test_generate_archimate_puml_body_layouts_branch_step_perpendicular_to_main_flow() -> None:

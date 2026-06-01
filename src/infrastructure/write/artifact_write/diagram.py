@@ -9,6 +9,7 @@ from src.application.modeling.artifact_write import (
 )
 from src.application.modeling.artifact_write_layout import optimize_puml_layout
 from src.application.verification.artifact_verifier import ArtifactVerifier
+from src.application.verification.artifact_verifier_types import ENTITY_ID_RE
 from src.config.repo_paths import DIAGRAM_CATALOG, DIAGRAMS
 
 from ._artifact_deduplication import extract_friendly_slug, get_repository, validate_diagram_unique
@@ -100,8 +101,13 @@ def create_diagram(
         connection_ids_used = _merge_reference_ids(connection_ids_used, collected_connection_ids)
     else:
         if effective_id is None:
+            # Only adopt the @startuml token as the artifact-id when it is itself a
+            # canonical id (i.e. round-tripping a previously-generated diagram).
+            # A bare PlantUML label (e.g. "@startuml the-forces-shaping-this-system")
+            # is not an identity and must not leak into the artifact-id, or it
+            # produces a non-conformant id + W041. Otherwise mint a canonical id.
             m = re.search(r"@startuml\s+(\S+)", puml)
-            if m:
+            if m and ENTITY_ID_RE.match(m.group(1).strip()):
                 effective_id = m.group(1).strip()
         if effective_id is None:
             effective_id = generate_diagram_id(diagram_type, name)

@@ -44,9 +44,32 @@ connection-ids-used:
 - OUT@1776629110.aOcRl9.architecture-governance-scales-without-proportional-coordination-overhead---GOL@1712870400.Po1Qw3.maintain-coherence-and-traceability@@archimate-realization
 - OUT@1712870400.LrpdG0.increased-architectural-coherence---GOL@1712870400.Po1Qw3.maintain-coherence-and-traceability@@archimate-realization
 - OUT@1776629112.edEkJa.proven-patterns-promoted-and-adopted-across-engagements---GOL@1776628205.kCcPph.enable-cross-engagement-architectural-reuse@@archimate-realization
-last-updated: '2026-05-31'
+last-updated: '2026-06-01'
 ---
 @startuml ARC@1777452513.d8jG_4.what-we-are-trying-to-achieve
+hide stereotype
+
+skinparam defaultFontName "Helvetica Neue, Helvetica, Arial, sans-serif"
+skinparam defaultFontSize 12
+skinparam shadowing false
+skinparam roundcorner 4
+skinparam backgroundColor #FAFAFA
+
+skinparam linetype ortho
+skinparam nodesep 60
+skinparam ranksep 80
+skinparam rectangle<<MotivationGrouping>> {
+  BackgroundColor #F7EEF9
+  BorderColor #7B3F9A
+}
+skinparam rectangle<<goal>> {
+  BackgroundColor #EDD6F0
+  BorderColor #7B3F9A
+}
+skinparam rectangle<<outcome>> {
+  BackgroundColor #EDD6F0
+  BorderColor #7B3F9A
+}
 hide stereotype
 
 skinparam defaultFontName "Helvetica Neue, Helvetica, Arial, sans-serif"
@@ -125,17 +148,17 @@ GOL_FCfDuc -- GOL_Xwvgpb
 GOL_Po1Qw3 -- GOL_FCfDuc
 GOL_kCcPph -- GOL_FCfDuc
 
-OUT_AlZjX8 -up-|> GOL_5Fk9di : <<realization>>
-OUT_JZMIk3 -up-|> GOL_5Fk9di : <<realization>>
-OUT_YSRwR0 -up-|> GOL_Lm2Bn2 : <<realization>>
-OUT_FXFGrO -up-|> GOL_Gh3Jk1 : <<realization>>
-OUT__AzP1Q -up-|> GOL_Gh3Jk1 : <<realization>>
-OUT_a5mNob -up-|> GOL_Xwvgpb : <<realization>>
-OUT_g7PM4Y -up-|> GOL_Xwvgpb : <<realization>>
-OUT_9jS0BB -up-|> GOL_Po1Qw3 : <<realization>>
-OUT_aOcRl9 -up-|> GOL_FCfDuc : <<realization>>
-OUT_aOcRl9 -up-|> GOL_Po1Qw3 : <<realization>>
-OUT_LrpdG0 -up-|> GOL_Po1Qw3 : <<realization>>
-OUT_edEkJa -up-|> GOL_kCcPph : <<realization>>
+OUT_AlZjX8 -up-|> GOL_5Fk9di
+OUT_JZMIk3 -up-|> GOL_5Fk9di
+OUT_YSRwR0 -up-|> GOL_Lm2Bn2
+OUT_FXFGrO -up-|> GOL_Gh3Jk1
+OUT__AzP1Q -up-|> GOL_Gh3Jk1
+OUT_a5mNob -up-|> GOL_Xwvgpb
+OUT_g7PM4Y -up-|> GOL_Xwvgpb
+OUT_9jS0BB -up-|> GOL_Po1Qw3
+OUT_aOcRl9 -up-|> GOL_FCfDuc
+OUT_aOcRl9 -up-|> GOL_Po1Qw3
+OUT_LrpdG0 -up-|> GOL_Po1Qw3
+OUT_edEkJa -up-|> GOL_kCcPph
 
 @enduml

@@ -85,10 +85,10 @@ def test_render_body_uses_includes_and_single_domain_type_groupings(tmp_path: Pa
     assert 'rectangle "Drivers" <<MotivationGrouping>> {' in puml
     assert 'rectangle "Assessments" <<MotivationGrouping>> {' in puml
     assert "top to bottom direction" in puml
-    assert 'Rel_Influence_Down(DRV_A, ASS_A, "")' in puml
+    assert "DRV_A .down.> ASS_A" in puml
 
 
-def test_render_body_keeps_serving_macro_unsuffixed_for_cross_group_layout(tmp_path: Path) -> None:
+def test_render_body_uses_direction_hints_for_cross_group_connections(tmp_path: Path) -> None:
     renderer = GenericPumlRenderer(_ARCHIMATE_CONFIG)
     source = _entity(
         "SSW@1.a.registry",
@@ -115,8 +115,7 @@ def test_render_body_keeps_serving_macro_unsuffixed_for_cross_group_layout(tmp_p
         tmp_path,
     )
 
-    assert 'Rel_Serving(SSW_REG, NOD_CLU, "")' in puml
-    assert "Rel_Serving_Up(" not in puml
+    assert "SSW_REG -up-> NOD_CLU" in puml
 
 
 def test_archimate_renderer_keeps_connection_text_hidden_by_default(tmp_path: Path) -> None:
@@ -146,7 +145,7 @@ def test_archimate_renderer_keeps_connection_text_hidden_by_default(tmp_path: Pa
         tmp_path,
     )
 
-    assert 'Rel_Serving(SSW_REG, NOD_CLU, "")' in puml
+    assert "SSW_REG -up-> NOD_CLU" in puml
     assert "HTTPS 443" not in puml
 
 
@@ -192,7 +191,7 @@ def test_archimate_renderer_renders_only_selected_connection_annotation_content(
         ],
     )
 
-    assert 'Rel_Serving(SSW_REG, NOD_CLU, "Registry pulls over HTTPS 443 | Outbound TCP")' in puml
+    assert "SSW_REG -up-> NOD_CLU : Registry pulls over HTTPS 443 | Outbound TCP" in puml
 
 
 def test_archimate_renderer_can_opt_in_cardinality_for_annotated_connections(tmp_path: Path) -> None:
@@ -222,7 +221,66 @@ def test_archimate_renderer_can_opt_in_cardinality_for_annotated_connections(tmp
         ],
     )
 
-    assert 'Rel_Realization_Up(OUT_A, GOL_A, "1 -> 0..* | Required path")' in puml
+    assert "OUT_A .up.|> GOL_A : 1 -> 0..* | Required path" in puml
+
+
+def test_archimate_connections_use_ontology_arrow_styles_not_macros(tmp_path: Path) -> None:
+    """ArchiMate connections must render with the type-specific puml_arrow from the ontology.
+
+    Each ArchiMate relationship has a distinct PlantUML arrow notation:
+    - association  → '--'   (undirected solid line)
+    - realization  → '..|>' (dashed hollow triangle)
+    - influence    → '..>'  (dashed directed line)
+    - serving      → '-->'  (solid directed line)
+    - specialization → '--|>' (solid hollow triangle)
+
+    No Rel_* macro calls must appear — those require a PlantUML ArchiMate stdlib
+    that is not present in the workspace.
+    """
+    renderer = GenericPumlRenderer(_ARCHIMATE_CONFIG)
+    src = _entity("GOL@1.a.goal", "goal", "Goal", "GOL_A")
+    tgt = _entity("OUT@1.b.outcome", "outcome", "Outcome", "OUT_A", subdomain="outcomes")
+
+    # Each connection type has a distinct arrow family encoded in puml_arrow.
+    # Direction hints may alter the middle of the arrow (e.g. ..|> → .down.|>,
+    # -- → -down-) but the line-style (solid vs dashed) and arrowhead type
+    # (open >, hollow |>, none) are preserved.
+    #
+    # Verification strategy per type:
+    #   realization   — dashed line with hollow triangle: contains ".|>"
+    #   influence     — dashed line with open arrowhead: contains ".>" but not ".|>"
+    #   association   — undirected solid line: NO arrowhead character (no ">" or "|>")
+    #   serving       — solid directed open arrowhead: contains "->" but not "-|>"
+    #   specialization— solid line with hollow triangle: contains "-|>"
+    cases: list[tuple[str, str | None, str | None]] = [
+        ("archimate-realization",   ".|>",  None),
+        ("archimate-influence",     ".>",   None),
+        ("archimate-association",   None,   ">"),   # None=must-contain, ">"=must-NOT-contain
+        ("archimate-serving",       "->",   None),
+        ("archimate-specialization", "-|>", None),
+    ]
+    for conn_type, must_contain, must_not_contain in cases:
+        puml = renderer.render_body(
+            "Test",
+            [src, tgt],
+            [_conn(src.artifact_id, tgt.artifact_id, conn_type)],
+            "archimate-motivation",
+            tmp_path,
+        )
+        conn_lines = [ln for ln in puml.splitlines() if "GOL_A" in ln and "OUT_A" in ln and "[hidden]" not in ln]
+        assert conn_lines, f"{conn_type!r}: no connection line found in PUML"
+        if must_contain is not None:
+            assert any(must_contain in ln for ln in conn_lines), (
+                f"{conn_type!r} should contain {must_contain!r} in connection line, got: {conn_lines}"
+            )
+        if must_not_contain is not None:
+            assert all(must_not_contain not in ln for ln in conn_lines), (
+                f"{conn_type!r} must NOT contain {must_not_contain!r} (undirected), got: {conn_lines}"
+            )
+        assert "Rel_" not in puml, f"{conn_type!r} must not generate Rel_* macro calls"
+        assert f"<<{conn_type.removeprefix('archimate-')}>>" not in puml, (
+            f"{conn_type!r} must not emit stereotype label — arrow style conveys the type"
+        )
 
 
 def test_render_body_renders_junction_inside_nested_parent(tmp_path: Path) -> None:
