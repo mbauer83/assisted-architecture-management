@@ -1,8 +1,4 @@
 connection_types:
-  seq-message:
-    embedding: none
-    cascade_delete_source: false
-
   seq-from:
     embedding: none
     cascade_delete_source: true
@@ -11,18 +7,13 @@ connection_types:
     embedding: none
     cascade_delete_source: true
 
-  seq-note-of:
-    embedding: property
-    embed_key: note
-    cascade_delete_source: true
-
 entity_types:
   lifeline:
     classes: [participant]
     create_when: >-
       Use for each participant (actor, system, component, service) in the sequence.
-      Optionally add a binding to a model entity (business-actor, role,
-      application-component, application-service, node) for model traceability.
+      Set participant_type and optionally map to a model entity for traceability.
+      Array order = left-to-right position in the diagram.
     never_create_when: >-
       Do not create multiple lifelines for the same participant.
     permitted_mappings:
@@ -40,15 +31,18 @@ entity_types:
         - ontology: archimate_next
           entity_type: node
     mapping_required: false
-    properties: {}
+    properties:
+      participant_type:
+        type: string
+        enum: [participant, actor, boundary, control, entity, database, queue]
+        required: false
+        description: UML participant stereotype (default participant)
 
   message:
     classes: [message]
     create_when: >-
-      Use for each message or call between two lifelines. Set sequence_index (integer,
-      1-based) for ordering and provide a label. Add seq-from and seq-to connections
-      to the source and target lifelines. Optionally add a binding to a model
-      connection for traceability.
+      Use for each message or call between two lifelines. Array order = top-to-bottom
+      sequence. Set seq-from and seq-to connections to source and target lifelines.
     never_create_when: >-
       Do not create a message without seq-from and seq-to connections to lifelines.
     required_connections:
@@ -59,78 +53,67 @@ entity_types:
         target: lifeline
         cardinality: [1, 1]
     properties:
-      sequence_index:
-        type: integer
-        required: true
-        description: Total ordering of this message in the diagram (1-based)
-      arrow_style:
+      arrow:
         type: string
-        enum: [sync, async, reply, create, destroy]
+        enum: [sync, async, reply, self, create, destroy]
         required: false
         description: Arrow notation style (default sync)
+      activate_target:
+        type: boolean
+        required: false
+        description: Activate target lifeline when this message arrives (PlantUML ++)
+      deactivate_target:
+        type: boolean
+        required: false
+        description: Deactivate target lifeline when this message arrives (PlantUML --)
 
-  fragment:
+  grouping:
     classes: [grouping]
     create_when: >-
-      Use to group a range of messages into a combined fragment block (opt, alt,
-      loop, par). Set from_index and to_index to the sequence_index range covered.
+      Use to group a contiguous span of messages into a combined fragment block.
+      Each operand has an optional guard and start_message_id / end_message_id.
+      alt uses ≥1 operands (first guard, remaining = else-if); par uses ≥1 parallel
+      flows; opt/loop/break/critical/group use exactly 1. Groupings may be nested.
     never_create_when: >-
-      Do not use fragment for a single unconditional message.
+      Do not use for a single unconditional message.
     properties:
       kind:
         type: string
-        enum: [opt, alt, loop, par]
+        enum: [alt, opt, loop, par, break, critical, group]
         required: true
-        description: Fragment type
-      from_index:
-        type: integer
-        required: true
-        description: sequence_index of the first message covered by this fragment
-      to_index:
-        type: integer
-        required: true
-        description: sequence_index of the last message covered by this fragment
-      condition:
+        description: Fragment kind
+      label:
         type: string
         required: false
-        description: Guard condition shown in the fragment header
-
-  execution-spec:
-    classes: [activation]
-    create_when: >-
-      Use to indicate that a participant is active (executing) during a range of
-      messages. Set lifeline_id to the target lifeline and from_index/to_index
-      to the message sequence_index range.
-    never_create_when: >-
-      Omit when the execution period is not relevant to the scenario.
-    properties:
-      lifeline_id:
-        type: string
+        description: Label for group kind or loop condition bound
+      operands:
+        type: array
         required: true
-        description: Id of the lifeline this execution spec covers
-      from_index:
-        type: integer
-        required: true
-        description: sequence_index of the first covered message
-      to_index:
-        type: integer
-        required: true
-        description: sequence_index of the last covered message
+        description: >-
+          Operands array. Each entry has guard? (string), start_message_id (string),
+          end_message_id (string). alt/par use ≥1; others use exactly 1.
 
   note:
     classes: [annotation]
-    required_connections:
-      - connection_type: seq-note-of
-        target: lifeline
-        cardinality: [1, 1]
     properties:
       text:
         type: string
         required: true
-      side:
+      placement:
         type: string
-        enum: [left, right]
+        enum: [left_of, right_of, over]
         required: false
+        description: Note placement relative to lifeline(s) (default right_of)
+      lifeline_ids:
+        type: array
+        required: true
+        description: >-
+          IDs of lifelines this note is attached to.
+          left_of / right_of = exactly 1; over = 1..N.
+      after_message_id:
+        type: string
+        required: false
+        description: Message ID after which the note appears; omit to append at end
 
 permitted_relationships: []
 

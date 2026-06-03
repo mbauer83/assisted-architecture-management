@@ -247,7 +247,7 @@ const attachInteractivity = async () => {
     const pathFwd = svgEl.getElementById(`${conn.source_alias}-${conn.target_alias}`)
     const pathRev = svgEl.getElementById(`${conn.target_alias}-${conn.source_alias}`)
     const pathEl = pathFwd ?? pathRev
-    g = pathEl?.closest('g') as SVGGElement | null
+    g = pathEl?.closest('g')
     if (g) attachConnGroup(g, conn)
   }
 }

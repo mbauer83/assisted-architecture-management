@@ -7,8 +7,6 @@ element_classes:
     description: A named participant column (lifeline) in the sequence
   message:
     description: A temporal message between two participants
-  activation:
-    description: An execution specification period on a lifeline
 guidance:
   when_to_use: >-
     Use for modeling ordered message flows between participants (actors, systems,
@@ -21,6 +19,8 @@ ui:
   label: Sequence Diagram
   description: UML sequence diagram with lifelines and messages
   entity_search_filter: false
+  type_ui_slots:
+    sequence-editor: sequence-editor
   diagram_only_types:
     - entity_type: lifeline
       label: Lifeline
@@ -30,10 +30,10 @@ ui:
       label: Message
       plural: Messages
 
-    - entity_type: fragment
-      label: Fragment
-      plural: Fragments
+    - entity_type: grouping
+      label: Grouping
+      plural: Groupings
 
-    - entity_type: execution-spec
-      label: Execution Specification
-      plural: Execution Specifications
+    - entity_type: note
+      label: Note
+      plural: Notes

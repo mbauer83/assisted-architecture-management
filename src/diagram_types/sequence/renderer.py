@@ -1,17 +1,14 @@
-"""Sequence diagram PUML renderer — PlantUML sequence syntax.
+"""Sequence diagram PUML renderer — PlantUML sequence syntax (v2 schema).
 
 diagram_entities keys:
-  lifeline:       [{id, label?}]
-  message:        [{id, label?, sequence_index, arrow_style?}]
-  fragment:       [{id, kind, from_index, to_index, condition?}]
-  execution-spec: [{id, lifeline_id, from_index, to_index}]
-  note:           [{id, text, side?}]
+  lifeline:  [{id, label?, participant_type?}]           # array order = left-to-right
+  message:   [{id, label?, arrow?, activate_target?, deactivate_target?}]  # array order = sequence
+  grouping:  [{id, kind, label?, operands: [{guard?, start_message_id, end_message_id}]}]
+  note:      [{id, text, placement?, lifeline_ids: [...], after_message_id?}]
 
-diagram_connections:
-  seq-from:     message → lifeline (source lifeline)
-  seq-to:       message → lifeline (target lifeline)
-  seq-note-of:  note → lifeline
-  seq-message:  lifeline → lifeline (direct edge without message entity)
+Connections in diagram_entities._connections (or diagram_connections parameter):
+  seq-from:  message → lifeline  (source)
+  seq-to:    message → lifeline  (target)
 """
 
 from __future__ import annotations
@@ -24,12 +21,23 @@ from typing import Any
 from src.domain.artifact_types import ConnectionRecord, EntityRecord
 from src.domain.ontology_protocol import DiagramRendererReferences
 
-_ARROW_MAP = {
+_PARTICIPANT_KEYWORD: dict[str, str] = {
+    "participant": "participant",
+    "actor": "actor",
+    "boundary": "boundary",
+    "control": "control",
+    "entity": "entity",
+    "database": "database",
+    "queue": "queue",
+}
+
+_ARROW_MAP: dict[str, str] = {
     "sync": "->",
     "async": "->>",
     "reply": "-->",
+    "self": "->",
     "create": "->",
-    "destroy": "->",
+    "destroy": "-\\\\",
     "": "->",
 }
 
@@ -49,28 +57,26 @@ class SequencePumlRenderer:
         diagram_entities: Mapping[str, object] | None = None,
         diagram_connections: list[dict[str, object]] | None = None,
     ) -> str:
-        del diagram_type, entities, connections
+        del diagram_type, entities, connections, repo_root
         diagram_name = re.sub(r"[^a-zA-Z0-9_-]", "-", name.lower()).strip("-") or "sequence"
         kd = diagram_entities or {}
-        kcs = diagram_connections or []
+
+        # Prefer explicit diagram_connections; fall back to _connections in diagram_entities
+        kcs: list[dict[str, object]] = diagram_connections or []
+        if not kcs:
+            raw = kd.get("_connections")
+            if isinstance(raw, list):
+                kcs = [c for c in raw if isinstance(c, dict)]
 
         lifelines = _read_list(kd, "lifeline")
-        messages = sorted(_read_list(kd, "message"), key=lambda m: int(m.get("sequence_index") or 0))
-        fragments = sorted(_read_list(kd, "fragment"), key=lambda f: int(f.get("from_index") or 0))
-        exec_specs = _read_list(kd, "execution-spec")
+        messages = _read_list(kd, "message")  # array order = sequence
+        groupings = _read_list(kd, "grouping")
+        notes = _read_list(kd, "note")
 
         alias_map = {ll["id"]: f"LL{i + 1}" for i, ll in enumerate(lifelines) if ll.get("id")}
-        from_map = _build_single(kcs, "seq-from")   # msg_id → lifeline_id
-        to_map = _build_single(kcs, "seq-to")       # msg_id → lifeline_id
-        note_map = _build_single(kcs, "seq-note-of")  # note_id → lifeline_id
-
-        # activation tracking: lifeline_id → sorted list of (from_idx, to_idx) specs
-        active_ranges: dict[str, list[tuple[int, int]]] = {}
-        for es in exec_specs:
-            ll_id = str(es.get("lifeline_id") or "")
-            if ll_id:
-                f, t = int(es.get("from_index") or 0), int(es.get("to_index") or 0)
-                active_ranges.setdefault(ll_id, []).append((f, t))
+        from_map = _build_single(kcs, "seq-from")
+        to_map = _build_single(kcs, "seq-to")
+        msg_id_to_idx = {str(m["id"]): i for i, m in enumerate(messages)}
 
         lines: list[str] = [f"@startuml {diagram_name}", f"title {_puml_text(name)}", ""]
 
@@ -78,13 +84,16 @@ class SequencePumlRenderer:
             ll_id = str(ll.get("id") or "")
             alias = alias_map.get(ll_id, ll_id)
             label = str(ll.get("label") or ll_id)
-            lines.append(f'participant "{_puml_text(label)}" as {alias}')
+            ptype = str(ll.get("participant_type") or "participant")
+            keyword = _PARTICIPANT_KEYWORD.get(ptype, "participant")
+            lines.append(f'{keyword} "{_puml_text(label)}" as {alias}')
 
-        _emit_notes(kd, note_map, alias_map, lines)
         if lifelines:
             lines.append("")
 
-        _emit_messages(messages, fragments, active_ranges, from_map, to_map, alias_map, lines)
+        _emit_messages_with_groupings(
+            messages, groupings, notes, from_map, to_map, alias_map, msg_id_to_idx, lines
+        )
 
         lines.append("")
         lines.append("@enduml")
@@ -144,89 +153,152 @@ def _build_single(kcs: list[dict[str, object]], conn_type: str) -> dict[str, str
     }
 
 
-def _emit_notes(
-    kd: Mapping[str, object],
-    note_map: dict[str, str],
+def _read_operands(g: dict[str, Any]) -> list[dict[str, Any]]:
+    ops = g.get("operands")
+    if not isinstance(ops, list):
+        return []
+    return [op for op in ops if isinstance(op, dict)]
+
+
+def _emit_messages_with_groupings(
+    messages: list[dict[str, Any]],
+    groupings: list[dict[str, Any]],
+    notes: list[dict[str, Any]],
+    from_map: dict[str, str],
+    to_map: dict[str, str],
     alias_map: dict[str, str],
+    msg_id_to_idx: dict[str, int],
     lines: list[str],
 ) -> None:
-    notes = _read_list(kd, "note")
-    if not notes:
-        return
-    lines.append("")
+    notes_after: dict[str, list[dict[str, Any]]] = {}
+    notes_at_end: list[dict[str, Any]] = []
     for note in notes:
-        note_id = str(note.get("id") or "")
-        ll_id = note_map.get(note_id, "")
-        alias = alias_map.get(ll_id, ll_id) if ll_id else ""
-        side = str(note.get("side") or "right")
-        if side not in ("left", "right"):
-            side = "right"
-        text = str(note.get("text") or "")
-        if not text:
-            continue
-        if alias:
-            lines.append(f"note {side} of {alias}: {_puml_text(text)}")
+        after_id = str(note.get("after_message_id") or "")
+        if after_id and after_id in msg_id_to_idx:
+            notes_after.setdefault(after_id, []).append(note)
         else:
-            lines.append(f"note {side}: {_puml_text(text)}")
+            notes_at_end.append(note)
+
+    # open_at[idx] = [(grouping, span)], close_at[idx] = [(grouping, span)]
+    # else_at[idx] = [(grouping, op_idx, guard, span)]
+    open_at: dict[int, list[tuple[dict[str, Any], int]]] = {}
+    close_at: dict[int, list[tuple[dict[str, Any], int]]] = {}
+    else_at: dict[int, list[tuple[dict[str, Any], int, str, int]]] = {}
+
+    for g in groupings:
+        ops = _read_operands(g)
+        if not ops:
+            continue
+        s_idx = msg_id_to_idx.get(str(ops[0].get("start_message_id") or ""))
+        e_idx = msg_id_to_idx.get(str(ops[-1].get("end_message_id") or ""))
+        if s_idx is None or e_idx is None:
+            continue
+        span = e_idx - s_idx
+        open_at.setdefault(s_idx, []).append((g, span))
+        close_at.setdefault(e_idx, []).append((g, span))
+        for i, op in enumerate(ops[1:], 1):
+            op_s = msg_id_to_idx.get(str(op.get("start_message_id") or ""))
+            if op_s is not None:
+                guard = str(op.get("guard") or "")
+                else_at.setdefault(op_s, []).append((g, i, guard, span))
+
+    for idx, msg in enumerate(messages):
+        msg_id = str(msg.get("id") or "")
+
+        # Else boundaries: innermost first (smallest span)
+        for _g, _i, guard, _span in sorted(else_at.get(idx, []), key=lambda x: x[3]):
+            lines.append(f"else [{_puml_text(guard)}]" if guard else "else")
+
+        # Open groupings: outermost first (largest span)
+        for g, _span in sorted(open_at.get(idx, []), key=lambda x: -x[1]):
+            _emit_grouping_open(g, lines)
+
+        _emit_message(msg, from_map, to_map, alias_map, lines)
+
+        for note in notes_after.get(msg_id, []):
+            _emit_note(note, alias_map, lines)
+
+        # Close groupings: innermost first (smallest span)
+        for _g, _span in sorted(close_at.get(idx, []), key=lambda x: x[1]):
+            lines.append("end")
+
+    for note in notes_at_end:
+        _emit_note(note, alias_map, lines)
 
 
-def _emit_messages(
-    messages: list[dict[str, Any]],
-    fragments: list[dict[str, Any]],
-    active_ranges: dict[str, list[tuple[int, int]]],
+def _emit_grouping_open(g: dict[str, Any], lines: list[str]) -> None:
+    kind = str(g.get("kind") or "opt")
+    label = str(g.get("label") or "")
+    ops = _read_operands(g)
+    first_guard = str(ops[0].get("guard") or "") if ops else ""
+
+    if kind == "group" and label:
+        lines.append(f"group {_puml_text(label)}")
+    elif kind in ("loop", "break", "critical") and label:
+        lines.append(f"{kind} {_puml_text(label)}")
+    elif first_guard:
+        lines.append(f"{kind} [{_puml_text(first_guard)}]")
+    else:
+        lines.append(kind)
+
+
+def _emit_message(
+    msg: dict[str, Any],
     from_map: dict[str, str],
     to_map: dict[str, str],
     alias_map: dict[str, str],
     lines: list[str],
 ) -> None:
-    # Build fragment open/close events keyed by message sequence_index
-    frag_open: dict[int, list[dict[str, Any]]] = {}
-    frag_close: dict[int, list[dict[str, Any]]] = {}
-    for frag in fragments:
-        fi = int(frag.get("from_index") or 0)
-        ti = int(frag.get("to_index") or 0)
-        frag_open.setdefault(fi, []).append(frag)
-        frag_close.setdefault(ti, []).append(frag)
+    msg_id = str(msg.get("id") or "")
+    src_ll = from_map.get(msg_id, "")
+    tgt_ll = to_map.get(msg_id, "")
+    src_alias = alias_map.get(src_ll, src_ll)
+    tgt_alias = alias_map.get(tgt_ll, tgt_ll)
+    arrow_key = str(msg.get("arrow") or "sync")
+    arrow = _ARROW_MAP.get(arrow_key, "->")
+    label = _puml_text(str(msg.get("label") or ""))
+    activate = bool(msg.get("activate_target"))
+    deactivate = bool(msg.get("deactivate_target"))
 
-    # Build activation open/close events keyed by message index
-    act_open: dict[int, list[str]] = {}
-    act_close: dict[int, list[str]] = {}
-    for ll_id, ranges in active_ranges.items():
-        for fi, ti in ranges:
-            act_open.setdefault(fi, []).append(ll_id)
-            act_close.setdefault(ti, []).append(ll_id)
+    if arrow_key == "self" or (src_ll and src_ll == tgt_ll):
+        if src_alias:
+            lines.append(f"{src_alias} {arrow} {src_alias}: {label}")
+        return
 
-    for msg in messages:
-        msg_id = str(msg.get("id") or "")
-        idx = int(msg.get("sequence_index") or 0)
-
-        for frag in frag_open.get(idx, []):
-            kind = str(frag.get("kind") or "opt")
-            cond = str(frag.get("condition") or "")
-            header = f"{kind}" + (f" [{_puml_text(cond)}]" if cond else "")
-            lines.append(header)
-
-        for ll_id in act_open.get(idx, []):
-            alias = alias_map.get(ll_id, ll_id)
-            lines.append(f"activate {alias}")
-
-        src_ll = from_map.get(msg_id, "")
-        tgt_ll = to_map.get(msg_id, "")
-        src_alias = alias_map.get(src_ll, src_ll)
-        tgt_alias = alias_map.get(tgt_ll, tgt_ll)
-        arrow = _ARROW_MAP.get(str(msg.get("arrow_style") or ""), "->")
-        label = _puml_text(str(msg.get("label") or ""))
-        if src_alias and tgt_alias:
-            lines.append(f"{src_alias} {arrow} {tgt_alias}: {label}")
-        elif label:
+    if not (src_alias and tgt_alias):
+        if label:
             lines.append(f"' {label}")
+        return
 
-        for ll_id in act_close.get(idx, []):
-            alias = alias_map.get(ll_id, ll_id)
-            lines.append(f"deactivate {alias}")
+    if arrow_key == "create":
+        lines.append(f"{src_alias} {arrow} {tgt_alias} **: {label}")
+    elif arrow_key == "destroy":
+        lines.append(f"{src_alias} {arrow} {tgt_alias} !!: {label}")
+    elif activate:
+        lines.append(f"{src_alias} {arrow} {tgt_alias} ++: {label}")
+    elif deactivate:
+        lines.append(f"{src_alias} {arrow} {tgt_alias} --: {label}")
+    else:
+        lines.append(f"{src_alias} {arrow} {tgt_alias}: {label}")
 
-        for _frag in frag_close.get(idx, []):
-            lines.append("end")
+
+def _emit_note(note: dict[str, Any], alias_map: dict[str, str], lines: list[str]) -> None:
+    placement = str(note.get("placement") or "right_of")
+    lifeline_ids = note.get("lifeline_ids")
+    if not isinstance(lifeline_ids, list):
+        lifeline_ids = []
+    text = str(note.get("text") or "")
+    if not text:
+        return
+    aliases = [alias_map.get(str(lid), str(lid)) for lid in lifeline_ids if lid]
+    if not aliases:
+        return
+    if placement == "left_of":
+        lines.append(f"note left of {aliases[0]}: {_puml_text(text)}")
+    elif placement == "over":
+        lines.append(f"note over {', '.join(aliases)}: {_puml_text(text)}")
+    else:
+        lines.append(f"note right of {aliases[0]}: {_puml_text(text)}")
 
 
 def _puml_text(value: str) -> str:
