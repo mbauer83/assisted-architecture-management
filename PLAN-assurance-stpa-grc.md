@@ -1,6 +1,6 @@
 # PLAN — Assurance Capability: STPA / CAST / GRC
 
-> **Status — Phase 2 complete (2026-06-04). Phase 3 is next.**
+> **Status — Phase 3 complete (2026-06-05). Phase 4 is next.**
 > **All design decisions are locked** (§18 — no open items remain). **Canonical progress tracker = §24**
 > (phased checklist + per-phase Definitions of Done + status). When you pick this up: update the §24 tracker
 > and check `[x]` items as they complete; detailed specs (full `entities.yaml`, JSON schemas, port interfaces)
@@ -670,7 +670,7 @@ keep the top-of-file Status line in sync. Status values: ☐ not started · ◐ 
 | 1c | Immutable records + safety/structural verifier | ☑ done |
 | 1d | Minimal UI surfacing (module_class plumbing, discoverability) | ☑ done |
 | 2 | STPA (wizard, control-structure canvas, matrices, MCP, skill) | ☑ done |
-| 3 | CAST + GRC depth (register, dashboards) | ☐ not started |
+| 3 | CAST + GRC depth (register, dashboards) | ☑ done |
 | 4 | Storage breadth + governance depth (opt-in) | ☐ not started |
 | 5 | Cybersecurity & supply-chain connectors (§27) | ☐ not started |
 | 6 | Assurance cases & polish (GSN/bowtie, dashboards) | ☐ not started |
@@ -727,9 +727,9 @@ through one `arch-assurance` read + write MCP path; assurance excluded from mode
 - [x] "Suggested model entities": W501 verifier + `assurance_model_this` task spec workflow (US6).
 
 **Phase 3 — CAST + GRC depth.** DoD: US5, US8 pass.
-- [ ] `incident`/`corrective-action` + UCA/scenario `mode` + `cast-investigation` doc type + skill.
-- [ ] `risk` entity + register/coverage views + `grc-management` skill.
-- [ ] Obligation/compliance handling + `compliance-statement` doc + evidence links + promotion warnings.
+- [x] `incident`/`corrective-action` + UCA/scenario `mode` + `cast-investigation` doc type + skill.
+- [x] `risk` entity + register/coverage views + `grc-management` skill.
+- [x] Obligation/compliance handling + `compliance-statement` doc + evidence links + promotion warnings.
 
 **Phase 4 — Storage breadth + governance depth (opt-in).** DoD: a team can run PocketBase; regulated users
 can enable WORM/legal-hold + crypto-shredding.

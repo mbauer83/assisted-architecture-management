@@ -1,12 +1,14 @@
 """Assurance write MCP tools.
 
 Tools registered on arch-assurance-write:
-  assurance_create_node    — create any assurance entity
-  assurance_add_edge       — add a typed assurance connection
-  assurance_edit_node      — update node attributes
-  assurance_delete_node    — delete a node (cascades edges)
-  assurance_seal_baseline  — seal a signed analysis baseline (Phase 1c)
-  assurance_register_arch_ref — record an assurance→architecture reference
+  assurance_create_node         — create any assurance entity
+  assurance_add_edge            — add a typed assurance connection
+  assurance_edit_node           — update node attributes
+  assurance_delete_node         — delete a node (cascades edges)
+  assurance_seal_baseline       — seal a signed analysis baseline
+  assurance_register_arch_ref   — record an assurance→architecture reference
+  assurance_model_this          — propose architecture entity to bind an unbound-pending CSN
+  assurance_promotion_preflight — pre-check safety/security constraints before promotion
 """
 
 from __future__ import annotations
@@ -279,3 +281,21 @@ def register_write_tools(server: FastMCP) -> None:
                 },
             },
         }
+
+    @server.tool(
+        name="assurance_promotion_preflight",
+        description=(
+            "Pre-check safety/security assurance-constraints before promoting findings to a "
+            "wider audience tier. Blocks promotion if any safety/security constraint is missing "
+            "an accountable-to owner OR an evidenced-by connection (§6 promotion pre-check, §23). "
+            "Returns a list of blocking issues and a promote_safe flag."
+        ),
+    )
+    def assurance_promotion_preflight(
+        node_ids: list[str] | None = None,
+    ) -> dict[str, object]:
+        if not ctx.is_available():
+            return ctx.locked_response()
+        from src.application.assurance_promotion import promotion_preflight  # noqa: PLC0415
+
+        return promotion_preflight(ctx.store, node_ids=node_ids)

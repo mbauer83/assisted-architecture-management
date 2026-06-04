@@ -9,11 +9,14 @@ Hard rules (always enforced, block sign-off):
   E502 — safety/security assurance-constraint must have accountable-to owner
   E503 — disposition=accepted on safety/security requires justification + sign-off
   E504 — risk.treatment=accept cannot be sole disposition for a safety hazard
+  E505 — incident has no investigates edge (CAST investigation incomplete)
 
 Informational findings (W5xx — never block writes):
   W501 — control-structure-node with binding_status=unbound-pending (modeling gap)
   W502 — assurance-constraint with no evidenced-by connection
   W503 — hazard with no leads-to loss connection
+  W504 — obligation with no complies-with constraint (coverage gap)
+  W505 — risk with no treatment attribute set
 """
 
 from __future__ import annotations
@@ -223,6 +226,65 @@ def _check_hazard_has_loss(
         ))
 
 
+def _check_incident_has_investigates(
+    node: dict[str, object],
+    edges: list[dict[str, object]],
+    result: AssuranceVerificationResult,
+) -> None:
+    """E505: incident must have at least one investigates edge."""
+    node_id = str(node["node_id"])
+    has_inv = any(str(e["source_id"]) == node_id and str(e["conn_type"]) == "investigates" for e in edges)
+    if not has_inv:
+        result.issues.append(AssuranceIssue(
+            severity="error",
+            code="E505",
+            message=(
+                "CAST incident has no 'investigates' edge. "
+                "Connect it to a control-structure-node or hazard (§10)."
+            ),
+            node_id=node_id,
+        ))
+
+
+def _check_obligation_has_constraint(
+    node: dict[str, object],
+    edges: list[dict[str, object]],
+    result: AssuranceVerificationResult,
+) -> None:
+    """W504: obligation with no complies-with constraint (coverage gap)."""
+    node_id = str(node["node_id"])
+    linked = any(str(e["target_id"]) == node_id and str(e["conn_type"]) == "complies-with" for e in edges)
+    if not linked:
+        result.issues.append(AssuranceIssue(
+            severity="warning",
+            code="W504",
+            message="Obligation has no 'complies-with' constraint. Link one to close the compliance gap.",
+            node_id=node_id,
+        ))
+
+
+def _check_risk_has_treatment(
+    node: dict[str, object],
+    result: AssuranceVerificationResult,
+) -> None:
+    """W505: risk with no treatment attribute set."""
+    import json as _json  # noqa: PLC0415
+
+    node_id = str(node["node_id"])
+    attrs_raw = node.get("attributes_json") or "{}"
+    try:
+        attrs: dict[str, object] = _json.loads(str(attrs_raw))
+    except Exception:  # noqa: BLE001
+        attrs = {}
+    if not str(attrs.get("treatment") or "").strip():
+        result.issues.append(AssuranceIssue(
+            severity="warning",
+            code="W505",
+            message="Risk has no 'treatment' attribute. Set to: mitigate | transfer | avoid | accept.",
+            node_id=node_id,
+        ))
+
+
 def verify_store(store: ConfidentialAssuranceStore) -> AssuranceVerificationResult:
     """Run all §17(A) hard validity + informational checks on the assurance store."""
     result = AssuranceVerificationResult()
@@ -250,12 +312,19 @@ def verify_store(store: ConfidentialAssuranceStore) -> AssuranceVerificationResu
 
         if ntype == "risk":
             _check_risk_not_sole_accept_for_safety(node, all_nodes, all_edges, result)
+            _check_risk_has_treatment(node, result)
 
         if ntype == "control-structure-node":
             _check_unbound_nodes(node, result)
 
         if ntype == "hazard":
             _check_hazard_has_loss(node, all_edges, result)
+
+        if ntype == "incident":
+            _check_incident_has_investigates(node, all_edges, result)
+
+        if ntype == "obligation":
+            _check_obligation_has_constraint(node, all_edges, result)
 
     return result
 

@@ -8,6 +8,7 @@ from pathlib import Path
 
 from src.application.artifact_document_schema import get_document_subdirectory
 from src.config.repo_paths import ARCH_DOC_SCHEMATA, ARCH_REPO, DIAGRAM_CATALOG, DIAGRAMS, DOCS, MODEL, RENDERED
+from src.infrastructure.workspace._assurance_doc_types import ASSURANCE_DOCUMENT_SCHEMAS
 
 INITIAL_COMMIT_MESSAGE = "Initialize engagement architecture repository"
 
@@ -59,37 +60,7 @@ DEFAULT_DOCUMENT_SCHEMAS: dict[str, dict] = {
         "required_entity_type_connections": ["requirement"],
         "suggested_entity_type_connections": ["principle", "goal"],
     },
-    "stpa-analysis": {
-        "abbreviation": "STPA",
-        "name": "STPA Analysis",
-        "frontmatter_schema": {
-            "type": "object",
-            "required": ["title", "status", "concern_class"],
-            "properties": {
-                "title": {"type": "string"},
-                "status": {
-                    "type": "string",
-                    "enum": ["draft", "in-progress", "complete", "archived"],
-                },
-                "concern_class": {
-                    "type": "string",
-                    "enum": ["safety", "security", "privacy", "operational"],
-                },
-                "analysis_scope": {"type": "string"},
-            },
-        },
-        "required_sections": [
-            "Purpose and Scope",
-            "Losses",
-            "Hazards",
-            "Control Structure",
-            "Unsafe Control Actions",
-            "Loss Scenarios",
-            "Assurance Constraints",
-            "References",
-        ],
-        "suggested_entity_type_connections": ["@all"],
-    },
+    **ASSURANCE_DOCUMENT_SCHEMAS,
 }
 
 DEFAULT_SCHEMATA: dict[str, dict] = {
