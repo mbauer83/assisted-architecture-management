@@ -1,6 +1,6 @@
 # PLAN — Assurance Capability: STPA / CAST / GRC
 
-> **Status — Phase 1 complete (2026-06-04). Phase 2 is next.**
+> **Status — Phase 2 complete (2026-06-04). Phase 3 is next.**
 > **All design decisions are locked** (§18 — no open items remain). **Canonical progress tracker = §24**
 > (phased checklist + per-phase Definitions of Done + status). When you pick this up: update the §24 tracker
 > and check `[x]` items as they complete; detailed specs (full `entities.yaml`, JSON schemas, port interfaces)
@@ -669,7 +669,7 @@ keep the top-of-file Status line in sync. Status values: ☐ not started · ◐ 
 | 1b | Assurance graph MVP — core types + MCP CRUD/verify (first vertical slice) | ☑ done |
 | 1c | Immutable records + safety/structural verifier | ☑ done |
 | 1d | Minimal UI surfacing (module_class plumbing, discoverability) | ☑ done |
-| 2 | STPA (wizard, control-structure canvas, matrices, MCP, skill) | ☐ not started |
+| 2 | STPA (wizard, control-structure canvas, matrices, MCP, skill) | ☑ done |
 | 3 | CAST + GRC depth (register, dashboards) | ☐ not started |
 | 4 | Storage breadth + governance depth (opt-in) | ☐ not started |
 | 5 | Cybersecurity & supply-chain connectors (§27) | ☐ not started |
@@ -718,11 +718,13 @@ through one `arch-assurance` read + write MCP path; assurance excluded from mode
 - [ ] Frontend `module_class` plumbing (separate "Assurance" nav, exclude from model catalogs) + locked/unlocked banner. (Wizards/canvas are Phase 2, §3.4.)
 
 **Phase 2 — STPA.** DoD: US1, US2, US4, US7, US9 acceptance criteria pass end-to-end.
-- [ ] `control-structure` diagram type (binding + `binding_status` rendering, incl. ghosted unbound).
-- [ ] UCA / risk / traceability matrices (assess matrix-renderer heatmap extension need).
-- [ ] `stpa-analysis` doc type (required sections + E155 links).
-- [ ] `arch-assurance` MCP server(s) + `assurance_guidance` tool + `stpa-analysis` skill.
-- [ ] "Suggested model entities" notice + guided "model this" workflow (US6).
+- [x] `control-structure` diagram type (`module_class: assurance`, PUML renderer, `binding_status` visual cues, G-f guard in `diagram_render.py`).
+- [x] `uca-matrix` diagram type (bespoke frontend grid; reuse generic `matrix` for traceability).
+- [x] `stpa-analysis` doc type (8 required sections + E155 links; seeded in `engagement_repo_template.py`).
+- [x] `assurance_stpa_complete` MCP tool (§17(B) coverage profile: 6 checks, gap report).
+- [x] `assurance_model_this` MCP tool (3-step task spec for binding unbound-pending CSNs).
+- [x] `stpa-analysis` skill directory (SKILL.md + references/ + assets/).
+- [x] "Suggested model entities": W501 verifier + `assurance_model_this` task spec workflow (US6).
 
 **Phase 3 — CAST + GRC depth.** DoD: US5, US8 pass.
 - [ ] `incident`/`corrective-action` + UCA/scenario `mode` + `cast-investigation` doc type + skill.

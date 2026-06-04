@@ -210,3 +210,72 @@ def register_write_tools(server: FastMCP) -> None:
             "ref_type": ref_type,
             "status": "registered",
         }
+
+    @server.tool(
+        name="assurance_model_this",
+        description=(
+            "Propose an architecture entity to bind an unbound-pending control-structure-node. "
+            "Returns a structured three-step task spec telling the agent what to call on "
+            "arch-repo-write to create the architecture entity, then register the arch reference, "
+            "then update binding_status to 'bound'. Does NOT modify any state itself."
+        ),
+    )
+    def assurance_model_this(
+        assurance_node_id: str,
+        suggested_arch_type: str,
+        suggested_name: str,
+        domain: str = "application",
+    ) -> dict[str, object]:
+        if not ctx.is_available():
+            return ctx.locked_response()
+        node = ctx.store.get_node(assurance_node_id)
+        if node is None:
+            return ctx.not_found_response(assurance_node_id)
+        binding_status = str(node.get("binding_status") or "")
+        if binding_status != "unbound-pending":
+            return {
+                "error": "invalid_binding_status",
+                "assurance_node_id": assurance_node_id,
+                "current_binding_status": binding_status,
+                "message": (
+                    "assurance_model_this only applies to nodes with "
+                    "binding_status='unbound-pending'."
+                ),
+            }
+        node_name = str(node.get("name", ""))
+        return {
+            "assurance_node_id": assurance_node_id,
+            "assurance_node_name": node_name,
+            "action_required": "create_arch_entity_then_bind",
+            "step_1": {
+                "call": "artifact_create_entity",
+                "on_server": "arch-repo-write",
+                "params": {
+                    "artifact_type": suggested_arch_type,
+                    "name": suggested_name,
+                    "domain": domain,
+                    "dry_run": True,
+                },
+                "note": (
+                    "Call with dry_run=true first to preview, then false to create. "
+                    "Capture the returned entity_id for step 2."
+                ),
+            },
+            "step_2": {
+                "call": "assurance_register_arch_ref",
+                "on_server": "arch-assurance-write",
+                "params": {
+                    "assurance_node_id": assurance_node_id,
+                    "arch_artifact_id": "<entity_id_from_step_1>",
+                    "ref_type": "binds-to",
+                },
+            },
+            "step_3": {
+                "call": "assurance_edit_node",
+                "on_server": "arch-assurance-write",
+                "params": {
+                    "node_id": assurance_node_id,
+                    "binding_status": "bound",
+                },
+            },
+        }

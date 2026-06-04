@@ -52,6 +52,20 @@ def _render_diagram_png(puml_path: Path, warnings: list[str]) -> Path | None:
 
     puml_body = content[start : end + len("@enduml")]
     diagram_type = str(parse_diagram_file(puml_path).frontmatter.get("diagram-type", "archimate"))
+
+    # G-f: assurance diagrams must never write plaintext to diagram-catalog/rendered/
+    try:
+        from src.infrastructure.diagram_types import find_diagram_type  # noqa: PLC0415
+        _dt = find_diagram_type(diagram_type)
+        if _dt is not None and getattr(_dt, "module_class", None) == "assurance":
+            warnings.append(
+                f"Render skipped: '{diagram_type}' is an assurance diagram type "
+                "(G-f: assurance diagrams must not write plaintext to diagram-catalog/rendered/)"
+            )
+            return None
+    except (ImportError, AttributeError, TypeError):
+        pass
+
     puml_body = _prepare_diagram_puml_body(puml_body, repo_root, diagram_type)
 
     # Strip the diagram name so PlantUML uses the temp-file stem as the output filename.
@@ -135,6 +149,20 @@ def _render_diagram_svg(puml_path: Path, warnings: list[str]) -> Path | None:
 
     puml_body = content[start : end + len("@enduml")]
     diagram_type = str(parse_diagram_file(puml_path).frontmatter.get("diagram-type", "archimate"))
+
+    # G-f: assurance diagrams must never write plaintext to diagram-catalog/rendered/
+    try:
+        from src.infrastructure.diagram_types import find_diagram_type  # noqa: PLC0415
+        _dt = find_diagram_type(diagram_type)
+        if _dt is not None and getattr(_dt, "module_class", None) == "assurance":
+            warnings.append(
+                f"Render skipped: '{diagram_type}' is an assurance diagram type "
+                "(G-f: assurance diagrams must not write plaintext to diagram-catalog/rendered/)"
+            )
+            return None
+    except (ImportError, AttributeError, TypeError):
+        pass
+
     puml_body = _prepare_diagram_puml_body(puml_body, repo_root, diagram_type)
     puml_body_for_render = re.sub(r"@startuml\s+\S+", "@startuml", puml_body, count=1)
 
