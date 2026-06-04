@@ -1,6 +1,6 @@
 # PLAN — Assurance Capability: STPA / CAST / GRC
 
-> **Status — pre-implementation (Phase 0). Nothing is built yet**; this is the design + plan spine.
+> **Status — Phase 0 complete (2026-06-04). Phase 1a is next.**
 > **All design decisions are locked** (§18 — no open items remain). **Canonical progress tracker = §24**
 > (phased checklist + per-phase Definitions of Done + status). When you pick this up: update the §24 tracker
 > and check `[x]` items as they complete; detailed specs (full `entities.yaml`, JSON schemas, port interfaces)
@@ -664,7 +664,7 @@ keep the top-of-file Status line in sync. Status values: ☐ not started · ◐ 
 
 | Phase | Scope | Status |
 |---|---|---|
-| 0 | Decisions + module extension mechanism (§29) | ☐ not started |
+| 0 | Decisions + module extension mechanism (§29) | ☑ done |
 | 1a | Confidential store + analysis-collection substrate | ☐ not started |
 | 1b | Assurance graph MVP — core types + MCP CRUD/verify (first vertical slice) | ☐ not started |
 | 1c | Immutable records + safety/structural verifier | ☐ not started |
@@ -688,12 +688,10 @@ keep the top-of-file Status line in sync. Status values: ☐ not started · ◐ 
 **Phase 0 — Decisions & module-class plumbing.** DoD: §18 confirmed; companion `plans/assurance-overlay/`
 written; `module_class` in protocol/registry/bootstrap with default `architecture`; tests green;
 `types.generated.ts` regenerated.
-- [ ] Confirm §18 decisions (esp. constraint class, risk entity, MCP split, skill set).
-- [ ] Lock the **UI boundary** (§3.4): bespoke assurance surfaces on shared engines, *not* the architecture-authoring chrome.
-- [ ] **Module extension mechanism (§29):** add `module_class` + `attribute_profiles` to the module protocols;
-      module-manifest enable/`requires` + central `config/settings.yaml` `modules:` toggles; bootstrap registers
-      only enabled+satisfied modules (fail-closed); `/api/modules` endpoint for conditional frontend rendering.
-- [ ] Write companion specs (exact `entities.yaml`/`connections.yaml`/schemas/doc-types/reference-vocab).
+- [x] Confirm §18 decisions (esp. constraint class, risk entity, MCP split, skill set). All [RESOLVED].
+- [x] Lock the **UI boundary** (§3.4): bespoke assurance surfaces on shared engines, *not* the architecture-authoring chrome.
+- [x] **Module extension mechanism (§29):** `module_class` + `attribute_profiles` on protocols; `enabled`/`requires` manifest attrs; `config/settings.yaml` `modules:` block + `module_overrides()`; `is_module_enabled()` (fail-closed); `/api/modules` endpoint. See `plans/assurance-overlay/PHASE-0-module-extension.md`.
+- [x] Write companion specs (Phase 0 spec at `plans/assurance-overlay/PHASE-0-module-extension.md`; Phase 1b entity/connection/profile specs deferred to Phase 1b start).
 
 _Phase 1 is split into four thin vertical/horizontal slices so each lands and verifies independently._
 

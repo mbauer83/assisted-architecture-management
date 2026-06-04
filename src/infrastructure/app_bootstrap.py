@@ -2,11 +2,13 @@
 
 from __future__ import annotations
 
+import logging
 from functools import lru_cache
 from typing import TYPE_CHECKING, Any
 
 from src.application.startup_validation import validate_registry_consistency
 from src.diagram_types import register_default_diagram_types
+from src.domain.module_filter import is_module_enabled
 from src.domain.module_registry import ModuleRegistry
 from src.ontologies.archimate_next import module as archimate_next_module
 from src.ontologies.sysml_v2_min import module as sysml_v2_min_module
@@ -15,13 +17,26 @@ if TYPE_CHECKING:
     from fastapi import Request
 
 _MODULE_REGISTRY_STATE_KEY = "module_registry"
+_logger = logging.getLogger(__name__)
+
+_ALL_ONTOLOGY_MODULES = (archimate_next_module, sysml_v2_min_module)
 
 
 def build_module_registry() -> ModuleRegistry:
+    from src.config.settings import module_overrides  # noqa: PLC0415
+
+    overrides = module_overrides()
     registry = ModuleRegistry()
-    registry.register_ontology(archimate_next_module)
-    registry.register_ontology(sysml_v2_min_module)
-    register_default_diagram_types(registry)
+    registered_names: set[str] = set()
+
+    for om in _ALL_ONTOLOGY_MODULES:
+        if is_module_enabled(om, overrides, registered_names):
+            registry.register_ontology(om)
+            registered_names.add(om.name)
+        else:
+            _logger.info("Ontology module %r skipped (disabled or unsatisfied requires)", om.name)
+
+    register_default_diagram_types(registry, overrides=overrides, registered_names=registered_names)
     validate_registry_consistency(registry)
     return registry
 

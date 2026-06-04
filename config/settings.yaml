@@ -14,3 +14,11 @@ repo_init:
   commit_author_name: Michael Bauer # Change to your name. @TODO: Make env-configurable
   commit_author_email: mbauer.mphil@googlemail.com # Change to your email. @TODO: Make env-configurable
   engagement: {}
+
+# Module toggles. Absent modules default to their manifest values (enabled: true, requires: []).
+# Only 'enabled' is a valid override key; 'requires' is a module manifest declaration.
+# Example: disable sysml_v2_min:
+#   modules:
+#     sysml_v2_min:
+#       enabled: false
+modules: {}

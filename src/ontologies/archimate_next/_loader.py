@@ -4,8 +4,9 @@ from __future__ import annotations
 
 import json
 import re
+from collections.abc import Mapping
 from pathlib import Path
-from typing import Any, cast
+from typing import Any, Literal, cast
 
 import yaml  # type: ignore[import-untyped]
 
@@ -36,6 +37,10 @@ def _load_glyphs() -> dict[str, Any]:
 class _ArchiMateNextModule:
     name = "archimate-next-snapshot1"
     display_section_id = DISPLAY_SECTION_ID
+    module_class: Literal["architecture", "assurance"] = "architecture"
+    enabled: bool = True
+    requires: list[str] = []
+    attribute_profiles: Mapping[str, dict[str, object]] = {}
 
     def __init__(
         self,

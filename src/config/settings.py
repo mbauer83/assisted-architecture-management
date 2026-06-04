@@ -54,7 +54,29 @@ def load_settings() -> dict:
             **repo_init_engagement_section,
         },
     }
-    return {"backend": backend, "diagrams": diagrams, "repo_init": repo_init}
+    modules_raw = data.get("modules")
+    modules_section: _SettingsSection = modules_raw if isinstance(modules_raw, dict) else {}
+    return {"backend": backend, "diagrams": diagrams, "repo_init": repo_init, "modules": modules_section}
+
+
+def module_overrides() -> dict[str, dict[str, object]]:
+    """Return the ``modules:`` section from settings.yaml as {name: override-dict}.
+
+    Only ``enabled`` is a supported YAML override key. Absent modules default to
+    the module's own manifest values (enabled=True, requires=[]).
+    """
+    raw = load_settings().get("modules", {})
+    if not isinstance(raw, dict):
+        return {}
+    out: dict[str, dict[str, object]] = {}
+    for name, entry in raw.items():
+        if not isinstance(entry, dict):
+            continue
+        parsed: dict[str, object] = {}
+        if "enabled" in entry:
+            parsed["enabled"] = bool(entry["enabled"])
+        out[str(name)] = parsed
+    return out
 
 
 def backend_port() -> int:

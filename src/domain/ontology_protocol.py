@@ -3,10 +3,18 @@
 from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
-from dataclasses import dataclass, field
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Protocol, TypeAlias, runtime_checkable
+from typing import TYPE_CHECKING, Any, Literal, Protocol, TypeAlias, runtime_checkable
 
+from src.domain.bridges import BridgeDeclaration
+from src.domain.diagram_type_config import (
+    DiagramOwnEntityTypePropertySpec,
+    DiagramOwnEntityTypeUiConfig,
+    DiagramRendererReferences,
+    DiagramTypeUiConfig,
+    DiagramTypeWriteGuidance,
+    diagram_type_ui_config_from_mapping,
+)
 from src.domain.module_types import (
     ConnectionTypeName,
     DiagramTypeName,
@@ -14,161 +22,43 @@ from src.domain.module_types import (
     EntityTypeName,
     _FreeOntologyType,
 )
-from src.domain.allowed_bindings import AllowedBindingsSpec
-from src.domain.bridges import BridgeDeclaration
 from src.domain.ontology_types import (
     ConnectionTypeInfo,
     ElementClassInfo,
     EntityTypeInfo,
-    PermittedMappingSpec,
-    RequiredConnection,
-    mapping_spec_from_config,
 )
-from src.domain.permitted_relationships import PermittedRelationshipSet, permitted_connections_from_config
+from src.domain.permitted_relationships import PermittedRelationshipSet
 
 if TYPE_CHECKING:
     from src.domain.artifact_types import ConnectionRecord, EntityRecord
 
+# Re-export all diagram_type_config public names for backward-compatible imports.
+__all__ = [
+    "DiagramOwnEntityTypePropertySpec",
+    "DiagramOwnEntityTypeUiConfig",
+    "DiagramRendererReferences",
+    "DiagramTypeBase",
+    "DiagramTypeModule",
+    "DiagramTypeUiConfig",
+    "DiagramTypeWriteGuidance",
+    "DiagramRenderer",
+    "OntologyModule",
+    "PrimaryOntology",
+    "diagram_type_ui_config_from_mapping",
+]
+
 PrimaryOntology: TypeAlias = "OntologyModule | _FreeOntologyType"
 
-
-@dataclass(frozen=True)
-class DiagramOwnEntityTypePropertySpec:
-    """Domain-specific property for a diagram-only entity type (management fields are auto-added)."""
-
-    name: str
-    schema: dict[str, object]
-    required: bool = True
-
-
-@dataclass(frozen=True)
-class DiagramOwnEntityTypeUiConfig:
-    entity_type: str
-    label: str
-    plural: str
-    min: int = 0
-    max: int | None = None
-    permitted_mappings: PermittedMappingSpec = field(default_factory=PermittedMappingSpec)
-    mapping_required: bool = False
-    classes: tuple[str, ...] = ()
-    create_when: str = ""
-    never_create_when: str = ""
-    properties: tuple[DiagramOwnEntityTypePropertySpec, ...] = ()
-    permitted_connections: PermittedRelationshipSet = field(default_factory=PermittedRelationshipSet.empty)
-    required_connections: tuple[RequiredConnection, ...] = ()
-    managed_fields: tuple[tuple[str, str], ...] | None = None
-
-
-@dataclass(frozen=True)
-class DiagramTypeUiConfig:
-    label: str
-    description: str = ""
-    entity_search_filter: bool = True
-    diagram_only_types: tuple[DiagramOwnEntityTypeUiConfig, ...] = ()
-    type_ui_slots: dict[str, str] = field(default_factory=dict)
-
-
-def diagram_type_ui_config_from_mapping(
-    config: Mapping[str, Any],
-    *,
-    default_label: str,
-) -> DiagramTypeUiConfig:
-    ui = config.get("ui")
-    if not isinstance(ui, Mapping):
-        return DiagramTypeUiConfig(label=default_label, entity_search_filter=True)
-    return DiagramTypeUiConfig(
-        label=str(ui.get("label") or default_label),
-        description=str(ui.get("description") or ""),
-        entity_search_filter=bool(ui.get("entity_search_filter", True)),
-        diagram_only_types=tuple(
-            _own_entity_ui_config_from_mapping(entry)
-            for entry in ui.get("diagram_only_types", ())
-            if isinstance(entry, Mapping)
-        ),
-        type_ui_slots={str(k): str(v) for k, v in ui.get("type_ui_slots", {}).items()},
-    )
-
-
-def _own_entity_ui_config_from_mapping(config: Mapping[str, Any]) -> DiagramOwnEntityTypeUiConfig:
-    mapping_spec = mapping_spec_from_config(config.get("permitted_mappings"))
-    raw_props: object = config.get("properties") or {}
-    props = tuple(
-        DiagramOwnEntityTypePropertySpec(
-            name=name,
-            schema={k: v for k, v in spec.items() if k != "required"},
-            required=bool(spec.get("required", True)),
-        )
-        for name, spec in (raw_props.items() if isinstance(raw_props, Mapping) else ())
-        if isinstance(spec, Mapping)
-    )
-    raw_conns = config.get("permitted_connections")
-    raw_req = config.get("required_connections") or ()
-    max_val = config.get("max")
-    return DiagramOwnEntityTypeUiConfig(
-        entity_type=str(config["entity_type"]),
-        label=str(config["label"]),
-        plural=str(config.get("plural") or config["label"] + "s"),
-        min=int(config.get("min", 0)),
-        max=None if max_val is None else int(max_val),
-        permitted_mappings=mapping_spec,
-        mapping_required=bool(config.get("mapping_required", False)),
-        classes=tuple(str(c) for c in config.get("classes", ())),
-        create_when=str(config.get("create_when") or ""),
-        never_create_when=str(config.get("never_create_when") or ""),
-        properties=props,
-        permitted_connections=(
-            permitted_connections_from_config(raw_conns)
-            if isinstance(raw_conns, list)
-            else PermittedRelationshipSet.empty()
-        ),
-        required_connections=tuple(_required_connection_from_mapping(rc) for rc in raw_req if isinstance(rc, Mapping)),
-        managed_fields=_parse_managed_fields(config.get("managed_fields")),
-    )
-
-
-def _parse_managed_fields(raw: object) -> tuple[tuple[str, str], ...] | None:
-    if not isinstance(raw, Mapping) or not raw:
-        return None
-    return tuple((str(k), str(v)) for k, v in raw.items())
-
-
-def _required_connection_from_mapping(config: Mapping[str, Any]) -> RequiredConnection:
-    raw_card = config.get("cardinality") or [1, 1]
-    card_min = int(raw_card[0]) if raw_card else 1
-    card_max: int | None = int(raw_card[1]) if len(raw_card) > 1 and raw_card[1] is not None else None
-    return RequiredConnection(
-        connection_type=str(config["connection_type"]),
-        target=str(config["target"]),
-        cardinality_min=card_min,
-        cardinality_max=card_max,
-    )
-
-
-@dataclass(frozen=True)
-class DiagramTypeWriteGuidance:
-    """Authoring guidance for one diagram type, returned by artifact_authoring_guidance(diagram_type=...)."""
-
-    when_to_use: str
-    when_not_to_use: str
-    accepted_domains: tuple[str, ...] = ()
-    diagram_entities_schema: dict[str, object] | None = None
-    own_entity_types: tuple[DiagramOwnEntityTypeUiConfig, ...] = ()
-    puml_notes: tuple[str, ...] = ()
-    allowed_bindings: AllowedBindingsSpec | None = None
-
-
-@dataclass(frozen=True)
-class DiagramRendererReferences:
-    """Model artifact references discovered by a renderer from diagram-owned data."""
-
-    entity_ids: tuple[str, ...] = ()
-    connection_ids: tuple[str, ...] = ()
+ModuleClass = Literal["architecture", "assurance"]
 
 
 @runtime_checkable
 class OntologyModule(Protocol):
     @property
     def name(self) -> str: ...
+
+    @property
+    def module_class(self) -> ModuleClass: ...
 
     @property
     def entity_types(self) -> Mapping[EntityTypeName, EntityTypeInfo]: ...
@@ -184,6 +74,9 @@ class OntologyModule(Protocol):
 
     @property
     def display_section_id(self) -> str: ...
+
+    @property
+    def attribute_profiles(self) -> Mapping[str, dict[str, object]]: ...
 
     def entity_types_with_class(self, cls: ElementClassName) -> frozenset[EntityTypeName]: ...
 
@@ -234,6 +127,9 @@ class DiagramRenderer(Protocol):
 class DiagramTypeModule(Protocol):
     @property
     def name(self) -> DiagramTypeName: ...
+
+    @property
+    def module_class(self) -> ModuleClass: ...
 
     @property
     def primary_ontology(self) -> OntologyModule | _FreeOntologyType: ...
@@ -287,6 +183,8 @@ class DiagramTypeBase:
     accepts_connection_type, own_entity_types, own_connection_types,
     own_permitted_relationships, and _config.
     """
+
+    module_class: ModuleClass = "architecture"
 
     @property
     def bridges(self) -> tuple[BridgeDeclaration, ...]:
