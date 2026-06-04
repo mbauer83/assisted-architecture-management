@@ -248,7 +248,7 @@ artifact_query_search_artifacts(query="<key concept>", limit=10)
 If the request is broad enough that you genuinely need a count overview first, call `artifact_query_stats` — but don't load broad stats before you know what you're looking for.
 
 **Step 2 — Resolve type and connection choices.**
-When the right entity type or connection is unclear, call `artifact_authoring_guidance(filter=[...])`. When the type is already obvious from context and the baked-in reference, skip this call. If you're working in a domain you haven't touched this session, call it once for that domain as a warm-up.
+Call `artifact_authoring_guidance(filter=[...])` for every entity type you plan to create that has not been confirmed via this tool in the current session. The quick-reference table in this skill is an aide-mémoire, not a substitute — the tool's `create_when` / `never_create_when` is authoritative and must be consulted before committing. If any type attempt is rejected by the system, that rejection is the signal to call guidance before trying an alternative; never fall back to a different type without it. If you're working in a domain you haven't touched this session, call it once for that domain as a warm-up.
 
 **Step 3 — Check for duplicates.**
 If Step 1 didn't already surface candidates, do a focused check before creating:
@@ -263,6 +263,9 @@ Before adding a connection, confirm it doesn't already exist:
 artifact_query_find_connections_for(entity_id="...", direction="any")
 ```
 For symmetric types (e.g. `archimate-association`), one direction check is enough.
+
+**Step 4.5 — Concept check (before dry-run).**
+State in one sentence what each element *is* at the conceptual level — not its type, its nature: "This is a named partition of a repository tier's content of one family." If the statement sounds like a design decision, a system behaviour, or an implementation detail rather than a named thing that exists in the architecture, reconsider whether it should be a model entity at all, and if so, which domain and type it actually belongs to. This check catches type mismatches that the quick-reference table alone will not surface.
 
 **Step 5 — Dry-run.**
 Call with `dry_run=true`. Read the `content` preview — verify type, name, summary, and structure are correct before committing.
