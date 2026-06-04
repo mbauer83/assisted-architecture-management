@@ -35,6 +35,7 @@ class ArtifactStorePort(Protocol):
         domain: str | None = None,
         subdomain: str | None = None,
         status: str | None = None,
+        group: str | None = None,
     ) -> list[EntityRecord]: ...
 
     def list_connections(
@@ -44,6 +45,7 @@ class ArtifactStorePort(Protocol):
         source: str | None = None,
         target: str | None = None,
         status: str | None = None,
+        group: str | None = None,
     ) -> list[ConnectionRecord]: ...
 
     def list_diagrams(
@@ -51,6 +53,7 @@ class ArtifactStorePort(Protocol):
         *,
         diagram_type: str | None = None,
         status: str | None = None,
+        group: str | None = None,
     ) -> list[DiagramRecord]: ...
 
     def list_documents(
@@ -58,6 +61,7 @@ class ArtifactStorePort(Protocol):
         *,
         doc_type: str | None = None,
         status: str | None = None,
+        group: str | None = None,
     ) -> list[DocumentRecord]: ...
 
     def list_artifacts(

@@ -6,8 +6,8 @@ import subprocess
 import tempfile
 from pathlib import Path
 
+from src.application.repo_path_helpers import rendered_dir_for_diagram, repo_root_for_diagram_path
 from src.application.verification.artifact_verifier_syntax import find_graphviz_dot, find_plantuml_jar
-from src.config.repo_paths import RENDERED
 from src.config.settings import plantuml_limit_size, render_dpi
 from src.infrastructure.rendering.puml_safety import strip_leading_puml_frontmatter
 
@@ -38,9 +38,8 @@ def _render_diagram_entities_puml(
 
 def _render_diagram_png(puml_path: Path, warnings: list[str]) -> Path | None:
     """Render a PUML file to PNG using PlantUML. Returns the PNG path or None."""
-    # Render into the sibling rendered/ directory (diagram-catalog/rendered/),
-    # not a nested subdirectory under diagrams/.
-    rendered_dir = puml_path.parent.parent / RENDERED
+    repo_root = repo_root_for_diagram_path(puml_path) or puml_path.parent.parent.parent
+    rendered_dir = rendered_dir_for_diagram(puml_path, repo_root)
     rendered_dir.mkdir(parents=True, exist_ok=True)
 
     # Extract @startuml..@enduml into a temp file (skip YAML frontmatter)
@@ -52,7 +51,6 @@ def _render_diagram_png(puml_path: Path, warnings: list[str]) -> Path | None:
         return None
 
     puml_body = content[start : end + len("@enduml")]
-    repo_root = puml_path.parent.parent.parent
     diagram_type = str(parse_diagram_file(puml_path).frontmatter.get("diagram-type", "archimate"))
     puml_body = _prepare_diagram_puml_body(puml_body, repo_root, diagram_type)
 
@@ -125,7 +123,8 @@ def _render_diagram_png(puml_path: Path, warnings: list[str]) -> Path | None:
 
 def _render_diagram_svg(puml_path: Path, warnings: list[str]) -> Path | None:
     """Render a PUML file to SVG using PlantUML. Returns the SVG path or None."""
-    rendered_dir = puml_path.parent.parent / RENDERED
+    repo_root = repo_root_for_diagram_path(puml_path) or puml_path.parent.parent.parent
+    rendered_dir = rendered_dir_for_diagram(puml_path, repo_root)
     rendered_dir.mkdir(parents=True, exist_ok=True)
 
     content = strip_leading_puml_frontmatter(puml_path.read_text(encoding="utf-8"))
@@ -135,7 +134,6 @@ def _render_diagram_svg(puml_path: Path, warnings: list[str]) -> Path | None:
         return None
 
     puml_body = content[start : end + len("@enduml")]
-    repo_root = puml_path.parent.parent.parent
     diagram_type = str(parse_diagram_file(puml_path).frontmatter.get("diagram-type", "archimate"))
     puml_body = _prepare_diagram_puml_body(puml_body, repo_root, diagram_type)
     puml_body_for_render = re.sub(r"@startuml\s+\S+", "@startuml", puml_body, count=1)

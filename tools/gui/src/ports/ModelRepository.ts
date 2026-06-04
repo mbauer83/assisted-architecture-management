@@ -37,6 +37,7 @@ import type {
   SyncSaveResult,
   ServerInfo,
   WriteHelp,
+  GroupList,
 } from '../domain'
 import type { NetworkError, NotFoundError } from '../domain'
 import type { MarkdownError } from '../application/MarkdownService'
@@ -52,6 +53,7 @@ export interface ListParams {
   readonly scope?: RepoScope
   readonly limit?: number
   readonly offset?: number
+  readonly group?: string
 }
 
 /** Errors that can come from any repository call. */
@@ -74,7 +76,7 @@ export interface ModelRepository {
     query: string, limit?: number,
   ) => Effect.Effect<SearchResult, RepoError>
   readonly listDiagrams: (
-    diagramType?: string, status?: string,
+    diagramType?: string, status?: string, group?: string,
   ) => Effect.Effect<DiagramList, RepoError>
   readonly listDiagramTypes: () => Effect.Effect<DiagramTypeSummary[], RepoError>
   readonly getDiagramTypeUiConfig: (type: string) => Effect.Effect<DiagramTypeUiConfig, RepoError | NotFoundError>
@@ -207,12 +209,13 @@ export interface ModelRepository {
       strategy: 'accept_engagement' | 'accept_enterprise' | 'merge';
       merged_fields?: Record<string, unknown>;
     }>;
+    group_mapping_resolutions?: Record<string, string>;
     dry_run?: boolean;
   }) => Effect.Effect<PromotionResult, RepoError>
   // ── Document methods ──────────────────────────────────────────────────────
   readonly listDocumentTypes: () => Effect.Effect<DocumentType[], RepoError>
   readonly listDocuments: (params?: {
-    doc_type?: string; status?: string; limit?: number; offset?: number;
+    doc_type?: string; status?: string; limit?: number; offset?: number; group?: string;
   }) => Effect.Effect<DocumentList, RepoError>
   readonly getDocument: (id: string) => Effect.Effect<DocumentDetail, RepoError | NotFoundError>
   readonly createDocument: (body: {
@@ -248,4 +251,12 @@ export interface ModelRepository {
   readonly previewMatrix: (body: object) => Effect.Effect<MatrixPreviewResult, RepoError>
   readonly createMatrixDiagram: (body: object) => Effect.Effect<WriteResult, RepoError>
   readonly editMatrixDiagram: (body: object) => Effect.Effect<WriteResult, RepoError>
+  // ── Group lifecycle ───────────────────────────────────────────────────────────
+  readonly listGroups: (kind?: string) => Effect.Effect<GroupList, RepoError>
+  readonly createGroup: (body: { kind: string; slug: string; name: string; description?: string; order?: number; meta_ontology?: string; type_filter?: string[] }) => Effect.Effect<Record<string, unknown>, RepoError>
+  readonly renameGroup: (body: { kind: string; target: string; name?: string; new_slug?: string }) => Effect.Effect<Record<string, unknown>, RepoError>
+  readonly archiveGroup: (body: { kind: string; target: string; confirm?: string }) => Effect.Effect<Record<string, unknown>, RepoError>
+  readonly unarchiveGroup: (body: { kind: string; target: string }) => Effect.Effect<Record<string, unknown>, RepoError>
+  readonly deleteGroup: (params: { kind: string; target: string; confirm?: string }) => Effect.Effect<Record<string, unknown>, RepoError>
+  readonly updateGroup: (body: { kind: string; target: string; name?: string; description?: string; meta_ontology?: string; type_filter?: string[] | null }) => Effect.Effect<Record<string, unknown>, RepoError>
 }

@@ -18,6 +18,7 @@ from src.infrastructure.mcp.artifact_mcp.write.entity import (
     artifact_create_entity,
     artifact_help,
 )
+from src.infrastructure.mcp.artifact_mcp.write.group import artifact_group
 from src.infrastructure.mcp.artifact_mcp.write.promote import artifact_promote_to_enterprise
 
 __all__ = [
@@ -31,6 +32,7 @@ __all__ = [
     "artifact_create_entity",
     "artifact_create_matrix",
     "artifact_edit_document",
+    "artifact_group",
     "artifact_help",
     "artifact_promote_to_enterprise",
 ]
@@ -38,11 +40,12 @@ __all__ = [
 
 def register_write_tools(mcp: FastMCP) -> None:
     from src.infrastructure.mcp.artifact_mcp import bulk_tools
-    from src.infrastructure.mcp.artifact_mcp.write import connection, diagram, document, entity, promote
+    from src.infrastructure.mcp.artifact_mcp.write import connection, diagram, document, entity, group, promote
 
     entity.register(mcp)
     connection.register(mcp)
     diagram.register(mcp)
     document.register(mcp)
     promote.register(mcp)
+    group.register(mcp)
     bulk_tools.register(mcp)

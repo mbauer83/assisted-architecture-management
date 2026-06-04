@@ -88,6 +88,36 @@ enterprise-repository/
 arch-workspace.yaml
 ```
 
+### Content Organisation (Grouping)
+
+Growing repositories are navigable via **three independent grouping axes**, one per artifact family:
+
+| Axis | Artifact family | Directory layout |
+|---|---|---|
+| **Model-project** | Entities + connections | `projects/<slug>/model/<domain>/<type>/…` |
+| **Diagram-collection** | Diagrams | `diagram-catalog/diagrams/<slug>/…` (+ `rendered/<slug>/`) |
+| **Document-collection** | Documents | `docs/<doc-type-subdir>/<slug>/…` |
+
+Axes are **mutually independent** — a diagram collection is never tied to a model-project. Grouping is a **soft partition**: it never constrains search, linking, or verification; it only controls where files live.
+
+**Migrate existing content** (idempotent, per-repo):
+```bash
+uv run python -m src.infrastructure.workspace.migrate_to_groups
+```
+
+**Group lifecycle** — via `artifact_group` MCP tool or REST `POST/PUT/DELETE /api/group*`:
+- `create` — register a new group (target = slug)
+- `rename` — change display name or slug (safe subtree `git mv`)
+- `archive` / `unarchive` — hide/restore from default pickers
+- `delete` (diagram/document collections) — remove folder + contents, typed confirm required
+- `delete` (model-project, `dry_run=True` first) — two-stage cascade: preflight impact report, then apply
+
+**Create/edit with a group** — `artifact_create_entity`, `artifact_create_diagram`, `artifact_create_document` and their `edit_*` counterparts all accept an optional `group` param:
+- create-time: places the artifact in that group's directory
+- edit-time: re-homes (safe `git mv`) the artifact to a new group
+
+**CLI is out of scope** for group authoring; use MCP tools or the REST/GUI surface.
+
 ## Affordances for Humans and AI Agents
 
 The system provides three complementary interfaces (REST API, MCP server, browser GUI) over the same underlying artifacts. This section describes what's possible; the interfaces differ only in ease of use for each audience.
@@ -476,17 +506,27 @@ Enterprise changes (e.g. after promoting engagement artifacts) follow a three-st
 
 The sync state for the enterprise repo is persisted in `.arch/enterprise-sync.json` and survives backend restarts.
 
-### SSH Key Passphrases
+### Git Authentication
 
-If the git remote requires an SSH key with a passphrase, supply it via environment variable or startup argument. The passphrase is never stored on disk; it is passed to git subprocesses via a temporary `SSH_ASKPASS` helper at runtime:
+Both SSH and HTTPS remotes are supported. Credentials are never stored on disk; they are kept in process memory and injected into git subprocesses at runtime via a temporary askpass helper.
+
+**Interactive prompting (recommended)**: `arch-backend` and `arch-init` detect which configured remotes need authentication, probe silently, and prompt on the terminal if credentials are required:
+
+```
+SSH key passphrase:         (invisible input — only asked when probe fails without credentials)
+Git username:               (HTTPS only)
+Git password/token:         (invisible input — HTTPS only)
+```
+
+For `arch-backend --daemon`, prompting happens in the foreground parent process before the daemon forks; the daemon subprocess inherits the credentials silently.
+
+**CI / non-interactive override**: set environment variables to skip prompting entirely:
 
 ```bash
-# Via environment variable (inherited by auto-started backends)
-export ARCH_GIT_SSH_PASSWORD="my passphrase"
+export ARCH_GIT_SSH_PASSWORD="my passphrase"   # SSH key passphrase
+export ARCH_GIT_HTTPS_USERNAME="my-user"        # HTTPS username
+export ARCH_GIT_HTTPS_PASSWORD="my-token"       # HTTPS password or token
 arch-backend --daemon
-
-# Via explicit argument (overrides env var)
-arch-backend --git-ssh-password "my passphrase" --daemon
 ```
 
 ## Continuous Git Sync

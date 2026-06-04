@@ -1,5 +1,4 @@
 import { createRouter, createWebHistory } from 'vue-router'
-import { defineAsyncComponent } from 'vue'
 import HomeView from '../views/HomeView.vue'
 import EntitiesView from '../views/EntitiesView.vue'
 import EntityDetailView from '../views/EntityDetailView.vue'
@@ -20,13 +19,16 @@ export const router = createRouter({
     { path: '/entities', component: EntitiesView },
     { path: '/entity/create', component: EntityCreateView },
     { path: '/entity', component: EntityDetailView },
-    { path: '/documents', component: defineAsyncComponent(() => import('../views/DocumentsView.vue')) },
-    { path: '/documents/new', component: defineAsyncComponent(() => import('../views/DocumentCreateView.vue')) },
-    { path: '/documents/:id', component: defineAsyncComponent(() => import('../views/DocumentDetailView.vue')) },
+    { path: '/entities/groups', component: () => import('../views/GroupManagementView.vue'), props: () => ({ axis: 'model-project' }) },
+    { path: '/documents', component: () => import('../views/DocumentsView.vue') },
+    { path: '/documents/new', component: () => import('../views/DocumentCreateView.vue') },
+    { path: '/documents/:id', component: () => import('../views/DocumentDetailView.vue') },
+    { path: '/documents/groups', component: () => import('../views/GroupManagementView.vue'), props: () => ({ axis: 'document-collection' }) },
     { path: '/search', component: SearchView },
     { path: '/diagrams', component: DiagramsView },
-    { path: '/diagram/create/matrix', component: defineAsyncComponent(() => import('../views/CreateMatrixView.vue')) },
-    { path: '/diagram/edit/matrix', component: defineAsyncComponent(() => import('../views/EditMatrixView.vue')) },
+    { path: '/diagrams/groups', component: () => import('../views/GroupManagementView.vue'), props: () => ({ axis: 'diagram-collection' }) },
+    { path: '/diagram/create/matrix', component: () => import('../views/CreateMatrixView.vue') },
+    { path: '/diagram/edit/matrix', component: () => import('../views/EditMatrixView.vue') },
     { path: '/diagram/create', component: CreateDiagramView },
     { path: '/diagram/edit', component: EditDiagramView },
     { path: '/diagram', component: DiagramDetailView },

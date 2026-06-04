@@ -23,9 +23,12 @@ def artifact_create_document(
     artifact_id: str | None = None,
     version: str = "0.1.0",
     status: str = "draft",
+    group: str | None = None,
     dry_run: bool = True,
     repo_root: str | None = None,
 ) -> dict[str, object]:
+    from src.domain.groups import UNCATEGORIZED  # noqa: PLC0415
+
     roots = resolve_repo_roots(
         repo_scope="engagement",
         repo_root=repo_root,
@@ -47,6 +50,7 @@ def artifact_create_document(
         status=status,
         last_updated=None,
         dry_run=dry_run,
+        group=group or UNCATEGORIZED,
     )
     if result.wrote and not dry_run:
         mutation_context.finalize()

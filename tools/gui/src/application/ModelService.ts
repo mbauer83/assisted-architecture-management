@@ -82,4 +82,11 @@ export const makeModelService = (repo: ModelRepository) =>
     previewMatrix: (body: Parameters<ModelRepository['previewMatrix']>[0]) => repo.previewMatrix(body),
     createMatrixDiagram: (body: Parameters<ModelRepository['createMatrixDiagram']>[0]) => repo.createMatrixDiagram(body),
     editMatrixDiagram: (body: Parameters<ModelRepository['editMatrixDiagram']>[0]) => repo.editMatrixDiagram(body),
+    listGroups: (kind?: string) => repo.listGroups(kind),
+    createGroup: (body: Parameters<ModelRepository['createGroup']>[0]) => repo.createGroup(body),
+    renameGroup: (body: Parameters<ModelRepository['renameGroup']>[0]) => repo.renameGroup(body),
+    archiveGroup: (body: Parameters<ModelRepository['archiveGroup']>[0]) => repo.archiveGroup(body),
+    unarchiveGroup: (body: Parameters<ModelRepository['unarchiveGroup']>[0]) => repo.unarchiveGroup(body),
+    deleteGroup: (params: Parameters<ModelRepository['deleteGroup']>[0]) => repo.deleteGroup(params),
+    updateGroup: (body: Parameters<ModelRepository['updateGroup']>[0]) => repo.updateGroup(body),
   }) as const

@@ -1,0 +1,15 @@
+model-projects:
+- slug: uncategorized
+  id: GRP@0.uncategorized
+  name: Uncategorized
+- slug: new-project-1
+  id: GRP@1780548660.1FX56i
+  name: New Project 1
+diagram-collections:
+- slug: uncategorized
+  id: GRP@0.uncategorized
+  name: Uncategorized
+document-collections:
+- slug: uncategorized
+  id: GRP@0.uncategorized
+  name: Uncategorized

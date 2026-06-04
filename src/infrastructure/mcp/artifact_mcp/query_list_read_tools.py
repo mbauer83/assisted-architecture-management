@@ -8,6 +8,23 @@ from src.infrastructure.mcp.artifact_mcp.tool_annotations import READ_ONLY
 
 _FIELD_ALIASES = {"id": "artifact_id"}
 
+_MULTI_FAMILY_TYPES = frozenset({"entities", "connections", "diagrams", "documents"})
+
+
+def _validate_group_scope(
+    group: str | None,
+    include_record_types: list[Literal["entities", "connections", "diagrams", "documents"]] | None,
+) -> None:
+    """Raise ValueError if group is requested on a mixed-family query."""
+    if group is None:
+        return
+    selected = set(include_record_types) if include_record_types else {"entities"}
+    if len(selected) > 1:
+        raise ValueError(
+            f"group filter requires a single-family include_record_types; "
+            f"got {sorted(selected)}. Pass one of: entities, connections, diagrams, documents."
+        )
+
 
 def _project(record: dict[str, object], fields: list[str] | None) -> dict[str, object]:
     if not fields:
@@ -56,10 +73,12 @@ def register_query_list_read_tools(mcp: FastMCP) -> None:
             "include_record_types defaults to ['entities']. "
             "Pass fields=[...] to project only the keys you need. "
             "Canonical field names: artifact_id (also accepts 'id'), artifact_type, name, version, "
-            "status, record_type, path, host_diagram_id. "
+            "status, record_type, path, host_diagram_id, group. "
             "Domain values (case-insensitive): 'common', 'motivation', 'strategy', 'business', "
             "'application', 'technology', 'implementation'; "
             "for diagram-only types, domain = diagram type name (e.g. 'activity')."
+            "\n\ngroup: filter to a specific model-project / diagram-collection / document-collection "
+            "slug. Only valid when include_record_types contains a single family."
             "\n\nhost_diagram_id in results: null = model entity (standalone file, shareable). "
             "non-null = diagram-only entity (no file; lives in that diagram's diagram-entities; "
             "path → diagram file; edit via artifact_edit_diagram)."
@@ -76,8 +95,10 @@ def register_query_list_read_tools(mcp: FastMCP) -> None:
         domain: str | list[str] | None = None,
         status: str | list[str] | None = None,
         include_record_types: list[Literal["entities", "connections", "diagrams", "documents"]] | None = None,
+        group: str | None = None,
         fields: list[str] | None = None,
     ) -> list[dict[str, object]]:
+        _validate_group_scope(group, include_record_types)
         roots = resolve_repo_roots(
             repo_scope=repo_scope,
             repo_root=repo_root,
@@ -98,6 +119,9 @@ def register_query_list_read_tools(mcp: FastMCP) -> None:
             include_diagrams=include_diagrams,
             include_documents=include_documents,
         )
+        # Apply group filter in-memory (list_artifacts is summary-only — group field available)
+        if group is not None:
+            summaries = [s for s in summaries if s.group == group]
         out: list[dict[str, object]] = []
         for s in summaries:
             d = asdict(s)

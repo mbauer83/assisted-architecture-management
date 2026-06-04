@@ -1,52 +1,114 @@
 <script setup lang="ts">
-import { computed, inject, onMounted, ref, watch } from 'vue'
+import { computed, inject, onMounted, onUnmounted, ref, watch } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
-import type { EntityList } from '../../domain'
+import type { EntityList, GroupList } from '../../domain'
 import type { RepoScope, RepoError } from '../../ports/ModelRepository'
 import { modelServiceKey } from '../keys'
 import { useQuery } from '../composables/useQuery'
 import EntitiesTreemap from '../components/EntitiesTreemap.vue'
 import ArchimateTypeGlyph from '../components/ArchimateTypeGlyph.vue'
+import EntityGroupNavTree from '../components/EntityGroupNavTree.vue'
 import {
-  DOMAIN_OPTIONS,
   friendlyEntityId,
   getEntityConnectionTotal,
   getDomainLabel,
 } from '../lib/domains'
+import { useHierarchicalEntities } from '../composables/useHierarchicalEntities'
 
 const props = defineProps<{ scope?: RepoScope }>()
 
 type ViewMode = 'table' | 'treemap'
 type SortKey = 'type' | 'in' | 'sym' | 'out' | 'total'
 
+const STORAGE_KEY = 'arch_group_model-project'
+
 const svc = inject(modelServiceKey)!
 const route = useRoute()
 const router = useRouter()
 const entityListState = useQuery<EntityList, RepoError>()
+const groupsState = useQuery<GroupList, RepoError>()
 
 const isGlobal = computed(() => props.scope === 'global')
 const basePath = computed(() => isGlobal.value ? '/global/entities' : '/entities')
 
 const activeDomain = computed(() => (route.query.domain as string | undefined) ?? '')
+const activeGroup = computed(() => (route.query.group as string | undefined) ?? '')
 const viewMode = computed<ViewMode>(() => route.query.view === 'treemap' ? 'treemap' : 'table')
 const typeFilter = ref((route.query.type as string | undefined) ?? '')
 const sortKey = ref<SortKey | null>(null)
 const sortOrder = ref<1 | -1>(1)
+const showArchivedGroups = ref(false)
 
 const replaceQuery = (patch: Record<string, string | undefined>) =>
   void router.replace({ path: basePath.value, query: { ...route.query, ...patch } })
 
 const setDomain = (domain: string) => replaceQuery({ domain: domain || undefined })
+const setGroup = (group: string) => {
+  replaceQuery({ group: group || undefined, domain: undefined })
+  if (!isGlobal.value) localStorage.setItem(STORAGE_KEY, group)
+}
+const goToGroups = () => { localStorage.removeItem(STORAGE_KEY); void router.push('/entities/groups') }
 const setViewMode = (view: ViewMode) => replaceQuery({ view: view === 'table' ? undefined : view })
-const load = () => entityListState.run(svc.listEntities({
-  ...(activeDomain.value ? { domain: activeDomain.value } : {}),
-  scope: props.scope,
-}))
 
-onMounted(load)
-watch([activeDomain, () => props.scope], () => {
-  typeFilter.value = ''
+const load = () => entityListState.run(svc.listEntities({ scope: props.scope }))
+const loadGroups = () => groupsState.run(svc.listGroups('model-project'))
+
+onMounted(() => {
+  if (!isGlobal.value) {
+    const saved = localStorage.getItem(STORAGE_KEY)
+    if (saved === null && !route.query.group && !route.query.domain) {
+      void router.replace('/entities/groups')
+      return
+    }
+    if (saved && !route.query.group) {
+      void router.replace({ path: '/entities', query: { ...route.query, group: saved || undefined } })
+    }
+  }
   load()
+  loadGroups()
+})
+
+watch(() => props.scope, () => { typeFilter.value = ''; load() })
+
+let refreshEventSource: EventSource | null = null
+onMounted(() => {
+  refreshEventSource = new EventSource('/api/events')
+  refreshEventSource.addEventListener('artifact_write_completed', () => { load(); loadGroups() })
+})
+onUnmounted(() => { refreshEventSource?.close() })
+
+const groupOptions = computed(() => {
+  const all = entityListState.data.value?.items ?? []
+  const counts: Record<string, number> = {}
+  for (const item of all) {
+    const g = item.group ?? 'uncategorized'
+    counts[g] = (counts[g] ?? 0) + 1
+  }
+  const registryData = groupsState.data.value?.['model-projects']
+  if (!registryData) return []
+  const result = registryData.map(g => ({
+    slug: g.slug,
+    name: g.name,
+    count: counts[g.slug] ?? 0,
+    archived: g.archived ?? false,
+    meta_ontology: g.meta_ontology ?? '',
+  }))
+  return [...result].sort((a, b) => {
+    if (a.archived !== b.archived) return a.archived ? 1 : -1
+    if (a.slug === 'uncategorized' && b.slug !== 'uncategorized') return 1
+    if (b.slug === 'uncategorized' && a.slug !== 'uncategorized') return -1
+    return a.name.localeCompare(b.name)
+  })
+})
+
+const activeDomainCounts = computed((): Record<string, number> | undefined => {
+  if (!entityListState.data.value) return undefined
+  const counts: Record<string, number> = {}
+  for (const item of entityListState.data.value.items) {
+    if (activeGroup.value && (item.group ?? 'uncategorized') !== activeGroup.value) continue
+    if (item.domain) counts[item.domain] = (counts[item.domain] ?? 0) + 1
+  }
+  return counts
 })
 
 const uniqueTypes = computed(() => {
@@ -58,21 +120,16 @@ const compareValues = (left: number | string, right: number | string) =>
   left < right ? -1 * sortOrder.value : left > right ? 1 * sortOrder.value : 0
 
 const sortBy = (key: SortKey) => {
-  if (sortKey.value !== key) {
-    sortKey.value = key
-    sortOrder.value = 1
-    return
-  }
+  if (sortKey.value !== key) { sortKey.value = key; sortOrder.value = 1; return }
   if (sortOrder.value === 1) sortOrder.value = -1
-  else {
-    sortKey.value = null
-    sortOrder.value = 1
-  }
+  else { sortKey.value = null; sortOrder.value = 1 }
 }
 
 const sortedEntities = computed(() => {
   const items = entityListState.data.value?.items.filter(item =>
-    !typeFilter.value || item.artifact_type === typeFilter.value,
+    (!typeFilter.value || item.artifact_type === typeFilter.value) &&
+    (!activeGroup.value || (item.group ?? 'uncategorized') === activeGroup.value) &&
+    (!activeDomain.value || item.domain === activeDomain.value),
   ) ?? []
   if (!sortKey.value) return items
   return [...items].sort((a, b) => {
@@ -84,57 +141,7 @@ const sortedEntities = computed(() => {
   })
 })
 
-const hierarchicalEntities = computed(() => {
-  const items = sortedEntities.value
-  const byId = new Map(items.map((item) => [item.artifact_id, item]))
-
-  type ChildEntry = { entity: typeof items[number]; relationType: string | undefined }
-  const children = new Map<string, ChildEntry[]>()
-
-  for (const item of items) {
-    const rawParents = item.all_parents?.length
-      ? item.all_parents
-      : item.parent_entity_id
-        ? [{ parent_id: item.parent_entity_id, relation_type: item.hierarchy_relation_type ?? '' }]
-        : []
-    for (const p of rawParents.filter((p) => byId.has(p.parent_id))) {
-      const bucket = children.get(p.parent_id) ?? []
-      bucket.push({ entity: item, relationType: p.relation_type || undefined })
-      children.set(p.parent_id, bucket)
-    }
-  }
-
-  const hasParent = new Set<string>()
-  for (const entries of children.values()) for (const { entity } of entries) hasParent.add(entity.artifact_id)
-  const roots = items.filter((item) => !hasParent.has(item.artifact_id))
-
-  const ordered: typeof items = []
-  const visited = new Set<string>()
-  const currentPath = new Set<string>()
-
-  // parentKey is the full ancestry key of the parent node, propagated down so that
-  // each (entity, ancestor-path) combination gets a unique visit key.  This lets
-  // grandchildren appear once per each copy of their parent, not just once globally.
-  const visit = (item: typeof items[number], depth: number, parentId: string | null, relationType: string | null, parentKey: string) => {
-    if (currentPath.has(item.artifact_id)) return  // cycle guard
-    const key = `${item.artifact_id}::${parentKey}`
-    if (visited.has(key)) return
-    visited.add(key)
-    ordered.push(
-      parentId !== null
-        ? { ...item, parent_entity_id: parentId, hierarchy_relation_type: relationType ?? undefined, hierarchy_depth: depth, specialization_depth: depth }
-        : { ...item, hierarchy_depth: depth, specialization_depth: depth },
-    )
-    currentPath.add(item.artifact_id)
-    for (const { entity: child, relationType: rt } of children.get(item.artifact_id) ?? []) {
-      visit(child, depth + 1, item.artifact_id, rt ?? null, key)
-    }
-    currentPath.delete(item.artifact_id)
-  }
-
-  for (const root of roots) visit(root, 0, null, null, '')
-  return ordered
-})
+const hierarchicalEntities = useHierarchicalEntities(sortedEntities)
 
 const hierarchyMarker = (relationType?: string) => {
   if (relationType === 'composition') return '◆'
@@ -152,7 +159,8 @@ const browseReturnQuery = computed(() => {
 
 const pageTitle = computed(() => {
   const scope = isGlobal.value ? 'Global ' : ''
-  return activeDomain.value ? `${scope}${getDomainLabel(activeDomain.value)} Entities` : `${scope}Entities`
+  const domainPart = activeDomain.value ? `${getDomainLabel(activeDomain.value)} ` : ''
+  return `${scope}${domainPart}Entities`
 })
 const sortArrow = (key: SortKey) => sortKey.value === key ? (sortOrder.value === 1 ? '↑' : '↓') : ''
 </script>
@@ -160,217 +168,120 @@ const sortArrow = (key: SortKey) => sortKey.value === key ? (sortOrder.value ===
 <template>
   <div class="layout">
     <aside class="sidebar">
-      <h2 class="sidebar-title">
-        Domain
-      </h2>
-      <ul class="domain-list">
-        <li
-          v-for="domain in DOMAIN_OPTIONS"
-          :key="domain.key"
-        >
-          <button
-            class="domain-btn"
-            :class="{ active: activeDomain === domain.key, [`domain-border--${domain.key || 'all'}`]: true }"
-            @click="setDomain(domain.key)"
-          >
-            {{ domain.label }}
-          </button>
-        </li>
-      </ul>
+      <div class="sidebar-header">
+        <h2 class="sidebar-title">Project</h2>
+        <RouterLink
+          v-if="!isGlobal"
+          to="/entities/groups"
+          class="manage-link"
+          title="Manage projects"
+        >⚙</RouterLink>
+      </div>
+
+      <EntityGroupNavTree
+        v-if="!isGlobal"
+        :groups="groupOptions"
+        :active-group="activeGroup"
+        :active-domain="activeDomain"
+        :manageable="true"
+        :show-archived="showArchivedGroups"
+        :domain-counts="activeDomainCounts"
+        axis="model-project"
+        @update:active-group="setGroup"
+        @update:active-domain="setDomain"
+        @update:show-archived="v => showArchivedGroups = v"
+        @group-mutated="() => { load(); loadGroups() }"
+        @navigate-to-groups="goToGroups"
+      />
+
+      <!-- Global view: flat domain list only -->
+      <template v-else>
+        <h2 class="sidebar-title" style="margin-top:1rem">Domain</h2>
+        <ul class="domain-list">
+          <li>
+            <button class="domain-btn" :class="{ active: activeDomain === '' }" @click="setDomain('')">All</button>
+          </li>
+        </ul>
+      </template>
     </aside>
 
     <section class="content">
       <div class="content-header">
         <div>
           <h1 class="page-title">
-            <span
-              v-if="isGlobal"
-              class="global-badge"
-            >Global</span>
+            <span v-if="isGlobal" class="global-badge">Global</span>
             {{ pageTitle }}
-            <span
-              v-if="entityListState.data.value"
-              class="count"
-            >
+            <span v-if="entityListState.data.value" class="count">
               ({{ hierarchicalEntities.length }}<template v-if="typeFilter"> / {{ entityListState.data.value.total }}</template>)
             </span>
           </h1>
           <p class="subtitle">
-            <template v-if="isGlobal">
-              Read-only view of the shared global (enterprise) repository.
-            </template>
-            <template v-else>
-              Filter by domain, then inspect the catalog as a sortable table or a connection-weighted treemap.
-            </template>
+            <template v-if="isGlobal">Read-only view of the shared global (enterprise) repository.</template>
+            <template v-else>Filter by project and domain, then inspect the catalog as a sortable table or treemap.</template>
           </p>
         </div>
         <div class="actions">
           <div class="view-toggle">
-            <button
-              class="toggle-btn"
-              :class="{ 'toggle-btn--active': viewMode === 'table' }"
-              @click="setViewMode('table')"
-            >
-              Table
-            </button>
-            <button
-              class="toggle-btn"
-              :class="{ 'toggle-btn--active': viewMode === 'treemap' }"
-              @click="setViewMode('treemap')"
-            >
-              Treemap
-            </button>
+            <button class="toggle-btn" :class="{ 'toggle-btn--active': viewMode === 'table' }" @click="setViewMode('table')">Table</button>
+            <button class="toggle-btn" :class="{ 'toggle-btn--active': viewMode === 'treemap' }" @click="setViewMode('treemap')">Treemap</button>
           </div>
-          <RouterLink
-            v-if="!isGlobal"
-            to="/entity/create"
-            class="create-btn"
-          >
-            + Create Entity
-          </RouterLink>
+          <RouterLink v-if="!isGlobal" to="/entity/create" class="create-btn">+ Create Entity</RouterLink>
         </div>
       </div>
 
       <div class="toolbar">
         <label class="toolbar-field">
           <span>Type</span>
-          <select
-            v-model="typeFilter"
-            class="toolbar-select"
-          >
+          <select v-model="typeFilter" class="toolbar-select">
             <option value="">All</option>
-            <option
-              v-for="type in uniqueTypes"
-              :key="type"
-              :value="type"
-            >{{ type }}</option>
+            <option v-for="type in uniqueTypes" :key="type" :value="type">{{ type }}</option>
           </select>
         </label>
       </div>
 
-      <div
-        v-if="entityListState.loading.value"
-        class="state-msg"
-      >
-        Loading…
-      </div>
-      <div
-        v-else-if="entityListState.errorMessage.value"
-        class="state-msg state-msg--error"
-      >
-        {{ entityListState.errorMessage.value }}
-      </div>
+      <div v-if="entityListState.loading.value" class="state-msg">Loading…</div>
+      <div v-else-if="entityListState.errorMessage.value" class="state-msg state-msg--error">{{ entityListState.errorMessage.value }}</div>
 
       <template v-else-if="entityListState.data.value">
-        <div
-          v-if="hierarchicalEntities.length === 0"
-          class="state-msg"
-        >
-          No entities found{{ activeDomain ? ` in ${getDomainLabel(activeDomain)}` : '' }}{{ typeFilter ? ` of type "${typeFilter}"` : '' }}.
+        <div v-if="hierarchicalEntities.length === 0" class="state-msg">
+          <template v-if="activeGroup">No entities in "{{ groupOptions.find(g => g.slug === activeGroup)?.name ?? activeGroup }}" yet.</template>
+          <template v-else>No entities found{{ activeDomain ? ` in ${getDomainLabel(activeDomain)}` : '' }}{{ typeFilter ? ` of type "${typeFilter}"` : '' }}.</template>
         </div>
 
-        <EntitiesTreemap
-          v-else-if="viewMode === 'treemap'"
-          :items="sortedEntities"
-          :active-domain="activeDomain"
-        />
+        <EntitiesTreemap v-else-if="viewMode === 'treemap'" :items="sortedEntities" :active-domain="activeDomain" />
 
-        <table
-          v-else
-          class="entity-table"
-        >
+        <table v-else class="entity-table">
           <thead>
             <tr>
               <th>Name</th>
-              <th>
-                <button
-                  class="sort-btn"
-                  @click="sortBy('type')"
-                >
-                  Type {{ sortArrow('type') }}
-                </button>
-              </th>
-              <th v-if="!activeDomain">
-                Domain
-              </th>
+              <th><button class="sort-btn" @click="sortBy('type')">Type {{ sortArrow('type') }}</button></th>
+              <th v-if="!activeDomain">Domain</th>
               <th class="th-conn">
-                <button
-                  class="sort-btn"
-                  @click="sortBy('total')"
-                >
-                  Connections {{ sortArrow('total') }}
-                </button>
-                <span class="th-conn-sub">
-                  (<button
-                    class="sort-sub"
-                    @click="sortBy('in')"
-                  >in {{ sortArrow('in') }}</button> /
-                  <button
-                    class="sort-sub"
-                    @click="sortBy('sym')"
-                  >sym {{ sortArrow('sym') }}</button> /
-                  <button
-                    class="sort-sub"
-                    @click="sortBy('out')"
-                  >out {{ sortArrow('out') }}</button>)
-                </span>
+                <button class="sort-btn" @click="sortBy('total')">Connections {{ sortArrow('total') }}</button>
+                <span class="th-conn-sub">(<button class="sort-sub" @click="sortBy('in')">in {{ sortArrow('in') }}</button> / <button class="sort-sub" @click="sortBy('sym')">sym {{ sortArrow('sym') }}</button> / <button class="sort-sub" @click="sortBy('out')">out {{ sortArrow('out') }}</button>)</span>
               </th>
               <th>Status</th>
             </tr>
           </thead>
           <tbody>
-            <tr
-              v-for="entity in hierarchicalEntities"
-              :key="`${entity.artifact_id}::${entity.parent_entity_id ?? ''}`"
-              :class="{ 'row--global': entity.is_global }"
-            >
+            <tr v-for="entity in hierarchicalEntities" :key="`${entity.artifact_id}::${entity.parent_entity_id ?? ''}`" :class="{ 'row--global': entity.is_global }">
               <td>
-                <div
-                  class="name-cell"
-                  :style="{ paddingLeft: `${(entity.hierarchy_depth ?? entity.specialization_depth ?? 0) * 18}px` }"
-                >
-                  <span
-                    v-if="(entity.hierarchy_depth ?? entity.specialization_depth)"
-                    class="spec-marker"
-                  >
-                    {{ hierarchyMarker(entity.hierarchy_relation_type) }}
-                  </span>
-                  <RouterLink :to="{ path: '/entity', query: { id: entity.artifact_id, ...browseReturnQuery } }">
-                    {{ entity.name || friendlyEntityId(entity.artifact_id) }}
-                  </RouterLink>
+                <div class="name-cell" :style="{ paddingLeft: `${(entity.hierarchy_depth ?? entity.specialization_depth ?? 0) * 18}px` }">
+                  <span v-if="(entity.hierarchy_depth ?? entity.specialization_depth)" class="spec-marker">{{ hierarchyMarker(entity.hierarchy_relation_type) }}</span>
+                  <RouterLink :to="{ path: '/entity', query: { id: entity.artifact_id, ...browseReturnQuery } }">{{ entity.name || friendlyEntityId(entity.artifact_id) }}</RouterLink>
                 </div>
-                <span
-                  v-if="entity.is_global && !isGlobal"
-                  class="global-chip"
-                  title="From the global repository"
-                >global</span>
+                <span v-if="entity.is_global && !isGlobal" class="global-chip" title="From the global repository">global</span>
+                <button v-if="!activeGroup && groupOptions.length > 1 && entity.group && entity.group !== 'uncategorized'" class="group-chip" :title="`In group: ${entity.group}`" @click="setGroup(entity.group ?? '')">{{ entity.group }}</button>
               </td>
               <td>
                 <span class="type-cell">
-                  <ArchimateTypeGlyph
-                    :type="entity.artifact_type"
-                    :size="15"
-                    class="type-glyph"
-                  />
+                  <ArchimateTypeGlyph :type="entity.artifact_type" :size="15" class="type-glyph" />
                   <span class="mono">{{ entity.artifact_type }}</span>
                 </span>
               </td>
-              <td v-if="!activeDomain">
-                <span
-                  class="domain-badge"
-                  :class="`domain--${entity.domain}`"
-                >{{ entity.domain }}</span>
-              </td>
-              <td class="conn-counts">
-                {{ getEntityConnectionTotal(entity) }}
-                <span class="conn-split">({{ entity.conn_in ?? 0 }} / {{ entity.conn_sym ?? 0 }} / {{ entity.conn_out ?? 0 }})</span>
-              </td>
-              <td>
-                <span
-                  class="status-badge"
-                  :class="`status--${entity.status}`"
-                >{{ entity.status }}</span>
-              </td>
+              <td v-if="!activeDomain"><span class="domain-badge" :class="`domain--${entity.domain}`">{{ entity.domain }}</span></td>
+              <td class="conn-counts">{{ getEntityConnectionTotal(entity) }}<span class="conn-split">({{ entity.conn_in ?? 0 }} / {{ entity.conn_sym ?? 0 }} / {{ entity.conn_out ?? 0 }})</span></td>
+              <td><span class="status-badge" :class="`status--${entity.status}`">{{ entity.status }}</span></td>
             </tr>
           </tbody>
         </table>
@@ -381,36 +292,16 @@ const sortArrow = (key: SortKey) => sortKey.value === key ? (sortOrder.value ===
 
 <style scoped>
 .layout { display: flex; gap: 24px; }
-.sidebar { width: 160px; flex-shrink: 0; }
-.sidebar-title, .toolbar-field span, .entity-table th {
-  font-size: 11px;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: .05em;
-  color: #6b7280;
-}
+.sidebar { width: 190px; flex-shrink: 0; }
+.sidebar-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; }
+.sidebar-title { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .05em; color: #6b7280; }
+.manage-link { font-size: 14px; color: #9ca3af; text-decoration: none; line-height: 1; }
+.manage-link:hover { color: #374151; }
 
 .domain-list { list-style: none; display: flex; flex-direction: column; gap: 2px; }
-.domain-btn {
-  width: 100%;
-  padding: 7px 10px;
-  border: 0;
-  border-left: 3px solid transparent;
-  border-radius: 6px;
-  background: transparent;
-  color: #374151;
-  cursor: pointer;
-  font-size: 13px;
-  text-align: left;
-}
+.domain-btn { width: 100%; padding: 7px 10px; border: 0; border-left: 3px solid transparent; border-radius: 6px; background: transparent; color: #374151; cursor: pointer; font-size: 13px; text-align: left; }
 .domain-btn:hover { background: #f3f4f6; }
 .domain-btn.active { background: #eff6ff; color: #1d4ed8; font-weight: 500; }
-.domain-border--motivation.active { border-left-color: var(--domain-motivation); }
-.domain-border--strategy.active { border-left-color: var(--domain-strategy); }
-.domain-border--common.active { border-left-color: var(--domain-common); }
-.domain-border--business.active { border-left-color: var(--domain-business); }
-.domain-border--application.active { border-left-color: var(--domain-application); }
-.domain-border--technology.active { border-left-color: var(--domain-technology); }
 
 .content { flex: 1; min-width: 0; }
 .content-header, .actions, .view-toggle, .toolbar, .toolbar-field { display: flex; align-items: center; }
@@ -422,50 +313,21 @@ const sortArrow = (key: SortKey) => sortKey.value === key ? (sortOrder.value ===
 .count { margin-left: 6px; font-size: 14px; font-weight: 400; }
 .toolbar { justify-content: space-between; margin-bottom: 14px; }
 .toolbar-field { gap: 8px; }
-
-.toolbar-select, .toggle-btn {
-  border: 1px solid #d1d5db;
-  border-radius: 6px;
-  background: white;
-  color: #374151;
-}
+.toolbar-field span { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .05em; color: #6b7280; }
+.toolbar-select, .toggle-btn { border: 1px solid #d1d5db; border-radius: 6px; background: white; color: #374151; }
 .toolbar-select { min-width: 180px; padding: 7px 10px; }
 .toggle-btn { padding: 7px 12px; cursor: pointer; font-size: 13px; }
 .toggle-btn--active { background: #2563eb; border-color: #2563eb; color: white; }
-
-.create-btn {
-  padding: 8px 14px;
-  border-radius: 6px;
-  background: #16a34a;
-  color: white;
-  font-size: 13px;
-  font-weight: 500;
-  white-space: nowrap;
-}
+.create-btn { padding: 8px 14px; border-radius: 6px; background: #16a34a; color: white; font-size: 13px; font-weight: 500; white-space: nowrap; }
 .create-btn:hover { background: #15803d; text-decoration: none; }
 
-.entity-table {
-  width: 100%;
-  border-collapse: collapse;
-  background: white;
-  border: 1px solid #e5e7eb;
-  border-radius: 8px;
-  overflow: hidden;
-}
+.entity-table { width: 100%; border-collapse: collapse; background: white; border: 1px solid #e5e7eb; border-radius: 8px; overflow: hidden; }
 .entity-table th, .entity-table td { padding: 10px 14px; text-align: left; }
-.entity-table th { background: #f9fafb; border-bottom: 1px solid #e5e7eb; }
+.entity-table th { background: #f9fafb; border-bottom: 1px solid #e5e7eb; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .05em; color: #6b7280; }
 .entity-table td { border-bottom: 1px solid #f3f4f6; font-size: 13px; }
 .entity-table tr:last-child td { border-bottom: 0; }
 .entity-table tr:hover td { background: #f9fafb; }
-
-.sort-btn, .sort-sub {
-  padding: 0;
-  border: 0;
-  background: transparent;
-  color: inherit;
-  cursor: pointer;
-  font: inherit;
-}
+.sort-btn, .sort-sub { padding: 0; border: 0; background: transparent; color: inherit; cursor: pointer; font: inherit; }
 .th-conn { min-width: 170px; }
 .th-conn-sub { display: block; margin-top: 2px; font-size: 9px; font-weight: 400; letter-spacing: 0; text-transform: none; color: #9ca3af; }
 .type-cell { display: inline-flex; align-items: center; gap: 8px; }
@@ -476,35 +338,10 @@ const sortArrow = (key: SortKey) => sortKey.value === key ? (sortOrder.value ===
 .mono { font-size: 12px; color: #374151; }
 .conn-counts { font-size: 12px; white-space: nowrap; }
 .state-msg--error { color: #dc2626; }
-
-.global-badge {
-  display: inline-block;
-  background: #fef3c7;
-  color: #92400e;
-  border: 1px solid #fde68a;
-  border-radius: 4px;
-  padding: 1px 7px;
-  font-size: 11px;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: .05em;
-  margin-right: 8px;
-  vertical-align: middle;
-}
-
-.global-chip {
-  display: inline-block;
-  margin-left: 8px;
-  background: #fef3c7;
-  color: #92400e;
-  border: 1px solid #fde68a;
-  border-radius: 3px;
-  padding: 0 5px;
-  font-size: 10px;
-  font-weight: 600;
-  vertical-align: middle;
-}
-
+.global-badge { display: inline-block; background: #fef3c7; color: #92400e; border: 1px solid #fde68a; border-radius: 4px; padding: 1px 7px; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; margin-right: 8px; vertical-align: middle; }
+.global-chip { display: inline-block; margin-left: 8px; background: #fef3c7; color: #92400e; border: 1px solid #fde68a; border-radius: 3px; padding: 0 5px; font-size: 10px; font-weight: 600; vertical-align: middle; }
+.group-chip { display: inline-block; margin-left: 6px; background: #e0f2fe; color: #0369a1; border: 1px solid #bae6fd; border-radius: 3px; padding: 0 5px; font-size: 10px; font-weight: 500; vertical-align: middle; cursor: pointer; }
+.group-chip:hover { background: #bae6fd; }
 .row--global td { background: #fffbeb; }
 .row--global:hover td { background: #fef9e7; }
 </style>

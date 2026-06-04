@@ -18,10 +18,12 @@ Execution logic lives in promote_execute.py.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import Any, Literal
 
 from src.application.artifact_query import ArtifactRepository
 from src.application.verification.artifact_verifier import ArtifactRegistry
+from src.infrastructure.write.artifact_write._promote_groups import GroupMappingEntry
 from src.infrastructure.write.artifact_write.parse_existing import parse_entity_file
 from src.infrastructure.write.artifact_write.promote_schema_check import check_promotion_schema_compatibility
 
@@ -85,6 +87,8 @@ class PromotionPlan:
     doc_conflicts: list[DocPromotionConflict] = field(default_factory=list)
     diagram_conflicts: list[DiagramPromotionConflict] = field(default_factory=list)
     schema_errors: list[str] = field(default_factory=list)
+    group_mapping: list[GroupMappingEntry] = field(default_factory=list)
+    available_enterprise_groups: list[dict[str, str]] = field(default_factory=list)
 
 
 @dataclass
@@ -187,6 +191,8 @@ def plan_promotion(
     exclude_connection_ids: set[str] | None = None,
     document_ids: list[str] | None = None,
     diagram_ids: list[str] | None = None,
+    engagement_root: Path | None = None,
+    enterprise_root: Path | None = None,
 ) -> PromotionPlan:
     """Compute an explicit promotion plan from a caller-selected artifact set."""
     all_entities = registry.entity_ids()
@@ -266,69 +272,13 @@ def plan_promotion(
     if exc_conns:
         conn_ids = [c for c in conn_ids if c not in exc_conns]
 
-    # ── Documents ────────────────────────────────────────────────────────────
-    docs_to_add: list[str] = []
-    doc_conflicts: list[DocPromotionConflict] = []
-    enterprise_doc_ids = registry.enterprise_document_ids()
-    enterprise_doc_index: dict[tuple[str, str], Any] = {}
-    for doc_rec in repo.list_documents():
-        if doc_rec.artifact_id in enterprise_doc_ids:
-            key = (doc_rec.doc_type, _normalize_name(doc_rec.title))
-            enterprise_doc_index[key] = doc_rec
-    for did in document_ids or []:
-        doc = repo.get_document(did)
-        if doc is None:
-            warnings.append(f"Document not found: {did}")
-            continue
-        if did in enterprise_doc_ids:
-            already.append(did)
-            continue
-        key = (doc.doc_type, _normalize_name(doc.title))
-        ent_doc = enterprise_doc_index.get(key)
-        if ent_doc is not None:
-            doc_conflicts.append(
-                DocPromotionConflict(
-                    engagement_id=did,
-                    enterprise_id=ent_doc.artifact_id,
-                    doc_type=doc.doc_type,
-                    engagement_title=doc.title,
-                    enterprise_title=ent_doc.title,
-                )
-            )
-        else:
-            docs_to_add.append(did)
+    from src.infrastructure.write.artifact_write._promote_plan_content import (  # noqa: PLC0415
+        plan_diagrams,
+        plan_docs,
+    )
 
-    # ── Diagrams ─────────────────────────────────────────────────────────────
-    diags_to_add: list[str] = []
-    diagram_conflicts: list[DiagramPromotionConflict] = []
-    enterprise_diag_ids = registry.enterprise_diagram_ids()
-    enterprise_diag_index: dict[tuple[str, str], Any] = {}
-    for diag_rec in repo.list_diagrams():
-        if diag_rec.artifact_id in enterprise_diag_ids:
-            key = (diag_rec.diagram_type, _normalize_name(diag_rec.name))
-            enterprise_diag_index[key] = diag_rec
-    for did in diagram_ids or []:
-        diag = repo.get_diagram(did)
-        if diag is None:
-            warnings.append(f"Diagram not found: {did}")
-            continue
-        if did in enterprise_diag_ids:
-            already.append(did)
-            continue
-        key = (diag.diagram_type, _normalize_name(diag.name))
-        ent_diag = enterprise_diag_index.get(key)
-        if ent_diag is not None:
-            diagram_conflicts.append(
-                DiagramPromotionConflict(
-                    engagement_id=did,
-                    enterprise_id=ent_diag.artifact_id,
-                    diagram_type=diag.diagram_type,
-                    engagement_name=diag.name,
-                    enterprise_name=ent_diag.name,
-                )
-            )
-        else:
-            diags_to_add.append(did)
+    docs_to_add, doc_conflicts = plan_docs(document_ids, repo, registry, already, warnings)
+    diags_to_add, diagram_conflicts = plan_diagrams(diagram_ids, repo, registry, already, warnings)
 
     schema_errors = check_promotion_schema_compatibility(
         entity_ids=to_add + [c.engagement_id for c in conflicts],
@@ -337,6 +287,16 @@ def plan_promotion(
         registry=registry,
         repo=repo,
     )
+
+    group_mapping: list[GroupMappingEntry] = []
+    available_enterprise_groups: list[dict[str, str]] = []
+    if engagement_root is not None and enterprise_root is not None:
+        from src.infrastructure.write.artifact_write._promote_groups import compute_group_mapping  # noqa: PLC0415
+
+        all_entity_ids = to_add + [c.engagement_id for c in conflicts]
+        group_mapping, available_enterprise_groups = compute_group_mapping(
+            all_entity_ids, registry, engagement_root, enterprise_root
+        )
 
     return PromotionPlan(
         root_entity=selected_ids[0] if selected_ids else (document_ids or diagram_ids or [""])[0],
@@ -350,4 +310,6 @@ def plan_promotion(
         doc_conflicts=doc_conflicts,
         diagram_conflicts=diagram_conflicts,
         schema_errors=schema_errors,
+        group_mapping=group_mapping,
+        available_enterprise_groups=available_enterprise_groups,
     )

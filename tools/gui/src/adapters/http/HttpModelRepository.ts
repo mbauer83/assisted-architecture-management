@@ -38,6 +38,7 @@ import {
   SyncSaveResultSchema,
   ServerInfoSchema,
   WriteHelpSchema,
+  GroupListSchema,
 } from '../../domain/schemas'
 import { SyncChangesResultSchema } from '../../domain/schemas-changes'
 import { parseMarkdown } from '../../application/MarkdownService'
@@ -166,6 +167,28 @@ const putJson = <A, I>(
       e instanceof NetworkError ? e : new NetworkError({ status: 0, message: String(e) }),
   }).pipe(Effect.flatMap(Schema.decodeUnknown(schema)))
 
+const patchJson = <A, I>(
+  url: string,
+  body: unknown,
+  schema: Schema.Schema<A, I>,
+): Effect.Effect<A, NetworkError | ParseResult.ParseError> =>
+  Effect.tryPromise({
+    try: async () => {
+      const resp = await fetchWithTimeout(url, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      })
+      if (!resp.ok) {
+        const text = await resp.text().catch(() => resp.statusText)
+        throw new NetworkError({ status: resp.status, message: text })
+      }
+      return resp.json() as Promise<unknown>
+    },
+    catch: (e) =>
+      e instanceof NetworkError ? e : new NetworkError({ status: 0, message: String(e) }),
+  }).pipe(Effect.flatMap(Schema.decodeUnknown(schema)))
+
 const deleteReq = <A, I>(
   url: string,
   schema: Schema.Schema<A, I>,
@@ -210,6 +233,7 @@ export const makeHttpModelRepository = (): ModelRepository => ({
     fetchJson(buildUrl('/entities', {
       domain: params.domain, artifact_type: params.artifactType,
       status: params.status, scope: params.scope, limit: params.limit, offset: params.offset,
+      group: params.group,
     }), EntityListSchema),
 
   getEntity: (id: string) =>
@@ -248,8 +272,11 @@ export const makeHttpModelRepository = (): ModelRepository => ({
       Effect.map((items) => [...items] as import('../../domain').DocumentType[]),
     ),
 
-  listDocuments: (params = {}) =>
-    fetchJson(buildUrl('/documents', params), DocumentListSchema),
+  listDocuments: (params: { doc_type?: string; status?: string; limit?: number; offset?: number; group?: string } = {}) =>
+    fetchJson(buildUrl('/documents', {
+      doc_type: params.doc_type, status: params.status,
+      limit: params.limit, offset: params.offset, group: params.group,
+    }), DocumentListSchema),
 
   getDocument: (id) =>
     fetchJsonNotFound(buildUrl('/document', { id }), DocumentDetailSchema, id),
@@ -272,8 +299,8 @@ export const makeHttpModelRepository = (): ModelRepository => ({
       entity_types: params.entity_types?.join(','), doc_types: params.doc_types?.join(','), limit: params.limit,
     }), ReferenceSearchResultSchema),
 
-  listDiagrams: (diagramType?: string, status?: string) =>
-    fetchJson(buildUrl('/diagrams', { diagram_type: diagramType, status }), DiagramListSchema),
+  listDiagrams: (diagramType?: string, status?: string, group?: string) =>
+    fetchJson(buildUrl('/diagrams', { diagram_type: diagramType, status, group }), DiagramListSchema),
 
   listDiagramTypes: () =>
     fetchJson(buildUrl('/diagram-types'), Schema.Array(DiagramTypeSummarySchema))
@@ -395,4 +422,19 @@ export const makeHttpModelRepository = (): ModelRepository => ({
   submitEnterpriseChanges: () => postJson('/api/sync/enterprise/submit', {}, SyncSaveResultSchema),
   withdrawEnterpriseChanges: () => postJson('/api/sync/enterprise/withdraw', { confirm: true }, SyncSaveResultSchema),
   getChanges: (repo) => fetchJson(buildUrl('/sync/changes', { repo }), SyncChangesResultSchema),
+
+  listGroups: (kind?: string) =>
+    fetchJson(buildUrl('/groups', kind ? { kind } : undefined), GroupListSchema),
+  createGroup: (body) =>
+    postJson(buildUrl('/group'), body, Schema.Record({ key: Schema.String, value: Schema.Unknown })),
+  renameGroup: (body) =>
+    putJson(buildUrl('/group'), body, Schema.Record({ key: Schema.String, value: Schema.Unknown })),
+  archiveGroup: (body) =>
+    postJson(buildUrl('/group/archive'), body, Schema.Record({ key: Schema.String, value: Schema.Unknown })),
+  unarchiveGroup: (body) =>
+    postJson(buildUrl('/group/unarchive'), body, Schema.Record({ key: Schema.String, value: Schema.Unknown })),
+  deleteGroup: ({ kind, target, confirm }) =>
+    deleteReq(buildUrl('/group', { kind, target, confirm }), Schema.Record({ key: Schema.String, value: Schema.Unknown })),
+  updateGroup: (body) =>
+    patchJson(buildUrl('/group'), body, Schema.Record({ key: Schema.String, value: Schema.Unknown })),
 })

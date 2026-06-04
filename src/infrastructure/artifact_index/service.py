@@ -175,6 +175,7 @@ class ArtifactIndex:
         domain: str | None = None,
         subdomain: str | None = None,
         status: str | None = None,
+        group: str | None = None,
     ) -> list[EntityRecord]:
         return self._list_sorted(
             self._mem.entities,
@@ -184,6 +185,7 @@ class ArtifactIndex:
                 domain=domain,
                 subdomain=subdomain,
                 status=status,
+                group=group,
             ),
         )
 
@@ -194,6 +196,7 @@ class ArtifactIndex:
         source: str | None = None,
         target: str | None = None,
         status: str | None = None,
+        group: str | None = None,
     ) -> list[ConnectionRecord]:
         return self._list_sorted(
             self._mem.connections,
@@ -203,23 +206,39 @@ class ArtifactIndex:
                 source=source,
                 target=target,
                 status=status,
+                group=group,
             ),
         )
 
-    def list_diagrams(self, *, diagram_type: str | None = None, status: str | None = None) -> list[DiagramRecord]:
+    def list_diagrams(
+        self,
+        *,
+        diagram_type: str | None = None,
+        status: str | None = None,
+        group: str | None = None,
+    ) -> list[DiagramRecord]:
         return self._list_sorted(
             self._mem.diagrams,
             lambda r: matches_diagram(
                 r,
                 diagram_type=diagram_type,
                 status=status,
+                group=group,
             ),
         )
 
-    def list_documents(self, *, doc_type: str | None = None, status: str | None = None) -> list[DocumentRecord]:
+    def list_documents(
+        self,
+        *,
+        doc_type: str | None = None,
+        status: str | None = None,
+        group: str | None = None,
+    ) -> list[DocumentRecord]:
         return self._list_sorted(
             self._mem.documents,
-            lambda r: (doc_type is None or r.doc_type == doc_type) and (status is None or r.status == status),
+            lambda r: (doc_type is None or r.doc_type == doc_type)
+            and (status is None or r.status == status)
+            and (group is None or r.group == group),
         )
 
     def list_artifacts(
@@ -344,6 +363,9 @@ class ArtifactIndex:
             "entities_by_domain": dict(Counter(e.domain for e in entities)),
             "connections_by_type": dict(Counter(c.conn_type for c in connections)),
             "documents_by_type": dict(Counter(d.doc_type for d in documents)),
+            "entities_by_group": dict(Counter(e.group for e in entities)),
+            "diagrams_by_group": dict(Counter(d.group for d in diagrams)),
+            "documents_by_group": dict(Counter(d.group for d in documents)),
         }
 
     # ── Connection queries ────────────────────────────────────────────────────

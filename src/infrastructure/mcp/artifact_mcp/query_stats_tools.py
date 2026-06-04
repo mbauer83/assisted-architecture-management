@@ -23,10 +23,11 @@ def register_query_stats_tools(mcp: FastMCP) -> None:
         title="Artifact Query: Stats",
         description=(
             "Return model statistics: total entity/connection/diagram counts and breakdowns "
-            "by domain and connection type. Use this first to confirm the server is pointed "
-            "at the expected repo. "
-            "Pass group_by='artifact_type'|'diagram_type'|'domain' to get a filtered count "
-            "breakdown instead of the default summary."
+            "by domain, connection type, and group. Use this first to confirm the server is "
+            "pointed at the expected repo. "
+            "Pass group_by='artifact_type'|'diagram_type'|'domain'|'group' to get a filtered "
+            "count breakdown instead of the default summary. "
+            "group_by='group' returns per-group counts for each artifact family."
             "\n\nRepo selection: repo_scope defaults to both (engagement + enterprise)."
         ),
         annotations=READ_ONLY,
@@ -34,7 +35,7 @@ def register_query_stats_tools(mcp: FastMCP) -> None:
     )
     def artifact_query_stats(
         *,
-        group_by: Literal["artifact_type", "diagram_type", "domain"] | None = None,
+        group_by: Literal["artifact_type", "diagram_type", "domain", "group"] | None = None,
         artifact_type: str | list[str] | None = None,
         domain: str | list[str] | None = None,
         status: str | list[str] | None = None,

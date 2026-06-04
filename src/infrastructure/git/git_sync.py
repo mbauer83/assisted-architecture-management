@@ -15,12 +15,13 @@ from __future__ import annotations
 
 import asyncio
 import logging
-import os
-import tempfile
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Literal
+from typing import TYPE_CHECKING, Literal
+
+if TYPE_CHECKING:
+    from src.infrastructure.git.git_auth import GitCredentials
 
 from src.config.repo_paths import DIAGRAM_CATALOG, DOCS, MODEL
 from src.infrastructure.git import enterprise_sync_state
@@ -45,23 +46,24 @@ class GitSyncManager:
         self,
         repos: list[RepoSpec],
         poll_interval_s: float = _DEFAULT_POLL_S,
-        ssh_passphrase: str | None = None,
+        credentials: "GitCredentials | None" = None,
         on_repo_changed: Callable[[Path], Awaitable[None]] | None = None,
     ) -> None:
         self._repos = repos
         self._poll_interval_s = poll_interval_s
-        self._ssh_passphrase = ssh_passphrase
+        self._credentials = credentials
         self._on_repo_changed = on_repo_changed
         self._task: asyncio.Task[None] | None = None
         self._askpass_script: Path | None = None
         self._last_dirty_state: dict[Path, bool] = {}
 
     async def start(self) -> None:
-        if self._ssh_passphrase:
-            self._askpass_script = self._create_askpass_script()
+        if self._credentials is not None:
             from src.infrastructure.git import git_env
+            from src.infrastructure.git.git_auth import build_git_env, create_askpass_script
 
-            git_env.set_ssh_env(self._ssh_env())
+            self._askpass_script = create_askpass_script()
+            git_env.set_ssh_env(build_git_env(self._credentials, self._askpass_script))
         self._task = asyncio.create_task(self._poll_loop(), name="git-sync")
         logger.info("git-sync started for %d repo(s) (poll %.1fs)", len(self._repos), self._poll_interval_s)
 
@@ -84,31 +86,6 @@ class GitSyncManager:
         git_env.set_ssh_env(None)
 
     # ------------------------------------------------------------------
-    # SSH helpers
-    # ------------------------------------------------------------------
-
-    def _create_askpass_script(self) -> Path:
-        fd, path_str = tempfile.mkstemp(prefix="arch-askpass-", suffix=".sh")
-        path = Path(path_str)
-        try:
-            os.write(fd, b"#!/bin/sh\nprintf '%s\\n' \"$ARCH_GIT_SSH_PASSWORD\"\n")
-        finally:
-            os.close(fd)
-        path.chmod(0o700)
-        return path
-
-    def _ssh_env(self) -> dict[str, str]:
-        env = os.environ.copy()
-        env["SSH_ASKPASS"] = str(self._askpass_script)
-        env["SSH_ASKPASS_REQUIRE"] = "force"
-        env["GIT_TERMINAL_PROMPT"] = "0"
-        env["ARCH_GIT_SSH_PASSWORD"] = self._ssh_passphrase or ""
-        return env
-
-    def _git_env(self) -> dict[str, str] | None:
-        return self._ssh_env() if self._askpass_script and self._ssh_passphrase else None
-
-    # ------------------------------------------------------------------
     # Polling loop
     # ------------------------------------------------------------------
 
@@ -129,13 +106,15 @@ class GitSyncManager:
     # ------------------------------------------------------------------
 
     async def _git(self, repo: Path, *args: str, timeout: float = 10.0) -> tuple[int, str, str]:
+        from src.infrastructure.git.git_env import get_ssh_env
+
         proc = await asyncio.create_subprocess_exec(
             "git",
             *args,
             cwd=repo,
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE,
-            env=self._git_env(),
+            env=get_ssh_env(),
         )
         try:
             out, err = await asyncio.wait_for(proc.communicate(), timeout=timeout)

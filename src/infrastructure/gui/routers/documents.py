@@ -93,11 +93,12 @@ def get_document_schemata() -> dict[str, Any]:
 def list_documents(
     doc_type: str | None = None,
     status: str | None = None,
+    group: str | None = None,
     limit: int = Query(default=200, le=1000),
     offset: int = 0,
 ) -> dict[str, Any]:
     repo = s.get_repo()
-    docs = repo.list_documents(doc_type=doc_type, status=status)
+    docs = repo.list_documents(doc_type=doc_type, status=status, group=group)
     page = docs[offset : offset + limit]
     return {
         "total": len(docs),
@@ -110,6 +111,7 @@ def list_documents(
                 "path": str(d.path),
                 "keywords": list(d.keywords),
                 "sections": list(d.sections),
+                "group": d.group,
             }
             for d in page
         ],

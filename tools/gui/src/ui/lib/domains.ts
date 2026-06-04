@@ -42,6 +42,25 @@ export const friendlyEntityId = (id: string) => {
   return parts.length > 2 ? parts.slice(2).join('.') : id
 }
 
+export const FRAMEWORK_GROUPS = [
+  {
+    key: 'archimate-next',
+    label: 'ArchiMate NEXT',
+    domains: ['motivation', 'strategy', 'common', 'business', 'application', 'technology', 'implementation'],
+  },
+  {
+    key: 'sysml-v2',
+    label: 'SysML v2',
+    domains: ['sysml'],
+  },
+] as const
+
+export const META_ONTOLOGY_OPTIONS = [
+  { value: '', label: 'No restriction' },
+  { value: 'archimate-next', label: 'ArchiMate NEXT' },
+  { value: 'sysml-v2', label: 'SysML v2' },
+]
+
 export const softTint = (hex: string, strength = 0.82) => {
   const value = hex.replace('#', '')
   if (value.length !== 6) return hex

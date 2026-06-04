@@ -1,19 +1,50 @@
 <script setup lang="ts">
-import { computed, inject, onMounted, ref } from 'vue'
+import { computed, inject, onMounted, onUnmounted, ref } from 'vue'
 import { Effect } from 'effect'
-import { RouterLink, useRouter } from 'vue-router'
+import { RouterLink, useRoute, useRouter } from 'vue-router'
 import { modelServiceKey } from '../keys'
-import type { DocumentList, DocumentType } from '../../domain'
+import { useQuery } from '../composables/useQuery'
+import type { DocumentList, DocumentType, GroupList } from '../../domain'
+import type { RepoError } from '../../ports/ModelRepository'
+import GroupSelector from '../components/GroupSelector.vue'
 
 const svc = inject(modelServiceKey)!
 const router = useRouter()
+const route = useRoute()
 
 const documentTypes = ref<DocumentType[]>([])
 const documentList = ref<DocumentList | null>(null)
+const groupsState = useQuery<GroupList, RepoError>()
 const loading = ref(false)
 const error = ref<string | null>(null)
 const docTypeFilter = ref('')
 const titleFilter = ref('')
+const showArchivedGroups = ref(false)
+
+const activeGroup = computed(() => (route.query.group as string | undefined) ?? '')
+const STORAGE_KEY = 'arch_group_document-collection'
+const setGroup = (g: string) => {
+  void router.replace({ path: '/documents', query: { ...(docTypeFilter.value ? { doc_type: docTypeFilter.value } : {}), group: g || undefined } })
+  localStorage.setItem(STORAGE_KEY, g)
+}
+const goToGroups = () => {
+  localStorage.removeItem(STORAGE_KEY)
+  void router.push('/documents/groups')
+}
+
+const groupOptions = computed(() => {
+  const all = documentList.value?.items ?? []
+  const counts: Record<string, number> = {}
+  for (const item of all) { const g = item.group ?? 'uncategorized'; counts[g] = (counts[g] ?? 0) + 1 }
+  const registry = groupsState.data.value?.['document-collections'] ?? []
+  if (registry.length > 0) {
+    return registry.map(g => ({
+      slug: g.slug, name: g.name, count: counts[g.slug] ?? 0,
+      archived: g.archived ?? false, type_filter: g.type_filter ?? [],
+    }))
+  }
+  return Object.entries(counts).sort(([a], [b]) => a.localeCompare(b)).map(([slug, count]) => ({ slug, name: slug, count, type_filter: [] as string[] }))
+})
 
 const load = () => {
   loading.value = true
@@ -30,123 +61,181 @@ const load = () => {
     loading.value = false
   })
 }
+const loadGroups = () => groupsState.run(svc.listGroups('document-collection'))
 
-onMounted(load)
+let refreshEventSource: EventSource | null = null
+onMounted(() => {
+  if (!route.query.group) {
+    const saved = localStorage.getItem(STORAGE_KEY)
+    if (saved === null) {
+      void router.replace('/documents/groups')
+      return
+    }
+    if (saved) {
+      void router.replace({ path: '/documents', query: { group: saved } })
+    }
+  }
+  load()
+  loadGroups()
+  refreshEventSource = new EventSource('/api/events')
+  refreshEventSource.addEventListener('artifact_write_completed', () => { load(); loadGroups() })
+})
+onUnmounted(() => { refreshEventSource?.close() })
+
+const activeGroupTypeFilter = computed(() =>
+  groupOptions.value.find(g => g.slug === activeGroup.value)?.type_filter ?? [],
+)
 
 const filteredItems = computed(() => {
   const lc = titleFilter.value.trim().toLowerCase()
   const items = documentList.value?.items ?? []
-  if (!lc) return items
-  return items.filter((item) => item.title.toLowerCase().includes(lc))
+  return items.filter(item =>
+    (!lc || item.title.toLowerCase().includes(lc)) &&
+    (!activeGroup.value || (item.group ?? 'uncategorized') === activeGroup.value) &&
+    (activeGroupTypeFilter.value.length === 0 || activeGroupTypeFilter.value.includes(item.doc_type)),
+  )
 })
 </script>
 
 <template>
   <div class="documents-page">
-    <div class="page-header">
-      <div>
-        <h1 class="page-title">
-          Documents
-        </h1>
-      </div>
-      <button
-        class="create-btn"
-        type="button"
-        @click="router.push('/documents/new')"
-      >
-        + New Document
-      </button>
-    </div>
-
-    <div class="toolbar card">
-      <label class="toolbar-field">
-        <span>Type</span>
-        <select
-          v-model="docTypeFilter"
-          class="toolbar-select"
-          @change="load"
-        >
-          <option value="">All</option>
-          <option
-            v-for="type in documentTypes"
-            :key="type.doc_type"
-            :value="type.doc_type"
-          >{{ type.name }}</option>
-        </select>
-      </label>
-      <label class="toolbar-field toolbar-field--grow">
-        <span>Title</span>
-        <input
-          v-model="titleFilter"
-          class="toolbar-input"
-          type="text"
-          placeholder="Filter by title..."
-        >
-      </label>
-    </div>
-
-    <div
-      v-if="loading"
-      class="state-msg"
-    >
-      Loading…
-    </div>
-    <div
-      v-else-if="error"
-      class="state-msg state-msg--error"
-    >
-      {{ error }}
-    </div>
-
-    <div
-      v-else
-      class="card table-card"
-    >
-      <div class="result-count">
-        {{ filteredItems.length }} document{{ filteredItems.length === 1 ? '' : 's' }}
-      </div>
-      <table class="documents-table">
-        <thead>
-          <tr>
-            <th>Title</th>
-            <th>Type</th>
-            <th>Status</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr
-            v-for="doc in filteredItems"
-            :key="doc.artifact_id"
+    <div class="layout">
+      <aside class="sidebar">
+        <div class="sidebar-header">
+          <h2 class="sidebar-title">Collection</h2>
+          <RouterLink to="/documents/groups" class="manage-link" title="Manage collections">⚙</RouterLink>
+        </div>
+        <GroupSelector
+          :groups="groupOptions"
+          :model-value="activeGroup"
+          :show-archived="showArchivedGroups"
+          :manageable="true"
+          axis="document-collection"
+          @update:model-value="setGroup"
+          @update:show-archived="v => showArchivedGroups = v"
+          @group-mutated="() => { load(); loadGroups() }"
+          @navigate-to-groups="goToGroups"
+        />
+      </aside>
+      <section class="content">
+        <div class="page-header">
+          <div>
+            <h1 class="page-title">
+              Documents
+            </h1>
+          </div>
+          <button
+            class="create-btn"
+            type="button"
+            @click="router.push('/documents/new')"
           >
-            <td>
-              <RouterLink :to="`/documents/${doc.artifact_id}`">
-                {{ doc.title }}
-              </RouterLink>
-            </td>
-            <td><span class="doc-type">{{ doc.doc_type }}</span></td>
-            <td>
-              <span
-                class="status-badge"
-                :class="`status--${doc.status}`"
-              >{{ doc.status }}</span>
-            </td>
-          </tr>
-          <tr v-if="!filteredItems.length">
-            <td
-              colspan="3"
-              class="empty-row"
+            + New Document
+          </button>
+        </div>
+
+        <div class="toolbar card">
+          <label class="toolbar-field">
+            <span>Type</span>
+            <select
+              v-model="docTypeFilter"
+              class="toolbar-select"
+              @change="load"
             >
-              No documents found.
-            </td>
-          </tr>
-        </tbody>
-      </table>
+              <option value="">All</option>
+              <option
+                v-for="type in documentTypes"
+                :key="type.doc_type"
+                :value="type.doc_type"
+              >{{ type.name }}</option>
+            </select>
+          </label>
+          <label class="toolbar-field toolbar-field--grow">
+            <span>Title</span>
+            <input
+              v-model="titleFilter"
+              class="toolbar-input"
+              type="text"
+              placeholder="Filter by title..."
+            >
+          </label>
+        </div>
+
+        <div
+          v-if="loading"
+          class="state-msg"
+        >
+          Loading…
+        </div>
+        <div
+          v-else-if="error"
+          class="state-msg state-msg--error"
+        >
+          {{ error }}
+        </div>
+
+        <div
+          v-else
+          class="card table-card"
+        >
+          <div class="result-count">
+            {{ filteredItems.length }} document{{ filteredItems.length === 1 ? '' : 's' }}
+          </div>
+          <table class="documents-table">
+            <thead>
+              <tr>
+                <th>Title</th>
+                <th>Type</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr
+                v-for="doc in filteredItems"
+                :key="doc.artifact_id"
+              >
+                <td>
+                  <RouterLink :to="`/documents/${doc.artifact_id}`">
+                    {{ doc.title }}
+                  </RouterLink>
+                </td>
+                <td><span class="doc-type">{{ doc.doc_type }}</span></td>
+                <td>
+                  <span
+                    class="status-badge"
+                    :class="`status--${doc.status}`"
+                  >{{ doc.status }}</span>
+                </td>
+              </tr>
+              <tr v-if="!filteredItems.length">
+                <td
+                  colspan="3"
+                  class="empty-row"
+                >
+                  <template v-if="activeGroup">
+                    No documents in "{{ groupOptions.find(g => g.slug === activeGroup)?.name ?? activeGroup }}" yet.
+                  </template>
+                  <template v-else>
+                    No documents found.
+                  </template>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
     </div>
   </div>
 </template>
 
 <style scoped>
 .documents-page { max-width: 1100px; margin: 0 auto; }
+.layout { display: flex; gap: 24px; }
+.sidebar { width: 190px; flex-shrink: 0; }
+.sidebar-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; }
+.sidebar-title { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .05em; color: #6b7280; }
+.manage-link { font-size: 14px; color: #9ca3af; text-decoration: none; }
+.manage-link:hover { color: #374151; }
+.content { flex: 1; min-width: 0; }
 .page-header { display: flex; justify-content: space-between; gap: 16px; align-items: flex-start; margin-bottom: 20px; }
 .page-title { font-size: 22px; font-weight: 600; margin-bottom: 4px; }
 .page-subtitle { color: #64748b; font-size: 13px; max-width: 720px; }

@@ -3,8 +3,9 @@ from pathlib import Path
 
 from src.application.entity_type_predicates import is_internal_entity_type
 from src.application.modeling.artifact_write import format_entity_markdown, generate_entity_id
+from src.application.repo_path_helpers import model_root_legacy
 from src.application.verification.artifact_verifier import ArtifactVerifier
-from src.config.repo_paths import MODEL
+from src.domain.groups import UNCATEGORIZED
 from src.domain.module_types import EntityTypeName
 from src.domain.ontology_types import EntityTypeInfo
 
@@ -30,8 +31,15 @@ def verification_to_entity_dict(path: Path, res) -> dict[str, object]:
     }
 
 
-def entity_path(repo_root: Path, info: EntityTypeInfo, eid: str) -> Path:
-    return repo_root / MODEL / Path(*info.hierarchy) / f"{eid}.md"
+def entity_path(repo_root: Path, info: EntityTypeInfo, eid: str, group: str = UNCATEGORIZED) -> Path:
+    """Return the target path for an entity file.
+
+    Legacy (uncategorized) : <repo>/model/<domain>/<type>/<id>.md
+    Group-aware (target)   : <repo>/projects/<group>/model/<domain>/<type>/<id>.md
+    """
+    if group == UNCATEGORIZED:
+        return model_root_legacy(repo_root) / Path(*info.hierarchy) / f"{eid}.md"
+    return repo_root / "projects" / group / "model" / Path(*info.hierarchy) / f"{eid}.md"
 
 
 def _alias_for(info: EntityTypeInfo, eid: str) -> str:
@@ -64,6 +72,7 @@ def create_entity(
     status: str,
     last_updated: str | None,
     dry_run: bool,
+    group: str = UNCATEGORIZED,
 ) -> WriteResult:
     assert_engagement_write_root(repo_root)
 
@@ -89,7 +98,7 @@ def create_entity(
         eid = ensure_unique_entity_random_part(eid, artifact_type, repo, info.prefix, name)
     except ValueError as e:
         error_msg = str(e)
-        path = entity_path(repo_root, info, eid)
+        path = entity_path(repo_root, info, eid, group)
         return WriteResult(
             wrote=False,
             path=path,
@@ -114,7 +123,7 @@ def create_entity(
         validate_entity_unique(repo, artifact_type, friendly_slug)
     except ValueError as e:
         error_msg = str(e)
-        path = entity_path(repo_root, info, eid)
+        path = entity_path(repo_root, info, eid, group)
         return WriteResult(
             wrote=False,
             path=path,

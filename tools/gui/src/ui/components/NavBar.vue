@@ -230,24 +230,24 @@ const hitTypeLabel = (hit: SearchDropdownHit) => (hit.artifact_type || hit.recor
 .nav { display: flex; align-items: center; gap: 20px; padding: 0 24px; height: 48px; background: #1e293b; color: #f8fafc; position: sticky; top: 0; z-index: 10; }
 .nav__brand { font-weight: 600; font-size: 15px; color: #f8fafc; white-space: nowrap; flex-shrink: 0; }
 .nav__brand:hover { text-decoration: none; color: #93c5fd; }
-.nav__sections { display: flex; align-items: center; gap: 0; flex: 1; }
-.nav__section { display: flex; align-items: center; gap: 8px; }
-.nav__section-label { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .07em; color: #64748b; white-space: nowrap; padding: 0 4px; }
+.nav__sections { display: flex; align-items: center; gap: 0; flex: 1; min-width: 0; overflow: hidden; }
+.nav__section { display: flex; align-items: center; gap: 8px; flex-shrink: 1; min-width: 0; }
+.nav__section-label { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .07em; color: #64748b; white-space: nowrap; padding: 0 4px; flex-shrink: 0; }
 .nav__section-label--global { color: #f59e0b; }
-.nav__divider { width: 1px; height: 20px; background: #334155; margin: 0 12px; }
-.nav__links { display: flex; gap: 4px; }
-.nav__links a { color: #b0bec5; font-size: 13px; padding: 4px 8px; border-radius: 4px; }
+.nav__divider { width: 1px; height: 20px; background: #334155; margin: 0 12px; flex-shrink: 0; }
+.nav__links { display: flex; gap: 4px; flex-wrap: nowrap; min-width: 0; overflow: hidden; }
+.nav__links a { color: #b0bec5; font-size: 13px; padding: 4px 8px; border-radius: 4px; white-space: nowrap; }
 .nav__links a.router-link-active { color: #f8fafc; font-weight: 500; background: #2d3f55; }
 .nav__links a:hover { color: #f1f5f9; text-decoration: none; background: #263347; }
 .nav__promote { color: #fbbf24 !important; }
 .nav__promote:hover { color: #f59e0b !important; }
-.nav__save-btn { background: #166534; color: #bbf7d0; border: none; border-radius: 4px; font-size: 12px; font-weight: 600; padding: 3px 9px; cursor: pointer; white-space: nowrap; }
+.nav__save-btn { background: #166534; color: #bbf7d0; border: none; border-radius: 4px; font-size: 12px; font-weight: 600; padding: 3px 9px; cursor: pointer; white-space: nowrap; flex-shrink: 0; }
 .nav__save-btn:hover:not(:disabled) { background: #15803d; }
 .nav__save-btn:disabled { cursor: not-allowed; }
 .nav__save-btn--clean { background: #1e3a2a; color: #4b7a5c; opacity: 0.6; }
 .nav__save-btn--global { background: #78350f; color: #fde68a; }
 .nav__save-btn--global:hover:not(:disabled) { background: #92400e; }
-.nav__action-btn { background: transparent; color: #93c5fd; border: 1px solid #475569; border-radius: 4px; font-size: 12px; padding: 3px 9px; cursor: pointer; white-space: nowrap; }
+.nav__action-btn { background: transparent; color: #93c5fd; border: 1px solid #475569; border-radius: 4px; font-size: 12px; padding: 3px 9px; cursor: pointer; white-space: nowrap; flex-shrink: 0; }
 .nav__action-btn:hover { background: #263347; }
 .nav__action-btn--warn { color: #fca5a5; border-color: #7f1d1d; }
 .nav__action-btn--warn:hover { background: #450a0a; }
@@ -265,4 +265,13 @@ const hitTypeLabel = (hit: SearchDropdownHit) => (hit.artifact_type || hit.recor
 .nav__search-item-glyph { flex-shrink: 0; color: #6b7280; margin-top: 1px; }
 .nav__search-item-name { flex: 1; font-weight: 500; }
 .nav__search-item-type { font-size: 11px; color: #64748b; white-space: nowrap; flex-shrink: 0; }
+@media (max-width: 1060px) {
+  .nav__section-label { display: none; }
+  .nav__divider { margin: 0 6px; }
+  .nav { gap: 12px; padding: 0 16px; }
+}
+@media (max-width: 820px) {
+  .nav__brand { font-size: 13px; }
+  .nav__search-input { width: clamp(80px, 12vw, 160px) !important; }
+}
 </style>

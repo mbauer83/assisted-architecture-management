@@ -30,12 +30,14 @@ def matches_entity(
     domain: str | None,
     subdomain: str | None,
     status: str | None,
+    group: str | None = None,
 ) -> bool:
     return (
         (artifact_type is None or rec.artifact_type == artifact_type)
         and (domain is None or rec.domain == domain)
         and (subdomain is None or rec.subdomain == subdomain)
         and (status is None or rec.status == status)
+        and (group is None or rec.group == group)
     )
 
 
@@ -46,17 +48,29 @@ def matches_connection(
     source: str | None,
     target: str | None,
     status: str | None,
+    group: str | None = None,
 ) -> bool:
     return (
         (conn_type is None or rec.conn_type == conn_type)
         and (source is None or source in rec.source_ids)
         and (target is None or target in rec.target_ids)
         and (status is None or rec.status == status)
+        and (group is None or rec.group == group)
     )
 
 
-def matches_diagram(rec: DiagramRecord, *, diagram_type: str | None, status: str | None) -> bool:
-    return (diagram_type is None or rec.diagram_type == diagram_type) and (status is None or rec.status == status)
+def matches_diagram(
+    rec: DiagramRecord,
+    *,
+    diagram_type: str | None,
+    status: str | None,
+    group: str | None = None,
+) -> bool:
+    return (
+        (diagram_type is None or rec.diagram_type == diagram_type)
+        and (status is None or rec.status == status)
+        and (group is None or rec.group == group)
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -132,10 +146,12 @@ def single_or_none(value: str | list[str] | None) -> str | None:
 
 def summary_group_key(
     summary: ArtifactSummary,
-    group_by: Literal["artifact_type", "diagram_type", "domain"],
+    group_by: Literal["artifact_type", "diagram_type", "domain", "group"],
 ) -> str:
     if group_by == "artifact_type":
         return summary.artifact_type or _NONE_LABEL
+    if group_by == "group":
+        return summary.group or _NONE_LABEL
     return _NONE_LABEL
 
 
@@ -157,6 +173,7 @@ def read_entity(rec: EntityRecord, *, mode: Literal["summary", "full"]) -> dict[
         "path": str(rec.path),
         "content_snippet": rec.content_text[:400] + ("…" if len(rec.content_text) > 400 else ""),
         "keywords": list(rec.keywords),
+        "group": rec.group,
     }
     if rec.host_diagram_id is not None:
         data["host_diagram_id"] = rec.host_diagram_id
@@ -178,6 +195,7 @@ def read_connection(rec: ConnectionRecord, *, mode: Literal["summary", "full"]) 
         "record_type": "connection",
         "path": str(rec.path),
         "content_snippet": rec.content_text[:400] + ("…" if len(rec.content_text) > 400 else ""),
+        "group": rec.group,
     }
     if mode == "full":
         data["content_text"] = rec.content_text
@@ -196,6 +214,7 @@ def read_diagram(rec: DiagramRecord, *, mode: Literal["summary", "full"]) -> dic
         "record_type": "diagram",
         "path": str(rec.path),
         "content_snippet": "",
+        "group": rec.group,
     }
     if mode == "full":
         try:
@@ -223,6 +242,7 @@ def read_document(
         "keywords": list(rec.keywords),
         "sections": list(rec.sections),
         "content_snippet": rec.content_text[:400] + ("…" if len(rec.content_text) > 400 else ""),
+        "group": rec.group,
     }
     if mode == "full":
         if section:

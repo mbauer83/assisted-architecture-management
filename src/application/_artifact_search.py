@@ -30,7 +30,7 @@ _RecordType = Literal["entity", "connection", "diagram", "document"]
 
 def count_artifacts_by(
     store: ArtifactStorePort,
-    group_by: Literal["artifact_type", "diagram_type", "domain"],
+    group_by: Literal["artifact_type", "diagram_type", "domain", "group"],
     *,
     artifact_type: str | list[str] | None = None,
     domain: str | list[str] | None = None,
@@ -53,6 +53,15 @@ def count_artifacts_by(
             key = ent.domain or _NONE_LABEL
             counts[key] = counts.get(key, 0) + 1
         return dict(sorted(counts.items()))
+    if group_by == "group":
+        result: dict[str, int] = {}
+        for ent in store.list_entities(artifact_type=_single_or_none(artifact_type), status=_single_or_none(status)):
+            result[f"entities/{ent.group}"] = result.get(f"entities/{ent.group}", 0) + 1
+        for diag in store.list_diagrams(status=_single_or_none(status)):
+            result[f"diagrams/{diag.group}"] = result.get(f"diagrams/{diag.group}", 0) + 1
+        for doc in store.list_documents(status=_single_or_none(status)):
+            result[f"documents/{doc.group}"] = result.get(f"documents/{doc.group}", 0) + 1
+        return dict(sorted(result.items()))
     for summary in store.list_artifacts(
         artifact_type=artifact_type,
         domain=domain,

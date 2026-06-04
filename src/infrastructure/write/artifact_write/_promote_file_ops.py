@@ -26,6 +26,14 @@ def make_target_resolver(
     return resolve
 
 
+def _remap_entity_rel(rel: Path, group_remap: dict[str, str]) -> Path:
+    """Rewrite projects/<old_slug>/... to projects/<new_slug>/... if slug is remapped."""
+    parts = rel.parts
+    if len(parts) >= 2 and parts[0] == "projects" and parts[1] in group_remap:
+        return Path("projects") / group_remap[parts[1]] / Path(*parts[2:])
+    return rel
+
+
 def copy_entity(
     eid: str,
     eng_root: Path,
@@ -36,12 +44,15 @@ def copy_entity(
     backups: list[Any],
     resolve_target: TargetResolver,
     conn_ids: Any,
+    group_slug_remap: dict[str, str] | None = None,
 ) -> None:
     src = registry.find_file_by_id(eid)
     if src is None:
         result.verification_errors.append(f"File not found for {eid}")
         return
     rel = src.relative_to(eng_root)
+    if group_slug_remap:
+        rel = _remap_entity_rel(rel, group_slug_remap)
     dest = ent_root / rel
     dest.parent.mkdir(parents=True, exist_ok=True)
     backups.append((dest, dest.read_bytes() if dest.exists() else None))
@@ -51,7 +62,10 @@ def copy_entity(
 
     outgoing = src.with_suffix(".outgoing.md")
     if outgoing.exists():
-        dest_out = ent_root / outgoing.relative_to(eng_root)
+        out_rel = outgoing.relative_to(eng_root)
+        if group_slug_remap:
+            out_rel = _remap_entity_rel(out_rel, group_slug_remap)
+        dest_out = ent_root / out_rel
         backups.append((dest_out, dest_out.read_bytes() if dest_out.exists() else None))
         dest_out.parent.mkdir(parents=True, exist_ok=True)
         dest_out.write_text(
@@ -64,7 +78,7 @@ def copy_entity(
             encoding="utf-8",
         )
         copied.append(dest_out)
-        result.copied_files.append(str(outgoing.relative_to(eng_root)))
+        result.copied_files.append(str(out_rel))
 
 
 def copy_simple(

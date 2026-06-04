@@ -42,6 +42,7 @@ export const EntitySummarySchema = Schema.Struct({
   conn_in: Schema.optional(Schema.Number),
   conn_sym: Schema.optional(Schema.Number),
   conn_out: Schema.optional(Schema.Number),
+  group: Schema.optional(Schema.String),
 })
 export type EntitySummary = typeof EntitySummarySchema.Type
 
@@ -197,6 +198,7 @@ export const DocumentSummarySchema = Schema.Struct({
   path: Schema.String,
   keywords: Schema.Array(Schema.String),
   sections: Schema.Array(Schema.String),
+  group: Schema.optional(Schema.String),
 })
 export type DocumentSummary = typeof DocumentSummarySchema.Type
 
@@ -282,6 +284,7 @@ export const DiagramSummarySchema = Schema.Struct({
   version: Schema.String,
   status: Schema.String,
   path: Schema.String,
+  group: Schema.optional(Schema.String),
 })
 export type DiagramSummary = typeof DiagramSummarySchema.Type
 
@@ -576,6 +579,15 @@ export const PromotionDiagramConflictSchema = Schema.Struct({
 })
 export type PromotionDiagramConflict = typeof PromotionDiagramConflictSchema.Type
 
+export const PromotionGroupMappingEntrySchema = Schema.Struct({
+  engagement_slug: Schema.String,
+  engagement_group_id: Schema.String,
+  match_status: Schema.Literal('matched_by_id', 'conflict', 'new'),
+  enterprise_slug: Schema.String,
+  enterprise_group_id: Schema.NullOr(Schema.String),
+})
+export type PromotionGroupMappingEntry = typeof PromotionGroupMappingEntrySchema.Type
+
 export const PromotionPlanSchema = Schema.Struct({
   entity_id: Schema.String,
   entities_to_add: Schema.Array(Schema.String),
@@ -588,6 +600,12 @@ export const PromotionPlanSchema = Schema.Struct({
   doc_conflicts: Schema.Array(PromotionDocumentConflictSchema),
   diagram_conflicts: Schema.Array(PromotionDiagramConflictSchema),
   schema_errors: Schema.Array(Schema.String),
+  group_mapping: Schema.optional(Schema.Array(PromotionGroupMappingEntrySchema)),
+  available_enterprise_groups: Schema.optional(Schema.Array(Schema.Struct({
+    slug: Schema.String,
+    id: Schema.String,
+    name: Schema.String,
+  }))),
 })
 export type PromotionPlan = typeof PromotionPlanSchema.Type
 
@@ -653,6 +671,28 @@ export const WriteHelpEntityTypeCatalogEntrySchema = Schema.Struct({
 })
 export type WriteHelpEntityTypeCatalogEntry =
   typeof WriteHelpEntityTypeCatalogEntrySchema.Type
+
+// ── Groups ────────────────────────────────────────────────────────────────────
+
+export const GroupEntrySchema = Schema.Struct({
+  slug: Schema.String,
+  id: Schema.String,
+  name: Schema.String,
+  description: Schema.optional(Schema.String),
+  order: Schema.optional(Schema.Number),
+  archived: Schema.optional(Schema.Boolean),
+  default: Schema.optional(Schema.Boolean),
+  meta_ontology: Schema.optional(Schema.String),
+  type_filter: Schema.optional(Schema.Array(Schema.String)),
+})
+export type GroupEntry = typeof GroupEntrySchema.Type
+
+export const GroupListSchema = Schema.Struct({
+  'model-projects': Schema.optional(Schema.Array(GroupEntrySchema)),
+  'diagram-collections': Schema.optional(Schema.Array(GroupEntrySchema)),
+  'document-collections': Schema.optional(Schema.Array(GroupEntrySchema)),
+})
+export type GroupList = typeof GroupListSchema.Type
 
 export const WriteHelpSchema = Schema.Struct({
   entity_types_by_domain: Schema.Record({

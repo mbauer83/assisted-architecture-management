@@ -35,6 +35,7 @@ def artifact_create_entity(
     artifact_id: str | None = None,
     version: str = "0.1.0",
     status: str = "draft",
+    group: str | None = None,
     from_diagram_element: dict[str, object] | None = None,
     dry_run: bool = True,
     repo_root: str | None = None,
@@ -82,6 +83,8 @@ def artifact_create_entity(
             "error": mat.error,
         }
 
+    from src.domain.groups import UNCATEGORIZED  # noqa: PLC0415
+
     result = artifact_write_ops.create_entity(
         repo_root=root,
         verifier=verifier_for(roots_key(roots), include_registry=False),
@@ -97,6 +100,7 @@ def artifact_create_entity(
         status=status,
         last_updated=None,
         dry_run=dry_run,
+        group=group or UNCATEGORIZED,
     )
     if result.wrote and not dry_run:
         mutation_context.finalize()
@@ -142,6 +146,7 @@ def register(mcp: FastMCP) -> None:
         description=(
             "Create a model entity file. Defaults to the engagement repo from arch-init workspace "
             "config (repo_root optional). dry_run=true validates without writing. "
+            "group: model-project slug to place the entity in (default: 'uncategorized'). "
             "from_diagram_element: {diagram_id, diagram_element_id, diagram_element_kind='entity', "
             "correspondence_kind_after='represents'} — when provided, atomically creates the entity "
             "and attaches a binding to the diagram element (materialization)."

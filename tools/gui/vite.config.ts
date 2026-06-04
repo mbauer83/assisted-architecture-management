@@ -7,6 +7,13 @@ export default defineConfig({
   plugins: [vue()],
   server: {
     proxy: {
+      // SSE: long-lived event stream — must NOT inherit the 10s timeout below,
+      // or the dev proxy severs it (ERR_EMPTY_RESPONSE + reconnect storm).
+      // Listed before '/api' so the more specific context matches first.
+      '/api/events': {
+        target: backendTarget,
+        changeOrigin: true,
+      },
       '/api': {
         target: backendTarget,
         changeOrigin: true,

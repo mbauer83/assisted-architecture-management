@@ -10,7 +10,8 @@ from src.application.modeling.artifact_write import (
 from src.application.modeling.artifact_write_layout import optimize_puml_layout
 from src.application.verification.artifact_verifier import ArtifactVerifier
 from src.application.verification.artifact_verifier_types import ENTITY_ID_RE
-from src.config.repo_paths import DIAGRAM_CATALOG, DIAGRAMS
+from src.application.repo_path_helpers import diagram_source_root
+from src.domain.groups import UNCATEGORIZED
 
 from ._artifact_deduplication import extract_friendly_slug, get_repository, validate_diagram_unique
 from .boundary import assert_engagement_write_root
@@ -58,6 +59,7 @@ def create_diagram(
     connection_inference: DiagramConnectionInferenceMode = "none",
     auto_include_stereotypes: bool = True,
     dry_run: bool,
+    group: str = UNCATEGORIZED,
 ) -> WriteResult:
     assert_engagement_write_root(repo_root)
 
@@ -136,7 +138,11 @@ def create_diagram(
         puml_body=puml_body,
     )
 
-    path = repo_root / DIAGRAM_CATALOG / DIAGRAMS / f"{effective_id}.puml"
+    diag_src_root = diagram_source_root(repo_root)
+    if group == UNCATEGORIZED:
+        path = diag_src_root / f"{effective_id}.puml"
+    else:
+        path = diag_src_root / group / f"{effective_id}.puml"
 
     friendly_slug = extract_friendly_slug(effective_id)
     repo = get_repository(repo_root)

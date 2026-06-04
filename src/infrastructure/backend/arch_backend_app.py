@@ -24,10 +24,11 @@ _REQUEST_SLOW_WARNING_S = 5.0
 _REQUEST_THREAD_DUMP_S = 20.0
 
 if TYPE_CHECKING:
+    from src.infrastructure.git.git_auth import GitCredentials
     from src.infrastructure.git.git_sync import RepoSpec
 
 
-def _find_git_repos() -> "list[RepoSpec]":
+def find_git_repos() -> "list[RepoSpec]":
     """Return git-backed repos from arch-workspace.yaml, tagged with their role."""
     from src.config.workspace_paths import find_workspace_config, parse_workspace_config
     from src.infrastructure.git.git_sync import RepoSpec
@@ -102,7 +103,7 @@ def _log_structured_output_tool_inventory() -> None:
         )
 
 
-def _build_app(git_ssh_passphrase: str | None = None):  # type: ignore[no-untyped-def]
+def _build_app(credentials: "GitCredentials | None" = None):  # type: ignore[no-untyped-def]
     from fastapi import FastAPI, Request
     from fastapi.middleware.cors import CORSMiddleware
     from fastapi.staticfiles import StaticFiles
@@ -115,6 +116,7 @@ def _build_app(git_ssh_passphrase: str | None = None):  # type: ignore[no-untype
     from src.infrastructure.gui.routers.documents import router as documents_router
     from src.infrastructure.gui.routers.entities import router as entities_router
     from src.infrastructure.gui.routers.events import router as events_router
+    from src.infrastructure.gui.routers.groups import router as groups_router
     from src.infrastructure.gui.routers.promote import router as promote_router
     from src.infrastructure.gui.routers.sync import router as sync_router
 
@@ -154,7 +156,7 @@ def _build_app(git_ssh_passphrase: str | None = None):  # type: ignore[no-untype
             logger.info("Default watcher auto-started")
             _log_structured_output_tool_inventory()
 
-            git_repos = _find_git_repos()
+            git_repos = find_git_repos()
             sync_mgr = None
             if git_repos:
                 from src.infrastructure.git.git_sync import GitSyncManager
@@ -165,7 +167,7 @@ def _build_app(git_ssh_passphrase: str | None = None):  # type: ignore[no-untype
                 )
                 sync_mgr = GitSyncManager(
                     git_repos,
-                    ssh_passphrase=git_ssh_passphrase,
+                    credentials=credentials,
                     on_repo_changed=_on_repo_changed,
                 )
                 await sync_mgr.start()
@@ -262,6 +264,7 @@ def _build_app(git_ssh_passphrase: str | None = None):  # type: ignore[no-untype
     app.include_router(diagram_types_router)
     app.include_router(diagrams_router)
     app.include_router(documents_router)
+    app.include_router(groups_router)
     app.include_router(promote_router)
     app.include_router(sync_router)
     app.include_router(admin_router)

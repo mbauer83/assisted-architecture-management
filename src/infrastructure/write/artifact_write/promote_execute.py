@@ -7,7 +7,6 @@ from typing import Any
 
 from src.application.artifact_query import ArtifactRepository
 from src.application.verification.artifact_verifier import ArtifactRegistry, ArtifactVerifier
-from src.config.repo_paths import MODEL
 from src.infrastructure.artifact_index import shared_artifact_index
 from src.infrastructure.write.artifact_write._promote_conflicts import build_handler
 from src.infrastructure.write.artifact_write._promote_file_ops import (
@@ -33,6 +32,7 @@ def execute_promotion(
     registry: ArtifactRegistry,
     *,
     conflict_resolutions: list[ConflictResolution] | None = None,
+    group_mapping_resolutions: dict[str, str] | None = None,
 ) -> PromotionResult:
     result = PromotionResult(plan=plan, executed=False)
     if plan.schema_errors:
@@ -49,6 +49,7 @@ def execute_promotion(
     resolve_target = make_target_resolver(gar_map, promoted_ids, registry.enterprise_entity_ids())
     conn_ids = set(plan.connection_ids)
     resolutions = {r.engagement_id: r for r in (conflict_resolutions or [])}
+    slug_remap = group_mapping_resolutions or {}
 
     try:
         for eid in plan.entities_to_add:
@@ -62,6 +63,7 @@ def execute_promotion(
                 ent_backups,
                 resolve_target,
                 conn_ids,
+                group_slug_remap=slug_remap or None,
             )
 
         for conflict in plan.conflicts:
@@ -127,6 +129,13 @@ def execute_promotion(
             rollback(ent_copied, ent_backups)
             result.rolled_back = True
             return result
+
+        if plan.group_mapping and slug_remap is not None:
+            from src.infrastructure.write.artifact_write._promote_groups import (
+                update_enterprise_groups,  # noqa: PLC0415
+            )
+
+            update_enterprise_groups(enterprise_root, engagement_root, plan.group_mapping, slug_remap)
 
         result.executed = True
 

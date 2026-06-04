@@ -61,8 +61,12 @@ def _rendered_name(d: DiagramRecord, suffix: str) -> str | None:
 
 
 @router.get("/api/diagrams")
-def list_diagrams(diagram_type: str | None = None, status: str | None = None) -> dict[str, Any]:
-    diagrams = s.get_repo().list_diagrams(diagram_type=diagram_type, status=status)
+def list_diagrams(
+    diagram_type: str | None = None,
+    status: str | None = None,
+    group: str | None = None,
+) -> dict[str, Any]:
+    diagrams = s.get_repo().list_diagrams(diagram_type=diagram_type, status=status, group=group)
     return {"total": len(diagrams), "items": [s.diagram_to_summary(d) for d in diagrams]}
 
 

@@ -226,7 +226,10 @@ onUnmounted(() => {
           :plan="workflow.planQuery.data.value ?? null"
           :strategies="workflow.conflictStrategies.value"
           :unresolved-count="workflow.unresolvedConflicts.value.length"
+          :group-mapping-resolutions="workflow.groupMappingResolutions.value"
+          :unresolved-group-conflict-count="workflow.unresolvedGroupConflicts.value.length"
           @set-strategy="workflow.setConflictStrategy"
+          @set-group-mapping="workflow.setGroupMapping"
         />
       </div>
     </template>

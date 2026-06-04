@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { PromotionPlan } from '../../domain'
+import type { PromotionGroupMappingEntry, PromotionPlan } from '../../domain'
 import type { ConflictStrategy } from '../composables/promotionShared'
 
 const props = defineProps<{
@@ -8,10 +8,13 @@ const props = defineProps<{
   plan: PromotionPlan | null
   strategies: Record<string, ConflictStrategy>
   unresolvedCount: number
+  groupMappingResolutions: Record<string, string>
+  unresolvedGroupConflictCount: number
 }>()
 
 const emit = defineEmits<{
   setStrategy: [artifactId: string, strategy: ConflictStrategy]
+  setGroupMapping: [engagementSlug: string, enterpriseSlug: string]
 }>()
 
 const strategyOptions = [
@@ -21,6 +24,12 @@ const strategyOptions = [
 
 const updateStrategy = (artifactId: string, event: Event) => {
   emit('setStrategy', artifactId, (event.target as HTMLInputElement).value as ConflictStrategy)
+}
+
+const matchStatusLabel = (entry: PromotionGroupMappingEntry): string => {
+  if (entry.match_status === 'matched_by_id') return '✓ Matched'
+  if (entry.match_status === 'conflict') return '⚠ Conflict'
+  return '+ New'
 }
 </script>
 
@@ -187,6 +196,57 @@ const updateStrategy = (artifactId: string, event: Event) => {
         {{ props.unresolvedCount }} conflict{{ props.unresolvedCount > 1 ? 's' : '' }}
         still need{{ props.unresolvedCount === 1 ? 's' : '' }} a resolution strategy.
       </div>
+
+      <section
+        v-if="(props.plan?.group_mapping ?? []).length"
+        class="section"
+      >
+        <h3 class="section-title">
+          Model-Project Mapping
+        </h3>
+        <p class="group-map-hint">
+          Each engagement model-project will be mapped to an enterprise group.
+        </p>
+        <div
+          v-for="entry in props.plan?.group_mapping ?? []"
+          :key="entry.engagement_slug"
+          class="group-map-row"
+          :class="`group-map-row--${entry.match_status}`"
+        >
+          <span class="group-map-badge">{{ matchStatusLabel(entry) }}</span>
+          <span class="group-map-eng mono">{{ entry.engagement_slug }}</span>
+          <span class="group-map-arrow">→</span>
+          <span
+            v-if="entry.match_status === 'matched_by_id'"
+            class="group-map-ent mono"
+          >{{ entry.enterprise_slug }}</span>
+          <select
+            v-else
+            class="group-map-sel"
+            :value="props.groupMappingResolutions[entry.engagement_slug] ?? entry.enterprise_slug"
+            @change="emit('setGroupMapping', entry.engagement_slug, ($event.target as HTMLSelectElement).value)"
+          >
+            <option
+              v-for="g in (props.plan?.available_enterprise_groups ?? [])"
+              :key="g.slug"
+              :value="g.slug"
+            >
+              {{ g.name }} ({{ g.slug }})
+            </option>
+            <option :value="entry.engagement_slug">
+              + Create new: {{ entry.engagement_slug }}
+            </option>
+          </select>
+        </div>
+      </section>
+
+      <div
+        v-if="props.unresolvedGroupConflictCount"
+        class="warn-banner"
+      >
+        {{ props.unresolvedGroupConflictCount }} group conflict{{ props.unresolvedGroupConflictCount > 1 ? 's' : '' }}
+        still need{{ props.unresolvedGroupConflictCount === 1 ? 's' : '' }} a mapping.
+      </div>
     </template>
   </div>
 </template>
@@ -216,4 +276,15 @@ const updateStrategy = (artifactId: string, event: Event) => {
 .state-msg { font-size: 13px; color: #6b7280; }
 .error-msg { margin-top: 12px; color: #dc2626; font-size: 13px; white-space: pre-wrap; }
 .mono { font-family: monospace; font-size: 12px; }
+.group-map-hint { font-size: 12px; color: #6b7280; margin-bottom: 8px; }
+.group-map-row { display: flex; align-items: center; gap: 8px; padding: 6px 10px; border-radius: 6px; margin-bottom: 4px; background: #f8fafc; border: 1px solid #e2e8f0; font-size: 13px; }
+.group-map-row--conflict { background: #fffbeb; border-color: #fde68a; }
+.group-map-badge { font-size: 11px; font-weight: 600; padding: 2px 6px; border-radius: 4px; white-space: nowrap; background: #e2e8f0; color: #334155; }
+.group-map-row--matched_by_id .group-map-badge { background: #dcfce7; color: #166534; }
+.group-map-row--conflict .group-map-badge { background: #fef3c7; color: #92400e; }
+.group-map-row--new .group-map-badge { background: #dbeafe; color: #1e40af; }
+.group-map-eng { flex: 0 0 auto; }
+.group-map-arrow { color: #9ca3af; }
+.group-map-ent { color: #374151; }
+.group-map-sel { font-size: 12px; border: 1px solid #d1d5db; border-radius: 4px; padding: 2px 6px; background: white; cursor: pointer; flex: 1; min-width: 0; }
 </style>

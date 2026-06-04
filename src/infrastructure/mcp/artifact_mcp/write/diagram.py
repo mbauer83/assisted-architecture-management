@@ -76,6 +76,7 @@ def artifact_create_diagram(
     bindings: list[dict[str, object]] | None = None,
     version: str = "0.1.0",
     status: str = "draft",
+    group: str | None = None,
     connection_inference: DiagramConnectionInferenceMode = "none",
     auto_include_stereotypes: bool = True,
     dry_run: bool = True,
@@ -124,6 +125,8 @@ def artifact_create_diagram(
     )
     key = roots_key(roots)
     mutation_context, clear_repo_caches = authoritative_callbacks_for(roots)
+    from src.domain.groups import UNCATEGORIZED  # noqa: PLC0415
+
     result = artifact_write_ops.create_diagram(
         repo_root=roots[0],
         verifier=verifier_for(key, include_registry=True),
@@ -145,6 +148,7 @@ def artifact_create_diagram(
         connection_inference=connection_inference,
         auto_include_stereotypes=auto_include_stereotypes,
         dry_run=dry_run,
+        group=group or UNCATEGORIZED,
     )
     if result.wrote and not dry_run:
         mutation_context.finalize()

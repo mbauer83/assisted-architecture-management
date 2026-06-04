@@ -87,8 +87,14 @@ class ArtifactRepository:
     def get_document(self, artifact_id: str) -> DocumentRecord | None:
         return self._store.get_document(artifact_id)
 
-    def list_documents(self, *, doc_type: str | None = None, status: str | None = None) -> list[DocumentRecord]:
-        return self._store.list_documents(doc_type=doc_type, status=status)
+    def list_documents(
+        self,
+        *,
+        doc_type: str | None = None,
+        status: str | None = None,
+        group: str | None = None,
+    ) -> list[DocumentRecord]:
+        return self._store.list_documents(doc_type=doc_type, status=status, group=group)
 
     def list_entities(
         self,
@@ -97,12 +103,14 @@ class ArtifactRepository:
         domain: str | None = None,
         subdomain: str | None = None,
         status: str | None = None,
+        group: str | None = None,
     ) -> list[EntityRecord]:
         return self._store.list_entities(
             artifact_type=artifact_type,
             domain=domain,
             subdomain=subdomain,
             status=status,
+            group=group,
         )
 
     def list_connections(
@@ -112,11 +120,18 @@ class ArtifactRepository:
         source: str | None = None,
         target: str | None = None,
         status: str | None = None,
+        group: str | None = None,
     ) -> list[ConnectionRecord]:
-        return self._store.list_connections(conn_type=conn_type, source=source, target=target, status=status)
+        return self._store.list_connections(conn_type=conn_type, source=source, target=target, status=status, group=group)
 
-    def list_diagrams(self, *, diagram_type: str | None = None, status: str | None = None) -> list[DiagramRecord]:
-        return self._store.list_diagrams(diagram_type=diagram_type, status=status)
+    def list_diagrams(
+        self,
+        *,
+        diagram_type: str | None = None,
+        status: str | None = None,
+        group: str | None = None,
+    ) -> list[DiagramRecord]:
+        return self._store.list_diagrams(diagram_type=diagram_type, status=status, group=group)
 
     def list_artifacts(
         self,
@@ -193,7 +208,7 @@ class ArtifactRepository:
 
     def count_artifacts_by(
         self,
-        group_by: Literal["artifact_type", "diagram_type", "domain"],
+        group_by: Literal["artifact_type", "diagram_type", "domain", "group"],
         *,
         artifact_type: str | list[str] | None = None,
         domain: str | list[str] | None = None,

@@ -50,13 +50,16 @@ from src.infrastructure.workspace.engagement_repo_template import create_engagem
 # ---------------------------------------------------------------------------
 
 
-def _run_git(args: list[str], cwd: Path | None = None) -> subprocess.CompletedProcess[str]:
+def _run_git(
+    args: list[str], cwd: Path | None = None, env: dict[str, str] | None = None
+) -> subprocess.CompletedProcess[str]:
     return subprocess.run(
         ["git", *args],
         cwd=cwd,
         capture_output=True,
         text=True,
         timeout=120,
+        env=env,
     )
 
 
@@ -90,9 +93,9 @@ def _has_commits(repo: Path) -> bool:
     return r.returncode == 0
 
 
-def _clone(url: str, branch: str, dest: Path) -> None:
+def _clone(url: str, branch: str, dest: Path, env: dict[str, str] | None = None) -> None:
     dest.parent.mkdir(parents=True, exist_ok=True)
-    r = _run_git(["clone", "--branch", branch, url, str(dest)])
+    r = _run_git(["clone", "--branch", branch, url, str(dest)], env=env)
     if r.returncode != 0:
         raise SystemExit(f"ERROR: git clone failed for {url}\n{r.stderr.strip()}")
 
@@ -110,6 +113,7 @@ def _resolve_repo(
     allow_dirty_git_repo: bool = False,
     allow_dirty_uncommitted_git_repo: bool = False,
     initialize_if_empty: bool = False,
+    git_env: dict[str, str] | None = None,
 ) -> Path:
     """Resolve a repo spec to an absolute path, cloning if needed."""
     if "local" in spec:
@@ -178,7 +182,7 @@ def _resolve_repo(
                 )
             else:
                 print(f"  {label}: cloning {url} (branch={branch}) → {dest}")
-                _clone(url, branch, dest)
+                _clone(url, branch, dest, env=git_env)
 
         model_dir = dest / MODEL
         if not model_dir.is_dir():
@@ -245,6 +249,22 @@ def _write_state(
 
 
 # ---------------------------------------------------------------------------
+# Credential helpers
+# ---------------------------------------------------------------------------
+
+
+def _collect_init_credentials(cfg: dict) -> dict[str, str] | None:
+    """Probe remote URLs from the workspace config; prompt interactively for any needed credentials."""
+    from src.infrastructure.git.git_auth import build_git_env, collect_credentials, create_askpass_script
+
+    urls = [url for key in ("engagement", "enterprise") if (url := cfg.get(key, {}).get("git", {}).get("url"))]
+    if not urls:
+        return None
+    creds = collect_credentials(urls)  # type: ignore[arg-type]
+    return build_git_env(creds, create_askpass_script()) if creds else None
+
+
+# ---------------------------------------------------------------------------
 # CLI entry point
 # ---------------------------------------------------------------------------
 
@@ -289,17 +309,21 @@ def main(argv: list[str] | None = None) -> None:
 
     cfg = _parse_config(config_path)
 
+    git_env = _collect_init_credentials(cfg)
+
     engagement_root = _resolve_repo(
         "engagement",
         cfg["engagement"],
         workspace_root,
         initialize_if_empty=args.initialize_engagement_repo_if_empty,
+        git_env=git_env,
     )
     enterprise_root = _resolve_repo(
         "enterprise",
         cfg["enterprise"],
         workspace_root,
         initialize_if_empty=args.initialize_enterprise_repo_if_empty,
+        git_env=git_env,
     )
 
     state_path = _write_state(workspace_root, engagement_root, enterprise_root)

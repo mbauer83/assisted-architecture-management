@@ -41,11 +41,12 @@ def list_entities(
     artifact_type: str | None = None,
     status: str | None = None,
     scope: str | None = None,
+    group: str | None = None,
     limit: int = Query(default=200, le=1000),
     offset: int = 0,
 ) -> dict[str, Any]:
     repo = s.get_repo()
-    entities = repo.list_entities(domain=domain, artifact_type=artifact_type, status=status)
+    entities = repo.list_entities(domain=domain, artifact_type=artifact_type, status=status, group=group)
     if scope == "global":
         entities = [e for e in entities if s.is_global(e.path)]
     elif scope == "engagement":

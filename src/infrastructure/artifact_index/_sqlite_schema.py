@@ -13,7 +13,8 @@ CREATE TABLE IF NOT EXISTS entities (
     path TEXT NOT NULL, scope TEXT NOT NULL, keywords_json TEXT NOT NULL,
     extra_json TEXT NOT NULL, content_text TEXT NOT NULL,
     display_blocks_json TEXT NOT NULL, display_label TEXT NOT NULL, display_alias TEXT NOT NULL,
-    host_diagram_id TEXT
+    host_diagram_id TEXT,
+    group_name TEXT NOT NULL DEFAULT 'uncategorized'
 );
 CREATE TABLE IF NOT EXISTS connections (
     artifact_id TEXT PRIMARY KEY,
@@ -21,19 +22,22 @@ CREATE TABLE IF NOT EXISTS connections (
     version TEXT NOT NULL, status TEXT NOT NULL, path TEXT NOT NULL,
     scope TEXT NOT NULL, extra_json TEXT NOT NULL, content_text TEXT NOT NULL,
     associated_entities_json TEXT NOT NULL,
-    src_cardinality TEXT NOT NULL, tgt_cardinality TEXT NOT NULL
+    src_cardinality TEXT NOT NULL, tgt_cardinality TEXT NOT NULL,
+    group_name TEXT NOT NULL DEFAULT 'uncategorized'
 );
 CREATE TABLE IF NOT EXISTS diagrams (
     artifact_id TEXT PRIMARY KEY,
     artifact_type TEXT NOT NULL, name TEXT NOT NULL, diagram_type TEXT NOT NULL,
     version TEXT NOT NULL, status TEXT NOT NULL, path TEXT NOT NULL,
-    scope TEXT NOT NULL, extra_json TEXT NOT NULL
+    scope TEXT NOT NULL, extra_json TEXT NOT NULL,
+    group_name TEXT NOT NULL DEFAULT 'uncategorized'
 );
 CREATE TABLE IF NOT EXISTS documents (
     artifact_id TEXT PRIMARY KEY,
     doc_type TEXT NOT NULL, title TEXT NOT NULL, status TEXT NOT NULL,
     path TEXT NOT NULL, scope TEXT NOT NULL, keywords_json TEXT NOT NULL,
-    sections_json TEXT NOT NULL, content_text TEXT NOT NULL, extra_json TEXT NOT NULL
+    sections_json TEXT NOT NULL, content_text TEXT NOT NULL, extra_json TEXT NOT NULL,
+    group_name TEXT NOT NULL DEFAULT 'uncategorized'
 );
 CREATE TABLE IF NOT EXISTS entity_context_edges (
     entity_id TEXT NOT NULL, connection_id TEXT NOT NULL, direction_bucket TEXT NOT NULL,
@@ -59,15 +63,19 @@ CREATE TABLE IF NOT EXISTS entity_context_stats (
 CREATE INDEX IF NOT EXISTS idx_entities_type ON entities(artifact_type);
 CREATE INDEX IF NOT EXISTS idx_entities_domain ON entities(domain);
 CREATE INDEX IF NOT EXISTS idx_entities_status ON entities(status);
+CREATE INDEX IF NOT EXISTS idx_entities_group ON entities(group_name);
 CREATE INDEX IF NOT EXISTS idx_entities_host_diagram ON entities(host_diagram_id) WHERE host_diagram_id IS NOT NULL;
 CREATE INDEX IF NOT EXISTS idx_connections_source ON connections(source);
 CREATE INDEX IF NOT EXISTS idx_connections_target ON connections(target);
 CREATE INDEX IF NOT EXISTS idx_connections_type ON connections(conn_type);
 CREATE INDEX IF NOT EXISTS idx_connections_status ON connections(status);
+CREATE INDEX IF NOT EXISTS idx_connections_group ON connections(group_name);
 CREATE INDEX IF NOT EXISTS idx_diagrams_type ON diagrams(diagram_type);
 CREATE INDEX IF NOT EXISTS idx_diagrams_status ON diagrams(status);
+CREATE INDEX IF NOT EXISTS idx_diagrams_group ON diagrams(group_name);
 CREATE INDEX IF NOT EXISTS idx_documents_doc_type ON documents(doc_type);
 CREATE INDEX IF NOT EXISTS idx_documents_status ON documents(status);
+CREATE INDEX IF NOT EXISTS idx_documents_group ON documents(group_name);
 CREATE INDEX IF NOT EXISTS idx_entity_context_edges_entity
     ON entity_context_edges(entity_id, direction_bucket, connection_id);
 CREATE INDEX IF NOT EXISTS idx_entity_context_edges_other ON entity_context_edges(other_entity_id);

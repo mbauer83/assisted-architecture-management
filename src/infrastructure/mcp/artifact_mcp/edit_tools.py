@@ -65,6 +65,7 @@ def artifact_edit_entity(
     keywords: list[str] | None = None,
     version: str | None = None,
     status: str | None = None,
+    group: str | None = None,
     dry_run: bool = True,
     repo_root: str | None = None,
 ) -> dict[str, object]:
@@ -72,21 +73,13 @@ def artifact_edit_entity(
     registry = _require_registry(registry)
     mutation_context, clear_repo_caches = authoritative_callbacks_for(root)
 
-    kwargs: dict[str, Any] = {}
-    if name is not None:
-        kwargs["name"] = name
-    if summary is not None:
-        kwargs["summary"] = summary
-    if properties is not None:
-        kwargs["properties"] = properties
-    if notes is not None:
-        kwargs["notes"] = notes
-    if keywords is not None:
-        kwargs["keywords"] = keywords
-    if version is not None:
-        kwargs["version"] = version
-    if status is not None:
-        kwargs["status"] = status
+    kwargs: dict[str, Any] = {
+        k: v for k, v in (
+            ("name", name), ("summary", summary), ("properties", properties),
+            ("notes", notes), ("keywords", keywords), ("version", version),
+            ("status", status), ("group", group),
+        ) if v is not None
+    }
 
     result = artifact_write_ops.edit_entity(
         repo_root=root,
@@ -303,7 +296,8 @@ def register_edit_tools(mcp: FastMCP) -> None:
         title="Artifact Write: Edit Entity",
         description=(
             "Edit an existing entity. Pass only fields to change; omitted fields are preserved. "
-            "Supports name, summary, properties, notes, keywords, version, status. "
+            "Supports name, summary, properties, notes, keywords, version, status, "
+            "group (str|None — re-home to a different model-project slug). "
             "Bumps last-updated automatically. Regenerates macros if name changes."
         ),
         annotations=LOCAL_WRITE,

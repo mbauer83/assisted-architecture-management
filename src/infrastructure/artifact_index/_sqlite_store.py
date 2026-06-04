@@ -17,20 +17,20 @@ from ._sqlite_schema import FTS_SQL, SCHEMA_SQL
 _INS_ENTITY = (
     "INSERT INTO entities (artifact_id,artifact_type,name,version,status,domain,"
     "subdomain,path,scope,keywords_json,extra_json,content_text,"
-    "display_blocks_json,display_label,display_alias,host_diagram_id) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)"
+    "display_blocks_json,display_label,display_alias,host_diagram_id,group_name) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)"
 )
 _INS_CONNECTION = (
     "INSERT INTO connections (artifact_id,source,target,conn_type,version,status,"
     "path,scope,extra_json,content_text,associated_entities_json,"
-    "src_cardinality,tgt_cardinality) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)"
+    "src_cardinality,tgt_cardinality,group_name) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)"
 )
 _INS_DIAGRAM = (
     "INSERT INTO diagrams (artifact_id,artifact_type,name,diagram_type,version,"
-    "status,path,scope,extra_json) VALUES (?,?,?,?,?,?,?,?,?)"
+    "status,path,scope,extra_json,group_name) VALUES (?,?,?,?,?,?,?,?,?,?)"
 )
 _INS_DOCUMENT = (
     "INSERT INTO documents (artifact_id,doc_type,title,status,path,scope,"
-    "keywords_json,sections_json,content_text,extra_json) VALUES (?,?,?,?,?,?,?,?,?,?)"
+    "keywords_json,sections_json,content_text,extra_json,group_name) VALUES (?,?,?,?,?,?,?,?,?,?,?)"
 )
 _INS_EDGE = (
     "INSERT INTO entity_context_edges "
@@ -338,6 +338,7 @@ class _SqliteStore:
             r.display_label,
             r.display_alias,
             r.host_diagram_id,
+            r.group,
         )
 
     def _connection_row(self, r: ConnectionRecord) -> tuple[str, ...]:
@@ -355,6 +356,7 @@ class _SqliteStore:
             json.dumps(list(r.associated_entities)),
             r.src_cardinality,
             r.tgt_cardinality,
+            r.group,
         )
 
     def _diagram_row(self, r: DiagramRecord) -> tuple[str, ...]:
@@ -368,6 +370,7 @@ class _SqliteStore:
             str(r.path),
             self._scope(r.path),
             json.dumps(r.extra, sort_keys=True),
+            r.group,
         )
 
     def _document_row(self, r: DocumentRecord) -> tuple[str, ...]:
@@ -382,6 +385,7 @@ class _SqliteStore:
             json.dumps(list(r.sections)),
             r.content_text,
             json.dumps(r.extra, sort_keys=True),
+            r.group,
         )
 
     def _context_rows(self, rec: ConnectionRecord) -> list[tuple[str, ...]]:

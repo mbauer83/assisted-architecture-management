@@ -6,13 +6,12 @@ from pathlib import Path
 
 from src.application.modeling.artifact_write import format_entity_markdown, slugify
 from src.application.verification.artifact_verifier import ArtifactRegistry, ArtifactVerifier
-from src.config.repo_paths import MODEL
 from src.domain.module_types import EntityTypeName
 
 from ._artifact_deduplication import get_repository, validate_entity_unique
 from .boundary import assert_engagement_write_root, today_iso
 from .coerce import as_optional_str, as_optional_str_dict, as_optional_str_list
-from .entity import verification_to_entity_dict
+from .entity import entity_path, verification_to_entity_dict
 from .parse_existing import parse_entity_file
 from .types import WriteResult
 from .verify import verify_content_in_temp_path
@@ -41,14 +40,16 @@ def _rename_entity_identity(
             old_outgoing.unlink()
         changed_paths.extend([old_outgoing, new_outgoing])
 
-    for outgoing_path in (repo_root / MODEL).rglob("*.outgoing.md"):
-        if outgoing_path == new_outgoing:
-            continue
-        text = outgoing_path.read_text(encoding="utf-8")
-        if old_artifact_id not in text:
-            continue
-        outgoing_path.write_text(text.replace(old_artifact_id, new_artifact_id), encoding="utf-8")
-        changed_paths.append(outgoing_path)
+    from src.application.repo_path_helpers import all_model_roots  # noqa: PLC0415
+    for model_root in all_model_roots(repo_root):
+        for outgoing_path in model_root.rglob("*.outgoing.md"):
+            if outgoing_path == new_outgoing:
+                continue
+            text = outgoing_path.read_text(encoding="utf-8")
+            if old_artifact_id not in text:
+                continue
+            outgoing_path.write_text(text.replace(old_artifact_id, new_artifact_id), encoding="utf-8")
+            changed_paths.append(outgoing_path)
 
     return new_entity_file, changed_paths
 
@@ -67,6 +68,7 @@ def edit_entity(
     keywords: object = _UNSET,
     version: str | None = None,
     status: str | None = None,
+    group: str | None = None,
     dry_run: bool,
 ) -> WriteResult:
     """Edit an existing entity file by merging partial updates.
@@ -110,6 +112,16 @@ def edit_entity(
             repo = get_repository(repo_root)
             validate_entity_unique(repo, artifact_type, next_slug, exclude_artifact_id=artifact_id)
 
+    if group is not None:
+        from src.application.repo_path_helpers import group_fn_entity  # noqa: PLC0415
+        current_group = group_fn_entity(entity_file, repo_root)
+        if group != current_group:
+            from src.infrastructure.app_bootstrap import get_module_registry  # noqa: PLC0415
+            info = get_module_registry().get_entity_type(EntityTypeName(artifact_type))
+            new_path = entity_path(repo_root, info, effective_artifact_id, group)
+            new_path.parent.mkdir(parents=True, exist_ok=True)
+            target_entity_file = new_path
+
     # Update display block — keep existing content, update label if name changed
     display_content = parsed.display_content
     if name is not None and display_content:
@@ -144,14 +156,16 @@ def edit_entity(
             own_outgoing = entity_file.with_suffix(".outgoing.md")
             if own_outgoing.exists():
                 impacted += 1
-            for outgoing_path in (repo_root / MODEL).rglob("*.outgoing.md"):
-                if outgoing_path == own_outgoing:
-                    continue
-                try:
-                    if artifact_id in outgoing_path.read_text(encoding="utf-8"):
-                        impacted += 1
-                except OSError:
-                    continue
+            from src.application.repo_path_helpers import all_model_roots  # noqa: PLC0415
+            for _mr in all_model_roots(repo_root):
+                for outgoing_path in _mr.rglob("*.outgoing.md"):
+                    if outgoing_path == own_outgoing:
+                        continue
+                    try:
+                        if artifact_id in outgoing_path.read_text(encoding="utf-8"):
+                            impacted += 1
+                    except OSError:
+                        continue
             rename_summary.append(
                 f"Rename will update artifact-id to {effective_artifact_id} and rewrite {impacted} outgoing file(s)."
             )
@@ -178,12 +192,23 @@ def edit_entity(
     target_entity_file.write_text(content, encoding="utf-8")
     if target_entity_file != entity_file:
         entity_file.unlink()
-        target_entity_file, renamed_paths = _rename_entity_identity(
+        _, renamed_paths = _rename_entity_identity(
             entity_file=entity_file,
             repo_root=repo_root,
             old_artifact_id=artifact_id,
             new_artifact_id=effective_artifact_id,
         )
+        if target_entity_file.parent != entity_file.parent:
+            for outgoing_src in (
+                entity_file.with_suffix(".outgoing.md"),
+                entity_file.with_name(f"{effective_artifact_id}.outgoing.md"),
+            ):
+                if outgoing_src.exists():
+                    new_outgoing = target_entity_file.with_suffix(".outgoing.md")
+                    new_outgoing.parent.mkdir(parents=True, exist_ok=True)
+                    outgoing_src.rename(new_outgoing)
+                    renamed_paths.extend([outgoing_src, new_outgoing])
+                    break
         rename_summary.append(
             f"Renamed artifact-id to {effective_artifact_id} and updated {len(renamed_paths)} outgoing file(s)."
         )

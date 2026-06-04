@@ -55,6 +55,7 @@ class EntityRecord:
     display_alias: str
     host_diagram_id: str | None = None
     """None for model entities; the owning diagram's artifact_id for diagram-only entities."""
+    group: str = "uncategorized"
 
     def __str__(self) -> str:
         return (
@@ -78,6 +79,7 @@ class ConnectionRecord:
     associated_entities: tuple[str, ...] = field(default_factory=tuple)
     src_cardinality: str = ""
     tgt_cardinality: str = ""
+    group: str = "uncategorized"
 
     @property
     def source_ids(self) -> list[str]:
@@ -104,6 +106,7 @@ class DiagramRecord:
     status: str
     path: Path
     extra: dict[str, object]
+    group: str = "uncategorized"
 
     def __str__(self) -> str:
         return f"[{self.artifact_id}] {self.name}  ({self.diagram_type} · status={self.status})"
@@ -120,6 +123,7 @@ class DocumentRecord:
     sections: tuple[str, ...]  # heading text of ## sections, in order
     content_text: str
     extra: dict[str, object]  # frontmatter fields beyond standard ones
+    group: str = "uncategorized"
 
 
 def summary_from_document(rec: DocumentRecord) -> "ArtifactSummary":
@@ -131,6 +135,7 @@ def summary_from_document(rec: DocumentRecord) -> "ArtifactSummary":
         status=rec.status,
         record_type="document",
         path=rec.path,
+        group=rec.group,
     )
 
 
@@ -188,6 +193,7 @@ class ArtifactSummary:
     It has no standalone file. The ``path`` field points to the diagram file, not an entity
     file. To author or edit this entity, open the owning diagram.
     """
+    group: str = "uncategorized"
 
     def __str__(self) -> str:
         label = f" {self.name}" if self.name else ""
@@ -205,6 +211,7 @@ def summary_from_entity(rec: EntityRecord) -> ArtifactSummary:
         record_type="entity",
         path=rec.path,
         host_diagram_id=rec.host_diagram_id,
+        group=rec.group,
     )
 
 
@@ -217,6 +224,7 @@ def summary_from_connection(rec: ConnectionRecord) -> ArtifactSummary:
         status=rec.status,
         record_type="connection",
         path=rec.path,
+        group=rec.group,
     )
 
 
@@ -229,6 +237,7 @@ def summary_from_diagram(rec: DiagramRecord) -> ArtifactSummary:
         status=rec.status,
         record_type="diagram",
         path=rec.path,
+        group=rec.group,
     )
 
 

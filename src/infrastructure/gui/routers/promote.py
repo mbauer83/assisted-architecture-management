@@ -37,6 +37,7 @@ class PromotionExecuteBody(BaseModel):
     document_ids: list[str] = []
     diagram_ids: list[str] = []
     conflict_resolutions: list[ConflictResolutionBody] = []
+    group_mapping_resolutions: dict[str, str] = {}
     dry_run: bool = True
 
 
@@ -61,6 +62,8 @@ def promotion_plan(body: PromotionPlanBody) -> dict[str, Any]:
             exclude_connection_ids=set(body.exclude_connection_ids) or None,
             document_ids=body.document_ids or None,
             diagram_ids=body.diagram_ids or None,
+            engagement_root=eng_root,
+            enterprise_root=ent_root,
         )
     except ValueError as e:
         raise HTTPException(400, str(e))
@@ -105,6 +108,17 @@ def promotion_plan(body: PromotionPlanBody) -> dict[str, Any]:
         ],
         "warnings": plan.warnings,
         "schema_errors": plan.schema_errors,
+        "group_mapping": [
+            {
+                "engagement_slug": m.engagement_slug,
+                "engagement_group_id": m.engagement_group_id,
+                "match_status": m.match_status,
+                "enterprise_slug": m.enterprise_slug,
+                "enterprise_group_id": m.enterprise_group_id,
+            }
+            for m in plan.group_mapping
+        ],
+        "available_enterprise_groups": plan.available_enterprise_groups,
     }
 
 
@@ -130,6 +144,8 @@ def promotion_execute(body: PromotionExecuteBody) -> dict[str, Any]:
             exclude_connection_ids=set(body.exclude_connection_ids) or None,
             document_ids=body.document_ids or None,
             diagram_ids=body.diagram_ids or None,
+            engagement_root=eng_root,
+            enterprise_root=ent_root,
         )
     except ValueError as e:
         raise HTTPException(400, str(e))
@@ -162,6 +178,7 @@ def promotion_execute(body: PromotionExecuteBody) -> dict[str, Any]:
         ent_root,
         registry,
         conflict_resolutions=resolutions,
+        group_mapping_resolutions=body.group_mapping_resolutions or None,
     )
     if result.executed:
         repo.refresh()

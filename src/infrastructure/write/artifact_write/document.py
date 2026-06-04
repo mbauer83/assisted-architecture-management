@@ -7,6 +7,7 @@ from src.application.artifact_document_schema import get_document_schema, get_do
 from src.application.modeling.artifact_write import generate_entity_id
 from src.application.verification.artifact_verifier import ArtifactVerifier
 from src.config.repo_paths import DOCS
+from src.domain.groups import UNCATEGORIZED
 
 from ._artifact_deduplication import extract_friendly_slug, get_repository, validate_document_unique
 from .boundary import assert_engagement_write_root, today_iso
@@ -62,8 +63,13 @@ def _build_placeholder_body(required_sections: list[str]) -> str:
     return "\n".join(parts)
 
 
-def _doc_dir(repo_root: Path, doc_subdirectory: str) -> Path:
-    return repo_root / DOCS / Path(doc_subdirectory)
+def _doc_dir(repo_root: Path, doc_subdirectory: str, group: str = UNCATEGORIZED) -> Path:
+    from src.application.repo_path_helpers import docs_root  # noqa: PLC0415
+
+    base = docs_root(repo_root) / doc_subdirectory
+    if group == UNCATEGORIZED:
+        return base
+    return base / group
 
 
 def _verification_to_document_dict(path: Path, res) -> dict[str, object]:
@@ -96,6 +102,7 @@ def create_document(
     status: str,
     last_updated: str | None,
     dry_run: bool,
+    group: str = UNCATEGORIZED,
 ) -> WriteResult:
     assert_engagement_write_root(repo_root)
 
@@ -109,7 +116,7 @@ def create_document(
 
     last = last_updated or today_iso()
     doc_id = artifact_id or _generate_document_id(abbreviation, title)
-    doc_dir = _doc_dir(repo_root, doc_subdirectory)
+    doc_dir = _doc_dir(repo_root, doc_subdirectory, group)
     path = doc_dir / f"{doc_id}.md"
 
     friendly_slug = extract_friendly_slug(doc_id)

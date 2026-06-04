@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from dataclasses import replace
 from pathlib import Path
 from typing import TypeVar
 
@@ -11,7 +12,15 @@ from src.application.artifact_parsing import (
     parse_entity,
     parse_outgoing_file,
 )
-from src.config.repo_paths import DIAGRAM_CATALOG, DIAGRAMS, DOCS, MODEL, RENDERED
+from src.application.repo_path_helpers import (
+    all_model_roots,
+    diagram_source_root,
+    docs_root,
+    group_fn_diagram,
+    group_fn_document,
+    group_fn_entity,
+)
+from src.config.repo_paths import DOCS, MODEL, RENDERED
 from src.domain.artifact_types import (
     ConnectionRecord,
     DiagramRecord,
@@ -36,8 +45,19 @@ def mount_for_path(path: Path, mounts: list[RepoMount]) -> RepoMount | None:
 
 
 def model_root_for_path(path: Path, mounts: list[RepoMount]) -> Path | None:
+    """Return the nearest model root for path (supports both legacy and target layouts)."""
     mount = mount_for_path(path, mounts)
-    return None if mount is None else mount.root / MODEL
+    if mount is None:
+        return None
+    # Check target layout first: projects/<slug>/model/
+    for mroot in all_model_roots(mount.root):
+        try:
+            path.resolve().relative_to(mroot.resolve())
+            return mroot
+        except ValueError:
+            continue
+    # Fallback to legacy root
+    return mount.root / MODEL
 
 
 def is_diagram_source_path(path: Path, mounts: list[RepoMount]) -> bool:
@@ -85,34 +105,39 @@ def _insert_mounted(
 
 
 def scan_mount(mount: RepoMount, mem: _MemStore) -> None:
-    model_root = mount.root / MODEL
-    if model_root.exists():
+    repo_root = mount.root
+    for model_root in all_model_roots(repo_root):
         for path in sorted(model_root.rglob("*.md")):
             if not path.name.endswith(".outgoing.md"):
                 entity = parse_entity(path, model_root)
                 if entity is not None:
-                    _insert_mounted(entity, "entity", mount.root, mem.entities)
+                    grp = group_fn_entity(path, repo_root)
+                    _insert_mounted(replace(entity, group=grp), "entity", repo_root, mem.entities)
         for path in sorted(model_root.rglob("*.outgoing.md")):
             for conn in parse_outgoing_file(path):
-                _insert_mounted(conn, "connection", mount.root, mem.connections)
-    diagrams_root = mount.root / DIAGRAM_CATALOG / DIAGRAMS
-    if diagrams_root.exists():
+                grp = group_fn_entity(path, repo_root)
+                _insert_mounted(replace(conn, group=grp), "connection", repo_root, mem.connections)
+    diag_root = diagram_source_root(repo_root)
+    if diag_root.exists():
         for suffix in ("*.puml", "*.md"):
-            for path in sorted(diagrams_root.rglob(suffix)):
-                if path.parent.name != RENDERED:
+            for path in sorted(diag_root.rglob(suffix)):
+                if not path.resolve().is_relative_to((diag_root.parent / RENDERED).resolve()):
                     diag = parse_diagram(path)
                     if diag is not None:
-                        _insert_mounted(diag, "diagram", mount.root, mem.diagrams)
+                        grp = group_fn_diagram(path, repo_root)
+                        diag = replace(diag, group=grp)
+                        _insert_mounted(diag, "diagram", repo_root, mem.diagrams)
                         for de in _extract_diagram_entities(diag):
                             mem.entities[de.artifact_id] = de
                         for dc in _extract_diagram_connections(diag):
                             mem.connections[dc.artifact_id] = dc
-    docs_root = mount.root / DOCS
-    if docs_root.exists():
-        for path in sorted(docs_root.rglob("*.md")):
+    doc_root = docs_root(repo_root)
+    if doc_root.exists():
+        for path in sorted(doc_root.rglob("*.md")):
             doc = parse_document(path)
             if doc is not None:
-                _insert_mounted(doc, "document", mount.root, mem.documents)
+                grp = group_fn_document(path, repo_root)
+                _insert_mounted(replace(doc, group=grp), "document", repo_root, mem.documents)
 
 
 # ── Incremental updates ───────────────────────────────────────────────────────

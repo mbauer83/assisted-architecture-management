@@ -1,6 +1,6 @@
 import { computed, ref, watch, type Ref } from 'vue'
 import { Effect, Exit } from 'effect'
-import type { EntityContextConnection, EntityDisplayInfo, PromotionPlan, PromotionResult } from '../../domain'
+import type { EntityContextConnection, EntityDisplayInfo, PromotionGroupMappingEntry, PromotionPlan, PromotionResult } from '../../domain'
 import type { RepoError } from '../../ports/ModelRepository'
 import type { ModelService } from '../../application/ModelService'
 import { useMutation } from './useMutation'
@@ -30,6 +30,7 @@ export const usePromotionWorkflow = (
   const planQuery = useQuery<PromotionPlan, RepoError>()
   const executeMutation = useMutation<PromotionResult, RepoError>()
   const conflictStrategies = ref<Record<string, ConflictStrategy>>({})
+  const groupMappingResolutions = ref<Record<string, string>>({})
 
   const includedEntityIds = computed(() => new Set(includedEntities.value.map((entity) => entity.artifact_id)))
   const includedDocumentIds = computed(() => includedDocuments.value.map((document) => document.artifact_id))
@@ -51,6 +52,15 @@ export const usePromotionWorkflow = (
       nextStrategies[conflict.engagement_id] = conflictStrategies.value[conflict.engagement_id] ?? 'accept_enterprise'
     }
     conflictStrategies.value = nextStrategies
+
+    // Auto-initialize group mapping resolutions from the plan
+    const nextGroupMapping: Record<string, string> = {}
+    for (const entry of (newPlan.group_mapping ?? [])) {
+      // matched_by_id and new: use default enterprise_slug; conflict: preserve any existing choice
+      nextGroupMapping[entry.engagement_slug] =
+        groupMappingResolutions.value[entry.engagement_slug] ?? entry.enterprise_slug
+    }
+    groupMappingResolutions.value = nextGroupMapping
   })
 
   const executeError = computed(() => {
@@ -108,8 +118,19 @@ export const usePromotionWorkflow = (
       ...plan.diagram_conflicts.map((conflict) => conflict.engagement_id),
     ].filter((artifactId) => !conflictStrategies.value[artifactId])
   })
+  const unresolvedGroupConflicts = computed<PromotionGroupMappingEntry[]>(() => {
+    const plan = planQuery.data.value
+    if (!plan) return []
+    return (plan.group_mapping ?? []).filter(
+      (entry) => entry.match_status === 'conflict' && !groupMappingResolutions.value[entry.engagement_slug],
+    )
+  })
   const totalSelectedArtifacts = computed(() => includedEntities.value.length + includedDocuments.value.length + includedDiagrams.value.length)
-  const canExecute = computed(() => totalSelectedArtifacts.value > 0 && unresolvedConflicts.value.length === 0)
+  const canExecute = computed(
+    () => totalSelectedArtifacts.value > 0
+      && unresolvedConflicts.value.length === 0
+      && unresolvedGroupConflicts.value.length === 0,
+  )
   const promotionTargetCount = computed(() => {
     const plan = planQuery.data.value
     if (!plan) return 0
@@ -225,6 +246,7 @@ export const usePromotionWorkflow = (
         document_ids: includedDocuments.value.map((document) => document.artifact_id),
         diagram_ids: includedDiagrams.value.map((diagram) => diagram.artifact_id),
         conflict_resolutions: conflictResolutions,
+        group_mapping_resolutions: { ...groupMappingResolutions.value },
         dry_run: false,
       }))
       Exit.match(exit, {
@@ -237,6 +259,10 @@ export const usePromotionWorkflow = (
 
   const setConflictStrategy = (artifactId: string, strategy: ConflictStrategy) => {
     conflictStrategies.value = { ...conflictStrategies.value, [artifactId]: strategy }
+  }
+
+  const setGroupMapping = (engagementSlug: string, enterpriseSlug: string) => {
+    groupMappingResolutions.value = { ...groupMappingResolutions.value, [engagementSlug]: enterpriseSlug }
   }
 
   const startPromotion = async () => {
@@ -316,6 +342,9 @@ export const usePromotionWorkflow = (
       includedConnIds.value = next
       refreshPlan()
     },
+    groupMappingResolutions,
+    unresolvedGroupConflicts,
+    setGroupMapping,
     setConflictStrategy,
     selectRoot,
     addArtifact,
@@ -339,6 +368,7 @@ export const usePromotionWorkflow = (
       planQuery.reset()
       executeMutation.reset()
       conflictStrategies.value = {}
+      groupMappingResolutions.value = {}
     },
     initializeFromRoute,
     cleanup,

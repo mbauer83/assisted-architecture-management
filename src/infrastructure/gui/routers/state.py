@@ -118,6 +118,7 @@ def entity_to_summary(
         "subdomain": e.subdomain,
         "path": str(e.path),
         "is_global": is_global(e.path),
+        "group": e.group,
     }
     if conn_counts is not None:
         inc, sym, out = conn_counts.get(e.artifact_id, (0, 0, 0))
@@ -190,6 +191,7 @@ def diagram_to_summary(d: DiagramRecord) -> dict[str, Any]:
         "version": d.version,
         "status": d.status,
         "path": str(d.path),
+        "group": d.group,
     }
 
 
