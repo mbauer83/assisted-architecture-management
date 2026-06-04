@@ -140,3 +140,35 @@ class AssuranceArchive(Protocol):
     def list_baselines(self) -> list[dict[str, object]]: ...
 
     def head(self) -> dict[str, object] | None: ...
+
+
+@runtime_checkable
+class WORMAssuranceArchive(AssuranceArchive, Protocol):
+    """Extended archive port with WORM semantics, legal-hold, and crypto-shredding.
+
+    Opt-in for regulated deployments. The base AssuranceArchive stores records;
+    this port additionally supports per-subject envelope encryption, legal holds,
+    shredding (DEK destruction), and RFC 3161 timestamp tokens on sealed baselines.
+    """
+
+    def provision_subject_key(self, subject_id: str) -> str: ...
+
+    def encrypt_payload(self, subject_id: str, plaintext: str) -> str: ...
+
+    def decrypt_payload(self, subject_id: str, ciphertext_hex: str) -> str: ...
+
+    def shred_subject(self, subject_id: str, *, reason: str = "") -> dict[str, object]: ...
+
+    def set_legal_hold(
+        self,
+        baseline_id: str,
+        *,
+        held_by: str = "",
+        reason: str = "",
+    ) -> str: ...
+
+    def release_legal_hold(self, hold_id: str, *, released_by: str = "") -> None: ...
+
+    def list_legal_holds(self, *, active_only: bool = True) -> list[dict[str, object]]: ...
+
+    def add_timestamp_token(self, baseline_id: str, token_der_hex: str) -> None: ...

@@ -16,7 +16,8 @@ import time
 from pathlib import Path
 from typing import Any
 
-from src.infrastructure.assurance._schema import ASSURANCE_SCHEMA_SQL, SCHEMA_VERSION
+from src.infrastructure.assurance._id_utils import make_edge_id, make_node_id
+from src.infrastructure.assurance._schema import ASSURANCE_SCHEMA_MIGRATIONS, ASSURANCE_SCHEMA_SQL, SCHEMA_VERSION
 
 logger = logging.getLogger(__name__)
 
@@ -32,37 +33,6 @@ def _dict_row_factory(cursor: Any, row: Any) -> dict[str, object]:
 
 def _now_iso() -> str:
     return time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
-
-
-def _node_id(node_type: str, name: str) -> str:
-    import hashlib
-    import random
-    import string
-
-    prefix_map = {
-        "loss": "LSS",
-        "hazard": "HAZ",
-        "control-structure-node": "CSN",
-        "control-action": "CAC",
-        "unsafe-control-action": "UCA",
-        "assurance-constraint": "ACN",
-        "risk": "RSK",
-        "incident": "INC",
-        "corrective-action": "CRA",
-        "obligation": "OBL",
-    }
-    prefix = prefix_map.get(node_type, node_type[:3].upper())
-    epoch = int(time.time())
-    rand = "".join(random.choices(string.ascii_lowercase + string.digits, k=4))
-    slug = hashlib.md5(name.encode()).hexdigest()[:6]
-    return f"{prefix}@{epoch}.{rand}.{slug}"
-
-
-def _edge_id(source_id: str, target_id: str, conn_type: str) -> str:
-    import hashlib
-
-    raw = f"{source_id}--{target_id}--{conn_type}--{time.time()}"
-    return "EDG@" + hashlib.sha256(raw.encode()).hexdigest()[:12]
 
 
 class SQLCipherAssuranceStore:
@@ -91,6 +61,12 @@ class SQLCipherAssuranceStore:
         conn = sqlcipher3.connect(str(self._db_path))
         conn.execute(f"PRAGMA key = '{key}'")
         conn.executescript(ASSURANCE_SCHEMA_SQL)
+        for migration_sql in ASSURANCE_SCHEMA_MIGRATIONS:
+            try:
+                conn.execute(migration_sql)
+            except Exception as _exc:  # noqa: BLE001
+                if "duplicate column" not in str(_exc):
+                    raise
         conn.execute(
             "INSERT OR REPLACE INTO schema_meta(key, value) VALUES (?, ?)",
             ("schema_version", SCHEMA_VERSION),
@@ -165,7 +141,7 @@ class SQLCipherAssuranceStore:
         content: str = "",
     ) -> str:
         conn = self._require_unlocked()
-        node_id = _node_id(node_type, name)
+        node_id = make_node_id(node_type, name)
         now = _now_iso()
         conn.execute(
             """
@@ -246,7 +222,7 @@ class SQLCipherAssuranceStore:
         attributes: dict[str, object] | None = None,
     ) -> str:
         conn = self._require_unlocked()
-        edge_id = _edge_id(source_id, target_id, conn_type)
+        edge_id = make_edge_id(source_id, target_id, conn_type)
         now = _now_iso()
         conn.execute(
             "INSERT INTO assurance_edges (edge_id, source_id, target_id, conn_type, attributes_json, created_at) "

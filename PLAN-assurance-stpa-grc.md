@@ -1,6 +1,6 @@
 # PLAN — Assurance Capability: STPA / CAST / GRC
 
-> **Status — Phase 3 complete (2026-06-05). Phase 4 is next.**
+> **Status — Phase 4 complete (2026-06-05). Phase 5 is next.**
 > **All design decisions are locked** (§18 — no open items remain). **Canonical progress tracker = §24**
 > (phased checklist + per-phase Definitions of Done + status). When you pick this up: update the §24 tracker
 > and check `[x]` items as they complete; detailed specs (full `entities.yaml`, JSON schemas, port interfaces)
@@ -671,7 +671,7 @@ keep the top-of-file Status line in sync. Status values: ☐ not started · ◐ 
 | 1d | Minimal UI surfacing (module_class plumbing, discoverability) | ☑ done |
 | 2 | STPA (wizard, control-structure canvas, matrices, MCP, skill) | ☑ done |
 | 3 | CAST + GRC depth (register, dashboards) | ☑ done |
-| 4 | Storage breadth + governance depth (opt-in) | ☐ not started |
+| 4 | Storage breadth + governance depth (opt-in) | ☑ done |
 | 5 | Cybersecurity & supply-chain connectors (§27) | ☐ not started |
 | 6 | Assurance cases & polish (GSN/bowtie, dashboards) | ☐ not started |
 | 7 | Dogfood (model the system's own posture) | ☐ not started |
@@ -733,8 +733,8 @@ through one `arch-assurance` read + write MCP path; assurance excluded from mode
 
 **Phase 4 — Storage breadth + governance depth (opt-in).** DoD: a team can run PocketBase; regulated users
 can enable WORM/legal-hold + crypto-shredding.
-- [ ] PocketBase adapter (tool-managed sidecar option) + Supabase/private-git adapters behind the stable port.
-- [ ] WORM/object-lock archive targets, legal-hold, eIDAS-qualified timestamping, crypto-shredding (per-record keys).
+- [x] PocketBase adapter (HTTP-based, collections-backed, parameterized filters, `pocketbase-init`/`pocketbase-status` CLI) + private-git adapter behind the stable port.
+- [x] WORM/legal-hold + crypto-shredding (per-subject AES-256-GCM DEK, legal-hold registry, shred operation) + eIDAS-qualified timestamping (RFC 3161 opt-in, manual DER).
 
 **Phase 5 — Cybersecurity & supply-chain connectors (§27).** DoD: an SBOM + CVE feed maps to model
 components and contextualises STPA-Sec findings; an AI-BOM can be emitted from the model and reconciled

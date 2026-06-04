@@ -14,7 +14,7 @@ import time
 from pathlib import Path
 from typing import Any
 
-from src.infrastructure.assurance._schema import ASSURANCE_SCHEMA_SQL, SCHEMA_VERSION
+from src.infrastructure.assurance._schema import ASSURANCE_SCHEMA_MIGRATIONS, ASSURANCE_SCHEMA_SQL, SCHEMA_VERSION
 from src.infrastructure.assurance._sqlcipher_store import SQLCipherAssuranceStore
 
 logger = logging.getLogger(__name__)
@@ -71,6 +71,12 @@ def init_store(db_path: Path, *, force: bool = False) -> dict[str, object]:
     conn = sqlcipher3.connect(str(db_path))
     conn.execute(f"PRAGMA key = '{key}'")
     conn.executescript(ASSURANCE_SCHEMA_SQL)
+    for migration_sql in ASSURANCE_SCHEMA_MIGRATIONS:
+        try:
+            conn.execute(migration_sql)
+        except Exception as _exc:  # noqa: BLE001
+            if "duplicate column" not in str(_exc):
+                raise
     conn.execute(
         "INSERT OR REPLACE INTO schema_meta(key, value) VALUES (?, ?)",
         ("schema_version", SCHEMA_VERSION),

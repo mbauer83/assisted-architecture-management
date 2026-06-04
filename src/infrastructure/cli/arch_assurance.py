@@ -148,6 +148,27 @@ def _cmd_export_key(_args: argparse.Namespace) -> int:
         return 1
 
 
+def _cmd_pocketbase_init(args: argparse.Namespace) -> int:
+    from src.infrastructure.assurance.pocketbase_lifecycle import create_collections  # noqa: PLC0415
+
+    try:
+        result = create_collections(args.base_url, args.admin_token)
+        print(json.dumps(result, indent=2))
+        return 0
+    except Exception as exc:  # noqa: BLE001
+        print(f"Error: {exc}", file=sys.stderr)
+        return 1
+
+
+def _cmd_pocketbase_status(args: argparse.Namespace) -> int:
+    from src.infrastructure.assurance.pocketbase_lifecycle import check_health  # noqa: PLC0415
+
+    healthy = check_health(args.base_url)
+    result = {"base_url": args.base_url, "healthy": healthy}
+    print(json.dumps(result, indent=2))
+    return 0 if healthy else 1
+
+
 def _cmd_verify_chain(args: argparse.Namespace) -> int:
     from src.infrastructure.assurance._archive import SQLCipherAssuranceArchive  # noqa: PLC0415
     from src.infrastructure.assurance._sqlcipher_store import SQLCipherAssuranceStore  # noqa: PLC0415
@@ -192,6 +213,13 @@ def main() -> None:
     sub.add_parser("export-key", help="Print recovery key from the OS keychain")
     sub.add_parser("verify-chain", help="Verify the audit log hash chain integrity")
 
+    p_pb_init = sub.add_parser("pocketbase-init", help="Initialise PocketBase collections for assurance")
+    p_pb_init.add_argument("--base-url", required=True, metavar="URL", help="PocketBase base URL")
+    p_pb_init.add_argument("--admin-token", required=True, metavar="TOKEN", help="PocketBase admin Bearer token")
+
+    p_pb_status = sub.add_parser("pocketbase-status", help="Check PocketBase health")
+    p_pb_status.add_argument("--base-url", required=True, metavar="URL", help="PocketBase base URL")
+
     args = parser.parse_args()
     dispatch = {
         "init": _cmd_init,
@@ -202,6 +230,8 @@ def main() -> None:
         "rotate-key": _cmd_rotate_key,
         "export-key": _cmd_export_key,
         "verify-chain": _cmd_verify_chain,
+        "pocketbase-init": _cmd_pocketbase_init,
+        "pocketbase-status": _cmd_pocketbase_status,
     }
     sys.exit(dispatch[args.command](args))
 

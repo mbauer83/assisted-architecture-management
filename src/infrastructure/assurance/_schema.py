@@ -78,6 +78,30 @@ CREATE INDEX IF NOT EXISTS idx_edges_type     ON assurance_edges(conn_type);
 CREATE INDEX IF NOT EXISTS idx_refs_arch      ON arch_refs(arch_artifact_id);
 CREATE INDEX IF NOT EXISTS idx_audit_seq      ON audit_log(seq);
 CREATE INDEX IF NOT EXISTS idx_audit_op       ON audit_log(operation);
+
+CREATE TABLE IF NOT EXISTS dek_store (
+    subject_id  TEXT PRIMARY KEY,
+    dek_hex     TEXT NOT NULL,
+    created_at  TEXT NOT NULL,
+    shredded_at TEXT
+);
+
+CREATE TABLE IF NOT EXISTS legal_holds (
+    hold_id     TEXT PRIMARY KEY,
+    baseline_id TEXT NOT NULL,
+    held_by     TEXT NOT NULL DEFAULT '',
+    reason      TEXT NOT NULL DEFAULT '',
+    created_at  TEXT NOT NULL,
+    released_at TEXT
+);
+
+CREATE INDEX IF NOT EXISTS idx_holds_baseline ON legal_holds(baseline_id);
 """
 
-SCHEMA_VERSION = "1"
+# Applied once after executescript to add columns to existing tables.
+# Each entry is executed and OperationalError (duplicate column) is silently ignored.
+ASSURANCE_SCHEMA_MIGRATIONS: list[str] = [
+    "ALTER TABLE baselines ADD COLUMN timestamp_token_hex TEXT",
+]
+
+SCHEMA_VERSION = "2"
