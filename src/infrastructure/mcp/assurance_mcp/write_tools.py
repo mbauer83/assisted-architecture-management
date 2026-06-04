@@ -16,6 +16,7 @@ from __future__ import annotations
 from mcp.server.fastmcp import FastMCP  # type: ignore[import-not-found]
 
 from src.infrastructure.mcp.assurance_mcp.context import get_assurance_context
+from src.infrastructure.mcp.assurance_mcp.security_write_tools import register_security_write_tools
 
 _VALID_NODE_TYPES = frozenset({
     "loss", "hazard", "control-structure-node", "control-action",
@@ -25,6 +26,7 @@ _VALID_NODE_TYPES = frozenset({
 
 
 def register_write_tools(server: FastMCP) -> None:
+    register_security_write_tools(server)
     ctx = get_assurance_context()
 
     @server.tool(

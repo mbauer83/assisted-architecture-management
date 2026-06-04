@@ -1,14 +1,19 @@
 """arch-assurance CLI — confidential assurance store lifecycle management.
 
 Commands:
-  init         Initialise a new encrypted assurance store (generates key → OS keychain)
-  status       Show whether the store is configured and locked/unlocked
-  unlock       Open the store and run a status check (validates key works)
-  backup       Copy the encrypted DB to a timestamped backup file
-  export       Export all assurance data to a JSON file (plaintext — handle with care)
-  rotate-key   Generate a new encryption key and re-encrypt the store
-  export-key   Print the recovery key from the keychain (for offline safe storage)
-  verify-chain Verify the audit log hash chain integrity
+  init                  Initialise a new encrypted assurance store
+  status                Show store configuration and lock status
+  unlock                Verify the encryption key works and report store stats
+  backup                Copy the encrypted DB to a timestamped backup file
+  export                Export all assurance data to a JSON file (plaintext)
+  rotate-key            Generate new encryption key and re-encrypt the store
+  export-key            Print recovery key from the OS keychain
+  verify-chain          Verify the audit log hash chain integrity
+  pocketbase-init       Initialise PocketBase collections
+  pocketbase-status     Check PocketBase health
+  import-sbom           Ingest a CycloneDX or SPDX BOM file
+  export-aibom          Emit a CycloneDX 1.6 AI-BOM from provided components JSON
+  scan-ai-candidates    Heuristic scan of architecture entities for AI-BOM relevance
 """
 
 from __future__ import annotations
@@ -169,6 +174,24 @@ def _cmd_pocketbase_status(args: argparse.Namespace) -> int:
     return 0 if healthy else 1
 
 
+def _cmd_import_sbom(args: argparse.Namespace) -> int:
+    from src.infrastructure.cli._security_commands import cmd_import_sbom  # noqa: PLC0415
+
+    return cmd_import_sbom(args, _workspace_root())
+
+
+def _cmd_export_aibom(args: argparse.Namespace) -> int:
+    from src.infrastructure.cli._security_commands import cmd_export_aibom  # noqa: PLC0415
+
+    return cmd_export_aibom(args)
+
+
+def _cmd_scan_ai_candidates(args: argparse.Namespace) -> int:
+    from src.infrastructure.cli._security_commands import cmd_scan_ai_candidates  # noqa: PLC0415
+
+    return cmd_scan_ai_candidates(args)
+
+
 def _cmd_verify_chain(args: argparse.Namespace) -> int:
     from src.infrastructure.assurance._archive import SQLCipherAssuranceArchive  # noqa: PLC0415
     from src.infrastructure.assurance._sqlcipher_store import SQLCipherAssuranceStore  # noqa: PLC0415
@@ -220,6 +243,18 @@ def main() -> None:
     p_pb_status = sub.add_parser("pocketbase-status", help="Check PocketBase health")
     p_pb_status.add_argument("--base-url", required=True, metavar="URL", help="PocketBase base URL")
 
+    p_import_sbom = sub.add_parser("import-sbom", help="Ingest a CycloneDX or SPDX BOM file")
+    p_import_sbom.add_argument("file", metavar="FILE", help="Path to the BOM JSON file")
+    p_import_sbom.add_argument("--anchor", metavar="ENTITY_ID", help="Architecture entity ID to anchor this BOM to")
+    p_import_sbom.add_argument("--signals-db-path", metavar="PATH", help="Override security signals DB path")
+
+    p_export_aibom = sub.add_parser("export-aibom", help="Emit a CycloneDX 1.6 AI-BOM")
+    p_export_aibom.add_argument("--components-file", metavar="PATH", help="JSON file with AI-component dicts")
+    p_export_aibom.add_argument("--output", metavar="PATH", help="Output file (default: stdout)")
+
+    p_scan = sub.add_parser("scan-ai-candidates", help="Heuristic AI-BOM candidate scan")
+    p_scan.add_argument("--entities-file", metavar="PATH", help="JSON file with architecture entity dicts")
+
     args = parser.parse_args()
     dispatch = {
         "init": _cmd_init,
@@ -232,6 +267,9 @@ def main() -> None:
         "verify-chain": _cmd_verify_chain,
         "pocketbase-init": _cmd_pocketbase_init,
         "pocketbase-status": _cmd_pocketbase_status,
+        "import-sbom": _cmd_import_sbom,
+        "export-aibom": _cmd_export_aibom,
+        "scan-ai-candidates": _cmd_scan_ai_candidates,
     }
     sys.exit(dispatch[args.command](args))
 

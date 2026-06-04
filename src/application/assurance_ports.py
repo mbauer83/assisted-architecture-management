@@ -143,6 +143,62 @@ class AssuranceArchive(Protocol):
 
 
 @runtime_checkable
+class SecuritySignalConnector(Protocol):
+    """Port for external security signals: SBOM, vulnerability feeds, AI-BOM.
+
+    Adapters: SQLiteSecurityConnector (default). Never gates the core assurance flow.
+    Read-mostly — importers pull external data in; export_aibom / reconcile_aibom are
+    the bidirectional operations (model → CycloneDX, discovered → drift report).
+    """
+
+    def import_bom(
+        self,
+        bom_data: dict[str, object],
+        *,
+        anchor_entity_id: str,
+        bom_format: str = "cyclonedx",
+        source_file: str = "",
+    ) -> dict[str, object]: ...
+
+    def list_bom_components(
+        self,
+        *,
+        anchor_entity_id: str | None = None,
+        purl: str | None = None,
+    ) -> list[dict[str, object]]: ...
+
+    def import_vulnerabilities(
+        self,
+        vuln_records: list[dict[str, object]],
+        *,
+        source: str = "osv",
+    ) -> dict[str, object]: ...
+
+    def list_vulnerabilities(
+        self,
+        *,
+        purl: str | None = None,
+        severity: str | None = None,
+    ) -> list[dict[str, object]]: ...
+
+    def set_anchor(
+        self,
+        component_ref: str,
+        arch_entity_id: str,
+        *,
+        ref_type: str = "purl",
+    ) -> None: ...
+
+    def list_anchors(
+        self,
+        *,
+        arch_entity_id: str | None = None,
+    ) -> list[dict[str, object]]: ...
+
+    def get_stats(self) -> dict[str, object]: ...
+
+
+@runtime_checkable
 class WORMAssuranceArchive(AssuranceArchive, Protocol):
     """Extended archive port with WORM semantics, legal-hold, and crypto-shredding.
 

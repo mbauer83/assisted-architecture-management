@@ -105,3 +105,63 @@ ASSURANCE_SCHEMA_MIGRATIONS: list[str] = [
 ]
 
 SCHEMA_VERSION = "2"
+
+# Security-signals schema — used by the separate (unencrypted) security signals DB.
+# Stored at .arch-assurance/security-signals.db alongside store.db.
+SECURITY_SIGNALS_SCHEMA_SQL = """
+PRAGMA journal_mode = WAL;
+PRAGMA synchronous = NORMAL;
+PRAGMA foreign_keys = ON;
+
+CREATE TABLE IF NOT EXISTS bom_ingests (
+    ingest_id        TEXT PRIMARY KEY,
+    anchor_entity_id TEXT NOT NULL,
+    bom_serial       TEXT,
+    bom_version     TEXT,
+    bom_format      TEXT NOT NULL,
+    component_count INTEGER NOT NULL DEFAULT 0,
+    ingested_at     TEXT NOT NULL,
+    source_file     TEXT NOT NULL DEFAULT ''
+);
+
+CREATE TABLE IF NOT EXISTS bom_components (
+    component_id    TEXT PRIMARY KEY,
+    ingest_id       TEXT NOT NULL,
+    purl            TEXT,
+    cpe             TEXT,
+    name            TEXT NOT NULL,
+    version         TEXT,
+    component_type  TEXT,
+    group_name      TEXT,
+    arch_entity_id  TEXT,
+    match_type      TEXT NOT NULL DEFAULT 'none',
+    created_at      TEXT NOT NULL,
+    FOREIGN KEY (ingest_id) REFERENCES bom_ingests(ingest_id) ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS vulnerabilities (
+    vuln_id          TEXT PRIMARY KEY,
+    purl             TEXT,
+    ext_id           TEXT NOT NULL,
+    source           TEXT NOT NULL,
+    severity         TEXT,
+    cvss_score       REAL,
+    vex_status       TEXT,
+    vex_justification TEXT,
+    description      TEXT,
+    ingested_at      TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS anchor_mappings (
+    component_ref   TEXT PRIMARY KEY,
+    arch_entity_id  TEXT NOT NULL,
+    ref_type        TEXT NOT NULL DEFAULT 'purl',
+    created_at      TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_comp_ingest  ON bom_components(ingest_id);
+CREATE INDEX IF NOT EXISTS idx_comp_purl    ON bom_components(purl);
+CREATE INDEX IF NOT EXISTS idx_comp_arch    ON bom_components(arch_entity_id);
+CREATE INDEX IF NOT EXISTS idx_vuln_purl    ON vulnerabilities(purl);
+CREATE INDEX IF NOT EXISTS idx_vuln_extid   ON vulnerabilities(ext_id);
+"""

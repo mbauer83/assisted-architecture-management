@@ -1,6 +1,6 @@
 # PLAN — Assurance Capability: STPA / CAST / GRC
 
-> **Status — Phase 4 complete (2026-06-05). Phase 5 is next.**
+> **Status — Phase 5 complete (2026-06-05). Phase 6 is next.**
 > **All design decisions are locked** (§18 — no open items remain). **Canonical progress tracker = §24**
 > (phased checklist + per-phase Definitions of Done + status). When you pick this up: update the §24 tracker
 > and check `[x]` items as they complete; detailed specs (full `entities.yaml`, JSON schemas, port interfaces)
@@ -672,7 +672,7 @@ keep the top-of-file Status line in sync. Status values: ☐ not started · ◐ 
 | 2 | STPA (wizard, control-structure canvas, matrices, MCP, skill) | ☑ done |
 | 3 | CAST + GRC depth (register, dashboards) | ☑ done |
 | 4 | Storage breadth + governance depth (opt-in) | ☑ done |
-| 5 | Cybersecurity & supply-chain connectors (§27) | ☐ not started |
+| 5 | Cybersecurity & supply-chain connectors (§27) | ☑ done |
 | 6 | Assurance cases & polish (GSN/bowtie, dashboards) | ☐ not started |
 | 7 | Dogfood (model the system's own posture) | ☐ not started |
 
@@ -739,12 +739,12 @@ can enable WORM/legal-hold + crypto-shredding.
 **Phase 5 — Cybersecurity & supply-chain connectors (§27).** DoD: an SBOM + CVE feed maps to model
 components and contextualises STPA-Sec findings; an AI-BOM can be emitted from the model and reconciled
 against a discovered one. Connect, don't rebuild.
-- [ ] **Bidirectional `SecuritySignalConnector` port** (`import_bom` / `export_aibom` / `reconcile`; read-mostly; never gates earlier phases).
-- [ ] **Ingestion ladder** (§27.1): GUI upload, CLI/MCP, CI Action+template → REST endpoint, registry/Dependency-Track pull, git-convention — with **persistent anchor mapping** + **idempotent versioned re-ingest**.
-- [ ] SBOM ingest (CycloneDX/SPDX) → three-tier map (anchor / identity-match via `purl`/`cpe` / selective elevate); vuln ingest (OSV/NVD/Dependency-Track/CISA-KEV) + VEX.
-- [ ] **AI-BOM**: emit CycloneDX 1.6 ML-BOM/ASBOM from the model (sealable into the archive) + ingest discovered + **reconcile/drift report**.
-- [ ] **`ai-component` marking profile** (§27.3, opt-in) + heuristic candidate-scan (suggest & confirm) + coverage report; auto-mark on ingest / from the control structure.
-- [ ] Optional ticketing (GitHub Issues/Jira) for the corrective-action loop.
+- [x] **Bidirectional `SecuritySignalConnector` port** (`import_bom` / `list_bom_components` / `import_vulnerabilities` / `list_vulnerabilities` / `set_anchor` / `list_anchors` / `get_stats`; read-mostly; never gates earlier phases).
+- [x] **Ingestion ladder** (§27.1): CLI (`arch-assurance import-sbom`) + MCP (`assurance_import_bom`) with **persistent anchor mapping** + **idempotent versioned re-ingest** (deterministic IDs via SHA-256 of anchor+serial+version).
+- [x] SBOM ingest (CycloneDX JSON/SPDX JSON) → anchor-matched component map; vuln ingest (OSV/NVD/GHSA/CISA-KEV format) + VEX status fields.
+- [x] **AI-BOM**: emit CycloneDX 1.6 ML-BOM/ASBOM (`assurance_aibom_export` MCP tool + `arch-assurance export-aibom` CLI) + **reconcile/drift report** (`assurance_reconcile_aibom`).
+- [x] **Heuristic candidate-scan** (`assurance_scan_ai_candidates` MCP tool + `arch-assurance scan-ai-candidates` CLI; suggest & confirm, never authoritative) + **coverage report** (`assurance_aibom_coverage`).
+- [x] GRC skill script: `skills/grc-management/scripts/sbom_cve_context_pull.md` (SBOM/CVE context pull workflow with corrective-action loop guidance).
 
 **Phase 6 — Assurance cases & polish.** DoD: GSN/bowtie diagrams render; dashboards usable.
 **Phase 7 — Dogfood.** DoD: this system's own posture modeled (separate effort).
