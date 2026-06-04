@@ -39,5 +39,8 @@ export const router = createRouter({
     { path: '/global/search', redirect: '/search' },
     // Promotion
     { path: '/promote', component: PromoteView },
+    // Assurance (enabled-gated, separate from model nav)
+    { path: '/assurance', component: () => import('../views/AssuranceView.vue') },
+    { path: '/assurance/analyses', component: () => import('../views/GroupManagementView.vue'), props: () => ({ axis: 'analysis-collection' }) },
   ],
 })

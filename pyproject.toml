@@ -12,6 +12,9 @@ dependencies = [
     "python-frontmatter>=1.1.0",
     "anyio>=4.0",
     "jsonschema>=4.0",
+    "sqlcipher3>=0.5.0",
+    "keyring>=25.0",
+    "keyrings.alt>=4.0",
 ]
 
 
@@ -26,6 +29,9 @@ get-plantuml = "src.infrastructure.bootstrap.get_plantuml:main"
 get-diagram-runtime = "src.infrastructure.bootstrap.get_diagram_runtime:main"
 check-diagram-runtime = "src.infrastructure.bootstrap.check_diagram_runtime:main"
 arch-write-cli = "src.infrastructure.write.artifact_write_cli:main"
+arch-assurance = "src.infrastructure.cli.arch_assurance:main"
+arch-mcp-stdio-assurance-read = "src.infrastructure.mcp.arch_mcp_stdio_assurance:main_read"
+arch-mcp-stdio-assurance-write = "src.infrastructure.mcp.arch_mcp_stdio_assurance:main_write"
 
 [build-system]
 requires = ["hatchling"]

@@ -9,7 +9,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Literal
 
-GroupAxis = Literal["model-project", "diagram-collection", "document-collection"]
+GroupAxis = Literal["model-project", "diagram-collection", "document-collection", "analysis-collection"]
 
 UNCATEGORIZED = "uncategorized"
 """Uniform fallback group returned by group_fn when no group segment is present."""
@@ -46,12 +46,15 @@ class GroupRegistry:
     model_projects: tuple[GroupEntry, ...] = field(default_factory=tuple)
     diagram_collections: tuple[GroupEntry, ...] = field(default_factory=tuple)
     document_collections: tuple[GroupEntry, ...] = field(default_factory=tuple)
+    analysis_collections: tuple[GroupEntry, ...] = field(default_factory=tuple)
 
     def _by_axis(self, axis: GroupAxis) -> tuple[GroupEntry, ...]:
         if axis == "model-project":
             return self.model_projects
         if axis == "diagram-collection":
             return self.diagram_collections
+        if axis == "analysis-collection":
+            return self.analysis_collections
         return self.document_collections
 
     def find(self, axis: GroupAxis, slug: str) -> GroupEntry | None:

@@ -23,6 +23,7 @@ def _make_app():  # type: ignore[no-untyped-def]
 
     from src.infrastructure.app_bootstrap import install_module_registry
     from src.infrastructure.gui.routers.admin import router as admin_router
+    from src.infrastructure.gui.routers.assurance import router as assurance_router
     from src.infrastructure.gui.routers.connections import router as connections_router
     from src.infrastructure.gui.routers.diagram_types import router as diagram_types_router
     from src.infrastructure.gui.routers.diagrams import router as diagrams_router
@@ -45,6 +46,7 @@ def _make_app():  # type: ignore[no-untyped-def]
     app.include_router(promote_router)
     app.include_router(sync_router)
     app.include_router(admin_router)
+    app.include_router(assurance_router)
     return app
 
 

@@ -1,6 +1,6 @@
 # PLAN — Assurance Capability: STPA / CAST / GRC
 
-> **Status — Phase 0 complete (2026-06-04). Phase 1a is next.**
+> **Status — Phase 1 complete (2026-06-04). Phase 2 is next.**
 > **All design decisions are locked** (§18 — no open items remain). **Canonical progress tracker = §24**
 > (phased checklist + per-phase Definitions of Done + status). When you pick this up: update the §24 tracker
 > and check `[x]` items as they complete; detailed specs (full `entities.yaml`, JSON schemas, port interfaces)
@@ -665,10 +665,10 @@ keep the top-of-file Status line in sync. Status values: ☐ not started · ◐ 
 | Phase | Scope | Status |
 |---|---|---|
 | 0 | Decisions + module extension mechanism (§29) | ☑ done |
-| 1a | Confidential store + analysis-collection substrate | ☐ not started |
-| 1b | Assurance graph MVP — core types + MCP CRUD/verify (first vertical slice) | ☐ not started |
-| 1c | Immutable records + safety/structural verifier | ☐ not started |
-| 1d | Minimal UI surfacing (module_class plumbing, discoverability) | ☐ not started |
+| 1a | Confidential store + analysis-collection substrate | ☑ done |
+| 1b | Assurance graph MVP — core types + MCP CRUD/verify (first vertical slice) | ☑ done |
+| 1c | Immutable records + safety/structural verifier | ☑ done |
+| 1d | Minimal UI surfacing (module_class plumbing, discoverability) | ☑ done |
 | 2 | STPA (wizard, control-structure canvas, matrices, MCP, skill) | ☐ not started |
 | 3 | CAST + GRC depth (register, dashboards) | ☐ not started |
 | 4 | Storage breadth + governance depth (opt-in) | ☐ not started |

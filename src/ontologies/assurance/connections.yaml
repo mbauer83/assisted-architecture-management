@@ -1,0 +1,149 @@
+# Assurance Ontology — connection types & permitted relationships
+#
+# All assurance connections are stored assurance-side (one-way persistence rule).
+# Cross-module refs (assurance→architecture) are handled via arch_refs table,
+# not as connections in this registry.
+
+matrix_abbreviations:
+  LT: leads-to
+  VL: violates
+  EX: explains
+  DV: derives
+  RF: refines
+  AT: accountable-to
+  EV: evidenced-by
+  BT: binds-to
+  AS: assesses
+  TB: treated-by
+  CW: complies-with
+
+connection_types:
+  assurance:
+
+    # ── Control-structure loops ──────────────────────────────────────────────
+    issues:
+      puml_arrow: "-->"
+      symmetric: false
+      classes: []
+
+    acts-on:
+      puml_arrow: "-->"
+      symmetric: false
+      classes: []
+
+    feedback:
+      puml_arrow: "<--"
+      symmetric: false
+      classes: []
+
+    # ── STPA/CAST causal chain ───────────────────────────────────────────────
+    concerns:
+      puml_arrow: "..>"
+      symmetric: false
+      classes: []
+
+    by-controller:
+      puml_arrow: "-->"
+      symmetric: false
+      classes: []
+
+    violates:
+      puml_arrow: "-->"
+      symmetric: false
+      classes: []
+
+    leads-to:
+      puml_arrow: "-->"
+      symmetric: false
+      classes: []
+
+    explains:
+      puml_arrow: "..>"
+      symmetric: false
+      classes: []
+
+    derives:
+      puml_arrow: "..>"
+      symmetric: false
+      classes: []
+
+    # ── Assurance-constraint linkage ─────────────────────────────────────────
+    refines:
+      puml_arrow: "..>"
+      symmetric: false
+      classes: []
+
+    satisfied-by:
+      puml_arrow: "..|>"
+      symmetric: false
+      classes: []
+
+    accountable-to:
+      puml_arrow: "-->"
+      symmetric: false
+      classes: []
+
+    responsible-of:
+      puml_arrow: "..>"
+      symmetric: false
+      classes: []
+
+    evidenced-by:
+      puml_arrow: "..>"
+      symmetric: false
+      classes: []
+
+    # ── GRC ──────────────────────────────────────────────────────────────────
+    assesses:
+      puml_arrow: "..>"
+      symmetric: false
+      classes: []
+
+    treated-by:
+      puml_arrow: "-->"
+      symmetric: false
+      classes: []
+
+    complies-with:
+      puml_arrow: "..>"
+      symmetric: false
+      classes: []
+
+    cites:
+      puml_arrow: "..>"
+      symmetric: false
+      classes: []
+
+    # ── Architecture binding (assurance-side) ────────────────────────────────
+    binds-to:
+      puml_arrow: "-->"
+      symmetric: false
+      classes: []
+
+    # ── CAST ─────────────────────────────────────────────────────────────────
+    investigates:
+      puml_arrow: "-->"
+      symmetric: false
+      classes: []
+
+# Permitted relationships: broad within the assurance ontology.
+# Fine-grained enforcement is handled by the AssuranceVerifier (Phase 1c).
+permitted_relationships:
+  - [control-structure-node, control-action, [issues]]
+  - [control-action, control-structure-node, [acts-on]]
+  - [control-structure-node, control-structure-node, [feedback]]
+  - [unsafe-control-action, control-action, [concerns]]
+  - [unsafe-control-action, control-structure-node, [by-controller]]
+  - [unsafe-control-action, hazard, [violates]]
+  - [hazard, loss, [leads-to]]
+  - [loss-scenario, unsafe-control-action, [explains]]
+  - [loss-scenario, assurance-constraint, [derives]]
+  - [incident, assurance-constraint, [derives]]
+  - [corrective-action, assurance-constraint, [derives]]
+  - [assurance-constraint, assurance-constraint, [refines]]
+  - [assurance-constraint, assurance-constraint, [satisfied-by]]
+  - [risk, hazard, [assesses]]
+  - [risk, assurance-constraint, [treated-by]]
+  - [assurance-constraint, obligation, [complies-with]]
+  - [incident, control-structure-node, [investigates]]
+  - [incident, hazard, [investigates]]

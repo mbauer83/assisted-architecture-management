@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { RouterLink, useRoute, useRouter } from 'vue-router'
-import { computed, inject, ref } from 'vue'
+import { computed, inject, onMounted, ref } from 'vue'
 import { Effect } from 'effect'
 import { modelServiceKey } from '../keys'
 import ArchimateTypeGlyph from './ArchimateTypeGlyph.vue'
@@ -98,6 +98,17 @@ const onSearchFocus = () => { if (searchHits.value.length > 0) showDropdown.valu
 const hitGlyphType = (hit: SearchDropdownHit) =>
   (hit.record_type === 'diagram' || hit.record_type === 'connection') ? 'generic' : hit.artifact_type
 const hitTypeLabel = (hit: SearchDropdownHit) => (hit.artifact_type || hit.record_type || '').replace(/^archimate[-_]/i, '')
+
+const assuranceStatus = ref<'unlocked' | 'locked' | 'not_initialised' | null>(null)
+onMounted(async () => {
+  try {
+    const resp = await fetch('/api/assurance/status')
+    if (resp.ok) {
+      const data = await resp.json() as { status: string }
+      assuranceStatus.value = data.status as 'unlocked' | 'locked' | 'not_initialised'
+    }
+  } catch { /* assurance store unavailable — suppress */ }
+})
 </script>
 
 <template>
@@ -187,6 +198,28 @@ const hitTypeLabel = (hit: SearchDropdownHit) => (hit.artifact_type || hit.recor
           </RouterLink>
         </nav>
       </div>
+      <template v-if="assuranceStatus !== null">
+        <div
+          class="nav__divider"
+          aria-hidden="true"
+        />
+        <div class="nav__section">
+          <span
+            class="nav__section-label nav__section-label--assurance"
+            :title="assuranceStatus === 'unlocked' ? 'Assurance store unlocked' : 'Assurance store locked'"
+          >
+            {{ assuranceStatus === 'unlocked' ? '🔓' : '🔒' }} Assurance
+          </span>
+          <nav
+            class="nav__links"
+            aria-label="Assurance"
+          >
+            <RouterLink to="/assurance">
+              Overview
+            </RouterLink>
+          </nav>
+        </div>
+      </template>
     </div>
     <form
       class="nav__search"
@@ -234,6 +267,7 @@ const hitTypeLabel = (hit: SearchDropdownHit) => (hit.artifact_type || hit.recor
 .nav__section { display: flex; align-items: center; gap: 8px; flex-shrink: 1; min-width: 0; }
 .nav__section-label { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .07em; color: #64748b; white-space: nowrap; padding: 0 4px; flex-shrink: 0; }
 .nav__section-label--global { color: #f59e0b; }
+.nav__section-label--assurance { color: #a78bfa; }
 .nav__divider { width: 1px; height: 20px; background: #334155; margin: 0 12px; flex-shrink: 0; }
 .nav__links { display: flex; gap: 4px; flex-wrap: nowrap; min-width: 0; overflow: hidden; }
 .nav__links a { color: #b0bec5; font-size: 13px; padding: 4px 8px; border-radius: 4px; white-space: nowrap; }

@@ -40,6 +40,7 @@ _GROUPS_SCHEMA: dict[str, object] = {
         "model-projects": {"type": "array", "items": {"$ref": "#/$defs/model_project_entry"}},
         "diagram-collections": {"type": "array", "items": {"$ref": "#/$defs/collection_entry"}},
         "document-collections": {"type": "array", "items": {"$ref": "#/$defs/collection_entry"}},
+        "analysis-collections": {"type": "array", "items": {"$ref": "#/$defs/collection_entry"}},
     },
     "additionalProperties": False,
     "$defs": {
@@ -65,6 +66,7 @@ _AXIS_KEYS: dict[GroupAxis, str] = {
     "model-project": "model-projects",
     "diagram-collection": "diagram-collections",
     "document-collection": "document-collections",
+    "analysis-collection": "analysis-collections",
 }
 
 
@@ -144,10 +146,12 @@ def load_group_registry(repo_root: Path, *, engagement_label: str = "") -> Group
     mp_raw = _axis("model-projects")
     dc_raw = _axis("diagram-collections")
     dcc_raw = _axis("document-collections")
+    ac_raw = _axis("analysis-collections")
 
     model_projects = _parse_entries(mp_raw, "model-project")
     diagram_collections = _parse_entries(dc_raw, "diagram-collection")
     document_collections = _parse_entries(dcc_raw, "document-collection")
+    analysis_collections = _parse_entries(ac_raw, "analysis-collection")
 
     # When no explicit default is set and an engagement label exists, synthesise one
     if engagement_label and not any(e.default for e in model_projects):
@@ -183,6 +187,7 @@ def load_group_registry(repo_root: Path, *, engagement_label: str = "") -> Group
         model_projects=tuple(model_projects),
         diagram_collections=tuple(diagram_collections),
         document_collections=tuple(document_collections),
+        analysis_collections=tuple(analysis_collections),
     )
 
 
@@ -222,6 +227,8 @@ def registry_to_yaml(registry: GroupRegistry) -> str:
         data["diagram-collections"] = _entries_to_list(registry.diagram_collections)
     if registry.document_collections:
         data["document-collections"] = _entries_to_list(registry.document_collections)
+    if registry.analysis_collections:
+        data["analysis-collections"] = _entries_to_list(registry.analysis_collections)
 
     result = yaml.dump(data, default_flow_style=False, allow_unicode=True, sort_keys=False)
     return result if isinstance(result, str) else ""

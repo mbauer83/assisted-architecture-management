@@ -8,7 +8,7 @@ from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel
 
 from src.application.artifact_parsing import parse_entity_content_sections
-from src.application.entity_type_predicates import is_internal_entity_type
+from src.application.entity_type_predicates import is_assurance_entity_type, is_internal_entity_type
 from src.application.read_models import EntityContextReadModel
 from src.infrastructure.diagram_types import diagram_type_domain
 from src.infrastructure.gui.routers import state as s
@@ -48,11 +48,19 @@ def list_entities(
     repo = s.get_repo()
     entities = repo.list_entities(domain=domain, artifact_type=artifact_type, status=status, group=group)
     if scope == "global":
-        entities = [e for e in entities if s.is_global(e.path)]
+        entities = [e for e in entities if s.is_global(e.path) and not is_assurance_entity_type(e.artifact_type)]
     elif scope == "engagement":
-        entities = [e for e in entities if not s.is_global(e.path) and not is_internal_entity_type(e.artifact_type)]
+        entities = [
+            e for e in entities
+            if not s.is_global(e.path)
+            and not is_internal_entity_type(e.artifact_type)
+            and not is_assurance_entity_type(e.artifact_type)
+        ]
     else:
-        entities = [e for e in entities if not is_internal_entity_type(e.artifact_type)]
+        entities = [
+            e for e in entities
+            if not is_internal_entity_type(e.artifact_type) and not is_assurance_entity_type(e.artifact_type)
+        ]
     page = entities[offset : offset + limit]
     return {"total": len(entities), "items": build_entity_summary_rows(page, repo)}
 
