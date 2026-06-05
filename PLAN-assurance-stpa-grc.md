@@ -1,6 +1,6 @@
 # PLAN — Assurance Capability: STPA / CAST / GRC
 
-> **Status — Phase 5 complete (2026-06-05). Phase 6 is next.**
+> **Status — Phase 6 complete (2026-06-05). Phase 7 is next.**
 > **All design decisions are locked** (§18 — no open items remain). **Canonical progress tracker = §24**
 > (phased checklist + per-phase Definitions of Done + status). When you pick this up: update the §24 tracker
 > and check `[x]` items as they complete; detailed specs (full `entities.yaml`, JSON schemas, port interfaces)
@@ -673,7 +673,7 @@ keep the top-of-file Status line in sync. Status values: ☐ not started · ◐ 
 | 3 | CAST + GRC depth (register, dashboards) | ☑ done |
 | 4 | Storage breadth + governance depth (opt-in) | ☑ done |
 | 5 | Cybersecurity & supply-chain connectors (§27) | ☑ done |
-| 6 | Assurance cases & polish (GSN/bowtie, dashboards) | ☐ not started |
+| 6 | Assurance cases & polish (GSN/bowtie, dashboards) | ☑ done |
 | 7 | Dogfood (model the system's own posture) | ☐ not started |
 
 **Release gates (testable — each maps to a phase):**

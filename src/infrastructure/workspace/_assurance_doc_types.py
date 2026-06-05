@@ -132,4 +132,33 @@ ASSURANCE_DOCUMENT_SCHEMAS: dict[str, dict] = {
         ],
         "suggested_entity_type_connections": ["@all"],
     },
+    "assurance-case": {
+        "abbreviation": "AC",
+        "name": "Assurance Case",
+        "frontmatter_schema": {
+            "type": "object",
+            "required": ["title", "status", "claim_type"],
+            "properties": {
+                "title": {"type": "string"},
+                "status": {
+                    "type": "string",
+                    "enum": ["draft", "in-progress", "complete", "submitted", "archived"],
+                },
+                "claim_type": {
+                    "type": "string",
+                    "enum": ["safety", "security", "combined"],
+                },
+            },
+        },
+        "required_sections": [
+            "Purpose and Scope",
+            "Safety/Security Claims",
+            "GSN Argument Structure",
+            "Evidence Summary",
+            "Argument Completeness",
+            "Sign-off",
+            "References",
+        ],
+        "suggested_entity_type_connections": ["@all"],
+    },
 }

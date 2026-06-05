@@ -126,6 +126,61 @@ _GUIDANCE: dict[str, dict[str, object]] = {
             "EU AI Act Art. 12/18/19/26",
         ],
     },
+    "assurance-case-gsn": {
+        "step": "Assurance Case — Build GSN Argument",
+        "what": (
+            "A GSN (Goal Structuring Notation) assurance case is a structured argument that the system "
+            "meets its safety/security claims. Notation: G=Goal (claim to be argued), S=Strategy "
+            "(how the argument proceeds), Sn=Solution (evidence node), C=Context (scope/assumption), "
+            "A=Assumption, J=Justification. Connections: 'supported-by' decomposes goals downward; "
+            "'in-context-of' links contextual information."
+        ),
+        "why": (
+            "GSN externalises the argument so it can be reviewed and challenged. Regulators (DO-178C, "
+            "IEC 62443, EU AI Act) and certification bodies often require an explicit safety/security "
+            "argument, not just evidence in isolation."
+        ),
+        "how": (
+            "1. Use assurance_draft_gsn to scaffold the initial argument from your STPA analysis. "
+            "2. Review the returned top_goal, sub_goals, strategies, solutions, and gaps. "
+            "3. Create a gsn diagram artifact with the scaffolded nodes and edges. "
+            "4. Fill gaps: add evidenced-by edges to constraints and add UCAs for unconstrained hazards. "
+            "5. Produce an assurance-case document using the assurance-case doc type."
+        ),
+        "standards": [
+            "GSN Community Standard v3 (Goal Structuring Notation)",
+            "SACM (OMG Structured Assurance Case Metamodel) v2.2",
+            "DO-178C §12 (software life cycle data), ARP4761 §A.4 (safety assessment)",
+            "IEC 62443-4-1 §SR 2.13 (security case)",
+        ],
+    },
+    "assurance-case-completeness": {
+        "step": "Assurance Case — Argument Completeness",
+        "what": (
+            "Argument completeness means every claim in the assurance case is supported by evidence "
+            "all the way down the argument tree. Three key checks: (1) every assurance-constraint has "
+            "≥1 evidenced-by edge pointing to evidence; (2) every hazard has ≥1 constraint derived "
+            "from a UCA (via the UCA derives chain); (3) every loss has ≥1 hazard leading to it."
+        ),
+        "why": (
+            "An incomplete argument has open sub-goals — claims without evidence or claims without "
+            "sub-goals. Open sub-goals are certification blockers. Completeness must be demonstrated "
+            "before sign-off."
+        ),
+        "how": (
+            "1. Run assurance_case_completeness to identify all gaps. "
+            "2. For each constraint without evidence: create evidence artifacts (test reports, audit "
+            "records, formal proofs) and add evidenced-by edges. "
+            "3. For each hazard without constraints: complete the STPA UCA analysis and derive constraints. "
+            "4. For each loss without hazards: add hazards with leads-to edges. "
+            "5. Re-run until all checks pass, then document in the 'Argument Completeness' section."
+        ),
+        "standards": [
+            "GSN Community Standard v3 §5 (completeness and consistency)",
+            "DO-178C §12.3.5 (evidence traceability)",
+            "STPA Handbook §2.6 (constraint derivation)",
+        ],
+    },
     "cast-investigation": {
         "step": "CAST — Incident/Accident Investigation",
         "what": (
