@@ -11,9 +11,11 @@
       "enum": [
         "External Trend",
         "Internal Challenge",
+        "Market Gap",
         "Organizational",
         "Organizational Constraint",
         "Organizational Trend",
+        "Regulatory & Standards Trend",
         "Technical Trend",
         "Technological",
         "Technology Trend"
