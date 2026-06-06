@@ -33,14 +33,24 @@ Legend: `[ ]` todo · `[~]` in progress · `[x]` done.
 - [x] **Acceptance:** `artifact_verify(repo_scope="engagement", return_mode="full")` → **0 errors** (7318249 — 0 errors 0 warnings, 570 files)
 
 ## Stage 0b — C4 additive model: Groups R, K, B, X  *(parallel with 0a/0c)*
-- [ ] R1 create `application-component` **AMP** (C4 §10.1) → record ID
-- [ ] B1 create 4 MCP bridges + 4 stdio `application-interface`s (C4 §10.1/§10.3) → record IDs
-- [ ] B2 wire `Backend S→ bridge`, `bridge As→ own interface`, `interface S→ $HOST` (C4 §10.3)
-- [ ] R2 `AMP Ag→ {Backend, GUI, CLI, 4 bridges}`; `AMP Asc– AMS` (C4 §10.2)
-- [ ] K  `Backend Ag→` the 7 omitted components (C4 §10.4)
-- [ ] X1 create external **AI Agent Host** `$HOST`, **Git Hosting**, **Supply-Chain Sources** (C4 §10.1); assign AI Agent role to `$HOST`; retire the 4 Agentic LLM Applications (migrate edges → bulk_delete)
-- [ ] X2 `Git Hosting S→ Git Sync`; `Supply Fl→ Connector`; real interface→actor serving edges (C4 §3.8/§10.7)
-- [ ] **Acceptance:** engagement verify clean; AMP/bridges/host reachable
+**Entity IDs:**
+- `$AMP` = `APP@1780783671.hkrdtm` (Architecture Management Platform)
+- `$ARDB` = `APP@1780783708.Ne0utf` | `$AWRB` = `APP@1780783709.etTj9M`
+- `$SRDB` = `APP@1780783710.iu_kKL` | `$SWRB` = `APP@1780783711.js9xHR`
+- `$IARDB` = `AIF@1780783712.xJdQZ_` | `$IAWRB` = `AIF@1780783713.Ik61W4`
+- `$ISRDB` = `AIF@1780783714.bkIdu0` | `$ISWRB` = `AIF@1780783715.qf_Jla`
+- `$HOST` = `APP@1780783991.v6AXNw` | `$GITHOST` = `APP@1780783992.Je9pmw` | `$SUPPLY` = `APP@1780783993.JqIBPJ`
+
+- [x] R1 create `application-component` **AMP** (C4 §10.1) → `APP@1780783671.hkrdtm` — a21a529
+- [x] B1 create 4 MCP bridges + 4 stdio `application-interface`s (C4 §10.1/§10.3) → IDs above — a21a529
+- [x] B2 wire `Backend S→ bridge`, `bridge As→ own interface`, `interface Asc→ $HOST` (C4 §10.3)
+      Note: NEXT rules prohibit `archimate-serving` from interface→component; used `archimate-association` for interface↔$HOST and interface↔actor edges — a21a529
+- [x] R2 `AMP Ag→ {Backend, GUI, CLI, 4 bridges}`; `AMP Asc– AMS` (C4 §10.2) — a21a529
+- [x] K  `Backend Ag→` the 7 omitted components (C4 §10.4) — a21a529
+- [x] X1 create external **AI Agent Host** `$HOST`, **Git Hosting**, **Supply-Chain Sources** (C4 §10.1); assign AI Agent role to `$HOST`; retire the 4 Agentic LLM Applications (bulk_delete) — 88efc6c
+- [x] X2 `Git Hosting S→ Git Sync`; `Supply S→ Connector`; real interface Asc→ actor edges (C4 §3.8/§10.7) — 88efc6c
+      Note: `archimate-flow` not permitted app-component→app-component; used `archimate-serving` for Supply→Connector
+- [x] **Acceptance:** engagement verify clean (589 files, 0 errors, 0 warnings) — 88efc6c; AMP/bridges/host present ✓
 
 ## Stage 0c — P2 projector delta  *(builds on the done renderer-fix)*
 - [ ] P2.1 reverse `serving` **direction** (label already done) → `Consumer --uses--> Service`
