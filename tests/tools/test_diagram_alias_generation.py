@@ -151,6 +151,59 @@ rectangle "Req" <<Requirement>> as REQ_A
     assert "skinparam rectangle<<Requirement>>" in result
 
 
+def test_inject_archimate_includes_inlines_relation_macros(tmp_path: Path) -> None:
+    repo_root = tmp_path / "repo"
+    catalog = repo_root / "diagram-catalog"
+    catalog.mkdir(parents=True, exist_ok=True)
+    (catalog / "_archimate-stereotypes.puml").write_text(
+        "hide stereotype\nskinparam rectangle<<Process>> {\n  BackgroundColor #E0D8CC\n}\n",
+        encoding="utf-8",
+    )
+    (catalog / "_archimate-relations.puml").write_text(
+        "' relations\n!define Rel_Triggering(from, to, label) from --> to\n!define Rel_Serving(from, to, label) from --> to\n",
+        encoding="utf-8",
+    )
+
+    puml = """\
+@startuml test
+!include ../_archimate-stereotypes.puml
+!include ../_archimate-relations.puml
+rectangle "A" <<Process>> as PRC_A
+rectangle "B" <<Process>> as PRC_B
+Rel_Triggering(PRC_A, PRC_B, "")
+@enduml
+"""
+    result = inject_archimate_includes(puml, repo_root)
+
+    assert "!include ../_archimate-stereotypes.puml" not in result
+    assert "!include ../_archimate-relations.puml" not in result
+    assert "!define Rel_Triggering(from, to, label) from --> to" in result
+    assert "!define Rel_Serving(from, to, label) from --> to" in result
+    assert "Rel_Triggering(PRC_A, PRC_B" in result
+
+
+def test_inject_archimate_includes_relations_file_missing_is_noop(tmp_path: Path) -> None:
+    repo_root = tmp_path / "repo"
+    catalog = repo_root / "diagram-catalog"
+    catalog.mkdir(parents=True, exist_ok=True)
+    (catalog / "_archimate-stereotypes.puml").write_text(
+        "hide stereotype\nskinparam rectangle<<Process>> {\n  BackgroundColor #E0D8CC\n}\n",
+        encoding="utf-8",
+    )
+
+    puml = """\
+@startuml test
+!include ../_archimate-stereotypes.puml
+rectangle "A" <<Process>> as PRC_A
+@enduml
+"""
+    result = inject_archimate_includes(puml, repo_root)
+
+    assert "!include ../_archimate-stereotypes.puml" not in result
+    assert "hide stereotype" in result
+    assert "skinparam rectangle<<Process>>" in result
+
+
 def test_prepare_diagram_puml_body_injects_renderer_assets(tmp_path: Path) -> None:
     repo_root = tmp_path / "repo"
     catalog = repo_root / "diagram-catalog"

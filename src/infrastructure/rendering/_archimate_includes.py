@@ -25,7 +25,9 @@ def inject_archimate_includes(body: str, repo_root: Path) -> str:
     Scans *body* for ``<<stereotype>>`` and ``<$archimate_sprite>`` references.
     Replaces the ``!include ../_archimate-stereotypes.puml`` marker with the
     selective skinparam blocks and sprite definitions, then removes the
-    ``!include ../_archimate-glyphs.puml`` marker.
+    ``!include ../_archimate-glyphs.puml`` and
+    ``!include ../_archimate-relations.puml`` markers (the relations macros are
+    inlined into the header so they are available without a file-system lookup).
     """
     if "_archimate-stereotypes.puml" not in body:
         return body
@@ -37,9 +39,12 @@ def inject_archimate_includes(body: str, repo_root: Path) -> str:
 
     header, stereotype_map = _load_stereotype_map(repo_root)
     sprite_map = _load_sprite_map(repo_root)
+    relation_macros = _load_relation_macros(repo_root)
 
     clean_header = _strip_puml_comments(header)
     parts: list[str] = [clean_header] if clean_header else []
+    if relation_macros:
+        parts.append(relation_macros)
     for name in sorted(needed_types):
         if name in stereotype_map:
             parts.append(stereotype_map[name])
@@ -49,7 +54,19 @@ def inject_archimate_includes(body: str, repo_root: Path) -> str:
 
     replacement = "\n".join(parts) + "\n"
     result = body.replace("!include ../_archimate-stereotypes.puml\n", replacement, 1)
-    return result.replace("!include ../_archimate-glyphs.puml\n", "")
+    result = result.replace("!include ../_archimate-glyphs.puml\n", "")
+    return result.replace("!include ../_archimate-relations.puml\n", "")
+
+
+def _load_relation_macros(repo_root: Path) -> str:
+    """Return the ``!define`` macro lines from ``_archimate-relations.puml``."""
+    relations_path = repo_root / "diagram-catalog" / "_archimate-relations.puml"
+    try:
+        content = relations_path.read_text(encoding="utf-8")
+    except OSError:
+        return ""
+    lines = [line for line in content.splitlines() if line.startswith("!define")]
+    return "\n".join(lines)
 
 
 def _load_sprite_map(repo_root: Path) -> dict[str, str]:
