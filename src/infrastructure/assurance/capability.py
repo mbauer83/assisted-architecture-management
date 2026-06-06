@@ -1,12 +1,13 @@
-"""Confidential-store capability sentinel.
+"""Confidential-store capability sentinel (adapter-agnostic after SC-1).
 
 Adding this sentinel to `registered_names` before the assurance ontology module
 is evaluated allows `is_module_enabled` to satisfy
 `requires: ["confidential_store"]` — a pure name-based capability signal.
 
-The sentinel's `enabled` property probes whether the store key exists in the OS
-keychain and the DB file is present.  If either is missing the capability is
-unavailable and the assurance module will not be registered (fail-closed).
+The sentinel's `enabled` property probes whether the configured backend is
+available (key/credentials present + store file/endpoint reachable). If either
+condition fails, the capability is unavailable and the assurance module will not
+be registered (fail-closed).
 """
 
 from __future__ import annotations
@@ -18,19 +19,59 @@ logger = logging.getLogger(__name__)
 
 _SERVICE_NAME = "arch-assurance"
 _KEY_ACCOUNT = "db-encryption-key"
+_GIT_ENC_KEY_ACCOUNT = "private-git-encryption-key"
 
 
-def _store_available(db_path: Path) -> bool:
-    """Return True if the keychain key exists and the DB file is present."""
+def _store_available(workspace_root: Path) -> bool:
+    """Return True if the configured backend appears ready to unlock."""
     try:
-        import keyring  # type: ignore[import-untyped]
+        from src.config.settings import storage_assurance_store_backend  # noqa: PLC0415
+
+        backend = storage_assurance_store_backend()
+    except (ValueError, Exception):  # noqa: BLE001
+        return False
+
+    if backend == "sqlcipher":
+        return _sqlcipher_available(workspace_root)
+    if backend == "pocketbase":
+        return _pocketbase_available()
+    if backend == "private-git":
+        return _private_git_available(workspace_root)
+    return False
+
+
+def _sqlcipher_available(workspace_root: Path) -> bool:
+    try:
+        import keyring  # type: ignore[import-untyped]  # noqa: PLC0415
 
         key = keyring.get_password(_SERVICE_NAME, _KEY_ACCOUNT)
         if not key:
             return False
     except Exception:  # noqa: BLE001
         return False
+    db_path = workspace_root / ".arch-assurance" / "store.db"
     return db_path.exists()
+
+
+def _pocketbase_available() -> bool:
+    import os  # noqa: PLC0415
+
+    return bool(os.getenv("ARCH_POCKETBASE_URL"))
+
+
+def _private_git_available(workspace_root: Path) -> bool:
+    try:
+        import keyring  # type: ignore[import-untyped]  # noqa: PLC0415
+
+        key = keyring.get_password(_SERVICE_NAME, _GIT_ENC_KEY_ACCOUNT)
+        if not key:
+            # Plain (unencrypted) private-git: check repo dir exists
+            repo_path = workspace_root / ".arch-assurance-git"
+            return repo_path.exists() and (repo_path / "nodes").exists()
+    except Exception:  # noqa: BLE001
+        return False
+    repo_path = workspace_root / ".arch-assurance-git"
+    return repo_path.exists()
 
 
 class _ConfidentialStoreCapability:
@@ -43,22 +84,24 @@ class _ConfidentialStoreCapability:
     name = "confidential_store"
     requires: list[str] = []
 
-    def __init__(self, db_path: Path) -> None:
-        self._db_path = db_path
+    def __init__(self, workspace_root: Path) -> None:
+        self._workspace_root = workspace_root
         self._available: bool | None = None
 
     @property
     def enabled(self) -> bool:
         if self._available is None:
-            self._available = _store_available(self._db_path)
+            self._available = _store_available(self._workspace_root)
             if not self._available:
                 logger.info(
-                    "confidential_store: unavailable (key or DB missing at %s). "
+                    "confidential_store: unavailable for configured backend at %s. "
                     "Run `arch-assurance init` to enable.",
-                    self._db_path,
+                    self._workspace_root,
                 )
         return self._available
 
 
 def make_capability(db_path: Path) -> _ConfidentialStoreCapability:
-    return _ConfidentialStoreCapability(db_path)
+    """Construct capability sentinel. db_path is interpreted as workspace root."""
+    workspace_root = db_path.parent.parent if db_path.name == "store.db" else db_path.parent
+    return _ConfidentialStoreCapability(workspace_root)

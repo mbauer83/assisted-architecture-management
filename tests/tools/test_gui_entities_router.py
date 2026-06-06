@@ -10,7 +10,7 @@ from src.application.artifact_query import ArtifactRepository
 from src.infrastructure.artifact_index import shared_artifact_index
 from src.infrastructure.gui.routers import state as gui_state
 from src.infrastructure.gui.routers.documents import read_document
-from src.infrastructure.gui.routers.entity_listing import build_entity_summary_rows
+from src.infrastructure.gui.routers.entity_listing import build_entity_list_rows
 
 
 def _write(path: Path, content: str) -> None:
@@ -129,7 +129,7 @@ def test_global_scope_listing_survives_root_entities_without_specialization_pare
     gui_state.init_state(repo, engagement_root, enterprise_root)
 
     global_entities = [entity for entity in repo.list_entities() if gui_state.is_global(entity.path)]
-    rows = build_entity_summary_rows(global_entities[:1], repo)
+    rows = build_entity_list_rows(global_entities[:1], repo)
 
     assert len(global_entities) == 1
     assert len(rows) == 1
@@ -138,125 +138,9 @@ def test_global_scope_listing_survives_root_entities_without_specialization_pare
     assert row["is_global"] is True
     assert "parent_entity_id" not in row
     assert "hierarchy_relation_type" not in row
-    assert row["hierarchy_depth"] == 0
+    assert "hierarchy_depth" not in row
     assert "parent_specialization_id" not in row
-    assert row["specialization_depth"] == 0
-
-
-def test_entity_rows_emit_hierarchy_metadata_for_specialization_composition_and_aggregation(
-    engagement_root: Path,
-    enterprise_root: Path,
-) -> None:
-    parent_id = "REQ@1000000000.ParAAA.parent-req"
-    specialization_child_id = "REQ@1000000001.ChdAAA.specialized-child"
-    composition_child_id = "REQ@1000000002.CmpAAA.composed-child"
-    aggregation_child_id = "REQ@1000000003.AggAAA.aggregated-child"
-    global_req = "REQ@2000000000.GloAAA.global-req"
-
-    _write(
-        engagement_root / "model" / "motivation" / "requirement" / f"{parent_id}.md",
-        _entity_md(parent_id, "Parent Req"),
-    )
-    _write(
-        engagement_root / "model" / "motivation" / "requirement" / f"{specialization_child_id}.md",
-        _entity_md(specialization_child_id, "Specialized Child"),
-    )
-    _write(
-        engagement_root / "model" / "motivation" / "requirement" / f"{composition_child_id}.md",
-        _entity_md(composition_child_id, "Composed Child"),
-    )
-    _write(
-        engagement_root / "model" / "motivation" / "requirement" / f"{aggregation_child_id}.md",
-        _entity_md(aggregation_child_id, "Aggregated Child"),
-    )
-    _write(
-        engagement_root / "model" / "motivation" / "requirement" / f"{specialization_child_id}.outgoing.md",
-        _outgoing_md(specialization_child_id, [("archimate-specialization", parent_id)]),
-    )
-    _write(
-        engagement_root / "model" / "motivation" / "requirement" / f"{parent_id}.outgoing.md",
-        _outgoing_md(
-            parent_id,
-            [
-                ("archimate-composition", composition_child_id),
-                ("archimate-aggregation", aggregation_child_id),
-            ],
-        ),
-    )
-    _write(
-        enterprise_root / "model" / "motivation" / "requirement" / f"{global_req}.md",
-        _entity_md(global_req, "Global Req"),
-    )
-
-    repo = ArtifactRepository(shared_artifact_index([engagement_root, enterprise_root]))
-    gui_state.init_state(repo, engagement_root, enterprise_root)
-
-    engagement_entities = [entity for entity in repo.list_entities() if not gui_state.is_global(entity.path)]
-    rows = {row["artifact_id"]: row for row in build_entity_summary_rows(engagement_entities, repo)}
-
-    assert rows[parent_id]["specialization_depth"] == 0
-    assert rows[parent_id]["hierarchy_depth"] == 0
-    assert "parent_entity_id" not in rows[parent_id]
-    assert "parent_specialization_id" not in rows[parent_id]
-    assert rows[parent_id]["all_parents"] == []
-
-    assert rows[specialization_child_id]["hierarchy_depth"] == 1
-    assert rows[specialization_child_id]["hierarchy_relation_type"] == "specialization"
-    assert rows[specialization_child_id]["parent_entity_id"] == parent_id
-    assert rows[specialization_child_id]["parent_specialization_id"] == parent_id
-    assert rows[specialization_child_id]["all_parents"] == [{"parent_id": parent_id, "relation_type": "specialization"}]
-
-    assert rows[composition_child_id]["hierarchy_depth"] == 1
-    assert rows[composition_child_id]["hierarchy_relation_type"] == "composition"
-    assert rows[composition_child_id]["parent_entity_id"] == parent_id
-    assert rows[composition_child_id]["specialization_depth"] == 1
-    assert rows[composition_child_id]["all_parents"] == [{"parent_id": parent_id, "relation_type": "composition"}]
-
-    assert rows[aggregation_child_id]["hierarchy_depth"] == 1
-    assert rows[aggregation_child_id]["hierarchy_relation_type"] == "aggregation"
-    assert rows[aggregation_child_id]["parent_entity_id"] == parent_id
-    assert rows[aggregation_child_id]["specialization_depth"] == 1
-    assert rows[aggregation_child_id]["all_parents"] == [{"parent_id": parent_id, "relation_type": "aggregation"}]
-
-    assert all(("parent_entity_id" not in row) or isinstance(row["parent_entity_id"], str) for row in rows.values())
-
-
-def test_entity_rows_emit_all_parents_for_multi_parent_entity(
-    engagement_root: Path,
-    enterprise_root: Path,
-) -> None:
-    parent_a = "REQ@1000000010.ParAAB.parent-a"
-    parent_b = "REQ@1000000011.ParAAC.parent-b"
-    child_id = "REQ@1000000012.ChdAAB.multi-parent-child"
-
-    for eid, name in [(parent_a, "Parent A"), (parent_b, "Parent B"), (child_id, "Multi-Parent Child")]:
-        _write(
-            engagement_root / "model" / "motivation" / "requirement" / f"{eid}.md",
-            _entity_md(eid, name),
-        )
-    _write(
-        engagement_root / "model" / "motivation" / "requirement" / f"{parent_a}.outgoing.md",
-        _outgoing_md(parent_a, [("archimate-composition", child_id)]),
-    )
-    _write(
-        engagement_root / "model" / "motivation" / "requirement" / f"{parent_b}.outgoing.md",
-        _outgoing_md(parent_b, [("archimate-aggregation", child_id)]),
-    )
-
-    from src.infrastructure.artifact_index import shared_artifact_index
-
-    repo = ArtifactRepository(shared_artifact_index([engagement_root, enterprise_root]))
-    gui_state.init_state(repo, engagement_root, enterprise_root)
-    engagement_entities = [e for e in repo.list_entities() if not gui_state.is_global(e.path)]
-    rows = {row["artifact_id"]: row for row in build_entity_summary_rows(engagement_entities, repo)}
-
-    child_row = rows[child_id]
-    assert len(child_row["all_parents"]) == 2
-    parent_ids_in_response = {p["parent_id"] for p in child_row["all_parents"]}
-    assert parent_ids_in_response == {parent_a, parent_b}
-    # Primary parent is the highest-priority one (composition < aggregation)
-    assert child_row["parent_entity_id"] == parent_a
-    assert child_row["hierarchy_relation_type"] == "composition"
+    assert "specialization_depth" not in row
 
 
 def test_connection_to_dict_resolves_live_endpoint_names(engagement_root: Path, enterprise_root: Path) -> None:

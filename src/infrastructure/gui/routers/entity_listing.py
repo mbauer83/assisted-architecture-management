@@ -2,108 +2,12 @@
 
 from __future__ import annotations
 
-from functools import lru_cache
 from typing import Any
 
 from src.domain.artifact_types import EntityRecord
-from src.domain.module_types import ConnectionTypeName
 from src.infrastructure.gui.routers import state as s
 
 
-@lru_cache(maxsize=1)
-def _registry():
-    from src.infrastructure.app_bootstrap import get_module_registry  # noqa: PLC0415
-
-    return get_module_registry()
-
-
-@lru_cache(maxsize=None)
-def _hierarchy_priority() -> dict[str, int]:
-    out: dict[str, int] = {}
-    for name, info in _registry().all_connection_types().items():
-        if info.hierarchy_priority is not None:
-            out[str(name)] = info.hierarchy_priority
-    return out
-
-
-@lru_cache(maxsize=None)
-def _hierarchy_types() -> frozenset[str]:
-    return frozenset(_hierarchy_priority())
-
-
-def hierarchy_meta(entities: list[EntityRecord], repo) -> dict[str, dict[str, object]]:
-    entity_ids = {e.artifact_id for e in entities}
-    hp = _hierarchy_priority()
-    ht = _hierarchy_types()
-    all_conn_types = _registry().all_connection_types()
-    parents_by_child: dict[str, list[tuple[str, str]]] = {}
-    for conn in repo.list_connections_by_types_for_entities(ht, entity_ids):
-        if conn.conn_type not in hp:
-            continue
-        ct_info = all_conn_types.get(ConnectionTypeName(conn.conn_type))
-        if ct_info is not None and "generalization" in ct_info.classes:
-            child_id = conn.source
-            parent_id = conn.target
-        else:
-            parent_id = conn.source
-            child_id = conn.target
-        if child_id not in entity_ids or parent_id not in entity_ids:
-            continue
-        if child_id not in parents_by_child:
-            parents_by_child[child_id] = []
-        parents_by_child[child_id].append((parent_id, conn.conn_type))
-
-    for child_id in parents_by_child:
-        parents_by_child[child_id].sort(key=lambda p: (hp[p[1]], p[0]))
-
-    depth_cache: dict[str, int] = {}
-
-    def depth_for(entity_id: str, trail: set[str] | None = None) -> int:
-        if entity_id in depth_cache:
-            return depth_cache[entity_id]
-        parents = parents_by_child.get(entity_id, [])
-        if not parents:
-            depth_cache[entity_id] = 0
-            return 0
-        trail = trail or set()
-        if entity_id in trail:
-            depth_cache[entity_id] = 0
-            return 0
-        min_depth = min(depth_for(p[0], trail | {entity_id}) for p in parents)
-        depth_cache[entity_id] = min_depth + 1
-        return depth_cache[entity_id]
-
-    def _label(ct: str) -> str:
-        info = all_conn_types.get(ConnectionTypeName(ct))
-        return info.hierarchy_label if info and info.hierarchy_label else ct
-
-    result: dict[str, dict[str, object]] = {}
-    for e in entities:
-        parents = parents_by_child.get(e.artifact_id, [])
-        primary = parents[0] if parents else None
-        meta: dict[str, object] = {
-            "hierarchy_depth": depth_for(e.artifact_id),
-            "specialization_depth": depth_for(e.artifact_id),
-            "all_parents": [{"parent_id": pid, "relation_type": _label(ct)} for pid, ct in parents],
-        }
-        if primary:
-            pid, ct = primary
-            meta["parent_entity_id"] = pid
-            meta["parent_specialization_id"] = pid
-            meta["hierarchy_relation_type"] = _label(ct)
-        result[e.artifact_id] = meta
-    return result
-
-
-def build_entity_summary_rows(
-    entities: list[EntityRecord],
-    repo,
-) -> list[dict[str, Any]]:
-    counts = s.build_conn_counts_for_entities(repo, [entity.artifact_id for entity in entities])
-    hierarchy = hierarchy_meta(entities, repo)
-    items: list[dict[str, Any]] = []
-    for entity in entities:
-        row = s.entity_to_summary(entity, counts)
-        row.update(hierarchy.get(entity.artifact_id, {}))
-        items.append(row)
-    return items
+def build_entity_list_rows(entities: list[EntityRecord], repo) -> list[dict[str, Any]]:
+    counts = s.build_conn_counts_for_entities(repo, [e.artifact_id for e in entities])
+    return [s.entity_to_summary(e, counts) for e in entities]

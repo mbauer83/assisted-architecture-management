@@ -10,10 +10,16 @@ Checks:
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, TypedDict
 
 if TYPE_CHECKING:
     from src.application.assurance_ports import AssuranceArchive, ConfidentialAssuranceStore
+
+
+class _CheckEntry(TypedDict):
+    passed: bool
+    gap_count: int
+    gaps: list[dict[str, str]]
 
 
 def _gap_nodes(
@@ -37,7 +43,7 @@ def _gap_nodes(
     return gaps
 
 
-def _check(checks: dict[str, dict[str, object]], key: str, gaps: list[dict[str, str]]) -> None:
+def _check(checks: dict[str, _CheckEntry], key: str, gaps: list[dict[str, str]]) -> None:
     checks[key] = {
         "passed": len(gaps) == 0,
         "gap_count": len(gaps),
@@ -57,7 +63,7 @@ def run_cast_complete(
     incidents = [n for n in all_nodes if str(n.get("node_type", "")) == "incident"]
     has_incidents = len(incidents) > 0
 
-    checks: dict[str, dict[str, object]] = {}
+    checks: dict[str, _CheckEntry] = {}
 
     # G-g: sealed baseline required when incidents exist
     baseline_gap: list[dict[str, str]] = (
@@ -81,8 +87,8 @@ def run_cast_complete(
         _gap_nodes(all_nodes, "corrective-action", all_edges, "derives"),
     )
 
-    all_passed = all(bool(v["passed"]) for v in checks.values())
-    total_gaps = sum(int(str(v["gap_count"])) for v in checks.values())
+    all_passed = all(v["passed"] for v in checks.values())
+    total_gaps = sum(v["gap_count"] for v in checks.values())
     failed_count = sum(1 for v in checks.values() if not v["passed"])
     summary = (
         "All CAST coverage checks passed."

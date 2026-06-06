@@ -5,6 +5,7 @@ import type { EntityList, GroupList } from '../../domain'
 import type { RepoScope, RepoError } from '../../ports/ModelRepository'
 import { modelServiceKey } from '../keys'
 import { useQuery } from '../composables/useQuery'
+import { usePagination } from '../composables/usePagination'
 import EntitiesTreemap from '../components/EntitiesTreemap.vue'
 import ArchimateTypeGlyph from '../components/ArchimateTypeGlyph.vue'
 import EntityGroupNavTree from '../components/EntityGroupNavTree.vue'
@@ -13,13 +14,13 @@ import {
   getEntityConnectionTotal,
   getDomainLabel,
 } from '../lib/domains'
-import { useHierarchicalEntities } from '../composables/useHierarchicalEntities'
 
 const props = defineProps<{ scope?: RepoScope }>()
 
 type ViewMode = 'table' | 'treemap'
 type SortKey = 'type' | 'in' | 'sym' | 'out' | 'total'
 
+const PAGE_SIZE = 50
 const STORAGE_KEY = 'arch_group_model-project'
 
 const svc = inject(modelServiceKey)!
@@ -39,6 +40,16 @@ const sortKey = ref<SortKey | null>(null)
 const sortOrder = ref<1 | -1>(1)
 const showArchivedGroups = ref(false)
 
+// Group view: named group selected (not 'uncategorized' or global).
+// All group entities are loaded at once (limit 1000); domain/type filters are client-side.
+// Non-group view: server-side domain+type filtering with PAGE_SIZE pagination.
+const isGroupView = computed(() =>
+  !isGlobal.value && Boolean(activeGroup.value) && activeGroup.value !== 'uncategorized'
+)
+
+const { currentPage, pageCount, hasPrev, hasNext, goNext, goPrev, reset: resetPage, offset } =
+  usePagination(computed(() => entityListState.data.value?.total ?? 0), PAGE_SIZE)
+
 const replaceQuery = (patch: Record<string, string | undefined>) =>
   void router.replace({ path: basePath.value, query: { ...route.query, ...patch } })
 
@@ -50,8 +61,23 @@ const setGroup = (group: string) => {
 const goToGroups = () => { localStorage.removeItem(STORAGE_KEY); void router.push('/entities/groups') }
 const setViewMode = (view: ViewMode) => replaceQuery({ view: view === 'table' ? undefined : view })
 
-const load = () => entityListState.run(svc.listEntities({ scope: props.scope }))
+const loadCurrentPage = () => entityListState.run(
+  isGroupView.value
+    ? svc.listEntities({ scope: props.scope, group: activeGroup.value, limit: 1000 })
+    : svc.listEntities({
+        scope: props.scope,
+        domain: activeDomain.value || undefined,
+        artifactType: typeFilter.value || undefined,
+        limit: PAGE_SIZE,
+        offset: offset.value,
+      })
+)
+
+const load = () => { resetPage(); loadCurrentPage() }
 const loadGroups = () => groupsState.run(svc.listGroups('model-project'))
+
+const goToNextPage = () => { goNext(); loadCurrentPage() }
+const goToPrevPage = () => { goPrev(); loadCurrentPage() }
 
 onMounted(() => {
   if (!isGlobal.value) {
@@ -69,6 +95,8 @@ onMounted(() => {
 })
 
 watch(() => props.scope, () => { typeFilter.value = ''; load() })
+watch(activeGroup, () => load())
+watch([activeDomain, typeFilter], () => { if (!isGroupView.value) load() })
 
 let refreshEventSource: EventSource | null = null
 onMounted(() => {
@@ -101,11 +129,11 @@ const groupOptions = computed(() => {
   })
 })
 
+// Domain breakdown counts are only meaningful in group view (all group items loaded).
 const activeDomainCounts = computed((): Record<string, number> | undefined => {
-  if (!entityListState.data.value) return undefined
+  if (!isGroupView.value || !entityListState.data.value) return undefined
   const counts: Record<string, number> = {}
   for (const item of entityListState.data.value.items) {
-    if (activeGroup.value && (item.group ?? 'uncategorized') !== activeGroup.value) continue
     if (item.domain) counts[item.domain] = (counts[item.domain] ?? 0) + 1
   }
   return counts
@@ -126,11 +154,14 @@ const sortBy = (key: SortKey) => {
 }
 
 const sortedEntities = computed(() => {
-  const items = entityListState.data.value?.items.filter(item =>
-    (!typeFilter.value || item.artifact_type === typeFilter.value) &&
-    (!activeGroup.value || (item.group ?? 'uncategorized') === activeGroup.value) &&
-    (!activeDomain.value || item.domain === activeDomain.value),
-  ) ?? []
+  // Group view: server returns all group items, client filters by domain + type.
+  // Non-group view: server already filtered; client only sorts.
+  const items = isGroupView.value
+    ? (entityListState.data.value?.items.filter(item =>
+        (!typeFilter.value || item.artifact_type === typeFilter.value) &&
+        (!activeDomain.value || item.domain === activeDomain.value)
+      ) ?? [])
+    : (entityListState.data.value?.items ?? [])
   if (!sortKey.value) return items
   return [...items].sort((a, b) => {
     if (sortKey.value === 'type') return compareValues(a.artifact_type, b.artifact_type)
@@ -140,14 +171,6 @@ const sortedEntities = computed(() => {
     return compareValues(getEntityConnectionTotal(a), getEntityConnectionTotal(b))
   })
 })
-
-const hierarchicalEntities = useHierarchicalEntities(sortedEntities)
-
-const hierarchyMarker = (relationType?: string) => {
-  if (relationType === 'composition') return '◆'
-  if (relationType === 'aggregation') return '◇'
-  return '↳'
-}
 
 const browseReturnQuery = computed(() => {
   const q: Record<string, string> = {}
@@ -163,6 +186,12 @@ const pageTitle = computed(() => {
   return `${scope}${domainPart}Entities`
 })
 const sortArrow = (key: SortKey) => sortKey.value === key ? (sortOrder.value === 1 ? '↑' : '↓') : ''
+
+const displayCount = computed(() => {
+  const total = entityListState.data.value?.total ?? 0
+  if (isGroupView.value) return `${sortedEntities.value.length} / ${total}`
+  return String(total)
+})
 </script>
 
 <template>
@@ -211,9 +240,7 @@ const sortArrow = (key: SortKey) => sortKey.value === key ? (sortOrder.value ===
           <h1 class="page-title">
             <span v-if="isGlobal" class="global-badge">Global</span>
             {{ pageTitle }}
-            <span v-if="entityListState.data.value" class="count">
-              ({{ hierarchicalEntities.length }}<template v-if="typeFilter"> / {{ entityListState.data.value.total }}</template>)
-            </span>
+            <span v-if="entityListState.data.value" class="count">({{ displayCount }})</span>
           </h1>
           <p class="subtitle">
             <template v-if="isGlobal">Read-only view of the shared global (enterprise) repository.</template>
@@ -243,48 +270,53 @@ const sortArrow = (key: SortKey) => sortKey.value === key ? (sortOrder.value ===
       <div v-else-if="entityListState.errorMessage.value" class="state-msg state-msg--error">{{ entityListState.errorMessage.value }}</div>
 
       <template v-else-if="entityListState.data.value">
-        <div v-if="hierarchicalEntities.length === 0" class="state-msg">
+        <div v-if="sortedEntities.length === 0" class="state-msg">
           <template v-if="activeGroup">No entities in "{{ groupOptions.find(g => g.slug === activeGroup)?.name ?? activeGroup }}" yet.</template>
           <template v-else>No entities found{{ activeDomain ? ` in ${getDomainLabel(activeDomain)}` : '' }}{{ typeFilter ? ` of type "${typeFilter}"` : '' }}.</template>
         </div>
 
         <EntitiesTreemap v-else-if="viewMode === 'treemap'" :items="sortedEntities" :active-domain="activeDomain" />
 
-        <table v-else class="entity-table">
-          <thead>
-            <tr>
-              <th>Name</th>
-              <th><button class="sort-btn" @click="sortBy('type')">Type {{ sortArrow('type') }}</button></th>
-              <th v-if="!activeDomain">Domain</th>
-              <th class="th-conn">
-                <button class="sort-btn" @click="sortBy('total')">Connections {{ sortArrow('total') }}</button>
-                <span class="th-conn-sub">(<button class="sort-sub" @click="sortBy('in')">in {{ sortArrow('in') }}</button> / <button class="sort-sub" @click="sortBy('sym')">sym {{ sortArrow('sym') }}</button> / <button class="sort-sub" @click="sortBy('out')">out {{ sortArrow('out') }}</button>)</span>
-              </th>
-              <th>Status</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr v-for="entity in hierarchicalEntities" :key="`${entity.artifact_id}::${entity.parent_entity_id ?? ''}`" :class="{ 'row--global': entity.is_global }">
-              <td>
-                <div class="name-cell" :style="{ paddingLeft: `${(entity.hierarchy_depth ?? entity.specialization_depth ?? 0) * 18}px` }">
-                  <span v-if="(entity.hierarchy_depth ?? entity.specialization_depth)" class="spec-marker">{{ hierarchyMarker(entity.hierarchy_relation_type) }}</span>
+        <template v-else>
+          <table class="entity-table">
+            <thead>
+              <tr>
+                <th>Name</th>
+                <th><button class="sort-btn" @click="sortBy('type')">Type {{ sortArrow('type') }}</button></th>
+                <th v-if="!activeDomain">Domain</th>
+                <th class="th-conn">
+                  <button class="sort-btn" @click="sortBy('total')">Connections {{ sortArrow('total') }}</button>
+                  <span class="th-conn-sub">(<button class="sort-sub" @click="sortBy('in')">in {{ sortArrow('in') }}</button> / <button class="sort-sub" @click="sortBy('sym')">sym {{ sortArrow('sym') }}</button> / <button class="sort-sub" @click="sortBy('out')">out {{ sortArrow('out') }}</button>)</span>
+                </th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="entity in sortedEntities" :key="entity.artifact_id" :class="{ 'row--global': entity.is_global }">
+                <td>
                   <RouterLink :to="{ path: '/entity', query: { id: entity.artifact_id, ...browseReturnQuery } }">{{ entity.name || friendlyEntityId(entity.artifact_id) }}</RouterLink>
-                </div>
-                <span v-if="entity.is_global && !isGlobal" class="global-chip" title="From the global repository">global</span>
-                <button v-if="!activeGroup && groupOptions.length > 1 && entity.group && entity.group !== 'uncategorized'" class="group-chip" :title="`In group: ${entity.group}`" @click="setGroup(entity.group ?? '')">{{ entity.group }}</button>
-              </td>
-              <td>
-                <span class="type-cell">
-                  <ArchimateTypeGlyph :type="entity.artifact_type" :size="15" class="type-glyph" />
-                  <span class="mono">{{ entity.artifact_type }}</span>
-                </span>
-              </td>
-              <td v-if="!activeDomain"><span class="domain-badge" :class="`domain--${entity.domain}`">{{ entity.domain }}</span></td>
-              <td class="conn-counts">{{ getEntityConnectionTotal(entity) }}<span class="conn-split">({{ entity.conn_in ?? 0 }} / {{ entity.conn_sym ?? 0 }} / {{ entity.conn_out ?? 0 }})</span></td>
-              <td><span class="status-badge" :class="`status--${entity.status}`">{{ entity.status }}</span></td>
-            </tr>
-          </tbody>
-        </table>
+                  <span v-if="entity.is_global && !isGlobal" class="global-chip" title="From the global repository">global</span>
+                  <button v-if="!activeGroup && groupOptions.length > 1 && entity.group && entity.group !== 'uncategorized'" class="group-chip" :title="`In group: ${entity.group}`" @click="setGroup(entity.group ?? '')">{{ entity.group }}</button>
+                </td>
+                <td>
+                  <span class="type-cell">
+                    <ArchimateTypeGlyph :type="entity.artifact_type" :size="15" class="type-glyph" />
+                    <span class="mono">{{ entity.artifact_type }}</span>
+                  </span>
+                </td>
+                <td v-if="!activeDomain"><span class="domain-badge" :class="`domain--${entity.domain}`">{{ entity.domain }}</span></td>
+                <td class="conn-counts">{{ getEntityConnectionTotal(entity) }}<span class="conn-split">({{ entity.conn_in ?? 0 }} / {{ entity.conn_sym ?? 0 }} / {{ entity.conn_out ?? 0 }})</span></td>
+                <td><span class="status-badge" :class="`status--${entity.status}`">{{ entity.status }}</span></td>
+              </tr>
+            </tbody>
+          </table>
+
+          <div v-if="!isGroupView && pageCount > 1" class="pagination">
+            <button class="page-btn" :disabled="!hasPrev" @click="goToPrevPage">← Prev</button>
+            <span class="page-info">Page {{ currentPage + 1 }} of {{ pageCount }}</span>
+            <button class="page-btn" :disabled="!hasNext" @click="goToNextPage">Next →</button>
+          </div>
+        </template>
       </template>
     </section>
   </div>
@@ -331,8 +363,6 @@ const sortArrow = (key: SortKey) => sortKey.value === key ? (sortOrder.value ===
 .th-conn { min-width: 170px; }
 .th-conn-sub { display: block; margin-top: 2px; font-size: 9px; font-weight: 400; letter-spacing: 0; text-transform: none; color: #9ca3af; }
 .type-cell { display: inline-flex; align-items: center; gap: 8px; }
-.name-cell { display: inline-flex; align-items: center; gap: 6px; }
-.spec-marker { color: #9ca3af; font-size: 12px; }
 .type-glyph { color: #374151; fill: none; flex: 0 0 auto; }
 .mono, .conn-counts { font-family: monospace; }
 .mono { font-size: 12px; color: #374151; }
@@ -344,4 +374,10 @@ const sortArrow = (key: SortKey) => sortKey.value === key ? (sortOrder.value ===
 .group-chip:hover { background: #bae6fd; }
 .row--global td { background: #fffbeb; }
 .row--global:hover td { background: #fef9e7; }
+
+.pagination { display: flex; align-items: center; gap: 12px; padding: 12px 0; justify-content: center; }
+.page-btn { padding: 6px 14px; border: 1px solid #d1d5db; border-radius: 6px; background: white; color: #374151; cursor: pointer; font-size: 13px; }
+.page-btn:hover:not(:disabled) { background: #f3f4f6; }
+.page-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+.page-info { font-size: 13px; color: #6b7280; }
 </style>

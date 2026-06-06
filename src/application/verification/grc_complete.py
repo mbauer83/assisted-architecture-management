@@ -10,10 +10,16 @@ Checks:
 from __future__ import annotations
 
 import json
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, TypedDict
 
 if TYPE_CHECKING:
     from src.application.assurance_ports import ConfidentialAssuranceStore
+
+
+class _CheckEntry(TypedDict):
+    passed: bool
+    gap_count: int
+    gaps: list[dict[str, str]]
 
 
 def _obligation_gaps(
@@ -72,7 +78,7 @@ def _risk_no_owner(
     return gaps
 
 
-def _check(checks: dict[str, dict[str, object]], key: str, gaps: list[dict[str, str]]) -> None:
+def _check(checks: dict[str, _CheckEntry], key: str, gaps: list[dict[str, str]]) -> None:
     checks[key] = {
         "passed": len(gaps) == 0,
         "gap_count": len(gaps),
@@ -85,14 +91,14 @@ def run_grc_complete(store: ConfidentialAssuranceStore) -> dict[str, object]:
     all_nodes = store.list_nodes()
     all_edges = store.list_edges()
 
-    checks: dict[str, dict[str, object]] = {}
+    checks: dict[str, _CheckEntry] = {}
 
     _check(checks, "obligation_has_constraint", _obligation_gaps(all_nodes, all_edges))
     _check(checks, "risk_has_treatment", _risk_no_treatment(all_nodes))
     _check(checks, "risk_has_owner", _risk_no_owner(all_nodes, all_edges))
 
-    all_passed = all(bool(v["passed"]) for v in checks.values())
-    total_gaps = sum(int(str(v["gap_count"])) for v in checks.values())
+    all_passed = all(v["passed"] for v in checks.values())
+    total_gaps = sum(v["gap_count"] for v in checks.values())
     failed_count = sum(1 for v in checks.values() if not v["passed"])
     summary = (
         "All GRC coverage checks passed."

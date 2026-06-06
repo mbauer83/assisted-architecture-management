@@ -24,30 +24,33 @@ def search_fts(
     if not tokens or not fts_enabled:
         return []
     match_query = " OR ".join(f'"{token}"' for token in tokens)
+    # Entity name column (position 1) gets 15× weight over content_text (0.5).
+    # Columns: artifact_id(UNINDEXED), name, artifact_type, domain, subdomain, keywords, content_text, display_label
+    _ENT_WEIGHTS = "0, 15.0, 1.0, 1.0, 1.0, 4.0, 0.5, 4.0"
     statements = [
         "SELECT artifact_id, 'entity' AS record_type, "
-        "1.0 / (1.0 + bm25(entities_fts)) AS score "
+        f"-bm25(entities_fts, {_ENT_WEIGHTS}) AS score "
         "FROM entities_fts WHERE entities_fts MATCH ?"
     ]
     params: list[str] = [match_query]
     if include_connections:
         statements.append(
             "SELECT artifact_id, 'connection' AS record_type, "
-            "1.0 / (1.0 + bm25(connections_fts)) AS score "
+            "-bm25(connections_fts) AS score "
             "FROM connections_fts WHERE connections_fts MATCH ?"
         )
         params.append(match_query)
     if include_diagrams:
         statements.append(
             "SELECT artifact_id, 'diagram' AS record_type, "
-            "1.0 / (1.0 + bm25(diagrams_fts)) AS score "
+            "-bm25(diagrams_fts) AS score "
             "FROM diagrams_fts WHERE diagrams_fts MATCH ?"
         )
         params.append(match_query)
     if include_documents:
         statements.append(
             "SELECT artifact_id, 'document' AS record_type, "
-            "1.0 / (1.0 + bm25(documents_fts)) AS score "
+            "-bm25(documents_fts) AS score "
             "FROM documents_fts WHERE documents_fts MATCH ?"
         )
         params.append(match_query)

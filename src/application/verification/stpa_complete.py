@@ -9,10 +9,16 @@ Checks that the full STPA analysis chain is connected:
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, TypedDict
 
 if TYPE_CHECKING:
     from src.application.assurance_ports import ConfidentialAssuranceStore
+
+
+class _CheckEntry(TypedDict):
+    passed: bool
+    gap_count: int
+    gaps: list[dict[str, str]]
 
 
 def _gap_nodes(
@@ -47,7 +53,7 @@ def _gap_nodes(
 
 
 def _check(
-    checks: dict[str, dict[str, object]],
+    checks: dict[str, _CheckEntry],
     key: str,
     gaps: list[dict[str, str]],
 ) -> None:
@@ -63,7 +69,7 @@ def run_stpa_complete(store: ConfidentialAssuranceStore) -> dict[str, object]:
     all_nodes = store.list_nodes()
     all_edges = store.list_edges()
 
-    checks: dict[str, dict[str, object]] = {}
+    checks: dict[str, _CheckEntry] = {}
 
     _check(
         checks, "hazard_leads_to_loss",
@@ -90,8 +96,8 @@ def run_stpa_complete(store: ConfidentialAssuranceStore) -> dict[str, object]:
         _gap_nodes(all_nodes, "loss-scenario", all_edges, source_conn="derives", target_conn=None),
     )
 
-    all_passed = all(bool(v["passed"]) for v in checks.values())
-    total_gaps = sum(int(str(v["gap_count"])) for v in checks.values())
+    all_passed = all(v["passed"] for v in checks.values())
+    total_gaps = sum(v["gap_count"] for v in checks.values())
     failed_count = sum(1 for v in checks.values() if not v["passed"])
     summary = (
         "All STPA coverage checks passed."

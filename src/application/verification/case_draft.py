@@ -7,10 +7,16 @@ Functions:
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, TypedDict
 
 if TYPE_CHECKING:
     from src.application.assurance_ports import ConfidentialAssuranceStore
+
+
+class _CheckEntry(TypedDict):
+    passed: bool
+    gap_count: int
+    gaps: list[dict[str, str]]
 
 
 # ── GSN scaffolding ────────────────────────────────────────────────────────────
@@ -166,7 +172,7 @@ def draft_gsn_from_store(store: ConfidentialAssuranceStore) -> dict[str, object]
 # ── Argument completeness ──────────────────────────────────────────────────────
 
 def _check(
-    checks: dict[str, dict[str, object]],
+    checks: dict[str, _CheckEntry],
     key: str,
     gaps: list[dict[str, str]],
 ) -> None:
@@ -190,7 +196,7 @@ def run_case_completeness(store: ConfidentialAssuranceStore) -> dict[str, object
     all_nodes = store.list_nodes()
     all_edges = store.list_edges()
 
-    checks: dict[str, dict[str, object]] = {}
+    checks: dict[str, _CheckEntry] = {}
 
     # Check 1: every constraint has evidence
     constraints = _nodes_of(all_nodes, "assurance-constraint")
@@ -237,8 +243,8 @@ def run_case_completeness(store: ConfidentialAssuranceStore) -> dict[str, object
     ]
     _check(checks, "loss_has_hazard", losses_no_hazard)
 
-    all_passed = all(bool(v["passed"]) for v in checks.values())
-    total_gaps = sum(int(str(v["gap_count"])) for v in checks.values())
+    all_passed = all(v["passed"] for v in checks.values())
+    total_gaps = sum(v["gap_count"] for v in checks.values())
     failed_count = sum(1 for v in checks.values() if not v["passed"])
     summary = (
         "All argument-completeness checks passed."

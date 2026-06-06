@@ -22,3 +22,13 @@ repo_init:
 #     sysml_v2_min:
 #       enabled: false
 modules: {}
+
+# Storage backend configuration.
+# storage.assurance selects the confidential assurance store + signals adapters.
+# storage.read_model is a reserved seam for a future optional text-index backend toggle.
+storage:
+  assurance:
+    store_backend: sqlcipher             # sqlcipher | pocketbase | private-git
+    signals_backend: sqlcipher-colocated # sqlcipher-colocated | sqlite | encrypted
+    max_classification: TLP:AMBER        # TLP:WHITE | TLP:GREEN | TLP:AMBER | TLP:RED
+  read_model: {}                         # reserved — future Tantivy-FTS toggle seam

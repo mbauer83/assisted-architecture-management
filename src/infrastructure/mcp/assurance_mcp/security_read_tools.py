@@ -1,19 +1,47 @@
-"""Security-signal read-only MCP tools.
+"""Security-signal read-only MCP tools (SC-2/SC-4 updates).
 
 Tools registered on arch-assurance-read:
   assurance_list_bom_components  — query ingested BOM components
   assurance_list_vulnerabilities — query vuln findings by PURL/severity
   assurance_security_stats       — counts of BOM/vuln/anchor data
   assurance_scan_ai_candidates   — heuristic AI-BOM candidate scan
-  assurance_aibom_export         — emit CycloneDX 1.6 ML-BOM from provided components
+  assurance_aibom_export         — emit CycloneDX 1.6 ML-BOM from provided components JSON
   assurance_aibom_coverage       — coverage/gap report for AI-BOM marking
+
+SC-2: BOM/vuln tools are gated behind store-unlock when signals_backend is
+      confidential (sqlcipher-colocated or encrypted). Locked ⇒ signals_locked_response.
+SC-4: Results are filtered by max_classification TLP ceiling before return;
+      withheld counts are emitted to the exposure log.
 """
 
 from __future__ import annotations
 
 from mcp.server.fastmcp import FastMCP  # type: ignore[import-not-found]
 
-from src.infrastructure.mcp.assurance_mcp.context import get_assurance_context
+from src.infrastructure.mcp.assurance_mcp.context import (
+    _exposure_log,
+    get_assurance_context,
+    is_above_ceiling,
+)
+
+
+def _filter_by_ceiling(
+    records: list[dict[str, object]],
+    ceiling: str,
+    label: str,
+) -> tuple[list[dict[str, object]], int]:
+    """Remove records whose TLP exceeds ceiling; return (kept, withheld_count)."""
+    kept: list[dict[str, object]] = []
+    withheld = 0
+    for rec in records:
+        tlp = str(rec.get("tlp", "TLP:AMBER"))
+        if is_above_ceiling(tlp, ceiling):
+            withheld += 1
+        else:
+            kept.append(rec)
+    if withheld:
+        _exposure_log.info("%s: ceiling=%s returned=%d withheld=%d", label, ceiling, len(kept), withheld)
+    return kept, withheld
 
 
 def register_security_read_tools(server: FastMCP) -> None:
@@ -24,18 +52,23 @@ def register_security_read_tools(server: FastMCP) -> None:
         description=(
             "List BOM components ingested via assurance_import_bom. "
             "Filter by anchor_entity_id (the architecture entity the BOM is anchored to) "
-            "or purl (Package URL for a specific component)."
+            "or purl (Package URL for a specific component). "
+            "Requires the assurance store to be unlocked when using confidential signals storage."
         ),
     )
     def assurance_list_bom_components(
         anchor_entity_id: str | None = None,
         purl: str | None = None,
     ) -> dict[str, object]:
+        if not ctx.signals_available():
+            return ctx.signals_locked_response()
+        ceiling = ctx.max_classification
         components = ctx.connector.list_bom_components(
             anchor_entity_id=anchor_entity_id,
             purl=purl,
         )
-        return {"components": components, "count": len(components)}
+        kept, withheld = _filter_by_ceiling(components, ceiling, "list_bom_components")
+        return {"components": kept, "count": len(kept), "withheld": withheld}
 
     @server.tool(
         name="assurance_list_vulnerabilities",
@@ -43,24 +76,32 @@ def register_security_read_tools(server: FastMCP) -> None:
             "List vulnerability findings ingested via assurance_import_vulnerabilities. "
             "Filter by purl (Package URL of the affected component) or severity "
             "(CRITICAL, HIGH, MEDIUM, LOW, NONE). "
-            "Contextualise these findings against STPA-Sec hazards and loss-scenarios."
+            "Contextualise these findings against STPA-Sec hazards and loss-scenarios. "
+            "Requires the assurance store to be unlocked when using confidential signals storage."
         ),
     )
     def assurance_list_vulnerabilities(
         purl: str | None = None,
         severity: str | None = None,
     ) -> dict[str, object]:
+        if not ctx.signals_available():
+            return ctx.signals_locked_response()
+        ceiling = ctx.max_classification
         vulns = ctx.connector.list_vulnerabilities(purl=purl, severity=severity)
-        return {"vulnerabilities": vulns, "count": len(vulns)}
+        kept, withheld = _filter_by_ceiling(vulns, ceiling, "list_vulnerabilities")
+        return {"vulnerabilities": kept, "count": len(kept), "withheld": withheld}
 
     @server.tool(
         name="assurance_security_stats",
         description=(
             "Return counts of security signal data: BOM ingests, BOM components, "
-            "vulnerability records, and anchor mappings."
+            "vulnerability records, and anchor mappings. "
+            "Requires the assurance store to be unlocked when using confidential signals storage."
         ),
     )
     def assurance_security_stats() -> dict[str, object]:
+        if not ctx.signals_available():
+            return ctx.signals_locked_response()
         return ctx.connector.get_stats()
 
     @server.tool(
@@ -114,17 +155,26 @@ def register_security_read_tools(server: FastMCP) -> None:
             "AI-BOM coverage/gap report: shows BOM components that have no anchor mapping "
             "(not linked to an architecture entity) and anchor mappings for entities "
             "that are not yet marked with an ai_role. "
-            "Use this to identify where AI-component marking is incomplete."
+            "Use this to identify where AI-component marking is incomplete. "
+            "Requires the assurance store to be unlocked when using confidential signals storage."
         ),
     )
     def assurance_aibom_coverage() -> dict[str, object]:
-        components = ctx.connector.list_bom_components()
-        anchors = ctx.connector.list_anchors()
+        if not ctx.signals_available():
+            return ctx.signals_locked_response()
+        ceiling = ctx.max_classification
+        components, comp_withheld = _filter_by_ceiling(
+            ctx.connector.list_bom_components(), ceiling, "aibom_coverage_components"
+        )
+        anchors, _ = _filter_by_ceiling(
+            ctx.connector.list_anchors(), ceiling, "aibom_coverage_anchors"
+        )
         unanchored = [c for c in components if not c.get("arch_entity_id")]
         anchor_entity_ids = {str(a["arch_entity_id"]) for a in anchors}
         unanchored_page = unanchored[:50]
         return {
             "total_bom_components": len(components),
+            "withheld_components": comp_withheld,
             "unanchored_components": len(unanchored),
             "unanchored_truncated": len(unanchored) > 50,
             "anchor_mappings": len(anchors),
@@ -132,7 +182,7 @@ def register_security_read_tools(server: FastMCP) -> None:
             "anchored_entity_ids": sorted(anchor_entity_ids),
             "summary": (
                 f"{len(unanchored)} BOM component(s) not linked to an architecture entity. "
-                f"Call assurance_set_anchor to map them, or assurance_scan_ai_candidates to "
-                f"find candidates."
+                "Call assurance_set_anchor to map them, or assurance_scan_ai_candidates to "
+                "find candidates."
             ),
         }

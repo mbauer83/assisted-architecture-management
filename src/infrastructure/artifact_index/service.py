@@ -22,6 +22,7 @@ from src.application._artifact_query_helpers import (
     read_entity,
     to_set,
 )
+from src.application.ports import ArtifactStorePort
 from src.config.workspace_paths import infer_repo_scope
 from src.domain.artifact_types import (
     ArtifactSummary,
@@ -56,7 +57,7 @@ from .versioning import ReadModelVersion, build_read_model_etag
 _T = TypeVar("_T", EntityRecord, ConnectionRecord, DiagramRecord, DocumentRecord)
 
 
-def shared_artifact_index(repo_root: Path | list[Path] | list[RepoMount]) -> "ArtifactIndex":
+def shared_artifact_index(repo_root: Path | list[Path] | list[RepoMount]) -> ArtifactStorePort:
     return get_shared_index(ArtifactIndex, repo_root)
 
 

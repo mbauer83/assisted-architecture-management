@@ -1018,7 +1018,7 @@ def test_arch_backend_redirects_stdio_when_background_tty_job(monkeypatch, tmp_p
         "resolve_server_roots",
         lambda repo_root, enterprise_root: (tmp_path, None),
     )
-    monkeypatch.setattr(arch_backend, "_build_app", lambda git_ssh_passphrase=None: object())
+    monkeypatch.setattr(arch_backend, "_build_app", lambda credentials=None: object())
     monkeypatch.setattr(arch_backend.uvicorn, "run", lambda app, host, port, log_level: None)
 
     arch_backend.main(["--repo-root", str(tmp_path)])
@@ -1089,7 +1089,7 @@ def test_arch_backend_restart_stops_then_returns_to_startup(monkeypatch, capsys,
         "backend_status",
         lambda port=8000: {"running": False, "reason": "not_running"},
     )
-    monkeypatch.setattr(arch_backend, "_build_app", lambda git_ssh_passphrase=None: object())
+    monkeypatch.setattr(arch_backend, "_build_app", lambda credentials=None: object())
     ran: dict[str, object] = {}
 
     def fake_run(app, host: str, port: int, log_level: str) -> None:
@@ -1123,7 +1123,7 @@ def test_arch_backend_build_failure_does_not_write_backend_state(monkeypatch, tm
     monkeypatch.setattr(
         arch_backend,
         "_build_app",
-        lambda git_ssh_passphrase=None: (_ for _ in ()).throw(ModuleNotFoundError("fastapi")),
+        lambda credentials=None: (_ for _ in ()).throw(ModuleNotFoundError("fastapi")),
     )
 
     try:

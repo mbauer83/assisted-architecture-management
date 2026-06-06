@@ -19,7 +19,11 @@ from __future__ import annotations
 
 from mcp.server.fastmcp import FastMCP  # type: ignore[import-not-found]
 
-from src.infrastructure.mcp.assurance_mcp.context import get_assurance_context
+from src.infrastructure.mcp.assurance_mcp.context import (
+    _exposure_log,
+    get_assurance_context,
+    is_above_ceiling,
+)
 from src.infrastructure.mcp.assurance_mcp.dashboard_tools import register_dashboard_tools
 from src.infrastructure.mcp.assurance_mcp.security_read_tools import register_security_read_tools
 
@@ -37,20 +41,26 @@ def register_read_tools(server: FastMCP) -> None:
         ),
     )
     def assurance_store_status() -> dict[str, object]:
-        store = ctx.store
-        configured = store._db_path.exists()  # noqa: SLF001
+        from src.infrastructure.mcp.assurance_mcp.context import default_db_path  # noqa: PLC0415
+
+        bundle = ctx._bundle()  # noqa: SLF001
+        store = bundle.store
         unlocked = store.is_unlocked()
+        db_path = default_db_path()
         return {
-            "configured": configured,
+            "store_backend": bundle.store_backend,
+            "signals_backend": bundle.signals_backend,
+            "max_classification": ctx.max_classification,
+            "db_path": str(db_path),
+            "db_exists": db_path.exists(),
             "unlocked": unlocked,
-            "db_path": str(store._db_path),  # noqa: SLF001
-            "status": "unlocked" if unlocked else ("locked" if configured else "not_initialised"),
+            "status": "unlocked" if unlocked else ("locked" if db_path.exists() else "not_initialised"),
             "hint": (
                 None
                 if unlocked
                 else (
                     "Run `arch-assurance unlock` to open the store."
-                    if configured
+                    if db_path.exists()
                     else "Run `arch-assurance init` to initialise the store."
                 )
             ),
@@ -71,13 +81,27 @@ def register_read_tools(server: FastMCP) -> None:
     ) -> dict[str, object]:
         if not ctx.is_available():
             return ctx.locked_response()
+        ceiling = ctx.max_classification
         nodes = ctx.store.list_nodes(
             node_type=node_type,
             status=status,
             concern_class=concern_class,
             tlp=tlp,
         )
-        return {"nodes": nodes, "count": len(nodes)}
+        exposed: list[dict[str, object]] = []
+        withheld_count = 0
+        for node in nodes:
+            node_tlp = str(node.get("tlp", "TLP:WHITE"))
+            if is_above_ceiling(node_tlp, ceiling):
+                withheld_count += 1
+            else:
+                exposed.append(node)
+        if withheld_count:
+            _exposure_log.info(
+                "list_nodes: ceiling=%s returned=%d withheld=%d",
+                ceiling, len(exposed), withheld_count,
+            )
+        return {"nodes": exposed, "count": len(exposed), "withheld": withheld_count}
 
     @server.tool(
         name="assurance_read_node",
@@ -89,6 +113,14 @@ def register_read_tools(server: FastMCP) -> None:
         node = ctx.store.get_node(node_id)
         if node is None:
             return ctx.not_found_response(node_id)
+        node_tlp = str(node.get("tlp", "TLP:WHITE"))
+        ceiling = ctx.max_classification
+        if is_above_ceiling(node_tlp, ceiling):
+            _exposure_log.info(
+                "read_node: ceiling=%s withheld=%s tlp=%s",
+                ceiling, node_id, node_tlp,
+            )
+            return ctx.withheld_response(node_id, node_tlp)
         edges_out = ctx.store.list_edges(source_id=node_id)
         edges_in = ctx.store.list_edges(target_id=node_id)
         return {"node": node, "outgoing_edges": edges_out, "incoming_edges": edges_in}

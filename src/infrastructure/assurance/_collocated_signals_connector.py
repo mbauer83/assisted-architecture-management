@@ -1,26 +1,22 @@
-"""SQLite-backed SecuritySignalConnector adapter — explicit public-BOM opt-out path.
+"""Co-located SQLCipher security-signals connector (SC-2 default).
 
-Stores BOM ingest records, individual components, vulnerability findings,
-and anchor mappings (component_ref → arch entity ID) in a plain SQLite DB
-at .arch-assurance/security-signals.db.
+Stores BOM ingest records, components, vulnerabilities, and anchor mappings
+in the *same* SQLCipher database as the main assurance store. The connection
+is shared — one trust zone, one encryption key, one unlock event.
 
-This adapter is the explicit public-BOM opt-out path (signals_backend: sqlite).
-The default confidential path is CollocatedSQLCipherSignalsConnector
-(signals_backend: sqlcipher-colocated), which co-locates signals in the
-encrypted SQLCipher store. Use sqlite only when BOM data is intentionally public.
+This is the default signals backend (signals_backend: sqlcipher-colocated).
+The plaintext SQLite connector is the explicit public-BOM opt-out path.
 
-All tables carry a `tlp` column (default TLP:AMBER) — even for the plain-SQLite
-path the schema is consistent; TLP on plain-SQLite is informational only.
+All tables carry a `tlp` column (default TLP:AMBER — confidential). Reads are
+gated behind store-unlock; locked ⇒ connector methods raise RuntimeError.
 """
 
 from __future__ import annotations
 
 import hashlib
 import logging
-import sqlite3
 import time
-from pathlib import Path
-from typing import Any
+from typing import Any, Callable
 
 from src.infrastructure.assurance._sbom_parser import parse_bom
 from src.infrastructure.assurance._schema import SECURITY_SIGNALS_SCHEMA_SQL
@@ -33,15 +29,8 @@ def _now_iso() -> str:
 
 
 def _stable_id(prefix: str, *parts: str) -> str:
-    """Deterministic ID — same logical inputs always yield the same ID (enables idempotent upsert)."""
     slug = hashlib.sha256("|".join(parts).encode()).hexdigest()[:16]
     return f"{prefix}@{slug}"
-
-
-def _transient_id(prefix: str, *parts: str) -> str:
-    """Non-deterministic ID with epoch — for records where uniqueness per-call is desired."""
-    slug = hashlib.sha256("|".join(parts).encode()).hexdigest()[:12]
-    return f"{prefix}@{int(time.time())}.{slug}"
 
 
 def _safe_float(v: object) -> float | None:
@@ -53,35 +42,25 @@ def _safe_float(v: object) -> float | None:
         return None
 
 
-def _dict_row(cursor: Any, row: Any) -> dict[str, object]:
-    cols = [col[0] for col in cursor.description]
-    return dict(zip(cols, row))
+class CollocatedSQLCipherSignalsConnector:
+    """SecuritySignalConnector adapter that co-locates signals in the SQLCipher store.
 
+    Accepts the store's private connection factory (same pattern as the archive).
+    All data is encrypted at rest via the store's SQLCipher key.
+    """
 
-class SQLiteSecurityConnector:
-    """SQLite adapter implementing SecuritySignalConnector."""
+    def __init__(self, conn_factory: Callable[[], Any]) -> None:
+        self._conn_factory = conn_factory
 
-    def __init__(self, db_path: Path) -> None:
-        self._db_path = db_path
-        self._conn: sqlite3.Connection | None = None
-
-    def _open(self) -> sqlite3.Connection:
-        if self._conn is None:
-            self._db_path.parent.mkdir(parents=True, exist_ok=True)
-            conn = sqlite3.connect(str(self._db_path))
-            conn.executescript(SECURITY_SIGNALS_SCHEMA_SQL)
-            conn.commit()
-            conn.row_factory = _dict_row  # type: ignore[assignment]
-            self._conn = conn
-        return self._conn
-
-    def close(self) -> None:
-        if self._conn is not None:
-            self._conn.close()
-            self._conn = None
-
-    def __del__(self) -> None:
-        self.close()
+    def _conn(self) -> Any:
+        c = self._conn_factory()
+        if c is None:
+            raise RuntimeError("Assurance store is locked — cannot access security signals.")
+        # Always run schema DDL — IF NOT EXISTS makes it idempotent, and the SQLCipher
+        # store may create a new connection object after a lock/unlock cycle.
+        c.executescript(SECURITY_SIGNALS_SCHEMA_SQL)
+        c.commit()
+        return c
 
     def import_bom(
         self,
@@ -90,8 +69,9 @@ class SQLiteSecurityConnector:
         anchor_entity_id: str,
         bom_format: str = "cyclonedx",
         source_file: str = "",
+        tlp: str = "TLP:AMBER",
     ) -> dict[str, object]:
-        conn = self._open()
+        conn = self._conn()
         try:
             meta, components = parse_bom(bom_data)
         except Exception as exc:  # noqa: BLE001
@@ -100,20 +80,21 @@ class SQLiteSecurityConnector:
         bom_serial = str(meta.get("bom_serial") or "")
         bom_version = str(meta.get("bom_version") or "1")
         detected_format = str(meta.get("bom_format") or bom_format)
-
-        # Deterministic ID: same anchor+serial+version always upserts the same row (idempotent).
         ingest_id = _stable_id("BOM", anchor_entity_id, bom_serial, bom_version)
         now = _now_iso()
 
-        anchors = {row["component_ref"]: row["arch_entity_id"]
-                   for row in conn.execute("SELECT component_ref, arch_entity_id FROM anchor_mappings").fetchall()}
+        anchors = {
+            row["component_ref"]: row["arch_entity_id"]
+            for row in conn.execute(
+                "SELECT component_ref, arch_entity_id FROM anchor_mappings"
+            ).fetchall()
+        }
 
         component_rows: list[dict[str, object]] = []
         for comp in components:
             purl = str(comp.get("purl") or "")
             cid = _stable_id("CMP", ingest_id, purl or str(comp.get("name") or ""))
-            arch_entity_id_match = anchors.get(purl) if purl else None
-            match_type = "anchor" if arch_entity_id_match else "none"
+            arch_match = anchors.get(purl) if purl else None
             component_rows.append({
                 "component_id": cid,
                 "ingest_id": ingest_id,
@@ -123,31 +104,33 @@ class SQLiteSecurityConnector:
                 "version": str(comp.get("version") or ""),
                 "component_type": str(comp.get("component_type") or "library"),
                 "group_name": str(comp.get("group_name") or ""),
-                "arch_entity_id": arch_entity_id_match,
-                "match_type": match_type,
+                "arch_entity_id": arch_match,
+                "match_type": "anchor" if arch_match else "none",
                 "created_at": now,
+                "tlp": tlp,
             })
 
         conn.execute(
             "INSERT OR REPLACE INTO bom_ingests "
             "(ingest_id, anchor_entity_id, bom_serial, bom_version, bom_format, "
-            "component_count, ingested_at, source_file) VALUES (?,?,?,?,?,?,?,?)",
+            "component_count, ingested_at, source_file, tlp) VALUES (?,?,?,?,?,?,?,?,?)",
             (ingest_id, anchor_entity_id, bom_serial, bom_version, detected_format,
-             len(component_rows), now, source_file),
+             len(component_rows), now, source_file, tlp),
         )
         conn.executemany(
             "INSERT OR REPLACE INTO bom_components "
-            "(component_id,ingest_id,purl,cpe,name,version,component_type,group_name,"
-            "arch_entity_id,match_type,created_at) VALUES (?,?,?,?,?,?,?,?,?,?,?)",
+            "(component_id, ingest_id, purl, cpe, name, version, component_type, "
+            "group_name, arch_entity_id, match_type, created_at, tlp) "
+            "VALUES (?,?,?,?,?,?,?,?,?,?,?,?)",
             [
                 (r["component_id"], r["ingest_id"], r["purl"], r["cpe"], r["name"],
                  r["version"], r["component_type"], r["group_name"],
-                 r["arch_entity_id"], r["match_type"], r["created_at"])
+                 r["arch_entity_id"], r["match_type"], r["created_at"], r["tlp"])
                 for r in component_rows
             ],
         )
         conn.commit()
-        logger.info("BOM ingested: %s (%d components)", ingest_id, len(component_rows))
+        logger.info("BOM ingested (colocated): %s (%d components)", ingest_id, len(component_rows))
         return {
             "ingest_id": ingest_id,
             "anchor_entity_id": anchor_entity_id,
@@ -162,7 +145,7 @@ class SQLiteSecurityConnector:
         anchor_entity_id: str | None = None,
         purl: str | None = None,
     ) -> list[dict[str, object]]:
-        conn = self._open()
+        conn = self._conn()
         clauses: list[str] = []
         params: list[str] = []
         if anchor_entity_id:
@@ -184,8 +167,9 @@ class SQLiteSecurityConnector:
         vuln_records: list[dict[str, object]],
         *,
         source: str = "osv",
+        tlp: str = "TLP:AMBER",
     ) -> dict[str, object]:
-        conn = self._open()
+        conn = self._conn()
         now = _now_iso()
         inserted = 0
         for rec in vuln_records:
@@ -194,8 +178,8 @@ class SQLiteSecurityConnector:
                 continue
             purl = str(rec.get("purl") or rec.get("affected_purl") or "")
             db_specific = rec.get("database_specific")
-            fallback_severity = db_specific.get("severity", "") if isinstance(db_specific, dict) else ""
-            severity = str(rec.get("severity") or fallback_severity)
+            fallback_sev = db_specific.get("severity", "") if isinstance(db_specific, dict) else ""
+            severity = str(rec.get("severity") or fallback_sev)
             cvss = rec.get("cvss_score") or rec.get("score")
             vex_status = str(rec.get("vex_status") or "")
             vex_just = str(rec.get("vex_justification") or "")
@@ -204,10 +188,9 @@ class SQLiteSecurityConnector:
             conn.execute(
                 "INSERT OR REPLACE INTO vulnerabilities "
                 "(vuln_id,purl,ext_id,source,severity,cvss_score,vex_status,"
-                "vex_justification,description,ingested_at) VALUES (?,?,?,?,?,?,?,?,?,?)",
-                (vuln_id, purl, ext_id, source, severity,
-                 _safe_float(cvss),
-                 vex_status, vex_just, desc, now),
+                "vex_justification,description,ingested_at,tlp) VALUES (?,?,?,?,?,?,?,?,?,?,?)",
+                (vuln_id, purl, ext_id, source, severity, _safe_float(cvss),
+                 vex_status, vex_just, desc, now, tlp),
             )
             inserted += 1
         conn.commit()
@@ -219,7 +202,7 @@ class SQLiteSecurityConnector:
         purl: str | None = None,
         severity: str | None = None,
     ) -> list[dict[str, object]]:
-        conn = self._open()
+        conn = self._conn()
         clauses: list[str] = []
         params: list[str] = []
         if purl:
@@ -240,13 +223,13 @@ class SQLiteSecurityConnector:
         arch_entity_id: str,
         *,
         ref_type: str = "purl",
+        tlp: str = "TLP:AMBER",
     ) -> None:
-        conn = self._open()
-        now = _now_iso()
+        conn = self._conn()
         conn.execute(
             "INSERT OR REPLACE INTO anchor_mappings "
-            "(component_ref, arch_entity_id, ref_type, created_at) VALUES (?,?,?,?)",
-            (component_ref, arch_entity_id, ref_type, now),
+            "(component_ref, arch_entity_id, ref_type, created_at, tlp) VALUES (?,?,?,?,?)",
+            (component_ref, arch_entity_id, ref_type, _now_iso(), tlp),
         )
         conn.commit()
 
@@ -255,16 +238,18 @@ class SQLiteSecurityConnector:
         *,
         arch_entity_id: str | None = None,
     ) -> list[dict[str, object]]:
-        conn = self._open()
+        conn = self._conn()
         if arch_entity_id:
             return conn.execute(  # type: ignore[return-value]
                 "SELECT * FROM anchor_mappings WHERE arch_entity_id=?",
                 (arch_entity_id,),
             ).fetchall()
-        return conn.execute("SELECT * FROM anchor_mappings ORDER BY created_at DESC").fetchall()  # type: ignore[return-value]
+        return conn.execute(  # type: ignore[return-value]
+            "SELECT * FROM anchor_mappings ORDER BY created_at DESC"
+        ).fetchall()
 
     def get_stats(self) -> dict[str, object]:
-        conn = self._open()
+        conn = self._conn()
         ingests = conn.execute("SELECT COUNT(*) as n FROM bom_ingests").fetchone()["n"]  # type: ignore[index]
         components = conn.execute("SELECT COUNT(*) as n FROM bom_components").fetchone()["n"]  # type: ignore[index]
         vulns = conn.execute("SELECT COUNT(*) as n FROM vulnerabilities").fetchone()["n"]  # type: ignore[index]
@@ -274,14 +259,4 @@ class SQLiteSecurityConnector:
             "bom_components": components,
             "vulnerabilities": vulns,
             "anchor_mappings": anchors,
-        }
-
-    def _export_data(self) -> dict[str, object]:
-        """Dump all tables for export/backup purposes."""
-        conn = self._open()
-        return {
-            "bom_ingests": conn.execute("SELECT * FROM bom_ingests").fetchall(),
-            "bom_components": conn.execute("SELECT * FROM bom_components").fetchall(),
-            "vulnerabilities": conn.execute("SELECT * FROM vulnerabilities").fetchall(),
-            "anchor_mappings": conn.execute("SELECT * FROM anchor_mappings").fetchall(),
         }

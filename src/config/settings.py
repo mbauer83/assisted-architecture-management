@@ -24,7 +24,19 @@ _DEFAULTS: dict[str, dict[str, object]] = {
         "commit_author_email": "arch-switch-engagement@local.invalid",
         "engagement": _DEFAULT_ENGAGEMENT,
     },
+    "storage": {
+        "assurance": {
+            "store_backend": "sqlcipher",
+            "signals_backend": "sqlcipher-colocated",
+            "max_classification": "TLP:AMBER",
+        },
+        "read_model": {},
+    },
 }
+
+_VALID_STORE_BACKENDS = frozenset({"sqlcipher", "pocketbase", "private-git"})
+_VALID_SIGNALS_BACKENDS = frozenset({"sqlcipher-colocated", "sqlite", "encrypted"})
+_VALID_TLP_LEVELS = frozenset({"TLP:WHITE", "TLP:GREEN", "TLP:AMBER", "TLP:RED"})
 
 _SettingsSection = dict[str, object]
 
@@ -56,7 +68,31 @@ def load_settings() -> dict:
     }
     modules_raw = data.get("modules")
     modules_section: _SettingsSection = modules_raw if isinstance(modules_raw, dict) else {}
-    return {"backend": backend, "diagrams": diagrams, "repo_init": repo_init, "modules": modules_section}
+
+    storage_raw = data.get("storage")
+    storage_section: _SettingsSection = storage_raw if isinstance(storage_raw, dict) else {}
+    storage_assurance_raw = storage_section.get("assurance")
+    storage_assurance: _SettingsSection = (
+        storage_assurance_raw if isinstance(storage_assurance_raw, dict) else {}
+    )
+    storage_read_model_raw = storage_section.get("read_model")
+    storage_read_model: _SettingsSection = (
+        storage_read_model_raw if isinstance(storage_read_model_raw, dict) else {}
+    )
+    default_storage: dict[str, object] = _DEFAULTS["storage"]  # type: ignore[assignment]
+    default_assurance: dict[str, object] = default_storage["assurance"]  # type: ignore[assignment]
+    storage: dict[str, object] = {
+        "assurance": {**default_assurance, **storage_assurance},
+        "read_model": {**storage_read_model},
+    }
+
+    return {
+        "backend": backend,
+        "diagrams": diagrams,
+        "repo_init": repo_init,
+        "modules": modules_section,
+        "storage": storage,
+    }
 
 
 def module_overrides() -> dict[str, dict[str, object]]:
@@ -165,3 +201,66 @@ def repo_init_commit_author_email(repo_kind: str | None = None) -> str:
     if not isinstance(value, str) or not value.strip():
         return "arch-switch-engagement@local.invalid"
     return value.strip()
+
+
+# ── Storage settings ──────────────────────────────────────────────────────────
+
+
+def _storage_assurance_value(key: str) -> object:
+    storage = load_settings().get("storage", {})
+    if not isinstance(storage, dict):
+        return _DEFAULTS["storage"]["assurance"][key]  # type: ignore[index]
+    assurance = storage.get("assurance", {})
+    if not isinstance(assurance, dict):
+        return _DEFAULTS["storage"]["assurance"][key]  # type: ignore[index]
+    return assurance.get(key, _DEFAULTS["storage"]["assurance"][key])  # type: ignore[index]
+
+
+def storage_assurance_store_backend() -> str:
+    """Return the active assurance store backend name.
+
+    Fails closed (raises ValueError) for unknown backends so misconfiguration
+    surfaces at startup rather than at first use.
+    """
+    value = _storage_assurance_value("store_backend")
+    candidate = str(value).strip() if isinstance(value, str) else "sqlcipher"
+    if candidate not in _VALID_STORE_BACKENDS:
+        raise ValueError(
+            f"Unknown storage.assurance.store_backend: {candidate!r}. "
+            f"Supported: {sorted(_VALID_STORE_BACKENDS)}"
+        )
+    return candidate
+
+
+def storage_assurance_signals_backend() -> str:
+    """Return the active signals backend name. Fails closed on unknown values."""
+    value = _storage_assurance_value("signals_backend")
+    candidate = str(value).strip() if isinstance(value, str) else "sqlcipher-colocated"
+    if candidate not in _VALID_SIGNALS_BACKENDS:
+        raise ValueError(
+            f"Unknown storage.assurance.signals_backend: {candidate!r}. "
+            f"Supported: {sorted(_VALID_SIGNALS_BACKENDS)}"
+        )
+    return candidate
+
+
+def storage_assurance_max_classification() -> str:
+    """Return the TLP max-classification ceiling for MCP exposure control.
+
+    Artifacts with a TLP level *above* this ceiling are withheld at the
+    arch-assurance-read boundary. Defaults to TLP:AMBER.
+    """
+    value = _storage_assurance_value("max_classification")
+    candidate = str(value).strip().upper() if isinstance(value, str) else "TLP:AMBER"
+    if candidate not in _VALID_TLP_LEVELS:
+        return "TLP:AMBER"
+    return candidate
+
+
+def storage_read_model_seam() -> dict[str, object]:
+    """Return the storage.read_model seam dict (reserved for future FTS-backend toggle)."""
+    storage = load_settings().get("storage", {})
+    if not isinstance(storage, dict):
+        return {}
+    read_model = storage.get("read_model", {})
+    return dict(read_model) if isinstance(read_model, dict) else {}

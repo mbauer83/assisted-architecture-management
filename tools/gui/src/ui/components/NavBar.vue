@@ -54,14 +54,7 @@ const onSearchInput = () => {
         const seen = new Set<string>()
         const resolved: SearchDropdownHit[] = []
         for (const hit of raw) {
-          if (hit.record_type === 'connection') {
-            for (const id of [hit.source, hit.target].filter((value): value is string => Boolean(value))) {
-              if (!seen.has(id)) {
-                seen.add(id)
-                resolved.push({ record_type: 'entity', artifact_id: id, name: id, artifact_type: 'generic' })
-              }
-            }
-          } else if (!seen.has(hit.artifact_id)) {
+          if (hit.record_type !== 'connection' && !seen.has(hit.artifact_id)) {
             seen.add(hit.artifact_id)
             resolved.push(hit)
           }
