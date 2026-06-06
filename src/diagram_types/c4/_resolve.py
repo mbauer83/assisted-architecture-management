@@ -130,6 +130,21 @@ def _resolve_model_backed(
         else:
             outside_items.append(resolved)
 
+    # P2.2: additive validated inclusion — extra IDs in _included_entity_ids that the
+    # projection did not yield are added as external neighbours if graph-justified (they
+    # have at least one connection to the already-projected entity set).
+    if included_only:
+        projected_eids = {scope_entity_id} | {i.local_id for i in internal_items} | {i.local_id for i in outside_items}
+        for extra_eid in sorted(included_only - projected_eids):
+            entity = query.get_entity(extra_eid)
+            if entity is None:
+                continue
+            if any(
+                c.source in projected_eids or c.target in projected_eids
+                for c in query.find_connections_for(extra_eid, direction="any")
+            ):
+                outside_items.append(_item_from_entity(entity, extra_eid, "software-system", external=True))
+
     all_displayed = (
         {scope_entity_id}
         | {i.local_id for i in internal_items}
@@ -137,27 +152,42 @@ def _resolve_model_backed(
     )
     alias_by_eid = {i.local_id: i.alias for i in [scope_item] + internal_items + outside_items}
 
+    # Collect model connections — include roll-up connections (one endpoint may be an
+    # internal entity not in alias_by_eid; the render loop below handles remapping).
     model_conns: list[Any] = []
     for cid in projection.connection_ids:
         conn = query.get_connection(cid)
         if conn is None:
             continue
-        if conn.source not in all_displayed or conn.target not in all_displayed:
-            continue
-        if conn.source not in alias_by_eid or conn.target not in alias_by_eid:
+        # Keep if at least one endpoint touches the displayed set (excludes internal↔internal)
+        if conn.source not in all_displayed and conn.target not in all_displayed:
             continue
         model_conns.append(conn)
     model_conns.sort(key=lambda x: x.artifact_id)
 
-    connections = tuple(
-        _C4Connection(
-            src_alias=alias_by_eid[c.source],
-            tgt_alias=alias_by_eid[c.target],
-            label=_conn_label(c),
-            artifact_id=c.artifact_id,
-        )
-        for c in model_conns
-    )
+    # Build _C4Connection list with:
+    #   P2.1 — reverse archimate-serving (provider→consumer becomes consumer --uses--> provider)
+    #   P2.3 — for system-context, remap internal entities not in alias_by_eid to scope root
+    #   P2.6 — deduplicate by (src_alias, tgt_alias) after remapping; remove self-loops
+    is_ctx = (diagram_type == "c4-system-context")
+    scope_alias = alias_by_eid.get(scope_entity_id, "")
+    seen_pairs: set[tuple[str, str]] = set()
+    conn_list: list[_C4Connection] = []
+    for c in model_conns:
+        src = alias_by_eid.get(c.source) or (scope_alias if is_ctx else None)
+        tgt = alias_by_eid.get(c.target) or (scope_alias if is_ctx else None)
+        if src is None or tgt is None:
+            continue
+        if c.conn_type == "archimate-serving":
+            src, tgt = tgt, src  # P2.1: consumer --uses--> provider
+        if src == tgt:
+            continue
+        pair = (src, tgt)
+        if pair in seen_pairs:
+            continue
+        seen_pairs.add(pair)
+        conn_list.append(_C4Connection(src_alias=src, tgt_alias=tgt, label=_conn_label(c), artifact_id=c.artifact_id))
+    connections = tuple(conn_list)
 
     return _ResolvedState(
         scope_item=scope_item,
