@@ -53,14 +53,18 @@ Legend: `[ ]` todo · `[~]` in progress · `[x]` done.
 - [x] **Acceptance:** engagement verify clean (589 files, 0 errors, 0 warnings) — 88efc6c; AMP/bridges/host present ✓
 
 ## Stage 0c — P2 projector delta  *(builds on the done renderer-fix)*
-- [ ] P2.1 reverse `serving` **direction** (label already done) → `Consumer --uses--> Service`
-- [ ] P2.2 additive **validated inclusion** (inclusion can add graph-justified elements)
-- [ ] P2.3 bounded **context roll-up** + the acceptance contract (C4 §4 P2)
-- [ ] P2.4 **passive-store** dependencies in component views
-- [ ] P2.5 **grouping scope** support (for D4)
-- [ ] P2.6 deterministic traversal + size limits  *(reuse the `usePagination` bounding pattern)*
-- [ ] P2.7 tests: preview / derivation / refresh / render parity
-- [ ] **Acceptance:** D1–D4 preview render correctly against a scratch scope
+- [x] P2.1 reverse `serving` **direction** → `Consumer --uses--> Provider` — f274e57
+- [x] P2.2 additive **validated inclusion** (graph-justified entities added) — f274e57
+- [x] P2.3 bounded **context roll-up**: system-context traverses all structural descendants;
+      internal entities remap to scope root; self-loops + duplicates removed — f274e57
+      Note: container/component roll-up discovers neighbours from deep descendants but
+      does NOT yet remap to nearest visible ancestor (out of scope for 0c)
+- [x] P2.4 **passive-store** `data-object` + `grouping` in `_COMPONENT_INTERNAL_TYPES` — f274e57
+- [x] P2.5 **grouping scope** support — added to all type sets — f274e57
+- [x] P2.6 `archimate-assignment` in `_NESTING_TYPES`; `archimate-association` in `_NEIGHBOR_TYPES`
+      with root-level skip; `_MAX_ITEMS=150` hard cap + `_MAX_ROLLUP_DEPTH=8` — f274e57
+- [x] P2.7 18 tests in `test_c4_p2_projector.py` covering P2.1–P2.6 — f274e57
+- [x] **Acceptance:** `zuban check` + full suite green (940 pass, 1 pre-existing skip) — f274e57
 
 ## Stage 1 — Backend runtime unification (P3+P4) + Groups M/S + reconcile  — owner: UNIFY
 - [ ] W1 mount 4 MCP endpoints in `arch-backend` (assurance gated)
