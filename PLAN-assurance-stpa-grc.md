@@ -735,6 +735,7 @@ through one `arch-assurance` read + write MCP path; assurance excluded from mode
 can enable WORM/legal-hold + crypto-shredding.
 - [x] PocketBase adapter (HTTP-based, collections-backed, parameterized filters, `pocketbase-init`/`pocketbase-status` CLI) + private-git adapter behind the stable port.
 - [x] WORM/legal-hold + crypto-shredding (per-subject AES-256-GCM DEK, legal-hold registry, shred operation) + eIDAS-qualified timestamping (RFC 3161 opt-in, manual DER).
+- [x] **Encrypted archive for private-git backend (§28)** — `EncryptedGitArchive` adapter + `store_factory` routing + `verify` CLI command + tests. Closes audit-log confidentiality gap identified 2026-06-05.
 
 **Phase 5 — Cybersecurity & supply-chain connectors (§27).** DoD: an SBOM + CVE feed maps to model
 components and contextualises STPA-Sec findings; an AI-BOM can be emitted from the model and reconciled
@@ -940,6 +941,257 @@ combine four layers, **authoritative-first**:
 - **Drift reconciliation** (§27.2) catches what marking + heuristics miss.
 - An emitted AI-BOM's completeness = f(marking discipline + ingestion coverage + reconciliation); the tool
   **states this** rather than implying completeness.
+
+### 27.4 Confidentiality of supply-chain signals & encrypted pluggable storage [RESOLVED 2026-06-05]
+
+**Correction to the Phase-5 implementation.** Signals are currently persisted in a *separate, unencrypted*
+SQLite DB (`.arch-assurance/security-signals.db`) on the rationale "BOM component lists are generally not
+sensitive." **That rationale is rejected for SBOMs of our own systems.** A system SBOM captures the **root
+component (our system/service name + version), the full dependency composition, the known vulnerabilities of
+those components, and the anchor mappings to our named architecture entities** — a precise attack-surface map.
+Generic public CVE/PURL *catalog* records are non-confidential (that is the §4.1 reference vocabulary); an
+SBOM/vuln set **bound to our system** is confidential.
+
+**Decision.**
+1. **Security signals are confidential by default** — TLP-classified, subject to MCP max-classification, with
+   **minimisation** (store public refs; keep anchor mappings thin). Only a *deliberately published* BOM (e.g.
+   an OSS artifact you release) may be opted out to non-confidential.
+2. **The signals store is pluggable like the rest of assurance storage.** `SecuritySignalConnector` must
+   support a **confidential/co-located adapter** (encrypted, or tables inside the SQLCipher store) for
+   confidential deployments; the plain-SQLite adapter is the *public-BOM* path only. Backend + confidentiality
+   posture are per-deployment choices for **all three** assurance persistence ports (store, archive, signals).
+3. **Encrypted private-git is a valid adapter.** The "crypto-in-git defeats queryability" sub-objection does
+   **not** apply to an opt-in adapter: the backend builds the read model **in-memory on startup** (§3.3 —
+   confirmed), so an encrypted private-git adapter *decrypts-on-load* and indexes in memory, preserving
+   queryability. ADR-001 rejected crypto-in-git **as the universal default** (history-permanence, bespoke-crypto
+   risk), not an opt-in encrypted git adapter using a vetted library. "Pluggable, Confidential Assurance
+   Storage" therefore spans SQLCipher (default), PocketBase, **encrypted private-git**, with the signals port
+   encryptable too.
+
+**Build follow-up (refines Phase 5, otherwise done — not a core-capability blocker):** add a
+confidential/encrypted signals adapter (or co-locate signals tables in SQLCipher) + TLP/minimisation on ingest;
+add an encrypted private-git store-adapter option.
+
+## 28. Addendum — Encrypted archive for private-git backend (audit-log confidentiality gap)
+
+**Identified:** 2026-06-05, design review of Phase 4 output.
+
+### 28.1 Context
+
+ADR-001 (§26) decision 5 establishes two distinct ports — `ConfidentialAssuranceStore` and
+`AssuranceArchive` — and decision 8 names "TLP classification" as an always-on layer. The principle
+**Assurance Content Is Confidential by Default** (§3.3, §23) must apply to both ports on all backends.
+
+The SQLCipher backend satisfies this correctly: `audit_log` and `baselines` tables live in `store.db`,
+encrypted by the same key, via the shared connection factory in `store_factory._build_archive`.
+
+The **private-git backend does not.** `store_factory._build_archive` falls through to
+`_make_local_sqlite_archive`, creating `.arch-assurance/private_git_archive.db` — a plain-SQLite file
+with no encryption. The `payload_json` column is not metadata: it carries the **full content of every
+write** — `name`, `content_text`, `tlp`, `concern_class`, `disposition`, `uca_type`, UCA/scenario
+detail. Anyone who reads that file has a complete timestamped history of all assurance work in
+plaintext. This directly contradicts the confidentiality principle and Requirement 2 (Pluggable,
+Confidential Assurance Storage, §3.3).
+
+**Tamper-evidence and confidentiality are not in tension.** The SHA-256 hash chain provides *integrity*
+(tamper detection) but not *confidentiality*. Both are achievable simultaneously with a standard
+commit-then-encrypt pattern:
+
+- Compute `entry_hash = SHA256(seq|timestamp|operation|payload_json|prev_hash)` over plaintext.
+- Encrypt the full entry with Fernet.
+- Append only `{seq, timestamp, operation, entry_hash, prev_hash}` — no content — to an unencrypted
+  `chain.jsonl` manifest.
+
+The manifest enables chain verification without the key; the `.enc` files preserve confidentiality.
+Baseline objects follow the same pattern in a `baselines/` sub-directory.
+
+**Why the plain-SQLite fallback is wrong here, even temporarily.** Unlike PocketBase (a server-backed
+store where the local archive is a client-side shadow copy), the private-git adapter's entire design
+premise is that the git repository is the system of record. The archive file sits next to the
+Fernet-encrypted node/edge/ref files and will be committed to the same repository. Shipping an
+unencrypted audit log alongside encrypted analysis artefacts is incoherent with the backend's trust model.
+
+### 28.2 Decision
+
+Add `EncryptedGitArchive` as the `AssuranceArchive` adapter for `store_backend: private-git`.
+
+**On-disk layout** under `{repo_path}/log/`:
+
+```
+.arch-assurance-git/
+  nodes/  edges/  refs/          ← existing encrypted store files
+  log/
+    chain.jsonl                  ← unencrypted JSONL; one line per entry
+                                    fields: seq, timestamp, operation,
+                                            entry_hash, prev_hash — NO payload, NO node_id
+    00000001.enc                 ← Fernet-encrypted full entry JSON
+    00000002.enc
+    baselines/
+      BSL@<ts>.<hash>.enc        ← Fernet-encrypted baseline JSON
+```
+
+Key design choices:
+- **Same Fernet key as the store** — passed via `fernet_factory: Callable[[], Fernet | None]`
+  (same pattern as `SQLCipherAssuranceArchive`'s `conn_factory`). Archive lifecycle is bound to
+  store unlock; `fernet_factory()` returning `None` means locked → raise `RuntimeError`.
+- **Atomic `.enc` writes** — write-to-tmp then `os.replace`, matching `_encrypted_private_git_store._write`.
+- **`chain.jsonl` append** — opened in mode `"a"` for single-writer desktop use; sufficient for the audience.
+- **`verify_chain()` reads only `chain.jsonl`** — O(n) integrity check requiring no decryption.
+- **Scope: private-git only.** PocketBase's plain-SQLite fallback is not changed here (PocketBase is
+  a server-backed store; the local archive is an optional client shadow, not the audit source of
+  record). The `_make_local_sqlite_archive` helper remains for that case.
+
+### 28.3 Acceptance criteria
+
+| # | Criterion |
+|---|---|
+| AC1 | When `store_backend: private-git`, `_build_archive` returns `EncryptedGitArchive`, not a plain-SQLite-backed archive. |
+| AC2 | `archive.append(op, node_id=…, payload=…)` writes `log/{seq:08d}.enc` (Fernet-encrypted, not plain-JSON-readable) and appends one line to `log/chain.jsonl` containing exactly `{seq, timestamp, operation, entry_hash, prev_hash}` — no `payload_json`, no `node_id`. |
+| AC3 | `log/chain.jsonl` is parseable as JSON Lines without the Fernet key; each line contains only the five fields above. |
+| AC4 | `archive.verify_chain()` returns `True` on an intact chain by reading only `chain.jsonl` (no decryption). Returns `False` if any `chain.jsonl` hash is modified or an entry is reordered or deleted. |
+| AC5 | `archive.verify_chain()` succeeds even when the Fernet key is replaced with a different one (proving it uses only `chain.jsonl`, not the `.enc` files). |
+| AC6 | `archive.seal_baseline(notes=…, analysis_id=…)` writes `log/baselines/{baseline_id}.enc` (encrypted) and appends a `SEAL` entry to the log. |
+| AC7 | `archive.list_entries()` decrypts and returns dicts with the same shape as `SQLCipherAssuranceArchive.list_entries()`. |
+| AC8 | `archive.list_baselines()` decrypts and returns baseline dicts matching `SQLCipherAssuranceArchive.list_baselines()`. |
+| AC9 | `archive.head()` returns the most-recent entry dict (decrypted), or `None` if empty. |
+| AC10 | All archive methods raise `RuntimeError` when `fernet_factory()` returns `None` (store locked). |
+| AC11 | `arch-assurance init --backend private-git` creates `log/` and `log/baselines/` directories under `{repo_path}`. |
+| AC12 | `uv run pytest tests/assurance/test_encrypted_git_archive.py` passes all required test cases (§28.4 ST-4). |
+| AC13 | `uv run zuban check` and `uv run ruff check src/` pass with no new issues. |
+
+### 28.4 Definition of done
+
+- [x] All AC1–AC13 pass.
+- [x] `uv run pytest tests/assurance/` green (existing tests unbroken; new test file passes).
+- [x] `uv run zuban check` clean.
+- [x] `uv run ruff check src/` clean.
+- [x] `store_factory.py` docstring updated to name `EncryptedGitArchive` for private-git.
+- [x] §24 Phase 4 checklist item for this fix ticked `[x]`.
+
+### 28.5 Subtasks
+
+**ST-1 — `src/infrastructure/assurance/_encrypted_git_archive.py`** (new file, ≤250 lines)
+
+Implement `EncryptedGitArchive`. Signature matches `AssuranceArchive` port exactly.
+
+```python
+class EncryptedGitArchive:
+    def __init__(self, repo_path: Path, fernet_factory: Callable[[], Any]) -> None:
+        # self._repo = repo_path
+        # self._log_dir = repo_path / "log"
+        # self._chain_path = repo_path / "log" / "chain.jsonl"
+        # self._baselines_dir = repo_path / "log" / "baselines"
+        # self._fernet_factory = fernet_factory
+
+    def append(self, operation: str, *, node_id: str | None = None,
+               payload: dict[str, object] | None = None) -> dict[str, object]: ...
+    def seal_baseline(self, *, notes: str = "",
+                      analysis_id: str | None = None) -> dict[str, object]: ...
+    def verify_chain(self) -> bool: ...
+    def list_entries(self, *, since_seq: int = 0, operation: str | None = None,
+                     limit: int = 100) -> list[dict[str, object]]: ...
+    def list_baselines(self) -> list[dict[str, object]]: ...
+    def head(self) -> dict[str, object] | None: ...
+```
+
+Hash computation: reuse the identical formula as `_archive._compute_hash`:
+`SHA256(f"{seq}|{timestamp}|{operation}|{payload_json}|{prev_hash}")`
+
+`append` must be atomic for `.enc` (write-to-tmp + `os.replace`, same as
+`_encrypted_private_git_store._write`). `chain.jsonl` is opened in append mode (`"a"`).
+
+`_require_unlocked` helper: call `self._fernet_factory()`; if it returns `None`, raise
+`RuntimeError("Encrypted archive is locked — call store unlock() first.")`.
+
+`verify_chain`: iterate `chain.jsonl` line by line; recompute each hash from the four preceding
+fields in the line (op, timestamp, seq, prev_hash) — but note that `payload_json` is not in
+`chain.jsonl`. The chain manifest stores hash results only; verification compares stored
+`entry_hash` against the previous entry's `entry_hash` (chained prev_hash walk), *not* a full
+recompute from payload. The chain is valid iff `row.prev_hash == prev_entry.entry_hash` for all
+entries ≥ 2, and every `entry_hash` is a non-empty string.
+
+> **Note on verify_chain semantics:** `chain.jsonl` does not have enough data to recompute
+> `entry_hash` from scratch (payload is absent). What it does enable is *chain continuity
+> verification*: confirming that no entry was inserted, deleted, or reordered by checking the
+> `prev_hash` linkage is unbroken. This is the correct and sufficient invariant for the
+> manifest-only path. Full `entry_hash` recomputation requires decrypting the `.enc` files —
+> an optional stronger check that `verify_chain` may offer as a `deep=True` kwarg in future.
+
+**ST-2 — `src/infrastructure/assurance/store_factory.py` — `_build_archive` and `_build_store`**
+
+In `_build_archive`, add a branch before the generic fallthrough:
+
+```python
+if store_backend == "private-git":
+    from src.infrastructure.assurance._encrypted_git_archive import EncryptedGitArchive
+    from src.infrastructure.assurance._encrypted_private_git_store import (
+        EncryptedPrivateGitAssuranceStore,
+    )
+    assert isinstance(store, EncryptedPrivateGitAssuranceStore)
+    return EncryptedGitArchive(store._repo, fernet_factory=lambda: store._fernet)  # noqa: SLF001
+```
+
+Also verify `_build_store` for `private-git`: it currently instantiates `PrivateGitAssuranceStore`
+(the plain, unencrypted variant, `_private_git_store.py`). Change it to instantiate
+`EncryptedPrivateGitAssuranceStore` instead — the CLI `init --backend private-git` already stores
+the Fernet key in the keychain, so the encrypted variant is the correct default. The unencrypted
+`PrivateGitAssuranceStore` is only appropriate for deployments explicitly relying on repo ACLs;
+it can remain in the codebase as an alternative but should not be the factory default for
+`store_backend: private-git`.
+
+```python
+if store_backend == "private-git":
+    repo_path = db_path or workspace / ".arch-assurance-git"
+    from src.infrastructure.assurance._encrypted_private_git_store import (
+        EncryptedPrivateGitAssuranceStore,
+    )
+    return EncryptedPrivateGitAssuranceStore(repo_path)
+```
+
+**ST-3 — `src/infrastructure/cli/arch_assurance.py` — init + verify**
+
+`_init_private_git`: after creating `nodes/`, `edges/`, `refs/`, also create
+`log/` and `log/baselines/` under `repo_path`.
+
+Add a `verify` sub-command:
+
+```
+arch-assurance verify [--db-path PATH]
+```
+
+- `sqlcipher` backend: unlock the store, call `archive.verify_chain()`, print pass/fail + entry count.
+- `private-git` backend: read `{repo_path}/log/chain.jsonl` directly (no unlock required), walk
+  the chain, print per-entry pass/fail + summary. This is the manifest-only check; it works without
+  the Fernet key, which is the intended property of the chain.jsonl design.
+
+**ST-4 — `tests/assurance/test_encrypted_git_archive.py`** (new file)
+
+Required test cases (one function per criterion; use `tmp_path` fixture; supply a real Fernet key):
+
+| Test | What it verifies |
+|---|---|
+| `test_append_writes_enc_file` | After `append(...)`, `log/00000001.enc` exists and is not JSON-decodable as plaintext |
+| `test_append_writes_chain_jsonl` | `chain.jsonl` has one line; parsed dict has exactly the five manifest fields; no `payload_json`, no `node_id` |
+| `test_verify_chain_intact` | Three appends → `verify_chain()` is `True` |
+| `test_verify_chain_tampered_jsonl` | Overwrite one `entry_hash` in `chain.jsonl` → `verify_chain()` is `False` |
+| `test_verify_chain_no_decryption_needed` | Replace Fernet key with a different one; `verify_chain()` is still `True` (reads only manifest) |
+| `test_seal_baseline` | `seal_baseline(notes="r1")` creates `log/baselines/*.enc`; `list_baselines()` returns one entry |
+| `test_list_entries_decrypted` | `list_entries()` returns dicts with `payload_json` and `operation` fields |
+| `test_head` | `head()` returns the most-recent entry after two appends |
+| `test_locked_raises` | All public methods raise `RuntimeError` when factory returns `None` |
+
+### 28.6 Cross-references
+
+- §26 ADR-001 decision 5 ("two ports") and decision 8 ("always-on: TLP") — this closes the
+  archive-confidentiality gap for private-git.
+- §23 🔴 C3 (encrypted-at-rest, all tiers) — archive on private-git must satisfy C3.
+- §24 Phase 4 — add `[ ] Encrypted archive for private-git backend (§28)` and tick on completion.
+- `src/infrastructure/assurance/_archive.py` — source of truth for `_compute_hash` formula and
+  `SQLCipherAssuranceArchive` interface to match.
+- `src/infrastructure/assurance/_encrypted_private_git_store.py` — source of the `_write` atomic
+  pattern and Fernet key account name (`"private-git-encryption-key"`).
+- `src/infrastructure/assurance/store_factory.py` — the two functions to modify (`_build_store`,
+  `_build_archive`).
 
 ## 29. Module extension mechanism — attribute-profiles + feature flags
 

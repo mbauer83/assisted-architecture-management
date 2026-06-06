@@ -15,9 +15,9 @@
 | 6 | Write companion specs in `plans/assurance-overlay/` | ☑ done |
 | 7 | Update `PLAN-assurance-stpa-grc.md` §24 Phase 0 status | ☑ done |
 | 8 | Run tests + regenerate `types.generated.ts` | ☑ done |
-| 9 | CodeRabbit review — fix critical findings | ◐ in progress |
-| 10 | feature-dev code-reviewer — convention compliance check | ☐ pending |
-| 11 | Commit Phase 0 | ☐ pending |
+| 9 | CodeRabbit review — fix critical findings | ☑ done |
+| 10 | feature-dev code-reviewer — convention compliance check | ☑ done |
+| 11 | Commit Phase 0 | ☑ done |
 
 ## Definition of Done (Phase 0)
 

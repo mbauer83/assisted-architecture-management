@@ -66,7 +66,7 @@
 | QG-3 | CodeRabbit review (uncommitted) — fix critical findings | ☑ done |
 | QG-4 | feature-dev code-reviewer — convention compliance check | ☑ done |
 | QG-5 | Update §24 checklist in PLAN-assurance-stpa-grc.md | ☑ done |
-| QG-6 | Commit Phase 1 | ◐ in progress |
+| QG-6 | Commit Phase 1 | ☑ done |
 
 ## Definition of Done (Phase 1)
 
