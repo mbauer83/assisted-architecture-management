@@ -18,20 +18,18 @@ Legend: `[ ]` todo · `[~]` in progress · `[x]` done.
 ---
 
 ## Stage 0a — P1 repo cleanup  *(gates all diagrams)*  — owner: CLEANUP plan
-- [~] P1 executed per CLEANUP plan (its own checklist is authoritative)
-      **DONE (branch c4-impl, commits dfc277f–7318249):**
-      - §2.5 drift items all fixed: 6×E350 (added `_archimate-relations.puml` to catalog + inject_archimate_includes extended), 2×E312 (stale Rel_Triggering removed from mmuM5i diagram), 2×E011 (ADRs migrated to managed adr doc-type in docs/adr/), E155+W155 (standard doc broken link fixed), 17×W042 (MUST→Must + Priority/Category on 16 requirements)
-      - Verifier inconsistency fixed: `verify_document_file` now uses doc-type schema's status enum (not global VALID_STATUSES) for E022 check
-      **REMAINING (next session):**
-      - CLEANUP §3.1 — normative fixture (ArchiMate NEXT Snapshot 1 triples as machine-readable data)
-      - CLEANUP §3.2 — reconcile connections.yaml with fixture (disallow component↔service realization, fix grouping/junction permissions)
-      - CLEANUP §3.3–§3.5 — semantic validation API + write-path enforcement + repository-wide semantic verifier
-      - CLEANUP §3.6 — realization quality guidance
-      - CLEANUP §4.1 — relationship cleanup in ENG-ARCH-REPO (Authoring/Verification/Discovery/Assurance service realizations, Model Verifier→Python Runtime)
-- [ ] Invalid `service↔component` realizations replaced with `function/process → service` chains (C4 §2.4/§3.1)
-      *(depends on CLEANUP §4.1 — needs semantic verifier to enumerate all invalid triples first)*
-- [ ] **Representative** `component→behaviour→service` chains wired (2–3 per service, C4 §3.1)
-      *(can proceed once §4.1 audit identifies the correct function→service pairs)*
+- [x] P1 executed per CLEANUP plan (its own checklist is authoritative)
+      **DONE (branch c4-impl, commits dfc277f–c00ada1):**
+      - §2.5 drift items all fixed (E350/E312/E011/E155/W042) — prior session
+      - §3.1 normative fixture `connection_rules_snapshot1.yaml` + parity tests
+      - §3.2 connections.yaml reconciled: added 4 missing ArchiMate rules (app-component→data-object access, app-component→function/process assignment, technology-node→artifact aggregation, behavior→goal influence)
+      - §3.3–§3.5 semantic triple validator (`_verifier_rules_semantic.py`, E126/W126), write-path enforcement, repository-wide verifier
+      - §3.6 W126 realization-quality guidance in verifier
+      - §4.1 all invalid component↔service/structure→behavior realizations removed; technology-node composition→aggregation fixed; process→goal influence restored; 5 function→service realization chains added; python-runtime serving chain added
+      **Result:** `artifact_verify(engagement)` → 0 errors 0 warnings (c00ada1)
+- [x] Invalid `service↔component` realizations replaced with `function/process → service` chains (C4 §2.4/§3.1) — c00ada1
+- [x] **Representative** `component→behaviour→service` chains wired (2–3 per service, C4 §3.1) — c00ada1
+      authoring(×2), validation(×1), discovery(×1), assurance(×1)
 - [x] **Acceptance:** `artifact_verify(repo_scope="engagement", return_mode="full")` → **0 errors** (7318249 — 0 errors 0 warnings, 570 files)
 
 ## Stage 0b — C4 additive model: Groups R, K, B, X  *(parallel with 0a/0c)*
