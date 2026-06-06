@@ -14,6 +14,7 @@ from src.application.verification._verifier_rules_schema import (
     check_attribute_schema,
     check_frontmatter_schema,
 )
+from src.application.verification._verifier_rules_semantic import check_connection_semantics
 from src.application.verification.artifact_verifier_incremental import (
     FileInventory,
     detect_changed_paths,
@@ -204,6 +205,7 @@ class ArtifactVerifier:
 
         # Validate each connection section header
         seen_connections: set[str] = set()
+        parsed_connections: list[tuple[str, str]] = []
         for line in content.splitlines():
             if line.startswith("### "):
                 header = line[4:].strip()
@@ -269,6 +271,10 @@ class ArtifactVerifier:
                         )
                     )
                 seen_connections.add(conn_key)
+                parsed_connections.append((conn_type, target_id))
+
+        if self.registry is not None and source and parsed_connections:
+            check_connection_semantics(source, parsed_connections, self.registry, result, loc)
 
         repo_root = self._repo_root_for_path(path)
         if repo_root is not None:

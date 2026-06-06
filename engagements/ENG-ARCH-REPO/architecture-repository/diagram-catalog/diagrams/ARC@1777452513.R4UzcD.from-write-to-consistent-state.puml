@@ -38,7 +38,7 @@ connection-ids-used:
 - EVT@1777390507.UCrh3V.architecture-repository-change-detected---FNC@1777390446.dxb6ru.index-repository@@archimate-triggering
 - FNC@1777390446.dxb6ru.index-repository---EVT@1776633084.b6XB2D.repository-indexed@@archimate-triggering
 - EVT@1776633084.b6XB2D.repository-indexed---FNC@1777390460.3ZsfnT.broadcast-model-update@@archimate-triggering
-- FNC@1777390460.3ZsfnT.broadcast-model-update---APP@1776149382.lmO0mp.gui-authoring-tool@@archimate-serving
+- FNC@1777390460.3ZsfnT.broadcast-model-update---APP@1776149382.lmO0mp.gui-authoring-tool@@archimate-association
 last-updated: '2026-06-06'
 ---
 @startuml ARC@1777452513.R4UzcD.from-write-to-consistent-state
@@ -144,6 +144,6 @@ Rel_Triggering(EVT_UCrh3V, FNC_dxb6ru, "")
 ' Index and broadcast pipeline
 Rel_Triggering(FNC_dxb6ru, EVT_b6XB2D, "")
 Rel_Triggering(EVT_b6XB2D, FNC_3ZsfnT, "")
-Rel_Serving(FNC_3ZsfnT, APP_lmO0mp, "")
+Rel_Association(FNC_3ZsfnT, APP_lmO0mp, "")
 
 @enduml

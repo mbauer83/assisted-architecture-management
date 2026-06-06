@@ -32,13 +32,8 @@ connection-ids-used:
 - APP@1780656430.m-U5S1.assurance-mcp-server---AIF@1780656431.cdcRZG.assurance-mcp-interface@@archimate-assignment
 - SRV@1780656241.ooK3YN.assurance-service---AIF@1780656431.cdcRZG.assurance-mcp-interface@@archimate-serving
 - APP@1780656430.m-U5S1.assurance-mcp-server---DOB@1780656431.ApaPcg.assurance-knowledge-base@@archimate-access
-- APP@1780656430.m-U5S1.assurance-mcp-server---SRV@1780656241.ooK3YN.assurance-service@@archimate-realization
 - APP@1780656431.E0fzqZ.confidential-assurance-store---DOB@1780656431.ApaPcg.assurance-knowledge-base@@archimate-access
-- APP@1780656431.E0fzqZ.confidential-assurance-store---SRV@1780656241.ooK3YN.assurance-service@@archimate-realization
-- APP@1780656431.GnsLC8.assurance-archive---SRV@1780656241.ooK3YN.assurance-service@@archimate-realization
 - APP@1780656431.XFD85E.assurance-verifier---DOB@1780656431.ApaPcg.assurance-knowledge-base@@archimate-access
-- APP@1780656431.XFD85E.assurance-verifier---SRV@1780656241.ooK3YN.assurance-service@@archimate-realization
-- APP@1780656431.e2zPs6.supply-chain-vulnerability-connector---SRV@1780656241.ooK3YN.assurance-service@@archimate-realization
 - FNC@1780656241.elLBp7.guide-assurance-method-standards---DOB@1780656431.NtsoOS.assurance-method-guidance@@archimate-access
 last-updated: '2026-06-05'
 ---
@@ -135,13 +130,8 @@ DOB_ApaPcg -[hidden]right- DOB_NtsoOS
 APP_m_U5S1 --> AIF_cdcRZG
 SRV_ooK3YN -down-> AIF_cdcRZG
 APP_m_U5S1 --> DOB_ApaPcg
-APP_m_U5S1 .up.|> SRV_ooK3YN
 APP_E0fzqZ --> DOB_ApaPcg
-APP_E0fzqZ .up.|> SRV_ooK3YN
-APP_GnsLC8 .up.|> SRV_ooK3YN
 APP_XFD85E --> DOB_ApaPcg
-APP_XFD85E .up.|> SRV_ooK3YN
-APP_e2zPs6 .up.|> SRV_ooK3YN
 FNC_elLBp7 -down-> DOB_NtsoOS
 
 @enduml

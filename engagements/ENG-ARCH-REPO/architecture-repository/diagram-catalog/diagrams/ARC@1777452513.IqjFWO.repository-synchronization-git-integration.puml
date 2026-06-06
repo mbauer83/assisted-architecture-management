@@ -22,13 +22,13 @@ entity-ids-used:
 - FNC@1777390446.dxb6ru.index-repository
 - PRC@1777409515.tEdRzw.synchronize-with-remote-repository
 connection-ids-used:
-- APP@1777293134.tY3JIK.git-sync-service---PRC@1777409515.tEdRzw.synchronize-with-remote-repository@@archimate-realization
-- APP@1777293134.tY3JIK.git-sync-service---EVT@1777390507.UCrh3V.architecture-repository-change-detected@@archimate-triggering
+- APP@1777293134.tY3JIK.git-sync-service---PRC@1777409515.tEdRzw.synchronize-with-remote-repository@@archimate-association
+- APP@1777293134.tY3JIK.git-sync-service---EVT@1777390507.UCrh3V.architecture-repository-change-detected@@archimate-association
 - FNC@1777409516.91ddSi.check-repository-workspace-status---FNC@1777409516.DGBZ9H.pull-repository-changes@@archimate-triggering
 - FNC@1777409516.91ddSi.check-repository-workspace-status---EVT@1777409516.iqz9jG.workspace-conflict-detected@@archimate-triggering
 - FNC@1777409516.DGBZ9H.pull-repository-changes---EVT@1777390507.UCrh3V.architecture-repository-change-detected@@archimate-triggering
 - EVT@1777390507.UCrh3V.architecture-repository-change-detected---FNC@1777390446.dxb6ru.index-repository@@archimate-triggering
-- EVT@1777409516.iqz9jG.workspace-conflict-detected---APP@1776149382.lmO0mp.gui-authoring-tool@@archimate-triggering
+- EVT@1777409516.iqz9jG.workspace-conflict-detected---APP@1776149382.lmO0mp.gui-authoring-tool@@archimate-association
 last-updated: '2026-06-06'
 ---
 @startuml ARC@1777452513.IqjFWO.repository-synchronization-git-integration
@@ -110,11 +110,11 @@ PRC_tEdRzw -[hidden]down- GRP_EVTS
 EVT_UCrh3V -[hidden]down- FNC_dxb6ru
 EVT_iqz9jG -[hidden]down- APP_lmO0mp
 
-' Realization: Git Sync Service implements the sync process
-Rel_Realization(APP_tY3JIK, PRC_tEdRzw, "")
+' Association: Git Sync Service performs the sync process
+Rel_Association(APP_tY3JIK, PRC_tEdRzw, "")
 
 ' (a) Filesystem watch path: service detects local change directly
-Rel_Triggering(APP_tY3JIK, EVT_UCrh3V, "")
+Rel_Association(APP_tY3JIK, EVT_UCrh3V, "")
 
 ' (b) Remote sync path: check status, then pull or raise conflict
 Rel_Triggering(FNC_91ddSi, FNC_DGBZ9H, "")
@@ -123,6 +123,6 @@ Rel_Triggering(FNC_DGBZ9H, EVT_UCrh3V, "")
 
 ' Downstream outcomes
 Rel_Triggering(EVT_UCrh3V, FNC_dxb6ru, "")
-Rel_Triggering(EVT_iqz9jG, APP_lmO0mp, "")
+Rel_Association(EVT_iqz9jG, APP_lmO0mp, "")
 
 @enduml

@@ -204,7 +204,8 @@ def _check_bindings(
                 result.issues.append(
                     Issue(
                         Severity.ERROR, "E401",
-                        f"binding '{binding_id}': subject entity element '{subject_id_str}' not found in diagram-entities",
+                        f"binding '{binding_id}': subject entity element "
+                        f"'{subject_id_str}' not found in diagram-entities",
                         loc,
                     )
                 )
@@ -229,7 +230,8 @@ def _check_bindings(
                 result.issues.append(
                     Issue(
                         Severity.ERROR, "E401",
-                        f"binding '{binding_id}': subject connection element '{subject_id_str}' not found in diagram connections",
+                        f"binding '{binding_id}': subject connection element "
+                        f"'{subject_id_str}' not found in diagram connections",
                         loc,
                     )
                 )

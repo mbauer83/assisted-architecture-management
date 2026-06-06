@@ -177,11 +177,14 @@ permitted_relationships:
 
   # ── Application Domain (internal) ──────────────────────────────────────
   - [application-component, application-interface, [assignment]]
-  - [application-component, data-object, [assignment]]
+  - [application-component, data-object, [assignment, access]]
+  - [application-component, [function, process], [assignment]]
+  - [application-component, [application-component, application-interface], [serving]]
 
   # ── Technology Domain (internal) ───────────────────────────────────────
   - ["@technology-internal-active-structure-element", technology-interface, [aggregation]]
   - [technology-node, [system-software, facility, device, equipment], [aggregation]]
+  - [technology-node, artifact, [aggregation]]
   - [system-software, system-software, [assignment]]
   - [system-software, communication-network, [association]]
   - [device, system-software, [assignment]]
@@ -207,6 +210,7 @@ permitted_relationships:
 
   # ── Common → Motivation ────────────────────────────────────────────────
   - [[event, function, path, process, role, service], requirement, [influence, realization]]
+  - [[event, function, path, process, role, service], goal, [influence]]
 
   # ── Common → Strategy ──────────────────────────────────────────────────
   - [[function, process], [capability, course-of-action, value-stream], [realization]]
@@ -252,6 +256,9 @@ permitted_relationships:
 
   # ── Business & Application → Implementation ────────────────────────────
   - [[business-object, data-object], deliverable, [specialization]]
+
+  # ── Technology → Application ───────────────────────────────────────────────
+  - ["@technology-internal-active-structure-element", [application-component, application-interface], [serving]]
 
   # ── Technology → Common ────────────────────────────────────────────────
   - [[communication-network, device, distribution-network, equipment, facility, technology-node, system-software, technology-interface], path, [realization]]

@@ -94,6 +94,7 @@ def _validate_inputs(
     target_entity: str,
     extra_known_ids: frozenset[str] = frozenset(),
 ) -> None:
+    from src.domain.connection_ontology import permissible_connection_types  # noqa: PLC0415
     from src.infrastructure.app_bootstrap import get_module_registry  # noqa: PLC0415
 
     if get_module_registry().find_connection_type(ConnectionTypeName(connection_type)) is None:
@@ -104,6 +105,18 @@ def _validate_inputs(
     if target_entity not in known_ids:
         raise ValueError(f"Target entity '{target_entity}' not found in model")
     _check_junction_homogeneity(registry, connection_type, source_entity, target_entity)
+
+    src_type = _entity_artifact_type(registry, source_entity)
+    tgt_type = _entity_artifact_type(registry, target_entity)
+    if src_type and tgt_type:
+        allowed = permissible_connection_types(src_type, tgt_type)
+        if connection_type not in allowed:
+            alt_str = ", ".join(allowed) if allowed else "none"
+            raise ValueError(
+                f"Relationship '{connection_type}' is not permitted from "
+                f"'{src_type}' to '{tgt_type}'. "
+                f"Permitted alternatives: {alt_str}."
+            )
 
 
 def _resolve_outgoing_path(
