@@ -572,6 +572,7 @@ class ArtifactVerifier:
 
         # E153: frontmatter schema validation against .arch-repo/documents/{doc_type}.json
         doc_type = str(fm.get("doc-type", "")).strip()
+        doc_type_status_enum: frozenset[str] | None = None
         if not doc_type:
             result.issues.append(Issue(Severity.ERROR, "E153", "Missing required frontmatter field 'doc-type'", loc))
         else:
@@ -604,6 +605,9 @@ class ArtifactVerifier:
                                     loc,
                                 )
                             )
+                        status_enum = fm_schema.get("properties", {}).get("status", {}).get("enum")
+                        if status_enum:
+                            doc_type_status_enum = frozenset(str(v) for v in status_enum)
                     # E154: required sections
                     required_sections: list[str] = schema.get("required_sections") or []
                     if required_sections:
@@ -680,7 +684,7 @@ class ArtifactVerifier:
                     )
                 )
 
-        check_enum(fm, "status", VALID_STATUSES, result, loc)
+        check_enum(fm, "status", doc_type_status_enum or VALID_STATUSES, result, loc)
         return result
 
     def _scope_for_path(self, path: Path) -> Literal["enterprise", "engagement", "unknown"]:

@@ -44,10 +44,43 @@ connection-ids-used:
 - JNO@1777467627.chqH1_.inclusive-or-for-architecture-work---FNC@1777390448.yuFXVJ.author-model-artifacts@@archimate-triggering
 - JNO@1777467627.chqH1_.inclusive-or-for-architecture-work---FNC@1777390449.uzJGYp.author-diagrams@@archimate-triggering
 - JNO@1777467627.chqH1_.inclusive-or-for-architecture-work---FNC@1777409722.saMRQ0.author-architecture-documents@@archimate-triggering
-last-updated: '2026-04-29'
+last-updated: '2026-06-06'
 ---
 @startuml reverse-architecture
-!include ../_archimate-stereotypes.puml
+hide stereotype
+
+skinparam defaultFontName "Helvetica Neue, Helvetica, Arial, sans-serif"
+skinparam defaultFontSize 12
+skinparam shadowing false
+skinparam roundcorner 4
+skinparam backgroundColor #FAFAFA
+
+skinparam linetype ortho
+skinparam nodesep 60
+skinparam ranksep 80
+!define Rel_Triggering(from, to, label) from --> to
+!define Rel_Realization(from, to, label) from ..|> to
+!define Rel_Realization_Up(from, to, label) from ..|> to
+!define Rel_Serving(from, to, label) from --> to
+!define Rel_Association(from, to, label) from -- to
+!define Rel_Association_Left(from, to, label) from -- to
+!define Rel_Association_Right(from, to, label) from -- to
+!define Rel_Access(from, to, label) from ..> to
+!define Rel_Influence(from, to, label) from ..> to
+skinparam rectangle<<CommonGrouping>> {
+  BackgroundColor #EDE8E1
+  BorderColor #8C7E6A
+}
+skinparam rectangle<<function>> {
+  BackgroundColor #E0D8CC
+  BorderColor #8C7E6A
+}
+skinparam rectangle<<process>> {
+  BackgroundColor #E0D8CC
+  BorderColor #8C7E6A
+}
+sprite $archimate_function <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><path d="M2.9 11.7V5.4L8 3.1l5.1 2.3v6.3L8 9.2z"  fill="#252327" stroke="none"/></svg>
+sprite $archimate_process <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><path d="M2.6 4.1h6.3V2.8l4.5 5.2-4.5 5.2v-1.3H2.6z"  fill="#252327" stroke="none"/></svg>
 
 top to bottom direction
 

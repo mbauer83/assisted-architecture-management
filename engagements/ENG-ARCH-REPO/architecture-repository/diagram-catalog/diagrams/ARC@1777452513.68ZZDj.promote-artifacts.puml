@@ -11,11 +11,80 @@ keywords:
 - process
 - governance
 diagram-type: archimate-business
-last-updated: '2026-04-28'
+entity-ids-used:
+- EVT@1777390508.Dm0CyE.promotion-plan-prepared
+- EVT@1777390509.fWpwu5.promotion-conflicts-detected
+- EVT@1777390504.hDF1Qz.artifacts-promoted
+- FNC@1777390498.54UnNB.validate-promotion-selection
+- FNC@1777390494.6xjXsw.execute-promotion
+- FNC@1777390500.A0dOFm.resolve-promotion-conflicts
+- FNC@1777390493.A-wFZl.run-quality-gates
+- FNC@1777390445.NGjUCa.verify-artifact-integrity-coherence
+- FNC@1777390496.Z2rrfP.select-artifacts-for-promotion
+- FNC@1777390497.ndMgDn.detect-promotion-conflicts
+- FNC@1777390501.wahMSm.replace-promoted-entities-with-grfs
+- PRC@1712870400.0Rz5Ex.promote-artifacts
+- SRV@1712870400.Uv9Wx9.repository-promotion-service
+connection-ids-used:
+- PRC@1712870400.0Rz5Ex.promote-artifacts---SRV@1712870400.Uv9Wx9.repository-promotion-service@@archimate-realization
+- FNC@1777390496.Z2rrfP.select-artifacts-for-promotion---FNC@1777390497.ndMgDn.detect-promotion-conflicts@@archimate-triggering
+- FNC@1777390497.ndMgDn.detect-promotion-conflicts---EVT@1777390508.Dm0CyE.promotion-plan-prepared@@archimate-triggering
+- FNC@1777390497.ndMgDn.detect-promotion-conflicts---EVT@1777390509.fWpwu5.promotion-conflicts-detected@@archimate-triggering
+- EVT@1777390508.Dm0CyE.promotion-plan-prepared---FNC@1777390498.54UnNB.validate-promotion-selection@@archimate-triggering
+- EVT@1777390509.fWpwu5.promotion-conflicts-detected---FNC@1777390500.A0dOFm.resolve-promotion-conflicts@@archimate-triggering
+- FNC@1777390500.A0dOFm.resolve-promotion-conflicts---FNC@1777390498.54UnNB.validate-promotion-selection@@archimate-triggering
+- FNC@1777390498.54UnNB.validate-promotion-selection---FNC@1777390493.A-wFZl.run-quality-gates@@archimate-triggering
+- FNC@1777390493.A-wFZl.run-quality-gates---FNC@1777390494.6xjXsw.execute-promotion@@archimate-triggering
+- FNC@1777390494.6xjXsw.execute-promotion---FNC@1777390501.wahMSm.replace-promoted-entities-with-grfs@@archimate-triggering
+- FNC@1777390494.6xjXsw.execute-promotion---EVT@1777390504.hDF1Qz.artifacts-promoted@@archimate-triggering
+- FNC@1777390501.wahMSm.replace-promoted-entities-with-grfs---FNC@1777390445.NGjUCa.verify-artifact-integrity-coherence@@archimate-triggering
+last-updated: '2026-06-06'
 ---
 @startuml ARC@1777452513.68ZZDj.promote-artifacts
-!include ../_archimate-stereotypes.puml
-!include ../_archimate-glyphs.puml
+hide stereotype
+
+skinparam defaultFontName "Helvetica Neue, Helvetica, Arial, sans-serif"
+skinparam defaultFontSize 12
+skinparam shadowing false
+skinparam roundcorner 4
+skinparam backgroundColor #FAFAFA
+
+skinparam linetype ortho
+skinparam nodesep 60
+skinparam ranksep 80
+!define Rel_Triggering(from, to, label) from --> to
+!define Rel_Realization(from, to, label) from ..|> to
+!define Rel_Realization_Up(from, to, label) from ..|> to
+!define Rel_Serving(from, to, label) from --> to
+!define Rel_Association(from, to, label) from -- to
+!define Rel_Association_Left(from, to, label) from -- to
+!define Rel_Association_Right(from, to, label) from -- to
+!define Rel_Access(from, to, label) from ..> to
+!define Rel_Influence(from, to, label) from ..> to
+skinparam rectangle<<CommonGrouping>> {
+  BackgroundColor #EDE8E1
+  BorderColor #8C7E6A
+}
+skinparam rectangle<<event>> {
+  BackgroundColor #E0D8CC
+  BorderColor #8C7E6A
+}
+skinparam rectangle<<function>> {
+  BackgroundColor #E0D8CC
+  BorderColor #8C7E6A
+}
+skinparam rectangle<<process>> {
+  BackgroundColor #E0D8CC
+  BorderColor #8C7E6A
+}
+skinparam rectangle<<service>> {
+  BackgroundColor #E0D8CC
+  BorderColor #8C7E6A
+}
+sprite $archimate_event <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><path d="M3.1 4h5.6a3.8 3.8 0 0 1 0 8H3.1l2.1-4z"  fill="#252327" stroke="none"/></svg>
+sprite $archimate_function <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><path d="M2.9 11.7V5.4L8 3.1l5.1 2.3v6.3L8 9.2z"  fill="#252327" stroke="none"/></svg>
+sprite $archimate_process <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><path d="M2.6 4.1h6.3V2.8l4.5 5.2-4.5 5.2v-1.3H2.6z"  fill="#252327" stroke="none"/></svg>
+sprite $archimate_service <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><path d="M3.2 4.1h7.2a2.8 2.8 0 0 1 0 7.8H3.2a2.8 2.8 0 0 1 0-7.8z"  fill="#252327" stroke="none"/></svg>
 top to bottom direction
 
 title Promote Artifacts
