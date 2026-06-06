@@ -3,11 +3,14 @@ from __future__ import annotations
 import time
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
+from unittest.mock import MagicMock
 
 from src.application.artifact_query import ArtifactRepository
 from src.infrastructure.artifact_index import shared_artifact_index
 from src.infrastructure.gui.routers import entities as entity_router
 from src.infrastructure.gui.routers import state as gui_state
+
+_MOCK_REQUEST = MagicMock()  # request object never accessed when meta_ontology is absent
 
 
 def _write(path: Path, content: str) -> None:
@@ -97,7 +100,7 @@ def test_parallel_read_endpoints_hold_up_under_moderate_concurrency(tmp_path: Pa
 
     # Warm the shared index before starting the timed parallel section.
     warm_context = entity_router.read_entity_context(entity_ids[0])
-    warm_list = entity_router.list_entities(domain="motivation", limit=50, offset=0)
+    warm_list = entity_router.list_entities(_MOCK_REQUEST, domain="motivation", limit=50, offset=0)
     assert warm_context["entity"]["artifact_id"] == entity_ids[0]
     assert warm_list["total"] == len(entity_ids)
 
@@ -107,6 +110,7 @@ def test_parallel_read_endpoints_hold_up_under_moderate_concurrency(tmp_path: Pa
             payload = entity_router.read_entity_context(entity_id)
             return str(payload["entity"]["artifact_id"])
         page = entity_router.list_entities(
+            _MOCK_REQUEST,
             domain="motivation",
             limit=50,
             offset=(task_index % 3) * 50,

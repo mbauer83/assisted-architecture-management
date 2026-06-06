@@ -672,6 +672,26 @@ export const WriteHelpEntityTypeCatalogEntrySchema = Schema.Struct({
 export type WriteHelpEntityTypeCatalogEntry =
   typeof WriteHelpEntityTypeCatalogEntrySchema.Type
 
+// ── Entity taxonomy ───────────────────────────────────────────────────────────
+
+export const EntityTaxonomyTypeSchema = Schema.Struct({
+  name: Schema.String,
+  count: Schema.Number,
+})
+export type EntityTaxonomyType = typeof EntityTaxonomyTypeSchema.Type
+
+export const EntityTaxonomyDomainSchema = Schema.Struct({
+  name: Schema.String,
+  count: Schema.Number,
+  types: Schema.Array(EntityTaxonomyTypeSchema),
+})
+export type EntityTaxonomyDomain = typeof EntityTaxonomyDomainSchema.Type
+
+export const EntityTaxonomySchema = Schema.Struct({
+  domains: Schema.Array(EntityTaxonomyDomainSchema),
+})
+export type EntityTaxonomy = typeof EntityTaxonomySchema.Type
+
 // ── Groups ────────────────────────────────────────────────────────────────────
 
 export const GroupEntrySchema = Schema.Struct({

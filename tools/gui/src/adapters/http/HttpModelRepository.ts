@@ -4,6 +4,7 @@ import { NetworkError, NotFoundError } from '../../domain/errors'
 import {
   StatsSchema,
   EntityListSchema,
+  EntityTaxonomySchema,
   EntityDetailSchema,
   EntityContextSchema,
   ConnectionListSchema,
@@ -233,8 +234,13 @@ export const makeHttpModelRepository = (): ModelRepository => ({
     fetchJson(buildUrl('/entities', {
       domain: params.domain, artifact_type: params.artifactType,
       status: params.status, scope: params.scope, limit: params.limit, offset: params.offset,
-      group: params.group,
+      group: params.group, meta_ontology: params.metaOntology,
     }), EntityListSchema),
+
+  listEntityTaxonomy: (params: ListParams = {}) =>
+    fetchJson(buildUrl('/entity-taxonomy', {
+      scope: params.scope, meta_ontology: params.metaOntology, group: params.group,
+    }), EntityTaxonomySchema),
 
   getEntity: (id: string) =>
     fetchJsonNotFound(buildUrl('/entity', { id }), EntityDetailSchema, id).pipe(

@@ -4,9 +4,9 @@ from __future__ import annotations
 
 from typing import Any
 
-from fastapi import APIRouter, Query
+from fastapi import APIRouter, Query, Request
 
-from src.application.entity_type_predicates import is_internal_entity_type
+from src.application.entity_type_predicates import is_assurance_entity_type, is_internal_entity_type
 from src.infrastructure.diagram_types import diagram_type_domain
 from src.infrastructure.gui.routers import state as s
 
@@ -127,3 +127,55 @@ def search_reference_artifacts(
 
     hits.sort(key=lambda h: _score_reference_hit(str(h["name"]), str(h["artifact_id"]), q))
     return {"query": q, "hits": hits[:limit]}
+
+
+@router.get("/api/entity-taxonomy")
+def get_entity_taxonomy(
+    request: Request,
+    scope: str | None = None,
+    meta_ontology: str | None = None,
+    group: str | None = None,
+) -> dict[str, Any]:
+    from src.infrastructure.app_bootstrap import (  # noqa: PLC0415
+        module_registry_from_app,
+        resolve_meta_ontology_artifact_types,
+    )
+
+    registry = module_registry_from_app(request.app)
+    repo = s.get_repo()
+    entities = repo.list_entities(group=group)
+    if scope == "global":
+        entities = [e for e in entities if s.is_global(e.path) and not is_assurance_entity_type(e.artifact_type)]
+    elif scope == "engagement":
+        entities = [
+            e for e in entities
+            if not s.is_global(e.path)
+            and not is_internal_entity_type(e.artifact_type)
+            and not is_assurance_entity_type(e.artifact_type)
+        ]
+    else:
+        entities = [
+            e for e in entities
+            if not is_internal_entity_type(e.artifact_type) and not is_assurance_entity_type(e.artifact_type)
+        ]
+
+    allowed_types = resolve_meta_ontology_artifact_types(meta_ontology or "", registry)
+    if allowed_types is not None:
+        entities = [e for e in entities if e.artifact_type in allowed_types]
+
+    domain_type_counts: dict[str, dict[str, int]] = {}
+    for entity in entities:
+        domain = entity.domain or ""
+        tc = domain_type_counts.setdefault(domain, {})
+        tc[entity.artifact_type] = tc.get(entity.artifact_type, 0) + 1
+
+    ordered = registry.domain_order()
+    extra = [d for d in domain_type_counts if d not in ordered]
+    domains = []
+    for domain_name in ordered + extra:
+        tc = domain_type_counts.get(domain_name, {})
+        if not tc:
+            continue
+        types = [{"name": t, "count": c} for t, c in sorted(tc.items())]
+        domains.append({"name": domain_name, "count": sum(tc.values()), "types": types})
+    return {"domains": domains}

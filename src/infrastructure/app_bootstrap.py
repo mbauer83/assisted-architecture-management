@@ -82,3 +82,22 @@ def module_registry_dependency(request: Request) -> ModuleRegistry:
 @lru_cache(maxsize=1)
 def get_module_registry() -> ModuleRegistry:
     return build_module_registry()
+
+
+_META_ONTOLOGY_ALIASES: dict[str, str] = {
+    "archimate-next": "archimate-next-snapshot1",
+    "sysml-v2": "sysml_v2_min",
+}
+
+
+def resolve_meta_ontology_artifact_types(
+    meta_ontology: str, registry: ModuleRegistry
+) -> frozenset[str] | None:
+    """Return allowed artifact type names for a meta-ontology shortname, or None for no filter."""
+    if not meta_ontology:
+        return None
+    module_name = _META_ONTOLOGY_ALIASES.get(meta_ontology)
+    if not module_name:
+        return frozenset()
+    om = registry.find_ontology(module_name)
+    return frozenset(om.entity_types.keys()) if om else frozenset()

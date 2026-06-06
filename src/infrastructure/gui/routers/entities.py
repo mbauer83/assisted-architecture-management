@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, HTTPException, Query, Request
 from pydantic import BaseModel
 
 from src.application.artifact_parsing import parse_entity_content_sections
@@ -23,11 +23,13 @@ def get_stats() -> dict[str, Any]:
 
 @router.get("/api/entities")
 def list_entities(
+    request: Request,
     domain: str | None = None,
     artifact_type: str | None = None,
     status: str | None = None,
     scope: str | None = None,
     group: str | None = None,
+    meta_ontology: str | None = None,
     limit: int = Query(default=200, le=2000),
     offset: int = 0,
 ) -> dict[str, Any]:
@@ -47,6 +49,14 @@ def list_entities(
             e for e in entities
             if not is_internal_entity_type(e.artifact_type) and not is_assurance_entity_type(e.artifact_type)
         ]
+    if meta_ontology:
+        from src.infrastructure.app_bootstrap import (  # noqa: PLC0415
+            module_registry_from_app,
+            resolve_meta_ontology_artifact_types,
+        )
+        allowed = resolve_meta_ontology_artifact_types(meta_ontology, module_registry_from_app(request.app))
+        if allowed is not None:
+            entities = [e for e in entities if e.artifact_type in allowed]
     page = entities[offset : offset + limit]
     return {"total": len(entities), "items": build_entity_list_rows(page, repo)}
 

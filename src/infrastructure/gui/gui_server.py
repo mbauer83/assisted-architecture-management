@@ -1,55 +1,14 @@
-"""FastAPI REST server backing the GUI tool.
+"""Utility helpers for the GUI / backend server CLI.
 
-All endpoint logic lives in src/tools/gui_routers/.
-This file only wires together the app, CORS, routers, static files, and CLI entrypoint.
-
-Admin mode (``--admin-mode``) enables the ``/admin/api/*`` router, which allows
-writes to the enterprise (global) repository in addition to the engagement repo.
-It is a convention guard for local use — there is no authentication.
-After an admin session, run ``git commit`` in the enterprise repo before
-restarting in normal mode (arch-init rejects dirty clones).
+The FastAPI application itself is built in ``arch_backend_app._build_app`` — this
+module only provides ``resolve_server_roots`` (used by the backend CLI) and a thin
+``main()`` shim that delegates to the real entry-point.
 """
 
 from __future__ import annotations
 
 import os
 from pathlib import Path
-
-
-def _make_app():  # type: ignore[no-untyped-def]
-    """Build and return the FastAPI application (lazy to avoid import-time FastAPI requirement)."""
-    from fastapi import FastAPI
-    from fastapi.middleware.cors import CORSMiddleware
-
-    from src.infrastructure.app_bootstrap import install_module_registry
-    from src.infrastructure.gui.routers.admin import router as admin_router
-    from src.infrastructure.gui.routers.assurance import router as assurance_router
-    from src.infrastructure.gui.routers.connections import router as connections_router
-    from src.infrastructure.gui.routers.diagram_types import router as diagram_types_router
-    from src.infrastructure.gui.routers.diagrams import router as diagrams_router
-    from src.infrastructure.gui.routers.entities import router as entities_router
-    from src.infrastructure.gui.routers.entity_search import router as entity_search_router
-    from src.infrastructure.gui.routers.promote import router as promote_router
-    from src.infrastructure.gui.routers.sync import router as sync_router
-
-    app = FastAPI(title="Architecture Repository GUI", version="0.2.0")
-    install_module_registry(app)
-    app.add_middleware(
-        CORSMiddleware,
-        allow_origins=["http://localhost:5173", "http://localhost:4173"],
-        allow_methods=["*"],
-        allow_headers=["*"],
-    )
-    app.include_router(entities_router)
-    app.include_router(entity_search_router)
-    app.include_router(connections_router)
-    app.include_router(diagram_types_router)
-    app.include_router(diagrams_router)
-    app.include_router(promote_router)
-    app.include_router(sync_router)
-    app.include_router(admin_router)
-    app.include_router(assurance_router)
-    return app
 
 
 def resolve_server_roots(

@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, inject, onMounted, onUnmounted, ref, watch } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
-import type { EntityList, GroupList } from '../../domain'
+import type { EntityList, EntityTaxonomy, GroupList } from '../../domain'
 import type { RepoScope, RepoError } from '../../ports/ModelRepository'
 import { modelServiceKey } from '../keys'
 import { useQuery } from '../composables/useQuery'
@@ -28,6 +28,7 @@ const route = useRoute()
 const router = useRouter()
 const entityListState = useQuery<EntityList, RepoError>()
 const groupsState = useQuery<GroupList, RepoError>()
+const taxonomyState = useQuery<EntityTaxonomy, RepoError>()
 
 const isGlobal = computed(() => props.scope === 'global')
 const basePath = computed(() => isGlobal.value ? '/global/entities' : '/entities')
@@ -75,6 +76,9 @@ const loadCurrentPage = () => entityListState.run(
 
 const load = () => { resetPage(); loadCurrentPage() }
 const loadGroups = () => groupsState.run(svc.listGroups('model-project'))
+const loadTaxonomy = () => taxonomyState.run(
+  svc.listEntityTaxonomy({ scope: props.scope, group: activeGroup.value || undefined })
+)
 
 const goToNextPage = () => { goNext(); loadCurrentPage() }
 const goToPrevPage = () => { goPrev(); loadCurrentPage() }
@@ -92,16 +96,17 @@ onMounted(() => {
   }
   load()
   loadGroups()
+  loadTaxonomy()
 })
 
-watch(() => props.scope, () => { typeFilter.value = ''; load() })
-watch(activeGroup, () => load())
+watch(() => props.scope, () => { typeFilter.value = ''; loadTaxonomy(); load() })
+watch(activeGroup, () => { loadTaxonomy(); load() })
 watch([activeDomain, typeFilter], () => { if (!isGroupView.value) load() })
 
 let refreshEventSource: EventSource | null = null
 onMounted(() => {
   refreshEventSource = new EventSource('/api/events')
-  refreshEventSource.addEventListener('artifact_write_completed', () => { load(); loadGroups() })
+  refreshEventSource.addEventListener('artifact_write_completed', () => { load(); loadGroups(); loadTaxonomy() })
 })
 onUnmounted(() => { refreshEventSource?.close() })
 
@@ -129,19 +134,19 @@ const groupOptions = computed(() => {
   })
 })
 
-// Domain breakdown counts are only meaningful in group view (all group items loaded).
 const activeDomainCounts = computed((): Record<string, number> | undefined => {
-  if (!isGroupView.value || !entityListState.data.value) return undefined
-  const counts: Record<string, number> = {}
-  for (const item of entityListState.data.value.items) {
-    if (item.domain) counts[item.domain] = (counts[item.domain] ?? 0) + 1
-  }
-  return counts
+  const tax = taxonomyState.data.value
+  if (!tax) return undefined
+  return Object.fromEntries(tax.domains.map(d => [d.name, d.count]))
 })
 
 const uniqueTypes = computed(() => {
-  const types = entityListState.data.value?.items.map(item => item.artifact_type) ?? []
-  return [...new Set(types)].sort()
+  const tax = taxonomyState.data.value
+  if (tax) {
+    const domains = activeDomain.value ? tax.domains.filter(d => d.name === activeDomain.value) : tax.domains
+    return [...new Set(domains.flatMap(d => d.types.map(t => t.name)))].sort()
+  }
+  return [...new Set((entityListState.data.value?.items ?? []).map(e => e.artifact_type))].sort()
 })
 
 const compareValues = (left: number | string, right: number | string) =>
@@ -162,7 +167,7 @@ const sortedEntities = computed(() => {
         (!activeDomain.value || item.domain === activeDomain.value)
       ) ?? [])
     : (entityListState.data.value?.items ?? [])
-  if (!sortKey.value) return items
+  if (!sortKey.value) return [...items]
   return [...items].sort((a, b) => {
     if (sortKey.value === 'type') return compareValues(a.artifact_type, b.artifact_type)
     if (sortKey.value === 'in') return compareValues(a.conn_in ?? 0, b.conn_in ?? 0)
@@ -219,7 +224,7 @@ const displayCount = computed(() => {
         @update:active-group="setGroup"
         @update:active-domain="setDomain"
         @update:show-archived="v => showArchivedGroups = v"
-        @group-mutated="() => { load(); loadGroups() }"
+        @group-mutated="() => { load(); loadGroups(); loadTaxonomy() }"
         @navigate-to-groups="goToGroups"
       />
 

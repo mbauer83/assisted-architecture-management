@@ -38,6 +38,7 @@ import type {
   ServerInfo,
   WriteHelp,
   GroupList,
+  EntityTaxonomy,
 } from '../domain'
 import type { NetworkError, NotFoundError } from '../domain'
 import type { MarkdownError } from '../application/MarkdownService'
@@ -54,6 +55,7 @@ export interface ListParams {
   readonly limit?: number
   readonly offset?: number
   readonly group?: string
+  readonly metaOntology?: string
 }
 
 /** Errors that can come from any repository call. */
@@ -64,6 +66,7 @@ export interface ModelRepository {
   readonly getServerInfo: () => Effect.Effect<ServerInfo, RepoError>
   readonly getStats: () => Effect.Effect<Stats, RepoError>
   readonly listEntities: (params?: ListParams) => Effect.Effect<EntityList, RepoError>
+  readonly listEntityTaxonomy: (params?: ListParams) => Effect.Effect<EntityTaxonomy, RepoError>
   readonly getEntity: (id: string) => Effect.Effect<EntityDetail, RepoError | NotFoundError | MarkdownError>
   readonly getEntityContext: (id: string) => Effect.Effect<EntityContext, RepoError | NotFoundError | MarkdownError>
   readonly getConnections: (

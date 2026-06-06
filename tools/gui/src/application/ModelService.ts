@@ -11,6 +11,7 @@ export const makeModelService = (repo: ModelRepository) =>
     getServerInfo: () => repo.getServerInfo(),
     getStats: () => repo.getStats(),
     listEntities: (params: ListParams = {}) => repo.listEntities(params),
+    listEntityTaxonomy: (params: ListParams = {}) => repo.listEntityTaxonomy(params),
     listEntitiesGlobal: (params: ListParams = {}) => repo.listEntities({ ...params, scope: 'global' }),
     getEntity: (id: string) => repo.getEntity(id),
     getEntityContext: (id: string) => repo.getEntityContext(id),
