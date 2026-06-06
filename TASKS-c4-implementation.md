@@ -21,7 +21,7 @@ Legend: `[ ]` todo · `[~]` in progress · `[x]` done.
 - [ ] P1 executed per CLEANUP plan (its own checklist is authoritative)
 - [ ] Invalid `service↔component` realizations replaced with `function/process → service` chains (C4 §2.4/§3.1)
 - [ ] **Representative** `component→behaviour→service` chains wired (2–3 per service, C4 §3.1)
-- [ ] **Acceptance:** `artifact_verify(repo_scope="engagement", return_mode="full")` → **0 errors**
+- [x] **Acceptance:** `artifact_verify(repo_scope="engagement", return_mode="full")` → **0 errors** (7318249 — 0 errors 0 warnings, 570 files)
 
 ## Stage 0b — C4 additive model: Groups R, K, B, X  *(parallel with 0a/0c)*
 - [ ] R1 create `application-component` **AMP** (C4 §10.1) → record ID
