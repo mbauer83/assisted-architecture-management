@@ -83,9 +83,15 @@ Legend: `[ ]` todo · `[~]` in progress · `[x]` done.
 - [x] **Acceptance:** UNIFY §5 (no mutation path bypasses the write queue; 4 endpoints; 4 bridges) — 62803e9
 
 ## Stage 2 — Author diagrams (per-view gates, C4 §6/§10.8)
-- [ ] D1 `c4-system-context` scope=AMP  *(gate P1,P2,R,B,X)*
-- [ ] D3 `c4-component` scope=Backend  *(gate P1,P2,K,MIG)*
-- [ ] D2 `c4-container` scope=AMP  *(gate P1,P2,P3,P4)*
-- [ ] D4 `c4-component` scope=Assurance Module  *(gate P1,P2,P3,M,S)*
-- [ ] D5 layered dynamic views (C4 §6.1) + **author the query/navigate use-case view** (the one open TODO)
-- [ ] **Final:** repo-wide `artifact_verify` clean; memory updated
+- [x] D1 `c4-system-context` scope=AMP  *(gate P1,P2,R,B,X)* — 42e5200
+      `CSC@1780829783.z8RRON.amp-system-context`
+- [x] D3 `c4-component` scope=Backend  *(gate P1,P2,K,MIG)* — 42e5200
+      `CC@1780829793.K3l46j.architecture-backend-components`
+- [x] D2 `c4-container` scope=AMP  *(gate P1,P2,P3,P4)* — 42e5200
+      `CC@1780829785.Z_fI-N.amp-containers`
+- [x] D4 `c4-component` scope=Assurance Module  *(gate P1,P2,P3,M,S)* — 42e5200
+      `CC@1780829796.SOoZQh.assurance-module-components`
+- [x] D5 layered dynamic views (C4 §6.1) + **author the query/navigate use-case view** — 42e5200
+      `ARC@1780830301.AypVs2.querying-navigation` (fills §6.1 gap)
+- [x] **Final:** repo-wide `artifact_verify` clean; memory updated — 42e5200
+      590 files, 0 errors, 0 warnings
