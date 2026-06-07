@@ -75,6 +75,12 @@ class ArtifactRepository:
     def candidate_connections_for_entities(self, entity_ids: list[str]) -> list[EntityContextConnection]:
         return self._store.candidate_connections_for_entities(entity_ids)
 
+    def entity_ids(self) -> set[str]:
+        return self._store.entity_ids()
+
+    def connection_ids(self) -> set[str]:
+        return self._store.connection_ids()
+
     def get_entity(self, artifact_id: str) -> EntityRecord | None:
         return self._store.get_entity(artifact_id)
 

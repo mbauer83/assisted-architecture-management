@@ -557,3 +557,31 @@ def test_semantic_supplement_skipped_when_store_has_fewer_than_50_entities() -> 
     # With only 10 entities the semantic supplement is skipped
     sem_hits = [h for h in result.hits if h.score > 2.0]
     assert len(sem_hits) == 0
+
+
+# ── registry-style delegation ─────────────────────────────────────────────────
+
+
+def test_repo_entity_ids_delegates_to_store() -> None:
+    store = FakeStore(entities=[_entity("e1"), _entity("e2"), _entity("e3")])
+    repo = ArtifactRepository(store)
+    assert repo.entity_ids() == {"e1", "e2", "e3"}
+
+
+def test_repo_entity_ids_empty_when_no_entities() -> None:
+    repo = ArtifactRepository(FakeStore())
+    assert repo.entity_ids() == set()
+
+
+def test_repo_connection_ids_delegates_to_store() -> None:
+    store = FakeStore(
+        entities=[_entity("src"), _entity("tgt")],
+        connections=[_conn("c1", "src", "tgt"), _conn("c2", "src", "tgt")],
+    )
+    repo = ArtifactRepository(store)
+    assert repo.connection_ids() == {"c1", "c2"}
+
+
+def test_repo_connection_ids_empty_when_no_connections() -> None:
+    repo = ArtifactRepository(FakeStore())
+    assert repo.connection_ids() == set()

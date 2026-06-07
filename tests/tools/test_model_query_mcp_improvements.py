@@ -133,3 +133,29 @@ def test_model_query_mcp_projection_and_aggregate_tool(tmp_path: Path) -> None:
         repo_scope="engagement",
     )
     assert grouped["counts"]["activity"] == 1
+
+
+def test_read_artifact_resolves_short_form_id(tmp_path: Path) -> None:
+    """artifact_query_read_artifact must not error when given a 2-segment short-form ID.
+
+    Regression: ArtifactRepository was missing entity_ids()/connection_ids() delegation
+    causing 'ArtifactRepository object has no attribute entity_ids' for short-form IDs.
+    """
+    repo_root = _build_repo(tmp_path / "repo")
+    tool_map = mcp_artifact_server.mcp_read._tool_manager._tools
+
+    # Full-form ID works
+    full = tool_map["artifact_query_read_artifact"].fn(
+        "APP@1712870400.kRZYOA.event-store",
+        repo_root=str(repo_root),
+        repo_scope="engagement",
+    )
+    assert full["artifact_id"] == "APP@1712870400.kRZYOA.event-store"
+
+    # Short-form ID (2 segments) must resolve to the same entity without raising
+    short = tool_map["artifact_query_read_artifact"].fn(
+        "APP@1712870400.kRZYOA",
+        repo_root=str(repo_root),
+        repo_scope="engagement",
+    )
+    assert short["artifact_id"] == "APP@1712870400.kRZYOA.event-store"
