@@ -36,6 +36,23 @@ RepoPreset = Literal[
 RepoScope = Literal["engagement", "enterprise", "both"]
 
 
+def expand_artifact_id(registry_or_repo, artifact_id: str) -> str:
+    """Expand short-form ID (PREFIX@epoch.random) to full ID (PREFIX@epoch.random.slug).
+
+    Full-form IDs (two or more dots) are returned unchanged.
+    """
+    if artifact_id.count(".") >= 2:
+        return artifact_id
+    prefix = f"{artifact_id}."
+    for candidate in registry_or_repo.entity_ids():
+        if candidate.startswith(prefix):
+            return candidate
+    for candidate in registry_or_repo.connection_ids():
+        if candidate.startswith(prefix):
+            return candidate
+    return artifact_id
+
+
 def workspace_root() -> Path:
     # .../src/tools/model_mcp/context.py -> parents[0]=model_mcp, [1]=tools, [2]=src, [3]=repo root
     return Path(__file__).resolve().parents[3]

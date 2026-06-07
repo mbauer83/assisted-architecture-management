@@ -9,6 +9,7 @@ from src.application.verification.artifact_verifier import ArtifactVerifier
 from src.application.verification.artifact_verifier_registry import ArtifactRegistry
 from src.infrastructure.mcp.artifact_mcp.context import (
     authoritative_callbacks_for,
+    expand_artifact_id,
     registry_cached,
     repo_cached,
     resolve_repo_roots,
@@ -72,6 +73,7 @@ def artifact_edit_entity(
     root, registry, verifier = _resolve(repo_root, need_registry=True)
     registry = _require_registry(registry)
     mutation_context, clear_repo_caches = authoritative_callbacks_for(root)
+    artifact_id = expand_artifact_id(registry, artifact_id)
 
     kwargs: dict[str, Any] = {
         k: v for k, v in (
@@ -116,6 +118,8 @@ def artifact_edit_connection(
     root, registry, verifier = _resolve(repo_root, need_registry=True)
     registry = _require_registry(registry)
     mutation_context, clear_repo_caches = authoritative_callbacks_for(root)
+    source_entity = expand_artifact_id(registry, source_entity)
+    target_entity = expand_artifact_id(registry, target_entity)
 
     if operation == "remove":
         result = artifact_write_ops.remove_connection(
@@ -298,7 +302,8 @@ def register_edit_tools(mcp: FastMCP) -> None:
             "Edit an existing entity. Pass only fields to change; omitted fields are preserved. "
             "Supports name, summary, properties, notes, keywords, version, status, "
             "group (str|None — re-home to a different model-project slug). "
-            "Bumps last-updated automatically. Regenerates macros if name changes."
+            "Bumps last-updated automatically. Regenerates macros if name changes. "
+            "artifact_id: full (PREFIX@epoch.random.slug) or short (PREFIX@epoch.random) form."
         ),
         annotations=LOCAL_WRITE,
         structured_output=True,
@@ -312,7 +317,8 @@ def register_edit_tools(mcp: FastMCP) -> None:
             "Identify by source_entity + target_entity + connection_type. "
             "operation='update' (default) changes description, src_cardinality, and/or "
             "tgt_cardinality; pass '' to remove an existing cardinality, omit (null) to "
-            "preserve it. operation='remove' deletes the connection."
+            "preserve it. operation='remove' deletes the connection. "
+            "source_entity/target_entity: full (PREFIX@epoch.random.slug) or short (PREFIX@epoch.random) form."
         ),
         annotations=DESTRUCTIVE_LOCAL_WRITE,
         structured_output=True,

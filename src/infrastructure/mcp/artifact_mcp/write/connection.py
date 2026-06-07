@@ -4,6 +4,7 @@ from typing import Literal
 
 from mcp.server.fastmcp import FastMCP  # type: ignore[import-not-found]
 
+from src.infrastructure.mcp.artifact_mcp.context import expand_artifact_id
 from src.infrastructure.mcp.artifact_mcp.tool_annotations import LOCAL_WRITE
 from src.infrastructure.mcp.artifact_mcp.write._common import (
     _out,
@@ -47,6 +48,8 @@ def _add_connection_impl(
     if clear_repo_caches is None:
         _context, clear_repo_caches = authoritative_callbacks_for(eng_root)
 
+    source_entity = expand_artifact_id(registry, source_entity)
+    target_entity = expand_artifact_id(registry, target_entity)
     effective_source = source_entity
     effective_target = target_entity
     gar_source_id: str | None = None
@@ -153,7 +156,8 @@ def artifact_add_connection(
 
     if from_diagram_element and str(from_diagram_element.get("diagram_element_kind", "connection")) == "connection":
         from src.infrastructure.write.artifact_write.materialization import (  # noqa: PLC0415
-            DiagramElementRef, materialize_connection,
+            DiagramElementRef,
+            materialize_connection,
         )
         ref = DiagramElementRef(
             diagram_id=str(from_diagram_element.get("diagram_id", "")),
@@ -220,7 +224,8 @@ def register(mcp: FastMCP) -> None:
             "of the connection (e.g. '1', '0..1', '1..*', '*'). "
             "Junction endpoints: cardinalities prohibited; all connections at a junction "
             "must share the same type (first connection locks it). "
-            "dry_run=true returns would-be content without writing."
+            "dry_run=true returns would-be content without writing. "
+            "source_entity/target_entity: full (PREFIX@epoch.random.slug) or short (PREFIX@epoch.random) form."
         ),
         annotations=LOCAL_WRITE,
         structured_output=True,
