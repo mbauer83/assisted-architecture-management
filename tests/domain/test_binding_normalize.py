@@ -118,7 +118,8 @@ class TestNormalizeBindings:
     def test_scoped_by_shorthand_allowed(self) -> None:
         entities: dict[str, object] = {
             "container": [
-                {"id": "box-1", "label": "X", "binding": {"correspondence_kind": "scoped-by", "target": {"entity_id": "SYS@1.s.S"}}}
+                {"id": "box-1", "label": "X",
+                 "binding": {"correspondence_kind": "scoped-by", "target": {"entity_id": "SYS@1.s.S"}}}
             ]
         }
         result = normalize_bindings(entities, None)
@@ -127,7 +128,8 @@ class TestNormalizeBindings:
     def test_refines_shorthand_allowed(self) -> None:
         entities: dict[str, object] = {
             "container": [
-                {"id": "box-1", "label": "X", "binding": {"correspondence_kind": "refines", "target": {"entity_id": "APP@1.a.A"}}}
+                {"id": "box-1", "label": "X",
+                 "binding": {"correspondence_kind": "refines", "target": {"entity_id": "APP@1.a.A"}}}
             ]
         }
         result = normalize_bindings(entities, None)
@@ -136,7 +138,8 @@ class TestNormalizeBindings:
     def test_traces_to_shorthand_allowed(self) -> None:
         entities: dict[str, object] = {
             "container": [
-                {"id": "box-1", "label": "X", "binding": {"correspondence_kind": "traces-to", "target": {"entity_id": "APP@1.a.A"}}}
+                {"id": "box-1", "label": "X",
+                 "binding": {"correspondence_kind": "traces-to", "target": {"entity_id": "APP@1.a.A"}}}
             ]
         }
         result = normalize_bindings(entities, None)
@@ -147,7 +150,8 @@ class TestNormalizeBindingsRejections:
     def test_abstracts_shorthand_rejected(self) -> None:
         entities: dict[str, object] = {
             "container": [
-                {"id": "box-1", "label": "X", "binding": {"correspondence_kind": "abstracts", "target": {"entity_id": "APP@1.a.A"}}}
+                {"id": "box-1", "label": "X",
+                 "binding": {"correspondence_kind": "abstracts", "target": {"entity_id": "APP@1.a.A"}}}
             ]
         }
         with pytest.raises(ValueError, match="cannot be expressed as shorthand"):

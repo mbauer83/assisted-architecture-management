@@ -28,7 +28,12 @@ def _result() -> VerificationResult:
 _SENTINEL = object()
 
 
-def _run(fm: dict, *, allowed_entities=_SENTINEL, allowed_connections=_SENTINEL, all_entities=_SENTINEL, all_connections=_SENTINEL, scope="engagement", allowed_bindings=None):
+def _run(
+    fm: dict, *,
+    allowed_entities=_SENTINEL, allowed_connections=_SENTINEL,
+    all_entities=_SENTINEL, all_connections=_SENTINEL,
+    scope="engagement", allowed_bindings=None,
+):
     r = _result()
     check_bindings_scoped(
         fm,

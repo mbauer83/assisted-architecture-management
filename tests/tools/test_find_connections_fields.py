@@ -62,10 +62,10 @@ class TestFindConnectionsNoFields:
         assert _find(eid, repo) == []
 
     def test_direction_filter_outbound_only(self, repo: Path) -> None:
-        # archimate-realization is directed; use it so outbound ≠ inbound
+        # archimate-influence is directed; use it so outbound ≠ inbound
         src = _make(repo, "goal", "DirSrc")
         tgt = _make(repo, "requirement", "DirTgt")
-        _connect(repo, src, tgt, "archimate-realization")
+        _connect(repo, src, tgt, "archimate-influence")
         outbound = _find(src, repo, direction="outbound")
         inbound = _find(src, repo, direction="inbound")
         assert len(outbound) == 1
@@ -132,10 +132,10 @@ class TestFindConnectionsWithFields:
         assert all(list(r.keys()) == ["target"] for r in results)
 
     def test_fields_and_direction_filter_combine(self, repo: Path) -> None:
-        # archimate-realization is directed so outbound returns exactly 1 result
+        # archimate-influence is directed so outbound returns exactly 1 result
         src = _make(repo, "goal", "CombSrc")
         tgt = _make(repo, "requirement", "CombTgt")
-        _connect(repo, src, tgt, "archimate-realization")
+        _connect(repo, src, tgt, "archimate-influence")
         results = _find(src, repo, direction="outbound", fields=["source", "conn_type"])
         assert results
         assert set(results[0].keys()) == {"source", "conn_type"}

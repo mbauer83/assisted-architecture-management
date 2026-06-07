@@ -184,7 +184,9 @@ def materialize_entity(
         version=version, status=status, last_updated=None, dry_run=False,
     )
     if not entity_result.wrote:
-        return MaterializationResult(wrote=False, error="Entity creation failed", verification=entity_result.verification)
+        return MaterializationResult(
+            wrote=False, error="Entity creation failed", verification=entity_result.verification
+        )
 
     new_b = Binding(
         id=f"bind-{ref.diagram_element_id}",

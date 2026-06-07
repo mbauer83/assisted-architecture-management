@@ -175,7 +175,9 @@ def _preview_entity_ids(module: object, diagram_type: str, scope_id: str, query:
     return {i.entity_id for i in items}
 
 
-def _engine_entity_ids(diagram_type: str, scope_id: str, query: FakeQuery, *, scope_entity_type: str, internal_c4_type: str) -> set[str]:
+def _engine_entity_ids(
+    diagram_type: str, scope_id: str, query: FakeQuery, *, scope_entity_type: str, internal_c4_type: str
+) -> set[str]:
     """Entity IDs that the engine projects (both seams agree: to_view_items)."""
     proj = project_c4(
         diagram_type, scope_id, query,

@@ -278,7 +278,9 @@ def _run_foreground(args: argparse.Namespace, parser: argparse.ArgumentParser, r
         return
     repo_root_path, enterprise_root_path = gui_server.resolve_server_roots(args.repo_root, args.enterprise_root)
     if repo_root_path is None:
-        parser.error("No --repo-root given, ARCH_REPO_ROOT not set, and no .arch/init-state.yaml found. Run arch-init first.")
+        parser.error(
+            "No --repo-root given, ARCH_REPO_ROOT not set, and no .arch/init-state.yaml found. Run arch-init first."
+        )
 
     repo = _initialise_repo(repo_root_path, enterprise_root_path, args)
     _run_startup_validations(repo, repo_root_path, enterprise_root_path)
@@ -297,7 +299,9 @@ def _run_foreground(args: argparse.Namespace, parser: argparse.ArgumentParser, r
         remove_backend_state()
 
 
-def _initialise_repo(repo_root_path: Path, enterprise_root_path: Path | None, args: argparse.Namespace) -> "ArtifactRepository":
+def _initialise_repo(
+    repo_root_path: Path, enterprise_root_path: Path | None, args: argparse.Namespace
+) -> "ArtifactRepository":
     from src.application.artifact_query import ArtifactRepository
     from src.infrastructure.artifact_index import shared_artifact_index
 
@@ -309,7 +313,9 @@ def _initialise_repo(repo_root_path: Path, enterprise_root_path: Path | None, ar
     return repo
 
 
-def _run_startup_validations(repo: "ArtifactRepository", repo_root_path: Path, enterprise_root_path: Path | None) -> None:
+def _run_startup_validations(
+    repo: "ArtifactRepository", repo_root_path: Path, enterprise_root_path: Path | None
+) -> None:
     from src.application.group_registry_validation import GroupRegistryError, validate_and_repair_group_registry
     from src.application.startup_validation import RepoCompatibilityError, validate_repo_compatibility
     from src.infrastructure.app_bootstrap import get_module_registry
@@ -341,7 +347,9 @@ def _configure_server_state(
     from src.application.artifact_document_schema import load_document_schemata
     from src.infrastructure.gui.routers import state as gui_state
 
-    gui_state.init_state(repo, repo_root_path, enterprise_root_path, admin_mode=args.admin_mode, read_only=args.read_only)
+    gui_state.init_state(
+        repo, repo_root_path, enterprise_root_path, admin_mode=args.admin_mode, read_only=args.read_only
+    )
     load_document_schemata(repo_root_path)
     if args.read_only:
         from src.infrastructure.workspace.write_block_manager import block_repo

@@ -39,19 +39,27 @@ def test_c4_scope_projection_registered_from_c4_module() -> None:
 
 
 def test_item_type_scope_returns_scope_entity_type() -> None:
-    assert _c4_item_type("scope", "application-component", "software-system", "container", frozenset()) == "software-system"
+    assert _c4_item_type("scope", "application-component", "software-system", "container", frozenset()) == (
+        "software-system"
+    )
 
 
 def test_item_type_internal_app_component_container_level() -> None:
-    assert _c4_item_type("internal", "application-component", "software-system", "container", frozenset()) == "container"
+    assert _c4_item_type("internal", "application-component", "software-system", "container", frozenset()) == (
+        "container"
+    )
 
 
 def test_item_type_internal_app_component_component_level() -> None:
-    assert _c4_item_type("internal", "application-component", "software-system", "component", frozenset()) == "component"
+    assert _c4_item_type("internal", "application-component", "software-system", "component", frozenset()) == (
+        "component"
+    )
 
 
 def test_item_type_external_app_component_is_software_system() -> None:
-    assert _c4_item_type("external", "application-component", "software-system", "container", frozenset()) == "software-system"
+    assert _c4_item_type("external", "application-component", "software-system", "container", frozenset()) == (
+        "software-system"
+    )
 
 
 def test_item_type_external_business_actor_is_person() -> None:

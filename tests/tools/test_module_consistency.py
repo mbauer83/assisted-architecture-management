@@ -18,7 +18,9 @@ from src.domain.permitted_relationships import PermittedRelationship, PermittedR
 
 
 def _entity_type(name: str) -> EntityTypeInfo:
-    return EntityTypeInfo(artifact_type=name, prefix=name[:3].upper(), hierarchy=(name,), classes=(), create_when="", never_create_when="")
+    return EntityTypeInfo(
+        artifact_type=name, prefix=name[:3].upper(), hierarchy=(name,), classes=(), create_when="", never_create_when=""
+    )
 
 
 def _conn_type(name: str) -> ConnectionTypeInfo:
@@ -41,8 +43,12 @@ class _StubOntology:
         permitted: PermittedRelationshipSet = PermittedRelationshipSet.empty(),
     ) -> None:
         self._name = name
-        self._entity_types: dict[EntityTypeName, EntityTypeInfo] = {EntityTypeName(n): _entity_type(n) for n in entity_names}
-        self._connection_types: dict[ConnectionTypeName, ConnectionTypeInfo] = {ConnectionTypeName(n): _conn_type(n) for n in conn_names}
+        self._entity_types: dict[EntityTypeName, EntityTypeInfo] = {
+            EntityTypeName(n): _entity_type(n) for n in entity_names
+        }
+        self._connection_types: dict[ConnectionTypeName, ConnectionTypeInfo] = {
+            ConnectionTypeName(n): _conn_type(n) for n in conn_names
+        }
         self._permitted = permitted
 
     @property

@@ -290,7 +290,7 @@ class TestVerifierCardinality:
     def test_valid_cardinality_passes_verification(self, repo: Path) -> None:
         src, tgt = _setup_two_entities(repo)
         out_path = repo / "model/motivation/requirements" / f"{src}.outgoing.md"
-        _write(out_path, _outgoing(src, [f"### archimate-realization [1] → [0..*] {tgt}"]))
+        _write(out_path, _outgoing(src, [f"### archimate-aggregation [1] → [0..*] {tgt}"]))
         registry = ArtifactRegistry(shared_artifact_index(repo))
         verifier = ArtifactVerifier(registry)
         result = verifier.verify_outgoing_file(out_path)
@@ -346,7 +346,7 @@ class TestAddConnectionWithCardinality:
             verifier=verifier,
             clear_repo_caches=clear,
             source_entity=src,
-            connection_type="archimate-realization",
+            connection_type="archimate-influence",
             target_entity=tgt,
             description=None,
             version="0.1.0",
@@ -358,7 +358,7 @@ class TestAddConnectionWithCardinality:
         assert result.wrote
         out_path = repo / "model/motivation/requirements" / f"{src}.outgoing.md"
         content = out_path.read_text()
-        assert "### archimate-realization [1] →" in content
+        assert "### archimate-influence [1] →" in content
 
     def test_add_connection_with_both_cardinalities(self, repo: Path) -> None:
         from src.infrastructure.write.artifact_write.connection import add_connection

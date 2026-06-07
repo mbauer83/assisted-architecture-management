@@ -89,7 +89,9 @@ def edit_diagram(
     # view_derivations: caller replaces; keep existing from file if caller omits
     _raw_vd = fm.get("view_derivations")
     existing_vd = [v for v in _raw_vd if isinstance(v, dict)] if isinstance(_raw_vd, list) else []
-    eff_view_derivations: list[dict[str, object]] | None = view_derivations if view_derivations is not None else (existing_vd or None)
+    eff_view_derivations: list[dict[str, object]] | None = (
+        view_derivations if view_derivations is not None else (existing_vd or None)
+    )
 
     # Bindings: existing from file + new from caller, then normalize shorthand from entities
     _raw_b = fm.get("bindings")

@@ -9,7 +9,7 @@ from src.domain.module_registry import ModuleRegistry
 from src.infrastructure.app_bootstrap import module_registry_dependency, module_registry_from_app
 from src.infrastructure.backend import arch_backend, backend_control, backend_probe, backend_process, backend_state
 from src.infrastructure.backend.arch_backend_app import _build_app
-from src.infrastructure.mcp import arch_mcp_stdio
+from src.infrastructure.mcp import arch_mcp_stdio, arch_mcp_stdio_assurance
 
 
 def test_arch_mcp_stdio_read_connects_to_read_path(monkeypatch) -> None:
@@ -86,6 +86,36 @@ def test_arch_mcp_stdio_uses_workspace_directory_for_autostart(monkeypatch, tmp_
     assert calls["ensure_port"] == 8123
     assert calls["ensure_cwd"] == workspace_dir
     assert calls["ensure_project_dir"] == project_dir
+
+
+def test_assurance_bridge_read_connects_to_assurance_read_path(monkeypatch) -> None:
+    """arch-mcp-stdio-assurance-read bridges to /mcp/assurance-read via HTTP."""
+    urls: list[str] = []
+
+    monkeypatch.setattr(arch_mcp_stdio.anyio, "run", lambda fn, url: urls.append(url))
+    monkeypatch.setattr(
+        arch_mcp_stdio, "ensure_backend_running", lambda port, start_if_missing, cwd=None, project_dir=None: port
+    )
+    monkeypatch.setattr(arch_mcp_stdio, "configured_backend_url", lambda: None)
+
+    arch_mcp_stdio_assurance.main_read([])
+
+    assert urls and urls[0].endswith("/mcp/assurance-read")
+
+
+def test_assurance_bridge_write_connects_to_assurance_write_path(monkeypatch) -> None:
+    """arch-mcp-stdio-assurance-write bridges to /mcp/assurance-write via HTTP."""
+    urls: list[str] = []
+
+    monkeypatch.setattr(arch_mcp_stdio.anyio, "run", lambda fn, url: urls.append(url))
+    monkeypatch.setattr(
+        arch_mcp_stdio, "ensure_backend_running", lambda port, start_if_missing, cwd=None, project_dir=None: port
+    )
+    monkeypatch.setattr(arch_mcp_stdio, "configured_backend_url", lambda: None)
+
+    arch_mcp_stdio_assurance.main_write([])
+
+    assert urls and urls[0].endswith("/mcp/assurance-write")
 
 
 def test_backend_state_path_falls_back_without_arch_init(tmp_path: Path) -> None:
@@ -486,6 +516,17 @@ def test_unified_backend_routes_split_mcp_paths() -> None:
     assert "/mcp/read/" in actual_paths
     assert "/mcp/write" in actual_paths
     assert "/mcp/write/" in actual_paths
+
+
+def test_unified_backend_routes_assurance_mcp_paths() -> None:
+    """All four MCP endpoints are mounted: arch read/write + assurance read/write."""
+    app = _build_app()
+    actual_paths = {getattr(route, "path", None) for route in app.routes}
+
+    assert "/mcp/assurance-read" in actual_paths
+    assert "/mcp/assurance-read/" in actual_paths
+    assert "/mcp/assurance-write" in actual_paths
+    assert "/mcp/assurance-write/" in actual_paths
 
 
 def test_unified_backend_installs_module_registry_on_app_state() -> None:
@@ -1150,3 +1191,58 @@ def test_arch_backend_refuses_to_start_when_port_used_by_other_process(monkeypat
         assert "already in use" in str(exc)
     else:
         raise AssertionError("expected SystemExit")
+
+
+# --- W3/W4: artifact_write_cli requires a running backend ---
+
+from src.infrastructure.write import artifact_write_cli  # noqa: E402
+
+
+def test_write_cli_errors_when_backend_absent(monkeypatch, tmp_path: Path, capsys) -> None:
+    """artifact_write_cli exits with error when no backend state exists."""
+    monkeypatch.setattr(artifact_write_cli, "read_backend_state", lambda path: None)
+
+    result = artifact_write_cli.main(["--repo-root", str(tmp_path), "delete-entity", "ENT@123.abc"])
+
+    assert result == 1
+    err = capsys.readouterr().err
+    assert "arch-backend" in err
+
+
+def test_write_cli_errors_when_backend_unhealthy(monkeypatch, tmp_path: Path, capsys) -> None:
+    """artifact_write_cli exits with error when backend state exists but probe fails."""
+    monkeypatch.setattr(artifact_write_cli, "read_backend_state", lambda path: {"port": 8123})
+    monkeypatch.setattr(artifact_write_cli, "probe_backend", lambda port: False)
+
+    result = artifact_write_cli.main(["--repo-root", str(tmp_path), "delete-entity", "ENT@123.abc"])
+
+    assert result == 1
+    err = capsys.readouterr().err
+    assert "arch-backend" in err
+
+
+def test_write_cli_routes_delete_entity_through_backend(monkeypatch, tmp_path: Path) -> None:
+    """delete-entity posts to /api/entity/remove when backend is available."""
+    import json as json_mod  # noqa: PLC0415
+
+    monkeypatch.setattr(artifact_write_cli, "read_backend_state", lambda path: {"port": 8123})
+    monkeypatch.setattr(artifact_write_cli, "probe_backend", lambda port: True)
+
+    requests_captured: list[dict[str, object]] = []
+
+    class _FakeResp:
+        def read(self): return json_mod.dumps({"artifact_id": "ENT@123.abc", "path": "x.yaml", "warnings": []}).encode()
+        def __enter__(self): return self
+        def __exit__(self, *a): pass
+
+    def fake_urlopen(req, timeout=10.0):
+        requests_captured.append({"url": req.full_url, "body": json_mod.loads(req.data)})
+        return _FakeResp()
+
+    monkeypatch.setattr(artifact_write_cli, "urlopen", fake_urlopen)
+
+    result = artifact_write_cli.main(["--repo-root", str(tmp_path), "delete-entity", "ENT@123.abc"])
+
+    assert result == 0
+    assert requests_captured[0]["url"].endswith("/api/entity/remove")
+    assert requests_captured[0]["body"]["artifact_id"] == "ENT@123.abc"

@@ -1,83 +1,58 @@
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
-from src.infrastructure.write.artifact_write_cli import main
+import pytest
+
+from src.infrastructure.write import artifact_write_cli
 
 
-def _write(path: Path, content: str) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(content, encoding="utf-8")
+@pytest.fixture()
+def live_backend(monkeypatch):
+    """Simulate a running backend: state resolves and probe succeeds."""
+    monkeypatch.setattr(artifact_write_cli, "read_backend_state", lambda path: {"port": 8000})
+    monkeypatch.setattr(artifact_write_cli, "probe_backend", lambda port: True)
 
 
-def _entity_md(artifact_id: str, name: str) -> str:
-    return f"""\
----
-artifact-id: {artifact_id}
-artifact-type: requirement
-name: "{name}"
-version: 0.1.0
-status: active
-last-updated: '2026-04-20'
----
+class _FakeResp:
+    def __init__(self, payload: dict) -> None:
+        self._data = json.dumps(payload).encode()
 
-<!-- §content -->
+    def read(self) -> bytes:
+        return self._data
 
-## {name}
+    def __enter__(self) -> "_FakeResp":
+        return self
 
-## Properties
-
-| Attribute | Value |
-|---|---|
-| (none) | (none) |
-
-<!-- §display -->
-
-### archimate
-
-```yaml
-domain: Motivation
-element-type: Requirement
-label: "{name}"
-alias: REQ_TEST
-```
-"""
+    def __exit__(self, *args: object) -> None:
+        pass
 
 
-def test_cli_delete_entity_dry_run(tmp_path: Path, capsys) -> None:
-    repo = tmp_path / "engagements" / "ENG" / "architecture-repository"
+def test_cli_delete_entity_dry_run(tmp_path: Path, capsys, live_backend, monkeypatch) -> None:
     eid = "REQ@1000000000.TestAa.delete-me"
-    _write(repo / "model" / "motivation" / "requirement" / f"{eid}.md", _entity_md(eid, "Delete Me"))
+    monkeypatch.setattr(
+        artifact_write_cli,
+        "urlopen",
+        lambda req, timeout=10.0: _FakeResp({"artifact_id": eid, "path": "model/x.md", "warnings": []}),
+    )
 
-    rc = main(["--repo-root", str(repo), "delete-entity", eid, "--dry-run"])
+    rc = artifact_write_cli.main(["--repo-root", str(tmp_path), "delete-entity", eid, "--dry-run"])
     captured = capsys.readouterr()
 
     assert rc == 0
     assert "Would delete entity" in captured.out
 
 
-def test_cli_delete_diagram_dry_run(tmp_path: Path, capsys) -> None:
-    repo = tmp_path / "engagements" / "ENG" / "architecture-repository"
+def test_cli_delete_diagram_dry_run(tmp_path: Path, capsys, live_backend, monkeypatch) -> None:
     did = "diag-delete"
-    _write(
-        repo / "diagram-catalog" / "diagrams" / f"{did}.puml",
-        f"""\
----
-artifact-id: {did}
-artifact-type: diagram
-diagram-type: activity
-name: "Diag"
-version: 0.1.0
-status: active
-last-updated: '2026-04-20'
----
-@startuml
-:x;
-@enduml
-""",
+    monkeypatch.setattr(
+        artifact_write_cli,
+        "urlopen",
+        lambda req, timeout=10.0: _FakeResp({"artifact_id": did, "path": "diagrams/x.puml", "warnings": []}),
     )
 
-    rc = main(["--repo-root", str(repo), "delete-diagram", did, "--dry-run"])
+    rc = artifact_write_cli.main(["--repo-root", str(tmp_path), "delete-diagram", did, "--dry-run"])
     captured = capsys.readouterr()
 
     assert rc == 0

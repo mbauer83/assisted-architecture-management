@@ -180,7 +180,7 @@ class TestRefSubstitution:
                 {
                     "op": "add_connection",
                     "source_entity": "$ref:src",
-                    "connection_type": "archimate-realization",
+                    "connection_type": "archimate-influence",
                     "target_entity": "$ref:tgt",
                 },
             ],
@@ -240,7 +240,7 @@ class TestAutoOrdering:
                 {
                     "op": "add_connection",
                     "source_entity": "$ref:comp",
-                    "connection_type": "archimate-serving",
+                    "connection_type": "archimate-association",
                     "target_entity": "$ref:svc",
                 },
                 {"op": "create_entity", "artifact_type": "application-component", "name": "Comp", "_ref": "comp"},

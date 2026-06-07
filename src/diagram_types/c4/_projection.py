@@ -166,15 +166,15 @@ def _neighbor_entities(
     """Entities reachable from scope via _NEIGHBOR_TYPES, NOT in scope, with allowed type.
 
     skip_association_from: if set, archimate-association connections where *this* entity is
-    one of the endpoints are skipped.  Used to suppress navigation-only links on the scope
-    root (e.g. AMP --association-- AMS) without affecting interface→actor discovery.
+    the SOURCE are skipped.  Used to suppress outbound navigation-only links on the scope
+    root (e.g. AMP --association→ AMS) without blocking inbound actor→system discovery.
     """
     result: set[str] = set()
     for eid in scope:
         for conn in query.find_connections_for(eid, direction="any"):
             if conn.conn_type not in _NEIGHBOR_TYPES:
                 continue
-            if conn.conn_type == "archimate-association" and skip_association_from in (conn.source, conn.target):
+            if conn.conn_type == "archimate-association" and skip_association_from == conn.source:
                 continue
             other = conn.target if conn.source == eid else conn.source
             if other in scope:

@@ -323,7 +323,8 @@ def register_edit_tools(mcp: FastMCP) -> None:
         title="Artifact Write: Edit Diagram",
         description=(
             "Edit an existing diagram. "
-            "Binding modes (pass mode=): 'refresh-derivation' (requires derivation_id — runs strategy, returns diff + base_revision, no write); "
+            "Binding modes (pass mode=): 'refresh-derivation'"
+            " (requires derivation_id — runs strategy, returns diff + base_revision, no write); "
             "'apply-diff' (requires diff + base_revision — applies diff with stale-write check); "
             "'propose-bindings' (requires entity_ids/connection_ids — returns proposals, no write); "
             "'detach-binding' (requires binding_id — removes binding). "

@@ -18,6 +18,7 @@ from src.infrastructure.artifact_index.coordination import get_write_queue_state
 from src.infrastructure.gui.routers import state as gui_state
 from src.infrastructure.mcp.artifact_mcp import auto_start_default_watcher
 from src.infrastructure.mcp.mcp_artifact_server import mcp_read, mcp_write
+from src.infrastructure.mcp.mcp_assurance_server import mcp_assurance_read, mcp_assurance_write
 
 logger = logging.getLogger(__name__)
 _REQUEST_SLOW_WARNING_S = 5.0
@@ -123,9 +124,13 @@ def _build_app(credentials: "GitCredentials | None" = None):  # type: ignore[no-
 
     mcp_read.streamable_http_app()
     mcp_write.streamable_http_app()
+    mcp_assurance_read.streamable_http_app()
+    mcp_assurance_write.streamable_http_app()
 
     read_app = StreamableHTTPASGIApp(mcp_read.session_manager)
     write_app = StreamableHTTPASGIApp(mcp_write.session_manager)
+    assurance_read_app = StreamableHTTPASGIApp(mcp_assurance_read.session_manager)
+    assurance_write_app = StreamableHTTPASGIApp(mcp_assurance_write.session_manager)
 
     async def _on_repo_changed(repo_path: Path) -> None:
         """Refresh the artifact index and notify GUI clients after a git pull or merge."""
@@ -150,6 +155,8 @@ def _build_app(credentials: "GitCredentials | None" = None):  # type: ignore[no-
             logger.info("Starting MCP session managers")
             await stack.enter_async_context(mcp_read.session_manager.run())
             await stack.enter_async_context(mcp_write.session_manager.run())
+            await stack.enter_async_context(mcp_assurance_read.session_manager.run())
+            await stack.enter_async_context(mcp_assurance_write.session_manager.run())
             from src.infrastructure.mcp.artifact_mcp.write_queue import attach_event_loop
 
             attach_event_loop(asyncio.get_running_loop())
@@ -249,12 +256,16 @@ def _build_app(credentials: "GitCredentials | None" = None):  # type: ignore[no-
 
         read_tools = mcp_read._tool_manager.list_tools()  # type: ignore[attr-defined]
         write_tools = mcp_write._tool_manager.list_tools()  # type: ignore[attr-defined]
+        assurance_read = mcp_assurance_read._tool_manager.list_tools()  # type: ignore[attr-defined]
+        assurance_write = mcp_assurance_write._tool_manager.list_tools()  # type: ignore[attr-defined]
         structured = [t.name for t in read_tools if t.output_schema is not None]
         return JSONResponse(
             {
                 "status": "ok",
                 "read_tools": len(read_tools),
                 "write_tools": len(write_tools),
+                "assurance_read_tools": len(assurance_read),
+                "assurance_write_tools": len(assurance_write),
                 "structured_output_tools": len(structured),
                 "structured_output_tool_names": structured,
             }
@@ -278,6 +289,10 @@ def _build_app(credentials: "GitCredentials | None" = None):  # type: ignore[no-
     app.add_route("/mcp/read/", cast(object, read_app), include_in_schema=False)  # type: ignore[arg-type]
     app.add_route("/mcp/write", cast(object, write_app), include_in_schema=False)  # type: ignore[arg-type]
     app.add_route("/mcp/write/", cast(object, write_app), include_in_schema=False)  # type: ignore[arg-type]
+    app.add_route("/mcp/assurance-read", cast(object, assurance_read_app), include_in_schema=False)  # type: ignore[arg-type]
+    app.add_route("/mcp/assurance-read/", cast(object, assurance_read_app), include_in_schema=False)  # type: ignore[arg-type]
+    app.add_route("/mcp/assurance-write", cast(object, assurance_write_app), include_in_schema=False)  # type: ignore[arg-type]
+    app.add_route("/mcp/assurance-write/", cast(object, assurance_write_app), include_in_schema=False)  # type: ignore[arg-type]
 
     gui_dist = Path(__file__).resolve().parent.parent.parent / "tools" / "gui" / "dist"
     if gui_dist.exists():

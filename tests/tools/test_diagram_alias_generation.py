@@ -160,7 +160,9 @@ def test_inject_archimate_includes_inlines_relation_macros(tmp_path: Path) -> No
         encoding="utf-8",
     )
     (catalog / "_archimate-relations.puml").write_text(
-        "' relations\n!define Rel_Triggering(from, to, label) from --> to\n!define Rel_Serving(from, to, label) from --> to\n",
+        "' relations\n"
+        "!define Rel_Triggering(from, to, label) from --> to\n"
+        "!define Rel_Serving(from, to, label) from --> to\n",
         encoding="utf-8",
     )
 

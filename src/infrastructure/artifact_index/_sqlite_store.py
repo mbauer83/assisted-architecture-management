@@ -17,7 +17,8 @@ from ._sqlite_schema import FTS_SQL, SCHEMA_SQL
 _INS_ENTITY = (
     "INSERT INTO entities (artifact_id,artifact_type,name,version,status,domain,"
     "subdomain,path,scope,keywords_json,extra_json,content_text,"
-    "display_blocks_json,display_label,display_alias,host_diagram_id,group_name) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)"
+    "display_blocks_json,display_label,display_alias,host_diagram_id,group_name)"
+    " VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)"
 )
 _INS_CONNECTION = (
     "INSERT INTO connections (artifact_id,source,target,conn_type,version,status,"

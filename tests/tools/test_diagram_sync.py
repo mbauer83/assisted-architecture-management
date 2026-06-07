@@ -262,7 +262,7 @@ class TestSyncDiagramToModel:
         tgt = _make_entity(repo, "Target")
         _ = mcp.artifact_add_connection(
             source_entity=src,
-            connection_type="archimate-realization",
+            connection_type="archimate-influence",
             target_entity=tgt,
             dry_run=False,
             repo_root=str(repo),
@@ -272,7 +272,7 @@ class TestSyncDiagramToModel:
                 {
                     "op": "delete_connection",
                     "source_entity": src,
-                    "connection_type": "archimate-realization",
+                    "connection_type": "archimate-influence",
                     "target_entity": tgt,
                 }
             ],
@@ -301,7 +301,7 @@ connection-ids-used: []
 @startuml {diag_id}
 rectangle "Source" <<Requirement>> as {src_alias}
 rectangle "Target" <<Requirement>> as {tgt_alias}
-Rel_Realization({src_alias}, {tgt_alias}, "")
+Rel_Influence({src_alias}, {tgt_alias}, "")
 @enduml
 """,
             encoding="utf-8",
@@ -319,9 +319,9 @@ Rel_Realization({src_alias}, {tgt_alias}, "")
         )
 
         assert sync_result.deleted_diagram is False
-        assert f"{src}---{tgt}@@archimate-realization" in sync_result.removed_connection_ids
+        assert f"{src}---{tgt}@@archimate-influence" in sync_result.removed_connection_ids
         text = path.read_text(encoding="utf-8")
-        assert "Rel_Realization(" not in text
+        assert "Rel_Influence(" not in text
 
     def test_sync_does_not_delete_diagram_when_puml_entities_still_exist(self, repo: Path) -> None:
         src = _make_entity(repo, "Alive Source")

@@ -24,9 +24,16 @@ class _ConfiguredArchimateDiagramType(_ConfiguredOntologyDiagramType):
             diagram_entities_schema=base.diagram_entities_schema,
             own_entity_types=base.own_entity_types,
             puml_notes=(
-                "ArchiMate connection descriptions are hidden by default. Only render selected connection text when the diagram explicitly opts in.",
-                "For manual PUML, keep model selectability by using real model entity aliases as arrow endpoints. Explicit arrows are selectable based on endpoint alias matching regardless of label text — stereotype prefixes like <<serving>> are not required and should be omitted for cleaner diagrams. Use --> for serving relations and -- for association relations.",
-                "For ArchiMate diagrams, diagram_connections may be used as per-diagram connection annotation metadata keyed by model connection artifact_id. Supported opt-in keys are artifact_id (or connection_id), include_description, include_cardinality, and label. The show_stereotype key is not needed since stereotype text is not required for selectability.",
+                "ArchiMate connection descriptions are hidden by default."
+                " Only render selected connection text when the diagram explicitly opts in.",
+                "For manual PUML, keep model selectability by using real model entity aliases as arrow endpoints."
+                " Explicit arrows are selectable based on endpoint alias matching regardless of label text"
+                " — stereotype prefixes like <<serving>> are not required and should be omitted for cleaner diagrams."
+                " Use --> for serving relations and -- for association relations.",
+                "For ArchiMate diagrams, diagram_connections may be used as per-diagram connection annotation"
+                " metadata keyed by model connection artifact_id. Supported opt-in keys are artifact_id"
+                " (or connection_id), include_description, include_cardinality, and label."
+                " The show_stereotype key is not needed since stereotype text is not required for selectability.",
             ),
         )
 

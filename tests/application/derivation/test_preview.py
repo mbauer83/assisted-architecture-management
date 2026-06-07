@@ -74,7 +74,9 @@ class _FixedModule:
     def __init__(self, result: ViewProjectionResult) -> None:
         self._result = result
 
-    def project_view(self, diagram_type: str, diagram_entities: Mapping[str, object], query: object) -> ViewProjectionResult:
+    def project_view(
+        self, diagram_type: str, diagram_entities: Mapping[str, object], query: object
+    ) -> ViewProjectionResult:
         return self._result
 
 

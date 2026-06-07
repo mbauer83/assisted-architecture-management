@@ -237,8 +237,10 @@ class TestBridgesFromConfig:
 
     def test_multiple_bridges_parsed(self) -> None:
         raw = [
-            {"name": "a", "from": {"type": "x"}, "to": {"module": "m", "types": ["y"]}, "correspondence_kind": "represents"},
-            {"name": "b", "from": {"type": "x"}, "to": {"module": "m", "types": ["z"]}, "correspondence_kind": "abstracts"},
+            {"name": "a", "from": {"type": "x"}, "to": {"module": "m", "types": ["y"]},
+             "correspondence_kind": "represents"},
+            {"name": "b", "from": {"type": "x"}, "to": {"module": "m", "types": ["z"]},
+             "correspondence_kind": "abstracts"},
         ]
         result = bridges_from_config(raw)
         assert len(result) == 2

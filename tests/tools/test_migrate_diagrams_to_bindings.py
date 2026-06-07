@@ -54,7 +54,8 @@ def _write_outgoing(tmp_path: Path, name: str, source: str, connections: list[di
         sections.append(f"\n### {c['connection_type']} → {c['target_entity']}")
         if c.get("description"):
             sections.append(f"\n{c['description']}")
-    content = f"---\nsource-entity: {source}\nversion: 0.1.0\nstatus: draft\nlast-updated: '2026-01-01'\n---\n\n" + "\n".join(sections) + "\n"
+    header = f"---\nsource-entity: {source}\nversion: 0.1.0\nstatus: draft\nlast-updated: '2026-01-01'\n---\n\n"
+    content = header + "\n".join(sections) + "\n"
     path.write_text(content, encoding="utf-8")
     return path
 

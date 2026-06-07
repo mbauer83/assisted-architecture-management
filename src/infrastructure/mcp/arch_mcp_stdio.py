@@ -48,9 +48,9 @@ def main(argv: list[str] | None = None) -> None:
     parser.add_argument("--no-autostart", action="store_true", default=False)
     parser.add_argument(
         "--server",
-        choices=("read", "write"),
+        choices=("read", "write", "assurance-read", "assurance-write"),
         default="read",
-        help="Which MCP server to connect to (read or write)",
+        help="Which MCP server to connect to",
     )
     args = parser.parse_args(argv)
 

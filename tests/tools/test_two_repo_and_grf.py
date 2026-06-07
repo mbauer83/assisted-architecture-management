@@ -377,7 +377,7 @@ class TestAddConnectionGrfRouting:
 
         result = mcp_tools.artifact_add_connection(
             source_entity=eng_id,
-            connection_type="archimate-realization",
+            connection_type="archimate-association",
             target_entity=glo_id,
             dry_run=False,
         )
@@ -411,13 +411,13 @@ class TestAddConnectionGrfRouting:
         # First connection creates GRF
         r1 = mcp_tools.artifact_add_connection(
             source_entity=eng_id,
-            connection_type="archimate-realization",
+            connection_type="archimate-association",
             target_entity=glo_id,
             dry_run=False,
         )
         gar_id_1 = r1["gar_artifact_id"]
 
-        # Second connection (different type) should reuse the same GAR
+        # Second connection (different source entity) should reuse the same GAR
         eng_id2 = "CAP@1000000002.EngCCC.my-cap2"
         _write(
             engagement_root / "model" / "strategy" / "capabilities" / f"{eng_id2}.md",
@@ -425,7 +425,7 @@ class TestAddConnectionGrfRouting:
         )
         r2 = mcp_tools.artifact_add_connection(
             source_entity=eng_id2,
-            connection_type="archimate-serving",
+            connection_type="archimate-association",
             target_entity=glo_id,
             dry_run=False,
         )
@@ -466,7 +466,7 @@ class TestAddConnectionGrfRouting:
 
         result = mcp_tools.artifact_add_connection(
             source_entity=glo_id,  # enterprise → engagement direction
-            connection_type="archimate-influence",
+            connection_type="archimate-association",
             target_entity=eng_id,
             dry_run=False,
         )
@@ -530,7 +530,7 @@ class TestAddConnectionGrfRouting:
 
         r1 = mcp_tools.artifact_add_connection(
             source_entity=glo_id,
-            connection_type="archimate-influence",
+            connection_type="archimate-association",
             target_entity=eng_id,
             dry_run=False,
         )
@@ -538,7 +538,7 @@ class TestAddConnectionGrfRouting:
 
         r2 = mcp_tools.artifact_add_connection(
             source_entity=glo_id,
-            connection_type="archimate-influence",
+            connection_type="archimate-association",
             target_entity=eng_id2,
             dry_run=False,
         )

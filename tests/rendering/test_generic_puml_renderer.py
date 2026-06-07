@@ -286,8 +286,12 @@ def test_archimate_connections_use_ontology_arrow_styles_not_macros(tmp_path: Pa
 def test_render_body_renders_junction_inside_nested_parent(tmp_path: Path) -> None:
     renderer = GenericPumlRenderer(_ARCHIMATE_CONFIG)
     process = _entity("PRC@1.a.process-a", "process", "Process A", "PRC_A", domain="business", subdomain="processes")
-    function_a = _entity("FNC@1.a.function-a", "function", "Function A", "FNC_A", domain="business", subdomain="functions")
-    function_b = _entity("FNC@1.b.function-b", "function", "Function B", "FNC_B", domain="business", subdomain="functions")
+    function_a = _entity(
+        "FNC@1.a.function-a", "function", "Function A", "FNC_A", domain="business", subdomain="functions"
+    )
+    function_b = _entity(
+        "FNC@1.b.function-b", "function", "Function B", "FNC_B", domain="business", subdomain="functions"
+    )
     junction = _entity("JNA@1.a.and-a", "and-junction", "AND A", "JNA_A", domain="business", subdomain="junctions")
 
     puml = renderer.render_body(
@@ -343,7 +347,9 @@ def test_render_body_entity_declarations_use_snake_case_stereotypes(tmp_path: Pa
 
 def test_render_body_multi_domain_with_connections_does_not_crash(tmp_path: Path) -> None:
     renderer = GenericPumlRenderer(_ARCHIMATE_CONFIG)
-    app = _entity("APP@1.a.app-a", "application-component", "App A", "APP_A", domain="application", subdomain="components")
+    app = _entity(
+        "APP@1.a.app-a", "application-component", "App A", "APP_A", domain="application", subdomain="components"
+    )
     node = _entity("NOD@1.a.node-a", "technology-node", "Node A", "NOD_A", domain="technology", subdomain="nodes")
 
     # Multi-domain scenario — must not raise UnboundLocalError

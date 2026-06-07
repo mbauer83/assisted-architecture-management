@@ -122,7 +122,9 @@ class ArtifactRepository:
         status: str | None = None,
         group: str | None = None,
     ) -> list[ConnectionRecord]:
-        return self._store.list_connections(conn_type=conn_type, source=source, target=target, status=status, group=group)
+        return self._store.list_connections(
+            conn_type=conn_type, source=source, target=target, status=status, group=group
+        )
 
     def list_diagrams(
         self,
