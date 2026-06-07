@@ -67,16 +67,16 @@ Legend: `[ ]` todo · `[~]` in progress · `[x]` done.
 - [x] **Acceptance:** `zuban check` + full suite green (940 pass, 1 pre-existing skip) — f274e57
 
 ## Stage 1 — Backend runtime unification (P3+P4) + Groups M/S + reconcile  — owner: UNIFY
-- [ ] W1 mount 4 MCP endpoints in `arch-backend` (assurance gated)
-- [ ] W2 four thin stdio bridges (split combined assurance bridge)
-- [ ] W3 CLI audit: route artifact-mutating commands through backend; bootstrap/config exempt
-- [ ] W4 CLI requires running backend (clear error); assurance unavailable/locked contract
-- [ ] W5 tests: cross-surface parity, single-writer concurrency, gating
+- [x] W1 mount 4 MCP endpoints in `arch-backend` (assurance gated) — 62803e9
+- [x] W2 four thin stdio bridges (split combined assurance bridge) — 62803e9
+- [x] W3 CLI audit: route artifact-mutating commands through backend; bootstrap/config exempt — 62803e9
+- [x] W4 CLI requires running backend (clear error); assurance unavailable/locked contract — 62803e9
+- [x] W5 tests: cross-surface parity, single-writer concurrency, gating — 62803e9
 - [ ] MIG reframe **MCP Model Server** & **Assurance MCP Server** → Backend-internal **endpoint adapters** (`Backend Ag→`), drop invalid realizations (C4 §3.4)
 - [ ] M  create `grouping` **Assurance Module** + aggregations (C4 §10.5)
 - [ ] S  `artifact R→ data-object`; `Backend Ac→ data-object`; baseline **no active-store container** (C4 §10.6)
 - [ ] REC apply the superseded-banner changes to `PLAN-assurance-architecture-model.md`'s model entities
-- [ ] **Acceptance:** UNIFY §5 (no mutation path bypasses the write queue; 4 endpoints; 4 bridges)
+- [x] **Acceptance:** UNIFY §5 (no mutation path bypasses the write queue; 4 endpoints; 4 bridges) — 62803e9
 
 ## Stage 2 — Author diagrams (per-view gates, C4 §6/§10.8)
 - [ ] D1 `c4-system-context` scope=AMP  *(gate P1,P2,R,B,X)*
