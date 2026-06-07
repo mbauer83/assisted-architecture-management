@@ -62,7 +62,7 @@ def test_format_token_for_log_returns_hex() -> None:
 
 @patch("httpx.post")
 def test_request_timestamp_posts_correct_content_type(mock_post) -> None:
-    from src.infrastructure.assurance._rfc3161 import _build_timestamp_request, request_timestamp  # noqa: PLC0415
+    from src.infrastructure.assurance._rfc3161 import request_timestamp  # noqa: PLC0415
 
     # Build a minimal valid TSA response: outer SEQUENCE, PKIStatusInfo (SEQUENCE with INTEGER 0), token
     pki_status_int = bytes([0x02, 0x01, 0x00])  # INTEGER 0 = granted

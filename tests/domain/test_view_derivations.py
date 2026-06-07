@@ -15,9 +15,9 @@ import pytest
 
 from src.application.derivation.strategy_registry import (
     StrategySpec,
+    _registry,
     lookup_strategy,
     register_strategy,
-    _registry,
 )
 from src.application.verification._verifier_rules_view_derivations import (
     check_bindings_derived_from,
@@ -33,7 +33,6 @@ from src.domain.view_derivations import (
     parse_view_derivation,
     parse_view_derivations,
     view_derivation_to_dict,
-    view_derivations_to_raw,
 )
 
 _LOC = "/test/diagram.puml"

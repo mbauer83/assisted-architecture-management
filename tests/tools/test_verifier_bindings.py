@@ -5,11 +5,11 @@ One test class per E4xx rule, plus a base-case class verifying clean bindings pa
 
 from __future__ import annotations
 
+from pathlib import Path
+
 from src.application.verification._verifier_rules_bindings import check_bindings_scoped
 from src.application.verification.artifact_verifier_types import VerificationResult
 from src.domain.allowed_bindings import allowed_bindings_from_config
-from pathlib import Path
-
 
 # ---------------------------------------------------------------------------
 # Test helpers

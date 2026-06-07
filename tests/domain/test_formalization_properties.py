@@ -28,7 +28,6 @@ from src.application.derivation.strategy_registry import register_strategy
 from src.application.verification._verifier_rules_bindings import check_bindings_scoped
 from src.application.verification.artifact_verifier_types import VerificationResult
 from src.domain.view_derivations import DerivationSelection, SourceModelSnapshot, ViewDerivation
-
 from tests.application.derivation._fixtures import FakeQuery, _entity
 
 register_strategy(ES_SPEC, es_derive)
@@ -117,7 +116,10 @@ class TestF1SignatureTyping:
         return _Repo()
 
     def test_unknown_entity_type_aborts_with_id(self) -> None:
-        from src.application.startup_validation import RepoCompatibilityError, validate_repo_compatibility  # noqa: PLC0415
+        from src.application.startup_validation import (  # noqa: PLC0415
+            RepoCompatibilityError,
+            validate_repo_compatibility,
+        )
         from src.infrastructure.app_bootstrap import build_module_registry  # noqa: PLC0415
 
         reg = build_module_registry()

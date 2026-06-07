@@ -9,12 +9,10 @@ Covers:
 from __future__ import annotations
 
 from pathlib import Path
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
-import pytest
-
-from src.diagram_types.c4.renderer import C4PumlRenderer
 from src.diagram_types.activity.renderer import ActivityPumlRenderer
+from src.diagram_types.c4.renderer import C4PumlRenderer
 
 _ENTITY_A = "APP@1000000000.AbcDef.entity-a"
 _ENTITY_B = "APP@1000000001.AbcDef.entity-b"
@@ -68,7 +66,7 @@ class TestC4RendererCollectReferences:
     def _collect(self, bindings: list[dict], diagram_entities: dict | None = None) -> tuple[tuple, tuple]:
         renderer = self._renderer()
         # Patch resolve_c4_state to return empty model-backed state (no scope binding).
-        from src.diagram_types.c4._resolve import _ResolvedState, _ResolvedItem
+        from src.diagram_types.c4._resolve import _ResolvedItem, _ResolvedState
         empty_item = _ResolvedItem(
             local_id="_blank", item_type="software-system",
             alias="C4_blank", label="", description="", technology="", external=False,
@@ -141,7 +139,7 @@ class TestC4RendererCollectReferences:
     def test_model_backed_state_entity_ids_included(self) -> None:
         """Model-backed state entity_ids are merged with binding entity_ids."""
         renderer = self._renderer()
-        from src.diagram_types.c4._resolve import _ResolvedState, _ResolvedItem
+        from src.diagram_types.c4._resolve import _ResolvedItem, _ResolvedState
         scope_item = _ResolvedItem(
             local_id=_ENTITY_A, item_type="software-system",
             alias="APP_scope", label="App", description="", technology="", external=False,
@@ -163,7 +161,7 @@ class TestC4RendererCollectReferences:
 
     def test_no_duplicates_between_state_and_bindings(self) -> None:
         renderer = self._renderer()
-        from src.diagram_types.c4._resolve import _ResolvedState, _ResolvedItem
+        from src.diagram_types.c4._resolve import _ResolvedItem, _ResolvedState
         scope_item = _ResolvedItem(
             local_id=_ENTITY_A, item_type="software-system",
             alias="APP_scope", label="App", description="", technology="", external=False,
@@ -234,7 +232,6 @@ class TestScopeInjectionFromBinding:
     the scoped-by binding so the C4 renderer can switch to model-backed mode."""
 
     def test_scope_entity_id_injected_for_model_backed_render(self) -> None:
-        from src.domain.bindings import Binding, BindingSubject, Target
         from src.application.modeling.binding_normalize import normalize_bindings
 
         diagram_entities: dict = {"software-system": [{"id": "sys1", "label": "My System"}]}

@@ -9,7 +9,7 @@ from __future__ import annotations
 # Importing any C4 diagram-type package triggers strategy registration.
 import src.diagram_types.c4._projection  # noqa: F401
 from src.application.derivation.strategy_registry import lookup_strategy
-from src.diagram_types.c4._projection import C4Projection, project_c4, _c4_item_type
+from src.diagram_types.c4._projection import _c4_item_type, project_c4
 from src.domain.view_projection import ProjectedViewItem
 from tests.application.derivation._fixtures import FakeQuery, _connection, _entity
 

@@ -11,7 +11,7 @@ from collections.abc import Mapping
 from src.application.derivation.preview import project_view_for_preview
 from src.domain.view_derivations import DerivationSelection, SourceModelSnapshot, ViewDerivation
 from src.domain.view_projection import ProjectedViewItem, ViewProjectionResult
-from tests.application.derivation._fixtures import FakeQuery, _entity
+from tests.application.derivation._fixtures import FakeQuery
 
 _SNAP = SourceModelSnapshot(repo_scope="both", root_entity_id="ROOT")
 _DERIVATION = ViewDerivation(

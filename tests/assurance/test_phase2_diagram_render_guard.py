@@ -111,7 +111,7 @@ def test_architecture_type_proceeds_past_guard(tmp_path: Path) -> None:
             return_value=None,
         ),
     ):
-        result = _render_diagram_png(puml, warnings)
+        _render_diagram_png(puml, warnings)
 
     # Guard did not trigger → no G-f warning regardless of render outcome
     assert not any("G-f" in w for w in warnings)
@@ -143,6 +143,6 @@ def test_unknown_type_does_not_trigger_guard(tmp_path: Path) -> None:
             return_value=None,
         ),
     ):
-        result = _render_diagram_png(puml, warnings)
+        _render_diagram_png(puml, warnings)
 
     assert not any("G-f" in w for w in warnings)

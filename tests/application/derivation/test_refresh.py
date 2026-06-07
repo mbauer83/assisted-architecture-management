@@ -18,7 +18,6 @@ Coverage:
 
 from __future__ import annotations
 
-import hashlib
 import tempfile
 from pathlib import Path
 
@@ -27,7 +26,6 @@ import pytest
 from src.application.derivation.explicit_selection import SPEC as ES_SPEC
 from src.application.derivation.explicit_selection import derive as es_derive
 from src.application.derivation.refresh import (
-    DerivationDiff,
     SelectionDelta,
     apply_selection_delta,
     compute_derivation_diff,
@@ -35,8 +33,7 @@ from src.application.derivation.refresh import (
 )
 from src.application.derivation.strategy_registry import register_strategy
 from src.domain.view_derivations import DerivationSelection, SourceModelSnapshot, ViewDerivation
-
-from tests.application.derivation._fixtures import FakeQuery, _connection, _entity
+from tests.application.derivation._fixtures import FakeQuery, _entity
 
 _SNAPSHOT = SourceModelSnapshot(repo_scope="both")
 

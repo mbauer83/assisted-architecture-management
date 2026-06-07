@@ -75,7 +75,7 @@ def test_stats(store) -> None:  # type: ignore[no-untyped-def]
     store.create_node("loss", "L1")
     store.create_node("loss", "L2")
     haz_id = store.create_node("hazard", "H1")
-    loss_id = store.get_node(store.create_node("loss", "L3"))
+    store.get_node(store.create_node("loss", "L3"))
     store.add_edge(haz_id, store.create_node("loss", "L4"), "leads-to")
     s = store.stats()
     assert s["node_count"] >= 4

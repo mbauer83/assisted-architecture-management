@@ -14,7 +14,6 @@ from unittest.mock import MagicMock, patch
 
 from src.infrastructure.rendering.diagram_builder import render_puml_preview
 
-
 # ── Integration-style pipeline tests (subprocess mocked) ─────────────────────
 
 _ACTIVITY_PUML = """\

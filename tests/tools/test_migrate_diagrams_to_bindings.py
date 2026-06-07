@@ -6,15 +6,11 @@ c4-contains deletion, idempotency (already-bound diagrams), dry-run mode.
 
 from __future__ import annotations
 
-import textwrap
-from pathlib import Path
-
-import pytest
-import yaml
-
 # Helpers to import the module under test
 import importlib.util
-import sys
+from pathlib import Path
+
+import yaml
 
 _TOOL_PATH = Path(__file__).parents[2] / "tools" / "migrate_diagrams_to_bindings.py"
 

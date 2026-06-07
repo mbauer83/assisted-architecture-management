@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-import io
+from pathlib import Path
 
 import yaml
 
@@ -48,8 +48,7 @@ def test_registry_to_yaml_includes_analysis_collections() -> None:
     assert data["analysis-collections"][0]["slug"] == "stpa-vehicle"
 
 
-def test_load_group_registry_analysis_collections(tmp_path: "Path") -> None:  # type: ignore[name-defined]
-    from pathlib import Path  # noqa: PLC0415
+def test_load_group_registry_analysis_collections(tmp_path: Path) -> None:
 
     arch_repo = tmp_path / ".arch-repo"
     arch_repo.mkdir()
@@ -66,9 +65,8 @@ def test_load_group_registry_analysis_collections(tmp_path: "Path") -> None:  # 
     assert "stpa-critical" in slugs
 
 
-def test_load_group_registry_uncategorized_synthesis(tmp_path: "Path") -> None:  # type: ignore[name-defined]
+def test_load_group_registry_uncategorized_synthesis(tmp_path: Path) -> None:
     """analysis-collection always has an uncategorized entry."""
-    from pathlib import Path  # noqa: PLC0415
 
     reg = load_group_registry(tmp_path)
     ac = reg.list_axis("analysis-collection")

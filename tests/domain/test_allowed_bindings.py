@@ -11,7 +11,6 @@ from src.domain.allowed_bindings import (
     allowed_bindings_from_config,
     serialize_allowed_bindings,
 )
-from src.domain.bindings import CORE_CORRESPONDENCE_KINDS
 
 
 class TestAllowedBindingsFromConfig:

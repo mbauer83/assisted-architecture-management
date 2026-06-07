@@ -14,7 +14,6 @@ from __future__ import annotations
 from src.application.derivation.incident_connections import SPEC, derive
 from src.application.derivation.strategy_registry import lookup_strategy
 from src.domain.view_derivations import SourceModelSnapshot
-
 from tests.application.derivation._fixtures import FakeQuery, _connection, _entity
 
 _SNAPSHOT = SourceModelSnapshot(repo_scope="engagement")

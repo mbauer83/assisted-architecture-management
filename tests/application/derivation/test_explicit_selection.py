@@ -13,7 +13,6 @@ from src.application.derivation.explicit_selection import SPEC, derive
 from src.application.derivation.strategy_registry import lookup_strategy
 from src.application.derivation.types import CandidateSet
 from src.domain.view_derivations import SourceModelSnapshot
-
 from tests.application.derivation._fixtures import FakeQuery, _connection, _entity
 
 _SNAPSHOT = SourceModelSnapshot(repo_scope="both")

@@ -137,8 +137,8 @@ def test_w502_constraint_without_evidence(store) -> None:  # type: ignore[no-unt
 
 def test_locked_store_returns_e500(tmp_path) -> None:  # type: ignore[no-untyped-def]
     """Locked store returns E500 error."""
-    from src.infrastructure.assurance._sqlcipher_store import SQLCipherAssuranceStore  # noqa: PLC0415
     from src.application.verification.assurance_verifier import verify_store  # noqa: PLC0415
+    from src.infrastructure.assurance._sqlcipher_store import SQLCipherAssuranceStore  # noqa: PLC0415
 
     s = SQLCipherAssuranceStore(tmp_path / "store.db")
     result = verify_store(s)

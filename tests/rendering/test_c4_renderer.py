@@ -4,7 +4,7 @@ from pathlib import Path
 from typing import Literal
 
 from src.diagram_types.c4.renderer import C4PumlRenderer
-from src.domain.artifact_types import ConnectionRecord, EntityRecord
+from src.domain.artifact_types import ConnectionRecord
 
 
 class _FakeQuery:

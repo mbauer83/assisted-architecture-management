@@ -16,7 +16,6 @@ from src.infrastructure.write.artifact_write.materialization import (
     find_represents_entity,
 )
 
-
 # ---------------------------------------------------------------------------
 # DiagramElementRef
 # ---------------------------------------------------------------------------

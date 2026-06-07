@@ -13,7 +13,6 @@ from src.domain.module_types import ConnectionTypeName, ElementClassName, Entity
 from src.domain.ontology_types import ConnectionTypeInfo, EntityTypeInfo
 from src.domain.permitted_relationships import PermittedRelationship, PermittedRelationshipSet
 
-
 # ── Stubs ─────────────────────────────────────────────────────────────────────
 
 

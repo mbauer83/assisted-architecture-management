@@ -8,7 +8,6 @@ from src.domain.module_types import ConnectionTypeName, ElementClassName, Entity
 from src.domain.ontology_protocol import OntologyModule
 from src.ontologies.sysml_v2_min import module
 
-
 # ── Basic structure ───────────────────────────────────────────────────────────
 
 

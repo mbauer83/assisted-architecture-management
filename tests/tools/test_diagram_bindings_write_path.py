@@ -13,7 +13,6 @@ from __future__ import annotations
 
 from pathlib import Path
 
-import pytest
 import yaml
 
 from src.application.modeling.artifact_write_formatting import format_diagram_puml
@@ -23,7 +22,6 @@ from src.infrastructure.artifact_index import shared_artifact_index
 from src.infrastructure.write.artifact_write.diagram import create_diagram
 from src.infrastructure.write.artifact_write.diagram_edit import edit_diagram
 from src.infrastructure.write.artifact_write.parse_existing import parse_diagram_file
-
 
 # ---------------------------------------------------------------------------
 # Helpers

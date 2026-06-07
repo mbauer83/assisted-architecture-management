@@ -5,8 +5,8 @@ from __future__ import annotations
 import pytest
 
 from src.domain.bindings import (
-    BINDINGS_ARRAY_SCHEMA,
     BINDING_SHORTHAND_SCHEMA,
+    BINDINGS_ARRAY_SCHEMA,
     CORE_CORRESPONDENCE_KINDS,
     Binding,
     BindingSubject,
@@ -19,7 +19,6 @@ from src.domain.bindings import (
     parse_bindings,
     parse_target,
 )
-
 
 # ---------------------------------------------------------------------------
 # Target construction

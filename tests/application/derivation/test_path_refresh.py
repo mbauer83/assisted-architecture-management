@@ -6,12 +6,8 @@ Property tests (idempotence, determinism) + unit tests for drifted/broken classi
 from __future__ import annotations
 
 from pathlib import Path
-from unittest.mock import MagicMock
-
-import pytest
 
 from src.application.derivation.refresh import (
-    DerivationDiff,
     SelectionDelta,
     _is_path_well_formed,
     _parse_path_key,
@@ -23,9 +19,8 @@ from src.application.verification._verifier_rules_binding_targets import (
     _check_connection_path_target,
 )
 from src.application.verification.artifact_verifier_types import VerificationResult
-from src.domain.view_derivations import DerivationSelection, ViewDerivation, SourceModelSnapshot
+from src.domain.view_derivations import DerivationSelection, SourceModelSnapshot, ViewDerivation
 from tests.application.derivation._fixtures import FakeQuery, _connection, _entity
-
 
 # ---------------------------------------------------------------------------
 # Path key helpers

@@ -30,3 +30,6 @@ plantuml.jar
 .worktrees/
 
 .playwright-mcp/
+
+# PDFs — never commit reference documents; keep them local only
+*.pdf
