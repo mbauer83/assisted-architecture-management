@@ -36,7 +36,8 @@ def register(mcp: FastMCP) -> None:
             "connection removals before final verification.\n"
             "Returns one result per item (input order): op, artifact_id, wrote, verification, warnings?, error?. "
             "Each result includes operation_id. Optional idempotency_key reuses a prior completed result for the same "
-            "logical batch. No file content in results. dry_run=true previews without writing."
+            "logical batch. No file content in results. dry_run=true previews without writing. "
+            "Accepts both full (PREFIX@epoch.random.slug) and short (PREFIX@epoch.random) artifact IDs."
         ),
         annotations=LOCAL_WRITE,
         structured_output=True,
@@ -55,7 +56,8 @@ def register(mcp: FastMCP) -> None:
             "explicit delete_diagram items when references become stale. Empty diagrams are removed. "
             "Connections are removed before dependent entity deletes; diagrams/documents are removed before entities; "
             "the tool returns per-item results plus a batch_verification summary and operation_id. "
-            "Optional idempotency_key reuses a prior completed result for the same logical batch."
+            "Optional idempotency_key reuses a prior completed result for the same logical batch. "
+            "Accepts both full (PREFIX@epoch.random.slug) and short (PREFIX@epoch.random) artifact IDs."
         ),
         annotations=DESTRUCTIVE_LOCAL_WRITE,
         structured_output=True,

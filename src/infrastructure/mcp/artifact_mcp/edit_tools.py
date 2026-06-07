@@ -239,6 +239,8 @@ def artifact_edit_connection_associations(
     root, registry, verifier = _resolve(repo_root, need_registry=True)
     registry = _require_registry(registry)
     mutation_context, clear_repo_caches = authoritative_callbacks_for(root)
+    source_entity = expand_artifact_id(registry, source_entity)
+    target_entity = expand_artifact_id(registry, target_entity)
     from src.infrastructure.write.artifact_write.connection_edit import edit_connection_associations
 
     result = edit_connection_associations(
@@ -349,7 +351,8 @@ def register_edit_tools(mcp: FastMCP) -> None:
             "Add or remove second-order association entity IDs from a connection. "
             "Associations link a connection to additional entities beyond source and target "
             "(stored as <!-- §assoc ENTITY_ID --> annotations). "
-            "add_entities and remove_entities may both be provided in one call."
+            "add_entities and remove_entities may both be provided in one call. "
+            "source_entity/target_entity: full (PREFIX@epoch.random.slug) or short (PREFIX@epoch.random) form."
         ),
         annotations=LOCAL_WRITE,
         structured_output=True,

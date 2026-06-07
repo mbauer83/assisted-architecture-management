@@ -6,6 +6,7 @@ from pathlib import Path
 from typing import Any
 
 from src.config.repo_paths import DOCS
+from src.infrastructure.mcp.artifact_mcp.context import expand_artifact_id
 from src.infrastructure.mcp.artifact_mcp.edit_tools import _require_registry, _resolve
 
 from .common import KNOWN_DELETE_OPS
@@ -55,6 +56,7 @@ def preflight_bulk_delete(
 
     root, registry, _verifier = _resolve(str(repo_root), need_registry=True)
     registry = _require_registry(registry)
+    _expand_item_ids(items, registry)
     connection_paths, incoming = scan_connections(root)
     grf_refs = scan_grf_refs(root)
     diagram_refs = scan_diagram_refs(root)
@@ -295,3 +297,11 @@ def _validate_connection_deletes(
                 + "\n".join(f"- diagram must also be deleted: {diagram_id}" for diagram_id in blocking_diagrams)
             ),
         )
+
+
+def _expand_item_ids(items: list[dict], registry) -> None:
+    """Expand short-form IDs in delete-batch items in place (PREFIX@epoch.random → full form)."""
+    for item in items:
+        for field in ("artifact_id", "source_entity", "target_entity"):
+            if field in item:
+                item[field] = expand_artifact_id(registry, str(item[field]))

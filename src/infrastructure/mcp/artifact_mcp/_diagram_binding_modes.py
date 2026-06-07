@@ -111,7 +111,11 @@ def _apply_diff(
         raise ValueError("apply-diff requires diff and base_revision")
     _require_exists(path, artifact_id)
 
-    from src.application.derivation.refresh import SelectionDelta, apply_selection_delta, compute_revision  # noqa: PLC0415
+    from src.application.derivation.refresh import (  # noqa: PLC0415
+        SelectionDelta,
+        apply_selection_delta,
+        compute_revision,
+    )
     from src.infrastructure.mcp.artifact_mcp.context import authoritative_callbacks_for, verifier_for  # noqa: PLC0415
 
     current_revision = compute_revision(path)
@@ -175,7 +179,10 @@ def _propose_bindings(
 ) -> dict[str, object]:
     _require_exists(path, artifact_id)
 
-    from src.application.derivation.binding_proposals import build_connection_proposals, build_entity_proposals  # noqa: PLC0415
+    from src.application.derivation.binding_proposals import (  # noqa: PLC0415
+        build_connection_proposals,
+        build_entity_proposals,
+    )
     from src.application.derivation.refresh import compute_revision  # noqa: PLC0415
     from src.domain.allowed_bindings import AllowedBindingsSpec  # noqa: PLC0415
     from src.infrastructure.app_bootstrap import get_module_registry  # noqa: PLC0415

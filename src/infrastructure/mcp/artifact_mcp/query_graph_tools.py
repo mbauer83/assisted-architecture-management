@@ -3,7 +3,13 @@ from typing import Literal
 
 from mcp.server.fastmcp import FastMCP  # type: ignore[import-not-found]
 
-from src.infrastructure.mcp.artifact_mcp.context import RepoScope, repo_cached, resolve_repo_roots, roots_key
+from src.infrastructure.mcp.artifact_mcp.context import (
+    RepoScope,
+    expand_artifact_id,
+    repo_cached,
+    resolve_repo_roots,
+    roots_key,
+)
 from src.infrastructure.mcp.artifact_mcp.tool_annotations import READ_ONLY
 
 
@@ -36,6 +42,7 @@ def register_query_graph_tools(mcp: FastMCP) -> None:
             "Results include source_name and target_name alongside source/target artifact_ids. "
             "fields: optional list of keys to project — e.g. "
             "['source','target','source_name','target_name','conn_type'] for fast dedup checks."
+            "\n\nAccepts both full (PREFIX@epoch.random.slug) and short (PREFIX@epoch.random) form."
             "\n\nRepo selection: repo_scope defaults to both (engagement + enterprise)."
         ),
         annotations=READ_ONLY,
@@ -58,6 +65,7 @@ def register_query_graph_tools(mcp: FastMCP) -> None:
         )
         key = roots_key(roots)
         repo = repo_cached(key)
+        entity_id = expand_artifact_id(repo, entity_id)
 
         conns = repo.find_connections_for(
             entity_id,
@@ -90,6 +98,7 @@ def register_query_graph_tools(mcp: FastMCP) -> None:
             "Pass diagram_type to receive binding_guidance for each neighbor — lists admissible "
             "diagram entity types, default and admissible correspondence kinds — so results can be "
             "used directly as binding proposals without a separate propose-bindings call."
+            "\n\nAccepts both full (PREFIX@epoch.random.slug) and short (PREFIX@epoch.random) form."
             "\n\nRepo selection: repo_scope defaults to both (engagement + enterprise)."
         ),
         annotations=READ_ONLY,
@@ -114,6 +123,7 @@ def register_query_graph_tools(mcp: FastMCP) -> None:
         )
         key = roots_key(roots)
         repo = repo_cached(key)
+        entity_id = expand_artifact_id(repo, entity_id)
 
         neighbors = repo.find_neighbors(entity_id, max_hops=max_hops, conn_type=conn_type)
         normalized = {k: sorted(list(v)) for k, v in neighbors.items()}

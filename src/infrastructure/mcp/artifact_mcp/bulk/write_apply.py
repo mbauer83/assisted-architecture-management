@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import Any
 
 from src.application.verification.artifact_verifier import ArtifactRegistry, ArtifactVerifier
+from src.infrastructure.mcp.artifact_mcp.context import expand_artifact_id
 from src.infrastructure.mcp.artifact_mcp.write._common import _out
 from src.infrastructure.mcp.artifact_mcp.write.connection import _add_connection_impl
 from src.infrastructure.write import artifact_write_ops
@@ -183,7 +184,7 @@ def _apply_single_edit(
             registry=registry,
             verifier=verifier,
             clear_repo_caches=clear_repo_caches,
-            artifact_id=item["artifact_id"],
+            artifact_id=expand_artifact_id(registry, str(item["artifact_id"])),
             name=item.get("name"),
             summary=item["summary"] if "summary" in item else _ENTITY_UNSET,
             properties=item["properties"] if "properties" in item else _ENTITY_UNSET,
@@ -193,14 +194,16 @@ def _apply_single_edit(
             status=item.get("status"),
             dry_run=False,
         )
+    source_entity = expand_artifact_id(registry, str(item["source_entity"]))
+    target_entity = expand_artifact_id(registry, str(item["target_entity"]))
     if item.get("operation", "update") == "remove":
         return artifact_write_ops.remove_connection(
             repo_root=staged_root,
             registry=registry,
             verifier=verifier,
             clear_repo_caches=clear_repo_caches,
-            source_entity=item["source_entity"],
-            target_entity=item["target_entity"],
+            source_entity=source_entity,
+            target_entity=target_entity,
             connection_type=item["connection_type"],
             dry_run=False,
         )
@@ -209,8 +212,8 @@ def _apply_single_edit(
         registry=registry,
         verifier=verifier,
         clear_repo_caches=clear_repo_caches,
-        source_entity=item["source_entity"],
-        target_entity=item["target_entity"],
+        source_entity=source_entity,
+        target_entity=target_entity,
         connection_type=item["connection_type"],
         description=item.get("description"),
         src_cardinality=item["src_cardinality"] if "src_cardinality" in item else _CONN_UNSET,
