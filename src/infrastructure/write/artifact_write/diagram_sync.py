@@ -1,325 +1,105 @@
-"""Diagram-to-model sync: reconcile a diagram against the current model state."""
+"""Diagram refresh / sync — dispatch by diagram ownership.
 
-import re
+Refresh semantics vary by diagram kind.  The invariant is that a refresh
+*never* silently deletes or blanks a diagram.  Unknown/unsupported combinations
+fail without modifying any file.
+
+Dispatch matrix (kind → refresh-op, empty-result, deletion-allowed):
+
+  Model-backed (has ``scoped-by`` / projector):
+    refresh = re-run the diagram-type projector;
+    empty   = valid empty view OR explicit error;
+    delete  = NEVER, not even on empty inference.
+
+  ArchiMate reconcile (explicit refs, no projector):
+    refresh = reconcile refs + regenerate PUML;
+    empty   = keep diagram, report unresolved refs;
+    delete  = only on an explicit delete intent, never silently.
+
+  Standalone (explicit diagram-entities):
+    refresh = re-render from stored entities;
+    empty   = keep diagram;
+    delete  = no.
+
+``sync_diagram_to_model`` in this module implements the ArchiMate-reconcile
+path only.  Model-backed (scope-bound) diagrams must be refreshed via
+``refresh_diagram``; passing a scope-bound diagram to ``sync_diagram_to_model``
+raises ValueError.
+"""
+
 from collections.abc import Callable
 from pathlib import Path
-from typing import Protocol
 
-from src.application.artifact_parsing import extract_declared_puml_aliases, normalize_puml_alias
-from src.application.modeling.artifact_write import ARCHIMATE_STEREOTYPE_TO_CONNECTION_TYPE
 from src.application.verification.artifact_verifier import ArtifactVerifier
 from src.config.repo_paths import DIAGRAM_CATALOG, DIAGRAMS
-from src.domain.artifact_types import ConnectionRecord, EntityRecord
 
+from ._sync_helpers import (
+    LookupStore,
+    dedupe_connections,
+    dedupe_entities,
+    infer_connections_from_puml,
+    infer_entities_from_puml,
+    resolve_connections,
+    resolve_entities,
+)
 from .boundary import assert_engagement_write_root
 from .coerce import as_optional_str_list
-from .diagram_delete import delete_diagram
 from .diagram_edit import edit_diagram
-from .parse_existing import parse_diagram_file
+from .parse_existing import ParsedDiagram, parse_diagram_file
 from .types import SyncDiagramToModelResult
 
 
-class _LookupStore(Protocol):
-    def get_entity(self, artifact_id: str) -> EntityRecord | None: ...
-    def get_connection(self, artifact_id: str) -> ConnectionRecord | None: ...
-    def list_entities(
-        self,
-        *,
-        artifact_type: str | None = None,
-        domain: str | None = None,
-        subdomain: str | None = None,
-        status: str | None = None,
-    ) -> list[EntityRecord]: ...
-    def list_connections(
-        self,
-        *,
-        conn_type: str | None = None,
-        source: str | None = None,
-        target: str | None = None,
-    ) -> list[ConnectionRecord]: ...
+def _is_scope_bound(parsed: ParsedDiagram) -> bool:
+    """True when the diagram is owned by a projector (has a scoped-by binding or _scope_entity_id)."""
+    for binding in parsed.bindings:
+        if (
+            binding.correspondence_kind == "scoped-by"
+            and binding.subject.kind == "diagram"
+            and binding.target.entity_id
+        ):
+            return True
+    diagram_entities = parsed.frontmatter.get("diagram-entities")
+    return isinstance(diagram_entities, dict) and bool(diagram_entities.get("_scope_entity_id"))
 
 
-_REL_MACRO_RE = re.compile(
-    r"^\s*Rel_(?P<rel>[A-Za-z0-9]+)(?:_(?:Up|Down|Left|Right))?"
-    r"\(\s*(?P<src>[A-Za-z0-9_-]+)\s*,\s*(?P<tgt>[A-Za-z0-9_-]+)",
-    re.MULTILINE,
-)
-_REL_LINE_RE = re.compile(
-    r"^\s*(?P<src>[A-Za-z0-9_-]+)\s+[-.*|o<>][^\n:]*\s+(?P<tgt>[A-Za-z0-9_-]+)\s*:\s*<<(?P<rel>[A-Za-z]+)>>",
-    re.MULTILINE,
-)
-_STD_ALIAS_RE = re.compile(r"^(?P<prefix>[A-Z]{2,6})_(?P<random>[A-Za-z0-9_-]{4,})$")
+def _is_standalone(parsed: ParsedDiagram) -> bool:
+    """True when the diagram has explicit diagram-entities but is not scope-bound.
 
-
-def _stable_prefix(artifact_id: str) -> str:
-    """Return the rename-stable part of an artifact ID (drops the trailing slug)."""
-    return artifact_id.rsplit(".", 1)[0]
-
-
-def _resolve_entities(
-    ids: list[str],
-    store: _LookupStore,
-) -> tuple[list[EntityRecord], list[str]]:
-    """Resolve entity IDs to records, following renames via stable-prefix fallback.
-
-    Returns (resolved_records, removed_ids) where removed_ids are IDs for which
-    no entity could be found even after rename detection.
+    Standalone diagrams store their full entity/connection set in frontmatter
+    (without a projector binding).  They must be re-rendered, not reconciled via
+    entity-ids-used, so deletion on empty inference is never correct for them.
     """
-    by_prefix: dict[str, EntityRecord] = {_stable_prefix(e.artifact_id): e for e in store.list_entities()}
-    records: list[EntityRecord] = []
-    removed: list[str] = []
-    for eid in ids:
-        record = store.get_entity(eid)
-        if record is None:
-            record = by_prefix.get(_stable_prefix(eid))
-        if record is not None:
-            records.append(record)
-        else:
-            removed.append(eid)
-    return records, removed
+    de = parsed.frontmatter.get("diagram-entities")
+    return isinstance(de, dict) and not _is_scope_bound(parsed)
 
 
-def _resolve_connections(
-    ids: list[str],
-    store: _LookupStore,
-) -> tuple[list[ConnectionRecord], list[str]]:
-    """Resolve connection IDs to records, following renames via stable-prefix fallback."""
-    connections = store.list_connections()
-    by_prefix: dict[str, ConnectionRecord] = {_stable_prefix(c.artifact_id): c for c in connections}
-    records: list[ConnectionRecord] = []
-    removed: list[str] = []
-    for cid in ids:
-        record = store.get_connection(cid)
-        if record is None:
-            record = by_prefix.get(_stable_prefix(cid))
-        if record is None:
-            record = _resolve_connection_by_parts(cid, connections)
-        if record is not None:
-            records.append(record)
-        else:
-            removed.append(cid)
-    return records, removed
-
-
-def _parse_connection_artifact_id(artifact_id: str) -> tuple[str, str, str] | None:
-    if "---" in artifact_id and "@@" in artifact_id:
-        try:
-            source, remainder = artifact_id.split("---", 1)
-            target, conn_type = remainder.rsplit("@@", 1)
-        except ValueError:
-            return None
-        return source, target, conn_type
-    if " → " in artifact_id:
-        try:
-            left, target = artifact_id.split(" → ", 1)
-            source, conn_type = left.split(" ", 1)
-        except ValueError:
-            return None
-        return source, target, conn_type
-    return None
-
-
-def _resolve_connection_by_parts(
-    artifact_id: str,
-    connections: list[ConnectionRecord],
-) -> ConnectionRecord | None:
-    parsed = _parse_connection_artifact_id(artifact_id)
-    if parsed is None:
-        return None
-    source, target, conn_type = parsed
-    source_prefix = _stable_prefix(source)
-    target_prefix = _stable_prefix(target)
-    for record in connections:
-        if record.conn_type != conn_type:
-            continue
-        if _stable_prefix(record.source) == source_prefix and _stable_prefix(record.target) == target_prefix:
-            return record
-    return None
-
-
-def _normalize_standard_alias(artifact_id: str) -> str:
-    parts = artifact_id.split(".")
-    if len(parts) < 2 or "@" not in parts[0]:
-        return ""
-    prefix = parts[0].split("@", 1)[0]
-    return f"{prefix}_{parts[1]}"
-
-
-def _resolve_standard_alias(alias: str, entities: list[EntityRecord]) -> EntityRecord | None:
-    match = _STD_ALIAS_RE.match(alias)
-    if match is None:
-        return None
-    prefix = match.group("prefix")
-    random = match.group("random")
-    needle = f".{random}."
-    for entity in entities:
-        if entity.artifact_id.startswith(f"{prefix}@") and needle in entity.artifact_id:
-            return entity
-    return None
-
-
-def _alias_entity_lookup(store: _LookupStore) -> dict[str, EntityRecord]:
-    alias_map: dict[str, EntityRecord] = {}
-    entities = store.list_entities()
-    for entity in entities:
-        if entity.display_alias:
-            alias_map.setdefault(normalize_puml_alias(entity.display_alias), entity)
-        std_alias = _normalize_standard_alias(entity.artifact_id)
-        if std_alias:
-            alias_map.setdefault(normalize_puml_alias(std_alias), entity)
-    return alias_map
-
-
-def _infer_entities_from_puml(
-    puml_body: str,
-    store: _LookupStore,
-) -> tuple[list[EntityRecord], list[str]]:
-    alias_map = _alias_entity_lookup(store)
-    inferred: list[EntityRecord] = []
-    unresolved_aliases: list[str] = []
-    seen: set[str] = set()
-    for alias in sorted(extract_declared_puml_aliases(puml_body)):
-        normalized = normalize_puml_alias(alias)
-        record = alias_map.get(normalized)
-        if record is None:
-            record = _resolve_standard_alias(normalized, store.list_entities())
-        if record is None:
-            unresolved_aliases.append(alias)
-            continue
-        if record.artifact_id in seen:
-            continue
-        seen.add(record.artifact_id)
-        inferred.append(record)
-    return inferred, unresolved_aliases
-
-
-def _iter_declared_relations(content: str) -> list[tuple[str, str, str]]:
-    relations: list[tuple[str, str, str]] = []
-    for match in _REL_MACRO_RE.finditer(content):
-        conn_type = ARCHIMATE_STEREOTYPE_TO_CONNECTION_TYPE.get(match.group("rel").lower())
-        if conn_type is None:
-            continue
-        relations.append((match.group("src"), match.group("tgt"), conn_type))
-    for match in _REL_LINE_RE.finditer(content):
-        conn_type = ARCHIMATE_STEREOTYPE_TO_CONNECTION_TYPE.get(match.group("rel").lower())
-        if conn_type is None:
-            continue
-        relations.append((match.group("src"), match.group("tgt"), conn_type))
-    return relations
-
-
-def _resolve_relation_connection(
-    src_id: str,
-    tgt_id: str,
-    conn_type: str,
-    connections: list[ConnectionRecord],
-) -> ConnectionRecord | None:
-    direct = _resolve_connection_by_parts(f"{src_id}---{tgt_id}@@{conn_type}", connections)
-    if direct is not None:
-        return direct
-    from src.domain.module_types import ConnectionTypeName  # noqa: PLC0415
-    from src.infrastructure.app_bootstrap import get_module_registry  # noqa: PLC0415
-
-    ct_info = get_module_registry().find_connection_type(ConnectionTypeName(conn_type))
-    if ct_info is not None and ct_info.bidirectional_sync:
-        return _resolve_connection_by_parts(f"{tgt_id}---{src_id}@@{conn_type}", connections)
-    return None
-
-
-def _infer_connections_from_puml(
-    puml_body: str,
-    store: _LookupStore,
-) -> tuple[list[ConnectionRecord], list[str]]:
-    alias_map = _alias_entity_lookup(store)
-    all_connections = store.list_connections()
-    inferred: list[ConnectionRecord] = []
-    removed: list[str] = []
-    seen: set[str] = set()
-
-    for src_alias, tgt_alias, conn_type in _iter_declared_relations(puml_body):
-        src = alias_map.get(normalize_puml_alias(src_alias))
-        tgt = alias_map.get(normalize_puml_alias(tgt_alias))
-        if src is None or tgt is None:
-            continue
-        record = _resolve_relation_connection(src.artifact_id, tgt.artifact_id, conn_type, all_connections)
-        if record is None:
-            removed.append(f"{src.artifact_id}---{tgt.artifact_id}@@{conn_type}")
-            continue
-        if record.artifact_id in seen:
-            continue
-        seen.add(record.artifact_id)
-        inferred.append(record)
-    return inferred, removed
-
-
-def _dedupe_entities(records: list[EntityRecord]) -> list[EntityRecord]:
-    out: list[EntityRecord] = []
-    seen: set[str] = set()
-    for record in records:
-        if record.artifact_id in seen:
-            continue
-        seen.add(record.artifact_id)
-        out.append(record)
-    return out
-
-
-def _dedupe_connections(records: list[ConnectionRecord]) -> list[ConnectionRecord]:
-    out: list[ConnectionRecord] = []
-    seen: set[str] = set()
-    for record in records:
-        if record.artifact_id in seen:
-            continue
-        seen.add(record.artifact_id)
-        out.append(record)
-    return out
-
-
-def sync_diagram_to_model(
+def refresh_diagram(
     *,
     repo_root: Path,
-    store: _LookupStore,
+    store: LookupStore,
     verifier: ArtifactVerifier,
     clear_repo_caches: Callable[[Path], None],
     artifact_id: str,
     dry_run: bool,
 ) -> SyncDiagramToModelResult:
-    """Reconcile a diagram against the current model state.
+    """Refresh a diagram according to its ownership kind (see module-level dispatch matrix).
 
-    Reads ``entity-ids-used`` and ``connection-ids-used`` from the diagram's
-    frontmatter, looks up each ID in the store, and drops any that no longer
-    exist. Renamed entities are detected by matching the stable prefix
-    (``TYPE@timestamp.random``) so a name change updates the reference rather
-    than removing the entity. Surviving records are passed to
-    ``generate_archimate_puml_body`` so names are always current.
+    Model-backed (scope-bound) diagrams are re-projected from the model — they are
+    NEVER deleted.  ArchiMate-reconcile diagrams are delegated to sync_diagram_to_model.
+    The ``store`` parameter is only used on the ArchiMate-reconcile path.
     """
-    from src.infrastructure.rendering.diagram_builder import generate_archimate_puml_body
-
-    assert_engagement_write_root(repo_root)
-
     diagram_path = repo_root / DIAGRAM_CATALOG / DIAGRAMS / f"{artifact_id}.puml"
     if not diagram_path.exists():
         raise ValueError(f"Diagram '{artifact_id}' not found at {diagram_path}")
 
     parsed = parse_diagram_file(diagram_path)
-    fm = parsed.frontmatter
 
-    existing_entity_ids: list[str] = as_optional_str_list(fm.get("entity-ids-used")) or []
-    existing_conn_ids: list[str] = as_optional_str_list(fm.get("connection-ids-used")) or []
-    diagram_type = str(fm.get("diagram-type", "archimate"))
-    name = str(fm.get("name", ""))
-
-    fm_entity_records, removed_entity_ids = _resolve_entities(existing_entity_ids, store)
-    fm_conn_records, removed_conn_ids = _resolve_connections(existing_conn_ids, store)
-    puml_entity_records, _unresolved_aliases = _infer_entities_from_puml(parsed.puml_body, store)
-    puml_conn_records, inferred_removed_conn_ids = _infer_connections_from_puml(parsed.puml_body, store)
-
-    entity_records = _dedupe_entities([*puml_entity_records, *fm_entity_records])
-    conn_records = _dedupe_connections([*puml_conn_records, *fm_conn_records])
-    removed_conn_ids = list(dict.fromkeys([*removed_conn_ids, *inferred_removed_conn_ids]))
-
-    if not entity_records:
-        write_result = delete_diagram(
+    if _is_scope_bound(parsed) or _is_standalone(parsed):
+        # Both scope-bound and standalone diagrams are re-rendered from stored state.
+        # Neither is ever deleted by a refresh — deletion requires an explicit call.
+        write_result = edit_diagram(
             repo_root=repo_root,
+            verifier=verifier,
             clear_repo_caches=clear_repo_caches,
             artifact_id=artifact_id,
             dry_run=dry_run,
@@ -331,12 +111,94 @@ def sync_diagram_to_model(
             content=write_result.content,
             warnings=write_result.warnings,
             verification=write_result.verification,
-            removed_entity_ids=removed_entity_ids,
-            removed_connection_ids=removed_conn_ids,
-            deleted_diagram=True,
+            removed_entity_ids=[],
+            removed_connection_ids=[],
+            deleted_diagram=False,
         )
 
-    puml = generate_archimate_puml_body(name, entity_records, conn_records, diagram_type=diagram_type)
+    return sync_diagram_to_model(
+        repo_root=repo_root,
+        store=store,
+        verifier=verifier,
+        clear_repo_caches=clear_repo_caches,
+        artifact_id=artifact_id,
+        dry_run=dry_run,
+    )
+
+
+def sync_diagram_to_model(
+    *,
+    repo_root: Path,
+    store: LookupStore,
+    verifier: ArtifactVerifier,
+    clear_repo_caches: Callable[[Path], None],
+    artifact_id: str,
+    dry_run: bool,
+) -> SyncDiagramToModelResult:
+    """Reconcile an ArchiMate-reconcile diagram against the current model state.
+
+    Reads ``entity-ids-used`` and ``connection-ids-used`` from the diagram's
+    frontmatter, looks up each ID in the store, and drops any that no longer
+    exist. Renamed entities are detected by matching the stable prefix
+    (``TYPE@timestamp.random``) so a name change updates the reference rather
+    than removing the entity. Surviving records are passed to
+    ``generate_archimate_puml_body`` so names are always current.
+
+    Raises ValueError for scope-bound (model-backed) diagrams — use
+    ``refresh_diagram`` for those.
+    """
+    from src.infrastructure.rendering.diagram_builder import generate_archimate_puml_body  # noqa: PLC0415
+
+    assert_engagement_write_root(repo_root)
+
+    diagram_path = repo_root / DIAGRAM_CATALOG / DIAGRAMS / f"{artifact_id}.puml"
+    if not diagram_path.exists():
+        raise ValueError(f"Diagram '{artifact_id}' not found at {diagram_path}")
+
+    parsed = parse_diagram_file(diagram_path)
+    fm = parsed.frontmatter
+
+    if _is_scope_bound(parsed):
+        raise ValueError(
+            f"Diagram '{artifact_id}' is model-backed (scope-bound). "
+            "Use refresh_diagram() — sync_diagram_to_model must not be called on projector-owned diagrams."
+        )
+
+    existing_entity_ids: list[str] = as_optional_str_list(fm.get("entity-ids-used")) or []
+    existing_conn_ids: list[str] = as_optional_str_list(fm.get("connection-ids-used")) or []
+    diagram_type = str(fm.get("diagram-type", "archimate"))
+    name = str(fm.get("name", ""))
+
+    fm_entity_records, removed_entity_ids = resolve_entities(existing_entity_ids, store)
+    fm_conn_records, removed_conn_ids = resolve_connections(existing_conn_ids, store)
+    puml_entity_records, _unresolved_aliases = infer_entities_from_puml(parsed.puml_body, store)
+    puml_conn_records, inferred_removed_conn_ids = infer_connections_from_puml(parsed.puml_body, store)
+
+    entity_records = dedupe_entities([*puml_entity_records, *fm_entity_records])
+    conn_records = dedupe_connections([*puml_conn_records, *fm_conn_records])
+    removed_conn_ids = list(dict.fromkeys([*removed_conn_ids, *inferred_removed_conn_ids]))
+
+    if not entity_records:
+        # All referenced entities are unresolved. Preserve the diagram — silent
+        # deletion violates the refresh-never-deletes contract.  The caller must
+        # explicitly delete the diagram if that is the intent.
+        return SyncDiagramToModelResult(
+            wrote=False,
+            path=diagram_path,
+            artifact_id=artifact_id,
+            content=None,
+            warnings=["All referenced entities are unresolved; diagram preserved. Delete explicitly if intended."],
+            verification={"path": str(diagram_path), "file_type": "diagram", "valid": True, "issues": []},
+            removed_entity_ids=removed_entity_ids,
+            removed_connection_ids=removed_conn_ids,
+            deleted_diagram=False,
+        )
+
+    raw_el = fm.get("edge-labels")
+    existing_edge_labels = dict(raw_el) if isinstance(raw_el, dict) else None
+    puml = generate_archimate_puml_body(
+        name, entity_records, conn_records, diagram_type=diagram_type, edge_labels=existing_edge_labels
+    )
 
     write_result = edit_diagram(
         repo_root=repo_root,

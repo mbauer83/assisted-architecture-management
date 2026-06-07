@@ -15,16 +15,28 @@ from .diagram_references import _prepare_diagram_puml_body
 from .parse_existing import parse_diagram_file
 
 
+def _renderer_supports_edge_labels(renderer: object) -> bool:
+    from src.diagram_types.c4.renderer import C4PumlRenderer  # noqa: PLC0415
+    from src.infrastructure.rendering.generic_puml_renderer import GenericPumlRenderer  # noqa: PLC0415
+
+    return isinstance(renderer, (C4PumlRenderer, GenericPumlRenderer))
+
+
 def _render_diagram_entities_puml(
     diagram_type: str,
     name: str,
     diagram_entities: dict[str, object],
     diagram_connections: list[dict[str, object]] | None,
     repo_root: Path,
+    *,
+    edge_labels: dict[str, str] | None = None,
 ) -> str:
     from src.infrastructure.diagram_types import get_diagram_type  # noqa: PLC0415
 
     diagram_type_mod = get_diagram_type(diagram_type)
+    extra: dict[str, object] = {}
+    if edge_labels and _renderer_supports_edge_labels(diagram_type_mod.renderer):
+        extra["edge_labels"] = edge_labels
     return diagram_type_mod.renderer.render_body(
         name,
         [],
@@ -33,6 +45,7 @@ def _render_diagram_entities_puml(
         repo_root,
         diagram_entities=diagram_entities,
         diagram_connections=diagram_connections,
+        **extra,
     )
 
 

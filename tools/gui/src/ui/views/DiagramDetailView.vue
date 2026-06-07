@@ -258,6 +258,12 @@ watch([svgHtml, diagramEntities, diagramConnections], () => { void attachInterac
 
 const selectedId = ref<string | null>(null)
 const selectedConnection = ref<DiagramConnection | null>(null)
+const edgeLabelInput = ref('')
+const edgeLabelMutation = useMutation<WriteResult, RepoError>()
+
+watch(selectedConnection, (conn) => {
+  edgeLabelInput.value = conn?.edge_label_override ?? ''
+})
 
 watch(selectedId, (newId) => {
   prevHighlighted.value?.classList.remove('svg-selected')
@@ -292,6 +298,25 @@ const selectEntity = (id: string) => {
   }
   selectedId.value = id
   entityQuery.run(svc.getEntity(id))
+}
+
+let _savingEdgeLabel = false
+
+const saveEdgeLabel = async () => {
+  if (_savingEdgeLabel) return
+  const conn = selectedConnection.value
+  if (!conn?.edge_key || !diagramId.value) return
+  const rawLabel = edgeLabelInput.value.trim()
+  const label = rawLabel.length > 0 ? rawLabel : null
+  _savingEdgeLabel = true
+  try {
+    const exit = await edgeLabelMutation.run(
+      svc.setEdgeLabel({ artifact_id: diagramId.value, edge_key: conn.edge_key, label, dry_run: false }),
+    )
+    if (Exit.isSuccess(exit)) load()
+  } finally {
+    _savingEdgeLabel = false
+  }
 }
 
 // ── Sidebar resize ────────────────────────────────────────────────────────────
@@ -771,6 +796,25 @@ onUnmounted(() => {
             >
               {{ selectedConnection.content_text }}
             </div>
+            <div
+              v-if="selectedConnection.edge_key"
+              class="det-edge-label"
+            >
+              <label class="det-label-text">Diagram label</label>
+              <input
+                v-model="edgeLabelInput"
+                class="det-label-input"
+                placeholder="(derived)"
+                @keydown.enter.prevent="saveEdgeLabel"
+                @blur="saveEdgeLabel"
+              >
+              <div
+                v-if="edgeLabelMutation.errorMessage.value"
+                class="det-label-err"
+              >
+                {{ edgeLabelMutation.errorMessage.value }}
+              </div>
+            </div>
           </div>
           <div
             v-if="selectedId && entityQuery.loading.value"
@@ -1079,6 +1123,11 @@ onUnmounted(() => {
 .det-chips { display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 8px; }
 .chip { font-size: 10px; padding: 2px 6px; border-radius: 3px; font-weight: 500; background: #f3f4f6; color: #374151; }
 .det-content { font-size: 12px; line-height: 1.5; color: #374151; margin-bottom: 8px; max-height: 220px; overflow-y: auto; }
+.det-edge-label { margin-top: 8px; }
+.det-label-text { display: block; font-size: 11px; color: #6b7280; margin-bottom: 3px; }
+.det-label-input { width: 100%; padding: 4px 6px; font-size: 12px; border: 1px solid #d1d5db; border-radius: 4px; box-sizing: border-box; }
+.det-label-input:focus { outline: none; border-color: #2563eb; }
+.det-label-err { font-size: 11px; color: #dc2626; margin-top: 3px; }
 .det-content :deep(p) { margin: 0.35rem 0; }
 .det-content :deep(h1),
 .det-content :deep(h2),

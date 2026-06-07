@@ -62,6 +62,7 @@ class GenericPumlRenderer:
         *,
         diagram_entities: Mapping[str, object] | None = None,
         diagram_connections: list[dict[str, object]] | None = None,
+        edge_labels: dict[str, str] | None = None,
     ) -> str:
         del repo_root, diagram_entities
         diagram_name = re.sub(r"[^a-zA-Z0-9_-]", "-", name.lower()).strip("-") or "diagram"
@@ -196,17 +197,21 @@ class GenericPumlRenderer:
                 tgt_group = group_index_by_alias.get(tgt)
                 if direction is None and src_group is not None and tgt_group is not None and src_group != tgt_group:
                     direction = "down" if src_group < tgt_group else "up"
-            visible_label = self.visible_connection_label(conn, diagram_connections)
             arrow = conn_info.puml_arrow if conn_info else "-->"
             if direction:
                 arrow = insert_arrow_direction(arrow, direction)
-            show_stereo = conn_info.show_stereotype if conn_info is not None else True
-            if show_stereo:
-                label = f"<<{display_connection_label(conn.conn_type)}>>"
-                if visible_label:
-                    label = f"{label} {visible_label}"
+            override = edge_labels.get(f"{src}:{tgt}") if edge_labels else None
+            if override is not None:
+                label = override
             else:
-                label = visible_label
+                visible_label = self.visible_connection_label(conn, diagram_connections)
+                show_stereo = conn_info.show_stereotype if conn_info is not None else True
+                if show_stereo:
+                    label = f"<<{display_connection_label(conn.conn_type)}>>"
+                    if visible_label:
+                        label = f"{label} {visible_label}"
+                else:
+                    label = visible_label
             if label:
                 conn_lines.append(f"{src} {arrow} {tgt} : {label}")
             else:

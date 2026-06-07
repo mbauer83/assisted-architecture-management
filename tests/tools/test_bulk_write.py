@@ -1036,8 +1036,10 @@ Alice -> Bob
         )
         assert actions and actions[0]["artifact_id"] == diag_id
 
-    def test_bulk_delete_auto_sync_deletes_now_empty_diagram(self, repo: Path) -> None:
-        eid = _make(repo, "requirement", "AutoSyncDeleteMe")
+    def test_bulk_delete_auto_sync_preserves_now_empty_diagram(self, repo: Path) -> None:
+        # Refresh-never-deletes: when all entity refs become unresolved, the diagram
+        # is preserved (not silently deleted) so authors can decide what to do with it.
+        eid = _make(repo, "requirement", "AutoSyncPreserveMe")
         diag_id = "bulk-delete-auto-sync-empty"
         _write(
             repo / "diagram-catalog" / "diagrams" / f"{diag_id}.puml",
@@ -1067,12 +1069,13 @@ Alice
 
         results = cast(list[dict[str, Any]], payload["results"])
         assert all("error" not in item for item in results), payload
-        assert not (repo / "diagram-catalog" / "diagrams" / f"{diag_id}.puml").exists()
+        # Diagram is preserved on disk — authors must explicitly delete it
+        assert (repo / "diagram-catalog" / "diagrams" / f"{diag_id}.puml").exists()
         actions = cast(
             list[dict[str, Any]],
             cast(dict[str, Any], payload["batch_verification"])["auto_synced_diagrams"],
         )
-        assert actions and actions[0]["deleted_diagram"] is True
+        assert actions and actions[0]["deleted_diagram"] is False
 
     def test_delete_entities_with_internal_cycle_succeeds_via_implicit_connection_cleanup(self, repo: Path) -> None:
         left = _make(repo, "goal", "Left")

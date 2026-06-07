@@ -164,6 +164,7 @@ def artifact_edit_diagram(
     bindings: list[dict[str, object]] | None = None,
     version: str | None = None,
     status: str | None = None,
+    edge_labels: dict[str, str | None] | None = None,
     derivation_id: str | None = None,
     diff: dict[str, object] | None = None,
     base_revision: str | None = None,
@@ -191,7 +192,7 @@ def artifact_edit_diagram(
 
     if puml == PUML_AUTO_SYNC:
         store = repo_cached(key)
-        result = artifact_write_ops.sync_diagram_to_model(
+        result = artifact_write_ops.refresh_diagram(
             repo_root=root,
             store=store,
             verifier=verifier,
@@ -213,6 +214,8 @@ def artifact_edit_diagram(
             ("version", version), ("status", status),
         ) if v is not None
     }
+    if edge_labels is not None:
+        kwargs["edge_labels"] = edge_labels
 
     result = artifact_write_ops.edit_diagram(
         repo_root=root,
@@ -336,8 +339,12 @@ def register_edit_tools(mcp: FastMCP) -> None:
             "'apply-diff' (requires diff + base_revision — applies diff with stale-write check); "
             "'propose-bindings' (requires entity_ids/connection_ids — returns proposals, no write); "
             "'detach-binding' (requires binding_id — removes binding). "
-            "Default (no mode): puml='auto-sync' reconciles; explicit puml replaces body; "
-            "frontmatter fields updated if provided; bindings merges + normalizes shorthand. "
+            "Default (no mode): puml='auto-sync' is projection-aware — scope-bound diagrams "
+            "re-run their projector (never deleted on empty result); ArchiMate diagrams reconcile "
+            "refs; standalone diagrams re-render. Explicit puml replaces body; frontmatter fields "
+            "updated if provided; bindings merges + normalizes shorthand. "
+            "edge_labels: per-diagram edge-label overrides keyed by '{src_alias}:{tgt_alias}'; "
+            "omit to preserve existing overrides; pass {} to clear all. "
             "Re-verifies and re-renders PNG on every write."
         ),
         annotations=LOCAL_WRITE,

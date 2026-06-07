@@ -33,6 +33,9 @@ def _verification_to_dict(path: Path, res) -> dict[str, object]:
     }
 
 
+_EDGE_LABELS_UNSET = object()
+
+
 def edit_diagram(
     *,
     repo_root: Path,
@@ -51,6 +54,7 @@ def edit_diagram(
     replace_bindings: bool = False,
     version: str | None = None,
     status: str | None = None,
+    edge_labels: dict[str, str | None] | None = _EDGE_LABELS_UNSET,  # type: ignore[assignment]
     dry_run: bool,
 ) -> WriteResult:
     """Edit an existing diagram file.
@@ -107,6 +111,21 @@ def edit_diagram(
 
     norm_bindings_raw = bindings_to_raw(norm_bindings)
 
+    # Edge-label overrides: merge caller-supplied delta into existing map.
+    # A None value for a key removes that key (single-key clear without full replacement).
+    _raw_el = fm.get("edge-labels")
+    existing_edge_labels: dict[str, str] = dict(_raw_el) if isinstance(_raw_el, dict) else {}
+    if edge_labels is _EDGE_LABELS_UNSET:
+        eff_edge_labels: dict[str, str] | None = existing_edge_labels or None
+    else:
+        merged: dict[str, str] = dict(existing_edge_labels)
+        for k, v in (edge_labels or {}).items():
+            if v is None:
+                merged.pop(k, None)
+            else:
+                merged[k] = v
+        eff_edge_labels = merged or None
+
     # Determine PUML body; inject _scope_entity_id from scoped-by binding so the
     # C4 renderer uses model-backed mode for diagrams that previously used _scope_entity_id.
     if eff_diagram_entities is not None and isinstance(eff_diagram_entities, dict) and puml is None:
@@ -126,6 +145,7 @@ def edit_diagram(
             render_entities,
             eff_diagram_conns,
             repo_root,
+            edge_labels=eff_edge_labels,
         )
         collected_entity_ids, collected_connection_ids = _collect_diagram_renderer_references(
             diagram_type,
@@ -162,6 +182,7 @@ def edit_diagram(
         connection_ids_used=eff_connection_ids_used,
         view_derivations=eff_view_derivations,
         bindings=bindings_to_raw(norm_bindings) if norm_bindings else None,
+        edge_labels=eff_edge_labels or None,
         puml_body=puml_body,
     )
 
@@ -210,4 +231,42 @@ def edit_diagram(
         content=None,
         warnings=warnings,
         verification=_verification_to_dict(diagram_path, res),
+    )
+
+
+def set_diagram_edge_label(
+    *,
+    repo_root: Path,
+    verifier: ArtifactVerifier,
+    clear_repo_caches: Callable[[Path], None],
+    artifact_id: str,
+    edge_key: str,
+    label: str | None,
+    dry_run: bool,
+) -> WriteResult:
+    """Set or clear a per-diagram edge-label override for a single edge.
+
+    ``edge_key`` is ``"{src_alias}:{tgt_alias}"`` from the rendered PUML.
+    ``label=None`` removes the override, reverting to the derived label.
+    """
+    diagram_path = repo_root / DIAGRAM_CATALOG / DIAGRAMS / f"{artifact_id}.puml"
+    if not diagram_path.exists():
+        raise ValueError(f"Diagram '{artifact_id}' not found at {diagram_path}")
+
+    parsed = parse_diagram_file(diagram_path)
+    raw_el = parsed.frontmatter.get("edge-labels")
+    current: dict[str, str | None] = dict(raw_el) if isinstance(raw_el, dict) else {}
+
+    if label is None:
+        current.pop(edge_key, None)
+    else:
+        current[edge_key] = label
+
+    return edit_diagram(
+        repo_root=repo_root,
+        verifier=verifier,
+        clear_repo_caches=clear_repo_caches,
+        artifact_id=artifact_id,
+        edge_labels=current,
+        dry_run=dry_run,
     )
