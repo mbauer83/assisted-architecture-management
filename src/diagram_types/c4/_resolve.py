@@ -8,13 +8,19 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-# C4-appropriate fallback labels per ArchiMate interaction connection type.
-# Used when content_text is absent; never emits structural type names like "aggregation".
+# Short, direction-consistent C4 edge labels per ArchiMate interaction type.
+# Projected (model-backed) C4 edges always use these verbs rather than the model
+# connection's prose description: C4 labels are short, and a directional sentence
+# would contradict an arrow the projector may have reversed/re-oriented. The rich
+# description stays on the model connection for documentation. (Standalone diagrams
+# still honour an explicit per-edge label.) Never emits structural names like
+# "aggregation".
 _C4_CONN_LABELS: dict[str, str] = {
     "archimate-serving": "uses",
     "archimate-flow": "flows to",
     "archimate-triggering": "triggers",
     "archimate-access": "accesses",
+    "archimate-association": "uses",
 }
 
 
@@ -130,7 +136,7 @@ def _resolve_model_backed(
         else:
             outside_items.append(resolved)
 
-    # P2.2: additive validated inclusion — extra IDs in _included_entity_ids that the
+    # additive validated inclusion — extra IDs in _included_entity_ids that the
     # projection did not yield are added as external neighbours if graph-justified (they
     # have at least one connection to the already-projected entity set).
     if included_only:
@@ -165,12 +171,16 @@ def _resolve_model_backed(
         model_conns.append(conn)
     model_conns.sort(key=lambda x: x.artifact_id)
 
-    # Build _C4Connection list with:
-    #   P2.1 — reverse archimate-serving (provider→consumer becomes consumer --uses--> provider)
-    #   P2.3 — for system-context, remap internal entities not in alias_by_eid to scope root
-    #   P2.6 — deduplicate by (src_alias, tgt_alias) after remapping; remove self-loops
+    # Build the C4 edge list:
+    #   - reverse archimate-serving so the arrow reads consumer --uses--> provider
+    #   - orient symmetric archimate-association by a deterministic role rule: the
+    #     system side (scope/internal) is the provider, so the edge points
+    #     consumer (person/external) --uses--> system side
+    #   - for system-context, internal endpoints remap to the scope root
+    #   - deduplicate by (src, tgt) after remapping; drop self-loops
     is_ctx = (diagram_type == "c4-system-context")
     scope_alias = alias_by_eid.get(scope_entity_id, "")
+    provider_aliases = {scope_alias} | {i.alias for i in internal_items}
     seen_pairs: set[tuple[str, str]] = set()
     conn_list: list[_C4Connection] = []
     for c in model_conns:
@@ -179,7 +189,9 @@ def _resolve_model_backed(
         if src is None or tgt is None:
             continue
         if c.conn_type == "archimate-serving":
-            src, tgt = tgt, src  # P2.1: consumer --uses--> provider
+            src, tgt = tgt, src  # provider→consumer becomes consumer --uses--> provider
+        elif c.conn_type == "archimate-association" and src in provider_aliases and tgt not in provider_aliases:
+            src, tgt = tgt, src  # role rule: consumer --uses--> system side
         if src == tgt:
             continue
         pair = (src, tgt)
@@ -319,9 +331,8 @@ def _scope_marked_id(diagram_entities: Mapping[str, object], scope_entity_type: 
 
 
 def _conn_label(conn: Any) -> str:
-    description = " ".join((conn.content_text or "").split())
-    if description:
-        return description
+    # Short C4 verb keyed on connection type — direction-consistent with the
+    # (possibly reversed/re-oriented) C4 arrow. Prose lives on the model connection.
     return _C4_CONN_LABELS.get(conn.conn_type, "uses")
 
 

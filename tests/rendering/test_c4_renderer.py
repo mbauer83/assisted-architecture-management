@@ -117,7 +117,10 @@ def test_system_context_renders_scope_and_model_relationship(monkeypatch) -> Non
     assert 'actor "Customer" as P_Cust01' in puml
     assert 'rectangle "Ordering System" <<C4System>> as SS_Order1' in puml
     assert "[[" not in puml
-    assert "Uses the ordering workflow" in puml
+    # Model-backed C4 edges use short, direction-consistent type-default verbs; the
+    # connection's prose description stays on the model connection, not the diagram.
+    assert "P_Cust01 --> SS_Order1 : accesses" in puml
+    assert "Uses the ordering workflow" not in puml
 
 
 def test_container_view_renders_scope_as_boundary_and_collects_references() -> None:

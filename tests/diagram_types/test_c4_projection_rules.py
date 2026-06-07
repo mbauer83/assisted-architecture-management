@@ -1,13 +1,14 @@
-"""Tests for P2 projector delta (Stage 0c).
+"""C4 projection edge & membership rules.
 
 Covers:
-  P2.1 — serving direction reversal (provider→consumer becomes consumer --uses--> provider)
-  P2.2 — additive validated inclusion (_included_entity_ids adds graph-justified entities)
-  P2.3 — bounded roll-up (system-context uses multi-hop descendants for neighbour discovery;
-          internal entities remap to scope root in rendering)
-  P2.4 — data-object surfaced as internal component in c4-component views
-  P2.5 — grouping as valid scope / internal type
-  P2.6 — duplicate connections deduplicated; self-loops removed
+  - serving direction reversal (provider→consumer becomes consumer --uses--> provider)
+  - association role rule (symmetric edge oriented consumer --uses--> system side)
+  - additive validated inclusion (_included_entity_ids adds graph-justified entities)
+  - bounded roll-up (system-context uses multi-hop descendants for neighbour discovery;
+    internal entities remap to scope root in rendering)
+  - data-object surfaced as internal component in c4-component views
+  - grouping as valid scope / internal type
+  - duplicate connections deduplicated; self-loops removed
 """
 
 from __future__ import annotations
@@ -49,7 +50,7 @@ def _resolve(query: FakeQuery, scope_id: str, diagram_entities: dict | None = No
 
 
 # ---------------------------------------------------------------------------
-# P2.1 — serving direction reversal
+# serving direction reversal
 # ---------------------------------------------------------------------------
 
 
@@ -97,8 +98,28 @@ def test_non_serving_connection_direction_preserved() -> None:
     assert c.src_alias == state.scope_item.alias
 
 
+def test_association_oriented_consumer_to_system_regardless_of_authoring() -> None:
+    """Symmetric association is oriented consumer --uses--> system side by the role
+    rule, even when the model authored it provider→consumer."""
+    root = _entity("SYS", "application-component")
+    comp = _entity("COMP", "application-component")
+    actor = _entity("ACTOR", "business-actor")
+    agg = _connection("SYS---COMP@@agg", "SYS", "COMP", "archimate-aggregation")
+    # Authored COMP(system side) → ACTOR(consumer): the "wrong" orientation for a C4 "uses".
+    assoc = _connection("COMP---ACTOR@@assoc", "COMP", "ACTOR", "archimate-association")
+    query = FakeQuery([root, comp, actor], [agg, assoc])
+
+    state = _resolve(query, "SYS")
+
+    actor_item = next(i for i in state.outside_items if i.local_id == "ACTOR")
+    edge = next(c for c in state.connections if actor_item.alias in (c.src_alias, c.tgt_alias))
+    assert edge.label == "uses"
+    assert edge.src_alias == actor_item.alias, "consumer (actor) must be the source"
+    assert edge.tgt_alias == state.scope_item.alias, "system side (scope) must be the target"
+
+
 # ---------------------------------------------------------------------------
-# P2.3 — bounded roll-up: system-context multi-hop neighbour discovery
+# bounded roll-up: system-context multi-hop neighbour discovery
 # ---------------------------------------------------------------------------
 
 
@@ -201,7 +222,7 @@ def test_system_context_rollup_rendering_maps_internal_to_scope_root() -> None:
 
 
 # ---------------------------------------------------------------------------
-# P2.3 — self-loop removal
+# self-loop removal
 # ---------------------------------------------------------------------------
 
 
@@ -222,7 +243,7 @@ def test_self_loop_removed_after_rollup() -> None:
 
 
 # ---------------------------------------------------------------------------
-# P2.6 — deduplication
+# deduplication
 # ---------------------------------------------------------------------------
 
 
@@ -246,7 +267,7 @@ def test_duplicate_rollup_connections_deduplicated() -> None:
 
 
 # ---------------------------------------------------------------------------
-# P2.4 — data-object in component views
+# data-object in component views
 # ---------------------------------------------------------------------------
 
 
@@ -279,7 +300,7 @@ def test_component_accessed_data_object_shown_as_external() -> None:
 
 
 # ---------------------------------------------------------------------------
-# P2.5 — grouping as valid scope / internal type
+# grouping as valid scope / internal type
 # ---------------------------------------------------------------------------
 
 
@@ -310,7 +331,7 @@ def test_grouping_discovered_as_context_neighbour() -> None:
 
 
 # ---------------------------------------------------------------------------
-# P2.2 — additive validated inclusion
+# additive validated inclusion
 # ---------------------------------------------------------------------------
 
 

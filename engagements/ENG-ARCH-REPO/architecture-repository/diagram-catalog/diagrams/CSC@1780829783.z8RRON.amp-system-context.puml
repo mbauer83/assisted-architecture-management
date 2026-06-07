@@ -114,15 +114,15 @@ APP_v6AXNw -[hidden]right- APP_Je9pmw
 APP_Je9pmw -[hidden]right- APP_JqIBPJ
 
 
-ACT_Nn7Oo7 --> APP_hkrdtm : Architect uses the GUI Authoring Tool as their primary surface for authoring and reviewing architecture content.
-ACT_OLWiNc --> APP_hkrdtm : DevOps Engineer uses the CLI Tool for pipeline automation and repository maintenance tasks.
-ACT_Pp8Qq8 --> APP_hkrdtm : Developer uses the CLI Tool as their primary surface for scripting, CI integration, and bulk architecture operations.
-ACT_Rr9Ss9 --> APP_hkrdtm : Product Owner uses the GUI Authoring Tool to view and comment on architecture decisions.
-ACT_Ut1Vv1 --> APP_hkrdtm : Upper Technical Management uses the GUI Authoring Tool to review architectural roadmaps and decisions.
-APP_v6AXNw --> APP_hkrdtm : AI Agent Host connects to the Architecture MCP Read Bridge via a stdio subprocess for read-only architecture access.
-APP_hkrdtm --> APP_Je9pmw : Git Hosting provides remote repository services consumed by the Architecture Backend (via Git Sync Service).
-APP_hkrdtm --> APP_JqIBPJ : Supply-Chain Signal Sources provide vulnerability and supply-chain signals consumed by the Architecture Backend (via the Supply-Chain Connector).
-ROL_udXPfB --> APP_hkrdtm : AI Agent uses the Architecture MCP Read Bridge as its primary read surface for querying architecture knowledge.
-ROL_abNYhO --> APP_hkrdtm : Risk & Compliance Officer uses the Assurance MCP Read Bridge to query GRC and compliance assurance records.
-ROL_yswDMB --> APP_hkrdtm : Safety / Security Analyst uses the Assurance MCP Read Bridge to query safety and security assurance records.
+ACT_Nn7Oo7 --> APP_hkrdtm : uses
+ACT_OLWiNc --> APP_hkrdtm : uses
+ACT_Pp8Qq8 --> APP_hkrdtm : uses
+ACT_Rr9Ss9 --> APP_hkrdtm : uses
+ACT_Ut1Vv1 --> APP_hkrdtm : uses
+APP_v6AXNw --> APP_hkrdtm : uses
+APP_hkrdtm --> APP_Je9pmw : uses
+APP_hkrdtm --> APP_JqIBPJ : uses
+ROL_udXPfB --> APP_hkrdtm : uses
+ROL_abNYhO --> APP_hkrdtm : uses
+ROL_yswDMB --> APP_hkrdtm : uses
 @enduml

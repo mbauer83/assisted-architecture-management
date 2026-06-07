@@ -141,23 +141,23 @@ APP_v6AXNw -[hidden]right- APP_Je9pmw
 APP_Je9pmw -[hidden]right- APP_JqIBPJ
 
 
-ACT_Nn7Oo7 --> APP_lmO0mp : Architect uses the GUI Authoring Tool as their primary surface for authoring and reviewing architecture content.
-ACT_OLWiNc --> APP_kjC6ex : DevOps Engineer uses the CLI Tool for pipeline automation and repository maintenance tasks.
-ACT_Pp8Qq8 --> APP_kjC6ex : Developer uses the CLI Tool as their primary surface for scripting, CI integration, and bulk architecture operations.
-ACT_Rr9Ss9 --> APP_lmO0mp : Product Owner uses the GUI Authoring Tool to view and comment on architecture decisions.
-ACT_Ut1Vv1 --> APP_lmO0mp : Upper Technical Management uses the GUI Authoring Tool to review architectural roadmaps and decisions.
-APP_lmO0mp --> APP_OYEmP1 : Architecture Backend provides the REST API and SSE event stream consumed by the GUI Authoring Tool for all model read, write, and real-time update operations.
-APP_Ne0utf --> APP_OYEmP1 : Architecture Backend serves the Architecture MCP Read Bridge (bridge uses the backend's HTTP API).
-APP_etTj9M --> APP_OYEmP1 : Architecture Backend serves the Architecture MCP Write Bridge (bridge uses the backend's HTTP API).
-APP_iu_kKL --> APP_OYEmP1 : Architecture Backend serves the Assurance MCP Read Bridge (bridge uses the backend's HTTP API).
-APP_js9xHR --> APP_OYEmP1 : Architecture Backend serves the Assurance MCP Write Bridge (bridge uses the backend's HTTP API).
-APP_v6AXNw --> APP_Ne0utf : AI Agent Host connects to the Architecture MCP Read Bridge via a stdio subprocess for read-only architecture access.
-APP_v6AXNw --> APP_etTj9M : AI Agent Host connects to the Architecture MCP Write Bridge via a stdio subprocess for write architecture access.
-APP_v6AXNw --> APP_iu_kKL : AI Agent Host connects to the Assurance MCP Read Bridge via a stdio subprocess for read-only assurance access.
-APP_v6AXNw --> APP_js9xHR : AI Agent Host connects to the Assurance MCP Write Bridge via a stdio subprocess for write assurance access.
-APP_OYEmP1 --> APP_Je9pmw : Git Hosting provides remote repository services consumed by the Architecture Backend (via Git Sync Service).
-APP_OYEmP1 --> APP_JqIBPJ : Supply-Chain Signal Sources provide vulnerability and supply-chain signals consumed by the Architecture Backend (via the Supply-Chain Connector).
-ROL_udXPfB --> APP_Ne0utf : AI Agent uses the Architecture MCP Read Bridge as its primary read surface for querying architecture knowledge.
-ROL_abNYhO --> APP_iu_kKL : Risk & Compliance Officer uses the Assurance MCP Read Bridge to query GRC and compliance assurance records.
-ROL_yswDMB --> APP_iu_kKL : Safety / Security Analyst uses the Assurance MCP Read Bridge to query safety and security assurance records.
+ACT_Nn7Oo7 --> APP_lmO0mp : uses
+ACT_OLWiNc --> APP_kjC6ex : uses
+ACT_Pp8Qq8 --> APP_kjC6ex : uses
+ACT_Rr9Ss9 --> APP_lmO0mp : uses
+ACT_Ut1Vv1 --> APP_lmO0mp : uses
+APP_lmO0mp --> APP_OYEmP1 : uses
+APP_Ne0utf --> APP_OYEmP1 : uses
+APP_etTj9M --> APP_OYEmP1 : uses
+APP_iu_kKL --> APP_OYEmP1 : uses
+APP_js9xHR --> APP_OYEmP1 : uses
+APP_v6AXNw --> APP_Ne0utf : uses
+APP_v6AXNw --> APP_etTj9M : uses
+APP_v6AXNw --> APP_iu_kKL : uses
+APP_v6AXNw --> APP_js9xHR : uses
+APP_OYEmP1 --> APP_Je9pmw : uses
+APP_OYEmP1 --> APP_JqIBPJ : uses
+ROL_udXPfB --> APP_Ne0utf : uses
+ROL_abNYhO --> APP_iu_kKL : uses
+ROL_yswDMB --> APP_iu_kKL : uses
 @enduml

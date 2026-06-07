@@ -1,8 +1,9 @@
 """C4 projection engine — the single membership+classification algorithm.
 
-Owns all C4-specific connection-type constants and implements the SPEC
-projection tables (SPEC-phase-3 §2.3). Both Seam B (strategy/refresh path)
-and Seam C (ViewProjector/preview path) are produced here from one run.
+Owns all C4-specific connection-type constants and implements the C4
+projection tables (system-context / container / component membership rules).
+Both Seam B (strategy/refresh path) and Seam C (ViewProjector/preview path)
+are produced here from one run.
 
 Also registers the c4.scope-projection/v1 strategy and the ("c4", 1) module
 projection so that the refresh/diff path gets Seam B via the generic registry.
@@ -20,8 +21,8 @@ from src.domain.view_projection import ProjectedViewItem
 _log = logging.getLogger(__name__)
 
 _WARNING_THRESHOLD = 200
-_MAX_ROLLUP_DEPTH = 8   # max nesting hops for roll-up traversal (P2.3)
-_MAX_ITEMS = 150        # hard cap on projected items before warning becomes truncation (P2.6)
+_MAX_ROLLUP_DEPTH = 8   # max nesting hops for roll-up traversal
+_MAX_ITEMS = 150        # hard cap on projected items before warning becomes truncation
 
 # ArchiMate structural (nesting) connection types.
 # archimate-assignment included: active-structure "performs" behavior; in C4 terms the
@@ -198,7 +199,7 @@ def _direct_conns(projected: set[str], query: ModelQuery) -> set[str]:
 def _rollup_conns(internal: set[str], external: set[str], query: ModelQuery) -> set[str]:
     """Connection IDs between any internal entity and any external entity via _NEIGHBOR_TYPES.
 
-    Used for P2.3 bounded roll-up: collects model connections from any structural descendant
+    Used for bounded roll-up: collects model connections from any structural descendant
     to external neighbours so the renderer can map them onto the visible scope boundary.
     """
     result: set[str] = set()
@@ -231,7 +232,7 @@ def project_c4(
         return _make_item(eid, role, scope_entity_type, internal_c4_type, person_archimate_types, query)
 
     root_item = make(root_entity_id, "scope")
-    # P2.3: pre-compute full structural descendants for roll-up (all levels, used below)
+    # pre-compute full structural descendants for roll-up (all levels, used below)
     all_descendants = _structural_children(root_entity_id, _MAX_ROLLUP_DEPTH, query)
 
     if diagram_type == "c4-system-context":
@@ -251,7 +252,7 @@ def project_c4(
         raw_children = _structural_children(root_entity_id, 1, query)
         internal_ids = {e for e in raw_children if _entity_type(e, query) in _CONTAINER_INTERNAL_TYPES}
         scope_set = {root_entity_id} | internal_ids
-        # P2.3: use full descendants so deep sub-components can surface external neighbours.
+        # use full descendants so deep sub-components can surface external neighbours.
         full_scope = {root_entity_id} | all_descendants
         neighbors = _neighbor_entities(
             full_scope, _CONTAINER_NEIGHBOR_TYPES, query,
@@ -285,7 +286,7 @@ def project_c4(
     else:
         return C4Projection(diagram_type=diagram_type, items=(), connection_ids=())
 
-    # P2.6: size limits — warn at threshold, truncate at hard cap
+    # size limits — warn at threshold, truncate at hard cap
     if len(items) > _MAX_ITEMS:
         _log.warning(
             "C4 projection: %d items exceeds hard cap %d for scope %s — truncating",

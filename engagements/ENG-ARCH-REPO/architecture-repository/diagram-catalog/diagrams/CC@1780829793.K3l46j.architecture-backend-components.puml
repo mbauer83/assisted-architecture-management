@@ -36,6 +36,15 @@ entity-ids-used:
 - APP@1780783992.Je9pmw.git-hosting
 - APP@1780783993.JqIBPJ.supply-chain-signal-sources
 - FNC@1777390460.3ZsfnT.broadcast-model-update
+- DOB@1712870400.3rilik.sqlite-index
+- DOB@1776633700.I9qEoI.workspace-configuration
+- DOB@1777239791.4Z28xK.textual-diagram-representation
+- DOB@1777293139.UjyXG3.architecture-ontology-configuration
+- DOB@1777293141.4dO6js.global-entity-reference-file
+- DOB@1777293144.zynRsm.rendered-diagram
+- DOB@1777399929.hhYsiw.staged-repository
+- DOB@1777399930.hExrX3.operation-record
+- DOB@1780656431.ApaPcg.assurance-knowledge-base
 connection-ids-used:
 - APP@1712870400.JOmFWy.sqlite-indexer---APP@1712870400.yNhgdh.model-registry@@archimate-serving
 - APP@1712870400.ca3vm7.model-verifier---APP@1712870400.YOOEbL.frontmatter-parser@@archimate-serving
@@ -51,6 +60,25 @@ connection-ids-used:
 - APP@1780783992.Je9pmw.git-hosting---APP@1777293134.tY3JIK.git-sync-service@@archimate-serving
 - APP@1780783993.JqIBPJ.supply-chain-signal-sources---APP@1777293133.OYEmP1.architecture-backend@@archimate-serving
 - FNC@1777390460.3ZsfnT.broadcast-model-update---APP@1776149382.lmO0mp.gui-authoring-tool@@archimate-association
+- APP@1712870400.JOmFWy.sqlite-indexer---DOB@1712870400.3rilik.sqlite-index@@archimate-access
+- APP@1712870400.YOOEbL.frontmatter-parser---DOB@1777293139.UjyXG3.architecture-ontology-configuration@@archimate-access
+- APP@1712870400.ca3vm7.model-verifier---DOB@1777293139.UjyXG3.architecture-ontology-configuration@@archimate-access
+- APP@1712870400.kRZYOA.architecture-mcp-endpoint-adapter---DOB@1776633700.I9qEoI.workspace-configuration@@archimate-access
+- APP@1712870400.kRZYOA.architecture-mcp-endpoint-adapter---DOB@1777293139.UjyXG3.architecture-ontology-configuration@@archimate-access
+- APP@1712870400.v9LvfK.query-engine---DOB@1712870400.3rilik.sqlite-index@@archimate-access
+- APP@1776149382.lmO0mp.gui-authoring-tool---DOB@1777293144.zynRsm.rendered-diagram@@archimate-access
+- APP@1776633693.tIMxjr.promotion-engine---DOB@1712870400.3rilik.sqlite-index@@archimate-access
+- APP@1776633693.tIMxjr.promotion-engine---DOB@1777293141.4dO6js.global-entity-reference-file@@archimate-access
+- APP@1776633694.w51oVF.workspace-initializer---DOB@1776633700.I9qEoI.workspace-configuration@@archimate-access
+- APP@1776633694.w51oVF.workspace-initializer---DOB@1777293139.UjyXG3.architecture-ontology-configuration@@archimate-access
+- APP@1777293133.OYEmP1.architecture-backend---DOB@1712870400.3rilik.sqlite-index@@archimate-access
+- APP@1777293133.OYEmP1.architecture-backend---DOB@1776633700.I9qEoI.workspace-configuration@@archimate-access
+- APP@1777293134.tY3JIK.git-sync-service---DOB@1776633700.I9qEoI.workspace-configuration@@archimate-access
+- APP@1777293136.yaxrWl.plantuml-renderer---DOB@1777239791.4Z28xK.textual-diagram-representation@@archimate-access
+- APP@1777293136.yaxrWl.plantuml-renderer---DOB@1777293144.zynRsm.rendered-diagram@@archimate-access
+- APP@1780656430.m-U5S1.assurance-mcp-endpoint-adapter---DOB@1780656431.ApaPcg.assurance-knowledge-base@@archimate-access
+- FNC@1777399926.DrKMhV.resolve-operation-idempotency---DOB@1777399930.hExrX3.operation-record@@archimate-access
+- FNC@1777399927.hbgFU3.create-staging-repository---DOB@1777399929.hhYsiw.staged-repository@@archimate-access
 diagram-entities: {}
 bindings:
 - id: bind-scope
@@ -146,6 +174,15 @@ rectangle "Assurance MCP Read Bridge" <<C4External>> as APP_iu_kKL
 rectangle "Assurance MCP Write Bridge" <<C4External>> as APP_js9xHR
 rectangle "Git Hosting" <<C4External>> as APP_Je9pmw
 rectangle "Supply-Chain Signal Sources" <<C4External>> as APP_JqIBPJ
+rectangle "SQLite Index" <<C4External>> as DOB_3rilik
+rectangle "Workspace Configuration" <<C4External>> as DOB_I9qEoI
+rectangle "Textual Diagram Representation" <<C4External>> as DOB_4Z28xK
+rectangle "Architecture Ontology Configuration" <<C4External>> as DOB_UjyXG3
+rectangle "Global Entity Reference File" <<C4External>> as DOB_4dO6js
+rectangle "Rendered Diagram" <<C4External>> as DOB_zynRsm
+rectangle "Staged Repository" <<C4External>> as DOB_hhYsiw
+rectangle "Operation Record" <<C4External>> as DOB_hExrX3
+rectangle "Assurance Knowledge Base" <<C4External>> as DOB_ApaPcg
 
 APP_OYEmP1 -[hidden]right- APP_lmO0mp
 APP_lmO0mp -[hidden]right- APP_Ne0utf
@@ -154,20 +191,46 @@ APP_etTj9M -[hidden]right- APP_iu_kKL
 APP_iu_kKL -[hidden]right- APP_js9xHR
 APP_js9xHR -[hidden]right- APP_Je9pmw
 APP_Je9pmw -[hidden]right- APP_JqIBPJ
+APP_JqIBPJ -[hidden]right- DOB_3rilik
+DOB_3rilik -[hidden]right- DOB_I9qEoI
+DOB_I9qEoI -[hidden]right- DOB_4Z28xK
+DOB_4Z28xK -[hidden]right- DOB_UjyXG3
+DOB_UjyXG3 -[hidden]right- DOB_4dO6js
+DOB_4dO6js -[hidden]right- DOB_zynRsm
+DOB_zynRsm -[hidden]right- DOB_hhYsiw
+DOB_hhYsiw -[hidden]right- DOB_hExrX3
+DOB_hExrX3 -[hidden]right- DOB_ApaPcg
 
 
-APP_yNhgdh --> APP_JOmFWy : SQLite Indexer populates and incrementally updates the in-memory store that the Model Registry exposes for fast entity and connection lookups.
-APP_YOOEbL --> APP_ca3vm7 : The model verifier uses the frontmatter parser for schema validation.
-APP_yNhgdh --> APP_ca3vm7 : The model verifier uses the model registry for reference resolution.
-APP_lmO0mp --> APP_ca3vm7 : The Model Verifier provides validation services consumed by the GUI Authoring Tool for dry-run preview and integrity checking.
-APP_lmO0mp --> APP_v9LvfK : The Query Engine provides search, list, and graph-traversal services consumed by the GUI Authoring Tool.
-APP_lmO0mp --> APP_OYEmP1 : Architecture Backend provides the REST API and SSE event stream consumed by the GUI Authoring Tool for all model read, write, and real-time update operations.
-APP_Ne0utf --> APP_OYEmP1 : Architecture Backend serves the Architecture MCP Read Bridge (bridge uses the backend's HTTP API).
-APP_etTj9M --> APP_OYEmP1 : Architecture Backend serves the Architecture MCP Write Bridge (bridge uses the backend's HTTP API).
-APP_iu_kKL --> APP_OYEmP1 : Architecture Backend serves the Assurance MCP Read Bridge (bridge uses the backend's HTTP API).
-APP_js9xHR --> APP_OYEmP1 : Architecture Backend serves the Assurance MCP Write Bridge (bridge uses the backend's HTTP API).
-APP_OYEmP1 --> APP_Je9pmw : Git Hosting provides remote repository services consumed by the Architecture Backend (via Git Sync Service).
-APP_tY3JIK --> APP_Je9pmw : Git Hosting serves the Git Sync Service by providing the remote repository endpoint for push and pull operations.
-APP_OYEmP1 --> APP_JqIBPJ : Supply-Chain Signal Sources provide vulnerability and supply-chain signals consumed by the Architecture Backend (via the Supply-Chain Connector).
-FNC_3ZsfnT --> APP_lmO0mp : uses
+APP_yNhgdh --> APP_JOmFWy : uses
+APP_JOmFWy --> DOB_3rilik : accesses
+APP_YOOEbL --> DOB_UjyXG3 : accesses
+APP_YOOEbL --> APP_ca3vm7 : uses
+APP_yNhgdh --> APP_ca3vm7 : uses
+APP_lmO0mp --> APP_ca3vm7 : uses
+APP_ca3vm7 --> DOB_UjyXG3 : accesses
+APP_kRZYOA --> DOB_I9qEoI : accesses
+APP_kRZYOA --> DOB_UjyXG3 : accesses
+APP_lmO0mp --> APP_v9LvfK : uses
+APP_v9LvfK --> DOB_3rilik : accesses
+APP_lmO0mp --> DOB_zynRsm : accesses
+APP_tIMxjr --> DOB_3rilik : accesses
+APP_tIMxjr --> DOB_4dO6js : accesses
+APP_w51oVF --> DOB_I9qEoI : accesses
+APP_w51oVF --> DOB_UjyXG3 : accesses
+APP_lmO0mp --> APP_OYEmP1 : uses
+APP_Ne0utf --> APP_OYEmP1 : uses
+APP_etTj9M --> APP_OYEmP1 : uses
+APP_iu_kKL --> APP_OYEmP1 : uses
+APP_js9xHR --> APP_OYEmP1 : uses
+APP_OYEmP1 --> DOB_3rilik : accesses
+APP_OYEmP1 --> DOB_I9qEoI : accesses
+APP_tY3JIK --> DOB_I9qEoI : accesses
+APP_yaxrWl --> DOB_4Z28xK : accesses
+APP_yaxrWl --> DOB_zynRsm : accesses
+APP_m_U5S1 --> DOB_ApaPcg : accesses
+APP_OYEmP1 --> APP_Je9pmw : uses
+APP_tY3JIK --> APP_Je9pmw : uses
+APP_OYEmP1 --> APP_JqIBPJ : uses
+APP_lmO0mp --> FNC_3ZsfnT : uses
 @enduml
