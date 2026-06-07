@@ -1,5 +1,9 @@
 # Claude Code — Project Instructions
 
+## Coding guidelines and style
+
+On any coding or code-review task, if the `arch-repo-read` MCP server is available, query it for coding guidelines, best practices, and style guides before writing or reviewing code. Read any matching documents in full and apply them. Search with terms like "coding guidelines", "best practices", "style guide", "conventions".
+
 ## Architectural discipline
 
 **Always choose the principled solution, never a workaround.**
