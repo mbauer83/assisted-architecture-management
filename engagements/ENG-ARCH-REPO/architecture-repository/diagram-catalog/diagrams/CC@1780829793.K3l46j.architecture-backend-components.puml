@@ -1,0 +1,173 @@
+---
+artifact-id: CC@1780829793.K3l46j.architecture-backend-components
+artifact-type: diagram
+name: "Architecture Backend \u2014 Components"
+version: 0.1.0
+status: draft
+keywords:
+- c4
+- component
+- backend
+diagram-type: c4-component
+entity-ids-used:
+- APP@1712870400.JOmFWy.sqlite-indexer
+- APP@1712870400.YOOEbL.frontmatter-parser
+- APP@1712870400.ca3vm7.model-verifier
+- APP@1712870400.kRZYOA.architecture-mcp-endpoint-adapter
+- APP@1712870400.v9LvfK.query-engine
+- APP@1712870400.yNhgdh.model-registry
+- APP@1776149382.lmO0mp.gui-authoring-tool
+- APP@1776633693.tIMxjr.promotion-engine
+- APP@1776633694.w51oVF.workspace-initializer
+- APP@1776633697.SCKD2U.diagram-scaffolder
+- APP@1776637531.a9k_mJ.write-request-queue
+- APP@1777293133.OYEmP1.architecture-backend
+- APP@1777293134.tY3JIK.git-sync-service
+- APP@1777293136.yaxrWl.plantuml-renderer
+- APP@1777399924.5n_KQJ.bulk-write-handler
+- APP@1777399925.HOOYAQ.batch-transaction-manager
+- APP@1777399925.WK_78v.bulk-delete-handler
+- APP@1777399926.PDJI8F.operation-registry
+- APP@1780656430.m-U5S1.assurance-mcp-endpoint-adapter
+- APP@1780783708.Ne0utf.architecture-mcp-read-bridge
+- APP@1780783709.etTj9M.architecture-mcp-write-bridge
+- APP@1780783710.iu_kKL.assurance-mcp-read-bridge
+- APP@1780783711.js9xHR.assurance-mcp-write-bridge
+- APP@1780783992.Je9pmw.git-hosting
+- APP@1780783993.JqIBPJ.supply-chain-signal-sources
+- FNC@1777390460.3ZsfnT.broadcast-model-update
+connection-ids-used:
+- APP@1712870400.JOmFWy.sqlite-indexer---APP@1712870400.yNhgdh.model-registry@@archimate-serving
+- APP@1712870400.ca3vm7.model-verifier---APP@1712870400.YOOEbL.frontmatter-parser@@archimate-serving
+- APP@1712870400.ca3vm7.model-verifier---APP@1712870400.yNhgdh.model-registry@@archimate-serving
+- APP@1712870400.ca3vm7.model-verifier---APP@1776149382.lmO0mp.gui-authoring-tool@@archimate-serving
+- APP@1712870400.v9LvfK.query-engine---APP@1776149382.lmO0mp.gui-authoring-tool@@archimate-serving
+- APP@1777293133.OYEmP1.architecture-backend---APP@1776149382.lmO0mp.gui-authoring-tool@@archimate-serving
+- APP@1777293133.OYEmP1.architecture-backend---APP@1780783708.Ne0utf.architecture-mcp-read-bridge@@archimate-serving
+- APP@1777293133.OYEmP1.architecture-backend---APP@1780783709.etTj9M.architecture-mcp-write-bridge@@archimate-serving
+- APP@1777293133.OYEmP1.architecture-backend---APP@1780783710.iu_kKL.assurance-mcp-read-bridge@@archimate-serving
+- APP@1777293133.OYEmP1.architecture-backend---APP@1780783711.js9xHR.assurance-mcp-write-bridge@@archimate-serving
+- APP@1780783992.Je9pmw.git-hosting---APP@1777293133.OYEmP1.architecture-backend@@archimate-serving
+- APP@1780783992.Je9pmw.git-hosting---APP@1777293134.tY3JIK.git-sync-service@@archimate-serving
+- APP@1780783993.JqIBPJ.supply-chain-signal-sources---APP@1777293133.OYEmP1.architecture-backend@@archimate-serving
+- FNC@1777390460.3ZsfnT.broadcast-model-update---APP@1776149382.lmO0mp.gui-authoring-tool@@archimate-association
+diagram-entities: {}
+bindings:
+- id: bind-scope
+  subject:
+    kind: diagram
+  correspondence_kind: scoped-by
+  target:
+    entity_id: APP@1777293133.OYEmP1.architecture-backend
+last-updated: '2026-06-07'
+---
+@startuml architecture-backend---components
+left to right direction
+skinparam shadowing false
+skinparam linetype ortho
+skinparam defaultTextAlignment center
+skinparam wrapWidth 240
+skinparam maxMessageSize 240
+skinparam rectangle {
+  RoundCorner 12
+  Padding 10
+}
+skinparam actor {
+  BackgroundColor #08427b
+  BorderColor #052e56
+  FontColor white
+}
+skinparam rectangle<<C4System>> {
+  BackgroundColor #1168bd
+  BorderColor #0b4884
+  FontColor white
+}
+skinparam rectangle<<C4Container>> {
+  BackgroundColor #438dd5
+  BorderColor #2f6da6
+  FontColor white
+}
+skinparam rectangle<<C4Component>> {
+  BackgroundColor #85bbf0
+  BorderColor #5e98c8
+  FontColor black
+}
+skinparam rectangle<<C4External>> {
+  BackgroundColor #dddddd
+  BorderColor #777777
+  FontColor black
+}
+
+title Architecture Backend — Components
+
+rectangle "Architecture Backend" <<C4System>> as APP_OYEmP1 {
+  rectangle "SQLite Indexer" <<C4Component>> as APP_JOmFWy
+  rectangle "Frontmatter Parser" <<C4Component>> as APP_YOOEbL
+  rectangle "Model Verifier" <<C4Component>> as APP_ca3vm7
+  rectangle "Architecture MCP Endpoint Adapter" <<C4Component>> as APP_kRZYOA
+  rectangle "Query Engine" <<C4Component>> as APP_v9LvfK
+  rectangle "Model Registry" <<C4Component>> as APP_yNhgdh
+  rectangle "Promotion Engine" <<C4Component>> as APP_tIMxjr
+  rectangle "Workspace Initializer" <<C4Component>> as APP_w51oVF
+  rectangle "Diagram Scaffolder" <<C4Component>> as APP_SCKD2U
+  rectangle "Write Request Queue" <<C4Component>> as APP_a9k_mJ
+  rectangle "Git Sync Service" <<C4Component>> as APP_tY3JIK
+  rectangle "PlantUML Renderer" <<C4Component>> as APP_yaxrWl
+  rectangle "Bulk Write Handler" <<C4Component>> as APP_5n_KQJ
+  rectangle "Batch Transaction Manager" <<C4Component>> as APP_HOOYAQ
+  rectangle "Bulk Delete Handler" <<C4Component>> as APP_WK_78v
+  rectangle "Operation Registry" <<C4Component>> as APP_PDJI8F
+  rectangle "Assurance MCP Endpoint Adapter" <<C4Component>> as APP_m_U5S1
+  rectangle "Broadcast Model Update" <<C4Component>> as FNC_3ZsfnT
+  APP_JOmFWy -[hidden]right- APP_YOOEbL
+  APP_YOOEbL -[hidden]right- APP_ca3vm7
+  APP_ca3vm7 -[hidden]right- APP_kRZYOA
+  APP_kRZYOA -[hidden]right- APP_v9LvfK
+  APP_v9LvfK -[hidden]right- APP_yNhgdh
+  APP_yNhgdh -[hidden]right- APP_tIMxjr
+  APP_tIMxjr -[hidden]right- APP_w51oVF
+  APP_w51oVF -[hidden]right- APP_SCKD2U
+  APP_SCKD2U -[hidden]right- APP_a9k_mJ
+  APP_a9k_mJ -[hidden]right- APP_tY3JIK
+  APP_tY3JIK -[hidden]right- APP_yaxrWl
+  APP_yaxrWl -[hidden]right- APP_5n_KQJ
+  APP_5n_KQJ -[hidden]right- APP_HOOYAQ
+  APP_HOOYAQ -[hidden]right- APP_WK_78v
+  APP_WK_78v -[hidden]right- APP_PDJI8F
+  APP_PDJI8F -[hidden]right- APP_m_U5S1
+  APP_m_U5S1 -[hidden]right- FNC_3ZsfnT
+
+}
+
+rectangle "GUI Authoring Tool" <<C4External>> as APP_lmO0mp
+rectangle "Architecture MCP Read Bridge" <<C4External>> as APP_Ne0utf
+rectangle "Architecture MCP Write Bridge" <<C4External>> as APP_etTj9M
+rectangle "Assurance MCP Read Bridge" <<C4External>> as APP_iu_kKL
+rectangle "Assurance MCP Write Bridge" <<C4External>> as APP_js9xHR
+rectangle "Git Hosting" <<C4External>> as APP_Je9pmw
+rectangle "Supply-Chain Signal Sources" <<C4External>> as APP_JqIBPJ
+
+APP_OYEmP1 -[hidden]right- APP_lmO0mp
+APP_lmO0mp -[hidden]right- APP_Ne0utf
+APP_Ne0utf -[hidden]right- APP_etTj9M
+APP_etTj9M -[hidden]right- APP_iu_kKL
+APP_iu_kKL -[hidden]right- APP_js9xHR
+APP_js9xHR -[hidden]right- APP_Je9pmw
+APP_Je9pmw -[hidden]right- APP_JqIBPJ
+
+
+APP_yNhgdh --> APP_JOmFWy : SQLite Indexer populates and incrementally updates the in-memory store that the Model Registry exposes for fast entity and connection lookups.
+APP_YOOEbL --> APP_ca3vm7 : The model verifier uses the frontmatter parser for schema validation.
+APP_yNhgdh --> APP_ca3vm7 : The model verifier uses the model registry for reference resolution.
+APP_lmO0mp --> APP_ca3vm7 : The Model Verifier provides validation services consumed by the GUI Authoring Tool for dry-run preview and integrity checking.
+APP_lmO0mp --> APP_v9LvfK : The Query Engine provides search, list, and graph-traversal services consumed by the GUI Authoring Tool.
+APP_lmO0mp --> APP_OYEmP1 : Architecture Backend provides the REST API and SSE event stream consumed by the GUI Authoring Tool for all model read, write, and real-time update operations.
+APP_Ne0utf --> APP_OYEmP1 : Architecture Backend serves the Architecture MCP Read Bridge (bridge uses the backend's HTTP API).
+APP_etTj9M --> APP_OYEmP1 : Architecture Backend serves the Architecture MCP Write Bridge (bridge uses the backend's HTTP API).
+APP_iu_kKL --> APP_OYEmP1 : Architecture Backend serves the Assurance MCP Read Bridge (bridge uses the backend's HTTP API).
+APP_js9xHR --> APP_OYEmP1 : Architecture Backend serves the Assurance MCP Write Bridge (bridge uses the backend's HTTP API).
+APP_OYEmP1 --> APP_Je9pmw : Git Hosting provides remote repository services consumed by the Architecture Backend (via Git Sync Service).
+APP_tY3JIK --> APP_Je9pmw : Git Hosting serves the Git Sync Service by providing the remote repository endpoint for push and pull operations.
+APP_OYEmP1 --> APP_JqIBPJ : Supply-Chain Signal Sources provide vulnerability and supply-chain signals consumed by the Architecture Backend (via the Supply-Chain Connector).
+FNC_3ZsfnT --> APP_lmO0mp : uses
+@enduml

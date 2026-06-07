@@ -1,0 +1,163 @@
+---
+artifact-id: CC@1780829785.Z_fI-N.amp-containers
+artifact-type: diagram
+name: "AMP \u2014 Containers"
+version: 0.1.0
+status: draft
+keywords:
+- c4
+- container
+- amp
+diagram-type: c4-container
+entity-ids-used:
+- ACT@1712870400.Nn7Oo7.architect
+- ACT@1712870400.OLWiNc.devops-engineer
+- ACT@1712870400.Pp8Qq8.developer
+- ACT@1712870400.Rr9Ss9.product-owner
+- ACT@1712870400.Ut1Vv1.upper-technical-management
+- APP@1712870400.kjC6ex.cli-tool
+- APP@1776149382.lmO0mp.gui-authoring-tool
+- APP@1777293133.OYEmP1.architecture-backend
+- APP@1780783671.hkrdtm.architecture-management-platform
+- APP@1780783708.Ne0utf.architecture-mcp-read-bridge
+- APP@1780783709.etTj9M.architecture-mcp-write-bridge
+- APP@1780783710.iu_kKL.assurance-mcp-read-bridge
+- APP@1780783711.js9xHR.assurance-mcp-write-bridge
+- APP@1780783991.v6AXNw.ai-agent-host
+- APP@1780783992.Je9pmw.git-hosting
+- APP@1780783993.JqIBPJ.supply-chain-signal-sources
+- ROL@1776633082.udXPfB.ai-agent
+- ROL@1780656241.abNYhO.risk-compliance-officer
+- ROL@1780656241.yswDMB.safety-security-analyst
+connection-ids-used:
+- ACT@1712870400.Nn7Oo7.architect---APP@1776149382.lmO0mp.gui-authoring-tool@@archimate-association
+- ACT@1712870400.OLWiNc.devops-engineer---APP@1712870400.kjC6ex.cli-tool@@archimate-association
+- ACT@1712870400.Pp8Qq8.developer---APP@1712870400.kjC6ex.cli-tool@@archimate-association
+- ACT@1712870400.Rr9Ss9.product-owner---APP@1776149382.lmO0mp.gui-authoring-tool@@archimate-association
+- ACT@1712870400.Ut1Vv1.upper-technical-management---APP@1776149382.lmO0mp.gui-authoring-tool@@archimate-association
+- APP@1777293133.OYEmP1.architecture-backend---APP@1776149382.lmO0mp.gui-authoring-tool@@archimate-serving
+- APP@1777293133.OYEmP1.architecture-backend---APP@1780783708.Ne0utf.architecture-mcp-read-bridge@@archimate-serving
+- APP@1777293133.OYEmP1.architecture-backend---APP@1780783709.etTj9M.architecture-mcp-write-bridge@@archimate-serving
+- APP@1777293133.OYEmP1.architecture-backend---APP@1780783710.iu_kKL.assurance-mcp-read-bridge@@archimate-serving
+- APP@1777293133.OYEmP1.architecture-backend---APP@1780783711.js9xHR.assurance-mcp-write-bridge@@archimate-serving
+- APP@1780783991.v6AXNw.ai-agent-host---APP@1780783708.Ne0utf.architecture-mcp-read-bridge@@archimate-association
+- APP@1780783991.v6AXNw.ai-agent-host---APP@1780783709.etTj9M.architecture-mcp-write-bridge@@archimate-association
+- APP@1780783991.v6AXNw.ai-agent-host---APP@1780783710.iu_kKL.assurance-mcp-read-bridge@@archimate-association
+- APP@1780783991.v6AXNw.ai-agent-host---APP@1780783711.js9xHR.assurance-mcp-write-bridge@@archimate-association
+- APP@1780783992.Je9pmw.git-hosting---APP@1777293133.OYEmP1.architecture-backend@@archimate-serving
+- APP@1780783992.Je9pmw.git-hosting---APP@1777293134.tY3JIK.git-sync-service@@archimate-serving
+- APP@1780783993.JqIBPJ.supply-chain-signal-sources---APP@1777293133.OYEmP1.architecture-backend@@archimate-serving
+- ROL@1776633082.udXPfB.ai-agent---APP@1780783708.Ne0utf.architecture-mcp-read-bridge@@archimate-association
+- ROL@1780656241.abNYhO.risk-compliance-officer---APP@1780783710.iu_kKL.assurance-mcp-read-bridge@@archimate-association
+- ROL@1780656241.yswDMB.safety-security-analyst---APP@1780783710.iu_kKL.assurance-mcp-read-bridge@@archimate-association
+diagram-entities: {}
+bindings:
+- id: bind-scope
+  subject:
+    kind: diagram
+  correspondence_kind: scoped-by
+  target:
+    entity_id: APP@1780783671.hkrdtm.architecture-management-platform
+last-updated: '2026-06-07'
+---
+@startuml amp---containers
+left to right direction
+skinparam shadowing false
+skinparam linetype ortho
+skinparam defaultTextAlignment center
+skinparam wrapWidth 240
+skinparam maxMessageSize 240
+skinparam rectangle {
+  RoundCorner 12
+  Padding 10
+}
+skinparam actor {
+  BackgroundColor #08427b
+  BorderColor #052e56
+  FontColor white
+}
+skinparam rectangle<<C4System>> {
+  BackgroundColor #1168bd
+  BorderColor #0b4884
+  FontColor white
+}
+skinparam rectangle<<C4Container>> {
+  BackgroundColor #438dd5
+  BorderColor #2f6da6
+  FontColor white
+}
+skinparam rectangle<<C4Component>> {
+  BackgroundColor #85bbf0
+  BorderColor #5e98c8
+  FontColor black
+}
+skinparam rectangle<<C4External>> {
+  BackgroundColor #dddddd
+  BorderColor #777777
+  FontColor black
+}
+
+title AMP — Containers
+
+rectangle "Architecture Management Platform" <<C4System>> as APP_hkrdtm {
+  rectangle "CLI Tool" <<C4Container>> as APP_kjC6ex
+  rectangle "GUI Authoring Tool" <<C4Container>> as APP_lmO0mp
+  rectangle "Architecture Backend" <<C4Container>> as APP_OYEmP1
+  rectangle "Architecture MCP Read Bridge" <<C4Container>> as APP_Ne0utf
+  rectangle "Architecture MCP Write Bridge" <<C4Container>> as APP_etTj9M
+  rectangle "Assurance MCP Read Bridge" <<C4Container>> as APP_iu_kKL
+  rectangle "Assurance MCP Write Bridge" <<C4Container>> as APP_js9xHR
+  APP_kjC6ex -[hidden]right- APP_lmO0mp
+  APP_lmO0mp -[hidden]right- APP_OYEmP1
+  APP_OYEmP1 -[hidden]right- APP_Ne0utf
+  APP_Ne0utf -[hidden]right- APP_etTj9M
+  APP_etTj9M -[hidden]right- APP_iu_kKL
+  APP_iu_kKL -[hidden]right- APP_js9xHR
+
+}
+
+actor "Architect" as ACT_Nn7Oo7
+actor "DevOps Engineer" as ACT_OLWiNc
+actor "Developer" as ACT_Pp8Qq8
+actor "Product Owner" as ACT_Rr9Ss9
+actor "Upper Technical Management" as ACT_Ut1Vv1
+rectangle "AI Agent Host" <<C4External>> as APP_v6AXNw
+rectangle "Git Hosting" <<C4External>> as APP_Je9pmw
+rectangle "Supply-Chain Signal Sources" <<C4External>> as APP_JqIBPJ
+actor "AI Agent" as ROL_udXPfB
+actor "Risk & Compliance Officer" as ROL_abNYhO
+actor "Safety / Security Analyst" as ROL_yswDMB
+
+ACT_Nn7Oo7 -[hidden]right- ACT_OLWiNc
+ACT_OLWiNc -[hidden]right- ACT_Pp8Qq8
+ACT_Pp8Qq8 -[hidden]right- ACT_Rr9Ss9
+ACT_Rr9Ss9 -[hidden]right- ACT_Ut1Vv1
+ACT_Ut1Vv1 -[hidden]right- ROL_udXPfB
+ROL_udXPfB -[hidden]right- ROL_abNYhO
+ROL_abNYhO -[hidden]right- ROL_yswDMB
+ROL_yswDMB -[hidden]right- APP_hkrdtm
+APP_hkrdtm -[hidden]right- APP_v6AXNw
+APP_v6AXNw -[hidden]right- APP_Je9pmw
+APP_Je9pmw -[hidden]right- APP_JqIBPJ
+
+
+ACT_Nn7Oo7 --> APP_lmO0mp : Architect uses the GUI Authoring Tool as their primary surface for authoring and reviewing architecture content.
+ACT_OLWiNc --> APP_kjC6ex : DevOps Engineer uses the CLI Tool for pipeline automation and repository maintenance tasks.
+ACT_Pp8Qq8 --> APP_kjC6ex : Developer uses the CLI Tool as their primary surface for scripting, CI integration, and bulk architecture operations.
+ACT_Rr9Ss9 --> APP_lmO0mp : Product Owner uses the GUI Authoring Tool to view and comment on architecture decisions.
+ACT_Ut1Vv1 --> APP_lmO0mp : Upper Technical Management uses the GUI Authoring Tool to review architectural roadmaps and decisions.
+APP_lmO0mp --> APP_OYEmP1 : Architecture Backend provides the REST API and SSE event stream consumed by the GUI Authoring Tool for all model read, write, and real-time update operations.
+APP_Ne0utf --> APP_OYEmP1 : Architecture Backend serves the Architecture MCP Read Bridge (bridge uses the backend's HTTP API).
+APP_etTj9M --> APP_OYEmP1 : Architecture Backend serves the Architecture MCP Write Bridge (bridge uses the backend's HTTP API).
+APP_iu_kKL --> APP_OYEmP1 : Architecture Backend serves the Assurance MCP Read Bridge (bridge uses the backend's HTTP API).
+APP_js9xHR --> APP_OYEmP1 : Architecture Backend serves the Assurance MCP Write Bridge (bridge uses the backend's HTTP API).
+APP_v6AXNw --> APP_Ne0utf : AI Agent Host connects to the Architecture MCP Read Bridge via a stdio subprocess for read-only architecture access.
+APP_v6AXNw --> APP_etTj9M : AI Agent Host connects to the Architecture MCP Write Bridge via a stdio subprocess for write architecture access.
+APP_v6AXNw --> APP_iu_kKL : AI Agent Host connects to the Assurance MCP Read Bridge via a stdio subprocess for read-only assurance access.
+APP_v6AXNw --> APP_js9xHR : AI Agent Host connects to the Assurance MCP Write Bridge via a stdio subprocess for write assurance access.
+APP_OYEmP1 --> APP_Je9pmw : Git Hosting provides remote repository services consumed by the Architecture Backend (via Git Sync Service).
+APP_OYEmP1 --> APP_JqIBPJ : Supply-Chain Signal Sources provide vulnerability and supply-chain signals consumed by the Architecture Backend (via the Supply-Chain Connector).
+ROL_udXPfB --> APP_Ne0utf : AI Agent uses the Architecture MCP Read Bridge as its primary read surface for querying architecture knowledge.
+ROL_abNYhO --> APP_iu_kKL : Risk & Compliance Officer uses the Assurance MCP Read Bridge to query GRC and compliance assurance records.
+ROL_yswDMB --> APP_iu_kKL : Safety / Security Analyst uses the Assurance MCP Read Bridge to query safety and security assurance records.
+@enduml

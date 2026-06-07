@@ -1,0 +1,109 @@
+---
+artifact-id: CC@1780829796.SOoZQh.assurance-module-components
+artifact-type: diagram
+name: "Assurance Module \u2014 Components"
+version: 0.1.0
+status: draft
+keywords:
+- c4
+- component
+- assurance
+diagram-type: c4-component
+entity-ids-used:
+- APP@1780656430.m-U5S1.assurance-mcp-endpoint-adapter
+- APP@1780656431.E0fzqZ.confidential-assurance-store
+- APP@1780656431.GnsLC8.assurance-archive
+- APP@1780656431.XFD85E.assurance-verifier
+- APP@1780656431.e2zPs6.supply-chain-vulnerability-connector
+- APP@1780783993.JqIBPJ.supply-chain-signal-sources
+- DOB@1780656431.ApaPcg.assurance-knowledge-base
+- DOB@1780656431.dRnK-o.bill-of-materials
+- DOB@1780656431.p04R7k.security-signals-store
+- GRP@1780819145.rW_2nX.assurance-module
+connection-ids-used:
+- APP@1780656430.m-U5S1.assurance-mcp-endpoint-adapter---DOB@1780656431.ApaPcg.assurance-knowledge-base@@archimate-access
+- APP@1780656431.E0fzqZ.confidential-assurance-store---DOB@1780656431.ApaPcg.assurance-knowledge-base@@archimate-access
+- APP@1780656431.XFD85E.assurance-verifier---DOB@1780656431.ApaPcg.assurance-knowledge-base@@archimate-access
+- APP@1780656431.e2zPs6.supply-chain-vulnerability-connector---DOB@1780656431.dRnK-o.bill-of-materials@@archimate-access
+- APP@1780656431.e2zPs6.supply-chain-vulnerability-connector---DOB@1780656431.p04R7k.security-signals-store@@archimate-access
+- APP@1780783993.JqIBPJ.supply-chain-signal-sources---APP@1780656431.e2zPs6.supply-chain-vulnerability-connector@@archimate-serving
+diagram-entities: {}
+bindings:
+- id: bind-scope
+  subject:
+    kind: diagram
+  correspondence_kind: scoped-by
+  target:
+    entity_id: GRP@1780819145.rW_2nX.assurance-module
+last-updated: '2026-06-07'
+---
+@startuml assurance-module---components
+left to right direction
+skinparam shadowing false
+skinparam linetype ortho
+skinparam defaultTextAlignment center
+skinparam wrapWidth 240
+skinparam maxMessageSize 240
+skinparam rectangle {
+  RoundCorner 12
+  Padding 10
+}
+skinparam actor {
+  BackgroundColor #08427b
+  BorderColor #052e56
+  FontColor white
+}
+skinparam rectangle<<C4System>> {
+  BackgroundColor #1168bd
+  BorderColor #0b4884
+  FontColor white
+}
+skinparam rectangle<<C4Container>> {
+  BackgroundColor #438dd5
+  BorderColor #2f6da6
+  FontColor white
+}
+skinparam rectangle<<C4Component>> {
+  BackgroundColor #85bbf0
+  BorderColor #5e98c8
+  FontColor black
+}
+skinparam rectangle<<C4External>> {
+  BackgroundColor #dddddd
+  BorderColor #777777
+  FontColor black
+}
+
+title Assurance Module — Components
+
+rectangle "Assurance Module" <<C4System>> as GRP_rW_2nX {
+  rectangle "Confidential Assurance Store" <<C4Component>> as APP_E0fzqZ
+  rectangle "Assurance Archive" <<C4Component>> as APP_GnsLC8
+  rectangle "Assurance Verifier" <<C4Component>> as APP_XFD85E
+  rectangle "Supply-Chain & Vulnerability Connector" <<C4Component>> as APP_e2zPs6
+  rectangle "Assurance Knowledge Base" <<C4Component>> as DOB_ApaPcg
+  rectangle "Bill of Materials" <<C4Component>> as DOB_dRnK_o
+  rectangle "Security Signals Store" <<C4Component>> as DOB_p04R7k
+  APP_E0fzqZ -[hidden]right- APP_GnsLC8
+  APP_GnsLC8 -[hidden]right- APP_XFD85E
+  APP_XFD85E -[hidden]right- APP_e2zPs6
+  APP_e2zPs6 -[hidden]right- DOB_ApaPcg
+  DOB_ApaPcg -[hidden]right- DOB_dRnK_o
+  DOB_dRnK_o -[hidden]right- DOB_p04R7k
+
+}
+
+rectangle "Assurance MCP Endpoint Adapter" <<C4External>> as APP_m_U5S1
+rectangle "Supply-Chain Signal Sources" <<C4External>> as APP_JqIBPJ
+
+GRP_rW_2nX -[hidden]right- APP_m_U5S1
+APP_m_U5S1 -[hidden]right- APP_JqIBPJ
+
+
+APP_m_U5S1 --> DOB_ApaPcg : accesses
+APP_E0fzqZ --> DOB_ApaPcg : accesses
+APP_XFD85E --> DOB_ApaPcg : accesses
+APP_e2zPs6 --> DOB_dRnK_o : accesses
+APP_e2zPs6 --> DOB_p04R7k : accesses
+APP_e2zPs6 --> APP_JqIBPJ : Supply-Chain Signal Sources serve the Supply-Chain & Vulnerability Connector by providing vulnerability and dependency signal feeds for ingestion and analysis.
+@enduml
