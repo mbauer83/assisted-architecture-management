@@ -51,7 +51,8 @@ def artifact_create_entity(
 
     if from_diagram_element:
         from src.infrastructure.write.artifact_write.materialization import (  # noqa: PLC0415
-            DiagramElementRef, materialize_entity,
+            DiagramElementRef,
+            materialize_entity,
         )
         ref = DiagramElementRef(
             diagram_id=str(from_diagram_element.get("diagram_id", "")),

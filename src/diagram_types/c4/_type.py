@@ -13,6 +13,8 @@ if TYPE_CHECKING:
 
 import yaml  # type: ignore[import-untyped]
 
+# Import engine module to trigger strategy registration as a side effect.
+import src.diagram_types.c4._projection  # noqa: F401
 from src.diagram_types.c4.renderer import C4PumlRenderer
 from src.domain.bridges import BridgeDeclaration
 from src.domain.diagram_entities_schema import derive_diagram_entities_schema
@@ -28,9 +30,6 @@ from src.domain.ontology_protocol import (
 from src.domain.ontology_types import ConnectionTypeInfo, ElementClassInfo, EntityTypeInfo
 from src.domain.permitted_mappings import resolve_model_entity_types_for_diagram_only_types
 from src.domain.permitted_relationships import PermittedRelationshipSet
-
-# Import engine module to trigger strategy registration as a side effect.
-import src.diagram_types.c4._projection  # noqa: F401
 
 _EMPTY_ENTITY_TYPES: dict[EntityTypeName, EntityTypeInfo] = {}
 

@@ -20,7 +20,6 @@ from pathlib import Path
 from src.config.repo_paths import DIAGRAM_CATALOG
 from src.config.settings import archimate_type_markers
 
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------

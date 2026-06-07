@@ -8,9 +8,9 @@ from src.application.modeling.artifact_write import (
     generate_diagram_id,
 )
 from src.application.modeling.artifact_write_layout import optimize_puml_layout
+from src.application.repo_path_helpers import diagram_source_root
 from src.application.verification.artifact_verifier import ArtifactVerifier
 from src.application.verification.artifact_verifier_types import ENTITY_ID_RE
-from src.application.repo_path_helpers import diagram_source_root
 from src.domain.groups import UNCATEGORIZED
 
 from ._artifact_deduplication import extract_friendly_slug, get_repository, validate_diagram_unique

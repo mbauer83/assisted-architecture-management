@@ -120,19 +120,30 @@ def _redirect_stdio_to_backend_log(*, start: Path | None = None) -> Path:
 def _run_status(resolved_port: int) -> None:
     result = backend_status(port=resolved_port)
     p, pid, reason = result.get("port"), result.get("pid"), result.get("reason")
-    if result.get("running"):           print(f"backend is running on port {p} (pid {pid})")
-    elif reason == "unmanaged_backend": print(f"backend responding on port {p} but not managed by this workspace")
-    elif reason == "port_in_use":       print(f"port {p} is in use by another process")
-    elif reason == "not_running":       print("backend is not running")
-    elif reason == "stopped_backend":   print(f"backend process pid {pid} is stopped on port {p}")
-    elif reason == "unhealthy_backend": print(f"backend process pid {pid} is not responding on port {p}")
-    elif reason == "stale_pid":         print(f"removed stale backend pid {pid}")
-    elif reason == "invalid_state":     print("backend state is invalid")
-    else:                               print(f"backend is not healthy on port {p} (pid {pid})")
-    if ps := result.get("process_state"):   print(f"  process state: {ps}")
+    if result.get("running"):
+        print(f"backend is running on port {p} (pid {pid})")
+    elif reason == "unmanaged_backend":
+        print(f"backend responding on port {p} but not managed by this workspace")
+    elif reason == "port_in_use":
+        print(f"port {p} is in use by another process")
+    elif reason == "not_running":
+        print("backend is not running")
+    elif reason == "stopped_backend":
+        print(f"backend process pid {pid} is stopped on port {p}")
+    elif reason == "unhealthy_backend":
+        print(f"backend process pid {pid} is not responding on port {p}")
+    elif reason == "stale_pid":
+        print(f"removed stale backend pid {pid}")
+    elif reason == "invalid_state":
+        print("backend state is invalid")
+    else:
+        print(f"backend is not healthy on port {p} (pid {pid})")
+    if ps := result.get("process_state"):
+        print(f"  process state: {ps}")
     if stdio := " ".join(f"{k}={result[k]}" for k in ("stdin", "stdout", "stderr") if result.get(k) is not None):
         print(f"  stdio: {stdio}")
-    if lp := result.get("log_path"):        print(f"  log: {lp}")
+    if lp := result.get("log_path"):
+        print(f"  log: {lp}")
 
 # ── Stop command ──────────────────────────────────────────────────────────────
 

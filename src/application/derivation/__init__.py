@@ -22,7 +22,13 @@ from src.application.derivation.strategy_registry import (
 from src.application.derivation.types import CandidateSet, DeriveFn, ModelQuery
 
 # Import strategy modules to trigger self-registration.
-from . import explicit_selection, incident_connections, local_neighborhood, path_projection, scope_projection  # noqa: E402, F401
+from . import (  # noqa: E402, F401
+    explicit_selection,
+    incident_connections,
+    local_neighborhood,
+    path_projection,
+    scope_projection,
+)
 
 __all__ = [
     "CandidateSet",

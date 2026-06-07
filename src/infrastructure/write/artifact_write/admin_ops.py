@@ -22,6 +22,7 @@ from src.application.modeling.artifact_write_formatting import format_entity_mar
 from src.application.verification.artifact_verifier import ArtifactRegistry, ArtifactVerifier
 from src.config.repo_paths import DIAGRAM_CATALOG, DIAGRAMS
 from src.domain.module_types import EntityTypeName
+
 from .boundary import assert_enterprise_write_root, today_iso
 from .coerce import as_optional_str, as_optional_str_dict, as_optional_str_list
 from .connection import (
