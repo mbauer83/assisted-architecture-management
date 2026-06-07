@@ -20,8 +20,9 @@ def artifact_help() -> dict[str, object]:
 def artifact_authoring_guidance(
     filter: list[str] | None = None,  # noqa: A002
     diagram_type: str | None = None,
+    target: str | None = None,
 ) -> dict[str, object]:
-    return artifact_write_ops.get_type_guidance(filter=filter, diagram_type=diagram_type)
+    return artifact_write_ops.get_type_guidance(filter=filter, diagram_type=diagram_type, target=target)
 
 
 def artifact_create_entity(
@@ -129,13 +130,15 @@ def register(mcp: FastMCP) -> None:
         title="Artifact: Authoring Guidance",
         description=(
             "Return authoring guidance before creating entities or diagrams. "
-            "Two independent params (usable separately or together):\n"
+            "Three independent params (usable separately or together):\n"
             "• diagram_type (str): diagram type block — when_to_use, when_not_to_use, "
             "accepted_domains, own entity types, diagram_entities schema, and optional puml_notes.\n"
             "• filter (list[str]): entity type guidance — create_when, never_create_when, "
             "permitted_connections. Pass type names (e.g. ['requirement', 'goal']) "
             "or domain names (e.g. ['motivation', 'strategy']) — not mixed.\n"
-            "Omit both to return all entity type guidance (large; prefer filtering)."
+            "• target (str): pair-legality — requires filter with exactly one concrete type name; "
+            "returns pair_guidance {outgoing, incoming, symmetric} for the (source, target) pair.\n"
+            "Omit all to return all entity type guidance (large; prefer filtering)."
         ),
         annotations=READ_ONLY,
         structured_output=False,

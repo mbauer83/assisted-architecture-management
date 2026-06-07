@@ -24,10 +24,12 @@ from src.infrastructure.gui.routers._diagram_context import (
     hop_suggestions,
     puml_contains,
 )
+from src.infrastructure.gui.routers._diagram_edge_label import router as _edge_label_router
 from src.infrastructure.gui.routers._diagram_write import router as _write_router
 
 router = APIRouter()
 router.include_router(_write_router)
+router.include_router(_edge_label_router)
 
 
 def _accepted_entity_types_for_diagram_type_guidance(diagram_type: str | None) -> set[str] | None:

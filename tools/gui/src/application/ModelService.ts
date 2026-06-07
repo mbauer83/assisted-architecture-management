@@ -65,6 +65,7 @@ export const makeModelService = (repo: ModelRepository) =>
     editDiagram: (body: Parameters<ModelRepository['editDiagram']>[0]) => repo.editDiagram(body),
     deleteDiagram: (body: Parameters<ModelRepository['deleteDiagram']>[0]) => repo.deleteDiagram(body),
     syncDiagramToModel: (body: Parameters<ModelRepository['syncDiagramToModel']>[0]) => repo.syncDiagramToModel(body),
+    setEdgeLabel: (body: Parameters<ModelRepository['setEdgeLabel']>[0]) => repo.setEdgeLabel(body),
     adminCreateEntity: (body: Parameters<ModelRepository['adminCreateEntity']>[0]) => repo.adminCreateEntity(body),
     adminEditEntity: (body: Parameters<ModelRepository['adminEditEntity']>[0]) => repo.adminEditEntity(body),
     adminDeleteEntity: (body: Parameters<ModelRepository['adminDeleteEntity']>[0]) => repo.adminDeleteEntity(body),

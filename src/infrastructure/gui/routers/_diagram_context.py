@@ -115,6 +115,8 @@ def diagram_context_payload(repo: Any, diag_rec: DiagramRecord) -> dict[str, Any
         if (rec := repo.get_entity(str(entity["artifact_id"]))) is not None
     }
     explicit_pairs = parse_explicit_connection_pairs(puml)
+    raw_el = diag_rec.extra.get("edge-labels") if diag_rec.extra else None
+    edge_labels: dict[str, str] = dict(raw_el) if isinstance(raw_el, dict) else {}
     connections: list[dict[str, Any]] = []
     seen: set[str] = set()
     for conn in repo.list_connections():
@@ -128,11 +130,18 @@ def diagram_context_payload(repo: Any, diag_rec: DiagramRecord) -> dict[str, Any
         ta = normalize_puml_alias(tgt.display_alias or "")
         if (sa, ta) not in explicit_pairs and (ta, sa) not in explicit_pairs:
             continue
+        # Determine edge key in the rendered PUML direction
+        if (sa, ta) in explicit_pairs:
+            edge_key = f"{sa}:{ta}"
+        else:
+            edge_key = f"{ta}:{sa}"
         d = s.connection_to_dict(conn)
         d["source_name"] = src.name
         d["target_name"] = tgt.name
         d["source_alias"] = sa
         d["target_alias"] = ta
+        d["edge_key"] = edge_key
+        d["edge_label_override"] = edge_labels.get(edge_key)
         connections.append(d)
         seen.add(conn.artifact_id)
     raw_de = diag_rec.extra.get("diagram-entities") if diag_rec.extra else None

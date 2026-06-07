@@ -36,6 +36,7 @@ class C4PumlRenderer:
         *,
         diagram_entities: Mapping[str, object] | None = None,
         diagram_connections: list[dict[str, object]] | None = None,
+        edge_labels: dict[str, str] | None = None,
     ) -> str:
         del entities, connections
         diagram_name = re.sub(r"[^a-zA-Z0-9_-]", "-", name.lower()).strip("-") or "c4-diagram"
@@ -114,7 +115,13 @@ class C4PumlRenderer:
 
         lines.append("")
         for conn in state.connections:
-            label = _escape_puml(conn.label) if conn.label else ""
+            # Diagram-level override takes precedence over the derived C4 verb label.
+            raw_label = (
+                edge_labels.get(f"{conn.src_alias}:{conn.tgt_alias}", conn.label)
+                if edge_labels
+                else conn.label
+            )
+            label = _escape_puml(raw_label) if raw_label else ""
             lines.append(f"{conn.src_alias} --> {conn.tgt_alias} : {label}")
         lines.append("@enduml")
 

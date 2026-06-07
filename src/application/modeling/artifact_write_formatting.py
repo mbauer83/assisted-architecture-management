@@ -171,6 +171,7 @@ def format_diagram_puml(
     diagram_connections: list[dict[str, object]] | None = None,
     view_derivations: list[dict[str, object]] | None = None,
     bindings: list[dict[str, object]] | None = None,
+    edge_labels: dict[str, str] | None = None,
 ) -> str:
     frontmatter: dict[str, object] = {
         "artifact-id": artifact_id,
@@ -194,6 +195,8 @@ def format_diagram_puml(
         frontmatter["view_derivations"] = view_derivations
     if bindings:
         frontmatter["bindings"] = bindings
+    if edge_labels:
+        frontmatter["edge-labels"] = edge_labels
     frontmatter["last-updated"] = last_updated
 
     ordered_keys = [
@@ -210,6 +213,7 @@ def format_diagram_puml(
         "connections",
         "view_derivations",
         "bindings",
+        "edge-labels",
         "last-updated",
     ]
     fm_out = {key: frontmatter[key] for key in ordered_keys if key in frontmatter}

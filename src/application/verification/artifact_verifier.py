@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import Literal
 
 from src.application.entity_type_predicates import is_internal_entity_type
+from src.application.verification._verifier_rules_edge_labels import check_edge_label_overrides
 from src.application.verification._verifier_rules_grf import (
     check_global_artifact_reference,
 )
@@ -331,6 +332,7 @@ class ArtifactVerifier:
             )
 
         check_puml_structure(content, fm, result, loc)
+        check_edge_label_overrides(content, fm, result, loc)
 
         repo_root = self._repo_root_for_path(path)
         if repo_root is not None:

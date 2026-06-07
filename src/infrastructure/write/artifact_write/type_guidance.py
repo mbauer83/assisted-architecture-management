@@ -22,6 +22,31 @@ from src.domain.module_types import EntityTypeName
 from src.domain.ontology_protocol import DiagramTypeWriteGuidance
 
 
+def pair_connection_guidance(source_type: str, target_type: str) -> dict[str, object]:
+    """Return directional pair-legality for (source_type, target_type).
+
+    Derives direction cleanly from ``classify_connections(source_type)`` so that
+    outgoing/incoming/symmetric are unambiguous.  Returns a dict with keys:
+    ``source``, ``target``, ``outgoing``, ``incoming``, ``symmetric``.
+    ``error`` is set when either type is unknown.
+    """
+    all_types = _registry().all_entity_types()
+    unknown = [t for t in (source_type, target_type) if t not in all_types]
+    if unknown:
+        return {
+            "error": f"Unknown entity type(s): {unknown!r}. Provide concrete type names.",
+            "known_types": sorted(all_types.keys()),
+        }
+    c = classify_connections(source_type)
+    return {
+        "source": source_type,
+        "target": target_type,
+        "outgoing": sorted(c["outgoing"].get(target_type, [])),
+        "incoming": sorted(c["incoming"].get(target_type, [])),
+        "symmetric": sorted(c["symmetric"].get(target_type, [])),
+    }
+
+
 @lru_cache(maxsize=1)
 def _registry():
     from src.infrastructure.app_bootstrap import get_module_registry  # noqa: PLC0415
@@ -32,6 +57,7 @@ def _registry():
 def get_type_guidance(
     filter: list[str] | None = None,  # noqa: A002
     diagram_type: str | None = None,
+    target: str | None = None,
 ) -> dict[str, object]:
     """Return focused modeling guidelines for the requested entity types, domains, or diagram type.
 
@@ -43,10 +69,30 @@ def get_type_guidance(
     When provided, the response includes a ``diagram_type_guidance`` block with when_to_use,
     when_not_to_use, accepted_domains, own entity type guidance, and puml_notes.
 
+    ``target`` enables pair-legality guidance: when set, ``filter`` must contain exactly one
+    concrete entity-type name (the source).  The response gains a ``pair_guidance`` block with
+    outgoing/incoming/symmetric connection types for the (source, target) pair.  A domain
+    filter, multiple source types, or ``target`` without ``filter`` is a validation error.
+
     Passing both ``diagram_type`` and ``filter`` returns the diagram type block plus entity type
     guidance for the filtered subset.  Omit both to return guidance for all entity types.
     """
     result: dict[str, object] = {}
+
+    if target is not None:
+        if filter is None:
+            return {"error": "target requires filter to contain exactly one concrete entity type name."}
+        all_types = _registry().all_entity_types()
+        concrete = [t for t in filter if t in all_types]
+        if len(concrete) != 1 or len(filter) != 1:
+            return {
+                "error": (
+                    "target requires filter with exactly one concrete entity type (e.g. ['requirement']). "
+                    "Domain filters and multiple types are not allowed."
+                ),
+                "filter_received": filter,
+            }
+        result["pair_guidance"] = pair_connection_guidance(concrete[0], target)
 
     if diagram_type is not None:
         diagram_type_mod = _registry().find_diagram_type(diagram_type)

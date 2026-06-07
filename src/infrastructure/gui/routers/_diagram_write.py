@@ -364,13 +364,13 @@ class SyncDiagramToModelBody(BaseModel):
 
 @router.post("/api/diagram/sync")
 def sync_diagram_to_model_gui(body: SyncDiagramToModelBody) -> dict[str, Any]:
-    from src.infrastructure.write.artifact_write.diagram_sync import sync_diagram_to_model
+    from src.infrastructure.write.artifact_write.diagram_sync import refresh_diagram
 
     repo = s.get_repo()
     repo_root, _, verifier = s.get_write_deps()
     try:
         result = s.run_serialized_write(
-            sync_diagram_to_model,
+            refresh_diagram,
             repo_root=repo_root,
             store=repo,
             verifier=verifier,

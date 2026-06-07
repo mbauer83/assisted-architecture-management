@@ -391,6 +391,9 @@ export const makeHttpModelRepository = (): ModelRepository => ({
   syncDiagramToModel: (body) =>
     postJson(buildUrl('/diagram/sync'), body, SyncDiagramToModelResultSchema),
 
+  setEdgeLabel: (body) =>
+    putJson(buildUrl('/diagram/edge-label'), body, WriteResultSchema),
+
   getMatrixConfig: (id: string) =>
     fetchJson(buildUrl('/matrix-config', { id }), MatrixConfigSchema),
 

@@ -396,7 +396,7 @@ progressive disclosure via `references/`, `assets/` (templates), `scripts/` (exe
 | **`assurance-case`** (consumes the three) | GSN; assurance-case patterns; STPA→GSN | GSN argument; case-doc | draft GSN from hazards→constraints→evidence; argument-completeness check | worked GSN case | 6 |
 
 **Cross-skill references:** `cast-investigation`→`stpa-analysis` (shared control-structure method);
-`assurance-case`→all three; all→`archimate-modelling` (the "model this" gap workflow + binding).
+`assurance-case`→all three; all→`architecture-modelling` (the "model this" gap workflow + binding).
 
 **Ask, don't assume (skill behaviour rule).** Where a step needs information that **cannot be read or inferred
 with very high confidence** from the available sources (model, store, repo, attached docs), the skill must
@@ -404,7 +404,7 @@ with very high confidence** from the available sources (model, store, repo, atta
 safety/security/legal judgements (losses, severity, integrity/ASIL, acceptance justifications, applicable
 obligations). Low-confidence inference on those is itself a hazard. (Reinforces §15.)
 
-Each skill mirrors the `archimate-modelling` philosophy (domain-driven thinking, Pareto/minimal-sufficient,
+Each skill mirrors the `architecture-modelling` philosophy (domain-driven thinking, Pareto/minimal-sufficient,
 iterative) and embeds best-practice workflow + standards/legal pointers + guardrails (§15). **Progressive build:**
 P2 `stpa-analysis`; P3 `cast-investigation` + `grc-management`; P5 adds GRC SBOM/CVE-context scripts; P6
 `assurance-case`. A script ships only once its backing capability exists (verifier profiles P1c; connectors P5).

@@ -212,7 +212,7 @@ sides with one passive-structure resource each:
 
 - **(general, +1 data-object)** `Architecture Modelling Guidance` — the machine-consumable guidance
   the system provides: the authoring-guidance catalog (type create-when/never-create, permitted
-  connections, domain reference models) and the `archimate-modelling` + `reverse-architecture` skill
+  connections, domain reference models) and the `architecture-modelling` + `reverse-architecture` skill
   directories. `accessed` by `Synthesize & Deliver Implementation Guidance` / `Retrieve Architectural
   Context`; `association` with `Architecture Ontology Configuration` (derived from it); supports the
   existing `Architectural Guidance Available…` outcome.

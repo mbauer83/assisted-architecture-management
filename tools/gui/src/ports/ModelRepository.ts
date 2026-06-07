@@ -164,6 +164,9 @@ export interface ModelRepository {
   readonly syncDiagramToModel: (body: {
     artifact_id: string; dry_run?: boolean;
   }) => Effect.Effect<SyncDiagramToModelResult, RepoError>
+  readonly setEdgeLabel: (body: {
+    artifact_id: string; edge_key: string; label: string | null; dry_run?: boolean;
+  }) => Effect.Effect<WriteResult, RepoError>
   // ── Admin write methods (active only in --admin-mode) ───────────────────
   readonly adminCreateEntity: (body: {
     artifact_type: string; name: string; summary?: string;

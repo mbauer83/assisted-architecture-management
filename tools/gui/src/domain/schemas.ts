@@ -473,6 +473,8 @@ export const DiagramConnectionSchema = Schema.Struct({
   target_name: Schema.String,
   source_alias: Schema.NullOr(Schema.String),
   target_alias: Schema.NullOr(Schema.String),
+  edge_key: Schema.optional(Schema.NullOr(Schema.String)),
+  edge_label_override: Schema.optional(Schema.NullOr(Schema.String)),
 })
 export type DiagramConnection = typeof DiagramConnectionSchema.Type
 

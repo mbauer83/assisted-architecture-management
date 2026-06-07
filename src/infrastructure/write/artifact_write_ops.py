@@ -22,9 +22,11 @@ from src.infrastructure.write.artifact_write import (
     edit_diagram,
     edit_document,
     edit_entity,
-    get_type_guidance,  # filter: list[str] | None = None
+    get_type_guidance,  # filter, diagram_type, target
     promote_entity,
+    refresh_diagram,
     remove_connection,
+    set_diagram_edge_label,
     sync_diagram_to_model,
     write_help,
 )
@@ -47,6 +49,8 @@ __all__ = [
     "remove_connection",
     "create_diagram",
     "edit_diagram",
+    "set_diagram_edge_label",
+    "refresh_diagram",
     "sync_diagram_to_model",
     "delete_diagram",
     "create_matrix",

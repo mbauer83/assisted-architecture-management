@@ -155,7 +155,7 @@ def auto_sync_diagrams(
     actions: list[dict[str, object]] = []
     for diagram_id in sorted(set(diagram_ids)):
         store = ArtifactRepository(shared_artifact_index([repo_root]))
-        result = artifact_write_ops.sync_diagram_to_model(
+        result = artifact_write_ops.refresh_diagram(
             repo_root=repo_root,
             store=store,
             verifier=verifier,
