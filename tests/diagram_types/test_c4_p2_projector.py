@@ -263,6 +263,21 @@ def test_component_data_object_shown_as_internal() -> None:
     assert "STORE" in internal_ids
 
 
+def test_component_accessed_data_object_shown_as_external() -> None:
+    """data-object accessed (not aggregated) by a component surfaces as external neighbour."""
+    root = _entity("ROOT", "application-component")
+    comp = _entity("COMP", "application-component")
+    store = _entity("STORE", "data-object")
+    agg = _connection("ROOT---COMP@@agg", "ROOT", "COMP", "archimate-aggregation")
+    acc = _connection("COMP---STORE@@acc", "COMP", "STORE", "archimate-access")
+    query = FakeQuery([root, comp, store], [agg, acc])
+
+    result = project_c4("c4-component", "ROOT", query, **_COMMON_COMP)
+
+    external_ids = {i.entity_id for i in result.items if i.role == "external"}
+    assert "STORE" in external_ids, "accessed data-object should be an external neighbour"
+
+
 # ---------------------------------------------------------------------------
 # P2.5 — grouping as valid scope / internal type
 # ---------------------------------------------------------------------------
