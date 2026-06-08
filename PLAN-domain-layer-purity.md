@@ -166,7 +166,7 @@ Notes:
 
 - [x] **G1** Extract pure rule functions operating on already-parsed inputs (frontmatter dicts, parsed PUML, catalog) returning `Issue` lists; orchestration composes them.
 - [x] **G2** Define application-owned ports for: filesystem inventory/loading, PlantUML/Java syntax execution, worker-pool scheduling, incremental-state persistence; move existing infra code behind adapters.
-- [ ] **G3** Reduce `artifact_verifier.py` (822 lines) and `artifact_verifier_rules.py` (542 lines) below the policy hard limit where feasible; update `source_file_length.py` baselines downward as files shrink.
+- [x] **G3** Reduce `artifact_verifier.py` (822 lines) and `artifact_verifier_rules.py` (542 lines) below the policy hard limit where feasible; update `source_file_length.py` baselines downward as files shrink.
 - [ ] **G4** Quality gates green. (Largest phase; split across dedicated work units WU-10..WU-12, executed after A–E land — **in DoD**.)
 
 ### Phase H — Immutability hardening (concern #6)
