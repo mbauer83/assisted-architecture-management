@@ -148,12 +148,12 @@ Notes:
 
 ### Phase E — `DiagramTypeBase` relocation + registry rename (concern #5)
 
-- [ ] **E1** Create `src/diagram_types/_base.py`; move `DiagramTypeBase` from `ontology_protocol.py` (keep its `GenericPumlRenderer` import — `diagram_types` is now a classified adapter package). Remove `DiagramTypeBase` from `ontology_protocol.__all__`; only Protocols/types remain there.
-- [ ] **E2** Update the 8 diagram-type module imports + `tests/domain/test_bridges.py`.
-- [ ] **E3** Rename `src/infrastructure/diagram_types.py` → `diagram_type_registry.py`; update the 12 import sites; fold its lookup logic into `DiagramTypeCatalog` where it duplicates B2, leaving only genuine infra adapter code.
-- [ ] **E4** Regression test asserting `src.domain.ontology_protocol` imports cleanly with **no** `src.infrastructure` import on any path.
+- [x] **E1** Create `src/diagram_types/_base.py`; move `DiagramTypeBase` from `ontology_protocol.py` (keep its `GenericPumlRenderer` import — `diagram_types` is now a classified adapter package). Remove `DiagramTypeBase` from `ontology_protocol.__all__`; only Protocols/types remain there.
+- [x] **E2** Update the 8 diagram-type module imports + `tests/domain/test_bridges.py`.
+- [x] **E3** Rename `src/infrastructure/diagram_types.py` → `diagram_type_registry.py`; update the 12 import sites; fold its lookup logic into `DiagramTypeCatalog` where it duplicates B2, leaving only genuine infra adapter code.
+- [x] **E4** Regression test asserting `src.domain.ontology_protocol` imports cleanly with **no** `src.infrastructure` import on any path.
 - [ ] **E5** (Flagged follow-on, not in DoD) Stage 2: split declarative diagram descriptor from renderer adapter; inject a renderer factory at bootstrap.
-- [ ] **E6** Quality gates green.
+- [x] **E6** Quality gates green.
 
 ### Phase F — Interface segregation of `ArtifactStorePort` (concern #4)
 
