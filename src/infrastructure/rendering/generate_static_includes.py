@@ -143,9 +143,7 @@ def _generate_stereotype_include(repo_root: Path) -> Path:
             domain = info.hierarchy[0] if info.hierarchy else "common"
             domain_types.setdefault(domain, []).append(str(artifact_type))
 
-    from src.domain.ontology_catalog import domain_order  # noqa: PLC0415
-
-    ordered_domains = domain_order()
+    ordered_domains = registry.domain_order()
 
     for domain in ordered_domains:
         colors = _DOMAIN_COLORS.get(domain)

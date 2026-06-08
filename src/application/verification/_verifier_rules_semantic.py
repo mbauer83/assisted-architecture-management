@@ -24,9 +24,13 @@ def _entity_type(registry: ArtifactRegistry, entity_id: str) -> str | None:
 
 def _permitted(source_type: str, conn_type: str, target_type: str) -> tuple[bool, list[str]]:
     """Return (allowed, alternatives).  Handles symmetric connections."""
-    from src.domain.connection_ontology import permissible_connection_types  # noqa: PLC0415
+    from src.infrastructure.app_bootstrap import build_runtime_catalogs, get_module_registry  # noqa: PLC0415
 
-    allowed_set = set(permissible_connection_types(source_type, target_type))
+    allowed_set = set(
+        build_runtime_catalogs(get_module_registry()).connections.permissible_connection_types(
+            source_type, target_type
+        )
+    )
     if conn_type in allowed_set:
         return True, []
     return False, sorted(allowed_set)

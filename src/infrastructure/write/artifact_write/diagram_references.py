@@ -1,14 +1,37 @@
 """Diagram reference-ID inference helpers."""
 
 import re
+from functools import lru_cache
 from pathlib import Path
 
 from src.application.artifact_parsing import extract_declared_puml_aliases, normalize_puml_alias
 from src.application.modeling.artifact_write import ARCHIMATE_STEREOTYPE_TO_CONNECTION_TYPE
 from src.domain.archimate_relation_rendering import strip_suppressed_relation_labels
-from src.domain.ontology_catalog import all_connection_types
 
 from ._artifact_deduplication import get_repository
+
+
+@lru_cache(maxsize=1)
+def _registry():
+    from src.infrastructure.app_bootstrap import get_module_registry  # noqa: PLC0415
+
+    return get_module_registry()
+
+
+@lru_cache(maxsize=1)
+def _symmetric_conn_types() -> frozenset[str]:
+    return frozenset(
+        str(name)
+        for name, info in _registry().all_connection_types().items()
+        if getattr(info, "symmetric", False)
+    )
+
+
+@lru_cache(maxsize=1)
+def _suppressed_stereotype_tokens() -> frozenset[str]:
+    from src.infrastructure.app_bootstrap import build_runtime_catalogs  # noqa: PLC0415
+
+    return build_runtime_catalogs(_registry()).diagram_types.suppressed_stereotype_tokens()
 
 
 def _collect_diagram_renderer_references(
@@ -120,11 +143,7 @@ def _infer_reference_ids_from_puml(
 
     conn_index: dict[tuple[str, str, str], str] = {}
     reverse_conn_index: dict[tuple[str, str, str], str] = {}
-    symmetric_types = {
-        conn_type
-        for conn_type, info in all_connection_types().items()
-        if getattr(info, "symmetric", False)
-    }
+    symmetric_types = _symmetric_conn_types()
     for conn in repo.list_connections():
         conn_index[(conn.source, conn.target, conn.conn_type)] = conn.artifact_id
         if conn.conn_type in symmetric_types:
@@ -151,6 +170,6 @@ def _prepare_diagram_puml_body(puml_body: str, repo_root: Path, diagram_type: st
     # Drop relation-stereotype edge labels the arrow style already conveys. This
     # is an ontology-global normalisation (keyed on ``show_stereotype`` across all
     # connection types), not a per-diagram-type concern, so it applies uniformly.
-    puml_body = strip_suppressed_relation_labels(puml_body)
+    puml_body = strip_suppressed_relation_labels(puml_body, _suppressed_stereotype_tokens())
     diagram_type_mod = get_diagram_type(diagram_type)
     return diagram_type_mod.renderer.inject_includes(puml_body, repo_root)

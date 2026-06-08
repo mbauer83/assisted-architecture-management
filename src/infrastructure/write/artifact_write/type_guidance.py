@@ -17,7 +17,6 @@ from __future__ import annotations
 from functools import lru_cache
 
 from src.domain.allowed_bindings import serialize_allowed_bindings
-from src.domain.connection_ontology import classify_connections
 from src.domain.module_types import EntityTypeName
 from src.domain.ontology_protocol import DiagramTypeWriteGuidance
 
@@ -37,7 +36,7 @@ def pair_connection_guidance(source_type: str, target_type: str) -> dict[str, ob
             "error": f"Unknown entity type(s): {unknown!r}. Provide concrete type names.",
             "known_types": sorted(all_types.keys()),
         }
-    c = classify_connections(source_type)
+    c = _classify_connections(source_type)
     return {
         "source": source_type,
         "target": target_type,
@@ -52,6 +51,34 @@ def _registry():
     from src.infrastructure.app_bootstrap import get_module_registry  # noqa: PLC0415
 
     return get_module_registry()
+
+
+def _classify_connections(source_type: str) -> dict[str, dict[str, list[str]]]:
+    """Classify permissible connections into outgoing/incoming/symmetric."""
+    from src.domain.module_types import ConnectionTypeName  # noqa: PLC0415
+
+    prs = _registry().aggregated_permitted_relationships()
+    src = EntityTypeName(source_type)
+    outgoing: dict[str, list[str]] = {}
+    incoming: dict[str, list[str]] = {}
+    symmetric: dict[str, list[str]] = {}
+
+    for tgt, ct in prs.by_source().get(src, []):
+        ct_info = _registry().find_connection_type(ConnectionTypeName(str(ct)))
+        if ct_info is not None and ct_info.symmetric:
+            symmetric.setdefault(str(tgt), []).append(str(ct))
+        else:
+            outgoing.setdefault(str(tgt), []).append(str(ct))
+
+    for src2, ct in prs.by_target().get(src, []):
+        ct_info = _registry().find_connection_type(ConnectionTypeName(str(ct)))
+        if ct_info is not None and ct_info.symmetric:
+            if str(src2) not in symmetric:
+                symmetric.setdefault(str(src2), []).append(str(ct))
+        else:
+            incoming.setdefault(str(src2), []).append(str(ct))
+
+    return {"outgoing": outgoing, "incoming": incoming, "symmetric": symmetric}
 
 
 def get_type_guidance(
@@ -215,7 +242,7 @@ def _entity_type_guidance(
 
     entries: list[dict[str, object]] = []
     for info in selected:
-        connections = classify_connections(info.artifact_type)
+        connections = _classify_connections(info.artifact_type)
         entry: dict[str, object] = {
             "name": info.artifact_type,
             "prefix": info.prefix,

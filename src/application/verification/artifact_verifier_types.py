@@ -3,8 +3,6 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Final, Literal, TypeAlias
 
-from src.domain.ontology_catalog import all_connection_type_names, all_entity_type_names
-
 
 class Severity:
     ERROR: Final[Literal["error"]] = "error"
@@ -90,9 +88,6 @@ def connection_header_matches_shape(header: str) -> bool:
     parts = header.split(" → ", 1)
     return len(parts) == 2 and bool(parts[0].strip()) and bool(parts[1].strip())
 
-
-ENTITY_TYPES: frozenset[str] = all_entity_type_names()
-CONNECTION_TYPES: frozenset[str] = all_connection_type_names()
 
 VALID_STATUSES: frozenset[str] = frozenset({"draft", "active", "deprecated"})
 

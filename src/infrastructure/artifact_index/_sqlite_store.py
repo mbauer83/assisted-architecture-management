@@ -5,11 +5,11 @@ import os
 import queue
 import sqlite3
 from contextlib import contextmanager
+from functools import lru_cache
 from pathlib import Path
 from typing import Callable, Generator
 
 from src.domain.artifact_types import ConnectionRecord, DiagramRecord, DocumentRecord, EntityRecord
-from src.domain.connection_ontology import is_symmetric as _is_symmetric_conn
 
 from ._mem_store import _MemStore
 from ._sqlite_schema import FTS_SQL, SCHEMA_SQL
@@ -53,6 +53,15 @@ _INS_DOCFTS = "INSERT INTO documents_fts (artifact_id,title,doc_type,keywords,co
 
 
 _READ_POOL_SIZE = min(max(os.cpu_count() or 4, 4), 8)
+
+
+@lru_cache(maxsize=None)
+def _is_symmetric_conn(conn_type: str) -> bool:
+    from src.domain.module_types import ConnectionTypeName  # noqa: PLC0415
+    from src.infrastructure.app_bootstrap import get_module_registry  # noqa: PLC0415
+
+    info = get_module_registry().find_connection_type(ConnectionTypeName(conn_type))
+    return info.symmetric if info is not None else False
 
 
 def _discard_from(d: dict, key: object, val: str) -> None:

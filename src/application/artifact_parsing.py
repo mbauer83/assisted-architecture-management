@@ -1,4 +1,5 @@
 import re
+from functools import lru_cache
 from pathlib import Path
 from typing import Any
 
@@ -16,7 +17,15 @@ from src.domain.artifact_types import (
     Domain,
     EntityRecord,
 )
-from src.domain.ontology_catalog import known_domain_names
+
+
+@lru_cache(maxsize=1)
+def _known_domain_names() -> frozenset[str]:
+    from src.infrastructure.app_bootstrap import get_module_registry  # noqa: PLC0415
+
+    reg = get_module_registry()
+    domains = {info.hierarchy[0] for info in reg.all_entity_types().values() if info.hierarchy}
+    return frozenset(domains | {"unknown"})
 
 
 def extract_yaml_block(content: str) -> dict | None:
@@ -125,7 +134,7 @@ def derive_domain(path: Path, root: Path) -> tuple[Domain, str]:
         parts = rel.parts
         domain_raw = parts[0] if len(parts) > 0 else "unknown"
         subdomain = parts[1] if len(parts) > 1 else ""
-        domain_names = known_domain_names()
+        domain_names = _known_domain_names()
         domain: Domain = domain_raw if domain_raw in domain_names else "unknown"  # type: ignore[assignment]
         return domain, subdomain
     except ValueError:

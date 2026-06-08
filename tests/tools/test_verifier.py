@@ -7,6 +7,7 @@ test_two_repo_and_grf.py; this file covers the non-GRF verification paths.
 
 from __future__ import annotations
 
+from functools import lru_cache
 from pathlib import Path
 
 import pytest
@@ -18,6 +19,13 @@ from src.infrastructure.artifact_index import shared_artifact_index
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
+
+@lru_cache(maxsize=1)
+def _all_entity_types() -> dict:
+    from src.infrastructure.app_bootstrap import build_module_registry  # noqa: PLC0415
+
+    return {str(k): v for k, v in build_module_registry().all_entity_types().items()}
 
 
 def _write(path: Path, content: str) -> None:
@@ -242,9 +250,7 @@ Consequences.
 class TestVerifyOutgoingFile:
     def _setup_entities(self, repo: Path, *eids_and_types) -> None:
         for eid, etype in eids_and_types:
-            from src.domain.ontology_catalog import all_entity_types
-
-            info = all_entity_types()[etype]
+            info = _all_entity_types()[etype]
             path = repo / "model" / Path(*info.hierarchy) / f"{eid}.md"
             _write(path, _entity(eid, etype))
 
@@ -282,10 +288,8 @@ class TestVerifyOutgoingFile:
 
 class TestVerifyDiagramFile:
     def _setup_entities(self, repo: Path, *eids_and_types) -> None:
-        from src.domain.ontology_catalog import all_entity_types
-
         for eid, etype in eids_and_types:
-            info = all_entity_types()[etype]
+            info = _all_entity_types()[etype]
             path = repo / "model" / Path(*info.hierarchy) / f"{eid}.md"
             _write(path, _entity(eid, etype))
 
@@ -470,10 +474,8 @@ class TestVerifyDocumentFile:
             ),
             encoding="utf-8",
         )
-        from src.domain.ontology_catalog import all_entity_types
-
         entity_id = "FNC@1000000002.AbcDef.function"
-        info = all_entity_types()["function"]
+        info = _all_entity_types()["function"]
         entity_path = repo / "model" / Path(*info.hierarchy) / f"{entity_id}.md"
         _write(entity_path, _entity(entity_id, "function"))
 
@@ -516,10 +518,8 @@ class TestVerifyDocumentFile:
             ),
             encoding="utf-8",
         )
-        from src.domain.ontology_catalog import all_entity_types
-
         entity_id = "REQ@1000000003.AbcDef.req"
-        info = all_entity_types()["requirement"]
+        info = _all_entity_types()["requirement"]
         entity_path = repo / "model" / Path(*info.hierarchy) / f"{entity_id}.md"
         _write(entity_path, _entity(entity_id, "requirement"))
 

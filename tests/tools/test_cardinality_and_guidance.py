@@ -5,6 +5,7 @@ Also covers the removal of element_category from EntityTypeInfo (feature ii).
 
 from __future__ import annotations
 
+from functools import lru_cache
 from pathlib import Path
 from typing import cast
 
@@ -20,6 +21,13 @@ from src.infrastructure.write.artifact_write.type_guidance import get_type_guida
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
+
+@lru_cache(maxsize=1)
+def _all_entity_types() -> dict:
+    from src.infrastructure.app_bootstrap import build_module_registry  # noqa: PLC0415
+
+    return {str(k): v for k, v in build_module_registry().all_entity_types().items()}
 
 
 def _write(path: Path, content: str) -> None:
@@ -507,15 +515,11 @@ class TestConnectionBodyCardinality:
 
 class TestElementCategoryRemoved:
     def test_entity_type_info_has_no_element_category(self) -> None:
-        from src.domain.ontology_catalog import all_entity_types
-
-        info = all_entity_types()["requirement"]
+        info = _all_entity_types()["requirement"]
         assert not hasattr(info, "element_category"), "element_category should have been removed from EntityTypeInfo"
 
     def test_entity_type_info_still_has_classes(self) -> None:
-        from src.domain.ontology_catalog import all_entity_types
-
-        info = all_entity_types()["requirement"]
+        info = _all_entity_types()["requirement"]
         assert hasattr(info, "classes")
         assert "motivation-element" in info.classes
 
@@ -532,10 +536,8 @@ class TestElementCategoryRemoved:
 
 class TestGetTypeGuidance:
     def test_all_types_returned_when_no_filter(self) -> None:
-        from src.domain.ontology_catalog import all_entity_types
-
         result = get_type_guidance()
-        assert _guidance_total(result) == len(all_entity_types())
+        assert _guidance_total(result) == len(_all_entity_types())
         assert isinstance(result["entity_types"], list)
 
     def test_all_types_include_domain(self) -> None:

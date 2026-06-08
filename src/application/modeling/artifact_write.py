@@ -14,6 +14,7 @@ import re
 import secrets
 import string
 import time
+from functools import lru_cache
 
 from src.application.modeling.artifact_write_formatting import (
     format_diagram_puml,
@@ -24,17 +25,48 @@ from src.application.modeling.artifact_write_formatting import (
 from src.application.modeling.types import (
     DiagramConnectionInferenceMode,
 )
-from src.domain.ontology_catalog import all_connection_types, all_entity_types, archimate_stereotype_to_connection_type
 
-ENTITY_TYPES = all_entity_types()
-CONNECTION_TYPES = all_connection_types()
-ARCHIMATE_STEREOTYPE_TO_CONNECTION_TYPE = archimate_stereotype_to_connection_type()
+
+@lru_cache(maxsize=1)
+def _registry():
+    from src.infrastructure.app_bootstrap import get_module_registry  # noqa: PLC0415
+
+    return get_module_registry()
+
+
+@lru_cache(maxsize=1)
+def _entity_types() -> dict:
+    return {str(n): info for n, info in _registry().all_entity_types().items()}
+
+
+@lru_cache(maxsize=1)
+def _connection_types() -> dict:
+    return {str(n): info for n, info in _registry().all_connection_types().items()}
+
+
+@lru_cache(maxsize=1)
+def _archimate_stereotype_map() -> dict[str, str]:
+    result: dict[str, str] = {}
+    for info in _registry().all_connection_types().values():
+        if info.conn_lang == "archimate" and info.archimate_relationship_type is not None:
+            result[info.archimate_relationship_type.lower()] = info.artifact_type
+    return result
+
+
+def __getattr__(name: str):
+    if name == "ENTITY_TYPES":
+        return _entity_types()
+    if name == "CONNECTION_TYPES":
+        return _connection_types()
+    if name == "ARCHIMATE_STEREOTYPE_TO_CONNECTION_TYPE":
+        return _archimate_stereotype_map()
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
 
 __all__ = [
-    "ARCHIMATE_STEREOTYPE_TO_CONNECTION_TYPE",
-    "CONNECTION_TYPES",
+    "ARCHIMATE_STEREOTYPE_TO_CONNECTION_TYPE",  # noqa: F822
+    "CONNECTION_TYPES",  # noqa: F822
     "DiagramConnectionInferenceMode",
-    "ENTITY_TYPES",
+    "ENTITY_TYPES",  # noqa: F822
     "format_diagram_puml",
     "format_entity_markdown",
     "format_matrix_markdown",
@@ -163,7 +195,7 @@ def infer_archimate_connection_ids_from_puml(
         src = m.group("src")
         tgt = m.group("tgt")
         rel = m.group("rel").strip().lower()
-        conn_type = ARCHIMATE_STEREOTYPE_TO_CONNECTION_TYPE.get(rel)
+        conn_type = _archimate_stereotype_map().get(rel)
         if conn_type is None:
             msg = f"Unknown ArchiMate relationship stereotype <<{m.group('rel')}>>"
             if mode == "strict":

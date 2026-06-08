@@ -23,8 +23,7 @@ from pathlib import Path
 from src.application.artifact_parsing import normalize_puml_alias
 from src.config.repo_paths import DIAGRAM_CATALOG, DIAGRAMS
 from src.domain.artifact_types import ConnectionRecord, EntityRecord
-from src.domain.module_types import ElementClassName
-from src.domain.ontology_catalog import all_connection_types, all_entity_types
+from src.domain.module_types import ConnectionTypeName, ElementClassName
 from src.infrastructure.diagram_types import get_diagram_type
 from src.infrastructure.rendering._diagram_layout import (
     build_visual_nesting,
@@ -119,7 +118,9 @@ def _parse_archimate_block(raw: str) -> dict:
         return {}
 
 
-_ENTITY_TYPE_ORDER = list(all_entity_types())
+@lru_cache(maxsize=1)
+def _entity_type_order() -> list[str]:
+    return list(_registry().all_entity_types())
 
 
 def _entity_stereotype_key(entity: EntityRecord) -> str:
@@ -171,7 +172,7 @@ def _ordered_type_groups(entities: list[EntityRecord]) -> list[tuple[str, list[E
     for entity in entities:
         grouped[entity.artifact_type].append(entity)
         labels.setdefault(entity.artifact_type, _type_group_label(entity))
-    ordered_types = [t for t in _ENTITY_TYPE_ORDER if t in grouped]
+    ordered_types = [t for t in _entity_type_order() if t in grouped]
     for artifact_type in grouped:
         if artifact_type not in ordered_types:
             ordered_types.append(artifact_type)
@@ -196,7 +197,7 @@ def _build_visual_nesting(
         tgt_alias = alias_by_id.get(conn.target)
         if not src_alias or not tgt_alias:
             continue
-        ct = all_connection_types().get(conn.conn_type)
+        ct = _registry().all_connection_types().get(ConnectionTypeName(conn.conn_type))
         if ct and ct.artifact_type in _nesting_conn_types() and tgt_alias in entity_by_alias:
             structural_edges.append((src_alias, tgt_alias))
             continue

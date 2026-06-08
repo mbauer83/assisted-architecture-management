@@ -16,7 +16,6 @@ from __future__ import annotations
 from functools import lru_cache
 
 from src.application.runtime_catalogs import RuntimeCatalogs
-from src.domain.connection_ontology import is_symmetric, permissible_connection_types
 from src.infrastructure.app_bootstrap import build_module_registry, build_runtime_catalogs
 from src.infrastructure.mcp import mcp_artifact_server as mcp
 from src.infrastructure.write.artifact_write.type_guidance import (
@@ -82,7 +81,7 @@ class TestPairConnectionGuidanceDomain:
         pg = pair_connection_guidance(source, target)
         assert "error" not in pg
 
-        rest_equiv = set(permissible_connection_types(source, target))
+        rest_equiv = set(_catalogs().connections.permissible_connection_types(source, target))
         guidance_source_to_target = set(pg["outgoing"]) | set(pg["symmetric"])
         assert guidance_source_to_target == rest_equiv, (
             f"pair_guidance (outgoing+symmetric) {sorted(guidance_source_to_target)!r} "
@@ -133,7 +132,7 @@ class TestGetTypeGuidanceWithTarget:
         if "error" in pg:
             return
         for ct in pg["symmetric"]:
-            assert is_symmetric(ct), f"{ct!r} in symmetric is not symmetric per is_symmetric()"
+            assert _catalogs().connections.is_symmetric(ct), f"{ct!r} in symmetric is not symmetric per is_symmetric()"
 
     def test_no_target_returns_normal_guidance(self) -> None:
         """Calling without target must not add pair_guidance or error."""

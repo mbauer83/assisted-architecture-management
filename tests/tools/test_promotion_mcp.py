@@ -7,6 +7,7 @@ exclude params, and rollback on verification failure.
 from __future__ import annotations
 
 import subprocess
+from functools import lru_cache
 from pathlib import Path
 
 import pytest
@@ -21,6 +22,13 @@ from src.infrastructure.mcp import mcp_artifact_server as mcp
 def _write(path: Path, content: str) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(content, encoding="utf-8")
+
+
+@lru_cache(maxsize=1)
+def _all_entity_types() -> dict:
+    from src.infrastructure.app_bootstrap import build_module_registry  # noqa: PLC0415
+
+    return {str(k): v for k, v in build_module_registry().all_entity_types().items()}
 
 
 def _entity_md(artifact_id: str, artifact_type: str, name: str) -> str:
@@ -89,9 +97,7 @@ def enterprise_root(tmp_path: Path) -> Path:
 
 
 def _make_entity(root: Path, artifact_id: str, artifact_type: str, name: str) -> None:
-    from src.domain.ontology_catalog import all_entity_types
-
-    info = all_entity_types()[artifact_type]
+    info = _all_entity_types()[artifact_type]
     path = root / "model" / Path(*info.hierarchy) / f"{artifact_id}.md"
     _write(path, _entity_md(artifact_id, artifact_type, name))
 

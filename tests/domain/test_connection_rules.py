@@ -18,9 +18,21 @@ Key rules exercised:
 
 from __future__ import annotations
 
+from functools import lru_cache
+
 import pytest
 
-from src.domain.connection_ontology import permissible_connection_types
+from src.domain.catalogs import ConnectionSemanticsImpl
+from src.infrastructure.app_bootstrap import build_module_registry
+
+
+@lru_cache(maxsize=1)
+def _connections() -> ConnectionSemanticsImpl:
+    return ConnectionSemanticsImpl(build_module_registry())
+
+
+def permissible_connection_types(source: str, target: str) -> list[str]:
+    return _connections().permissible_connection_types(source, target)
 
 # (source, target, connection) triples the normative matrix marks PERMITTED.
 _PERMITTED: list[tuple[str, str, str]] = [

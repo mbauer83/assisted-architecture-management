@@ -3,6 +3,7 @@
 import re
 from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor
+from functools import lru_cache
 from pathlib import Path
 from typing import Literal
 
@@ -52,10 +53,8 @@ from src.application.verification.artifact_verifier_syntax import (
     resolve_worker_count,
 )
 from src.application.verification.artifact_verifier_types import (
-    CONNECTION_TYPES,
     DIAGRAM_REQUIRED,
     ENTITY_REQUIRED,
-    ENTITY_TYPES,
     OUTGOING_FILE_REQUIRED,
     VALID_STATUSES,
     IncrementalState,
@@ -66,6 +65,27 @@ from src.application.verification.artifact_verifier_types import (
     entity_id_from_path,
 )
 from src.config.repo_paths import ARCH_REPO, DOCS, MODEL
+
+
+@lru_cache(maxsize=1)
+def _entity_type_names() -> frozenset[str]:
+    from src.infrastructure.app_bootstrap import get_module_registry  # noqa: PLC0415
+
+    return frozenset(str(n) for n in get_module_registry().all_entity_types())
+
+
+@lru_cache(maxsize=1)
+def _connection_type_names() -> frozenset[str]:
+    from src.infrastructure.app_bootstrap import get_module_registry  # noqa: PLC0415
+
+    return frozenset(str(n) for n in get_module_registry().all_connection_types())
+
+
+@lru_cache(maxsize=1)
+def _ontology_catalog():
+    from src.infrastructure.app_bootstrap import build_runtime_catalogs, get_module_registry  # noqa: PLC0415
+
+    return build_runtime_catalogs(get_module_registry()).ontology
 
 # Cardinality: n  |  n..m  |  n..*  |  *
 _CARDINALITY_RE = re.compile(r"^\d+$|^\d+\.\.\d+$|^\d+\.\.\*$|^\*$")
@@ -130,7 +150,7 @@ class ArtifactVerifier:
 
         check_required_fields(fm, ENTITY_REQUIRED, result, loc)
         check_artifact_id_entity(fm, result, loc)
-        check_artifact_type(fm, ENTITY_TYPES, "entity type", result, loc)
+        check_artifact_type(fm, _entity_type_names(), "entity type", result, loc)
         check_enum(fm, "status", VALID_STATUSES, result, loc)
         check_section(content, "§content", required=True, result=result, loc=loc)
         check_section(content, "§display", required=True, result=result, loc=loc)
@@ -222,7 +242,7 @@ class ArtifactVerifier:
                     )
                     continue
                 conn_type, src_card, tgt_card, target_id = parsed
-                if conn_type not in CONNECTION_TYPES:
+                if conn_type not in _connection_type_names():
                     result.issues.append(
                         Issue(
                             Severity.ERROR,
@@ -634,16 +654,13 @@ class ArtifactVerifier:
                     # E155: required entity-type connections
                     required_entity_types: list[str] = schema.get("required_entity_type_connections") or []
                     if required_entity_types:
-                        from src.domain.ontology_catalog import (
-                            entity_type_term_matches,
-                            expand_entity_type_term,
-                            format_entity_type_term,
-                        )
+                        from src.domain.ontology_catalog import format_entity_type_term  # noqa: PLC0415
 
+                        _oc = _ontology_catalog()
                         linked_types = _linked_entity_types(path, content)
                         for etype in required_entity_types:
                             label = format_entity_type_term(etype)
-                            if not expand_entity_type_term(etype):
+                            if not _oc.expand_entity_type_term(etype):
                                 result.issues.append(
                                     Issue(
                                         Severity.ERROR,
@@ -652,7 +669,7 @@ class ArtifactVerifier:
                                         loc,
                                     )
                                 )
-                            elif not entity_type_term_matches(etype, linked_types):
+                            elif not _oc.entity_type_term_matches(etype, linked_types):
                                 result.issues.append(
                                     Issue(
                                         Severity.ERROR,
