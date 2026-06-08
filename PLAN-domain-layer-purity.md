@@ -182,9 +182,9 @@ Notes:
 
 ### Phase I — Glossary & responsibility-driven renames (concern #7)
 
-- [ ] **I1** Add a glossary (architecture doc / README §) distinguishing: ontology-&-diagram **Module Catalog**; **Artifact Index**; **Artifact Repository**; **Application Composition Root**; **Runtime Host**; **Verification Policy** vs **Verification Executor**.
-- [ ] **I2** Rename only modules whose responsibilities changed in A–H (e.g. confirm `ModuleCatalog` vs self-model "Model Registry"; `diagram_type_registry`); avoid cosmetic churn elsewhere.
-- [ ] **I3** Quality gates green.
+- [x] **I1** Add a glossary (architecture doc / README §) distinguishing: ontology-&-diagram **Module Catalog**; **Artifact Index**; **Artifact Repository**; **Application Composition Root**; **Runtime Host**; **Verification Policy** vs **Verification Executor**.
+- [x] **I2** Rename only modules whose responsibilities changed in A–H (e.g. confirm `ModuleCatalog` vs self-model "Model Registry"; `diagram_type_registry`); avoid cosmetic churn elsewhere.
+- [x] **I3** Quality gates green.
 
 ### Phase J — Self-model & README sync (concern #8)
 
@@ -231,7 +231,7 @@ python -m pytest tests/architecture/test_dependency_policy.py -q   # policy hold
 - [ ] `ArtifactStorePort` is segregated into role contracts; consumers depend on narrow ones. *(Phase F)*
 - [ ] Verifier is a pipeline of pure rules over parsed inputs with I/O behind application-owned ports. *(Phase G)*
 - [x] Public contracts expose immutable views; configuration is frozen on publication. *(Phase H)*
-- [ ] Glossary published; renames are responsibility-driven only. *(Phase I)*
+- [x] Glossary published; renames are responsibility-driven only. *(Phase I)*
 - [ ] Self-model (`Model Registry`, `Model Verifier`) and README reflect the real implementation; a verifier conformance check guards self-model source paths. *(Phase J)*
 - [x] All strategy registrations are at the composition root; no module-level side effects; `DerivationStrategyCatalog` built directly from manifests and injected. *(Phase K)*
 - [x] `DiagramTypeModuleManifest` in `domain/` declares ontology compatibility and role-to-entity-type mapping; `scope_projection.py` deleted. *(Phase K)*
