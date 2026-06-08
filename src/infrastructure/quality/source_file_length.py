@@ -14,8 +14,7 @@ SOURCE_FILE_SOFT_LIMIT = 250
 SOURCE_FILE_HARD_LIMIT = 350
 SOURCE_FILE_BASELINE_LIMITS: dict[str, int] = {
     "gen_id.py": 0,
-    "src/application/verification/artifact_verifier.py": 787,
-    "src/application/verification/artifact_verifier_rules.py": 480,
+    "src/application/verification/artifact_verifier.py": 377,
     "src/infrastructure/rendering/diagram_builder.py": 467,
     "src/application/verification/artifact_verifier_incremental.py": 351,
     "src/infrastructure/artifact_index/_sqlite_store.py": 387,

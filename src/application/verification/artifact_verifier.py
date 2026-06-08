@@ -1,21 +1,24 @@
 """ERP v2.0 model verification facade with modular helper backends."""
 
+from __future__ import annotations
+
 import functools
-import re
 from pathlib import Path
 from typing import Literal
 
 from src.application.entity_type_predicates import is_internal_entity_type
 from src.application.runtime_catalogs import RuntimeCatalogs
+from src.application.verification._verifier_document import verify_document
+from src.application.verification._verifier_outgoing import verify_outgoing
 from src.application.verification._verifier_rules_edge_labels import check_edge_label_overrides
-from src.application.verification._verifier_rules_grf import (
-    check_global_artifact_reference,
-)
+from src.application.verification._verifier_rules_grf import check_global_artifact_reference
+from src.application.verification._verifier_rules_puml_relations import check_diagram_relation_references
 from src.application.verification._verifier_rules_schema import (
     check_attribute_schema,
     check_frontmatter_schema,
 )
-from src.application.verification._verifier_rules_semantic import check_connection_semantics
+from src.application.verification._verifier_rules_semantic import check_connection_semantics  # noqa: F401
+from src.application.verification._verifier_serde import merge_results, results_from_state
 from src.application.verification.artifact_verifier_incremental import (
     FileInventory,
     detect_changed_paths,
@@ -34,7 +37,6 @@ from src.application.verification.artifact_verifier_rules import (
     check_artifact_type,
     check_diagram_artifact_type,
     check_diagram_references_scoped,
-    check_diagram_relation_references,
     check_enum,
     check_puml_structure,
     check_required_fields,
@@ -43,7 +45,6 @@ from src.application.verification.artifact_verifier_rules import (
 from src.application.verification.artifact_verifier_types import (
     DIAGRAM_REQUIRED,
     ENTITY_REQUIRED,
-    OUTGOING_FILE_REQUIRED,
     VALID_STATUSES,
     IncrementalState,
     Issue,
@@ -58,39 +59,6 @@ from src.application.verification.verifier_ports import (
     PumlSyntaxPort,
     VerifierScheduler,
 )
-from src.domain.repo_layout import ARCH_REPO, DOCS, MODEL
-
-# Cardinality: n  |  n..m  |  n..*  |  *
-_CARDINALITY_RE = re.compile(r"^\d+$|^\d+\.\.\d+$|^\d+\.\.\*$|^\*$")
-
-# Connection header after "### ":
-#   conn-type [[src_card]] → [[tgt_card] ]target_id
-_CONN_HEADER_RE = re.compile(
-    r"^(?P<conn_type>[a-z][a-z0-9-]+)"
-    r"(?:\s+\[(?P<src_card>[^\]]+)\])?"
-    r"\s+→\s+"
-    r"(?:\[(?P<tgt_card>[^\]]+)\]\s+)?"
-    r"(?P<target_id>\S+)$"
-)
-
-_WINDOWS_ABS_PATH_RE = re.compile(r"^[A-Za-z]:[/\\]")
-
-
-def _parse_conn_header(header: str) -> tuple[str, str, str, str] | None:
-    """Parse a connection header line (after '### ').
-
-    Returns (conn_type, src_card, tgt_card, target_id) or None on failure.
-    src_card / tgt_card are empty strings when absent.
-    """
-    m = _CONN_HEADER_RE.match(header)
-    if not m:
-        return None
-    return (
-        m.group("conn_type"),
-        m.group("src_card") or "",
-        m.group("tgt_card") or "",
-        m.group("target_id"),
-    )
 
 
 class ArtifactVerifier:
@@ -154,7 +122,6 @@ class ArtifactVerifier:
         return DefaultIncrementalStateAdapter()
 
     def _repo_root_for_path(self, path: Path) -> Path | None:
-        """Resolve the configured model repository root for a file path."""
         if self.registry is None:
             return None
         resolved = path.resolve()
@@ -194,152 +161,17 @@ class ArtifactVerifier:
         return result
 
     def verify_outgoing_file(self, path: Path) -> VerificationResult:
-        """Verify a .outgoing.md file (new convention)."""
-        result = VerificationResult(path=path, file_type="connection")
-        loc = str(path)
-        content = read_file(path, result, loc)
-        if content is None:
-            return result
-        fm = parse_frontmatter(content, result, loc)
-        if fm is None:
-            return result
-
-        check_required_fields(fm, OUTGOING_FILE_REQUIRED, result, loc)
-        check_enum(fm, "status", VALID_STATUSES, result, loc)
-
-        file_scope = self._scope_for_path(path)
-
-        # Validate source-entity references an actual entity
-        source = fm.get("source-entity", "")
-        if self.registry is not None and source:
-            all_entities = self.registry.entity_ids()
-            if source not in all_entities:
-                result.issues.append(
-                    Issue(
-                        Severity.ERROR,
-                        "E120",
-                        f"source-entity '{source}' not found in model",
-                        loc,
-                    )
-                )
-            elif file_scope == "enterprise" and source not in self.registry.enterprise_entity_ids():
-                result.issues.append(
-                    Issue(
-                        Severity.ERROR,
-                        "E131",
-                        f"enterprise connection has non-enterprise source-entity '{source}'",
-                        loc,
-                    )
-                )
-
-        # Validate §connections marker is present
-        if "<!-- §connections -->" not in content:
-            result.issues.append(
-                Issue(
-                    Severity.ERROR,
-                    "E121",
-                    "Missing <!-- §connections --> section marker",
-                    loc,
-                )
-            )
-
-        # Scope-aware entity sets for target validation
-        if self.registry is not None:
-            allowed_entities = (
-                self.registry.enterprise_entity_ids() if file_scope == "enterprise" else self.registry.entity_ids()
-            )
-            all_entities_for_scope = self.registry.entity_ids()
-        else:
-            allowed_entities = all_entities_for_scope = set()
-
-        # Validate each connection section header
-        seen_connections: set[str] = set()
-        parsed_connections: list[tuple[str, str]] = []
-        for line in content.splitlines():
-            if line.startswith("### "):
-                header = line[4:].strip()
-                parsed = _parse_conn_header(header)
-                if parsed is None:
-                    result.issues.append(
-                        Issue(
-                            Severity.ERROR,
-                            "E122",
-                            f"Connection header missing ' → ' separator: '{header}'",
-                            loc,
-                        )
-                    )
-                    continue
-                conn_type, src_card, tgt_card, target_id = parsed
-                if conn_type not in self._runtime_catalogs.ontology.all_connection_type_names():
-                    result.issues.append(
-                        Issue(
-                            Severity.ERROR,
-                            "E123",
-                            f"Unknown connection type '{conn_type}'",
-                            loc,
-                        )
-                    )
-                for card_label, card_val in (("source", src_card), ("target", tgt_card)):
-                    if card_val and not _CARDINALITY_RE.match(card_val):
-                        result.issues.append(
-                            Issue(
-                                Severity.ERROR,
-                                "E125",
-                                f"Invalid {card_label} cardinality '{card_val}' in '{header}' "
-                                f"— expected n, n..m, n..*, or *",
-                                loc,
-                            )
-                        )
-                if self.registry is not None and target_id not in allowed_entities:
-                    if target_id in all_entities_for_scope and file_scope == "enterprise":
-                        result.issues.append(
-                            Issue(
-                                Severity.ERROR,
-                                "E130",
-                                (f"enterprise connection references non-enterprise entity '{target_id}'"),
-                                loc,
-                            )
-                        )
-                    else:
-                        result.issues.append(
-                            Issue(
-                                Severity.ERROR,
-                                "E124",
-                                f"Target entity '{target_id}' not found in model",
-                                loc,
-                            )
-                        )
-                conn_key = f"{conn_type} → {target_id}"
-                if conn_key in seen_connections:
-                    result.issues.append(
-                        Issue(
-                            Severity.WARNING,
-                            "W120",
-                            f"Duplicate connection: '{conn_key}'",
-                            loc,
-                        )
-                    )
-                seen_connections.add(conn_key)
-                parsed_connections.append((conn_type, target_id))
-
-        if self.registry is not None and source and parsed_connections:
-            check_connection_semantics(
-                source, parsed_connections, self.registry, result, loc,
-                connections_catalog=self._runtime_catalogs.connections,
-                ontology_catalog=self._runtime_catalogs.ontology,
-            )
-
-        repo_root = self._repo_root_for_path(path)
-        if repo_root is not None:
-            check_frontmatter_schema(fm, repo_root, "outgoing", result, loc)
-
-        return result
+        return verify_outgoing(
+            path,
+            registry=self.registry,
+            catalogs=self._runtime_catalogs,
+            scope=self._scope_for_path(path),
+            repo_root=self._repo_root_for_path(path),
+        )
 
     def verify_connection_file(self, path: Path) -> VerificationResult:
-        """Verify a connection file — dispatches to outgoing or legacy format."""
         if path.name.endswith(".outgoing.md"):
             return self.verify_outgoing_file(path)
-        # Legacy format — minimal validation
         result = VerificationResult(path=path, file_type="connection")
         loc = str(path)
         content = read_file(path, result, loc)
@@ -377,14 +209,10 @@ class ArtifactVerifier:
             )
             check_diagram_relation_references(content, fm, self.registry, scope, result, loc)
         else:
-            result.issues.append(
-                Issue(
-                    Severity.WARNING,
-                    "W002",
-                    "No ArtifactRegistry provided; entity/connection reference checks skipped",
-                    loc,
-                )
-            )
+            result.issues.append(Issue(
+                Severity.WARNING, "W002",
+                "No ArtifactRegistry provided; entity/connection reference checks skipped", loc,
+            ))
 
         check_puml_structure(content, fm, result, loc)
         check_edge_label_overrides(content, fm, result, loc)
@@ -418,33 +246,21 @@ class ArtifactVerifier:
                 diagram_type_catalog=self._runtime_catalogs.diagram_types,
             )
         else:
-            result.issues.append(
-                Issue(
-                    Severity.WARNING,
-                    "W002",
-                    "No ArtifactRegistry provided; entity/connection reference checks skipped",
-                    loc,
-                )
-            )
+            result.issues.append(Issue(
+                Severity.WARNING, "W002",
+                "No ArtifactRegistry provided; entity/connection reference checks skipped", loc,
+            ))
 
         if "diagram-type" in fm and str(fm.get("diagram-type")) != "matrix":
-            result.issues.append(
-                Issue(
-                    Severity.WARNING,
-                    "W321",
-                    ("Markdown diagram file under diagram-catalog/diagrams should use diagram-type: matrix"),
-                    loc,
-                )
-            )
+            result.issues.append(Issue(
+                Severity.WARNING, "W321",
+                "Markdown diagram file under diagram-catalog/diagrams should use diagram-type: matrix", loc,
+            ))
         if "|" not in content:
-            result.issues.append(
-                Issue(
-                    Severity.WARNING,
-                    "W322",
-                    ("Matrix diagram markdown has no table markup; expected at least one matrix table"),
-                    loc,
-                )
-            )
+            result.issues.append(Issue(
+                Severity.WARNING, "W322",
+                "Matrix diagram markdown has no table markup; expected at least one matrix table", loc,
+            ))
         return result
 
     def verify_all(self, repo_path: Path, *, include_diagrams: bool = True) -> list[VerificationResult]:
@@ -501,12 +317,8 @@ class ArtifactVerifier:
             results = self._verify_all_full(repo_path, include_diagrams=include_diagrams)
         else:
             assert prev is not None
-            mode, results = self._verify_from_existing_incremental_state(
-                prev,
-                inv,
-                repo_path=repo_path,
-                include_diagrams=include_diagrams,
-                cfg=cfg,
+            mode, results = self._verify_from_incremental_state(
+                prev, inv, repo_path=repo_path, include_diagrams=include_diagrams, cfg=cfg
             )
 
         doc_files = self._inventory.list_doc_files(repo_path)
@@ -543,10 +355,9 @@ class ArtifactVerifier:
             return True
         if prev.engine_signature != engine_sig:
             return True
-        # Registry availability changed — must re-verify to resolve/drop W002 warnings
         return prev.include_registry != (self.registry is not None)
 
-    def _verify_from_existing_incremental_state(
+    def _verify_from_incremental_state(
         self,
         prev: IncrementalState,
         inv: FileInventory,
@@ -559,25 +370,17 @@ class ArtifactVerifier:
         if deleted:
             return "full", self._verify_all_full(repo_path, include_diagrams=include_diagrams)
         if not changed:
-            cached = _results_from_state(prev, inv)
+            cached = results_from_state(prev, inv)
             if cached is not None:
                 return "incremental-cached", cached
             return "full", self._verify_all_full(repo_path, include_diagrams=include_diagrams)
-        if self._incremental_change_set_too_large(inv, changed, cfg):
+        total = len(inv.ordered_paths)
+        ratio = (len(changed) / total) if total > 0 else 1.0
+        if ratio >= cfg.changed_ratio_threshold or len(changed) >= cfg.changed_count_threshold:
             return "full", self._verify_all_full(repo_path, include_diagrams=include_diagrams)
         impacted = expand_impacted_paths(inv, changed)
         fresh = self._verify_inventory_subset(inv, impacted)
-        return "incremental", _merge_results(prev, inv, fresh)
-
-    def _incremental_change_set_too_large(
-        self,
-        inv: FileInventory,
-        changed: set[str],
-        cfg: VerifierRuntimeConfig,
-    ) -> bool:
-        total = len(inv.ordered_paths)
-        changed_ratio = (len(changed) / total) if total > 0 else 1.0
-        return changed_ratio >= cfg.changed_ratio_threshold or len(changed) >= cfg.changed_count_threshold
+        return "incremental", merge_results(prev, inv, fresh)
 
     def _verify_inventory_subset(self, inv: FileInventory, relpaths: set[str]) -> list[VerificationResult]:
         if self.registry is not None:
@@ -602,7 +405,6 @@ class ArtifactVerifier:
             for d in diagram_results:
                 d.issues.extend(issues_by_path.get(d.path, []))
         out.extend(diagram_results)
-
         out.extend(self._scheduler.run(self.verify_matrix_diagram_file, matrix_files))
 
         by_path = {r.path: r for r in out}
@@ -610,225 +412,15 @@ class ArtifactVerifier:
             by_path[inv.rel_to_path[r]] for r in inv.ordered_paths if r in relpaths and inv.rel_to_path[r] in by_path
         ]
 
-    def verify_document_file(self, path: Path) -> VerificationResult:  # noqa: C901
-        result = VerificationResult(path=path, file_type="document")
-        loc = str(path)
-        content = read_file(path, result, loc)
-        if content is None:
-            return result
-        fm = parse_frontmatter(content, result, loc)
-        if fm is None:
-            return result
-
-        # E153: frontmatter schema validation against .arch-repo/documents/{doc_type}.json
-        doc_type = str(fm.get("doc-type", "")).strip()
-        doc_type_status_enum: frozenset[str] | None = None
-        if not doc_type:
-            result.issues.append(Issue(Severity.ERROR, "E153", "Missing required frontmatter field 'doc-type'", loc))
-        else:
-            repo_root = self._repo_root_for_path(path) or _infer_repo_root_for_document(path)
-            if repo_root is not None:
-                from src.application.artifact_document_schema import get_document_schema
-
-                schema = get_document_schema(repo_root, doc_type)
-                if schema is None:
-                    result.issues.append(
-                        Issue(
-                            Severity.ERROR,
-                            "E153",
-                            (f"Unknown doc-type '{doc_type}': no schema at .arch-repo/documents/{doc_type}.json"),
-                            loc,
-                        )
-                    )
-                else:
-                    fm_schema = schema.get("frontmatter_schema")
-                    if fm_schema:
-                        from src.application.artifact_schema import validate_against_schema
-
-                        errors = validate_against_schema(fm, fm_schema)
-                        for err in errors:
-                            result.issues.append(
-                                Issue(
-                                    Severity.ERROR,
-                                    "E153",
-                                    f"Document frontmatter schema violation: {err}",
-                                    loc,
-                                )
-                            )
-                        status_enum = fm_schema.get("properties", {}).get("status", {}).get("enum")
-                        if status_enum:
-                            doc_type_status_enum = frozenset(str(v) for v in status_enum)
-                    # E154: required sections
-                    required_sections: list[str] = schema.get("required_sections") or []
-                    if required_sections:
-                        body = re.sub(r"^---\n.*?\n---\n", "", content, count=1, flags=re.DOTALL)
-                        present = {m.group(1).strip() for m in re.finditer(r"^##\s+(.+)$", body, re.MULTILINE)}
-                        for section in required_sections:
-                            if section not in present:
-                                result.issues.append(
-                                    Issue(
-                                        Severity.ERROR,
-                                        "E154",
-                                        f"Required section '## {section}' missing from document",
-                                        loc,
-                                    )
-                                )
-                    # E155: required entity-type connections
-                    required_entity_types: list[str] = schema.get("required_entity_type_connections") or []
-                    if required_entity_types:
-                        _oc = self._runtime_catalogs.ontology
-                        linked_types = _linked_entity_types(path, content)
-                        for etype in required_entity_types:
-                            label = _oc.format_entity_type_term(etype)
-                            if not _oc.expand_entity_type_term(etype):
-                                result.issues.append(
-                                    Issue(
-                                        Severity.ERROR,
-                                        "E155",
-                                        (f"Unknown required entity-type connection term: {label} ({etype})"),
-                                        loc,
-                                    )
-                                )
-                            elif not _oc.entity_type_term_matches(etype, linked_types):
-                                result.issues.append(Issue(
-                                    Severity.ERROR, "E155",
-                                    f"Required entity-type connection missing: link at least one {label}", loc,
-                                ))
-
-        # W155: unresolvable internal markdown links
-        for m in re.finditer(r"\[([^\]]+)\]\(([^)]+)\)", content):
-            href = m.group(2)
-            if href.startswith("http://") or href.startswith("https://") or href.startswith("#"):
-                continue
-            anchor_idx = href.find("#")
-            file_href = href[:anchor_idx] if anchor_idx >= 0 else href
-            if not file_href or not file_href.endswith(".md"):
-                continue
-            if _is_absolute_markdown_link(file_href):
-                result.issues.append(
-                    Issue(
-                        Severity.WARNING,
-                        "W156",
-                        f"Absolute internal link must be relative: '{file_href}'",
-                        loc,
-                    )
-                )
-                continue
-            target = (path.parent / file_href).resolve()
-            if not target.exists():
-                result.issues.append(
-                    Issue(
-                        Severity.WARNING,
-                        "W155",
-                        f"Unresolvable internal link: '{file_href}'",
-                        loc,
-                    )
-                )
-
-        check_enum(fm, "status", doc_type_status_enum or VALID_STATUSES, result, loc)
-        return result
+    def verify_document_file(self, path: Path) -> VerificationResult:
+        return verify_document(path, registry=self.registry, catalogs=self._runtime_catalogs)
 
     def _scope_for_path(self, path: Path) -> Literal["enterprise", "engagement", "unknown"]:
         if self.registry is not None:
             return self.registry.scope_for_path(path)
-        from src.domain.repo_scope import infer_repo_scope
+        from src.domain.repo_scope import infer_repo_scope  # noqa: PLC0415
 
         return infer_repo_scope(path)
-
-
-def _linked_entity_types(doc_path: Path, content: str) -> set[str]:
-    """Return the set of artifact-type values found in entities linked from a document."""
-    types: set[str] = set()
-    for m in re.finditer(r"\[([^\]]+)\]\(([^)]+)\)", content):
-        href = m.group(2)
-        if href.startswith("http") or href.startswith("#"):
-            continue
-        anchor_idx = href.find("#")
-        file_href = href[:anchor_idx] if anchor_idx >= 0 else href
-        if not file_href.endswith(".md"):
-            continue
-        target = (doc_path.parent / file_href).resolve()
-        if not target.is_file():
-            continue
-        try:
-            target_content = target.read_text(encoding="utf-8")
-        except OSError:
-            continue
-        fm = parse_frontmatter(target_content, VerificationResult(path=target, file_type="entity"), str(target))
-        if fm:
-            etype = fm.get("artifact-type", "")
-            if etype:
-                types.add(str(etype))
-    return types
-
-
-def _infer_repo_root_for_document(path: Path) -> Path | None:
-    """Walk up from a document path to find the repo root (parent of docs/)."""
-    for parent in path.parents:
-        if (parent / DOCS).exists() and (parent / ARCH_REPO).exists():
-            return parent
-        if (parent / DOCS).exists() and (parent / MODEL).exists():
-            return parent
-    return None
-
-
-def _is_absolute_markdown_link(href: str) -> bool:
-    return href.startswith("/") or href.startswith("file://") or bool(_WINDOWS_ABS_PATH_RE.match(href))
-
-
-def _results_from_state(prev: IncrementalState, inv: FileInventory) -> list[VerificationResult] | None:
-    out: list[VerificationResult] = []
-    for rel in inv.ordered_paths:
-        raw = prev.results.get(rel)
-        if not isinstance(raw, dict):
-            return None
-        parsed = _deserialize_result(inv.rel_to_path[rel], raw)
-        if parsed is None:
-            return None
-        out.append(parsed)
-    return out
-
-
-def _merge_results(
-    prev: IncrementalState, inv: FileInventory, fresh: list[VerificationResult]
-) -> list[VerificationResult]:
-    by_rel = {inv.path_to_rel[r.path]: r for r in fresh}
-    merged: list[VerificationResult] = []
-    for rel in inv.ordered_paths:
-        if rel in by_rel:
-            merged.append(by_rel[rel])
-            continue
-        raw = prev.results.get(rel)
-        if not isinstance(raw, dict):
-            return fresh
-        parsed = _deserialize_result(inv.rel_to_path[rel], raw)
-        if parsed is None:
-            return fresh
-        merged.append(parsed)
-    return merged
-
-
-def _deserialize_result(path: Path, data: dict) -> VerificationResult | None:
-    file_type = data.get("file_type")
-    if file_type not in {"entity", "connection", "diagram"}:
-        return None
-    issues_raw = data.get("issues", [])
-    if not isinstance(issues_raw, list):
-        return None
-    issues: list[Issue] = []
-    for item in issues_raw:
-        if not isinstance(item, dict):
-            return None
-        severity = item.get("severity")
-        if severity not in {Severity.ERROR, Severity.WARNING}:
-            return None
-        code = item.get("code")
-        message = item.get("message")
-        location = item.get("location")
-        if not all(isinstance(v, str) for v in [code, message, location]):
-            return None
-        issues.append(Issue(severity=severity, code=str(code), message=str(message), location=str(location)))
-    return VerificationResult(path=path, file_type=file_type, issues=issues)
 
 
 __all__ = [

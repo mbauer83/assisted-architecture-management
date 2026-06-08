@@ -2,8 +2,11 @@ import re
 from typing import Literal
 
 from src.application.artifact_parsing import extract_declared_puml_aliases as _extract_declared_puml_aliases_shared
-from src.application.modeling.artifact_write import ARCHIMATE_STEREOTYPE_TO_CONNECTION_TYPE
 from src.application.verification._verifier_rules_bindings import check_bindings_scoped, get_allowed_bindings
+from src.application.verification._verifier_rules_puml_relations import (
+    _extract_entity_display_alias,
+    _normalize_puml_alias,
+)
 from src.application.verification._verifier_rules_view_derivations import check_all_view_derivations
 from src.application.verification.artifact_verifier_registry import ArtifactRegistry
 from src.application.verification.artifact_verifier_types import (
@@ -16,17 +19,6 @@ from src.application.verification.artifact_verifier_types import (
 )
 from src.domain.catalogs import DiagramTypeCatalog
 from src.domain.repo_layout import MODEL
-
-_REL_MACRO_RE = re.compile(
-    r"^\s*Rel_(?P<rel>[A-Za-z0-9]+)(?:_(?:Up|Down|Left|Right))?"
-    r"\(\s*(?P<src>[A-Za-z0-9_-]+)\s*,\s*(?P<tgt>[A-Za-z0-9_-]+)",
-    re.MULTILINE,
-)
-_REL_LINE_RE = re.compile(
-    r"^\s*(?P<src>[A-Za-z0-9_-]+)\s+[-.*|o<>][^\n:]*\s+(?P<tgt>[A-Za-z0-9_-]+)\s*:\s*<<(?P<rel>[A-Za-z]+)>>",
-    re.MULTILINE,
-)
-_STD_ALIAS_RE = re.compile(r"^(?P<prefix>[A-Z]{2,6})_(?P<random>[A-Za-z0-9_-]{4,})$")
 
 
 def check_required_fields(fm: dict, required: frozenset[str], result: VerificationResult, loc: str) -> None:
@@ -173,78 +165,6 @@ def check_diagram_references_scoped(
         result, loc,
         allowed_bindings=get_allowed_bindings(str(fm.get("diagram-type", "")), diagram_type_catalog),
     )
-
-
-def check_diagram_relation_references(
-    content: str,
-    fm: dict,
-    registry: ArtifactRegistry,
-    file_scope: Literal["enterprise", "engagement", "unknown"],
-    result: VerificationResult,
-    loc: str,
-) -> None:
-    allowed_connections = (
-        registry.enterprise_connection_ids() if file_scope == "enterprise" else registry.connection_ids()
-    )
-    all_connections = registry.connection_ids()
-    alias_to_entity_id = _build_alias_lookup(content, fm, registry)
-
-    for src_alias, tgt_alias, conn_type in _iter_declared_relations(content):
-        src_id = alias_to_entity_id.get(src_alias) or alias_to_entity_id.get(_normalize_puml_alias(src_alias))
-        tgt_id = alias_to_entity_id.get(tgt_alias) or alias_to_entity_id.get(_normalize_puml_alias(tgt_alias))
-        if src_id is None:
-            result.issues.append(
-                Issue(
-                    Severity.ERROR,
-                    "E311",
-                    f"diagram relation references unknown source alias '{src_alias}'",
-                    loc,
-                )
-            )
-            continue
-        if tgt_id is None:
-            result.issues.append(
-                Issue(
-                    Severity.ERROR,
-                    "E311",
-                    f"diagram relation references unknown target alias '{tgt_alias}'",
-                    loc,
-                )
-            )
-            continue
-
-        conn_id = f"{src_id}---{tgt_id}@@{conn_type}"
-        if conn_id in allowed_connections:
-            continue
-
-        # Realization is often drawn concrete -> abstract in PUML even when the
-        # stored model edge is abstract -> concrete.
-        reverse_conn_id = f"{tgt_id}---{src_id}@@{conn_type}"
-        if conn_type == "archimate-realization" and reverse_conn_id in allowed_connections:
-            continue
-
-        if conn_id in all_connections or reverse_conn_id in all_connections:
-            result.issues.append(
-                Issue(
-                    Severity.ERROR,
-                    "E313",
-                    (
-                        f"diagram relation '{conn_type}' between '{src_alias}' and '{tgt_alias}' "
-                        "is out of scope for this repository"
-                    ),
-                    loc,
-                )
-            )
-            continue
-
-        result.issues.append(
-            Issue(
-                Severity.ERROR,
-                "E312",
-                (f"diagram relation '{conn_type}' between '{src_alias}' and '{tgt_alias}' does not exist in the model"),
-                loc,
-            )
-        )
 
 
 def _check_entity_ids_used(
@@ -425,118 +345,8 @@ def _check_entity_aliases_declared(content: str, fm: dict, result: VerificationR
             )
 
 
-def _normalize_puml_alias(alias: str) -> str:
-    return alias.strip().replace("-", "_")
-
-
 def _extract_declared_puml_aliases(content: str) -> set[str]:
     return _extract_declared_puml_aliases_shared(content)
-
-
-def _extract_entity_display_alias(entity_text: str) -> str:
-    marker = "<!-- §display -->"
-    pos = entity_text.find(marker)
-    if pos == -1:
-        return ""
-    display_body = entity_text[pos + len(marker) :]
-    m = re.search(r"alias:\s*([A-Za-z0-9_-]+)", display_body)
-    return _normalize_puml_alias(m.group(1)) if m else ""
-
-
-def _build_alias_lookup(content: str, fm: dict, registry: ArtifactRegistry) -> dict[str, str]:
-    alias_map: dict[str, str] = {}
-    display_alias_to_entity_id: dict[str, str] = {}
-
-    for entity_id in registry.entity_ids():
-        path = registry.find_file_by_id(entity_id)
-        if path is None:
-            continue
-        try:
-            entity_text = path.read_text(encoding="utf-8")
-        except OSError:
-            continue
-        alias = _extract_entity_display_alias(entity_text)
-        if alias:
-            display_alias_to_entity_id.setdefault(_normalize_puml_alias(alias), entity_id)
-
-    for eid in fm.get("entity-ids-used", []) if isinstance(fm.get("entity-ids-used"), list) else []:
-        eid_str = str(eid)
-        std_alias = _normalize_standard_alias(eid_str)
-        if std_alias:
-            alias_map[std_alias] = eid_str
-            alias_map[_normalize_puml_alias(std_alias)] = eid_str
-        alias = display_alias_to_entity_id.get(_normalize_puml_alias(std_alias), "")
-        if alias:
-            alias_map[_normalize_puml_alias(std_alias)] = alias
-        display_alias = ""
-        path = registry.find_file_by_id(eid_str)
-        if path is not None:
-            try:
-                entity_text = path.read_text(encoding="utf-8")
-            except OSError:
-                entity_text = ""
-            display_alias = _extract_entity_display_alias(entity_text) if entity_text else ""
-        if display_alias:
-            alias_map[display_alias] = eid_str
-
-    aliases_to_resolve = set(_extract_declared_puml_aliases(content))
-    for src_alias, tgt_alias, _conn_type in _iter_declared_relations(content):
-        aliases_to_resolve.add(src_alias)
-        aliases_to_resolve.add(tgt_alias)
-
-    for alias in aliases_to_resolve:
-        normalized = _normalize_puml_alias(alias)
-        if alias in alias_map or normalized in alias_map:
-            continue
-        resolved = display_alias_to_entity_id.get(normalized)
-        if resolved is not None:
-            alias_map[alias] = resolved
-            alias_map[normalized] = resolved
-            continue
-        resolved = _resolve_standard_alias(alias, registry.entity_ids())
-        if resolved is None:
-            resolved = _resolve_standard_alias(normalized, registry.entity_ids())
-        if resolved is not None:
-            alias_map[alias] = resolved
-            alias_map[normalized] = resolved
-
-    return alias_map
-
-
-def _normalize_standard_alias(artifact_id: str) -> str:
-    parts = artifact_id.split(".")
-    if len(parts) < 2 or "@" not in parts[0]:
-        return ""
-    prefix = parts[0].split("@", 1)[0]
-    return f"{prefix}_{parts[1]}"
-
-
-def _resolve_standard_alias(alias: str, entity_ids: set[str]) -> str | None:
-    match = _STD_ALIAS_RE.match(alias)
-    if match is None:
-        return None
-    prefix = match.group("prefix")
-    random = match.group("random")
-    needle = f".{random}."
-    for entity_id in entity_ids:
-        if entity_id.startswith(f"{prefix}@") and needle in entity_id:
-            return entity_id
-    return None
-
-
-def _iter_declared_relations(content: str) -> list[tuple[str, str, str]]:
-    relations: list[tuple[str, str, str]] = []
-    for match in _REL_MACRO_RE.finditer(content):
-        conn_type = ARCHIMATE_STEREOTYPE_TO_CONNECTION_TYPE.get(match.group("rel").lower())
-        if conn_type is None:
-            continue
-        relations.append((match.group("src"), match.group("tgt"), conn_type))
-    for match in _REL_LINE_RE.finditer(content):
-        conn_type = ARCHIMATE_STEREOTYPE_TO_CONNECTION_TYPE.get(match.group("rel").lower())
-        if conn_type is None:
-            continue
-        relations.append((match.group("src"), match.group("tgt"), conn_type))
-    return relations
 
 
 def check_diagram_artifact_type(fm: dict, result: VerificationResult, loc: str) -> None:
