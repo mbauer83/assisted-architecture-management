@@ -18,7 +18,7 @@ from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from src.application.assurance_ports import ConfidentialAssuranceStore
-    from src.application.ports import ArtifactStorePort
+    from src.application.ports import ArtifactLookup
 
 logger = logging.getLogger(__name__)
 
@@ -29,7 +29,7 @@ def _now_iso() -> str:
 
 def resolve_arch_refs(
     assurance_store: ConfidentialAssuranceStore,
-    artifact_store: ArtifactStorePort,
+    artifact_store: ArtifactLookup,
 ) -> dict[str, object]:
     """Resolve dangling assurance→architecture references.
 

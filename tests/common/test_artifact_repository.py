@@ -10,7 +10,16 @@ from pathlib import Path
 from typing import Literal
 
 from src.application.artifact_repository import ArtifactRepository
-from src.application.ports import ArtifactStorePort
+from src.application.ports import (
+    ArtifactIndexLifecycle,
+    ArtifactLookup,
+    ArtifactMutationObserver,
+    ArtifactSearch,
+    ArtifactStorePort,
+    RelationshipGraph,
+    RepositoryScopeResolver,
+    VerifierStorePort,
+)
 from src.application.read_models import EntityContextConnection, EntityContextReadModel
 from src.domain.artifact_types import (
     ArtifactSummary,
@@ -380,6 +389,73 @@ def test_artifact_index_satisfies_store_port(tmp_path: Path) -> None:
 
 def test_fake_store_satisfies_store_port() -> None:
     _: ArtifactStorePort = FakeStore()  # FakeStore must conform for tests to be meaningful
+
+
+def test_artifact_index_satisfies_narrow_contracts(tmp_path: Path) -> None:
+    """ArtifactIndex satisfies all six narrow sub-contracts."""
+    index = ArtifactIndex(tmp_path)
+    _lookup: ArtifactLookup = index
+    _search: ArtifactSearch = index
+    _graph: RelationshipGraph = index
+    _scope: RepositoryScopeResolver = index
+    _lifecycle: ArtifactIndexLifecycle = index
+    _observer: ArtifactMutationObserver = index
+    _verifier: VerifierStorePort = index
+
+
+def test_fake_store_satisfies_narrow_contracts() -> None:
+    """FakeStore satisfies all six narrow sub-contracts."""
+    store = FakeStore()
+    _lookup: ArtifactLookup = store
+    _search: ArtifactSearch = store
+    _graph: RelationshipGraph = store
+    _scope: RepositoryScopeResolver = store
+    _lifecycle: ArtifactIndexLifecycle = store
+    _observer: ArtifactMutationObserver = store
+    _verifier: VerifierStorePort = store
+
+
+def test_narrow_lookup_contract(tmp_path: Path) -> None:
+    """ArtifactLookup can be used where only point-lookups are needed."""
+    store: ArtifactLookup = FakeStore(entities=[_entity("e1")])
+    assert store.get_entity("e1") is not None
+    assert store.get_entity("missing") is None
+    assert store.find_file_by_id("e1") is not None
+
+
+def test_narrow_lifecycle_contract() -> None:
+    """ArtifactIndexLifecycle exposes ID membership sets."""
+    store: ArtifactIndexLifecycle = FakeStore(entities=[_entity("e1"), _entity("e2")])
+    assert "e1" in store.entity_ids()
+    assert store.enterprise_entity_ids() == set()
+    assert "e1" in store.engagement_entity_ids()
+
+
+def test_narrow_scope_resolver_contract() -> None:
+    """RepositoryScopeResolver exposes scope classification and status."""
+    store: RepositoryScopeResolver = FakeStore(entities=[_entity("e1", status="approved")])
+    assert store.scope_of_entity("e1") == "unknown"
+    assert store.entity_status("e1") == "approved"
+    assert store.entity_statuses() == {"e1": "approved"}
+
+
+def test_narrow_mutation_observer_contract() -> None:
+    """ArtifactMutationObserver accepts file-change paths."""
+    store: ArtifactMutationObserver = FakeStore()
+    version = store.apply_file_changes([Path("/tmp/fake.md")])
+    assert version is not None
+
+
+def test_verifier_store_port_uses_subset() -> None:
+    """VerifierStorePort is satisfied by the full store and exposes only verifier methods."""
+    store: VerifierStorePort = FakeStore(entities=[_entity("e1")])
+    # ArtifactLookup methods
+    assert store.find_file_by_id("e1") is not None
+    # ArtifactIndexLifecycle methods
+    assert "e1" in store.entity_ids()
+    # RepositoryScopeResolver methods
+    assert store.scope_of_entity("e1") == "unknown"
+    store.refresh()  # ArtifactIndexLifecycle
 
 
 # ── count_artifacts_by ────────────────────────────────────────────────────────

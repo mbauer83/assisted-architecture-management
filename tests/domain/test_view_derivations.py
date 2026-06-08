@@ -207,10 +207,12 @@ class TestViewDerivationsSchema:
 
 class TestStrategyRegistry:
     def setup_method(self) -> None:
+        self._saved = dict(_registry)
         _registry.clear()
 
     def teardown_method(self) -> None:
         _registry.clear()
+        _registry.update(self._saved)
 
     def test_lookup_unknown_returns_none(self) -> None:
         assert lookup_strategy("unknown", 1) is None
@@ -300,10 +302,12 @@ class TestE413InvalidRepoScope:
 
 class TestE411UnknownStrategy:
     def setup_method(self) -> None:
+        self._saved = dict(_registry)
         _registry.clear()
 
     def teardown_method(self) -> None:
         _registry.clear()
+        _registry.update(self._saved)
 
     def test_unknown_strategy_raises_e411(self) -> None:
         fm = {"view_derivations": [_vd_entry(strategy="no-such-strategy", strategy_version=1)]}
@@ -332,6 +336,7 @@ class TestE411UnknownStrategy:
 
 class TestE412UnsupportedFilter:
     def setup_method(self) -> None:
+        self._saved = dict(_registry)
         _registry.clear()
         register_strategy(StrategySpec(
             name="my-strategy", version=1,
@@ -340,6 +345,7 @@ class TestE412UnsupportedFilter:
 
     def teardown_method(self) -> None:
         _registry.clear()
+        _registry.update(self._saved)
 
     def test_unsupported_filter_raises_e412(self) -> None:
         entry = _vd_entry(parameters={"pre_filters": {"unknown_filter": True}})

@@ -15,19 +15,29 @@ from src.domain.artifact_types import (
 )
 
 
-class ArtifactStorePort(Protocol):
-    # Lifecycle
-    def refresh(self) -> None: ...
-    def read_model_version(self) -> ReadModelVersion: ...
-    def apply_file_changes(self, paths: list[Path]) -> ReadModelVersion: ...
+class ArtifactLookup(Protocol):
+    """Point-lookup by artifact ID."""
 
-    # Point lookups
     def get_entity(self, artifact_id: str) -> EntityRecord | None: ...
     def get_connection(self, artifact_id: str) -> ConnectionRecord | None: ...
     def get_diagram(self, artifact_id: str) -> DiagramRecord | None: ...
     def get_document(self, artifact_id: str) -> DocumentRecord | None: ...
+    def read_artifact(
+        self,
+        artifact_id: str,
+        *,
+        mode: Literal["summary", "full"] = "summary",
+        section: str | None = None,
+    ) -> dict[str, object] | None: ...
+    def summarize_artifact(self, artifact_id: str) -> ArtifactSummary | None: ...
+    def read_entity_context(self, artifact_id: str) -> EntityContextReadModel | None: ...
+    def find_file_by_id(self, artifact_id: str) -> Path | None: ...
+    def stats(self) -> dict[str, object]: ...
 
-    # Filtered list queries (return sorted copies — callers never hold the live dict)
+
+class ArtifactSearch(Protocol):
+    """Filtered list queries and full-text search."""
+
     def list_entities(
         self,
         *,
@@ -75,21 +85,23 @@ class ArtifactStorePort(Protocol):
         include_documents: bool = False,
     ) -> list[ArtifactSummary]: ...
 
-    # Richer reads
-    def read_artifact(
+    def search_fts(
         self,
-        artifact_id: str,
+        query: str,
         *,
-        mode: Literal["summary", "full"] = "summary",
-        section: str | None = None,
-    ) -> dict[str, object] | None: ...
+        limit: int,
+        include_connections: bool,
+        include_diagrams: bool,
+        include_documents: bool,
+        prefer_record_type: str | None,
+        strict_record_type: bool,
+    ) -> list[tuple[str, str, float]]: ...
 
-    def summarize_artifact(self, artifact_id: str) -> ArtifactSummary | None: ...
-    def read_entity_context(self, artifact_id: str) -> EntityContextReadModel | None: ...
+
+class RelationshipGraph(Protocol):
+    """Connection graph traversal and candidate queries."""
+
     def candidate_connections_for_entities(self, entity_ids: list[str]) -> list[EntityContextConnection]: ...
-    def stats(self) -> dict[str, object]: ...
-
-    # Connection-specific queries
     def connection_counts(self) -> dict[str, tuple[int, int, int]]: ...
     def connection_counts_for(self, entity_id: str) -> tuple[int, int, int]: ...
     def connection_counts_for_entities(
@@ -116,25 +128,29 @@ class ArtifactStorePort(Protocol):
         conn_type: str | None = None,
     ) -> dict[str, set[str]]: ...
 
-    # FTS search
-    def search_fts(
-        self,
-        query: str,
-        *,
-        limit: int,
-        include_connections: bool,
-        include_diagrams: bool,
-        include_documents: bool,
-        prefer_record_type: str | None,
-        strict_record_type: bool,
-    ) -> list[tuple[str, str, float]]: ...
 
-    # Scope
+class RepositoryScopeResolver(Protocol):
+    """Repository mount enumeration, scope classification, and artifact status."""
+
+    @property
+    def repo_mounts(self) -> list[RepoMount]: ...
+    @property
+    def repo_roots(self) -> list[Path]: ...
+    @property
+    def repo_root(self) -> Path: ...
     def scope_for_path(self, path: Path) -> Literal["enterprise", "engagement", "unknown"]: ...
     def scope_of_entity(self, artifact_id: str) -> Literal["enterprise", "engagement", "unknown"]: ...
     def scope_of_connection(self, artifact_id: str) -> Literal["enterprise", "engagement", "unknown"]: ...
+    def entity_status(self, artifact_id: str) -> str | None: ...
+    def entity_statuses(self) -> dict[str, str]: ...
+    def connection_status(self, artifact_id: str) -> str | None: ...
 
-    # Registry-style queries
+
+class ArtifactIndexLifecycle(Protocol):
+    """Index read-model versioning, refresh, and ID-membership sets."""
+
+    def refresh(self) -> None: ...
+    def read_model_version(self) -> ReadModelVersion: ...
     def entity_ids(self) -> set[str]: ...
     def connection_ids(self) -> set[str]: ...
     def enterprise_entity_ids(self) -> set[str]: ...
@@ -143,18 +159,36 @@ class ArtifactStorePort(Protocol):
     def engagement_connection_ids(self) -> set[str]: ...
     def enterprise_document_ids(self) -> set[str]: ...
     def enterprise_diagram_ids(self) -> set[str]: ...
-    def entity_status(self, artifact_id: str) -> str | None: ...
-    def entity_statuses(self) -> dict[str, str]: ...
-    def connection_status(self, artifact_id: str) -> str | None: ...
-    def find_file_by_id(self, artifact_id: str) -> Path | None: ...
 
-    # Mount introspection
-    @property
-    def repo_mounts(self) -> list[RepoMount]: ...
-    @property
-    def repo_roots(self) -> list[Path]: ...
-    @property
-    def repo_root(self) -> Path: ...
+
+class ArtifactMutationObserver(Protocol):
+    """Notification when repository files change on disk."""
+
+    def apply_file_changes(self, paths: list[Path]) -> ReadModelVersion: ...
+
+
+class ArtifactStorePort(
+    ArtifactLookup,
+    ArtifactSearch,
+    RelationshipGraph,
+    RepositoryScopeResolver,
+    ArtifactIndexLifecycle,
+    ArtifactMutationObserver,
+    Protocol,
+):
+    """Full composite artifact store port.
+
+    Prefer narrow sub-contracts where the consumer only needs a subset.
+    """
+
+
+class VerifierStorePort(
+    ArtifactLookup,
+    ArtifactIndexLifecycle,
+    RepositoryScopeResolver,
+    Protocol,
+):
+    """Narrowed port for verifier/registry consumers."""
 
 
 @dataclass(frozen=True)

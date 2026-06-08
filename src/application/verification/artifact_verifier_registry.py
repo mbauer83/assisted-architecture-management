@@ -3,13 +3,13 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Literal
 
-from src.application.ports import ArtifactStorePort
+from src.application.ports import VerifierStorePort
 
 
 class ArtifactRegistry:
     """Verifier/write-oriented facade over the shared model index."""
 
-    def __init__(self, store: ArtifactStorePort) -> None:
+    def __init__(self, store: VerifierStorePort) -> None:
         self._store = store
 
     @property
