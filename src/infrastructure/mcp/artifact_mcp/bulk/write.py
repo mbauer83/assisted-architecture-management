@@ -198,9 +198,14 @@ def _sync_verify_and_commit(
             items=[item for _index, item in indexed],
             results=results,
         )
+        from src.infrastructure.app_bootstrap import build_runtime_catalogs, get_module_registry  # noqa: PLC0415
+
         auto_sync_diagrams(
             repo_root=staged_root,
-            verifier=ArtifactVerifier(ArtifactRegistry(shared_artifact_index([staged_root]))),
+            verifier=ArtifactVerifier(
+                ArtifactRegistry(shared_artifact_index([staged_root])),
+                catalogs=build_runtime_catalogs(get_module_registry()),
+            ),
             clear_repo_caches=clear_repo_caches,
             diagram_ids=auto_sync_diagram_ids,
             dry_run=dry_run,

@@ -15,6 +15,7 @@ Covers:
 
 from __future__ import annotations
 
+from functools import lru_cache
 from pathlib import Path
 
 import pytest
@@ -24,6 +25,13 @@ from src.application.verification.artifact_verifier import ArtifactVerifier
 from src.application.verification.artifact_verifier_registry import ArtifactRegistry
 from src.infrastructure.artifact_index import shared_artifact_index
 from src.infrastructure.mcp import mcp_artifact_server as mcp_tools
+
+
+@lru_cache(maxsize=1)
+def _catalogs():
+    from src.infrastructure.app_bootstrap import build_runtime_catalogs, get_module_registry  # noqa: PLC0415
+
+    return build_runtime_catalogs(get_module_registry())
 
 # ---------------------------------------------------------------------------
 # Fixtures
@@ -215,7 +223,7 @@ class TestGrfCreation:
         result = ensure_global_artifact_reference(
             engagement_repo=repo,
             engagement_root=engagement_root,
-            verifier=ArtifactVerifier(None),
+            verifier=ArtifactVerifier(None, catalogs=_catalogs()),
             clear_repo_caches=lambda _: None,
             global_artifact_id="REQ@2000000000.GloAAA.global-req",
             global_artifact_name="Global Req",
@@ -241,7 +249,7 @@ class TestGrfCreation:
         r1 = ensure_global_artifact_reference(
             engagement_repo=repo,
             engagement_root=engagement_root,
-            verifier=ArtifactVerifier(None),
+            verifier=ArtifactVerifier(None, catalogs=_catalogs()),
             clear_repo_caches=_notify,
             global_artifact_id=global_id,
             global_artifact_name="Global Req",
@@ -254,7 +262,7 @@ class TestGrfCreation:
         r2 = ensure_global_artifact_reference(
             engagement_repo=repo2,
             engagement_root=engagement_root,
-            verifier=ArtifactVerifier(None),
+            verifier=ArtifactVerifier(None, catalogs=_catalogs()),
             clear_repo_caches=_notify,
             global_artifact_id=global_id,
             global_artifact_name="Global Req",
@@ -300,7 +308,7 @@ class TestGrfVerifierRules:
         _write(gar_path, _grf_md(gar_id, "Global Req", global_id))
 
         registry = ArtifactRegistry(shared_artifact_index([engagement_root, enterprise_root]))
-        verifier = ArtifactVerifier(registry)
+        verifier = ArtifactVerifier(registry, catalogs=_catalogs())
         result = verifier.verify_entity_file(gar_path)
         errors = [i for i in result.issues if i.severity == "error"]
         assert not errors, [i.message for i in errors]
@@ -311,7 +319,7 @@ class TestGrfVerifierRules:
         # Write a GAR without global-artifact-id
         _write(gar_path, _entity_md(gar_id, "global-artifact-reference", "Bad GAR"))
 
-        verifier = ArtifactVerifier(None)
+        verifier = ArtifactVerifier(None, catalogs=_catalogs())
         result = verifier.verify_entity_file(gar_path)
         codes = {i.code for i in result.issues if i.severity == "error"}
         assert "E140" in codes
@@ -329,7 +337,7 @@ class TestGrfVerifierRules:
             _entity_md("REQ@2000000000.GloAAA.other", "requirement", "Other"),
         )
         registry = ArtifactRegistry(shared_artifact_index([engagement_root, enterprise_root]))
-        verifier = ArtifactVerifier(registry)
+        verifier = ArtifactVerifier(registry, catalogs=_catalogs())
         result = verifier.verify_entity_file(gar_path)
         codes = {i.code for i in result.issues if i.severity == "error"}
         assert "E141" in codes
@@ -338,7 +346,7 @@ class TestGrfVerifierRules:
         gar_id = "GAR@1000000001.AbcDef.no-ent"
         gar_path = engagement_root / "model" / "common" / "global-artifact-reference" / f"{gar_id}.md"
         _write(gar_path, _grf_md(gar_id, "Some Ref", "REQ@2000000000.GloAAA.unknown"))
-        verifier = ArtifactVerifier(None)
+        verifier = ArtifactVerifier(None, catalogs=_catalogs())
         result = verifier.verify_entity_file(gar_path)
         codes = {i.code for i in result.issues if i.severity == "warning"}
         errors = {i.code for i in result.issues if i.severity == "error"}

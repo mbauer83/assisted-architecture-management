@@ -233,6 +233,7 @@ def _build_matrix_markdown(
     to_entity_ids: list[str] | None = None,
 ) -> str:
     from src.application.modeling.matrix_builder import ConnTypeConfig, build_matrix_tables
+    from src.infrastructure.app_bootstrap import build_runtime_catalogs, get_module_registry  # noqa: PLC0415
 
     all_ids = list(set(from_entity_ids or entity_ids) | set(to_entity_ids or entity_ids))
     entity_names: dict[str, str] = {}
@@ -244,6 +245,7 @@ def _build_matrix_markdown(
     configs = [
         ConnTypeConfig(conn_type=str(c["conn_type"]), active=bool(c.get("active", True))) for c in conn_type_configs
     ]
+    abbrevs = build_runtime_catalogs(get_module_registry()).ontology.matrix_connection_type_abbreviations()
     return build_matrix_tables(
         entity_ids=entity_ids,
         conn_type_configs=configs,
@@ -252,6 +254,7 @@ def _build_matrix_markdown(
         connections=connections,
         from_entity_ids=from_entity_ids,
         to_entity_ids=to_entity_ids,
+        matrix_abbreviations=abbrevs,
     )
 
 

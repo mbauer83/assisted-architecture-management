@@ -76,14 +76,14 @@ def create_entity(
 ) -> WriteResult:
     assert_engagement_write_root(repo_root)
 
-    if is_internal_entity_type(artifact_type):
+    from src.infrastructure.app_bootstrap import build_runtime_catalogs, get_module_registry  # noqa: PLC0415
+
+    if is_internal_entity_type(artifact_type, build_runtime_catalogs(get_module_registry()).ontology):
         raise ValueError(
             "global-artifact-reference entities may not be created directly. "
             "Use ensure_global_artifact_reference (MCP) or "
             "POST /api/global-entity-reference (GUI) instead."
         )
-
-    from src.infrastructure.app_bootstrap import get_module_registry  # noqa: PLC0415
 
     info = get_module_registry().find_entity_type(EntityTypeName(artifact_type))
     if info is None:

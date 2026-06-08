@@ -83,25 +83,26 @@ class ArtifactVerifier:
 
     @functools.cached_property
     def _runtime_catalogs(self) -> RuntimeCatalogs:
-        if self._catalogs is not None:
-            return self._catalogs
-        from src.infrastructure.app_bootstrap import build_runtime_catalogs, get_module_registry  # noqa: PLC0415
-
-        return build_runtime_catalogs(get_module_registry())
+        if self._catalogs is None:
+            raise RuntimeError(
+                "ArtifactVerifier requires 'catalogs'; "
+                "pass catalogs=build_runtime_catalogs(get_module_registry())"
+            )
+        return self._catalogs
 
     @functools.cached_property
     def _puml_syntax(self) -> PumlSyntaxPort:
         if self._puml_port is not None:
             return self._puml_port
-        from src.infrastructure.verification.adapters import DefaultPumlSyntaxAdapter  # noqa: PLC0415
+        from src.application.verification._verifier_stdlib_adapters import _NullPumlSyntax  # noqa: PLC0415
 
-        return DefaultPumlSyntaxAdapter()
+        return _NullPumlSyntax()
 
     @functools.cached_property
     def _scheduler(self) -> VerifierScheduler:
         if self._scheduler_port is not None:
             return self._scheduler_port
-        from src.infrastructure.verification.adapters import ThreadPoolVerifierScheduler  # noqa: PLC0415
+        from src.application.verification._verifier_stdlib_adapters import ThreadPoolVerifierScheduler  # noqa: PLC0415
 
         return ThreadPoolVerifierScheduler()
 
@@ -109,7 +110,7 @@ class ArtifactVerifier:
     def _inventory(self) -> FileInventoryPort:
         if self._inventory_port is not None:
             return self._inventory_port
-        from src.infrastructure.verification.adapters import FilesystemInventoryAdapter  # noqa: PLC0415
+        from src.application.verification._verifier_stdlib_adapters import FilesystemInventoryAdapter  # noqa: PLC0415
 
         return FilesystemInventoryAdapter()
 
@@ -117,7 +118,9 @@ class ArtifactVerifier:
     def _incremental(self) -> IncrementalStatePort:
         if self._incremental_port is not None:
             return self._incremental_port
-        from src.infrastructure.verification.adapters import DefaultIncrementalStateAdapter  # noqa: PLC0415
+        from src.application.verification._verifier_stdlib_adapters import (
+            DefaultIncrementalStateAdapter,  # noqa: PLC0415
+        )
 
         return DefaultIncrementalStateAdapter()
 
@@ -150,7 +153,7 @@ class ArtifactVerifier:
         check_section(content, "§content", required=True, result=result, loc=loc)
         check_section(content, "§display", required=True, result=result, loc=loc)
 
-        if is_internal_entity_type(str(fm.get("artifact-type", ""))):
+        if is_internal_entity_type(str(fm.get("artifact-type", "")), self._runtime_catalogs.ontology):
             check_global_artifact_reference(fm, self.registry, result, loc)
 
         repo_root = self._repo_root_for_path(path)
@@ -208,7 +211,10 @@ class ArtifactVerifier:
                 diagram_type_catalog=self._runtime_catalogs.diagram_types,
                 derivation_catalog=self._runtime_catalogs.derivation,
             )
-            check_diagram_relation_references(content, fm, self.registry, scope, result, loc)
+            check_diagram_relation_references(
+                content, fm, self.registry, scope, result, loc,
+                stereotype_map=self._runtime_catalogs.ontology.archimate_stereotype_to_connection_type(),
+            )
         else:
             result.issues.append(Issue(
                 Severity.WARNING, "W002",

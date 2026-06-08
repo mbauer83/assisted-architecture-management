@@ -4,14 +4,6 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 from dataclasses import dataclass
-from functools import lru_cache
-
-
-@lru_cache(maxsize=1)
-def _matrix_connection_type_abbreviations() -> Mapping[str, str]:
-    from src.infrastructure.app_bootstrap import build_runtime_catalogs, get_module_registry  # noqa: PLC0415
-
-    return build_runtime_catalogs(get_module_registry()).ontology.matrix_connection_type_abbreviations()
 
 
 @dataclass
@@ -29,6 +21,7 @@ def build_matrix_tables(
     connections: list[Mapping[str, object]],
     from_entity_ids: list[str] | None = None,
     to_entity_ids: list[str] | None = None,
+    matrix_abbreviations: Mapping[str, str] | None = None,
 ) -> str:
     """Return markdown matrix table(s).
 
@@ -56,7 +49,7 @@ def build_matrix_tables(
             conn_set.setdefault(ct, set()).add((tgt, src))
 
     if combined:
-        return _combined_table(row_ids, col_ids, entity_names, active, conn_set)
+        return _combined_table(row_ids, col_ids, entity_names, active, conn_set, matrix_abbreviations or {})
     return "\n\n".join(_single_table(row_ids, col_ids, entity_names, cfg.conn_type, conn_set) for cfg in active)
 
 
@@ -89,10 +82,11 @@ def _single_table(
 _LANG_PREFIXES = ("archimate-", "er-", "sequence-", "activity-", "usecase-")
 
 
-def _abbreviations(active: list[ConnTypeConfig]) -> dict[str, str]:
+def _abbreviations(
+    active: list[ConnTypeConfig], ontology_abbreviations: Mapping[str, str]
+) -> dict[str, str]:
     """Return abbreviation → conn_type using ontology declarations, falling back to
     auto-generation (strip language prefix, first letter uppercase) for unknown types."""
-    ontology_abbreviations = _matrix_connection_type_abbreviations()
     abbrevs: dict[str, str] = {}
     used: set[str] = set()
     for cfg in active:
@@ -122,9 +116,10 @@ def _combined_table(
     entity_names: dict[str, str],
     active: list[ConnTypeConfig],
     conn_set: dict[str, set[tuple[str, str]]],
+    ontology_abbreviations: Mapping[str, str],
 ) -> str:
     _ = entity_names  # available for future use
-    abbrevs = _abbreviations(active)
+    abbrevs = _abbreviations(active, ontology_abbreviations)
     header = "| | " + " | ".join(_header_cell(e) for e in col_ids) + " |"
     sep = "|---|" + "---|" * len(col_ids)
     rows = [header, sep]

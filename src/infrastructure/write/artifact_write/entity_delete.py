@@ -105,8 +105,10 @@ def _entity_ref_blockers(
             if other_entity.name.endswith(".outgoing.md") or other_entity == entity_file:
                 continue
             fm = parse_frontmatter_from_path(other_entity) or {}
+            from src.infrastructure.app_bootstrap import build_runtime_catalogs, get_module_registry  # noqa: PLC0415
+            _cat = build_runtime_catalogs(get_module_registry())
             if (
-                is_internal_entity_type(str(fm.get("artifact-type", "")))
+                is_internal_entity_type(str(fm.get("artifact-type", "")), _cat.ontology)
                 and str(fm.get("global-artifact-id", "")) == artifact_id
             ):
                 grf_refs.append(str(fm.get("artifact-id", other_entity.stem)))

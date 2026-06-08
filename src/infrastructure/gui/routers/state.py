@@ -20,10 +20,19 @@ else:
                 super().__init__(detail)
 
 
+from functools import lru_cache as _lru_cache
+
 from src.application.artifact_query import ArtifactRepository
 from src.application.entity_type_predicates import is_internal_entity_type
 from src.domain.artifact_types import ConnectionRecord, DiagramRecord, EntityRecord
 from src.infrastructure.artifact_index.coordination import publish_authoritative_mutation
+
+
+@_lru_cache(maxsize=1)
+def _catalogs():
+    from src.infrastructure.app_bootstrap import build_runtime_catalogs, get_module_registry  # noqa: PLC0415
+
+    return build_runtime_catalogs(get_module_registry())
 
 # Module-level server state — set by gui_server.main() before uvicorn starts.
 # Guarded by _state_lock so background threads (git sync, refresh workers) can
@@ -143,7 +152,7 @@ def resolve_gar(artifact_id: str) -> tuple[str, bool]:
     if repo is None:
         return artifact_id, False
     rec = repo.get_entity(artifact_id)
-    if rec is not None and is_internal_entity_type(rec.artifact_type):
+    if rec is not None and is_internal_entity_type(rec.artifact_type, _catalogs().ontology):
         gaid = rec.extra.get("global-artifact-id")
         if isinstance(gaid, str) and gaid:
             return gaid, True
@@ -199,6 +208,7 @@ def get_write_deps() -> tuple[Path, Any, Any]:
     """Return (engagement_root, registry, verifier). Registry spans both repos."""
     from src.application.verification.artifact_verifier import ArtifactVerifier
     from src.application.verification.artifact_verifier_registry import ArtifactRegistry
+    from src.infrastructure.app_bootstrap import build_runtime_catalogs, get_module_registry  # noqa: PLC0415
     from src.infrastructure.artifact_index import shared_artifact_index
 
     with _state_lock:
@@ -210,7 +220,7 @@ def get_write_deps() -> tuple[Path, Any, Any]:
     if enterprise_root is not None:
         roots.append(enterprise_root)
     registry = ArtifactRegistry(shared_artifact_index(roots))
-    return repo_root, registry, ArtifactVerifier(registry)
+    return repo_root, registry, ArtifactVerifier(registry, catalogs=build_runtime_catalogs(get_module_registry()))
 
 
 def get_admin_write_deps() -> tuple[Path, Any, Any]:
@@ -222,6 +232,7 @@ def get_admin_write_deps() -> tuple[Path, Any, Any]:
     """
     from src.application.verification.artifact_verifier import ArtifactVerifier
     from src.application.verification.artifact_verifier_registry import ArtifactRegistry
+    from src.infrastructure.app_bootstrap import build_runtime_catalogs, get_module_registry  # noqa: PLC0415
     from src.infrastructure.artifact_index import shared_artifact_index
 
     with _state_lock:
@@ -236,7 +247,7 @@ def get_admin_write_deps() -> tuple[Path, Any, Any]:
     if repo_root is not None:
         roots.append(repo_root)
     registry = ArtifactRegistry(shared_artifact_index(roots))
-    return enterprise_root, registry, ArtifactVerifier(registry)
+    return enterprise_root, registry, ArtifactVerifier(registry, catalogs=build_runtime_catalogs(get_module_registry()))
 
 
 def clear_caches(path: Path | list[Path]) -> None:

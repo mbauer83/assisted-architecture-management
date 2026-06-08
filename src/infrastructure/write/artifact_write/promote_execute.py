@@ -116,10 +116,15 @@ def execute_promotion(
                 resolutions,
             )
 
+        from src.infrastructure.app_bootstrap import build_runtime_catalogs, get_module_registry  # noqa: PLC0415
+
         ent_registry = ArtifactRegistry(shared_artifact_index(enterprise_root))
         errors = [
             f"{i.code}: {i.message} ({i.location})"
-            for r in ArtifactVerifier(ent_registry).verify_all(enterprise_root, include_diagrams=False)
+            for r in ArtifactVerifier(
+                ent_registry,
+                catalogs=build_runtime_catalogs(get_module_registry()),
+            ).verify_all(enterprise_root, include_diagrams=False)
             for i in r.issues
             if i.severity == "error"
         ]
@@ -232,12 +237,15 @@ def _replace_artifact_with_gar(
             if name is None:
                 name = aid
 
-    from src.infrastructure.write.artifact_write.global_artifact_reference import ensure_global_artifact_reference
+    from src.infrastructure.app_bootstrap import build_runtime_catalogs, get_module_registry  # noqa: PLC0415
+    from src.infrastructure.write.artifact_write.global_artifact_reference import (
+        ensure_global_artifact_reference,  # noqa: PLC0415
+    )
 
     gar_result = ensure_global_artifact_reference(
         engagement_repo=eng_repo,
         engagement_root=eng_root,
-        verifier=ArtifactVerifier(None),
+        verifier=ArtifactVerifier(None, catalogs=build_runtime_catalogs(get_module_registry())),
         clear_repo_caches=lambda _: None,
         global_artifact_id=aid,
         global_artifact_name=name,

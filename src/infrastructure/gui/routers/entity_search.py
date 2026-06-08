@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from functools import lru_cache as _lru_cache
 from typing import Any
 
 from fastapi import APIRouter, Depends, Query, Request
@@ -10,6 +11,13 @@ from src.application.entity_type_predicates import is_assurance_entity_type, is_
 from src.application.runtime_catalogs import RuntimeCatalogs
 from src.infrastructure.app_bootstrap import runtime_catalogs_dependency
 from src.infrastructure.gui.routers import state as s
+
+
+@_lru_cache(maxsize=1)
+def _catalogs():
+    from src.infrastructure.app_bootstrap import build_runtime_catalogs, get_module_registry  # noqa: PLC0415
+
+    return build_runtime_catalogs(get_module_registry())
 
 router = APIRouter()
 
@@ -75,7 +83,7 @@ def search_reference_artifacts(
 
     if kind in (None, "entity"):
         for entity in repo.list_entities():
-            if is_internal_entity_type(entity.artifact_type):
+            if is_internal_entity_type(entity.artifact_type, _catalogs().ontology):
                 continue
             if selected_domains and entity.domain not in selected_domains:
                 continue
@@ -147,18 +155,25 @@ def get_entity_taxonomy(
     repo = s.get_repo()
     entities = repo.list_entities(group=group)
     if scope == "global":
-        entities = [e for e in entities if s.is_global(e.path) and not is_assurance_entity_type(e.artifact_type)]
+        _cat = _catalogs()
+        entities = [
+            e for e in entities
+            if s.is_global(e.path) and not is_assurance_entity_type(e.artifact_type, _cat.module_catalog)
+        ]
     elif scope == "engagement":
+        _cat = _catalogs()
         entities = [
             e for e in entities
             if not s.is_global(e.path)
-            and not is_internal_entity_type(e.artifact_type)
-            and not is_assurance_entity_type(e.artifact_type)
+            and not is_internal_entity_type(e.artifact_type, _cat.ontology)
+            and not is_assurance_entity_type(e.artifact_type, _cat.module_catalog)
         ]
     else:
+        _cat = _catalogs()
         entities = [
             e for e in entities
-            if not is_internal_entity_type(e.artifact_type) and not is_assurance_entity_type(e.artifact_type)
+            if not is_internal_entity_type(e.artifact_type, _cat.ontology)
+            and not is_assurance_entity_type(e.artifact_type, _cat.module_catalog)
         ]
 
     allowed_types = resolve_meta_ontology_artifact_types(meta_ontology or "", registry)

@@ -3,9 +3,9 @@
 from __future__ import annotations
 
 import re
+from collections.abc import Mapping
 from typing import Literal
 
-from src.application.modeling.artifact_write import ARCHIMATE_STEREOTYPE_TO_CONNECTION_TYPE
 from src.application.verification.artifact_verifier_registry import ArtifactRegistry
 from src.application.verification.artifact_verifier_types import Issue, Severity, VerificationResult
 
@@ -56,22 +56,26 @@ def _extract_entity_display_alias(entity_text: str) -> str:
     return _normalize_puml_alias(m.group(1)) if m else ""
 
 
-def _iter_declared_relations(content: str) -> list[tuple[str, str, str]]:
+def _iter_declared_relations(
+    content: str, stereotype_map: Mapping[str, str]
+) -> list[tuple[str, str, str]]:
     relations: list[tuple[str, str, str]] = []
     for match in _REL_MACRO_RE.finditer(content):
-        conn_type = ARCHIMATE_STEREOTYPE_TO_CONNECTION_TYPE.get(match.group("rel").lower())
+        conn_type = stereotype_map.get(match.group("rel").lower())
         if conn_type is None:
             continue
         relations.append((match.group("src"), match.group("tgt"), conn_type))
     for match in _REL_LINE_RE.finditer(content):
-        conn_type = ARCHIMATE_STEREOTYPE_TO_CONNECTION_TYPE.get(match.group("rel").lower())
+        conn_type = stereotype_map.get(match.group("rel").lower())
         if conn_type is None:
             continue
         relations.append((match.group("src"), match.group("tgt"), conn_type))
     return relations
 
 
-def _build_alias_lookup(content: str, fm: dict, registry: ArtifactRegistry) -> dict[str, str]:
+def _build_alias_lookup(
+    content: str, fm: dict, registry: ArtifactRegistry, stereotype_map: Mapping[str, str]
+) -> dict[str, str]:
     alias_map: dict[str, str] = {}
     display_alias_to_entity_id: dict[str, str] = {}
 
@@ -112,7 +116,7 @@ def _build_alias_lookup(content: str, fm: dict, registry: ArtifactRegistry) -> d
     )
 
     aliases_to_resolve = set(_extract_declared_puml_aliases(content))
-    for src_alias, tgt_alias, _conn_type in _iter_declared_relations(content):
+    for src_alias, tgt_alias, _conn_type in _iter_declared_relations(content, stereotype_map):
         aliases_to_resolve.add(src_alias)
         aliases_to_resolve.add(tgt_alias)
 
@@ -142,14 +146,16 @@ def check_diagram_relation_references(
     file_scope: Literal["enterprise", "engagement", "unknown"],
     result: VerificationResult,
     loc: str,
+    *,
+    stereotype_map: Mapping[str, str],
 ) -> None:
     allowed_connections = (
         registry.enterprise_connection_ids() if file_scope == "enterprise" else registry.connection_ids()
     )
     all_connections = registry.connection_ids()
-    alias_to_entity_id = _build_alias_lookup(content, fm, registry)
+    alias_to_entity_id = _build_alias_lookup(content, fm, registry, stereotype_map)
 
-    for src_alias, tgt_alias, conn_type in _iter_declared_relations(content):
+    for src_alias, tgt_alias, conn_type in _iter_declared_relations(content, stereotype_map):
         src_id = alias_to_entity_id.get(src_alias) or alias_to_entity_id.get(_normalize_puml_alias(src_alias))
         tgt_id = alias_to_entity_id.get(tgt_alias) or alias_to_entity_id.get(_normalize_puml_alias(tgt_alias))
         if src_id is None:

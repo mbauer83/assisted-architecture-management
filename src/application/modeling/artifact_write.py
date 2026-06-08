@@ -14,7 +14,7 @@ import re
 import secrets
 import string
 import time
-from functools import lru_cache
+from collections.abc import Mapping
 
 from src.application.modeling.artifact_write_formatting import (
     format_diagram_puml,
@@ -26,47 +26,8 @@ from src.application.modeling.types import (
     DiagramConnectionInferenceMode,
 )
 
-
-@lru_cache(maxsize=1)
-def _registry():
-    from src.infrastructure.app_bootstrap import get_module_registry  # noqa: PLC0415
-
-    return get_module_registry()
-
-
-@lru_cache(maxsize=1)
-def _entity_types() -> dict:
-    return {str(n): info for n, info in _registry().all_entity_types().items()}
-
-
-@lru_cache(maxsize=1)
-def _connection_types() -> dict:
-    return {str(n): info for n, info in _registry().all_connection_types().items()}
-
-
-@lru_cache(maxsize=1)
-def _archimate_stereotype_map() -> dict[str, str]:
-    result: dict[str, str] = {}
-    for info in _registry().all_connection_types().values():
-        if info.conn_lang == "archimate" and info.archimate_relationship_type is not None:
-            result[info.archimate_relationship_type.lower()] = info.artifact_type
-    return result
-
-
-def __getattr__(name: str):
-    if name == "ENTITY_TYPES":
-        return _entity_types()
-    if name == "CONNECTION_TYPES":
-        return _connection_types()
-    if name == "ARCHIMATE_STEREOTYPE_TO_CONNECTION_TYPE":
-        return _archimate_stereotype_map()
-    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
-
 __all__ = [
-    "ARCHIMATE_STEREOTYPE_TO_CONNECTION_TYPE",  # noqa: F822
-    "CONNECTION_TYPES",  # noqa: F822
     "DiagramConnectionInferenceMode",
-    "ENTITY_TYPES",  # noqa: F822
     "format_diagram_puml",
     "format_entity_markdown",
     "format_matrix_markdown",
@@ -176,6 +137,7 @@ def infer_archimate_connection_ids_from_puml(
     puml: str,
     *,
     mode: DiagramConnectionInferenceMode,
+    stereotype_map: Mapping[str, str],
 ) -> tuple[list[dict[str, str]], list[str]]:
     """Infer ArchiMate connections from PUML lines with <<relationship>> stereotypes.
 
@@ -195,7 +157,7 @@ def infer_archimate_connection_ids_from_puml(
         src = m.group("src")
         tgt = m.group("tgt")
         rel = m.group("rel").strip().lower()
-        conn_type = _archimate_stereotype_map().get(rel)
+        conn_type = stereotype_map.get(rel)
         if conn_type is None:
             msg = f"Unknown ArchiMate relationship stereotype <<{m.group('rel')}>>"
             if mode == "strict":

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import re
 from difflib import SequenceMatcher
+from functools import lru_cache as _lru_cache
 from typing import TYPE_CHECKING, Any
 
 from src.application.artifact_parsing import extract_declared_puml_aliases, normalize_puml_alias
@@ -14,6 +15,13 @@ from src.infrastructure.gui.routers import state as s
 
 if TYPE_CHECKING:
     from src.application.runtime_catalogs import RuntimeCatalogs
+
+
+@_lru_cache(maxsize=1)
+def _catalogs():
+    from src.infrastructure.app_bootstrap import build_runtime_catalogs, get_module_registry  # noqa: PLC0415
+
+    return build_runtime_catalogs(get_module_registry())
 
 
 def declared_aliases_in_puml(puml: str) -> set[str]:
@@ -191,7 +199,8 @@ def hop_suggestions(
         items = [
             entity_display_item(rec, catalogs)
             for entity_id in sorted(next_frontier)
-            if (rec := repo.get_entity(entity_id)) is not None and not is_internal_entity_type(rec.artifact_type)
+            if (rec := repo.get_entity(entity_id)) is not None
+            and not is_internal_entity_type(rec.artifact_type, _catalogs().ontology)
         ]
         items.sort(
             key=lambda item: (
@@ -219,7 +228,7 @@ def fuzzy_entity_hits(
         return []
     scored: list[tuple[float, EntityRecord]] = []
     for rec in repo.list_entities():
-        if is_internal_entity_type(rec.artifact_type) or rec.artifact_id in excluded:
+        if is_internal_entity_type(rec.artifact_type, _catalogs().ontology) or rec.artifact_id in excluded:
             continue
         if accepted_entity_types is not None and rec.artifact_type not in accepted_entity_types:
             continue

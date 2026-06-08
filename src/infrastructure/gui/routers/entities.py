@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from functools import lru_cache as _lru_cache
 from typing import Any
 
 from fastapi import APIRouter, HTTPException, Query, Request
@@ -12,6 +13,13 @@ from src.application.entity_type_predicates import is_assurance_entity_type, is_
 from src.application.read_models import EntityContextReadModel
 from src.infrastructure.gui.routers import state as s
 from src.infrastructure.gui.routers.entity_listing import build_entity_list_rows
+
+
+@_lru_cache(maxsize=1)
+def _catalogs():
+    from src.infrastructure.app_bootstrap import build_runtime_catalogs, get_module_registry  # noqa: PLC0415
+
+    return build_runtime_catalogs(get_module_registry())
 
 router = APIRouter()
 
@@ -35,19 +43,24 @@ def list_entities(
 ) -> dict[str, Any]:
     repo = s.get_repo()
     entities = repo.list_entities(domain=domain, artifact_type=artifact_type, status=status, group=group)
+    _cat = _catalogs()
     if scope == "global":
-        entities = [e for e in entities if s.is_global(e.path) and not is_assurance_entity_type(e.artifact_type)]
+        entities = [
+            e for e in entities
+            if s.is_global(e.path) and not is_assurance_entity_type(e.artifact_type, _cat.module_catalog)
+        ]
     elif scope == "engagement":
         entities = [
             e for e in entities
             if not s.is_global(e.path)
-            and not is_internal_entity_type(e.artifact_type)
-            and not is_assurance_entity_type(e.artifact_type)
+            and not is_internal_entity_type(e.artifact_type, _cat.ontology)
+            and not is_assurance_entity_type(e.artifact_type, _cat.module_catalog)
         ]
     else:
         entities = [
             e for e in entities
-            if not is_internal_entity_type(e.artifact_type) and not is_assurance_entity_type(e.artifact_type)
+            if not is_internal_entity_type(e.artifact_type, _cat.ontology)
+            and not is_assurance_entity_type(e.artifact_type, _cat.module_catalog)
         ]
     if meta_ontology:
         from src.infrastructure.app_bootstrap import (  # noqa: PLC0415
@@ -150,7 +163,7 @@ class DeleteEntityBody(BaseModel):
 
 @router.post("/api/entity")
 def create_entity(body: CreateEntityBody) -> dict[str, Any]:
-    if is_internal_entity_type(body.artifact_type):
+    if is_internal_entity_type(body.artifact_type, _catalogs().ontology):
         raise HTTPException(400, "global-artifact-reference entities cannot be created directly")
     repo_root, _registry, verifier = s.get_write_deps()
     from src.infrastructure.write.artifact_write.entity import create_entity as _create

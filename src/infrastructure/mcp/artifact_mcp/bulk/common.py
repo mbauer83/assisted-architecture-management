@@ -189,7 +189,11 @@ def _preexisting_invalid_paths(
 
     live_registry = ArtifactRegistry(shared_artifact_index([live_root]))
     # check_puml_syntax=False: avoid spawning any subprocess in this path.
-    live_verifier = ArtifactVerifier(live_registry, check_puml_syntax=False)
+    from src.infrastructure.app_bootstrap import build_runtime_catalogs, get_module_registry  # noqa: PLC0415
+
+    live_verifier = ArtifactVerifier(
+        live_registry, check_puml_syntax=False, catalogs=build_runtime_catalogs(get_module_registry())
+    )
     # Build the live inventory once to get authoritative file-type mappings.
     live_inv = inventory_files(live_root, include_diagrams=True)
 
@@ -240,8 +244,10 @@ def stage_batch_verification(
     directly_changed_paths: set[Path] | None = None,
     live_root: Path | None = None,
 ) -> dict[str, object]:
+    from src.infrastructure.app_bootstrap import build_runtime_catalogs, get_module_registry  # noqa: PLC0415
+
     registry = ArtifactRegistry(shared_artifact_index([repo_root]))
-    verifier = ArtifactVerifier(registry)
+    verifier = ArtifactVerifier(registry, catalogs=build_runtime_catalogs(get_module_registry()))
     results = verifier.verify_paths(
         repo_root,
         changed_paths=sorted(changed_paths),

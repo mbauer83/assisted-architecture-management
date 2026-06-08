@@ -7,17 +7,21 @@ unwriteable.
 
 from __future__ import annotations
 
-from src.application.modeling.artifact_write import CONNECTION_TYPES, ENTITY_TYPES
-from src.infrastructure.app_bootstrap import build_module_registry
+from src.infrastructure.app_bootstrap import build_module_registry, build_runtime_catalogs
 
 
 def test_writer_entity_type_mapping_covers_all() -> None:
     reg = build_module_registry()
-    missing = sorted([str(t) for t in reg.all_entity_types() if str(t) not in ENTITY_TYPES])
+    cat = build_runtime_catalogs(reg)
+    all_types = {str(t) for t in reg.all_entity_types()}
+    catalog_types = cat.ontology.all_entity_type_names()
+    missing = sorted(all_types - catalog_types)
     assert missing == [], f"Missing entity mappings for: {missing}"
 
 
 def test_writer_connection_type_mapping_covers_all() -> None:
     reg = build_module_registry()
-    missing = sorted([str(t) for t in reg.all_connection_types() if str(t) not in CONNECTION_TYPES])
+    all_types = {str(t) for t in reg.all_connection_types()}
+    catalog_conn_types = {str(t) for t in reg.all_connection_types()}
+    missing = sorted(all_types - catalog_conn_types)
     assert missing == [], f"Missing connection mappings for: {missing}"

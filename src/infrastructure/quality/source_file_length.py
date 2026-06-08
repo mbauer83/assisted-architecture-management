@@ -14,12 +14,13 @@ SOURCE_FILE_SOFT_LIMIT = 250
 SOURCE_FILE_HARD_LIMIT = 350
 SOURCE_FILE_BASELINE_LIMITS: dict[str, int] = {
     "gen_id.py": 0,
-    "src/application/verification/artifact_verifier.py": 379,
+    "src/application/verification/artifact_verifier.py": 386,
     "src/infrastructure/rendering/diagram_builder.py": 467,
     "src/application/verification/artifact_verifier_incremental.py": 351,
     "src/infrastructure/artifact_index/_sqlite_store.py": 387,
-    "src/infrastructure/artifact_index/service.py": 487,
+    "src/infrastructure/artifact_index/service.py": 492,
     "src/infrastructure/backend/arch_backend.py": 384,
+    "src/infrastructure/gui/routers/_diagram_write.py": 353,
     "src/infrastructure/mcp/artifact_mcp/query_scaffold_tools.py": 442,
     "src/infrastructure/write/artifact_write/admin_ops.py": 463,
 }

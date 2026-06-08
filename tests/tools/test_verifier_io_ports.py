@@ -8,6 +8,7 @@ subprocess, ThreadPoolExecutor, or Path I/O.
 
 from __future__ import annotations
 
+from functools import lru_cache
 from pathlib import Path
 from typing import Any
 
@@ -19,6 +20,13 @@ from src.application.verification.artifact_verifier_types import (
     VerificationResult,
     VerifierRuntimeConfig,
 )
+
+
+@lru_cache(maxsize=1)
+def _catalogs():
+    from src.infrastructure.app_bootstrap import build_runtime_catalogs, get_module_registry  # noqa: PLC0415
+
+    return build_runtime_catalogs(get_module_registry())
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -138,6 +146,7 @@ def test_verify_all_full_calls_inventory_build(tmp_path: Path) -> None:
         check_puml_syntax=False,
         file_inventory=inventory,
         scheduler=scheduler,
+        catalogs=_catalogs(),
     )
     verifier.verify_all(tmp_path)
     assert len(inventory.build_calls) >= 1
@@ -151,6 +160,7 @@ def test_verify_all_full_calls_list_doc_files(tmp_path: Path) -> None:
         check_puml_syntax=False,
         file_inventory=inventory,
         scheduler=scheduler,
+        catalogs=_catalogs(),
     )
     verifier.verify_all(tmp_path)
     assert tmp_path in inventory.list_doc_calls
@@ -165,6 +175,7 @@ def test_verify_paths_calls_filter_doc_files(tmp_path: Path) -> None:
         check_puml_syntax=False,
         file_inventory=inventory,
         scheduler=scheduler,
+        catalogs=_catalogs(),
     )
     verifier.verify_paths(tmp_path, changed_paths=[entity_file], verification_scope="changed")
     assert len(inventory.filter_doc_calls) == 1
@@ -183,6 +194,7 @@ def test_verify_all_full_uses_scheduler(tmp_path: Path) -> None:
         check_puml_syntax=False,
         file_inventory=inventory,
         scheduler=scheduler,
+        catalogs=_catalogs(),
     )
     verifier.verify_all(tmp_path)
     assert len(scheduler.calls) >= 1
@@ -195,7 +207,7 @@ def test_verify_all_full_uses_scheduler(tmp_path: Path) -> None:
 
 def test_verify_diagram_file_uses_puml_port(tmp_path: Path) -> None:
     puml_port = _FakePumlSyntaxPort()
-    verifier = ArtifactVerifier(check_puml_syntax=True, puml_syntax=puml_port)
+    verifier = ArtifactVerifier(check_puml_syntax=True, puml_syntax=puml_port, catalogs=_catalogs())
     path = tmp_path / "test.puml"
     path.write_text("---\nartifact-type: diagram\nstatus: draft\n---\n@startuml\nA -> B\n@enduml\n")
     verifier.verify_diagram_file(path)
@@ -205,7 +217,7 @@ def test_verify_diagram_file_uses_puml_port(tmp_path: Path) -> None:
 
 def test_verify_diagram_file_skips_puml_port_when_check_disabled(tmp_path: Path) -> None:
     puml_port = _FakePumlSyntaxPort()
-    verifier = ArtifactVerifier(check_puml_syntax=False, puml_syntax=puml_port)
+    verifier = ArtifactVerifier(check_puml_syntax=False, puml_syntax=puml_port, catalogs=_catalogs())
     path = tmp_path / "test.puml"
     path.write_text("@startuml\nA -> B\n@enduml\n")
     verifier.verify_diagram_file(path)
@@ -242,6 +254,7 @@ def test_verify_all_incremental_uses_state_port(tmp_path: Path, monkeypatch) -> 
         file_inventory=inventory,
         scheduler=scheduler,
         incremental_state=incremental,
+        catalogs=_catalogs(),
     )
     verifier.verify_all(tmp_path)
 

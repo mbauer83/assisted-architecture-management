@@ -180,9 +180,12 @@ def registry_cached(roots_key_str: str) -> ArtifactRegistry:
 
 
 def verifier_for(roots_key_str: str, *, include_registry: bool) -> ArtifactVerifier:
+    from src.infrastructure.app_bootstrap import build_runtime_catalogs, get_module_registry  # noqa: PLC0415
+
+    catalogs = build_runtime_catalogs(get_module_registry())
     if include_registry:
-        return ArtifactVerifier(registry_cached(roots_key_str))
-    return ArtifactVerifier(None)
+        return ArtifactVerifier(registry_cached(roots_key_str), catalogs=catalogs)
+    return ArtifactVerifier(None, catalogs=catalogs)
 
 
 def _refresh_repo_now(roots: list[Path]) -> ReadModelVersion:

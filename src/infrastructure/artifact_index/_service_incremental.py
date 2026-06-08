@@ -104,12 +104,12 @@ def _insert_mounted(
     )
 
 
-def scan_mount(mount: RepoMount, mem: _MemStore) -> None:
+def scan_mount(mount: RepoMount, mem: _MemStore, *, domain_names: frozenset[str]) -> None:
     repo_root = mount.root
     for model_root in all_model_roots(repo_root):
         for path in sorted(model_root.rglob("*.md")):
             if not path.name.endswith(".outgoing.md"):
-                entity = parse_entity(path, model_root)
+                entity = parse_entity(path, model_root, domain_names=domain_names)
                 if entity is not None:
                     grp = group_fn_entity(path, repo_root)
                     _insert_mounted(replace(entity, group=grp), "entity", repo_root, mem.entities)
@@ -147,12 +147,18 @@ def scan_mount(mount: RepoMount, mem: _MemStore) -> None:
 #   apply_*  — updates mem and SQLite; call UNDER the index write lock
 
 
-def parse_entity_for_path(path: Path, mounts: list[RepoMount]) -> EntityRecord | None:
+def parse_entity_for_path(
+    path: Path, mounts: list[RepoMount], *, domain_names: frozenset[str]
+) -> EntityRecord | None:
     model_root = model_root_for_path(path, mounts)
-    return parse_entity(path, model_root) if path.exists() and model_root else None
+    return (
+        parse_entity(path, model_root, domain_names=domain_names) if path.exists() and model_root else None
+    )
 
 
-def classify_path_change(path: Path, mounts: list[RepoMount]) -> tuple[str, Path, object] | None:
+def classify_path_change(
+    path: Path, mounts: list[RepoMount], *, domain_names: frozenset[str]
+) -> tuple[str, Path, object] | None:
     """Return a (kind, path, parsed-data) triple or None if the path needs a full refresh."""
     if path.name.endswith(".outgoing.md"):
         return ("outgoing", path, parse_outgoing_for_path(path))
@@ -161,7 +167,7 @@ def classify_path_change(path: Path, mounts: list[RepoMount]) -> tuple[str, Path
     if is_document_path(path, mounts):
         return ("document", path, parse_document_for_path(path))
     if path.suffix == ".md":
-        return ("entity", path, parse_entity_for_path(path, mounts))
+        return ("entity", path, parse_entity_for_path(path, mounts, domain_names=domain_names))
     return None
 
 

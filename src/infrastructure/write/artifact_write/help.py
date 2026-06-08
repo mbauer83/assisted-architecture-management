@@ -11,7 +11,6 @@ Progressive discovery pattern:
 
 from functools import lru_cache
 
-from src.application.modeling.artifact_write import ARCHIMATE_STEREOTYPE_TO_CONNECTION_TYPE
 from src.domain.module_types import ElementClassName
 
 
@@ -20,6 +19,13 @@ def _registry():
     from src.infrastructure.app_bootstrap import get_module_registry  # noqa: PLC0415
 
     return get_module_registry()
+
+
+@lru_cache(maxsize=1)
+def _archimate_stereotype_keys() -> tuple[str, ...]:
+    from src.infrastructure.app_bootstrap import build_runtime_catalogs  # noqa: PLC0415
+
+    return tuple(build_runtime_catalogs(_registry()).ontology.archimate_stereotype_to_connection_type())
 
 
 def write_help() -> dict[str, object]:
@@ -37,7 +43,7 @@ def write_help() -> dict[str, object]:
         "connection_types_by_language": _connection_types_by_language(),
         "connection_type_catalog": _connection_type_catalog(),
         "diagram_types": _diagram_types_catalog(),
-        "archimate_stereotypes": sorted(ARCHIMATE_STEREOTYPE_TO_CONNECTION_TYPE.keys()),
+        "archimate_stereotypes": sorted(_archimate_stereotype_keys()),
         "conventions": {
             "entity_id_format": "TYPE@epoch.random.friendly-name (auto-generated)",
             "puml_alias_format": "TYPE_random (e.g. DRV_Qw7Er1)",

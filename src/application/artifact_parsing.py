@@ -1,6 +1,5 @@
 import re
 from collections.abc import Mapping
-from functools import lru_cache
 from pathlib import Path
 from typing import Any
 
@@ -18,15 +17,6 @@ from src.domain.artifact_types import (
     Domain,
     EntityRecord,
 )
-
-
-@lru_cache(maxsize=1)
-def _known_domain_names() -> frozenset[str]:
-    from src.infrastructure.app_bootstrap import get_module_registry  # noqa: PLC0415
-
-    reg = get_module_registry()
-    domains = {info.hierarchy[0] for info in reg.all_entity_types().values() if info.hierarchy}
-    return frozenset(domains | {"unknown"})
 
 
 def extract_yaml_block(content: str) -> dict | None:
@@ -129,13 +119,14 @@ def parse_diagram_source(content: str) -> dict[str, Any]:
     return {"frontmatter": frontmatter, "puml_body": body}
 
 
-def derive_domain(path: Path, root: Path) -> tuple[Domain, str]:
+def derive_domain(
+    path: Path, root: Path, *, domain_names: frozenset[str]
+) -> tuple[Domain, str]:
     try:
         rel = path.relative_to(root)
         parts = rel.parts
         domain_raw = parts[0] if len(parts) > 0 else "unknown"
         subdomain = parts[1] if len(parts) > 1 else ""
-        domain_names = _known_domain_names()
         domain: Domain = domain_raw if domain_raw in domain_names else "unknown"  # type: ignore[assignment]
         return domain, subdomain
     except ValueError:
@@ -170,7 +161,9 @@ def extract_declared_puml_aliases(content: str) -> set[str]:
     return aliases
 
 
-def parse_entity(path: Path, model_root: Path) -> EntityRecord | None:
+def parse_entity(
+    path: Path, model_root: Path, *, domain_names: frozenset[str]
+) -> EntityRecord | None:
     try:
         content = path.read_text(encoding="utf-8")
     except OSError:
@@ -180,7 +173,7 @@ def parse_entity(path: Path, model_root: Path) -> EntityRecord | None:
     if not frontmatter:
         return None
 
-    domain, subdomain = derive_domain(path, model_root)
+    domain, subdomain = derive_domain(path, model_root, domain_names=domain_names)
     display_blocks = extract_display_blocks(content)
     display_label, display_alias = extract_archimate_label_alias(display_blocks)
 

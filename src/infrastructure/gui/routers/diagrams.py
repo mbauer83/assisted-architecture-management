@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from functools import lru_cache as _lru_cache
 from typing import Any, Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -31,6 +32,13 @@ from src.infrastructure.gui.routers._diagram_write import router as _write_route
 router = APIRouter()
 router.include_router(_write_router)
 router.include_router(_edge_label_router)
+
+
+@_lru_cache(maxsize=1)
+def _catalogs():
+    from src.infrastructure.app_bootstrap import build_runtime_catalogs, get_module_registry  # noqa: PLC0415
+
+    return build_runtime_catalogs(get_module_registry())
 
 
 def _accepted_entity_types(diagram_type: str | None, catalogs: RuntimeCatalogs) -> set[str] | None:
@@ -105,7 +113,7 @@ def _entity_display_search_impl(
         items = [
             entity_display_item(rec, catalogs)
             for rec in repo.list_entities()
-            if not is_internal_entity_type(rec.artifact_type)
+            if not is_internal_entity_type(rec.artifact_type, _catalogs().ontology)
             and (accepted_entity_types is None or rec.artifact_type in accepted_entity_types)
         ]
         items.sort(
@@ -122,7 +130,7 @@ def _entity_display_search_impl(
         if h.record_type != "entity" or not isinstance(h.record, EntityRecord):
             continue
         rec = h.record
-        if is_internal_entity_type(rec.artifact_type):
+        if is_internal_entity_type(rec.artifact_type, _catalogs().ontology):
             continue
         if accepted_entity_types is not None and rec.artifact_type not in accepted_entity_types:
             continue

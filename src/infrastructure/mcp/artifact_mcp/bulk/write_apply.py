@@ -60,9 +60,11 @@ def apply_create_entities(
             results[index] = skipped_result("create_entity", dry_run=dry_run, operation_id=operation_id)
             continue
         try:
+            from src.infrastructure.app_bootstrap import build_runtime_catalogs, get_module_registry  # noqa: PLC0415
+
             result = artifact_write_ops.create_entity(
                 repo_root=staged_root,
-                verifier=ArtifactVerifier(None),
+                verifier=ArtifactVerifier(None, catalogs=build_runtime_catalogs(get_module_registry())),
                 clear_repo_caches=clear_repo_caches,
                 artifact_type=item["artifact_type"],
                 name=item["name"],
@@ -149,8 +151,10 @@ def apply_edits(
             results[index] = skipped_result(op, dry_run=dry_run, operation_id=operation_id)
             continue
         try:
+            from src.infrastructure.app_bootstrap import build_runtime_catalogs, get_module_registry  # noqa: PLC0415
+
             registry = current_registry()
-            verifier = ArtifactVerifier(registry)
+            verifier = ArtifactVerifier(registry, catalogs=build_runtime_catalogs(get_module_registry()))
             result = _apply_single_edit(
                 item=item,
                 op=op,

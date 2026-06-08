@@ -128,8 +128,10 @@ def _execute_staged_delete_batch(
 ) -> dict[str, Any]:
     results: dict[int, dict[str, object]] = {}
     clear_repo_caches, changed_paths = temp_repo_callbacks(staged_root)
+    from src.infrastructure.app_bootstrap import build_runtime_catalogs, get_module_registry  # noqa: PLC0415
+
     registry = ArtifactRegistry(shared_artifact_index([staged_root]))
-    verifier = ArtifactVerifier(registry)
+    verifier = ArtifactVerifier(registry, catalogs=build_runtime_catalogs(get_module_registry()))
     operation_registry.set_phase(operation_id, "apply")
 
     apply_implicit_connection_deletes(
@@ -154,7 +156,10 @@ def _execute_staged_delete_batch(
         operation_registry.set_phase(operation_id, "sync_diagrams")
         auto_sync_actions = auto_sync_diagrams(
             repo_root=staged_root,
-            verifier=ArtifactVerifier(ArtifactRegistry(shared_artifact_index([staged_root]))),
+            verifier=ArtifactVerifier(
+                ArtifactRegistry(shared_artifact_index([staged_root])),
+                catalogs=build_runtime_catalogs(get_module_registry()),
+            ),
             clear_repo_caches=clear_repo_caches,
             diagram_ids=auto_sync_ids,
             dry_run=False,

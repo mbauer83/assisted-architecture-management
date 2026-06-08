@@ -85,10 +85,16 @@ class ArtifactIndex:
             if not self._ready.is_set():
                 self.refresh()
 
+    def _get_domain_names(self) -> frozenset[str]:
+        from src.infrastructure.app_bootstrap import build_runtime_catalogs, get_module_registry  # noqa: PLC0415
+
+        return build_runtime_catalogs(get_module_registry()).ontology.known_domain_names()
+
     def refresh(self) -> None:
         temp = _MemStore()
+        domain_names = self._get_domain_names()
         for mount in self.repo_mounts:
-            scan_mount(mount, temp)
+            scan_mount(mount, temp, domain_names=domain_names)
         with self._lock.writing():
             self._mem.entities.clear()
             self._mem.entities.update(temp.entities)
@@ -112,8 +118,9 @@ class ArtifactIndex:
             self.refresh()
             return self.read_model_version()
         parsed: list[tuple] = []
+        domain_names = self._get_domain_names()
         for path in normalized:
-            change = classify_path_change(path, self.repo_mounts)
+            change = classify_path_change(path, self.repo_mounts, domain_names=domain_names)
             if change is None:
                 self.refresh()
                 return self.read_model_version()

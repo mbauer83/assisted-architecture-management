@@ -201,7 +201,9 @@ class ArtifactParsers:
     parse_document: Callable[[Path], DocumentRecord | None]
 
     @staticmethod
-    def default() -> "ArtifactParsers":
+    def default(domain_names: frozenset[str]) -> "ArtifactParsers":
+        import functools
+
         from src.application.artifact_parsing import (
             parse_diagram,
             parse_document,
@@ -210,7 +212,7 @@ class ArtifactParsers:
         )
 
         return ArtifactParsers(
-            parse_entity=parse_entity,
+            parse_entity=functools.partial(parse_entity, domain_names=domain_names),
             parse_outgoing=parse_outgoing_file,
             parse_diagram=parse_diagram,
             parse_document=parse_document,

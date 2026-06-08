@@ -121,7 +121,9 @@ def scan_grf_refs(repo_root: Path) -> dict[str, list[str]]:
         if path.name.endswith(".outgoing.md"):
             continue
         fm = parse_frontmatter_from_path(path) or {}
-        if not is_internal_entity_type(str(fm.get("artifact-type", ""))):
+        from src.infrastructure.app_bootstrap import build_runtime_catalogs, get_module_registry  # noqa: PLC0415
+        _cat = build_runtime_catalogs(get_module_registry())
+        if not is_internal_entity_type(str(fm.get("artifact-type", "")), _cat.ontology):
             continue
         target = str(fm.get("global-artifact-id", "")).strip()
         gar_id = str(fm.get("artifact-id", path.stem)).strip()

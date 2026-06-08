@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import re
+from functools import lru_cache as _lru_cache
 from typing import Any, Literal
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -12,6 +13,13 @@ from src.application.entity_type_predicates import is_internal_entity_type
 from src.application.runtime_catalogs import RuntimeCatalogs
 from src.infrastructure.app_bootstrap import runtime_catalogs_dependency
 from src.infrastructure.gui.routers import state as s
+
+
+@_lru_cache(maxsize=1)
+def _catalogs():
+    from src.infrastructure.app_bootstrap import build_runtime_catalogs, get_module_registry  # noqa: PLC0415
+
+    return build_runtime_catalogs(get_module_registry())
 
 # Accepted cardinality formats: n  |  n..m  |  n..*  |  *
 _CARDINALITY_RE = re.compile(r"^\d+$|^\d+\.\.\d+$|^\d+\.\.\*$|^\*$")
@@ -86,7 +94,7 @@ def _resolve_effective_type(artifact_id: str | None, declared_type: str) -> tupl
     if repo is None:
         return declared_type, False
     rec = repo.get_entity(artifact_id)
-    if rec is None or not is_internal_entity_type(rec.artifact_type):
+    if rec is None or not is_internal_entity_type(rec.artifact_type, _catalogs().ontology):
         return declared_type, False
     if rec.extra.get("global-artifact-type") != "entity":
         return declared_type, True
@@ -159,7 +167,11 @@ def _reject_if_non_entity_gar(artifact_id: str, role: str) -> None:
     rec = repo.get_entity(artifact_id) if repo is not None else None
     if rec is None:
         return
-    if is_internal_entity_type(rec.artifact_type) and rec.extra.get("global-artifact-type") != "entity":
+    is_non_entity_gar = (
+        is_internal_entity_type(rec.artifact_type, _catalogs().ontology)
+        and rec.extra.get("global-artifact-type") != "entity"
+    )
+    if is_non_entity_gar:
         raise HTTPException(400, f"Cannot use a document/diagram global-artifact-reference as a connection {role}")
 
 
