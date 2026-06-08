@@ -27,7 +27,7 @@ _COMMON = dict(
 # ---------------------------------------------------------------------------
 
 
-def test_c4_scope_projection_registered_from_c4_module() -> None:
+def test_c4_projection_strategy_registered() -> None:
     spec = lookup_strategy("c4.scope-projection", 1)
     assert spec is not None
     assert spec.supported_filters == frozenset({"repo_scope"})

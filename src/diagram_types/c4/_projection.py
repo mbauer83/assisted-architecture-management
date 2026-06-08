@@ -303,13 +303,12 @@ def project_c4(
 
 
 # ---------------------------------------------------------------------------
-# Strategy + module-projection registration (Seam B)
+# Strategy registration (Seam B)
 # ---------------------------------------------------------------------------
-# These registrations run as a side effect when this module is first imported,
+# Runs as a side effect when this module is first imported,
 # which happens when c4/_type.py (and thus any C4 diagram-type package) loads.
 # ---------------------------------------------------------------------------
 
-from src.application.derivation.scope_projection import register_module_projection  # noqa: E402
 from src.application.derivation.strategy_registry import StrategySpec, register_strategy  # noqa: E402
 from src.domain.view_derivations import SourceModelSnapshot  # noqa: E402
 
@@ -342,4 +341,3 @@ register_strategy(
     StrategySpec(name="c4.scope-projection", version=1, supported_filters=frozenset({"repo_scope"})),
     derive_fn=_derive,
 )
-register_module_projection("c4", 1, _derive)
