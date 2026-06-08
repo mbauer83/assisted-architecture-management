@@ -175,10 +175,10 @@ Notes:
 
 ### Phase H — Immutability hardening (concern #6)
 
-- [ ] **H1** Audit `@dataclass(frozen=True)` records carrying mutable `dict`/`list` (e.g. `EntityRecord.extra`, `display_blocks`); publish immutable views (`Mapping`, `tuple`, `frozenset`) across architectural boundaries; keep mutable builders local.
-- [ ] **H2** Copy+freeze configuration when publishing it into a catalog.
+- [x] **H1** Audit `@dataclass(frozen=True)` records carrying mutable `dict`/`list` (e.g. `EntityRecord.extra`, `display_blocks`); publish immutable views (`Mapping`, `tuple`, `frozenset`) across architectural boundaries; keep mutable builders local.
+- [x] **H2** Copy+freeze configuration when publishing it into a catalog.
 - [ ] **H3** Ensure verification accumulates issues via returned values from pure functions rather than mutating shared result objects (overlaps G).
-- [ ] **H4** Quality gates green.
+- [x] **H4** Quality gates green.
 
 ### Phase I — Glossary & responsibility-driven renames (concern #7)
 
@@ -230,7 +230,7 @@ python -m pytest tests/architecture/test_dependency_policy.py -q   # policy hold
 - [ ] `DiagramTypeBase` lives in `src/diagram_types/_base.py`; `ontology_protocol.py` exports only Protocols/types; `infrastructure/diagram_type_registry.py` replaces `diagram_types.py`.
 - [ ] `ArtifactStorePort` is segregated into role contracts; consumers depend on narrow ones. *(Phase F)*
 - [ ] Verifier is a pipeline of pure rules over parsed inputs with I/O behind application-owned ports. *(Phase G)*
-- [ ] Public contracts expose immutable views; configuration is frozen on publication. *(Phase H)*
+- [x] Public contracts expose immutable views; configuration is frozen on publication. *(Phase H)*
 - [ ] Glossary published; renames are responsibility-driven only. *(Phase I)*
 - [ ] Self-model (`Model Registry`, `Model Verifier`) and README reflect the real implementation; a verifier conformance check guards self-model source paths. *(Phase J)*
 - [ ] All strategy registrations are at the composition root; no module-level side effects; `DerivationStrategyCatalog` built directly from manifests and injected. *(Phase K)*
