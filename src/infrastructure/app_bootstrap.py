@@ -1,4 +1,4 @@
-"""Application startup wiring for the module registry."""
+"""Application startup wiring for the module registry and runtime catalogs."""
 
 from __future__ import annotations
 
@@ -7,11 +7,16 @@ from functools import lru_cache
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
+from src.application.derivation.strategy_registry import snapshot_catalog
+from src.application.runtime_catalogs import RuntimeCatalogs
 from src.application.startup_validation import validate_registry_consistency
 from src.diagram_types import register_default_diagram_types
+from src.domain.catalogs import ConnectionSemanticsImpl, DiagramTypeCatalogImpl, OntologyCatalogImpl
+from src.domain.module_catalog import ModuleCatalog, ModuleCatalogBuilder
 from src.domain.module_filter import is_module_enabled
 from src.domain.module_registry import ModuleRegistry
 from src.infrastructure.assurance.capability import make_capability
+from src.ontologies.archimate_next import matrix_abbreviations as _archimate_matrix_abbreviations
 from src.ontologies.archimate_next import module as archimate_next_module
 from src.ontologies.assurance import module as assurance_module
 from src.ontologies.sysml_v2_min import module as sysml_v2_min_module
@@ -20,6 +25,7 @@ if TYPE_CHECKING:
     from fastapi import Request
 
 _MODULE_REGISTRY_STATE_KEY = "module_registry"
+_RUNTIME_CATALOGS_STATE_KEY = "runtime_catalogs"
 _logger = logging.getLogger(__name__)
 
 _ALL_ONTOLOGY_MODULES = (archimate_next_module, sysml_v2_min_module, assurance_module)
@@ -59,10 +65,40 @@ def build_module_registry() -> ModuleRegistry:
     return registry
 
 
+def build_module_catalog(registry: ModuleRegistry) -> ModuleCatalog:
+    """Convert a ModuleRegistry snapshot into an immutable ModuleCatalog."""
+    builder = ModuleCatalogBuilder()
+    for om in registry.all_ontologies().values():
+        builder.register_ontology(om)
+    for dt in registry.all_diagram_types().values():
+        builder.register_diagram_type(dt)
+    return builder.build()
+
+
+def build_runtime_catalogs(registry: ModuleRegistry) -> RuntimeCatalogs:
+    """Build a frozen RuntimeCatalogs from a fully-built ModuleRegistry.
+
+    Must be called after all strategy modules are imported (all_ontologies +
+    diagram_types trigger c4 strategy registration; ``src.application.derivation``
+    import completes the rest).
+    """
+    import src.application.derivation  # noqa: F401  — triggers strategy self-registration
+
+    module_catalog = build_module_catalog(registry)
+    return RuntimeCatalogs(
+        module_catalog=module_catalog,
+        ontology=OntologyCatalogImpl(module_catalog, _archimate_matrix_abbreviations),
+        connections=ConnectionSemanticsImpl(module_catalog),
+        diagram_types=DiagramTypeCatalogImpl(module_catalog),
+        derivation=snapshot_catalog(),
+    )
+
+
 def install_module_registry(app: Any, *, registry: ModuleRegistry | None = None) -> ModuleRegistry:
-    """Attach the module registry to FastAPI app state for dependency-based access."""
+    """Attach the module registry and runtime catalogs to FastAPI app state."""
     resolved = registry or get_module_registry()
     setattr(app.state, _MODULE_REGISTRY_STATE_KEY, resolved)
+    setattr(app.state, _RUNTIME_CATALOGS_STATE_KEY, build_runtime_catalogs(resolved))
     return resolved
 
 
@@ -77,6 +113,19 @@ def module_registry_from_app(app: Any) -> ModuleRegistry:
 def module_registry_dependency(request: Request) -> ModuleRegistry:
     """FastAPI dependency exposing the installed module registry."""
     return module_registry_from_app(request.app)
+
+
+def runtime_catalogs_from_app(app: Any) -> RuntimeCatalogs:
+    """Return the RuntimeCatalogs installed on a FastAPI application."""
+    catalogs = getattr(app.state, _RUNTIME_CATALOGS_STATE_KEY, None)
+    if not isinstance(catalogs, RuntimeCatalogs):
+        raise RuntimeError("RuntimeCatalogs have not been installed on the FastAPI application")
+    return catalogs
+
+
+def runtime_catalogs_dependency(request: Request) -> RuntimeCatalogs:
+    """FastAPI dependency exposing the installed RuntimeCatalogs."""
+    return runtime_catalogs_from_app(request.app)
 
 
 @lru_cache(maxsize=1)

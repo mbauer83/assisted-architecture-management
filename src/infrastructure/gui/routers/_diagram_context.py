@@ -4,13 +4,16 @@ from __future__ import annotations
 
 import re
 from difflib import SequenceMatcher
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from src.application.artifact_parsing import extract_declared_puml_aliases, normalize_puml_alias
 from src.application.entity_type_predicates import is_internal_entity_type
 from src.domain.artifact_types import DiagramRecord, EntityRecord
-from src.infrastructure.diagram_types import domain_order, find_diagram_type, get_diagram_type
+from src.domain.module_types import EntityTypeName
 from src.infrastructure.gui.routers import state as s
+
+if TYPE_CHECKING:
+    from src.application.runtime_catalogs import RuntimeCatalogs
 
 
 def declared_aliases_in_puml(puml: str) -> set[str]:
@@ -25,11 +28,8 @@ def puml_contains(d: DiagramRecord, *aliases: str) -> bool:
         return False
 
 
-def entity_display_item(rec: EntityRecord) -> dict[str, Any]:
-    from src.domain.module_types import EntityTypeName  # noqa: PLC0415
-    from src.infrastructure.app_bootstrap import get_module_registry  # noqa: PLC0415
-
-    ontology = get_module_registry().ontology_for_entity_type(EntityTypeName(rec.artifact_type))
+def entity_display_item(rec: EntityRecord, catalogs: RuntimeCatalogs) -> dict[str, Any]:
+    ontology = catalogs.module_catalog.ontology_for_entity_type(EntityTypeName(rec.artifact_type))
     section_id = ontology.display_section_id if ontology else "archimate"
     arch_data: dict[str, Any] = {}
     raw_block = rec.display_blocks.get(section_id, "")
@@ -50,7 +50,9 @@ def entity_display_item(rec: EntityRecord) -> dict[str, Any]:
     }
 
 
-def diagram_entities_and_puml(repo: Any, diag_rec: DiagramRecord) -> tuple[list[dict[str, Any]], str]:
+def diagram_entities_and_puml(
+    repo: Any, diag_rec: DiagramRecord, catalogs: RuntimeCatalogs
+) -> tuple[list[dict[str, Any]], str]:
     try:
         puml = diag_rec.path.read_text(encoding="utf-8")
     except OSError:
@@ -62,7 +64,7 @@ def diagram_entities_and_puml(repo: Any, diag_rec: DiagramRecord) -> tuple[list[
             row = s.entity_to_summary(rec)
             row["display_alias"] = rec.display_alias
             entities.append(row)
-    ordered_domains = domain_order()
+    ordered_domains = catalogs.ontology.domain_order()
     entities.sort(
         key=lambda e: (
             ordered_domains.index(e["domain"]) if e["domain"] in ordered_domains else 99,
@@ -102,12 +104,12 @@ def parse_explicit_connection_pairs(puml: str) -> set[tuple[str, str]]:
     return pairs
 
 
-def diagram_context_payload(repo: Any, diag_rec: DiagramRecord) -> dict[str, Any]:
-    from src.infrastructure.gui.routers.diagrams import read_diagram
+def diagram_context_payload(repo: Any, diag_rec: DiagramRecord, catalogs: RuntimeCatalogs) -> dict[str, Any]:
+    from src.infrastructure.gui.routers.diagrams import _read_diagram_impl  # noqa: PLC0415
 
     version = repo.read_model_version()
-    diagram = read_diagram(diag_rec.artifact_id)
-    entities, puml = diagram_entities_and_puml(repo, diag_rec)
+    diagram = _read_diagram_impl(diag_rec.artifact_id, catalogs)
+    entities, puml = diagram_entities_and_puml(repo, diag_rec, catalogs)
     entity_ids = [str(entity["artifact_id"]) for entity in entities]
     in_diagram = {
         str(entity["artifact_id"]): rec
@@ -130,7 +132,6 @@ def diagram_context_payload(repo: Any, diag_rec: DiagramRecord) -> dict[str, Any
         ta = normalize_puml_alias(tgt.display_alias or "")
         if (sa, ta) not in explicit_pairs and (ta, sa) not in explicit_pairs:
             continue
-        # Determine edge key in the rendered PUML direction
         if (sa, ta) in explicit_pairs:
             edge_key = f"{sa}:{ta}"
         else:
@@ -146,14 +147,14 @@ def diagram_context_payload(repo: Any, diag_rec: DiagramRecord) -> dict[str, Any
         seen.add(conn.artifact_id)
     raw_de = diag_rec.extra.get("diagram-entities") if diag_rec.extra else None
     diagram_entities: dict[str, Any] = raw_de if isinstance(raw_de, dict) else {}
-    dt = find_diagram_type(diag_rec.diagram_type)
+    dt = catalogs.diagram_types.find_diagram_type(diag_rec.diagram_type)
     type_extras = dt.build_context_extras(repo, diag_rec.artifact_id, diagram_entities) if dt else {}
     return {
         "diagram": diagram,
         "entities": entities,
         "connections": connections,
         "candidate_connections": candidate_connections_for_entities(repo, entity_ids),
-        "suggested_entities": hop_suggestions(repo, entity_ids, max_hops=2, limit_per_hop=25),
+        "suggested_entities": hop_suggestions(repo, entity_ids, catalogs, max_hops=2, limit_per_hop=25),
         "explicit_connection_pairs": [list(pair) for pair in sorted(explicit_pairs)],
         "generation": version.generation,
         "etag": version.etag,
@@ -161,8 +162,15 @@ def diagram_context_payload(repo: Any, diag_rec: DiagramRecord) -> dict[str, Any
     }
 
 
-def hop_suggestions(repo: Any, entity_ids: list[str], *, max_hops: int, limit_per_hop: int) -> list[dict[str, Any]]:
-    ordered_domains = domain_order()
+def hop_suggestions(
+    repo: Any,
+    entity_ids: list[str],
+    catalogs: RuntimeCatalogs,
+    *,
+    max_hops: int,
+    limit_per_hop: int,
+) -> list[dict[str, Any]]:
+    ordered_domains = catalogs.ontology.domain_order()
     frontier = set(entity_ids)
     visited = set(entity_ids)
     groups: list[dict[str, Any]] = []
@@ -181,7 +189,7 @@ def hop_suggestions(repo: Any, entity_ids: list[str], *, max_hops: int, limit_pe
         if not next_frontier:
             break
         items = [
-            entity_display_item(rec)
+            entity_display_item(rec, catalogs)
             for entity_id in sorted(next_frontier)
             if (rec := repo.get_entity(entity_id)) is not None and not is_internal_entity_type(rec.artifact_type)
         ]
@@ -203,6 +211,7 @@ def fuzzy_entity_hits(
     q: str,
     limit: int,
     excluded: set[str],
+    catalogs: RuntimeCatalogs,
     accepted_entity_types: set[str] | None = None,
 ) -> list[dict[str, Any]]:
     query = q.strip().lower()
@@ -219,12 +228,12 @@ def fuzzy_entity_hits(
         if score >= 0.35:
             scored.append((score, rec))
     scored.sort(key=lambda item: item[0], reverse=True)
-    return [entity_display_item(rec) for _, rec in scored[:limit]]
+    return [entity_display_item(rec, catalogs) for _, rec in scored[:limit]]
 
 
-def diagram_kind_entity_type_items(diagram_type: str) -> list[dict[str, Any]]:
-    kind = get_diagram_type(diagram_type)
-    ordered_domains = domain_order()
+def diagram_kind_entity_type_items(diagram_type: str, catalogs: RuntimeCatalogs) -> list[dict[str, Any]]:
+    kind = catalogs.diagram_types.get_diagram_type(diagram_type)
+    ordered_domains = catalogs.ontology.domain_order()
     items = [
         {
             "artifact_type": artifact_type,
@@ -244,8 +253,8 @@ def diagram_kind_entity_type_items(diagram_type: str) -> list[dict[str, Any]]:
     return items
 
 
-def diagram_kind_connection_type_items(diagram_type: str) -> list[dict[str, Any]]:
-    kind = get_diagram_type(diagram_type)
+def diagram_kind_connection_type_items(diagram_type: str, catalogs: RuntimeCatalogs) -> list[dict[str, Any]]:
+    kind = catalogs.diagram_types.get_diagram_type(diagram_type)
     items = [
         {
             "connection_type": connection_type,

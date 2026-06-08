@@ -4,10 +4,11 @@ from __future__ import annotations
 
 from typing import Any
 
-from fastapi import APIRouter, Query, Request
+from fastapi import APIRouter, Depends, Query, Request
 
 from src.application.entity_type_predicates import is_assurance_entity_type, is_internal_entity_type
-from src.infrastructure.diagram_types import diagram_type_domain
+from src.application.runtime_catalogs import RuntimeCatalogs
+from src.infrastructure.app_bootstrap import runtime_catalogs_dependency
 from src.infrastructure.gui.routers import state as s
 
 router = APIRouter()
@@ -63,6 +64,7 @@ def search_reference_artifacts(
     entity_types: str | None = None,
     doc_types: str | None = None,
     limit: int = Query(default=30, le=100),
+    catalogs: RuntimeCatalogs = Depends(runtime_catalogs_dependency),
 ) -> dict[str, Any]:
     repo = s.get_repo()
     selected_domains = {v.strip().lower() for v in (domains or "").split(",") if v.strip()}
@@ -94,7 +96,7 @@ def search_reference_artifacts(
 
     if kind in (None, "diagram"):
         for diagram in repo.list_diagrams():
-            domain = diagram_type_domain(diagram.diagram_type)
+            domain = catalogs.diagram_types.diagram_type_domain(diagram.diagram_type)
             if selected_domains and (domain is None or domain not in selected_domains):
                 continue
             if q_lc and q_lc not in diagram.name.lower() and q_lc not in diagram.artifact_id.lower():

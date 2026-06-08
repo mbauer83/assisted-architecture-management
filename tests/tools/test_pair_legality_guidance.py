@@ -13,12 +13,21 @@ Covers:
 
 from __future__ import annotations
 
+from functools import lru_cache
+
+from src.application.runtime_catalogs import RuntimeCatalogs
 from src.domain.connection_ontology import is_symmetric, permissible_connection_types
+from src.infrastructure.app_bootstrap import build_module_registry, build_runtime_catalogs
 from src.infrastructure.mcp import mcp_artifact_server as mcp
 from src.infrastructure.write.artifact_write.type_guidance import (
     get_type_guidance,
     pair_connection_guidance,
 )
+
+
+@lru_cache(maxsize=1)
+def _catalogs() -> RuntimeCatalogs:
+    return build_runtime_catalogs(build_module_registry())
 
 # ---------------------------------------------------------------------------
 # domain helper: pair_connection_guidance
@@ -178,7 +187,7 @@ class TestRestOntologyEndpointParity:
     def test_rest_ontology_endpoint_returns_connection_types(self) -> None:
         from src.infrastructure.gui.routers.connections import get_ontology
 
-        result = get_ontology(source_type="requirement", target_type="goal")
+        result = get_ontology(source_type="requirement", target_type="goal", catalogs=_catalogs())
         assert "connection_types" in result, (
             "REST /api/ontology with source+target must return connection_types"
         )
@@ -191,7 +200,7 @@ class TestRestOntologyEndpointParity:
         pg = pair_connection_guidance(source, target)
         guidance_types = set(pg.get("outgoing", [])) | set(pg.get("symmetric", []))
 
-        rest_result = get_ontology(source_type=source, target_type=target)
+        rest_result = get_ontology(source_type=source, target_type=target, catalogs=_catalogs())
         rest_types = set(rest_result.get("connection_types", []))
 
         assert guidance_types == rest_types, (

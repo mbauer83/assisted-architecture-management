@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from functools import lru_cache
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -7,9 +8,10 @@ import pytest
 
 from src.application.artifact_repository import ArtifactRepository
 from src.application.modeling.artifact_write import generate_diagram_id
+from src.application.runtime_catalogs import RuntimeCatalogs
 from src.application.verification.artifact_verifier import ArtifactRegistry, ArtifactVerifier
 from src.domain.artifact_types import EntityRecord
-from src.infrastructure.app_bootstrap import build_module_registry
+from src.infrastructure.app_bootstrap import build_module_registry, build_runtime_catalogs
 from src.infrastructure.artifact_index import shared_artifact_index
 from src.infrastructure.diagram_types import diagram_type_domain
 from src.infrastructure.gui.routers import state as gui_state
@@ -27,6 +29,11 @@ from src.infrastructure.write.artifact_write.connection import add_connection
 from src.infrastructure.write.artifact_write.diagram import create_diagram
 from src.infrastructure.write.artifact_write.diagram_edit import edit_diagram
 from src.infrastructure.write.artifact_write.entity import create_entity
+
+
+@lru_cache(maxsize=1)
+def _catalogs() -> RuntimeCatalogs:
+    return build_runtime_catalogs(build_module_registry())
 
 
 @pytest.fixture()
@@ -98,7 +105,7 @@ def test_diagram_type_domain_is_registry_derived() -> None:
 
 
 def test_diagram_kind_entity_types_endpoint_excludes_internal_types() -> None:
-    items = get_diagram_kind_entity_types("archimate-business")
+    items = get_diagram_kind_entity_types("archimate-business", catalogs=_catalogs())
 
     assert items
     assert any(item["artifact_type"] == "business-actor" for item in items)
@@ -106,7 +113,7 @@ def test_diagram_kind_entity_types_endpoint_excludes_internal_types() -> None:
 
 
 def test_c4_entity_types_endpoint_exposes_mapped_model_types() -> None:
-    items = get_diagram_kind_entity_types("c4-system-context")
+    items = get_diagram_kind_entity_types("c4-system-context", catalogs=_catalogs())
 
     assert any(item["artifact_type"] == "application-component" for item in items)
     assert any(item["artifact_type"] == "business-actor" for item in items)
@@ -114,7 +121,7 @@ def test_c4_entity_types_endpoint_exposes_mapped_model_types() -> None:
 
 
 def test_diagram_kind_connection_types_endpoint_exposes_effective_vocabulary() -> None:
-    items = get_diagram_kind_connection_types("matrix")
+    items = get_diagram_kind_connection_types("matrix", catalogs=_catalogs())
 
     flow_item = next(item for item in items if item["connection_type"] == "archimate-flow")
 
@@ -123,8 +130,8 @@ def test_diagram_kind_connection_types_endpoint_exposes_effective_vocabulary() -
 
 
 def test_diagram_kind_ui_config_endpoint_shape() -> None:
-    kinds = list_diagram_types()
-    activity = read_diagram_kind_ui_config("activity")
+    kinds = list_diagram_types(catalogs=_catalogs())
+    activity = read_diagram_kind_ui_config("activity", catalogs=_catalogs())
 
     assert any(kind["key"] == "activity" and kind["label"] == "Activity Diagram" for kind in kinds)
     assert activity["entity_search_filter"] is False
@@ -167,6 +174,7 @@ def test_fuzzy_entity_hits_filters_to_accepted_entity_types() -> None:
         "customer service application-component",
         10,
         set(),
+        _catalogs(),
         accepted_entity_types={"application-component"},
     )
 
@@ -216,7 +224,7 @@ def test_c4_diagram_auto_populates_model_references(repo_root: Path) -> None:
     repo = ArtifactRepository(shared_artifact_index(repo_root))
     repo.refresh()
     gui_state.init_state(repo, repo_root, None)
-    detail = read_diagram(diagram_id)
+    detail = read_diagram(diagram_id, catalogs=_catalogs())
 
     assert sorted(detail["entity_ids_used"]) == sorted([user_id, system_id])
     assert detail["connection_ids_used"] == [f"{user_id}---{system_id}@@archimate-association"]
@@ -250,7 +258,7 @@ def test_diagram_entities_round_trips_create_read_edit_read(repo_root: Path) -> 
     repo = ArtifactRepository(shared_artifact_index(repo_root))
     repo.refresh()
     gui_state.init_state(repo, repo_root, None)
-    assert read_diagram(diagram_id)["diagram_entities"] == created_diagram_entities
+    assert read_diagram(diagram_id, catalogs=_catalogs())["diagram_entities"] == created_diagram_entities
 
     edited_diagram_entities = {
         "swimlanes": [{"id": "sw-2", "label": "System"}],
@@ -268,4 +276,4 @@ def test_diagram_entities_round_trips_create_read_edit_read(repo_root: Path) -> 
     assert edit_result.wrote is True
 
     repo.refresh()
-    assert read_diagram(diagram_id)["diagram_entities"] == edited_diagram_entities
+    assert read_diagram(diagram_id, catalogs=_catalogs())["diagram_entities"] == edited_diagram_entities

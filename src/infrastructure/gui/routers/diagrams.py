@@ -4,14 +4,15 @@ from __future__ import annotations
 
 from typing import Any, Literal
 
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import FileResponse, Response
 
 from src.application.artifact_parsing import parse_diagram_source
 from src.application.entity_type_predicates import is_internal_entity_type
+from src.application.runtime_catalogs import RuntimeCatalogs
 from src.config.repo_paths import DIAGRAM_CATALOG, DIAGRAMS, RENDERED
 from src.domain.artifact_types import DiagramRecord, EntityRecord
-from src.infrastructure.diagram_types import find_diagram_type
+from src.infrastructure.app_bootstrap import runtime_catalogs_dependency
 from src.infrastructure.gui.routers import state as s
 from src.infrastructure.gui.routers._diagram_context import (
     candidate_connections_for_entities,
@@ -32,10 +33,10 @@ router.include_router(_write_router)
 router.include_router(_edge_label_router)
 
 
-def _accepted_entity_types_for_diagram_type_guidance(diagram_type: str | None) -> set[str] | None:
+def _accepted_entity_types(diagram_type: str | None, catalogs: RuntimeCatalogs) -> set[str] | None:
     if diagram_type is None:
         return None
-    kind = find_diagram_type(diagram_type)
+    kind = catalogs.diagram_types.find_diagram_type(diagram_type)
     if kind is None:
         raise HTTPException(404, f"Diagram type not found: {diagram_type!r}")
     types = {str(entity_type) for entity_type in kind.effective_entity_types()}
@@ -62,18 +63,7 @@ def _rendered_name(d: DiagramRecord, suffix: str) -> str | None:
     return None
 
 
-@router.get("/api/diagrams")
-def list_diagrams(
-    diagram_type: str | None = None,
-    status: str | None = None,
-    group: str | None = None,
-) -> dict[str, Any]:
-    diagrams = s.get_repo().list_diagrams(diagram_type=diagram_type, status=status, group=group)
-    return {"total": len(diagrams), "items": [s.diagram_to_summary(d) for d in diagrams]}
-
-
-@router.get("/api/diagram")
-def read_diagram(id: str) -> dict[str, Any]:
+def _read_diagram_impl(id: str, catalogs: RuntimeCatalogs) -> dict[str, Any]:
     result = s.get_repo().read_artifact(id, mode="full")
     if result is None or result.get("record_type") != "diagram":
         raise HTTPException(404, f"Diagram not found: {id!r}")
@@ -95,10 +85,72 @@ def read_diagram(id: str) -> dict[str, Any]:
             result["entity_ids_used"] = [str(x) for x in entity_ids_used]
         if isinstance(connection_ids_used, list):
             result["connection_ids_used"] = [str(x) for x in connection_ids_used]
-        dt = find_diagram_type(diag_rec.diagram_type)
+        dt = catalogs.diagram_types.find_diagram_type(diag_rec.diagram_type)
         if dt:
             result.update(dt.read_diagram_extras(parsed))
     return result
+
+
+def _entity_display_search_impl(
+    q: str,
+    limit: int,
+    diagram_type: str | None,
+    catalogs: RuntimeCatalogs,
+) -> list[dict[str, Any]]:
+    repo = s.get_repo()
+    accepted_entity_types = _accepted_entity_types(diagram_type, catalogs)
+
+    if not q.strip():
+        ordered_domains = catalogs.ontology.domain_order()
+        items = [
+            entity_display_item(rec, catalogs)
+            for rec in repo.list_entities()
+            if not is_internal_entity_type(rec.artifact_type)
+            and (accepted_entity_types is None or rec.artifact_type in accepted_entity_types)
+        ]
+        items.sort(
+            key=lambda x: (
+                ordered_domains.index(str(x["domain"])) if x["domain"] in ordered_domains else 99,
+                x["name"],
+            )
+        )
+        return items[:limit]
+
+    hits = repo.search_artifacts(q, limit=limit * 3).hits
+    items = []
+    for h in hits:
+        if h.record_type != "entity" or not isinstance(h.record, EntityRecord):
+            continue
+        rec = h.record
+        if is_internal_entity_type(rec.artifact_type):
+            continue
+        if accepted_entity_types is not None and rec.artifact_type not in accepted_entity_types:
+            continue
+        items.append(entity_display_item(rec, catalogs))
+        if len(items) >= limit:
+            break
+    if len(items) < limit:
+        seen = {str(item["artifact_id"]) for item in items}
+        items.extend(fuzzy_entity_hits(repo, q, limit - len(items), seen, catalogs, accepted_entity_types))
+    return items
+
+
+@router.get("/api/diagrams")
+def list_diagrams(
+    diagram_type: str | None = None,
+    status: str | None = None,
+    group: str | None = None,
+) -> dict[str, Any]:
+    diagrams = s.get_repo().list_diagrams(diagram_type=diagram_type, status=status, group=group)
+    return {"total": len(diagrams), "items": [s.diagram_to_summary(d) for d in diagrams]}
+
+
+@router.get("/api/diagram")
+def read_diagram(
+    id: str,
+    catalogs: RuntimeCatalogs = Depends(runtime_catalogs_dependency),
+) -> dict[str, Any]:
+    return _read_diagram_impl(id, catalogs)
 
 
 @router.get("/api/matrix-config")
@@ -175,45 +227,60 @@ def get_diagram_refs(source_id: str, target_id: str) -> list[dict[str, str]]:
 
 
 @router.get("/api/diagram-entities")
-def get_diagram_entities(id: str) -> list[dict[str, Any]]:
+def get_diagram_entities(
+    id: str,
+    catalogs: RuntimeCatalogs = Depends(runtime_catalogs_dependency),
+) -> list[dict[str, Any]]:
     repo = s.get_repo()
     diag_rec = repo.get_diagram(id)
     if diag_rec is None:
         raise HTTPException(404, f"Diagram not found: {id!r}")
-    entities, _puml = diagram_entities_and_puml(repo, diag_rec)
+    entities, _puml = diagram_entities_and_puml(repo, diag_rec, catalogs)
     return entities
 
 
 @router.get("/api/diagram-connections")
-def get_diagram_connections(id: str) -> list[dict[str, Any]]:
+def get_diagram_connections(
+    id: str,
+    catalogs: RuntimeCatalogs = Depends(runtime_catalogs_dependency),
+) -> list[dict[str, Any]]:
     repo = s.get_repo()
     diag_rec = repo.get_diagram(id)
     if diag_rec is None:
         raise HTTPException(404, f"Diagram not found: {id!r}")
-    return diagram_context_payload(repo, diag_rec)["connections"]
+    return diagram_context_payload(repo, diag_rec, catalogs)["connections"]
 
 
 @router.get("/api/diagram-context")
-def get_diagram_context(id: str) -> dict[str, Any]:
+def get_diagram_context(
+    id: str,
+    catalogs: RuntimeCatalogs = Depends(runtime_catalogs_dependency),
+) -> dict[str, Any]:
     repo = s.get_repo()
     diag_rec = repo.get_diagram(id)
     if diag_rec is None:
         raise HTTPException(404, f"Diagram not found: {id!r}")
-    return diagram_context_payload(repo, diag_rec)
+    return diagram_context_payload(repo, diag_rec, catalogs)
 
 
 @router.get("/api/diagram-types/{name}/entity-types")
-def get_diagram_kind_entity_types(name: str) -> list[dict[str, Any]]:
+def get_diagram_kind_entity_types(
+    name: str,
+    catalogs: RuntimeCatalogs = Depends(runtime_catalogs_dependency),
+) -> list[dict[str, Any]]:
     try:
-        return diagram_kind_entity_type_items(name)
+        return diagram_kind_entity_type_items(name, catalogs)
     except KeyError:
         raise HTTPException(404, f"Diagram type not found: {name!r}")
 
 
 @router.get("/api/diagram-types/{name}/connection-types")
-def get_diagram_kind_connection_types(name: str) -> list[dict[str, Any]]:
+def get_diagram_kind_connection_types(
+    name: str,
+    catalogs: RuntimeCatalogs = Depends(runtime_catalogs_dependency),
+) -> list[dict[str, Any]]:
     try:
-        return diagram_kind_connection_type_items(name)
+        return diagram_kind_connection_type_items(name, catalogs)
     except KeyError:
         raise HTTPException(404, f"Diagram type not found: {name!r}")
 
@@ -267,12 +334,15 @@ def download_diagram(id: str, format: Literal["png", "svg"] = "png") -> FileResp
 
 
 @router.get("/api/entity-display-item")
-def get_entity_display_item(id: str) -> dict[str, Any]:
+def get_entity_display_item(
+    id: str,
+    catalogs: RuntimeCatalogs = Depends(runtime_catalogs_dependency),
+) -> dict[str, Any]:
     repo = s.get_repo()
     rec = repo.get_entity(id)
     if rec is None:
         raise HTTPException(404, f"Entity {id!r} not found")
-    return entity_display_item(rec)
+    return entity_display_item(rec, catalogs)
 
 
 @router.get("/api/entity-display-search")
@@ -280,45 +350,9 @@ def entity_display_search(
     q: str,
     limit: int = Query(default=20, le=50),
     diagram_type: str | None = None,
+    catalogs: RuntimeCatalogs = Depends(runtime_catalogs_dependency),
 ) -> list[dict[str, Any]]:
-    from src.infrastructure.diagram_types import domain_order  # noqa: PLC0415
-
-    repo = s.get_repo()
-    accepted_entity_types = _accepted_entity_types_for_diagram_type_guidance(diagram_type)
-
-    if not q.strip():
-        ordered_domains = domain_order()
-        items = [
-            entity_display_item(rec)
-            for rec in repo.list_entities()
-            if not is_internal_entity_type(rec.artifact_type)
-            and (accepted_entity_types is None or rec.artifact_type in accepted_entity_types)
-        ]
-        items.sort(
-            key=lambda x: (
-                ordered_domains.index(str(x["domain"])) if x["domain"] in ordered_domains else 99,
-                x["name"],
-            )
-        )
-        return items[:limit]
-
-    hits = repo.search_artifacts(q, limit=limit * 3).hits
-    items = []
-    for h in hits:
-        if h.record_type != "entity" or not isinstance(h.record, EntityRecord):
-            continue
-        rec = h.record
-        if is_internal_entity_type(rec.artifact_type):
-            continue
-        if accepted_entity_types is not None and rec.artifact_type not in accepted_entity_types:
-            continue
-        items.append(entity_display_item(rec))
-        if len(items) >= limit:
-            break
-    if len(items) < limit:
-        seen = {str(item["artifact_id"]) for item in items}
-        items.extend(fuzzy_entity_hits(repo, q, limit - len(items), seen, accepted_entity_types))
-    return items
+    return _entity_display_search_impl(q, limit, diagram_type, catalogs)
 
 
 @router.get("/api/diagram-entity-discovery")
@@ -328,6 +362,7 @@ def diagram_entity_discovery(
     diagram_type: str | None = None,
     max_hops: int = Query(default=2, ge=1, le=4),
     limit: int = Query(default=20, ge=1, le=50),
+    catalogs: RuntimeCatalogs = Depends(runtime_catalogs_dependency),
 ) -> dict[str, Any]:
     repo = s.get_repo()
     included = [
@@ -337,11 +372,11 @@ def diagram_entity_discovery(
     ]
     excluded = set(included)
     search_results: list[dict[str, Any]] = (
-        entity_display_search(q or "", limit=limit, diagram_type=diagram_type) if (q or "").strip() else []
+        _entity_display_search_impl(q or "", limit, diagram_type, catalogs) if (q or "").strip() else []
     )
     search_results = [item for item in search_results if str(item["artifact_id"]) not in excluded][:limit]
     return {
         "search_results": search_results,
         "candidate_connections": candidate_connections_for_entities(repo, included),
-        "suggested_entities": hop_suggestions(repo, included, max_hops=max_hops, limit_per_hop=limit),
+        "suggested_entities": hop_suggestions(repo, included, catalogs, max_hops=max_hops, limit_per_hop=limit),
     }

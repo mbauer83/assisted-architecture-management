@@ -4,12 +4,13 @@ from __future__ import annotations
 
 from typing import Any
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 
 from src.application.derivation.preview import project_view_for_preview
+from src.application.runtime_catalogs import RuntimeCatalogs
+from src.infrastructure.app_bootstrap import runtime_catalogs_dependency
 from src.infrastructure.artifact_index import shared_artifact_index
-from src.infrastructure.diagram_types import get_diagram_type
 from src.infrastructure.gui.routers import state as s
 from src.infrastructure.gui.routers._diagram_selection import resolve_diagram_selection
 
@@ -67,7 +68,7 @@ class DeleteDiagramBody(BaseModel):
 
 
 @router.post("/api/diagram/preview")
-def preview_diagram(body: DiagramPreviewBody) -> dict[str, Any]:
+def preview_diagram(body: DiagramPreviewBody, catalogs: RuntimeCatalogs = Depends(runtime_catalogs_dependency)) -> dict[str, Any]:  # noqa: E501
     repo_root = s.maybe_engagement_root()
     if repo_root is None:
         raise HTTPException(500, "Repository not initialized")
@@ -90,7 +91,7 @@ def preview_diagram(body: DiagramPreviewBody) -> dict[str, Any]:
     )
     image, warnings = render_puml_preview(puml, repo_root, body.diagram_type)
 
-    items = project_view_for_preview(get_diagram_type(body.diagram_type), body.diagram_type, de or {}, query)
+    items = project_view_for_preview(catalogs.diagram_types.get_diagram_type(body.diagram_type), body.diagram_type, de or {}, query)  # noqa: E501
     derived_entities = None if items is None else [{"id": i.entity_id, "name": i.name, "item_type": i.display_class, "role": i.role, "excluded": i.excluded} for i in items]  # noqa: E501
     return {"puml": puml, "image": image, "warnings": warnings, "derived_entities": derived_entities}
 
@@ -381,8 +382,7 @@ def sync_diagram_to_model_gui(body: SyncDiagramToModelBody) -> dict[str, Any]:
     except ValueError as e:
         raise HTTPException(400, str(e))
     d = s.write_result_to_dict(result)
-    d["removed_entity_ids"] = result.removed_entity_ids
-    d["removed_connection_ids"] = result.removed_connection_ids
+    d.update(removed_entity_ids=result.removed_entity_ids, removed_connection_ids=result.removed_connection_ids)
     return d
 
 

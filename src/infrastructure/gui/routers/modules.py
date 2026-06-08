@@ -2,17 +2,17 @@
 
 from __future__ import annotations
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
 
-from src.infrastructure.app_bootstrap import get_module_registry
+from src.application.runtime_catalogs import RuntimeCatalogs
+from src.infrastructure.app_bootstrap import runtime_catalogs_dependency
 
 router = APIRouter()
 
 
 @router.get("/api/modules")
-def list_modules() -> list[dict[str, object]]:
+def list_modules(catalogs: RuntimeCatalogs = Depends(runtime_catalogs_dependency)) -> list[dict[str, object]]:
     """Return metadata for every registered (enabled + satisfied) ontology module."""
-    registry = get_module_registry()
     return [
         {
             "name": om.name,
@@ -22,5 +22,5 @@ def list_modules() -> list[dict[str, object]]:
             "entity_type_count": len(om.entity_types),
             "connection_type_count": len(om.connection_types),
         }
-        for om in sorted(registry.all_ontologies().values(), key=lambda m: m.name)
+        for om in sorted(catalogs.module_catalog.all_ontologies().values(), key=lambda m: m.name)
     ]

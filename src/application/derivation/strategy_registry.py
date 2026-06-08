@@ -98,3 +98,11 @@ class DerivationStrategyCatalogBuilder:
     def build(self) -> DerivationStrategyCatalog:
         self._built = True
         return DerivationStrategyCatalog(dict(self._specs), dict(self._fns))
+
+
+def snapshot_catalog() -> DerivationStrategyCatalog:
+    """Snapshot the current global derivation registry into an immutable catalog.
+
+    Must be called after all strategy modules have been imported.
+    """
+    return DerivationStrategyCatalog(dict(_registry), dict(_derive_fns))

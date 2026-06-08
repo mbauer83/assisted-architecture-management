@@ -5,10 +5,12 @@ from __future__ import annotations
 import re
 from typing import Any, Literal
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, field_validator
 
 from src.application.entity_type_predicates import is_internal_entity_type
+from src.application.runtime_catalogs import RuntimeCatalogs
+from src.infrastructure.app_bootstrap import runtime_catalogs_dependency
 from src.infrastructure.gui.routers import state as s
 
 # Accepted cardinality formats: n  |  n..m  |  n..*  |  *
@@ -98,13 +100,8 @@ def get_ontology(
     target_type: str | None = None,
     source_id: str | None = None,
     target_id: str | None = None,
+    catalogs: RuntimeCatalogs = Depends(runtime_catalogs_dependency),
 ) -> dict[str, Any]:
-    from src.domain.connection_ontology import (
-        classify_connections,
-        is_symmetric,
-        permissible_connection_types,
-    )
-
     effective_source, source_is_non_entity_gar = _resolve_effective_type(source_id, source_type)
     effective_target, target_is_non_entity_gar = _resolve_effective_type(target_id, target_type or "")
 
@@ -117,14 +114,14 @@ def get_ontology(
         }
 
     if effective_target:
-        conn_types = permissible_connection_types(effective_source, effective_target)
+        conn_types = catalogs.connections.permissible_connection_types(effective_source, effective_target)
         return {
             "source_type": source_type,
             "target_type": target_type,
             "connection_types": conn_types,
-            "symmetric": [ct for ct in conn_types if is_symmetric(ct)],
+            "symmetric": [ct for ct in conn_types if catalogs.connections.is_symmetric(ct)],
         }
-    return {"source_type": source_type, **classify_connections(effective_source)}
+    return {"source_type": source_type, **catalogs.connections.classify_connections(effective_source)}
 
 
 @router.get("/api/write-help")
