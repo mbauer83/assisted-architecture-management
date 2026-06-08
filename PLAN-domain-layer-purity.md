@@ -133,11 +133,11 @@ Notes:
 - [x] **C3** Migrate FastAPI routers and application/infrastructure consumers off the deleted free-function modules onto injected catalogs (constructor params or `Depends`). Enumerated call sites (16) from the dependency audit:
   - `application/artifact_parsing.py`, `application/modeling/artifact_write.py`, `application/modeling/matrix_builder.py`, `application/verification/artifact_verifier.py` (+`_verifier_rules_semantic.py`, `artifact_verifier_types.py`)
   - `infrastructure/artifact_index/_sqlite_store.py`, `infrastructure/gui/routers/connections.py`, `infrastructure/rendering/{archimate_puml_renderer,diagram_builder,generate_static_includes,generic_puml_renderer}.py`, `infrastructure/write/artifact_write/{connection,diagram_references,type_guidance}.py`
-- [ ] **C4** CLI composition roots (`cli/artifact_query_cli.py`, `cli/arch_assurance.py`) construct catalogs in `main()` and pass down.
-- [ ] **C5** MCP: resolve catalogs from the shared backend context (`mcp/artifact_mcp/context.py`); no module-global lookups in tool logic.
+- [x] **C4** CLI composition roots (`cli/artifact_query_cli.py`, `cli/arch_assurance.py`) construct catalogs in `main()` and pass down.
+- [x] **C5** MCP: resolve catalogs from the shared backend context (`mcp/artifact_mcp/context.py`); no module-global lookups in tool logic.
 - [x] **C6** Delete `src/domain/ontology_catalog.py`, `src/domain/connection_ontology.py` free-function APIs and the registry-coupled parts of `archimate_relation_rendering.py`; remove `get_module_registry` global from `app_bootstrap.py` (or reduce to a composition-root-only builder helper). **No `@lru_cache(maxsize=1)` registry singletons remain.**
-- [ ] **C7** Architecture-test baseline: remove all `domain → infrastructure` entries; they must now pass.
-- [ ] **C8** Quality gates green; full regression run.
+- [x] **C7** Architecture-test baseline: remove all `domain → infrastructure` entries; they must now pass.
+- [x] **C8** Quality gates green; full regression run.
 
 ### Phase D — `config` / `ontologies` dependency cleanup (concerns #2, #5)
 
