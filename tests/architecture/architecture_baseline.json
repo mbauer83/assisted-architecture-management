@@ -19,7 +19,6 @@
   "src/diagram_types/c4/_type.py::src.application.derivation.types",
   "src/domain/artifact_types.py::src.config.workspace_paths",
   "src/domain/ontology_catalog.py::src.ontologies.archimate_next",
-  "src/domain/ontology_protocol.py::src.infrastructure.rendering.generic_puml_renderer",
   "src/domain/view_projection.py::src.application.derivation.types",
   "src/ontologies/archimate_next/_loader.py::src.infrastructure.rendering._svg_sprite_convert"
 ]

@@ -6,6 +6,7 @@ from typing import Any
 from src.application.artifact_query import ArtifactRepository
 from src.config.workspace_paths import resolve_workspace_repo_roots
 from src.domain.artifact_types import ConnectionRecord, DiagramRecord, EntityRecord
+from src.infrastructure.app_bootstrap import build_runtime_catalogs, get_module_registry
 from src.infrastructure.artifact_index import shared_artifact_index
 
 USAGE = """\
@@ -106,6 +107,7 @@ def main(argv: list[str] | None = None) -> int:
         print(f"Error: repository path does not exist: {repo}", file=sys.stderr)
         return 1
 
+    build_runtime_catalogs(get_module_registry())
     registry = ArtifactRepository(shared_artifact_index(repo))
     dispatch = {
         "stats": _cmd_stats,

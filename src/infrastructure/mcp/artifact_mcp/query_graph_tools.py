@@ -1,4 +1,3 @@
-from functools import lru_cache
 from typing import Literal
 
 from mcp.server.fastmcp import FastMCP  # type: ignore[import-not-found]
@@ -9,22 +8,16 @@ from src.infrastructure.mcp.artifact_mcp.context import (
     repo_cached,
     resolve_repo_roots,
     roots_key,
+    runtime_catalogs,
 )
 from src.infrastructure.mcp.artifact_mcp.tool_annotations import READ_ONLY
-
-
-@lru_cache(maxsize=1)
-def _registry():
-    from src.infrastructure.app_bootstrap import get_module_registry  # noqa: PLC0415
-
-    return get_module_registry()
 
 
 def _allowed_bindings_for(diagram_type: str | None):  # type: ignore[return]
     """Return AllowedBindingsSpec for diagram_type, or None if not found / empty."""
     if not diagram_type:
         return None
-    mod = _registry().find_diagram_type(diagram_type)
+    mod = runtime_catalogs().diagram_types.find_diagram_type(diagram_type)
     if mod is None:
         return None
     guidance = mod.write_guidance()

@@ -253,12 +253,6 @@ class DiagramTypeBase:
             entity_search_filter=True,
         )
 
-    @property
-    def renderer(self) -> DiagramRenderer:
-        from src.infrastructure.rendering.generic_puml_renderer import GenericPumlRenderer  # noqa: PLC0415
-
-        return GenericPumlRenderer(self._config)  # type: ignore[attr-defined]
-
     def write_guidance(self) -> DiagramTypeWriteGuidance:
         return DiagramTypeWriteGuidance(when_to_use="", when_not_to_use="")
 

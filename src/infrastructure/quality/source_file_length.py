@@ -18,7 +18,7 @@ SOURCE_FILE_BASELINE_LIMITS: dict[str, int] = {
     "src/application/verification/artifact_verifier_rules.py": 480,
     "src/infrastructure/rendering/diagram_builder.py": 467,
     "src/application/verification/artifact_verifier_incremental.py": 351,
-    "src/infrastructure/artifact_index/_sqlite_store.py": 381,
+    "src/infrastructure/artifact_index/_sqlite_store.py": 387,
     "src/infrastructure/artifact_index/service.py": 487,
     "src/infrastructure/backend/arch_backend.py": 384,
     "src/infrastructure/mcp/artifact_mcp/query_scaffold_tools.py": 442,

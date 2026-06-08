@@ -185,8 +185,8 @@ def _propose_bindings(
     )
     from src.application.derivation.refresh import compute_revision  # noqa: PLC0415
     from src.domain.allowed_bindings import AllowedBindingsSpec  # noqa: PLC0415
-    from src.infrastructure.app_bootstrap import get_module_registry  # noqa: PLC0415
     from src.infrastructure.artifact_index.service import shared_artifact_index  # noqa: PLC0415
+    from src.infrastructure.mcp.artifact_mcp.context import runtime_catalogs  # noqa: PLC0415
 
     base_revision = compute_revision(path)
     parsed = parse_diagram_file(path)
@@ -194,8 +194,7 @@ def _propose_bindings(
 
     allowed_bindings: AllowedBindingsSpec | None = None
     if diagram_type_name:
-        registry = get_module_registry()
-        mod = registry.find_diagram_type(diagram_type_name)
+        mod = runtime_catalogs().diagram_types.find_diagram_type(diagram_type_name)
         if mod is not None:
             guidance = mod.write_guidance()
             allowed_bindings = guidance.allowed_bindings

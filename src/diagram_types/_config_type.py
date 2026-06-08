@@ -10,6 +10,7 @@ import yaml  # type: ignore[import-untyped]
 
 from src.domain.module_types import ConnectionTypeName, DiagramTypeName, EntityTypeName
 from src.domain.ontology_protocol import (
+    DiagramRenderer,
     DiagramTypeBase,
     DiagramTypeModule,
     DiagramTypeWriteGuidance,
@@ -96,6 +97,12 @@ class _ConfiguredOntologyDiagramType(DiagramTypeBase):
     @property
     def own_permitted_relationships(self) -> PermittedRelationshipSet:
         return PermittedRelationshipSet.empty()
+
+    @property
+    def renderer(self) -> DiagramRenderer:
+        from src.infrastructure.rendering.generic_puml_renderer import GenericPumlRenderer  # noqa: PLC0415
+
+        return GenericPumlRenderer(self._config)
 
     def write_guidance(self) -> DiagramTypeWriteGuidance:
         g: dict[str, Any] = self._config.get("guidance") or {}

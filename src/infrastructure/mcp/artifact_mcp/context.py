@@ -157,6 +157,13 @@ def _shared_state_repo_for_roots(roots: list[Path]) -> ArtifactRepository | None
     return None
 
 
+@lru_cache(maxsize=1)
+def runtime_catalogs():
+    from src.infrastructure.app_bootstrap import build_runtime_catalogs, get_module_registry  # noqa: PLC0415
+
+    return build_runtime_catalogs(get_module_registry())
+
+
 @lru_cache(maxsize=8)
 def repo_cached(roots_key_str: str) -> ArtifactRepository:
     roots = [Path(p) for p in roots_key_str.split("|") if p]

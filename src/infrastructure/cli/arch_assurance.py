@@ -23,6 +23,7 @@ from __future__ import annotations
 import argparse
 import sys
 
+from src.infrastructure.app_bootstrap import build_runtime_catalogs, get_module_registry
 from src.infrastructure.cli._assurance_commands import (
     cmd_backup,
     cmd_export,
@@ -62,6 +63,11 @@ def main() -> None:
         choices=["sqlcipher-colocated", "sqlite", "encrypted"], default=None,
         help="Signals backend (default: sqlcipher-colocated for sqlcipher, sqlite otherwise)",
     )
+    p_init.add_argument(
+        "--archive-backend", metavar="ARCHIVE", dest="archive_backend",
+        choices=["standard", "worm", "s3-worm", "azure-blob-worm"], default=None,
+        help="Archive backend: standard (default), worm (sqlcipher), s3-worm, azure-blob-worm",
+    )
 
     p_use_backend = sub.add_parser("use-backend", help="Switch the active storage backend in config/settings.yaml")
     p_use_backend.add_argument(
@@ -72,6 +78,11 @@ def main() -> None:
         "--signals", metavar="SIGNALS",
         choices=["sqlcipher-colocated", "sqlite", "encrypted"], default=None,
         help="Signals backend to activate (default: auto-selected for backend)",
+    )
+    p_use_backend.add_argument(
+        "--archive-backend", metavar="ARCHIVE", dest="archive_backend",
+        choices=["standard", "worm", "s3-worm", "azure-blob-worm"], default=None,
+        help="Archive backend: standard (default), worm (sqlcipher), s3-worm, azure-blob-worm",
     )
 
     sub.add_parser("status", help="Show store configuration, backends, and lock status")
@@ -108,6 +119,7 @@ def main() -> None:
     p_scan.add_argument("--entities-file", metavar="PATH", help="JSON file with architecture entity dicts")
 
     args = parser.parse_args()
+    build_runtime_catalogs(get_module_registry())
     dispatch = {
         "init": cmd_init, "status": cmd_status, "use-backend": cmd_use_backend,
         "unlock": cmd_unlock, "backup": cmd_backup, "export": cmd_export,
