@@ -157,10 +157,10 @@ Notes:
 
 ### Phase F — Interface segregation of `ArtifactStorePort` (concern #4)
 
-- [ ] **F1** Split the ~40-method `ArtifactStorePort` (`application/ports.py:18`) into role contracts: `ArtifactLookup`, `ArtifactSearch`, `RelationshipGraph`, `RepositoryScopeResolver`, `ArtifactIndexLifecycle`, `ArtifactMutationObserver`.
-- [ ] **F2** The concrete index/store implements all; each consumer's type hints narrow to the contract(s) it actually uses.
-- [ ] **F3** Update `ArtifactRepository` and consumers to depend on the narrow contracts.
-- [ ] **F4** Quality gates green. (Independent of G; runs as its own work unit WU-09 — in DoD.)
+- [x] **F1** Split the ~40-method `ArtifactStorePort` (`application/ports.py:18`) into role contracts: `ArtifactLookup`, `ArtifactSearch`, `RelationshipGraph`, `RepositoryScopeResolver`, `ArtifactIndexLifecycle`, `ArtifactMutationObserver`.
+- [x] **F2** The concrete index/store implements all; each consumer's type hints narrow to the contract(s) it actually uses.
+- [x] **F3** Update `ArtifactRepository` and consumers to depend on the narrow contracts.
+- [x] **F4** Quality gates green. (Independent of G; runs as its own work unit WU-09 — in DoD.)
 
 ### Phase G — Verifier pipeline refactor (concerns #4, #6)
 
