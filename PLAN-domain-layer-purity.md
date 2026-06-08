@@ -121,7 +121,7 @@ Notes:
 
 - [x] **B1** Add `ModuleCatalogBuilder` (mutable; current `register_*`/`replace_*`/`unregister_*`) and immutable `ModuleCatalog` (all query methods) in `src/domain/module_catalog.py`. Builder `.build()` returns a `ModuleCatalog` and refuses subsequent registration. Keep `ModuleRegistry` temporarily as a thin alias only if needed to stage callers; remove by end of C.
 - [x] **B2** Define Protocols `OntologyCatalog`, `ConnectionSemantics`, `DiagramTypeCatalog` in `src/domain/` and immutable implementations backed by a `ModuleCatalog`, caching derived values per-instance (`cached_property`/precomputed frozen maps). Port the logic currently in `ontology_catalog.py`, `connection_ontology.py`, and the registry-using parts of `archimate_relation_rendering.py`.
-- [ ] **B3** Remove import-time snapshots `ENTITY_TYPES`/`CONNECTION_TYPES` (`artifact_verifier_types.py:94`); the verifier derives these from the injected catalog (lands fully in C when the verifier receives the catalog).
+- [x] **B3** Remove import-time snapshots `ENTITY_TYPES`/`CONNECTION_TYPES` (`artifact_verifier_types.py:94`); the verifier derives these from the injected catalog (lands fully in C when the verifier receives the catalog).
 - [x] **B4** Split the derivation registry (`strategy_registry.py`) into a `DerivationStrategyCatalogBuilder` + immutable `DerivationStrategyCatalog`; remove module-level `_registry`/`_derive_fns` globals.
 - [x] **B5** Unit tests: build a `ModuleCatalog` from a minimal fake; assert builder rejects post-build registration; assert catalogs expose immutable views.
 - [x] **B6** Quality gates green.
@@ -130,12 +130,12 @@ Notes:
 
 - [x] **C1** Add `RuntimeCatalogs` (frozen dataclass) in `src/application/runtime_catalogs.py` bundling the three catalogs (+ `DerivationStrategyCatalog`).
 - [x] **C2** `app_bootstrap.py`: build `ModuleCatalog` via the builder, construct `RuntimeCatalogs`, install on FastAPI app-state (extend existing `install_module_registry` at line 62 → `install_runtime_catalogs`). Add a `Depends` provider `runtime_catalogs_dependency(request)`.
-- [ ] **C3** Migrate FastAPI routers and application/infrastructure consumers off the deleted free-function modules onto injected catalogs (constructor params or `Depends`). Enumerated call sites (16) from the dependency audit:
+- [x] **C3** Migrate FastAPI routers and application/infrastructure consumers off the deleted free-function modules onto injected catalogs (constructor params or `Depends`). Enumerated call sites (16) from the dependency audit:
   - `application/artifact_parsing.py`, `application/modeling/artifact_write.py`, `application/modeling/matrix_builder.py`, `application/verification/artifact_verifier.py` (+`_verifier_rules_semantic.py`, `artifact_verifier_types.py`)
   - `infrastructure/artifact_index/_sqlite_store.py`, `infrastructure/gui/routers/connections.py`, `infrastructure/rendering/{archimate_puml_renderer,diagram_builder,generate_static_includes,generic_puml_renderer}.py`, `infrastructure/write/artifact_write/{connection,diagram_references,type_guidance}.py`
 - [ ] **C4** CLI composition roots (`cli/artifact_query_cli.py`, `cli/arch_assurance.py`) construct catalogs in `main()` and pass down.
 - [ ] **C5** MCP: resolve catalogs from the shared backend context (`mcp/artifact_mcp/context.py`); no module-global lookups in tool logic.
-- [ ] **C6** Delete `src/domain/ontology_catalog.py`, `src/domain/connection_ontology.py` free-function APIs and the registry-coupled parts of `archimate_relation_rendering.py`; remove `get_module_registry` global from `app_bootstrap.py` (or reduce to a composition-root-only builder helper). **No `@lru_cache(maxsize=1)` registry singletons remain.**
+- [x] **C6** Delete `src/domain/ontology_catalog.py`, `src/domain/connection_ontology.py` free-function APIs and the registry-coupled parts of `archimate_relation_rendering.py`; remove `get_module_registry` global from `app_bootstrap.py` (or reduce to a composition-root-only builder helper). **No `@lru_cache(maxsize=1)` registry singletons remain.**
 - [ ] **C7** Architecture-test baseline: remove all `domain → infrastructure` entries; they must now pass.
 - [ ] **C8** Quality gates green; full regression run.
 
