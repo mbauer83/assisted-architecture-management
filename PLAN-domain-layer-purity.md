@@ -141,10 +141,10 @@ Notes:
 
 ### Phase D — `config` / `ontologies` dependency cleanup (concerns #2, #5)
 
-- [ ] **D1** Move the pure repo-scope/path-classification helper out of `config.workspace_paths` into `domain/` (e.g. `domain/repo_scope.py`); leave YAML/workspace-file reading in `config/`. Update `domain/artifact_types.py:5`.
-- [ ] **D2** Remove `domain/ontology_catalog.py`'s import of `src.ontologies.archimate_next.matrix_abbreviations` — supply matrix abbreviations through `OntologyCatalog` (sourced from the ontology modules at build time).
-- [ ] **D3** Architecture-test: classify `ontologies/*` (pure plugin) and `diagram_types/*` (adapter-plugin, D9); remove the corresponding baseline entries.
-- [ ] **D4** Quality gates green.
+- [x] **D1** Move the pure repo-scope/path-classification helper out of `config.workspace_paths` into `domain/` (e.g. `domain/repo_scope.py`); leave YAML/workspace-file reading in `config/`. Update `domain/artifact_types.py:5`.
+- [x] **D2** Remove `domain/ontology_catalog.py`'s import of `src.ontologies.archimate_next.matrix_abbreviations` — supply matrix abbreviations through `OntologyCatalog` (sourced from the ontology modules at build time).
+- [x] **D3** Architecture-test: classify `ontologies/*` (pure plugin) and `diagram_types/*` (adapter-plugin, D9); remove the corresponding baseline entries.
+- [x] **D4** Quality gates green.
 
 ### Phase E — `DiagramTypeBase` relocation + registry rename (concern #5)
 
