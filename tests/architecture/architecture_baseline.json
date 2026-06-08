@@ -5,6 +5,7 @@
   "src/application/group_registry.py::src.config.repo_paths",
   "src/application/group_registry_validation.py::src.config.repo_paths",
   "src/application/modeling/artifact_write.py::src.infrastructure.app_bootstrap",
+  "src/application/modeling/matrix_builder.py::src.infrastructure.app_bootstrap",
   "src/application/repo_path_helpers.py::src.config.repo_paths",
   "src/application/verification/_verifier_rules_bindings.py::src.infrastructure.app_bootstrap",
   "src/application/verification/_verifier_rules_semantic.py::src.infrastructure.app_bootstrap",
@@ -17,8 +18,6 @@
   "src/diagram_types/c4/_projection.py::src.application.derivation.strategy_registry",
   "src/diagram_types/c4/_projection.py::src.application.derivation.types",
   "src/diagram_types/c4/_type.py::src.application.derivation.types",
-  "src/domain/artifact_types.py::src.config.workspace_paths",
-  "src/domain/ontology_catalog.py::src.ontologies.archimate_next",
   "src/domain/view_projection.py::src.application.derivation.types",
   "src/ontologies/archimate_next/_loader.py::src.infrastructure.rendering._svg_sprite_convert"
 ]

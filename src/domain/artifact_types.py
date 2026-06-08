@@ -2,11 +2,9 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Literal, Protocol, TypeAlias, runtime_checkable
 
-from src.config.workspace_paths import infer_repo_scope
+from src.domain.repo_scope import MountScope, infer_repo_scope
 
 Domain: TypeAlias = str
-
-MountScope = Literal["engagement", "enterprise"]
 
 
 @dataclass(frozen=True)

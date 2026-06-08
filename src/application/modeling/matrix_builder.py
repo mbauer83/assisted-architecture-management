@@ -4,8 +4,14 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 from dataclasses import dataclass
+from functools import lru_cache
 
-from src.domain.ontology_catalog import matrix_connection_type_abbreviations
+
+@lru_cache(maxsize=1)
+def _matrix_connection_type_abbreviations() -> dict[str, str]:
+    from src.infrastructure.app_bootstrap import build_runtime_catalogs, get_module_registry  # noqa: PLC0415
+
+    return build_runtime_catalogs(get_module_registry()).ontology.matrix_connection_type_abbreviations()
 
 
 @dataclass
@@ -86,7 +92,7 @@ _LANG_PREFIXES = ("archimate-", "er-", "sequence-", "activity-", "usecase-")
 def _abbreviations(active: list[ConnTypeConfig]) -> dict[str, str]:
     """Return abbreviation → conn_type using ontology declarations, falling back to
     auto-generation (strip language prefix, first letter uppercase) for unknown types."""
-    ontology_abbreviations = matrix_connection_type_abbreviations()
+    ontology_abbreviations = _matrix_connection_type_abbreviations()
     abbrevs: dict[str, str] = {}
     used: set[str] = set()
     for cfg in active:
