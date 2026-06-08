@@ -14,13 +14,21 @@ from src.application.derivation.refresh import (
     apply_selection_delta,
     compute_derivation_diff,
 )
+from src.application.derivation.strategy_registry import DerivationStrategyCatalog, DerivationStrategyCatalogBuilder
 from src.application.derivation.types import CandidateSet
 from src.application.verification._verifier_rules_binding_targets import (
     _check_connection_path_target,
 )
 from src.application.verification.artifact_verifier_types import VerificationResult
+from src.domain.derivation_types import StrategySpec
 from src.domain.view_derivations import DerivationSelection, SourceModelSnapshot, ViewDerivation
 from tests.application.derivation._fixtures import FakeQuery, _connection, _entity
+
+
+def _path_catalog(derive_fn) -> DerivationStrategyCatalog:
+    b = DerivationStrategyCatalogBuilder()
+    b.register(StrategySpec(name="path-projection", version=1, supported_filters=frozenset()), derive_fn)
+    return b.build()
 
 # ---------------------------------------------------------------------------
 # Path key helpers
@@ -128,14 +136,9 @@ def test_new_path_appears_in_diff(tmp_path: Path) -> None:
     ab = _connection("A---B@@serving", "A", "B")
     query = FakeQuery([a, b], [ab])
 
-    # Monkey-patch the strategy to return a known candidate
-    import src.application.derivation.strategy_registry as reg
-    reg._derive_fns[("path-projection", 1)] = lambda params, snap, q: CandidateSet(
-        paths=frozenset(["A---B@@serving@fwd"])
-    )
-
+    catalog = _path_catalog(lambda params, snap, q: CandidateSet(paths=frozenset(["A---B@@serving@fwd"])))
     vd = _make_vd(included_paths=())
-    diff = compute_derivation_diff(diag, {}, vd, query)
+    diff = compute_derivation_diff(diag, {}, vd, query, catalog)
     assert "A---B@@serving@fwd" in diff.new_paths
     assert diff.gone_paths == []
 
@@ -147,11 +150,9 @@ def test_gone_path_broken_when_conn_missing(tmp_path: Path) -> None:
     # Query has NO connections — path ids are unknown → broken
     query = FakeQuery([], [])
 
-    import src.application.derivation.strategy_registry as reg
-    reg._derive_fns[("path-projection", 1)] = lambda params, snap, q: CandidateSet(paths=frozenset())
-
+    catalog = _path_catalog(lambda params, snap, q: CandidateSet(paths=frozenset()))
     vd = _make_vd(included_paths=("A---B@@s@fwd|B---C@@s@fwd",))
-    diff = compute_derivation_diff(diag, {}, vd, query)
+    diff = compute_derivation_diff(diag, {}, vd, query, catalog)
 
     assert "A---B@@s@fwd|B---C@@s@fwd" in diff.broken_paths
     assert diff.drifted_paths == []
@@ -165,12 +166,10 @@ def test_gone_path_drifted_when_conns_present(tmp_path: Path) -> None:
     bc = _connection("B---C@@s", "B", "C")
     query = FakeQuery([], [ab, bc])
 
-    import src.application.derivation.strategy_registry as reg
-    reg._derive_fns[("path-projection", 1)] = lambda params, snap, q: CandidateSet(paths=frozenset())
-
+    catalog = _path_catalog(lambda params, snap, q: CandidateSet(paths=frozenset()))
     pk = "A---B@@s@fwd|B---C@@s@fwd"
     vd = _make_vd(included_paths=(pk,))
-    diff = compute_derivation_diff(diag, {}, vd, query)
+    diff = compute_derivation_diff(diag, {}, vd, query, catalog)
 
     assert pk in diff.drifted_paths
     assert diff.broken_paths == []
@@ -186,14 +185,10 @@ def test_refresh_idempotent_no_change(tmp_path: Path) -> None:
     diag.write_text("---\nbindings: []\n---\n")
 
     pk = "A---B@@serving@fwd"
-    import src.application.derivation.strategy_registry as reg
-    reg._derive_fns[("path-projection", 1)] = lambda params, snap, q: CandidateSet(
-        paths=frozenset([pk])
-    )
-
+    catalog = _path_catalog(lambda params, snap, q: CandidateSet(paths=frozenset([pk])))
     query = FakeQuery([], [_connection("A---B@@serving", "A", "B")])
     vd = _make_vd(included_paths=(pk,))
-    diff = compute_derivation_diff(diag, {}, vd, query)
+    diff = compute_derivation_diff(diag, {}, vd, query, catalog)
 
     assert diff.new_paths == []
     assert diff.gone_paths == []

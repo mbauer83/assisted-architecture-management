@@ -31,9 +31,18 @@ from src.application.derivation.refresh import (
     compute_derivation_diff,
     compute_revision,
 )
-from src.application.derivation.strategy_registry import register_strategy
+from src.application.derivation.strategy_registry import DerivationStrategyCatalog, DerivationStrategyCatalogBuilder
 from src.domain.view_derivations import DerivationSelection, SourceModelSnapshot, ViewDerivation
 from tests.application.derivation._fixtures import FakeQuery, _entity
+
+
+def _es_catalog() -> DerivationStrategyCatalog:
+    b = DerivationStrategyCatalogBuilder()
+    b.register(ES_SPEC, es_derive)
+    return b.build()
+
+
+_ES_CATALOG = _es_catalog()
 
 _SNAPSHOT = SourceModelSnapshot(repo_scope="both")
 
@@ -94,9 +103,6 @@ class TestComputeRevision:
 
 
 class TestComputeDerivationDiff:
-    def setup_method(self) -> None:
-        register_strategy(ES_SPEC, es_derive)
-
     def _query_abc(self) -> FakeQuery:
         return FakeQuery(entities=[_entity("A@1"), _entity("B@2"), _entity("C@3")])
 
@@ -104,7 +110,7 @@ class TestComputeDerivationDiff:
         vd = _make_vd(entity_ids=["A@1", "B@2"])
         p = _tmp_file("diag")
         try:
-            diff = compute_derivation_diff(p, {}, vd, self._query_abc())
+            diff = compute_derivation_diff(p, {}, vd, self._query_abc(), _ES_CATALOG)
             assert "A@1" in diff.new_entity_ids
             assert "B@2" in diff.new_entity_ids
             assert diff.gone_entity_ids == []
@@ -116,7 +122,7 @@ class TestComputeDerivationDiff:
         vd = _make_vd(entity_ids=["A@1", "B@2"], selection=sel)
         p = _tmp_file("diag")
         try:
-            diff = compute_derivation_diff(p, {}, vd, self._query_abc())
+            diff = compute_derivation_diff(p, {}, vd, self._query_abc(), _ES_CATALOG)
             assert "A@1" not in diff.new_entity_ids
             assert "B@2" in diff.new_entity_ids
         finally:
@@ -128,7 +134,7 @@ class TestComputeDerivationDiff:
         vd = _make_vd(entity_ids=["A@1", "B@2"], selection=sel)
         p = _tmp_file("diag")
         try:
-            diff = compute_derivation_diff(p, {}, vd, self._query_abc())
+            diff = compute_derivation_diff(p, {}, vd, self._query_abc(), _ES_CATALOG)
             assert "B@2" not in diff.new_entity_ids
             assert "A@1" in diff.new_entity_ids
         finally:
@@ -140,7 +146,7 @@ class TestComputeDerivationDiff:
         vd = _make_vd(entity_ids=["A@1", "B@2"], selection=sel)
         p = _tmp_file("diag")
         try:
-            diff = compute_derivation_diff(p, {}, vd, self._query_abc())
+            diff = compute_derivation_diff(p, {}, vd, self._query_abc(), _ES_CATALOG)
             assert diff.is_empty
             assert diff.new_entity_ids == []
             assert diff.gone_entity_ids == []
@@ -153,7 +159,7 @@ class TestComputeDerivationDiff:
         vd = _make_vd(entity_ids=["A@1"], selection=sel)
         p = _tmp_file("diag")
         try:
-            diff = compute_derivation_diff(p, {}, vd, self._query_abc())
+            diff = compute_derivation_diff(p, {}, vd, self._query_abc(), _ES_CATALOG)
             assert "GONE@99" in diff.gone_entity_ids
         finally:
             p.unlink()
@@ -182,7 +188,7 @@ class TestComputeDerivationDiff:
         }
         p = _tmp_file("diag")
         try:
-            diff = compute_derivation_diff(p, fm, vd, self._query_abc())
+            diff = compute_derivation_diff(p, fm, vd, self._query_abc(), _ES_CATALOG)
             assert "manual-bind" not in diff.remove_binding_ids
             assert "derived-bind" in diff.remove_binding_ids
         finally:
@@ -198,7 +204,7 @@ class TestComputeDerivationDiff:
         p = _tmp_file("diag")
         try:
             with pytest.raises(ValueError, match="no-such-strategy"):
-                compute_derivation_diff(p, {}, vd, self._query_abc())
+                compute_derivation_diff(p, {}, vd, self._query_abc(), _ES_CATALOG)
         finally:
             p.unlink()
 
@@ -206,7 +212,7 @@ class TestComputeDerivationDiff:
         vd = _make_vd(entity_ids=[])
         p = _tmp_file("content123")
         try:
-            diff = compute_derivation_diff(p, {}, vd, self._query_abc())
+            diff = compute_derivation_diff(p, {}, vd, self._query_abc(), _ES_CATALOG)
             assert diff.base_revision == compute_revision(p)
         finally:
             p.unlink()

@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from src.application.derivation.path_projection import _path_key, derive
+from src.application.derivation.path_projection import SPEC, _path_key, derive
 from src.domain.view_derivations import SourceModelSnapshot
 from tests.application.derivation._fixtures import FakeQuery, _connection, _entity
 
@@ -141,11 +141,7 @@ def test_empty_sources() -> None:
     assert result.connection_ids == frozenset()
 
 
-def test_path_projection_registered() -> None:
-    import src.application.derivation  # noqa: F401
-    from src.application.derivation.strategy_registry import lookup_strategy
-
-    spec = lookup_strategy("path-projection", 1)
-    assert spec is not None
-    assert "connection_types" in spec.supported_filters
-    assert "max_path_length" in spec.supported_filters
+def test_path_projection_spec() -> None:
+    assert SPEC.name == "path-projection"
+    assert "connection_types" in SPEC.supported_filters
+    assert "max_path_length" in SPEC.supported_filters

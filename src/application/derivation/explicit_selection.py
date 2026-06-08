@@ -9,8 +9,8 @@ Projects to ``represents`` by default.
 
 from __future__ import annotations
 
-from src.application.derivation.strategy_registry import StrategySpec, register_strategy
 from src.application.derivation.types import CandidateSet, ModelQuery
+from src.domain.derivation_types import StrategySpec
 from src.domain.view_derivations import SourceModelSnapshot
 
 
@@ -44,4 +44,3 @@ SPEC = StrategySpec(
     version=1,
     supported_filters=frozenset(),
 )
-register_strategy(SPEC, derive)

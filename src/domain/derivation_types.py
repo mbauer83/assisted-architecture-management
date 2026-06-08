@@ -10,6 +10,13 @@ from src.domain.view_derivations import SourceModelSnapshot
 
 
 @dataclass(frozen=True)
+class StrategySpec:
+    name: str
+    version: int
+    supported_filters: frozenset[str]
+
+
+@dataclass(frozen=True)
 class CandidateSet:
     """Output of a derivation strategy: sets of model entity/connection artifact_ids.
 

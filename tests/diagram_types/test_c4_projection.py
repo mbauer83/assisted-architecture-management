@@ -6,10 +6,7 @@ and AC B: strategy registration from the C4 module (not the generic package).
 
 from __future__ import annotations
 
-# Importing any C4 diagram-type package triggers strategy registration.
-import src.diagram_types.c4._projection  # noqa: F401
-from src.application.derivation.strategy_registry import lookup_strategy
-from src.diagram_types.c4._projection import _c4_item_type, project_c4
+from src.diagram_types.c4._projection import MANIFEST, _c4_item_type, project_c4
 from src.domain.view_projection import ProjectedViewItem
 from tests.application.derivation._fixtures import FakeQuery, _connection, _entity
 
@@ -28,9 +25,9 @@ _COMMON = dict(
 
 
 def test_c4_projection_strategy_registered() -> None:
-    spec = lookup_strategy("c4.scope-projection", 1)
-    assert spec is not None
-    assert spec.supported_filters == frozenset({"repo_scope"})
+    specs = {spec.name: spec for spec, _ in MANIFEST.strategies}
+    assert "c4.scope-projection" in specs
+    assert specs["c4.scope-projection"].supported_filters == frozenset({"repo_scope"})
 
 
 # ---------------------------------------------------------------------------

@@ -9,8 +9,13 @@ E413: invalid repo_scope value in source_model_snapshot.
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 from src.application.verification.artifact_verifier_types import Issue, Severity, VerificationResult
 from src.domain.view_derivations import VALID_REPO_SCOPES
+
+if TYPE_CHECKING:
+    from src.application.derivation.strategy_registry import DerivationStrategyCatalog
 
 
 def collect_view_derivation_ids(fm: dict) -> set[str]:
@@ -21,10 +26,16 @@ def collect_view_derivation_ids(fm: dict) -> set[str]:
     return {str(raw["id"]) for raw in raw_vds if isinstance(raw, dict) and raw.get("id") is not None}
 
 
-def check_view_derivations(fm: dict, result: VerificationResult, loc: str) -> None:
+def check_view_derivations(
+    fm: dict,
+    result: VerificationResult,
+    loc: str,
+    catalog: "DerivationStrategyCatalog | None" = None,
+) -> None:
     """Validate the view_derivations block in diagram frontmatter.
 
     Silently returns when view_derivations is absent or empty.
+    E411/E412 strategy checks are skipped when catalog is None.
     """
     raw_vds = fm.get("view_derivations")
     if not raw_vds or not isinstance(raw_vds, list):
@@ -65,17 +76,23 @@ def check_view_derivations(fm: dict, result: VerificationResult, loc: str) -> No
         strategy = str(raw.get("strategy") or "")
         sv = raw.get("strategy_version")
         version = int(sv) if isinstance(sv, (int, float)) else 0
-        _check_strategy(vd_id, strategy, version, raw, result, loc)
+        _check_strategy(vd_id, strategy, version, raw, result, loc, catalog=catalog)
 
 
-def check_all_view_derivations(fm: dict, result: VerificationResult, loc: str) -> None:
+def check_all_view_derivations(
+    fm: dict,
+    result: VerificationResult,
+    loc: str,
+    catalog: "DerivationStrategyCatalog | None" = None,
+) -> None:
     """Run all view_derivations verifier rules for a diagram frontmatter dict.
 
     Combines structural validation (E410, E411, E412, E413) with binding
     derived_from cross-reference validation (E409).  Call once per diagram.
+    E411/E412 strategy checks are skipped when catalog is None.
     """
     vd_ids = collect_view_derivation_ids(fm)
-    check_view_derivations(fm, result, loc)
+    check_view_derivations(fm, result, loc, catalog=catalog)
     check_bindings_derived_from(fm, vd_ids, result, loc)
 
 
@@ -121,13 +138,12 @@ def _check_strategy(
     raw: dict[str, object],
     result: VerificationResult,
     loc: str,
+    catalog: "DerivationStrategyCatalog | None" = None,
 ) -> None:
-    from src.application.derivation import lookup_strategy  # noqa: PLC0415
-
-    if not strategy:
+    if not strategy or catalog is None:
         return
 
-    spec = lookup_strategy(strategy, version)
+    spec = catalog.lookup_strategy(strategy, version)
     if spec is None:
         result.issues.append(Issue(
             Severity.ERROR, "E411",

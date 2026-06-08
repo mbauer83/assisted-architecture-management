@@ -24,13 +24,20 @@ from hypothesis import strategies as st
 from src.application.derivation.explicit_selection import SPEC as ES_SPEC
 from src.application.derivation.explicit_selection import derive as es_derive
 from src.application.derivation.refresh import compute_derivation_diff
-from src.application.derivation.strategy_registry import register_strategy
+from src.application.derivation.strategy_registry import DerivationStrategyCatalog, DerivationStrategyCatalogBuilder
 from src.application.verification._verifier_rules_bindings import check_bindings_scoped
 from src.application.verification.artifact_verifier_types import VerificationResult
 from src.domain.view_derivations import DerivationSelection, SourceModelSnapshot, ViewDerivation
 from tests.application.derivation._fixtures import FakeQuery, _entity
 
-register_strategy(ES_SPEC, es_derive)
+
+def _build_es_catalog() -> DerivationStrategyCatalog:
+    b = DerivationStrategyCatalogBuilder()
+    b.register(ES_SPEC, es_derive)
+    return b.build()
+
+
+_ES_CATALOG = _build_es_catalog()
 
 _SNAPSHOT = SourceModelSnapshot(repo_scope="both")
 _ENTITY_ID = "APP@1000000000.AbcDef.my-app"
@@ -269,7 +276,7 @@ class TestF4DerivationPurity:
         )
         tmp = _tmp_diagram_file()
         try:
-            diff = compute_derivation_diff(tmp, {}, vd, query)
+            diff = compute_derivation_diff(tmp, {}, vd, query, _ES_CATALOG)
             assert diff.is_empty, f"new={diff.new_entity_ids}, gone={diff.gone_entity_ids}"
         finally:
             tmp.unlink(missing_ok=True)
@@ -286,7 +293,7 @@ class TestF4DerivationPurity:
         vd = _make_vd(all_ids, selected=[], excluded=excluded)
         tmp = _tmp_diagram_file()
         try:
-            diff = compute_derivation_diff(tmp, {}, vd, query)
+            diff = compute_derivation_diff(tmp, {}, vd, query, _ES_CATALOG)
             overlap = set(diff.new_entity_ids) & set(excluded)
             assert not overlap, f"excluded ids appeared as new candidates: {overlap}"
         finally:
@@ -307,7 +314,7 @@ class TestF4DerivationPurity:
         vd = _make_vd(all_ids, selected=selected, excluded=excluded)
         tmp = _tmp_diagram_file()
         try:
-            compute_derivation_diff(tmp, {}, vd, query)
+            compute_derivation_diff(tmp, {}, vd, query, _ES_CATALOG)
         finally:
             tmp.unlink(missing_ok=True)
 

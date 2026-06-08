@@ -86,10 +86,13 @@ def _refresh_derivation(
 
     from src.application.derivation.refresh import compute_derivation_diff  # noqa: PLC0415
     from src.infrastructure.artifact_index.service import shared_artifact_index  # noqa: PLC0415
+    from src.infrastructure.mcp.artifact_mcp.context import runtime_catalogs  # noqa: PLC0415
 
     roots = [Path(p) for p in key.split("|") if p]
     index = shared_artifact_index(roots)
-    diff = compute_derivation_diff(path, parsed.frontmatter, vd_entry, index)
+    diff = compute_derivation_diff(
+        path, parsed.frontmatter, vd_entry, index, runtime_catalogs().derivation,
+    )
     return diff.to_dict()
 
 

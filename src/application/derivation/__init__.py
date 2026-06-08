@@ -1,24 +1,19 @@
-"""Derivation package — view-derivation strategies and registry.
+"""Derivation package — view-derivation strategies and catalog.
 
-Importing this package registers all built-in strategies as a side effect
-of loading the strategy modules. The verifier's E411/E412 rules import
-``lookup_strategy`` from here (not from ``strategy_registry`` directly)
-so that auto-registration runs before validation.
+Strategy modules are imported here for convenient access; the composition
+root (app_bootstrap.py) registers them explicitly via DerivationStrategyCatalogBuilder.
 """
 
 from __future__ import annotations
 
 from src.application.derivation.strategy_registry import (
+    DerivationStrategyCatalog,
+    DerivationStrategyCatalogBuilder,
     StrategySpec,
-    lookup_derive_fn,
-    lookup_strategy,
-    register_strategy,
-    registered_strategies,
 )
 from src.application.derivation.types import CandidateSet, DeriveFn, ModelQuery
 
-# Import strategy modules to trigger self-registration.
-from . import (  # noqa: E402, F401
+from . import (  # noqa: F401
     explicit_selection,
     incident_connections,
     local_neighborhood,
@@ -28,14 +23,12 @@ from . import (  # noqa: E402, F401
 __all__ = [
     "CandidateSet",
     "DeriveFn",
+    "DerivationStrategyCatalog",
+    "DerivationStrategyCatalogBuilder",
     "ModelQuery",
     "StrategySpec",
     "explicit_selection",
     "incident_connections",
     "local_neighborhood",
     "path_projection",
-    "lookup_derive_fn",
-    "lookup_strategy",
-    "register_strategy",
-    "registered_strategies",
 ]

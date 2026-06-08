@@ -20,9 +20,9 @@ from __future__ import annotations
 
 from collections import deque
 
-from src.application.derivation.strategy_registry import StrategySpec, register_strategy
 from src.application.derivation.types import CandidateSet, ModelQuery
 from src.domain.artifact_types import ConnectionRecord
+from src.domain.derivation_types import StrategySpec
 from src.domain.view_derivations import SourceModelSnapshot
 
 _VALID_DIRECTIONS = frozenset({"any", "outbound", "inbound"})
@@ -186,11 +186,8 @@ def derive(
     return CandidateSet(connection_ids=connection_ids, paths=path_keys)
 
 
-register_strategy(
-    StrategySpec(
-        name="path-projection",
-        version=1,
-        supported_filters=_SUPPORTED_FILTERS,
-    ),
-    derive_fn=derive,
+SPEC = StrategySpec(
+    name="path-projection",
+    version=1,
+    supported_filters=_SUPPORTED_FILTERS,
 )

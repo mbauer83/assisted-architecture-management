@@ -8,8 +8,7 @@ what the engine projects for system-context, container, and component).
 from __future__ import annotations
 
 from src.application.derivation.preview import project_view_for_preview
-from src.application.derivation.strategy_registry import lookup_derive_fn
-from src.diagram_types.c4._projection import project_c4
+from src.diagram_types.c4._projection import MANIFEST, project_c4
 from src.diagram_types.c4.component import module as c4_component
 from src.diagram_types.c4.container import module as c4_container
 from src.diagram_types.c4.system_context import module as c4_system_context
@@ -145,8 +144,10 @@ def test_seam_b_and_seam_c_agree_on_entity_membership() -> None:
     result = c4_container.project_view("c4-container", de, query)
     assert result is not None
 
-    # Seam B: re-run via registered derive fn
-    derive_fn = lookup_derive_fn("c4.scope-projection", 1)
+    # Seam B: re-run via manifest derive fn
+    _, derive_fn = next(
+        (spec, fn) for spec, fn in MANIFEST.strategies if spec.name == "c4.scope-projection"
+    )
     assert derive_fn is not None
     candidate = derive_fn(
         dict(result.derivation.parameters),

@@ -14,10 +14,9 @@ from pathlib import Path
 import pytest
 
 from src.application.derivation.strategy_registry import (
+    DerivationStrategyCatalog,
+    DerivationStrategyCatalogBuilder,
     StrategySpec,
-    _registry,
-    lookup_strategy,
-    register_strategy,
 )
 from src.application.verification._verifier_rules_view_derivations import (
     check_bindings_derived_from,
@@ -206,31 +205,28 @@ class TestViewDerivationsSchema:
 
 
 class TestStrategyRegistry:
-    def setup_method(self) -> None:
-        self._saved = dict(_registry)
-        _registry.clear()
-
-    def teardown_method(self) -> None:
-        _registry.clear()
-        _registry.update(self._saved)
-
     def test_lookup_unknown_returns_none(self) -> None:
-        assert lookup_strategy("unknown", 1) is None
+        catalog = DerivationStrategyCatalogBuilder().build()
+        assert catalog.lookup_strategy("unknown", 1) is None
 
     def test_register_and_lookup(self) -> None:
         spec = StrategySpec(name="explicit-selection", version=1, supported_filters=frozenset({"direction"}))
-        register_strategy(spec)
-        found = lookup_strategy("explicit-selection", 1)
+        b = DerivationStrategyCatalogBuilder()
+        b.register(spec)
+        catalog = b.build()
+        found = catalog.lookup_strategy("explicit-selection", 1)
         assert found is not None
         assert found.supported_filters == frozenset({"direction"})
 
     def test_different_versions_independent(self) -> None:
         v1 = StrategySpec(name="s", version=1, supported_filters=frozenset({"a"}))
         v2 = StrategySpec(name="s", version=2, supported_filters=frozenset({"a", "b"}))
-        register_strategy(v1)
-        register_strategy(v2)
-        assert lookup_strategy("s", 1) == v1
-        assert lookup_strategy("s", 2) == v2
+        b = DerivationStrategyCatalogBuilder()
+        b.register(v1)
+        b.register(v2)
+        catalog = b.build()
+        assert catalog.lookup_strategy("s", 1) == v1
+        assert catalog.lookup_strategy("s", 2) == v2
 
 
 # ---------------------------------------------------------------------------
@@ -301,31 +297,30 @@ class TestE413InvalidRepoScope:
 
 
 class TestE411UnknownStrategy:
-    def setup_method(self) -> None:
-        self._saved = dict(_registry)
-        _registry.clear()
+    def _empty_catalog(self) -> DerivationStrategyCatalog:
+        return DerivationStrategyCatalogBuilder().build()
 
-    def teardown_method(self) -> None:
-        _registry.clear()
-        _registry.update(self._saved)
+    def _catalog_with_my_strategy(self) -> DerivationStrategyCatalog:
+        b = DerivationStrategyCatalogBuilder()
+        b.register(StrategySpec(name="my-strategy", version=1, supported_filters=frozenset()))
+        return b.build()
 
     def test_unknown_strategy_raises_e411(self) -> None:
         fm = {"view_derivations": [_vd_entry(strategy="no-such-strategy", strategy_version=1)]}
         r = _result()
-        check_view_derivations(fm, r, _LOC)
+        check_view_derivations(fm, r, _LOC, catalog=self._empty_catalog())
         assert "E411" in _codes(r)
 
     def test_registered_strategy_ok(self) -> None:
-        register_strategy(StrategySpec(name="my-strategy", version=1, supported_filters=frozenset()))
         fm = {"view_derivations": [_vd_entry()]}
         r = _result()
-        check_view_derivations(fm, r, _LOC)
+        check_view_derivations(fm, r, _LOC, catalog=self._catalog_with_my_strategy())
         assert "E411" not in _codes(r)
 
     def test_empty_strategy_string_skipped(self) -> None:
         fm = {"view_derivations": [_vd_entry(strategy="")]}
         r = _result()
-        check_view_derivations(fm, r, _LOC)
+        check_view_derivations(fm, r, _LOC, catalog=self._empty_catalog())
         assert "E411" not in _codes(r)
 
 
@@ -335,37 +330,33 @@ class TestE411UnknownStrategy:
 
 
 class TestE412UnsupportedFilter:
-    def setup_method(self) -> None:
-        self._saved = dict(_registry)
-        _registry.clear()
-        register_strategy(StrategySpec(
+    def _catalog(self) -> DerivationStrategyCatalog:
+        b = DerivationStrategyCatalogBuilder()
+        b.register(StrategySpec(
             name="my-strategy", version=1,
             supported_filters=frozenset({"direction", "max_hops"}),
         ))
-
-    def teardown_method(self) -> None:
-        _registry.clear()
-        _registry.update(self._saved)
+        return b.build()
 
     def test_unsupported_filter_raises_e412(self) -> None:
         entry = _vd_entry(parameters={"pre_filters": {"unknown_filter": True}})
         fm = {"view_derivations": [entry]}
         r = _result()
-        check_view_derivations(fm, r, _LOC)
+        check_view_derivations(fm, r, _LOC, catalog=self._catalog())
         assert "E412" in _codes(r)
 
     def test_supported_filter_ok(self) -> None:
         entry = _vd_entry(parameters={"pre_filters": {"direction": "outbound"}})
         fm = {"view_derivations": [entry]}
         r = _result()
-        check_view_derivations(fm, r, _LOC)
+        check_view_derivations(fm, r, _LOC, catalog=self._catalog())
         assert "E412" not in _codes(r)
 
     def test_no_pre_filters_ok(self) -> None:
         entry = _vd_entry(parameters={"diagram_type": "c4-container"})
         fm = {"view_derivations": [entry]}
         r = _result()
-        check_view_derivations(fm, r, _LOC)
+        check_view_derivations(fm, r, _LOC, catalog=self._catalog())
         assert "E412" not in _codes(r)
 
 

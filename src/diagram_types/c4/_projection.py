@@ -303,13 +303,11 @@ def project_c4(
 
 
 # ---------------------------------------------------------------------------
-# Strategy registration (Seam B)
-# ---------------------------------------------------------------------------
-# Runs as a side effect when this module is first imported,
-# which happens when c4/_type.py (and thus any C4 diagram-type package) loads.
+# Module manifest (Seam B) — strategies registered at the composition root.
 # ---------------------------------------------------------------------------
 
-from src.application.derivation.strategy_registry import StrategySpec, register_strategy  # noqa: E402
+from src.domain.derivation_types import StrategySpec  # noqa: E402
+from src.domain.module_manifest import DiagramTypeModuleManifest  # noqa: E402
 from src.domain.view_derivations import SourceModelSnapshot  # noqa: E402
 
 
@@ -337,7 +335,13 @@ def _derive(
     ).to_candidate_set()
 
 
-register_strategy(
-    StrategySpec(name="c4.scope-projection", version=1, supported_filters=frozenset({"repo_scope"})),
-    derive_fn=_derive,
+MANIFEST = DiagramTypeModuleManifest(
+    id="c4",
+    version=1,
+    compatible_ontologies=("archimate-next-snapshot1", "sysml_v2_min"),
+    ontology_role_mapping={},  # K2-followon: parameterise projection per active ontology
+    strategies=((
+        StrategySpec(name="c4.scope-projection", version=1, supported_filters=frozenset({"repo_scope"})),
+        _derive,
+    ),),
 )

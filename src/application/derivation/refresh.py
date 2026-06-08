@@ -17,7 +17,7 @@ import hashlib
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from src.application.derivation.strategy_registry import lookup_derive_fn
+from src.application.derivation.strategy_registry import DerivationStrategyCatalog
 from src.application.derivation.types import ModelQuery
 from src.domain.view_derivations import ViewDerivation
 
@@ -154,20 +154,20 @@ def compute_derivation_diff(
     fm: dict[str, object],
     vd: ViewDerivation,
     query: ModelQuery,
+    catalog: DerivationStrategyCatalog | None = None,
 ) -> DerivationDiff:
     """Run the strategy and compute the diff vs the stored selection.
 
-    Raises ValueError if no derive function is registered for the strategy.
+    Raises ValueError if no derive function is found for the strategy.
     Manual-beats-refresh: only bindings with derived_from == vd.id targeting gone
     entities are proposed for removal; manual bindings are never touched.
     """
     base_revision = compute_revision(diagram_path)
 
-    derive_fn = lookup_derive_fn(vd.strategy, vd.strategy_version)
+    derive_fn = catalog.lookup_derive_fn(vd.strategy, vd.strategy_version) if catalog else None
     if derive_fn is None:
         raise ValueError(
-            f"No derive function registered for strategy '{vd.strategy}' v{vd.strategy_version}. "
-            "Ensure the strategy module is imported."
+            f"No derive function registered for strategy '{vd.strategy}' v{vd.strategy_version}."
         )
 
     candidate_set = derive_fn(vd.parameters, vd.source_model_snapshot, query)

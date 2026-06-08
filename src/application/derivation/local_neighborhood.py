@@ -11,9 +11,9 @@ Supported pre_filters:
 
 from __future__ import annotations
 
-from src.application.derivation.strategy_registry import StrategySpec, register_strategy
 from src.application.derivation.types import CandidateSet, ModelQuery
 from src.domain.artifact_types import ConnectionRecord
+from src.domain.derivation_types import StrategySpec
 from src.domain.view_derivations import SourceModelSnapshot
 
 _VALID_DIRECTIONS = frozenset({"any", "outbound", "inbound"})
@@ -98,4 +98,3 @@ SPEC = StrategySpec(
     version=1,
     supported_filters=frozenset({"direction", "connection_types", "entity_types"}),
 )
-register_strategy(SPEC, derive)

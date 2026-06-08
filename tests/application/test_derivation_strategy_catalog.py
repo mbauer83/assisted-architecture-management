@@ -7,8 +7,8 @@ import pytest
 from src.application.derivation.strategy_registry import (
     DerivationStrategyCatalog,
     DerivationStrategyCatalogBuilder,
-    StrategySpec,
 )
+from src.domain.derivation_types import StrategySpec
 
 _SPEC_A = StrategySpec(name="scope-projection", version=1, supported_filters=frozenset({"domain"}))
 _SPEC_B = StrategySpec(name="neighborhood", version=2, supported_filters=frozenset())
@@ -108,22 +108,10 @@ class TestCatalogQueries:
         assert cat.registered_strategies() == []
 
 
-# ── Independence from global registry ────────────────────────────────────────
+# ── Independence between catalogs ────────────────────────────────────────────
 
 
 class TestNoGlobalState:
-    def test_catalog_independent_of_module_globals(self) -> None:
-        from src.application.derivation.strategy_registry import (
-            _registry as global_registry,
-        )
-        before = set(global_registry)
-        b = DerivationStrategyCatalogBuilder()
-        b.register(_SPEC_A)
-        cat = b.build()
-        after = set(global_registry)
-        assert before == after  # catalog build did not touch the module-level dict
-        assert cat.lookup_strategy("scope-projection", 1) is _SPEC_A
-
     def test_two_catalogs_are_independent(self) -> None:
         b1 = DerivationStrategyCatalogBuilder()
         b1.register(_SPEC_A)

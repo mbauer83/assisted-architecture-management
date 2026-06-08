@@ -13,7 +13,6 @@ Coverage:
 from __future__ import annotations
 
 from src.application.derivation.local_neighborhood import SPEC, derive
-from src.application.derivation.strategy_registry import lookup_strategy
 from src.domain.view_derivations import SourceModelSnapshot
 from tests.application.derivation._fixtures import FakeQuery, _connection, _entity
 
@@ -30,9 +29,8 @@ class TestLocalNeighborhoodSpec:
         assert "connection_types" in SPEC.supported_filters
         assert "entity_types" in SPEC.supported_filters
 
-    def test_registered(self) -> None:
-        found = lookup_strategy("local-neighborhood", 1)
-        assert found is not None
+    def test_spec_name(self) -> None:
+        assert SPEC.name == "local-neighborhood"
 
 
 def _linear_query() -> FakeQuery:

@@ -2,6 +2,7 @@ import re
 from typing import Literal
 
 from src.application.artifact_parsing import extract_declared_puml_aliases as _extract_declared_puml_aliases_shared
+from src.application.derivation.strategy_registry import DerivationStrategyCatalog
 from src.application.verification._verifier_rules_bindings import check_bindings_scoped, get_allowed_bindings
 from src.application.verification._verifier_rules_puml_relations import (
     _extract_entity_display_alias,
@@ -127,6 +128,7 @@ def check_diagram_references_scoped(
     result: VerificationResult,
     loc: str,
     diagram_type_catalog: DiagramTypeCatalog | None = None,
+    derivation_catalog: DerivationStrategyCatalog | None = None,
 ) -> None:
     diagram_is_baselined = str(fm.get("status", "")) == "baselined"
 
@@ -157,7 +159,7 @@ def check_diagram_references_scoped(
         result,
         loc,
     )
-    check_all_view_derivations(fm, result, loc)
+    check_all_view_derivations(fm, result, loc, catalog=derivation_catalog)
     check_bindings_scoped(
         fm, file_scope,
         allowed_entities, allowed_connections,

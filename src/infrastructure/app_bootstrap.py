@@ -7,7 +7,7 @@ from functools import lru_cache
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
-from src.application.derivation.strategy_registry import snapshot_catalog
+from src.application.derivation.strategy_registry import DerivationStrategyCatalogBuilder
 from src.application.runtime_catalogs import RuntimeCatalogs
 from src.application.startup_validation import validate_registry_consistency
 from src.diagram_types import register_default_diagram_types
@@ -28,6 +28,7 @@ _MODULE_REGISTRY_STATE_KEY = "module_registry"
 _RUNTIME_CATALOGS_STATE_KEY = "runtime_catalogs"
 _logger = logging.getLogger(__name__)
 
+# TODO: Referencing instead of discovering modules should be reviewed
 _ALL_ONTOLOGY_MODULES = (archimate_next_module, sysml_v2_min_module, assurance_module)
 
 _DEFAULT_ASSURANCE_DB = Path(__file__).resolve().parents[2] / ".arch-assurance" / "store.db"
@@ -75,22 +76,34 @@ def build_module_catalog(registry: ModuleRegistry) -> ModuleCatalog:
     return builder.build()
 
 
+def _build_derivation_catalog():
+    from src.application.derivation import (  # noqa: PLC0415
+        explicit_selection,
+        incident_connections,
+        local_neighborhood,
+        path_projection,
+    )
+    from src.diagram_types.c4._projection import MANIFEST as _c4_manifest  # noqa: PLC0415
+
+    builder = DerivationStrategyCatalogBuilder()
+    builder.register(explicit_selection.SPEC, explicit_selection.derive)
+    builder.register(local_neighborhood.SPEC, local_neighborhood.derive)
+    builder.register(incident_connections.SPEC, incident_connections.derive)
+    builder.register(path_projection.SPEC, path_projection.derive)
+    for spec, fn in _c4_manifest.strategies:
+        builder.register(spec, fn)
+    return builder.build()
+
+
 def build_runtime_catalogs(registry: ModuleRegistry) -> RuntimeCatalogs:
-    """Build a frozen RuntimeCatalogs from a fully-built ModuleRegistry.
-
-    Must be called after all strategy modules are imported (all_ontologies +
-    diagram_types trigger c4 strategy registration; ``src.application.derivation``
-    import completes the rest).
-    """
-    import src.application.derivation  # noqa: F401  — triggers strategy self-registration
-
+    """Build a frozen RuntimeCatalogs from a fully-built ModuleRegistry."""
     module_catalog = build_module_catalog(registry)
     return RuntimeCatalogs(
         module_catalog=module_catalog,
         ontology=OntologyCatalogImpl(module_catalog, _archimate_matrix_abbreviations),
         connections=ConnectionSemanticsImpl(module_catalog),
         diagram_types=DiagramTypeCatalogImpl(module_catalog),
-        derivation=snapshot_catalog(),
+        derivation=_build_derivation_catalog(),
     )
 
 

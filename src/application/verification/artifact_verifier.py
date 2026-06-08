@@ -206,6 +206,7 @@ class ArtifactVerifier:
             check_diagram_references_scoped(
                 fm, self.registry, scope, result, loc,
                 diagram_type_catalog=self._runtime_catalogs.diagram_types,
+                derivation_catalog=self._runtime_catalogs.derivation,
             )
             check_diagram_relation_references(content, fm, self.registry, scope, result, loc)
         else:
@@ -244,6 +245,7 @@ class ArtifactVerifier:
             check_diagram_references_scoped(
                 fm, self.registry, scope, result, loc,
                 diagram_type_catalog=self._runtime_catalogs.diagram_types,
+                derivation_catalog=self._runtime_catalogs.derivation,
             )
         else:
             result.issues.append(Issue(

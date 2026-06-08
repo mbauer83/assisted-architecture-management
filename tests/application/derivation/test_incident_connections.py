@@ -12,7 +12,6 @@ Coverage:
 from __future__ import annotations
 
 from src.application.derivation.incident_connections import SPEC, derive
-from src.application.derivation.strategy_registry import lookup_strategy
 from src.domain.view_derivations import SourceModelSnapshot
 from tests.application.derivation._fixtures import FakeQuery, _connection, _entity
 
@@ -29,9 +28,8 @@ class TestIncidentConnectionsSpec:
         assert "connection_types" in SPEC.supported_filters
         assert "entity_types" not in SPEC.supported_filters
 
-    def test_registered(self) -> None:
-        found = lookup_strategy("incident-connections", 1)
-        assert found is not None
+    def test_spec_name(self) -> None:
+        assert SPEC.name == "incident-connections"
 
 
 def _hub_query() -> FakeQuery:

@@ -10,7 +10,6 @@ Coverage:
 from __future__ import annotations
 
 from src.application.derivation.explicit_selection import SPEC, derive
-from src.application.derivation.strategy_registry import lookup_strategy
 from src.application.derivation.types import CandidateSet
 from src.domain.view_derivations import SourceModelSnapshot
 from tests.application.derivation._fixtures import FakeQuery, _connection, _entity
@@ -26,10 +25,8 @@ class TestExplicitSelectionSpec:
     def test_no_supported_filters(self) -> None:
         assert SPEC.supported_filters == frozenset()
 
-    def test_registered_in_registry(self) -> None:
-        found = lookup_strategy("explicit-selection", 1)
-        assert found is not None
-        assert found.name == "explicit-selection"
+    def test_spec_name_matches(self) -> None:
+        assert SPEC.name == "explicit-selection"
 
 
 class TestExplicitSelectionDerive:
