@@ -203,9 +203,9 @@ Resolves the 9 remaining entries in `architecture_baseline.json` through four se
 
 - [x] **K3** Decouple `ontologies/archimate_next/_loader.py` from `src/infrastructure/rendering/_svg_sprite_convert.py`. The loader function that calls `browser_markup_to_plantuml_svg` lazily is refactored to accept a `svg_converter: Callable[[str], str]` parameter; `app_bootstrap.py` passes `browser_markup_to_plantuml_svg` from `infrastructure/` when building the `OntologyCatalog`. No Protocol wrapper needed — a typed callable suffices. Resolves `ontologies/archimate_next → infrastructure.rendering._svg_sprite_convert` (1 baseline entry).
 
-- [ ] **K4** Remove all lazy `src.infrastructure.app_bootstrap` fallbacks from the application layer. Affected: `artifact_parsing.py`, `entity_type_predicates.py`, `modeling/artifact_write.py`, `modeling/matrix_builder.py`, `verification/artifact_verifier.py` (catalog default + adapter defaults). Audit every call site; thread `RuntimeCatalogs` explicitly wherever needed; tests construct `RuntimeCatalogs` from a minimal `ModuleCatalog` (test infrastructure already exists from WU-03). After this pass `architecture_baseline.json` must be **empty** — confirmed by the arch test running cleanly with no baseline file or an explicitly empty `[]`. Resolves all remaining 6 `application → infrastructure.*` entries.
+- [x] **K4** Remove all lazy `src.infrastructure.app_bootstrap` fallbacks from the application layer. Affected: `artifact_parsing.py`, `entity_type_predicates.py`, `modeling/artifact_write.py`, `modeling/matrix_builder.py`, `verification/artifact_verifier.py` (catalog default + adapter defaults). Audit every call site; thread `RuntimeCatalogs` explicitly wherever needed; tests construct `RuntimeCatalogs` from a minimal `ModuleCatalog` (test infrastructure already exists from WU-03). After this pass `architecture_baseline.json` must be **empty** — confirmed by the arch test running cleanly with no baseline file or an explicitly empty `[]`. Resolves all remaining 6 `application → infrastructure.*` entries.
 
-- [ ] **K5** Quality gates green and `architecture_baseline.json` confirmed empty.
+- [x] **K5** Quality gates green and `architecture_baseline.json` confirmed empty.
 
 ---
 
@@ -224,7 +224,7 @@ python -m pytest tests/architecture/test_dependency_policy.py -q   # policy hold
 
 - [ ] **No service locator / global registry singleton** remains (no `@lru_cache(maxsize=1)` registry accessors; no module-level mutable registries).
 - [ ] `src/domain/` imports **only** `src/domain/` — verified by the AST architecture test, lazy imports included.
-- [ ] The dependency matrix (§5) holds for **all six packages**; `architecture_baseline.json` is **empty**.
+- [x] The dependency matrix (§5) holds for **all six packages**; `architecture_baseline.json` is **empty**.
 - [ ] `ModuleCatalogBuilder` + immutable `ModuleCatalog` exist; the builder rejects post-build registration; import-time `ENTITY_TYPES`/`CONNECTION_TYPES` snapshots are gone; the derivation registry has the same lifecycle.
 - [ ] `RuntimeCatalogs` is built at all three composition roots (FastAPI app-state, CLI `main()`, MCP backend context) and injected; no consumer reaches a global.
 - [ ] `DiagramTypeBase` lives in `src/diagram_types/_base.py`; `ontology_protocol.py` exports only Protocols/types; `infrastructure/diagram_type_registry.py` replaces `diagram_types.py`.
@@ -235,7 +235,7 @@ python -m pytest tests/architecture/test_dependency_policy.py -q   # policy hold
 - [ ] Self-model (`Model Registry`, `Model Verifier`) and README reflect the real implementation; a verifier conformance check guards self-model source paths. *(Phase J)*
 - [x] All strategy registrations are at the composition root; no module-level side effects; `DerivationStrategyCatalog` built directly from manifests and injected. *(Phase K)*
 - [x] `DiagramTypeModuleManifest` in `domain/` declares ontology compatibility and role-to-entity-type mapping; `scope_projection.py` deleted. *(Phase K)*
-- [ ] `architecture_baseline.json` is **empty** — arch test passes with zero violations. *(Phase K)*
+- [x] `architecture_baseline.json` is **empty** — arch test passes with zero violations. *(Phase K)*
 - [ ] **No change to REST, MCP, or CLI surfaces.**
 
 ---
