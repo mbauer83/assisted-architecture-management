@@ -28,6 +28,7 @@ This plan replaces that approach with **explicit dependency injection from compo
 | 6 | Strengthen real immutability; publish immutable views; pure rule cores | **H** (+ B, G) |
 | 7 | Clarify domain language; glossary; incremental (not cosmetic) renames | **I** (+ E) |
 | 8 | Synchronize the self-model & README as architectural deliverables | **J** |
+| 9 | Plugin self-registration anti-pattern; lazy fallback imports; SVG converter coupling; zero-baseline DoD | **K** |
 
 Phases are ordered by dependency. **A → B → C** are the foundation and must land in order. **D, E** are small and can land alongside C. **F, G, H** are larger structural refactors that depend on C and may be staged/scheduled independently. **I, J** are finishing work that must reflect whatever the earlier phases actually changed.
 
@@ -80,6 +81,9 @@ Derived values are cached **inside each catalog instance** (e.g. `functools.cach
 | D13 | Public contract return types use immutable views (`Mapping`, `tuple`, `frozenset`); mutable builders stay local to parsing/indexing/validation; config is copied+frozen when published into a catalog (§Phase H). |
 | D14 | Renames are **responsibility-driven, not cosmetic** — applied only to modules whose boundaries this work changes. A glossary (§Phase I) records the canonical vocabulary. |
 | D15 | The self-model and README are updated **in the same change set** as the code that invalidates them; a verifier check flags self-model `Module:` properties that point at non-existent source paths (§Phase J). |
+| D16 | **All strategy registrations are performed at the composition root** (`app_bootstrap.py`), never as module-level side effects. Strategy modules in `diagram_types/` expose a `MANIFEST` constant (domain type); pure application-layer strategies (`explicit-selection`, `local-neighborhood`, etc.) are registered explicitly in `app_bootstrap.py`. The global mutable `_registry`/`_derive_fns` dicts in `strategy_registry.py` are deleted; `DerivationStrategyCatalogBuilder` is used directly in `app_bootstrap.py`; runtime consumers use the injected `DerivationStrategyCatalog`. The orphaned `RuntimeCatalogs.derivation` snapshot is thereby activated — it is now the authoritative source. |
+| D17 | **`DiagramTypeModuleManifest`** (in `domain/module_manifest.py`) declares `compatible_ontologies: tuple[str, ...]` — a statement of which base ontologies the diagram type can operate over, not a hard requirement of all of them. `ontology_role_mapping: Mapping[str, Mapping[str, tuple[str, ...]]]` maps each ontology id → (visual role → model entity type names). Roles intentionally absent from the mapping have no model counterpart and are rendered as pure diagram-notation nodes (e.g. C4 grouping boxes). The composition root selects the active ontology and configures the projection accordingly. Full parameterisation of projection algorithms to use the active mapping rather than hard-coded ArchiMate NEXT type constants is a flagged follow-on (K2-followon). |
+| D18 | **`scope_projection.py` and the module-projection registry are dead code** and are deleted. The generic `scope-projection/v1` meta-dispatcher (which reads `projection_id` from params and routes to a secondary registry) has no production consumer: all C4 diagrams set `strategy: c4.scope-projection` directly. No abstraction is lost. |
 
 ---
 
@@ -189,6 +193,20 @@ Notes:
 - [ ] **J3** Add a verifier check that flags self-model `Module:` source-path properties pointing at non-existent files (conformance guard).
 - [ ] **J4** Quality gates green.
 
+### Phase K — Plugin registration inversion + baseline clearance (concern #9)
+
+Resolves the 9 remaining entries in `architecture_baseline.json` through four sequenced moves: dead-code removal, registration inversion via module manifests, an SVG converter port, and completing the injection migration. Together these bring the baseline to **zero** and satisfy the final DoD bullet.
+
+- [ ] **K1** Delete `src/application/derivation/scope_projection.py` in its entirety (the generic meta-dispatcher and its module-projection registry are dead code — D18). Remove the `register_module_projection("c4", 1, _derive)` call from `src/diagram_types/c4/_projection.py`. Delete `tests/application/derivation/test_scope_projection.py` (it covers only the dead path). No baseline entry resolved directly, but eliminates the code that K2 would otherwise have to maintain.
+
+- [ ] **K2** Invert all strategy registrations to the composition root (D16, D17). Steps: (a) Move `StrategySpec` to `src/domain/derivation_types.py` alongside `CandidateSet`, `ModelQuery`, `DeriveFn`. (b) Define `DiagramTypeModuleManifest` in `src/domain/module_manifest.py` as a frozen dataclass with `id`, `version`, `compatible_ontologies: tuple[str, ...]`, `ontology_role_mapping: Mapping[str, Mapping[str, tuple[str, ...]]]` (visual-role → model entity types per ontology; absent roles are intentionally unmodelled), `strategies: tuple[tuple[StrategySpec, DeriveFn], ...]`. (c) C4's `_projection.py` exposes a `MANIFEST` constant and removes its `register_strategy()` call; no other application imports remain. (d) All pure-application strategy modules (`explicit_selection`, `local_neighborhood`, `incident_connections`, `path_projection`) also remove their module-level `register_strategy()` side effects. (e) `app_bootstrap.py` registers all strategies explicitly and builds `DerivationStrategyCatalog` via `DerivationStrategyCatalogBuilder` — delete `snapshot_catalog()` and the module-level mutable `_registry`/`_derive_fns` globals from `strategy_registry.py`. (f) Route runtime consumers (`refresh.py`, `_verifier_rules_view_derivations.py`) to the injected `catalogs.derivation`. Resolves `diagram_types/c4 → application.derivation.strategy_registry` and `→ application.derivation.scope_projection` (2 baseline entries). **Flagged follow-on (K2-followon, out of DoD):** parameterise `project_c4()` to use the active ontology's entity type set from `ontology_role_mapping` rather than hardcoded ArchiMate NEXT constants; this unlocks the SysML v2 compatibility path declared by the manifest.
+
+- [ ] **K3** Decouple `ontologies/archimate_next/_loader.py` from `src/infrastructure/rendering/_svg_sprite_convert.py`. The loader function that calls `browser_markup_to_plantuml_svg` lazily is refactored to accept a `svg_converter: Callable[[str], str]` parameter; `app_bootstrap.py` passes `browser_markup_to_plantuml_svg` from `infrastructure/` when building the `OntologyCatalog`. No Protocol wrapper needed — a typed callable suffices. Resolves `ontologies/archimate_next → infrastructure.rendering._svg_sprite_convert` (1 baseline entry).
+
+- [ ] **K4** Remove all lazy `src.infrastructure.app_bootstrap` fallbacks from the application layer. Affected: `artifact_parsing.py`, `entity_type_predicates.py`, `modeling/artifact_write.py`, `modeling/matrix_builder.py`, `verification/artifact_verifier.py` (catalog default + adapter defaults). Audit every call site; thread `RuntimeCatalogs` explicitly wherever needed; tests construct `RuntimeCatalogs` from a minimal `ModuleCatalog` (test infrastructure already exists from WU-03). After this pass `architecture_baseline.json` must be **empty** — confirmed by the arch test running cleanly with no baseline file or an explicitly empty `[]`. Resolves all remaining 6 `application → infrastructure.*` entries.
+
+- [ ] **K5** Quality gates green and `architecture_baseline.json` confirmed empty.
+
 ---
 
 ## 7. Quality Gates (every phase, run in order)
@@ -215,6 +233,9 @@ python -m pytest tests/architecture/test_dependency_policy.py -q   # policy hold
 - [ ] Public contracts expose immutable views; configuration is frozen on publication. *(Phase H)*
 - [ ] Glossary published; renames are responsibility-driven only. *(Phase I)*
 - [ ] Self-model (`Model Registry`, `Model Verifier`) and README reflect the real implementation; a verifier conformance check guards self-model source paths. *(Phase J)*
+- [ ] All strategy registrations are at the composition root; no module-level side effects; `DerivationStrategyCatalog` built directly from manifests and injected. *(Phase K)*
+- [ ] `DiagramTypeModuleManifest` in `domain/` declares ontology compatibility and role-to-entity-type mapping; `scope_projection.py` deleted. *(Phase K)*
+- [ ] `architecture_baseline.json` is **empty** — arch test passes with zero violations. *(Phase K)*
 - [ ] **No change to REST, MCP, or CLI surfaces.**
 
 ---
@@ -223,8 +244,9 @@ python -m pytest tests/architecture/test_dependency_policy.py -q   # policy hold
 
 - **Land first (low risk, high leverage):** A → B → C, with D and E folded in. This eliminates the entire `domain → infrastructure/config/ontologies` class of violations and removes all global state — the core of concerns #1–#3 and #5.
 - **Larger, lower coupling — still in DoD:** **Phase F** (port segregation) and **Phase G** (verifier pipeline) are sizable and touch hot paths. They are **not** deferred out of scope; they run as their own work units (WU-09 for F; WU-10–12 for G) in later sessions once the foundation is in place. Their session boundaries are organisational, not scope boundaries.
-- **Always last:** **I** and **J** must reflect the final shape of the code; doing them earlier risks re-drift.
-- **Open follow-on (out of DoD):** E5 (diagram descriptor/renderer split) and Phase 3-style "every modification yields a new registry value" (vs freeze-after-build) are recorded as future refinements.
+- **Always last:** **I** and **J** must reflect the final shape of the code; doing them earlier risks re-drift. **WU-14 (I/glossary) now depends on WU-20/K4** so the glossary can name the final manifest/catalog vocabulary.
+- **Phase K** runs alongside **H** (WU-17 is immediate dead-code removal, independent; WU-18/19 depend only on K1; WU-20 depends on WU-18+19). K clears the baseline; H hardens the value types; neither blocks the other.
+- **Open follow-on (out of DoD):** E5 (diagram descriptor/renderer split); K2-followon (parameterise `project_c4()` for non-ArchiMate NEXT ontologies via `ontology_role_mapping`); "every modification yields a new registry value" (vs freeze-after-build).
 
 ---
 

@@ -64,7 +64,11 @@ python -m pytest tests/architecture/test_dependency_policy.py -q   # exists afte
 | WU-11 | G | Application-owned I/O ports + infra adapters for verifier | WU-10 | ✅ done |
 | WU-12 | G | Shrink verifier files below LoC limits; lower baselines | WU-11 | ✅ done |
 | WU-13 | H | Immutability hardening (immutable public views; freeze-on-publish) | WU-05 | ▶ NEXT |
-| WU-14 | I | Glossary doc + responsibility-driven renames | WU-08, WU-09, WU-12 | ☐ todo |
+| WU-17 | K | Delete `scope_projection.py` + dead module-projection registration | WU-12 | ☐ todo |
+| WU-18 | K | Module manifest + registration inversion to composition root | WU-17 | ☐ todo |
+| WU-19 | K | SVG sprite converter port — decouple `archimate_next/_loader.py` from infra | WU-12 | ☐ todo |
+| WU-20 | K | Complete injection — remove all lazy `app_bootstrap` fallbacks; empty baseline | WU-18, WU-19 | ☐ todo |
+| WU-14 | I | Glossary doc + responsibility-driven renames | WU-08, WU-09, WU-12, WU-20 | ☐ todo |
 | WU-15 | J | Self-model (Model Registry/Verifier) + README + stale docstrings | WU-14 | ☐ todo |
 | WU-16 | J | Verifier conformance check for self-model `Module:` source paths | WU-15 | ☐ todo |
 
@@ -130,6 +134,21 @@ python -m pytest tests/architecture/test_dependency_policy.py -q   # exists afte
 - **Scope:** Bring `artifact_verifier.py` (822) and `artifact_verifier_rules.py` (542) under the 350 hard limit where feasible by extracting cohesive modules; lower the corresponding `source_file_length.py` baselines to the new sizes.
 - **Done-when:** `source_file_length` baselines reduced (never raised); LoC policy test green.
 
+### WU-17 — Delete dead code: `scope_projection.py` + module-projection registry  · PLAN §4 D18, Phase K
+- **Scope:** Delete `src/application/derivation/scope_projection.py` (the generic `scope-projection/v1` meta-dispatcher and its `_module_projections` registry have no production consumer — confirmed by audit: no diagram frontmatter uses `strategy: scope-projection` with `projection_id: c4`; all C4 diagrams use `strategy: c4.scope-projection` directly). Remove the single `register_module_projection("c4", 1, _derive)` call from `src/diagram_types/c4/_projection.py`. Delete `tests/application/derivation/test_scope_projection.py` (only covers the dead path). Update `src/application/derivation/__init__.py` to remove the carry-over comment about `scope_projection`.
+- **Key files:** `src/application/derivation/scope_projection.py` (DELETE), `src/diagram_types/c4/_projection.py` (remove 1 line), `tests/application/derivation/test_scope_projection.py` (DELETE).
+- **Done-when:** no file imports `scope_projection`; `grep -rn "scope_projection\|register_module_projection" src/ tests/` returns nothing; gates green.
+
+### WU-18 — Module manifest + registration inversion  · PLAN §4 D16/D17, Phase K
+- **Scope:** (a) Move `StrategySpec` from `src/application/derivation/strategy_registry.py` to `src/domain/derivation_types.py` alongside `CandidateSet`, `ModelQuery`, `DeriveFn`; add re-export shim if needed. (b) Define `DiagramTypeModuleManifest` in `src/domain/module_manifest.py`: frozen dataclass with `id: str`, `version: int`, `compatible_ontologies: tuple[str, ...]`, `ontology_role_mapping: Mapping[str, Mapping[str, tuple[str, ...]]]` (visual-role → model entity type names per ontology; absent roles are intentionally unmodelled — e.g. C4 grouping boxes), `strategies: tuple[tuple[StrategySpec, DeriveFn], ...]`. (c) `src/diagram_types/c4/_projection.py` exposes `MANIFEST = DiagramTypeModuleManifest(id="c4", version=1, compatible_ontologies=("archimate-next", "sysml-v2"), ontology_role_mapping={...}, strategies=(...))` and removes its `register_strategy()` call. (d) All five pure-application strategy modules remove their module-level `register_strategy()` side effects. (e) `app_bootstrap.py` registers all strategies using `DerivationStrategyCatalogBuilder` before sealing `RuntimeCatalogs`; delete `snapshot_catalog()` and the module-level `_registry`/`_derive_fns` globals from `strategy_registry.py`. (f) Route `refresh.py` and `_verifier_rules_view_derivations.py` to use the injected `catalogs.derivation` instead of module-level lookup functions.
+- **Key files:** `src/domain/derivation_types.py`, new `src/domain/module_manifest.py`, `src/application/derivation/strategy_registry.py`, `src/diagram_types/c4/_projection.py`, `src/application/derivation/{explicit_selection,local_neighborhood,incident_connections,path_projection}.py`, `src/infrastructure/app_bootstrap.py`, `src/application/derivation/refresh.py`, `src/application/verification/_verifier_rules_view_derivations.py`.
+- **Done-when:** `grep -rn "register_strategy\|register_module_projection" src/` returns only the `app_bootstrap.py` call sites; baseline entries `diagram_types/c4 → application.derivation.*` removed; gates green.
+
+### WU-19 — SVG sprite converter port  · PLAN Phase K
+- **Scope:** Refactor `src/ontologies/archimate_next/_loader.py` to accept a `svg_converter: Callable[[str], str]` parameter for the function/class that currently lazily imports `browser_markup_to_plantuml_svg` from `src/infrastructure/rendering/_svg_sprite_convert.py`. Update `src/infrastructure/app_bootstrap.py` (the `OntologyCatalog` construction path) to pass `browser_markup_to_plantuml_svg` as the converter. No Protocol type needed — a typed `Callable` annotation is sufficient.
+- **Key files:** `src/ontologies/archimate_next/_loader.py`, `src/infrastructure/app_bootstrap.py`.
+- **Done-when:** `grep -rn "infrastructure.*_svg_sprite\|_svg_sprite.*infrastructure" src/ontologies/` returns nothing; baseline entry `ontologies/archimate_next → infrastructure.rendering._svg_sprite_convert` removed; gates green.
+
 ### WU-13 — Immutability hardening  · PLAN §4 D13, Phase H
 - **Scope:** Publish immutable views (`Mapping`/`tuple`/`frozenset`) on public contracts carrying today's mutable `dict`/`list` (e.g. `EntityRecord.extra`, `display_blocks`); copy+freeze config on publication into catalogs; keep mutable builders local.
 - **Done-when:** public catalog/record accessors return immutable types; gates green.
@@ -146,6 +165,11 @@ python -m pytest tests/architecture/test_dependency_policy.py -q   # exists afte
 ### WU-16 — Self-model conformance check  · PLAN §4 D15, Phase J
 - **Scope:** Add a verifier check that flags self-model `Module:` source-path properties pointing at non-existent files; test it.
 - **Done-when:** check catches a deliberately-broken fixture path and passes for valid ones; gates green.
+
+### WU-20 — Complete injection; empty the baseline  · PLAN Phase K
+- **Scope:** Remove all remaining lazy `src.infrastructure.app_bootstrap` and `src.infrastructure.verification.adapters` fallbacks from the application layer. Specifically: `src/application/artifact_parsing.py` (`@lru_cache(maxsize=1)` calling `get_module_registry`), `src/application/entity_type_predicates.py` (two such caches), `src/application/modeling/artifact_write.py` (three caches), `src/application/modeling/matrix_builder.py` (one cache), `src/application/verification/artifact_verifier.py` (`_runtime_catalogs` and adapter `cached_property` defaults). For each module: add an explicit `catalogs: RuntimeCatalogs` (or narrow catalog type) parameter to the functions/constructors that need it; propagate to all callers. Tests that invoke these functions directly must construct `RuntimeCatalogs` from a minimal `ModuleCatalog` (the test-catalog helpers from WU-03 already exist). After all fallbacks are removed, confirm `architecture_baseline.json` is empty (`[]`) and the arch test passes.
+- **Key files:** the six `application/` modules listed above, their callers throughout `infrastructure/` and `tests/`, `tests/architecture/architecture_baseline.json` (must end as `[]`).
+- **Done-when:** `grep -rn "infrastructure.app_bootstrap\|infrastructure.verification.adapters" src/application/` returns nothing; `architecture_baseline.json` contains `[]`; arch test passes; all gates green.
 
 ---
 
