@@ -1,4 +1,4 @@
-"""OntologyModule, DiagramTypeModule, DiagramRenderer protocols and DiagramTypeBase mixin."""
+"""OntologyModule, DiagramTypeModule, DiagramRenderer protocols."""
 
 from __future__ import annotations
 
@@ -37,11 +37,11 @@ __all__ = [
     "DiagramOwnEntityTypePropertySpec",
     "DiagramOwnEntityTypeUiConfig",
     "DiagramRendererReferences",
-    "DiagramTypeBase",
     "DiagramTypeModule",
     "DiagramTypeUiConfig",
     "DiagramTypeWriteGuidance",
     "DiagramRenderer",
+    "ModuleClass",
     "OntologyModule",
     "PrimaryOntology",
     "diagram_type_ui_config_from_mapping",
@@ -176,93 +176,3 @@ class DiagramTypeModule(Protocol):
     def read_diagram_extras(self, parsed_source: dict[str, Any]) -> dict[str, Any]: ...
 
 
-class DiagramTypeBase:
-    """Mixin providing default DiagramTypeModule implementations.
-
-    Subclasses must provide: name, primary_ontology, accepts_entity_type,
-    accepts_connection_type, own_entity_types, own_connection_types,
-    own_permitted_relationships, and _config.
-    """
-
-    module_class: ModuleClass = "architecture"
-
-    @property
-    def bridges(self) -> tuple[BridgeDeclaration, ...]:
-        return ()
-
-    @property
-    def element_classes(self) -> Mapping[str, ElementClassInfo]:
-        return {}
-
-    @property
-    def effective_permitted_relationships(self) -> PermittedRelationshipSet:
-        diagram_conn_rules = PermittedRelationshipSet.empty()
-        for oe in self.ui_config.diagram_only_types:  # type: ignore[attr-defined]
-            diagram_conn_rules = diagram_conn_rules | oe.permitted_connections
-
-        if isinstance(self.primary_ontology, _FreeOntologyType):  # type: ignore[attr-defined]
-            return self.own_permitted_relationships | diagram_conn_rules  # type: ignore[attr-defined]
-        ontology: OntologyModule = self.primary_ontology  # type: ignore[assignment]
-        accepted_base_entities = frozenset(
-            t
-            for t in ontology.entity_types
-            if self.accepts_entity_type(t)  # type: ignore[attr-defined]
-        )
-        accepted_base_conns = frozenset(
-            t
-            for t in ontology.connection_types
-            if self.accepts_connection_type(t)  # type: ignore[attr-defined]
-        )
-        inherited = ontology.permitted_relationships.filter_to(
-            accepted_base_entities,
-            accepted_base_conns,
-        )
-        return inherited | self.own_permitted_relationships | diagram_conn_rules  # type: ignore[attr-defined]
-
-    def effective_entity_types(self) -> Mapping[EntityTypeName, EntityTypeInfo]:
-        if isinstance(self.primary_ontology, _FreeOntologyType):  # type: ignore[attr-defined]
-            return dict(self.own_entity_types)  # type: ignore[attr-defined]
-        ontology: OntologyModule = self.primary_ontology  # type: ignore[assignment]
-        out = {
-            t: info
-            for t, info in ontology.entity_types.items()
-            if self.accepts_entity_type(t)  # type: ignore[attr-defined]
-        }
-        out.update(self.own_entity_types)  # type: ignore[attr-defined]
-        return out
-
-    def effective_connection_types(self) -> Mapping[ConnectionTypeName, ConnectionTypeInfo]:
-        if isinstance(self.primary_ontology, _FreeOntologyType):  # type: ignore[attr-defined]
-            return dict(self.own_connection_types)  # type: ignore[attr-defined]
-        ontology: OntologyModule = self.primary_ontology  # type: ignore[assignment]
-        out = {
-            t: info
-            for t, info in ontology.connection_types.items()
-            if self.accepts_connection_type(t)  # type: ignore[attr-defined]
-        }
-        out.update(self.own_connection_types)  # type: ignore[attr-defined]
-        return out
-
-    @property
-    def ui_config(self) -> DiagramTypeUiConfig:
-        configured = getattr(self, "_ui_config", None)
-        if isinstance(configured, DiagramTypeUiConfig):
-            return configured
-        return DiagramTypeUiConfig(
-            label=str(self.name).replace("-", " ").title(),  # type: ignore[attr-defined]
-            entity_search_filter=True,
-        )
-
-    def write_guidance(self) -> DiagramTypeWriteGuidance:
-        return DiagramTypeWriteGuidance(when_to_use="", when_not_to_use="")
-
-    def build_context_extras(
-        self,
-        repo: Any,
-        diagram_id: str,
-        diagram_entities: dict[str, Any],
-    ) -> dict[str, Any]:
-        return {}
-
-    def read_diagram_extras(self, parsed_source: dict[str, Any]) -> dict[str, Any]:
-        return {}

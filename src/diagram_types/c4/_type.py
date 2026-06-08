@@ -7,7 +7,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
-    from src.application.derivation.types import ModelQuery
+    from src.domain.derivation_types import ModelQuery
     from src.domain.view_derivations import DerivationSelection
     from src.domain.view_projection import ViewProjectionResult
 
@@ -15,6 +15,7 @@ import yaml  # type: ignore[import-untyped]
 
 # Import engine module to trigger strategy registration as a side effect.
 import src.diagram_types.c4._projection  # noqa: F401
+from src.diagram_types._base import DiagramTypeBase
 from src.diagram_types.c4.renderer import C4PumlRenderer
 from src.domain.bridges import BridgeDeclaration
 from src.domain.diagram_entities_schema import derive_diagram_entities_schema
@@ -22,7 +23,6 @@ from src.domain.diagram_ontology_loader import DiagramOntology, load_diagram_ont
 from src.domain.module_types import ConnectionTypeName, DiagramTypeName, EntityTypeName, FreeOntology
 from src.domain.ontology_protocol import (
     DiagramRenderer,
-    DiagramTypeBase,
     DiagramTypeModule,
     DiagramTypeWriteGuidance,
     diagram_type_ui_config_from_mapping,

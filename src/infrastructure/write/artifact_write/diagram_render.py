@@ -31,7 +31,7 @@ def _render_diagram_entities_puml(
     *,
     edge_labels: dict[str, str] | None = None,
 ) -> str:
-    from src.infrastructure.diagram_types import get_diagram_type  # noqa: PLC0415
+    from src.infrastructure.diagram_type_registry import get_diagram_type  # noqa: PLC0415
 
     diagram_type_mod = get_diagram_type(diagram_type)
     extra: dict[str, object] = {}
@@ -68,7 +68,7 @@ def _render_diagram_png(puml_path: Path, warnings: list[str]) -> Path | None:
 
     # G-f: assurance diagrams must never write plaintext to diagram-catalog/rendered/
     try:
-        from src.infrastructure.diagram_types import find_diagram_type  # noqa: PLC0415
+        from src.infrastructure.diagram_type_registry import find_diagram_type  # noqa: PLC0415
         _dt = find_diagram_type(diagram_type)
         if _dt is not None and getattr(_dt, "module_class", None) == "assurance":
             warnings.append(
@@ -165,7 +165,7 @@ def _render_diagram_svg(puml_path: Path, warnings: list[str]) -> Path | None:
 
     # G-f: assurance diagrams must never write plaintext to diagram-catalog/rendered/
     try:
-        from src.infrastructure.diagram_types import find_diagram_type  # noqa: PLC0415
+        from src.infrastructure.diagram_type_registry import find_diagram_type  # noqa: PLC0415
         _dt = find_diagram_type(diagram_type)
         if _dt is not None and getattr(_dt, "module_class", None) == "assurance":
             warnings.append(

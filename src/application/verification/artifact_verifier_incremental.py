@@ -14,7 +14,7 @@ from src.application.verification.artifact_verifier_types import (
     VerifierRuntimeConfig,
     entity_id_from_path,
 )
-from src.config.repo_paths import DIAGRAM_CATALOG, DIAGRAMS, MODEL
+from src.domain.repo_layout import DIAGRAM_CATALOG, DIAGRAMS, MODEL
 
 
 @dataclass

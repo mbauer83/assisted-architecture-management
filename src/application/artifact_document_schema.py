@@ -7,7 +7,7 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Any
 
-from src.config.repo_paths import ARCH_DOC_SCHEMATA, ARCH_REPO
+from src.domain.repo_layout import ARCH_DOC_SCHEMATA, ARCH_REPO
 
 
 @lru_cache(maxsize=4)

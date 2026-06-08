@@ -8,10 +8,11 @@ from typing import Any
 import pytest
 
 from src.application.startup_validation import RegistryConsistencyError, validate_registry_consistency
+from src.diagram_types._base import DiagramTypeBase
 from src.domain.bridges import BridgeDeclaration, bridges_from_config
 from src.domain.module_registry import ModuleRegistry
 from src.domain.module_types import ConnectionTypeName, ElementClassName, EntityTypeName
-from src.domain.ontology_protocol import DiagramOwnEntityTypeUiConfig, DiagramTypeBase, DiagramTypeUiConfig
+from src.domain.ontology_protocol import DiagramOwnEntityTypeUiConfig, DiagramTypeUiConfig
 from src.domain.ontology_types import ConnectionTypeInfo, EntityTypeInfo, PermittedMappingSpec
 from src.domain.permitted_relationships import PermittedRelationshipSet
 

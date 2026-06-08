@@ -64,7 +64,7 @@ from src.application.verification.artifact_verifier_types import (
     VerifierRuntimeConfig,
     entity_id_from_path,
 )
-from src.config.repo_paths import ARCH_REPO, DOCS, MODEL
+from src.domain.repo_layout import ARCH_REPO, DOCS, MODEL
 
 
 @lru_cache(maxsize=1)
@@ -715,7 +715,7 @@ class ArtifactVerifier:
     def _scope_for_path(self, path: Path) -> Literal["enterprise", "engagement", "unknown"]:
         if self.registry is not None:
             return self.registry.scope_for_path(path)
-        from src.config.workspace_paths import infer_repo_scope
+        from src.domain.repo_scope import infer_repo_scope
 
         return infer_repo_scope(path)
 

@@ -13,7 +13,7 @@ from src.application.verification.artifact_verifier import ArtifactRegistry, Art
 from src.domain.artifact_types import EntityRecord
 from src.infrastructure.app_bootstrap import build_module_registry, build_runtime_catalogs
 from src.infrastructure.artifact_index import shared_artifact_index
-from src.infrastructure.diagram_types import diagram_type_domain
+from src.infrastructure.diagram_type_registry import diagram_type_domain
 from src.infrastructure.gui.routers import state as gui_state
 from src.infrastructure.gui.routers._diagram_context import fuzzy_entity_hits
 from src.infrastructure.gui.routers.diagram_types import (

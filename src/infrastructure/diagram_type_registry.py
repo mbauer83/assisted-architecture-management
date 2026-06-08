@@ -1,4 +1,4 @@
-"""Shared helpers for registry-backed diagram-type lookups."""
+"""Infrastructure adapter: registry-backed diagram-type lookups."""
 
 from __future__ import annotations
 

@@ -21,8 +21,8 @@ from pathlib import Path
 import yaml
 
 from src.application.group_registry import load_group_registry, registry_to_yaml
-from src.config.repo_paths import ARCH_REPO, DIAGRAM_CATALOG, DIAGRAMS, DOCS
 from src.domain.groups import UNCATEGORIZED, GroupAxis, GroupEntry, GroupRegistry
+from src.domain.repo_layout import ARCH_REPO, DIAGRAM_CATALOG, DIAGRAMS, DOCS
 
 _GROUPS_FILE = "groups.yaml"
 _VALID_META_ONTOLOGIES = frozenset({"", "archimate-next", "sysml-v2"})

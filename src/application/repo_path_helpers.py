@@ -23,8 +23,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from src.config.repo_paths import DIAGRAM_CATALOG, DIAGRAMS, DOCS, MODEL, RENDERED
 from src.domain.groups import UNCATEGORIZED
+from src.domain.repo_layout import DIAGRAM_CATALOG, DIAGRAMS, DOCS, MODEL, RENDERED
 
 _PROJECTS = "projects"
 

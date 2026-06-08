@@ -14,7 +14,7 @@ from src.application.verification.artifact_verifier_types import (
     VerificationResult,
     entity_id_from_path,
 )
-from src.config.repo_paths import MODEL
+from src.domain.repo_layout import MODEL
 
 _REL_MACRO_RE = re.compile(
     r"^\s*Rel_(?P<rel>[A-Za-z0-9]+)(?:_(?:Up|Down|Left|Right))?"

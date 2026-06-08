@@ -41,7 +41,7 @@ def _collect_diagram_renderer_references(
     diagram_connections: list[dict[str, object]] | None,
     bindings: list[dict[str, object]] | None = None,
 ) -> tuple[list[str] | None, list[str] | None]:
-    from src.infrastructure.diagram_types import get_diagram_type  # noqa: PLC0415
+    from src.infrastructure.diagram_type_registry import get_diagram_type  # noqa: PLC0415
 
     diagram_type_mod = get_diagram_type(diagram_type)
     refs = diagram_type_mod.renderer.collect_references(
@@ -165,7 +165,7 @@ def _infer_reference_ids_from_puml(
 
 
 def _prepare_diagram_puml_body(puml_body: str, repo_root: Path, diagram_type: str) -> str:
-    from src.infrastructure.diagram_types import get_diagram_type  # noqa: PLC0415
+    from src.infrastructure.diagram_type_registry import get_diagram_type  # noqa: PLC0415
 
     # Drop relation-stereotype edge labels the arrow style already conveys. This
     # is an ontology-global normalisation (keyed on ``show_stereotype`` across all

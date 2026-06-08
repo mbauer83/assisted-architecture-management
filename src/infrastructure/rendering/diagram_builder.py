@@ -24,7 +24,7 @@ from src.application.artifact_parsing import normalize_puml_alias
 from src.config.repo_paths import DIAGRAM_CATALOG, DIAGRAMS
 from src.domain.artifact_types import ConnectionRecord, EntityRecord
 from src.domain.module_types import ConnectionTypeName, ElementClassName
-from src.infrastructure.diagram_types import get_diagram_type
+from src.infrastructure.diagram_type_registry import get_diagram_type
 from src.infrastructure.rendering._diagram_layout import (
     build_visual_nesting,
 )

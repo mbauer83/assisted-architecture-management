@@ -53,7 +53,7 @@ def test_assurance_type_skips_png_render(tmp_path: Path) -> None:
             "src.infrastructure.write.artifact_write.diagram_render.strip_leading_puml_frontmatter",
             return_value="@startuml test\ncomponent A\n@enduml",
         ),
-        patch("src.infrastructure.diagram_types.find_diagram_type", return_value=_assurance_mock()),
+        patch("src.infrastructure.diagram_type_registry.find_diagram_type", return_value=_assurance_mock()),
     ):
         result = _render_diagram_png(puml, warnings)
 
@@ -76,7 +76,7 @@ def test_assurance_type_skips_svg_render(tmp_path: Path) -> None:
             "src.infrastructure.write.artifact_write.diagram_render.strip_leading_puml_frontmatter",
             return_value="@startuml test\ncomponent A\n@enduml",
         ),
-        patch("src.infrastructure.diagram_types.find_diagram_type", return_value=_assurance_mock()),
+        patch("src.infrastructure.diagram_type_registry.find_diagram_type", return_value=_assurance_mock()),
     ):
         result = _render_diagram_svg(puml, warnings)
 
@@ -100,7 +100,7 @@ def test_architecture_type_proceeds_past_guard(tmp_path: Path) -> None:
             return_value="@startuml test\ncomponent A\n@enduml",
         ),
         # Local import inside the function: patch at the source module
-        patch("src.infrastructure.diagram_types.find_diagram_type", return_value=_architecture_mock()),
+        patch("src.infrastructure.diagram_type_registry.find_diagram_type", return_value=_architecture_mock()),
         # Avoid downstream get_diagram_type failure by patching _prepare_diagram_puml_body
         patch(
             "src.infrastructure.write.artifact_write.diagram_render._prepare_diagram_puml_body",
@@ -133,7 +133,7 @@ def test_unknown_type_does_not_trigger_guard(tmp_path: Path) -> None:
             return_value="@startuml test\ncomponent A\n@enduml",
         ),
         # find_diagram_type returns None → guard skips
-        patch("src.infrastructure.diagram_types.find_diagram_type", return_value=None),
+        patch("src.infrastructure.diagram_type_registry.find_diagram_type", return_value=None),
         patch(
             "src.infrastructure.write.artifact_write.diagram_render._prepare_diagram_puml_body",
             return_value="@startuml test\ncomponent A\n@enduml",

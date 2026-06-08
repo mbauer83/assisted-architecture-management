@@ -12,7 +12,7 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING, Protocol, runtime_checkable
 
 if TYPE_CHECKING:
-    from src.application.derivation.types import ModelQuery
+    from src.domain.derivation_types import ModelQuery
     from src.domain.view_derivations import ViewDerivation
 
 

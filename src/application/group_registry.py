@@ -13,8 +13,8 @@ from pathlib import Path
 
 import yaml
 
-from src.config.repo_paths import ARCH_REPO
 from src.domain.groups import UNCATEGORIZED, GroupAxis, GroupEntry, GroupRegistry
+from src.domain.repo_layout import ARCH_REPO
 
 _GROUPS_FILE = "groups.yaml"
 

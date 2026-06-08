@@ -6,6 +6,7 @@ from typing import Any
 
 import yaml  # type: ignore[import-untyped]
 
+from src.diagram_types._base import DiagramTypeBase
 from src.diagram_types.sequence.renderer import SequencePumlRenderer
 from src.domain.bridges import BridgeDeclaration
 from src.domain.diagram_entities_schema import derive_diagram_entities_schema
@@ -13,7 +14,6 @@ from src.domain.diagram_ontology_loader import DiagramOntology, load_diagram_ont
 from src.domain.module_types import ConnectionTypeName, DiagramTypeName, EntityTypeName, FreeOntology
 from src.domain.ontology_protocol import (
     DiagramRenderer,
-    DiagramTypeBase,
     DiagramTypeModule,
     DiagramTypeWriteGuidance,
     diagram_type_ui_config_from_mapping,

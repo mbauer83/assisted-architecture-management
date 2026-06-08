@@ -7,7 +7,7 @@ from pathlib import Path
 from typing import Literal
 
 from src.domain.artifact_types import ConnectionRecord, EntityRecord
-from src.infrastructure.diagram_types import find_diagram_type, get_diagram_type
+from src.infrastructure.diagram_type_registry import find_diagram_type, get_diagram_type
 from src.infrastructure.mcp.artifact_mcp.context import (
     RepoScope,
     repo_cached,

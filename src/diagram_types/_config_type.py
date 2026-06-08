@@ -8,10 +8,10 @@ from typing import Any
 
 import yaml  # type: ignore[import-untyped]
 
+from src.diagram_types._base import DiagramTypeBase
 from src.domain.module_types import ConnectionTypeName, DiagramTypeName, EntityTypeName
 from src.domain.ontology_protocol import (
     DiagramRenderer,
-    DiagramTypeBase,
     DiagramTypeModule,
     DiagramTypeWriteGuidance,
     OntologyModule,

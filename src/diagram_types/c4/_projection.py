@@ -15,7 +15,7 @@ from __future__ import annotations
 import logging
 from dataclasses import dataclass
 
-from src.application.derivation.types import CandidateSet, ModelQuery
+from src.domain.derivation_types import CandidateSet, ModelQuery
 from src.domain.view_projection import ProjectedViewItem
 
 _log = logging.getLogger(__name__)
