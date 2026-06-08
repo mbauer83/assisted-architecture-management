@@ -10,6 +10,7 @@ from __future__ import annotations
 from src.application.verification.artifact_verifier_parsing import parse_frontmatter_from_path
 from src.application.verification.artifact_verifier_registry import ArtifactRegistry
 from src.application.verification.artifact_verifier_types import Issue, Severity, VerificationResult
+from src.domain.catalogs import ConnectionSemantics, OntologyCatalog
 
 
 def _entity_type(registry: ArtifactRegistry, entity_id: str) -> str | None:
@@ -22,15 +23,14 @@ def _entity_type(registry: ArtifactRegistry, entity_id: str) -> str | None:
     return str(fm.get("artifact-type", "")) or None
 
 
-def _permitted(source_type: str, conn_type: str, target_type: str) -> tuple[bool, list[str]]:
-    """Return (allowed, alternatives).  Handles symmetric connections."""
-    from src.infrastructure.app_bootstrap import build_runtime_catalogs, get_module_registry  # noqa: PLC0415
-
-    allowed_set = set(
-        build_runtime_catalogs(get_module_registry()).connections.permissible_connection_types(
-            source_type, target_type
-        )
-    )
+def _permitted(
+    connections_catalog: ConnectionSemantics,
+    source_type: str,
+    conn_type: str,
+    target_type: str,
+) -> tuple[bool, list[str]]:
+    """Return (allowed, alternatives)."""
+    allowed_set = set(connections_catalog.permissible_connection_types(source_type, target_type))
     if conn_type in allowed_set:
         return True, []
     return False, sorted(allowed_set)
@@ -44,15 +44,8 @@ _STRUCTURE_CLASSES = frozenset(
 _BEHAVIOR_TARGET = frozenset(["service"])
 
 
-def _is_structure(source_type: str) -> bool:
-    from src.domain.module_types import ElementClassName, EntityTypeName  # noqa: PLC0415
-    from src.infrastructure.app_bootstrap import get_module_registry  # noqa: PLC0415
-
-    reg = get_module_registry()
-    for cls in _STRUCTURE_CLASSES:
-        if EntityTypeName(source_type) in reg.entity_types_with_class(ElementClassName(cls)):
-            return True
-    return False
+def _is_structure(ontology_catalog: OntologyCatalog, source_type: str) -> bool:
+    return any(source_type in ontology_catalog.entity_types_with_class(cls) for cls in _STRUCTURE_CLASSES)
 
 
 def check_connection_semantics(
@@ -61,8 +54,17 @@ def check_connection_semantics(
     registry: ArtifactRegistry,
     result: VerificationResult,
     loc: str,
+    *,
+    connections_catalog: ConnectionSemantics | None = None,
+    ontology_catalog: OntologyCatalog | None = None,
 ) -> None:
-    """Validate semantic triples; add E126/W126 issues to result."""
+    """Validate semantic triples; add E126/W126 issues to result.
+
+    When connections_catalog is None the check is skipped (catalog not injected).
+    """
+    if connections_catalog is None:
+        return
+
     source_type = _entity_type(registry, source_id)
     if source_type is None:
         return
@@ -72,7 +74,7 @@ def check_connection_semantics(
         if target_type is None:
             continue
 
-        ok, alternatives = _permitted(source_type, conn_type, target_type)
+        ok, alternatives = _permitted(connections_catalog, source_type, conn_type, target_type)
         if ok:
             continue
 
@@ -88,7 +90,12 @@ def check_connection_semantics(
             )
         )
 
-        if conn_type == _REALIZATION and target_type in _BEHAVIOR_TARGET and _is_structure(source_type):
+        if (
+            ontology_catalog is not None
+            and conn_type == _REALIZATION
+            and target_type in _BEHAVIOR_TARGET
+            and _is_structure(ontology_catalog, source_type)
+        ):
             result.issues.append(
                 Issue(
                     Severity.WARNING,

@@ -14,6 +14,7 @@ from src.application.verification.artifact_verifier_types import (
     VerificationResult,
     entity_id_from_path,
 )
+from src.domain.catalogs import DiagramTypeCatalog
 from src.domain.repo_layout import MODEL
 
 _REL_MACRO_RE = re.compile(
@@ -133,6 +134,7 @@ def check_diagram_references_scoped(
     file_scope: Literal["enterprise", "engagement", "unknown"],
     result: VerificationResult,
     loc: str,
+    diagram_type_catalog: DiagramTypeCatalog | None = None,
 ) -> None:
     diagram_is_baselined = str(fm.get("status", "")) == "baselined"
 
@@ -169,7 +171,7 @@ def check_diagram_references_scoped(
         allowed_entities, allowed_connections,
         all_entities, all_connections,
         result, loc,
-        allowed_bindings=get_allowed_bindings(str(fm.get("diagram-type", ""))),
+        allowed_bindings=get_allowed_bindings(str(fm.get("diagram-type", "")), diagram_type_catalog),
     )
 
 
@@ -401,8 +403,7 @@ def _check_entity_aliases_declared(content: str, fm: dict, result: VerificationR
     declared_aliases = _extract_declared_puml_aliases(content)
     for eid in entity_ids:
         eid_str = str(eid)
-        entity_path = result.path.parents[2] / MODEL
-        matches = list(entity_path.rglob(f"{eid_str}.md"))
+        matches = list((result.path.parents[2] / MODEL).rglob(f"{eid_str}.md"))
         if not matches:
             continue
         try:

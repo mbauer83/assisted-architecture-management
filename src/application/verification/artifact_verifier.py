@@ -1,13 +1,14 @@
 """ERP v2.0 model verification facade with modular helper backends."""
 
+import functools
 import re
 from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor
-from functools import lru_cache
 from pathlib import Path
 from typing import Literal
 
 from src.application.entity_type_predicates import is_internal_entity_type
+from src.application.runtime_catalogs import RuntimeCatalogs
 from src.application.verification._verifier_rules_edge_labels import check_edge_label_overrides
 from src.application.verification._verifier_rules_grf import (
     check_global_artifact_reference,
@@ -66,27 +67,6 @@ from src.application.verification.artifact_verifier_types import (
 )
 from src.domain.repo_layout import ARCH_REPO, DOCS, MODEL
 
-
-@lru_cache(maxsize=1)
-def _entity_type_names() -> frozenset[str]:
-    from src.infrastructure.app_bootstrap import get_module_registry  # noqa: PLC0415
-
-    return frozenset(str(n) for n in get_module_registry().all_entity_types())
-
-
-@lru_cache(maxsize=1)
-def _connection_type_names() -> frozenset[str]:
-    from src.infrastructure.app_bootstrap import get_module_registry  # noqa: PLC0415
-
-    return frozenset(str(n) for n in get_module_registry().all_connection_types())
-
-
-@lru_cache(maxsize=1)
-def _ontology_catalog():
-    from src.infrastructure.app_bootstrap import build_runtime_catalogs, get_module_registry  # noqa: PLC0415
-
-    return build_runtime_catalogs(get_module_registry()).ontology
-
 # Cardinality: n  |  n..m  |  n..*  |  *
 _CARDINALITY_RE = re.compile(r"^\d+$|^\d+\.\.\d+$|^\d+\.\.\*$|^\*$")
 
@@ -121,9 +101,24 @@ def _parse_conn_header(header: str) -> tuple[str, str, str, str] | None:
 
 
 class ArtifactVerifier:
-    def __init__(self, registry: ArtifactRegistry | None = None, *, check_puml_syntax: bool = True) -> None:
+    def __init__(
+        self,
+        registry: ArtifactRegistry | None = None,
+        *,
+        check_puml_syntax: bool = True,
+        catalogs: RuntimeCatalogs | None = None,
+    ) -> None:
         self.registry = registry
         self.check_puml_syntax = check_puml_syntax
+        self._catalogs = catalogs
+
+    @functools.cached_property
+    def _runtime_catalogs(self) -> RuntimeCatalogs:
+        if self._catalogs is not None:
+            return self._catalogs
+        from src.infrastructure.app_bootstrap import build_runtime_catalogs, get_module_registry  # noqa: PLC0415
+
+        return build_runtime_catalogs(get_module_registry())
 
     def _repo_root_for_path(self, path: Path) -> Path | None:
         """Resolve the configured model repository root for a file path."""
@@ -150,7 +145,7 @@ class ArtifactVerifier:
 
         check_required_fields(fm, ENTITY_REQUIRED, result, loc)
         check_artifact_id_entity(fm, result, loc)
-        check_artifact_type(fm, _entity_type_names(), "entity type", result, loc)
+        check_artifact_type(fm, self._runtime_catalogs.ontology.all_entity_type_names(), "entity type", result, loc)
         check_enum(fm, "status", VALID_STATUSES, result, loc)
         check_section(content, "§content", required=True, result=result, loc=loc)
         check_section(content, "§display", required=True, result=result, loc=loc)
@@ -242,7 +237,7 @@ class ArtifactVerifier:
                     )
                     continue
                 conn_type, src_card, tgt_card, target_id = parsed
-                if conn_type not in _connection_type_names():
+                if conn_type not in self._runtime_catalogs.ontology.all_connection_type_names():
                     result.issues.append(
                         Issue(
                             Severity.ERROR,
@@ -295,7 +290,11 @@ class ArtifactVerifier:
                 parsed_connections.append((conn_type, target_id))
 
         if self.registry is not None and source and parsed_connections:
-            check_connection_semantics(source, parsed_connections, self.registry, result, loc)
+            check_connection_semantics(
+                source, parsed_connections, self.registry, result, loc,
+                connections_catalog=self._runtime_catalogs.connections,
+                ontology_catalog=self._runtime_catalogs.ontology,
+            )
 
         repo_root = self._repo_root_for_path(path)
         if repo_root is not None:
@@ -339,7 +338,10 @@ class ArtifactVerifier:
 
         scope = self._scope_for_path(path)
         if self.registry is not None:
-            check_diagram_references_scoped(fm, self.registry, scope, result, loc)
+            check_diagram_references_scoped(
+                fm, self.registry, scope, result, loc,
+                diagram_type_catalog=self._runtime_catalogs.diagram_types,
+            )
             check_diagram_relation_references(content, fm, self.registry, scope, result, loc)
         else:
             result.issues.append(
@@ -378,7 +380,10 @@ class ArtifactVerifier:
 
         scope = self._scope_for_path(path)
         if self.registry is not None:
-            check_diagram_references_scoped(fm, self.registry, scope, result, loc)
+            check_diagram_references_scoped(
+                fm, self.registry, scope, result, loc,
+                diagram_type_catalog=self._runtime_catalogs.diagram_types,
+            )
         else:
             result.issues.append(
                 Issue(
@@ -654,12 +659,10 @@ class ArtifactVerifier:
                     # E155: required entity-type connections
                     required_entity_types: list[str] = schema.get("required_entity_type_connections") or []
                     if required_entity_types:
-                        from src.domain.ontology_catalog import format_entity_type_term  # noqa: PLC0415
-
-                        _oc = _ontology_catalog()
+                        _oc = self._runtime_catalogs.ontology
                         linked_types = _linked_entity_types(path, content)
                         for etype in required_entity_types:
-                            label = format_entity_type_term(etype)
+                            label = _oc.format_entity_type_term(etype)
                             if not _oc.expand_entity_type_term(etype):
                                 result.issues.append(
                                     Issue(
@@ -670,14 +673,10 @@ class ArtifactVerifier:
                                     )
                                 )
                             elif not _oc.entity_type_term_matches(etype, linked_types):
-                                result.issues.append(
-                                    Issue(
-                                        Severity.ERROR,
-                                        "E155",
-                                        (f"Required entity-type connection missing: link at least one {label}"),
-                                        loc,
-                                    )
-                                )
+                                result.issues.append(Issue(
+                                    Severity.ERROR, "E155",
+                                    f"Required entity-type connection missing: link at least one {label}", loc,
+                                ))
 
         # W155: unresolvable internal markdown links
         for m in re.finditer(r"\[([^\]]+)\]\(([^)]+)\)", content):

@@ -12,28 +12,28 @@ E408: duplicate 'represents' binding for the same model target (without visual_r
 
 from __future__ import annotations
 
-from functools import lru_cache
 from typing import Literal
 
 from src.application.verification._verifier_rules_binding_targets import check_binding_target
 from src.application.verification.artifact_verifier_types import Issue, Severity, VerificationResult
 from src.domain.allowed_bindings import AllowedBindingsSpec
 from src.domain.bindings import CORE_CORRESPONDENCE_KINDS
+from src.domain.catalogs import DiagramTypeCatalog
 
 
-@lru_cache(maxsize=1)
-def _module_registry():
-    from src.infrastructure.app_bootstrap import get_module_registry  # noqa: PLC0415
+def get_allowed_bindings(
+    diagram_type: str,
+    diagram_type_catalog: DiagramTypeCatalog | None = None,
+) -> AllowedBindingsSpec | None:
+    """Return AllowedBindingsSpec for a diagram type, or None if unknown/not declared.
 
-    return get_module_registry()
-
-
-def get_allowed_bindings(diagram_type: str) -> AllowedBindingsSpec | None:
-    """Return AllowedBindingsSpec for a diagram type, or None if unknown/not declared."""
-    if not diagram_type:
+    When diagram_type_catalog is None the diagram type's extended bindings are not
+    checked (falls back to core correspondence kinds only).
+    """
+    if not diagram_type or diagram_type_catalog is None:
         return None
     try:
-        mod = _module_registry().find_diagram_type(diagram_type)
+        mod = diagram_type_catalog.find_diagram_type(diagram_type)
     except Exception:  # noqa: BLE001
         return None
     if mod is None:
