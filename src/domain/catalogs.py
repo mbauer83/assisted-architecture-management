@@ -8,7 +8,7 @@ ModuleCatalog and injected into consumers.
 from __future__ import annotations
 
 import functools
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from typing import Protocol, runtime_checkable
 
 from src.domain.module_catalog import ModuleCatalog
@@ -28,16 +28,16 @@ class OntologyCatalog(Protocol):
     def all_entity_type_names(self) -> frozenset[str]: ...
     def all_connection_type_names(self) -> frozenset[str]: ...
     def known_domain_names(self) -> frozenset[str]: ...
-    def domain_order(self) -> list[str]: ...
-    def domain_grouping(self) -> dict[str, str]: ...
+    def domain_order(self) -> Sequence[str]: ...
+    def domain_grouping(self) -> Mapping[str, str]: ...
     def entity_types_with_class(self, element_class: str) -> frozenset[str]: ...
-    def expand_entity_type_term(self, term: str) -> list[str]: ...
+    def expand_entity_type_term(self, term: str) -> Sequence[str]: ...
     def format_entity_type_term(self, term: str) -> str: ...
     def entity_type_term_matches(self, term: str, linked_types: set[str]) -> bool: ...
-    def archimate_stereotype_to_connection_type(self) -> dict[str, str]: ...
-    def entity_type_prefixes(self) -> dict[str, str]: ...
-    def matrix_abbreviations_by_connection_type(self) -> dict[str, str]: ...
-    def matrix_connection_type_abbreviations(self) -> dict[str, str]: ...
+    def archimate_stereotype_to_connection_type(self) -> Mapping[str, str]: ...
+    def entity_type_prefixes(self) -> Mapping[str, str]: ...
+    def matrix_abbreviations_by_connection_type(self) -> Mapping[str, str]: ...
+    def matrix_connection_type_abbreviations(self) -> Mapping[str, str]: ...
 
 
 @runtime_checkable
@@ -45,9 +45,9 @@ class ConnectionSemantics(Protocol):
     """Permitted-relationship and symmetry queries over registered ontologies."""
 
     def is_symmetric(self, conn_type: str) -> bool: ...
-    def permissible_connection_types(self, source_type: str, target_type: str) -> list[str]: ...
-    def permissible_target_types(self, source_type: str) -> dict[str, list[str]]: ...
-    def classify_connections(self, source_type: str) -> dict[str, dict[str, list[str]]]: ...
+    def permissible_connection_types(self, source_type: str, target_type: str) -> Sequence[str]: ...
+    def permissible_target_types(self, source_type: str) -> Mapping[str, Sequence[str]]: ...
+    def classify_connections(self, source_type: str) -> Mapping[str, Mapping[str, Sequence[str]]]: ...
 
 
 @runtime_checkable
@@ -127,17 +127,17 @@ class OntologyCatalogImpl:
     def known_domain_names(self) -> frozenset[str]:
         return self._domain_names
 
-    def domain_order(self) -> list[str]:
+    def domain_order(self) -> Sequence[str]:
         return list(self._domain_ord)
 
-    def domain_grouping(self) -> dict[str, str]:
+    def domain_grouping(self) -> Mapping[str, str]:
         return {d: f"{d.capitalize()}Grouping" for d in self._domain_ord}
 
     def entity_types_with_class(self, element_class: str) -> frozenset[str]:
         raw = self._catalog.entity_types_with_class(ElementClassName(element_class))
         return frozenset(str(n) for n in raw)
 
-    def expand_entity_type_term(self, term: str) -> list[str]:
+    def expand_entity_type_term(self, term: str) -> Sequence[str]:
         if term == "@all":
             return sorted(self._et_names)
         if term.startswith("@"):
@@ -153,16 +153,16 @@ class OntologyCatalogImpl:
     def entity_type_term_matches(self, term: str, linked_types: set[str]) -> bool:
         return bool(set(self.expand_entity_type_term(term)) & linked_types)
 
-    def archimate_stereotype_to_connection_type(self) -> dict[str, str]:
-        return dict(self._archimate_stereo_map)
+    def archimate_stereotype_to_connection_type(self) -> Mapping[str, str]:
+        return self._archimate_stereo_map
 
-    def entity_type_prefixes(self) -> dict[str, str]:
-        return dict(self._et_prefix_map)
+    def entity_type_prefixes(self) -> Mapping[str, str]:
+        return self._et_prefix_map
 
-    def matrix_abbreviations_by_connection_type(self) -> dict[str, str]:
-        return dict(self._matrix_abbrevs)
+    def matrix_abbreviations_by_connection_type(self) -> Mapping[str, str]:
+        return self._matrix_abbrevs
 
-    def matrix_connection_type_abbreviations(self) -> dict[str, str]:
+    def matrix_connection_type_abbreviations(self) -> Mapping[str, str]:
         return {ct: abbrev for abbrev, ct in self._matrix_abbrevs.items()}
 
 
@@ -180,7 +180,7 @@ class ConnectionSemanticsImpl:
         info = self._catalog.find_connection_type(ConnectionTypeName(conn_type))
         return info.symmetric if info is not None else False
 
-    def permissible_connection_types(self, source_type: str, target_type: str) -> list[str]:
+    def permissible_connection_types(self, source_type: str, target_type: str) -> Sequence[str]:
         prs = self._permitted
         src, tgt = EntityTypeName(source_type), EntityTypeName(target_type)
         result = set(prs.permitted_connection_types(src, tgt))
@@ -189,13 +189,13 @@ class ConnectionSemanticsImpl:
                 result.add(ct)
         return sorted(result)
 
-    def permissible_target_types(self, source_type: str) -> dict[str, list[str]]:
+    def permissible_target_types(self, source_type: str) -> Mapping[str, Sequence[str]]:
         out: dict[str, list[str]] = {}
         for tgt, ct in self._permitted.by_source().get(EntityTypeName(source_type), []):
             out.setdefault(str(ct), []).append(str(tgt))
         return {ct: sorted(tgts) for ct, tgts in sorted(out.items())}
 
-    def classify_connections(self, source_type: str) -> dict[str, dict[str, list[str]]]:
+    def classify_connections(self, source_type: str) -> Mapping[str, Mapping[str, Sequence[str]]]:
         prs = self._permitted
         src = EntityTypeName(source_type)
         outgoing: dict[str, list[str]] = {}

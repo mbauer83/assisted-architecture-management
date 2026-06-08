@@ -1,3 +1,4 @@
+from collections.abc import Mapping
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Literal, Protocol, TypeAlias, runtime_checkable
@@ -46,9 +47,9 @@ class EntityRecord:
     subdomain: str
     path: Path
     keywords: tuple[str, ...]
-    extra: dict[str, object]
+    extra: Mapping[str, object]
     content_text: str
-    display_blocks: dict[str, str]
+    display_blocks: Mapping[str, str]
     display_label: str
     display_alias: str
     host_diagram_id: str | None = None
@@ -72,7 +73,7 @@ class ConnectionRecord:
     version: str
     status: str
     path: Path
-    extra: dict[str, object]
+    extra: Mapping[str, object]
     content_text: str
     associated_entities: tuple[str, ...] = field(default_factory=tuple)
     src_cardinality: str = ""
@@ -103,7 +104,7 @@ class DiagramRecord:
     version: str
     status: str
     path: Path
-    extra: dict[str, object]
+    extra: Mapping[str, object]
     group: str = "uncategorized"
 
     def __str__(self) -> str:
@@ -120,7 +121,7 @@ class DocumentRecord:
     keywords: tuple[str, ...]
     sections: tuple[str, ...]  # heading text of ## sections, in order
     content_text: str
-    extra: dict[str, object]  # frontmatter fields beyond standard ones
+    extra: Mapping[str, object]  # frontmatter fields beyond standard ones
     group: str = "uncategorized"
 
 

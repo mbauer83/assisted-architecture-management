@@ -8,7 +8,7 @@ from functools import lru_cache
 
 
 @lru_cache(maxsize=1)
-def _matrix_connection_type_abbreviations() -> dict[str, str]:
+def _matrix_connection_type_abbreviations() -> Mapping[str, str]:
     from src.infrastructure.app_bootstrap import build_runtime_catalogs, get_module_registry  # noqa: PLC0415
 
     return build_runtime_catalogs(get_module_registry()).ontology.matrix_connection_type_abbreviations()

@@ -1,4 +1,5 @@
 import re
+from collections.abc import Mapping
 from functools import lru_cache
 from pathlib import Path
 from typing import Any
@@ -141,7 +142,7 @@ def derive_domain(path: Path, root: Path) -> tuple[Domain, str]:
         return "unknown", ""
 
 
-def extract_archimate_label_alias(display_blocks: dict[str, str]) -> tuple[str, str]:
+def extract_archimate_label_alias(display_blocks: Mapping[str, str]) -> tuple[str, str]:
     archimate_block = display_blocks.get("archimate", "")
     if not archimate_block:
         return "", ""

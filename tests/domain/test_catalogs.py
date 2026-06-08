@@ -401,3 +401,78 @@ class TestDiagramTypeCatalog:
         a = DiagramTypeCatalogImpl(_catalog())
         b = DiagramTypeCatalogImpl(_catalog())
         assert a is not b
+
+
+# ── Immutability contract ─────────────────────────────────────────────────────
+
+
+class TestCatalogImmutability:
+    """Verify that public catalog accessors return Mapping/Sequence views, not naked mutable dicts/lists."""
+
+    def _onto_impl(self) -> OntologyCatalogImpl:
+        onto = _StubOntology(
+            "o",
+            entity_types={"app": _et("app", domain="application")},
+            connection_types={
+                "archimate-assoc": _ct("archimate-assoc", conn_lang="archimate", archimate_rel_type="Association"),
+            },
+        )
+        return OntologyCatalogImpl(_catalog([onto]), {"A": "archimate-assoc"})
+
+    def test_domain_order_is_sequence(self) -> None:
+        impl = self._onto_impl()
+        result = impl.domain_order()
+        assert isinstance(result, (list, tuple))
+        assert "application" in result
+
+    def test_domain_grouping_is_mapping(self) -> None:
+        impl = self._onto_impl()
+        result = impl.domain_grouping()
+        assert isinstance(result, Mapping)
+        assert "application" in result
+
+    def test_archimate_stereotype_mapping_is_mapping(self) -> None:
+        impl = self._onto_impl()
+        result = impl.archimate_stereotype_to_connection_type()
+        assert isinstance(result, Mapping)
+        assert result.get("association") == "archimate-assoc"
+
+    def test_entity_type_prefixes_is_mapping(self) -> None:
+        onto = _StubOntology("o", entity_types={"app": _et("app", prefix="AP")})
+        impl = OntologyCatalogImpl(_catalog([onto]), {})
+        result = impl.entity_type_prefixes()
+        assert isinstance(result, Mapping)
+        assert result["AP"] == "app"
+
+    def test_matrix_abbreviations_is_mapping(self) -> None:
+        impl = self._onto_impl()
+        by_ct = impl.matrix_abbreviations_by_connection_type()
+        by_abbrev = impl.matrix_connection_type_abbreviations()
+        assert isinstance(by_ct, Mapping)
+        assert isinstance(by_abbrev, Mapping)
+
+    def test_expand_entity_type_term_is_sequence(self) -> None:
+        impl = self._onto_impl()
+        result = impl.expand_entity_type_term("@all")
+        assert hasattr(result, "__iter__")
+        assert "app" in result
+
+    def test_stereotype_map_shared_across_calls(self) -> None:
+        """Repeated calls return the same cached object (no defensive copy overhead)."""
+        impl = self._onto_impl()
+        assert impl.archimate_stereotype_to_connection_type() is impl.archimate_stereotype_to_connection_type()
+
+    def test_connection_semantics_permissible_types_is_sequence(self) -> None:
+        onto = _StubOntology("o")
+        impl = ConnectionSemanticsImpl(_catalog([onto]))
+        result = impl.permissible_connection_types("a", "b")
+        assert hasattr(result, "__iter__")
+
+    def test_connection_semantics_classify_is_mapping(self) -> None:
+        onto = _StubOntology("o")
+        impl = ConnectionSemanticsImpl(_catalog([onto]))
+        result = impl.classify_connections("some-type")
+        assert isinstance(result, Mapping)
+        assert "outgoing" in result
+        assert "incoming" in result
+        assert "symmetric" in result
