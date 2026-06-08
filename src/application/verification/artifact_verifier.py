@@ -2,8 +2,6 @@
 
 import functools
 import re
-from collections.abc import Callable
-from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from typing import Literal
 
@@ -22,14 +20,8 @@ from src.application.verification.artifact_verifier_incremental import (
     FileInventory,
     detect_changed_paths,
     expand_impacted_paths,
-    git_head,
-    inventory_files,
-    load_incremental_state,
     load_runtime_config,
-    save_incremental_state,
     serialize_result,
-    state_file_path,
-    verifier_engine_signature,
 )
 from src.application.verification.artifact_verifier_parsing import (
     parse_frontmatter,
@@ -48,11 +40,6 @@ from src.application.verification.artifact_verifier_rules import (
     check_required_fields,
     check_section,
 )
-from src.application.verification.artifact_verifier_syntax import (
-    check_puml_syntax,
-    check_puml_syntax_batch,
-    resolve_worker_count,
-)
 from src.application.verification.artifact_verifier_types import (
     DIAGRAM_REQUIRED,
     ENTITY_REQUIRED,
@@ -64,6 +51,12 @@ from src.application.verification.artifact_verifier_types import (
     VerificationResult,
     VerifierRuntimeConfig,
     entity_id_from_path,
+)
+from src.application.verification.verifier_ports import (
+    FileInventoryPort,
+    IncrementalStatePort,
+    PumlSyntaxPort,
+    VerifierScheduler,
 )
 from src.domain.repo_layout import ARCH_REPO, DOCS, MODEL
 
@@ -107,10 +100,18 @@ class ArtifactVerifier:
         *,
         check_puml_syntax: bool = True,
         catalogs: RuntimeCatalogs | None = None,
+        puml_syntax: PumlSyntaxPort | None = None,
+        scheduler: VerifierScheduler | None = None,
+        file_inventory: FileInventoryPort | None = None,
+        incremental_state: IncrementalStatePort | None = None,
     ) -> None:
         self.registry = registry
         self.check_puml_syntax = check_puml_syntax
         self._catalogs = catalogs
+        self._puml_port = puml_syntax
+        self._scheduler_port = scheduler
+        self._inventory_port = file_inventory
+        self._incremental_port = incremental_state
 
     @functools.cached_property
     def _runtime_catalogs(self) -> RuntimeCatalogs:
@@ -119,6 +120,38 @@ class ArtifactVerifier:
         from src.infrastructure.app_bootstrap import build_runtime_catalogs, get_module_registry  # noqa: PLC0415
 
         return build_runtime_catalogs(get_module_registry())
+
+    @functools.cached_property
+    def _puml_syntax(self) -> PumlSyntaxPort:
+        if self._puml_port is not None:
+            return self._puml_port
+        from src.infrastructure.verification.adapters import DefaultPumlSyntaxAdapter  # noqa: PLC0415
+
+        return DefaultPumlSyntaxAdapter()
+
+    @functools.cached_property
+    def _scheduler(self) -> VerifierScheduler:
+        if self._scheduler_port is not None:
+            return self._scheduler_port
+        from src.infrastructure.verification.adapters import ThreadPoolVerifierScheduler  # noqa: PLC0415
+
+        return ThreadPoolVerifierScheduler()
+
+    @functools.cached_property
+    def _inventory(self) -> FileInventoryPort:
+        if self._inventory_port is not None:
+            return self._inventory_port
+        from src.infrastructure.verification.adapters import FilesystemInventoryAdapter  # noqa: PLC0415
+
+        return FilesystemInventoryAdapter()
+
+    @functools.cached_property
+    def _incremental(self) -> IncrementalStatePort:
+        if self._incremental_port is not None:
+            return self._incremental_port
+        from src.infrastructure.verification.adapters import DefaultIncrementalStateAdapter  # noqa: PLC0415
+
+        return DefaultIncrementalStateAdapter()
 
     def _repo_root_for_path(self, path: Path) -> Path | None:
         """Resolve the configured model repository root for a file path."""
@@ -361,7 +394,7 @@ class ArtifactVerifier:
             check_frontmatter_schema(fm, repo_root, "diagram", result, loc)
 
         if run_syntax_check:
-            result.issues.extend(check_puml_syntax(path, loc))
+            result.issues.extend(self._puml_syntax.check_one(path, loc))
         return result
 
     def verify_matrix_diagram_file(self, path: Path) -> VerificationResult:
@@ -431,7 +464,7 @@ class ArtifactVerifier:
         if verification_scope == "full":
             return self._verify_all_full(repo_path, include_diagrams=include_diagrams)
 
-        inv = inventory_files(repo_path, include_diagrams=include_diagrams)
+        inv = self._inventory.build(repo_path, include_diagrams=include_diagrams)
         relpaths = {inv.path_to_rel[path.resolve()] for path in changed_paths if path.resolve() in inv.path_to_rel}
         if not relpaths:
             return []
@@ -439,26 +472,15 @@ class ArtifactVerifier:
         selected = relpaths if verification_scope == "changed" else expand_impacted_paths(inv, relpaths)
         results = self._verify_inventory_subset(inv, selected)
 
-        docs_root = repo_path / DOCS
-        if docs_root.exists():
-            doc_files = [
-                path
-                for path in changed_paths
-                if path.suffix == ".md" and path.exists() and docs_root in path.resolve().parents
-            ]
-            worker_count = resolve_worker_count()
-            results.extend(_verify_paths(doc_files, self.verify_document_file, workers=worker_count))
+        doc_files = self._inventory.filter_doc_files(repo_path, list(changed_paths))
+        results.extend(self._scheduler.run(self.verify_document_file, doc_files))
         return results
 
     def _verify_all_full(self, repo_path: Path, *, include_diagrams: bool) -> list[VerificationResult]:
-        inv = inventory_files(repo_path, include_diagrams=include_diagrams)
+        inv = self._inventory.build(repo_path, include_diagrams=include_diagrams)
         results = self._verify_inventory_subset(inv, set(inv.ordered_paths))
-        # Verify docs/ directory — not tracked by FileInventory
-        docs_root = repo_path / DOCS
-        if docs_root.exists():
-            doc_files = sorted(docs_root.rglob("*.md"))
-            worker_count = resolve_worker_count()
-            results.extend(_verify_paths(doc_files, self.verify_document_file, workers=worker_count))
+        doc_files = self._inventory.list_doc_files(repo_path)
+        results.extend(self._scheduler.run(self.verify_document_file, doc_files))
         return results
 
     def _verify_all_incremental(
@@ -468,11 +490,11 @@ class ArtifactVerifier:
         include_diagrams: bool,
         cfg: VerifierRuntimeConfig,
     ) -> list[VerificationResult]:
-        inv = inventory_files(repo_path, include_diagrams=include_diagrams)
-        state_path = state_file_path(repo_path, include_diagrams=include_diagrams, state_dir=cfg.state_dir)
-        prev = load_incremental_state(state_path)
-        head = git_head(repo_path)
-        engine_sig = verifier_engine_signature()
+        inv = self._inventory.build(repo_path, include_diagrams=include_diagrams)
+        state_path = self._incremental.state_path(repo_path, include_diagrams=include_diagrams)
+        prev = self._incremental.load(state_path)
+        head = self._incremental.git_head(repo_path)
+        engine_sig = self._incremental.engine_signature()
 
         if self._incremental_requires_full(prev, include_diagrams=include_diagrams, head=head, engine_sig=engine_sig):
             mode = "full"
@@ -487,12 +509,8 @@ class ArtifactVerifier:
                 cfg=cfg,
             )
 
-        # Verify docs/ — always fresh, not tracked by incremental state
-        docs_root = repo_path / DOCS
-        if docs_root.exists():
-            doc_files = sorted(docs_root.rglob("*.md"))
-            worker_count = resolve_worker_count()
-            results.extend(_verify_paths(doc_files, self.verify_document_file, workers=worker_count))
+        doc_files = self._inventory.list_doc_files(repo_path)
+        results.extend(self._scheduler.run(self.verify_document_file, doc_files))
 
         state = IncrementalState(
             schema_version=1,
@@ -503,7 +521,7 @@ class ArtifactVerifier:
             results={inv.path_to_rel[r.path]: serialize_result(r) for r in results if r.path in inv.path_to_rel},
             include_registry=(self.registry is not None),
         )
-        save_incremental_state(state_path, state)
+        self._incremental.save(state_path, state)
 
         if cfg.log_mode:
             print(f"[ArtifactVerifier] mode={mode} include_diagrams={include_diagrams} files={len(results)}")
@@ -562,7 +580,6 @@ class ArtifactVerifier:
         return changed_ratio >= cfg.changed_ratio_threshold or len(changed) >= cfg.changed_count_threshold
 
     def _verify_inventory_subset(self, inv: FileInventory, relpaths: set[str]) -> list[VerificationResult]:
-        worker_count = resolve_worker_count()
         if self.registry is not None:
             _ = self.registry.entity_ids()
             _ = self.registry.connection_ids()
@@ -572,21 +589,21 @@ class ArtifactVerifier:
         matrix_files = [inv.rel_to_path[r] for r in inv.diagram_matrix_relpaths if r in relpaths]
 
         out: list[VerificationResult] = []
-        out.extend(_verify_paths(entity_files, self.verify_entity_file, workers=worker_count))
-        out.extend(_verify_paths(connection_files, self.verify_connection_file, workers=worker_count))
+        out.extend(self._scheduler.run(self.verify_entity_file, entity_files))
+        out.extend(self._scheduler.run(self.verify_connection_file, connection_files))
 
-        diagram_results = _verify_paths(
-            diagram_files,
+        diagram_results = self._scheduler.run(
             lambda path: self._verify_diagram_file(path, run_syntax_check=False),
-            workers=min(worker_count, 4),
+            diagram_files,
+            max_workers=4,
         )
         if self.check_puml_syntax and diagram_results:
-            issues_by_path = check_puml_syntax_batch([r.path for r in diagram_results])
+            issues_by_path = self._puml_syntax.check_batch([r.path for r in diagram_results])
             for d in diagram_results:
                 d.issues.extend(issues_by_path.get(d.path, []))
         out.extend(diagram_results)
 
-        out.extend(_verify_paths(matrix_files, self.verify_matrix_diagram_file, workers=worker_count))
+        out.extend(self._scheduler.run(self.verify_matrix_diagram_file, matrix_files))
 
         by_path = {r.path: r for r in out}
         return [
@@ -757,20 +774,6 @@ def _infer_repo_root_for_document(path: Path) -> Path | None:
 
 def _is_absolute_markdown_link(href: str) -> bool:
     return href.startswith("/") or href.startswith("file://") or bool(_WINDOWS_ABS_PATH_RE.match(href))
-
-
-def _verify_paths(
-    paths: list[Path],
-    verifier_fn: Callable[[Path], VerificationResult],
-    *,
-    workers: int,
-) -> list[VerificationResult]:
-    if not paths:
-        return []
-    if workers <= 1:
-        return [verifier_fn(path) for path in paths]
-    with ThreadPoolExecutor(max_workers=workers) as executor:
-        return list(executor.map(verifier_fn, paths))
 
 
 def _results_from_state(prev: IncrementalState, inv: FileInventory) -> list[VerificationResult] | None:
