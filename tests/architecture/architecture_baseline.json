@@ -4,6 +4,5 @@
   "src/application/modeling/artifact_write.py::src.infrastructure.app_bootstrap",
   "src/application/modeling/matrix_builder.py::src.infrastructure.app_bootstrap",
   "src/application/verification/artifact_verifier.py::src.infrastructure.app_bootstrap",
-  "src/application/verification/artifact_verifier.py::src.infrastructure.verification.adapters",
-  "src/ontologies/archimate_next/_loader.py::src.infrastructure.rendering._svg_sprite_convert"
+  "src/application/verification/artifact_verifier.py::src.infrastructure.verification.adapters"
 ]

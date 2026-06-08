@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import json
 import re
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 from pathlib import Path
 from typing import Any, Literal, cast
 
@@ -49,12 +49,14 @@ class _ArchiMateNextModule:
         permitted_relationships: PermittedRelationshipSet,
         matrix_abbreviations: dict[str, str],
         element_classes: dict[str, ElementClassInfo] | None = None,
+        svg_converter: Callable[[str], str] | None = None,
     ) -> None:
         self._entity_types = entity_types
         self._connection_types = connection_types
         self._permitted_relationships = permitted_relationships
         self._matrix_abbreviations = matrix_abbreviations
         self._element_classes: dict[str, ElementClassInfo] = element_classes or {}
+        self._svg_converter = svg_converter
 
         self._class_index: dict[ElementClassName, frozenset[EntityTypeName]] = {}
         _class_build: dict[ElementClassName, set[EntityTypeName]] = {}
@@ -140,12 +142,10 @@ class _ArchiMateNextModule:
         markup = self._glyphs.get("kinds", {}).get(kind)
         if not markup:
             return None
-        from src.infrastructure.rendering._svg_sprite_convert import (  # noqa: PLC0415
-            browser_markup_to_plantuml_svg as _convert,
-        )
-
+        if self._svg_converter is None:
+            return None
         key = _sprite_key(artifact_type)
-        return f"sprite $archimate_{key} {_convert(markup)}"
+        return f"sprite $archimate_{key} {self._svg_converter(markup)}"
 
 
 def _load_entity_types(data: dict[str, Any]) -> dict[EntityTypeName, EntityTypeInfo]:
@@ -248,7 +248,11 @@ def _load_element_classes(data: dict[str, Any]) -> dict[str, ElementClassInfo]:
     return out
 
 
-def load_archimate_next_module(package_dir: Path) -> _ArchiMateNextModule:
+def load_archimate_next_module(
+    package_dir: Path,
+    *,
+    svg_converter: Callable[[str], str] | None = None,
+) -> _ArchiMateNextModule:
     with open(package_dir / "entities.yaml") as fh:
         entity_data = yaml.safe_load(fh)
     with open(package_dir / "connections.yaml") as fh:
@@ -266,4 +270,5 @@ def load_archimate_next_module(package_dir: Path) -> _ArchiMateNextModule:
         permitted_relationships=permitted,
         matrix_abbreviations=matrix_abbreviations,
         element_classes=element_classes,
+        svg_converter=svg_converter,
     )

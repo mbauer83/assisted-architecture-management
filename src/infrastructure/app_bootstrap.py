@@ -16,10 +16,14 @@ from src.domain.module_catalog import ModuleCatalog, ModuleCatalogBuilder
 from src.domain.module_filter import is_module_enabled
 from src.domain.module_registry import ModuleRegistry
 from src.infrastructure.assurance.capability import make_capability
-from src.ontologies.archimate_next import matrix_abbreviations as _archimate_matrix_abbreviations
-from src.ontologies.archimate_next import module as archimate_next_module
+from src.infrastructure.rendering._svg_sprite_convert import browser_markup_to_plantuml_svg as _svg_convert
+from src.ontologies.archimate_next._loader import _PACKAGE_DIR as _ARCH_PACKAGE_DIR
+from src.ontologies.archimate_next._loader import load_archimate_next_module
 from src.ontologies.assurance import module as assurance_module
 from src.ontologies.sysml_v2_min import module as sysml_v2_min_module
+
+_archimate_next_module = load_archimate_next_module(_ARCH_PACKAGE_DIR, svg_converter=_svg_convert)
+_archimate_matrix_abbreviations = _archimate_next_module.matrix_abbreviations
 
 if TYPE_CHECKING:
     from fastapi import Request
@@ -29,7 +33,7 @@ _RUNTIME_CATALOGS_STATE_KEY = "runtime_catalogs"
 _logger = logging.getLogger(__name__)
 
 # TODO: Referencing instead of discovering modules should be reviewed
-_ALL_ONTOLOGY_MODULES = (archimate_next_module, sysml_v2_min_module, assurance_module)
+_ALL_ONTOLOGY_MODULES = (_archimate_next_module, sysml_v2_min_module, assurance_module)
 
 _DEFAULT_ASSURANCE_DB = Path(__file__).resolve().parents[2] / ".arch-assurance" / "store.db"
 
