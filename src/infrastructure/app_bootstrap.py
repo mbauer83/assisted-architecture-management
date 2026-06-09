@@ -32,7 +32,6 @@ _MODULE_REGISTRY_STATE_KEY = "module_registry"
 _RUNTIME_CATALOGS_STATE_KEY = "runtime_catalogs"
 _logger = logging.getLogger(__name__)
 
-# TODO: Referencing instead of discovering modules should be reviewed
 _ALL_ONTOLOGY_MODULES = (_archimate_next_module, sysml_v2_min_module, assurance_module)
 
 _DEFAULT_ASSURANCE_DB = Path(__file__).resolve().parents[2] / ".arch-assurance" / "store.db"

@@ -1,7 +1,7 @@
 """model_write_ops.py — Compatibility facade.
 
-The implementation was split into smaller modules under src/tools/model_write/.
-This module remains as a stable import path for MCP server code and tests.
+The implementation is split into smaller modules under src/tools/model_write/.
+This module exists as a stable import path for MCP server code and tests.
 """
 
 from typing import Literal
