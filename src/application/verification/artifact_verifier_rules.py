@@ -190,24 +190,26 @@ def _check_entity_ids_used(
     for eid in entity_ids:
         eid_str = str(eid)
         if eid_str not in allowed_entities:
-            if eid_str in all_entities and file_scope == "enterprise":
-                msg = (
-                    f"entity-ids-used references non-enterprise entity '{eid_str}' "
-                    "— enterprise diagrams may only reference enterprise entities"
+            issue = (
+                Issue(
+                    Severity.ERROR,
+                    "E310",
+                    (
+                        f"entity-ids-used references non-enterprise entity '{eid_str}' "
+                        "— enterprise diagrams may only reference enterprise entities"
+                    ),
+                    loc,
                 )
-                result.issues.append(Issue(Severity.ERROR, "E310", msg, loc))
-            else:
-                result.issues.append(
-                    Issue(
-                        Severity.ERROR,
-                        "E301",
-                        f"entity-ids-used references unknown entity '{eid_str}'",
-                        loc,
-                    )
+                if eid_str in all_entities and file_scope == "enterprise"
+                else Issue(
+                    Severity.ERROR,
+                    "E301",
+                    f"entity-ids-used references unknown entity '{eid_str}'",
+                    loc,
                 )
-            continue
-
-        if diagram_is_baselined and registry.entity_status(eid_str) == "draft":
+            )
+            result.issues.append(issue)
+        elif diagram_is_baselined and registry.entity_status(eid_str) == "draft":
             result.issues.append(
                 Issue(
                     Severity.ERROR,
@@ -243,24 +245,26 @@ def _check_connection_ids_used(
     for cid in conn_ids:
         cid_str = str(cid)
         if cid_str not in allowed_connections:
-            if cid_str in all_connections and file_scope == "enterprise":
-                msg = (
-                    f"connection-ids-used references non-enterprise connection '{cid_str}' "
-                    "— enterprise diagrams may only reference enterprise connections"
+            issue = (
+                Issue(
+                    Severity.ERROR,
+                    "E320",
+                    (
+                        f"connection-ids-used references non-enterprise connection '{cid_str}' "
+                        "— enterprise diagrams may only reference enterprise connections"
+                    ),
+                    loc,
                 )
-                result.issues.append(Issue(Severity.ERROR, "E320", msg, loc))
-            else:
-                result.issues.append(
-                    Issue(
-                        Severity.ERROR,
-                        "E302",
-                        f"connection-ids-used references unknown connection '{cid_str}'",
-                        loc,
-                    )
+                if cid_str in all_connections and file_scope == "enterprise"
+                else Issue(
+                    Severity.ERROR,
+                    "E302",
+                    f"connection-ids-used references unknown connection '{cid_str}'",
+                    loc,
                 )
-            continue
-
-        if diagram_is_baselined and registry.connection_status(cid_str) == "draft":
+            )
+            result.issues.append(issue)
+        elif diagram_is_baselined and registry.connection_status(cid_str) == "draft":
             result.issues.append(
                 Issue(
                     Severity.ERROR,
@@ -326,25 +330,25 @@ def _check_entity_aliases_declared(content: str, fm: dict, result: VerificationR
     for eid in entity_ids:
         eid_str = str(eid)
         matches = list((result.path.parents[2] / MODEL).rglob(f"{eid_str}.md"))
-        if not matches:
-            continue
-        try:
-            entity_text = matches[0].read_text(encoding="utf-8")
-        except OSError:
-            continue
-        alias = _extract_entity_display_alias(entity_text)
-        if alias and _normalize_puml_alias(alias) not in declared_aliases:
-            result.issues.append(
-                Issue(
-                    Severity.ERROR,
-                    "E309",
-                    (
-                        f"entity-ids-used references '{eid_str}' with display alias '{alias}', "
-                        "but that alias is not declared in the PUML body"
-                    ),
-                    loc,
-                )
-            )
+        if matches:
+            try:
+                entity_text = matches[0].read_text(encoding="utf-8")
+            except OSError:
+                entity_text = None
+            if entity_text is not None:
+                alias = _extract_entity_display_alias(entity_text)
+                if alias and _normalize_puml_alias(alias) not in declared_aliases:
+                    result.issues.append(
+                        Issue(
+                            Severity.ERROR,
+                            "E309",
+                            (
+                                f"entity-ids-used references '{eid_str}' with display alias '{alias}', "
+                                "but that alias is not declared in the PUML body"
+                            ),
+                            loc,
+                        )
+                    )
 
 
 def _extract_declared_puml_aliases(content: str) -> set[str]:

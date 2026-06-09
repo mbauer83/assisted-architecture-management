@@ -30,6 +30,13 @@ def _all_entity_types() -> dict:
     return {str(k): v for k, v in build_module_registry().all_entity_types().items()}
 
 
+@lru_cache(maxsize=1)
+def _catalogs():
+    from src.infrastructure.app_bootstrap import build_runtime_catalogs, get_module_registry  # noqa: PLC0415
+
+    return build_runtime_catalogs(get_module_registry())
+
+
 def _write(path: Path, content: str) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(content, encoding="utf-8")
@@ -300,7 +307,7 @@ class TestVerifierCardinality:
         out_path = repo / "model/motivation/requirements" / f"{src}.outgoing.md"
         _write(out_path, _outgoing(src, [f"### archimate-aggregation [1] → [0..*] {tgt}"]))
         registry = ArtifactRegistry(shared_artifact_index(repo))
-        verifier = ArtifactVerifier(registry)
+        verifier = ArtifactVerifier(registry, catalogs=_catalogs())
         result = verifier.verify_outgoing_file(out_path)
         assert result.valid, [i.message for i in result.issues]
 
@@ -310,7 +317,7 @@ class TestVerifierCardinality:
             out_path = repo / "model/motivation/requirements" / f"{src}.outgoing.md"
             _write(out_path, _outgoing(src, [f"### archimate-association [{card}] → {tgt}"]))
             registry = ArtifactRegistry(shared_artifact_index(repo))
-            verifier = ArtifactVerifier(registry)
+            verifier = ArtifactVerifier(registry, catalogs=_catalogs())
             result = verifier.verify_outgoing_file(out_path)
             assert result.valid, f"Cardinality '{card}' failed: {[i.message for i in result.issues]}"
 
@@ -319,7 +326,7 @@ class TestVerifierCardinality:
         out_path = repo / "model/motivation/requirements" / f"{src}.outgoing.md"
         _write(out_path, _outgoing(src, [f"### archimate-realization [1:n] → {tgt}"]))
         registry = ArtifactRegistry(shared_artifact_index(repo))
-        verifier = ArtifactVerifier(registry)
+        verifier = ArtifactVerifier(registry, catalogs=_catalogs())
         result = verifier.verify_outgoing_file(out_path)
         assert not result.valid
         assert any(i.code == "E125" for i in result.issues)
@@ -329,7 +336,7 @@ class TestVerifierCardinality:
         out_path = repo / "model/motivation/requirements" / f"{src}.outgoing.md"
         _write(out_path, _outgoing(src, [f"### archimate-realization → [many] {tgt}"]))
         registry = ArtifactRegistry(shared_artifact_index(repo))
-        verifier = ArtifactVerifier(registry)
+        verifier = ArtifactVerifier(registry, catalogs=_catalogs())
         result = verifier.verify_outgoing_file(out_path)
         assert not result.valid
         assert any(i.code == "E125" for i in result.issues)
@@ -343,7 +350,7 @@ class TestAddConnectionWithCardinality:
 
         src, tgt = _setup_two_entities(repo)
         registry = ArtifactRegistry(shared_artifact_index(repo))
-        verifier = ArtifactVerifier(registry)
+        verifier = ArtifactVerifier(registry, catalogs=_catalogs())
 
         def clear(_: Path) -> None:
             pass
@@ -373,7 +380,7 @@ class TestAddConnectionWithCardinality:
 
         src, tgt = _setup_two_entities(repo)
         registry = ArtifactRegistry(shared_artifact_index(repo))
-        verifier = ArtifactVerifier(registry)
+        verifier = ArtifactVerifier(registry, catalogs=_catalogs())
 
         def clear(_: Path) -> None:
             pass

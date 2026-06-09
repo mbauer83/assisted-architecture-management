@@ -1,34 +1,21 @@
 backend:
-  port: 8000
   log_path: .arch/backend.log
   min_log_level: INFO
-
+  port: 8000
 diagrams:
   archimate_type_markers: icons
-  sprite_scale: 1.5
-  render_dpi: 150
   plantuml_limit_size: 16384
-
-repo_init:
-  default_branch: main
-  commit_author_name: Michael Bauer # Change to your name. @TODO: Make env-configurable
-  commit_author_email: mbauer.mphil@googlemail.com # Change to your email. @TODO: Make env-configurable
-  engagement: {}
-
-# Module toggles. Absent modules default to their manifest values (enabled: true, requires: []).
-# Only 'enabled' is a valid override key; 'requires' is a module manifest declaration.
-# Example: disable sysml_v2_min:
-#   modules:
-#     sysml_v2_min:
-#       enabled: false
+  render_dpi: 150
+  sprite_scale: 1.5
 modules: {}
-
-# Storage backend configuration.
-# storage.assurance selects the confidential assurance store + signals adapters.
-# storage.read_model is a reserved seam for a future optional text-index backend toggle.
+repo_init:
+  commit_author_email: mbauer.mphil@googlemail.com
+  commit_author_name: Michael Bauer
+  default_branch: main
+  engagement: {}
 storage:
   assurance:
-    store_backend: sqlcipher             # sqlcipher | pocketbase | private-git
-    signals_backend: sqlcipher-colocated # sqlcipher-colocated | sqlite | encrypted
-    max_classification: TLP:AMBER        # TLP:WHITE | TLP:GREEN | TLP:AMBER | TLP:RED
-  read_model: {}                         # reserved — future Tantivy-FTS toggle seam
+    max_classification: TLP:AMBER
+    signals_backend: sqlcipher-colocated
+    store_backend: sqlcipher
+  read_model: {}

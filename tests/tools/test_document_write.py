@@ -1,10 +1,18 @@
 from __future__ import annotations
 
+from functools import lru_cache
 from pathlib import Path
 
 from src.application.verification.artifact_verifier import ArtifactRegistry, ArtifactVerifier
 from src.infrastructure.artifact_index import shared_artifact_index
 from src.infrastructure.write.artifact_write.document import create_document, edit_document
+
+
+@lru_cache(maxsize=1)
+def _catalogs():
+    from src.infrastructure.app_bootstrap import build_module_registry, build_runtime_catalogs  # noqa: PLC0415
+
+    return build_runtime_catalogs(build_module_registry())
 
 
 def _write(path: Path, content: str) -> None:
@@ -28,7 +36,7 @@ def _schema(repo: Path, *, subdirectory: str | None = None) -> None:
 
 
 def _verifier(repo: Path) -> ArtifactVerifier:
-    return ArtifactVerifier(ArtifactRegistry(shared_artifact_index(repo)))
+    return ArtifactVerifier(ArtifactRegistry(shared_artifact_index(repo)), catalogs=_catalogs())
 
 
 def test_create_document_uses_schema_subdirectory(tmp_path: Path) -> None:

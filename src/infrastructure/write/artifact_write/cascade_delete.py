@@ -215,12 +215,14 @@ def _cascade_apply(repo_root: Path, project_slug: str, preflight: dict) -> dict:
 
         from src.application.verification.artifact_verifier import ArtifactVerifier  # noqa: PLC0415
         from src.application.verification.artifact_verifier_registry import ArtifactRegistry  # noqa: PLC0415
+        from src.infrastructure.app_bootstrap import build_runtime_catalogs, get_module_registry  # noqa: PLC0415
         from src.infrastructure.artifact_index import shared_artifact_index  # noqa: PLC0415
 
         reg = ArtifactRegistry(shared_artifact_index(repo_root))
+        _verifier = ArtifactVerifier(reg, catalogs=build_runtime_catalogs(get_module_registry()))
         errors = [
             f"{i.code}: {i.message} ({i.location})"
-            for r in ArtifactVerifier(reg).verify_all(repo_root, include_diagrams=False)
+            for r in _verifier.verify_all(repo_root, include_diagrams=False)
             for i in r.issues if i.severity == "error"
         ]
         if errors:

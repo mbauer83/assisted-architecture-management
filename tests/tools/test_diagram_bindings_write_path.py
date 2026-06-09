@@ -11,6 +11,7 @@ Covers:
 
 from __future__ import annotations
 
+from functools import lru_cache
 from pathlib import Path
 
 import yaml
@@ -28,12 +29,23 @@ from src.infrastructure.write.artifact_write.parse_existing import parse_diagram
 # ---------------------------------------------------------------------------
 
 
+@lru_cache(maxsize=1)
+def _catalogs():
+    from src.infrastructure.app_bootstrap import build_module_registry, build_runtime_catalogs  # noqa: PLC0415
+
+    return build_runtime_catalogs(build_module_registry())
+
+
 def _noop_caches(path: Path) -> None:  # noqa: ARG001
     pass
 
 
 def _verifier(repo_root: Path) -> ArtifactVerifier:
-    return ArtifactVerifier(ArtifactRegistry(shared_artifact_index(repo_root)), check_puml_syntax=False)
+    return ArtifactVerifier(
+        ArtifactRegistry(shared_artifact_index(repo_root)),
+        check_puml_syntax=False,
+        catalogs=_catalogs(),
+    )
 
 
 def _write(path: Path, content: str) -> None:

@@ -10,11 +10,19 @@ Verifies:
 
 from __future__ import annotations
 
+from functools import lru_cache
 from pathlib import Path
 
 import pytest
 
 from src.infrastructure.artifact_index import shared_artifact_index
+
+
+@lru_cache(maxsize=1)
+def _catalogs():
+    from src.infrastructure.app_bootstrap import build_runtime_catalogs, get_module_registry  # noqa: PLC0415
+
+    return build_runtime_catalogs(get_module_registry())
 
 # ---------------------------------------------------------------------------
 # Fixtures
@@ -138,7 +146,7 @@ class TestBoundaryGuards:
         with pytest.raises(ValueError, match="enterprise"):
             create_entity(
                 repo_root=enterprise_root,
-                verifier=ArtifactVerifier(None),
+                verifier=ArtifactVerifier(None, catalogs=_catalogs()),
                 clear_repo_caches=lambda _: None,
                 artifact_type="requirement",
                 name="Should Fail",
@@ -160,7 +168,7 @@ class TestBoundaryGuards:
             add_connection(
                 repo_root=enterprise_root,
                 registry=ArtifactRegistry(shared_artifact_index(enterprise_root)),
-                verifier=ArtifactVerifier(None),
+                verifier=ArtifactVerifier(None, catalogs=_catalogs()),
                 clear_repo_caches=lambda _: None,
                 source_entity="X",
                 connection_type="archimate-association",
@@ -179,7 +187,7 @@ class TestBoundaryGuards:
         with pytest.raises(ValueError, match="enterprise"):
             admin_create_entity(
                 repo_root=engagement_root,  # wrong root → should be rejected
-                verifier=ArtifactVerifier(None),
+                verifier=ArtifactVerifier(None, catalogs=_catalogs()),
                 clear_repo_caches=lambda _: None,
                 artifact_type="requirement",
                 name="Should Fail",
@@ -200,7 +208,7 @@ class TestBoundaryGuards:
         # dry_run=True — no files written, just verifies the guard passes
         result = admin_create_entity(
             repo_root=enterprise_root,
-            verifier=ArtifactVerifier(None),
+            verifier=ArtifactVerifier(None, catalogs=_catalogs()),
             clear_repo_caches=lambda _: None,
             artifact_type="requirement",
             name="Enterprise Entity",

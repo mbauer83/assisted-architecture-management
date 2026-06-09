@@ -10,6 +10,7 @@ Covers:
 
 from __future__ import annotations
 
+from functools import lru_cache
 from pathlib import Path
 
 import pytest
@@ -18,6 +19,13 @@ from src.application.verification.artifact_verifier import ArtifactVerifier
 from src.application.verification.artifact_verifier_registry import ArtifactRegistry
 from src.infrastructure.artifact_index import shared_artifact_index
 from src.infrastructure.mcp import mcp_artifact_server as tools
+
+
+@lru_cache(maxsize=1)
+def _catalogs():
+    from src.infrastructure.app_bootstrap import build_runtime_catalogs, get_module_registry  # noqa: PLC0415
+
+    return build_runtime_catalogs(get_module_registry())
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -111,7 +119,7 @@ class TestVerifierSemanticCheck:
         _write(out_path, _outgoing_md(fnc_id, "archimate-realization", srv_id))
 
         registry = ArtifactRegistry(shared_artifact_index(repo))
-        verifier = ArtifactVerifier(registry=registry)
+        verifier = ArtifactVerifier(registry=registry, catalogs=_catalogs())
         result = verifier.verify_outgoing_file(out_path)
 
         codes = {i.code for i in result.issues}
@@ -123,7 +131,7 @@ class TestVerifierSemanticCheck:
         _write(out_path, _outgoing_md(srv_id, "archimate-realization", app_id))
 
         registry = ArtifactRegistry(shared_artifact_index(repo))
-        verifier = ArtifactVerifier(registry=registry)
+        verifier = ArtifactVerifier(registry=registry, catalogs=_catalogs())
         result = verifier.verify_outgoing_file(out_path)
 
         codes = {i.code for i in result.issues}
@@ -135,7 +143,7 @@ class TestVerifierSemanticCheck:
         _write(out_path, _outgoing_md(app_id, "archimate-realization", srv_id))
 
         registry = ArtifactRegistry(shared_artifact_index(repo))
-        verifier = ArtifactVerifier(registry=registry)
+        verifier = ArtifactVerifier(registry=registry, catalogs=_catalogs())
         result = verifier.verify_outgoing_file(out_path)
 
         codes = {i.code for i in result.issues}
@@ -148,7 +156,7 @@ class TestVerifierSemanticCheck:
         _write(out_path, _outgoing_md(srv_id, "archimate-serving", app_id))
 
         registry = ArtifactRegistry(shared_artifact_index(repo))
-        verifier = ArtifactVerifier(registry=registry)
+        verifier = ArtifactVerifier(registry=registry, catalogs=_catalogs())
         result = verifier.verify_outgoing_file(out_path)
 
         codes = {i.code for i in result.issues}
@@ -160,7 +168,7 @@ class TestVerifierSemanticCheck:
         _write(out_path, _outgoing_md(ssw_id, "archimate-serving", app_id))
 
         registry = ArtifactRegistry(shared_artifact_index(repo))
-        verifier = ArtifactVerifier(registry=registry)
+        verifier = ArtifactVerifier(registry=registry, catalogs=_catalogs())
         result = verifier.verify_outgoing_file(out_path)
 
         codes = {i.code for i in result.issues}
@@ -172,7 +180,7 @@ class TestVerifierSemanticCheck:
         _write(out_path, _outgoing_md(app_id, "archimate-association", srv_id))
 
         registry = ArtifactRegistry(shared_artifact_index(repo))
-        verifier = ArtifactVerifier(registry=registry)
+        verifier = ArtifactVerifier(registry=registry, catalogs=_catalogs())
         result = verifier.verify_outgoing_file(out_path)
 
         codes = {i.code for i in result.issues}

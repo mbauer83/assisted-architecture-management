@@ -13,11 +13,12 @@ from __future__ import annotations
 import json
 import tempfile
 from pathlib import Path
-from unittest.mock import patch
+
+from src.infrastructure.assurance import _credential_store as creds
 
 
 def _make_store(tmpdir: str) -> tuple:
-    """Return (store, fernet_key) with keychain mocked."""
+    """Return (store, fernet_key) with credential backend pre-seeded."""
     from cryptography.fernet import Fernet  # type: ignore[import-untyped]
 
     from src.infrastructure.assurance._encrypted_private_git_store import EncryptedPrivateGitAssuranceStore
@@ -40,23 +41,23 @@ class TestEncryptedGitLifecycle:
     def test_unlock_with_valid_key(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
             store, key = _make_store(tmpdir)
-            with patch("keyring.get_password", return_value=key):
-                store.unlock()
+            creds.set_credential("private-git-encryption-key", key)
+            store.unlock()
             assert store.is_unlocked()
 
     def test_unlock_missing_key_raises(self) -> None:
         import pytest
         with tempfile.TemporaryDirectory() as tmpdir:
             store, _ = _make_store(tmpdir)
-            with patch("keyring.get_password", return_value=None):
-                with pytest.raises(RuntimeError, match="not found in OS keychain"):
-                    store.unlock()
+            # no key seeded — raises
+            with pytest.raises(RuntimeError, match="not found in OS keychain"):
+                store.unlock()
 
     def test_lock_clears_state(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
             store, key = _make_store(tmpdir)
-            with patch("keyring.get_password", return_value=key):
-                store.unlock()
+            creds.set_credential("private-git-encryption-key", key)
+            store.unlock()
             store.lock()
             assert not store.is_unlocked()
 
@@ -67,8 +68,8 @@ class TestEncryptedGitLifecycle:
 class TestEncryptedRoundTrip:
     def _unlocked_store(self, tmpdir: str):
         store, key = _make_store(tmpdir)
-        with patch("keyring.get_password", return_value=key):
-            store.unlock()
+        creds.set_credential("private-git-encryption-key", key)
+        store.unlock()
         return store
 
     def test_node_write_read(self) -> None:
@@ -84,13 +85,10 @@ class TestEncryptedRoundTrip:
         with tempfile.TemporaryDirectory() as tmpdir:
             store = self._unlocked_store(tmpdir)
             store.create_node("loss", "SecretLoss", status="draft")
-            # All .enc files should not contain the plaintext name
             enc_files = list((Path(tmpdir) / ".arch-assurance-git" / "nodes").glob("*.enc"))
             assert len(enc_files) == 1
             raw_bytes = enc_files[0].read_bytes()
-            # Ciphertext must not contain the plaintext name
             assert b"SecretLoss" not in raw_bytes
-            # Also not valid JSON
             try:
                 json.loads(raw_bytes)
                 is_json = True
@@ -107,17 +105,14 @@ class TestEncryptedRoundTrip:
             key = Fernet.generate_key().decode()
             repo_path = Path(tmpdir) / ".arch-assurance-git"
 
-            # Write with store1
             store1 = EncryptedPrivateGitAssuranceStore(repo_path)
-            with patch("keyring.get_password", return_value=key):
-                store1.unlock()
+            creds.set_credential("private-git-encryption-key", key)
+            store1.unlock()
             nid = store1.create_node("hazard", "H-1 — System unavailable")
             store1.lock()
 
-            # Read back with a fresh store2 (same key, same path)
             store2 = EncryptedPrivateGitAssuranceStore(repo_path)
-            with patch("keyring.get_password", return_value=key):
-                store2.unlock()
+            store2.unlock()
             node = store2.get_node(nid)
             assert node is not None
             assert node["name"] == "H-1 — System unavailable"
@@ -133,15 +128,14 @@ class TestEncryptedRoundTrip:
             repo_path = Path(tmpdir) / ".arch-assurance-git"
 
             store1 = EncryptedPrivateGitAssuranceStore(repo_path)
-            with patch("keyring.get_password", return_value=key1):
-                store1.unlock()
+            creds.set_credential("private-git-encryption-key", key1)
+            store1.unlock()
             nid = store1.create_node("loss", "L-1")
             store1.lock()
 
-            # Try to read with wrong key
             store2 = EncryptedPrivateGitAssuranceStore(repo_path)
-            with patch("keyring.get_password", return_value=key2):
-                store2.unlock()
+            creds.set_credential("private-git-encryption-key", key2)
+            store2.unlock()
             node = store2.get_node(nid)
             assert node is None  # graceful skip on invalid token
 
@@ -178,8 +172,8 @@ class TestLockedGating:
 class TestEdgeAndRefCRUD:
     def _store(self, tmpdir: str):
         store, key = _make_store(tmpdir)
-        with patch("keyring.get_password", return_value=key):
-            store.unlock()
+        creds.set_credential("private-git-encryption-key", key)
+        store.unlock()
         return store
 
     def test_edge_round_trip(self) -> None:

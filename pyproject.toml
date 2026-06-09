@@ -74,6 +74,11 @@ check_untyped_defs = true
 warn_unused_ignores = true
 warn_unreachable = true
 
+[project.optional-dependencies]
+s3-archive = ["boto3>=1.34"]
+azure-archive = ["azure-storage-blob>=12.19", "azure-identity>=1.15"]
+cloud-archive = ["boto3>=1.34", "azure-storage-blob>=12.19", "azure-identity>=1.15"]
+
 [dependency-groups]
 dev = [
     "hypothesis>=6.0",
@@ -81,6 +86,8 @@ dev = [
     "pytest-bdd>=7.3",
     "ruff>=0.15.11",
     "zuban>=0.7.0",
+    "moto[s3]>=5.0",
+    "boto3>=1.34",
 ]
 gui = [
     "fastapi>=0.115.0",

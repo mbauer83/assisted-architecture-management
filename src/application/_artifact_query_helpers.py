@@ -122,11 +122,13 @@ def matches_direction(
 ) -> bool:
     in_src = entity_id in rec.source_ids
     in_tgt = entity_id in rec.target_ids
-    if direction == "outbound":
-        return in_src
-    if direction == "inbound":
-        return in_tgt
-    return in_src or in_tgt
+    match direction:
+        case "outbound":
+            return in_src
+        case "inbound":
+            return in_tgt
+        case _:
+            return in_src or in_tgt
 
 
 # ---------------------------------------------------------------------------
@@ -148,11 +150,13 @@ def summary_group_key(
     summary: ArtifactSummary,
     group_by: Literal["artifact_type", "diagram_type", "domain", "group"],
 ) -> str:
-    if group_by == "artifact_type":
-        return summary.artifact_type or _NONE_LABEL
-    if group_by == "group":
-        return summary.group or _NONE_LABEL
-    return _NONE_LABEL
+    match group_by:
+        case "artifact_type":
+            return summary.artifact_type or _NONE_LABEL
+        case "group":
+            return summary.group or _NONE_LABEL
+        case _:
+            return _NONE_LABEL
 
 
 # ---------------------------------------------------------------------------
@@ -245,10 +249,7 @@ def read_document(
         "group": rec.group,
     }
     if mode == "full":
-        if section:
-            data["content_text"] = _extract_section(rec.content_text, section)
-        else:
-            data["content_text"] = rec.content_text
+        data["content_text"] = _extract_section(rec.content_text, section) if section else rec.content_text
         data["extra"] = rec.extra
     return data
 

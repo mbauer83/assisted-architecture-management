@@ -15,7 +15,12 @@ import logging
 import os
 from pathlib import Path
 
-from src.application.assurance_ports import AssuranceArchive, ConfidentialAssuranceStore, SecuritySignalConnector
+from src.application.assurance_ports import (
+    AssuranceArchive,
+    ConfidentialAssuranceStore,
+    SecuritySignalConnector,
+    WORMAssuranceArchive,
+)
 
 _ENV_DB_PATH = "ARCH_ASSURANCE_DB_PATH"
 _ENV_SIGNALS_DB_PATH = "ARCH_SECURITY_SIGNALS_DB_PATH"
@@ -101,6 +106,23 @@ class AssuranceContext:
     @property
     def signals_backend(self) -> str:
         return self._bundle().signals_backend
+
+    @property
+    def archive_backend(self) -> str:
+        return self._bundle().archive_backend
+
+    @property
+    def worm_archive(self) -> WORMAssuranceArchive | None:
+        """Return the archive as WORMAssuranceArchive when the worm backend is active.
+
+        Returns None when archive_backend is 'standard'. Callers should check for
+        None before invoking WORM-specific methods (legal holds, crypto-shredding,
+        DEK provisioning, RFC 3161 timestamps).
+        """
+        archive = self._bundle().archive
+        if isinstance(archive, WORMAssuranceArchive):
+            return archive
+        return None
 
     @property
     def max_classification(self) -> str:

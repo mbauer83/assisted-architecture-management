@@ -1,8 +1,8 @@
 """SQLCipher-backed confidential assurance store adapter.
 
-Key management: the encryption key is stored in the OS keychain via `keyring`.
-The DB file is stored at the path given at construction time (typically
-.arch-assurance/store.db, gitignored).
+Key management: the encryption key is retrieved from the secure credential store
+(_credential_store). The DB file is stored at the path given at construction
+time (typically .arch-assurance/store.db, gitignored).
 
 Thread-safety: this adapter is single-threaded and synchronous. The backend
 uses it from within a write-queue serialised context.
@@ -10,18 +10,20 @@ uses it from within a write-queue serialised context.
 
 from __future__ import annotations
 
+import contextlib
 import json
 import logging
+import os
 import time
 from pathlib import Path
 from typing import Any
 
+from src.infrastructure.assurance import _credential_store as creds
 from src.infrastructure.assurance._id_utils import make_edge_id, make_node_id
 from src.infrastructure.assurance._schema import ASSURANCE_SCHEMA_MIGRATIONS, ASSURANCE_SCHEMA_SQL, SCHEMA_VERSION
 
 logger = logging.getLogger(__name__)
 
-_SERVICE_NAME = "arch-assurance"
 _KEY_ACCOUNT = "db-encryption-key"
 
 
@@ -33,6 +35,25 @@ def _dict_row_factory(cursor: Any, row: Any) -> dict[str, object]:
 
 def _now_iso() -> str:
     return time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
+
+
+@contextlib.contextmanager  # type: ignore[misc]
+def _suppress_c_stderr():  # type: ignore[return]
+    """Redirect fd 2 to /dev/null for C-library calls that emit diagnostic noise.
+
+    SQLCipher writes 'ERROR CORE ...' messages directly to fd 2 before raising a
+    Python exception on key mismatch. Suppress them here; the RuntimeError raised
+    by the caller carries the actionable message.
+    """
+    devnull_fd = os.open(os.devnull, os.O_WRONLY)
+    saved = os.dup(2)
+    os.dup2(devnull_fd, 2)
+    try:
+        yield
+    finally:
+        os.dup2(saved, 2)
+        os.close(saved)
+        os.close(devnull_fd)
 
 
 class SQLCipherAssuranceStore:
@@ -48,19 +69,30 @@ class SQLCipherAssuranceStore:
         return self._conn is not None
 
     def unlock(self) -> None:
-        import keyring  # type: ignore[import-untyped]
         import sqlcipher3  # type: ignore[import-untyped]
 
-        key = keyring.get_password(_SERVICE_NAME, _KEY_ACCOUNT)
+        key = creds.get(_KEY_ACCOUNT)
         if key is None:
             raise RuntimeError(
-                "Assurance store key not found in OS keychain. "
+                "Assurance store key not found in credential store. "
                 "Run `arch-assurance init` to initialise the store."
             )
         self._db_path.parent.mkdir(parents=True, exist_ok=True)
         conn = sqlcipher3.connect(str(self._db_path))
         conn.execute(f"PRAGMA key = '{key}'")
-        conn.executescript(ASSURANCE_SCHEMA_SQL)
+        # Suppress C-library 'ERROR CORE ...' output on key mismatch; the
+        # RuntimeError below carries the actionable message instead.
+        try:
+            with _suppress_c_stderr():
+                conn.executescript(ASSURANCE_SCHEMA_SQL)
+        except Exception as exc:
+            conn.close()
+            raise RuntimeError(
+                "Failed to unlock the assurance store — the keychain key does not match "
+                "this database. This usually means the store was re-initialised after the "
+                "key was last saved. Run `arch-assurance init --force` to create a fresh "
+                "store (existing data will be lost)."
+            ) from exc
         for migration_sql in ASSURANCE_SCHEMA_MIGRATIONS:
             try:
                 conn.execute(migration_sql)

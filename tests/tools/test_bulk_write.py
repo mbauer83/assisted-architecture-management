@@ -9,6 +9,7 @@ dry-run coherence.
 
 from __future__ import annotations
 
+from functools import lru_cache
 from pathlib import Path
 from typing import Any, cast
 
@@ -24,6 +25,13 @@ from src.infrastructure.mcp.artifact_mcp.bulk_tools import (
     artifact_get_operation,
 )
 from src.infrastructure.write import artifact_write_ops
+
+
+@lru_cache(maxsize=1)
+def _catalogs():
+    from src.infrastructure.app_bootstrap import build_module_registry, build_runtime_catalogs  # noqa: PLC0415
+
+    return build_runtime_catalogs(build_module_registry())
 
 # ---------------------------------------------------------------------------
 # Fixtures and helpers
@@ -915,7 +923,7 @@ Alice -> Bob
         assert all(item["wrote"] is True for item in results)
         assert cast(dict[str, Any], payload["batch_verification"])["valid"] is True
 
-        verifier = ArtifactVerifier(ArtifactRegistry(shared_artifact_index(repo)))
+        verifier = ArtifactVerifier(ArtifactRegistry(shared_artifact_index(repo)), catalogs=_catalogs())
         assert all(r.valid for r in verifier.verify_all(repo)), "repo should verify after batch delete"
 
     def test_delete_entity_requires_diagram_delete_in_same_batch(self, repo: Path) -> None:

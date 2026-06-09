@@ -20,10 +20,10 @@
 > | Change | Summary | Status |
 > |---|---|---|
 > | SC-1 | Shared `storage:` config + per-context factory + port-typed accessors | ☑ |
-> | SC-2 | Confidential signals storage + TLP + minimisation | ☐ |
-> | SC-3 | Encrypted private-git store adapter | ☐ |
-> | SC-4 | MCP max-classification + exposure logging | ☐ |
-> | SC-5 | Read-model composition root aligned (single backend kept) | ☐ |
+> | SC-2 | Confidential signals storage + TLP + minimisation | ☑ |
+> | SC-3 | Encrypted private-git store adapter | ☑ |
+> | SC-4 | MCP max-classification + exposure logging | ☑ |
+> | SC-5 | Read-model composition root aligned (single backend kept) | ☑ |
 
 ## 1. Business context & why now
 

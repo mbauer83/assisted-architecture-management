@@ -45,7 +45,7 @@ def repo_root(tmp_path: Path) -> Path:
 
 
 def _verifier(repo_root: Path) -> ArtifactVerifier:
-    return ArtifactVerifier(ArtifactRegistry(shared_artifact_index(repo_root)))
+    return ArtifactVerifier(ArtifactRegistry(shared_artifact_index(repo_root)), catalogs=_catalogs())
 
 
 def _entity(artifact_id: str, artifact_type: str, name: str) -> EntityRecord:

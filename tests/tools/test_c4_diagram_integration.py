@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from functools import lru_cache
 from pathlib import Path
 
 from src.application.artifact_query import ArtifactRepository
@@ -7,6 +8,13 @@ from src.application.startup_validation import validate_repo_compatibility
 from src.application.verification.artifact_verifier import ArtifactRegistry, ArtifactVerifier
 from src.infrastructure.app_bootstrap import build_module_registry
 from src.infrastructure.artifact_index import shared_artifact_index
+
+
+@lru_cache(maxsize=1)
+def _catalogs():
+    from src.infrastructure.app_bootstrap import build_runtime_catalogs, get_module_registry  # noqa: PLC0415
+
+    return build_runtime_catalogs(get_module_registry())
 
 
 def _write(path: Path, content: str) -> None:
@@ -167,7 +175,7 @@ def test_c4_diagram_verification_and_validation_pass(tmp_path: Path) -> None:
     registry = ArtifactRegistry(shared_artifact_index(repo_root))
     diagram_path = repo_root / "diagram-catalog" / "diagrams" / f"{_DIAGRAM_ID}.puml"
 
-    result = ArtifactVerifier(registry, check_puml_syntax=False).verify_diagram_file(diagram_path)
+    result = ArtifactVerifier(registry, check_puml_syntax=False, catalogs=_catalogs()).verify_diagram_file(diagram_path)
 
     assert result.valid, [issue.message for issue in result.issues]
     validate_repo_compatibility(ArtifactRepository(shared_artifact_index(repo_root)), build_module_registry())

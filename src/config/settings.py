@@ -28,6 +28,7 @@ _DEFAULTS: dict[str, dict[str, object]] = {
         "assurance": {
             "store_backend": "sqlcipher",
             "signals_backend": "sqlcipher-colocated",
+            "archive_backend": "standard",
             "max_classification": "TLP:AMBER",
         },
         "read_model": {},
@@ -36,6 +37,7 @@ _DEFAULTS: dict[str, dict[str, object]] = {
 
 _VALID_STORE_BACKENDS = frozenset({"sqlcipher", "pocketbase", "private-git"})
 _VALID_SIGNALS_BACKENDS = frozenset({"sqlcipher-colocated", "sqlite", "encrypted"})
+_VALID_ARCHIVE_BACKENDS = frozenset({"standard", "worm", "s3-worm", "azure-blob-worm"})
 _VALID_TLP_LEVELS = frozenset({"TLP:WHITE", "TLP:GREEN", "TLP:AMBER", "TLP:RED"})
 
 _SettingsSection = dict[str, object]
@@ -240,6 +242,26 @@ def storage_assurance_signals_backend() -> str:
         raise ValueError(
             f"Unknown storage.assurance.signals_backend: {candidate!r}. "
             f"Supported: {sorted(_VALID_SIGNALS_BACKENDS)}"
+        )
+    return candidate
+
+
+def storage_assurance_archive_backend() -> str:
+    """Return the active archive backend name. Fails closed on unknown values.
+
+    'standard'        — append-only hash-chained log (SQLCipherAssuranceArchive).
+    'worm'            — extends standard with DEK encryption, legal holds,
+                        crypto-shredding, RFC 3161; requires store_backend 'sqlcipher'.
+    's3-worm'         — S3 Object Lock WORM; independent of store_backend.
+    'azure-blob-worm' — Azure Blob immutability-policy WORM; independent of
+                        store_backend.
+    """
+    value = _storage_assurance_value("archive_backend")
+    candidate = str(value).strip() if isinstance(value, str) else "standard"
+    if candidate not in _VALID_ARCHIVE_BACKENDS:
+        raise ValueError(
+            f"Unknown storage.assurance.archive_backend: {candidate!r}. "
+            f"Supported: {sorted(_VALID_ARCHIVE_BACKENDS)}"
         )
     return candidate
 

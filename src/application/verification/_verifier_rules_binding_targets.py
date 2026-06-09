@@ -83,25 +83,15 @@ def _check_entity_target(
     if not entity_id:
         return
     if entity_id not in allowed_entities:
-        if entity_id in all_entities and file_scope == "enterprise":
-            result.issues.append(
-                Issue(
-                    Severity.ERROR, "E402",
-                    (
-                        f"binding '{binding_id}': target entity_id '{entity_id}' is not an "
-                        "enterprise entity — enterprise diagram bindings may only target enterprise entities"
-                    ),
-                    loc,
-                )
+        message = (
+            (
+                f"binding '{binding_id}': target entity_id '{entity_id}' is not an "
+                "enterprise entity — enterprise diagram bindings may only target enterprise entities"
             )
-        else:
-            result.issues.append(
-                Issue(
-                    Severity.ERROR, "E402",
-                    f"binding '{binding_id}': target entity_id '{entity_id}' does not exist in scope",
-                    loc,
-                )
-            )
+            if entity_id in all_entities and file_scope == "enterprise"
+            else f"binding '{binding_id}': target entity_id '{entity_id}' does not exist in scope"
+        )
+        result.issues.append(Issue(Severity.ERROR, "E402", message, loc))
         return
 
     if corr_kind != "represents":
@@ -153,35 +143,32 @@ def _check_connection_path_target(
     """E409: step id not in scope. E410: chain not contiguous under orientation."""
     prev_to: str | None = None
     for i, step in enumerate(cp_raw):
-        if not isinstance(step, dict):
-            continue
-        step_id = str(step.get("id") or "")
-        reversed_flag = bool(step.get("reversed", False))
-        if not step_id or step_id not in allowed_connections:
-            result.issues.append(Issue(
-                Severity.ERROR, "E409",
-                f"binding '{binding_id}': connection_path step {i} id '{step_id}' does not exist in scope",
-                loc,
-            ))
-            prev_to = None
-            continue
-        endpoints = _conn_endpoints(step_id)
-        if endpoints is None:
-            prev_to = None
-            continue
-        src, tgt = endpoints
-        step_from = tgt if reversed_flag else src
-        step_to = src if reversed_flag else tgt
-        if prev_to is not None and step_from != prev_to:
-            result.issues.append(Issue(
-                Severity.ERROR, "E410",
-                (
-                    f"binding '{binding_id}': connection_path is not contiguous at step {i}: "
-                    f"expected from='{prev_to}', got from='{step_from}' (id='{step_id}')"
-                ),
-                loc,
-            ))
-        prev_to = step_to
+        if isinstance(step, dict):
+            step_id = str(step.get("id") or "")
+            reversed_flag = bool(step.get("reversed", False))
+            if not step_id or step_id not in allowed_connections:
+                result.issues.append(Issue(
+                    Severity.ERROR, "E409",
+                    f"binding '{binding_id}': connection_path step {i} id '{step_id}' does not exist in scope",
+                    loc,
+                ))
+                prev_to = None
+            elif (endpoints := _conn_endpoints(step_id)) is None:
+                prev_to = None
+            else:
+                src, tgt = endpoints
+                step_from = tgt if reversed_flag else src
+                step_to = src if reversed_flag else tgt
+                if prev_to is not None and step_from != prev_to:
+                    result.issues.append(Issue(
+                        Severity.ERROR, "E410",
+                        (
+                            f"binding '{binding_id}': connection_path is not contiguous at step {i}: "
+                            f"expected from='{prev_to}', got from='{step_from}' (id='{step_id}')"
+                        ),
+                        loc,
+                    ))
+                prev_to = step_to
 
 
 def _check_single_connection_target(

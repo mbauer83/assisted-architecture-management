@@ -19,12 +19,15 @@ import logging
 import os
 import tempfile
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 from src.infrastructure.assurance._id_utils import make_edge_id, make_node_id
 
+if TYPE_CHECKING:
+    from cryptography.fernet import Fernet
+
 logger = logging.getLogger(__name__)
 
-_SERVICE_NAME = "arch-assurance"
 _GIT_ENC_KEY_ACCOUNT = "private-git-encryption-key"
 _LOCKED_MSG = "Encrypted assurance store is locked. Call unlock() first."
 
@@ -48,7 +51,7 @@ class EncryptedPrivateGitAssuranceStore:
 
     def __init__(self, repo_path: Path) -> None:
         self._repo = repo_path
-        self._fernet: object = None  # cryptography.fernet.Fernet
+        self._fernet: Fernet | None = None
         self._unlocked = False
 
     # ── Lifecycle ─────────────────────────────────────────────────────────────
@@ -57,10 +60,11 @@ class EncryptedPrivateGitAssuranceStore:
         return self._unlocked
 
     def unlock(self) -> None:
-        import keyring  # type: ignore[import-untyped]
-        from cryptography.fernet import Fernet  # type: ignore[import-untyped]
+        from cryptography.fernet import Fernet  # type: ignore[import-untyped]  # noqa: PLC0415
 
-        raw_key = keyring.get_password(_SERVICE_NAME, _GIT_ENC_KEY_ACCOUNT)
+        from src.infrastructure.assurance import _credential_store as creds  # noqa: PLC0415
+
+        raw_key = creds.get(_GIT_ENC_KEY_ACCOUNT)
         if raw_key is None:
             raise RuntimeError(
                 "Encrypted private-git store key not found in OS keychain. "

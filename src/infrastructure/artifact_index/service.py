@@ -56,6 +56,13 @@ from .versioning import ReadModelVersion, build_read_model_etag
 
 _T = TypeVar("_T", EntityRecord, ConnectionRecord, DiagramRecord, DocumentRecord)
 
+_CHANGE_APPLIERS = {
+    "outgoing": lambda service, path, data: _apply_outgoing_records(path, data, service._mem, service._db),
+    "entity": lambda service, path, data: _apply_entity_record(path, data, service._mem, service._db),
+    "diagram": lambda service, path, data: apply_diagram_change(path, service._mem, service._db, parsed=data),
+    "document": lambda service, path, data: apply_document_change(path, service._mem, service._db, parsed=data),
+}
+
 
 def shared_artifact_index(repo_root: Path | list[Path] | list[RepoMount]) -> ArtifactStorePort:
     return get_shared_index(ArtifactIndex, repo_root)
@@ -127,14 +134,7 @@ class ArtifactIndex:
             parsed.append(change)
         with self._lock.writing():
             for kind, path, data in parsed:
-                if kind == "outgoing":
-                    _apply_outgoing_records(path, data, self._mem, self._db)
-                elif kind == "entity":
-                    _apply_entity_record(path, data, self._mem, self._db)
-                elif kind == "diagram":
-                    apply_diagram_change(path, self._mem, self._db, parsed=data)
-                else:
-                    apply_document_change(path, self._mem, self._db, parsed=data)
+                _CHANGE_APPLIERS[kind](self, path, data)
             self._bump_generation()
         return self.read_model_version()
 
@@ -300,36 +300,28 @@ class ArtifactIndex:
     ) -> dict[str, object] | None:
         self._ensure_loaded()
         with self._lock.reading():
-            ent = self._mem.entities.get(artifact_id)
-            if ent is not None:
-                return read_entity(ent, mode=mode)
-            conn = self._mem.connections.get(artifact_id)
-            if conn is not None:
-                return read_connection(conn, mode=mode)
-            diag = self._mem.diagrams.get(artifact_id)
-            if diag is not None:
-                return read_diagram(diag, mode=mode)
-            doc = self._mem.documents.get(artifact_id)
-            if doc is not None:
-                return read_document(doc, mode=mode, section=section)
-        return None
+            return (
+                read_entity(ent, mode=mode) if (ent := self._mem.entities.get(artifact_id)) is not None
+                else read_connection(conn, mode=mode) if (conn := self._mem.connections.get(artifact_id)) is not None
+                else read_diagram(diag, mode=mode) if (diag := self._mem.diagrams.get(artifact_id)) is not None
+                else read_document(doc, mode=mode, section=section)
+                if (doc := self._mem.documents.get(artifact_id)) is not None
+                else None
+            )
 
     def summarize_artifact(self, artifact_id: str) -> ArtifactSummary | None:
         self._ensure_loaded()
         with self._lock.reading():
-            ent = self._mem.entities.get(artifact_id)
-            if ent is not None:
-                return summary_from_entity(ent)
-            conn = self._mem.connections.get(artifact_id)
-            if conn is not None:
-                return summary_from_connection(conn)
-            diag = self._mem.diagrams.get(artifact_id)
-            if diag is not None:
-                return summary_from_diagram(diag)
-            doc = self._mem.documents.get(artifact_id)
-            if doc is not None:
-                return summary_from_document(doc)
-        return None
+            return (
+                summary_from_entity(ent) if (ent := self._mem.entities.get(artifact_id)) is not None
+                else summary_from_connection(conn)
+                if (conn := self._mem.connections.get(artifact_id)) is not None
+                else summary_from_diagram(diag)
+                if (diag := self._mem.diagrams.get(artifact_id)) is not None
+                else summary_from_document(doc)
+                if (doc := self._mem.documents.get(artifact_id)) is not None
+                else None
+            )
 
     def read_entity_context(self, artifact_id: str) -> EntityContextReadModel | None:
         self._ensure_loaded()
@@ -465,13 +457,18 @@ class ArtifactIndex:
 
     def scope_for_path(self, path: Path) -> Literal["enterprise", "engagement", "unknown"]:
         resolved = path.resolve()
-        for root in self.repo_roots:
+
+        def _scope_for_root(root: Path) -> Literal["enterprise", "engagement"] | None:
             try:
                 resolved.relative_to(root)
-                return "enterprise" if infer_repo_scope(root) == "enterprise" else "engagement"
             except ValueError:
-                continue
-        return "unknown"
+                return None
+            return "enterprise" if infer_repo_scope(root) == "enterprise" else "engagement"
+
+        return next(
+            (scope for root in self.repo_roots if (scope := _scope_for_root(root)) is not None),
+            "unknown",
+        )
 
     def scope_of_entity(self, artifact_id: str) -> Literal["enterprise", "engagement", "unknown"]:
         rec = self.get_entity(artifact_id)
@@ -525,34 +522,32 @@ class ArtifactIndex:
         with self._lock.reading():
             with self._db.reader() as conn:
                 rows = _q.connections_for_entity_set(conn, frozenset(entity_ids))
-        result: list[EntityContextConnection] = []
-        for row in rows:
-            result.append(
-                EntityContextConnection(
-                    artifact_id=str(row["connection_id"]),
-                    source=str(row["source_id"]),
-                    target=str(row["target_id"]),
-                    conn_type=str(row["conn_type"]),
-                    version=str(row["connection_version"]),
-                    status=str(row["connection_status"]),
-                    path=str(row["path"]),
-                    content_text=str(row["content_text"]),
-                    associated_entities=json.loads(str(row["associated_entities_json"])),
-                    src_cardinality=str(row["src_cardinality"]),
-                    tgt_cardinality=str(row["tgt_cardinality"]),
-                    source_name=str(row["source_name"]),
-                    target_name=str(row["target_name"]),
-                    source_artifact_type=str(row["source_artifact_type"]),
-                    target_artifact_type=str(row["target_artifact_type"]),
-                    source_domain=str(row["source_domain"]),
-                    target_domain=str(row["target_domain"]),
-                    source_scope=str(row["source_scope"]),
-                    target_scope=str(row["target_scope"]),
-                    other_entity_id=str(row["other_entity_id"]),
-                    direction=str(row["direction_bucket"]),
-                )
+        return [
+            EntityContextConnection(
+                artifact_id=str(row["connection_id"]),
+                source=str(row["source_id"]),
+                target=str(row["target_id"]),
+                conn_type=str(row["conn_type"]),
+                version=str(row["connection_version"]),
+                status=str(row["connection_status"]),
+                path=str(row["path"]),
+                content_text=str(row["content_text"]),
+                associated_entities=json.loads(str(row["associated_entities_json"])),
+                src_cardinality=str(row["src_cardinality"]),
+                tgt_cardinality=str(row["tgt_cardinality"]),
+                source_name=str(row["source_name"]),
+                target_name=str(row["target_name"]),
+                source_artifact_type=str(row["source_artifact_type"]),
+                target_artifact_type=str(row["target_artifact_type"]),
+                source_domain=str(row["source_domain"]),
+                target_domain=str(row["target_domain"]),
+                source_scope=str(row["source_scope"]),
+                target_scope=str(row["target_scope"]),
+                other_entity_id=str(row["other_entity_id"]),
+                direction=str(row["direction_bucket"]),
             )
-        return result
+            for row in rows
+        ]
 
     # ── Internal helpers ──────────────────────────────────────────────────────
 

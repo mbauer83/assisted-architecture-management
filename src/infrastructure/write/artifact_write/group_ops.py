@@ -49,11 +49,13 @@ def _update_axis(
     axis: GroupAxis,
     entries: list[GroupEntry],
 ) -> GroupRegistry:
-    if axis == "model-project":
-        return replace(registry, model_projects=tuple(entries))
-    if axis == "diagram-collection":
-        return replace(registry, diagram_collections=tuple(entries))
-    return replace(registry, document_collections=tuple(entries))
+    match axis:
+        case "model-project":
+            return replace(registry, model_projects=tuple(entries))
+        case "diagram-collection":
+            return replace(registry, diagram_collections=tuple(entries))
+        case _:
+            return replace(registry, document_collections=tuple(entries))
 
 
 def _new_id() -> str:
@@ -154,11 +156,10 @@ def group_archive(
     else:
         group_dir = _group_dir(repo_root, axis, slug)
         is_nonempty = group_dir is not None and group_dir.exists() and any(group_dir.rglob("*"))
-    if is_nonempty:
-        if confirm != slug:
-            raise GroupOpError(
-                f"Group {slug!r} is non-empty. Pass confirm={slug!r} to archive it."
-            )
+    if is_nonempty and confirm != slug:
+        raise GroupOpError(
+            f"Group {slug!r} is non-empty. Pass confirm={slug!r} to archive it."
+        )
 
     entries = [replace(e, archived=True) if e.slug == slug else e for e in registry._by_axis(axis)]
     registry = _update_axis(registry, axis, entries)
@@ -219,11 +220,11 @@ def group_delete_collection(
     else:
         group_dir = _group_dir(repo_root, axis, slug)
         files = _subtree_files(group_dir) if group_dir is not None and group_dir.exists() else []
+    if files and confirm != slug:
+        raise GroupOpError(
+            f"Group {slug!r} contains {len(files)} file(s). Pass confirm={slug!r} to delete."
+        )
     if files:
-        if confirm != slug:
-            raise GroupOpError(
-                f"Group {slug!r} contains {len(files)} file(s). Pass confirm={slug!r} to delete."
-            )
         rel_paths = [str(f.relative_to(repo_root)) for f in files]
         _run_git(["rm", "-f", *rel_paths], repo_root)
         if axis == "document-collection":
@@ -331,39 +332,43 @@ def group_op(
 ) -> dict[str, object]:
     """Dispatch a group lifecycle operation and return a summary dict."""
     slug = target or ""
-    if action == "create":
-        if not slug:
-            raise GroupOpError("target (slug) is required for action='create'.")
-        return group_create(
-            repo_root, axis=axis, slug=slug, name=name or slug,
-            description=description, order=order,
-            meta_ontology=meta_ontology,
-            type_filter=tuple(type_filter) if type_filter is not None else (),
-        )
-    if action == "rename":
-        if not slug:
-            raise GroupOpError("target (existing slug) is required for action='rename'.")
-        return group_rename(repo_root, axis=axis, slug=slug, new_name=name, new_slug=new_slug)
-    if action == "archive":
-        if not slug:
-            raise GroupOpError("target (slug) is required for action='archive'.")
-        return group_archive(repo_root, axis=axis, slug=slug, confirm=confirm)
-    if action == "unarchive":
-        if not slug:
-            raise GroupOpError("target (slug) is required for action='unarchive'.")
-        return group_unarchive(repo_root, axis=axis, slug=slug)
-    if action == "delete":
-        if not slug:
-            raise GroupOpError("target (slug) is required for action='delete'.")
-        return group_delete_collection(repo_root, axis=axis, slug=slug, confirm=confirm, dry_run=dry_run)
-    if action == "update":
-        if not slug:
-            raise GroupOpError("target (slug) is required for action='update'.")
-        return group_update(
-            repo_root, axis=axis, slug=slug,
-            name=name,
-            description=description or None,
-            meta_ontology=meta_ontology or None,
-            type_filter=tuple(type_filter) if type_filter is not None else None,
-        )
-    raise GroupOpError(f"Unknown action: {action!r}. Valid: create, rename, archive, unarchive, delete, update.")
+    match action:
+        case "create":
+            if not slug:
+                raise GroupOpError("target (slug) is required for action='create'.")
+            return group_create(
+                repo_root, axis=axis, slug=slug, name=name or slug,
+                description=description, order=order,
+                meta_ontology=meta_ontology,
+                type_filter=tuple(type_filter) if type_filter is not None else (),
+            )
+        case "rename":
+            if not slug:
+                raise GroupOpError("target (existing slug) is required for action='rename'.")
+            return group_rename(repo_root, axis=axis, slug=slug, new_name=name, new_slug=new_slug)
+        case "archive":
+            if not slug:
+                raise GroupOpError("target (slug) is required for action='archive'.")
+            return group_archive(repo_root, axis=axis, slug=slug, confirm=confirm)
+        case "unarchive":
+            if not slug:
+                raise GroupOpError("target (slug) is required for action='unarchive'.")
+            return group_unarchive(repo_root, axis=axis, slug=slug)
+        case "delete":
+            if not slug:
+                raise GroupOpError("target (slug) is required for action='delete'.")
+            return group_delete_collection(repo_root, axis=axis, slug=slug, confirm=confirm, dry_run=dry_run)
+        case "update":
+            if not slug:
+                raise GroupOpError("target (slug) is required for action='update'.")
+            return group_update(
+                repo_root, axis=axis, slug=slug,
+                name=name,
+                description=description or None,
+                meta_ontology=meta_ontology or None,
+                type_filter=tuple(type_filter) if type_filter is not None else None,
+            )
+        case _:
+            raise GroupOpError(
+                f"Unknown action: {action!r}. Valid: create, rename, archive, unarchive, delete, update."
+            )

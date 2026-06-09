@@ -109,49 +109,47 @@ def verify_outgoing(
                         loc,
                     )
                 )
-                continue
-            conn_type, src_card, tgt_card, target_id = parsed
-            if conn_type not in catalogs.ontology.all_connection_type_names():
-                result.issues.append(
-                    Issue(Severity.ERROR, "E123", f"Unknown connection type '{conn_type}'", loc)
-                )
-            for card_label, card_val in (("source", src_card), ("target", tgt_card)):
-                if card_val and not _CARDINALITY_RE.match(card_val):
+            else:
+                conn_type, src_card, tgt_card, target_id = parsed
+                if conn_type not in catalogs.ontology.all_connection_type_names():
                     result.issues.append(
-                        Issue(
-                            Severity.ERROR,
-                            "E125",
-                            f"Invalid {card_label} cardinality '{card_val}' in '{header}' "
-                            f"— expected n, n..m, n..*, or *",
-                            loc,
-                        )
+                        Issue(Severity.ERROR, "E123", f"Unknown connection type '{conn_type}'", loc)
                     )
-            if registry is not None and target_id not in allowed_entities:
-                if target_id in all_entities_for_scope and scope == "enterprise":
-                    result.issues.append(
+                for card_label, card_val in (("source", src_card), ("target", tgt_card)):
+                    if card_val and not _CARDINALITY_RE.match(card_val):
+                        result.issues.append(
+                            Issue(
+                                Severity.ERROR,
+                                "E125",
+                                f"Invalid {card_label} cardinality '{card_val}' in '{header}' "
+                                f"— expected n, n..m, n..*, or *",
+                                loc,
+                            )
+                        )
+                if registry is not None and target_id not in allowed_entities:
+                    issue = (
                         Issue(
                             Severity.ERROR,
                             "E130",
                             f"enterprise connection references non-enterprise entity '{target_id}'",
                             loc,
                         )
-                    )
-                else:
-                    result.issues.append(
-                        Issue(
+                        if target_id in all_entities_for_scope and scope == "enterprise"
+                        else Issue(
                             Severity.ERROR,
                             "E124",
                             f"Target entity '{target_id}' not found in model",
                             loc,
                         )
                     )
-            conn_key = f"{conn_type} → {target_id}"
-            if conn_key in seen_connections:
-                result.issues.append(
-                    Issue(Severity.WARNING, "W120", f"Duplicate connection: '{conn_key}'", loc)
-                )
-            seen_connections.add(conn_key)
-            parsed_connections.append((conn_type, target_id))
+                    result.issues.append(issue)
+                conn_key = f"{conn_type} → {target_id}"
+                if conn_key in seen_connections:
+                    result.issues.append(
+                        Issue(Severity.WARNING, "W120", f"Duplicate connection: '{conn_key}'", loc)
+                    )
+                seen_connections.add(conn_key)
+                parsed_connections.append((conn_type, target_id))
 
     if registry is not None and source and parsed_connections:
         check_connection_semantics(

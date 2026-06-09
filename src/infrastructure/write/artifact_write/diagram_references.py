@@ -5,7 +5,6 @@ from functools import lru_cache
 from pathlib import Path
 
 from src.application.artifact_parsing import extract_declared_puml_aliases, normalize_puml_alias
-from src.application.modeling.artifact_write import ARCHIMATE_STEREOTYPE_TO_CONNECTION_TYPE
 from src.domain.archimate_relation_rendering import strip_suppressed_relation_labels
 
 from ._artifact_deduplication import get_repository
@@ -102,9 +101,12 @@ def _alias_entity_lookup(repo_root: Path) -> dict[str, str]:
 
 
 def _iter_declared_relations(content: str) -> list[tuple[str, str, str]]:
+    from src.infrastructure.app_bootstrap import build_runtime_catalogs, get_module_registry  # noqa: PLC0415
+
+    stereo_map = build_runtime_catalogs(get_module_registry()).ontology.archimate_stereotype_to_connection_type()
     relations: list[tuple[str, str, str]] = []
     for match in _REL_MACRO_RE.finditer(content):
-        conn_type = ARCHIMATE_STEREOTYPE_TO_CONNECTION_TYPE.get(match.group("rel").lower())
+        conn_type = stereo_map.get(match.group("rel").lower())
         if conn_type is None:
             continue
         relations.append(
@@ -115,7 +117,7 @@ def _iter_declared_relations(content: str) -> list[tuple[str, str, str]]:
             )
         )
     for match in _REL_LINE_RE.finditer(content):
-        conn_type = ARCHIMATE_STEREOTYPE_TO_CONNECTION_TYPE.get(match.group("rel").lower())
+        conn_type = stereo_map.get(match.group("rel").lower())
         if conn_type is None:
             continue
         relations.append(

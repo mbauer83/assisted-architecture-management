@@ -202,16 +202,14 @@ class ConnectionSemanticsImpl:
         incoming: dict[str, list[str]] = {}
         symmetric: dict[str, list[str]] = {}
         for tgt, ct in prs.by_source().get(src, []):
-            if self.is_symmetric(ct):
-                symmetric.setdefault(str(tgt), []).append(str(ct))
-            else:
-                outgoing.setdefault(str(tgt), []).append(str(ct))
+            target = symmetric if self.is_symmetric(ct) else outgoing
+            target.setdefault(str(tgt), []).append(str(ct))
         for src2, ct in prs.by_target().get(src, []):
+            key = str(src2)
             if self.is_symmetric(ct):
-                if str(src2) not in symmetric:
-                    symmetric.setdefault(str(src2), []).append(str(ct))
+                symmetric.setdefault(key, []).extend([] if key in symmetric else [str(ct)])
             else:
-                incoming.setdefault(str(src2), []).append(str(ct))
+                incoming.setdefault(key, []).append(str(ct))
         return {"outgoing": outgoing, "incoming": incoming, "symmetric": symmetric}
 
 

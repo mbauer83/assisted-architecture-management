@@ -11,6 +11,8 @@ import json
 import sys
 from pathlib import Path
 
+from src.infrastructure.cli._assurance_commands import _print_yaml
+
 
 def _default_signals_db_path(workspace_root: Path) -> Path:
     return workspace_root / ".arch-assurance" / "security-signals.db"
@@ -37,7 +39,7 @@ def cmd_import_sbom(args: argparse.Namespace, workspace_root: Path) -> int:
         anchor_entity_id=args.anchor or "",
         source_file=str(sbom_file),
     )
-    print(json.dumps(result, indent=2))
+    _print_yaml(result)
     return 1 if "error" in result else 0
 
 
@@ -92,10 +94,9 @@ def cmd_scan_ai_candidates(args: argparse.Namespace) -> int:
         return 1
 
     candidates = scan_candidates(entities)
-    result = {
+    _print_yaml({
         "candidates": candidates,
         "count": len(candidates),
         "note": "Heuristic suggestions only — confirm before marking.",
-    }
-    print(json.dumps(result, indent=2))
+    })
     return 0

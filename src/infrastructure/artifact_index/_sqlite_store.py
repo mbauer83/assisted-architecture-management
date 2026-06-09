@@ -143,12 +143,12 @@ class _SqliteStore:
     def delete_entity(self, artifact_id: str) -> None:
         old = self._mem.entities.pop(artifact_id, None)
         if old is not None:
-            if old.host_diagram_id is None:
-                self._mem.entity_by_path.pop(old.path.resolve(), None)
-            else:
-                eids = self._mem.entities_by_diagram.get(old.host_diagram_id)
-                if eids:
-                    eids.discard(artifact_id)
+            match old.host_diagram_id:
+                case None:
+                    self._mem.entity_by_path.pop(old.path.resolve(), None)
+                case host_diagram_id:
+                    if eids := self._mem.entities_by_diagram.get(host_diagram_id):
+                        eids.discard(artifact_id)
         with self._conn:
             self._conn.execute("DELETE FROM entities WHERE artifact_id=?", (artifact_id,))
             self._conn.execute("DELETE FROM entity_context_edges WHERE entity_id=?", (artifact_id,))

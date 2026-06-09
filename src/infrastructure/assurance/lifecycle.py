@@ -1,7 +1,7 @@
 """Assurance store lifecycle operations: init, unlock, backup, export, rotate-key.
 
 These are called by the `arch-assurance` CLI. They are pure functions that
-operate on a store path and the OS keychain.
+operate on a store path and the OS credential store.
 """
 
 from __future__ import annotations
@@ -12,22 +12,15 @@ import secrets
 import shutil
 import time
 from pathlib import Path
-from typing import Any
 
+from src.infrastructure.assurance import _credential_store as creds
 from src.infrastructure.assurance._schema import ASSURANCE_SCHEMA_MIGRATIONS, ASSURANCE_SCHEMA_SQL, SCHEMA_VERSION
 from src.infrastructure.assurance._sqlcipher_store import SQLCipherAssuranceStore
 
 logger = logging.getLogger(__name__)
 
-_SERVICE_NAME = "arch-assurance"
 _KEY_ACCOUNT = "db-encryption-key"
 _RECOVERY_KEY_ACCOUNT = "db-recovery-key"
-
-
-def _keyring() -> Any:
-    import keyring  # type: ignore[import-untyped]
-
-    return keyring
 
 
 def default_store_path(workspace_root: Path) -> Path:
@@ -50,7 +43,7 @@ def init_store(db_path: Path, *, force: bool = False) -> dict[str, object]:
     """
     import sqlcipher3  # type: ignore[import-untyped]
 
-    kr = _keyring()
+
 
     if db_path.exists() and not force:
         raise FileExistsError(
@@ -65,8 +58,8 @@ def init_store(db_path: Path, *, force: bool = False) -> dict[str, object]:
     key = secrets.token_hex(32)
     recovery_key = secrets.token_hex(32)
 
-    kr.set_password(_SERVICE_NAME, _KEY_ACCOUNT, key)
-    kr.set_password(_SERVICE_NAME, _RECOVERY_KEY_ACCOUNT, recovery_key)
+    creds.set_credential(_KEY_ACCOUNT, key)
+    creds.set_credential(_RECOVERY_KEY_ACCOUNT, recovery_key)
 
     conn = sqlcipher3.connect(str(db_path))
     conn.execute(f"PRAGMA key = '{key}'")
@@ -83,6 +76,22 @@ def init_store(db_path: Path, *, force: bool = False) -> dict[str, object]:
     )
     conn.commit()
     conn.close()
+
+    # Re-open with a fresh connection to verify the stored key actually decrypts
+    # the DB before we return success. Catches any key-storage round-trip issues.
+    conn2 = sqlcipher3.connect(str(db_path))
+    conn2.execute(f"PRAGMA key = '{key}'")
+    try:
+        conn2.execute("SELECT count(*) FROM sqlite_master").fetchone()
+    except Exception as exc:
+        conn2.close()
+        db_path.unlink(missing_ok=True)
+        raise RuntimeError(
+            "Assurance store was written but cannot be re-opened with the generated key. "
+            "This indicates a keyring round-trip issue. "
+            "Run `arch-assurance init --force` again."
+        ) from exc
+    conn2.close()
 
     _add_to_gitignore(db_path.parent)
 
@@ -147,16 +156,16 @@ def rotate_key(db_path: Path) -> dict[str, object]:
     """Generate a new encryption key and re-encrypt the DB in place (REKEY)."""
     import sqlcipher3  # type: ignore[import-untyped]
 
-    kr = _keyring()
-    old_key = kr.get_password(_SERVICE_NAME, _KEY_ACCOUNT)
+
+    old_key = creds.get(_KEY_ACCOUNT)
     if old_key is None:
-        raise RuntimeError("Current key not found in keychain.")
+        raise RuntimeError("Current key not found in credential store.")
     new_key = secrets.token_hex(32)
     conn = sqlcipher3.connect(str(db_path))
     conn.execute(f"PRAGMA key = '{old_key}'")
     conn.execute(f"PRAGMA rekey = '{new_key}'")
     conn.close()
-    kr.set_password(_SERVICE_NAME, _KEY_ACCOUNT, new_key)
+    creds.set_credential(_KEY_ACCOUNT, new_key)
     logger.info("Assurance store key rotated successfully")
     return {"status": "key_rotated"}
 
@@ -166,11 +175,11 @@ def rotate_key(db_path: Path) -> dict[str, object]:
 
 def export_recovery_key() -> dict[str, object]:
     """Return the recovery key from the keychain (for safe offline storage)."""
-    kr = _keyring()
-    recovery_key = kr.get_password(_SERVICE_NAME, _RECOVERY_KEY_ACCOUNT)
+
+    recovery_key = creds.get(_RECOVERY_KEY_ACCOUNT)
     if recovery_key is None:
-        raise RuntimeError("Recovery key not found in keychain.")
+        raise RuntimeError("Recovery key not found in credential store.")
     return {
         "recovery_key": recovery_key,
-        "warning": "Store this key securely offline. It can restore access if the OS keychain is lost.",
+        "warning": "Store this key securely offline. It can restore access if the credential store is lost.",
     }

@@ -21,6 +21,7 @@ from src.infrastructure.mcp.mcp_artifact_server import mcp_read, mcp_write
 from src.infrastructure.mcp.mcp_assurance_server import mcp_assurance_read, mcp_assurance_write
 
 logger = logging.getLogger(__name__)
+# @TODO: What do these do and why are these aspects configured here? Is this sound?
 _REQUEST_SLOW_WARNING_S = 5.0
 _REQUEST_THREAD_DUMP_S = 20.0
 
@@ -111,6 +112,7 @@ def _build_app(credentials: "GitCredentials | None" = None):  # type: ignore[no-
 
     from src.infrastructure.app_bootstrap import install_module_registry
     from src.infrastructure.gui.routers.admin import router as admin_router
+    from src.infrastructure.gui.routers.assurance import router as assurance_router
     from src.infrastructure.gui.routers.connections import router as connections_router
     from src.infrastructure.gui.routers.diagram_types import router as diagram_types_router
     from src.infrastructure.gui.routers.diagrams import router as diagrams_router
@@ -282,6 +284,7 @@ def _build_app(credentials: "GitCredentials | None" = None):  # type: ignore[no-
     app.include_router(sync_router)
     app.include_router(admin_router)
     app.include_router(events_router)
+    app.include_router(assurance_router)
     # Starlette mounts only match `/mcp/…`, not the bare `/mcp` path.
     # Serve the MCP ASGI handlers on both variants so IDE clients can POST to
     # `/mcp` without getting routed into the SPA/static handler.

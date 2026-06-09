@@ -14,6 +14,7 @@ Covers:
 from __future__ import annotations
 
 import re
+from functools import lru_cache
 from pathlib import Path
 
 import pytest
@@ -24,6 +25,13 @@ from src.application.verification._verifier_rules_edge_labels import check_edge_
 from src.application.verification.artifact_verifier_types import Severity, VerificationResult
 from src.diagram_types.c4.renderer import C4PumlRenderer
 from src.infrastructure.mcp import mcp_artifact_server as mcp
+
+
+@lru_cache(maxsize=1)
+def _catalogs():
+    from src.infrastructure.app_bootstrap import build_runtime_catalogs, get_module_registry  # noqa: PLC0415
+
+    return build_runtime_catalogs(get_module_registry())
 
 # ---------------------------------------------------------------------------
 # Fixtures
@@ -188,7 +196,7 @@ def test_set_diagram_edge_label_writes_to_frontmatter(repo: Path) -> None:
     # Use dry_run=True and inspect content — avoids needing a matching rendered PUML
     scope_id = _make_app(repo, "MyApp")
     diag_id = _make_c4_diagram(repo, scope_id)
-    verifier = ArtifactVerifier()
+    verifier = ArtifactVerifier(catalogs=_catalogs())
 
     result = set_diagram_edge_label(
         repo_root=repo,
@@ -219,7 +227,7 @@ def test_set_diagram_edge_label_clear_removes_key(repo: Path) -> None:
     diag_id = _make_c4_diagram(repo, scope_id)
 
     # Pre-populate edge-labels in frontmatter (dry_run=True verifies content)
-    verifier = ArtifactVerifier()
+    verifier = ArtifactVerifier(catalogs=_catalogs())
 
     # First set a label
     r1 = set_diagram_edge_label(
@@ -401,7 +409,7 @@ def test_edge_label_per_diagram_independence(repo: Path) -> None:
     diag_a = _make_c4_diagram(repo, scope_id, "Diagram A")
     diag_b = _make_c4_diagram(repo, scope_id, "Diagram B")
 
-    verifier = ArtifactVerifier()
+    verifier = ArtifactVerifier(catalogs=_catalogs())
     r_a = set_diagram_edge_label(
         repo_root=repo,
         verifier=verifier,
@@ -439,7 +447,7 @@ def test_edge_label_per_diagram_independence_persisted(repo: Path) -> None:
     scope_id = _make_app(repo, "SharedApp2")
     diag_b = _make_c4_diagram(repo, scope_id, "Persist B")
 
-    verifier = ArtifactVerifier()
+    verifier = ArtifactVerifier(catalogs=_catalogs())
     before_b = (repo / "diagram-catalog" / "diagrams" / f"{diag_b}.puml").read_bytes()
 
     result = set_diagram_edge_label(
@@ -475,7 +483,7 @@ def test_mcp_edge_labels_null_value_clears_key(repo: Path) -> None:
 
     # Use the standalone fixture so we have a valid edge key
     diag_id, edge_key = _make_standalone_c4_diagram_with_connection(repo, "MCP Null Test")
-    verifier = ArtifactVerifier()
+    verifier = ArtifactVerifier(catalogs=_catalogs())
 
     # Seed the diagram with two labels (dry_run=True only checks content, no file write)
     # We simulate the merged state by writing the map directly via edit_diagram
@@ -506,7 +514,7 @@ def test_mcp_edge_labels_merges_with_existing(repo: Path) -> None:
     from src.infrastructure.write.artifact_write.diagram_edit import edit_diagram
 
     diag_id, edge_key = _make_standalone_c4_diagram_with_connection(repo, "MCP Merge Test")
-    verifier = ArtifactVerifier()
+    verifier = ArtifactVerifier(catalogs=_catalogs())
 
     # Set two labels by building the full map in a single dry_run call
     r1 = edit_diagram(

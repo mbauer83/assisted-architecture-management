@@ -12,6 +12,7 @@ Updated for ArchiMate NEXT conventions:
 - model_add_connection (not model_create_connection)
 """
 
+from functools import lru_cache
 from pathlib import Path
 
 import pytest
@@ -21,6 +22,13 @@ from src.application.modeling.artifact_write import generate_diagram_id, prefix_
 from src.application.verification.artifact_verifier import ArtifactRegistry, ArtifactVerifier
 from src.infrastructure.artifact_index import shared_artifact_index
 from src.infrastructure.mcp import mcp_artifact_server as tools
+
+
+@lru_cache(maxsize=1)
+def _catalogs():
+    from src.infrastructure.app_bootstrap import build_module_registry, build_runtime_catalogs  # noqa: PLC0415
+
+    return build_runtime_catalogs(build_module_registry())
 
 scenarios("features/model_write_tools.feature")
 
@@ -155,7 +163,7 @@ def repo_with_entities_and_connection(repo_root: Path) -> tuple[Path, str, str]:
     assert conn.get("wrote") is True
 
     # Sanity: verifier should pass across repo.
-    verifier = ArtifactVerifier(ArtifactRegistry(shared_artifact_index(repo_root)))
+    verifier = ArtifactVerifier(ArtifactRegistry(shared_artifact_index(repo_root)), catalogs=_catalogs())
     results = verifier.verify_all(repo_root)
     assert all(r.valid for r in results), [i for r in results for i in r.errors]
     return repo_root, e1_id, e2_id
@@ -206,7 +214,7 @@ def diagram_inferred_ids(
 
     # Verify the created file.
     p = Path(diagram_result["path"])
-    verifier = ArtifactVerifier(ArtifactRegistry(shared_artifact_index(repo_root)))
+    verifier = ArtifactVerifier(ArtifactRegistry(shared_artifact_index(repo_root)), catalogs=_catalogs())
     res = verifier.verify_diagram_file(p)
     assert res.valid is True, res.issues
 
