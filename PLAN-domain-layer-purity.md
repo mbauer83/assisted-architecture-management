@@ -188,8 +188,8 @@ Notes:
 
 ### Phase J — Self-model & README sync (concern #8)
 
-- [ ] **J1** Update self-model entities `APP@…yNhgdh` (**Model Registry**) and `APP@…ca3vm7` (**Model Verifier**) via MCP tools: their `Module:` properties cite `src/common/model_verifier_registry.py` / `src/common/model_verifier.py`, which **no longer exist**. Either remove implementation paths from these conceptual components or replace with accurate role-oriented descriptions + traceability properties pointing at real modules. Reconcile "Model Registry" naming with `ModuleCatalog` (D14/I2).
-- [ ] **J2** Fix README `Repository Layout` to the real six-package structure (`domain/ application/ infrastructure/ config/ diagram_types/ ontologies/`) and correct the `Repository Layout` prose; also correct stale module-doc headers (e.g. `mcp_artifact_server.py` docstring referencing `src/common/` and `src/tools/`).
+- [x] **J1** Update self-model entities `APP@…yNhgdh` (**Model Registry**) and `APP@…ca3vm7` (**Model Verifier**) via MCP tools: their `Module:` properties cite `src/common/model_verifier_registry.py` / `src/common/model_verifier.py`, which **no longer exist**. Either remove implementation paths from these conceptual components or replace with accurate role-oriented descriptions + traceability properties pointing at real modules. Reconcile "Model Registry" naming with `ModuleCatalog` (D14/I2).
+- [x] **J2** Fix README `Repository Layout` to the real six-package structure (`domain/ application/ infrastructure/ config/ diagram_types/ ontologies/`) and correct the `Repository Layout` prose; also correct stale module-doc headers (e.g. `mcp_artifact_server.py` docstring referencing `src/common/` and `src/tools/`).
 - [ ] **J3** Add a verifier check that flags self-model `Module:` source-path properties pointing at non-existent files (conformance guard).
 - [ ] **J4** Quality gates green.
 
