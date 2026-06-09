@@ -131,3 +131,49 @@ def parse_properties_table(content: str) -> dict[str, str] | None:
 
 
 # ---------------------------------------------------------------------------
+# Module source-path existence check (W160)
+# ---------------------------------------------------------------------------
+
+
+def _find_source_root(path: Path) -> Path | None:
+    """Return the first ancestor of *path* that contains a ``src/`` subdirectory."""
+    for parent in path.parents:
+        if (parent / "src").is_dir():
+            return parent
+    return None
+
+
+def check_module_source_path(
+    content: str,
+    file_path: Path,
+    result: VerificationResult,
+    loc: str,
+) -> None:
+    """Warn (W160) when a ``Module:`` property in the Properties table points at a
+    source path that does not exist on disk.
+
+    Silently skips when the entity has no ``Module:`` property, or when no
+    ancestor directory containing ``src/`` can be found (the architecture repo
+    is not co-located with the source tree).
+    """
+    props = parse_properties_table(content)
+    if not props:
+        return
+    module_val = props.get("Module", "").strip()
+    if not module_val:
+        return
+    source_root = _find_source_root(file_path)
+    if source_root is None:
+        return
+    if not (source_root / module_val).exists():
+        result.issues.append(
+            Issue(
+                Severity.WARNING,
+                "W160",
+                f"Module property references non-existent source path: '{module_val}'",
+                loc,
+            )
+        )
+
+
+# ---------------------------------------------------------------------------

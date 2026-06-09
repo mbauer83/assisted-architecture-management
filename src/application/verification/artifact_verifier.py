@@ -16,6 +16,7 @@ from src.application.verification._verifier_rules_puml_relations import check_di
 from src.application.verification._verifier_rules_schema import (
     check_attribute_schema,
     check_frontmatter_schema,
+    check_module_source_path,
 )
 from src.application.verification._verifier_rules_semantic import check_connection_semantics  # noqa: F401
 from src.application.verification._verifier_serde import merge_results, results_from_state
@@ -160,6 +161,8 @@ class ArtifactVerifier:
         if repo_root is not None:
             check_frontmatter_schema(fm, repo_root, "entity", result, loc)
             check_attribute_schema(content, fm, repo_root, result, loc)
+
+        check_module_source_path(content, path, result, loc)
 
         return result
 
