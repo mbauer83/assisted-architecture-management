@@ -5,9 +5,9 @@ Two separate servers share the same unified backend:
 - mcp_write → /mcp/write (create, edit, delete, promote tools)
 
 Tool logic lives in:
-- src/tools/artifact_mcp/*_tools.py (MCP tool wrappers)
-- src/common/* (domain logic)
-- src/tools/artifact_write/* (writer I/O operations)
+- src/infrastructure/mcp/artifact_mcp/ (MCP tool wrappers)
+- src/domain/, src/application/ (domain and application logic)
+- src/infrastructure/write/artifact_write/ (writer I/O operations)
 """
 
 import os

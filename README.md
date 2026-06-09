@@ -77,8 +77,12 @@ Backend settings (port, log path, log level) are configured in `config/settings.
 
 ```
 src/
-  common/          # Core library: parsing, verification, query, write, connection ontology
-  tools/           # Entry-point servers: MCP/REST backend, GUI server wrapper, arch-init
+  domain/          # Pure domain protocols, value types, module catalog, focused catalogs
+  application/     # Use cases, runtime catalogs, verification engine, derivation strategies
+  config/          # Workspace and settings configuration readers
+  infrastructure/  # FastAPI REST, MCP servers, CLI, rendering, artifact index, write I/O
+  ontologies/      # Ontology plugins (ArchiMate NEXT; extend for SysML, TOGAF, etc.)
+  diagram_types/   # Diagram-type adapter plugins (C4, UML activity, matrix, etc.)
 tools/
   gui/             # Vue 3 + TypeScript SPA (hexagonal ports-and-adapters)
 engagements/
@@ -250,17 +254,99 @@ The GUI is built over the REST API, so anything a human can do in the browser ca
 
 ## Installation and Setup
 
-**Requirements**: Python ≥ 3.13, Java ≥ 11 (for diagram verification and rendering), Node ≥ 18 (for GUI development), `uv`.
+### System Requirements
 
-### 1. Install Dependencies
+| Dependency | Minimum | Purpose |
+|---|---|---|
+| Python | 3.13 | All server and CLI components |
+| `uv` | any recent | Python environment and script runner |
+| Java | 11 | PlantUML diagram rendering and verification |
+| Graphviz | 2.49.0 | Diagram layout engine |
+| Node.js | 18 | Frontend development only (not needed to run) |
+| npm | 9 | Frontend development only |
+| SQLCipher (system lib) | 4 | Assurance store (optional) |
+
+### Per-Environment Prerequisites
+
+#### macOS
 
 ```bash
-# Python environment
-uv sync                        # core dependencies
-uv sync --dev                  # + pytest, ruff, zuban
-uv sync --extra gui            # + GUI server dependencies
-uv sync --dev --extra gui      # full local developer setup
+# Core
+brew install python@3.13 openjdk graphviz
+curl -LsSf https://astral.sh/uv/install.sh | sh
 
+# Frontend development (optional)
+brew install node
+
+# Assurance store (optional)
+brew install sqlcipher
+```
+
+Java from Homebrew needs to be symlinked for the system `java` command:
+
+```bash
+sudo ln -sfn $(brew --prefix openjdk)/libexec/openjdk.jdk /Library/Java/JavaVirtualMachines/openjdk.jdk
+```
+
+Credentials for the assurance store are kept in **macOS Keychain** automatically — no extra configuration needed.
+
+#### Linux (Debian / Ubuntu)
+
+```bash
+# Core
+sudo apt-get update
+sudo apt-get install -y python3.13 python3.13-dev default-jre graphviz curl
+
+# uv
+curl -LsSf https://astral.sh/uv/install.sh | sh
+
+# Frontend development (optional) — use nvm or NodeSource
+curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
+sudo apt-get install -y nodejs
+
+# Assurance store (optional)
+sudo apt-get install -y libsqlcipher-dev
+```
+
+For credential storage the assurance store uses **SecretService (D-Bus / gnome-keyring)** when a desktop session is running. On headless servers (CI, SSH-only) set a master password instead — see [Assurance: Credential Storage](#assurance-credential-storage) below.
+
+#### WSL2 on Windows
+
+Run all commands in the WSL2 Debian/Ubuntu shell. Follow the Debian/Ubuntu steps above.
+
+SQLCipher requires the native system library inside WSL2, even though the Windows host has no equivalent:
+
+```bash
+sudo apt-get install -y libsqlcipher-dev
+```
+
+Credentials are kept in **Windows DPAPI** via PowerShell interop (`Export-Clixml`/`Import-Clixml`). This encrypts each key with the Windows user's login credentials — it is machine-and-user-scoped and does not require any extra setup beyond having PowerShell accessible from WSL2 (the default in any WSL2 installation on Windows 11).
+
+#### Docker
+
+No local prerequisites beyond Docker. The container image bundles Java, Graphviz, and all Python dependencies. See [Running in Docker](#running-in-docker).
+
+The assurance store is **not** enabled in the default Docker image because it requires host-level credential storage. To use it in Docker, mount credentials or supply `ARCH_ASSURANCE_MASTER_PASSWORD` as an environment variable (see [Assurance: Credential Storage](#assurance-credential-storage)).
+
+### 1. Install Python Dependencies
+
+```bash
+# Core runtime
+uv sync                           # core dependencies
+uv sync --group dev               # + pytest, ruff, zuban  (alias: --dev)
+uv sync --group gui               # + FastAPI / uvicorn for the GUI server
+uv sync --group dev --group gui   # full local developer setup
+
+# Assurance store (optional — needs libsqlcipher-dev on the host)
+uv sync --all-groups              # installs all dependency groups
+
+# Cloud archive backends (optional — pick what you need)
+uv sync --extra s3-archive        # + boto3 for S3 Object Lock archive
+uv sync --extra azure-archive     # + azure-storage-blob + azure-identity for Azure archive
+uv sync --extra cloud-archive     # both S3 and Azure
+```
+
+```bash
 # Download and verify plantuml.jar from Maven Central
 get-plantuml                   # → tools/plantuml.jar (gitignored)
 
@@ -392,7 +478,70 @@ npm run dev
 # API calls are proxied to arch-backend on :8000
 ```
 
-### 6. Quality Checks
+### 6. Assurance Store (Optional)
+
+The assurance store is an encrypted evidence store for safety analysis (STPA, CAST), governance (GRC), and supply-chain security. The live store is fully mutable; an append-only audit log and optional WORM layer are separate concerns — see [Using Assurance Features](#using-assurance-features) for details. The default backend requires `libsqlcipher-dev` on the host — see [Per-Environment Prerequisites](#per-environment-prerequisites) above.
+
+After installing the system library, initialise and activate the store once:
+
+```bash
+# Create the encrypted database and store the key in the OS credential backend
+arch-assurance init
+
+# Verify the key round-trips and activate auto-unlock on backend start
+arch-assurance unlock
+
+# Save the recovery key offline (print to stdout — store this in a password manager)
+arch-assurance export-key
+```
+
+On subsequent backend starts the store is unlocked automatically from the OS credential backend (macOS Keychain, Windows DPAPI, or SecretService). No manual unlock is needed after the first `arch-assurance unlock`.
+
+#### Assurance: Credential Storage {#assurance-credential-storage}
+
+The assurance store uses platform-appropriate credential storage — selected automatically in this order:
+
+| Environment | Backend | Notes |
+|---|---|---|
+| macOS | macOS Keychain | Always available; no setup needed |
+| WSL2 on Windows | Windows DPAPI | Uses `powershell.exe`; user-and-machine-scoped |
+| Linux desktop | SecretService (D-Bus) | Requires gnome-keyring or kwallet running |
+| Headless Linux / CI | Fernet-encrypted vault | Set `ARCH_ASSURANCE_MASTER_PASSWORD` env var |
+
+For headless Linux (SSH-only servers, CI pipelines):
+
+```bash
+export ARCH_ASSURANCE_MASTER_PASSWORD="your-long-random-passphrase"
+arch-assurance init
+arch-assurance unlock
+```
+
+Add `ARCH_ASSURANCE_MASTER_PASSWORD` to `~/.bashrc`, a systemd service unit, or your CI secrets store so it is available on every start.
+
+#### Assurance MCP Servers (Optional)
+
+To expose assurance tools to AI agents, add the assurance MCP servers to `.mcp.json`:
+
+```json
+{
+  "mcpServers": {
+    "arch-repo-read": { "command": "uv", "args": ["run", "arch-mcp-stdio-read"] },
+    "arch-repo-write": { "command": "uv", "args": ["run", "arch-mcp-stdio-write"] },
+    "arch-assurance-read": {
+      "command": "uv",
+      "args": ["run", "arch-mcp-stdio-assurance-read"]
+    },
+    "arch-assurance-write": {
+      "command": "uv",
+      "args": ["run", "arch-mcp-stdio-assurance-write"]
+    }
+  }
+}
+```
+
+The assurance MCP servers require the store to be unlocked. Auto-unlock applies as long as `arch-assurance unlock` has been run at least once.
+
+### 7. Quality Checks
 
 Run the Python lint and type checks from the workspace root:
 
@@ -574,11 +723,20 @@ repo_init:
     default_branch: main
     commit_author_name: Architecture Bot
     commit_author_email: architecture-bot@example.com
+
+storage:
+  assurance:
+    store_backend: sqlcipher        # sqlcipher | private-git | pocketbase
+    signals_backend: sqlcipher-colocated  # sqlcipher-colocated | sqlite | encrypted
+    archive_backend: standard       # standard | worm | s3-worm | azure-blob-worm
+    max_classification: TLP:RED     # TLP:WHITE | TLP:GREEN | TLP:AMBER | TLP:RED
 ```
 
 These settings apply globally and are read by `arch-backend` at startup. They are **not** configurable via `arch-workspace.yaml`.
 
 `repo_init` controls git defaults used when scaffolding a new engagement repository via `arch-switch-engagement --create`. `default_branch`, `commit_author_name`, and `commit_author_email` may be set globally or overridden for `engagement`.
+
+`storage.assurance` controls the assurance module backends. These keys are written automatically by `arch-assurance init` and `arch-assurance use-backend`, so manual editing is rarely needed. The `max_classification` ceiling controls the highest TLP level the assurance MCP servers will expose to AI agents; entries above the ceiling are withheld from tool responses. See [Storage Architecture](#storage-architecture) for a description of each backend option.
 
 ### Per-Repository Schemata (`.arch-repo/schemata/`)
 
@@ -664,6 +822,236 @@ Each file defines one document type. The filename (without `.json`) is the `doc-
 **`required_entity_type_connections`** — Entity type terms of which at least one matching entity must be linked (via a Markdown link in the body) for verification to pass. Terms may be a concrete entity type (`requirement`), `@all`, or any element class from `config/entity_ontology.yaml` prefixed with `@` (for example `@internal-behavior-element`, using the same syntax as `config/connection_ontology.yaml`). Missing links are reported as E155 errors and block writes.
 
 **`suggested_entity_type_connections`** — Entity type terms whose linking is recommended but not enforced. The GUI displays these as blue "Suggested entity links" notices to prompt the author.
+
+## Using Assurance Features
+
+The assurance module stores safety, security, and compliance evidence separately from the architecture model. This keeps sensitive findings (hazard analyses, incident data, risk registers) out of the main model git history while keeping them linked to the architecture entities they describe.
+
+### Store and Archive: two independent concerns
+
+Every assurance deployment has exactly **two active components** that run in parallel: a **store** and an **archive**. They serve different purposes and are configured with separate keys (`store_backend` and `archive_backend`). You do not choose between them — you choose *how* to deploy each one.
+
+**The store** (`ConfidentialAssuranceStore`) is your working dataset. It is a fully mutable encrypted graph of nodes and edges: you create hazards, update their status, link them to controls, delete draft entries. This is where ongoing STPA, STPA-sec, CAST, and GRC work lives while analysis is in progress. The store has no immutability guarantees — that is intentional. Safety analysis evolves; forcing immutability on a live model would make the tool unusable for iterative work.
+
+**The archive** (`AssuranceArchive`) is a parallel evidence trail. It is append-only: every significant operation is automatically recorded as a hash-chained entry. No entry is ever modified or deleted. Its purpose is regulatory and forensic — to prove after the fact what was known, when, and in what state. The EU AI Act (Art. 12 and related provisions) requires exactly this kind of tamper-evident log for high-risk AI systems. The archive runs automatically alongside the store; you do not interact with it directly during normal analysis work.
+
+The key implication: **confidentiality is a store concern; immutability is an archive concern**. The store is encrypted but mutable. The archive is append-only but may or may not be encrypted at the storage layer depending on the backend. WORM (hardware/cloud-enforced immutability) is an opt-in extension to the archive for deployments where the hash-chain alone is not a sufficient guarantee — typically regulated incident records, finished accident reports, or records subject to legal hold.
+
+| Component | Config key | Default | Role |
+|---|---|---|---|
+| Store | `store_backend` | `sqlcipher` | Mutable encrypted workspace for live analysis |
+| Archive | `archive_backend` | `standard` | Append-only tamper-evident evidence trail |
+
+The two backends are configured independently. There is one constraint: `archive_backend: worm` (local SQLCipher WORM) requires `store_backend: sqlcipher` because it shares the same database file. The cloud archive backends (`s3-worm`, `azure-blob-worm`) have no such constraint — they write to their own storage and work with any store backend.
+
+### Archive backends
+
+The archive backend controls where audit entries are written and what immutability guarantees the storage layer enforces:
+
+| `archive_backend` | Storage | Immutability mechanism | Required dependency |
+|---|---|---|---|
+| `standard` (default) | Co-located with the store | SHA-256 hash chain (software) | none |
+| `worm` | SQLCipher (same DB as store) | Hash chain + per-subject AES-256-GCM DEK + legal holds | `store_backend: sqlcipher` |
+| `s3-worm` | Amazon S3 | S3 Object Lock (GOVERNANCE or COMPLIANCE mode) | `boto3`; S3 bucket with Object Lock enabled |
+| `azure-blob-worm` | Azure Blob Storage | Container-level immutability policy | `azure-storage-blob`, `azure-identity` |
+
+`standard` is sufficient for most teams — the hash chain detects any tampering, and the store encryption protects confidentiality. Upgrade to a WORM backend when you need storage-layer enforcement: cloud-provider guarantees that even a compromised account cannot delete or overwrite records, legal holds that survive key rotation, per-subject crypto-shredding for GDPR right-to-erasure, or RFC 3161 timestamp tokens for non-repudiation.
+
+**`worm`** (on-premises / local, requires SQLCipher store):
+
+```bash
+arch-assurance use-backend sqlcipher --archive-backend worm
+```
+
+**`s3-worm`** (AWS — independent of store backend):
+
+```bash
+uv sync --extra s3-archive
+export ARCH_S3_BUCKET="my-worm-bucket"          # must have Object Lock enabled at bucket creation
+export ARCH_S3_REGION="eu-west-1"               # optional
+export ARCH_S3_OBJECT_LOCK_MODE="GOVERNANCE"    # or COMPLIANCE for stricter legal enforcement
+export ARCH_S3_RETENTION_DAYS="730"             # default: 365
+arch-assurance use-backend sqlcipher --archive-backend s3-worm
+```
+
+AWS credentials follow the standard boto3 chain (env vars, `~/.aws/credentials`, EC2 instance profile, ECS task role, etc.). No credential configuration is needed in the assurance store when using an IAM role.
+
+**`azure-blob-worm`** (Azure — independent of store backend):
+
+```bash
+uv sync --extra azure-archive
+export ARCH_AZURE_STORAGE_ACCOUNT="myaccount"
+export ARCH_AZURE_CONTAINER="arch-assurance"    # must have immutability policy applied
+export ARCH_AZURE_STATE_CONTAINER="arch-assurance-state"   # optional; default: {container}-state
+# Omit ARCH_AZURE_STORAGE_KEY to use DefaultAzureCredential (managed identity, az login, etc.)
+arch-assurance use-backend sqlcipher --archive-backend azure-blob-worm
+```
+
+The `azure-blob-worm` adapter uses **two containers**: the archive container (WORM, covered by the immutability policy) and a state container (mutable; holds chain head pointer, holds index, and DEKs). Apply the time-based immutability policy only to the archive container and lock it for compliance-grade enforcement.
+
+### Store on cloud infrastructure
+
+The mutable store is a local file (`sqlcipher`) or a service (`pocketbase`). For cloud deployments:
+
+- **AWS**: run in a container or EC2 instance with an EBS volume encrypted at rest via AWS KMS. The SQLCipher file sits on that volume — application-layer AES-256 encryption stacks on top.
+- **Azure**: run in a container with Azure Disk Encryption or Managed Disk with SSE. PocketBase can run as an Azure Container App.
+
+No new store adapter is needed for AWS or Azure. The cloud archive backends (`s3-worm`, `azure-blob-worm`) handle the immutability requirement; the store backend choice remains independent.
+
+### Prerequisites
+
+The assurance store must be initialised and unlocked before use. If you have not done this yet, follow the [Assurance Store (Optional)](#6-assurance-store-optional) setup steps. Verify the current state at any time:
+
+```bash
+arch-assurance status
+```
+
+A healthy, active store reports:
+
+```
+archive_backend: standard
+db_exists: true
+db_path: /workspace/.arch-assurance/store.db
+key_in_keychain: true
+max_classification: TLP:RED
+setup_confirmed: true
+signals_backend: sqlcipher-colocated
+status: unlocked
+store_backend: sqlcipher
+unlocked: true
+```
+
+### CLI Reference
+
+| Command | Description |
+|---|---|
+| `arch-assurance init` | Create the encrypted store; generate and save the encryption key |
+| `arch-assurance init --force` | Re-initialise, replacing an existing store |
+| `arch-assurance init --backend <B>` | Choose store backend: `sqlcipher` (default), `private-git`, `pocketbase` |
+| `arch-assurance init --archive-backend <A>` | Choose archive backend: `standard` (default), `worm`, `s3-worm`, `azure-blob-worm` |
+| `arch-assurance unlock` | Verify the key, report store stats, and activate auto-unlock |
+| `arch-assurance status` | Show all backends, DB path, lock state, and key presence |
+| `arch-assurance export-key` | Print the recovery key (store this offline in a password manager) |
+| `arch-assurance rotate-key` | Generate a new encryption key and re-encrypt the database |
+| `arch-assurance backup` | Copy the encrypted DB to a timestamped backup file |
+| `arch-assurance export -o out.json` | Export all assurance data as plaintext JSON |
+| `arch-assurance verify` | Backend-aware chain integrity check (all archive backends) |
+| `arch-assurance verify-chain` | Verify the audit log hash chain (SQLCipher only) |
+| `arch-assurance use-backend <B>` | Switch store backend in `config/settings.yaml` |
+| `arch-assurance use-backend <B> --archive-backend <A>` | Switch both store and archive backends |
+| `arch-assurance import-sbom` | Ingest a CycloneDX or SPDX bill-of-materials file |
+| `arch-assurance export-aibom` | Emit a CycloneDX 1.6 AI-BOM from component data |
+| `arch-assurance scan-ai-candidates` | Heuristic scan of architecture entities for AI-BOM relevance |
+
+### Encryption Key Management
+
+The encryption key is stored in the OS credential backend (see [Assurance: Credential Storage](#assurance-credential-storage)) and never written to disk in plaintext. The recovery key is a separate, randomly generated token that can decrypt the database if the OS credential entry is lost (e.g. after migrating to a new machine):
+
+```bash
+# Print the recovery key — run once after init and store it offline
+arch-assurance export-key
+```
+
+To restore from a recovery key on a new machine, re-initialise the store against the existing database file and supply the recovery key when prompted (or contact the relevant `arch-assurance rotate-key` workflow for your team).
+
+To rotate the encryption key (for example, after an operator leaves a team):
+
+```bash
+arch-assurance rotate-key
+arch-assurance export-key   # save the new recovery key
+```
+
+### Backup and Recovery
+
+```bash
+# Create a timestamped encrypted backup (the backup is still encrypted)
+arch-assurance backup
+
+# Specify an explicit backup path
+arch-assurance backup --backup-path /safe/location/store-backup.db
+
+# Export plaintext JSON for migration or archival (handle with care)
+arch-assurance export -o assurance-export.json
+```
+
+Backups are encrypted with the same key as the live database. Keep at least one backup and the recovery key in separate, durable locations.
+
+### Storage Architecture
+
+Three adapter dimensions, each independently configurable:
+
+```
+  ┌──────────────────────────────────────────────────────────────┐
+  │              Assurance store  (store_backend)                │
+  │       sqlcipher │ private-git │ pocketbase                   │  ← mutable encrypted workspace
+  └──────────────────────────────────────────────────────────────┘
+                      ↑ key lookup
+  ┌──────────────────────────────────────────────────────────────┐
+  │              Encryption keys  (credential backend)           │
+  │       Keychain │ DPAPI │ SecretService │ Fernet vault        │  ← auto-selected per OS
+  └──────────────────────────────────────────────────────────────┘
+
+  ┌──────────────────────────────────────────────────────────────┐
+  │              Archive  (archive_backend)                      │
+  │       standard │ worm │ s3-worm │ azure-blob-worm            │  ← append-only evidence trail
+  └──────────────────────────────────────────────────────────────┘
+```
+
+The store and archive run in parallel — configuring one does not constrain the other (except `archive_backend: worm`, which shares the SQLCipher DB file and requires `store_backend: sqlcipher`). The credential backend is selected automatically based on OS and is not configurable separately.
+
+#### Store Backends (simple → complex)
+
+**`sqlcipher` (default)** — a single AES-256 encrypted SQLite file collocated with the workspace at `.arch-assurance/store.db`. Best choice for individuals and small teams working in a single workspace. Setup is a single `arch-assurance init`.
+
+```bash
+arch-assurance init                # creates .arch-assurance/store.db
+arch-assurance unlock              # verifies key, activates auto-unlock
+```
+
+**`private-git`** — Fernet-encrypted JSON files in a local directory tree (`.arch-assurance-git/`). Each assurance entity is a separate `.enc` file; the directory is git-trackable (history is ciphertext). Suited to teams that want file-level encryption with a browsable, diffable history.
+
+```bash
+arch-assurance init --backend private-git
+arch-assurance unlock
+```
+
+No `libsqlcipher-dev` system library is required for the `private-git` backend — it uses only the Python `cryptography` package.
+
+**`pocketbase`** — delegates storage to a [PocketBase](https://pocketbase.io) REST API. Suited to shared team deployments where multiple workstations should access the same assurance evidence. Requires a running PocketBase instance and three environment variables:
+
+```bash
+export ARCH_POCKETBASE_URL="http://localhost:8090"
+export ARCH_POCKETBASE_ADMIN_EMAIL="admin@example.com"
+export ARCH_POCKETBASE_ADMIN_PASSWORD="..."
+
+arch-assurance pocketbase-init --base-url http://localhost:8090 --admin-token <token>
+arch-assurance use-backend pocketbase
+arch-backend --restart --daemon
+```
+
+PocketBase authentication is session-based (env-var HTTP credentials) and does not use the OS credential backend for key storage — the PocketBase server handles its own encryption.
+
+#### Switching Backends
+
+```bash
+# Switch the active backend (writes config/settings.yaml)
+arch-assurance use-backend sqlcipher
+arch-assurance use-backend private-git
+arch-assurance use-backend pocketbase
+
+# Then restart the backend
+arch-backend --restart --daemon
+```
+
+Data is not migrated automatically when switching backends. Use `arch-assurance export -o backup.json` before switching if you need to preserve existing entries.
+
+### MCP Tools for AI Agents
+
+When the assurance MCP servers are configured (see [Assurance MCP Servers](#assurance-mcp-servers-optional)), AI agents have access to tools for creating and querying assurance content — STPA hazards, losses, UCAs, CAST incidents, GRC obligations, risk entries, and supply-chain signals — all linked to architecture entities via cross-references.
+
+The store must be unlocked before the MCP tools become operational. Auto-unlock handles this on every backend start after the initial `arch-assurance unlock` activation.
+
+The assurance MCP surface is intentionally split from the architecture MCP servers so agents can be granted read-only or read-write assurance access independently of their architecture repository permissions.
 
 ## Further Reading
 
