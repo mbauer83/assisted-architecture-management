@@ -190,8 +190,8 @@ Notes:
 
 - [x] **J1** Update self-model entities `APP@…yNhgdh` (**Model Registry**) and `APP@…ca3vm7` (**Model Verifier**) via MCP tools: their `Module:` properties cite `src/common/model_verifier_registry.py` / `src/common/model_verifier.py`, which **no longer exist**. Either remove implementation paths from these conceptual components or replace with accurate role-oriented descriptions + traceability properties pointing at real modules. Reconcile "Model Registry" naming with `ModuleCatalog` (D14/I2).
 - [x] **J2** Fix README `Repository Layout` to the real six-package structure (`domain/ application/ infrastructure/ config/ diagram_types/ ontologies/`) and correct the `Repository Layout` prose; also correct stale module-doc headers (e.g. `mcp_artifact_server.py` docstring referencing `src/common/` and `src/tools/`).
-- [ ] **J3** Add a verifier check that flags self-model `Module:` source-path properties pointing at non-existent files (conformance guard).
-- [ ] **J4** Quality gates green.
+- [x] **J3** Add a verifier check that flags self-model `Module:` source-path properties pointing at non-existent files (conformance guard).
+- [x] **J4** Quality gates green.
 
 ### Phase K — Plugin registration inversion + baseline clearance (concern #9)
 
@@ -232,7 +232,7 @@ python -m pytest tests/architecture/test_dependency_policy.py -q   # policy hold
 - [ ] Verifier is a pipeline of pure rules over parsed inputs with I/O behind application-owned ports. *(Phase G)*
 - [x] Public contracts expose immutable views; configuration is frozen on publication. *(Phase H)*
 - [x] Glossary published; renames are responsibility-driven only. *(Phase I)*
-- [ ] Self-model (`Model Registry`, `Model Verifier`) and README reflect the real implementation; a verifier conformance check guards self-model source paths. *(Phase J)*
+- [x] Self-model (`Model Registry`, `Model Verifier`) and README reflect the real implementation; a verifier conformance check guards self-model source paths. *(Phase J)*
 - [x] All strategy registrations are at the composition root; no module-level side effects; `DerivationStrategyCatalog` built directly from manifests and injected. *(Phase K)*
 - [x] `DiagramTypeModuleManifest` in `domain/` declares ontology compatibility and role-to-entity-type mapping; `scope_projection.py` deleted. *(Phase K)*
 - [x] `architecture_baseline.json` is **empty** — arch test passes with zero violations. *(Phase K)*
