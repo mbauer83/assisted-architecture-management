@@ -99,7 +99,9 @@ const toggleArchived = () => emit('update:showArchived', !props.showArchived)
       v-if="mgmt.dialog.value === 'create'"
       class="group-dialog"
     >
-      <div class="dialog-title">New Group</div>
+      <div class="dialog-title">
+        New Group
+      </div>
       <label class="field">Name<input
         v-model="mgmt.fieldName.value"
         class="field-input"
@@ -109,10 +111,26 @@ const toggleArchived = () => emit('update:showArchived', !props.showArchived)
         v-model="mgmt.fieldSlug.value"
         class="field-input"
       ></label>
-      <div v-if="mgmt.dialogError.value" class="dialog-err">{{ mgmt.dialogError.value }}</div>
+      <div
+        v-if="mgmt.dialogError.value"
+        class="dialog-err"
+      >
+        {{ mgmt.dialogError.value }}
+      </div>
       <div class="dialog-row">
-        <button class="btn" @click="mgmt.closeDialog()">Cancel</button>
-        <button class="btn btn--primary" :disabled="mgmt.busy.value || !mgmt.fieldSlug.value || !mgmt.fieldName.value" @click="mgmt.submitCreate()">Create</button>
+        <button
+          class="btn"
+          @click="mgmt.closeDialog()"
+        >
+          Cancel
+        </button>
+        <button
+          class="btn btn--primary"
+          :disabled="mgmt.busy.value || !mgmt.fieldSlug.value || !mgmt.fieldName.value"
+          @click="mgmt.submitCreate()"
+        >
+          Create
+        </button>
       </div>
     </div>
 
@@ -120,12 +138,33 @@ const toggleArchived = () => emit('update:showArchived', !props.showArchived)
       v-if="mgmt.dialog.value === 'rename'"
       class="group-dialog"
     >
-      <div class="dialog-title">Rename "{{ mgmt.dialogTarget.value?.name }}"</div>
-      <label class="field">Display name<input v-model="mgmt.fieldName.value" class="field-input"></label>
-      <div v-if="mgmt.dialogError.value" class="dialog-err">{{ mgmt.dialogError.value }}</div>
+      <div class="dialog-title">
+        Rename "{{ mgmt.dialogTarget.value?.name }}"
+      </div>
+      <label class="field">Display name<input
+        v-model="mgmt.fieldName.value"
+        class="field-input"
+      ></label>
+      <div
+        v-if="mgmt.dialogError.value"
+        class="dialog-err"
+      >
+        {{ mgmt.dialogError.value }}
+      </div>
       <div class="dialog-row">
-        <button class="btn" @click="mgmt.closeDialog()">Cancel</button>
-        <button class="btn btn--primary" :disabled="mgmt.busy.value || !mgmt.fieldName.value" @click="mgmt.submitRename()">Rename</button>
+        <button
+          class="btn"
+          @click="mgmt.closeDialog()"
+        >
+          Cancel
+        </button>
+        <button
+          class="btn btn--primary"
+          :disabled="mgmt.busy.value || !mgmt.fieldName.value"
+          @click="mgmt.submitRename()"
+        >
+          Rename
+        </button>
       </div>
     </div>
 
@@ -133,13 +172,41 @@ const toggleArchived = () => emit('update:showArchived', !props.showArchived)
       v-if="mgmt.dialog.value === 'archive'"
       class="group-dialog"
     >
-      <div class="dialog-title">{{ mgmt.dialogTarget.value?.archived ? 'Unarchive' : 'Archive' }} "{{ mgmt.dialogTarget.value?.name }}"</div>
-      <p v-if="mgmt.archiveNeedsConfirm.value" class="dialog-note">Has {{ mgmt.dialogTarget.value?.count }} items. Type slug to confirm:</p>
-      <input v-if="mgmt.archiveNeedsConfirm.value" v-model="mgmt.fieldConfirm.value" class="field-input" :placeholder="mgmt.dialogTarget.value?.slug">
-      <div v-if="mgmt.dialogError.value" class="dialog-err">{{ mgmt.dialogError.value }}</div>
+      <div class="dialog-title">
+        {{ mgmt.dialogTarget.value?.archived ? 'Unarchive' : 'Archive' }} "{{ mgmt.dialogTarget.value?.name }}"
+      </div>
+      <p
+        v-if="mgmt.archiveNeedsConfirm.value"
+        class="dialog-note"
+      >
+        Has {{ mgmt.dialogTarget.value?.count }} items. Type slug to confirm:
+      </p>
+      <input
+        v-if="mgmt.archiveNeedsConfirm.value"
+        v-model="mgmt.fieldConfirm.value"
+        class="field-input"
+        :placeholder="mgmt.dialogTarget.value?.slug"
+      >
+      <div
+        v-if="mgmt.dialogError.value"
+        class="dialog-err"
+      >
+        {{ mgmt.dialogError.value }}
+      </div>
       <div class="dialog-row">
-        <button class="btn" @click="mgmt.closeDialog()">Cancel</button>
-        <button class="btn btn--primary" :disabled="mgmt.busy.value || !mgmt.archiveReady.value" @click="mgmt.submitArchive()">{{ mgmt.dialogTarget.value?.archived ? 'Unarchive' : 'Archive' }}</button>
+        <button
+          class="btn"
+          @click="mgmt.closeDialog()"
+        >
+          Cancel
+        </button>
+        <button
+          class="btn btn--primary"
+          :disabled="mgmt.busy.value || !mgmt.archiveReady.value"
+          @click="mgmt.submitArchive()"
+        >
+          {{ mgmt.dialogTarget.value?.archived ? 'Unarchive' : 'Archive' }}
+        </button>
       </div>
     </div>
 
@@ -147,13 +214,41 @@ const toggleArchived = () => emit('update:showArchived', !props.showArchived)
       v-if="mgmt.dialog.value === 'delete'"
       class="group-dialog"
     >
-      <div class="dialog-title">Delete "{{ mgmt.dialogTarget.value?.name }}"</div>
-      <p v-if="mgmt.deleteNeedsConfirm.value" class="dialog-note">Has {{ mgmt.dialogTarget.value?.count }} items — all deleted. Type slug:</p>
-      <input v-if="mgmt.deleteNeedsConfirm.value" v-model="mgmt.fieldConfirm.value" class="field-input" :placeholder="mgmt.dialogTarget.value?.slug">
-      <div v-if="mgmt.dialogError.value" class="dialog-err">{{ mgmt.dialogError.value }}</div>
+      <div class="dialog-title">
+        Delete "{{ mgmt.dialogTarget.value?.name }}"
+      </div>
+      <p
+        v-if="mgmt.deleteNeedsConfirm.value"
+        class="dialog-note"
+      >
+        Has {{ mgmt.dialogTarget.value?.count }} items — all deleted. Type slug:
+      </p>
+      <input
+        v-if="mgmt.deleteNeedsConfirm.value"
+        v-model="mgmt.fieldConfirm.value"
+        class="field-input"
+        :placeholder="mgmt.dialogTarget.value?.slug"
+      >
+      <div
+        v-if="mgmt.dialogError.value"
+        class="dialog-err"
+      >
+        {{ mgmt.dialogError.value }}
+      </div>
       <div class="dialog-row">
-        <button class="btn" @click="mgmt.closeDialog()">Cancel</button>
-        <button class="btn btn--danger" :disabled="mgmt.busy.value || !mgmt.deleteReady.value" @click="mgmt.submitDelete()">Delete</button>
+        <button
+          class="btn"
+          @click="mgmt.closeDialog()"
+        >
+          Cancel
+        </button>
+        <button
+          class="btn btn--danger"
+          :disabled="mgmt.busy.value || !mgmt.deleteReady.value"
+          @click="mgmt.submitDelete()"
+        >
+          Delete
+        </button>
       </div>
     </div>
   </div>

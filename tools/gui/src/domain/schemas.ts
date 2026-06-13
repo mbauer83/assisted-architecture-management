@@ -713,6 +713,7 @@ export const GroupListSchema = Schema.Struct({
   'model-projects': Schema.optional(Schema.Array(GroupEntrySchema)),
   'diagram-collections': Schema.optional(Schema.Array(GroupEntrySchema)),
   'document-collections': Schema.optional(Schema.Array(GroupEntrySchema)),
+  'analysis-collections': Schema.optional(Schema.Array(GroupEntrySchema)),
 })
 export type GroupList = typeof GroupListSchema.Type
 

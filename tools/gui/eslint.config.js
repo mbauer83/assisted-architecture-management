@@ -87,4 +87,18 @@ export default tseslint.config(
       },
     },
   },
+  {
+    // E2E test infra (Playwright). Runs in Node, with browser-context callbacks for
+    // addInitScript/evaluate. Type-aware linting is not needed here and the files live
+    // outside the app tsconfig the project service loads, so disable it for these paths.
+    files: ['playwright.config.ts', 'tests/**/*.ts'],
+    extends: [tseslint.configs.disableTypeChecked],
+    languageOptions: {
+      parserOptions: { projectService: false, project: false },
+      globals: {
+        ...globals.node,
+        ...globals.browser,
+      },
+    },
+  },
 )

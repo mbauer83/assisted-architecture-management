@@ -203,13 +203,17 @@ const displayCount = computed(() => {
   <div class="layout">
     <aside class="sidebar">
       <div class="sidebar-header">
-        <h2 class="sidebar-title">Project</h2>
+        <h2 class="sidebar-title">
+          Project
+        </h2>
         <RouterLink
           v-if="!isGlobal"
           to="/entities/groups"
           class="manage-link"
           title="Manage projects"
-        >⚙</RouterLink>
+        >
+          ⚙
+        </RouterLink>
       </div>
 
       <EntityGroupNavTree
@@ -230,10 +234,21 @@ const displayCount = computed(() => {
 
       <!-- Global view: flat domain list only -->
       <template v-else>
-        <h2 class="sidebar-title" style="margin-top:1rem">Domain</h2>
+        <h2
+          class="sidebar-title"
+          style="margin-top:1rem"
+        >
+          Domain
+        </h2>
         <ul class="domain-list">
           <li>
-            <button class="domain-btn" :class="{ active: activeDomain === '' }" @click="setDomain('')">All</button>
+            <button
+              class="domain-btn"
+              :class="{ active: activeDomain === '' }"
+              @click="setDomain('')"
+            >
+              All
+            </button>
           </li>
         </ul>
       </template>
@@ -243,83 +258,210 @@ const displayCount = computed(() => {
       <div class="content-header">
         <div>
           <h1 class="page-title">
-            <span v-if="isGlobal" class="global-badge">Global</span>
+            <span
+              v-if="isGlobal"
+              class="global-badge"
+            >Global</span>
             {{ pageTitle }}
-            <span v-if="entityListState.data.value" class="count">({{ displayCount }})</span>
+            <span
+              v-if="entityListState.data.value"
+              class="count"
+            >({{ displayCount }})</span>
           </h1>
           <p class="subtitle">
-            <template v-if="isGlobal">Read-only view of the shared global (enterprise) repository.</template>
-            <template v-else>Filter by project and domain, then inspect the catalog as a sortable table or treemap.</template>
+            <template v-if="isGlobal">
+              Read-only view of the shared global (enterprise) repository.
+            </template>
+            <template v-else>
+              Filter by project and domain, then inspect the catalog as a sortable table or treemap.
+            </template>
           </p>
         </div>
         <div class="actions">
           <div class="view-toggle">
-            <button class="toggle-btn" :class="{ 'toggle-btn--active': viewMode === 'table' }" @click="setViewMode('table')">Table</button>
-            <button class="toggle-btn" :class="{ 'toggle-btn--active': viewMode === 'treemap' }" @click="setViewMode('treemap')">Treemap</button>
+            <button
+              class="toggle-btn"
+              :class="{ 'toggle-btn--active': viewMode === 'table' }"
+              @click="setViewMode('table')"
+            >
+              Table
+            </button>
+            <button
+              class="toggle-btn"
+              :class="{ 'toggle-btn--active': viewMode === 'treemap' }"
+              @click="setViewMode('treemap')"
+            >
+              Treemap
+            </button>
           </div>
-          <RouterLink v-if="!isGlobal" to="/entity/create" class="create-btn">+ Create Entity</RouterLink>
+          <RouterLink
+            v-if="!isGlobal"
+            to="/entity/create"
+            class="create-btn"
+          >
+            + Create Entity
+          </RouterLink>
         </div>
       </div>
 
       <div class="toolbar">
         <label class="toolbar-field">
           <span>Type</span>
-          <select v-model="typeFilter" class="toolbar-select">
+          <select
+            v-model="typeFilter"
+            class="toolbar-select"
+          >
             <option value="">All</option>
-            <option v-for="type in uniqueTypes" :key="type" :value="type">{{ type }}</option>
+            <option
+              v-for="type in uniqueTypes"
+              :key="type"
+              :value="type"
+            >{{ type }}</option>
           </select>
         </label>
       </div>
 
-      <div v-if="entityListState.loading.value" class="state-msg">Loading…</div>
-      <div v-else-if="entityListState.errorMessage.value" class="state-msg state-msg--error">{{ entityListState.errorMessage.value }}</div>
+      <div
+        v-if="entityListState.loading.value"
+        class="state-msg"
+      >
+        Loading…
+      </div>
+      <div
+        v-else-if="entityListState.errorMessage.value"
+        class="state-msg state-msg--error"
+      >
+        {{ entityListState.errorMessage.value }}
+      </div>
 
       <template v-else-if="entityListState.data.value">
-        <div v-if="sortedEntities.length === 0" class="state-msg">
-          <template v-if="activeGroup">No entities in "{{ groupOptions.find(g => g.slug === activeGroup)?.name ?? activeGroup }}" yet.</template>
-          <template v-else>No entities found{{ activeDomain ? ` in ${getDomainLabel(activeDomain)}` : '' }}{{ typeFilter ? ` of type "${typeFilter}"` : '' }}.</template>
+        <div
+          v-if="sortedEntities.length === 0"
+          class="state-msg"
+        >
+          <template v-if="activeGroup">
+            No entities in "{{ groupOptions.find(g => g.slug === activeGroup)?.name ?? activeGroup }}" yet.
+          </template>
+          <template v-else>
+            No entities found{{ activeDomain ? ` in ${getDomainLabel(activeDomain)}` : '' }}{{ typeFilter ? ` of type "${typeFilter}"` : '' }}.
+          </template>
         </div>
 
-        <EntitiesTreemap v-else-if="viewMode === 'treemap'" :items="sortedEntities" :active-domain="activeDomain" />
+        <EntitiesTreemap
+          v-else-if="viewMode === 'treemap'"
+          :items="sortedEntities"
+          :active-domain="activeDomain"
+        />
 
         <template v-else>
           <table class="entity-table">
             <thead>
               <tr>
                 <th>Name</th>
-                <th><button class="sort-btn" @click="sortBy('type')">Type {{ sortArrow('type') }}</button></th>
-                <th v-if="!activeDomain">Domain</th>
+                <th>
+                  <button
+                    class="sort-btn"
+                    @click="sortBy('type')"
+                  >
+                    Type {{ sortArrow('type') }}
+                  </button>
+                </th>
+                <th v-if="!activeDomain">
+                  Domain
+                </th>
                 <th class="th-conn">
-                  <button class="sort-btn" @click="sortBy('total')">Connections {{ sortArrow('total') }}</button>
-                  <span class="th-conn-sub">(<button class="sort-sub" @click="sortBy('in')">in {{ sortArrow('in') }}</button> / <button class="sort-sub" @click="sortBy('sym')">sym {{ sortArrow('sym') }}</button> / <button class="sort-sub" @click="sortBy('out')">out {{ sortArrow('out') }}</button>)</span>
+                  <button
+                    class="sort-btn"
+                    @click="sortBy('total')"
+                  >
+                    Connections {{ sortArrow('total') }}
+                  </button>
+                  <span class="th-conn-sub">(<button
+                    class="sort-sub"
+                    @click="sortBy('in')"
+                  >in {{ sortArrow('in') }}</button> / <button
+                    class="sort-sub"
+                    @click="sortBy('sym')"
+                  >sym {{ sortArrow('sym') }}</button> / <button
+                    class="sort-sub"
+                    @click="sortBy('out')"
+                  >out {{ sortArrow('out') }}</button>)</span>
                 </th>
                 <th>Status</th>
               </tr>
             </thead>
             <tbody>
-              <tr v-for="entity in sortedEntities" :key="entity.artifact_id" :class="{ 'row--global': entity.is_global }">
+              <tr
+                v-for="entity in sortedEntities"
+                :key="entity.artifact_id"
+                :class="{ 'row--global': entity.is_global }"
+              >
                 <td>
-                  <RouterLink :to="{ path: '/entity', query: { id: entity.artifact_id, ...browseReturnQuery } }">{{ entity.name || friendlyEntityId(entity.artifact_id) }}</RouterLink>
-                  <span v-if="entity.is_global && !isGlobal" class="global-chip" title="From the global repository">global</span>
-                  <button v-if="!activeGroup && groupOptions.length > 1 && entity.group && entity.group !== 'uncategorized'" class="group-chip" :title="`In group: ${entity.group}`" @click="setGroup(entity.group ?? '')">{{ entity.group }}</button>
+                  <RouterLink :to="{ path: '/entity', query: { id: entity.artifact_id, ...browseReturnQuery } }">
+                    {{ entity.name || friendlyEntityId(entity.artifact_id) }}
+                  </RouterLink>
+                  <span
+                    v-if="entity.is_global && !isGlobal"
+                    class="global-chip"
+                    title="From the global repository"
+                  >global</span>
+                  <button
+                    v-if="!activeGroup && groupOptions.length > 1 && entity.group && entity.group !== 'uncategorized'"
+                    class="group-chip"
+                    :title="`In group: ${entity.group}`"
+                    @click="setGroup(entity.group ?? '')"
+                  >
+                    {{ entity.group }}
+                  </button>
                 </td>
                 <td>
                   <span class="type-cell">
-                    <ArchimateTypeGlyph :type="entity.artifact_type" :size="15" class="type-glyph" />
+                    <ArchimateTypeGlyph
+                      :type="entity.artifact_type"
+                      :size="15"
+                      class="type-glyph"
+                    />
                     <span class="mono">{{ entity.artifact_type }}</span>
                   </span>
                 </td>
-                <td v-if="!activeDomain"><span class="domain-badge" :class="`domain--${entity.domain}`">{{ entity.domain }}</span></td>
-                <td class="conn-counts">{{ getEntityConnectionTotal(entity) }}<span class="conn-split">({{ entity.conn_in ?? 0 }} / {{ entity.conn_sym ?? 0 }} / {{ entity.conn_out ?? 0 }})</span></td>
-                <td><span class="status-badge" :class="`status--${entity.status}`">{{ entity.status }}</span></td>
+                <td v-if="!activeDomain">
+                  <span
+                    class="domain-badge"
+                    :class="`domain--${entity.domain}`"
+                  >{{ entity.domain }}</span>
+                </td>
+                <td class="conn-counts">
+                  {{ getEntityConnectionTotal(entity) }}<span class="conn-split">({{ entity.conn_in ?? 0 }} / {{ entity.conn_sym ?? 0 }} / {{ entity.conn_out ?? 0 }})</span>
+                </td>
+                <td>
+                  <span
+                    class="status-badge"
+                    :class="`status--${entity.status}`"
+                  >{{ entity.status }}</span>
+                </td>
               </tr>
             </tbody>
           </table>
 
-          <div v-if="!isGroupView && pageCount > 1" class="pagination">
-            <button class="page-btn" :disabled="!hasPrev" @click="goToPrevPage">← Prev</button>
+          <div
+            v-if="!isGroupView && pageCount > 1"
+            class="pagination"
+          >
+            <button
+              class="page-btn"
+              :disabled="!hasPrev"
+              @click="goToPrevPage"
+            >
+              ← Prev
+            </button>
             <span class="page-info">Page {{ currentPage + 1 }} of {{ pageCount }}</span>
-            <button class="page-btn" :disabled="!hasNext" @click="goToNextPage">Next →</button>
+            <button
+              class="page-btn"
+              :disabled="!hasNext"
+              @click="goToNextPage"
+            >
+              Next →
+            </button>
           </div>
         </template>
       </template>

@@ -32,13 +32,25 @@ onMounted(async () => {
 <template>
   <div class="assurance-view">
     <div class="assurance-header">
-      <h1 class="assurance-title">Assurance</h1>
-      <p class="assurance-subtitle">STPA / CAST / GRC analysis — confidential, traceable, auditable</p>
+      <h1 class="assurance-title">
+        Assurance
+      </h1>
+      <p class="assurance-subtitle">
+        STPA / CAST / GRC analysis — confidential, traceable, auditable
+      </p>
     </div>
 
-    <div v-if="loading" class="assurance-loading">Loading assurance store status…</div>
+    <div
+      v-if="loading"
+      class="assurance-loading"
+    >
+      Loading assurance store status…
+    </div>
 
-    <div v-else-if="error" class="assurance-error">
+    <div
+      v-else-if="error"
+      class="assurance-error"
+    >
       <p>{{ error }}</p>
     </div>
 
@@ -49,7 +61,9 @@ onMounted(async () => {
         class="assurance-banner"
         :class="`assurance-banner--${status.status}`"
       >
-        <div class="assurance-banner__icon">🔒</div>
+        <div class="assurance-banner__icon">
+          🔒
+        </div>
         <div class="assurance-banner__body">
           <p class="assurance-banner__title">
             {{ status.status === 'not_initialised' ? 'Assurance store not initialised' : 'Assurance store locked' }}
@@ -66,16 +80,30 @@ onMounted(async () => {
       </div>
 
       <!-- Unlocked state -->
-      <div v-else class="assurance-unlocked">
+      <div
+        v-else
+        class="assurance-unlocked"
+      >
         <div class="assurance-banner assurance-banner--unlocked">
-          <div class="assurance-banner__icon">🔓</div>
+          <div class="assurance-banner__icon">
+            🔓
+          </div>
           <div class="assurance-banner__body">
-            <p class="assurance-banner__title">Assurance store unlocked</p>
-            <p class="assurance-banner__hint">Use the arch-assurance-read / write MCP servers to author analyses.</p>
+            <p class="assurance-banner__title">
+              Assurance store unlocked
+            </p>
+            <p class="assurance-banner__hint">
+              Use the arch-assurance-read / write MCP servers to author analyses.
+            </p>
           </div>
         </div>
         <div class="assurance-links">
-          <RouterLink to="/assurance/analyses" class="assurance-link">Analysis Collections →</RouterLink>
+          <RouterLink
+            to="/assurance/analyses"
+            class="assurance-link"
+          >
+            Analysis Collections →
+          </RouterLink>
         </div>
       </div>
 

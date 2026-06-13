@@ -149,8 +149,16 @@ watch(() => route.query.type, (t) => { selectedType.value = (t as string) ?? '';
       class="sidebar"
     >
       <div class="sidebar-header">
-        <h2 class="sidebar-title">Collection</h2>
-        <RouterLink to="/diagrams/groups" class="manage-link" title="Manage collections">⚙</RouterLink>
+        <h2 class="sidebar-title">
+          Collection
+        </h2>
+        <RouterLink
+          to="/diagrams/groups"
+          class="manage-link"
+          title="Manage collections"
+        >
+          ⚙
+        </RouterLink>
       </div>
       <GroupSelector
         :groups="groupOptions"

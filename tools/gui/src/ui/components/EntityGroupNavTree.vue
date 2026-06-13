@@ -69,7 +69,7 @@ const hasDomainEntities = (domainKey: string): boolean =>
 const visibleDomains = (fw: (typeof FRAMEWORK_GROUPS)[number]): readonly string[] =>
   props.domainCounts
     ? (fw.domains as readonly string[]).filter(d => (props.domainCounts![d] ?? 0) > 0)
-    : (fw.domains as readonly string[])
+    : (fw.domains)
 </script>
 
 <template>
@@ -97,14 +97,19 @@ const visibleDomains = (fw: (typeof FRAMEWORK_GROUPS)[number]): readonly string[
           @click="selectGroup(g.slug)"
         >
           <span class="node-label">{{ g.name }}</span>
-          <span v-if="g.count !== undefined" class="node-count">{{ g.count }}</span>
+          <span
+            v-if="g.count !== undefined"
+            class="node-count"
+          >{{ g.count }}</span>
         </button>
         <button
           v-if="manageable"
           class="mgmt-btn"
           title="Manage"
           @click.stop="mgmt.openRename(g)"
-        >⋯</button>
+        >
+          ⋯
+        </button>
       </div>
 
       <!-- Domain sub-tree — only under active project -->
@@ -173,42 +178,135 @@ const visibleDomains = (fw: (typeof FRAMEWORK_GROUPS)[number]): readonly string[
 
     <!-- Management actions -->
     <div class="tree-actions">
-      <button v-if="manageable" class="action-btn" @click="mgmt.openCreate()">+ New</button>
-      <button class="action-btn" :class="{ active: showArchived }" @click="emit('update:showArchived', !showArchived)">
+      <button
+        v-if="manageable"
+        class="action-btn"
+        @click="mgmt.openCreate()"
+      >
+        + New
+      </button>
+      <button
+        class="action-btn"
+        :class="{ active: showArchived }"
+        @click="emit('update:showArchived', !showArchived)"
+      >
         {{ showArchived ? '− archived' : '+ archived' }}
       </button>
     </div>
 
     <!-- Dialogs -->
-    <div v-if="mgmt.dialog.value === 'create'" class="group-dialog">
-      <div class="dialog-title">New Project</div>
-      <label class="field">Name<input v-model="mgmt.fieldName.value" class="field-input" @input="mgmt.fieldSlug.value = mgmt.slugify(mgmt.fieldName.value)"></label>
-      <label class="field">Slug<input v-model="mgmt.fieldSlug.value" class="field-input"></label>
-      <div v-if="mgmt.dialogError.value" class="dialog-err">{{ mgmt.dialogError.value }}</div>
+    <div
+      v-if="mgmt.dialog.value === 'create'"
+      class="group-dialog"
+    >
+      <div class="dialog-title">
+        New Project
+      </div>
+      <label class="field">Name<input
+        v-model="mgmt.fieldName.value"
+        class="field-input"
+        @input="mgmt.fieldSlug.value = mgmt.slugify(mgmt.fieldName.value)"
+      ></label>
+      <label class="field">Slug<input
+        v-model="mgmt.fieldSlug.value"
+        class="field-input"
+      ></label>
+      <div
+        v-if="mgmt.dialogError.value"
+        class="dialog-err"
+      >
+        {{ mgmt.dialogError.value }}
+      </div>
       <div class="dialog-row">
-        <button class="btn" @click="mgmt.closeDialog()">Cancel</button>
-        <button class="btn btn--primary" :disabled="mgmt.busy.value || !mgmt.fieldSlug.value || !mgmt.fieldName.value" @click="mgmt.submitCreate()">Create</button>
+        <button
+          class="btn"
+          @click="mgmt.closeDialog()"
+        >
+          Cancel
+        </button>
+        <button
+          class="btn btn--primary"
+          :disabled="mgmt.busy.value || !mgmt.fieldSlug.value || !mgmt.fieldName.value"
+          @click="mgmt.submitCreate()"
+        >
+          Create
+        </button>
       </div>
     </div>
 
-    <div v-if="mgmt.dialog.value === 'rename'" class="group-dialog">
-      <div class="dialog-title">Rename "{{ mgmt.dialogTarget.value?.name }}"</div>
-      <label class="field">Display name<input v-model="mgmt.fieldName.value" class="field-input"></label>
-      <div v-if="mgmt.dialogError.value" class="dialog-err">{{ mgmt.dialogError.value }}</div>
+    <div
+      v-if="mgmt.dialog.value === 'rename'"
+      class="group-dialog"
+    >
+      <div class="dialog-title">
+        Rename "{{ mgmt.dialogTarget.value?.name }}"
+      </div>
+      <label class="field">Display name<input
+        v-model="mgmt.fieldName.value"
+        class="field-input"
+      ></label>
+      <div
+        v-if="mgmt.dialogError.value"
+        class="dialog-err"
+      >
+        {{ mgmt.dialogError.value }}
+      </div>
       <div class="dialog-row">
-        <button class="btn" @click="mgmt.closeDialog()">Cancel</button>
-        <button class="btn btn--primary" :disabled="mgmt.busy.value || !mgmt.fieldName.value" @click="mgmt.submitRename()">Rename</button>
+        <button
+          class="btn"
+          @click="mgmt.closeDialog()"
+        >
+          Cancel
+        </button>
+        <button
+          class="btn btn--primary"
+          :disabled="mgmt.busy.value || !mgmt.fieldName.value"
+          @click="mgmt.submitRename()"
+        >
+          Rename
+        </button>
       </div>
     </div>
 
-    <div v-if="mgmt.dialog.value === 'archive'" class="group-dialog">
-      <div class="dialog-title">{{ mgmt.dialogTarget.value?.archived ? 'Unarchive' : 'Archive' }} "{{ mgmt.dialogTarget.value?.name }}"</div>
-      <p v-if="mgmt.archiveNeedsConfirm.value" class="dialog-note">Has {{ mgmt.dialogTarget.value?.count }} items. Type slug to confirm:</p>
-      <input v-if="mgmt.archiveNeedsConfirm.value" v-model="mgmt.fieldConfirm.value" class="field-input" :placeholder="mgmt.dialogTarget.value?.slug">
-      <div v-if="mgmt.dialogError.value" class="dialog-err">{{ mgmt.dialogError.value }}</div>
+    <div
+      v-if="mgmt.dialog.value === 'archive'"
+      class="group-dialog"
+    >
+      <div class="dialog-title">
+        {{ mgmt.dialogTarget.value?.archived ? 'Unarchive' : 'Archive' }} "{{ mgmt.dialogTarget.value?.name }}"
+      </div>
+      <p
+        v-if="mgmt.archiveNeedsConfirm.value"
+        class="dialog-note"
+      >
+        Has {{ mgmt.dialogTarget.value?.count }} items. Type slug to confirm:
+      </p>
+      <input
+        v-if="mgmt.archiveNeedsConfirm.value"
+        v-model="mgmt.fieldConfirm.value"
+        class="field-input"
+        :placeholder="mgmt.dialogTarget.value?.slug"
+      >
+      <div
+        v-if="mgmt.dialogError.value"
+        class="dialog-err"
+      >
+        {{ mgmt.dialogError.value }}
+      </div>
       <div class="dialog-row">
-        <button class="btn" @click="mgmt.closeDialog()">Cancel</button>
-        <button class="btn btn--primary" :disabled="mgmt.busy.value || !mgmt.archiveReady.value" @click="mgmt.submitArchive()">{{ mgmt.dialogTarget.value?.archived ? 'Unarchive' : 'Archive' }}</button>
+        <button
+          class="btn"
+          @click="mgmt.closeDialog()"
+        >
+          Cancel
+        </button>
+        <button
+          class="btn btn--primary"
+          :disabled="mgmt.busy.value || !mgmt.archiveReady.value"
+          @click="mgmt.submitArchive()"
+        >
+          {{ mgmt.dialogTarget.value?.archived ? 'Unarchive' : 'Archive' }}
+        </button>
       </div>
     </div>
   </div>

@@ -10,7 +10,7 @@ import type { RepoError } from '../../ports/ModelRepository'
 import EntityGroupNavTree from '../components/EntityGroupNavTree.vue'
 import GroupSelector from '../components/GroupSelector.vue'
 
-type Axis = 'model-project' | 'diagram-collection' | 'document-collection'
+type Axis = 'model-project' | 'diagram-collection' | 'document-collection' | 'analysis-collection'
 
 const props = defineProps<{ axis: Axis }>()
 
@@ -22,21 +22,25 @@ const STORAGE_KEYS: Record<Axis, string> = {
   'model-project': 'arch_group_model-project',
   'diagram-collection': 'arch_group_diagram-collection',
   'document-collection': 'arch_group_document-collection',
+  'analysis-collection': 'arch_group_analysis-collection',
 }
 const BROWSE_PATHS: Record<Axis, string> = {
   'model-project': '/entities',
   'diagram-collection': '/diagrams',
   'document-collection': '/documents',
+  'analysis-collection': '/assurance/analyses',
 }
 const AXIS_LABELS: Record<Axis, { title: string; singular: string; filterLabel: string }> = {
   'model-project': { title: 'Model Projects', singular: 'project', filterLabel: 'Framework' },
   'diagram-collection': { title: 'Diagram Collections', singular: 'collection', filterLabel: 'Type Filter' },
   'document-collection': { title: 'Document Collections', singular: 'collection', filterLabel: 'Type Filter' },
+  'analysis-collection': { title: 'Analysis Collections', singular: 'collection', filterLabel: 'Type Filter' },
 }
 const REGISTRY_KEY: Record<Axis, keyof GroupList> = {
   'model-project': 'model-projects',
   'diagram-collection': 'diagram-collections',
   'document-collection': 'document-collections',
+  'analysis-collection': 'analysis-collections',
 }
 
 const groups = computed(() => groupsState.data.value?.[REGISTRY_KEY[props.axis]] ?? [])
@@ -159,127 +163,307 @@ const label = computed(() => AXIS_LABELS[props.axis])
   <div class="outer-layout">
     <aside class="sidebar">
       <div class="sidebar-header">
-        <h2 class="sidebar-title">{{ axis === 'model-project' ? 'Project' : 'Collection' }}</h2>
+        <h2 class="sidebar-title">
+          {{ axis === 'model-project' ? 'Project' : 'Collection' }}
+        </h2>
       </div>
       <EntityGroupNavTree
         v-if="axis === 'model-project'"
-        :groups="sidebarGroups" active-group="" active-domain=""
-        :manageable="false" axis="model-project"
-        @update:active-group="onSidebarSelectGroup" @navigate-to-groups="() => {}"
+        :groups="sidebarGroups"
+        active-group=""
+        active-domain=""
+        :manageable="false"
+        axis="model-project"
+        @update:active-group="onSidebarSelectGroup"
+        @navigate-to-groups="() => {}"
       />
       <GroupSelector
         v-else
-        :groups="sidebarGroups" model-value="" :manageable="false" :axis="axis"
-        @update:model-value="onSidebarSelectGroup" @navigate-to-groups="() => {}"
+        :groups="sidebarGroups"
+        model-value=""
+        :manageable="false"
+        :axis="axis"
+        @update:model-value="onSidebarSelectGroup"
+        @navigate-to-groups="() => {}"
       />
     </aside>
     <div class="mgmt-page">
-    <div class="page-header">
-      <div>
-        <h1 class="page-title">{{ label.title }}</h1>
-        <p class="subtitle">Manage groupings, metadata, and {{ showMetaOntology ? 'ontology restrictions' : 'type filters' }}.</p>
-      </div>
-      <button class="browse-btn" @click="browseTo">Browse {{ label.title }} →</button>
-    </div>
-
-    <div v-if="groupsState.loading.value" class="state-msg">Loading…</div>
-    <div v-else-if="groupsState.errorMessage.value" class="state-msg error">{{ groupsState.errorMessage.value }}</div>
-
-    <template v-else>
-      <div class="toolbar">
-        <button class="create-btn" @click="createMode = !createMode">{{ createMode ? '✕ Cancel' : '+ New ' + label.singular }}</button>
-        <button class="archived-btn" :class="{ active: showArchived }" @click="showArchived = !showArchived">{{ showArchived ? '− archived' : '+ archived' }}</button>
-      </div>
-
-      <div v-if="createMode" class="create-form card">
-        <div class="form-row">
-          <label class="field">Name<input v-model="newName" class="field-input" @input="newSlug = slugify(newName)"></label>
-          <label class="field">Slug<input v-model="newSlug" class="field-input"></label>
-          <label v-if="showMetaOntology" class="field">
-            Framework
-            <select v-model="newMetaOntology" class="field-input">
-              <option v-for="o in META_ONTOLOGY_OPTIONS" :key="o.value" :value="o.value">{{ o.label }}</option>
-            </select>
-          </label>
+      <div class="page-header">
+        <div>
+          <h1 class="page-title">
+            {{ label.title }}
+          </h1>
+          <p class="subtitle">
+            Manage groupings, metadata, and {{ showMetaOntology ? 'ontology restrictions' : 'type filters' }}.
+          </p>
         </div>
-        <label class="field">Description<input v-model="newDescription" class="field-input"></label>
-        <div v-if="showTypeFilter && availableTypes.length > 0" class="field">
-          {{ label.filterLabel }} (leave empty for all)
-          <div class="type-checks">
-            <label v-for="t in availableTypes" :key="t" class="type-check">
-              <input type="checkbox" :checked="newTypeFilter.includes(t)" @change="toggleType(newTypeFilter, t)"> {{ t }}
+        <button
+          class="browse-btn"
+          @click="browseTo"
+        >
+          Browse {{ label.title }} →
+        </button>
+      </div>
+
+      <div
+        v-if="groupsState.loading.value"
+        class="state-msg"
+      >
+        Loading…
+      </div>
+      <div
+        v-else-if="groupsState.errorMessage.value"
+        class="state-msg error"
+      >
+        {{ groupsState.errorMessage.value }}
+      </div>
+
+      <template v-else>
+        <div class="toolbar">
+          <button
+            class="create-btn"
+            @click="createMode = !createMode"
+          >
+            {{ createMode ? '✕ Cancel' : '+ New ' + label.singular }}
+          </button>
+          <button
+            class="archived-btn"
+            :class="{ active: showArchived }"
+            @click="showArchived = !showArchived"
+          >
+            {{ showArchived ? '− archived' : '+ archived' }}
+          </button>
+        </div>
+
+        <div
+          v-if="createMode"
+          class="create-form card"
+        >
+          <div class="form-row">
+            <label class="field">Name<input
+              v-model="newName"
+              class="field-input"
+              @input="newSlug = slugify(newName)"
+            ></label>
+            <label class="field">Slug<input
+              v-model="newSlug"
+              class="field-input"
+            ></label>
+            <label
+              v-if="showMetaOntology"
+              class="field"
+            >
+              Framework
+              <select
+                v-model="newMetaOntology"
+                class="field-input"
+              >
+                <option
+                  v-for="o in META_ONTOLOGY_OPTIONS"
+                  :key="o.value"
+                  :value="o.value"
+                >{{ o.label }}</option>
+              </select>
             </label>
           </div>
+          <label class="field">Description<input
+            v-model="newDescription"
+            class="field-input"
+          ></label>
+          <div
+            v-if="showTypeFilter && availableTypes.length > 0"
+            class="field"
+          >
+            {{ label.filterLabel }} (leave empty for all)
+            <div class="type-checks">
+              <label
+                v-for="t in availableTypes"
+                :key="t"
+                class="type-check"
+              >
+                <input
+                  type="checkbox"
+                  :checked="newTypeFilter.includes(t)"
+                  @change="toggleType(newTypeFilter, t)"
+                > {{ t }}
+              </label>
+            </div>
+          </div>
+          <div
+            v-if="createError"
+            class="err"
+          >
+            {{ createError }}
+          </div>
+          <div class="form-actions">
+            <button
+              class="btn--primary"
+              :disabled="createBusy || !newSlug || !newName"
+              @click="submitCreate"
+            >
+              Create
+            </button>
+          </div>
         </div>
-        <div v-if="createError" class="err">{{ createError }}</div>
-        <div class="form-actions">
-          <button class="btn--primary" :disabled="createBusy || !newSlug || !newName" @click="submitCreate">Create</button>
-        </div>
-      </div>
 
-      <div class="card table-card">
-        <table class="groups-table">
-          <thead>
-            <tr>
-              <th>Name</th>
-              <th>Slug / ID</th>
-              <th>{{ label.filterLabel }}</th>
-              <th>Description</th>
-              <th></th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr v-if="visibleGroups.length === 0">
-              <td colspan="5" class="empty">No {{ label.singular }}s yet.</td>
-            </tr>
-            <template v-for="g in visibleGroups" :key="g.slug">
-              <tr v-if="editSlug !== g.slug" :class="{ archived: g.archived }">
-                <td class="td-name">
-                  <button class="name-link" @click="browseToGroup(g.slug)">{{ g.name }}</button>
-                  <span v-if="g.archived" class="arch-badge">archived</span>
-                  <span v-if="g.default" class="default-badge">default</span>
-                </td>
-                <td class="td-meta">
-                  <span class="mono">{{ g.slug }}</span>
-                  <span class="id-text">{{ g.id }}</span>
-                </td>
-                <td>
-                  <span v-if="showMetaOntology && g.meta_ontology" class="mo-badge">{{ META_ONTOLOGY_OPTIONS.find(o => o.value === g.meta_ontology)?.label ?? g.meta_ontology }}</span>
-                  <span v-else-if="showTypeFilter && g.type_filter && g.type_filter.length > 0" class="tf-badge">{{ g.type_filter.join(', ') }}</span>
-                  <span v-else class="none-text">—</span>
-                </td>
-                <td class="td-desc">{{ g.description || '—' }}</td>
-                <td class="td-actions">
-                  <button class="row-btn" @click="openEdit(g)">Edit</button>
+        <div class="card table-card">
+          <table class="groups-table">
+            <thead>
+              <tr>
+                <th>Name</th>
+                <th>Slug / ID</th>
+                <th>{{ label.filterLabel }}</th>
+                <th>Description</th>
+                <th />
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-if="visibleGroups.length === 0">
+                <td
+                  colspan="5"
+                  class="empty"
+                >
+                  No {{ label.singular }}s yet.
                 </td>
               </tr>
-              <tr v-else class="edit-row">
-                <td><input v-model="editName" class="field-input" placeholder="Name"></td>
-                <td class="td-meta"><span class="mono">{{ g.slug }}</span></td>
-                <td>
-                  <select v-if="showMetaOntology" v-model="editMetaOntology" class="field-input">
-                    <option v-for="o in META_ONTOLOGY_OPTIONS" :key="o.value" :value="o.value">{{ o.label }}</option>
-                  </select>
-                  <div v-else-if="showTypeFilter && availableTypes.length > 0" class="type-checks">
-                    <label v-for="t in availableTypes" :key="t" class="type-check">
-                      <input type="checkbox" :checked="editTypeFilter.includes(t)" @change="toggleType(editTypeFilter, t)"> {{ t }}
-                    </label>
-                  </div>
-                  <span v-else class="none-text">—</span>
-                </td>
-                <td><input v-model="editDescription" class="field-input" placeholder="Description"></td>
-                <td class="td-actions">
-                  <div v-if="editError" class="err">{{ editError }}</div>
-                  <button class="row-btn row-btn--primary" :disabled="editBusy" @click="saveEdit">Save</button>
-                  <button class="row-btn" @click="cancelEdit">Cancel</button>
-                </td>
-              </tr>
-            </template>
-          </tbody>
-        </table>
-      </div>
-    </template>
-  </div>
+              <template
+                v-for="g in visibleGroups"
+                :key="g.slug"
+              >
+                <tr
+                  v-if="editSlug !== g.slug"
+                  :class="{ archived: g.archived }"
+                >
+                  <td class="td-name">
+                    <button
+                      class="name-link"
+                      @click="browseToGroup(g.slug)"
+                    >
+                      {{ g.name }}
+                    </button>
+                    <span
+                      v-if="g.archived"
+                      class="arch-badge"
+                    >archived</span>
+                    <span
+                      v-if="g.default"
+                      class="default-badge"
+                    >default</span>
+                  </td>
+                  <td class="td-meta">
+                    <span class="mono">{{ g.slug }}</span>
+                    <span class="id-text">{{ g.id }}</span>
+                  </td>
+                  <td>
+                    <span
+                      v-if="showMetaOntology && g.meta_ontology"
+                      class="mo-badge"
+                    >{{ META_ONTOLOGY_OPTIONS.find(o => o.value === g.meta_ontology)?.label ?? g.meta_ontology }}</span>
+                    <span
+                      v-else-if="showTypeFilter && g.type_filter && g.type_filter.length > 0"
+                      class="tf-badge"
+                    >{{ g.type_filter.join(', ') }}</span>
+                    <span
+                      v-else
+                      class="none-text"
+                    >—</span>
+                  </td>
+                  <td class="td-desc">
+                    {{ g.description || '—' }}
+                  </td>
+                  <td class="td-actions">
+                    <button
+                      class="row-btn"
+                      @click="openEdit(g)"
+                    >
+                      Edit
+                    </button>
+                  </td>
+                </tr>
+                <tr
+                  v-else
+                  class="edit-row"
+                >
+                  <td>
+                    <input
+                      v-model="editName"
+                      class="field-input"
+                      placeholder="Name"
+                    >
+                  </td>
+                  <td class="td-meta">
+                    <span class="mono">{{ g.slug }}</span>
+                  </td>
+                  <td>
+                    <select
+                      v-if="showMetaOntology"
+                      v-model="editMetaOntology"
+                      class="field-input"
+                    >
+                      <option
+                        v-for="o in META_ONTOLOGY_OPTIONS"
+                        :key="o.value"
+                        :value="o.value"
+                      >
+                        {{ o.label }}
+                      </option>
+                    </select>
+                    <div
+                      v-else-if="showTypeFilter && availableTypes.length > 0"
+                      class="type-checks"
+                    >
+                      <label
+                        v-for="t in availableTypes"
+                        :key="t"
+                        class="type-check"
+                      >
+                        <input
+                          type="checkbox"
+                          :checked="editTypeFilter.includes(t)"
+                          @change="toggleType(editTypeFilter, t)"
+                        > {{ t }}
+                      </label>
+                    </div>
+                    <span
+                      v-else
+                      class="none-text"
+                    >—</span>
+                  </td>
+                  <td>
+                    <input
+                      v-model="editDescription"
+                      class="field-input"
+                      placeholder="Description"
+                    >
+                  </td>
+                  <td class="td-actions">
+                    <div
+                      v-if="editError"
+                      class="err"
+                    >
+                      {{ editError }}
+                    </div>
+                    <button
+                      class="row-btn row-btn--primary"
+                      :disabled="editBusy"
+                      @click="saveEdit"
+                    >
+                      Save
+                    </button>
+                    <button
+                      class="row-btn"
+                      @click="cancelEdit"
+                    >
+                      Cancel
+                    </button>
+                  </td>
+                </tr>
+              </template>
+            </tbody>
+          </table>
+        </div>
+      </template>
+    </div>
   </div>
 </template>
 
