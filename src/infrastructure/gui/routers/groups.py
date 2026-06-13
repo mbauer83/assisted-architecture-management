@@ -80,6 +80,8 @@ def list_groups(kind: str | None = None) -> dict[str, Any]:
         result["diagram-collections"] = [_entry_dict(e) for e in registry.list_axis("diagram-collection")]
     if kind is None or kind == "document-collection":
         result["document-collections"] = [_entry_dict(e) for e in registry.list_axis("document-collection")]
+    if kind is None or kind == "analysis-collection":
+        result["analysis-collections"] = [_entry_dict(e) for e in registry.list_axis("analysis-collection")]
     return result
 
 

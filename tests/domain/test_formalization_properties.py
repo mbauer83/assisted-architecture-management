@@ -15,6 +15,7 @@ F4 — Derivation as pure function (hypothesis property tests):
 from __future__ import annotations
 
 import tempfile
+from collections.abc import Iterator
 from pathlib import Path
 
 import pytest
@@ -92,6 +93,21 @@ def _tmp_diagram_file() -> Path:
     f.write("dummy")
     f.close()
     return Path(f.name)
+
+
+@pytest.fixture(scope="module")
+def dummy_diagram() -> Iterator[Path]:
+    """One reusable on-disk diagram file for the F4 property tests.
+
+    The file content is irrelevant (``compute_revision`` only hashes it), so a single
+    file is shared across all Hypothesis examples instead of being created and unlinked
+    per example — this removes per-example filesystem IO from the property loop.
+    """
+    path = _tmp_diagram_file()
+    try:
+        yield path
+    finally:
+        path.unlink(missing_ok=True)
 
 
 # ── F1: Signature + instance typing ──────────────────────────────────────────
@@ -245,7 +261,7 @@ class TestF4DerivationPurity:
     """
 
     @given(_entity_model())
-    @settings(max_examples=150)
+    @settings(max_examples=150, deadline=None)
     def test_f4_determinism(
         self, model_data: tuple[list[str], list[str], list[str]]
     ) -> None:
@@ -256,9 +272,9 @@ class TestF4DerivationPurity:
         assert es_derive(params, _SNAPSHOT, query) == es_derive(params, _SNAPSHOT, query)
 
     @given(_entity_model())
-    @settings(max_examples=150)
+    @settings(max_examples=150, deadline=None)
     def test_f4_refresh_idempotence(
-        self, model_data: tuple[list[str], list[str], list[str]]
+        self, dummy_diagram: Path, model_data: tuple[list[str], list[str], list[str]]
     ) -> None:
         """If M is unchanged and all candidates are already included, Refresh yields empty diff."""
         all_ids, selected, _ = model_data
@@ -274,35 +290,27 @@ class TestF4DerivationPurity:
                 included_entity_ids=tuple(sorted(candidates.entity_ids)),
             ),
         )
-        tmp = _tmp_diagram_file()
-        try:
-            diff = compute_derivation_diff(tmp, {}, vd, query, _ES_CATALOG)
-            assert diff.is_empty, f"new={diff.new_entity_ids}, gone={diff.gone_entity_ids}"
-        finally:
-            tmp.unlink(missing_ok=True)
+        diff = compute_derivation_diff(dummy_diagram, {}, vd, query, _ES_CATALOG)
+        assert diff.is_empty, f"new={diff.new_entity_ids}, gone={diff.gone_entity_ids}"
 
     @given(_entity_model())
-    @settings(max_examples=150)
+    @settings(max_examples=150, deadline=None)
     def test_f4_selection_monotonicity(
-        self, model_data: tuple[list[str], list[str], list[str]]
+        self, dummy_diagram: Path, model_data: tuple[list[str], list[str], list[str]]
     ) -> None:
         """Excluded entities stay excluded: they never appear in new_entity_ids on refresh."""
         all_ids, _, excluded = model_data
         assume(len(all_ids) > 0)
         query = FakeQuery(entities=[_entity(eid) for eid in all_ids])
         vd = _make_vd(all_ids, selected=[], excluded=excluded)
-        tmp = _tmp_diagram_file()
-        try:
-            diff = compute_derivation_diff(tmp, {}, vd, query, _ES_CATALOG)
-            overlap = set(diff.new_entity_ids) & set(excluded)
-            assert not overlap, f"excluded ids appeared as new candidates: {overlap}"
-        finally:
-            tmp.unlink(missing_ok=True)
+        diff = compute_derivation_diff(dummy_diagram, {}, vd, query, _ES_CATALOG)
+        overlap = set(diff.new_entity_ids) & set(excluded)
+        assert not overlap, f"excluded ids appeared as new candidates: {overlap}"
 
     @given(_entity_model())
-    @settings(max_examples=150)
+    @settings(max_examples=150, deadline=None)
     def test_f4_no_silent_mutation(
-        self, model_data: tuple[list[str], list[str], list[str]]
+        self, dummy_diagram: Path, model_data: tuple[list[str], list[str], list[str]]
     ) -> None:
         """Neither F_θ nor Refresh writes to M: model entity/connection sets unchanged."""
         all_ids, selected, excluded = model_data
@@ -312,11 +320,7 @@ class TestF4DerivationPurity:
 
         es_derive({"entity_ids": selected}, _SNAPSHOT, query)
         vd = _make_vd(all_ids, selected=selected, excluded=excluded)
-        tmp = _tmp_diagram_file()
-        try:
-            compute_derivation_diff(tmp, {}, vd, query, _ES_CATALOG)
-        finally:
-            tmp.unlink(missing_ok=True)
+        compute_derivation_diff(dummy_diagram, {}, vd, query, _ES_CATALOG)
 
         assert frozenset(query.entity_ids()) == entities_before
         assert frozenset(query.connection_ids()) == connections_before

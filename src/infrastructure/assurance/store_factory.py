@@ -101,7 +101,7 @@ def _build_bundle(
     # Auto-unlock for key-backed backends. PocketBase omitted — its auth is
     # session-based (env-var HTTP credentials, not an OS-keychain key).
     if store_backend in ("sqlcipher", "private-git"):
-        _try_auto_unlock(store, store_backend)
+        try_auto_unlock(store, store_backend)
 
     logger.info(
         "Assurance bundle: store=%s signals=%s archive=%s",
@@ -235,7 +235,7 @@ def _build_connector(
     return SQLiteSecurityConnector(signals_db_path or assurance_dir / "security-signals.db")
 
 
-def _try_auto_unlock(store: ConfidentialAssuranceStore, store_backend: str) -> None:
+def try_auto_unlock(store: ConfidentialAssuranceStore, store_backend: str) -> None:
     """Auto-unlock when the OS keychain confirms the store has been explicitly activated.
 
     The "setup-confirmed" keychain entry is written by `arch-assurance unlock` on first

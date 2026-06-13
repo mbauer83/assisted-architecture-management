@@ -55,7 +55,7 @@ _COMPONENT_INTERNAL_TYPES: frozenset[str] = frozenset({
     "application-component", "function", "service", "data-object", "grouping",
 })
 _COMPONENT_NEIGHBOR_TYPES: frozenset[str] = frozenset({
-    "application-component", "service", "data-object",
+    "application-component", "service", "data-object", "business-actor", "role",
 })
 
 

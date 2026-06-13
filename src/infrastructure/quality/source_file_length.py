@@ -12,17 +12,14 @@ from pathlib import Path
 
 SOURCE_FILE_SOFT_LIMIT = 250
 SOURCE_FILE_HARD_LIMIT = 350
+# Grandfathered files still above the 350-line hard limit. Each entry is a ratchet: the
+# recorded number is the current counted length, and the policy test fails if the file grows
+# past it — so these only ever shrink. Files driven back under 350 are removed entirely.
 SOURCE_FILE_BASELINE_LIMITS: dict[str, int] = {
-    "gen_id.py": 0,
     "src/application/verification/artifact_verifier.py": 388,
-    "src/infrastructure/rendering/diagram_builder.py": 467,
-    "src/application/verification/artifact_verifier_incremental.py": 351,
     "src/infrastructure/artifact_index/_sqlite_store.py": 387,
-    "src/infrastructure/artifact_index/service.py": 492,
-    "src/infrastructure/backend/arch_backend.py": 384,
+    "src/infrastructure/artifact_index/service.py": 484,
     "src/infrastructure/gui/routers/_diagram_write.py": 353,
-    "src/infrastructure/mcp/artifact_mcp/query_scaffold_tools.py": 442,
-    "src/infrastructure/write/artifact_write/admin_ops.py": 463,
 }
 
 
@@ -35,11 +32,7 @@ class SourceLengthViolation:
 
 
 def iter_policy_source_files(repo_root: Path) -> list[Path]:
-    paths = sorted((repo_root / "src").rglob("*.py"))
-    gen_id = repo_root / "gen_id.py"
-    if gen_id.exists():
-        paths.append(gen_id)
-    return paths
+    return sorted((repo_root / "src").rglob("*.py"))
 
 
 def counted_source_lines(path: Path) -> int:

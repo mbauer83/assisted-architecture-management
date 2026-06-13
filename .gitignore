@@ -33,3 +33,18 @@ plantuml.jar
 
 # PDFs — never commit reference documents; keep them local only
 *.pdf
+
+# Coverage analysis artifacts
+.coverage
+.coverage.*
+coverage.xml
+coverage.json
+htmlcov/
+
+# Hypothesis / pytest / ruff caches
+.hypothesis/
+.pytest_cache/
+.ruff_cache/
+
+# Stray local screenshots (Playwright MCP cwd captures, etc.)
+/overview.png

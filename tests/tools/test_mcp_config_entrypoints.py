@@ -22,7 +22,17 @@ def test_project_scripts_do_not_expose_legacy_arch_model_stdio_aliases() -> None
 
 
 def test_checked_in_mcp_configs_use_supported_stdio_entrypoints() -> None:
-    supported = {"arch-mcp-stdio-read", "arch-mcp-stdio-write"}
+    # Every checked-in stdio entrypoint must be a supported console script. The two
+    # architecture servers are always present; the assurance servers are optional
+    # (documented opt-in), so this is a subset check rather than exact equality.
+    supported = {
+        "arch-mcp-stdio-read",
+        "arch-mcp-stdio-write",
+        "arch-mcp-stdio-assurance-read",
+        "arch-mcp-stdio-assurance-write",
+    }
+    supported_args = {("run", command) for command in supported}
+    required_args = {("run", "arch-mcp-stdio-read"), ("run", "arch-mcp-stdio-write")}
 
     claude_config = _load_json(".mcp.json")
     vscode_config = _load_json(".vscode/mcp.json")
@@ -30,8 +40,10 @@ def test_checked_in_mcp_configs_use_supported_stdio_entrypoints() -> None:
     claude_args = {tuple(server["args"]) for server in claude_config["mcpServers"].values()}
     vscode_args = {tuple(server["args"]) for server in vscode_config["servers"].values()}
 
-    assert claude_args == {("run", command) for command in supported}
-    assert vscode_args == {("run", command) for command in supported}
+    assert claude_args <= supported_args, f"unsupported entrypoint in .mcp.json: {claude_args - supported_args}"
+    assert vscode_args <= supported_args, f"unsupported entrypoint in .vscode/mcp.json: {vscode_args - supported_args}"
+    assert required_args <= claude_args
+    assert required_args <= vscode_args
 
 
 def test_read_server_tools_are_marked_read_only() -> None:

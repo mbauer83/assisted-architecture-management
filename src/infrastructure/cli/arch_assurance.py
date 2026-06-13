@@ -31,6 +31,7 @@ from src.infrastructure.cli._assurance_commands import (
     cmd_export_key,
     cmd_import_sbom,
     cmd_init,
+    cmd_lock,
     cmd_pocketbase_init,
     cmd_pocketbase_status,
     cmd_rotate_key,
@@ -86,7 +87,16 @@ def main() -> None:
     )
 
     sub.add_parser("status", help="Show store configuration, backends, and lock status")
-    sub.add_parser("unlock", help="Verify the encryption key works and report store stats")
+    sub.add_parser(
+        "unlock",
+        help="Activate the store: verify the key and persistently enable auto-unlock "
+        "(the backend then opens it automatically on every start)",
+    )
+    sub.add_parser(
+        "lock",
+        help="Persistently disable auto-unlock (clears the setup-confirmed gate); "
+        "the key stays in the keychain so `unlock` re-enables access",
+    )
 
     p_backup = sub.add_parser("backup", help="Backup the encrypted DB")
     p_backup.add_argument("--backup-path", metavar="PATH", help="Destination path")
@@ -122,7 +132,7 @@ def main() -> None:
     build_runtime_catalogs(get_module_registry())
     dispatch = {
         "init": cmd_init, "status": cmd_status, "use-backend": cmd_use_backend,
-        "unlock": cmd_unlock, "backup": cmd_backup, "export": cmd_export,
+        "unlock": cmd_unlock, "lock": cmd_lock, "backup": cmd_backup, "export": cmd_export,
         "rotate-key": cmd_rotate_key, "export-key": cmd_export_key,
         "verify": cmd_verify, "verify-chain": cmd_verify_chain,
         "pocketbase-init": cmd_pocketbase_init, "pocketbase-status": cmd_pocketbase_status,

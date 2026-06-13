@@ -5,7 +5,9 @@ from __future__ import annotations
 import logging
 from functools import lru_cache
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
+from typing import Any
+
+from fastapi import Request
 
 from src.application.derivation.strategy_registry import DerivationStrategyCatalogBuilder
 from src.application.runtime_catalogs import RuntimeCatalogs
@@ -24,9 +26,6 @@ from src.ontologies.sysml_v2_min import module as sysml_v2_min_module
 
 _archimate_next_module = load_archimate_next_module(_ARCH_PACKAGE_DIR, svg_converter=_svg_convert)
 _archimate_matrix_abbreviations = _archimate_next_module.matrix_abbreviations
-
-if TYPE_CHECKING:
-    from fastapi import Request
 
 _MODULE_REGISTRY_STATE_KEY = "module_registry"
 _RUNTIME_CATALOGS_STATE_KEY = "runtime_catalogs"

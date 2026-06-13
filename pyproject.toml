@@ -1,7 +1,7 @@
 [project]
-name = "scalable-architecture-for-humans-and-ai"
+name = "architectonic"
 version = "0.1.0"
-description = "Provides scalable and discoverable architecture management for humans and ai"
+description = "Architectonic — architecture as code for humans and AI: a typed, verifiable, git-versioned model with MCP, REST, CLI, and GUI access, plus safety/security/GRC assurance."
 requires-python = ">=3.13"
 dependencies = [
     "pyyaml>=6.0",
@@ -61,12 +61,57 @@ select = [
     "I",
 ]
 
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-n auto"
+# Coverage is opt-in to keep the default quality-gate run fast. Enable with:
+#   uv run pytest --cov            (terminal summary with missing lines)
+#   uv run pytest --cov --cov-report=html   (browsable htmlcov/ report)
+# The --cov flag needs no argument; the measured package is configured below.
+
+[tool.coverage.run]
+source = ["src"]
+branch = true
+omit = [
+    "*/__pycache__/*",
+    "src/infrastructure/gui/gui_server.py",
+]
+
+[tool.coverage.report]
+show_missing = true
+skip_covered = true
+precision = 1
+# Coverage bases (measured 2026-06): 78.6% statement/line · 75.7% combined · 66% branch.
+# The canonical, reported figure is statement/line coverage (~79%) — this is also what
+# Codecov shows by default. Because branch=true above, coverage.py's headline
+# `percent_covered` (and therefore `fail_under`) is the branch-INCLUSIVE combined metric
+# (~76%), not the line figure — do not compare a line-basis target against it.
+# `fail_under` is a ratchet for explicit `--cov` runs only; it never blocks the default
+# (no-coverage) quality-gate run. Raise it as coverage improves.
+fail_under = 74
+# Only lines that genuinely cannot be exercised by tests. Each pattern below was
+# checked against src/: TYPE_CHECKING blocks (30, import-only), abstract method
+# bodies (6), __main__ entry guards (16), and bare `...` Protocol/stub bodies.
+# The ellipsis pattern is anchored to a whole line so it never swallows real
+# `tuple[str, ...]` annotations.
+exclude_also = [
+    "if TYPE_CHECKING:",
+    "@(abc\\.)?abstractmethod",
+    "if __name__ == .__main__.:",
+    "^\\s*\\.\\.\\.\\s*$",
+]
+
+[tool.coverage.html]
+directory = "htmlcov"
+
+[tool.coverage.xml]
+output = "coverage.xml"
+
 [tool.zuban]
 mode = "default"
 python_version = "3.13"
 files = [
     "src",
-    "gen_id.py",
 ]
 exclude = "(^|/)(\\.arch|\\.venv|engagements|enterprise-repository|tools/gui)(/|$)"
 ignore_missing_imports = true
@@ -84,6 +129,8 @@ dev = [
     "hypothesis>=6.0",
     "pytest>=8.3",
     "pytest-bdd>=7.3",
+    "pytest-cov>=6.0",
+    "pytest-xdist>=3.5",
     "ruff>=0.15.11",
     "zuban>=0.7.0",
     "moto[s3]>=5.0",

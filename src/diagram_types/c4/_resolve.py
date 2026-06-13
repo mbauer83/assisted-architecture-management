@@ -278,6 +278,25 @@ def _resolve_standalone(
     )
 
 
+def _short_description(entity: Any) -> str:
+    """First prose sentence of the entity's body, truncated — the C4 element/person role line.
+
+    Skips the leading ``## Name`` heading and any table/properties blocks; returns the first
+    real paragraph's opening sentence so C4 boxes (and especially Persons) carry a short role
+    description rather than rendering bare.
+    """
+    text = getattr(entity, "content_text", "") if entity is not None else ""
+    if not text:
+        return ""
+    for block in text.split("\n\n"):
+        line = block.strip().splitlines()[0].strip() if block.strip() else ""
+        if not line or line.startswith(("#", "|", "-", "*", ">")):
+            continue
+        sentence = line.split(". ")[0].rstrip(".")
+        return sentence if len(sentence) <= 100 else sentence[:99].rstrip() + "…"
+    return ""
+
+
 def _item_from_entity(entity: Any, entity_id: str, item_type: str, *, external: bool) -> _ResolvedItem:
     label = entity.name if entity is not None else entity_id
     raw_alias = getattr(entity, "display_alias", "") or "" if entity is not None else ""
@@ -287,7 +306,7 @@ def _item_from_entity(entity: Any, entity_id: str, item_type: str, *, external: 
         item_type=item_type,
         alias=alias,
         label=label,
-        description="",
+        description=_short_description(entity),
         technology="",
         external=external,
     )

@@ -107,14 +107,23 @@ def cmd_status(args: argparse.Namespace) -> int:
     except Exception:  # noqa: BLE001
         pass
 
+    # The store is "unlocked" in the only persistent sense that matters when its key is in
+    # the OS keychain AND `unlock` has set the setup-confirmed gate: it then opens in every
+    # process and across restarts without ceremony. We report that truthfully by running the
+    # SAME auto-unlock gate the backend uses against a throwaway probe — not the (always
+    # false) in-memory state of a freshly built store.
     unlocked = False
     status_str = "not_initialised"
     if key_present:
         status_str = "locked"
     if store_backend == "sqlcipher" and db_path.exists() and key_present:
         from src.infrastructure.assurance._sqlcipher_store import SQLCipherAssuranceStore  # noqa: PLC0415
+        from src.infrastructure.assurance.store_factory import try_auto_unlock  # noqa: PLC0415
 
-        unlocked = SQLCipherAssuranceStore(db_path).is_unlocked()
+        probe = SQLCipherAssuranceStore(db_path)
+        try_auto_unlock(probe, "sqlcipher")
+        unlocked = probe.is_unlocked()
+        probe.lock()
         if unlocked:
             status_str = "unlocked"
         elif not setup_confirmed:
@@ -184,6 +193,29 @@ def cmd_unlock(args: argparse.Namespace) -> int:
     except RuntimeError as exc:
         print(f"Error: {exc}", file=sys.stderr)
         return 1
+
+
+def cmd_lock(_args: argparse.Namespace) -> int:
+    """Persistently disable auto-unlock by clearing the setup-confirmed gate.
+
+    The inverse of `unlock`. The encryption key stays in the OS keychain (so `unlock`
+    re-enables access without the recovery key), but the backend will no longer open the
+    store automatically until `unlock` is run again — fail-closed.
+    """
+    try:
+        creds.delete("setup-confirmed")
+    except Exception as exc:  # noqa: BLE001
+        print(f"Error: {exc}", file=sys.stderr)
+        return 1
+    _notify_backend_reload()
+    _print_yaml({
+        "status": "locked",
+        "note": (
+            "Auto-unlock disabled. The backend will not open the store until you run "
+            "`arch-assurance unlock` again. The encryption key remains in the OS keychain."
+        ),
+    })
+    return 0
 
 
 def cmd_backup(args: argparse.Namespace) -> int:
