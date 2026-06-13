@@ -4,6 +4,8 @@ Enforced by `tests/architecture/test_dependency_policy.py` (AST-based, baseline 
 
 ---
 
+&nbsp;
+
 ## Package roles
 
 | Package | Role | Notes |
@@ -33,6 +35,8 @@ Composition roots (allowed to import from all packages):
 
 ---
 
+&nbsp;
+
 ## Dependency matrix
 
 ```
@@ -49,6 +53,8 @@ composition   →  all packages
 ```
 
 ---
+
+&nbsp;
 
 ## Burn-down
 

@@ -5,6 +5,8 @@ listed in dependency order (lower entries depend only on earlier ones).
 
 ---
 
+&nbsp;
+
 ## Module Catalog
 
 **What it is:** The immutable registry of all installed diagram-type modules (C4,
@@ -25,6 +27,8 @@ in WU-15/Phase J). In code, the canonical name is `ModuleCatalog`.
 
 ---
 
+&nbsp;
+
 ## Artifact Index
 
 **What it is:** The in-memory, SQLite-backed read model that tracks all parsed
@@ -44,6 +48,8 @@ a derived cache; the repository is the source of truth.
 
 ---
 
+&nbsp;
+
 ## Artifact Repository
 
 **What it is:** The on-disk storage layer — the git directory tree containing
@@ -60,6 +66,8 @@ repositories may be mounted simultaneously as `RepoMount` instances.
 store; the index is rebuilt from it.
 
 ---
+
+&nbsp;
 
 ## Application Composition Root
 
@@ -79,6 +87,8 @@ downward from here.
 
 ---
 
+&nbsp;
+
 ## Runtime Host
 
 **What it is:** A deployable process that owns exactly one composition root and
@@ -94,6 +104,8 @@ presents the application capabilities over a specific transport.
 
 ---
 
+&nbsp;
+
 ## Verification Policy
 
 **What it is:** The set of rules that `ArtifactVerifier` enforces, expressed as
@@ -108,6 +120,8 @@ Policy never touches I/O directly.
   accept parsed frontmatter/PUML/catalog data and return `list[Issue]`.
 
 ---
+
+&nbsp;
 
 ## Verification Executor
 

@@ -1,0 +1,102 @@
+# Git Sync & Promotion
+
+Architecture changes accumulate as file edits, then reach git in two explicit steps: *saving*
+(committing locally) and, for enterprise changes, *submitting for review* (pushing a branch).
+Promotion moves selected content from an engagement repo up to the enterprise baseline.
+
+&nbsp;
+
+## Promotion
+
+Promotion is a one-way transfer of an explicitly selected set of entities and connections from
+engagement to enterprise.
+
+- **Conflict detection** matches by both `(artifact_type, normalized_name)` and
+  `(artifact_type, id_suffix)`. The same entity renamed in one repo is caught by the ID match;
+  the same name with a different ID is caught by the name match.
+- **Resolution strategies** — accept engagement version, accept enterprise version, or manual
+  merge.
+- **Blocked** when the engagement repo's schemata are not supersets of the enterprise schemata
+  (per-violation error).
+- **Asymmetric references** — enterprise entities may reference only enterprise entities;
+  engagement entities may reference both. The verifier enforces this.
+
+Run promotion through the `↑ Promote` GUI view, the `artifact_promote_to_enterprise` MCP tool,
+or REST.
+
+&nbsp;
+
+## Saving — engagement
+
+| Surface | How |
+|---|---|
+| GUI | "Save Changes" → commit message; optional immediate push |
+| MCP | `artifact_save_changes(message="…", target="engagement")` |
+| REST | `POST /api/sync/engagement/save` `{"message": "…", "push": true}` |
+
+With `push=true` (default) the commit is pushed to the remote branch immediately.
+
+&nbsp;
+
+## Enterprise — branch-based review workflow
+
+Enterprise changes follow a three-step lifecycle that works with any git host without API
+integration:
+
+```
+ promote artifacts ──► save (commit) ──► submit for review (push branch → open PR manually)
+   [accumulating]        [accumulating]         [pending]
+                                                   │
+                              [synced] ◄───────────┘  auto-detected when the branch
+                                                       content lands in origin/main
+```
+
+- **Accumulating** — the first enterprise write creates an isolated working branch (e.g.
+  `arch/work-20260425-143012`); later promotions accumulate on it. The enterprise read view
+  always reflects branch content.
+- **Saving** — commits the working branch without pushing
+  (`artifact_save_changes(target="enterprise")` / `POST /api/sync/enterprise/save`).
+- **Submitting** — pushes and marks pending; the returned branch name is used to open a PR
+  (`artifact_submit_for_review()` / `POST /api/sync/enterprise/submit`).
+- **Auto-merge detection** — the sync loop polls `origin/main`; when the branch content is
+  detected there (content diff, so squash/rebase merges are handled), it checks out `main`,
+  pulls, and transitions to *synced*.
+- **Discarding** — `artifact_withdraw_changes(confirm=True)` /
+  `POST /api/sync/enterprise/withdraw`.
+
+State is persisted in `.arch/enterprise-sync.json` and survives restarts.
+
+&nbsp;
+
+## Continuous git sync
+
+When a repo is configured as a git repo, the backend runs a background sync loop (default 60s).
+
+**Engagement** — fetch every cycle; `git pull --ff-only` when clean and behind;
+`git pull --rebase` when there are local commits; abort cleanly and emit a conflict event on a
+rebase conflict.
+
+**Enterprise** — *synced*: fetch + fast-forward; *accumulating*: fetch only, emit a divergence
+event if `origin/main` moved ahead; *pending*: fetch + content-diff to detect a merge, then
+transition to *synced*.
+
+In all cases writes are briefly blocked during pull/checkout, the block auto-lifts after 60s
+if a sync fails, and the artifact index refreshes (and the GUI is notified via SSE) after any
+pull or transition.
+
+&nbsp;
+
+## Git authentication
+
+SSH and HTTPS remotes are both supported. Credentials are never written to disk — they are
+held in process memory and injected into git subprocesses via a temporary askpass helper.
+
+`arch-backend` and `arch-init` probe configured remotes and prompt on the terminal only when
+credentials are required. For `--daemon`, prompting happens in the foreground parent before
+the daemon forks. For CI / non-interactive use, set environment variables to skip prompting:
+
+```bash
+export ARCH_GIT_SSH_PASSWORD="my passphrase"   # SSH key passphrase
+export ARCH_GIT_HTTPS_USERNAME="my-user"        # HTTPS username
+export ARCH_GIT_HTTPS_PASSWORD="my-token"       # HTTPS password or token
+```
