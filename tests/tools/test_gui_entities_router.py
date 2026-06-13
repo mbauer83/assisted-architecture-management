@@ -103,6 +103,77 @@ def enterprise_root(tmp_path: Path) -> Path:
     return root
 
 
+def _activity_diagram_md(diagram_id: str) -> str:
+    return f"""\
+---
+artifact-id: {diagram_id}
+artifact-type: diagram
+name: "My Process"
+diagram-type: activity
+version: 0.1.0
+status: draft
+last-updated: '2026-05-09'
+diagram-entities:
+  swimlane:
+    - id: sw-1
+      label: Author
+  action:
+    - id: a1
+      label: Submit Form
+      lane_id: sw-1
+---
+@startuml my-process
+title My Process
+@enduml
+"""
+
+
+def test_entity_catalog_excludes_diagram_owned_entities(
+    engagement_root: Path,
+    enterprise_root: Path,
+) -> None:
+    """Diagram-owned entities (swimlane/action/…) must not surface in the /api/entities catalog.
+
+    Regression: activity/sequence diagram-owned entities are indexed with a host_diagram_id
+    so they are queryable in-diagram, but they are not standalone model entities. They had
+    been leaking into the model-entity listing, whose types the frontend union rightly
+    rejects (e.g. "action" is not a model entity type).
+    """
+    from typing import cast
+
+    from fastapi import Request
+
+    from src.infrastructure.gui.routers.entities import list_entities
+
+    model_req = "REQ@1000000000.EngAAA.eng-req"
+    diagram_id = "ACT@1234567890.aBcDeF.my-process"
+    _write(
+        engagement_root / "model" / "motivation" / "requirement" / f"{model_req}.md",
+        _entity_md(model_req, "Engagement Req"),
+    )
+    _write(
+        engagement_root / "diagram-catalog" / "diagrams" / f"{diagram_id}.md",
+        _activity_diagram_md(diagram_id),
+    )
+
+    repo = ArtifactRepository(shared_artifact_index([engagement_root, enterprise_root]))
+    gui_state.init_state(repo, engagement_root, enterprise_root)
+
+    # Sanity: the diagram-owned entities are indexed (queryable in-diagram) ...
+    all_types = {e.artifact_type for e in repo.list_entities()}
+    assert {"action", "swimlane"} <= all_types
+
+    # ... but the catalog endpoint omits them.
+    payload = list_entities(request=cast("Request", None), limit=2000, offset=0)
+    catalog_types = {row["artifact_type"] for row in payload["items"]}
+    catalog_ids = {row["artifact_id"] for row in payload["items"]}
+
+    assert "requirement" in catalog_types
+    assert "action" not in catalog_types
+    assert "swimlane" not in catalog_types
+    assert all("#action/" not in i and "#swimlane/" not in i for i in catalog_ids)
+
+
 def test_global_scope_listing_survives_root_entities_without_specialization_parent(
     engagement_root: Path,
     enterprise_root: Path,

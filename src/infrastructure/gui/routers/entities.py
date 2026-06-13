@@ -43,6 +43,10 @@ def list_entities(
 ) -> dict[str, Any]:
     repo = s.get_repo()
     entities = repo.list_entities(domain=domain, artifact_type=artifact_type, status=status, group=group)
+    # Diagram-owned entities (swimlanes, lifelines, actions, …) live inside a diagram's
+    # frontmatter; they are indexed for in-diagram queries but are not standalone model
+    # entities and must not surface in the model-entity catalog.
+    entities = [e for e in entities if e.host_diagram_id is None]
     _cat = _catalogs()
     if scope == "global":
         entities = [
