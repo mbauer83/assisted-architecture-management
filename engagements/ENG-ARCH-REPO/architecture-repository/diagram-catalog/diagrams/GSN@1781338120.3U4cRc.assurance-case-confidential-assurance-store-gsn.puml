@@ -1,0 +1,88 @@
+---
+artifact-id: GSN@1781338120.3U4cRc.assurance-case-confidential-assurance-store-gsn
+artifact-type: diagram
+name: "Assurance Case \u2014 Confidential Assurance Store (GSN)"
+version: 0.1.0
+status: draft
+diagram-type: gsn
+diagram-entities:
+  nodes:
+  - node_id: cx1
+    name: 'Scope: STPA-Sec of the confidential assurance store; EU AI Act Art. 12'
+    gsn_type: context
+  - node_id: g1
+    name: The confidential assurance store is acceptably protected against evidence
+      disclosure
+    gsn_type: goal
+  - node_id: s1
+    name: Argue over the STPA-Sec access-control and record-keeping constraints
+    gsn_type: strategy
+  - node_id: g2
+    name: "Access is denied unless requestor clearance \u2265 entry TLP (fail closed)"
+    gsn_type: goal
+  - node_id: g3
+    name: The store re-locks at the end of the authorized activation window
+    gsn_type: goal
+  - node_id: g4
+    name: Every significant operation is recorded in a tamper-evident archive
+    gsn_type: goal
+  - node_id: sn1
+    name: Classification gate enforced before retrieval
+    gsn_type: solution
+  - node_id: sn2
+    name: Activation-window re-lock
+    gsn_type: solution
+  - node_id: sn3
+    name: Hash-chained Assurance Archive (Art. 12 evidence)
+    gsn_type: solution
+  edges:
+  - source_id: g1
+    target_id: cx1
+    conn_type: in-context-of
+  - source_id: g1
+    target_id: s1
+    conn_type: supported-by
+  - source_id: s1
+    target_id: g2
+    conn_type: supported-by
+  - source_id: s1
+    target_id: g3
+    conn_type: supported-by
+  - source_id: s1
+    target_id: g4
+    conn_type: supported-by
+  - source_id: g2
+    target_id: sn1
+    conn_type: supported-by
+  - source_id: g3
+    target_id: sn2
+    conn_type: supported-by
+  - source_id: g4
+    target_id: sn3
+    conn_type: supported-by
+last-updated: '2026-06-13'
+---
+@startuml Assurance_Case_Confidential_Assurance_Store_GSN
+title Assurance Case — Confidential Assurance Store (GSN)
+top to bottom direction
+
+usecase "C: Scope: STPA-Sec of the confidential assurance store; EU AI Act Art. 12" as cx1 #FFFFD0
+rectangle "G: The confidential assurance store is acceptably protected against evidence disclosure" as g1 #D0E8FF
+card "S: Argue over the STPA-Sec access-control and record-keeping constraints" as s1 #E8E0FF
+rectangle "G: Access is denied unless requestor clearance ≥ entry TLP (fail closed)" as g2 #D0E8FF
+rectangle "G: The store re-locks at the end of the authorized activation window" as g3 #D0E8FF
+rectangle "G: Every significant operation is recorded in a tamper-evident archive" as g4 #D0E8FF
+database "Sn: Classification gate enforced before retrieval" as sn1 #D0FFD8
+database "Sn: Activation-window re-lock" as sn2 #D0FFD8
+database "Sn: Hash-chained Assurance Archive (Art. 12 evidence)" as sn3 #D0FFD8
+
+g1 ..> cx1 : in-context-of
+g1 --> s1 : supported-by
+s1 --> g2 : supported-by
+s1 --> g3 : supported-by
+s1 --> g4 : supported-by
+g2 --> sn1 : supported-by
+g3 --> sn2 : supported-by
+g4 --> sn3 : supported-by
+
+@enduml
