@@ -34,7 +34,7 @@ _GITHUB_DOWNLOAD = "https://github.com/plantuml/plantuml/releases/download/v{ver
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
 
-def _fetch(url: str, label: str) -> bytes:
+def _fetch(url: str, label: str) -> bytes:  # pragma: no cover — network download, not testable in unit tests
     print(f"  {label}: {url} … ", end="", flush=True)
     try:
         req = urllib.request.Request(url, headers={"User-Agent": "get-plantuml/1.0"})
@@ -47,7 +47,7 @@ def _fetch(url: str, label: str) -> bytes:
     return data
 
 
-def _head_ok(url: str) -> bool:
+def _head_ok(url: str) -> bool:  # pragma: no cover — network HEAD request, not testable in unit tests
     """Return True if url responds with 2xx."""
     try:
         req = urllib.request.Request(url, method="HEAD", headers={"User-Agent": "get-plantuml/1.0"})
@@ -61,7 +61,7 @@ def _sha256hex(data: bytes) -> str:
     return hashlib.sha256(data).hexdigest().lower()
 
 
-def _latest_github_version() -> str:
+def _latest_github_version() -> str:  # pragma: no cover — network GitHub API, not testable in unit tests
     print(f"  querying: {_GITHUB_API_LATEST} … ", end="", flush=True)
     try:
         req = urllib.request.Request(_GITHUB_API_LATEST, headers={"User-Agent": "get-plantuml/1.0"})
@@ -78,7 +78,7 @@ def _latest_github_version() -> str:
 # ── Download strategies ───────────────────────────────────────────────────────
 
 
-def _download_maven(version: str, output: Path) -> bool:
+def _download_maven(version: str, output: Path) -> bool:  # pragma: no cover
     """Try Maven Central. Returns True on success, False if version not found there."""
     base = f"{_MAVEN_BASE}/{version}/plantuml-{version}"
     jar_url = f"{base}.jar"
@@ -107,7 +107,7 @@ def _download_maven(version: str, output: Path) -> bool:
     return True
 
 
-def _download_github(version: str, output: Path) -> None:
+def _download_github(version: str, output: Path) -> None:  # pragma: no cover
     """Download from GitHub Releases (no SHA-256 sidecar)."""
     jar_url = _GITHUB_DOWNLOAD.format(version=version)
     print(f"Downloading PlantUML {version} from GitHub Releases:")

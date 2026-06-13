@@ -192,6 +192,22 @@ def create_document(
     )
 
 
+_MANAGED_DOC_FM_KEYS = frozenset(
+    {"artifact-id", "artifact-type", "doc-type", "title", "status", "version", "last-updated", "keywords"}
+)
+
+
+def _split_document_frontmatter(raw: str, path: Path) -> tuple[dict[str, object], str]:
+    """Split a document's raw text into its parsed frontmatter mapping and body."""
+    if not raw.startswith("---"):
+        raise ValueError(f"Document at {path} has no YAML frontmatter")
+    end = raw.find("\n---", 3)
+    if end == -1:
+        raise ValueError(f"Document at {path} has malformed YAML frontmatter")
+    fm: dict[str, object] = yaml.safe_load(raw[3:end].strip()) or {}
+    return fm, raw[end + 4 :].lstrip("\n")
+
+
 def edit_document(
     *,
     repo_root: Path,
@@ -215,32 +231,13 @@ def edit_document(
         raise ValueError(f"Document '{artifact_id}' not found under {docs_root}")
     path = candidates[0]
 
-    raw = path.read_text(encoding="utf-8")
-    # Split frontmatter / body
-    if not raw.startswith("---"):
-        raise ValueError(f"Document at {path} has no YAML frontmatter")
-    end = raw.find("\n---", 3)
-    if end == -1:
-        raise ValueError(f"Document at {path} has malformed YAML frontmatter")
-    fm: dict[str, object] = yaml.safe_load(raw[3:end].strip()) or {}
-    existing_body = raw[end + 4 :].lstrip("\n")
-
-    if title is not None:
-        fm["title"] = title
-    if status is not None:
-        fm["status"] = status
-    if version is not None:
-        fm["version"] = version
-    if last_updated is not None:
-        fm["last-updated"] = last_updated
-    else:
-        fm["last-updated"] = today_iso()
-    if keywords is not None:
-        fm["keywords"] = keywords
+    fm, existing_body = _split_document_frontmatter(path.read_text(encoding="utf-8"), path)
+    fm.update({k: v for k, v in {"title": title, "status": status, "version": version, "keywords": keywords}.items()
+               if v is not None})
+    fm["last-updated"] = last_updated if last_updated is not None else today_iso()
     if extra_frontmatter:
         fm.update(extra_frontmatter)
 
-    new_body = body if body is not None else existing_body
     content = _format_document_markdown(
         artifact_id=str(fm.get("artifact-id", artifact_id)),
         doc_type=str(fm.get("doc-type", "")),
@@ -249,22 +246,8 @@ def edit_document(
         version=str(fm.get("version", "")),
         last_updated=str(fm.get("last-updated", today_iso())),
         keywords=as_optional_str_list(fm.get("keywords")),
-        extra_frontmatter={
-            k: v
-            for k, v in fm.items()
-            if k
-            not in {
-                "artifact-id",
-                "artifact-type",
-                "doc-type",
-                "title",
-                "status",
-                "version",
-                "last-updated",
-                "keywords",
-            }
-        },
-        body=new_body,
+        extra_frontmatter={k: v for k, v in fm.items() if k not in _MANAGED_DOC_FM_KEYS},
+        body=body if body is not None else existing_body,
     )
 
     relative_path = path.relative_to(repo_root / DOCS).as_posix()
@@ -279,25 +262,13 @@ def edit_document(
 
     if dry_run or not _document_write_allowed(preview_res):
         return WriteResult(
-            wrote=False,
-            path=path,
-            artifact_id=artifact_id,
-            content=content,
-            warnings=[],
-            verification=verification,
+            wrote=False, path=path, artifact_id=artifact_id, content=content, warnings=[], verification=verification
         )
 
-    if not dry_run:
-        path.write_text(content, encoding="utf-8")
-        clear_repo_caches(path)
-
+    path.write_text(content, encoding="utf-8")
+    clear_repo_caches(path)
     return WriteResult(
-        wrote=True,
-        path=path,
-        artifact_id=artifact_id,
-        content=None,
-        warnings=[],
-        verification=verification,
+        wrote=True, path=path, artifact_id=artifact_id, content=None, warnings=[], verification=verification
     )
 
 

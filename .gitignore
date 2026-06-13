@@ -21,6 +21,9 @@ tools/plantuml.jar
 
 # Engagement-specific (not part of this repo)
 engagements/ENG-001/
+
+# Separate enterprise repository checked out alongside the workspace (its own git repo)
+u2p-enterprise-repository/
 .arch/
 src/tools/model_mcp/__pycache__/
 src/tools/model_write/__pycache__/

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Iterator
 from dataclasses import replace
 from pathlib import Path
 from typing import TypeVar
@@ -104,40 +105,61 @@ def _insert_mounted(
     )
 
 
-def scan_mount(mount: RepoMount, mem: _MemStore, *, domain_names: frozenset[str]) -> None:
-    repo_root = mount.root
+def _scan_model_records(repo_root: Path, mem: _MemStore, *, domain_names: frozenset[str]) -> None:
+    """Index entities and outgoing connections across every model root of a repo."""
     for model_root in all_model_roots(repo_root):
         for path in sorted(model_root.rglob("*.md")):
-            if not path.name.endswith(".outgoing.md"):
-                entity = parse_entity(path, model_root, domain_names=domain_names)
-                if entity is not None:
-                    grp = group_fn_entity(path, repo_root)
-                    _insert_mounted(replace(entity, group=grp), "entity", repo_root, mem.entities)
-        for path in sorted(model_root.rglob("*.outgoing.md")):
-            for conn in parse_outgoing_file(path):
+            if path.name.endswith(".outgoing.md"):
+                continue
+            entity = parse_entity(path, model_root, domain_names=domain_names)
+            if entity is not None:
                 grp = group_fn_entity(path, repo_root)
+                _insert_mounted(replace(entity, group=grp), "entity", repo_root, mem.entities)
+        for path in sorted(model_root.rglob("*.outgoing.md")):
+            grp = group_fn_entity(path, repo_root)
+            for conn in parse_outgoing_file(path):
                 _insert_mounted(replace(conn, group=grp), "connection", repo_root, mem.connections)
+
+
+def _iter_diagram_sources(diag_root: Path) -> Iterator[Path]:
+    """Diagram .puml/.md sources under *diag_root*, excluding the rendered output tree."""
+    rendered = (diag_root.parent / RENDERED).resolve()
+    for suffix in ("*.puml", "*.md"):
+        for path in sorted(diag_root.rglob(suffix)):
+            if not path.resolve().is_relative_to(rendered):
+                yield path
+
+
+def _scan_diagram_records(repo_root: Path, mem: _MemStore) -> None:
+    """Index diagrams and the entities/connections they materialise."""
     diag_root = diagram_source_root(repo_root)
-    if diag_root.exists():
-        for suffix in ("*.puml", "*.md"):
-            for path in sorted(diag_root.rglob(suffix)):
-                if not path.resolve().is_relative_to((diag_root.parent / RENDERED).resolve()):
-                    diag = parse_diagram(path)
-                    if diag is not None:
-                        grp = group_fn_diagram(path, repo_root)
-                        diag = replace(diag, group=grp)
-                        _insert_mounted(diag, "diagram", repo_root, mem.diagrams)
-                        for de in _extract_diagram_entities(diag):
-                            mem.entities[de.artifact_id] = de
-                        for dc in _extract_diagram_connections(diag):
-                            mem.connections[dc.artifact_id] = dc
+    if not diag_root.exists():
+        return
+    for path in _iter_diagram_sources(diag_root):
+        diag = parse_diagram(path)
+        if diag is None:
+            continue
+        diag = replace(diag, group=group_fn_diagram(path, repo_root))
+        _insert_mounted(diag, "diagram", repo_root, mem.diagrams)
+        mem.entities.update({de.artifact_id: de for de in _extract_diagram_entities(diag)})
+        mem.connections.update({dc.artifact_id: dc for dc in _extract_diagram_connections(diag)})
+
+
+def _scan_document_records(repo_root: Path, mem: _MemStore) -> None:
     doc_root = docs_root(repo_root)
-    if doc_root.exists():
-        for path in sorted(doc_root.rglob("*.md")):
-            doc = parse_document(path)
-            if doc is not None:
-                grp = group_fn_document(path, repo_root)
-                _insert_mounted(replace(doc, group=grp), "document", repo_root, mem.documents)
+    if not doc_root.exists():
+        return
+    for path in sorted(doc_root.rglob("*.md")):
+        doc = parse_document(path)
+        if doc is not None:
+            grp = group_fn_document(path, repo_root)
+            _insert_mounted(replace(doc, group=grp), "document", repo_root, mem.documents)
+
+
+def scan_mount(mount: RepoMount, mem: _MemStore, *, domain_names: frozenset[str]) -> None:
+    _scan_model_records(mount.root, mem, domain_names=domain_names)
+    _scan_diagram_records(mount.root, mem)
+    _scan_document_records(mount.root, mem)
 
 
 # ── Incremental updates ───────────────────────────────────────────────────────
@@ -171,27 +193,28 @@ def classify_path_change(
     return None
 
 
+def _touching_endpoints(entity_id: str, mem: _MemStore) -> set[str]:
+    """*entity_id* plus the far endpoint of every connection touching it."""
+    endpoints = {entity_id}
+    for cid in mem.connections_by_entity.get(entity_id, set()):
+        r = mem.connections.get(cid)
+        if r is not None:
+            endpoints.add(r.source if r.source != entity_id else r.target)
+    return endpoints
+
+
 def _apply_entity_record(path: Path, new: EntityRecord | None, mem: _MemStore, db: _SqliteStore) -> None:
     old_id = mem.entity_by_path.get(path.resolve())
     old = mem.entities.get(old_id) if old_id else None
 
-    # Impacted: the changed entity plus the other endpoint of every touching connection.
     impacted: set[str] = set()
     if old is not None:
-        impacted.add(old.artifact_id)
-        for cid in mem.connections_by_entity.get(old.artifact_id, set()):
-            r = mem.connections.get(cid)
-            if r is not None:
-                impacted.add(r.source if r.source != old.artifact_id else r.target)
+        impacted |= _touching_endpoints(old.artifact_id, mem)
         if new is None or old.artifact_id != new.artifact_id:
             db.delete_entity(old.artifact_id)
     if new is not None:
         db.upsert_entity(new)
-        impacted.add(new.artifact_id)
-        for cid in mem.connections_by_entity.get(new.artifact_id, set()):
-            r = mem.connections.get(cid)
-            if r is not None:
-                impacted.add(r.source if r.source != new.artifact_id else r.target)
+        impacted |= _touching_endpoints(new.artifact_id, mem)
     for eid in sorted(impacted):
         db.rebuild_context_for(eid)
 
@@ -292,6 +315,45 @@ def _extract_diagram_entities(diag: DiagramRecord) -> list[EntityRecord]:
     return result
 
 
+def _diagram_local_to_full(diag: DiagramRecord) -> dict[str, str]:
+    """Map each diagram-entity local id to its full '{diagram_id}#{entity_type}/{local_id}' id."""
+    diagram_entities = diag.extra.get("diagram-entities")
+    if not isinstance(diagram_entities, dict):
+        return {}
+    return {
+        local_id: f"{diag.artifact_id}#{entity_type}/{local_id}"
+        for entity_type, items in diagram_entities.items()
+        if isinstance(items, list)
+        for item in items
+        if isinstance(item, dict) and (local_id := str(item.get("id") or ""))
+    }
+
+
+def _diagram_connection_record(
+    kc: object, diag: DiagramRecord, local_to_full: dict[str, str]
+) -> ConnectionRecord | None:
+    """Build one ConnectionRecord from a connections-frontmatter row, or None if incomplete."""
+    if not isinstance(kc, dict):
+        return None
+    local_id = str(kc.get("id") or "")
+    conn_type = str(kc.get("conn_type") or "")
+    source_local = str(kc.get("source") or "")
+    target_local = str(kc.get("target") or "")
+    if not (local_id and conn_type and source_local and target_local):
+        return None
+    return ConnectionRecord(
+        artifact_id=f"{diag.artifact_id}#conn/{local_id}",
+        source=local_to_full.get(source_local, f"{diag.artifact_id}#unknown/{source_local}"),
+        target=local_to_full.get(target_local, f"{diag.artifact_id}#unknown/{target_local}"),
+        conn_type=conn_type,
+        version=diag.version,
+        status=diag.status,
+        path=diag.path,
+        extra={},
+        content_text="",
+    )
+
+
 def _extract_diagram_connections(diag: DiagramRecord) -> list[ConnectionRecord]:
     """Extract ConnectionRecords from a diagram's connections frontmatter.
 
@@ -302,67 +364,28 @@ def _extract_diagram_connections(diag: DiagramRecord) -> list[ConnectionRecord]:
     diagram_connections = diag.extra.get("connections")
     if not isinstance(diagram_connections, list) or not diagram_connections:
         return []
+    local_to_full = _diagram_local_to_full(diag)
+    records = (_diagram_connection_record(kc, diag, local_to_full) for kc in diagram_connections)
+    return [rec for rec in records if rec is not None]
 
-    # Build local_id → full_artifact_id from diagram-entities
-    diagram_entities = diag.extra.get("diagram-entities")
-    local_to_full: dict[str, str] = {}
-    if isinstance(diagram_entities, dict):
-        for entity_type, items in diagram_entities.items():
-            if isinstance(items, list):
-                for item in items:
-                    if isinstance(item, dict):
-                        local_id = str(item.get("id") or "")
-                        if local_id:
-                            local_to_full[local_id] = f"{diag.artifact_id}#{entity_type}/{local_id}"
 
-    result: list[ConnectionRecord] = []
-    for kc in diagram_connections:
-        if not isinstance(kc, dict):
-            continue
-        local_id = str(kc.get("id") or "")
-        conn_type = str(kc.get("conn_type") or "")
-        source_local = str(kc.get("source") or "")
-        target_local = str(kc.get("target") or "")
-        if not (local_id and conn_type and source_local and target_local):
-            continue
-        source_full = local_to_full.get(source_local, f"{diag.artifact_id}#unknown/{source_local}")
-        target_full = local_to_full.get(target_local, f"{diag.artifact_id}#unknown/{target_local}")
-        artifact_id = f"{diag.artifact_id}#conn/{local_id}"
-        result.append(
-            ConnectionRecord(
-                artifact_id=artifact_id,
-                source=source_full,
-                target=target_full,
-                conn_type=conn_type,
-                version=diag.version,
-                status=diag.status,
-                path=diag.path,
-                extra={},
-                content_text="",
-            )
-        )
-    return result
+def _leaf_strings(value: object) -> Iterator[str]:
+    """Yield every non-empty leaf string in *value*, descending lists/dicts and skipping 'id' keys."""
+    if isinstance(value, str):
+        if value:
+            yield value
+    elif isinstance(value, list):
+        for v in value:
+            yield from _leaf_strings(v)
+    elif isinstance(value, dict):
+        for k, v in value.items():
+            if k != "id":
+                yield from _leaf_strings(v)
 
 
 def _diagram_entity_content_text(item: dict[str, object]) -> str:
-    """Recursively collect leaf string values for FTS (skip id field)."""
-    parts: list[str] = []
-
-    def _collect(value: object) -> None:
-        if isinstance(value, str) and value:
-            parts.append(value)
-        elif isinstance(value, list):
-            for v in value:
-                _collect(v)
-        elif isinstance(value, dict):
-            for k, v in value.items():
-                if k != "id":
-                    _collect(v)
-
-    for k, v in item.items():
-        if k != "id":
-            _collect(v)
-    return " ".join(parts)
+    """Collect leaf string values for FTS (skip id field)."""
+    return " ".join(_leaf_strings({k: v for k, v in item.items() if k != "id"}))
 
 
 def parse_document_for_path(path: Path) -> DocumentRecord | None:

@@ -177,6 +177,31 @@ def auto_sync_diagrams(
     return actions
 
 
+def _auto_sync_ids_for_item(
+    item: dict[str, Any],
+    result: dict[str, object],
+    refs: dict[str, list[str]],
+    connection_ref_keys: list[str],
+) -> set[str]:
+    """Diagram ids whose renders are invalidated by a single successful edit item."""
+    op = str(item.get("op", ""))
+    if op == "edit_entity":
+        old_id = str(item["artifact_id"])
+        new_id = str(result.get("artifact_id", old_id))
+        if new_id == old_id:
+            return set()
+        return set(refs.get(old_id, [])).union(
+            ref
+            for cid in connection_ref_keys
+            if connection_id_involves_entity(cid, old_id)
+            for ref in refs.get(cid, [])
+        )
+    if op == "edit_connection" and item.get("operation", "update") == "remove":
+        cids = connection_ref_ids(str(item["source_entity"]), str(item["connection_type"]), str(item["target_entity"]))
+        return {ref for cid in cids for ref in refs.get(cid, [])}
+    return set()
+
+
 def collect_bulk_write_auto_sync_diagram_ids(
     repo_root: Path,
     *,
@@ -184,30 +209,12 @@ def collect_bulk_write_auto_sync_diagram_ids(
     results: dict[int, dict[str, object]],
 ) -> list[str]:
     refs = scan_diagram_refs(repo_root)
-    diagram_ids: set[str] = set()
     connection_ref_keys = [key for key in refs if parse_connection_ref_id(key) is not None]
-
+    diagram_ids: set[str] = set()
     for index, item in enumerate(items):
         result = results.get(index)
-        if result is None or not bool(result.get("wrote")):
-            continue
-        op = str(item.get("op", ""))
-        if op == "edit_entity":
-            old_entity_id = str(item["artifact_id"])
-            new_entity_id = str(result.get("artifact_id", old_entity_id))
-            if new_entity_id == old_entity_id:
-                continue
-            diagram_ids.update(refs.get(old_entity_id, []))
-            for connection_id in connection_ref_keys:
-                if connection_id_involves_entity(connection_id, old_entity_id):
-                    diagram_ids.update(refs.get(connection_id, []))
-        elif op == "edit_connection" and item.get("operation", "update") == "remove":
-            for connection_id in connection_ref_ids(
-                str(item["source_entity"]),
-                str(item["connection_type"]),
-                str(item["target_entity"]),
-            ):
-                diagram_ids.update(refs.get(connection_id, []))
+        if result is not None and bool(result.get("wrote")):
+            diagram_ids.update(_auto_sync_ids_for_item(item, result, refs, connection_ref_keys))
     return sorted(diagram_ids)
 
 
@@ -221,16 +228,11 @@ def entity_owned_connection_ids(entity_id: str, connection_paths: dict[tuple[str
 
 
 def toposort_entities(entity_ids: set[str], grf_refs: dict[str, list[str]]) -> list[str]:
-    deps: dict[str, set[str]] = {entity_id: set() for entity_id in entity_ids}
-    for target, gar_ids in grf_refs.items():
-        if target not in entity_ids:
-            continue
-        for gar_id in gar_ids:
-            if gar_id in entity_ids:
-                deps[target].add(gar_id)
-
+    remaining: dict[str, set[str]] = {
+        entity_id: {gar_id for gar_id in grf_refs.get(entity_id, []) if gar_id in entity_ids}
+        for entity_id in entity_ids
+    }
     ordered: list[str] = []
-    remaining = {entity_id: set(blockers) for entity_id, blockers in deps.items()}
     while remaining:
         ready = sorted(entity_id for entity_id, blockers in remaining.items() if not blockers)
         if not ready:

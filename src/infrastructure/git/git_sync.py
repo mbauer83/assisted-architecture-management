@@ -171,19 +171,45 @@ class GitSyncManager:
     # Engagement
     # ------------------------------------------------------------------
 
+    async def _publish_dirty_state_change(self, repo: Path, *, is_dirty: bool) -> None:
+        from src.infrastructure.gui.routers.events import event_bus  # noqa: PLC0415
+
+        if is_dirty != self._last_dirty_state.get(repo, False):
+            self._last_dirty_state[repo] = is_dirty
+            await event_bus.publish({"type": "sync_status_changed", "repo": str(repo)})
+
+    async def _handle_engagement_pull_result(
+        self, repo: Path, *, rc: int, err: str, pull_args: list[str], behind: int, was_blocked: bool
+    ) -> None:
+        from src.infrastructure.gui.routers.events import event_bus  # noqa: PLC0415
+        from src.infrastructure.workspace.write_block_manager import unblock_repo  # noqa: PLC0415
+
+        repo_label = str(repo)
+        if rc == 0:
+            if not was_blocked:
+                unblock_repo(repo)
+            await event_bus.publish({"type": "sync_pull_completed", "repo": repo_label, "commits_pulled": behind})
+            await self._notify_changed(repo)
+            return
+        if "--rebase" in pull_args and "CONFLICT" in err:
+            await self._git(repo, "rebase", "--abort")
+            await event_bus.publish({"type": "sync_conflict", "repo": repo_label, "error": err.strip()})
+        else:
+            await event_bus.publish({
+                "type": "sync_pull_failed", "repo": repo_label, "error": err.strip(),
+                "auto_unblock_in_seconds": int(_AUTO_UNBLOCK_S),
+            })
+        asyncio.create_task(self._auto_unblock(repo, _AUTO_UNBLOCK_S, was_blocked))
+
     async def _sync_engagement(self, repo: Path) -> None:
-        from src.infrastructure.gui.routers.events import event_bus
-        from src.infrastructure.workspace.write_block_manager import block_repo, is_blocked, unblock_repo
+        from src.infrastructure.gui.routers.events import event_bus  # noqa: PLC0415
+        from src.infrastructure.workspace.write_block_manager import block_repo, is_blocked  # noqa: PLC0415
 
         if not await self._is_git_repo(repo):
             return
 
         is_clean = await self._is_clean(repo)
-        is_dirty = not is_clean
-        was_dirty = self._last_dirty_state.get(repo, False)
-        if is_dirty != was_dirty:
-            self._last_dirty_state[repo] = is_dirty
-            await event_bus.publish({"type": "sync_status_changed", "repo": str(repo)})
+        await self._publish_dirty_state_change(repo, is_dirty=not is_clean)
 
         rc, _, err = await self._git(repo, "fetch", "origin", timeout=_FETCH_TIMEOUT_S)
         if rc != 0:
@@ -199,44 +225,24 @@ class GitSyncManager:
             return
 
         pull_args = ["pull", "--rebase"] if ahead > 0 else ["pull", "--ff-only"]
-        repo_label, was_blocked = str(repo), is_blocked(repo)
+        was_blocked = is_blocked(repo)
         block_repo(repo)
-        await event_bus.publish({"type": "sync_pull_started", "repo": repo_label, "behind": behind})
+        await event_bus.publish({"type": "sync_pull_started", "repo": str(repo), "behind": behind})
 
         try:
             rc, _, err = await self._git(repo, *pull_args, timeout=_PULL_TIMEOUT_S)
         except Exception as exc:
             logger.exception("pull error for engagement %s", repo)
-            await event_bus.publish(
-                {
-                    "type": "sync_pull_failed",
-                    "repo": repo_label,
-                    "error": str(exc),
-                    "auto_unblock_in_seconds": int(_AUTO_UNBLOCK_S),
-                }
-            )
+            await event_bus.publish({
+                "type": "sync_pull_failed", "repo": str(repo), "error": str(exc),
+                "auto_unblock_in_seconds": int(_AUTO_UNBLOCK_S),
+            })
             asyncio.create_task(self._auto_unblock(repo, _AUTO_UNBLOCK_S, was_blocked))
             return
 
-        if rc == 0:
-            if not was_blocked:
-                unblock_repo(repo)
-            await event_bus.publish({"type": "sync_pull_completed", "repo": repo_label, "commits_pulled": behind})
-            await self._notify_changed(repo)
-        else:
-            if "--rebase" in pull_args and "CONFLICT" in err:
-                await self._git(repo, "rebase", "--abort")
-                await event_bus.publish({"type": "sync_conflict", "repo": repo_label, "error": err.strip()})
-            else:
-                await event_bus.publish(
-                    {
-                        "type": "sync_pull_failed",
-                        "repo": repo_label,
-                        "error": err.strip(),
-                        "auto_unblock_in_seconds": int(_AUTO_UNBLOCK_S),
-                    }
-                )
-            asyncio.create_task(self._auto_unblock(repo, _AUTO_UNBLOCK_S, was_blocked))
+        await self._handle_engagement_pull_result(
+            repo, rc=rc, err=err, pull_args=pull_args, behind=behind, was_blocked=was_blocked
+        )
 
     # ------------------------------------------------------------------
     # Enterprise (state-machine dispatch)

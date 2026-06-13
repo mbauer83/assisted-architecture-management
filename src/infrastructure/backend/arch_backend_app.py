@@ -105,8 +105,85 @@ def _log_structured_output_tool_inventory() -> None:
         )
 
 
+def _request_watchdogs(method: str, path: str) -> tuple[threading.Timer, threading.Timer]:
+    """Two daemon timers that warn on a slow request and dump threads on a stuck one."""
+    slow = threading.Timer(
+        _REQUEST_SLOW_WARNING_S,
+        _log_slow_request_warning,
+        kwargs={"method": method, "path": path, "threshold_s": _REQUEST_SLOW_WARNING_S},
+    )
+    dump = threading.Timer(
+        _REQUEST_THREAD_DUMP_S,
+        _log_thread_dump,
+        kwargs={"reason": (
+            f"request still running after {_REQUEST_THREAD_DUMP_S:.1f}s method={method} path={path}"
+        )},
+    )
+    for timer in (slow, dump):
+        timer.daemon = True
+        timer.start()
+    return slow, dump
+
+
+async def _log_requests(request, call_next):  # type: ignore[no-untyped-def]
+    """HTTP middleware: log start/end, time the request, and arm slow/stuck watchdogs."""
+    started = time.perf_counter()
+    method, path = request.method, request.url.path
+    slow_watchdog, dump_watchdog = _request_watchdogs(method, path)
+    logger.info("HTTP request started method=%s path=%s", method, path)
+    try:
+        response = await call_next(request)
+    except Exception:
+        logger.exception(
+            "HTTP request failed method=%s path=%s duration_ms=%.1f",
+            method, path, (time.perf_counter() - started) * 1000.0,
+        )
+        raise
+    finally:
+        slow_watchdog.cancel()
+        dump_watchdog.cancel()
+    logger.info(
+        "HTTP request completed method=%s path=%s status=%s duration_ms=%.1f",
+        method, path, response.status_code, (time.perf_counter() - started) * 1000.0,
+    )
+    return response
+
+
+async def _on_repo_changed(repo_path: Path) -> None:
+    """Refresh the artifact index and notify GUI clients after a git pull or merge."""
+    repo = gui_state.maybe_get_repo()
+    if repo is not None:
+        await asyncio.to_thread(repo.refresh)
+    from src.infrastructure.gui.routers.events import event_bus  # noqa: PLC0415
+    from src.infrastructure.gui.routers.sync_status_cache import invalidate_sync_status_cache  # noqa: PLC0415
+
+    invalidate_sync_status_cache(repo=repo_path)
+    await event_bus.publish({
+        "type": "sync_repository_updated",
+        "repo": str(repo_path),
+        "label": "Repository updated — refreshing view…",
+    })
+
+
+async def _health_check():  # type: ignore[no-untyped-def]
+    from fastapi.responses import JSONResponse  # noqa: PLC0415
+
+    managers = {
+        "read_tools": mcp_read, "write_tools": mcp_write,
+        "assurance_read_tools": mcp_assurance_read, "assurance_write_tools": mcp_assurance_write,
+    }
+    counts = {key: mgr._tool_manager.list_tools() for key, mgr in managers.items()}  # type: ignore[attr-defined]
+    structured = [t.name for t in counts["read_tools"] if t.output_schema is not None]
+    return JSONResponse({
+        "status": "ok",
+        **{key: len(tools) for key, tools in counts.items()},
+        "structured_output_tools": len(structured),
+        "structured_output_tool_names": structured,
+    })
+
+
 def _build_app(credentials: "GitCredentials | None" = None):  # type: ignore[no-untyped-def]
-    from fastapi import FastAPI, Request
+    from fastapi import FastAPI
     from fastapi.middleware.cors import CORSMiddleware
     from fastapi.staticfiles import StaticFiles
 
@@ -133,23 +210,6 @@ def _build_app(credentials: "GitCredentials | None" = None):  # type: ignore[no-
     write_app = StreamableHTTPASGIApp(mcp_write.session_manager)
     assurance_read_app = StreamableHTTPASGIApp(mcp_assurance_read.session_manager)
     assurance_write_app = StreamableHTTPASGIApp(mcp_assurance_write.session_manager)
-
-    async def _on_repo_changed(repo_path: Path) -> None:
-        """Refresh the artifact index and notify GUI clients after a git pull or merge."""
-        repo = gui_state.maybe_get_repo()
-        if repo is not None:
-            await asyncio.to_thread(repo.refresh)
-        from src.infrastructure.gui.routers.events import event_bus
-        from src.infrastructure.gui.routers.sync_status_cache import invalidate_sync_status_cache
-
-        invalidate_sync_status_cache(repo=repo_path)
-        await event_bus.publish(
-            {
-                "type": "sync_repository_updated",
-                "repo": str(repo_path),
-                "label": "Repository updated — refreshing view…",
-            }
-        )
 
     @asynccontextmanager
     async def lifespan(_app: FastAPI):
@@ -194,57 +254,7 @@ def _build_app(credentials: "GitCredentials | None" = None):  # type: ignore[no-
     app = FastAPI(title="Architecture Repository Backend", version="0.3.0", lifespan=lifespan)
     install_module_registry(app)
 
-    @app.middleware("http")
-    async def log_requests(request: Request, call_next):  # type: ignore[no-untyped-def]
-        started = time.perf_counter()
-        slow_watchdog = threading.Timer(
-            _REQUEST_SLOW_WARNING_S,
-            _log_slow_request_warning,
-            kwargs={
-                "method": request.method,
-                "path": request.url.path,
-                "threshold_s": _REQUEST_SLOW_WARNING_S,
-            },
-        )
-        dump_watchdog = threading.Timer(
-            _REQUEST_THREAD_DUMP_S,
-            _log_thread_dump,
-            kwargs={
-                "reason": (
-                    f"request still running after {_REQUEST_THREAD_DUMP_S:.1f}s"
-                    f" method={request.method} path={request.url.path}"
-                )
-            },
-        )
-        slow_watchdog.daemon = True
-        dump_watchdog.daemon = True
-        slow_watchdog.start()
-        dump_watchdog.start()
-        logger.info("HTTP request started method=%s path=%s", request.method, request.url.path)
-        try:
-            response = await call_next(request)
-        except Exception:
-            duration_ms = (time.perf_counter() - started) * 1000.0
-            logger.exception(
-                "HTTP request failed method=%s path=%s duration_ms=%.1f",
-                request.method,
-                request.url.path,
-                duration_ms,
-            )
-            raise
-        finally:
-            slow_watchdog.cancel()
-            dump_watchdog.cancel()
-        duration_ms = (time.perf_counter() - started) * 1000.0
-        logger.info(
-            "HTTP request completed method=%s path=%s status=%s duration_ms=%.1f",
-            request.method,
-            request.url.path,
-            response.status_code,
-            duration_ms,
-        )
-        return response
-
+    app.middleware("http")(_log_requests)
     app.add_middleware(
         CORSMiddleware,
         allow_origins=["http://localhost:5173", "http://localhost:4173"],
@@ -252,50 +262,25 @@ def _build_app(credentials: "GitCredentials | None" = None):  # type: ignore[no-
         allow_headers=["*"],
     )
 
-    @app.get("/health", include_in_schema=False)
-    async def health_check():  # type: ignore[no-untyped-def]
-        from fastapi.responses import JSONResponse
+    app.add_api_route("/health", _health_check, include_in_schema=False)
 
-        read_tools = mcp_read._tool_manager.list_tools()  # type: ignore[attr-defined]
-        write_tools = mcp_write._tool_manager.list_tools()  # type: ignore[attr-defined]
-        assurance_read = mcp_assurance_read._tool_manager.list_tools()  # type: ignore[attr-defined]
-        assurance_write = mcp_assurance_write._tool_manager.list_tools()  # type: ignore[attr-defined]
-        structured = [t.name for t in read_tools if t.output_schema is not None]
-        return JSONResponse(
-            {
-                "status": "ok",
-                "read_tools": len(read_tools),
-                "write_tools": len(write_tools),
-                "assurance_read_tools": len(assurance_read),
-                "assurance_write_tools": len(assurance_write),
-                "structured_output_tools": len(structured),
-                "structured_output_tool_names": structured,
-            }
-        )
+    for router in (
+        entities_router, entity_search_router, connections_router, diagram_types_router,
+        diagrams_router, documents_router, groups_router, promote_router, sync_router,
+        admin_router, events_router, assurance_router,
+    ):
+        app.include_router(router)
 
-    app.include_router(entities_router)
-    app.include_router(entity_search_router)
-    app.include_router(connections_router)
-    app.include_router(diagram_types_router)
-    app.include_router(diagrams_router)
-    app.include_router(documents_router)
-    app.include_router(groups_router)
-    app.include_router(promote_router)
-    app.include_router(sync_router)
-    app.include_router(admin_router)
-    app.include_router(events_router)
-    app.include_router(assurance_router)
-    # Starlette mounts only match `/mcp/…`, not the bare `/mcp` path.
-    # Serve the MCP ASGI handlers on both variants so IDE clients can POST to
-    # `/mcp` without getting routed into the SPA/static handler.
-    app.add_route("/mcp/read", cast(object, read_app), include_in_schema=False)  # type: ignore[arg-type]
-    app.add_route("/mcp/read/", cast(object, read_app), include_in_schema=False)  # type: ignore[arg-type]
-    app.add_route("/mcp/write", cast(object, write_app), include_in_schema=False)  # type: ignore[arg-type]
-    app.add_route("/mcp/write/", cast(object, write_app), include_in_schema=False)  # type: ignore[arg-type]
-    app.add_route("/mcp/assurance-read", cast(object, assurance_read_app), include_in_schema=False)  # type: ignore[arg-type]
-    app.add_route("/mcp/assurance-read/", cast(object, assurance_read_app), include_in_schema=False)  # type: ignore[arg-type]
-    app.add_route("/mcp/assurance-write", cast(object, assurance_write_app), include_in_schema=False)  # type: ignore[arg-type]
-    app.add_route("/mcp/assurance-write/", cast(object, assurance_write_app), include_in_schema=False)  # type: ignore[arg-type]
+    # Starlette mounts only match `/mcp/…`, not the bare `/mcp` path. Serve each MCP ASGI
+    # handler on both variants so IDE clients can POST to `/mcp` without being routed into
+    # the SPA/static handler.
+    mcp_routes = {
+        "read": read_app, "write": write_app,
+        "assurance-read": assurance_read_app, "assurance-write": assurance_write_app,
+    }
+    for name, asgi_app in mcp_routes.items():
+        for suffix in (f"/mcp/{name}", f"/mcp/{name}/"):
+            app.add_route(suffix, cast(object, asgi_app), include_in_schema=False)  # type: ignore[arg-type]
 
     gui_dist = Path(__file__).resolve().parent.parent.parent / "tools" / "gui" / "dist"
     if gui_dist.exists():

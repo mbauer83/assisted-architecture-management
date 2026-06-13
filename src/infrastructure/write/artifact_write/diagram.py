@@ -1,5 +1,6 @@
 import re
 from collections.abc import Callable
+from dataclasses import dataclass
 from pathlib import Path
 
 from src.application.modeling.artifact_write import (
@@ -11,6 +12,7 @@ from src.application.modeling.artifact_write_layout import optimize_puml_layout
 from src.application.repo_path_helpers import diagram_source_root
 from src.application.verification.artifact_verifier import ArtifactVerifier
 from src.application.verification.artifact_verifier_types import ENTITY_ID_RE
+from src.domain.bindings import Binding
 from src.domain.groups import UNCATEGORIZED
 
 from ._artifact_deduplication import extract_friendly_slug, get_repository, validate_diagram_unique
@@ -35,6 +37,89 @@ def _verification_to_dict(path: Path, res) -> dict[str, object]:
             {"severity": i.severity, "code": i.code, "message": i.message, "location": i.location} for i in res.issues
         ],
     }
+
+
+@dataclass(frozen=True)
+class _DiagramBuild:
+    """Outcome of resolving a diagram's body, id, and reference sets before formatting."""
+
+    puml_body: str
+    effective_id: str
+    entity_ids_used: list[str] | None
+    connection_ids_used: list[str] | None
+
+
+def _build_model_backed(
+    *,
+    diagram_type: str,
+    name: str,
+    repo_root: Path,
+    diagram_entities: dict[str, object],
+    diagram_connections: list[dict[str, object]] | None,
+    norm_bindings: list[Binding],
+    norm_bindings_raw: list[dict[str, object]] | None,
+    effective_id: str | None,
+    entity_ids_used: list[str] | None,
+    connection_ids_used: list[str] | None,
+) -> _DiagramBuild:
+    """Render a diagram from structured entities/connections, collecting referenced ids."""
+    # Inject _scope_entity_id from a scoped-by binding so the C4 renderer can switch
+    # to model-backed mode for diagrams that previously used _scope_entity_id.
+    scope_eid = next(
+        (
+            b.target.entity_id
+            for b in norm_bindings
+            if b.correspondence_kind == "scoped-by" and b.subject.kind == "diagram" and b.target.entity_id
+        ),
+        None,
+    )
+    render_entities: dict[str, object] = dict(diagram_entities)
+    if scope_eid and "_scope_entity_id" not in render_entities:
+        render_entities["_scope_entity_id"] = scope_eid
+    puml_body = _render_diagram_entities_puml(diagram_type, name, render_entities, diagram_connections, repo_root)
+    collected_e, collected_c = _collect_diagram_renderer_references(
+        diagram_type, repo_root, render_entities, diagram_connections, bindings=norm_bindings_raw
+    )
+    return _DiagramBuild(
+        puml_body=puml_body,
+        effective_id=effective_id or generate_diagram_id(diagram_type, name),
+        entity_ids_used=_merge_reference_ids(entity_ids_used, collected_e),
+        connection_ids_used=_merge_reference_ids(connection_ids_used, collected_c),
+    )
+
+
+def _build_from_puml(
+    *,
+    diagram_type: str,
+    name: str,
+    repo_root: Path,
+    puml: str,
+    effective_id: str | None,
+    auto_include_stereotypes: bool,
+    entity_ids_used: list[str] | None,
+    connection_ids_used: list[str] | None,
+) -> _DiagramBuild:
+    """Prepare a hand-authored PUML body, inferring its referenced ids and minting an id if needed."""
+    eid = effective_id
+    if eid is None:
+        # Only adopt the @startuml token as the artifact-id when it is itself a canonical id
+        # (round-tripping a generated diagram); a bare label must not leak into the id (→ W041).
+        m = re.search(r"@startuml\s+(\S+)", puml)
+        if m and ENTITY_ID_RE.match(m.group(1).strip()):
+            eid = m.group(1).strip()
+    eid = eid or generate_diagram_id(diagram_type, name)
+
+    puml_body = puml.strip("\n") + "\n"
+    if auto_include_stereotypes:
+        puml_body = _prepare_diagram_puml_body(puml_body, repo_root, diagram_type)
+    puml_body = optimize_puml_layout(puml_body)
+    inferred_e, inferred_c = _infer_reference_ids_from_puml(repo_root, puml_body)
+    return _DiagramBuild(
+        puml_body=puml_body,
+        effective_id=eid,
+        entity_ids_used=_merge_reference_ids(entity_ids_used, inferred_e),
+        connection_ids_used=_merge_reference_ids(connection_ids_used, inferred_c),
+    )
 
 
 def create_diagram(
@@ -66,60 +151,28 @@ def create_diagram(
     from src.application.modeling.binding_normalize import normalize_bindings, strip_diagram_shorthand
     from src.domain.bindings import bindings_to_raw
 
-    effective_id = artifact_id
-    warnings: list[str] = []
-
     from .boundary import today_iso
 
+    warnings: list[str] = []
     last = last_updated or today_iso()
-
     norm_bindings = normalize_bindings(diagram_entities, bindings)
     clean_entities = strip_diagram_shorthand(diagram_entities)
     norm_bindings_raw = bindings_to_raw(norm_bindings)
 
     if diagram_entities is not None:
-        # Inject _scope_entity_id from scoped-by binding so the C4 renderer can
-        # switch to model-backed mode for diagrams that previously used _scope_entity_id.
-        scope_eid = next(
-            (b.target.entity_id for b in norm_bindings
-             if b.correspondence_kind == "scoped-by" and b.subject.kind == "diagram"
-             and b.target.entity_id),
-            None,
+        build = _build_model_backed(
+            diagram_type=diagram_type, name=name, repo_root=repo_root, diagram_entities=diagram_entities,
+            diagram_connections=diagram_connections, norm_bindings=norm_bindings,
+            norm_bindings_raw=norm_bindings_raw, effective_id=artifact_id,
+            entity_ids_used=entity_ids_used, connection_ids_used=connection_ids_used,
         )
-        render_entities: dict[str, object] = dict(diagram_entities)
-        if scope_eid and "_scope_entity_id" not in render_entities:
-            render_entities["_scope_entity_id"] = scope_eid
-        puml_body = _render_diagram_entities_puml(diagram_type, name, render_entities, diagram_connections, repo_root)
-        if effective_id is None:
-            effective_id = generate_diagram_id(diagram_type, name)
-        collected_entity_ids, collected_connection_ids = _collect_diagram_renderer_references(
-            diagram_type,
-            repo_root,
-            render_entities,
-            diagram_connections,
-            bindings=norm_bindings_raw,
-        )
-        entity_ids_used = _merge_reference_ids(entity_ids_used, collected_entity_ids)
-        connection_ids_used = _merge_reference_ids(connection_ids_used, collected_connection_ids)
     else:
-        if effective_id is None:
-            # Only adopt the @startuml token as the artifact-id when it is itself a
-            # canonical id (i.e. round-tripping a previously-generated diagram).
-            # A bare PlantUML label (e.g. "@startuml the-forces-shaping-this-system")
-            # is not an identity and must not leak into the artifact-id, or it
-            # produces a non-conformant id + W041. Otherwise mint a canonical id.
-            m = re.search(r"@startuml\s+(\S+)", puml)
-            if m and ENTITY_ID_RE.match(m.group(1).strip()):
-                effective_id = m.group(1).strip()
-        if effective_id is None:
-            effective_id = generate_diagram_id(diagram_type, name)
-        puml_body = puml.strip("\n") + "\n"
-        if auto_include_stereotypes:
-            puml_body = _prepare_diagram_puml_body(puml_body, repo_root, diagram_type)
-        puml_body = optimize_puml_layout(puml_body)
-        inferred_entity_ids, inferred_connection_ids = _infer_reference_ids_from_puml(repo_root, puml_body)
-        entity_ids_used = _merge_reference_ids(entity_ids_used, inferred_entity_ids)
-        connection_ids_used = _merge_reference_ids(connection_ids_used, inferred_connection_ids)
+        build = _build_from_puml(
+            diagram_type=diagram_type, name=name, repo_root=repo_root, puml=puml, effective_id=artifact_id,
+            auto_include_stereotypes=auto_include_stereotypes,
+            entity_ids_used=entity_ids_used, connection_ids_used=connection_ids_used,
+        )
+    effective_id = build.effective_id
 
     content = format_diagram_puml(
         artifact_id=effective_id,
@@ -131,18 +184,19 @@ def create_diagram(
         keywords=keywords,
         diagram_entities=clean_entities,
         diagram_connections=diagram_connections,
-        entity_ids_used=entity_ids_used,
-        connection_ids_used=connection_ids_used,
+        entity_ids_used=build.entity_ids_used,
+        connection_ids_used=build.connection_ids_used,
         view_derivations=view_derivations,
         bindings=bindings_to_raw(norm_bindings) if norm_bindings else None,
-        puml_body=puml_body,
+        puml_body=build.puml_body,
     )
 
     diag_src_root = diagram_source_root(repo_root)
-    if group == UNCATEGORIZED:
-        path = diag_src_root / f"{effective_id}.puml"
-    else:
-        path = diag_src_root / group / f"{effective_id}.puml"
+    path = (
+        diag_src_root / f"{effective_id}.puml"
+        if group == UNCATEGORIZED
+        else diag_src_root / group / f"{effective_id}.puml"
+    )
 
     friendly_slug = extract_friendly_slug(effective_id)
     repo = get_repository(repo_root)

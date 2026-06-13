@@ -61,6 +61,26 @@ def _build_timestamp_request(data_bytes: bytes) -> bytes:
     return _der_tlv(0x30, body)
 
 
+def _read_der_length(buf: bytes, offset: int) -> tuple[int, int]:
+    """Decode a DER definite-form length at *offset*; return (length, header byte count)."""
+    first = buf[offset]
+    if first & 0x80:
+        n = first & 0x7F
+        return int.from_bytes(buf[offset + 1 : offset + 1 + n], "big"), 1 + n
+    return first, 1
+
+
+def _check_pki_status(buf: bytes, status_offset: int) -> None:
+    """Reject a TSA response whose PKIStatus is neither granted (0) nor grantedWithMods (1)."""
+    if buf[status_offset] != 0x02:
+        return
+    if buf[status_offset + 1] != 1:
+        raise RuntimeError("Unexpected PKIStatus INTEGER encoding in TSA response")
+    status_val = buf[status_offset + 2]
+    if status_val not in (0, 1):
+        raise RuntimeError(f"TSA returned non-zero status: {status_val}")
+
+
 def _parse_timestamp_response(resp_bytes: bytes) -> bytes:
     """Extract the timeStampToken from a RFC 3161 TimeStampResp DER response.
 
@@ -71,41 +91,18 @@ def _parse_timestamp_response(resp_bytes: bytes) -> bytes:
     if not resp_bytes or resp_bytes[0] != 0x30:
         raise RuntimeError("Invalid TSA response: expected SEQUENCE tag")
 
-    offset = 1
-    # skip outer SEQUENCE length
-    if resp_bytes[offset] & 0x80:
-        n_len_bytes = resp_bytes[offset] & 0x7F
-        offset += 1 + n_len_bytes
-    else:
-        offset += 1
+    _, outer_header_len = _read_der_length(resp_bytes, 1)
+    offset = 1 + outer_header_len  # start of PKIStatusInfo
 
-    # PKIStatusInfo starts here — it's a SEQUENCE
     if resp_bytes[offset] != 0x30:
         raise RuntimeError("Invalid TSA response: expected PKIStatusInfo SEQUENCE")
     pki_offset = offset + 1
-    if resp_bytes[pki_offset] & 0x80:
-        n = resp_bytes[pki_offset] & 0x7F
-        pki_len = int.from_bytes(resp_bytes[pki_offset + 1 : pki_offset + 1 + n], "big")
-        pki_header_len = 1 + n
-    else:
-        pki_len = resp_bytes[pki_offset]
-        pki_header_len = 1
-
-    # First element of PKIStatusInfo is status INTEGER
-    status_offset = pki_offset + pki_header_len
-    if resp_bytes[status_offset] == 0x02:
-        status_len_byte = resp_bytes[status_offset + 1]
-        if status_len_byte == 1:
-            status_val = resp_bytes[status_offset + 2]
-        else:
-            raise RuntimeError("Unexpected PKIStatus INTEGER encoding in TSA response")
-        if status_val not in (0, 1):
-            raise RuntimeError(f"TSA returned non-zero status: {status_val}")
+    pki_len, pki_header_len = _read_der_length(resp_bytes, pki_offset)
+    _check_pki_status(resp_bytes, pki_offset + pki_header_len)
 
     token_start = offset + 1 + pki_header_len + pki_len
     if token_start >= len(resp_bytes):
         raise RuntimeError("TSA response contains no timeStampToken")
-
     return resp_bytes[token_start:]
 
 

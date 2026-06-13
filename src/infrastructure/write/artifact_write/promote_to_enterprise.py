@@ -24,8 +24,27 @@ from typing import Any, Literal
 from src.application.artifact_query import ArtifactRepository
 from src.application.verification.artifact_verifier import ArtifactRegistry
 from src.infrastructure.write.artifact_write._promote_groups import GroupMappingEntry
-from src.infrastructure.write.artifact_write.parse_existing import parse_entity_file
+from src.infrastructure.write.artifact_write._promote_planning import (
+    _build_enterprise_id_suffix_index,
+    _build_enterprise_name_index,
+    _collect_promotable_connections,
+    _entity_frontmatter,
+    _match_enterprise,
+    _normalize_name,
+    _partition_selected,
+)
 from src.infrastructure.write.artifact_write.promote_schema_check import check_promotion_schema_compatibility
+
+__all__ = [
+    "ConflictResolution",
+    "DiagramPromotionConflict",
+    "DocPromotionConflict",
+    "PromotionConflict",
+    "PromotionPlan",
+    "PromotionResult",
+    "_normalize_name",
+    "plan_promotion",
+]
 
 # ---------------------------------------------------------------------------
 # Data types
@@ -102,82 +121,43 @@ class PromotionResult:
 
 
 # ---------------------------------------------------------------------------
-# Helpers
-# ---------------------------------------------------------------------------
-
-
-def _extract_id_suffix(artifact_id: str) -> str | None:
-    """Return the portion after '@' (epoch.random), or None if the ID has no '@'."""
-    if "@" not in artifact_id:
-        return None
-    return artifact_id.split("@", 1)[1]
-
-
-def _parse_conn_full(cid: str) -> tuple[str, str, str] | None:
-    if "---" in cid and "@@" in cid:
-        source, rest = cid.split("---", 1)
-        target, conn_type = rest.rsplit("@@", 1)
-        if source and target and conn_type:
-            return source.strip(), conn_type.strip(), target.strip()
-    if " → " not in cid:
-        return None
-    left, target = cid.rsplit(" → ", 1)
-    parts = left.split(" ", 1)
-    if len(parts) < 2:
-        return None
-    return (parts[0].strip(), parts[1].strip(), target.strip())
-
-
-def _normalize_name(name: str) -> str:
-    return name.strip().lower().replace("-", " ").replace("_", " ")
-
-
-def _build_enterprise_name_index(
-    repo: ArtifactRepository,
-    registry: ArtifactRegistry,
-) -> dict[tuple[str, str], Any]:
-    enterprise_ids = registry.enterprise_entity_ids()
-    index: dict[tuple[str, str], Any] = {}
-    for eid in enterprise_ids:
-        rec = repo.get_entity(eid)
-        if rec is None:
-            continue
-        key = (rec.artifact_type, _normalize_name(rec.name))
-        index[key] = rec
-    return index
-
-
-def _build_enterprise_id_suffix_index(
-    repo: ArtifactRepository,
-    registry: ArtifactRegistry,
-) -> dict[tuple[str, str], Any]:
-    """Index enterprise entities by (artifact_type, id_suffix) to catch same-ID renames."""
-    enterprise_ids = registry.enterprise_entity_ids()
-    index: dict[tuple[str, str], Any] = {}
-    for eid in enterprise_ids:
-        rec = repo.get_entity(eid)
-        if rec is None:
-            continue
-        suffix = _extract_id_suffix(eid)
-        if suffix is not None:
-            index[(rec.artifact_type, suffix)] = rec
-    return index
-
-
-def _entity_frontmatter(registry: ArtifactRegistry, eid: str) -> dict[str, Any]:
-    path = registry.find_file_by_id(eid)
-    if path is None:
-        return {}
-    try:
-        parsed = parse_entity_file(path)
-        return dict(parsed.frontmatter)
-    except Exception:
-        return {}
-
-
-# ---------------------------------------------------------------------------
 # Plan
 # ---------------------------------------------------------------------------
+
+
+def _classify_candidates(
+    candidates: list[str],
+    *,
+    repo: ArtifactRepository,
+    registry: ArtifactRegistry,
+    name_index: dict[tuple[str, str], Any],
+    suffix_index: dict[tuple[str, str], Any],
+    warnings: list[str],
+) -> tuple[list[str], list[PromotionConflict]]:
+    """Sort candidates into clean additions and enterprise conflicts."""
+    to_add: list[str] = []
+    conflicts: list[PromotionConflict] = []
+    for eid in candidates:
+        rec = repo.get_entity(eid)
+        if rec is None:
+            warnings.append(f"Entity record not found for {eid}")
+            continue
+        ent_rec = _match_enterprise(rec, eid, name_index, suffix_index)
+        if ent_rec is None:
+            to_add.append(eid)
+            continue
+        conflicts.append(
+            PromotionConflict(
+                engagement_id=eid,
+                enterprise_id=ent_rec.artifact_id,
+                artifact_type=rec.artifact_type,
+                engagement_name=rec.name,
+                enterprise_name=ent_rec.name,
+                engagement_fields=_entity_frontmatter(registry, eid),
+                enterprise_fields=_entity_frontmatter(registry, ent_rec.artifact_id),
+            )
+        )
+    return to_add, conflicts
 
 
 def plan_promotion(
@@ -209,59 +189,23 @@ def plan_promotion(
     ent_name_index = _build_enterprise_name_index(repo, registry)
     ent_id_suffix_index = _build_enterprise_id_suffix_index(repo, registry)
     warnings: list[str] = []
-    already: list[str] = []
-    candidates: list[str] = []
-    for eid in selected_ids:
-        if eid in enterprise_ids:
-            already.append(eid)
-            continue
-        if eid in gar_ids:
-            warnings.append(f"Skipped GAR {eid} from promotion set")
-            continue
-        candidates.append(eid)
-
-    to_add: list[str] = []
-    conflicts: list[PromotionConflict] = []
-    for eid in candidates:
-        rec = repo.get_entity(eid)
-        if rec is None:
-            warnings.append(f"Entity record not found for {eid}")
-            continue
-        # Match by name first, then fall back to ID suffix (catches same entity renamed in one repo)
-        name_key = (rec.artifact_type, _normalize_name(rec.name))
-        ent_rec = ent_name_index.get(name_key)
-        if ent_rec is None:
-            suffix = _extract_id_suffix(eid)
-            if suffix is not None:
-                ent_rec = ent_id_suffix_index.get((rec.artifact_type, suffix))
-        if ent_rec is not None:
-            conflicts.append(
-                PromotionConflict(
-                    engagement_id=eid,
-                    enterprise_id=ent_rec.artifact_id,
-                    artifact_type=rec.artifact_type,
-                    engagement_name=rec.name,
-                    enterprise_name=ent_rec.name,
-                    engagement_fields=_entity_frontmatter(registry, eid),
-                    enterprise_fields=_entity_frontmatter(registry, ent_rec.artifact_id),
-                )
-            )
-        else:
-            to_add.append(eid)
-
-    promotable = set(candidates)
-    selected_set = set(selected_ids)
-    explicit_connection_ids = set(connection_ids or ())
-    conn_ids: list[str] = []
-    for cid in registry.connection_ids():
-        parsed = _parse_conn_full(cid)
-        if parsed is None:
-            continue
-        src, _conn_type, tgt = parsed
-        if src not in promotable:
-            continue
-        if tgt in selected_set and cid in explicit_connection_ids:
-            conn_ids.append(cid)
+    already, candidates = _partition_selected(
+        selected_ids, enterprise_ids=enterprise_ids, gar_ids=gar_ids, warnings=warnings
+    )
+    to_add, conflicts = _classify_candidates(
+        candidates,
+        repo=repo,
+        registry=registry,
+        name_index=ent_name_index,
+        suffix_index=ent_id_suffix_index,
+        warnings=warnings,
+    )
+    conn_ids = _collect_promotable_connections(
+        registry,
+        promotable=set(candidates),
+        selected_set=set(selected_ids),
+        explicit_connection_ids=set(connection_ids or ()),
+    )
 
     exc_ents = exclude_entity_ids or set()
     exc_conns = exclude_connection_ids or set()

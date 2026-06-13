@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
@@ -10,6 +11,7 @@ from src.application.verification.artifact_verifier import ArtifactRegistry, Art
 from src.infrastructure.artifact_index import shared_artifact_index
 from src.infrastructure.write.artifact_write._promote_conflicts import build_handler
 from src.infrastructure.write.artifact_write._promote_file_ops import (
+    TargetResolver,
     copy_entity,
     copy_simple,
     make_target_resolver,
@@ -23,6 +25,101 @@ from src.infrastructure.write.artifact_write.promote_to_enterprise import (
     PromotionPlan,
     PromotionResult,
 )
+from src.infrastructure.write.artifact_write.verify import collect_verification_errors
+
+
+@dataclass
+class _ExecCtx:
+    """Shared state threaded through the phases of a single promotion execution."""
+
+    plan: PromotionPlan
+    engagement_root: Path
+    enterprise_root: Path
+    registry: ArtifactRegistry
+    result: PromotionResult
+    eng_repo: ArtifactRepository
+    resolve_target: TargetResolver
+    conn_ids: set[str]
+    resolutions: dict[str, ConflictResolution]
+    slug_remap: dict[str, str]
+    ent_copied: list[Path] = field(default_factory=list)
+    ent_backups: list[tuple[Path, bytes | None]] = field(default_factory=list)
+
+
+def _copy_entities(ctx: _ExecCtx) -> None:
+    for eid in ctx.plan.entities_to_add:
+        copy_entity(
+            eid, ctx.engagement_root, ctx.enterprise_root, ctx.registry, ctx.result,
+            ctx.ent_copied, ctx.ent_backups, ctx.resolve_target, ctx.conn_ids,
+            group_slug_remap=ctx.slug_remap or None,
+        )
+
+
+def _apply_entity_conflicts(ctx: _ExecCtx) -> None:
+    for conflict in ctx.plan.conflicts:
+        res = ctx.resolutions.get(conflict.engagement_id)
+        if res is None:
+            ctx.result.plan.warnings.append(f"No resolution for conflict {conflict.engagement_id} — skipped")
+            continue
+        handler = build_handler(res)
+        if handler is None:
+            ctx.result.plan.warnings.append(
+                f"Unrecognised resolution strategy {res.strategy!r} for {conflict.engagement_id} — skipped"
+            )
+            continue
+        handler.handle(
+            conflict, ctx.engagement_root, ctx.enterprise_root, ctx.registry,
+            ctx.result, ctx.ent_backups, ctx.resolve_target, ctx.conn_ids,
+        )
+
+
+def _copy_simple_artifacts(ctx: _ExecCtx) -> None:
+    def _copy(did: str) -> None:
+        copy_simple(
+            did, ctx.engagement_root, ctx.enterprise_root, ctx.registry,
+            ctx.result, ctx.ent_copied, ctx.ent_backups,
+        )
+
+    def _resolve(dc: Any, kind: str) -> None:
+        _resolve_simple_conflict(
+            dc, kind, ctx.engagement_root, ctx.enterprise_root, ctx.registry,
+            ctx.result, ctx.ent_backups, ctx.resolutions,
+        )
+
+    for did in ctx.plan.documents_to_add:
+        _copy(did)
+    for dc in ctx.plan.doc_conflicts:
+        _resolve(dc, "document")
+    for did in ctx.plan.diagrams_to_add:
+        _copy(did)
+    for diag_dc in ctx.plan.diagram_conflicts:
+        _resolve(diag_dc, "diagram")
+
+
+def _accepted_engagement_ids(confs: list[Any], resolutions: dict[str, ConflictResolution]) -> list[str]:
+    return [
+        c.engagement_id
+        for c in confs
+        if (r := resolutions.get(c.engagement_id)) is not None and r.strategy == "accept_engagement"
+    ]
+
+
+def _replace_promoted_with_gars(ctx: _ExecCtx) -> None:
+    plan = ctx.plan
+    for eid in list(plan.entities_to_add) + [c.engagement_id for c in plan.conflicts]:
+        _replace_artifact_with_gar(eid, ctx.engagement_root, ctx.eng_repo, ctx.registry, ctx.result, "entity")
+    for did in plan.documents_to_add + _accepted_engagement_ids(plan.doc_conflicts, ctx.resolutions):
+        doc = ctx.eng_repo.get_document(did)
+        _replace_artifact_with_gar(
+            did, ctx.engagement_root, ctx.eng_repo, ctx.registry, ctx.result, "document",
+            name=doc.title if doc else did,
+        )
+    for did in plan.diagrams_to_add + _accepted_engagement_ids(plan.diagram_conflicts, ctx.resolutions):
+        diag = ctx.eng_repo.get_diagram(did)
+        _replace_artifact_with_gar(
+            did, ctx.engagement_root, ctx.eng_repo, ctx.registry, ctx.result, "diagram",
+            name=diag.name if diag else did,
+        )
 
 
 def execute_promotion(
@@ -38,147 +135,47 @@ def execute_promotion(
     if plan.schema_errors:
         result.verification_errors = list(plan.schema_errors)
         return result
-    ent_copied: list[Path] = []
-    ent_backups: list[tuple[Path, bytes | None]] = []
 
-    from src.infrastructure.write.artifact_write.global_artifact_reference import build_gar_map
+    from src.infrastructure.write.artifact_write.global_artifact_reference import build_gar_map  # noqa: PLC0415
 
     eng_repo = ArtifactRepository(shared_artifact_index(engagement_root))
-    gar_map = build_gar_map(eng_repo)
     promoted_ids = set(plan.entities_to_add) | {c.engagement_id for c in plan.conflicts}
-    resolve_target = make_target_resolver(gar_map, promoted_ids, registry.enterprise_entity_ids())
-    conn_ids = set(plan.connection_ids)
-    resolutions = {r.engagement_id: r for r in (conflict_resolutions or [])}
     slug_remap = group_mapping_resolutions or {}
+    ctx = _ExecCtx(
+        plan=plan,
+        engagement_root=engagement_root,
+        enterprise_root=enterprise_root,
+        registry=registry,
+        result=result,
+        eng_repo=eng_repo,
+        resolve_target=make_target_resolver(build_gar_map(eng_repo), promoted_ids, registry.enterprise_entity_ids()),
+        conn_ids=set(plan.connection_ids),
+        resolutions={r.engagement_id: r for r in (conflict_resolutions or [])},
+        slug_remap=slug_remap,
+    )
 
     try:
-        for eid in plan.entities_to_add:
-            copy_entity(
-                eid,
-                engagement_root,
-                enterprise_root,
-                registry,
-                result,
-                ent_copied,
-                ent_backups,
-                resolve_target,
-                conn_ids,
-                group_slug_remap=slug_remap or None,
-            )
+        _copy_entities(ctx)
+        _apply_entity_conflicts(ctx)
+        _copy_simple_artifacts(ctx)
 
-        for conflict in plan.conflicts:
-            res = resolutions.get(conflict.engagement_id)
-            if res is None:
-                result.plan.warnings.append(f"No resolution for conflict {conflict.engagement_id} — skipped")
-                continue
-            handler = build_handler(res)
-            if handler is None:
-                result.plan.warnings.append(
-                    f"Unrecognised resolution strategy {res.strategy!r} for {conflict.engagement_id} — skipped"
-                )
-                continue
-            handler.handle(
-                conflict,
-                engagement_root,
-                enterprise_root,
-                registry,
-                result,
-                ent_backups,
-                resolve_target,
-                conn_ids,
-            )
-
-        for did in plan.documents_to_add:
-            copy_simple(did, engagement_root, enterprise_root, registry, result, ent_copied, ent_backups)
-        for dc in plan.doc_conflicts:
-            _resolve_simple_conflict(
-                dc,
-                "document",
-                engagement_root,
-                enterprise_root,
-                registry,
-                result,
-                ent_backups,
-                resolutions,
-            )
-
-        for did in plan.diagrams_to_add:
-            copy_simple(did, engagement_root, enterprise_root, registry, result, ent_copied, ent_backups)
-        for diag_dc in plan.diagram_conflicts:
-            _resolve_simple_conflict(
-                diag_dc,
-                "diagram",
-                engagement_root,
-                enterprise_root,
-                registry,
-                result,
-                ent_backups,
-                resolutions,
-            )
-
-        from src.infrastructure.app_bootstrap import build_runtime_catalogs, get_module_registry  # noqa: PLC0415
-
-        ent_registry = ArtifactRegistry(shared_artifact_index(enterprise_root))
-        errors = [
-            f"{i.code}: {i.message} ({i.location})"
-            for r in ArtifactVerifier(
-                ent_registry,
-                catalogs=build_runtime_catalogs(get_module_registry()),
-            ).verify_all(enterprise_root, include_diagrams=False)
-            for i in r.issues
-            if i.severity == "error"
-        ]
-        result.verification_errors = errors
-
-        if errors:
-            rollback(ent_copied, ent_backups)
+        result.verification_errors = collect_verification_errors(enterprise_root)
+        if result.verification_errors:
+            rollback(ctx.ent_copied, ctx.ent_backups)
             result.rolled_back = True
             return result
 
-        if plan.group_mapping and slug_remap is not None:
-            from src.infrastructure.write.artifact_write._promote_groups import (
-                update_enterprise_groups,  # noqa: PLC0415
+        if plan.group_mapping:
+            from src.infrastructure.write.artifact_write._promote_groups import (  # noqa: PLC0415
+                update_enterprise_groups,
             )
 
             update_enterprise_groups(enterprise_root, engagement_root, plan.group_mapping, slug_remap)
 
         result.executed = True
-
-        for eid in list(plan.entities_to_add) + [c.engagement_id for c in plan.conflicts]:
-            _replace_artifact_with_gar(eid, engagement_root, eng_repo, registry, result, "entity")
-
-        def _accepted(confs: list[Any]) -> list[str]:
-            return [
-                c.engagement_id
-                for c in confs
-                if resolutions.get(c.engagement_id) and resolutions[c.engagement_id].strategy == "accept_engagement"
-            ]
-
-        for did in plan.documents_to_add + _accepted(plan.doc_conflicts):
-            doc = eng_repo.get_document(did)
-            _replace_artifact_with_gar(
-                did,
-                engagement_root,
-                eng_repo,
-                registry,
-                result,
-                "document",
-                name=doc.title if doc else did,
-            )
-        for did in plan.diagrams_to_add + _accepted(plan.diagram_conflicts):
-            diag = eng_repo.get_diagram(did)
-            _replace_artifact_with_gar(
-                did,
-                engagement_root,
-                eng_repo,
-                registry,
-                result,
-                "diagram",
-                name=diag.name if diag else did,
-            )
-
-    except Exception as exc:
-        rollback(ent_copied, ent_backups)
+        _replace_promoted_with_gars(ctx)
+    except Exception as exc:  # noqa: BLE001
+        rollback(ctx.ent_copied, ctx.ent_backups)
         result.rolled_back = True
         result.executed = False
         result.verification_errors.append(str(exc))
@@ -211,6 +208,28 @@ def _resolve_simple_conflict(
         result.plan.warnings.append(f"Merge not supported for {kind}s; skipping {dc.engagement_id}")
 
 
+def _infer_gar_name_subtype(src: Path, aid: str, artifact_type: str, name: str | None) -> tuple[str, str | None]:
+    """Resolve the GAR display name and (for entities) the underlying entity subtype from the source file."""
+    if name is not None and artifact_type != "entity":
+        return name, None
+    try:
+        fm = parse_entity_file(src).frontmatter
+        resolved_name = name if name is not None else str(fm.get("name", aid))
+        subtype = (str(fm.get("artifact-type", "")) or None) if artifact_type == "entity" else None
+        return resolved_name, subtype
+    except Exception:  # noqa: BLE001
+        return (name if name is not None else aid), None
+
+
+def _remove_promoted_file(path: Path, eng_root: Path, result: Any) -> None:
+    """Unlink a promoted source file, recording the removal; missing files are ignored."""
+    try:
+        path.unlink()
+        result.updated_files.append(f"[removed] {path.relative_to(eng_root)}")
+    except OSError:
+        pass
+
+
 def _replace_artifact_with_gar(
     aid: str,
     eng_root: Path,
@@ -225,17 +244,7 @@ def _replace_artifact_with_gar(
     src = registry.find_file_by_id(aid)
     if src is None or not src.is_relative_to(eng_root):
         return
-    entity_subtype: str | None = None
-    if name is None or artifact_type == "entity":
-        try:
-            parsed = parse_entity_file(src)
-            if name is None:
-                name = str(parsed.frontmatter.get("name", aid))
-            if artifact_type == "entity":
-                entity_subtype = str(parsed.frontmatter.get("artifact-type", "")) or None
-        except Exception:  # noqa: BLE001
-            if name is None:
-                name = aid
+    name, entity_subtype = _infer_gar_name_subtype(src, aid, artifact_type, name)
 
     from src.infrastructure.app_bootstrap import build_runtime_catalogs, get_module_registry  # noqa: PLC0415
     from src.infrastructure.write.artifact_write.global_artifact_reference import (
@@ -260,16 +269,8 @@ def _replace_artifact_with_gar(
     else:
         update_body_references(aid, eng_root, result)
 
-    try:
-        src.unlink()
-        result.updated_files.append(f"[removed] {src.relative_to(eng_root)}")
-    except OSError:
-        pass
+    _remove_promoted_file(src, eng_root, result)
     if artifact_type == "entity":
         outgoing = src.with_suffix(".outgoing.md")
         if outgoing.exists():
-            try:
-                outgoing.unlink()
-                result.updated_files.append(f"[removed] {outgoing.relative_to(eng_root)}")
-            except OSError:
-                pass
+            _remove_promoted_file(outgoing, eng_root, result)

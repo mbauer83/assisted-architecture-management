@@ -13,6 +13,8 @@ Two independent checks:
 
 from __future__ import annotations
 
+from collections.abc import Iterable, Iterator
+from itertools import chain
 from typing import TYPE_CHECKING
 
 from src.domain.bindings import CORE_CORRESPONDENCE_KINDS
@@ -46,39 +48,30 @@ def validate_registry_consistency(registry: "ModuleRegistry") -> None:
         raise RegistryConsistencyError(errors)
 
 
-def _collect_consistency_errors(registry: "ModuleRegistry") -> list[str]:
-    errors: list[str] = []
-    seen: set[str] = set()
-
-    def _add(msg: str) -> None:
-        if msg not in seen:
-            seen.add(msg)
-            errors.append(msg)
-
-    # Ontology modules: every entity type and connection type referenced in
-    # permitted_relationships must be declared in that same module.
+def _ontology_consistency_msgs(registry: "ModuleRegistry") -> Iterator[str]:
+    """Every type referenced in an ontology's permitted_relationships must be declared in it."""
     for om_name, om in registry.all_ontologies().items():
         known_entity = set(om.entity_types.keys())
         known_conn = set(om.connection_types.keys())
         for src, targets in om.permitted_relationships.by_source().items():
             if src not in known_entity:
-                _add(f"Ontology {om_name!r}: permitted_relationships source {str(src)!r} is not a declared entity type")
+                yield f"Ontology {om_name!r}: permitted_relationships source {str(src)!r} is not a declared entity type"
             for tgt, conn in targets:
                 if tgt not in known_entity:
-                    _add(f"Ontology {om_name!r}: permitted_relationships target {str(tgt)!r}"
-                         " is not a declared entity type")
+                    yield (f"Ontology {om_name!r}: permitted_relationships target {str(tgt)!r}"
+                           " is not a declared entity type")
                 if conn not in known_conn:
-                    _add(f"Ontology {om_name!r}: permitted_relationships connection {str(conn)!r}"
-                         " is not a declared connection type")
+                    yield (f"Ontology {om_name!r}: permitted_relationships connection {str(conn)!r}"
+                           " is not a declared connection type")
 
-    # Diagram types: entity types in own_permitted_relationships must be either a
-    # diagram_only_type or a model entity type declared in a registered ontology.
-    # The latter covers cross-references such as activity swimlane-maps-to rules that
-    # point at ArchiMate entity types.  Diagram types backed entirely by an external
-    # ontology (no diagram_only_types) are skipped.  Connection type vocabulary lives
-    # inside the internal DiagramOntology and is not re-checked here.
-    # NOTE: effective_entity_types() is intentionally avoided; for model-backed diagram
-    # types (e.g. C4) it calls get_module_registry(), which would recurse during build.
+
+def _diagram_type_consistency_msgs(registry: "ModuleRegistry") -> Iterator[str]:
+    """Diagram permitted_relationships entity types must be diagram-owned or declared in an ontology.
+
+    effective_entity_types() is intentionally avoided; for model-backed diagram types (e.g. C4) it
+    calls get_module_registry(), which would recurse during build. Diagram types backed entirely by
+    an external ontology (no diagram_only_types) are skipped; connection vocabulary is not re-checked.
+    """
     all_ontology_entity_names = frozenset(str(k) for k in registry.all_entity_types().keys())
     for dt_name, dt in registry.all_diagram_types().items():
         diagram_entity_names = frozenset(oe.entity_type for oe in dt.ui_config.diagram_only_types)
@@ -87,13 +80,27 @@ def _collect_consistency_errors(registry: "ModuleRegistry") -> list[str]:
         all_valid = diagram_entity_names | all_ontology_entity_names
         for src, targets in dt.own_permitted_relationships.by_source().items():
             if str(src) not in all_valid:
-                _add(f"Diagram type {dt_name!r}: permitted_relationships source {str(src)!r}"
-                     " is not a known entity type")
-            for tgt, conn in targets:
+                yield (f"Diagram type {dt_name!r}: permitted_relationships source {str(src)!r}"
+                       " is not a known entity type")
+            for tgt, _conn in targets:
                 if str(tgt) not in all_valid:
-                    _add(f"Diagram type {dt_name!r}: permitted_relationships target {str(tgt)!r}"
-                         " is not a known entity type")
+                    yield (f"Diagram type {dt_name!r}: permitted_relationships target {str(tgt)!r}"
+                           " is not a known entity type")
 
+
+def _dedupe(messages: Iterable[str]) -> list[str]:
+    """Preserve first-occurrence order while dropping duplicate messages."""
+    seen: set[str] = set()
+    ordered: list[str] = []
+    for msg in messages:
+        if msg not in seen:
+            seen.add(msg)
+            ordered.append(msg)
+    return ordered
+
+
+def _collect_consistency_errors(registry: "ModuleRegistry") -> list[str]:
+    errors = _dedupe(chain(_ontology_consistency_msgs(registry), _diagram_type_consistency_msgs(registry)))
     errors.extend(_collect_bridge_errors(registry))
     return errors
 
@@ -214,76 +221,90 @@ def validate_repo_compatibility(
         raise RepoCompatibilityError(errors)
 
 
-def _collect_errors(
-    repo: "ArtifactRepository",
-    registry: "ModuleRegistry",
+def _unknown_type_errors(typed_ids: Iterable[tuple[str, str]], known: set[str], label: str) -> list[str]:
+    """Report each repo type absent from *known*, naming one example artifact, sorted by type."""
+    first_example: dict[str, str] = {}
+    for type_name, artifact_id in typed_ids:
+        if type_name and type_name not in known and type_name not in first_example:
+            first_example[type_name] = artifact_id
+    return [
+        f"Unknown {label} type {t!r} (example artifact: {example})"
+        for t, example in sorted(first_example.items())
+    ]
+
+
+def _unknown_schema_errors(
+    repo: "ArtifactRepository", *, prefix: str, suffix: str, known: set[str], label: str
 ) -> list[str]:
+    """Report ``<prefix><stem><suffix>`` schema files whose *stem* type is not in *known*."""
     errors: list[str] = []
-    known_entity_types = set(registry.all_entity_types().keys()) | set(registry.all_diagram_entity_types())
-    known_connection_types = set(registry.all_connection_types().keys())
-    known_diagram_types = set(registry.all_diagram_types().keys())
-
-    unknown_entities: dict[str, str] = {}
-    for entity in repo.list_entities():
-        t = entity.artifact_type
-        if t and t not in known_entity_types and t not in unknown_entities:
-            unknown_entities[t] = entity.artifact_id
-    for t, example in sorted(unknown_entities.items()):
-        errors.append(f"Unknown entity type {t!r} (example artifact: {example})")
-
-    unknown_conns: dict[str, str] = {}
-    for conn in repo.list_connections():
-        t = conn.conn_type
-        if t and t not in known_connection_types and t not in unknown_conns:
-            unknown_conns[t] = conn.artifact_id
-    for t, example in sorted(unknown_conns.items()):
-        errors.append(f"Unknown connection type {t!r} (example artifact: {example})")
-
-    unknown_diagrams: dict[str, str] = {}
-    for diagram in repo.list_diagrams():
-        t = diagram.diagram_type
-        if t and t not in known_diagram_types and t not in unknown_diagrams:
-            unknown_diagrams[t] = diagram.artifact_id
-    for t, example in sorted(unknown_diagrams.items()):
-        errors.append(f"Unknown diagram type {t!r} (example artifact: {example})")
-
     for repo_root in repo.repo_roots:
         schemata_dir = repo_root / ".arch-repo" / "schemata"
         if not schemata_dir.is_dir():
             continue
-        prefix, suffix = "attributes.", ".schema.json"
         for f in sorted(schemata_dir.glob(f"{prefix}*{suffix}")):
             stem = f.name[len(prefix) : -len(suffix)]
-            if stem and stem not in known_entity_types:
-                errors.append(f"Attribute schema for unknown entity type {stem!r} (file: {f.relative_to(repo_root)})")
-        prefix, suffix = "connection-metadata.", ".schema.json"
-        for f in sorted(schemata_dir.glob(f"{prefix}*{suffix}")):
-            stem = f.name[len(prefix) : -len(suffix)]
-            if stem and stem not in known_connection_types:
-                errors.append(
-                    f"Connection metadata schema for unknown connection type {stem!r}"
-                    f" (file: {f.relative_to(repo_root)})"
-                )
+            if stem and stem not in known:
+                errors.append(f"{label} {stem!r} (file: {f.relative_to(repo_root)})")
+    return errors
+
+
+def _element_class_errors(registry: "ModuleRegistry", known_element_classes: set[str]) -> list[str]:
+    """Report entity/diagram types referencing element classes that no module declares."""
+    errors: list[str] = []
+    for om in registry.all_ontologies().values():
+        for etype, einfo in om.entity_types.items():
+            errors.extend(
+                f"Entity type {etype!r} references undeclared element class {cls!r}"
+                for cls in einfo.classes
+                if cls not in known_element_classes
+            )
+    for dk in registry.all_diagram_types().values():
+        for oe in dk.ui_config.diagram_only_types:
+            errors.extend(
+                f"Diagram type {dk.name!r} entity type {oe.entity_type!r} "
+                f"references undeclared element class {cls!r}"
+                for cls in oe.classes
+                if cls not in known_element_classes
+            )
+    return errors
+
+
+def _collect_errors(
+    repo: "ArtifactRepository",
+    registry: "ModuleRegistry",
+) -> list[str]:
+    known_entity_types: set[str] = {str(t) for t in registry.all_entity_types()} | {
+        str(t) for t in registry.all_diagram_entity_types()
+    }
+    known_connection_types: set[str] = {str(t) for t in registry.all_connection_types()}
+    known_diagram_types: set[str] = {str(t) for t in registry.all_diagram_types()}
+
+    errors = [
+        *_unknown_type_errors(
+            ((e.artifact_type, e.artifact_id) for e in repo.list_entities()), known_entity_types, "entity"
+        ),
+        *_unknown_type_errors(
+            ((c.conn_type, c.artifact_id) for c in repo.list_connections()), known_connection_types, "connection"
+        ),
+        *_unknown_type_errors(
+            ((d.diagram_type, d.artifact_id) for d in repo.list_diagrams()), known_diagram_types, "diagram"
+        ),
+        *_unknown_schema_errors(
+            repo, prefix="attributes.", suffix=".schema.json", known=known_entity_types,
+            label="Attribute schema for unknown entity type",
+        ),
+        *_unknown_schema_errors(
+            repo, prefix="connection-metadata.", suffix=".schema.json", known=known_connection_types,
+            label="Connection metadata schema for unknown connection type",
+        ),
+    ]
 
     try:
-        known_element_classes = set(registry.all_element_classes().keys())
+        known_element_classes: set[str] = {str(c) for c in registry.all_element_classes()}
     except ValueError as exc:
         errors.append(f"Element class declaration conflict: {exc}")
         return errors
 
-    for om in registry.all_ontologies().values():
-        for etype, einfo in om.entity_types.items():
-            for cls in einfo.classes:
-                if cls not in known_element_classes:
-                    errors.append(f"Entity type {etype!r} references undeclared element class {cls!r}")
-
-    for dk in registry.all_diagram_types().values():
-        for oe in dk.ui_config.diagram_only_types:
-            for cls in oe.classes:
-                if cls not in known_element_classes:
-                    errors.append(
-                        f"Diagram type {dk.name!r} entity type {oe.entity_type!r} "
-                        f"references undeclared element class {cls!r}"
-                    )
-
+    errors.extend(_element_class_errors(registry, known_element_classes))
     return errors

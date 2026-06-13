@@ -9,49 +9,104 @@ from src.application.verification.artifact_verifier import ArtifactRegistry, Art
 from src.domain.module_types import EntityTypeName
 
 from ._artifact_deduplication import get_repository, validate_entity_unique
+from ._entity_edit_support import (
+    _UNSET,
+    MergedFields,
+    count_rename_referrers,
+    merge_fields,
+)
+from ._entity_rename import persist_rename
 from .boundary import assert_engagement_write_root, today_iso
-from .coerce import as_optional_str, as_optional_str_dict, as_optional_str_list
 from .entity import entity_path, verification_to_entity_dict
-from .parse_existing import parse_entity_file
+from .parse_existing import ParsedEntity, parse_entity_file
 from .types import WriteResult
 from .verify import verify_content_in_temp_path
 
-# Sentinel to distinguish "not provided" from explicit None
-_UNSET = object()
+__all__ = ["_UNSET", "edit_entity", "promote_entity"]
 
 
-def _rename_entity_identity(
+def _resolve_target_identity(
     *,
-    entity_file: Path,
     repo_root: Path,
-    old_artifact_id: str,
-    new_artifact_id: str,
-) -> tuple[Path, list[Path]]:
-    new_entity_file = entity_file.with_name(f"{new_artifact_id}.md")
+    entity_file: Path,
+    artifact_type: str,
+    artifact_id: str,
+    current_name: str,
+    new_name: str | None,
+    eff_name: str,
+    group: str | None,
+) -> tuple[str, Path]:
+    """Resolve the artifact-id and file path a rename and/or group-move imply.
 
-    old_outgoing = entity_file.with_suffix(".outgoing.md")
-    new_outgoing = new_entity_file.with_suffix(".outgoing.md")
-    changed_paths: list[Path] = []
+    Returns the (possibly unchanged) effective id and target file. Raises if a
+    rename would collide with an existing file or a duplicate entity name.
+    """
+    effective_artifact_id = artifact_id
+    target_entity_file = entity_file
 
-    if old_outgoing.exists():
-        outgoing_text = old_outgoing.read_text(encoding="utf-8").replace(old_artifact_id, new_artifact_id)
-        new_outgoing.write_text(outgoing_text, encoding="utf-8")
-        if new_outgoing != old_outgoing:
-            old_outgoing.unlink()
-        changed_paths.extend([old_outgoing, new_outgoing])
+    if new_name is not None and slugify(eff_name) != slugify(current_name):
+        next_slug = slugify(eff_name)
+        effective_artifact_id = f"{artifact_id.rsplit('.', 1)[0]}.{next_slug}"
+        target_entity_file = entity_file.with_name(f"{effective_artifact_id}.md")
+        if target_entity_file.exists() and target_entity_file != entity_file:
+            raise ValueError(f"Target entity file already exists: {target_entity_file.name}")
+        validate_entity_unique(
+            get_repository(repo_root), artifact_type, next_slug, exclude_artifact_id=artifact_id
+        )
 
-    from src.application.repo_path_helpers import all_model_roots  # noqa: PLC0415
-    for model_root in all_model_roots(repo_root):
-        for outgoing_path in model_root.rglob("*.outgoing.md"):
-            if outgoing_path == new_outgoing:
-                continue
-            text = outgoing_path.read_text(encoding="utf-8")
-            if old_artifact_id not in text:
-                continue
-            outgoing_path.write_text(text.replace(old_artifact_id, new_artifact_id), encoding="utf-8")
-            changed_paths.append(outgoing_path)
+    if group is not None:
+        from src.application.repo_path_helpers import group_fn_entity  # noqa: PLC0415
+        from src.infrastructure.app_bootstrap import get_module_registry  # noqa: PLC0415
 
-    return new_entity_file, changed_paths
+        if group != group_fn_entity(entity_file, repo_root):
+            info = get_module_registry().get_entity_type(EntityTypeName(artifact_type))
+            target_entity_file = entity_path(repo_root, info, effective_artifact_id, group)
+            target_entity_file.parent.mkdir(parents=True, exist_ok=True)
+
+    return effective_artifact_id, target_entity_file
+
+
+def _render_entity(
+    *,
+    parsed: ParsedEntity,
+    merged: MergedFields,
+    artifact_type: str,
+    effective_artifact_id: str,
+    name_changed: bool,
+    repo_root: Path,
+) -> str:
+    """Format the entity markdown, relabelling the display block when the name changed."""
+    display_content = parsed.display_content
+    if name_changed and display_content:
+        display_content = re.sub(r"(?m)^(label:\s*).*$", rf"\g<1>{merged.name}", display_content, count=1)
+    return format_entity_markdown(
+        artifact_id=effective_artifact_id,
+        artifact_type=artifact_type,
+        name=merged.name,
+        version=merged.version,
+        status=merged.status,
+        last_updated=today_iso(),
+        keywords=merged.keywords,
+        summary=merged.summary,
+        properties=merged.properties,
+        notes=merged.notes,
+        display_section_id=parsed.display_section_id,
+        display_content=display_content,
+        repo_root=repo_root,
+    )
+
+
+def _entity_result(
+    *, wrote: bool, path: Path, artifact_id: str, content: str | None, warnings: list[str], verification: object
+) -> WriteResult:
+    return WriteResult(
+        wrote=wrote,
+        path=path,
+        artifact_id=artifact_id,
+        content=content,
+        warnings=warnings,
+        verification=verification_to_entity_dict(path, verification),
+    )
 
 
 def edit_entity(
@@ -83,166 +138,98 @@ def edit_entity(
         raise ValueError(f"Entity '{artifact_id}' not found in model")
 
     parsed = parse_entity_file(entity_file)
-    fm = parsed.frontmatter
-    artifact_type = str(fm.get("artifact-type", ""))
+    artifact_type = str(parsed.frontmatter.get("artifact-type", ""))
     from src.infrastructure.app_bootstrap import get_module_registry  # noqa: PLC0415
 
     get_module_registry().get_entity_type(EntityTypeName(artifact_type))
-    current_name = str(fm.get("name", ""))
-    effective_artifact_id = artifact_id
-    target_entity_file = entity_file
-    rename_summary: list[str] = []
 
-    # Merge updates — _UNSET means "keep existing"
-    eff_name = name if name is not None else current_name
-    eff_version = version if version is not None else str(fm.get("version", "0.1.0"))
-    eff_status = status if status is not None else str(fm.get("status", "draft"))
-    eff_keywords = as_optional_str_list(keywords if keywords is not _UNSET else fm.get("keywords"))
-    eff_summary = as_optional_str(summary) if summary is not _UNSET else parsed.summary
-    eff_properties = as_optional_str_dict(properties) if properties is not _UNSET else (parsed.properties or None)
-    eff_notes = as_optional_str(notes) if notes is not _UNSET else parsed.notes
-    if name is not None:
-        current_slug = slugify(current_name)
-        next_slug = slugify(eff_name)
-        if next_slug != current_slug:
-            effective_artifact_id = f"{artifact_id.rsplit('.', 1)[0]}.{next_slug}"
-            target_entity_file = entity_file.with_name(f"{effective_artifact_id}.md")
-            if target_entity_file.exists() and target_entity_file != entity_file:
-                raise ValueError(f"Target entity file already exists: {target_entity_file.name}")
-            repo = get_repository(repo_root)
-            validate_entity_unique(repo, artifact_type, next_slug, exclude_artifact_id=artifact_id)
-
-    if group is not None:
-        from src.application.repo_path_helpers import group_fn_entity  # noqa: PLC0415
-        current_group = group_fn_entity(entity_file, repo_root)
-        if group != current_group:
-            from src.infrastructure.app_bootstrap import get_module_registry  # noqa: PLC0415
-            info = get_module_registry().get_entity_type(EntityTypeName(artifact_type))
-            new_path = entity_path(repo_root, info, effective_artifact_id, group)
-            new_path.parent.mkdir(parents=True, exist_ok=True)
-            target_entity_file = new_path
-
-    # Update display block — keep existing content, update label if name changed
-    display_content = parsed.display_content
-    if name is not None and display_content:
-        display_content = re.sub(r"(?m)^(label:\s*).*$", rf"\g<1>{eff_name}", display_content, count=1)
-
-    content = format_entity_markdown(
-        artifact_id=effective_artifact_id,
+    merged = merge_fields(
+        parsed,
+        name=name,
+        version=version,
+        status=status,
+        keywords=keywords,
+        summary=summary,
+        properties=properties,
+        notes=notes,
+    )
+    effective_artifact_id, target_entity_file = _resolve_target_identity(
+        repo_root=repo_root,
+        entity_file=entity_file,
         artifact_type=artifact_type,
-        name=eff_name,
-        version=eff_version,
-        status=eff_status,
-        last_updated=today_iso(),
-        keywords=eff_keywords,
-        summary=eff_summary,
-        properties=eff_properties,
-        notes=eff_notes,
-        display_section_id=parsed.display_section_id,
-        display_content=display_content,
+        artifact_id=artifact_id,
+        current_name=str(parsed.frontmatter.get("name", "")),
+        new_name=name,
+        eff_name=merged.name,
+        group=group,
+    )
+    content = _render_entity(
+        parsed=parsed,
+        merged=merged,
+        artifact_type=artifact_type,
+        effective_artifact_id=effective_artifact_id,
+        name_changed=name is not None,
         repo_root=repo_root,
     )
 
     preview_res = verify_content_in_temp_path(
-        verifier=verifier,
-        file_type="entity",
-        desired_name=target_entity_file.name,
-        content=content,
+        verifier=verifier, file_type="entity", desired_name=target_entity_file.name, content=content
     )
 
+    renamed = effective_artifact_id != artifact_id
+    warnings: list[str] = []
     if dry_run:
-        if effective_artifact_id != artifact_id:
-            impacted = 0
-            own_outgoing = entity_file.with_suffix(".outgoing.md")
-            if own_outgoing.exists():
-                impacted += 1
-            from src.application.repo_path_helpers import all_model_roots  # noqa: PLC0415
-            for _mr in all_model_roots(repo_root):
-                for outgoing_path in _mr.rglob("*.outgoing.md"):
-                    if outgoing_path == own_outgoing:
-                        continue
-                    try:
-                        if artifact_id in outgoing_path.read_text(encoding="utf-8"):
-                            impacted += 1
-                    except OSError:
-                        continue
-            rename_summary.append(
+        if renamed:
+            impacted = count_rename_referrers(repo_root, artifact_id, entity_file.with_suffix(".outgoing.md"))
+            warnings.append(
                 f"Rename will update artifact-id to {effective_artifact_id} and rewrite {impacted} outgoing file(s)."
             )
-        return WriteResult(
-            wrote=False,
-            path=target_entity_file,
-            artifact_id=effective_artifact_id,
-            content=content,
-            warnings=rename_summary,
-            verification=verification_to_entity_dict(target_entity_file, preview_res),
+        return _entity_result(
+            wrote=False, path=target_entity_file, artifact_id=effective_artifact_id,
+            content=content, warnings=warnings, verification=preview_res,
         )
 
     if not preview_res.valid:
-        return WriteResult(
-            wrote=False,
-            path=target_entity_file,
-            artifact_id=effective_artifact_id,
-            content=content,
-            warnings=rename_summary,
-            verification=verification_to_entity_dict(target_entity_file, preview_res),
+        return _entity_result(
+            wrote=False, path=target_entity_file, artifact_id=effective_artifact_id,
+            content=content, warnings=warnings, verification=preview_res,
         )
 
+    moved = target_entity_file != entity_file
     prev = entity_file.read_text(encoding="utf-8")
     target_entity_file.write_text(content, encoding="utf-8")
-    if target_entity_file != entity_file:
-        entity_file.unlink()
-        _, renamed_paths = _rename_entity_identity(
+    renamed_paths = (
+        persist_rename(
             entity_file=entity_file,
+            target_entity_file=target_entity_file,
             repo_root=repo_root,
-            old_artifact_id=artifact_id,
-            new_artifact_id=effective_artifact_id,
+            artifact_id=artifact_id,
+            effective_artifact_id=effective_artifact_id,
         )
-        if target_entity_file.parent != entity_file.parent:
-            for outgoing_src in (
-                entity_file.with_suffix(".outgoing.md"),
-                entity_file.with_name(f"{effective_artifact_id}.outgoing.md"),
-            ):
-                if outgoing_src.exists():
-                    new_outgoing = target_entity_file.with_suffix(".outgoing.md")
-                    new_outgoing.parent.mkdir(parents=True, exist_ok=True)
-                    outgoing_src.rename(new_outgoing)
-                    renamed_paths.extend([outgoing_src, new_outgoing])
-                    break
-        rename_summary.append(
+        if moved
+        else []
+    )
+    if moved:
+        warnings.append(
             f"Renamed artifact-id to {effective_artifact_id} and updated {len(renamed_paths)} outgoing file(s)."
         )
-    else:
-        renamed_paths = []
 
     res = verifier.verify_entity_file(target_entity_file)
     if not res.valid:
-        if target_entity_file != entity_file:
+        if moved:
             target_entity_file.unlink(missing_ok=True)
-            entity_file.write_text(prev, encoding="utf-8")
-        else:
-            entity_file.write_text(prev, encoding="utf-8")
-        return WriteResult(
-            wrote=False,
-            path=target_entity_file,
-            artifact_id=effective_artifact_id,
-            content=content,
-            warnings=rename_summary,
-            verification=verification_to_entity_dict(target_entity_file, res),
+        entity_file.write_text(prev, encoding="utf-8")
+        return _entity_result(
+            wrote=False, path=target_entity_file, artifact_id=effective_artifact_id,
+            content=content, warnings=warnings, verification=res,
         )
 
-    if target_entity_file != entity_file:
-        for changed_path in [entity_file, target_entity_file, *renamed_paths]:
-            clear_repo_caches(changed_path)
-    else:
-        clear_repo_caches(target_entity_file)
-    return WriteResult(
-        wrote=True,
-        path=target_entity_file,
-        artifact_id=effective_artifact_id,
-        content=None,
-        warnings=rename_summary,
-        verification=verification_to_entity_dict(target_entity_file, res),
+    changed_paths = [entity_file, target_entity_file, *renamed_paths] if moved else [target_entity_file]
+    for changed_path in changed_paths:
+        clear_repo_caches(changed_path)
+    return _entity_result(
+        wrote=True, path=target_entity_file, artifact_id=effective_artifact_id,
+        content=None, warnings=warnings, verification=res,
     )
 
 

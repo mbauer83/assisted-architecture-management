@@ -18,7 +18,7 @@ def _parse_version(text: str) -> tuple[int, ...] | None:
     return tuple(int(part) for part in match.groups())
 
 
-def _run(cmd: list[str]) -> str:
+def _run(cmd: list[str]) -> str:  # pragma: no cover — subprocess system call, not testable in unit tests
     proc = subprocess.run(cmd, capture_output=True, text=True, check=False)
     if proc.returncode != 0:
         output = (proc.stdout + proc.stderr).strip()

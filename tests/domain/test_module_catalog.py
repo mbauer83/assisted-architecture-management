@@ -8,7 +8,7 @@ from typing import Any
 
 import pytest
 
-from src.domain.diagram_type_config import DiagramTypeUiConfig
+from src.domain.diagram_type_config import DiagramOwnEntityTypeUiConfig, DiagramTypeUiConfig
 from src.domain.module_catalog import ModuleCatalog, ModuleCatalogBuilder
 from src.domain.module_types import ConnectionTypeName, ElementClassName, EntityTypeName
 from src.domain.ontology_types import ConnectionTypeInfo, ElementClassInfo, EntityTypeInfo
@@ -410,3 +410,108 @@ class TestCatalogImmutability:
         with pytest.raises(RuntimeError):
             b.register_ontology(_StubOntology("o2"))
         assert cat.find_ontology("o2") is None
+
+
+# ── Builder: diagram type edge cases ─────────────────────────────────────────
+
+
+class TestBuilderDiagramTypeEdgeCases:
+    def test_unregister_missing_diagram_type_raises(self) -> None:
+        b = ModuleCatalogBuilder()
+        with pytest.raises(KeyError):
+            b.unregister_diagram_type("no-such")
+
+    def test_replace_diagram_type_before_build(self) -> None:
+        b = ModuleCatalogBuilder()
+        dt1 = _StubDiagramType("dt-x")
+        dt2 = _StubDiagramType("dt-x")
+        b.register_diagram_type(dt1)
+        b.replace_diagram_type(dt2)
+        cat = b.build()
+        assert cat.get_diagram_type("dt-x") is dt2
+
+
+# ── Catalog: multi-ontology lookups ───────────────────────────────────────────
+
+
+class TestCatalogMultiOntologyLookups:
+    def test_get_entity_type_in_second_ontology(self) -> None:
+        o1 = _StubOntology("o1", ["type-a"])
+        o2 = _StubOntology("o2", ["type-b"])
+        cat = _build([o1, o2])
+        et = cat.get_entity_type(EntityTypeName("type-b"))
+        assert et.artifact_type == "type-b"
+
+    def test_find_entity_type_in_second_ontology(self) -> None:
+        o1 = _StubOntology("o1", ["type-a"])
+        o2 = _StubOntology("o2", ["type-b"])
+        cat = _build([o1, o2])
+        et = cat.find_entity_type(EntityTypeName("type-b"))
+        assert et is not None
+        assert et.artifact_type == "type-b"
+
+    def test_get_connection_type_from_diagram_when_not_in_ontology(self) -> None:
+        o1 = _StubOntology("o1", conn_names=["conn-a"])
+        dt = _StubDiagramType("dt", conn_names=["conn-dt"])
+        cat = _build([o1], [dt])
+        ct = cat.get_connection_type(ConnectionTypeName("conn-dt"))
+        assert ct.artifact_type == "conn-dt"
+
+    def test_find_connection_type_from_diagram_type(self) -> None:
+        dt = _StubDiagramType("dt", conn_names=["conn-only-in-dt"])
+        cat = _build(diagram_types=[dt])
+        ct = cat.find_connection_type(ConnectionTypeName("conn-only-in-dt"))
+        assert ct is not None
+        assert ct.artifact_type == "conn-only-in-dt"
+
+    def test_connection_types_with_class_from_diagram_type(self) -> None:
+        dt = _StubDiagramType("dt")
+        dt._own_connection_types = {
+            ConnectionTypeName("classed-conn"): ConnectionTypeInfo(
+                artifact_type="classed-conn", conn_lang="test", classes=("my-class",)
+            )
+        }
+        cat = _build(diagram_types=[dt])
+        result = cat.connection_types_with_class("my-class")
+        assert ConnectionTypeName("classed-conn") in result
+
+
+# ── Catalog: diagram-only entity types ───────────────────────────────────────
+
+
+class TestCatalogDiagramOnlyEntityTypes:
+    def test_all_diagram_entity_types_includes_diagram_only(self) -> None:
+        from dataclasses import dataclass, field as dc_field
+
+        own_type = DiagramOwnEntityTypeUiConfig(entity_type="my-special-type", label="Special", plural="Specials")
+        ui = DiagramTypeUiConfig(label="dt-x", diagram_only_types=(own_type,))
+        dt = _StubDiagramType("dt-x")
+        dt._ui_config = ui
+        # Monkey-patch the ui_config property
+        type(dt).ui_config = property(lambda self: self._ui_config)
+        cat = _build(diagram_types=[dt])
+        result = cat.all_diagram_entity_types()
+        assert EntityTypeName("my-special-type") in result
+
+    def test_is_diagram_entity_type_true_for_diagram_only(self) -> None:
+        own_type = DiagramOwnEntityTypeUiConfig(entity_type="special-dt-type", label="S", plural="Ss")
+        ui = DiagramTypeUiConfig(label="dt-y", diagram_only_types=(own_type,))
+        dt = _StubDiagramType("dt-y")
+        type(dt).ui_config = property(lambda self: self._ui_config)
+        dt._ui_config = ui
+        cat = _build(diagram_types=[dt])
+        assert cat.is_diagram_entity_type(EntityTypeName("special-dt-type")) is True
+        assert cat.is_diagram_entity_type(EntityTypeName("other-type")) is False
+
+
+# ── Catalog: all_element_classes duplicate detection ────────────────────────
+
+
+class TestAllElementClassesDuplicates:
+    def test_duplicate_across_ontologies_raises(self) -> None:
+        ec_info = ElementClassInfo(name="cls-dup", description="some class")
+        o1 = _StubOntology("o1", element_classes={"cls-dup": ec_info})
+        o2 = _StubOntology("o2", element_classes={"cls-dup": ec_info})
+        cat = _build([o1, o2])
+        with pytest.raises(ValueError, match="Duplicate element class"):
+            cat.all_element_classes()

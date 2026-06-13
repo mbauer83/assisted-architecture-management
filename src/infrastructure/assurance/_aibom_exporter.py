@@ -34,32 +34,28 @@ _CDX_AI_ROLE_TO_TYPE: dict[str, str] = {
 }
 
 
+# Optional CycloneDX node fields copied verbatim (source key, node key).
+_CDX_NODE_FIELDS: tuple[tuple[str, str], ...] = (("version", "version"), ("purl", "purl"), ("cpe", "cpe"))
+# Optional ai:/arch: properties emitted from present component fields (source key, property name).
+_CDX_PROP_FIELDS: tuple[tuple[str, str], ...] = (
+    ("ai_role", "ai:role"),
+    ("provider", "ai:provider"),
+    ("hosted", "ai:hosted"),
+    ("external", "ai:external"),
+    ("arch_entity_id", "arch:entity_id"),
+)
+
+
 def _cdx_component(comp: dict[str, object]) -> dict[str, object]:
     ai_role = str(comp.get("ai_role") or "")
-    cdx_type = _CDX_AI_ROLE_TO_TYPE.get(ai_role, "library")
     node: dict[str, object] = {
-        "type": cdx_type,
+        "type": _CDX_AI_ROLE_TO_TYPE.get(ai_role, "library"),
         "name": str(comp.get("name") or ""),
+        **{dst: str(comp[src]) for src, dst in _CDX_NODE_FIELDS if comp.get(src)},
     }
-    if comp.get("version"):
-        node["version"] = str(comp["version"])
-    if comp.get("purl"):
-        node["purl"] = str(comp["purl"])
-    if comp.get("cpe"):
-        node["cpe"] = str(comp["cpe"])
-    props: list[dict[str, str]] = []
-    if ai_role:
-        props.append({"name": "ai:role", "value": ai_role})
-    if comp.get("provider"):
-        props.append({"name": "ai:provider", "value": str(comp["provider"])})
-    if comp.get("hosted"):
-        props.append({"name": "ai:hosted", "value": str(comp["hosted"])})
-    if comp.get("external"):
-        props.append({"name": "ai:external", "value": str(comp["external"])})
-    if comp.get("arch_entity_id"):
-        props.append({"name": "arch:entity_id", "value": str(comp["arch_entity_id"])})
     if comp.get("model_card_ref"):
         node["modelCard"] = {"bom-ref": str(comp["model_card_ref"])}
+    props = [{"name": label, "value": str(comp[src])} for src, label in _CDX_PROP_FIELDS if comp.get(src)]
     if props:
         node["properties"] = props
     return node

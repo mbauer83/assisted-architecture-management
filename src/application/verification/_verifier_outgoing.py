@@ -43,6 +43,75 @@ def _parse_conn_header(header: str) -> tuple[str, str, str, str] | None:
     )
 
 
+def _target_issue(target_id: str, all_entities_for_scope: set[str], scope: str, loc: str) -> Issue:
+    """Distinguish an enterprise-scope leak (E130) from a genuinely missing target (E124)."""
+    if target_id in all_entities_for_scope and scope == "enterprise":
+        return Issue(
+            Severity.ERROR, "E130", f"enterprise connection references non-enterprise entity '{target_id}'", loc
+        )
+    return Issue(Severity.ERROR, "E124", f"Target entity '{target_id}' not found in model", loc)
+
+
+def _check_source_entity(
+    source: str, *, registry: ArtifactRegistry, scope: str, result: VerificationResult, loc: str
+) -> None:
+    """Validate that ``source-entity`` exists and respects enterprise scoping (E120/E131)."""
+    if source not in registry.entity_ids():
+        result.issues.append(Issue(Severity.ERROR, "E120", f"source-entity '{source}' not found in model", loc))
+    elif scope == "enterprise" and source not in registry.enterprise_entity_ids():
+        result.issues.append(
+            Issue(Severity.ERROR, "E131", f"enterprise connection has non-enterprise source-entity '{source}'", loc)
+        )
+
+
+def _check_connection_block(
+    header: str,
+    *,
+    catalogs: RuntimeCatalogs,
+    has_registry: bool,
+    allowed_entities: set[str],
+    all_entities_for_scope: set[str],
+    scope: str,
+    seen_connections: set[str],
+    result: VerificationResult,
+    loc: str,
+) -> tuple[str, str] | None:
+    """Validate a single ``### <header>`` connection block, appending any issues.
+
+    Returns ``(conn_type, target_id)`` for downstream semantic checks, or ``None``
+    when the header is malformed.
+    """
+    parsed = _parse_conn_header(header)
+    if parsed is None:
+        result.issues.append(
+            Issue(Severity.ERROR, "E122", f"Connection header missing ' → ' separator: '{header}'", loc)
+        )
+        return None
+
+    conn_type, src_card, tgt_card, target_id = parsed
+    if conn_type not in catalogs.ontology.all_connection_type_names():
+        result.issues.append(Issue(Severity.ERROR, "E123", f"Unknown connection type '{conn_type}'", loc))
+    for card_label, card_val in (("source", src_card), ("target", tgt_card)):
+        if card_val and not _CARDINALITY_RE.match(card_val):
+            result.issues.append(
+                Issue(
+                    Severity.ERROR,
+                    "E125",
+                    f"Invalid {card_label} cardinality '{card_val}' in '{header}' "
+                    f"— expected n, n..m, n..*, or *",
+                    loc,
+                )
+            )
+    if has_registry and target_id not in allowed_entities:
+        result.issues.append(_target_issue(target_id, all_entities_for_scope, scope, loc))
+
+    conn_key = f"{conn_type} → {target_id}"
+    if conn_key in seen_connections:
+        result.issues.append(Issue(Severity.WARNING, "W120", f"Duplicate connection: '{conn_key}'", loc))
+    seen_connections.add(conn_key)
+    return conn_type, target_id
+
+
 def verify_outgoing(
     path: Path,
     *,
@@ -66,20 +135,7 @@ def verify_outgoing(
 
     source = fm.get("source-entity", "")
     if registry is not None and source:
-        all_entities = registry.entity_ids()
-        if source not in all_entities:
-            result.issues.append(
-                Issue(Severity.ERROR, "E120", f"source-entity '{source}' not found in model", loc)
-            )
-        elif scope == "enterprise" and source not in registry.enterprise_entity_ids():
-            result.issues.append(
-                Issue(
-                    Severity.ERROR,
-                    "E131",
-                    f"enterprise connection has non-enterprise source-entity '{source}'",
-                    loc,
-                )
-            )
+        _check_source_entity(source, registry=registry, scope=scope, result=result, loc=loc)
 
     if "<!-- §connections -->" not in content:
         result.issues.append(
@@ -97,59 +153,21 @@ def verify_outgoing(
     seen_connections: set[str] = set()
     parsed_connections: list[tuple[str, str]] = []
     for line in content.splitlines():
-        if line.startswith("### "):
-            header = line[4:].strip()
-            parsed = _parse_conn_header(header)
-            if parsed is None:
-                result.issues.append(
-                    Issue(
-                        Severity.ERROR,
-                        "E122",
-                        f"Connection header missing ' → ' separator: '{header}'",
-                        loc,
-                    )
-                )
-            else:
-                conn_type, src_card, tgt_card, target_id = parsed
-                if conn_type not in catalogs.ontology.all_connection_type_names():
-                    result.issues.append(
-                        Issue(Severity.ERROR, "E123", f"Unknown connection type '{conn_type}'", loc)
-                    )
-                for card_label, card_val in (("source", src_card), ("target", tgt_card)):
-                    if card_val and not _CARDINALITY_RE.match(card_val):
-                        result.issues.append(
-                            Issue(
-                                Severity.ERROR,
-                                "E125",
-                                f"Invalid {card_label} cardinality '{card_val}' in '{header}' "
-                                f"— expected n, n..m, n..*, or *",
-                                loc,
-                            )
-                        )
-                if registry is not None and target_id not in allowed_entities:
-                    issue = (
-                        Issue(
-                            Severity.ERROR,
-                            "E130",
-                            f"enterprise connection references non-enterprise entity '{target_id}'",
-                            loc,
-                        )
-                        if target_id in all_entities_for_scope and scope == "enterprise"
-                        else Issue(
-                            Severity.ERROR,
-                            "E124",
-                            f"Target entity '{target_id}' not found in model",
-                            loc,
-                        )
-                    )
-                    result.issues.append(issue)
-                conn_key = f"{conn_type} → {target_id}"
-                if conn_key in seen_connections:
-                    result.issues.append(
-                        Issue(Severity.WARNING, "W120", f"Duplicate connection: '{conn_key}'", loc)
-                    )
-                seen_connections.add(conn_key)
-                parsed_connections.append((conn_type, target_id))
+        if not line.startswith("### "):
+            continue
+        conn = _check_connection_block(
+            line[4:].strip(),
+            catalogs=catalogs,
+            has_registry=registry is not None,
+            allowed_entities=allowed_entities,
+            all_entities_for_scope=all_entities_for_scope,
+            scope=scope,
+            seen_connections=seen_connections,
+            result=result,
+            loc=loc,
+        )
+        if conn is not None:
+            parsed_connections.append(conn)
 
     if registry is not None and source and parsed_connections:
         check_connection_semantics(

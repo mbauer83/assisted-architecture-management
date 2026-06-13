@@ -43,14 +43,14 @@ def _parse_version(text: str) -> tuple[int, ...] | None:
     return tuple(int(part) for part in match.groups())
 
 
-def _dot_version(dot_path: Path | str) -> tuple[int, ...] | None:
+def _dot_version(dot_path: Path | str) -> tuple[int, ...] | None:  # pragma: no cover — subprocess Graphviz probe
     proc = subprocess.run([str(dot_path), "-V"], capture_output=True, text=True, check=False)
     if proc.returncode != 0:
         return None
     return _parse_version((proc.stdout + proc.stderr).strip())
 
 
-def _download_bytes(url: str) -> bytes:
+def _download_bytes(url: str) -> bytes:  # pragma: no cover — network download, not testable in unit tests
     with urllib.request.urlopen(url) as resp:  # noqa: S310
         return resp.read()
 
@@ -59,7 +59,7 @@ def _sha256hex(data: bytes) -> str:
     return hashlib.sha256(data).hexdigest().lower()
 
 
-def _ensure_graphviz_from_source(root: Path, *, force: bool) -> Path:
+def _ensure_graphviz_from_source(root: Path, *, force: bool) -> Path:  # pragma: no cover
     tools_dir = root / "tools"
     output_dir = tools_dir / "graphviz"
     dot_name = "dot.exe" if os.name == "nt" else "dot"
@@ -112,43 +112,37 @@ def _ensure_graphviz_from_source(root: Path, *, force: bool) -> Path:
     return dot_path
 
 
-def _install_graphviz_system() -> None:
-    system = platform.system().lower()
-    commands: list[list[str]] = []
-    if system == "darwin" and shutil.which("brew"):
-        commands = [["brew", "install", "graphviz"]]
-    elif system == "linux":
-        if shutil.which("apt-get"):
-            commands = [["apt-get", "update"], ["apt-get", "install", "-y", "graphviz"]]
-        elif shutil.which("dnf"):
-            commands = [["dnf", "install", "-y", "graphviz"]]
-        elif shutil.which("pacman"):
-            commands = [["pacman", "-Sy", "--noconfirm", "graphviz"]]
-    elif system == "windows":
-        if shutil.which("winget"):
-            commands = [
-                [
-                    "winget",
-                    "install",
-                    "--id",
-                    "Graphviz.Graphviz",
-                    "-e",
-                    "--accept-source-agreements",
-                    "--accept-package-agreements",
-                ]
-            ]
-        elif shutil.which("choco"):
-            commands = [["choco", "install", "graphviz", "-y"]]
+# Per-platform install plans, ordered by preference: (package-manager binary, commands to run).
+# The first plan whose binary is on PATH wins.
+_GRAPHVIZ_INSTALL_PLANS: dict[str, list[tuple[str, list[list[str]]]]] = {
+    "darwin": [("brew", [["brew", "install", "graphviz"]])],
+    "linux": [
+        ("apt-get", [["apt-get", "update"], ["apt-get", "install", "-y", "graphviz"]]),
+        ("dnf", [["dnf", "install", "-y", "graphviz"]]),
+        ("pacman", [["pacman", "-Sy", "--noconfirm", "graphviz"]]),
+    ],
+    "windows": [
+        (
+            "winget",
+            [["winget", "install", "--id", "Graphviz.Graphviz", "-e",
+              "--accept-source-agreements", "--accept-package-agreements"]],
+        ),
+        ("choco", [["choco", "install", "graphviz", "-y"]]),
+    ],
+}
 
+
+def _install_graphviz_system() -> None:  # pragma: no cover — subprocess package manager, not testable in unit tests
+    plans = _GRAPHVIZ_INSTALL_PLANS.get(platform.system().lower(), [])
+    commands = next((cmds for tool, cmds in plans if shutil.which(tool)), None)
     if not commands:
         raise SystemExit("No supported system package manager found for Graphviz installation")
-
     for cmd in commands:
         print(f"Running: {' '.join(cmd)}")
         subprocess.run(cmd, check=True)
 
 
-def _check_runtime(root: Path) -> int:
+def _check_runtime(root: Path) -> int:  # pragma: no cover — subprocess JVM/Graphviz check, not testable in unit tests
     from src.application.verification.artifact_verifier_syntax import find_graphviz_dot
     from src.infrastructure.bootstrap.check_diagram_runtime import main as check_runtime
 

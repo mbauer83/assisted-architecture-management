@@ -34,6 +34,16 @@ from src.infrastructure.backend.backend_state import (
 logger = logging.getLogger(__name__)
 
 
+def _wait_for_exit(pid: int, *, timeout_s: float, interval: float) -> bool:
+    """Poll until ``pid`` is gone or ``timeout_s`` elapses. Returns whether it exited."""
+    deadline = time.monotonic() + timeout_s
+    while time.monotonic() < deadline:
+        if not _process_exists(pid):
+            return True
+        time.sleep(interval)
+    return False
+
+
 def ensure_backend_running(
     *,
     port: int | None = None,
@@ -188,52 +198,57 @@ def _stop_pid(
         timeout_s,
         process_state,
     )
+    def _stale() -> dict[str, object]:
+        if tracked_pid == pid:
+            remove_backend_state(cwd)
+        return {"stopped": False, "reason": "stale_pid", "pid": pid}
+
+    def _exited() -> dict[str, object]:
+        if tracked_pid == pid:
+            remove_backend_state(cwd)
+        return {"stopped": True, "pid": pid, "port": port}
+
     if process_state in {"T", "t"}:
         try:
             os.kill(pid, signal.SIGCONT)
             logger.info("Sent SIGCONT to stopped pid %s before termination", pid)
         except ProcessLookupError:
             logger.warning("SIGCONT target pid %s does not exist", pid)
-            if tracked_pid == pid:
-                remove_backend_state(cwd)
-            return {"stopped": False, "reason": "stale_pid", "pid": pid}
+            return _stale()
     try:
         os.kill(pid, signal.SIGTERM)
     except ProcessLookupError:
         logger.warning("SIGTERM target pid %s does not exist", pid)
-        if tracked_pid == pid:
-            remove_backend_state(cwd)
-        return {"stopped": False, "reason": "stale_pid", "pid": pid}
+        return _stale()
 
-    deadline = time.monotonic() + timeout_s
-    while time.monotonic() < deadline:
-        if not _process_exists(pid):
-            logger.info("pid %s exited after SIGTERM", pid)
-            if tracked_pid == pid:
-                remove_backend_state(cwd)
-            return {"stopped": True, "pid": pid, "port": port}
-        time.sleep(0.1)
+    if _wait_for_exit(pid, timeout_s=timeout_s, interval=0.1):
+        logger.info("pid %s exited after SIGTERM", pid)
+        return _exited()
 
     logger.warning("Timed out waiting for pid %s to exit after SIGTERM; escalating to SIGKILL", pid)
     try:
         os.kill(pid, signal.SIGKILL)
     except ProcessLookupError:
         logger.info("pid %s exited before SIGKILL was delivered", pid)
-        if tracked_pid == pid:
-            remove_backend_state(cwd)
-        return {"stopped": True, "pid": pid, "port": port}
+        return _exited()
 
-    kill_deadline = time.monotonic() + min(timeout_s, 2.0)
-    while time.monotonic() < kill_deadline:
-        if not _process_exists(pid):
-            logger.info("pid %s exited after SIGKILL", pid)
-            if tracked_pid == pid:
-                remove_backend_state(cwd)
-            return {"stopped": True, "pid": pid, "port": port}
-        time.sleep(0.05)
+    if _wait_for_exit(pid, timeout_s=min(timeout_s, 2.0), interval=0.05):
+        logger.info("pid %s exited after SIGKILL", pid)
+        return _exited()
 
     logger.error("Timed out waiting for pid %s to exit even after SIGKILL", pid)
     return {"stopped": False, "reason": "timeout", "pid": pid, "port": port}
+
+
+def _stop_all(pids: list[int], *, cwd: Path | None, timeout_s: float, port: int) -> dict[str, object]:
+    """Stop every pid in ``pids`` (same-port backends), reporting which actually stopped."""
+    logger.warning("Stopping all %d arch-backend instances on port %s: %s", len(pids), port, pids)
+    stopped_pids = [
+        pid for pid in pids if _stop_pid(pid, cwd=cwd, timeout_s=timeout_s, port=port).get("stopped")
+    ]
+    if stopped_pids:
+        return {"stopped": True, "pid": stopped_pids[0], "pids": stopped_pids, "port": port}
+    return {"stopped": False, "reason": "multiple_matching", "port": port, "pids": pids}
 
 
 def stop_backend(*, cwd: Path | None = None, timeout_s: float = 5.0, port: int | None = None) -> dict[str, object]:
@@ -292,33 +307,11 @@ def stop_backend(*, cwd: Path | None = None, timeout_s: float = 5.0, port: int |
                     os.kill(leftover_pid, signal.SIGTERM)
                 except ProcessLookupError:
                     continue
-                wait_deadline = time.monotonic() + min(timeout_s, 3.0)
-                while time.monotonic() < wait_deadline:
-                    if not _process_exists(leftover_pid):
-                        break
-                    time.sleep(0.1)
+                _wait_for_exit(leftover_pid, timeout_s=min(timeout_s, 3.0), interval=0.1)
             return result
         # Genuinely multiple backend instances on the same port — stop all.
         pids = [m["pid"] for m in (socket_owners or matches)]
-        logger.warning("Stopping all %d arch-backend instances on port %s: %s", len(pids), resolved_port, pids)
-        stopped_pids: list[int] = []
-        for pid in pids:
-            r = _stop_pid(pid, cwd=cwd, timeout_s=timeout_s, port=resolved_port)
-            if r.get("stopped"):
-                stopped_pids.append(pid)
-        if stopped_pids:
-            return {
-                "stopped": True,
-                "pid": stopped_pids[0],
-                "pids": stopped_pids,
-                "port": resolved_port,
-            }
-        return {
-            "stopped": False,
-            "reason": "multiple_matching",
-            "port": resolved_port,
-            "pids": pids,
-        }
+        return _stop_all(pids, cwd=cwd, timeout_s=timeout_s, port=resolved_port)
 
     if len(instances) == 1:
         instance = instances[0]

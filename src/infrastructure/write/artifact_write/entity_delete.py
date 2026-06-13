@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from collections.abc import Callable
+from collections.abc import Callable, Iterator
 from pathlib import Path
 
 from src.application.entity_type_predicates import is_internal_entity_type
@@ -75,6 +75,62 @@ def _format_dependency_tree(
     return "\n".join(lines)
 
 
+def _iter_model_files(registry: ArtifactRegistry, pattern: str) -> Iterator[Path]:
+    """Flat iteration over files matching *pattern* under every repo's model root."""
+    for root in registry.repo_roots:
+        model_root = root / MODEL
+        if model_root.exists():
+            yield from sorted(model_root.rglob(pattern))
+
+
+def _incoming_connection_blockers(registry: ArtifactRegistry, artifact_id: str) -> list[str]:
+    """Connections from other entities that target *artifact_id*."""
+    blockers: list[str] = []
+    for outgoing_path in _iter_model_files(registry, "*.outgoing.md"):
+        try:
+            parsed = parse_outgoing_file(outgoing_path)
+        except Exception:  # noqa: BLE001
+            continue
+        source_entity = str(parsed.frontmatter.get("source-entity", ""))
+        if source_entity == artifact_id:
+            continue
+        blockers.extend(
+            f"{source_entity} {conn['connection_type']} → {artifact_id}"
+            for conn in parsed.connections
+            if conn["target_entity"] == artifact_id
+        )
+    return blockers
+
+
+def _grf_blockers(registry: ArtifactRegistry, artifact_id: str, entity_file: Path) -> list[str]:
+    """Internal global-artifact-reference proxies pointing at *artifact_id*."""
+    from src.infrastructure.app_bootstrap import build_runtime_catalogs, get_module_registry  # noqa: PLC0415
+
+    ontology = build_runtime_catalogs(get_module_registry()).ontology
+    blockers: list[str] = []
+    for other_entity in _iter_model_files(registry, "*.md"):
+        if other_entity.name.endswith(".outgoing.md") or other_entity == entity_file:
+            continue
+        fm = parse_frontmatter_from_path(other_entity) or {}
+        if is_internal_entity_type(str(fm.get("artifact-type", "")), ontology) and (
+            str(fm.get("global-artifact-id", "")) == artifact_id
+        ):
+            blockers.append(str(fm.get("artifact-id", other_entity.stem)))
+    return blockers
+
+
+def _diagram_blockers(registry: ArtifactRegistry, artifact_id: str, owned_connection_ids: set[str]) -> list[str]:
+    """Diagrams referencing the entity or any connection it owns."""
+    blockers: list[str] = []
+    for diagram_path in _diagram_paths(registry.repo_roots):
+        refs = parse_diagram_refs(diagram_path) or {}
+        entity_ids = set(refs.get("entity_ids", []))
+        conn_ids = set(refs.get("connection_ids", []))
+        if artifact_id in entity_ids or owned_connection_ids.intersection(conn_ids):
+            blockers.append(diagram_path.stem)
+    return blockers
+
+
 def _entity_ref_blockers(
     *,
     registry: ArtifactRegistry,
@@ -83,44 +139,9 @@ def _entity_ref_blockers(
     owned_connection_ids: set[str],
     ignore_diagram_refs: bool = False,
 ) -> tuple[list[str], list[str], list[str]]:
-    incoming_connections: list[str] = []
-    diagram_refs: list[str] = []
-    grf_refs: list[str] = []
-    for root in registry.repo_roots:
-        model_root = root / MODEL
-        if not model_root.exists():
-            continue
-        for outgoing_path in sorted(model_root.rglob("*.outgoing.md")):
-            try:
-                parsed = parse_outgoing_file(outgoing_path)
-            except Exception:  # noqa: BLE001
-                continue
-            source_entity = str(parsed.frontmatter.get("source-entity", ""))
-            if source_entity == artifact_id:
-                continue
-            for conn in parsed.connections:
-                if conn["target_entity"] == artifact_id:
-                    incoming_connections.append(f"{source_entity} {conn['connection_type']} → {artifact_id}")
-        for other_entity in sorted(model_root.rglob("*.md")):
-            if other_entity.name.endswith(".outgoing.md") or other_entity == entity_file:
-                continue
-            fm = parse_frontmatter_from_path(other_entity) or {}
-            from src.infrastructure.app_bootstrap import build_runtime_catalogs, get_module_registry  # noqa: PLC0415
-            _cat = build_runtime_catalogs(get_module_registry())
-            if (
-                is_internal_entity_type(str(fm.get("artifact-type", "")), _cat.ontology)
-                and str(fm.get("global-artifact-id", "")) == artifact_id
-            ):
-                grf_refs.append(str(fm.get("artifact-id", other_entity.stem)))
-
-    if not ignore_diagram_refs:
-        for diagram_path in _diagram_paths(registry.repo_roots):
-            refs = parse_diagram_refs(diagram_path) or {}
-            entity_ids = set(refs.get("entity_ids", []))
-            conn_ids = set(refs.get("connection_ids", []))
-            if artifact_id in entity_ids or owned_connection_ids.intersection(conn_ids):
-                diagram_refs.append(diagram_path.stem)
-
+    incoming_connections = _incoming_connection_blockers(registry, artifact_id)
+    grf_refs = _grf_blockers(registry, artifact_id, entity_file)
+    diagram_refs = [] if ignore_diagram_refs else _diagram_blockers(registry, artifact_id, owned_connection_ids)
     return incoming_connections, diagram_refs, grf_refs
 
 

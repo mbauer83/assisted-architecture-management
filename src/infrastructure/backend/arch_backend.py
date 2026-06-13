@@ -117,27 +117,26 @@ def _redirect_stdio_to_backend_log(*, start: Path | None = None) -> Path:
 
 # ── Status command ────────────────────────────────────────────────────────────
 
+def _status_headline(result: dict) -> str:
+    """One-line status summary derived from the backend_status result."""
+    p, pid = result.get("port"), result.get("pid")
+    if result.get("running"):
+        return f"backend is running on port {p} (pid {pid})"
+    messages: dict[object, str] = {
+        "unmanaged_backend": f"backend responding on port {p} but not managed by this workspace",
+        "port_in_use": f"port {p} is in use by another process",
+        "not_running": "backend is not running",
+        "stopped_backend": f"backend process pid {pid} is stopped on port {p}",
+        "unhealthy_backend": f"backend process pid {pid} is not responding on port {p}",
+        "stale_pid": f"removed stale backend pid {pid}",
+        "invalid_state": "backend state is invalid",
+    }
+    return messages.get(result.get("reason"), f"backend is not healthy on port {p} (pid {pid})")
+
+
 def _run_status(resolved_port: int) -> None:
     result = backend_status(port=resolved_port)
-    p, pid, reason = result.get("port"), result.get("pid"), result.get("reason")
-    if result.get("running"):
-        print(f"backend is running on port {p} (pid {pid})")
-    elif reason == "unmanaged_backend":
-        print(f"backend responding on port {p} but not managed by this workspace")
-    elif reason == "port_in_use":
-        print(f"port {p} is in use by another process")
-    elif reason == "not_running":
-        print("backend is not running")
-    elif reason == "stopped_backend":
-        print(f"backend process pid {pid} is stopped on port {p}")
-    elif reason == "unhealthy_backend":
-        print(f"backend process pid {pid} is not responding on port {p}")
-    elif reason == "stale_pid":
-        print(f"removed stale backend pid {pid}")
-    elif reason == "invalid_state":
-        print("backend state is invalid")
-    else:
-        print(f"backend is not healthy on port {p} (pid {pid})")
+    print(_status_headline(result))
     if ps := result.get("process_state"):
         print(f"  process state: {ps}")
     if stdio := " ".join(f"{k}={result[k]}" for k in ("stdin", "stdout", "stderr") if result.get(k) is not None):

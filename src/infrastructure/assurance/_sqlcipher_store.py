@@ -37,6 +37,18 @@ def _now_iso() -> str:
     return time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
 
 
+def _where(filters: dict[str, object | None]) -> tuple[str, list[object]]:
+    """Build a parameterised ``WHERE`` clause from the truthy entries of ``filters``.
+
+    Keys are trusted column names; values become positional ``?`` parameters.
+    Returns ``("", [])`` when no filter is active.
+    """
+    active = [(col, val) for col, val in filters.items() if val]
+    clauses = " AND ".join(f"{col} = ?" for col, _ in active)
+    where = f"WHERE {clauses}" if active else ""
+    return where, [val for _, val in active]
+
+
 @contextlib.contextmanager  # type: ignore[misc]
 def _suppress_c_stderr():  # type: ignore[return]
     """Redirect fd 2 to /dev/null for C-library calls that emit diagnostic noise.
@@ -137,21 +149,9 @@ class SQLCipherAssuranceStore:
         tlp: str | None = None,
     ) -> list[dict[str, object]]:
         conn = self._require_unlocked()
-        clauses: list[str] = []
-        params: list[object] = []
-        if node_type:
-            clauses.append("node_type = ?")
-            params.append(node_type)
-        if status:
-            clauses.append("status = ?")
-            params.append(status)
-        if concern_class:
-            clauses.append("concern_class = ?")
-            params.append(concern_class)
-        if tlp:
-            clauses.append("tlp = ?")
-            params.append(tlp)
-        where = f"WHERE {' AND '.join(clauses)}" if clauses else ""
+        where, params = _where(
+            {"node_type": node_type, "status": status, "concern_class": concern_class, "tlp": tlp}
+        )
         rows = conn.execute(
             f"SELECT * FROM assurance_nodes {where} ORDER BY created_at", params
         ).fetchall()
@@ -228,18 +228,7 @@ class SQLCipherAssuranceStore:
         conn_type: str | None = None,
     ) -> list[dict[str, object]]:
         conn = self._require_unlocked()
-        clauses: list[str] = []
-        params: list[object] = []
-        if source_id:
-            clauses.append("source_id = ?")
-            params.append(source_id)
-        if target_id:
-            clauses.append("target_id = ?")
-            params.append(target_id)
-        if conn_type:
-            clauses.append("conn_type = ?")
-            params.append(conn_type)
-        where = f"WHERE {' AND '.join(clauses)}" if clauses else ""
+        where, params = _where({"source_id": source_id, "target_id": target_id, "conn_type": conn_type})
         rows = conn.execute(
             f"SELECT * FROM assurance_edges {where} ORDER BY created_at", params
         ).fetchall()
@@ -307,15 +296,9 @@ class SQLCipherAssuranceStore:
         arch_artifact_id: str | None = None,
     ) -> list[dict[str, object]]:
         conn = self._require_unlocked()
-        clauses: list[str] = []
-        params: list[object] = []
-        if assurance_node_id:
-            clauses.append("assurance_node_id = ?")
-            params.append(assurance_node_id)
-        if arch_artifact_id:
-            clauses.append("arch_artifact_id = ?")
-            params.append(arch_artifact_id)
-        where = f"WHERE {' AND '.join(clauses)}" if clauses else ""
+        where, params = _where(
+            {"assurance_node_id": assurance_node_id, "arch_artifact_id": arch_artifact_id}
+        )
         rows = conn.execute(f"SELECT * FROM arch_refs {where}", params).fetchall()
         return list(rows)
 
