@@ -26,22 +26,40 @@ finalised to **Architectonic** (public slug `mbauer83/architectonic`).
 
 ## Phase C — remaining verification
 
-- [ ] After backend restart: verify on the live self-model that C4 **drill-down** links render
-      and **component-level persons** appear. Check whether `assurance-module-components`'s scope
-      is a container in `amp-containers`; if not, that L3 won't link (a content/modelling gap to close).
-- [ ] Push a branch → confirm the **CI** Actions badge goes green; connect **Codecov**
-      (add `CODECOV_TOKEN`) so the coverage badge resolves.
+- [x] Verified on the live self-model: **component-level persons** render at the context/container
+      levels (`amp-containers` shows 5 actors + 3 roles); **drill-down** works for
+      `backend-components` (scope = `architecture-backend` container). The
+      `assurance-module-components` L3→L2 link was broken (its scope, the `assurance-module`
+      group, had no container at L2). **Fixed**: aggregated the assurance module under the
+      platform and re-projected `amp-containers`, which now renders it as a peer C4 container;
+      the child/parent nav links resolve (commit `cac91e0`).
+- [ ] **Pre-existing follow-up (WIP fallout):** `architecture-backend-components` references
+      `APP@…yNhgdh.model-registry`, but that entity was renamed to `module-catalog`, so a
+      re-projection fails (E301/E302 stale entity/connection refs). Re-bind the diagram to the
+      renamed entity. (Not a startup blocker — validation checks types, not id existence.)
+- [ ] Push → confirm the **CI** Actions badge goes green; connect **Codecov**
+      (add `CODECOV_TOKEN`) so the coverage badge resolves. *(User action: push + token.)*
 - [x] Markdown link/image check across README + `docs/**` (passes).
-- [ ] GitHub render preview of README + docs pages.
+- [ ] GitHub render preview of README + docs pages. *(User action.)*
 - [ ] Optional: `pngquant` pass over `docs/media/` (~50–65% smaller; needs `sudo apt-get install pngquant`).
 
 ## Product gaps (follow-ups, not built)
 
-1. **Assurance-context diagram viewer.** Assurance diagrams render only via the generic
+1. **Store-less boot fails on optional-module artifacts.** A clone *without* a configured
+   confidential store cannot boot the backend if the repo contains assurance diagrams: their
+   source files persist to the non-confidential git `diagram-catalog/` (see gap 3), but their
+   diagram/connection/entity types are unknown when the assurance module is disabled, so
+   startup repo-compatibility validation aborts ("Unknown diagram type 'bowtie'", …). The
+   principled fix is **validation tolerance**: treat artifacts whose types belong to a
+   *known-but-disabled* optional module as inert (warn + hide) instead of refusing startup —
+   compare repo types against the complete vocabulary (`build_module_registry(complete_vocabulary=True)`)
+   and only abort for types no module declares. (Worked around in CI by provisioning an empty
+   store; the underlying product behaviour still needs fixing.)
+2. **Assurance-context diagram viewer.** Assurance diagrams render only via the generic
    architecture Diagrams view, and rule **G-f** blocks writing rendered assurance plaintext to
    disk — so the GUI cannot display them. Add an in-memory/gated assurance viewer (render on
    demand inside the confidential context).
-2. **Assurance-diagram source confidentiality.** G-f gates the *rendered* output, but the
+3. **Assurance-diagram source confidentiality.** G-f gates the *rendered* output, but the
    source `.puml` (with diagram-owned content) still persists to the non-confidential git
    `diagram-catalog/`. For sensitive analyses, gate or redirect the source too.
 
