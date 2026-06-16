@@ -152,7 +152,7 @@ class _SequenceDiagramType(DiagramTypeBase):
         return False
 
     def accepts_connection_type(self, t: ConnectionTypeName) -> bool:
-        return False
+        return t in self.own_connection_types
 
     @property
     def own_entity_types(self) -> dict[EntityTypeName, EntityTypeInfo]:
