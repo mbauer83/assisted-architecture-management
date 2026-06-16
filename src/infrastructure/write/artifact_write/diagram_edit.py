@@ -15,6 +15,7 @@ from .diagram_references import (
     _infer_reference_ids_from_puml,
     _merge_reference_ids,
     _prepare_diagram_puml_body,
+    _prune_unknown_references,
 )
 from .diagram_render import _render_diagram_entities_puml, _render_diagram_png, _render_diagram_svg
 from .parse_existing import parse_diagram_file
@@ -167,6 +168,12 @@ def edit_diagram(
         eff_connection_ids_used = _merge_reference_ids(eff_connection_ids_used, inferred_connection_ids)
     else:
         puml_body = parsed.puml_body
+
+    # Drop references to entities/connections that no longer exist (e.g. after a rename or
+    # delete) so a stale cached reference cannot leave the diagram permanently unwritable.
+    eff_entity_ids_used, eff_connection_ids_used = _prune_unknown_references(
+        verifier.registry, eff_entity_ids_used, eff_connection_ids_used
+    )
 
     content = format_diagram_puml(
         artifact_id=artifact_id,

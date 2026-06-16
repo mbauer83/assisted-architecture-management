@@ -3,11 +3,15 @@
 import re
 from functools import lru_cache
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 from src.application.artifact_parsing import extract_declared_puml_aliases, normalize_puml_alias
 from src.domain.archimate_relation_rendering import strip_suppressed_relation_labels
 
 from ._artifact_deduplication import get_repository
+
+if TYPE_CHECKING:
+    from src.application.verification.artifact_verifier_registry import ArtifactRegistry
 
 
 @lru_cache(maxsize=1)
@@ -67,6 +71,35 @@ def _merge_reference_ids(
             if value not in merged:
                 merged.append(value)
     return merged
+
+
+def _prune_unknown_references(
+    registry: "ArtifactRegistry | None",
+    entity_ids: list[str] | None,
+    connection_ids: list[str] | None,
+) -> tuple[list[str] | None, list[str] | None]:
+    """Drop references to entities/connections that no longer resolve.
+
+    After an entity is renamed (slug change) or deleted, a diagram's cached entity-ids-used /
+    connection-ids-used can point at ids that no longer exist, which makes the diagram fail
+    verification (E301/E302) and become unwritable. Pruning lets a re-projection self-heal.
+    The registry spans both repo roots, so valid enterprise/global references are preserved;
+    pruning is skipped when the registry is unavailable or its id set is empty so a cold or
+    partial index can never strip valid references.
+    """
+    if registry is None:
+        return entity_ids, connection_ids
+    valid_entities = registry.entity_ids()
+    valid_connections = registry.connection_ids()
+    pruned_entities = (
+        [e for e in entity_ids if e in valid_entities] if entity_ids and valid_entities else entity_ids
+    )
+    pruned_connections = (
+        [c for c in connection_ids if c in valid_connections]
+        if connection_ids and valid_connections
+        else connection_ids
+    )
+    return pruned_entities, pruned_connections
 
 
 _REL_MACRO_RE = re.compile(
