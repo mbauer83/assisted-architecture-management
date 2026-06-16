@@ -33,10 +33,15 @@ finalised to **Architectonic** (public slug `mbauer83/architectonic`).
       group, had no container at L2). **Fixed**: aggregated the assurance module under the
       platform and re-projected `amp-containers`, which now renders it as a peer C4 container;
       the child/parent nav links resolve (commit `cac91e0`).
-- [ ] **Pre-existing follow-up (WIP fallout):** `architecture-backend-components` references
-      `APP@…yNhgdh.model-registry`, but that entity was renamed to `module-catalog`, so a
-      re-projection fails (E301/E302 stale entity/connection refs). Re-bind the diagram to the
-      renamed entity. (Not a startup blocker — validation checks types, not id existence.)
+- [x] **Pre-existing follow-up (WIP fallout) — tool fixed:** `architecture-backend-components`
+      pinned `APP@…yNhgdh.model-registry`, renamed to `module-catalog`, so re-projection failed
+      (E301/E302). Root cause: `edit_diagram` merged stored + collected refs and never pruned
+      dangling ones. Fixed in the writer (`diagram_edit` prunes refs absent from the verifier
+      registry's both-repo id set; commit `d16fe6a`), so a re-projection now self-heals.
+      **Apply:** after the next backend restart (MCP runs against the live process), trigger one
+      `artifact_edit_diagram(architecture-backend-components, puml=auto-sync)` — the prune drops
+      the stale ref and rewrites the diagram. (Never blocked startup — validation checks types,
+      not id existence.)
 - [ ] Push → confirm the **CI** Actions badge goes green; connect **Codecov**
       (add `CODECOV_TOKEN`) so the coverage badge resolves. *(User action: push + token.)*
 - [x] Markdown link/image check across README + `docs/**` (passes).
