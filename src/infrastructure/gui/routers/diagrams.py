@@ -3,16 +3,14 @@
 from __future__ import annotations
 
 from functools import lru_cache as _lru_cache
-from typing import Any, Literal
+from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from fastapi.responses import FileResponse, Response
 
 from src.application.artifact_parsing import parse_diagram_source
 from src.application.entity_type_predicates import is_internal_entity_type
 from src.application.runtime_catalogs import RuntimeCatalogs
-from src.config.repo_paths import DIAGRAM_CATALOG, DIAGRAMS, RENDERED
-from src.domain.artifact_types import DiagramRecord, EntityRecord
+from src.domain.artifact_types import EntityRecord
 from src.infrastructure.app_bootstrap import runtime_catalogs_dependency
 from src.infrastructure.gui.routers import state as s
 from src.infrastructure.gui.routers._diagram_context import (
@@ -27,11 +25,14 @@ from src.infrastructure.gui.routers._diagram_context import (
     puml_contains,
 )
 from src.infrastructure.gui.routers._diagram_edge_label import router as _edge_label_router
+from src.infrastructure.gui.routers._diagram_serving import _rendered_name
+from src.infrastructure.gui.routers._diagram_serving import router as _serving_router
 from src.infrastructure.gui.routers._diagram_write import router as _write_router
 
 router = APIRouter()
 router.include_router(_write_router)
 router.include_router(_edge_label_router)
+router.include_router(_serving_router)
 
 
 @_lru_cache(maxsize=1)
@@ -49,26 +50,6 @@ def _accepted_entity_types(diagram_type: str | None, catalogs: RuntimeCatalogs) 
         raise HTTPException(404, f"Diagram type not found: {diagram_type!r}")
     types = {str(entity_type) for entity_type in kind.effective_entity_types()}
     return types if types else None
-
-
-def _rendered_name(d: DiagramRecord, suffix: str) -> str | None:
-    repo_root = s.maybe_engagement_root()
-    if repo_root is None:
-        return None
-    rendered_dir = repo_root / DIAGRAM_CATALOG / RENDERED
-    candidate = rendered_dir / f"{d.artifact_id}{suffix}"
-    if candidate.exists():
-        return candidate.name
-    if rendered_dir.exists():
-        parts = d.artifact_id.split(".")
-        if len(parts) >= 3:
-            legacy = rendered_dir / f"{'.'.join(parts[2:])}{suffix}"
-            if legacy.exists():
-                return legacy.name
-        for f in rendered_dir.iterdir():
-            if f.suffix == suffix and f.stem in d.artifact_id:
-                return f.name
-    return None
 
 
 def _read_diagram_impl(id: str, catalogs: RuntimeCatalogs) -> dict[str, Any]:
@@ -207,19 +188,6 @@ def get_matrix_config(id: str) -> dict[str, Any]:
     }
 
 
-@router.get("/api/diagram-image/{filename}")
-def get_diagram_image(filename: str) -> FileResponse:
-    repo_root = s.maybe_engagement_root()
-    if repo_root is None:
-        raise HTTPException(500, "Repository not initialized")
-    if "/" in filename or "\\" in filename or ".." in filename:
-        raise HTTPException(400, "Invalid filename")
-    path = repo_root / DIAGRAM_CATALOG / RENDERED / filename
-    if not path.exists():
-        raise HTTPException(404, f"Rendered image not found: {filename}")
-    return FileResponse(path, media_type="image/png")
-
-
 @router.get("/api/diagram-refs")
 def get_diagram_refs(source_id: str, target_id: str) -> list[dict[str, str]]:
     repo = s.get_repo()
@@ -291,54 +259,6 @@ def get_diagram_kind_connection_types(
         return diagram_kind_connection_type_items(name, catalogs)
     except KeyError:
         raise HTTPException(404, f"Diagram type not found: {name!r}")
-
-
-@router.get("/api/diagram-svg")
-def get_diagram_svg(id: str) -> Response:
-    repo_root = s.maybe_engagement_root()
-    if repo_root is None:
-        raise HTTPException(500, "Repository not initialized")
-    diagram_path = repo_root / DIAGRAM_CATALOG / DIAGRAMS / f"{id}.puml"
-    if not diagram_path.exists():
-        raise HTTPException(404, f"Diagram '{id}' not found")
-    diag_rec = s.get_repo().get_diagram(id)
-    if diag_rec:
-        svg_name = _rendered_name(diag_rec, ".svg")
-        if svg_name:
-            svg_path = repo_root / DIAGRAM_CATALOG / RENDERED / svg_name
-            if svg_path.exists():
-                return Response(content=svg_path.read_bytes(), media_type="image/svg+xml")
-    from src.infrastructure.rendering.diagram_builder import render_puml_svg
-    from src.infrastructure.write.artifact_write.parse_existing import parse_diagram_file
-
-    parsed = parse_diagram_file(diagram_path)
-    svg, warnings = render_puml_svg(parsed.puml_body, repo_root, diag_rec.diagram_type if diag_rec else None)
-    if svg is None:
-        raise HTTPException(500, f"SVG render failed: {'; '.join(warnings)}")
-    return Response(content=svg, media_type="image/svg+xml")
-
-
-@router.get("/api/diagram-download")
-def download_diagram(id: str, format: Literal["png", "svg"] = "png") -> FileResponse:
-    repo_root = s.maybe_engagement_root()
-    if repo_root is None:
-        raise HTTPException(500, "Repository not initialized")
-    diag_rec = s.get_repo().get_diagram(id)
-    if diag_rec is None:
-        raise HTTPException(404, f"Diagram '{id}' not found")
-    rendered_dir = repo_root / DIAGRAM_CATALOG / RENDERED
-    suffix = ".svg" if format == "svg" else ".png"
-    media = "image/svg+xml" if format == "svg" else "image/png"
-    fname = _rendered_name(diag_rec, suffix)
-    if fname:
-        path = rendered_dir / fname
-        if path.exists():
-            return FileResponse(
-                path,
-                media_type=media,
-                headers={"Content-Disposition": f'attachment; filename="{fname}"'},
-            )
-    raise HTTPException(404, f"{format.upper()} not yet rendered — save the diagram first")
 
 
 @router.get("/api/entity-display-item")
