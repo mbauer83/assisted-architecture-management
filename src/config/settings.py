@@ -4,6 +4,8 @@ from pathlib import Path
 
 import yaml  # type: ignore[import-untyped]
 
+from src.domain.classification import TLP_ORDER
+
 _CONFIG_DIR = Path(__file__).resolve().parent.parent.parent / "config"
 _DEFAULT_ENGAGEMENT: dict[str, object] = {}
 _DEFAULTS: dict[str, dict[str, object]] = {
@@ -38,7 +40,7 @@ _DEFAULTS: dict[str, dict[str, object]] = {
 _VALID_STORE_BACKENDS = frozenset({"sqlcipher", "pocketbase", "private-git"})
 _VALID_SIGNALS_BACKENDS = frozenset({"sqlcipher-colocated", "sqlite", "encrypted"})
 _VALID_ARCHIVE_BACKENDS = frozenset({"standard", "worm", "s3-worm", "azure-blob-worm"})
-_VALID_TLP_LEVELS = frozenset({"TLP:WHITE", "TLP:GREEN", "TLP:AMBER", "TLP:RED"})
+_VALID_TLP_LEVELS = frozenset(TLP_ORDER)
 
 _SettingsSection = dict[str, object]
 
