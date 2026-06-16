@@ -29,6 +29,7 @@ entity-ids-used:
 - ROL@1776633082.udXPfB.ai-agent
 - ROL@1780656241.abNYhO.risk-compliance-officer
 - ROL@1780656241.yswDMB.safety-security-analyst
+- GRP@1780819145.rW_2nX.assurance-module
 connection-ids-used:
 - ACT@1712870400.Nn7Oo7.architect---APP@1776149382.lmO0mp.gui-authoring-tool@@archimate-association
 - ACT@1712870400.OLWiNc.devops-engineer---APP@1712870400.kjC6ex.cli-tool@@archimate-association
@@ -50,6 +51,7 @@ connection-ids-used:
 - ROL@1776633082.udXPfB.ai-agent---APP@1780783708.Ne0utf.architecture-mcp-read-bridge@@archimate-association
 - ROL@1780656241.abNYhO.risk-compliance-officer---APP@1780783710.iu_kKL.assurance-mcp-read-bridge@@archimate-association
 - ROL@1780656241.yswDMB.safety-security-analyst---APP@1780783710.iu_kKL.assurance-mcp-read-bridge@@archimate-association
+- APP@1780783993.JqIBPJ.supply-chain-signal-sources---APP@1780656431.e2zPs6.supply-chain-vulnerability-connector@@archimate-serving
 diagram-entities: {}
 bindings:
 - id: bind-scope
@@ -58,7 +60,7 @@ bindings:
   correspondence_kind: scoped-by
   target:
     entity_id: APP@1780783671.hkrdtm.architecture-management-platform
-last-updated: '2026-06-07'
+last-updated: '2026-06-16'
 ---
 @startuml amp---containers
 left to right direction
@@ -100,33 +102,35 @@ skinparam rectangle<<C4External>> {
 title AMP — Containers
 
 rectangle "Architecture Management Platform" <<C4System>> as APP_hkrdtm {
-  rectangle "CLI Tool" <<C4Container>> as APP_kjC6ex
-  rectangle "GUI Authoring Tool" <<C4Container>> as APP_lmO0mp
-  rectangle "Architecture Backend" <<C4Container>> as APP_OYEmP1
-  rectangle "Architecture MCP Read Bridge" <<C4Container>> as APP_Ne0utf
-  rectangle "Architecture MCP Write Bridge" <<C4Container>> as APP_etTj9M
-  rectangle "Assurance MCP Read Bridge" <<C4Container>> as APP_iu_kKL
-  rectangle "Assurance MCP Write Bridge" <<C4Container>> as APP_js9xHR
+  rectangle "CLI Tool\nThe command-line interface for repository operations" <<C4Container>> as APP_kjC6ex
+  rectangle "GUI Authoring Tool\nWeb-based SPA for browsing, searching, and authoring architecture model entities, connections, and…" <<C4Container>> as APP_lmO0mp
+  rectangle "Architecture Backend\nFastAPI-based HTTP server that is the single runtime process for the system, mounting the MCP read…" <<C4Container>> as APP_OYEmP1
+  rectangle "Architecture MCP Read Bridge\nThin stdio↔HTTP client of the Architecture Backend providing read-only access to the architecture r…" <<C4Container>> as APP_Ne0utf
+  rectangle "Architecture MCP Write Bridge\nThin stdio↔HTTP client of the Architecture Backend providing write access to the architecture repos…" <<C4Container>> as APP_etTj9M
+  rectangle "Assurance MCP Read Bridge\nThin stdio↔HTTP client of the Architecture Backend providing read-only access to assurance data via…" <<C4Container>> as APP_iu_kKL
+  rectangle "Assurance MCP Write Bridge\nThin stdio↔HTTP client of the Architecture Backend providing write access to assurance data via MCP" <<C4Container>> as APP_js9xHR
+  rectangle "Assurance Module\nConcern boundary (module_class: assurance) grouping the assurance verifier, supply-chain connector,…" <<C4Container>> as GRP_rW_2nX
   APP_kjC6ex -[hidden]right- APP_lmO0mp
   APP_lmO0mp -[hidden]right- APP_OYEmP1
   APP_OYEmP1 -[hidden]right- APP_Ne0utf
   APP_Ne0utf -[hidden]right- APP_etTj9M
   APP_etTj9M -[hidden]right- APP_iu_kKL
   APP_iu_kKL -[hidden]right- APP_js9xHR
+  APP_js9xHR -[hidden]right- GRP_rW_2nX
 
 }
 
-actor "Architect" as ACT_Nn7Oo7
-actor "DevOps Engineer" as ACT_OLWiNc
-actor "Developer" as ACT_Pp8Qq8
-actor "Product Owner" as ACT_Rr9Ss9
-actor "Upper Technical Management" as ACT_Ut1Vv1
-rectangle "AI Agent Host" <<C4External>> as APP_v6AXNw
-rectangle "Git Hosting" <<C4External>> as APP_Je9pmw
-rectangle "Supply-Chain Signal Sources" <<C4External>> as APP_JqIBPJ
-actor "AI Agent" as ROL_udXPfB
-actor "Risk & Compliance Officer" as ROL_abNYhO
-actor "Safety / Security Analyst" as ROL_yswDMB
+actor "Architect\nA concrete actor (human or AI agent) who performs the Author and Reviewer roles for architectural m…" as ACT_Nn7Oo7
+actor "DevOps Engineer\nA concrete actor (human) who consumes and contributes to the technology domain of the architectural…" as ACT_OLWiNc
+actor "Developer\nA concrete actor (human or AI coding agent) who primarily consumes the architecture repository for…" as ACT_Pp8Qq8
+actor "Product Owner\nA concrete actor (human) who uses the architecture repository for product planning and requirements…" as ACT_Rr9Ss9
+actor "Upper Technical Management\nA concrete actor group (CTOs, VPs of Engineering, principal engineers) who use the architecture rep…" as ACT_Ut1Vv1
+rectangle "AI Agent Host\nGeneric external agent harness (CLI, desktop, IDE, or web form factor; coding, planning, reporting,…" <<C4External>> as APP_v6AXNw
+rectangle "Git Hosting\nExternal Git hosting service (e.g" <<C4External>> as APP_Je9pmw
+rectangle "Supply-Chain Signal Sources\nExternal sources of supply-chain and vulnerability signals (e.g" <<C4External>> as APP_JqIBPJ
+actor "AI Agent\nThe role performed by an AI language model (e.g" as ROL_udXPfB
+actor "Risk & Compliance Officer\nRole that manages GRC assessments, regulatory obligation mappings, and compliance evidence within t…" as ROL_abNYhO
+actor "Safety / Security Analyst\nRole that performs hazard analysis, STPA, CAST investigations, and security analysis within the ass…" as ROL_yswDMB
 
 ACT_Nn7Oo7 -[hidden]right- ACT_OLWiNc
 ACT_OLWiNc -[hidden]right- ACT_Pp8Qq8
