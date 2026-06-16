@@ -185,7 +185,6 @@ async def _health_check():  # type: ignore[no-untyped-def]
 def _build_app(credentials: "GitCredentials | None" = None):  # type: ignore[no-untyped-def]
     from fastapi import FastAPI
     from fastapi.middleware.cors import CORSMiddleware
-    from fastapi.staticfiles import StaticFiles
 
     from src.infrastructure.app_bootstrap import install_module_registry
     from src.infrastructure.gui.routers.admin import router as admin_router
@@ -284,5 +283,9 @@ def _build_app(credentials: "GitCredentials | None" = None):  # type: ignore[no-
 
     gui_dist = Path(__file__).resolve().parent.parent.parent / "tools" / "gui" / "dist"
     if gui_dist.exists():
-        app.mount("/", StaticFiles(directory=str(gui_dist), html=True), name="static")
+        # SPA history-fallback: deep links (e.g. /entities/groups) have no file on disk, so
+        # serve index.html and let the client router resolve them.
+        from src.infrastructure.backend._spa_static import SPAStaticFiles  # noqa: PLC0415
+
+        app.mount("/", SPAStaticFiles(directory=str(gui_dist), html=True), name="static")
     return app
