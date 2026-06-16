@@ -42,10 +42,12 @@ def _store_available(workspace_root: Path) -> bool:
 
 def _sqlcipher_available(workspace_root: Path) -> bool:
     try:
-        import keyring  # type: ignore[import-untyped]  # noqa: PLC0415
+        # Use the credential-store abstraction (not raw keyring) so the same backend the
+        # store was initialised with is consulted — e.g. the headless Fernet vault on CI,
+        # where a raw keyring/SecretService probe would fail on a missing session D-Bus.
+        from src.infrastructure.assurance import _credential_store as creds  # noqa: PLC0415
 
-        key = keyring.get_password(_SERVICE_NAME, _KEY_ACCOUNT)
-        if not key:
+        if not creds.get(_KEY_ACCOUNT):
             return False
     except Exception:  # noqa: BLE001
         return False
@@ -61,10 +63,9 @@ def _pocketbase_available() -> bool:
 
 def _private_git_available(workspace_root: Path) -> bool:
     try:
-        import keyring  # type: ignore[import-untyped]  # noqa: PLC0415
+        from src.infrastructure.assurance import _credential_store as creds  # noqa: PLC0415
 
-        key = keyring.get_password(_SERVICE_NAME, _GIT_ENC_KEY_ACCOUNT)
-        if not key:
+        if not creds.get(_GIT_ENC_KEY_ACCOUNT):
             # Plain (unencrypted) private-git: check repo dir exists
             repo_path = workspace_root / ".arch-assurance-git"
             return repo_path.exists() and (repo_path / "nodes").exists()
