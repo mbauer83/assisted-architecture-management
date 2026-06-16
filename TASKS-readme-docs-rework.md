@@ -47,25 +47,33 @@ finalised to **Architectonic** (public slug `mbauer83/architectonic`).
 - [ ] GitHub render preview of README + docs pages. *(User action.)*
 - [ ] Optional: `pngquant` pass over `docs/media/` (~50–65% smaller; needs `sudo apt-get install pngquant`).
 
-## Product gaps (follow-ups, not built)
+## Product gaps — RESOLVED
 
-1. **Store-less boot fails on optional-module artifacts.** A clone *without* a configured
-   confidential store cannot boot the backend if the repo contains assurance diagrams: their
-   source files persist to the non-confidential git `diagram-catalog/` (see gap 3), but their
-   diagram/connection/entity types are unknown when the assurance module is disabled, so
-   startup repo-compatibility validation aborts ("Unknown diagram type 'bowtie'", …). The
-   principled fix is **validation tolerance**: treat artifacts whose types belong to a
-   *known-but-disabled* optional module as inert (warn + hide) instead of refusing startup —
-   compare repo types against the complete vocabulary (`build_module_registry(complete_vocabulary=True)`)
-   and only abort for types no module declares. (Worked around in CI by provisioning an empty
-   store; the underlying product behaviour still needs fixing.)
-2. **Assurance-context diagram viewer.** Assurance diagrams render only via the generic
-   architecture Diagrams view, and rule **G-f** blocks writing rendered assurance plaintext to
-   disk — so the GUI cannot display them. Add an in-memory/gated assurance viewer (render on
-   demand inside the confidential context).
-3. **Assurance-diagram source confidentiality.** G-f gates the *rendered* output, but the
-   source `.puml` (with diagram-owned content) still persists to the non-confidential git
-   `diagram-catalog/`. For sensitive analyses, gate or redirect the source too.
+1. **[DONE] Store-less boot tolerance.** `validate_repo_compatibility` now takes a complete-vocabulary
+   registry; artifacts whose types belong to a *known-but-disabled* module (e.g. assurance diagrams
+   with no store) warn + stay inert instead of aborting boot. Types no module declares still abort.
+   (commit `6ca5e8b`; verified on the live self-model with the store suppressed.)
+2. **[DONE] Assurance-context diagram viewer.** `/api/diagram-svg` is the gated viewer: confidential
+   assurance diagrams render on demand in memory (never to disk, per G-f) only when the store is
+   unlocked; locked → HTTP 403. The GUI (DiagramDetailView/EditDiagramView) already consumes this
+   endpoint, so confidential diagrams display when unlocked. (commit for #14.) *Optional polish:* a
+   dedicated "unlock to view" CTA on the 403 instead of the generic error surface.
+3. **[DONE] Assurance-diagram source confidentiality (TLP-driven).** Confidentiality keys off TLP
+   classification, not a blanket per-type rule. Publishable assurance diagrams (TLP:WHITE/GREEN)
+   render + persist their source to the shared catalog; confidential ones (above the publishability
+   ceiling, or unclassified) redirect their `.puml` to a gitignored `diagram-catalog/diagrams/confidential/`
+   root and are withheld from disk rendering. `tlp` exposed on the create/edit MCP tools + GUI bodies;
+   classification is store-independent; modelled in ENG-ARCH-REPO as a new requirement. (commits
+   `138ddc7`, `a8ad92a`, `a152275`, `f26f363`, the #14 viewer commit, and the classification fix.)
+
+### Restart-gated follow-ups for the public self-describing demo
+
+- **Mark the example assurance diagrams TLP:GREEN.** The bundled bowtie/control-structure/GSN diagrams
+  are currently unclassified → treated as confidential (won't render to disk; SVG viewer gates them).
+  After a Claude **session restart** (to surface the new MCP `tlp` param), set `tlp: TLP:GREEN` on each
+  via `artifact_edit_diagram` so they render + persist publicly, completing the fully-featured public
+  assurance example. (Backend restart already done.)
+- **Optional #14 frontend polish:** friendly "unlock the assurance store" CTA on a 403 from `/api/diagram-svg`.
 
 ## New public repo (later)
 
