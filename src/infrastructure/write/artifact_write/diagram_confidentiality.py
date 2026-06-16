@@ -14,20 +14,37 @@ unclassified, is confidential and is redirected to a gitignored location.
 
 from __future__ import annotations
 
+from functools import lru_cache
 from pathlib import Path
 
 from src.domain.classification import is_publishable
 
 
+@lru_cache(maxsize=1)
+def _assurance_diagram_type_names() -> frozenset[str]:
+    """Names of all assurance (module_class == 'assurance') diagram types in the COMPLETE vocabulary.
+
+    Resolved against the complete module registry, not the active one, so a diagram type's
+    confidentiality classification is independent of whether the confidential store happens to
+    be unlocked. Otherwise a store-less host would mis-classify an existing assurance diagram
+    as non-confidential and could leak its source/render — the exact opposite of the gate's intent.
+    """
+    try:
+        from src.infrastructure.app_bootstrap import build_module_registry  # noqa: PLC0415
+
+        registry = build_module_registry(complete_vocabulary=True)
+    except Exception:  # noqa: BLE001
+        return frozenset()
+    return frozenset(
+        str(name)
+        for name, dt in registry.all_diagram_types().items()
+        if getattr(dt, "module_class", None) == "assurance"
+    )
+
+
 def is_assurance_diagram_type(diagram_type: str) -> bool:
     """True if *diagram_type* belongs to the assurance module (module_class == 'assurance')."""
-    try:
-        from src.infrastructure.diagram_type_registry import find_diagram_type  # noqa: PLC0415
-
-        dt = find_diagram_type(diagram_type)
-    except (ImportError, AttributeError, TypeError):
-        return False
-    return dt is not None and getattr(dt, "module_class", None) == "assurance"
+    return diagram_type in _assurance_diagram_type_names()
 
 
 def is_confidential_diagram_source(diagram_type: str, tlp: str | None) -> bool:
