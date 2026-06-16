@@ -237,18 +237,22 @@ def _get_backend() -> _Backend:
     if _backend is not None:
         return _backend
 
-    if platform.system() == "Darwin":
+    # An explicit master password is the headless / CI escape hatch: honour it first so the
+    # Fernet vault is selected deterministically, even on platforms where a keyring backend
+    # imports cleanly but cannot actually reach its secret service (e.g. Linux without a
+    # session D-Bus, where SecretService would crash with DBUS_SESSION_BUS_ADDRESS unset).
+    if pw := os.environ.get(_MASTER_PW_ENV):
+        logger.debug("credential store: Fernet-encrypted vault (master password from env)")
+        _backend = _FernetVault(pw)
+    elif platform.system() == "Darwin":
         logger.debug("credential store: macOS Keychain")
         _backend = _KeyringBackend("keyring.backends.macOS", "Keyring")
     elif _is_wsl2() and _powershell_accessible():
         logger.debug("credential store: Windows DPAPI (WSL2)")
         _backend = _DPAPIBackend()
-    elif platform.system() == "Linux" and _dbus_available():
+    elif platform.system() == "Linux" and os.environ.get("DBUS_SESSION_BUS_ADDRESS") and _dbus_available():
         logger.debug("credential store: SecretService (D-Bus)")
         _backend = _KeyringBackend("keyring.backends.SecretService", "Keyring")
-    elif pw := os.environ.get(_MASTER_PW_ENV):
-        logger.debug("credential store: Fernet-encrypted vault (master password from env)")
-        _backend = _FernetVault(pw)
     else:
         raise RuntimeError(_NO_BACKEND_MSG)
 
