@@ -328,10 +328,19 @@ def _run_startup_validations(
 ) -> None:
     from src.application.group_registry_validation import GroupRegistryError, validate_and_repair_group_registry
     from src.application.startup_validation import RepoCompatibilityError, validate_repo_compatibility
-    from src.infrastructure.app_bootstrap import get_module_registry
+    from src.infrastructure.app_bootstrap import build_module_registry, get_module_registry
 
     try:
-        validate_repo_compatibility(repo, get_module_registry())
+        # Compare against the complete vocabulary (all modules, enabled or not) so that
+        # artifacts belonging to a merely-disabled optional module (e.g. assurance diagrams
+        # when no confidential store is configured) warn rather than abort startup.
+        warnings = validate_repo_compatibility(
+            repo,
+            get_module_registry(),
+            complete_registry=build_module_registry(complete_vocabulary=True),
+        )
+        for warning in warnings:
+            logger.warning("Repository compatibility: %s", warning)
     except RepoCompatibilityError as exc:
         logger.error("Startup aborted — repository uses types not in the module registry:\n%s", exc)
         sys.exit(1)

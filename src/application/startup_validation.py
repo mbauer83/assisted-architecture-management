@@ -206,31 +206,53 @@ class RepoCompatibilityError(Exception):
 def validate_repo_compatibility(
     repo: "ArtifactRepository",
     registry: "ModuleRegistry",
-) -> None:
-    """Raise RepoCompatibilityError if the indexed repo uses types not in the registry.
+    *,
+    complete_registry: "ModuleRegistry | None" = None,
+) -> list[str]:
+    """Raise RepoCompatibilityError on hard incompatibilities; return tolerable warnings.
 
-    Checks:
-    - Entity artifact_type values
-    - Connection conn_type values
-    - Diagram diagram_type values (diagram types)
-    - Attribute schema filenames for entity types
-    - Connection-metadata schema filenames for connection types
+    A type absent from the active *registry* but present in *complete_registry* belongs to a
+    module that is merely disabled (e.g. the assurance module when no confidential store is
+    configured). Such artifacts are inert, not corrupt, so they yield a warning rather than
+    aborting startup — a repository containing optional-module content stays usable without
+    that module. Types unknown to every module remain hard errors. When *complete_registry*
+    is omitted, every unknown type is a hard error (backward-compatible).
+
+    Checks: entity artifact_type, connection conn_type, diagram diagram_type, attribute and
+    connection-metadata schema filenames, and element-class declarations.
     """
-    errors = _collect_errors(repo, registry)
+    errors, warnings = _collect_errors(repo, registry, complete_registry)
     if errors:
         raise RepoCompatibilityError(errors)
+    return warnings
 
 
-def _unknown_type_errors(typed_ids: Iterable[tuple[str, str]], known: set[str], label: str) -> list[str]:
-    """Report each repo type absent from *known*, naming one example artifact, sorted by type."""
+def _split_unknown_types(
+    typed_ids: Iterable[tuple[str, str]],
+    active: set[str],
+    complete: set[str],
+    label: str,
+) -> tuple[list[str], list[str]]:
+    """Partition repo types missing from *active* into hard errors and disabled-module warnings.
+
+    A type present in *complete* (some module declares it) but absent from *active* (that module
+    is disabled) is tolerated with a warning; a type in neither is an unknown-type error.
+    """
     first_example: dict[str, str] = {}
     for type_name, artifact_id in typed_ids:
-        if type_name and type_name not in known and type_name not in first_example:
+        if type_name and type_name not in active and type_name not in first_example:
             first_example[type_name] = artifact_id
-    return [
-        f"Unknown {label} type {t!r} (example artifact: {example})"
-        for t, example in sorted(first_example.items())
-    ]
+    errors: list[str] = []
+    warnings: list[str] = []
+    for t, example in sorted(first_example.items()):
+        if t in complete:
+            warnings.append(
+                f"{label} type {t!r} belongs to a disabled module — its artifacts are inert "
+                f"(example artifact: {example}); enable the module to use them"
+            )
+        else:
+            errors.append(f"Unknown {label} type {t!r} (example artifact: {example})")
+    return errors, warnings
 
 
 def _unknown_schema_errors(
@@ -270,41 +292,54 @@ def _element_class_errors(registry: "ModuleRegistry", known_element_classes: set
     return errors
 
 
+def _entity_connection_diagram_sets(registry: "ModuleRegistry") -> tuple[set[str], set[str], set[str]]:
+    entity_types = {str(t) for t in registry.all_entity_types()} | {
+        str(t) for t in registry.all_diagram_entity_types()
+    }
+    connection_types = {str(t) for t in registry.all_connection_types()}
+    diagram_types = {str(t) for t in registry.all_diagram_types()}
+    return entity_types, connection_types, diagram_types
+
+
 def _collect_errors(
     repo: "ArtifactRepository",
     registry: "ModuleRegistry",
-) -> list[str]:
-    known_entity_types: set[str] = {str(t) for t in registry.all_entity_types()} | {
-        str(t) for t in registry.all_diagram_entity_types()
-    }
-    known_connection_types: set[str] = {str(t) for t in registry.all_connection_types()}
-    known_diagram_types: set[str] = {str(t) for t in registry.all_diagram_types()}
+    complete_registry: "ModuleRegistry | None" = None,
+) -> tuple[list[str], list[str]]:
+    active_e, active_c, active_d = _entity_connection_diagram_sets(registry)
+    complete_e, complete_c, complete_d = (
+        _entity_connection_diagram_sets(complete_registry)
+        if complete_registry is not None
+        else (active_e, active_c, active_d)
+    )
 
-    errors = [
-        *_unknown_type_errors(
-            ((e.artifact_type, e.artifact_id) for e in repo.list_entities()), known_entity_types, "entity"
-        ),
-        *_unknown_type_errors(
-            ((c.conn_type, c.artifact_id) for c in repo.list_connections()), known_connection_types, "connection"
-        ),
-        *_unknown_type_errors(
-            ((d.diagram_type, d.artifact_id) for d in repo.list_diagrams()), known_diagram_types, "diagram"
-        ),
-        *_unknown_schema_errors(
-            repo, prefix="attributes.", suffix=".schema.json", known=known_entity_types,
-            label="Attribute schema for unknown entity type",
-        ),
-        *_unknown_schema_errors(
-            repo, prefix="connection-metadata.", suffix=".schema.json", known=known_connection_types,
-            label="Connection metadata schema for unknown connection type",
-        ),
-    ]
+    errors: list[str] = []
+    warnings: list[str] = []
+    for typed_ids, active, complete, label in (
+        (((e.artifact_type, e.artifact_id) for e in repo.list_entities()), active_e, complete_e, "entity"),
+        (((c.conn_type, c.artifact_id) for c in repo.list_connections()), active_c, complete_c, "connection"),
+        (((d.diagram_type, d.artifact_id) for d in repo.list_diagrams()), active_d, complete_d, "diagram"),
+    ):
+        type_errors, type_warnings = _split_unknown_types(typed_ids, active, complete, label)
+        errors.extend(type_errors)
+        warnings.extend(type_warnings)
+
+    # Schema files for disabled-module types are tolerated (checked against the complete set);
+    # only schemas for types no module declares are errors.
+    errors.extend(_unknown_schema_errors(
+        repo, prefix="attributes.", suffix=".schema.json", known=complete_e,
+        label="Attribute schema for unknown entity type",
+    ))
+    errors.extend(_unknown_schema_errors(
+        repo, prefix="connection-metadata.", suffix=".schema.json", known=complete_c,
+        label="Connection metadata schema for unknown connection type",
+    ))
 
     try:
         known_element_classes: set[str] = {str(c) for c in registry.all_element_classes()}
     except ValueError as exc:
         errors.append(f"Element class declaration conflict: {exc}")
-        return errors
+        return errors, warnings
 
     errors.extend(_element_class_errors(registry, known_element_classes))
-    return errors
+    return errors, warnings

@@ -382,3 +382,32 @@ class TestMultiRepoMultiOntology:
             diagrams=[_diagram("d1", "archimate-application")],
         )
         validate_repo_compatibility(repo, reg)  # must not raise
+
+
+class TestDisabledModuleTolerance:
+    """A type from a known-but-disabled module warns; a type no module declares aborts."""
+
+    def test_disabled_module_diagram_type_warns_not_aborts(self) -> None:
+        active = _make_registry(["driver"], ["uses"], ["archimate-application"])
+        complete = _make_registry(["driver"], ["uses"], ["archimate-application", "bowtie"])
+        repo = _FakeRepo(diagrams=[_diagram("d1", "bowtie")])
+
+        warnings = validate_repo_compatibility(repo, active, complete_registry=complete)
+
+        assert any("bowtie" in w and "disabled module" in w for w in warnings)
+
+    def test_type_unknown_to_every_module_still_aborts(self) -> None:
+        active = _make_registry(["driver"], ["uses"], ["archimate-application"])
+        complete = _make_registry(["driver"], ["uses"], ["archimate-application", "bowtie"])
+        repo = _FakeRepo(diagrams=[_diagram("d1", "totally-unknown")])
+
+        with pytest.raises(RepoCompatibilityError) as exc_info:
+            validate_repo_compatibility(repo, active, complete_registry=complete)
+        assert "totally-unknown" in exc_info.value.errors[0]
+
+    def test_without_complete_registry_unknown_type_is_a_hard_error(self) -> None:
+        active = _make_registry(["driver"], ["uses"], ["archimate-application"])
+        repo = _FakeRepo(diagrams=[_diagram("d1", "bowtie")])
+
+        with pytest.raises(RepoCompatibilityError):
+            validate_repo_compatibility(repo, active)  # no tolerance without a complete registry
