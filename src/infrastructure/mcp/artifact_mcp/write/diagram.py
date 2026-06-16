@@ -76,6 +76,7 @@ def artifact_create_diagram(
     bindings: list[dict[str, object]] | None = None,
     version: str = "0.1.0",
     status: str = "draft",
+    tlp: str | None = None,
     group: str | None = None,
     connection_inference: DiagramConnectionInferenceMode = "none",
     auto_include_stereotypes: bool = True,
@@ -145,6 +146,7 @@ def artifact_create_diagram(
         version=version,
         status=status,
         last_updated=None,
+        tlp=tlp,
         connection_inference=connection_inference,
         auto_include_stereotypes=auto_include_stereotypes,
         dry_run=dry_run,
@@ -192,6 +194,10 @@ def register(mcp: FastMCP) -> None:
             "diagram_entities items (single-target shorthand: entity_id, connection_id, or diagram_local). "
             "Legacy entity_id on items and _scope_entity_id in diagram_entities are accepted as input shorthand "
             "and normalized to top-level bindings on write.\n\n"
+            "tlp: classification (TLP:WHITE|GREEN|AMBER|RED) for assurance diagram types. TLP:WHITE/GREEN are "
+            "publishable (rendered + source persisted to the shared catalog); TLP:AMBER/RED (or unset) are "
+            "confidential — source is redirected to a gitignored confidential/ root and rendering to disk is "
+            "withheld. Ignored for non-assurance diagram types.\n\n"
             "dry_run=true validates without writing."
         ),
         annotations=LOCAL_WRITE,

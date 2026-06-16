@@ -47,6 +47,7 @@ class CreateDiagramGuiBody(BaseModel):
     diagram_entities: dict[str, Any] | None = None
     version: str = "0.1.0"
     status: str = "draft"
+    tlp: str | None = None
     dry_run: bool = True
 
 
@@ -59,6 +60,7 @@ class EditDiagramGuiBody(BaseModel):
     diagram_entities: dict[str, Any] | None = None
     version: str | None = None
     status: str | None = None
+    tlp: str | None = None
     dry_run: bool = True
 
 
@@ -137,6 +139,7 @@ def create_diagram_gui(body: CreateDiagramGuiBody) -> dict[str, Any]:
             version=body.version,
             status=body.status,
             last_updated=None,
+            tlp=body.tlp,
             connection_inference="none",
             dry_run=body.dry_run,
         )
@@ -183,6 +186,7 @@ def edit_diagram_gui(body: EditDiagramGuiBody) -> dict[str, Any]:
             connection_ids_used=connection_ids_used,
             version=body.version,
             status=body.status,
+            tlp=body.tlp,
             dry_run=body.dry_run,
         )
     except ValueError as e:

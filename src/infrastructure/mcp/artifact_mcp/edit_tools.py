@@ -164,6 +164,7 @@ def artifact_edit_diagram(
     bindings: list[dict[str, object]] | None = None,
     version: str | None = None,
     status: str | None = None,
+    tlp: str | None = None,
     edge_labels: dict[str, str | None] | None = None,
     derivation_id: str | None = None,
     diff: dict[str, object] | None = None,
@@ -211,7 +212,7 @@ def artifact_edit_diagram(
             ("puml", puml), ("name", name), ("keywords", keywords),
             ("diagram_entities", diagram_entities), ("diagram_connections", diagram_connections),
             ("view_derivations", view_derivations), ("bindings", bindings),
-            ("version", version), ("status", status),
+            ("version", version), ("status", status), ("tlp", tlp),
         ) if v is not None
     }
     if edge_labels is not None:
