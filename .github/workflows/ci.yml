@@ -161,11 +161,18 @@ jobs:
 
       - name: Start the backend (serves API + built SPA on :8000)
         run: |
-          uv run arch-backend --daemon
+          uv run arch-backend --daemon || {
+            echo "::group::backend.log"; cat .arch/backend.log 2>/dev/null || echo "(no backend.log written)"; echo "::endgroup::";
+            echo "::error::arch-backend --daemon did not come up"; exit 1;
+          }
           for i in $(seq 1 30); do
             if curl -sf http://127.0.0.1:8000/api/stats >/dev/null; then echo "backend up"; break; fi
             sleep 2
           done
+          curl -sf http://127.0.0.1:8000/api/stats >/dev/null || {
+            echo "::group::backend.log"; cat .arch/backend.log 2>/dev/null || echo "(no backend.log)"; echo "::endgroup::";
+            echo "::error::backend did not answer /api/stats in time"; exit 1;
+          }
 
       - name: Run route-walk smoke test
         working-directory: tools/gui

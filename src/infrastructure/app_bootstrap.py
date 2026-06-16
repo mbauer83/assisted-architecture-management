@@ -47,7 +47,15 @@ def _inject_capability_sentinels(registered_names: set[str]) -> None:
         _logger.info("confidential_store capability available at %s", _DEFAULT_ASSURANCE_DB)
 
 
-def build_module_registry() -> ModuleRegistry:
+def build_module_registry(*, complete_vocabulary: bool = False) -> ModuleRegistry:
+    """Assemble the module registry from the configured ontology and diagram-type modules.
+
+    complete_vocabulary: register every module and diagram type unconditionally, ignoring
+    optional runtime capabilities (e.g. the confidential assurance store) and local YAML
+    overrides. Code generation and schema export use this so the emitted vocabulary is the
+    full, stable superset regardless of the environment it runs in — otherwise the output
+    would differ between a machine that has the assurance store and one that does not.
+    """
     from src.config.settings import module_overrides  # noqa: PLC0415
 
     overrides = module_overrides()
@@ -57,13 +65,16 @@ def build_module_registry() -> ModuleRegistry:
     _inject_capability_sentinels(registered_names)
 
     for om in _ALL_ONTOLOGY_MODULES:
-        if is_module_enabled(om, overrides, registered_names):
+        if complete_vocabulary or is_module_enabled(om, overrides, registered_names):
             registry.register_ontology(om)
             registered_names.add(om.name)
         else:
             _logger.info("Ontology module %r skipped (disabled or unsatisfied requires)", om.name)
 
-    register_default_diagram_types(registry, overrides=overrides, registered_names=registered_names)
+    if complete_vocabulary:
+        register_default_diagram_types(registry)
+    else:
+        register_default_diagram_types(registry, overrides=overrides, registered_names=registered_names)
     validate_registry_consistency(registry)
     return registry
 

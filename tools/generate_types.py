@@ -28,7 +28,10 @@ def _const_array(const_name: str, type_name: str, values: list[str]) -> str:
 
 
 def main() -> None:
-    registry = build_module_registry()
+    # Emit the complete vocabulary (all modules + diagram types) regardless of which
+    # optional runtime capabilities are present, so the generated file is identical on
+    # every machine — e.g. with or without the confidential assurance store configured.
+    registry = build_module_registry(complete_vocabulary=True)
 
     entity_types = sorted(registry.all_entity_types().keys())
     connection_types = sorted(registry.all_connection_types().keys())
