@@ -15,7 +15,7 @@ assurance built in.
 [![Vue 3](https://img.shields.io/badge/Vue-3-4FC08D?logo=vuedotjs&logoColor=white)](tools/gui)
 
 [![Lint: Ruff](https://img.shields.io/badge/lint-ruff-261230?logo=ruff&logoColor=white)](pyproject.toml)
-[![Types: zuban](https://img.shields.io/badge/types-zuban_(mypy)-2A6DB0)](pyproject.toml)
+[![Types: zuban](https://img.shields.io/badge/types-zuban_(strict)-2A6DB0)](pyproject.toml)
 [![MCP](https://img.shields.io/badge/MCP-enabled-000000?logo=anthropic&logoColor=white)](docs/03-modeling/interfaces-and-mcp.md)
 [![Model: ArchiMate NEXT (draft)](https://img.shields.io/badge/model-ArchiMate_NEXT_(draft)-6F42C1)](docs/01-motivation.md)
 [![Assurance: STPA · CAST · GRC](https://img.shields.io/badge/assurance-STPA·CAST·GRC-B7472A)](docs/04-assurance/index.md)
