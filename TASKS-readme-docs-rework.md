@@ -38,10 +38,9 @@ finalised to **Architectonic** (public slug `mbauer83/architectonic`).
       (E301/E302). Root cause: `edit_diagram` merged stored + collected refs and never pruned
       dangling ones. Fixed in the writer (`diagram_edit` prunes refs absent from the verifier
       registry's both-repo id set; commit `d16fe6a`), so a re-projection now self-heals.
-      **Apply:** after the next backend restart (MCP runs against the live process), trigger one
-      `artifact_edit_diagram(architecture-backend-components, puml=auto-sync)` — the prune drops
-      the stale ref and rewrites the diagram. (Never blocked startup — validation checks types,
-      not id existence.)
+      **Applied** (commit `a897b1b`): post-restart auto-sync pruned the stale ref and re-bound
+      the diagram to `module-catalog`; verifies clean, re-rendered. (Never blocked startup —
+      validation checks types, not id existence.)
 - [ ] Push → confirm the **CI** Actions badge goes green; connect **Codecov**
       (add `CODECOV_TOKEN`) so the coverage badge resolves. *(User action: push + token.)*
 - [x] Markdown link/image check across README + `docs/**` (passes).
