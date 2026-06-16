@@ -34,6 +34,12 @@ jobs:
       - name: Install dependencies (all groups)
         run: uv sync --all-groups
 
+      - name: Verify generated frontend types are in sync with the ontology
+        run: |
+          uv run tools/generate_types.py
+          git diff --exit-code -- tools/gui/src/domain/types.generated.ts \
+            || { echo "::error::types.generated.ts is stale — run 'uv run tools/generate_types.py' and commit"; exit 1; }
+
       - name: Fetch the PlantUML runtime
         run: uv run get-plantuml
 
@@ -140,6 +146,15 @@ jobs:
           enterprise:
             local: enterprise-repository
           YAML
+
+      - name: Scaffold an empty local enterprise repo (gitlink is empty on CI checkout)
+        run: |
+          # The committed enterprise-repository is a gitlink, so a plain checkout leaves it
+          # empty. arch-init's local: spec requires a model/ dir; give it an empty, valid
+          # repo (model/ + the engagement's schemata) so global/enterprise views render.
+          rm -rf enterprise-repository
+          mkdir -p enterprise-repository/model
+          cp -r engagements/ENG-ARCH-REPO/architecture-repository/.arch-repo enterprise-repository/.arch-repo
 
       - name: Initialise workspace (bundled self-describing model)
         run: uv run arch-init

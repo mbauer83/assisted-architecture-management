@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "generate-types": "cd ../.. && uv run tools/generate_types.py",
+    "generate-types": "cd ../.. && if command -v uv >/dev/null 2>&1; then uv run tools/generate_types.py; else echo 'generate-types: uv not found on PATH; building from committed types.generated.ts'; fi",
     "typecheck": "vue-tsc --noEmit -p tsconfig.json && tsc --noEmit -p tsconfig.node.json",
     "lint": "eslint . --cache --cache-location node_modules/.cache/eslint/.eslintcache --max-warnings=0 --ext .js,.ts,.vue",
     "lint:fix": "npm run lint -- --fix",
