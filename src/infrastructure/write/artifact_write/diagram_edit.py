@@ -55,6 +55,7 @@ def edit_diagram(
     replace_bindings: bool = False,
     version: str | None = None,
     status: str | None = None,
+    tlp: str | None = None,
     edge_labels: dict[str, str | None] | None = _EDGE_LABELS_UNSET,  # type: ignore[assignment]
     dry_run: bool,
 ) -> WriteResult:
@@ -72,7 +73,13 @@ def edit_diagram(
 
     diagram_path = repo_root / DIAGRAM_CATALOG / DIAGRAMS / f"{artifact_id}.puml"
     if not diagram_path.exists():
-        raise ValueError(f"Diagram '{artifact_id}' not found at {diagram_path}")
+        # Fall back to the indexed location so diagrams in subdirectories (group collections
+        # or the gitignored confidential/ root) resolve rather than spuriously 404.
+        resolved = verifier.registry.find_file_by_id(artifact_id) if verifier.registry is not None else None
+        if resolved is not None and resolved.exists():
+            diagram_path = resolved
+        else:
+            raise ValueError(f"Diagram '{artifact_id}' not found at {diagram_path}")
 
     parsed = parse_diagram_file(diagram_path)
     fm = parsed.frontmatter
@@ -80,6 +87,8 @@ def edit_diagram(
     eff_name = name if name is not None else str(fm.get("name", ""))
     eff_version = version if version is not None else str(fm.get("version", "0.1.0"))
     eff_status = status if status is not None else str(fm.get("status", "draft"))
+    _fm_tlp = fm.get("tlp")
+    eff_tlp = tlp if tlp is not None else (str(_fm_tlp) if isinstance(_fm_tlp, str) else None)
     eff_keywords = keywords if keywords is not ... else as_optional_str_list(fm.get("keywords"))
     eff_diagram_entities = diagram_entities if diagram_entities is not None else fm.get("diagram-entities")
     eff_diagram_connections = diagram_connections if diagram_connections is not None else fm.get("connections")
@@ -191,6 +200,7 @@ def edit_diagram(
         bindings=bindings_to_raw(norm_bindings) if norm_bindings else None,
         edge_labels=eff_edge_labels or None,
         puml_body=puml_body,
+        tlp=eff_tlp,
     )
 
     if dry_run:

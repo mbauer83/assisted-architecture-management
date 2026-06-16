@@ -172,6 +172,7 @@ def format_diagram_puml(
     view_derivations: list[dict[str, object]] | None = None,
     bindings: list[dict[str, object]] | None = None,
     edge_labels: dict[str, str] | None = None,
+    tlp: str | None = None,
 ) -> str:
     frontmatter: dict[str, object] = {
         "artifact-id": artifact_id,
@@ -183,6 +184,8 @@ def format_diagram_puml(
     if keywords:
         frontmatter["keywords"] = keywords
     frontmatter["diagram-type"] = diagram_type
+    if tlp:
+        frontmatter["tlp"] = tlp
     if entity_ids_used:
         frontmatter["entity-ids-used"] = entity_ids_used
     if connection_ids_used:
@@ -207,6 +210,7 @@ def format_diagram_puml(
         "status",
         "keywords",
         "diagram-type",
+        "tlp",
         "entity-ids-used",
         "connection-ids-used",
         "diagram-entities",

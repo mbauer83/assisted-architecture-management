@@ -62,6 +62,18 @@ def diagram_source_root(repo_root: Path) -> Path:
     return repo_root / DIAGRAM_CATALOG / DIAGRAMS
 
 
+# Confidential diagram sources (e.g. assurance diagrams classified above the publishability
+# ceiling) live under this subdirectory of the scanned source root. It is still indexed
+# (the source scan recurses), so reads/listing/GUI work, but a `.gitignore` written into it
+# keeps its contents out of git so confidential analysis content never reaches a shared repo.
+CONFIDENTIAL_DIAGRAMS = "confidential"
+
+
+def diagram_source_confidential_root(repo_root: Path) -> Path:
+    """Confidential diagram source root: <repo>/diagram-catalog/diagrams/confidential/"""
+    return diagram_source_root(repo_root) / CONFIDENTIAL_DIAGRAMS
+
+
 def rendered_root(repo_root: Path) -> Path:
     """Rendered output root: <repo>/diagram-catalog/rendered/"""
     return repo_root / DIAGRAM_CATALOG / RENDERED

@@ -9,7 +9,7 @@ from src.application.modeling.artifact_write import (
     generate_diagram_id,
 )
 from src.application.modeling.artifact_write_layout import optimize_puml_layout
-from src.application.repo_path_helpers import diagram_source_root
+from src.application.repo_path_helpers import diagram_source_confidential_root, diagram_source_root
 from src.application.verification.artifact_verifier import ArtifactVerifier
 from src.application.verification.artifact_verifier_types import ENTITY_ID_RE
 from src.domain.bindings import Binding
@@ -17,6 +17,7 @@ from src.domain.groups import UNCATEGORIZED
 
 from ._artifact_deduplication import extract_friendly_slug, get_repository, validate_diagram_unique
 from .boundary import assert_engagement_write_root
+from .diagram_confidentiality import ensure_confidential_gitignore, is_confidential_diagram_source
 from .diagram_references import (
     _collect_diagram_renderer_references,
     _infer_reference_ids_from_puml,
@@ -141,6 +142,7 @@ def create_diagram(
     version: str,
     status: str,
     last_updated: str | None,
+    tlp: str | None = None,
     connection_inference: DiagramConnectionInferenceMode = "none",
     auto_include_stereotypes: bool = True,
     dry_run: bool,
@@ -189,9 +191,17 @@ def create_diagram(
         view_derivations=view_derivations,
         bindings=bindings_to_raw(norm_bindings) if norm_bindings else None,
         puml_body=build.puml_body,
+        tlp=tlp,
     )
 
-    diag_src_root = diagram_source_root(repo_root)
+    # Confidential assurance diagrams are redirected to a gitignored source root so their
+    # source never reaches the shared catalog (mirrors G-f for the rendered output).
+    if is_confidential_diagram_source(diagram_type, tlp):
+        diag_src_root = diagram_source_confidential_root(repo_root)
+        if not dry_run:
+            ensure_confidential_gitignore(diag_src_root)
+    else:
+        diag_src_root = diagram_source_root(repo_root)
     path = (
         diag_src_root / f"{effective_id}.puml"
         if group == UNCATEGORIZED

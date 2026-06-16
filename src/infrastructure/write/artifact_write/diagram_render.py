@@ -11,8 +11,27 @@ from src.application.verification.artifact_verifier_syntax import find_graphviz_
 from src.config.settings import plantuml_limit_size, render_dpi
 from src.infrastructure.rendering.puml_safety import strip_leading_puml_frontmatter
 
+from .diagram_confidentiality import is_confidential_diagram_source
 from .diagram_references import _prepare_diagram_puml_body
 from .parse_existing import parse_diagram_file
+
+
+def _confidential_render_skip(puml_path: Path) -> str | None:
+    """G-f gate: return a skip-warning if this diagram is confidential, else None.
+
+    Confidentiality is classification-driven: a *publishable* assurance diagram
+    (TLP:WHITE/GREEN) renders to disk like any diagram; only confidential ones
+    (above the publishability ceiling, or unclassified) are withheld.
+    """
+    fm = parse_diagram_file(puml_path).frontmatter
+    diagram_type = str(fm.get("diagram-type", "archimate"))
+    tlp = fm.get("tlp")
+    if is_confidential_diagram_source(diagram_type, tlp if isinstance(tlp, str) else None):
+        return (
+            f"Render skipped: '{diagram_type}' is a confidential assurance diagram "
+            "(G-f: confidential assurance diagrams must not write plaintext to diagram-catalog/rendered/)"
+        )
+    return None
 
 
 def _renderer_supports_edge_labels(renderer: object) -> bool:
@@ -66,18 +85,9 @@ def _render_diagram_png(puml_path: Path, warnings: list[str]) -> Path | None:
     puml_body = content[start : end + len("@enduml")]
     diagram_type = str(parse_diagram_file(puml_path).frontmatter.get("diagram-type", "archimate"))
 
-    # G-f: assurance diagrams must never write plaintext to diagram-catalog/rendered/
-    try:
-        from src.infrastructure.diagram_type_registry import find_diagram_type  # noqa: PLC0415
-        _dt = find_diagram_type(diagram_type)
-        if _dt is not None and getattr(_dt, "module_class", None) == "assurance":
-            warnings.append(
-                f"Render skipped: '{diagram_type}' is an assurance diagram type "
-                "(G-f: assurance diagrams must not write plaintext to diagram-catalog/rendered/)"
-            )
-            return None
-    except (ImportError, AttributeError, TypeError):
-        pass
+    if (skip := _confidential_render_skip(puml_path)) is not None:
+        warnings.append(skip)
+        return None
 
     puml_body = _prepare_diagram_puml_body(puml_body, repo_root, diagram_type)
 
@@ -163,18 +173,9 @@ def _render_diagram_svg(puml_path: Path, warnings: list[str]) -> Path | None:
     puml_body = content[start : end + len("@enduml")]
     diagram_type = str(parse_diagram_file(puml_path).frontmatter.get("diagram-type", "archimate"))
 
-    # G-f: assurance diagrams must never write plaintext to diagram-catalog/rendered/
-    try:
-        from src.infrastructure.diagram_type_registry import find_diagram_type  # noqa: PLC0415
-        _dt = find_diagram_type(diagram_type)
-        if _dt is not None and getattr(_dt, "module_class", None) == "assurance":
-            warnings.append(
-                f"Render skipped: '{diagram_type}' is an assurance diagram type "
-                "(G-f: assurance diagrams must not write plaintext to diagram-catalog/rendered/)"
-            )
-            return None
-    except (ImportError, AttributeError, TypeError):
-        pass
+    if (skip := _confidential_render_skip(puml_path)) is not None:
+        warnings.append(skip)
+        return None
 
     puml_body = _prepare_diagram_puml_body(puml_body, repo_root, diagram_type)
     puml_body_for_render = re.sub(r"@startuml\s+\S+", "@startuml", puml_body, count=1)
