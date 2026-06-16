@@ -5,7 +5,6 @@ from __future__ import annotations
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException
-from pydantic import BaseModel
 
 from src.application.derivation.preview import project_view_for_preview
 from src.application.runtime_catalogs import RuntimeCatalogs
@@ -13,6 +12,16 @@ from src.infrastructure.app_bootstrap import runtime_catalogs_dependency
 from src.infrastructure.artifact_index import shared_artifact_index
 from src.infrastructure.gui.routers import state as s
 from src.infrastructure.gui.routers._diagram_selection import resolve_diagram_selection
+from src.infrastructure.gui.routers._diagram_write_bodies import (
+    CreateDiagramGuiBody,
+    CreateMatrixBody,
+    DeleteDiagramBody,
+    DiagramPreviewBody,
+    EditDiagramGuiBody,
+    EditMatrixBody,
+    MatrixPreviewBody,
+    SyncDiagramToModelBody,
+)
 
 router = APIRouter()
 
@@ -28,45 +37,6 @@ def _split_diagram_entities(
         return diagram_entities, None
     clean = {k: v for k, v in diagram_entities.items() if k != "_connections"}
     return clean or None, conns if isinstance(conns, list) else None
-
-
-class DiagramPreviewBody(BaseModel):
-    diagram_type: str
-    name: str
-    entity_ids: list[str]
-    connection_ids: list[str]
-    diagram_entities: dict[str, Any] | None = None
-
-
-class CreateDiagramGuiBody(BaseModel):
-    diagram_type: str
-    name: str
-    entity_ids: list[str]
-    connection_ids: list[str]
-    keywords: list[str] | None = None
-    diagram_entities: dict[str, Any] | None = None
-    version: str = "0.1.0"
-    status: str = "draft"
-    tlp: str | None = None
-    dry_run: bool = True
-
-
-class EditDiagramGuiBody(BaseModel):
-    artifact_id: str
-    diagram_type: str
-    name: str
-    entity_ids: list[str]
-    connection_ids: list[str]
-    diagram_entities: dict[str, Any] | None = None
-    version: str | None = None
-    status: str | None = None
-    tlp: str | None = None
-    dry_run: bool = True
-
-
-class DeleteDiagramBody(BaseModel):
-    artifact_id: str
-    dry_run: bool = True
 
 
 @router.post("/api/diagram/preview")
@@ -192,40 +162,6 @@ def edit_diagram_gui(body: EditDiagramGuiBody) -> dict[str, Any]:
     except ValueError as e:
         raise HTTPException(400, str(e))
     return s.write_result_to_dict(result)
-
-
-class MatrixPreviewBody(BaseModel):
-    entity_ids: list[str]
-    conn_type_configs: list[dict[str, object]]
-    combined: bool = False
-    from_entity_ids: list[str] | None = None
-    to_entity_ids: list[str] | None = None
-
-
-class CreateMatrixBody(BaseModel):
-    name: str
-    entity_ids: list[str]
-    conn_type_configs: list[dict[str, object]]
-    combined: bool = False
-    keywords: list[str] | None = None
-    version: str = "0.1.0"
-    status: str = "draft"
-    dry_run: bool = True
-    from_entity_ids: list[str] | None = None
-    to_entity_ids: list[str] | None = None
-
-
-class EditMatrixBody(BaseModel):
-    artifact_id: str
-    name: str
-    entity_ids: list[str]
-    conn_type_configs: list[dict[str, object]]
-    combined: bool = False
-    version: str | None = None
-    status: str | None = None
-    dry_run: bool = True
-    from_entity_ids: list[str] | None = None
-    to_entity_ids: list[str] | None = None
 
 
 def _build_matrix_markdown(
@@ -363,11 +299,6 @@ def edit_matrix_gui(body: EditMatrixBody) -> dict[str, Any]:
     except ValueError as e:
         raise HTTPException(400, str(e))
     return s.write_result_to_dict(result)
-
-
-class SyncDiagramToModelBody(BaseModel):
-    artifact_id: str
-    dry_run: bool = True
 
 
 @router.post("/api/diagram/sync")
