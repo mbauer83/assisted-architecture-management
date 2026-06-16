@@ -15,7 +15,6 @@ entity-ids-used:
 - APP@1712870400.ca3vm7.model-verifier
 - APP@1712870400.kRZYOA.architecture-mcp-endpoint-adapter
 - APP@1712870400.v9LvfK.query-engine
-- APP@1712870400.yNhgdh.model-registry
 - APP@1776149382.lmO0mp.gui-authoring-tool
 - APP@1776633693.tIMxjr.promotion-engine
 - APP@1776633694.w51oVF.workspace-initializer
@@ -45,10 +44,9 @@ entity-ids-used:
 - DOB@1777399929.hhYsiw.staged-repository
 - DOB@1777399930.hExrX3.operation-record
 - DOB@1780656431.ApaPcg.assurance-knowledge-base
+- APP@1712870400.yNhgdh.module-catalog
 connection-ids-used:
-- APP@1712870400.JOmFWy.sqlite-indexer---APP@1712870400.yNhgdh.model-registry@@archimate-serving
 - APP@1712870400.ca3vm7.model-verifier---APP@1712870400.YOOEbL.frontmatter-parser@@archimate-serving
-- APP@1712870400.ca3vm7.model-verifier---APP@1712870400.yNhgdh.model-registry@@archimate-serving
 - APP@1712870400.ca3vm7.model-verifier---APP@1776149382.lmO0mp.gui-authoring-tool@@archimate-serving
 - APP@1712870400.v9LvfK.query-engine---APP@1776149382.lmO0mp.gui-authoring-tool@@archimate-serving
 - APP@1777293133.OYEmP1.architecture-backend---APP@1776149382.lmO0mp.gui-authoring-tool@@archimate-serving
@@ -79,6 +77,8 @@ connection-ids-used:
 - APP@1780656430.m-U5S1.assurance-mcp-endpoint-adapter---DOB@1780656431.ApaPcg.assurance-knowledge-base@@archimate-access
 - FNC@1777399926.DrKMhV.resolve-operation-idempotency---DOB@1777399930.hExrX3.operation-record@@archimate-access
 - FNC@1777399927.hbgFU3.create-staging-repository---DOB@1777399929.hhYsiw.staged-repository@@archimate-access
+- APP@1712870400.JOmFWy.sqlite-indexer---APP@1712870400.yNhgdh.module-catalog@@archimate-serving
+- APP@1712870400.ca3vm7.model-verifier---APP@1712870400.yNhgdh.module-catalog@@archimate-serving
 diagram-entities: {}
 bindings:
 - id: bind-scope
@@ -87,7 +87,7 @@ bindings:
   correspondence_kind: scoped-by
   target:
     entity_id: APP@1777293133.OYEmP1.architecture-backend
-last-updated: '2026-06-07'
+last-updated: '2026-06-16'
 ---
 @startuml architecture-backend---components
 left to right direction
@@ -129,24 +129,24 @@ skinparam rectangle<<C4External>> {
 title Architecture Backend — Components
 
 rectangle "Architecture Backend" <<C4System>> as APP_OYEmP1 {
-  rectangle "SQLite Indexer" <<C4Component>> as APP_JOmFWy
-  rectangle "Frontmatter Parser" <<C4Component>> as APP_YOOEbL
-  rectangle "Model Verifier" <<C4Component>> as APP_ca3vm7
-  rectangle "Architecture MCP Endpoint Adapter" <<C4Component>> as APP_kRZYOA
-  rectangle "Query Engine" <<C4Component>> as APP_v9LvfK
-  rectangle "Model Registry" <<C4Component>> as APP_yNhgdh
-  rectangle "Promotion Engine" <<C4Component>> as APP_tIMxjr
-  rectangle "Workspace Initializer" <<C4Component>> as APP_w51oVF
-  rectangle "Diagram Scaffolder" <<C4Component>> as APP_SCKD2U
-  rectangle "Write Request Queue" <<C4Component>> as APP_a9k_mJ
-  rectangle "Git Sync Service" <<C4Component>> as APP_tY3JIK
-  rectangle "PlantUML Renderer" <<C4Component>> as APP_yaxrWl
-  rectangle "Bulk Write Handler" <<C4Component>> as APP_5n_KQJ
-  rectangle "Batch Transaction Manager" <<C4Component>> as APP_HOOYAQ
-  rectangle "Bulk Delete Handler" <<C4Component>> as APP_WK_78v
-  rectangle "Operation Registry" <<C4Component>> as APP_PDJI8F
-  rectangle "Assurance MCP Endpoint Adapter" <<C4Component>> as APP_m_U5S1
-  rectangle "Broadcast Model Update" <<C4Component>> as FNC_3ZsfnT
+  rectangle "SQLite Indexer\nIndexes artifact metadata into a SQLite database for efficient querying" <<C4Component>> as APP_JOmFWy
+  rectangle "Frontmatter Parser\nParses YAML frontmatter from `.md` and `.puml` files" <<C4Component>> as APP_YOOEbL
+  rectangle "Model Verifier\nCore verification engine that validates entities, connections, and diagrams against model rules" <<C4Component>> as APP_ca3vm7
+  rectangle "Architecture MCP Endpoint Adapter\nBackend-internal FastMCP application component hosting the /mcp/read and /mcp/write MCP endpoints;…" <<C4Component>> as APP_kRZYOA
+  rectangle "Query Engine\nSupports full-text search, metadata-based querying, and graph-based relationship traversal over the…" <<C4Component>> as APP_v9LvfK
+  rectangle "Module Catalog\nImmutable catalog of loaded ontology modules, built once at startup from YAML definitions by Module…" <<C4Component>> as APP_yNhgdh
+  rectangle "Promotion Engine\nThe application component that calculates artifact dependency closures, runs promotion quality gate…" <<C4Component>> as APP_tIMxjr
+  rectangle "Workspace Initializer\nThe application component that provisions a new architecture repository by creating the required di…" <<C4Component>> as APP_w51oVF
+  rectangle "Diagram Scaffolder\nThe application component that generates pre-populated PlantUML diagram files by resolving entity a…" <<C4Component>> as APP_SCKD2U
+  rectangle "Write Request Queue\nInternal FIFO async queue within the unified backend that accepts all incoming write requests immed…" <<C4Component>> as APP_a9k_mJ
+  rectangle "Git Sync Service\nRuntime service that watches the engagement and enterprise repository directories for file-system c…" <<C4Component>> as APP_tY3JIK
+  rectangle "PlantUML Renderer\nConverts textual PlantUML diagram representations to raster and vector images (PNG/SVG) by invoking…" <<C4Component>> as APP_yaxrWl
+  rectangle "Bulk Write Handler\nOrchestrates transactional execution of bulk create and edit operations by running the staged bulk…" <<C4Component>> as APP_5n_KQJ
+  rectangle "Batch Transaction Manager\nCreates a temporary staging copy of the live repository, coordinates all write operations against i…" <<C4Component>> as APP_HOOYAQ
+  rectangle "Bulk Delete Handler\nOrchestrates transactional execution of bulk delete operations, including preflight dependency vali…" <<C4Component>> as APP_WK_78v
+  rectangle "Operation Registry\nRegisters bulk operations with unique IDs, tracks phase progression, and enforces idempotency by re…" <<C4Component>> as APP_PDJI8F
+  rectangle "Assurance MCP Endpoint Adapter\nBackend-internal FastMCP application component hosting the /mcp/assurance-read and /mcp/assurance-w…" <<C4Component>> as APP_m_U5S1
+  rectangle "Broadcast Model Update\nBroadcasts relevant model changes to interested consumers such as the GUI and other live clients" <<C4Component>> as FNC_3ZsfnT
   APP_JOmFWy -[hidden]right- APP_YOOEbL
   APP_YOOEbL -[hidden]right- APP_ca3vm7
   APP_ca3vm7 -[hidden]right- APP_kRZYOA
@@ -167,22 +167,22 @@ rectangle "Architecture Backend" <<C4System>> as APP_OYEmP1 {
 
 }
 
-rectangle "GUI Authoring Tool" <<C4External>> as APP_lmO0mp
-rectangle "Architecture MCP Read Bridge" <<C4External>> as APP_Ne0utf
-rectangle "Architecture MCP Write Bridge" <<C4External>> as APP_etTj9M
-rectangle "Assurance MCP Read Bridge" <<C4External>> as APP_iu_kKL
-rectangle "Assurance MCP Write Bridge" <<C4External>> as APP_js9xHR
-rectangle "Git Hosting" <<C4External>> as APP_Je9pmw
-rectangle "Supply-Chain Signal Sources" <<C4External>> as APP_JqIBPJ
-rectangle "SQLite Index" <<C4External>> as DOB_3rilik
-rectangle "Workspace Configuration" <<C4External>> as DOB_I9qEoI
-rectangle "Textual Diagram Representation" <<C4External>> as DOB_4Z28xK
-rectangle "Architecture Ontology Configuration" <<C4External>> as DOB_UjyXG3
-rectangle "Global Entity Reference File" <<C4External>> as DOB_4dO6js
-rectangle "Rendered Diagram" <<C4External>> as DOB_zynRsm
-rectangle "Staged Repository" <<C4External>> as DOB_hhYsiw
-rectangle "Operation Record" <<C4External>> as DOB_hExrX3
-rectangle "Assurance Knowledge Base" <<C4External>> as DOB_ApaPcg
+rectangle "GUI Authoring Tool\nWeb-based SPA for browsing, searching, and authoring architecture model entities, connections, and…" <<C4External>> as APP_lmO0mp
+rectangle "Architecture MCP Read Bridge\nThin stdio↔HTTP client of the Architecture Backend providing read-only access to the architecture r…" <<C4External>> as APP_Ne0utf
+rectangle "Architecture MCP Write Bridge\nThin stdio↔HTTP client of the Architecture Backend providing write access to the architecture repos…" <<C4External>> as APP_etTj9M
+rectangle "Assurance MCP Read Bridge\nThin stdio↔HTTP client of the Architecture Backend providing read-only access to assurance data via…" <<C4External>> as APP_iu_kKL
+rectangle "Assurance MCP Write Bridge\nThin stdio↔HTTP client of the Architecture Backend providing write access to assurance data via MCP" <<C4External>> as APP_js9xHR
+rectangle "Git Hosting\nExternal Git hosting service (e.g" <<C4External>> as APP_Je9pmw
+rectangle "Supply-Chain Signal Sources\nExternal sources of supply-chain and vulnerability signals (e.g" <<C4External>> as APP_JqIBPJ
+rectangle "SQLite Index\nThe SQLite database file containing the runtime index of all repository metadata" <<C4External>> as DOB_3rilik
+rectangle "Workspace Configuration\nThe YAML configuration file (arch-workspace.yml) recording the engagement repository root, enterpri…" <<C4External>> as DOB_I9qEoI
+rectangle "Textual Diagram Representation\nA PlantUML `.puml` file representing an architectural diagram or a markdown `.md` file containing m…" <<C4External>> as DOB_4Z28xK
+rectangle "Architecture Ontology Configuration\nYAML configuration files (entity_ontology.yaml and connection_ontology.yaml) that define the comple…" <<C4External>> as DOB_UjyXG3
+rectangle "Global Entity Reference File\nA proxy entity file created automatically in the engagement repository when a connection crosses th…" <<C4External>> as DOB_4dO6js
+rectangle "Rendered Diagram\nPNG or SVG image file produced by the PlantUML Renderer from a textual diagram representation, stor…" <<C4External>> as DOB_zynRsm
+rectangle "Staged Repository\nTemporary filesystem copy of the live repository used as the isolated transaction workspace during…" <<C4External>> as DOB_hhYsiw
+rectangle "Operation Record\nCaptures the idempotency key, phase, status, and result for a running or completed bulk operation,…" <<C4External>> as DOB_hExrX3
+rectangle "Assurance Knowledge Base\nStore-wide confidential resource containing all assurance entities, typed one-way architecture conn…" <<C4External>> as DOB_ApaPcg
 
 APP_OYEmP1 -[hidden]right- APP_lmO0mp
 APP_lmO0mp -[hidden]right- APP_Ne0utf
