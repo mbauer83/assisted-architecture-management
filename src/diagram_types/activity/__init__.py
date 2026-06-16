@@ -22,7 +22,6 @@ from src.domain.ontology_types import ConnectionTypeInfo, ElementClassInfo, Enti
 from src.domain.permitted_relationships import PermittedRelationshipSet
 
 _OWN_ENTITY_TYPES: dict[EntityTypeName, EntityTypeInfo] = {}
-_OWN_CONNECTION_TYPES: dict[ConnectionTypeName, ConnectionTypeInfo] = {}
 
 
 def _load_config(package_dir: Path) -> dict[str, Any]:
@@ -169,7 +168,7 @@ class _ActivityDiagramType(DiagramTypeBase):
 
     @property
     def own_connection_types(self) -> dict[ConnectionTypeName, ConnectionTypeInfo]:
-        return _OWN_CONNECTION_TYPES
+        return dict(self._ontology.connection_types)
 
     @property
     def own_permitted_relationships(self) -> PermittedRelationshipSet:

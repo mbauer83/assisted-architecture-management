@@ -97,6 +97,11 @@ jobs:
       # make any stray git call fail fast instead of prompting.
       GIT_TERMINAL_PROMPT: "0"
       GIT_SSH_COMMAND: "ssh -o BatchMode=yes -o ConnectTimeout=5"
+      # Headless credential backend (Fernet vault) so `arch-assurance init` can provision a
+      # store without an OS keyring. The self-model repo contains assurance diagrams, so the
+      # assurance module must be enabled for the backend to validate and serve it. The store
+      # is ephemeral and empty — this value is not a secret.
+      ARCH_ASSURANCE_MASTER_PASSWORD: ci-ephemeral-not-a-secret
     steps:
       - uses: actions/checkout@v4
 
@@ -158,6 +163,9 @@ jobs:
 
       - name: Initialise workspace (bundled self-describing model)
         run: uv run arch-init
+
+      - name: Initialise an empty confidential assurance store (enables the assurance module)
+        run: uv run arch-assurance init
 
       - name: Start the backend (serves API + built SPA on :8000)
         run: |
