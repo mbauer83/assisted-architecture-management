@@ -281,7 +281,8 @@ def _build_app(credentials: "GitCredentials | None" = None):  # type: ignore[no-
         for suffix in (f"/mcp/{name}", f"/mcp/{name}/"):
             app.add_route(suffix, cast(object, asgi_app), include_in_schema=False)  # type: ignore[arg-type]
 
-    gui_dist = Path(__file__).resolve().parent.parent.parent / "tools" / "gui" / "dist"
+    # repo root is four levels up: backend → infrastructure → src → <repo>
+    gui_dist = Path(__file__).resolve().parents[3] / "tools" / "gui" / "dist"
     if gui_dist.exists():
         # SPA history-fallback: deep links (e.g. /entities/groups) have no file on disk, so
         # serve index.html and let the client router resolve them.
