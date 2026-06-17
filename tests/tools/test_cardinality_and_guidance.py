@@ -23,11 +23,14 @@ from src.infrastructure.write.artifact_write.type_guidance import get_type_guida
 # ---------------------------------------------------------------------------
 
 
-@lru_cache(maxsize=1)
 def _all_entity_types() -> dict:
-    from src.infrastructure.app_bootstrap import build_module_registry  # noqa: PLC0415
+    # Use the same cached registry get_type_guidance reads (get_module_registry), not a fresh
+    # build_module_registry(): a freshly built registry can reflect a different optional-module
+    # (confidential_store) capability state than the cached one, making the count comparison
+    # order-dependent under xdist. Comparing like-for-like keeps the assertion stable.
+    from src.infrastructure.app_bootstrap import get_module_registry  # noqa: PLC0415
 
-    return {str(k): v for k, v in build_module_registry().all_entity_types().items()}
+    return {str(k): v for k, v in get_module_registry().all_entity_types().items()}
 
 
 @lru_cache(maxsize=1)
