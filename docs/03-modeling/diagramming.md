@@ -61,6 +61,45 @@ participants and messages without hand-editing frontmatter.
 
 &nbsp;
 
+## Datatype (UML class)
+
+A restricted UML class diagram for modelling data structures and their relationships. The
+diagram owns five **diagram-only connection types** (`dt-association`, `dt-aggregation`,
+`dt-composition`, `dt-generalization`, `dt-dependency`) and five **classifier kinds**
+(`class`, `datatype`, `enumeration`, `variant`, `primitive`).
+
+Each classifier may be **bound** to a Data Object entity in the model store, recording that
+the diagram's structural depiction corresponds to a specific model element. When both ends of
+a `dt-*` edge are bound, the system enforces **§3.2 consistency**: the edge must have a
+**backing model connection** whose `relationship_kind` matches the `dt-*` type:
+
+| dt-* type | Relationship kind | Compatible backing types (examples) |
+|---|---|---|
+| `dt-association` | association | `archimate-association` |
+| `dt-aggregation` | containment | `archimate-aggregation` |
+| `dt-composition` | containment | `archimate-composition` |
+| `dt-generalization` | generalization | `archimate-specialization` |
+| `dt-dependency` | dependency | `archimate-association` |
+
+Two error codes enforce this invariant:
+
+- **E330** (forward) — a `dt-*` edge between two bound classifiers has no backing connection.
+  The GUI editor shows an inline "Create & bind" quick-fix: clicking it creates the preferred
+  backing connection between the two Data Objects and records the binding automatically.
+- **E331** (reverse) — a recorded backing connection has the wrong `relationship_kind` or
+  points the wrong direction.
+
+Both errors surface through the standard verification flow (inline in the GUI, structured
+`details` and `actions` fields in the MCP/REST response) and clear as soon as a correct
+binding is in place.
+
+Authoring via MCP: pass `diagram-type: datatype` to `artifact_create_diagram` or
+`artifact_edit_diagram`. Use `artifact_authoring_guidance(filter=["classifier"])` to see the
+accepted vocabulary. The legacy `er-*` connection types are deprecated; new diagrams should
+use the `dt-*` family.
+
+&nbsp;
+
 ## C4
 
 A progressive zoom across three levels — **system context** (L1), **container** (L2), and

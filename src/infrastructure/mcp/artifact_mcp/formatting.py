@@ -1,21 +1,6 @@
-from typing import Any
+from src.application.verification._issue_serialization import (
+    as_issue_dict,
+    as_verification_result_dict,
+)
 
-from src.application.verification.artifact_verifier import Issue, VerificationResult
-
-
-def as_issue_dict(issue: Issue) -> dict[str, str]:
-    return {
-        "severity": issue.severity,
-        "code": issue.code,
-        "message": issue.message,
-        "location": issue.location,
-    }
-
-
-def as_verification_result_dict(result: VerificationResult) -> dict[str, Any]:
-    return {
-        "path": str(result.path),
-        "file_type": result.file_type,
-        "valid": result.valid,
-        "issues": [as_issue_dict(i) for i in result.issues],
-    }
+__all__ = ["as_issue_dict", "as_verification_result_dict"]

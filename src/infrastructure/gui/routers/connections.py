@@ -128,6 +128,7 @@ def get_ontology(
             "target_type": target_type,
             "connection_types": conn_types,
             "symmetric": [ct for ct in conn_types if catalogs.connections.is_symmetric(ct)],
+            "relationship_kind_map": {ct: catalogs.connections.relationship_kind(ct) for ct in conn_types},
         }
     return {"source_type": source_type, **catalogs.connections.classify_connections(effective_source)}
 

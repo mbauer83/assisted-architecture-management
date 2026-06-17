@@ -17,7 +17,7 @@ GUI, the REST API, the CLI, and the MCP tools.
 |---|---|
 | [Projects & grouping](projects-and-grouping.md) | The three independent grouping axes and the group lifecycle |
 | [Views & exploration](views-and-exploration.md) | List view, treemap, grid, full-text search, and graph navigation |
-| [Diagramming](diagramming.md) | ArchiMate, matrix, activity, sequence, and C4 diagram families |
+| [Diagramming](diagramming.md) | ArchiMate, matrix, activity, sequence, C4, and datatype (UML class) diagram families |
 | [Interfaces & MCP](interfaces-and-mcp.md) | The MCP read/write tool surface, REST API, and GUI parity |
 
 &nbsp;

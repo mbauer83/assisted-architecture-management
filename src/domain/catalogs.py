@@ -45,6 +45,7 @@ class ConnectionSemantics(Protocol):
     """Permitted-relationship and symmetry queries over registered ontologies."""
 
     def is_symmetric(self, conn_type: str) -> bool: ...
+    def relationship_kind(self, conn_type: str) -> str | None: ...
     def permissible_connection_types(self, source_type: str, target_type: str) -> Sequence[str]: ...
     def permissible_target_types(self, source_type: str) -> Mapping[str, Sequence[str]]: ...
     def classify_connections(self, source_type: str) -> Mapping[str, Mapping[str, Sequence[str]]]: ...
@@ -179,6 +180,10 @@ class ConnectionSemanticsImpl:
     def is_symmetric(self, conn_type: str) -> bool:
         info = self._catalog.find_connection_type(ConnectionTypeName(conn_type))
         return info.symmetric if info is not None else False
+
+    def relationship_kind(self, conn_type: str) -> str | None:
+        info = self._catalog.find_connection_type(ConnectionTypeName(conn_type))
+        return info.relationship_kind if info is not None else None
 
     def permissible_connection_types(self, source_type: str, target_type: str) -> Sequence[str]:
         prs = self._permitted

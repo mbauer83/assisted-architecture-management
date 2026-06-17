@@ -55,6 +55,37 @@ links between them live in the diagram's `connections:` list, not as entity prop
 
 &nbsp;
 
+## Diagram-owned connection types and connection bindings
+
+A diagram module can declare **diagram-only connection types** — structural edges that live
+in the diagram's `connections:` list rather than as model connections. They are declared in
+`ontology.yaml` alongside entity types, and they carry the same metadata fields
+(`relationship_kind`, `symmetric`, `puml_arrow`).
+
+The `datatype` module is the reference case. It owns five `dt-*` connection types
+(`dt-association` through `dt-dependency`), each tagged with a `relationship_kind` matching
+the ArchiMate backing type family. When a `dt-*` edge connects two classifiers that are each
+bound to a Data Object, the verifier checks that a backing model connection with a
+corresponding `relationship_kind` exists — and surfaces structured `details` and `actions` in
+the error payload when it does not.
+
+**Connection bindings** record this correspondence. In the diagram's `bindings:` list, a
+connection binding entry looks like:
+
+```yaml
+bindings:
+  - id: bind-e1
+    subject: { kind: connection, id: e1 }
+    correspondence_kind: represents
+    target: { connection_id: "DOB@1---DOB@2@@archimate-association" }
+```
+
+The GUI write path strips `backing_conn_id` from `_connections` items and converts them to
+proper binding entries before persisting, so MCP callers can pass `backing_conn_id` as a
+convenience field and the storage layer normalises it.
+
+&nbsp;
+
 ## Model-backed projection (C4)
 
 Diagram types that derive content from the ArchiMate graph may implement the `ViewProjector`

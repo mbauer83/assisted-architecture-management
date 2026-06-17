@@ -41,6 +41,7 @@ connection_types:
       classes: [containment, nesting]
       hierarchy_priority: 1
       hierarchy_label: composition
+      relationship_kind: containment
     archimate-aggregation:
       archimate_relationship_type: Aggregation
       puml_arrow: "-->"
@@ -48,6 +49,7 @@ connection_types:
       classes: [containment, nesting]
       hierarchy_priority: 2
       hierarchy_label: aggregation
+      relationship_kind: containment
     archimate-assignment:
       archimate_relationship_type: Assignment
       puml_arrow: "-->"
@@ -79,6 +81,7 @@ connection_types:
       puml_arrow: "--"
       symmetric: true
       classes: []
+      relationship_kind: association
     archimate-specialization:
       archimate_relationship_type: Specialization
       puml_arrow: "--|>"
@@ -86,6 +89,7 @@ connection_types:
       classes: [generalization]
       hierarchy_priority: 0
       hierarchy_label: specialization
+      relationship_kind: generalization
     archimate-flow:
       archimate_relationship_type: Flow
       puml_arrow: "..>"
@@ -97,10 +101,13 @@ connection_types:
       symmetric: false
       classes: [dynamic]
 
+  # DEPRECATED — er-* are model-level DOB connections; the datatype diagram
+  # uses diagram-local dt-* instead. Migrate ENG-001 to ArchiMate-backed
+  # relations (WU-A2), then remove this block. Do NOT remove before migration.
   er:
-    er-one-to-many:    {}
-    er-many-to-many:   {}
-    er-one-to-one:     {}
+    er-one-to-many:    {deprecated: true}
+    er-many-to-many:   {deprecated: true}
+    er-one-to-one:     {deprecated: true}
 
   sequence:
     sequence-synchronous:  {}

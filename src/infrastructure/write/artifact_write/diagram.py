@@ -10,6 +10,7 @@ from src.application.modeling.artifact_write import (
 )
 from src.application.modeling.artifact_write_layout import optimize_puml_layout
 from src.application.repo_path_helpers import diagram_source_confidential_root, diagram_source_root
+from src.application.verification._issue_serialization import as_issue_dict
 from src.application.verification.artifact_verifier import ArtifactVerifier
 from src.application.verification.artifact_verifier_types import ENTITY_ID_RE
 from src.domain.bindings import Binding
@@ -34,9 +35,7 @@ def _verification_to_dict(path: Path, res) -> dict[str, object]:
         "path": str(path),
         "file_type": "diagram",
         "valid": res.valid,
-        "issues": [
-            {"severity": i.severity, "code": i.code, "message": i.message, "location": i.location} for i in res.issues
-        ],
+        "issues": [as_issue_dict(i) for i in res.issues],
     }
 
 

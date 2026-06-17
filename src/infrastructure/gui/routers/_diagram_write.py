@@ -39,6 +39,31 @@ def _split_diagram_entities(
     return clean or None, conns if isinstance(conns, list) else None
 
 
+def _extract_conn_bindings(
+    connections: list[dict[str, Any]] | None,
+) -> tuple[list[dict[str, Any]] | None, list[dict[str, Any]]]:
+    """Strip `backing_conn_id` from connections; return (clean, binding_dicts)."""
+    if not connections:
+        return connections, []
+    bindings: list[dict[str, Any]] = []
+    clean: list[dict[str, Any]] = []
+    for conn in connections:
+        if not isinstance(conn, dict):
+            clean.append(conn)
+            continue
+        backing_id = conn.get("backing_conn_id")
+        conn_id = conn.get("id")
+        if backing_id and conn_id:
+            bindings.append({
+                "id": f"bind-conn-{conn_id}",
+                "subject": {"kind": "connection", "id": conn_id},
+                "correspondence_kind": "represents",
+                "target": {"connection_id": backing_id},
+            })
+        clean.append({k: v for k, v in conn.items() if k != "backing_conn_id"})
+    return clean or None, bindings
+
+
 @router.post("/api/diagram/preview")
 def preview_diagram(body: DiagramPreviewBody, catalogs: RuntimeCatalogs = Depends(runtime_catalogs_dependency)) -> dict[str, Any]:  # noqa: E501
     repo_root = s.maybe_engagement_root()
@@ -82,6 +107,7 @@ def create_diagram_gui(body: CreateDiagramGuiBody) -> dict[str, Any]:
         body.connection_ids,
     )
     de, dc = _split_diagram_entities(body.diagram_entities)
+    dc, conn_bindings = _extract_conn_bindings(dc)
     puml = generate_archimate_puml_body(
         body.name,
         entities,
@@ -111,6 +137,7 @@ def create_diagram_gui(body: CreateDiagramGuiBody) -> dict[str, Any]:
             last_updated=None,
             tlp=body.tlp,
             connection_inference="none",
+            bindings=conn_bindings or None,
             dry_run=body.dry_run,
         )
     except ValueError as e:
@@ -131,6 +158,7 @@ def edit_diagram_gui(body: EditDiagramGuiBody) -> dict[str, Any]:
         body.connection_ids,
     )
     de, dc = _split_diagram_entities(body.diagram_entities)
+    dc, conn_bindings = _extract_conn_bindings(dc)
     puml = generate_archimate_puml_body(
         body.name,
         entities,
@@ -157,6 +185,7 @@ def edit_diagram_gui(body: EditDiagramGuiBody) -> dict[str, Any]:
             version=body.version,
             status=body.status,
             tlp=body.tlp,
+            bindings=conn_bindings or None,
             dry_run=body.dry_run,
         )
     except ValueError as e:

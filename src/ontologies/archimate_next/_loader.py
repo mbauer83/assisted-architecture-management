@@ -182,6 +182,7 @@ def _load_connection_types(data: dict[str, Any]) -> dict[ConnectionTypeName, Con
                 hierarchy_priority=int(hp_raw) if hp_raw is not None else None,
                 hierarchy_label=str(raw["hierarchy_label"]) if raw.get("hierarchy_label") else None,
                 bidirectional_sync=bool(raw.get("bidirectional_sync", False)),
+                relationship_kind=str(raw["relationship_kind"]) if raw.get("relationship_kind") else None,
             )
     return out
 

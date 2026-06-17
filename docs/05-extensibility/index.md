@@ -37,8 +37,8 @@ promoted up still satisfies the enterprise constraints. See
   v2 vocabulary), and `assurance` (STPA/CAST/GRC). The SysML v2 domain appears as its own
   filter in the GUI, alongside the ArchiMate domains.
 - **Diagram types** — ArchiMate domain views (seven) plus layered, C4 (three levels),
-  activity, sequence, matrix, and the four assurance views (bowtie, control structure, GSN,
-  UCA matrix).
+  activity, sequence, datatype (UML class), matrix, and the four assurance views (bowtie,
+  control structure, GSN, UCA matrix).
 
 Startup validation cross-checks every type found in repo content against the registered
 modules and aborts on any unknown type, so a removed or renamed module can never silently

@@ -95,6 +95,9 @@ class EntityTypeInfo:
     mapping_required: bool = False
 
 
+RELATIONSHIP_KINDS: frozenset[str] = frozenset({"association", "containment", "generalization", "dependency"})
+
+
 @dataclass(frozen=True)
 class ConnectionTypeInfo:
     """Canonical metadata for a single connection type."""
@@ -112,3 +115,4 @@ class ConnectionTypeInfo:
     embedding: Literal["none", "array", "property"] = "none"
     embed_key: str | None = None
     cascade_delete_source: bool = False
+    relationship_kind: str | None = None

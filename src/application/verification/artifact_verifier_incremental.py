@@ -363,18 +363,19 @@ def _expand_for_connection(inv: FileInventory, impacted: set[str], rel: str, con
         impacted |= inv.diagram_paths_by_entity.get(entity_id, set())
 
 
+def _serialize_issue(i) -> dict:
+    d = {"severity": i.severity, "code": i.code, "message": i.message, "location": i.location}
+    if i.details is not None:
+        d["details"] = dict(i.details)
+    if i.actions is not None:
+        d["actions"] = [dict(a) for a in i.actions]
+    return d
+
+
 def serialize_result(result: VerificationResult) -> dict:
     return {
         "file_type": result.file_type,
-        "issues": [
-            {
-                "severity": i.severity,
-                "code": i.code,
-                "message": i.message,
-                "location": i.location,
-            }
-            for i in result.issues
-        ],
+        "issues": [_serialize_issue(i) for i in result.issues],
     }
 
 

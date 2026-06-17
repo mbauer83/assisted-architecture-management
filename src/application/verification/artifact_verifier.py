@@ -213,6 +213,7 @@ class ArtifactVerifier:
                 fm, self.registry, scope, result, loc,
                 diagram_type_catalog=self._runtime_catalogs.diagram_types,
                 derivation_catalog=self._runtime_catalogs.derivation,
+                ontology_catalog=self._runtime_catalogs.ontology,
             )
             check_diagram_relation_references(
                 content, fm, self.registry, scope, result, loc,
@@ -358,15 +359,13 @@ class ArtifactVerifier:
         head: str | None,
         engine_sig: str,
     ) -> bool:
-        if prev is None:
-            return True
-        if prev.include_diagrams != include_diagrams:
-            return True
-        if prev.git_head != head:
-            return True
-        if prev.engine_signature != engine_sig:
-            return True
-        return prev.include_registry != (self.registry is not None)
+        return (
+            prev is None
+            or prev.include_diagrams != include_diagrams
+            or prev.git_head != head
+            or prev.engine_signature != engine_sig
+            or prev.include_registry != (self.registry is not None)
+        )
 
     def _verify_from_incremental_state(
         self,

@@ -1,7 +1,8 @@
 import re
+from collections.abc import Mapping
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Final, Literal, TypeAlias
+from typing import Any, Final, Literal, TypeAlias
 
 
 class Severity:
@@ -19,6 +20,8 @@ class Issue:
     code: str
     message: str
     location: str
+    details: Mapping[str, Any] | None = None
+    actions: tuple[Mapping[str, Any], ...] | None = None
 
 
 @dataclass

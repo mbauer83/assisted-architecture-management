@@ -114,6 +114,11 @@ def _parse_connection_types(raw: dict[str, Any]) -> dict[ConnectionTypeName, Con
             embedding=embedding,  # type: ignore[arg-type]
             embed_key=str(cfg["embed_key"]) if cfg.get("embed_key") else None,
             cascade_delete_source=bool(cfg.get("cascade_delete_source", False)),
+            classes=tuple(str(c) for c in cfg.get("classes", ())),
+            symmetric=bool(cfg.get("symmetric", False)),
+            puml_arrow=str(cfg["puml_arrow"]) if cfg.get("puml_arrow") else "-->",
+            show_stereotype=bool(cfg.get("show_stereotype", True)),
+            relationship_kind=str(cfg["relationship_kind"]) if cfg.get("relationship_kind") else None,
         )
     return out
 

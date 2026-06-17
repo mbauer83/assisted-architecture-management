@@ -431,3 +431,45 @@ def test_model_create_diagram_entity_ids_uses_renderer_and_connection_labels(rep
     assert " --> " in content  # serving arrow style from ontology puml_arrow
     assert "HTTPS 443 | TLS" in content
     assert f"{e1_id}---{e2_id}@@archimate-serving" in content
+
+
+def test_model_create_diagram_short_form_entity_ids_produce_non_empty_body(repo_root: Path) -> None:
+    """Short-form IDs (PREFIX@epoch.random, no slug) must expand before lookup.
+
+    Regression: passing short-form IDs caused get_entity() misses, producing an
+    empty render body and an E303 ArchiMate stereotypes error.
+    """
+    e1 = _write_entity(repo_root, "application-component", "Alpha")
+    e2 = _write_entity(repo_root, "application-component", "Beta")
+    e1_full = str(e1["artifact_id"])
+    e2_full = str(e2["artifact_id"])
+    # Build short-form IDs: strip the slug suffix (everything from the second dot onward)
+    parts1 = e1_full.split(".")
+    parts2 = e2_full.split(".")
+    e1_short = f"{parts1[0]}.{parts1[1]}"
+    e2_short = f"{parts2[0]}.{parts2[1]}"
+    assert e1_short != e1_full, "test requires the full ID to include a slug"
+
+    tools.artifact_add_connection(
+        connection_type="archimate-serving",
+        source_entity=e1_full,
+        target_entity=e2_full,
+        dry_run=False,
+        repo_root=str(repo_root),
+    )
+
+    result = tools.artifact_create_diagram(
+        diagram_type="archimate-application",
+        name="Short ID Diagram",
+        entity_ids=[e1_short, e2_short],
+        dry_run=True,
+        repo_root=str(repo_root),
+    )
+
+    verification = result.get("verification")
+    assert isinstance(verification, dict)
+    assert verification.get("valid") is True, verification
+    content = str(result.get("content", ""))
+    # Both entities must appear in the rendered body
+    assert "Alpha" in content
+    assert "Beta" in content

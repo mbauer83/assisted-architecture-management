@@ -1,0 +1,135 @@
+entity_types:
+  classifier:
+    classes: []
+    create_when: >-
+      Use for each UML classifier in the data structure: set classifier_kind to class
+      (identity-bearing entity), datatype (value object / structured DataType),
+      enumeration (DataType with named literals), variant (abstract sum type, cases
+      linked by dt-generalization), or primitive (leaf PrimitiveType). Optionally bind
+      to a Data Object entity for architectural traceability.
+    never_create_when: >-
+      Do not create a classifier for an operation, method, behaviour, service, or
+      process. This diagram type is restricted to data structure (attributes and
+      structural relations) only.
+    permitted_mappings:
+      entity_types: [data-object]
+      entity_classes: []
+      sources:
+        - ontology: archimate_next
+          entity_type: data-object
+    mapping_required: false
+    properties:
+      classifier_kind:
+        type: string
+        enum: [class, datatype, enumeration, variant, primitive]
+        required: true
+        description: >-
+          UML classifier kind. class = identity-bearing entity (instances distinct
+          by identity). datatype = value object (instances equal by value). enumeration
+          = DataType with ordered EnumerationLiterals. variant = abstract Classifier
+          representing a sum type; cases are classifiers linked by dt-generalization
+          in a {complete, disjoint} GeneralizationSet. primitive = leaf PrimitiveType
+          with no internal structure (Integer, String, …).
+      attributes:
+        type: array
+        required: false
+        description: >-
+          Typed attribute compartment (class, datatype, variant, primitive kinds).
+          Each entry: {name: str, type: str,
+          multiplicity: str (UML notation: 1 / 0..1 / 1..* / *),
+          is_id: bool (marks a primary key / identity field),
+          is_unique: bool (unique constraint),
+          default: str (optional default value expression)}.
+      literals:
+        type: array
+        required: false
+        description: >-
+          EnumerationLiteral names (enumeration kind only). String list in
+          declaration order. Ignored for other classifier kinds.
+      is_abstract:
+        type: boolean
+        required: false
+        description: >-
+          Render as abstract classifier. Automatically true for variant kind;
+          set explicitly for other abstract classifiers.
+      generalization_set:
+        type: object
+        required: false
+        description: >-
+          GeneralizationSet metadata (variant kind). Fields: is_covering (bool,
+          true = the cases exhaust all instances of the variant) and is_disjoint
+          (bool, true = cases are mutually exclusive). Both true for a proper
+          sum type / tagged union.
+
+connection_types:
+  dt-association:
+    embedding: none
+    cascade_delete_source: false
+    symmetric: true
+    relationship_kind: association
+    puml_arrow: "--"
+
+  dt-aggregation:
+    embedding: none
+    cascade_delete_source: false
+    symmetric: false
+    relationship_kind: containment
+    puml_arrow: "o--"
+
+  dt-composition:
+    embedding: none
+    cascade_delete_source: false
+    symmetric: false
+    relationship_kind: containment
+    puml_arrow: "*--"
+
+  dt-generalization:
+    embedding: none
+    cascade_delete_source: false
+    symmetric: false
+    relationship_kind: generalization
+    puml_arrow: "--|>"
+
+  dt-dependency:
+    embedding: none
+    cascade_delete_source: false
+    symmetric: false
+    relationship_kind: dependency
+    puml_arrow: "..>"
+
+permitted_relationships:
+  - [classifier, classifier, [dt-association, dt-aggregation, dt-composition,
+                               dt-generalization, dt-dependency]]
+
+allowed_bindings:
+  entity:
+    classifier:
+      correspondence_kinds: [represents, traces-to]
+      default_correspondence_kind: represents
+      target_forms: [entity-id, diagram-local]
+  connection:
+    dt-association:
+      target_connection_classes: [association]
+      correspondence_kinds: [represents, refines]
+      default_correspondence_kind: represents
+      target_forms: [connection-id]
+    dt-aggregation:
+      target_connection_classes: [containment]
+      correspondence_kinds: [represents, refines]
+      default_correspondence_kind: represents
+      target_forms: [connection-id]
+    dt-composition:
+      target_connection_classes: [containment]
+      correspondence_kinds: [represents, refines]
+      default_correspondence_kind: represents
+      target_forms: [connection-id]
+    dt-generalization:
+      target_connection_classes: [generalization]
+      correspondence_kinds: [represents, refines]
+      default_correspondence_kind: represents
+      target_forms: [connection-id]
+    dt-dependency:
+      target_connection_classes: [dependency]
+      correspondence_kinds: [represents, refines]
+      default_correspondence_kind: represents
+      target_forms: [connection-id]

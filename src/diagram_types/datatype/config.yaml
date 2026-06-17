@@ -1,0 +1,26 @@
+name: datatype
+
+guidance:
+  when_to_use: >-
+    Use to document data structures as a restricted UML class diagram. Model classifiers
+    (Class, DataType, Enumeration, Variant) with typed attributes and UML structural
+    relations (association, aggregation, composition, generalization). Optionally bind
+    classifiers to Data Object entities to trace fine-grained schema to architectural
+    data elements. Suitable for domain models, API payloads, persisted record schemas,
+    and value-type hierarchies.
+  when_not_to_use: >-
+    Do not use for process or interaction flows (use Sequence or Activity diagrams), for
+    component or deployment views (use ArchiMate or C4), or for documenting operations
+    and methods (this diagram is structure-only). Do not model infrastructure entities
+    or services here.
+
+ui:
+  label: Datatype Diagram
+  description: A UML class diagram restricted to data structure (no operations)
+  entity_search_filter: false
+  type_ui_slots:
+    datatype-editor: datatype-editor
+  diagram_only_types:
+    - entity_type: classifier
+      label: Classifier
+      plural: Classifiers

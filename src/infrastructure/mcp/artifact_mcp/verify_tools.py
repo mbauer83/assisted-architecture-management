@@ -4,7 +4,7 @@ from mcp.server.fastmcp import FastMCP  # type: ignore[import-not-found]
 
 from src.config.repo_paths import DIAGRAM_CATALOG, DIAGRAMS, DOCS
 from src.infrastructure.mcp.artifact_mcp.context import RepoScope, resolve_repo_roots, roots_key, verifier_for
-from src.infrastructure.mcp.artifact_mcp.formatting import as_verification_result_dict
+from src.infrastructure.mcp.artifact_mcp.formatting import as_issue_dict, as_verification_result_dict
 from src.infrastructure.mcp.artifact_mcp.tool_annotations import READ_ONLY
 
 
@@ -71,15 +71,7 @@ def artifact_verify(
                 "path": str(r.path),
                 "file_type": r.file_type,
                 "valid": r.valid,
-                "issues": [
-                    {
-                        "severity": i.severity,
-                        "code": i.code,
-                        "message": i.message,
-                        "location": i.location,
-                    }
-                    for i in r.issues
-                ],
+                "issues": [as_issue_dict(i) for i in r.issues],
             }
             for r in results
             if r.issues

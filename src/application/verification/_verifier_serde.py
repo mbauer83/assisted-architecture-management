@@ -64,5 +64,20 @@ def deserialize_result(path: Path, data: dict) -> VerificationResult | None:
         location = item.get("location")
         if not all(isinstance(v, str) for v in [code, message, location]):
             return None
-        issues.append(Issue(severity=severity, code=str(code), message=str(message), location=str(location)))
+        raw_details = item.get("details")
+        details = raw_details if isinstance(raw_details, dict) else None
+        raw_actions = item.get("actions")
+        actions: tuple | None = (
+            tuple(a for a in raw_actions if isinstance(a, dict)) if isinstance(raw_actions, list) else None
+        )
+        issues.append(
+            Issue(
+                severity=severity,
+                code=str(code),
+                message=str(message),
+                location=str(location),
+                details=details,
+                actions=actions,
+            )
+        )
     return VerificationResult(path=path, file_type=file_type, issues=issues)
