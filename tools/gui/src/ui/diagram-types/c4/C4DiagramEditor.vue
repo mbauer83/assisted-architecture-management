@@ -13,6 +13,7 @@ import type { DiagramTypeUiConfig, EntityDisplayInfo, DiagramConnection } from '
 import EntityPickerInput from '../../components/EntityPickerInput.vue'
 import DiagramOwnEntityTypeSection from '../../components/DiagramOwnEntityTypeSection.vue'
 import C4ConnectionSection from './C4ConnectionSection.vue'
+import C4ModelBackedPanel from './C4ModelBackedPanel.vue'
 
 const SCOPE_ITEM_ID = '_scope'
 
@@ -133,6 +134,10 @@ const c4UsesConnections = computed(() =>
   props.diagramConnections.filter((c) => c.conn_type === 'c4-uses'),
 )
 
+const handleExcludedChange = (ids: string[]) => {
+  emit('diagramEntitiesChange', { _excluded_entity_ids: ids, _included_entity_ids: [] })
+}
+
 const handleConnectionsChange = (updated: DiagramConnection[]) => {
   emit('diagramConnectionsChange', updated)
   const simplified = updated.map((c) => ({ source: c.source, target: c.target, label: c.content_text }))
@@ -167,6 +172,7 @@ const handleConnectionsChange = (updated: DiagramConnection[]) => {
         <EntityPickerInput
           class="scope-picker"
           :fixed-entity-types="scopePermittedTypes.length ? [...scopePermittedTypes] : undefined"
+          widenable-to="none"
           placeholder="Search model entities…"
           @select="selectScope"
         />
@@ -199,14 +205,16 @@ const handleConnectionsChange = (updated: DiagramConnection[]) => {
     </template>
   </section>
 
-  <!-- Model-backed: no manual entity/connection editing needed -->
-  <div
+  <!-- Model-backed: entity curation panel (exclude/restore per entity) -->
+  <C4ModelBackedPanel
     v-if="isModelBacked"
-    class="model-backed-hint"
-  >
-    Entities and connections are auto-derived from the ArchiMate model.
-    Use <code>_excluded_entity_ids</code> to filter neighbours if needed.
-  </div>
+    :entities="entities"
+    :diagram-connections="diagramConnections"
+    :scope-entity-id="scopeEntityId"
+    :diagram-only-types="uiConfig.diagram_only_types"
+    :diagram-entities="diagramEntities"
+    @excluded-ids-change="handleExcludedChange"
+  />
 
   <!-- Standalone: entity sections + connections -->
   <template v-else>
@@ -261,9 +269,4 @@ const handleConnectionsChange = (updated: DiagramConnection[]) => {
 .scope-type-badge { font-size: 11px; padding: 2px 7px; border-radius: 4px; background: #dbeafe; color: #1d4ed8; font-weight: 500; }
 .scope-change-btn { padding: 4px 10px; font-size: 12px; border: 1px solid #d1d5db; border-radius: 6px; background: white; cursor: pointer; color: #374151; }
 .scope-change-btn:hover { background: #f9fafb; }
-.model-backed-hint {
-  padding: 10px 12px; background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 8px;
-  font-size: 12px; color: #166534;
-}
-.model-backed-hint code { font-family: monospace; background: #dcfce7; padding: 1px 4px; border-radius: 3px; }
 </style>

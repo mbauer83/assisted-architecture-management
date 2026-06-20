@@ -12,7 +12,6 @@ from src.diagram_types.c4._navigation import (
     scope_entity_id,
 )
 
-
 # ── helpers ───────────────────────────────────────────────────────────────────
 
 

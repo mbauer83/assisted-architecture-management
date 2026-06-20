@@ -114,9 +114,13 @@ def test_system_context_renders_scope_and_model_relationship(monkeypatch) -> Non
         diagram_entities={"_scope_entity_id": "APP@1.system"},
     )
 
-    assert 'actor "Customer" as P_Cust01' in puml
-    assert 'rectangle "Ordering System" <<C4System>> as SS_Order1' in puml
+    # Person uses Person_Ext macro (C4-PlantUML stdlib) — person glyph + coloured box.
+    # Customer is a business-actor OUTSIDE the system scope → Person_Ext.
+    assert 'Person_Ext(P_Cust01, "Customer")' in puml
+    assert "actor" not in puml
+    assert 'System(SS_Order1, "Ordering System")' in puml
     assert "[[" not in puml
+    assert "!include <C4/C4_Component>" in puml
     # Model-backed C4 edges use short, direction-consistent type-default verbs; the
     # connection's prose description stays on the model connection, not the diagram.
     assert "P_Cust01 --> SS_Order1 : accesses" in puml
@@ -151,9 +155,10 @@ def test_container_view_renders_scope_as_boundary_and_collects_references() -> N
         diagram_connections=diagram_connections,
     )
 
-    assert 'rectangle "Ordering System" <<C4System>> as SS_ordering_0 {' in puml
-    assert 'rectangle "API\\n[FastAPI]" <<C4Container>> as C_api_0' in puml
-    assert 'rectangle "Database\\n[PostgreSQL]" <<C4Container>> as C_db_1' in puml
+    assert 'System_Boundary(SS_ordering_0, "Ordering System") {' in puml
+    # FastAPI has no db/queue keyword → generic Container; PostgreSQL → ContainerDb
+    assert 'Container(C_api_0, "API", "FastAPI")' in puml
+    assert 'ContainerDb(C_db_1, "Database", "PostgreSQL")' in puml
     assert "Reads and writes orders" in puml
     assert refs.entity_ids == ()  # standalone mode: no model entity tracking
     assert refs.connection_ids == ()
