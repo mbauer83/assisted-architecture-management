@@ -104,7 +104,8 @@ def admin_edit_entity(
 
     merged = merge_fields(
         parsed, name=name, version=version, status=status,
-        keywords=keywords, summary=summary, properties=properties, notes=notes,
+        keywords=keywords, summary=summary, properties=properties,
+        attribute_types=_UNSET, notes=notes,
     )
     display_content = parsed.display_content
     if name is not None and display_content:
@@ -113,8 +114,8 @@ def admin_edit_entity(
     content = format_entity_markdown(
         artifact_id=artifact_id, artifact_type=artifact_type, name=merged.name, version=merged.version,
         status=merged.status, last_updated=today_iso(), keywords=merged.keywords, summary=merged.summary,
-        properties=merged.properties, notes=merged.notes, display_section_id=parsed.display_section_id,
-        display_content=display_content, repo_root=repo_root,
+        properties=merged.properties, attribute_types=merged.attribute_types, notes=merged.notes,
+        display_section_id=parsed.display_section_id, display_content=display_content, repo_root=repo_root,
     )
 
     if dry_run:

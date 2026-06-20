@@ -17,7 +17,6 @@ from src.infrastructure.app_bootstrap import build_runtime_catalogs, get_module_
 from src.infrastructure.artifact_index import shared_artifact_index
 from src.infrastructure.write.artifact_write.entity import create_entity
 
-
 # ── helpers ───────────────────────────────────────────────────────────────────
 
 

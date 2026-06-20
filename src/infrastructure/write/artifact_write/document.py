@@ -56,10 +56,42 @@ def _format_document_markdown(
     return f"---\n{frontmatter}\n---\n\n{body.strip()}\n"
 
 
-def _build_placeholder_body(required_sections: list[str]) -> str:
+def _validate_section_templates(
+    section_templates: object,
+    required_sections: list[str],
+    doc_type: str,
+) -> None:
+    if not isinstance(section_templates, dict):
+        raise ValueError(
+            f"Doc-type {doc_type!r}: section_templates must be an object, "
+            f"got {type(section_templates).__name__}"
+        )
+    valid_sections = set(required_sections)
+    for key, value in section_templates.items():
+        if key not in valid_sections:
+            raise ValueError(
+                f"Doc-type {doc_type!r}: section_templates key {key!r} is not in "
+                f"required_sections {required_sections}"
+            )
+        if not isinstance(value, str):
+            raise ValueError(
+                f"Doc-type {doc_type!r}: section_templates[{key!r}] must be a string, "
+                f"got {type(value).__name__}"
+            )
+
+
+def _build_placeholder_body(
+    required_sections: list[str],
+    section_templates: dict[str, str] | None = None,
+) -> str:
     parts = []
+    templates = section_templates or {}
     for section in required_sections:
-        parts.append(f"## {section}\n\n<!-- Add content here -->\n")
+        template_body = templates.get(section)
+        if template_body is not None:
+            parts.append(f"## {section}\n\n{template_body.rstrip()}\n")
+        else:
+            parts.append(f"## {section}\n\n<!-- Add content here -->\n")
     return "\n".join(parts)
 
 
@@ -114,6 +146,12 @@ def create_document(
     doc_subdirectory = get_document_subdirectory(schema, doc_type)
     required_sections: list[str] = schema.get("required_sections") or []
 
+    section_templates_raw = schema.get("section_templates")
+    section_templates: dict[str, str] | None = None
+    if section_templates_raw is not None:
+        _validate_section_templates(section_templates_raw, required_sections, doc_type)
+        section_templates = section_templates_raw  # type: ignore[assignment]
+
     last = last_updated or today_iso()
     doc_id = artifact_id or _generate_document_id(abbreviation, title)
     doc_dir = _doc_dir(repo_root, doc_subdirectory, group)
@@ -145,7 +183,7 @@ def create_document(
             },
         )
 
-    actual_body = body or _build_placeholder_body(required_sections)
+    actual_body = body or _build_placeholder_body(required_sections, section_templates)
     content = _format_document_markdown(
         artifact_id=doc_id,
         doc_type=doc_type,

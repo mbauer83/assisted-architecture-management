@@ -16,7 +16,6 @@ from src.infrastructure.write.artifact_write._promote_planning import (
     _partition_selected,
 )
 
-
 # ---------------------------------------------------------------------------
 # _parse_conn_full
 # ---------------------------------------------------------------------------
@@ -73,7 +72,10 @@ class TestEntityFrontmatter:
 
     def test_returns_frontmatter_for_valid_file(self, tmp_path: Path) -> None:
         good_file = tmp_path / "entity.md"
-        good_file.write_text("---\nartifact-id: REQ@1.A.a\nname: Test\nartifact-type: requirement\nversion: 0.1.0\nstatus: draft\nlast-updated: '2026-01-01'\n---\nbody\n")
+        good_file.write_text(
+            "---\nartifact-id: REQ@1.A.a\nname: Test\nartifact-type: requirement\n"
+            "version: 0.1.0\nstatus: draft\nlast-updated: '2026-01-01'\n---\nbody\n"
+        )
         registry = MagicMock()
         registry.find_file_by_id = lambda eid: good_file
         result = _entity_frontmatter(registry, "REQ@1.A.a")

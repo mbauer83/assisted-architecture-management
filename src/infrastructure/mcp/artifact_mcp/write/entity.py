@@ -30,7 +30,8 @@ def artifact_create_entity(
     artifact_type: str,
     name: str,
     summary: str | None = None,
-    properties: dict[str, str] | None = None,
+    properties: dict[str, object] | None = None,
+    attribute_types: dict[str, str] | None = None,
     notes: str | None = None,
     keywords: list[str] | None = None,
     artifact_id: str | None = None,
@@ -66,7 +67,7 @@ def artifact_create_entity(
             verifier=verifier_for(roots_key(roots), include_registry=False),
             clear_repo_caches=clear_repo_caches,
             ref=ref, artifact_type=artifact_type, name=name,
-            summary=summary, properties=properties, notes=notes, keywords=keywords,
+            summary=summary, properties=properties, attribute_types=attribute_types, notes=notes, keywords=keywords,
             version=version, status=status, dry_run=dry_run,
         )
         if mat.wrote and not dry_run:
@@ -95,6 +96,7 @@ def artifact_create_entity(
         name=name,
         summary=summary,
         properties=properties,
+        attribute_types=attribute_types,
         notes=notes,
         keywords=keywords,
         artifact_id=artifact_id,

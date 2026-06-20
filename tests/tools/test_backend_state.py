@@ -12,8 +12,6 @@ import os
 from pathlib import Path
 from unittest.mock import patch
 
-import pytest
-
 from src.infrastructure.backend.backend_state import (
     _process_exists,
     _state_dir,
@@ -23,7 +21,6 @@ from src.infrastructure.backend.backend_state import (
     remove_backend_state,
     write_backend_state,
 )
-
 
 # ── _state_dir ────────────────────────────────────────────────────────────────
 

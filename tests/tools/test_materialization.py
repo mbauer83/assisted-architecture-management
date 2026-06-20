@@ -8,21 +8,14 @@ from __future__ import annotations
 
 from pathlib import Path
 
-import pytest
 import yaml
 
-from src.domain.bindings import Binding, BindingSubject, Target
 from src.infrastructure.write.artifact_write.materialization import (
     DiagramElementRef,
-    MaterializationResult,
-    diagram_connection_endpoints,
     diagram_entity_exists,
-    filter_bindings,
-    find_represents_entity,
     materialize_connection,
     materialize_entity,
 )
-
 
 # ── helpers ───────────────────────────────────────────────────────────────────
 
@@ -32,7 +25,13 @@ def _write(path: Path, text: str) -> None:
     path.write_text(text, encoding="utf-8")
 
 
-def _diagram_puml(artifact_id: str, *, entities: list[dict] | None = None, connections: list[dict] | None = None, bindings: list[dict] | None = None) -> str:
+def _diagram_puml(
+    artifact_id: str,
+    *,
+    entities: list[dict] | None = None,
+    connections: list[dict] | None = None,
+    bindings: list[dict] | None = None,
+) -> str:
     fm: dict = {
         "artifact-id": artifact_id,
         "artifact-type": "diagram",
@@ -55,15 +54,6 @@ def _diagram_puml(artifact_id: str, *, entities: list[dict] | None = None, conne
 DIAG_ID = "DIAG@1000000080.MatTest.mat-test"
 DIAG_CONN_ID = "DIAG@1000000081.MatConn.mat-conn"
 
-
-def _build_verifier(repo_root: Path):
-    from src.application.verification.artifact_verifier import ArtifactVerifier
-    from src.application.verification.artifact_verifier_registry import ArtifactRegistry
-    from src.infrastructure.app_bootstrap import build_runtime_catalogs, get_module_registry
-    from src.infrastructure.artifact_index import shared_artifact_index
-
-    registry = ArtifactRegistry(shared_artifact_index([repo_root]))
-    return verifier, registry
 
 
 def _verifier(repo_root: Path):

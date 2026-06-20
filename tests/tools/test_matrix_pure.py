@@ -17,8 +17,8 @@ from src.infrastructure.write.artifact_write.matrix import (
     _build_diagram_id_to_relpath,
     _display_name_from_entity_file,
     _infer_entity_ids_from_matrix,
-    _linkify_matrix_ids,
     _linkify_known_tokens_in_matrix_rows,
+    _linkify_matrix_ids,
     _read_frontmatter,
     create_matrix,
 )
@@ -226,7 +226,6 @@ class TestLinkifyMatrixIds:
         return tmp_path / "engagements" / "ENG-MAT" / "architecture-repository"
 
     def _write_entity(self, root: Path, artifact_id: str, name: str) -> None:
-        parts = artifact_id.split("@")[0].lower()
         entity_dir = root / "model" / "motivation" / "requirement"
         entity_dir.mkdir(parents=True, exist_ok=True)
         path = entity_dir / f"{artifact_id}.md"
@@ -244,7 +243,7 @@ class TestLinkifyMatrixIds:
             matrix_markdown=md,
             candidate_entity_ids=[eid],
         )
-        assert f"[Mat Link]" in result or eid in result
+        assert "[Mat Link]" in result or eid in result
         assert count >= 1
 
     def test_no_match_returns_unchanged(self, tmp_path: Path) -> None:

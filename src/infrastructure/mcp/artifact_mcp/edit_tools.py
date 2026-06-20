@@ -61,7 +61,8 @@ def artifact_edit_entity(
     artifact_id: str,
     name: str | None = None,
     summary: str | None = None,
-    properties: dict[str, str] | None = None,
+    properties: dict[str, object] | None = None,
+    attribute_types: dict[str, str] | None = None,
     notes: str | None = None,
     keywords: list[str] | None = None,
     version: str | None = None,
@@ -78,6 +79,7 @@ def artifact_edit_entity(
     kwargs: dict[str, Any] = {
         k: v for k, v in (
             ("name", name), ("summary", summary), ("properties", properties),
+            ("attribute_types", attribute_types),
             ("notes", notes), ("keywords", keywords), ("version", version),
             ("status", status), ("group", group),
         ) if v is not None

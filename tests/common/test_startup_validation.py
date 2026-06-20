@@ -411,3 +411,55 @@ class TestDisabledModuleTolerance:
 
         with pytest.raises(RepoCompatibilityError):
             validate_repo_compatibility(repo, active)  # no tolerance without a complete registry
+
+
+class TestDiagramDerivedProjectionsExempt:
+    """Diagram-only projections (node_id-format GSN/bowtie/control-structure) must not abort startup.
+
+    Regression for WU-E5: indexing diagram-only entities/connections by ``node_id`` made their
+    free-ontology group-key ``artifact_type`` (``nodes``) and edge ``conn_type``
+    (``supported-by``/``in-context-of``) appear in the index. These are diagram-internal
+    projections owned by the registered diagram type, not authored model artifacts, so the
+    registry-compatibility check must skip them rather than treating the group-keys as unknown types.
+    """
+
+    @staticmethod
+    def _diagram_entity(artifact_id: str, artifact_type: str, host_diagram_id: str) -> EntityRecord:
+        return EntityRecord(
+            artifact_id=artifact_id,
+            artifact_type=artifact_type,
+            name=artifact_id,
+            version="0.1.0",
+            status="draft",
+            domain="gsn",
+            subdomain=artifact_type,
+            path=Path("/tmp/host.puml"),
+            keywords=(),
+            extra={},
+            content_text="",
+            display_blocks={},
+            display_label=artifact_id,
+            display_alias="g1",
+            host_diagram_id=host_diagram_id,
+        )
+
+    def test_gsn_diagram_only_projections_do_not_abort(self) -> None:
+        reg = _make_registry(["driver"], ["uses"], ["gsn"])
+        host = "GSN@1.aB.case"
+        repo = _FakeRepo(
+            entities=[self._diagram_entity(f"{host}#nodes/g1", "nodes", host)],
+            connections=[
+                _conn(f"{host}#conn/g1:supported-by:s1", "supported-by"),
+                _conn(f"{host}#conn/g1:in-context-of:cx1", "in-context-of"),
+            ],
+            diagrams=[_diagram(host, "gsn")],
+        )
+        validate_repo_compatibility(repo, reg)  # must not raise
+
+    def test_authored_entity_unknown_type_still_aborts(self) -> None:
+        """The exemption is scoped to diagram-derived projections — file-backed artifacts still checked."""
+        reg = _make_registry(["driver"], ["uses"], ["gsn"])
+        repo = _FakeRepo(entities=[_entity("e1", "unknown-entity")])  # host_diagram_id is None
+        with pytest.raises(RepoCompatibilityError) as exc_info:
+            validate_repo_compatibility(repo, reg)
+        assert "unknown-entity" in exc_info.value.errors[0]

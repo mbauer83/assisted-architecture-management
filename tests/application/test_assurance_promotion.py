@@ -49,7 +49,10 @@ class TestPromotionPreflightSafe:
 class TestPromotionPreflightBlocking:
     def test_missing_owner_blocks(self) -> None:
         store = _make_store(
-            nodes=[{"node_id": "C1", "node_type": "assurance-constraint", "concern_class": "safety", "name": "No Owner"}],
+            nodes=[{
+                "node_id": "C1", "node_type": "assurance-constraint",
+                "concern_class": "safety", "name": "No Owner",
+            }],
             edges=[{"source_id": "C1", "conn_type": "evidenced-by"}],
         )
         result = promotion_preflight(store)
@@ -59,7 +62,10 @@ class TestPromotionPreflightBlocking:
 
     def test_missing_evidence_blocks(self) -> None:
         store = _make_store(
-            nodes=[{"node_id": "C2", "node_type": "assurance-constraint", "concern_class": "security", "name": "No Evidence"}],
+            nodes=[{
+                "node_id": "C2", "node_type": "assurance-constraint",
+                "concern_class": "security", "name": "No Evidence",
+            }],
             edges=[{"source_id": "C2", "conn_type": "accountable-to"}],
         )
         result = promotion_preflight(store)
@@ -68,7 +74,10 @@ class TestPromotionPreflightBlocking:
 
     def test_both_missing_produces_two_blocks(self) -> None:
         store = _make_store(
-            nodes=[{"node_id": "C3", "node_type": "assurance-constraint", "concern_class": "safety", "name": "Both Missing"}],
+            nodes=[{
+                "node_id": "C3", "node_type": "assurance-constraint",
+                "concern_class": "safety", "name": "Both Missing",
+            }],
             edges=[],
         )
         result = promotion_preflight(store)
@@ -78,7 +87,10 @@ class TestPromotionPreflightBlocking:
 class TestPromotionPreflightTLP:
     def test_tlp_amber_produces_warning(self) -> None:
         store = _make_store(
-            nodes=[{"node_id": "C4", "node_type": "assurance-constraint", "concern_class": "other", "tlp": "TLP:AMBER", "name": "Amber"}],
+            nodes=[{
+                "node_id": "C4", "node_type": "assurance-constraint",
+                "concern_class": "other", "tlp": "TLP:AMBER", "name": "Amber",
+            }],
             edges=[],
         )
         result = promotion_preflight(store)
@@ -96,7 +108,10 @@ class TestPromotionPreflightTLP:
 
     def test_tlp_white_no_warning(self) -> None:
         store = _make_store(
-            nodes=[{"node_id": "C6", "node_type": "assurance-constraint", "concern_class": "other", "tlp": "TLP:WHITE"}],
+            nodes=[{
+                "node_id": "C6", "node_type": "assurance-constraint",
+                "concern_class": "other", "tlp": "TLP:WHITE",
+            }],
             edges=[],
         )
         result = promotion_preflight(store)

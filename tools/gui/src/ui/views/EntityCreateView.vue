@@ -1,9 +1,10 @@
 <script setup lang="ts">
-import { inject, onMounted, ref, watch } from 'vue'
+import { inject, onMounted, ref, watch, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { Effect } from 'effect'
 import { modelServiceKey } from '../keys'
-import type { WriteHelp, WriteResult } from '../../domain'
+import TypedPropertyInput from '../components/TypedPropertyInput.vue'
+import type { WriteHelp, WriteResult, EntityAttributeDescriptor } from '../../domain'
 import { hasVerificationErrors, readErrorMessage, collectVerificationIssues } from '../lib/errors'
 
 const svc = inject(modelServiceKey)!
@@ -23,13 +24,15 @@ onMounted(() => {
 
 // ── Form state ────────────────────────────────────────────────────────────────
 
+type AdHocType = 'string' | 'integer' | 'number' | 'boolean' | 'array'
+
 const artifactType = ref('')
 const name = ref('')
 const summary = ref('')
 const keywords = ref('')
 const status = ref('draft')
 const version = ref('0.1.0')
-const properties = ref<{ key: string; value: string }[]>([])
+const properties = ref<{ key: string; value: string; adHocType: AdHocType }[]>([])
 const notes = ref('')
 
 const busy = ref(false)
@@ -42,20 +45,39 @@ const previewIssues = ref<string[]>([])
 
 const schemaProps = ref<string[]>([])
 const schemaRequired = ref<Set<string>>(new Set())
+const schemaDescriptors = ref<Record<string, EntityAttributeDescriptor>>({})
+
+const createRequiredMissing = computed(() =>
+  [...schemaRequired.value].some((key) => {
+    const row = properties.value.find((r) => r.key === key)
+    return !row || !row.value.trim()
+  }),
+)
 
 watch(artifactType, (newType) => {
-  if (!newType) { schemaProps.value = []; schemaRequired.value = new Set(); return }
+  if (!newType) {
+    schemaProps.value = []
+    schemaRequired.value = new Set()
+    schemaDescriptors.value = {}
+    return
+  }
   void Effect.runPromise(svc.getEntitySchemata(newType))
     .then((info) => {
       schemaProps.value = [...info.properties]
       schemaRequired.value = new Set(info.required)
+      schemaDescriptors.value = info.descriptors
       properties.value = info.properties.length > 0
-        ? [...info.properties].map((key) => ({ key, value: '' }))
+        ? [...info.properties].map((key) => ({
+            key,
+            value: info.descriptors[key]?.default ?? '',
+            adHocType: 'string',
+          }))
         : []
     })
     .catch((error: unknown) => {
       schemaProps.value = []
       schemaRequired.value = new Set()
+      schemaDescriptors.value = {}
       formError.value = readErrorMessage(error)
     })
 })
@@ -68,15 +90,21 @@ watch(name, () => {
 
 // ── Property rows ─────────────────────────────────────────────────────────────
 
-const addPropRow = () => properties.value.push({ key: '', value: '' })
+const addPropRow = () => properties.value.push({ key: '', value: '', adHocType: 'string' })
 const removePropRow = (i: number) => properties.value.splice(i, 1)
 
 // ── Build body ────────────────────────────────────────────────────────────────
 
 const buildBody = (dryRun: boolean) => {
   const props: Record<string, string> = {}
+  const adhocTypes: Record<string, string> = {}
   for (const row of properties.value) {
-    if (row.key.trim()) props[row.key.trim()] = row.value
+    const k = row.key.trim()
+    if (!k) continue
+    props[k] = row.value
+    if (!schemaDescriptors.value[k] && row.adHocType !== 'string') {
+      adhocTypes[k] = row.adHocType
+    }
   }
   const kws = keywords.value.split(',').map(k => k.trim()).filter(Boolean)
   return {
@@ -87,6 +115,7 @@ const buildBody = (dryRun: boolean) => {
     status: status.value,
     version: version.value,
     properties: Object.keys(props).length ? props : undefined,
+    attribute_types: Object.keys(adhocTypes).length ? adhocTypes : undefined,
     notes: notes.value || undefined,
     dry_run: dryRun,
   }
@@ -251,16 +280,46 @@ const doCreate = () => {
             class="prop-row"
           >
             <input
-              v-model="row.key"
+              :value="row.key"
               class="prop-key"
               :placeholder="schemaRequired.has(row.key) ? row.key + ' *' : 'key'"
               :readonly="schemaProps.includes(row.key)"
+              @input="row.key = ($event.target as HTMLInputElement).value"
             >
-            <input
+            <TypedPropertyInput
+              v-if="schemaDescriptors[row.key]"
               v-model="row.value"
-              class="prop-value"
-              placeholder="value"
-            >
+              :descriptor="schemaDescriptors[row.key]"
+              :required="schemaRequired.has(row.key)"
+            />
+            <template v-else>
+              <select
+                v-model="row.adHocType"
+                class="prop-type-select"
+                title="Value type"
+                @change="row.value = row.adHocType === 'boolean' ? 'false' : ''"
+              >
+                <option value="string">
+                  text
+                </option>
+                <option value="integer">
+                  integer
+                </option>
+                <option value="number">
+                  number
+                </option>
+                <option value="boolean">
+                  boolean
+                </option>
+                <option value="array">
+                  array
+                </option>
+              </select>
+              <TypedPropertyInput
+                v-model="row.value"
+                :descriptor="{ type: row.adHocType }"
+              />
+            </template>
             <button
               class="remove-prop-btn icon-btn"
               :disabled="schemaRequired.has(row.key)"
@@ -297,15 +356,16 @@ const doCreate = () => {
         <div class="form-actions">
           <button
             class="preview-btn"
-            :disabled="busy"
+            :disabled="busy || createRequiredMissing"
+            :title="createRequiredMissing ? 'Fill in all required properties first' : undefined"
             @click="doPreview"
           >
             Preview
           </button>
           <button
             class="create-btn"
-            :disabled="busy || !previewClean"
-            :title="!previewClean ? 'Run preview first to enable create' : ''"
+            :disabled="busy || !previewClean || createRequiredMissing"
+            :title="!previewClean ? 'Run preview first to enable create' : createRequiredMissing ? 'Fill in all required properties first' : ''"
             @click="doCreate"
           >
             Create

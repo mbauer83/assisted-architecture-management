@@ -89,6 +89,7 @@ def _render_entity(
         keywords=merged.keywords,
         summary=merged.summary,
         properties=merged.properties,
+        attribute_types=merged.attribute_types,
         notes=merged.notes,
         display_section_id=parsed.display_section_id,
         display_content=display_content,
@@ -119,6 +120,7 @@ def edit_entity(
     name: str | None = None,
     summary: object = _UNSET,
     properties: object = _UNSET,
+    attribute_types: object = _UNSET,
     notes: object = _UNSET,
     keywords: object = _UNSET,
     version: str | None = None,
@@ -151,6 +153,7 @@ def edit_entity(
         keywords=keywords,
         summary=summary,
         properties=properties,
+        attribute_types=attribute_types,
         notes=notes,
     )
     effective_artifact_id, target_entity_file = _resolve_target_identity(

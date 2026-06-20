@@ -19,7 +19,6 @@ from src.infrastructure.cli.artifact_query_cli import (
     repo_from_args,
 )
 
-
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
 def _make_entity(

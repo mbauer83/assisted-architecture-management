@@ -28,6 +28,11 @@ DEFAULT_DOCUMENT_SCHEMAS: dict[str, dict] = {
             },
         },
         "required_sections": ["Context", "Decision", "Consequences"],
+        "section_templates": {
+            "Context": "Describe the problem or situation requiring a decision.\n",
+            "Decision": "Describe the decision that was made and why.\n",
+            "Consequences": "Describe the resulting context, trade-offs, and any follow-up actions.\n",
+        },
         "suggested_entity_type_connections": ["@all"],
     },
     "spec": {
@@ -43,6 +48,11 @@ DEFAULT_DOCUMENT_SCHEMAS: dict[str, dict] = {
             },
         },
         "required_sections": ["Scope", "Summary", "Specification"],
+        "section_templates": {
+            "Scope": "State what this specification covers and any explicit exclusions.\n",
+            "Summary": "Summarise the intent in 2-3 sentences.\n",
+            "Specification": "Provide the detailed specification.\n",
+        },
     },
     "standard": {
         "abbreviation": "STD",
@@ -57,6 +67,12 @@ DEFAULT_DOCUMENT_SCHEMAS: dict[str, dict] = {
             },
         },
         "required_sections": ["Scope", "Motivation", "Summary", "Specification"],
+        "section_templates": {
+            "Scope": "State what this standard applies to and any explicit exclusions.\n",
+            "Motivation": "Explain why this standard is needed.\n",
+            "Summary": "Summarise the standard in 2-3 sentences.\n",
+            "Specification": "Provide the normative specification with SHALL/SHOULD/MAY guidance.\n",
+        },
         "required_entity_type_connections": ["requirement"],
         "suggested_entity_type_connections": ["principle", "goal"],
     },
@@ -74,7 +90,8 @@ DEFAULT_SCHEMATA: dict[str, dict] = {
         "properties": {
             "Maturity": {
                 "type": "string",
-                "enum": ["Initial", "Developing", "Defined", "Managed", "Optimising"],
+                "enum": ["Not Assessed", "Initial", "Developing", "Defined", "Managed", "Optimising"],
+                "default": "Not Assessed",
             },
             "Realizes": {"type": "string"},
         },
@@ -86,20 +103,24 @@ DEFAULT_SCHEMATA: dict[str, dict] = {
         "title": "Driver Attribute Schema",
         "description": "Attribute schema for Properties table in Driver entities.",
         "type": "object",
-        "required": ["Category", "Source"],
+        "required": ["Category"],
         "properties": {
             "Category": {
                 "type": "string",
                 "enum": [
+                    "Unspecified",
                     "External Trend",
                     "Internal Challenge",
+                    "Market Gap",
                     "Organizational",
                     "Organizational Constraint",
                     "Organizational Trend",
+                    "Regulatory & Standards Trend",
                     "Technical Trend",
                     "Technological",
                     "Technology Trend",
                 ],
+                "default": "Unspecified",
             },
             "Source": {"type": "string"},
         },
@@ -111,7 +132,7 @@ DEFAULT_SCHEMATA: dict[str, dict] = {
         "title": "Goal Attribute Schema",
         "description": "Attribute schema for Properties table in Goal entities.",
         "type": "object",
-        "required": ["Priority", "Measurability"],
+        "required": [],
         "properties": {
             "Priority": {"type": "string", "enum": ["Must", "Should", "Could", "Won't"]},
             "Measurability": {"type": "string"},
@@ -124,7 +145,7 @@ DEFAULT_SCHEMATA: dict[str, dict] = {
         "title": "Principle Attribute Schema",
         "description": "Attribute schema for Properties table in Principle entities.",
         "type": "object",
-        "required": ["Priority", "Rationale"],
+        "required": [],
         "properties": {
             "Priority": {"type": "string", "enum": ["Must", "Should", "Could", "Won't"]},
             "Rationale": {"type": "string"},
@@ -137,7 +158,7 @@ DEFAULT_SCHEMATA: dict[str, dict] = {
         "title": "Requirement Attribute Schema",
         "description": "Attribute schema for Properties table in Requirement entities.",
         "type": "object",
-        "required": ["Priority", "Category"],
+        "required": [],
         "properties": {
             "Priority": {"type": "string", "enum": ["Must", "Should", "Could", "Won't", "Never"]},
             "Category": {"type": "string"},
@@ -151,7 +172,7 @@ DEFAULT_SCHEMATA: dict[str, dict] = {
         "title": "Stakeholder Attribute Schema",
         "description": "Attribute schema for Properties table in Stakeholder entities.",
         "type": "object",
-        "required": ["Category", "Concerns"],
+        "required": [],
         "properties": {
             "Category": {"type": "string"},
             "Concerns": {"type": "string"},
@@ -220,6 +241,21 @@ def _write_json_if_missing(path: Path, payload: dict) -> None:
     if path.exists():
         return
     path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
+
+
+_ARCH_REPO_CONFIG_TEMPLATE = """\
+# Repository authoring policy.
+# required_defaults_policy: strict  — every required attribute must declare a valid default
+# required_defaults_policy: non-strict  — recommended but not enforced at startup
+required_defaults_policy: non-strict
+"""
+
+
+def _write_arch_repo_config_if_missing(arch_repo_dir: Path) -> None:
+    config_path = arch_repo_dir / "config.yaml"
+    if config_path.exists():
+        return
+    config_path.write_text(_ARCH_REPO_CONFIG_TEMPLATE, encoding="utf-8")
 
 
 def _run_git(args: list[str], cwd: Path) -> None:
@@ -311,6 +347,7 @@ def create_engagement_repo(
     for filename, schema in DEFAULT_SCHEMATA.items():
         _write_json_if_missing(schemata_dir / filename, schema)
 
+    _write_arch_repo_config_if_missing(path / ARCH_REPO)
     _ensure_git_repo(path, git_url=git_url, branch=branch)
     _commit_initial_scaffold(
         path,

@@ -10,7 +10,6 @@ import asyncio
 
 from src.infrastructure.gui.routers.events import EventBus
 
-
 # ── subscribe / unsubscribe ───────────────────────────────────────────────────
 
 

@@ -124,7 +124,8 @@ def materialize_entity(
     artifact_type: str,
     name: str,
     summary: str | None = None,
-    properties: dict[str, str] | None = None,
+    properties: dict[str, object] | None = None,
+    attribute_types: dict[str, str] | None = None,
     notes: str | None = None,
     keywords: list[str] | None = None,
     version: str = "0.1.0",
@@ -158,7 +159,7 @@ def materialize_entity(
     dr = create_entity(
         repo_root=repo_root, verifier=verifier, clear_repo_caches=clear_repo_caches,  # type: ignore[arg-type]
         artifact_type=artifact_type, name=name, summary=summary, properties=properties,
-        notes=notes, keywords=keywords, artifact_id=None,
+        attribute_types=attribute_types, notes=notes, keywords=keywords, artifact_id=None,
         version=version, status=status, last_updated=None, dry_run=True,
     )
     proposed_binding: dict[str, object] = {
@@ -180,7 +181,7 @@ def materialize_entity(
     entity_result = create_entity(
         repo_root=repo_root, verifier=verifier, clear_repo_caches=clear_repo_caches,  # type: ignore[arg-type]
         artifact_type=artifact_type, name=name, summary=summary, properties=properties,
-        notes=notes, keywords=keywords, artifact_id=None,
+        attribute_types=attribute_types, notes=notes, keywords=keywords, artifact_id=None,
         version=version, status=status, last_updated=None, dry_run=False,
     )
     if not entity_result.wrote:

@@ -15,7 +15,8 @@ from fastapi import FastAPI
 from src.application.artifact_query import ArtifactRepository
 from src.infrastructure.artifact_index import shared_artifact_index
 from src.infrastructure.gui.routers import state as gui_state
-from src.infrastructure.gui.routers.connections import _check_cardinality, router as connections_router
+from src.infrastructure.gui.routers.connections import _check_cardinality
+from src.infrastructure.gui.routers.connections import router as connections_router
 
 httpx = pytest.importorskip("httpx")
 

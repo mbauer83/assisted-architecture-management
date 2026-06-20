@@ -1,5 +1,6 @@
 from collections.abc import Callable
 from pathlib import Path
+from typing import Any
 
 from src.application.entity_type_predicates import is_internal_entity_type
 from src.application.modeling.artifact_write import format_entity_markdown, generate_entity_id
@@ -64,7 +65,8 @@ def create_entity(
     artifact_type: str,
     name: str,
     summary: str | None,
-    properties: dict[str, str] | None,
+    properties: dict[str, Any] | None,
+    attribute_types: dict[str, str] | None = None,
     notes: str | None,
     keywords: list[str] | None = None,
     artifact_id: str | None,
@@ -156,6 +158,7 @@ def create_entity(
         keywords=keywords,
         summary=summary,
         properties=properties,
+        attribute_types=attribute_types,
         notes=notes,
         display_section_id=display_section_id,
         display_content=display_content,

@@ -1,5 +1,6 @@
 import re
 from pathlib import Path
+from typing import Any
 
 import yaml  # type: ignore[import-untyped]
 
@@ -8,6 +9,7 @@ from src.application.artifact_schema import (
     schema_all_properties,
     schema_required_properties,
 )
+from src.domain.property_value import encode as _encode_cell
 
 
 def _dump_yaml_text(data: object) -> str:
@@ -27,7 +29,8 @@ def format_entity_markdown(
     last_updated: str,
     keywords: list[str] | None = None,
     summary: str | None,
-    properties: dict[str, str] | None,
+    properties: dict[str, Any] | None,
+    attribute_types: dict[str, str] | None = None,
     notes: str | None,
     display_section_id: str,
     display_content: str,
@@ -49,6 +52,8 @@ def format_entity_markdown(
     }
     if keywords:
         frontmatter["keywords"] = keywords
+    if attribute_types:
+        frontmatter["attribute-types"] = attribute_types
     frontmatter["last-updated"] = last_updated
 
     ordered_keys = [
@@ -58,6 +63,7 @@ def format_entity_markdown(
         "version",
         "status",
         "keywords",
+        "attribute-types",
         "last-updated",
     ]
     fm_out = {key: frontmatter[key] for key in ordered_keys if key in frontmatter}
@@ -74,7 +80,7 @@ def format_entity_markdown(
     scaffold_keys = _scaffold_keys_from_schema(repo_root, artifact_type)
     if props:
         for key in sorted(props.keys()):
-            content_lines.append(f"| {key} | {props[key]} |")
+            content_lines.append(f"| {key} | {_encode_cell(props[key])} |")
         for key in scaffold_keys:
             if key not in props:
                 content_lines.append(f"| {key} | |")

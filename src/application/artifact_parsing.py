@@ -17,6 +17,7 @@ from src.domain.artifact_types import (
     Domain,
     EntityRecord,
 )
+from src.domain.property_value import decode_lenient, get_adhoc_type
 
 
 def extract_yaml_block(content: str) -> dict | None:
@@ -54,6 +55,32 @@ def extract_display_blocks(content: str) -> dict[str, str]:
     for lang, body in zip(iterator, iterator):
         blocks[lang.strip()] = body.strip()
     return blocks
+
+
+def decode_entity_properties(
+    raw_props: dict[str, str],
+    prop_schemata: dict[str, dict],
+    attribute_types: dict[str, str],
+) -> dict[str, Any]:
+    """Decode raw Markdown-cell property strings to typed Python values.
+
+    *raw_props* is a ``{attr_name: cell_string}`` dict (from
+    ``_extract_properties_map``).  *prop_schemata* is the ``properties`` dict
+    from the entity's JSON-Schema attribute schema.  *attribute_types* is the
+    ``attribute-types`` frontmatter map used for ad-hoc (non-schema) attributes.
+
+    Decode failures produce a ``str`` fallback (raw cell) — never raises.
+    """
+    decoded: dict[str, Any] = {}
+    for key, cell in raw_props.items():
+        prop_schema = prop_schemata.get(key)
+        if prop_schema:
+            value, _ = decode_lenient(cell, prop_schema)
+        else:
+            adhoc_type = get_adhoc_type(key, attribute_types)
+            value, _ = decode_lenient(cell, {"type": adhoc_type})
+        decoded[key] = value
+    return decoded
 
 
 def parse_entity_content_sections(content_section: str) -> dict[str, Any]:
@@ -149,6 +176,9 @@ def normalize_puml_alias(alias: str) -> str:
     return alias.strip().replace("-", "_")
 
 
+_PUML_MACRO_ALIAS_RE = re.compile(r"^[A-Z][A-Za-z_]*\(\s*([A-Za-z0-9_]+)\s*,")
+
+
 def extract_declared_puml_aliases(content: str) -> set[str]:
     aliases: set[str] = set()
     for line in content.splitlines():
@@ -158,6 +188,12 @@ def extract_declared_puml_aliases(content: str) -> set[str]:
         m = re.search(r"\bas\s+([A-Za-z0-9_-]+)\s*\{?\s*$", stripped)
         if m:
             aliases.add(normalize_puml_alias(m.group(1)))
+            continue
+        # Some PUML renderers emit macro calls where the alias is the first argument:
+        # MacroName(ALIAS, "label", ...) rather than `element ... as ALIAS`.
+        m2 = _PUML_MACRO_ALIAS_RE.match(stripped)
+        if m2:
+            aliases.add(normalize_puml_alias(m2.group(1)))
     return aliases
 
 

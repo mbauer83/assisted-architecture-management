@@ -9,10 +9,11 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Any
 
 from src.application.repo_path_helpers import all_model_roots
 
-from .coerce import as_optional_str, as_optional_str_dict, as_optional_str_list
+from .coerce import as_optional_str, as_optional_str_dict, as_optional_str_list, as_optional_typed_dict
 from .parse_existing import ParsedEntity
 
 # Sentinel to distinguish "not provided" from explicit None. Re-exported by
@@ -29,7 +30,8 @@ class MergedFields:
     status: str
     keywords: list[str] | None
     summary: str | None
-    properties: dict[str, str] | None
+    properties: dict[str, Any] | None
+    attribute_types: dict[str, str] | None
     notes: str | None
 
 
@@ -42,6 +44,7 @@ def merge_fields(
     keywords: object,
     summary: object,
     properties: object,
+    attribute_types: object,
     notes: object,
 ) -> MergedFields:
     """Merge provided fields over the parsed entity; ``_UNSET``/``None`` keep current values."""
@@ -52,7 +55,14 @@ def merge_fields(
         status=status if status is not None else str(fm.get("status", "draft")),
         keywords=as_optional_str_list(keywords if keywords is not _UNSET else fm.get("keywords")),
         summary=as_optional_str(summary) if summary is not _UNSET else parsed.summary,
-        properties=as_optional_str_dict(properties) if properties is not _UNSET else (parsed.properties or None),
+        properties=(
+            as_optional_typed_dict(properties) if properties is not _UNSET else (parsed.properties or None)
+        ),
+        attribute_types=(
+            as_optional_str_dict(attribute_types)
+            if attribute_types is not _UNSET
+            else as_optional_str_dict(fm.get("attribute-types"))
+        ),
         notes=as_optional_str(notes) if notes is not _UNSET else parsed.notes,
     )
 

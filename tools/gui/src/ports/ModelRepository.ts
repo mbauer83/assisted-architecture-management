@@ -113,14 +113,14 @@ export interface ModelRepository {
   readonly getOntologyPair: (sourceType: string, targetType: string) => Effect.Effect<OntologyPair, RepoError>
   readonly createEntity: (body: {
     artifact_type: string; name: string; summary?: string;
-    properties?: Record<string, string>; notes?: string;
-    keywords?: string[]; version?: string; status?: string;
+    properties?: Record<string, string>; attribute_types?: Record<string, string>;
+    notes?: string; keywords?: string[]; version?: string; status?: string;
     dry_run?: boolean;
   }) => Effect.Effect<WriteResult, RepoError>
   readonly editEntity: (body: {
     artifact_id: string; name?: string; summary?: string;
-    properties?: Record<string, string>; notes?: string;
-    keywords?: string[]; version?: string; status?: string;
+    properties?: Record<string, string>; attribute_types?: Record<string, string>;
+    notes?: string; keywords?: string[]; version?: string; status?: string;
     dry_run?: boolean;
   }) => Effect.Effect<WriteResult, RepoError>
   readonly deleteEntity: (body: {
@@ -175,8 +175,8 @@ export interface ModelRepository {
   }) => Effect.Effect<WriteResult, RepoError>
   readonly adminEditEntity: (body: {
     artifact_id: string; name?: string; summary?: string;
-    properties?: Record<string, string>; notes?: string;
-    keywords?: string[]; version?: string; status?: string; dry_run?: boolean;
+    properties?: Record<string, string>; attribute_types?: Record<string, string>;
+    notes?: string; keywords?: string[]; version?: string; status?: string; dry_run?: boolean;
   }) => Effect.Effect<WriteResult, RepoError>
   readonly adminDeleteEntity: (body: {
     artifact_id: string; dry_run?: boolean;

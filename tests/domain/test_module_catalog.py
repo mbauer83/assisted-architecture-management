@@ -481,7 +481,6 @@ class TestCatalogMultiOntologyLookups:
 
 class TestCatalogDiagramOnlyEntityTypes:
     def test_all_diagram_entity_types_includes_diagram_only(self) -> None:
-        from dataclasses import dataclass, field as dc_field
 
         own_type = DiagramOwnEntityTypeUiConfig(entity_type="my-special-type", label="Special", plural="Specials")
         ui = DiagramTypeUiConfig(label="dt-x", diagram_only_types=(own_type,))

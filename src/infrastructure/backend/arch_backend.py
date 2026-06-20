@@ -327,7 +327,12 @@ def _run_startup_validations(
     repo: "ArtifactRepository", repo_root_path: Path, enterprise_root_path: Path | None
 ) -> None:
     from src.application.group_registry_validation import GroupRegistryError, validate_and_repair_group_registry
-    from src.application.startup_validation import RepoCompatibilityError, validate_repo_compatibility
+    from src.application.startup_validation import (
+        RepoCompatibilityError,
+        SchemaPolicyError,
+        validate_repo_compatibility,
+        validate_schema_policy,
+    )
     from src.infrastructure.app_bootstrap import build_module_registry, get_module_registry
 
     try:
@@ -343,6 +348,13 @@ def _run_startup_validations(
             logger.warning("Repository compatibility: %s", warning)
     except RepoCompatibilityError as exc:
         logger.error("Startup aborted — repository uses types not in the module registry:\n%s", exc)
+        sys.exit(1)
+
+    try:
+        for warning in validate_schema_policy(repo):
+            logger.warning("Schema policy: %s", warning)
+    except SchemaPolicyError as exc:
+        logger.error("Startup aborted — attribute-schema policy violations:\n%s", exc)
         sys.exit(1)
 
     try:

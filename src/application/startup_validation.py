@@ -1,4 +1,4 @@
-"""Startup validation: registry internal consistency and repo/registry compatibility.
+"""Startup validation: registry internal consistency, repo/registry compatibility, and schema policy.
 
 Two independent checks:
 
@@ -315,9 +315,22 @@ def _collect_errors(
 
     errors: list[str] = []
     warnings: list[str] = []
+    # Diagram-derived projections (diagram-only entities with a host diagram, and the
+    # synthetic ``…#conn/…`` connections extracted from a diagram's diagram-entities) are not
+    # authored model artifacts: their ``artifact_type``/``conn_type`` is the host diagram type's
+    # internal group-key / edge-kind (e.g. a free-ontology GSN diagram's ``nodes`` /
+    # ``supported-by``). They are governed by their registered diagram type's renderer, not the
+    # model ontology vocabulary, so they are out of scope for this compatibility check. The host
+    # ``diagram_type`` itself is still validated below.
     for typed_ids, active, complete, label in (
-        (((e.artifact_type, e.artifact_id) for e in repo.list_entities()), active_e, complete_e, "entity"),
-        (((c.conn_type, c.artifact_id) for c in repo.list_connections()), active_c, complete_c, "connection"),
+        (
+            ((e.artifact_type, e.artifact_id) for e in repo.list_entities() if e.host_diagram_id is None),
+            active_e, complete_e, "entity",
+        ),
+        (
+            ((c.conn_type, c.artifact_id) for c in repo.list_connections() if "#conn/" not in c.artifact_id),
+            active_c, complete_c, "connection",
+        ),
         (((d.diagram_type, d.artifact_id) for d in repo.list_diagrams()), active_d, complete_d, "diagram"),
     ):
         type_errors, type_warnings = _split_unknown_types(typed_ids, active, complete, label)
@@ -343,3 +356,8 @@ def _collect_errors(
 
     errors.extend(_element_class_errors(registry, known_element_classes))
     return errors, warnings
+
+
+# ── Schema-policy check (re-exported; implementation in _startup_schema_policy) ─
+from src.application._startup_schema_policy import SchemaPolicyError as SchemaPolicyError  # noqa: E402,F401
+from src.application._startup_schema_policy import validate_schema_policy as validate_schema_policy  # noqa: E402,F401

@@ -129,7 +129,8 @@ def register(mcp: FastMCP) -> None:
             "Create a new architecture document (e.g. ADR, RFC). "
             "doc_type must match a schema in .arch-repo/documents/. "
             "body is the full markdown body after the frontmatter; if omitted, "
-            "placeholder sections are generated from the schema's required_sections. "
+            "placeholder sections are generated from the schema's required_sections "
+            "using section_templates from the spec when defined, otherwise a comment placeholder. "
             "Set dry_run=false to write the file."
         ),
         annotations=LOCAL_WRITE,

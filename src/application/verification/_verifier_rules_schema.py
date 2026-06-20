@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+from typing import Any
 
 from src.application.artifact_schema import (
     load_attribute_schema,
@@ -10,6 +11,7 @@ from src.application.artifact_schema import (
     validate_against_schema,
 )
 from src.application.verification.artifact_verifier_types import Issue, Severity, VerificationResult
+from src.domain.property_value import decode_lenient, get_adhoc_type
 
 # ---------------------------------------------------------------------------
 # Configurable JSON Schema checks (WS-C)
@@ -56,8 +58,9 @@ def check_attribute_schema(
     Extracts key-value pairs from the ``## Properties`` markdown table and
     validates them against ``attributes.{artifact-type}.schema.json``.
 
-    If no schema file exists for the entity's artifact-type, validation is
-    silently skipped (free schema).
+    Cells are decoded using the schema's declared type (schema-driven decode).
+    Decode failures produce a blocking E042 error; other constraint violations
+    remain W042 warnings until schemas are fully remediated (see WU-B2).
     """
     artifact_type = fm.get("artifact-type", "")
     if not artifact_type:
@@ -67,7 +70,6 @@ def check_attribute_schema(
         return
     props = parse_properties_table(content)
     if props is None:
-        # No Properties table found — if schema has required fields, report
         required = schema.get("required", [])
         if required:
             result.issues.append(
@@ -79,8 +81,32 @@ def check_attribute_schema(
                 )
             )
         return
-    errors = validate_against_schema(props, schema)
-    for msg in errors:
+
+    # Schema-driven decode: convert raw cell strings to typed values before
+    # running jsonschema.  This makes type: integer / boolean / number work
+    # correctly and detects genuinely wrong values (E042 = blocking).
+    prop_schemata: dict[str, Any] = schema.get("properties", {}) or {}
+    attribute_types: dict[str, str] = fm.get("attribute-types", {}) or {}
+    decoded: dict[str, Any] = {}
+    for key, cell in props.items():
+        prop_schema = prop_schemata.get(key)
+        if prop_schema:
+            value, err = decode_lenient(cell, prop_schema)
+        else:
+            adhoc_type = get_adhoc_type(key, attribute_types)
+            value, err = decode_lenient(cell, {"type": adhoc_type})
+        if err:
+            result.issues.append(
+                Issue(
+                    Severity.ERROR,
+                    "E042",
+                    f"Attribute schema ({artifact_type}): type error on '{key}': {err}",
+                    loc,
+                )
+            )
+        decoded[key] = value
+
+    for msg in validate_against_schema(decoded, schema):
         result.issues.append(
             Issue(
                 Severity.WARNING,

@@ -64,49 +64,51 @@ def _parsed(*, name="Orig", version="0.1.0", status="draft", keywords=None) -> P
 class TestMergeFields:
     def test_uses_new_name_when_provided(self) -> None:
         merged = merge_fields(_parsed(), name="New Name", version=None, status=None,
-                              keywords=_UNSET, summary=_UNSET, properties=_UNSET, notes=_UNSET)
+                              keywords=_UNSET, summary=_UNSET, properties=_UNSET, attribute_types=_UNSET, notes=_UNSET)
         assert merged.name == "New Name"
 
     def test_keeps_current_name_when_none(self) -> None:
         merged = merge_fields(_parsed(name="Keep"), name=None, version=None, status=None,
-                              keywords=_UNSET, summary=_UNSET, properties=_UNSET, notes=_UNSET)
+                              keywords=_UNSET, summary=_UNSET, properties=_UNSET, attribute_types=_UNSET, notes=_UNSET)
         assert merged.name == "Keep"
 
     def test_uses_new_version_when_provided(self) -> None:
         merged = merge_fields(_parsed(), name=None, version="1.0.0", status=None,
-                              keywords=_UNSET, summary=_UNSET, properties=_UNSET, notes=_UNSET)
+                              keywords=_UNSET, summary=_UNSET, properties=_UNSET, attribute_types=_UNSET, notes=_UNSET)
         assert merged.version == "1.0.0"
 
     def test_uses_new_status_when_provided(self) -> None:
         merged = merge_fields(_parsed(), name=None, version=None, status="active",
-                              keywords=_UNSET, summary=_UNSET, properties=_UNSET, notes=_UNSET)
+                              keywords=_UNSET, summary=_UNSET, properties=_UNSET, attribute_types=_UNSET, notes=_UNSET)
         assert merged.status == "active"
 
     def test_keeps_parsed_summary_when_unset(self) -> None:
         parsed = _parsed()
         merged = merge_fields(parsed, name=None, version=None, status=None,
-                              keywords=_UNSET, summary=_UNSET, properties=_UNSET, notes=_UNSET)
+                              keywords=_UNSET, summary=_UNSET, properties=_UNSET, attribute_types=_UNSET, notes=_UNSET)
         assert merged.summary == parsed.summary
 
     def test_uses_new_summary_when_provided(self) -> None:
         merged = merge_fields(_parsed(), name=None, version=None, status=None,
-                              keywords=_UNSET, summary="New summary", properties=_UNSET, notes=_UNSET)
+                              keywords=_UNSET, summary="New summary",
+                              properties=_UNSET, attribute_types=_UNSET, notes=_UNSET)
         assert merged.summary == "New summary"
 
     def test_none_summary_sets_to_none(self) -> None:
         merged = merge_fields(_parsed(), name=None, version=None, status=None,
-                              keywords=_UNSET, summary=None, properties=_UNSET, notes=_UNSET)
+                              keywords=_UNSET, summary=None, properties=_UNSET, attribute_types=_UNSET, notes=_UNSET)
         assert merged.summary is None
 
     def test_keeps_parsed_properties_when_unset(self) -> None:
         parsed = _parsed()
         merged = merge_fields(parsed, name=None, version=None, status=None,
-                              keywords=_UNSET, summary=_UNSET, properties=_UNSET, notes=_UNSET)
+                              keywords=_UNSET, summary=_UNSET, properties=_UNSET, attribute_types=_UNSET, notes=_UNSET)
         assert merged.properties == {"key": "val"}
 
     def test_uses_new_keywords_when_provided(self) -> None:
         merged = merge_fields(_parsed(), name=None, version=None, status=None,
-                              keywords=["a", "b"], summary=_UNSET, properties=_UNSET, notes=_UNSET)
+                              keywords=["a", "b"], summary=_UNSET,
+                              properties=_UNSET, attribute_types=_UNSET, notes=_UNSET)
         assert merged.keywords == ["a", "b"]
 
 

@@ -8,7 +8,8 @@ from typing import Any
 from fastapi import APIRouter, HTTPException, Query, Request
 from pydantic import BaseModel
 
-from src.application.artifact_parsing import parse_entity_content_sections
+from src.application.artifact_parsing import decode_entity_properties, parse_entity_content_sections
+from src.application.artifact_schema import load_attribute_schema
 from src.application.entity_type_predicates import is_assurance_entity_type, is_internal_entity_type
 from src.application.read_models import EntityContextReadModel
 from src.infrastructure.gui.routers import state as s
@@ -107,11 +108,49 @@ def read_entity_context(id: str) -> EntityContextReadModel:
     entity_rec = repo.get_entity(id)
     if entity_rec is not None:
         parsed = parse_entity_content_sections(entity_rec.content_text)
+        # Decode raw cell strings to typed Python values using the attribute schema.
+        repo_root = s.maybe_engagement_root()
+        raw_props: dict[str, str] = parsed["properties"]
+        artifact_type = entity_rec.artifact_type
+        attr_schema = load_attribute_schema(repo_root, artifact_type) if repo_root else None
+        prop_schemata: dict[str, dict] = (attr_schema or {}).get("properties", {}) or {}
+        _raw_attr_types = entity_rec.extra.get("attribute-types")
+        attr_types: dict[str, str] = (
+            {k: str(v) for k, v in _raw_attr_types.items()} if isinstance(_raw_attr_types, dict) else {}
+        )
         context["entity"]["summary"] = parsed["summary"]
-        context["entity"]["properties"] = parsed["properties"]
+        context["entity"]["properties"] = decode_entity_properties(raw_props, prop_schemata, attr_types)
         context["entity"]["notes"] = parsed["notes"]
         context["entity"]["is_global"] = s.is_global(entity_rec.path)
     return context
+
+
+def _attribute_descriptors(schema: dict[str, Any]) -> dict[str, dict[str, Any]]:
+    """Extract per-attribute UI descriptors (type, enum, default, constraints) from a JSON Schema."""
+    props: dict[str, Any] = schema.get("properties", {}) or {}
+    out: dict[str, dict[str, Any]] = {}
+    for name, prop_schema in props.items():
+        if not isinstance(prop_schema, dict):
+            continue
+        schema_type = prop_schema.get("type", "string")
+        descriptor: dict[str, Any] = {"type": schema_type}
+        if "enum" in prop_schema:
+            descriptor["enum"] = [str(v) for v in prop_schema["enum"]]
+        if "default" in prop_schema:
+            raw = prop_schema["default"]
+            if isinstance(raw, bool):
+                descriptor["default"] = "true" if raw else "false"
+            elif raw is not None:
+                descriptor["default"] = str(raw)
+        constraints: dict[str, Any] = {}
+        for key in ("minimum", "maximum", "exclusiveMinimum", "exclusiveMaximum",
+                    "minLength", "maxLength", "pattern"):
+            if key in prop_schema:
+                constraints[key] = prop_schema[key]
+        if constraints:
+            descriptor["constraints"] = constraints
+        out[name] = descriptor
+    return out
 
 
 @router.get("/api/entity-schemata")
@@ -127,12 +166,19 @@ def get_entity_schemata(artifact_type: str) -> dict[str, Any]:
 
     schema = load_attribute_schema(repo_root, artifact_type)
     if schema is None:
-        return {"artifact_type": artifact_type, "schema": None, "properties": [], "required": []}
+        return {
+            "artifact_type": artifact_type,
+            "schema": None,
+            "properties": [],
+            "required": [],
+            "descriptors": {},
+        }
     return {
         "artifact_type": artifact_type,
         "schema": schema,
         "properties": schema_all_properties(schema),
         "required": schema_required_properties(schema),
+        "descriptors": _attribute_descriptors(schema),
     }
 
 
@@ -140,7 +186,8 @@ class CreateEntityBody(BaseModel):
     artifact_type: str
     name: str
     summary: str | None = None
-    properties: dict[str, str] | None = None
+    properties: dict[str, Any] | None = None
+    attribute_types: dict[str, str] | None = None
     notes: str | None = None
     keywords: list[str] | None = None
     version: str = "0.1.0"
@@ -152,7 +199,8 @@ class EditEntityBody(BaseModel):
     artifact_id: str
     name: str | None = None
     summary: str | None = None
-    properties: dict[str, str] | None = None
+    properties: dict[str, Any] | None = None
+    attribute_types: dict[str, str] | None = None
     notes: str | None = None
     keywords: list[str] | None = None
     version: str | None = None
@@ -182,6 +230,7 @@ def create_entity(body: CreateEntityBody) -> dict[str, Any]:
             name=body.name,
             summary=body.summary,
             properties=body.properties,
+            attribute_types=body.attribute_types,
             notes=body.notes,
             keywords=body.keywords,
             artifact_id=None,
@@ -213,6 +262,7 @@ def edit_entity(body: EditEntityBody) -> dict[str, Any]:
             name=body.name,
             summary=body.summary if "summary" in provided else _UNSET,
             properties=body.properties if "properties" in provided else _UNSET,
+            attribute_types=body.attribute_types if "attribute_types" in provided else _UNSET,
             notes=body.notes if "notes" in provided else _UNSET,
             keywords=body.keywords if "keywords" in provided else _UNSET,
             version=body.version,

@@ -7,7 +7,8 @@ import { useQuery } from '../composables/useQuery'
 import ConnectionsPanel from '../components/ConnectionsPanel.vue'
 import ArchimateTypeGlyph from '../components/ArchimateTypeGlyph.vue'
 import ArtifactReferenceInput from '../components/ArtifactReferenceInput.vue'
-import type { EntityContext, WriteResult } from '../../domain'
+import TypedPropertyInput from '../components/TypedPropertyInput.vue'
+import type { EntityContext, WriteResult, EntityAttributeDescriptor } from '../../domain'
 import type { NotFoundError } from '../../domain'
 import type { MarkdownError } from '../../application/MarkdownService'
 import type { RepoError } from '../../ports/ModelRepository'
@@ -57,12 +58,15 @@ watch(entityId, load)
 
 // ── Edit mode ─────────────────────────────────────────────────────────────────
 
+type AdHocType = 'string' | 'integer' | 'number' | 'boolean' | 'array'
+const _ADHOC_VALID = new Set<string>(['string', 'integer', 'number', 'boolean', 'array'])
+
 const editing = ref(false)
 const editName = ref('')
 const editSummary = ref('')
 const editKeywords = ref('')
 const editStatus = ref('')
-const editProperties = ref<{ key: string; value: string }[]>([])
+const editProperties = ref<{ key: string; value: string; adHocType: AdHocType }[]>([])
 const editNotes = ref('')
 const editBusy = ref(false)
 const editError = ref<string | null>(null)
@@ -76,6 +80,25 @@ const activeReferenceField = ref<'summary' | 'notes'>('summary')
 const summaryTextareaRef = ref<HTMLTextAreaElement | null>(null)
 const notesTextareaRef = ref<HTMLTextAreaElement | null>(null)
 
+const editSchemaDescriptors = ref<Record<string, EntityAttributeDescriptor>>({})
+const editSchemaRequired = ref<Set<string>>(new Set())
+
+const toLexical = (v: unknown): string => {
+  if (v === null || v === undefined) return ''
+  if (typeof v === 'boolean') return v ? 'true' : 'false'
+  if (typeof v === 'number') return String(v)
+  if (typeof v === 'string') return v
+  // Arrays and other objects arrive as JSON from the backend
+  return JSON.stringify(v)
+}
+
+const editRequiredMissing = computed(() =>
+  [...editSchemaRequired.value].some((key) => {
+    const row = editProperties.value.find((r) => r.key === key)
+    return !row || !row.value.trim()
+  }),
+)
+
 const startEdit = () => {
   if (!detail.value) return
   const d = detail.value
@@ -85,10 +108,33 @@ const startEdit = () => {
   editKeywords.value = (d.keywords ?? []).join(', ')
   editStatus.value = d.status
   editNotes.value = d.notes ?? ''
-  editProperties.value = Object.entries(d.properties ?? {}).map(([key, value]) => ({ key, value }))
+  const rawAttrTypes = d.extra?.['attribute-types']
+  const savedAttrTypes: Record<string, AdHocType> =
+    rawAttrTypes && typeof rawAttrTypes === 'object' && !Array.isArray(rawAttrTypes)
+      ? Object.fromEntries(
+          Object.entries(rawAttrTypes as Record<string, unknown>)
+            .filter(([, v]) => _ADHOC_VALID.has(String(v)))
+            .map(([k, v]) => [k, String(v) as AdHocType]),
+        )
+      : {}
+  editProperties.value = Object.entries(d.properties ?? {}).map(([key, value]) => ({
+    key,
+    value: toLexical(value),
+    adHocType: savedAttrTypes[key] ?? 'string',
+  }))
   editPreview.value = null
   editError.value = null
   editing.value = true
+  // Load schema descriptors for typed inputs
+  void Effect.runPromise(svc.getEntitySchemata(d.artifact_type))
+    .then((info) => {
+      editSchemaDescriptors.value = info.descriptors
+      editSchemaRequired.value = new Set(info.required)
+    })
+    .catch(() => {
+      editSchemaDescriptors.value = {}
+      editSchemaRequired.value = new Set()
+    })
 }
 
 const cancelEdit = () => {
@@ -98,7 +144,7 @@ const cancelEdit = () => {
 }
 
 const addPropertyRow = () => {
-  editProperties.value.push({ key: '', value: '' })
+  editProperties.value.push({ key: '', value: '', adHocType: 'string' })
 }
 
 const removePropertyRow = (i: number) => {
@@ -107,8 +153,14 @@ const removePropertyRow = (i: number) => {
 
 const buildEditBody = (dryRun: boolean) => {
   const props: Record<string, string> = {}
+  const adhocTypes: Record<string, string> = {}
   for (const row of editProperties.value) {
-    if (row.key.trim()) props[row.key.trim()] = row.value
+    const k = row.key.trim()
+    if (!k) continue
+    props[k] = row.value
+    if (!editSchemaDescriptors.value[k] && row.adHocType !== 'string') {
+      adhocTypes[k] = row.adHocType
+    }
   }
   const kws = editKeywords.value.split(',').map(k => k.trim()).filter(Boolean)
   return {
@@ -118,6 +170,7 @@ const buildEditBody = (dryRun: boolean) => {
     keywords: kws.length ? kws : undefined,
     status: editStatus.value || undefined,
     properties: props,
+    attribute_types: Object.keys(adhocTypes).length ? adhocTypes : undefined,
     notes: editNotes.value || undefined,
     dry_run: dryRun,
   }
@@ -296,7 +349,8 @@ const insertReference = (markdownLink: string) => {
         <button
           v-if="editing"
           class="save-btn"
-          :disabled="editBusy"
+          :disabled="editBusy || editRequiredMissing"
+          :title="editRequiredMissing ? 'Fill in all required properties first' : undefined"
           @click="saveEdit"
         >
           Save
@@ -435,17 +489,55 @@ const insertReference = (markdownLink: string) => {
             class="prop-row"
           >
             <input
+              v-if="editSchemaDescriptors[row.key]"
+              :value="row.key"
+              class="prop-key"
+              readonly
+              :placeholder="editSchemaRequired.has(row.key) ? row.key + ' *' : row.key"
+            >
+            <input
+              v-else
               v-model="row.key"
               class="prop-key"
               placeholder="key"
             >
-            <input
+            <TypedPropertyInput
+              v-if="editSchemaDescriptors[row.key]"
               v-model="row.value"
-              class="prop-value"
-              placeholder="value"
-            >
+              :descriptor="editSchemaDescriptors[row.key]"
+              :required="editSchemaRequired.has(row.key)"
+            />
+            <template v-else>
+              <select
+                v-model="row.adHocType"
+                class="prop-type-select"
+                title="Value type"
+                @change="row.value = row.adHocType === 'boolean' ? 'false' : ''"
+              >
+                <option value="string">
+                  text
+                </option>
+                <option value="integer">
+                  integer
+                </option>
+                <option value="number">
+                  number
+                </option>
+                <option value="boolean">
+                  boolean
+                </option>
+                <option value="array">
+                  array
+                </option>
+              </select>
+              <TypedPropertyInput
+                v-model="row.value"
+                :descriptor="{ type: row.adHocType }"
+              />
+            </template>
             <button
               class="icon-btn remove-prop-btn"
+              :disabled="editSchemaRequired.has(row.key)"
               @click="removePropertyRow(i)"
             >
               ×
@@ -509,7 +601,8 @@ const insertReference = (markdownLink: string) => {
           </button>
           <button
             class="save-btn"
-            :disabled="editBusy"
+            :disabled="editBusy || editRequiredMissing"
+            :title="editRequiredMissing ? 'Fill in all required properties first' : undefined"
             @click="saveEdit"
           >
             Save
