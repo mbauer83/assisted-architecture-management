@@ -54,6 +54,7 @@ class DiagramTypeUiConfig:
     entity_search_filter: bool = True
     diagram_only_types: tuple[DiagramOwnEntityTypeUiConfig, ...] = ()
     type_ui_slots: dict[str, str] = field(default_factory=dict)
+    primitive_types: tuple[str, ...] = ()
 
 
 def diagram_type_ui_config_from_mapping(
@@ -74,6 +75,7 @@ def diagram_type_ui_config_from_mapping(
             if isinstance(entry, Mapping)
         ),
         type_ui_slots={str(k): str(v) for k, v in ui.get("type_ui_slots", {}).items()},
+        primitive_types=tuple(str(t) for t in ui.get("primitive_types", ())),
     )
 
 

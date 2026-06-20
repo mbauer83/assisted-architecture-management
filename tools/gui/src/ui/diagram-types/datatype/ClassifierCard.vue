@@ -2,9 +2,13 @@
 import ActivityEntityPicker from '../activity/ActivityEntityPicker.vue'
 import type { Classifier, Attribute, ClassifierKind } from './useDatatypeModel'
 import { CLASSIFIER_KINDS } from './useDatatypeModel'
+import { buildTypeOptions } from './ClassifierCard.helpers'
+import { computed } from 'vue'
 
 const props = defineProps<{
   classifier: Classifier
+  primitiveTypes: readonly string[]
+  classifierLabels: readonly string[]
 }>()
 const emit = defineEmits<{
   update: [patch: Partial<Classifier>]
@@ -26,6 +30,12 @@ const onKindChange = (e: Event) => {
 }
 
 const isEnum = () => props.classifier.classifier_kind === 'enumeration'
+
+// Datalist id unique per classifier so multiple cards don't collide.
+const typeListId = computed(() => `dt-type-opts-${props.classifier.id}`)
+
+// Combined options: primitives then in-diagram classifiers (deduplicated).
+const typeOptions = computed(() => buildTypeOptions(props.primitiveTypes, props.classifierLabels))
 </script>
 
 <template>
@@ -95,12 +105,20 @@ const isEnum = () => props.classifier.classifier_kind === 'enumeration'
             @input="emit('updateAttr', i, { name: ($event.target as HTMLInputElement).value })"
           >
           <input
+            :list="typeListId"
             type="text"
             class="attr-type"
             :value="attr.type ?? ''"
             placeholder="type"
             @input="emit('updateAttr', i, { type: ($event.target as HTMLInputElement).value || undefined })"
           >
+          <datalist :id="typeListId">
+            <option
+              v-for="opt in typeOptions"
+              :key="opt"
+              :value="opt"
+            />
+          </datalist>
           <input
             type="text"
             class="attr-mult"

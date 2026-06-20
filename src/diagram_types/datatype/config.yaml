@@ -20,6 +20,14 @@ ui:
   entity_search_filter: false
   type_ui_slots:
     datatype-editor: datatype-editor
+  primitive_types:
+    - String
+    - Integer
+    - Number
+    - Boolean
+    - Date
+    - DateTime
+    - UUID
   diagram_only_types:
     - entity_type: classifier
       label: Classifier

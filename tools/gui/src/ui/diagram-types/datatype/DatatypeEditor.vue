@@ -1,11 +1,13 @@
 <script setup lang="ts">
-import type { EntityDisplayInfo } from '../../../domain'
+import type { DiagramTypeUiConfig, EntityDisplayInfo } from '../../../domain'
 import ClassifierCard from './ClassifierCard.vue'
 import RelationList from './RelationList.vue'
 import { useDatatypeModel } from './useDatatypeModel'
 import type { Attribute, Classifier, DtConn } from './useDatatypeModel'
+import { computed } from 'vue'
 
 const props = defineProps<{
+  uiConfig: DiagramTypeUiConfig
   diagramEntities: Record<string, unknown>
   entities: EntityDisplayInfo[]
 }>()
@@ -22,6 +24,11 @@ const {
 } = useDatatypeModel(
   () => props.diagramEntities,
   (patch) => emit('diagramEntitiesChange', patch),
+)
+
+const primitiveTypes = computed(() => props.uiConfig.primitive_types ?? [])
+const classifierLabels = computed(() =>
+  classifiers.value.map((c) => c.label ?? c.id).filter(Boolean)
 )
 </script>
 
@@ -48,6 +55,8 @@ const {
         v-for="cls in classifiers"
         :key="cls.id"
         :classifier="cls"
+        :primitive-types="primitiveTypes"
+        :classifier-labels="classifierLabels"
         @update="(patch: Partial<Classifier>) => updateClassifier(cls.id, patch)"
         @remove="removeClassifier(cls.id)"
         @add-attr="addAttribute(cls.id)"
