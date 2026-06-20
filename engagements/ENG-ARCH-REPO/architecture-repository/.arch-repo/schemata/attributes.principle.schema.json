@@ -4,7 +4,7 @@
   "title": "Principle Attribute Schema",
   "description": "Attribute schema for Properties table in Principle entities.",
   "type": "object",
-  "required": ["Priority", "Rationale"],
+  "required": [],
   "properties": {
     "Priority": {
       "type": "string",

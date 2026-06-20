@@ -4,7 +4,7 @@
   "title": "Stakeholder Attribute Schema",
   "description": "Attribute schema for Properties table in Stakeholder entities.",
   "type": "object",
-  "required": ["Category", "Concerns"],
+  "required": [],
   "properties": {
     "Category": {
       "type": "string"
