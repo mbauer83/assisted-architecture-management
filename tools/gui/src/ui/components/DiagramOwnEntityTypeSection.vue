@@ -93,6 +93,7 @@ const propertyType = (schema: unknown): string => {
           v-if="permittedTypes.length"
           class="card-picker"
           :fixed-entity-types="[...permittedTypes]"
+          widenable-to="none"
           :placeholder="item.entity_id ? 'Change model mapping…' : 'Map to model entity…'"
           @select="setMapping(item.id, $event)"
         />

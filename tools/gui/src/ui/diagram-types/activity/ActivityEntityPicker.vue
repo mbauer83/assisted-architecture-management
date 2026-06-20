@@ -55,6 +55,7 @@ const onClear = () => {
       <EntityPickerInput
         :fixed-entity-types="acceptedTypes"
         :accepted-types="new Set(acceptedTypes)"
+        widenable-to="none"
         placeholder="Search entities…"
         @select="onSelect"
       />

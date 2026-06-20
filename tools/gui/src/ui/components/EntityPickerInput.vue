@@ -6,6 +6,12 @@ import { useEntityFilters } from '../composables/useEntityFilters'
 import type { EntityDisplayInfo, ReferenceSearchHit } from '../../domain'
 import ArchimateTypeGlyph from './ArchimateTypeGlyph.vue'
 import { toGlyphKey } from '../lib/glyphKey'
+import {
+  calcHasStageUI,
+  calcCanGoBack,
+  calcCanGoForward,
+} from './EntityPickerInput.helpers'
+import type { WidenableTo } from './EntityPickerInput.helpers'
 
 type Stage = 'scope' | 'entity-type'
 
@@ -14,13 +20,15 @@ const props = defineProps<{
   placeholder?: string
   fixedDomains?: string[]
   fixedEntityTypes?: string[]
+  widenableTo?: WidenableTo
   acceptedTypes?: Set<string>
   diagramType?: string
 }>()
 const emit = defineEmits<{ select: [entity: EntityDisplayInfo] }>()
 
 const svc = inject(modelServiceKey)!
-const { selectedDomains, selectedEntityTypes, domainOptions, availableEntityTypes, toggle } = useEntityFilters()
+const { selectedDomains, selectedEntityTypes, domainOptions, availableEntityTypes, impliedDomains, toggle } =
+  useEntityFilters({ fixedEntityTypes: props.fixedEntityTypes })
 
 const query = ref('')
 const results = ref<ReferenceSearchHit[]>([])
@@ -71,14 +79,24 @@ onUnmounted(() => {
 const initialStage = computed<Stage>(() => props.fixedDomains?.length ? 'entity-type' : 'scope')
 const currentStage = ref<Stage>(initialStage.value)
 
-const hasStageUI = computed(() => !(props.fixedDomains?.length && props.fixedEntityTypes?.length))
+const hasStageUI = computed(() =>
+  calcHasStageUI(props.fixedDomains, props.fixedEntityTypes, props.widenableTo),
+)
 const stageTitle = computed(() =>
   currentStage.value === 'scope' ? '1. Filter Domains' : '2. Filter Entity Types',
 )
-const canGoBack = computed(() => currentStage.value === 'entity-type' && !props.fixedDomains?.length)
-const canGoForward = computed(() => currentStage.value === 'scope' && !props.fixedEntityTypes?.length)
+const canGoBack = computed(() =>
+  calcCanGoBack(currentStage.value, props.fixedDomains, props.widenableTo),
+)
+const canGoForward = computed(() =>
+  calcCanGoForward(currentStage.value, props.fixedEntityTypes, props.widenableTo),
+)
 
-const effectiveDomains = computed(() => [...(props.fixedDomains ?? []), ...selectedDomains.value])
+const effectiveDomains = computed(() => [
+  ...(props.fixedDomains ?? []),
+  ...selectedDomains.value,
+  ...impliedDomains.value,
+])
 const effectiveEntityTypes = computed(() => [...(props.fixedEntityTypes ?? []), ...selectedEntityTypes.value])
 
 const summaryParts = computed(() => {
@@ -255,7 +273,69 @@ watch([selectedDomains, selectedEntityTypes], scheduleSearch)
       :style="dropStyle"
       @mousedown.prevent
     >
-      <!-- Filter stage -->
+      <!-- Fixed domain display — strategy A: compact chip (1 value), disabled row (N values) -->
+      <div
+        v-if="fixedDomains?.length"
+        class="ep-fixed-row"
+      >
+        <span class="ep-fixed-label">{{ fixedDomains.length === 1 ? 'Domain' : 'Domains' }}</span>
+        <template v-if="fixedDomains.length === 1">
+          <span
+            class="ep-fixed-chip"
+            title="Domain filter is pinned"
+          >{{ fixedDomains[0] }}</span>
+          <span
+            class="ep-fixed-lock"
+            aria-label="locked"
+          >🔒</span>
+        </template>
+        <template v-else>
+          <div class="ep-fixed-set">
+            <span
+              v-for="d in fixedDomains"
+              :key="d"
+              class="ep-fixed-chip"
+            >{{ d }}</span>
+          </div>
+          <span
+            class="ep-fixed-lock"
+            aria-label="locked"
+          >🔒</span>
+        </template>
+      </div>
+
+      <!-- Fixed entity type display — strategy A: compact chip (1 value), disabled row (N values) -->
+      <div
+        v-if="fixedEntityTypes?.length"
+        class="ep-fixed-row ep-fixed-row--types"
+      >
+        <span class="ep-fixed-label">{{ fixedEntityTypes.length === 1 ? 'Type' : 'Types' }}</span>
+        <template v-if="fixedEntityTypes.length === 1">
+          <span
+            class="ep-fixed-chip ep-fixed-chip--type"
+            title="Entity type filter is pinned"
+          >{{ fixedEntityTypes[0] }}</span>
+          <span
+            class="ep-fixed-lock"
+            aria-label="locked"
+          >🔒</span>
+        </template>
+        <template v-else>
+          <div class="ep-fixed-set">
+            <span
+              v-for="t in fixedEntityTypes"
+              :key="t"
+              class="ep-fixed-chip ep-fixed-chip--type"
+            >{{ t }}</span>
+          </div>
+          <span
+            class="ep-fixed-lock"
+            aria-label="locked"
+          >🔒</span>
+        </template>
+      </div>
+
+      <!-- Interactive filter stage (hidden when widenableTo=none or all levels are fixed) -->
       <div
         v-if="hasStageUI"
         class="ep-stage"
@@ -296,8 +376,13 @@ watch([selectedDomains, selectedEntityTypes], scheduleSearch)
               v-for="(d, i) in domainOptions"
               :key="d.key"
               class="chip"
-              :class="{ 'chip--on': effectiveDomains.includes(d.key), 'chip--fixed': fixedDomains?.includes(d.key) }"
+              :class="{
+                'chip--on': effectiveDomains.includes(d.key),
+                'chip--fixed': fixedDomains?.includes(d.key),
+                'chip--implied': impliedDomains.includes(d.key) && !selectedDomains.includes(d.key) && !fixedDomains?.includes(d.key),
+              }"
               type="button"
+              :title="impliedDomains.includes(d.key) && !selectedDomains.includes(d.key) ? 'Derived from selected entity type' : undefined"
               @click="toggleDomain(d.key)"
               @keydown="(e) => onChipKeydown(e, i)"
             >
@@ -385,7 +470,17 @@ watch([selectedDomains, selectedEntityTypes], scheduleSearch)
   box-shadow: 0 6px 20px rgba(0,0,0,.13); overflow-y: auto;
 }
 
-.ep-stage { padding: 10px 10px 6px; border-bottom: 1px solid #f3f4f6; background: #f8fafc; border-radius: 8px 8px 0 0; }
+/* Fixed-level read-only sections (strategy A: compact chip for single, row for set) */
+.ep-fixed-row { display: flex; align-items: center; gap: 6px; padding: 6px 10px; background: #f0f9ff; border-bottom: 1px solid #bae6fd; font-size: 12px; flex-wrap: wrap; }
+.ep-fixed-row--types { background: #f5f3ff; border-bottom-color: #c4b5fd; }
+.ep-fixed-label { font-size: 10px; font-weight: 700; color: #0369a1; flex-shrink: 0; text-transform: uppercase; letter-spacing: .05em; }
+.ep-fixed-row--types .ep-fixed-label { color: #6d28d9; }
+.ep-fixed-chip { background: #e0f2fe; border: 1px solid #7dd3fc; color: #0369a1; border-radius: 999px; padding: 2px 9px; font-size: 11px; cursor: default; }
+.ep-fixed-chip--type { background: #ede9fe; border-color: #a78bfa; color: #6d28d9; }
+.ep-fixed-set { display: flex; flex-wrap: wrap; gap: 4px; }
+.ep-fixed-lock { color: #94a3b8; font-size: 10px; }
+
+.ep-stage { padding: 10px 10px 6px; border-bottom: 1px solid #f3f4f6; background: #f8fafc; }
 .ep-stage-hdr { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
 .ep-stage-title { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: #475569; }
 .ep-nav { display: flex; gap: 6px; }
@@ -400,6 +495,7 @@ watch([selectedDomains, selectedEntityTypes], scheduleSearch)
 .chip--sm { font-size: 11px; padding: 4px 9px; }
 .chip--on { background: #0f172a; border-color: #0f172a; color: white; }
 .chip--fixed { opacity: .6; cursor: default; }
+.chip--implied { border-style: dashed; border-color: #6366f1; color: #4338ca; background: #eef2ff; }
 
 .ep-summary { margin-top: 7px; font-size: 11px; color: #64748b; }
 
