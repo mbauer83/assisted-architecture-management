@@ -38,6 +38,7 @@ def _score_reference_hit(name: str, artifact_id: str, query: str) -> tuple[int, 
 def search_artifacts(
     q: str,
     limit: int = Query(default=20, le=100),
+    include_entities: bool = True,
     include_connections: bool = False,
     include_diagrams: bool = True,
     include_documents: bool = True,
@@ -46,6 +47,7 @@ def search_artifacts(
     result = repo.search_artifacts(
         q,
         limit=limit,
+        include_entities=include_entities,
         include_connections=include_connections,
         include_diagrams=include_diagrams,
         include_documents=include_documents,

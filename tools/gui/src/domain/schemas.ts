@@ -1,8 +1,4 @@
 import { Schema } from 'effect'
-import { DOMAIN_NAMES, ENTITY_TYPE_NAMES } from './types.generated'
-
-const EntityTypeNameSchema = Schema.Literal(...ENTITY_TYPE_NAMES)
-const DomainNameSchema = Schema.Literal(...DOMAIN_NAMES)
 
 // ── Stats ────────────────────────────────────────────────────────────────────
 
@@ -21,14 +17,15 @@ export type Stats = typeof StatsSchema.Type
 
 export const EntitySummarySchema = Schema.Struct({
   artifact_id: Schema.String,
-  artifact_type: EntityTypeNameSchema,
+  artifact_type: Schema.String,
   name: Schema.String,
   version: Schema.String,
   status: Schema.String,
-  domain: DomainNameSchema,
+  domain: Schema.String,
   subdomain: Schema.String,
   path: Schema.String,
   is_global: Schema.optional(Schema.Boolean),
+  host_diagram_id: Schema.optional(Schema.String),
   display_alias: Schema.optional(Schema.String),
   parent_entity_id: Schema.optional(Schema.NullOr(Schema.String)),
   hierarchy_relation_type: Schema.optional(Schema.String),
@@ -56,20 +53,21 @@ export type EntityList = typeof EntityListSchema.Type
 
 export const EntityDetailSchema = Schema.Struct({
   artifact_id: Schema.String,
-  artifact_type: EntityTypeNameSchema,
+  artifact_type: Schema.String,
   name: Schema.String,
   version: Schema.String,
   status: Schema.String,
-  domain: DomainNameSchema,
+  domain: Schema.String,
   subdomain: Schema.String,
   record_type: Schema.Literal('entity'),
   path: Schema.String,
   content_snippet: Schema.String,
   keywords: Schema.optional(Schema.Array(Schema.String)),
   summary: Schema.optional(Schema.String),
-  properties: Schema.optional(Schema.Record({ key: Schema.String, value: Schema.String })),
+  properties: Schema.optional(Schema.Record({ key: Schema.String, value: Schema.Unknown })),
   notes: Schema.optional(Schema.String),
   is_global: Schema.optional(Schema.Boolean),
+  host_diagram_id: Schema.optional(Schema.String),
   conn_in: Schema.optional(Schema.Number),
   conn_sym: Schema.optional(Schema.Number),
   conn_out: Schema.optional(Schema.Number),
@@ -143,10 +141,17 @@ export type Neighbors = typeof NeighborsSchema.Type
 
 export const SearchHitSchema = Schema.Struct({
   score: Schema.Number,
-  record_type: Schema.Literal('entity', 'connection', 'diagram'),
+  record_type: Schema.Union(
+    Schema.Literal('entity'),
+    Schema.Literal('connection'),
+    Schema.Literal('diagram'),
+    Schema.Literal('document'),
+    Schema.Literal('assurance-node'),   // placeholder; consumed in WU-G3
+    Schema.Literal('assurance-edge'),   // placeholder; consumed in WU-G3
+  ),
   artifact_id: Schema.String,
   name: Schema.String,
-  artifact_type: Schema.String,
+  artifact_type: Schema.optional(Schema.String),
   status: Schema.String,
   path: Schema.String,
   source: Schema.optional(Schema.String),
@@ -225,28 +230,13 @@ export const DocumentDetailSchema = Schema.Struct({
 })
 export type DocumentDetail = typeof DocumentDetailSchema.Type
 
-// ── Artifact search (cross-type) ──────────────────────────────────────────────
+// ── Artifact search (cross-type) — unified with SearchHitSchema ───────────────
 
-export const ArtifactSearchHitSchema = Schema.Struct({
-  score: Schema.Number,
-  record_type: Schema.Union(
-    Schema.Literal('entity'),
-    Schema.Literal('connection'),
-    Schema.Literal('diagram'),
-    Schema.Literal('document'),
-  ),
-  artifact_id: Schema.String,
-  name: Schema.String,
-  status: Schema.String,
-  path: Schema.String,
-})
-export type ArtifactSearchHit = typeof ArtifactSearchHitSchema.Type
+export const ArtifactSearchHitSchema = SearchHitSchema
+export type ArtifactSearchHit = SearchHit
 
-export const ArtifactSearchResultSchema = Schema.Struct({
-  query: Schema.String,
-  hits: Schema.Array(ArtifactSearchHitSchema),
-})
-export type ArtifactSearchResult = typeof ArtifactSearchResultSchema.Type
+export const ArtifactSearchResultSchema = SearchResultSchema
+export type ArtifactSearchResult = SearchResult
 
 // ── Reference search ─────────────────────────────────────────────────────────
 
@@ -341,6 +331,7 @@ export const DiagramTypeUiConfigSchema = Schema.Struct({
   entity_search_filter: Schema.Boolean,
   diagram_only_types: Schema.Array(DiagramOwnEntityTypeUiConfigSchema),
   type_ui_slots: Schema.Record({ key: Schema.String, value: Schema.String }),
+  primitive_types: Schema.optional(Schema.Array(Schema.String)),
 })
 export type DiagramTypeUiConfig = typeof DiagramTypeUiConfigSchema.Type
 
@@ -449,8 +440,8 @@ export type DiagramRefs = typeof DiagramRefsSchema.Type
 export const EntityDisplayInfoSchema = Schema.Struct({
   artifact_id: Schema.String,
   name: Schema.String,
-  artifact_type: EntityTypeNameSchema,
-  domain: DomainNameSchema,
+  artifact_type: Schema.String,
+  domain: Schema.String,
   subdomain: Schema.String,
   status: Schema.String,
   display_alias: Schema.String,
@@ -543,11 +534,30 @@ export type DiagramPreviewResult = typeof DiagramPreviewResultSchema.Type
 
 // ── Entity attribute schemata ─────────────────────────────────────────────────
 
+const EntityAttributeConstraintsSchema = Schema.Struct({
+  minimum: Schema.optional(Schema.Number),
+  maximum: Schema.optional(Schema.Number),
+  exclusiveMinimum: Schema.optional(Schema.Number),
+  exclusiveMaximum: Schema.optional(Schema.Number),
+  minLength: Schema.optional(Schema.Number),
+  maxLength: Schema.optional(Schema.Number),
+  pattern: Schema.optional(Schema.String),
+})
+
+const EntityAttributeDescriptorSchema = Schema.Struct({
+  type: Schema.String,
+  enum: Schema.optional(Schema.Array(Schema.String)),
+  default: Schema.optional(Schema.String),
+  constraints: Schema.optional(EntityAttributeConstraintsSchema),
+})
+export type EntityAttributeDescriptor = typeof EntityAttributeDescriptorSchema.Type
+
 export const EntitySchemaInfoSchema = Schema.Struct({
   artifact_type: Schema.String,
   schema: Schema.NullOr(Schema.Unknown),
   properties: Schema.Array(Schema.String),
   required: Schema.Array(Schema.String),
+  descriptors: Schema.Record({ key: Schema.String, value: EntityAttributeDescriptorSchema }),
 })
 export type EntitySchemaInfo = typeof EntitySchemaInfoSchema.Type
 

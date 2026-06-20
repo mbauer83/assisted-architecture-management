@@ -6,6 +6,12 @@ from pathlib import Path
 from typing import Iterable, Literal
 
 from src.application._artifact_search import (
+    _RECORD_TYPE_TO_KIND,
+)
+from src.application._artifact_search import (
+    ALL_SEARCHABLE_KINDS as _ALL_SEARCHABLE_KINDS,
+)
+from src.application._artifact_search import (
     count_artifacts_by as _count_artifacts_by,
 )
 from src.application._artifact_search import (
@@ -147,6 +153,7 @@ class ArtifactRepository:
         artifact_type: str | list[str] | None = None,
         domain: str | list[str] | None = None,
         status: str | list[str] | None = None,
+        include_entities: bool = True,
         include_connections: bool = False,
         include_diagrams: bool = False,
         include_documents: bool = False,
@@ -155,6 +162,7 @@ class ArtifactRepository:
             artifact_type=artifact_type,
             domain=domain,
             status=status,
+            include_entities=include_entities,
             include_connections=include_connections,
             include_diagrams=include_diagrams,
             include_documents=include_documents,
@@ -241,6 +249,7 @@ class ArtifactRepository:
         limit: int = 10,
         domain: str | list[str] | None = None,
         artifact_type: str | list[str] | None = None,
+        include_entities: bool = True,
         include_connections: bool = True,
         include_diagrams: bool = True,
         include_documents: bool = True,
@@ -254,6 +263,7 @@ class ArtifactRepository:
             limit=limit,
             domain=domain,
             artifact_type=artifact_type,
+            include_entities=include_entities,
             include_connections=include_connections,
             include_diagrams=include_diagrams,
             include_documents=include_documents,
@@ -274,6 +284,18 @@ class ArtifactRepository:
         prefer_record_type: _RecordType | None = None,
         strict_record_type: bool = False,
     ) -> SearchResult:
+        kinds: set[str] = {"entities"}  # entities are always in for this .search() method
+        if include_connections:
+            kinds.add("connections")
+        if include_diagrams:
+            kinds.add("diagrams")
+        if include_documents:
+            kinds.add("documents")
+        if strict_record_type and prefer_record_type is not None:
+            kind = _RECORD_TYPE_TO_KIND.get(prefer_record_type)
+            if kind:
+                kinds = {kind}
+        prefer_kind = _RECORD_TYPE_TO_KIND.get(prefer_record_type) if prefer_record_type else None
         return _search(
             self._store,
             self._semantic,
@@ -281,9 +303,6 @@ class ArtifactRepository:
             limit=limit,
             entity_types=entity_types,
             domains=domains,
-            include_connections=include_connections,
-            include_diagrams=include_diagrams,
-            include_documents=include_documents,
-            prefer_record_type=prefer_record_type,
-            strict_record_type=strict_record_type,
+            included_kinds=frozenset(kinds) & _ALL_SEARCHABLE_KINDS,
+            prefer_kind=prefer_kind,
         )

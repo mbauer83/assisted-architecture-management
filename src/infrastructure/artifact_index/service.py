@@ -255,6 +255,7 @@ class ArtifactIndex:
         artifact_type: str | list[str] | None = None,
         domain: str | list[str] | None = None,
         status: str | list[str] | None = None,
+        include_entities: bool = True,
         include_connections: bool = False,
         include_diagrams: bool = False,
         include_documents: bool = False,
@@ -267,7 +268,7 @@ class ArtifactIndex:
             out: list[ArtifactSummary] = [
                 summary_from_entity(r)
                 for r in self._mem.entities.values()
-                if matches_entity_sets(r, types, domains, statuses)
+                if include_entities and matches_entity_sets(r, types, domains, statuses)
             ]
             if include_connections:
                 out.extend(
@@ -432,11 +433,10 @@ class ArtifactIndex:
         query: str,
         *,
         limit: int,
-        include_connections: bool,
-        include_diagrams: bool,
-        include_documents: bool,
-        prefer_record_type: str | None,
-        strict_record_type: bool,
+        include_entities: bool = True,
+        include_connections: bool = True,
+        include_diagrams: bool = True,
+        include_documents: bool = True,
     ) -> list[tuple[str, str, float]]:
         self._ensure_loaded()
         with self._lock.reading():
@@ -445,11 +445,10 @@ class ArtifactIndex:
                     conn,
                     query,
                     limit=limit,
+                    include_entities=include_entities,
                     include_connections=include_connections,
                     include_diagrams=include_diagrams,
                     include_documents=include_documents,
-                    prefer_record_type=prefer_record_type,
-                    strict_record_type=strict_record_type,
                     fts_enabled=self._db.fts_enabled,
                 )
 

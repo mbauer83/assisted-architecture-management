@@ -101,6 +101,7 @@ onMounted(() => {
 
 watch(() => props.scope, () => { typeFilter.value = ''; loadTaxonomy(); load() })
 watch(activeGroup, () => { loadTaxonomy(); load() })
+watch(activeDomain, () => { typeFilter.value = '' })
 watch([activeDomain, typeFilter], () => { if (!isGroupView.value) load() })
 
 let refreshEventSource: EventSource | null = null

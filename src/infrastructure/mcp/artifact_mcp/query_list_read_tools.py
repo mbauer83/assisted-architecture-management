@@ -3,6 +3,7 @@ from typing import Literal
 
 from mcp.server.fastmcp import FastMCP  # type: ignore[import-not-found]
 
+from src.application._artifact_search import ALL_SEARCHABLE_KINDS
 from src.infrastructure.mcp.artifact_mcp.context import (
     RepoScope,
     expand_artifact_id,
@@ -13,8 +14,6 @@ from src.infrastructure.mcp.artifact_mcp.context import (
 from src.infrastructure.mcp.artifact_mcp.tool_annotations import READ_ONLY
 
 _FIELD_ALIASES = {"id": "artifact_id"}
-
-_MULTI_FAMILY_TYPES = frozenset({"entities", "connections", "diagrams", "documents"})
 
 
 def _validate_group_scope(
@@ -43,9 +42,15 @@ def _include_flags(
     include_record_types: list[Literal["entities", "connections", "diagrams", "documents"]] | None,
     *,
     default: tuple[str, ...],
-) -> tuple[bool, bool, bool]:
-    selected = set(include_record_types or default)
+) -> tuple[bool, bool, bool, bool]:
+    """Return (include_entities, include_connections, include_diagrams, include_documents).
+
+    Uses the same canonical ALL_SEARCHABLE_KINDS set as the search path (WU-A2/A3).
+    Entities are a normal member of the set — no implicit always-on behaviour.
+    """
+    selected = frozenset(include_record_types or default) & ALL_SEARCHABLE_KINDS
     return (
+        "entities" in selected,
         "connections" in selected,
         "diagrams" in selected,
         "documents" in selected,
@@ -95,7 +100,7 @@ def register_query_list_read_tools(mcp: FastMCP) -> None:
         )
         key = roots_key(roots)
         repo = repo_cached(key)
-        include_connections, include_diagrams, include_documents = _include_flags(
+        include_entities, include_connections, include_diagrams, include_documents = _include_flags(
             include_record_types,
             default=("entities",),
         )
@@ -103,6 +108,7 @@ def register_query_list_read_tools(mcp: FastMCP) -> None:
             artifact_type=artifact_type,
             domain=domain,
             status=status,
+            include_entities=include_entities,
             include_connections=include_connections,
             include_diagrams=include_diagrams,
             include_documents=include_documents,

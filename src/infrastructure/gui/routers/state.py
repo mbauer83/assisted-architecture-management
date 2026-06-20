@@ -129,6 +129,8 @@ def entity_to_summary(
         "is_global": is_global(e.path),
         "group": e.group,
     }
+    if e.host_diagram_id is not None:
+        d["host_diagram_id"] = e.host_diagram_id
     if conn_counts is not None:
         inc, sym, out = conn_counts.get(e.artifact_id, (0, 0, 0))
         d["conn_in"] = inc

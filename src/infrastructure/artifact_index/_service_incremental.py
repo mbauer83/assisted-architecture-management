@@ -31,6 +31,12 @@ from src.domain.artifact_types import (
     RepoMount,
 )
 
+from ._diagram_entity_extraction import (
+    extract_diagram_connections as _extract_diagram_connections,
+)
+from ._diagram_entity_extraction import (
+    extract_diagram_entities as _extract_diagram_entities,
+)
 from ._mem_store import _MemStore
 from ._sqlite_store import _SqliteStore
 
@@ -274,118 +280,6 @@ def _delete_diagram_connections(diagram_id: str, mem: _MemStore, db: _SqliteStor
     for aid in owned:
         db.delete_connection(aid)
 
-
-def _extract_diagram_entities(diag: DiagramRecord) -> list[EntityRecord]:
-    """Extract diagram-only EntityRecords from a diagram's diagram-entities frontmatter."""
-    diagram_entities = diag.extra.get("diagram-entities")
-    if not isinstance(diagram_entities, dict):
-        return []
-    result: list[EntityRecord] = []
-    for entity_type, items in diagram_entities.items():
-        if not isinstance(items, list):
-            continue
-        for item in items:
-            if not isinstance(item, dict):
-                continue
-            local_id = str(item.get("id") or "")
-            if not local_id:
-                continue
-            artifact_id = f"{diag.artifact_id}#{entity_type}/{local_id}"
-            name = str(item.get("label") or item.get("text") or item.get("name") or local_id)
-            content_text = _diagram_entity_content_text(item)
-            result.append(
-                EntityRecord(
-                    artifact_id=artifact_id,
-                    artifact_type=entity_type,
-                    name=name,
-                    version=diag.version,
-                    status=diag.status,
-                    domain=diag.diagram_type,
-                    subdomain=entity_type,
-                    path=diag.path,
-                    keywords=(),
-                    extra={k: v for k, v in item.items() if not isinstance(v, list)},
-                    content_text=content_text,
-                    display_blocks={},
-                    display_label=name,
-                    display_alias="",
-                    host_diagram_id=diag.artifact_id,
-                )
-            )
-    return result
-
-
-def _diagram_local_to_full(diag: DiagramRecord) -> dict[str, str]:
-    """Map each diagram-entity local id to its full '{diagram_id}#{entity_type}/{local_id}' id."""
-    diagram_entities = diag.extra.get("diagram-entities")
-    if not isinstance(diagram_entities, dict):
-        return {}
-    return {
-        local_id: f"{diag.artifact_id}#{entity_type}/{local_id}"
-        for entity_type, items in diagram_entities.items()
-        if isinstance(items, list)
-        for item in items
-        if isinstance(item, dict) and (local_id := str(item.get("id") or ""))
-    }
-
-
-def _diagram_connection_record(
-    kc: object, diag: DiagramRecord, local_to_full: dict[str, str]
-) -> ConnectionRecord | None:
-    """Build one ConnectionRecord from a connections-frontmatter row, or None if incomplete."""
-    if not isinstance(kc, dict):
-        return None
-    local_id = str(kc.get("id") or "")
-    conn_type = str(kc.get("conn_type") or "")
-    source_local = str(kc.get("source") or "")
-    target_local = str(kc.get("target") or "")
-    if not (local_id and conn_type and source_local and target_local):
-        return None
-    return ConnectionRecord(
-        artifact_id=f"{diag.artifact_id}#conn/{local_id}",
-        source=local_to_full.get(source_local, f"{diag.artifact_id}#unknown/{source_local}"),
-        target=local_to_full.get(target_local, f"{diag.artifact_id}#unknown/{target_local}"),
-        conn_type=conn_type,
-        version=diag.version,
-        status=diag.status,
-        path=diag.path,
-        extra={},
-        content_text="",
-    )
-
-
-def _extract_diagram_connections(diag: DiagramRecord) -> list[ConnectionRecord]:
-    """Extract ConnectionRecords from a diagram's connections frontmatter.
-
-    connections stores local IDs. Each source/target is resolved to a
-    full artifact ID in the form '{diagram_id}#{entity_type}/{local_id}'.
-    The local→full map is built from the diagram-entities entities in the diagram.
-    """
-    diagram_connections = diag.extra.get("connections")
-    if not isinstance(diagram_connections, list) or not diagram_connections:
-        return []
-    local_to_full = _diagram_local_to_full(diag)
-    records = (_diagram_connection_record(kc, diag, local_to_full) for kc in diagram_connections)
-    return [rec for rec in records if rec is not None]
-
-
-def _leaf_strings(value: object) -> Iterator[str]:
-    """Yield every non-empty leaf string in *value*, descending lists/dicts and skipping 'id' keys."""
-    if isinstance(value, str):
-        if value:
-            yield value
-    elif isinstance(value, list):
-        for v in value:
-            yield from _leaf_strings(v)
-    elif isinstance(value, dict):
-        for k, v in value.items():
-            if k != "id":
-                yield from _leaf_strings(v)
-
-
-def _diagram_entity_content_text(item: dict[str, object]) -> str:
-    """Collect leaf string values for FTS (skip id field)."""
-    return " ".join(_leaf_strings({k: v for k, v in item.items() if k != "id"}))
 
 
 def parse_document_for_path(path: Path) -> DocumentRecord | None:

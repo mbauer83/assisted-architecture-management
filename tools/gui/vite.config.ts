@@ -1,10 +1,14 @@
-import { defineConfig } from 'vite'
+import { defineConfig } from 'vitest/config'
 import vue from '@vitejs/plugin-vue'
 
 const backendTarget = 'http://127.0.0.1:8000'
 
 export default defineConfig({
   plugins: [vue()],
+  test: {
+    environment: 'node',
+    include: ['src/**/*.test.ts'],
+  },
   server: {
     proxy: {
       // SSE: long-lived event stream — must NOT inherit the 10s timeout below,

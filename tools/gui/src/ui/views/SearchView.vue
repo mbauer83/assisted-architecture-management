@@ -104,6 +104,13 @@ const friendlyName = (id: string) => {
             >
               {{ h.name || friendlyName(h.artifact_id) }}
             </RouterLink>
+            <RouterLink
+              v-else-if="h.record_type === 'document'"
+              :to="{ path: '/document', query: { id: h.artifact_id } }"
+              class="result-name"
+            >
+              {{ h.name || friendlyName(h.artifact_id) }}
+            </RouterLink>
             <span
               v-else
               class="result-name"

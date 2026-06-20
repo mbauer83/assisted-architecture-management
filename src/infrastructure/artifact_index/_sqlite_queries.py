@@ -13,11 +13,10 @@ def search_fts(
     query: str,
     *,
     limit: int,
-    include_connections: bool,
-    include_diagrams: bool,
-    include_documents: bool,
-    prefer_record_type: str | None,
-    strict_record_type: bool,
+    include_entities: bool = True,
+    include_connections: bool = True,
+    include_diagrams: bool = True,
+    include_documents: bool = True,
     fts_enabled: bool,
 ) -> list[tuple[str, str, float]]:
     tokens = tokenize(query.lower())
@@ -27,43 +26,50 @@ def search_fts(
     # Entity name column (position 1) gets 15× weight over content_text (0.5).
     # Columns: artifact_id(UNINDEXED), name, artifact_type, domain, subdomain, keywords, content_text, display_label
     _ENT_WEIGHTS = "0, 15.0, 1.0, 1.0, 1.0, 4.0, 0.5, 4.0"
-    statements = [
-        "SELECT artifact_id, 'entity' AS record_type, "
-        f"-bm25(entities_fts, {_ENT_WEIGHTS}) AS score "
-        "FROM entities_fts WHERE entities_fts MATCH ?"
-    ]
-    params: list[str] = [match_query]
+    # Per-kind subqueries each get their own ORDER BY + LIMIT so that a dominant
+    # kind (e.g. hundreds of entity hits) cannot crowd out minority kinds.
+    subqueries: list[str] = []
+    params: list[str] = []
+    per_kind_limit = max(limit, 1)
+    if include_entities:
+        subqueries.append(
+            "SELECT artifact_id, 'entity' AS record_type, "
+            f"-bm25(entities_fts, {_ENT_WEIGHTS}) AS score "
+            "FROM entities_fts WHERE entities_fts MATCH ? "
+            f"ORDER BY score DESC LIMIT {per_kind_limit}"
+        )
+        params.append(match_query)
     if include_connections:
-        statements.append(
+        subqueries.append(
             "SELECT artifact_id, 'connection' AS record_type, "
             "-bm25(connections_fts) AS score "
-            "FROM connections_fts WHERE connections_fts MATCH ?"
+            "FROM connections_fts WHERE connections_fts MATCH ? "
+            f"ORDER BY score DESC LIMIT {per_kind_limit}"
         )
         params.append(match_query)
     if include_diagrams:
-        statements.append(
+        subqueries.append(
             "SELECT artifact_id, 'diagram' AS record_type, "
             "-bm25(diagrams_fts) AS score "
-            "FROM diagrams_fts WHERE diagrams_fts MATCH ?"
+            "FROM diagrams_fts WHERE diagrams_fts MATCH ? "
+            f"ORDER BY score DESC LIMIT {per_kind_limit}"
         )
         params.append(match_query)
     if include_documents:
-        statements.append(
+        subqueries.append(
             "SELECT artifact_id, 'document' AS record_type, "
             "-bm25(documents_fts) AS score "
-            "FROM documents_fts WHERE documents_fts MATCH ?"
+            "FROM documents_fts WHERE documents_fts MATCH ? "
+            f"ORDER BY score DESC LIMIT {per_kind_limit}"
         )
         params.append(match_query)
-    sql = "SELECT artifact_id, record_type, score FROM (" + " UNION ALL ".join(statements) + ")"
-    if strict_record_type and prefer_record_type is not None:
-        sql += " WHERE record_type = ?"
-        params.append(prefer_record_type)
-    sql += " ORDER BY "
-    if prefer_record_type is not None and not strict_record_type:
-        sql += "CASE WHEN record_type = ? THEN 1 ELSE 0 END DESC, "
-        params.append(prefer_record_type)
-    sql += "score DESC, artifact_id ASC LIMIT ?"
-    params.append(str(max(limit, 0)))
+    if not subqueries:
+        return []
+    sql = (
+        "SELECT artifact_id, record_type, score FROM ("
+        + " UNION ALL ".join(f"SELECT * FROM ({sq})" for sq in subqueries)
+        + ") ORDER BY score DESC, artifact_id ASC"
+    )
     rows = conn.execute(sql, params).fetchall()
     return [(str(r["artifact_id"]), str(r["record_type"]), float(r["score"])) for r in rows]
 

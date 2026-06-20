@@ -80,6 +80,7 @@ class ArtifactSearch(Protocol):
         artifact_type: str | list[str] | None = None,
         domain: str | list[str] | None = None,
         status: str | list[str] | None = None,
+        include_entities: bool = True,
         include_connections: bool = False,
         include_diagrams: bool = False,
         include_documents: bool = False,
@@ -90,11 +91,10 @@ class ArtifactSearch(Protocol):
         query: str,
         *,
         limit: int,
-        include_connections: bool,
-        include_diagrams: bool,
-        include_documents: bool,
-        prefer_record_type: str | None,
-        strict_record_type: bool,
+        include_entities: bool = True,
+        include_connections: bool = True,
+        include_diagrams: bool = True,
+        include_documents: bool = True,
     ) -> list[tuple[str, str, float]]: ...
 
 

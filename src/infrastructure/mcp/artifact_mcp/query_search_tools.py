@@ -3,6 +3,7 @@ from typing import Literal
 
 from mcp.server.fastmcp import FastMCP  # type: ignore[import-not-found]
 
+from src.application._artifact_search import ALL_SEARCHABLE_KINDS
 from src.infrastructure.mcp.artifact_mcp.context import RepoScope, repo_cached, resolve_repo_roots, roots_key
 from src.infrastructure.mcp.artifact_mcp.tool_annotations import READ_ONLY
 
@@ -16,17 +17,16 @@ def _project(record: dict[str, object], fields: list[str] | None) -> dict[str, o
     return {field: record[field] for field in resolved if field in record}
 
 
-def _include_flags(
+def _included_kinds(
     include_record_types: list[Literal["entities", "connections", "diagrams", "documents"]] | None,
     *,
     default: tuple[str, ...],
-) -> tuple[bool, bool, bool]:
-    selected = set(include_record_types or default)
-    return (
-        "connections" in selected,
-        "diagrams" in selected,
-        "documents" in selected,
-    )
+) -> frozenset[str]:
+    """Return the canonical included-kinds set from the caller's include list.
+
+    Entities are a normal member of the set — no implicit always-on behaviour.
+    """
+    return frozenset(include_record_types or default) & ALL_SEARCHABLE_KINDS
 
 
 def register_query_search_tools(mcp: FastMCP) -> None:
@@ -65,7 +65,7 @@ def register_query_search_tools(mcp: FastMCP) -> None:
         )
         key = roots_key(roots)
         repo = repo_cached(key)
-        include_connections, include_diagrams, include_documents = _include_flags(
+        kinds = _included_kinds(
             include_record_types,
             default=("entities", "diagrams", "documents"),
         )
@@ -75,9 +75,10 @@ def register_query_search_tools(mcp: FastMCP) -> None:
             limit=limit,
             domain=domain,
             artifact_type=artifact_type,
-            include_connections=include_connections,
-            include_diagrams=include_diagrams,
-            include_documents=include_documents,
+            include_entities="entities" in kinds,
+            include_connections="connections" in kinds,
+            include_diagrams="diagrams" in kinds,
+            include_documents="documents" in kinds,
             prefer_record_type=prefer_record_type,
             strict_record_type=strict_record_type,
         )

@@ -9,9 +9,11 @@ import pytest
 from src.application.artifact_query import ArtifactRepository
 from src.domain.artifact_types import DiagramRecord
 from src.infrastructure.artifact_index import shared_artifact_index
-from src.infrastructure.artifact_index._service_incremental import (
+from src.infrastructure.artifact_index._diagram_entity_extraction import (
     _diagram_entity_content_text,
-    _extract_diagram_entities,
+)
+from src.infrastructure.artifact_index._diagram_entity_extraction import (
+    extract_diagram_entities as _extract_diagram_entities,
 )
 
 # ── helpers ──────────────────────────────────────────────────────────────────
@@ -273,8 +275,6 @@ def test_fts_search_finds_diagram_entity_by_name(tmp_path: Path) -> None:
         include_connections=False,
         include_diagrams=False,
         include_documents=False,
-        prefer_record_type=None,
-        strict_record_type=False,
     )
     artifact_ids = [h[0] for h in hits]
     assert f"{_DIAGRAM_ID}#swimlane/sw-1" in artifact_ids

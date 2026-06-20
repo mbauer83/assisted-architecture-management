@@ -77,6 +77,7 @@ const onSearchInput = () => {
 const selectHit = (hit: SearchDropdownHit) => {
   showDropdown.value = false; searchQuery.value = ''; searchHits.value = []
   if (hit.record_type === 'diagram') void router.push({ path: '/diagram', query: { id: hit.artifact_id } })
+  else if (hit.record_type === 'document') void router.push({ path: '/document', query: { id: hit.artifact_id } })
   else void router.push({ path: '/entity', query: { id: hit.artifact_id } })
 }
 const submitSearch = () => {
@@ -89,7 +90,7 @@ const submitSearch = () => {
 const onSearchBlur = () => { setTimeout(() => { showDropdown.value = false }, 180) }
 const onSearchFocus = () => { if (searchHits.value.length > 0) showDropdown.value = true }
 const hitGlyphType = (hit: SearchDropdownHit) =>
-  (hit.record_type === 'diagram' || hit.record_type === 'connection') ? 'generic' : hit.artifact_type
+  (hit.record_type === 'diagram' || hit.record_type === 'connection') ? 'generic' : (hit.artifact_type ?? 'generic')
 const hitTypeLabel = (hit: SearchDropdownHit) => (hit.artifact_type || hit.record_type || '').replace(/^archimate[-_]/i, '')
 
 const assuranceStatus = ref<'unlocked' | 'locked' | 'not_initialised' | null>(null)

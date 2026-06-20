@@ -16,6 +16,7 @@ import { useMutation } from '../composables/useMutation'
 import { toGlyphKey } from '../lib/glyphKey'
 import { renderMatrixMarkdown } from '../lib/matrixMarkdown'
 import type { C4Navigation } from '../../domain'
+import { buildAliasToId, buildDrilldownByEntityId } from './DiagramDetailView.helpers'
 
 const svc = inject(modelServiceKey)!
 const route = useRoute()
@@ -32,6 +33,7 @@ const syncMutation = useMutation<SyncDiagramToModelResult, RepoError>()
 
 const detail = computed(() => contextQuery.data.value?.diagram ?? null)
 const c4Nav = computed<C4Navigation | null>(() => contextQuery.data.value?.c4_navigation ?? null)
+const drilldownByEntityId = computed(() => buildDrilldownByEntityId(c4Nav.value))
 const diagramEntities = computed(() =>
   (contextQuery.data.value?.entities ?? [])
     .slice()
@@ -160,14 +162,8 @@ const attachInteractivity = async () => {
   const svgEl = svgContainer.value?.querySelector('svg')
   if (!svgEl || !diagramEntities.value.length) return
 
-  const aliasToId = new Map<string, string>()
+  const aliasToId = buildAliasToId(diagramEntities.value)
   const svgNodeIdToAlias = new Map<string, string>()
-  for (const e of diagramEntities.value) {
-    if (e.display_alias) {
-      aliasToId.set(e.display_alias, e.artifact_id)
-      aliasToId.set(e.display_alias.replace(/[^a-zA-Z0-9_]/g, '_'), e.artifact_id)
-    }
-  }
   if (!aliasToId.size) return
 
   for (const g of Array.from(svgEl.querySelectorAll<SVGGElement>('g'))) {
@@ -197,6 +193,37 @@ const attachInteractivity = async () => {
     g.setAttribute('data-entity-id', artifactId)
     svgNodeElems.value.set(artifactId, g)
     g.addEventListener('click', (ev) => { ev.stopPropagation(); selectEntity(artifactId) }, { signal })
+  }
+
+  // Inject drill-down badges for entities that scope a child C4 diagram.
+  // Badges sit at the node's top-right corner inside the SVG coordinate space.
+  const drillTargets = drilldownByEntityId.value
+  for (const [artifactId, targetId] of Object.entries(drillTargets)) {
+    const entityEl = svgNodeElems.value.get(artifactId)
+    if (!(entityEl instanceof SVGGraphicsElement)) continue
+    try {
+      const bbox = entityEl.getBBox()
+      if (!bbox.width || !bbox.height) continue
+      const badgeG = document.createElementNS('http://www.w3.org/2000/svg', 'g')
+      badgeG.setAttribute('class', 'c4-drill-badge')
+      badgeG.setAttribute('transform', `translate(${bbox.x + bbox.width - 18},${bbox.y + 2})`)
+      const br = document.createElementNS('http://www.w3.org/2000/svg', 'rect')
+      br.setAttribute('width', '16'); br.setAttribute('height', '14'); br.setAttribute('rx', '3')
+      br.setAttribute('fill', '#1e40af'); br.setAttribute('opacity', '0.85')
+      br.setAttribute('cursor', 'pointer')
+      badgeG.appendChild(br)
+      const bt = document.createElementNS('http://www.w3.org/2000/svg', 'text')
+      bt.setAttribute('x', '8'); bt.setAttribute('y', '11')
+      bt.setAttribute('text-anchor', 'middle'); bt.setAttribute('font-size', '10')
+      bt.setAttribute('fill', 'white'); bt.setAttribute('pointer-events', 'none')
+      bt.textContent = '⤵'
+      badgeG.appendChild(bt)
+      svgEl.appendChild(badgeG)
+      badgeG.addEventListener('click', (ev) => {
+        ev.stopPropagation()
+        void router.push({ path: '/diagram', query: { id: targetId } })
+      }, { signal })
+    } catch { /* getBBox unavailable in non-rendered contexts */ }
   }
 
   const aliasToConnQueue = new Map<string, DiagramConnection[]>()
@@ -621,60 +648,41 @@ onUnmounted(() => {
         <span class="mono faded">v{{ detail.version }} · {{ detail.artifact_id }}</span>
       </div>
 
-      <!-- C4 navigation panel -->
+      <!-- C4 up-banner: sticky breadcrumb showing parent C4 diagrams -->
       <div
-        v-if="c4Nav"
-        class="c4-nav"
+        v-if="c4Nav?.parent_diagrams.length"
+        class="c4-up-banner"
       >
-        <div class="c4-nav-hdr">
-          <span class="c4-level-badge">L{{ c4Nav.current_level }}</span>
-          <span class="c4-nav-title">
-            {{ ['System Landscape', 'System Context', 'Container', 'Component'][c4Nav.current_level] ?? '' }} Diagram
-          </span>
-          <span
-            v-if="c4Nav.scope_entity_name"
-            class="c4-scope-label"
-          >Scope: {{ c4Nav.scope_entity_name }}</span>
-        </div>
-        <div
-          v-if="c4Nav.parent_diagrams.length || c4Nav.child_diagrams.length"
-          class="c4-nav-links"
+        <span class="c4-level-badge">L{{ c4Nav.current_level }}</span>
+        <span
+          v-if="c4Nav.scope_entity_name"
+          class="c4-scope-name"
+        >{{ c4Nav.scope_entity_name }}</span>
+        <span class="c4-sep">·</span>
+        <RouterLink
+          v-for="p in c4Nav.parent_diagrams"
+          :key="p.diagram_id"
+          :to="{ path: '/diagram', query: { id: p.diagram_id } }"
+          class="c4-up-link"
         >
-          <div
-            v-if="c4Nav.parent_diagrams.length"
-            class="c4-nav-group"
-          >
-            <span class="c4-nav-dir">↑ Higher level</span>
-            <RouterLink
-              v-for="link in c4Nav.parent_diagrams"
-              :key="link.diagram_id"
-              :to="{ path: '/diagram', query: { id: link.diagram_id } }"
-              class="c4-nav-link"
-            >
-              {{ link.diagram_name }}
-            </RouterLink>
-          </div>
-          <div
-            v-if="c4Nav.child_diagrams.length"
-            class="c4-nav-group"
-          >
-            <span class="c4-nav-dir">↓ Drill down</span>
-            <RouterLink
-              v-for="link in c4Nav.child_diagrams"
-              :key="link.diagram_id"
-              :to="{ path: '/diagram', query: { id: link.diagram_id } }"
-              class="c4-nav-link"
-            >
-              {{ link.diagram_name }}
-            </RouterLink>
-          </div>
-        </div>
-        <div
-          v-else
-          class="c4-nav-empty"
+          ↑ {{ p.diagram_name }}
+        </RouterLink>
+      </div>
+
+      <!-- C4 child links (de-emphasised; primary drill-down is via on-node badges) -->
+      <div
+        v-if="c4Nav?.child_diagrams.length"
+        class="c4-child-nav"
+      >
+        <span class="c4-nav-dir">Drill down:</span>
+        <RouterLink
+          v-for="child in c4Nav.child_diagrams"
+          :key="child.diagram_id"
+          :to="{ path: '/diagram', query: { id: child.diagram_id } }"
+          class="c4-nav-link"
         >
-          No linked C4 diagrams found at adjacent levels.
-        </div>
+          ⤵ {{ child.diagram_name }}
+        </RouterLink>
       </div>
 
       <div
@@ -1183,18 +1191,26 @@ onUnmounted(() => {
 .matrix-view :deep(td:not(:first-child)) { text-align: center; }
 .matrix-view :deep(h2) { font-size: 13px; font-weight: 700; margin: 16px 0 6px; color: #374151; }
 
-.c4-nav {
-  margin-bottom: 12px; padding: 10px 14px; background: #f0f9ff;
-  border: 1px solid #bae6fd; border-radius: 8px; display: flex; flex-direction: column; gap: 8px;
+.c4-up-banner {
+  display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+  padding: 7px 12px; margin-bottom: 8px;
+  background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 6px;
+  position: sticky; top: 0; z-index: 10;
 }
-.c4-nav-hdr { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.c4-scope-name { font-size: 12px; color: #1e40af; font-weight: 500; }
+.c4-sep { font-size: 11px; color: #9ca3af; }
+.c4-up-link {
+  font-size: 12px; color: #1d4ed8; text-decoration: none; font-weight: 600;
+  padding: 2px 8px; background: white; border: 1px solid #bfdbfe; border-radius: 4px;
+}
+.c4-up-link:hover { background: #dbeafe; text-decoration: none; }
+.c4-child-nav {
+  display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+  padding: 5px 10px; margin-bottom: 10px;
+  background: #f8fafc; border: 1px solid #e5e7eb; border-radius: 6px;
+}
 .c4-level-badge { padding: 2px 8px; border-radius: 4px; background: #0ea5e9; color: white; font-size: 11px; font-weight: 700; }
-.c4-nav-title { font-size: 13px; font-weight: 600; color: #0c4a6e; }
-.c4-scope-label { font-size: 12px; color: #0369a1; margin-left: 4px; }
-.c4-nav-links { display: flex; gap: 16px; flex-wrap: wrap; }
-.c4-nav-group { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .c4-nav-dir { font-size: 11px; font-weight: 700; color: #6b7280; white-space: nowrap; }
 .c4-nav-link { font-size: 12px; color: #0369a1; text-decoration: none; padding: 2px 8px; border: 1px solid #bae6fd; border-radius: 4px; background: white; }
 .c4-nav-link:hover { background: #e0f2fe; text-decoration: none; }
-.c4-nav-empty { font-size: 12px; color: #9ca3af; }
 </style>

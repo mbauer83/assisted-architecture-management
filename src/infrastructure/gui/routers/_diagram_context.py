@@ -68,6 +68,9 @@ def diagram_entities_and_puml(
     aliases = declared_aliases_in_puml(puml)
     entities = []
     for rec in repo.list_entities():
+        # Diagram-only entities from a *different* diagram must never bleed in.
+        if rec.host_diagram_id is not None and rec.host_diagram_id != diag_rec.artifact_id:
+            continue
         if rec.display_alias and normalize_puml_alias(rec.display_alias) in aliases:
             row = s.entity_to_summary(rec)
             row["display_alias"] = rec.display_alias

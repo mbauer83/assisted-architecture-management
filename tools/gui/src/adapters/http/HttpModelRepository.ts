@@ -1,4 +1,4 @@
-import { Effect, Schema, ParseResult } from 'effect'
+import { Effect, Schema, ParseResult, Either } from 'effect'
 import type { ModelRepository, ListParams, Direction } from '../../ports/ModelRepository'
 import { NetworkError, NotFoundError } from '../../domain/errors'
 import {
@@ -9,7 +9,7 @@ import {
   EntityContextSchema,
   ConnectionListSchema,
   NeighborsSchema,
-  SearchResultSchema,
+  SearchHitSchema,
   DocumentTypesSchema,
   DocumentListSchema,
   DocumentDetailSchema,
@@ -270,8 +270,23 @@ export const makeHttpModelRepository = (): ModelRepository => ({
     fetchJson(buildUrl('/connections', { entity_id: entityId, direction, conn_type: connType }), ConnectionListSchema),
   getNeighbors: (entityId: string, maxHops = 1) =>
     fetchJson(buildUrl('/neighbors', { entity_id: entityId, max_hops: maxHops }), NeighborsSchema),
-  search: (query: string, limit = 20) =>
-    fetchJson(buildUrl('/search', { q: query, limit }), SearchResultSchema),
+  search: (query: string, limit = 20) => {
+    const RawSearchResultSchema = Schema.Struct({ query: Schema.String, hits: Schema.Array(Schema.Unknown) })
+    const decodeHit = Schema.decodeUnknownEither(SearchHitSchema)
+    return fetchJson(buildUrl('/search', { q: query, limit }), RawSearchResultSchema).pipe(
+      Effect.map((raw) => ({
+        query: raw.query,
+        hits: raw.hits.flatMap((h) => {
+          const result = decodeHit(h)
+          if (Either.isLeft(result)) {
+            console.warn('[search] skipped unrecognised search hit', h)
+            return []
+          }
+          return [result.right]
+        }),
+      })),
+    )
+  },
 
   listDocumentTypes: () =>
     fetchJson(buildUrl('/document-types'), DocumentTypesSchema).pipe(

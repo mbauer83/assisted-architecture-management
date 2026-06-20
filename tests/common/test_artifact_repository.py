@@ -215,6 +215,7 @@ class FakeStore:
         artifact_type: str | list[str] | None = None,
         domain: str | list[str] | None = None,
         status: str | list[str] | None = None,
+        include_entities: bool = True,
         include_connections: bool = False,
         include_diagrams: bool = False,
         include_documents: bool = False,
@@ -227,7 +228,8 @@ class FakeStore:
         out: list[ArtifactSummary] = [
             summary_from_entity(r)
             for r in self._entities.values()
-            if (not types or r.artifact_type in types)
+            if include_entities
+            and (not types or r.artifact_type in types)
             and (not domains or r.domain.lower() in domains)
             and (not statuses or r.status in statuses)
         ]
@@ -307,11 +309,10 @@ class FakeStore:
         query: str,
         *,
         limit: int,
-        include_connections: bool,
-        include_diagrams: bool,
-        include_documents: bool,
-        prefer_record_type: str | None,
-        strict_record_type: bool,
+        include_entities: bool = True,
+        include_connections: bool = True,
+        include_diagrams: bool = True,
+        include_documents: bool = True,
     ) -> list[tuple[str, str, float]]:
         return []
 

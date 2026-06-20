@@ -8,13 +8,12 @@ connection_to_dict, diagram_to_summary, get_both_roots, resolve_gar.
 from __future__ import annotations
 
 from pathlib import Path
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 
 import pytest
 
 from src.domain.artifact_types import ConnectionRecord, DiagramRecord, EntityRecord
 from src.infrastructure.gui.routers import state as s
-
 
 # ── helpers ───────────────────────────────────────────────────────────────────
 
