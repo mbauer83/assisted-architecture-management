@@ -57,3 +57,33 @@ def test_no_dt_relationship_kind_is_visual_class():
     assert not collisions, (
         f"dt-* types whose relationship_kind collides with a visual class tag: {collisions}"
     )
+
+
+# ── WU-0.2: classifier workspace identity ────────────────────────────────────
+
+def _dt_classifier_entity_type():
+    from src.domain.module_types import EntityTypeName
+    registry = app_bootstrap.build_module_registry(complete_vocabulary=True)
+    return registry.all_diagram_types()["datatype"].diagram_entity_type_infos[EntityTypeName("classifier")]
+
+
+def _dt_classifier_ui_config():
+    registry = app_bootstrap.build_module_registry(complete_vocabulary=True)
+    dt = registry.all_diagram_types()["datatype"]
+    return next(oe for oe in dt.ui_config.diagram_only_types if oe.entity_type == "classifier")
+
+
+def test_classifier_identity_scope_workspace():
+    assert _dt_classifier_entity_type().identity_scope == "workspace"
+
+
+def test_classifier_id_prefix_clf():
+    assert _dt_classifier_entity_type().id_prefix == "CLF"
+
+
+def test_classifier_ui_config_identity_scope():
+    assert _dt_classifier_ui_config().identity_scope == "workspace"
+
+
+def test_classifier_ui_config_id_prefix():
+    assert _dt_classifier_ui_config().id_prefix == "CLF"

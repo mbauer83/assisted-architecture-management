@@ -24,6 +24,75 @@ from src.domain.permitted_relationships import PermittedRelationshipSet
 _OWN_ENTITY_TYPES: dict[EntityTypeName, EntityTypeInfo] = {}
 
 
+def _build_classifier_label_map(
+    diagram_entities: dict[str, Any],
+    candidate: Any,
+) -> dict[str, str]:
+    """Return id→label for all visible classifiers.
+
+    Inline classifiers (defined in *diagram_entities*) take precedence so that
+    the same-write contract works without a candidate.
+    """
+    label_map: dict[str, str] = {}
+
+    if candidate is not None:
+        for entity in candidate.list_entities(artifact_type="classifier"):
+            label_map[entity.artifact_id] = entity.name
+
+    for clf in diagram_entities.get("classifier") or []:
+        if isinstance(clf, dict):
+            clf_id = str(clf.get("id") or "")
+            if clf_id:
+                label_map[clf_id] = str(clf.get("label") or clf_id)
+
+    return label_map
+
+
+def _resolve_one_type_label(
+    type_ref: Any,
+    label_map: dict[str, str],
+    primitive_names: frozenset[str],
+) -> Any:
+    """Resolve a single attribute type ref to a label string or return the original."""
+    if not isinstance(type_ref, dict):
+        return type_ref
+    kind = type_ref.get("kind")
+    if kind == "primitive":
+        return str(type_ref.get("name") or "")
+    if kind == "classifier":
+        clf_id = str(type_ref.get("id") or "")
+        return label_map.get(clf_id, clf_id)
+    return type_ref
+
+
+def _prepare_classifier_for_render(
+    clf: Any,
+    label_map: dict[str, str],
+    primitive_names: frozenset[str],
+) -> Any:
+    if not isinstance(clf, dict):
+        return clf
+    new_attrs = [
+        {**attr, "type": _resolve_one_type_label(attr.get("type"), label_map, primitive_names)}
+        if isinstance(attr, dict) and isinstance(attr.get("type"), dict)
+        else attr
+        for attr in (clf.get("attributes") or [])
+    ]
+    return {**clf, "attributes": new_attrs}
+
+
+def _apply_type_labels(
+    diagram_entities: dict[str, Any],
+    label_map: dict[str, str],
+    primitive_names: frozenset[str],
+) -> dict[str, Any]:
+    prepared = [
+        _prepare_classifier_for_render(clf, label_map, primitive_names)
+        for clf in (diagram_entities.get("classifier") or [])
+    ]
+    return {**diagram_entities, "classifier": prepared}
+
+
 def _load_config(package_dir: Path) -> dict[str, Any]:
     config_path = package_dir / "config.yaml"
     with config_path.open(encoding="utf-8") as handle:
@@ -121,6 +190,9 @@ def _apply_ontology_fields(
             }
             for rc in ont_et.required_connections
         ]
+    entry["identity_scope"] = ont_et.identity_scope
+    if ont_et.id_prefix is not None:
+        entry["id_prefix"] = ont_et.id_prefix
 
 
 class _DatatypeDiagramType(DiagramTypeBase):
@@ -159,6 +231,11 @@ class _DatatypeDiagramType(DiagramTypeBase):
         return _OWN_ENTITY_TYPES
 
     @property
+    def diagram_entity_type_infos(self) -> dict[EntityTypeName, EntityTypeInfo]:
+        """EntityTypeInfo for diagram-owned entity types (authoritative source for identity metadata)."""
+        return dict(self._ontology.entity_types)
+
+    @property
     def own_connection_types(self) -> dict[ConnectionTypeName, ConnectionTypeInfo]:
         return dict(self._ontology.connection_types)
 
@@ -184,6 +261,43 @@ class _DatatypeDiagramType(DiagramTypeBase):
             diagram_entities_schema=derive_diagram_entities_schema(own_types),
             own_entity_types=own_types,
             allowed_bindings=ab if not ab.is_empty() else None,
+        )
+
+    def prepare_render_model(
+        self, diagram_entities: dict[str, Any], candidate: Any = None
+    ) -> dict[str, Any]:
+        """Resolve attribute type refs to label strings suitable for PUML rendering.
+
+        Builds a label map from (1) classifiers defined inline in *diagram_entities*,
+        then (2) any entities in *candidate*.  Converts {kind:…} type dicts to plain
+        strings; non-dict types are preserved as-is (supports legacy string types).
+        """
+        label_map = _build_classifier_label_map(diagram_entities, candidate)
+        primitive_names = frozenset(
+            str(p) for p in (self._config.get("ui") or {}).get("primitive_types") or []
+        )
+        return _apply_type_labels(diagram_entities, label_map, primitive_names)
+
+    def repository_verification_contributions(self) -> tuple:
+        from src.diagram_types.datatype._contributions import _ReferenceImpactContribution  # noqa: PLC0415
+
+        return (_ReferenceImpactContribution(),)
+
+    def diagram_verification_contributions(self) -> tuple:
+        from src.diagram_types.datatype._contributions import (  # noqa: PLC0415
+            ATTRIBUTE_TYPE_SCHEMA_CONTRIBUTION,
+            BACKING_CONSISTENCY_CONTRIBUTION,
+            UNIQUE_CONSTRAINT_CONTRIBUTION,
+            _ProjectionBasedContributions,
+        )
+        primitive_names = frozenset(
+            str(p) for p in (self._config.get("ui") or {}).get("primitive_types") or []
+        )
+        return (
+            BACKING_CONSISTENCY_CONTRIBUTION,
+            ATTRIBUTE_TYPE_SCHEMA_CONTRIBUTION,
+            UNIQUE_CONSTRAINT_CONTRIBUTION,
+            _ProjectionBasedContributions(primitive_names),
         )
 
 

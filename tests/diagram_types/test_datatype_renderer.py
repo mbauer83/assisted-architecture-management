@@ -101,6 +101,20 @@ class TestAttributes:
         out = _render(classifiers=[_cls("c1", attributes=[{"name": "name", "type": "string"}])])
         assert "{id}" not in out
 
+    def test_attribute_unique_marker(self):
+        out = _render(classifiers=[_cls("c1", attributes=[{
+            "name": "email", "type": "string", "is_unique": True,
+        }])])
+        assert "{unique}" in out
+
+    def test_composite_unique_constraint_note(self):
+        out = _render(classifiers=[_cls(
+            "c1",
+            attributes=[{"name": "tenant"}, {"name": "number"}],
+            unique_constraints=[["tenant", "number"]],
+        )])
+        assert "{unique(tenant, number)}" in out
+
 
 # ---------------------------------------------------------------------------
 # Enumeration literals
@@ -185,6 +199,24 @@ class TestCardinality:
             "conn_type": "dt-association", "label": "owns",
         }])
         assert ": owns" in out
+
+
+class TestNotes:
+    def test_classifier_note_in_output(self):
+        out = _render(classifiers=[_cls("c1", label="Order", note="Aggregate root")])
+        assert "note right of _c1" in out
+        assert "Aggregate root" in out
+
+    def test_connection_note_in_output(self):
+        out = _render(connections=[{
+            "id": "e1",
+            "source": "a",
+            "target": "b",
+            "conn_type": "dt-association",
+            "note": "Derived relation",
+        }])
+        assert "note on link" in out
+        assert "Derived relation" in out
 
 
 # ---------------------------------------------------------------------------

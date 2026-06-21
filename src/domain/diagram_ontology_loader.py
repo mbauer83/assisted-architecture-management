@@ -87,6 +87,8 @@ def _parse_entity_types(raw: dict[str, Any]) -> dict[EntityTypeName, EntityTypeI
             max=None if max_val is None else int(max_val),
             permitted_mappings=mapping_spec_from_config(cfg.get("permitted_mappings")),
             mapping_required=bool(cfg.get("mapping_required", False)),
+            identity_scope=str(cfg.get("identity_scope") or "diagram"),  # type: ignore[arg-type]
+            id_prefix=(str(cfg["id_prefix"]) if cfg.get("id_prefix") else None),
         )
     return out
 

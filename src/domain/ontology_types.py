@@ -93,6 +93,8 @@ class EntityTypeInfo:
     max: int | None = None
     permitted_mappings: PermittedMappingSpec = field(default_factory=PermittedMappingSpec)
     mapping_required: bool = False
+    identity_scope: Literal["diagram", "workspace"] = "diagram"
+    id_prefix: str | None = None
 
 
 RELATIONSHIP_KINDS: frozenset[str] = frozenset({"association", "containment", "generalization", "dependency"})

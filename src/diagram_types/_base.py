@@ -103,3 +103,14 @@ class DiagramTypeBase:
 
     def read_diagram_extras(self, parsed_source: dict[str, Any]) -> dict[str, Any]:
         return {}
+
+    def diagram_verification_contributions(self) -> tuple:
+        return ()
+
+    def repository_verification_contributions(self) -> tuple:
+        return ()
+
+    def prepare_render_model(
+        self, diagram_entities: dict[str, Any], candidate: Any = None
+    ) -> dict[str, Any]:
+        return diagram_entities

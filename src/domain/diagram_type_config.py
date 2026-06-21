@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 from dataclasses import dataclass, field
-from typing import Any
+from typing import Any, Literal
 
 from src.domain.allowed_bindings import AllowedBindingsSpec
 from src.domain.ontology_types import (
@@ -45,6 +45,8 @@ class DiagramOwnEntityTypeUiConfig:
     permitted_connections: PermittedRelationshipSet = field(default_factory=PermittedRelationshipSet.empty)
     required_connections: tuple[RequiredConnection, ...] = ()
     managed_fields: tuple[tuple[str, str], ...] | None = None
+    identity_scope: Literal["diagram", "workspace"] = "diagram"
+    id_prefix: str | None = None
 
 
 @dataclass(frozen=True)
@@ -113,6 +115,8 @@ def _own_entity_ui_config_from_mapping(config: Mapping[str, Any]) -> DiagramOwnE
         ),
         required_connections=tuple(_required_connection_from_mapping(rc) for rc in raw_req if isinstance(rc, Mapping)),
         managed_fields=_parse_managed_fields(config.get("managed_fields")),
+        identity_scope=str(config.get("identity_scope") or "diagram"),  # type: ignore[arg-type]
+        id_prefix=(str(config["id_prefix"]) if config.get("id_prefix") else None),
     )
 
 

@@ -31,6 +31,7 @@ from src.domain.permitted_relationships import PermittedRelationshipSet
 
 if TYPE_CHECKING:
     from src.domain.artifact_types import ConnectionRecord, EntityRecord
+    from src.domain.diagram_verification import DiagramVerificationContribution, RepositoryVerificationContribution
 
 # Re-export all diagram_type_config public names for backward-compatible imports.
 __all__ = [
@@ -41,6 +42,7 @@ __all__ = [
     "DiagramTypeUiConfig",
     "DiagramTypeWriteGuidance",
     "DiagramRenderer",
+    "NativeSvgDiagramRenderer",
     "ModuleClass",
     "OntologyModule",
     "PrimaryOntology",
@@ -124,6 +126,13 @@ class DiagramRenderer(Protocol):
 
 
 @runtime_checkable
+class NativeSvgDiagramRenderer(Protocol):
+    """Optional capability for diagram types that own their SVG notation."""
+
+    def render_svg(self, puml_body: str) -> str: ...
+
+
+@runtime_checkable
 class DiagramTypeModule(Protocol):
     @property
     def name(self) -> DiagramTypeName: ...
@@ -175,4 +184,11 @@ class DiagramTypeModule(Protocol):
 
     def read_diagram_extras(self, parsed_source: dict[str, Any]) -> dict[str, Any]: ...
 
+    def diagram_verification_contributions(self) -> tuple[DiagramVerificationContribution, ...]: ...
+
+    def repository_verification_contributions(self) -> tuple[RepositoryVerificationContribution, ...]: ...
+
+    def prepare_render_model(
+        self, diagram_entities: dict[str, Any], candidate: Any
+    ) -> dict[str, Any]: ...
 

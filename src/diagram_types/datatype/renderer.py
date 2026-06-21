@@ -79,6 +79,7 @@ def _render_classifier(c: dict[str, Any]) -> list[str]:
             atype = str(attr.get("type") or "")
             mult = str(attr.get("multiplicity") or "")
             is_id = bool(attr.get("is_id"))
+            is_unique = bool(attr.get("is_unique"))
             parts: list[str] = [f"  + {name}"]
             if atype:
                 parts.append(f" : {atype}")
@@ -86,13 +87,29 @@ def _render_classifier(c: dict[str, Any]) -> list[str]:
                 parts.append(f" [{mult}]")
             if is_id:
                 parts.append(" {id}")
+            if is_unique:
+                parts.append(" {unique}")
             lines.append("".join(parts))
 
     lines.append("}")
+    constraints = [
+        ", ".join(str(name) for name in constraint)
+        for constraint in (c.get("unique_constraints") or [])
+        if isinstance(constraint, list) and constraint
+    ]
+    if constraints:
+        lines.extend((
+            f"note right of {alias}",
+            *[f"{{unique({constraint})}}" for constraint in constraints],
+            "end note",
+        ))
+    note = _safe_text(str(c.get("note") or "")).strip()
+    if note:
+        lines.extend((f"note right of {alias}", note, "end note"))
     return lines
 
 
-def _render_connection(kc: dict[str, Any]) -> str:
+def _render_connection(kc: dict[str, Any]) -> list[str]:
     src = _safe_alias(str(kc.get("source") or ""))
     tgt = _safe_alias(str(kc.get("target") or ""))
     conn_type = str(kc.get("conn_type") or "dt-association")
@@ -105,7 +122,11 @@ def _render_connection(kc: dict[str, Any]) -> str:
     tgt_part = f'"{tgt_card}" ' if tgt_card else ""
     label_part = f" : {label}" if label else ""
 
-    return f"{src}{src_part} {arrow} {tgt_part}{tgt}{label_part}"
+    lines = [f"{src}{src_part} {arrow} {tgt_part}{tgt}{label_part}"]
+    note = _safe_text(str(kc.get("note") or "")).strip()
+    if note:
+        lines.extend(("note on link", note, "end note"))
+    return lines
 
 
 class DatatypePumlRenderer:
@@ -144,7 +165,7 @@ class DatatypePumlRenderer:
             lines.append("")
         for kc in kcs:
             if kc.get("conn_type") in _PUML_ARROWS:
-                lines.append(_render_connection(kc))
+                lines.extend(_render_connection(kc))
         lines += ["", "@enduml"]
         return "\n".join(lines)
 

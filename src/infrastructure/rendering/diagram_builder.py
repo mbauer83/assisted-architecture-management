@@ -11,24 +11,23 @@ code from ``src.common``).
 
 from __future__ import annotations
 
-import base64
-import os
 import re
-import subprocess
-import tempfile
 from collections import defaultdict
 from functools import lru_cache
 from pathlib import Path
 
 from src.application.artifact_parsing import normalize_puml_alias
-from src.config.repo_paths import DIAGRAM_CATALOG, DIAGRAMS
+from src.config.repo_paths import DIAGRAM_CATALOG
 from src.domain.artifact_types import ConnectionRecord, EntityRecord
 from src.domain.module_types import ConnectionTypeName, ElementClassName
 from src.infrastructure.diagram_type_registry import get_diagram_type
 from src.infrastructure.rendering._diagram_layout import (
     build_visual_nesting,
 )
-from src.infrastructure.rendering.puml_safety import strip_leading_puml_frontmatter
+from src.infrastructure.rendering.puml_runtime import (
+    render_puml_preview as render_puml_preview,
+)
+from src.infrastructure.rendering.puml_runtime import render_puml_svg as render_puml_svg
 
 
 @lru_cache(maxsize=1)
@@ -243,111 +242,3 @@ def generate_archimate_puml_body(
         diagram_connections=diagram_connections,
         **extra,
     )
-
-
-def _prepare_preview_body(
-    puml_body: str,
-    repo_root: Path,
-    diagram_type: str | None,
-) -> str:
-    if diagram_type is None:
-        return puml_body
-    return get_diagram_type(diagram_type).renderer.inject_includes(puml_body, repo_root)
-
-
-def _render_puml(
-    puml_body: str,
-    repo_root: Path,
-    fmt: str,
-    diagram_type: str | None = None,
-) -> tuple[str | None, list[str]]:
-    """Core PlantUML render pipeline.
-
-    *fmt* is ``"png"`` or ``"svg"``.  Returns ``(result, warnings)`` where
-    *result* is a ``data:image/png;base64,…`` data-URL for PNG, raw SVG text
-    for SVG, or ``None`` on failure.  No files are written to the model.
-    """
-    from src.application.verification.artifact_verifier_syntax import find_graphviz_dot, find_plantuml_jar
-    from src.config.settings import plantuml_limit_size, render_dpi
-
-    warnings: list[str] = []
-    jar = find_plantuml_jar()
-    if jar is None:
-        return None, ["plantuml.jar not found; render skipped"]
-
-    diag_dir = repo_root / DIAGRAM_CATALOG / DIAGRAMS
-    if not diag_dir.exists():
-        return None, [f"Diagram directory not found: {diag_dir}"]
-
-    render_body = strip_leading_puml_frontmatter(puml_body)
-    render_body = re.sub(r"@startuml\s+\S+", "@startuml", render_body, count=1)
-    render_body = _prepare_preview_body(render_body, repo_root, diagram_type)
-
-    tmp_path: Path | None = None
-    try:
-        with tempfile.NamedTemporaryFile(mode="w", suffix=".puml", dir=diag_dir, delete=False, encoding="utf-8") as tmp:
-            tmp.write(render_body)
-            tmp_path = Path(tmp.name)
-
-        with tempfile.TemporaryDirectory() as out_dir:
-            env = None
-            dot = find_graphviz_dot()
-            if dot is not None:
-                env = {**os.environ, "GRAPHVIZ_DOT": str(dot)}
-            cmd = [
-                "java",
-                "-Djava.awt.headless=true",
-                f"-DPLANTUML_LIMIT_SIZE={plantuml_limit_size()}",
-                "-jar",
-                str(jar.resolve()),
-                f"-t{fmt}",
-            ]
-            if fmt == "png":
-                cmd.append(f"-Sdpi={render_dpi()}")
-            cmd += ["-o", out_dir, tmp_path.name]
-            proc = subprocess.run(
-                cmd,
-                cwd=str(diag_dir),
-                capture_output=True,
-                text=True,
-                timeout=60,
-                env=env,
-            )
-            if proc.returncode != 0:
-                warnings.append(f"PlantUML render failed: {proc.stderr[:300]}")
-                return None, warnings
-            outputs = list(Path(out_dir).glob(f"*.{fmt}"))
-            if not outputs:
-                warnings.append(f"PlantUML produced no {fmt.upper()} output")
-                return None, warnings
-            if fmt == "png":
-                return (
-                    "data:image/png;base64," + base64.b64encode(outputs[0].read_bytes()).decode(),
-                    warnings,
-                )
-            return outputs[0].read_text(encoding="utf-8"), warnings
-
-    except (OSError, subprocess.TimeoutExpired) as exc:
-        warnings.append(f"Render error: {exc}")
-        return None, warnings
-    finally:
-        if tmp_path is not None:
-            tmp_path.unlink(missing_ok=True)
-
-
-def render_puml_preview(
-    puml_body: str,
-    repo_root: Path,
-    diagram_type: str | None = None,
-) -> tuple[str | None, list[str]]:
-    """Render *puml_body* to PNG. Returns ``(data:image/png;base64,…, warnings)``."""
-    return _render_puml(puml_body, repo_root, "png", diagram_type)
-
-
-def render_puml_svg(
-    puml_body: str,
-    repo_root: Path,
-    diagram_type: str | None = None,
-) -> tuple[str | None, list[str]]:
-    """Render *puml_body* to SVG. Returns ``(svg_text, warnings)``."""
-    return _render_puml(puml_body, repo_root, "svg", diagram_type)
