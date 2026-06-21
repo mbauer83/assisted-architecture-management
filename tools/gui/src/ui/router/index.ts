@@ -41,6 +41,14 @@ export const router = createRouter({
     { path: '/promote', component: PromoteView },
     // Assurance (enabled-gated, separate from model nav)
     { path: '/assurance', component: () => import('../views/AssuranceView.vue') },
-    { path: '/assurance/analyses', component: () => import('../views/GroupManagementView.vue'), props: () => ({ axis: 'analysis-collection' }) },
+    { path: '/assurance/browse', component: () => import('../views/AssuranceBrowseView.vue') },
+    { path: '/assurance/stpa', component: () => import('../views/AssuranceStpaWizardView.vue') },
+    { path: '/assurance/grc', component: () => import('../views/AssuranceGrcWizardView.vue') },
+    { path: '/assurance/cast', component: () => import('../views/AssuranceCastWizardView.vue') },
+    { path: '/assurance/gsn', component: () => import('../views/AssuranceGsnWizardView.vue') },
+    { path: '/assurance/supply-chain', component: () => import('../views/AssuranceSupplyChainWizardView.vue') },
+    { path: '/assurance/baselines', component: () => import('../views/AssuranceBaselinesView.vue') },
+    { path: '/assurance/diagrams', component: () => import('../views/AssuranceDiagramsView.vue') },
+    { path: '/assurance/analyses', redirect: '/assurance/browse' },
   ],
 })

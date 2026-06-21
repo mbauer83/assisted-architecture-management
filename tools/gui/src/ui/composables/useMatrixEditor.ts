@@ -65,8 +65,8 @@ export function useMatrixEditor(opts?: { toEntityIds?: () => string[] }) {
         seenByEntity.set(ownerId, seen)
         related[ownerId].push({
           artifact_id: otherId, name,
-          artifact_type: artifactType as EntityDisplayInfo['artifact_type'],
-          domain: domain as EntityDisplayInfo['domain'],
+          artifact_type: artifactType,
+          domain: domain,
           subdomain: '', status: '', display_alias: '',
           element_type: artifactType, element_label: name,
         })

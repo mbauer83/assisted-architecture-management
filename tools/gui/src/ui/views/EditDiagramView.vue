@@ -185,8 +185,8 @@ const relatedEntitiesById = computed<Record<string, EntityDisplayInfo[]>>(() => 
       seenByEntity.set(ownerId, seen)
       related[ownerId].push({
         artifact_id: otherId, name,
-        artifact_type: artifactType as EntityDisplayInfo['artifact_type'],
-        domain: domain as EntityDisplayInfo['domain'],
+        artifact_type: artifactType,
+        domain,
         subdomain: '', status: scope, display_alias: '',
         element_type: artifactType, element_label: name,
       })
@@ -545,6 +545,7 @@ onUnmounted(() => {
             :diagram-entities="typeEntityData"
             :entities="effectiveEntitiesList"
             :diagram-connections="diagramConnections"
+            :diagram-id="diagramId"
             @diagram-entities-change="mergeTypeEntityData"
             @diagram-connections-change="diagramConnections = $event"
           />

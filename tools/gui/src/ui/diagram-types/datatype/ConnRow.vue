@@ -5,6 +5,7 @@ import type { Classifier, DtConn, DtConnType } from './useDatatypeModel'
 import { DT_CONN_TYPES } from './useDatatypeModel'
 import { useDtBackingConstraint } from './useDtBackingConstraint'
 import { modelServiceKey } from '../../keys'
+import DatatypeNoteSection from './DatatypeNoteSection.vue'
 
 const props = defineProps<{
   conn: DtConn
@@ -115,22 +116,28 @@ async function applyFix() {
           {{ cls.label ?? cls.id }}
         </option>
       </select>
-      <input
-        class="card-in"
-        type="text"
-        :value="conn.src_cardinality ?? ''"
-        placeholder="src card"
-        title="Source cardinality"
-        @input="emit('updateConn', conn.id, { src_cardinality: ($event.target as HTMLInputElement).value || undefined })"
-      >
-      <input
-        class="card-in"
-        type="text"
-        :value="conn.tgt_cardinality ?? ''"
-        placeholder="tgt card"
-        title="Target cardinality"
-        @input="emit('updateConn', conn.id, { tgt_cardinality: ($event.target as HTMLInputElement).value || undefined })"
-      >
+      <label class="field-stack">
+        <span>Source cardinality</span>
+        <input
+          class="card-in"
+          type="text"
+          :value="conn.src_cardinality ?? ''"
+          placeholder="0..1"
+          title="Source cardinality (for example: 1, 0..1, 1..*, *)"
+          @input="emit('updateConn', conn.id, { src_cardinality: ($event.target as HTMLInputElement).value || undefined })"
+        >
+      </label>
+      <label class="field-stack">
+        <span>Target cardinality</span>
+        <input
+          class="card-in"
+          type="text"
+          :value="conn.tgt_cardinality ?? ''"
+          placeholder="1..*"
+          title="Target cardinality (for example: 1, 0..1, 1..*, *)"
+          @input="emit('updateConn', conn.id, { tgt_cardinality: ($event.target as HTMLInputElement).value || undefined })"
+        >
+      </label>
       <input
         class="lbl-in"
         type="text"
@@ -141,8 +148,8 @@ async function applyFix() {
       <span
         v-if="conn.backing_conn_id"
         class="binding-badge"
-        :title="`Bound to: ${conn.backing_conn_id}`"
-      >⇌</span>
+        :title="`Backed by model relation: ${conn.backing_conn_id}`"
+      >Model relation bound</span>
       <button
         class="del-btn"
         type="button"
@@ -151,18 +158,22 @@ async function applyFix() {
         ×
       </button>
     </div>
+    <DatatypeNoteSection
+      :note="conn.note"
+      @update="emit('updateConn', conn.id, { note: $event })"
+    />
     <div
       v-if="needsBacking"
       class="fix-row"
     >
-      <span class="fix-warn">⚠ No backing model connection</span>
+      <span class="fix-warn">This relation needs a compatible backing model relation.</span>
       <button
         class="fix-btn"
         type="button"
         :disabled="fixing"
         @click="applyFix"
       >
-        {{ fixing ? 'Creating…' : 'Create & bind' }}
+        {{ fixing ? 'Creating relation…' : 'Create compatible relation & bind' }}
       </button>
       <span
         v-if="fixError"
@@ -179,6 +190,7 @@ async function applyFix() {
 .conn-end { font-size: 11px; border: 1px solid #e2e8f0; border-radius: 3px; padding: 1px 3px; min-width: 80px; }
 .rl-arrow { font-size: 11px; color: #6b7280; }
 .card-in { width: 52px; font-size: 11px; border: 1px solid #e2e8f0; border-radius: 3px; padding: 1px 3px; }
+.field-stack { display: flex; flex-direction: column; gap: 1px; font-size: 9px; color: #6b7280; }
 .lbl-in { flex: 1; min-width: 60px; font-size: 11px; border: 1px solid #e2e8f0; border-radius: 3px; padding: 1px 4px; }
 .binding-badge { font-size: 12px; color: #059669; padding: 0 2px; }
 .del-btn { border: none; background: none; cursor: pointer; color: #9ca3af; font-size: 14px; padding: 0 2px; flex-shrink: 0; }

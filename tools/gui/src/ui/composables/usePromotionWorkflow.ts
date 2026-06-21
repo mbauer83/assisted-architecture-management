@@ -95,8 +95,8 @@ export const usePromotionWorkflow = (
         related[ownerId].push({
           artifact_id: otherId,
           name: isSource ? (conn.target_name ?? otherId) : (conn.source_name ?? otherId),
-          artifact_type: (isSource ? conn.target_artifact_type : conn.source_artifact_type) as EntityDisplayInfo['artifact_type'],
-          domain: (isSource ? conn.target_domain : conn.source_domain) as EntityDisplayInfo['domain'],
+          artifact_type: (isSource ? conn.target_artifact_type : conn.source_artifact_type),
+          domain: (isSource ? conn.target_domain : conn.source_domain),
           subdomain: '',
           status: isSource ? conn.target_scope : conn.source_scope,
           display_alias: '',

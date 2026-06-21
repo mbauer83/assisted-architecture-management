@@ -8,6 +8,7 @@ import ConnectionsPanel from '../components/ConnectionsPanel.vue'
 import ArchimateTypeGlyph from '../components/ArchimateTypeGlyph.vue'
 import ArtifactReferenceInput from '../components/ArtifactReferenceInput.vue'
 import TypedPropertyInput from '../components/TypedPropertyInput.vue'
+import AssuranceLens from '../components/AssuranceLens.vue'
 import type { EntityContext, WriteResult, EntityAttributeDescriptor } from '../../domain'
 import type { NotFoundError } from '../../domain'
 import type { MarkdownError } from '../../application/MarkdownService'
@@ -706,6 +707,12 @@ const insertReference = (markdownLink: string) => {
           @refresh="load"
         />
       </div>
+
+      <!-- Assurance lens: shows assurance findings that concern this entity (hidden when locked) -->
+      <AssuranceLens
+        v-if="entityId"
+        :artifact-id="entityId"
+      />
 
       <div
         v-if="showReferencePicker"

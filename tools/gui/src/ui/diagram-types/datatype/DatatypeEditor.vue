@@ -1,15 +1,19 @@
 <script setup lang="ts">
 import type { DiagramTypeUiConfig, EntityDisplayInfo } from '../../../domain'
+import { Effect } from 'effect'
 import ClassifierCard from './ClassifierCard.vue'
 import RelationList from './RelationList.vue'
 import { useDatatypeModel } from './useDatatypeModel'
 import type { Attribute, Classifier, DtConn } from './useDatatypeModel'
-import { computed } from 'vue'
+import type { CatalogClassifier } from './ClassifierCard.helpers'
+import { computed, inject, onMounted, ref, watch } from 'vue'
+import { modelServiceKey } from '../../keys'
 
 const props = defineProps<{
   uiConfig: DiagramTypeUiConfig
   diagramEntities: Record<string, unknown>
   entities: EntityDisplayInfo[]
+  diagramId?: string
 }>()
 const emit = defineEmits<{
   diagramEntitiesChange: [patch: Record<string, unknown>]
@@ -26,9 +30,53 @@ const {
   (patch) => emit('diagramEntitiesChange', patch),
 )
 
+const svc = inject(modelServiceKey)!
 const primitiveTypes = computed(() => props.uiConfig.primitive_types ?? [])
-const classifierLabels = computed(() =>
-  classifiers.value.map((c) => c.label ?? c.id).filter(Boolean)
+const catalogClassifiers = ref<CatalogClassifier[]>([])
+const usageCounts = ref<Record<string, number>>({})
+
+async function loadTypes() {
+  const result = await Effect.runPromise(svc.getDatatypeTypes({
+    limit: 500,
+    diagramId: props.diagramId || undefined,
+  })).catch(() => null)
+  if (!result) return
+  catalogClassifiers.value = [...result.classifiers]
+}
+
+async function refreshUsageCounts() {
+  const ids = classifiers.value.map((classifier) => classifier.id)
+  const entries = await Promise.all(ids.map(async (id) => {
+    const result = await Effect.runPromise(svc.getDatatypeTypeUsages(id)).catch(() => null)
+    return [id, result?.usages.length ?? 0] as const
+  }))
+  usageCounts.value = Object.fromEntries(entries)
+}
+
+async function createClassifier(attrOwnerId?: string, attrIndex?: number) {
+  const allocated = await Effect.runPromise(svc.allocateDiagramEntityId({
+    owner_kind: 'diagram',
+    diagram_type: 'datatype',
+    entity_type: 'classifier',
+    name_hint: 'Classifier',
+  })).catch(() => null)
+  if (!allocated) return
+  addClassifier(
+    allocated.id,
+    'Classifier',
+    attrOwnerId !== undefined && attrIndex !== undefined
+      ? { classifierId: attrOwnerId, attrIndex }
+      : undefined,
+  )
+}
+
+onMounted(() => {
+  void loadTypes()
+  void refreshUsageCounts()
+})
+watch(
+  () => classifiers.value.map((classifier) => classifier.id).join('|'),
+  () => { void refreshUsageCounts() },
 )
 </script>
 
@@ -40,7 +88,7 @@ const classifierLabels = computed(() =>
         <button
           class="dte-add-btn"
           type="button"
-          @click="addClassifier()"
+          @click="createClassifier()"
         >
           + Classifier
         </button>
@@ -56,7 +104,10 @@ const classifierLabels = computed(() =>
         :key="cls.id"
         :classifier="cls"
         :primitive-types="primitiveTypes"
-        :classifier-labels="classifierLabels"
+        :classifiers="classifiers"
+        :catalog-classifiers="catalogClassifiers"
+        :diagram-id="diagramId ?? ''"
+        :usage-count="usageCounts[cls.id] ?? 0"
         @update="(patch: Partial<Classifier>) => updateClassifier(cls.id, patch)"
         @remove="removeClassifier(cls.id)"
         @add-attr="addAttribute(cls.id)"
@@ -65,6 +116,7 @@ const classifierLabels = computed(() =>
         @add-literal="addLiteral(cls.id)"
         @remove-literal="(i: number) => removeLiteral(cls.id, i)"
         @update-literal="(i: number, val: string) => updateLiteral(cls.id, i, val)"
+        @new-classifier="(i: number) => createClassifier(cls.id, i)"
       />
     </section>
 

@@ -9,6 +9,7 @@ const props = defineProps<{
   diagramEntities: Record<string, unknown>
   entities?: EntityDisplayInfo[]
   diagramConnections?: DiagramConnection[]
+  diagramId?: string
 }>()
 const emit = defineEmits<{
   diagramEntitiesChange: [patch: Record<string, unknown>]
@@ -53,6 +54,7 @@ const ownTypes = computed(() => {
       :diagram-entities="diagramEntities"
       :entities="entities ?? []"
       :diagram-connections="diagramConnections ?? []"
+      :diagram-id="diagramId"
       v-bind="slot.config"
       @diagram-entities-change="emit('diagramEntitiesChange', $event)"
       @diagram-connections-change="emit('diagramConnectionsChange', $event)"

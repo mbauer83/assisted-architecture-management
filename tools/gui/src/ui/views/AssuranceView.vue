@@ -93,16 +93,58 @@ onMounted(async () => {
               Assurance store unlocked
             </p>
             <p class="assurance-banner__hint">
-              Use the arch-assurance-read / write MCP servers to author analyses.
+              Browse and inspect assurance nodes, or use the arch-assurance MCP tools to author analyses.
             </p>
           </div>
         </div>
         <div class="assurance-links">
           <RouterLink
-            to="/assurance/analyses"
+            to="/assurance/stpa"
             class="assurance-link"
           >
-            Analysis Collections →
+            STPA wizard →
+          </RouterLink>
+          <RouterLink
+            to="/assurance/grc"
+            class="assurance-link"
+          >
+            GRC wizard →
+          </RouterLink>
+          <RouterLink
+            to="/assurance/cast"
+            class="assurance-link"
+          >
+            CAST wizard →
+          </RouterLink>
+          <RouterLink
+            to="/assurance/supply-chain"
+            class="assurance-link"
+          >
+            Supply-chain wizard →
+          </RouterLink>
+          <RouterLink
+            to="/assurance/gsn"
+            class="assurance-link"
+          >
+            Assurance-case / GSN wizard →
+          </RouterLink>
+          <RouterLink
+            to="/assurance/browse"
+            class="assurance-link"
+          >
+            Browse assurance nodes →
+          </RouterLink>
+          <RouterLink
+            to="/assurance/diagrams"
+            class="assurance-link"
+          >
+            Derived diagrams →
+          </RouterLink>
+          <RouterLink
+            to="/assurance/baselines"
+            class="assurance-link"
+          >
+            Sealed baselines →
           </RouterLink>
         </div>
       </div>

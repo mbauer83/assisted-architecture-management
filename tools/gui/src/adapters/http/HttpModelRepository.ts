@@ -19,6 +19,9 @@ import {
   DiagramDetailSchema,
   DiagramTypeSummarySchema,
   DiagramTypeUiConfigSchema,
+  DatatypeTypeCatalogSchema,
+  DatatypeTypeUsagesSchema,
+  AllocatedIdentifierSchema,
   DiagramContextSchema,
   DiagramEntityDiscoverySchema,
   WriteResultSchema,
@@ -329,6 +332,22 @@ export const makeHttpModelRepository = (): ModelRepository => ({
 
   getDiagramTypeUiConfig: (type: string) =>
     fetchJsonNotFound(buildUrl(`/diagram-types/${encodeURIComponent(type)}/ui-config`), DiagramTypeUiConfigSchema, type),
+
+  getDatatypeTypes: (params = {}) =>
+    fetchJson(buildUrl('/diagram-types/datatype/types', {
+      query: params.query,
+      scope: params.scope,
+      kind: params.kind,
+      limit: params.limit,
+      cursor: params.cursor,
+      diagram_id: params.diagramId,
+    }), DatatypeTypeCatalogSchema),
+
+  getDatatypeTypeUsages: (typeId: string) =>
+    fetchJson(buildUrl('/diagram-types/datatype/type-usages', { type_id: typeId }), DatatypeTypeUsagesSchema),
+
+  allocateDiagramEntityId: (body) =>
+    postJson(buildUrl('/identifiers/allocate'), body, AllocatedIdentifierSchema),
 
   getDiagram: (id: string) =>
     fetchJsonNotFound(buildUrl('/diagram', { id }), DiagramDetailSchema, id),

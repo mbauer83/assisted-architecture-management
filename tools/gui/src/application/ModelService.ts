@@ -32,6 +32,11 @@ export const makeModelService = (repo: ModelRepository) =>
       repo.listDiagrams(diagramType, status),
     listDiagramTypes: () => repo.listDiagramTypes(),
     getDiagramTypeUiConfig: (type: string) => repo.getDiagramTypeUiConfig(type),
+    getDatatypeTypes: (params?: Parameters<ModelRepository['getDatatypeTypes']>[0]) =>
+      repo.getDatatypeTypes(params),
+    getDatatypeTypeUsages: (typeId: string) => repo.getDatatypeTypeUsages(typeId),
+    allocateDiagramEntityId: (body: Parameters<ModelRepository['allocateDiagramEntityId']>[0]) =>
+      repo.allocateDiagramEntityId(body),
     getDiagram: (id: string) => repo.getDiagram(id),
     getDiagramContext: (id: string) => repo.getDiagramContext(id),
     diagramImageUrl: (filename: string) => repo.diagramImageUrl(filename),

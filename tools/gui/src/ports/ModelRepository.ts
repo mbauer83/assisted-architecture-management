@@ -17,6 +17,9 @@ import type {
   DiagramDetail,
   DiagramTypeSummary,
   DiagramTypeUiConfig,
+  DatatypeTypeCatalog,
+  DatatypeTypeUsages,
+  AllocatedIdentifier,
   DiagramContext,
   DiagramEntityDiscovery,
   WriteResult,
@@ -83,6 +86,14 @@ export interface ModelRepository {
   ) => Effect.Effect<DiagramList, RepoError>
   readonly listDiagramTypes: () => Effect.Effect<DiagramTypeSummary[], RepoError>
   readonly getDiagramTypeUiConfig: (type: string) => Effect.Effect<DiagramTypeUiConfig, RepoError | NotFoundError>
+  readonly getDatatypeTypes: (params?: {
+    query?: string; scope?: string; kind?: string; limit?: number;
+    cursor?: string; diagramId?: string;
+  }) => Effect.Effect<DatatypeTypeCatalog, RepoError>
+  readonly getDatatypeTypeUsages: (typeId: string) => Effect.Effect<DatatypeTypeUsages, RepoError>
+  readonly allocateDiagramEntityId: (body: {
+    owner_kind: 'diagram'; diagram_type: string; entity_type: string; name_hint?: string;
+  }) => Effect.Effect<AllocatedIdentifier, RepoError>
   readonly getDiagram: (id: string) => Effect.Effect<DiagramDetail, RepoError | NotFoundError>
   readonly getDiagramContext: (id: string) => Effect.Effect<DiagramContext, RepoError | NotFoundError>
   readonly diagramImageUrl: (filename: string) => string

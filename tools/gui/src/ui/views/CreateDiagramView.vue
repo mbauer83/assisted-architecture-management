@@ -87,8 +87,8 @@ const relatedEntitiesById = computed<Record<string, EntityDisplayInfo[]>>(() => 
       related[ownerId].push({
         artifact_id: otherId,
         name,
-        artifact_type: artifactType as EntityDisplayInfo['artifact_type'],
-        domain: domain as EntityDisplayInfo['domain'],
+        artifact_type: artifactType,
+        domain,
         subdomain: '',
         status: scope,
         display_alias: '',
@@ -313,6 +313,7 @@ watch(diagramType, () => {
           :ui-config="uiConfig"
           :diagram-entities="diagramEntities"
           :entities="includedEntities"
+          diagram-id=""
           @diagram-entities-change="mergeDiagramEntities"
         />
 

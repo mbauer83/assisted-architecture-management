@@ -335,6 +335,37 @@ export const DiagramTypeUiConfigSchema = Schema.Struct({
 })
 export type DiagramTypeUiConfig = typeof DiagramTypeUiConfigSchema.Type
 
+export const DatatypeClassifierInfoSchema = Schema.Struct({
+  type_id: Schema.String,
+  label: Schema.String,
+  kind: Schema.String,
+  scope: Schema.String,
+  host_diagram_id: Schema.String,
+})
+
+export const DatatypeTypeCatalogSchema = Schema.Struct({
+  generation: Schema.Number,
+  primitives: Schema.Array(Schema.String),
+  classifiers: Schema.Array(DatatypeClassifierInfoSchema),
+  next_cursor: Schema.NullOr(Schema.String),
+})
+export type DatatypeTypeCatalog = typeof DatatypeTypeCatalogSchema.Type
+
+export const DatatypeTypeUsageSchema = Schema.Struct({
+  diagram_id: Schema.String,
+  classifier_local_id: Schema.String,
+  attr_name: Schema.String,
+})
+
+export const DatatypeTypeUsagesSchema = Schema.Struct({
+  type_id: Schema.String,
+  usages: Schema.Array(DatatypeTypeUsageSchema),
+})
+export type DatatypeTypeUsages = typeof DatatypeTypeUsagesSchema.Type
+
+export const AllocatedIdentifierSchema = Schema.Struct({ id: Schema.String })
+export type AllocatedIdentifier = typeof AllocatedIdentifierSchema.Type
+
 // ── Diagram detail ───────────────────────────────────────────────────────────
 
 export const DiagramDetailSchema = Schema.Struct({

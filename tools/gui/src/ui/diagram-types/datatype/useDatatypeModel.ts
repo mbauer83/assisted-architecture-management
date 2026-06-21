@@ -6,11 +6,16 @@ export const CLASSIFIER_KINDS: ClassifierKind[] = ['class', 'datatype', 'enumera
 export const DT_CONN_TYPES = ['dt-association', 'dt-aggregation', 'dt-composition', 'dt-generalization', 'dt-dependency'] as const
 export type DtConnType = (typeof DT_CONN_TYPES)[number]
 
+export type AttrTypeRef =
+  | { kind: 'primitive'; name: string }
+  | { kind: 'classifier'; id: string }
+
 export interface Attribute {
   name: string
-  type?: string
+  type?: AttrTypeRef
   multiplicity?: string
   is_id?: boolean
+  is_unique?: boolean
 }
 
 export interface Classifier {
@@ -22,6 +27,8 @@ export interface Classifier {
   literals?: string[]
   is_abstract?: boolean
   generalization_set?: { is_covering?: boolean; is_disjoint?: boolean }
+  unique_constraints?: string[][]
+  note?: string
 }
 
 export interface DtConn {
@@ -33,6 +40,7 @@ export interface DtConn {
   tgt_cardinality?: string
   label?: string
   backing_conn_id?: string
+  note?: string
 }
 
 function readClassifiers(data: Record<string, unknown>): Classifier[] {
@@ -63,8 +71,28 @@ export function useDatatypeModel(
     emit({ classifier: cls, _connections: [...other, ...conns] })
   }
 
-  function addClassifier() {
-    save([...classifiers.value, { id: mkId('cls'), classifier_kind: 'class', label: 'Classifier' }], connections.value)
+  function addClassifier(
+    id?: string,
+    label = 'Classifier',
+    selectedBy?: { classifierId: string; attrIndex: number },
+  ) {
+    const newId = id ?? mkId('cls')
+    const existing = selectedBy
+      ? classifiers.value.map((classifier) => classifier.id === selectedBy.classifierId
+        ? {
+            ...classifier,
+            attributes: (classifier.attributes ?? []).map((attr, index) =>
+              index === selectedBy.attrIndex
+                ? { ...attr, type: { kind: 'classifier' as const, id: newId } }
+                : attr),
+          }
+        : classifier)
+      : classifiers.value
+    save([...existing, {
+      id: newId,
+      classifier_kind: 'class',
+      label,
+    }], connections.value)
   }
 
   function removeClassifier(id: string) {
@@ -81,7 +109,7 @@ export function useDatatypeModel(
   function addAttribute(classifierId: string) {
     const cls = classifiers.value.find((c) => c.id === classifierId)
     if (!cls) return
-    updateClassifier(classifierId, { attributes: [...(cls.attributes ?? []), { name: 'attr', type: '' }] })
+    updateClassifier(classifierId, { attributes: [...(cls.attributes ?? []), { name: 'attr' }] })
   }
 
   function removeAttribute(classifierId: string, attrIndex: number) {
