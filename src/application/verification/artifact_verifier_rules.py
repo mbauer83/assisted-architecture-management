@@ -4,7 +4,6 @@ from typing import Literal
 from src.application.artifact_parsing import extract_declared_puml_aliases as _extract_declared_puml_aliases_shared
 from src.application.derivation.strategy_registry import DerivationStrategyCatalog
 from src.application.verification._verifier_rules_bindings import check_bindings_scoped, get_allowed_bindings
-from src.application.verification._verifier_rules_datatype import check_datatype_backing_consistency
 from src.application.verification._verifier_rules_puml_relations import (
     _extract_entity_display_alias,
     _normalize_puml_alias,
@@ -19,7 +18,7 @@ from src.application.verification.artifact_verifier_types import (
     VerificationResult,
     entity_id_from_path,
 )
-from src.domain.catalogs import DiagramTypeCatalog, OntologyCatalog
+from src.domain.catalogs import DiagramTypeCatalog
 from src.domain.repo_layout import MODEL
 
 
@@ -130,7 +129,6 @@ def check_diagram_references_scoped(
     loc: str,
     diagram_type_catalog: DiagramTypeCatalog | None = None,
     derivation_catalog: DerivationStrategyCatalog | None = None,
-    ontology_catalog: OntologyCatalog | None = None,
 ) -> None:
     diagram_is_baselined = str(fm.get("status", "")) == "baselined"
 
@@ -169,10 +167,6 @@ def check_diagram_references_scoped(
         result, loc,
         allowed_bindings=get_allowed_bindings(str(fm.get("diagram-type", "")), diagram_type_catalog),
     )
-    if ontology_catalog is not None:
-        check_datatype_backing_consistency(
-            fm, allowed_connections, ontology_catalog, diagram_type_catalog, result, loc,
-        )
 
 
 def _check_entity_ids_used(

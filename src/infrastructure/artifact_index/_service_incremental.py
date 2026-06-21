@@ -2,11 +2,17 @@
 
 from __future__ import annotations
 
-from collections.abc import Iterator
+from collections.abc import Callable, Iterator
 from dataclasses import replace
 from pathlib import Path
 from typing import TypeVar
 
+from src.application._diagram_entity_extraction import (
+    extract_diagram_connections as _extract_diagram_connections,
+)
+from src.application._diagram_entity_extraction import (
+    extract_diagram_entities as _extract_diagram_entities,
+)
 from src.application.artifact_parsing import (
     parse_diagram,
     parse_document,
@@ -31,12 +37,6 @@ from src.domain.artifact_types import (
     RepoMount,
 )
 
-from ._diagram_entity_extraction import (
-    extract_diagram_connections as _extract_diagram_connections,
-)
-from ._diagram_entity_extraction import (
-    extract_diagram_entities as _extract_diagram_entities,
-)
 from ._mem_store import _MemStore
 from ._sqlite_store import _SqliteStore
 
@@ -136,7 +136,16 @@ def _iter_diagram_sources(diag_root: Path) -> Iterator[Path]:
                 yield path
 
 
-def _scan_diagram_records(repo_root: Path, mem: _MemStore) -> None:
+_AttrTypeRefFn = Callable[["DiagramRecord"], list[tuple[str, str, str]]]
+
+
+def _scan_diagram_records(
+    repo_root: Path,
+    mem: _MemStore,
+    *,
+    workspace_types: dict[str, frozenset[str]] | None = None,
+    attr_type_ref_fn: _AttrTypeRefFn | None = None,
+) -> None:
     """Index diagrams and the entities/connections they materialise."""
     diag_root = diagram_source_root(repo_root)
     if not diag_root.exists():
@@ -147,8 +156,11 @@ def _scan_diagram_records(repo_root: Path, mem: _MemStore) -> None:
             continue
         diag = replace(diag, group=group_fn_diagram(path, repo_root))
         _insert_mounted(diag, "diagram", repo_root, mem.diagrams)
-        mem.entities.update({de.artifact_id: de for de in _extract_diagram_entities(diag)})
-        mem.connections.update({dc.artifact_id: dc for dc in _extract_diagram_connections(diag)})
+        ws = (workspace_types or {}).get(diag.diagram_type, frozenset())
+        mem.entities.update({de.artifact_id: de for de in _extract_diagram_entities(diag, ws)})
+        mem.connections.update({dc.artifact_id: dc for dc in _extract_diagram_connections(diag, ws)})
+        if attr_type_ref_fn is not None:
+            mem.attribute_type_refs[diag.artifact_id] = attr_type_ref_fn(diag)
 
 
 def _scan_document_records(repo_root: Path, mem: _MemStore) -> None:
@@ -162,9 +174,16 @@ def _scan_document_records(repo_root: Path, mem: _MemStore) -> None:
             _insert_mounted(replace(doc, group=grp), "document", repo_root, mem.documents)
 
 
-def scan_mount(mount: RepoMount, mem: _MemStore, *, domain_names: frozenset[str]) -> None:
+def scan_mount(
+    mount: RepoMount,
+    mem: _MemStore,
+    *,
+    domain_names: frozenset[str],
+    workspace_types: dict[str, frozenset[str]] | None = None,
+    attr_type_ref_fn: _AttrTypeRefFn | None = None,
+) -> None:
     _scan_model_records(mount.root, mem, domain_names=domain_names)
-    _scan_diagram_records(mount.root, mem)
+    _scan_diagram_records(mount.root, mem, workspace_types=workspace_types, attr_type_ref_fn=attr_type_ref_fn)
     _scan_document_records(mount.root, mem)
 
 
@@ -253,20 +272,26 @@ def apply_diagram_change(
     db: _SqliteStore,
     *,
     parsed: DiagramRecord | None,
+    workspace_types: dict[str, frozenset[str]] | None = None,
+    attr_type_ref_fn: _AttrTypeRefFn | None = None,
 ) -> None:
     old_id = mem.diagram_by_path.get(path.resolve())
     old = mem.diagrams.get(old_id) if old_id else None
     if old is not None:
         _delete_diagram_entities(old.artifact_id, mem, db)
         _delete_diagram_connections(old.artifact_id, mem, db)
+        db.delete_attribute_type_refs(old.artifact_id)
         if parsed is None or old.artifact_id != parsed.artifact_id:
             db.delete_diagram(old.artifact_id)
     if parsed is not None:
+        ws = (workspace_types or {}).get(parsed.diagram_type, frozenset())
         db.upsert_diagram(parsed)
-        for de in _extract_diagram_entities(parsed):
+        for de in _extract_diagram_entities(parsed, ws):
             db.upsert_entity(de)
-        for dc in _extract_diagram_connections(parsed):
+        for dc in _extract_diagram_connections(parsed, ws):
             db.upsert_connection(dc)
+        refs = attr_type_ref_fn(parsed) if attr_type_ref_fn is not None else []
+        db.upsert_attribute_type_refs(parsed.artifact_id, refs)
 
 
 def _delete_diagram_entities(diagram_id: str, mem: _MemStore, db: _SqliteStore) -> None:

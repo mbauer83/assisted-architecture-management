@@ -6,15 +6,15 @@ from pathlib import Path
 
 import pytest
 
+from src.application._diagram_entity_extraction import (
+    _diagram_entity_content_text,
+)
+from src.application._diagram_entity_extraction import (
+    extract_diagram_entities as _extract_diagram_entities,
+)
 from src.application.artifact_query import ArtifactRepository
 from src.domain.artifact_types import DiagramRecord
 from src.infrastructure.artifact_index import shared_artifact_index
-from src.infrastructure.artifact_index._diagram_entity_extraction import (
-    _diagram_entity_content_text,
-)
-from src.infrastructure.artifact_index._diagram_entity_extraction import (
-    extract_diagram_entities as _extract_diagram_entities,
-)
 
 # ── helpers ──────────────────────────────────────────────────────────────────
 

@@ -3,7 +3,7 @@
 from pathlib import Path
 
 from src.application.artifact_repository import ArtifactRepository
-from src.application.modeling.artifact_write import generate_entity_id
+from src.application.identifier_allocator import get_default_allocator
 from src.domain.artifact_types import DiagramRecord, DocumentRecord, EntityRecord
 
 
@@ -138,7 +138,7 @@ def ensure_unique_entity_random_part(
         if extract_random_part(entity.artifact_id) == random_part:
             # Random part collision - regenerate
             for _ in range(max_retries):
-                new_id = generate_entity_id(prefix, friendly_name)
+                new_id = get_default_allocator().allocate(prefix=prefix, name_hint=friendly_name)
                 new_random = extract_random_part(new_id)
                 # Verify new random part is unique
                 collision = False

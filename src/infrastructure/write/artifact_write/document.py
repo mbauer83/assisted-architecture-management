@@ -4,7 +4,7 @@ from pathlib import Path
 import yaml  # type: ignore[import-untyped]
 
 from src.application.artifact_document_schema import get_document_schema, get_document_subdirectory
-from src.application.modeling.artifact_write import generate_entity_id
+from src.application.identifier_allocator import get_default_allocator
 from src.application.verification.artifact_verifier import ArtifactVerifier
 from src.config.repo_paths import DOCS
 from src.domain.groups import UNCATEGORIZED
@@ -24,7 +24,7 @@ def _dump_yaml_text(data: object) -> str:
 
 
 def _generate_document_id(abbreviation: str, title: str) -> str:
-    return generate_entity_id(abbreviation, title)
+    return get_default_allocator().allocate(prefix=abbreviation, name_hint=title)
 
 
 def _format_document_markdown(

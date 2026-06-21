@@ -13,6 +13,7 @@ Two independent checks:
 
 from __future__ import annotations
 
+import re as _re
 from collections.abc import Iterable, Iterator
 from itertools import chain
 from typing import TYPE_CHECKING
@@ -99,8 +100,43 @@ def _dedupe(messages: Iterable[str]) -> list[str]:
     return ordered
 
 
+_ID_PREFIX_GRAMMAR = _re.compile(r"^[A-Z]+$")
+
+
+def _id_prefix_consistency_msgs(registry: "ModuleRegistry") -> Iterator[str]:
+    """Every workspace-scoped diagram entity type must declare a unique, grammar-valid id_prefix."""
+    seen_prefixes: dict[str, str] = {}  # prefix → first declaring type
+    for dk in registry.all_diagram_types().values():
+        for oe in dk.ui_config.diagram_only_types:
+            if oe.identity_scope != "workspace":
+                continue
+            if not oe.id_prefix:
+                yield (
+                    f"Diagram type {str(dk.name)!r}: entity type {oe.entity_type!r} has "
+                    f"identity_scope 'workspace' but declares no id_prefix"
+                )
+                continue
+            if not _ID_PREFIX_GRAMMAR.match(oe.id_prefix):
+                yield (
+                    f"Diagram type {str(dk.name)!r}: entity type {oe.entity_type!r} "
+                    f"id_prefix {oe.id_prefix!r} does not match grammar [A-Z]+"
+                )
+                continue
+            if oe.id_prefix in seen_prefixes:
+                yield (
+                    f"Diagram type {str(dk.name)!r}: entity type {oe.entity_type!r} "
+                    f"id_prefix {oe.id_prefix!r} already declared by {seen_prefixes[oe.id_prefix]!r}"
+                )
+            else:
+                seen_prefixes[oe.id_prefix] = oe.entity_type
+
+
 def _collect_consistency_errors(registry: "ModuleRegistry") -> list[str]:
-    errors = _dedupe(chain(_ontology_consistency_msgs(registry), _diagram_type_consistency_msgs(registry)))
+    errors = _dedupe(chain(
+        _ontology_consistency_msgs(registry),
+        _diagram_type_consistency_msgs(registry),
+        _id_prefix_consistency_msgs(registry),
+    ))
     errors.extend(_collect_bridge_errors(registry))
     return errors
 

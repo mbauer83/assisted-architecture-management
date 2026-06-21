@@ -6,11 +6,40 @@ dataclasses, so they stay trivially testable and free of import cycles.
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 from typing import Any
 
 from src.application.artifact_query import ArtifactRepository
 from src.application.verification.artifact_verifier import ArtifactRegistry
 from src.infrastructure.write.artifact_write.parse_existing import parse_entity_file
+
+
+@dataclass(frozen=True)
+class ClassifierIndexes:
+    """Enterprise workspace classifier ids indexed for same-id and name-clash detection."""
+
+    by_id: frozenset[str]          # enterprise classifier artifact_ids (CLF@…)
+    by_name: dict[str, str]        # normalized_name → first-seen enterprise clf_id
+
+
+def _normalize_classifier_name(name: str) -> str:
+    return name.strip().lower()
+
+
+def build_enterprise_classifier_indexes(
+    repo: ArtifactRepository, registry: ArtifactRegistry
+) -> ClassifierIndexes:
+    """Build name and id indexes of all enterprise workspace classifiers."""
+    enterprise_ids = registry.enterprise_entity_ids()
+    clf_ids: set[str] = {eid for eid in enterprise_ids if eid.startswith("CLF@")}
+    by_name: dict[str, str] = {}
+    for clf_id in clf_ids:
+        rec = repo.get_entity(clf_id)
+        if rec is not None:
+            norm = _normalize_classifier_name(rec.name)
+            if norm not in by_name:
+                by_name[norm] = clf_id
+    return ClassifierIndexes(by_id=frozenset(clf_ids), by_name=by_name)
 
 
 def _extract_id_suffix(artifact_id: str) -> str | None:

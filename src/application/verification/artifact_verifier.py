@@ -8,6 +8,11 @@ from typing import Literal
 
 from src.application.entity_type_predicates import is_internal_entity_type
 from src.application.runtime_catalogs import RuntimeCatalogs
+from src.application.verification._verifier_contribution_runner import (
+    build_candidate_repo,
+    run_diagram_contributions,
+    run_repository_contributions,
+)
 from src.application.verification._verifier_document import verify_document
 from src.application.verification._verifier_outgoing import verify_outgoing
 from src.application.verification._verifier_rules_edge_labels import check_edge_label_overrides
@@ -18,7 +23,6 @@ from src.application.verification._verifier_rules_schema import (
     check_frontmatter_schema,
     check_module_source_path,
 )
-from src.application.verification._verifier_rules_semantic import check_connection_semantics  # noqa: F401
 from src.application.verification._verifier_serde import merge_results, results_from_state
 from src.application.verification.artifact_verifier_incremental import (
     FileInventory,
@@ -69,6 +73,7 @@ class ArtifactVerifier:
         *,
         check_puml_syntax: bool = True,
         catalogs: RuntimeCatalogs | None = None,
+        committed_repo: object | None = None,
         puml_syntax: PumlSyntaxPort | None = None,
         scheduler: VerifierScheduler | None = None,
         file_inventory: FileInventoryPort | None = None,
@@ -77,6 +82,7 @@ class ArtifactVerifier:
         self.registry = registry
         self.check_puml_syntax = check_puml_syntax
         self._catalogs = catalogs
+        self._candidate_repo: object | None = build_candidate_repo(committed_repo, registry)
         self._puml_port = puml_syntax
         self._scheduler_port = scheduler
         self._inventory_port = file_inventory
@@ -213,12 +219,20 @@ class ArtifactVerifier:
                 fm, self.registry, scope, result, loc,
                 diagram_type_catalog=self._runtime_catalogs.diagram_types,
                 derivation_catalog=self._runtime_catalogs.derivation,
-                ontology_catalog=self._runtime_catalogs.ontology,
             )
             check_diagram_relation_references(
                 content, fm, self.registry, scope, result, loc,
                 stereotype_map=self._runtime_catalogs.ontology.archimate_stereotype_to_connection_type(),
             )
+            candidate = self._candidate_repo
+            if candidate is not None:
+                diag_type = str(fm.get("diagram-type", ""))
+                module = self._runtime_catalogs.diagram_types.find_diagram_type(diag_type)
+                if module is not None:
+                    run_diagram_contributions(
+                        module=module, candidate=candidate, fm=fm, registry=self.registry,
+                        scope=scope, runtime_catalogs=self._runtime_catalogs, result=result, loc=loc,
+                    )
         else:
             result.issues.append(Issue(
                 Severity.WARNING, "W002",
@@ -309,6 +323,11 @@ class ArtifactVerifier:
         results = self._verify_inventory_subset(inv, set(inv.ordered_paths))
         doc_files = self._inventory.list_doc_files(repo_path)
         results.extend(self._scheduler.run(self.verify_document_file, doc_files))
+        repo_result = run_repository_contributions(
+            candidate=self._candidate_repo, runtime_catalogs=self._catalogs, repo_path=repo_path
+        )
+        if repo_result is not None:
+            results.append(repo_result)
         return results
 
     def _verify_all_incremental(

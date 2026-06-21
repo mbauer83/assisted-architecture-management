@@ -5,7 +5,8 @@ from pathlib import Path
 
 import yaml
 
-from src.application.modeling.artifact_write import format_matrix_markdown, generate_diagram_id
+from src.application.identifier_allocator import get_default_allocator
+from src.application.modeling.artifact_write import format_matrix_markdown, prefix_for_diagram_type
 from src.application.verification.artifact_verifier import ArtifactRegistry, ArtifactVerifier
 from src.config.repo_paths import DIAGRAM_CATALOG, DIAGRAMS
 
@@ -183,7 +184,9 @@ def create_matrix(
     dry_run: bool = True,
 ) -> WriteResult:
     assert_engagement_write_root(repo_root)
-    effective_id = artifact_id or generate_diagram_id("matrix", name)
+    effective_id = artifact_id or get_default_allocator().allocate(
+        prefix=prefix_for_diagram_type("matrix"), name_hint=name
+    )
 
     last = last_updated or today_iso()
 

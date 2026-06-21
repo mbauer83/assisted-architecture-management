@@ -95,7 +95,8 @@ def preview_diagram(body: DiagramPreviewBody, catalogs: RuntimeCatalogs = Depend
 
 @router.post("/api/diagram")
 def create_diagram_gui(body: CreateDiagramGuiBody) -> dict[str, Any]:
-    from src.application.modeling.artifact_write import generate_diagram_id
+    from src.application.identifier_allocator import get_default_allocator
+    from src.application.modeling.artifact_write import prefix_for_diagram_type
     from src.infrastructure.rendering.diagram_builder import generate_archimate_puml_body
     from src.infrastructure.write.artifact_write.diagram import create_diagram
 
@@ -126,7 +127,9 @@ def create_diagram_gui(body: CreateDiagramGuiBody) -> dict[str, Any]:
             diagram_type=body.diagram_type,
             name=body.name,
             puml=puml,
-            artifact_id=generate_diagram_id(body.diagram_type, body.name),
+            artifact_id=get_default_allocator().allocate(
+                prefix=prefix_for_diagram_type(body.diagram_type), name_hint=body.name
+            ),
             keywords=body.keywords,
             diagram_entities=de,
             diagram_connections=dc,
@@ -168,6 +171,7 @@ def edit_diagram_gui(body: EditDiagramGuiBody) -> dict[str, Any]:
         diagram_entities=de,
         diagram_connections=dc,
     )
+    from src.application.candidate_repository import committed_repository  # noqa: PLC0415
     try:
         result = s.run_serialized_write(
             edit_diagram,
@@ -187,6 +191,7 @@ def edit_diagram_gui(body: EditDiagramGuiBody) -> dict[str, Any]:
             tlp=body.tlp,
             bindings=conn_bindings or None,
             dry_run=body.dry_run,
+            committed_repo=committed_repository(repo),
         )
     except ValueError as e:
         raise HTTPException(400, str(e))
@@ -355,8 +360,10 @@ def sync_diagram_to_model_gui(body: SyncDiagramToModelBody) -> dict[str, Any]:
 
 @router.post("/api/diagram/remove")
 def delete_diagram_gui(body: DeleteDiagramBody) -> dict[str, Any]:
+    from src.application.candidate_repository import committed_repository  # noqa: PLC0415
     from src.infrastructure.write.artifact_write.diagram_delete import delete_diagram
 
+    repo = s.get_repo()
     repo_root, _registry, _verifier = s.get_write_deps()
     try:
         result = s.run_serialized_write(
@@ -365,6 +372,8 @@ def delete_diagram_gui(body: DeleteDiagramBody) -> dict[str, Any]:
             clear_repo_caches=s.clear_caches,
             artifact_id=body.artifact_id,
             dry_run=body.dry_run,
+            verifier=_verifier,
+            committed_repo=committed_repository(repo),
         )
     except ValueError as e:
         raise HTTPException(400, str(e))

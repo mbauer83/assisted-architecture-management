@@ -35,6 +35,9 @@ _DEFAULTS: dict[str, dict[str, object]] = {
         },
         "read_model": {},
     },
+    "validation": {
+        "datatype_type_references_blocking": True,
+    },
 }
 
 _VALID_STORE_BACKENDS = frozenset({"sqlcipher", "pocketbase", "private-git"})
@@ -89,6 +92,9 @@ def load_settings() -> dict:
         "assurance": {**default_assurance, **storage_assurance},
         "read_model": {**storage_read_model},
     }
+    validation_raw = data.get("validation")
+    validation_section: _SettingsSection = validation_raw if isinstance(validation_raw, dict) else {}
+    validation = {**_DEFAULTS["validation"], **validation_section}
 
     return {
         "backend": backend,
@@ -96,6 +102,7 @@ def load_settings() -> dict:
         "repo_init": repo_init,
         "modules": modules_section,
         "storage": storage,
+        "validation": validation,
     }
 
 
@@ -173,6 +180,12 @@ def plantuml_limit_size() -> int:
         return max(4096, int(value))
     except (TypeError, ValueError):
         return 16384
+
+
+def datatype_type_references_blocking() -> bool:
+    """Whether E332/E334/E335/E336 reject writes instead of remaining advisory."""
+    value = load_settings()["validation"].get("datatype_type_references_blocking", True)
+    return value if isinstance(value, bool) else True
 
 
 def _repo_init_value(key: str, repo_kind: str | None = None) -> object:

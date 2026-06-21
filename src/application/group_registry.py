@@ -8,11 +8,11 @@ always receive a fully populated registry.
 from __future__ import annotations
 
 import json
-import time
 from pathlib import Path
 
 import yaml
 
+from src.domain.clock import epoch_seconds
 from src.domain.groups import UNCATEGORIZED, GroupAxis, GroupEntry, GroupRegistry
 from src.domain.repo_layout import ARCH_REPO
 
@@ -83,7 +83,7 @@ def _new_group_id() -> str:
     import random
     import string
 
-    epoch = int(time.time())
+    epoch = epoch_seconds()
     rand = "".join(random.choices(string.ascii_letters + string.digits, k=6))
     return f"GRP@{epoch}.{rand}"
 

@@ -8,21 +8,21 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from src.application._diagram_entity_extraction import (
+    _is_connection_item,
+)
+from src.application._diagram_entity_extraction import (
+    diagram_local_to_full as _diagram_local_to_full,
+)
+from src.application._diagram_entity_extraction import (
+    extract_diagram_connections as _extract_diagram_connections,
+)
+from src.application._diagram_entity_extraction import (
+    extract_diagram_entities as _extract_diagram_entities,
+)
 from src.application.artifact_query import ArtifactRepository
 from src.domain.artifact_types import DiagramRecord
 from src.infrastructure.artifact_index import shared_artifact_index
-from src.infrastructure.artifact_index._diagram_entity_extraction import (
-    _is_connection_item,
-)
-from src.infrastructure.artifact_index._diagram_entity_extraction import (
-    diagram_local_to_full as _diagram_local_to_full,
-)
-from src.infrastructure.artifact_index._diagram_entity_extraction import (
-    extract_diagram_connections as _extract_diagram_connections,
-)
-from src.infrastructure.artifact_index._diagram_entity_extraction import (
-    extract_diagram_entities as _extract_diagram_entities,
-)
 
 # ── helpers ──────────────────────────────────────────────────────────────────
 

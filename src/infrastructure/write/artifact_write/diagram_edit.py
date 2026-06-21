@@ -2,7 +2,9 @@
 
 from collections.abc import Callable
 from pathlib import Path
+from typing import Any
 
+from src.application.candidate_repository import CandidateRepository
 from src.application.modeling.artifact_write import format_diagram_puml
 from src.application.modeling.artifact_write_layout import optimize_puml_layout
 from src.application.verification.artifact_verifier import ArtifactVerifier
@@ -34,6 +36,25 @@ def _verification_to_dict(path: Path, res) -> dict[str, object]:
     }
 
 
+def _extract_workspace_ids(fm: dict, module: object) -> set[str]:
+    """Return the set of workspace entity ids currently in the committed diagram frontmatter."""
+    result: set[str] = set()
+    try:
+        de: dict[str, Any] = fm.get("diagram-entities") or {}
+        for ui_cfg in module.ui_config.diagram_only_types:  # type: ignore[attr-defined]
+            if ui_cfg.identity_scope != "workspace":
+                continue
+            items: list[Any] = de.get(str(ui_cfg.entity_type)) or []
+            for item in items:
+                if isinstance(item, dict):
+                    eid = str(item.get("id") or "")
+                    if eid:
+                        result.add(eid)
+    except Exception:  # noqa: BLE001
+        pass
+    return result
+
+
 _EDGE_LABELS_UNSET = object()
 
 
@@ -58,6 +79,7 @@ def edit_diagram(
     tlp: str | None = None,
     edge_labels: dict[str, str | None] | None = _EDGE_LABELS_UNSET,  # type: ignore[assignment]
     dry_run: bool,
+    committed_repo: CandidateRepository | None = None,
 ) -> WriteResult:
     """Edit an existing diagram file.
 
@@ -93,6 +115,25 @@ def edit_diagram(
     eff_diagram_entities = diagram_entities if diagram_entities is not None else fm.get("diagram-entities")
     eff_diagram_connections = diagram_connections if diagram_connections is not None else fm.get("connections")
     diagram_type = str(fm.get("diagram-type", "archimate"))
+    raw_format_version = fm.get("diagram-format-version")
+    eff_format_version = (
+        2 if diagram_type == "datatype"
+        else raw_format_version if isinstance(raw_format_version, int)
+        else None
+    )
+    if diagram_entities is not None:
+        from src.application.identifier_allocator import get_default_allocator  # noqa: PLC0415
+        from src.infrastructure.write.artifact_write.diagram_entity_identity import (  # noqa: PLC0415
+            normalize_diagram_entity_identities,
+        )
+        diagram_entities, diagram_connections, bindings = normalize_diagram_entity_identities(  # type: ignore[assignment]
+            diagram_type,
+            diagram_entities,  # type: ignore[arg-type]
+            list(diagram_connections or []),
+            list(bindings or []),
+            module_catalog=verifier._runtime_catalogs.diagram_types,
+            allocator=get_default_allocator(),
+        )
     eff_entity_ids_used = (
         entity_ids_used if entity_ids_used is not None else as_optional_str_list(fm.get("entity-ids-used"))
     )
@@ -118,6 +159,64 @@ def edit_diagram(
     clean_entities = strip_diagram_shorthand(
         eff_diagram_entities if isinstance(eff_diagram_entities, dict) else None
     )
+
+    # Workspace-id format check: validate any NEW workspace entity ids in this edit.
+    if diagram_entities is not None and isinstance(clean_entities, dict):
+        from src.application.verification._workspace_identity_rules import (
+            validate_workspace_entity_ids,  # noqa: PLC0415
+        )
+        try:
+            _dt_module = verifier._runtime_catalogs.diagram_types.find_diagram_type(diagram_type)
+        except Exception:  # noqa: BLE001
+            _dt_module = None
+        if _dt_module is not None:
+            _committed_ids = _extract_workspace_ids(fm, _dt_module)
+            _ws_errors = validate_workspace_entity_ids(clean_entities, _dt_module, committed_ids=_committed_ids)
+            from src.config.settings import datatype_type_references_blocking  # noqa: PLC0415
+            if _ws_errors and datatype_type_references_blocking():
+                return WriteResult(
+                    wrote=False,
+                    path=diagram_path,
+                    artifact_id=artifact_id,
+                    content=None,
+                    warnings=warnings,
+                    verification={
+                        "path": str(diagram_path),
+                        "file_type": "diagram",
+                        "valid": False,
+                        "issues": [
+                            {"severity": "error", "code": "E335-fmt", "message": m, "location": str(diagram_path)}
+                            for m in _ws_errors
+                        ],
+                    },
+                )
+
+    # E334 reference-impact: detect removed classifiers still referenced by other diagrams.
+    if committed_repo is not None and diagram_entities is not None and isinstance(clean_entities, dict):
+        from src.application.candidate_repository import candidate_with  # noqa: PLC0415
+        from src.application.verification._verifier_contribution_runner import (  # noqa: PLC0415
+            run_repository_contributions,
+            workspace_types_from_catalogs,
+        )
+        from src.domain.artifact_types import DiagramRecord  # noqa: PLC0415
+        _new_diag = DiagramRecord(
+            artifact_id=artifact_id, artifact_type="diagram",
+            name=eff_name, version=eff_version, status=eff_status,
+            diagram_type=diagram_type, path=diagram_path,
+            extra={"diagram-entities": clean_entities},
+        )
+        _catalogs = getattr(verifier, "_catalogs", None)
+        _ws = workspace_types_from_catalogs(_catalogs) if _catalogs is not None else {}
+        _cand = candidate_with(committed_repo, changed_diagrams=[_new_diag], workspace_types=_ws)
+        _rr = run_repository_contributions(
+            candidate=_cand, committed=committed_repo, runtime_catalogs=_catalogs, repo_path=repo_root,
+        )
+        if _rr is not None and not _rr.valid:
+            return WriteResult(
+                wrote=False, path=diagram_path, artifact_id=artifact_id,
+                content=None, warnings=warnings,
+                verification=_verification_to_dict(diagram_path, _rr),
+            )
 
     norm_bindings_raw = bindings_to_raw(norm_bindings)
 
@@ -201,6 +300,7 @@ def edit_diagram(
         edge_labels=eff_edge_labels or None,
         puml_body=puml_body,
         tlp=eff_tlp,
+        diagram_format_version=eff_format_version,
     )
 
     if dry_run:

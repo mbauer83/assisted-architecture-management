@@ -83,12 +83,19 @@ def verify_content_in_temp_path(
 
 def collect_verification_errors(repo_root: Path, *, include_diagrams: bool = False) -> list[str]:
     """Build a verifier for *repo_root* and return formatted ``CODE: message (location)`` error strings."""
+    from src.application.candidate_repository import committed_repository  # noqa: PLC0415
     from src.application.verification.artifact_verifier_registry import ArtifactRegistry  # noqa: PLC0415
     from src.infrastructure.app_bootstrap import build_runtime_catalogs, get_module_registry  # noqa: PLC0415
     from src.infrastructure.artifact_index import shared_artifact_index  # noqa: PLC0415
 
-    registry = ArtifactRegistry(shared_artifact_index(repo_root))
-    verifier = ArtifactVerifier(registry, catalogs=build_runtime_catalogs(get_module_registry()))
+    store = shared_artifact_index(repo_root)
+    registry = ArtifactRegistry(store)
+    committed_repo = committed_repository(store)
+    verifier = ArtifactVerifier(
+        registry,
+        catalogs=build_runtime_catalogs(get_module_registry()),
+        committed_repo=committed_repo,
+    )
     return [
         f"{i.code}: {i.message} ({i.location})"
         for r in verifier.verify_all(repo_root, include_diagrams=include_diagrams)

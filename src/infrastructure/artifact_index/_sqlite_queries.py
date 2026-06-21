@@ -229,6 +229,17 @@ def find_neighbors(
     return result
 
 
+def diagrams_referencing_type(
+    conn: sqlite3.Connection, type_id: str
+) -> list[tuple[str, str, str]]:
+    """Return (diagram_id, classifier_local_id, attr_name) tuples for a given type_id."""
+    rows = conn.execute(
+        "SELECT diagram_id, classifier_local_id, attr_name FROM attribute_type_refs WHERE type_id=?",
+        (type_id,),
+    ).fetchall()
+    return [(str(r[0]), str(r[1]), str(r[2])) for r in rows]
+
+
 def entity_context(
     conn: sqlite3.Connection,
     entity_id: str,

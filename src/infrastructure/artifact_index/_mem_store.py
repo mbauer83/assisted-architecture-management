@@ -21,6 +21,8 @@ class _MemStore:
     """diagram_id → set of diagram-only entity artifact_ids owned by that diagram."""
     connections_by_diagram: dict[str, set[str]] = field(default_factory=dict)
     """diagram_id → set of diagram-owned connection artifact_ids (artifact_id contains '#conn/')."""
+    attribute_type_refs: dict[str, list[tuple[str, str, str]]] = field(default_factory=dict)
+    """diagram_id → [(classifier_local_id, attr_name, type_id)] for classifier-typed attributes."""
 
     def clear(self) -> None:
         for attr in (
@@ -35,6 +37,7 @@ class _MemStore:
             "document_by_path",
             "entities_by_diagram",
             "connections_by_diagram",
+            "attribute_type_refs",
         ):
             getattr(self, attr).clear()
 

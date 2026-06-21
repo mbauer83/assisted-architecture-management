@@ -192,6 +192,8 @@ def artifact_edit_diagram(
 
     verifier = verifier_for(key, include_registry=True)
     mutation_context, clear_repo_caches = authoritative_callbacks_for(roots)
+    from src.application.candidate_repository import committed_repository  # noqa: PLC0415
+    committed_repo = committed_repository(repo_cached(key))
 
     if puml == PUML_AUTO_SYNC:
         store = repo_cached(key)
@@ -226,6 +228,7 @@ def artifact_edit_diagram(
         clear_repo_caches=clear_repo_caches,
         artifact_id=artifact_id,
         dry_run=dry_run,
+        committed_repo=committed_repo,
         **kwargs,
     )
     return _finalize_authoritative_write(dry_run, result, mutation_context)
@@ -289,13 +292,20 @@ def artifact_delete_diagram(
     dry_run: bool = True,
     repo_root: str | None = None,
 ) -> dict[str, object]:
-    root, _registry, _verifier = _resolve(repo_root, need_registry=False)
-    mutation_context, clear_repo_caches = authoritative_callbacks_for(root)
+    roots = resolve_repo_roots(repo_scope="engagement", repo_root=repo_root, repo_preset=None, enterprise_root=None)
+    key = roots_key(roots)
+    root = roots[0]
+    from src.application.candidate_repository import committed_repository  # noqa: PLC0415
+    verifier = verifier_for(key, include_registry=False)
+    committed_repo = committed_repository(repo_cached(key))
+    mutation_context, clear_repo_caches = authoritative_callbacks_for(roots)
     result = artifact_write_ops.delete_diagram(
         repo_root=root,
         clear_repo_caches=clear_repo_caches,
         artifact_id=artifact_id,
         dry_run=dry_run,
+        verifier=verifier,
+        committed_repo=committed_repo,
     )
     return _finalize_authoritative_write(dry_run, result, mutation_context)
 

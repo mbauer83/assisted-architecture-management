@@ -46,12 +46,20 @@ def _diagram_entity_content_text(item: dict[str, object]) -> str:
     return " ".join(_leaf_strings({k: v for k, v in item.items() if k not in _ID_KEYS}))
 
 
-def extract_diagram_entities(diag: DiagramRecord) -> list[EntityRecord]:
+def extract_diagram_entities(
+    diag: DiagramRecord,
+    workspace_entity_types: frozenset[str] = frozenset(),
+) -> list[EntityRecord]:
     """Extract diagram-only EntityRecords from a diagram's diagram-entities frontmatter.
 
     Recognises both canonical 'id' and diagram-specific 'node_id' (GSN format).
     Sets display_alias to the local_id so SVG alias matching works.
     Skips connection-like items (those with source/target but no id/node_id).
+
+    For entity types in *workspace_entity_types* the artifact_id is the bare local_id
+    (a canonical ``CLF@epoch.random.slug``); otherwise it is the qualified
+    ``{diagram_id}#{entity_type}/{local_id}`` form.  ``host_diagram_id`` is always set
+    to the owning diagram for both scopes.
     """
     diagram_entities = diag.extra.get("diagram-entities")
     if not isinstance(diagram_entities, dict):
@@ -60,6 +68,7 @@ def extract_diagram_entities(diag: DiagramRecord) -> list[EntityRecord]:
     for entity_type, items in diagram_entities.items():
         if not isinstance(items, list):
             continue
+        is_workspace = entity_type in workspace_entity_types
         for item in items:
             if not isinstance(item, dict):
                 continue
@@ -68,7 +77,7 @@ def extract_diagram_entities(diag: DiagramRecord) -> list[EntityRecord]:
             local_id = _diagram_local_id(item)
             if not local_id:
                 continue
-            artifact_id = f"{diag.artifact_id}#{entity_type}/{local_id}"
+            artifact_id = local_id if is_workspace else f"{diag.artifact_id}#{entity_type}/{local_id}"
             name = str(item.get("label") or item.get("text") or item.get("name") or local_id)
             content_text = _diagram_entity_content_text(item)
             result.append(
@@ -93,18 +102,31 @@ def extract_diagram_entities(diag: DiagramRecord) -> list[EntityRecord]:
     return result
 
 
-def diagram_local_to_full(diag: DiagramRecord) -> dict[str, str]:
-    """Map each diagram-entity local id to its full '{diagram_id}#{entity_type}/{local_id}' id."""
+def diagram_local_to_full(
+    diag: DiagramRecord,
+    workspace_entity_types: frozenset[str] = frozenset(),
+) -> dict[str, str]:
+    """Map each diagram-entity local id to its canonical artifact_id.
+
+    For workspace-scoped entity types, the local_id IS the canonical id.
+    For diagram-scoped entity types, the canonical id is ``{diagram_id}#{entity_type}/{local_id}``.
+    """
     diagram_entities = diag.extra.get("diagram-entities")
     if not isinstance(diagram_entities, dict):
         return {}
-    return {
-        local_id: f"{diag.artifact_id}#{entity_type}/{local_id}"
-        for entity_type, items in diagram_entities.items()
-        if isinstance(items, list)
-        for item in items
-        if isinstance(item, dict) and (local_id := _diagram_local_id(item))
-    }
+    result: dict[str, str] = {}
+    for entity_type, items in diagram_entities.items():
+        if not isinstance(items, list):
+            continue
+        is_workspace = entity_type in workspace_entity_types
+        for item in items:
+            if not isinstance(item, dict):
+                continue
+            local_id = _diagram_local_id(item)
+            if not local_id:
+                continue
+            result[local_id] = local_id if is_workspace else f"{diag.artifact_id}#{entity_type}/{local_id}"
+    return result
 
 
 def _diagram_connection_record(
@@ -136,7 +158,10 @@ def _diagram_connection_record(
     )
 
 
-def extract_diagram_connections(diag: DiagramRecord) -> list[ConnectionRecord]:
+def extract_diagram_connections(
+    diag: DiagramRecord,
+    workspace_entity_types: frozenset[str] = frozenset(),
+) -> list[ConnectionRecord]:
     """Extract ConnectionRecords from diagram frontmatter.
 
     Two sources are checked:
@@ -146,7 +171,7 @@ def extract_diagram_connections(diag: DiagramRecord) -> list[ConnectionRecord]:
 
     Each source/target local ID is resolved via diagram_local_to_full.
     """
-    local_to_full = diagram_local_to_full(diag)
+    local_to_full = diagram_local_to_full(diag, workspace_entity_types)
     result: list[ConnectionRecord] = []
 
     diagram_connections = diag.extra.get("connections")

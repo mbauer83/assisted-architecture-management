@@ -156,9 +156,53 @@ def create_diagram(
 
     warnings: list[str] = []
     last = last_updated or today_iso()
+    if diagram_entities is not None:
+        from src.application.identifier_allocator import get_default_allocator  # noqa: PLC0415
+        from src.infrastructure.write.artifact_write.diagram_entity_identity import (  # noqa: PLC0415
+            normalize_diagram_entity_identities,
+        )
+        diagram_entities, diagram_connections, bindings = normalize_diagram_entity_identities(  # type: ignore[assignment]
+            diagram_type,
+            diagram_entities,  # type: ignore[arg-type]
+            list(diagram_connections or []),
+            list(bindings or []),
+            module_catalog=verifier._runtime_catalogs.diagram_types,
+            allocator=get_default_allocator(),
+        )
     norm_bindings = normalize_bindings(diagram_entities, bindings)
     clean_entities = strip_diagram_shorthand(diagram_entities)
     norm_bindings_raw = bindings_to_raw(norm_bindings)
+
+    # Workspace-id format check: all workspace entity ids in a new diagram are new.
+    if diagram_entities is not None and isinstance(clean_entities, dict):
+        from src.application.verification._workspace_identity_rules import (
+            validate_workspace_entity_ids,  # noqa: PLC0415
+        )
+        try:
+            _dt_module = verifier._runtime_catalogs.diagram_types.find_diagram_type(diagram_type)
+        except Exception:  # noqa: BLE001
+            _dt_module = None
+        if _dt_module is not None:
+            _ws_errors = validate_workspace_entity_ids(clean_entities, _dt_module, committed_ids=None)
+            from src.config.settings import datatype_type_references_blocking  # noqa: PLC0415
+            if _ws_errors and datatype_type_references_blocking():
+                _dummy_id = artifact_id or "new-diagram"
+                return WriteResult(
+                    wrote=False,
+                    path=repo_root / "diagram-catalog" / "diagrams" / f"{_dummy_id}.puml",
+                    artifact_id=_dummy_id,
+                    content=None,
+                    warnings=warnings,
+                    verification={
+                        "path": f"{_dummy_id}.puml",
+                        "file_type": "diagram",
+                        "valid": False,
+                        "issues": [
+                            {"severity": "error", "code": "E335-fmt", "message": m, "location": _dummy_id}
+                            for m in _ws_errors
+                        ],
+                    },
+                )
 
     if diagram_entities is not None:
         build = _build_model_backed(
@@ -191,6 +235,7 @@ def create_diagram(
         bindings=bindings_to_raw(norm_bindings) if norm_bindings else None,
         puml_body=build.puml_body,
         tlp=tlp,
+        diagram_format_version=2 if diagram_type == "datatype" else None,
     )
 
     # Confidential assurance diagrams are redirected to a gitignored source root so their

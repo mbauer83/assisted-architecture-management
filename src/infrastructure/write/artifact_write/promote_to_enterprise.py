@@ -32,8 +32,10 @@ from src.infrastructure.write.artifact_write._promote_planning import (
     _match_enterprise,
     _normalize_name,
     _partition_selected,
+    build_enterprise_classifier_indexes,
 )
 from src.infrastructure.write.artifact_write.promote_schema_check import check_promotion_schema_compatibility
+from src.infrastructure.write.artifact_write.promote_type_closure import compute_type_closure
 
 __all__ = [
     "ConflictResolution",
@@ -108,6 +110,9 @@ class PromotionPlan:
     schema_errors: list[str] = field(default_factory=list)
     group_mapping: list[GroupMappingEntry] = field(default_factory=list)
     available_enterprise_groups: list[dict[str, str]] = field(default_factory=list)
+    type_closure_additions: list[str] = field(default_factory=list)
+    type_closure_reasons: dict[str, str] = field(default_factory=dict)
+    broken_type_closure: list[str] = field(default_factory=list)
 
 
 @dataclass
@@ -222,7 +227,17 @@ def plan_promotion(
     )
 
     docs_to_add, doc_conflicts = plan_docs(document_ids, repo, registry, already, warnings)
-    diags_to_add, diagram_conflicts = plan_diagrams(diagram_ids, repo, registry, already, warnings)
+    clf_indexes = build_enterprise_classifier_indexes(repo, registry) if diagram_ids else None
+    diags_to_add, diagram_conflicts = plan_diagrams(
+        diagram_ids, repo, registry, already, warnings, classifier_indexes=clf_indexes
+    )
+
+    closure = compute_type_closure(diags_to_add, repo, registry)
+    type_closure_additions = closure.additions
+    type_closure_reasons = closure.reasons
+    broken_type_closure = closure.broken
+    if type_closure_additions:
+        diags_to_add = list(dict.fromkeys(diags_to_add + type_closure_additions))
 
     schema_errors = check_promotion_schema_compatibility(
         entity_ids=to_add + [c.engagement_id for c in conflicts],
@@ -231,6 +246,11 @@ def plan_promotion(
         registry=registry,
         repo=repo,
     )
+    for clf_id in broken_type_closure:
+        schema_errors.append(
+            f"Broken type closure: classifier {clf_id} is referenced in a promoted diagram "
+            "but its host diagram cannot be found — exclude the referencing diagram or include its host"
+        )
 
     group_mapping: list[GroupMappingEntry] = []
     available_enterprise_groups: list[dict[str, str]] = []
@@ -256,4 +276,7 @@ def plan_promotion(
         schema_errors=schema_errors,
         group_mapping=group_mapping,
         available_enterprise_groups=available_enterprise_groups,
+        type_closure_additions=type_closure_additions,
+        type_closure_reasons=type_closure_reasons,
+        broken_type_closure=broken_type_closure,
     )

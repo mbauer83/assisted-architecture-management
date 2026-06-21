@@ -12,6 +12,7 @@ from fastapi import Request
 from src.application.derivation.strategy_registry import DerivationStrategyCatalogBuilder
 from src.application.runtime_catalogs import RuntimeCatalogs
 from src.application.startup_validation import validate_registry_consistency
+from src.config.settings import datatype_type_references_blocking
 from src.diagram_types import register_default_diagram_types
 from src.domain.catalogs import ConnectionSemanticsImpl, DiagramTypeCatalogImpl, OntologyCatalogImpl
 from src.domain.module_catalog import ModuleCatalog, ModuleCatalogBuilder
@@ -117,6 +118,7 @@ def build_runtime_catalogs(registry: ModuleRegistry) -> RuntimeCatalogs:
         connections=ConnectionSemanticsImpl(module_catalog),
         diagram_types=DiagramTypeCatalogImpl(module_catalog),
         derivation=_build_derivation_catalog(),
+        datatype_type_references_blocking=datatype_type_references_blocking(),
     )
 
 

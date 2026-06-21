@@ -2,12 +2,15 @@
 
 from __future__ import annotations
 
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from src.infrastructure.write.artifact_write.promote_to_enterprise import (
     DiagramPromotionConflict,
     DocPromotionConflict,
 )
+
+if TYPE_CHECKING:
+    from src.infrastructure.write.artifact_write._promote_planning import ClassifierIndexes
 
 
 def plan_docs(
@@ -45,12 +48,43 @@ def plan_docs(
     return docs_to_add, doc_conflicts
 
 
+def _check_diagram_classifiers(
+    diag: Any,
+    indexes: "ClassifierIndexes",
+    warnings: list[str],
+) -> None:
+    """Emit advisory warnings for datatype classifier name-clashes with enterprise."""
+    de = diag.extra.get("diagram-entities") if hasattr(diag, "extra") else None
+    if not isinstance(de, dict):
+        return
+    for clf in de.get("classifier") or []:
+        if not isinstance(clf, dict):
+            continue
+        clf_id = str(clf.get("id") or "")
+        clf_label = str(clf.get("label") or "")
+        if not clf_id.startswith("CLF@"):
+            continue
+        if clf_id in indexes.by_id:
+            continue  # same id — idempotent, no warning
+        if clf_label:
+            norm = clf_label.strip().lower()
+            existing_id = indexes.by_name.get(norm)
+            if existing_id is not None:
+                warnings.append(
+                    f"Advisory: classifier '{clf_label}' in {diag.artifact_id} "
+                    f"matches enterprise classifier {existing_id} by name but has a different id "
+                    "(non-blocking; review before publishing)"
+                )
+
+
 def plan_diagrams(
     diagram_ids: list[str] | None,
     repo: Any,
     registry: Any,
     already: list[str],
     warnings: list[str],
+    *,
+    classifier_indexes: "ClassifierIndexes | None" = None,
 ) -> tuple[list[str], list[DiagramPromotionConflict]]:
     from src.infrastructure.write.artifact_write.promote_to_enterprise import _normalize_name  # noqa: PLC0415
 
@@ -77,4 +111,6 @@ def plan_diagrams(
             ))
         else:
             diags_to_add.append(did)
+        if classifier_indexes is not None and getattr(diag, "diagram_type", None) == "datatype":
+            _check_diagram_classifiers(diag, classifier_indexes, warnings)
     return diags_to_add, diagram_conflicts

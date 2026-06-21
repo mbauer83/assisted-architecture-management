@@ -9,6 +9,7 @@ from fastapi import APIRouter, Depends, HTTPException
 
 from src.application.runtime_catalogs import RuntimeCatalogs
 from src.infrastructure.app_bootstrap import runtime_catalogs_dependency
+from src.infrastructure.gui.routers import state as s
 
 router = APIRouter()
 
@@ -34,3 +35,47 @@ def read_diagram_kind_ui_config(
     if kind is None:
         raise HTTPException(404, f"Diagram type not found: {diagram_type!r}")
     return asdict(kind.ui_config)
+
+
+@router.get("/api/diagram-types/datatype/types")
+def query_datatype_type_catalog(
+    query: str | None = None,
+    scope: str | None = None,
+    kind: str | None = None,
+    limit: int = 50,
+    cursor: str | None = None,
+    diagram_id: str | None = None,
+) -> dict[str, Any]:
+    from src.diagram_types.datatype import _config as _dt_config  # noqa: PLC0415
+    from src.diagram_types.datatype._type_catalog import query_datatype_types  # noqa: PLC0415
+
+    primitive_names = list(str(p) for p in (_dt_config.get("ui") or {}).get("primitive_types") or [])
+    repo = s.get_repo()
+    result = query_datatype_types(
+        repo, primitive_names,
+        query=query, scope=scope, kind=kind, limit=limit, cursor=cursor, diagram_id=diagram_id,
+    )
+    return {
+        "generation": result.generation,
+        "primitives": result.primitives,
+        "classifiers": [
+            {
+                "type_id": c.type_id,
+                "label": c.label,
+                "kind": c.kind,
+                "scope": c.scope,
+                "host_diagram_id": c.host_diagram_id,
+            }
+            for c in result.classifiers
+        ],
+        "next_cursor": result.next_cursor,
+    }
+
+
+@router.get("/api/diagram-types/datatype/type-usages")
+def query_datatype_type_usages(type_id: str) -> dict[str, Any]:
+    from src.diagram_types.datatype._type_catalog import query_type_usages  # noqa: PLC0415
+
+    repo = s.get_repo()
+    usages = query_type_usages(repo, type_id=type_id)
+    return {"type_id": type_id, "usages": usages}

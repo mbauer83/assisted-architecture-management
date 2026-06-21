@@ -15,12 +15,12 @@ from __future__ import annotations
 import random
 import string
 import subprocess
-import time
 from pathlib import Path
 
 import yaml
 
 from src.application.group_registry import load_group_registry, registry_to_yaml
+from src.domain.clock import epoch_seconds
 from src.domain.groups import UNCATEGORIZED, GroupAxis, GroupEntry, GroupRegistry
 from src.domain.repo_layout import ARCH_REPO, DIAGRAM_CATALOG, DIAGRAMS, DOCS
 
@@ -139,7 +139,7 @@ def _persist_registry(repo_root: Path, registry: GroupRegistry, messages: list[s
 
 
 def _new_id() -> str:
-    epoch, rand = int(time.time()), "".join(random.choices(string.ascii_letters + string.digits, k=6))
+    epoch, rand = epoch_seconds(), "".join(random.choices(string.ascii_letters + string.digits, k=6))
     return f"GRP@{epoch}.{rand}"
 
 

@@ -140,7 +140,11 @@ def register(mcp: FastMCP) -> None:
             "or domain names (e.g. ['motivation', 'strategy']) — not mixed.\n"
             "• target (str): pair-legality — requires filter with exactly one concrete type name; "
             "returns pair_guidance {outgoing, incoming, symmetric} for the (source, target) pair.\n"
-            "Omit all to return all entity type guidance (large; prefer filtering)."
+            "Omit all to return all entity type guidance (large; prefer filtering).\n\n"
+            "Datatype diagrams — attribute type contract: each attribute's 'type' field is either "
+            "{kind: 'primitive', name: '<name>'} for built-in scalar types, or "
+            "{kind: 'classifier', id: '<type_id>'} for a named classifier type. "
+            "Call artifact_query_datatype_types to discover available type_ids."
         ),
         annotations=READ_ONLY,
         structured_output=False,

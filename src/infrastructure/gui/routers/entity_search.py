@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 from functools import lru_cache as _lru_cache
 from typing import Any
 
@@ -11,6 +12,8 @@ from src.application.entity_type_predicates import is_assurance_entity_type, is_
 from src.application.runtime_catalogs import RuntimeCatalogs
 from src.infrastructure.app_bootstrap import runtime_catalogs_dependency
 from src.infrastructure.gui.routers import state as s
+
+logger = logging.getLogger(__name__)
 
 
 @_lru_cache(maxsize=1)
@@ -34,6 +37,34 @@ def _score_reference_hit(name: str, artifact_id: str, query: str) -> tuple[int, 
     return (2, name_lc, id_lc)
 
 
+def _try_assurance_hits(q: str, limit: int) -> list[dict[str, Any]]:
+    """Return assurance search hits when the store is unlocked; silent empty on any failure."""
+    try:
+        from src.application.assurance_exposure import AssuranceExposurePolicy  # noqa: PLC0415
+        from src.infrastructure.mcp.assurance_mcp.context import get_assurance_context  # noqa: PLC0415
+        ctx = get_assurance_context()
+        pol = AssuranceExposurePolicy(ctx.max_classification, ctx.is_available())
+        if pol.check_locked():
+            return []
+        raw = ctx.store.search_nodes(q.strip(), limit=limit * 2)
+        visible, _ = pol.filter_nodes(raw)
+        return [
+            {
+                "score": 1.0,
+                "record_type": "assurance-node",
+                "artifact_id": str(n["node_id"]),
+                "name": str(n.get("name", "")),
+                "artifact_type": str(n.get("node_type", "")),
+                "status": str(n.get("status", "")),
+                "path": "",
+            }
+            for n in visible[:limit]
+        ]
+    except Exception:  # noqa: BLE001
+        logger.debug("Assurance search unavailable for global merge", exc_info=False)
+        return []
+
+
 @router.get("/api/artifact-search")
 def search_artifacts(
     q: str,
@@ -52,7 +83,7 @@ def search_artifacts(
         include_diagrams=include_diagrams,
         include_documents=include_documents,
     )
-    hits = []
+    hits: list[dict[str, Any]] = []
     for h in result.hits:
         aid = getattr(h.record, "artifact_id", "")
         hits.append({
@@ -63,6 +94,7 @@ def search_artifacts(
             "status": getattr(h.record, "status", ""),
             "path": str(h.record.path),
         })
+    hits.extend(_try_assurance_hits(q, limit))
     return {"query": result.query, "hits": hits}
 
 

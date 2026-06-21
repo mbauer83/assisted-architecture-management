@@ -159,7 +159,7 @@ def execute_promotion(
         _apply_entity_conflicts(ctx)
         _copy_simple_artifacts(ctx)
 
-        result.verification_errors = collect_verification_errors(enterprise_root)
+        result.verification_errors = collect_verification_errors(enterprise_root, include_diagrams=True)
         if result.verification_errors:
             rollback(ctx.ent_copied, ctx.ent_backups)
             result.rolled_back = True

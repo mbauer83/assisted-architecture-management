@@ -13,7 +13,6 @@ belongs in infrastructure adapters (see ``src/infrastructure/write/artifact_writ
 import re
 import secrets
 import string
-import time
 from collections.abc import Mapping
 
 from src.application.modeling.artifact_write_formatting import (
@@ -25,6 +24,7 @@ from src.application.modeling.artifact_write_formatting import (
 from src.application.modeling.types import (
     DiagramConnectionInferenceMode,
 )
+from src.domain.clock import epoch_seconds
 
 __all__ = [
     "DiagramConnectionInferenceMode",
@@ -56,7 +56,7 @@ def slugify(value: str) -> str:
 
 def generate_entity_id(prefix: str, friendly_name: str, *, random_length: int = 6) -> str:
     """Generate an artifact-id in the new convention: TYPE@epoch.random.friendly-name"""
-    epoch = int(time.time())
+    epoch = epoch_seconds()
     random_part = "".join(secrets.choice(_ID_ALPHABET) for _ in range(random_length))
     slug = slugify(friendly_name)
     return f"{prefix}@{epoch}.{random_part}.{slug}"

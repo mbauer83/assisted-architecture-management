@@ -13,7 +13,7 @@ from collections.abc import Callable
 from pathlib import Path
 
 from src.application.artifact_query import ArtifactRepository
-from src.application.modeling.artifact_write import generate_entity_id
+from src.application.identifier_allocator import get_default_allocator
 from src.application.modeling.artifact_write_formatting import format_entity_markdown
 from src.application.verification.artifact_verifier import ArtifactVerifier
 from src.domain.module_types import EntityTypeName
@@ -69,7 +69,7 @@ def ensure_global_artifact_reference(
     from src.infrastructure.app_bootstrap import get_module_registry  # noqa: PLC0415
 
     info = get_module_registry().get_entity_type(EntityTypeName(_GAR_TYPE))
-    eid = generate_entity_id(info.prefix, global_artifact_name)
+    eid = get_default_allocator().allocate(prefix=info.prefix, name_hint=global_artifact_name)
     from src.infrastructure.write.artifact_write.entity import (  # noqa: PLC0415
         _alias_for,
         entity_path,

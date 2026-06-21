@@ -6,7 +6,7 @@ import re
 from collections.abc import Callable
 from pathlib import Path
 
-from src.application.modeling.artifact_write import generate_entity_id
+from src.application.identifier_allocator import get_default_allocator
 from src.application.modeling.artifact_write_formatting import format_entity_markdown
 from src.application.verification.artifact_verifier import ArtifactRegistry, ArtifactVerifier
 from src.domain.module_types import EntityTypeName
@@ -47,7 +47,7 @@ def admin_create_entity(
     if info is None:
         raise ValueError(f"Unknown entity artifact_type: {artifact_type!r}")
 
-    eid = artifact_id or generate_entity_id(info.prefix, name)
+    eid = artifact_id or get_default_allocator().allocate(prefix=info.prefix, name_hint=name)
     from src.infrastructure.write.artifact_write.entity import _render_display, entity_path  # noqa: PLC0415
 
     path = entity_path(repo_root, info, eid)

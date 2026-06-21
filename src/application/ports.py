@@ -97,6 +97,23 @@ class ArtifactSearch(Protocol):
         include_documents: bool = True,
     ) -> list[tuple[str, str, float]]: ...
 
+    def find_entity_by_workspace_id(
+        self,
+        artifact_id: str,
+        *,
+        scope: Literal["both", "engagement", "enterprise"] = "both",
+    ) -> EntityRecord | None: ...
+
+    def find_entities_by_name(
+        self,
+        name: str,
+        *,
+        artifact_type: str | None = None,
+        scope: Literal["both", "engagement", "enterprise"] = "both",
+    ) -> list[EntityRecord]: ...
+
+    def diagrams_referencing_type_id(self, type_id: str) -> list[tuple[str, str, str]]: ...
+
 
 class RelationshipGraph(Protocol):
     """Connection graph traversal and candidate queries."""

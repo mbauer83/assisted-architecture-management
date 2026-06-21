@@ -22,3 +22,4 @@ class RuntimeCatalogs:
     connections: ConnectionSemantics
     diagram_types: DiagramTypeCatalog
     derivation: DerivationStrategyCatalog
+    datatype_type_references_blocking: bool = True

@@ -50,6 +50,9 @@ _INS_EFTS = (
 _INS_CFTS = "INSERT INTO connections_fts (artifact_id,source,target,conn_type,content_text) VALUES (?,?,?,?,?)"
 _INS_DFTS = "INSERT INTO diagrams_fts (artifact_id,name,diagram_type,artifact_type) VALUES (?,?,?,?)"
 _INS_DOCFTS = "INSERT INTO documents_fts (artifact_id,title,doc_type,keywords,content_text) VALUES (?,?,?,?,?)"
+_INS_ATTR_TYPE_REF = (
+    "INSERT INTO attribute_type_refs (diagram_id,classifier_local_id,attr_name,type_id) VALUES (?,?,?,?)"
+)
 
 
 _READ_POOL_SIZE = min(max(os.cpu_count() or 4, 4), 8)
@@ -234,6 +237,18 @@ class _SqliteStore:
             if self._fts_enabled:
                 self._conn.execute("DELETE FROM documents_fts WHERE artifact_id=?", (artifact_id,))
 
+    def upsert_attribute_type_refs(self, diagram_id: str, refs: list[tuple[str, str, str]]) -> None:
+        self._mem.attribute_type_refs[diagram_id] = refs
+        with self._conn:
+            self._conn.execute("DELETE FROM attribute_type_refs WHERE diagram_id=?", (diagram_id,))
+            if refs:
+                self._conn.executemany(_INS_ATTR_TYPE_REF, [(diagram_id, *r) for r in refs])
+
+    def delete_attribute_type_refs(self, diagram_id: str) -> None:
+        self._mem.attribute_type_refs.pop(diagram_id, None)
+        with self._conn:
+            self._conn.execute("DELETE FROM attribute_type_refs WHERE diagram_id=?", (diagram_id,))
+
     # ── Full rebuild ──────────────────────────────────────────────────────────
 
     def rebuild(self) -> None:
@@ -245,6 +260,7 @@ class _SqliteStore:
                 "documents",
                 "entity_context_edges",
                 "entity_context_stats",
+                "attribute_type_refs",
             ):
                 self._conn.execute(f"DELETE FROM {t}")  # noqa: S608
             if self._fts_enabled:
@@ -254,6 +270,13 @@ class _SqliteStore:
             self._conn.executemany(_INS_CONNECTION, [self._connection_row(r) for r in self._mem.connections.values()])
             self._conn.executemany(_INS_DIAGRAM, [self._diagram_row(r) for r in self._mem.diagrams.values()])
             self._conn.executemany(_INS_DOCUMENT, [self._document_row(r) for r in self._mem.documents.values()])
+            attr_ref_rows = [
+                (diagram_id, clf_id, attr_name, type_id)
+                for diagram_id, refs in self._mem.attribute_type_refs.items()
+                for clf_id, attr_name, type_id in refs
+            ]
+            if attr_ref_rows:
+                self._conn.executemany(_INS_ATTR_TYPE_REF, attr_ref_rows)
             if self._fts_enabled:
                 self._conn.executemany(
                     _INS_EFTS,

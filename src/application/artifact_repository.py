@@ -271,6 +271,29 @@ class ArtifactRepository:
             strict_record_type=strict_record_type,
         )
 
+    def scope_for_path(self, path: Path) -> Literal["enterprise", "engagement", "unknown"]:
+        return self._store.scope_for_path(path)
+
+    def find_entity_by_workspace_id(
+        self,
+        artifact_id: str,
+        *,
+        scope: Literal["both", "engagement", "enterprise"] = "both",
+    ) -> EntityRecord | None:
+        return self._store.find_entity_by_workspace_id(artifact_id, scope=scope)
+
+    def find_entities_by_name(
+        self,
+        name: str,
+        *,
+        artifact_type: str | None = None,
+        scope: Literal["both", "engagement", "enterprise"] = "both",
+    ) -> list[EntityRecord]:
+        return self._store.find_entities_by_name(name, artifact_type=artifact_type, scope=scope)
+
+    def diagrams_referencing_type_id(self, type_id: str) -> list[tuple[str, str, str]]:
+        return self._store.diagrams_referencing_type_id(type_id)
+
     def search(
         self,
         query: str,

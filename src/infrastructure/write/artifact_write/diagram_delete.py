@@ -5,6 +5,8 @@ from __future__ import annotations
 from collections.abc import Callable
 from pathlib import Path
 
+from src.application.candidate_repository import CandidateRepository
+from src.application.verification.artifact_verifier import ArtifactVerifier
 from src.application.verification.artifact_verifier_parsing import parse_frontmatter_from_path
 from src.config.repo_paths import DIAGRAM_CATALOG, DIAGRAMS, RENDERED
 
@@ -55,6 +57,8 @@ def _delete_diagram_core(
     clear_repo_caches: Callable[[Path], None],
     artifact_id: str,
     dry_run: bool,
+    verifier: ArtifactVerifier | None = None,
+    committed_repo: CandidateRepository | None = None,
 ) -> WriteResult:
     diagram_path = _find_diagram_file(repo_root, artifact_id)
     if diagram_path is None:
@@ -62,6 +66,32 @@ def _delete_diagram_core(
 
     rendered = [path for path in _rendered_paths(diagram_path) if path.exists()]
     warnings = [f"Will delete rendered artifact: {path.name}" for path in rendered]
+
+    # E334 pre-flight: block deletion if hosted classifiers are still referenced by other diagrams.
+    if committed_repo is not None and verifier is not None:
+        from src.application.candidate_repository import candidate_with  # noqa: PLC0415
+        from src.application.verification._verifier_contribution_runner import (  # noqa: PLC0415
+            run_repository_contributions,
+            workspace_types_from_catalogs,
+        )
+        _catalogs = getattr(verifier, "_catalogs", None)
+        _ws = workspace_types_from_catalogs(_catalogs) if _catalogs is not None else {}
+        _cand = candidate_with(committed_repo, deleted_ids=frozenset([artifact_id]), workspace_types=_ws)
+        _rr = run_repository_contributions(
+            candidate=_cand, committed=committed_repo, runtime_catalogs=_catalogs, repo_path=repo_root,
+        )
+        if _rr is not None and not _rr.valid:
+            return WriteResult(
+                wrote=False, path=diagram_path, artifact_id=artifact_id,
+                content=None, warnings=warnings,
+                verification={
+                    "path": str(diagram_path), "file_type": "diagram", "valid": False,
+                    "issues": [
+                        {"severity": i.severity, "code": i.code, "message": i.message, "location": i.location}
+                        for i in _rr.issues
+                    ],
+                },
+            )
 
     if dry_run:
         preview = "\n".join(
@@ -99,6 +129,8 @@ def delete_diagram(
     clear_repo_caches: Callable[[Path], None],
     artifact_id: str,
     dry_run: bool,
+    verifier: ArtifactVerifier | None = None,
+    committed_repo: CandidateRepository | None = None,
 ) -> WriteResult:
     assert_engagement_write_root(repo_root)
     return _delete_diagram_core(
@@ -106,4 +138,6 @@ def delete_diagram(
         clear_repo_caches=clear_repo_caches,
         artifact_id=artifact_id,
         dry_run=dry_run,
+        verifier=verifier,
+        committed_repo=committed_repo,
     )

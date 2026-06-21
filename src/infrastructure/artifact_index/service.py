@@ -59,7 +59,11 @@ _T = TypeVar("_T", EntityRecord, ConnectionRecord, DiagramRecord, DocumentRecord
 _CHANGE_APPLIERS = {
     "outgoing": lambda service, path, data: _apply_outgoing_records(path, data, service._mem, service._db),
     "entity": lambda service, path, data: _apply_entity_record(path, data, service._mem, service._db),
-    "diagram": lambda service, path, data: apply_diagram_change(path, service._mem, service._db, parsed=data),
+    "diagram": lambda service, path, data: apply_diagram_change(
+        path, service._mem, service._db, parsed=data,
+        workspace_types=service._get_workspace_types(),
+        attr_type_ref_fn=service._attr_type_ref_extractor,
+    ),
     "document": lambda service, path, data: apply_document_change(path, service._mem, service._db, parsed=data),
 }
 
@@ -97,11 +101,51 @@ class ArtifactIndex:
 
         return build_runtime_catalogs(get_module_registry()).ontology.known_domain_names()
 
+    def _get_workspace_types(self) -> dict[str, frozenset[str]]:
+        from src.domain.ontology_protocol import DiagramTypeModule  # noqa: PLC0415
+        from src.infrastructure.app_bootstrap import get_module_registry  # noqa: PLC0415
+
+        def _ws(dk: DiagramTypeModule) -> frozenset[str]:
+            return frozenset(
+                oe.entity_type for oe in dk.ui_config.diagram_only_types if oe.identity_scope == "workspace"
+            )
+
+        return {str(n): ws for n, dk in get_module_registry().all_diagram_types().items() if (ws := _ws(dk))}
+
+    def _attr_type_ref_extractor(self, diag: DiagramRecord) -> list[tuple[str, str, str]]:
+        """Extract classifier-typed attribute refs from a datatype diagram for indexing."""
+        if diag.diagram_type != "datatype":
+            return []
+        refs: list[tuple[str, str, str]] = []
+        raw_de = diag.extra.get("diagram-entities")
+        de: dict = raw_de if isinstance(raw_de, dict) else {}
+        for clf in (de.get("classifier") or []):
+            if not isinstance(clf, dict):
+                continue
+            clf_id = str(clf.get("id") or "")
+            for attr in (clf.get("attributes") or []):
+                if not isinstance(attr, dict):
+                    continue
+                type_ref = attr.get("type")
+                if not isinstance(type_ref, dict) or type_ref.get("kind") != "classifier":
+                    continue
+                type_id = str(type_ref.get("id") or "")
+                attr_name = str(attr.get("name") or "")
+                if type_id and attr_name:
+                    refs.append((clf_id, attr_name, type_id))
+        return refs
+
     def refresh(self) -> None:
         temp = _MemStore()
         domain_names = self._get_domain_names()
+        workspace_types = self._get_workspace_types()
         for mount in self.repo_mounts:
-            scan_mount(mount, temp, domain_names=domain_names)
+            scan_mount(
+                mount, temp,
+                domain_names=domain_names,
+                workspace_types=workspace_types,
+                attr_type_ref_fn=self._attr_type_ref_extractor,
+            )
         with self._lock.writing():
             self._mem.entities.clear()
             self._mem.entities.update(temp.entities)
@@ -111,6 +155,8 @@ class ArtifactIndex:
             self._mem.diagrams.update(temp.diagrams)
             self._mem.documents.clear()
             self._mem.documents.update(temp.documents)
+            self._mem.attribute_type_refs.clear()
+            self._mem.attribute_type_refs.update(temp.attribute_type_refs)
             self._db.rebuild()
             self._mem.rebuild_path_indexes()
             self._bump_generation()
@@ -451,6 +497,42 @@ class ArtifactIndex:
                     include_documents=include_documents,
                     fts_enabled=self._db.fts_enabled,
                 )
+
+    def find_entity_by_workspace_id(
+        self,
+        artifact_id: str,
+        *,
+        scope: Literal["both", "engagement", "enterprise"] = "both",
+    ) -> EntityRecord | None:
+        self._ensure_loaded()
+        with self._lock.reading():
+            rec = self._mem.entities.get(artifact_id)
+        if rec is None or scope == "both":
+            return rec
+        return rec if self.scope_for_path(rec.path) == scope else None
+
+    def find_entities_by_name(
+        self,
+        name: str,
+        *,
+        artifact_type: str | None = None,
+        scope: Literal["both", "engagement", "enterprise"] = "both",
+    ) -> list[EntityRecord]:
+        self._ensure_loaded()
+        norm = name.lower().strip()
+        with self._lock.reading():
+            return [
+                r for r in self._mem.entities.values()
+                if r.name.lower().strip() == norm
+                and (artifact_type is None or r.artifact_type == artifact_type)
+                and (scope == "both" or self.scope_for_path(r.path) == scope)
+            ]
+
+    def diagrams_referencing_type_id(self, type_id: str) -> list[tuple[str, str, str]]:
+        self._ensure_loaded()
+        with self._lock.reading():
+            with self._db.reader() as conn:
+                return _q.diagrams_referencing_type(conn, type_id)
 
     # ── Scope ─────────────────────────────────────────────────────────────────
 

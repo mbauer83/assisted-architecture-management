@@ -9,6 +9,7 @@ from pathlib import Path
 from src.application.repo_path_helpers import rendered_dir_for_diagram, repo_root_for_diagram_path
 from src.application.verification.artifact_verifier_syntax import find_graphviz_dot, find_plantuml_jar
 from src.config.settings import plantuml_limit_size, render_dpi
+from src.infrastructure.rendering.native_svg import render_native_svg
 from src.infrastructure.rendering.puml_safety import strip_leading_puml_frontmatter
 
 from .diagram_confidentiality import is_confidential_diagram_source
@@ -49,10 +50,12 @@ def _render_diagram_entities_puml(
     repo_root: Path,
     *,
     edge_labels: dict[str, str] | None = None,
+    candidate: object = None,
 ) -> str:
     from src.infrastructure.diagram_type_registry import get_diagram_type  # noqa: PLC0415
 
     diagram_type_mod = get_diagram_type(diagram_type)
+    prepared_entities = diagram_type_mod.prepare_render_model(dict(diagram_entities), candidate)
     extra: dict[str, object] = {}
     if edge_labels and _renderer_supports_edge_labels(diagram_type_mod.renderer):
         extra["edge_labels"] = edge_labels
@@ -62,7 +65,7 @@ def _render_diagram_entities_puml(
         [],
         diagram_type,
         repo_root,
-        diagram_entities=diagram_entities,
+        diagram_entities=prepared_entities,
         diagram_connections=diagram_connections,
         **extra,
     )
@@ -95,6 +98,11 @@ def _render_diagram_png(puml_path: Path, warnings: list[str]) -> Path | None:
     # When @startuml carries a name PlantUML uses that name instead, which breaks the
     # temp→final rename below.
     puml_body_for_render = re.sub(r"@startuml\s+\S+", "@startuml", puml_body, count=1)
+    if render_native_svg(puml_body_for_render, diagram_type) is not None:
+        warnings.append(
+            f"PNG render skipped: '{diagram_type}' owns scalable SVG notation; use the SVG rendering"
+        )
+        return None
 
     with tempfile.NamedTemporaryFile(
         mode="w", suffix=".puml", dir=puml_path.parent, delete=False, encoding="utf-8"
@@ -179,6 +187,10 @@ def _render_diagram_svg(puml_path: Path, warnings: list[str]) -> Path | None:
 
     puml_body = _prepare_diagram_puml_body(puml_body, repo_root, diagram_type)
     puml_body_for_render = re.sub(r"@startuml\s+\S+", "@startuml", puml_body, count=1)
+    if (native_svg := render_native_svg(puml_body_for_render, diagram_type)) is not None:
+        final = rendered_dir / f"{puml_path.stem}.svg"
+        final.write_text(native_svg, encoding="utf-8")
+        return final
 
     with tempfile.NamedTemporaryFile(
         mode="w", suffix=".puml", dir=puml_path.parent, delete=False, encoding="utf-8"

@@ -79,6 +79,15 @@ CREATE INDEX IF NOT EXISTS idx_documents_group ON documents(group_name);
 CREATE INDEX IF NOT EXISTS idx_entity_context_edges_entity
     ON entity_context_edges(entity_id, direction_bucket, connection_id);
 CREATE INDEX IF NOT EXISTS idx_entity_context_edges_other ON entity_context_edges(other_entity_id);
+
+CREATE TABLE IF NOT EXISTS attribute_type_refs (
+  diagram_id TEXT NOT NULL,
+  classifier_local_id TEXT NOT NULL,
+  attr_name TEXT NOT NULL,
+  type_id TEXT NOT NULL,
+  PRIMARY KEY (diagram_id, classifier_local_id, attr_name)
+);
+CREATE INDEX IF NOT EXISTS idx_attr_type_refs_type ON attribute_type_refs(type_id);
 """
 
 FTS_SQL = """

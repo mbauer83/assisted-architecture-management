@@ -247,7 +247,8 @@ def admin_create_diagram(body: AdminCreateDiagramBody) -> dict[str, Any]:
     """
     _require_admin()
     ent_root, _, verifier = s.get_admin_write_deps()
-    from src.application.modeling.artifact_write import generate_diagram_id
+    from src.application.identifier_allocator import get_default_allocator
+    from src.application.modeling.artifact_write import prefix_for_diagram_type
     from src.infrastructure.gui.routers._diagram_selection import resolve_diagram_selection
     from src.infrastructure.rendering.diagram_builder import generate_archimate_puml_body
 
@@ -268,7 +269,9 @@ def admin_create_diagram(body: AdminCreateDiagramBody) -> dict[str, Any]:
             diagram_type=body.diagram_type,
             name=body.name,
             puml=puml,
-            artifact_id=generate_diagram_id(body.diagram_type, body.name),
+            artifact_id=get_default_allocator().allocate(
+                prefix=prefix_for_diagram_type(body.diagram_type), name_hint=body.name
+            ),
             keywords=body.keywords,
             version=body.version,
             status=body.status,
