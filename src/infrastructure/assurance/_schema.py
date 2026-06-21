@@ -13,6 +13,17 @@ CREATE TABLE IF NOT EXISTS schema_meta (
     value TEXT NOT NULL
 );
 
+CREATE TABLE IF NOT EXISTS assurance_analyses (
+    analysis_id            TEXT PRIMARY KEY,
+    name                   TEXT NOT NULL,
+    method                 TEXT NOT NULL,
+    architecture_anchor_id TEXT NOT NULL DEFAULT '',
+    status                 TEXT NOT NULL DEFAULT 'draft',
+    tlp                    TEXT NOT NULL DEFAULT 'TLP:WHITE',
+    created_at             TEXT NOT NULL,
+    updated_at             TEXT NOT NULL
+);
+
 CREATE TABLE IF NOT EXISTS assurance_nodes (
     node_id         TEXT PRIMARY KEY,
     node_type       TEXT NOT NULL,
@@ -24,6 +35,7 @@ CREATE TABLE IF NOT EXISTS assurance_nodes (
     uca_type        TEXT,
     binding_status  TEXT,
     node_role       TEXT,
+    analysis_id     TEXT,
     attributes_json TEXT NOT NULL DEFAULT '{}',
     content_text    TEXT NOT NULL DEFAULT '',
     created_at      TEXT NOT NULL,
@@ -72,6 +84,8 @@ CREATE TABLE IF NOT EXISTS baselines (
 CREATE INDEX IF NOT EXISTS idx_nodes_type     ON assurance_nodes(node_type);
 CREATE INDEX IF NOT EXISTS idx_nodes_status   ON assurance_nodes(status);
 CREATE INDEX IF NOT EXISTS idx_nodes_cc       ON assurance_nodes(concern_class);
+CREATE INDEX IF NOT EXISTS idx_analyses_method ON assurance_analyses(method);
+CREATE INDEX IF NOT EXISTS idx_analyses_status ON assurance_analyses(status);
 CREATE INDEX IF NOT EXISTS idx_edges_source   ON assurance_edges(source_id);
 CREATE INDEX IF NOT EXISTS idx_edges_target   ON assurance_edges(target_id);
 CREATE INDEX IF NOT EXISTS idx_edges_type     ON assurance_edges(conn_type);
@@ -100,11 +114,16 @@ CREATE INDEX IF NOT EXISTS idx_holds_baseline ON legal_holds(baseline_id);
 
 # Applied once after executescript to add columns to existing tables.
 # Each entry is executed and OperationalError (duplicate column) is silently ignored.
+# Column-adding ALTERs must precede any index that references the new column,
+# because the main schema script (which only has IF NOT EXISTS guards) runs first.
 ASSURANCE_SCHEMA_MIGRATIONS: list[str] = [
     "ALTER TABLE baselines ADD COLUMN timestamp_token_hex TEXT",
+    "ALTER TABLE assurance_nodes ADD COLUMN analysis_id TEXT",
+    "CREATE INDEX IF NOT EXISTS idx_nodes_an_type ON assurance_nodes(analysis_id, node_type, created_at)",
+    "CREATE INDEX IF NOT EXISTS idx_nodes_an_status ON assurance_nodes(analysis_id, status)",
 ]
 
-SCHEMA_VERSION = "2"
+SCHEMA_VERSION = "3"
 
 # Archive-only schema — used when the archive needs a separate local SQLite file
 # (non-SQLCipher store backends: pocketbase, private-git).

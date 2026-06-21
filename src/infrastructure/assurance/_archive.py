@@ -14,14 +14,12 @@ from __future__ import annotations
 import hashlib
 import json
 import logging
-import time
 from typing import Any
 
+from src.domain.clock import epoch_seconds
+from src.domain.clock import utc_now_iso as _now_iso
+
 logger = logging.getLogger(__name__)
-
-
-def _now_iso() -> str:
-    return time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
 
 
 def _compute_hash(
@@ -100,7 +98,7 @@ class SQLCipherAssuranceArchive:
         head_seq = int(head["seq"])
         head_hash = str(head["entry_hash"])
 
-        baseline_id = f"BSL@{int(time.time())}.{hashlib.sha256(head_hash.encode()).hexdigest()[:8]}"
+        baseline_id = f"BSL@{epoch_seconds()}.{hashlib.sha256(head_hash.encode()).hexdigest()[:8]}"
         now = _now_iso()
         conn.execute(
             "INSERT INTO baselines (baseline_id, created_at, head_seq, head_hash, notes, analysis_id) "

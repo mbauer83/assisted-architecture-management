@@ -54,11 +54,26 @@ def _check(checks: dict[str, _CheckEntry], key: str, gaps: list[dict[str, str]])
 def run_cast_complete(
     store: ConfidentialAssuranceStore,
     archive: AssuranceArchive,
+    *,
+    analysis_id: str | None = None,
 ) -> dict[str, object]:
-    """Run §17(B) cast-complete checks and return a structured result."""
-    all_nodes = store.list_nodes()
-    all_edges = store.list_edges()
+    """Run §17(B) cast-complete checks and return a structured result.
+
+    When ``analysis_id`` is given, only that analysis's nodes (and the edges between
+    them, and baselines sealed for it) are checked, so the wizard reports coverage
+    for one unit of work.
+    """
+    all_nodes = store.list_nodes(analysis_id=analysis_id)
     baselines = archive.list_baselines()
+    if analysis_id is None:
+        all_edges = store.list_edges()
+    else:
+        scoped = {str(n["node_id"]) for n in all_nodes}
+        all_edges = [
+            e for e in store.list_edges()
+            if str(e.get("source_id")) in scoped and str(e.get("target_id")) in scoped
+        ]
+        baselines = [b for b in baselines if str(b.get("analysis_id") or "") == analysis_id]
 
     incidents = [n for n in all_nodes if str(n.get("node_type", "")) == "incident"]
     has_incidents = len(incidents) > 0

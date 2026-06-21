@@ -5,6 +5,8 @@ Tools registered on arch-assurance-write:
   assurance_import_vulnerabilities — ingest OSV/NVD/GitHub Advisory vulnerability records
   assurance_set_anchor            — map a component PURL to an architecture entity
   assurance_reconcile_aibom       — drift report: modeled vs discovered AI-BOM
+
+All write tools gate on the store being unlocked and append to the audit log.
 """
 
 from __future__ import annotations
@@ -34,12 +36,23 @@ def register_security_write_tools(server: FastMCP) -> None:
         source_file: str = "",
         bom_format: str = "cyclonedx",
     ) -> dict[str, object]:
-        return ctx.connector.import_bom(
+        if not ctx.is_available():
+            return ctx.locked_response()
+        result = ctx.connector.import_bom(
             bom_data,
             anchor_entity_id=anchor_entity_id,
             bom_format=bom_format,
             source_file=source_file,
         )
+        ctx.archive.append(
+            "IMPORT_BOM",
+            payload={
+                "anchor_entity_id": anchor_entity_id,
+                "bom_format": bom_format,
+                "source_file": source_file,
+            },
+        )
+        return result  # type: ignore[return-value]
 
     @server.tool(
         name="assurance_import_vulnerabilities",
@@ -56,7 +69,14 @@ def register_security_write_tools(server: FastMCP) -> None:
         vuln_records: list[dict[str, object]],
         source: str = "osv",
     ) -> dict[str, object]:
-        return ctx.connector.import_vulnerabilities(vuln_records, source=source)
+        if not ctx.is_available():
+            return ctx.locked_response()
+        result = ctx.connector.import_vulnerabilities(vuln_records, source=source)
+        ctx.archive.append(
+            "IMPORT_VULNERABILITIES",
+            payload={"source": source, "record_count": len(vuln_records)},
+        )
+        return result  # type: ignore[return-value]
 
     @server.tool(
         name="assurance_set_anchor",
@@ -73,7 +93,17 @@ def register_security_write_tools(server: FastMCP) -> None:
         arch_entity_id: str,
         ref_type: str = "purl",
     ) -> dict[str, object]:
+        if not ctx.is_available():
+            return ctx.locked_response()
         ctx.connector.set_anchor(component_ref, arch_entity_id, ref_type=ref_type)
+        ctx.archive.append(
+            "SET_ANCHOR",
+            payload={
+                "component_ref": component_ref,
+                "arch_entity_id": arch_entity_id,
+                "ref_type": ref_type,
+            },
+        )
         return {
             "component_ref": component_ref,
             "arch_entity_id": arch_entity_id,

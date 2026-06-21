@@ -17,9 +17,11 @@ import json
 import logging
 import os
 import tempfile
-import time
 from pathlib import Path
 from typing import Any, Callable, TypedDict
+
+from src.domain.clock import epoch_seconds
+from src.domain.clock import utc_now_iso as _now_iso
 
 logger = logging.getLogger(__name__)
 
@@ -30,10 +32,6 @@ class _ManifestRow(TypedDict):
     operation: str
     entry_hash: str
     prev_hash: str
-
-
-def _now_iso() -> str:
-    return time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
 
 
 def _compute_hash(
@@ -177,7 +175,7 @@ class EncryptedGitArchive:
         head_seq = last["seq"]
         head_hash = last["entry_hash"]
 
-        baseline_id = f"BSL@{int(time.time())}.{hashlib.sha256(head_hash.encode()).hexdigest()[:8]}"
+        baseline_id = f"BSL@{epoch_seconds()}.{hashlib.sha256(head_hash.encode()).hexdigest()[:8]}"
         now = _now_iso()
         self._baselines_dir.mkdir(parents=True, exist_ok=True)
 

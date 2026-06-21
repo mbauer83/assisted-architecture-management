@@ -114,3 +114,37 @@ def test_summary_reports_gap_counts(store) -> None:  # type: ignore[no-untyped-d
     result = run_grc_complete(store)
     assert "2" in str(result["summary"])
     assert result["passed"] is False
+
+
+def test_risk_owner_satisfied_by_accountability_arch_ref(store) -> None:  # type: ignore[no-untyped-def]
+    from src.application.verification.grc_complete import run_grc_complete
+
+    risk_id = store.create_node("risk", "RSK-1", attributes={"treatment": "mitigate"})
+    # Accountability points to an architecture role via an arch-ref, not an edge.
+    store.register_arch_ref(risk_id, "ACT@1712870400.role", "accountable-to")
+    result = run_grc_complete(store)
+    assert result["checks"]["risk_has_owner"]["passed"] is True
+
+
+def test_unrelated_arch_ref_does_not_satisfy_owner(store) -> None:  # type: ignore[no-untyped-def]
+    from src.application.verification.grc_complete import run_grc_complete
+
+    risk_id = store.create_node("risk", "RSK-1", attributes={"treatment": "mitigate"})
+    store.register_arch_ref(risk_id, "APP@1", "binds-to")
+    result = run_grc_complete(store)
+    assert result["checks"]["risk_has_owner"]["passed"] is False
+
+
+def test_analysis_scoping_isolates_other_analyses(store) -> None:  # type: ignore[no-untyped-def]
+    from src.application.verification.grc_complete import run_grc_complete
+
+    a1 = store.create_analysis("Q3", "GRC")
+    a2 = store.create_analysis("Q4", "GRC")
+    # An untreated risk in a2 must not fail a1's coverage.
+    store.create_node("risk", "A2-RSK", analysis_id=a2)
+    risk_id = store.create_node("risk", "A1-RSK", attributes={"treatment": "mitigate"}, analysis_id=a1)
+    store.register_arch_ref(risk_id, "ACT@1.role", "accountable-to")
+    scoped = run_grc_complete(store, analysis_id=a1)
+    assert scoped["passed"] is True
+    overall = run_grc_complete(store)
+    assert overall["checks"]["risk_has_treatment"]["passed"] is False

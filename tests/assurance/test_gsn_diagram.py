@@ -2,9 +2,14 @@
 
 from __future__ import annotations
 
+import xml.etree.ElementTree as ET
 from pathlib import Path
+from typing import cast
+
+import pytest
 
 from src.diagram_types.gsn import module as gsn_module
+from src.domain.ontology_protocol import NativeSvgDiagramRenderer
 
 
 def test_module_name() -> None:
@@ -57,8 +62,8 @@ def test_renderer_goal_node() -> None:
     assert "@startuml" in body
     assert "@enduml" in body
     assert "G: System is safe" in body
-    assert "rectangle" in body
-    assert "#D0E8FF" in body
+    assert '$GsnGoal(G1, "G: System is safe")' in body
+    assert "BackgroundColor<<GsnGoal>> #D0E8FF" in body
 
 
 def test_renderer_strategy_node() -> None:
@@ -71,8 +76,9 @@ def test_renderer_strategy_node() -> None:
         "test", [], [], "gsn", Path("/"), diagram_entities=diagram_entities
     )
     assert "S: By hazard decomposition" in body
-    assert "card" in body
-    assert "#E8E0FF" in body
+    assert '$GsnStrategy(S1, "S: By hazard decomposition")' in body
+    assert "card" not in body
+    assert "BackgroundColor<<GsnStrategy>> #E8E0FF" in body
 
 
 def test_renderer_solution_node() -> None:
@@ -84,9 +90,9 @@ def test_renderer_solution_node() -> None:
     body = renderer.render_body(
         "test", [], [], "gsn", Path("/"), diagram_entities=diagram_entities
     )
-    assert "Sn: Test Report T-001" in body
-    assert "database" in body
-    assert "#D0FFD8" in body
+    assert '$GsnSolution(Sn1, "Sn: Test Report\\nT-001")' in body
+    assert "database" not in body
+    assert "BackgroundColor<<GsnSolution>> #D0FFD8" in body
 
 
 def test_renderer_context_node() -> None:
@@ -99,8 +105,8 @@ def test_renderer_context_node() -> None:
         "test", [], [], "gsn", Path("/"), diagram_entities=diagram_entities
     )
     assert "C: Safety concern" in body
-    assert "usecase" in body
-    assert "#FFFFD0" in body
+    assert '$GsnContext(C1, "C: Safety concern")' in body
+    assert "BackgroundColor<<GsnContext>> #FFFFD0" in body
 
 
 def test_renderer_assumption_node() -> None:
@@ -113,7 +119,8 @@ def test_renderer_assumption_node() -> None:
         "test", [], [], "gsn", Path("/"), diagram_entities=diagram_entities
     )
     assert "A: Normal operation" in body
-    assert "#FFE8D0" in body
+    assert '$GsnAssumption(A1, "A: Normal operation")' in body
+    assert "BackgroundColor<<GsnAssumption>> #FFE8D0" in body
 
 
 def test_renderer_justification_node() -> None:
@@ -126,7 +133,23 @@ def test_renderer_justification_node() -> None:
         "test", [], [], "gsn", Path("/"), diagram_entities=diagram_entities
     )
     assert "J: Industry standard" in body
-    assert "#FFD0E8" in body
+    assert '$GsnJustification(J1, "J: Industry standard")' in body
+    assert "BackgroundColor<<GsnJustification>> #FFD0E8" in body
+
+
+def test_renderer_undeveloped_marker() -> None:
+    body = gsn_module.renderer.render_body(
+        "test",
+        [],
+        [],
+        "gsn",
+        Path("/"),
+        diagram_entities={
+            "nodes": [{"node_id": "U1", "name": "Further argument required", "gsn_type": "undeveloped"}],
+            "edges": [],
+        },
+    )
+    assert '$GsnUndeveloped(U1, "Further argument required")' in body
 
 
 def test_renderer_supported_by_edge() -> None:
@@ -141,11 +164,11 @@ def test_renderer_supported_by_edge() -> None:
     body = renderer.render_body(
         "test", [], [], "gsn", Path("/"), diagram_entities=diagram_entities
     )
-    assert "G1 --> Sn1" in body
-    assert "supported-by" in body
+    assert "$GsnSupportedBy(G1, Sn1)" in body
+    assert "$source --> $target : supported-by" in body
 
 
-def test_renderer_in_context_of_edge_uses_dashed_arrow() -> None:
+def test_renderer_in_context_of_edge_uses_hollow_arrowhead() -> None:
     renderer = gsn_module.renderer
     diagram_entities = {
         "nodes": [
@@ -157,8 +180,8 @@ def test_renderer_in_context_of_edge_uses_dashed_arrow() -> None:
     body = renderer.render_body(
         "test", [], [], "gsn", Path("/"), diagram_entities=diagram_entities
     )
-    assert "..>" in body
-    assert "in-context-of" in body
+    assert "$GsnInContextOf(G1, C1)" in body
+    assert "$source --|> $target : in-context-of" in body
 
 
 def test_renderer_full_gsn_argument() -> None:
@@ -214,3 +237,156 @@ def test_renderer_json_string_nodes() -> None:
         "test", [], [], "gsn", Path("/"), diagram_entities=diagram_entities
     )
     assert "Claim" in body
+
+
+def test_native_svg_uses_standard_shapes_and_accessibility() -> None:
+    puml = gsn_module.renderer.render_body(
+        "shapes",
+        [],
+        [],
+        "gsn",
+        Path("/"),
+        diagram_entities={
+            "nodes": [
+                {"node_id": "S1", "name": "Strategy", "gsn_type": "strategy"},
+                {"node_id": "Sn1", "name": "Evidence", "gsn_type": "solution"},
+                {"node_id": "C1", "name": "Context", "gsn_type": "context"},
+                {"node_id": "A1", "name": "Assumption", "gsn_type": "assumption"},
+                {"node_id": "J1", "name": "Justification", "gsn_type": "justification"},
+                {"node_id": "G1", "name": "Goal", "gsn_type": "goal"},
+                {"node_id": "U1", "name": "Undeveloped", "gsn_type": "undeveloped"},
+            ],
+            "edges": [],
+        },
+    )
+    result = cast(NativeSvgDiagramRenderer, gsn_module.renderer).render_svg(puml)
+    root = ET.fromstring(result)
+    ns = {"svg": "http://www.w3.org/2000/svg"}
+    groups = {
+        alias: group
+        for group in root.findall(".//svg:g", ns)
+        if (alias := group.get("data-qualified-name")) is not None
+    }
+    assert groups["S1"].find("svg:polygon", ns) is not None
+    solution = groups["Sn1"].find("svg:circle", ns)
+    assert solution is not None
+    context = groups["C1"].find("svg:rect", ns)
+    assert context is not None
+    assert float(context.get("rx", "0")) * 2 == float(context.get("height", "0"))
+    assert groups["U1"].find("svg:polygon", ns) is not None
+    assert groups["A1"].find("svg:ellipse", ns) is not None
+    assert groups["J1"].find("svg:ellipse", ns) is not None
+    assert groups["G1"].find("svg:rect", ns) is not None
+    assert all(group.get("role") == "group" for group in groups.values())
+    assert root.get("role") == "img"
+    assert '#111827' in result
+
+
+def test_generated_puml_fallback_is_valid(tmp_path: Path) -> None:
+    from src.application.verification.artifact_verifier_syntax import check_puml_syntax
+
+    body = gsn_module.renderer.render_body(
+        "fallback",
+        [],
+        [],
+        "gsn",
+        tmp_path,
+        diagram_entities={
+            "nodes": [
+                {"node_id": "G1", "name": "Claim", "gsn_type": "goal"},
+                {"node_id": "S1", "name": "Argument", "gsn_type": "strategy"},
+                {"node_id": "Sn1", "name": "Evidence", "gsn_type": "solution"},
+                {"node_id": "C1", "name": "Context", "gsn_type": "context"},
+                {"node_id": "A1", "name": "Assumption", "gsn_type": "assumption"},
+                {"node_id": "J1", "name": "Justification", "gsn_type": "justification"},
+                {"node_id": "U1", "name": "Undeveloped", "gsn_type": "undeveloped"},
+            ],
+            "edges": [
+                {"source_id": "G1", "target_id": "S1", "conn_type": "supported-by"},
+                {"source_id": "S1", "target_id": "Sn1", "conn_type": "supported-by"},
+                {"source_id": "G1", "target_id": "C1", "conn_type": "in-context-of"},
+            ],
+        },
+    )
+    path = tmp_path / "fallback.puml"
+    path.write_text(body, encoding="utf-8")
+    assert check_puml_syntax(path, str(path)) == []
+
+
+def test_native_renderer_migrates_stored_legacy_gsn_source() -> None:
+    legacy = """\
+@startuml legacy
+usecase "C: Scope" as cx1 #FFFFD0
+rectangle "G: Protected" as g1 #D0E8FF
+card "S: Argue over controls" as s1 #E8E0FF
+database "Sn: Verification report" as sn1 #D0FFD8
+g1 ..> cx1 : in-context-of
+g1 --> s1 : supported-by
+s1 --> sn1 : supported-by
+@enduml
+"""
+    svg = cast(NativeSvgDiagramRenderer, gsn_module.renderer).render_svg(legacy)
+    root = ET.fromstring(svg)
+    ns = {"svg": "http://www.w3.org/2000/svg"}
+    groups = {
+        alias: group
+        for group in root.findall(".//svg:g", ns)
+        if (alias := group.get("data-qualified-name")) is not None
+    }
+    assert groups["s1"].find("svg:polygon", ns) is not None
+    assert groups["sn1"].find("svg:circle", ns) is not None
+    assert groups["cx1"].find("svg:rect", ns).get("rx") is not None  # type: ignore[union-attr]
+    assert 'marker-end="url(#gsn-hollow-arrow)"' in svg
+
+
+def test_rendered_svg_retains_click_targets_and_gsn_shapes(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from src.infrastructure.rendering.diagram_builder import render_puml_preview, render_puml_svg
+
+    monkeypatch.setattr(
+        "src.infrastructure.rendering.puml_runtime.get_diagram_type", lambda _name: gsn_module
+    )
+    monkeypatch.setattr(
+        "src.infrastructure.rendering.native_svg.find_diagram_type",
+        lambda _name: gsn_module,
+    )
+    (tmp_path / "diagram-catalog" / "diagrams").mkdir(parents=True)
+    body = gsn_module.renderer.render_body(
+        "rendered-gsn",
+        [],
+        [],
+        "gsn",
+        tmp_path,
+        diagram_entities={
+            "nodes": [
+                {"node_id": "S1", "name": "Argument", "gsn_type": "strategy"},
+                {"node_id": "Sn1", "name": "Verification report", "gsn_type": "solution"},
+                {"node_id": "C1", "name": "Operating context", "gsn_type": "context"},
+            ],
+            "edges": [
+                {"source_id": "S1", "target_id": "Sn1", "conn_type": "supported-by"},
+                {"source_id": "S1", "target_id": "C1", "conn_type": "in-context-of"},
+            ],
+        },
+    )
+    svg, warnings = render_puml_svg(body, tmp_path, "gsn")
+    assert warnings == []
+    assert svg is not None
+    root = ET.fromstring(svg)
+    ns = {"svg": "http://www.w3.org/2000/svg"}
+    groups = {
+        alias: group
+        for group in root.findall(".//svg:g", ns)
+        if (alias := group.get("data-qualified-name")) is not None
+    }
+    assert {"S1", "Sn1", "C1"} <= groups.keys()
+    assert groups["S1"].find("svg:polygon", ns) is not None
+    assert groups["Sn1"].find("svg:circle", ns) is not None
+    assert groups["C1"].find("svg:rect", ns).get("rx") is not None  # type: ignore[union-attr]
+    assert all(group.get("data-gsn-type") for group in groups.values())
+    assert 'marker-end="url(#gsn-filled-arrow)"' in svg
+    assert 'marker-end="url(#gsn-hollow-arrow)"' in svg
+    preview, preview_warnings = render_puml_preview(body, tmp_path, "gsn")
+    assert preview_warnings == []
+    assert preview is not None and preview.startswith("data:image/svg+xml;base64,")

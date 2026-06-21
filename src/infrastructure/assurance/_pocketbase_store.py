@@ -4,9 +4,10 @@ PocketBase (https://pocketbase.io) provides a self-hosted REST API with RBAC —
 suitable for teams sharing an assurance store without the single-device SQLCipher constraint.
 
 Collections used:
-  assurance_nodes  — node records
-  assurance_edges  — edge records
-  arch_refs        — cross-references to architecture artifacts
+  assurance_analyses — analysis aggregate records
+  assurance_nodes    — node records
+  assurance_edges    — edge records
+  arch_refs          — cross-references to architecture artifacts
 
 Authentication uses the PocketBase Admin API (email+password → Bearer token).
 Use `pocketbase_lifecycle.create_collections` to initialise the collections before first use.
@@ -15,17 +16,18 @@ Use `pocketbase_lifecycle.create_collections` to initialise the collections befo
 from __future__ import annotations
 
 import logging
-import time
 from typing import Any
 
+from src.domain.clock import utc_now_iso
 from src.infrastructure.assurance._id_utils import make_edge_id, make_node_id
+from src.infrastructure.assurance._pocketbase_analysis import RestAnalysisStoreMixin
 
 logger = logging.getLogger(__name__)
 
 _LOCKED_MSG = "PocketBase store is locked. Call unlock() first."
 
 
-class PocketBaseAssuranceStore:
+class PocketBaseAssuranceStore(RestAnalysisStoreMixin):
     """Adapter implementing ConfidentialAssuranceStore using PocketBase REST API."""
 
     def __init__(self, base_url: str, admin_email: str, admin_password: str) -> None:
@@ -78,6 +80,9 @@ class PocketBaseAssuranceStore:
     def _ref_url(self) -> str:
         return "/api/collections/arch_refs/records"
 
+    def _analysis_url(self) -> str:
+        return "/api/collections/assurance_analyses/records"
+
     def _filter(self, **bindings: str) -> dict[str, str]:
         """Build a parameterized PocketBase filter using {:param} binding syntax.
 
@@ -91,6 +96,8 @@ class PocketBaseAssuranceStore:
         for k, v in bindings.items():
             params[k] = v
         return params
+
+    # ── Analysis aggregate ─ provided by RestAnalysisStoreMixin ──────────────────
 
     # ── Node CRUD ─────────────────────────────────────────────────────────────
 
@@ -108,6 +115,7 @@ class PocketBaseAssuranceStore:
         status: str | None = None,
         concern_class: str | None = None,
         tlp: str | None = None,
+        analysis_id: str | None = None,
     ) -> list[dict[str, object]]:
         client = self._require_unlocked()
         bindings: dict[str, str] = {}
@@ -119,6 +127,8 @@ class PocketBaseAssuranceStore:
             bindings["concern_class"] = concern_class
         if tlp:
             bindings["tlp"] = tlp
+        if analysis_id:
+            bindings["analysis_id"] = analysis_id
         params: dict[str, str | int] = {"perPage": 500}
         params.update(self._filter(**bindings))
         resp = client.get(self._node_url(), params=params)
@@ -137,6 +147,7 @@ class PocketBaseAssuranceStore:
         uca_type: str | None = None,
         binding_status: str | None = None,
         node_role: str | None = None,
+        analysis_id: str | None = None,
         attributes: dict[str, object] | None = None,
         content: str = "",
     ) -> str:
@@ -144,12 +155,13 @@ class PocketBaseAssuranceStore:
 
         client = self._require_unlocked()
         node_id = make_node_id(node_type, name)
-        now = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
+        now = utc_now_iso()
         payload = {
             "node_id": node_id, "node_type": node_type, "name": name,
             "status": status, "tlp": tlp, "concern_class": concern_class or "",
             "disposition": disposition or "", "uca_type": uca_type or "",
             "binding_status": binding_status or "", "node_role": node_role or "",
+            "analysis_id": analysis_id or "",
             "attributes_json": json.dumps(attributes or {}),
             "content_text": content, "created_at": now, "updated_at": now,
         }
@@ -167,7 +179,7 @@ class PocketBaseAssuranceStore:
         pb_id = str(existing["id"])
         allowed = {"name", "status", "tlp", "concern_class", "disposition", "uca_type",
                    "binding_status", "node_role", "content_text"}
-        payload: dict[str, object] = {"updated_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())}
+        payload: dict[str, object] = {"updated_at": utc_now_iso()}
         for k, v in attrs.items():
             if k in allowed:
                 payload[k] = v
@@ -224,7 +236,7 @@ class PocketBaseAssuranceStore:
             "edge_id": edge_id, "source_id": source_id, "target_id": target_id,
             "conn_type": conn_type,
             "attributes_json": json.dumps(attributes or {}),
-            "created_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+            "created_at": utc_now_iso(),
         }
         resp = client.post(self._edge_url(), json=payload)
         resp.raise_for_status()
@@ -261,7 +273,7 @@ class PocketBaseAssuranceStore:
                 pb_id = str(ref["id"])
                 client.patch(
                     f"{self._ref_url()}/{pb_id}",
-                    json={"resolved_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())},
+                    json={"resolved_at": utc_now_iso()},
                 ).raise_for_status()
                 return
 
@@ -282,6 +294,21 @@ class PocketBaseAssuranceStore:
         resp = client.get(self._ref_url(), params=params)
         resp.raise_for_status()
         return resp.json().get("items", [])
+
+    def search_nodes(
+        self,
+        query: str,
+        *,
+        limit: int = 20,
+    ) -> list[dict[str, object]]:
+        q = query.lower()
+        results: list[dict[str, object]] = []
+        for node in self.list_nodes():
+            if q in str(node.get("name", "")).lower() or q in str(node.get("content_text", "")).lower():
+                results.append(node)
+                if len(results) >= limit:
+                    break
+        return results
 
     # ── Stats ─────────────────────────────────────────────────────────────────
 

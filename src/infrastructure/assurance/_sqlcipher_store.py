@@ -10,62 +10,23 @@ uses it from within a write-queue serialised context.
 
 from __future__ import annotations
 
-import contextlib
 import json
 import logging
-import os
-import time
 from pathlib import Path
 from typing import Any
 
 from src.infrastructure.assurance import _credential_store as creds
+from src.infrastructure.assurance import _sqlcipher_analysis as _analysis
 from src.infrastructure.assurance._id_utils import make_edge_id, make_node_id
 from src.infrastructure.assurance._schema import ASSURANCE_SCHEMA_MIGRATIONS, ASSURANCE_SCHEMA_SQL, SCHEMA_VERSION
+from src.infrastructure.assurance._sqlcipher_util import dict_row_factory as _dict_row_factory
+from src.infrastructure.assurance._sqlcipher_util import now_iso as _now_iso
+from src.infrastructure.assurance._sqlcipher_util import suppress_c_stderr as _suppress_c_stderr
+from src.infrastructure.assurance._sqlcipher_util import where as _where
 
 logger = logging.getLogger(__name__)
 
 _KEY_ACCOUNT = "db-encryption-key"
-
-
-def _dict_row_factory(cursor: Any, row: Any) -> dict[str, object]:
-    """Convert a sqlcipher3 row to a plain dict using cursor.description."""
-    cols = [col[0] for col in cursor.description]
-    return dict(zip(cols, row))
-
-
-def _now_iso() -> str:
-    return time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
-
-
-def _where(filters: dict[str, object | None]) -> tuple[str, list[object]]:
-    """Build a parameterised ``WHERE`` clause from the truthy entries of ``filters``.
-
-    Keys are trusted column names; values become positional ``?`` parameters.
-    Returns ``("", [])`` when no filter is active.
-    """
-    active = [(col, val) for col, val in filters.items() if val]
-    clauses = " AND ".join(f"{col} = ?" for col, _ in active)
-    where = f"WHERE {clauses}" if active else ""
-    return where, [val for _, val in active]
-
-
-@contextlib.contextmanager  # type: ignore[misc]
-def _suppress_c_stderr():  # type: ignore[return]
-    """Redirect fd 2 to /dev/null for C-library calls that emit diagnostic noise.
-
-    SQLCipher writes 'ERROR CORE ...' messages directly to fd 2 before raising a
-    Python exception on key mismatch. Suppress them here; the RuntimeError raised
-    by the caller carries the actionable message.
-    """
-    devnull_fd = os.open(os.devnull, os.O_WRONLY)
-    saved = os.dup(2)
-    os.dup2(devnull_fd, 2)
-    try:
-        yield
-    finally:
-        os.dup2(saved, 2)
-        os.close(saved)
-        os.close(devnull_fd)
 
 
 class SQLCipherAssuranceStore:
@@ -131,6 +92,35 @@ class SQLCipherAssuranceStore:
             raise RuntimeError("Assurance store is locked. Run `arch-assurance unlock`.")
         return self._conn
 
+    # ── Analysis aggregate ──────────────────────────────────────────────────────
+
+    def create_analysis(
+        self,
+        name: str,
+        method: str,
+        architecture_anchor_id: str = "",
+        *,
+        tlp: str = "TLP:WHITE",
+        status: str = "draft",
+    ) -> str:
+        return _analysis.create(
+            self._require_unlocked(), name, method, architecture_anchor_id, tlp=tlp, status=status
+        )
+
+    def get_analysis(self, analysis_id: str) -> dict[str, object] | None:
+        return _analysis.get(self._require_unlocked(), analysis_id)
+
+    def list_analyses(
+        self,
+        *,
+        method: str | None = None,
+        status: str | None = None,
+    ) -> list[dict[str, object]]:
+        return _analysis.list_analyses(self._require_unlocked(), method=method, status=status)
+
+    def update_analysis(self, analysis_id: str, **attrs: object) -> None:
+        _analysis.update(self._require_unlocked(), analysis_id, attrs)
+
     # ── Node CRUD ─────────────────────────────────────────────────────────────
 
     def get_node(self, node_id: str) -> dict[str, object] | None:
@@ -147,10 +137,14 @@ class SQLCipherAssuranceStore:
         status: str | None = None,
         concern_class: str | None = None,
         tlp: str | None = None,
+        analysis_id: str | None = None,
     ) -> list[dict[str, object]]:
         conn = self._require_unlocked()
         where, params = _where(
-            {"node_type": node_type, "status": status, "concern_class": concern_class, "tlp": tlp}
+            {
+                "node_type": node_type, "status": status, "concern_class": concern_class,
+                "tlp": tlp, "analysis_id": analysis_id,
+            }
         )
         rows = conn.execute(
             f"SELECT * FROM assurance_nodes {where} ORDER BY created_at", params
@@ -169,6 +163,7 @@ class SQLCipherAssuranceStore:
         uca_type: str | None = None,
         binding_status: str | None = None,
         node_role: str | None = None,
+        analysis_id: str | None = None,
         attributes: dict[str, object] | None = None,
         content: str = "",
     ) -> str:
@@ -179,13 +174,13 @@ class SQLCipherAssuranceStore:
             """
             INSERT INTO assurance_nodes
                 (node_id, node_type, name, status, tlp, concern_class, disposition,
-                 uca_type, binding_status, node_role, attributes_json, content_text,
-                 created_at, updated_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                 uca_type, binding_status, node_role, analysis_id, attributes_json,
+                 content_text, created_at, updated_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 node_id, node_type, name, status, tlp, concern_class, disposition,
-                uca_type, binding_status, node_role,
+                uca_type, binding_status, node_role, analysis_id,
                 json.dumps(attributes or {}), content, now, now,
             ),
         )
@@ -300,6 +295,25 @@ class SQLCipherAssuranceStore:
             {"assurance_node_id": assurance_node_id, "arch_artifact_id": arch_artifact_id}
         )
         rows = conn.execute(f"SELECT * FROM arch_refs {where}", params).fetchall()
+        return list(rows)
+
+    def search_nodes(
+        self,
+        query: str,
+        *,
+        limit: int = 20,
+    ) -> list[dict[str, object]]:
+        conn = self._require_unlocked()
+        pattern = f"%{query}%"
+        rows = conn.execute(
+            """SELECT * FROM assurance_nodes
+               WHERE name LIKE ? OR content_text LIKE ?
+               ORDER BY
+                   CASE WHEN name LIKE ? THEN 0 ELSE 1 END,
+                   created_at
+               LIMIT ?""",
+            (pattern, pattern, pattern, limit),
+        ).fetchall()
         return list(rows)
 
     # ── Stats ─────────────────────────────────────────────────────────────────

@@ -17,9 +17,10 @@ from __future__ import annotations
 
 import json
 import logging
-import time
 from pathlib import Path
 
+from src.domain.clock import utc_now_iso as _now_iso
+from src.infrastructure.assurance._analysis_records import FileAnalysisStoreMixin
 from src.infrastructure.assurance._id_utils import make_edge_id, make_node_id
 
 logger = logging.getLogger(__name__)
@@ -27,20 +28,18 @@ logger = logging.getLogger(__name__)
 _LOCKED_MSG = "Assurance store is locked. Call unlock() first."
 
 
-def _now_iso() -> str:
-    return time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
-
-
 def _ref_filename(assurance_node_id: str, ref_type: str, arch_artifact_id: str) -> str:
     return f"{assurance_node_id}__{ref_type}__{arch_artifact_id}.json"
 
 
-class PrivateGitAssuranceStore:
+class PrivateGitAssuranceStore(FileAnalysisStoreMixin):
     """Adapter implementing ConfidentialAssuranceStore backed by a local directory tree.
 
     Suitable for teams using a private git repository as their assurance store.
     All writes are atomic (write to temp then rename) where the filesystem supports it.
     """
+
+    _ANALYSIS_EXT = "json"
 
     def __init__(self, repo_path: Path) -> None:
         self._repo = repo_path
@@ -53,9 +52,8 @@ class PrivateGitAssuranceStore:
 
     def unlock(self) -> None:
         self._repo.mkdir(parents=True, exist_ok=True)
-        (self._repo / "nodes").mkdir(exist_ok=True)
-        (self._repo / "edges").mkdir(exist_ok=True)
-        (self._repo / "refs").mkdir(exist_ok=True)
+        for subdir in ("nodes", "edges", "refs", "analyses"):
+            (self._repo / subdir).mkdir(exist_ok=True)
         self._unlocked = True
         logger.info("Private-git store unlocked at %s", self._repo)
 
@@ -90,6 +88,8 @@ class PrivateGitAssuranceStore:
             return None
         return json.loads(path.read_text())  # type: ignore[return-value]
 
+    # ── Analysis aggregate ─ provided by FileAnalysisStoreMixin (analyses/*.json) ─
+
     # ── Node CRUD ─────────────────────────────────────────────────────────────
 
     def get_node(self, node_id: str) -> dict[str, object] | None:
@@ -103,6 +103,7 @@ class PrivateGitAssuranceStore:
         status: str | None = None,
         concern_class: str | None = None,
         tlp: str | None = None,
+        analysis_id: str | None = None,
     ) -> list[dict[str, object]]:
         self._require_unlocked()
         nodes: list[dict[str, object]] = []
@@ -115,6 +116,8 @@ class PrivateGitAssuranceStore:
             if concern_class and node.get("concern_class") != concern_class:
                 continue
             if tlp and node.get("tlp") != tlp:
+                continue
+            if analysis_id and node.get("analysis_id") != analysis_id:
                 continue
             nodes.append(node)
         return nodes
@@ -131,6 +134,7 @@ class PrivateGitAssuranceStore:
         uca_type: str | None = None,
         binding_status: str | None = None,
         node_role: str | None = None,
+        analysis_id: str | None = None,
         attributes: dict[str, object] | None = None,
         content: str = "",
     ) -> str:
@@ -142,6 +146,7 @@ class PrivateGitAssuranceStore:
             "status": status, "tlp": tlp, "concern_class": concern_class,
             "disposition": disposition, "uca_type": uca_type,
             "binding_status": binding_status, "node_role": node_role,
+            "analysis_id": analysis_id,
             "attributes_json": json.dumps(attributes or {}),
             "content_text": content, "created_at": now, "updated_at": now,
         }
@@ -255,6 +260,21 @@ class PrivateGitAssuranceStore:
                 continue
             refs.append(ref)
         return refs
+
+    def search_nodes(
+        self,
+        query: str,
+        *,
+        limit: int = 20,
+    ) -> list[dict[str, object]]:
+        q = query.lower()
+        results: list[dict[str, object]] = []
+        for node in self.list_nodes():
+            if q in str(node.get("name", "")).lower() or q in str(node.get("content_text", "")).lower():
+                results.append(node)
+                if len(results) >= limit:
+                    break
+        return results
 
     # ── Stats ─────────────────────────────────────────────────────────────────
 

@@ -16,8 +16,9 @@ Component dict keys used by this module (all optional except name):
 from __future__ import annotations
 
 import hashlib
-import time
 import uuid
+
+from src.domain.clock import utc_now_iso
 
 _CDX_AI_ROLE_TO_TYPE: dict[str, str] = {
     "machine-learning-model": "machine-learning-model",
@@ -32,6 +33,10 @@ _CDX_AI_ROLE_TO_TYPE: dict[str, str] = {
     "vector-store": "data",
     "rag-pipeline": "application",
 }
+
+# Canonical AI-BOM role vocabulary — single source of truth. Surfaced over HTTP
+# (GET /api/assurance/aibom/roles) so the GUI never redeclares the enum.
+AI_BOM_ROLES: tuple[str, ...] = tuple(_CDX_AI_ROLE_TO_TYPE)
 
 
 # Optional CycloneDX node fields copied verbatim (source key, node key).
@@ -69,7 +74,7 @@ def build_cyclonedx_16(
 ) -> dict[str, object]:
     """Emit a CycloneDX 1.6 ML-BOM/ASBOM JSON document."""
     bom_serial = serial or f"urn:uuid:{uuid.uuid4()}"
-    timestamp = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
+    timestamp = utc_now_iso()
     return {
         "bomFormat": "CycloneDX",
         "specVersion": "1.6",

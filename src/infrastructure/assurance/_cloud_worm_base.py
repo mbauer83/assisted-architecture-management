@@ -23,9 +23,11 @@ import hashlib
 import json
 import logging
 import os
-import time
 from abc import ABC, abstractmethod
 from typing import Any
+
+from src.domain.clock import epoch_seconds
+from src.domain.clock import utc_now_iso as _now_iso
 
 logger = logging.getLogger(__name__)
 
@@ -35,10 +37,6 @@ _DEK = "deks/"
 _HLD = "holds/"
 _HEAD = "_head.json"
 _HOLDS_IDX = "_holds_index.json"
-
-
-def _now_iso() -> str:
-    return time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
 
 
 def _compute_hash(seq: int, timestamp: str, operation: str, payload_json: str, prev_hash: str) -> str:
@@ -128,7 +126,7 @@ class _CloudWORMBase(ABC):
             raise RuntimeError("Cannot seal baseline: audit log is empty.")
         head_seq = int(head["seq"])
         head_hash = str(head["entry_hash"])
-        baseline_id = f"BSL@{int(time.time())}.{hashlib.sha256(head_hash.encode()).hexdigest()[:8]}"
+        baseline_id = f"BSL@{epoch_seconds()}.{hashlib.sha256(head_hash.encode()).hexdigest()[:8]}"
         now = _now_iso()
         record: dict[str, Any] = {
             "baseline_id": baseline_id, "created_at": now,
@@ -249,7 +247,7 @@ class _CloudWORMBase(ABC):
     # ── WORMAssuranceArchive: legal holds ─────────────────────────────────────
 
     def set_legal_hold(self, baseline_id: str, *, held_by: str = "", reason: str = "") -> str:
-        hold_id = f"HLD@{int(time.time())}.{os.urandom(4).hex()}"
+        hold_id = f"HLD@{epoch_seconds()}.{os.urandom(4).hex()}"
         now = _now_iso()
         record: dict[str, Any] = {
             "hold_id": hold_id, "baseline_id": baseline_id, "held_by": held_by,

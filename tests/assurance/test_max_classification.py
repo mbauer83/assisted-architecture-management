@@ -3,7 +3,7 @@
 Covers:
   - tlp_level ordering: WHITE < GREEN < AMBER < RED
   - is_above_ceiling: edge cases and unknown values
-  - _filter_by_ceiling: correct keep/withheld split for signals
+  - AssuranceExposurePolicy.filter_security_records: correct keep/withheld split
   - Assurance node redaction via AssuranceContext.withheld_response
 """
 
@@ -50,58 +50,63 @@ class TestTLPHelpers:
         assert not is_above_ceiling("TLP:AMBER", "TLP:AMBER")
 
 
-# ── Signal filter ─────────────────────────────────────────────────────────────
+# ── Signal filter (via AssuranceExposurePolicy) ───────────────────────────────
 
 
 class TestFilterByCeiling:
     def test_all_pass_when_below_ceiling(self) -> None:
-        from src.infrastructure.mcp.assurance_mcp.security_read_tools import _filter_by_ceiling
+        from src.application.assurance_exposure import AssuranceExposurePolicy
 
+        pol = AssuranceExposurePolicy("TLP:AMBER", True)
         records = [
             {"tlp": "TLP:WHITE"},
             {"tlp": "TLP:GREEN"},
             {"tlp": "TLP:AMBER"},
         ]
-        kept, withheld = _filter_by_ceiling(records, "TLP:AMBER", "test")
+        kept, withheld = pol.filter_security_records(records)
         assert kept == records
         assert withheld == 0
 
     def test_red_withheld_at_amber_ceiling(self) -> None:
-        from src.infrastructure.mcp.assurance_mcp.security_read_tools import _filter_by_ceiling
+        from src.application.assurance_exposure import AssuranceExposurePolicy
 
+        pol = AssuranceExposurePolicy("TLP:AMBER", True)
         records = [
             {"id": 1, "tlp": "TLP:GREEN"},
             {"id": 2, "tlp": "TLP:RED"},
         ]
-        kept, withheld = _filter_by_ceiling(records, "TLP:AMBER", "test")
+        kept, withheld = pol.filter_security_records(records)
         assert len(kept) == 1
         assert kept[0]["id"] == 1
         assert withheld == 1
 
     def test_all_withheld_at_white_ceiling(self) -> None:
-        from src.infrastructure.mcp.assurance_mcp.security_read_tools import _filter_by_ceiling
+        from src.application.assurance_exposure import AssuranceExposurePolicy
 
+        pol = AssuranceExposurePolicy("TLP:WHITE", True)
         records = [
             {"tlp": "TLP:GREEN"},
             {"tlp": "TLP:AMBER"},
             {"tlp": "TLP:RED"},
         ]
-        kept, withheld = _filter_by_ceiling(records, "TLP:WHITE", "test")
+        kept, withheld = pol.filter_security_records(records)
         assert kept == []
         assert withheld == 3
 
     def test_missing_tlp_treated_as_amber_passes_amber_ceiling(self) -> None:
-        from src.infrastructure.mcp.assurance_mcp.security_read_tools import _filter_by_ceiling
+        from src.application.assurance_exposure import AssuranceExposurePolicy
 
-        records = [{"id": 1}]  # no tlp field
-        kept, withheld = _filter_by_ceiling(records, "TLP:AMBER", "test")
+        pol = AssuranceExposurePolicy("TLP:AMBER", True)
+        records = [{"id": 1}]  # no tlp field → defaults TLP:AMBER → passes ceiling
+        kept, withheld = pol.filter_security_records(records)
         assert len(kept) == 1
         assert withheld == 0
 
     def test_empty_input(self) -> None:
-        from src.infrastructure.mcp.assurance_mcp.security_read_tools import _filter_by_ceiling
+        from src.application.assurance_exposure import AssuranceExposurePolicy
 
-        kept, withheld = _filter_by_ceiling([], "TLP:AMBER", "test")
+        pol = AssuranceExposurePolicy("TLP:AMBER", True)
+        kept, withheld = pol.filter_security_records([])
         assert kept == []
         assert withheld == 0
 

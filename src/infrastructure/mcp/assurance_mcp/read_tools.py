@@ -19,10 +19,10 @@ from __future__ import annotations
 
 from mcp.server.fastmcp import FastMCP  # type: ignore[import-not-found]
 
+from src.application.assurance_exposure import AssuranceExposurePolicy
 from src.infrastructure.mcp.assurance_mcp.context import (
     _exposure_log,
     get_assurance_context,
-    is_above_ceiling,
 )
 from src.infrastructure.mcp.assurance_mcp.dashboard_tools import register_dashboard_tools
 from src.infrastructure.mcp.assurance_mcp.security_read_tools import register_security_read_tools
@@ -81,25 +81,18 @@ def register_read_tools(server: FastMCP) -> None:
     ) -> dict[str, object]:
         if not ctx.is_available():
             return ctx.locked_response()
-        ceiling = ctx.max_classification
+        policy = AssuranceExposurePolicy(ctx.max_classification, True)
         nodes = ctx.store.list_nodes(
             node_type=node_type,
             status=status,
             concern_class=concern_class,
             tlp=tlp,
         )
-        exposed: list[dict[str, object]] = []
-        withheld_count = 0
-        for node in nodes:
-            node_tlp = str(node.get("tlp", "TLP:WHITE"))
-            if is_above_ceiling(node_tlp, ceiling):
-                withheld_count += 1
-            else:
-                exposed.append(node)
+        exposed, withheld_count = policy.filter_nodes(nodes)
         if withheld_count:
             _exposure_log.info(
                 "list_nodes: ceiling=%s returned=%d withheld=%d",
-                ceiling, len(exposed), withheld_count,
+                ctx.max_classification, len(exposed), withheld_count,
             )
         return {"nodes": exposed, "count": len(exposed), "withheld": withheld_count}
 
@@ -110,20 +103,15 @@ def register_read_tools(server: FastMCP) -> None:
     def assurance_read_node(node_id: str) -> dict[str, object]:
         if not ctx.is_available():
             return ctx.locked_response()
+        policy = AssuranceExposurePolicy(ctx.max_classification, True)
         node = ctx.store.get_node(node_id)
-        if node is None:
+        from src.application.assurance_exposure import Visible  # noqa: PLC0415
+        outcome = policy.apply_node(node)
+        if not isinstance(outcome, Visible):
             return ctx.not_found_response(node_id)
-        node_tlp = str(node.get("tlp", "TLP:WHITE"))
-        ceiling = ctx.max_classification
-        if is_above_ceiling(node_tlp, ceiling):
-            _exposure_log.info(
-                "read_node: ceiling=%s withheld=%s tlp=%s",
-                ceiling, node_id, node_tlp,
-            )
-            return ctx.withheld_response(node_id, node_tlp)
         edges_out = ctx.store.list_edges(source_id=node_id)
         edges_in = ctx.store.list_edges(target_id=node_id)
-        return {"node": node, "outgoing_edges": edges_out, "incoming_edges": edges_in}
+        return {"node": outcome.value, "outgoing_edges": edges_out, "incoming_edges": edges_in}
 
     @server.tool(
         name="assurance_list_edges",
@@ -148,7 +136,9 @@ def register_read_tools(server: FastMCP) -> None:
     def assurance_stats() -> dict[str, object]:
         if not ctx.is_available():
             return ctx.locked_response()
-        return ctx.store.stats()
+        policy = AssuranceExposurePolicy(ctx.max_classification, True)
+        visible, _ = policy.filter_nodes(ctx.store.list_nodes())
+        return policy.redact_stats(visible, ctx.store.list_edges())
 
     @server.tool(
         name="assurance_verify",
@@ -192,7 +182,7 @@ def register_read_tools(server: FastMCP) -> None:
         ),
     )
     def assurance_guidance(topic: str) -> dict[str, object]:
-        from src.infrastructure.mcp.assurance_mcp.guidance import lookup  # noqa: PLC0415
+        from src.application.assurance_guidance import lookup  # noqa: PLC0415
 
         return lookup(topic)
 
@@ -227,3 +217,29 @@ def register_read_tools(server: FastMCP) -> None:
         from src.application.verification.grc_complete import run_grc_complete  # noqa: PLC0415
 
         return run_grc_complete(ctx.store)
+
+    @server.tool(
+        name="assurance_list_analyses",
+        description=(
+            "List assurance analyses — the aggregate roots for units of STPA/CAST/GRC work. "
+            "Filter by method (STPA/CAST/GRC) or status. Pass analysis_id to fetch one analysis. "
+            "Above-ceiling analyses are omitted; an absent or above-ceiling id returns not_found."
+        ),
+    )
+    def assurance_list_analyses(
+        method: str | None = None,
+        status: str | None = None,
+        analysis_id: str | None = None,
+    ) -> dict[str, object]:
+        if not ctx.is_available():
+            return ctx.locked_response()
+        policy = AssuranceExposurePolicy(ctx.max_classification, True)
+        if analysis_id:
+            from src.application.assurance_exposure import Visible  # noqa: PLC0415
+
+            outcome = policy.apply_analysis(ctx.store.get_analysis(analysis_id))
+            if isinstance(outcome, Visible):
+                return {"analysis": outcome.value}
+            return ctx.not_found_response(analysis_id)
+        exposed, _ = policy.filter_analyses(ctx.store.list_analyses(method=method, status=status))
+        return {"analyses": exposed, "count": len(exposed)}

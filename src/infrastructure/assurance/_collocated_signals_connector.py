@@ -15,17 +15,13 @@ from __future__ import annotations
 
 import hashlib
 import logging
-import time
 from typing import Any, Callable
 
+from src.domain.clock import utc_now_iso as _now_iso
 from src.infrastructure.assurance._sbom_parser import parse_bom
 from src.infrastructure.assurance._schema import SECURITY_SIGNALS_SCHEMA_SQL
 
 logger = logging.getLogger(__name__)
-
-
-def _now_iso() -> str:
-    return time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
 
 
 def _stable_id(prefix: str, *parts: str) -> str:

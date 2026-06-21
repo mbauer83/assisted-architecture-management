@@ -10,9 +10,9 @@ import json
 import logging
 import secrets
 import shutil
-import time
 from pathlib import Path
 
+from src.domain.clock import utc_now_compact, utc_now_iso
 from src.infrastructure.assurance import _credential_store as creds
 from src.infrastructure.assurance._schema import ASSURANCE_SCHEMA_MIGRATIONS, ASSURANCE_SCHEMA_SQL, SCHEMA_VERSION
 from src.infrastructure.assurance._sqlcipher_store import SQLCipherAssuranceStore
@@ -124,7 +124,7 @@ def backup_store(db_path: Path, *, backup_path: Path | None = None) -> dict[str,
     if not db_path.exists():
         raise FileNotFoundError(f"No store at {db_path}. Run `arch-assurance init` first.")
     if backup_path is None:
-        ts = time.strftime("%Y%m%dT%H%M%SZ", time.gmtime())
+        ts = utc_now_compact()
         backup_path = db_path.parent / f"store.backup.{ts}.db"
     shutil.copy2(db_path, backup_path)
     logger.info("Assurance store backed up to %s", backup_path)
@@ -139,7 +139,7 @@ def export_store(store: SQLCipherAssuranceStore, output_path: Path) -> dict[str,
     if not store.is_unlocked():
         raise RuntimeError("Store must be unlocked before export.")
     data = {
-        "export_time": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+        "export_time": utc_now_iso(),
         "nodes": store.list_nodes(),
         "edges": store.list_edges(),
         "arch_refs": store.list_arch_refs(),

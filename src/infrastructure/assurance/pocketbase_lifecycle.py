@@ -12,6 +12,17 @@ import logging
 logger = logging.getLogger(__name__)
 
 # Minimal field definitions for each collection.
+_ANALYSES_FIELDS = [
+    {"name": "analysis_id", "type": "text", "required": True},
+    {"name": "name", "type": "text", "required": True},
+    {"name": "method", "type": "text", "required": True},
+    {"name": "architecture_anchor_id", "type": "text", "required": False},
+    {"name": "status", "type": "text", "required": False},
+    {"name": "tlp", "type": "text", "required": False},
+    {"name": "created_at", "type": "text", "required": False},
+    {"name": "updated_at", "type": "text", "required": False},
+]
+
 _NODES_FIELDS = [
     {"name": "node_id", "type": "text", "required": True},
     {"name": "node_type", "type": "text", "required": True},
@@ -23,6 +34,7 @@ _NODES_FIELDS = [
     {"name": "uca_type", "type": "text", "required": False},
     {"name": "binding_status", "type": "text", "required": False},
     {"name": "node_role", "type": "text", "required": False},
+    {"name": "analysis_id", "type": "text", "required": False},
     {"name": "attributes_json", "type": "text", "required": False},
     {"name": "content_text", "type": "text", "required": False},
     {"name": "created_at", "type": "text", "required": False},
@@ -46,6 +58,7 @@ _REFS_FIELDS = [
 ]
 
 _COLLECTIONS = [
+    ("assurance_analyses", _ANALYSES_FIELDS),
     ("assurance_nodes", _NODES_FIELDS),
     ("assurance_edges", _EDGES_FIELDS),
     ("arch_refs", _REFS_FIELDS),

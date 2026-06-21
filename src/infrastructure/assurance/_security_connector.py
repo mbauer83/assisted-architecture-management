@@ -18,18 +18,15 @@ from __future__ import annotations
 import hashlib
 import logging
 import sqlite3
-import time
 from pathlib import Path
 from typing import Any
 
+from src.domain.clock import epoch_seconds
+from src.domain.clock import utc_now_iso as _now_iso
 from src.infrastructure.assurance._sbom_parser import parse_bom
 from src.infrastructure.assurance._schema import SECURITY_SIGNALS_SCHEMA_SQL
 
 logger = logging.getLogger(__name__)
-
-
-def _now_iso() -> str:
-    return time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
 
 
 def _stable_id(prefix: str, *parts: str) -> str:
@@ -41,7 +38,7 @@ def _stable_id(prefix: str, *parts: str) -> str:
 def _transient_id(prefix: str, *parts: str) -> str:
     """Non-deterministic ID with epoch — for records where uniqueness per-call is desired."""
     slug = hashlib.sha256("|".join(parts).encode()).hexdigest()[:12]
-    return f"{prefix}@{int(time.time())}.{slug}"
+    return f"{prefix}@{epoch_seconds()}.{slug}"
 
 
 def _safe_float(v: object) -> float | None:

@@ -13,21 +13,18 @@ from __future__ import annotations
 import hashlib
 import logging
 import os
-import time
 from typing import Any
 
+from src.domain.clock import epoch_seconds
+from src.domain.clock import utc_now_iso as _now_iso
 from src.infrastructure.assurance._archive import SQLCipherAssuranceArchive
 
 logger = logging.getLogger(__name__)
 
 
-def _now_iso() -> str:
-    return time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
-
-
 def _hold_id() -> str:
     rand = os.urandom(6).hex()
-    return f"HLD@{int(time.time())}.{rand}"
+    return f"HLD@{epoch_seconds()}.{rand}"
 
 
 class WORMSQLCipherAssuranceArchive(SQLCipherAssuranceArchive):

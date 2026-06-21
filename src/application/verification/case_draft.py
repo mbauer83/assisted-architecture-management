@@ -41,7 +41,35 @@ def _edges_of(
     return result
 
 
-def draft_gsn_from_store(store: ConfidentialAssuranceStore) -> dict[str, object]:
+def _analysis_graph(
+    store: ConfidentialAssuranceStore,
+    analysis_id: str | None,
+) -> tuple[list[dict[str, object]], list[dict[str, object]]]:
+    nodes = store.list_nodes(analysis_id=analysis_id)
+    if analysis_id is None:
+        return nodes, store.list_edges()
+    node_ids = {str(node["node_id"]) for node in nodes}
+    edges = [
+        edge
+        for edge in store.list_edges()
+        if str(edge["source_id"]) in node_ids and str(edge["target_id"]) in node_ids
+    ]
+    return nodes, edges
+
+
+def draft_gsn_from_store(
+    store: ConfidentialAssuranceStore,
+    *,
+    analysis_id: str | None = None,
+) -> dict[str, object]:
+    """Build a structured GSN scaffold from an analysis-scoped store graph."""
+    return draft_gsn_from_records(*_analysis_graph(store, analysis_id))
+
+
+def draft_gsn_from_records(
+    all_nodes: list[dict[str, object]],
+    all_edges: list[dict[str, object]],
+) -> dict[str, object]:
     """Build a structured GSN scaffold from store content.
 
     Returns a dict with:
@@ -51,9 +79,6 @@ def draft_gsn_from_store(store: ConfidentialAssuranceStore) -> dict[str, object]
       solutions    — evidence artifacts (from evidenced-by edges on constraints)
       gaps         — constraints without evidence, hazards without constraints
     """
-    all_nodes = store.list_nodes()
-    all_edges = store.list_edges()
-
     losses = _nodes_of(all_nodes, "loss")
     hazards = _nodes_of(all_nodes, "hazard")
     constraints = _nodes_of(all_nodes, "assurance-constraint")
@@ -183,7 +208,19 @@ def _check(
     }
 
 
-def run_case_completeness(store: ConfidentialAssuranceStore) -> dict[str, object]:
+def run_case_completeness(
+    store: ConfidentialAssuranceStore,
+    *,
+    analysis_id: str | None = None,
+) -> dict[str, object]:
+    """Check argument completeness for an analysis-scoped store graph."""
+    return case_completeness_from_records(*_analysis_graph(store, analysis_id))
+
+
+def case_completeness_from_records(
+    all_nodes: list[dict[str, object]],
+    all_edges: list[dict[str, object]],
+) -> dict[str, object]:
     """Check argument completeness for an assurance case.
 
     Checks:
@@ -193,9 +230,6 @@ def run_case_completeness(store: ConfidentialAssuranceStore) -> dict[str, object
 
     Returns structured result with passed/checks/summary.
     """
-    all_nodes = store.list_nodes()
-    all_edges = store.list_edges()
-
     checks: dict[str, _CheckEntry] = {}
 
     # Check 1: every constraint has evidence

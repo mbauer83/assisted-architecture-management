@@ -23,6 +23,32 @@ class ConfidentialAssuranceStore(Protocol):
 
     def lock(self) -> None: ...
 
+    # ── Analysis aggregate ──────────────────────────────────────────────────────
+    # An analysis is the aggregate root of a unit of STPA/CAST/GRC work: every
+    # node belongs to one analysis, and an analysis is anchored to one
+    # architecture artifact. Application services enforce the invariants.
+
+    def create_analysis(
+        self,
+        name: str,
+        method: str,
+        architecture_anchor_id: str = "",
+        *,
+        tlp: str = "TLP:WHITE",
+        status: str = "draft",
+    ) -> str: ...
+
+    def get_analysis(self, analysis_id: str) -> dict[str, object] | None: ...
+
+    def list_analyses(
+        self,
+        *,
+        method: str | None = None,
+        status: str | None = None,
+    ) -> list[dict[str, object]]: ...
+
+    def update_analysis(self, analysis_id: str, **attrs: object) -> None: ...
+
     # ── Node CRUD ─────────────────────────────────────────────────────────────
 
     def get_node(self, node_id: str) -> dict[str, object] | None: ...
@@ -34,6 +60,7 @@ class ConfidentialAssuranceStore(Protocol):
         status: str | None = None,
         concern_class: str | None = None,
         tlp: str | None = None,
+        analysis_id: str | None = None,
     ) -> list[dict[str, object]]: ...
 
     def create_node(
@@ -48,6 +75,7 @@ class ConfidentialAssuranceStore(Protocol):
         uca_type: str | None = None,
         binding_status: str | None = None,
         node_role: str | None = None,
+        analysis_id: str | None = None,
         attributes: dict[str, object] | None = None,
         content: str = "",
     ) -> str: ...
@@ -98,6 +126,13 @@ class ConfidentialAssuranceStore(Protocol):
         *,
         assurance_node_id: str | None = None,
         arch_artifact_id: str | None = None,
+    ) -> list[dict[str, object]]: ...
+
+    def search_nodes(
+        self,
+        query: str,
+        *,
+        limit: int = 20,
     ) -> list[dict[str, object]]: ...
 
     # ── Stats ─────────────────────────────────────────────────────────────────

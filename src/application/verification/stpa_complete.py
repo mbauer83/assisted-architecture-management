@@ -64,10 +64,25 @@ def _check(
     }
 
 
-def run_stpa_complete(store: ConfidentialAssuranceStore) -> dict[str, object]:
-    """Run all §17(B) stpa-basic-complete checks and return a structured result."""
-    all_nodes = store.list_nodes()
-    all_edges = store.list_edges()
+def run_stpa_complete(
+    store: ConfidentialAssuranceStore,
+    *,
+    analysis_id: str | None = None,
+) -> dict[str, object]:
+    """Run all §17(B) stpa-basic-complete checks and return a structured result.
+
+    When ``analysis_id`` is given, only that analysis's nodes (and the edges between
+    them) are checked, so the wizard reports completeness for one unit of work.
+    """
+    all_nodes = store.list_nodes(analysis_id=analysis_id)
+    if analysis_id is None:
+        all_edges = store.list_edges()
+    else:
+        scoped = {str(n["node_id"]) for n in all_nodes}
+        all_edges = [
+            e for e in store.list_edges()
+            if str(e.get("source_id")) in scoped and str(e.get("target_id")) in scoped
+        ]
 
     checks: dict[str, _CheckEntry] = {}
 

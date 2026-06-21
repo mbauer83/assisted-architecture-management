@@ -13,7 +13,6 @@ assurance node. That would violate the one-way confidentiality rule.
 from __future__ import annotations
 
 import logging
-import time
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
@@ -21,10 +20,6 @@ if TYPE_CHECKING:
     from src.application.ports import ArtifactLookup
 
 logger = logging.getLogger(__name__)
-
-
-def _now_iso() -> str:
-    return time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
 
 
 def resolve_arch_refs(

@@ -21,6 +21,8 @@ import tempfile
 from pathlib import Path
 from typing import TYPE_CHECKING
 
+from src.domain.clock import utc_now_iso as _now_iso
+from src.infrastructure.assurance._analysis_records import FileAnalysisStoreMixin
 from src.infrastructure.assurance._id_utils import make_edge_id, make_node_id
 
 if TYPE_CHECKING:
@@ -32,22 +34,19 @@ _GIT_ENC_KEY_ACCOUNT = "private-git-encryption-key"
 _LOCKED_MSG = "Encrypted assurance store is locked. Call unlock() first."
 
 
-def _now_iso() -> str:
-    import time
-    return time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
-
-
 def _ref_filename(assurance_node_id: str, ref_type: str, arch_artifact_id: str) -> str:
     return f"{assurance_node_id}__{ref_type}__{arch_artifact_id}.enc"
 
 
-class EncryptedPrivateGitAssuranceStore:
+class EncryptedPrivateGitAssuranceStore(FileAnalysisStoreMixin):
     """ConfidentialAssuranceStore backed by a local directory tree with Fernet encryption.
 
     On-disk files are Fernet-encrypted JSON; git history contains only ciphertext.
     The Fernet key is stored in the OS keychain. Queryability is preserved because
     the read model is built in-memory on unlock (decrypt-on-load).
     """
+
+    _ANALYSIS_EXT = "enc"
 
     def __init__(self, repo_path: Path) -> None:
         self._repo = repo_path
@@ -72,7 +71,7 @@ class EncryptedPrivateGitAssuranceStore:
             )
         self._fernet = Fernet(raw_key.encode())
         self._repo.mkdir(parents=True, exist_ok=True)
-        for subdir in ("nodes", "edges", "refs"):
+        for subdir in ("nodes", "edges", "refs", "analyses"):
             (self._repo / subdir).mkdir(exist_ok=True)
         self._unlocked = True
         logger.info("Encrypted private-git store unlocked at %s", self._repo)
@@ -132,6 +131,8 @@ class EncryptedPrivateGitAssuranceStore:
                 results.append(item)
         return results
 
+    # ── Analysis aggregate ─ provided by FileAnalysisStoreMixin (analyses/*.enc) ──
+
     # ── Node CRUD ─────────────────────────────────────────────────────────────
 
     def get_node(self, node_id: str) -> dict[str, object] | None:
@@ -145,6 +146,7 @@ class EncryptedPrivateGitAssuranceStore:
         status: str | None = None,
         concern_class: str | None = None,
         tlp: str | None = None,
+        analysis_id: str | None = None,
     ) -> list[dict[str, object]]:
         self._require_unlocked()
         results: list[dict[str, object]] = []
@@ -156,6 +158,8 @@ class EncryptedPrivateGitAssuranceStore:
             if concern_class and node.get("concern_class") != concern_class:
                 continue
             if tlp and node.get("tlp") != tlp:
+                continue
+            if analysis_id and node.get("analysis_id") != analysis_id:
                 continue
             results.append(node)
         return results
@@ -172,6 +176,7 @@ class EncryptedPrivateGitAssuranceStore:
         uca_type: str | None = None,
         binding_status: str | None = None,
         node_role: str | None = None,
+        analysis_id: str | None = None,
         attributes: dict[str, object] | None = None,
         content: str = "",
     ) -> str:
@@ -185,6 +190,7 @@ class EncryptedPrivateGitAssuranceStore:
             "status": status, "tlp": tlp, "concern_class": concern_class,
             "disposition": disposition, "uca_type": uca_type,
             "binding_status": binding_status, "node_role": node_role,
+            "analysis_id": analysis_id,
             "attributes_json": json.dumps(attributes or {}),
             "content_text": content, "created_at": now, "updated_at": now,
         }
@@ -298,6 +304,21 @@ class EncryptedPrivateGitAssuranceStore:
             if arch_artifact_id and ref.get("arch_artifact_id") != arch_artifact_id:
                 continue
             results.append(ref)
+        return results
+
+    def search_nodes(
+        self,
+        query: str,
+        *,
+        limit: int = 20,
+    ) -> list[dict[str, object]]:
+        q = query.lower()
+        results: list[dict[str, object]] = []
+        for node in self.list_nodes():
+            if q in str(node.get("name", "")).lower() or q in str(node.get("content_text", "")).lower():
+                results.append(node)
+                if len(results) >= limit:
+                    break
         return results
 
     # ── Stats ─────────────────────────────────────────────────────────────────

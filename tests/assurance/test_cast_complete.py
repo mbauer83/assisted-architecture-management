@@ -118,6 +118,28 @@ def test_corrective_action_with_derives_passes(store, archive) -> None:  # type:
     assert result["checks"]["corrective_action_derives_constraint"]["passed"] is True
 
 
+def test_analysis_scoping_isolates_baseline_and_nodes(store, archive) -> None:  # type: ignore[no-untyped-def]
+    from src.application.verification.cast_complete import run_cast_complete
+
+    archive.append("CREATE", payload={"test": "setup"})
+    # Baseline + a complete chain belong to A@1 only.
+    archive.seal_baseline(notes="b", analysis_id="A@1")
+    inc = store.create_node("incident", "INC", concern_class="safety", analysis_id="A@1")
+    haz = store.create_node("hazard", "HAZ", concern_class="safety", analysis_id="A@1")
+    store.add_edge(inc, haz, "investigates")
+    cra = store.create_node("corrective-action", "CRA", analysis_id="A@1")
+    acn = store.create_node("assurance-constraint", "ACN", concern_class="safety", analysis_id="A@1")
+    store.add_edge(cra, acn, "derives")
+    # A@2 has an incident but no baseline of its own.
+    store.create_node("incident", "INC2", concern_class="safety", analysis_id="A@2")
+
+    scoped1 = run_cast_complete(store, archive, analysis_id="A@1")
+    assert scoped1["passed"] is True
+    # A@1's baseline must not satisfy A@2's gate.
+    scoped2 = run_cast_complete(store, archive, analysis_id="A@2")
+    assert scoped2["checks"]["baseline_exists"]["passed"] is False
+
+
 def test_complete_cast_chain_passes(store, archive) -> None:  # type: ignore[no-untyped-def]
     from src.application.verification.cast_complete import run_cast_complete
 

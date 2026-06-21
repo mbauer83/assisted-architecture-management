@@ -1,8 +1,12 @@
-"""Backend endpoints for assurance module status and metadata.
+"""Backend endpoints for the assurance module.
 
-Phase 1d: minimal surfacing — store status endpoint + module_class-aware
-exclusion from architecture stats. The assurance store's content is NOT
-exposed through these endpoints (that's the MCP server's job).
+Includes:
+  - Store status / reload (always callable)
+  - Unlock-gated read endpoints (nodes, edges, stats, coverage, verify,
+    risk-register, BOM/vuln, baselines, architecture lens) — via _assurance_read.
+  - Unlock-gated write endpoints (create/edit/delete nodes, edges, arch-refs,
+    baselines/seal, model-this, BOM/vuln/anchor imports) — via _assurance_write.
+  - AI-BOM coverage / candidate scan / ML-BOM export — via _assurance_aibom.
 """
 
 from __future__ import annotations
@@ -11,7 +15,16 @@ from pathlib import Path
 
 from fastapi import APIRouter
 
+from src.infrastructure.gui.routers._assurance_aibom import aibom_router
+from src.infrastructure.gui.routers._assurance_analysis_routes import analysis_router
+from src.infrastructure.gui.routers._assurance_read import read_router
+from src.infrastructure.gui.routers._assurance_write import write_router
+
 router = APIRouter()
+router.include_router(read_router)
+router.include_router(write_router)
+router.include_router(analysis_router)
+router.include_router(aibom_router)
 
 _DEFAULT_DB = Path(__file__).resolve().parents[4] / ".arch-assurance" / "store.db"
 

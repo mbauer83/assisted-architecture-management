@@ -18,30 +18,11 @@ from __future__ import annotations
 
 from mcp.server.fastmcp import FastMCP  # type: ignore[import-not-found]
 
+from src.application.assurance_exposure import AssuranceExposurePolicy
 from src.infrastructure.mcp.assurance_mcp.context import (
     _exposure_log,
     get_assurance_context,
-    is_above_ceiling,
 )
-
-
-def _filter_by_ceiling(
-    records: list[dict[str, object]],
-    ceiling: str,
-    label: str,
-) -> tuple[list[dict[str, object]], int]:
-    """Remove records whose TLP exceeds ceiling; return (kept, withheld_count)."""
-    kept: list[dict[str, object]] = []
-    withheld = 0
-    for rec in records:
-        tlp = str(rec.get("tlp", "TLP:AMBER"))
-        if is_above_ceiling(tlp, ceiling):
-            withheld += 1
-        else:
-            kept.append(rec)
-    if withheld:
-        _exposure_log.info("%s: ceiling=%s returned=%d withheld=%d", label, ceiling, len(kept), withheld)
-    return kept, withheld
 
 
 def register_security_read_tools(server: FastMCP) -> None:
@@ -62,12 +43,17 @@ def register_security_read_tools(server: FastMCP) -> None:
     ) -> dict[str, object]:
         if not ctx.signals_available():
             return ctx.signals_locked_response()
-        ceiling = ctx.max_classification
+        policy = AssuranceExposurePolicy(ctx.max_classification, True)
         components = ctx.connector.list_bom_components(
             anchor_entity_id=anchor_entity_id,
             purl=purl,
         )
-        kept, withheld = _filter_by_ceiling(components, ceiling, "list_bom_components")
+        kept, withheld = policy.filter_security_records(components)
+        if withheld:
+            _exposure_log.info(
+                "list_bom_components: ceiling=%s returned=%d withheld=%d",
+                ctx.max_classification, len(kept), withheld,
+            )
         return {"components": kept, "count": len(kept), "withheld": withheld}
 
     @server.tool(
@@ -86,9 +72,14 @@ def register_security_read_tools(server: FastMCP) -> None:
     ) -> dict[str, object]:
         if not ctx.signals_available():
             return ctx.signals_locked_response()
-        ceiling = ctx.max_classification
+        policy = AssuranceExposurePolicy(ctx.max_classification, True)
         vulns = ctx.connector.list_vulnerabilities(purl=purl, severity=severity)
-        kept, withheld = _filter_by_ceiling(vulns, ceiling, "list_vulnerabilities")
+        kept, withheld = policy.filter_security_records(vulns)
+        if withheld:
+            _exposure_log.info(
+                "list_vulnerabilities: ceiling=%s returned=%d withheld=%d",
+                ctx.max_classification, len(kept), withheld,
+            )
         return {"vulnerabilities": kept, "count": len(kept), "withheld": withheld}
 
     @server.tool(
@@ -162,27 +153,16 @@ def register_security_read_tools(server: FastMCP) -> None:
     def assurance_aibom_coverage() -> dict[str, object]:
         if not ctx.signals_available():
             return ctx.signals_locked_response()
-        ceiling = ctx.max_classification
-        components, comp_withheld = _filter_by_ceiling(
-            ctx.connector.list_bom_components(), ceiling, "aibom_coverage_components"
+        from src.application.assurance_queries import aibom_coverage  # noqa: PLC0415
+
+        policy = AssuranceExposurePolicy(ctx.max_classification, True)
+        components, comp_withheld = policy.filter_security_records(ctx.connector.list_bom_components())
+        anchors, _ = policy.filter_security_records(ctx.connector.list_anchors())
+        report = aibom_coverage(components, anchors)
+        report["withheld_components"] = comp_withheld
+        report["summary"] = (
+            f"{report['summary']} "
+            "Call assurance_set_anchor to map them, or assurance_scan_ai_candidates to "
+            "find candidates."
         )
-        anchors, _ = _filter_by_ceiling(
-            ctx.connector.list_anchors(), ceiling, "aibom_coverage_anchors"
-        )
-        unanchored = [c for c in components if not c.get("arch_entity_id")]
-        anchor_entity_ids = {str(a["arch_entity_id"]) for a in anchors}
-        unanchored_page = unanchored[:50]
-        return {
-            "total_bom_components": len(components),
-            "withheld_components": comp_withheld,
-            "unanchored_components": len(unanchored),
-            "unanchored_truncated": len(unanchored) > 50,
-            "anchor_mappings": len(anchors),
-            "unanchored": unanchored_page,
-            "anchored_entity_ids": sorted(anchor_entity_ids),
-            "summary": (
-                f"{len(unanchored)} BOM component(s) not linked to an architecture entity. "
-                "Call assurance_set_anchor to map them, or assurance_scan_ai_candidates to "
-                "find candidates."
-            ),
-        }
+        return report

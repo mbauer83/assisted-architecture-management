@@ -5,24 +5,44 @@ Tools registered on arch-assurance-write:
   assurance_add_edge            — add a typed assurance connection
   assurance_edit_node           — update node attributes
   assurance_delete_node         — delete a node (cascades edges)
+  assurance_delete_edge         — delete a single edge by edge_id
   assurance_seal_baseline       — seal a signed analysis baseline
   assurance_register_arch_ref   — record an assurance→architecture reference
-  assurance_model_this          — propose architecture entity to bind an unbound-pending CSN
+  assurance_model_this          — propose architecture entity to bind an unbound-pending node
   assurance_promotion_preflight — pre-check safety/security constraints before promotion
+
+All node/edge/ref mutations delegate to src.application.assurance_mutations use cases,
+which enforce the three-step protocol: unlock-check → write → audit → post-write verify.
 """
 
 from __future__ import annotations
 
+from typing import Any
+
 from mcp.server.fastmcp import FastMCP  # type: ignore[import-not-found]
 
+from src.application import assurance_mutations as mutations
 from src.infrastructure.mcp.assurance_mcp.context import get_assurance_context
 from src.infrastructure.mcp.assurance_mcp.security_write_tools import register_security_write_tools
 
-_VALID_NODE_TYPES = frozenset({
-    "loss", "hazard", "control-structure-node", "control-action",
-    "unsafe-control-action", "loss-scenario", "assurance-constraint",
-    "risk", "incident", "corrective-action", "obligation",
-})
+
+def _ok(result: mutations.MutationOk) -> dict[str, object]:
+    out: dict[str, object] = dict(result.payload)
+    if result.findings:
+        out["verification_findings"] = result.findings
+    return out
+
+
+def _analysis_result(result: Any, ctx: Any) -> dict[str, object]:
+    from src.application import assurance_analysis as analysis_uc  # noqa: PLC0415
+
+    if isinstance(result, analysis_uc.AnalysisLocked):
+        return ctx.locked_response()
+    if isinstance(result, analysis_uc.AnalysisNotFound):
+        return ctx.not_found_response(result.analysis_id)
+    if isinstance(result, analysis_uc.AnalysisInvalid):
+        return {"error": result.error, "message": result.message}
+    return result.payload
 
 
 def register_write_tools(server: FastMCP) -> None:
@@ -35,7 +55,8 @@ def register_write_tools(server: FastMCP) -> None:
             "Create an assurance entity (loss, hazard, control-structure-node, control-action, "
             "unsafe-control-action, loss-scenario, assurance-constraint, risk, incident, "
             "corrective-action, obligation). "
-            "Returns the new node_id. All writes are appended to the audit log."
+            "Returns the new node_id. All writes are audited; post-write verification findings "
+            "are included in the response (writes are never blocked by the verifier)."
         ),
     )
     def assurance_create_node(
@@ -48,36 +69,23 @@ def register_write_tools(server: FastMCP) -> None:
         uca_type: str | None = None,
         binding_status: str | None = None,
         node_role: str | None = None,
+        analysis_id: str | None = None,
         content_text: str = "",
         attributes: dict[str, object] | None = None,
     ) -> dict[str, object]:
-        if not ctx.is_available():
+        result = mutations.create_node(
+            ctx.store, ctx.archive,
+            node_type=node_type, name=name, status=status, tlp=tlp,
+            concern_class=concern_class, disposition=disposition,
+            uca_type=uca_type, binding_status=binding_status,
+            node_role=node_role, analysis_id=analysis_id,
+            content_text=content_text, attributes=attributes,
+        )
+        if isinstance(result, mutations.MutationLocked):
             return ctx.locked_response()
-        if node_type not in _VALID_NODE_TYPES:
-            return {
-                "error": "invalid_node_type",
-                "node_type": node_type,
-                "valid_types": sorted(_VALID_NODE_TYPES),
-            }
-        node_id = ctx.store.create_node(
-            node_type,
-            name,
-            status=status,
-            tlp=tlp,
-            concern_class=concern_class,
-            disposition=disposition,
-            uca_type=uca_type,
-            binding_status=binding_status,
-            node_role=node_role,
-            content=content_text,
-            attributes=attributes,
-        )
-        ctx.archive.append(
-            "CREATE",
-            node_id=node_id,
-            payload={"node_type": node_type, "name": name, "status": status},
-        )
-        return {"node_id": node_id, "node_type": node_type, "name": name}
+        if isinstance(result, mutations.MutationNotFound):
+            return ctx.not_found_response(result.artifact_id)
+        return _ok(result)
 
     @server.tool(
         name="assurance_add_edge",
@@ -95,18 +103,16 @@ def register_write_tools(server: FastMCP) -> None:
         conn_type: str,
         attributes: dict[str, object] | None = None,
     ) -> dict[str, object]:
-        if not ctx.is_available():
-            return ctx.locked_response()
-        if ctx.store.get_node(source_id) is None:
-            return ctx.not_found_response(source_id)
-        if ctx.store.get_node(target_id) is None:
-            return ctx.not_found_response(target_id)
-        edge_id = ctx.store.add_edge(source_id, target_id, conn_type, attributes=attributes)
-        ctx.archive.append(
-            "ADD_EDGE",
-            payload={"edge_id": edge_id, "source_id": source_id, "target_id": target_id, "conn_type": conn_type},
+        result = mutations.add_edge(
+            ctx.store, ctx.archive,
+            source_id=source_id, target_id=target_id,
+            conn_type=conn_type, attributes=attributes,
         )
-        return {"edge_id": edge_id, "source_id": source_id, "target_id": target_id, "conn_type": conn_type}
+        if isinstance(result, mutations.MutationLocked):
+            return ctx.locked_response()
+        if isinstance(result, mutations.MutationNotFound):
+            return ctx.not_found_response(result.artifact_id)
+        return _ok(result)
 
     @server.tool(
         name="assurance_edit_node",
@@ -130,25 +136,18 @@ def register_write_tools(server: FastMCP) -> None:
         content_text: str | None = None,
         attributes: dict[str, object] | None = None,
     ) -> dict[str, object]:
-        if not ctx.is_available():
+        result = mutations.edit_node(
+            ctx.store, ctx.archive,
+            node_id=node_id, name=name, status=status, tlp=tlp,
+            concern_class=concern_class, disposition=disposition,
+            uca_type=uca_type, binding_status=binding_status,
+            node_role=node_role, content_text=content_text, attributes=attributes,
+        )
+        if isinstance(result, mutations.MutationLocked):
             return ctx.locked_response()
-        if ctx.store.get_node(node_id) is None:
-            return ctx.not_found_response(node_id)
-        updates: dict[str, object] = {}
-        for field_name, value in [
-            ("name", name), ("status", status), ("tlp", tlp),
-            ("concern_class", concern_class), ("disposition", disposition),
-            ("uca_type", uca_type), ("binding_status", binding_status),
-            ("node_role", node_role), ("content_text", content_text),
-        ]:
-            if value is not None:
-                updates[field_name] = value
-        if attributes is not None:
-            updates["attributes"] = attributes
-        if updates:
-            ctx.store.update_node(node_id, **updates)
-            ctx.archive.append("UPDATE", node_id=node_id, payload={"updated_fields": list(updates)})
-        return {"node_id": node_id, "updated": list(updates)}
+        if isinstance(result, mutations.MutationNotFound):
+            return ctx.not_found_response(result.artifact_id)
+        return _ok(result)
 
     @server.tool(
         name="assurance_delete_node",
@@ -158,14 +157,28 @@ def register_write_tools(server: FastMCP) -> None:
         ),
     )
     def assurance_delete_node(node_id: str) -> dict[str, object]:
-        if not ctx.is_available():
+        result = mutations.delete_node(ctx.store, ctx.archive, node_id=node_id)
+        if isinstance(result, mutations.MutationLocked):
             return ctx.locked_response()
-        node = ctx.store.get_node(node_id)
-        if node is None:
-            return ctx.not_found_response(node_id)
-        ctx.store.delete_node(node_id)
-        ctx.archive.append("DELETE", node_id=node_id, payload={"node_type": node.get("node_type")})
-        return {"deleted": node_id}
+        if isinstance(result, mutations.MutationNotFound):
+            return ctx.not_found_response(result.artifact_id)
+        return _ok(result)
+
+    @server.tool(
+        name="assurance_delete_edge",
+        description=(
+            "Delete a single assurance edge by its edge_id. "
+            "Unlike assurance_delete_node, this removes only the edge (not its endpoints). "
+            "The operation is logged in the audit trail and is not reversible."
+        ),
+    )
+    def assurance_delete_edge(edge_id: str) -> dict[str, object]:
+        result = mutations.delete_edge(ctx.store, ctx.archive, edge_id=edge_id)
+        if isinstance(result, mutations.MutationLocked):
+            return ctx.locked_response()
+        if isinstance(result, mutations.MutationNotFound):
+            return ctx.not_found_response(result.artifact_id)
+        return _ok(result)
 
     @server.tool(
         name="assurance_seal_baseline",
@@ -198,22 +211,17 @@ def register_write_tools(server: FastMCP) -> None:
         arch_artifact_id: str,
         ref_type: str,
     ) -> dict[str, object]:
-        if not ctx.is_available():
-            return ctx.locked_response()
-        if ctx.store.get_node(assurance_node_id) is None:
-            return ctx.not_found_response(assurance_node_id)
-        ctx.store.register_arch_ref(assurance_node_id, arch_artifact_id, ref_type)
-        ctx.archive.append(
-            "ADD_ARCH_REF",
-            node_id=assurance_node_id,
-            payload={"arch_artifact_id": arch_artifact_id, "ref_type": ref_type},
+        result = mutations.register_arch_ref(
+            ctx.store, ctx.archive,
+            assurance_node_id=assurance_node_id,
+            arch_artifact_id=arch_artifact_id,
+            ref_type=ref_type,
         )
-        return {
-            "assurance_node_id": assurance_node_id,
-            "arch_artifact_id": arch_artifact_id,
-            "ref_type": ref_type,
-            "status": "registered",
-        }
+        if isinstance(result, mutations.MutationLocked):
+            return ctx.locked_response()
+        if isinstance(result, mutations.MutationNotFound):
+            return ctx.not_found_response(result.artifact_id)
+        return _ok(result)
 
     @server.tool(
         name="assurance_model_this",
@@ -221,7 +229,9 @@ def register_write_tools(server: FastMCP) -> None:
             "Propose an architecture entity to bind an unbound-pending control-structure-node. "
             "Returns a structured three-step task spec telling the agent what to call on "
             "arch-repo-write to create the architecture entity, then register the arch reference, "
-            "then update binding_status to 'bound'. Does NOT modify any state itself."
+            "then update binding_status to 'bound'. This assurance-scoped server does NOT modify "
+            "the architecture repository — the GUI's create+bind path (POST /api/assurance/model-this) "
+            "is the direct-bind alternative."
         ),
     )
     def assurance_model_this(
@@ -230,59 +240,86 @@ def register_write_tools(server: FastMCP) -> None:
         suggested_name: str,
         domain: str = "application",
     ) -> dict[str, object]:
+        from src.application import assurance_model_bind as model_bind  # noqa: PLC0415
+
         if not ctx.is_available():
             return ctx.locked_response()
-        node = ctx.store.get_node(assurance_node_id)
-        if node is None:
-            return ctx.not_found_response(assurance_node_id)
-        binding_status = str(node.get("binding_status") or "")
-        if binding_status != "unbound-pending":
+        # No architecture-write port here (separation of duties): always a task spec.
+        result = model_bind.model_and_bind(
+            ctx.store, ctx.archive,
+            assurance_node_id=assurance_node_id,
+            suggested_arch_type=suggested_arch_type,
+            suggested_name=suggested_name,
+            domain=domain,
+            arch_creator=None,
+        )
+        if isinstance(result, model_bind.BindNotFound):
+            return ctx.not_found_response(result.assurance_node_id)
+        if isinstance(result, model_bind.BindLocked):
+            return ctx.locked_response()
+        if isinstance(result, model_bind.BindInvalid):
             return {
-                "error": "invalid_binding_status",
+                "error": result.error,
                 "assurance_node_id": assurance_node_id,
-                "current_binding_status": binding_status,
-                "message": (
-                    "assurance_model_this only applies to nodes with "
-                    "binding_status='unbound-pending'."
-                ),
+                "message": result.message,
             }
-        node_name = str(node.get("name", ""))
-        return {
-            "assurance_node_id": assurance_node_id,
-            "assurance_node_name": node_name,
-            "action_required": "create_arch_entity_then_bind",
-            "step_1": {
-                "call": "artifact_create_entity",
-                "on_server": "arch-repo-write",
-                "params": {
-                    "artifact_type": suggested_arch_type,
-                    "name": suggested_name,
-                    "domain": domain,
-                    "dry_run": True,
-                },
-                "note": (
-                    "Call with dry_run=true first to preview, then false to create. "
-                    "Capture the returned entity_id for step 2."
-                ),
-            },
-            "step_2": {
-                "call": "assurance_register_arch_ref",
-                "on_server": "arch-assurance-write",
-                "params": {
-                    "assurance_node_id": assurance_node_id,
-                    "arch_artifact_id": "<entity_id_from_step_1>",
-                    "ref_type": "binds-to",
-                },
-            },
-            "step_3": {
-                "call": "assurance_edit_node",
-                "on_server": "arch-assurance-write",
-                "params": {
-                    "node_id": assurance_node_id,
-                    "binding_status": "bound",
-                },
-            },
+        if isinstance(result, model_bind.TaskRequired):
+            return result.spec
+        return {  # defensive: Bound never occurs with arch_creator=None
+            "outcome": "bound",
+            "assurance_node_id": result.assurance_node_id,
+            "arch_artifact_id": result.arch_artifact_id,
         }
+
+    @server.tool(
+        name="assurance_create_analysis",
+        description=(
+            "Create an assurance analysis — the aggregate root for a unit of STPA/CAST/GRC work; "
+            "every node is created within one analysis. method must be STPA, CAST, or GRC. "
+            "architecture_anchor_id is OPTIONAL: the single system-under-analysis element when one "
+            "applies (typical for STPA/CAST); leave empty for cross-system work (typical for GRC)."
+        ),
+    )
+    def assurance_create_analysis(
+        name: str,
+        method: str,
+        architecture_anchor_id: str = "",
+        tlp: str = "TLP:WHITE",
+        status: str = "draft",
+    ) -> dict[str, object]:
+        from src.application import assurance_analysis as analysis_uc  # noqa: PLC0415
+
+        if not ctx.is_available():
+            return ctx.locked_response()
+        result = analysis_uc.create_analysis(
+            ctx.store, ctx.archive,
+            name=name, method=method, architecture_anchor_id=architecture_anchor_id,
+            tlp=tlp, status=status,
+        )
+        return _analysis_result(result, ctx)
+
+    @server.tool(
+        name="assurance_update_analysis",
+        description=(
+            "Update an analysis's name, status (draft/active/completed/archived), or tlp. "
+            "method and architecture_anchor_id are immutable (they scope the whole aggregate)."
+        ),
+    )
+    def assurance_update_analysis(
+        analysis_id: str,
+        name: str | None = None,
+        status: str | None = None,
+        tlp: str | None = None,
+    ) -> dict[str, object]:
+        from src.application import assurance_analysis as analysis_uc  # noqa: PLC0415
+
+        if not ctx.is_available():
+            return ctx.locked_response()
+        result = analysis_uc.update_analysis(
+            ctx.store, ctx.archive,
+            analysis_id=analysis_id, name=name, status=status, tlp=tlp,
+        )
+        return _analysis_result(result, ctx)
 
     @server.tool(
         name="assurance_promotion_preflight",
