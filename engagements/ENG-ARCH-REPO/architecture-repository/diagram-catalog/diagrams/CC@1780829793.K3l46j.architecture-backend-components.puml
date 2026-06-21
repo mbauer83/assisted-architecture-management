@@ -45,6 +45,7 @@ entity-ids-used:
 - DOB@1777399930.hExrX3.operation-record
 - DOB@1780656431.ApaPcg.assurance-knowledge-base
 - APP@1712870400.yNhgdh.module-catalog
+- APP@1781976554.AeU7V3.identifier-allocation-service
 connection-ids-used:
 - APP@1712870400.ca3vm7.model-verifier---APP@1712870400.YOOEbL.frontmatter-parser@@archimate-serving
 - APP@1712870400.ca3vm7.model-verifier---APP@1776149382.lmO0mp.gui-authoring-tool@@archimate-serving
@@ -79,6 +80,8 @@ connection-ids-used:
 - FNC@1777399927.hbgFU3.create-staging-repository---DOB@1777399929.hhYsiw.staged-repository@@archimate-access
 - APP@1712870400.JOmFWy.sqlite-indexer---APP@1712870400.yNhgdh.module-catalog@@archimate-serving
 - APP@1712870400.ca3vm7.model-verifier---APP@1712870400.yNhgdh.module-catalog@@archimate-serving
+- APP@1781976554.AeU7V3.identifier-allocation-service---APP@1776633697.SCKD2U.diagram-scaffolder@@archimate-serving
+- FNC@1781705395.halAQt.validate-datatype-data-object-relationship-consistency---APP@1776149382.lmO0mp.gui-authoring-tool@@archimate-association
 diagram-entities: {}
 bindings:
 - id: bind-scope
@@ -87,66 +90,38 @@ bindings:
   correspondence_kind: scoped-by
   target:
     entity_id: APP@1777293133.OYEmP1.architecture-backend
-last-updated: '2026-06-16'
+last-updated: '2026-06-22'
 ---
 @startuml architecture-backend---components
+!include <C4/C4_Component>
 left to right direction
 skinparam shadowing false
 skinparam linetype ortho
 skinparam defaultTextAlignment center
 skinparam wrapWidth 240
 skinparam maxMessageSize 240
-skinparam rectangle {
-  RoundCorner 12
-  Padding 10
-}
-skinparam actor {
-  BackgroundColor #08427b
-  BorderColor #052e56
-  FontColor white
-}
-skinparam rectangle<<C4System>> {
-  BackgroundColor #1168bd
-  BorderColor #0b4884
-  FontColor white
-}
-skinparam rectangle<<C4Container>> {
-  BackgroundColor #438dd5
-  BorderColor #2f6da6
-  FontColor white
-}
-skinparam rectangle<<C4Component>> {
-  BackgroundColor #85bbf0
-  BorderColor #5e98c8
-  FontColor black
-}
-skinparam rectangle<<C4External>> {
-  BackgroundColor #dddddd
-  BorderColor #777777
-  FontColor black
-}
 
 title Architecture Backend — Components
 
-rectangle "Architecture Backend" <<C4System>> as APP_OYEmP1 {
-  rectangle "SQLite Indexer\nIndexes artifact metadata into a SQLite database for efficient querying" <<C4Component>> as APP_JOmFWy
-  rectangle "Frontmatter Parser\nParses YAML frontmatter from `.md` and `.puml` files" <<C4Component>> as APP_YOOEbL
-  rectangle "Model Verifier\nCore verification engine that validates entities, connections, and diagrams against model rules" <<C4Component>> as APP_ca3vm7
-  rectangle "Architecture MCP Endpoint Adapter\nBackend-internal FastMCP application component hosting the /mcp/read and /mcp/write MCP endpoints;…" <<C4Component>> as APP_kRZYOA
-  rectangle "Query Engine\nSupports full-text search, metadata-based querying, and graph-based relationship traversal over the…" <<C4Component>> as APP_v9LvfK
-  rectangle "Module Catalog\nImmutable catalog of loaded ontology modules, built once at startup from YAML definitions by Module…" <<C4Component>> as APP_yNhgdh
-  rectangle "Promotion Engine\nThe application component that calculates artifact dependency closures, runs promotion quality gate…" <<C4Component>> as APP_tIMxjr
-  rectangle "Workspace Initializer\nThe application component that provisions a new architecture repository by creating the required di…" <<C4Component>> as APP_w51oVF
-  rectangle "Diagram Scaffolder\nThe application component that generates pre-populated PlantUML diagram files by resolving entity a…" <<C4Component>> as APP_SCKD2U
-  rectangle "Write Request Queue\nInternal FIFO async queue within the unified backend that accepts all incoming write requests immed…" <<C4Component>> as APP_a9k_mJ
-  rectangle "Git Sync Service\nRuntime service that watches the engagement and enterprise repository directories for file-system c…" <<C4Component>> as APP_tY3JIK
-  rectangle "PlantUML Renderer\nConverts textual PlantUML diagram representations to raster and vector images (PNG/SVG) by invoking…" <<C4Component>> as APP_yaxrWl
-  rectangle "Bulk Write Handler\nOrchestrates transactional execution of bulk create and edit operations by running the staged bulk…" <<C4Component>> as APP_5n_KQJ
-  rectangle "Batch Transaction Manager\nCreates a temporary staging copy of the live repository, coordinates all write operations against i…" <<C4Component>> as APP_HOOYAQ
-  rectangle "Bulk Delete Handler\nOrchestrates transactional execution of bulk delete operations, including preflight dependency vali…" <<C4Component>> as APP_WK_78v
-  rectangle "Operation Registry\nRegisters bulk operations with unique IDs, tracks phase progression, and enforces idempotency by re…" <<C4Component>> as APP_PDJI8F
-  rectangle "Assurance MCP Endpoint Adapter\nBackend-internal FastMCP application component hosting the /mcp/assurance-read and /mcp/assurance-w…" <<C4Component>> as APP_m_U5S1
-  rectangle "Broadcast Model Update\nBroadcasts relevant model changes to interested consumers such as the GUI and other live clients" <<C4Component>> as FNC_3ZsfnT
+System_Boundary(APP_OYEmP1, "Architecture Backend") {
+  Component(APP_JOmFWy, "SQLite Indexer", "")
+  Component(APP_YOOEbL, "Frontmatter Parser", "")
+  Component(APP_ca3vm7, "Model Verifier", "")
+  Component(APP_kRZYOA, "Architecture MCP Endpoint Adapter", "")
+  Component(APP_v9LvfK, "Query Engine", "")
+  Component(APP_yNhgdh, "Module Catalog", "")
+  Component(APP_tIMxjr, "Promotion Engine", "")
+  Component(APP_w51oVF, "Workspace Initializer", "")
+  Component(APP_SCKD2U, "Diagram Scaffolder", "")
+  Component(APP_a9k_mJ, "Write Request Queue", "")
+  Component(APP_tY3JIK, "Git Sync Service", "")
+  Component(APP_yaxrWl, "PlantUML Renderer", "")
+  Component(APP_5n_KQJ, "Bulk Write Handler", "")
+  Component(APP_HOOYAQ, "Batch Transaction Manager", "")
+  Component(APP_WK_78v, "Bulk Delete Handler", "")
+  Component(APP_PDJI8F, "Operation Registry", "")
+  Component(APP_m_U5S1, "Assurance MCP Endpoint Adapter", "")
+  Component(FNC_3ZsfnT, "Broadcast Model Update", "")
   APP_JOmFWy -[hidden]right- APP_YOOEbL
   APP_YOOEbL -[hidden]right- APP_ca3vm7
   APP_ca3vm7 -[hidden]right- APP_kRZYOA
@@ -167,22 +142,23 @@ rectangle "Architecture Backend" <<C4System>> as APP_OYEmP1 {
 
 }
 
-rectangle "GUI Authoring Tool\nWeb-based SPA for browsing, searching, and authoring architecture model entities, connections, and…" <<C4External>> as APP_lmO0mp
-rectangle "Architecture MCP Read Bridge\nThin stdio↔HTTP client of the Architecture Backend providing read-only access to the architecture r…" <<C4External>> as APP_Ne0utf
-rectangle "Architecture MCP Write Bridge\nThin stdio↔HTTP client of the Architecture Backend providing write access to the architecture repos…" <<C4External>> as APP_etTj9M
-rectangle "Assurance MCP Read Bridge\nThin stdio↔HTTP client of the Architecture Backend providing read-only access to assurance data via…" <<C4External>> as APP_iu_kKL
-rectangle "Assurance MCP Write Bridge\nThin stdio↔HTTP client of the Architecture Backend providing write access to assurance data via MCP" <<C4External>> as APP_js9xHR
-rectangle "Git Hosting\nExternal Git hosting service (e.g" <<C4External>> as APP_Je9pmw
-rectangle "Supply-Chain Signal Sources\nExternal sources of supply-chain and vulnerability signals (e.g" <<C4External>> as APP_JqIBPJ
-rectangle "SQLite Index\nThe SQLite database file containing the runtime index of all repository metadata" <<C4External>> as DOB_3rilik
-rectangle "Workspace Configuration\nThe YAML configuration file (arch-workspace.yml) recording the engagement repository root, enterpri…" <<C4External>> as DOB_I9qEoI
-rectangle "Textual Diagram Representation\nA PlantUML `.puml` file representing an architectural diagram or a markdown `.md` file containing m…" <<C4External>> as DOB_4Z28xK
-rectangle "Architecture Ontology Configuration\nYAML configuration files (entity_ontology.yaml and connection_ontology.yaml) that define the comple…" <<C4External>> as DOB_UjyXG3
-rectangle "Global Entity Reference File\nA proxy entity file created automatically in the engagement repository when a connection crosses th…" <<C4External>> as DOB_4dO6js
-rectangle "Rendered Diagram\nPNG or SVG image file produced by the PlantUML Renderer from a textual diagram representation, stor…" <<C4External>> as DOB_zynRsm
-rectangle "Staged Repository\nTemporary filesystem copy of the live repository used as the isolated transaction workspace during…" <<C4External>> as DOB_hhYsiw
-rectangle "Operation Record\nCaptures the idempotency key, phase, status, and result for a running or completed bulk operation,…" <<C4External>> as DOB_hExrX3
-rectangle "Assurance Knowledge Base\nStore-wide confidential resource containing all assurance entities, typed one-way architecture conn…" <<C4External>> as DOB_ApaPcg
+System_Ext(APP_lmO0mp, "GUI Authoring Tool")
+System_Ext(APP_Ne0utf, "Architecture MCP Read Bridge")
+System_Ext(APP_etTj9M, "Architecture MCP Write Bridge")
+System_Ext(APP_iu_kKL, "Assurance MCP Read Bridge")
+System_Ext(APP_js9xHR, "Assurance MCP Write Bridge")
+System_Ext(APP_Je9pmw, "Git Hosting")
+System_Ext(APP_JqIBPJ, "Supply-Chain Signal Sources")
+System_Ext(APP_AeU7V3, "Identifier Allocation Service")
+System_Ext(DOB_3rilik, "SQLite Index")
+System_Ext(DOB_I9qEoI, "Workspace Configuration")
+System_Ext(DOB_4Z28xK, "Textual Diagram Representation")
+System_Ext(DOB_UjyXG3, "Architecture Ontology Configuration")
+System_Ext(DOB_4dO6js, "Global Entity Reference File")
+System_Ext(DOB_zynRsm, "Rendered Diagram")
+System_Ext(DOB_hhYsiw, "Staged Repository")
+System_Ext(DOB_hExrX3, "Operation Record")
+System_Ext(DOB_ApaPcg, "Assurance Knowledge Base")
 
 APP_OYEmP1 -[hidden]right- APP_lmO0mp
 APP_lmO0mp -[hidden]right- APP_Ne0utf
@@ -191,7 +167,8 @@ APP_etTj9M -[hidden]right- APP_iu_kKL
 APP_iu_kKL -[hidden]right- APP_js9xHR
 APP_js9xHR -[hidden]right- APP_Je9pmw
 APP_Je9pmw -[hidden]right- APP_JqIBPJ
-APP_JqIBPJ -[hidden]right- DOB_3rilik
+APP_JqIBPJ -[hidden]right- APP_AeU7V3
+APP_AeU7V3 -[hidden]right- DOB_3rilik
 DOB_3rilik -[hidden]right- DOB_I9qEoI
 DOB_I9qEoI -[hidden]right- DOB_4Z28xK
 DOB_4Z28xK -[hidden]right- DOB_UjyXG3
@@ -232,5 +209,6 @@ APP_m_U5S1 --> DOB_ApaPcg : accesses
 APP_OYEmP1 --> APP_Je9pmw : uses
 APP_tY3JIK --> APP_Je9pmw : uses
 APP_OYEmP1 --> APP_JqIBPJ : uses
+APP_SCKD2U --> APP_AeU7V3 : uses
 APP_lmO0mp --> FNC_3ZsfnT : uses
 @enduml

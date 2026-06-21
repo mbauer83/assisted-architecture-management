@@ -37,55 +37,27 @@ bindings:
   correspondence_kind: scoped-by
   target:
     entity_id: GRP@1780819145.rW_2nX.assurance-module
-last-updated: '2026-06-07'
+last-updated: '2026-06-22'
 ---
 @startuml assurance-module---components
+!include <C4/C4_Component>
 left to right direction
 skinparam shadowing false
 skinparam linetype ortho
 skinparam defaultTextAlignment center
 skinparam wrapWidth 240
 skinparam maxMessageSize 240
-skinparam rectangle {
-  RoundCorner 12
-  Padding 10
-}
-skinparam actor {
-  BackgroundColor #08427b
-  BorderColor #052e56
-  FontColor white
-}
-skinparam rectangle<<C4System>> {
-  BackgroundColor #1168bd
-  BorderColor #0b4884
-  FontColor white
-}
-skinparam rectangle<<C4Container>> {
-  BackgroundColor #438dd5
-  BorderColor #2f6da6
-  FontColor white
-}
-skinparam rectangle<<C4Component>> {
-  BackgroundColor #85bbf0
-  BorderColor #5e98c8
-  FontColor black
-}
-skinparam rectangle<<C4External>> {
-  BackgroundColor #dddddd
-  BorderColor #777777
-  FontColor black
-}
 
 title Assurance Module — Components
 
-rectangle "Assurance Module" <<C4System>> as GRP_rW_2nX {
-  rectangle "Confidential Assurance Store" <<C4Component>> as APP_E0fzqZ
-  rectangle "Assurance Archive" <<C4Component>> as APP_GnsLC8
-  rectangle "Assurance Verifier" <<C4Component>> as APP_XFD85E
-  rectangle "Supply-Chain & Vulnerability Connector" <<C4Component>> as APP_e2zPs6
-  rectangle "Assurance Knowledge Base" <<C4Component>> as DOB_ApaPcg
-  rectangle "Bill of Materials" <<C4Component>> as DOB_dRnK_o
-  rectangle "Security Signals Store" <<C4Component>> as DOB_p04R7k
+System_Boundary(GRP_rW_2nX, "Assurance Module") {
+  Component(APP_E0fzqZ, "Confidential Assurance Store", "")
+  Component(APP_GnsLC8, "Assurance Archive", "")
+  Component(APP_XFD85E, "Assurance Verifier", "")
+  Component(APP_e2zPs6, "Supply-Chain & Vulnerability Connector", "")
+  Component(DOB_ApaPcg, "Assurance Knowledge Base", "")
+  Component(DOB_dRnK_o, "Bill of Materials", "")
+  Component(DOB_p04R7k, "Security Signals Store", "")
   APP_E0fzqZ -[hidden]right- APP_GnsLC8
   APP_GnsLC8 -[hidden]right- APP_XFD85E
   APP_XFD85E -[hidden]right- APP_e2zPs6
@@ -95,9 +67,9 @@ rectangle "Assurance Module" <<C4System>> as GRP_rW_2nX {
 
 }
 
-rectangle "Assurance MCP Endpoint Adapter" <<C4External>> as APP_m_U5S1
-rectangle "Supply-Chain Signal Sources" <<C4External>> as APP_JqIBPJ
-rectangle "Assurance Audit Log" <<C4External>> as DOB_H_xFye
+System_Ext(APP_m_U5S1, "Assurance MCP Endpoint Adapter")
+System_Ext(APP_JqIBPJ, "Supply-Chain Signal Sources")
+System_Ext(DOB_H_xFye, "Assurance Audit Log")
 
 GRP_rW_2nX -[hidden]right- APP_m_U5S1
 APP_m_U5S1 -[hidden]right- APP_JqIBPJ

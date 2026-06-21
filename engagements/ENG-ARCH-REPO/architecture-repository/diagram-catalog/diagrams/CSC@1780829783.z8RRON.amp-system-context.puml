@@ -22,6 +22,7 @@ entity-ids-used:
 - ROL@1776633082.udXPfB.ai-agent
 - ROL@1780656241.abNYhO.risk-compliance-officer
 - ROL@1780656241.yswDMB.safety-security-analyst
+- APP@1781976554.AeU7V3.identifier-allocation-service
 connection-ids-used:
 - ACT@1712870400.Nn7Oo7.architect---APP@1776149382.lmO0mp.gui-authoring-tool@@archimate-association
 - ACT@1712870400.OLWiNc.devops-engineer---APP@1712870400.kjC6ex.cli-tool@@archimate-association
@@ -38,6 +39,8 @@ connection-ids-used:
 - ROL@1776633082.udXPfB.ai-agent---APP@1780783708.Ne0utf.architecture-mcp-read-bridge@@archimate-association
 - ROL@1780656241.abNYhO.risk-compliance-officer---APP@1780783710.iu_kKL.assurance-mcp-read-bridge@@archimate-association
 - ROL@1780656241.yswDMB.safety-security-analyst---APP@1780783710.iu_kKL.assurance-mcp-read-bridge@@archimate-association
+- APP@1780783993.JqIBPJ.supply-chain-signal-sources---APP@1780656431.e2zPs6.supply-chain-vulnerability-connector@@archimate-serving
+- APP@1781976554.AeU7V3.identifier-allocation-service---APP@1776633697.SCKD2U.diagram-scaffolder@@archimate-serving
 diagram-entities: {}
 bindings:
 - id: bind-scope
@@ -46,60 +49,33 @@ bindings:
   correspondence_kind: scoped-by
   target:
     entity_id: APP@1780783671.hkrdtm.architecture-management-platform
-last-updated: '2026-06-07'
+last-updated: '2026-06-21'
 ---
 @startuml amp---system-context
+!include <C4/C4_Component>
 left to right direction
 skinparam shadowing false
 skinparam linetype ortho
 skinparam defaultTextAlignment center
 skinparam wrapWidth 240
 skinparam maxMessageSize 240
-skinparam rectangle {
-  RoundCorner 12
-  Padding 10
-}
-skinparam actor {
-  BackgroundColor #08427b
-  BorderColor #052e56
-  FontColor white
-}
-skinparam rectangle<<C4System>> {
-  BackgroundColor #1168bd
-  BorderColor #0b4884
-  FontColor white
-}
-skinparam rectangle<<C4Container>> {
-  BackgroundColor #438dd5
-  BorderColor #2f6da6
-  FontColor white
-}
-skinparam rectangle<<C4Component>> {
-  BackgroundColor #85bbf0
-  BorderColor #5e98c8
-  FontColor black
-}
-skinparam rectangle<<C4External>> {
-  BackgroundColor #dddddd
-  BorderColor #777777
-  FontColor black
-}
 
 title AMP — System Context
 
-rectangle "Architecture Management Platform" <<C4System>> as APP_hkrdtm
+System(APP_hkrdtm, "Architecture Management Platform")
 
-actor "Architect" as ACT_Nn7Oo7
-actor "DevOps Engineer" as ACT_OLWiNc
-actor "Developer" as ACT_Pp8Qq8
-actor "Product Owner" as ACT_Rr9Ss9
-actor "Upper Technical Management" as ACT_Ut1Vv1
-rectangle "AI Agent Host" <<C4External>> as APP_v6AXNw
-rectangle "Git Hosting" <<C4External>> as APP_Je9pmw
-rectangle "Supply-Chain Signal Sources" <<C4External>> as APP_JqIBPJ
-actor "AI Agent" as ROL_udXPfB
-actor "Risk & Compliance Officer" as ROL_abNYhO
-actor "Safety / Security Analyst" as ROL_yswDMB
+Person_Ext(ACT_Nn7Oo7, "Architect")
+Person_Ext(ACT_OLWiNc, "DevOps Engineer")
+Person_Ext(ACT_Pp8Qq8, "Developer")
+Person_Ext(ACT_Rr9Ss9, "Product Owner")
+Person_Ext(ACT_Ut1Vv1, "Upper Technical Management")
+System_Ext(APP_v6AXNw, "AI Agent Host")
+System_Ext(APP_Je9pmw, "Git Hosting")
+System_Ext(APP_JqIBPJ, "Supply-Chain Signal Sources")
+System_Ext(APP_AeU7V3, "Identifier Allocation Service")
+Person_Ext(ROL_udXPfB, "AI Agent")
+Person_Ext(ROL_abNYhO, "Risk & Compliance Officer")
+Person_Ext(ROL_yswDMB, "Safety / Security Analyst")
 
 ACT_Nn7Oo7 -[hidden]right- ACT_OLWiNc
 ACT_OLWiNc -[hidden]right- ACT_Pp8Qq8
@@ -112,6 +88,7 @@ ROL_yswDMB -[hidden]right- APP_hkrdtm
 APP_hkrdtm -[hidden]right- APP_v6AXNw
 APP_v6AXNw -[hidden]right- APP_Je9pmw
 APP_Je9pmw -[hidden]right- APP_JqIBPJ
+APP_JqIBPJ -[hidden]right- APP_AeU7V3
 
 
 ACT_Nn7Oo7 --> APP_hkrdtm : uses
@@ -122,6 +99,7 @@ ACT_Ut1Vv1 --> APP_hkrdtm : uses
 APP_v6AXNw --> APP_hkrdtm : uses
 APP_hkrdtm --> APP_Je9pmw : uses
 APP_hkrdtm --> APP_JqIBPJ : uses
+APP_hkrdtm --> APP_AeU7V3 : uses
 ROL_udXPfB --> APP_hkrdtm : uses
 ROL_abNYhO --> APP_hkrdtm : uses
 ROL_yswDMB --> APP_hkrdtm : uses
