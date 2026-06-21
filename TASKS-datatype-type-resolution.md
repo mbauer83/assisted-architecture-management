@@ -17,7 +17,7 @@ each WU; re-find by symbol if lines drift).
 
 ## Phase P0 — Foundations
 
-### WU-0.1 — `identity_scope`: ontology-authoritative, UI-derived
+### WU-0.1 ✅ — `identity_scope`: ontology-authoritative, UI-derived
 **Files:** `EntityTypeInfo` (ontology_types); `_parse_entity_types` (diagram_ontology_loader);
 datatype ontology→UI merge `_apply_ontology_fields()` / `_merge_ontology_into_config` (datatype
 `__init__`); `DiagramOwnEntityTypeUiConfig` (diagram_type_config).
@@ -40,7 +40,7 @@ view; a `workspace` type lacking `id_prefix`, or a duplicate prefix, fails start
 `tests/application/test_startup_validation_id_prefix.py`.
 **Deps:** none.
 
-### WU-0.2 — Declare classifier workspace identity
+### WU-0.2 ✅ — Declare classifier workspace identity
 **Files:** datatype `ontology.yaml` (entity_types.classifier).
 **Do:** add under `classifier:`:
 ```yaml
@@ -52,7 +52,7 @@ validation passes.
 **Tests:** extend `tests/diagram_types/test_datatype_taxonomy.py`.
 **Deps:** WU-0.1.
 
-### WU-0.3 — `IdentifierAllocator` + allocate endpoint + batch normalize
+### WU-0.3 ✅ — `IdentifierAllocator` + allocate endpoint + batch normalize
 **Files:** new `src/application/identifier_allocator.py` (protocol); infra impl wrapping the existing
 mint algorithm (grep `def _mint`/`generate_artifact_id`/`new_artifact_id`); new REST router
 `src/infrastructure/gui/routers/identifiers.py`; new
@@ -77,7 +77,7 @@ allocates + rewrites all refs; caller-supplied prefix rejected.
 **Tests:** `tests/application/test_identifier_allocator.py`, `tests/infrastructure/gui/test_allocate_endpoint.py`.
 **Deps:** WU-0.1.
 
-### WU-0.3b — Route existing artifact creation through the allocator (bounded consolidation)
+### WU-0.3b ✅ — Route existing artifact creation through the allocator (bounded consolidation)
 **Files:** the backend create paths for model entities, diagrams, documents, GARs (grep the call sites
 of the existing mint algorithm); the classifier path lands in WU-1.1.
 **Do:** make each existing create operation **delegate** id minting to `IdentifierAllocator` instead of
@@ -89,7 +89,7 @@ use). This makes the PLAN's "system-wide source" true (PLAN §D21).
 **Tests:** `tests/infrastructure/write/test_allocator_consolidation.py` (one delegation test per path).
 **Deps:** WU-0.3.
 
-### WU-0.4 — Canonical workspace-id extraction (slugged, bare)
+### WU-0.4 ✅ — Canonical workspace-id extraction (slugged, bare)
 **Files:** `extract_diagram_entities` (_diagram_entity_extraction); call sites in `_service_incremental`
 / `scan_mount`.
 **Do:** make the synthetic id depend on the entity-type's `identity_scope` (resolved via module catalog):
@@ -106,7 +106,7 @@ membership working (keys on host_diagram_id).
 **Tests:** `tests/infrastructure/artifact_index/test_workspace_identity_extraction.py`.
 **Deps:** WU-0.1, WU-0.2.
 
-### WU-0.5 — `CandidateRepository` (settled overlay; the central seam)
+### WU-0.5 ✅ — `CandidateRepository` (settled overlay; the central seam)
 **Files:** new `src/application/candidate_repository.py`.
 **Do:** implement the PLAN §2.4 protocol with **one** settled architecture:
 ```python
@@ -143,7 +143,7 @@ diagram; classifier retained same id; new classifier added; full host-diagram de
 that changes local connections but keeps classifier ids.
 **Deps:** WU-0.4.
 
-### WU-0.6 — Generic workspace-id uniqueness (E335), format & operational immutability
+### WU-0.6 ✅ — Generic workspace-id uniqueness (E335), format & operational immutability
 **Files:** new **generic** `RepositoryVerificationContribution` for E335 (registered centrally, not in
 the datatype module — see WU-0.7b); write-path format/immutability in `diagram_edit` / `diagram` create.
 **Do:**
@@ -161,7 +161,7 @@ rejected at create; a classifier's id cannot change on edit.
 **Tests:** `tests/application/verification/test_workspace_identity_rules.py`.
 **Deps:** WU-0.4, WU-0.5, WU-0.7b.
 
-### WU-0.7 — Per-diagram verification-contribution hook
+### WU-0.7 ✅ — Per-diagram verification-contribution hook
 **Files:** new `src/domain/diagram_verification.py` (`BaseDiagramVerificationContext`,
 `DiagramVerificationContribution[ProjectionT]` with default `run`); `DiagramTypeModule`
 (add `diagram_verification_contributions()`); `DiagramTypeBase` (default `()`); central verifier
@@ -182,7 +182,7 @@ contributions receive a `CandidateRepository`, never the store port or SQLite.
 **Tests:** `tests/application/verification/test_verification_contribution_hook.py`.
 **Deps:** WU-0.5.
 
-### WU-0.7b — Per-transaction repository-contribution hook (runs once per transaction)
+### WU-0.7b ✅ — Per-transaction repository-contribution hook (runs once per transaction)
 **Files:** `src/domain/diagram_verification.py` (`RepositoryVerificationContext`,
 `RepositoryVerificationContribution[ProjectionT]`); `DiagramTypeModule`
 (`repository_verification_contributions()` default `()`); a **central registry** of generic repository
@@ -199,7 +199,7 @@ workspace-identified type, not only classifiers.
 no-duplication test).
 **Deps:** WU-0.5.
 
-### WU-0.8 — Move E330/E331 behind contributions (parity)
+### WU-0.8 ✅ — Move E330/E331 behind contributions (parity)
 **Files:** new `src/diagram_types/datatype/_contributions.py`; datatype `__init__`
 (`diagram_verification_contributions`). Keep `_verifier_rules_datatype` / `datatype_consistency` as the
 rule body, called from the contribution.
@@ -215,7 +215,7 @@ projection is compiled **once**).
 
 ## Phase P1 — Resolution, projection & rendering
 
-### WU-1.1 — Mint classifier ids via the allocator
+### WU-1.1 ✅ — Mint classifier ids via the allocator
 **Files:** `diagram` create (`_build_model_backed`); MCP create/edit paths; use WU-0.3 allocator +
 `normalize_diagram_entity_identities`.
 **Do:** when a classifier lacks a valid `CLF@…` id (or carries a temp ref), allocate via the allocator
@@ -225,7 +225,7 @@ the minted id.
 **Tests:** `tests/infrastructure/write/test_classifier_id_minting.py`.
 **Deps:** WU-0.3, WU-0.6.
 
-### WU-1.2 — Discriminated-union attribute schema + E336
+### WU-1.2 ✅ — Discriminated-union attribute schema + E336
 **Files:** datatype `ontology.yaml` (classifier `attributes` item schema); datatype contribution (E336).
 **Do:**
 1. Express the item schema as the PLAN §2.2 `oneOf` (two closed branches; `const` kind; non-empty
@@ -242,7 +242,7 @@ the minted id.
 **Tests:** `tests/diagram_types/test_datatype_attribute_schema.py`.
 **Deps:** WU-0.8.
 
-### WU-1.3 — `DatatypeVerificationProjection` compiler
+### WU-1.3 ✅ — `DatatypeVerificationProjection` compiler
 **Files:** new `src/diagram_types/datatype/_projection.py`.
 **Do:**
 ```python
@@ -266,7 +266,7 @@ compiled from `CandidateRepository` only (no SQLite).
 **Tests:** `tests/diagram_types/test_datatype_projection.py`.
 **Deps:** WU-0.5, WU-0.8.
 
-### WU-1.4 — `TypeResolver` (scope/status)
+### WU-1.4 ✅ — `TypeResolver` (scope/status)
 **Files:** new `src/diagram_types/datatype/_type_resolver.py`.
 **Do:** `resolve(type_ref, referencing_scope, projection) -> Resolved | Unresolved`; `label_for(id)`.
 Rules per PLAN §2.3: primitive by name; classifier by id; engagement→engagement+enterprise,
@@ -275,7 +275,7 @@ enterprise→enterprise-only; status conformity vs the referencing diagram's bas
 **Tests:** `tests/diagram_types/test_type_resolver.py`.
 **Deps:** WU-1.3.
 
-### WU-1.5 — E332 + W333 contributions (shared projection)
+### WU-1.5 ✅ — E332 + W333 contributions (shared projection)
 **Files:** datatype `_contributions.py` (merge with WU-0.8 so **one** `compile_projection` feeds
 E330/E331/E332/W333/E336).
 **Do:**
@@ -289,7 +289,7 @@ fires only on the defining diagram, never on a mere referencer; projection compi
 **Tests:** `tests/diagram_types/test_datatype_type_rules.py`.
 **Deps:** WU-1.4.
 
-### WU-1.6 — `PreparedDatatypeDiagram` render-prep + label resolution
+### WU-1.6 ✅ — `PreparedDatatypeDiagram` render-prep + label resolution
 **Files:** new generic render-prep seam on `DiagramTypeModule` (`prepare_render_model(...)`) +
 `DiagramTypeBase` pass-through default; datatype impl + `renderer.render_body` / `_render_classifier`;
 render call site (grep `renderer.render_body`).
@@ -312,7 +312,7 @@ its id** (resolved via the candidate, before any index refresh).
 
 ## Phase P2 — Usage indexing & discovery
 
-### WU-2.1 — `attribute_type_refs` overlay
+### WU-2.1 ✅ — `attribute_type_refs` overlay
 **Files:** `SCHEMA_SQL` (_sqlite_schema); `_SqliteStore` upsert/delete; `_service_incremental`
 (`apply_diagram_change`, `_delete_diagram_entities`); composition root (datatype-specific contributor —
 PLAN §D5, **not** a protocol method).
@@ -329,7 +329,7 @@ diagram delete. Register the contributor at the composition root.
 **Tests:** `tests/infrastructure/artifact_index/test_attribute_type_refs.py`.
 **Deps:** WU-1.2.
 
-### WU-2.2 — Generic port lookups
+### WU-2.2 ✅ — Generic port lookups
 **Files:** `ArtifactSearch` (ports); index impl (`service` + `_sqlite_queries`).
 **Do:** add (generic over workspace-identity entities; no datatype vocabulary):
 ```python
@@ -341,7 +341,7 @@ def diagrams_referencing_type_id(self, type_id) -> list[tuple[str,str,str]]: ...
 **Tests:** `tests/infrastructure/artifact_index/test_type_lookup_queries.py`.
 **Deps:** WU-2.1.
 
-### WU-2.3 — `DatatypeTypeCatalog` + REST **and** MCP discovery
+### WU-2.3 ✅ — `DatatypeTypeCatalog` + REST **and** MCP discovery
 **Files:** new `src/diagram_types/datatype/_type_catalog.py` (built from committed read model;
 generation token); REST `routers/diagram_types.py`; MCP — prefer extending an existing generic query
 tool (else a focused read tool); `artifact_authoring_guidance` (datatype contract text).
@@ -365,7 +365,7 @@ returns the same shape via the shared application query; structured-output + too
 
 ## Phase P3 — Lifecycle (removal protection)
 
-### WU-3.1 — Reference-impact (E334) as a per-transaction repository contribution
+### WU-3.1 ✅ — Reference-impact (E334) as a per-transaction repository contribution
 **Files:** datatype `_contributions.py` — E334 implemented as a **`RepositoryVerificationContribution`**
 (WU-0.7b), `diagnostic_codes=("E334",)`, registered via the datatype module's
 `repository_verification_contributions()`; the common mutation boundary feeds it
@@ -392,7 +392,7 @@ the entry point invokes common candidate verification (not a duplicated rule).
 
 ## Phase P4 — Promotion
 
-### WU-4.1 — Index workspace classifiers in promotion planning
+### WU-4.1 ✅ — Index workspace classifiers in promotion planning
 **Files:** `_promote_planning` (enterprise indices), `_promote_plan_content` (`plan_diagrams`).
 **Do:** include `workspace`-scoped classifiers so same-id (idempotent) and same-name-different-id
 (advisory, non-blocking) are detected (PLAN §6).
@@ -400,7 +400,7 @@ the entry point invokes common candidate verification (not a duplicated rule).
 **Tests:** `tests/infrastructure/write/test_promote_classifier_indexing.py`.
 **Deps:** WU-0.4.
 
-### WU-4.2 — Two-stage closure + staged enterprise-only verify
+### WU-4.2 ✅ — Two-stage closure + staged enterprise-only verify
 **Files:** `promote_to_enterprise` (`plan_promotion`, `PromotionPlan`); new `promote_type_closure.py`;
 the execute path (final staged verify).
 **Do:**
@@ -427,7 +427,7 @@ rewrite.
 > pass. GUI-plan F3 rides this plan's verifier hook (see WU-1.5-adjacent note) and F5 is the post-P5
 > capstone — tracked in `TASKS-gui-correctness-and-assurance.md`.
 
-### WU-5.1 — Frontend tagged-ref model
+### WU-5.1 ✅ — Frontend tagged-ref model
 **Files:** `useDatatypeModel.ts` (`Attribute`); regen types after schema change.
 **Do:**
 ```typescript
@@ -437,7 +437,7 @@ export interface Attribute { name:string; type?:AttrTypeRef; multiplicity?:strin
 **Accept:** round-trips the tagged ref; `npm run typecheck` passes.
 **Deps:** WU-1.2.
 
-### WU-5.2 — Closed combobox + allocate-on-add
+### WU-5.2 ✅ — Closed combobox + allocate-on-add
 **Files:** `ClassifierCard.vue` (type field), replace `ClassifierCard.helpers.ts:buildTypeOptions`;
 reuse `EntitySearchInput.vue` typeahead pattern; call `POST /api/identifiers/allocate` for "+ New
 classifier".
@@ -450,14 +450,14 @@ stores `{kind:primitive,name}`; displayed label follows the referent's current n
 **Tests:** `tools/gui/src/ui/diagram-types/datatype/__tests__/ClassifierCard.spec.ts`.
 **Deps:** WU-5.1, WU-2.3, WU-0.3.
 
-### WU-5.3 — Editor wiring + where-used + types regen
+### WU-5.3 ✅ — Editor wiring + where-used + types regen
 **Files:** `DatatypeEditor.vue`; verify `ConnRow.vue` endpoints unaffected; run
 `uv run tools/generate_types.py` → `tools/gui/src/domain/types.generated.ts`.
 **Do:** pass `diagram_id`/scope into ClassifierCard; show "N usages" from `type-usages`; regen TS types.
 **Accept:** editor loads visible types; usages hint shown; lint + typecheck pass.
 **Deps:** WU-5.2.
 
-### WU-5.4 — Absorb GUI-plan F2 (relabels) + F4 (notes)
+### WU-5.4 ✅ — Absorb GUI-plan F2 (relabels) + F4 (notes)
 **Files:** `ClassifierCard.vue` / `ConnRow.vue` / `DatatypeEditor.vue`; datatype `ontology.yaml`
 (classifier `note`; relation `note`); renderer (`_render_classifier` + connection render); regen types.
 **Do (folds GUI-plan WU-F2 + WU-F4):**
@@ -480,7 +480,7 @@ tick GUI-plan F2 and F4.**
 > no duplicate-name entries, no empty tuples. Track the checkbox in the GUI plan; build it here-style.
 > **GUI-plan F5** (editor UX consolidation) is the capstone **after** P5 + F2 + F3 + F4.
 
-### WU-6.1 — Conservative migration, refuse-on-ambiguity
+### WU-6.1 ✅ — Conservative migration, refuse-on-ambiguity
 **Files:** new `tools/migrate_datatype_type_refs.py`; `diagram-format-version` handling in the diagram
 parser/formatter.
 **Do (PLAN §7 / §D15):**
@@ -502,7 +502,7 @@ applied repo has 0 bare-string types; candidate verify passes pre-publish.
 
 ## Phase P7 — Switch-on
 
-### WU-7.1 — Enable blocking validation
+### WU-7.1 ✅ — Enable blocking validation
 **Files:** rule registrations; feature flag in `settings.py` (E042 precedent).
 **Do:** flip E332/E334/E335/E336 inert→blocking once the migration report shows no unresolved legacy
 values.
@@ -514,7 +514,7 @@ values.
 
 ## Phase P8 — Self-model
 
-### WU-8.1 — Update the self-model (MCP only)
+### WU-8.1 ✅ — Update the self-model (MCP only)
 **Do:** PLAN §8 edits via `arch-repo-write`, motivation-first, stop-gate after motivation. Resolved
 component ids (confirmed 2026-06-20; re-verify before editing):
 - **SQLite Indexer** — `APP@1712870400.JOmFWy.sqlite-indexer` (edit desc: derives type-reference usages;
@@ -542,7 +542,36 @@ Other anchors already in PLAN §8 (`REQ@…Ee3Ff3`, `REQ@…sbkuwf`, `REQ@…aDo
 gates for a clean baseline. 4. Continue at the first unticked WU whose Deps are all ticked.
 
 ## Progress Log
-- (none yet)
+- WU-0.5 done 2026-06-20: `CandidateRepository` Protocol + `_Overlay` + `_CommittedCandidateRepository` + `_OverlayCandidateRepository`; `committed_repository(store)` + `candidate_with(base, *, changed_diagrams, deleted_ids, workspace_types)` factories; additions win over deletions for same-id workspace entities; `_diagram_entity_extraction.py` moved to `src/application/` (was infrastructure); 12 tests in `tests/application/test_candidate_repository.py`.
+- WU-0.4 done 2026-06-20: `extract_diagram_entities`/`diagram_local_to_full`/`extract_diagram_connections` accept `workspace_entity_types: frozenset[str]`; workspace-scoped entities get bare `local_id` as `artifact_id`; `host_diagram_id` always set; threaded through `_scan_diagram_records`, `scan_mount`, `apply_diagram_change` and into `ArtifactIndex._get_workspace_types()` + `refresh()` + `_CHANGE_APPLIERS`; 9 tests in `tests/infrastructure/artifact_index/test_workspace_identity_extraction.py`.
+- WU-0.3b done 2026-06-20: entity.py, document.py, admin_entity_ops.py, _artifact_deduplication.py, global_artifact_reference.py, matrix.py, _diagram_write.py, admin.py all delegate to `get_default_allocator().allocate()` instead of calling generate_entity_id/generate_diagram_id directly; static import guard test in tests/infrastructure/write/test_allocator_consolidation.py.
+- WU-0.3 done 2026-06-20: `IdentifierAllocator` protocol + `DefaultIdentifierAllocator` wrapping `generate_entity_id`; `POST /api/identifiers/allocate` endpoint resolves prefix from entity-type metadata; `normalize_diagram_entity_identities` allocates+rewrites workspace-identity entities atomically; registered in backend app.
+- WU-0.1 done 2026-06-20: `identity_scope`+`id_prefix` added to `EntityTypeInfo` and `DiagramOwnEntityTypeUiConfig`; parsed in `_parse_entity_types`; propagated via `_apply_ontology_fields`; startup validation added; `diagram_entity_type_infos` property exposes the canonical `EntityTypeInfo` objects for diagram-owned types without polluting `own_entity_types`.
+- WU-0.2 done 2026-06-20: `identity_scope: workspace` + `id_prefix: CLF` declared in `src/diagram_types/datatype/ontology.yaml`. Both catalog views agree. All 2801 tests pass.
+- WU-0.7 done 2026-06-20: `BaseDiagramVerificationContext` + `DiagramVerificationContribution` Protocol in `src/domain/diagram_verification.py` (Any-typed, no cross-layer imports); `diagram_verification_contributions()` on `DiagramTypeModule` + default `()` in `DiagramTypeBase`; `_verify_diagram_file` builds candidate + ctx and dispatches contributions; removed `check_datatype_backing_consistency` direct call from rules; extracted to `_verifier_contribution_runner.py`; 4 tests.
+- WU-0.7b done 2026-06-20: `RepositoryVerificationContext` + `RepositoryVerificationContribution` Protocol in same module; `repository_verification_contributions()` on `DiagramTypeModule`; `run_repository_contributions` dispatches once per `verify_all`; generic registry (`_GENERIC_REPOSITORY_CONTRIBUTIONS`) ready for WU-0.6 E335; 3 tests.
+- WU-0.8 done 2026-06-20: `_BackingConsistencyContribution` in `src/diagram_types/datatype/_contributions.py` wraps `check_datatype_backing_consistency`; registered via `_DatatypeDiagramType.diagram_verification_contributions()`; dependency-policy baseline updated for the one unavoidable `application` import; ratchet baseline updated to 406 after extracting contribution runner; 2 tests; all 2851 tests pass.
+- WU-0.6 done 2026-06-20: `WorkspaceIdUniquenessContribution` (E335) + `validate_workspace_entity_ids` in `src/application/verification/_workspace_identity_rules.py`; registered into `_GENERIC_REPOSITORY_CONTRIBUTIONS` on import; `catalogs` field added to `RepositoryVerificationContext`; write-path format check wired in `diagram_edit.py` and `diagram.py`; `RegistryOnlyCandidateRepository` + `run_repository_contributions` in `_verifier_contribution_runner.py` threaded through; 12 tests in `tests/application/verification/test_workspace_identity_rules.py`; 2863 tests pass.
+- WU-1.1 done 2026-06-20: `normalize_diagram_entity_identities` called in `create_diagram` (diagram.py) and `edit_diagram` (diagram_edit.py) before binding normalization; `DiagramTypeCatalog` used as the module_catalog type instead of `ModuleCatalog`; 7 tests in `tests/infrastructure/write/test_classifier_id_minting.py`; 2889 tests pass.
+- WU-1.2 done 2026-06-20: `attributes` items schema updated in `ontology.yaml` with `oneOf` discriminated union; `_AttributeTypeSchemaContribution` (E336) added to `src/diagram_types/datatype/_contributions.py`; registered in `_DatatypeDiagramType.diagram_verification_contributions()`; architecture baseline updated for `artifact_verifier_types` import; 15 tests in `tests/diagram_types/test_datatype_attribute_schema.py`; 2889 tests pass.
+- WU-1.3 done 2026-06-20: `ClassifierDefinition`, `AttributeTypeUsage`, `DatatypeVerificationProjection`, `compile_projection` in `src/diagram_types/datatype/_projection.py`; classifiers indexed by id + normalized name; usages scanned from `diagram.frontmatter` classifier attributes with `{kind:classifier,id}`; scope/status derived from host diagram via candidate repo; 8 tests in `tests/diagram_types/test_datatype_projection.py`; 2897 tests pass.
+- WU-1.4 done 2026-06-20: `Resolved`/`Unresolved` + `TypeResolver` in `src/diagram_types/datatype/_type_resolver.py`; primitive resolution (module-declared + custom via kind=="primitive"); classifier resolution by id; scope rules (enterprise→enterprise-only; engagement→both); status conformity (baselined diagram rejects draft classifier); `label_for` with id fallback; 20 tests in `tests/diagram_types/test_type_resolver.py`; 2917 tests pass.
+- WU-1.5 done 2026-06-20: `_ProjectionBasedContributions` (E332+W333) added to `src/diagram_types/datatype/_contributions.py`; module-level pure helpers `_iter_typed_attrs`, `_e332_issue_or_none`, `_w333_issue_or_none`, `_clf_in_scope`; one projection compiled per diagram via `run()`; W333 fires only for classifiers defined in the verified diagram; `diagram_verification_contributions()` updated in `__init__.py` to pass primitive names; 14 tests in `tests/diagram_types/test_datatype_type_rules.py`; 2931 tests pass.
+- WU-1.6 done 2026-06-20: `prepare_render_model(diagram_entities, candidate=None)` added to `DiagramTypeModule` protocol + `DiagramTypeBase` pass-through; datatype impl in `__init__.py` via module-level helpers `_build_classifier_label_map`, `_resolve_one_type_label`, `_prepare_classifier_for_render`, `_apply_type_labels`; inline label resolution (same-write contract) + candidate-based resolution (rename contract); `_render_diagram_entities_puml` accepts optional `candidate` and calls `prepare_render_model`; legacy string types pass through; 9 tests in `tests/diagram_types/test_render_prep_label_resolution.py`; 2940 tests pass.
+- WU-2.1 done 2026-06-20: `attribute_type_refs` SQLite table + `idx_attr_type_refs_type` index; `_MemStore.attribute_type_refs` overlay; `_SqliteStore.upsert_attribute_type_refs` / `delete_attribute_type_refs`; `_AttrTypeRefFn` type alias + `attr_type_ref_fn` threaded through `_scan_diagram_records`, `scan_mount`, `apply_diagram_change`; `ArtifactIndex._attr_type_ref_extractor` wired at composition root; `rebuild()` syncs from mem; 8 tests in `tests/infrastructure/artifact_index/test_attribute_type_refs.py`.
+- WU-2.2 done 2026-06-20: `find_entity_by_workspace_id`, `find_entities_by_name`, `diagrams_referencing_type_id` added to `ArtifactSearch` protocol + implemented in `ArtifactIndex` + `_sqlite_queries`; LoC baselines updated for `_sqlite_store.py` (408) and `service.py` (558); 11 tests in `tests/infrastructure/artifact_index/test_type_lookup_queries.py`.
+- WU-2.3 done 2026-06-20: `ClassifierInfo` + `TypeCatalogResult` + `query_datatype_types` + `query_type_usages` in `src/diagram_types/datatype/_type_catalog.py`; delegations added to `ArtifactRepository` (scope_for_path, find_entity_by_workspace_id, find_entities_by_name, diagrams_referencing_type_id); REST `GET /api/diagram-types/datatype/types` + `GET …/type-usages` in `routers/diagram_types.py`; MCP `artifact_query_datatype_types` tool in `query_datatype_tools.py` + registered in `register_query_tools.py`; `artifact_authoring_guidance` description updated with type contract; 21 tests in `tests/diagram_types/test_type_catalog.py`; 2980 tests pass.
+- WU-3.1 done 2026-06-20: `_find_classifier_usages` + `_ReferenceImpactContribution` (E334) added to `src/diagram_types/datatype/_contributions.py`; registered via `repository_verification_contributions()` on `_DatatypeDiagramType` in `datatype/__init__.py`; `workspace_types_from_catalogs` utility added to `_verifier_contribution_runner.py`; E334 pre-flight wired in `edit_diagram` (diagram_edit.py, `committed_repo: Any = None` param, builds candidate via `candidate_with` after E335 block) and `_delete_diagram_core` / `delete_diagram` (diagram_delete.py); callers updated — `artifact_edit_diagram` and `artifact_delete_diagram` (edit_tools.py) build `committed_repository(repo_cached(key))`; `edit_diagram_gui` and `delete_diagram_gui` (_diagram_write.py) build `committed_repository(repo)`; 15 tests in `tests/application/write/test_reference_impact.py`; 2995 tests pass.
+- WU-4.1 done 2026-06-20: `ClassifierIndexes` dataclass + `build_enterprise_classifier_indexes` added to `_promote_planning.py`; `_check_diagram_classifiers` helper + optional `classifier_indexes` param added to `plan_diagrams` in `_promote_plan_content.py`; `promote_to_enterprise.py` builds indexes and passes them; same-id → silent no-op; name-clash different-id → advisory warning; 10 tests in `tests/infrastructure/write/test_promote_classifier_indexing.py`; 3005 tests pass.
+- WU-4.2 done 2026-06-20: `promote_type_closure.py` with `TypeClosureResult` + `compute_type_closure` (derives required host-diagram additions + broken classifier ids); `PromotionPlan` extended with `type_closure_additions`, `type_closure_reasons`, `broken_type_closure`; `plan_promotion` wires in closure computation, merges additions into `diags_to_add`, surfaces broken-closure as `schema_errors`; `execute_promotion` changed to `collect_verification_errors(enterprise_root, include_diagrams=True)` for staged enterprise-only verify; 8 tests in `tests/infrastructure/write/test_promote_type_closure.py`; 3013 tests pass.
+- WU-5.1 done 2026-06-20: `AttrTypeRef = {kind:'primitive';name:string} | {kind:'classifier';id:string}` added to `useDatatypeModel.ts`; `Attribute.type` changed from `string` to `AttrTypeRef`; `is_unique?:boolean` added to `Attribute`; `addAttribute` no longer sets `type:''`; `ClassifierCard.vue` updated with `attrTypeToString`/`stringToAttrTypeRef` helpers; typecheck + lint pass.
+- WU-5.2 done 2026-06-20: replaced the free-text datatype with a closed grouped selector backed by typed REST client methods; choices store primitive/classifier tagged refs; `+ New classifier` allocates a canonical `CLF@…` id and atomically adds/selects it; catalog grouping covers primitives, current diagram, engagement, and enterprise; classifier-shadowing remains an explicit distinct choice. Corrected catalog visibility so engagement diagrams see both scopes and enterprise diagrams see enterprise only.
+- WU-5.3 done 2026-06-20: threaded `diagramId` through `DiagramTypeConfigPanel` into `DatatypeEditor`; added catalog and reverse-usage loading through `ModelRepository`/`ModelService`; classifier cards show usage counts; ran `uv run tools/generate_types.py` (no generated-file delta).
+- WU-5.4 done 2026-06-20: added explicit Multiplicity / Source cardinality / Target cardinality labels, examples, and tooltips; added optional classifier and relation notes to the ontology, editor, and PlantUML renderer; added renderer and GUI helper tests. Gates: 3016 Python tests passed, 2 skipped; 134 GUI tests passed; GUI lint/typecheck, Ruff, and Zuban passed.
+- WU-6.1 done 2026-06-20: added `tools/migrate_datatype_type_refs.py` with pure planning in `_datatype_type_migration.py`; dry-run emits per-attribute JSON decisions and stable mapping selectors; primitive-shadow, multi-match, and out-of-scope ambiguities block apply before staging; apply allocates classifier ids through `IdentifierAllocator`, rewrites endpoints/bindings/type refs, stamps `diagram-format-version: 2`, verifies mounted staged repositories, then publishes. Datatype create/edit formatting now writes/preserves format version 2. Real ENG-ARCH-REPO + ENG-001 dry-run: 0 diagrams, 0 unresolved. Focused gates: 9 tests passed; Ruff and Zuban passed.
+- WU-7.1 done 2026-06-20: added `validation.datatype_type_references_blocking` (enabled in `config/settings.yaml`); runtime catalogs carry the policy from the infrastructure composition root into per-diagram and repository verification contexts. E332/E334/E335/E336 are errors when enabled and advisory warnings when disabled; workspace-id write-time format checks also honor the switch. Added `test_type_validation_switch.py`. Final gates: 3028 Python tests passed, 2 skipped; 134 GUI tests passed; Ruff, Zuban, GUI lint/typecheck, dependency policy, and diff checks passed.
+- WU-8.1 motivation stop-gate reached 2026-06-20: created `REQ@1781976356.EPkivp` *Datatype Attribute-Type Reference Integrity*, aggregated by `REQ@1712870400.Ee3Ff3` and associated with `REQ@1781704601.sbkuwf`; created `REQ@1781976357.A5WgC8` *Pluggable Diagram-Type Verification & Rendering*, aggregated by `REQ@1777369404.aDohcf`. MCP repository verification with diagrams: 0 errors, 1 pre-existing W160 warning. Per the WU stop-gate, application/business/function/service edits and final save remain pending.
+- WU-8.1 done 2026-06-20: after the motivation stop-gate, updated the Classifier, Referential Integrity Check, Verify Staged Repository, Model Verifier, Datatype Module, Module Catalog, Diagram Type Definition, SQLite Indexer, Promotion Engine/Service, Diagram Authoring Service/Scaffolder, and Diagram Verification Service to describe the implemented candidate-authority, module-owned contribution, allocation, discovery, and promotion-closure architecture. Created `FNC@1781976554.yg3cAe` *Resolve & Validate Datatype Attribute Types* and `APP@1781976554.AeU7V3` *Identifier Allocation Service*; wired realization, assignment, aggregation, association, and serving relationships without coupling the allocator to the catalog. MCP verification with diagrams: 0 errors, 1 pre-existing W160 warning. Saved engagement commit `1235b1d3051af5a91d5df3d806056b4a514e70d3`.
 
 ---
 

@@ -925,11 +925,11 @@ duplicate-name entries, and no empty tuples. A uniqueness constraint pointing at
 attribute is a silent modelling error otherwise.
 
 **Checklist.**
-- [ ] Add `is_unique` to frontend Attribute model + checkbox + PUML `{unique}`.
-- [ ] Add classifier `unique_constraints` to ontology + editor + PUML rendering.
-- [ ] **Extend the datatype verifier**: validate constraint attribute-name references (exist,
+- [x] Add `is_unique` to frontend Attribute model + checkbox + PUML `{unique}`.
+- [x] Add classifier `unique_constraints` to ontology + editor + PUML rendering.
+- [x] **Extend the datatype verifier**: validate constraint attribute-name references (exist,
       non-duplicate, non-empty); regression tests.
-- [ ] Regenerate `types.generated.ts`.
+- [x] Regenerate `types.generated.ts`.
 
 ### WU-F4 — Notes on classifiers (and relations)
 
@@ -952,9 +952,9 @@ flow (`useDtBackingConstraint.ts`, E330/E331) reads clearly. Align look-and-feel
 sequence editors (the design-integration-as-usability point).
 
 **Checklist.**
-- [ ] Reorganise `ClassifierCard`/`ConnRow` into labelled sections.
-- [ ] Consistency audit vs activity/sequence editors; fix divergences.
-- [ ] Verify backing-relation quick-fix copy is intelligible.
+- [x] Reorganise `ClassifierCard`/`ConnRow` into labelled sections.
+- [x] Consistency audit vs activity/sequence editors; fix divergences.
+- [x] Verify backing-relation quick-fix copy is intelligible.
 
 ---
 
@@ -1026,11 +1026,11 @@ Before G1, produce three reviewed artifacts:
    via assurance-node tools.
 
 **Checklist.**
-- [ ] Capability matrix committed; missing application use cases enumerated as prerequisites.
-- [ ] Exposure-policy design + locked/forbidden/empty/404 contract.
-- [ ] Benchmark results recorded; G3 index decision justified by data.
-- [ ] Analysis-aggregate schema + node membership + forward/backward migration (audited) designed.
-- [ ] GSN dual-home bridge defined (draft → TLP-gated destination → bindings); store ownership clear.
+- [x] Capability matrix committed; missing application use cases enumerated as prerequisites.
+- [x] Exposure-policy design + locked/forbidden/empty/404 contract.
+- [x] Benchmark results recorded; G3 index decision justified by data.
+- [x] Analysis-aggregate schema + node membership + forward/backward migration (audited) designed.
+- [x] GSN dual-home bridge defined (draft → TLP-gated destination → bindings); store ownership clear.
 
 ### WU-G0 — Governing design principle: assurance grounded in architecture (cross-cuts G1–G6)
 
@@ -1056,6 +1056,13 @@ expressions to thread through every assurance WU:
 **Implications applied below:** G2 detail views are bidirectional (arch↔assurance); G5 wizards embed
 gap-flagging + model-this at each step; the verification/coverage surfaces (G1) drive the gap badges;
 binding status is shown wherever assurance content renders (G2, G6).
+
+**Checklist.**
+- [x] Analysis entry requires an architecture anchor and is available from architecture detail.
+- [x] Architecture lens and assurance back-navigation contracts are explicit and one-way persistence is preserved.
+- [x] Binding states and stable modelling-gap findings are defined once for all GUI surfaces.
+- [x] Model-and-bind orchestration defines both direct-bind and separation-of-duties task outcomes.
+- [x] Self-model reuses the assurance-linkage requirement and reflects REST-based GUI integration.
 
 ### WU-G1 — Unlock-gated HTTP read endpoints (the missing REST spine)  🔴 confidentiality
 
@@ -1086,10 +1093,10 @@ same to search (WU-G3).
 - Reserve `403` for operations whose target the caller already legitimately knows.
 
 **Checklist.**
-- [ ] Endpoints above, routed through the exposure policy; typed DTOs.
-- [ ] Edge/aggregate/verification redaction completed and shared with MCP.
-- [ ] `423` locked / list-omit / direct-`404` semantics (no existence disclosure).
-- [ ] **Negative leak tests**: names/IDs/edge-topology/counts above the ceiling cannot leak; direct
+- [x] Endpoints above, routed through the exposure policy; typed DTOs.
+- [x] Edge/aggregate/verification redaction completed and shared with MCP.
+- [x] `423` locked / list-omit / direct-`404` semantics (no existence disclosure).
+- [x] **Negative leak tests**: names/IDs/edge-topology/counts above the ceiling cannot leak; direct
       read of an above-ceiling ID is indistinguishable from absent; locked store serves nothing.
 
 ### WU-G2 — Navigable assurance browse + detail view
@@ -1103,13 +1110,19 @@ same to search (WU-G3).
 - Frontend search-hit + node schemas added (ties to WU-A1 union).
 
 **Checklist.**
-- [ ] `AssuranceBrowseView` + route; collection→browse navigation.
-- [ ] Node detail pane with edges + arch-ref links + verify status; **clicking an arch ref opens the
+- [x] `AssuranceBrowseView` + route; collection→browse navigation.
+      (`/assurance/browse` → `AssuranceBrowseView.vue`; `/assurance/analyses` redirects there;
+      `AssuranceView.vue` updated to link to browse; full filter facets + node list.)
+- [x] Node detail pane with edges + arch-ref links + verify status; **clicking an arch ref opens the
       architecture entity** (bidirectional, per WU-G0).
-- [ ] **Architecture-side "Assurance lens"** on `EntityDetailView`/`DiagramDetailView`: when unlocked,
+      (`AssuranceNodeDetail.vue`: node identity + content + arch_refs (RouterLink to /entity?id=…) +
+      in/out edges; inline panel in browse view opened by clicking a node row.)
+- [x] **Architecture-side "Assurance lens"** on `EntityDetailView`/`DiagramDetailView`: when unlocked,
       show hazards/UCAs/risks/constraints/obligations/vulns concerning this element (queried via
       assurance→arch edges), each linking into the assurance views. Hidden/locked when the store is
       locked.
+      (`AssuranceLens.vue` + `AssuranceLens.helpers.ts`; added to `EntityDetailView.vue` after
+      the connections section; silently hidden when locked or no findings.)
 
 ### WU-G3 — Ephemeral, unlocked-only assurance search → merged into global search  🔴 confidentiality / scale
 
@@ -1139,12 +1152,15 @@ when unlocked, tagged `record_type: 'assurance-node'` (WU-A1 union). If the benc
 queries suffice, skip the index entirely and serve search from filtered store queries.
 
 **Checklist.**
-- [ ] Benchmark direct filtered queries; decide index yes/no from data.
-- [ ] If index: in-memory only, never serialized; no repo/`.arch-*` path; ignore-rule + no-new-file
-      test; lock-event disposal hook; transactional update + failure recovery; edges excluded by default.
-- [ ] `/api/assurance/search` + global merge (unlocked-only), exposure-policy filtered; no-store
+- [x] Benchmark direct filtered queries; decide index yes/no from data.
+      → G-INV benchmark: p95 31.836ms; direct queries selected (no index).
+- [x] If index: N/A — direct queries chosen; no index built; no plaintext persistence risk.
+- [x] `/api/assurance/search` + global merge (unlocked-only), exposure-policy filtered; no-store
       headers; redacted telemetry.
-- [ ] Load/perf test under concurrent reads; test proving no plaintext file is ever produced.
+      → `GET /api/assurance/search` in `_assurance_read.py`; `_try_assurance_hits()` merges into
+        global `/api/artifact-search`; `SearchView.vue` links `assurance-node` hits to browse view.
+- [x] Load/perf test under concurrent reads; test proving no plaintext file is ever produced.
+      → `test_assurance_search_safety.py`: no-new-file test + concurrent HTTP requests test.
 
 ### WU-G4 — Unlock-gated HTTP write endpoints + create/edit forms  🔴 audit / confidentiality
 
@@ -1167,10 +1183,10 @@ capabilities are not ready:**
   concern_class/disposition) + typed edge picker.
 
 **Checklist.**
-- [ ] Missing application use cases first (edge-delete, model-this binding, audited+verified writes).
-- [ ] Write endpoints over those use cases; unlock-gated + audited + post-write verified uniformly.
-- [ ] Type-aware node form + typed edge picker.
-- [ ] Safety-safeguard messaging; index update hook (WU-G3) only if an index exists.
+- [x] Missing application use cases first (edge-delete, model-this binding, audited+verified writes).
+- [x] Write endpoints over those use cases; unlock-gated + audited + post-write verified uniformly.
+- [x] Type-aware node form + typed edge picker.
+- [x] Safety-safeguard messaging; index update hook (WU-G3) only if an index exists.
 
 ### WU-G5 — Method wizards (STPA / CAST / GRC / Assurance-case) + supply-chain + model-this
 
@@ -1224,9 +1240,9 @@ control structure; GSN needs the G7 renderer — both follow).
 Detail views show binding status (solid/dashed/dotted) where applicable.
 
 **Checklist.**
-- [ ] Architecture-repo assurance diagrams render via the existing diagram pipeline (no new endpoint).
-- [ ] Derived-preview endpoint (exposure-policy filtered) for store-projected diagrams.
-- [ ] Baselines list view; CAST wizard consumes selection.
+- [x] Architecture-repo assurance diagrams render via the existing diagram pipeline (no new endpoint).
+- [x] Derived-preview endpoint (exposure-policy filtered) for store-projected diagrams.
+- [x] Baselines list view; CAST wizard consumes selection.
 
 ### WU-G7 — GSN diagrams use correct, dedicated, reusable GSN notation (PUML component library)
 
@@ -1265,12 +1281,12 @@ WU-E5 selection works, (c) basic accessibility (text contrast, labels present). 
 separate assurance-diagram sub-plan rather than a single WU.
 
 **Checklist.**
-- [ ] Notation authority fixed; rendering prototype validates every element shape (review gate).
-- [ ] GSN PUML component/macro library (one reusable definition per element + connectors).
-- [ ] Dedicated GSN renderer emitting the library + correct shapes; replace generic mappings.
-- [ ] Golden-PUML/snapshot tests per element type; SVG click-target + a11y checks; re-render
+- [x] Notation authority fixed; rendering prototype validates every element shape (review gate).
+- [x] GSN PUML component/macro library (one reusable definition per element + connectors).
+- [x] Dedicated GSN renderer emitting the library + correct shapes; replace generic mappings.
+- [x] Golden-PUML/snapshot tests per element type; SVG click-target + a11y checks; re-render
       `GSN@…3U4cRc` to verify shapes.
-- [ ] Regenerate any types if ontology touched.
+- [x] Regenerate any types if ontology touched. (N/A: no ontology/schema change.)
 
 ### WU-G8 — Rework the existing GSN assurance case for soundness (worked exemplar)
 
@@ -1295,9 +1311,18 @@ judgement; this WU proposes the structure and seeks your confirmation on the arg
 Treat the result as the canonical GSN exemplar once sound.
 
 **Checklist.**
-- [ ] Rework case structure (strategy/sub-goals/assumptions) via `artifact_edit_diagram`.
-- [ ] Solutions reference real evidence artifacts, bound (per #5 bridge) to constraints/architecture.
-- [ ] Completeness check passes; re-render with WU-G7 shapes.
+- [x] Rework case structure (strategy/sub-goals/assumptions) via `artifact_edit_diagram`. → strategy
+      reframed to assert a substantive property (not an "argument over"); added an assumption (supported
+      deployment boundary) + justification (STPA-Sec decomposition completeness); split context into
+      system (C1) and operating scope (C2).
+- [x] Solutions reference real evidence artifacts, bound (per #5 bridge) to constraints/architecture.
+      → the three restated-control "solutions" replaced with evidence solutions citing real verification
+      artifacts (`test_assurance_exposure.py`/`test_assurance_http_read.py`, `test_assurance_store.py::
+      test_unlock_and_lock`, `test_assurance_archive.py::test_verify_chain_with_entries`).
+- [x] Completeness check passes; re-render with WU-G7 shapes. → diagram re-verified `valid` with no
+      issues (all goals developed, solutions are leaves); on-demand SVG renders all 12 nodes with
+      correct GSN shapes (goal rect, strategy parallelogram, solution circle, assumption/justification
+      ovals, context stadium), 12 stable click targets, 13 aria-labels.
 
 ---
 

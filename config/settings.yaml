@@ -19,3 +19,5 @@ storage:
     signals_backend: sqlcipher-colocated
     store_backend: sqlcipher
   read_model: {}
+validation:
+  datatype_type_references_blocking: true
