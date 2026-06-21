@@ -21,6 +21,7 @@ from src.application.verification.case_draft import case_completeness_from_recor
 from src.application.verification.cast_complete import run_cast_complete
 from src.application.verification.grc_complete import run_grc_complete
 from src.application.verification.stpa_complete import run_stpa_complete
+from src.infrastructure.assurance.write_serialization import run_write
 from src.infrastructure.gui.routers._assurance_http import (
     NO_STORE,
     build_policy,
@@ -122,12 +123,12 @@ def create_analysis(body: CreateAnalysisBody) -> JSONResponse:
     ctx = build_policy()[0]
     if not ctx.is_available():
         return locked_response()
-    result = uc.create_analysis(
+    result = run_write(lambda: uc.create_analysis(
         ctx.store, ctx.archive,
         name=body.name, method=body.method,
         architecture_anchor_id=body.architecture_anchor_id,
         tlp=body.tlp, status=body.status,
-    )
+    ))
     return _translate_write(result)
 
 
@@ -136,11 +137,22 @@ def update_analysis(analysis_id: str, body: UpdateAnalysisBody) -> JSONResponse:
     ctx = build_policy()[0]
     if not ctx.is_available():
         return locked_response()
-    result = uc.update_analysis(
+    result = run_write(lambda: uc.update_analysis(
         ctx.store, ctx.archive,
         analysis_id=analysis_id,
         name=body.name, status=body.status, tlp=body.tlp,
-    )
+    ))
+    return _translate_write(result)
+
+
+@analysis_router.delete("/api/assurance/analyses/{analysis_id}", status_code=200)
+def delete_analysis(analysis_id: str) -> JSONResponse:
+    ctx = build_policy()[0]
+    if not ctx.is_available():
+        return locked_response()
+    result = run_write(lambda: uc.delete_analysis(
+        ctx.store, ctx.archive, analysis_id=analysis_id,
+    ))
     return _translate_write(result)
 
 
@@ -267,13 +279,13 @@ def record_gsn_publication(body: RecordGsnPublicationBody) -> JSONResponse:
         return locked_response()
     if state.get_repo().get_diagram(body.diagram_id) is None:
         return not_found_response()
-    result = record_publication(
+    result = run_write(lambda: record_publication(
         ctx.store,
         ctx.archive,
         analysis_id=body.analysis_id,
         diagram_id=body.diagram_id,
         source_bindings=[binding.model_dump() for binding in body.source_bindings],
-    )
+    ))
     status = 409 if result.get("error") == "classification_not_publishable" else 200
     if result.get("error") == "analysis_not_found":
         return not_found_response()

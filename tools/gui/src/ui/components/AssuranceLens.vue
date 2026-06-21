@@ -3,6 +3,8 @@ import { ref, onMounted, watch } from 'vue'
 import { RouterLink } from 'vue-router'
 import { parseLensResponse, browseLinkForNode } from './AssuranceLens.helpers'
 import type { LensResult, RawLensResponse } from './AssuranceLens.helpers'
+import { tlpColor } from './tlp'
+import WithheldNotice from './WithheldNotice.vue'
 
 const props = defineProps<{ artifactId: string }>()
 
@@ -30,12 +32,10 @@ watch(() => props.artifactId, (id) => { void load(id) })
       <h3 class="lens-title">
         Assurance findings
       </h3>
-      <p
+      <WithheldNotice
         v-if="result.visibilityLimited"
-        class="lens-limited"
-      >
-        Some findings are withheld by classification policy.
-      </p>
+        kind="findings"
+      />
       <ul class="lens-list">
         <li
           v-for="node in result.nodes"
@@ -51,6 +51,7 @@ watch(() => props.artifactId, (id) => { void load(id) })
             <span
               v-if="node.tlp && node.tlp !== 'TLP:WHITE'"
               class="lens-tlp"
+              :style="{ color: tlpColor(node.tlp) }"
             >{{ node.tlp }}</span>
           </RouterLink>
         </li>
@@ -118,7 +119,6 @@ watch(() => props.artifactId, (id) => { void load(id) })
 }
 .lens-tlp {
   font-size: 11px;
-  color: #dc2626;
   font-weight: 600;
 }
 </style>

@@ -61,6 +61,10 @@ def update(client: Any, url: str, record_id: str, attrs: dict[str, object]) -> N
     client.patch(f"{url}/{record_id}", json=payload).raise_for_status()
 
 
+def delete(client: Any, url: str, record_id: str) -> None:
+    client.delete(f"{url}/{record_id}").raise_for_status()
+
+
 class RestAnalysisStoreMixin:
     """Shared analysis CRUD for PocketBase-style REST assurance stores.
 
@@ -109,3 +113,10 @@ class RestAnalysisStoreMixin:
         if existing is None:
             raise RuntimeError(f"Analysis not found: {analysis_id}")
         update(client, self._analysis_url(), str(existing["id"]), attrs)
+
+    def delete_analysis(self, analysis_id: str) -> None:
+        client = self._require_unlocked()
+        existing = self.get_analysis(analysis_id)
+        if existing is None:
+            return
+        delete(client, self._analysis_url(), str(existing["id"]))

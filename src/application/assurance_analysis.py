@@ -141,3 +141,31 @@ def update_analysis(
         store.update_analysis(analysis_id, **updates)
         archive.append("UPDATE_ANALYSIS", node_id=analysis_id, payload=dict(updates))
     return AnalysisOk(payload=store.get_analysis(analysis_id) or {"analysis_id": analysis_id})
+
+
+def delete_analysis(
+    store: ConfidentialAssuranceStore,
+    archive: AssuranceArchive,
+    *,
+    analysis_id: str,
+) -> AnalysisResult:
+    """Delete an analysis. Blocks if it still owns member nodes (non-destructive default).
+
+    The analysis is the aggregate root; deleting it must not silently destroy the
+    member nodes. Callers detach or delete the member nodes first, then delete the
+    (now empty) analysis. An abandoned/empty analysis deletes cleanly.
+    """
+    if not store.is_unlocked():
+        return AnalysisLocked()
+    if store.get_analysis(analysis_id) is None:
+        return AnalysisNotFound(analysis_id)
+    member_count = len(store.list_nodes(analysis_id=analysis_id))
+    if member_count > 0:
+        return AnalysisInvalid(
+            "analysis_not_empty",
+            f"This analysis still owns {member_count} node(s). Reassign or delete its "
+            "nodes before deleting the analysis.",
+        )
+    store.delete_analysis(analysis_id)
+    archive.append("DELETE_ANALYSIS", node_id=analysis_id, payload={"analysis_id": analysis_id})
+    return AnalysisOk(payload={"analysis_id": analysis_id, "deleted": True})

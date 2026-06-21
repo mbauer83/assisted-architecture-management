@@ -1,11 +1,15 @@
 import { describe, it, expect } from 'vitest'
 import {
+  analysisErrorMessage,
   buildAnalysisOptions,
   emptyNewAnalysisForm,
+  findAnalysis,
   newAnalysisBody,
   validateNewAnalysis,
   nodesUrlForAnalysis,
+  ANALYSIS_ANCHOR_TYPES,
   ANALYSIS_METHODS,
+  ANALYSIS_STATUSES,
   type AnalysisSummary,
 } from '../AssuranceAnalysisPicker.helpers'
 
@@ -87,5 +91,43 @@ describe('nodesUrlForAnalysis', () => {
   it('encodes the analysis id', () => {
     expect(nodesUrlForAnalysis('STPA@1.a/b'))
       .toBe('/api/assurance/nodes?analysis_id=STPA%401.a%2Fb')
+  })
+})
+
+describe('findAnalysis', () => {
+  it('returns the matching summary', () => {
+    expect(findAnalysis(sample, 'GRC@2')?.name).toBe('Q3 Controls')
+  })
+
+  it('returns null for a missing id or null selection', () => {
+    expect(findAnalysis(sample, 'nope')).toBeNull()
+    expect(findAnalysis(sample, null)).toBeNull()
+  })
+})
+
+describe('analysisErrorMessage', () => {
+  it('prefers the server message', () => {
+    expect(analysisErrorMessage({ message: 'still owns 3 node(s)' }, 400))
+      .toBe('still owns 3 node(s)')
+  })
+
+  it('falls back to the HTTP status', () => {
+    expect(analysisErrorMessage({}, 409)).toBe('HTTP 409')
+  })
+})
+
+describe('ANALYSIS_STATUSES', () => {
+  it('matches the backend status vocabulary', () => {
+    expect([...ANALYSIS_STATUSES]).toEqual(['draft', 'active', 'completed', 'archived'])
+  })
+})
+
+describe('ANALYSIS_ANCHOR_TYPES', () => {
+  it('are ArchiMate (model) types, never C4 view elements', () => {
+    const types = [...ANALYSIS_ANCHOR_TYPES]
+    expect(types).toContain('application-component')
+    expect(types.some((t) => t.startsWith('c4-'))).toBe(false)
+    expect(types).not.toContain('container')
+    expect(types).not.toContain('system')
   })
 })

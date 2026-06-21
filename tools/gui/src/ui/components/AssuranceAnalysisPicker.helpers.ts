@@ -3,6 +3,24 @@
 export const ANALYSIS_METHODS = ['STPA', 'CAST', 'GRC'] as const
 export type AnalysisMethod = (typeof ANALYSIS_METHODS)[number]
 
+export const ANALYSIS_STATUSES = ['draft', 'active', 'completed', 'archived'] as const
+export type AnalysisStatus = (typeof ANALYSIS_STATUSES)[number]
+
+/**
+ * Admissible ArchiMate anchor types for an analysis's system-under-analysis.
+ * Expressed in ArchiMate terms (never a C4 view element): a service →
+ * application-component; a system or subset → application-collaboration/grouping;
+ * technology → node/system-software. Keeps the anchor a real model entity rather
+ * than free text.
+ */
+export const ANALYSIS_ANCHOR_TYPES = [
+  'application-component',
+  'application-collaboration',
+  'grouping',
+  'node',
+  'system-software',
+] as const
+
 export interface AnalysisSummary {
   analysis_id: string
   name: string
@@ -59,4 +77,19 @@ export function nodesUrlForAnalysis(analysisId: string | null): string {
   return analysisId
     ? `/api/assurance/nodes?analysis_id=${encodeURIComponent(analysisId)}`
     : '/api/assurance/nodes'
+}
+
+/** The selected analysis summary, or null when nothing is selected / not found. */
+export function findAnalysis(
+  analyses: AnalysisSummary[],
+  analysisId: string | null,
+): AnalysisSummary | null {
+  if (!analysisId) return null
+  return analyses.find((a) => a.analysis_id === analysisId) ?? null
+}
+
+/** Human message from a failed analysis mutation response body. */
+export function analysisErrorMessage(body: Record<string, unknown>, status: number): string {
+  if (typeof body['message'] === 'string') return body['message']
+  return `HTTP ${status}`
 }

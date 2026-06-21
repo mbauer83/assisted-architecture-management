@@ -3,7 +3,7 @@ import DOMPurify from 'dompurify'
 
 const HREF_ATTR_RE = /href="([^"]+)"/g
 const ROOT_MARKERS = ['documents', 'model', 'diagram-catalog']
-const ARTIFACT_FILE_RE = /^([A-Z][A-Z0-9]*@\d+\.[a-z0-9]+\.[^./?#]+)\.(md|puml)$/i
+const ARTIFACT_FILE_RE = /^([A-Z][A-Z0-9]*@\d+\.[^.]+\.[^./?#]+)\.(md|puml)$/i
 
 const toRepoRelativePath = (value: string): string => {
   const normalized = String(value ?? '').replace(/\\/g, '/')
@@ -13,7 +13,7 @@ const toRepoRelativePath = (value: string): string => {
   return markerIndex >= 0 ? parts.slice(markerIndex).join('/') : normalized.replace(/^\/+/, '')
 }
 
-const toGuiArtifactHref = (href: string): string => {
+export const toGuiArtifactHref = (href: string): string => {
   const value = String(href ?? '').trim()
   if (!value || value.startsWith('#')) return value
   if (/^[a-zA-Z][a-zA-Z0-9+.-]*:/.test(value) || value.startsWith('//')) return value

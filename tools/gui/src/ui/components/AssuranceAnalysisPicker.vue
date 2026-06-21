@@ -1,9 +1,15 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
+import EntityPickerInput from './EntityPickerInput.vue'
+import type { EntityDisplayInfo } from '../../domain'
 import {
+  ANALYSIS_ANCHOR_TYPES,
   ANALYSIS_METHODS,
+  ANALYSIS_STATUSES,
+  analysisErrorMessage,
   buildAnalysisOptions,
   emptyNewAnalysisForm,
+  findAnalysis,
   newAnalysisBody,
   validateNewAnalysis,
   type AnalysisMethod,
@@ -27,8 +33,74 @@ const creating = ref(false)
 const form = ref(emptyNewAnalysisForm())
 const formError = ref<string | null>(null)
 const submitting = ref(false)
+const anchorName = ref('')
+const ANCHOR_TYPES = [...ANALYSIS_ANCHOR_TYPES]
+
+function selectAnchor(entity: EntityDisplayInfo) {
+  form.value.architecture_anchor_id = entity.artifact_id
+  anchorName.value = entity.name
+}
+
+function clearAnchor() {
+  form.value.architecture_anchor_id = ''
+  anchorName.value = ''
+}
 
 const options = computed(() => buildAnalysisOptions(analyses.value))
+
+// ── Management of the selected analysis (status change + delete) ──────────────
+const managing = ref(false)
+const manageError = ref<string | null>(null)
+const manageBusy = ref(false)
+const selected = computed(() => findAnalysis(analyses.value, props.modelValue))
+
+function toggleManage() {
+  managing.value = !managing.value
+  manageError.value = null
+}
+
+async function changeStatus(event: Event) {
+  const status = (event.target as HTMLSelectElement).value
+  const id = props.modelValue
+  if (!id) return
+  manageBusy.value = true
+  manageError.value = null
+  try {
+    const resp = await fetch(`/api/assurance/analyses/${encodeURIComponent(id)}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ status }),
+    })
+    const body = await resp.json().catch(() => ({})) as Record<string, unknown>
+    if (!resp.ok) { manageError.value = analysisErrorMessage(body, resp.status); return }
+    await load()
+  } catch (e) {
+    manageError.value = String(e)
+  } finally {
+    manageBusy.value = false
+  }
+}
+
+async function deleteSelected() {
+  const id = props.modelValue
+  if (!id) return
+  const name = selected.value?.name ?? id
+  if (!window.confirm(`Delete analysis "${name}"? This cannot be undone.`)) return
+  manageBusy.value = true
+  manageError.value = null
+  try {
+    const resp = await fetch(`/api/assurance/analyses/${encodeURIComponent(id)}`, { method: 'DELETE' })
+    const body = await resp.json().catch(() => ({})) as Record<string, unknown>
+    if (!resp.ok) { manageError.value = analysisErrorMessage(body, resp.status); return }
+    managing.value = false
+    emit('update:modelValue', null)
+    await load()
+  } catch (e) {
+    manageError.value = String(e)
+  } finally {
+    manageBusy.value = false
+  }
+}
 
 async function load() {
   loading.value = true
@@ -54,6 +126,7 @@ function onSelect(event: Event) {
 function openCreate() {
   creating.value = true
   form.value = emptyNewAnalysisForm(props.defaultMethod)
+  anchorName.value = ''
   formError.value = null
 }
 
@@ -126,6 +199,51 @@ onMounted(load)
     >
       + New analysis
     </button>
+    <button
+      v-if="selected && !creating"
+      class="ap-manage-btn"
+      type="button"
+      :aria-expanded="managing"
+      @click="toggleManage"
+    >
+      {{ managing ? 'Done' : 'Manage' }}
+    </button>
+
+    <div
+      v-if="managing && selected"
+      class="ap-manage"
+    >
+      <label class="ap-manage-label">Status</label>
+      <select
+        class="ap-input"
+        :value="selected.status ?? 'draft'"
+        :disabled="manageBusy"
+        aria-label="Analysis status"
+        @change="changeStatus"
+      >
+        <option
+          v-for="s in ANALYSIS_STATUSES"
+          :key="s"
+          :value="s"
+        >
+          {{ s }}
+        </option>
+      </select>
+      <button
+        class="ap-delete"
+        type="button"
+        :disabled="manageBusy"
+        @click="deleteSelected"
+      >
+        Delete analysis
+      </button>
+      <p
+        v-if="manageError"
+        class="ap-error"
+      >
+        {{ manageError }}
+      </p>
+    </div>
 
     <form
       v-if="creating"
@@ -151,12 +269,29 @@ onMounted(load)
           {{ m }}
         </option>
       </select>
-      <input
-        v-model="form.architecture_anchor_id"
-        class="ap-input"
-        placeholder="Architecture anchor id (optional)"
-        aria-label="Architecture anchor id"
-      >
+      <div class="ap-anchor">
+        <label class="ap-manage-label">Architecture anchor (optional)</label>
+        <div
+          v-if="form.architecture_anchor_id"
+          class="ap-anchor-chip"
+        >
+          <span class="ap-anchor-name">{{ anchorName || form.architecture_anchor_id }}</span>
+          <button
+            class="ap-anchor-change"
+            type="button"
+            @click="clearAnchor"
+          >
+            change
+          </button>
+        </div>
+        <EntityPickerInput
+          v-else
+          :fixed-entity-types="ANCHOR_TYPES"
+          widenable-to="none"
+          placeholder="Search architecture elements for the system under analysis…"
+          @select="selectAnchor"
+        />
+      </div>
       <div class="ap-form-actions">
         <button
           class="ap-submit"
@@ -205,6 +340,41 @@ onMounted(load)
   cursor: pointer;
 }
 .ap-new-btn:hover { background: #dbeafe; }
+.ap-manage-btn {
+  font-size: 12px;
+  padding: 5px 10px;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  background: #fff;
+  color: #475569;
+  cursor: pointer;
+}
+.ap-manage-btn:hover { background: #f1f5f9; }
+.ap-manage {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  width: 100%;
+  margin-top: 6px;
+  padding: 8px;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 6px;
+}
+.ap-manage-label { font-size: 12px; font-weight: 600; color: #475569; }
+.ap-delete {
+  font-size: 12px;
+  padding: 5px 12px;
+  border: 1px solid #fecaca;
+  border-radius: 5px;
+  background: #fef2f2;
+  color: #b91c1c;
+  font-weight: 600;
+  cursor: pointer;
+}
+.ap-delete:hover { background: #fee2e2; }
+.ap-delete:disabled { opacity: 0.5; cursor: default; }
 .ap-form {
   display: flex;
   align-items: center;
@@ -245,4 +415,14 @@ onMounted(load)
   cursor: pointer;
 }
 .ap-error { font-size: 12px; color: #b91c1c; width: 100%; margin: 4px 0 0; }
+.ap-anchor { display: flex; flex-direction: column; gap: 4px; width: 100%; }
+.ap-anchor-chip {
+  display: flex; align-items: center; gap: 8px;
+  padding: 5px 8px; background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 5px;
+}
+.ap-anchor-name { font-size: 12px; font-weight: 600; color: #1e293b; }
+.ap-anchor-change {
+  font-size: 11px; padding: 2px 8px; border: 1px solid #cbd5e1; border-radius: 4px;
+  background: #fff; color: #475569; cursor: pointer;
+}
 </style>

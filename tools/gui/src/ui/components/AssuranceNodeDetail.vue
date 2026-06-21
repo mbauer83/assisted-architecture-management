@@ -3,6 +3,7 @@ import { ref, watch } from 'vue'
 import { RouterLink } from 'vue-router'
 import ModelThisPanel from './ModelThisPanel.vue'
 import { isUnboundControlNode } from './ModelThisPanel.helpers'
+import { tlpColor } from './tlp'
 
 const props = defineProps<{ nodeId: string | null }>()
 const emit = defineEmits<{ close: [] }>()
@@ -121,8 +122,8 @@ function archEntityPath(ref: ArchRef): string {
         >
           <span class="detail-label">TLP</span>
           <span
-            class="detail-value"
-            :class="data.node.tlp !== 'TLP:WHITE' ? 'tlp-classified' : ''"
+            class="detail-value tlp-value"
+            :style="{ color: tlpColor(data.node.tlp) }"
           >{{ data.node.tlp }}</span>
         </div>
         <div
@@ -313,7 +314,7 @@ function archEntityPath(ref: ArchRef): string {
   padding: 2px 7px;
   border-radius: 4px;
 }
-.tlp-classified { color: #dc2626; font-weight: 600; }
+.tlp-value { font-weight: 600; }
 .detail-content {
   font-size: 13px;
   color: #374151;

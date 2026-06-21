@@ -7,6 +7,8 @@ import type { AssuranceNodeFormData } from './AssuranceNodeForm.vue'
 import AssuranceEdgePicker from '../components/AssuranceEdgePicker.vue'
 import AssuranceAnalysisPicker from '../components/AssuranceAnalysisPicker.vue'
 import { nodesUrlForAnalysis } from '../components/AssuranceAnalysisPicker.helpers'
+import { tlpColor } from '../components/tlp'
+import WithheldNotice from '../components/WithheldNotice.vue'
 
 interface AssuranceNode {
   node_id: string
@@ -284,12 +286,10 @@ watch(analysisId, () => { void loadNodes() })
       <div class="browse-analysis-row">
         <AssuranceAnalysisPicker v-model="analysisId" />
       </div>
-      <p
+      <WithheldNotice
         v-if="visibilityLimited"
-        class="visibility-note"
-      >
-        Some nodes are withheld by classification policy.
-      </p>
+        kind="nodes"
+      />
     </div>
 
     <div
@@ -415,6 +415,7 @@ watch(analysisId, () => { void loadNodes() })
             <span
               v-if="node.tlp && node.tlp !== 'TLP:WHITE'"
               class="node-tlp"
+              :style="{ color: tlpColor(node.tlp) }"
             >{{ node.tlp }}</span>
             <span
               v-if="node.binding_status"
@@ -730,7 +731,7 @@ watch(analysisId, () => { void loadNodes() })
   flex-shrink: 0;
 }
 .node-name { flex: 1; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.node-tlp { font-size: 11px; color: #dc2626; font-weight: 600; flex-shrink: 0; }
+.node-tlp { font-size: 11px; font-weight: 600; flex-shrink: 0; }
 .node-binding { font-size: 11px; padding: 1px 6px; border-radius: 3px; flex-shrink: 0; }
 .node-binding--bound { background: #dcfce7; color: #15803d; }
 .node-binding--unbound { background: #fee2e2; color: #b91c1c; }

@@ -34,6 +34,7 @@ class _FakeStore:
     def __init__(self, *, unlocked: bool = True) -> None:
         self._unlocked = unlocked
         self.analyses: dict[str, dict[str, Any]] = {}
+        self.nodes: list[dict[str, Any]] = []
         self._seq = 0
 
     def is_unlocked(self) -> bool:
@@ -63,6 +64,14 @@ class _FakeStore:
 
     def update_analysis(self, analysis_id: str, **attrs: Any) -> None:
         self.analyses[analysis_id].update(attrs)
+
+    def delete_analysis(self, analysis_id: str) -> None:
+        self.analyses.pop(analysis_id, None)
+
+    def list_nodes(self, *, analysis_id: str | None = None, **_kwargs: Any) -> list[dict[str, Any]]:
+        if analysis_id is None:
+            return list(self.nodes)
+        return [n for n in self.nodes if n.get("analysis_id") == analysis_id]
 
 
 # ── create_analysis invariants ──────────────────────────────────────────────────
@@ -190,6 +199,47 @@ def test_update_analysis_not_found() -> None:
     assert isinstance(
         uc.update_analysis(store, archive, analysis_id="missing", status="active"),
         uc.AnalysisNotFound,
+    )
+
+
+# ── delete ────────────────────────────────────────────────────────────────────────
+
+
+def test_delete_analysis_empty_succeeds_and_audits() -> None:
+    store, archive = _FakeStore(), _FakeArchive()
+    aid = store.create_analysis("Abandoned", "STPA", "")
+    result = uc.delete_analysis(store, archive, analysis_id=aid)
+    assert isinstance(result, uc.AnalysisOk)
+    assert result.payload == {"analysis_id": aid, "deleted": True}
+    assert store.get_analysis(aid) is None
+    assert archive.appended[-1]["operation"] == "DELETE_ANALYSIS"
+    assert archive.appended[-1]["node_id"] == aid
+
+
+def test_delete_analysis_blocks_when_nonempty() -> None:
+    store, archive = _FakeStore(), _FakeArchive()
+    aid = store.create_analysis("Has nodes", "STPA", "")
+    store.nodes.append({"node_id": "HAZ@1", "analysis_id": aid})
+    result = uc.delete_analysis(store, archive, analysis_id=aid)
+    assert isinstance(result, uc.AnalysisInvalid)
+    assert result.error == "analysis_not_empty"
+    assert store.get_analysis(aid) is not None  # not deleted
+    assert not any(e["operation"] == "DELETE_ANALYSIS" for e in archive.appended)
+
+
+def test_delete_analysis_not_found() -> None:
+    store, archive = _FakeStore(), _FakeArchive()
+    assert isinstance(
+        uc.delete_analysis(store, archive, analysis_id="missing"),
+        uc.AnalysisNotFound,
+    )
+
+
+def test_delete_analysis_locked_store() -> None:
+    store, archive = _FakeStore(unlocked=False), _FakeArchive()
+    assert isinstance(
+        uc.delete_analysis(store, archive, analysis_id="x"),
+        uc.AnalysisLocked,
     )
 
 

@@ -55,6 +55,11 @@ def list_analyses(
     return list(rows)
 
 
+def delete(conn: Any, analysis_id: str) -> None:
+    conn.execute("DELETE FROM assurance_analyses WHERE analysis_id = ?", (analysis_id,))
+    conn.commit()
+
+
 def update(conn: Any, analysis_id: str, attrs: dict[str, object]) -> None:
     sets: list[str] = ["updated_at = ?"]
     params: list[object] = [now_iso()]
