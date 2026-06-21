@@ -195,6 +195,9 @@ class C4PumlRenderer:
         # Shape resolution: explicit shape → technology inference → item-type default
         if item.shape:
             macro = item.shape
+            # Apply external suffix unless the caller already included it.
+            if item.external and not macro.endswith("_Ext"):
+                macro = macro + "_Ext"
             has_tech_arg = not macro.startswith(("Person", "System"))
         else:
             variant = _tech_variant(item.technology) if item.technology else "generic"

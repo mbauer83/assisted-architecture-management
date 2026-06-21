@@ -134,9 +134,46 @@ def test_diagram_kind_ui_config_endpoint_shape() -> None:
     activity = read_diagram_kind_ui_config("activity", catalogs=_catalogs())
 
     assert any(kind["key"] == "activity" and kind["label"] == "Activity Diagram" for kind in kinds)
+    assert not {"bowtie", "control-structure", "uca-matrix"} & {kind["key"] for kind in kinds}
+    assert "gsn" in {kind["key"] for kind in kinds}
     assert activity["entity_search_filter"] is False
     assert activity["diagram_only_types"][0]["entity_type"] == "swimlane"
     assert activity["type_ui_slots"]["step_editor"] == "activity-steps"
+
+
+def test_c4_container_ui_config_exposes_shape_enum_for_containers() -> None:
+    """Container entity type must expose a shape property with enum for db/queue shape selection."""
+    cfg = read_diagram_kind_ui_config("c4-container", catalogs=_catalogs())
+    dot = {t["entity_type"]: t for t in cfg.get("diagram_only_types", [])}
+
+    container = dot.get("container", {})
+    props = {p["name"]: p for p in container.get("properties", [])}
+
+    assert "shape" in props, "container entity type must have a 'shape' property"
+    shape_schema = props["shape"]["schema"]
+    assert shape_schema.get("type") == "string"
+    enum_vals = shape_schema.get("enum", [])
+    assert "" in enum_vals, "empty string (auto-infer) must be in shape enum"
+    assert "ContainerDb" in enum_vals
+    assert "ContainerQueue" in enum_vals
+    assert "Container" in enum_vals
+
+
+def test_c4_component_ui_config_exposes_shape_enum_for_components() -> None:
+    """Component entity type must expose a shape property with db/queue enum values."""
+    cfg = read_diagram_kind_ui_config("c4-component", catalogs=_catalogs())
+    dot = {t["entity_type"]: t for t in cfg.get("diagram_only_types", [])}
+
+    component = dot.get("component", {})
+    props = {p["name"]: p for p in component.get("properties", [])}
+
+    assert "shape" in props, "component entity type must have a 'shape' property"
+    shape_schema = props["shape"]["schema"]
+    assert shape_schema.get("type") == "string"
+    enum_vals = shape_schema.get("enum", [])
+    assert "ComponentDb" in enum_vals
+    assert "ComponentQueue" in enum_vals
+    assert "Component" in enum_vals
 
 
 def _registry(repo_root: Path) -> ArtifactRegistry:

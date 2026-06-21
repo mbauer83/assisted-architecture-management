@@ -255,6 +255,25 @@ class _C4DiagramType(DiagramTypeBase):
         return self._mapped_model_entity_types
 
 
+    def read_diagram_extras(self, parsed_source: dict[str, Any]) -> dict[str, Any]:
+        """Inject _scope_entity_id from a 'scoped-by' binding when diagram-entities is empty.
+
+        Model-backed C4 diagrams store the scope in a binding, not diagram-entities.
+        The frontend's C4DiagramEditor needs _scope_entity_id in diagram_entities to
+        activate model-backed mode. This merges it in from the binding so the edit view
+        receives a complete diagram_entities payload.
+        """
+        from src.diagram_types.c4._navigation import _scope_from_bindings  # noqa: PLC0415
+
+        frontmatter: dict[str, Any] = parsed_source.get("frontmatter") or {}
+        raw_de = frontmatter.get("diagram-entities")
+        de: dict[str, Any] = raw_de if isinstance(raw_de, dict) else {}
+        if not de.get("_scope_entity_id"):
+            scope_id = _scope_from_bindings(frontmatter.get("bindings"))
+            if scope_id:
+                de = {**de, "_scope_entity_id": scope_id}
+        return {"diagram_entities": de} if de else {}
+
     def build_context_extras(
         self,
         repo: Any,

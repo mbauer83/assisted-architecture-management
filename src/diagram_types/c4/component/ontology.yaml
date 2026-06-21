@@ -75,6 +75,10 @@ entity_types:
       technology:
         type: string
         required: false
+      shape:
+        type: string
+        enum: ["", "Container", "ContainerDb", "ContainerQueue"]
+        required: false
       external:
         type: boolean
         required: false
@@ -105,6 +109,10 @@ entity_types:
         required: false
       technology:
         type: string
+        required: false
+      shape:
+        type: string
+        enum: ["", "Component", "ComponentDb", "ComponentQueue"]
         required: false
       external:
         type: boolean

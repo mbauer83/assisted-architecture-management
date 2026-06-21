@@ -68,6 +68,11 @@ const propertyType = (schema: unknown): string => {
   const value = (schema as { type?: unknown }).type
   return typeof value === 'string' ? value : ''
 }
+const propEnumValues = (schema: unknown): string[] => {
+  if (!schema || typeof schema !== 'object' || !('enum' in schema)) return []
+  const value = (schema as { enum?: unknown }).enum
+  return Array.isArray(value) ? value.filter((v): v is string => typeof v === 'string') : []
+}
 </script>
 
 <template>
@@ -126,8 +131,20 @@ const propertyType = (schema: unknown): string => {
             v-if="propertyType(prop.schema) !== 'boolean'"
             class="prop-label"
           >{{ prop.name }}</span>
+          <select
+            v-if="propertyType(prop.schema) === 'string' && propEnumValues(prop.schema).length"
+            class="inp"
+            :value="String(item[prop.name] ?? '')"
+            @change="patchItem(item.id, { [prop.name]: ($event.target as HTMLSelectElement).value })"
+          >
+            <option
+              v-for="opt in propEnumValues(prop.schema)"
+              :key="opt"
+              :value="opt"
+            >{{ opt || '(auto — infer from technology)' }}</option>
+          </select>
           <input
-            v-if="propertyType(prop.schema) !== 'boolean'"
+            v-else-if="propertyType(prop.schema) !== 'boolean'"
             class="inp"
             :value="String(item[prop.name] ?? '')"
             :placeholder="prop.name"

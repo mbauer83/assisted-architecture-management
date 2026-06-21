@@ -155,6 +155,26 @@ def test_render_item_explicit_shape_overrides_tech_inference() -> None:
     assert "PostgreSQL" in rendered
 
 
+def test_render_item_explicit_shape_with_external_appends_ext() -> None:
+    """Explicit shape + external=True → _Ext suffix applied automatically."""
+    renderer = _renderer()
+    item = _item(item_type="container", alias="C_ext", label="Ext DB",
+                 technology="PostgreSQL", shape="ContainerDb", external=True)
+    rendered = renderer._render_item(item)
+    assert rendered.startswith("ContainerDb_Ext(")
+    assert "PostgreSQL" in rendered
+
+
+def test_render_item_explicit_shape_already_ext_not_doubled() -> None:
+    """If shape already includes _Ext suffix it is not doubled."""
+    renderer = _renderer()
+    item = _item(item_type="container", alias="C_ext2", label="Ext Queue",
+                 shape="ContainerQueue_Ext", external=True)
+    rendered = renderer._render_item(item)
+    assert rendered.startswith("ContainerQueue_Ext(")
+    assert "ContainerQueue_Ext_Ext" not in rendered
+
+
 def test_render_item_tech_postgres_gives_containerdb() -> None:
     renderer = _renderer()
     item = _item(item_type="container", alias="C_db", label="Database", technology="PostgreSQL")
