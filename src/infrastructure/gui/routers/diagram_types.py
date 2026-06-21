@@ -7,6 +7,7 @@ from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException
 
+from src.application.assurance_diagrams import ASSURANCE_SURFACE_DIAGRAM_TYPES
 from src.application.runtime_catalogs import RuntimeCatalogs
 from src.infrastructure.app_bootstrap import runtime_catalogs_dependency
 from src.infrastructure.gui.routers import state as s
@@ -23,6 +24,7 @@ def list_diagram_types(catalogs: RuntimeCatalogs = Depends(runtime_catalogs_depe
             "description": kind.ui_config.description,
         }
         for key, kind in sorted(catalogs.diagram_types.all_diagram_types().items())
+        if key not in ASSURANCE_SURFACE_DIAGRAM_TYPES
     ]
 
 
