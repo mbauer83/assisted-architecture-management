@@ -23,6 +23,7 @@ from pydantic import BaseModel
 
 from src.application import assurance_model_bind as model_bind
 from src.application import assurance_mutations as mutations
+from src.infrastructure.assurance.write_serialization import run_write
 from src.infrastructure.gui.routers._arch_entity_creator import GuiArchitectureEntityCreator
 from src.infrastructure.mcp.assurance_mcp.context import get_assurance_context
 
@@ -148,33 +149,33 @@ class SetAnchorBody(BaseModel):
 @write_router.post("/api/assurance/nodes", status_code=200)
 def create_node(body: CreateNodeBody) -> JSONResponse:
     ctx = get_assurance_context()
-    return _translate(mutations.create_node(
+    return _translate(run_write(lambda: mutations.create_node(
         ctx.store, ctx.archive,
         node_type=body.node_type, name=body.name, status=body.status, tlp=body.tlp,
         concern_class=body.concern_class, disposition=body.disposition,
         uca_type=body.uca_type, binding_status=body.binding_status,
         node_role=body.node_role, analysis_id=body.analysis_id,
         content_text=body.content_text, attributes=body.attributes,
-    ))
+    )))
 
 
 @write_router.patch("/api/assurance/nodes/{node_id}", status_code=200)
 def edit_node(node_id: str, body: EditNodeBody) -> JSONResponse:
     ctx = get_assurance_context()
-    return _translate(mutations.edit_node(
+    return _translate(run_write(lambda: mutations.edit_node(
         ctx.store, ctx.archive,
         node_id=node_id, name=body.name, status=body.status, tlp=body.tlp,
         concern_class=body.concern_class, disposition=body.disposition,
         uca_type=body.uca_type, binding_status=body.binding_status,
         node_role=body.node_role, content_text=body.content_text,
         attributes=body.attributes,
-    ))
+    )))
 
 
 @write_router.delete("/api/assurance/nodes/{node_id}", status_code=200)
 def delete_node(node_id: str) -> JSONResponse:
     ctx = get_assurance_context()
-    return _translate(mutations.delete_node(ctx.store, ctx.archive, node_id=node_id))
+    return _translate(run_write(lambda: mutations.delete_node(ctx.store, ctx.archive, node_id=node_id)))
 
 
 # ── Edge endpoints ─────────────────────────────────────────────────────────────
@@ -183,17 +184,17 @@ def delete_node(node_id: str) -> JSONResponse:
 @write_router.post("/api/assurance/edges", status_code=200)
 def add_edge(body: AddEdgeBody) -> JSONResponse:
     ctx = get_assurance_context()
-    return _translate(mutations.add_edge(
+    return _translate(run_write(lambda: mutations.add_edge(
         ctx.store, ctx.archive,
         source_id=body.source_id, target_id=body.target_id,
         conn_type=body.conn_type, attributes=body.attributes,
-    ))
+    )))
 
 
 @write_router.delete("/api/assurance/edges/{edge_id}", status_code=200)
 def delete_edge(edge_id: str) -> JSONResponse:
     ctx = get_assurance_context()
-    return _translate(mutations.delete_edge(ctx.store, ctx.archive, edge_id=edge_id))
+    return _translate(run_write(lambda: mutations.delete_edge(ctx.store, ctx.archive, edge_id=edge_id)))
 
 
 # ── Baselines ─────────────────────────────────────────────────────────────────
@@ -204,7 +205,7 @@ def seal_baseline(body: SealBaselineBody) -> JSONResponse:
     ctx = get_assurance_context()
     if not ctx.is_available():
         return _locked()
-    result = ctx.archive.seal_baseline(notes=body.notes, analysis_id=body.analysis_id)
+    result = run_write(lambda: ctx.archive.seal_baseline(notes=body.notes, analysis_id=body.analysis_id))
     return JSONResponse(content=result, headers={"Cache-Control": _NO_STORE})  # type: ignore[arg-type]
 
 
@@ -214,12 +215,12 @@ def seal_baseline(body: SealBaselineBody) -> JSONResponse:
 @write_router.post("/api/assurance/arch-refs", status_code=200)
 def register_arch_ref(body: RegisterArchRefBody) -> JSONResponse:
     ctx = get_assurance_context()
-    return _translate(mutations.register_arch_ref(
+    return _translate(run_write(lambda: mutations.register_arch_ref(
         ctx.store, ctx.archive,
         assurance_node_id=body.assurance_node_id,
         arch_artifact_id=body.arch_artifact_id,
         ref_type=body.ref_type,
-    ))
+    )))
 
 
 # ── Model-this (create+bind, or task for an architecture-write session) ───────────
@@ -258,14 +259,14 @@ def model_this(body: ModelThisBody) -> JSONResponse:
     if not ctx.is_available():
         return _locked()
     creator = None if body.separation_of_duties else GuiArchitectureEntityCreator()
-    result = model_bind.model_and_bind(
+    result = run_write(lambda: model_bind.model_and_bind(
         ctx.store, ctx.archive,
         assurance_node_id=body.assurance_node_id,
         suggested_arch_type=body.suggested_arch_type,
         suggested_name=body.suggested_name,
         domain=body.domain,
         arch_creator=creator,
-    )
+    ))
     return _translate_bind(result)
 
 
@@ -277,20 +278,20 @@ def import_bom(body: ImportBomBody) -> JSONResponse:
     ctx = get_assurance_context()
     if not ctx.signals_available():
         return _locked()
-    result = ctx.connector.import_bom(
+    result = run_write(lambda: ctx.connector.import_bom(
         body.bom_data,
         anchor_entity_id=body.anchor_entity_id,
         bom_format=body.bom_format,
         source_file=body.source_file,
-    )
-    ctx.archive.append(
+    ))
+    run_write(lambda: ctx.archive.append(
         "IMPORT_BOM",
         payload={
             "anchor_entity_id": body.anchor_entity_id,
             "bom_format": body.bom_format,
             "source_file": body.source_file,
         },
-    )
+    ))
     return JSONResponse(content=result, headers={"Cache-Control": _NO_STORE})  # type: ignore[arg-type]
 
 
@@ -299,11 +300,11 @@ def import_vulnerabilities(body: ImportVulnsBody) -> JSONResponse:
     ctx = get_assurance_context()
     if not ctx.signals_available():
         return _locked()
-    result = ctx.connector.import_vulnerabilities(body.vuln_records, source=body.source)
-    ctx.archive.append(
+    result = run_write(lambda: ctx.connector.import_vulnerabilities(body.vuln_records, source=body.source))
+    run_write(lambda: ctx.archive.append(
         "IMPORT_VULNERABILITIES",
         payload={"source": body.source, "record_count": len(body.vuln_records)},
-    )
+    ))
     return JSONResponse(content=result, headers={"Cache-Control": _NO_STORE})  # type: ignore[arg-type]
 
 
@@ -312,15 +313,15 @@ def set_anchor(body: SetAnchorBody) -> JSONResponse:
     ctx = get_assurance_context()
     if not ctx.signals_available():
         return _locked()
-    ctx.connector.set_anchor(body.component_ref, body.arch_entity_id, ref_type=body.ref_type)
-    ctx.archive.append(
+    run_write(lambda: ctx.connector.set_anchor(body.component_ref, body.arch_entity_id, ref_type=body.ref_type))
+    run_write(lambda: ctx.archive.append(
         "SET_ANCHOR",
         payload={
             "component_ref": body.component_ref,
             "arch_entity_id": body.arch_entity_id,
             "ref_type": body.ref_type,
         },
-    )
+    ))
     return JSONResponse(
         content={
             "component_ref": body.component_ref,

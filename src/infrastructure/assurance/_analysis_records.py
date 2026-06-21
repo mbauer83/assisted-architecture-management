@@ -138,6 +138,14 @@ def update_analysis_file(
     write(path, apply_analysis_update(record, attrs))
 
 
+def delete_analysis_file(
+    analyses_dir: Path,
+    ext: str,
+    analysis_id: str,
+) -> None:
+    (analyses_dir / f"{analysis_id}.{ext}").unlink(missing_ok=True)
+
+
 class FileAnalysisStoreMixin:
     """Shared analysis CRUD for file-tree assurance stores.
 
@@ -190,3 +198,7 @@ class FileAnalysisStoreMixin:
         update_analysis_file(
             self._read, self._write, self._analyses_dir(), self._ANALYSIS_EXT, analysis_id, attrs
         )
+
+    def delete_analysis(self, analysis_id: str) -> None:
+        self._require_unlocked()
+        delete_analysis_file(self._analyses_dir(), self._ANALYSIS_EXT, analysis_id)

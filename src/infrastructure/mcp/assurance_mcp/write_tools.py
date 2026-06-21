@@ -22,6 +22,7 @@ from typing import Any
 from mcp.server.fastmcp import FastMCP  # type: ignore[import-not-found]
 
 from src.application import assurance_mutations as mutations
+from src.infrastructure.assurance.write_serialization import run_write
 from src.infrastructure.mcp.assurance_mcp.context import get_assurance_context
 from src.infrastructure.mcp.assurance_mcp.security_write_tools import register_security_write_tools
 
@@ -73,14 +74,14 @@ def register_write_tools(server: FastMCP) -> None:
         content_text: str = "",
         attributes: dict[str, object] | None = None,
     ) -> dict[str, object]:
-        result = mutations.create_node(
+        result = run_write(lambda: mutations.create_node(
             ctx.store, ctx.archive,
             node_type=node_type, name=name, status=status, tlp=tlp,
             concern_class=concern_class, disposition=disposition,
             uca_type=uca_type, binding_status=binding_status,
             node_role=node_role, analysis_id=analysis_id,
             content_text=content_text, attributes=attributes,
-        )
+        ))
         if isinstance(result, mutations.MutationLocked):
             return ctx.locked_response()
         if isinstance(result, mutations.MutationNotFound):
@@ -103,11 +104,11 @@ def register_write_tools(server: FastMCP) -> None:
         conn_type: str,
         attributes: dict[str, object] | None = None,
     ) -> dict[str, object]:
-        result = mutations.add_edge(
+        result = run_write(lambda: mutations.add_edge(
             ctx.store, ctx.archive,
             source_id=source_id, target_id=target_id,
             conn_type=conn_type, attributes=attributes,
-        )
+        ))
         if isinstance(result, mutations.MutationLocked):
             return ctx.locked_response()
         if isinstance(result, mutations.MutationNotFound):
@@ -136,13 +137,13 @@ def register_write_tools(server: FastMCP) -> None:
         content_text: str | None = None,
         attributes: dict[str, object] | None = None,
     ) -> dict[str, object]:
-        result = mutations.edit_node(
+        result = run_write(lambda: mutations.edit_node(
             ctx.store, ctx.archive,
             node_id=node_id, name=name, status=status, tlp=tlp,
             concern_class=concern_class, disposition=disposition,
             uca_type=uca_type, binding_status=binding_status,
             node_role=node_role, content_text=content_text, attributes=attributes,
-        )
+        ))
         if isinstance(result, mutations.MutationLocked):
             return ctx.locked_response()
         if isinstance(result, mutations.MutationNotFound):
@@ -157,7 +158,7 @@ def register_write_tools(server: FastMCP) -> None:
         ),
     )
     def assurance_delete_node(node_id: str) -> dict[str, object]:
-        result = mutations.delete_node(ctx.store, ctx.archive, node_id=node_id)
+        result = run_write(lambda: mutations.delete_node(ctx.store, ctx.archive, node_id=node_id))
         if isinstance(result, mutations.MutationLocked):
             return ctx.locked_response()
         if isinstance(result, mutations.MutationNotFound):
@@ -173,7 +174,7 @@ def register_write_tools(server: FastMCP) -> None:
         ),
     )
     def assurance_delete_edge(edge_id: str) -> dict[str, object]:
-        result = mutations.delete_edge(ctx.store, ctx.archive, edge_id=edge_id)
+        result = run_write(lambda: mutations.delete_edge(ctx.store, ctx.archive, edge_id=edge_id))
         if isinstance(result, mutations.MutationLocked):
             return ctx.locked_response()
         if isinstance(result, mutations.MutationNotFound):
@@ -195,7 +196,7 @@ def register_write_tools(server: FastMCP) -> None:
     ) -> dict[str, object]:
         if not ctx.is_available():
             return ctx.locked_response()
-        return ctx.archive.seal_baseline(notes=notes, analysis_id=analysis_id)
+        return run_write(lambda: ctx.archive.seal_baseline(notes=notes, analysis_id=analysis_id))
 
     @server.tool(
         name="assurance_register_arch_ref",
@@ -211,12 +212,12 @@ def register_write_tools(server: FastMCP) -> None:
         arch_artifact_id: str,
         ref_type: str,
     ) -> dict[str, object]:
-        result = mutations.register_arch_ref(
+        result = run_write(lambda: mutations.register_arch_ref(
             ctx.store, ctx.archive,
             assurance_node_id=assurance_node_id,
             arch_artifact_id=arch_artifact_id,
             ref_type=ref_type,
-        )
+        ))
         if isinstance(result, mutations.MutationLocked):
             return ctx.locked_response()
         if isinstance(result, mutations.MutationNotFound):
@@ -245,14 +246,14 @@ def register_write_tools(server: FastMCP) -> None:
         if not ctx.is_available():
             return ctx.locked_response()
         # No architecture-write port here (separation of duties): always a task spec.
-        result = model_bind.model_and_bind(
+        result = run_write(lambda: model_bind.model_and_bind(
             ctx.store, ctx.archive,
             assurance_node_id=assurance_node_id,
             suggested_arch_type=suggested_arch_type,
             suggested_name=suggested_name,
             domain=domain,
             arch_creator=None,
-        )
+        ))
         if isinstance(result, model_bind.BindNotFound):
             return ctx.not_found_response(result.assurance_node_id)
         if isinstance(result, model_bind.BindLocked):
@@ -291,11 +292,11 @@ def register_write_tools(server: FastMCP) -> None:
 
         if not ctx.is_available():
             return ctx.locked_response()
-        result = analysis_uc.create_analysis(
+        result = run_write(lambda: analysis_uc.create_analysis(
             ctx.store, ctx.archive,
             name=name, method=method, architecture_anchor_id=architecture_anchor_id,
             tlp=tlp, status=status,
-        )
+        ))
         return _analysis_result(result, ctx)
 
     @server.tool(
@@ -315,10 +316,28 @@ def register_write_tools(server: FastMCP) -> None:
 
         if not ctx.is_available():
             return ctx.locked_response()
-        result = analysis_uc.update_analysis(
+        result = run_write(lambda: analysis_uc.update_analysis(
             ctx.store, ctx.archive,
             analysis_id=analysis_id, name=name, status=status, tlp=tlp,
-        )
+        ))
+        return _analysis_result(result, ctx)
+
+    @server.tool(
+        name="assurance_delete_analysis",
+        description=(
+            "Delete an assurance analysis. Blocks (analysis_not_empty) if the analysis still owns "
+            "member nodes — reassign or delete those nodes first. An empty/abandoned analysis "
+            "deletes cleanly. The deletion is audited and not reversible."
+        ),
+    )
+    def assurance_delete_analysis(analysis_id: str) -> dict[str, object]:
+        from src.application import assurance_analysis as analysis_uc  # noqa: PLC0415
+
+        if not ctx.is_available():
+            return ctx.locked_response()
+        result = run_write(lambda: analysis_uc.delete_analysis(
+            ctx.store, ctx.archive, analysis_id=analysis_id,
+        ))
         return _analysis_result(result, ctx)
 
     @server.tool(

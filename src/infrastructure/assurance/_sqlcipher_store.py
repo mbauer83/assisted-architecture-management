@@ -4,8 +4,15 @@ Key management: the encryption key is retrieved from the secure credential store
 (_credential_store). The DB file is stored at the path given at construction
 time (typically .arch-assurance/store.db, gitignored).
 
-Thread-safety: this adapter is single-threaded and synchronous. The backend
-uses it from within a write-queue serialised context.
+Thread-safety: the store is a process singleton served by the backend from a pool
+of OS threads (the FastAPI/anyio threadpool for sync REST handlers and FastMCP
+tool execution). SQLite/SQLCipher connection objects are bound to the thread that
+created them, so each accessing thread gets its **own** connection, opened lazily
+and cached thread-locally. Connections run in **WAL** mode with a busy timeout, so
+concurrent readers do not block one another or the writer. Application-level write
+*serialisation* (single-writer discipline) is provided separately by the assurance
+write queue at the MCP/REST boundary; this adapter only guarantees that any thread
+can safely talk to the store. ``lock()`` disposes every open connection.
 """
 
 from __future__ import annotations
@@ -19,7 +26,7 @@ from src.infrastructure.assurance import _credential_store as creds
 from src.infrastructure.assurance import _sqlcipher_analysis as _analysis
 from src.infrastructure.assurance._id_utils import make_edge_id, make_node_id
 from src.infrastructure.assurance._schema import ASSURANCE_SCHEMA_MIGRATIONS, ASSURANCE_SCHEMA_SQL, SCHEMA_VERSION
-from src.infrastructure.assurance._sqlcipher_util import dict_row_factory as _dict_row_factory
+from src.infrastructure.assurance._sqlcipher_connection import ThreadLocalConnectionManager
 from src.infrastructure.assurance._sqlcipher_util import now_iso as _now_iso
 from src.infrastructure.assurance._sqlcipher_util import suppress_c_stderr as _suppress_c_stderr
 from src.infrastructure.assurance._sqlcipher_util import where as _where
@@ -30,36 +37,46 @@ _KEY_ACCOUNT = "db-encryption-key"
 
 
 class SQLCipherAssuranceStore:
-    """Adapter implementing ConfidentialAssuranceStore using SQLCipher."""
+    """Adapter implementing ConfidentialAssuranceStore using SQLCipher.
+
+    Connection lifecycle (per-thread WAL connections, generation-based
+    invalidation, disposal on lock) is delegated to ThreadLocalConnectionManager.
+    The encryption key is held in process memory only between unlock and lock
+    (never written to disk).
+    """
 
     def __init__(self, db_path: Path) -> None:
         self._db_path = db_path
-        self._conn: Any = None  # sqlcipher3.Connection
+        self._conns = ThreadLocalConnectionManager(db_path, bootstrap=self._bootstrap_schema)
 
     # ── Lifecycle ─────────────────────────────────────────────────────────────
 
     def is_unlocked(self) -> bool:
-        return self._conn is not None
+        return self._conns.is_open()
 
     def unlock(self) -> None:
-        import sqlcipher3  # type: ignore[import-untyped]
-
         key = creds.get(_KEY_ACCOUNT)
         if key is None:
             raise RuntimeError(
                 "Assurance store key not found in credential store. "
                 "Run `arch-assurance init` to initialise the store."
             )
-        self._db_path.parent.mkdir(parents=True, exist_ok=True)
-        conn = sqlcipher3.connect(str(self._db_path))
-        conn.execute(f"PRAGMA key = '{key}'")
+        self._conns.open(key)
+        logger.info("Assurance store unlocked at %s", self._db_path)
+
+    def lock(self) -> None:
+        self._conns.close()
+        logger.info("Assurance store locked")
+
+    @staticmethod
+    def _bootstrap_schema(conn: Any) -> None:
+        """Apply schema + migrations on the first connection; key mismatch → RuntimeError."""
         # Suppress C-library 'ERROR CORE ...' output on key mismatch; the
         # RuntimeError below carries the actionable message instead.
         try:
             with _suppress_c_stderr():
                 conn.executescript(ASSURANCE_SCHEMA_SQL)
         except Exception as exc:
-            conn.close()
             raise RuntimeError(
                 "Failed to unlock the assurance store — the keychain key does not match "
                 "this database. This usually means the store was re-initialised after the "
@@ -77,20 +94,13 @@ class SQLCipherAssuranceStore:
             ("schema_version", SCHEMA_VERSION),
         )
         conn.commit()
-        conn.row_factory = _dict_row_factory
-        self._conn = conn
-        logger.info("Assurance store unlocked at %s", self._db_path)
 
-    def lock(self) -> None:
-        if self._conn is not None:
-            self._conn.close()
-            self._conn = None
-        logger.info("Assurance store locked")
+    def _thread_conn_or_none(self) -> Any:
+        """Calling thread's connection, or None if locked (archive/signals factory)."""
+        return self._conns.get_or_none()
 
     def _require_unlocked(self) -> Any:
-        if self._conn is None:
-            raise RuntimeError("Assurance store is locked. Run `arch-assurance unlock`.")
-        return self._conn
+        return self._conns.require()
 
     # ── Analysis aggregate ──────────────────────────────────────────────────────
 
@@ -120,6 +130,9 @@ class SQLCipherAssuranceStore:
 
     def update_analysis(self, analysis_id: str, **attrs: object) -> None:
         _analysis.update(self._require_unlocked(), analysis_id, attrs)
+
+    def delete_analysis(self, analysis_id: str) -> None:
+        _analysis.delete(self._require_unlocked(), analysis_id)
 
     # ── Node CRUD ─────────────────────────────────────────────────────────────
 

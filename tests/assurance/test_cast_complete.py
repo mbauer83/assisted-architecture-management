@@ -24,7 +24,7 @@ def store(tmp_path):  # type: ignore[no-untyped-def]
 def archive(store):  # type: ignore[no-untyped-def]
     from src.infrastructure.assurance._archive import SQLCipherAssuranceArchive
 
-    return SQLCipherAssuranceArchive(lambda: store._conn)  # noqa: SLF001
+    return SQLCipherAssuranceArchive(store._thread_conn_or_none)  # noqa: SLF001
 
 
 def test_empty_store_passes_all_checks(store, archive) -> None:  # type: ignore[no-untyped-def]

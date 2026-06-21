@@ -18,7 +18,7 @@ def worm_archive(tmp_path):
     init_store(db_path)
     store = SQLCipherAssuranceStore(db_path)
     store.unlock()
-    archive = WORMSQLCipherAssuranceArchive(lambda: store._conn)  # noqa: SLF001
+    archive = WORMSQLCipherAssuranceArchive(store._thread_conn_or_none)  # noqa: SLF001
     yield store, archive
     store.lock()
 

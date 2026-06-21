@@ -13,6 +13,7 @@ from __future__ import annotations
 
 from mcp.server.fastmcp import FastMCP  # type: ignore[import-not-found]
 
+from src.infrastructure.assurance.write_serialization import run_write
 from src.infrastructure.mcp.assurance_mcp.context import get_assurance_context
 
 
@@ -38,20 +39,20 @@ def register_security_write_tools(server: FastMCP) -> None:
     ) -> dict[str, object]:
         if not ctx.is_available():
             return ctx.locked_response()
-        result = ctx.connector.import_bom(
+        result = run_write(lambda: ctx.connector.import_bom(
             bom_data,
             anchor_entity_id=anchor_entity_id,
             bom_format=bom_format,
             source_file=source_file,
-        )
-        ctx.archive.append(
+        ))
+        run_write(lambda: ctx.archive.append(
             "IMPORT_BOM",
             payload={
                 "anchor_entity_id": anchor_entity_id,
                 "bom_format": bom_format,
                 "source_file": source_file,
             },
-        )
+        ))
         return result  # type: ignore[return-value]
 
     @server.tool(
@@ -71,11 +72,11 @@ def register_security_write_tools(server: FastMCP) -> None:
     ) -> dict[str, object]:
         if not ctx.is_available():
             return ctx.locked_response()
-        result = ctx.connector.import_vulnerabilities(vuln_records, source=source)
-        ctx.archive.append(
+        result = run_write(lambda: ctx.connector.import_vulnerabilities(vuln_records, source=source))
+        run_write(lambda: ctx.archive.append(
             "IMPORT_VULNERABILITIES",
             payload={"source": source, "record_count": len(vuln_records)},
-        )
+        ))
         return result  # type: ignore[return-value]
 
     @server.tool(
@@ -95,15 +96,15 @@ def register_security_write_tools(server: FastMCP) -> None:
     ) -> dict[str, object]:
         if not ctx.is_available():
             return ctx.locked_response()
-        ctx.connector.set_anchor(component_ref, arch_entity_id, ref_type=ref_type)
-        ctx.archive.append(
+        run_write(lambda: ctx.connector.set_anchor(component_ref, arch_entity_id, ref_type=ref_type))
+        run_write(lambda: ctx.archive.append(
             "SET_ANCHOR",
             payload={
                 "component_ref": component_ref,
                 "arch_entity_id": arch_entity_id,
                 "ref_type": ref_type,
             },
-        )
+        ))
         return {
             "component_ref": component_ref,
             "arch_entity_id": arch_entity_id,

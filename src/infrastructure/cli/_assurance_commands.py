@@ -355,7 +355,7 @@ def cmd_verify(args: argparse.Namespace) -> int:
     store = SQLCipherAssuranceStore(db_path)
     try:
         store.unlock()
-        archive = SQLCipherAssuranceArchive(lambda: store._conn)  # noqa: SLF001
+        archive = SQLCipherAssuranceArchive(store._thread_conn_or_none)  # noqa: SLF001
         ok = archive.verify_chain()
         entries = archive.list_entries(limit=100_000)
         _print_yaml({"chain_valid": ok, "entry_count": len(entries), "db_path": str(db_path)})
@@ -375,7 +375,7 @@ def cmd_verify_chain(args: argparse.Namespace) -> int:
     store = SQLCipherAssuranceStore(db_path)
     try:
         store.unlock()
-        archive = SQLCipherAssuranceArchive(lambda: store._conn)  # noqa: SLF001
+        archive = SQLCipherAssuranceArchive(store._thread_conn_or_none)  # noqa: SLF001
         ok = archive.verify_chain()
         _print_yaml({"chain_valid": ok, "db_path": str(db_path)})
         return 0 if ok else 2

@@ -169,7 +169,7 @@ def _build_archive(
 
         assert isinstance(store, SQLCipherAssuranceStore)
         sqlcipher_store = store
-        conn_factory = lambda: sqlcipher_store._conn  # noqa: E731, SLF001
+        conn_factory = sqlcipher_store._thread_conn_or_none  # noqa: SLF001
         if archive_backend == "worm":
             from src.infrastructure.assurance._worm_archive import WORMSQLCipherAssuranceArchive
             return WORMSQLCipherAssuranceArchive(conn_factory)
@@ -210,7 +210,7 @@ def _build_connector(
 
         assert isinstance(store, SQLCipherAssuranceStore)
         sqlcipher_store = store
-        return CollocatedSQLCipherSignalsConnector(lambda: sqlcipher_store._conn)  # noqa: SLF001
+        return CollocatedSQLCipherSignalsConnector(sqlcipher_store._thread_conn_or_none)  # noqa: SLF001
 
     if signals_backend == "sqlite":
         from src.infrastructure.assurance._security_connector import SQLiteSecurityConnector
@@ -228,7 +228,7 @@ def _build_connector(
 
         assert isinstance(store, SQLCipherAssuranceStore)
         sqlcipher_store = store
-        return CollocatedSQLCipherSignalsConnector(lambda: sqlcipher_store._conn)  # noqa: SLF001
+        return CollocatedSQLCipherSignalsConnector(sqlcipher_store._thread_conn_or_none)  # noqa: SLF001
 
     from src.infrastructure.assurance._security_connector import SQLiteSecurityConnector
 

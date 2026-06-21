@@ -17,7 +17,7 @@ def store_and_archive(tmp_path):  # type: ignore[no-untyped-def]
     init_store(db_path)
     store = SQLCipherAssuranceStore(db_path)
     store.unlock()
-    archive = SQLCipherAssuranceArchive(lambda: store._conn)  # noqa: SLF001
+    archive = SQLCipherAssuranceArchive(store._thread_conn_or_none)  # noqa: SLF001
     yield store, archive
     store.lock()
 
