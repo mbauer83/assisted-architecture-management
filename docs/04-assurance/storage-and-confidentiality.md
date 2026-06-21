@@ -57,6 +57,12 @@ arch-assurance use-backend pocketbase     # then: arch-backend --restart --daemo
 Switching backends does not migrate data. Run `arch-assurance export -o backup.json` first
 if you need to carry entries across.
 
+**SQLCipher WAL mode.** The SQLCipher backend runs in WAL (Write-Ahead Log) mode, which
+creates two sidecar files alongside `store.db`: `store.db-wal` and `store.db-shm`. Both files
+are encrypted by SQLCipher to the same standard as the main database — no plaintext assurance
+content reaches disk in any of the three files. The sidecar files are covered by the
+`.arch-assurance/.gitignore` rules and will never appear as untracked files in the repository.
+
 &nbsp;
 
 ## Archive backends
@@ -94,6 +100,34 @@ arch-assurance use-backend sqlcipher --archive-backend azure-blob-worm
 The `azure-blob-worm` adapter uses two containers: the archive container (WORM) and a mutable
 state container holding the chain head, holds index, and DEKs. Apply the time-based
 immutability policy to the archive container only.
+
+&nbsp;
+
+## TLP ceiling and withheld content
+
+Every deployment is configured with a **TLP ceiling** — the highest classification that the
+backend will expose over REST and MCP interfaces. Nodes, edges, and analyses above the ceiling
+are withheld from all read responses; they are not counted, mentioned, or hinted at in any
+response body, count, or finding.
+
+The ceiling is set in `config/settings.yaml`:
+
+```yaml
+storage:
+  assurance:
+    max_classification: TLP:AMBER   # TLP:WHITE | TLP:GREEN | TLP:AMBER | TLP:RED
+```
+
+`TLP:RED` (the default) exposes everything the store contains — appropriate for a single
+operator who holds the encryption key. Lower values let a team see analysis results without
+accessing the most sensitive records, for example when RED entries contain unpublished
+vulnerability details or PII.
+
+When the ceiling omits records, the GUI shows a **withheld notice** that names the count and
+the ceiling: for example *"3 items withheld above your TLP:AMBER ceiling."* This is the policy
+working as intended, not an error. The notice appears in the browse view, node detail, and
+assurance lens wherever visible counts are lower than the full store total. It does not reveal
+the IDs, names, or contents of the withheld items.
 
 &nbsp;
 

@@ -108,7 +108,47 @@ from the ArchiMate graph (a software system, its containers, its components), so
 stays consistent with the model. Parent/child navigation moves between levels, and a
 preview/refresh path shows what a projection will include before it is saved.
 
+Node descriptions are **off by default** — C4 nodes render name only. Set
+`show_node_descriptions: true` in the diagram's frontmatter to include the description line
+under the name.
+
+C4 containers and components support a **shape** property that maps to C4 PlantUML macros:
+
+| Shape value | Rendered as | Best for |
+|---|---|---|
+| *(empty / default)* | `Container` / `Component` | Generic box |
+| `Container/ComponentDb` | `ContainerDb` / `ComponentDb` | Databases, file stores |
+| `Container/ComponentQueue` | `ContainerQueue` / `ComponentQueue` | Message queues, event buses |
+
+The `shape` field is a dropdown in the create view. Setting `external: true` on any entity
+appends the `_Ext` suffix automatically (`ContainerDb_Ext`, etc.).
+
 ![C4 container diagram](../media/diagram-c4.png)
+
+&nbsp;
+
+**Edit view sidebar.** Opening an existing model-backed C4 diagram in the edit view populates
+the sidebar with the **derived entities** (grouped by role: software systems, containers,
+components, actors) and the **read-only connections** between them. Entities in the sidebar
+are those the projection found in the model — adding or removing them in the model updates
+what appears on a refresh.
+
+&nbsp;
+
+## Viewer interactivity
+
+The rendered SVG viewer is interactive for C4 diagrams and any architecture-repository GSN
+diagram:
+
+- **Click a node** — the detail sidebar opens with the entity name, type badges, description,
+  and connections. C4 nodes are identified by `data-entity-id` attributes attached when the
+  SVG is rendered.
+- **Click an edge** — the connection flow detail opens, showing the relationship kind and both
+  endpoint names.
+- Clicking a second element deselects the first; clicking the same element toggles it off.
+
+Assurance diagrams (bowtie, control structure, UCA matrix) have the same selection UX inside
+their own assurance viewer — see [Assurance diagrams](../04-assurance/diagrams.md).
 
 &nbsp;
 

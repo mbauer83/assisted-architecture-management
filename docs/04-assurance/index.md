@@ -27,8 +27,8 @@ specialist method and legal expertise — guidance-first, with method-completion
 | Page | What it covers |
 |---|---|
 | [Methods](methods.md) | STPA, STPA-Sec, CAST, GRC, supply-chain signals; wizards; method-completion verification |
-| [Diagrams](diagrams.md) | Bowtie, STAMP control structure, GSN assurance cases, UCA matrix |
-| [Storage & confidentiality](storage-and-confidentiality.md) | Store vs. archive, backends, credential storage, WORM, CLI reference |
+| [Diagrams](diagrams.md) | Bowtie, STAMP control structure, GSN assurance cases, UCA matrix; unified assurance viewer; GSN dual-home |
+| [Storage & confidentiality](storage-and-confidentiality.md) | Store vs. archive, backends, credential storage, TLP ceiling, withheld content, WORM, WAL, CLI reference |
 | [MCP tools](mcp-tools.md) | The assurance MCP server surface for AI agents |
 
 &nbsp;

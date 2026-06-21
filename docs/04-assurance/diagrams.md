@@ -1,20 +1,39 @@
 # Assurance Diagrams
 
 Four diagram families visualise an assurance analysis, each a diagram type module under
-`src/diagram_types/`. Three render to PlantUML (control structure, bowtie, GSN); the UCA
-matrix is an interactive frontend grid with no PlantUML body.
+`src/diagram_types/`.
 
-| Diagram | Module | Reads from |
-|---|---|---|
-| STAMP control structure | `control_structure` | Control-structure nodes + control actions |
-| UCA matrix | `uca_matrix` | Control actions × STPA guidewords |
-| Bowtie | `bowtie` | A hazard, its threats, consequences, and barriers |
-| Assurance case (GSN) | `gsn` | Goals, strategies, solutions/evidence |
+| Diagram | Module | Reads from | Viewer |
+|---|---|---|---|
+| STAMP control structure | `control_structure` | Control-structure nodes + control actions | Assurance viewer |
+| UCA matrix | `uca_matrix` | Control actions × STPA guidewords | Assurance viewer |
+| Bowtie | `bowtie` | A hazard, its threats, consequences, and barriers | Assurance viewer |
+| Assurance case (GSN) | `gsn` | Goals, strategies, solutions/evidence | Generic + assurance bridge |
 
 Assurance diagrams are **never written as plaintext to disk** — the renderer refuses to emit
 into `diagram-catalog/rendered/`, keeping confidential analysis out of the clear. The figures
 below are the project's **own** STPA-Sec analysis of its confidential assurance store
 (a worked, self-describing example), rendered for this documentation.
+
+&nbsp;
+
+## Unified assurance diagram viewer
+
+Bowtie, STAMP control structure, and UCA matrix open in the **assurance diagram viewer**,
+not in the generic architecture diagram viewer. This surface:
+
+- Applies the `AssuranceExposurePolicy` to every response — nodes and edges above the
+  configured TLP ceiling are never sent to the client.
+- Renders the diagram from the live store graph rather than a stored `.puml` file, so it
+  always reflects the current analysis state.
+- Supports **interactive node and edge selection**: clicking any node or edge opens an
+  assurance detail panel on the right with the node's name, type, status, description,
+  architecture bindings, and a link to the full node-edit view.
+- Falls back to a selectable store-grounded entity list when PlantUML is unavailable.
+
+The three assurance-only types are **not listed in the generic diagram browser** — they cannot
+be opened through the architecture diagram catalogue, so there is no risk of encountering a
+broken, unfiltered, or non-selectable view of confidential content.
 
 &nbsp;
 
@@ -60,6 +79,19 @@ discharge them. This is the artifact a regulator or auditor expects, assembled f
 store as the analysis it argues over.
 
 ![GSN assurance case: the top protection goal argued via the STPA-Sec constraints down to evidence solutions](../media/assurance-gsn.png)
+
+### GSN dual-home
+
+GSN is the only assurance diagram type with a dual home:
+
+| Classification | Where it lives | How to access |
+|---|---|---|
+| `TLP:WHITE` / `TLP:GREEN` | Architecture repository as a `gsn` diagram | Generic diagram viewer — selectable nodes/edges, detail panel |
+| `TLP:AMBER` / `TLP:RED` | Assurance store only — rendered as a derived preview | Assurance viewer — same selection UX, exposure-filtered |
+
+Publishing a `TLP:WHITE` or `TLP:GREEN` GSN draft to the architecture repository is audited in
+the assurance store. The architecture repository never gains back-references to the confidential
+source analysis.
 
 &nbsp;
 

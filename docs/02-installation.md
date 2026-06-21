@@ -328,4 +328,44 @@ full backend matrix, credential storage per OS, WORM archives, and the CLI refer
 
 ---
 
+&nbsp;
+
+## Deployment topology
+
+The backend supports two deployment profiles. Both profiles share the same process and the
+same configuration — what differs is the host environment and the number of concurrent callers.
+
+### Single-architect (local)
+
+One person runs the backend on their own workstation. The GUI and any MCP-connected agents
+share a single backend process. This is the default and requires no additional configuration.
+
+```
+workstation ── arch-backend (port 8000) ── GUI (browser)
+                                        └─ MCP agents (stdio bridges)
+```
+
+### Team-serving
+
+The backend runs on a shared host (a team server, a container, a VM) and serves multiple
+engineers and agents concurrently. The backend is designed to handle this without additional
+configuration: reads from the assurance store are concurrent (each request gets its own
+connection from a thread-local connection pool operating in WAL mode), while writes are
+serialized through a single-writer queue so there are never concurrent mutations.
+
+```
+team server ── arch-backend ── GUI clients (browsers)
+                            └─ MCP agents (many concurrent)
+```
+
+Point clients at the shared backend by setting `ARCH_MCP_BACKEND_URL` in the MCP server
+config and opening `http://<host>:8000` in a browser. No per-client backend is needed.
+
+For assurance, one operator holds the encryption key and runs `arch-assurance unlock` on the
+server after each restart. The `max_classification` ceiling can be set lower than `TLP:RED` so
+team members access analysis results without seeing the most sensitive records — see
+[TLP ceiling](04-assurance/storage-and-confidentiality.md#tlp-ceiling-and-withheld-content).
+
+---
+
 *Next: [Architecture Modeling →](03-modeling/index.md)*
