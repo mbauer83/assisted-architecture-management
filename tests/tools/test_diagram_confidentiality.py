@@ -32,6 +32,13 @@ class TestConfidentialityDecision:
         assert is_confidential_diagram_source("c4-component", None) is False
         assert is_confidential_diagram_source("archimate-application", "TLP:RED") is False
 
+    def test_gsn_is_general_unclassified_and_gated_when_assurance_classified(self) -> None:
+        assert is_assurance_diagram_type("gsn") is False
+        assert is_confidential_diagram_source("gsn", None) is False
+        assert is_confidential_diagram_source("gsn", "TLP:GREEN") is False
+        assert is_confidential_diagram_source("gsn", "TLP:AMBER") is True
+        assert is_confidential_diagram_source("gsn", "TLP:RED") is True
+
 
 class TestFormatAndGitignore:
     def test_format_emits_tlp_frontmatter_when_set(self) -> None:

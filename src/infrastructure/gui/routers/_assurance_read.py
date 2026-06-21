@@ -24,8 +24,10 @@ from fastapi.responses import JSONResponse
 
 from src.application.assurance_diagrams import (
     AVAILABLE_DIAGRAMS,
+    bowtie_nodes,
+    render_bowtie,
     render_control_structure,
-    render_uca_matrix,
+    uca_matrix_nodes,
 )
 from src.application.assurance_exposure import AssuranceExposurePolicy
 from src.application.assurance_queries import coverage_gaps, risk_register
@@ -269,10 +271,39 @@ def render_assurance_diagram(diagram_id: str) -> JSONResponse:
     all_edges = ctx.store.list_edges()
     visible_edges = pol.filter_edges(all_edges, visible_ids)
 
-    if diagram_id == "control-structure":
-        puml = render_control_structure(visible_nodes, visible_edges)
+    projected_nodes: list[dict[str, object]]
+    projected_edges: list[dict[str, object]]
+    if diagram_id == "bowtie":
+        projected_nodes = bowtie_nodes(visible_nodes)
+        projected_ids = {str(n["node_id"]) for n in projected_nodes}
+        projected_edges = [
+            e for e in visible_edges
+            if str(e.get("source_id", "")) in projected_ids
+            and str(e.get("target_id", "")) in projected_ids
+        ]
+        puml = render_bowtie(projected_nodes, projected_edges)
+    elif diagram_id == "control-structure":
+        projected_nodes = [
+            n for n in visible_nodes
+            if str(n.get("node_type", "")) in {"control-structure-node", "control-action"}
+        ]
+        projected_ids = {str(n["node_id"]) for n in projected_nodes}
+        projected_edges = [
+            e for e in visible_edges
+            if str(e.get("source_id", "")) in projected_ids
+            and str(e.get("target_id", "")) in projected_ids
+        ]
+        puml = render_control_structure(projected_nodes, projected_edges)
     elif diagram_id == "uca-matrix":
-        puml = render_uca_matrix(visible_nodes)
+        projected_nodes = uca_matrix_nodes(visible_nodes)
+        projected_ids = {str(n["node_id"]) for n in projected_nodes}
+        projected_edges = [
+            e for e in visible_edges
+            if str(e.get("source_id", "")) in projected_ids
+            and str(e.get("target_id", "")) in projected_ids
+            and str(e.get("conn_type", "")) == "concerns"
+        ]
+        puml = None
     else:
         return JSONResponse(
             status_code=404,
@@ -282,22 +313,25 @@ def render_assurance_diagram(diagram_id: str) -> JSONResponse:
         )
 
     svg: str | None = None
-    try:
-        from src.infrastructure.gui.routers import state as s  # noqa: PLC0415
-        from src.infrastructure.rendering.diagram_builder import render_puml_svg  # noqa: PLC0415
+    if puml is not None:
+        try:
+            from src.infrastructure.gui.routers import state as s  # noqa: PLC0415
+            from src.infrastructure.rendering.diagram_builder import render_puml_svg  # noqa: PLC0415
 
-        repo_root = s.maybe_engagement_root()
-        if repo_root is not None:
-            svg_text, _ = render_puml_svg(puml, repo_root, "generic")
-            if svg_text is not None:
-                svg = svg_text
-    except Exception:  # noqa: BLE001
-        pass
+            repo_root = s.maybe_engagement_root()
+            if repo_root is not None:
+                svg_text, _ = render_puml_svg(puml, repo_root, "generic")
+                if svg_text is not None:
+                    svg = svg_text
+        except Exception:  # noqa: BLE001
+            pass
 
     return _ok({
         "diagram_id": diagram_id,
         "puml": puml,
         "svg": svg,
+        "nodes": projected_nodes,
+        "edges": projected_edges,
         "visibility_limited": pol.scope().visibility_limited,
     })
 

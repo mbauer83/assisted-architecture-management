@@ -14,6 +14,7 @@ import EntityPickerInput from '../../components/EntityPickerInput.vue'
 import DiagramOwnEntityTypeSection from '../../components/DiagramOwnEntityTypeSection.vue'
 import C4ConnectionSection from './C4ConnectionSection.vue'
 import C4ModelBackedPanel from './C4ModelBackedPanel.vue'
+import { resolveScopeEntityId } from './C4DiagramEditor.helpers'
 
 const SCOPE_ITEM_ID = '_scope'
 
@@ -31,19 +32,7 @@ const emit = defineEmits<{
 
 // ── Mode ──────────────────────────────────────────────────────────────────────
 
-const scopeEntityId = computed<string>(() => {
-  const explicit = props.diagramEntities._scope_entity_id
-  if (typeof explicit === 'string' && explicit) return explicit
-  const typeList = props.diagramEntities[props.scopeEntityType]
-  if (!Array.isArray(typeList)) return ''
-  for (const item of typeList) {
-    if (item && typeof item === 'object' && (item as Record<string, unknown>).scope &&
-        (item as Record<string, unknown>).entity_id) {
-      return String((item as Record<string, unknown>).entity_id)
-    }
-  }
-  return ''
-})
+const scopeEntityId = computed<string>(() => resolveScopeEntityId(props.diagramEntities))
 
 const isModelBacked = computed(() => !!scopeEntityId.value)
 

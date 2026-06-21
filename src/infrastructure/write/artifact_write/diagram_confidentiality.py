@@ -50,9 +50,12 @@ def is_assurance_diagram_type(diagram_type: str) -> bool:
 def is_confidential_diagram_source(diagram_type: str, tlp: str | None) -> bool:
     """True if this diagram's source must be kept out of the shared catalog.
 
-    Only assurance diagram types are gated; for those, an unclassified or above-ceiling TLP is
-    confidential (conservative default), while a publishable TLP (<= GREEN) is not.
+    Assurance-only types default to confidential when unclassified. GSN is dual-home:
+    unclassified GSN is general architecture content, while an explicitly classified GSN
+    published through the assurance bridge is gated above the publishable ceiling.
     """
+    if diagram_type == "gsn":
+        return tlp is not None and not is_publishable(tlp)
     return is_assurance_diagram_type(diagram_type) and not is_publishable(tlp)
 
 

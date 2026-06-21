@@ -8,6 +8,7 @@ from typing import Any
 from fastapi import APIRouter, Depends, HTTPException, Query
 
 from src.application.artifact_parsing import parse_diagram_source
+from src.application.assurance_diagrams import ASSURANCE_SURFACE_DIAGRAM_TYPES
 from src.application.entity_type_predicates import is_internal_entity_type
 from src.application.runtime_catalogs import RuntimeCatalogs
 from src.domain.artifact_types import EntityRecord
@@ -130,7 +131,10 @@ def list_diagrams(
     status: str | None = None,
     group: str | None = None,
 ) -> dict[str, Any]:
+    if diagram_type in ASSURANCE_SURFACE_DIAGRAM_TYPES:
+        return {"total": 0, "items": []}
     diagrams = s.get_repo().list_diagrams(diagram_type=diagram_type, status=status, group=group)
+    diagrams = [d for d in diagrams if d.diagram_type not in ASSURANCE_SURFACE_DIAGRAM_TYPES]
     return {"total": len(diagrams), "items": [s.diagram_to_summary(d) for d in diagrams]}
 
 

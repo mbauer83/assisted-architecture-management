@@ -7,6 +7,10 @@ from difflib import SequenceMatcher
 from functools import lru_cache as _lru_cache
 from typing import TYPE_CHECKING, Any
 
+from src.application._diagram_entity_extraction import (
+    extract_diagram_connections,
+    extract_diagram_entities,
+)
 from src.application.artifact_parsing import extract_declared_puml_aliases, normalize_puml_alias
 from src.application.entity_type_predicates import is_internal_entity_type
 from src.domain.artifact_types import DiagramRecord, EntityRecord
@@ -66,12 +70,15 @@ def diagram_entities_and_puml(
     except OSError:
         return [], ""
     aliases = declared_aliases_in_puml(puml)
+    records = {rec.artifact_id: rec for rec in repo.list_entities()}
+    records.update({rec.artifact_id: rec for rec in extract_diagram_entities(diag_rec)})
     entities = []
-    for rec in repo.list_entities():
+    for rec in records.values():
         # Diagram-only entities from a *different* diagram must never bleed in.
         if rec.host_diagram_id is not None and rec.host_diagram_id != diag_rec.artifact_id:
             continue
-        if rec.display_alias and normalize_puml_alias(rec.display_alias) in aliases:
+        is_owned = rec.host_diagram_id == diag_rec.artifact_id
+        if is_owned or (rec.display_alias and normalize_puml_alias(rec.display_alias) in aliases):
             row = s.entity_to_summary(rec)
             row["display_alias"] = rec.display_alias
             entities.append(row)
@@ -100,6 +107,9 @@ def parse_explicit_connection_pairs(puml: str) -> set[tuple[str, str]]:
         r"^\s*Rel_[A-Za-z0-9]+(?:_(?:Up|Down|Left|Right))?"
         r"\(\s*(\w+)\s*,\s*(\w+)"
     )
+    _gsn_macro_re = re.compile(
+        r"^\s*\$Gsn(?:SupportedBy|InContextOf)\(\s*(\w+)\s*,\s*(\w+)\s*\)"
+    )
     pairs: set[tuple[str, str]] = set()
     for line in puml.splitlines():
         stripped = line.strip()
@@ -112,6 +122,10 @@ def parse_explicit_connection_pairs(puml: str) -> set[tuple[str, str]]:
         macro = _macro_re.match(line)
         if macro:
             pairs.add((normalize_puml_alias(macro.group(1)), normalize_puml_alias(macro.group(2))))
+            continue
+        gsn_macro = _gsn_macro_re.match(line)
+        if gsn_macro:
+            pairs.add((normalize_puml_alias(gsn_macro.group(1)), normalize_puml_alias(gsn_macro.group(2))))
     return pairs
 
 
@@ -122,17 +136,23 @@ def diagram_context_payload(repo: Any, diag_rec: DiagramRecord, catalogs: Runtim
     diagram = _read_diagram_impl(diag_rec.artifact_id, catalogs)
     entities, puml = diagram_entities_and_puml(repo, diag_rec, catalogs)
     entity_ids = [str(entity["artifact_id"]) for entity in entities]
-    in_diagram = {
-        str(entity["artifact_id"]): rec
-        for entity in entities
-        if (rec := repo.get_entity(str(entity["artifact_id"]))) is not None
-    }
+    extracted_entities = {rec.artifact_id: rec for rec in extract_diagram_entities(diag_rec)}
+    in_diagram = {}
+    for entity in entities:
+        entity_id = str(entity["artifact_id"])
+        rec = repo.get_entity(entity_id) or extracted_entities.get(entity_id)
+        if rec is not None:
+            in_diagram[entity_id] = rec
     explicit_pairs = parse_explicit_connection_pairs(puml)
     raw_el = diag_rec.extra.get("edge-labels") if diag_rec.extra else None
     edge_labels: dict[str, str] = dict(raw_el) if isinstance(raw_el, dict) else {}
     connections: list[dict[str, Any]] = []
     seen: set[str] = set()
-    for conn in repo.list_connections():
+    connection_records = {conn.artifact_id: conn for conn in repo.list_connections()}
+    connection_records.update({
+        conn.artifact_id: conn for conn in extract_diagram_connections(diag_rec)
+    })
+    for conn in connection_records.values():
         if conn.artifact_id in seen:
             continue
         src = in_diagram.get(conn.source)
@@ -141,7 +161,8 @@ def diagram_context_payload(repo: Any, diag_rec: DiagramRecord, catalogs: Runtim
             continue
         sa = normalize_puml_alias(src.display_alias or "")
         ta = normalize_puml_alias(tgt.display_alias or "")
-        if (sa, ta) not in explicit_pairs and (ta, sa) not in explicit_pairs:
+        is_owned = conn.path == diag_rec.path and "#conn/" in conn.artifact_id
+        if not is_owned and (sa, ta) not in explicit_pairs and (ta, sa) not in explicit_pairs:
             continue
         if (sa, ta) in explicit_pairs:
             edge_key = f"{sa}:{ta}"

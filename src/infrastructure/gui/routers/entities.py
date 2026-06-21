@@ -8,6 +8,8 @@ from typing import Any
 from fastapi import APIRouter, HTTPException, Query, Request
 from pydantic import BaseModel
 
+from src.application._artifact_query_helpers import read_entity as serialize_entity
+from src.application._diagram_entity_extraction import extract_diagram_entities
 from src.application.artifact_parsing import decode_entity_properties, parse_entity_content_sections
 from src.application.artifact_schema import load_attribute_schema
 from src.application.entity_type_predicates import is_assurance_entity_type, is_internal_entity_type
@@ -83,9 +85,19 @@ def list_entities(
 def read_entity(id: str) -> dict[str, Any]:
     repo = s.get_repo()
     result = repo.read_artifact(id, mode="full")
+    entity_rec = repo.get_entity(id)
+    if result is None and "#" in id:
+        diagram_id = id.split("#", 1)[0]
+        diagram = repo.get_diagram(diagram_id)
+        if diagram is not None:
+            entity_rec = next(
+                (entity for entity in extract_diagram_entities(diagram) if entity.artifact_id == id),
+                None,
+            )
+            if entity_rec is not None:
+                result = serialize_entity(entity_rec, mode="full")
     if result is None:
         raise HTTPException(404, f"Not found: {id!r}")
-    entity_rec = repo.get_entity(id)
     if entity_rec is not None:
         parsed = parse_entity_content_sections(entity_rec.content_text)
         result["summary"] = parsed["summary"]

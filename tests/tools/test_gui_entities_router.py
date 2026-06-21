@@ -384,6 +384,8 @@ def test_diagram_detail_view_queues_connection_matches_and_promote_button() -> N
     view_path = Path("tools/gui/src/ui/views/DiagramDetailView.vue")
     content = view_path.read_text(encoding="utf-8")
 
-    assert "aliasToConnQueue" in content
+    # Connection queuing is now handled via the extracted helpers
+    assert "buildConnectionAliasMap" in content
+    assert "resolveConnection" in content
     assert "selectedConnectionGroup" in content
     assert "query: { diagram_id: diagramId }" in content

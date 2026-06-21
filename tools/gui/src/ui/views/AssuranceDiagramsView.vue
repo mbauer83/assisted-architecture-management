@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
-import { RouterLink } from 'vue-router'
+import { RouterLink, useRoute, useRouter } from 'vue-router'
 import AssuranceDiagramPanel from '../components/AssuranceDiagramPanel.vue'
 
 interface DiagramMeta {
@@ -13,6 +13,13 @@ const diagrams = ref<DiagramMeta[]>([])
 const selected = ref<string | null>(null)
 const loading = ref(true)
 const error = ref<string | null>(null)
+const route = useRoute()
+const router = useRouter()
+
+function selectDiagram(diagramId: string) {
+  selected.value = diagramId
+  void router.replace({ path: '/assurance/diagrams', query: { type: diagramId } })
+}
 
 onMounted(async () => {
   try {
@@ -21,7 +28,10 @@ onMounted(async () => {
     if (!resp.ok) { error.value = `HTTP ${resp.status}`; loading.value = false; return }
     const body = await resp.json() as { diagrams: DiagramMeta[] }
     diagrams.value = body.diagrams ?? []
-    selected.value = diagrams.value[0]?.diagram_id ?? null
+    const requested = typeof route.query.type === 'string' ? route.query.type : null
+    selected.value = diagrams.value.some((diagram) => diagram.diagram_id === requested)
+      ? requested
+      : diagrams.value[0]?.diagram_id ?? null
   } catch (e) {
     error.value = String(e)
   } finally {
@@ -40,7 +50,7 @@ onMounted(async () => {
         ← Assurance
       </RouterLink>
       <h1 class="diagrams-title">
-        Derived Diagrams
+        Assurance Diagrams
       </h1>
       <p class="diagrams-subtitle">
         Live projections from the assurance store. Ephemeral — never persisted.
@@ -70,7 +80,7 @@ onMounted(async () => {
           :key="d.diagram_id"
           class="diagram-btn"
           :class="{ 'diagram-btn--active': selected === d.diagram_id }"
-          @click="selected = d.diagram_id"
+          @click="selectDiagram(d.diagram_id)"
         >
           <span class="diagram-btn__title">{{ d.title }}</span>
           <span class="diagram-btn__desc">{{ d.description }}</span>

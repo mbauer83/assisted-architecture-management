@@ -16,7 +16,13 @@ import { useMutation } from '../composables/useMutation'
 import { toGlyphKey } from '../lib/glyphKey'
 import { renderMatrixMarkdown } from '../lib/matrixMarkdown'
 import type { C4Navigation } from '../../domain'
-import { buildAliasToId, buildDrilldownByEntityId } from './DiagramDetailView.helpers'
+import {
+  buildAliasToId,
+  buildConnectionAliasMap,
+  buildDrilldownByEntityId,
+  diagramNeedsSvg,
+  resolveConnection,
+} from './DiagramDetailView.helpers'
 
 const svc = inject(modelServiceKey)!
 const route = useRoute()
@@ -112,8 +118,9 @@ let _attachRun = 0
 
 const load = () => {
   if (!diagramId.value) return
+  contextQuery.reset()
+  svgQuery.reset()
   contextQuery.run(svc.getDiagramContext(diagramId.value))
-  svgQuery.run(svc.getDiagramSvg(diagramId.value))
 }
 
 onMounted(() => {
@@ -226,18 +233,7 @@ const attachInteractivity = async () => {
     } catch { /* getBBox unavailable in non-rendered contexts */ }
   }
 
-  const aliasToConnQueue = new Map<string, DiagramConnection[]>()
-  const aliasToConnFallback = new Map<string, DiagramConnection>()
-  for (const conn of diagramConnections.value) {
-    if (!conn.source_alias || !conn.target_alias) continue
-    const forwardKey = `${conn.source_alias}:${conn.target_alias}`
-    const reverseKey = `${conn.target_alias}:${conn.source_alias}`
-    const queue = aliasToConnQueue.get(forwardKey) ?? []
-    queue.push(conn)
-    aliasToConnQueue.set(forwardKey, queue)
-    aliasToConnFallback.set(forwardKey, conn)
-    if (!aliasToConnFallback.has(reverseKey)) aliasToConnFallback.set(reverseKey, conn)
-  }
+  const connAliasMap = buildConnectionAliasMap(diagramConnections.value)
 
   const attachConnGroup = (g: SVGGElement, conn: DiagramConnection) => {
     if (g.hasAttribute('data-conn-id')) return
@@ -252,12 +248,7 @@ const attachInteractivity = async () => {
     const a2raw = g.getAttribute('data-entity-2') ?? ''
     const a1 = svgNodeIdToAlias.get(a1raw) ?? a1raw
     const a2 = svgNodeIdToAlias.get(a2raw) ?? a2raw
-    const forwardKey = `${a1}:${a2}`
-    const reverseKey = `${a2}:${a1}`
-    const conn = aliasToConnQueue.get(forwardKey)?.shift()
-      ?? aliasToConnQueue.get(reverseKey)?.shift()
-      ?? aliasToConnFallback.get(forwardKey)
-      ?? aliasToConnFallback.get(reverseKey)
+    const conn = resolveConnection(a1, a2, connAliasMap)
     if (!conn) continue
     attachConnGroup(g, conn)
   }
@@ -564,6 +555,9 @@ watch(containerRef, (el, prev) => {
   resizeObserver.observe(el)
 })
 watch(svgHtml, (svg) => { if (svg) void fitDiagramToViewport() })
+watch(detail, (next) => {
+  if (diagramNeedsSvg(next?.diagram_type)) svgQuery.run(svc.getDiagramSvg(diagramId.value))
+})
 watch(diagramId, load)
 onUnmounted(() => {
   resizeObserver?.disconnect()
@@ -1163,7 +1157,8 @@ onUnmounted(() => {
   text-align: center;
   vertical-align: bottom;
   white-space: normal;
-  word-break: break-word;
+  overflow-wrap: break-word;
+  word-break: normal;
 }
 .matrix-view :deep(th:first-child) {
   position: sticky;
@@ -1185,7 +1180,8 @@ onUnmounted(() => {
   font-weight: 500;
   min-width: 11rem;
   max-width: 18rem;
-  word-break: break-word;
+  overflow-wrap: break-word;
+  word-break: normal;
   border-right: 2px solid #d1d5db;
 }
 .matrix-view :deep(td:not(:first-child)) { text-align: center; }

@@ -8,8 +8,11 @@ from __future__ import annotations
 
 from src.application.assurance_diagrams import (
     AVAILABLE_DIAGRAMS,
+    bowtie_nodes,
+    render_bowtie,
     render_control_structure,
     render_uca_matrix,
+    uca_matrix_nodes,
 )
 
 
@@ -29,6 +32,7 @@ def _uca(nid: str, name: str, uca_type: str = "commission") -> dict[str, object]
 
 def test_available_diagrams_contains_required_ids() -> None:
     ids = {d["diagram_id"] for d in AVAILABLE_DIAGRAMS}
+    assert "bowtie" in ids
     assert "control-structure" in ids
     assert "uca-matrix" in ids
 
@@ -46,6 +50,18 @@ def test_control_structure_single_node() -> None:
     puml = render_control_structure([_cs_node("N1", "Controller")], [])
     assert "Controller" in puml
     assert "rectangle" in puml
+
+
+def test_control_structure_includes_control_actions_and_their_edges() -> None:
+    nodes = [
+        _cs_node("N1", "Controller"),
+        {"node_id": "CA1", "node_type": "control-action", "name": "Apply brake"},
+    ]
+    edges = [_edge("N1", "CA1", "issues")]
+    puml = render_control_structure(nodes, edges)
+    assert "control" in puml
+    assert "Apply brake" in puml
+    assert "issues" in puml
 
 
 def test_control_structure_node_role_in_output() -> None:
@@ -133,3 +149,31 @@ def test_uca_matrix_unspecified_uca_type_fallback() -> None:
     puml = render_uca_matrix([uca])
     assert "unspecified" in puml
     assert "Unknown UCA" in puml
+
+
+def test_uca_matrix_projection_includes_actions_and_ucas_only() -> None:
+    nodes = [
+        {"node_id": "CA1", "node_type": "control-action", "name": "Brake"},
+        _uca("U1", "Brake omitted"),
+        {"node_id": "H1", "node_type": "hazard", "name": "Collision"},
+    ]
+    assert [n["node_id"] for n in uca_matrix_nodes(nodes)] == ["CA1", "U1"]
+
+
+def test_bowtie_projection_maps_assurance_causal_chain() -> None:
+    nodes = [
+        _uca("U1", "Brake omitted"),
+        {"node_id": "H1", "node_type": "hazard", "name": "Collision"},
+        {"node_id": "L1", "node_type": "loss", "name": "Injury"},
+        {"node_id": "CA1", "node_type": "control-action", "name": "Brake"},
+    ]
+    projected = bowtie_nodes(nodes)
+    assert [n["node_id"] for n in projected] == ["U1", "H1", "L1"]
+    puml = render_bowtie(projected, [
+        _edge("U1", "H1", "violates"),
+        _edge("H1", "L1", "leads-to"),
+    ])
+    assert "<<threat>>" in puml
+    assert "<<top-event>>" in puml
+    assert "<<consequence>>" in puml
+    assert "violates" in puml

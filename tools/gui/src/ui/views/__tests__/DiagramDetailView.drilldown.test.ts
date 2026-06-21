@@ -7,7 +7,7 @@
  */
 import { describe, it, expect } from 'vitest'
 import { computed, ref } from 'vue'
-import { buildDrilldownByEntityId } from '../DiagramDetailView.helpers'
+import { buildDrilldownByEntityId, diagramNeedsSvg } from '../DiagramDetailView.helpers'
 import type { C4Navigation } from '../../../domain'
 
 const makeNav = (overrides: Partial<C4Navigation> = {}): C4Navigation => ({
@@ -17,6 +17,18 @@ const makeNav = (overrides: Partial<C4Navigation> = {}): C4Navigation => ({
   parent_diagrams: [],
   child_diagrams: [],
   ...overrides,
+})
+
+describe('diagramNeedsSvg', () => {
+  it('skips the SVG endpoint for Markdown matrix diagrams', () => {
+    expect(diagramNeedsSvg('matrix')).toBe(false)
+  })
+
+  it('requests SVG for rendered diagram types only after their context is known', () => {
+    expect(diagramNeedsSvg('c4-container')).toBe(true)
+    expect(diagramNeedsSvg('archimate-layered')).toBe(true)
+    expect(diagramNeedsSvg(null)).toBe(false)
+  })
 })
 
 describe('buildDrilldownByEntityId', () => {

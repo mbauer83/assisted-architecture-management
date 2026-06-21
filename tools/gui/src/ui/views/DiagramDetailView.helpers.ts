@@ -1,4 +1,4 @@
-import type { C4Navigation, EntitySummary } from '../../domain'
+import type { C4Navigation, DiagramConnection, EntitySummary } from '../../domain'
 
 /**
  * Build alias→artifactId map for SVG interactivity.
@@ -20,6 +20,11 @@ export function isDiagramOnly(entity: { host_diagram_id?: string | null }): bool
   return !!entity.host_diagram_id
 }
 
+/** Matrix diagrams render their stored Markdown and must never call the SVG renderer. */
+export function diagramNeedsSvg(diagramType: string | null | undefined): boolean {
+  return !!diagramType && diagramType !== 'matrix'
+}
+
 /**
  * Builds a map of entityId → childDiagramId from the C4 navigation context.
  *
@@ -37,4 +42,53 @@ export function buildDrilldownByEntityId(
     if (entityId) map[entityId] = child.diagram_id
   }
   return map
+}
+
+export type ConnectionAliasMap = {
+  queue: Map<string, DiagramConnection[]>
+  fallback: Map<string, DiagramConnection>
+}
+
+/**
+ * Build bidirectional alias-keyed lookup structures for SVG edge interactivity.
+ *
+ * `queue` holds ordered lists of connections per forward/reverse key so that
+ * parallel edges between the same pair of nodes are each matched at most once.
+ * `fallback` holds the first connection seen per key for unordered lookups.
+ */
+export function buildConnectionAliasMap(
+  connections: ReadonlyArray<DiagramConnection>,
+): ConnectionAliasMap {
+  const queue = new Map<string, DiagramConnection[]>()
+  const fallback = new Map<string, DiagramConnection>()
+  for (const conn of connections) {
+    if (!conn.source_alias || !conn.target_alias) continue
+    const fwd = `${conn.source_alias}:${conn.target_alias}`
+    const rev = `${conn.target_alias}:${conn.source_alias}`
+    const q = queue.get(fwd) ?? []
+    q.push(conn)
+    queue.set(fwd, q)
+    fallback.set(fwd, conn)
+    if (!fallback.has(rev)) fallback.set(rev, conn)
+  }
+  return { queue, fallback }
+}
+
+/**
+ * Resolve which DiagramConnection corresponds to an SVG edge between aliases a1 and a2.
+ * Consumes from the queue first (for parallel edges), then falls back to the first seen.
+ */
+export function resolveConnection(
+  a1: string,
+  a2: string,
+  { queue, fallback }: ConnectionAliasMap,
+): DiagramConnection | undefined {
+  const fwd = `${a1}:${a2}`
+  const rev = `${a2}:${a1}`
+  return (
+    queue.get(fwd)?.shift()
+    ?? queue.get(rev)?.shift()
+    ?? fallback.get(fwd)
+    ?? fallback.get(rev)
+  )
 }

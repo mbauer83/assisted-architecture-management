@@ -68,3 +68,26 @@ export function parseExcludedIds(diagramEntities: Record<string, unknown>): Set<
   if (!Array.isArray(raw)) return new Set()
   return new Set(raw.filter((x): x is string => typeof x === 'string'))
 }
+
+/**
+ * Derive the scope entity id from the raw diagramEntities payload that
+ * EditDiagramView receives from the backend.
+ *
+ * Model-backed C4 diagrams: the backend injects _scope_entity_id from the
+ * scoped-by binding into diagram_entities.  Standalone diagrams fall back to
+ * the inline item with scope=true that the frontend writes on scope selection.
+ */
+export function resolveScopeEntityId(diagramEntities: Record<string, unknown>): string {
+  const explicit = diagramEntities._scope_entity_id
+  if (typeof explicit === 'string' && explicit) return explicit
+  for (const [key, items] of Object.entries(diagramEntities)) {
+    if (key.startsWith('_') || !Array.isArray(items)) continue
+    for (const item of items) {
+      if (item && typeof item === 'object') {
+        const r = item as Record<string, unknown>
+        if (r.scope && r.entity_id && typeof r.entity_id === 'string') return r.entity_id
+      }
+    }
+  }
+  return ''
+}

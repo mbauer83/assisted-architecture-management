@@ -16,13 +16,12 @@ def test_module_name() -> None:
     assert str(gsn_module.name) == "gsn"
 
 
-def test_module_class_is_assurance() -> None:
-    assert gsn_module.module_class == "assurance"
+def test_module_class_is_architecture() -> None:
+    assert gsn_module.module_class == "architecture"
 
 
-def test_requires_confidential_store() -> None:
-    requires = list(getattr(gsn_module, "requires", []))
-    assert "confidential_store" in requires
+def test_general_gsn_does_not_require_confidential_store() -> None:
+    assert list(getattr(gsn_module, "requires", [])) == []
 
 
 def test_accepts_no_entity_types() -> None:

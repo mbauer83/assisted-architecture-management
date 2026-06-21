@@ -85,6 +85,8 @@ component "Comp A" as compA
 
 ENT_ID = "REQ@1000000020.EntDia.entity-for-diag"
 DIAG_ID = "DIAG@1000000020.DiagTst.test-diagram"
+ASSURANCE_DIAG_ID = "DIAG@1000000021.BowTest.legacy-bowtie"
+GSN_DIAG_ID = "GSN@1000000022.GsnTst.selectable-gsn"
 
 
 # ── fixtures ──────────────────────────────────────────────────────────────────
@@ -96,6 +98,41 @@ def populated_root(tmp_path: Path) -> Path:
     diag_dir = root / "diagram-catalog" / "diagrams"
     _write(model_dir / f"{ENT_ID}.md", _entity_md(ENT_ID, "Entity For Diag"))
     _write(diag_dir / f"{DIAG_ID}.md", _diagram_md(DIAG_ID, "Test Diagram"))
+    _write(
+        diag_dir / f"{ASSURANCE_DIAG_ID}.md",
+        _diagram_md(ASSURANCE_DIAG_ID, "Legacy Bowtie", "bowtie"),
+    )
+    _write(
+        diag_dir / f"{GSN_DIAG_ID}.puml",
+        f"""\
+---
+artifact-id: {GSN_DIAG_ID}
+artifact-type: diagram
+diagram-type: gsn
+name: "Selectable GSN"
+version: 0.1.0
+status: draft
+last-updated: '2026-06-21'
+diagram-entities:
+  nodes:
+    - node_id: g1
+      name: Claim
+      gsn_type: goal
+    - node_id: s1
+      name: Argument
+      gsn_type: strategy
+  edges:
+    - source_id: g1
+      target_id: s1
+      conn_type: supported-by
+---
+@startuml
+$GsnGoal(g1, "G: Claim")
+$GsnStrategy(s1, "S: Argument")
+$GsnSupportedBy(g1, s1)
+@enduml
+""",
+    )
     return root
 
 
@@ -135,6 +172,12 @@ class TestListDiagrams:
         ids = [d["artifact_id"] for d in r.json()["items"]]
         assert DIAG_ID in ids
 
+    def test_assurance_surface_diagrams_are_absent(self, sync_client) -> None:
+        data = sync_client.get("/api/diagrams").json()
+        assert ASSURANCE_DIAG_ID not in {d["artifact_id"] for d in data["items"]}
+        filtered = sync_client.get("/api/diagrams?diagram_type=bowtie").json()
+        assert filtered == {"total": 0, "items": []}
+
     def test_filter_by_type(self, sync_client) -> None:
         r = sync_client.get("/api/diagrams?diagram_type=archimate-application")
         assert r.status_code == 200
@@ -171,6 +214,16 @@ class TestReadDiagram:
         data = r.json()
         assert "name" in data
         assert "diagram_type" in data
+
+
+def test_gsn_context_includes_selectable_diagram_owned_nodes_and_edges(sync_client) -> None:
+    response = sync_client.get(f"/api/diagram-context?id={GSN_DIAG_ID}")
+    assert response.status_code == 200
+    body = response.json()
+    assert {entity["display_alias"] for entity in body["entities"]} == {"g1", "s1"}
+    assert len(body["connections"]) == 1
+    assert body["connections"][0]["source_alias"] == "g1"
+    assert body["connections"][0]["target_alias"] == "s1"
 
 
 # ── GET /api/entity-display-search ───────────────────────────────────────────

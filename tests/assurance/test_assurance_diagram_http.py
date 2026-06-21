@@ -125,6 +125,7 @@ def test_list_diagrams_returns_available_ids() -> None:
     r = client.get("/api/assurance/diagrams")
     assert r.status_code == 200
     ids = {d["diagram_id"] for d in r.json()["diagrams"]}
+    assert "bowtie" in ids
     assert "control-structure" in ids
     assert "uca-matrix" in ids
     assert r.headers.get("cache-control") == "no-store"
@@ -152,12 +153,53 @@ def test_rendered_control_structure_returns_puml() -> None:
     assert r.headers.get("cache-control") == "no-store"
 
 
-def test_rendered_uca_matrix_returns_puml() -> None:
-    ctx = _FakeContext(_FakeStore())
+def test_rendered_uca_matrix_returns_selectable_grid_data() -> None:
+    store = _FakeStore()
+    store._nodes = [
+        {"node_id": "CA1", "node_type": "control-action", "name": "Brake", "tlp": "TLP:GREEN"},
+        {
+            "node_id": "U1",
+            "node_type": "unsafe-control-action",
+            "name": "Brake omitted",
+            "uca_type": "not-provided",
+            "tlp": "TLP:GREEN",
+        },
+        {"node_id": "H1", "node_type": "hazard", "name": "Collision", "tlp": "TLP:GREEN"},
+    ]
+    store._edges = [
+        {
+            "edge_id": "E1",
+            "source_id": "U1",
+            "target_id": "CA1",
+            "conn_type": "concerns",
+        },
+    ]
+    ctx = _FakeContext(store)
     client = _make_client(ctx)
     r = client.get("/api/assurance/diagrams/uca-matrix/rendered")
     assert r.status_code == 200
-    assert "@startuml" in r.json()["puml"]
+    body = r.json()
+    assert body["puml"] is None
+    assert {node["node_id"] for node in body["nodes"]} == {"CA1", "U1"}
+    assert [edge["edge_id"] for edge in body["edges"]] == ["E1"]
+
+
+def test_rendered_bowtie_returns_store_grounded_nodes() -> None:
+    store = _FakeStore()
+    store._nodes = [
+        {"node_id": "U1", "node_type": "unsafe-control-action", "name": "Omitted", "tlp": "TLP:GREEN"},
+        {"node_id": "H1", "node_type": "hazard", "name": "Collision", "tlp": "TLP:GREEN"},
+        {"node_id": "L1", "node_type": "loss", "name": "Injury", "tlp": "TLP:GREEN"},
+    ]
+    store._edges = [
+        {"edge_id": "E1", "source_id": "U1", "target_id": "H1", "conn_type": "violates"},
+        {"edge_id": "E2", "source_id": "H1", "target_id": "L1", "conn_type": "leads-to"},
+    ]
+    client = _make_client(_FakeContext(store))
+    body = client.get("/api/assurance/diagrams/bowtie/rendered").json()
+    assert {node["node_id"] for node in body["nodes"]} == {"U1", "H1", "L1"}
+    assert {edge["edge_id"] for edge in body["edges"]} == {"E1", "E2"}
+    assert "<<top-event>>" in body["puml"]
 
 
 def test_rendered_unknown_id_returns_404() -> None:

@@ -21,8 +21,8 @@ _EMPTY_ENTITY_TYPES: dict[EntityTypeName, EntityTypeInfo] = {}
 _EMPTY_CONNECTION_TYPES: dict[ConnectionTypeName, ConnectionTypeInfo] = {}
 
 class _GsnDiagramType(DiagramTypeBase):
-    module_class = "assurance"
-    requires: list[str] = ["confidential_store"]
+    module_class = "architecture"
+    requires: list[str] = []
 
     def __init__(self, config: dict[str, Any]) -> None:
         self._config = config
@@ -66,7 +66,8 @@ class _GsnDiagramType(DiagramTypeBase):
                 "Shows goals (G), strategies (S), solutions/evidence (Sn), contexts (C), "
                 "assumptions (A), justifications (J), and undeveloped markers with supported-by "
                 "and in-context-of edges, using GSN Community Standard notation. "
-                "This diagram type is assurance-only and renders into the confidential store context."
+                "Use it directly for general architecture arguments, or publish a TLP-classified "
+                "draft through the assurance GSN bridge."
             ),
             when_not_to_use=(
                 "Do not use for bowtie threat models (use bowtie instead) or STPA control structures "

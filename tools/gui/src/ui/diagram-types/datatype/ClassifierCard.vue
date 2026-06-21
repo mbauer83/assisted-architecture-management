@@ -196,7 +196,6 @@ function removeUniqueConstraint(index: number) {
             </option>
           </select>
           <label class="field-stack">
-            <span>Multiplicity</span>
             <input
               type="text"
               class="attr-mult"

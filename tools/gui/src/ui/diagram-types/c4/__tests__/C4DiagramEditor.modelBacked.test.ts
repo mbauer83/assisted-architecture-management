@@ -10,6 +10,7 @@ import {
   buildC4RoleMap,
   parseExcludedIds,
   groupEntitiesByRole,
+  resolveScopeEntityId,
 } from '../C4DiagramEditor.helpers'
 import type { DiagramOwnEntityTypeUiConfig, EntityDisplayInfo } from '../../../../domain'
 import type { EntityTypeName } from '../../../../domain/types.generated'
@@ -123,6 +124,37 @@ describe('groupEntitiesByRole', () => {
     const groups = groupEntitiesByRole([scope, unknown], 'SCOPE', SYSTEM_CONTEXT_DOTS)
     const otherGroup = groups.find(g => g.entityType === '__other__')
     expect(otherGroup?.entities.map(e => e.artifact_id)).toEqual(['U1'])
+  })
+})
+
+// ── resolveScopeEntityId — T17 data path ─────────────────────────────────────
+
+describe('resolveScopeEntityId', () => {
+  it('returns _scope_entity_id from diagram_entities (model-backed C4 with binding-injected id)', () => {
+    const de = { _scope_entity_id: 'APP@1780783671.hkrdtm.architecture-management-platform' }
+    expect(resolveScopeEntityId(de)).toBe('APP@1780783671.hkrdtm.architecture-management-platform')
+  })
+
+  it('falls back to inline scope item entity_id (standalone mode after scope selection)', () => {
+    const de = {
+      'software-system': [
+        { id: '_scope', entity_id: 'APP@inline-scope', label: 'My System', scope: true },
+      ],
+    }
+    expect(resolveScopeEntityId(de)).toBe('APP@inline-scope')
+  })
+
+  it('returns empty string when diagram_entities is empty (no scope set)', () => {
+    expect(resolveScopeEntityId({})).toBe('')
+  })
+
+  it('returns empty string when _scope_entity_id is an empty string', () => {
+    expect(resolveScopeEntityId({ _scope_entity_id: '' })).toBe('')
+  })
+
+  it('ignores private underscore keys when looking for inline scope', () => {
+    const de = { _excluded_entity_ids: [{ scope: true, entity_id: 'SHOULD-NOT-MATCH' }] }
+    expect(resolveScopeEntityId(de)).toBe('')
   })
 })
 
