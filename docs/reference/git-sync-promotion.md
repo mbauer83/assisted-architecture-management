@@ -97,6 +97,25 @@ the daemon forks. For CI / non-interactive use, set environment variables to ski
 
 ```bash
 export ARCH_GIT_SSH_PASSWORD="my passphrase"   # SSH key passphrase
+export ARCH_GIT_HTTPS_TOKEN="ghp_…"             # personal access token (no username needed)
+# …or an explicit username + password/token instead (takes precedence over the token):
 export ARCH_GIT_HTTPS_USERNAME="my-user"        # HTTPS username
 export ARCH_GIT_HTTPS_PASSWORD="my-token"       # HTTPS password or token
 ```
+
+`ARCH_GIT_HTTPS_TOKEN` is the simplest option for GitHub/GitLab, which ignore the username
+for token auth; the same variable works identically for `arch-backend`, `arch-init`, and the
+container entrypoint, since they share one credential-resolution layer.
+
+To keep the token out of the environment entirely, put it in a file and reference the path
+— via `ARCH_GIT_HTTPS_TOKEN_FILE` or the CLI flag (a path, never the token value itself):
+
+```bash
+arch-backend --daemon --git-token-file /run/secrets/git_pat
+arch-init    --git-token-file /run/secrets/git_pat
+```
+
+A daemon started this way inherits only the file *path*, then re-reads the file itself.
+
+> A PAT only authenticates `https://` remotes. SSH remotes use a key pair; the SSH-side
+> secret is the key passphrase (`ARCH_GIT_SSH_PASSWORD`), not a token.

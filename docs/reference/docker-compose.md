@@ -101,6 +101,11 @@ prompts that would otherwise appear are skipped by design.
 **Git sync** — set whichever your remotes need (in `.env`):
 
 ```ini
+# Simplest: a personal access token alone (GitHub/GitLab ignore the username for
+# token auth, so none is required):
+ARCH_GIT_HTTPS_TOKEN=<personal-access-token>
+# Explicit username + password/token instead (e.g. Bitbucket app passwords, or to
+# override the token's default username). Takes precedence over ARCH_GIT_HTTPS_TOKEN:
 ARCH_GIT_HTTPS_USERNAME=ci-bot
 ARCH_GIT_HTTPS_PASSWORD=<personal-access-token>
 # or, for SSH remotes:

@@ -35,8 +35,11 @@ logger = logging.getLogger(__name__)
 
 
 def main(argv: list[str] | None = None) -> None:
+    from src.infrastructure.git.git_auth import register_token_file
+
     parser = _build_parser()
     args = parser.parse_args(argv)
+    register_token_file(args.git_token_file)
 
     if not (args.status or args.stop) and _is_background_tty_job():
         log_path = _redirect_stdio_to_backend_log(start=Path.cwd())
@@ -86,6 +89,9 @@ def _build_parser() -> argparse.ArgumentParser:
                    help="Start arch-backend detached with output in .arch/backend.log")
     p.add_argument("--host", default="127.0.0.1")
     p.add_argument("--port", type=int, default=None)
+    p.add_argument("--git-token-file", default=None, metavar="PATH",
+                   help="Read the HTTPS personal access token from this file (alternative to "
+                        "ARCH_GIT_HTTPS_TOKEN; keeps the secret out of the environment)")
     return p
 
 

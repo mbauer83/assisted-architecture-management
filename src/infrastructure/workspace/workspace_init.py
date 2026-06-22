@@ -292,7 +292,18 @@ def main(argv: list[str] | None = None) -> None:
         default=False,
         help="Initialize an existing empty git enterprise repo if the configured branch does not exist yet",
     )
+    parser.add_argument(
+        "--git-token-file",
+        default=None,
+        metavar="PATH",
+        help="Read the HTTPS personal access token from this file (alternative to "
+        "ARCH_GIT_HTTPS_TOKEN; keeps the secret out of the environment)",
+    )
     args = parser.parse_args(argv)
+
+    from src.infrastructure.git.git_auth import register_token_file
+
+    register_token_file(args.git_token_file)
 
     if args.config:
         config_path = args.config.resolve()

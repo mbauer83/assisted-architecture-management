@@ -7,6 +7,11 @@ CI / non-interactive overrides (skips prompting):
   ARCH_GIT_SSH_PASSWORD   — SSH key passphrase
   ARCH_GIT_HTTPS_USERNAME — HTTPS username
   ARCH_GIT_HTTPS_PASSWORD — HTTPS password or token
+  ARCH_GIT_HTTPS_TOKEN    — personal access token; used as the password when no explicit
+                            password is given, defaulting the username so a PAT alone is
+                            sufficient (GitHub/GitLab ignore the username for token auth).
+  ARCH_GIT_HTTPS_TOKEN_FILE — path to a file holding the PAT (docker/k8s secret, or the
+                            `--git-token-file` CLI flag). Read when the inline token is unset.
 """
 
 from __future__ import annotations
@@ -116,6 +121,54 @@ def probe_needs_credential(target: Path | str) -> bool:
 
 
 # ---------------------------------------------------------------------------
+# HTTPS credential resolution (supports a PAT supplied without a username)
+# ---------------------------------------------------------------------------
+
+# A non-empty username is required for HTTPS basic auth, but GitHub and GitLab ignore its
+# value when the password is a token — so a PAT alone is enough. Hosts that *do* bind the
+# username (e.g. Bitbucket app passwords) can still set ARCH_GIT_HTTPS_USERNAME explicitly.
+_DEFAULT_TOKEN_USERNAME = "x-access-token"
+
+
+def _read_secret_file(env_var: str) -> str | None:
+    """Read a secret from the file path held in *env_var* (trailing whitespace stripped)."""
+    path = os.environ.get(env_var)
+    if not path:
+        return None
+    try:
+        return Path(path).read_text(encoding="utf-8").strip() or None
+    except OSError:
+        return None
+
+
+def register_token_file(path: str | None) -> None:
+    """Wire a ``--git-token-file`` CLI value into the shared, env-based resolver.
+
+    Sets the *path* (not the token) in the environment so a spawned daemon inherits only the
+    location and re-reads the file itself — the secret never enters the operator-facing config.
+    """
+    if path:
+        os.environ["ARCH_GIT_HTTPS_TOKEN_FILE"] = path
+
+
+def resolve_https_from_env() -> tuple[str | None, str | None]:
+    """Resolve the effective (username, password) for HTTPS auth from the environment.
+
+    ``ARCH_GIT_HTTPS_TOKEN`` (inline) or ``ARCH_GIT_HTTPS_TOKEN_FILE`` (a file path, e.g. a
+    docker/k8s secret or ``--git-token-file``) is a personal access token: it becomes the
+    password when no explicit ``ARCH_GIT_HTTPS_PASSWORD`` is set, and supplies a default
+    username when none is given. Explicit username/password always take precedence.
+    """
+    username = os.environ.get("ARCH_GIT_HTTPS_USERNAME") or None
+    password = os.environ.get("ARCH_GIT_HTTPS_PASSWORD") or None
+    token = os.environ.get("ARCH_GIT_HTTPS_TOKEN") or _read_secret_file("ARCH_GIT_HTTPS_TOKEN_FILE")
+    if token and not password:
+        password = token
+        username = username or _DEFAULT_TOKEN_USERNAME
+    return username, password
+
+
+# ---------------------------------------------------------------------------
 # Interactive collection
 # ---------------------------------------------------------------------------
 
@@ -143,8 +196,7 @@ def collect_credentials(targets: list[Path | str]) -> GitCredentials | None:
             creds.ssh_passphrase = getpass.getpass("SSH key passphrase: ")
 
     if https_targets:
-        env_user = os.environ.get("ARCH_GIT_HTTPS_USERNAME")
-        env_pass = os.environ.get("ARCH_GIT_HTTPS_PASSWORD")
+        env_user, env_pass = resolve_https_from_env()
         if env_user or env_pass:
             creds.https_username = env_user
             creds.https_password = env_pass
@@ -165,12 +217,16 @@ def _target_protocol(target: Path | str) -> str | None:
 # Askpass env construction
 # ---------------------------------------------------------------------------
 
+# A PAT in ARCH_GIT_HTTPS_TOKEN stands in for the password, and defaults the username only
+# when one isn't set — mirroring resolve_https_from_env() so a token alone authenticates
+# even on a code path that hands git the raw process environment.
 _ASKPASS_SCRIPT = (
     "#!/bin/sh\n"
     'prompt="${1:-}"\n'
     'case "$prompt" in\n'
-    '  Username*) printf \'%s\\n\' "${ARCH_GIT_HTTPS_USERNAME:-}" ;;\n'
-    '  Password*) printf \'%s\\n\' "${ARCH_GIT_HTTPS_PASSWORD:-}" ;;\n'
+    '  Username*) printf \'%s\\n\' "${ARCH_GIT_HTTPS_USERNAME:-${ARCH_GIT_HTTPS_TOKEN:+'
+    + _DEFAULT_TOKEN_USERNAME + '}}" ;;\n'
+    '  Password*) printf \'%s\\n\' "${ARCH_GIT_HTTPS_PASSWORD:-${ARCH_GIT_HTTPS_TOKEN:-}}" ;;\n'
     '  *)         printf \'%s\\n\' "${ARCH_GIT_SSH_PASSWORD:-}" ;;\n'
     "esac\n"
 )
@@ -213,8 +269,12 @@ def credentials_to_env_overrides(credentials: GitCredentials | None) -> dict[str
     result: dict[str, str] = {}
     if credentials.ssh_passphrase:
         result["ARCH_GIT_SSH_PASSWORD"] = credentials.ssh_passphrase
-    if credentials.https_username:
-        result["ARCH_GIT_HTTPS_USERNAME"] = credentials.https_username
-    if credentials.https_password:
-        result["ARCH_GIT_HTTPS_PASSWORD"] = credentials.https_password
+    # When the HTTPS secret comes from a token file, the daemon already inherits the file
+    # path (ARCH_GIT_HTTPS_TOKEN_FILE) and re-reads it, so we don't expand the token value
+    # into the daemon's environment.
+    if not os.environ.get("ARCH_GIT_HTTPS_TOKEN_FILE"):
+        if credentials.https_username:
+            result["ARCH_GIT_HTTPS_USERNAME"] = credentials.https_username
+        if credentials.https_password:
+            result["ARCH_GIT_HTTPS_PASSWORD"] = credentials.https_password
     return result
