@@ -14,6 +14,7 @@ from pathlib import Path
 import pytest
 
 from src.config.repo_paths import ARCH_REPO, MODEL
+from src.infrastructure.workspace import workspace_init
 from src.infrastructure.workspace.engagement_repo_template import initialize_arch_repo_in_place
 from src.infrastructure.workspace.workspace_init import _resolve_repo
 
@@ -89,3 +90,35 @@ class TestResolveRepoAutoInit:
 
         with pytest.raises(SystemExit, match="no model/ directory"):
             _resolve_repo("engagement", spec, tmp_path, initialize_if_empty=False)
+
+
+class TestArchInitMainWiring:
+    """End-to-end: the --initialize-*-if-empty CLI flags reach _resolve_repo and scaffold.
+
+    This is the exact docker entrypoint path (arch-init --initialize-engagement-repo-if-empty
+    --initialize-enterprise-repo-if-empty) that the container runs on first boot.
+    """
+
+    def test_main_auto_initializes_empty_clones(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        eng = _clone_with_readme(tmp_path / "data" / "engagement")
+        ent = _clone_with_readme(tmp_path / "data" / "enterprise")
+        config = tmp_path / "arch-workspace.yaml"
+        config.write_text(
+            "engagement:\n"
+            "  git: { url: 'git@example.com:org/eng.git', branch: main, path: data/engagement }\n"
+            "enterprise:\n"
+            "  git: { url: 'git@example.com:org/ent.git', branch: main, path: data/enterprise }\n",
+            encoding="utf-8",
+        )
+        # Dests already exist locally — no cloning or credentials needed.
+        monkeypatch.setattr(workspace_init, "_collect_init_credentials", lambda _cfg: None)
+
+        workspace_init.main([
+            "--config", str(config),
+            "--initialize-engagement-repo-if-empty",
+            "--initialize-enterprise-repo-if-empty",
+        ])
+
+        assert (eng / MODEL).is_dir()
+        assert (ent / MODEL).is_dir()
+        assert workspace_init.load_init_state(tmp_path) is not None

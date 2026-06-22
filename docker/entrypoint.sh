@@ -15,13 +15,25 @@ set -eu
 log() { printf '[entrypoint] %s\n' "$*" >&2; }
 
 # ── 1. Workspace resolution ──────────────────────────────────────────────────
+# Auto-initialize empty/uninitialized git repos on first boot — ON by default so a
+# fresh deployment bootstraps cleanly. Opt out per repo with ARCH_INIT_*_IF_EMPTY set
+# to a falsy value (0/false/no/off).
+is_enabled() {
+    case "$(printf '%s' "${1:-}" | tr '[:upper:]' '[:lower:]')" in
+        0 | false | no | off | "") return 1 ;;
+        *) return 0 ;;
+    esac
+}
+
 WORKSPACE_CONFIG="${ARCH_WORKSPACE_CONFIG:-/app/arch-workspace.yaml}"
 if [ -f "$WORKSPACE_CONFIG" ]; then
     log "Resolving workspace from $WORKSPACE_CONFIG"
+    init_args=""
+    is_enabled "${ARCH_INIT_ENGAGEMENT_IF_EMPTY:-true}" && init_args="$init_args --initialize-engagement-repo-if-empty"
+    is_enabled "${ARCH_INIT_ENTERPRISE_IF_EMPTY:-true}" && init_args="$init_args --initialize-enterprise-repo-if-empty"
+    log "Workspace init flags:${init_args:- (none)}"
     # shellcheck disable=SC2086
-    arch-init --config "$WORKSPACE_CONFIG" \
-        ${ARCH_INIT_ENGAGEMENT_IF_EMPTY:+--initialize-engagement-repo-if-empty} \
-        ${ARCH_INIT_ENTERPRISE_IF_EMPTY:+--initialize-enterprise-repo-if-empty}
+    arch-init --config "$WORKSPACE_CONFIG" $init_args
 else
     log "No workspace config at $WORKSPACE_CONFIG — relying on ARCH_REPO_ROOT/ARCH_ENTERPRISE_ROOT"
 fi
