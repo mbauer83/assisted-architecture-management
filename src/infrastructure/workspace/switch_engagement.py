@@ -308,7 +308,11 @@ def main(argv: list[str] | None = None) -> None:
     branch = args.branch or repo_init_default_branch("engagement")
     available[args.name] = target_spec
     raw_config["engagements"]["active"] = args.name
-    raw_config["engagement"] = target_spec
+    # Catalog form is the single source of truth: the active entry under
+    # 'engagements' fully determines the engagement, so a top-level 'engagement'
+    # would be a redundant (and conflict-prone) duplicate. parse_workspace_config
+    # derives it from 'engagements.active'.
+    raw_config.pop("engagement", None)
 
     _write_config(config_path, raw_config)
     _materialize_new_repo(spec=target_spec, workspace_root=workspace_root, create=args.create, branch=branch)

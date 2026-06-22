@@ -43,7 +43,10 @@ from src.config.workspace_paths import (
 from src.config.workspace_paths import (
     parse_workspace_config as _parse_config,
 )
-from src.infrastructure.workspace.engagement_repo_template import create_engagement_repo
+from src.infrastructure.workspace.engagement_repo_template import (
+    create_engagement_repo,
+    initialize_arch_repo_in_place,
+)
 
 # ---------------------------------------------------------------------------
 # Git helpers
@@ -186,7 +189,14 @@ def _resolve_repo(
 
         model_dir = dest / MODEL
         if not model_dir.is_dir():
-            raise SystemExit(f"ERROR: cloned {label} repo has no {MODEL}/ directory: {dest}")
+            if not initialize_if_empty:
+                raise SystemExit(f"ERROR: cloned {label} repo has no {MODEL}/ directory: {dest}")
+            print(f"  {label}: clone has no arch-repo structure — initializing in place ({dest})")
+            initialize_arch_repo_in_place(
+                dest,
+                commit_author_name=repo_init_commit_author_name(label),
+                commit_author_email=repo_init_commit_author_email(label),
+            )
         return dest
 
     raise SystemExit(f"ERROR: {label} must specify either 'local' or 'git'")

@@ -46,7 +46,8 @@ def test_switches_to_existing_configured_engagement(tmp_path: Path) -> None:
 
     updated = yaml.safe_load(config_path.read_text(encoding="utf-8"))
     assert updated["engagements"]["active"] == "eng-b"
-    assert updated["engagement"]["local"] == "eng-b"
+    # Catalog form is the single source of truth — no redundant top-level 'engagement'.
+    assert "engagement" not in updated
     state = load_init_state(workspace_root)
     assert state is not None
     assert state["engagement_root"] == str(eng_b.resolve())

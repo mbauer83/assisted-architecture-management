@@ -171,6 +171,30 @@ def _commit_initial_scaffold(path: Path, *, commit_author_name: str, commit_auth
         raise SystemExit(f"ERROR: git commit failed for {path}\n{result.stderr.strip()}")
 
 
+def _scaffold_arch_dirs(path: Path) -> None:
+    path.mkdir(parents=True, exist_ok=True)
+    (path / MODEL).mkdir(parents=True, exist_ok=True)
+    (path / DOCS).mkdir(parents=True, exist_ok=True)
+    (path / DIAGRAM_CATALOG / DIAGRAMS).mkdir(parents=True, exist_ok=True)
+    (path / DIAGRAM_CATALOG / RENDERED).mkdir(parents=True, exist_ok=True)
+    # Empty-repo init gets the full current default (base + assurance doc-types).
+    ensure_arch_repo_defaults(path, document_schemas=DEFAULT_DOCUMENT_SCHEMAS)
+
+
+def _commit_scaffold_changes(path: Path, *, commit_author_name: str, commit_author_email: str) -> None:
+    """Commit the scaffolded structure, even when the repo already has unrelated commits."""
+    _run_git(["add", "-A"], cwd=path)
+    if not _git_output(["status", "--porcelain"], cwd=path).stdout.strip():
+        return
+    result = _git_output(
+        ["-c", f"user.name={commit_author_name}", "-c", f"user.email={commit_author_email}",
+         "commit", "-m", INITIAL_COMMIT_MESSAGE],
+        cwd=path,
+    )
+    if result.returncode != 0:
+        raise SystemExit(f"ERROR: git commit failed for {path}\n{result.stderr.strip()}")
+
+
 def create_engagement_repo(
     path: Path,
     *,
@@ -184,17 +208,33 @@ def create_engagement_repo(
     if path.exists() and any(path.iterdir()) and not (path / MODEL).is_dir():
         raise SystemExit(f"ERROR: engagement path exists but does not look like an architecture repository: {path}")
 
-    path.mkdir(parents=True, exist_ok=True)
-    (path / MODEL).mkdir(parents=True, exist_ok=True)
-    (path / DOCS).mkdir(parents=True, exist_ok=True)
-    (path / DIAGRAM_CATALOG / DIAGRAMS).mkdir(parents=True, exist_ok=True)
-    (path / DIAGRAM_CATALOG / RENDERED).mkdir(parents=True, exist_ok=True)
-
-    # Empty-repo init gets the full current default (base + assurance doc-types).
-    ensure_arch_repo_defaults(path, document_schemas=DEFAULT_DOCUMENT_SCHEMAS)
-
+    _scaffold_arch_dirs(path)
     _ensure_git_repo(path, git_url=git_url, branch=branch)
     _commit_initial_scaffold(
+        path,
+        commit_author_name=commit_author_name,
+        commit_author_email=commit_author_email,
+    )
+    return path.resolve()
+
+
+def initialize_arch_repo_in_place(
+    path: Path,
+    *,
+    commit_author_name: str = "arch-init",
+    commit_author_email: str = "arch-init@local.invalid",
+) -> Path:
+    """Scaffold the arch-repo structure into an existing git checkout that lacks it.
+
+    Unlike :func:`create_engagement_repo`, this is for a repo that is already a git
+    checkout (cloned, possibly carrying unrelated commits such as a README). It adds the
+    missing model/docs/diagram-catalog structure plus ``.arch-repo`` defaults and commits
+    the additions. Idempotent: a no-op once ``model/`` exists.
+    """
+    if (path / MODEL).is_dir():
+        return path.resolve()
+    _scaffold_arch_dirs(path)
+    _commit_scaffold_changes(
         path,
         commit_author_name=commit_author_name,
         commit_author_email=commit_author_email,
