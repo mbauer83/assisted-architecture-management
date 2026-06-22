@@ -3,6 +3,7 @@ import { RouterLink, useRoute, useRouter } from 'vue-router'
 import { computed, inject, onMounted, ref } from 'vue'
 import { Effect } from 'effect'
 import { modelServiceKey } from '../keys'
+import { searchHitRoute } from '../lib/searchNavigation'
 import ArchimateTypeGlyph from './ArchimateTypeGlyph.vue'
 import type { EnterpriseSyncStatus, SearchHit } from '../../domain'
 import { readErrorMessage } from '../lib/errors'
@@ -76,9 +77,8 @@ const onSearchInput = () => {
 
 const selectHit = (hit: SearchDropdownHit) => {
   showDropdown.value = false; searchQuery.value = ''; searchHits.value = []
-  if (hit.record_type === 'diagram') void router.push({ path: '/diagram', query: { id: hit.artifact_id } })
-  else if (hit.record_type === 'document') void router.push({ path: '/document', query: { id: hit.artifact_id } })
-  else void router.push({ path: '/entity', query: { id: hit.artifact_id } })
+  const to = searchHitRoute(hit)
+  if (to) void router.push(to)
 }
 const submitSearch = () => {
   const q = searchQuery.value.trim()

@@ -2,6 +2,7 @@
 import { inject, ref, watch } from 'vue'
 import { useRoute, useRouter, RouterLink } from 'vue-router'
 import { modelServiceKey } from '../keys'
+import { searchHitRoute } from '../lib/searchNavigation'
 import { useQuery } from '../composables/useQuery'
 import type { SearchResult } from '../../domain'
 import type { RepoError } from '../../ports/ModelRepository'
@@ -91,29 +92,8 @@ const friendlyName = (id: string) => {
         >
           <div class="result-top">
             <RouterLink
-              v-if="h.record_type === 'entity'"
-              :to="{ path: '/entity', query: { id: h.artifact_id } }"
-              class="result-name"
-            >
-              {{ h.name || friendlyName(h.artifact_id) }}
-            </RouterLink>
-            <RouterLink
-              v-else-if="h.record_type === 'diagram'"
-              :to="{ path: '/diagram', query: { id: h.artifact_id } }"
-              class="result-name"
-            >
-              {{ h.name || friendlyName(h.artifact_id) }}
-            </RouterLink>
-            <RouterLink
-              v-else-if="h.record_type === 'document'"
-              :to="{ path: '/document', query: { id: h.artifact_id } }"
-              class="result-name"
-            >
-              {{ h.name || friendlyName(h.artifact_id) }}
-            </RouterLink>
-            <RouterLink
-              v-else-if="h.record_type === 'assurance-node'"
-              :to="{ path: '/assurance/browse', query: { node_id: h.artifact_id } }"
+              v-if="searchHitRoute(h)"
+              :to="searchHitRoute(h)!"
               class="result-name"
             >
               {{ h.name || friendlyName(h.artifact_id) }}
