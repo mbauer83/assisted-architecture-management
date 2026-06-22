@@ -7,6 +7,7 @@ Commands:
   unlock                Verify the encryption key works and report store stats
   backup                Copy the encrypted DB to a timestamped backup file
   export                Export all assurance data to a JSON file (plaintext)
+  import                Restore a JSON bundle into the store (inverse of export)
   rotate-key            Generate new encryption key and re-encrypt the store
   export-key            Print recovery key from the OS keychain
   verify                Backend-aware chain integrity check (private-git: no key required)
@@ -29,6 +30,7 @@ from src.infrastructure.cli._assurance_commands import (
     cmd_export,
     cmd_export_aibom,
     cmd_export_key,
+    cmd_import,
     cmd_import_sbom,
     cmd_init,
     cmd_lock,
@@ -104,6 +106,13 @@ def main() -> None:
     p_export = sub.add_parser("export", help="Export all data to JSON (decrypted — handle carefully)")
     p_export.add_argument("--output", required=True, metavar="PATH", help="Output JSON file path")
 
+    p_import = sub.add_parser("import", help="Restore a JSON bundle into the store (inverse of export)")
+    p_import.add_argument("input", metavar="FILE", help="Path to the exported JSON bundle")
+    p_import.add_argument(
+        "--replace", action="store_true",
+        help="Clear existing assurance data first (idempotent re-seed) instead of merging",
+    )
+
     sub.add_parser("rotate-key", help="Generate new encryption key and re-encrypt the store")
     sub.add_parser("export-key", help="Print recovery key from the OS keychain")
     sub.add_parser("verify", help="Backend-aware chain integrity check (private-git: no key required)")
@@ -133,6 +142,7 @@ def main() -> None:
     dispatch = {
         "init": cmd_init, "status": cmd_status, "use-backend": cmd_use_backend,
         "unlock": cmd_unlock, "lock": cmd_lock, "backup": cmd_backup, "export": cmd_export,
+        "import": cmd_import,
         "rotate-key": cmd_rotate_key, "export-key": cmd_export_key,
         "verify": cmd_verify, "verify-chain": cmd_verify_chain,
         "pocketbase-init": cmd_pocketbase_init, "pocketbase-status": cmd_pocketbase_status,

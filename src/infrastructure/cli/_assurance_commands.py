@@ -250,6 +250,24 @@ def cmd_export(args: argparse.Namespace) -> int:
         store.lock()
 
 
+def cmd_import(args: argparse.Namespace) -> int:
+    from src.infrastructure.assurance._sqlcipher_store import SQLCipherAssuranceStore  # noqa: PLC0415
+    from src.infrastructure.assurance.lifecycle import import_store  # noqa: PLC0415
+
+    db_path = Path(args.db_path) if args.db_path else _default_db_path()
+    store = SQLCipherAssuranceStore(db_path)
+    try:
+        store.unlock()
+        result = import_store(store, Path(args.input), replace=args.replace)
+        print(f"Imported {result['counts']} from {result['input_path']}.")
+        return 0
+    except RuntimeError as exc:
+        print(f"Error: {exc}", file=sys.stderr)
+        return 1
+    finally:
+        store.lock()
+
+
 def cmd_rotate_key(args: argparse.Namespace) -> int:
     from src.infrastructure.assurance.lifecycle import rotate_key  # noqa: PLC0415
 

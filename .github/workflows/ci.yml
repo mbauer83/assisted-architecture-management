@@ -164,8 +164,16 @@ jobs:
       - name: Initialise workspace (bundled self-describing model)
         run: uv run arch-init
 
-      - name: Initialise an empty confidential assurance store (enables the assurance module)
+      - name: Initialise the confidential assurance store (enables the assurance module)
         run: uv run arch-assurance init
+
+      - name: Activate + seed the assurance store with the committed dogfood content
+        # `unlock` sets the persistent setup-confirmed gate so the backend auto-unlocks on
+        # start; `import` restores the published demo graph (all TLP:GREEN → publishable) so
+        # the assurance GUI/e2e tests run against real data instead of an empty store.
+        run: |
+          uv run arch-assurance unlock
+          uv run arch-assurance import seed-assurance.json --replace
 
       - name: Start the backend (serves API + built SPA on :8000)
         run: |

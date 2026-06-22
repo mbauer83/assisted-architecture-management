@@ -135,18 +135,25 @@ def backup_store(db_path: Path, *, backup_path: Path | None = None) -> dict[str,
 
 
 def export_store(store: SQLCipherAssuranceStore, output_path: Path) -> dict[str, object]:
-    """Export all assurance nodes and edges to a JSON file (for data portability)."""
-    if not store.is_unlocked():
-        raise RuntimeError("Store must be unlocked before export.")
-    data = {
-        "export_time": utc_now_iso(),
-        "nodes": store.list_nodes(),
-        "edges": store.list_edges(),
-        "arch_refs": store.list_arch_refs(),
-    }
+    """Export the full assurance graph (analyses, nodes, edges, arch-refs) to a JSON file."""
+    from src.infrastructure.assurance._portability import export_bundle  # noqa: PLC0415
+
+    data: dict[str, object] = {"export_time": utc_now_iso(), **export_bundle(store)}
     output_path.write_text(json.dumps(data, indent=2))
     logger.info("Assurance store exported to %s", output_path)
-    return {"status": "exported", "output_path": str(output_path), "node_count": len(data["nodes"])}
+    nodes = data["nodes"]
+    node_count = len(nodes) if isinstance(nodes, list) else 0
+    return {"status": "exported", "output_path": str(output_path), "node_count": node_count}
+
+
+def import_store(store: SQLCipherAssuranceStore, input_path: Path, *, replace: bool = False) -> dict[str, object]:
+    """Restore an exported JSON bundle into *store*, preserving ids (inverse of export_store)."""
+    from src.infrastructure.assurance._portability import import_bundle  # noqa: PLC0415
+
+    bundle = json.loads(input_path.read_text())
+    counts = import_bundle(store, bundle, replace=replace)
+    logger.info("Assurance store imported from %s: %s", input_path, counts)
+    return {"status": "imported", "input_path": str(input_path), "counts": counts}
 
 
 # ── rotate-key ────────────────────────────────────────────────────────────────

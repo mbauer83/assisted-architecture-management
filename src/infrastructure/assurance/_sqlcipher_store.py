@@ -102,6 +102,10 @@ class SQLCipherAssuranceStore:
     def _require_unlocked(self) -> Any:
         return self._conns.require()
 
+    def unlocked_connection(self) -> Any:
+        """Public handle to the unlocked DB connection for bulk portability operations."""
+        return self._require_unlocked()
+
     # ── Analysis aggregate ──────────────────────────────────────────────────────
 
     def create_analysis(
