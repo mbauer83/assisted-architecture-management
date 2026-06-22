@@ -26,7 +26,7 @@ from src.infrastructure.gui.routers._diagram_context import (
     puml_contains,
 )
 from src.infrastructure.gui.routers._diagram_edge_label import router as _edge_label_router
-from src.infrastructure.gui.routers._diagram_serving import _rendered_name
+from src.infrastructure.gui.routers._diagram_serving import _rendered_path
 from src.infrastructure.gui.routers._diagram_serving import router as _serving_router
 from src.infrastructure.gui.routers._diagram_write import router as _write_router
 
@@ -65,7 +65,8 @@ def _read_diagram_impl(id: str, catalogs: RuntimeCatalogs) -> dict[str, Any]:
         if local_connections:
             diagram_entities = {**diagram_entities, "_connections": local_connections}
         result["diagram_entities"] = diagram_entities or None
-        result["rendered_filename"] = _rendered_name(diag_rec, ".png")
+        _png = _rendered_path(diag_rec, ".png")
+        result["rendered_filename"] = _png.name if _png is not None else None
         result["is_global"] = s.is_global(diag_rec.path)
         parsed = parse_diagram_source(str(result.get("puml_source", "")))
         frontmatter = parsed["frontmatter"]

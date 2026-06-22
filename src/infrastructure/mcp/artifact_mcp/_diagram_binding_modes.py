@@ -11,14 +11,20 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from src.config.repo_paths import DIAGRAM_CATALOG, DIAGRAMS
+from src.application.repo_path_helpers import diagram_source_root, resolve_diagram_source_path
 from src.infrastructure.mcp.artifact_mcp.write._common import _out
 from src.infrastructure.write.artifact_write.diagram_edit import edit_diagram
 from src.infrastructure.write.artifact_write.parse_existing import parse_diagram_file
 
 
-def _diagram_path(root: Path, artifact_id: str) -> Path:
-    return root / DIAGRAM_CATALOG / DIAGRAMS / f"{artifact_id}.puml"
+def _diagram_path(root: Path, artifact_id: str, key: str) -> Path:
+    """Resolve a diagram's source path group-aware, so binding modes work on diagrams in a
+    group collection (or other subdirectory), not only a flat layout."""
+    from src.infrastructure.artifact_index.service import shared_artifact_index  # noqa: PLC0415
+
+    index = shared_artifact_index([Path(p) for p in key.split("|") if p])
+    resolved = resolve_diagram_source_path(root, artifact_id, index.find_file_by_id)
+    return resolved if resolved is not None else diagram_source_root(root) / f"{artifact_id}.puml"
 
 
 def _require_exists(path: Path, artifact_id: str) -> None:
@@ -48,7 +54,7 @@ def dispatch_binding_mode(
     binding_id: str | None,
     dry_run: bool,
 ) -> dict[str, object]:
-    path = _diagram_path(root, artifact_id)
+    path = _diagram_path(root, artifact_id, key)
 
     if mode == "refresh-derivation":
         return _refresh_derivation(artifact_id, derivation_id, path, key)

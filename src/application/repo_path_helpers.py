@@ -21,6 +21,7 @@ the ``group`` field on every record.
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from pathlib import Path
 
 from src.domain.groups import UNCATEGORIZED
@@ -60,6 +61,29 @@ def all_model_roots(repo_root: Path) -> list[Path]:
 def diagram_source_root(repo_root: Path) -> Path:
     """Diagram source root: <repo>/diagram-catalog/diagrams/"""
     return repo_root / DIAGRAM_CATALOG / DIAGRAMS
+
+
+def resolve_diagram_source_path(
+    repo_root: Path,
+    artifact_id: str,
+    find_file_by_id: Callable[[str], Path | None] | None = None,
+) -> Path | None:
+    """Resolve a diagram's source ``.puml``, honouring group-collection subdirectories.
+
+    Single resolution seam for every read/write process: the conventional flat path is tried
+    first (fast, no index dependency), then the injected id→path resolver (the artifact index)
+    so a diagram in a group collection — or any other subdirectory — resolves wherever it
+    actually lives rather than 404'ing against an assumed flat layout. The resolver is passed
+    as a callable to keep this path helper free of any index/port dependency.
+    """
+    flat = diagram_source_root(repo_root) / f"{artifact_id}.puml"
+    if flat.exists():
+        return flat
+    if find_file_by_id is not None:
+        resolved = find_file_by_id(artifact_id)
+        if resolved is not None and resolved.exists():
+            return resolved
+    return None
 
 
 # Confidential diagram sources (e.g. assurance diagrams classified above the publishability

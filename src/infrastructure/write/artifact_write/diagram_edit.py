@@ -7,8 +7,8 @@ from typing import Any
 from src.application.candidate_repository import CandidateRepository
 from src.application.modeling.artifact_write import format_diagram_puml
 from src.application.modeling.artifact_write_layout import optimize_puml_layout
+from src.application.repo_path_helpers import diagram_source_root, resolve_diagram_source_path
 from src.application.verification.artifact_verifier import ArtifactVerifier
-from src.config.repo_paths import DIAGRAM_CATALOG, DIAGRAMS
 
 from .boundary import assert_engagement_write_root, today_iso
 from .coerce import as_optional_str_list
@@ -93,15 +93,10 @@ def edit_diagram(
     assert_engagement_write_root(repo_root)
     warnings: list[str] = []
 
-    diagram_path = repo_root / DIAGRAM_CATALOG / DIAGRAMS / f"{artifact_id}.puml"
-    if not diagram_path.exists():
-        # Fall back to the indexed location so diagrams in subdirectories (group collections
-        # or the gitignored confidential/ root) resolve rather than spuriously 404.
-        resolved = verifier.registry.find_file_by_id(artifact_id) if verifier.registry is not None else None
-        if resolved is not None and resolved.exists():
-            diagram_path = resolved
-        else:
-            raise ValueError(f"Diagram '{artifact_id}' not found at {diagram_path}")
+    _find = verifier.registry.find_file_by_id if verifier.registry is not None else None
+    diagram_path = resolve_diagram_source_path(repo_root, artifact_id, _find)
+    if diagram_path is None:
+        raise ValueError(f"Diagram '{artifact_id}' not found under {diagram_source_root(repo_root)}")
 
     parsed = parse_diagram_file(diagram_path)
     fm = parsed.frontmatter
@@ -366,9 +361,10 @@ def set_diagram_edge_label(
     ``edge_key`` is ``"{src_alias}:{tgt_alias}"`` from the rendered PUML.
     ``label=None`` removes the override, reverting to the derived label.
     """
-    diagram_path = repo_root / DIAGRAM_CATALOG / DIAGRAMS / f"{artifact_id}.puml"
-    if not diagram_path.exists():
-        raise ValueError(f"Diagram '{artifact_id}' not found at {diagram_path}")
+    _find = verifier.registry.find_file_by_id if verifier.registry is not None else None
+    diagram_path = resolve_diagram_source_path(repo_root, artifact_id, _find)
+    if diagram_path is None:
+        raise ValueError(f"Diagram '{artifact_id}' not found under {diagram_source_root(repo_root)}")
 
     parsed = parse_diagram_file(diagram_path)
     raw_el = parsed.frontmatter.get("edge-labels")

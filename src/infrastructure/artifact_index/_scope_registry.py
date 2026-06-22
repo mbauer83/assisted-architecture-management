@@ -92,7 +92,16 @@ class _ScopeRegistry:
             return r.status if r is not None else None
 
     def find_file_by_id(self, artifact_id: str) -> Path | None:
+        """Resolve any artifact id to its indexed file path, group subdirectory included.
+
+        Honours the port contract for every standalone artifact kind — entities, diagrams,
+        and documents — rather than entities alone, so callers resolve a diagram or document
+        in a group collection (or other subdirectory) instead of assuming a flat layout.
+        """
         self._ensure_loaded()
         with self._lock.reading():
-            r = self._mem.entities.get(artifact_id)
-            return r.path if r is not None else None
+            for table in (self._mem.entities, self._mem.diagrams, self._mem.documents):
+                r = table.get(artifact_id)
+                if r is not None:
+                    return r.path
+            return None

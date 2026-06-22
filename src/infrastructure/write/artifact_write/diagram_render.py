@@ -1,7 +1,6 @@
 """Diagram PlantUML rendering helpers (PNG, SVG, and entity-body rendering)."""
 
 import os
-import re
 import subprocess
 import tempfile
 from pathlib import Path
@@ -10,7 +9,7 @@ from src.application.repo_path_helpers import rendered_dir_for_diagram, repo_roo
 from src.application.verification.artifact_verifier_syntax import find_graphviz_dot, find_plantuml_jar
 from src.config.settings import plantuml_limit_size, render_dpi
 from src.infrastructure.rendering.native_svg import render_native_svg
-from src.infrastructure.rendering.puml_safety import strip_leading_puml_frontmatter
+from src.infrastructure.rendering.puml_safety import strip_leading_puml_frontmatter, strip_startuml_name
 
 from .diagram_confidentiality import is_confidential_diagram_source
 from .diagram_references import _prepare_diagram_puml_body
@@ -97,7 +96,7 @@ def _render_diagram_png(puml_path: Path, warnings: list[str]) -> Path | None:
     # Strip the diagram name so PlantUML uses the temp-file stem as the output filename.
     # When @startuml carries a name PlantUML uses that name instead, which breaks the
     # temp→final rename below.
-    puml_body_for_render = re.sub(r"@startuml\s+\S+", "@startuml", puml_body, count=1)
+    puml_body_for_render = strip_startuml_name(puml_body)
     if render_native_svg(puml_body_for_render, diagram_type) is not None:
         warnings.append(
             f"PNG render skipped: '{diagram_type}' owns scalable SVG notation; use the SVG rendering"
@@ -186,7 +185,7 @@ def _render_diagram_svg(puml_path: Path, warnings: list[str]) -> Path | None:
         return None
 
     puml_body = _prepare_diagram_puml_body(puml_body, repo_root, diagram_type)
-    puml_body_for_render = re.sub(r"@startuml\s+\S+", "@startuml", puml_body, count=1)
+    puml_body_for_render = strip_startuml_name(puml_body)
     if (native_svg := render_native_svg(puml_body_for_render, diagram_type)) is not None:
         final = rendered_dir / f"{puml_path.stem}.svg"
         final.write_text(native_svg, encoding="utf-8")
@@ -200,6 +199,7 @@ def _render_diagram_svg(puml_path: Path, warnings: list[str]) -> Path | None:
 
     jar = find_plantuml_jar()
     if jar is None:
+        warnings.append("plantuml.jar not found; SVG render skipped")
         tmp_path.unlink(missing_ok=True)
         return None
 
@@ -227,6 +227,7 @@ def _render_diagram_svg(puml_path: Path, warnings: list[str]) -> Path | None:
             env=env,
         )
         if result.returncode != 0:
+            warnings.append(f"SVG render failed: {result.stderr[:200]}")
             return None
 
         rendered = rendered_dir / f"{tmp_path.stem}.svg"
@@ -234,8 +235,10 @@ def _render_diagram_svg(puml_path: Path, warnings: list[str]) -> Path | None:
             final = rendered_dir / f"{puml_path.stem}.svg"
             rendered.rename(final)
             return final
+        warnings.append("SVG render produced no output file")
         return None
-    except (OSError, subprocess.TimeoutExpired):
+    except (OSError, subprocess.TimeoutExpired) as exc:
+        warnings.append(f"SVG render error: {exc}")
         return None
     finally:
         try:

@@ -30,8 +30,8 @@ raises ValueError.
 from collections.abc import Callable
 from pathlib import Path
 
+from src.application.repo_path_helpers import diagram_source_root, resolve_diagram_source_path
 from src.application.verification.artifact_verifier import ArtifactVerifier
-from src.config.repo_paths import DIAGRAM_CATALOG, DIAGRAMS
 
 from ._sync_helpers import (
     LookupStore,
@@ -88,9 +88,10 @@ def refresh_diagram(
     NEVER deleted.  ArchiMate-reconcile diagrams are delegated to sync_diagram_to_model.
     The ``store`` parameter is only used on the ArchiMate-reconcile path.
     """
-    diagram_path = repo_root / DIAGRAM_CATALOG / DIAGRAMS / f"{artifact_id}.puml"
-    if not diagram_path.exists():
-        raise ValueError(f"Diagram '{artifact_id}' not found at {diagram_path}")
+    _find = verifier.registry.find_file_by_id if verifier.registry is not None else None
+    diagram_path = resolve_diagram_source_path(repo_root, artifact_id, _find)
+    if diagram_path is None:
+        raise ValueError(f"Diagram '{artifact_id}' not found under {diagram_source_root(repo_root)}")
 
     parsed = parse_diagram_file(diagram_path)
 
@@ -151,9 +152,10 @@ def sync_diagram_to_model(
 
     assert_engagement_write_root(repo_root)
 
-    diagram_path = repo_root / DIAGRAM_CATALOG / DIAGRAMS / f"{artifact_id}.puml"
-    if not diagram_path.exists():
-        raise ValueError(f"Diagram '{artifact_id}' not found at {diagram_path}")
+    _find = verifier.registry.find_file_by_id if verifier.registry is not None else None
+    diagram_path = resolve_diagram_source_path(repo_root, artifact_id, _find)
+    if diagram_path is None:
+        raise ValueError(f"Diagram '{artifact_id}' not found under {diagram_source_root(repo_root)}")
 
     parsed = parse_diagram_file(diagram_path)
     fm = parsed.frontmatter

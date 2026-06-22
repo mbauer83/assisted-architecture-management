@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import base64
 import os
-import re
 import subprocess
 import tempfile
 from pathlib import Path
@@ -12,12 +11,12 @@ from pathlib import Path
 from src.config.repo_paths import DIAGRAM_CATALOG, DIAGRAMS
 from src.infrastructure.diagram_type_registry import get_diagram_type
 from src.infrastructure.rendering.native_svg import render_native_svg
-from src.infrastructure.rendering.puml_safety import strip_leading_puml_frontmatter
+from src.infrastructure.rendering.puml_safety import strip_leading_puml_frontmatter, strip_startuml_name
 
 
 def _prepare_body(puml_body: str, repo_root: Path, diagram_type: str | None) -> str:
     body = strip_leading_puml_frontmatter(puml_body)
-    body = re.sub(r"@startuml\s+\S+", "@startuml", body, count=1)
+    body = strip_startuml_name(body)
     if diagram_type is None:
         return body
     return get_diagram_type(diagram_type).renderer.inject_includes(body, repo_root)

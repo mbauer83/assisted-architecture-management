@@ -157,6 +157,12 @@ test('every stored diagram instance renders (exercises each diagram type)', asyn
 
   for (const diagram of diagrams) {
     await test.step(`${diagram.diagram_type}: ${diagram.name}`, async () => {
+      // Assert the SVG actually renders. Navigating the page and checking health races the
+      // lazy, ~1s /api/diagram-svg call (which can outlast the health check), so a broken
+      // diagram passed unnoticed; fetch the render endpoint directly and require success.
+      const svg = await request.get(`/api/diagram-svg?id=${encodeURIComponent(diagram.artifact_id)}`)
+      expect(svg.ok(), `${diagram.diagram_type} '${diagram.name}' failed to render: HTTP ${svg.status()}`).toBeTruthy()
+
       const page = await context.newPage()
       const { problems } = watch(page)
       try {
