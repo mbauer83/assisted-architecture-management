@@ -23,6 +23,7 @@ import {
   diagramNeedsSvg,
   resolveConnection,
 } from './DiagramDetailView.helpers'
+import { lookupViewerExtension } from '../lib/diagramViewerExtensions'
 
 const svc = inject(modelServiceKey)!
 const route = useRoute()
@@ -46,6 +47,9 @@ const diagramEntities = computed(() =>
     .sort((a, b) => a.domain.localeCompare(b.domain) || a.artifact_type.localeCompare(b.artifact_type) || a.name.localeCompare(b.name))
 )
 const diagramConnections = computed(() => contextQuery.data.value?.connections ?? [])
+// Per-diagram-type viewer extension (e.g. datatype: selectable attribute rows). The generic
+// viewer stays type-agnostic — it only knows a type may contribute selectable node sub-parts.
+const viewerExtension = computed(() => lookupViewerExtension(detail.value?.diagram_type))
 
 const svgHtml = computed(() =>
   svgQuery.data.value
@@ -118,6 +122,7 @@ let _attachRun = 0
 
 const load = () => {
   if (!diagramId.value) return
+  selectedSubPart.value = null
   contextQuery.reset()
   svgQuery.reset()
   contextQuery.run(svc.getDiagramContext(diagramId.value))
@@ -154,6 +159,21 @@ const addConnectionHitAreas = (group: SVGGElement) => {
     hit.setAttribute('vector-effect', 'non-scaling-stroke')
     group.appendChild(hit)
   }
+}
+
+// Delegate selectable node sub-parts (e.g. datatype attribute rows) to the diagram type's
+// viewer extension, if any — keeps all type-specific knowledge out of this generic view.
+const attachNodeSubParts = (g: SVGGElement, entityId: string, signal: AbortSignal) => {
+  const ext = viewerExtension.value
+  const diagramEntities = detail.value?.diagram_entities
+  if (!ext || typeof diagramEntities !== 'object' || diagramEntities === null) return
+  ext.attachNodeSubParts({
+    entityId,
+    node: g,
+    diagramEntities: diagramEntities as Record<string, unknown>,
+    signal,
+    onSelect: selectSubPart,
+  })
 }
 
 const attachInteractivity = async () => {
@@ -200,6 +220,7 @@ const attachInteractivity = async () => {
     g.setAttribute('data-entity-id', artifactId)
     svgNodeElems.value.set(artifactId, g)
     g.addEventListener('click', (ev) => { ev.stopPropagation(); selectEntity(artifactId) }, { signal })
+    attachNodeSubParts(g, artifactId, signal)
   }
 
   // Inject drill-down badges for entities that scope a child C4 diagram.
@@ -276,6 +297,8 @@ watch([svgHtml, diagramEntities, diagramConnections], () => { void attachInterac
 
 const selectedId = ref<string | null>(null)
 const selectedConnection = ref<DiagramConnection | null>(null)
+// Opaque payload from the diagram type's viewer extension; rendered by its detailComponent.
+const selectedSubPart = ref<unknown>(null)
 const edgeLabelInput = ref('')
 const edgeLabelMutation = useMutation<WriteResult, RepoError>()
 
@@ -297,8 +320,10 @@ const clearConnection = () => {
   selectedConnectionGroup.value = null
   selectedConnection.value = null
 }
+const clearSubPart = () => { selectedSubPart.value = null }
 const selectConnection = (conn: DiagramConnection, el: SVGGElement) => {
   if (selectedId.value) selectedId.value = null
+  clearSubPart()
   const same = selectedConnection.value?.artifact_id === conn.artifact_id
   clearConnection()
   if (!same) {
@@ -307,8 +332,14 @@ const selectConnection = (conn: DiagramConnection, el: SVGGElement) => {
     el.classList.add('svg-conn-selected')
   }
 }
+const selectSubPart = (detail: unknown) => {
+  clearConnection()
+  if (selectedId.value) { selectedId.value = null; entityQuery.reset() }
+  selectedSubPart.value = detail
+}
 const selectEntity = (id: string) => {
   clearConnection()
+  clearSubPart()
   if (selectedId.value === id) {
     selectedId.value = null
     entityQuery.reset()
@@ -776,6 +807,13 @@ onUnmounted(() => {
             </li>
           </ul>
 
+          <component
+            :is="viewerExtension.detailComponent"
+            v-if="selectedSubPart && viewerExtension"
+            :detail="selectedSubPart"
+            @close="clearSubPart()"
+          />
+
           <div
             v-if="selectedConnection"
             class="ent-det"
@@ -1043,6 +1081,8 @@ onUnmounted(() => {
 .svg-wrap :deep(.svg-selected) rect,
 .svg-wrap :deep(.svg-selected) polyline,
 .svg-wrap :deep(.svg-selected) ellipse { stroke: #2563eb !important; stroke-width: 2.5 !important; }
+.svg-wrap :deep([data-subpart]) { cursor: pointer; }
+.svg-wrap :deep([data-subpart]:hover) text { fill: #2563eb !important; }
 .svg-wrap :deep([data-conn-id]) { cursor: pointer; }
 .svg-wrap :deep([data-conn-id]:hover) path,
 .svg-wrap :deep([data-conn-id]:hover) polygon,
