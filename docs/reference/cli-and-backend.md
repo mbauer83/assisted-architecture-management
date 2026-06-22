@@ -35,7 +35,7 @@ frontmatter / attribute-profile / document-type schemata.
 ## Backend
 
 ```bash
-arch-backend --daemon              # serve REST at :8000, MCP at :8000/mcp, GUI at /
+arch-backend --daemon              # serve REST :8000, MCP :8000/mcp/{read,write}; GUI at / if built
 arch-backend --status
 arch-backend --stop
 arch-backend --restart --daemon

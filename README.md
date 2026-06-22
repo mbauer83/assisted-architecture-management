@@ -93,14 +93,21 @@ cd architectonic
 uv sync --group dev --group gui
 get-plantuml && check-diagram-runtime
 
-# 3. Resolve the workspace (uses the bundled self-describing model)
+# 3. Build the GUI so the backend can serve it (one-off; skip if you only need REST/MCP)
+( cd tools/gui && npm install && npm run build )
+
+# 4. Resolve the workspace (uses the bundled self-describing model)
 arch-init
 
-# 4. Start the unified backend (REST :8000, MCP :8000/mcp, GUI at /)
+# 5. Start the backend (REST :8000, MCP at :8000/mcp/{read,write})
 arch-backend --daemon
 ```
 
-Open **http://localhost:8000** for the GUI, or query the model directly:
+The backend serves the compiled GUI at **http://localhost:8000** *only when
+`tools/gui/dist/` exists* (step 3). Without that build it exposes the REST and MCP
+APIs but no web UI. For live frontend work, run the Vite dev server instead of
+step 3 — see [Build and serve the GUI](docs/02-installation.md#6-build-and-serve-the-gui).
+The Docker image builds the GUI for you. Query the model directly with:
 
 ```bash
 curl http://localhost:8000/api/stats

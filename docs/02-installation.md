@@ -10,7 +10,7 @@
 - [3. Initialise the workspace](#3-initialise-the-workspace)
 - [4. Start the backend](#4-start-the-backend)
 - [5. Configure MCP access for AI agents](#5-configure-mcp-access-for-ai-agents)
-- [6. Frontend development (optional)](#6-frontend-development-optional)
+- [6. Build and serve the GUI](#6-build-and-serve-the-gui)
 - [7. Quality checks](#7-quality-checks)
 - [Running in Docker](#running-in-docker)
 - [Assurance store setup](#assurance-store-setup)
@@ -183,8 +183,13 @@ usage, see [CLI & Backend Reference](reference/cli-and-backend.md).
 
 ## 4. Start the backend
 
+`arch-backend` serves the REST API and the MCP endpoints. It also serves the GUI at `/` —
+but **only if the SPA has been built** into `tools/gui/dist/` (see
+[§6](#6-build-and-serve-the-gui)). Without that build, `/` returns nothing and you use the
+APIs or the Vite dev server. The backend never builds or runs the frontend itself.
+
 ```bash
-# Unified backend: REST API at :8000, MCP at :8000/mcp, GUI at /
+# Backend: REST API at :8000, MCP at :8000/mcp/{read,write}; GUI at / if built (§6)
 arch-backend --daemon
 
 # Inspect / stop / restart
@@ -230,16 +235,36 @@ the MCP Inspector, see [Interfaces & MCP](03-modeling/interfaces-and-mcp.md).
 
 &nbsp;
 
-## 6. Frontend development (optional)
+## 6. Build and serve the GUI
 
-For active frontend work with Vite hot-reload:
+The frontend is a Vue single-page app. It is **not** a runtime service the backend launches —
+you either compile it to static files that the backend serves, or run the Vite dev server
+during development. Pick one:
+
+**Serve the GUI from the backend (production / normal use).** Build once; the backend then
+serves the result at `/`:
+
+```bash
+cd tools/gui
+npm install
+npm run build          # → tools/gui/dist/  (served by arch-backend at /)
+cd ../..
+```
+
+Re-run `npm run build` after pulling frontend changes. The Docker image performs this build
+automatically, so containerised deployments need no manual step.
+
+**Develop with hot-reload (frontend work).** Run the Vite dev server instead of building; it
+proxies API calls to the backend on :8000:
 
 ```bash
 cd tools/gui
 npm install
 npm run dev
-# → open http://localhost:5173  (API calls proxy to arch-backend on :8000)
+# → open http://localhost:5173  (API + MCP proxied to arch-backend on :8000)
 ```
+
+If you only need the REST and MCP APIs, you can skip this step entirely.
 
 &nbsp;
 
