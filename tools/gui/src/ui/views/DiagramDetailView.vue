@@ -299,6 +299,7 @@ const selectedId = ref<string | null>(null)
 const selectedConnection = ref<DiagramConnection | null>(null)
 // Opaque payload from the diagram type's viewer extension; rendered by its detailComponent.
 const selectedSubPart = ref<unknown>(null)
+let selectedSubPartEls: Element[] = []
 const edgeLabelInput = ref('')
 const edgeLabelMutation = useMutation<WriteResult, RepoError>()
 
@@ -320,7 +321,11 @@ const clearConnection = () => {
   selectedConnectionGroup.value = null
   selectedConnection.value = null
 }
-const clearSubPart = () => { selectedSubPart.value = null }
+const clearSubPart = () => {
+  for (const el of selectedSubPartEls) el.classList.remove('svg-subpart-selected')
+  selectedSubPartEls = []
+  selectedSubPart.value = null
+}
 const selectConnection = (conn: DiagramConnection, el: SVGGElement) => {
   if (selectedId.value) selectedId.value = null
   clearSubPart()
@@ -332,10 +337,13 @@ const selectConnection = (conn: DiagramConnection, el: SVGGElement) => {
     el.classList.add('svg-conn-selected')
   }
 }
-const selectSubPart = (detail: unknown) => {
+const selectSubPart = (detail: unknown, elements: Element[] = []) => {
   clearConnection()
   if (selectedId.value) { selectedId.value = null; entityQuery.reset() }
+  clearSubPart()
   selectedSubPart.value = detail
+  selectedSubPartEls = elements
+  for (const el of elements) el.classList.add('svg-subpart-selected')
 }
 const selectEntity = (id: string) => {
   clearConnection()
@@ -1082,7 +1090,10 @@ onUnmounted(() => {
 .svg-wrap :deep(.svg-selected) polyline,
 .svg-wrap :deep(.svg-selected) ellipse { stroke: #2563eb !important; stroke-width: 2.5 !important; }
 .svg-wrap :deep([data-subpart]) { cursor: pointer; }
-.svg-wrap :deep([data-subpart]:hover) text { fill: #2563eb !important; }
+.svg-wrap :deep(text[data-subpart]:hover) { fill: #2563eb !important; }
+.svg-wrap :deep(g[data-subpart]:hover) ellipse { stroke: #2563eb !important; }
+.svg-wrap :deep(text.svg-subpart-selected) { fill: #2563eb !important; font-weight: 700; }
+.svg-wrap :deep(.svg-subpart-selected) ellipse { stroke: #2563eb !important; stroke-width: 2 !important; }
 .svg-wrap :deep([data-conn-id]) { cursor: pointer; }
 .svg-wrap :deep([data-conn-id]:hover) path,
 .svg-wrap :deep([data-conn-id]:hover) polygon,

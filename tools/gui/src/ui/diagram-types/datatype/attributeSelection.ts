@@ -123,26 +123,34 @@ export function toAttributeDetail(info: ClassifierAttributeInfo, attr: DatatypeA
 }
 
 /**
- * Attach attribute-row selection to a classifier node. The class box renders one
- * `[data-visibility-modifier]` row per attribute in declaration order; we only wire up when the
- * row count matches the model's attribute count, so a divergent layout never mis-binds a row.
- * Each selectable row is marked `data-subpart` so the generic viewer can style the affordance.
+ * Attach attribute-row selection to a classifier node. The class box renders, per attribute in
+ * declaration order, a `[data-visibility-modifier]` glyph group immediately followed by a sibling
+ * `<text>` label. We bind BOTH (so the whole row — glyph and name — is the click target, not just
+ * the small glyph) and report them to the viewer for selected-highlighting. Wiring only happens
+ * when the glyph-row count matches the model's attribute count, so a divergent layout never
+ * mis-binds. Selectable elements are marked `data-subpart` for the viewer's hover affordance.
  */
 export function attachClassifierAttributeRows(ctx: ViewerSubPartContext): void {
   const info = buildClassifierAttributes(ctx.diagramEntities).get(ctx.entityId)
   if (!info || info.attributes.length === 0) return
-  const rows = Array.from(ctx.node.querySelectorAll<SVGGElement>('g[data-visibility-modifier]'))
-  if (rows.length !== info.attributes.length) return
-  rows.forEach((row, index) => {
+  const glyphs = Array.from(ctx.node.querySelectorAll<SVGGElement>('g[data-visibility-modifier]'))
+  if (glyphs.length !== info.attributes.length) return
+  glyphs.forEach((glyph, index) => {
     const attr = info.attributes[index]
-    row.setAttribute('data-subpart', '')
-    row.addEventListener(
-      'click',
-      (ev) => {
-        ev.stopPropagation()
-        ctx.onSelect(toAttributeDetail(info, attr))
-      },
-      { signal: ctx.signal },
-    )
+    const detail = toAttributeDetail(info, attr)
+    const label = glyph.nextElementSibling
+    const rowEls: Element[] =
+      label && label.tagName.toLowerCase() === 'text' ? [glyph, label] : [glyph]
+    for (const el of rowEls) {
+      el.setAttribute('data-subpart', '')
+      el.addEventListener(
+        'click',
+        (ev) => {
+          ev.stopPropagation()
+          ctx.onSelect(detail, rowEls)
+        },
+        { signal: ctx.signal },
+      )
+    }
   })
 }

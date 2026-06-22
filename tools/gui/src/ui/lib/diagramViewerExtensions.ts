@@ -19,8 +19,12 @@ export interface ViewerSubPartContext {
   diagramEntities: Record<string, unknown>
   /** Aborted when interactivity is re-attached; use to scope event listeners. */
   signal: AbortSignal
-  /** Select a sub-part. The payload is opaque to the viewer and handed to `detailComponent` as `detail`. */
-  onSelect: (detail: unknown) => void
+  /**
+   * Select a sub-part. `detail` is opaque to the viewer and handed to `detailComponent` as
+   * `detail`. `elements` are the SVG nodes that make up the sub-part (e.g. an attribute row's
+   * glyph and label); the viewer toggles a generic selected-highlight class on them.
+   */
+  onSelect: (detail: unknown, elements?: Element[]) => void
 }
 
 export interface DiagramViewerExtension {
