@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Mapping
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from src.domain.bridges import BridgeDeclaration
 from src.domain.diagram_type_config import DiagramTypeUiConfig, DiagramTypeWriteGuidance
@@ -11,6 +11,9 @@ from src.domain.module_types import ConnectionTypeName, EntityTypeName, _FreeOnt
 from src.domain.ontology_protocol import ModuleClass, OntologyModule
 from src.domain.ontology_types import ConnectionTypeInfo, ElementClassInfo, EntityTypeInfo
 from src.domain.permitted_relationships import PermittedRelationshipSet
+
+if TYPE_CHECKING:
+    from src.domain.module_registry import ModuleRegistry
 
 
 class DiagramTypeBase:
@@ -56,7 +59,8 @@ class DiagramTypeBase:
         )
         return inherited | self.own_permitted_relationships | diagram_conn_rules  # type: ignore[attr-defined]
 
-    def effective_entity_types(self) -> Mapping[EntityTypeName, EntityTypeInfo]:
+    def effective_entity_types(self, registry: ModuleRegistry | None = None) -> Mapping[EntityTypeName, EntityTypeInfo]:
+        del registry  # ontology-bound types derive from primary_ontology, not the registry
         if isinstance(self.primary_ontology, _FreeOntologyType):  # type: ignore[attr-defined]
             return dict(self.own_entity_types)  # type: ignore[attr-defined]
         ontology: OntologyModule = self.primary_ontology  # type: ignore[assignment]
@@ -68,7 +72,10 @@ class DiagramTypeBase:
         out.update(self.own_entity_types)  # type: ignore[attr-defined]
         return out
 
-    def effective_connection_types(self) -> Mapping[ConnectionTypeName, ConnectionTypeInfo]:
+    def effective_connection_types(
+        self, registry: ModuleRegistry | None = None
+    ) -> Mapping[ConnectionTypeName, ConnectionTypeInfo]:
+        del registry  # ontology-bound types derive from primary_ontology, not the registry
         if isinstance(self.primary_ontology, _FreeOntologyType):  # type: ignore[attr-defined]
             return dict(self.own_connection_types)  # type: ignore[attr-defined]
         ontology: OntologyModule = self.primary_ontology  # type: ignore[assignment]

@@ -8,6 +8,7 @@ from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     from src.domain.derivation_types import ModelQuery
+    from src.domain.module_registry import ModuleRegistry
     from src.domain.view_derivations import DerivationSelection
     from src.domain.view_projection import ViewProjectionResult
 
@@ -173,16 +174,19 @@ class _C4DiagramType(DiagramTypeBase):
     def accepts_connection_type(self, t: ConnectionTypeName) -> bool:
         return _registry().find_connection_type(t) is not None
 
-    def effective_entity_types(self) -> dict[EntityTypeName, EntityTypeInfo]:
-        registry = _registry()
+    def effective_entity_types(self, registry: ModuleRegistry | None = None) -> dict[EntityTypeName, EntityTypeInfo]:
+        reg = registry if registry is not None else _registry()
         return {
-            entity_type: registry.get_entity_type(entity_type)
+            entity_type: reg.get_entity_type(entity_type)
             for entity_type in sorted(self._resolved_mapped_model_entity_types())
-            if registry.find_entity_type(entity_type) is not None
+            if reg.find_entity_type(entity_type) is not None
         }
 
-    def effective_connection_types(self) -> dict[ConnectionTypeName, ConnectionTypeInfo]:
-        return dict(_registry().all_connection_types())
+    def effective_connection_types(
+        self, registry: ModuleRegistry | None = None
+    ) -> dict[ConnectionTypeName, ConnectionTypeInfo]:
+        reg = registry if registry is not None else _registry()
+        return dict(reg.all_connection_types())
 
     @property
     def own_entity_types(self) -> dict[EntityTypeName, EntityTypeInfo]:

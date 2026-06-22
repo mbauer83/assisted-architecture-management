@@ -89,7 +89,7 @@ class TestDiagramTypeModuleProtocol:
     def test_effective_entity_types_subset_of_registry(self, registry) -> None:
         all_entity_types = set(registry.all_entity_types().keys())
         for name, module in registry.all_diagram_types().items():
-            for type_name in module.effective_entity_types():
+            for type_name in module.effective_entity_types(registry):
                 assert type_name in all_entity_types, (
                     f"DiagramType {name!r}: effective entity type {type_name!r} not in registry"
                 )
@@ -97,7 +97,7 @@ class TestDiagramTypeModuleProtocol:
     def test_effective_connection_types_subset_of_registry(self, registry) -> None:
         all_conn_types = set(registry.all_connection_types().keys())
         for name, module in registry.all_diagram_types().items():
-            for type_name in module.effective_connection_types():
+            for type_name in module.effective_connection_types(registry):
                 assert type_name in all_conn_types, (
                     f"DiagramType {name!r}: effective connection type {type_name!r} not in registry"
                 )
