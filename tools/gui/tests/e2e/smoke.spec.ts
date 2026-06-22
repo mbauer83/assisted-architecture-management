@@ -33,11 +33,25 @@ test.beforeEach(async ({ context }) => {
   })
 })
 
+// The browser auto-logs "Failed to load resource: the server responded with a status
+// of 423 (Locked)" for assurance endpoints whenever the confidential assurance store
+// is locked — the intended state in CI (and any env that hasn't unlocked it). The app
+// handles 423 explicitly and renders a "Store is locked" message, so this is an
+// expected, gracefully-handled condition, not a runtime problem. HTTP-status health is
+// owned by the response listener below (scoped to 5xx), so suppressing this one echo —
+// tightly bound to status 423 on an /api/assurance resource — masks nothing else.
+function isExpectedLockedAssuranceEcho(msg: { text(): string; location(): { url: string } }): boolean {
+  return /Failed to load resource.*status of 423/.test(msg.text())
+    && msg.location().url.includes('/api/assurance')
+}
+
 function watch(page: Page): { problems: Problem[] } {
   const problems: Problem[] = []
   page.on('pageerror', (err) => problems.push({ kind: 'pageerror', detail: String(err) }))
   page.on('console', (msg) => {
-    if (msg.type() === 'error') problems.push({ kind: 'console.error', detail: msg.text() })
+    if (msg.type() !== 'error') return
+    if (isExpectedLockedAssuranceEcho(msg)) return
+    problems.push({ kind: 'console.error', detail: msg.text() })
   })
   page.on('response', (resp) => {
     const url = resp.url()
@@ -54,6 +68,42 @@ async function expectHealthyMain(page: Page, problems: Problem[]): Promise<void>
   const text = (await main.innerText()).trim()
   expect(text.length, 'main content should not be empty (header-only blank)').toBeGreaterThan(0)
   expect(problems, `runtime problems:\n${problems.map((p) => `  [${p.kind}] ${p.detail}`).join('\n')}`).toEqual([])
+}
+
+/**
+ * Click a rendered SVG entity node and return the name shown in the detail sidebar.
+ *
+ * Robustness notes (this was a recurring CI-only flake):
+ *  - Prefer leaf nodes (`:not(.cluster)`). A cluster is a large boundary box whose
+ *    interior is legitimately crossed by edges and child nodes, so its geometric
+ *    centre — where Playwright clicks a <g> — is often covered by a connection's
+ *    wide transparent hit-area (`data-conn-hit`, pointer-events="stroke"), which
+ *    intercepts the click. Graphviz lays diagrams out slightly differently in CI
+ *    than locally, so the overlap only ever bit in CI. Leaf nodes meet their edges
+ *    at the border, leaving the centre clickable.
+ *  - Verify a *real entity* was selected via `a.det-name`: the entity detail renders
+ *    its name as a RouterLink (<a>), whereas a connection detail renders a <span>.
+ *    Keying off `.det-name` alone would pass even if a stray click hit an edge.
+ *  - Try candidates in turn so a single overlapped node cannot fail the whole test.
+ */
+async function clickEntityNodeForDetail(page: Page, label: string): Promise<string> {
+  await page.waitForSelector('.svg-wrap [data-entity-id]', { timeout: 15_000 })
+  const leaves = page.locator('.svg-wrap [data-entity-id]:not(.cluster)')
+  const candidates = (await leaves.count()) > 0 ? leaves : page.locator('.svg-wrap [data-entity-id]')
+  const entityName = page.locator('.ent-det a.det-name')
+  const count = await candidates.count()
+  let lastErr: unknown
+  for (let i = 0; i < count; i++) {
+    try {
+      await candidates.nth(i).click({ timeout: 10_000 })
+      await expect(entityName).toBeVisible({ timeout: 5_000 })
+      const text = (await entityName.textContent())?.trim() ?? ''
+      if (text.length > 0) return text
+    } catch (err) {
+      lastErr = err
+    }
+  }
+  throw new Error(`${label}: no entity node click populated the detail sidebar (${count} candidates): ${String(lastErr)}`)
 }
 
 const STATIC_ROUTES = [
@@ -380,16 +430,10 @@ test('SVG node and edge click populates the detail sidebar (C4 + GSN)', async ({
   const c4Diagram = c4Items[0]
 
   await page.goto(`/diagram?id=${encodeURIComponent(c4Diagram.artifact_id)}`, { waitUntil: 'load' })
-  // Wait for SVG interactivity to attach (data-entity-id set on <g> elements)
-  await page.waitForSelector('.svg-wrap [data-entity-id]', { timeout: 15_000 })
-  const c4Node = page.locator('.svg-wrap [data-entity-id]').first()
-  await c4Node.click()
-  const c4Detail = page.locator('.ent-det')
-  await expect(c4Detail).toBeVisible()
-  const c4Name = c4Detail.locator('.det-name')
-  await expect(c4Name).toBeVisible()
-  const c4NameText = await c4Name.textContent()
-  expect(c4NameText?.trim().length, 'C4 node click must populate name in detail panel').toBeGreaterThan(0)
+  // Wait for SVG interactivity to attach (data-entity-id set on <g> elements), then
+  // click a node and confirm the detail sidebar names a real entity.
+  const c4NameText = await clickEntityNodeForDetail(page, 'C4')
+  expect(c4NameText.length, 'C4 node click must populate name in detail panel').toBeGreaterThan(0)
 
   // ── C4: click a connection/edge if one is present ─────────────────────────
   const c4Edge = page.locator('.svg-wrap [data-conn-id]').first()
@@ -407,13 +451,8 @@ test('SVG node and edge click populates the detail sidebar (C4 + GSN)', async ({
   const gsnDiagram = gsnItems[0]
 
   await page.goto(`/diagram?id=${encodeURIComponent(gsnDiagram.artifact_id)}`, { waitUntil: 'load' })
-  await page.waitForSelector('.svg-wrap [data-entity-id]', { timeout: 15_000 })
-  const gsnNode = page.locator('.svg-wrap [data-entity-id]').first()
-  await gsnNode.click()
-  const gsnDetail = page.locator('.ent-det')
-  await expect(gsnDetail).toBeVisible()
-  const gsnNameText = await gsnDetail.locator('.det-name').textContent()
-  expect(gsnNameText?.trim().length, 'GSN node click must populate name in detail panel').toBeGreaterThan(0)
+  const gsnNameText = await clickEntityNodeForDetail(page, 'GSN')
+  expect(gsnNameText.length, 'GSN node click must populate name in detail panel').toBeGreaterThan(0)
 
   await expectHealthyMain(page, problems)
   const screenshot = testInfo.outputPath('t18-node-edge-selection.png')
