@@ -264,4 +264,23 @@ describe('buildAliasToId — derived C4 entities (no host_diagram_id)', () => {
     expect(map.get('My-System')).toBe('APP@001.sys')
     expect(map.get('My_System')).toBe('APP@001.sys')
   })
+
+  it('mirrors the class-diagram renderer leading-underscore alias (_safe_alias)', () => {
+    // Datatype classifiers carry their canonical id as display_alias; the renderer's SVG
+    // node uses '_' + sanitised id, so that form must resolve to the canonical id.
+    const entities: EntitySummary[] = [makeEntity('CLF@1.ShZ_Qq.artifact', 'CLF@1.ShZ_Qq.artifact')]
+    const map = buildAliasToId(entities)
+    expect(map.get('_CLF_1_ShZ_Qq_artifact')).toBe('CLF@1.ShZ_Qq.artifact')
+  })
+
+  it('prefers a canonical id over a diagram-scoped #fragment for the same alias', () => {
+    const alias = 'CLF@1.ShZ_Qq.artifact'
+    const entities: EntitySummary[] = [
+      makeEntity(`DATATY@9.d#classifier/${alias}`, alias, 'DATATY@9.d'),
+      makeEntity(alias, alias),
+    ]
+    const map = buildAliasToId(entities)
+    // The non-fragment canonical id wins regardless of ordering — it is the one that loads.
+    expect(map.get('_CLF_1_ShZ_Qq_artifact')).toBe(alias)
+  })
 })

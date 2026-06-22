@@ -2,14 +2,25 @@ import type { C4Navigation, DiagramConnection, EntitySummary } from '../../domai
 
 /**
  * Build alias→artifactId map for SVG interactivity.
- * Stores both the raw alias and a PlantUML-safe variant (non-alphanumeric chars → '_').
+ *
+ * Stores the raw alias, a PlantUML-safe variant (non-alphanumeric chars → '_'), and that
+ * variant with a leading '_'. The leading-'_' form mirrors the class-diagram renderer's
+ * `_safe_alias` ('_' + sanitised id), which guarantees a PlantUML-valid alias; without it,
+ * class-diagram SVG nodes (whose `data-qualified-name` carries the '_'-prefixed alias)
+ * would never resolve and so would not be selectable.
  */
 export function buildAliasToId(entities: ReadonlyArray<EntitySummary>): Map<string, string> {
   const map = new Map<string, string>()
   for (const e of entities) {
-    if (e.display_alias) {
-      map.set(e.display_alias, e.artifact_id)
-      map.set(e.display_alias.replace(/[^a-zA-Z0-9_]/g, '_'), e.artifact_id)
+    if (!e.display_alias) continue
+    const safe = e.display_alias.replace(/[^a-zA-Z0-9_]/g, '_')
+    for (const alias of [e.display_alias, safe, `_${safe}`]) {
+      // First non-fragment id wins: prefer a canonical workspace id (CLF@…) over a
+      // diagram-scoped '#fragment' id so the click target resolves to a loadable entity.
+      const existing = map.get(alias)
+      if (existing === undefined || (existing.includes('#') && !e.artifact_id.includes('#'))) {
+        map.set(alias, e.artifact_id)
+      }
     }
   }
   return map
