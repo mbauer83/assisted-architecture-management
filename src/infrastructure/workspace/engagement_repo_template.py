@@ -9,232 +9,18 @@ from pathlib import Path
 from src.application.artifact_document_schema import get_document_subdirectory
 from src.config.repo_paths import ARCH_DOC_SCHEMATA, ARCH_REPO, DIAGRAM_CATALOG, DIAGRAMS, DOCS, MODEL, RENDERED
 from src.infrastructure.workspace._assurance_doc_types import ASSURANCE_DOCUMENT_SCHEMAS
+from src.infrastructure.workspace._repo_default_schemata import (
+    BASE_DOCUMENT_SCHEMAS,
+    DEFAULT_SCHEMATA,
+)
 
 INITIAL_COMMIT_MESSAGE = "Initialize engagement architecture repository"
 
-DEFAULT_DOCUMENT_SCHEMAS: dict[str, dict] = {
-    "adr": {
-        "abbreviation": "ADR",
-        "name": "Architecture Decision Record",
-        "subdirectory": "adr",
-        "frontmatter_schema": {
-            "type": "object",
-            "required": ["title", "status"],
-            "properties": {
-                "title": {"type": "string"},
-                "status": {"type": "string", "enum": ["draft", "accepted", "rejected", "superseded"]},
-                "deciders": {"type": "array", "items": {"type": "string"}},
-                "date": {"type": "string"},
-            },
-        },
-        "required_sections": ["Context", "Decision", "Consequences"],
-        "section_templates": {
-            "Context": "Describe the problem or situation requiring a decision.\n",
-            "Decision": "Describe the decision that was made and why.\n",
-            "Consequences": "Describe the resulting context, trade-offs, and any follow-up actions.\n",
-        },
-        "suggested_entity_type_connections": ["@all"],
-    },
-    "spec": {
-        "abbreviation": "SPC",
-        "name": "Specification",
-        "frontmatter_schema": {
-            "type": "object",
-            "required": ["title", "status"],
-            "properties": {
-                "title": {"type": "string"},
-                "status": {"type": "string", "enum": ["draft", "accepted", "rejected", "superseded"]},
-                "keywords": {"type": "array", "items": {"type": "string"}},
-            },
-        },
-        "required_sections": ["Scope", "Summary", "Specification"],
-        "section_templates": {
-            "Scope": "State what this specification covers and any explicit exclusions.\n",
-            "Summary": "Summarise the intent in 2-3 sentences.\n",
-            "Specification": "Provide the detailed specification.\n",
-        },
-    },
-    "standard": {
-        "abbreviation": "STD",
-        "name": "Standard",
-        "frontmatter_schema": {
-            "type": "object",
-            "required": ["title", "status", "applies_to"],
-            "properties": {
-                "title": {"type": "string"},
-                "status": {"type": "string", "enum": ["draft", "accepted", "rejected", "superseded"]},
-                "applies_to": {"type": "array", "items": {"type": "string"}},
-            },
-        },
-        "required_sections": ["Scope", "Motivation", "Summary", "Specification"],
-        "section_templates": {
-            "Scope": "State what this standard applies to and any explicit exclusions.\n",
-            "Motivation": "Explain why this standard is needed.\n",
-            "Summary": "Summarise the standard in 2-3 sentences.\n",
-            "Specification": "Provide the normative specification with SHALL/SHOULD/MAY guidance.\n",
-        },
-        "required_entity_type_connections": ["requirement"],
-        "suggested_entity_type_connections": ["principle", "goal"],
-    },
-    **ASSURANCE_DOCUMENT_SCHEMAS,
-}
+# Base doc-types (adr/spec/standard) are scaffolded into every repo. Assurance doc-types are
+# added on top for empty-repo init (current default); the repair path writes the base set only,
+# so an existing non-assurance repo is not retrofitted with assurance doc-types.
+DEFAULT_DOCUMENT_SCHEMAS: dict[str, dict] = {**BASE_DOCUMENT_SCHEMAS, **ASSURANCE_DOCUMENT_SCHEMAS}
 
-DEFAULT_SCHEMATA: dict[str, dict] = {
-    "attributes.capability.schema.json": {
-        "$schema": "https://json-schema.org/draft/2020-12/schema",
-        "$id": "attributes.capability.schema.json",
-        "title": "Capability Attribute Schema",
-        "description": "Attribute schema for Properties table in Capability entities.",
-        "type": "object",
-        "required": ["Maturity"],
-        "properties": {
-            "Maturity": {
-                "type": "string",
-                "enum": ["Not Assessed", "Initial", "Developing", "Defined", "Managed", "Optimising"],
-                "default": "Not Assessed",
-            },
-            "Realizes": {"type": "string"},
-        },
-        "additionalProperties": True,
-    },
-    "attributes.driver.schema.json": {
-        "$schema": "https://json-schema.org/draft/2020-12/schema",
-        "$id": "attributes.driver.schema.json",
-        "title": "Driver Attribute Schema",
-        "description": "Attribute schema for Properties table in Driver entities.",
-        "type": "object",
-        "required": ["Category"],
-        "properties": {
-            "Category": {
-                "type": "string",
-                "enum": [
-                    "Unspecified",
-                    "External Trend",
-                    "Internal Challenge",
-                    "Market Gap",
-                    "Organizational",
-                    "Organizational Constraint",
-                    "Organizational Trend",
-                    "Regulatory & Standards Trend",
-                    "Technical Trend",
-                    "Technological",
-                    "Technology Trend",
-                ],
-                "default": "Unspecified",
-            },
-            "Source": {"type": "string"},
-        },
-        "additionalProperties": True,
-    },
-    "attributes.goal.schema.json": {
-        "$schema": "https://json-schema.org/draft/2020-12/schema",
-        "$id": "attributes.goal.schema.json",
-        "title": "Goal Attribute Schema",
-        "description": "Attribute schema for Properties table in Goal entities.",
-        "type": "object",
-        "required": [],
-        "properties": {
-            "Priority": {"type": "string", "enum": ["Must", "Should", "Could", "Won't"]},
-            "Measurability": {"type": "string"},
-        },
-        "additionalProperties": True,
-    },
-    "attributes.principle.schema.json": {
-        "$schema": "https://json-schema.org/draft/2020-12/schema",
-        "$id": "attributes.principle.schema.json",
-        "title": "Principle Attribute Schema",
-        "description": "Attribute schema for Properties table in Principle entities.",
-        "type": "object",
-        "required": [],
-        "properties": {
-            "Priority": {"type": "string", "enum": ["Must", "Should", "Could", "Won't"]},
-            "Rationale": {"type": "string"},
-        },
-        "additionalProperties": True,
-    },
-    "attributes.requirement.schema.json": {
-        "$schema": "https://json-schema.org/draft/2020-12/schema",
-        "$id": "attributes.requirement.schema.json",
-        "title": "Requirement Attribute Schema",
-        "description": "Attribute schema for Properties table in Requirement entities.",
-        "type": "object",
-        "required": [],
-        "properties": {
-            "Priority": {"type": "string", "enum": ["Must", "Should", "Could", "Won't", "Never"]},
-            "Category": {"type": "string"},
-            "Children": {"type": "string"},
-        },
-        "additionalProperties": True,
-    },
-    "attributes.stakeholder.schema.json": {
-        "$schema": "https://json-schema.org/draft/2020-12/schema",
-        "$id": "attributes.stakeholder.schema.json",
-        "title": "Stakeholder Attribute Schema",
-        "description": "Attribute schema for Properties table in Stakeholder entities.",
-        "type": "object",
-        "required": [],
-        "properties": {
-            "Category": {"type": "string"},
-            "Concerns": {"type": "string"},
-        },
-        "additionalProperties": True,
-    },
-    "frontmatter.diagram.schema.json": {
-        "$schema": "https://json-schema.org/draft/2020-12/schema",
-        "$id": "frontmatter.diagram.schema.json",
-        "title": "Diagram Frontmatter Schema",
-        "description": "JSON Schema for diagram file frontmatter. Extends tool-required base fields.",
-        "type": "object",
-        "required": ["artifact-id", "artifact-type", "name", "diagram-type", "version", "status", "last-updated"],
-        "properties": {
-            "artifact-id": {"type": "string", "pattern": "^[A-Z]{2,6}@\\d+\\.[A-Za-z0-9_-]+\\..+$"},
-            "artifact-type": {"type": "string", "enum": ["diagram"]},
-            "name": {"type": "string", "minLength": 1},
-            "diagram-type": {"type": "string"},
-            "version": {"type": "string", "pattern": "^\\d+\\.\\d+\\.\\d+$"},
-            "status": {"type": "string", "enum": ["draft", "active", "deprecated"]},
-            "keywords": {"type": "array", "items": {"type": "string"}},
-            "last-updated": {"type": "string"},
-        },
-        "additionalProperties": True,
-    },
-    "frontmatter.entity.schema.json": {
-        "$schema": "https://json-schema.org/draft/2020-12/schema",
-        "$id": "frontmatter.entity.schema.json",
-        "title": "Entity Frontmatter Schema",
-        "description": (
-            "JSON Schema for entity file frontmatter. Extends the tool-required base fields; "
-            "tool-required fields cannot be removed or overridden."
-        ),
-        "type": "object",
-        "required": ["artifact-id", "artifact-type", "name", "version", "status", "last-updated"],
-        "properties": {
-            "artifact-id": {"type": "string", "pattern": "^[A-Z]{2,6}@\\d+\\.[A-Za-z0-9_-]+\\..+$"},
-            "artifact-type": {"type": "string"},
-            "name": {"type": "string", "minLength": 1},
-            "version": {"type": "string", "pattern": "^\\d+\\.\\d+\\.\\d+$"},
-            "status": {"type": "string", "enum": ["draft", "active", "deprecated"]},
-            "keywords": {"type": "array", "items": {"type": "string"}},
-            "last-updated": {"type": "string"},
-        },
-        "additionalProperties": True,
-    },
-    "frontmatter.outgoing.schema.json": {
-        "$schema": "https://json-schema.org/draft/2020-12/schema",
-        "$id": "frontmatter.outgoing.schema.json",
-        "title": "Outgoing Connections File Frontmatter Schema",
-        "description": "JSON Schema for .outgoing.md file frontmatter. Extends tool-required base fields.",
-        "type": "object",
-        "required": ["source-entity", "version", "status", "last-updated"],
-        "properties": {
-            "source-entity": {"type": "string", "pattern": "^[A-Z]{2,6}@\\d+\\.[A-Za-z0-9_-]+\\..+$"},
-            "version": {"type": "string", "pattern": "^\\d+\\.\\d+\\.\\d+$"},
-            "status": {"type": "string", "enum": ["draft", "active", "deprecated"]},
-            "last-updated": {"type": "string"},
-        },
-        "additionalProperties": True,
-    },
-}
 
 
 def _write_json_if_missing(path: Path, payload: dict) -> None:
@@ -256,6 +42,73 @@ def _write_arch_repo_config_if_missing(arch_repo_dir: Path) -> None:
     if config_path.exists():
         return
     config_path.write_text(_ARCH_REPO_CONFIG_TEMPLATE, encoding="utf-8")
+
+
+def _migrate_legacy_flat_schemata(arch_repo_dir: Path, schemata_dir: Path) -> list[str]:
+    """Remove legacy schema files written flat in .arch-repo/, migrating canonical ones first.
+
+    Older repos placed schema files directly under .arch-repo/, where the loader (which reads
+    only .arch-repo/schemata/) ignores them. A flat file whose name is a canonical schema is
+    moved into schemata/ when not already present; non-canonical legacy files (e.g. the old
+    mis-pluralised `frontmatter.entities.schema.json`) are simply dropped. The canonical files
+    have already been written to schemata/ by the caller, so this never loses real content.
+    Returns the names of the flat files that were migrated or dropped.
+    """
+    removed: list[str] = []
+    for flat in sorted(arch_repo_dir.glob("*.schema.json")):
+        if not flat.is_file():
+            continue
+        canonical = schemata_dir / flat.name
+        if flat.name in DEFAULT_SCHEMATA and not canonical.exists():
+            canonical.write_text(flat.read_text(encoding="utf-8"), encoding="utf-8")
+        flat.unlink()
+        removed.append(flat.name)
+    return removed
+
+
+def ensure_arch_repo_defaults(
+    path: Path,
+    *,
+    document_schemas: dict[str, dict] = BASE_DOCUMENT_SCHEMAS,
+) -> dict[str, list[str]]:
+    """Idempotently bring an existing repo's .arch-repo up to current defaults (no git).
+
+    Writes any missing doc-type schemas (`.arch-repo/documents/`), attribute + frontmatter
+    schemata (`.arch-repo/schemata/`), and `config.yaml`, and migrates legacy flat schema files
+    into `schemata/`. Existing files are never overwritten, so an operator's local edits are
+    preserved. Returns a summary of what was added/migrated for reporting.
+    """
+    arch_repo_dir = path / ARCH_REPO
+    documents_dir = arch_repo_dir / ARCH_DOC_SCHEMATA
+    schemata_dir = arch_repo_dir / "schemata"
+    documents_dir.mkdir(parents=True, exist_ok=True)
+    schemata_dir.mkdir(parents=True, exist_ok=True)
+
+    added_docs: list[str] = []
+    for doc_type, schema in document_schemas.items():
+        target = documents_dir / f"{doc_type}.json"
+        if not target.exists():
+            _write_json_if_missing(target, schema)
+            added_docs.append(f"{doc_type}.json")
+        (path / DOCS / get_document_subdirectory(schema, doc_type)).mkdir(parents=True, exist_ok=True)
+
+    added_schemata: list[str] = []
+    for filename, schema in DEFAULT_SCHEMATA.items():
+        target = schemata_dir / filename
+        if not target.exists():
+            _write_json_if_missing(target, schema)
+            added_schemata.append(filename)
+
+    migrated = _migrate_legacy_flat_schemata(arch_repo_dir, schemata_dir)
+    config_added = not (arch_repo_dir / "config.yaml").exists()
+    _write_arch_repo_config_if_missing(arch_repo_dir)
+
+    return {
+        "documents": added_docs,
+        "schemata": added_schemata,
+        "migrated_flat": migrated,
+        "config": ["config.yaml"] if config_added else [],
+    }
 
 
 def _run_git(args: list[str], cwd: Path) -> None:
@@ -336,18 +189,10 @@ def create_engagement_repo(
     (path / DOCS).mkdir(parents=True, exist_ok=True)
     (path / DIAGRAM_CATALOG / DIAGRAMS).mkdir(parents=True, exist_ok=True)
     (path / DIAGRAM_CATALOG / RENDERED).mkdir(parents=True, exist_ok=True)
-    documents_dir = path / ARCH_REPO / ARCH_DOC_SCHEMATA
-    schemata_dir = path / ARCH_REPO / "schemata"
-    documents_dir.mkdir(parents=True, exist_ok=True)
-    schemata_dir.mkdir(parents=True, exist_ok=True)
 
-    for doc_type, schema in DEFAULT_DOCUMENT_SCHEMAS.items():
-        _write_json_if_missing(documents_dir / f"{doc_type}.json", schema)
-        (path / DOCS / get_document_subdirectory(schema, doc_type)).mkdir(parents=True, exist_ok=True)
-    for filename, schema in DEFAULT_SCHEMATA.items():
-        _write_json_if_missing(schemata_dir / filename, schema)
+    # Empty-repo init gets the full current default (base + assurance doc-types).
+    ensure_arch_repo_defaults(path, document_schemas=DEFAULT_DOCUMENT_SCHEMAS)
 
-    _write_arch_repo_config_if_missing(path / ARCH_REPO)
     _ensure_git_repo(path, git_url=git_url, branch=branch)
     _commit_initial_scaffold(
         path,

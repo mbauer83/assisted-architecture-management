@@ -299,6 +299,13 @@ def main(argv: list[str] | None = None) -> None:
         help="Read the HTTPS personal access token from this file (alternative to "
         "ARCH_GIT_HTTPS_TOKEN; keeps the secret out of the environment)",
     )
+    parser.add_argument(
+        "--repair-arch-repo",
+        action="store_true",
+        default=False,
+        help="Bring existing repos' .arch-repo up to current defaults (base doc-types, "
+        "schemata, config); migrates legacy flat schema files. Idempotent; never overwrites.",
+    )
     args = parser.parse_args(argv)
 
     from src.infrastructure.git.git_auth import register_token_file
@@ -336,6 +343,13 @@ def main(argv: list[str] | None = None) -> None:
         initialize_if_empty=args.initialize_enterprise_repo_if_empty,
         git_env=git_env,
     )
+
+    if args.repair_arch_repo:
+        from src.infrastructure.workspace.engagement_repo_template import ensure_arch_repo_defaults  # noqa: PLC0415
+        for role, root in (("engagement", engagement_root), ("enterprise", enterprise_root)):
+            summary = ensure_arch_repo_defaults(root)
+            changes = {k: v for k, v in summary.items() if v}
+            print(f"  repair {role} ({root}): {changes or 'already current'}")
 
     state_path = _write_state(workspace_root, engagement_root, enterprise_root)
 
