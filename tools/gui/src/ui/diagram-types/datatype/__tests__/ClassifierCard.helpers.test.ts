@@ -1,10 +1,12 @@
 import { describe, expect, it } from 'vitest'
 import {
+  appendMember,
+  attrLabel,
   buildTypeOptions,
+  moveInList,
   optionKey,
-  removeUniqueConstraint,
-  replaceUniqueConstraint,
   refFromOptionKey,
+  removeAt,
 } from '../ClassifierCard.helpers'
 
 const local = [
@@ -69,15 +71,29 @@ describe('buildTypeOptions', () => {
   })
 })
 
-describe('unique constraint editing', () => {
-  it('replaces one composite constraint without mutating the others', () => {
-    expect(replaceUniqueConstraint([['tenant'], ['email']], 0, ['tenant', 'number'])).toEqual([
-      ['tenant', 'number'],
-      ['email'],
-    ])
+describe('ordered key helpers', () => {
+  const attrs = [
+    { id: 'a1', name: 'tenant' },
+    { id: 'a2', name: 'number' },
+  ]
+
+  it('resolves an attribute id to its current name (rename-free references)', () => {
+    expect(attrLabel('a1', attrs)).toBe('tenant')
+    expect(attrLabel('missing', attrs)).toBe('missing')
   })
 
-  it('removes the final constraint as an absent optional field', () => {
-    expect(removeUniqueConstraint([['email']], 0)).toBeUndefined()
+  it('appends a member without repetition', () => {
+    expect(appendMember(['a1'], 'a2')).toEqual(['a1', 'a2'])
+    expect(appendMember(['a1'], 'a1')).toEqual(['a1'])
+  })
+
+  it('removes a member by index', () => {
+    expect(removeAt(['a1', 'a2', 'a3'], 1)).toEqual(['a1', 'a3'])
+  })
+
+  it('reorders members, clamping at the ends', () => {
+    expect(moveInList(['a1', 'a2', 'a3'], 0, 1)).toEqual(['a2', 'a1', 'a3'])
+    expect(moveInList(['a1', 'a2'], 0, -1)).toEqual(['a1', 'a2'])
+    expect(moveInList(['a1', 'a2'], 1, 1)).toEqual(['a1', 'a2'])
   })
 })

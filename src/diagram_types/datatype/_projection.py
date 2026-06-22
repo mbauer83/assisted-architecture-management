@@ -8,7 +8,8 @@ CandidateRepository reads — no SQLite direct access.
 from __future__ import annotations
 
 from collections import defaultdict
-from dataclasses import dataclass
+from collections.abc import Iterator
+from dataclasses import dataclass, replace
 from typing import Any, Mapping
 
 from src.domain.diagram_verification import BaseDiagramVerificationContext
@@ -48,70 +49,101 @@ def compile_projection(
     candidate: Any,
     ctx: BaseDiagramVerificationContext,
 ) -> DatatypeVerificationProjection:
-    """Compile a DatatypeVerificationProjection from *candidate*.
+    """Compile a DatatypeVerificationProjection from *candidate* and the diagram under test.
 
-    Uses only CandidateRepository reads; candidate is typed Any to avoid
-    cross-layer imports (it satisfies CandidateRepository at runtime).
+    Classifiers come from two sources, the second taking precedence so a diagram always
+    resolves references to its own classifiers (the same-write contract) even before it is
+    committed to the candidate view:
+      1. committed / candidate classifiers (cross-diagram resolution), and
+      2. the classifiers declared inline in the diagram being verified (``ctx.fm``).
+
+    candidate is typed Any to avoid cross-layer imports (it satisfies CandidateRepository).
     """
     classifiers_by_id: dict[str, ClassifierDefinition] = {}
-    name_to_ids: dict[str, list[str]] = defaultdict(list)
-
     for entity in candidate.list_entities(artifact_type="classifier"):
-        scope = str(candidate.scope_for_path(entity.path))
         extra: dict[str, Any] = dict(entity.extra) if entity.extra else {}
-        clf_def = ClassifierDefinition(
+        classifiers_by_id[entity.artifact_id] = ClassifierDefinition(
             type_id=entity.artifact_id,
             label=entity.name,
             kind=str(extra.get("classifier_kind") or ""),
-            scope=scope,
+            scope=str(candidate.scope_for_path(entity.path)),
             status=entity.status,
             host_diagram_id=str(entity.host_diagram_id or ""),
         )
-        classifiers_by_id[entity.artifact_id] = clf_def
-        norm_name = entity.name.lower().strip()
-        if norm_name:
-            name_to_ids[norm_name].append(entity.artifact_id)
+    for clf_def in _inline_classifier_defs(ctx):
+        committed = classifiers_by_id.get(clf_def.type_id)
+        if committed is not None and clf_def.label == clf_def.type_id:
+            # Inline classifier omitted an explicit label (managed_fields: label falls back to
+            # the bound model entity name) — preserve the committed/binding-derived label.
+            clf_def = replace(clf_def, label=committed.label)
+        classifiers_by_id[clf_def.type_id] = clf_def
 
-    classifier_ids_by_name: dict[str, tuple[str, ...]] = {
-        name: tuple(ids) for name, ids in name_to_ids.items()
-    }
+    name_to_ids: dict[str, list[str]] = defaultdict(list)
+    for clf in classifiers_by_id.values():
+        norm_name = clf.label.lower().strip()
+        if norm_name:
+            name_to_ids[norm_name].append(clf.type_id)
 
     usages_raw: dict[str, list[AttributeTypeUsage]] = defaultdict(list)
+    seen_diagram_ids: set[str] = set()
     for diagram in candidate.list_diagrams(diagram_type="datatype"):
+        seen_diagram_ids.add(diagram.artifact_id)
         extra_d: dict[str, Any] = dict(diagram.extra) if diagram.extra else {}
-        de: dict[str, Any] = extra_d.get("diagram-entities") or {}
-        if not isinstance(de, dict):
-            continue
-        classifiers_raw: list[Any] = de.get("classifier") or []
-        if not isinstance(classifiers_raw, list):
-            continue
-        for clf in classifiers_raw:
-            if not isinstance(clf, dict):
-                continue
-            clf_id = str(clf.get("id") or "")
-            attrs: list[Any] = clf.get("attributes") or []
-            if not isinstance(attrs, list):
-                continue
-            for attr in attrs:
-                if not isinstance(attr, dict):
-                    continue
-                type_ref = attr.get("type")
-                if not isinstance(type_ref, dict):
-                    continue
-                if type_ref.get("kind") != "classifier":
-                    continue
-                ref_id = str(type_ref.get("id") or "")
-                if not ref_id:
-                    continue
-                attr_name = str(attr.get("name") or "")
-                usages_raw[ref_id].append(AttributeTypeUsage(
-                    diagram_id=diagram.artifact_id,
-                    classifier_local_id=clf_id,
-                    attr_name=attr_name,
-                ))
+        _collect_usages(diagram.artifact_id, extra_d.get("diagram-entities"), usages_raw)
+    own_id = str(ctx.fm.get("artifact-id") or "")
+    if own_id and own_id not in seen_diagram_ids:
+        _collect_usages(own_id, ctx.fm.get("diagram-entities"), usages_raw)
 
     return DatatypeVerificationProjection(
         classifiers_by_id=classifiers_by_id,
-        classifier_ids_by_name=classifier_ids_by_name,
+        classifier_ids_by_name={name: tuple(ids) for name, ids in name_to_ids.items()},
         usages_by_id={k: tuple(v) for k, v in usages_raw.items()},
     )
+
+
+def _inline_classifier_defs(ctx: BaseDiagramVerificationContext) -> Iterator[ClassifierDefinition]:
+    """ClassifierDefinitions for the classifiers declared in the diagram under verification."""
+    de = ctx.fm.get("diagram-entities")
+    classifiers = de.get("classifier") if isinstance(de, dict) else None
+    own_id = str(ctx.fm.get("artifact-id") or "")
+    status = str(ctx.fm.get("status") or "")
+    for clf in classifiers if isinstance(classifiers, list) else []:
+        if not isinstance(clf, dict):
+            continue
+        clf_id = str(clf.get("id") or "")
+        if not clf_id:
+            continue
+        yield ClassifierDefinition(
+            type_id=clf_id,
+            label=str(clf.get("label") or clf_id),
+            kind=str(clf.get("classifier_kind") or ""),
+            scope=str(ctx.scope),
+            status=status,
+            host_diagram_id=own_id,
+        )
+
+
+def _collect_usages(
+    diagram_id: str,
+    de: Any,
+    usages_raw: dict[str, list[AttributeTypeUsage]],
+) -> None:
+    """Append every classifier-typed attribute usage found in *de* to *usages_raw*."""
+    classifiers = de.get("classifier") if isinstance(de, dict) else None
+    for clf in classifiers if isinstance(classifiers, list) else []:
+        if not isinstance(clf, dict):
+            continue
+        clf_id = str(clf.get("id") or "")
+        for attr in clf.get("attributes") or []:
+            if not isinstance(attr, dict):
+                continue
+            type_ref = attr.get("type")
+            if not isinstance(type_ref, dict) or type_ref.get("kind") != "classifier":
+                continue
+            ref_id = str(type_ref.get("id") or "")
+            if ref_id:
+                usages_raw[ref_id].append(AttributeTypeUsage(
+                    diagram_id=diagram_id,
+                    classifier_local_id=clf_id,
+                    attr_name=str(attr.get("name") or ""),
+                ))

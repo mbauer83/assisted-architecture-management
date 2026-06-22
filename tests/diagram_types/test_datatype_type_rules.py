@@ -204,6 +204,28 @@ def test_e332_known_classifier_no_fire() -> None:
     assert e332 == []
 
 
+def test_e332_same_write_intra_diagram_reference_resolves() -> None:
+    """A reference to a classifier defined in the SAME, not-yet-committed diagram resolves.
+
+    The candidate (repo) is empty; resolution must come from the diagram under verification
+    itself (compile_projection's same-write step).
+    """
+    fm = {
+        "artifact-id": "DT-A",
+        "diagram-type": "datatype",
+        "status": "draft",
+        "diagram-entities": {"classifier": [
+            {
+                "id": "CLF@1.ab.order", "classifier_kind": "class", "label": "Order",
+                "attributes": [{"name": "color", "type": {"kind": "classifier", "id": "CLF@1.cd.color"}}],
+            },
+            {"id": "CLF@1.cd.color", "classifier_kind": "enumeration", "label": "Color"},
+        ]},
+    }
+    e332, _ = _run(fm)  # empty candidate — only the same-write contract can resolve the ref
+    assert e332 == []
+
+
 def test_e332_details_fields_present() -> None:
     fm = _fm_with_attrs(
         "CLF@1.ab.x", [{"name": "my_field", "type": {"kind": "primitive", "name": "Blob"}}]

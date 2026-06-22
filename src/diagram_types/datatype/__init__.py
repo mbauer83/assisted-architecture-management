@@ -287,8 +287,11 @@ class _DatatypeDiagramType(DiagramTypeBase):
         from src.diagram_types.datatype._contributions import (  # noqa: PLC0415
             ATTRIBUTE_TYPE_SCHEMA_CONTRIBUTION,
             BACKING_CONSISTENCY_CONTRIBUTION,
-            UNIQUE_CONSTRAINT_CONTRIBUTION,
             _ProjectionBasedContributions,
+        )
+        from src.diagram_types.datatype._contributions_keys import (  # noqa: PLC0415
+            GENERALIZATION_SET_CONTRIBUTION,
+            KEY_CONSTRAINT_CONTRIBUTION,
         )
         primitive_names = frozenset(
             str(p) for p in (self._config.get("ui") or {}).get("primitive_types") or []
@@ -296,7 +299,8 @@ class _DatatypeDiagramType(DiagramTypeBase):
         return (
             BACKING_CONSISTENCY_CONTRIBUTION,
             ATTRIBUTE_TYPE_SCHEMA_CONTRIBUTION,
-            UNIQUE_CONSTRAINT_CONTRIBUTION,
+            KEY_CONSTRAINT_CONTRIBUTION,
+            GENERALIZATION_SET_CONTRIBUTION,
             _ProjectionBasedContributions(primitive_names),
         )
 

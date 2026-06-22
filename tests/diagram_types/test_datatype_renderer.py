@@ -1,8 +1,9 @@
 """Renderer tests for the datatype diagram type (restricted UML class diagram).
 
-Covers: all five classifier_kinds, attribute compartment, enumeration literals,
-all five dt-* connection arrows, src/tgt cardinality labels, variant+generalization_set
-data tolerance, and collect_references binding extraction.
+Covers: classifier kinds, is_abstract, attribute compartment, optional marker,
+identity / unique_keys key markers + composite key note, enumeration literals,
+all five dt-* connection arrows, src/tgt cardinality labels, generalization_set
+constraint note, and collect_references binding extraction.
 """
 
 from __future__ import annotations
@@ -18,14 +19,17 @@ def _renderer() -> DatatypePumlRenderer:
     return DatatypePumlRenderer({})
 
 
-def _render(*, classifiers=None, connections=None) -> str:
+def _render(*, classifiers=None, connections=None, generalization_sets=None) -> str:
+    entities: dict[str, object] = {"classifier": classifiers or []}
+    if generalization_sets is not None:
+        entities["generalization_set"] = generalization_sets
     return _renderer().render_body(
         "Test Diagram",
         [],
         [],
         "datatype",
         _REPO,
-        diagram_entities={"classifier": classifiers or []},
+        diagram_entities=entities,
         diagram_connections=connections or [],
     )
 
@@ -53,14 +57,23 @@ class TestClassifierKinds:
         assert "<<datatype>>" in out
         assert 'class "Money"' in out
 
+    def test_stereotype_follows_alias(self):
+        # PlantUML requires: class "Label" as Alias <<stereotype>>  (stereotype after alias)
+        out = _render(classifiers=[_cls("c1", kind="datatype", label="Money")])
+        assert 'class "Money" as _c1 <<datatype>> {' in out
+
     def test_enumeration_uses_enum_keyword(self):
         out = _render(classifiers=[_cls("c1", kind="enumeration", label="Status")])
         assert 'enum "Status"' in out
 
-    def test_variant_uses_abstract_class(self):
-        out = _render(classifiers=[_cls("c1", kind="variant", label="Shape")])
+    def test_is_abstract_uses_abstract_class(self):
+        out = _render(classifiers=[_cls("c1", label="Shape", is_abstract=True)])
         assert "abstract class" in out
-        assert "<<variant>>" in out
+
+    def test_variant_kind_is_no_longer_supported(self):
+        # "variant" is no longer a classifier kind; rendering tolerates it as a plain class.
+        out = _render(classifiers=[_cls("c1", kind="variant", label="Shape")])
+        assert "<<variant>>" not in out
 
     def test_primitive_has_stereotype(self):
         out = _render(classifiers=[_cls("c1", kind="primitive", label="String")])
@@ -72,48 +85,71 @@ class TestClassifierKinds:
 
 
 # ---------------------------------------------------------------------------
-# Attribute compartment
+# Attribute compartment + keys
 # ---------------------------------------------------------------------------
 
 
 class TestAttributes:
-    def _attr(self, **kwargs):
-        return {"name": "field", "type": "string", **kwargs}
-
     def test_attribute_name_present(self):
-        out = _render(classifiers=[_cls("c1", attributes=[{"name": "price", "type": "decimal"}])])
+        out = _render(classifiers=[_cls("c1", attributes=[{"id": "a1", "name": "price", "type": "decimal"}])])
         assert "price" in out
         assert "decimal" in out
 
     def test_attribute_multiplicity_present(self):
         out = _render(classifiers=[_cls("c1", attributes=[{
-            "name": "tags", "type": "string", "multiplicity": "0..*"
+            "id": "a1", "name": "tags", "type": "string", "multiplicity": "0..*"
         }])])
         assert "[0..*]" in out
 
-    def test_attribute_is_id_marker(self):
+    def test_optional_marker(self):
         out = _render(classifiers=[_cls("c1", attributes=[{
-            "name": "id", "type": "uuid", "is_id": True
+            "id": "a1", "name": "nickname", "type": "string", "optional": True
         }])])
-        assert "{id}" in out
+        assert "{optional}" in out
 
-    def test_attribute_without_is_id_no_marker(self):
-        out = _render(classifiers=[_cls("c1", attributes=[{"name": "name", "type": "string"}])])
-        assert "{id}" not in out
-
-    def test_attribute_unique_marker(self):
-        out = _render(classifiers=[_cls("c1", attributes=[{
-            "name": "email", "type": "string", "is_unique": True,
-        }])])
-        assert "{unique}" in out
-
-    def test_composite_unique_constraint_note(self):
+    def test_identity_marks_member_attribute(self):
         out = _render(classifiers=[_cls(
             "c1",
-            attributes=[{"name": "tenant"}, {"name": "number"}],
-            unique_constraints=[["tenant", "number"]],
+            attributes=[{"id": "a1", "name": "id", "type": "uuid"}],
+            identity=["a1"],
         )])
-        assert "{unique(tenant, number)}" in out
+        assert "{id}" in out
+
+    def test_no_identity_no_id_marker(self):
+        out = _render(classifiers=[_cls("c1", attributes=[{"id": "a1", "name": "name", "type": "string"}])])
+        assert "{id}" not in out
+
+    def test_named_unique_key_marker(self):
+        out = _render(classifiers=[_cls(
+            "c1",
+            attributes=[{"id": "a1", "name": "email", "type": "string"}],
+            unique_keys=[{"name": "email", "attribute_ids": ["a1"]}],
+        )])
+        assert "{unique:email}" in out
+
+    def test_unnamed_unique_key_marker(self):
+        out = _render(classifiers=[_cls(
+            "c1",
+            attributes=[{"id": "a1", "name": "email", "type": "string"}],
+            unique_keys=[{"attribute_ids": ["a1"]}],
+        )])
+        assert "{unique}" in out
+
+    def test_composite_key_note_uses_names(self):
+        out = _render(classifiers=[_cls(
+            "c1",
+            attributes=[{"id": "a1", "name": "tenant"}, {"id": "a2", "name": "number"}],
+            unique_keys=[{"name": "tn", "attribute_ids": ["a1", "a2"]}],
+        )])
+        assert "«unique tn» (tenant, number)" in out
+
+    def test_no_legacy_unique_constraints_note(self):
+        out = _render(classifiers=[_cls(
+            "c1",
+            attributes=[{"id": "a1", "name": "tenant"}, {"id": "a2", "name": "number"}],
+            unique_keys=[{"attribute_ids": ["a1", "a2"]}],
+        )])
+        assert "{unique(" not in out
 
 
 # ---------------------------------------------------------------------------
@@ -132,10 +168,7 @@ class TestLiterals:
         assert "BLUE" in out
 
     def test_literals_not_rendered_for_class_kind(self):
-        out = _render(classifiers=[_cls(
-            "c1", kind="class",
-            literals=["GHOST"],
-        )])
+        out = _render(classifiers=[_cls("c1", kind="class", literals=["GHOST"])])
         assert "GHOST" not in out
 
 
@@ -149,24 +182,19 @@ class TestConnectionArrows:
         return {"id": "e1", "source": "a", "target": "b", "conn_type": conn_type}
 
     def test_dt_association_arrow(self):
-        out = _render(connections=[self._conn("dt-association")])
-        assert " -- " in out
+        assert " -- " in _render(connections=[self._conn("dt-association")])
 
     def test_dt_aggregation_arrow(self):
-        out = _render(connections=[self._conn("dt-aggregation")])
-        assert "o--" in out
+        assert "o--" in _render(connections=[self._conn("dt-aggregation")])
 
     def test_dt_composition_arrow(self):
-        out = _render(connections=[self._conn("dt-composition")])
-        assert "*--" in out
+        assert "*--" in _render(connections=[self._conn("dt-composition")])
 
     def test_dt_generalization_arrow(self):
-        out = _render(connections=[self._conn("dt-generalization")])
-        assert "--|>" in out
+        assert "--|>" in _render(connections=[self._conn("dt-generalization")])
 
     def test_dt_dependency_arrow(self):
-        out = _render(connections=[self._conn("dt-dependency")])
-        assert "..>" in out
+        assert "..>" in _render(connections=[self._conn("dt-dependency")])
 
     def test_unknown_conn_type_excluded(self):
         out = _render(connections=[{"id": "e1", "source": "a", "target": "b", "conn_type": "seq-from"}])
@@ -209,34 +237,52 @@ class TestNotes:
 
     def test_connection_note_in_output(self):
         out = _render(connections=[{
-            "id": "e1",
-            "source": "a",
-            "target": "b",
-            "conn_type": "dt-association",
-            "note": "Derived relation",
+            "id": "e1", "source": "a", "target": "b",
+            "conn_type": "dt-association", "note": "Derived relation",
         }])
         assert "note on link" in out
         assert "Derived relation" in out
 
 
 # ---------------------------------------------------------------------------
-# Variant + generalization_set tolerance
+# Generalization set
 # ---------------------------------------------------------------------------
 
 
-class TestVariantGeneralizationSet:
-    def test_variant_with_generalization_set_does_not_crash(self):
-        out = _render(classifiers=[_cls(
-            "c1", kind="variant", label="Shape",
-            generalization_set={"is_covering": True, "is_disjoint": True},
-        )])
-        assert "abstract class" in out
+class TestGeneralizationSet:
+    def _scene(self):
+        classifiers = [
+            _cls("g", label="PaymentMethod", is_abstract=True),
+            _cls("card", label="Card"),
+            _cls("pp", label="PayPal"),
+        ]
+        connections = [
+            {"id": "e1", "conn_type": "dt-generalization", "source": "card", "target": "g",
+             "generalization_set": "GS@1.x.m"},
+            {"id": "e2", "conn_type": "dt-generalization", "source": "pp", "target": "g",
+             "generalization_set": "GS@1.x.m"},
+        ]
+        sets = [{"id": "GS@1.x.m", "label": "method", "is_covering": True, "is_disjoint": True}]
+        return classifiers, connections, sets
 
-    def test_variant_without_generalization_set_renders_cleanly(self):
-        out = _render(classifiers=[_cls("c1", kind="variant", label="Shape")])
-        assert "abstract class" in out
-        assert "@startuml" in out
-        assert "@enduml" in out
+    def test_constraint_note_rendered_on_general_end(self):
+        classifiers, connections, sets = self._scene()
+        out = _render(classifiers=classifiers, connections=connections, generalization_sets=sets)
+        assert "note bottom of _g" in out
+        assert "GeneralizationSet «method» {complete, disjoint}" in out
+
+    def test_incomplete_overlapping_constraint(self):
+        classifiers, connections, _ = self._scene()
+        sets = [{"id": "GS@1.x.m", "label": "method", "is_covering": False, "is_disjoint": False}]
+        out = _render(classifiers=classifiers, connections=connections, generalization_sets=sets)
+        assert "{incomplete, overlapping}" in out
+
+    def test_unreferenced_set_renders_no_note(self):
+        out = _render(
+            classifiers=[_cls("g", label="X")],
+            generalization_sets=[{"id": "GS@1.x.m", "label": "m", "is_covering": True}],
+        )
+        assert "GeneralizationSet" not in out
 
 
 # ---------------------------------------------------------------------------

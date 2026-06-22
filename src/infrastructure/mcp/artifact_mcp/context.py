@@ -180,12 +180,16 @@ def registry_cached(roots_key_str: str) -> ArtifactRegistry:
 
 
 def verifier_for(roots_key_str: str, *, include_registry: bool) -> ArtifactVerifier:
+    from src.application.candidate_repository import committed_repository  # noqa: PLC0415
     from src.infrastructure.app_bootstrap import build_runtime_catalogs, get_module_registry  # noqa: PLC0415
 
     catalogs = build_runtime_catalogs(get_module_registry())
-    if include_registry:
-        return ArtifactVerifier(registry_cached(roots_key_str), catalogs=catalogs)
-    return ArtifactVerifier(None, catalogs=catalogs)
+    # The committed CandidateRepository lets datatype type-reference resolution (E332) see
+    # classifiers defined in other diagrams; same-diagram references are resolved by the
+    # projection from the diagram under verification (compile_projection's same-write step).
+    committed_repo = committed_repository(repo_cached(roots_key_str))
+    registry = registry_cached(roots_key_str) if include_registry else None
+    return ArtifactVerifier(registry, catalogs=catalogs, committed_repo=committed_repo)
 
 
 def _refresh_repo_now(roots: list[Path]) -> ReadModelVersion:

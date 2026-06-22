@@ -51,16 +51,24 @@ def test_views_agree():
         )
 
 
-def test_absent_identity_scope_defaults_to_diagram():
-    """Entity types not declaring identity_scope default to 'diagram'."""
-    dt = _datatype()
-    ui_map = {oe.entity_type: oe for oe in dt.ui_config.diagram_only_types}
-    for etype_name, et_info in dt.diagram_entity_type_infos.items():
-        if str(etype_name) == "classifier":
-            continue
-        assert et_info.identity_scope == "diagram", (
-            f"{etype_name} should default to 'diagram', got {et_info.identity_scope!r}"
-        )
-        ui = ui_map.get(str(etype_name))
-        if ui is not None:
-            assert ui.identity_scope == "diagram"
+def test_absent_identity_scope_defaults_to_diagram(tmp_path):
+    """An entity type that omits identity_scope defaults to 'diagram' (loader contract).
+
+    Tested directly against the loader so it does not depend on the datatype module
+    happening to declare a scope-less type (classifier and generalization_set are both
+    workspace-scoped).
+    """
+    from src.domain.diagram_ontology_loader import load_diagram_ontology
+
+    ont = tmp_path / "ontology.yaml"
+    ont.write_text(
+        "entity_types:\n"
+        "  widget:\n"
+        "    classes: []\n"
+        "    properties:\n"
+        "      label: {type: string}\n",
+        encoding="utf-8",
+    )
+    info = load_diagram_ontology(ont).entity_types[EntityTypeName("widget")]
+    assert info.identity_scope == "diagram"
+    assert info.id_prefix is None

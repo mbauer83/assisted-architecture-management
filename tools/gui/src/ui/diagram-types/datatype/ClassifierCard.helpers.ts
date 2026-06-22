@@ -61,18 +61,25 @@ export function buildTypeOptions(
   return options
 }
 
-export function replaceUniqueConstraint(
-  constraints: readonly string[][],
-  index: number,
-  names: readonly string[],
-): string[][] {
-  return constraints.map((constraint, i) => i === index ? [...names] : [...constraint])
+/** Resolve an attribute id to its current name (falls back to the id). */
+export function attrLabel(id: string, attributes: readonly { id: string; name: string }[]): string {
+  return attributes.find((a) => a.id === id)?.name ?? id
 }
 
-export function removeUniqueConstraint(
-  constraints: readonly string[][],
-  index: number,
-): string[][] | undefined {
-  const remaining = constraints.filter((_, i) => i !== index).map((constraint) => [...constraint])
-  return remaining.length ? remaining : undefined
+/** Append an id to an ordered list iff not already present (no repetition). */
+export function appendMember(list: readonly string[], id: string): string[] {
+  return list.includes(id) ? [...list] : [...list, id]
+}
+
+export function removeAt<T>(list: readonly T[], index: number): T[] {
+  return list.filter((_, i) => i !== index)
+}
+
+/** Swap the element at `index` with its neighbour `delta` away (clamped: no-op at the ends). */
+export function moveInList<T>(list: readonly T[], index: number, delta: number): T[] {
+  const next = [...list]
+  const target = index + delta
+  if (target < 0 || target >= next.length) return next
+  ;[next[index], next[target]] = [next[target], next[index]]
+  return next
 }

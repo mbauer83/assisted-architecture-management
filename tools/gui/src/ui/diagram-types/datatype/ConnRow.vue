@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, inject, ref } from 'vue'
 import { Effect, Exit } from 'effect'
-import type { Classifier, DtConn, DtConnType } from './useDatatypeModel'
+import type { Classifier, DtConn, DtConnType, GeneralizationSet } from './useDatatypeModel'
 import { DT_CONN_TYPES } from './useDatatypeModel'
 import { useDtBackingConstraint } from './useDtBackingConstraint'
 import { modelServiceKey } from '../../keys'
@@ -10,6 +10,7 @@ import DatatypeNoteSection from './DatatypeNoteSection.vue'
 const props = defineProps<{
   conn: DtConn
   classifiers: Classifier[]
+  generalizationSets: GeneralizationSet[]
 }>()
 const emit = defineEmits<{
   removeConn: [id: string]
@@ -145,6 +146,24 @@ async function applyFix() {
         placeholder="label"
         @input="emit('updateConn', conn.id, { label: ($event.target as HTMLInputElement).value || undefined })"
       >
+      <select
+        v-if="conn.conn_type === 'dt-generalization'"
+        class="gset-sel"
+        title="Generalization set (groups cases under {covering, disjoint})"
+        :value="conn.generalization_set ?? ''"
+        @change="emit('updateConn', conn.id, { generalization_set: ($event.target as HTMLSelectElement).value || undefined })"
+      >
+        <option value="">
+          (no set)
+        </option>
+        <option
+          v-for="set in generalizationSets"
+          :key="set.id"
+          :value="set.id"
+        >
+          {{ set.label ?? set.id }}
+        </option>
+      </select>
       <span
         v-if="conn.backing_conn_id"
         class="binding-badge"
@@ -192,6 +211,7 @@ async function applyFix() {
 .card-in { width: 52px; font-size: 11px; border: 1px solid #e2e8f0; border-radius: 3px; padding: 1px 3px; }
 .field-stack { display: flex; flex-direction: column; gap: 1px; font-size: 9px; color: #6b7280; }
 .lbl-in { flex: 1; min-width: 60px; font-size: 11px; border: 1px solid #e2e8f0; border-radius: 3px; padding: 1px 4px; }
+.gset-sel { font-size: 11px; border: 1px solid #c7d2fe; border-radius: 3px; padding: 1px 3px; background: #eef2ff; }
 .binding-badge { font-size: 12px; color: #059669; padding: 0 2px; }
 .del-btn { border: none; background: none; cursor: pointer; color: #9ca3af; font-size: 14px; padding: 0 2px; flex-shrink: 0; }
 .del-btn:hover { color: #ef4444; }

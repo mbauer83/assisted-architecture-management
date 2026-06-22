@@ -1,17 +1,14 @@
 <script setup lang="ts">
-import ActivityEntityPicker from '../activity/ActivityEntityPicker.vue'
-import type { Classifier, Attribute, ClassifierKind, AttrTypeRef } from './useDatatypeModel'
-import { CLASSIFIER_KINDS } from './useDatatypeModel'
-import type { CatalogClassifier, TypeOptionGroup } from './ClassifierCard.helpers'
-import {
-  buildTypeOptions,
-  optionKey,
-  removeUniqueConstraint as withoutUniqueConstraint,
-  replaceUniqueConstraint,
-  refFromOptionKey,
-} from './ClassifierCard.helpers'
-import DatatypeNoteSection from './DatatypeNoteSection.vue'
 import { computed } from 'vue'
+import ActivityEntityPicker from '../activity/ActivityEntityPicker.vue'
+import type { Attribute, Classifier, ClassifierKind, UniqueKey } from './useDatatypeModel'
+import { CLASSIFIER_KINDS } from './useDatatypeModel'
+import type { CatalogClassifier } from './ClassifierCard.helpers'
+import { buildTypeOptions } from './ClassifierCard.helpers'
+import AttributeRow from './AttributeRow.vue'
+import KeysSection from './KeysSection.vue'
+import ClassifierMetadata from './ClassifierMetadata.vue'
+import DatatypeNoteSection from './DatatypeNoteSection.vue'
 
 const props = defineProps<{
   classifier: Classifier
@@ -33,15 +30,11 @@ const emit = defineEmits<{
   newClassifier: [attrIndex: number]
 }>()
 
-const onKindChange = (e: Event) => {
-  const kind = (e.target as HTMLSelectElement).value as ClassifierKind
-  const patch: Partial<Classifier> = { classifier_kind: kind }
-  if (kind === 'enumeration') patch.attributes = undefined
-  else patch.literals = undefined
-  emit('update', patch)
-}
-
-const isEnum = () => props.classifier.classifier_kind === 'enumeration'
+const isEnum = computed(() => props.classifier.classifier_kind === 'enumeration')
+const attributes = computed(() => props.classifier.attributes ?? [])
+const roleRequired = computed(() =>
+  !isEnum.value && (attributes.value.length > 0 || !!props.classifier.is_abstract),
+)
 
 const typeOptions = computed(() => buildTypeOptions(
   props.primitiveTypes,
@@ -49,43 +42,13 @@ const typeOptions = computed(() => buildTypeOptions(
   props.catalogClassifiers,
   props.diagramId,
 ))
-const optionGroups: TypeOptionGroup[] = ['Primitives', 'This diagram', 'Engagement', 'Enterprise']
-const optionsFor = (group: TypeOptionGroup) =>
-  typeOptions.value.filter((option) => option.group === group)
 
-function onTypeChange(index: number, current: AttrTypeRef | undefined, event: Event) {
-  const select = event.target as HTMLSelectElement
-  const key = select.value
-  if (key === '__new_classifier__') {
-    select.value = optionKey(current)
-    emit('newClassifier', index)
-    return
-  }
-  emit('updateAttr', index, { type: refFromOptionKey(key, typeOptions.value) })
-}
-
-function addUniqueConstraint() {
-  emit('update', {
-    unique_constraints: [...(props.classifier.unique_constraints ?? []), []],
-  })
-}
-
-function updateUniqueConstraint(index: number, event: Event) {
-  const selected = [...(event.target as HTMLSelectElement).selectedOptions]
-    .map((option) => option.value)
-  emit('update', {
-    unique_constraints: replaceUniqueConstraint(
-      props.classifier.unique_constraints ?? [],
-      index,
-      selected,
-    ),
-  })
-}
-
-function removeUniqueConstraint(index: number) {
-  emit('update', {
-    unique_constraints: withoutUniqueConstraint(props.classifier.unique_constraints ?? [], index),
-  })
+const onKindChange = (e: Event) => {
+  const kind = (e.target as HTMLSelectElement).value as ClassifierKind
+  const patch: Partial<Classifier> = { classifier_kind: kind }
+  if (kind === 'enumeration') patch.attributes = undefined
+  else patch.literals = undefined
+  emit('update', patch)
 }
 </script>
 
@@ -123,6 +86,16 @@ function removeUniqueConstraint(index: number) {
           placeholder="Classifier name"
           @input="emit('update', { label: ($event.target as HTMLInputElement).value || undefined })"
         >
+        <label
+          class="abstract-chk"
+          title="Abstract — the general end of a sum type"
+        >
+          <input
+            type="checkbox"
+            :checked="!!classifier.is_abstract"
+            @change="emit('update', { is_abstract: ($event.target as HTMLInputElement).checked || undefined })"
+          > abstract
+        </label>
         <button
           class="del-btn"
           type="button"
@@ -142,7 +115,7 @@ function removeUniqueConstraint(index: number) {
       </div>
     </section>
 
-    <template v-if="!isEnum()">
+    <template v-if="!isEnum">
       <section class="card-section attrs-section">
         <div class="section-row">
           <span class="section-title">Attributes</span>
@@ -154,121 +127,31 @@ function removeUniqueConstraint(index: number) {
             + Attribute
           </button>
         </div>
-        <div
-          v-for="(attr, i) in classifier.attributes ?? []"
-          :key="i"
-          class="attr-row"
-        >
-          <input
-            type="text"
-            class="attr-name"
-            :value="attr.name"
-            placeholder="name"
-            @input="emit('updateAttr', i, { name: ($event.target as HTMLInputElement).value })"
-          >
-          <select
-            class="attr-type"
-            :value="optionKey(attr.type)"
-            title="Attribute type"
-            @change="onTypeChange(i, attr.type, $event)"
-          >
-            <option
-              value=""
-              disabled
-            >
-              Select type…
-            </option>
-            <optgroup
-              v-for="group in optionGroups"
-              :key="group"
-              :label="group"
-            >
-              <option
-                v-for="option in optionsFor(group)"
-                :key="option.key"
-                :value="option.key"
-              >
-                {{ option.label }}
-              </option>
-            </optgroup>
-            <option value="__new_classifier__">
-              + New classifier
-            </option>
-          </select>
-          <label class="field-stack">
-            <input
-              type="text"
-              class="attr-mult"
-              :value="attr.multiplicity ?? ''"
-              placeholder="0..1"
-              title="Multiplicity (for example: 1, 0..1, 1..*, *)"
-              @input="emit('updateAttr', i, { multiplicity: ($event.target as HTMLInputElement).value || undefined })"
-            >
-          </label>
-          <label class="attr-id-chk">
-            <input
-              type="checkbox"
-              :checked="!!attr.is_id"
-              @change="emit('updateAttr', i, { is_id: ($event.target as HTMLInputElement).checked || undefined })"
-            > {id}
-          </label>
-          <label class="attr-id-chk">
-            <input
-              type="checkbox"
-              :checked="!!attr.is_unique"
-              @change="emit('updateAttr', i, { is_unique: ($event.target as HTMLInputElement).checked || undefined })"
-            > {unique}
-          </label>
-          <button
-            class="del-btn"
-            type="button"
-            @click="emit('removeAttr', i)"
-          >
-            ×
-          </button>
-        </div>
+        <AttributeRow
+          v-for="(attr, i) in attributes"
+          :key="attr.id || i"
+          :attr="attr"
+          :type-options="typeOptions"
+          @update="(patch) => emit('updateAttr', i, patch)"
+          @remove="emit('removeAttr', i)"
+          @new-classifier="emit('newClassifier', i)"
+        />
       </section>
-      <section class="card-section constraints-section">
-        <div class="section-row">
-          <span class="section-title">Constraints</span>
-          <button
-            class="add-btn"
-            type="button"
-            :disabled="!(classifier.attributes?.length)"
-            @click="addUniqueConstraint"
-          >
-            + Constraint
-          </button>
-        </div>
-        <div
-          v-for="(constraint, i) in classifier.unique_constraints ?? []"
-          :key="i"
-          class="constraint-row"
-        >
-          <select
-            multiple
-            class="constraint-select"
-            title="Select every attribute participating in this composite uniqueness constraint"
-            @change="updateUniqueConstraint(i, $event)"
-          >
-            <option
-              v-for="attr in classifier.attributes ?? []"
-              :key="attr.name"
-              :value="attr.name"
-              :selected="constraint.includes(attr.name)"
-            >
-              {{ attr.name }}
-            </option>
-          </select>
-          <button
-            class="del-btn"
-            type="button"
-            title="Remove unique constraint"
-            @click="removeUniqueConstraint(i)"
-          >
-            ×
-          </button>
-        </div>
+      <section class="card-section">
+        <KeysSection
+          :attributes="attributes"
+          :identity="classifier.identity"
+          :unique-keys="classifier.unique_keys"
+          @update-identity="emit('update', { identity: $event })"
+          @update-unique-keys="(keys: UniqueKey[] | undefined) => emit('update', { unique_keys: keys })"
+        />
+      </section>
+      <section class="card-section">
+        <ClassifierMetadata
+          :classifier="classifier"
+          :role-required="roleRequired"
+          @update="emit('update', $event)"
+        />
       </section>
     </template>
 
@@ -323,22 +206,16 @@ function removeUniqueConstraint(index: number) {
 .usage-count { margin-left: auto; font-size: 10px; color: #6b7280; white-space: nowrap; }
 .kind-sel { font-size: 11px; border: 1px solid #cbd5e1; border-radius: 4px; padding: 2px 4px; background: #f1f5f9; }
 .label-in { flex: 1; font-size: 12px; border: 1px solid #cbd5e1; border-radius: 4px; padding: 2px 6px; }
+.abstract-chk { font-size: 10px; color: #6b7280; display: flex; align-items: center; gap: 2px; cursor: pointer; white-space: nowrap; }
 .del-btn { border: none; background: none; cursor: pointer; color: #9ca3af; font-size: 14px; padding: 0 2px; }
 .del-btn:hover { color: #ef4444; }
 .dob-row { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
 .section-title { font-size: 11px; font-weight: 600; color: #374151; white-space: nowrap; }
 .field-label { font-size: 10px; color: #6b7280; white-space: nowrap; }
-.attrs-section, .lits-section, .constraints-section { display: flex; flex-direction: column; gap: 4px; }
+.attrs-section, .lits-section { display: flex; flex-direction: column; gap: 4px; }
 .section-row { display: flex; align-items: center; gap: 6px; }
 .add-btn { font-size: 11px; padding: 1px 6px; border: 1px solid #cbd5e1; border-radius: 4px; background: #fff; cursor: pointer; }
 .add-btn:hover { background: #f1f5f9; }
-.attr-row, .lit-row { display: flex; gap: 4px; align-items: center; }
-.attr-name { width: 90px; font-size: 11px; border: 1px solid #e2e8f0; border-radius: 3px; padding: 1px 4px; }
-.attr-type { width: 130px; font-size: 11px; border: 1px solid #e2e8f0; border-radius: 3px; padding: 1px 4px; background: #fff; }
-.attr-mult { width: 55px; font-size: 11px; border: 1px solid #e2e8f0; border-radius: 3px; padding: 1px 4px; }
-.field-stack { display: flex; flex-direction: column; gap: 1px; font-size: 9px; color: #6b7280; }
-.attr-id-chk { font-size: 11px; color: #6b7280; display: flex; align-items: center; gap: 2px; cursor: pointer; }
-.constraint-row { display: flex; align-items: center; gap: 4px; }
-.constraint-select { min-width: 180px; min-height: 48px; font-size: 11px; border: 1px solid #e2e8f0; border-radius: 3px; }
+.lit-row { display: flex; gap: 4px; align-items: center; }
 .lit-in { flex: 1; font-size: 11px; border: 1px solid #e2e8f0; border-radius: 3px; padding: 1px 4px; }
 </style>

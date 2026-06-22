@@ -6,9 +6,11 @@ entity_types:
     create_when: >-
       Use for each UML classifier in the data structure: set classifier_kind to class
       (identity-bearing entity), datatype (value object / structured DataType),
-      enumeration (DataType with named literals), variant (abstract sum type, cases
-      linked by dt-generalization), or primitive (leaf PrimitiveType). Optionally bind
-      to a Data Object entity for architectural traceability.
+      enumeration (DataType with named literals), or primitive (leaf PrimitiveType).
+      A sum type / tagged union is an abstract class or datatype (is_abstract: true)
+      whose cases are joined by dt-generalization and grouped by a generalization_set;
+      there is no distinct "variant" kind. Optionally bind to a Data Object entity for
+      architectural traceability.
     never_create_when: >-
       Do not create a classifier for an operation, method, behaviour, service, or
       process. This diagram type is restricted to data structure (attributes and
@@ -23,28 +25,36 @@ entity_types:
     properties:
       classifier_kind:
         type: string
-        enum: [class, datatype, enumeration, variant, primitive]
+        enum: [class, datatype, enumeration, primitive]
         required: true
         description: >-
           UML classifier kind. class = identity-bearing entity (instances distinct
           by identity). datatype = value object (instances equal by value). enumeration
-          = DataType with ordered EnumerationLiterals. variant = abstract Classifier
-          representing a sum type; cases are classifiers linked by dt-generalization
-          in a {complete, disjoint} GeneralizationSet. primitive = leaf PrimitiveType
-          with no internal structure (Integer, String, …).
+          = DataType with ordered EnumerationLiterals. primitive = leaf PrimitiveType
+          with no internal structure (Integer, String, …). A sum type / tagged union
+          is not a kind: it is an abstract class or datatype (is_abstract: true) whose
+          cases are joined by dt-generalization and grouped by a generalization_set
+          carrying {is_covering, is_disjoint}.
       attributes:
         type: array
         required: false
         description: >-
-          Typed attribute compartment (class, datatype, variant, primitive kinds).
-          Each entry: name (string, required), optional type discriminated union
-          ({kind: primitive, name: "String"} or {kind: classifier, id: "CLF@…"}),
-          multiplicity (UML: 1 / 0..1 / 1..* / *), is_id (bool, primary key),
-          is_unique (bool, unique constraint), default (optional default expression).
+          Typed attribute compartment (class, datatype, primitive kinds). Each entry:
+          id (string, stable internal identity — minted once, never displayed, used by
+          identity / unique_keys so renames are free), name (string, required, freely
+          renamable), optional type discriminated union ({kind: primitive, name:
+          "String"} or {kind: classifier, id: "CLF@…"}), multiplicity (UML collection
+          cardinality: 1 / 0..1 / 1..* / *), optional (bool — presence/nullability of a
+          product-type member, distinct from multiplicity), default (optional default
+          expression), and descriptive metadata: role (free-form, optional) and
+          provenance (free-form, optional).
         items:
           type: object
           required: [name]
           properties:
+            id:
+              type: string
+              minLength: 1
             name:
               type: string
               minLength: 1
@@ -72,11 +82,13 @@ entity_types:
                       pattern: '^[A-Z]+@[0-9]+\.[A-Za-z0-9_-]+\..+$'
             multiplicity:
               type: string
-            is_id:
-              type: boolean
-            is_unique:
+            optional:
               type: boolean
             default:
+              type: string
+            role:
+              type: string
+            provenance:
               type: string
       literals:
         type: array
@@ -88,33 +100,107 @@ entity_types:
         type: boolean
         required: false
         description: >-
-          Render as abstract classifier. Automatically true for variant kind;
-          set explicitly for other abstract classifiers.
-      generalization_set:
-        type: object
-        required: false
-        description: >-
-          GeneralizationSet metadata (variant kind). Fields: is_covering (bool,
-          true = the cases exhaust all instances of the variant) and is_disjoint
-          (bool, true = cases are mutually exclusive). Both true for a proper
-          sum type / tagged union.
-      unique_constraints:
+          Render as abstract classifier. Set true for the general end of a sum type
+          (the classifier whose cases are joined by dt-generalization).
+      identity:
         type: array
         required: false
         description: >-
-          Composite uniqueness constraints. Each entry is a non-empty list of
-          distinct attribute names declared by this classifier.
+          The composite primary key: an ordered, repetition-free list of attribute
+          ids (the `id` field of attributes declared by this classifier). At most one
+          identity per classifier (this single list is it). Order is significant.
+        uniqueItems: true
         items:
-          type: array
-          minItems: 1
-          uniqueItems: true
-          items:
-            type: string
-            minLength: 1
+          type: string
+          minLength: 1
+      unique_keys:
+        type: array
+        required: false
+        description: >-
+          Unique keys (candidate keys). Many are allowed. Each is an ordered,
+          repetition-free list of attribute ids, with an optional name.
+        items:
+          type: object
+          required: [attribute_ids]
+          properties:
+            name:
+              type: string
+            attribute_ids:
+              type: array
+              minItems: 1
+              uniqueItems: true
+              items:
+                type: string
+                minLength: 1
+      role:
+        type: string
+        required: true
+        description: >-
+          Brief description of the data type's role in the system. Required for
+          classifiers with an attribute compartment and for the general end of a sum
+          type; may be empty for enumerations and attribute-less value datatypes.
+      internal_consistency_criteria:
+        type: array
+        required: true
+        description: >-
+          How values of this type's own attributes must relate to be valid
+          (free-form text, one rule per entry). Required but may be empty.
+        items:
+          type: string
+      external_consistency_criteria:
+        type: array
+        required: true
+        description: >-
+          Rules about how this type's data must relate to other data for the whole
+          to be consistent (free-form text, one rule per entry). Required but may be empty.
+        items:
+          type: string
+      tags:
+        type: array
+        required: false
+        description: Free-form classification tags.
+        items:
+          type: string
+      provenance:
+        type: string
+        required: false
+        description: Optional free-form note on where this data type / its definition comes from.
       note:
         type: string
         required: false
         description: Free-form note rendered next to the classifier.
+
+  generalization_set:
+    identity_scope: workspace
+    id_prefix: GSET
+    classes: []
+    create_when: >-
+      Create one for each UML GeneralizationSet: a named grouping of dt-generalization
+      relationships that share one general (target) classifier, carrying the
+      {is_covering, is_disjoint} constraints. A proper sum type / tagged union sets both
+      true. Each participating dt-generalization references this set by id.
+    never_create_when: >-
+      Do not create a generalization_set for a single, ungrouped specialization, or to
+      model anything other than the covering/disjoint constraints over a set of
+      generalizations.
+    permitted_mappings:
+      entity_types: []
+      entity_classes: []
+    mapping_required: false
+    properties:
+      is_covering:
+        type: boolean
+        required: false
+        description: >-
+          True = the cases exhaust all instances of the general classifier (complete).
+      is_disjoint:
+        type: boolean
+        required: false
+        description: True = the cases are mutually exclusive (disjoint).
+      note:
+        type: string
+        required: false
+        description: Free-form note.
 
 connection_types:
   dt-association:
@@ -151,6 +237,13 @@ connection_types:
     relationship_kind: generalization
     puml_arrow: "--|>"
     properties:
+      generalization_set:
+        type: string
+        required: false
+        description: >-
+          Id of the generalization_set this specialization belongs to. All
+          dt-generalizations sharing a set must share one general (target) classifier;
+          the set carries the {is_covering, is_disjoint} constraints.
       note: {type: string, required: false}
 
   dt-dependency:

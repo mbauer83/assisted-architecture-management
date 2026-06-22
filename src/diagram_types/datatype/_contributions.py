@@ -98,54 +98,6 @@ class _AttributeTypeSchemaContribution:
 ATTRIBUTE_TYPE_SCHEMA_CONTRIBUTION = _AttributeTypeSchemaContribution()
 
 
-class _UniqueConstraintContribution:
-    """E337 — composite unique constraints reference valid distinct attributes."""
-
-    diagnostic_codes: tuple[str, ...] = ("E337",)
-
-    def run(self, candidate: Any, ctx: BaseDiagramVerificationContext, result: Any) -> None:
-        del candidate
-        from src.application.verification.artifact_verifier_types import Issue, Severity  # noqa: PLC0415
-
-        de = ctx.fm.get("diagram-entities")
-        classifiers = de.get("classifier") if isinstance(de, dict) else None
-        for classifier in classifiers if isinstance(classifiers, list) else []:
-            if not isinstance(classifier, dict):
-                continue
-            classifier_id = str(classifier.get("id") or "")
-            attributes = classifier.get("attributes")
-            attribute_names = {
-                str(attr.get("name") or "")
-                for attr in (attributes if isinstance(attributes, list) else [])
-                if isinstance(attr, dict) and str(attr.get("name") or "")
-            }
-            constraints = classifier.get("unique_constraints")
-            for index, constraint in enumerate(constraints if isinstance(constraints, list) else []):
-                error = _unique_constraint_error(constraint, attribute_names)
-                if error is not None:
-                    result.issues.append(Issue(
-                        Severity.ERROR,
-                        "E337",
-                        f"Classifier '{classifier_id}' unique constraint {index + 1}: {error}",
-                        ctx.loc,
-                    ))
-
-
-def _unique_constraint_error(constraint: object, attribute_names: set[str]) -> str | None:
-    if not isinstance(constraint, list) or not constraint:
-        return "must contain at least one attribute name"
-    names = [str(name) for name in constraint]
-    if any(not name for name in names):
-        return "contains an empty attribute name"
-    if len(names) != len(set(names)):
-        return "contains duplicate attribute names"
-    missing = sorted(set(names) - attribute_names)
-    return f"references unknown attribute(s): {missing}" if missing else None
-
-
-UNIQUE_CONSTRAINT_CONTRIBUTION = _UniqueConstraintContribution()
-
-
 # ---------------------------------------------------------------------------
 # E332 / W333 helpers (module-level pure functions)
 # ---------------------------------------------------------------------------

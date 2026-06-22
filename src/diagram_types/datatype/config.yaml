@@ -3,11 +3,12 @@ name: datatype
 guidance:
   when_to_use: >-
     Use to document data structures as a restricted UML class diagram. Model classifiers
-    (Class, DataType, Enumeration, Variant) with typed attributes and UML structural
-    relations (association, aggregation, composition, generalization). Optionally bind
-    classifiers to Data Object entities to trace fine-grained schema to architectural
-    data elements. Suitable for domain models, API payloads, persisted record schemas,
-    and value-type hierarchies.
+    (Class, DataType, Enumeration, Primitive) with typed attributes and UML structural
+    relations (association, aggregation, composition, generalization). A sum type / tagged
+    union is an abstract classifier whose cases are joined by generalization and grouped by
+    a generalization_set. Optionally bind classifiers to Data Object entities to trace
+    fine-grained schema to architectural data elements. Suitable for domain models, API
+    payloads, persisted record schemas, and value-type hierarchies.
   when_not_to_use: >-
     Do not use for process or interaction flows (use Sequence or Activity diagrams), for
     component or deployment views (use ArchiMate or C4), or for documenting operations
@@ -32,3 +33,6 @@ ui:
     - entity_type: classifier
       label: Classifier
       plural: Classifiers
+    - entity_type: generalization_set
+      label: Generalization set
+      plural: Generalization sets

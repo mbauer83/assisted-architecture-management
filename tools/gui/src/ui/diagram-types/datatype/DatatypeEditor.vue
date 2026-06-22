@@ -2,9 +2,10 @@
 import type { DiagramTypeUiConfig, EntityDisplayInfo } from '../../../domain'
 import { Effect } from 'effect'
 import ClassifierCard from './ClassifierCard.vue'
+import GeneralizationSetCard from './GeneralizationSetCard.vue'
 import RelationList from './RelationList.vue'
 import { useDatatypeModel } from './useDatatypeModel'
-import type { Attribute, Classifier, DtConn } from './useDatatypeModel'
+import type { Attribute, Classifier, DtConn, GeneralizationSet } from './useDatatypeModel'
 import type { CatalogClassifier } from './ClassifierCard.helpers'
 import { computed, inject, onMounted, ref, watch } from 'vue'
 import { modelServiceKey } from '../../keys'
@@ -20,10 +21,11 @@ const emit = defineEmits<{
 }>()
 
 const {
-  classifiers, connections,
+  classifiers, generalizationSets, connections,
   addClassifier, removeClassifier, updateClassifier,
   addAttribute, removeAttribute, updateAttribute,
   addLiteral, removeLiteral, updateLiteral,
+  addGeneralizationSet, removeGeneralizationSet, updateGeneralizationSet,
   addConnection, removeConnection, updateConnection,
 } = useDatatypeModel(
   () => props.diagramEntities,
@@ -68,6 +70,17 @@ async function createClassifier(attrOwnerId?: string, attrIndex?: number) {
       ? { classifierId: attrOwnerId, attrIndex }
       : undefined,
   )
+}
+
+async function createGeneralizationSet() {
+  const allocated = await Effect.runPromise(svc.allocateDiagramEntityId({
+    owner_kind: 'diagram',
+    diagram_type: 'datatype',
+    entity_type: 'generalization_set',
+    name_hint: 'Generalization set',
+  })).catch(() => null)
+  if (!allocated) return
+  addGeneralizationSet(allocated.id, 'Generalization set')
 }
 
 onMounted(() => {
@@ -124,9 +137,19 @@ watch(
       <RelationList
         :classifiers="classifiers"
         :connections="connections"
+        :generalization-sets="generalizationSets"
         @add-conn="(src: string, tgt: string) => addConnection(src, tgt)"
         @remove-conn="(id: string) => removeConnection(id)"
         @update-conn="(id: string, patch: Partial<DtConn>) => updateConnection(id, patch)"
+      />
+    </section>
+
+    <section class="dte-section">
+      <GeneralizationSetCard
+        :sets="generalizationSets"
+        @add="createGeneralizationSet"
+        @remove="(id: string) => removeGeneralizationSet(id)"
+        @update="(id: string, patch: Partial<GeneralizationSet>) => updateGeneralizationSet(id, patch)"
       />
     </section>
   </div>

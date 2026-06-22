@@ -1,10 +1,11 @@
 <script setup lang="ts">
-import type { Classifier, DtConn } from './useDatatypeModel'
+import type { Classifier, DtConn, GeneralizationSet } from './useDatatypeModel'
 import ConnRow from './ConnRow.vue'
 
 const props = defineProps<{
   classifiers: Classifier[]
   connections: DtConn[]
+  generalizationSets: GeneralizationSet[]
 }>()
 const emit = defineEmits<{
   addConn: [sourceId: string, targetId: string]
@@ -44,6 +45,7 @@ const addConnDefault = () => {
       :key="conn.id"
       :conn="conn"
       :classifiers="classifiers"
+      :generalization-sets="generalizationSets"
       @remove-conn="emit('removeConn', $event)"
       @update-conn="(id, patch) => emit('updateConn', id, patch)"
     />
