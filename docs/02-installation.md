@@ -286,20 +286,26 @@ rules, and `vue-tsc` / `tsc` for application and Vite config type-checking.
 
 ## Running in Docker
 
-```bash
-# Start with the bundled self-describing model
-docker compose up --build
-# → http://localhost:8000
+A multi-stage image bundles the SPA, the Python backend, and the diagram runtime
+(Java, Graphviz, fonts). The whole stack — GUI, REST, and all MCP endpoints — runs as one
+container on port 8000, started fully non-interactively (git and assurance credentials come
+from the environment).
 
-# Or point at a different repository
-ARCH_REPO_ROOT=/path/to/your/architecture-repository docker compose up --build
+```bash
+cp .env.example .env                 # secrets & toggles
+$EDITOR arch-workspace.server.yaml   # point at your git repos
+docker compose up -d --build         # → http://localhost:8000  (assurance OFF by default)
 ```
 
-The container includes the system dependencies for PlantUML rendering (Java, Graphviz,
-fonts). To attach host-started MCP clients to the Dockerised backend, publish the container
-on `localhost:8000` (the compose file does this) and set
-`ARCH_MCP_BACKEND_URL=http://127.0.0.1:8000` in your MCP config so the launcher attaches to
-the published port instead of starting its own.
+Profiles add a TLS reverse proxy (`proxy`) and a PocketBase assurance store (`pocketbase`);
+assurance, storage backends, the TLP ceiling, and VPN/proxy setup are all configured
+declaratively. The full guide — profiles, the storage matrix, non-interactive secrets, and
+connecting MCP clients over the network — is in
+[Docker Compose Deployment](reference/docker-compose.md).
+
+To attach a host MCP client to the Dockerised backend, point it at the served endpoints
+(`https://<host>/mcp/read`, …) or set `ARCH_MCP_BACKEND_URL=http://127.0.0.1:8000` so the
+STDIO bridge attaches to the published port instead of starting its own.
 
 ---
 

@@ -135,7 +135,7 @@ The agent can then `artifact_query_search_artifacts`, walk the graph with
 | 3 | [Architecture Modeling](docs/03-modeling/index.md) | Projects, views, graph exploration, diagramming, the MCP/REST surface |
 | 4 | [Assurance — Safety, Security, GRC](docs/04-assurance/index.md) | STPA/CAST/GRC methods, assurance diagrams, confidential storage |
 | 5 | [Extensibility](docs/05-extensibility/index.md) | Profiles, document types, ontology & diagram-type modules, hexagonal core |
-| — | [Reference](docs/reference/configuration.md) | Configuration, CLI, git sync & promotion |
+| — | [Reference](docs/reference/configuration.md) | Configuration, CLI, git sync & promotion, [Docker Compose](docs/reference/docker-compose.md) |
 
 &nbsp;
 
