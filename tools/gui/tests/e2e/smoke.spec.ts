@@ -160,8 +160,12 @@ test('every stored diagram instance renders (exercises each diagram type)', asyn
       // Assert the SVG actually renders. Navigating the page and checking health races the
       // lazy, ~1s /api/diagram-svg call (which can outlast the health check), so a broken
       // diagram passed unnoticed; fetch the render endpoint directly and require success.
-      const svg = await request.get(`/api/diagram-svg?id=${encodeURIComponent(diagram.artifact_id)}`)
-      expect(svg.ok(), `${diagram.diagram_type} '${diagram.name}' failed to render: HTTP ${svg.status()}`).toBeTruthy()
+      // Matrix diagrams have no SVG representation — they render as Markdown in-page (mirrors
+      // the frontend's diagramNeedsSvg), so the page health check below is their coverage.
+      if (diagram.diagram_type !== 'matrix') {
+        const svg = await request.get(`/api/diagram-svg?id=${encodeURIComponent(diagram.artifact_id)}`)
+        expect(svg.ok(), `${diagram.diagram_type} '${diagram.name}' failed to render: HTTP ${svg.status()}`).toBeTruthy()
+      }
 
       const page = await context.newPage()
       const { problems } = watch(page)
