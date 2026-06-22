@@ -52,33 +52,10 @@ def get_neighbors(entity_id: str, max_hops: int = 1) -> dict[str, list[str]]:
 
 @router.get("/api/search")
 def search(q: str, limit: int = 20) -> dict[str, Any]:
-    from src.domain.artifact_types import ConnectionRecord, DiagramRecord, EntityRecord
-
-    result = s.get_repo().search_artifacts(q, limit=limit)
-    hits = []
-    for h in result.hits:
-        rec = h.record
-        artifact_type = getattr(rec, "artifact_type", None) or getattr(rec, "conn_type", "connection")
-        hit: dict[str, Any] = {
-            "score": h.score,
-            "record_type": h.record_type,
-            "artifact_id": rec.artifact_id,
-            "artifact_type": artifact_type,
-            "status": rec.status,
-            "path": str(rec.path),
-            "name": getattr(rec, "name", ""),
-        }
-        if isinstance(rec, EntityRecord):
-            hit["domain"] = rec.domain
-            hit["subdomain"] = rec.subdomain
-            hit["is_global"] = s.is_global(rec.path)
-        if isinstance(rec, ConnectionRecord):
-            hit["source"] = rec.source
-            hit["target"] = rec.target
-        if isinstance(rec, DiagramRecord):
-            hit["diagram_type"] = rec.diagram_type
-        hits.append(hit)
-    return {"query": result.query, "hits": hits}
+    # Global search surfaces navigable artifacts only. Connections are relationships,
+    # not destinations, so they are excluded (matching the canonical search default).
+    result = s.get_repo().search_artifacts(q, limit=limit, include_connections=False)
+    return {"query": result.query, "hits": [s.search_hit_to_dict(h) for h in result.hits]}
 
 
 def _resolve_effective_type(artifact_id: str | None, declared_type: str) -> tuple[str, bool]:

@@ -5,7 +5,7 @@ Supports both canonical 'id'-keyed formats (activity, C4) and 'node_id'-keyed fo
 
 from __future__ import annotations
 
-from collections.abc import Iterator
+from collections.abc import Callable, Iterable, Iterator, Mapping
 
 from src.domain.artifact_types import ConnectionRecord, DiagramRecord, EntityRecord
 
@@ -44,6 +44,50 @@ def _leaf_strings(value: object) -> Iterator[str]:
 def _diagram_entity_content_text(item: dict[str, object]) -> str:
     """Collect leaf string values for FTS (skip ID-role fields)."""
     return " ".join(_leaf_strings({k: v for k, v in item.items() if k not in _ID_KEYS}))
+
+
+def diagram_bound_entity_ids(extra: Mapping[str, object]) -> list[str]:
+    """Workspace entity ids a diagram binds or links to via its frontmatter.
+
+    Covers the matrix axes (``from-entity-ids``/``to-entity-ids``) and C4 ``bindings``
+    (``target.entity_id``). Diagram-local nodes are not included here — their names are
+    resolved separately via ``host_diagram_id``.
+    """
+    ids: list[str] = []
+    for axis_key in ("from-entity-ids", "to-entity-ids"):
+        axis = extra.get(axis_key)
+        if isinstance(axis, list):
+            ids.extend(v for v in axis if isinstance(v, str) and v)
+    bindings = extra.get("bindings")
+    if isinstance(bindings, list):
+        for binding in bindings:
+            target = binding.get("target") if isinstance(binding, dict) else None
+            entity_id = target.get("entity_id") if isinstance(target, dict) else None
+            if isinstance(entity_id, str) and entity_id:
+                ids.append(entity_id)
+    return ids
+
+
+def diagram_member_text(
+    diag: DiagramRecord,
+    *,
+    local_names: Iterable[str],
+    name_of: Callable[[str], str | None],
+) -> str:
+    """Space-joined, de-duplicated names of the entities a diagram contains or links to.
+
+    ``local_names`` are the names of diagram-local entities (resolved by the caller from
+    ``host_diagram_id``); bound workspace entities are resolved via ``name_of``. The
+    result feeds the diagram FTS index so a diagram is discoverable by its members' names.
+    """
+    bound_names = (name_of(entity_id) for entity_id in diagram_bound_entity_ids(diag.extra))
+    seen: set[str] = set()
+    ordered: list[str] = []
+    for name in (*local_names, *(n for n in bound_names if n)):
+        if name and name not in seen:
+            seen.add(name)
+            ordered.append(name)
+    return " ".join(ordered)
 
 
 def extract_diagram_entities(

@@ -157,8 +157,10 @@ class ArtifactIndex:
             self._mem.documents.update(temp.documents)
             self._mem.attribute_type_refs.clear()
             self._mem.attribute_type_refs.update(temp.attribute_type_refs)
-            self._db.rebuild()
+            # Derived indexes (entities_by_diagram) must precede the SQLite dump: the
+            # diagram FTS rows resolve each diagram's member entity names through them.
             self._mem.rebuild_path_indexes()
+            self._db.rebuild()
             self._bump_generation()
             self._ready.set()
 

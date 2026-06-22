@@ -233,11 +233,35 @@ def search(
         _apply_semantic_supplement(store, semantic, query, hits, seen)
 
     prefer_rt = _KIND_TO_RECORD_TYPE.get(prefer_kind) if prefer_kind else None
-    hits.sort(
-        key=lambda h: (h.record_type == prefer_rt, h.score) if prefer_rt else h.score,
-        reverse=True,
-    )
-    return SearchResult(query=query, hits=hits[:limit])
+    return SearchResult(query=query, hits=_rank_balanced(hits, limit, prefer_rt))
+
+
+def _rank_balanced(hits: list[SearchHit], limit: int, prefer_rt: str | None) -> list[SearchHit]:
+    """Select up to ``limit`` hits with fair representation across record kinds.
+
+    Per-table FTS (bm25) and the token-match supplement produce scores on incomparable
+    scales, so a single global sort lets a high-volume kind (entities) crowd minority
+    kinds (diagrams, documents) out of the result window entirely. Instead, rank within
+    each kind by its own score, then round-robin across kinds — ordering the kinds by
+    their strongest hit (``prefer_rt`` first) — so every matching kind stays visible.
+    """
+    by_kind: dict[str, list[SearchHit]] = {}
+    for h in hits:
+        by_kind.setdefault(h.record_type, []).append(h)
+    for group in by_kind.values():
+        group.sort(key=lambda h: h.score, reverse=True)
+    order = sorted(by_kind, key=lambda rt: by_kind[rt][0].score, reverse=True)
+    if prefer_rt in by_kind:
+        order = [prefer_rt, *(rt for rt in order if rt != prefer_rt)]
+    ranked: list[SearchHit] = []
+    rank = 0
+    while len(ranked) < limit:
+        drawn = [by_kind[rt][rank] for rt in order if rank < len(by_kind[rt])]
+        if not drawn:
+            break
+        ranked.extend(drawn)
+        rank += 1
+    return ranked[:limit]
 
 
 def _search_entities(

@@ -285,11 +285,13 @@ def apply_diagram_change(
             db.delete_diagram(old.artifact_id)
     if parsed is not None:
         ws = (workspace_types or {}).get(parsed.diagram_type, frozenset())
-        db.upsert_diagram(parsed)
+        # Upsert diagram-local entities first so the diagram's FTS row (built in
+        # upsert_diagram) can resolve their names via entities_by_diagram.
         for de in _extract_diagram_entities(parsed, ws):
             db.upsert_entity(de)
         for dc in _extract_diagram_connections(parsed, ws):
             db.upsert_connection(dc)
+        db.upsert_diagram(parsed)
         refs = attr_type_ref_fn(parsed) if attr_type_ref_fn is not None else []
         db.upsert_attribute_type_refs(parsed.artifact_id, refs)
 

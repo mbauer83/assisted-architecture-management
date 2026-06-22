@@ -11,6 +11,7 @@ from typing import Callable, Generator
 
 from src.domain.artifact_types import ConnectionRecord, DiagramRecord, DocumentRecord, EntityRecord
 
+from ._diagram_fts import diagram_fts_row
 from ._mem_store import _MemStore
 from ._sqlite_schema import FTS_SQL, SCHEMA_SQL
 
@@ -48,7 +49,7 @@ _INS_EFTS = (
     " VALUES (?,?,?,?,?,?,?,?)"
 )
 _INS_CFTS = "INSERT INTO connections_fts (artifact_id,source,target,conn_type,content_text) VALUES (?,?,?,?,?)"
-_INS_DFTS = "INSERT INTO diagrams_fts (artifact_id,name,diagram_type,artifact_type) VALUES (?,?,?,?)"
+_INS_DFTS = "INSERT INTO diagrams_fts (artifact_id,name,diagram_type,artifact_type,member_names) VALUES (?,?,?,?,?)"
 _INS_DOCFTS = "INSERT INTO documents_fts (artifact_id,title,doc_type,keywords,content_text) VALUES (?,?,?,?,?)"
 _INS_ATTR_TYPE_REF = (
     "INSERT INTO attribute_type_refs (diagram_id,classifier_local_id,attr_name,type_id) VALUES (?,?,?,?)"
@@ -198,7 +199,7 @@ class _SqliteStore:
             self._conn.execute(_INS_DIAGRAM, self._diagram_row(rec))
             if self._fts_enabled:
                 self._conn.execute("DELETE FROM diagrams_fts WHERE artifact_id=?", (rec.artifact_id,))
-                self._conn.execute(_INS_DFTS, (rec.artifact_id, rec.name, rec.diagram_type, rec.artifact_type))
+                self._conn.execute(_INS_DFTS, diagram_fts_row(rec, self._mem))
 
     def delete_diagram(self, artifact_id: str) -> None:
         old = self._mem.diagrams.pop(artifact_id, None)
@@ -301,10 +302,7 @@ class _SqliteStore:
                         for r in self._mem.connections.values()
                     ],
                 )
-                self._conn.executemany(
-                    _INS_DFTS,
-                    [(r.artifact_id, r.name, r.diagram_type, r.artifact_type) for r in self._mem.diagrams.values()],
-                )
+                self._conn.executemany(_INS_DFTS, [diagram_fts_row(r, self._mem) for r in self._mem.diagrams.values()])
                 self._conn.executemany(
                     _INS_DOCFTS,
                     [

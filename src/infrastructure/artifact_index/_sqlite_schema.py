@@ -99,7 +99,7 @@ CREATE VIRTUAL TABLE IF NOT EXISTS connections_fts USING fts5(
     artifact_id UNINDEXED, source, target, conn_type, content_text
 );
 CREATE VIRTUAL TABLE IF NOT EXISTS diagrams_fts USING fts5(
-    artifact_id UNINDEXED, name, diagram_type, artifact_type
+    artifact_id UNINDEXED, name, diagram_type, artifact_type, member_names
 );
 CREATE VIRTUAL TABLE IF NOT EXISTS documents_fts USING fts5(
     artifact_id UNINDEXED, title, doc_type, keywords, content_text

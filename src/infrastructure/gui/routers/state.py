@@ -24,7 +24,7 @@ from functools import lru_cache as _lru_cache
 
 from src.application.artifact_query import ArtifactRepository
 from src.application.entity_type_predicates import is_internal_entity_type
-from src.domain.artifact_types import ConnectionRecord, DiagramRecord, EntityRecord
+from src.domain.artifact_types import ConnectionRecord, DiagramRecord, DocumentRecord, EntityRecord, SearchHit
 from src.infrastructure.artifact_index.coordination import publish_authoritative_mutation
 
 
@@ -192,6 +192,39 @@ def connection_to_dict(c: ConnectionRecord) -> dict[str, Any]:
     if via_gar:
         d["gar_artifact_id"] = c.target
     return d
+
+
+def search_hit_to_dict(h: SearchHit) -> dict[str, Any]:
+    """Serialize a search hit, mapping each record kind to its proper display fields.
+
+    Documents expose ``title``/``doc_type`` (not ``name``/``artifact_type``); diagrams
+    carry ``diagram_type``. Connections are not independently navigable and are excluded
+    from search upstream, but are serialized defensively here for completeness.
+    """
+    rec = h.record
+    base: dict[str, Any] = {
+        "score": h.score,
+        "record_type": h.record_type,
+        "artifact_id": rec.artifact_id,
+        "status": rec.status,
+        "path": str(rec.path),
+    }
+    match rec:
+        case EntityRecord():
+            return {
+                **base,
+                "name": rec.name,
+                "artifact_type": rec.artifact_type,
+                "domain": rec.domain,
+                "subdomain": rec.subdomain,
+                "is_global": is_global(rec.path),
+            }
+        case DiagramRecord():
+            return {**base, "name": rec.name, "artifact_type": rec.artifact_type, "diagram_type": rec.diagram_type}
+        case DocumentRecord():
+            return {**base, "name": rec.title, "artifact_type": rec.doc_type}
+        case ConnectionRecord():
+            return {**base, "name": "", "artifact_type": rec.conn_type, "source": rec.source, "target": rec.target}
 
 
 def diagram_to_summary(d: DiagramRecord) -> dict[str, Any]:
