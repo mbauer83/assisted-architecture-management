@@ -55,3 +55,10 @@ htmlcov/
 
 # Playwright/test run output
 test-results/
+
+# Local working checkouts of git-backed workspace repos (cloned by arch-init from
+# the remotes in arch-workspace.yaml; never committed into the superproject — they
+# were previously accidental gitlinks with no .gitmodules entry).
+/enterprise-repository/
+/u2p-enterprise-repository/
+/engagements/TECHNOLOGY_ARCHITECTURE/architecture-repository/
