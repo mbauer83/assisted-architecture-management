@@ -164,6 +164,7 @@ const onStorageChanged = (event: StorageEvent) => {
 type WriteBlockChangedEvent = { blocked: boolean }
 type SyncPullCompletedEvent = { commits_pulled: number }
 type SyncPullFailedEvent = { error: string; auto_unblock_in_seconds: number }
+type SyncBlockedEvent = { reason: string }
 
 const parseEventData = <T extends Record<string, unknown>>(
   raw: string,
@@ -188,6 +189,9 @@ const isSyncPullCompletedEvent = (value: Record<string, unknown>): value is Sync
 
 const isSyncPullFailedEvent = (value: Record<string, unknown>): value is SyncPullFailedEvent =>
   typeof value.error === 'string' && typeof value.auto_unblock_in_seconds === 'number'
+
+const isSyncBlockedEvent = (value: Record<string, unknown>): value is SyncBlockedEvent =>
+  typeof value.reason === 'string'
 
 let eventSource: EventSource | null = null
 
@@ -240,6 +244,15 @@ onMounted(() => {
         return
       }
       addToast(`Sync failed: ${data.error}. Writes resume in ${data.auto_unblock_in_seconds}s`, 'error', 7000)
+    })
+    eventSource.addEventListener('sync_blocked', (e: MessageEvent<string>) => {
+      const data = parseEventData(e.data, isSyncBlockedEvent)
+      if (!data) {
+        addToast('Received malformed sync-blocked event', 'error')
+        return
+      }
+      addToast(`Sync blocked: ${data.reason}`, 'error', 10000)
+      scheduleSyncStatusRefresh()
     })
 
     const onSyncEvent = (label: string) => () => { addToast(label, 'info'); scheduleSyncStatusRefresh() }

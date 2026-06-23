@@ -6,6 +6,7 @@ from pathlib import Path
 
 import pytest
 
+from src.infrastructure.workspace import git_remote, workspace_init
 from src.infrastructure.workspace.workspace_init import (
     _current_branch,
     _parse_config,
@@ -146,25 +147,26 @@ class TestResolveRepo:
             ["symbolic-ref", "--quiet", "--short", "HEAD"],
         ]
 
-    def test_git_repo_can_be_initialized_if_empty(self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    def test_empty_existing_checkout_delegates_to_reconcile(
+        self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+    ) -> None:
+        """A committed-less existing checkout is handed to git_remote for clone-vs-init reconciliation."""
         repo = tmp_path / "eng-git"
         repo.mkdir()
         (repo / ".git").mkdir()
 
-        def fake_current_branch(path: Path) -> str | None:
-            return "main" if (path / "model").is_dir() else None
+        branch_state: dict[str, str | None] = {"branch": None}
+        monkeypatch.setattr(workspace_init, "_current_branch", lambda path: branch_state["branch"])
+        monkeypatch.setattr(workspace_init, "_has_commits", lambda path: False)
 
-        monkeypatch.setattr("src.infrastructure.workspace.workspace_init._current_branch", fake_current_branch)
-        monkeypatch.setattr("src.infrastructure.workspace.workspace_init._has_commits", lambda path: False)
+        calls: list[git_remote.BootstrapContext] = []
 
-        create_calls: list[dict[str, object]] = []
+        def fake_reconcile(ctx: git_remote.BootstrapContext) -> None:
+            calls.append(ctx)
+            (ctx.dest / "model").mkdir(parents=True, exist_ok=True)
+            branch_state["branch"] = ctx.branch
 
-        def fake_create_repo(path: Path, **kwargs) -> Path:
-            create_calls.append({"path": path, **kwargs})
-            (path / "model").mkdir(parents=True, exist_ok=True)
-            return path
-
-        monkeypatch.setattr("src.infrastructure.workspace.workspace_init.create_engagement_repo", fake_create_repo)
+        monkeypatch.setattr(git_remote, "reconcile_empty_checkout", fake_reconcile)
 
         result = _resolve_repo(
             "engagement",
@@ -174,23 +176,21 @@ class TestResolveRepo:
         )
 
         assert result == repo.resolve()
-        assert create_calls
-        assert create_calls[0]["branch"] == "main"
+        assert calls and calls[0].branch == "main"
+        assert calls[0].initialize_if_empty is True
 
-    def test_missing_git_repo_can_be_initialized_if_flag_is_set(
-        self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
-    ) -> None:
+    def test_absent_dest_delegates_to_bootstrap(self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+        """A missing clone directory is handed to git_remote.bootstrap_absent (clone or init+publish)."""
         repo = tmp_path / "ent-git"
 
-        create_calls: list[dict[str, object]] = []
+        calls: list[git_remote.BootstrapContext] = []
 
-        def fake_create_repo(path: Path, **kwargs) -> Path:
-            create_calls.append({"path": path, **kwargs})
-            (path / ".git").mkdir(parents=True, exist_ok=True)
-            (path / "model").mkdir(parents=True, exist_ok=True)
-            return path
+        def fake_bootstrap(ctx: git_remote.BootstrapContext) -> None:
+            calls.append(ctx)
+            (ctx.dest / ".git").mkdir(parents=True, exist_ok=True)
+            (ctx.dest / "model").mkdir(parents=True, exist_ok=True)
 
-        monkeypatch.setattr("src.infrastructure.workspace.workspace_init.create_engagement_repo", fake_create_repo)
+        monkeypatch.setattr(git_remote, "bootstrap_absent", fake_bootstrap)
 
         result = _resolve_repo(
             "enterprise",
@@ -200,9 +200,8 @@ class TestResolveRepo:
         )
 
         assert result == repo.resolve()
-        assert create_calls
-        assert create_calls[0]["path"] == repo
-        assert create_calls[0]["branch"] == "main"
+        assert calls and calls[0].dest == repo.resolve()
+        assert calls[0].initialize_if_empty is True
 
     def test_git_repo_without_branch_still_raises_without_initialize_flag(
         self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
@@ -210,7 +209,10 @@ class TestResolveRepo:
         repo = tmp_path / "eng-git"
         repo.mkdir()
         (repo / ".git").mkdir()
-        monkeypatch.setattr("src.infrastructure.workspace.workspace_init._current_branch", lambda path: None)
+        monkeypatch.setattr(workspace_init, "_current_branch", lambda path: None)
+        monkeypatch.setattr(workspace_init, "_has_commits", lambda path: False)
+        # Remote empty + no init flag → reconcile is a no-op, so the branch stays unset.
+        monkeypatch.setattr(git_remote, "reconcile_empty_checkout", lambda ctx: None)
 
         with pytest.raises(SystemExit, match="expected 'main'"):
             _resolve_repo(

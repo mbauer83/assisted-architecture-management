@@ -56,6 +56,7 @@ class GitSyncManager:
         self._task: asyncio.Task[None] | None = None
         self._askpass_script: Path | None = None
         self._last_dirty_state: dict[Path, bool] = {}
+        self._last_block_reason: dict[Path, str | None] = {}
 
     async def start(self) -> None:
         if self._credentials is not None:
@@ -130,15 +131,50 @@ class GitSyncManager:
         return rc == 0
 
     async def _count(self, repo: Path, range_: str) -> int:
+        count = await self._rev_count(repo, range_)
+        return count if count is not None else 0
+
+    async def _rev_count(self, repo: Path, range_: str) -> int | None:
+        """Commit count for ``range_``, or None when git could not evaluate it.
+
+        The None case (invalid ref, repo error) is distinct from a genuine zero,
+        so callers can surface a problem instead of silently treating it as
+        "nothing to do".
+        """
         rc, out, _ = await self._git(repo, "rev-list", "--count", range_)
+        if rc != 0:
+            return None
         try:
-            return int(out.strip()) if rc == 0 else 0
+            return int(out.strip())
         except ValueError:
-            return 0
+            return None
 
     async def _is_clean(self, repo: Path) -> bool:
         rc, out, _ = await self._git(repo, "status", "--porcelain")
         return rc == 0 and not out.strip()
+
+    async def _upstream_ref(self, repo: Path) -> str | None:
+        """Resolve the current branch's upstream (e.g. ``origin/main``), or None if unset."""
+        rc, out, _ = await self._git(repo, "rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{u}")
+        ref = out.strip()
+        return ref if rc == 0 and ref else None
+
+    async def _notify_sync_blocked(self, repo: Path, reason: str) -> None:
+        """Surface a non-fatal sync skip, once per distinct reason (avoids per-poll spam).
+
+        Emitted as a dedicated ``sync_blocked`` event (no write block was taken), so the
+        GUI can report the reason without the misleading "writes resume in 0s" wording.
+        """
+        if self._last_block_reason.get(repo) == reason:
+            return
+        self._last_block_reason[repo] = reason
+        from src.infrastructure.gui.routers.events import event_bus  # noqa: PLC0415
+
+        logger.warning("enterprise sync blocked for %s: %s", repo, reason)
+        await event_bus.publish({"type": "sync_blocked", "repo": str(repo), "reason": reason})
+
+    def _clear_block_reason(self, repo: Path) -> None:
+        self._last_block_reason[repo] = None
 
     async def _promotion_merged(self, enterprise_root: Path) -> bool:
         rc, out, _ = await self._git(
@@ -253,7 +289,7 @@ class GitSyncManager:
             return
         rc, _, err = await self._git(root, "fetch", "origin", timeout=_FETCH_TIMEOUT_S)
         if rc != 0:
-            logger.warning("fetch failed for enterprise %s: %s", root, err.strip())
+            await self._notify_sync_blocked(root, f"git fetch from origin failed — {err.strip() or 'unknown error'}")
             return
 
         state = enterprise_sync_state.load(root)
@@ -268,24 +304,41 @@ class GitSyncManager:
         from src.infrastructure.gui.routers.events import event_bus
         from src.infrastructure.workspace.write_block_manager import block_repo, is_blocked, unblock_repo
 
-        behind = await self._count(root, "HEAD..@{u}")
-        if behind == 0 or not await self._is_clean(root):
+        upstream = await self._upstream_ref(root)
+        if upstream is None:
+            await self._notify_sync_blocked(
+                root,
+                "no upstream tracking for the checked-out branch — the repository was not cloned "
+                "from origin (likely an unrelated local init). Re-clone it so sync can fast-forward.",
+            )
             return
+        behind = await self._rev_count(root, f"HEAD..{upstream}")
+        ahead = await self._rev_count(root, f"{upstream}..HEAD")
+        if behind is None or ahead is None:
+            await self._notify_sync_blocked(root, f"could not compute sync state against {upstream}")
+            return
+        if ahead > 0:
+            await self._notify_sync_blocked(
+                root,
+                f"local branch is {ahead} commit(s) ahead of {upstream} — the enterprise mirror has "
+                "diverged (unpublished commits). Investigate before sync can resume.",
+            )
+            return
+        if behind == 0:
+            self._clear_block_reason(root)
+            return
+        if not await self._is_clean(root):
+            await self._notify_sync_blocked(root, "local working tree has uncommitted changes — pull skipped")
+            return
+
+        self._clear_block_reason(root)
         root_label, was_blocked = str(root), is_blocked(root)
         block_repo(root)
         await event_bus.publish({"type": "sync_pull_started", "repo": root_label, "behind": behind})
         try:
             rc, _, err = await self._git(root, "pull", "--ff-only", timeout=_PULL_TIMEOUT_S)
         except Exception as exc:
-            await event_bus.publish(
-                {
-                    "type": "sync_pull_failed",
-                    "repo": root_label,
-                    "error": str(exc),
-                    "auto_unblock_in_seconds": int(_AUTO_UNBLOCK_S),
-                }
-            )
-            asyncio.create_task(self._auto_unblock(root, _AUTO_UNBLOCK_S, was_blocked))
+            await self._fail_enterprise_pull(root, root_label, str(exc), was_blocked)
             return
 
         if rc == 0:
@@ -294,15 +347,20 @@ class GitSyncManager:
             await event_bus.publish({"type": "sync_pull_completed", "repo": root_label, "commits_pulled": behind})
             await self._notify_changed(root)
         else:
-            await event_bus.publish(
-                {
-                    "type": "sync_pull_failed",
-                    "repo": root_label,
-                    "error": err.strip(),
-                    "auto_unblock_in_seconds": int(_AUTO_UNBLOCK_S),
-                }
-            )
-            asyncio.create_task(self._auto_unblock(root, _AUTO_UNBLOCK_S, was_blocked))
+            await self._fail_enterprise_pull(root, root_label, err.strip(), was_blocked)
+
+    async def _fail_enterprise_pull(self, root: Path, root_label: str, error: str, was_blocked: bool) -> None:
+        from src.infrastructure.gui.routers.events import event_bus  # noqa: PLC0415
+
+        await event_bus.publish(
+            {
+                "type": "sync_pull_failed",
+                "repo": root_label,
+                "error": error,
+                "auto_unblock_in_seconds": int(_AUTO_UNBLOCK_S),
+            }
+        )
+        asyncio.create_task(self._auto_unblock(root, _AUTO_UNBLOCK_S, was_blocked))
 
     async def _ent_accumulating(
         self,

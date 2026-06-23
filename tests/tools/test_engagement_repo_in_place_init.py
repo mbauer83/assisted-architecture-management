@@ -36,6 +36,20 @@ def _clone_with_readme(path: Path) -> Path:
     return path
 
 
+def _readme_remote(tmp_path: Path, name: str) -> Path:
+    """A bare remote whose ``main`` has a README but no arch-repo structure."""
+    remote = tmp_path / name
+    subprocess.run(["git", "init", "--bare", "-b", "main", str(remote)], check=True, capture_output=True, text=True)
+    seed = _clone_with_readme(tmp_path / f"{name}-seed")
+    _git(["remote", "add", "origin", str(remote)], seed)
+    _git(["push", "origin", "main"], seed)
+    return remote
+
+
+def _head(path: Path, ref: str = "HEAD") -> str:
+    return subprocess.run(["git", "rev-parse", ref], cwd=path, capture_output=True, text=True).stdout.strip()
+
+
 def _is_clean(path: Path) -> bool:
     out = subprocess.run(["git", "status", "--porcelain"], cwd=path, capture_output=True, text=True)
     return not out.stdout.strip()
@@ -75,39 +89,59 @@ class TestInitializeArchRepoInPlace:
 
 
 class TestResolveRepoAutoInit:
-    def test_clone_without_model_is_initialized_when_flag_set(self, tmp_path: Path) -> None:
-        _clone_with_readme(tmp_path / "eng")
-        spec = {"git": {"url": "git@example.com:org/eng.git", "branch": "main", "path": "eng"}}
+    def test_clone_without_model_is_scaffolded_and_published_when_flag_set(self, tmp_path: Path) -> None:
+        remote = _readme_remote(tmp_path, "eng.git")
+        ws = tmp_path / "ws"
+        ws.mkdir()
+        dest = ws / "eng"
+        subprocess.run(["git", "clone", str(remote), str(dest)], check=True, capture_output=True, text=True)
+        spec = {"git": {"url": str(remote), "branch": "main", "path": "eng"}}
 
-        result = _resolve_repo("engagement", spec, tmp_path, initialize_if_empty=True)
+        result = _resolve_repo("engagement", spec, ws, initialize_if_empty=True)
 
-        assert result == (tmp_path / "eng").resolve()
-        assert (tmp_path / "eng" / MODEL).is_dir()
+        assert result == dest.resolve()
+        assert (dest / MODEL).is_dir()
+        # The scaffold is published, not left as an unsynchronized local commit.
+        assert _is_clean(dest)
+        assert _head(remote, "main") == _head(dest)
 
     def test_clone_without_model_still_raises_without_flag(self, tmp_path: Path) -> None:
-        _clone_with_readme(tmp_path / "eng")
-        spec = {"git": {"url": "git@example.com:org/eng.git", "branch": "main", "path": "eng"}}
+        remote = _readme_remote(tmp_path, "eng.git")
+        ws = tmp_path / "ws"
+        ws.mkdir()
+        dest = ws / "eng"
+        subprocess.run(["git", "clone", str(remote), str(dest)], check=True, capture_output=True, text=True)
+        spec = {"git": {"url": str(remote), "branch": "main", "path": "eng"}}
 
         with pytest.raises(SystemExit, match="no model/ directory"):
-            _resolve_repo("engagement", spec, tmp_path, initialize_if_empty=False)
+            _resolve_repo("engagement", spec, ws, initialize_if_empty=False)
 
 
 class TestArchInitMainWiring:
-    """End-to-end: the --initialize-*-if-empty CLI flags reach _resolve_repo and scaffold.
+    """End-to-end: the --initialize-*-if-empty CLI flags reach _resolve_repo, scaffold, and publish.
 
     This is the exact docker entrypoint path (arch-init --initialize-engagement-repo-if-empty
-    --initialize-enterprise-repo-if-empty) that the container runs on first boot.
+    --initialize-enterprise-repo-if-empty) that the container runs on first boot against
+    brand-new remotes that contain only a README.
     """
 
-    def test_main_auto_initializes_empty_clones(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-        eng = _clone_with_readme(tmp_path / "data" / "engagement")
-        ent = _clone_with_readme(tmp_path / "data" / "enterprise")
-        config = tmp_path / "arch-workspace.yaml"
+    def test_main_scaffolds_and_publishes_readme_clones(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        eng_remote = _readme_remote(tmp_path, "eng.git")
+        ent_remote = _readme_remote(tmp_path, "ent.git")
+        ws = tmp_path / "ws"
+        ws.mkdir()
+        for remote, name in ((eng_remote, "engagement"), (ent_remote, "enterprise")):
+            subprocess.run(
+                ["git", "clone", str(remote), str(ws / "data" / name)], check=True, capture_output=True, text=True
+            )
+        config = ws / "arch-workspace.yaml"
         config.write_text(
-            "engagement:\n"
-            "  git: { url: 'git@example.com:org/eng.git', branch: main, path: data/engagement }\n"
-            "enterprise:\n"
-            "  git: { url: 'git@example.com:org/ent.git', branch: main, path: data/enterprise }\n",
+            f"engagement:\n"
+            f"  git: {{ url: '{eng_remote}', branch: main, path: data/engagement }}\n"
+            f"enterprise:\n"
+            f"  git: {{ url: '{ent_remote}', branch: main, path: data/enterprise }}\n",
             encoding="utf-8",
         )
         # Dests already exist locally — no cloning or credentials needed.
@@ -119,6 +153,8 @@ class TestArchInitMainWiring:
             "--initialize-enterprise-repo-if-empty",
         ])
 
-        assert (eng / MODEL).is_dir()
-        assert (ent / MODEL).is_dir()
-        assert workspace_init.load_init_state(tmp_path) is not None
+        assert (ws / "data" / "engagement" / MODEL).is_dir()
+        assert (ws / "data" / "enterprise" / MODEL).is_dir()
+        assert _head(eng_remote, "main") == _head(ws / "data" / "engagement")
+        assert _head(ent_remote, "main") == _head(ws / "data" / "enterprise")
+        assert workspace_init.load_init_state(ws) is not None
