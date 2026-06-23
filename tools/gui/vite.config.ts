@@ -8,6 +8,22 @@ export default defineConfig({
   test: {
     environment: 'node',
     include: ['src/**/*.test.ts'],
+    coverage: {
+      provider: 'v8',
+      // text for the CI log; lcov for the Codecov upload; json-summary for local glances.
+      reporter: ['text-summary', 'lcov', 'json-summary'],
+      include: ['src/**/*.ts', 'src/**/*.vue'],
+      exclude: ['src/**/*.test.ts', 'src/domain/types.generated.ts', 'src/main.ts'],
+      // Gate ONLY the logic-heavy directories where unit tests are the right tool.
+      // .vue views/components and composables are wiring covered by the Playwright
+      // route-walk (see e2e job), so they are measured + reported but not gated here.
+      // Thresholds are seeded just below current coverage as a regression floor and
+      // are meant to ratchet upward over time (cf. the backend fail_under ratchet).
+      thresholds: {
+        'src/domain/**': { statements: 90, lines: 90, functions: 80, branches: 80 },
+        'src/ui/lib/**': { statements: 33, lines: 35, functions: 20, branches: 18 },
+      },
+    },
   },
   server: {
     proxy: {

@@ -56,12 +56,13 @@ jobs:
         uses: codecov/codecov-action@v5
         with:
           files: coverage.xml
+          flags: backend
           fail_ci_if_error: false
         env:
           CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
 
   frontend:
-    name: Frontend · lint · typecheck
+    name: Frontend · lint · types · tests
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -84,6 +85,18 @@ jobs:
 
       - name: Type check
         run: npm run typecheck
+
+      - name: Unit tests + coverage (gates logic dirs; see vite.config.ts thresholds)
+        run: npm run test:coverage
+
+      - name: Upload frontend coverage to Codecov
+        uses: codecov/codecov-action@v5
+        with:
+          files: tools/gui/coverage/lcov.info
+          flags: frontend
+          fail_ci_if_error: false
+        env:
+          CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
 
       - name: Build
         run: npm run build

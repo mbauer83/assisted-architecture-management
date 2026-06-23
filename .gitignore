@@ -8,6 +8,7 @@ __pycache__/
 # Node / Vue SPA
 tools/gui/node_modules/
 tools/gui/dist/
+tools/gui/coverage/
 
 # Docker / misc build artefacts
 tools/plantuml.jar
