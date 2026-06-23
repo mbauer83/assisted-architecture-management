@@ -46,7 +46,12 @@ class GitCredentials:
 
 
 def detect_remote_protocol(repo_path: Path) -> str | None:
-    """Return 'ssh', 'https', or None (local / no remote configured)."""
+    """Return 'ssh', 'https', or None (local / no remote / repo not present yet)."""
+    # A configured repo may not be cloned yet (arch-init runs before the backend in
+    # real deployments, but not in every harness). Probing a missing path would make
+    # subprocess.run raise FileNotFoundError on the cwd; treat it as "no remote".
+    if not repo_path.is_dir():
+        return None
     result = subprocess.run(
         ["git", "remote", "get-url", "origin"],
         cwd=repo_path,
