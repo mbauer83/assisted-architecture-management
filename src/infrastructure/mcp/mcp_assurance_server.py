@@ -17,6 +17,7 @@ from mcp.server.fastmcp import FastMCP  # type: ignore[import-not-found]
 from src.infrastructure.mcp.assurance_mcp.context import get_assurance_context
 from src.infrastructure.mcp.assurance_mcp.read_tools import register_read_tools
 from src.infrastructure.mcp.assurance_mcp.write_tools import register_write_tools
+from src.infrastructure.mcp.transport_security import build_transport_security
 
 _HOST = os.getenv("ARCH_MCP_HOST", "127.0.0.1")
 _PORT = int(os.getenv("ARCH_MCP_PORT", "8000"))
@@ -44,6 +45,7 @@ mcp_assurance_read = FastMCP(
     json_response=_JSON_RESPONSE,
     stateless_http=_STATELESS,
     log_level=_LOG_LEVEL,  # type: ignore[arg-type]
+    transport_security=build_transport_security(),
 )
 
 mcp_assurance_write = FastMCP(
@@ -55,6 +57,7 @@ mcp_assurance_write = FastMCP(
     json_response=_JSON_RESPONSE,
     stateless_http=_STATELESS,
     log_level=_LOG_LEVEL,  # type: ignore[arg-type]
+    transport_security=build_transport_security(),
 )
 
 register_read_tools(mcp_assurance_read)

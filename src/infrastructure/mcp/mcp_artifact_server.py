@@ -49,6 +49,7 @@ from src.infrastructure.mcp.artifact_mcp.write_tools import (  # noqa: F401
     artifact_help,
     artifact_promote_to_enterprise,
 )
+from src.infrastructure.mcp.transport_security import build_transport_security
 
 _HOST = os.getenv("ARCH_MCP_HOST", "127.0.0.1")
 _PORT = int(os.getenv("ARCH_MCP_PORT", "8000"))
@@ -76,6 +77,7 @@ mcp_read = FastMCP(
     json_response=_JSON_RESPONSE,
     stateless_http=_STATELESS_HTTP,
     log_level=_LOG_LEVEL,  # type: ignore[arg-type]
+    transport_security=build_transport_security(),
 )
 
 register_query_tools(mcp_read)
@@ -92,6 +94,7 @@ mcp_write = FastMCP(
     json_response=_JSON_RESPONSE,
     stateless_http=_STATELESS_HTTP,
     log_level=_LOG_LEVEL,  # type: ignore[arg-type]
+    transport_security=build_transport_security(),
 )
 
 register_write_tools(mcp_write)
