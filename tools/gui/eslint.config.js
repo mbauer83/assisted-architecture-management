@@ -6,7 +6,7 @@ import vueParser from 'vue-eslint-parser'
 
 export default tseslint.config(
   {
-    ignores: ['dist/**', 'coverage/**'],
+    ignores: ['dist/**', 'coverage/**', 'coverage-e2e/**', '.nyc_output/**'],
   },
   {
     files: ['**/*.ts'],

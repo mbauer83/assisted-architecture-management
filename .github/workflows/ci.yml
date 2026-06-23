@@ -146,8 +146,10 @@ jobs:
       - name: Fetch the PlantUML runtime
         run: uv run get-plantuml
 
-      - name: Build the GUI (served by the backend at /)
+      - name: Build the GUI (instrumented for E2E coverage; served by the backend at /)
         working-directory: tools/gui
+        env:
+          VITE_COVERAGE: "true"
         run: |
           npm ci
           npm run build
@@ -208,6 +210,21 @@ jobs:
         env:
           E2E_BASE_URL: http://localhost:8000
         run: npm run test:e2e
+
+      - name: Generate E2E coverage (lcov from .nyc_output; reachability, report-only)
+        if: always()
+        working-directory: tools/gui
+        run: npx nyc report --reporter=lcov --reporter=text-summary --report-dir=coverage-e2e --temp-dir=.nyc_output || true
+
+      - name: Upload E2E coverage to Codecov
+        if: always()
+        uses: codecov/codecov-action@v5
+        with:
+          files: tools/gui/coverage-e2e/lcov.info
+          flags: frontend-e2e
+          fail_ci_if_error: false
+        env:
+          CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
 
       - name: Upload Playwright report on failure
         if: failure()

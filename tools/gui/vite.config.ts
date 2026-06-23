@@ -1,10 +1,32 @@
 import { defineConfig } from 'vitest/config'
 import vue from '@vitejs/plugin-vue'
+import istanbul from 'vite-plugin-istanbul'
 
 const backendTarget = 'http://127.0.0.1:8000'
 
+// Opt-in Istanbul instrumentation for E2E coverage (VITE_COVERAGE=true npm run build).
+// Off by default, so the shipped production build is never instrumented. The resulting
+// build records browser-side execution in window.__coverage__, which the Playwright
+// route-walk collects as a *reachability* signal over .vue/composables (report-only,
+// never gated — see the e2e job + tests/e2e/coverage-fixture.ts).
+const e2eCoverage = process.env.VITE_COVERAGE === 'true'
+
 export default defineConfig({
-  plugins: [vue()],
+  plugins: [
+    vue(),
+    ...(e2eCoverage
+      ? [
+          istanbul({
+            include: 'src/**',
+            exclude: ['src/**/*.test.ts', 'src/domain/types.generated.ts'],
+            extension: ['.ts', '.vue'],
+            // The E2E build is a production `vite build`; instrument it anyway (the plugin
+            // skips production by default to avoid shipping instrumented code).
+            forceBuildInstrument: true,
+          }),
+        ]
+      : []),
+  ],
   test: {
     environment: 'node',
     include: ['src/**/*.test.ts'],

@@ -9,6 +9,8 @@ __pycache__/
 tools/gui/node_modules/
 tools/gui/dist/
 tools/gui/coverage/
+tools/gui/coverage-e2e/
+tools/gui/.nyc_output/
 
 # Docker / misc build artefacts
 tools/plantuml.jar
