@@ -307,6 +307,11 @@ def stop_backend(*, cwd: Path | None = None, timeout_s: float = 5.0, port: int |
                     os.kill(leftover_pid, signal.SIGTERM)
                 except ProcessLookupError:
                     continue
+                except PermissionError:
+                    # Best-effort cleanup: a declarant we cannot signal (not ours) must
+                    # not abort the stop — the socket owner has already been terminated.
+                    logger.warning("No permission to terminate declarant pid=%s; skipping", leftover_pid)
+                    continue
                 _wait_for_exit(leftover_pid, timeout_s=min(timeout_s, 3.0), interval=0.1)
             return result
         # Genuinely multiple backend instances on the same port — stop all.

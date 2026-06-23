@@ -377,11 +377,17 @@ def test_stop_backend_resolves_multiple_to_socket_owner(monkeypatch) -> None:
         return {"stopped": True, "pid": pid, "port": port}
 
     monkeypatch.setattr(backend_control, "_stop_pid", fake_stop_pid)
+    # The non-socket declarant (1002) is SIGTERMed during cleanup; mock os.kill so the
+    # test never signals a real, arbitrary PID (which fails non-deterministically in CI).
+    killed: list[int] = []
+    monkeypatch.setattr(backend_control.os, "kill", lambda pid, sig: killed.append(pid))
+    monkeypatch.setattr(backend_control, "_wait_for_exit", lambda pid, **kwargs: True)
 
     result = backend_control.stop_backend(port=8000)
 
     assert result["stopped"] is True
     assert stopped == [1001]
+    assert killed == [1002]
 
 
 def test_stop_backend_cleans_up_non_socket_declarants(monkeypatch) -> None:
@@ -416,6 +422,27 @@ def test_stop_backend_cleans_up_non_socket_declarants(monkeypatch) -> None:
     assert stopped_via_stop_pid == [1001]
     sigtermed = [pid for pid, sig in killed if sig == signal_module.SIGTERM]
     assert 1002 in sigtermed
+
+
+def test_stop_backend_tolerates_unkillable_declarant(monkeypatch) -> None:
+    """A declarant we lack permission to signal must not abort an otherwise-successful stop."""
+    socket_owner = {"pid": 1001, "ports": [8000], "declared_port": 8000}
+    declarant = {"pid": 1002, "ports": [], "declared_port": 8000}
+
+    monkeypatch.setattr(backend_control, "read_backend_state", lambda start=None: None)
+    monkeypatch.setattr(backend_control, "find_arch_backend_instances", lambda: [socket_owner, declarant])
+    monkeypatch.setattr(
+        backend_control, "_stop_pid", lambda pid, **kwargs: {"stopped": True, "pid": pid, "port": kwargs.get("port")}
+    )
+
+    def raise_eperm(pid: int, sig: int) -> None:
+        raise PermissionError(1, "Operation not permitted")
+
+    monkeypatch.setattr(backend_control.os, "kill", raise_eperm)
+
+    result = backend_control.stop_backend(port=8000)
+
+    assert result["stopped"] is True
 
 
 def test_restart_daemon_cleans_up_leftover_unhealthy_process(monkeypatch, tmp_path: Path) -> None:
