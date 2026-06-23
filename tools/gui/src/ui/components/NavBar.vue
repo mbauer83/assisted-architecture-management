@@ -260,8 +260,8 @@ onMounted(async () => {
 .nav__sections { display: flex; align-items: center; gap: 0; flex: 1; min-width: 0; overflow: hidden; }
 .nav__section { display: flex; align-items: center; gap: 8px; flex-shrink: 1; min-width: 0; }
 .nav__section-label { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .07em; color: #64748b; white-space: nowrap; padding: 0 4px; flex-shrink: 0; }
-.nav__section-label--global { color: #f59e0b; }
-.nav__section-label--assurance { color: #a78bfa; }
+.nav__section-label--global { color: #f59e0b; padding-top: 0.3em; }
+.nav__section-label--assurance { color: #a78bfa; padding-top: 0.3em; }
 .nav__divider { width: 1px; height: 20px; background: #334155; margin: 0 12px; flex-shrink: 0; }
 .nav__links { display: flex; gap: 4px; flex-wrap: nowrap; min-width: 0; overflow: hidden; }
 .nav__links a { color: #b0bec5; font-size: 13px; padding: 4px 8px; border-radius: 4px; white-space: nowrap; }
