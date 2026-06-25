@@ -83,6 +83,8 @@ R 'cd /data/engagement &&
 #     Resumable — rerun the same command after any interruption (state in .git/arch-repair-state.json).
 #     Auth: `docker compose run` loads the deployment's env_file automatically, so no auth flag is
 #     needed here (see "Git authentication" above for the fallback if a credential is kept out of it).
+#     Author identity: the commit uses ARCH_GIT_AUTHOR_NAME/_EMAIL from the env_file (default
+#     "Architecture Repository Service" if unset) — see "Git author identity" below to set it first.
 docker compose run --rm --no-deps --entrypoint arch-repair app \
   --repo-root /data/engagement \
   --repair-branch repair/cps-rename \
@@ -105,9 +107,26 @@ docker compose exec app sh -lc '
 rm -f orig-branch.txt   # clear the durable marker only after a clean, verified completion
 ```
 
+## Git author identity (set before step 4b)
+The repair commit and all normal `save_changes` commits take their identity from **environment
+variables**, applied as `git -c user.name=… -c user.email=…` — the container's `git config` is **not**
+consulted, so `git config --global` has no effect here. Set these in the deployment's `env_file` (the
+same file used for auth) so the commit is attributable:
+
+```
+ARCH_GIT_AUTHOR_NAME=Your Service Or Person Name
+ARCH_GIT_AUTHOR_EMAIL=you@example.com
+```
+
+This identity is the **committer** (and the author of the repair commit). If you leave it unset, the
+commit still succeeds using the built-in default `Architecture Repository Service
+<arch-service@localhost>` — functional, but unattributed. To override just this one repair without
+editing the env file, pass it inline: `docker compose run … -e ARCH_GIT_AUTHOR_NAME=… -e
+ARCH_GIT_AUTHOR_EMAIL=… --entrypoint arch-repair app …`. (A normal `save_changes` can additionally
+carry a distinct per-request **author** while keeping this env identity as committer.)
+
 ## Notes
 - If anything looks wrong: restore `eng-backup.tgz` (or just redo steps 3–4) — recovery is cheap.
-- Persist the author identity to stop recurrence: `docker compose exec app git config --global user.name "…" && … user.email "…"` (writes into the `arch-home` volume).
 - After the code fix (`PLAN-rename-stale-index-fix.md`) ships, stale slug refs are **non-fatal** (they
   resolve by short id), so this manual repair becomes optional cosmetic cleanup.
 - Independent post-check from a workstation with the read MCP (optional): `artifact_verify` on
