@@ -1,5 +1,3 @@
-"""SQLite-backed artifact index — in-memory read model with incremental update."""
-
 from __future__ import annotations
 
 import hashlib
@@ -22,7 +20,7 @@ from src.application._artifact_query_helpers import (
     read_entity,
     to_set,
 )
-from src.application.ports import ArtifactStorePort
+from src.application.ports import ArtifactStorePort, Candidate
 from src.config.workspace_paths import infer_repo_scope
 from src.domain.artifact_types import (
     ArtifactSummary,
@@ -38,6 +36,7 @@ from src.domain.artifact_types import (
 )
 
 from . import _sqlite_queries as _q
+from ._identity_resolver import _IdentityResolver
 from ._mem_store import _MemStore
 from ._rwlock import _RWLock
 from ._scope_registry import _ScopeRegistry
@@ -88,6 +87,7 @@ class ArtifactIndex:
         name_hash = hashlib.blake2b(service_key(mounts).encode("utf-8"), digest_size=10).hexdigest()
         self._db = _SqliteStore(name_hash, self._mem, self.scope_for_path)
         self._registry = _ScopeRegistry(self._mem, self._lock, self._ensure_loaded, self.scope_for_path)
+        self._identity = _IdentityResolver(self._mem, self._lock, self._ensure_loaded, self.scope_for_path)
 
     def _ensure_loaded(self) -> None:
         if self._ready.is_set():
@@ -113,7 +113,6 @@ class ArtifactIndex:
         return {str(n): ws for n, dk in get_module_registry().all_diagram_types().items() if (ws := _ws(dk))}
 
     def _attr_type_ref_extractor(self, diag: DiagramRecord) -> list[tuple[str, str, str]]:
-        """Extract classifier-typed attribute refs from a datatype diagram for indexing."""
         if diag.diagram_type != "datatype":
             return []
         refs: list[tuple[str, str, str]] = []
@@ -147,16 +146,7 @@ class ArtifactIndex:
                 attr_type_ref_fn=self._attr_type_ref_extractor,
             )
         with self._lock.writing():
-            self._mem.entities.clear()
-            self._mem.entities.update(temp.entities)
-            self._mem.connections.clear()
-            self._mem.connections.update(temp.connections)
-            self._mem.diagrams.clear()
-            self._mem.diagrams.update(temp.diagrams)
-            self._mem.documents.clear()
-            self._mem.documents.update(temp.documents)
-            self._mem.attribute_type_refs.clear()
-            self._mem.attribute_type_refs.update(temp.attribute_type_refs)
+            self._mem.replace_from(temp)
             # Derived indexes (entities_by_diagram) must precede the SQLite dump: the
             # diagram FTS rows resolve each diagram's member entity names through them.
             self._mem.rebuild_path_indexes()
@@ -400,36 +390,30 @@ class ArtifactIndex:
     def stats(self) -> dict[str, object]:
         self._ensure_loaded()
         with self._lock.reading():
-            entities = list(self._mem.entities.values())
-            connections = list(self._mem.connections.values())
-            diagrams = list(self._mem.diagrams.values())
-            documents = list(self._mem.documents.values())
+            ents, conns = list(self._mem.entities.values()), list(self._mem.connections.values())
+            diags, docs = list(self._mem.diagrams.values()), list(self._mem.documents.values())
         return {
-            "entities": len(entities),
-            "connections": len(connections),
-            "diagrams": len(diagrams),
-            "documents": len(documents),
-            "entities_by_domain": dict(Counter(e.domain for e in entities)),
-            "connections_by_type": dict(Counter(c.conn_type for c in connections)),
-            "documents_by_type": dict(Counter(d.doc_type for d in documents)),
-            "entities_by_group": dict(Counter(e.group for e in entities)),
-            "diagrams_by_group": dict(Counter(d.group for d in diagrams)),
-            "documents_by_group": dict(Counter(d.group for d in documents)),
+            "entities": len(ents), "connections": len(conns),
+            "diagrams": len(diags), "documents": len(docs),
+            "entities_by_domain": dict(Counter(e.domain for e in ents)),
+            "connections_by_type": dict(Counter(c.conn_type for c in conns)),
+            "documents_by_type": dict(Counter(d.doc_type for d in docs)),
+            "entities_by_group": dict(Counter(e.group for e in ents)),
+            "diagrams_by_group": dict(Counter(d.group for d in diags)),
+            "documents_by_group": dict(Counter(d.group for d in docs)),
         }
 
     # ── Connection queries ────────────────────────────────────────────────────
 
     def connection_counts(self) -> dict[str, tuple[int, int, int]]:
         self._ensure_loaded()
-        with self._lock.reading():
-            with self._db.reader() as conn:
-                return _q.all_connection_stats(conn)
+        with self._lock.reading(), self._db.reader() as conn:
+            return _q.all_connection_stats(conn)
 
     def connection_counts_for(self, entity_id: str) -> tuple[int, int, int]:
         self._ensure_loaded()
-        with self._lock.reading():
-            with self._db.reader() as conn:
-                return _q.connection_stats_for(conn, entity_id)
+        with self._lock.reading(), self._db.reader() as conn:
+            return _q.connection_stats_for(conn, entity_id)
 
     def connection_counts_for_entities(
         self, entity_ids: list[str] | set[str] | frozenset[str]
@@ -599,8 +583,16 @@ class ArtifactIndex:
     def find_file_by_id(self, artifact_id: str) -> Path | None:
         return self._registry.find_file_by_id(artifact_id)
 
+    def find_all_by_stable_id(self, short: str) -> list[Candidate]:
+        return self._identity.find_all_by_stable_id(short)
+
+    def reconcile_short_id(self, short: str) -> None:
+        self._identity.reconcile_short_id(short, self.apply_file_changes, self.repo_roots)
+
+    def scan_duplicate_short_ids(self) -> dict[str, list[Path]]:
+        return self._identity.scan_duplicates()
+
     def candidate_connections_for_entities(self, entity_ids: list[str]) -> list[EntityContextConnection]:
-        """Return all enriched connection dicts touching any of the given entity IDs (single query)."""
         self._ensure_loaded()
         with self._lock.reading():
             with self._db.reader() as conn:

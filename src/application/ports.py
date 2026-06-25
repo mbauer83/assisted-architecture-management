@@ -13,6 +13,39 @@ from src.domain.artifact_types import (
     EntityRecord,
     RepoMount,
 )
+from src.domain.repo_scope import MountScope
+
+
+@dataclass(frozen=True)
+class Candidate:
+    """A file candidate resolved from the identity multimap."""
+
+    artifact_id: str
+    path: Path
+    scope: MountScope
+
+
+@dataclass(frozen=True)
+class ResolvedArtifact:
+    """Result of a canonical artifact resolution, tolerating slug drift."""
+
+    requested_id: str
+    canonical_id: str
+    path: Path
+    renamed: bool
+    stale_slug: str | None
+
+
+class AmbiguousArtifactError(ValueError):
+    """Raised when a short stable ID maps to multiple files with no unique scope selection."""
+
+
+class ArtifactIdentityResolver(Protocol):
+    """Stable-id multimap query and per-entity reconciliation."""
+
+    def find_all_by_stable_id(self, short: str) -> list[Candidate]: ...
+    def reconcile_short_id(self, short: str) -> None: ...
+    def scan_duplicate_short_ids(self) -> dict[str, list[Path]]: ...
 
 
 class ArtifactLookup(Protocol):
@@ -190,6 +223,7 @@ class ArtifactStorePort(
     RelationshipGraph,
     RepositoryScopeResolver,
     ArtifactIndexLifecycle,
+    ArtifactIdentityResolver,
     ArtifactMutationObserver,
     Protocol,
 ):
@@ -202,6 +236,7 @@ class ArtifactStorePort(
 class VerifierStorePort(
     ArtifactLookup,
     ArtifactIndexLifecycle,
+    ArtifactIdentityResolver,
     RepositoryScopeResolver,
     Protocol,
 ):

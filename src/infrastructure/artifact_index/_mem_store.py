@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from pathlib import Path
 
+from src.application.ports import Candidate
 from src.domain.artifact_types import ConnectionRecord, DiagramRecord, DocumentRecord, EntityRecord
 
 
@@ -23,6 +24,8 @@ class _MemStore:
     """diagram_id → set of diagram-owned connection artifact_ids (artifact_id contains '#conn/')."""
     attribute_type_refs: dict[str, list[tuple[str, str, str]]] = field(default_factory=dict)
     """diagram_id → [(classifier_local_id, attr_name, type_id)] for classifier-typed attributes."""
+    identity_candidates: dict[str, list[Candidate]] = field(default_factory=dict)
+    """stable_id → all Candidate files ever indexed under that stable key (cross-mount multimap)."""
 
     def clear(self) -> None:
         for attr in (
@@ -38,8 +41,14 @@ class _MemStore:
             "entities_by_diagram",
             "connections_by_diagram",
             "attribute_type_refs",
+            "identity_candidates",
         ):
             getattr(self, attr).clear()
+
+    def replace_from(self, other: _MemStore) -> None:
+        for attr in ("entities", "connections", "diagrams", "documents", "identity_candidates", "attribute_type_refs"):
+            getattr(self, attr).clear()
+            getattr(self, attr).update(getattr(other, attr))
 
     def rebuild_path_indexes(self) -> None:
         self.entity_by_path = {

@@ -19,6 +19,7 @@ from src.application.artifact_parsing import (
     parse_entity,
     parse_outgoing_file,
 )
+from src.application.ports import Candidate
 from src.application.repo_path_helpers import (
     all_model_roots,
     diagram_source_root,
@@ -28,6 +29,7 @@ from src.application.repo_path_helpers import (
     group_fn_entity,
 )
 from src.config.repo_paths import DOCS, MODEL, RENDERED
+from src.domain.artifact_id import stable_id
 from src.domain.artifact_types import (
     ConnectionRecord,
     DiagramRecord,
@@ -97,7 +99,15 @@ def _insert_mounted(
     label: str,
     mount_root: Path,
     store: dict[str, _ArtT],
+    *,
+    candidates_map: dict[str, list[Candidate]] | None = None,
+    scope: str | None = None,
 ) -> None:
+    if candidates_map is not None and scope is not None:
+        key = stable_id(rec.artifact_id)
+        candidates_map.setdefault(key, []).append(
+            Candidate(artifact_id=rec.artifact_id, path=rec.path, scope=scope)  # type: ignore[arg-type]
+        )
     existing = store.get(rec.artifact_id)
     if existing is None:
         store[rec.artifact_id] = rec
@@ -111,20 +121,26 @@ def _insert_mounted(
     )
 
 
-def _scan_model_records(repo_root: Path, mem: _MemStore, *, domain_names: frozenset[str]) -> None:
+def _scan_model_records(mount: RepoMount, mem: _MemStore, *, domain_names: frozenset[str]) -> None:
     """Index entities and outgoing connections across every model root of a repo."""
-    for model_root in all_model_roots(repo_root):
+    for model_root in all_model_roots(mount.root):
         for path in sorted(model_root.rglob("*.md")):
             if path.name.endswith(".outgoing.md"):
                 continue
             entity = parse_entity(path, model_root, domain_names=domain_names)
             if entity is not None:
-                grp = group_fn_entity(path, repo_root)
-                _insert_mounted(replace(entity, group=grp), "entity", repo_root, mem.entities)
+                grp = group_fn_entity(path, mount.root)
+                _insert_mounted(
+                    replace(entity, group=grp), "entity", mount.root, mem.entities,
+                    candidates_map=mem.identity_candidates, scope=mount.scope,
+                )
         for path in sorted(model_root.rglob("*.outgoing.md")):
-            grp = group_fn_entity(path, repo_root)
+            grp = group_fn_entity(path, mount.root)
             for conn in parse_outgoing_file(path):
-                _insert_mounted(replace(conn, group=grp), "connection", repo_root, mem.connections)
+                _insert_mounted(
+                    replace(conn, group=grp), "connection", mount.root, mem.connections,
+                    candidates_map=mem.identity_candidates, scope=mount.scope,
+                )
 
 
 def _iter_diagram_sources(diag_root: Path) -> Iterator[Path]:
@@ -182,7 +198,7 @@ def scan_mount(
     workspace_types: dict[str, frozenset[str]] | None = None,
     attr_type_ref_fn: _AttrTypeRefFn | None = None,
 ) -> None:
-    _scan_model_records(mount.root, mem, domain_names=domain_names)
+    _scan_model_records(mount, mem, domain_names=domain_names)
     _scan_diagram_records(mount.root, mem, workspace_types=workspace_types, attr_type_ref_fn=attr_type_ref_fn)
     _scan_document_records(mount.root, mem)
 

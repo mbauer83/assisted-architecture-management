@@ -18,11 +18,12 @@ def normalize_mounts(repo_root: Path | list[Path] | list[RepoMount]) -> list[Rep
     roots = [m.root for m in mounts]
     if len(set(map(str, roots))) != len(roots):
         raise ValueError("Duplicate repo root in ArtifactIndex mounts")
+    mounts.sort(key=lambda m: str(m.root.resolve()))
     return mounts
 
 
 def service_key(mounts: list[RepoMount]) -> str:
-    return "|".join(str(m.root.resolve()) for m in mounts)
+    return "|".join(sorted(str(m.root.resolve()) for m in mounts))
 
 
 _services: dict[str, "ArtifactIndex"] = {}

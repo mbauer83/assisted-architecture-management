@@ -18,7 +18,7 @@ SOURCE_FILE_HARD_LIMIT = 350
 SOURCE_FILE_BASELINE_LIMITS: dict[str, int] = {
     "src/application/verification/artifact_verifier.py": 406,
     "src/infrastructure/artifact_index/_sqlite_store.py": 408,
-    "src/infrastructure/artifact_index/service.py": 558,
+    "src/infrastructure/artifact_index/service.py": 548,
     "src/infrastructure/gui/routers/_diagram_write.py": 353,
 }
 

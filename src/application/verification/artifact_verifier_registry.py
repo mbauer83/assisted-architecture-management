@@ -3,7 +3,8 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Literal
 
-from src.application.ports import VerifierStorePort
+from src.application.ports import AmbiguousArtifactError, ResolvedArtifact, VerifierStorePort
+from src.domain.artifact_id import slug_of, stable_id
 
 
 class ArtifactRegistry:
@@ -63,3 +64,61 @@ class ArtifactRegistry:
 
     def scope_of_connection(self, artifact_id: str) -> Literal["enterprise", "engagement", "unknown"]:
         return self._store.scope_of_connection(artifact_id)
+
+    def resolve_artifact(
+        self,
+        artifact_id: str,
+        *,
+        scope: Literal["engagement", "enterprise", "both"] = "both",
+    ) -> ResolvedArtifact | None:
+        """Resolve an artifact ID tolerating slug drift and cross-mount shadowing.
+
+        Returns None when no live file exists.  Raises AmbiguousArtifactError when
+        multiple files share the same stable id and the given scope does not select
+        exactly one.
+        """
+        short = stable_id(artifact_id)
+
+        path = self._store.find_file_by_id(artifact_id)
+        if path is not None and path.exists():
+            requested_slug = slug_of(artifact_id)
+            entity = self._store.get_entity(artifact_id)
+            canonical_id = entity.artifact_id if entity is not None else artifact_id
+            canonical_slug = slug_of(canonical_id)
+            stale_slug = requested_slug if requested_slug != canonical_slug else None
+            return ResolvedArtifact(
+                requested_id=artifact_id,
+                canonical_id=canonical_id,
+                path=path,
+                renamed=False,
+                stale_slug=stale_slug,
+            )
+
+        self._store.reconcile_short_id(short)
+
+        candidates = self._store.find_all_by_stable_id(short)
+        if scope != "both":
+            candidates = [c for c in candidates if c.scope == scope]
+        candidates = [c for c in candidates if c.path.exists()]
+
+        if not candidates:
+            return None
+        if len(candidates) > 1:
+            paths = [str(c.path) for c in candidates]
+            raise AmbiguousArtifactError(
+                f"Stable id {short!r} matches multiple files: {paths}"
+            )
+
+        candidate = candidates[0]
+        entity = self._store.get_entity(candidate.artifact_id)
+        canonical_id = entity.artifact_id if entity is not None else candidate.artifact_id
+        requested_slug = slug_of(artifact_id)
+        canonical_slug = slug_of(canonical_id)
+        stale_slug = requested_slug if requested_slug != canonical_slug else None
+        return ResolvedArtifact(
+            requested_id=artifact_id,
+            canonical_id=canonical_id,
+            path=candidate.path,
+            renamed=candidate.artifact_id != artifact_id,
+            stale_slug=stale_slug,
+        )
