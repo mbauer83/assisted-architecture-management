@@ -21,9 +21,9 @@ Only **Docker + Compose v2**. (Plus `git` *if* the host builds the image from so
 - Entity CPS `APP@1782278054.OPaZCl` (current file `…OPaZCl.cps.md`; stale refs say `…cam-projects-cps`).
 - Diagrams `ARC@1782278684.yUXoze` (CFCS) and `ARC@1782365608.c3xIZY` (MIRA).
 
-## Git authentication (for the push in step 4b)
+## Git authentication (for the push in step 5b)
 **This deployment authenticates via the compose `env_file:`.** `docker compose run app` loads that same
-`env_file:` automatically, so the step-4b command below needs **no extra auth flags** — `arch-repair`
+`env_file:` automatically, so the step-5b command below needs **no extra auth flags** — `arch-repair`
 reuses the image's resolver (the same one git-sync already uses) and picks the credentials straight out
 of the inherited env. The resolver reads, in order:
 
@@ -40,7 +40,7 @@ R 'env | grep -E "ARCH_GIT_(HTTPS|SSH)" | sed "s/=.*/=<set>/"'   # shows which a
 ```
 
 > Fallback only — if a credential is *not* in the env file (e.g. you keep it out of the deployment),
-> append it to the step-4b `docker compose run`: `-e ARCH_GIT_HTTPS_TOKEN=…`, or
+> append it to the step-5b `docker compose run`: `-e ARCH_GIT_HTTPS_TOKEN=…`, or
 > `--git-token-file /run/secrets/git_token`, or `-e ARCH_GIT_HTTPS_USERNAME=… -e ARCH_GIT_HTTPS_PASSWORD=…`,
 > or `-e ARCH_GIT_SSH_PASSWORD=…`. Not needed for this deployment.
 
@@ -55,9 +55,12 @@ R 'env | grep -E "ARCH_GIT_(HTTPS|SSH)" | sed "s/=.*/=<set>/"'   # shows which a
 # volume but overrides the entrypoint, so arch-init does NOT run here.
 R() { docker compose run --rm -T --no-deps --entrypoint sh app -lc "$1"; }
 
-# Cardinal rule: arch-init runs on the next normal start (step 5) and ABORTS startup if the
-# engagement repo is dirty or on a branch other than 'main' — it never resets or discards data.
-# So fully FINISH the repair (HEAD back on main, clean tree) BEFORE you restart in step 5.
+# ORDER MATTERS: `arch-repair` (step 5b) ships *in the updated image* — it does NOT exist on the
+# currently-running old image. So you must build/pull the new image (step 4) BEFORE the repair.
+# Building/pulling only prepares the image; it does not start the service. The service stays stopped
+# through the whole repair, so arch-init (which ABORTS on a dirty tree or a non-'main' branch, and
+# never resets or discards data) only runs at the final start (step 6) — by which point the repair
+# has committed a clean tree back on 'main'. Cardinal rule: FINISH the repair before step 6.
 
 # 0. QUIESCE FIRST — stop the service so git-sync (60s) and GUI/MCP writes cannot race the repair.
 docker compose stop app
@@ -79,21 +82,31 @@ R 'cd /data/engagement &&
    grep -rl --exclude-dir=.git "APP@1782278054.OPaZCl.cam-projects-cps" . |
    xargs -r sed -i "s/APP@1782278054\.OPaZCl\.cam-projects-cps/APP@1782278054.OPaZCl.cps/g"'
 
-# 4a. INSPECT on the ORIGINAL production branch. Nothing here is irreversible.
+# 4. DEPLOY THE UPDATED IMAGE NOW — REQUIRED before the repair, because `arch-repair` lives in this
+#    image. This only builds/pulls the image; it does NOT start the service (so nothing can abort on the
+#    dirty tree yet). First ensure the latest commits are pushed to the project remote, then on the host:
+#      Source checkout on host:
+git pull                      # fetch the latest application source into the deployment checkout
+docker compose build app      # build the new image — it now contains `arch-repair`
+#      Registry-based deploy — use INSTEAD of the build line above:
+#      docker compose pull app
+#    (Every `docker compose run`/`up` below now uses this new image.)
+
+# 5a. INSPECT on the ORIGINAL production branch. Nothing here is irreversible.
 R 'cd /data/engagement &&
    git diff --check &&
    test -f "projects/autocam/model/application/application-component/APP@1782278054.OPaZCl.cps.md" &&
    ! grep -rq --exclude-dir=.git "APP@1782278054.OPaZCl.cam-projects-cps" . &&
-   echo "=== working-tree change set — review before step 4b ===" &&
+   echo "=== working-tree change set — review before step 5b ===" &&
    git status --short'
-#     >>> OPERATOR: proceed to 4b only if the change list is exactly as expected. <<<
+#     >>> OPERATOR: proceed to 5b only if the change list is exactly as expected. <<<
 
-# 4b. Guarded, resumable repair. Verifies the upstream is origin/<prod-branch>, commits the staged
-#     fix onto repair/cps-rename, pushes it, then fast-forward-only merges it into the production
-#     branch and pushes that (ff-only: aborts instead of clobbering a diverged production branch).
-#     Resumable — rerun the same command after any interruption (state in .git/arch-repair-state.json).
-#     Auth: `docker compose run` loads the deployment's env_file automatically, so no auth flag is
-#     needed here (see "Git authentication" above for the fallback if a credential is kept out of it).
+# 5b. Guarded, resumable repair (now available from the step-4 image). Verifies the upstream is
+#     origin/<prod-branch>, commits the staged fix onto repair/cps-rename, pushes it, then
+#     fast-forward-only merges it into the production branch and pushes that (ff-only: aborts instead
+#     of clobbering a diverged production branch). Resumable — rerun after any interruption (state in
+#     .git/arch-repair-state.json). Auth: `docker compose run` loads the deployment's env_file
+#     automatically, so no auth flag is needed (see "Git authentication" above for the fallback).
 #     Author identity: the commit uses ARCH_GIT_AUTHOR_NAME/_EMAIL from the env_file (default
 #     "Architecture Repository Service" if unset) — see "Git author identity" below to set it first.
 docker compose run --rm -T --no-deps --entrypoint arch-repair app \
@@ -103,45 +116,37 @@ docker compose run --rm -T --no-deps --entrypoint arch-repair app \
   --confirm
 #     >>> MUST print "Repair complete: repair/cps-rename → main" before you continue. If it failed
 #         partway (auth, ff-only on a diverged production branch, etc.) HEAD may still be on
-#         repair/cps-rename — DO NOT restart yet (arch-init would abort startup). Fix the cause and
+#         repair/cps-rename — DO NOT start the service yet (arch-init would abort). Fix the cause and
 #         rerun the SAME command (it is resumable) until it prints "Repair complete". An ff-only
 #         abort means production diverged: re-fetch and reconcile, then rerun. <<<
 
-# 4c. Pre-restart gate — assert the tree is clean and NOT on the repair branch, so the step-5 start
+# 5c. Pre-start gate — assert the tree is clean and NOT on the repair branch, so the step-6 start
 #     cannot abort (arch-init refuses a dirty tree or a non-'main' branch).
 R 'cd /data/engagement &&
    test -z "$(git status --porcelain)" &&
    case "$(git rev-parse --abbrev-ref HEAD)" in
-     repair/*) echo "ABORT: still on the repair branch — rerun step 4b until complete"; exit 1;;
-     *) echo "OK: clean, on $(git rev-parse --abbrev-ref HEAD) — safe to restart";;
+     repair/*) echo "ABORT: still on the repair branch — rerun step 5b until complete"; exit 1;;
+     *) echo "OK: clean, on $(git rev-parse --abbrev-ref HEAD) — safe to start";;
    esac'
 
-# 5. Update the deployment to the latest application code (the WS1–WS14 fix) AND bring the service
-#    back. This is required: we want the system running the current pushed code over the repaired data.
-#    Volumes persist — NEVER pass -v. Starting the app re-runs arch-init and rebuilds the in-memory
-#    index from the now-repaired /data, so the served index ≡ disk at first request (WS9 ordering).
-#
-#    First make sure the latest commits are pushed to the project remote, then on the deployment host:
-#      Source checkout on host (builds the image):
-git pull                      # fetch the latest application source into the deployment checkout
-docker compose build app      # rebuild the image from the new source
-docker compose up -d app      # recreate the container on the new image; rebuilds the index from /data
-#      Registry-based deploy (pulls a prebuilt image) — use INSTEAD of the three lines above:
-#      docker compose pull app && docker compose up -d app
+# 6. Start the service on the step-4 image (volumes persist — NEVER pass -v). The container was stopped
+#    in step 0; starting it now runs the WS1–WS14 code, re-runs arch-init over the clean repaired tree,
+#    and rebuilds the in-memory index from /data, so the served index ≡ disk at first request (WS9).
+docker compose up -d app
 
-# 6. Verify the system is actually RUNNING and serving the repaired data (no MCP needed).
-#    6a. Wait for the app to report healthy (the compose healthcheck curls /health). A healthy app
+# 7. Verify the system is actually RUNNING and serving the repaired data (no MCP needed).
+#    7a. Wait for the app to report healthy (the compose healthcheck curls /health). A healthy app
 #        also proves the index built cleanly — WS9 aborts startup on a duplicate/inconsistent index.
 until [ "$(docker inspect -f '{{.State.Health.Status}}' "$(docker compose ps -q app)")" = healthy ]; do
   sleep 3; done
 docker compose exec -T app curl -fsS http://localhost:8000/health && echo " <- app healthy"
-#    6b. On-disk: no stale refs remain, entity file present.
+#    7b. On-disk: no stale refs remain, entity file present.
 docker compose exec -T app sh -lc '
   cd /data/engagement &&
   ! grep -rq --exclude-dir=.git "cam-projects-cps" . &&
   test -f projects/autocam/model/application/application-component/APP@1782278054.OPaZCl.cps.md &&
   echo "OK: no stale refs, entity file present"'
-#    6c. Served data: the repaired entity is served through the running REST API (HTTP 200 + JSON).
+#    7c. Served data: the repaired entity is served through the running REST API (HTTP 200 + JSON).
 #        Query by the rename-stable SHORT id — read_artifact resolves short/long/stale-slug forms, so
 #        this stays correct even if the slug changes again.
 docker compose exec -T app curl -fsS \
@@ -150,7 +155,7 @@ docker compose exec -T app curl -fsS \
 rm -f orig-branch.txt   # clear the durable marker only after a clean, verified completion
 ```
 
-## Git author identity (set before step 4b)
+## Git author identity (set before step 5b)
 The repair commit and all normal `save_changes` commits take their identity from **environment
 variables**, applied as `git -c user.name=… -c user.email=…` — the container's `git config` is **not**
 consulted, so `git config --global` has no effect here. Set these in the deployment's `env_file` (the
@@ -170,17 +175,22 @@ carry a distinct per-request **author** while keeping this env identity as commi
 
 ## Notes
 - **Safety of restart:** arch-init never resets or discards the working tree — it either accepts a
-  clean (or explicitly-allowed-dirty) checkout or aborts startup. The step-4c gate plus "commit before
-  restart" mean a restart can only ever serve the fully-repaired, committed state.
-- If anything looks wrong: restore `eng-backup.tgz` (or just redo steps 3–4) — recovery is cheap.
+  clean (or explicitly-allowed-dirty) checkout or aborts startup. The step-5c gate plus "commit before
+  start" mean the step-6 start can only ever serve the fully-repaired, committed state.
+- If anything looks wrong: restore `eng-backup.tgz` (or just redo steps 3 + 5a–5b) — recovery is cheap.
+- **If you genuinely cannot deploy the updated image** (no source build and no registry image carrying
+  WS14 yet): there is no `arch-repair` to run. Either publish the image first, or perform the commit/push
+  by hand inside the `R` shell (`git switch -c …`, `add -A`, `commit`, `push`, ff-only merge) — but then
+  *you* must wire git credentials (the env_file token alone won't authenticate a bare `git push` without
+  the askpass helper arch-repair sets up). Deploying the image (step 4) is the supported path.
 - **Enterprise repo:** this repair scopes to `/data/engagement`. If the enterprise repo also carries the
   stale slug (e.g. the entity was promoted), scan and repeat the same procedure against it:
   `R 'grep -rq --exclude-dir=.git "cam-projects-cps" /data/enterprise && echo FOUND || echo clean'`,
-  then rerun steps 3–4b with `--repo-root /data/enterprise` and a fresh `--repair-branch`.
+  then rerun steps 3 + 5a–5b with `--repo-root /data/enterprise` and a fresh `--repair-branch`.
 - **Cleanup (optional):** the merged `repair/cps-rename` branch remains locally and on origin; delete it
   once production is confirmed good: `R 'cd /data/engagement && git branch -D repair/cps-rename'` and
-  `git push origin --delete repair/cps-rename` (with auth as in step 4b).
-- Once the WS1–WS14 code is running (step 5), any **residual** stale slug is non-fatal — it resolves by
+  `git push origin --delete repair/cps-rename` (with auth as in step 5b).
+- Once the WS1–WS14 code is running (step 6), any **residual** stale slug is non-fatal — it resolves by
   short id — so this data repair is belt-and-braces, not load-bearing, going forward.
 - Independent post-check from a workstation with the read MCP (optional): `artifact_verify` on
   `ARC@1782278684.yUXoze` and `ARC@1782365608.c3xIZY` → expect no `E301`/`E302`.
