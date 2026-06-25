@@ -10,6 +10,7 @@ Projects to ``represents`` by default.
 from __future__ import annotations
 
 from src.application.derivation.types import CandidateSet, ModelQuery
+from src.domain.artifact_id import stable_conn_id, stable_id
 from src.domain.derivation_types import StrategySpec
 from src.domain.view_derivations import SourceModelSnapshot
 
@@ -30,12 +31,12 @@ def derive(
         [str(x) for x in raw_conn_ids] if isinstance(raw_conn_ids, list) else []
     )
 
-    known_entities = query.entity_ids()
-    known_connections = query.connection_ids()
+    known_short_entities = {stable_id(e) for e in query.entity_ids()}
+    known_short_connections = {stable_conn_id(c) for c in query.connection_ids()}
 
     return CandidateSet(
-        entity_ids=frozenset(eid for eid in entity_ids if eid in known_entities),
-        connection_ids=frozenset(cid for cid in connection_ids if cid in known_connections),
+        entity_ids=frozenset(eid for eid in entity_ids if stable_id(eid) in known_short_entities),
+        connection_ids=frozenset(cid for cid in connection_ids if stable_conn_id(cid) in known_short_connections),
     )
 
 

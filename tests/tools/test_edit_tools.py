@@ -13,6 +13,7 @@ import pytest
 
 from src.application.modeling.artifact_write import generate_diagram_id
 from src.application.verification.artifact_verifier_registry import ArtifactRegistry
+from src.domain.artifact_id import stable_id
 from src.infrastructure.artifact_index import shared_artifact_index
 from src.infrastructure.mcp import mcp_artifact_server as mcp
 
@@ -141,7 +142,7 @@ class TestEditEntity:
         _make_connection(repo, src, tgt, "archimate-influence")
 
         registry = ArtifactRegistry(shared_artifact_index([repo]))
-        expected = f"{src}---{tgt}@@archimate-influence"
+        expected = f"{stable_id(src)}---{stable_id(tgt)}@@archimate-influence"
 
         assert expected in registry.connection_ids()
 

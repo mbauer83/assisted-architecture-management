@@ -20,6 +20,7 @@ from pytest_bdd import given, scenarios, then, when
 
 from src.application.modeling.artifact_write import generate_diagram_id, prefix_for_diagram_type
 from src.application.verification.artifact_verifier import ArtifactRegistry, ArtifactVerifier
+from src.domain.artifact_id import stable_id
 from src.infrastructure.artifact_index import shared_artifact_index
 from src.infrastructure.mcp import mcp_artifact_server as tools
 
@@ -390,7 +391,7 @@ Rel_Serving({e1_alias}, {e2_alias}, "HTTPS 443")
     content = str(result.get("content", ""))
     assert e1_id in content
     assert e2_id in content
-    assert f"{e1_id}---{e2_id}@@archimate-serving" in content
+    assert f"{stable_id(e1_id)}---{stable_id(e2_id)}@@archimate-serving" in content
 
 
 def test_model_create_diagram_entity_ids_uses_renderer_and_connection_labels(repo_root: Path) -> None:

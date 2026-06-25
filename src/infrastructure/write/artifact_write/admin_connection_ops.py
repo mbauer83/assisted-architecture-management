@@ -7,6 +7,7 @@ from pathlib import Path
 
 from src.application.modeling.artifact_write import format_outgoing_markdown
 from src.application.verification.artifact_verifier import ArtifactRegistry, ArtifactVerifier
+from src.domain.artifact_id import stable_id
 
 from .boundary import assert_enterprise_write_root, today_iso
 from .connection import (
@@ -96,7 +97,10 @@ def admin_remove_connection(
     remaining = [
         c
         for c in parsed.connections
-        if not (c["connection_type"] == connection_type and c["target_entity"] == target_entity)
+        if not (
+            c["connection_type"] == connection_type
+            and stable_id(str(c["target_entity"])) == stable_id(target_entity)
+        )
     ]
     if len(remaining) == len(parsed.connections):
         raise ValueError(f"Connection '{conn_id}' not found in {outgoing_path.name}")

@@ -12,6 +12,7 @@ from src.application.verification.artifact_verifier_parsing import (
     parse_frontmatter_from_path,
 )
 from src.config.repo_paths import DIAGRAM_CATALOG, DIAGRAMS, MODEL, RENDERED
+from src.domain.artifact_id import stable_id
 
 from .boundary import assert_engagement_write_root
 from .parse_existing import parse_outgoing_file
@@ -92,12 +93,12 @@ def _incoming_connection_blockers(registry: ArtifactRegistry, artifact_id: str) 
         except Exception:  # noqa: BLE001
             continue
         source_entity = str(parsed.frontmatter.get("source-entity", ""))
-        if source_entity == artifact_id:
+        if stable_id(source_entity) == stable_id(artifact_id):
             continue
         blockers.extend(
             f"{source_entity} {conn['connection_type']} → {artifact_id}"
             for conn in parsed.connections
-            if conn["target_entity"] == artifact_id
+            if stable_id(str(conn["target_entity"])) == stable_id(artifact_id)
         )
     return blockers
 

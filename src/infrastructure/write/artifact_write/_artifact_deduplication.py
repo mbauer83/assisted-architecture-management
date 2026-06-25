@@ -4,7 +4,17 @@ from pathlib import Path
 
 from src.application.artifact_repository import ArtifactRepository
 from src.application.identifier_allocator import get_default_allocator
+from src.domain.artifact_id import stable_id
 from src.domain.artifact_types import DiagramRecord, DocumentRecord, EntityRecord
+
+
+def _is_self(artifact_id: str, exclude_artifact_id: str | None) -> bool:
+    """True when ``artifact_id`` denotes the same artifact as ``exclude_artifact_id``.
+
+    Compared on the stable short id so a slug difference (e.g. an in-flight rename
+    or a short-form exclude id) never defeats self-exclusion (WS6 canonical identity).
+    """
+    return exclude_artifact_id is not None and stable_id(artifact_id) == stable_id(exclude_artifact_id)
 
 
 def extract_friendly_slug(artifact_id: str) -> str:
@@ -35,7 +45,7 @@ def check_entity_duplicate(
     """Check if entity with same type + slug exists. Returns the duplicate or None."""
     entities = repo.list_entities(artifact_type=artifact_type)
     for entity in entities:
-        if exclude_artifact_id and entity.artifact_id == exclude_artifact_id:
+        if _is_self(entity.artifact_id, exclude_artifact_id):
             continue
         if extract_friendly_slug(entity.artifact_id) == friendly_slug:
             return entity
@@ -51,7 +61,7 @@ def check_diagram_duplicate(
     """Check if diagram with same type + slug exists. Returns the duplicate or None."""
     diagrams = repo.list_diagrams(diagram_type=diagram_type)
     for diagram in diagrams:
-        if exclude_artifact_id and diagram.artifact_id == exclude_artifact_id:
+        if _is_self(diagram.artifact_id, exclude_artifact_id):
             continue
         if extract_friendly_slug(diagram.artifact_id) == friendly_slug:
             return diagram
@@ -67,7 +77,7 @@ def check_document_duplicate(
     """Check if document with same type + slug exists. Returns the duplicate or None."""
     documents = repo.list_documents(doc_type=doc_type)
     for document in documents:
-        if exclude_artifact_id and document.artifact_id == exclude_artifact_id:
+        if _is_self(document.artifact_id, exclude_artifact_id):
             continue
         if extract_friendly_slug(document.artifact_id) == friendly_slug:
             return document

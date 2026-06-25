@@ -11,6 +11,7 @@ from typing import Any
 
 from src.application.artifact_query import ArtifactRepository
 from src.application.verification.artifact_verifier import ArtifactRegistry
+from src.domain.artifact_id import stable_id
 from src.infrastructure.write.artifact_write.parse_existing import parse_entity_file
 
 
@@ -100,12 +101,15 @@ def _partition_selected(
     selected_ids: list[str], *, enterprise_ids: set[str], gar_ids: set[str], warnings: list[str]
 ) -> tuple[list[str], list[str]]:
     """Split the selection into entities already promoted and fresh candidates (GARs skipped)."""
+    enterprise_short = {stable_id(e) for e in enterprise_ids}
+    gar_short = {stable_id(e) for e in gar_ids}
     already: list[str] = []
     candidates: list[str] = []
     for eid in selected_ids:
-        if eid in enterprise_ids:
+        eid_short = stable_id(eid)
+        if eid_short in enterprise_short:
             already.append(eid)
-        elif eid in gar_ids:
+        elif eid_short in gar_short:
             warnings.append(f"Skipped GAR {eid} from promotion set")
         else:
             candidates.append(eid)

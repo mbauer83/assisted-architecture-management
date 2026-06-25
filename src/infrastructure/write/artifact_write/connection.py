@@ -5,6 +5,7 @@ from pathlib import Path
 
 from src.application.modeling.artifact_write import format_outgoing_markdown
 from src.application.verification.artifact_verifier import ArtifactRegistry, ArtifactVerifier
+from src.domain.artifact_id import stable_id
 from src.domain.module_types import ConnectionTypeName, ElementClassName
 
 from .boundary import assert_engagement_write_root, today_iso
@@ -100,9 +101,10 @@ def _validate_inputs(
     if reg.find_connection_type(ConnectionTypeName(connection_type)) is None:
         raise ValueError(f"Unknown connection type: {connection_type!r}")
     known_ids = registry.entity_ids() | extra_known_ids
-    if source_entity not in known_ids:
+    known_short_ids = {stable_id(k) for k in known_ids}
+    if stable_id(source_entity) not in known_short_ids:
         raise ValueError(f"Source entity '{source_entity}' not found in model")
-    if target_entity not in known_ids:
+    if stable_id(target_entity) not in known_short_ids:
         raise ValueError(f"Target entity '{target_entity}' not found in model")
     _check_junction_homogeneity(registry, connection_type, source_entity, target_entity)
 
@@ -166,7 +168,7 @@ def _build_content(
                     bracket_end = existing_target.find("]")
                     if bracket_end != -1:
                         existing_target = existing_target[bracket_end + 1 :].lstrip()
-                if existing_target == target_entity:
+                if stable_id(existing_target) == stable_id(target_entity):
                     raise ValueError(
                         f"Connection '{connection_type} → {target_entity}' already exists in {outgoing_path.name}"
                     )
@@ -206,7 +208,7 @@ def _write_and_verify(
     outgoing_path.write_text(content, encoding="utf-8")
 
     res = verifier.verify_outgoing_file(outgoing_path)
-    conn_id = f"{source_entity}---{target_entity}@@{connection_type}"
+    conn_id = f"{stable_id(source_entity)}---{stable_id(target_entity)}@@{connection_type}"
 
     if not res.valid:
         _rollback(outgoing_path, prev)
@@ -271,7 +273,7 @@ def add_connection(
 
     last = last_updated or today_iso()
     outgoing_path = _resolve_outgoing_path(registry, source_entity, dry_run=dry_run, extra_known_ids=extra_known_ids)
-    conn_id = f"{source_entity}---{target_entity}@@{connection_type}"
+    conn_id = f"{stable_id(source_entity)}---{stable_id(target_entity)}@@{connection_type}"
 
     content = _build_content(
         outgoing_path,

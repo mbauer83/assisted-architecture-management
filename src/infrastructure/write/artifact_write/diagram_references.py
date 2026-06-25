@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING
 
 from src.application.artifact_parsing import extract_declared_puml_aliases, normalize_puml_alias
 from src.domain.archimate_relation_rendering import strip_suppressed_relation_labels
+from src.domain.artifact_id import stable_conn_id, stable_id
 
 from ._artifact_deduplication import get_repository
 
@@ -89,14 +90,16 @@ def _prune_unknown_references(
     """
     if registry is None:
         return entity_ids, connection_ids
-    valid_entities = registry.entity_ids()
-    valid_connections = registry.connection_ids()
+    valid_short_entities = {stable_id(e) for e in registry.entity_ids()}
+    valid_short_connections = {stable_conn_id(c) for c in registry.connection_ids()}
     pruned_entities = (
-        [e for e in entity_ids if e in valid_entities] if entity_ids and valid_entities else entity_ids
+        [e for e in entity_ids if stable_id(e) in valid_short_entities]
+        if entity_ids and valid_short_entities
+        else entity_ids
     )
     pruned_connections = (
-        [c for c in connection_ids if c in valid_connections]
-        if connection_ids and valid_connections
+        [c for c in connection_ids if stable_conn_id(c) in valid_short_connections]
+        if connection_ids and valid_short_connections
         else connection_ids
     )
     return pruned_entities, pruned_connections

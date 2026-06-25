@@ -5,6 +5,7 @@ from __future__ import annotations
 from typing import Literal
 
 from src.application.verification.artifact_verifier_types import Issue, Severity, VerificationResult
+from src.domain.artifact_id import MalformedArtifactIdError, parse_connection_id, stable_conn_id, stable_id
 
 
 def check_binding_target(
@@ -82,13 +83,16 @@ def _check_entity_target(
 ) -> None:
     if not entity_id:
         return
-    if entity_id not in allowed_entities:
+    allowed_short = {stable_id(a) for a in allowed_entities}
+    all_short = {stable_id(a) for a in all_entities}
+    eid_short = stable_id(entity_id)
+    if eid_short not in allowed_short:
         message = (
             (
                 f"binding '{binding_id}': target entity_id '{entity_id}' is not an "
                 "enterprise entity — enterprise diagram bindings may only target enterprise entities"
             )
-            if entity_id in all_entities and file_scope == "enterprise"
+            if eid_short in all_short and file_scope == "enterprise"
             else f"binding '{binding_id}': target entity_id '{entity_id}' does not exist in scope"
         )
         result.issues.append(Issue(Severity.ERROR, "E402", message, loc))
@@ -122,15 +126,12 @@ def _check_entity_target(
 
 
 def _conn_endpoints(conn_id: str) -> tuple[str, str] | None:
-    """Parse (source, target) entity ids from a canonical {src}---{tgt}@@{type} id."""
-    dash = conn_id.find("---")
-    if dash < 0:
+    """Parse stable (source_short, target_short) from a connection id."""
+    try:
+        key = parse_connection_id(conn_id)
+        return key.src_short, key.tgt_short
+    except MalformedArtifactIdError:
         return None
-    source = conn_id[:dash]
-    rest = conn_id[dash + 3:]
-    at = rest.find("@@")
-    target = rest[:at] if at >= 0 else rest
-    return source, target
 
 
 def _check_connection_path_target(
@@ -141,12 +142,13 @@ def _check_connection_path_target(
     loc: str,
 ) -> None:
     """E409: step id not in scope. E410: chain not contiguous under orientation."""
+    allowed_short_conns = {stable_conn_id(c) for c in allowed_connections}
     prev_to: str | None = None
     for i, step in enumerate(cp_raw):
         if isinstance(step, dict):
             step_id = str(step.get("id") or "")
             reversed_flag = bool(step.get("reversed", False))
-            if not step_id or step_id not in allowed_connections:
+            if not step_id or stable_conn_id(step_id) not in allowed_short_conns:
                 result.issues.append(Issue(
                     Severity.ERROR, "E409",
                     f"binding '{binding_id}': connection_path step {i} id '{step_id}' does not exist in scope",
@@ -183,8 +185,11 @@ def _check_single_connection_target(
 ) -> None:
     if not connection_id:
         return
-    if connection_id not in allowed_connections:
-        if connection_id in all_connections and file_scope == "enterprise":
+    allowed_short_conns = {stable_conn_id(c) for c in allowed_connections}
+    conn_stable = stable_conn_id(connection_id)
+    if conn_stable not in allowed_short_conns:
+        all_short_conns = {stable_conn_id(c) for c in all_connections}
+        if conn_stable in all_short_conns and file_scope == "enterprise":
             result.issues.append(
                 Issue(
                     Severity.ERROR, code,

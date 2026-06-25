@@ -16,6 +16,7 @@ from typing import Any, cast
 import pytest
 
 from src.application.verification.artifact_verifier import ArtifactRegistry, ArtifactVerifier
+from src.domain.artifact_id import stable_id
 from src.infrastructure.artifact_index import shared_artifact_index
 from src.infrastructure.artifact_index.events import AuthoritativeIndexMutationCommitted, event_bus
 from src.infrastructure.mcp import mcp_artifact_server as mcp
@@ -729,7 +730,7 @@ Alice -> Bob
         assert results[0]["wrote"] is True
         assert new_src in text
         assert src not in text
-        assert f"{new_src}---{tgt}@@archimate-realization" in text
+        assert f"{stable_id(new_src)}---{stable_id(tgt)}@@archimate-realization" in text
 
     def test_bulk_write_auto_sync_updates_diagram_after_connection_remove(self, repo: Path) -> None:
         src = _make(repo, "requirement", "ConnRemoveSrc")

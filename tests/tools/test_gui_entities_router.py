@@ -7,6 +7,7 @@ from pathlib import Path
 import pytest
 
 from src.application.artifact_query import ArtifactRepository
+from src.domain.artifact_id import stable_id
 from src.infrastructure.artifact_index import shared_artifact_index
 from src.infrastructure.gui.routers import state as gui_state
 from src.infrastructure.gui.routers.documents import read_document
@@ -268,12 +269,12 @@ def test_entity_context_read_model_groups_connections_and_counts(
     assert payload["entity"]["artifact_id"] == src_id
     assert payload["counts"] == {"conn_in": 0, "conn_out": 1, "conn_sym": 2}
     assert [conn["artifact_id"] for conn in payload["connections"]["outbound"]] == [
-        f"{src_id}---{peer_id}@@archimate-flow"
+        f"{stable_id(src_id)}---{stable_id(peer_id)}@@archimate-flow"
     ]
     assert payload["connections"]["inbound"] == []
     assert {conn["artifact_id"] for conn in payload["connections"]["symmetric"]} == {
-        f"{src_id}---{tgt_id}@@archimate-association",
-        f"{peer_id}---{src_id}@@archimate-association",
+        f"{stable_id(src_id)}---{stable_id(tgt_id)}@@archimate-association",
+        f"{stable_id(peer_id)}---{stable_id(src_id)}@@archimate-association",
     }
     assert payload["generation"] >= 1
 
@@ -308,8 +309,8 @@ def test_clear_caches_applies_incremental_outgoing_changes(
     assert after["counts"] == {"conn_in": 0, "conn_out": 2, "conn_sym": 0}
     assert after["generation"] > before["generation"]
     assert {conn["artifact_id"] for conn in after["connections"]["outbound"]} == {
-        f"{src_id}---{tgt_a}@@archimate-flow",
-        f"{src_id}---{tgt_b}@@archimate-serving",
+        f"{stable_id(src_id)}---{stable_id(tgt_a)}@@archimate-flow",
+        f"{stable_id(src_id)}---{stable_id(tgt_b)}@@archimate-serving",
     }
 
 

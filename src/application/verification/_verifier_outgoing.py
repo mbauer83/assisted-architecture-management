@@ -19,6 +19,7 @@ from src.application.verification.artifact_verifier_types import (
     Severity,
     VerificationResult,
 )
+from src.domain.artifact_id import stable_id
 
 _CARDINALITY_RE = re.compile(r"^\d+$|^\d+\.\.\d+$|^\d+\.\.\*$|^\*$")
 
@@ -43,9 +44,9 @@ def _parse_conn_header(header: str) -> tuple[str, str, str, str] | None:
     )
 
 
-def _target_issue(target_id: str, all_entities_for_scope: set[str], scope: str, loc: str) -> Issue:
+def _target_issue(target_id: str, all_short_ids: set[str], scope: str, loc: str) -> Issue:
     """Distinguish an enterprise-scope leak (E130) from a genuinely missing target (E124)."""
-    if target_id in all_entities_for_scope and scope == "enterprise":
+    if stable_id(target_id) in all_short_ids and scope == "enterprise":
         return Issue(
             Severity.ERROR, "E130", f"enterprise connection references non-enterprise entity '{target_id}'", loc
         )
@@ -53,12 +54,19 @@ def _target_issue(target_id: str, all_entities_for_scope: set[str], scope: str, 
 
 
 def _check_source_entity(
-    source: str, *, registry: ArtifactRegistry, scope: str, result: VerificationResult, loc: str
+    source: str,
+    *,
+    entity_short_ids: set[str],
+    enterprise_short_ids: set[str],
+    scope: str,
+    result: VerificationResult,
+    loc: str,
 ) -> None:
     """Validate that ``source-entity`` exists and respects enterprise scoping (E120/E131)."""
-    if source not in registry.entity_ids():
+    source_short = stable_id(source)
+    if source_short not in entity_short_ids:
         result.issues.append(Issue(Severity.ERROR, "E120", f"source-entity '{source}' not found in model", loc))
-    elif scope == "enterprise" and source not in registry.enterprise_entity_ids():
+    elif scope == "enterprise" and source_short not in enterprise_short_ids:
         result.issues.append(
             Issue(Severity.ERROR, "E131", f"enterprise connection has non-enterprise source-entity '{source}'", loc)
         )
@@ -69,8 +77,8 @@ def _check_connection_block(
     *,
     catalogs: RuntimeCatalogs,
     has_registry: bool,
-    allowed_entities: set[str],
-    all_entities_for_scope: set[str],
+    allowed_short_ids: set[str],
+    all_short_ids: set[str],
     scope: str,
     seen_connections: set[str],
     result: VerificationResult,
@@ -102,10 +110,10 @@ def _check_connection_block(
                     loc,
                 )
             )
-    if has_registry and target_id not in allowed_entities:
-        result.issues.append(_target_issue(target_id, all_entities_for_scope, scope, loc))
+    if has_registry and stable_id(target_id) not in allowed_short_ids:
+        result.issues.append(_target_issue(target_id, all_short_ids, scope, loc))
 
-    conn_key = f"{conn_type} → {target_id}"
+    conn_key = f"{conn_type} → {stable_id(target_id)}"
     if conn_key in seen_connections:
         result.issues.append(Issue(Severity.WARNING, "W120", f"Duplicate connection: '{conn_key}'", loc))
     seen_connections.add(conn_key)
@@ -134,21 +142,30 @@ def verify_outgoing(
     check_enum(fm, "status", VALID_STATUSES, result, loc)
 
     source = fm.get("source-entity", "")
-    if registry is not None and source:
-        _check_source_entity(source, registry=registry, scope=scope, result=result, loc=loc)
+    if registry is not None:
+        all_entity_ids = registry.entity_ids()
+        ent_entity_ids = registry.enterprise_entity_ids()
+        all_short_ids = {stable_id(e) for e in all_entity_ids}
+        ent_short_ids = {stable_id(e) for e in ent_entity_ids}
+        allowed_short_ids = ent_short_ids if scope == "enterprise" else all_short_ids
+    else:
+        all_short_ids = ent_short_ids = allowed_short_ids = set()
+
+    if source:
+        if registry is not None:
+            _check_source_entity(
+                source,
+                entity_short_ids=all_short_ids,
+                enterprise_short_ids=ent_short_ids,
+                scope=scope,
+                result=result,
+                loc=loc,
+            )
 
     if "<!-- §connections -->" not in content:
         result.issues.append(
             Issue(Severity.ERROR, "E121", "Missing <!-- §connections --> section marker", loc)
         )
-
-    if registry is not None:
-        allowed_entities = (
-            registry.enterprise_entity_ids() if scope == "enterprise" else registry.entity_ids()
-        )
-        all_entities_for_scope = registry.entity_ids()
-    else:
-        allowed_entities = all_entities_for_scope = set()
 
     seen_connections: set[str] = set()
     parsed_connections: list[tuple[str, str]] = []
@@ -159,8 +176,8 @@ def verify_outgoing(
             line[4:].strip(),
             catalogs=catalogs,
             has_registry=registry is not None,
-            allowed_entities=allowed_entities,
-            all_entities_for_scope=all_entities_for_scope,
+            allowed_short_ids=allowed_short_ids,
+            all_short_ids=all_short_ids,
             scope=scope,
             seen_connections=seen_connections,
             result=result,

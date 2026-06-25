@@ -11,6 +11,7 @@ Supported pre_filters:
 from __future__ import annotations
 
 from src.application.derivation.types import CandidateSet, ModelQuery
+from src.domain.artifact_id import stable_id
 from src.domain.derivation_types import StrategySpec
 from src.domain.view_derivations import SourceModelSnapshot
 
@@ -39,8 +40,8 @@ def derive(
         {str(t) for t in raw_types} if isinstance(raw_types, list) else None
     )
 
-    known_entities = query.entity_ids()
-    valid_entity_ids = [eid for eid in entity_ids if eid in known_entities]
+    known_short_entities = {stable_id(e) for e in query.entity_ids()}
+    valid_entity_ids = [eid for eid in entity_ids if stable_id(eid) in known_short_entities]
 
     found_connection_ids: set[str] = set()
     endpoint_entity_ids: set[str] = set(valid_entity_ids)

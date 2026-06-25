@@ -8,6 +8,7 @@ from typing import Literal
 
 from src.application.verification.artifact_verifier_registry import ArtifactRegistry
 from src.application.verification.artifact_verifier_types import Issue, Severity, VerificationResult
+from src.domain.artifact_id import stable_conn_id as _stable_conn_id
 
 _REL_MACRO_RE = re.compile(
     r"^\s*Rel_(?P<rel>[A-Za-z0-9]+)(?:_(?:Up|Down|Left|Right))?"
@@ -153,6 +154,8 @@ def check_diagram_relation_references(
         registry.enterprise_connection_ids() if file_scope == "enterprise" else registry.connection_ids()
     )
     all_connections = registry.connection_ids()
+    allowed_stable = {_stable_conn_id(c) for c in allowed_connections}
+    all_stable = {_stable_conn_id(c) for c in all_connections}
     alias_to_entity_id = _build_alias_lookup(content, fm, registry, stereotype_map)
 
     for src_alias, tgt_alias, conn_type in _iter_declared_relations(content, stereotype_map):
@@ -169,15 +172,15 @@ def check_diagram_relation_references(
             )
             continue
 
-        conn_id = f"{src_id}---{tgt_id}@@{conn_type}"
-        if conn_id in allowed_connections:
+        stable_cid = _stable_conn_id(f"{src_id}---{tgt_id}@@{conn_type}")
+        if stable_cid in allowed_stable:
             continue
 
-        reverse_conn_id = f"{tgt_id}---{src_id}@@{conn_type}"
-        if conn_type == "archimate-realization" and reverse_conn_id in allowed_connections:
+        stable_rev = _stable_conn_id(f"{tgt_id}---{src_id}@@{conn_type}")
+        if conn_type == "archimate-realization" and stable_rev in allowed_stable:
             continue
 
-        if conn_id in all_connections or reverse_conn_id in all_connections:
+        if stable_cid in all_stable or stable_rev in all_stable:
             result.issues.append(
                 Issue(
                     Severity.ERROR,

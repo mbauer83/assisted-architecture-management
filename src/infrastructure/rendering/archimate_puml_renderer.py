@@ -4,6 +4,7 @@ from collections.abc import Mapping
 from pathlib import Path
 
 from src.domain.archimate_relation_rendering import format_cardinality_label
+from src.domain.artifact_id import stable_conn_id
 from src.domain.artifact_types import ConnectionRecord
 from src.domain.ontology_protocol import DiagramRendererReferences
 from src.infrastructure.rendering.generic_puml_renderer import GenericPumlRenderer
@@ -61,6 +62,6 @@ def _connection_annotation_spec(
         if not isinstance(item, dict):
             continue
         current = str(item.get("artifact_id") or item.get("connection_id") or "").strip()
-        if current == artifact_id:
+        if stable_conn_id(current) == stable_conn_id(artifact_id):
             return item
     return None

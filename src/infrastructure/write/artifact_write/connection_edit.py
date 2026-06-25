@@ -5,6 +5,7 @@ from pathlib import Path
 
 from src.application.modeling.artifact_write import format_outgoing_markdown
 from src.application.verification.artifact_verifier import ArtifactRegistry, ArtifactVerifier
+from src.domain.artifact_id import stable_id
 
 from .boundary import assert_engagement_write_root, today_iso
 from .coerce import as_optional_str_list
@@ -48,7 +49,8 @@ def edit_connection(
     # Find the target connection
     found = False
     for conn in parsed.connections:
-        if conn["connection_type"] == connection_type and conn["target_entity"] == target_entity:
+        if (conn["connection_type"] == connection_type
+                and stable_id(str(conn["target_entity"])) == stable_id(target_entity)):
             conn["description"] = description or ""
             if src_cardinality is not _UNSET:
                 if src_cardinality:
@@ -125,7 +127,10 @@ def remove_connection(
     remaining = [
         c
         for c in parsed.connections
-        if not (c["connection_type"] == connection_type and c["target_entity"] == target_entity)
+        if not (
+            c["connection_type"] == connection_type
+            and stable_id(str(c["target_entity"])) == stable_id(target_entity)
+        )
     ]
 
     if len(remaining) == original_count:
@@ -225,7 +230,8 @@ def edit_connection_associations(
 
     found = False
     for conn in parsed.connections:
-        if conn["connection_type"] == connection_type and conn["target_entity"] == target_entity:
+        if (conn["connection_type"] == connection_type
+                and stable_id(str(conn["target_entity"])) == stable_id(target_entity)):
             existing = as_optional_str_list(conn.get("associated_entities")) or []
             for eid in add_entities or []:
                 if eid not in existing:

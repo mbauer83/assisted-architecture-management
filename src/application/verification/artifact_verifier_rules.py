@@ -18,6 +18,7 @@ from src.application.verification.artifact_verifier_types import (
     VerificationResult,
     entity_id_from_path,
 )
+from src.domain.artifact_id import stable_conn_id, stable_id
 from src.domain.catalogs import DiagramTypeCatalog
 from src.domain.repo_layout import MODEL
 
@@ -187,9 +188,12 @@ def _check_entity_ids_used(
             result.issues.append(Issue(Severity.WARNING, "W303", "entity-ids-used should be a YAML list", loc))
         return
 
+    allowed_short = {stable_id(a) for a in allowed_entities}
+    all_short = {stable_id(a) for a in all_entities}
     for eid in entity_ids:
         eid_str = str(eid)
-        if eid_str not in allowed_entities:
+        eid_short = stable_id(eid_str)
+        if eid_short not in allowed_short:
             issue = (
                 Issue(
                     Severity.ERROR,
@@ -200,7 +204,7 @@ def _check_entity_ids_used(
                     ),
                     loc,
                 )
-                if eid_str in all_entities and file_scope == "enterprise"
+                if eid_short in all_short and file_scope == "enterprise"
                 else Issue(
                     Severity.ERROR,
                     "E301",
@@ -242,9 +246,12 @@ def _check_connection_ids_used(
             result.issues.append(Issue(Severity.WARNING, "W304", "connection-ids-used should be a YAML list", loc))
         return
 
+    allowed_short_conns = {stable_conn_id(c) for c in allowed_connections}
+    all_short_conns = {stable_conn_id(c) for c in all_connections}
     for cid in conn_ids:
         cid_str = str(cid)
-        if cid_str not in allowed_connections:
+        cid_stable = stable_conn_id(cid_str)
+        if cid_stable not in allowed_short_conns:
             issue = (
                 Issue(
                     Severity.ERROR,
@@ -255,7 +262,7 @@ def _check_connection_ids_used(
                     ),
                     loc,
                 )
-                if cid_str in all_connections and file_scope == "enterprise"
+                if cid_stable in all_short_conns and file_scope == "enterprise"
                 else Issue(
                     Severity.ERROR,
                     "E302",

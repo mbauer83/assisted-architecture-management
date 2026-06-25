@@ -10,6 +10,7 @@ from src.application.artifact_repository import ArtifactRepository
 from src.application.modeling.artifact_write import generate_diagram_id
 from src.application.runtime_catalogs import RuntimeCatalogs
 from src.application.verification.artifact_verifier import ArtifactRegistry, ArtifactVerifier
+from src.domain.artifact_id import stable_id
 from src.domain.artifact_types import EntityRecord
 from src.infrastructure.app_bootstrap import build_module_registry, build_runtime_catalogs
 from src.infrastructure.artifact_index import shared_artifact_index
@@ -264,7 +265,7 @@ def test_c4_diagram_auto_populates_model_references(repo_root: Path) -> None:
     detail = read_diagram(diagram_id, catalogs=_catalogs())
 
     assert sorted(detail["entity_ids_used"]) == sorted([user_id, system_id])
-    assert detail["connection_ids_used"] == [f"{user_id}---{system_id}@@archimate-association"]
+    assert detail["connection_ids_used"] == [f"{stable_id(user_id)}---{stable_id(system_id)}@@archimate-association"]
 
 
 def test_diagram_entities_round_trips_create_read_edit_read(repo_root: Path) -> None:

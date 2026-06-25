@@ -5,6 +5,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 from src.application.verification.artifact_verifier_types import Issue, Severity, VerificationResult
+from src.domain.artifact_id import stable_id
 
 if TYPE_CHECKING:
     from src.application.verification.artifact_verifier_registry import ArtifactRegistry
@@ -64,6 +65,7 @@ def check_global_artifact_reference(
         )
         return
 
+    global_short = stable_id(global_id)
     if artifact_type == "entity":
         enterprise_ids = registry.enterprise_entity_ids()
         if not enterprise_ids:
@@ -76,7 +78,7 @@ def check_global_artifact_reference(
                 )
             )
             return
-        if global_id not in enterprise_ids:
+        if global_short not in {stable_id(e) for e in enterprise_ids}:
             result.issues.append(
                 Issue(
                     Severity.ERROR,
@@ -97,7 +99,7 @@ def check_global_artifact_reference(
                 )
             )
             return
-        if global_id not in enterprise_ids:
+        if global_short not in {stable_id(e) for e in enterprise_ids}:
             result.issues.append(
                 Issue(
                     Severity.ERROR,
@@ -118,7 +120,7 @@ def check_global_artifact_reference(
                 )
             )
             return
-        if global_id not in enterprise_ids:
+        if global_short not in {stable_id(e) for e in enterprise_ids}:
             result.issues.append(
                 Issue(
                     Severity.ERROR,

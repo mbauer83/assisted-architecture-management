@@ -6,6 +6,7 @@ from typing import Any
 import yaml  # type: ignore[import-untyped]
 
 from src.application.verification.artifact_verifier_types import entity_id_from_path
+from src.domain.artifact_id import stable_id
 from src.domain.artifact_types import (
     STANDARD_DIAGRAM_FIELDS,
     STANDARD_DOCUMENT_FIELDS,
@@ -274,7 +275,7 @@ def parse_outgoing_file(path: Path) -> list[ConnectionRecord]:
         assoc = tuple(_ASSOC_RE.findall(body))
         clean_body = _ASSOC_RE.sub("", body).strip()
 
-        artifact_id = f"{source_entity}---{target}@@{conn_type}"
+        artifact_id = f"{stable_id(source_entity)}---{stable_id(target)}@@{conn_type}"
         records.append(
             ConnectionRecord(
                 artifact_id=artifact_id,

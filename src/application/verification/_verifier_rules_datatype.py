@@ -16,6 +16,7 @@ from collections.abc import Mapping
 
 from src.application.verification.artifact_verifier_types import Issue, Severity, VerificationResult
 from src.application.verification.datatype_consistency import admissible_backing_kinds, corresponds
+from src.domain.artifact_id import stable_conn_id
 from src.domain.catalogs import DiagramTypeCatalog, OntologyCatalog
 from src.domain.ontology_types import ConnectionTypeInfo
 
@@ -174,7 +175,8 @@ def _emit_reverse_error_if_inconsistent(
     result: VerificationResult,
     loc: str,
 ) -> None:
-    if model_conn_id not in allowed_connections:
+    allowed_short_conns = {stable_conn_id(c) for c in allowed_connections}
+    if stable_conn_id(model_conn_id) not in allowed_short_conns:
         return  # E402/E403 handle unknown/out-of-scope targets
 
     parsed = _parse_model_conn_id(model_conn_id)

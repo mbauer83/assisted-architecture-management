@@ -37,18 +37,18 @@ RepoScope = Literal["engagement", "enterprise", "both"]
 
 
 def expand_artifact_id(registry_or_repo, artifact_id: str) -> str:
-    """Expand short-form ID (PREFIX@epoch.random) to full ID (PREFIX@epoch.random.slug).
+    """Expand a short or stale-slug entity ID to the current canonical full ID.
 
-    Full-form IDs (two or more dots) are returned unchanged.
+    Connection IDs (containing '---') are returned unchanged — they are already
+    stable (slug-free endpoints) after the WS6 canonical-key migration.
     """
-    if artifact_id.count(".") >= 2:
+    from src.domain.artifact_id import stable_id as _stable_id  # noqa: PLC0415
+
+    if "---" in artifact_id:
         return artifact_id
-    prefix = f"{artifact_id}."
+    short = _stable_id(artifact_id)
     for candidate in registry_or_repo.entity_ids():
-        if candidate.startswith(prefix):
-            return candidate
-    for candidate in registry_or_repo.connection_ids():
-        if candidate.startswith(prefix):
+        if _stable_id(candidate) == short:
             return candidate
     return artifact_id
 
