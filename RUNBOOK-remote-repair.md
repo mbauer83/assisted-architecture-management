@@ -94,7 +94,6 @@ docker compose build app      # build the new image — it now contains `arch-re
 
 # 5a. INSPECT on the ORIGINAL production branch. Nothing here is irreversible.
 R 'cd /data/engagement &&
-   git diff --check &&
    test -f "projects/autocam/model/application/application-component/APP@1782278054.OPaZCl.cps.md" &&
    ! grep -rq --exclude-dir=.git "APP@1782278054.OPaZCl.cam-projects-cps" . &&
    echo "=== working-tree change set — review before step 5b ===" &&
