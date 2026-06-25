@@ -65,3 +65,5 @@ test-results/
 /enterprise-repository/
 /u2p-enterprise-repository/
 /engagements/TECHNOLOGY_ARCHITECTURE/architecture-repository/
+# Agent auto-memory working store (not project content)
+/memory/
