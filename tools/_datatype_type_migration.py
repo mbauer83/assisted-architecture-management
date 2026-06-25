@@ -343,7 +343,13 @@ def apply_migration(
             raise MigrationBlockedError("Staged verification failed:\n" + "\n".join(errors))
         changed: list[Path] = []
         for root in roots:
-            changed.extend(commit_staged_repo(live_root=root, staged_root=staged_by_live[root]).changed_paths)
+            changed.extend(
+                commit_staged_repo(
+                    live_root=root,
+                    staged_root=staged_by_live[root],
+                    rebuild_index=lambda _result: None,
+                ).changed_paths
+            )
         return tuple(changed)
     finally:
         for handle, _staged in staging.values():

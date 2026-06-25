@@ -25,6 +25,8 @@ def artifact_save_changes(
     message: str,
     target: str = "engagement",
     push: bool = True,
+    author_name: str | None = None,
+    author_email: str | None = None,
 ) -> dict[str, object]:
     """Commit all accumulated architecture changes to the repository.
 
@@ -45,7 +47,12 @@ def artifact_save_changes(
             eng_root = maybe_engagement_root()
             if eng_root is None:
                 return {"ok": False, "error": "Engagement repository is not initialised"}
-            commit = enterprise_git_ops.commit_engagement_work(eng_root, message)
+            commit = enterprise_git_ops.commit_engagement_work(
+                eng_root,
+                message,
+                author_name=author_name,
+                author_email=author_email,
+            )
             if push:
                 enterprise_git_ops.push_engagement(eng_root)
             return {
@@ -60,7 +67,12 @@ def artifact_save_changes(
             if ent_root is None:
                 return {"ok": False, "error": "Enterprise repository is not configured"}
             enterprise_git_ops.ensure_working_branch(ent_root)
-            commit = enterprise_git_ops.commit_enterprise_work(ent_root, message)
+            commit = enterprise_git_ops.commit_enterprise_work(
+                ent_root,
+                message,
+                author_name=author_name,
+                author_email=author_email,
+            )
             return {
                 "ok": True,
                 "target": "enterprise",
@@ -165,6 +177,8 @@ def artifact_withdraw_changes(*, confirm: bool = False) -> dict[str, object]:
 
 
 def register(mcp: FastMCP) -> None:
+    from src.infrastructure.mcp.artifact_mcp.write_queue import queued  # noqa: PLC0415
+
     mcp.tool(
         name="artifact_save_changes",
         title="Save Changes",
@@ -172,11 +186,13 @@ def register(mcp: FastMCP) -> None:
             "Commit all accumulated architecture changes. target='engagement' (default) saves "
             "to the engagement repository and optionally pushes to the remote. "
             "target='enterprise' commits changes to the enterprise working branch "
-            "(use artifact_submit_for_review to push it for team review)."
+            "(use artifact_submit_for_review to push it for team review). "
+            "Optional author_name and author_email set the commit author; the configured "
+            "service identity remains the committer."
         ),
         annotations=OPEN_WORLD_WRITE,
         structured_output=True,
-    )(artifact_save_changes)
+    )(queued(artifact_save_changes))
 
     mcp.tool(
         name="artifact_submit_for_review",
@@ -188,7 +204,7 @@ def register(mcp: FastMCP) -> None:
         ),
         annotations=OPEN_WORLD_WRITE,
         structured_output=True,
-    )(artifact_submit_for_review)
+    )(queued(artifact_submit_for_review))
 
     mcp.tool(
         name="artifact_withdraw_changes",
@@ -199,4 +215,4 @@ def register(mcp: FastMCP) -> None:
         ),
         annotations=DESTRUCTIVE_LOCAL_WRITE,
         structured_output=True,
-    )(artifact_withdraw_changes)
+    )(queued(artifact_withdraw_changes))

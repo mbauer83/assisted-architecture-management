@@ -2,9 +2,141 @@
 
 from __future__ import annotations
 
+import uuid
+from collections.abc import Callable
 from pathlib import Path
 
 from src.application.repo_path_helpers import all_model_roots
+
+
+def rename_entity_via_m4(
+    *,
+    entity_file: Path,
+    target_entity_file: Path,
+    new_content: str,
+    repo_root: Path,
+    artifact_id: str,
+    effective_artifact_id: str,
+    rebuild_index: Callable[[], None],
+    on_boundary: Callable[[str], None] | None = None,
+) -> list[Path]:
+    """Commit an entity + outgoing sidecar rename atomically via M4.
+
+    Manifest: create new entity, create new sidecar, delete old entity, delete old sidecar.
+    Referrer slug-hint rewrites are NOT included; call rewrite_outgoing_referrers() separately.
+    Returns [old_entity, new_entity, old_sidecar, new_sidecar].
+    """
+    from src.infrastructure.write.artifact_write.m4_transaction import (
+        ManifestEntry,
+        TransactionManifest,
+        fsync_directory,
+        hash_file,
+        publish_transaction,
+        write_transaction_intent,
+    )
+
+    old_sidecar = entity_file.with_suffix(".outgoing.md")
+    new_sidecar = target_entity_file.with_suffix(".outgoing.md")
+
+    old_entity_rel = entity_file.relative_to(repo_root).as_posix()
+    new_entity_rel = target_entity_file.relative_to(repo_root).as_posix()
+    old_sidecar_rel = old_sidecar.relative_to(repo_root).as_posix()
+    new_sidecar_rel = new_sidecar.relative_to(repo_root).as_posix()
+
+    sidecar_content = old_sidecar.read_text(encoding="utf-8").replace(artifact_id, effective_artifact_id)
+
+    # Step 1: create transaction dir + staged root
+    txns_dir = repo_root / ".arch-repo" / "transactions"
+    txns_dir.mkdir(parents=True, exist_ok=True)
+    fsync_directory(txns_dir.parent)
+    txn_dir = txns_dir / f"rename-{uuid.uuid4().hex}"
+    txn_dir.mkdir()
+    fsync_directory(txns_dir)
+
+    staged = txn_dir / "staged"
+    staged.mkdir()
+
+    # Write payloads to staged root
+    (staged / new_entity_rel).parent.mkdir(parents=True, exist_ok=True)
+    (staged / new_entity_rel).write_text(new_content, encoding="utf-8")
+    (staged / new_sidecar_rel).parent.mkdir(parents=True, exist_ok=True)
+    (staged / new_sidecar_rel).write_text(sidecar_content, encoding="utf-8")
+
+    entries = [
+        ManifestEntry(
+            kind="create",
+            dest=new_entity_rel,
+            target_hash=hash_file(staged / new_entity_rel),
+            prior_hash_or_absent="absent",
+            payload="payloads/entity",
+        ),
+        ManifestEntry(
+            kind="delete",
+            dest=old_entity_rel,
+            target_hash="absent",
+            prior_hash_or_absent=hash_file(entity_file),
+            payload=None,
+        ),
+        ManifestEntry(
+            kind="create",
+            dest=new_sidecar_rel,
+            target_hash=hash_file(staged / new_sidecar_rel),
+            prior_hash_or_absent="absent",
+            payload="payloads/sidecar",
+        ),
+        ManifestEntry(
+            kind="delete",
+            dest=old_sidecar_rel,
+            target_hash="absent",
+            prior_hash_or_absent=hash_file(old_sidecar),
+            payload=None,
+        ),
+    ]
+    manifest = TransactionManifest(entries=entries)
+    write_transaction_intent(
+        repo_root=repo_root,
+        transaction_dir=txn_dir,
+        staged_root=staged,
+        manifest=manifest,
+        on_boundary=on_boundary,
+    )
+    publish_transaction(
+        repo_root=repo_root,
+        transaction_dir=txn_dir,
+        manifest=manifest,
+        rebuild_index=rebuild_index,
+        on_boundary=on_boundary,
+    )
+    return [entity_file, target_entity_file, old_sidecar, new_sidecar]
+
+
+def rewrite_outgoing_referrers(
+    *,
+    repo_root: Path,
+    old_artifact_id: str,
+    new_artifact_id: str,
+    exclude_path: Path | None = None,
+) -> list[Path]:
+    """Rewrite slug hints in outgoing files that reference old_artifact_id.
+
+    Best-effort cosmetic update; not part of any M4 transaction.
+    """
+    changed: list[Path] = []
+    for model_root in all_model_roots(repo_root):
+        for outgoing_path in model_root.rglob("*.outgoing.md"):
+            if exclude_path is not None and outgoing_path == exclude_path:
+                continue
+            text = outgoing_path.read_text(encoding="utf-8")
+            if old_artifact_id not in text:
+                continue
+            outgoing_path.write_text(text.replace(old_artifact_id, new_artifact_id), encoding="utf-8")
+            changed.append(outgoing_path)
+    return changed
+
+
+# ---------------------------------------------------------------------------
+# Legacy helpers kept for the sidecar-less rename path in entity_edit.py
+# ---------------------------------------------------------------------------
 
 
 def rename_entity_identity(

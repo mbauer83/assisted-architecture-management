@@ -3,8 +3,9 @@
 from __future__ import annotations
 
 import re
-import subprocess
 from pathlib import Path
+
+from src.infrastructure.mutation_adapters import run_git
 
 _FM_RE = re.compile(r"^---\n(.*?)^---\n", re.MULTILINE | re.DOTALL)
 _ID_RE = re.compile(r"^artifact-id:\s*(.+?)\s*$", re.MULTILINE)
@@ -140,4 +141,4 @@ def rollback_cascade(backups: list[tuple[Path, bytes | None]], repo_root: Path) 
                 path.write_bytes(original)
         except OSError:
             pass
-    subprocess.run(["git", "reset", "HEAD"], cwd=repo_root, capture_output=True, text=True, check=False)
+    run_git(repo_root, ["reset", "HEAD"])

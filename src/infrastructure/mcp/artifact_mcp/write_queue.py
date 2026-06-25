@@ -27,6 +27,7 @@ from src.infrastructure.artifact_index.coordination import publish_write_queue_s
 from src.infrastructure.write.operation_registry import operation_registry
 
 _F = TypeVar("_F", bound=Callable[..., Any])
+_WRITE_EXECUTOR_WORKERS = 1
 
 _executor: ThreadPoolExecutor | None = None
 _state_cond = threading.Condition()
@@ -64,8 +65,13 @@ def _notify_gui_dirty() -> None:
 
 def _get_executor() -> ThreadPoolExecutor:
     global _executor
+    if _WRITE_EXECUTOR_WORKERS != 1:
+        raise AssertionError("The architecture write executor must remain single-worker")
     if _executor is None or _executor._shutdown:
-        _executor = ThreadPoolExecutor(max_workers=1, thread_name_prefix="model-write-queue")
+        _executor = ThreadPoolExecutor(
+            max_workers=_WRITE_EXECUTOR_WORKERS,
+            thread_name_prefix="model-write-queue",
+        )
     return _executor
 
 
@@ -137,21 +143,23 @@ def queued(fn: _F) -> _F:
     Returns an async coroutine function with the same parameter signature as *fn*
     (FastMCP inspects __wrapped__ to derive the tool schema). At most one queued
     operation runs at a time; all others wait in the executor's work queue.
+
+    The workspace mutation gate is acquired inside the executor worker so the
+    block check and the execution are atomic (no TOCTOU window).
     """
 
     @wraps(fn)
     async def wrapper(*args: Any, **kwargs: Any) -> Any:
-        # Check write-block state before submitting to queue
-        repo_root_str = kwargs.get("repo_root")
-        if repo_root_str is not None:
-            from pathlib import Path
+        from src.infrastructure.workspace.mutation_gate import get_workspace_gate  # noqa: PLC0415
 
-            from src.infrastructure.workspace.write_block_manager import is_blocked
+        gate = get_workspace_gate()
+        fn_name = fn.__name__
 
-            if is_blocked(Path(repo_root_str)):
-                raise RuntimeError("Writes are temporarily blocked (sync in progress or read-only mode)")
+        def _gated() -> Any:
+            with gate.writing():
+                return fn(*args, **kwargs)
 
-        future = _submit(fn.__name__, fn, *args, **kwargs)
+        future = _submit(fn_name, _gated)
         return await asyncio.wrap_future(future)
 
     return wrapper  # type: ignore[return-value]
@@ -160,11 +168,20 @@ def queued(fn: _F) -> _F:
 def run_sync(fn: Callable[..., Any], /, *args: Any, **kwargs: Any) -> Any:
     """Execute a synchronous write through the shared single-worker queue.
 
-    This is intended for REST handlers, which are currently synchronous and need
-    to serialize writes with MCP tool calls once both paths share one process.
+    Acquires the workspace mutation gate inside the worker so the block check
+    and execution are atomic.  Raises ``GateRejected`` if the gate is blocked;
+    callers on the REST surface should convert this to HTTPException(423).
     """
+    from src.infrastructure.workspace.mutation_gate import get_workspace_gate  # noqa: PLC0415
 
-    return _submit(fn.__name__, fn, *args, **kwargs).result()
+    gate = get_workspace_gate()
+    fn_name = fn.__name__
+
+    def _gated() -> Any:
+        with gate.writing():
+            return fn(*args, **kwargs)
+
+    return _submit(fn_name, _gated).result()
 
 
 def wait_until_idle(timeout_s: float | None = None) -> bool:

@@ -1,29 +1,46 @@
-"""Thread-safe per-repo write block manager."""
+"""Compat shim — per-repo write block backed by WorkspaceMutationGate.
 
-import threading
+New code should use ``mutation_gate.get_workspace_gate()`` directly.  This
+module preserves the ``block_repo`` / ``unblock_repo`` / ``is_blocked`` API
+consumed by git_sync.py until WS8 migrates those callers to the gate's
+``blocking_writes()`` context manager.
+
+One process serves one workspace, so all roots share a single gate.  The
+``repo_root`` parameter is accepted for API compatibility but is not used for
+gate selection.
+"""
+
+from __future__ import annotations
+
 from pathlib import Path
 
-_lock = threading.Lock()
-_blocked: set[str] = set()
+from src.infrastructure.workspace.mutation_gate import BlockReason, get_workspace_gate
 
 
-def _key(repo_root: Path) -> str:
-    return str(repo_root.resolve())
+def block_repo(repo_root: Path, *, reason: BlockReason = "sync_in_progress") -> None:  # noqa: ARG001
+    """Signal that writes are blocked for this workspace.
+
+    Never downgrades ``read_only`` to ``sync_in_progress`` — a permanent
+    read-only gate must not be temporarily overridden by a transient sync.
+    """
+    gate = get_workspace_gate()
+    if gate.block_reason == "read_only" and reason != "read_only":
+        return
+    gate.set_block(reason)
 
 
-def block_repo(repo_root: Path) -> None:
-    """Block writes to a repository."""
-    with _lock:
-        _blocked.add(_key(repo_root))
+def unblock_repo(repo_root: Path) -> None:  # noqa: ARG001
+    """Clear the write block for this workspace.
+
+    Never clears a ``read_only`` block — that mode is permanent for the
+    process lifetime and must not be undone by a sync completing.
+    """
+    gate = get_workspace_gate()
+    if gate.block_reason == "read_only":
+        return
+    gate.clear_block()
 
 
-def unblock_repo(repo_root: Path) -> None:
-    """Unblock writes to a repository."""
-    with _lock:
-        _blocked.discard(_key(repo_root))
-
-
-def is_blocked(repo_root: Path) -> bool:
-    """Check whether writes to a repository are blocked."""
-    with _lock:
-        return _key(repo_root) in _blocked
+def is_blocked(repo_root: Path) -> bool:  # noqa: ARG001
+    """Return True if any write block is currently active."""
+    return get_workspace_gate().block_reason is not None

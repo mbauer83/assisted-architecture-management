@@ -124,15 +124,28 @@ def test_invalid_count_emits_blocked(monkeypatch: pytest.MonkeyPatch) -> None:
 def test_clean_and_behind_pulls_to_completion(monkeypatch: pytest.MonkeyPatch) -> None:
     bus = _patch_bus(monkeypatch)
 
+    from src.infrastructure.git import git_sync_m4
+    from src.infrastructure.workspace.mutation_gate import _reset_for_test
+
+    _reset_for_test()
+
+    async def _fake_add_worktree(git_runner, repo, sha, *, timeout):
+        return repo / ".arch-repo" / "sync-worktrees" / "fake-wt"
+
+    monkeypatch.setattr(git_sync_m4, "add_detached_worktree", _fake_add_worktree)
+    monkeypatch.setattr(git_sync_m4, "run_m4_pull", lambda *_args, **_kwargs: None)
+
     def responder(args: tuple[str, ...]) -> tuple[int, str, str]:
         if args[0] == "rev-parse":
-            return (0, "origin/main\n", "")
+            if "--symbolic-full-name" in args:
+                return (0, "origin/main\n", "")  # _upstream_ref
+            if "--abbrev-ref" in args:
+                return (0, "main\n", "")  # branch name
+            return (0, "abc123def456\n", "")  # any sha
         if args[0] == "rev-list":
             return (0, ("3" if args[2] == _BEHIND else "0") + "\n", "")
         if args[0] == "status":
             return (0, "", "")
-        if args[0] == "pull":
-            return (0, "Updating abc..def\n", "")
         return (0, "", "")
 
     mgr = _manager(monkeypatch, responder)

@@ -214,32 +214,9 @@ class GitSyncManager:
             self._last_dirty_state[repo] = is_dirty
             await event_bus.publish({"type": "sync_status_changed", "repo": str(repo)})
 
-    async def _handle_engagement_pull_result(
-        self, repo: Path, *, rc: int, err: str, pull_args: list[str], behind: int, was_blocked: bool
-    ) -> None:
-        from src.infrastructure.gui.routers.events import event_bus  # noqa: PLC0415
-        from src.infrastructure.workspace.write_block_manager import unblock_repo  # noqa: PLC0415
-
-        repo_label = str(repo)
-        if rc == 0:
-            if not was_blocked:
-                unblock_repo(repo)
-            await event_bus.publish({"type": "sync_pull_completed", "repo": repo_label, "commits_pulled": behind})
-            await self._notify_changed(repo)
-            return
-        if "--rebase" in pull_args and "CONFLICT" in err:
-            await self._git(repo, "rebase", "--abort")
-            await event_bus.publish({"type": "sync_conflict", "repo": repo_label, "error": err.strip()})
-        else:
-            await event_bus.publish({
-                "type": "sync_pull_failed", "repo": repo_label, "error": err.strip(),
-                "auto_unblock_in_seconds": int(_AUTO_UNBLOCK_S),
-            })
-        asyncio.create_task(self._auto_unblock(repo, _AUTO_UNBLOCK_S, was_blocked))
-
     async def _sync_engagement(self, repo: Path) -> None:
         from src.infrastructure.gui.routers.events import event_bus  # noqa: PLC0415
-        from src.infrastructure.workspace.write_block_manager import block_repo, is_blocked  # noqa: PLC0415
+        from src.infrastructure.workspace.mutation_gate import get_workspace_gate  # noqa: PLC0415
 
         if not await self._is_git_repo(repo):
             return
@@ -260,25 +237,50 @@ class GitSyncManager:
             logger.info("skipping engagement pull %s: uncommitted changes", repo)
             return
 
-        pull_args = ["pull", "--rebase"] if ahead > 0 else ["pull", "--ff-only"]
-        was_blocked = is_blocked(repo)
-        block_repo(repo)
-        await event_bus.publish({"type": "sync_pull_started", "repo": str(repo), "behind": behind})
+        rc, head_out, _ = await self._git(repo, "rev-parse", "HEAD")
+        old_sha = head_out.strip()
+        rc, branch_out, _ = await self._git(repo, "rev-parse", "--abbrev-ref", "HEAD")
+        branch = branch_out.strip()
+        gate = get_workspace_gate()
+        if gate.block_reason == "read_only":
+            return
 
+        from src.infrastructure.git.git_sync_m4 import (  # noqa: PLC0415
+            add_detached_worktree,
+            prepare_rebase_worktree,
+            run_m4_pull,
+        )
+
+        await event_bus.publish({"type": "sync_pull_started", "repo": str(repo), "behind": behind})
         try:
-            rc, _, err = await self._git(repo, *pull_args, timeout=_PULL_TIMEOUT_S)
+            with gate.blocking_writes("sync_in_progress"):
+                if ahead > 0:
+                    rebase_result = await prepare_rebase_worktree(self._git, repo, old_sha, timeout=_PULL_TIMEOUT_S)
+                    if rebase_result is None:
+                        await event_bus.publish(
+                            {"type": "sync_conflict", "repo": str(repo), "error": "rebase conflict"}
+                        )
+                        return
+                    worktree_path, new_sha = rebase_result
+                else:
+                    rc, new_sha_out, _ = await self._git(repo, "rev-parse", "@{u}")
+                    new_sha = new_sha_out.strip()
+                    worktree_path = await add_detached_worktree(self._git, repo, new_sha, timeout=_PULL_TIMEOUT_S)
+                try:
+                    run_m4_pull(repo, worktree_path, branch=branch, old_sha=old_sha, new_sha=new_sha, gate=gate)
+                finally:
+                    await self._git(repo, "worktree", "remove", "--force", str(worktree_path))
+                await self._git(repo, "reset", "--mixed", "HEAD")
         except Exception as exc:
             logger.exception("pull error for engagement %s", repo)
             await event_bus.publish({
                 "type": "sync_pull_failed", "repo": str(repo), "error": str(exc),
-                "auto_unblock_in_seconds": int(_AUTO_UNBLOCK_S),
+                "auto_unblock_in_seconds": 0,
             })
-            asyncio.create_task(self._auto_unblock(repo, _AUTO_UNBLOCK_S, was_blocked))
             return
 
-        await self._handle_engagement_pull_result(
-            repo, rc=rc, err=err, pull_args=pull_args, behind=behind, was_blocked=was_blocked
-        )
+        await event_bus.publish({"type": "sync_pull_completed", "repo": str(repo), "commits_pulled": behind})
+        await self._notify_changed(repo)
 
     # ------------------------------------------------------------------
     # Enterprise (state-machine dispatch)
@@ -302,7 +304,7 @@ class GitSyncManager:
 
     async def _ent_on_main(self, root: Path) -> None:
         from src.infrastructure.gui.routers.events import event_bus
-        from src.infrastructure.workspace.write_block_manager import block_repo, is_blocked, unblock_repo
+        from src.infrastructure.workspace.mutation_gate import get_workspace_gate
 
         upstream = await self._upstream_ref(root)
         if upstream is None:
@@ -332,35 +334,40 @@ class GitSyncManager:
             return
 
         self._clear_block_reason(root)
-        root_label, was_blocked = str(root), is_blocked(root)
-        block_repo(root)
-        await event_bus.publish({"type": "sync_pull_started", "repo": root_label, "behind": behind})
-        try:
-            rc, _, err = await self._git(root, "pull", "--ff-only", timeout=_PULL_TIMEOUT_S)
-        except Exception as exc:
-            await self._fail_enterprise_pull(root, root_label, str(exc), was_blocked)
+        root_label = str(root)
+        gate = get_workspace_gate()
+        if gate.block_reason == "read_only":
             return
 
-        if rc == 0:
-            if not was_blocked:
-                unblock_repo(root)
-            await event_bus.publish({"type": "sync_pull_completed", "repo": root_label, "commits_pulled": behind})
-            await self._notify_changed(root)
-        else:
-            await self._fail_enterprise_pull(root, root_label, err.strip(), was_blocked)
+        rc, head_out, _ = await self._git(root, "rev-parse", "HEAD")
+        old_sha = head_out.strip()
+        rc, branch_out, _ = await self._git(root, "rev-parse", "--abbrev-ref", "HEAD")
+        branch = branch_out.strip()
+        rc, new_sha_out, _ = await self._git(root, "rev-parse", upstream)
+        new_sha = new_sha_out.strip()
 
-    async def _fail_enterprise_pull(self, root: Path, root_label: str, error: str, was_blocked: bool) -> None:
-        from src.infrastructure.gui.routers.events import event_bus  # noqa: PLC0415
+        from src.infrastructure.git.git_sync_m4 import add_detached_worktree, run_m4_pull  # noqa: PLC0415
 
-        await event_bus.publish(
-            {
-                "type": "sync_pull_failed",
-                "repo": root_label,
-                "error": error,
+        await event_bus.publish({"type": "sync_pull_started", "repo": root_label, "behind": behind})
+        try:
+            with gate.blocking_writes("sync_in_progress"):
+                worktree_path = await add_detached_worktree(self._git, root, new_sha, timeout=_PULL_TIMEOUT_S)
+                try:
+                    run_m4_pull(root, worktree_path, branch=branch, old_sha=old_sha, new_sha=new_sha, gate=gate)
+                finally:
+                    await self._git(root, "worktree", "remove", "--force", str(worktree_path))
+                await self._git(root, "reset", "--mixed", "HEAD")
+        except Exception as exc:
+            from src.infrastructure.gui.routers.events import event_bus as _bus  # noqa: PLC0415
+            await _bus.publish({
+                "type": "sync_pull_failed", "repo": root_label, "error": str(exc),
                 "auto_unblock_in_seconds": int(_AUTO_UNBLOCK_S),
-            }
-        )
-        asyncio.create_task(self._auto_unblock(root, _AUTO_UNBLOCK_S, was_blocked))
+            })
+            asyncio.create_task(self._auto_unblock(root, _AUTO_UNBLOCK_S, False))
+            return
+
+        await event_bus.publish({"type": "sync_pull_completed", "repo": root_label, "commits_pulled": behind})
+        await self._notify_changed(root)
 
     async def _ent_accumulating(
         self,

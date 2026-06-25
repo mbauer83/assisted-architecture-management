@@ -9,6 +9,7 @@ from src.application.verification.artifact_verifier import ArtifactRegistry, Art
 from src.infrastructure.artifact_index import shared_artifact_index
 from src.infrastructure.mcp.artifact_mcp.context import authoritative_callbacks_for
 from src.infrastructure.write.artifact_write.batch_transaction import (
+    BatchCommitResult,
     commit_staged_repo,
     create_staging_repo,
 )
@@ -225,11 +226,18 @@ def _sync_verify_and_commit(
         return False
 
     operation_registry.set_phase(operation_id, "update_index")
-    commit_result = commit_staged_repo(live_root=live_root, staged_root=staged_root)
     mutation_context, _live_clear = authoritative_callbacks_for(live_root)
-    for path in [*commit_result.changed_paths, *commit_result.deleted_paths]:
-        mutation_context.record_changed(path)
-    mutation_context.finalize()
+
+    def rebuild_index(commit_result: BatchCommitResult) -> None:
+        for path in [*commit_result.changed_paths, *commit_result.deleted_paths]:
+            mutation_context.record_changed(path)
+        mutation_context.finalize()
+
+    commit_staged_repo(
+        live_root=live_root,
+        staged_root=staged_root,
+        rebuild_index=rebuild_index,
+    )
     return True
 
 

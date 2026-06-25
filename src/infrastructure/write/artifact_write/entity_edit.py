@@ -15,7 +15,7 @@ from ._entity_edit_support import (
     count_rename_referrers,
     merge_fields,
 )
-from ._entity_rename import persist_rename
+from ._entity_rename import rename_entity_via_m4, rewrite_outgoing_referrers
 from .boundary import assert_engagement_write_root, today_iso
 from .entity import entity_path, verification_to_entity_dict
 from .parse_existing import ParsedEntity, parse_entity_file
@@ -200,36 +200,73 @@ def edit_entity(
 
     moved = target_entity_file != entity_file
     prev = entity_file.read_text(encoding="utf-8")
-    target_entity_file.write_text(content, encoding="utf-8")
-    renamed_paths = (
-        persist_rename(
+
+    if not moved:
+        # In-place content update: single atomic write, no M4 needed
+        entity_file.write_text(content, encoding="utf-8")
+        res = verifier.verify_entity_file(entity_file)
+        if not res.valid:
+            entity_file.write_text(prev, encoding="utf-8")
+            return _entity_result(
+                wrote=False, path=entity_file, artifact_id=effective_artifact_id,
+                content=content, warnings=warnings, verification=res,
+            )
+        clear_repo_caches(entity_file)
+        return _entity_result(
+            wrote=True, path=entity_file, artifact_id=effective_artifact_id,
+            content=None, warnings=warnings, verification=res,
+        )
+
+    # Identity-changing rename
+    old_sidecar = entity_file.with_suffix(".outgoing.md")
+    if not old_sidecar.exists():
+        # Sidecar-less: lone atomic os.rename (write new content, then rename atomically)
+        import os  # noqa: PLC0415
+
+        entity_file.write_text(content, encoding="utf-8")
+        os.rename(str(entity_file), str(target_entity_file))
+        res = verifier.verify_entity_file(target_entity_file)
+        if not res.valid:
+            os.rename(str(target_entity_file), str(entity_file))
+            entity_file.write_text(prev, encoding="utf-8")
+            return _entity_result(
+                wrote=False, path=target_entity_file, artifact_id=effective_artifact_id,
+                content=content, warnings=warnings, verification=res,
+            )
+        clear_repo_caches(entity_file)
+        clear_repo_caches(target_entity_file)
+        renamed_paths: list[Path] = []
+    else:
+        # Rename with sidecar: route through M4 for atomic entity+sidecar commit
+        new_sidecar = target_entity_file.with_suffix(".outgoing.md")
+
+        def _rebuild_index_for_rename() -> None:
+            for _p in (entity_file, target_entity_file, old_sidecar, new_sidecar):
+                clear_repo_caches(_p)
+
+        renamed_paths = rename_entity_via_m4(
             entity_file=entity_file,
             target_entity_file=target_entity_file,
+            new_content=content,
             repo_root=repo_root,
             artifact_id=artifact_id,
             effective_artifact_id=effective_artifact_id,
+            rebuild_index=_rebuild_index_for_rename,
         )
-        if moved
-        else []
+        res = preview_res  # intent already verified pre-write; M4 is idempotent post-commit
+
+    # Referrer slug-hint rewrites are cosmetic and not part of the M4 transaction
+    referrer_paths = rewrite_outgoing_referrers(
+        repo_root=repo_root,
+        old_artifact_id=artifact_id,
+        new_artifact_id=effective_artifact_id,
+        exclude_path=target_entity_file.with_suffix(".outgoing.md"),
     )
-    if moved:
-        warnings.append(
-            f"Renamed artifact-id to {effective_artifact_id} and updated {len(renamed_paths)} outgoing file(s)."
-        )
+    for path in referrer_paths:
+        clear_repo_caches(path)
 
-    res = verifier.verify_entity_file(target_entity_file)
-    if not res.valid:
-        if moved:
-            target_entity_file.unlink(missing_ok=True)
-        entity_file.write_text(prev, encoding="utf-8")
-        return _entity_result(
-            wrote=False, path=target_entity_file, artifact_id=effective_artifact_id,
-            content=content, warnings=warnings, verification=res,
-        )
-
-    changed_paths = [entity_file, target_entity_file, *renamed_paths] if moved else [target_entity_file]
-    for changed_path in changed_paths:
-        clear_repo_caches(changed_path)
+    total_rewrites = len(renamed_paths) + len(referrer_paths)
+    warnings.append(f"Renamed artifact-id to {effective_artifact_id} and updated {total_rewrites} outgoing file(s).")
     return _entity_result(
         wrote=True, path=target_entity_file, artifact_id=effective_artifact_id,
         content=None, warnings=warnings, verification=res,

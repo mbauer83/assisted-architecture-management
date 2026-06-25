@@ -28,6 +28,8 @@ router = APIRouter()
 class SaveBody(BaseModel):
     message: str
     push: bool = True
+    author_name: str | None = None
+    author_email: str | None = None
 
 
 class WithdrawBody(BaseModel):
@@ -88,7 +90,13 @@ async def save_engagement(body: SaveBody) -> dict:
     if eng_root is None:
         raise HTTPException(400, "Engagement repository is not configured")
     try:
-        commit = await asyncio.to_thread(enterprise_git_ops.commit_engagement_work, eng_root, body.message)
+        commit = await asyncio.to_thread(
+            enterprise_git_ops.commit_engagement_work,
+            eng_root,
+            body.message,
+            author_name=body.author_name,
+            author_email=body.author_email,
+        )
         if body.push:
             await asyncio.to_thread(enterprise_git_ops.push_engagement, eng_root)
         sync_status_cache.invalidate_sync_status_cache(repo=eng_root)
@@ -124,7 +132,13 @@ async def save_enterprise(body: SaveBody) -> dict:
         raise HTTPException(400, "Enterprise repository is not configured")
     try:
         await asyncio.to_thread(enterprise_git_ops.ensure_working_branch, ent_root)
-        commit = await asyncio.to_thread(enterprise_git_ops.commit_enterprise_work, ent_root, body.message)
+        commit = await asyncio.to_thread(
+            enterprise_git_ops.commit_enterprise_work,
+            ent_root,
+            body.message,
+            author_name=body.author_name,
+            author_email=body.author_email,
+        )
         sync_state = enterprise_sync_state.load(ent_root)
         sync_status_cache.invalidate_sync_status_cache(repo=ent_root)
         await event_bus.publish(

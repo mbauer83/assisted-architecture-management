@@ -305,14 +305,12 @@ def refresh_now() -> None:
 
 def run_serialized_write(fn: Any, /, *args: Any, **kwargs: Any) -> Any:
     from src.infrastructure.mcp.artifact_mcp.write_queue import run_sync
-    from src.infrastructure.workspace.write_block_manager import is_blocked
+    from src.infrastructure.workspace.mutation_gate import GateRejected
 
-    # Check write-block state before passing to queue
-    target_root = kwargs.get("repo_root") or (args[0] if args else None)
-    if target_root is not None and is_blocked(Path(str(target_root))):
-        raise HTTPException(503, "Writes are temporarily blocked (sync in progress or read-only mode)")
-
-    return run_sync(fn, *args, **kwargs)
+    try:
+        return run_sync(fn, *args, **kwargs)
+    except GateRejected as exc:
+        raise HTTPException(423, f"Write rejected: {exc.reason}") from exc
 
 
 def write_result_to_dict(result: Any) -> dict[str, Any]:

@@ -6,11 +6,11 @@ Two-stage: _cascade_preflight (dry_run=True) → impact report only.
 
 from __future__ import annotations
 
-import subprocess
 from collections.abc import Callable, Iterator
 from pathlib import Path
 
 from src.application.repo_path_helpers import all_model_roots, diagram_source_root, docs_root
+from src.infrastructure.mutation_adapters import run_git
 from src.infrastructure.write.artifact_write._cascade_helpers import (
     conn_row_touches,
     conn_touches,
@@ -215,7 +215,7 @@ def _cascade_apply(repo_root: Path, project_slug: str, preflight: dict) -> dict:
     warnings: list[str] = []
 
     def _git(args: list[str]) -> None:
-        subprocess.run(["git", *args], cwd=repo_root, capture_output=True, text=True, check=False)
+        run_git(repo_root, args)
 
     def _rm(path: Path) -> None:
         backups.append((path, path.read_bytes() if path.exists() else None))

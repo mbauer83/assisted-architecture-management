@@ -42,8 +42,18 @@ class _RWLock:
                 self._cond.wait()
             self._writing = True
         try:
+            from src.infrastructure.workspace.mutation_gate import _mark_index_write_held  # noqa: PLC0415
+            _mark_index_write_held(True)
+        except ImportError:
+            pass
+        try:
             yield
         finally:
+            try:
+                from src.infrastructure.workspace.mutation_gate import _mark_index_write_held  # noqa: PLC0415
+                _mark_index_write_held(False)
+            except ImportError:
+                pass
             with self._cond:
                 self._writing = False
                 self._cond.notify_all()

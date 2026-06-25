@@ -13,12 +13,13 @@ from pathlib import Path
 from src.application.group_registry import registry_to_yaml
 from src.config.repo_paths import ARCH_REPO
 from src.domain.groups import GroupAxis, GroupEntry, GroupRegistry
+from src.infrastructure.mutation_adapters import run_git
 
 _GROUPS_FILE = "groups.yaml"
 
 
 def _run_git(args: list[str], cwd: Path) -> subprocess.CompletedProcess[str]:
-    return subprocess.run(["git", *args], cwd=cwd, capture_output=True, text=True, check=False)
+    return run_git(cwd, args)
 
 
 def _git_add(path: Path, repo_root: Path) -> None:
