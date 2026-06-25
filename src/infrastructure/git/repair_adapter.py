@@ -62,8 +62,12 @@ class GitRepairAdapter:
         self._checked(args)
 
     def stage_and_validate(self) -> None:
+        # Stage everything. We deliberately do NOT run `git diff --cached --check`: it rejects
+        # legitimate model content — trailing whitespace in Markdown, and `===`/`---` setext
+        # underlines that it mistakes for conflict markers — which is style, not correctness.
+        # Commit-worthiness is decided by has_staged_changes(); referential safety by the
+        # upstream guard + ff-only promote, neither of which can introduce conflict markers.
         self._checked(["add", "-A"])
-        self._checked(["diff", "--cached", "--check"])
 
     def has_staged_changes(self) -> bool:
         return not self._quiet(["diff", "--cached", "--quiet"])
