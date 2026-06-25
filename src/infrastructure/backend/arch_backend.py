@@ -13,6 +13,7 @@ from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from src.application.artifact_query import ArtifactRepository
+    from src.application.ports import ArtifactStorePort
 
 import uvicorn
 
@@ -299,7 +300,7 @@ def _run_foreground(args: argparse.Namespace, parser: argparse.ArgumentParser, r
         )
 
     repo = _initialise_repo(repo_root_path, enterprise_root_path, args)
-    _run_startup_validations(repo, repo_root_path, enterprise_root_path)
+    _run_startup_validations(repo)
     _configure_server_state(repo, repo_root_path, enterprise_root_path, args)
 
     app = _build_app(credentials=_get_git_credentials())
@@ -320,19 +321,65 @@ def _initialise_repo(
 ) -> "ArtifactRepository":
     from src.application.artifact_query import ArtifactRepository
     from src.infrastructure.artifact_index import shared_artifact_index
+    from src.infrastructure.write.artifact_write.m4_transaction import recover_transactions
 
     roots = [p for p in (repo_root_path, enterprise_root_path) if p is not None]
     logger.info("Initializing backend — repo_root=%s enterprise_root=%s admin_mode=%s read_only=%s",
                 repo_root_path, enterprise_root_path, args.admin_mode, args.read_only)
-    repo = ArtifactRepository(shared_artifact_index(roots))
+    index = shared_artifact_index(roots)
+    # Startup ordering (WS9): recover durable transactions → repair group registry (mutates
+    # files) → build index → duplicate scan → serve.  Group repair must precede the index
+    # build so the index is consistent with disk at first served request (INV-2); the
+    # duplicate scan fails closed on a genuine cross-mount collision (INV-1/WS2).
+    for root in roots:
+        recovered = recover_transactions(root, rebuild_index=index.refresh)
+        if recovered:
+            logger.warning("Recovered %s durable transaction(s) in %s", recovered, root)
+    _repair_group_registries(repo_root_path, enterprise_root_path)
+    repo = ArtifactRepository(index)
     repo.refresh()
+    _assert_no_duplicate_short_ids(index)
     return repo
 
 
-def _run_startup_validations(
-    repo: "ArtifactRepository", repo_root_path: Path, enterprise_root_path: Path | None
-) -> None:
+def _repair_group_registries(repo_root_path: Path, enterprise_root_path: Path | None) -> None:
+    """Repair the engagement group registry (and validate the enterprise one) under the gate.
+
+    Runs before the index build so any file mutation is reflected by the first index load.
+    """
     from src.application.group_registry_validation import GroupRegistryError, validate_and_repair_group_registry
+    from src.infrastructure.workspace.mutation_gate import get_workspace_gate
+
+    with get_workspace_gate().privileged_writing():
+        try:
+            for msg in validate_and_repair_group_registry(repo_root_path):
+                logger.info("Group registry repair: %s", msg)
+        except (GroupRegistryError, OSError) as exc:
+            logger.error("Startup aborted — group registry error:\n%s\nFix .arch-repo/groups.yaml and restart.", exc)
+            sys.exit(1)
+
+        if enterprise_root_path is not None:
+            try:
+                for msg in validate_and_repair_group_registry(enterprise_root_path, read_only=True):
+                    logger.warning("Group registry (enterprise): %s", msg)
+            except GroupRegistryError as exc:
+                logger.warning("Enterprise group registry has errors (server will start; fix when possible):\n%s", exc)
+
+
+def _assert_no_duplicate_short_ids(index: "ArtifactStorePort") -> None:
+    """Fail closed if a stable id maps to >1 distinct file within one mount (WS2/WS9)."""
+    duplicates = index.scan_duplicate_short_ids()
+    if duplicates:
+        detail = "\n".join(f"  {short}: {[str(p) for p in paths]}" for short, paths in sorted(duplicates.items()))
+        logger.error(
+            "Startup aborted — stable id(s) map to multiple files in one mount "
+            "(rename/shadowing hazard); resolve the duplicates and restart:\n%s",
+            detail,
+        )
+        sys.exit(1)
+
+
+def _run_startup_validations(repo: "ArtifactRepository") -> None:
     from src.application.startup_validation import (
         RepoCompatibilityError,
         SchemaPolicyError,
@@ -363,20 +410,6 @@ def _run_startup_validations(
         logger.error("Startup aborted — attribute-schema policy violations:\n%s", exc)
         sys.exit(1)
 
-    try:
-        for msg in validate_and_repair_group_registry(repo_root_path):
-            logger.info("Group registry repair: %s", msg)
-    except (GroupRegistryError, OSError) as exc:
-        logger.error("Startup aborted — group registry error:\n%s\nFix .arch-repo/groups.yaml and restart.", exc)
-        sys.exit(1)
-
-    if enterprise_root_path is not None:
-        try:
-            for msg in validate_and_repair_group_registry(enterprise_root_path, read_only=True):
-                logger.warning("Group registry (enterprise): %s", msg)
-        except GroupRegistryError as exc:
-            logger.warning("Enterprise group registry has errors (server will start; fix when possible):\n%s", exc)
-
 
 def _configure_server_state(
     repo: "ArtifactRepository", repo_root_path: Path, enterprise_root_path: Path | None, args: argparse.Namespace
@@ -390,7 +423,7 @@ def _configure_server_state(
     load_document_schemata(repo_root_path)
     if args.read_only:
         from src.infrastructure.workspace.write_block_manager import block_repo
-        block_repo(repo_root_path)
+        block_repo(repo_root_path, reason="read_only")
 
 if __name__ == "__main__":
     main()
