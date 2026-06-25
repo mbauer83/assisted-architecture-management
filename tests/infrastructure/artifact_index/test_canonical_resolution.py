@@ -388,3 +388,36 @@ class TestResolveArtifact:
         result = reg.resolve_artifact("REQ@1000.AAA.missing-slug")
         assert result is None
         assert "REQ@1000.AAA" in store._reconcile_called
+
+
+def _write_entity_file(tmp_path: Path, artifact_id: str) -> Path:
+    path = tmp_path / "model" / "motivation" / "requirement" / f"{artifact_id}.md"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(
+        f"---\nartifact-id: {artifact_id}\nartifact-type: requirement\n"
+        "name: Current\nversion: 0.1.0\nstatus: draft\n---\n",
+        encoding="utf-8",
+    )
+    return path
+
+
+class TestReadPathAcceptsShortAndLongIds:
+    """read_artifact / get_entity tacitly resolve short, current-slug and stale-slug ids."""
+
+    def test_read_artifact_resolves_all_id_forms(self, tmp_path: Path) -> None:
+        _write_entity_file(tmp_path, "REQ@1000.AAA.current")
+        index = ArtifactIndex(tmp_path)
+        index.refresh()
+
+        assert index.read_artifact("REQ@1000.AAA.current") is not None  # exact long id
+        assert index.read_artifact("REQ@1000.AAA") is not None  # short id
+        assert index.read_artifact("REQ@1000.AAA.old-slug") is not None  # stale slug
+        assert index.read_artifact("REQ@9999.ZZZ") is None  # genuinely absent short id
+
+    def test_get_entity_resolves_short_and_stale_slug(self, tmp_path: Path) -> None:
+        _write_entity_file(tmp_path, "REQ@1000.AAA.current")
+        index = ArtifactIndex(tmp_path)
+        index.refresh()
+
+        assert index.get_entity("REQ@1000.AAA").artifact_id == "REQ@1000.AAA.current"  # type: ignore[union-attr]
+        assert index.get_entity("REQ@1000.AAA.old").artifact_id == "REQ@1000.AAA.current"  # type: ignore[union-attr]

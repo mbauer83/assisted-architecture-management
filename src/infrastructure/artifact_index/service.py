@@ -189,22 +189,22 @@ class ArtifactIndex:
     def get_entity(self, artifact_id: str) -> EntityRecord | None:
         self._ensure_loaded()
         with self._lock.reading():
-            return self._mem.entities.get(artifact_id)
+            return self._mem.entities.get(self._mem.canonical_id(artifact_id))
 
     def get_connection(self, artifact_id: str) -> ConnectionRecord | None:
         self._ensure_loaded()
         with self._lock.reading():
-            return self._mem.connections.get(artifact_id)
+            return self._mem.connections.get(self._mem.canonical_id(artifact_id))
 
     def get_diagram(self, artifact_id: str) -> DiagramRecord | None:
         self._ensure_loaded()
         with self._lock.reading():
-            return self._mem.diagrams.get(artifact_id)
+            return self._mem.diagrams.get(self._mem.canonical_id(artifact_id))
 
     def get_document(self, artifact_id: str) -> DocumentRecord | None:
         self._ensure_loaded()
         with self._lock.reading():
-            return self._mem.documents.get(artifact_id)
+            return self._mem.documents.get(self._mem.canonical_id(artifact_id))
 
     # ── Filtered list queries ─────────────────────────────────────────────────
 
@@ -339,6 +339,7 @@ class ArtifactIndex:
     ) -> dict[str, object] | None:
         self._ensure_loaded()
         with self._lock.reading():
+            artifact_id = self._mem.canonical_id(artifact_id)
             return (
                 read_entity(ent, mode=mode) if (ent := self._mem.entities.get(artifact_id)) is not None
                 else read_connection(conn, mode=mode) if (conn := self._mem.connections.get(artifact_id)) is not None
@@ -419,9 +420,8 @@ class ArtifactIndex:
         self, entity_ids: list[str] | set[str] | frozenset[str]
     ) -> dict[str, tuple[int, int, int]]:
         self._ensure_loaded()
-        with self._lock.reading():
-            with self._db.reader() as conn:
-                return _q.connection_stats_for_set(conn, frozenset(entity_ids))
+        with self._lock.reading(), self._db.reader() as conn:
+            return _q.connection_stats_for_set(conn, frozenset(entity_ids))
 
     def list_connections_by_types(self, types: frozenset[str]) -> list[ConnectionRecord]:
         self._ensure_loaded()

@@ -4,6 +4,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from src.application.ports import Candidate
+from src.domain.artifact_id import stable_id
 from src.domain.artifact_types import ConnectionRecord, DiagramRecord, DocumentRecord, EntityRecord
 
 
@@ -26,6 +27,24 @@ class _MemStore:
     """diagram_id → [(classifier_local_id, attr_name, type_id)] for classifier-typed attributes."""
     identity_candidates: dict[str, list[Candidate]] = field(default_factory=dict)
     """stable_id → all Candidate files ever indexed under that stable key (cross-mount multimap)."""
+
+    def canonical_id(self, artifact_id: str) -> str:
+        """Resolve a short or stale-slug id to the stored full id (any artifact kind).
+
+        Lets readers pass either form: an exact hit wins; otherwise the unique
+        record whose stable id matches is returned. Falls back to *artifact_id*
+        unchanged when it is absent or ambiguous across mounts (so the caller's
+        own lookup then misses safely). Must be called under the index read lock.
+        """
+        stores = (self.entities, self.connections, self.diagrams, self.documents)
+        if any(artifact_id in store for store in stores):
+            return artifact_id
+        short = stable_id(artifact_id)
+        for store in stores:
+            matches = [key for key in store if stable_id(key) == short]
+            if len(matches) == 1:
+                return matches[0]
+        return artifact_id
 
     def clear(self) -> None:
         for attr in (
