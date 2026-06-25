@@ -5,6 +5,7 @@ Logic lives in src/tools/model_mcp/write/*.
 
 from mcp.server.fastmcp import FastMCP  # type: ignore[import-not-found]
 
+from src.infrastructure.mcp.artifact_mcp.admin_tools import artifact_admin_reindex
 from src.infrastructure.mcp.artifact_mcp.bulk_tools import artifact_bulk_delete
 from src.infrastructure.mcp.artifact_mcp.write._common import DiagramConnectionInferenceMode, WriteRepoScope
 from src.infrastructure.mcp.artifact_mcp.write.connection import artifact_add_connection
@@ -25,6 +26,7 @@ __all__ = [
     "DiagramConnectionInferenceMode",
     "WriteRepoScope",
     "artifact_add_connection",
+    "artifact_admin_reindex",
     "artifact_authoring_guidance",
     "artifact_bulk_delete",
     "artifact_create_diagram",
@@ -39,7 +41,7 @@ __all__ = [
 
 
 def register_write_tools(mcp: FastMCP) -> None:
-    from src.infrastructure.mcp.artifact_mcp import bulk_tools
+    from src.infrastructure.mcp.artifact_mcp import admin_tools, bulk_tools
     from src.infrastructure.mcp.artifact_mcp.write import connection, diagram, document, entity, group, promote
 
     entity.register(mcp)
@@ -49,3 +51,4 @@ def register_write_tools(mcp: FastMCP) -> None:
     promote.register(mcp)
     group.register(mcp)
     bulk_tools.register(mcp)
+    admin_tools.register_admin_tools(mcp)

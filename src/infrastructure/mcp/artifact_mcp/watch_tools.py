@@ -3,7 +3,8 @@ import time
 from pathlib import Path
 from typing import Any
 
-from src.config.repo_paths import DIAGRAM_CATALOG, DIAGRAMS, MODEL
+from src.application.repo_path_helpers import all_model_roots
+from src.config.repo_paths import DIAGRAM_CATALOG, DIAGRAMS
 from src.infrastructure.artifact_index.coordination import suppress_redundant_refresh_paths
 from src.infrastructure.mcp.artifact_mcp.context import (
     RepoPreset,
@@ -11,6 +12,7 @@ from src.infrastructure.mcp.artifact_mcp.context import (
     enqueue_background_refresh,
     resolve_repo_roots,
 )
+from src.infrastructure.workspace.mutation_gate import get_workspace_gate
 
 # ---------------------------------------------------------------------------
 # Snapshotting
@@ -19,8 +21,11 @@ from src.infrastructure.mcp.artifact_mcp.context import (
 
 def _repo_state_snapshot(repo_path: Path) -> dict[str, tuple[int, int]]:
     snapshot: dict[str, tuple[int, int]] = {}
-    for sub in (MODEL, f"{DIAGRAM_CATALOG}/{DIAGRAMS}"):
-        root = repo_path / sub
+    scan_roots = [
+        *all_model_roots(repo_path),
+        repo_path / DIAGRAM_CATALOG / DIAGRAMS,
+    ]
+    for root in scan_roots:
         if not root.exists():
             continue
         for p in root.rglob("*"):
@@ -95,14 +100,15 @@ def _watcher_loop(
                 changed_paths = suppress_redundant_refresh_paths(roots, changed_paths)
             force = periodic_refresh_s is not None and (now - last_periodic) >= periodic_refresh_s
             if changed_paths or force or must_full_refresh:
-                if force or must_full_refresh or len(changed_paths) > 64:
-                    enqueue_background_refresh(roots, full_refresh=True)
-                else:
-                    enqueue_background_refresh(
-                        roots,
-                        changed_paths=changed_paths,
-                        full_refresh=False,
-                    )
+                with get_workspace_gate().writing():
+                    if force or must_full_refresh or len(changed_paths) > 64:
+                        enqueue_background_refresh(roots, full_refresh=True)
+                    else:
+                        enqueue_background_refresh(
+                            roots,
+                            changed_paths=changed_paths,
+                            full_refresh=False,
+                        )
                 last_snapshot = snapshot
                 if force:
                     last_periodic = now

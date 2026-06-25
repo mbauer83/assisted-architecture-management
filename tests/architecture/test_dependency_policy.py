@@ -17,6 +17,18 @@ from pathlib import Path
 _PROJECT_ROOT = Path(__file__).parent.parent.parent
 _BASELINE_PATH = Path(__file__).parent / "architecture_baseline.json"
 _SRC_ROOT = _PROJECT_ROOT / "src"
+_MUTATION_ADAPTER = "src.infrastructure.mutation_adapters"
+_MUTATION_ADAPTER_IMPORTERS = frozenset(
+    {
+        "src/infrastructure/git/enterprise_git_ops.py",
+        "src/infrastructure/git/git_sync_m4.py",
+        "src/infrastructure/git/repair_adapter.py",
+        "src/infrastructure/write/artifact_write/_cascade_helpers.py",
+        "src/infrastructure/write/artifact_write/_group_fs.py",
+        "src/infrastructure/write/artifact_write/cascade_delete.py",
+        "src/infrastructure/write/artifact_write/m4_transaction.py",
+    }
+)
 
 # Entry-point modules that wire the full object graph; allowed to import from any package.
 _COMPOSITION_ROOTS: frozenset[str] = frozenset(
@@ -92,6 +104,38 @@ def _collect_imports(tree: ast.AST) -> list[str]:
     return sorted(seen)
 
 
+def _mutation_boundary_violations(rel: str, tree: ast.AST) -> list[str]:
+    violations: list[str] = []
+    imports_adapter = any(
+        module == _MUTATION_ADAPTER or module.startswith(f"{_MUTATION_ADAPTER}.")
+        for module in _collect_imports(tree)
+    )
+    if imports_adapter and rel not in _MUTATION_ADAPTER_IMPORTERS:
+        violations.append(f"{rel}::unauthorized-mutation-adapter-import")
+    if rel.startswith("src/infrastructure/write/") or rel == "src/infrastructure/git/enterprise_git_ops.py":
+        for node in ast.walk(tree):
+            if _is_direct_subprocess_git_call(node):
+                violations.append(f"{rel}:{getattr(node, 'lineno', 0)}::direct-subprocess-git")
+    return violations
+
+
+def _is_direct_subprocess_git_call(node: ast.AST) -> bool:
+    if not isinstance(node, ast.Call) or not isinstance(node.func, ast.Attribute):
+        return False
+    if node.func.attr not in {"run", "call", "check_call", "check_output", "Popen"}:
+        return False
+    owner = node.func.value
+    if not isinstance(owner, ast.Name) or owner.id != "subprocess" or not node.args:
+        return False
+    command = node.args[0]
+    return (
+        isinstance(command, (ast.List, ast.Tuple))
+        and bool(command.elts)
+        and isinstance(command.elts[0], ast.Constant)
+        and command.elts[0].value == "git"
+    )
+
+
 def _load_baseline() -> set[str]:
     if not _BASELINE_PATH.exists():
         return set()
@@ -114,6 +158,7 @@ def test_dependency_policy() -> None:
         except SyntaxError:
             continue
 
+        new_violations.extend(_mutation_boundary_violations(rel, tree))
         for module in _collect_imports(tree):
             target_role = _import_role(module)
             if target_role is None:
@@ -128,3 +173,21 @@ def test_dependency_policy() -> None:
         raise AssertionError(
             f"New dependency-policy violations (add to baseline to acknowledge):\n{formatted}"
         )
+
+
+def test_mutation_boundary_fixture_detects_bypass() -> None:
+    tree = ast.parse(
+        "import subprocess\n"
+        "from src.infrastructure.mutation_adapters import run_git\n"
+        "subprocess.run(['git', 'commit'])\n"
+    )
+
+    violations = _mutation_boundary_violations(
+        "src/infrastructure/write/unreviewed_bypass.py",
+        tree,
+    )
+
+    assert violations == [
+        "src/infrastructure/write/unreviewed_bypass.py::unauthorized-mutation-adapter-import",
+        "src/infrastructure/write/unreviewed_bypass.py:3::direct-subprocess-git",
+    ]

@@ -32,6 +32,7 @@ get-diagram-runtime = "src.infrastructure.bootstrap.get_diagram_runtime:main"
 check-diagram-runtime = "src.infrastructure.bootstrap.check_diagram_runtime:main"
 arch-write-cli = "src.infrastructure.write.artifact_write_cli:main"
 arch-assurance = "src.infrastructure.cli.arch_assurance:main"
+arch-repair = "src.infrastructure.cli.arch_repair:main"
 arch-mcp-stdio-assurance-read = "src.infrastructure.mcp.arch_mcp_stdio_assurance:main_read"
 arch-mcp-stdio-assurance-write = "src.infrastructure.mcp.arch_mcp_stdio_assurance:main_write"
 

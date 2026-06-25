@@ -11,29 +11,37 @@ Engagement-repo helpers are also here to keep all git commit/push logic in one p
 from __future__ import annotations
 
 import logging
-import subprocess
+import os
 from datetime import datetime, timezone
 from pathlib import Path
 
+from src.config.git_identity import GitIdentity, load_service_git_identity, optional_git_author
 from src.config.repo_paths import DIAGRAM_CATALOG, DOCS, MODEL
 from src.infrastructure.git import enterprise_sync_state
 from src.infrastructure.git.enterprise_sync_state import EnterpriseSyncState
+from src.infrastructure.mutation_adapters import run_git
 
 logger = logging.getLogger(__name__)
 _GIT_TIMEOUT = 30
 _PUSH_TIMEOUT = 60
 
 
-def _run(repo: Path, *args: str, timeout: float = _GIT_TIMEOUT) -> tuple[int, str, str]:
+def _run(
+    repo: Path,
+    *args: str,
+    timeout: float = _GIT_TIMEOUT,
+    env_overrides: dict[str, str] | None = None,
+) -> tuple[int, str, str]:
     from src.infrastructure.git.git_env import get_ssh_env
 
-    result = subprocess.run(
-        ["git", *args],
-        cwd=repo,
-        capture_output=True,
-        text=True,
+    env = dict(get_ssh_env() or os.environ)
+    if env_overrides:
+        env.update(env_overrides)
+    result = run_git(
+        repo,
+        args,
         timeout=timeout,
-        env=get_ssh_env(),
+        env=env,
     )
     return result.returncode, result.stdout.strip(), result.stderr.strip()
 
@@ -139,14 +147,25 @@ def ensure_working_branch(enterprise_root: Path) -> str:
     return branch_name
 
 
-def commit_enterprise_work(enterprise_root: Path, message: str) -> str:
+def commit_enterprise_work(
+    enterprise_root: Path,
+    message: str,
+    *,
+    author_name: str | None = None,
+    author_email: str | None = None,
+) -> str:
     """Stage and commit all changes in the enterprise repo. Returns the new commit hash."""
+    author = optional_git_author(author_name, author_email)
     if not has_uncommitted_changes(enterprise_root):
         raise ValueError("No changes to save in the enterprise repository")
     rc, _, stderr = _run(enterprise_root, "add", ".")
     if rc != 0:
         raise RuntimeError(f"Failed to stage enterprise changes: {stderr}")
-    rc, _, stderr = _run(enterprise_root, "commit", "-m", message)
+    rc, _, stderr = _commit(
+        enterprise_root,
+        message,
+        author=author,
+    )
     if rc != 0:
         raise RuntimeError(f"Failed to commit enterprise changes: {stderr}")
     commit = current_commit(enterprise_root) or ""
@@ -203,14 +222,25 @@ def abandon_enterprise_branch(enterprise_root: Path) -> str | None:
 # ---------------------------------------------------------------------------
 
 
-def commit_engagement_work(engagement_root: Path, message: str) -> str:
+def commit_engagement_work(
+    engagement_root: Path,
+    message: str,
+    *,
+    author_name: str | None = None,
+    author_email: str | None = None,
+) -> str:
     """Stage and commit all changes in the engagement repo. Returns the commit hash."""
+    author = optional_git_author(author_name, author_email)
     if not has_uncommitted_changes(engagement_root):
         raise ValueError("No changes to save in the engagement repository")
     rc, _, stderr = _run(engagement_root, "add", ".")
     if rc != 0:
         raise RuntimeError(f"Failed to stage engagement changes: {stderr}")
-    rc, _, stderr = _run(engagement_root, "commit", "-m", message)
+    rc, _, stderr = _commit(
+        engagement_root,
+        message,
+        author=author,
+    )
     if rc != 0:
         raise RuntimeError(f"Failed to commit engagement changes: {stderr}")
     commit = current_commit(engagement_root) or ""
@@ -224,3 +254,29 @@ def push_engagement(engagement_root: Path) -> None:
     if rc != 0:
         raise RuntimeError(f"Failed to push engagement changes: {stderr}")
     logger.info("Engagement changes pushed to remote")
+
+
+def _commit(repo: Path, message: str, *, author: GitIdentity | None) -> tuple[int, str, str]:
+    service = load_service_git_identity()
+    env = {
+        "GIT_COMMITTER_NAME": service.name,
+        "GIT_COMMITTER_EMAIL": service.email,
+    }
+    if author is not None:
+        env.update(
+            {
+                "GIT_AUTHOR_NAME": author.name,
+                "GIT_AUTHOR_EMAIL": author.email,
+            }
+        )
+    return _run(
+        repo,
+        "-c",
+        f"user.name={service.name}",
+        "-c",
+        f"user.email={service.email}",
+        "commit",
+        "-m",
+        message,
+        env_overrides=env,
+    )
