@@ -62,12 +62,17 @@ class GitRepairAdapter:
         self._checked(args)
 
     def stage_and_validate(self) -> None:
-        # Stage everything. We deliberately do NOT run `git diff --cached --check`: it rejects
-        # legitimate model content — trailing whitespace in Markdown, and `===`/`---` setext
-        # underlines that it mistakes for conflict markers — which is style, not correctness.
-        # Commit-worthiness is decided by has_staged_changes(); referential safety by the
-        # upstream guard + ff-only promote, neither of which can introduce conflict markers.
-        self._checked(["add", "-A"])
+        # Stage the working tree, but NEVER the transient M4 transaction journal
+        # (.arch-repo/transactions/): an interrupted write may have left one on disk, and a
+        # blind `git add -A` would otherwise commit and push runtime internals. The pathspec
+        # exclude holds even when the repo has no .gitignore.
+        #
+        # We deliberately do NOT run `git diff --cached --check`: it false-fails on legitimate
+        # model content — trailing whitespace in Markdown, and `===`/`---` setext underlines it
+        # mistakes for conflict markers — which is style, not correctness. Commit-worthiness is
+        # decided by has_staged_changes(); referential safety by the upstream guard + ff-only
+        # promote, neither of which can introduce conflict markers.
+        self._checked(["add", "-A", "--", ".", ":(exclude).arch-repo/transactions"])
 
     def has_staged_changes(self) -> bool:
         return not self._quiet(["diff", "--cached", "--quiet"])

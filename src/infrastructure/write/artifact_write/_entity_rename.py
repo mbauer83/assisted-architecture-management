@@ -29,6 +29,7 @@ def rename_entity_via_m4(
     from src.infrastructure.write.artifact_write.m4_transaction import (
         ManifestEntry,
         TransactionManifest,
+        ensure_transactions_root,
         fsync_directory,
         hash_file,
         publish_transaction,
@@ -46,8 +47,7 @@ def rename_entity_via_m4(
     sidecar_content = old_sidecar.read_text(encoding="utf-8").replace(artifact_id, effective_artifact_id)
 
     # Step 1: create transaction dir + staged root
-    txns_dir = repo_root / ".arch-repo" / "transactions"
-    txns_dir.mkdir(parents=True, exist_ok=True)
+    txns_dir = ensure_transactions_root(repo_root)
     fsync_directory(txns_dir.parent)
     txn_dir = txns_dir / f"rename-{uuid.uuid4().hex}"
     txn_dir.mkdir()

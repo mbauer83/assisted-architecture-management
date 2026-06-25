@@ -157,6 +157,23 @@ def test_staging_and_transaction_are_repo_local(tmp_path: Path) -> None:
     staging.cleanup()
 
 
+def test_transactions_journal_is_gitignored_from_every_commit_path(tmp_path: Path) -> None:
+    """The transient journal must never be staged by `git add .` / `git add -A` (no repo .gitignore)."""
+    repo = _fixture_repo(tmp_path)
+    subprocess.run(["git", "init", "-b", "main"], cwd=repo, check=True, capture_output=True)
+    staging, _staged_root = create_staging_repo(repo)  # creates the journal + .arch-repo/.gitignore
+
+    assert "transactions/" in (repo / ".arch-repo" / ".gitignore").read_text().splitlines()
+    subprocess.run(["git", "add", "."], cwd=repo, check=True, capture_output=True)
+    staged = subprocess.run(
+        ["git", "diff", "--cached", "--name-only"], cwd=repo, check=True, capture_output=True, text=True
+    ).stdout
+    assert ".arch-repo/transactions" not in staged
+    staging.cleanup()
+    # The journal dir stays empty at rest, so the "no pending transactions" invariant still holds.
+    assert not any((repo / ".arch-repo" / "transactions").iterdir())
+
+
 def test_ref_transition_replays_after_kill(tmp_path: Path) -> None:
     repo = _fixture_repo(tmp_path)
     _git(repo, "init", "-b", "main")

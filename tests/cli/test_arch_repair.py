@@ -56,7 +56,8 @@ def test_repair_wires_auth_and_runs_guarded_sequence(
 
     assert result.phase == "complete"
     assert ("fetch", "origin", "main") in calls
-    assert ("add", "-A") in calls
+    # Stages the tree but excludes the transient M4 transaction journal.
+    assert ("add", "-A", "--", ".", ":(exclude).arch-repo/transactions") in calls
     # Must NOT gate on `git diff --cached --check`: it false-fails on legitimate model
     # whitespace and Markdown setext underlines mistaken for conflict markers.
     assert ("diff", "--cached", "--check") not in calls

@@ -16,6 +16,7 @@ from src.infrastructure.write.artifact_write.m4_transaction import (
     GitRefTransition,
     ManifestEntry,
     TransactionManifest,
+    ensure_transactions_root,
     fsync_directory,
     hash_file,
     publish_transaction,
@@ -172,7 +173,7 @@ def publish_git_pull_via_m4(
     ref = GitRefTransition(branch=branch, old_sha=old_sha, new_sha=new_sha)
     manifest = TransactionManifest(entries=entries, ref=ref)
     txn_id = f"sync-{new_sha[:16]}-{uuid.uuid4().hex[:6]}"
-    txn_dir = repo_root / ".arch-repo" / "transactions" / txn_id
+    txn_dir = ensure_transactions_root(repo_root) / txn_id
     txn_dir.mkdir(parents=True, exist_ok=True)
     fsync_directory(txn_dir.parent)
     write_transaction_intent(

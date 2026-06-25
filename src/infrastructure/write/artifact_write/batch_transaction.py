@@ -14,6 +14,7 @@ from .m4_transaction import (
     GitRefTransition,
     ManifestEntry,
     TransactionManifest,
+    ensure_transactions_root,
     fsync_directory,
     hash_file,
     publish_transaction,
@@ -21,7 +22,6 @@ from .m4_transaction import (
 )
 
 _MANAGED_SUBTREES = (MODEL, DOCS, DIAGRAM_CATALOG)
-_TRANSACTIONS = Path(".arch-repo") / "transactions"
 
 
 @dataclass(frozen=True)
@@ -46,8 +46,7 @@ def create_staging_repo(
     *,
     on_boundary: Callable[[str], None] | None = None,
 ) -> tuple[StagingDirectory, Path]:
-    transactions = repo_root / _TRANSACTIONS
-    transactions.mkdir(parents=True, exist_ok=True)
+    transactions = ensure_transactions_root(repo_root)
     fsync_directory(transactions.parent)
     transaction_dir = transactions / uuid.uuid4().hex
     transaction_dir.mkdir()

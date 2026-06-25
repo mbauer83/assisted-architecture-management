@@ -62,3 +62,21 @@ def test_stage_and_validate_stages_untracked_whole_tree(tmp_path: Path) -> None:
     staged = _git(repo, "diff", "--cached", "--name-only").splitlines()
     assert "model/a/E@1.aa.x.md" in staged
     assert "diagram-catalog/d/ARC@2.bb.y.puml" in staged
+
+
+def test_stage_does_not_commit_m4_transaction_journal(tmp_path: Path) -> None:
+    """An interrupted write's .arch-repo/transactions/ journal must never be staged."""
+    repo = _init_repo(tmp_path)
+    model = repo / "model" / "a" / "E@1.aa.x.md"
+    model.parent.mkdir(parents=True)
+    model.write_text("ok\n", encoding="utf-8")
+    txn = repo / ".arch-repo" / "transactions" / "tx-123"
+    txn.mkdir(parents=True)
+    (txn / "intent").write_text('{"entries": []}\n', encoding="utf-8")
+    (txn / "done").write_text("done\n", encoding="utf-8")
+
+    GitRepairAdapter(repo, os.environ.copy()).stage_and_validate()
+
+    staged = _git(repo, "diff", "--cached", "--name-only").splitlines()
+    assert "model/a/E@1.aa.x.md" in staged
+    assert not any(path.startswith(".arch-repo/transactions") for path in staged)

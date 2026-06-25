@@ -178,6 +178,27 @@ def fsync_directory(path: Path) -> None:
         os.close(descriptor)
 
 
+def ensure_transactions_root(repo_root: Path) -> Path:
+    """Return ``<repo>/.arch-repo/transactions``, creating it if absent and recording a
+    tracked ``.arch-repo/.gitignore`` that excludes it.
+
+    The transient transaction journal must never be staged by any commit path — normal
+    ``git add .`` saves, git-sync, or ``arch-repair`` — regardless of whether the repo carries
+    a top-level .gitignore.  Keeping the ignore in ``.arch-repo/.gitignore`` (not inside
+    ``transactions/``) leaves the journal directory itself empty at rest.
+    """
+    arch_repo = repo_root / ".arch-repo"
+    transactions = arch_repo / "transactions"
+    transactions.mkdir(parents=True, exist_ok=True)
+    gitignore = arch_repo / ".gitignore"
+    lines = gitignore.read_text(encoding="utf-8").splitlines() if gitignore.exists() else []
+    if "transactions/" not in lines:
+        with gitignore.open("a", encoding="utf-8") as handle:
+            handle.write("transactions/\n")
+        fsync_directory(arch_repo)
+    return transactions
+
+
 def _apply_entry(repo_root: Path, transaction_dir: Path, entry: ManifestEntry) -> None:
     dest = _destination(repo_root, entry.dest)
     current = hash_file(dest) if dest.exists() else "absent"
