@@ -28,6 +28,9 @@ const props = defineProps<{
    * already connected to them (the "spine" a questionnaire is building). */
   proximityAnchors?: string[]
   doneLabel?: string
+  /** Open in "find existing" instead of "create new" — for reverse-architecture steps whose
+   * entities usually already exist in the model (e.g. agent-imported application components). */
+  preferFind?: boolean
 }>()
 /** `entity` is set when the user completed a create/find this step, null on plain cancel — a
  * guided sequence needs to tell "advance" from "abandon this question" apart. */
@@ -35,7 +38,8 @@ const emit = defineEmits<{ done: [entity: { id: string; name: string } | null] }
 
 const svc = inject(modelServiceKey)!
 
-const subMode = ref<'create' | 'find'>('create')
+const initialSubMode = () => (props.preferFind ? 'find' as const : 'create' as const)
+const subMode = ref<'create' | 'find'>(initialSubMode())
 
 interface ActiveEntity { id: string; name: string; type: string; wasCreated: boolean }
 const activeEntity = ref<ActiveEntity | null>(null)
@@ -55,7 +59,7 @@ const activeSuggestions = computed<WizardSuggestion[]>(() => {
 
 const resetActiveEntity = () => {
   activeEntity.value = null
-  subMode.value = 'create'
+  subMode.value = initialSubMode()
   commitError.value = null
 }
 

@@ -7,6 +7,8 @@ import { useSuggestionCommit } from '../composables/useSuggestionCommit'
 import { buildWizardDomainCards } from './ModelWizardView.helpers'
 import WizardDomainStage from '../components/WizardDomainStage.vue'
 import WizardConnectionSuggestions from '../components/WizardConnectionSuggestions.vue'
+import { SPINES, type WizardMode } from '../lib/wizardQuestionnaires'
+import { getDomainLabel } from '../lib/domains'
 import type { AuthoringGuidance } from '../../domain'
 import type { RepoError } from '../../ports/ModelRepository'
 
@@ -15,7 +17,12 @@ const session = useWizardSession()
 const guidanceQuery = useQuery<AuthoringGuidance, RepoError>()
 const reviewLaterCommit = useSuggestionCommit(session)
 
-const domainCards = computed(() => buildWizardDomainCards(createdCountByDomain(session.state)))
+const mode = computed(() => session.state.mode)
+const setMode = (m: WizardMode) => session.setMode(m)
+const spineLabel = computed(() => SPINES[mode.value].map(getDomainLabel).join(' → '))
+
+const domainCards = computed(() =>
+  buildWizardDomainCards(createdCountByDomain(session.state), mode.value))
 const activeDomain = computed(() => session.state.activeDomain)
 const hasProgress = computed(() =>
   session.state.createdEntities.length > 0 || session.state.reviewLaterQueue.length > 0)
@@ -45,10 +52,32 @@ watch(activeDomain, (domain) => {
       <h1 class="page-title">
         Guided Modeling Wizard
       </h1>
+      <div
+        class="mode-toggle"
+        role="group"
+        aria-label="Wizard mode"
+      >
+        <button
+          type="button"
+          class="mode-btn"
+          :class="{ 'mode-btn--active': mode === 'planning' }"
+          @click="setMode('planning')"
+        >
+          Planning — start from why
+        </button>
+        <button
+          type="button"
+          class="mode-btn"
+          :class="{ 'mode-btn--active': mode === 'reverse' }"
+          @click="setMode('reverse')"
+        >
+          Reverse architecture — start from what exists
+        </button>
+      </div>
       <p class="wizard-subtitle">
         Pick a domain to see what belongs there and why. For a lightweight end-to-end model,
-        follow the guided spine: Motivation → Business → Common → Application. Skip freely
-        between domains — nothing here is gated.
+        follow the guided spine: {{ spineLabel }}. Skip freely between domains and questions —
+        nothing here is gated.
       </p>
       <button
         v-if="hasProgress"
@@ -138,6 +167,12 @@ watch(activeDomain, (domain) => {
 <style scoped>
 .page-title { font-size: 22px; font-weight: 600; margin-bottom: 4px; }
 .wizard-header { margin-bottom: 20px; }
+.mode-toggle { display: flex; gap: 8px; margin: 6px 0 10px; }
+.mode-btn {
+  padding: 6px 14px; border-radius: 6px; border: 1px solid #d1d5db; background: #fff;
+  font-size: 13px; cursor: pointer; color: #374151;
+}
+.mode-btn--active { background: #2563eb; color: #fff; border-color: #2563eb; }
 .wizard-subtitle { color: #6b7280; margin: 0 0 8px; }
 .btn-link {
   background: none; border: none; color: #2563eb; cursor: pointer; padding: 0;

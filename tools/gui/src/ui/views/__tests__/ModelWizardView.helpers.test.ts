@@ -46,4 +46,13 @@ describe('buildWizardDomainCards', () => {
   it('spine recommendation ignores off-spine progress (technology does not satisfy it)', () => {
     expect(recommendedNextDomain({ technology: 5 })).toBe('motivation')
   })
+
+  it('reverse mode recommends the bottom-up order starting at application', () => {
+    expect(recommendedNextDomain({}, 'reverse')).toBe('application')
+    expect(recommendedNextDomain({ application: 1 }, 'reverse')).toBe('common')
+    expect(recommendedNextDomain({ application: 1, common: 2, business: 1 }, 'reverse'))
+      .toBe('motivation')
+    const cards = buildWizardDomainCards({ application: 1 }, 'reverse')
+    expect(cards.filter((c) => c.recommended).map((c) => c.key)).toEqual(['common'])
+  })
 })
