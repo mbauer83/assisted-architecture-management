@@ -6,7 +6,7 @@ __pycache__/
 .mypy_cache/
 
 # Node / Vue SPA
-tools/gui/node_modules/
+node_modules/
 tools/gui/dist/
 tools/gui/coverage/
 tools/gui/coverage-e2e/
