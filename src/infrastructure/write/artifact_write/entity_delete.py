@@ -2,20 +2,13 @@
 
 from __future__ import annotations
 
-from collections.abc import Callable, Iterator
+from collections.abc import Callable
 from pathlib import Path
 
-from src.application.entity_type_predicates import is_internal_entity_type
 from src.application.verification.artifact_verifier import ArtifactRegistry
-from src.application.verification.artifact_verifier_parsing import (
-    parse_diagram_refs,
-    parse_frontmatter_from_path,
-)
-from src.config.repo_paths import DIAGRAM_CATALOG, DIAGRAMS, MODEL, RENDERED
 from src.domain.artifact_id import stable_id
 
 from .boundary import assert_engagement_write_root
-from .parse_existing import parse_outgoing_file
 from .types import WriteResult
 
 
@@ -32,28 +25,12 @@ def _owned_outgoing_path(entity_file: Path) -> Path:
     return entity_file.with_suffix(".outgoing.md")
 
 
-def _owned_connection_ids(artifact_id: str, outgoing_path: Path) -> list[str]:
-    if not outgoing_path.exists():
-        return []
-    parsed = parse_outgoing_file(outgoing_path)
+def _owned_connection_ids(registry: ArtifactRegistry, artifact_id: str) -> list[str]:
     ids: list[str] = []
-    for conn in parsed.connections:
-        ids.append(f"{artifact_id}---{conn['target_entity']}@@{conn['connection_type']}")
-        ids.append(f"{artifact_id} {conn['connection_type']} → {conn['target_entity']}")
+    for conn in registry.find_connections_for(artifact_id, direction="outbound"):
+        ids.append(f"{conn.source}---{conn.target}@@{conn.conn_type}")
+        ids.append(f"{conn.source} {conn.conn_type} → {conn.target}")
     return ids
-
-
-def _diagram_paths(repo_roots: list[Path]) -> list[Path]:
-    paths: list[Path] = []
-    for root in repo_roots:
-        diagrams_root = root / DIAGRAM_CATALOG / DIAGRAMS
-        if not diagrams_root.exists():
-            continue
-        for suffix in ("*.puml", "*.md"):
-            for path in diagrams_root.rglob(suffix):
-                if path.parent.name != RENDERED:
-                    paths.append(path)
-    return sorted(paths)
 
 
 def _format_dependency_tree(
@@ -76,60 +53,31 @@ def _format_dependency_tree(
     return "\n".join(lines)
 
 
-def _iter_model_files(registry: ArtifactRegistry, pattern: str) -> Iterator[Path]:
-    """Flat iteration over files matching *pattern* under every repo's model root."""
-    for root in registry.repo_roots:
-        model_root = root / MODEL
-        if model_root.exists():
-            yield from sorted(model_root.rglob(pattern))
-
-
 def _incoming_connection_blockers(registry: ArtifactRegistry, artifact_id: str) -> list[str]:
     """Connections from other entities that target *artifact_id*."""
     blockers: list[str] = []
-    for outgoing_path in _iter_model_files(registry, "*.outgoing.md"):
-        try:
-            parsed = parse_outgoing_file(outgoing_path)
-        except Exception:  # noqa: BLE001
+    for conn in registry.find_connections_for(artifact_id, direction="inbound"):
+        if stable_id(conn.source) == stable_id(artifact_id):
             continue
-        source_entity = str(parsed.frontmatter.get("source-entity", ""))
-        if stable_id(source_entity) == stable_id(artifact_id):
-            continue
-        blockers.extend(
-            f"{source_entity} {conn['connection_type']} → {artifact_id}"
-            for conn in parsed.connections
-            if stable_id(str(conn["target_entity"])) == stable_id(artifact_id)
-        )
+        blockers.append(f"{conn.source} {conn.conn_type} → {artifact_id}")
     return blockers
 
 
 def _grf_blockers(registry: ArtifactRegistry, artifact_id: str, entity_file: Path) -> list[str]:
     """Internal global-artifact-reference proxies pointing at *artifact_id*."""
-    from src.infrastructure.app_bootstrap import build_runtime_catalogs, get_module_registry  # noqa: PLC0415
-
-    ontology = build_runtime_catalogs(get_module_registry()).ontology
-    blockers: list[str] = []
-    for other_entity in _iter_model_files(registry, "*.md"):
-        if other_entity.name.endswith(".outgoing.md") or other_entity == entity_file:
-            continue
-        fm = parse_frontmatter_from_path(other_entity) or {}
-        if is_internal_entity_type(str(fm.get("artifact-type", "")), ontology) and (
-            str(fm.get("global-artifact-id", "")) == artifact_id
-        ):
-            blockers.append(str(fm.get("artifact-id", other_entity.stem)))
-    return blockers
+    return [
+        rec.artifact_id
+        for rec in registry.grf_references_to_entity(artifact_id)
+        if rec.path.resolve() != entity_file.resolve()
+    ]
 
 
 def _diagram_blockers(registry: ArtifactRegistry, artifact_id: str, owned_connection_ids: set[str]) -> list[str]:
     """Diagrams referencing the entity or any connection it owns."""
-    blockers: list[str] = []
-    for diagram_path in _diagram_paths(registry.repo_roots):
-        refs = parse_diagram_refs(diagram_path) or {}
-        entity_ids = set(refs.get("entity_ids", []))
-        conn_ids = set(refs.get("connection_ids", []))
-        if artifact_id in entity_ids or owned_connection_ids.intersection(conn_ids):
-            blockers.append(diagram_path.stem)
-    return blockers
+    diagram_ids = {rec.artifact_id for rec in registry.diagrams_referencing_artifact(artifact_id)}
+    for conn_id in owned_connection_ids:
+        diagram_ids.update(rec.artifact_id for rec in registry.diagrams_referencing_artifact(conn_id))
+    return sorted(diagram_ids)
 
 
 def _entity_ref_blockers(
@@ -158,13 +106,16 @@ def _delete_entity_core(
     entity_file = registry.find_file_by_id(artifact_id)
     if entity_file is None:
         raise ValueError(f"Entity '{artifact_id}' not found in model")
+    resolved = registry.resolve_artifact(artifact_id)
+    if resolved is not None:
+        artifact_id = resolved.canonical_id
     try:
         entity_file.relative_to(repo_root)
     except ValueError as exc:
         raise ValueError(f"Entity '{artifact_id}' is not in writable repo '{repo_root}'") from exc
 
     outgoing_path = _owned_outgoing_path(entity_file)
-    owned_connection_ids = set(_owned_connection_ids(artifact_id, outgoing_path))
+    owned_connection_ids = set(_owned_connection_ids(registry, artifact_id))
     incoming_connections, diagram_refs, grf_refs = _entity_ref_blockers(
         registry=registry,
         artifact_id=artifact_id,

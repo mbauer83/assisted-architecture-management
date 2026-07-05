@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 import subprocess
 from collections.abc import Callable
 from pathlib import Path
@@ -9,6 +10,8 @@ import pytest
 from src.infrastructure.write.artifact_write.batch_transaction import (
     BatchCommitResult,
     StagingDirectory,
+    _derive_manifest,
+    _derive_manifest_from_touched_paths,
     commit_staged_repo,
     create_staging_repo,
 )
@@ -17,6 +20,7 @@ from src.infrastructure.write.artifact_write.m4_transaction import (
     TransactionRecoveryError,
     recover_transactions,
 )
+from src.infrastructure.write.artifact_write.staged_workspace import stage_live_path
 
 
 class SimulatedKill(BaseException):
@@ -39,8 +43,17 @@ def _stage_post_state(repo: Path) -> tuple[StagingDirectory, Path]:
     staging, staged_root = create_staging_repo(repo)
     _write(staged_root / "model" / "a.md", "new-a")
     _write(staged_root / "model" / "create.md", "new-create")
+    stage_live_path(staged_root / "model" / "delete.md", repo / "model" / "delete.md")
     (staged_root / "model" / "delete.md").unlink()
     return staging, staged_root
+
+
+def _touched_post_state(staged_root: Path) -> set[Path]:
+    return {
+        staged_root / "model" / "a.md",
+        staged_root / "model" / "create.md",
+        staged_root / "model" / "delete.md",
+    }
 
 
 def _assert_pre_state(repo: Path) -> None:
@@ -53,6 +66,23 @@ def _assert_post_state(repo: Path) -> None:
     assert (repo / "model" / "a.md").read_text() == "new-a"
     assert (repo / "model" / "create.md").read_text() == "new-create"
     assert not (repo / "model" / "delete.md").exists()
+
+
+def test_tracked_path_manifest_matches_full_tree_diff(tmp_path: Path) -> None:
+    repo = _fixture_repo(tmp_path)
+    staging, staged_root = _stage_post_state(repo)
+    try:
+        tracked_entries, tracked_result = _derive_manifest_from_touched_paths(
+            live_root=repo,
+            staged_root=staged_root,
+            touched_paths=_touched_post_state(staged_root),
+        )
+        full_entries, full_result = _derive_manifest(live_root=repo, staged_root=staged_root)
+    finally:
+        staging.cleanup()
+
+    assert tracked_entries == full_entries
+    assert tracked_result == full_result
 
 
 @pytest.mark.parametrize(
@@ -84,6 +114,7 @@ def test_boundary_kill_recovers_to_pre_or_post(
         commit_staged_repo(
             live_root=repo,
             staged_root=staged_root,
+            touched_paths=_touched_post_state(staged_root),
             rebuild_index=lambda _result: rebuilt.append("commit"),
             on_boundary=kill_at,
         )
@@ -103,6 +134,7 @@ def test_recovery_is_idempotent_and_delete_replay_ignores_absence(tmp_path: Path
         commit_staged_repo(
             live_root=repo,
             staged_root=staged_root,
+            touched_paths=_touched_post_state(staged_root),
             rebuild_index=lambda _result: None,
             on_boundary=_kill_on("entry_applied:2"),
         )
@@ -120,6 +152,7 @@ def test_recovery_fails_closed_on_third_state(tmp_path: Path) -> None:
         commit_staged_repo(
             live_root=repo,
             staged_root=staged_root,
+            touched_paths=_touched_post_state(staged_root),
             rebuild_index=lambda _result: None,
             on_boundary=_kill_on("intent_installed"),
         )
@@ -140,6 +173,7 @@ def test_done_is_durable_before_index_rebuild_and_cleanup(tmp_path: Path) -> Non
         commit_staged_repo(
             live_root=repo,
             staged_root=staged_root,
+            touched_paths=_touched_post_state(staged_root),
             rebuild_index=fail_rebuild,
         )
 
@@ -155,6 +189,89 @@ def test_staging_and_transaction_are_repo_local(tmp_path: Path) -> None:
     staging, staged_root = create_staging_repo(repo)
     assert staged_root.is_relative_to(repo / ".arch-repo" / "transactions")
     staging.cleanup()
+
+
+def test_symlink_staging_write_does_not_mutate_live_file(tmp_path: Path) -> None:
+    repo = _fixture_repo(tmp_path)
+    staging, staged_root = create_staging_repo(repo)
+    try:
+        staged_file = stage_live_path(staged_root / "model" / "a.md", repo / "model" / "a.md")
+        assert staged_file.is_symlink()
+
+        staged_file.write_text("staged-only", encoding="utf-8")
+
+        assert not staged_file.is_symlink()
+        assert staged_file.read_text(encoding="utf-8") == "staged-only"
+        assert (repo / "model" / "a.md").read_text(encoding="utf-8") == "old-a"
+    finally:
+        staging.cleanup()
+
+
+def test_symlink_staging_delete_does_not_mutate_live_file(tmp_path: Path) -> None:
+    repo = _fixture_repo(tmp_path)
+    staging, staged_root = create_staging_repo(repo)
+    try:
+        staged_file = stage_live_path(staged_root / "model" / "a.md", repo / "model" / "a.md")
+        staged_file.unlink()
+
+        assert not staged_file.exists()
+        assert (repo / "model" / "a.md").read_text(encoding="utf-8") == "old-a"
+    finally:
+        staging.cleanup()
+
+
+def test_symlink_staging_rename_does_not_replace_live_destination(tmp_path: Path) -> None:
+    repo = _fixture_repo(tmp_path)
+    _write(repo / "model" / "target.md", "live-target")
+    staging, staged_root = create_staging_repo(repo)
+    try:
+        stage_live_path(staged_root / "model" / "a.md", repo / "model" / "a.md")
+        stage_live_path(staged_root / "model" / "target.md", repo / "model" / "target.md")
+        os.rename(staged_root / "model" / "a.md", staged_root / "model" / "target.md")
+
+        assert (repo / "model" / "a.md").read_text(encoding="utf-8") == "old-a"
+        assert (repo / "model" / "target.md").read_text(encoding="utf-8") == "live-target"
+        assert (staged_root / "model" / "target.md").read_text(encoding="utf-8") == "old-a"
+    finally:
+        staging.cleanup()
+
+
+def test_broken_symlink_materializes_as_absent_for_write(tmp_path: Path) -> None:
+    repo = _fixture_repo(tmp_path)
+    staging, staged_root = create_staging_repo(repo)
+    try:
+        stage_live_path(staged_root / "model" / "a.md", repo / "model" / "a.md")
+        (repo / "model" / "a.md").unlink()
+        staged_file = staged_root / "model" / "a.md"
+        assert staged_file.is_symlink()
+
+        staged_file.write_text("recreated-in-stage", encoding="utf-8")
+
+        assert staged_file.read_text(encoding="utf-8") == "recreated-in-stage"
+        assert not (repo / "model" / "a.md").exists()
+    finally:
+        staging.cleanup()
+
+
+def test_sparse_staging_does_not_walk_repo_tree(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    repo = _fixture_repo(tmp_path)
+    for index in range(50):
+        _write(repo / "model" / f"extra-{index}.md", f"extra-{index}")
+    rglob_calls = 0
+    original = Path.rglob
+
+    def counted_rglob(path: Path, pattern: str):
+        nonlocal rglob_calls
+        rglob_calls += 1
+        return original(path, pattern)
+
+    monkeypatch.setattr(Path, "rglob", counted_rglob)
+    staging, staged_root = create_staging_repo(repo)
+    try:
+        assert staged_root.exists()
+        assert rglob_calls == 0
+    finally:
+        staging.cleanup()
 
 
 def test_transactions_journal_is_gitignored_from_every_commit_path(tmp_path: Path) -> None:
@@ -193,6 +310,7 @@ def test_ref_transition_replays_after_kill(tmp_path: Path) -> None:
         commit_staged_repo(
             live_root=repo,
             staged_root=staged_root,
+            touched_paths=set(),
             rebuild_index=lambda _result: None,
             ref_transition=GitRefTransition(branch="main", old_sha=old_sha, new_sha=new_sha),
             on_boundary=_kill_on("ref_updated"),
@@ -210,6 +328,7 @@ def test_recovery_fails_closed_when_payload_is_missing(tmp_path: Path) -> None:
         commit_staged_repo(
             live_root=repo,
             staged_root=staged_root,
+            touched_paths=_touched_post_state(staged_root),
             rebuild_index=lambda _result: None,
             on_boundary=_kill_on("intent_installed"),
         )

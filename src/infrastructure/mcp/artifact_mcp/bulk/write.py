@@ -5,16 +5,17 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
-from src.application.verification.artifact_verifier import ArtifactRegistry, ArtifactVerifier
-from src.infrastructure.artifact_index import shared_artifact_index
+from src.application.verification.artifact_verifier import ArtifactVerifier
 from src.infrastructure.mcp.artifact_mcp.context import authoritative_callbacks_for
 from src.infrastructure.write.artifact_write.batch_transaction import (
     BatchCommitResult,
     commit_staged_repo,
     create_staging_repo,
+    staged_write_guard,
 )
 from src.infrastructure.write.operation_registry import operation_registry
 
+from .candidate_state import candidate_registry, candidate_store
 from .common import (
     KNOWN_OPS,
     normalize_staged_result,
@@ -121,35 +122,45 @@ def _execute_staged(
     clear_repo_caches, changed_paths = temp_repo_callbacks(staged_root)
     ref_map: dict[str, str] = {}
     results: dict[int, dict[str, object]] = {}
-    skipped = apply_create_entities(
-        creates_ent,
-        ref_map=ref_map,
-        results=results,
-        clear_repo_caches=clear_repo_caches,
-        staged_root=staged_root,
-        dry_run=dry_run,
-        operation_id=operation_id,
-    )
-    skipped = apply_add_connections(
-        creates_con,
-        ref_map=ref_map,
-        results=results,
-        clear_repo_caches=clear_repo_caches,
-        staged_root=staged_root,
-        dry_run=dry_run,
-        operation_id=operation_id,
-        skipped=skipped,
-    )
-    skipped = apply_edits(
-        edits,
-        results=results,
-        clear_repo_caches=clear_repo_caches,
-        staged_root=staged_root,
-        dry_run=dry_run,
-        operation_id=operation_id,
-        skipped=skipped,
-        current_registry=lambda: ArtifactRegistry(shared_artifact_index([staged_root])),
-    )
+    with staged_write_guard(staged_root):
+        skipped = apply_create_entities(
+            creates_ent,
+            ref_map=ref_map,
+            results=results,
+            clear_repo_caches=clear_repo_caches,
+            staged_root=staged_root,
+            dry_run=dry_run,
+            operation_id=operation_id,
+        )
+        skipped = apply_add_connections(
+            creates_con,
+            ref_map=ref_map,
+            results=results,
+            clear_repo_caches=clear_repo_caches,
+            staged_root=staged_root,
+            dry_run=dry_run,
+            operation_id=operation_id,
+            skipped=skipped,
+            current_registry=lambda: candidate_registry(
+                live_root=live_root,
+                staged_root=staged_root,
+                touched_paths=changed_paths,
+            ),
+        )
+        skipped = apply_edits(
+            edits,
+            results=results,
+            clear_repo_caches=clear_repo_caches,
+            staged_root=staged_root,
+            dry_run=dry_run,
+            operation_id=operation_id,
+            skipped=skipped,
+            current_registry=lambda: candidate_registry(
+                live_root=live_root,
+                staged_root=staged_root,
+                touched_paths=changed_paths,
+            ),
+        )
 
     if skipped:
         _mark_batch_aborted_by_item_failure(
@@ -203,18 +214,32 @@ def _sync_verify_and_commit(
             staged_root,
             items=[item for _index, item in indexed],
             results=results,
+            registry=candidate_registry(
+                live_root=live_root,
+                staged_root=staged_root,
+                touched_paths=changed_paths,
+            ),
         )
         from src.infrastructure.app_bootstrap import build_runtime_catalogs, get_module_registry  # noqa: PLC0415
 
         auto_sync_diagrams(
             repo_root=staged_root,
             verifier=ArtifactVerifier(
-                ArtifactRegistry(shared_artifact_index([staged_root])),
+                candidate_registry(
+                    live_root=live_root,
+                    staged_root=staged_root,
+                    touched_paths=changed_paths,
+                ),
                 catalogs=build_runtime_catalogs(get_module_registry()),
             ),
             clear_repo_caches=clear_repo_caches,
             diagram_ids=auto_sync_diagram_ids,
             dry_run=dry_run,
+            store_factory=lambda: candidate_store(
+                live_root=live_root,
+                staged_root=staged_root,
+                touched_paths=changed_paths,
+            ),
         )
 
     operation_registry.set_phase(operation_id, "verify")
@@ -241,6 +266,7 @@ def _sync_verify_and_commit(
     commit_staged_repo(
         live_root=live_root,
         staged_root=staged_root,
+        touched_paths=changed_paths,
         rebuild_index=rebuild_index,
     )
     return True

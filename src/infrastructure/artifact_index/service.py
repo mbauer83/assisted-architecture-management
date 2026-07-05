@@ -38,6 +38,7 @@ from src.domain.artifact_types import (
 from . import _sqlite_queries as _q
 from ._identity_resolver import _IdentityResolver
 from ._mem_store import _MemStore
+from ._reverse_reference_queries import _EntityIds, _ReverseReferenceQueries
 from ._rwlock import _RWLock
 from ._scope_registry import _ScopeRegistry
 from ._service_incremental import (
@@ -71,7 +72,7 @@ def shared_artifact_index(repo_root: Path | list[Path] | list[RepoMount]) -> Art
     return get_shared_index(ArtifactIndex, repo_root)
 
 
-class ArtifactIndex:
+class ArtifactIndex(_ReverseReferenceQueries):
     def __init__(self, repo_root: Path | list[Path] | list[RepoMount]) -> None:
         mounts = normalize_mounts(repo_root)
         self.repo_mounts: list[RepoMount] = mounts
@@ -416,9 +417,7 @@ class ArtifactIndex:
         with self._lock.reading(), self._db.reader() as conn:
             return _q.connection_stats_for(conn, entity_id)
 
-    def connection_counts_for_entities(
-        self, entity_ids: list[str] | set[str] | frozenset[str]
-    ) -> dict[str, tuple[int, int, int]]:
+    def connection_counts_for_entities(self, entity_ids: _EntityIds) -> dict[str, tuple[int, int, int]]:
         self._ensure_loaded()
         with self._lock.reading(), self._db.reader() as conn:
             return _q.connection_stats_for_set(conn, frozenset(entity_ids))

@@ -334,10 +334,12 @@ def apply_migration(
     staging = {root: create_staging_repo(root) for root in roots}
     try:
         staged_by_live = {root: staged for root, (_handle, staged) in staging.items()}
+        touched_by_live: dict[Path, set[Path]] = {root: set() for root in roots}
         for change in plan.changes:
             relative = change.path.relative_to(change.repo_root)
             staged_path = staged_by_live[change.repo_root] / relative
             staged_path.write_text(_render(change.frontmatter, change.body), encoding="utf-8")
+            touched_by_live[change.repo_root].add(staged_path)
         errors = verify(staged_by_live)
         if errors:
             raise MigrationBlockedError("Staged verification failed:\n" + "\n".join(errors))
@@ -347,6 +349,7 @@ def apply_migration(
                 commit_staged_repo(
                     live_root=root,
                     staged_root=staged_by_live[root],
+                    touched_paths=touched_by_live[root],
                     rebuild_index=lambda _result: None,
                 ).changed_paths
             )

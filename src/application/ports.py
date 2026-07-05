@@ -170,6 +170,8 @@ class RelationshipGraph(Protocol):
         direction: Literal["any", "outbound", "inbound"] = "any",
         conn_type: str | None = None,
     ) -> list[ConnectionRecord]: ...
+    def diagrams_referencing_artifact(self, artifact_id: str) -> list[DiagramRecord]: ...
+    def grf_references_to_entity(self, artifact_id: str) -> list[EntityRecord]: ...
     def find_neighbors(
         self,
         entity_id: str,
@@ -237,6 +239,7 @@ class VerifierStorePort(
     ArtifactLookup,
     ArtifactIndexLifecycle,
     ArtifactIdentityResolver,
+    RelationshipGraph,
     RepositoryScopeResolver,
     Protocol,
 ):

@@ -308,11 +308,16 @@ def delete_document(
     clear_repo_caches: Callable[[Path], None],
     artifact_id: str,
     dry_run: bool,
+    verifier: ArtifactVerifier | None = None,
 ) -> WriteResult:
     assert_engagement_write_root(repo_root)
 
     docs_root = repo_root / DOCS
-    path = _resolve_document_path(docs_root, artifact_id)
+    path = None
+    if verifier is not None and verifier.registry is not None:
+        path = verifier.registry.find_file_by_id(artifact_id)
+    if path is None:
+        path = _resolve_document_path(docs_root, artifact_id)
     if path is None:
         raise ValueError(f"Document '{artifact_id}' not found under {docs_root}")
 

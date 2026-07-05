@@ -65,6 +65,9 @@ select = [
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 addopts = "-n auto"
+markers = [
+    "perf_manual: opt-in, machine-dependent performance benchmarks; enable with ARCH_PERF_MANUAL=1",
+]
 # Coverage is opt-in to keep the default quality-gate run fast. Enable with:
 #   uv run pytest --cov            (terminal summary with missing lines)
 #   uv run pytest --cov --cov-report=html   (browsable htmlcov/ report)

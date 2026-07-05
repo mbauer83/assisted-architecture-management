@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
@@ -39,6 +40,8 @@ def apply_planned_deletes(
     root: Path,
     registry: ArtifactRegistry,
     verifier: ArtifactVerifier,
+    registry_factory: Callable[[], ArtifactRegistry] | None = None,
+    verifier_factory: Callable[[ArtifactRegistry], ArtifactVerifier] | None = None,
     clear_repo_caches,
     operation_id: str,
     results: dict[int, dict[str, object]],
@@ -52,6 +55,9 @@ def apply_planned_deletes(
             results[index] = skipped_delete_result(op, operation_id=operation_id)
             continue
         try:
+            if registry_factory is not None:
+                registry = registry_factory()
+                verifier = verifier_factory(registry) if verifier_factory is not None else verifier
             result = apply_single_delete(
                 item=item,
                 op=op,
@@ -102,6 +108,7 @@ def apply_single_delete(
             clear_repo_caches=clear_repo_caches,
             artifact_id=str(item["artifact_id"]),
             dry_run=False,
+            verifier=verifier,
         )
     if op == "delete_document":
         return artifact_write_ops.delete_document(
@@ -109,6 +116,7 @@ def apply_single_delete(
             clear_repo_caches=clear_repo_caches,
             artifact_id=str(item["artifact_id"]),
             dry_run=False,
+            verifier=verifier,
         )
     return artifact_write_ops.delete_entity(
         repo_root=root,

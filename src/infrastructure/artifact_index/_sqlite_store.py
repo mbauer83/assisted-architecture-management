@@ -68,13 +68,6 @@ def _is_symmetric_conn(conn_type: str) -> bool:
     return info.symmetric if info is not None else False
 
 
-def _discard_from(d: dict, key: object, val: str) -> None:
-    if s := d.get(key):
-        s.discard(val)
-        if not s:
-            del d[key]
-
-
 class _SqliteStore:
     def __init__(self, name_hash: str, mem: _MemStore, scope_fn: Callable[[Path], str]) -> None:
         self._uri = f"file:arch-artifact-index-{name_hash}?mode=memory&cache=shared"
@@ -120,11 +113,11 @@ class _SqliteStore:
     # ── Write operations ──────────────────────────────────────────────────────
 
     def upsert_entity(self, rec: EntityRecord) -> None:
+        old = self._mem.entities.get(rec.artifact_id)
+        if old is not None:
+            self._mem.unindex_entity(old)
         self._mem.entities[rec.artifact_id] = rec
-        if rec.host_diagram_id is None:
-            self._mem.entity_by_path[rec.path.resolve()] = rec.artifact_id
-        else:
-            self._mem.entities_by_diagram.setdefault(rec.host_diagram_id, set()).add(rec.artifact_id)
+        self._mem.index_entity(rec)
         with self._conn:
             self._conn.execute("DELETE FROM entities WHERE artifact_id=?", (rec.artifact_id,))
             self._conn.execute(_INS_ENTITY, self._entity_row(rec))
@@ -147,12 +140,7 @@ class _SqliteStore:
     def delete_entity(self, artifact_id: str) -> None:
         old = self._mem.entities.pop(artifact_id, None)
         if old is not None:
-            match old.host_diagram_id:
-                case None:
-                    self._mem.entity_by_path.pop(old.path.resolve(), None)
-                case host_diagram_id:
-                    if eids := self._mem.entities_by_diagram.get(host_diagram_id):
-                        eids.discard(artifact_id)
+            self._mem.unindex_entity(old)
         with self._conn:
             self._conn.execute("DELETE FROM entities WHERE artifact_id=?", (artifact_id,))
             self._conn.execute("DELETE FROM entity_context_edges WHERE entity_id=?", (artifact_id,))
@@ -161,12 +149,11 @@ class _SqliteStore:
                 self._conn.execute("DELETE FROM entities_fts WHERE artifact_id=?", (artifact_id,))
 
     def upsert_connection(self, rec: ConnectionRecord) -> None:
+        old = self._mem.connections.get(rec.artifact_id)
+        if old is not None:
+            self._mem.unindex_connection(old)
         self._mem.connections[rec.artifact_id] = rec
-        self._mem.connections_by_path.setdefault(rec.path.resolve(), set()).add(rec.artifact_id)
-        self._mem.connections_by_entity.setdefault(rec.source, set()).add(rec.artifact_id)
-        self._mem.connections_by_entity.setdefault(rec.target, set()).add(rec.artifact_id)
-        if "#conn/" in rec.artifact_id:
-            self._mem.connections_by_diagram.setdefault(rec.artifact_id.split("#conn/")[0], set()).add(rec.artifact_id)
+        self._mem.index_connection(rec)
         with self._conn:
             self._conn.execute("DELETE FROM connections WHERE artifact_id=?", (rec.artifact_id,))
             self._conn.execute(_INS_CONNECTION, self._connection_row(rec))
@@ -180,11 +167,7 @@ class _SqliteStore:
     def delete_connection(self, artifact_id: str) -> None:
         old = self._mem.connections.pop(artifact_id, None)
         if old is not None:
-            _discard_from(self._mem.connections_by_path, old.path.resolve(), artifact_id)
-            for eid in (old.source, old.target):
-                _discard_from(self._mem.connections_by_entity, eid, artifact_id)
-            if "#conn/" in artifact_id:
-                _discard_from(self._mem.connections_by_diagram, artifact_id.split("#conn/")[0], artifact_id)
+            self._mem.unindex_connection(old)
         with self._conn:
             self._conn.execute("DELETE FROM connections WHERE artifact_id=?", (artifact_id,))
             self._conn.execute("DELETE FROM entity_context_edges WHERE connection_id=?", (artifact_id,))
@@ -192,8 +175,11 @@ class _SqliteStore:
                 self._conn.execute("DELETE FROM connections_fts WHERE artifact_id=?", (artifact_id,))
 
     def upsert_diagram(self, rec: DiagramRecord) -> None:
+        old = self._mem.diagrams.get(rec.artifact_id)
+        if old is not None:
+            self._mem.unindex_diagram(old)
         self._mem.diagrams[rec.artifact_id] = rec
-        self._mem.diagram_by_path[rec.path.resolve()] = rec.artifact_id
+        self._mem.index_diagram(rec)
         with self._conn:
             self._conn.execute("DELETE FROM diagrams WHERE artifact_id=?", (rec.artifact_id,))
             self._conn.execute(_INS_DIAGRAM, self._diagram_row(rec))
@@ -204,7 +190,7 @@ class _SqliteStore:
     def delete_diagram(self, artifact_id: str) -> None:
         old = self._mem.diagrams.pop(artifact_id, None)
         if old is not None:
-            self._mem.diagram_by_path.pop(old.path.resolve(), None)
+            self._mem.unindex_diagram(old)
         with self._conn:
             self._conn.execute("DELETE FROM diagrams WHERE artifact_id=?", (artifact_id,))
             if self._fts_enabled:

@@ -7,16 +7,15 @@ from pathlib import Path
 from typing import Any
 
 from src.application.artifact_repository import ArtifactRepository
-from src.application.entity_type_predicates import is_internal_entity_type
-from src.application.verification.artifact_verifier import ArtifactVerifier
+from src.application.verification.artifact_verifier import ArtifactRegistry, ArtifactVerifier
 from src.application.verification.artifact_verifier_parsing import (
     parse_diagram_refs,
     parse_frontmatter_from_path,
 )
-from src.config.repo_paths import DIAGRAM_CATALOG, DIAGRAMS, DOCS, MODEL, RENDERED
+from src.config.repo_paths import DIAGRAM_CATALOG, DIAGRAMS, RENDERED
 from src.infrastructure.artifact_index import shared_artifact_index
 from src.infrastructure.write import artifact_write_ops
-from src.infrastructure.write.artifact_write.parse_existing import parse_outgoing_file
+from src.infrastructure.write.artifact_write._sync_helpers import LookupStore
 
 
 def connection_artifact_id(source_entity: str, connection_type: str, target_entity: str) -> str:
@@ -78,60 +77,6 @@ def find_diagram_artifact_id(path: Path) -> str | None:
     return artifact_id or None
 
 
-def find_document_path(repo_root: Path, artifact_id: str) -> Path | None:
-    docs_root = repo_root / DOCS
-    candidates = list(docs_root.rglob(f"{artifact_id}.md")) if docs_root.exists() else []
-    return candidates[0] if candidates else None
-
-
-def find_diagram_path(repo_root: Path, artifact_id: str) -> Path | None:
-    for path in diagram_paths(repo_root):
-        if find_diagram_artifact_id(path) == artifact_id:
-            return path
-    return None
-
-
-def scan_connections(
-    repo_root: Path,
-) -> tuple[dict[tuple[str, str, str], Path], dict[str, list[tuple[str, str, str]]]]:
-    connection_paths: dict[tuple[str, str, str], Path] = {}
-    incoming: dict[str, list[tuple[str, str, str]]] = {}
-    model_root = repo_root / MODEL
-    if not model_root.exists():
-        return connection_paths, incoming
-    for outgoing_path in sorted(model_root.rglob("*.outgoing.md")):
-        try:
-            parsed = parse_outgoing_file(outgoing_path)
-        except Exception:  # noqa: BLE001
-            continue
-        source = str(parsed.frontmatter.get("source-entity", ""))
-        for conn in parsed.connections:
-            key = (source, str(conn["connection_type"]), str(conn["target_entity"]))
-            connection_paths[key] = outgoing_path
-            incoming.setdefault(key[2], []).append(key)
-    return connection_paths, incoming
-
-
-def scan_grf_refs(repo_root: Path) -> dict[str, list[str]]:
-    refs: dict[str, list[str]] = {}
-    model_root = repo_root / MODEL
-    if not model_root.exists():
-        return refs
-    for path in sorted(model_root.rglob("*.md")):
-        if path.name.endswith(".outgoing.md"):
-            continue
-        fm = parse_frontmatter_from_path(path) or {}
-        from src.infrastructure.app_bootstrap import build_runtime_catalogs, get_module_registry  # noqa: PLC0415
-        _cat = build_runtime_catalogs(get_module_registry())
-        if not is_internal_entity_type(str(fm.get("artifact-type", "")), _cat.ontology):
-            continue
-        target = str(fm.get("global-artifact-id", "")).strip()
-        gar_id = str(fm.get("artifact-id", path.stem)).strip()
-        if target and gar_id:
-            refs.setdefault(target, []).append(gar_id)
-    return refs
-
-
 def scan_diagram_refs(repo_root: Path) -> dict[str, list[str]]:
     refs: dict[str, list[str]] = {}
     for path in diagram_paths(repo_root):
@@ -153,10 +98,11 @@ def auto_sync_diagrams(
     clear_repo_caches: Callable[[Path], None],
     diagram_ids: list[str],
     dry_run: bool,
+    store_factory: Callable[[], LookupStore] | None = None,
 ) -> list[dict[str, object]]:
     actions: list[dict[str, object]] = []
     for diagram_id in sorted(set(diagram_ids)):
-        store = ArtifactRepository(shared_artifact_index([repo_root]))
+        store = store_factory() if store_factory is not None else ArtifactRepository(shared_artifact_index([repo_root]))
         result = artifact_write_ops.refresh_diagram(
             repo_root=repo_root,
             store=store,
@@ -207,8 +153,9 @@ def collect_bulk_write_auto_sync_diagram_ids(
     *,
     items: list[dict[str, Any]],
     results: dict[int, dict[str, object]],
+    registry: ArtifactRegistry | None = None,
 ) -> list[str]:
-    refs = scan_diagram_refs(repo_root)
+    refs = _indexed_auto_sync_refs(registry, items, results) if registry is not None else scan_diagram_refs(repo_root)
     connection_ref_keys = [key for key in refs if parse_connection_ref_id(key) is not None]
     diagram_ids: set[str] = set()
     for index, item in enumerate(items):
@@ -216,6 +163,42 @@ def collect_bulk_write_auto_sync_diagram_ids(
         if result is not None and bool(result.get("wrote")):
             diagram_ids.update(_auto_sync_ids_for_item(item, result, refs, connection_ref_keys))
     return sorted(diagram_ids)
+
+
+def _indexed_auto_sync_refs(
+    registry: ArtifactRegistry,
+    items: list[dict[str, Any]],
+    results: dict[int, dict[str, object]],
+) -> dict[str, list[str]]:
+    refs: dict[str, list[str]] = {}
+    for index, item in enumerate(items):
+        result = results.get(index)
+        if result is None or not bool(result.get("wrote")):
+            continue
+        op = str(item.get("op", ""))
+        if op == "edit_entity":
+            old_id = str(item["artifact_id"])
+            _add_diagram_refs(refs, old_id, registry.diagrams_referencing_artifact(old_id))
+            for connection in registry.find_connections_for(old_id):
+                _add_diagram_refs(
+                    refs,
+                    connection.artifact_id,
+                    registry.diagrams_referencing_artifact(connection.artifact_id),
+                )
+        elif op == "edit_connection" and item.get("operation", "update") == "remove":
+            for connection_id in connection_ref_ids(
+                str(item["source_entity"]),
+                str(item["connection_type"]),
+                str(item["target_entity"]),
+            ):
+                _add_diagram_refs(refs, connection_id, registry.diagrams_referencing_artifact(connection_id))
+    return refs
+
+
+def _add_diagram_refs(refs: dict[str, list[str]], artifact_id: str, diagrams) -> None:
+    ids = [diagram.artifact_id for diagram in diagrams]
+    if ids:
+        refs.setdefault(artifact_id, []).extend(ids)
 
 
 def entity_owned_connection_ids(entity_id: str, connection_paths: dict[tuple[str, str, str], Path]) -> set[str]:

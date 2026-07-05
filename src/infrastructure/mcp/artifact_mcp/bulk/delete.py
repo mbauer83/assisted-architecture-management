@@ -5,16 +5,17 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
-from src.application.verification.artifact_verifier import ArtifactRegistry, ArtifactVerifier
-from src.infrastructure.artifact_index import shared_artifact_index
+from src.application.verification.artifact_verifier import ArtifactVerifier
 from src.infrastructure.mcp.artifact_mcp.context import authoritative_callbacks_for
 from src.infrastructure.write.artifact_write.batch_transaction import (
     BatchCommitResult,
     commit_staged_repo,
     create_staging_repo,
+    staged_write_guard,
 )
 from src.infrastructure.write.operation_registry import operation_registry
 
+from .candidate_state import candidate_registry, candidate_store
 from .common import (
     normalize_staged_result,
     normalize_staged_verification,
@@ -131,26 +132,38 @@ def _execute_staged_delete_batch(
     clear_repo_caches, changed_paths = temp_repo_callbacks(staged_root)
     from src.infrastructure.app_bootstrap import build_runtime_catalogs, get_module_registry  # noqa: PLC0415
 
-    registry = ArtifactRegistry(shared_artifact_index([staged_root]))
+    registry = candidate_registry(live_root=live_root, staged_root=staged_root, touched_paths=changed_paths)
     verifier = ArtifactVerifier(registry, catalogs=build_runtime_catalogs(get_module_registry()))
     operation_registry.set_phase(operation_id, "apply")
 
-    apply_implicit_connection_deletes(
-        implicit_connection_deletes=implicit_connection_deletes,
-        root=staged_root,
-        registry=registry,
-        verifier=verifier,
-        clear_repo_caches=clear_repo_caches,
-    )
-    skipped = apply_planned_deletes(
-        planned=planned,
-        root=staged_root,
-        registry=registry,
-        verifier=verifier,
-        clear_repo_caches=clear_repo_caches,
-        operation_id=operation_id,
-        results=results,
-    )
+    with staged_write_guard(staged_root):
+        apply_implicit_connection_deletes(
+            implicit_connection_deletes=implicit_connection_deletes,
+            root=staged_root,
+            registry=registry,
+            verifier=verifier,
+            clear_repo_caches=clear_repo_caches,
+        )
+        registry = candidate_registry(live_root=live_root, staged_root=staged_root, touched_paths=changed_paths)
+        verifier = ArtifactVerifier(registry, catalogs=build_runtime_catalogs(get_module_registry()))
+        skipped = apply_planned_deletes(
+            planned=planned,
+            root=staged_root,
+            registry=registry,
+            verifier=verifier,
+            registry_factory=lambda: candidate_registry(
+                live_root=live_root,
+                staged_root=staged_root,
+                touched_paths=changed_paths,
+            ),
+            verifier_factory=lambda current: ArtifactVerifier(
+                current,
+                catalogs=build_runtime_catalogs(get_module_registry()),
+            ),
+            clear_repo_caches=clear_repo_caches,
+            operation_id=operation_id,
+            results=results,
+        )
 
     auto_sync_actions: list[dict[str, object]] = []
     if not skipped and auto_sync_ids:
@@ -158,12 +171,21 @@ def _execute_staged_delete_batch(
         auto_sync_actions = auto_sync_diagrams(
             repo_root=staged_root,
             verifier=ArtifactVerifier(
-                ArtifactRegistry(shared_artifact_index([staged_root])),
+                candidate_registry(
+                    live_root=live_root,
+                    staged_root=staged_root,
+                    touched_paths=changed_paths,
+                ),
                 catalogs=build_runtime_catalogs(get_module_registry()),
             ),
             clear_repo_caches=clear_repo_caches,
             diagram_ids=auto_sync_ids,
             dry_run=False,
+            store_factory=lambda: candidate_store(
+                live_root=live_root,
+                staged_root=staged_root,
+                touched_paths=changed_paths,
+            ),
         )
 
     verification = _staged_delete_verification(
@@ -187,6 +209,7 @@ def _execute_staged_delete_batch(
         commit_staged_repo(
             live_root=live_root,
             staged_root=staged_root,
+            touched_paths=changed_paths,
             rebuild_index=rebuild_index,
         )
         committed = True

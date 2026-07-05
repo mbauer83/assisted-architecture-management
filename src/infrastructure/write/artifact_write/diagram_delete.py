@@ -74,7 +74,11 @@ def _delete_diagram_core(
     verifier: ArtifactVerifier | None = None,
     committed_repo: CandidateRepository | None = None,
 ) -> WriteResult:
-    diagram_path = _find_diagram_file(repo_root, artifact_id)
+    diagram_path = None
+    if verifier is not None and verifier.registry is not None:
+        diagram_path = verifier.registry.find_file_by_id(artifact_id)
+    if diagram_path is None:
+        diagram_path = _find_diagram_file(repo_root, artifact_id)
     if diagram_path is None:
         raise ValueError(f"Diagram '{artifact_id}' not found in repo '{repo_root}'")
 

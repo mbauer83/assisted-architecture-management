@@ -34,25 +34,7 @@ def _catalogs():
 
 
 def _empty_inventory(repo_path: Path) -> FileInventory:
-    return FileInventory(
-        repo_path=repo_path,
-        include_diagrams=True,
-        rel_to_path={},
-        path_to_rel={},
-        snapshots={},
-        ordered_paths=[],
-        entity_relpaths=[],
-        connection_relpaths=[],
-        diagram_puml_relpaths=[],
-        diagram_matrix_relpaths=[],
-        file_type_by_relpath={},
-        entity_path_by_id={},
-        connection_refs_by_path={},
-        connection_paths_by_entity={},
-        neighbor_entities={},
-        diagram_paths_by_entity={},
-        diagram_paths_by_connection_id={},
-    )
+    return FileInventory(repo_path=repo_path, include_diagrams=True)
 
 
 class _FakeInventoryPort:

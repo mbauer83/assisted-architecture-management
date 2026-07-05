@@ -25,27 +25,11 @@ from src.application.verification.artifact_verifier_types import (
 
 
 def _empty_inventory(paths: list[Path]) -> FileInventory:
-    rel_to_path = {p.name: p for p in paths}
-    path_to_rel = {p: p.name for p in paths}
-    return FileInventory(
-        repo_path=Path("/repo"),
-        include_diagrams=True,
-        rel_to_path=rel_to_path,
-        path_to_rel=path_to_rel,
-        snapshots={},
-        ordered_paths=[p.name for p in paths],
-        entity_relpaths=[],
-        connection_relpaths=[],
-        diagram_puml_relpaths=[],
-        diagram_matrix_relpaths=[],
-        file_type_by_relpath={},
-        entity_path_by_id={},
-        connection_refs_by_path={},
-        connection_paths_by_entity={},
-        neighbor_entities={},
-        diagram_paths_by_entity={},
-        diagram_paths_by_connection_id={},
-    )
+    inv = FileInventory(repo_path=Path("/repo"), include_diagrams=True)
+    inv.rel_to_path = {p.name: p for p in paths}
+    inv.path_to_rel = {p: p.name for p in paths}
+    inv.ordered_paths = [p.name for p in paths]
+    return inv
 
 
 def _state(results: dict[str, dict]) -> IncrementalState:

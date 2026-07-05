@@ -5,7 +5,6 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
-from src.config.repo_paths import DOCS
 from src.infrastructure.mcp.artifact_mcp.context import expand_artifact_id
 from src.infrastructure.mcp.artifact_mcp.edit_tools import _require_registry, _resolve
 
@@ -17,14 +16,7 @@ from .delete_plan import (
     validation_error,
 )
 from .diagram_refs import (
-    connection_id_involves_entity,
     connection_ref_ids,
-    entity_owned_connection_ids,
-    find_diagram_path,
-    find_document_path,
-    scan_connections,
-    scan_diagram_refs,
-    scan_grf_refs,
     toposort_entities,
 )
 
@@ -57,9 +49,6 @@ def preflight_bulk_delete(
     root, registry, _verifier = _resolve(str(repo_root), need_registry=True)
     registry = _require_registry(registry)
     _expand_item_ids(items, registry)
-    connection_paths, incoming = scan_connections(root)
-    grf_refs = scan_grf_refs(root)
-    diagram_refs = scan_diagram_refs(root)
 
     explicit_connection_deletes, entity_deletes, document_deletes, diagram_deletes, duplicate_errors = collect_requests(
         indexed
@@ -74,18 +63,16 @@ def preflight_bulk_delete(
     explicit_connection_delete_set = set(explicit_connection_deletes)
     implicit_connection_deletes: set[ConnectionKey] = set()
     auto_sync_diagram_ids: set[str] = set()
-    connection_ref_keys = [key for key in diagram_refs if " → " in key or ("---" in key and "@@" in key)]
+    grf_refs = {
+        artifact_id: [rec.artifact_id for rec in registry.grf_references_to_entity(artifact_id)]
+        for artifact_id in entity_delete_set
+    }
 
     _validate_entity_deletes(
         entity_deletes=entity_deletes,
         entity_delete_set=entity_delete_set,
         diagram_delete_set=diagram_delete_set,
         explicit_connection_delete_set=explicit_connection_delete_set,
-        connection_paths=connection_paths,
-        incoming=incoming,
-        grf_refs=grf_refs,
-        diagram_refs=diagram_refs,
-        connection_ref_keys=connection_ref_keys,
         registry=registry,
         root=root,
         auto_sync_diagrams=auto_sync_diagrams,
@@ -95,21 +82,20 @@ def preflight_bulk_delete(
     )
     _validate_connection_deletes(
         explicit_connection_deletes=explicit_connection_deletes,
-        connection_paths=connection_paths,
-        diagram_refs=diagram_refs,
         diagram_delete_set=diagram_delete_set,
+        registry=registry,
         auto_sync_diagrams=auto_sync_diagrams,
         results=results,
         auto_sync_diagram_ids=auto_sync_diagram_ids,
     )
     for artifact_id, index in document_deletes.items():
-        if find_document_path(root, artifact_id) is None:
+        if not _artifact_path_in_root(registry, artifact_id, root):
             results[index] = validation_error(
                 "delete_document",
-                f"Document '{artifact_id}' not found under {root / DOCS}",
+                f"Document '{artifact_id}' not found under {root}",
             )
     for artifact_id, index in diagram_deletes.items():
-        if find_diagram_path(root, artifact_id) is None:
+        if not _artifact_path_in_root(registry, artifact_id, root):
             results[index] = validation_error(
                 "delete_diagram",
                 f"Diagram '{artifact_id}' not found in repo '{root}'",
@@ -134,11 +120,6 @@ def _validate_entity_deletes(
     entity_delete_set: set[str],
     diagram_delete_set: set[str],
     explicit_connection_delete_set: set[ConnectionKey],
-    connection_paths: dict[ConnectionKey, Path],
-    incoming: dict[str, list[ConnectionKey]],
-    grf_refs: dict[str, list[str]],
-    diagram_refs: dict[str, list[str]],
-    connection_ref_keys: list[str],
     registry: Any,
     root: Path,
     auto_sync_diagrams: bool,
@@ -153,11 +134,6 @@ def _validate_entity_deletes(
             entity_delete_set=entity_delete_set,
             diagram_delete_set=diagram_delete_set,
             explicit_connection_delete_set=explicit_connection_delete_set,
-            connection_paths=connection_paths,
-            incoming=incoming,
-            grf_refs=grf_refs,
-            diagram_refs=diagram_refs,
-            connection_ref_keys=connection_ref_keys,
             registry=registry,
             root=root,
             auto_sync_diagrams=auto_sync_diagrams,
@@ -182,11 +158,6 @@ def _entity_delete_blockers(
     entity_delete_set: set[str],
     diagram_delete_set: set[str],
     explicit_connection_delete_set: set[ConnectionKey],
-    connection_paths: dict[ConnectionKey, Path],
-    incoming: dict[str, list[ConnectionKey]],
-    grf_refs: dict[str, list[str]],
-    diagram_refs: dict[str, list[str]],
-    connection_ref_keys: list[str],
     registry: Any,
     root: Path,
     auto_sync_diagrams: bool,
@@ -208,27 +179,26 @@ def _entity_delete_blockers(
         return []
 
     blockers: list[str] = []
-    for conn in incoming.get(artifact_id, []):
-        if conn in explicit_connection_delete_set:
+    for rec in registry.find_connections_for(artifact_id, direction="inbound"):
+        key = (rec.source, rec.conn_type, rec.target)
+        if key in explicit_connection_delete_set:
             continue
-        if conn[0] in entity_delete_set:
-            implicit_connection_deletes.add(conn)
+        if rec.source in entity_delete_set:
+            implicit_connection_deletes.add(key)
             continue
-        blockers.append(f"incoming connection must also be deleted: {conn[0]} {conn[1]} -> {artifact_id}")
+        blockers.append(f"incoming connection must also be deleted: {rec.source} {rec.conn_type} -> {artifact_id}")
 
     _collect_entity_diagram_effects(
         artifact_id=artifact_id,
         diagram_delete_set=diagram_delete_set,
-        connection_paths=connection_paths,
-        diagram_refs=diagram_refs,
-        connection_ref_keys=connection_ref_keys,
+        registry=registry,
         auto_sync_diagrams=auto_sync_diagrams,
         blockers=blockers,
         auto_sync_diagram_ids=auto_sync_diagram_ids,
     )
-    for gar_id in grf_refs.get(artifact_id, []):
-        if gar_id not in entity_delete_set:
-            blockers.append(f"global entity reference must also be deleted: {gar_id}")
+    for rec in registry.grf_references_to_entity(artifact_id):
+        if rec.artifact_id not in entity_delete_set:
+            blockers.append(f"global entity reference must also be deleted: {rec.artifact_id}")
     return blockers
 
 
@@ -236,20 +206,19 @@ def _collect_entity_diagram_effects(
     *,
     artifact_id: str,
     diagram_delete_set: set[str],
-    connection_paths: dict[ConnectionKey, Path],
-    diagram_refs: dict[str, list[str]],
-    connection_ref_keys: list[str],
+    registry: Any,
     auto_sync_diagrams: bool,
     blockers: list[str],
     auto_sync_diagram_ids: set[str],
 ) -> None:
-    refs_to_check = set(diagram_refs.get(artifact_id, []))
-    for owned_conn_id in entity_owned_connection_ids(artifact_id, connection_paths):
-        refs_to_check.update(diagram_refs.get(owned_conn_id, []))
+    refs_to_check = {rec.artifact_id for rec in registry.diagrams_referencing_artifact(artifact_id)}
+    for rec in registry.find_connections_for(artifact_id, direction="outbound"):
+        for conn_id in connection_ref_ids(rec.source, rec.conn_type, rec.target):
+            refs_to_check.update(d.artifact_id for d in registry.diagrams_referencing_artifact(conn_id))
     if auto_sync_diagrams:
-        for connection_id in connection_ref_keys:
-            if connection_id_involves_entity(connection_id, artifact_id):
-                refs_to_check.update(diagram_refs.get(connection_id, []))
+        for rec in registry.find_connections_for(artifact_id, direction="any"):
+            for conn_id in connection_ref_ids(rec.source, rec.conn_type, rec.target):
+                refs_to_check.update(d.artifact_id for d in registry.diagrams_referencing_artifact(conn_id))
     for ref in sorted(refs_to_check):
         if ref in diagram_delete_set:
             continue
@@ -262,15 +231,14 @@ def _collect_entity_diagram_effects(
 def _validate_connection_deletes(
     *,
     explicit_connection_deletes: dict[ConnectionKey, int],
-    connection_paths: dict[ConnectionKey, Path],
-    diagram_refs: dict[str, list[str]],
     diagram_delete_set: set[str],
+    registry: Any,
     auto_sync_diagrams: bool,
     results: dict[int, dict[str, object]],
     auto_sync_diagram_ids: set[str],
 ) -> None:
     for key, index in explicit_connection_deletes.items():
-        if key not in connection_paths:
+        if _connection_for_key(registry, key) is None:
             results[index] = validation_error(
                 "delete_connection",
                 f"Connection '{key[1]} -> {key[2]}' not found for source '{key[0]}'",
@@ -278,10 +246,10 @@ def _validate_connection_deletes(
             continue
         blocking_diagrams = sorted(
             {
-                ref
+                diagram.artifact_id
                 for connection_id in connection_ref_ids(key[0], key[1], key[2])
-                for ref in diagram_refs.get(connection_id, [])
-                if ref not in diagram_delete_set
+                for diagram in registry.diagrams_referencing_artifact(connection_id)
+                if diagram.artifact_id not in diagram_delete_set
             }
         )
         if not blocking_diagrams:
@@ -305,3 +273,22 @@ def _expand_item_ids(items: list[dict], registry) -> None:
         for field in ("artifact_id", "source_entity", "target_entity"):
             if field in item:
                 item[field] = expand_artifact_id(registry, str(item[field]))
+
+
+def _artifact_path_in_root(registry: Any, artifact_id: str, root: Path) -> bool:
+    path = registry.find_file_by_id(artifact_id)
+    if path is None:
+        return False
+    try:
+        path.relative_to(root)
+    except ValueError:
+        return False
+    return True
+
+
+def _connection_for_key(registry: Any, key: ConnectionKey):
+    source, conn_type, target = key
+    for rec in registry.find_connections_for(source, direction="outbound", conn_type=conn_type):
+        if rec.target == target:
+            return rec
+    return None

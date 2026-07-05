@@ -3,7 +3,7 @@ import json
 import os
 import subprocess
 import tempfile
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Literal
 
@@ -20,22 +20,36 @@ from src.domain.repo_layout import DIAGRAM_CATALOG, DIAGRAMS, MODEL
 @dataclass
 class FileInventory:
     repo_path: Path
-    include_diagrams: bool
-    rel_to_path: dict[str, Path]
-    path_to_rel: dict[Path, str]
-    snapshots: dict[str, dict[str, int | str]]
-    ordered_paths: list[str]
-    entity_relpaths: list[str]
-    connection_relpaths: list[str]
-    diagram_puml_relpaths: list[str]
-    diagram_matrix_relpaths: list[str]
-    file_type_by_relpath: dict[str, Literal["entity", "connection", "diagram"]]
-    entity_path_by_id: dict[str, str]
-    connection_refs_by_path: dict[str, tuple[tuple[str, ...], tuple[str, ...]]]
-    connection_paths_by_entity: dict[str, set[str]]
-    neighbor_entities: dict[str, set[str]]
-    diagram_paths_by_entity: dict[str, set[str]]
-    diagram_paths_by_connection_id: dict[str, set[str]]
+    include_diagrams: bool = True
+    rel_to_path: dict[str, Path] = field(default_factory=dict)
+    path_to_rel: dict[Path, str] = field(default_factory=dict)
+    snapshots: dict[str, dict[str, int | str]] = field(default_factory=dict)
+    ordered_paths: list[str] = field(default_factory=list)
+    entity_relpaths: list[str] = field(default_factory=list)
+    connection_relpaths: list[str] = field(default_factory=list)
+    diagram_puml_relpaths: list[str] = field(default_factory=list)
+    diagram_matrix_relpaths: list[str] = field(default_factory=list)
+    file_type_by_relpath: dict[str, Literal["entity", "connection", "diagram"]] = field(default_factory=dict)
+    entity_path_by_id: dict[str, str] = field(default_factory=dict)
+    connection_refs_by_path: dict[str, tuple[tuple[str, ...], tuple[str, ...]]] = field(default_factory=dict)
+    connection_paths_by_entity: dict[str, set[str]] = field(default_factory=dict)
+    neighbor_entities: dict[str, set[str]] = field(default_factory=dict)
+    diagram_paths_by_entity: dict[str, set[str]] = field(default_factory=dict)
+    diagram_paths_by_connection_id: dict[str, set[str]] = field(default_factory=dict)
+
+    def add_file(self, path: Path, file_type: Literal["entity", "connection", "diagram"]) -> str:
+        rel = str(path.relative_to(self.repo_path))
+        stat = path.stat()
+        self.rel_to_path[rel] = path
+        self.path_to_rel[path] = rel
+        self.path_to_rel[path.resolve()] = rel
+        self.snapshots[rel] = {
+            "mtime_ns": int(stat.st_mtime_ns),
+            "size": int(stat.st_size),
+            "file_type": file_type,
+        }
+        self.file_type_by_relpath[rel] = file_type
+        return rel
 
 
 def verifier_engine_signature() -> str:
@@ -136,25 +150,7 @@ def inventory_files(repo_path: Path, *, include_diagrams: bool) -> FileInventory
 
 
 def _new_inventory(repo_path: Path, *, include_diagrams: bool) -> FileInventory:
-    return FileInventory(
-        repo_path=repo_path,
-        include_diagrams=include_diagrams,
-        rel_to_path={},
-        path_to_rel={},
-        snapshots={},
-        ordered_paths=[],
-        entity_relpaths=[],
-        connection_relpaths=[],
-        diagram_puml_relpaths=[],
-        diagram_matrix_relpaths=[],
-        file_type_by_relpath={},
-        entity_path_by_id={},
-        connection_refs_by_path={},
-        connection_paths_by_entity={},
-        neighbor_entities={},
-        diagram_paths_by_entity={},
-        diagram_paths_by_connection_id={},
-    )
+    return FileInventory(repo_path=repo_path, include_diagrams=include_diagrams)
 
 
 def _index_entity_files(inventory: FileInventory) -> None:
@@ -222,17 +218,7 @@ def _add_indexed_file(
     path: Path,
     file_type: Literal["entity", "connection", "diagram"],
 ) -> str:
-    rel = str(path.relative_to(inventory.repo_path))
-    stat = path.stat()
-    inventory.rel_to_path[rel] = path
-    inventory.path_to_rel[path] = rel
-    inventory.snapshots[rel] = {
-        "mtime_ns": int(stat.st_mtime_ns),
-        "size": int(stat.st_size),
-        "file_type": file_type,
-    }
-    inventory.file_type_by_relpath[rel] = file_type
-    return rel
+    return inventory.add_file(path, file_type)
 
 
 def _add_diagram_refs(

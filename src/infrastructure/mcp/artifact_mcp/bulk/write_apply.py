@@ -9,7 +9,6 @@ from typing import Any
 from src.application.verification.artifact_verifier import ArtifactRegistry, ArtifactVerifier
 from src.infrastructure.mcp.artifact_mcp.context import expand_artifact_id
 from src.infrastructure.mcp.artifact_mcp.write._common import _out
-from src.infrastructure.mcp.artifact_mcp.write.connection import _add_connection_impl
 from src.infrastructure.write import artifact_write_ops
 from src.infrastructure.write.artifact_write.connection_edit import _UNSET as _CONN_UNSET
 from src.infrastructure.write.artifact_write.entity_edit import _UNSET as _ENTITY_UNSET
@@ -100,34 +99,39 @@ def apply_add_connections(
     dry_run: bool,
     operation_id: str,
     skipped: bool,
+    current_registry: Callable[[], ArtifactRegistry],
 ) -> bool:
     for index, item in creates_con:
         if skipped:
             results[index] = skipped_result("add_connection", dry_run=dry_run, operation_id=operation_id)
             continue
         try:
+            from src.infrastructure.app_bootstrap import build_runtime_catalogs, get_module_registry  # noqa: PLC0415
+
             source = resolve_ref(item["source_entity"], ref_map)
             target = resolve_ref(item["target_entity"], ref_map)
-            provisional_ids = frozenset(ref_map.values())
-            out = strip_content(
-                _add_connection_impl(
-                    source_entity=source,
-                    connection_type=item["connection_type"],
-                    target_entity=target,
-                    description=item.get("description"),
-                    src_cardinality=item.get("src_cardinality"),
-                    tgt_cardinality=item.get("tgt_cardinality"),
-                    version=item.get("version", "0.1.0"),
-                    status=item.get("status", "draft"),
-                    dry_run=False,
-                    repo_root=str(staged_root),
-                    provisional_ids=provisional_ids,
-                    clear_repo_caches=clear_repo_caches,
-                )
+            registry = current_registry()
+            verifier = ArtifactVerifier(registry, catalogs=build_runtime_catalogs(get_module_registry()))
+            result = artifact_write_ops.add_connection(
+                repo_root=staged_root,
+                registry=registry,
+                verifier=verifier,
+                clear_repo_caches=clear_repo_caches,
+                source_entity=source,
+                connection_type=item["connection_type"],
+                target_entity=target,
+                description=item.get("description"),
+                src_cardinality=item.get("src_cardinality"),
+                tgt_cardinality=item.get("tgt_cardinality"),
+                version=item.get("version", "0.1.0"),
+                status=item.get("status", "draft"),
+                last_updated=None,
+                dry_run=False,
             )
+            out = strip_content(_out(result, dry_run=False))
             out["op"] = "add_connection"
             results[index] = out
-            skipped = skipped or not bool(out.get("wrote"))
+            skipped = skipped or not result.wrote
         except Exception as exc:  # noqa: BLE001
             results[index] = error_result("add_connection", exc, dry_run=dry_run, operation_id=operation_id)
             skipped = True

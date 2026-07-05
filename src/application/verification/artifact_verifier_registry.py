@@ -5,6 +5,7 @@ from typing import Literal
 
 from src.application.ports import AmbiguousArtifactError, ResolvedArtifact, VerifierStorePort
 from src.domain.artifact_id import slug_of, stable_id
+from src.domain.artifact_types import ConnectionRecord, DiagramRecord, EntityRecord
 
 
 class ArtifactRegistry:
@@ -55,6 +56,21 @@ class ArtifactRegistry:
 
     def connection_status(self, artifact_id: str) -> str | None:
         return self._store.connection_status(artifact_id)
+
+    def find_connections_for(
+        self,
+        entity_id: str,
+        *,
+        direction: Literal["any", "outbound", "inbound"] = "any",
+        conn_type: str | None = None,
+    ) -> list[ConnectionRecord]:
+        return self._store.find_connections_for(entity_id, direction=direction, conn_type=conn_type)
+
+    def diagrams_referencing_artifact(self, artifact_id: str) -> list[DiagramRecord]:
+        return self._store.diagrams_referencing_artifact(artifact_id)
+
+    def grf_references_to_entity(self, artifact_id: str) -> list[EntityRecord]:
+        return self._store.grf_references_to_entity(artifact_id)
 
     def scope_for_path(self, path: Path) -> Literal["enterprise", "engagement", "unknown"]:
         return self._store.scope_for_path(path)

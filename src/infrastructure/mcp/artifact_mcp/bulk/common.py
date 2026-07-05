@@ -10,6 +10,9 @@ from src.application.verification.artifact_verifier import ArtifactRegistry, Art
 from src.infrastructure.artifact_index import shared_artifact_index
 from src.infrastructure.mcp.artifact_mcp.edit_tools import _require_registry, _resolve
 
+from .candidate_inventory import CandidateInventoryPort
+from .candidate_state import candidate_registry
+
 KNOWN_DELETE_OPS = frozenset({"delete_entity", "delete_connection", "delete_document", "delete_diagram"})
 KNOWN_OPS = frozenset({"create_entity", "add_connection", "edit_entity", "edit_connection"})
 
@@ -246,8 +249,21 @@ def stage_batch_verification(
 ) -> dict[str, object]:
     from src.infrastructure.app_bootstrap import build_runtime_catalogs, get_module_registry  # noqa: PLC0415
 
-    registry = ArtifactRegistry(shared_artifact_index([repo_root]))
-    verifier = ArtifactVerifier(registry, catalogs=build_runtime_catalogs(get_module_registry()))
+    registry = (
+        candidate_registry(live_root=live_root, staged_root=repo_root, touched_paths=changed_paths)
+        if live_root is not None
+        else ArtifactRegistry(shared_artifact_index([repo_root]))
+    )
+    inventory = (
+        CandidateInventoryPort(registry=registry, changed_paths=changed_paths)
+        if live_root is not None
+        else None
+    )
+    verifier = ArtifactVerifier(
+        registry,
+        catalogs=build_runtime_catalogs(get_module_registry()),
+        file_inventory=inventory,
+    )
     results = verifier.verify_paths(
         repo_root,
         changed_paths=sorted(changed_paths),
