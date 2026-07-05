@@ -5,48 +5,77 @@
  * one question per step, each answer becoming an entity the wizard's existing create/find/
  * suggest machinery (`WizardEntityStage.vue`) handles exactly as it would in free-choice mode.
  *
- * The questionnaires chain into a cross-domain spine (motivation → business → common →
- * application): each bridge hands off to the next domain's questionnaire, and every completed
- * step's entity becomes a session-wide proximity anchor so later domains' connection suggestions
- * rank near the chain built so far. Question wording is grounded in each type's `create_when`
+ * Every question is optional — the questionnaire is a menu of prompts, not a rail: users skip
+ * questions or jump between them freely (a requirement without a stakeholder, a process without
+ * a role, are all legitimate lightweight models).
+ *
+ * Two modes serve the two personas: **planning** walks the spine top-down (motivation →
+ * business → common → application, "start from why"), **reverse** architecture walks it
+ * bottom-up (application → common → business → motivation, "start from what exists"). The same
+ * per-domain step content serves both; a step carries a `reverseQuestion` variant only where the
+ * planning phrasing would be jarring when documenting an existing system, and each domain
+ * carries one bridge per mode. Question wording is grounded in each type's `create_when`
  * guidance (`/api/authoring-guidance`); the behavioural core (role/process/service) lives in the
  * **common** domain in this ontology, not business.
  */
+export type WizardMode = 'planning' | 'reverse'
+
 export interface QuestionnaireStep {
   readonly entityType: string
   readonly question: string
+  /** Reverse-architecture phrasing; omitted when `question` reads naturally in both modes. */
+  readonly reverseQuestion?: string
+}
+
+export interface QuestionnaireBridge {
+  readonly prompt: string
+  readonly nextDomain: string
 }
 
 export interface DomainQuestionnaire {
   readonly domain: string
   readonly steps: readonly QuestionnaireStep[]
-  /** Shown after the last step — the "impact mapping" bridge to the next domain in the spine.
-   * Absent on the spine's terminal questionnaire. */
-  readonly bridge?: {
-    readonly prompt: string
-    readonly nextDomain: string
-  }
+  /** One hand-off per mode; a mode with no entry makes this domain the spine's terminal. */
+  readonly bridges: Partial<Record<WizardMode, QuestionnaireBridge>>
+  /** In reverse mode, steps default to "find existing" instead of "create new" — set where the
+   * entities usually already exist in the model (e.g. application components imported by the
+   * MCP reverse-architecture agent) and the GUI user's job is to anchor on them, not duplicate
+   * them. */
+  readonly reversePrefersFind?: boolean
 }
 
-/** Recommended lightweight modeling order — drives the hub's "start here / next" hint. */
-export const QUESTIONNAIRE_SPINE: readonly string[] =
-  ['motivation', 'business', 'common', 'application']
+/** Recommended modeling order per mode — drives the hub's "start here / next" hint. */
+export const SPINES: Record<WizardMode, readonly string[]> = {
+  planning: ['motivation', 'business', 'common', 'application'],
+  reverse: ['application', 'common', 'business', 'motivation'],
+}
 
 const QUESTIONNAIRES: readonly DomainQuestionnaire[] = [
   {
     domain: 'motivation',
     steps: [
       { entityType: 'stakeholder', question: 'Who cares about this, and why?' },
-      { entityType: 'driver', question: 'What internal or external force is pushing for change?' },
+      {
+        entityType: 'driver',
+        question: 'What internal or external force is pushing for change?',
+        reverseQuestion: 'What force or need led to this system existing?',
+      },
       { entityType: 'assessment', question: 'What specific problem or condition does that force create?' },
       { entityType: 'goal', question: 'What desired state of affairs would resolve it?' },
       { entityType: 'outcome', question: 'How will you know the goal was actually achieved?' },
-      { entityType: 'requirement', question: 'What specific, testable need must be met to get there?' },
+      {
+        entityType: 'requirement',
+        question: 'What specific, testable need must be met to get there?',
+        reverseQuestion: 'What specific, testable need does the system meet?',
+      },
     ],
-    bridge: {
-      prompt: 'You have a motivation chain from stakeholder to requirement. Now bridge it to '
-        + 'impact: who in the business is affected, and what do they work with?',
-      nextDomain: 'business',
+    bridges: {
+      planning: {
+        prompt: 'You have a motivation chain from stakeholder to requirement. Now bridge it to '
+          + 'impact: who in the business is affected, and what do they work with?',
+        nextDomain: 'business',
+      },
+      // Terminal in reverse mode — the why is captured last.
     },
   },
   {
@@ -62,10 +91,17 @@ const QUESTIONNAIRES: readonly DomainQuestionnaire[] = [
         question: 'What tangible or intangible business thing does that work use or produce?',
       },
     ],
-    bridge: {
-      prompt: 'You know who is involved and what they handle. Now model how the work actually '
-        + 'gets done: the roles, processes, and services live in the common domain.',
-      nextDomain: 'common',
+    bridges: {
+      planning: {
+        prompt: 'You know who is involved and what they handle. Now model how the work actually '
+          + 'gets done: the roles, processes, and services live in the common domain.',
+        nextDomain: 'common',
+      },
+      reverse: {
+        prompt: 'You know who is involved. Finally, capture why the system exists — drivers, '
+          + 'goals, and the requirements it fulfils — so future changes can trace intent.',
+        nextDomain: 'motivation',
+      },
     },
   },
   {
@@ -85,10 +121,17 @@ const QUESTIONNAIRES: readonly DomainQuestionnaire[] = [
         question: 'What explicit, well-defined behavior does that work offer to its environment?',
       },
     ],
-    bridge: {
-      prompt: 'The behaviour is modeled. Which applications support or automate it, and what '
-        + 'data do they manage?',
-      nextDomain: 'application',
+    bridges: {
+      planning: {
+        prompt: 'The behaviour is modeled. Which applications support or automate it, and what '
+          + 'data do they manage?',
+        nextDomain: 'application',
+      },
+      reverse: {
+        prompt: 'The behaviour is mapped. Now, who is involved: which organizational entities '
+          + 'perform or consume it, and what business things do they handle?',
+        nextDomain: 'business',
+      },
     },
   },
   {
@@ -97,15 +140,35 @@ const QUESTIONNAIRES: readonly DomainQuestionnaire[] = [
       {
         entityType: 'application-component',
         question: 'What deployable unit of software supports or automates the process?',
+        reverseQuestion: 'Which existing application component (often imported by the '
+          + 'reverse-architecture tooling) are you documenting?',
       },
       {
         entityType: 'data-object',
         question: 'What type of data does that application manage or exchange?',
+        reverseQuestion: 'What type of data does it manage as its source of truth?',
       },
     ],
-    // Terminal spine domain — completion UI offers review-later cleanup instead of a bridge.
+    bridges: {
+      // Terminal in planning mode.
+      reverse: {
+        prompt: 'You have anchored on what exists. Now model the behaviour it supports — the '
+          + 'services it offers, the processes behind them, and the roles involved — which the '
+          + 'tooling cannot infer from code alone.',
+        nextDomain: 'common',
+      },
+    },
+    reversePrefersFind: true,
   },
 ]
 
 export const questionnaireForDomain = (domain: string): DomainQuestionnaire | undefined =>
   QUESTIONNAIRES.find((q) => q.domain === domain)
+
+export const questionForStep = (step: QuestionnaireStep, mode: WizardMode): string =>
+  (mode === 'reverse' && step.reverseQuestion) ? step.reverseQuestion : step.question
+
+export const bridgeForMode = (
+  questionnaire: DomainQuestionnaire,
+  mode: WizardMode,
+): QuestionnaireBridge | undefined => questionnaire.bridges[mode]

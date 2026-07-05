@@ -49,12 +49,18 @@ describe('parseWizardSessionState', () => {
     const result = parseWizardSessionState(JSON.stringify({ activeDomain: 'motivation' }))
     expect(result).toEqual({
       activeDomain: 'motivation',
+      mode: 'planning',
       createdEntities: [],
       createdConnections: [],
       pendingSuggestions: [],
       reviewLaterQueue: [],
       spineAnchorIds: [],
     })
+  })
+
+  it('parses a persisted reverse mode and defaults anything else to planning', () => {
+    expect(parseWizardSessionState(JSON.stringify({ mode: 'reverse' })).mode).toBe('reverse')
+    expect(parseWizardSessionState(JSON.stringify({ mode: 'bogus' })).mode).toBe('planning')
   })
 
   it('defaults spineAnchorIds to empty for a pre-spine persisted session', () => {
@@ -106,6 +112,14 @@ describe('useWizardSession', () => {
     session.setActiveDomain('application')
     const persisted = parseWizardSessionState(storage.getItem(WIZARD_SESSION_STORAGE_KEY))
     expect(persisted.activeDomain).toBe('application')
+  })
+
+  it('setMode switches and persists the wizard mode', () => {
+    const storage = fakeStorage()
+    const session = useWizardSession(storage)
+    expect(session.state.mode).toBe('planning')
+    session.setMode('reverse')
+    expect(parseWizardSessionState(storage.getItem(WIZARD_SESSION_STORAGE_KEY)).mode).toBe('reverse')
   })
 
   it('recordCreated adds an entity once and ignores duplicates', () => {

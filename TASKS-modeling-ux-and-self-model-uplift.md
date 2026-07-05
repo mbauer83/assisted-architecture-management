@@ -1752,3 +1752,27 @@ CONTINUE OR STOP.
   off-spine progress ignored], `WizardDomainStage.helpers.test.ts` [priority float, stable sort]);
   `vue-tsc --noEmit` clean; `eslint src/ui` clean. Merged this worktree into `main` on the
   user's request so :5173 (main checkout) serves the working wizard after a vite restart.
+- 2026-07-05 — Wizard flexibility + persona-guidance uplift (user feedback: the questionnaire
+  forced linear progression — e.g. goals/requirements without stakeholders, or processes/events
+  without roles, weren't reachable inside the guided flow; "Show all types" revealed types with no
+  guidance; and guidance should serve both planning and reverse-architecture personas, noting
+  application-domain reverse architecture happens mostly via the MCP agent, so GUI reverse mode is
+  chiefly for motivation/business/common). Changes, all frontend: (1) **Non-linear
+  questionnaires** — every question skippable ("Skip — I don't need a X here"), clickable step
+  chips jump to any question in any order, answered steps marked ✓; only answered steps feed the
+  spine anchors (`WizardQuestionnaireStage.vue`). (2) **Guidance on every type button** — the
+  show-all set now renders `create_when` like the priority set; hints are line-clamped (4 lines,
+  full on hover) to keep the grid scannable (`WizardDomainStage.vue`). (3) **Planning vs
+  reverse-architecture modes** — persisted session `mode` with a header toggle ("Planning — start
+  from why" / "Reverse architecture — start from what exists"); `SPINES` per mode (planning:
+  motivation→business→common→application; reverse: the exact reverse); per-mode bridges (each
+  spine terminal has none in that mode), `reverseQuestion` step variants where planning phrasing
+  would jar (driver, requirement, application-component, data-object), and
+  `reversePrefersFind` on the application questionnaire so reverse-mode steps there open in
+  "find existing" — anchoring on agent-imported components instead of duplicating them
+  (`wizardQuestionnaires.ts`, `useWizardSession.ts`, `ModelWizardView.vue`/`helpers.ts`,
+  `WizardEntityStage.vue` new `preferFind` prop). Recommendation badge + spine subtitle follow
+  the mode. Gates: vitest 453 passed (+8: per-mode spine/bridge chains, reverse-question
+  fallback, reversePrefersFind placement, mode parse/persist/default, reverse-mode
+  recommendation ladder); `npm run typecheck` clean; `npm run lint` clean. Merged into `main`;
+  live-verified on :5173.

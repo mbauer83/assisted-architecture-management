@@ -50,7 +50,8 @@ watch(() => props.domain, () => { resetToTypeChoice(); questionnaireStarted.valu
       >
         ✨ Start the guided {{ domain }} questionnaire — {{ questionnaire.steps.length }} short
         questions from {{ questionnaire.steps[0].entityType }} to
-        {{ questionnaire.steps[questionnaire.steps.length - 1].entityType }}
+        {{ questionnaire.steps[questionnaire.steps.length - 1].entityType }}. Answer any,
+        in any order — every question is skippable.
       </button>
 
       <p class="stage-hint">
@@ -79,6 +80,10 @@ watch(() => props.domain, () => { resetToTypeChoice(); questionnaireStarted.valu
             @click="chooseType(t.name)"
           >
             <span class="type-name">New {{ t.name }}</span>
+            <span
+              v-if="t.create_when"
+              class="type-hint"
+            >{{ t.create_when }}</span>
           </button>
         </template>
       </div>
@@ -129,7 +134,11 @@ watch(() => props.domain, () => { resetToTypeChoice(); questionnaireStarted.valu
 }
 .type-btn:hover { border-color: #93c5fd; }
 .type-name { font-weight: 600; font-size: 13px; }
-.type-hint { font-size: 12px; color: #6b7280; }
+.type-hint {
+  font-size: 12px; color: #6b7280;
+  display: -webkit-box; -webkit-line-clamp: 4; -webkit-box-orient: vertical; overflow: hidden;
+}
+.type-btn:hover .type-hint { -webkit-line-clamp: unset; }
 .btn-link { align-self: flex-start; background: none; border: none; color: #2563eb; cursor: pointer; padding: 0; font-size: 12px; text-decoration: underline; }
 .stage-body { display: flex; flex-direction: column; gap: 14px; }
 </style>

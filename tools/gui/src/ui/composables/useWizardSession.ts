@@ -1,4 +1,5 @@
 import { reactive, watch } from 'vue'
+import type { WizardMode } from '../lib/wizardQuestionnaires'
 
 export interface WizardCreatedEntity {
   readonly artifactId: string
@@ -32,6 +33,9 @@ export interface WizardSuggestion {
 
 export interface WizardSessionState {
   activeDomain: string | null
+  /** Planning walks the spine top-down (start from why); reverse architecture bottom-up
+   * (start from what exists). Controls spine order, bridges, and question variants. */
+  mode: WizardMode
   createdEntities: WizardCreatedEntity[]
   createdConnections: WizardCreatedConnection[]
   pendingSuggestions: WizardSuggestion[]
@@ -55,6 +59,7 @@ export const WIZARD_SESSION_STORAGE_KEY = 'arch.model-wizard.session.v2'
 
 export const initialWizardSessionState = (): WizardSessionState => ({
   activeDomain: null,
+  mode: 'planning',
   createdEntities: [],
   createdConnections: [],
   pendingSuggestions: [],
@@ -68,6 +73,7 @@ export const parseWizardSessionState = (raw: string | null): WizardSessionState 
     const parsed = JSON.parse(raw) as Partial<WizardSessionState>
     return {
       activeDomain: typeof parsed.activeDomain === 'string' ? parsed.activeDomain : null,
+      mode: parsed.mode === 'reverse' ? 'reverse' : 'planning',
       createdEntities: Array.isArray(parsed.createdEntities) ? parsed.createdEntities : [],
       createdConnections: Array.isArray(parsed.createdConnections) ? parsed.createdConnections : [],
       pendingSuggestions: Array.isArray(parsed.pendingSuggestions) ? parsed.pendingSuggestions : [],
@@ -99,6 +105,8 @@ export const useWizardSession = (storage: WizardStorage = window.sessionStorage)
   )
 
   const setActiveDomain = (domain: string | null) => { state.activeDomain = domain }
+
+  const setMode = (mode: WizardMode) => { state.mode = mode }
 
   const recordCreated = (entity: WizardCreatedEntity) => {
     if (state.createdEntities.some((e) => e.artifactId === entity.artifactId)) return
@@ -157,6 +165,7 @@ export const useWizardSession = (storage: WizardStorage = window.sessionStorage)
   return {
     state,
     setActiveDomain,
+    setMode,
     recordCreated,
     undoCreated,
     recordSpineAnchor,
