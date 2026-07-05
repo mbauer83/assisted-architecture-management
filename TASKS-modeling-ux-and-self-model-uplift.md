@@ -72,13 +72,13 @@ restart mid-session; state clearly when a restart is needed.
 | B2a | Authoring-guidance REST endpoint + wizard shell + session store | — | done | route `/model/wizard` |
 | B2b | Wizard domain stages: create / find / connect + commit flow | B2a, A1.2 | done | live-verified in Motivation+Application; 2 real pre-existing bugs found+fixed (domain-filter, key/value swap) |
 | B2c | Elicitation layers (questionnaire, impact spine, capability anchor) + ranking | B2b | done | full cross-domain spine motivation→business→common→application (questionnaires + bridges + session-persisted proximity anchors + next-domain recommendation + priority type ordering), all live-verified; capability-anchored reuse search in strategy not built (see progress log) |
-| B4.1 | Exclude `internal` entity types from authoring guidance (GAR never manually creatable) | — | todo | backend `_entity_type_guidance`; fixes wizard offering "New global-artifact-reference" |
-| B4.2 | Chain-first connection suggestions (spine anchors first-rank, always in candidate pool) | — | todo | fixes hop-neighbor-only proximity + 20-item search cutoff dropping just-created entities |
-| B4.3 | Reuse-first step surface: live dedupe search while typing + multiple entities per step | — | todo | supersedes `preferFind` |
-| B4.4 | Omnidirectional spine: bidirectional bridges, remove mode toggle | B4.3, D-7 | todo | fold reverseQuestion variants into neutral wording |
-| B4.5 | Guidance depth: in-step when-to-use, naming exemplars, domain one-liners | — | todo | content-file driven |
-| B4.6 | Session recap + persistent wizard-draft resume/cleanup | D-8 | todo | recap independent of D-8; draft lifecycle gated |
-| B4.7 | Strategy questionnaire + capability-anchored reuse search | B4.3 | todo | WU-B2c remainder |
+| B4.1 | Exclude `internal` entity types from authoring guidance (GAR never manually creatable) | — | done | backend `_entity_type_guidance`; **backend restart required** before live GUI reflects it |
+| B4.2 | Chain-first connection suggestions (spine anchors first-rank, always in candidate pool) | — | done | deterministic `buildChainSuggestions` queued before similarity-ranked pool |
+| B4.3 | Reuse-first step surface: live dedupe search while typing + multiple entities per step | — | done | `useSimilarEntities` composable; `preferFind` removed |
+| B4.4 | Omnidirectional spine: bidirectional bridges, remove mode toggle | B4.3, D-7 | done | D-7 decided; goal-labeled bridges both directions; adjacency-based recommendation |
+| B4.5 | Guidance depth: in-step when-to-use, naming exemplars, domain one-liners | — | done | collapsible create_when/never_create_when per question; nameHint placeholders; card intros |
+| B4.6 | Session recap + persistent wizard-draft resume/cleanup | D-8 | done | recap panel + prior-draft banner (`keywords` facet); finalization semantics still gated on D-8 |
+| B4.7 | Strategy questionnaire + capability-anchored reuse search | B4.3 | done | capability→value-stream→resource; reuse via B4.3 surface; bridges to motivation+common |
 
 Recommended order: **A3 → A2 → A1.1 → A1.2 → A4.1 → A4.2 → A4.3 → B3.1 → B3.2 → B1.1…B1.5 →
 C1/C2/C3 (C-work may interleave anytime; C1.3 waits for B3.2) → B2a → B2b → B2c →
@@ -1801,3 +1801,29 @@ CONTINUE OR STOP.
   omnidirectional spine (bidirectional goal-labeled bridges + reuse-first step surface +
   state-derived recommendation), pending the user's call. No code changed in this session
   increment — analysis and plan only.
+- 2026-07-05 — WU-B4.1–B4.7 implemented (wizard usability uplift; D-7 decided: omnidirectional,
+  mode toggle removed). Backend: `_entity_type_guidance` excludes `internal` entity types (GAR
+  can no longer be offered by any guidance consumer — REST or MCP); `EntityFilter` gains an
+  exact-`keywords` facet, exposed as `keywords=` on `/api/entity-display-search` (fuzzy
+  augmentation is skipped under the facet since it cannot honor it). Frontend:
+  `wizardQuestionnaires.ts` v3 — single `SPINE`, per-domain `bridges[]` (goal-labeled, both
+  spine directions; strategy bridges to motivation+common), `nameHint` exemplars on every step,
+  `DOMAIN_INTROS`, new strategy questionnaire (capability→value-stream→resource);
+  `buildChainSuggestions` (deterministic new-entity×spine-anchor suggestions queued before the
+  similarity pool; anchors also unioned into the candidate pool + proximity set so the 20-item
+  alphabetical search page can't drop them); `useSimilarEntities` composable + reuse-chips in
+  `WizardEntityForm` (typing live-searches same-type entities, click = use existing;
+  `preferFind`/`reversePrefersFind` removed as superseded); `WizardEntityStage` gains
+  `nameHint`/`allowAnother` + `another` emit; `WizardQuestionnaireStage` — per-step answer
+  counts on chips (`✓ role ×2`), collapsible when-to-use/never-use under each question,
+  multi-bridge completion; `ModelWizardView` — no mode toggle, adjacency-based
+  `recommendedNextDomain(counts, lastDomain)`, card intros, session recap panel (entity links
+  `/entity?id=`), prior-draft banner (`wizard-draft` keyword facet, own session excluded).
+  Session state drops `mode` (parse tolerant). Gates: backend 3690 passed/49 skipped (one test
+  updated to the new internal-exclusion contract), ruff clean, zuban clean (442 files);
+  frontend vitest 460 passed (45 files; +buildChainSuggestions, useSimilarEntities, bridges
+  invariants, adjacency recommendation suites), typecheck clean, lint clean. **Backend restart
+  required** for B4.1's GAR removal and the draft banner's `keywords=` facet to take effect on
+  the live GUI — until then the old backend ignores the param and the banner would list
+  arbitrary entities, and GAR still appears in guidance. Frontend live-verified on :5173 after
+  merge. D-8 (draft finalization semantics) remains the only open decision.

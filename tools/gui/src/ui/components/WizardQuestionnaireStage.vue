@@ -2,13 +2,16 @@
 import { ref, computed } from 'vue'
 import type { useWizardSession } from '../composables/useWizardSession'
 import type { AuthoringGuidance } from '../../domain'
-import { questionForStep, bridgeForMode, type DomainQuestionnaire } from '../lib/wizardQuestionnaires'
+import type { DomainQuestionnaire } from '../lib/wizardQuestionnaires'
+import { entityTypesForDomain } from './WizardDomainStage.helpers'
 import WizardEntityStage from './WizardEntityStage.vue'
 
 /**
- * A questionnaire is a menu of prompts, not a rail: every question is skippable and the step
- * chips jump anywhere, so "a requirement without a stakeholder" or "a process without a role"
- * are one click away. Only answered steps feed the spine's proximity anchors.
+ * A questionnaire is a menu of prompts, not a rail: every question is skippable, the step chips
+ * jump anywhere, and a step accepts several entities ("+ Add another") — so "a requirement
+ * without a stakeholder" or "three affected processes" are one click away. Only answered steps
+ * feed the spine's proximity anchors. Completion offers every goal-labeled bridge the domain
+ * has (omnidirectional spine, decision D-7).
  */
 const props = defineProps<{
   questionnaire: DomainQuestionnaire
@@ -18,41 +21,52 @@ const props = defineProps<{
 const emit = defineEmits<{ exit: [] }>()
 
 const stepIndex = ref(0)
-const answered = ref<Set<number>>(new Set())
+const answeredCounts = ref<Map<number, number>>(new Map())
 
-const mode = computed(() => props.session.state.mode)
 const currentStep = computed(() => props.questionnaire.steps[stepIndex.value])
-const currentQuestion = computed(() =>
-  currentStep.value ? questionForStep(currentStep.value, mode.value) : '')
 const isLastStep = computed(() => stepIndex.value === props.questionnaire.steps.length - 1)
 const complete = computed(() => stepIndex.value >= props.questionnaire.steps.length)
-const bridge = computed(() => bridgeForMode(props.questionnaire, mode.value))
-const preferFind = computed(() =>
-  mode.value === 'reverse' && props.questionnaire.reversePrefersFind === true)
+
+const currentTypeGuidance = computed(() => {
+  if (!currentStep.value) return undefined
+  return entityTypesForDomain(props.guidance, props.questionnaire.domain)
+    .find((t) => t.name === currentStep.value.entityType)
+})
 
 // Anchors live in the session, not locally: a bridge to the next domain's questionnaire keeps
 // the whole cross-domain spine (motivation chain → business actors → …) as ranking context.
 const spineAnchors = computed(() => [...props.session.state.spineAnchorIds])
 
+const recordAnswer = (entity: { id: string; name: string }) => {
+  props.session.recordSpineAnchor(entity.id)
+  answeredCounts.value.set(stepIndex.value, (answeredCounts.value.get(stepIndex.value) ?? 0) + 1)
+}
+
 const onStepDone = (entity: { id: string; name: string } | null) => {
   if (!entity) { emit('exit'); return }
-  props.session.recordSpineAnchor(entity.id)
-  answered.value.add(stepIndex.value)
+  recordAnswer(entity)
   stepIndex.value += 1
 }
+
+const onStepAnother = (entity: { id: string; name: string }) => { recordAnswer(entity) }
 
 const skipStep = () => { stepIndex.value += 1 }
 const jumpTo = (index: number) => { stepIndex.value = index }
 
 const restart = () => {
   stepIndex.value = 0
-  answered.value = new Set()
+  answeredCounts.value = new Map()
 }
 
-const openNextDomain = () => {
-  if (!bridge.value) return
-  props.session.setActiveDomain(bridge.value.nextDomain)
+const openBridge = (nextDomain: string) => {
+  props.session.setActiveDomain(nextDomain)
   emit('exit')
+}
+
+const chipText = (index: number, entityType: string) => {
+  const count = answeredCounts.value.get(index) ?? 0
+  if (count === 0) return `${index + 1} ${entityType}`
+  return count === 1 ? `✓ ${entityType}` : `✓ ${entityType} ×${count}`
 }
 </script>
 
@@ -74,11 +88,11 @@ const openNextDomain = () => {
         class="step-chip"
         :class="{
           'step-chip--active': index === stepIndex,
-          'step-chip--answered': answered.has(index),
+          'step-chip--answered': (answeredCounts.get(index) ?? 0) > 0,
         }"
         @click="jumpTo(index)"
       >
-        {{ answered.has(index) ? '✓' : index + 1 }} {{ step.entityType }}
+        {{ chipText(index, step.entityType) }}
       </button>
     </div>
 
@@ -87,8 +101,23 @@ const openNextDomain = () => {
         Question {{ stepIndex + 1 }} of {{ questionnaire.steps.length }} — answer any, in any order
       </p>
       <h3 class="question">
-        {{ currentQuestion }}
+        {{ currentStep.question }}
       </h3>
+      <details
+        v-if="currentTypeGuidance"
+        class="type-guidance"
+      >
+        <summary>When to use a {{ currentStep.entityType }}</summary>
+        <p v-if="currentTypeGuidance.create_when">
+          {{ currentTypeGuidance.create_when }}
+        </p>
+        <p
+          v-if="currentTypeGuidance.never_create_when"
+          class="type-guidance__never"
+        >
+          {{ currentTypeGuidance.never_create_when }}
+        </p>
+      </details>
       <button
         type="button"
         class="btn-link"
@@ -103,9 +132,11 @@ const openNextDomain = () => {
         :guidance="guidance"
         :session="session"
         :proximity-anchors="spineAnchors"
-        :prefer-find="preferFind"
+        :name-hint="currentStep.nameHint"
+        allow-another
         :done-label="isLastStep ? 'Finish questionnaire' : 'Next question →'"
         @done="onStepDone"
+        @another="onStepAnother"
       />
     </template>
 
@@ -113,28 +144,29 @@ const openNextDomain = () => {
       <h3 class="question">
         Questionnaire complete
       </h3>
-      <p class="bridge-prompt">
-        {{ bridge?.prompt
-          ?? 'The cross-domain spine is complete. Review any deferred connection suggestions '
-            + 'below, or pick another domain to go deeper.' }}
-      </p>
-      <div class="bridge-actions">
+      <div
+        v-for="bridge in questionnaire.bridges"
+        :key="bridge.nextDomain"
+        class="bridge"
+      >
+        <p class="bridge-prompt">
+          {{ bridge.prompt }}
+        </p>
         <button
-          v-if="bridge"
           type="button"
           class="btn-primary"
-          @click="openNextDomain"
+          @click="openBridge(bridge.nextDomain)"
         >
-          Open {{ bridge.nextDomain }}
-        </button>
-        <button
-          type="button"
-          class="btn-link"
-          @click="restart"
-        >
-          Start over
+          {{ bridge.label }} → {{ bridge.nextDomain }}
         </button>
       </div>
+      <button
+        type="button"
+        class="btn-link"
+        @click="restart"
+      >
+        Start over
+      </button>
     </template>
   </div>
 </template>
@@ -150,11 +182,15 @@ const openNextDomain = () => {
 .step-chip--answered { border-color: #86efac; background: #f0fdf4; color: #15803d; }
 .progress { font-size: 12px; color: #6b7280; margin: 0; text-transform: uppercase; letter-spacing: .04em; }
 .question { font-size: 16px; font-weight: 600; margin: 0; color: #1f2937; }
-.bridge-prompt { font-size: 13px; color: #374151; line-height: 1.5; }
-.bridge-actions { display: flex; align-items: center; gap: 12px; }
+.type-guidance { font-size: 12px; color: #4b5563; border: 1px solid #e5e7eb; border-radius: 6px; padding: 6px 10px; }
+.type-guidance summary { cursor: pointer; color: #2563eb; font-weight: 600; }
+.type-guidance p { margin: 6px 0 0; line-height: 1.5; }
+.type-guidance__never { color: #b45309; }
+.bridge { display: flex; flex-direction: column; gap: 6px; border-top: 1px solid #f3f4f6; padding-top: 10px; }
+.bridge-prompt { font-size: 13px; color: #374151; line-height: 1.5; margin: 0; }
 .btn-primary {
-  padding: 7px 16px; border-radius: 6px; border: none; background: #2563eb; color: #fff;
-  font-size: 13px; font-weight: 600; cursor: pointer;
+  align-self: flex-start; padding: 7px 16px; border-radius: 6px; border: none; background: #2563eb;
+  color: #fff; font-size: 13px; font-weight: 600; cursor: pointer;
 }
 .btn-link { align-self: flex-start; background: none; border: none; color: #2563eb; cursor: pointer; padding: 0; font-size: 12px; text-decoration: underline; }
 </style>

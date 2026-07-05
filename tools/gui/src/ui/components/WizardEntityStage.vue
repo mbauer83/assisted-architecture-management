@@ -9,7 +9,9 @@ import WizardEntityForm from './WizardEntityForm.vue'
 import WizardConnectionSuggestions from './WizardConnectionSuggestions.vue'
 import EntityPickerInput from './EntityPickerInput.vue'
 import { entityTypesForDomain } from './WizardDomainStage.helpers'
-import { legalConnectionPairs, buildWizardSuggestions } from '../lib/wizardSuggestions'
+import {
+  legalConnectionPairs, buildWizardSuggestions, buildChainSuggestions, type ChainAnchor,
+} from '../lib/wizardSuggestions'
 import { readErrorMessage } from '../lib/errors'
 
 /**
@@ -28,18 +30,23 @@ const props = defineProps<{
    * already connected to them (the "spine" a questionnaire is building). */
   proximityAnchors?: string[]
   doneLabel?: string
-  /** Open in "find existing" instead of "create new" — for reverse-architecture steps whose
-   * entities usually already exist in the model (e.g. agent-imported application components). */
-  preferFind?: boolean
+  /** Example of a well-formed name, passed through to the create form's placeholder. */
+  nameHint?: string
+  /** Offer "+ Add another <type>" alongside the done action (questionnaire steps that may need
+   * several entities of one type — N stakeholders, N affected processes). */
+  allowAnother?: boolean
 }>()
 /** `entity` is set when the user completed a create/find this step, null on plain cancel — a
- * guided sequence needs to tell "advance" from "abandon this question" apart. */
-const emit = defineEmits<{ done: [entity: { id: string; name: string } | null] }>()
+ * guided sequence needs to tell "advance" from "abandon this question" apart. `another` records
+ * the completed entity but stays on the step for one more of the same type. */
+const emit = defineEmits<{
+  done: [entity: { id: string; name: string } | null]
+  another: [entity: { id: string; name: string }]
+}>()
 
 const svc = inject(modelServiceKey)!
 
-const initialSubMode = () => (props.preferFind ? 'find' as const : 'create' as const)
-const subMode = ref<'create' | 'find'>(initialSubMode())
+const subMode = ref<'create' | 'find'>('create')
 
 interface ActiveEntity { id: string; name: string; type: string; wasCreated: boolean }
 const activeEntity = ref<ActiveEntity | null>(null)
@@ -59,8 +66,14 @@ const activeSuggestions = computed<WizardSuggestion[]>(() => {
 
 const resetActiveEntity = () => {
   activeEntity.value = null
-  subMode.value = initialSubMode()
+  subMode.value = 'create'
   commitError.value = null
+}
+
+const anotherEntity = () => {
+  if (!activeEntity.value) return
+  emit('another', activeEntity.value)
+  resetActiveEntity()
 }
 
 async function proximityNeighborIds(entityId: string): Promise<Set<string>> {
@@ -75,6 +88,21 @@ async function proximityNeighborIds(entityId: string): Promise<Set<string>> {
   }
 }
 
+/** Resolve the session's spine-anchor ids to (id, name, type) — anchors may be found entities,
+ * not only wizard-created ones, so names/types come from the display-item lookup. Failures drop
+ * the anchor silently: chain suggestions are a bonus, never a blocker. */
+async function resolveChainAnchors(excludeId: string): Promise<ChainAnchor[]> {
+  const ids = (props.proximityAnchors ?? []).filter((id) => id !== excludeId)
+  const anchors: ChainAnchor[] = []
+  for (const id of ids) {
+    try {
+      const item = await Effect.runPromise(svc.getEntityDisplayItem(id))
+      anchors.push({ id: item.artifact_id, name: item.name, type: item.artifact_type })
+    } catch { /* dropped */ }
+  }
+  return anchors
+}
+
 async function loadSuggestionsFor(entity: ActiveEntity) {
   const typeGuidance = entityTypesForDomain(props.guidance, props.domain).find((t) => t.name === entity.type)
     ?? props.guidance?.entity_types?.find((t) => t.name === entity.type)
@@ -82,7 +110,14 @@ async function loadSuggestionsFor(entity: ActiveEntity) {
   suggestionsLoading.value = true
   suggestionsError.value = null
   try {
+    const source = { id: entity.id, name: entity.name, domain: props.domain }
     const pairs = legalConnectionPairs(typeGuidance.permitted_connections)
+    const anchors = await resolveChainAnchors(entity.id)
+
+    // Chain first: the session's own spine outranks anything similarity-scored (WU-B4.2).
+    const chain = buildChainSuggestions(source, pairs, anchors, 3)
+    for (const suggestion of chain) props.session.queueSuggestion(suggestion)
+
     const targetTypes = [...new Set(pairs.map((p) => p.targetType))]
     const candidatesByTargetType = new Map<string, EntityDisplayInfo[]>()
     for (const targetType of targetTypes) {
@@ -92,13 +127,18 @@ async function loadSuggestionsFor(entity: ActiveEntity) {
       candidatesByTargetType.set(targetType, result.items.filter((item) => item.artifact_id !== entity.id))
     }
     const proximity = await proximityNeighborIds(entity.id)
-    const suggestions = buildWizardSuggestions(
-      { id: entity.id, name: entity.name, domain: props.domain },
-      pairs,
-      candidatesByTargetType,
-      5,
-      proximity,
-    )
+    // Anchors are full-strength proximity candidates too — the alphabetical 20-item search page
+    // must never be able to drop the entity created a minute ago.
+    for (const anchor of anchors) {
+      proximity.add(anchor.id)
+      const pool = candidatesByTargetType.get(anchor.type)
+      if (pool && !pool.some((item) => item.artifact_id === anchor.id)) {
+        try {
+          pool.push(await Effect.runPromise(svc.getEntityDisplayItem(anchor.id)))
+        } catch { /* dropped */ }
+      }
+    }
+    const suggestions = buildWizardSuggestions(source, pairs, candidatesByTargetType, 5, proximity)
     for (const suggestion of suggestions) props.session.queueSuggestion(suggestion)
   } catch (error: unknown) {
     suggestionsError.value = readErrorMessage(error)
@@ -174,8 +214,10 @@ defineExpose({ resetActiveEntity })
     <WizardEntityForm
       v-if="!activeEntity && subMode === 'create'"
       :entity-type="entityType"
+      :name-placeholder="nameHint"
       @created="onEntityCreated"
       @cancel="emit('done', null)"
+      @use-existing="onEntityFound"
     />
     <EntityPickerInput
       v-if="!activeEntity && subMode === 'find'"
@@ -232,13 +274,23 @@ defineExpose({ resetActiveEntity })
         @later="laterSuggestion"
       />
 
-      <button
-        type="button"
-        class="btn-link"
-        @click="emit('done', activeEntity)"
-      >
-        {{ doneLabel ?? '+ Add another entity to this domain' }}
-      </button>
+      <div class="stage-actions">
+        <button
+          v-if="allowAnother"
+          type="button"
+          class="btn-link"
+          @click="anotherEntity"
+        >
+          + Add another {{ entityType }}
+        </button>
+        <button
+          type="button"
+          class="btn-link"
+          @click="emit('done', activeEntity)"
+        >
+          {{ doneLabel ?? '+ Add another entity to this domain' }}
+        </button>
+      </div>
     </div>
   </div>
 </template>
@@ -253,6 +305,7 @@ defineExpose({ resetActiveEntity })
 .suggestions-title { font-size: 13px; font-weight: 600; margin: 0; color: #374151; }
 .btn-link { align-self: flex-start; background: none; border: none; color: #2563eb; cursor: pointer; padding: 0; font-size: 12px; text-decoration: underline; }
 .btn-link--danger { color: #dc2626; margin-left: 8px; }
+.stage-actions { display: flex; gap: 16px; }
 .state-msg { font-size: 12px; color: #6b7280; }
 .state-msg--error { color: #dc2626; }
 </style>

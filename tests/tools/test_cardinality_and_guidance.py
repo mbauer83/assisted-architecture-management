@@ -545,9 +545,12 @@ class TestElementCategoryRemoved:
 
 
 class TestGetTypeGuidance:
-    def test_all_types_returned_when_no_filter(self) -> None:
+    def test_all_manually_creatable_types_returned_when_no_filter(self) -> None:
+        # Internal types (promotion-created only, e.g. global-artifact-reference) are excluded:
+        # guidance must never offer a type the create path rejects.
         result = get_type_guidance()
-        assert _guidance_total(result) == len(_all_entity_types())
+        creatable = [name for name, info in _all_entity_types().items() if not info.internal]
+        assert _guidance_total(result) == len(creatable)
         assert isinstance(result["entity_types"], list)
 
     def test_all_types_include_domain(self) -> None:

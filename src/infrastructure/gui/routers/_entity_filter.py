@@ -24,12 +24,22 @@ def parse_csv_filter(raw: str | None, *, lowercase: bool = False) -> frozenset[s
 class EntityFilter:
     domains: frozenset[str]
     entity_types: frozenset[str]
+    keywords: frozenset[str] = frozenset()
+    """Exact keyword facet: an entity matches only if it carries every requested keyword
+    (e.g. the wizard's `wizard-draft` session tag)."""
 
     @classmethod
-    def from_params(cls, *, domains: str | None, entity_types: str | None) -> EntityFilter:
+    def from_params(
+        cls,
+        *,
+        domains: str | None,
+        entity_types: str | None,
+        keywords: str | None = None,
+    ) -> EntityFilter:
         return cls(
             domains=parse_csv_filter(domains, lowercase=True),
             entity_types=parse_csv_filter(entity_types),
+            keywords=parse_csv_filter(keywords),
         )
 
     def matches(
@@ -44,5 +54,7 @@ class EntityFilter:
         if self.domains and entity.domain not in self.domains:
             return False
         if self.entity_types and entity.artifact_type not in self.entity_types:
+            return False
+        if self.keywords and not self.keywords.issubset(entity.keywords):
             return False
         return accepted_entity_types is None or entity.artifact_type in accepted_entity_types

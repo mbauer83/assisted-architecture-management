@@ -229,11 +229,13 @@ def entity_display_search(
     diagram_type: str | None = None,
     domains: str | None = None,
     entity_types: str | None = None,
+    keywords: str | None = None,
     cursor: str | None = None,
     catalogs: RuntimeCatalogs = Depends(runtime_catalogs_dependency),
 ) -> dict[str, Any]:
     result = entity_display_search_impl(
-        q, limit, diagram_type, catalogs, domains=domains, entity_types=entity_types, cursor=cursor,
+        q, limit, diagram_type, catalogs,
+        domains=domains, entity_types=entity_types, keywords=keywords, cursor=cursor,
     )
     return {"items": result.items, "next_cursor": result.next_cursor}
 

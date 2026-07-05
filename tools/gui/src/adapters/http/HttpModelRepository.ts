@@ -409,10 +409,11 @@ export const makeHttpModelRepository = (): ModelRepository => ({
   getEntityDisplayItem: (artifactId: string) =>
     fetchJson(buildUrl('/entity-display-item', { id: artifactId }), EntityDisplayInfoSchema),
 
-  searchEntityDisplay: ({ query, limit = 20, diagramType, domains, entityTypes, cursor }) =>
+  searchEntityDisplay: ({ query, limit = 20, diagramType, domains, entityTypes, keywords, cursor }) =>
     fetchJson(buildUrl('/entity-display-search', {
       q: query, limit, diagram_type: diagramType,
-      domains: domains?.join(','), entity_types: entityTypes?.join(','), cursor,
+      domains: domains?.join(','), entity_types: entityTypes?.join(','),
+      keywords: keywords?.join(','), cursor,
     }), EntityDisplaySearchResultSchema),
   discoverDiagramEntities: ({ includedEntityIds = [], query, diagramType, maxHops = 2, limit = 20 }) =>
     fetchJson(buildUrl('/diagram-entity-discovery', {

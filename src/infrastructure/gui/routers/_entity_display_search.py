@@ -43,12 +43,13 @@ def entity_display_search_impl(
     *,
     domains: str | None = None,
     entity_types: str | None = None,
+    keywords: str | None = None,
     cursor: str | None = None,
 ) -> EntityDisplaySearchResult:
     repo = s.get_repo()
     ontology = catalogs.ontology
     accepted_types = accepted_entity_types(diagram_type, catalogs)
-    entity_filter = EntityFilter.from_params(domains=domains, entity_types=entity_types)
+    entity_filter = EntityFilter.from_params(domains=domains, entity_types=entity_types, keywords=keywords)
     offset = int(cursor) if cursor and cursor.isdigit() else 0
 
     if not q.strip():
@@ -93,8 +94,12 @@ def entity_display_search_impl(
         rec = h.record
         if is_internal_entity_type(rec.artifact_type, ontology):
             continue
+        if entity_filter.keywords and not entity_filter.keywords.issubset(rec.keywords):
+            continue
         items.append(entity_display_item(rec, catalogs))
-    if len(items) < search_limit:
+    # Fuzzy augmentation returns display items without their keyword lists, so it cannot honor
+    # the exact-keyword facet — skip it entirely rather than dilute a faceted result.
+    if len(items) < search_limit and not entity_filter.keywords:
         seen = {str(item["artifact_id"]) for item in items}
         fuzzy = fuzzy_entity_hits(repo, q, search_limit - len(items), seen, catalogs, selected_types)
         if entity_filter.domains:

@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { inject, watch, computed } from 'vue'
+import { inject, watch, computed, onMounted, ref } from 'vue'
+import { Effect } from 'effect'
 import { modelServiceKey } from '../keys'
 import { useQuery } from '../composables/useQuery'
 import { useWizardSession, createdCountByDomain } from '../composables/useWizardSession'
@@ -7,9 +8,10 @@ import { useSuggestionCommit } from '../composables/useSuggestionCommit'
 import { buildWizardDomainCards } from './ModelWizardView.helpers'
 import WizardDomainStage from '../components/WizardDomainStage.vue'
 import WizardConnectionSuggestions from '../components/WizardConnectionSuggestions.vue'
-import { SPINES, type WizardMode } from '../lib/wizardQuestionnaires'
-import { getDomainLabel } from '../lib/domains'
-import type { AuthoringGuidance } from '../../domain'
+import { WIZARD_DRAFT_KEYWORD } from '../components/WizardDomainStage.helpers'
+import { SPINE } from '../lib/wizardQuestionnaires'
+import { getDomainLabel, friendlyEntityId } from '../lib/domains'
+import type { AuthoringGuidance, EntityDisplayInfo } from '../../domain'
 import type { RepoError } from '../../ports/ModelRepository'
 
 const svc = inject(modelServiceKey)!
@@ -17,12 +19,12 @@ const session = useWizardSession()
 const guidanceQuery = useQuery<AuthoringGuidance, RepoError>()
 const reviewLaterCommit = useSuggestionCommit(session)
 
-const mode = computed(() => session.state.mode)
-const setMode = (m: WizardMode) => session.setMode(m)
-const spineLabel = computed(() => SPINES[mode.value].map(getDomainLabel).join(' → '))
+const spineLabel = SPINE.map(getDomainLabel).join(' ↔ ')
 
+const lastDomain = computed(() =>
+  session.state.createdEntities.at(-1)?.domain ?? session.state.activeDomain)
 const domainCards = computed(() =>
-  buildWizardDomainCards(createdCountByDomain(session.state), mode.value))
+  buildWizardDomainCards(createdCountByDomain(session.state), lastDomain.value))
 const activeDomain = computed(() => session.state.activeDomain)
 const hasProgress = computed(() =>
   session.state.createdEntities.length > 0 || session.state.reviewLaterQueue.length > 0)
@@ -38,6 +40,19 @@ const acceptReviewLater = (suggestion: (typeof session.state.reviewLaterQueue)[n
   reviewLaterCommit.accept(suggestion, (id) => session.resolveReviewLater(id))
 const dismissReviewLater = (id: string) => session.resolveReviewLater(id)
 
+// Drafts left behind by *previous* wizard sessions (tagged wizard-draft, decision D-6) —
+// surfaced so abandoned work is finished or cleaned up instead of silently accumulating.
+// This session's own creations are excluded; lookup failure just hides the banner.
+const priorDrafts = ref<readonly EntityDisplayInfo[]>([])
+onMounted(() => {
+  void Effect.runPromise(
+    svc.searchEntityDisplay({ query: '', limit: 20, keywords: [WIZARD_DRAFT_KEYWORD] }),
+  ).then((result) => {
+    const sessionIds = new Set(session.state.createdEntities.map((e) => e.artifactId))
+    priorDrafts.value = result.items.filter((item) => !sessionIds.has(item.artifact_id))
+  }).catch(() => { priorDrafts.value = [] })
+})
+
 // Any activeDomain change — a direct click, resuming a session on mount, or a questionnaire's
 // bridge step switching domains — refetches guidance for it. Single source of truth instead of
 // duplicating the fetch at every call site that can change the active domain.
@@ -52,32 +67,10 @@ watch(activeDomain, (domain) => {
       <h1 class="page-title">
         Guided Modeling Wizard
       </h1>
-      <div
-        class="mode-toggle"
-        role="group"
-        aria-label="Wizard mode"
-      >
-        <button
-          type="button"
-          class="mode-btn"
-          :class="{ 'mode-btn--active': mode === 'planning' }"
-          @click="setMode('planning')"
-        >
-          Planning — start from why
-        </button>
-        <button
-          type="button"
-          class="mode-btn"
-          :class="{ 'mode-btn--active': mode === 'reverse' }"
-          @click="setMode('reverse')"
-        >
-          Reverse architecture — start from what exists
-        </button>
-      </div>
       <p class="wizard-subtitle">
-        Pick a domain to see what belongs there and why. For a lightweight end-to-end model,
-        follow the guided spine: {{ spineLabel }}. Skip freely between domains and questions —
-        nothing here is gated.
+        Pick a domain to see what belongs there and why. The spine —
+        {{ spineLabel }} — connects in both directions: start from a need, from an existing
+        system, or anywhere between. Every question is skippable; nothing here is gated.
       </p>
       <button
         v-if="hasProgress"
@@ -87,6 +80,23 @@ watch(activeDomain, (domain) => {
       >
         Start over
       </button>
+    </div>
+
+    <div
+      v-if="priorDrafts.length"
+      class="draft-banner"
+    >
+      <strong>{{ priorDrafts.length }} draft{{ priorDrafts.length === 1 ? '' : 's' }}</strong>
+      from earlier wizard sessions:
+      <RouterLink
+        v-for="draft in priorDrafts.slice(0, 5)"
+        :key="draft.artifact_id"
+        class="draft-link"
+        :to="{ path: '/entity', query: { id: draft.artifact_id } }"
+      >
+        {{ draft.name }}
+      </RouterLink>
+      <span v-if="priorDrafts.length > 5">…</span>
     </div>
 
     <div class="domain-hub">
@@ -104,6 +114,7 @@ watch(activeDomain, (domain) => {
           v-if="card.recommended"
           class="domain-card__badge"
         >{{ hasProgress ? 'Next' : 'Start here' }}</span>
+        <span class="domain-card__intro">{{ card.intro }}</span>
         <span
           v-if="card.createdCount > 0"
           class="domain-card__count"
@@ -141,6 +152,33 @@ watch(activeDomain, (domain) => {
     </div>
 
     <div
+      v-if="session.state.createdEntities.length"
+      class="recap"
+    >
+      <h2 class="domain-panel__title">
+        This session
+      </h2>
+      <ul class="recap-list">
+        <li
+          v-for="entity in session.state.createdEntities"
+          :key="entity.artifactId"
+        >
+          <RouterLink :to="{ path: '/entity', query: { id: entity.artifactId } }">
+            {{ entity.name }}
+          </RouterLink>
+          <span class="recap-meta">{{ entity.artifactType }} · {{ entity.domain }}
+            · {{ friendlyEntityId(entity.artifactId) }}</span>
+        </li>
+      </ul>
+      <p
+        v-if="session.state.createdConnections.length"
+        class="recap-connections"
+      >
+        Connections made: {{ session.state.createdConnections.map((c) => c.summary).join(' · ') }}
+      </p>
+    </div>
+
+    <div
       v-if="session.state.reviewLaterQueue.length"
       class="review-later"
     >
@@ -167,12 +205,6 @@ watch(activeDomain, (domain) => {
 <style scoped>
 .page-title { font-size: 22px; font-weight: 600; margin-bottom: 4px; }
 .wizard-header { margin-bottom: 20px; }
-.mode-toggle { display: flex; gap: 8px; margin: 6px 0 10px; }
-.mode-btn {
-  padding: 6px 14px; border-radius: 6px; border: 1px solid #d1d5db; background: #fff;
-  font-size: 13px; cursor: pointer; color: #374151;
-}
-.mode-btn--active { background: #2563eb; color: #fff; border-color: #2563eb; }
 .wizard-subtitle { color: #6b7280; margin: 0 0 8px; }
 .btn-link {
   background: none; border: none; color: #2563eb; cursor: pointer; padding: 0;
@@ -180,6 +212,13 @@ watch(activeDomain, (domain) => {
 }
 .state-msg { color: #6b7280; padding: 8px 0; }
 .state-msg--error { color: #dc2626; }
+
+.draft-banner {
+  border: 1px solid #fcd34d; background: #fffbeb; color: #92400e; border-radius: 8px;
+  padding: 10px 14px; margin-bottom: 16px; font-size: 13px;
+  display: flex; flex-wrap: wrap; gap: 8px; align-items: center;
+}
+.draft-link { color: #b45309; text-decoration: underline; }
 
 .domain-hub {
   display: grid;
@@ -199,10 +238,18 @@ watch(activeDomain, (domain) => {
   align-self: flex-start; font-size: 11px; font-weight: 600; color: #1d4ed8;
   background: #dbeafe; border-radius: 10px; padding: 1px 8px;
 }
+.domain-card__intro {
+  font-size: 12px; color: #6b7280; line-height: 1.4;
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+}
 .domain-card__count { font-size: 12px; color: #6b7280; }
 
-.domain-panel, .review-later {
+.domain-panel, .review-later, .recap {
   border: 1px solid #e5e7eb; border-radius: 8px; padding: 16px 20px; margin-bottom: 20px;
 }
 .domain-panel__title { font-size: 16px; font-weight: 600; margin: 0 0 12px; }
+.recap-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.recap-list a { color: #2563eb; font-size: 13px; }
+.recap-meta { font-size: 12px; color: #6b7280; margin-left: 8px; }
+.recap-connections { font-size: 12px; color: #4b5563; margin: 10px 0 0; }
 </style>

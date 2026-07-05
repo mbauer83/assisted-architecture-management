@@ -4,6 +4,7 @@ import {
   nameSimilarity,
   phraseSuggestion,
   buildWizardSuggestions,
+  buildChainSuggestions,
   type PermittedConnectionsByPeer,
 } from '../wizardSuggestions'
 import type { EntityDisplayInfo } from '../../../domain'
@@ -137,5 +138,47 @@ describe('buildWizardSuggestions', () => {
     const candidatesByType = new Map([['outcome', [entity('o1', 'Reduce Onboarding Friction Outcome')]]])
     const suggestions = buildWizardSuggestions(source, pairs, candidatesByType, 5)
     expect(suggestions).toHaveLength(1)
+  })
+})
+
+describe('buildChainSuggestions', () => {
+  const source = { id: 'DRV@1.a.d', name: 'Regulatory Pressure', domain: 'motivation' }
+  const pairs = [
+    { direction: 'outgoing' as const, connectionType: 'archimate-association', targetType: 'stakeholder' },
+    { direction: 'incoming' as const, connectionType: 'archimate-influence', targetType: 'assessment' },
+  ]
+
+  it('connects the source to a spine anchor of a legal peer type, most recent anchor first', () => {
+    const anchors = [
+      { id: 'STK@1.a.s1', name: 'Old Stakeholder', type: 'stakeholder' },
+      { id: 'STK@1.a.s2', name: 'Compliance Officer', type: 'stakeholder' },
+    ]
+    const suggestions = buildChainSuggestions(source, pairs, anchors, 3)
+    expect(suggestions[0].targetId).toBe('STK@1.a.s2')
+    expect(suggestions[0].connectionType).toBe('archimate-association')
+    expect(suggestions[1].targetId).toBe('STK@1.a.s1')
+  })
+
+  it('flips endpoints for incoming pairs (anchor is the real connection source)', () => {
+    const anchors = [{ id: 'ASS@1.a.a1', name: 'Untraceable Actions', type: 'assessment' }]
+    const [suggestion] = buildChainSuggestions(source, pairs, anchors, 3)
+    expect(suggestion.sourceId).toBe('ASS@1.a.a1')
+    expect(suggestion.targetId).toBe(source.id)
+  })
+
+  it('skips anchors with no legal pair and the source itself, and honors the cap', () => {
+    const anchors = [
+      { id: source.id, name: source.name, type: 'driver' },
+      { id: 'GOL@1.a.g1', name: 'Some Goal', type: 'goal' },
+      { id: 'STK@1.a.s1', name: 'S1', type: 'stakeholder' },
+      { id: 'STK@1.a.s2', name: 'S2', type: 'stakeholder' },
+    ]
+    expect(buildChainSuggestions(source, pairs, anchors, 1)).toHaveLength(1)
+    expect(buildChainSuggestions(source, pairs, anchors, 5).map((s) => s.targetId))
+      .toEqual(['STK@1.a.s2', 'STK@1.a.s1'])
+  })
+
+  it('returns nothing for an empty anchor list', () => {
+    expect(buildChainSuggestions(source, pairs, [], 3)).toHaveLength(0)
   })
 })

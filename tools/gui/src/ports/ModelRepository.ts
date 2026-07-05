@@ -153,6 +153,8 @@ export interface ModelRepository {
     diagramType?: string
     domains?: string[]
     entityTypes?: string[]
+    /** Exact keyword facet — every listed keyword must be on the entity. */
+    keywords?: string[]
     cursor?: string
   }) => Effect.Effect<EntityDisplaySearchResult, RepoError>
   readonly discoverDiagramEntities: (params: {
