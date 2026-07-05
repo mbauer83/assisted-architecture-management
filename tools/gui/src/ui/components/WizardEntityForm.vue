@@ -6,13 +6,26 @@ import TypedPropertyInput from './TypedPropertyInput.vue'
 import type { EntityAttributeDescriptor } from '../../domain'
 import { hasVerificationErrors, readErrorMessage, collectVerificationIssues } from '../lib/errors'
 import { WIZARD_DRAFT_KEYWORD } from './WizardDomainStage.helpers'
+import { useSimilarEntities } from '../composables/useSimilarEntities'
+import type { EntityDisplayInfo } from '../../domain'
 
-const componentProps = defineProps<{ entityType: string }>()
-const emit = defineEmits<{ created: [{ artifactId: string; name: string }]; cancel: [] }>()
+const componentProps = defineProps<{ entityType: string; namePlaceholder?: string }>()
+const emit = defineEmits<{
+  created: [{ artifactId: string; name: string }]
+  cancel: []
+  useExisting: [EntityDisplayInfo]
+}>()
 
 const svc = inject(modelServiceKey)!
 
 const name = ref('')
+const similar = useSimilarEntities(
+  (query, entityType) =>
+    Effect.runPromise(svc.searchEntityDisplay({ query, limit: 5, entityTypes: [entityType] }))
+      .then((result) => result.items),
+  () => componentProps.entityType,
+  name,
+)
 const summary = ref('')
 const propertyRows = ref<{ key: string; value: string }[]>([])
 const showOptional = ref(false)
@@ -110,8 +123,24 @@ watch(name, () => { previewClean.value = false })
       <input
         v-model="name"
         class="form-input"
-        placeholder="A short, descriptive name"
+        :placeholder="namePlaceholder ?? 'A short, descriptive name'"
       >
+    </div>
+
+    <div
+      v-if="similar.matches.value.length"
+      class="similar-block"
+    >
+      <span class="similar-label">Similar existing — reuse instead of duplicating:</span>
+      <button
+        v-for="match in similar.matches.value"
+        :key="match.artifact_id"
+        type="button"
+        class="similar-chip"
+        @click="emit('useExisting', match)"
+      >
+        {{ match.name }}
+      </button>
     </div>
 
     <div class="form-row">
@@ -233,6 +262,13 @@ watch(name, () => { previewClean.value = false })
   outline: none; box-sizing: border-box; font-family: inherit;
 }
 .form-input:focus, .form-textarea:focus { border-color: #2563eb; }
+.similar-block { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.similar-label { font-size: 12px; color: #92400e; }
+.similar-chip {
+  padding: 2px 10px; border-radius: 12px; border: 1px solid #fcd34d; background: #fffbeb;
+  color: #92400e; font-size: 12px; cursor: pointer;
+}
+.similar-chip:hover { background: #fef3c7; }
 .prop-row { display: flex; gap: 8px; align-items: center; margin-bottom: 6px; }
 .prop-key { flex: 0 0 160px; font-size: 12px; color: #4b5563; }
 .btn-link { align-self: flex-start; background: none; border: none; color: #2563eb; cursor: pointer; padding: 0; font-size: 12px; text-decoration: underline; }

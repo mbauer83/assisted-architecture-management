@@ -205,7 +205,13 @@ def _serialize_own_entity_type(oe) -> dict[str, object]:  # type: ignore[no-unty
 def _entity_type_guidance(
     filter: list[str] | None,  # noqa: A002
 ) -> dict[str, object]:
-    all_infos = _registry().all_entity_types()
+    # Internal entity types (e.g. global-artifact-reference) are never manually created — they
+    # are produced exclusively by mechanisms like artifact promotion. Excluding them here keeps
+    # every guidance consumer (REST wizard, MCP agents) from offering uncreatable types; the
+    # create path independently rejects them (`entity.py::is_internal_entity_type` guard).
+    all_infos = {
+        name: info for name, info in _registry().all_entity_types().items() if not info.internal
+    }
 
     if filter is None:
         selected = list(all_infos.values())

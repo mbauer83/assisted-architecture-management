@@ -19,40 +19,48 @@ describe('buildWizardDomainCards', () => {
     expect(cards.find((c) => c.key === 'business')?.createdCount).toBe(0)
   })
 
-  it('every card has a non-empty label and color', () => {
+  it('every card has a non-empty label, color, and intro', () => {
     for (const card of buildWizardDomainCards({})) {
       expect(card.label.length).toBeGreaterThan(0)
       expect(card.color.length).toBeGreaterThan(0)
+      expect(card.intro.length, card.key).toBeGreaterThan(0)
     }
   })
 
-  it('recommends motivation on a fresh session', () => {
-    const cards = buildWizardDomainCards({})
-    expect(cards.filter((c) => c.recommended).map((c) => c.key)).toEqual(['motivation'])
+  it('marks exactly the recommended domain', () => {
+    const cards = buildWizardDomainCards({ application: 1 }, 'application')
+    expect(cards.filter((c) => c.recommended).map((c) => c.key)).toEqual(['common'])
+  })
+})
+
+describe('recommendedNextDomain (omnidirectional, D-7)', () => {
+  it('defaults a fresh session to motivation', () => {
+    expect(recommendedNextDomain({})).toBe('motivation')
+    expect(recommendedNextDomain({}, null)).toBe('motivation')
   })
 
-  it('recommends the first untouched spine domain once earlier ones have content', () => {
-    expect(recommendedNextDomain({ motivation: 2 })).toBe('business')
-    expect(recommendedNextDomain({ motivation: 2, business: 1 })).toBe('common')
-    expect(recommendedNextDomain({ motivation: 2, business: 1, common: 3 })).toBe('application')
+  it('recommends the untouched spine neighbor of where the user just worked', () => {
+    expect(recommendedNextDomain({ application: 1 }, 'application')).toBe('common')
+    expect(recommendedNextDomain({ motivation: 2 }, 'motivation')).toBe('business')
+    expect(recommendedNextDomain({ common: 1, application: 1 }, 'common')).toBe('business')
+  })
+
+  it('prefers the forward neighbor when both are untouched', () => {
+    expect(recommendedNextDomain({ business: 1 }, 'business')).toBe('common')
+  })
+
+  it('falls back to the first untouched spine domain when neighbors are covered', () => {
+    expect(recommendedNextDomain({ business: 1, common: 1, application: 1 }, 'common'))
+      .toBe('motivation')
   })
 
   it('recommends nothing once every spine domain has content', () => {
     const counts = { motivation: 1, business: 1, common: 1, application: 1 }
-    expect(recommendedNextDomain(counts)).toBeNull()
-    expect(buildWizardDomainCards(counts).some((c) => c.recommended)).toBe(false)
+    expect(recommendedNextDomain(counts, 'application')).toBeNull()
+    expect(buildWizardDomainCards(counts, 'application').some((c) => c.recommended)).toBe(false)
   })
 
-  it('spine recommendation ignores off-spine progress (technology does not satisfy it)', () => {
+  it('ignores off-spine progress (technology does not satisfy the spine)', () => {
     expect(recommendedNextDomain({ technology: 5 })).toBe('motivation')
-  })
-
-  it('reverse mode recommends the bottom-up order starting at application', () => {
-    expect(recommendedNextDomain({}, 'reverse')).toBe('application')
-    expect(recommendedNextDomain({ application: 1 }, 'reverse')).toBe('common')
-    expect(recommendedNextDomain({ application: 1, common: 2, business: 1 }, 'reverse'))
-      .toBe('motivation')
-    const cards = buildWizardDomainCards({ application: 1 }, 'reverse')
-    expect(cards.filter((c) => c.recommended).map((c) => c.key)).toEqual(['common'])
   })
 })

@@ -1,17 +1,12 @@
 import { describe, it, expect } from 'vitest'
-import {
-  questionnaireForDomain,
-  questionForStep,
-  bridgeForMode,
-  SPINES,
-  type WizardMode,
-} from '../wizardQuestionnaires'
+import { questionnaireForDomain, SPINE, DOMAIN_INTROS } from '../wizardQuestionnaires'
+
+const bridgeTargets = (domain: string): string[] =>
+  (questionnaireForDomain(domain)?.bridges ?? []).map((b) => b.nextDomain)
 
 describe('questionnaireForDomain', () => {
   it('returns the motivation questionnaire with its full stakeholder-to-requirement sequence', () => {
-    const q = questionnaireForDomain('motivation')
-    expect(q).toBeDefined()
-    expect(q?.steps.map((s) => s.entityType)).toEqual([
+    expect(questionnaireForDomain('motivation')?.steps.map((s) => s.entityType)).toEqual([
       'stakeholder', 'driver', 'assessment', 'goal', 'outcome', 'requirement',
     ])
   })
@@ -31,15 +26,16 @@ describe('questionnaireForDomain', () => {
       .toEqual(['application-component', 'data-object'])
   })
 
-  it('every spine questionnaire step has a non-empty question in both modes', () => {
-    for (const mode of ['planning', 'reverse'] as const) {
-      for (const domain of SPINES[mode]) {
-        const q = questionnaireForDomain(domain)
-        expect(q, domain).toBeDefined()
-        for (const step of q?.steps ?? []) {
-          expect(questionForStep(step, mode).length, `${domain}/${step.entityType}/${mode}`)
-            .toBeGreaterThan(0)
-        }
+  it('covers the strategy capability anchor', () => {
+    expect(questionnaireForDomain('strategy')?.steps.map((s) => s.entityType))
+      .toEqual(['capability', 'value-stream', 'resource'])
+  })
+
+  it('every step has a non-empty question and a concrete name hint', () => {
+    for (const domain of [...SPINE, 'strategy']) {
+      for (const step of questionnaireForDomain(domain)?.steps ?? []) {
+        expect(step.question.length, `${domain}/${step.entityType}`).toBeGreaterThan(0)
+        expect(step.nameHint, `${domain}/${step.entityType}`).toMatch(/^e\.g\. /)
       }
     }
   })
@@ -49,53 +45,33 @@ describe('questionnaireForDomain', () => {
   })
 })
 
-describe('SPINES and bridges', () => {
-  it('reverse spine is the planning spine reversed', () => {
-    expect([...SPINES.reverse]).toEqual([...SPINES.planning].reverse())
+describe('omnidirectional spine bridges (D-7)', () => {
+  it('every spine domain bridges to each of its spine neighbors', () => {
+    for (let i = 0; i < SPINE.length; i++) {
+      const expected = [SPINE[i - 1], SPINE[i + 1]].filter((d): d is string => d !== undefined)
+      expect(new Set(bridgeTargets(SPINE[i])), SPINE[i]).toEqual(new Set(expected))
+    }
   })
 
-  const chainCase = (mode: WizardMode) => {
-    const spine = SPINES[mode]
-    for (let i = 0; i < spine.length; i++) {
-      const q = questionnaireForDomain(spine[i])
-      expect(q, spine[i]).toBeDefined()
-      const bridge = q ? bridgeForMode(q, mode) : undefined
-      if (i < spine.length - 1) {
-        expect(bridge?.nextDomain, `${spine[i]}/${mode}`).toBe(spine[i + 1])
-        expect(bridge?.prompt.length).toBeGreaterThan(0)
-      } else {
-        expect(bridge, `${spine[i]}/${mode} should be terminal`).toBeUndefined()
+  it('strategy bridges to its natural anchors (motivation, common)', () => {
+    expect(new Set(bridgeTargets('strategy'))).toEqual(new Set(['motivation', 'common']))
+  })
+
+  it('every bridge has a goal label, a prompt, and a target with a questionnaire', () => {
+    for (const domain of [...SPINE, 'strategy']) {
+      for (const bridge of questionnaireForDomain(domain)?.bridges ?? []) {
+        expect(bridge.label.length, `${domain}→${bridge.nextDomain}`).toBeGreaterThan(0)
+        expect(bridge.prompt.length).toBeGreaterThan(0)
+        expect(questionnaireForDomain(bridge.nextDomain), bridge.nextDomain).toBeDefined()
       }
     }
-  }
-
-  it('planning bridges chain the spine in order; application is terminal', () => {
-    chainCase('planning')
-  })
-
-  it('reverse bridges chain the reversed spine; motivation is terminal', () => {
-    chainCase('reverse')
   })
 })
 
-describe('questionForStep', () => {
-  it('uses the reverse variant when defined and mode is reverse', () => {
-    const step = questionnaireForDomain('application')!.steps[0]
-    expect(questionForStep(step, 'reverse')).toContain('existing application component')
-    expect(questionForStep(step, 'planning')).not.toContain('existing application component')
-  })
-
-  it('falls back to the planning question when no reverse variant exists', () => {
-    const step = questionnaireForDomain('motivation')!.steps[0]
-    expect(questionForStep(step, 'reverse')).toBe(step.question)
-  })
-})
-
-describe('reversePrefersFind', () => {
-  it('is set on application (agent-imported entities: anchor, do not duplicate) and unset elsewhere', () => {
-    expect(questionnaireForDomain('application')?.reversePrefersFind).toBe(true)
-    for (const domain of ['motivation', 'business', 'common']) {
-      expect(questionnaireForDomain(domain)?.reversePrefersFind, domain).toBeUndefined()
+describe('DOMAIN_INTROS', () => {
+  it('has a one-liner for every ArchiMate domain', () => {
+    for (const domain of ['motivation', 'strategy', 'common', 'business', 'application', 'technology', 'implementation']) {
+      expect(DOMAIN_INTROS[domain]?.length, domain).toBeGreaterThan(0)
     }
   })
 })

@@ -6,6 +6,7 @@ see PLAN-modeling-ux-and-self-model-uplift.md WU-A1, decision D-1.
 
 from __future__ import annotations
 
+from dataclasses import replace
 from pathlib import Path
 
 from src.domain.artifact_types import EntityRecord
@@ -75,3 +76,17 @@ def test_accepted_entity_types_is_an_additional_intersection() -> None:
     entity = _entity(artifact_type="requirement")
     assert entity_filter.matches(entity, ontology=_ONTOLOGY, accepted_entity_types=frozenset({"requirement"})) is True
     assert entity_filter.matches(entity, ontology=_ONTOLOGY, accepted_entity_types=frozenset({"goal"})) is False
+
+
+def test_keyword_facet_requires_every_requested_keyword() -> None:
+    entity_filter = EntityFilter.from_params(domains=None, entity_types=None, keywords="wizard-draft")
+    tagged = replace(_entity(artifact_id="E-tagged"), keywords=("wizard-draft", "other"))
+    untagged = _entity(artifact_id="E-untagged")
+    assert entity_filter.matches(tagged, ontology=_ONTOLOGY) is True
+    assert entity_filter.matches(untagged, ontology=_ONTOLOGY) is False
+
+
+def test_keyword_facet_defaults_to_empty_and_matches_all() -> None:
+    entity_filter = EntityFilter.from_params(domains=None, entity_types=None)
+    assert entity_filter.keywords == frozenset()
+    assert entity_filter.matches(_entity(), ontology=_ONTOLOGY) is True

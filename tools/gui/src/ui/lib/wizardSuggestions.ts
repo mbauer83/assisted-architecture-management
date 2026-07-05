@@ -87,6 +87,59 @@ export interface WizardSuggestionSource {
   readonly domain: string
 }
 
+export interface ChainAnchor {
+  readonly id: string
+  readonly name: string
+  readonly type: string
+}
+
+const suggestionFor = (
+  source: WizardSuggestionSource,
+  pair: LegalConnectionPair,
+  peerId: string,
+  peerName: string,
+): WizardSuggestion => {
+  const [sourceId, sourceName, targetId, targetName] = pair.direction === 'incoming'
+    ? [peerId, peerName, source.id, source.name]
+    : [source.id, source.name, peerId, peerName]
+  return {
+    id: `${sourceId}:${pair.connectionType}:${targetId}`,
+    domain: source.domain,
+    summary: phraseSuggestion(sourceName, pair.connectionType, targetName),
+    sourceId,
+    sourceName,
+    connectionType: pair.connectionType,
+    targetId,
+    targetName,
+  }
+}
+
+/**
+ * Deterministic chain-first suggestions (WU-B4.2): connect the new entity to the session's own
+ * spine anchors — the entities the user just built. These outrank every similarity-scored
+ * candidate because "link the driver to the stakeholder you created a minute ago" is the
+ * wizard's single most likely next action, and similarity ranking cannot be trusted to surface
+ * it (a fresh chain has no graph neighborhood yet, and the candidate search cap can drop
+ * just-created entities entirely). One suggestion per anchor — the first legal pair wins —
+ * most recent anchors first, capped.
+ */
+export function buildChainSuggestions(
+  source: WizardSuggestionSource,
+  legalPairs: readonly LegalConnectionPair[],
+  anchors: readonly ChainAnchor[],
+  cap: number,
+): WizardSuggestion[] {
+  const suggestions: WizardSuggestion[] = []
+  for (const anchor of [...anchors].reverse()) {
+    if (anchor.id === source.id) continue
+    const pair = legalPairs.find((p) => p.targetType === anchor.type)
+    if (!pair) continue
+    suggestions.push(suggestionFor(source, pair, anchor.id, anchor.name))
+    if (suggestions.length >= cap) break
+  }
+  return suggestions
+}
+
 /**
  * Builds ranked, commit-ready suggestions for `source`: for each legal (direction, connType,
  * targetType) triple, take the best-scoring candidate from `candidatesByTargetType` (name
@@ -111,21 +164,9 @@ export function buildWizardSuggestions(
       (a, b) => candidateScore(source.name, b, proximityBoost) - candidateScore(source.name, a, proximityBoost),
     )[0]
     if (!best) continue
-    const [sourceId, sourceName, targetId, targetName] = pair.direction === 'incoming'
-      ? [best.artifact_id, best.name, source.id, source.name]
-      : [source.id, source.name, best.artifact_id, best.name]
     scored.push({
       score: candidateScore(source.name, best, proximityBoost),
-      suggestion: {
-        id: `${sourceId}:${pair.connectionType}:${targetId}`,
-        domain: source.domain,
-        summary: phraseSuggestion(sourceName, pair.connectionType, targetName),
-        sourceId,
-        sourceName,
-        connectionType: pair.connectionType,
-        targetId,
-        targetName,
-      },
+      suggestion: suggestionFor(source, pair, best.artifact_id, best.name),
     })
   }
   return scored

@@ -74,3 +74,25 @@ class TestPairLegality:
         resp = client.get("/api/authoring-guidance", params={"target": "goal"})
         assert resp.status_code == 200
         assert "error" in resp.json()
+
+
+class TestInternalTypesExcluded:
+    """Internal entity types (promotion-created only, e.g. global-artifact-reference) must never
+    be offered by any authoring-guidance surface — the create path rejects them outright."""
+
+    def test_domain_guidance_never_lists_internal_types(self, client: TestClient) -> None:
+        resp = client.get("/api/authoring-guidance", params={"domain": "common"})
+        names = {e["name"] for e in resp.json()["entity_types"]}
+        assert "global-artifact-reference" not in names
+        assert "process" in names
+
+    def test_unfiltered_guidance_never_lists_internal_types(self, client: TestClient) -> None:
+        resp = client.get("/api/authoring-guidance")
+        names = {e["name"] for e in resp.json()["entity_types"]}
+        assert "global-artifact-reference" not in names
+
+    def test_explicit_request_for_internal_type_is_not_honored(self, client: TestClient) -> None:
+        resp = client.get("/api/authoring-guidance", params={"entity_type": "global-artifact-reference"})
+        body = resp.json()
+        listed = {e["name"] for e in body.get("entity_types", [])}
+        assert "global-artifact-reference" not in listed

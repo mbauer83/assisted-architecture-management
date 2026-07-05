@@ -958,10 +958,10 @@ The mode toggle then disappears.
   surface.
 
 **Decisions.**
-- **D-7 (open)** — Replace the mode toggle with the omnidirectional spine (B4.4)?
-  Recommendation: yes — the toggle is an upfront methodology question users shouldn't have to
-  answer, and everything it controls is derivable. Counterargument to weigh: an explicit reverse
-  mode is a teachable, documentable workflow ("run the agent, then enrich in reverse mode").
+- **D-7 (decided)** — The mode toggle is replaced by the omnidirectional spine (B4.4): the
+  toggle was an upfront methodology question users shouldn't have to answer, and everything it
+  controlled (bridge direction, find-vs-create default, phrasing, starting domain) is derivable
+  from content and session state.
 - **D-8 (open)** — Draft finalization semantics: does "finish session" strip the `wizard-draft`
   keyword, and is there a bulk cleanup for abandoned drafts?
 
