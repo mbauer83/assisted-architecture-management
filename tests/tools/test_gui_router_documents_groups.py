@@ -47,6 +47,30 @@ _ADR_SCHEMA = """\
 }
 """
 
+_STANDARD_SCHEMA = """\
+{
+  "abbreviation": "STD",
+  "name": "Standard",
+  "subdirectory": "standards",
+  "frontmatter_schema": {
+    "type": "object",
+    "required": ["title", "status"],
+    "properties": {
+      "title": {"type": "string"},
+      "status": {"type": "string"}
+    }
+  },
+  "sections": [
+    {"name": "Overview"},
+    {
+      "name": "Decision",
+      "required_entity_type_connections": ["requirement"],
+      "suggested_entity_type_connections": ["@all"]
+    }
+  ]
+}
+"""
+
 
 def _doc_md(artifact_id: str, title: str, doc_type: str = "adr") -> str:
     return f"""\
@@ -73,6 +97,7 @@ def populated_root(tmp_path: Path) -> Path:
     root = tmp_path / "engagements" / "ENG-DOC" / "architecture-repository"
     _write(root / "docs" / "adrs" / f"{DOC_ID}.md", _doc_md(DOC_ID, "Test Document"))
     _write(root / ".arch-repo" / "documents" / "adr.json", _ADR_SCHEMA)
+    _write(root / ".arch-repo" / "documents" / "standard.json", _STANDARD_SCHEMA)
     return root
 
 
@@ -106,6 +131,31 @@ class TestDocumentTypes:
         r = doc_client.get("/api/document-types")
         assert r.status_code == 200
         assert isinstance(r.json(), list)
+
+    def test_canonical_sections_exposed_with_per_section_entity_rules(self, doc_client) -> None:
+        r = doc_client.get("/api/document-types")
+        assert r.status_code == 200
+        by_type = {item["doc_type"]: item for item in r.json()}
+        standard = by_type["standard"]
+        assert standard["sections"] == [
+            {"name": "Overview"},
+            {
+                "name": "Decision",
+                "required_entity_type_connections": ["requirement"],
+                "suggested_entity_type_connections": ["@all"],
+            },
+        ]
+
+    def test_legacy_schema_normalizes_to_sections_without_entity_rules(self, doc_client) -> None:
+        r = doc_client.get("/api/document-types")
+        assert r.status_code == 200
+        by_type = {item["doc_type"]: item for item in r.json()}
+        adr = by_type["adr"]
+        assert adr["sections"] == [
+            {"name": "Context"},
+            {"name": "Decision"},
+            {"name": "Consequences"},
+        ]
 
     def test_schemata_endpoint(self, doc_client) -> None:
         r = doc_client.get("/api/document-schemata")

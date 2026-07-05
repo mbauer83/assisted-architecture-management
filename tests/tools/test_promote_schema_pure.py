@@ -237,6 +237,51 @@ class TestDocumentSchemaErrors:
         errors = _document_schema_errors(eng, ent, ["DOC@9.ZZZ.not-found"], repo)
         assert errors == []
 
+    def test_missing_section_entity_type_connection_reported(self, tmp_path: Path) -> None:
+        eng = tmp_path / "eng"
+        ent = tmp_path / "ent"
+        eng.mkdir()
+        ent.mkdir()
+        ent_schema_dir = ent / ".arch-repo" / "documents"
+        ent_schema_dir.mkdir(parents=True)
+        eng_schema_dir = eng / ".arch-repo" / "documents"
+        eng_schema_dir.mkdir(parents=True)
+        ent_schema = {
+            "frontmatter_schema": {},
+            "sections": [{"name": "Specification", "required_entity_type_connections": ["requirement"]}],
+        }
+        eng_schema = {"frontmatter_schema": {}, "sections": [{"name": "Specification"}]}
+        (ent_schema_dir / "my-doc3.json").write_text(json.dumps(ent_schema))
+        (eng_schema_dir / "my-doc3.json").write_text(json.dumps(eng_schema))
+        repo = _make_mock_repo("DOC@1.DD.test", "my-doc3")
+        errors = _document_schema_errors(eng, ent, ["DOC@1.DD.test"], repo)
+        assert any("requirement" in e and "Specification" in e for e in errors)
+
+    def test_engagement_section_superset_reports_no_error(self, tmp_path: Path) -> None:
+        eng = tmp_path / "eng"
+        ent = tmp_path / "ent"
+        eng.mkdir()
+        ent.mkdir()
+        ent_schema_dir = ent / ".arch-repo" / "documents"
+        ent_schema_dir.mkdir(parents=True)
+        eng_schema_dir = eng / ".arch-repo" / "documents"
+        eng_schema_dir.mkdir(parents=True)
+        ent_schema = {
+            "frontmatter_schema": {},
+            "sections": [{"name": "Specification", "required_entity_type_connections": ["requirement"]}],
+        }
+        eng_schema = {
+            "frontmatter_schema": {},
+            "sections": [
+                {"name": "Specification", "required_entity_type_connections": ["requirement", "capability"]}
+            ],
+        }
+        (ent_schema_dir / "my-doc4.json").write_text(json.dumps(ent_schema))
+        (eng_schema_dir / "my-doc4.json").write_text(json.dumps(eng_schema))
+        repo = _make_mock_repo("DOC@1.EE.test", "my-doc4")
+        errors = _document_schema_errors(eng, ent, ["DOC@1.EE.test"], repo)
+        assert errors == []
+
 
 # ---------------------------------------------------------------------------
 # check_promotion_schema_compatibility — both roots present

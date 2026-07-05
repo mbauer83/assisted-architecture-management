@@ -1,7 +1,7 @@
 """Normalize diagram binding shorthand to canonical top-level Binding records.
 
 Diagram entity items may carry a nested ``binding:`` shorthand for convenience.
-The write path also accepts two legacy shorthand forms: ``entity_id`` on items
+The write path also accepts shorthand forms: ``entity_id``/``backing_entity_id`` on items
 (→ ``represents`` binding) and ``_scope_entity_id`` at the top of
 ``diagram-entities`` (→ diagram-level ``scoped-by`` binding).  All forms are
 normalized to top-level Binding records; none is persisted in the output file.
@@ -37,10 +37,11 @@ def normalize_bindings(
 ) -> list[Binding]:
     """Merge explicit top-level bindings with shorthand extracted from diagram entities.
 
-    Handles three shorthand forms:
+    Handles shorthand forms:
     1. Explicit ``binding:`` key on a diagram-entity item (new API, §1.2).
     2. Legacy ``entity_id`` on a diagram-entity item → ``represents`` binding.
-    3. Legacy ``_scope_entity_id`` at top of diagram_entities → ``scoped-by`` binding.
+    3. ArchiMate ``backing_entity_id`` on a diagram-entity item → ``represents`` binding.
+    4. Legacy ``_scope_entity_id`` at top of diagram_entities → ``scoped-by`` binding.
 
     Explicit top-level bindings take precedence: if an explicit binding has the same
     id as a shorthand-derived binding, the shorthand is silently dropped.
@@ -98,8 +99,8 @@ def normalize_bindings(
                     result.append(binding)
                     seen_ids.add(binding.id)
             else:
-                # entity_id shorthand (legacy)
-                entity_id_str = str(item.get("entity_id") or "").strip()
+                # entity_id shorthand (legacy) / backing_entity_id shorthand (ArchiMate occurrences)
+                entity_id_str = str(item.get("entity_id") or item.get("backing_entity_id") or "").strip()
                 if not entity_id_str:
                     continue
                 element_id = str(item.get("id") or "").strip()
@@ -113,6 +114,7 @@ def normalize_bindings(
                             subject=BindingSubject(kind="entity", id=element_id),
                             correspondence_kind="represents",
                             target=Target(entity_id=entity_id_str),
+                            visual_role=str(item["visual_role"]) if item.get("visual_role") is not None else None,
                         )
                     )
                     seen_ids.add(bid)
@@ -125,7 +127,7 @@ def strip_diagram_shorthand(
 ) -> dict[str, object] | None:
     """Return diagram_entities with all binding shorthand fields removed.
 
-    Strips ``entity_id`` and ``binding:`` from entity items, and removes
+    Strips ``entity_id``, ``backing_entity_id``, and ``binding:`` from entity items, and removes
     the top-level ``_scope_entity_id`` key.  The result is safe to persist;
     the write path calls this after normalize_bindings so the output file
     contains only clean entity data and top-level bindings.
@@ -138,7 +140,7 @@ def strip_diagram_shorthand(
             continue
         if isinstance(value, list):
             out[key] = [
-                {k: v for k, v in item.items() if k not in ("entity_id", "binding")}
+                {k: v for k, v in item.items() if k not in ("entity_id", "backing_entity_id", "binding")}
                 if isinstance(item, dict)
                 else item
                 for item in value

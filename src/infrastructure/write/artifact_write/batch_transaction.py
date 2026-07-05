@@ -7,7 +7,7 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
 
-from src.config.repo_paths import DIAGRAM_CATALOG, DOCS, MODEL
+from src.config.repo_paths import DIAGRAM_CATALOG, DOCS, MODEL, PROJECTS
 
 from .m4_transaction import (
     ChangeKind,
@@ -21,7 +21,7 @@ from .m4_transaction import (
     write_transaction_intent,
 )
 
-_MANAGED_SUBTREES = (MODEL, DOCS, DIAGRAM_CATALOG)
+_MANAGED_SUBTREES = (MODEL, DOCS, DIAGRAM_CATALOG, PROJECTS)
 
 
 @dataclass(frozen=True)

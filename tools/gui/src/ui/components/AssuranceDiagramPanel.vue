@@ -4,6 +4,7 @@ import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import { RouterLink } from 'vue-router'
 import AssuranceNodeDetail from './AssuranceNodeDetail.vue'
 import WithheldNotice from './WithheldNotice.vue'
+import { stripMarkerAttributes } from '../lib/svgHitAreas'
 import {
   UCA_TYPES,
   buildAssuranceAliasMap,
@@ -49,6 +50,7 @@ function selectEdge(edge: AssuranceDiagramEdge) {
 function addEdgeHitArea(group: SVGGElement) {
   for (const segment of Array.from(group.querySelectorAll<SVGElement>('path, line, polyline'))) {
     const hit = segment.cloneNode(false) as SVGElement
+    stripMarkerAttributes(hit)
     hit.setAttribute('fill', 'none')
     hit.setAttribute('stroke', 'transparent')
     hit.setAttribute('stroke-width', '12')

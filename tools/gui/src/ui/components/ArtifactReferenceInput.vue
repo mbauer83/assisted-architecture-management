@@ -4,12 +4,15 @@ import { Effect } from 'effect'
 import { modelServiceKey } from '../keys'
 import { DOMAIN_OPTIONS, getDomainLabel } from '../lib/domains'
 import { buildReferenceMarkdown } from '../lib/referenceLinks.js'
+import { formatEntityTypeTerm, rankedEntityTypeSet } from '../lib/documentSections'
 import type { DocumentType, ReferenceSearchHit, WriteHelp } from '../../domain'
 import { readErrorMessage } from '../lib/errors'
 
 interface Props {
   currentPath?: string
   fixedKinds?: ArtifactKind[]
+  sectionLabel?: string
+  suggestedEntityTypes?: string[]
 }
 
 type ArtifactKind = 'entity' | 'diagram' | 'document'
@@ -51,12 +54,21 @@ const selectedDomainLabels = computed(() =>
   selectedDomains.value.map((domain) => getDomainLabel(domain)),
 )
 
+const suggestedEntityTypeSet = computed(() => rankedEntityTypeSet(props.suggestedEntityTypes))
+
+const suggestedEntityTypeLabels = computed(() =>
+  (props.suggestedEntityTypes ?? []).map(formatEntityTypeTerm),
+)
+
 const availableEntityTypes = computed(() => {
   const map = writeHelp.value?.entity_types_by_domain ?? {}
   const buckets = selectedDomains.value.length
     ? selectedDomains.value.flatMap((domain) => map[domain] ?? [])
     : Object.values(map).flat()
-  return [...new Set(buckets)].sort()
+  const unique = [...new Set(buckets)].sort()
+  const suggested = suggestedEntityTypeSet.value
+  if (suggested.size === 0) return unique
+  return [...unique.filter((t) => suggested.has(t)), ...unique.filter((t) => !suggested.has(t))]
 })
 
 const selectedDocTypeLabels = computed(() =>
@@ -178,6 +190,16 @@ onMounted(() => {
       </button>
     </div>
 
+    <div
+      v-if="sectionLabel"
+      class="reference-picker__section-hint"
+    >
+      Inserting into section: <strong>{{ sectionLabel }}</strong>
+      <span v-if="suggestedEntityTypeLabels.length">
+        — suggested links: {{ suggestedEntityTypeLabels.join(', ') }}
+      </span>
+    </div>
+
     <div class="reference-picker__search">
       <input
         v-model="query"
@@ -274,7 +296,10 @@ onMounted(() => {
             v-for="entityType in availableEntityTypes"
             :key="entityType"
             class="chip chip--small"
-            :class="{ 'chip--active': selectedEntityTypes.includes(entityType) }"
+            :class="{
+              'chip--active': selectedEntityTypes.includes(entityType),
+              'chip--suggested': suggestedEntityTypeSet.has(entityType),
+            }"
             type="button"
             @click="selectedEntityTypes = toggleValue(selectedEntityTypes, entityType)"
           >
@@ -419,6 +444,16 @@ onMounted(() => {
   line-height: 1;
 }
 
+.reference-picker__section-hint {
+  background: #eff6ff;
+  border: 1px solid #bfdbfe;
+  color: #1e40af;
+  border-radius: 8px;
+  padding: 7px 11px;
+  font-size: 12px;
+  margin-bottom: 10px;
+}
+
 .reference-picker__input {
   width: 100%;
   padding: 11px 13px;
@@ -518,6 +553,12 @@ onMounted(() => {
   background: #0f172a;
   border-color: #0f172a;
   color: white;
+}
+
+.chip--suggested:not(.chip--active) {
+  border-color: #93c5fd;
+  background: #eff6ff;
+  color: #1e40af;
 }
 
 .reference-picker__summary {

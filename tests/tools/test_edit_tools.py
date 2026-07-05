@@ -220,6 +220,21 @@ class TestDeleteEntity:
         assert not entity_path.exists()
         assert not outgoing_path.exists()
 
+    def test_delete_entity_resolves_short_form_id(self, repo: Path) -> None:
+        """Regression: registry.find_file_by_id previously did an exact-key lookup
+        only, so a short id (no trailing .slug) always reported "not found"."""
+        eid = _make_entity(repo, "requirement", "Delete Via Short Id")
+        entity_path = next((repo / "model").rglob(f"{eid}.md"))
+        assert entity_path.exists()
+
+        result = mcp.artifact_delete_entity(
+            artifact_id=stable_id(eid),
+            dry_run=False,
+            repo_root=str(repo),
+        )
+        assert result["wrote"] is True
+        assert not entity_path.exists()
+
     def test_delete_entity_blocked_by_incoming_connection_tree(self, repo: Path) -> None:
         src = _make_entity(repo, "requirement", "Incoming Src")
         tgt = _make_entity(repo, "outcome", "Blocked Tgt")

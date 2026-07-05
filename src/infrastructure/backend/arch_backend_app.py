@@ -189,6 +189,7 @@ def _build_app(credentials: "GitCredentials | None" = None):  # type: ignore[no-
     from src.infrastructure.app_bootstrap import install_module_registry
     from src.infrastructure.gui.routers.admin import router as admin_router
     from src.infrastructure.gui.routers.assurance import router as assurance_router
+    from src.infrastructure.gui.routers.authoring_guidance import router as authoring_guidance_router
     from src.infrastructure.gui.routers.connections import router as connections_router
     from src.infrastructure.gui.routers.diagram_types import router as diagram_types_router
     from src.infrastructure.gui.routers.diagrams import router as diagrams_router
@@ -267,7 +268,7 @@ def _build_app(credentials: "GitCredentials | None" = None):  # type: ignore[no-
     for router in (
         entities_router, entity_search_router, connections_router, diagram_types_router,
         diagrams_router, documents_router, groups_router, identifiers_router, promote_router,
-        sync_router, admin_router, events_router, assurance_router,
+        sync_router, admin_router, events_router, assurance_router, authoring_guidance_router,
     ):
         app.include_router(router)
 

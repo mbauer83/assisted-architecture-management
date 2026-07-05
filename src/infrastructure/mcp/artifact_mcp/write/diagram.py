@@ -29,6 +29,8 @@ def artifact_create_matrix(
     status: str = "draft",
     infer_entity_ids: bool = True,
     auto_link_entity_ids: bool = True,
+    tlp: str | None = None,
+    group: str | None = None,
     dry_run: bool = True,
     repo_root: str | None = None,
 ) -> dict[str, object]:
@@ -54,6 +56,8 @@ def artifact_create_matrix(
         last_updated=None,
         infer_entity_ids=infer_entity_ids,
         auto_link_entity_ids=auto_link_entity_ids,
+        tlp=tlp,
+        group=group,
         dry_run=dry_run,
     )
     if result.wrote and not dry_run:
@@ -167,7 +171,13 @@ def register(mcp: FastMCP) -> None:
         title="Artifact Write: Create Connection Matrix",
         description=(
             "Create a markdown connection-matrix diagram. Defaults to engagement repo from "
-            "arch-init config. dry_run=true returns would-be content without writing."
+            "arch-init config. dry_run=true returns would-be content without writing. "
+            "Passing an existing artifact_id upserts it in place (resolved via the registry, "
+            "honouring any diagram-collection group it already lives in) instead of creating "
+            "a duplicate at the flat path. group (str|None) re-homes it to a diagram-collection "
+            "slug; for a metadata-only group/name/version/status move without resupplying the "
+            "table, use artifact_edit_diagram instead. "
+            "artifact_id: full (PREFIX@epoch.random.slug) or short (PREFIX@epoch.random) form."
         ),
         annotations=LOCAL_WRITE,
         structured_output=True,
@@ -187,6 +197,10 @@ def register(mcp: FastMCP) -> None:
             "For ArchiMate views, diagram_connections is optional per-diagram connection annotation metadata keyed by "
             "model connection artifact_id. It does not create diagram-owned connections. Supported opt-in keys are "
             "artifact_id (or connection_id), include_description, include_cardinality, and label.\n"
+            "For additional occurrences of an already included model entity, pass "
+            "diagram_entities={'occurrence': [{'id': '<occurrence-id>', 'backing_entity_id': '<model-entity-id>'}]}. "
+            "The occurrence id distinguishes the diagram element; backing_entity_id preserves the single model "
+            "identity. visual_role is optional metadata, not required for identity.\n"
             "direction='left_to_right' | 'top_to_bottom' (default). "
             "auto_include_stereotypes=true injects !include lines. "
             "connection_inference: 'none' | 'auto' (warn) | 'strict' (error) on unknown stereotypes.\n\n"

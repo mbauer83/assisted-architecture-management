@@ -1,0 +1,105 @@
+"""Entity-display search — the picker's single backend (WU-A1, decision D-1).
+
+Filters (domain/entity-type) via the shared `EntityFilter` predicate; cursor-paginated with a
+stable sort key so pages never skip or duplicate an entity.
+"""
+
+from __future__ import annotations
+
+from dataclasses import dataclass
+from typing import Any
+
+from fastapi import HTTPException
+
+from src.application.entity_type_predicates import is_internal_entity_type
+from src.application.runtime_catalogs import RuntimeCatalogs
+from src.domain.artifact_types import EntityRecord
+from src.infrastructure.gui.routers import state as s
+from src.infrastructure.gui.routers._diagram_context import entity_display_item, fuzzy_entity_hits
+from src.infrastructure.gui.routers._entity_filter import EntityFilter
+
+
+def accepted_entity_types(diagram_type: str | None, catalogs: RuntimeCatalogs) -> set[str] | None:
+    if diagram_type is None:
+        return None
+    kind = catalogs.diagram_types.find_diagram_type(diagram_type)
+    if kind is None:
+        raise HTTPException(404, f"Diagram type not found: {diagram_type!r}")
+    types = {str(entity_type) for entity_type in kind.effective_entity_types()}
+    return types if types else None
+
+
+@dataclass(frozen=True)
+class EntityDisplaySearchResult:
+    items: list[dict[str, Any]]
+    next_cursor: str | None
+
+
+def entity_display_search_impl(
+    q: str,
+    limit: int,
+    diagram_type: str | None,
+    catalogs: RuntimeCatalogs,
+    *,
+    domains: str | None = None,
+    entity_types: str | None = None,
+    cursor: str | None = None,
+) -> EntityDisplaySearchResult:
+    repo = s.get_repo()
+    ontology = catalogs.ontology
+    accepted_types = accepted_entity_types(diagram_type, catalogs)
+    entity_filter = EntityFilter.from_params(domains=domains, entity_types=entity_types)
+    offset = int(cursor) if cursor and cursor.isdigit() else 0
+
+    if not q.strip():
+        ordered_domains = ontology.domain_order()
+        candidates = [
+            rec
+            for rec in repo.list_entities()
+            if entity_filter.matches(rec, ontology=ontology, accepted_entity_types=accepted_types)
+        ]
+        candidates.sort(
+            key=lambda rec: (
+                ordered_domains.index(rec.domain) if rec.domain in ordered_domains else 99,
+                rec.name,
+                rec.artifact_id,
+            )
+        )
+        page = candidates[offset : offset + limit]
+        next_cursor = str(offset + limit) if offset + limit < len(candidates) else None
+        return EntityDisplaySearchResult(
+            items=[entity_display_item(rec, catalogs) for rec in page],
+            next_cursor=next_cursor,
+        )
+
+    selected_types_raw = entity_filter.entity_types & accepted_types if (
+        entity_filter.entity_types and accepted_types is not None
+    ) else (entity_filter.entity_types or accepted_types)
+    selected_types: set[str] | None = set(selected_types_raw) if selected_types_raw else None
+    search_limit = offset + limit
+    hits = repo.search_artifacts(
+        q,
+        limit=search_limit,
+        domain=sorted(entity_filter.domains) or None,
+        artifact_type=sorted(selected_types) if selected_types else None,
+        include_connections=False,
+        include_diagrams=False,
+        include_documents=False,
+    ).hits
+    items: list[dict[str, Any]] = []
+    for h in hits:
+        if h.record_type != "entity" or not isinstance(h.record, EntityRecord):
+            continue
+        rec = h.record
+        if is_internal_entity_type(rec.artifact_type, ontology):
+            continue
+        items.append(entity_display_item(rec, catalogs))
+    if len(items) < search_limit:
+        seen = {str(item["artifact_id"]) for item in items}
+        fuzzy = fuzzy_entity_hits(repo, q, search_limit - len(items), seen, catalogs, selected_types)
+        if entity_filter.domains:
+            fuzzy = [item for item in fuzzy if item["domain"] in entity_filter.domains]
+        items.extend(fuzzy)
+    page = items[offset : offset + limit]
+    next_cursor = str(offset + limit) if offset + limit < len(items) else None
+    return EntityDisplaySearchResult(items=page, next_cursor=next_cursor)

@@ -8,13 +8,14 @@ E405: duplicate diagram-level 'scoped-by' binding.
 E406: correspondence_kind not in the allowed set (core five + module-declared kinds for the element type).
 E407: a member of target.connection_ids is unknown or out of scope.
 E408: duplicate 'represents' binding for the same model target (without visual_roles).
+E408b: occurrence visual_role missing, not in the declared set, or duplicated for the same target.
 """
 
 from __future__ import annotations
 
 from typing import Literal
 
-from src.application.verification._verifier_rules_binding_targets import check_binding_target
+from src.application.verification._verifier_rules_binding_targets import RepresentsTracker, check_binding_target
 from src.application.verification.artifact_verifier_types import Issue, Severity, VerificationResult
 from src.domain.allowed_bindings import AllowedBindingsSpec
 from src.domain.bindings import CORE_CORRESPONDENCE_KINDS
@@ -162,7 +163,7 @@ def _check_bindings(
     allowed_bindings: AllowedBindingsSpec | None,
 ) -> None:
     represents_by_subject: dict[str, str] = {}   # subject_id → first binding id
-    represents_by_target: dict[str, str] = {}    # model_target → first binding id
+    represents_tracker = RepresentsTracker()
     scoped_by_diagram_count = 0
 
     for raw in raw_bindings:
@@ -240,22 +241,28 @@ def _check_bindings(
         if not isinstance(target, dict):
             continue
 
-        # Build visual_roles map for this binding's target entity (for E408)
-        visual_roles_for_target: dict[str, tuple[str, ...]] = {}
-        if subject_kind == "entity" and subject_id is not None:
+        # Register this target's declared visual_roles (for E408/E408b)
+        if (
+            subject_kind == "entity"
+            and subject_id is not None
+            and "entity_id" in target
+            and target["entity_id"] is not None
+        ):
             etype = entity_type_map.get(str(subject_id))
             if etype and allowed_bindings is not None:
                 roles = allowed_bindings.visual_roles_for(etype)
-                if "entity_id" in target and target["entity_id"] is not None:
-                    visual_roles_for_target[str(target["entity_id"])] = roles
+                represents_tracker.roles_for_target[str(target["entity_id"])] = roles
+            elif etype == "occurrence":
+                represents_tracker.roles_for_target[str(target["entity_id"])] = ("*",)
 
         check_binding_target(
             binding_id, corr_kind, target,
             entity_element_ids, connection_element_ids,
             file_scope, allowed_entities, allowed_connections,
             all_entities, all_connections,
-            represents_by_target, visual_roles_for_target,
+            represents_tracker,
             result, loc,
+            visual_role=str(raw["visual_role"]) if raw.get("visual_role") is not None else None,
         )
 
 

@@ -15,6 +15,7 @@ from src.application.artifact_schema import load_attribute_schema, load_frontmat
 from src.config.workspace_paths import infer_repo_scope
 
 if TYPE_CHECKING:
+    from src.application.artifact_document_schema import DocumentSchema
     from src.application.artifact_query import ArtifactRepository
     from src.application.verification.artifact_verifier import ArtifactRegistry
 
@@ -100,36 +101,60 @@ def _frontmatter_schema_errors(
     )
 
 
+def _document_section_errors(doc_type: str, ent_ds: "DocumentSchema", eng_ds: "DocumentSchema") -> list[str]:
+    """Compare normalized section specs: engagement must cover every enterprise section and,
+
+    for sections present in both, require at least the same entity-type connection terms.
+    """
+    errors: list[str] = []
+    eng_sections = {section.name: section for section in eng_ds.sections}
+    missing_sections = [section.name for section in ent_ds.sections if section.name not in eng_sections]
+    if missing_sections:
+        errors.append(
+            f"document schema '{doc_type}': engagement schema missing required sections: "
+            + ", ".join(sorted(missing_sections))
+        )
+    for ent_section in ent_ds.sections:
+        eng_section = eng_sections.get(ent_section.name)
+        if eng_section is None:
+            continue
+        missing_terms = set(ent_section.required_entity_type_connections) - set(
+            eng_section.required_entity_type_connections
+        )
+        if missing_terms:
+            errors.append(
+                f"document schema '{doc_type}': section '{ent_section.name}' engagement schema does not "
+                "require entity-type connections: " + ", ".join(sorted(missing_terms))
+                + " (required by enterprise schema)"
+            )
+    return errors
+
+
 def _document_schema_errors(
     eng_root: Path, ent_root: Path, document_ids: list[str], repo: "ArtifactRepository"
 ) -> list[str]:
     if not document_ids:
         return []
-    from src.application.artifact_document_schema import get_document_schema
+    from src.application.artifact_document_schema import get_document_schema_object
 
     doc_types = sorted({doc.doc_type for did in document_ids if (doc := repo.get_document(did)) is not None})
     errors: list[str] = []
     for doc_type in doc_types:
-        ent_ds = get_document_schema(ent_root, doc_type)
+        ent_ds = get_document_schema_object(ent_root, doc_type)
         if ent_ds is None:
             continue
-        eng_ds = get_document_schema(eng_root, doc_type)
+        eng_ds = get_document_schema_object(eng_root, doc_type)
         if eng_ds is None:
             errors.append(
                 f"document schema '{doc_type}': engagement repo missing schema — "
                 f"add .arch-repo/documents/{doc_type}.json"
             )
             continue
-        ent_fm: dict[str, object] = ent_ds.get("frontmatter_schema") or {}
-        eng_fm: dict[str, object] = eng_ds.get("frontmatter_schema") or {}
+        ent_fm: dict[str, object] = ent_ds.data.get("frontmatter_schema") or {}
+        eng_fm: dict[str, object] = eng_ds.data.get("frontmatter_schema") or {}
         if ent_fm:
             errors.extend(_schema_superset_errors(eng_fm, ent_fm, f"document frontmatter '{doc_type}'"))
-        missing_sections = set(ent_ds.get("required_sections", [])) - set(eng_ds.get("required_sections", []))
-        if missing_sections:
-            errors.append(
-                f"document schema '{doc_type}': engagement schema missing required sections: "
-                + ", ".join(sorted(missing_sections))
-            )
+        errors.extend(_document_section_errors(doc_type, ent_ds, eng_ds))
     return errors
 
 

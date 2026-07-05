@@ -57,7 +57,7 @@ class SequencePumlRenderer:
         diagram_entities: Mapping[str, object] | None = None,
         diagram_connections: list[dict[str, object]] | None = None,
     ) -> str:
-        del diagram_type, entities, connections, repo_root
+        del diagram_type, entities, connections
         diagram_name = re.sub(r"[^a-zA-Z0-9_-]", "-", name.lower()).strip("-") or "sequence"
         kd = diagram_entities or {}
 
@@ -73,7 +73,7 @@ class SequencePumlRenderer:
         groupings = _read_list(kd, "grouping")
         notes = _read_list(kd, "note")
 
-        alias_map = {ll["id"]: f"LL{i + 1}" for i, ll in enumerate(lifelines) if ll.get("id")}
+        alias_map = _build_alias_map(lifelines, repo_root)
         from_map = _build_single(kcs, "seq-from")
         to_map = _build_single(kcs, "seq-to")
         msg_id_to_idx = {str(m["id"]): i for i, m in enumerate(messages)}
@@ -136,11 +136,49 @@ class SequencePumlRenderer:
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
 
+def _normalize_puml_alias(alias: str) -> str:
+    """Diagram-types may not import ``application`` (dependency policy); mirrors
+    ``application.artifact_parsing.normalize_puml_alias`` — same duplication the C4
+    renderer already carries as ``c4._c4_types._normalize_alias``."""
+    return alias.strip().replace("-", "_")
+
+
 def _read_list(kd: Mapping[str, object], key: str) -> list[dict[str, Any]]:
     raw = kd.get(key)
     if not isinstance(raw, list):
         return []
     return [item for item in raw if isinstance(item, dict) and item.get("id")]
+
+
+def _build_alias_map(lifelines: list[dict[str, Any]], repo_root: Path) -> dict[str, str]:
+    """Alias every lifeline by a normalized, stable identity — never a positional ``LL{n}``.
+
+    A bound lifeline's PUML alias must match what ``_diagram_context.py`` publishes as the
+    entity's ``source_alias``/``target_alias`` (both derive from
+    ``_normalize_puml_alias(entity.display_alias)``); an unbound lifeline's alias must match
+    the ``display_alias`` the diagram-local entity extraction gives it, which is its own local
+    id (``_diagram_entity_extraction.extract_diagram_entities``). Either way the frontend
+    viewer extension resolves clicks/highlights against the diagram context's entity list — a
+    positional alias has no counterpart there and could never be matched.
+    """
+    from src.infrastructure.artifact_index import shared_artifact_index  # noqa: PLC0415
+
+    query = None
+    alias_map: dict[str, str] = {}
+    for ll in lifelines:
+        ll_id = ll.get("id")
+        if not ll_id:
+            continue
+        alias = _normalize_puml_alias(str(ll_id))
+        entity_id = ll.get("entity_id")
+        if entity_id:
+            if query is None:
+                query = shared_artifact_index([repo_root])
+            entity = query.get_entity(str(entity_id))
+            if entity is not None and entity.display_alias:
+                alias = _normalize_puml_alias(entity.display_alias)
+        alias_map[ll_id] = alias
+    return alias_map
 
 
 def _build_single(kcs: list[dict[str, object]], conn_type: str) -> dict[str, str]:

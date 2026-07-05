@@ -47,6 +47,15 @@ _FILL = {
     "justification": "#FFD0E8",
     "undeveloped": "#FFFFFF",
 }
+_LEGEND_LABEL = {
+    "goal": "Goal",
+    "strategy": "Strategy",
+    "solution": "Solution",
+    "context": "Context",
+    "assumption": "Assumption",
+    "justification": "Justification",
+    "undeveloped": "Undeveloped",
+}
 
 
 @dataclass(frozen=True)
@@ -208,7 +217,7 @@ def _shape(item: PlacedNode) -> str:
     if node.node_type in {"assumption", "justification"}:
         return f'<ellipse cx="{x}" cy="{y}" rx="{width / 2}" ry="{height / 2}" {style}/>'
     if node.node_type == "context":
-        return f'<rect x="{left}" y="{top}" width="{width}" height="{height}" rx="{height / 2}" {style}/>'
+        return f'<rect x="{left}" y="{top}" width="{width}" height="{height}" rx="10" {style}/>'
     if node.node_type == "undeveloped":
         points = f"{x},{top} {left + width},{y} {x},{top + height} {left},{y}"
         return f'<polygon points="{points}" {style}/>'
@@ -249,6 +258,23 @@ def _edge(edge: GsnEdge, by_alias: dict[str, PlacedNode]) -> str:
     )
 
 
+def _legend(present_types: list[str], top: float, left: float) -> tuple[str, float]:
+    """Compact legend row: a swatch + label per node kind actually present in the diagram."""
+    chip, gap_after_chip, gap_between = 14.0, 6.0, 24.0
+    x = left
+    parts = []
+    for node_type in present_types:
+        label = _LEGEND_LABEL[node_type]
+        parts.append(
+            f'<rect x="{x}" y="{top}" width="{chip}" height="{chip}" rx="2" '
+            f'fill="{_FILL[node_type]}" stroke="#20242A" stroke-width="1"/>'
+            f'<text x="{x + chip + gap_after_chip}" y="{top + chip - 2}" '
+            f'font-family="sans-serif" font-size="12" fill="#111827">{html.escape(label)}</text>'
+        )
+        x += chip + gap_after_chip + len(label) * 6.5 + gap_between
+    return "".join(parts), x - gap_between if present_types else left
+
+
 def render_gsn_svg(puml_body: str) -> str:
     nodes, edges = _parse(puml_body)
     placed, width, height = _place(nodes, edges)
@@ -262,15 +288,22 @@ def render_gsn_svg(puml_body: str) -> str:
         f'<title>{html.escape(" ".join(item.node.lines))}</title>{_shape(item)}{_text(item)}</g>'
         for item in placed
     )
+    present_types = [node_type for node_type in _FILL if any(node.node_type == node_type for node in nodes)]
+    legend_margin = 16.0
+    legend_markup, legend_right = _legend(present_types, height + 14.0, legend_margin)
+    legend_height = 40.0 if present_types else 0.0
+    total_width = max(width, legend_right + legend_margin)
+    total_height = height + legend_height
     return (
-        f'<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}" '
-        f'viewBox="0 0 {width} {height}" role="img" aria-label="Goal Structuring Notation diagram">'
+        f'<svg xmlns="http://www.w3.org/2000/svg" width="{total_width}" height="{total_height}" '
+        f'viewBox="0 0 {total_width} {total_height}" role="img" '
+        'aria-label="Goal Structuring Notation diagram">'
         "<defs>"
-        '<marker id="gsn-filled-arrow" markerWidth="10" markerHeight="10" refX="9" refY="3" '
-        'orient="auto" markerUnits="strokeWidth"><path d="M0,0 L0,6 L9,3 z" fill="#20242A"/></marker>'
-        '<marker id="gsn-hollow-arrow" markerWidth="11" markerHeight="11" refX="10" refY="4" '
-        'orient="auto" markerUnits="strokeWidth"><path d="M0,0 L0,8 L10,4 z" fill="#FFFFFF" '
+        '<marker id="gsn-filled-arrow" markerWidth="13" markerHeight="13" refX="11" refY="4" '
+        'orient="auto" markerUnits="userSpaceOnUse"><path d="M0,0 L0,8 L11,4 z" fill="#20242A"/></marker>'
+        '<marker id="gsn-hollow-arrow" markerWidth="14" markerHeight="14" refX="12" refY="5" '
+        'orient="auto" markerUnits="userSpaceOnUse"><path d="M0,0 L0,10 L12,5 z" fill="#FFFFFF" '
         'stroke="#20242A" stroke-width="1"/></marker>'
         "</defs>"
-        f"{edge_markup}{node_markup}</svg>"
+        f'{edge_markup}{node_markup}<g class="legend">{legend_markup}</g></svg>'
     )

@@ -32,6 +32,7 @@ import {
   EntitySchemaInfoSchema,
   EntitySummarySchema,
   EntityDisplayInfoSchema,
+  EntityDisplaySearchResultSchema,
   DiagramPreviewResultSchema,
   DiagramConnectionSchema,
   MatrixConfigSchema,
@@ -43,6 +44,7 @@ import {
   ServerInfoSchema,
   WriteHelpSchema,
   GroupListSchema,
+  AuthoringGuidanceSchema,
 } from '../../domain/schemas'
 import { SyncChangesResultSchema } from '../../domain/schemas-changes'
 import { parseMarkdown } from '../../application/MarkdownService'
@@ -375,6 +377,13 @@ export const makeHttpModelRepository = (): ModelRepository => ({
     fetchJson(buildUrl('/ontology', { source_type: sourceType }), OntologyClassificationSchema),
   getOntologyPair: (sourceType: string, targetType: string) =>
     fetchJson(buildUrl('/ontology', { source_type: sourceType, target_type: targetType }), OntologyPairSchema),
+  getAuthoringGuidance: (params) =>
+    fetchJson(buildUrl('/authoring-guidance', {
+      entity_type: params.entityTypes?.length ? params.entityTypes.join(',') : undefined,
+      domain: params.domains?.length ? params.domains.join(',') : undefined,
+      diagram_type: params.diagramType,
+      target: params.target,
+    }), AuthoringGuidanceSchema),
 
   createEntity: (body) => postJson(buildUrl('/entity'), body, WriteResultSchema),
 
@@ -400,12 +409,11 @@ export const makeHttpModelRepository = (): ModelRepository => ({
   getEntityDisplayItem: (artifactId: string) =>
     fetchJson(buildUrl('/entity-display-item', { id: artifactId }), EntityDisplayInfoSchema),
 
-  searchEntityDisplay: (query: string, limit = 20, diagramType?: string) =>
-    fetchJson(
-      buildUrl('/entity-display-search', { q: query, limit, diagram_type: diagramType }),
-      Schema.Array(EntityDisplayInfoSchema),
-    )
-      .pipe(Effect.map((arr) => arr as import('../../domain').EntityDisplayInfo[])),
+  searchEntityDisplay: ({ query, limit = 20, diagramType, domains, entityTypes, cursor }) =>
+    fetchJson(buildUrl('/entity-display-search', {
+      q: query, limit, diagram_type: diagramType,
+      domains: domains?.join(','), entity_types: entityTypes?.join(','), cursor,
+    }), EntityDisplaySearchResultSchema),
   discoverDiagramEntities: ({ includedEntityIds = [], query, diagramType, maxHops = 2, limit = 20 }) =>
     fetchJson(buildUrl('/diagram-entity-discovery', {
       q: query, diagram_type: diagramType, max_hops: maxHops, limit,

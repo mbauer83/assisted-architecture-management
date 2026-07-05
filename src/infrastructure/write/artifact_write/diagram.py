@@ -204,7 +204,7 @@ def create_diagram(
                     },
                 )
 
-    if diagram_entities is not None:
+    if diagram_entities is not None and not puml:
         build = _build_model_backed(
             diagram_type=diagram_type, name=name, repo_root=repo_root, diagram_entities=diagram_entities,
             diagram_connections=diagram_connections, norm_bindings=norm_bindings,

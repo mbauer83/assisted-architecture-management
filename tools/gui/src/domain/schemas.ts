@@ -210,12 +210,21 @@ export type FrontmatterField = typeof FrontmatterFieldSchema.Type
 
 // ── Document types ────────────────────────────────────────────────────────────
 
+export const SectionSpecSchema = Schema.Struct({
+  name: Schema.String,
+  template: Schema.optional(Schema.String),
+  required_entity_type_connections: Schema.optional(Schema.Array(Schema.String)),
+  suggested_entity_type_connections: Schema.optional(Schema.Array(Schema.String)),
+})
+export type SectionSpec = typeof SectionSpecSchema.Type
+
 export const DocumentTypeSchema = Schema.Struct({
   doc_type: Schema.String,
   abbreviation: Schema.String,
   name: Schema.String,
   subdirectory: Schema.String,
   required_sections: Schema.Array(Schema.String),
+  sections: Schema.optional(Schema.Array(SectionSpecSchema)),
   extra_frontmatter_fields: Schema.optional(Schema.Array(FrontmatterFieldSchema)),
   required_entity_type_connections: Schema.optional(Schema.Array(Schema.String)),
   suggested_entity_type_connections: Schema.optional(Schema.Array(Schema.String)),
@@ -510,6 +519,12 @@ export const EntityDisplayInfoSchema = Schema.Struct({
 })
 export type EntityDisplayInfo = typeof EntityDisplayInfoSchema.Type
 
+export const EntityDisplaySearchResultSchema = Schema.Struct({
+  items: Schema.Array(EntityDisplayInfoSchema),
+  next_cursor: Schema.NullOr(Schema.String),
+})
+export type EntityDisplaySearchResult = typeof EntityDisplaySearchResultSchema.Type
+
 // ── Diagram preview result ────────────────────────────────────────────────────
 
 export const DiagramConnectionSchema = Schema.Struct({
@@ -801,3 +816,44 @@ export const WriteHelpSchema = Schema.Struct({
   ),
 })
 export type WriteHelp = typeof WriteHelpSchema.Type
+
+// ── Authoring guidance (GET /api/authoring-guidance) ───────────────────────────
+
+export const PermittedConnectionsByPeerSchema = Schema.Struct({
+  outgoing: Schema.Record({ key: Schema.String, value: Schema.Array(Schema.String) }),
+  incoming: Schema.Record({ key: Schema.String, value: Schema.Array(Schema.String) }),
+  symmetric: Schema.Record({ key: Schema.String, value: Schema.Array(Schema.String) }),
+})
+
+export const EntityTypeGuidanceSchema = Schema.Struct({
+  name: Schema.String,
+  prefix: Schema.String,
+  domain: Schema.optional(Schema.String),
+  classes: Schema.Array(Schema.String),
+  create_when: Schema.String,
+  never_create_when: Schema.String,
+  permitted_connections: PermittedConnectionsByPeerSchema,
+})
+export type EntityTypeGuidance = typeof EntityTypeGuidanceSchema.Type
+
+export const PairGuidanceSchema = Schema.Struct({
+  source: Schema.optional(Schema.String),
+  target: Schema.optional(Schema.String),
+  outgoing: Schema.optional(Schema.Array(Schema.String)),
+  incoming: Schema.optional(Schema.Array(Schema.String)),
+  symmetric: Schema.optional(Schema.Array(Schema.String)),
+  error: Schema.optional(Schema.String),
+  known_types: Schema.optional(Schema.Array(Schema.String)),
+})
+export type PairGuidance = typeof PairGuidanceSchema.Type
+
+export const AuthoringGuidanceSchema = Schema.Struct({
+  entity_types: Schema.optional(Schema.Array(EntityTypeGuidanceSchema)),
+  total: Schema.optional(Schema.Number),
+  domains: Schema.optional(Schema.Array(Schema.String)),
+  pair_guidance: Schema.optional(PairGuidanceSchema),
+  diagram_type_guidance: Schema.optional(Schema.Unknown),
+  error: Schema.optional(Schema.String),
+  unknown: Schema.optional(Schema.Array(Schema.String)),
+})
+export type AuthoringGuidance = typeof AuthoringGuidanceSchema.Type

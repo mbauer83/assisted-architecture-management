@@ -2,7 +2,7 @@
 
 from mcp.server.fastmcp import FastMCP  # type: ignore[import-not-found]
 
-from src.infrastructure.mcp.artifact_mcp.tool_annotations import LOCAL_WRITE
+from src.infrastructure.mcp.artifact_mcp.tool_annotations import DESTRUCTIVE_LOCAL_WRITE, LOCAL_WRITE
 from src.infrastructure.mcp.artifact_mcp.write._common import (
     _out,
     artifact_write_ops,
@@ -66,6 +66,7 @@ def artifact_edit_document(
     extra_frontmatter: dict[str, object] | None = None,
     status: str | None = None,
     version: str | None = None,
+    group: str | None = None,
     dry_run: bool = True,
     repo_root: str | None = None,
 ) -> dict[str, object]:
@@ -88,6 +89,7 @@ def artifact_edit_document(
         status=status,
         version=version,
         last_updated=None,
+        group=group,
         dry_run=dry_run,
     )
     if result.wrote and not dry_run:
@@ -129,8 +131,9 @@ def register(mcp: FastMCP) -> None:
             "Create a new architecture document (e.g. ADR, RFC). "
             "doc_type must match a schema in .arch-repo/documents/. "
             "body is the full markdown body after the frontmatter; if omitted, "
-            "placeholder sections are generated from the schema's required_sections "
-            "using section_templates from the spec when defined, otherwise a comment placeholder. "
+            "placeholder ## sections are generated from the schema's sections, using each "
+            "section template when defined and adding an HTML comment hint for required/suggested "
+            "entity links. Place entity links in the section whose schema names the expectation. "
             "Set dry_run=false to write the file."
         ),
         annotations=LOCAL_WRITE,
@@ -143,9 +146,26 @@ def register(mcp: FastMCP) -> None:
         description=(
             "Edit an existing architecture document's frontmatter or body. "
             "All fields are optional — supply only those that should change. "
-            "body replaces the entire body when supplied. "
-            "Set dry_run=false to write the file."
+            "body replaces the entire body when supplied; preserve required ## section headings "
+            "and place required entity links in the section named by the document schema. "
+            "group (str|None): re-home to a different document-collection slug, moving the file. "
+            "Set dry_run=false to write the file. "
+            "artifact_id: full (PREFIX@epoch.random.slug) or short (PREFIX@epoch.random) form."
         ),
         annotations=LOCAL_WRITE,
         structured_output=True,
     )(queued(artifact_edit_document))
+
+    mcp.tool(
+        name="artifact_delete_document",
+        title="Artifact Write: Delete Document",
+        description=(
+            "Delete a single architecture document. No dependency check — documents aren't "
+            "referenced by other verifier rules the way entities/diagrams are, so this deletes "
+            "immediately once resolved. For a batch, use artifact_bulk_delete instead; this tool "
+            "is the lighter-weight single-item path (no full-repo staging copy). "
+            "artifact_id: full (PREFIX@epoch.random.slug) or short (PREFIX@epoch.random) form."
+        ),
+        annotations=DESTRUCTIVE_LOCAL_WRITE,
+        structured_output=True,
+    )(queued(artifact_delete_document))

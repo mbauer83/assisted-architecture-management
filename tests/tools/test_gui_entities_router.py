@@ -385,8 +385,15 @@ def test_diagram_detail_view_queues_connection_matches_and_promote_button() -> N
     view_path = Path("tools/gui/src/ui/views/DiagramDetailView.vue")
     content = view_path.read_text(encoding="utf-8")
 
-    # Connection queuing is now handled via the extracted helpers
-    assert "buildConnectionAliasMap" in content
-    assert "resolveConnection" in content
+    # Connection matching is delegated to the viewer-extension contract (mapElements), which
+    # itself calls buildConnectionAliasMap/resolveConnection — see graphvizElementMapping.ts.
+    assert "resolveElementMap" in content
     assert "selectedConnectionGroup" in content
     assert "query: { diagram_id: diagramId }" in content
+
+
+def test_graphviz_element_mapping_matches_connections_via_alias_helpers() -> None:
+    content = Path("tools/gui/src/ui/lib/graphvizElementMapping.ts").read_text(encoding="utf-8")
+
+    assert "buildConnectionAliasMap" in content
+    assert "resolveConnection" in content

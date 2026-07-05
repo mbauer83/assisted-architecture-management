@@ -1,4 +1,6 @@
 import type { Component } from 'vue'
+import type { DiagramConnection, EntitySummary } from '../../domain'
+import { graphvizMapElements } from './graphvizElementMapping'
 
 /**
  * Viewer-side diagram-type extension registry.
@@ -27,11 +29,41 @@ export interface ViewerSubPartContext {
   onSelect: (detail: unknown, elements?: Element[]) => void
 }
 
+/** Inputs a `mapElements` implementation needs to resolve SVG elements to model artifacts. */
+export interface DiagramMapContext {
+  entities: ReadonlyArray<EntitySummary>
+  connections: ReadonlyArray<DiagramConnection>
+  /**
+   * Raw `diagram-entities` frontmatter, for types whose renderer gives no per-element SVG
+   * anchor and must instead match DOM order against the authored array order (e.g. sequence
+   * messages). Omitted by default — only extensions that need authored order read it.
+   */
+  diagramEntities?: Record<string, unknown>
+}
+
+/**
+ * SVG-element↔artifact mapping for a rendered diagram. One-to-many from the start: an
+ * artifact_id key may resolve to several SVG elements (a model entity occurring more than once
+ * in one view — see WU-B3). Selection highlights every mapped element; clicking any of them
+ * selects the artifact.
+ */
+export interface DiagramElementMap {
+  nodes: Map<string, Element[]>
+  edges: Map<string, Element[]>
+}
+
 export interface DiagramViewerExtension {
   /** Attach click handlers to selectable sub-parts within an entity node. */
   attachNodeSubParts: (ctx: ViewerSubPartContext) => void
   /** Sidebar component for a selected sub-part. Receives `detail` (the `onSelect` payload); emits `close`. */
   detailComponent: Component
+  /**
+   * Map this diagram type's rendered SVG to artifact ids. Optional — types whose SVG follows
+   * graphviz/PlantUML's default id/attribute conventions omit it; the generic viewer then falls
+   * back to `graphvizMapElements`, which becomes the default implementation of this contract
+   * rather than special-cased logic inside the view.
+   */
+  mapElements?: (svgRoot: SVGSVGElement, ctx: DiagramMapContext) => DiagramElementMap
 }
 
 const registry = new Map<string, DiagramViewerExtension>()
@@ -43,3 +75,16 @@ export const registerViewerExtension = (diagramType: string, ext: DiagramViewerE
 export const lookupViewerExtension = (
   diagramType: string | null | undefined,
 ): DiagramViewerExtension | undefined => (diagramType ? registry.get(diagramType) : undefined)
+
+/**
+ * Resolve the element map for a diagram: the registered extension's `mapElements` if it
+ * declares one, otherwise the graphviz/PlantUML default matcher.
+ */
+export const resolveElementMap = (
+  diagramType: string | null | undefined,
+  svgRoot: SVGSVGElement,
+  ctx: DiagramMapContext,
+): DiagramElementMap => {
+  const ext = lookupViewerExtension(diagramType)
+  return ext?.mapElements ? ext.mapElements(svgRoot, ctx) : graphvizMapElements(svgRoot, ctx)
+}

@@ -141,6 +141,42 @@ def test_create_document_refuses_broken_internal_reference(tmp_path: Path) -> No
     assert not result.path.exists()
 
 
+def test_create_document_resolves_link_into_grouped_entity(tmp_path: Path) -> None:
+    """Regression: dry-run/verify only symlinked ARCH_REPO+MODEL into the verification
+    sandbox, so a link into an entity re-homed under projects/<group>/model/... always
+    read as W155-broken even though it resolves fine in the live repo."""
+    repo = tmp_path / "engagements" / "ENG-T" / "architecture-repository"
+    _schema(repo)
+    grouped_entity = repo / "projects" / "my-group" / "model" / "motivation" / "requirement" / "REQ@1.a.probe.md"
+    _write(
+        grouped_entity,
+        "---\nartifact-id: REQ@1.a.probe\nartifact-type: requirement\nname: Probe\n"
+        "version: 0.1.0\nstatus: draft\nlast-updated: '2026-01-01'\n---\n\n## Probe\n",
+    )
+
+    result = create_document(
+        repo_root=repo,
+        verifier=_verifier(repo),
+        clear_repo_caches=lambda _path: None,
+        doc_type="adr",
+        title="Links Into Grouped Entity",
+        body=(
+            "## Context\n\nSee [Probe](../../projects/my-group/model/motivation/requirement/REQ@1.a.probe.md).\n\n"
+            "## Decision\n\nDecision.\n\n"
+            "## Consequences\n\nConsequences.\n"
+        ),
+        keywords=None,
+        extra_frontmatter=None,
+        artifact_id="ADR@1000000004.AbcDef.grouped-link",
+        version="0.1.0",
+        status="draft",
+        last_updated="2026-04-22",
+        dry_run=False,
+    )
+
+    assert result.wrote is True, result.verification
+
+
 def test_edit_document_refuses_invalid_update(tmp_path: Path) -> None:
     repo = tmp_path / "engagements" / "ENG-T" / "architecture-repository"
     _schema(repo)

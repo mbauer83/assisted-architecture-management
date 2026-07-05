@@ -64,7 +64,7 @@ def test_empty_kind_data_renders_start_stop() -> None:
 
 def test_action_step_renders_as_v2_action() -> None:
     puml = _render(diagram_entities={"action": [{"type": "action", "id": "a1", "label": "Submit Form"}]})
-    assert ":Submit Form;" in puml
+    assert ":Submit Form [[arch://a1]];" in puml
 
 
 _D1_VALID = {"type": "decision", "id": "d1", "condition": "Valid", "then_label": "yes", "else_label": "no"}
@@ -81,10 +81,10 @@ def test_decision_step_renders_if_then_else() -> None:
         },
         diagram_connections=[_then("d1", "a1"), _else("d1", "a2")],
     )
-    assert "if (Valid?) then (yes)" in puml
-    assert ":Proceed;" in puml
+    assert "if (Valid? [[arch://d1]]) then (yes)" in puml
+    assert ":Proceed [[arch://a1]];" in puml
     assert "else (no)" in puml
-    assert ":Reject;" in puml
+    assert ":Reject [[arch://a2]];" in puml
     assert "endif" in puml
 
 
@@ -102,8 +102,8 @@ def test_fork_step_renders_fork_again_end_fork() -> None:
     assert "fork\n" in puml
     assert "fork again" in puml
     assert "end fork" in puml
-    assert ":Branch A;" in puml
-    assert ":Branch B;" in puml
+    assert ":Branch A [[arch://a1]];" in puml
+    assert ":Branch B [[arch://a2]];" in puml
 
 
 def test_swimlane_emitted_before_first_step_in_lane() -> None:
@@ -124,9 +124,9 @@ def test_swimlane_emitted_before_first_step_in_lane() -> None:
 
     start_pos = _re.search(r"^start$", puml, _re.MULTILINE).start()  # type: ignore[union-attr]
     customer_pos = puml.index("|Customer|")
-    submit_pos = puml.index(":Submit;")
+    submit_pos = puml.index(":Submit [[arch://a1]];")
     system_pos = puml.index("|System|")
-    process_pos = puml.index(":Process;")
+    process_pos = puml.index(":Process [[arch://a2]];")
     assert customer_pos < start_pos < submit_pos < system_pos < process_pos
 
 
@@ -188,7 +188,7 @@ def test_nested_decision_inside_decision() -> None:
         diagram_connections=[_then("d1", "d2"), _then("d2", "a1")],
     )
     assert puml.count("if (") == 2
-    assert ":Deep Action;" in puml
+    assert ":Deep Action [[arch://a1]];" in puml
 
 
 def test_decision_branch_lane_switch() -> None:
@@ -212,7 +212,7 @@ def test_decision_branch_lane_switch() -> None:
     )
     assert "|Manager|" in puml
     assert "|System|" in puml
-    assert "if (Approved?) then (yes)" in puml
+    assert "if (Approved? [[arch://d1]]) then (yes)" in puml
 
 
 def test_partition_step_renders_partition_block() -> None:
@@ -223,14 +223,14 @@ def test_partition_step_renders_partition_block() -> None:
         },
         diagram_connections=[_contains("p1", "a1")],
     )
-    assert 'partition "My Partition" {' in puml
-    assert ":Inside;" in puml
+    assert 'partition "My Partition" [[arch://p1]] {' in puml
+    assert ":Inside [[arch://a1]];" in puml
     assert "}" in puml
 
 
 def test_action_link_renders_bracket_syntax() -> None:
     puml = _render(diagram_entities={"action": [{"type": "action", "id": "a1", "label": "Go", "link": "https://example.com"}]})
-    assert ":Go [[https://example.com]];" in puml
+    assert ":Go [[https://example.com]] [[arch://a1]];" in puml
 
 
 def test_action_link_escapes_brackets_in_url() -> None:
@@ -249,7 +249,7 @@ def test_note_on_action_follows_action_line() -> None:
         },
         diagram_connections=[_note_kc("n1", "a1")],
     )
-    action_pos = puml.index(":Submit;")
+    action_pos = puml.index(":Submit [[arch://a1]];")
     note_pos = puml.index("note right: Attached note")
     assert action_pos < note_pos
 
@@ -263,9 +263,9 @@ def test_note_on_decision_precedes_then_branch() -> None:
         },
         diagram_connections=[_then("d1", "a1"), _note_kc("n1", "d1")],
     )
-    if_pos = puml.index("if (Valid?)")
+    if_pos = puml.index("if (Valid?")
     note_pos = puml.index("note left: Check validity")
-    proceed_pos = puml.index(":Proceed;")
+    proceed_pos = puml.index(":Proceed [[arch://a1]];")
     assert if_pos < note_pos < proceed_pos
 
 
@@ -283,7 +283,7 @@ def test_note_on_fork_follows_fork_keyword() -> None:
     )
     fork_pos = puml.index("fork\n")
     note_pos = puml.index("note right: Parallel work")
-    branch_pos = puml.index(":Branch A;")
+    branch_pos = puml.index(":Branch A [[arch://a1]];")
     assert fork_pos < note_pos < branch_pos
 
 
@@ -296,9 +296,9 @@ def test_note_on_partition_follows_opening_brace() -> None:
         },
         diagram_connections=[_contains("p1", "a1"), _note_kc("n1", "p1")],
     )
-    brace_pos = puml.index('partition "Phase" {')
+    brace_pos = puml.index('partition "Phase" [[arch://p1]] {')
     note_pos = puml.index("note right: Phase note")
-    inside_pos = puml.index(":Inside;")
+    inside_pos = puml.index(":Inside [[arch://a1]];")
     assert brace_pos < note_pos < inside_pos
 
 
@@ -342,7 +342,7 @@ def test_continuation_after_decision_via_step_flow() -> None:
         diagram_connections=[_then("d1", "a1"), _flow("d1", "a2")],
     )
     endif_pos = puml.index("endif")
-    after_pos = puml.index(":After Decision;")
+    after_pos = puml.index(":After Decision [[arch://a2]];")
     assert endif_pos < after_pos
 
 

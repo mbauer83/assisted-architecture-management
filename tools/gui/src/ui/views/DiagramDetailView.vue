@@ -17,13 +17,11 @@ import { toGlyphKey } from '../lib/glyphKey'
 import { renderMatrixMarkdown } from '../lib/matrixMarkdown'
 import type { C4Navigation } from '../../domain'
 import {
-  buildAliasToId,
-  buildConnectionAliasMap,
   buildDrilldownByEntityId,
   diagramNeedsSvg,
-  resolveConnection,
 } from './DiagramDetailView.helpers'
-import { lookupViewerExtension } from '../lib/diagramViewerExtensions'
+import { lookupViewerExtension, resolveElementMap } from '../lib/diagramViewerExtensions'
+import { SVG_MARKER_ATTRIBUTES } from '../lib/svgHitAreas'
 
 const svc = inject(modelServiceKey)!
 const route = useRoute()
@@ -114,8 +112,8 @@ const selectedEntityDetailHtml = computed(() => {
 // ── SVG rendering ─────────────────────────────────────────────────────────────
 
 const svgContainer = ref<HTMLElement | null>(null)
-const svgNodeElems = ref(new Map<string, Element>())
-const prevHighlighted = ref<Element | null>(null)
+const svgNodeElems = ref(new Map<string, Element[]>())
+const prevHighlighted = ref<Element[]>([])
 const selectedConnectionGroup = ref<SVGGElement | null>(null)
 let _interactivityController: AbortController | null = null
 let _attachRun = 0
@@ -145,8 +143,9 @@ const addConnectionHitAreas = (group: SVGGElement) => {
     if (segment.closest('[data-entity-id]')) continue
     const tag = segment.tagName.toLowerCase()
     const hit = document.createElementNS('http://www.w3.org/2000/svg', tag)
+    const skippedAttrs: readonly string[] = ['id', 'class', 'style', ...SVG_MARKER_ATTRIBUTES]
     for (const attr of Array.from(segment.attributes)) {
-      if (attr.name === 'id' || attr.name === 'class' || attr.name === 'style') continue
+      if (skippedAttrs.includes(attr.name)) continue
       hit.setAttribute(attr.name, attr.value)
     }
     const strokeWidth = Number(segment.getAttribute('stroke-width') ?? '')
@@ -182,52 +181,39 @@ const attachInteractivity = async () => {
   _interactivityController = new AbortController()
   const { signal } = _interactivityController
   svgNodeElems.value.clear()
-  prevHighlighted.value = null
+  prevHighlighted.value = []
   await nextTick()
   await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()))
   if (runId !== _attachRun || signal.aborted) return
   const svgEl = svgContainer.value?.querySelector('svg')
   if (!svgEl || !diagramEntities.value.length) return
 
-  const aliasToId = buildAliasToId(diagramEntities.value)
-  const svgNodeIdToAlias = new Map<string, string>()
-  if (!aliasToId.size) return
+  // Renderer-specific SVG↔artifact matching lives behind the viewer-extension contract; this
+  // view only consumes the resulting maps, never the diagram type's SVG conventions directly.
+  const rawDiagramEntities = detail.value?.diagram_entities
+  const { nodes, edges } = resolveElementMap(detail.value?.diagram_type, svgEl, {
+    entities: diagramEntities.value,
+    connections: diagramConnections.value,
+    diagramEntities: typeof rawDiagramEntities === 'object' && rawDiagramEntities !== null
+      ? (rawDiagramEntities as Record<string, unknown>)
+      : undefined,
+  })
 
-  for (const g of Array.from(svgEl.querySelectorAll<SVGGElement>('g'))) {
-    let alias: string | null = null
-    // Old PlantUML format: data-entity="ALIAS"
-    const de = g.getAttribute('data-entity')
-    if (de && aliasToId.has(de)) alias = de
-    if (!alias && g.id.startsWith('entity_') && aliasToId.has(g.id.slice(7))) alias = g.id.slice(7)
-    if (!alias && g.id && aliasToId.has(g.id)) alias = g.id
-    if (!alias) {
-      const t = g.querySelector(':scope > title')?.textContent?.trim() ?? ''
-      if (aliasToId.has(t)) alias = t
+  for (const [artifactId, elems] of nodes) {
+    svgNodeElems.value.set(artifactId, elems)
+    for (const g of elems) {
+      if (!(g instanceof SVGGElement)) continue
+      g.setAttribute('data-entity-id', artifactId)
+      g.addEventListener('click', (ev) => { ev.stopPropagation(); selectEntity(artifactId) }, { signal })
+      attachNodeSubParts(g, artifactId, signal)
     }
-    if (!alias && g.id.startsWith('cluster_') && aliasToId.has(g.id.slice(8))) alias = g.id.slice(8)
-    // New PlantUML format (1.2026+): data-qualified-name="CONTAINER.ALIAS" or "ALIAS"
-    if (!alias) {
-      const qn = g.getAttribute('data-qualified-name') ?? ''
-      if (qn) {
-        const last = qn.split('.').pop() ?? ''
-        if (last && aliasToId.has(last)) alias = last
-      }
-    }
-    if (!alias) continue
-
-    const artifactId = aliasToId.get(alias)!
-    if (g.id) svgNodeIdToAlias.set(g.id, alias)
-    g.setAttribute('data-entity-id', artifactId)
-    svgNodeElems.value.set(artifactId, g)
-    g.addEventListener('click', (ev) => { ev.stopPropagation(); selectEntity(artifactId) }, { signal })
-    attachNodeSubParts(g, artifactId, signal)
   }
 
   // Inject drill-down badges for entities that scope a child C4 diagram.
-  // Badges sit at the node's top-right corner inside the SVG coordinate space.
+  // Badges sit at the node's top-right corner inside the SVG coordinate space (first occurrence).
   const drillTargets = drilldownByEntityId.value
   for (const [artifactId, targetId] of Object.entries(drillTargets)) {
-    const entityEl = svgNodeElems.value.get(artifactId)
+    const entityEl = svgNodeElems.value.get(artifactId)?.[0]
     if (!(entityEl instanceof SVGGraphicsElement)) continue
     try {
       const bbox = entityEl.getBBox()
@@ -254,40 +240,15 @@ const attachInteractivity = async () => {
     } catch { /* getBBox unavailable in non-rendered contexts */ }
   }
 
-  const connAliasMap = buildConnectionAliasMap(diagramConnections.value)
-
-  const attachConnGroup = (g: SVGGElement, conn: DiagramConnection) => {
-    if (g.hasAttribute('data-conn-id')) return
-    addConnectionHitAreas(g)
-    g.setAttribute('data-conn-id', conn.artifact_id)
-    g.addEventListener('click', (ev) => { ev.stopPropagation(); selectConnection(conn, g) }, { signal })
-  }
-
-  // Primary: attribute-based (old PlantUML: data-entity-1/2 hold aliases)
-  for (const g of Array.from(svgEl.querySelectorAll<SVGGElement>('g[data-entity-1]'))) {
-    const a1raw = g.getAttribute('data-entity-1') ?? ''
-    const a2raw = g.getAttribute('data-entity-2') ?? ''
-    const a1 = svgNodeIdToAlias.get(a1raw) ?? a1raw
-    const a2 = svgNodeIdToAlias.get(a2raw) ?? a2raw
-    const conn = resolveConnection(a1, a2, connAliasMap)
+  for (const [connArtifactId, elems] of edges) {
+    const conn = diagramConnections.value.find((c) => c.artifact_id === connArtifactId)
     if (!conn) continue
-    attachConnGroup(g, conn)
-  }
-
-  // Fallback: id-based lookup via PlantUML's link_SOURCE_TARGET convention (old)
-  // and SOURCE-TARGET path id convention (new PlantUML 1.2026+)
-  for (const conn of diagramConnections.value) {
-    if (!conn.source_alias || !conn.target_alias) continue
-    const fwdId = `link_${conn.source_alias}_${conn.target_alias}`
-    const revId = `link_${conn.target_alias}_${conn.source_alias}`
-    let g = (svgEl.getElementById(fwdId) ?? svgEl.getElementById(revId)) as SVGGElement | null
-    if (g) { attachConnGroup(g, conn); continue }
-    // New format: find g.link whose child path has id="SRC-TGT"
-    const pathFwd = svgEl.getElementById(`${conn.source_alias}-${conn.target_alias}`)
-    const pathRev = svgEl.getElementById(`${conn.target_alias}-${conn.source_alias}`)
-    const pathEl = pathFwd ?? pathRev
-    g = pathEl?.closest('g')
-    if (g) attachConnGroup(g, conn)
+    for (const g of elems) {
+      if (!(g instanceof SVGGElement) || g.hasAttribute('data-conn-id')) continue
+      addConnectionHitAreas(g)
+      g.setAttribute('data-conn-id', conn.artifact_id)
+      g.addEventListener('click', (ev) => { ev.stopPropagation(); selectConnection(conn, g) }, { signal })
+    }
   }
 }
 
@@ -308,12 +269,12 @@ watch(selectedConnection, (conn) => {
 })
 
 watch(selectedId, (newId) => {
-  prevHighlighted.value?.classList.remove('svg-selected')
-  prevHighlighted.value = null
+  for (const el of prevHighlighted.value) el.classList.remove('svg-selected')
+  prevHighlighted.value = []
   if (!newId) return
-  const el = svgNodeElems.value.get(newId) ?? null
-  el?.classList.add('svg-selected')
-  prevHighlighted.value = el
+  const els = svgNodeElems.value.get(newId) ?? []
+  for (const el of els) el.classList.add('svg-selected')
+  prevHighlighted.value = els
 })
 
 const clearConnection = () => {

@@ -46,8 +46,8 @@ from ._service_incremental import (
     apply_diagram_change,
     apply_document_change,
     classify_path_change,
-    scan_mount,
 )
+from ._service_scan import scan_mount
 from ._sqlite_store import _SqliteStore
 from .bootstrap import get_shared_index, normalize_mounts, service_key
 from .types import EntityContextConnection, EntityContextReadModel

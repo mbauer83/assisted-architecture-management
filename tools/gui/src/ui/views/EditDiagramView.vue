@@ -15,10 +15,13 @@ import ArchimateTypeGlyph from '../components/ArchimateTypeGlyph.vue'
 import EntitySelectionList from '../components/EntitySelectionList.vue'
 import EntityPickerInput from '../components/EntityPickerInput.vue'
 import DiagramTypeConfigPanel from '../components/DiagramTypeConfigPanel.vue'
+import PreviewViewport from '../components/PreviewViewport.vue'
+import ArchimateOccurrenceControls from '../components/ArchimateOccurrenceControls.vue'
 import { useQuery } from '../composables/useQuery'
 import { useMutation } from '../composables/useMutation'
-import { usePanZoom } from '../composables/usePanZoom'
 import { toGlyphKey } from '../lib/glyphKey'
+import { isArchimateDiagramType } from '../lib/archimateOccurrences'
+import { resolveElementMap } from '../lib/diagramViewerExtensions'
 
 const svc = inject(modelServiceKey)!
 const addToast = inject(toastKey)!
@@ -41,6 +44,12 @@ const asRecord = (value: unknown): Record<string, unknown> =>
   value && typeof value === 'object' && !Array.isArray(value) ? value as Record<string, unknown> : {}
 const mergeTypeEntityData = (patch: Record<string, unknown>) => {
   typeEntityPatch.value = { ...typeEntityPatch.value, ...patch }
+  previewMutation.reset()
+}
+
+const setTypeEntityData = (next: Record<string, unknown>) => {
+  baseTypeEntityData.value = next
+  typeEntityPatch.value = {}
   previewMutation.reset()
 }
 
@@ -102,13 +111,6 @@ watch(containerRef, (el, prev) => {
   prev?.removeEventListener('wheel', onWheel)
   el?.addEventListener('wheel', onWheel, { passive: false })
 })
-
-const previewViewport = usePanZoom(computed(() => previewMutation.result.value))
-const prevContainerRef = previewViewport.containerRef
-const prevCanvasStyle = previewViewport.canvasStyle
-const prevIsTransformed = previewViewport.isTransformed
-const prevOnMouseDown = previewViewport.startDrag
-const prevResetView = previewViewport.resetView
 
 // ── Diagram entity / connection state ─────────────────────────────────────────
 
@@ -196,15 +198,16 @@ const relatedEntitiesById = computed<Record<string, EntityDisplayInfo[]>>(() => 
   return related
 })
 
-const svgEntityElems = new Map<string, Element>()
-const svgConnElems = new Map<string, Element>()
+const svgEntityElems = new Map<string, Element[]>()
+const svgConnElems = new Map<string, Element[]>()
 const svgContainer = ref<HTMLElement | null>(null)
 
 const updateHighlights = () => {
-  for (const [id, el] of svgEntityElems) el.classList.toggle('svg-remove', toRemoveEntityIds.value.has(id))
-  for (const [id, el] of svgConnElems) {
+  for (const [id, elems] of svgEntityElems)
+    for (const el of elems) el.classList.toggle('svg-remove', toRemoveEntityIds.value.has(id))
+  for (const [id, elems] of svgConnElems) {
     const excl = !isConnIncluded(id) && includedConnIds.value.has(id)
-    el.classList.toggle('svg-remove', excl)
+    for (const el of elems) el.classList.toggle('svg-remove', excl)
   }
 }
 
@@ -267,57 +270,30 @@ const attachInteractivity = () => {
   const svgEl = svgContainer.value?.querySelector('svg')
   if (!svgEl || !diagramEntities.value.length) return
 
-  const aliasToId = new Map<string, string>()
-  const svgNodeIdToAlias = new Map<string, string>()
-  for (const e of diagramEntities.value) {
-    if (!e.display_alias) continue
-    aliasToId.set(e.display_alias, e.artifact_id)
-    aliasToId.set(e.display_alias.replace(/[^a-zA-Z0-9_]/g, '_'), e.artifact_id)
-  }
-  if (!aliasToId.size) return
-
-  for (const g of Array.from(svgEl.querySelectorAll<SVGGElement>('g'))) {
-    let alias: string | null = null
-    const de = g.getAttribute('data-entity')
-    if (de && aliasToId.has(de)) alias = de
-    if (!alias && g.id.startsWith('entity_') && aliasToId.has(g.id.slice(7))) alias = g.id.slice(7)
-    if (!alias && g.id && aliasToId.has(g.id)) alias = g.id
-    if (!alias) {
-      const t = g.querySelector(':scope > title')?.textContent?.trim() ?? ''
-      if (aliasToId.has(t)) alias = t
+  const { nodes, edges } = resolveElementMap(diagramDetail.value?.diagram_type, svgEl, {
+    entities: diagramEntities.value,
+    connections: diagramConnections.value,
+    diagramEntities: typeEntityData.value,
+  })
+  for (const [artifactId, elems] of nodes) {
+    svgEntityElems.set(artifactId, elems)
+    for (const el of elems) {
+      if (!(el instanceof SVGGElement)) continue
+      el.setAttribute('data-entity-id', artifactId)
+      el.addEventListener('click', (ev) => { ev.stopPropagation(); toggleEntityRemoval(artifactId) })
     }
-    if (!alias) {
-      const qn = g.getAttribute('data-qualified-name') ?? ''
-      if (qn) {
-        const last = qn.split('.').pop() ?? ''
-        if (last && aliasToId.has(last)) alias = last
-      }
-    }
-    if (!alias) continue
-    const artifactId = aliasToId.get(alias)!
-    if (g.id) svgNodeIdToAlias.set(g.id, alias)
-    g.setAttribute('data-entity-id', artifactId)
-    svgEntityElems.set(artifactId, g)
-    g.addEventListener('click', (ev) => { ev.stopPropagation(); toggleEntityRemoval(artifactId) })
   }
-
-  const aliasToConn = new Map<string, DiagramConnection>()
-  for (const c of diagramConnections.value)
-    if (c.source_alias && c.target_alias) aliasToConn.set(`${c.source_alias}:${c.target_alias}`, c)
-  for (const g of Array.from(svgEl.querySelectorAll<SVGGElement>('g[data-entity-1]'))) {
-    const a1raw = g.getAttribute('data-entity-1') ?? ''; const a2raw = g.getAttribute('data-entity-2') ?? ''
-    const a1 = svgNodeIdToAlias.get(a1raw) ?? a1raw
-    const a2 = svgNodeIdToAlias.get(a2raw) ?? a2raw
-    const conn = aliasToConn.get(`${a1}:${a2}`) ?? aliasToConn.get(`${a2}:${a1}`)
-    if (!conn) continue
-    g.setAttribute('data-conn-id', conn.artifact_id)
-    svgConnElems.set(conn.artifact_id, g)
-    g.addEventListener('click', (ev) => { ev.stopPropagation(); toggleConn(conn.artifact_id) })
+  for (const [connArtifactId, elems] of edges) {
+    for (const el of elems) {
+      if (!(el instanceof SVGGElement)) continue
+      el.setAttribute('data-conn-id', connArtifactId)
+      el.addEventListener('click', (ev) => { ev.stopPropagation(); toggleConn(connArtifactId) })
+    }
   }
   updateHighlights()
 }
 
-watch([svgHtml, diagramEntities, diagramConnections], attachInteractivity, { flush: 'post' })
+watch([svgHtml, diagramEntities, diagramConnections, typeEntityData], attachInteractivity, { flush: 'post' })
 watch([toRemoveEntityIds, toRemoveConnIds, selectedNewConnIds], updateHighlights)
 
 // ── Search / discovery ────────────────────────────────────────────────────────
@@ -551,6 +527,17 @@ onUnmounted(() => {
           />
 
           <div
+            v-if="isArchimateDiagramType(diagramDetail?.diagram_type) && effectiveEntitiesList.length"
+            class="sb-section sb-section--pad"
+          >
+            <ArchimateOccurrenceControls
+              :diagram-entities="typeEntityData"
+              :entities="effectiveEntitiesList"
+              @change="setTypeEntityData"
+            />
+          </div>
+
+          <div
             v-if="uiConfig?.entity_search_filter !== false && effectiveEntitiesList.length"
             class="sb-section"
           >
@@ -660,32 +647,17 @@ onUnmounted(() => {
         >
           {{ w }}
         </div>
-        <div
+        <PreviewViewport
           v-if="previewMutation.result.value.image"
-          ref="prevContainerRef"
-          class="prev-container"
-          @mousedown="prevOnMouseDown"
-          @dblclick="prevResetView"
+          :reset-signal="previewMutation.result.value"
         >
-          <div :style="prevCanvasStyle">
-            <img
-              :src="previewMutation.result.value.image"
-              class="preview-img"
-              alt="Preview"
-              draggable="false"
-            >
-          </div>
-          <button
-            v-if="prevIsTransformed"
-            class="prev-reset-btn"
-            @click.stop="prevResetView"
+          <img
+            :src="previewMutation.result.value.image"
+            class="preview-img"
+            alt="Preview"
+            draggable="false"
           >
-            ⊙ Reset
-          </button>
-          <div class="prev-zoom-hint">
-            Scroll to zoom · Drag to pan · Double-click to reset
-          </div>
-        </div>
+        </PreviewViewport>
         <div
           v-else
           class="state-msg"
@@ -753,6 +725,7 @@ onUnmounted(() => {
 .inp:focus { border-color: #6366f1; }
 .sb-scroll { flex: 1; overflow-y: auto; display: flex; flex-direction: column; min-height: 0; }
 .sb-section { border-bottom: 1px solid #f3f4f6; }
+.sb-section--pad { padding: 10px; }
 .sb-sec-hdr { display: flex; align-items: center; gap: 5px; padding: 8px 10px 6px; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: #6b7280; }
 .sb-sec-hdr--rm { color: #dc2626; }
 .sb-count { font-size: 10px; font-weight: 400; color: #9ca3af; }
@@ -777,15 +750,7 @@ onUnmounted(() => {
 .state-msg { font-size: 13px; color: #6b7280; }
 .state-err { font-size: 13px; color: #dc2626; margin-top: 6px; }
 .warn-msg { font-size: 12px; color: #b45309; margin-bottom: 4px; }
-.prev-container {
-  position: relative; overflow: hidden; cursor: grab; user-select: none;
-  background: #f8fafc; border: 1px solid #e5e7eb; border-radius: 8px; min-height: 200px;
-}
-.prev-container:active { cursor: grabbing; }
 .preview-img { max-width: none; display: block; }
-.prev-reset-btn { position: absolute; top: 8px; right: 8px; padding: 4px 10px; background: rgba(255,255,255,.92); border: 1px solid #d1d5db; border-radius: 5px; font-size: 12px; cursor: pointer; color: #374151; }
-.prev-reset-btn:hover { background: white; }
-.prev-zoom-hint { position: absolute; bottom: 6px; left: 50%; transform: translateX(-50%); font-size: 11px; color: #9ca3af; background: rgba(255,255,255,.8); padding: 2px 8px; border-radius: 4px; pointer-events: none; white-space: nowrap; }
 .toggle-src { margin-top: 10px; font-size: 12px; color: #2563eb; background: none; border: none; cursor: pointer; padding: 0; }
 .puml-src { font-size: 11px; font-family: monospace; white-space: pre-wrap; margin-top: 8px; background: #f9fafb; border: 1px solid #e5e7eb; border-radius: 6px; padding: 10px; max-height: 400px; overflow-y: auto; }
 </style>

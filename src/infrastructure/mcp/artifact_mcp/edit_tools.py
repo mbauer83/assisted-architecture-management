@@ -7,6 +7,7 @@ from mcp.server.fastmcp import FastMCP  # type: ignore[import-not-found]
 
 from src.application.verification.artifact_verifier import ArtifactVerifier
 from src.application.verification.artifact_verifier_registry import ArtifactRegistry
+from src.infrastructure.mcp.artifact_mcp import edit_tool_descriptions as descriptions
 from src.infrastructure.mcp.artifact_mcp.context import (
     authoritative_callbacks_for,
     expand_artifact_id,
@@ -174,6 +175,7 @@ def artifact_edit_diagram(
     entity_ids: list[str] | None = None,
     connection_ids: list[str] | None = None,
     binding_id: str | None = None,
+    group: str | None = None,
     dry_run: bool = True,
     repo_root: str | None = None,
 ) -> dict[str, object]:
@@ -216,7 +218,7 @@ def artifact_edit_diagram(
             ("puml", puml), ("name", name), ("keywords", keywords),
             ("diagram_entities", diagram_entities), ("diagram_connections", diagram_connections),
             ("view_derivations", view_derivations), ("bindings", bindings),
-            ("version", version), ("status", status), ("tlp", tlp),
+            ("version", version), ("status", status), ("tlp", tlp), ("group", group),
         ) if v is not None
     }
     if edge_labels is not None:
@@ -316,13 +318,7 @@ def register_edit_tools(mcp: FastMCP) -> None:
     mcp.tool(
         name="artifact_edit_entity",
         title="Artifact Write: Edit Entity",
-        description=(
-            "Edit an existing entity. Pass only fields to change; omitted fields are preserved. "
-            "Supports name, summary, properties, notes, keywords, version, status, "
-            "group (str|None — re-home to a different model-project slug). "
-            "Bumps last-updated automatically. Regenerates macros if name changes. "
-            "artifact_id: full (PREFIX@epoch.random.slug) or short (PREFIX@epoch.random) form."
-        ),
+        description=descriptions.EDIT_ENTITY_DESCRIPTION,
         annotations=LOCAL_WRITE,
         structured_output=True,
     )(queued(artifact_edit_entity))
@@ -330,14 +326,7 @@ def register_edit_tools(mcp: FastMCP) -> None:
     mcp.tool(
         name="artifact_edit_connection",
         title="Artifact Write: Edit/Remove Connection",
-        description=(
-            "Edit or remove a connection in an .outgoing.md file. "
-            "Identify by source_entity + target_entity + connection_type. "
-            "operation='update' (default) changes description, src_cardinality, and/or "
-            "tgt_cardinality; pass '' to remove an existing cardinality, omit (null) to "
-            "preserve it. operation='remove' deletes the connection. "
-            "source_entity/target_entity: full (PREFIX@epoch.random.slug) or short (PREFIX@epoch.random) form."
-        ),
+        description=descriptions.EDIT_CONNECTION_DESCRIPTION,
         annotations=DESTRUCTIVE_LOCAL_WRITE,
         structured_output=True,
     )(queued(artifact_edit_connection))
@@ -345,21 +334,7 @@ def register_edit_tools(mcp: FastMCP) -> None:
     mcp.tool(
         name="artifact_edit_diagram",
         title="Artifact Write: Edit Diagram",
-        description=(
-            "Edit an existing diagram. "
-            "Binding modes (pass mode=): 'refresh-derivation'"
-            " (requires derivation_id — runs strategy, returns diff + base_revision, no write); "
-            "'apply-diff' (requires diff + base_revision — applies diff with stale-write check); "
-            "'propose-bindings' (requires entity_ids/connection_ids — returns proposals, no write); "
-            "'detach-binding' (requires binding_id — removes binding). "
-            "Default (no mode): puml='auto-sync' is projection-aware — scope-bound diagrams "
-            "re-run their projector (never deleted on empty result); ArchiMate diagrams reconcile "
-            "refs; standalone diagrams re-render. Explicit puml replaces body; frontmatter fields "
-            "updated if provided; bindings merges + normalizes shorthand. "
-            "edge_labels: per-diagram edge-label overrides keyed by '{src_alias}:{tgt_alias}'; "
-            "omit to preserve existing overrides; pass {} to clear all. "
-            "Re-verifies and re-renders PNG on every write."
-        ),
+        description=descriptions.EDIT_DIAGRAM_DESCRIPTION,
         annotations=LOCAL_WRITE,
         structured_output=True,
     )(queued(artifact_edit_diagram))
@@ -367,13 +342,23 @@ def register_edit_tools(mcp: FastMCP) -> None:
     mcp.tool(
         name="artifact_edit_connection_associations",
         title="Artifact Write: Edit Connection Associations",
-        description=(
-            "Add or remove second-order association entity IDs from a connection. "
-            "Associations link a connection to additional entities beyond source and target "
-            "(stored as <!-- §assoc ENTITY_ID --> annotations). "
-            "add_entities and remove_entities may both be provided in one call. "
-            "source_entity/target_entity: full (PREFIX@epoch.random.slug) or short (PREFIX@epoch.random) form."
-        ),
+        description=descriptions.EDIT_CONNECTION_ASSOCIATIONS_DESCRIPTION,
         annotations=LOCAL_WRITE,
         structured_output=True,
     )(queued(artifact_edit_connection_associations))
+
+    mcp.tool(
+        name="artifact_delete_entity",
+        title="Artifact Write: Delete Entity",
+        description=descriptions.DELETE_ENTITY_DESCRIPTION,
+        annotations=DESTRUCTIVE_LOCAL_WRITE,
+        structured_output=True,
+    )(queued(artifact_delete_entity))
+
+    mcp.tool(
+        name="artifact_delete_diagram",
+        title="Artifact Write: Delete Diagram",
+        description=descriptions.DELETE_DIAGRAM_DESCRIPTION,
+        annotations=DESTRUCTIVE_LOCAL_WRITE,
+        structured_output=True,
+    )(queued(artifact_delete_diagram))

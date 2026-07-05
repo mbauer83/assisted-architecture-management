@@ -46,6 +46,15 @@ class ParsedDiagram:
     view_derivations: list  # list[ViewDerivation] — typed derivations parsed from frontmatter
 
 
+@dataclass
+class ParsedMatrix:
+    """Structured representation of an existing matrix diagram .md file."""
+
+    frontmatter: dict[str, object]
+    matrix_markdown: str  # everything after the frontmatter closing ---
+    raw_text: str
+
+
 def parse_entity_file(path: Path) -> ParsedEntity:
     """Parse an entity .md file into structured components."""
     text = path.read_text(encoding="utf-8")
@@ -110,6 +119,15 @@ def parse_diagram_file(path: Path) -> ParsedDiagram:
         bindings=bindings,
         view_derivations=view_derivations,
     )
+
+
+def parse_matrix_file(path: Path) -> ParsedMatrix:
+    """Parse a matrix diagram .md file into structured components."""
+    text = path.read_text(encoding="utf-8")
+    frontmatter = _parse_frontmatter(text)
+    fm_end = _frontmatter_end_pos(text)
+    matrix_markdown = text[fm_end:] if fm_end else text
+    return ParsedMatrix(frontmatter=frontmatter, matrix_markdown=matrix_markdown, raw_text=text)
 
 
 # ---------------------------------------------------------------------------

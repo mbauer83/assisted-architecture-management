@@ -151,6 +151,11 @@ def _execute_staged(
         current_registry=lambda: ArtifactRegistry(shared_artifact_index([staged_root])),
     )
 
+    if skipped:
+        _mark_batch_aborted_by_item_failure(
+            indexed=indexed, results=results, dry_run=dry_run, operation_id=operation_id
+        )
+
     committed = False
     if not skipped:
         committed = _sync_verify_and_commit(
@@ -239,6 +244,32 @@ def _sync_verify_and_commit(
         rebuild_index=rebuild_index,
     )
     return True
+
+
+def _mark_batch_aborted_by_item_failure(
+    *,
+    indexed: list[tuple[int, dict[str, Any]]],
+    results: dict[int, dict[str, object]],
+    dry_run: bool,
+    operation_id: str,
+) -> None:
+    """Backfill a reason on items that succeeded during staging before a later
+    item failed. Without this, a caller cannot tell such an item apart from one
+    that silently no-op'd — items with their own real error (the failing item)
+    or an explicit "Skipped because..." (items after it) already carry one.
+    """
+    for index, item in indexed:
+        existing = results.get(index)
+        if existing is None:
+            results[index] = {
+                "op": str(item.get("op", "unknown")),
+                "error": "Skipped because an earlier batch item failed",
+                "wrote": False,
+                "dry_run": dry_run,
+                "operation_id": operation_id,
+            }
+        elif "error" not in existing:
+            existing["error"] = "Rolled back: a later item in this batch failed, so no changes were committed"
 
 
 def _mark_verification_failure(

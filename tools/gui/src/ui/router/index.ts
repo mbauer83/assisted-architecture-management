@@ -39,6 +39,8 @@ export const router = createRouter({
     { path: '/global/search', redirect: '/search' },
     // Promotion
     { path: '/promote', component: PromoteView },
+    // Guided modeling wizard
+    { path: '/model/wizard', component: () => import('../views/ModelWizardView.vue') },
     // Assurance (enabled-gated, separate from model nav)
     { path: '/assurance', component: () => import('../views/AssuranceView.vue') },
     { path: '/assurance/browse', component: () => import('../views/AssuranceBrowseView.vue') },

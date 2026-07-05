@@ -10,6 +10,7 @@ from src.application.modeling.artifact_write_layout import optimize_puml_layout
 from src.application.repo_path_helpers import diagram_source_root, resolve_diagram_source_path
 from src.application.verification.artifact_verifier import ArtifactVerifier
 
+from ._diagram_group_move import _verification_to_dict, commit_diagram_write
 from .boundary import assert_engagement_write_root, today_iso
 from .coerce import as_optional_str_list
 from .diagram_references import (
@@ -18,22 +19,11 @@ from .diagram_references import (
     _merge_reference_ids,
     _prepare_diagram_puml_body,
     _prune_unknown_references,
+    diagram_entities_are_authoritative,
 )
-from .diagram_render import _render_diagram_entities_puml, _render_diagram_png, _render_diagram_svg
+from .diagram_render import _render_diagram_entities_puml
 from .parse_existing import parse_diagram_file
 from .types import WriteResult
-from .verify import verify_content_in_temp_path
-
-
-def _verification_to_dict(path: Path, res) -> dict[str, object]:
-    return {
-        "path": str(path),
-        "file_type": "diagram",
-        "valid": res.valid,
-        "issues": [
-            {"severity": i.severity, "code": i.code, "message": i.message, "location": i.location} for i in res.issues
-        ],
-    }
 
 
 def _extract_workspace_ids(fm: dict, module: object) -> set[str]:
@@ -78,6 +68,7 @@ def edit_diagram(
     status: str | None = None,
     tlp: str | None = None,
     edge_labels: dict[str, str | None] | None = _EDGE_LABELS_UNSET,  # type: ignore[assignment]
+    group: str | None = None,
     dry_run: bool,
     committed_repo: CandidateRepository | None = None,
 ) -> WriteResult:
@@ -85,7 +76,15 @@ def edit_diagram(
 
     If ``puml`` is provided, replaces the PUML body and re-runs auto-layout.
     Other fields (name, keywords, version, status) update frontmatter only.
-    Always re-verifies and re-renders PNG on successful write.
+    ``group`` re-homes the diagram to a different diagram-collection slug
+    (moving the source file and its rendered outputs); omit to leave it in
+    place. Always re-verifies and re-renders PNG on successful write.
+
+    Matrix diagrams (``diagram-type: matrix``) are markdown tables, not PUML:
+    only name/keywords/version/status/tlp/group are supported (metadata + group
+    move, table content preserved); ``puml``/``diagram_entities``/etc. raise
+    ``ValueError`` — use ``create_matrix`` (the ``artifact_create_matrix`` MCP
+    tool) with ``artifact_id`` set instead.
     """
     from src.application.modeling.binding_normalize import normalize_bindings, strip_diagram_shorthand
     from src.domain.bindings import bindings_to_raw
@@ -100,6 +99,10 @@ def edit_diagram(
 
     parsed = parse_diagram_file(diagram_path)
     fm = parsed.frontmatter
+    # A caller-supplied short/stale-slug id resolved to diagram_path above; canonicalize to
+    # the file's own recorded id now so nothing downstream (frontmatter, group-move filename,
+    # WriteResult) writes the short form back out as if it were the real artifact id.
+    artifact_id = str(fm.get("artifact-id", artifact_id))
 
     eff_name = name if name is not None else str(fm.get("name", ""))
     eff_version = version if version is not None else str(fm.get("version", "0.1.0"))
@@ -110,6 +113,21 @@ def edit_diagram(
     eff_diagram_entities = diagram_entities if diagram_entities is not None else fm.get("diagram-entities")
     eff_diagram_connections = diagram_connections if diagram_connections is not None else fm.get("connections")
     diagram_type = str(fm.get("diagram-type", "archimate"))
+
+    if diagram_type == "matrix":
+        from ._diagram_matrix_edit import edit_matrix_diagram  # noqa: PLC0415
+
+        return edit_matrix_diagram(
+            repo_root=repo_root, verifier=verifier, clear_repo_caches=clear_repo_caches,
+            diagram_path=diagram_path, artifact_id=artifact_id, name=name,
+            keywords=None if keywords is ... else keywords,
+            version=version, status=status, tlp=tlp, group=group, dry_run=dry_run,
+            puml=puml, diagram_entities=diagram_entities, diagram_connections=diagram_connections,
+            entity_ids_used=entity_ids_used, connection_ids_used=connection_ids_used,
+            view_derivations=view_derivations, bindings=bindings, replace_bindings=replace_bindings,
+            edge_labels_given=edge_labels is not _EDGE_LABELS_UNSET,
+        )
+
     raw_format_version = fm.get("diagram-format-version")
     eff_format_version = (
         2 if diagram_type == "datatype"
@@ -232,7 +250,12 @@ def edit_diagram(
 
     # Determine PUML body; inject _scope_entity_id from scoped-by binding so the
     # C4 renderer uses model-backed mode for diagrams that previously used _scope_entity_id.
-    if eff_diagram_entities is not None and isinstance(eff_diagram_entities, dict) and puml is None:
+    if (
+        eff_diagram_entities is not None
+        and isinstance(eff_diagram_entities, dict)
+        and puml is None
+        and diagram_entities_are_authoritative(verifier, diagram_type)
+    ):
         scope_eid = next(
             (b.target.entity_id for b in norm_bindings
              if b.correspondence_kind == "scoped-by" and b.subject.kind == "diagram"
@@ -298,88 +321,16 @@ def edit_diagram(
         diagram_format_version=eff_format_version,
     )
 
-    if dry_run:
-        res = verify_content_in_temp_path(
-            verifier=verifier,
-            file_type="diagram",
-            desired_name=diagram_path.name,
-            content=content,
-            support_repo_root=repo_root,
-        )
-        return WriteResult(
-            wrote=False,
-            path=diagram_path,
-            artifact_id=artifact_id,
-            content=content,
-            warnings=warnings,
-            verification=_verification_to_dict(diagram_path, res),
-        )
-
-    prev = diagram_path.read_text(encoding="utf-8")
-    diagram_path.write_text(content, encoding="utf-8")
-
-    res = verifier.verify_diagram_file(diagram_path)
-    if not res.valid:
-        diagram_path.write_text(prev, encoding="utf-8")
-        return WriteResult(
-            wrote=False,
-            path=diagram_path,
-            artifact_id=artifact_id,
-            content=content,
-            warnings=warnings,
-            verification=_verification_to_dict(diagram_path, res),
-        )
-
-    png_path = _render_diagram_png(diagram_path, warnings)
-    if png_path:
-        warnings.append(f"Rendered PNG: {png_path}")
-    _render_diagram_svg(diagram_path, warnings)
-
-    clear_repo_caches(diagram_path)
-    return WriteResult(
-        wrote=True,
-        path=diagram_path,
-        artifact_id=artifact_id,
-        content=None,
-        warnings=warnings,
-        verification=_verification_to_dict(diagram_path, res),
-    )
-
-
-def set_diagram_edge_label(
-    *,
-    repo_root: Path,
-    verifier: ArtifactVerifier,
-    clear_repo_caches: Callable[[Path], None],
-    artifact_id: str,
-    edge_key: str,
-    label: str | None,
-    dry_run: bool,
-) -> WriteResult:
-    """Set or clear a per-diagram edge-label override for a single edge.
-
-    ``edge_key`` is ``"{src_alias}:{tgt_alias}"`` from the rendered PUML.
-    ``label=None`` removes the override, reverting to the derived label.
-    """
-    _find = verifier.registry.find_file_by_id if verifier.registry is not None else None
-    diagram_path = resolve_diagram_source_path(repo_root, artifact_id, _find)
-    if diagram_path is None:
-        raise ValueError(f"Diagram '{artifact_id}' not found under {diagram_source_root(repo_root)}")
-
-    parsed = parse_diagram_file(diagram_path)
-    raw_el = parsed.frontmatter.get("edge-labels")
-    current: dict[str, str | None] = dict(raw_el) if isinstance(raw_el, dict) else {}
-
-    if label is None:
-        current.pop(edge_key, None)
-    else:
-        current[edge_key] = label
-
-    return edit_diagram(
+    return commit_diagram_write(
         repo_root=repo_root,
         verifier=verifier,
         clear_repo_caches=clear_repo_caches,
         artifact_id=artifact_id,
-        edge_labels=current,
+        diagram_path=diagram_path,
+        diagram_type=diagram_type,
+        tlp=eff_tlp,
+        group=group,
+        content=content,
+        warnings=warnings,
         dry_run=dry_run,
     )

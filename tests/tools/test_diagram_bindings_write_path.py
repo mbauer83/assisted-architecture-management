@@ -163,6 +163,13 @@ def test_strip_removes_entity_id_from_items():
     assert out["container"][0]["label"] == "X"  # type: ignore[index]
 
 
+def test_strip_removes_backing_entity_id_from_items():
+    de = {"occurrence": [{"id": "repo-left", "backing_entity_id": "BOB@1.a.repo"}]}
+    out = strip_diagram_shorthand(de)
+    assert out is not None
+    assert "backing_entity_id" not in out["occurrence"][0]  # type: ignore[index]
+
+
 def test_strip_removes_binding_from_items():
     de = {"container": [{"id": "c1", "label": "X", "binding": {"target": {"entity_id": "APP@1.a.a"}}}]}
     out = strip_diagram_shorthand(de)
@@ -229,6 +236,22 @@ def test_normalize_entity_id_skipped_without_item_id():
     # Should silently skip — no error for legacy entity_id (unlike binding: which errors)
     bindings = normalize_bindings(de, None)
     assert bindings == []
+
+
+def test_normalize_backing_entity_id_with_visual_role():
+    de = {
+        "occurrence": [
+            {
+                "id": "repo-left",
+                "backing_entity_id": "BOB@1.a.repo",
+                "visual_role": "left-context",
+            }
+        ]
+    }
+    bindings = normalize_bindings(de, None)
+    assert len(bindings) == 1
+    assert bindings[0].target.entity_id == "BOB@1.a.repo"
+    assert bindings[0].visual_role == "left-context"
 
 
 # ---------------------------------------------------------------------------
@@ -299,6 +322,44 @@ def test_create_diagram_normalizes_entity_id_shorthand(tmp_path):
     assert fm["bindings"][0]["correspondence_kind"] == "represents"
     items = fm.get("diagram-entities", {}).get("container", [])
     assert all("entity_id" not in item for item in items)
+
+
+def test_create_diagram_normalizes_backing_entity_occurrence(tmp_path):
+    repo_root = tmp_path / "repo"
+    (repo_root / "diagram-catalog" / "diagrams").mkdir(parents=True)
+
+    de = {
+        "occurrence": [
+            {
+                "id": "repo-left",
+                "backing_entity_id": "BOB@1.a.repo",
+                "visual_role": "left-context",
+            }
+        ]
+    }
+    result = create_diagram(
+        repo_root=repo_root,
+        verifier=_verifier(repo_root),
+        clear_repo_caches=_noop_caches,
+        diagram_type="archimate-business",
+        name="Occurrences",
+        puml="@startuml Occurrences\n@enduml",
+        artifact_id="ARC@1.x.occurrences",
+        diagram_entities=de,
+        version="0.1.0",
+        status="draft",
+        last_updated="2026-01-01",
+        dry_run=True,
+    )
+    content = result.content
+    assert content is not None
+    fm = yaml.safe_load(content.split("---\n")[1])
+    binding = fm["bindings"][0]
+    assert binding["subject"] == {"kind": "entity", "id": "repo-left"}
+    assert binding["target"] == {"entity_id": "BOB@1.a.repo"}
+    assert binding["visual_role"] == "left-context"
+    items = fm.get("diagram-entities", {}).get("occurrence", [])
+    assert all("backing_entity_id" not in item for item in items)
 
 
 def test_create_diagram_explicit_bindings_persisted(tmp_path):

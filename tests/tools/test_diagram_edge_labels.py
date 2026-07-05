@@ -190,7 +190,7 @@ SS_sys_0 --> C_svc_0 : calls
 def test_set_diagram_edge_label_writes_to_frontmatter(repo: Path) -> None:
     """set_diagram_edge_label persists the label override in frontmatter."""
     from src.application.verification.artifact_verifier import ArtifactVerifier
-    from src.infrastructure.write.artifact_write.diagram_edit import set_diagram_edge_label
+    from src.infrastructure.write.artifact_write._diagram_edge_labels import set_diagram_edge_label
     from src.infrastructure.write.artifact_write.parse_existing import parse_diagram_file
 
     # Use dry_run=True and inspect content — avoids needing a matching rendered PUML
@@ -220,7 +220,7 @@ def test_set_diagram_edge_label_writes_to_frontmatter(repo: Path) -> None:
 
 def test_set_diagram_edge_label_clear_removes_key(repo: Path) -> None:
     from src.application.verification.artifact_verifier import ArtifactVerifier
-    from src.infrastructure.write.artifact_write.diagram_edit import set_diagram_edge_label
+    from src.infrastructure.write.artifact_write._diagram_edge_labels import set_diagram_edge_label
     from src.infrastructure.write.artifact_write.parse_existing import parse_diagram_file
 
     scope_id = _make_app(repo, "MyApp2")
@@ -403,7 +403,7 @@ def test_mcp_edit_diagram_edge_labels_stored(repo: Path) -> None:
 def test_edge_label_per_diagram_independence(repo: Path) -> None:
     """Setting a label in diagram A does not affect diagram B's frontmatter."""
     from src.application.verification.artifact_verifier import ArtifactVerifier
-    from src.infrastructure.write.artifact_write.diagram_edit import set_diagram_edge_label
+    from src.infrastructure.write.artifact_write._diagram_edge_labels import set_diagram_edge_label
 
     scope_id = _make_app(repo, "SharedApp")
     diag_a = _make_c4_diagram(repo, scope_id, "Diagram A")
@@ -440,7 +440,7 @@ def test_edge_label_per_diagram_independence_persisted(repo: Path) -> None:
     verifier accepts the key and the write actually persists to disk.
     """
     from src.application.verification.artifact_verifier import ArtifactVerifier
-    from src.infrastructure.write.artifact_write.diagram_edit import set_diagram_edge_label
+    from src.infrastructure.write.artifact_write._diagram_edge_labels import set_diagram_edge_label
     from src.infrastructure.write.artifact_write.parse_existing import parse_diagram_file
 
     diag_a, edge_key = _make_standalone_c4_diagram_with_connection(repo, "Persist A")

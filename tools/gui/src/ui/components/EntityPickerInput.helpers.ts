@@ -2,8 +2,22 @@
  * Pure helpers for EntityPickerInput fixed-level display and widen constraints.
  * Extracted for testability (no .vue import required).
  */
+import type { EntityDisplayInfo, ReferenceSearchHit } from '../../domain'
 
 export type WidenableTo = 'none' | 'domain' | 'group'
+
+/** Adapt an entity-display-search result item to the picker's generic result-hit shape. */
+export function entityDisplayInfoToHit(entity: EntityDisplayInfo): ReferenceSearchHit {
+  return {
+    artifact_id: entity.artifact_id,
+    record_type: 'entity',
+    name: entity.name,
+    status: entity.status,
+    path: '',
+    artifact_type: entity.artifact_type,
+    domain: entity.domain,
+  }
+}
 
 /** Whether the interactive filter stage should be shown. */
 export function calcHasStageUI(

@@ -12,6 +12,7 @@ from src.application.entity_type_predicates import is_assurance_entity_type, is_
 from src.application.runtime_catalogs import RuntimeCatalogs
 from src.infrastructure.app_bootstrap import runtime_catalogs_dependency
 from src.infrastructure.gui.routers import state as s
+from src.infrastructure.gui.routers._entity_filter import EntityFilter
 
 logger = logging.getLogger(__name__)
 
@@ -109,19 +110,14 @@ def search_reference_artifacts(
     catalogs: RuntimeCatalogs = Depends(runtime_catalogs_dependency),
 ) -> dict[str, Any]:
     repo = s.get_repo()
-    selected_domains = {v.strip().lower() for v in (domains or "").split(",") if v.strip()}
-    selected_entity_types = {v.strip() for v in (entity_types or "").split(",") if v.strip()}
+    entity_filter = EntityFilter.from_params(domains=domains, entity_types=entity_types)
     selected_doc_types = {v.strip() for v in (doc_types or "").split(",") if v.strip()}
     q_lc = q.strip().lower()
     hits: list[dict[str, Any]] = []
 
     if kind in (None, "entity"):
         for entity in repo.list_entities():
-            if is_internal_entity_type(entity.artifact_type, _catalogs().ontology):
-                continue
-            if selected_domains and entity.domain not in selected_domains:
-                continue
-            if selected_entity_types and entity.artifact_type not in selected_entity_types:
+            if not entity_filter.matches(entity, ontology=_catalogs().ontology):
                 continue
             if q_lc and q_lc not in entity.name.lower() and q_lc not in entity.artifact_id.lower():
                 continue
@@ -139,7 +135,7 @@ def search_reference_artifacts(
     if kind in (None, "diagram"):
         for diagram in repo.list_diagrams():
             domain = catalogs.diagram_types.diagram_type_domain(diagram.diagram_type)
-            if selected_domains and (domain is None or domain not in selected_domains):
+            if entity_filter.domains and (domain is None or domain not in entity_filter.domains):
                 continue
             if q_lc and q_lc not in diagram.name.lower() and q_lc not in diagram.artifact_id.lower():
                 continue

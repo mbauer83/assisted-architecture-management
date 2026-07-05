@@ -1,10 +1,4 @@
-"""Tests for pure/near-pure functions in artifact_write/matrix.py.
-
-Covers: _infer_entity_ids_from_matrix, _read_frontmatter,
-_display_name_from_entity_file, _build_diagram_id_to_relpath,
-_linkify_known_tokens_in_matrix_rows, _linkify_matrix_ids,
-and create_matrix (dry_run path).
-"""
+"""Tests for artifact_write/matrix.py: create_matrix (create, upsert, group-move)."""
 
 from __future__ import annotations
 
@@ -13,274 +7,10 @@ from pathlib import Path
 from src.application.verification.artifact_verifier import ArtifactRegistry, ArtifactVerifier
 from src.infrastructure.app_bootstrap import build_runtime_catalogs, get_module_registry
 from src.infrastructure.artifact_index import shared_artifact_index
-from src.infrastructure.write.artifact_write.matrix import (
-    _build_diagram_id_to_relpath,
-    _display_name_from_entity_file,
-    _infer_entity_ids_from_matrix,
-    _linkify_known_tokens_in_matrix_rows,
-    _linkify_matrix_ids,
-    _read_frontmatter,
-    create_matrix,
-)
-
-# ---------------------------------------------------------------------------
-# _infer_entity_ids_from_matrix
-# ---------------------------------------------------------------------------
+from src.infrastructure.write.artifact_write.matrix import create_matrix
 
 
-class TestInferEntityIdsFromMatrix:
-    def test_extracts_entity_ids_from_table(self) -> None:
-        md = "| ENT@1.foo.bar | ENT@2.baz.qux |\n|---|\n| value |"
-        ids = _infer_entity_ids_from_matrix(md)
-        assert "ENT@1.foo.bar" in ids
-        assert "ENT@2.baz.qux" in ids
-
-    def test_deduplicates_ids(self) -> None:
-        md = "| ENT@1.foo.bar | ENT@1.foo.bar |\n"
-        ids = _infer_entity_ids_from_matrix(md)
-        assert ids.count("ENT@1.foo.bar") == 1
-
-    def test_returns_sorted(self) -> None:
-        md = "| ENT@2.b.b | ENT@1.a.a |"
-        ids = _infer_entity_ids_from_matrix(md)
-        assert ids == sorted(ids)
-
-    def test_empty_markdown_returns_empty(self) -> None:
-        assert _infer_entity_ids_from_matrix("") == []
-
-    def test_no_entity_ids_returns_empty(self) -> None:
-        assert _infer_entity_ids_from_matrix("| foo | bar |\n") == []
-
-
-# ---------------------------------------------------------------------------
-# _read_frontmatter
-# ---------------------------------------------------------------------------
-
-
-class TestReadFrontmatter:
-    def test_reads_valid_frontmatter(self, tmp_path: Path) -> None:
-        f = tmp_path / "entity.md"
-        f.write_text("---\nname: My Entity\nartifact-id: ENT@1.x.y\n---\nbody\n")
-        fm = _read_frontmatter(f)
-        assert fm["name"] == "My Entity"
-        assert fm["artifact-id"] == "ENT@1.x.y"
-
-    def test_returns_empty_for_missing_file(self, tmp_path: Path) -> None:
-        fm = _read_frontmatter(tmp_path / "nonexistent.md")
-        assert fm == {}
-
-    def test_returns_empty_when_no_frontmatter_delimiter(self, tmp_path: Path) -> None:
-        f = tmp_path / "plain.md"
-        f.write_text("just text, no frontmatter\n")
-        assert _read_frontmatter(f) == {}
-
-    def test_returns_empty_when_frontmatter_not_closed(self, tmp_path: Path) -> None:
-        f = tmp_path / "unclosed.md"
-        f.write_text("---\nname: Foo\n")
-        assert _read_frontmatter(f) == {}
-
-    def test_returns_empty_for_invalid_yaml(self, tmp_path: Path) -> None:
-        f = tmp_path / "bad.md"
-        f.write_text("---\n{invalid: [yaml\n---\nbody\n")
-        assert _read_frontmatter(f) == {}
-
-    def test_returns_empty_when_yaml_not_dict(self, tmp_path: Path) -> None:
-        f = tmp_path / "scalar.md"
-        f.write_text("---\n- list item\n---\nbody\n")
-        assert _read_frontmatter(f) == {}
-
-
-# ---------------------------------------------------------------------------
-# _display_name_from_entity_file
-# ---------------------------------------------------------------------------
-
-
-class TestDisplayNameFromEntityFile:
-    def test_returns_name_from_frontmatter(self, tmp_path: Path) -> None:
-        f = tmp_path / "ent.md"
-        f.write_text("---\nname: My Component\n---\nbody\n")
-        result = _display_name_from_entity_file(f, "ENT@1.x.y")
-        assert result == "My Component"
-
-    def test_falls_back_to_artifact_id_when_no_name(self, tmp_path: Path) -> None:
-        f = tmp_path / "ent.md"
-        f.write_text("---\n---\nbody\n")
-        result = _display_name_from_entity_file(f, "ENT@1.x.y")
-        assert result == "ENT@1.x.y"
-
-    def test_falls_back_when_name_is_empty(self, tmp_path: Path) -> None:
-        f = tmp_path / "ent.md"
-        f.write_text("---\nname: ''\n---\nbody\n")
-        result = _display_name_from_entity_file(f, "ENT@1.x.y")
-        assert result == "ENT@1.x.y"
-
-    def test_falls_back_when_file_missing(self, tmp_path: Path) -> None:
-        f = tmp_path / "missing.md"
-        result = _display_name_from_entity_file(f, "ENT@9.x.y")
-        assert result == "ENT@9.x.y"
-
-
-# ---------------------------------------------------------------------------
-# _build_diagram_id_to_relpath
-# ---------------------------------------------------------------------------
-
-
-class TestBuildDiagramIdToRelpath:
-    def test_finds_puml_files(self, tmp_path: Path) -> None:
-        diagrams = tmp_path / "diagrams"
-        diagrams.mkdir()
-        (diagrams / "DIAG@1.abc.puml").write_text("@startuml\n@enduml\n")
-        result = _build_diagram_id_to_relpath(diagrams_dir=diagrams, registry=object())
-        assert "DIAG@1.abc" in result
-
-    def test_skips_underscore_puml_files(self, tmp_path: Path) -> None:
-        diagrams = tmp_path / "diagrams"
-        diagrams.mkdir()
-        (diagrams / "_private.puml").write_text("")
-        result = _build_diagram_id_to_relpath(diagrams_dir=diagrams, registry=object())
-        assert "_private" not in result
-
-    def test_finds_md_files_with_artifact_id(self, tmp_path: Path) -> None:
-        diagrams = tmp_path / "diagrams"
-        diagrams.mkdir()
-        f = diagrams / "MATRIX@1.abc.md"
-        f.write_text("---\nartifact-id: MATRIX@1.abc\n---\nbody\n")
-        result = _build_diagram_id_to_relpath(diagrams_dir=diagrams, registry=object())
-        assert "MATRIX@1.abc" in result
-        assert result["MATRIX@1.abc"] == "MATRIX@1.abc.md"
-
-    def test_skips_underscore_md_files(self, tmp_path: Path) -> None:
-        diagrams = tmp_path / "diagrams"
-        diagrams.mkdir()
-        (diagrams / "_index.md").write_text("")
-        result = _build_diagram_id_to_relpath(diagrams_dir=diagrams, registry=object())
-        assert "_index" not in result
-
-    def test_returns_empty_when_dir_missing(self, tmp_path: Path) -> None:
-        result = _build_diagram_id_to_relpath(diagrams_dir=tmp_path / "nodir", registry=object())
-        assert result == {}
-
-    def test_stem_fallback_for_md_without_artifact_id(self, tmp_path: Path) -> None:
-        diagrams = tmp_path / "diagrams"
-        diagrams.mkdir()
-        (diagrams / "my-matrix.md").write_text("---\n---\nbody\n")
-        result = _build_diagram_id_to_relpath(diagrams_dir=diagrams, registry=object())
-        assert "my-matrix" in result
-
-
-# ---------------------------------------------------------------------------
-# _linkify_known_tokens_in_matrix_rows
-# ---------------------------------------------------------------------------
-
-
-class TestLinkifyKnownTokensInMatrixRows:
-    def test_replaces_token_in_table_row(self) -> None:
-        md = "| DIAG@1.abc | description |\n|---|---|\n"
-        mapping = {"DIAG@1.abc": "DIAG@1.abc.md"}
-        result, count = _linkify_known_tokens_in_matrix_rows(
-            matrix_markdown=md, diagram_id_to_relpath=mapping
-        )
-        assert "[DIAG@1.abc](DIAG@1.abc.md)" in result
-        assert count == 1
-
-    def test_skips_header_separator_rows(self) -> None:
-        md = "|---|---|\n"
-        mapping = {"foo": "foo.md"}
-        result, count = _linkify_known_tokens_in_matrix_rows(matrix_markdown=md, diagram_id_to_relpath=mapping)
-        assert count == 0
-
-    def test_skips_already_linked_rows(self) -> None:
-        md = "| [foo](foo.md) | desc |\n"
-        mapping = {"foo": "foo.md"}
-        result, count = _linkify_known_tokens_in_matrix_rows(matrix_markdown=md, diagram_id_to_relpath=mapping)
-        assert count == 0
-
-    def test_returns_unchanged_when_empty_mapping(self) -> None:
-        md = "| foo | bar |\n"
-        result, count = _linkify_known_tokens_in_matrix_rows(matrix_markdown=md, diagram_id_to_relpath={})
-        assert result == md
-        assert count == 0
-
-    def test_multiple_distinct_tokens_replaced(self) -> None:
-        md = "| alpha | beta |\n"
-        mapping = {"alpha": "alpha.md", "beta": "beta.md"}
-        result, count = _linkify_known_tokens_in_matrix_rows(matrix_markdown=md, diagram_id_to_relpath=mapping)
-        assert "[alpha](alpha.md)" in result
-        assert "[beta](beta.md)" in result
-        assert count == 2
-
-    def test_non_table_rows_unchanged(self) -> None:
-        md = "# Header\nsome text\n| row | data |\n"
-        mapping = {"row": "row.md"}
-        result, _ = _linkify_known_tokens_in_matrix_rows(matrix_markdown=md, diagram_id_to_relpath=mapping)
-        assert result.startswith("# Header")
-
-
-# ---------------------------------------------------------------------------
-# _linkify_matrix_ids
-# ---------------------------------------------------------------------------
-
-
-class TestLinkifyMatrixIds:
-    def _eng_root(self, tmp_path: Path) -> Path:
-        return tmp_path / "engagements" / "ENG-MAT" / "architecture-repository"
-
-    def _write_entity(self, root: Path, artifact_id: str, name: str) -> None:
-        entity_dir = root / "model" / "motivation" / "requirement"
-        entity_dir.mkdir(parents=True, exist_ok=True)
-        path = entity_dir / f"{artifact_id}.md"
-        path.write_text(f"---\nartifact-id: {artifact_id}\nname: {name}\n---\n")
-
-    def test_replaces_entity_id_with_link(self, tmp_path: Path) -> None:
-        root = self._eng_root(tmp_path)
-        eid = "REQ@1000000230.MatLnk.mat-lnk"
-        self._write_entity(root, eid, "Mat Link")
-        registry = ArtifactRegistry(shared_artifact_index([root]))
-        md = f"| {eid} | description |\n|---|\n"
-        result, count = _linkify_matrix_ids(
-            repo_root=root,
-            registry=registry,
-            matrix_markdown=md,
-            candidate_entity_ids=[eid],
-        )
-        assert "[Mat Link]" in result or eid in result
-        assert count >= 1
-
-    def test_no_match_returns_unchanged(self, tmp_path: Path) -> None:
-        root = self._eng_root(tmp_path)
-        root.mkdir(parents=True)
-        registry = ArtifactRegistry(shared_artifact_index([root]))
-        md = "| REQ@9.ZZZ.no-such | description |\n"
-        result, count = _linkify_matrix_ids(
-            repo_root=root,
-            registry=registry,
-            matrix_markdown=md,
-            candidate_entity_ids=["REQ@9.ZZZ.no-such"],
-        )
-        assert count == 0
-        assert result == md
-
-    def test_no_candidate_ids_returns_unchanged(self, tmp_path: Path) -> None:
-        root = self._eng_root(tmp_path)
-        root.mkdir(parents=True)
-        registry = ArtifactRegistry(shared_artifact_index([root]))
-        md = "| some content |\n"
-        result, count = _linkify_matrix_ids(
-            repo_root=root,
-            registry=registry,
-            matrix_markdown=md,
-            candidate_entity_ids=[],
-        )
-        assert result == md
-        assert count == 0
-
-
-# ---------------------------------------------------------------------------
-# create_matrix — dry_run path
-# ---------------------------------------------------------------------------
-
-
-class TestCreateMatrixDryRun:
+class _Fixture:
     def _eng_root(self, tmp_path: Path) -> Path:
         return tmp_path / "engagements" / "ENG-CMX" / "architecture-repository"
 
@@ -288,6 +18,8 @@ class TestCreateMatrixDryRun:
         registry = ArtifactRegistry(shared_artifact_index([root]))
         return ArtifactVerifier(registry, catalogs=build_runtime_catalogs(get_module_registry()))
 
+
+class TestCreateMatrixDryRun(_Fixture):
     def test_dry_run_returns_write_result(self, tmp_path: Path) -> None:
         root = self._eng_root(tmp_path)
         root.mkdir(parents=True)
@@ -333,3 +65,121 @@ class TestCreateMatrixDryRun:
         )
         assert result.wrote is False
         assert result.content is not None
+
+    def test_dry_run_uses_matrix_verification_not_puml(self, tmp_path: Path) -> None:
+        """Regression: matrix content has no @startuml/@enduml — must not run PUML structure checks."""
+        root = self._eng_root(tmp_path)
+        root.mkdir(parents=True)
+        registry = ArtifactRegistry(shared_artifact_index([root]))
+        verifier = self._verifier(root)
+        md = "| Component | Status |\n|---|---|\n| Alpha | Active |\n"
+        result = create_matrix(
+            repo_root=root,
+            registry=registry,
+            verifier=verifier,
+            clear_repo_caches=lambda p: None,
+            name="Test Matrix",
+            matrix_markdown=md,
+            artifact_id="MATRIX@1000000243.NoPuml.no-puml",
+            dry_run=True,
+        )
+        assert result.verification is not None
+        codes = {i["code"] for i in result.verification["issues"]}
+        assert "E304" not in codes  # @startuml missing — would fire if PUML checks ran on this markdown table
+        assert "E305" not in codes  # @enduml missing — same
+
+    def test_dry_run_fresh_create_into_group_does_not_claim_a_move(self, tmp_path: Path) -> None:
+        """Regression: a brand-new artifact_id with group= set has nothing to relocate —
+        commit_diagram_write's `moved` flag is a path comparison, not existence-aware, so a
+        naive `if moved:` (borrowed from the always-pre-existing edit_diagram use case) wrongly
+        claimed "Will move diagram to group" for a diagram_path that was never on disk."""
+        root = self._eng_root(tmp_path)
+        root.mkdir(parents=True)
+        registry = ArtifactRegistry(shared_artifact_index([root]))
+        verifier = self._verifier(root)
+        result = create_matrix(
+            repo_root=root,
+            registry=registry,
+            verifier=verifier,
+            clear_repo_caches=lambda p: None,
+            name="Fresh In Group",
+            matrix_markdown="| A |\n|---|\n| 1 |\n",
+            artifact_id="MATRIX@1000000246.FreshGrp.fresh-grp",
+            group="some-group",
+            dry_run=True,
+        )
+        assert result.wrote is False
+        assert not any("Will move diagram" in w for w in result.warnings)
+
+
+class TestCreateMatrixLiveWriteAndUpsert(_Fixture):
+    def test_create_then_edit_in_place_resolves_existing_path(self, tmp_path: Path) -> None:
+        """A second create_matrix call with the same artifact_id must edit the existing
+        file in place, not write a stray duplicate at the flat/ungrouped path."""
+        root = self._eng_root(tmp_path)
+        root.mkdir(parents=True)
+        registry = ArtifactRegistry(shared_artifact_index([root]))
+        verifier = self._verifier(root)
+        aid = "MATRIX@1000000244.EditInPlace.edit-in-place"
+
+        first = create_matrix(
+            repo_root=root, registry=registry, verifier=verifier, clear_repo_caches=lambda p: None,
+            name="V1", matrix_markdown="| A |\n|---|\n| 1 |\n", artifact_id=aid, dry_run=False,
+        )
+        assert first.wrote is True
+
+        registry2 = ArtifactRegistry(shared_artifact_index([root]))
+        second = create_matrix(
+            repo_root=root, registry=registry2, verifier=verifier, clear_repo_caches=lambda p: None,
+            name="V2", matrix_markdown="| A |\n|---|\n| 2 |\n", artifact_id=aid, dry_run=False,
+        )
+        assert second.wrote is True
+        assert second.path == first.path
+
+        matches = list(root.rglob(f"{aid}.md"))
+        assert len(matches) == 1
+
+    def test_group_move_relocates_existing_matrix_file(self, tmp_path: Path) -> None:
+        root = self._eng_root(tmp_path)
+        root.mkdir(parents=True)
+        registry = ArtifactRegistry(shared_artifact_index([root]))
+        verifier = self._verifier(root)
+        aid = "MATRIX@1000000245.GroupMove.group-move"
+
+        created = create_matrix(
+            repo_root=root, registry=registry, verifier=verifier, clear_repo_caches=lambda p: None,
+            name="Grouped Matrix", matrix_markdown="| A |\n|---|\n| 1 |\n", artifact_id=aid, dry_run=False,
+        )
+        assert created.wrote is True
+        old_path = created.path
+
+        registry2 = ArtifactRegistry(shared_artifact_index([root]))
+        moved = create_matrix(
+            repo_root=root, registry=registry2, verifier=verifier, clear_repo_caches=lambda p: None,
+            name="Grouped Matrix", matrix_markdown="| A |\n|---|\n| 1 |\n", artifact_id=aid,
+            group="some-group", dry_run=False,
+        )
+        assert moved.wrote is True
+        assert moved.path != old_path
+        assert "some-group" in moved.path.parts
+        assert not old_path.exists()
+        assert moved.path.exists()
+        assert any("Moved diagram to group" in w for w in moved.warnings)
+
+    def test_fresh_create_directly_into_group_does_not_claim_a_move(self, tmp_path: Path) -> None:
+        """Regression: a brand-new matrix created straight into a group has nothing to
+        relocate — must not report "Moved diagram to group" (nothing existed beforehand)."""
+        root = self._eng_root(tmp_path)
+        root.mkdir(parents=True)
+        registry = ArtifactRegistry(shared_artifact_index([root]))
+        verifier = self._verifier(root)
+
+        result = create_matrix(
+            repo_root=root, registry=registry, verifier=verifier, clear_repo_caches=lambda p: None,
+            name="Fresh In Group", matrix_markdown="| A |\n|---|\n| 1 |\n",
+            artifact_id="MATRIX@1000000247.FreshGrpLive.fresh-grp-live",
+            group="some-group", dry_run=False,
+        )
+        assert result.wrote is True
+        assert "some-group" in result.path.parts
+        assert not any("Moved diagram to group" in w for w in result.warnings)

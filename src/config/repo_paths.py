@@ -12,5 +12,6 @@ from src.domain.repo_layout import (  # noqa: F401
     DOCS,
     ENGAGEMENT_REPO,
     MODEL,
+    PROJECTS,
     RENDERED,
 )

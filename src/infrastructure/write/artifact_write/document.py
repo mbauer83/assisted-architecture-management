@@ -7,9 +7,12 @@ from src.application.artifact_document_schema import get_document_schema, get_do
 from src.application.identifier_allocator import get_default_allocator
 from src.application.verification.artifact_verifier import ArtifactVerifier
 from src.config.repo_paths import DOCS
+from src.domain.artifact_id import stable_id
 from src.domain.groups import UNCATEGORIZED
 
 from ._artifact_deduplication import extract_friendly_slug, get_repository, validate_document_unique
+from ._document_group_move import _doc_dir, _resolve_document_group_path
+from ._document_placeholder import _build_placeholder_body, _validate_section_templates
 from .boundary import assert_engagement_write_root, today_iso
 from .coerce import as_optional_str_list
 from .types import WriteResult
@@ -56,54 +59,6 @@ def _format_document_markdown(
     return f"---\n{frontmatter}\n---\n\n{body.strip()}\n"
 
 
-def _validate_section_templates(
-    section_templates: object,
-    required_sections: list[str],
-    doc_type: str,
-) -> None:
-    if not isinstance(section_templates, dict):
-        raise ValueError(
-            f"Doc-type {doc_type!r}: section_templates must be an object, "
-            f"got {type(section_templates).__name__}"
-        )
-    valid_sections = set(required_sections)
-    for key, value in section_templates.items():
-        if key not in valid_sections:
-            raise ValueError(
-                f"Doc-type {doc_type!r}: section_templates key {key!r} is not in "
-                f"required_sections {required_sections}"
-            )
-        if not isinstance(value, str):
-            raise ValueError(
-                f"Doc-type {doc_type!r}: section_templates[{key!r}] must be a string, "
-                f"got {type(value).__name__}"
-            )
-
-
-def _build_placeholder_body(
-    required_sections: list[str],
-    section_templates: dict[str, str] | None = None,
-) -> str:
-    parts = []
-    templates = section_templates or {}
-    for section in required_sections:
-        template_body = templates.get(section)
-        if template_body is not None:
-            parts.append(f"## {section}\n\n{template_body.rstrip()}\n")
-        else:
-            parts.append(f"## {section}\n\n<!-- Add content here -->\n")
-    return "\n".join(parts)
-
-
-def _doc_dir(repo_root: Path, doc_subdirectory: str, group: str = UNCATEGORIZED) -> Path:
-    from src.application.repo_path_helpers import docs_root  # noqa: PLC0415
-
-    base = docs_root(repo_root) / doc_subdirectory
-    if group == UNCATEGORIZED:
-        return base
-    return base / group
-
-
 def _verification_to_document_dict(path: Path, res) -> dict[str, object]:
     return {
         "path": str(path),
@@ -145,6 +100,8 @@ def create_document(
     abbreviation: str = schema.get("abbreviation") or doc_type.upper()
     doc_subdirectory = get_document_subdirectory(schema, doc_type)
     required_sections: list[str] = schema.get("required_sections") or []
+    sections_raw = schema.get("sections")
+    sections: list[object] = list(sections_raw) if isinstance(sections_raw, list) else list(required_sections)
 
     section_templates_raw = schema.get("section_templates")
     section_templates: dict[str, str] | None = None
@@ -183,7 +140,7 @@ def create_document(
             },
         )
 
-    actual_body = body or _build_placeholder_body(required_sections, section_templates)
+    actual_body = body or _build_placeholder_body(sections, section_templates)
     content = _format_document_markdown(
         artifact_id=doc_id,
         doc_type=doc_type,
@@ -246,6 +203,27 @@ def _split_document_frontmatter(raw: str, path: Path) -> tuple[dict[str, object]
     return fm, raw[end + 4 :].lstrip("\n")
 
 
+def _resolve_document_path(docs_root: Path, artifact_id: str) -> Path | None:
+    """Locate a document by filename stem (the artifact id), group subdirectory included.
+
+    Documents have no registry-backed lookup, so this mirrors
+    ``diagram_delete._find_diagram_file``'s own disk-scan short-id tolerance: an exact
+    filename match wins; otherwise a short (rename-stable) id is accepted if exactly one
+    file matches it (ambiguous short ids report not-found, same fail-safe convention as
+    ``_MemStore.canonical_id``).
+    """
+    if not docs_root.exists():
+        return None
+    short = stable_id(artifact_id)
+    short_matches: list[Path] = []
+    for path in docs_root.rglob("*.md"):
+        if path.stem == artifact_id:
+            return path
+        if stable_id(path.stem) == short:
+            short_matches.append(path)
+    return short_matches[0] if len(short_matches) == 1 else None
+
+
 def edit_document(
     *,
     repo_root: Path,
@@ -259,15 +237,15 @@ def edit_document(
     status: str | None,
     version: str | None,
     last_updated: str | None,
+    group: str | None = None,
     dry_run: bool,
 ) -> WriteResult:
     assert_engagement_write_root(repo_root)
 
     docs_root = repo_root / DOCS
-    candidates = list(docs_root.rglob(f"{artifact_id}.md")) if docs_root.exists() else []
-    if not candidates:
+    path = _resolve_document_path(docs_root, artifact_id)
+    if path is None:
         raise ValueError(f"Document '{artifact_id}' not found under {docs_root}")
-    path = candidates[0]
 
     fm, existing_body = _split_document_frontmatter(path.read_text(encoding="utf-8"), path)
     fm.update({k: v for k, v in {"title": title, "status": status, "version": version, "keywords": keywords}.items()
@@ -288,7 +266,12 @@ def edit_document(
         body=body if body is not None else existing_body,
     )
 
-    relative_path = path.relative_to(repo_root / DOCS).as_posix()
+    target_path = _resolve_document_group_path(
+        repo_root=repo_root, current_path=path, doc_type=str(fm.get("doc-type", "")), group=group
+    )
+    moved = target_path != path
+
+    relative_path = target_path.relative_to(repo_root / DOCS).as_posix()
     preview_res = verify_content_in_temp_path(
         verifier=verifier,
         file_type="document",
@@ -296,17 +279,26 @@ def edit_document(
         content=content,
         support_repo_root=repo_root,
     )
-    verification = _verification_to_document_dict(path, preview_res)
+    verification = _verification_to_document_dict(target_path, preview_res)
+    warnings = [f"Will move document to group '{group}': {target_path}"] if moved and dry_run else []
 
     if dry_run or not _document_write_allowed(preview_res):
         return WriteResult(
-            wrote=False, path=path, artifact_id=artifact_id, content=content, warnings=[], verification=verification
+            wrote=False, path=target_path, artifact_id=artifact_id, content=content,
+            warnings=warnings, verification=verification,
         )
 
-    path.write_text(content, encoding="utf-8")
-    clear_repo_caches(path)
+    if moved:
+        target_path.parent.mkdir(parents=True, exist_ok=True)
+    target_path.write_text(content, encoding="utf-8")
+    if moved:
+        path.unlink()
+        clear_repo_caches(path)
+        warnings.append(f"Moved document to group '{group}': {target_path}")
+    clear_repo_caches(target_path)
     return WriteResult(
-        wrote=True, path=path, artifact_id=artifact_id, content=None, warnings=[], verification=verification
+        wrote=True, path=target_path, artifact_id=artifact_id, content=None,
+        warnings=warnings, verification=verification,
     )
 
 
@@ -320,10 +312,9 @@ def delete_document(
     assert_engagement_write_root(repo_root)
 
     docs_root = repo_root / DOCS
-    candidates = list(docs_root.rglob(f"{artifact_id}.md")) if docs_root.exists() else []
-    if not candidates:
+    path = _resolve_document_path(docs_root, artifact_id)
+    if path is None:
         raise ValueError(f"Document '{artifact_id}' not found under {docs_root}")
-    path = candidates[0]
 
     if not dry_run:
         path.unlink()

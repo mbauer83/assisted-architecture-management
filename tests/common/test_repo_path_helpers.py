@@ -68,6 +68,17 @@ class TestGroupFnDiagram:
         diag = tmp_path / "other" / "diagram.puml"
         assert group_fn_diagram(diag, repo) == UNCATEGORIZED
 
+    def test_confidential_flat_diagram_returns_uncategorized(self, tmp_path: Path) -> None:
+        """Regression: the 'confidential' segment itself was misread as the group slug."""
+        repo = tmp_path / "repo"
+        diag = repo / "diagram-catalog" / "diagrams" / "confidential" / "DIAG@1.abc.puml"
+        assert group_fn_diagram(diag, repo) == UNCATEGORIZED
+
+    def test_confidential_collection_diagram_returns_slug(self, tmp_path: Path) -> None:
+        repo = tmp_path / "repo"
+        diag = repo / "diagram-catalog" / "diagrams" / "confidential" / "assurance" / "DIAG@1.abc.puml"
+        assert group_fn_diagram(diag, repo) == "assurance"
+
 
 # ---------------------------------------------------------------------------
 # group_fn_document

@@ -233,13 +233,15 @@ class TestEntityDisplaySearch:
     def test_empty_query_returns_items(self, sync_client) -> None:
         r = sync_client.get("/api/entity-display-search?q=")
         assert r.status_code == 200
-        assert isinstance(r.json(), list)
+        body = r.json()
+        assert isinstance(body["items"], list)
+        assert "next_cursor" in body
 
     def test_query_returns_matches(self, sync_client) -> None:
         r = sync_client.get("/api/entity-display-search?q=Entity")
         assert r.status_code == 200
-        hits = r.json()
-        assert isinstance(hits, list)
+        body = r.json()
+        assert isinstance(body["items"], list)
 
     def test_with_diagram_type_filter(self, sync_client) -> None:
         r = sync_client.get("/api/entity-display-search?q=&diagram_type=archimate-application")

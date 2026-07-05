@@ -10,7 +10,7 @@ Shape expectations from svg_renderer.py:
   goal          → <rect rx="3">
   strategy      → <polygon> (parallelogram)
   solution      → <circle>
-  context       → <rect rx=height/2> (stadium/pill shape)
+  context       → <rect rx="10"> (rounded rectangle, GSN Community Standard notation)
   assumption    → <ellipse>
   justification → <ellipse>
   undeveloped   → <polygon> (diamond)
@@ -113,14 +113,15 @@ def test_solution_uses_circle_shape() -> None:
     assert group.find("svg:circle", _NS) is not None, "solution must render as <circle>"
 
 
-def test_context_uses_pill_rect_shape() -> None:
+def test_context_uses_rounded_rect_shape() -> None:
+    """GSN Community Standard renders context as a rounded rectangle, not a full pill."""
     group = _node([{"node_id": "C1", "name": "Context", "gsn_type": "context"}])
     rect = group.find("svg:rect", _NS)
     assert rect is not None, "context must render as <rect>"
     rx = float(rect.get("rx", "0"))
     height = float(rect.get("height", "0"))
-    assert rx * 2 == height, (
-        f"context rect rx ({rx}) must be half of height ({height}) for pill/stadium shape"
+    assert 0 < rx < height / 2, (
+        f"context rect rx ({rx}) must be a modest corner radius, not a pill (height {height})"
     )
 
 
@@ -163,6 +164,47 @@ def test_in_context_of_edge_renders_hollow_arrow() -> None:
     )
     assert 'gsn-hollow-arrow' in svg, "in-context-of edge must use the hollow arrowhead marker"
     assert 'data-gsn-edge="in-context-of"' in svg
+
+
+# ── marker + legend tests ──────────────────────────────────────────────────────
+
+def test_arrow_markers_use_user_space_on_use() -> None:
+    """Marker size must be absolute (userSpaceOnUse), not scaled by a consumer's stroke-width —
+    defense-in-depth against hit-area clones that copy a widened stroke-width."""
+    svg = _render(
+        nodes=[
+            {"node_id": "G1", "name": "Goal", "gsn_type": "goal"},
+            {"node_id": "S1", "name": "Strategy", "gsn_type": "strategy"},
+        ],
+        edges=[{"source_id": "G1", "target_id": "S1", "conn_type": "supported-by"}],
+    )
+    markers = re.findall(r'<marker[^>]*>', svg)
+    assert markers, "expected marker definitions in <defs>"
+    for marker in markers:
+        assert 'markerUnits="userSpaceOnUse"' in marker
+
+
+def test_legend_lists_exactly_the_kinds_present() -> None:
+    nodes = [
+        {"node_id": "G1", "name": "Goal", "gsn_type": "goal"},
+        {"node_id": "S1", "name": "Strategy", "gsn_type": "strategy"},
+        {"node_id": "Sn1", "name": "Solution", "gsn_type": "solution"},
+    ]
+    svg = _render(nodes)
+    root = ET.fromstring(svg)
+    legend = root.find(".//svg:g[@class='legend']", _NS)
+    assert legend is not None
+    labels = {text.text for text in legend.findall("svg:text", _NS)}
+    assert labels == {"Goal", "Strategy", "Solution"}
+
+
+def test_legend_omits_kinds_not_present() -> None:
+    svg = _render([{"node_id": "G1", "name": "Goal", "gsn_type": "goal"}])
+    root = ET.fromstring(svg)
+    legend = root.find(".//svg:g[@class='legend']", _NS)
+    assert legend is not None
+    labels = [text.text for text in legend.findall("svg:text", _NS)]
+    assert labels == ["Goal"]
 
 
 def test_multi_node_diagram_labels_and_edges() -> None:

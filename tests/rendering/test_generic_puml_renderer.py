@@ -365,6 +365,52 @@ def test_render_body_multi_domain_with_connections_does_not_crash(tmp_path: Path
     assert "NOD_A" in puml
 
 
+def test_render_body_adds_archimate_occurrence_aliases(tmp_path: Path) -> None:
+    renderer = GenericPumlRenderer(_ARCHIMATE_CONFIG)
+    repo = _entity("BOB@1.a.repo", "business-object", "Repository", "BOB_REPO", domain="business")
+
+    puml = renderer.render_body(
+        "Repository Occurrences",
+        [repo],
+        [],
+        "archimate-business",
+        tmp_path,
+        diagram_entities={
+            "occurrence": [
+                {"id": "repo-left", "backing_entity_id": repo.artifact_id},
+                {"id": "repo-right", "backing_entity_id": repo.artifact_id},
+            ]
+        },
+    )
+
+    assert "<<business_object>> as BOB_REPO" in puml
+    assert "<<business_object>> as BOB_REPO__2" in puml
+    assert "<<business_object>> as BOB_REPO__3" in puml
+
+
+def test_render_body_connections_default_to_primary_occurrence(tmp_path: Path) -> None:
+    renderer = GenericPumlRenderer(_ARCHIMATE_CONFIG)
+    repo = _entity("BOB@1.a.repo", "business-object", "Repository", "BOB_REPO", domain="business")
+    process = _entity("PRC@1.a.promote", "process", "Promote", "PRC_PROMOTE", domain="business")
+
+    puml = renderer.render_body(
+        "Repository Occurrences",
+        [repo, process],
+        [_conn(process.artifact_id, repo.artifact_id, "archimate-access")],
+        "archimate-business",
+        tmp_path,
+        diagram_entities={
+            "occurrence": [
+                {"id": "repo-left", "backing_entity_id": repo.artifact_id}
+            ]
+        },
+    )
+
+    conn_lines = [line for line in puml.splitlines() if "PRC_PROMOTE" in line and "BOB_REPO" in line]
+    assert any("PRC_PROMOTE" in line and "BOB_REPO" in line for line in conn_lines)
+    assert all("BOB_REPO__2" not in line for line in conn_lines)
+
+
 def test_inject_includes_inlines_only_needed_stereotypes_and_sprites(tmp_path: Path) -> None:
     repo_root = tmp_path / "repo"
     catalog = repo_root / "diagram-catalog"

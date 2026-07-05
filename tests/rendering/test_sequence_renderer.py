@@ -58,19 +58,19 @@ def test_empty_renders_startuml_enduml() -> None:
 
 def test_lifeline_declared_as_participant() -> None:
     puml = _render(diagram_entities={"lifeline": [_ll("ll1", "Web App")]})
-    assert 'participant "Web App" as LL1' in puml
+    assert 'participant "Web App" as ll1' in puml
 
 
 def test_lifeline_actor_keyword() -> None:
     puml = _render(diagram_entities={"lifeline": [_ll("ll1", "User", "actor")]})
-    assert 'actor "User" as LL1' in puml
+    assert 'actor "User" as ll1' in puml
 
 
 def test_multiple_lifelines_sequential_aliases() -> None:
     lls = [_ll("ll1", "A"), _ll("ll2", "B")]
     puml = _render(diagram_entities={"lifeline": lls})
-    assert "LL1" in puml
-    assert "LL2" in puml
+    assert "ll1" in puml
+    assert "ll2" in puml
 
 
 def test_simple_sync_message() -> None:
@@ -78,7 +78,7 @@ def test_simple_sync_message() -> None:
     msgs = [_msg("m1", "request")]
     kcs = [_conn("seq-from", "m1", "ll1"), _conn("seq-to", "m1", "ll2")]
     puml = _render(diagram_entities={"lifeline": lls, "message": msgs}, diagram_connections=kcs)
-    assert "LL1 -> LL2: request" in puml
+    assert "ll1 -> ll2: request" in puml
 
 
 def test_reply_arrow() -> None:
@@ -86,7 +86,7 @@ def test_reply_arrow() -> None:
     msgs = [_msg("m1", "response", "reply")]
     kcs = [_conn("seq-from", "m1", "ll2"), _conn("seq-to", "m1", "ll1")]
     puml = _render(diagram_entities={"lifeline": lls, "message": msgs}, diagram_connections=kcs)
-    assert "LL2 --> LL1: response" in puml
+    assert "ll2 --> ll1: response" in puml
 
 
 def test_async_arrow() -> None:
@@ -94,7 +94,7 @@ def test_async_arrow() -> None:
     msgs = [_msg("m1", "fire", "async")]
     kcs = [_conn("seq-from", "m1", "ll1"), _conn("seq-to", "m1", "ll2")]
     puml = _render(diagram_entities={"lifeline": lls, "message": msgs}, diagram_connections=kcs)
-    assert "LL1 ->> LL2: fire" in puml
+    assert "ll1 ->> ll2: fire" in puml
 
 
 def test_messages_ordered_by_array_index() -> None:
@@ -116,7 +116,7 @@ def test_connections_read_from_underscore_connections() -> None:
     # Pass via _connections in diagram_entities (no separate diagram_connections)
     kcs = [_conn("seq-from", "m1", "ll1"), _conn("seq-to", "m1", "ll2")]
     puml = _render(diagram_entities={"lifeline": lls, "message": msgs, "_connections": kcs})
-    assert "LL1 -> LL2: call" in puml
+    assert "ll1 -> ll2: call" in puml
 
 
 def test_opt_grouping_wraps_messages() -> None:
@@ -132,8 +132,8 @@ def test_opt_grouping_wraps_messages() -> None:
     )
     assert "opt [if ready]" in puml
     assert "end" in puml
-    assert puml.index("opt [if ready]") < puml.index("LL1 -> LL2: call")
-    assert puml.index("LL1 -> LL2: call") < puml.rindex("end")
+    assert puml.index("opt [if ready]") < puml.index("ll1 -> ll2: call")
+    assert puml.index("ll1 -> ll2: call") < puml.rindex("end")
 
 
 def test_alt_grouping_with_else() -> None:
@@ -192,7 +192,7 @@ def test_activate_target_flag() -> None:
     msgs = [_msg("m1", "start", activate_target=True)]
     kcs = [_conn("seq-from", "m1", "ll1"), _conn("seq-to", "m1", "ll2")]
     puml = _render(diagram_entities={"lifeline": lls, "message": msgs}, diagram_connections=kcs)
-    assert "LL1 -> LL2 ++: start" in puml
+    assert "ll1 -> ll2 ++: start" in puml
 
 
 def test_deactivate_target_flag() -> None:
@@ -200,28 +200,28 @@ def test_deactivate_target_flag() -> None:
     msgs = [_msg("m1", "done", deactivate_target=True)]
     kcs = [_conn("seq-from", "m1", "ll2"), _conn("seq-to", "m1", "ll1")]
     puml = _render(diagram_entities={"lifeline": lls, "message": msgs}, diagram_connections=kcs)
-    assert "LL2 -> LL1 --: done" in puml
+    assert "ll2 -> ll1 --: done" in puml
 
 
 def test_note_right_of_lifeline() -> None:
     lls = [_ll("ll1", "A")]
     notes = [{"id": "n1", "text": "important", "placement": "right_of", "lifeline_ids": ["ll1"]}]
     puml = _render(diagram_entities={"lifeline": lls, "note": notes})
-    assert "note right of LL1: important" in puml
+    assert "note right of ll1: important" in puml
 
 
 def test_note_left_of_lifeline() -> None:
     lls = [_ll("ll1", "A")]
     notes = [{"id": "n1", "text": "left note", "placement": "left_of", "lifeline_ids": ["ll1"]}]
     puml = _render(diagram_entities={"lifeline": lls, "note": notes})
-    assert "note left of LL1: left note" in puml
+    assert "note left of ll1: left note" in puml
 
 
 def test_note_over_multiple_lifelines() -> None:
     lls = [_ll("ll1", "A"), _ll("ll2", "B")]
     notes = [{"id": "n1", "text": "shared", "placement": "over", "lifeline_ids": ["ll1", "ll2"]}]
     puml = _render(diagram_entities={"lifeline": lls, "note": notes})
-    assert "note over LL1, LL2: shared" in puml
+    assert "note over ll1, ll2: shared" in puml
 
 
 def test_note_after_message() -> None:
@@ -237,8 +237,8 @@ def test_note_after_message() -> None:
         diagram_entities={"lifeline": lls, "message": msgs, "note": notes},
         diagram_connections=kcs,
     )
-    assert puml.index("LL1 -> LL2: call") < puml.index("note right of LL1: check here")
-    assert puml.index("note right of LL1: check here") < puml.index("LL2 -> LL1: callback")
+    assert puml.index("ll1 -> ll2: call") < puml.index("note right of ll1: check here")
+    assert puml.index("note right of ll1: check here") < puml.index("ll2 -> ll1: callback")
 
 
 def test_self_message() -> None:
@@ -246,7 +246,7 @@ def test_self_message() -> None:
     msgs = [_msg("m1", "think", "self")]
     kcs = [_conn("seq-from", "m1", "ll1"), _conn("seq-to", "m1", "ll1")]
     puml = _render(diagram_entities={"lifeline": lls, "message": msgs}, diagram_connections=kcs)
-    assert "LL1 -> LL1: think" in puml
+    assert "ll1 -> ll1: think" in puml
 
 
 def test_title_uses_diagram_name() -> None:

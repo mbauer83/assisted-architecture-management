@@ -32,6 +32,8 @@ from src.infrastructure.rendering.puml_safety import (
     warn_when_puml_exceeds_threshold,
 )
 
+from ._step_links import link_suffix
+
 _STEP_KEYS = ("action", "decision", "fork", "partition")
 
 
@@ -271,11 +273,7 @@ def _emit_step(step: dict[str, Any], step_id: str, ctx: _Ctx, lines: list[str], 
     if stype == "action":
         _maybe_switch_lane(step_id, lane_index, lane_map, state, lines, has_lanes=has_lanes)
         label = _puml_text(str(step.get("label") or "action"))
-        link = step.get("link")
-        if link:
-            lines.append(f":{label} [[{str(link).replace(']', '%5D')}]];")
-        else:
-            lines.append(f":{label};")
+        lines.append(f":{label}{link_suffix(step)};")
         _emit_step_note(step_id, notes_index, lines)
 
     elif stype == "decision":
@@ -283,7 +281,7 @@ def _emit_step(step: dict[str, Any], step_id: str, ctx: _Ctx, lines: list[str], 
         condition = _puml_text(str(step.get("condition") or "?"))
         then_label = _puml_text(str(step.get("then_label") or "yes"))
         else_label = _puml_text(str(step.get("else_label") or "no"))
-        lines.append(f"if ({condition}?) then ({then_label})")
+        lines.append(f"if ({condition}?{link_suffix(step)}) then ({then_label})")
         _emit_step_note(step_id, notes_index, lines)
         then_first = then_target.get(step_id)
         if then_first:
@@ -295,6 +293,9 @@ def _emit_step(step: dict[str, Any], step_id: str, ctx: _Ctx, lines: list[str], 
         lines.append("endif")
 
     elif stype == "fork":
+        # No sentinel link here: PlantUML's `fork` keyword takes no label/link argument at
+        # all (`fork [[url]]` is a syntax error) and renders as an unlabeled, ungrouped bar
+        # with no distinguishing SVG attribute — forks are not selectable in the viewer.
         _maybe_switch_lane(step_id, lane_index, lane_map, state, lines, has_lanes=has_lanes)
         branches = fork_branches.get(step_id, [])
         if branches:
@@ -308,7 +309,7 @@ def _emit_step(step: dict[str, Any], step_id: str, ctx: _Ctx, lines: list[str], 
 
     elif stype == "partition":
         label = _puml_text(str(step.get("label") or "Partition"))
-        lines.append(f'partition "{label}" {{')
+        lines.append(f'partition "{label}"{link_suffix(step)} {{')
         _emit_step_note(step_id, notes_index, lines)
         contains_id = contains_first.get(step_id)
         if contains_id:

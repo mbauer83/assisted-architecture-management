@@ -4,11 +4,12 @@ This package is the tool/infrastructure side of deterministic writing.
 The MCP server should depend on these modules, not embed the logic.
 """
 
+from ._diagram_edge_labels import set_diagram_edge_label
 from .connection import add_connection
 from .connection_edit import edit_connection, edit_connection_associations, remove_connection
 from .diagram import create_diagram
 from .diagram_delete import delete_diagram
-from .diagram_edit import edit_diagram, set_diagram_edge_label
+from .diagram_edit import edit_diagram
 from .diagram_sync import refresh_diagram, sync_diagram_to_model
 from .document import create_document, delete_document, edit_document
 from .entity import create_entity

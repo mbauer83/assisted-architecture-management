@@ -1,0 +1,62 @@
+---
+artifact-id: ARC@1781706104.EyaUUG.datatype-diagram-type-application-view
+artifact-type: diagram
+name: "Datatype Diagram Type \u2014 Application View"
+version: 0.1.0
+status: draft
+keywords:
+- datatype diagram
+- diagram type module
+- module catalog
+- verifier
+- consistency
+diagram-type: archimate-application
+entity-ids-used:
+- APP@1712870400.ca3vm7.model-verifier
+- APP@1781705596.n8Pikk.datatype-diagram-type-module
+- APP@1712870400.yNhgdh.module-catalog
+- APP@1777293136.yaxrWl.plantuml-renderer
+- FNC@1781705395.halAQt.validate-datatype-data-object-relationship-consistency
+- REQ@1781704600.TbcGSB.datatype-uml-class-diagram-authoring
+- REQ@1781704601.sbkuwf.datatype-data-object-relationship-consistency
+connection-ids-used:
+- APP@1781705596.n8Pikk.datatype-diagram-type-module---REQ@1781704600.TbcGSB.datatype-uml-class-diagram-authoring@@archimate-realization
+- APP@1781705596.n8Pikk.datatype-diagram-type-module---FNC@1781705395.halAQt.validate-datatype-data-object-relationship-consistency@@archimate-association
+connections:
+- connection_id: APP@1712870400.yNhgdh.module-catalog---APP@1781705596.n8Pikk.datatype-diagram-type-module@@archimate-aggregation
+- connection_id: APP@1781705596.n8Pikk.datatype-diagram-type-module---REQ@1781704600.TbcGSB.datatype-uml-class-diagram-authoring@@archimate-realization
+- connection_id: APP@1781705596.n8Pikk.datatype-diagram-type-module---FNC@1781705395.halAQt.validate-datatype-data-object-relationship-consistency@@archimate-association
+- connection_id: APP@1712870400.ca3vm7.model-verifier---FNC@1781705395.halAQt.validate-datatype-data-object-relationship-consistency@@archimate-assignment
+last-updated: '2026-07-05'
+---
+@startuml datatype-diagram-type-application-view
+!include ../_archimate-stereotypes.puml
+!include ../_archimate-glyphs.puml
+!include ../_archimate-relations.puml
+top to bottom direction
+
+title Datatype Diagram Type -- Application View
+
+' Motivation
+rectangle "Datatype (UML Class) Diagram Authoring" <<requirement>> as REQ_TbcGSB
+rectangle "Datatype-Data Object Relationship Consistency" <<requirement>> as REQ_sbkuwf
+
+' Common
+rectangle "<$archimate_function{scale=1.5}> Validate Datatype-Data Object Relationship Consistency" <<function>> as FNC_halAQt
+
+' Application
+rectangle "<$archimate_application_component{scale=1.5}> Module Catalog" <<application_component>> as APP_yNhgdh
+rectangle "<$archimate_application_component{scale=1.5}> Datatype Diagram Type Module" <<application_component>> as APP_n8Pikk
+rectangle "<$archimate_application_component{scale=1.5}> Model Verifier" <<application_component>> as APP_ca3vm7
+rectangle "<$archimate_application_component{scale=1.5}> PlantUML Renderer" <<application_component>> as APP_yaxrWl
+
+REQ_TbcGSB -[hidden]right- REQ_sbkuwf
+APP_yNhgdh -[hidden]right- APP_ca3vm7
+APP_yaxrWl -[hidden]left- APP_ca3vm7
+
+Rel_Realization(APP_n8Pikk, REQ_TbcGSB, "")
+APP_yNhgdh o-- APP_n8Pikk
+Rel_Association(APP_n8Pikk, FNC_halAQt, "")
+APP_ca3vm7 --> FNC_halAQt
+
+@enduml

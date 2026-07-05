@@ -30,6 +30,7 @@ import type {
   EntitySchemaInfo,
   EntitySummary,
   EntityDisplayInfo,
+  EntityDisplaySearchResult,
   DiagramPreviewResult,
   DiagramConnection,
   MatrixConfig,
@@ -42,6 +43,7 @@ import type {
   WriteHelp,
   GroupList,
   EntityTaxonomy,
+  AuthoringGuidance,
 } from '../domain'
 import type { NetworkError, NotFoundError } from '../domain'
 import type { MarkdownError } from '../application/MarkdownService'
@@ -122,6 +124,9 @@ export interface ModelRepository {
   readonly getWriteHelp: () => Effect.Effect<WriteHelp, RepoError>
   readonly getOntologyClassification: (sourceType: string) => Effect.Effect<OntologyClassification, RepoError>
   readonly getOntologyPair: (sourceType: string, targetType: string) => Effect.Effect<OntologyPair, RepoError>
+  readonly getAuthoringGuidance: (params: {
+    entityTypes?: string[]; domains?: string[]; diagramType?: string; target?: string;
+  }) => Effect.Effect<AuthoringGuidance, RepoError>
   readonly createEntity: (body: {
     artifact_type: string; name: string; summary?: string;
     properties?: Record<string, string>; attribute_types?: Record<string, string>;
@@ -142,9 +147,14 @@ export interface ModelRepository {
   readonly getDiagramConnections: (diagramId: string) => Effect.Effect<DiagramConnection[], RepoError>
   readonly getDiagramSvg: (diagramId: string) => Effect.Effect<string, RepoError>
   readonly getEntityDisplayItem: (artifactId: string) => Effect.Effect<EntityDisplayInfo, RepoError>
-  readonly searchEntityDisplay: (
-    query: string, limit?: number, diagramType?: string,
-  ) => Effect.Effect<EntityDisplayInfo[], RepoError>
+  readonly searchEntityDisplay: (params: {
+    query: string
+    limit?: number
+    diagramType?: string
+    domains?: string[]
+    entityTypes?: string[]
+    cursor?: string
+  }) => Effect.Effect<EntityDisplaySearchResult, RepoError>
   readonly discoverDiagramEntities: (params: {
     includedEntityIds?: string[]
     query?: string

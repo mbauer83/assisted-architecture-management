@@ -15,7 +15,7 @@ from src.domain.artifact_types import EntityRecord
 from src.infrastructure.artifact_index._identity_resolver import _IdentityResolver
 from src.infrastructure.artifact_index._mem_store import _MemStore
 from src.infrastructure.artifact_index._rwlock import _RWLock
-from src.infrastructure.artifact_index._service_incremental import _insert_mounted
+from src.infrastructure.artifact_index._service_scan import _insert_mounted
 from src.infrastructure.artifact_index.service import ArtifactIndex
 
 # ── Helpers ───────────────────────────────────────────────────────────────────

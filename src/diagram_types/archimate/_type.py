@@ -34,6 +34,10 @@ class _ConfiguredArchimateDiagramType(_ConfiguredOntologyDiagramType):
                 " metadata keyed by model connection artifact_id. Supported opt-in keys are artifact_id"
                 " (or connection_id), include_description, include_cardinality, and label."
                 " The show_stereotype key is not needed since stereotype text is not required for selectability.",
+                "For additional occurrences of an already included model entity, add"
+                " diagram_entities.occurrence[] items with id and backing_entity_id. The id is the"
+                " occurrence identity; backing_entity_id is the model entity to render again. visual_role"
+                " is optional human-readable metadata, not the occurrence identifier.",
             ),
         )
 

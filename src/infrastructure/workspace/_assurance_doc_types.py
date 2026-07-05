@@ -150,15 +150,14 @@ ASSURANCE_DOCUMENT_SCHEMAS: dict[str, dict] = {
                 },
             },
         },
-        "required_sections": [
-            "Purpose and Scope",
-            "Safety/Security Claims",
-            "GSN Argument Structure",
-            "Evidence Summary",
-            "Argument Completeness",
-            "Sign-off",
-            "References",
+        "sections": [
+            {"name": "Purpose and Scope"},
+            {"name": "Safety/Security Claims"},
+            {"name": "GSN Argument Structure"},
+            {"name": "Evidence Summary", "suggested_entity_type_connections": ["@all"]},
+            {"name": "Argument Completeness"},
+            {"name": "Sign-off", "suggested_entity_type_connections": ["stakeholder"]},
+            {"name": "References"},
         ],
-        "suggested_entity_type_connections": ["@all"],
     },
 }

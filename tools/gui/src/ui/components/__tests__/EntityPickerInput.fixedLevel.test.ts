@@ -9,7 +9,9 @@ import {
   calcHasStageUI,
   calcCanGoBack,
   calcCanGoForward,
+  entityDisplayInfoToHit,
 } from '../EntityPickerInput.helpers'
+import type { EntityDisplayInfo } from '../../../domain'
 
 // ── calcHasStageUI ─────────────────────────────────────────────────────────────
 
@@ -106,5 +108,33 @@ describe('calcCanGoForward', () => {
     // ensures fixedEntityTypes are the only types offered. calcCanGoForward
     // returning false when types are fixed prevents the stage from being navigable.
     expect(calcCanGoForward('scope', ['application-component', 'application-service'], undefined)).toBe(false)
+  })
+})
+
+// ── entityDisplayInfoToHit ─────────────────────────────────────────────────────
+
+describe('entityDisplayInfoToHit', () => {
+  const entity: EntityDisplayInfo = {
+    artifact_id: 'APP@1.Foo.bar',
+    name: 'Bar',
+    artifact_type: 'application-component',
+    domain: 'application',
+    subdomain: '',
+    status: 'active',
+    display_alias: 'bar',
+    element_type: 'ApplicationComponent',
+    element_label: 'Bar',
+  }
+
+  it('adapts an entity-display item to a record_type=entity result hit', () => {
+    expect(entityDisplayInfoToHit(entity)).toEqual({
+      artifact_id: 'APP@1.Foo.bar',
+      record_type: 'entity',
+      name: 'Bar',
+      status: 'active',
+      path: '',
+      artifact_type: 'application-component',
+      domain: 'application',
+    })
   })
 })

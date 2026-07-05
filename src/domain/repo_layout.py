@@ -7,6 +7,7 @@ one-line change rather than a grep-and-replace across the entire codebase.
 ENGAGEMENT_REPO = "architecture-repository"
 MODEL = "model"
 DOCS = "docs"
+PROJECTS = "projects"  # model-project group containers: PROJECTS/<slug>/MODEL/...
 DIAGRAM_CATALOG = "diagram-catalog"
 DIAGRAMS = "diagrams"  # subdirectory within DIAGRAM_CATALOG/
 RENDERED = "rendered"  # subdirectory within DIAGRAMS/ — excluded from indexing

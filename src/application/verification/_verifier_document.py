@@ -18,6 +18,8 @@ from src.application.verification.artifact_verifier_types import (
 from src.domain.repo_layout import ARCH_REPO, DOCS, MODEL
 
 _WINDOWS_ABS_PATH_RE = re.compile(r"^[A-Za-z]:[/\\]")
+_FRONTMATTER_RE = re.compile(r"^---\n.*?\n---\n", re.DOTALL)
+_SECTION_HEADING_RE = re.compile(r"^##\s+(.+)$", re.MULTILINE)
 
 
 def _is_absolute_markdown_link(href: str) -> bool:
@@ -45,6 +47,20 @@ def _doc_repo_root(path: Path, registry: ArtifactRegistry | None) -> Path | None
     return _infer_repo_root_for_document(path)
 
 
+def _document_body(content: str) -> str:
+    return _FRONTMATTER_RE.sub("", content, count=1)
+
+
+def _section_spans(body: str) -> dict[str, str]:
+    matches = list(_SECTION_HEADING_RE.finditer(body))
+    spans: dict[str, list[str]] = {}
+    for index, match in enumerate(matches):
+        name = match.group(1).strip()
+        end = matches[index + 1].start() if index + 1 < len(matches) else len(body)
+        spans.setdefault(name, []).append(body[match.start() : end])
+    return {name: "\n".join(parts) for name, parts in spans.items()}
+
+
 def _linked_entity_types(doc_path: Path, content: str) -> set[str]:
     types: set[str] = set()
     for m in re.finditer(r"\[([^\]]+)\]\(([^)]+)\)", content):
@@ -70,6 +86,77 @@ def _linked_entity_types(doc_path: Path, content: str) -> set[str]:
             if etype:
                 types.add(str(etype))
     return types
+
+
+def _verify_required_entity_type_connections(
+    *,
+    result: VerificationResult,
+    loc: str,
+    catalogs: RuntimeCatalogs,
+    linked_types: set[str],
+    required_entity_types: list[str],
+) -> None:
+    _oc = catalogs.ontology
+    for etype in required_entity_types:
+        label = _oc.format_entity_type_term(etype)
+        if not _oc.expand_entity_type_term(etype):
+            result.issues.append(
+                Issue(
+                    Severity.ERROR,
+                    "E155",
+                    f"Unknown required entity-type connection term: {label} ({etype})",
+                    loc,
+                )
+            )
+        elif not _oc.entity_type_term_matches(etype, linked_types):
+            result.issues.append(
+                Issue(
+                    Severity.ERROR,
+                    "E155",
+                    f"Required entity-type connection missing: link at least one {label}",
+                    loc,
+                )
+            )
+
+
+def _verify_section_entity_type_connections(
+    *,
+    result: VerificationResult,
+    loc: str,
+    doc_path: Path,
+    catalogs: RuntimeCatalogs,
+    section_spans: dict[str, str],
+    sections: list[dict],
+) -> None:
+    _oc = catalogs.ontology
+    for section in sections:
+        name = str(section.get("name") or "").strip()
+        if not name:
+            continue
+        required_entity_types: list[str] = section.get("required_entity_type_connections") or []
+        if not required_entity_types or name not in section_spans:
+            continue
+        linked_types = _linked_entity_types(doc_path, section_spans[name])
+        for etype in required_entity_types:
+            label = _oc.format_entity_type_term(etype)
+            if not _oc.expand_entity_type_term(etype):
+                result.issues.append(
+                    Issue(
+                        Severity.WARNING,
+                        "W157",
+                        f"Unknown required entity-type connection term in section '{name}': {label} ({etype})",
+                        loc,
+                    )
+                )
+            elif not _oc.entity_type_term_matches(etype, linked_types):
+                result.issues.append(
+                    Issue(
+                        Severity.ERROR,
+                        "E156",
+                        f"Required entity-type connection missing in section '{name}': link at least one {label}",
+                        loc,
+                    )
+                )
 
 
 def verify_document(  # noqa: C901
@@ -121,9 +208,10 @@ def verify_document(  # noqa: C901
                     if status_enum:
                         doc_type_status_enum = frozenset(str(v) for v in status_enum)
                 required_sections: list[str] = schema.get("required_sections") or []
+                body = _document_body(content)
+                section_spans = _section_spans(body)
                 if required_sections:
-                    body = re.sub(r"^---\n.*?\n---\n", "", content, count=1, flags=re.DOTALL)
-                    present = {m.group(1).strip() for m in re.finditer(r"^##\s+(.+)$", body, re.MULTILINE)}
+                    present = set(section_spans)
                     for section in required_sections:
                         if section not in present:
                             result.issues.append(
@@ -136,28 +224,22 @@ def verify_document(  # noqa: C901
                             )
                 required_entity_types: list[str] = schema.get("required_entity_type_connections") or []
                 if required_entity_types:
-                    _oc = catalogs.ontology
                     linked_types = _linked_entity_types(path, content)
-                    for etype in required_entity_types:
-                        label = _oc.format_entity_type_term(etype)
-                        if not _oc.expand_entity_type_term(etype):
-                            result.issues.append(
-                                Issue(
-                                    Severity.ERROR,
-                                    "E155",
-                                    f"Unknown required entity-type connection term: {label} ({etype})",
-                                    loc,
-                                )
-                            )
-                        elif not _oc.entity_type_term_matches(etype, linked_types):
-                            result.issues.append(
-                                Issue(
-                                    Severity.ERROR,
-                                    "E155",
-                                    f"Required entity-type connection missing: link at least one {label}",
-                                    loc,
-                                )
-                            )
+                    _verify_required_entity_type_connections(
+                        result=result,
+                        loc=loc,
+                        catalogs=catalogs,
+                        linked_types=linked_types,
+                        required_entity_types=required_entity_types,
+                    )
+                _verify_section_entity_type_connections(
+                    result=result,
+                    loc=loc,
+                    doc_path=path,
+                    catalogs=catalogs,
+                    section_spans=section_spans,
+                    sections=schema.get("sections") or [],
+                )
 
     for m in re.finditer(r"\[([^\]]+)\]\(([^)]+)\)", content):
         href = m.group(2)

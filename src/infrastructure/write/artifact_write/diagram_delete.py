@@ -9,6 +9,7 @@ from src.application.candidate_repository import CandidateRepository
 from src.application.verification.artifact_verifier import ArtifactVerifier
 from src.application.verification.artifact_verifier_parsing import parse_frontmatter_from_path
 from src.config.repo_paths import DIAGRAM_CATALOG, DIAGRAMS, RENDERED
+from src.domain.artifact_id import stable_id
 
 from .boundary import assert_engagement_write_root
 from .types import WriteResult
@@ -24,17 +25,30 @@ def _verification(path: Path) -> dict[str, object]:
 
 
 def _find_diagram_file(repo_root: Path, artifact_id: str) -> Path | None:
+    """Locate a diagram by its own id, scanning disk directly (no registry required).
+
+    ``delete_diagram`` may run without a registry, unlike ``resolve_diagram_source_path``,
+    so it cannot rely on ``find_file_by_id``'s canonicalization — an exact match wins;
+    otherwise a short (rename-stable) id is accepted if exactly one file matches it
+    (ambiguous short ids report not-found, same fail-safe convention as
+    ``_MemStore.canonical_id``).
+    """
     diagrams_root = repo_root / DIAGRAM_CATALOG / DIAGRAMS
     if not diagrams_root.exists():
         return None
+    short = stable_id(artifact_id)
+    short_matches: list[Path] = []
     for suffix in ("*.puml", "*.md"):
         for path in sorted(diagrams_root.rglob(suffix)):
             if path.parent.name == RENDERED:
                 continue
             fm = parse_frontmatter_from_path(path) or {}
-            if str(fm.get("artifact-id", "")) == artifact_id:
+            found_id = str(fm.get("artifact-id", ""))
+            if found_id == artifact_id:
                 return path
-    return None
+            if found_id and stable_id(found_id) == short:
+                short_matches.append(path)
+    return short_matches[0] if len(short_matches) == 1 else None
 
 
 def _rendered_paths(diagram_path: Path) -> list[Path]:

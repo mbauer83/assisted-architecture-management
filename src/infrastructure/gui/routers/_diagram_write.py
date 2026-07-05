@@ -236,7 +236,7 @@ def _build_matrix_markdown(
 def preview_matrix(body: MatrixPreviewBody) -> dict[str, Any]:
     repo = s.get_repo()
     repo_root, registry, _ = s.get_write_deps()
-    from src.infrastructure.write.artifact_write.matrix import _linkify_matrix_ids
+    from src.infrastructure.write.artifact_write._matrix_content import _linkify_matrix_ids
 
     md = _build_matrix_markdown(
         body.entity_ids,

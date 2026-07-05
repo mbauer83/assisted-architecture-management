@@ -202,6 +202,22 @@ def _infer_reference_ids_from_puml(
     return entity_ids or None, connection_ids or None
 
 
+def diagram_entities_are_authoritative(verifier, diagram_type: str) -> bool:
+    """True when *diagram_type*'s own entity types make ``diagram_entities`` its body source.
+
+    Diagram-owned types (activity, sequence, C4, datatype, GSN — declared via
+    ``ui_config.diagram_only_types``) are always rendered from ``diagram_entities``.
+    ArchiMate-family types may carry ``diagram_entities`` purely as occurrence-binding
+    metadata (WU-B3) on top of a hand-authored ``puml=`` body, so it must not be
+    treated as a render trigger for them.
+    """
+    try:
+        module = verifier._runtime_catalogs.diagram_types.find_diagram_type(diagram_type)
+    except Exception:  # noqa: BLE001
+        return False
+    return bool(module is not None and module.ui_config.diagram_only_types)
+
+
 def _prepare_diagram_puml_body(puml_body: str, repo_root: Path, diagram_type: str) -> str:
     from src.infrastructure.diagram_type_registry import get_diagram_type  # noqa: PLC0415
 

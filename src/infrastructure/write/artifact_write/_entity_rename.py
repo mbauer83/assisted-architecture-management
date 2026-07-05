@@ -2,11 +2,51 @@
 
 from __future__ import annotations
 
+import re
 import uuid
 from collections.abc import Callable
 from pathlib import Path
 
-from src.application.repo_path_helpers import all_model_roots
+from src.application.repo_path_helpers import all_model_roots, docs_root, rewrite_doc_link
+
+_MD_LINK_RE = re.compile(r"(\[[^\]]*\]\()([^)\s]+)(\))")
+
+
+def rewrite_document_links_for_moved_entity(
+    *, repo_root: Path, old_path: Path, new_path: Path
+) -> list[Path]:
+    """Rewrite markdown-body relative links that point at an entity's old path.
+
+    Best-effort cosmetic update, mirroring rewrite_outgoing_referrers() for
+    connection sidecars — entity moves (group re-home or rename) change the
+    file's location, but nothing else updates a hand-authored `[label](../..
+    /old/path.md)` link elsewhere in the docs tree.
+    """
+    changed: list[Path] = []
+    doc_root = docs_root(repo_root)
+    if not doc_root.exists():
+        return changed
+    for doc_path in doc_root.rglob("*.md"):
+        text = doc_path.read_text(encoding="utf-8")
+
+        def _replace(match: re.Match[str]) -> str:
+            prefix, target, suffix = match.group(1), match.group(2), match.group(3)
+            if target.startswith(("http://", "https://", "#", "mailto:")):
+                return match.group(0)
+            rewritten = rewrite_doc_link(
+                target,
+                doc_old_dir=doc_path.parent,
+                doc_new_dir=doc_path.parent,
+                target_old_path=old_path,
+                target_new_path=new_path,
+            )
+            return f"{prefix}{rewritten}{suffix}" if rewritten != target else match.group(0)
+
+        new_text = _MD_LINK_RE.sub(_replace, text)
+        if new_text != text:
+            doc_path.write_text(new_text, encoding="utf-8")
+            changed.append(doc_path)
+    return changed
 
 
 def rename_entity_via_m4(

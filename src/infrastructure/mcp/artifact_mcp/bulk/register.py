@@ -57,7 +57,10 @@ def register(mcp: FastMCP) -> None:
             "Connections are removed before dependent entity deletes; diagrams/documents are removed before entities; "
             "the tool returns per-item results plus a batch_verification summary and operation_id. "
             "Optional idempotency_key reuses a prior completed result for the same logical batch. "
-            "Accepts both full (PREFIX@epoch.random.slug) and short (PREFIX@epoch.random) artifact IDs."
+            "Accepts both full (PREFIX@epoch.random.slug) and short (PREFIX@epoch.random) artifact IDs. "
+            "Stages the whole batch in a repo copy and verifies before committing — for a single "
+            "item with no cascade, artifact_delete_entity/artifact_delete_diagram/"
+            "artifact_delete_document are cheaper (no full-repo staging copy)."
         ),
         annotations=DESTRUCTIVE_LOCAL_WRITE,
         structured_output=True,

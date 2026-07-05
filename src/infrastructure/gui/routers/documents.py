@@ -75,6 +75,7 @@ def list_document_types() -> list[dict[str, object]]:
             "name": schema.get("name", doc_type),
             "subdirectory": get_document_subdirectory(schema, doc_type),
             "required_sections": schema.get("required_sections", []),
+            "sections": schema.get("sections", []),
             "extra_frontmatter_fields": _extra_frontmatter_fields(schema),
             "required_entity_type_connections": schema.get("required_entity_type_connections", []),
             "suggested_entity_type_connections": schema.get("suggested_entity_type_connections", []),

@@ -5,6 +5,8 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Callable, Literal
 
+from src.domain.artifact_id import stable_id
+
 from ._mem_store import _MemStore
 from ._rwlock import _RWLock
 
@@ -97,6 +99,16 @@ class _ScopeRegistry:
         Honours the port contract for every standalone artifact kind — entities, diagrams,
         and documents — rather than entities alone, so callers resolve a diagram or document
         in a group collection (or other subdirectory) instead of assuming a flat layout.
+
+        Also accepts the short (rename-stable) id form — no trailing ``.slug`` — via
+        ``_mem.canonical_id``, the same canonicalization ``ArtifactIndex.read_artifact``/
+        ``summarize_artifact`` already apply for reads; every current write-path caller
+        (``resolve_diagram_source_path``, entity delete) gets short-id tolerance from this
+        one place rather than each needing its own. Deliberately narrower than
+        ``canonical_id``'s own general tolerance: a full id whose *slug* is merely stale
+        (renamed elsewhere, not just short-form) still misses here — that reconciliation is
+        reserved for the explicit ``resolve_artifact``/``artifact_admin_reindex`` path, not
+        silently absorbed into ordinary file lookups.
         """
         self._ensure_loaded()
         with self._lock.reading():
@@ -104,4 +116,11 @@ class _ScopeRegistry:
                 r = table.get(artifact_id)
                 if r is not None:
                     return r.path
+            if stable_id(artifact_id) == artifact_id:
+                resolved_id = self._mem.canonical_id(artifact_id)
+                if resolved_id != artifact_id:
+                    for table in (self._mem.entities, self._mem.diagrams, self._mem.documents):
+                        r = table.get(resolved_id)
+                        if r is not None:
+                            return r.path
             return None

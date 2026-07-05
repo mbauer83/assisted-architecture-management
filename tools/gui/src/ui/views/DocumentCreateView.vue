@@ -9,6 +9,7 @@ import ArtifactReferenceInput from '../components/ArtifactReferenceInput.vue'
 import { draftDocumentPath } from '../lib/referenceLinks.js'
 import type { DocumentType } from '../../domain'
 import { collectVerificationIssues, readErrorMessage } from '../lib/errors'
+import { formatEntityTypeTerm } from '../lib/documentSections'
 
 const svc = inject(modelServiceKey)!
 const router = useRouter()
@@ -50,12 +51,6 @@ const placeholderBody = (requiredSections: readonly string[]) =>
 const formatFieldLabel = (name: string) =>
   name.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())
 
-const formatEntityTypeTerm = (term: string) => {
-  if (term === '@all') return 'Any entity'
-  const normalized = term.startsWith('@') ? term.slice(1) : term
-  return normalized.replace(/[-_]/g, ' ').replace(/\b\w/g, c => c.toUpperCase())
-}
-
 const selectedType = computed(() =>
   documentTypes.value.find((type) => type.doc_type === docType.value) ?? null,
 )
@@ -63,6 +58,13 @@ const selectedType = computed(() =>
 const extraFields = computed(() => selectedType.value?.extra_frontmatter_fields ?? [])
 const requiredEntityTypes = computed(() => selectedType.value?.required_entity_type_connections ?? [])
 const suggestedEntityTypes = computed(() => selectedType.value?.suggested_entity_type_connections ?? [])
+const sectionsWithEntityHints = computed(() =>
+  (selectedType.value?.sections ?? []).filter(
+    (section) =>
+      (section.required_entity_type_connections?.length ?? 0) > 0 ||
+      (section.suggested_entity_type_connections?.length ?? 0) > 0,
+  ),
+)
 
 const draftPath = computed(() => draftDocumentPath(docType.value, selectedType.value?.subdirectory))
 const titleError = computed(() =>
@@ -376,6 +378,43 @@ const insertReference = (markdownLink: string) => {
         >{{ formatEntityTypeTerm(t) }}<span v-if="i < suggestedEntityTypes.length - 1">,&nbsp;</span></span>
       </div>
 
+      <div
+        v-if="sectionsWithEntityHints.length"
+        class="section-hints"
+      >
+        <div
+          v-for="section in sectionsWithEntityHints"
+          :key="section.name"
+          class="section-hint"
+        >
+          <span class="section-hint__name"># {{ section.name }}</span>
+          <span
+            v-if="section.required_entity_type_connections?.length"
+            class="entity-connection-hint entity-connection-hint--required entity-connection-hint--inline"
+          >
+            Required:
+            <span
+              v-for="(t, i) in section.required_entity_type_connections"
+              :key="t"
+              class="entity-type-tag entity-type-tag--required"
+              :title="t"
+            >{{ formatEntityTypeTerm(t) }}<span v-if="i < section.required_entity_type_connections.length - 1">,&nbsp;</span></span>
+          </span>
+          <span
+            v-if="section.suggested_entity_type_connections?.length"
+            class="entity-connection-hint entity-connection-hint--suggested entity-connection-hint--inline"
+          >
+            Suggested:
+            <span
+              v-for="(t, i) in section.suggested_entity_type_connections"
+              :key="t"
+              class="entity-type-tag"
+              :title="t"
+            >{{ formatEntityTypeTerm(t) }}<span v-if="i < section.suggested_entity_type_connections.length - 1">,&nbsp;</span></span>
+          </span>
+        </div>
+      </div>
+
       <div class="form-field">
         <span>Body</span>
         <div class="editor-toolbar">
@@ -580,6 +619,33 @@ const insertReference = (markdownLink: string) => {
 }
 .entity-type-tag--required {
   background: rgba(220, 38, 38, .1);
+}
+
+.section-hints {
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  padding: 10px 12px;
+  margin-bottom: 14px;
+  background: #f8fafc;
+}
+.section-hint {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 0;
+}
+.section-hint + .section-hint {
+  border-top: 1px solid #e5e7eb;
+}
+.section-hint__name {
+  font-size: 12px;
+  font-weight: 700;
+  color: #334155;
+}
+.entity-connection-hint--inline {
+  margin-bottom: 0;
+  padding: 2px 8px;
 }
 
 @media (max-width: 700px) {

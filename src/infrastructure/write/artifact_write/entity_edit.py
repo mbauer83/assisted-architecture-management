@@ -15,7 +15,11 @@ from ._entity_edit_support import (
     count_rename_referrers,
     merge_fields,
 )
-from ._entity_rename import rename_entity_via_m4, rewrite_outgoing_referrers
+from ._entity_rename import (
+    rename_entity_via_m4,
+    rewrite_document_links_for_moved_entity,
+    rewrite_outgoing_referrers,
+)
 from .boundary import assert_engagement_write_root, today_iso
 from .entity import entity_path, verification_to_entity_dict
 from .parse_existing import ParsedEntity, parse_entity_file
@@ -265,7 +269,15 @@ def edit_entity(
     for path in referrer_paths:
         clear_repo_caches(path)
 
-    total_rewrites = len(renamed_paths) + len(referrer_paths)
+    # Document-body relative links are unaffected by the M4 transaction and the
+    # artifact-id-based referrer rewrite above (they link by path, not by id).
+    doc_link_paths = rewrite_document_links_for_moved_entity(
+        repo_root=repo_root, old_path=entity_file, new_path=target_entity_file
+    )
+    for path in doc_link_paths:
+        clear_repo_caches(path)
+
+    total_rewrites = len(renamed_paths) + len(referrer_paths) + len(doc_link_paths)
     warnings.append(f"Renamed artifact-id to {effective_artifact_id} and updated {total_rewrites} outgoing file(s).")
     return _entity_result(
         wrote=True, path=target_entity_file, artifact_id=effective_artifact_id,

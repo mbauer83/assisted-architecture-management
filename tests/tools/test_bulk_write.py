@@ -449,6 +449,27 @@ class TestBulkEdits:
         assert results[0]["wrote"] is False
         assert "Not written" not in Path(str(results[0]["path"])).read_text()
 
+    def test_edit_entity_group_relocates_file(self, repo: Path) -> None:
+        """Regression: the bulk edit_entity op previously dropped `group`, so
+        a batch group re-home (as WU-C3's mass re-grouping relies on) silently
+        no-opped despite reporting wrote=True."""
+        eid = _make(repo, "requirement", "Group Me")
+        old_path = Path(str(mcp.artifact_edit_entity(artifact_id=eid, dry_run=True, repo_root=str(repo))["path"]))
+        assert old_path.exists()
+
+        results = _bulk(
+            repo,
+            [
+                {"op": "edit_entity", "artifact_id": eid, "group": "my-collection"},
+            ],
+        )
+
+        assert results[0]["wrote"] is True
+        new_path = Path(str(results[0]["path"]))
+        assert "my-collection" in new_path.parts
+        assert new_path.exists()
+        assert not old_path.exists()
+
 
 # ---------------------------------------------------------------------------
 # Conflict and dependency scenarios
@@ -477,13 +498,55 @@ class TestConflictsAndDependencies:
             ],
         )
         assert len(results) == 2
+        # The first item succeeded during staging but the batch aborted because the
+        # second (duplicate) item failed — it must carry a reason, not a bare
+        # wrote:False that is indistinguishable from "never attempted".
         assert results[0]["wrote"] is False
-        assert "error" not in results[0]
+        assert "error" in results[0]
+        assert "already exists" not in results[0]["error"]
         assert "error" in results[1]
+        assert "already exists" in results[1]["error"]
 
         outgoing = Path(str(results[0]["path"]))
         if outgoing.exists():
             assert "archimate-realization" not in outgoing.read_text(encoding="utf-8")
+
+    def test_earlier_batch_item_reports_rollback_reason_not_bare_wrote_false(self, repo: Path) -> None:
+        """Regression for the item that *succeeded* during staging before a later
+        item failed: it must not look identical to an item that was never attempted
+        (skipped_result) or one that itself failed (error_result)."""
+        src = _make(repo, "requirement", "RollbackSrc")
+        tgt = _make(repo, "outcome", "RollbackTgt")
+        other_tgt = _make(repo, "outcome", "RollbackTgt2")
+        results = _bulk(
+            repo,
+            [
+                {
+                    "op": "add_connection",
+                    "source_entity": src,
+                    "connection_type": "archimate-realization",
+                    "target_entity": tgt,
+                },
+                {
+                    "op": "add_connection",
+                    "source_entity": src,
+                    "connection_type": "archimate-realization",
+                    "target_entity": other_tgt,
+                },
+                {
+                    "op": "add_connection",
+                    "source_entity": src,
+                    "connection_type": "archimate-realization",
+                    "target_entity": tgt,
+                },
+            ],
+        )
+        assert len(results) == 3
+        assert results[0]["wrote"] is False
+        assert results[0]["error"] == "Rolled back: a later item in this batch failed, so no changes were committed"
+        assert results[1]["wrote"] is False
+        assert results[1]["error"] == "Rolled back: a later item in this batch failed, so no changes were committed"
+        assert "already exists" in results[2]["error"]
 
     def test_same_ref_used_in_multiple_connections(self, repo: Path) -> None:
         """One entity can be both source and target of multiple connections via the same ref."""

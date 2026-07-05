@@ -7,8 +7,9 @@ import DOMPurify from 'dompurify'
 import { modelServiceKey, toastKey } from '../keys'
 import MarkdownEditor from '../components/MarkdownEditor.vue'
 import ArtifactReferenceInput from '../components/ArtifactReferenceInput.vue'
-import type { DocumentDetail } from '../../domain'
+import type { DocumentDetail, DocumentType } from '../../domain'
 import { collectVerificationIssues, readErrorMessage } from '../lib/errors'
+import { findSectionSpec, sectionAtOffset, sectionEntityTypeTerms } from '../lib/documentSections'
 
 const svc = inject(modelServiceKey)!
 const addToast = inject(toastKey)!
@@ -23,9 +24,14 @@ const deleting = ref(false)
 const error = ref<string | null>(null)
 const verificationIssues = ref<string[]>([])
 const showReferencePicker = ref(false)
-type MarkdownEditorHandle = { insertAtCursor: (markdownLink: string) => void }
+type MarkdownEditorHandle = {
+  insertAtCursor: (markdownLink: string) => void
+  getCursorOffset: () => number
+}
 const editorRef = ref<MarkdownEditorHandle | null>(null)
 const isGlobalDocument = computed(() => detail.value?.is_global ?? false)
+const documentTypes = ref<DocumentType[]>([])
+const referenceCursorOffset = ref(0)
 
 const editing = ref(false)
 
@@ -63,11 +69,35 @@ const load = async () => {
   }
 }
 
-onMounted(load)
+onMounted(() => {
+  void load()
+  void Effect.runPromise(svc.listDocumentTypes())
+    .then((types) => { documentTypes.value = types })
+    .catch((reason: unknown) => {
+      console.error('Failed to load document types', readErrorMessage(reason))
+    })
+})
 watch(documentId, () => {
   editing.value = false
   void load()
 })
+
+const matchedDocType = computed(() =>
+  documentTypes.value.find((type) => type.doc_type === detail.value?.doc_type) ?? null,
+)
+
+const currentSectionName = computed(() => sectionAtOffset(body.value, referenceCursorOffset.value))
+
+const currentSectionSpec = computed(() =>
+  findSectionSpec(matchedDocType.value?.sections, currentSectionName.value),
+)
+
+const suggestedEntityTypesForSection = computed(() => sectionEntityTypeTerms(currentSectionSpec.value))
+
+const openReferencePicker = () => {
+  referenceCursorOffset.value = editorRef.value?.getCursorOffset() ?? body.value.length
+  showReferencePicker.value = true
+}
 
 const startEdit = () => {
   error.value = null
@@ -303,7 +333,7 @@ const insertReference = (markdownLink: string) => {
           <button
             class="secondary-btn"
             type="button"
-            @click="showReferencePicker = true"
+            @click="openReferencePicker"
           >
             Insert Reference
           </button>
@@ -366,6 +396,8 @@ const insertReference = (markdownLink: string) => {
     >
       <ArtifactReferenceInput
         :current-path="detail?.path"
+        :section-label="currentSectionName ?? undefined"
+        :suggested-entity-types="suggestedEntityTypesForSection"
         @insert="insertReference"
         @close="showReferencePicker = false"
       />

@@ -1,0 +1,141 @@
+---
+artifact-id: ARC@1777470600.cwupfB.reverse-architecture
+artifact-type: diagram
+name: Reverse Architecture
+version: 0.1.0
+status: draft
+diagram-type: archimate-layered
+entity-ids-used:
+- FNC@1777409722.saMRQ0.author-architecture-documents
+- FNC@1777390449.uzJGYp.author-diagrams
+- FNC@1777390448.yuFXVJ.author-model-artifacts
+- FNC@1777390465.SXt2mM.check-model-coverage
+- FNC@1777409722.rkx32U.determine-required-changes-to-architecture-content
+- FNC@1777390444.lLdx12.discover-relevant-architecture-content
+- FNC@1777390462.erPw5B.explore-system-structure
+- JNO@1777467627.chqH1_.inclusive-or-for-architecture-work
+- FNC@1777390463.oRz6Qe.map-elements-to-architecture-concepts
+- PRC@1777293168.CYgU64.reverse-architecture
+- FNC@1777390445.NGjUCa.verify-artifact-integrity-coherence
+- JNA@1777468790.zGOowi.reverse-architecture-fork-parallel-model-discovery-archimate-mapping
+- JNA@1777468802.Ps7rVy.reverse-architecture-join-parallel-model-discovery-archimate-mapping
+connection-ids-used:
+- PRC@1777293168.CYgU64.reverse-architecture---FNC@1777409722.saMRQ0.author-architecture-documents@@archimate-aggregation
+- PRC@1777293168.CYgU64.reverse-architecture---FNC@1777390449.uzJGYp.author-diagrams@@archimate-aggregation
+- PRC@1777293168.CYgU64.reverse-architecture---FNC@1777390448.yuFXVJ.author-model-artifacts@@archimate-aggregation
+- PRC@1777293168.CYgU64.reverse-architecture---FNC@1777390465.SXt2mM.check-model-coverage@@archimate-aggregation
+- FNC@1777390465.SXt2mM.check-model-coverage---FNC@1777409722.rkx32U.determine-required-changes-to-architecture-content@@archimate-triggering
+- PRC@1777293168.CYgU64.reverse-architecture---FNC@1777409722.rkx32U.determine-required-changes-to-architecture-content@@archimate-aggregation
+- PRC@1777293168.CYgU64.reverse-architecture---FNC@1777390444.lLdx12.discover-relevant-architecture-content@@archimate-aggregation
+- PRC@1777293168.CYgU64.reverse-architecture---FNC@1777390462.erPw5B.explore-system-structure@@archimate-aggregation
+- FNC@1777390463.oRz6Qe.map-elements-to-architecture-concepts---FNC@1777390444.lLdx12.discover-relevant-architecture-content@@archimate-association
+- PRC@1777293168.CYgU64.reverse-architecture---FNC@1777390463.oRz6Qe.map-elements-to-architecture-concepts@@archimate-aggregation
+- FNC@1777390448.yuFXVJ.author-model-artifacts---FNC@1777390445.NGjUCa.verify-artifact-integrity-coherence@@archimate-triggering
+- FNC@1777390449.uzJGYp.author-diagrams---FNC@1777390445.NGjUCa.verify-artifact-integrity-coherence@@archimate-triggering
+- FNC@1777409722.saMRQ0.author-architecture-documents---FNC@1777390445.NGjUCa.verify-artifact-integrity-coherence@@archimate-triggering
+- PRC@1777293168.CYgU64.reverse-architecture---FNC@1777390445.NGjUCa.verify-artifact-integrity-coherence@@archimate-aggregation
+- FNC@1777390462.erPw5B.explore-system-structure---JNA@1777468790.zGOowi.reverse-architecture-fork-parallel-model-discovery-archimate-mapping@@archimate-triggering
+- JNA@1777468790.zGOowi.reverse-architecture-fork-parallel-model-discovery-archimate-mapping---FNC@1777390444.lLdx12.discover-relevant-architecture-content@@archimate-triggering
+- JNA@1777468790.zGOowi.reverse-architecture-fork-parallel-model-discovery-archimate-mapping---FNC@1777390463.oRz6Qe.map-elements-to-architecture-concepts@@archimate-triggering
+- FNC@1777390444.lLdx12.discover-relevant-architecture-content---JNA@1777468802.Ps7rVy.reverse-architecture-join-parallel-model-discovery-archimate-mapping@@archimate-triggering
+- FNC@1777390463.oRz6Qe.map-elements-to-architecture-concepts---JNA@1777468802.Ps7rVy.reverse-architecture-join-parallel-model-discovery-archimate-mapping@@archimate-triggering
+- JNA@1777468802.Ps7rVy.reverse-architecture-join-parallel-model-discovery-archimate-mapping---FNC@1777390465.SXt2mM.check-model-coverage@@archimate-triggering
+- FNC@1777409722.rkx32U.determine-required-changes-to-architecture-content---JNO@1777467627.chqH1_.inclusive-or-for-architecture-work@@archimate-triggering
+- JNO@1777467627.chqH1_.inclusive-or-for-architecture-work---FNC@1777390448.yuFXVJ.author-model-artifacts@@archimate-triggering
+- JNO@1777467627.chqH1_.inclusive-or-for-architecture-work---FNC@1777390449.uzJGYp.author-diagrams@@archimate-triggering
+- JNO@1777467627.chqH1_.inclusive-or-for-architecture-work---FNC@1777409722.saMRQ0.author-architecture-documents@@archimate-triggering
+last-updated: '2026-07-05'
+---
+@startuml reverse-architecture
+hide stereotype
+
+skinparam defaultFontName "Helvetica Neue, Helvetica, Arial, sans-serif"
+skinparam defaultFontSize 12
+skinparam shadowing false
+skinparam roundcorner 4
+skinparam backgroundColor #FAFAFA
+
+skinparam linetype ortho
+skinparam nodesep 60
+skinparam ranksep 80
+!define Rel_Triggering(from, to, label) from --> to
+!define Rel_Realization(from, to, label) from ..|> to
+!define Rel_Realization_Up(from, to, label) from ..|> to
+!define Rel_Serving(from, to, label) from --> to
+!define Rel_Association(from, to, label) from -- to
+!define Rel_Association_Left(from, to, label) from -- to
+!define Rel_Association_Right(from, to, label) from -- to
+!define Rel_Access(from, to, label) from ..> to
+!define Rel_Influence(from, to, label) from ..> to
+skinparam rectangle<<CommonGrouping>> {
+  BackgroundColor #EDE8E1
+  BorderColor #8C7E6A
+}
+skinparam rectangle<<function>> {
+  BackgroundColor #E0D8CC
+  BorderColor #8C7E6A
+}
+skinparam rectangle<<process>> {
+  BackgroundColor #E0D8CC
+  BorderColor #8C7E6A
+}
+sprite $archimate_function <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><path d="M2.9 11.7V5.4L8 3.1l5.1 2.3v6.3L8 9.2z"  fill="#252327" stroke="none"/></svg>
+sprite $archimate_process <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><path d="M2.6 4.1h6.3V2.8l4.5 5.2-4.5 5.2v-1.3H2.6z"  fill="#252327" stroke="none"/></svg>
+
+top to bottom direction
+
+title Reverse Architecture
+
+rectangle "Processes" <<CommonGrouping>> {
+  rectangle "<$archimate_process{scale=1.5}> Reverse Architecture" <<process>> as PRC_CYgU64 {
+    rectangle "<$archimate_function{scale=1.5}> Author Architecture Documents" <<function>> as FNC_saMRQ0
+    rectangle "<$archimate_function{scale=1.5}> Author Diagrams" <<function>> as FNC_uzJGYp
+    rectangle "<$archimate_function{scale=1.5}> Author Model Artifacts" <<function>> as FNC_yuFXVJ
+    rectangle "<$archimate_function{scale=1.5}> Check Model Coverage" <<function>> as FNC_SXt2mM
+    rectangle "<$archimate_function{scale=1.5}> Determine Required Changes to Architecture Content" <<function>> as FNC_rkx32U
+    rectangle "<$archimate_function{scale=1.5}> Discover Relevant Architecture Content" <<function>> as FNC_lLdx12
+    rectangle "<$archimate_function{scale=1.5}> Explore System Structure" <<function>> as FNC_erPw5B
+    circle " " as JNO_chqH1_
+    rectangle "<$archimate_function{scale=1.5}> Map Elements to Architecture Concepts" <<function>> as FNC_oRz6Qe
+    rectangle "<$archimate_function{scale=1.5}> Verify Artifact Integrity & Coherence" <<function>> as FNC_NGjUCa
+    circle " " as JNA_zGOowi
+    circle " " as JNA_Ps7rVy
+    FNC_erPw5B -[hidden]down- JNA_zGOowi
+    JNA_zGOowi -[hidden]down- FNC_lLdx12
+    FNC_lLdx12 -[hidden]right- FNC_oRz6Qe
+    FNC_oRz6Qe -[hidden]down- JNA_Ps7rVy
+    JNA_Ps7rVy -[hidden]down- FNC_SXt2mM
+    FNC_SXt2mM -[hidden]down- FNC_rkx32U
+    FNC_rkx32U -[hidden]down- JNO_chqH1_
+    JNO_chqH1_ -[hidden]down- FNC_saMRQ0
+    FNC_saMRQ0 -[hidden]right- FNC_uzJGYp
+    FNC_uzJGYp -[hidden]right- FNC_yuFXVJ
+    FNC_yuFXVJ -[hidden]down- FNC_NGjUCa
+    JNA_zGOowi -[hidden]down- FNC_lLdx12
+    JNA_zGOowi -[hidden]down- FNC_oRz6Qe
+    FNC_lLdx12 -[hidden]down- JNA_Ps7rVy
+    FNC_oRz6Qe -[hidden]down- JNA_Ps7rVy
+    JNO_chqH1_ -[hidden]down- FNC_saMRQ0
+    JNO_chqH1_ -[hidden]down- FNC_uzJGYp
+    JNO_chqH1_ -[hidden]down- FNC_yuFXVJ
+  }
+}
+
+' Connections
+Rel_Triggering(FNC_SXt2mM, FNC_rkx32U, "")
+Rel_Association_Left(FNC_oRz6Qe, FNC_lLdx12, "")
+Rel_Triggering(FNC_yuFXVJ, FNC_NGjUCa, "")
+Rel_Triggering(FNC_uzJGYp, FNC_NGjUCa, "")
+Rel_Triggering(FNC_saMRQ0, FNC_NGjUCa, "")
+Rel_Triggering(FNC_erPw5B, JNA_zGOowi, "")
+Rel_Triggering(JNA_zGOowi, FNC_lLdx12, "")
+Rel_Triggering(JNA_zGOowi, FNC_oRz6Qe, "")
+Rel_Triggering(FNC_lLdx12, JNA_Ps7rVy, "")
+Rel_Triggering(FNC_oRz6Qe, JNA_Ps7rVy, "")
+Rel_Triggering(JNA_Ps7rVy, FNC_SXt2mM, "")
+Rel_Triggering(FNC_rkx32U, JNO_chqH1_, "")
+Rel_Triggering(JNO_chqH1_, FNC_yuFXVJ, "")
+Rel_Triggering(JNO_chqH1_, FNC_uzJGYp, "")
+Rel_Triggering(JNO_chqH1_, FNC_saMRQ0, "")
+
+@enduml

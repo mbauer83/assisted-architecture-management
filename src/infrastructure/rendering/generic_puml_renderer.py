@@ -14,21 +14,28 @@ from src.domain.archimate_relation_rendering import (
     format_cardinality_label,
 )
 from src.domain.artifact_types import ConnectionRecord, EntityRecord
-from src.domain.module_types import ConnectionTypeName, ElementClassName, EntityTypeName
+from src.domain.module_types import ConnectionTypeName, ElementClassName
 from src.domain.ontology_protocol import DiagramRendererReferences
-from src.domain.ontology_types import ConnectionTypeInfo, EntityTypeInfo
+from src.domain.ontology_types import ConnectionTypeInfo
 from src.infrastructure.rendering._archimate_includes import (
     inject_archimate_includes,
-    parse_archimate_display_block,
 )
 from src.infrastructure.rendering._diagram_layout import (
     build_branch_direction_hints,
     build_nested_layout_lines,
 )
-from src.infrastructure.rendering._diagram_text import insert_arrow_direction, pluralize_label
+from src.infrastructure.rendering._diagram_text import insert_arrow_direction
+from src.infrastructure.rendering.archimate_entity_declarations import (
+    entity_declaration,
+    entity_nest_declaration,
+    grouping_key,
+    grouping_stereotype,
+    ordered_domains,
+    ordered_entity_type_groups,
+)
+from src.infrastructure.rendering.archimate_occurrences import occurrence_entities
 from src.infrastructure.rendering.generic_puml_layout import (
     build_generic_visual_nesting,
-    ordered_type_groups,
 )
 from src.infrastructure.rendering.puml_safety import (
     configured_puml_size_warning_threshold,
@@ -40,10 +47,6 @@ def _registry():
     from src.infrastructure.app_bootstrap import get_module_registry  # noqa: PLC0415
 
     return get_module_registry()
-
-
-def _stereotype_key(artifact_type: str) -> str:
-    return artifact_type.replace("-", "_")
 
 
 class GenericPumlRenderer:
@@ -64,12 +67,16 @@ class GenericPumlRenderer:
         diagram_connections: list[dict[str, object]] | None = None,
         edge_labels: dict[str, str] | None = None,
     ) -> str:
-        del repo_root, diagram_entities
+        del repo_root
         diagram_name = re.sub(r"[^a-zA-Z0-9_-]", "-", name.lower()).strip("-") or "diagram"
         lines: list[str] = [f"@startuml {diagram_name}"]
         for include in self._includes():
             lines.append(f"!include ../{include}")
         lines.extend(["", f"title {name}", ""])
+
+        entity_by_id = {entity.artifact_id: entity for entity in entities}
+        render_entities = list(entities)
+        render_entities.extend(occurrence_entities(diagram_entities, entity_by_id))
 
         alias_by_id = {
             entity.artifact_id: normalize_puml_alias(entity.display_alias)
@@ -77,17 +84,17 @@ class GenericPumlRenderer:
             if entity.display_alias
         }
         entity_by_alias = {
-            normalize_puml_alias(entity.display_alias): entity for entity in entities if entity.display_alias
+            normalize_puml_alias(entity.display_alias): entity for entity in render_entities if entity.display_alias
         }
 
         domain_entities: dict[str, list[EntityRecord]] = defaultdict(list)
-        for entity in entities:
+        for entity in render_entities:
             alias = normalize_puml_alias(entity.display_alias)
             if alias:
-                domain_entities[self._grouping_key(entity)].append(entity)
+                domain_entities[grouping_key(entity, _registry())].append(entity)
 
-        ordered_domains = self._ordered_domains(domain_entities)
-        single_domain = len(ordered_domains) == 1
+        ordered_domain_keys = ordered_domains(domain_entities, _registry())
+        single_domain = len(ordered_domain_keys) == 1
         nested_main_axis = "down" if single_domain else "right"
         nested_branch_axis = "right" if single_domain else "down"
         flow_edges = [
@@ -121,9 +128,9 @@ class GenericPumlRenderer:
                 return []
             children = children_map.get(alias, [])
             if not children:
-                return [f"{indent}{self._entity_declaration(entity, alias)}"]
+                return [f"{indent}{entity_declaration(entity, alias, _registry(), self._junction_types())}"]
             inner = indent + "  "
-            rendered = [f"{indent}{self._entity_nest_declaration(entity, alias)}"]
+            rendered = [f"{indent}{entity_nest_declaration(entity, alias, _registry(), self._junction_types())}"]
             for child in children:
                 rendered.extend(render_entity(child, inner))
             child_als = [normalize_puml_alias(child.display_alias) for child in children if child.display_alias]
@@ -149,13 +156,15 @@ class GenericPumlRenderer:
             return rendered
 
         group_index_by_alias: dict[str, int] = {}
-        if single_domain and ordered_domains:
+        if single_domain and ordered_domain_keys:
             lines.insert(len(self._includes()) + 2, "top to bottom direction")
             lines.insert(len(self._includes()) + 3, "")
-            domain = ordered_domains[0]
-            grouping = self._grouping_stereotype(domain)
+            domain = ordered_domain_keys[0]
+            grouping = grouping_stereotype(self._config, domain)
             prev_anchor_alias: str | None = None
-            for index, (label, grouped_entities) in enumerate(self._ordered_type_groups(domain_entities[domain])):
+            for index, (label, grouped_entities) in enumerate(
+                ordered_entity_type_groups(domain_entities[domain], _registry())
+            ):
                 lines.append(f'rectangle "{label}" <<{grouping}>> {{')
                 for entity in grouped_entities:
                     lines.extend(render_entity(entity, "  "))
@@ -175,8 +184,8 @@ class GenericPumlRenderer:
                     prev_anchor_alias = top_aliases[-1]
                 lines.append("")
         else:
-            for domain in ordered_domains:
-                lines.append(f'rectangle "{domain.title()}" <<{self._grouping_stereotype(domain)}>> {{')
+            for domain in ordered_domain_keys:
+                lines.append(f'rectangle "{domain.title()}" <<{grouping_stereotype(self._config, domain)}>> {{')
                 for entity in domain_entities[domain]:
                     lines.extend(render_entity(entity, "  "))
                 lines.append("}")
@@ -258,9 +267,6 @@ class GenericPumlRenderer:
     def _includes(self) -> list[str]:
         return [str(value) for value in self._config.get("includes", ())]
 
-    def _entity_info(self, artifact_type: str) -> EntityTypeInfo | None:
-        return _registry().find_entity_type(EntityTypeName(artifact_type))
-
     def _connection_info(self, conn_type: str) -> ConnectionTypeInfo | None:
         return _registry().find_connection_type(ConnectionTypeName(conn_type))
 
@@ -284,89 +290,6 @@ class GenericPumlRenderer:
 
     def _flow_conn_types(self) -> frozenset[str]:
         return self._classified_conn_types("flow_connection_classes", "dynamic")
-
-    def _grouping_key(self, entity: EntityRecord) -> str:
-        info = self._entity_info(entity.artifact_type)
-        if info is not None and info.hierarchy:
-            return info.hierarchy[0]
-        return (entity.domain or "common").lower()
-
-    def _ordered_domains(self, domain_entities: Mapping[str, list[EntityRecord]]) -> list[str]:
-        ordered: list[str] = []
-        for domain in _registry().domain_order():
-            if domain in domain_entities:
-                ordered.append(domain)
-        for domain in sorted(domain_entities):
-            if domain not in ordered:
-                ordered.append(domain)
-        return ordered
-
-    def _grouping_stereotype(self, grouping_key: str) -> str:
-        grouping = self._config.get("grouping", {})
-        if not isinstance(grouping, dict):
-            return grouping_key.capitalize() + "Grouping"
-        pattern = str(grouping.get("stereotype_pattern", "{hierarchy_0|capitalize}Grouping"))
-        return (
-            pattern.replace("{hierarchy_0|capitalize}", grouping_key.capitalize())
-            .replace("{hierarchy_0}", grouping_key)
-            # legacy pattern names kept for any hand-authored configs
-            .replace("{domain_dir|capitalize}", grouping_key.capitalize())
-            .replace("{domain_dir}", grouping_key)
-        )
-
-    def _display_section_id(self, entity: EntityRecord) -> str:
-        ontology = _registry().ontology_for_entity_type(EntityTypeName(entity.artifact_type))
-        if ontology is not None:
-            return ontology.display_section_id
-        return "archimate"
-
-    def _entity_label_and_stereotype(
-        self,
-        entity: EntityRecord,
-    ) -> tuple[str, str | None]:
-        section_id = self._display_section_id(entity)
-        raw_block = entity.display_blocks.get(section_id, "")
-        archimate_block = parse_archimate_display_block(raw_block)
-        label = str(archimate_block.get("label") or entity.display_label or entity.name).replace('"', "'")
-        info = self._entity_info(entity.artifact_type)
-        stereotype = _stereotype_key(info.artifact_type) if info else None
-        return label, stereotype
-
-    def _entity_has_sprite(self, entity: EntityRecord) -> bool:
-        ontology = _registry().ontology_for_entity_type(EntityTypeName(entity.artifact_type))
-        return ontology is not None and ontology.sprite_for(entity.artifact_type) is not None
-
-    def _entity_declaration(self, entity: EntityRecord, alias: str) -> str:
-        if entity.artifact_type in self._junction_types():
-            return f'circle " " as {alias}'
-        label, stereotype = self._entity_label_and_stereotype(entity)
-        if stereotype and self._entity_has_sprite(entity):
-            return f'rectangle "<$archimate_{stereotype}{{scale=1.5}}> {label}" <<{stereotype}>> as {alias}'
-        if stereotype:
-            return f'rectangle "{label}" <<{stereotype}>> as {alias}'
-        return f'rectangle "{label}" as {alias}'
-
-    def _entity_nest_declaration(self, entity: EntityRecord, alias: str) -> str:
-        if entity.artifact_type in self._junction_types():
-            return f'circle " " as {alias}'
-        label, stereotype = self._entity_label_and_stereotype(entity)
-        if stereotype and self._entity_has_sprite(entity):
-            return f'rectangle "<$archimate_{stereotype}{{scale=1.5}}> {label}" <<{stereotype}>> as {alias} {{'
-        if stereotype:
-            return f'rectangle "{label}" <<{stereotype}>> as {alias} {{'
-        return f'rectangle "{label}" as {alias} {{'
-
-    def _ordered_type_groups(self, entities: list[EntityRecord]) -> list[tuple[str, list[EntityRecord]]]:
-        return ordered_type_groups(
-            entities,
-            type_order=[str(k) for k in _registry().all_entity_types()],
-            label_by_type={
-                entity.artifact_type: pluralize_label(
-                    (self._entity_info(entity.artifact_type) or entity).artifact_type.replace("-", " ").title()
-                )
-                for entity in entities
-            },
-        )
 
     def _build_visual_nesting(
         self,

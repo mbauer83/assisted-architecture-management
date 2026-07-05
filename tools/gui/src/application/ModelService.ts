@@ -53,6 +53,8 @@ export const makeModelService = (repo: ModelRepository) =>
     getWriteHelp: () => repo.getWriteHelp(),
     getOntologyClassification: (sourceType: string) => repo.getOntologyClassification(sourceType),
     getOntologyPair: (sourceType: string, targetType: string) => repo.getOntologyPair(sourceType, targetType),
+    getAuthoringGuidance: (params: Parameters<ModelRepository['getAuthoringGuidance']>[0]) =>
+      repo.getAuthoringGuidance(params),
     createEntity: (body: Parameters<ModelRepository['createEntity']>[0]) => repo.createEntity(body),
     editEntity: (body: Parameters<ModelRepository['editEntity']>[0]) => repo.editEntity(body),
     deleteEntity: (body: Parameters<ModelRepository['deleteEntity']>[0]) => repo.deleteEntity(body),
@@ -61,8 +63,8 @@ export const makeModelService = (repo: ModelRepository) =>
     getDiagramConnections: (diagramId: string) => repo.getDiagramConnections(diagramId),
     getDiagramSvg: (diagramId: string) => repo.getDiagramSvg(diagramId),
     getEntityDisplayItem: (artifactId: string) => repo.getEntityDisplayItem(artifactId),
-    searchEntityDisplay: (query: string, limit?: number, diagramType?: string) =>
-      repo.searchEntityDisplay(query, limit, diagramType),
+    searchEntityDisplay: (params: Parameters<ModelRepository['searchEntityDisplay']>[0]) =>
+      repo.searchEntityDisplay(params),
     discoverDiagramEntities: (params: Parameters<ModelRepository['discoverDiagramEntities']>[0]) =>
       repo.discoverDiagramEntities(params),
     previewDiagram: (body: Parameters<ModelRepository['previewDiagram']>[0]) => repo.previewDiagram(body),

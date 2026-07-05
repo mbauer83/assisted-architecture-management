@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 from functools import lru_cache
 from pathlib import Path
 
@@ -23,6 +24,13 @@ def _catalogs():
     return build_runtime_catalogs(build_module_registry())
 
 
+@lru_cache(maxsize=1)
+def _all_entity_types() -> dict:
+    from src.infrastructure.app_bootstrap import build_module_registry  # noqa: PLC0415
+
+    return {str(k): v for k, v in build_module_registry().all_entity_types().items()}
+
+
 def _write(path: Path, content: str) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(content, encoding="utf-8")
@@ -35,6 +43,18 @@ def _adr_schema(repo: Path, section_templates: str = "") -> None:
         '  "required_sections": ["Context", "Decision", "Consequences"]'
     )
     _write(repo / ".arch-repo" / "documents" / "adr.json", f"{base}{templates_field}\n}}\n")
+
+
+def _adr_schema_sections(repo: Path, sections: str) -> None:
+    _write(
+        repo / ".arch-repo" / "documents" / "adr.json",
+        f"""\
+{{
+  "abbreviation": "ADR",
+  "sections": {sections}
+}}
+""",
+    )
 
 
 def _verifier(repo: Path) -> ArtifactVerifier:
@@ -72,6 +92,21 @@ class TestBuildPlaceholderBody:
         result = _build_placeholder_body(["Context"], templates)
         assert "Some content." in result
         assert result.count("Some content.") == 1
+
+    def test_canonical_section_entries_include_expected_link_hints(self) -> None:
+        result = _build_placeholder_body(
+            [
+                {
+                    "name": "Context",
+                    "template": "Describe the context.\n",
+                    "required_entity_type_connections": ["requirement"],
+                    "suggested_entity_type_connections": ["capability"],
+                }
+            ]
+        )
+        assert "## Context" in result
+        assert "<!-- Expected entity links for this section: required: requirement; suggested: capability -->" in result
+        assert "Describe the context." in result
 
 
 # ── pure unit: _validate_section_templates ─────────────────────────────────
@@ -217,3 +252,137 @@ class TestCreateDocumentSectionTemplates:
         assert "## Context\n\nDescribe the context." in content
         assert "## Decision\n\n<!-- Add content here -->" in content
         assert "## Consequences\n\n<!-- Add content here -->" in content
+
+    def test_creates_placeholder_body_from_canonical_sections_with_hints(self, tmp_path: Path) -> None:
+        repo = tmp_path / "engagements" / "ENG-T" / "architecture-repository"
+        _adr_schema_sections(
+            repo,
+            (
+                '[{"name": "Context", "template": "Describe the context.\\n", '
+                '"required_entity_type_connections": ["requirement"]}, '
+                '{"name": "Decision", "suggested_entity_type_connections": ["capability"]}]'
+            ),
+        )
+        result = create_document(
+            repo_root=repo,
+            verifier=_verifier(repo),
+            clear_repo_caches=lambda _: None,
+            doc_type="adr",
+            title="Canonical Sections ADR",
+            body=None,
+            keywords=None,
+            extra_frontmatter=None,
+            artifact_id="ADR@1000000005.Test.canonical-sections",
+            version="0.1.0",
+            status="draft",
+            last_updated="2026-06-19",
+            dry_run=True,
+        )
+        assert result.content is not None
+        assert "## Context" in result.content
+        assert "<!-- Expected entity links for this section: required: requirement -->" in result.content
+        assert "Describe the context." in result.content
+        assert "## Decision" in result.content
+        assert "<!-- Expected entity links for this section: suggested: capability -->" in result.content
+
+
+# ── end-to-end: real `standard` seed schema, create → placeholder → verify ──
+
+
+class TestStandardDocTypeSectionLifecycle:
+    """Dogfoods the seeded `standard` doc-type exemplar (per-section rules, not document-level)."""
+
+    def _seed_standard_schema(self, repo: Path) -> None:
+        from src.infrastructure.workspace._repo_default_schemata import BASE_DOCUMENT_SCHEMAS
+
+        _write(
+            repo / ".arch-repo" / "documents" / "standard.json",
+            json.dumps(BASE_DOCUMENT_SCHEMAS["standard"]),
+        )
+
+    def test_placeholder_places_link_hints_in_their_own_sections(self, tmp_path: Path) -> None:
+        repo = tmp_path / "engagements" / "ENG-T" / "architecture-repository"
+        self._seed_standard_schema(repo)
+        result = create_document(
+            repo_root=repo,
+            verifier=_verifier(repo),
+            clear_repo_caches=lambda _: None,
+            doc_type="standard",
+            title="Test Standard",
+            body=None,
+            keywords=None,
+            extra_frontmatter={"applies_to": ["testing"]},
+            artifact_id="STD@1000000010.Test.test-standard",
+            version="0.1.0",
+            status="draft",
+            last_updated="2026-06-19",
+            dry_run=True,
+        )
+        assert result.content is not None
+        assert "## Specification" in result.content
+        assert "<!-- Expected entity links for this section: required: requirement -->" in result.content
+        assert "## Motivation" in result.content
+        assert "<!-- Expected entity links for this section: suggested: principle, goal -->" in result.content
+        # The document-level rule moved into "Specification"; "Scope"/"Summary" carry no hint.
+        assert "## Scope\n\nState what this standard applies to" in result.content
+
+    def test_verifier_reports_e156_until_requirement_linked_in_specification(self, tmp_path: Path) -> None:
+        repo = tmp_path / "engagements" / "ENG-T" / "architecture-repository"
+        self._seed_standard_schema(repo)
+        info = _all_entity_types()["requirement"]
+        req_id = "REQ@1000000011.Test.my-req"
+        req_path = repo / "model" / Path(*info.hierarchy) / f"{req_id}.md"
+        _write(
+            req_path,
+            "---\n"
+            f"artifact-id: {req_id}\n"
+            "artifact-type: requirement\n"
+            'name: "My Requirement"\n'
+            "version: 0.1.0\n"
+            "status: draft\n"
+            "last-updated: '2026-06-19'\n"
+            "---\n\n"
+            "<!-- §content -->\n\n"
+            "## My Requirement\n\n"
+            "<!-- §display -->\n",
+        )
+
+        # The placeholder body carries no entity links yet, so writing it for real would be
+        # blocked by the same E156 check (write-time verification requires no issues) — preview
+        # it instead, then place the still-unlinked placeholder on disk as an author would before
+        # filling it in, and verify it standalone.
+        result = create_document(
+            repo_root=repo,
+            verifier=_verifier(repo),
+            clear_repo_caches=lambda _: None,
+            doc_type="standard",
+            title="Test Standard",
+            body=None,
+            keywords=None,
+            extra_frontmatter={"applies_to": ["testing"]},
+            artifact_id="STD@1000000012.Test.test-standard2",
+            version="0.1.0",
+            status="draft",
+            last_updated="2026-06-19",
+            dry_run=True,
+        )
+        assert result.content is not None
+        doc_path = Path(result.path)
+        _write(doc_path, result.content)
+
+        before = _verifier(repo).verify_document_file(doc_path)
+        assert any(
+            i.code == "E156" and "Specification" in i.message for i in before.issues
+        ), [i.message for i in before.issues]
+
+        rel = Path("../../model") / Path(*info.hierarchy) / f"{req_id}.md"
+        content = doc_path.read_text(encoding="utf-8")
+        updated = content.replace(
+            "## Specification\n\n",
+            f"## Specification\n\n[My Requirement]({rel.as_posix()})\n\n",
+            1,
+        )
+        doc_path.write_text(updated, encoding="utf-8")
+
+        after = _verifier(repo).verify_document_file(doc_path)
+        assert not any(i.code == "E156" for i in after.issues), [i.message for i in after.issues]

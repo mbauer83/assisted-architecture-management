@@ -616,3 +616,123 @@ class TestE408WithVisualRoles:
         }
         r = _run(fm, allowed_bindings=_VISUAL_ROLES_ALLOWED_BINDINGS)
         assert "E408" not in _codes(r)
+
+
+# ---------------------------------------------------------------------------
+# E408b — occurrence visual_role must be present, declared, and distinct
+# ---------------------------------------------------------------------------
+
+
+class TestE408bVisualRoleValidity:
+    def test_missing_visual_role_when_declared_errors(self) -> None:
+        fm = _fm_with_entity()
+        r = _run(fm, allowed_bindings=_VISUAL_ROLES_ALLOWED_BINDINGS)
+        assert "E408b" in _codes(r)
+
+    def test_visual_role_not_in_declared_set_errors(self) -> None:
+        fm = _fm_with_entity({"visual_role": "bogus"})
+        r = _run(fm, allowed_bindings=_VISUAL_ROLES_ALLOWED_BINDINGS)
+        assert "E408b" in _codes(r)
+
+    def test_valid_single_visual_role_passes(self) -> None:
+        fm = _fm_with_entity({"visual_role": "primary"})
+        r = _run(fm, allowed_bindings=_VISUAL_ROLES_ALLOWED_BINDINGS)
+        assert "E408b" not in _codes(r)
+
+    def test_duplicate_visual_role_value_errors(self) -> None:
+        fm = {
+            "diagram-entities": {"container": [{"id": "box1"}, {"id": "box2"}]},
+            "bindings": [
+                {
+                    "id": "bind-box1",
+                    "subject": {"kind": "entity", "id": "box1"},
+                    "correspondence_kind": "represents",
+                    "target": {"entity_id": _ENTITY_ID},
+                    "visual_role": "primary",
+                },
+                {
+                    "id": "bind-box2",
+                    "subject": {"kind": "entity", "id": "box2"},
+                    "correspondence_kind": "represents",
+                    "target": {"entity_id": _ENTITY_ID},
+                    "visual_role": "primary",
+                },
+            ],
+        }
+        r = _run(fm, allowed_bindings=_VISUAL_ROLES_ALLOWED_BINDINGS)
+        assert "E408b" in _codes(r)
+        assert "E408" not in _codes(r)
+
+    def test_distinct_valid_visual_roles_passes_cleanly(self) -> None:
+        fm = {
+            "diagram-entities": {"container": [{"id": "box1"}, {"id": "box2"}]},
+            "bindings": [
+                {
+                    "id": "bind-box1",
+                    "subject": {"kind": "entity", "id": "box1"},
+                    "correspondence_kind": "represents",
+                    "target": {"entity_id": _ENTITY_ID},
+                    "visual_role": "primary",
+                },
+                {
+                    "id": "bind-box2",
+                    "subject": {"kind": "entity", "id": "box2"},
+                    "correspondence_kind": "represents",
+                    "target": {"entity_id": _ENTITY_ID},
+                    "visual_role": "replica",
+                },
+            ],
+        }
+        r = _run(fm, allowed_bindings=_VISUAL_ROLES_ALLOWED_BINDINGS)
+        assert r.issues == []
+
+    def test_no_visual_roles_declared_skips_role_check(self) -> None:
+        fm = _fm_with_entity()
+        r = _run(fm)
+        assert "E408b" not in _codes(r)
+
+    def test_occurrence_elements_allow_distinct_occurrence_ids_without_visual_roles(self) -> None:
+        fm = {
+            "diagram-entities": {"occurrence": [{"id": "repo-left"}, {"id": "repo-right"}]},
+            "bindings": [
+                {
+                    "id": "bind-repo-left",
+                    "subject": {"kind": "entity", "id": "repo-left"},
+                    "correspondence_kind": "represents",
+                    "target": {"entity_id": _ENTITY_ID},
+                },
+                {
+                    "id": "bind-repo-right",
+                    "subject": {"kind": "entity", "id": "repo-right"},
+                    "correspondence_kind": "represents",
+                    "target": {"entity_id": _ENTITY_ID},
+                },
+            ],
+        }
+        r = _run(fm)
+        assert "E408" not in _codes(r)
+        assert "E408b" not in _codes(r)
+
+    def test_occurrence_elements_reject_duplicate_visual_roles_when_supplied(self) -> None:
+        fm = {
+            "diagram-entities": {"occurrence": [{"id": "repo-left"}, {"id": "repo-right"}]},
+            "bindings": [
+                {
+                    "id": "bind-repo-left",
+                    "subject": {"kind": "entity", "id": "repo-left"},
+                    "correspondence_kind": "represents",
+                    "target": {"entity_id": _ENTITY_ID},
+                    "visual_role": "context",
+                },
+                {
+                    "id": "bind-repo-right",
+                    "subject": {"kind": "entity", "id": "repo-right"},
+                    "correspondence_kind": "represents",
+                    "target": {"entity_id": _ENTITY_ID},
+                    "visual_role": "context",
+                },
+            ],
+        }
+        r = _run(fm)
+        assert "E408b" in _codes(r)
+        assert "E408" not in _codes(r)

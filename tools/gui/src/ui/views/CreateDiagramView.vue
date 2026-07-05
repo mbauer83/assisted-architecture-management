@@ -11,7 +11,9 @@ import EntitySelectionList from '../components/EntitySelectionList.vue'
 import EntityPickerInput from '../components/EntityPickerInput.vue'
 import DiagramTypeSelect from '../components/DiagramTypeSelect.vue'
 import DiagramTypeConfigPanel from '../components/DiagramTypeConfigPanel.vue'
-import { usePanZoom } from '../composables/usePanZoom'
+import PreviewViewport from '../components/PreviewViewport.vue'
+import ArchimateOccurrenceControls from '../components/ArchimateOccurrenceControls.vue'
+import { isArchimateDiagramType } from '../lib/archimateOccurrences'
 
 const svc = inject(modelServiceKey)!
 const route = useRoute()
@@ -34,6 +36,12 @@ const mergeDiagramEntities = (patch: Record<string, unknown>) => {
       _lastSuggestedName = suggested
     }
   }
+  preview.value = null
+  previewClean.value = false
+}
+
+const setDiagramEntities = (next: Record<string, unknown>) => {
+  diagramEntities.value = next
   preview.value = null
   previewClean.value = false
 }
@@ -199,13 +207,6 @@ const toggleExclusion = (entityId: string) => {
   previewClean.value = false
 }
 
-const previewViewport = usePanZoom(preview)
-const prevContainerRef = previewViewport.containerRef
-const prevCanvasStyle = previewViewport.canvasStyle
-const prevIsTransformed = previewViewport.isTransformed
-const prevOnMouseDown = previewViewport.startDrag
-const prevResetView = previewViewport.resetView
-
 const mergedEntityIds = () => {
   const base = includedEntities.value.map((e) => e.artifact_id)
   const mapped = (diagramEntities.value.entity_ids_mapped as string[] | undefined) ?? []
@@ -318,6 +319,17 @@ watch(diagramType, () => {
         />
 
         <div
+          v-if="isArchimateDiagramType(diagramType) && includedEntities.length"
+          class="form-row"
+        >
+          <ArchimateOccurrenceControls
+            :diagram-entities="diagramEntities"
+            :entities="includedEntities"
+            @change="setDiagramEntities"
+          />
+        </div>
+
+        <div
           v-if="uiConfig?.entity_search_filter !== false"
           class="form-row"
         >
@@ -418,32 +430,17 @@ watch(diagramType, () => {
           >
             Verification passed.
           </div>
-          <div
+          <PreviewViewport
             v-if="preview.image"
-            ref="prevContainerRef"
-            class="prev-container"
-            @mousedown="prevOnMouseDown"
-            @dblclick="prevResetView"
+            :reset-signal="preview"
           >
-            <div :style="prevCanvasStyle">
-              <img
-                :src="preview.image"
-                class="preview-img"
-                alt="Diagram preview"
-                draggable="false"
-              >
-            </div>
-            <button
-              v-if="prevIsTransformed"
-              class="reset-btn"
-              @click.stop="prevResetView"
+            <img
+              :src="preview.image"
+              class="preview-img"
+              alt="Diagram preview"
+              draggable="false"
             >
-              ⊙ Reset
-            </button>
-            <div class="zoom-hint">
-              Scroll to zoom · Drag to pan · Double-click to reset
-            </div>
-          </div>
+          </PreviewViewport>
           <div
             v-else
             class="state-msg"
@@ -540,15 +537,7 @@ watch(diagramType, () => {
 .state-err { font-size: 13px; color: #dc2626; margin-top: 6px; }
 .warn { font-size: 12px; color: #b45309; margin-bottom: 4px; }
 .preview-hint { font-size: 13px; color: #9ca3af; }
-.prev-container {
-  position: relative; overflow: hidden; cursor: grab; user-select: none;
-  background: #f8fafc; border: 1px solid #e5e7eb; border-radius: 6px; min-height: 200px;
-}
-.prev-container:active { cursor: grabbing; }
 .preview-img { max-width: none; display: block; }
-.reset-btn { position: absolute; top: 8px; right: 8px; padding: 4px 10px; background: rgba(255,255,255,.92); border: 1px solid #d1d5db; border-radius: 5px; font-size: 12px; cursor: pointer; color: #374151; }
-.reset-btn:hover { background: white; }
-.zoom-hint { position: absolute; bottom: 6px; left: 50%; transform: translateX(-50%); font-size: 11px; color: #9ca3af; background: rgba(255,255,255,.8); padding: 2px 8px; border-radius: 4px; pointer-events: none; white-space: nowrap; }
 .toggle-src { margin-top: 10px; font-size: 12px; color: #2563eb; background: none; border: none; cursor: pointer; padding: 0; }
 .toggle-src:hover { text-decoration: underline; }
 .puml-src { font-size: 11px; font-family: monospace; white-space: pre-wrap; margin-top: 8px; background: #f9fafb; border: 1px solid #e5e7eb; border-radius: 6px; padding: 10px; max-height: 400px; overflow-y: auto; }

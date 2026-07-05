@@ -21,7 +21,7 @@ class SetEdgeLabelBody(BaseModel):
 
 @router.put("/api/diagram/edge-label")
 def set_edge_label_gui(body: SetEdgeLabelBody) -> dict[str, Any]:
-    from src.infrastructure.write.artifact_write.diagram_edit import set_diagram_edge_label
+    from src.infrastructure.write.artifact_write._diagram_edge_labels import set_diagram_edge_label
 
     repo_root, _, verifier = s.get_write_deps()
     try:

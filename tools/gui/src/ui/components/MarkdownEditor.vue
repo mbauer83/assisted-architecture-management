@@ -93,6 +93,9 @@ const focusEditor = () => {
   editorView?.focus()
 }
 
+const getCursorOffset = (): number =>
+  editorView?.state.selection.main.from ?? props.modelValue.length
+
 watch(() => props.modelValue, (nextValue) => {
   if (!editorView) return
   const currentValue = editorView.state.doc.toString()
@@ -120,6 +123,7 @@ onUnmounted(destroyEditor)
 defineExpose({
   insertAtCursor,
   focusEditor,
+  getCursorOffset,
 })
 </script>
 

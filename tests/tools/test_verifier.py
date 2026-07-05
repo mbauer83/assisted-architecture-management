@@ -223,6 +223,41 @@ def _document_schema(repo: Path) -> None:
     )
 
 
+def _document_schema_with_sections(
+    repo: Path,
+    *,
+    sections: str,
+    document_required: str = "",
+) -> None:
+    schema_path = repo / ".arch-repo" / "documents" / "adr.json"
+    document_required_text = (
+        f',\n  "required_entity_type_connections": {document_required}' if document_required else ""
+    )
+    _write(
+        schema_path,
+        f"""\
+{{
+  "abbreviation": "ADR",
+  "name": "Architecture Decision Record",
+  "frontmatter_schema": {{
+    "type": "object",
+    "required": ["artifact-id", "artifact-type", "doc-type", "title", "status", "version", "last-updated"],
+    "properties": {{
+      "artifact-id": {{ "type": "string" }},
+      "artifact-type": {{ "const": "document" }},
+      "doc-type": {{ "const": "adr" }},
+      "title": {{ "type": "string" }},
+      "status": {{ "type": "string" }},
+      "version": {{ "type": "string" }},
+      "last-updated": {{ "type": "string" }}
+    }}
+  }},
+  "sections": {sections}{document_required_text}
+}}
+""",
+    )
+
+
 def _document(artifact_id: str, body: str) -> str:
     return f"""\
 ---
@@ -246,6 +281,22 @@ Decision.
 ## Consequences
 
 Consequences.
+"""
+
+
+def _document_with_body(artifact_id: str, body: str) -> str:
+    return f"""\
+---
+artifact-id: {artifact_id}
+artifact-type: document
+doc-type: adr
+title: "ADR Title"
+status: draft
+version: 0.1.0
+last-updated: '2026-04-22'
+---
+
+{body}
 """
 
 
@@ -549,6 +600,92 @@ class TestVerifyDocumentFile:
         result = verifier.verify_document_file(doc_path)
 
         assert not any(i.code == "E155" for i in result.issues), [i.message for i in result.issues]
+
+    def test_section_required_entity_connection_must_be_in_that_section(self, repo: Path) -> None:
+        _document_schema_with_sections(
+            repo,
+            sections=(
+                '[{"name": "Context", "required_entity_type_connections": ["requirement"]}, '
+                '{"name": "Decision"}, {"name": "Consequences"}]'
+            ),
+        )
+        entity_id = "REQ@1000000004.AbcDef.req"
+        info = _all_entity_types()["requirement"]
+        entity_path = repo / "model" / Path(*info.hierarchy) / f"{entity_id}.md"
+        _write(entity_path, _entity(entity_id, "requirement"))
+
+        doc_id = "ADR@1000000000.AbcDef.source"
+        doc_path = repo / "documents" / "adr" / f"{doc_id}.md"
+        _write(
+            doc_path,
+            _document_with_body(
+                doc_id,
+                "## Context\n\nNo entity links here.\n\n"
+                "## Decision\n\n"
+                f"[Requirement](../../model/{'/'.join(info.hierarchy)}/{entity_id}.md)\n\n"
+                "## Consequences\n\nConsequences.",
+            ),
+        )
+
+        verifier = ArtifactVerifier(ArtifactRegistry(shared_artifact_index(repo)), catalogs=_catalogs())
+        result = verifier.verify_document_file(doc_path)
+
+        e156_messages = [i.message for i in result.issues if i.code == "E156"]
+        assert e156_messages == [
+            "Required entity-type connection missing in section 'Context': link at least one requirement"
+        ]
+        assert not any(i.code == "E155" for i in result.issues), [i.message for i in result.issues]
+
+    def test_document_required_entity_connection_still_matches_any_section(self, repo: Path) -> None:
+        _document_schema_with_sections(
+            repo,
+            sections='[{"name": "Context"}, {"name": "Decision"}, {"name": "Consequences"}]',
+            document_required='["requirement"]',
+        )
+        entity_id = "REQ@1000000005.AbcDef.req"
+        info = _all_entity_types()["requirement"]
+        entity_path = repo / "model" / Path(*info.hierarchy) / f"{entity_id}.md"
+        _write(entity_path, _entity(entity_id, "requirement"))
+
+        doc_id = "ADR@1000000000.AbcDef.source"
+        doc_path = repo / "documents" / "adr" / f"{doc_id}.md"
+        _write(
+            doc_path,
+            _document_with_body(
+                doc_id,
+                "## Context\n\nNo entity links here.\n\n"
+                "## Decision\n\n"
+                f"[Requirement](../../model/{'/'.join(info.hierarchy)}/{entity_id}.md)\n\n"
+                "## Consequences\n\nConsequences.",
+            ),
+        )
+
+        verifier = ArtifactVerifier(ArtifactRegistry(shared_artifact_index(repo)), catalogs=_catalogs())
+        result = verifier.verify_document_file(doc_path)
+
+        assert not any(i.code == "E155" for i in result.issues), [i.message for i in result.issues]
+        assert not any(i.code == "E156" for i in result.issues), [i.message for i in result.issues]
+
+    def test_unknown_section_entity_connection_term_warns(self, repo: Path) -> None:
+        _document_schema_with_sections(
+            repo,
+            sections=(
+                '[{"name": "Context", "required_entity_type_connections": ["@not-a-real-class"]}, '
+                '{"name": "Decision"}, {"name": "Consequences"}]'
+            ),
+        )
+
+        doc_id = "ADR@1000000000.AbcDef.source"
+        doc_path = repo / "documents" / "adr" / f"{doc_id}.md"
+        _write(doc_path, _document(doc_id, "No entity links."))
+
+        verifier = ArtifactVerifier(ArtifactRegistry(shared_artifact_index(repo)), catalogs=_catalogs())
+        result = verifier.verify_document_file(doc_path)
+
+        w157_messages = [i.message for i in result.issues if i.code == "W157"]
+        assert w157_messages == [
+            "Unknown required entity-type connection term in section 'Context': not a real class (@not-a-real-class)"
+        ]
 
 
 # ---------------------------------------------------------------------------

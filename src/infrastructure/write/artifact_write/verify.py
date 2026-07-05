@@ -1,10 +1,11 @@
 import os
 import tempfile
+from collections.abc import Callable
 from pathlib import Path
 from typing import Literal
 
 from src.application.verification.artifact_verifier import ArtifactVerifier, VerificationResult
-from src.config.repo_paths import ARCH_REPO, DIAGRAM_CATALOG, DIAGRAMS, DOCS, MODEL
+from src.config.repo_paths import ARCH_REPO, DIAGRAM_CATALOG, DIAGRAMS, DOCS, MODEL, PROJECTS
 
 
 def _diagram_temp_path(tmp_root: Path, desired_name: str, support_repo_root: Path | None) -> Path:
@@ -38,7 +39,7 @@ def _document_temp_path(tmp_root: Path, desired_name: str, support_repo_root: Pa
         tmp_path.parent.mkdir(parents=True, exist_ok=True)
         return tmp_path
 
-    for top in (ARCH_REPO, MODEL):
+    for top in (ARCH_REPO, MODEL, PROJECTS):
         src = support_repo_root / top
         if src.exists():
             os.symlink(src, tmp_root / top, target_is_directory=True)
@@ -60,8 +61,14 @@ def verify_content_in_temp_path(
     desired_name: str,
     content: str,
     support_repo_root: Path | None = None,
+    verify_fn: Callable[[Path], VerificationResult] | None = None,
 ) -> VerificationResult:
-    """Verify *content* by writing it to a temp location laid out for its file type."""
+    """Verify *content* by writing it to a temp location laid out for its file type.
+
+    ``verify_fn`` overrides the file-type's default verifier method — e.g. matrix
+    diagrams share ``file_type="diagram"``'s temp layout but need
+    ``verify_matrix_diagram_file`` instead of the PUML-oriented ``verify_diagram_file``.
+    """
     tmp_root = Path(tempfile.mkdtemp(prefix=f"model-write-verify-{file_type}-"))
     if file_type == "diagram":
         tmp_path = _diagram_temp_path(tmp_root, desired_name, support_repo_root)
@@ -71,6 +78,9 @@ def verify_content_in_temp_path(
         tmp_path = tmp_root / desired_name
 
     tmp_path.write_text(content, encoding="utf-8")
+
+    if verify_fn is not None:
+        return verify_fn(tmp_path)
 
     dispatch = {
         "entity": verifier.verify_entity_file,

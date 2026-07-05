@@ -35,7 +35,6 @@ def build_diagram_scaffold(
     entities: list[EntityRecord] = []
     not_found: list[str] = []
     missing_alias: list[str] = []
-    id_set = set(entity_ids)
 
     for entity_id in entity_ids:
         entity = repo.get_entity(entity_id)
@@ -47,7 +46,8 @@ def build_diagram_scaffold(
             continue
         entities.append(entity)
 
-    connections = _selected_connections(repo=repo, entity_ids=id_set)
+    resolved_ids = {entity.artifact_id for entity in entities}
+    connections = _selected_connections(repo=repo, entity_ids=resolved_ids)
     kind_name = _scaffold_diagram_kind_name(entities)
     puml = get_diagram_type(kind_name).renderer.render_body(
         diagram_name,

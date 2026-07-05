@@ -1,164 +1,17 @@
-import os
-import re
 from collections.abc import Callable
 from pathlib import Path
-
-import yaml
 
 from src.application.identifier_allocator import get_default_allocator
 from src.application.modeling.artifact_write import format_matrix_markdown, prefix_for_diagram_type
 from src.application.verification.artifact_verifier import ArtifactRegistry, ArtifactVerifier
 from src.config.repo_paths import DIAGRAM_CATALOG, DIAGRAMS
 
+from ._diagram_group_move import commit_diagram_write
+from ._matrix_content import compose_matrix_body
 from .boundary import assert_engagement_write_root, today_iso
+from .coerce import as_optional_str_list
+from .parse_existing import parse_matrix_file
 from .types import WriteResult
-
-_ENTITY_ID_PATTERN = re.compile(r"\b([A-Z]{2,6}@\d+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+(?:\.[A-Za-z0-9_-]+)*)\b")
-
-
-def _verification_to_dict(path: Path, res) -> dict[str, object]:
-    return {
-        "path": str(path),
-        "file_type": "diagram",
-        "valid": res.valid,
-        "issues": [
-            {"severity": i.severity, "code": i.code, "message": i.message, "location": i.location} for i in res.issues
-        ],
-    }
-
-
-def _infer_entity_ids_from_matrix(markdown: str) -> list[str]:
-    found = sorted(set(_ENTITY_ID_PATTERN.findall(markdown)))
-    return found
-
-
-def _read_frontmatter(path: Path) -> dict[str, object]:
-    try:
-        content = path.read_text(encoding="utf-8")
-    except OSError:
-        return {}
-    if not content.startswith("---\n"):
-        return {}
-    end = content.find("\n---\n", 4)
-    if end == -1:
-        return {}
-    try:
-        parsed = yaml.safe_load(content[4:end])
-    except yaml.YAMLError:
-        return {}
-    return parsed if isinstance(parsed, dict) else {}
-
-
-def _display_name_from_entity_file(path: Path, artifact_id: str) -> str:
-    fm = _read_frontmatter(path)
-    name = str(fm.get("name", "")).strip()
-    if not name:
-        return artifact_id
-    return name
-
-
-def _linkify_matrix_ids(
-    *,
-    repo_root: Path,
-    registry: ArtifactRegistry,
-    matrix_markdown: str,
-    candidate_entity_ids: list[str],
-) -> tuple[str, int]:
-    """Replace plain entity IDs with relative markdown links in matrix rows."""
-
-    diagrams_dir = repo_root / DIAGRAM_CATALOG / DIAGRAMS
-    id_to_relpath: dict[str, str] = {}
-    id_to_link_text: dict[str, str] = {}
-
-    for entity_id in candidate_entity_ids:
-        p = registry.find_file_by_id(entity_id)
-        if p is None:
-            continue
-        rel = os.path.relpath(str(p), start=str(diagrams_dir)).replace("\\", "/")
-        id_to_relpath[entity_id] = rel
-        id_to_link_text[entity_id] = _display_name_from_entity_file(p, entity_id)
-
-    if not id_to_relpath:
-        return matrix_markdown, 0
-
-    replaced = 0
-
-    def repl(match: re.Match[str]) -> str:
-        nonlocal replaced
-        artifact_id = match.group(1)
-        target = id_to_relpath.get(artifact_id)
-        if target is None:
-            return artifact_id
-        link_text = id_to_link_text.get(artifact_id, artifact_id)
-        replaced += 1
-        return f"[{link_text}]({target})"
-
-    out_lines: list[str] = []
-    for line in matrix_markdown.splitlines():
-        if line.startswith("| ") and not line.startswith("|---") and "](" not in line:
-            out_lines.append(_ENTITY_ID_PATTERN.sub(repl, line))
-        else:
-            out_lines.append(line)
-
-    return "\n".join(out_lines), replaced
-
-
-def _build_diagram_id_to_relpath(*, diagrams_dir: Path, registry: ArtifactRegistry) -> dict[str, str]:
-    diagram_map: dict[str, str] = {}
-    _ = registry
-
-    if diagrams_dir.exists():
-        for p in diagrams_dir.glob("*.puml"):
-            if p.name.startswith("_"):
-                continue
-            diagram_map.setdefault(p.stem, p.name)
-        for p in diagrams_dir.glob("*.md"):
-            if p.name.startswith("_"):
-                continue
-            fm = _read_frontmatter(p)
-            artifact_id = str(fm.get("artifact-id", "")).strip()
-            if artifact_id:
-                diagram_map.setdefault(artifact_id, p.name)
-            diagram_map.setdefault(p.stem, p.name)
-
-    return diagram_map
-
-
-def _linkify_known_tokens_in_matrix_rows(
-    *,
-    matrix_markdown: str,
-    diagram_id_to_relpath: dict[str, str],
-) -> tuple[str, int]:
-    """Link known diagram artifact IDs inside plain table rows."""
-
-    if not diagram_id_to_relpath:
-        return matrix_markdown, 0
-
-    replaced = 0
-
-    def replace_token_links(line: str, mapping: dict[str, str]) -> str:
-        nonlocal replaced
-        out = line
-        for token in sorted(mapping.keys(), key=len, reverse=True):
-            pattern = re.compile(rf"\b{re.escape(token)}\b")
-
-            def _repl(m: re.Match[str], token_value: str = token) -> str:
-                nonlocal replaced
-                replaced += 1
-                return f"[{token_value}]({mapping[token_value]})"
-
-            out = pattern.sub(_repl, out)
-        return out
-
-    out_lines: list[str] = []
-    for line in matrix_markdown.splitlines():
-        if line.startswith("| ") and not line.startswith("|---") and "](" not in line:
-            linked = replace_token_links(line, diagram_id_to_relpath)
-            out_lines.append(linked)
-        else:
-            out_lines.append(line)
-
-    return "\n".join(out_lines), replaced
 
 
 def create_matrix(
@@ -181,39 +34,40 @@ def create_matrix(
     to_entity_ids: list[str] | None = None,
     conn_type_configs: list[dict[str, object]] | None = None,
     combined: bool | None = None,
+    tlp: str | None = None,
+    group: str | None = None,
     dry_run: bool = True,
 ) -> WriteResult:
+    """Create a new matrix diagram, or upsert an existing one when ``artifact_id`` is given.
+
+    When ``artifact_id`` names an already-existing matrix diagram, its real
+    on-disk location is resolved via the registry — honouring any diagram-
+    collection group it already lives in — instead of assuming the flat,
+    ungrouped path. ``group`` re-homes the file to a different diagram-
+    collection slug (moving it there on a successful write).
+    """
     assert_engagement_write_root(repo_root)
-    effective_id = artifact_id or get_default_allocator().allocate(
-        prefix=prefix_for_diagram_type("matrix"), name_hint=name
-    )
+    existing_path = registry.find_file_by_id(artifact_id) if artifact_id else None
+    if existing_path is not None:
+        # artifact_id may be the short/stale-slug form that resolved to existing_path above;
+        # canonicalize to the file's own recorded id so it isn't written back out truncated.
+        effective_id = str(parse_matrix_file(existing_path).frontmatter.get("artifact-id") or artifact_id)
+    else:
+        effective_id = artifact_id or get_default_allocator().allocate(
+            prefix=prefix_for_diagram_type("matrix"), name_hint=name
+        )
+    current_path = existing_path or (repo_root / DIAGRAM_CATALOG / DIAGRAMS / f"{effective_id}.md")
 
     last = last_updated or today_iso()
-
     warnings: list[str] = []
-    inferred_entities: list[str] = []
-    if infer_entity_ids:
-        inferred_entities = _infer_entity_ids_from_matrix(matrix_markdown)
 
-    body_markdown = matrix_markdown
-    if auto_link_entity_ids:
-        ids_for_links = inferred_entities if inferred_entities else _infer_entity_ids_from_matrix(matrix_markdown)
-        body_markdown, replaced_count = _linkify_matrix_ids(
-            repo_root=repo_root,
-            registry=registry,
-            matrix_markdown=matrix_markdown,
-            candidate_entity_ids=ids_for_links,
-        )
-
-        diagrams_dir = repo_root / DIAGRAM_CATALOG / DIAGRAMS
-        diagram_links = _build_diagram_id_to_relpath(
-            diagrams_dir=diagrams_dir,
-            registry=registry,
-        )
-        body_markdown, known_link_replacements = _linkify_known_tokens_in_matrix_rows(
-            matrix_markdown=body_markdown,
-            diagram_id_to_relpath=diagram_links,
-        )
+    body_markdown = compose_matrix_body(
+        repo_root=repo_root,
+        registry=registry,
+        matrix_markdown=matrix_markdown,
+        infer_entity_ids=infer_entity_ids,
+        auto_link_entity_ids=auto_link_entity_ids,
+    )
 
     content = format_matrix_markdown(
         artifact_id=effective_id,
@@ -230,53 +84,73 @@ def create_matrix(
         combined=combined,
     )
 
-    path = repo_root / DIAGRAM_CATALOG / DIAGRAMS / f"{effective_id}.md"
-
-    if dry_run:
-        from tempfile import TemporaryDirectory
-
-        with TemporaryDirectory(prefix="model-write-verify-matrix-") as tmp_dir:
-            tmp_path = Path(tmp_dir) / f"{artifact_id}.md"
-            tmp_path.write_text(content, encoding="utf-8")
-            res = verifier.verify_matrix_diagram_file(tmp_path)
-        return WriteResult(
-            wrote=False,
-            path=path,
-            artifact_id=effective_id,
-            content=content,
-            warnings=warnings,
-            verification=_verification_to_dict(path, res),
-        )
-
-    path.parent.mkdir(parents=True, exist_ok=True)
-    prev = path.read_text(encoding="utf-8") if path.exists() else None
-    path.write_text(content, encoding="utf-8")
-
-    res = verifier.verify_matrix_diagram_file(path)
-    if not res.valid:
-        if prev is None:
-            try:
-                path.unlink()
-            except OSError:
-                pass
-        else:
-            path.write_text(prev, encoding="utf-8")
-        return WriteResult(
-            wrote=False,
-            path=path,
-            artifact_id=effective_id,
-            content=content,
-            warnings=warnings,
-            verification=_verification_to_dict(path, res),
-        )
-
-    clear_repo_caches(path)
-
-    return WriteResult(
-        wrote=True,
-        path=path,
+    return commit_diagram_write(
+        repo_root=repo_root,
+        verifier=verifier,
+        clear_repo_caches=clear_repo_caches,
         artifact_id=effective_id,
-        content=None,
+        diagram_path=current_path,
+        diagram_type="matrix",
+        tlp=tlp,
+        group=group,
+        content=content,
         warnings=warnings,
-        verification=_verification_to_dict(path, res),
+        dry_run=dry_run,
+        verify_fn=verifier.verify_matrix_diagram_file,
+        render=False,
+    )
+
+
+def edit_matrix_metadata(
+    *,
+    repo_root: Path,
+    registry: ArtifactRegistry,
+    verifier: ArtifactVerifier,
+    clear_repo_caches: Callable[[Path], None],
+    diagram_path: Path,
+    artifact_id: str,
+    name: str | None,
+    keywords: list[str] | None,
+    version: str | None,
+    status: str | None,
+    tlp: str | None,
+    group: str | None,
+    dry_run: bool,
+) -> WriteResult:
+    """Metadata/group-only edit for an existing matrix diagram.
+
+    Preserves the existing table body and structural fields (entity-ids,
+    conn-type-configs, combined) verbatim — only frontmatter fields and the
+    file's group/location change through this path. To change table content
+    itself, call ``create_matrix`` with ``artifact_id`` set (an upsert), or
+    edit it via the GUI. ``None`` for ``keywords`` means "leave unchanged";
+    there is no way to explicitly clear keywords through this metadata-only path.
+    """
+    parsed = parse_matrix_file(diagram_path)
+    fm = parsed.frontmatter
+    raw_conn_type_configs = fm.get("conn-type-configs")
+    conn_type_configs = raw_conn_type_configs if isinstance(raw_conn_type_configs, list) else None
+    raw_combined = fm.get("combined")
+    combined = raw_combined if isinstance(raw_combined, bool) else None
+    return create_matrix(
+        repo_root=repo_root,
+        registry=registry,
+        verifier=verifier,
+        clear_repo_caches=clear_repo_caches,
+        name=name if name is not None else str(fm.get("name", "")),
+        matrix_markdown=parsed.matrix_markdown,
+        artifact_id=artifact_id,
+        keywords=keywords if keywords is not None else as_optional_str_list(fm.get("keywords")),
+        version=version if version is not None else str(fm.get("version", "0.1.0")),
+        status=status if status is not None else str(fm.get("status", "draft")),
+        entity_ids=as_optional_str_list(fm.get("entity-ids")),
+        from_entity_ids=as_optional_str_list(fm.get("from-entity-ids")),
+        to_entity_ids=as_optional_str_list(fm.get("to-entity-ids")),
+        conn_type_configs=conn_type_configs,
+        combined=combined,
+        infer_entity_ids=False,
+        auto_link_entity_ids=False,
+        tlp=tlp,
+        group=group,
+        dry_run=dry_run,
     )

@@ -61,15 +61,26 @@ BASE_DOCUMENT_SCHEMAS: dict[str, dict] = {
                 "applies_to": {"type": "array", "items": {"type": "string"}},
             },
         },
-        "required_sections": ["Scope", "Motivation", "Summary", "Specification"],
-        "section_templates": {
-            "Scope": "State what this standard applies to and any explicit exclusions.\n",
-            "Motivation": "Explain why this standard is needed.\n",
-            "Summary": "Summarise the standard in 2-3 sentences.\n",
-            "Specification": "Provide the normative specification with SHALL/SHOULD/MAY guidance.\n",
-        },
-        "required_entity_type_connections": ["requirement"],
-        "suggested_entity_type_connections": ["principle", "goal"],
+        "sections": [
+            {
+                "name": "Scope",
+                "template": "State what this standard applies to and any explicit exclusions.\n",
+            },
+            {
+                "name": "Motivation",
+                "template": "Explain why this standard is needed.\n",
+                "suggested_entity_type_connections": ["principle", "goal"],
+            },
+            {
+                "name": "Summary",
+                "template": "Summarise the standard in 2-3 sentences.\n",
+            },
+            {
+                "name": "Specification",
+                "template": "Provide the normative specification with SHALL/SHOULD/MAY guidance.\n",
+                "required_entity_type_connections": ["requirement"],
+            },
+        ],
     },
 }
 

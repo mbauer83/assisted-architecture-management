@@ -210,8 +210,9 @@ def group_fn_entity(entity_path: Path, repo_root: Path) -> str:
 def group_fn_diagram(diagram_path: Path, repo_root: Path) -> str:
     """Derive the diagram-collection group slug from a diagram source path.
 
-    Legacy  : diagram-catalog/diagrams/<file>            → "uncategorized"
-    Target  : diagram-catalog/diagrams/<collection>/<file> → collection
+    Legacy  : diagram-catalog/diagrams/<file>                          → "uncategorized"
+    Target  : diagram-catalog/diagrams/<collection>/<file>             → collection
+    Confidential : diagram-catalog/diagrams/confidential/<collection>/<file> → collection
     """
     src_root = diagram_source_root(repo_root)
     try:
@@ -220,6 +221,8 @@ def group_fn_diagram(diagram_path: Path, repo_root: Path) -> str:
         return UNCATEGORIZED
 
     parts = rel.parts
+    if parts and parts[0] == CONFIDENTIAL_DIAGRAMS:
+        return parts[1] if len(parts) >= 3 else UNCATEGORIZED
     if len(parts) >= 2:
         return parts[0]  # collection segment
     return UNCATEGORIZED

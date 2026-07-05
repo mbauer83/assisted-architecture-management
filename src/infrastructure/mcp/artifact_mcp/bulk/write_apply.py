@@ -196,6 +196,7 @@ def _apply_single_edit(
             keywords=item["keywords"] if "keywords" in item else _ENTITY_UNSET,
             version=item.get("version"),
             status=item.get("status"),
+            group=item.get("group"),
             dry_run=False,
         )
     source_entity = expand_artifact_id(registry, str(item["source_entity"]))

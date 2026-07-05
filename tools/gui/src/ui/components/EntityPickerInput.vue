@@ -4,6 +4,7 @@ import { Effect, Exit } from 'effect'
 import { modelServiceKey } from '../keys'
 import { useEntityFilters } from '../composables/useEntityFilters'
 import type { EntityDisplayInfo, ReferenceSearchHit } from '../../domain'
+import { entityDisplayInfoToHit } from './EntityPickerInput.helpers'
 import ArchimateTypeGlyph from './ArchimateTypeGlyph.vue'
 import { toGlyphKey } from '../lib/glyphKey'
 import {
@@ -34,12 +35,16 @@ const query = ref('')
 const results = ref<ReferenceSearchHit[]>([])
 const open = ref(false)
 const busy = ref(false)
+const loadingMore = ref(false)
+const nextCursor = ref<string | null>(null)
 const activeResultIdx = ref(-1)
 const inputRef = ref<HTMLInputElement | null>(null)
 const wrapRef = ref<HTMLElement | null>(null)
 const chipRowRef = ref<HTMLElement | null>(null)
 const navRef = ref<HTMLElement | null>(null)
+const sentinelRef = ref<HTMLLIElement | null>(null)
 let timer: ReturnType<typeof setTimeout> | null = null
+let sentinelObserver: IntersectionObserver | null = null
 
 // ── Dropdown positioning (fixed to viewport so it never extends page height) ──
 
@@ -72,6 +77,7 @@ watch(open, (isOpen) => {
 onUnmounted(() => {
   window.removeEventListener('scroll', computeDropPos, true)
   window.removeEventListener('resize', computeDropPos)
+  sentinelObserver?.disconnect()
 })
 
 // ── Stage ──────────────────────────────────────────────────────────────────────
@@ -108,46 +114,41 @@ const summaryParts = computed(() => {
 
 // ── Search ─────────────────────────────────────────────────────────────────────
 
+const acceptHits = (items: readonly EntityDisplayInfo[]): ReferenceSearchHit[] =>
+  items.map(entityDisplayInfoToHit).filter(r =>
+    !props.excludedIds?.has(r.artifact_id)
+    && (!props.acceptedTypes || props.acceptedTypes.has(String(r.artifact_type))),
+  )
+
+const searchParams = (cursor?: string) => ({
+  query: query.value.trim() || '',
+  limit: 30,
+  diagramType: props.diagramType,
+  domains: effectiveDomains.value.length ? effectiveDomains.value : undefined,
+  entityTypes: effectiveEntityTypes.value.length ? effectiveEntityTypes.value : undefined,
+  cursor,
+})
+
 const doSearch = async () => {
   busy.value = true
-  if (props.diagramType) {
-    const exit = await Effect.runPromiseExit(svc.searchEntityDisplay(query.value.trim() || '', 30, props.diagramType))
-    busy.value = false
-    if (Exit.isSuccess(exit)) {
-      const hits: ReferenceSearchHit[] = exit.value.map((entity) => ({
-        artifact_id: entity.artifact_id,
-        record_type: 'entity',
-        name: entity.name,
-        status: entity.status,
-        path: '',
-        artifact_type: entity.artifact_type,
-        domain: entity.domain,
-      }))
-      results.value = hits.filter(r =>
-        !props.excludedIds?.has(r.artifact_id)
-        && (!props.acceptedTypes || props.acceptedTypes.has(String(r.artifact_type))),
-      )
-      activeResultIdx.value = -1
-    }
-    return
-  }
-
-  const exit = await Effect.runPromiseExit(
-    svc.searchReferenceArtifacts({
-      q: query.value.trim() || undefined,
-      kind: 'entity',
-      domains: effectiveDomains.value.length ? effectiveDomains.value : undefined,
-      entity_types: effectiveEntityTypes.value.length ? effectiveEntityTypes.value : undefined,
-      limit: 30,
-    }),
-  )
+  nextCursor.value = null
+  const exit = await Effect.runPromiseExit(svc.searchEntityDisplay(searchParams()))
   busy.value = false
   if (Exit.isSuccess(exit)) {
-    results.value = exit.value.hits.filter(r =>
-      !props.excludedIds?.has(r.artifact_id)
-      && (!props.acceptedTypes || props.acceptedTypes.has(String(r.artifact_type))),
-    )
+    results.value = acceptHits(exit.value.items)
+    nextCursor.value = exit.value.next_cursor
     activeResultIdx.value = -1
+  }
+}
+
+const loadMore = async () => {
+  if (!nextCursor.value || loadingMore.value) return
+  loadingMore.value = true
+  const exit = await Effect.runPromiseExit(svc.searchEntityDisplay(searchParams(nextCursor.value)))
+  loadingMore.value = false
+  if (Exit.isSuccess(exit)) {
+    results.value = [...results.value, ...acceptHits(exit.value.items)]
+    nextCursor.value = exit.value.next_cursor
   }
 }
 
@@ -155,6 +156,16 @@ const scheduleSearch = () => {
   if (timer) clearTimeout(timer)
   timer = setTimeout(() => void doSearch(), 200)
 }
+
+watch(sentinelRef, (el) => {
+  sentinelObserver?.disconnect()
+  sentinelObserver = null
+  if (!el) return
+  sentinelObserver = new IntersectionObserver((entries) => {
+    if (entries[0]?.isIntersecting) void loadMore()
+  })
+  sentinelObserver.observe(el)
+})
 
 const openDropdown = () => {
   currentStage.value = initialStage.value
@@ -448,6 +459,14 @@ watch([selectedDomains, selectedEntityTypes], scheduleSearch)
           <span class="ep-name">{{ r.name }}</span>
           <span class="ep-meta">{{ r.artifact_type ?? r.record_type }} · {{ r.domain }}</span>
         </li>
+        <li
+          v-if="nextCursor"
+          ref="sentinelRef"
+          class="ep-sentinel"
+          aria-hidden="true"
+        >
+          {{ loadingMore ? 'Loading more…' : '' }}
+        </li>
       </ul>
       <div
         v-else
@@ -502,6 +521,7 @@ watch([selectedDomains, selectedEntityTypes], scheduleSearch)
 .ep-results { margin: 0; padding: 4px 0; list-style: none; }
 .ep-result { display: flex; align-items: center; gap: 8px; padding: 7px 10px; cursor: pointer; outline: none; }
 .ep-result:hover, .ep-result:focus, .ep-result--hi { background: #eff6ff; }
+.ep-sentinel { height: 24px; font-size: 11px; color: #9ca3af; text-align: center; line-height: 24px; }
 .ep-glyph { flex-shrink: 0; color: #4b5563; display: flex; align-items: center; }
 .ep-name { flex: 1; font-weight: 500; font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .ep-meta { font-size: 11px; color: #9ca3af; white-space: nowrap; }

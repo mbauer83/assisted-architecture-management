@@ -63,13 +63,17 @@ def compute_group_mapping(
     available_enterprise_groups: all enterprise model-project groups (slug, id, name).
     """
     from src.application.group_registry import load_group_registry  # noqa: PLC0415
+    from src.application.modeling.artifact_write import slugify  # noqa: PLC0415
     from src.application.repo_path_helpers import group_fn_entity  # noqa: PLC0415
+    from src.domain.artifact_types import infer_engagement_label
+    from src.domain.groups import UNCATEGORIZED
 
     eng_reg = load_group_registry(engagement_root)
     ent_reg = load_group_registry(enterprise_root)
 
     ent_by_id = {e.id: e for e in ent_reg.model_projects}
     ent_by_slug = {e.slug: e for e in ent_reg.model_projects}
+    engagement_label = slugify(infer_engagement_label(engagement_root, scope="engagement"))
 
     seen: set[str] = set()
     mapping: list[GroupMappingEntry] = []
@@ -105,11 +109,19 @@ def compute_group_mapping(
                 enterprise_group_id=ent_e.id,
             ))
         else:
+            # Default a brand-new enterprise group to an engagement-qualified slug rather
+            # than the bare engagement-local slug: two engagements independently naming a
+            # group "assurance" must not silently collide/merge in the shared enterprise
+            # namespace. UNCATEGORIZED is the absence of grouping, not a theme — leave it
+            # unqualified. The promoting user can still override via
+            # update_enterprise_groups()'s group_mapping_resolutions to merge into an
+            # existing enterprise group when that's genuinely intended.
+            default_slug = slug if slug == UNCATEGORIZED else f"{engagement_label}-{slug}"
             mapping.append(GroupMappingEntry(
                 engagement_slug=slug,
                 engagement_group_id=eng_id,
                 match_status="new",
-                enterprise_slug=slug,
+                enterprise_slug=default_slug,
                 enterprise_group_id=None,
             ))
 

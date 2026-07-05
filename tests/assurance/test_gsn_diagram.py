@@ -271,7 +271,8 @@ def test_native_svg_uses_standard_shapes_and_accessibility() -> None:
     assert solution is not None
     context = groups["C1"].find("svg:rect", ns)
     assert context is not None
-    assert float(context.get("rx", "0")) * 2 == float(context.get("height", "0"))
+    rx, height = float(context.get("rx", "0")), float(context.get("height", "0"))
+    assert 0 < rx < height / 2, "context must be a rounded rectangle, not a pill"
     assert groups["U1"].find("svg:polygon", ns) is not None
     assert groups["A1"].find("svg:ellipse", ns) is not None
     assert groups["J1"].find("svg:ellipse", ns) is not None

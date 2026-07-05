@@ -107,6 +107,23 @@ class TestNormalizeBindings:
         result = normalize_bindings(entities, None)
         assert result == []
 
+    def test_backing_entity_id_produces_occurrence_binding(self) -> None:
+        entities: dict[str, object] = {
+            "occurrence": [
+                {
+                    "id": "repo-left",
+                    "backing_entity_id": "BOB@1.a.enterprise-repository",
+                    "visual_role": "left-context",
+                }
+            ]
+        }
+        result = normalize_bindings(entities, None)
+        assert len(result) == 1
+        assert result[0].id == "bind-repo-left"
+        assert result[0].subject.id == "repo-left"
+        assert result[0].target.entity_id == "BOB@1.a.enterprise-repository"
+        assert result[0].visual_role == "left-context"
+
     def test_multiple_entity_types(self) -> None:
         entities: dict[str, object] = {
             "person": [{"id": "usr-1", "label": "User", "binding": {"target": {"entity_id": "ACT@1.a.User"}}}],
