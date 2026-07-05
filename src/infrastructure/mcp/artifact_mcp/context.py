@@ -21,11 +21,16 @@ from src.application.read_models import ReadModelVersion
 from src.application.verification.artifact_verifier import ArtifactRegistry, ArtifactVerifier
 from src.config.repo_paths import MODEL
 from src.config.workspace_paths import resolve_workspace_repo_roots
-from src.infrastructure.artifact_index import shared_artifact_index
+from src.infrastructure.artifact_index import notify_paths_changed, shared_artifact_index
 from src.infrastructure.artifact_index.coordination import (
     publish_authoritative_mutation,
     publish_background_refresh_completed,
     wait_for_write_queue_drain,
+)
+from src.infrastructure.mcp.artifact_mcp._background_refresh_queue import (
+    REFRESH_DEBOUNCE_S,
+    queue_for,
+    refresh_worker,
 )
 
 RepoPreset = Literal[
@@ -203,10 +208,18 @@ def _refresh_repo_now(roots: list[Path]) -> ReadModelVersion:
 
 
 def _apply_paths_now(roots: list[Path], paths: list[Path]) -> ReadModelVersion:
-    index = shared_artifact_index(roots)
-    version = index.apply_file_changes(paths)
+    # Broadcasting via notify_paths_changed (not calling index.apply_file_changes directly)
+    # is load-bearing: `roots` reflects only *this* caller's scope (e.g. engagement-only for
+    # edit_tools.py), but other live cached ArtifactIndex singletons for overlapping physical
+    # repos (e.g. the engagement+enterprise-combined index the REST/GUI layer holds) must see
+    # this write too, or they silently serve a stale existence check until a manual reindex —
+    # notify_paths_changed already applies changes to every registered index whose mounts
+    # overlap the given paths (see bootstrap.py), so it is the correct universal write-commit
+    # hook, not just the git-sync hook it also used to look like.
+    index = shared_artifact_index(roots)  # ensures this scope's index exists/is registered
+    notify_paths_changed(paths)
     registry_cached.cache_clear()
-    return version
+    return index.read_model_version()
 
 
 
@@ -247,7 +260,7 @@ def enqueue_background_refresh(
     full_refresh: bool,
 ) -> None:
     roots = _normalize_roots(repo_roots)
-    queue = _queue_for(roots)
+    queue = queue_for(roots_key(roots))
     with queue.cond:
         if full_refresh:
             queue.pending_full = True
@@ -256,11 +269,14 @@ def enqueue_background_refresh(
             if queue.pending_paths is None:
                 queue.pending_paths = set()
             queue.pending_paths.update(path.resolve() for path in changed_paths)
-        queue.next_due_monotonic = time.monotonic() + _REFRESH_DEBOUNCE_S
+        queue.next_due_monotonic = time.monotonic() + REFRESH_DEBOUNCE_S
         if queue.worker is None or not queue.worker.is_alive():
             queue.worker = threading.Thread(
-                target=_refresh_worker,
-                args=(roots, queue),
+                target=refresh_worker,
+                args=(
+                    roots, queue, _refresh_repo_now, _apply_paths_now,
+                    wait_for_write_queue_drain, publish_background_refresh_completed,
+                ),
                 daemon=True,
                 name=f"model-refresh:{roots_key(roots)}",
             )
@@ -294,59 +310,6 @@ def authoritative_callbacks_for(
 ) -> tuple[AuthoritativeMutationContext, Callable[[Path], None]]:
     context = mutation_context_for(root_or_roots)
     return context, context.record_changed
-
-
-@dataclass
-class _RefreshQueue:
-    cond: threading.Condition
-    pending_full: bool = False
-    pending_paths: set[Path] | None = None
-    next_due_monotonic: float = 0.0
-    worker: threading.Thread | None = None
-
-
-_queues: dict[str, _RefreshQueue] = {}
-_queues_mu = threading.Lock()
-_REFRESH_DEBOUNCE_S = 0.20
-
-
-def _queue_for(roots: list[Path]) -> _RefreshQueue:
-    key = roots_key(roots)
-    with _queues_mu:
-        queue = _queues.get(key)
-        if queue is None:
-            queue = _RefreshQueue(cond=threading.Condition(), pending_paths=set())
-            _queues[key] = queue
-        return queue
-
-
-def _refresh_worker(roots: list[Path], queue: _RefreshQueue) -> None:
-    while True:
-        with queue.cond:
-            while not queue.pending_full and not queue.pending_paths:
-                queue.worker = None
-                return
-            delay = max(0.0, queue.next_due_monotonic - time.monotonic())
-            if delay > 0:
-                queue.cond.wait(timeout=delay)
-                continue
-            pending_full = queue.pending_full
-            pending_paths = sorted(queue.pending_paths or [])
-            queue.pending_full = False
-            queue.pending_paths = set()
-        wait_for_write_queue_drain()
-        if pending_full:
-            version = _refresh_repo_now(roots)
-            publish_background_refresh_completed(roots, full_refresh=True, changed_paths=[], version=version)
-            continue
-        if pending_paths:
-            version = _apply_paths_now(roots, pending_paths)
-            publish_background_refresh_completed(
-                roots,
-                full_refresh=False,
-                changed_paths=pending_paths,
-                version=version,
-            )
 
 
 def sync_refresh_for_roots(root_or_roots: Path | list[Path]) -> None:

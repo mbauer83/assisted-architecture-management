@@ -25,6 +25,7 @@ from functools import lru_cache as _lru_cache
 from src.application.artifact_query import ArtifactRepository
 from src.application.entity_type_predicates import is_internal_entity_type
 from src.domain.artifact_types import ConnectionRecord, DiagramRecord, DocumentRecord, EntityRecord, SearchHit
+from src.infrastructure.artifact_index import notify_paths_changed
 from src.infrastructure.artifact_index.coordination import publish_authoritative_mutation
 
 
@@ -290,7 +291,14 @@ def clear_caches(path: Path | list[Path]) -> None:
         repo = _repo
     if repo is not None:
         changed_paths = path if isinstance(path, list) else [path]
-        version = repo.apply_file_changes(changed_paths)
+        # notify_paths_changed (not repo.apply_file_changes) updates every live cached
+        # ArtifactIndex singleton whose mounts overlap these paths — not just this REST
+        # layer's own engagement+enterprise-combined index. MCP write tools resolve a
+        # narrower, engagement-only index for the same physical repo; without this broadcast
+        # their existence checks (e.g. artifact_delete_entity) would keep serving stale state
+        # for anything created/changed through the GUI until a manual admin reindex.
+        notify_paths_changed(changed_paths)
+        version = repo.read_model_version()
         roots = configured_roots()
         if roots:
             publish_authoritative_mutation(roots, changed_paths=changed_paths, version=version)

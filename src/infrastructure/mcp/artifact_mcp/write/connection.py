@@ -46,7 +46,10 @@ def _add_connection_impl(
     verifier = verifier_for(both_key, include_registry=True)
     eng_root = both_roots[0]
     if clear_repo_caches is None:
-        _context, clear_repo_caches = authoritative_callbacks_for(eng_root)
+        # Notification scope must match the scope validation ran against (both_roots) — an
+        # engagement-only mutation context here previously left the combined-scope index this
+        # call just validated against un-notified of its own write.
+        _context, clear_repo_caches = authoritative_callbacks_for(both_roots)
 
     source_entity = expand_artifact_id(registry, source_entity)
     target_entity = expand_artifact_id(registry, target_entity)
@@ -152,7 +155,7 @@ def artifact_add_connection(
     """
     scope: Literal["engagement", "both"] = "engagement" if repo_root else "both"
     roots = resolve_repo_roots(repo_scope=scope, repo_root=repo_root, repo_preset=None, enterprise_root=None)
-    mutation_context, clear_repo_caches = authoritative_callbacks_for(roots[0])
+    mutation_context, clear_repo_caches = authoritative_callbacks_for(roots)
 
     if from_diagram_element and str(from_diagram_element.get("diagram_element_kind", "connection")) == "connection":
         from src.infrastructure.write.artifact_write.materialization import (  # noqa: PLC0415
