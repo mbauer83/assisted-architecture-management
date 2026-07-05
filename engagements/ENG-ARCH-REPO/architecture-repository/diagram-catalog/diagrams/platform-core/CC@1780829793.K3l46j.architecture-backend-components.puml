@@ -49,6 +49,8 @@ entity-ids-used:
 - APP@1782080485.uTC8zx.assurance-write-queue
 - APP@1782080489.XWVKAX.assurance-read-connection-pool
 - APP@1782080499.KqDjXG.unified-assurance-diagram-surface
+- DOB@1783266368.4f-C9z.canonical-per-repo-artifact-index
+- FNC@1783266393.4zLFys.compose-combined-scope-read
 connection-ids-used:
 - APP@1712870400.ca3vm7.model-verifier---APP@1712870400.YOOEbL.frontmatter-parser@@archimate-serving
 - APP@1712870400.ca3vm7.model-verifier---APP@1776149382.lmO0mp.gui-authoring-tool@@archimate-serving
@@ -124,6 +126,8 @@ connection-ids-used:
 - FNC@1777399927.hbgFU3---DOB@1777399929.hhYsiw@@archimate-access
 - FNC@1781705395.halAQt---APP@1776149382.lmO0mp@@archimate-association
 - FNC@1782080495.afm5YF---DOB@1780656431.ApaPcg@@archimate-access
+- APP@1777293133.OYEmP1---DOB@1783266368.4f-C9z@@archimate-access
+- FNC@1783266393.4zLFys---DOB@1783266368.4f-C9z@@archimate-access
 diagram-entities: {}
 bindings:
 - id: bind-scope
@@ -167,6 +171,7 @@ System_Boundary(APP_OYEmP1, "Architecture Backend") {
   Component(APP_XWVKAX, "Assurance Read Connection Pool", "")
   Component(APP_KqDjXG, "Unified Assurance Diagram Surface", "")
   Component(FNC_3ZsfnT, "Broadcast Model Update", "")
+  Component(FNC_4zLFys, "Compose Combined-Scope Read", "")
   APP_JOmFWy -[hidden]right- APP_YOOEbL
   APP_YOOEbL -[hidden]right- APP_ca3vm7
   APP_ca3vm7 -[hidden]right- APP_kRZYOA
@@ -187,6 +192,7 @@ System_Boundary(APP_OYEmP1, "Architecture Backend") {
   APP_uTC8zx -[hidden]right- APP_XWVKAX
   APP_XWVKAX -[hidden]right- APP_KqDjXG
   APP_KqDjXG -[hidden]right- FNC_3ZsfnT
+  FNC_3ZsfnT -[hidden]right- FNC_4zLFys
 
 }
 
@@ -207,6 +213,7 @@ System_Ext(DOB_zynRsm, "Rendered Diagram")
 System_Ext(DOB_hhYsiw, "Staged Repository")
 System_Ext(DOB_hExrX3, "Operation Record")
 System_Ext(DOB_ApaPcg, "Assurance Knowledge Base")
+System_Ext(DOB_4f_C9z, "Canonical Per-Repo Artifact Index")
 
 APP_OYEmP1 -[hidden]right- APP_lmO0mp
 APP_lmO0mp -[hidden]right- APP_Ne0utf
@@ -225,6 +232,7 @@ DOB_4dO6js -[hidden]right- DOB_zynRsm
 DOB_zynRsm -[hidden]right- DOB_hhYsiw
 DOB_hhYsiw -[hidden]right- DOB_hExrX3
 DOB_hExrX3 -[hidden]right- DOB_ApaPcg
+DOB_ApaPcg -[hidden]right- DOB_4f_C9z
 
 
 APP_yNhgdh --> APP_JOmFWy : uses
@@ -250,6 +258,7 @@ APP_iu_kKL --> APP_OYEmP1 : uses
 APP_js9xHR --> APP_OYEmP1 : uses
 APP_OYEmP1 --> DOB_3rilik : accesses
 APP_OYEmP1 --> DOB_I9qEoI : accesses
+APP_OYEmP1 --> DOB_4f_C9z : accesses
 APP_tY3JIK --> DOB_I9qEoI : accesses
 APP_yaxrWl --> DOB_4Z28xK : accesses
 APP_yaxrWl --> DOB_zynRsm : accesses
@@ -262,4 +271,5 @@ APP_uTC8zx --> DOB_ApaPcg : accesses
 APP_XWVKAX --> DOB_ApaPcg : accesses
 APP_KqDjXG --> DOB_ApaPcg : accesses
 APP_lmO0mp --> FNC_3ZsfnT : uses
+FNC_4zLFys --> DOB_4f_C9z : accesses
 @enduml
