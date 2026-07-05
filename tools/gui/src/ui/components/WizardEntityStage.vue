@@ -1,0 +1,254 @@
+<script setup lang="ts">
+import { inject, ref, computed, watch } from 'vue'
+import { Effect } from 'effect'
+import { modelServiceKey } from '../keys'
+import type { useWizardSession, WizardSuggestion } from '../composables/useWizardSession'
+import { useSuggestionCommit } from '../composables/useSuggestionCommit'
+import type { AuthoringGuidance, EntityDisplayInfo } from '../../domain'
+import WizardEntityForm from './WizardEntityForm.vue'
+import WizardConnectionSuggestions from './WizardConnectionSuggestions.vue'
+import EntityPickerInput from './EntityPickerInput.vue'
+import { entityTypesForDomain } from './WizardDomainStage.helpers'
+import { legalConnectionPairs, buildWizardSuggestions } from '../lib/wizardSuggestions'
+import { readErrorMessage } from '../lib/errors'
+
+/**
+ * Create-or-find one entity of `entityType`, then surface ranked connection suggestions for it.
+ * Shared by the free-choice hub (`WizardDomainStage.vue`) and the guided questionnaire
+ * (`WizardQuestionnaireStage.vue`) — the only difference between those two callers is what
+ * happens on `done` (reset to type-choice vs. advance to the next question) and, for the
+ * questionnaire, which prior entities count as graph-proximity anchors.
+ */
+const props = defineProps<{
+  entityType: string
+  domain: string
+  guidance: AuthoringGuidance | null
+  session: ReturnType<typeof useWizardSession>
+  /** Entity ids from earlier in a guided sequence — biases suggestion ranking toward entities
+   * already connected to them (the "spine" a questionnaire is building). */
+  proximityAnchors?: string[]
+  doneLabel?: string
+}>()
+/** `entity` is set when the user completed a create/find this step, null on plain cancel — a
+ * guided sequence needs to tell "advance" from "abandon this question" apart. */
+const emit = defineEmits<{ done: [entity: { id: string; name: string } | null] }>()
+
+const svc = inject(modelServiceKey)!
+
+const subMode = ref<'create' | 'find'>('create')
+
+interface ActiveEntity { id: string; name: string; type: string; wasCreated: boolean }
+const activeEntity = ref<ActiveEntity | null>(null)
+const suggestionsLoading = ref(false)
+const suggestionsError = ref<string | null>(null)
+const commitError = ref<string | null>(null)
+const busy = ref(false)
+const suggestionCommit = useSuggestionCommit(props.session)
+const anyBusy = computed(() => busy.value || suggestionCommit.busy.value)
+const anyError = computed(() => commitError.value ?? suggestionCommit.error.value)
+
+const activeSuggestions = computed<WizardSuggestion[]>(() => {
+  if (!activeEntity.value) return []
+  const id = activeEntity.value.id
+  return props.session.state.pendingSuggestions.filter((s) => s.sourceId === id || s.targetId === id)
+})
+
+const resetActiveEntity = () => {
+  activeEntity.value = null
+  subMode.value = 'create'
+  commitError.value = null
+}
+
+async function proximityNeighborIds(entityId: string): Promise<Set<string>> {
+  const anchors = [entityId, ...(props.proximityAnchors ?? [])]
+  try {
+    const discovery = await Effect.runPromise(svc.discoverDiagramEntities({ includedEntityIds: anchors, maxHops: 1 }))
+    const ids = new Set<string>()
+    for (const group of discovery.suggested_entities) for (const item of group.items) ids.add(item.artifact_id)
+    return ids
+  } catch {
+    return new Set()
+  }
+}
+
+async function loadSuggestionsFor(entity: ActiveEntity) {
+  const typeGuidance = entityTypesForDomain(props.guidance, props.domain).find((t) => t.name === entity.type)
+    ?? props.guidance?.entity_types?.find((t) => t.name === entity.type)
+  if (!typeGuidance) return
+  suggestionsLoading.value = true
+  suggestionsError.value = null
+  try {
+    const pairs = legalConnectionPairs(typeGuidance.permitted_connections)
+    const targetTypes = [...new Set(pairs.map((p) => p.targetType))]
+    const candidatesByTargetType = new Map<string, EntityDisplayInfo[]>()
+    for (const targetType of targetTypes) {
+      const result = await Effect.runPromise(
+        svc.searchEntityDisplay({ query: '', limit: 20, entityTypes: [targetType] }),
+      )
+      candidatesByTargetType.set(targetType, result.items.filter((item) => item.artifact_id !== entity.id))
+    }
+    const proximity = await proximityNeighborIds(entity.id)
+    const suggestions = buildWizardSuggestions(
+      { id: entity.id, name: entity.name, domain: props.domain },
+      pairs,
+      candidatesByTargetType,
+      5,
+      proximity,
+    )
+    for (const suggestion of suggestions) props.session.queueSuggestion(suggestion)
+  } catch (error: unknown) {
+    suggestionsError.value = readErrorMessage(error)
+  } finally {
+    suggestionsLoading.value = false
+  }
+}
+
+const onEntityCreated = (result: { artifactId: string; name: string }) => {
+  const entity: ActiveEntity = { id: result.artifactId, name: result.name, type: props.entityType, wasCreated: true }
+  activeEntity.value = entity
+  props.session.recordCreated({
+    artifactId: entity.id, artifactType: entity.type, domain: props.domain, name: entity.name,
+  })
+  void loadSuggestionsFor(entity)
+}
+
+const onEntityFound = (entity: EntityDisplayInfo) => {
+  const found: ActiveEntity = { id: entity.artifact_id, name: entity.name, type: entity.artifact_type, wasCreated: false }
+  activeEntity.value = found
+  void loadSuggestionsFor(found)
+}
+
+const undoActiveEntity = () => {
+  if (!activeEntity.value?.wasCreated) return
+  busy.value = true
+  void Effect.runPromise(svc.deleteEntity({ artifact_id: activeEntity.value.id, dry_run: false }))
+    .then(() => {
+      if (activeEntity.value) props.session.undoCreated(activeEntity.value.id)
+      activeEntity.value = null
+      busy.value = false
+    })
+    .catch((error: unknown) => {
+      commitError.value = readErrorMessage(error)
+      busy.value = false
+    })
+}
+
+const acceptSuggestion = (suggestion: WizardSuggestion) =>
+  suggestionCommit.accept(suggestion, (id) => props.session.dismissSuggestion(id))
+
+const dismissSuggestion = (id: string) => props.session.dismissSuggestion(id)
+const laterSuggestion = (id: string) => props.session.deferToReviewLater(id)
+
+watch(() => props.entityType, resetActiveEntity)
+defineExpose({ resetActiveEntity })
+</script>
+
+<template>
+  <div class="entity-stage">
+    <div
+      v-if="!activeEntity"
+      class="mode-toggle"
+    >
+      <button
+        type="button"
+        class="mode-btn"
+        :class="{ 'mode-btn--active': subMode === 'create' }"
+        @click="subMode = 'create'"
+      >
+        Create new {{ entityType }}
+      </button>
+      <button
+        type="button"
+        class="mode-btn"
+        :class="{ 'mode-btn--active': subMode === 'find' }"
+        @click="subMode = 'find'"
+      >
+        Find existing {{ entityType }}
+      </button>
+    </div>
+
+    <WizardEntityForm
+      v-if="!activeEntity && subMode === 'create'"
+      :entity-type="entityType"
+      @created="onEntityCreated"
+      @cancel="emit('done', null)"
+    />
+    <EntityPickerInput
+      v-if="!activeEntity && subMode === 'find'"
+      :fixed-entity-types="[entityType]"
+      placeholder="Search for an existing entity…"
+      @select="onEntityFound"
+    />
+
+    <div
+      v-if="activeEntity"
+      class="active-entity"
+    >
+      <p class="active-entity-label">
+        {{ activeEntity.wasCreated ? 'Created' : 'Found' }}: <strong>{{ activeEntity.name }}</strong>
+        <button
+          v-if="activeEntity.wasCreated"
+          type="button"
+          class="btn-link btn-link--danger"
+          :disabled="anyBusy"
+          @click="undoActiveEntity"
+        >
+          Undo
+        </button>
+      </p>
+
+      <div
+        v-if="anyError"
+        class="state-msg state-msg--error"
+      >
+        {{ anyError }}
+      </div>
+
+      <h3 class="suggestions-title">
+        Connections
+      </h3>
+      <p
+        v-if="suggestionsLoading"
+        class="state-msg"
+      >
+        Looking for likely connections…
+      </p>
+      <p
+        v-else-if="suggestionsError"
+        class="state-msg state-msg--error"
+      >
+        {{ suggestionsError }}
+      </p>
+      <WizardConnectionSuggestions
+        v-else
+        :suggestions="activeSuggestions"
+        :busy="anyBusy"
+        @accept="acceptSuggestion"
+        @dismiss="dismissSuggestion"
+        @later="laterSuggestion"
+      />
+
+      <button
+        type="button"
+        class="btn-link"
+        @click="emit('done', activeEntity)"
+      >
+        {{ doneLabel ?? '+ Add another entity to this domain' }}
+      </button>
+    </div>
+  </div>
+</template>
+
+<style scoped>
+.entity-stage { display: flex; flex-direction: column; gap: 14px; }
+.mode-toggle { display: flex; gap: 8px; }
+.mode-btn { padding: 6px 14px; border-radius: 6px; border: 1px solid #d1d5db; background: #fff; font-size: 13px; cursor: pointer; }
+.mode-btn--active { background: #2563eb; color: #fff; border-color: #2563eb; }
+.active-entity { display: flex; flex-direction: column; gap: 10px; border-top: 1px solid #f3f4f6; padding-top: 12px; }
+.active-entity-label { font-size: 13px; color: #374151; }
+.suggestions-title { font-size: 13px; font-weight: 600; margin: 0; color: #374151; }
+.btn-link { align-self: flex-start; background: none; border: none; color: #2563eb; cursor: pointer; padding: 0; font-size: 12px; text-decoration: underline; }
+.btn-link--danger { color: #dc2626; margin-left: 8px; }
+.state-msg { font-size: 12px; color: #6b7280; }
+.state-msg--error { color: #dc2626; }
+</style>

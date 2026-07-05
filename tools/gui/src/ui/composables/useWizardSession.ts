@@ -7,17 +7,39 @@ export interface WizardCreatedEntity {
   readonly name: string
 }
 
+export interface WizardCreatedConnection {
+  readonly sourceId: string
+  readonly connectionType: string
+  readonly targetId: string
+  readonly summary: string
+}
+
+/**
+ * A ranked, commit-ready connection suggestion: enough to render a one-line sentence
+ * ("*X* probably **realizes** *Y*") and, on accept, call `addConnection` directly without
+ * re-resolving anything.
+ */
 export interface WizardSuggestion {
   readonly id: string
   readonly domain: string
   readonly summary: string
+  readonly sourceId: string
+  readonly sourceName: string
+  readonly connectionType: string
+  readonly targetId: string
+  readonly targetName: string
 }
 
 export interface WizardSessionState {
   activeDomain: string | null
   createdEntities: WizardCreatedEntity[]
+  createdConnections: WizardCreatedConnection[]
   pendingSuggestions: WizardSuggestion[]
   reviewLaterQueue: WizardSuggestion[]
+  /** Entity ids (created *or* found) completed as questionnaire steps, across all domains —
+   * the cross-domain spine. Later domains' suggestion ranking biases toward graph neighbors
+   * of these, so a business questionnaire ranks candidates near the motivation chain. */
+  spineAnchorIds: string[]
 }
 
 export interface WizardStorage {
@@ -26,13 +48,18 @@ export interface WizardStorage {
   removeItem(key: string): void
 }
 
-export const WIZARD_SESSION_STORAGE_KEY = 'arch.model-wizard.session.v1'
+// v2: added createdConnections + commit-ready suggestion fields (sourceId/connectionType/
+// targetId/etc.) — a v1 session would render suggestions with no way to commit them, so the
+// key bumps rather than silently coexisting with the old shape.
+export const WIZARD_SESSION_STORAGE_KEY = 'arch.model-wizard.session.v2'
 
 export const initialWizardSessionState = (): WizardSessionState => ({
   activeDomain: null,
   createdEntities: [],
+  createdConnections: [],
   pendingSuggestions: [],
   reviewLaterQueue: [],
+  spineAnchorIds: [],
 })
 
 export const parseWizardSessionState = (raw: string | null): WizardSessionState => {
@@ -42,8 +69,10 @@ export const parseWizardSessionState = (raw: string | null): WizardSessionState 
     return {
       activeDomain: typeof parsed.activeDomain === 'string' ? parsed.activeDomain : null,
       createdEntities: Array.isArray(parsed.createdEntities) ? parsed.createdEntities : [],
+      createdConnections: Array.isArray(parsed.createdConnections) ? parsed.createdConnections : [],
       pendingSuggestions: Array.isArray(parsed.pendingSuggestions) ? parsed.pendingSuggestions : [],
       reviewLaterQueue: Array.isArray(parsed.reviewLaterQueue) ? parsed.reviewLaterQueue : [],
+      spineAnchorIds: Array.isArray(parsed.spineAnchorIds) ? parsed.spineAnchorIds : [],
     }
   } catch {
     return initialWizardSessionState()
@@ -78,6 +107,26 @@ export const useWizardSession = (storage: WizardStorage = window.sessionStorage)
 
   const undoCreated = (artifactId: string) => {
     state.createdEntities = state.createdEntities.filter((e) => e.artifactId !== artifactId)
+    state.spineAnchorIds = state.spineAnchorIds.filter((id) => id !== artifactId)
+  }
+
+  const recordSpineAnchor = (artifactId: string) => {
+    if (state.spineAnchorIds.includes(artifactId)) return
+    state.spineAnchorIds.push(artifactId)
+  }
+
+  const recordConnectionCreated = (connection: WizardCreatedConnection) => {
+    const exists = state.createdConnections.some((c) =>
+      c.sourceId === connection.sourceId
+      && c.connectionType === connection.connectionType
+      && c.targetId === connection.targetId)
+    if (exists) return
+    state.createdConnections.push(connection)
+  }
+
+  const undoConnectionCreated = (sourceId: string, connectionType: string, targetId: string) => {
+    state.createdConnections = state.createdConnections.filter((c) =>
+      !(c.sourceId === sourceId && c.connectionType === connectionType && c.targetId === targetId))
   }
 
   const queueSuggestion = (suggestion: WizardSuggestion) => {
@@ -110,6 +159,9 @@ export const useWizardSession = (storage: WizardStorage = window.sessionStorage)
     setActiveDomain,
     recordCreated,
     undoCreated,
+    recordSpineAnchor,
+    recordConnectionCreated,
+    undoConnectionCreated,
     queueSuggestion,
     dismissSuggestion,
     deferToReviewLater,
