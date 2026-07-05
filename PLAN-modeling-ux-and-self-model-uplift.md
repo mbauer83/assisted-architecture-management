@@ -892,6 +892,79 @@ and the E408 verifier rule (`_verifier_rules_binding_targets.py`) already permit
 
 ---
 
+### WU-B4 — Wizard usability uplift (persona-driven)
+
+**Grounding.** Persona walk-through (product owner modeling a new cross-cutting feature; junior
+architect changing an existing product; architect enriching business/common context around
+MCP-agent-imported application components; returning user resuming a session) against the shipped
+WU-B2 wizard, with each mechanism claim verified in code. Two confirmed defects and a set of
+guidance gaps; the biggest structural question is the planning/reverse mode toggle itself.
+
+**Confirmed defects [CODE, verified].**
+- `global-artifact-reference` is offered as "New global-artifact-reference" in the common domain,
+  but the type is `internal: true` (`src/ontologies/archimate_next/entities.yaml` — "May not be
+  created or edited directly; only produced by the connection-to-global-entity mechanism") and
+  the create path raises (`artifact_write/entity.py::is_internal_entity_type` guard). The
+  guidance layer (`type_guidance.py::_entity_type_guidance`) is the only surface that fails to
+  filter `internal` types — `module_registry.py` domain display already skips them. GARs are
+  created exclusively by artifact promotion, never manually.
+- The wizard's highest-value suggestion — "connect the entity you just created to the previous
+  chain entity" — is unreliable. `hop_suggestions` (`_diagram_context.py`) seeds `visited` with
+  the anchor ids and returns only their *neighbors*, so `WizardEntityStage.proximityNeighborIds`
+  never boosts the session's own spine anchors; and the candidate pool
+  (`searchEntityDisplay('', limit 20, type)`) can miss the just-created entity entirely once a
+  type has >20 instances. A fresh feature chain (no pre-existing connections) therefore gets
+  zero help linking driver→stakeholder, goal→driver, etc.
+
+**Structural finding — the mode toggle.** "Planning vs reverse architecture" forces a
+methodology decision before the user gets any value, and real work is hybrid (planning a
+cross-cutting change = anchoring on existing entities + adding new ones, interleaved). What the
+modes actually vary — starting domain, bridge direction, a few question phrasings, find-vs-create
+default — can all be derived without asking: make the spine **omnidirectional** (every
+questionnaire completion offers both neighbors, labeled by user goal — "capture why" vs "map the
+impact"), make the step surface **reuse-first** (existing entities of the step's type visible
+inline; create and pick-existing are one surface, not a toggle), and derive the recommendation
+from session state (least-covered adjacent spine domain; fresh sessions default to motivation).
+The mode toggle then disappears.
+
+**Work units** (statuses in TASKS ledger):
+- **B4.1 — Exclude internal entity types from authoring guidance.** Filter `info.internal` in
+  `_entity_type_guidance` (serves REST *and* MCP consumers). Regression test: guidance for
+  `common` never contains `global-artifact-reference`; unit test for the filter. No GUI change —
+  ontology knowledge stays out of generic components.
+- **B4.2 — Chain-first connection suggestions.** For questionnaire steps, generate deterministic
+  suggestions between the new/found entity and the session's spine anchors first (legal-pair
+  filtered, fixed top rank, capped), then similarity-ranked existing-model candidates; always
+  union anchors into the candidate pool so the 20-item search cutoff cannot drop them.
+  `wizardSuggestions.ts` + `WizardEntityStage.vue`; unit tests for rank order and pool union.
+- **B4.3 — Reuse-first step surface.** While typing a name in the create form, live-search
+  same-type entities and offer "use existing" matches inline (dedupe by design; supersedes
+  `preferFind`); allow multiple entities per questionnaire step ("Add another X" stays on the
+  step; chips show per-step counts). Show existing-entity count for the step's type.
+- **B4.4 — Omnidirectional spine, no mode toggle.** Bidirectional bridges on every spine
+  questionnaire (both-neighbor prompts, goal-labeled); fold `reverseQuestion` variants into
+  neutral wording; recommendation = least-covered adjacent spine domain; remove `mode` from
+  session state (parse tolerates old payloads). Depends on B4.3 (reuse-first replaces the
+  reverse-mode find default). Decision D-7 below gates this.
+- **B4.5 — Guidance depth.** Collapsible "when to use / when not to use" under each questionnaire
+  question (data already in loaded guidance); per-type example-name placeholder + naming hint in
+  the questionnaire content file; one-line domain descriptions on hub cards (content file).
+- **B4.6 — Session recap + persistent draft lifecycle.** Recap panel: entities and accepted
+  connections created this session, linked, with undo. On wizard entry, search
+  `keyword=wizard-draft` and surface prior-session drafts (resume / review / finalize). Decision
+  D-8 gates finalization semantics.
+- **B4.7 — Strategy questionnaire + capability anchor.** Capability → value-stream → resource
+  steps; capability-anchored reuse search (the WU-B2c remainder), reusing B4.3's reuse-first
+  surface.
+
+**Decisions.**
+- **D-7 (open)** — Replace the mode toggle with the omnidirectional spine (B4.4)?
+  Recommendation: yes — the toggle is an upfront methodology question users shouldn't have to
+  answer, and everything it controls is derivable. Counterargument to weigh: an explicit reverse
+  mode is a teachable, documentable workflow ("run the agent, then enrich in reverse mode").
+- **D-8 (open)** — Draft finalization semantics: does "finish session" strip the `wizard-draft`
+  keyword, and is there a bulk cleanup for abandoned drafts?
+
 ## Workstream C — Self-model uplift
 
 **Audit findings [MODEL, verified].** 331 entities / 743 connections / 31 diagrams. The size is

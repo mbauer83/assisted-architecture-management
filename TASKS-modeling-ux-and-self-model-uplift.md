@@ -72,9 +72,17 @@ restart mid-session; state clearly when a restart is needed.
 | B2a | Authoring-guidance REST endpoint + wizard shell + session store | — | done | route `/model/wizard` |
 | B2b | Wizard domain stages: create / find / connect + commit flow | B2a, A1.2 | done | live-verified in Motivation+Application; 2 real pre-existing bugs found+fixed (domain-filter, key/value swap) |
 | B2c | Elicitation layers (questionnaire, impact spine, capability anchor) + ranking | B2b | done | full cross-domain spine motivation→business→common→application (questionnaires + bridges + session-persisted proximity anchors + next-domain recommendation + priority type ordering), all live-verified; capability-anchored reuse search in strategy not built (see progress log) |
+| B4.1 | Exclude `internal` entity types from authoring guidance (GAR never manually creatable) | — | todo | backend `_entity_type_guidance`; fixes wizard offering "New global-artifact-reference" |
+| B4.2 | Chain-first connection suggestions (spine anchors first-rank, always in candidate pool) | — | todo | fixes hop-neighbor-only proximity + 20-item search cutoff dropping just-created entities |
+| B4.3 | Reuse-first step surface: live dedupe search while typing + multiple entities per step | — | todo | supersedes `preferFind` |
+| B4.4 | Omnidirectional spine: bidirectional bridges, remove mode toggle | B4.3, D-7 | todo | fold reverseQuestion variants into neutral wording |
+| B4.5 | Guidance depth: in-step when-to-use, naming exemplars, domain one-liners | — | todo | content-file driven |
+| B4.6 | Session recap + persistent wizard-draft resume/cleanup | D-8 | todo | recap independent of D-8; draft lifecycle gated |
+| B4.7 | Strategy questionnaire + capability-anchored reuse search | B4.3 | todo | WU-B2c remainder |
 
 Recommended order: **A3 → A2 → A1.1 → A1.2 → A4.1 → A4.2 → A4.3 → B3.1 → B3.2 → B1.1…B1.5 →
-C1/C2/C3 (C-work may interleave anytime; C1.3 waits for B3.2) → B2a → B2b → B2c**.
+C1/C2/C3 (C-work may interleave anytime; C1.3 waits for B3.2) → B2a → B2b → B2c →
+B4.1 → B4.2 → B4.3 → B4.4 (after D-7) → B4.5 → B4.6 → B4.7**.
 
 ---
 
@@ -1776,3 +1784,20 @@ CONTINUE OR STOP.
   fallback, reversePrefersFind placement, mode parse/persist/default, reverse-mode
   recommendation ladder); `npm run typecheck` clean; `npm run lint` clean. Merged into `main`;
   live-verified on :5173.
+- 2026-07-05 — Usability/usefulness analysis of the wizard (user-requested; personas: product
+  owner modeling a new cross-cutting feature, junior architect changing an existing product,
+  architect enriching context around agent-imported components, returning user). Findings and
+  the improvement plan recorded as new section WU-B4 in the plan (B4.1–B4.7 + open decisions
+  D-7/D-8) and as `todo` rows above. Two defects verified in code, not just observed: (1) the
+  guidance layer serves `internal: true` entity types, so the wizard offers
+  "New global-artifact-reference" although GARs are exclusively promotion-created and the create
+  path raises — filter belongs in `_entity_type_guidance` (`type_guidance.py`), the one surface
+  missing the `internal` check; (2) spine anchors are excluded from suggestion ranking —
+  `hop_suggestions` (`_diagram_context.py`) returns only anchor *neighbors* (anchors seed
+  `visited`), and the candidate pool (`searchEntityDisplay('', limit 20)`) can drop just-created
+  entities once a type exceeds 20 instances, so a fresh chain gets no driver→stakeholder-style
+  link help. Structural question raised by the user and taken up as D-7: the planning/reverse
+  mode toggle forces an upfront methodology decision; recommendation is to replace it with an
+  omnidirectional spine (bidirectional goal-labeled bridges + reuse-first step surface +
+  state-derived recommendation), pending the user's call. No code changed in this session
+  increment — analysis and plan only.
