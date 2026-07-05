@@ -25,6 +25,17 @@ const fakeStorage = (): WizardStorage => {
   }
 }
 
+const sampleSuggestion = (id = 's1') => ({
+  id,
+  domain: 'motivation',
+  summary: 'X probably serves Y',
+  sourceId: 'GOL@1.a.x',
+  sourceName: 'X',
+  connectionType: 'serves',
+  targetId: 'OUT@1.b.y',
+  targetName: 'Y',
+})
+
 describe('parseWizardSessionState', () => {
   it('returns the initial state for null input', () => {
     expect(parseWizardSessionState(null)).toEqual(initialWizardSessionState())
@@ -39,9 +50,19 @@ describe('parseWizardSessionState', () => {
     expect(result).toEqual({
       activeDomain: 'motivation',
       createdEntities: [],
+      createdConnections: [],
       pendingSuggestions: [],
       reviewLaterQueue: [],
+      spineAnchorIds: [],
     })
+  })
+
+  it('defaults spineAnchorIds to empty for a pre-spine persisted session', () => {
+    const result = parseWizardSessionState(JSON.stringify({
+      activeDomain: 'business', createdEntities: [], createdConnections: [],
+      pendingSuggestions: [], reviewLaterQueue: [],
+    }))
+    expect(result.spineAnchorIds).toEqual([])
   })
 })
 
@@ -70,6 +91,7 @@ describe('useWizardSession', () => {
     storage.setItem(WIZARD_SESSION_STORAGE_KEY, JSON.stringify({
       activeDomain: 'business',
       createdEntities: [{ artifactId: 'x', artifactType: 'goal', domain: 'motivation', name: 'X' }],
+      createdConnections: [],
       pendingSuggestions: [],
       reviewLaterQueue: [],
     }))
@@ -101,10 +123,39 @@ describe('useWizardSession', () => {
     expect(session.state.createdEntities).toHaveLength(0)
   })
 
+  it('recordSpineAnchor adds an anchor once, persists it, and undoCreated drops it', () => {
+    const storage = fakeStorage()
+    const session = useWizardSession(storage)
+    session.recordSpineAnchor('STK@1.a.x')
+    session.recordSpineAnchor('STK@1.a.x')
+    session.recordSpineAnchor('ACT@1.b.y')
+    expect(session.state.spineAnchorIds).toEqual(['STK@1.a.x', 'ACT@1.b.y'])
+
+    const persisted = parseWizardSessionState(storage.getItem(WIZARD_SESSION_STORAGE_KEY))
+    expect(persisted.spineAnchorIds).toEqual(['STK@1.a.x', 'ACT@1.b.y'])
+
+    session.undoCreated('STK@1.a.x')
+    expect(session.state.spineAnchorIds).toEqual(['ACT@1.b.y'])
+  })
+
+  it('recordConnectionCreated adds a connection once and ignores duplicates', () => {
+    const session = useWizardSession(fakeStorage())
+    const conn = { sourceId: 'a', connectionType: 'serves', targetId: 'b', summary: 'A serves B' }
+    session.recordConnectionCreated(conn)
+    session.recordConnectionCreated(conn)
+    expect(session.state.createdConnections).toHaveLength(1)
+  })
+
+  it('undoConnectionCreated removes a previously recorded connection', () => {
+    const session = useWizardSession(fakeStorage())
+    session.recordConnectionCreated({ sourceId: 'a', connectionType: 'serves', targetId: 'b', summary: 'A serves B' })
+    session.undoConnectionCreated('a', 'serves', 'b')
+    expect(session.state.createdConnections).toHaveLength(0)
+  })
+
   it('queueSuggestion, deferToReviewLater, and resolveReviewLater move a suggestion through its lifecycle', () => {
     const session = useWizardSession(fakeStorage())
-    const suggestion = { id: 's1', domain: 'motivation', summary: 'X probably serves Y' }
-    session.queueSuggestion(suggestion)
+    session.queueSuggestion(sampleSuggestion())
     expect(session.state.pendingSuggestions).toHaveLength(1)
 
     session.deferToReviewLater('s1')
@@ -117,7 +168,7 @@ describe('useWizardSession', () => {
 
   it('dismissSuggestion drops a pending suggestion without queuing it for review', () => {
     const session = useWizardSession(fakeStorage())
-    session.queueSuggestion({ id: 's1', domain: 'motivation', summary: 'X probably serves Y' })
+    session.queueSuggestion(sampleSuggestion())
     session.dismissSuggestion('s1')
     expect(session.state.pendingSuggestions).toHaveLength(0)
     expect(session.state.reviewLaterQueue).toHaveLength(0)

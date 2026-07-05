@@ -200,10 +200,12 @@ and append. Reset pagination on any query/filter change. Keep page size modest (
       +1 test); the request-shape/sentinel/reset behaviors are covered by reading the
       implementation (single call site, `nextCursor` reset at the top of `doSearch`) and deferred
       to the Playwright smoke below.
-- [ ] Playwright smoke: picker in diagram-edit context — select application domain → application
-      entities appear. **Not performed** — this sandbox has no working Chrome/Chromium
-      (`playwright install chrome` needs interactive `sudo`, unavailable here). Needs a live check
-      in a session with a working browser before WU-A1 is fully trusted.
+- [x] Playwright smoke: picker in diagram-edit context — select application domain → application
+      entities appear. Confirmed live against the ArchiMate two-tier diagram's edit view: the
+      unfiltered picker lists motivation-domain entities first (reproducing symptom 2's cutoff);
+      toggling the "Application" chip re-issues the request and application-component/interface/
+      data-object entities appear; scrolling the sentinel into view appends the next page
+      (59→67 items for the application domain, ~68 total).
 
 ### WU-A2 — Diagram-creation preview viewport unbounded
 
@@ -244,10 +246,10 @@ low-risk.
       typecheck/lint/existing Vitest suite (346 tests, all green) confirm the extraction compiles
       and wires correctly; the CSS is a direct copy of `DiagramDetailView.vue`'s already-correct,
       already-shipped `clamp()` contract, not new logic being introduced blind.
-- [ ] Manual/Playwright check: preview of a large ArchiMate render stays within the viewport at
-      1366px and 2560px widths. **Not performed** — this sandbox has no working Chrome/Chromium
-      (`npx playwright install chrome` needs `sudo`, no password available non-interactively).
-      Needs a live check in a session with a working browser before this WU is fully trusted.
+- [x] Manual/Playwright check: preview of a large ArchiMate render stays within the viewport at
+      1366px and 2560px widths. Confirmed live on the two-team ArchiMate view's edit page: at
+      both widths the `.img-container` stays bounded (not growing to the SVG's natural
+      2259×514px size), `overflow: hidden` clips it, and pan/zoom remains usable.
 
 ### WU-A3 — GSN diagrams: giant arrowheads, unexplained colors
 
@@ -437,8 +439,48 @@ Per type:
       through `DiagramDetailView.vue` is not Vitest-testable in this repo (no
       `@vue/test-utils`, Vitest `environment: 'node'` project-wide, no precedent for mounting
       an SFC — same finding as WU-A2/A1.2) — needs the Playwright smoke below instead.
-- [ ] Playwright smoke on the self-model's ACT + SEQ diagrams (needs a working browser — none
-      in this sandbox, same as WU-A2/A1.2).
+- [x] Playwright smoke on the self-model's ACT + SEQ diagrams. Sequence worked exactly as
+      designed with zero further changes: lifelines and messages both map correctly, both
+      click→sidebar and sidebar→highlight directions confirmed live and visually (blue
+      activation-bar highlight). Activity was completely non-functional live despite passing
+      every unit/golden-fixture test, because of three pre-existing consumer-side defects that
+      only an anchor-typed `mapElements` representative (introduced by this WU) ever exercised:
+      (1) `DiagramDetailView.vue`/`EditDiagramView.vue`'s `DOMPurify.sanitize(...)` call has no
+      `ALLOWED_URI_REGEXP` override, so DOMPurify's default allow-list silently strips
+      `href`/`xlink:href="arch://…"` before the sanitized SVG ever reaches the DOM — confirmed by
+      diffing the raw `/api/diagram-svg` response (has the href) against the live post-sanitize
+      DOM (doesn't); (2) both views' `attachInteractivity` gated `data-entity-id`/click-listener
+      attachment on `instanceof SVGGElement`, silently skipping the sentinel `<a>` (an
+      `SVGAElement`) entirely; (3) the `.svg-selected`/hover highlight CSS only targets
+      `polygon`/`rect`/`polyline`/`ellipse` children, none of which exist inside an anchor that
+      wraps only a `<text>`. Fixed all three at their actual layers (not a workaround): new
+      `ui/lib/svgSanitize.ts` (`sanitizeDiagramSvg`, exported `ALLOWED_URI_REGEXP` extending
+      DOMPurify's default scheme list with `arch`) replaces the inline sanitize calls in both
+      views; the element-type gate now accepts `SVGGElement || SVGAElement` in both views (the
+      `<g>`-only `attachNodeSubParts` call stays gated on `SVGGElement`); new
+      `a[data-entity-id]`/`a.svg-selected` CSS rules apply `fill`/`font-weight` to the anchor's
+      `text` child. Also found and fixed, via a real (non-synthetic) click during this same
+      check: neither view's click handler called `preventDefault()`, so a genuine click on the
+      now-mapped sentinel `<a href="arch://…" target="_top">` triggered the browser's native
+      link-following, surfacing as a console error ("Not allowed to launch 'arch://…' because a
+      user gesture is required") and, worse, would bypass the `click` handler entirely on a
+      middle-click/new-tab or drag-to-bookmark (those never fire `click`). Fixed with a new
+      shared `neutralizeSentinelLink` helper (`diagramViewerExtensions.ts`) that strips
+      `href`/`xlink:href`/`target` from an anchor representative once `attachInteractivity` has
+      read what it needs from it, plus `preventDefault()` on the click listener itself as
+      defense in depth; both views call it. All three original defects plus this one are
+      cross-cutting consumer bugs in the generic viewer, not activity-specific — they would have
+      identically broken any future diagram type that returns an anchor from `mapElements`.
+      Verified live end-to-end after the fix (dispatched real click events and confirmed via
+      Playwright's own actual mouse click for the neutralization check): all 7 sentinels on the
+      self-model's promotion activity diagram map correctly, click→sidebar and sidebar→highlight
+      both work for actions and the decision, and the anchors no longer carry `href`/`target`
+      after mapping. New regression test `svgSanitize.test.ts` (3: `arch:` allowed, default-safe
+      schemes still allowed, `javascript:`/`data:` still blocked) — the DOM-dependent half
+      (`sanitizeDiagramSvg` itself, `neutralizeSentinelLink`) is not Vitest-testable in this repo
+      for the same `environment: 'node'`/no-jsdom reason as everything else in this WU; confirmed
+      `document` is genuinely `typeof undefined` in this test environment before concluding that,
+      rather than assuming it from the prior sessions' notes.
 
 ---
 
@@ -605,11 +647,17 @@ goal-elicitation, plus how Archi/Bizzdesign/LeanIX/Ardoq guide novices. Verdict:
   (classification + pair endpoints, capped and ranked). **Commit semantics (decision D-6):**
   wizard writes commit per-artifact through the existing verified write path, each preceded by
   dry-run; the wizard session tracks created ids and offers "undo step" (delete of just-created
-  draft artifacts). Full multi-entity atomicity via the staged-bulk-operation machinery is
-  explicitly deferred — evaluate promoting it to a REST surface only if per-step commits prove
-  confusing in practice. Rationale: artifacts are draft-status in an engagement repo; partial
-  progress is visible, verifiable, and individually reversible — acceptable consistency for an
-  authoring aid, and it avoids building a second transactional pathway.
+  draft artifacts). Every entity/connection the wizard creates also carries a `wizard-draft`
+  keyword/note tag — a passive breadcrumb, not an active cleanup mechanism — so artifacts left
+  behind by an abandoned session (the browser tab closed, `sessionStorage` gone, the undo
+  affordance lost with it) stay discoverable later via an ordinary Browse/keyword filter rather
+  than becoming silently indistinguishable from intentional hand-created drafts. Full
+  multi-entity atomicity via the staged-bulk-operation machinery is explicitly rejected, not
+  just deferred: `PLAN-scalable-bulk-staging.md` already establishes that path is O(repo-size)
+  per call, unsuited to holding a whole wizard session's writes, on top of requiring a second
+  transactional pathway that doesn't exist today. Rationale: artifacts are draft-status in an
+  engagement repo; partial progress is visible, verifiable, and individually reversible —
+  acceptable consistency for an authoring aid.
 - **B2c — Elicitation layers + cross-domain spine.** Motivation questionnaire (stakeholder →
   driver → assessment → goal → outcome → requirement prompts); impact-mapping bridge steps at
   domain transitions; capability-anchored reuse search in strategy; review-later queue
@@ -646,12 +694,116 @@ goal-elicitation, plus how Archi/Bizzdesign/LeanIX/Ardoq guide novices. Verdict:
       smoke performed this session (B2a's checklist doesn't require one; B2b's does) — the shell
       renders against static/guidance-only data with no write path yet, so a live check adds little
       before B2b gives it something to actually create.
-- [ ] B2b: stage components (decomposed per LoC policy); connection-suggestion service (rank +
+- [x] B2b: stage components (decomposed per LoC policy); connection-suggestion service (rank +
       cap + queue); dry-run→commit flow + undo; Vitest per component; backend tests for any new
       query params; Playwright: create a small motivation+application slice end-to-end.
-- [ ] B2c: questionnaire/spine step definitions (helpers modules, content-driven so wording
+      New `WizardDomainStage.vue`/`.helpers.ts` (type-choice question phrasing, 2-4 visible +
+      "show all"), `WizardEntityForm.vue` (name/summary + required-schema properties via
+      `TypedPropertyInput`, progressive disclosure for optional ones, dry-run→create, auto-tags
+      every created entity `wizard-draft` per D-6), `WizardConnectionSuggestions.vue` (accept/
+      later/dismiss list), and `ui/lib/wizardSuggestions.ts` (pure: `legalConnectionPairs` +
+      `nameSimilarity` (Jaccard word-overlap) + `rankCandidatesByName` + `buildWizardSuggestions`
+      — metamodel-validity-then-name-similarity ranking, capped). Reused existing
+      `getAuthoringGuidance`'s per-entity-type `permitted_connections` for the ranking signal
+      instead of adding a second `getOntologyClassification` call (same `{outgoing, incoming,
+      symmetric}` shape) — no new backend endpoint or query params needed at all, confirming the
+      plan's own "reusable today" grounding. `useWizardSession.ts` gained `createdConnections` +
+      `recordConnectionCreated`/`undoConnectionCreated` and extended `WizardSuggestion` with
+      commit-ready `sourceId`/`connectionType`/`targetId` fields (storage key bumped `v1`→`v2`,
+      a v1 session had no way to commit its own suggestions). Undo now really deletes: the
+      wizard's "Undo" button calls `deleteEntity`/`removeConnection` before clearing session
+      state, not just clearing local UI state.
+      **Two real, previously-undetected bugs found and fixed during the live Playwright check**
+      (both pre-dated this WU, in code B2a shipped without a live check): (1)
+      `entityTypesForDomain` filtered on a per-item `domain` field that `GET
+      /api/authoring-guidance?domain=...` never populates when the whole response is already
+      domain-scoped (`_entity_type_guidance`'s `include_domain=False` branch,
+      `type_guidance.py`) — the wizard's own only call pattern — so the type-choice grid was
+      silently empty for every domain until now; fixed to trust the omission (filter only when
+      the field is actually present). (2) my own `legalConnectionPairs` had the classification
+      record's key/value backwards on first pass — `_classify_connections` keys each record by
+      **target type** with **connection types** as the value array, not the reverse — caught by
+      inspecting live network requests during the Playwright check (`entity_types=archimate-*`
+      instead of real entity type names) before it shipped; both have regression tests
+      (`WizardDomainStage.helpers.test.ts`'s domain-omitted case,
+      `wizardSuggestions.test.ts`'s corrected fixture shape with an explanatory comment).
+      Playwright: live end-to-end in both Motivation (create→suggest→accept, find-existing→
+      suggest) and Application (create→suggest→undo) — confirmed the `wizard-draft` keyword tag
+      lands on created entities, suggestions rank sensibly, accept commits a real connection,
+      and undo really deletes server-side (verified via `artifact_query_search_artifacts` after
+      each, not assumed from the UI alone). One accepted test suggestion (a real connection
+      between two pre-existing self-model entities) was found on review to be an unreviewed
+      synthetic addition rather than a curated one and was removed via `artifact_edit_connection`
+      (`operation=remove`) immediately after the check, restoring the pre-test state exactly (dry-run
+      diffed against the original file content first). Backend: none touched — no new REST
+      endpoints or query params were needed, so no backend tests apply. Vitest:
+      `wizardSuggestions.test.ts` (13), `useWizardSession.test.ts` (+2 for the connection
+      tracking), `WizardDomainStage.helpers.test.ts` (8, includes the domain-omission
+      regression) — the interaction-heavy parts of `WizardDomainStage.vue`/`WizardEntityForm.vue`
+      (async schema/suggestion fetching, dry-run→commit sequencing) are not Vitest-testable in
+      this repo for the same `environment: 'node'`/no-DOM reason as every other `.vue` view in
+      this plan; covered instead by the live Playwright check. Gates: frontend
+      `lint`/`typecheck` clean, `test` 428 passed (+21); backend untouched, not re-run.
+- [x] B2c: questionnaire/spine step definitions (helpers modules, content-driven so wording
       iterates without code churn); ranking integration; Playwright: novice path from empty
       domain to connected mini-model.
+      Extracted the create/find/suggest/undo logic shared by both the free-choice hub and the
+      new guided questionnaire into `WizardEntityStage.vue` (was inline in `WizardDomainStage.vue`;
+      no behavior change, pure decomposition so the questionnaire doesn't duplicate it). New
+      `ui/lib/wizardQuestionnaires.ts` (pure, content-driven): the motivation questionnaire
+      (stakeholder → driver → assessment → goal → outcome → requirement, one GQM/KAOS-style
+      question per step) plus its "bridge" — the impact-mapping spine step shown on completion,
+      pointing to the business domain (why/who/how/what framing) and actually switching
+      `session.state.activeDomain` there, not just a static message. New
+      `WizardQuestionnaireStage.vue`: progress indicator ("Question N of M"), current question,
+      embeds `WizardEntityStage` with `proximityAnchors` = every entity id created earlier in the
+      sequence, auto-advances on a real create/find (an emitted `null` — a plain form cancel —
+      exits back to the hub instead of silently advancing past an unanswered question).
+      `WizardDomainStage.vue` gained a "✨ Start the guided questionnaire" entry point above the
+      free-choice type grid when a questionnaire exists for the domain, never replacing free
+      choice (the plan's "free skipping" requirement).
+      **Ranking integration**: `buildWizardSuggestions` gained an optional `proximityBoost`
+      parameter — a small (+0.15) tiebreaker added to a candidate's name-similarity score when it
+      appears in `discoverDiagramEntities`'s hop-neighbor results for the entities built up so far
+      in the session, matching the plan's stated priority order (metamodel validity, structural →
+      name similarity → graph proximity, in that order, proximity never overriding a clear name
+      match). Removed `rankCandidatesByName`, now dead code once the per-pair candidate selection
+      moved to the same combined-score comparator used for cross-pair ordering.
+      **Review-later queue resolution UI**: the hub's flat "Resolved"-only list (which just
+      discarded a suggestion without ever committing it) is replaced with the same
+      `WizardConnectionSuggestions` component the domain stage uses (`hideLater` prop added, since
+      "later" is meaningless for an item already in the later queue) — Accept now actually commits
+      the connection. New shared `ui/composables/useSuggestionCommit.ts` extracts the commit
+      sequence (`addConnection` dry-run-implied write → `recordConnectionCreated` →
+      caller-supplied removal callback) so `WizardEntityStage.vue`'s in-context accept and the
+      hub's review-later accept can't drift apart. Also fixed a related wiring gap while touching
+      this: switching domains no longer requires a direct card click to trigger a guidance
+      refetch — `ModelWizardView.vue` now watches `session.state.activeDomain` directly
+      (`immediate: true`), so the questionnaire's own domain-switching bridge button (and session
+      resume on page load) both refetch guidance correctly through one code path instead of two
+      that could fall out of sync.
+      New tests: `wizardQuestionnaires.test.ts` (4), `wizardSuggestions.test.ts` proximity-boost
+      cases (+3, replacing the 1 removed `rankCandidatesByName` test). Gates: frontend
+      `lint`/`typecheck` clean, `test` 434 passed (+6); backend untouched, not re-run (no `.py`
+      changes).
+      Playwright — novice path live in Motivation: started the questionnaire, created a
+      throwaway stakeholder (step 1 of 6), deferred one suggestion to "Later" (confirmed it
+      surfaced on the hub via the new resolution UI, with no "Later" button there), advanced to
+      "Question 2 of 6" (driver — confirmed the schema-driven required `Category` enum property
+      rendered correctly), created a throwaway driver, confirmed proximity-ranked suggestions
+      referencing the step-1 stakeholder appeared at the top, accepted the hub's deferred
+      suggestion (confirmed it actually committed — a real connection to a real, pre-existing
+      outcome entity — and disappeared from the queue), then used in-questionnaire "Undo" on the
+      driver (confirmed it reverts within questionnaire mode, not just free-choice mode). Did not
+      walk all 6 steps to the bridge screen — the remaining steps exercise no new B2c mechanism
+      beyond what steps 1-2 already proved (create/undo were already proven end-to-end in WU-B2b);
+      stopped once the questionnaire-specific pieces (sequencing, proximity ranking, review-later
+      commit) were each confirmed working, to limit live test-data footprint in the shared
+      self-model. All test entities/connections deleted and reverified clean afterward
+      (`artifact_verify`: 0 errors/0 warnings; `artifact_query_search_artifacts` for both
+      throwaway names returns no hits) — this time re-querying and re-confirming the target
+      artifact_id via a fresh read immediately before every delete call, per the near-miss
+      recorded in the WU-B2b ledger entry.
 
 ### WU-B3 — ArchiMate views: multiple occurrences of one model entity
 

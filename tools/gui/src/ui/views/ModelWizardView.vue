@@ -1,35 +1,42 @@
 <script setup lang="ts">
-import { inject, onMounted, computed } from 'vue'
+import { inject, watch, computed } from 'vue'
 import { modelServiceKey } from '../keys'
 import { useQuery } from '../composables/useQuery'
 import { useWizardSession, createdCountByDomain } from '../composables/useWizardSession'
-import { buildWizardDomainCards, entityTypesForDomain } from './ModelWizardView.helpers'
+import { useSuggestionCommit } from '../composables/useSuggestionCommit'
+import { buildWizardDomainCards } from './ModelWizardView.helpers'
+import WizardDomainStage from '../components/WizardDomainStage.vue'
+import WizardConnectionSuggestions from '../components/WizardConnectionSuggestions.vue'
 import type { AuthoringGuidance } from '../../domain'
 import type { RepoError } from '../../ports/ModelRepository'
 
 const svc = inject(modelServiceKey)!
 const session = useWizardSession()
 const guidanceQuery = useQuery<AuthoringGuidance, RepoError>()
+const reviewLaterCommit = useSuggestionCommit(session)
 
 const domainCards = computed(() => buildWizardDomainCards(createdCountByDomain(session.state)))
 const activeDomain = computed(() => session.state.activeDomain)
-const activeEntityTypes = computed(() => entityTypesForDomain(guidanceQuery.data.value, activeDomain.value ?? ''))
 const hasProgress = computed(() =>
   session.state.createdEntities.length > 0 || session.state.reviewLaterQueue.length > 0)
 
-const openDomain = (domain: string) => {
-  session.setActiveDomain(domain)
-  guidanceQuery.run(svc.getAuthoringGuidance({ domains: [domain] }))
-}
+const openDomain = (domain: string) => session.setActiveDomain(domain)
 
 const startOver = () => {
   session.reset()
   guidanceQuery.reset()
 }
 
-onMounted(() => {
-  if (session.state.activeDomain) openDomain(session.state.activeDomain)
-})
+const acceptReviewLater = (suggestion: (typeof session.state.reviewLaterQueue)[number]) =>
+  reviewLaterCommit.accept(suggestion, (id) => session.resolveReviewLater(id))
+const dismissReviewLater = (id: string) => session.resolveReviewLater(id)
+
+// Any activeDomain change — a direct click, resuming a session on mount, or a questionnaire's
+// bridge step switching domains — refetches guidance for it. Single source of truth instead of
+// duplicating the fetch at every call site that can change the active domain.
+watch(activeDomain, (domain) => {
+  if (domain) guidanceQuery.run(svc.getAuthoringGuidance({ domains: [domain] }))
+}, { immediate: true })
 </script>
 
 <template>
@@ -39,8 +46,9 @@ onMounted(() => {
         Guided Modeling Wizard
       </h1>
       <p class="wizard-subtitle">
-        Pick a domain to see what belongs there and why. Skip freely between domains — nothing
-        here is gated.
+        Pick a domain to see what belongs there and why. For a lightweight end-to-end model,
+        follow the guided spine: Motivation → Business → Common → Application. Skip freely
+        between domains — nothing here is gated.
       </p>
       <button
         v-if="hasProgress"
@@ -63,6 +71,10 @@ onMounted(() => {
         @click="openDomain(card.key)"
       >
         <span class="domain-card__label">{{ card.label }}</span>
+        <span
+          v-if="card.recommended"
+          class="domain-card__badge"
+        >{{ hasProgress ? 'Next' : 'Start here' }}</span>
         <span
           v-if="card.createdCount > 0"
           class="domain-card__count"
@@ -90,30 +102,13 @@ onMounted(() => {
       >
         {{ guidanceQuery.errorMessage.value }}
       </div>
-      <ul
+      <WizardDomainStage
         v-else
-        class="entity-type-list"
-      >
-        <li
-          v-for="entityType in activeEntityTypes"
-          :key="entityType.name"
-          class="entity-type-item"
-        >
-          <span class="entity-type-name">{{ entityType.name }}</span>
-          <p
-            v-if="entityType.create_when"
-            class="entity-type-hint"
-          >
-            Create when: {{ entityType.create_when }}
-          </p>
-          <p
-            v-if="entityType.never_create_when"
-            class="entity-type-hint entity-type-hint--never"
-          >
-            Never create when: {{ entityType.never_create_when }}
-          </p>
-        </li>
-      </ul>
+        :key="activeDomain"
+        :domain="activeDomain"
+        :guidance="guidanceQuery.data.value"
+        :session="session"
+      />
     </div>
 
     <div
@@ -123,22 +118,19 @@ onMounted(() => {
       <h2 class="domain-panel__title">
         Review later
       </h2>
-      <ul class="entity-type-list">
-        <li
-          v-for="suggestion in session.state.reviewLaterQueue"
-          :key="suggestion.id"
-          class="entity-type-item"
-        >
-          <span>{{ suggestion.summary }}</span>
-          <button
-            type="button"
-            class="btn-link"
-            @click="session.resolveReviewLater(suggestion.id)"
-          >
-            Resolved
-          </button>
-        </li>
-      </ul>
+      <div
+        v-if="reviewLaterCommit.error.value"
+        class="state-msg state-msg--error"
+      >
+        {{ reviewLaterCommit.error.value }}
+      </div>
+      <WizardConnectionSuggestions
+        :suggestions="session.state.reviewLaterQueue"
+        :busy="reviewLaterCommit.busy.value"
+        hide-later
+        @accept="acceptReviewLater"
+        @dismiss="dismissReviewLater"
+      />
     </div>
   </div>
 </template>
@@ -168,16 +160,14 @@ onMounted(() => {
 .domain-card:hover { box-shadow: 0 2px 8px rgba(0, 0, 0, .08); }
 .domain-card--active { outline: 2px solid #2563eb; outline-offset: -1px; }
 .domain-card__label { font-weight: 600; }
+.domain-card__badge {
+  align-self: flex-start; font-size: 11px; font-weight: 600; color: #1d4ed8;
+  background: #dbeafe; border-radius: 10px; padding: 1px 8px;
+}
 .domain-card__count { font-size: 12px; color: #6b7280; }
 
 .domain-panel, .review-later {
   border: 1px solid #e5e7eb; border-radius: 8px; padding: 16px 20px; margin-bottom: 20px;
 }
 .domain-panel__title { font-size: 16px; font-weight: 600; margin: 0 0 12px; }
-.entity-type-list { list-style: none; margin: 0; padding: 0; }
-.entity-type-item { padding: 8px 0; border-top: 1px solid #f3f4f6; }
-.entity-type-item:first-child { border-top: none; }
-.entity-type-name { font-weight: 600; }
-.entity-type-hint { margin: 2px 0 0; color: #4b5563; font-size: 13px; }
-.entity-type-hint--never { color: #b45309; }
 </style>

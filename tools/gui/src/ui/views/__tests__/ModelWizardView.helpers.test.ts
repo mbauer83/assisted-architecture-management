@@ -1,6 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { buildWizardDomainCards, entityTypesForDomain } from '../ModelWizardView.helpers'
-import type { AuthoringGuidance } from '../../../domain'
+import { buildWizardDomainCards, recommendedNextDomain } from '../ModelWizardView.helpers'
 
 describe('buildWizardDomainCards', () => {
   it('scopes to ArchiMate domains only (excludes sysml)', () => {
@@ -26,33 +25,25 @@ describe('buildWizardDomainCards', () => {
       expect(card.color.length).toBeGreaterThan(0)
     }
   })
-})
 
-describe('entityTypesForDomain', () => {
-  const guidance: AuthoringGuidance = {
-    entity_types: [
-      {
-        name: 'goal', prefix: 'GOL', domain: 'motivation', classes: [],
-        create_when: 'a desired end state exists', never_create_when: '',
-        permitted_connections: { outgoing: {}, incoming: {}, symmetric: {} },
-      },
-      {
-        name: 'business-process', prefix: 'PRC', domain: 'business', classes: [],
-        create_when: '', never_create_when: '',
-        permitted_connections: { outgoing: {}, incoming: {}, symmetric: {} },
-      },
-    ],
-  }
-
-  it('filters entity types to the requested domain', () => {
-    expect(entityTypesForDomain(guidance, 'motivation').map((e) => e.name)).toEqual(['goal'])
+  it('recommends motivation on a fresh session', () => {
+    const cards = buildWizardDomainCards({})
+    expect(cards.filter((c) => c.recommended).map((c) => c.key)).toEqual(['motivation'])
   })
 
-  it('returns an empty array for a domain with no matches', () => {
-    expect(entityTypesForDomain(guidance, 'technology')).toEqual([])
+  it('recommends the first untouched spine domain once earlier ones have content', () => {
+    expect(recommendedNextDomain({ motivation: 2 })).toBe('business')
+    expect(recommendedNextDomain({ motivation: 2, business: 1 })).toBe('common')
+    expect(recommendedNextDomain({ motivation: 2, business: 1, common: 3 })).toBe('application')
   })
 
-  it('returns an empty array when guidance is null', () => {
-    expect(entityTypesForDomain(null, 'motivation')).toEqual([])
+  it('recommends nothing once every spine domain has content', () => {
+    const counts = { motivation: 1, business: 1, common: 1, application: 1 }
+    expect(recommendedNextDomain(counts)).toBeNull()
+    expect(buildWizardDomainCards(counts).some((c) => c.recommended)).toBe(false)
+  })
+
+  it('spine recommendation ignores off-spine progress (technology does not satisfy it)', () => {
+    expect(recommendedNextDomain({ technology: 5 })).toBe('motivation')
   })
 })

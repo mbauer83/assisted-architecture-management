@@ -2,7 +2,6 @@
 import { inject, ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { Effect, Exit } from 'effect'
-import DOMPurify from 'dompurify'
 import { modelServiceKey, toastKey } from '../keys'
 import type {
   DiagramContext, EntitySummary, DiagramConnection,
@@ -21,7 +20,8 @@ import { useQuery } from '../composables/useQuery'
 import { useMutation } from '../composables/useMutation'
 import { toGlyphKey } from '../lib/glyphKey'
 import { isArchimateDiagramType } from '../lib/archimateOccurrences'
-import { resolveElementMap } from '../lib/diagramViewerExtensions'
+import { resolveElementMap, neutralizeSentinelLink } from '../lib/diagramViewerExtensions'
+import { sanitizeDiagramSvg } from '../lib/svgSanitize'
 
 const svc = inject(modelServiceKey)!
 const addToast = inject(toastKey)!
@@ -59,9 +59,7 @@ watch(diagramDetail, (d) => {
   }
 })
 const svgHtml = computed(() =>
-  svgQuery.data.value
-    ? DOMPurify.sanitize(svgQuery.data.value, { USE_PROFILES: { svg: true, svgFilters: true } })
-    : null
+  svgQuery.data.value ? sanitizeDiagramSvg(svgQuery.data.value) : null
 )
 const saveError = computed(() => {
   const r = saveMutation.result.value
@@ -278,16 +276,18 @@ const attachInteractivity = () => {
   for (const [artifactId, elems] of nodes) {
     svgEntityElems.set(artifactId, elems)
     for (const el of elems) {
-      if (!(el instanceof SVGGElement)) continue
+      if (!(el instanceof SVGGElement || el instanceof SVGAElement)) continue
       el.setAttribute('data-entity-id', artifactId)
-      el.addEventListener('click', (ev) => { ev.stopPropagation(); toggleEntityRemoval(artifactId) })
+      el.addEventListener('click', (ev) => { ev.stopPropagation(); ev.preventDefault(); toggleEntityRemoval(artifactId) })
+      if (el instanceof SVGAElement) neutralizeSentinelLink(el)
     }
   }
   for (const [connArtifactId, elems] of edges) {
     for (const el of elems) {
-      if (!(el instanceof SVGGElement)) continue
+      if (!(el instanceof SVGGElement || el instanceof SVGAElement)) continue
       el.setAttribute('data-conn-id', connArtifactId)
-      el.addEventListener('click', (ev) => { ev.stopPropagation(); toggleConn(connArtifactId) })
+      el.addEventListener('click', (ev) => { ev.stopPropagation(); ev.preventDefault(); toggleConn(connArtifactId) })
+      if (el instanceof SVGAElement) neutralizeSentinelLink(el)
     }
   }
   updateHighlights()
@@ -706,6 +706,7 @@ onUnmounted(() => {
 .svg-wrap :deep([data-entity-id]) { cursor: pointer; }
 .svg-wrap :deep([data-entity-id]:hover) polygon,
 .svg-wrap :deep([data-entity-id]:hover) rect { stroke: #ef4444 !important; stroke-width: 2 !important; }
+.svg-wrap :deep(a[data-entity-id]:hover) text { fill: #ef4444 !important; }
 .svg-wrap :deep(.svg-remove) { opacity: 0.4; }
 .svg-wrap :deep(.svg-remove) polygon,
 .svg-wrap :deep(.svg-remove) rect,
