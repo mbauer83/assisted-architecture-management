@@ -2,7 +2,6 @@
 import { inject, onMounted, onUnmounted, watch, computed, ref, nextTick } from 'vue'
 import { useRoute, useRouter, RouterLink } from 'vue-router'
 import { Effect, Exit } from 'effect'
-import DOMPurify from 'dompurify'
 import { modelServiceKey } from '../keys'
 import type { DiagramContext, EntityDetail, DiagramConnection, WriteResult, SyncDiagramToModelResult } from '../../domain'
 import type { RepoError } from '../../ports/ModelRepository'
@@ -20,8 +19,9 @@ import {
   buildDrilldownByEntityId,
   diagramNeedsSvg,
 } from './DiagramDetailView.helpers'
-import { lookupViewerExtension, resolveElementMap } from '../lib/diagramViewerExtensions'
+import { lookupViewerExtension, resolveElementMap, neutralizeSentinelLink } from '../lib/diagramViewerExtensions'
 import { SVG_MARKER_ATTRIBUTES } from '../lib/svgHitAreas'
+import { sanitizeDiagramSvg } from '../lib/svgSanitize'
 
 const svc = inject(modelServiceKey)!
 const route = useRoute()
@@ -50,12 +50,7 @@ const diagramConnections = computed(() => contextQuery.data.value?.connections ?
 const viewerExtension = computed(() => lookupViewerExtension(detail.value?.diagram_type))
 
 const svgHtml = computed(() =>
-  svgQuery.data.value
-    ? DOMPurify.sanitize(svgQuery.data.value, {
-        USE_PROFILES: { svg: true, svgFilters: true },
-        ADD_ATTR: ['data-entity', 'data-entity-1', 'data-entity-2'],
-      })
-    : null
+  svgQuery.data.value ? sanitizeDiagramSvg(svgQuery.data.value) : null
 )
 
 const matrixHtml = computed(() => {
@@ -202,10 +197,11 @@ const attachInteractivity = async () => {
   for (const [artifactId, elems] of nodes) {
     svgNodeElems.value.set(artifactId, elems)
     for (const g of elems) {
-      if (!(g instanceof SVGGElement)) continue
+      if (!(g instanceof SVGGElement || g instanceof SVGAElement)) continue
       g.setAttribute('data-entity-id', artifactId)
-      g.addEventListener('click', (ev) => { ev.stopPropagation(); selectEntity(artifactId) }, { signal })
-      attachNodeSubParts(g, artifactId, signal)
+      g.addEventListener('click', (ev) => { ev.stopPropagation(); ev.preventDefault(); selectEntity(artifactId) }, { signal })
+      if (g instanceof SVGGElement) attachNodeSubParts(g, artifactId, signal)
+      else neutralizeSentinelLink(g)
     }
   }
 
@@ -1050,6 +1046,10 @@ onUnmounted(() => {
 .svg-wrap :deep(.svg-selected) rect,
 .svg-wrap :deep(.svg-selected) polyline,
 .svg-wrap :deep(.svg-selected) ellipse { stroke: #2563eb !important; stroke-width: 2.5 !important; }
+/* Sentinel-link representatives (activity diagrams) wrap only a <text> node, with no
+   polygon/rect/polyline/ellipse child for the rules above to match. */
+.svg-wrap :deep(a[data-entity-id]:hover) text { fill: #2563eb !important; }
+.svg-wrap :deep(a.svg-selected) text { fill: #2563eb !important; font-weight: 700; }
 .svg-wrap :deep([data-subpart]) { cursor: pointer; }
 .svg-wrap :deep(text[data-subpart]:hover) { fill: #2563eb !important; }
 .svg-wrap :deep(g[data-subpart]:hover) ellipse { stroke: #2563eb !important; }

@@ -88,3 +88,16 @@ export const resolveElementMap = (
   const ext = lookupViewerExtension(diagramType)
   return ext?.mapElements ? ext.mapElements(svgRoot, ctx) : graphvizMapElements(svgRoot, ctx)
 }
+
+/**
+ * Some `mapElements` implementations (e.g. activity's sentinel `[[arch://…]]` links) return a
+ * real `<a>` as the selectable representative. Once the viewer has read its `href` to build the
+ * map and attached its own click listener, the anchor's native navigation must be disarmed —
+ * `preventDefault` alone only covers a plain left-click; a middle-click/new-tab or drag-to-bookmark
+ * bypasses the `click` handler entirely and would try to launch the unregistered `arch:` scheme.
+ */
+export const neutralizeSentinelLink = (a: SVGAElement): void => {
+  a.removeAttribute('href')
+  a.removeAttributeNS('http://www.w3.org/1999/xlink', 'href')
+  a.removeAttribute('target')
+}
