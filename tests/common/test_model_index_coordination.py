@@ -3,7 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from src.application.artifact_query import ArtifactRepository
-from src.infrastructure.artifact_index import shared_artifact_index
+from src.infrastructure.artifact_index import mutable_artifact_index
 from src.infrastructure.artifact_index.coordination import (
     publish_authoritative_mutation,
     suppress_redundant_refresh_paths,
@@ -101,7 +101,8 @@ REQ_TestAA --> REQ_TestBB
 """,
     )
 
-    repo = ArtifactRepository(shared_artifact_index([root]))
+    index = mutable_artifact_index(root)
+    repo = ArtifactRepository(index)
     before = repo.read_model_version()
 
     _write(entity_path, _entity_md(entity_id, "Sample Updated", "REQ_TestAA"))
@@ -122,7 +123,7 @@ last-updated: '2026-04-21'
 """,
     )
 
-    after = repo.apply_file_changes([entity_path, outgoing_path])
+    after = index.apply_file_changes([entity_path, outgoing_path])
 
     assert after.generation == before.generation + 1
     assert after.etag != before.etag

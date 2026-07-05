@@ -299,11 +299,11 @@ def candidate_registry(*, live_root: Path, staged_root: Path, touched_paths: set
 
 def candidate_store(*, live_root: Path, staged_root: Path, touched_paths: set[Path]) -> CandidateStore:
     from src.infrastructure.app_bootstrap import build_runtime_catalogs, get_module_registry
-    from src.infrastructure.artifact_index import shared_artifact_index
+    from src.infrastructure.artifact_index import mutable_artifact_index
 
     domain_names = build_runtime_catalogs(get_module_registry()).ontology.known_domain_names()
     return CandidateStore(
-        live=shared_artifact_index([live_root]),
+        live=mutable_artifact_index(live_root),
         live_root=live_root,
         staged_root=staged_root,
         touched_paths=touched_paths,

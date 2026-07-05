@@ -13,11 +13,14 @@ from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from src.application.artifact_query import ArtifactRepository
-    from src.application.ports import ArtifactStorePort
 
 import uvicorn
 
 from src.config.settings import backend_min_log_level
+from src.infrastructure.backend._startup_id_checks import (
+    assert_no_cross_repo_id_collisions,
+    assert_no_duplicate_short_ids,
+)
 from src.infrastructure.backend.arch_backend_app import _build_app
 from src.infrastructure.backend.backend_control import backend_status, stop_backend
 from src.infrastructure.backend.backend_probe import probe_backend, resolve_backend_port
@@ -320,13 +323,17 @@ def _initialise_repo(
     repo_root_path: Path, enterprise_root_path: Path | None, args: argparse.Namespace
 ) -> "ArtifactRepository":
     from src.application.artifact_query import ArtifactRepository
-    from src.infrastructure.artifact_index import shared_artifact_index
+    from src.infrastructure.artifact_index import combined_artifact_index, shared_artifact_index
     from src.infrastructure.write.artifact_write.m4_transaction import recover_transactions
 
     roots = [p for p in (repo_root_path, enterprise_root_path) if p is not None]
     logger.info("Initializing backend — repo_root=%s enterprise_root=%s admin_mode=%s read_only=%s",
                 repo_root_path, enterprise_root_path, args.admin_mode, args.read_only)
-    index = shared_artifact_index(roots)
+    index = (
+        combined_artifact_index(repo_root_path, enterprise_root_path)
+        if enterprise_root_path is not None
+        else shared_artifact_index(repo_root_path)
+    )
     # Startup ordering (WS9): recover durable transactions → repair group registry (mutates
     # files) → build index → duplicate scan → serve.  Group repair must precede the index
     # build so the index is consistent with disk at first served request (INV-2); the
@@ -338,7 +345,8 @@ def _initialise_repo(
     _repair_group_registries(repo_root_path, enterprise_root_path)
     repo = ArtifactRepository(index)
     repo.refresh()
-    _assert_no_duplicate_short_ids(index)
+    assert_no_duplicate_short_ids(index)
+    assert_no_cross_repo_id_collisions(index)
     return repo
 
 
@@ -364,19 +372,6 @@ def _repair_group_registries(repo_root_path: Path, enterprise_root_path: Path | 
                     logger.warning("Group registry (enterprise): %s", msg)
             except GroupRegistryError as exc:
                 logger.warning("Enterprise group registry has errors (server will start; fix when possible):\n%s", exc)
-
-
-def _assert_no_duplicate_short_ids(index: "ArtifactStorePort") -> None:
-    """Fail closed if a stable id maps to >1 distinct file within one mount (WS2/WS9)."""
-    duplicates = index.scan_duplicate_short_ids()
-    if duplicates:
-        detail = "\n".join(f"  {short}: {[str(p) for p in paths]}" for short, paths in sorted(duplicates.items()))
-        logger.error(
-            "Startup aborted — stable id(s) map to multiple files in one mount "
-            "(rename/shadowing hazard); resolve the duplicates and restart:\n%s",
-            detail,
-        )
-        sys.exit(1)
 
 
 def _run_startup_validations(repo: "ArtifactRepository") -> None:

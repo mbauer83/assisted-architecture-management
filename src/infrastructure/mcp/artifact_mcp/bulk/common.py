@@ -37,7 +37,9 @@ def resolve_root(repo_root: str | None) -> Path:
 
 
 def local_apply_paths(repo_root: Path, paths: list[Path]) -> None:
-    shared_artifact_index([repo_root]).apply_file_changes(paths)
+    from src.infrastructure.artifact_index import mutable_artifact_index
+
+    mutable_artifact_index(repo_root).apply_file_changes(paths)
 
 
 def temp_repo_callbacks(

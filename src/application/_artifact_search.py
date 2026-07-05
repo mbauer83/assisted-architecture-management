@@ -13,7 +13,7 @@ from src.application.artifact_scoring import (
     score_entity,
     tokenize,
 )
-from src.application.ports import ArtifactStorePort
+from src.application.ports import ReadableArtifactStore
 from src.domain.artifact_types import (
     ConnectionRecord,
     DiagramRecord,
@@ -45,7 +45,7 @@ _RecordType = RecordType  # internal alias for cast()
 
 
 def count_artifacts_by(
-    store: ArtifactStorePort,
+    store: ReadableArtifactStore,
     group_by: Literal["artifact_type", "diagram_type", "domain", "group"],
     *,
     artifact_type: str | list[str] | None = None,
@@ -91,7 +91,7 @@ def count_artifacts_by(
 
 
 def search_artifacts(
-    store: ArtifactStorePort,
+    store: ReadableArtifactStore,
     semantic: SemanticSearchProvider | None,
     query: str,
     *,
@@ -136,7 +136,7 @@ def search_artifacts(
 
 
 def search(
-    store: ArtifactStorePort,
+    store: ReadableArtifactStore,
     semantic: SemanticSearchProvider | None,
     query: str,
     *,
@@ -265,7 +265,7 @@ def _rank_balanced(hits: list[SearchHit], limit: int, prefer_rt: str | None) -> 
 
 
 def _search_entities(
-    store: ArtifactStorePort,
+    store: ReadableArtifactStore,
     query_lc: str,
     tokens: list[str],
     entity_type_set: set[str],
@@ -282,7 +282,7 @@ def _search_entities(
     return hits
 
 
-def _search_connections(store: ArtifactStorePort, query_lc: str, tokens: list[str]) -> list[SearchHit]:
+def _search_connections(store: ReadableArtifactStore, query_lc: str, tokens: list[str]) -> list[SearchHit]:
     return [
         SearchHit(score=s, record_type="connection", record=r)
         for r in store.list_connections()
@@ -290,7 +290,7 @@ def _search_connections(store: ArtifactStorePort, query_lc: str, tokens: list[st
     ]
 
 
-def _search_diagrams(store: ArtifactStorePort, query_lc: str, tokens: list[str]) -> list[SearchHit]:
+def _search_diagrams(store: ReadableArtifactStore, query_lc: str, tokens: list[str]) -> list[SearchHit]:
     return [
         SearchHit(score=s, record_type="diagram", record=r)
         for r in store.list_diagrams()
@@ -298,7 +298,7 @@ def _search_diagrams(store: ArtifactStorePort, query_lc: str, tokens: list[str])
     ]
 
 
-def _search_documents(store: ArtifactStorePort, query_lc: str, tokens: list[str]) -> list[SearchHit]:
+def _search_documents(store: ReadableArtifactStore, query_lc: str, tokens: list[str]) -> list[SearchHit]:
     return [
         SearchHit(score=s, record_type="document", record=r)
         for r in store.list_documents()
@@ -307,7 +307,7 @@ def _search_documents(store: ArtifactStorePort, query_lc: str, tokens: list[str]
 
 
 def _apply_semantic_supplement(
-    store: ArtifactStorePort,
+    store: ReadableArtifactStore,
     semantic: SemanticSearchProvider | None,
     query: str,
     hits: list[SearchHit],

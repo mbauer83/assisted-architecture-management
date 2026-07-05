@@ -235,6 +235,18 @@ class ArtifactStorePort(
     """
 
 
+class ReadableArtifactStore(
+    ArtifactLookup,
+    ArtifactSearch,
+    RelationshipGraph,
+    RepositoryScopeResolver,
+    ArtifactIndexLifecycle,
+    ArtifactIdentityResolver,
+    Protocol,
+):
+    """Read-side artifact store without mutation notifications."""
+
+
 class VerifierStorePort(
     ArtifactLookup,
     ArtifactIndexLifecycle,

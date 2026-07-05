@@ -1,9 +1,9 @@
-"""Query/search facade built on top of an ArtifactStorePort."""
+"""Query/search facade built on top of a readable artifact store."""
 
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Iterable, Literal
+from typing import Literal
 
 from src.application._artifact_search import (
     _RECORD_TYPE_TO_KIND,
@@ -20,7 +20,7 @@ from src.application._artifact_search import (
 from src.application._artifact_search import (
     search_artifacts as _search_artifacts,
 )
-from src.application.ports import ArtifactStorePort
+from src.application.ports import ReadableArtifactStore
 from src.application.read_models import (
     EntityContextConnection,
     EntityContextReadModel,
@@ -41,11 +41,11 @@ _RecordType = Literal["entity", "connection", "diagram", "document"]
 
 
 class ArtifactRepository:
-    """Query/search facade over an ArtifactStorePort."""
+    """Query/search facade over a ReadableArtifactStore."""
 
     def __init__(
         self,
-        store: ArtifactStorePort,
+        store: ReadableArtifactStore,
         semantic_provider: SemanticSearchProvider | None = None,
     ) -> None:
         self._store = store
@@ -68,12 +68,6 @@ class ArtifactRepository:
 
     def read_model_version(self) -> ReadModelVersion:
         return self._store.read_model_version()
-
-    def apply_file_change(self, path: Path) -> None:
-        self._store.apply_file_changes([path])
-
-    def apply_file_changes(self, paths: Iterable[Path]) -> ReadModelVersion:
-        return self._store.apply_file_changes(list(paths))
 
     def read_entity_context(self, artifact_id: str) -> EntityContextReadModel | None:
         return self._store.read_entity_context(artifact_id)

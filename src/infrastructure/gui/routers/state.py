@@ -245,17 +245,19 @@ def get_write_deps() -> tuple[Path, Any, Any]:
     from src.application.verification.artifact_verifier import ArtifactVerifier
     from src.application.verification.artifact_verifier_registry import ArtifactRegistry
     from src.infrastructure.app_bootstrap import build_runtime_catalogs, get_module_registry  # noqa: PLC0415
-    from src.infrastructure.artifact_index import shared_artifact_index
+    from src.infrastructure.artifact_index import combined_artifact_index, shared_artifact_index
 
     with _state_lock:
         repo_root = _repo_root
         enterprise_root = _enterprise_root
     if repo_root is None:
         raise HTTPException(500, "Repository not initialized")
-    roots: list[Path] = [repo_root]
-    if enterprise_root is not None:
-        roots.append(enterprise_root)
-    registry = ArtifactRegistry(shared_artifact_index(roots))
+    index = (
+        combined_artifact_index(repo_root, enterprise_root)
+        if enterprise_root is not None
+        else shared_artifact_index(repo_root)
+    )
+    registry = ArtifactRegistry(index)
     return repo_root, registry, ArtifactVerifier(registry, catalogs=build_runtime_catalogs(get_module_registry()))
 
 
@@ -269,7 +271,7 @@ def get_admin_write_deps() -> tuple[Path, Any, Any]:
     from src.application.verification.artifact_verifier import ArtifactVerifier
     from src.application.verification.artifact_verifier_registry import ArtifactRegistry
     from src.infrastructure.app_bootstrap import build_runtime_catalogs, get_module_registry  # noqa: PLC0415
-    from src.infrastructure.artifact_index import shared_artifact_index
+    from src.infrastructure.artifact_index import combined_artifact_index, shared_artifact_index
 
     with _state_lock:
         admin_mode = _admin_mode
@@ -279,10 +281,12 @@ def get_admin_write_deps() -> tuple[Path, Any, Any]:
         raise HTTPException(403, "Admin mode is not enabled")
     if enterprise_root is None:
         raise HTTPException(500, "Enterprise repository not configured")
-    roots: list[Path] = [enterprise_root]
-    if repo_root is not None:
-        roots.append(repo_root)
-    registry = ArtifactRegistry(shared_artifact_index(roots))
+    index = (
+        combined_artifact_index(repo_root, enterprise_root)
+        if repo_root is not None
+        else shared_artifact_index(enterprise_root)
+    )
+    registry = ArtifactRegistry(index)
     return enterprise_root, registry, ArtifactVerifier(registry, catalogs=build_runtime_catalogs(get_module_registry()))
 
 

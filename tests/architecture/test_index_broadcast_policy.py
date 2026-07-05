@@ -29,19 +29,12 @@ _CALL_RE = re.compile(r"\.apply_file_changes?\(")
 #   service.py         — ArtifactIndex calling its own method on `self` (identity reconciliation
 #                         healing that one index's own stale short-id cache from disk); not an
 #                         external write event that other cached indices need telling about.
-#   artifact_repository.py — thin facade delegation (`ArtifactRepository.apply_file_change(s)` ->
-#                         `self._store.apply_file_changes(...)`); a generic primitive on the
-#                         query/search facade, not itself a write-commit hook. Do not call these
-#                         two ArtifactRepository methods from a write-commit path — that was
-#                         exactly the state.py bug this test guards against; broadcast via
-#                         notify_paths_changed instead and read the version back afterward.
 #   bulk/common.py      — local_apply_paths applies changes to a throwaway staging/dry-run temp
 #                         directory's own index (`temp_repo_callbacks(staged_root)`), never the
 #                         live repo; no other live singleton can share mounts with a fresh temp dir.
 _ALLOWED_FILES = frozenset({
     "src/infrastructure/artifact_index/bootstrap.py",
     "src/infrastructure/artifact_index/service.py",
-    "src/application/artifact_repository.py",
     "src/infrastructure/mcp/artifact_mcp/bulk/common.py",
 })
 

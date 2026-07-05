@@ -45,11 +45,11 @@ class PromotionExecuteBody(BaseModel):
 def promotion_plan(body: PromotionPlanBody) -> dict[str, Any]:
     """Compute the promotion plan for an explicit selection of entities and connections."""
     from src.application.verification.artifact_verifier_registry import ArtifactRegistry
-    from src.infrastructure.artifact_index import shared_artifact_index
+    from src.infrastructure.artifact_index import combined_artifact_index
     from src.infrastructure.write.artifact_write.promote_to_enterprise import plan_promotion
 
     eng_root, ent_root = s.get_both_roots()
-    registry = ArtifactRegistry(shared_artifact_index([eng_root, ent_root]))
+    registry = ArtifactRegistry(combined_artifact_index(eng_root, ent_root))
     repo = s.get_repo()
     try:
         plan = plan_promotion(
@@ -126,12 +126,12 @@ def promotion_plan(body: PromotionPlanBody) -> dict[str, Any]:
 def promotion_execute(body: PromotionExecuteBody) -> dict[str, Any]:
     """Execute a promotion plan built from an explicit selection of entities and connections."""
     from src.application.verification.artifact_verifier_registry import ArtifactRegistry
-    from src.infrastructure.artifact_index import shared_artifact_index
+    from src.infrastructure.artifact_index import combined_artifact_index
     from src.infrastructure.write.artifact_write.promote_execute import execute_promotion
     from src.infrastructure.write.artifact_write.promote_to_enterprise import ConflictResolution, plan_promotion
 
     eng_root, ent_root = s.get_both_roots()
-    registry = ArtifactRegistry(shared_artifact_index([eng_root, ent_root]))
+    registry = ArtifactRegistry(combined_artifact_index(eng_root, ent_root))
     repo = s.get_repo()
     try:
         plan = plan_promotion(

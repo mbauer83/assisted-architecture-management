@@ -8,7 +8,7 @@ from typing import Any
 
 from src.application.artifact_query import ArtifactRepository
 from src.application.verification.artifact_verifier import ArtifactRegistry, ArtifactVerifier
-from src.infrastructure.artifact_index import shared_artifact_index
+from src.infrastructure.artifact_index import notify_paths_changed, shared_artifact_index
 from src.infrastructure.write.artifact_write._promote_conflicts import build_handler
 from src.infrastructure.write.artifact_write._promote_file_ops import (
     TargetResolver,
@@ -158,10 +158,13 @@ def execute_promotion(
         _copy_entities(ctx)
         _apply_entity_conflicts(ctx)
         _copy_simple_artifacts(ctx)
+        if ctx.ent_copied:
+            notify_paths_changed(ctx.ent_copied)
 
         result.verification_errors = collect_verification_errors(enterprise_root, include_diagrams=True)
         if result.verification_errors:
             rollback(ctx.ent_copied, ctx.ent_backups)
+            notify_paths_changed([enterprise_root])
             result.rolled_back = True
             return result
 
@@ -174,8 +177,10 @@ def execute_promotion(
 
         result.executed = True
         _replace_promoted_with_gars(ctx)
+        notify_paths_changed([engagement_root])
     except Exception as exc:  # noqa: BLE001
         rollback(ctx.ent_copied, ctx.ent_backups)
+        notify_paths_changed([enterprise_root])
         result.rolled_back = True
         result.executed = False
         result.verification_errors.append(str(exc))

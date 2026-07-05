@@ -20,7 +20,7 @@ from src.application._artifact_query_helpers import (
     read_entity,
     to_set,
 )
-from src.application.ports import ArtifactStorePort, Candidate
+from src.application.ports import Candidate
 from src.config.workspace_paths import infer_repo_scope
 from src.domain.artifact_types import (
     ArtifactSummary,
@@ -50,7 +50,7 @@ from ._service_incremental import (
 )
 from ._service_scan import scan_mount
 from ._sqlite_store import _SqliteStore
-from .bootstrap import get_shared_index, normalize_mounts, service_key
+from .bootstrap import normalize_mounts, service_key
 from .types import EntityContextConnection, EntityContextReadModel
 from .versioning import ReadModelVersion, build_read_model_etag
 
@@ -66,10 +66,6 @@ _CHANGE_APPLIERS = {
     ),
     "document": lambda service, path, data: apply_document_change(path, service._mem, service._db, parsed=data),
 }
-
-
-def shared_artifact_index(repo_root: Path | list[Path] | list[RepoMount]) -> ArtifactStorePort:
-    return get_shared_index(ArtifactIndex, repo_root)
 
 
 class ArtifactIndex(_ReverseReferenceQueries):

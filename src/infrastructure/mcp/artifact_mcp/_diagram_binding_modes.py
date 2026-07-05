@@ -20,7 +20,7 @@ from src.infrastructure.write.artifact_write.parse_existing import parse_diagram
 def _diagram_path(root: Path, artifact_id: str, key: str) -> Path:
     """Resolve a diagram's source path group-aware, so binding modes work on diagrams in a
     group collection (or other subdirectory), not only a flat layout."""
-    from src.infrastructure.artifact_index.service import shared_artifact_index  # noqa: PLC0415
+    from src.infrastructure.artifact_index import shared_artifact_index  # noqa: PLC0415
 
     index = shared_artifact_index([Path(p) for p in key.split("|") if p])
     resolved = resolve_diagram_source_path(root, artifact_id, index.find_file_by_id)
@@ -91,7 +91,7 @@ def _refresh_derivation(
         raise ValueError(f"Derivation '{derivation_id}' not found in diagram '{artifact_id}'")
 
     from src.application.derivation.refresh import compute_derivation_diff  # noqa: PLC0415
-    from src.infrastructure.artifact_index.service import shared_artifact_index  # noqa: PLC0415
+    from src.infrastructure.artifact_index import shared_artifact_index  # noqa: PLC0415
     from src.infrastructure.mcp.artifact_mcp.context import runtime_catalogs  # noqa: PLC0415
 
     roots = [Path(p) for p in key.split("|") if p]
@@ -194,7 +194,7 @@ def _propose_bindings(
     )
     from src.application.derivation.refresh import compute_revision  # noqa: PLC0415
     from src.domain.allowed_bindings import AllowedBindingsSpec  # noqa: PLC0415
-    from src.infrastructure.artifact_index.service import shared_artifact_index  # noqa: PLC0415
+    from src.infrastructure.artifact_index import shared_artifact_index  # noqa: PLC0415
     from src.infrastructure.mcp.artifact_mcp.context import runtime_catalogs  # noqa: PLC0415
 
     base_revision = compute_revision(path)

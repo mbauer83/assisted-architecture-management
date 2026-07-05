@@ -6,6 +6,8 @@ from typing import TYPE_CHECKING
 
 from src.domain.artifact_types import RepoMount, infer_mount
 
+from .combined_index import CombinedArtifactView
+
 if TYPE_CHECKING:
     from .service import ArtifactIndex
 
@@ -28,10 +30,14 @@ def service_key(mounts: list[RepoMount]) -> str:
 
 _services: dict[str, "ArtifactIndex"] = {}
 _services_mu = threading.Lock()
+_combined_views: dict[str, CombinedArtifactView] = {}
+_combined_views_mu = threading.Lock()
 
 
 def get_shared_index(factory: type["ArtifactIndex"], repo_root: Path | list[Path] | list[RepoMount]) -> "ArtifactIndex":
     mounts = normalize_mounts(repo_root)
+    if len(mounts) != 1:
+        raise ValueError("get_shared_index only accepts one physical repo root")
     key = service_key(mounts)
     with _services_mu:
         service = _services.get(key)
@@ -39,6 +45,24 @@ def get_shared_index(factory: type["ArtifactIndex"], repo_root: Path | list[Path
             service = factory(mounts)
             _services[key] = service
         return service
+
+
+def get_combined_index(
+    factory: type["ArtifactIndex"],
+    engagement_root: Path,
+    enterprise_root: Path,
+) -> CombinedArtifactView:
+    roots = sorted((engagement_root.resolve(), enterprise_root.resolve()), key=str)
+    key = "|".join(str(root) for root in roots)
+    with _combined_views_mu:
+        view = _combined_views.get(key)
+        if view is None:
+            view = CombinedArtifactView(
+                get_shared_index(factory, engagement_root),
+                get_shared_index(factory, enterprise_root),
+            )
+            _combined_views[key] = view
+        return view
 
 
 def notify_paths_changed(paths: list[Path]) -> None:

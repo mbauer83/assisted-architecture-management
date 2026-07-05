@@ -146,13 +146,13 @@ class TestWithheldResponse:
 
 class TestArtifactStorePortAnnotation:
     def test_shared_artifact_index_return_type_annotation(self) -> None:
-        """shared_artifact_index return annotation should be ArtifactStorePort (not ArtifactIndex)."""
+        """shared_artifact_index return annotation should be ReadableArtifactStore (not ArtifactIndex)."""
         import typing
 
-        from src.application.ports import ArtifactStorePort
-        from src.infrastructure.artifact_index import service as svc_module
+        from src.application.ports import ReadableArtifactStore
+        from src.infrastructure.artifact_index import factory as factory_module
 
         # get_type_hints resolves PEP-563 string annotations to actual types
-        hints = typing.get_type_hints(svc_module.shared_artifact_index)
+        hints = typing.get_type_hints(factory_module.shared_artifact_index)
         assert "return" in hints
-        assert hints["return"] is ArtifactStorePort
+        assert hints["return"] is ReadableArtifactStore

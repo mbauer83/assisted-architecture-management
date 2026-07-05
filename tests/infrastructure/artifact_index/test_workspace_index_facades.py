@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from src.infrastructure.artifact_index import combined_artifact_index, shared_artifact_index
 from src.infrastructure.artifact_index.bootstrap import (
     get_shared_index,
     normalize_mounts,
@@ -33,25 +34,26 @@ class TestWorkspaceIndexIdentity:
         assert mounts[0].root.name == "aaa"
         assert mounts[1].root.name == "zzz"
 
-    def test_reversed_root_order_same_instance(self, tmp_path: Path) -> None:
-        eng = tmp_path / "live_eng"
-        ent = tmp_path / "live_ent"
-        eng.mkdir()
+    def test_combined_scope_uses_shared_view_not_physical_index(self, tmp_path: Path) -> None:
+        eng = tmp_path / "engagements" / "live_eng" / "architecture-repository"
+        ent = tmp_path / "enterprise-repository"
+        eng.mkdir(parents=True)
         ent.mkdir()
-        idx1 = get_shared_index(ArtifactIndex, [eng, ent])
-        idx2 = get_shared_index(ArtifactIndex, [ent, eng])
+        idx1 = shared_artifact_index([eng, ent])
+        idx2 = combined_artifact_index(eng, ent)
         assert idx1 is idx2
 
-    def test_different_mount_sets_different_instances(self, tmp_path: Path) -> None:
+    def test_get_shared_index_rejects_multi_root_physical_index(self, tmp_path: Path) -> None:
         a = tmp_path / "repo_a"
         b = tmp_path / "repo_b"
-        c = tmp_path / "repo_c"
         a.mkdir()
         b.mkdir()
-        c.mkdir()
-        idx_ab = get_shared_index(ArtifactIndex, [a, b])
-        idx_ac = get_shared_index(ArtifactIndex, [a, c])
-        assert idx_ab is not idx_ac
+        try:
+            get_shared_index(ArtifactIndex, [a, b])
+        except ValueError:
+            pass
+        else:
+            raise AssertionError("multi-root physical ArtifactIndex construction should be rejected")
 
     def test_single_root_identity(self, tmp_path: Path) -> None:
         r = tmp_path / "single"
@@ -70,7 +72,7 @@ class TestScopedFacades:
         ent = tmp_path / "enterprise-repository"
         eng.mkdir(parents=True)
         ent.mkdir()
-        idx = get_shared_index(ArtifactIndex, [eng, ent])
+        idx = shared_artifact_index([eng, ent])
         assert idx.scope_for_path(eng / "model" / "req.md") == "engagement"
 
     def test_enterprise_scope_for_enterprise_path(self, tmp_path: Path) -> None:
@@ -78,7 +80,7 @@ class TestScopedFacades:
         ent = tmp_path / "enterprise-repository"
         eng.mkdir(parents=True)
         ent.mkdir()
-        idx = get_shared_index(ArtifactIndex, [eng, ent])
+        idx = shared_artifact_index([eng, ent])
         assert idx.scope_for_path(ent / "model" / "req.md") == "enterprise"
 
     def test_unknown_scope_for_unrelated_path(self, tmp_path: Path) -> None:
@@ -92,8 +94,8 @@ class TestScopedFacades:
         ent = tmp_path / "rw_ent"
         eng.mkdir()
         ent.mkdir()
-        idx_fwd = get_shared_index(ArtifactIndex, [eng, ent])
-        idx_rev = get_shared_index(ArtifactIndex, [ent, eng])
+        idx_fwd = shared_artifact_index([eng, ent])
+        idx_rev = shared_artifact_index([ent, eng])
         assert idx_fwd is idx_rev
         assert idx_fwd.find_file_by_id("NOTEXIST@0.X.slug") is None
 
