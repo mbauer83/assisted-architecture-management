@@ -7,7 +7,6 @@ import { useSuggestionCommit } from '../composables/useSuggestionCommit'
 import type { AuthoringGuidance, EntityDisplayInfo } from '../../domain'
 import WizardEntityForm from './WizardEntityForm.vue'
 import WizardConnectionSuggestions from './WizardConnectionSuggestions.vue'
-import EntityPickerInput from './EntityPickerInput.vue'
 import { entityTypesForDomain } from './WizardDomainStage.helpers'
 import {
   legalConnectionPairs, buildWizardSuggestions, buildChainSuggestions, type ChainAnchor,
@@ -15,7 +14,11 @@ import {
 import { readErrorMessage } from '../lib/errors'
 
 /**
- * Create-or-find one entity of `entityType`, then surface ranked connection suggestions for it.
+ * One entity of `entityType` per pass, then ranked connection suggestions for it. There is no
+ * create-vs-find mode: the form is a single search-as-you-type surface — typing the intended
+ * name live-searches existing same-type entities, clicking a match reuses it ("Found"),
+ * creating anyway is always one click. Fast users never engage with the matches; cautious
+ * users get dedupe and anchor-on-existing for free.
  * Shared by the free-choice hub (`WizardDomainStage.vue`) and the guided questionnaire
  * (`WizardQuestionnaireStage.vue`) — the only difference between those two callers is what
  * happens on `done` (reset to type-choice vs. advance to the next question) and, for the
@@ -46,7 +49,6 @@ const emit = defineEmits<{
 
 const svc = inject(modelServiceKey)!
 
-const subMode = ref<'create' | 'find'>('create')
 
 interface ActiveEntity { id: string; name: string; type: string; wasCreated: boolean }
 const activeEntity = ref<ActiveEntity | null>(null)
@@ -66,7 +68,6 @@ const activeSuggestions = computed<WizardSuggestion[]>(() => {
 
 const resetActiveEntity = () => {
   activeEntity.value = null
-  subMode.value = 'create'
   commitError.value = null
 }
 
@@ -189,41 +190,13 @@ defineExpose({ resetActiveEntity })
 
 <template>
   <div class="entity-stage">
-    <div
-      v-if="!activeEntity"
-      class="mode-toggle"
-    >
-      <button
-        type="button"
-        class="mode-btn"
-        :class="{ 'mode-btn--active': subMode === 'create' }"
-        @click="subMode = 'create'"
-      >
-        Create new {{ entityType }}
-      </button>
-      <button
-        type="button"
-        class="mode-btn"
-        :class="{ 'mode-btn--active': subMode === 'find' }"
-        @click="subMode = 'find'"
-      >
-        Find existing {{ entityType }}
-      </button>
-    </div>
-
     <WizardEntityForm
-      v-if="!activeEntity && subMode === 'create'"
+      v-if="!activeEntity"
       :entity-type="entityType"
       :name-placeholder="nameHint"
       @created="onEntityCreated"
       @cancel="emit('done', null)"
       @use-existing="onEntityFound"
-    />
-    <EntityPickerInput
-      v-if="!activeEntity && subMode === 'find'"
-      :fixed-entity-types="[entityType]"
-      placeholder="Search for an existing entity…"
-      @select="onEntityFound"
     />
 
     <div
@@ -297,9 +270,6 @@ defineExpose({ resetActiveEntity })
 
 <style scoped>
 .entity-stage { display: flex; flex-direction: column; gap: 14px; }
-.mode-toggle { display: flex; gap: 8px; }
-.mode-btn { padding: 6px 14px; border-radius: 6px; border: 1px solid #d1d5db; background: #fff; font-size: 13px; cursor: pointer; }
-.mode-btn--active { background: #2563eb; color: #fff; border-color: #2563eb; }
 .active-entity { display: flex; flex-direction: column; gap: 10px; border-top: 1px solid #f3f4f6; padding-top: 12px; }
 .active-entity-label { font-size: 13px; color: #374151; }
 .suggestions-title { font-size: 13px; font-weight: 600; margin: 0; color: #374151; }

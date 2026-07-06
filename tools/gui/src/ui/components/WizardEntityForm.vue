@@ -9,6 +9,8 @@ import { WIZARD_DRAFT_KEYWORD } from './WizardDomainStage.helpers'
 import { useSimilarEntities } from '../composables/useSimilarEntities'
 import type { EntityDisplayInfo } from '../../domain'
 
+// The form is the wizard's single create-or-reuse surface (no separate "find" mode): the name
+// input doubles as the search box over existing same-type entities.
 const componentProps = defineProps<{ entityType: string; namePlaceholder?: string }>()
 const emit = defineEmits<{
   created: [{ artifactId: string; name: string }]
@@ -125,13 +127,15 @@ watch(name, () => { previewClean.value = false })
         class="form-input"
         :placeholder="namePlaceholder ?? 'A short, descriptive name'"
       >
+      <span class="form-hint">Typing searches existing {{ entityType }}s — click a match to
+        reuse it instead of creating a duplicate.</span>
     </div>
 
     <div
       v-if="similar.matches.value.length"
       class="similar-block"
     >
-      <span class="similar-label">Similar existing — reuse instead of duplicating:</span>
+      <span class="similar-label">Existing — click to use instead:</span>
       <button
         v-for="match in similar.matches.value"
         :key="match.artifact_id"
@@ -262,6 +266,7 @@ watch(name, () => { previewClean.value = false })
   outline: none; box-sizing: border-box; font-family: inherit;
 }
 .form-input:focus, .form-textarea:focus { border-color: #2563eb; }
+.form-hint { font-size: 11px; color: #9ca3af; }
 .similar-block { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
 .similar-label { font-size: 12px; color: #92400e; }
 .similar-chip {
