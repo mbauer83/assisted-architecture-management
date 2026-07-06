@@ -1834,3 +1834,26 @@ CONTINUE OR STOP.
   read-only view) — discoverable exactly where a user is about to model by hand. Route
   `/model/wizard` unchanged. Gates: vitest 460 passed, typecheck clean, lint clean; live-verified
   on :5173.
+- 2026-07-06 — Fixed major diagram-rendering regression (no entity-type icons, no arrow lines,
+  e.g. `/diagram?id=ARC@1777470600.cwupfB.reverse-architecture`). **Root cause, reproduced in
+  Chrome and jsdom**: `svgSanitize.ts`'s `ALLOWED_URI_REGEXP` — introduced to admit the
+  `arch://` sentinel scheme — dropped DOMPurify's hyphen escapes, turning `[^a-z+.-:]` into a
+  character class containing the RANGE `.-:` (which includes all digits 0-9). DOMPurify applies
+  this regexp to EVERY attribute value (`_isValidAttribute`, purify.cjs.js:1646), so any value
+  starting with a letter followed by a digit failed — i.e. exactly SVG path data (`d="M307.9…"`).
+  All 25 `<path d>` attributes were stripped (0/40 in the rendered DOM) while polygon `points`
+  (digit-first → `[^a-z]` alternative) and word-only values survived — hence precisely
+  "icons and connector lines gone, boxes and arrowheads intact". **Why tests missed it**: the
+  vitest suite runs in the `node` environment, where DOMPurify is unsupported
+  (`isSupported=false`) and returns its input unchanged — any full-pipeline sanitize test would
+  have passed vacuously, and the existing test only probed the regexp with URI-shaped strings.
+  **Fix**: regexp restored to character-for-character parity with the installed DOMPurify
+  default (incl. its `matrix` scheme) plus `arch`, with a comment marking the escaped hyphens as
+  load-bearing. **Regression prevention**: `svgSanitize.test.ts` rewritten with
+  `@vitest-environment jsdom` (new `jsdom` devDep; happy-dom evaluated first but does NOT
+  reproduce DOMPurify's attribute stripping — unsuitable for sanitizer tests) — full-pipeline
+  test on a structurally faithful PlantUML fixture asserting path `d`/polygon `points`/stroke
+  `style`/`textLength`/`class`/`data-source-line`/`arch:` links all survive and script/
+  `javascript:` content is still stripped, plus regexp-level tests on real path-data values.
+  Verified the new tests fail against the pre-fix code (2 failures) before trusting them.
+  Gates: vitest 465 passed, typecheck clean, lint clean; live-verified on :5173 post-merge.
