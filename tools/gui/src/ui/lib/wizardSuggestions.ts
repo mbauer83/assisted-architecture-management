@@ -75,7 +75,56 @@ function candidateScore(sourceName: string, candidate: EntityDisplayInfo, proxim
   return nameSimilarity(sourceName, candidate.name) + (proximityBoost.has(candidate.artifact_id) ? PROXIMITY_BONUS : 0)
 }
 
-const phraseVerb = (connectionType: string): string => connectionType.replace(/[-_]/g, ' ')
+/**
+ * Modeling-semantics ranking of ArchiMate connection kinds: when several relations are legal
+ * between two elements, the wizard leads with the semantically strong, structurally informative
+ * one — realization (process realizes service), serving, triggering and flow (the behavioural
+ * spine between functions, processes, and events), access (behaviour ↔ objects), assignment
+ * (who performs what) — and offers the generic catch-all association last. Unlisted kinds rank
+ * between the named ones and association.
+ */
+const CONNECTION_KIND_PRIORITY: readonly string[] = [
+  'archimate-realization',
+  'archimate-serving',
+  'archimate-triggering',
+  'archimate-flow',
+  'archimate-access',
+  'archimate-assignment',
+  'archimate-composition',
+  'archimate-aggregation',
+  'archimate-specialization',
+  'archimate-influence',
+]
+
+export function connectionKindRank(connectionType: string): number {
+  const index = CONNECTION_KIND_PRIORITY.indexOf(connectionType)
+  if (index !== -1) return index
+  return connectionType === 'archimate-association'
+    ? CONNECTION_KIND_PRIORITY.length + 1
+    : CONNECTION_KIND_PRIORITY.length
+}
+
+/** Stable sort of legal pairs by connection-kind priority — a caller that then picks "the first
+ * legal pair" for a peer picks the most meaningful relation, not an alphabetical accident. */
+export const prioritizeLegalPairs = (pairs: readonly LegalConnectionPair[]): LegalConnectionPair[] =>
+  [...pairs].sort((a, b) => connectionKindRank(a.connectionType) - connectionKindRank(b.connectionType))
+
+const CONNECTION_VERBS: Record<string, string> = {
+  'archimate-realization': 'realizes',
+  'archimate-serving': 'serves',
+  'archimate-triggering': 'triggers',
+  'archimate-flow': 'flows to',
+  'archimate-access': 'accesses',
+  'archimate-assignment': 'is assigned to',
+  'archimate-composition': 'is composed of',
+  'archimate-aggregation': 'aggregates',
+  'archimate-specialization': 'specializes',
+  'archimate-influence': 'influences',
+  'archimate-association': 'is associated with',
+}
+
+const phraseVerb = (connectionType: string): string =>
+  CONNECTION_VERBS[connectionType] ?? connectionType.replace(/^archimate-/, '').replace(/[-_]/g, ' ')
 
 export function phraseSuggestion(sourceName: string, connectionType: string, targetName: string): string {
   return `${sourceName} probably ${phraseVerb(connectionType)} ${targetName}`
@@ -120,8 +169,9 @@ const suggestionFor = (
  * candidate because "link the driver to the stakeholder you created a minute ago" is the
  * wizard's single most likely next action, and similarity ranking cannot be trusted to surface
  * it (a fresh chain has no graph neighborhood yet, and the candidate search cap can drop
- * just-created entities entirely). One suggestion per anchor — the first legal pair wins —
- * most recent anchors first, capped.
+ * just-created entities entirely). One suggestion per anchor — the highest-priority legal
+ * relation wins (realization/serving/triggering/flow/access before association) — most recent
+ * anchors first, capped.
  */
 export function buildChainSuggestions(
   source: WizardSuggestionSource,
@@ -129,10 +179,11 @@ export function buildChainSuggestions(
   anchors: readonly ChainAnchor[],
   cap: number,
 ): WizardSuggestion[] {
+  const rankedPairs = prioritizeLegalPairs(legalPairs)
   const suggestions: WizardSuggestion[] = []
   for (const anchor of [...anchors].reverse()) {
     if (anchor.id === source.id) continue
-    const pair = legalPairs.find((p) => p.targetType === anchor.type)
+    const pair = rankedPairs.find((p) => p.targetType === anchor.type)
     if (!pair) continue
     suggestions.push(suggestionFor(source, pair, anchor.id, anchor.name))
     if (suggestions.length >= cap) break
@@ -156,21 +207,28 @@ export function buildWizardSuggestions(
   cap: number,
   proximityBoost: ReadonlySet<string> = new Set(),
 ): WizardSuggestion[] {
-  const scored: { score: number; suggestion: WizardSuggestion }[] = []
-  for (const pair of legalPairs) {
+  const scored: { score: number; rank: number; suggestion: WizardSuggestion }[] = []
+  const seenEndpoints = new Set<string>()
+  // Priority order + endpoint dedupe: several relations are often legal for the same peer —
+  // suggest only the most meaningful one per (source, peer) instead of a run of near-duplicates.
+  for (const pair of prioritizeLegalPairs(legalPairs)) {
     const candidates = candidatesByTargetType.get(pair.targetType)
     if (!candidates || candidates.length === 0) continue
     const best = [...candidates].sort(
       (a, b) => candidateScore(source.name, b, proximityBoost) - candidateScore(source.name, a, proximityBoost),
     )[0]
     if (!best) continue
+    const endpointKey = `${source.id}::${best.artifact_id}`
+    if (seenEndpoints.has(endpointKey)) continue
+    seenEndpoints.add(endpointKey)
     scored.push({
       score: candidateScore(source.name, best, proximityBoost),
+      rank: connectionKindRank(pair.connectionType),
       suggestion: suggestionFor(source, pair, best.artifact_id, best.name),
     })
   }
   return scored
-    .sort((a, b) => b.score - a.score)
+    .sort((a, b) => (b.score - a.score) || (a.rank - b.rank))
     .slice(0, cap)
     .map((s) => s.suggestion)
 }

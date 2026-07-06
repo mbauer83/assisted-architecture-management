@@ -1893,3 +1893,18 @@ CONTINUE OR STOP.
   `GroupEntry`/`EntityRecord` (no `Any` — user directive, saved to memory). Gates: backend 3774
   passed, ruff, zuban clean; frontend 465, typecheck, lint clean. **Backend restart required**
   for the sidebar to show correct counts.
+- 2026-07-06 — Wizard connection-kind guidance (user request: guide the most relevant within- and
+  cross-domain relations — flows/triggering between functions/processes/events, access to
+  objects, serving, realization). `wizardSuggestions.ts` gains a modeling-semantics priority
+  order over ArchiMate connection kinds (realization > serving > triggering > flow > access >
+  assignment > composition > aggregation > specialization > influence > unlisted > association)
+  applied in both suggestion paths: chain suggestions now pick the *strongest* legal relation to
+  each spine anchor instead of the first listed (process anchor on a service now suggests
+  "realizes", not "is associated with"); the similarity pool sorts pairs by priority, dedupes to
+  one relation per (source, peer) endpoint — killing the near-duplicate runs where several
+  relations are legal for the same peer — and tiebreaks equal scores by kind priority.
+  Suggestion phrasing upgraded from raw type names ("probably archimate association") to natural
+  verbs per kind ("probably realizes / serves / triggers / flows to / accesses / is associated
+  with"). Tests: kind ranking, chain strongest-relation pick, per-peer dedupe, verb phrasing
+  (+4; suite 469). Gates: vitest 469, typecheck, lint clean. Frontend-only — no backend restart
+  needed.

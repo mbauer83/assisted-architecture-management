@@ -5,6 +5,7 @@ import {
   phraseSuggestion,
   buildWizardSuggestions,
   buildChainSuggestions,
+  connectionKindRank,
   type PermittedConnectionsByPeer,
 } from '../wizardSuggestions'
 import type { EntityDisplayInfo } from '../../../domain'
@@ -180,5 +181,45 @@ describe('buildChainSuggestions', () => {
 
   it('returns nothing for an empty anchor list', () => {
     expect(buildChainSuggestions(source, pairs, [], 3)).toHaveLength(0)
+  })
+})
+
+describe('connection-kind guidance', () => {
+  const source = { id: 'PRC@1.a.p', name: 'Review Audit Trail', domain: 'common' }
+
+  it('ranks meaningful kinds ahead of the generic association', () => {
+    expect(connectionKindRank('archimate-realization')).toBeLessThan(connectionKindRank('archimate-access'))
+    expect(connectionKindRank('archimate-triggering')).toBeLessThan(connectionKindRank('archimate-association'))
+    expect(connectionKindRank('some-unknown-kind')).toBeLessThan(connectionKindRank('archimate-association'))
+  })
+
+  it('chain suggestions pick the strongest legal relation, not the first listed', () => {
+    // A process↔service peer where both association and realization are legal — the wizard
+    // must lead with "realizes", the behavioural spine relation.
+    const pairs = [
+      { direction: 'outgoing' as const, connectionType: 'archimate-association', targetType: 'service' },
+      { direction: 'outgoing' as const, connectionType: 'archimate-realization', targetType: 'service' },
+    ]
+    const anchors = [{ id: 'SRV@1.a.s', name: 'Audit Logging Service', type: 'service' }]
+    const [suggestion] = buildChainSuggestions(source, pairs, anchors, 3)
+    expect(suggestion.connectionType).toBe('archimate-realization')
+    expect(suggestion.summary).toContain('probably realizes')
+  })
+
+  it('pool suggestions offer one relation per peer — the strongest — instead of near-duplicates', () => {
+    const pairs = [
+      { direction: 'outgoing' as const, connectionType: 'archimate-association', targetType: 'event' },
+      { direction: 'outgoing' as const, connectionType: 'archimate-triggering', targetType: 'event' },
+    ]
+    const candidates = new Map([['event', [entity('e1', 'Audit Event Raised')]]])
+    const suggestions = buildWizardSuggestions(source, pairs, candidates, 5)
+    expect(suggestions).toHaveLength(1)
+    expect(suggestions[0].connectionType).toBe('archimate-triggering')
+  })
+
+  it('phrases known kinds as natural verbs', () => {
+    expect(phraseSuggestion('A', 'archimate-access', 'B')).toBe('A probably accesses B')
+    expect(phraseSuggestion('A', 'archimate-flow', 'B')).toBe('A probably flows to B')
+    expect(phraseSuggestion('A', 'archimate-association', 'B')).toBe('A probably is associated with B')
   })
 })
