@@ -21,12 +21,26 @@ function buildSentinelIndex(entities: DiagramMapContext['entities']): Map<string
   return index
 }
 
+const _SHAPE_TAGS = new Set(['rect', 'polygon'])
+
+/**
+ * The step's shape element, if the SVG structure allows finding it: PlantUML emits the
+ * action `<rect>` / decision `<polygon>` as the immediate previous sibling of the label's
+ * sentinel `<a>`. Anything else in that position (an arrow path, another label) means the
+ * structure isn't the expected shape-then-label pair — return null rather than guess.
+ */
+function stepShapeFor(a: SVGAElement): Element | null {
+  const prev = a.previousElementSibling
+  return prev && _SHAPE_TAGS.has(prev.tagName.toLowerCase()) ? prev : null
+}
+
 /**
  * Activity diagrams: PlantUML's activity syntax gives fork no label/link position at all
- * (unselectable — see `_step_links.py`), and wraps action/decision/partition links as their
- * own separate `<a>` text rather than around the shape (no `<g>` per step to attach a click
- * listener to either way). So the sentinel `<a href="arch://…">` itself is the selectable,
- * highlightable element for that step.
+ * (unselectable — see `_step_links.py`), and provides no `<g>` per step. The sentinel
+ * `[[arch://…]]` link wraps the step's label (see `sentinel_wrapped`), so the `<a>` plus —
+ * when structurally identifiable — the step's shape element (the rect/polygon PlantUML emits
+ * immediately before the label) are the selectable, highlightable elements: clicking anywhere
+ * on the step selects it, not only the label text.
  */
 export function activityMapElements(svgRoot: SVGSVGElement, ctx: DiagramMapContext): DiagramElementMap {
   const nodes = new Map<string, Element[]>()
@@ -37,9 +51,11 @@ export function activityMapElements(svgRoot: SVGSVGElement, ctx: DiagramMapConte
     if (!href.startsWith(_SENTINEL_PREFIX)) continue
     const artifactId = sentinelIndex.get(href.slice(_SENTINEL_PREFIX.length))
     if (!artifactId) continue
-    const list = nodes.get(artifactId)
-    if (list) list.push(a)
-    else nodes.set(artifactId, [a])
+    const elements = nodes.get(artifactId) ?? []
+    const shape = stepShapeFor(a)
+    if (shape) elements.push(shape)
+    elements.push(a)
+    nodes.set(artifactId, elements)
   }
 
   return { nodes, edges: new Map() }

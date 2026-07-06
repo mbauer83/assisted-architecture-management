@@ -67,3 +67,44 @@ describe('activityMapElements', () => {
     expect(edges.size).toBe(0)
   })
 })
+
+describe('whole-step selectability (label-wrapped sentinels)', () => {
+  // Mirrors the new renderer emission (`:[[arch://id label]];`): PlantUML places the step's
+  // rect/polygon as the immediate previous sibling of the label's <a> — see
+  // fixtures/order-flow-wrapped.svg for a structurally faithful sample.
+  it('includes the action rect so clicking the shape selects the step', () => {
+    const root = new FakeSvgRoot()
+    const rect = root.appendChild(new FakeElement('rect'))
+    const link = addSentinelLink(root, 'arch://APC@1.orders')
+
+    const { nodes } = activityMapElements(asSvgRoot(root), {
+      entities: [makeEntity('APC@1.orders', '', 'application-component')],
+      connections: [],
+    })
+    expect(nodes.get('APC@1.orders')).toEqual([rect, link])
+  })
+
+  it('includes the decision polygon', () => {
+    const root = new FakeSvgRoot()
+    const polygon = root.appendChild(new FakeElement('polygon'))
+    const link = addSentinelLink(root, 'arch://d1')
+
+    const { nodes } = activityMapElements(asSvgRoot(root), {
+      entities: [makeEntity('ACT@1#decision/d1', 'd1', 'decision')],
+      connections: [],
+    })
+    expect(nodes.get('ACT@1#decision/d1')).toEqual([polygon, link])
+  })
+
+  it('claims no shape when the previous sibling is not one (old-format SVGs, arrow paths)', () => {
+    const root = new FakeSvgRoot()
+    root.appendChild(new FakeElement('text'))
+    const link = addSentinelLink(root, 'arch://a2')
+
+    const { nodes } = activityMapElements(asSvgRoot(root), {
+      entities: [makeEntity('ACT@1#action/a2', 'a2', 'action')],
+      connections: [],
+    })
+    expect(nodes.get('ACT@1#action/a2')).toEqual([link])
+  })
+})

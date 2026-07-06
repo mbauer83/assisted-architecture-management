@@ -1973,3 +1973,17 @@ CONTINUE OR STOP.
   **Backend restart required**, then the existing activity diagram
   (`ACT@1781338474.NTuMXo`) needs `artifact_edit_diagram(puml='auto-sync')` to re-render with
   the new emission.
+- 2026-07-06 — Activity diagram follow-through after backend restart (user report: still visible
+  anchors, and only anchors clickable). Two causes. (1) The stored diagram body predated the
+  renderer fix — re-rendered `ACT@1781338474.NTuMXo` via `artifact_edit_diagram(puml='auto-sync')`;
+  live SVG now has 0 visible arch:// texts. (2) Whole-step selectability: the activity mapper
+  returned only the sentinel `<a>`; now `stepShapeFor` also claims the step's shape — PlantUML
+  emits the action `<rect>` / decision `<polygon>` as the anchor's immediate previous sibling —
+  falling back to anchor-only when the structure differs (old-format SVGs, arrow paths). Both
+  viewer views' wiring loops accepted only `SVGGElement|SVGAElement` and silently skipped bare
+  shapes — now any `SVGElement`; added self-targeting hover/selected CSS
+  (`rect[data-entity-id]:hover` etc. — the existing rules only matched descendants). New
+  fixture `order-flow-wrapped.svg` (new-format structure) + 3 mapper tests incl. old-format
+  fallback; `FakeElement` gains `previousElementSibling`. Live-verified: 6 rects + 1 polygon +
+  7 anchors wired; clicking a rect selects the step and highlights shape+label. Gates: vitest
+  476, typecheck, lint clean.

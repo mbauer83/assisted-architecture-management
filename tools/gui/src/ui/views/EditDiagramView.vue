@@ -276,7 +276,7 @@ const attachInteractivity = () => {
   for (const [artifactId, elems] of nodes) {
     svgEntityElems.set(artifactId, elems)
     for (const el of elems) {
-      if (!(el instanceof SVGGElement || el instanceof SVGAElement)) continue
+      if (!(el instanceof SVGElement)) continue
       el.setAttribute('data-entity-id', artifactId)
       el.addEventListener('click', (ev) => { ev.stopPropagation(); ev.preventDefault(); toggleEntityRemoval(artifactId) })
       if (el instanceof SVGAElement) neutralizeSentinelLink(el)
@@ -284,7 +284,7 @@ const attachInteractivity = () => {
   }
   for (const [connArtifactId, elems] of edges) {
     for (const el of elems) {
-      if (!(el instanceof SVGGElement || el instanceof SVGAElement)) continue
+      if (!(el instanceof SVGElement)) continue
       el.setAttribute('data-conn-id', connArtifactId)
       el.addEventListener('click', (ev) => { ev.stopPropagation(); ev.preventDefault(); toggleConn(connArtifactId) })
       if (el instanceof SVGAElement) neutralizeSentinelLink(el)
@@ -707,6 +707,8 @@ onUnmounted(() => {
 .svg-wrap :deep([data-entity-id]:hover) polygon,
 .svg-wrap :deep([data-entity-id]:hover) rect { stroke: #ef4444 !important; stroke-width: 2 !important; }
 .svg-wrap :deep(a[data-entity-id]:hover) text { fill: #ef4444 !important; }
+.svg-wrap :deep(rect[data-entity-id]:hover),
+.svg-wrap :deep(polygon[data-entity-id]:hover) { stroke: #ef4444 !important; stroke-width: 2 !important; }
 .svg-wrap :deep(.svg-remove) { opacity: 0.4; }
 .svg-wrap :deep(.svg-remove) polygon,
 .svg-wrap :deep(.svg-remove) rect,

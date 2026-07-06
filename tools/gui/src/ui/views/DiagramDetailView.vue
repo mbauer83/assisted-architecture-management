@@ -197,11 +197,13 @@ const attachInteractivity = async () => {
   for (const [artifactId, elems] of nodes) {
     svgNodeElems.value.set(artifactId, elems)
     for (const g of elems) {
-      if (!(g instanceof SVGGElement || g instanceof SVGAElement)) continue
+      // Mapped representatives may be group/anchor elements OR bare shapes (an activity
+      // step's rect/polygon, mapped so the whole step is clickable, not only its label).
+      if (!(g instanceof SVGElement)) continue
       g.setAttribute('data-entity-id', artifactId)
       g.addEventListener('click', (ev) => { ev.stopPropagation(); ev.preventDefault(); selectEntity(artifactId) }, { signal })
       if (g instanceof SVGGElement) attachNodeSubParts(g, artifactId, signal)
-      else neutralizeSentinelLink(g)
+      else if (g instanceof SVGAElement) neutralizeSentinelLink(g)
     }
   }
 
@@ -1050,6 +1052,12 @@ onUnmounted(() => {
    polygon/rect/polyline/ellipse child for the rules above to match. */
 .svg-wrap :deep(a[data-entity-id]:hover) text { fill: #2563eb !important; }
 .svg-wrap :deep(a.svg-selected) text { fill: #2563eb !important; font-weight: 700; }
+/* Bare-shape representatives (an activity step's own rect/polygon) — the descendant rules
+   above can't match the element itself. */
+.svg-wrap :deep(rect[data-entity-id]:hover),
+.svg-wrap :deep(polygon[data-entity-id]:hover) { stroke: #2563eb !important; stroke-width: 2 !important; }
+.svg-wrap :deep(rect.svg-selected),
+.svg-wrap :deep(polygon.svg-selected) { stroke: #2563eb !important; stroke-width: 2.5 !important; }
 .svg-wrap :deep([data-subpart]) { cursor: pointer; }
 .svg-wrap :deep(text[data-subpart]:hover) { fill: #2563eb !important; }
 .svg-wrap :deep(g[data-subpart]:hover) ellipse { stroke: #2563eb !important; }

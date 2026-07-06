@@ -38,6 +38,12 @@ export class FakeElement {
     if (this.tagName === 'g') return this
     return this.parent?.closest(selector) ?? null
   }
+
+  get previousElementSibling(): FakeElement | null {
+    const siblings = this.parent?.children ?? []
+    const index = siblings.indexOf(this)
+    return index > 0 ? siblings[index - 1] : null
+  }
 }
 
 const hasClass = (e: FakeElement, cls: string): boolean =>
