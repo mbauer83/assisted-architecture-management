@@ -1987,3 +1987,16 @@ CONTINUE OR STOP.
   fallback; `FakeElement` gains `previousElementSibling`. Live-verified: 6 rects + 1 polygon +
   7 anchors wired; clicking a rect selects the step and highlights shape+label. Gates: vitest
   476, typecheck, lint clean.
+- 2026-07-06 — Group lifecycle actions added to the GUI (user report: no way to delete an empty
+  project or archive one with artifacts). The full stack already existed (REST
+  `/api/group/archive|unarchive`, `DELETE /api/group`, port + service methods) — only
+  `GroupManagementView.vue` never exposed it. Row actions now: **Archive** on any non-archived,
+  non-uncategorized group (typed-slug confirm required only when the group has members —
+  mirroring the backend's contract via the `member_count` field from the earlier sidebar fix);
+  **Unarchive** on archived groups; **Delete** only on *empty* groups (typed-slug confirm always,
+  matching the backend; the cascade delete of populated projects stays MCP-only) and never on
+  analysis collections, whose members live in the possibly-locked assurance store so emptiness
+  is unknowable from the repo. Uncategorized offers neither (backend rejects both).
+  Live-verified: gating correct across all 7 real projects; full create→delete cycle on a probe
+  project through the new UI (typed confirm honored, row disappears, no error). Gates: vitest
+  476, typecheck, lint clean. Frontend-only.

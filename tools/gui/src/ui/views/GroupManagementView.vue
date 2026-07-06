@@ -105,6 +105,68 @@ const saveEdit = async () => {
   finally { editBusy.value = false }
 }
 
+/**
+ * Archive / unarchive / delete lifecycle. Archiving a group that still has members and any
+ * delete require typing the slug — mirroring the backend's typed-confirm contract instead of
+ * hiding it behind an auto-filled parameter. Delete is offered only for empty groups (the
+ * cascade path for populated projects stays MCP-only); analysis collections get no delete —
+ * their members live in the (possibly locked) assurance store, so emptiness is unknowable here.
+ */
+const lifecycleSlug = ref<string | null>(null)
+const lifecycleAction = ref<'archive' | 'delete' | null>(null)
+const lifecycleConfirmText = ref('')
+const lifecycleError = ref('')
+const lifecycleBusy = ref(false)
+
+const memberCount = (g: { member_count?: number }) => g.member_count ?? 0
+const canDelete = (g: { slug: string; member_count?: number }) =>
+  props.axis !== 'analysis-collection' && g.slug !== 'uncategorized' && memberCount(g) === 0
+const canArchive = (g: { slug: string; archived?: boolean }) =>
+  g.slug !== 'uncategorized' && !g.archived
+
+const needsTypedConfirm = computed(() => {
+  const g = groups.value.find(x => x.slug === lifecycleSlug.value)
+  return lifecycleAction.value === 'delete' || (g !== undefined && memberCount(g) > 0)
+})
+
+const openLifecycle = (slug: string, action: 'archive' | 'delete') => {
+  lifecycleSlug.value = slug
+  lifecycleAction.value = action
+  lifecycleConfirmText.value = ''
+  lifecycleError.value = ''
+}
+const cancelLifecycle = () => { lifecycleSlug.value = null; lifecycleAction.value = null }
+
+const confirmLifecycle = async () => {
+  const slug = lifecycleSlug.value
+  const action = lifecycleAction.value
+  if (!slug || !action) return
+  if (needsTypedConfirm.value && lifecycleConfirmText.value !== slug) {
+    lifecycleError.value = `Type "${slug}" to confirm.`
+    return
+  }
+  lifecycleBusy.value = true; lifecycleError.value = ''
+  try {
+    if (action === 'archive') {
+      await Effect.runPromise(svc.archiveGroup({ kind: props.axis, target: slug, confirm: slug }))
+    } else {
+      await Effect.runPromise(svc.deleteGroup({ kind: props.axis, target: slug, confirm: slug }))
+    }
+    cancelLifecycle()
+    loadGroups()
+  } catch (e) { lifecycleError.value = String(e) }
+  finally { lifecycleBusy.value = false }
+}
+
+const unarchive = async (slug: string) => {
+  lifecycleBusy.value = true
+  try {
+    await Effect.runPromise(svc.unarchiveGroup({ kind: props.axis, target: slug }))
+    loadGroups()
+  } catch (e) { lifecycleError.value = String(e); lifecycleSlug.value = slug; lifecycleAction.value = null }
+  finally { lifecycleBusy.value = false }
+}
+
 const submitCreate = async () => {
   if (!newSlug.value || !newName.value) return
   createBusy.value = true; createError.value = ''
@@ -372,12 +434,67 @@ const label = computed(() => AXIS_LABELS[props.axis])
                     {{ g.description || '—' }}
                   </td>
                   <td class="td-actions">
-                    <button
-                      class="row-btn"
-                      @click="openEdit(g)"
-                    >
-                      Edit
-                    </button>
+                    <template v-if="lifecycleSlug === g.slug">
+                      <div
+                        v-if="lifecycleError"
+                        class="err"
+                      >
+                        {{ lifecycleError }}
+                      </div>
+                      <template v-if="lifecycleAction">
+                        <input
+                          v-if="needsTypedConfirm"
+                          v-model="lifecycleConfirmText"
+                          class="field-input confirm-input"
+                          :placeholder="`Type ${g.slug} to confirm`"
+                        >
+                        <button
+                          class="row-btn row-btn--danger"
+                          :disabled="lifecycleBusy"
+                          @click="confirmLifecycle"
+                        >
+                          {{ lifecycleAction === 'delete' ? 'Delete' : 'Archive' }}
+                        </button>
+                        <button
+                          class="row-btn"
+                          @click="cancelLifecycle"
+                        >
+                          Cancel
+                        </button>
+                      </template>
+                    </template>
+                    <template v-else>
+                      <button
+                        class="row-btn"
+                        @click="openEdit(g)"
+                      >
+                        Edit
+                      </button>
+                      <button
+                        v-if="canArchive(g)"
+                        class="row-btn"
+                        :disabled="lifecycleBusy"
+                        @click="openLifecycle(g.slug, 'archive')"
+                      >
+                        Archive
+                      </button>
+                      <button
+                        v-if="g.archived && g.slug !== 'uncategorized'"
+                        class="row-btn"
+                        :disabled="lifecycleBusy"
+                        @click="unarchive(g.slug)"
+                      >
+                        Unarchive
+                      </button>
+                      <button
+                        v-if="canDelete(g)"
+                        class="row-btn row-btn--danger"
+                        :disabled="lifecycleBusy"
+                        @click="openLifecycle(g.slug, 'delete')"
+                      >
+                        Delete
+                      </button>
+                    </template>
                   </td>
                 </tr>
                 <tr
@@ -517,6 +634,9 @@ const label = computed(() => AXIS_LABELS[props.axis])
 .empty { text-align: center; color: #9ca3af; padding: 20px; }
 .row-btn { padding: 4px 10px; border: 1px solid #d1d5db; border-radius: 4px; background: white; cursor: pointer; font-size: 12px; }
 .row-btn--primary { background: #2563eb; color: white; border-color: #2563eb; }
+.row-btn--danger { color: #dc2626; border-color: #fca5a5; }
+.row-btn--danger:hover { background: #fef2f2; }
+.confirm-input { max-width: 180px; font-size: 12px; margin-right: 6px; }
 .row-btn--primary:hover:not(:disabled) { background: #1d4ed8; }
 .row-btn:disabled { opacity: 0.5; cursor: not-allowed; }
 .err { font-size: 11px; color: #dc2626; }
