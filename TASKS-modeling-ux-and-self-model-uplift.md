@@ -1946,3 +1946,13 @@ CONTINUE OR STOP.
   interim influence shortcut, and included the outcome in both diagrams
   (one-enterprise-repository-many-engagements; what-we-are-trying-to-achieve). artifact_verify:
   0 errors / 0 warnings.
+- 2026-07-06 — Goals & Outcomes diagram (`ARC@1777452513.d8jG_4`) relaid out vertically (user
+  feedback: too wide). The two single-row container rectangles ("Goals", "Outcomes") forced a
+  4.36:1 aspect; row-wrap hints inside containers lost to the `-up-|>` rank constraints, and an
+  LTR two-column attempt rotated the hints (9:1). Working pattern: drop the containers,
+  interleave goal→its-outcomes sections top-to-bottom (goal rank, outcomes rank below, next
+  goal), realizations as short up-arrows — 2857×2442, 1.17:1. Also included the new outcome
+  OUT@1783330223.620dTh in this diagram (realizing GOL Lm2Bn2, solid style matching the
+  diagram's other realizations; ref already persisted in connection-ids-used). Note for future
+  diagram edits: `Rel_Realization_Right` is NOT among the injected `!define` macros (only
+  plain + `_Up`) — using it fails the PlantUML render.

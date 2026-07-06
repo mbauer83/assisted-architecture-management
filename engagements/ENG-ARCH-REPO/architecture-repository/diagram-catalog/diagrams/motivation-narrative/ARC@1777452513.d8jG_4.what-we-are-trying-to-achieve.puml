@@ -69,10 +69,6 @@ skinparam ranksep 80
 !define Rel_Association_Right(from, to, label) from -- to
 !define Rel_Access(from, to, label) from ..> to
 !define Rel_Influence(from, to, label) from ..> to
-skinparam rectangle<<MotivationGrouping>> {
-  BackgroundColor #F7EEF9
-  BorderColor #7B3F9A
-}
 skinparam rectangle<<goal>> {
   BackgroundColor #EDD6F0
   BorderColor #7B3F9A
@@ -87,49 +83,53 @@ top to bottom direction
 
 title What We Are Trying to Achieve — Goals & Outcomes
 
-rectangle "Goals" <<MotivationGrouping>> {
-  rectangle "<$archimate_goal{scale=1.5}> Achieve Unity of Effort Across Autonomous, Agentic SDLC Work" <<goal>> as GOL_FCfDuc
-  rectangle "<$archimate_goal{scale=1.5}> Speed Up Architectural Planning & Governance for Agentic Work" <<goal>> as GOL_5Fk9di
-  rectangle "<$archimate_goal{scale=1.5}> Plan Collaboratively in a Unified, Staged Repository System" <<goal>> as GOL_Lm2Bn2
-  rectangle "<$archimate_goal{scale=1.5}> Provide Independent Read-Access to Architecture for Teams & Agents" <<goal>> as GOL_Gh3Jk1
-  rectangle "<$archimate_goal{scale=1.5}> Enable Fast Feedback from Implementation to Architecture" <<goal>> as GOL_Xwvgpb
-  rectangle "<$archimate_goal{scale=1.5}> Maintain Coherence and Traceability" <<goal>> as GOL_Po1Qw3
-  rectangle "<$archimate_goal{scale=1.5}> Enable Cross-Engagement Architectural Reuse" <<goal>> as GOL_kCcPph
-}
-GOL_FCfDuc -[hidden]right- GOL_5Fk9di
-GOL_5Fk9di -[hidden]right- GOL_Lm2Bn2
-GOL_Lm2Bn2 -[hidden]right- GOL_Gh3Jk1
-GOL_Gh3Jk1 -[hidden]right- GOL_Xwvgpb
-GOL_Xwvgpb -[hidden]right- GOL_Po1Qw3
-GOL_Po1Qw3 -[hidden]right- GOL_kCcPph
+' Vertical narrative: each goal followed by the outcomes that realize it (outcome below its
+' goal, realization arrow pointing up), sections stacked top to bottom.
+rectangle "<$archimate_goal{scale=1.5}> Speed Up Architectural Planning & Governance for Agentic Work" <<goal>> as GOL_5Fk9di
+rectangle "<$archimate_outcome{scale=1.5}> Reduced Planning & Governance Overhead" <<outcome>> as OUT_AlZjX8
+rectangle "<$archimate_outcome{scale=1.5}> AI Agents Efficiently Discover & Edit Architecture Artifacts" <<outcome>> as OUT_JZMIk3
 
-rectangle "Outcomes" <<MotivationGrouping>> {
-  rectangle "<$archimate_outcome{scale=1.5}> Reduced Planning & Governance Overhead" <<outcome>> as OUT_AlZjX8
-  rectangle "<$archimate_outcome{scale=1.5}> AI Agents Efficiently Discover & Edit Architecture Artifacts" <<outcome>> as OUT_JZMIk3
-  rectangle "<$archimate_outcome{scale=1.5}> Stakeholder Concerns and Hand-Off Points Explicitly Verifiable" <<outcome>> as OUT_YSRwR0
-  rectangle "<$archimate_outcome{scale=1.5}> Architectural Guidance Available Without Specialist Dependency" <<outcome>> as OUT_FXFGrO
-  rectangle "<$archimate_outcome{scale=1.5}> AI Agents Produce Fewer Architecture-Drift Corrections" <<outcome>> as OUT__AzP1Q
-  rectangle "<$archimate_outcome{scale=1.5}> Changes Validated Against Architecture Before Implementation" <<outcome>> as OUT_a5mNob
-  rectangle "<$archimate_outcome{scale=1.5}> Implementation Changes Fed Back, Reviewed & Promoted" <<outcome>> as OUT_g7PM4Y
-  rectangle "<$archimate_outcome{scale=1.5}> Requirements Traceable to Realized Components" <<outcome>> as OUT_9jS0BB
-  rectangle "<$archimate_outcome{scale=1.5}> Architecture Governance Scales Without Proportional Overhead" <<outcome>> as OUT_aOcRl9
-  rectangle "<$archimate_outcome{scale=1.5}> Increased Architectural Coherence" <<outcome>> as OUT_LrpdG0
-  rectangle "<$archimate_outcome{scale=1.5}> Proven Patterns Promoted and Adopted Across Engagements" <<outcome>> as OUT_edEkJa
-  rectangle "<$archimate_outcome{scale=1.5}> Engagements Plan Concurrently Against a Shared, Staged Baseline" <<outcome>> as OUT_620dTh
-}
+rectangle "<$archimate_goal{scale=1.5}> Plan Collaboratively in a Unified, Staged Repository System" <<goal>> as GOL_Lm2Bn2
+rectangle "<$archimate_outcome{scale=1.5}> Stakeholder Concerns and Hand-Off Points Explicitly Verifiable" <<outcome>> as OUT_YSRwR0
+rectangle "<$archimate_outcome{scale=1.5}> Engagements Plan Concurrently Against a Shared, Staged Baseline" <<outcome>> as OUT_620dTh
+
+rectangle "<$archimate_goal{scale=1.5}> Provide Independent Read-Access to Architecture for Teams & Agents" <<goal>> as GOL_Gh3Jk1
+rectangle "<$archimate_outcome{scale=1.5}> Architectural Guidance Available Without Specialist Dependency" <<outcome>> as OUT_FXFGrO
+rectangle "<$archimate_outcome{scale=1.5}> AI Agents Produce Fewer Architecture-Drift Corrections" <<outcome>> as OUT__AzP1Q
+
+rectangle "<$archimate_goal{scale=1.5}> Enable Fast Feedback from Implementation to Architecture" <<goal>> as GOL_Xwvgpb
+rectangle "<$archimate_outcome{scale=1.5}> Changes Validated Against Architecture Before Implementation" <<outcome>> as OUT_a5mNob
+rectangle "<$archimate_outcome{scale=1.5}> Implementation Changes Fed Back, Reviewed & Promoted" <<outcome>> as OUT_g7PM4Y
+
+rectangle "<$archimate_goal{scale=1.5}> Maintain Coherence and Traceability" <<goal>> as GOL_Po1Qw3
+rectangle "<$archimate_outcome{scale=1.5}> Requirements Traceable to Realized Components" <<outcome>> as OUT_9jS0BB
+rectangle "<$archimate_outcome{scale=1.5}> Increased Architectural Coherence" <<outcome>> as OUT_LrpdG0
+rectangle "<$archimate_outcome{scale=1.5}> Architecture Governance Scales Without Proportional Overhead" <<outcome>> as OUT_aOcRl9
+
+rectangle "<$archimate_goal{scale=1.5}> Enable Cross-Engagement Architectural Reuse" <<goal>> as GOL_kCcPph
+rectangle "<$archimate_outcome{scale=1.5}> Proven Patterns Promoted and Adopted Across Engagements" <<outcome>> as OUT_edEkJa
+
+rectangle "<$archimate_goal{scale=1.5}> Achieve Unity of Effort Across Autonomous, Agentic SDLC Work" <<goal>> as GOL_FCfDuc
+
+' --- Layout: goal rank, then its outcomes rank, then the next goal ---
+GOL_5Fk9di -[hidden]down- OUT_AlZjX8
 OUT_AlZjX8 -[hidden]right- OUT_JZMIk3
-OUT_JZMIk3 -[hidden]right- OUT_YSRwR0
-OUT_YSRwR0 -[hidden]right- OUT_FXFGrO
+OUT_AlZjX8 -[hidden]down- GOL_Lm2Bn2
+GOL_Lm2Bn2 -[hidden]down- OUT_YSRwR0
+OUT_YSRwR0 -[hidden]right- OUT_620dTh
+OUT_YSRwR0 -[hidden]down- GOL_Gh3Jk1
+GOL_Gh3Jk1 -[hidden]down- OUT_FXFGrO
 OUT_FXFGrO -[hidden]right- OUT__AzP1Q
-OUT__AzP1Q -[hidden]right- OUT_a5mNob
+OUT_FXFGrO -[hidden]down- GOL_Xwvgpb
+GOL_Xwvgpb -[hidden]down- OUT_a5mNob
 OUT_a5mNob -[hidden]right- OUT_g7PM4Y
-OUT_g7PM4Y -[hidden]right- OUT_9jS0BB
-OUT_9jS0BB -[hidden]right- OUT_aOcRl9
-OUT_aOcRl9 -[hidden]right- OUT_LrpdG0
-OUT_LrpdG0 -[hidden]right- OUT_edEkJa
-OUT_edEkJa -[hidden]right- OUT_620dTh
-
-GOL_kCcPph -[hidden]down- OUT_AlZjX8
+OUT_a5mNob -[hidden]down- GOL_Po1Qw3
+GOL_Po1Qw3 -[hidden]down- OUT_9jS0BB
+OUT_9jS0BB -[hidden]right- OUT_LrpdG0
+OUT_LrpdG0 -[hidden]right- OUT_aOcRl9
+OUT_9jS0BB -[hidden]down- GOL_kCcPph
+GOL_kCcPph -[hidden]down- OUT_edEkJa
+OUT_edEkJa -[hidden]down- GOL_FCfDuc
 
 GOL_FCfDuc -- GOL_5Fk9di
 GOL_FCfDuc -- GOL_Lm2Bn2
@@ -141,6 +141,7 @@ GOL_kCcPph -- GOL_FCfDuc
 OUT_AlZjX8 -up-|> GOL_5Fk9di
 OUT_JZMIk3 -up-|> GOL_5Fk9di
 OUT_YSRwR0 -up-|> GOL_Lm2Bn2
+OUT_620dTh -up-|> GOL_Lm2Bn2
 OUT_FXFGrO -up-|> GOL_Gh3Jk1
 OUT__AzP1Q -up-|> GOL_Gh3Jk1
 OUT_a5mNob -up-|> GOL_Xwvgpb
@@ -150,6 +151,5 @@ OUT_aOcRl9 -up-|> GOL_FCfDuc
 OUT_aOcRl9 -up-|> GOL_Po1Qw3
 OUT_LrpdG0 -up-|> GOL_Po1Qw3
 OUT_edEkJa -up-|> GOL_kCcPph
-Rel_Realization_Up(OUT_620dTh, GOL_Lm2Bn2, "")
 
 @enduml
