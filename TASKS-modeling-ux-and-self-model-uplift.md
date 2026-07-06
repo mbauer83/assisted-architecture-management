@@ -1871,3 +1871,9 @@ CONTINUE OR STOP.
   create_when/never_create_when guidance in the button's native `title` tooltip (zero layout
   shift); the visible/rest template duplication collapsed into one loop while touching it.
   Gates: vitest 465 passed, typecheck clean, lint clean; live-verified on :5173.
+- 2026-07-06 — Free-choice wizard mode now also supports multiple entities of one type:
+  `WizardDomainStage.vue` passes `allow-another` (the questionnaire already did), so after
+  creating/reusing an entity the stage offers "+ Add another <type>" alongside
+  "Done — choose another type" (explicit done-label; the stage's fallback label simplified to
+  "Done"). Note: the main checkout needed `npm install` for the merged `jsdom` devDep — without
+  it the svgSanitize suite errors out of the run. Gates: vitest 465, typecheck, lint clean.

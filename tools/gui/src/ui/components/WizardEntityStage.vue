@@ -261,7 +261,7 @@ defineExpose({ resetActiveEntity })
           class="btn-link"
           @click="emit('done', activeEntity)"
         >
-          {{ doneLabel ?? '+ Add another entity to this domain' }}
+          {{ doneLabel ?? 'Done' }}
         </button>
       </div>
     </div>

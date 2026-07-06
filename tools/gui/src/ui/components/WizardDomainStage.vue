@@ -105,6 +105,8 @@ watch(() => props.domain, () => { resetToTypeChoice(); questionnaireStarted.valu
         :domain="domain"
         :guidance="guidance"
         :session="session"
+        allow-another
+        done-label="Done — choose another type"
         @done="resetToTypeChoice"
       />
     </div>
