@@ -1,7 +1,4 @@
 model-projects:
-- slug: new-project-1
-  id: GRP@1780548660.1FX56i
-  name: New Project 1
 - slug: motivation-narrative
   id: GRP@1783190272.5z1XxB
   name: Motivation Narrative

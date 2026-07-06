@@ -6,7 +6,9 @@ import DatatypeEditor from './DatatypeEditor.vue'
 
 export function register(): void {
   registerExtension('datatype-editor', DatatypeEditor, {
-    managedOwnTypes: ['classifier'],
+    // Every own type the bespoke editor covers — anything omitted here is ALSO rendered by
+    // the generic DiagramOwnEntityTypeSection, producing two competing UIs for one concept.
+    managedOwnTypes: ['classifier', 'generalization_set'],
   })
   // Viewer: make classifier attribute rows selectable, with a sidebar detail panel.
   registerViewerExtension('datatype', {

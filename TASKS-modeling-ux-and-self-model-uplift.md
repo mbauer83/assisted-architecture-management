@@ -2000,3 +2000,15 @@ CONTINUE OR STOP.
   Live-verified: gating correct across all 7 real projects; full create→delete cycle on a probe
   project through the new UI (typed confirm honored, row disappears, no error). Gates: vitest
   476, typecheck, lint clean. Frontend-only.
+- 2026-07-06 — Datatype editor showed two competing generalization-set UIs (user report with
+  screenshots): the bespoke `GeneralizationSetCard` (complete/disjoint) AND the generic
+  `DiagramOwnEntityTypeSection` (raw `is_covering`/`is_disjoint`/`note` schema fields). Cause:
+  the datatype extension declared `managedOwnTypes: ['classifier']` only, so the config panel's
+  existing dedup mechanism still rendered `generalization_set` generically. Fix: claim
+  `generalization_set` as managed; to lose no capability, the bespoke card gains the `note`
+  input the generic form had (model field already existed), and the renderer now appends the
+  set's note to its constraint note (previously accepted-but-never-rendered). Tests: gs-note
+  render test (+ repaired an assertion split my edit caused in the adjacent test). Live-verified
+  in the edit view: one card, note input present, no raw field names. Gates: backend 3778,
+  ruff, zuban; frontend 476, typecheck, lint. **Backend restart needed** only for the note to
+  appear in re-rendered PUML (the GUI dedup is live already).

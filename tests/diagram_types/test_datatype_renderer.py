@@ -271,6 +271,13 @@ class TestGeneralizationSet:
         assert "note bottom of _g" in out
         assert "GeneralizationSet «method» {complete, disjoint}" in out
 
+    def test_set_note_appended_to_constraint_note(self):
+        classifiers, connections, sets = self._scene()
+        sets = [{**sets[0], "note": "Cases are mutually exclusive by regulation."}]
+        out = _render(classifiers=classifiers, connections=connections, generalization_sets=sets)
+        assert "GeneralizationSet «method» {complete, disjoint}" in out
+        assert "Cases are mutually exclusive by regulation." in out
+
     def test_incomplete_overlapping_constraint(self):
         classifiers, connections, _ = self._scene()
         sets = [{"id": "GS@1.x.m", "label": "method", "is_covering": False, "is_disjoint": False}]

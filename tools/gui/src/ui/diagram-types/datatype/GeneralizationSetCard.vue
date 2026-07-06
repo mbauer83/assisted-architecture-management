@@ -56,6 +56,14 @@ const emit = defineEmits<{
           @change="emit('update', set.id, { is_disjoint: ($event.target as HTMLInputElement).checked })"
         > disjoint
       </label>
+      <input
+        class="gs-note"
+        type="text"
+        :value="set.note ?? ''"
+        placeholder="note"
+        title="Free-text note rendered on the set's constraint note"
+        @input="emit('update', set.id, { note: ($event.target as HTMLInputElement).value || undefined })"
+      >
       <button
         class="del-btn"
         type="button"
@@ -77,6 +85,7 @@ const emit = defineEmits<{
 .gs-empty { font-size: 11px; color: #9ca3af; }
 .gs-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .gs-name { width: 140px; font-size: 11px; border: 1px solid #e2e8f0; border-radius: 3px; padding: 1px 4px; }
+.gs-note { flex: 1; min-width: 100px; font-size: 11px; border: 1px solid #e2e8f0; border-radius: 3px; padding: 1px 4px; }
 .gs-chk { font-size: 11px; color: #6b7280; display: flex; align-items: center; gap: 3px; cursor: pointer; }
 .del-btn { border: none; background: none; cursor: pointer; color: #9ca3af; font-size: 14px; padding: 0 2px; margin-left: auto; }
 .del-btn:hover { color: #ef4444; }

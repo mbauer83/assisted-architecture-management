@@ -174,9 +174,11 @@ def _render_generalization_sets(
             continue
         gset = sets_by_id[set_id]
         label = _safe_text(str(gset.get("label") or set_id))
+        note = _safe_text(str(gset.get("note") or "")).strip()
         lines.extend((
             f"note bottom of {_safe_alias(target)}",
             f"GeneralizationSet «{label}» {_gen_set_constraint(gset)}",
+            *([note] if note else []),
             "end note",
         ))
     return lines
