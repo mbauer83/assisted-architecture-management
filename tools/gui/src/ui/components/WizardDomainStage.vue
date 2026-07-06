@@ -22,6 +22,12 @@ const questionnaireStarted = ref(false)
 
 const chosenType = ref<string | null>(null)
 
+/** Full guidance for the native tooltip — the clamped hint expands nowhere, so hover reveals
+ * the rest without reflowing the grid. */
+const typeTooltip = (t: { create_when: string; never_create_when: string }) =>
+  [t.create_when, t.never_create_when && `Never: ${t.never_create_when}`]
+    .filter(Boolean).join('\n\n')
+
 const chooseType = (type: string) => { chosenType.value = type }
 const resetToTypeChoice = () => { chosenType.value = null }
 
@@ -59,10 +65,11 @@ watch(() => props.domain, () => { resetToTypeChoice(); questionnaireStarted.valu
       </p>
       <div class="type-grid">
         <button
-          v-for="t in typeSplit.visible"
+          v-for="t in (showAllTypes ? [...typeSplit.visible, ...typeSplit.rest] : typeSplit.visible)"
           :key="t.name"
           type="button"
           class="type-btn"
+          :title="typeTooltip(t)"
           @click="chooseType(t.name)"
         >
           <span class="type-name">New {{ t.name }}</span>
@@ -71,21 +78,6 @@ watch(() => props.domain, () => { resetToTypeChoice(); questionnaireStarted.valu
             class="type-hint"
           >{{ t.create_when }}</span>
         </button>
-        <template v-if="showAllTypes">
-          <button
-            v-for="t in typeSplit.rest"
-            :key="t.name"
-            type="button"
-            class="type-btn"
-            @click="chooseType(t.name)"
-          >
-            <span class="type-name">New {{ t.name }}</span>
-            <span
-              v-if="t.create_when"
-              class="type-hint"
-            >{{ t.create_when }}</span>
-          </button>
-        </template>
       </div>
       <button
         v-if="!showAllTypes && typeSplit.rest.length > 0"
@@ -134,11 +126,12 @@ watch(() => props.domain, () => { resetToTypeChoice(); questionnaireStarted.valu
 }
 .type-btn:hover { border-color: #93c5fd; }
 .type-name { font-weight: 600; font-size: 13px; }
+/* Fixed clamp with the full text in the button's title attribute — expanding in place on hover
+ * would reflow the whole grid under the cursor. */
 .type-hint {
   font-size: 12px; color: #6b7280;
   display: -webkit-box; -webkit-line-clamp: 4; -webkit-box-orient: vertical; overflow: hidden;
 }
-.type-btn:hover .type-hint { -webkit-line-clamp: unset; }
 .btn-link { align-self: flex-start; background: none; border: none; color: #2563eb; cursor: pointer; padding: 0; font-size: 12px; text-decoration: underline; }
 .stage-body { display: flex; flex-direction: column; gap: 14px; }
 </style>

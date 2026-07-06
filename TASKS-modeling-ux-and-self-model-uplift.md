@@ -1857,3 +1857,17 @@ CONTINUE OR STOP.
   `javascript:` content is still stripped, plus regexp-level tests on real path-data values.
   Verified the new tests fail against the pre-fix code (2 failures) before trusting them.
   Gates: vitest 465 passed, typecheck clean, lint clean; live-verified on :5173 post-merge.
+- 2026-07-06 — Wizard step surface unified + hover-reflow fix (user feedback). (1) The
+  create-vs-find toggle in `WizardEntityStage.vue` is removed: the create form was already a
+  search-as-you-type surface (B4.3's `useSimilarEntities` — typing the intended name live-
+  searches existing same-type entities, click = reuse), making the explicit "Find existing"
+  mode a redundant upfront decision of the same class as the removed planning/reverse toggle.
+  The form is now the single surface, with a muted hint under the name input ("Typing searches
+  existing <type>s…") so the behavior is discoverable; experienced users are never slowed —
+  matches surface passively and Create stays one click. `EntityPickerInput` remains in use
+  elsewhere; only the wizard stage dropped it. (2) `WizardDomainStage.vue`'s
+  `.type-btn:hover .type-hint { -webkit-line-clamp: unset }` — which reflowed the whole type
+  grid under the cursor — is replaced by a fixed 4-line clamp plus the full
+  create_when/never_create_when guidance in the button's native `title` tooltip (zero layout
+  shift); the visible/rest template duplication collapsed into one loop while touching it.
+  Gates: vitest 465 passed, typecheck clean, lint clean; live-verified on :5173.
