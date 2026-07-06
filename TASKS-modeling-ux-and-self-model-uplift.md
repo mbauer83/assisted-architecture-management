@@ -1877,3 +1877,19 @@ CONTINUE OR STOP.
   "Done — choose another type" (explicit done-label; the stage's fallback label simplified to
   "Done"). Note: the main checkout needed `npm install` for the merged `jsdom` devDep — without
   it the svgSanitize suite errors out of the run. Gates: vitest 465, typecheck, lint clean.
+- 2026-07-06 — Fixed sidebar group-count bug (user report: Browse's project/directory categories
+  show zero entities until clicked). Root cause: all three list views (EntitiesView,
+  DiagramsView, DocumentsView) derived group badges by counting the *currently loaded* list —
+  which is group-filtered (and for entities paginated at limit 1000/200), so only the active
+  group ever showed its true count; the initial "All" view also showed page-local counts. Fix at
+  the right layer: `/api/groups` entries now carry a whole-catalog `member_count` per axis
+  (`groups.py::_axis_member_counts`), reusing the exact list-endpoint populations — the new
+  `entities.py::engagement_model_catalog` helper is shared by `/api/entities?scope=engagement`
+  and the counter so they cannot drift; diagram counts exclude assurance-surface types like the
+  diagram list; analysis-collection counts stay absent (assurance store, possibly locked). All
+  three views now consume `member_count` (schema field added); the client-side counting is gone.
+  Regression tests: `TestGroupMemberCounts` (two projects + uncategorized fixture asserting
+  exact per-group counts; every axis entry carries the field). Typed with `GroupAxis`/
+  `GroupEntry`/`EntityRecord` (no `Any` — user directive, saved to memory). Gates: backend 3774
+  passed, ruff, zuban clean; frontend 465, typecheck, lint clean. **Backend restart required**
+  for the sidebar to show correct counts.

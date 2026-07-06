@@ -86,8 +86,10 @@ const groupOptions = computed(() => {
   for (const item of all) { const g = item.group ?? 'uncategorized'; counts[g] = (counts[g] ?? 0) + 1 }
   const registry = groupsState.data.value?.['diagram-collections'] ?? []
   if (registry.length > 0) {
+    // Whole-catalog member_count from the registry — the loaded list is group-filtered, so
+    // counting it shows zero for every non-active group.
     return registry.map(g => ({
-      slug: g.slug, name: g.name, count: counts[g.slug] ?? 0,
+      slug: g.slug, name: g.name, count: g.member_count ?? 0,
       archived: g.archived ?? false, type_filter: g.type_filter ?? [],
     }))
   }

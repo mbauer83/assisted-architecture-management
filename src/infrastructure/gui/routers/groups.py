@@ -3,11 +3,14 @@
 from __future__ import annotations
 
 import asyncio
+from collections import Counter
 from typing import Any
 
 from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel
 
+from src.application.assurance_diagrams import ASSURANCE_SURFACE_DIAGRAM_TYPES
+from src.domain.groups import GroupAxis, GroupEntry, GroupRegistry
 from src.infrastructure.gui.routers import state as s
 
 router = APIRouter()
@@ -50,7 +53,7 @@ class UpdateGroupBody(BaseModel):
     type_filter: list[str] | None = None
 
 
-def _entry_dict(e: Any) -> dict[str, Any]:
+def _entry_dict(e: GroupEntry, member_count: int) -> dict[str, Any]:
     return {
         "slug": e.slug,
         "id": e.id,
@@ -61,7 +64,33 @@ def _entry_dict(e: Any) -> dict[str, Any]:
         "default": e.default,
         "meta_ontology": e.meta_ontology,
         "type_filter": list(e.type_filter),
+        "member_count": member_count,
     }
+
+
+def _axis_member_counts(kind: GroupAxis) -> Counter[str]:
+    """Whole-repo member counts per group slug, matching each axis's browse-list population —
+    the sidebar badges must reflect the full catalog, never the currently loaded (group-filtered)
+    page, or every non-active group reads zero."""
+    repo = s.get_repo()
+    if kind == "model-project":
+        from src.infrastructure.gui.routers.entities import engagement_model_catalog  # noqa: PLC0415
+
+        return Counter(e.group for e in engagement_model_catalog(repo.list_entities()))
+    if kind == "diagram-collection":
+        return Counter(
+            d.group for d in repo.list_diagrams()
+            if d.diagram_type not in ASSURANCE_SURFACE_DIAGRAM_TYPES
+        )
+    if kind == "document-collection":
+        return Counter(d.group for d in repo.list_documents())
+    # analysis-collection members live in the (possibly locked) assurance store, not this repo.
+    return Counter()
+
+
+def _axis_entries(registry: GroupRegistry, kind: GroupAxis) -> list[dict[str, Any]]:
+    counts = _axis_member_counts(kind)
+    return [_entry_dict(e, counts.get(e.slug, 0)) for e in registry.list_axis(kind)]
 
 
 @router.get("/api/groups")
@@ -75,13 +104,13 @@ def list_groups(kind: str | None = None) -> dict[str, Any]:
     registry = load_group_registry(repo_root)
     result: dict[str, Any] = {}
     if kind is None or kind == "model-project":
-        result["model-projects"] = [_entry_dict(e) for e in registry.list_axis("model-project")]
+        result["model-projects"] = _axis_entries(registry, "model-project")
     if kind is None or kind == "diagram-collection":
-        result["diagram-collections"] = [_entry_dict(e) for e in registry.list_axis("diagram-collection")]
+        result["diagram-collections"] = _axis_entries(registry, "diagram-collection")
     if kind is None or kind == "document-collection":
-        result["document-collections"] = [_entry_dict(e) for e in registry.list_axis("document-collection")]
+        result["document-collections"] = _axis_entries(registry, "document-collection")
     if kind is None or kind == "analysis-collection":
-        result["analysis-collections"] = [_entry_dict(e) for e in registry.list_axis("analysis-collection")]
+        result["analysis-collections"] = _axis_entries(registry, "analysis-collection")
     return result
 
 

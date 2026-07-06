@@ -112,18 +112,14 @@ onMounted(() => {
 onUnmounted(() => { refreshEventSource?.close() })
 
 const groupOptions = computed(() => {
-  const all = entityListState.data.value?.items ?? []
-  const counts: Record<string, number> = {}
-  for (const item of all) {
-    const g = item.group ?? 'uncategorized'
-    counts[g] = (counts[g] ?? 0) + 1
-  }
+  // Counts come from the registry's whole-catalog member_count — deriving them from the loaded
+  // (group-filtered, paginated) list made every non-active group read zero until clicked.
   const registryData = groupsState.data.value?.['model-projects']
   if (!registryData) return []
   const result = registryData.map(g => ({
     slug: g.slug,
     name: g.name,
-    count: counts[g.slug] ?? 0,
+    count: g.member_count ?? 0,
     archived: g.archived ?? false,
     meta_ontology: g.meta_ontology ?? '',
   }))

@@ -792,6 +792,9 @@ export const GroupEntrySchema = Schema.Struct({
   default: Schema.optional(Schema.Boolean),
   meta_ontology: Schema.optional(Schema.String),
   type_filter: Schema.optional(Schema.Array(Schema.String)),
+  /** Whole-catalog member count per axis — sidebar badges must use this, never counts derived
+   * from the currently loaded (group-filtered) list, which read zero for inactive groups. */
+  member_count: Schema.optional(Schema.Number),
 })
 export type GroupEntry = typeof GroupEntrySchema.Type
 

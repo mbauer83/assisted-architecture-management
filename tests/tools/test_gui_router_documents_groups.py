@@ -267,3 +267,66 @@ class TestListGroups:
         assert r.status_code == 200
         data = r.json()
         assert "document-collections" in data
+
+
+# ── group member counts ───────────────────────────────────────────────────────
+
+
+_GOAL_MD = """\
+---
+artifact-id: {artifact_id}
+artifact-type: goal
+name: "{name}"
+version: 0.1.0
+status: draft
+last-updated: '2026-01-01'
+---
+
+<!-- §content -->
+"""
+
+
+@pytest.fixture()
+def counted_client(tmp_path: Path):
+    """Two named projects with 2 and 1 entities plus one uncategorized entity — the sidebar
+    regression showed 0 for every group that wasn't the active list filter, because counts were
+    derived client-side from the loaded (group-filtered) page instead of the whole catalog."""
+    from starlette.testclient import TestClient
+
+    root = tmp_path / "engagements" / "ENG-GRP" / "architecture-repository"
+    _write(root / ".arch-repo" / "groups.yaml",
+           "model-projects:\n"
+           "  - slug: alpha\n"
+           "    id: GRP@1.alpha\n"
+           "    name: Alpha\n"
+           "  - slug: beta\n"
+           "    id: GRP@2.beta\n"
+           "    name: Beta\n")
+    for slug, ids in {"alpha": ["GOL@1.aa.g1", "GOL@1.ab.g2"], "beta": ["GOL@1.ba.g3"]}.items():
+        for artifact_id in ids:
+            _write(root / "projects" / slug / "model" / "motivation" / "goal" / f"{artifact_id}.md",
+                   _GOAL_MD.format(artifact_id=artifact_id, name=artifact_id))
+    _write(root / "model" / "motivation" / "goal" / "GOL@1.un.g4.md",
+           _GOAL_MD.format(artifact_id="GOL@1.un.g4", name="Ungrouped"))
+
+    repo = ArtifactRepository(shared_artifact_index([root]))
+    gui_state.init_state(repo, root, None)
+    app = FastAPI()
+    app.include_router(groups_router)
+    return TestClient(app)
+
+
+class TestGroupMemberCounts:
+    def test_model_project_counts_reflect_the_whole_catalog(self, counted_client) -> None:
+        data = counted_client.get("/api/groups?kind=model-project").json()
+        counts = {e["slug"]: e["member_count"] for e in data["model-projects"]}
+        assert counts["alpha"] == 2
+        assert counts["beta"] == 1
+        assert counts["uncategorized"] == 1
+
+    def test_every_axis_entry_carries_a_member_count(self, counted_client) -> None:
+        data = counted_client.get("/api/groups").json()
+        for axis_entries in data.values():
+            for entry in axis_entries:
+                assert isinstance(entry["member_count"], int)
+                assert entry["member_count"] >= 0

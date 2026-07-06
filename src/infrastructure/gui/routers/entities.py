@@ -14,6 +14,7 @@ from src.application.artifact_parsing import decode_entity_properties, parse_ent
 from src.application.artifact_schema import load_attribute_schema
 from src.application.entity_type_predicates import is_assurance_entity_type, is_internal_entity_type
 from src.application.read_models import EntityContextReadModel
+from src.domain.artifact_types import EntityRecord
 from src.infrastructure.gui.routers import state as s
 from src.infrastructure.gui.routers.entity_listing import build_entity_list_rows
 
@@ -25,6 +26,21 @@ def _catalogs():
     return build_runtime_catalogs(get_module_registry())
 
 router = APIRouter()
+
+
+def engagement_model_catalog(records: list[EntityRecord]) -> list[EntityRecord]:
+    """Filter to the engagement model-entity catalog: standalone (non-diagram-owned),
+    engagement-side, non-internal, non-assurance entities — the exact population
+    `/api/entities?scope=engagement` lists. Shared with `/api/groups`'s member counts so sidebar
+    badges can never drift from what browsing a group actually shows."""
+    _cat = _catalogs()
+    return [
+        e for e in records
+        if e.host_diagram_id is None
+        and not s.is_global(e.path)
+        and not is_internal_entity_type(e.artifact_type, _cat.ontology)
+        and not is_assurance_entity_type(e.artifact_type, _cat.module_catalog)
+    ]
 
 
 @router.get("/api/stats")
@@ -57,12 +73,7 @@ def list_entities(
             if s.is_global(e.path) and not is_assurance_entity_type(e.artifact_type, _cat.module_catalog)
         ]
     elif scope == "engagement":
-        entities = [
-            e for e in entities
-            if not s.is_global(e.path)
-            and not is_internal_entity_type(e.artifact_type, _cat.ontology)
-            and not is_assurance_entity_type(e.artifact_type, _cat.module_catalog)
-        ]
+        entities = engagement_model_catalog(entities)
     else:
         entities = [
             e for e in entities
