@@ -1827,3 +1827,10 @@ CONTINUE OR STOP.
   the live GUI — until then the old backend ignores the param and the banner would list
   arbitrary entities, and GAR still appears in guidance. Frontend live-verified on :5173 after
   merge. D-8 (draft finalization semantics) remains the only open decision.
+- 2026-07-06 — Wizard demoted from primary navigation (user feedback: it is a secondary mode of
+  engagement, not a sibling of Browse/Documents/Diagrams). Removed the "Wizard" link from
+  `NavBar.vue`'s Engagement nav; the entry point is now a subtle "✨ Guided" outline link next
+  to "+ Create Entity" in `EntitiesView.vue`'s actions (engagement only, hidden on the global
+  read-only view) — discoverable exactly where a user is about to model by hand. Route
+  `/model/wizard` unchanged. Gates: vitest 460 passed, typecheck clean, lint clean; live-verified
+  on :5173.
