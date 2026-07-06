@@ -1928,3 +1928,21 @@ CONTINUE OR STOP.
   realization/serving. Tests: common step sequence, chainPreference override (aggregation beats
   triggering when declared), type-diverse selection + backfill (+4; suite 473). Gates: vitest
   473, typecheck, lint clean. Frontend-only.
+- 2026-07-06 — Fixed `artifact_create_entity` dropping the `group` param (user-directed tool fix;
+  found while creating the missing outcome for the two-tier→collaborative-planning chain). Root
+  cause, bisected layer by layer with an in-process spy: MCP wrapper forwards `group` correctly;
+  core `create_entity` (`artifact_write/entity.py`) passed it to `entity_path` in both *error*
+  branches but omitted it on the happy path (`entity_path(repo_root, info, eid)` — default
+  UNCATEGORIZED), so every created entity landed in the legacy location regardless of the
+  requested project. One-argument fix; regression tests
+  (`TestCreateEntityGroupPlacement`, proven to fail pre-fix) cover grouped + default placement.
+  Also noted: the GUI REST creator (`_arch_entity_creator.py`) hardcodes UNCATEGORIZED — that is
+  its deliberate current default (no group selection in the wizard yet), not this bug. Gates:
+  3776 passed, ruff, zuban clean. **Backend restart required** for the fix (and the still-pending
+  sidebar member_count) to take effect. Model work in the same session: created
+  OUT@1783330223.620dTh "Engagements Plan Concurrently Against a Shared, Staged Baseline"
+  (re-homed to motivation-narrative via artifact_edit_entity group-move after the buggy create),
+  wired REQ two-tiered —realization→ OUT —realization→ GOL plan-collaboratively, removed the
+  interim influence shortcut, and included the outcome in both diagrams
+  (one-enterprise-repository-many-engagements; what-we-are-trying-to-achieve). artifact_verify:
+  0 errors / 0 warnings.

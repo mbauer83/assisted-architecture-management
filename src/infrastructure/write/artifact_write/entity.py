@@ -146,7 +146,7 @@ def create_entity(
             },
         )
 
-    path = entity_path(repo_root, info, eid)
+    path = entity_path(repo_root, info, eid, group)
     display_section_id, display_content = _render_display(info, name, eid)
 
     content = format_entity_markdown(

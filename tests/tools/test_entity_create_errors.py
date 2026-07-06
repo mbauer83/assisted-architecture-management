@@ -186,3 +186,55 @@ class TestRenderDisplayFallback:
             )
         assert result.content is not None
         assert "archimate" in result.content
+
+
+# ── group placement ───────────────────────────────────────────────────────────
+
+
+class TestCreateEntityGroupPlacement:
+    """The group param must place the file under projects/<slug>/model/… — a regression
+    silently dropped it on the happy path (only the error branches honored it), landing
+    every entity in the legacy uncategorized location regardless of the requested project."""
+
+    def test_group_places_entity_in_project_directory(self, tmp_path: Path) -> None:
+        root = _eng_root(tmp_path, "GRP1")
+        root.mkdir(parents=True)
+        result = create_entity(
+            repo_root=root,
+            verifier=_build_verifier(root),
+            clear_repo_caches=lambda p: None,
+            artifact_type="outcome",
+            name="Grouped Outcome",
+            summary=None,
+            properties=None,
+            notes=None,
+            artifact_id=None,
+            version="0.1.0",
+            status="draft",
+            last_updated=None,
+            dry_run=True,
+            group="alpha-project",
+        )
+        rel = result.path.relative_to(root)
+        assert rel.parts[:2] == ("projects", "alpha-project"), rel
+        assert "model" in rel.parts
+
+    def test_default_group_stays_in_legacy_location(self, tmp_path: Path) -> None:
+        root = _eng_root(tmp_path, "GRP2")
+        root.mkdir(parents=True)
+        result = create_entity(
+            repo_root=root,
+            verifier=_build_verifier(root),
+            clear_repo_caches=lambda p: None,
+            artifact_type="outcome",
+            name="Ungrouped Outcome",
+            summary=None,
+            properties=None,
+            notes=None,
+            artifact_id=None,
+            version="0.1.0",
+            status="draft",
+            last_updated=None,
+            dry_run=True,
+        )
+        assert result.path.relative_to(root).parts[0] == "model"

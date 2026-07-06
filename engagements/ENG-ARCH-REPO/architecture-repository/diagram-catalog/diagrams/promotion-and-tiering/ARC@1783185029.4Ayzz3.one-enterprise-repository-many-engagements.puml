@@ -25,6 +25,7 @@ entity-ids-used:
 - ACT@1712870400.Nn7Oo7.architect
 - ACT@1712870400.Pp8Qq8.developer
 - ROL@1776633082.udXPfB.ai-agent
+- OUT@1783330223.620dTh.engagements-plan-concurrently-against-a-shared-staged-baseline
 connection-ids-used:
 - ACT@1712870400.Nn7Oo7---BOB@1712870400.so7gfN@@archimate-assignment
 - ACT@1712870400.Pp8Qq8---BOB@1712870400.so7gfN@@archimate-assignment
@@ -39,6 +40,9 @@ connection-ids-used:
 - REQ@1712870400.kOU3al---OUT@1776629112.edEkJa@@archimate-realization
 - PRC@1712870400.0Rz5Ex---SRV@1712870400.Uv9Wx9@@archimate-realization
 - SRV@1712870400.Uv9Wx9---REQ@1712870400.Gg4Hh4@@archimate-realization
+- PRC@1712870400.0Rz5Ex---DOB@1777293141.4dO6js@@archimate-access
+- REQ@1712870400.kOU3al---OUT@1783330223.620dTh@@archimate-realization
+- OUT@1783330223.620dTh---GOL@1712870400.Lm2Bn2@@archimate-realization
 diagram-entities:
   occurrence:
   - id: occ-engagement-repository-team-b
@@ -78,7 +82,7 @@ bindings:
   correspondence_kind: represents
   target:
     entity_id: ROL@1776633082.udXPfB.ai-agent
-last-updated: '2026-07-05'
+last-updated: '2026-07-06'
 ---
 @startuml one-enterprise-repository--many-engagements
 hide stereotype
@@ -170,6 +174,7 @@ rectangle "Motivation" <<MotivationGrouping>> {
   rectangle "<$archimate_requirement{scale=1.5}> Two-Tiered Repository" <<requirement>> as REQ_kOU3al
   rectangle "<$archimate_requirement{scale=1.5}> Promotion Mechanism" <<requirement>> as REQ_Gg4Hh4
   rectangle "<$archimate_outcome{scale=1.5}> Proven Patterns Promoted and Adopted Across Engagements" <<outcome>> as OUT_edEkJa
+  rectangle "<$archimate_outcome{scale=1.5}> Engagements Plan Concurrently Against a Shared, Staged Baseline" <<outcome>> as OUT_620dTh
   rectangle "<$archimate_goal{scale=1.5}> Enable Cross-Engagement Architectural Reuse" <<goal>> as GOL_kCcPph
   rectangle "<$archimate_goal{scale=1.5}> Plan Collaboratively in a Unified, Staged Repository System" <<goal>> as GOL_Lm2Bn2
 }
@@ -204,7 +209,8 @@ rectangle "Application" <<ApplicationGrouping>> {
 ' --- Auto-layout: spread and position groupings ---
 REQ_kOU3al -[hidden]right- REQ_Gg4Hh4
 REQ_Gg4Hh4 -[hidden]right- OUT_edEkJa
-OUT_edEkJa -[hidden]right- GOL_kCcPph
+OUT_edEkJa -[hidden]right- OUT_620dTh
+OUT_620dTh -[hidden]right- GOL_kCcPph
 GOL_kCcPph -[hidden]right- GOL_Lm2Bn2
 PRC_0Rz5Ex -[hidden]right- SRV_Uv9Wx9
 BOB_so7gfN -[hidden]right- ACT_Nn7Oo7
@@ -230,5 +236,17 @@ REQ_Gg4Hh4 ..|> OUT_edEkJa
 REQ_kOU3al ..|> OUT_edEkJa
 PRC_0Rz5Ex ..|> SRV_Uv9Wx9
 SRV_Uv9Wx9 .up.|> REQ_Gg4Hh4
+
+' Team / Project B — same model entities as Team A, drawn at their occurrences
+ACT_Nn7Oo7__2 --> BOB_so7gfN__2
+ACT_Pp8Qq8__2 --> BOB_so7gfN__2
+ROL_udXPfB__2 -down- BOB_so7gfN__2
+BOB_6Uok0b -- BOB_so7gfN__2
+DOB_4dO6js -up- BOB_so7gfN__2
+' Promotion produces the per-engagement global entity reference files
+Rel_Access(PRC_0Rz5Ex, DOB_4dO6js, "")
+' Two-tier structure realizes concurrent planning, which realizes the collaborative-planning goal
+Rel_Realization(REQ_kOU3al, OUT_620dTh, "")
+Rel_Realization(OUT_620dTh, GOL_Lm2Bn2, "")
 
 @enduml

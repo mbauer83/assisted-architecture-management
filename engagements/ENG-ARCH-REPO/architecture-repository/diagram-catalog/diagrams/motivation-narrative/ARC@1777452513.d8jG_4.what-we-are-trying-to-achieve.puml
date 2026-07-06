@@ -31,6 +31,7 @@ entity-ids-used:
 - OUT@1776629110.aOcRl9.architecture-governance-scales-without-proportional-coordination-overhead
 - OUT@1776629112.edEkJa.proven-patterns-promoted-and-adopted-across-engagements
 - OUT@1780220699.g7PM4Y.implementation-changes-fed-back-reviewed-promoted
+- OUT@1783330223.620dTh.engagements-plan-concurrently-against-a-shared-staged-baseline
 connection-ids-used:
 - OUT@1712870400.AlZjX8.reduced-planning-governance-overhead---GOL@1712870400.5Fk9di.speed-up-architectural-planning-governance-for-agentic-work@@archimate-realization
 - OUT@1776670379.JZMIk3.ai-agents-author-and-maintain-model-content-autonomously---GOL@1712870400.5Fk9di.speed-up-architectural-planning-governance-for-agentic-work@@archimate-realization
@@ -44,7 +45,8 @@ connection-ids-used:
 - OUT@1776629110.aOcRl9.architecture-governance-scales-without-proportional-coordination-overhead---GOL@1712870400.Po1Qw3.maintain-coherence-and-traceability@@archimate-realization
 - OUT@1712870400.LrpdG0.increased-architectural-coherence---GOL@1712870400.Po1Qw3.maintain-coherence-and-traceability@@archimate-realization
 - OUT@1776629112.edEkJa.proven-patterns-promoted-and-adopted-across-engagements---GOL@1776628205.kCcPph.enable-cross-engagement-architectural-reuse@@archimate-realization
-last-updated: '2026-07-05'
+- OUT@1783330223.620dTh---GOL@1712870400.Lm2Bn2@@archimate-realization
+last-updated: '2026-07-06'
 ---
 @startuml ARC@1777452513.d8jG_4.what-we-are-trying-to-achieve
 hide stereotype
@@ -58,29 +60,15 @@ skinparam backgroundColor #FAFAFA
 skinparam linetype ortho
 skinparam nodesep 60
 skinparam ranksep 80
-skinparam rectangle<<MotivationGrouping>> {
-  BackgroundColor #F7EEF9
-  BorderColor #7B3F9A
-}
-skinparam rectangle<<goal>> {
-  BackgroundColor #EDD6F0
-  BorderColor #7B3F9A
-}
-skinparam rectangle<<outcome>> {
-  BackgroundColor #EDD6F0
-  BorderColor #7B3F9A
-}
-hide stereotype
-
-skinparam defaultFontName "Helvetica Neue, Helvetica, Arial, sans-serif"
-skinparam defaultFontSize 12
-skinparam shadowing false
-skinparam roundcorner 4
-skinparam backgroundColor #FAFAFA
-
-skinparam linetype ortho
-skinparam nodesep 60
-skinparam ranksep 80
+!define Rel_Triggering(from, to, label) from --> to
+!define Rel_Realization(from, to, label) from ..|> to
+!define Rel_Realization_Up(from, to, label) from ..|> to
+!define Rel_Serving(from, to, label) from --> to
+!define Rel_Association(from, to, label) from -- to
+!define Rel_Association_Left(from, to, label) from -- to
+!define Rel_Association_Right(from, to, label) from -- to
+!define Rel_Access(from, to, label) from ..> to
+!define Rel_Influence(from, to, label) from ..> to
 skinparam rectangle<<MotivationGrouping>> {
   BackgroundColor #F7EEF9
   BorderColor #7B3F9A
@@ -127,6 +115,7 @@ rectangle "Outcomes" <<MotivationGrouping>> {
   rectangle "<$archimate_outcome{scale=1.5}> Architecture Governance Scales Without Proportional Overhead" <<outcome>> as OUT_aOcRl9
   rectangle "<$archimate_outcome{scale=1.5}> Increased Architectural Coherence" <<outcome>> as OUT_LrpdG0
   rectangle "<$archimate_outcome{scale=1.5}> Proven Patterns Promoted and Adopted Across Engagements" <<outcome>> as OUT_edEkJa
+  rectangle "<$archimate_outcome{scale=1.5}> Engagements Plan Concurrently Against a Shared, Staged Baseline" <<outcome>> as OUT_620dTh
 }
 OUT_AlZjX8 -[hidden]right- OUT_JZMIk3
 OUT_JZMIk3 -[hidden]right- OUT_YSRwR0
@@ -138,6 +127,7 @@ OUT_g7PM4Y -[hidden]right- OUT_9jS0BB
 OUT_9jS0BB -[hidden]right- OUT_aOcRl9
 OUT_aOcRl9 -[hidden]right- OUT_LrpdG0
 OUT_LrpdG0 -[hidden]right- OUT_edEkJa
+OUT_edEkJa -[hidden]right- OUT_620dTh
 
 GOL_kCcPph -[hidden]down- OUT_AlZjX8
 
@@ -160,5 +150,6 @@ OUT_aOcRl9 -up-|> GOL_FCfDuc
 OUT_aOcRl9 -up-|> GOL_Po1Qw3
 OUT_LrpdG0 -up-|> GOL_Po1Qw3
 OUT_edEkJa -up-|> GOL_kCcPph
+Rel_Realization_Up(OUT_620dTh, GOL_Lm2Bn2, "")
 
 @enduml
