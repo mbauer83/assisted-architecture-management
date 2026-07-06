@@ -133,6 +133,7 @@ const chipText = (index: number, entityType: string) => {
         :session="session"
         :proximity-anchors="spineAnchors"
         :name-hint="currentStep.nameHint"
+        :chain-preference="currentStep.chainPreference ? [...currentStep.chainPreference] : undefined"
         allow-another
         :done-label="isLastStep ? 'Finish questionnaire' : 'Next question →'"
         @done="onStepDone"

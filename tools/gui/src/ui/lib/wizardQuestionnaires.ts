@@ -19,6 +19,10 @@ export interface QuestionnaireStep {
   readonly question: string
   /** Example of a well-formed name, e.g. "e.g. 'Audit events are traceable end-to-end'". */
   readonly nameHint?: string
+  /** Connection kinds this step is really about, ranked first when suggesting links to the
+   * spine (e.g. the subdivision step prefers aggregation over the globally higher-ranked
+   * triggering). */
+  readonly chainPreference?: readonly string[]
 }
 
 export interface QuestionnaireBridge {
@@ -137,6 +141,19 @@ const QUESTIONNAIRES: readonly DomainQuestionnaire[] = [
         entityType: 'process',
         question: 'What ordered sequence of activities achieves the result?',
         nameHint: "e.g. 'Review Audit Trail'",
+      },
+      {
+        entityType: 'function',
+        question: 'How does the process subdivide — what grouped behaviours (functions) or '
+          + 'sub-processes compose it? (For a sub-process, add another process instead.)',
+        nameHint: "e.g. 'Collect Audit Evidence'",
+        chainPreference: ['archimate-aggregation'],
+      },
+      {
+        entityType: 'event',
+        question: 'What happening marks an important transition — triggering or interrupting '
+          + 'behaviour, or coordinating hand-offs between (sub-)processes?',
+        nameHint: "e.g. 'Audit Threshold Exceeded'",
       },
       {
         entityType: 'service',

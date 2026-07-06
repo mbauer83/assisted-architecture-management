@@ -16,9 +16,14 @@ describe('questionnaireForDomain', () => {
       .toEqual(['business-actor', 'business-object'])
   })
 
-  it('covers the common behavioural core (role, process, service)', () => {
+  it('covers the common behavioural core incl. subdivision and coordination (role, process, function, event, service)', () => {
     expect(questionnaireForDomain('common')?.steps.map((s) => s.entityType))
-      .toEqual(['role', 'process', 'service'])
+      .toEqual(['role', 'process', 'function', 'event', 'service'])
+  })
+
+  it('the subdivision step prefers aggregation for its chain suggestions', () => {
+    const step = questionnaireForDomain('common')?.steps.find((s) => s.entityType === 'function')
+    expect(step?.chainPreference).toEqual(['archimate-aggregation'])
   })
 
   it('covers the application support pair', () => {

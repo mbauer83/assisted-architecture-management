@@ -1908,3 +1908,23 @@ CONTINUE OR STOP.
   with"). Tests: kind ranking, chain strongest-relation pick, per-peer dedupe, verb phrasing
   (+4; suite 469). Gates: vitest 469, typecheck, lint clean. Frontend-only — no backend restart
   needed.
+- 2026-07-06 — Common-domain questionnaire completed with events + process subdivision, and
+  chain suggestions made relation-complete (user feedback, two messages). Steps now: role →
+  process → **function** ("How does the process subdivide — functions or sub-processes?"; for a
+  sub-process the question points at adding another process) → **event** ("What happening marks
+  an important transition — triggering, interrupting, or coordinating hand-offs between
+  (sub-)processes?") → service. Grounded in the ontology: subdivision is **aggregation** here
+  (process aggregates functions/sub-processes, verified via pair guidance), which the global
+  kind ranking would lose to triggering — so `QuestionnaireStep` gains `chainPreference`
+  (content-declared connection kinds ranked first for that step's chain suggestions; the
+  function step declares `['archimate-aggregation']`), plumbed questionnaire → entity stage →
+  `buildChainSuggestions(…, preferredKinds)`. Object-access relations verified legal
+  (process/function/event × business-/data-object → `archimate-access`, priority rank 4).
+  Chain anchor selection is now **type-diverse** (cap 3→4): at most one anchor per entity type
+  until every type had its turn, then backfill — so a run of recent same-type anchors (three
+  functions) can no longer crowd out the role's assignment, the object's access, or the
+  service's realization/serving. Covers the requested relations: event↔function and
+  event↔process triggering/flow, behaviour×object access, behaviour×service
+  realization/serving. Tests: common step sequence, chainPreference override (aggregation beats
+  triggering when declared), type-diverse selection + backfill (+4; suite 473). Gates: vitest
+  473, typecheck, lint clean. Frontend-only.

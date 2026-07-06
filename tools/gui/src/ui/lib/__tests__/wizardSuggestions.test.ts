@@ -217,9 +217,61 @@ describe('connection-kind guidance', () => {
     expect(suggestions[0].connectionType).toBe('archimate-triggering')
   })
 
+  it('a step chainPreference overrides the global kind ranking for chain suggestions', () => {
+    // function × process: aggregation (subdivision) must beat the globally higher-ranked
+    // triggering when the step declares its intent.
+    const pairs = [
+      { direction: 'incoming' as const, connectionType: 'archimate-triggering', targetType: 'process' },
+      { direction: 'incoming' as const, connectionType: 'archimate-aggregation', targetType: 'process' },
+    ]
+    const anchors = [{ id: 'PRC@1.a.parent', name: 'Review Audit Trail', type: 'process' }]
+    const fn = { id: 'FUN@1.a.f', name: 'Collect Audit Evidence', domain: 'common' }
+    const [plain] = buildChainSuggestions(fn, pairs, anchors, 3)
+    expect(plain.connectionType).toBe('archimate-triggering')
+    const [preferred] = buildChainSuggestions(fn, pairs, anchors, 3, ['archimate-aggregation'])
+    expect(preferred.connectionType).toBe('archimate-aggregation')
+    expect(preferred.summary).toContain('probably aggregates')
+  })
+
   it('phrases known kinds as natural verbs', () => {
     expect(phraseSuggestion('A', 'archimate-access', 'B')).toBe('A probably accesses B')
     expect(phraseSuggestion('A', 'archimate-flow', 'B')).toBe('A probably flows to B')
     expect(phraseSuggestion('A', 'archimate-association', 'B')).toBe('A probably is associated with B')
+  })
+})
+
+describe('type-diverse chain anchor selection', () => {
+  const process = { id: 'PRC@1.a.new', name: 'Handle Audit Request', domain: 'common' }
+  const pairs = [
+    { direction: 'incoming' as const, connectionType: 'archimate-assignment', targetType: 'role' },
+    { direction: 'outgoing' as const, connectionType: 'archimate-access', targetType: 'business-object' },
+    { direction: 'outgoing' as const, connectionType: 'archimate-triggering', targetType: 'process' },
+  ]
+
+  it('a run of recent same-type anchors cannot crowd out the object and role relations', () => {
+    // Oldest → newest: role, business-object, then three processes. Recency-only selection
+    // with cap 4 would pick 3 processes + the object and drop the role's assignment.
+    const anchors = [
+      { id: 'ROL@1.a.r', name: 'Audit Reviewer', type: 'role' },
+      { id: 'BOB@1.a.o', name: 'Audit Record', type: 'business-object' },
+      { id: 'PRC@1.a.p1', name: 'P1', type: 'process' },
+      { id: 'PRC@1.a.p2', name: 'P2', type: 'process' },
+      { id: 'PRC@1.a.p3', name: 'P3', type: 'process' },
+    ]
+    const suggestions = buildChainSuggestions(process, pairs, anchors, 4)
+    const kinds = suggestions.map((s) => s.connectionType)
+    expect(kinds).toContain('archimate-assignment')
+    expect(kinds).toContain('archimate-access')
+    expect(kinds.filter((k) => k === 'archimate-triggering')).toHaveLength(2)
+  })
+
+  it('backfills remaining slots with same-type anchors after every type had its turn', () => {
+    const anchors = [
+      { id: 'PRC@1.a.p1', name: 'P1', type: 'process' },
+      { id: 'PRC@1.a.p2', name: 'P2', type: 'process' },
+    ]
+    const suggestions = buildChainSuggestions(process, pairs, anchors, 4)
+    expect(suggestions.map((s) => s.targetId === process.id ? s.sourceId : s.targetId).sort())
+      .toEqual(['PRC@1.a.p1', 'PRC@1.a.p2'])
   })
 })

@@ -171,24 +171,36 @@ const suggestionFor = (
  * it (a fresh chain has no graph neighborhood yet, and the candidate search cap can drop
  * just-created entities entirely). One suggestion per anchor — the highest-priority legal
  * relation wins (realization/serving/triggering/flow/access before association) — most recent
- * anchors first, capped.
+ * anchors first, capped. Selection is anchor-type-diverse: at most one anchor per entity type
+ * until every type had its turn, so a run of recent same-type anchors (three functions) cannot
+ * crowd out the relations that span the model — the role's assignment, the business/data
+ * object's access, the service's realization — before leftover slots are backfilled.
  */
 export function buildChainSuggestions(
   source: WizardSuggestionSource,
   legalPairs: readonly LegalConnectionPair[],
   anchors: readonly ChainAnchor[],
   cap: number,
+  preferredKinds: readonly string[] = [],
 ): WizardSuggestion[] {
-  const rankedPairs = prioritizeLegalPairs(legalPairs)
-  const suggestions: WizardSuggestion[] = []
-  for (const anchor of [...anchors].reverse()) {
-    if (anchor.id === source.id) continue
-    const pair = rankedPairs.find((p) => p.targetType === anchor.type)
-    if (!pair) continue
-    suggestions.push(suggestionFor(source, pair, anchor.id, anchor.name))
-    if (suggestions.length >= cap) break
+  // A step's own intent overrides the global kind ranking: the subdivision step is about
+  // aggregation even though triggering ranks higher globally.
+  const rank = (connectionType: string) => {
+    const preferred = preferredKinds.indexOf(connectionType)
+    return preferred !== -1 ? preferred - preferredKinds.length : connectionKindRank(connectionType)
   }
-  return suggestions
+  const rankedPairs = [...prioritizeLegalPairs(legalPairs)].sort(
+    (a, b) => rank(a.connectionType) - rank(b.connectionType))
+  const linkable = [...anchors].reverse().filter((anchor) =>
+    anchor.id !== source.id && rankedPairs.some((p) => p.targetType === anchor.type))
+  const seenTypes = new Set<string>()
+  const firstPerType = linkable.filter((anchor) =>
+    seenTypes.has(anchor.type) ? false : (seenTypes.add(anchor.type), true))
+  const backfill = linkable.filter((anchor) => !firstPerType.includes(anchor))
+  return [...firstPerType, ...backfill].slice(0, cap).map((anchor) => {
+    const pair = rankedPairs.find((p) => p.targetType === anchor.type)!
+    return suggestionFor(source, pair, anchor.id, anchor.name)
+  })
 }
 
 /**

@@ -38,6 +38,9 @@ const props = defineProps<{
   /** Offer "+ Add another <type>" alongside the done action (questionnaire steps that may need
    * several entities of one type — N stakeholders, N affected processes). */
   allowAnother?: boolean
+  /** Connection kinds the current step is about — ranked first in chain suggestions (e.g. the
+   * subdivision step prefers aggregation over the globally higher-ranked triggering). */
+  chainPreference?: string[]
 }>()
 /** `entity` is set when the user completed a create/find this step, null on plain cancel — a
  * guided sequence needs to tell "advance" from "abandon this question" apart. `another` records
@@ -116,7 +119,7 @@ async function loadSuggestionsFor(entity: ActiveEntity) {
     const anchors = await resolveChainAnchors(entity.id)
 
     // Chain first: the session's own spine outranks anything similarity-scored (WU-B4.2).
-    const chain = buildChainSuggestions(source, pairs, anchors, 3)
+    const chain = buildChainSuggestions(source, pairs, anchors, 4, props.chainPreference ?? [])
     for (const suggestion of chain) props.session.queueSuggestion(suggestion)
 
     const targetTypes = [...new Set(pairs.map((p) => p.targetType))]
