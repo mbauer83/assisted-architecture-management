@@ -32,7 +32,7 @@ from src.infrastructure.rendering.puml_safety import (
     warn_when_puml_exceeds_threshold,
 )
 
-from ._step_links import link_suffix
+from ._step_links import link_suffix, sentinel_wrapped, user_link_suffix
 
 _STEP_KEYS = ("action", "decision", "fork", "partition")
 
@@ -77,7 +77,15 @@ class ActivityPumlRenderer:
         if initial_lane_id is None and lanes:
             initial_lane_id = lanes[0]["id"]
 
-        lines: list[str] = [f"@startuml {diagram_name}", f"title {_puml_text(name)}", ""]
+        lines: list[str] = [
+            f"@startuml {diagram_name}",
+            # Sentinel arch:// links wrap the step labels themselves (see _step_links) —
+            # style hyperlinks as plain text so the anchor is invisible, not blue/underlined.
+            "skinparam hyperlinkColor #252327",
+            "skinparam hyperlinkUnderline false",
+            f"title {_puml_text(name)}",
+            "",
+        ]
         if initial_lane_id and initial_lane_id in lane_map:
             lane = lane_map[initial_lane_id]
             lines.append(f"|{_puml_text(str(lane.get('label') or lane['id']))}|")
@@ -273,7 +281,7 @@ def _emit_step(step: dict[str, Any], step_id: str, ctx: _Ctx, lines: list[str], 
     if stype == "action":
         _maybe_switch_lane(step_id, lane_index, lane_map, state, lines, has_lanes=has_lanes)
         label = _puml_text(str(step.get("label") or "action"))
-        lines.append(f":{label}{link_suffix(step)};")
+        lines.append(f":{sentinel_wrapped(step, label)}{user_link_suffix(step)};")
         _emit_step_note(step_id, notes_index, lines)
 
     elif stype == "decision":
@@ -281,7 +289,7 @@ def _emit_step(step: dict[str, Any], step_id: str, ctx: _Ctx, lines: list[str], 
         condition = _puml_text(str(step.get("condition") or "?"))
         then_label = _puml_text(str(step.get("then_label") or "yes"))
         else_label = _puml_text(str(step.get("else_label") or "no"))
-        lines.append(f"if ({condition}?{link_suffix(step)}) then ({then_label})")
+        lines.append(f"if ({sentinel_wrapped(step, f'{condition}?')}{user_link_suffix(step)}) then ({then_label})")
         _emit_step_note(step_id, notes_index, lines)
         then_first = then_target.get(step_id)
         if then_first:

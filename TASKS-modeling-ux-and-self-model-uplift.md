@@ -1956,3 +1956,20 @@ CONTINUE OR STOP.
   diagram's other realizations; ref already persisted in connection-ids-used). Note for future
   diagram edits: `Rel_Realization_Right` is NOT among the injected `!define` macros (only
   plain + `_Up`) — using it fails the PlantUML render.
+- 2026-07-06 — Two user-reported items. (1) Goals & Outcomes diagram: "Achieve Unity of Effort"
+  moved to the top — it sank because the goal-association edges were drawn with it as *target*
+  (PlantUML ranks sources above targets); flipped all six to source-form + anchored the hidden
+  chain from it; aspect now 0.79 (portrait). (2) Activity diagrams rendered visible
+  "arch://…" link text inside action/decision shapes: the sentinel was emitted as a standalone
+  link clause (`:label [[arch://id]];`), which PlantUML renders as its own link text. Fix in
+  the activity renderer: sentinel now wraps the label itself (`:[[arch://id label]];`,
+  `if ([[arch://id cond?]])`) — the whole label becomes the anchor — plus preamble
+  `skinparam hyperlinkColor #252327` / `hyperlinkUnderline false` so it reads as plain text.
+  Partitions keep the title-link form (`partition "x" [[url]]` attaches without visible text).
+  User links stay separate visible clauses. Proven by a real PlantUML render through
+  `render_puml_svg`: visible texts contain no arch:// entries, anchors intact for the viewer
+  mapping (which is href-based and unaffected), no underline, normal text fill. Tests updated
+  to the new contract (+1 preamble test). Gates: 3777 passed, ruff, zuban clean.
+  **Backend restart required**, then the existing activity diagram
+  (`ACT@1781338474.NTuMXo`) needs `artifact_edit_diagram(puml='auto-sync')` to re-render with
+  the new emission.

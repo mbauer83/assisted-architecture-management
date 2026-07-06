@@ -83,8 +83,10 @@ top to bottom direction
 
 title What We Are Trying to Achieve — Goals & Outcomes
 
-' Vertical narrative: each goal followed by the outcomes that realize it (outcome below its
-' goal, realization arrow pointing up), sections stacked top to bottom.
+' Vertical narrative: the overarching unity-of-effort goal on top, then each subordinate goal
+' followed by the outcomes that realize it (outcome below its goal, realization arrow up).
+rectangle "<$archimate_goal{scale=1.5}> Achieve Unity of Effort Across Autonomous, Agentic SDLC Work" <<goal>> as GOL_FCfDuc
+
 rectangle "<$archimate_goal{scale=1.5}> Speed Up Architectural Planning & Governance for Agentic Work" <<goal>> as GOL_5Fk9di
 rectangle "<$archimate_outcome{scale=1.5}> Reduced Planning & Governance Overhead" <<outcome>> as OUT_AlZjX8
 rectangle "<$archimate_outcome{scale=1.5}> AI Agents Efficiently Discover & Edit Architecture Artifacts" <<outcome>> as OUT_JZMIk3
@@ -109,9 +111,8 @@ rectangle "<$archimate_outcome{scale=1.5}> Architecture Governance Scales Withou
 rectangle "<$archimate_goal{scale=1.5}> Enable Cross-Engagement Architectural Reuse" <<goal>> as GOL_kCcPph
 rectangle "<$archimate_outcome{scale=1.5}> Proven Patterns Promoted and Adopted Across Engagements" <<outcome>> as OUT_edEkJa
 
-rectangle "<$archimate_goal{scale=1.5}> Achieve Unity of Effort Across Autonomous, Agentic SDLC Work" <<goal>> as GOL_FCfDuc
-
-' --- Layout: goal rank, then its outcomes rank, then the next goal ---
+' --- Layout: unity goal on top, then goal rank / outcomes rank alternating ---
+GOL_FCfDuc -[hidden]down- GOL_5Fk9di
 GOL_5Fk9di -[hidden]down- OUT_AlZjX8
 OUT_AlZjX8 -[hidden]right- OUT_JZMIk3
 OUT_AlZjX8 -[hidden]down- GOL_Lm2Bn2
@@ -129,14 +130,13 @@ OUT_9jS0BB -[hidden]right- OUT_LrpdG0
 OUT_LrpdG0 -[hidden]right- OUT_aOcRl9
 OUT_9jS0BB -[hidden]down- GOL_kCcPph
 GOL_kCcPph -[hidden]down- OUT_edEkJa
-OUT_edEkJa -[hidden]down- GOL_FCfDuc
 
 GOL_FCfDuc -- GOL_5Fk9di
 GOL_FCfDuc -- GOL_Lm2Bn2
 GOL_FCfDuc -- GOL_Gh3Jk1
 GOL_FCfDuc -- GOL_Xwvgpb
-GOL_Po1Qw3 -- GOL_FCfDuc
-GOL_kCcPph -- GOL_FCfDuc
+GOL_FCfDuc -- GOL_Po1Qw3
+GOL_FCfDuc -- GOL_kCcPph
 
 OUT_AlZjX8 -up-|> GOL_5Fk9di
 OUT_JZMIk3 -up-|> GOL_5Fk9di

@@ -12,16 +12,19 @@ def _render(diagram_entities: object, diagram_connections: list[dict[str, object
     )
 
 
-def test_action_sentinel_uses_bound_entity_id() -> None:
+def test_action_sentinel_wraps_the_label_as_an_invisible_anchor() -> None:
+    # The label itself is the anchor ([[url label]]) — no separate visible "arch://…" link
+    # text inside the shape; the preamble styles hyperlinks as plain text.
     puml = _render({"action": [
         {"type": "action", "id": "a1", "label": "Ship Order", "entity_id": "APC@1.orders"},
     ]})
-    assert ":Ship Order [[arch://APC@1.orders]];" in puml
+    assert ":[[arch://APC@1.orders Ship Order]];" in puml
+    assert "Ship Order [[arch://" not in puml
 
 
 def test_action_sentinel_falls_back_to_local_id_when_unbound() -> None:
     puml = _render({"action": [{"type": "action", "id": "a1", "label": "Ship Order"}]})
-    assert ":Ship Order [[arch://a1]];" in puml
+    assert ":[[arch://a1 Ship Order]];" in puml
 
 
 def test_action_preserves_user_link_alongside_sentinel() -> None:
@@ -29,7 +32,7 @@ def test_action_preserves_user_link_alongside_sentinel() -> None:
         {"type": "action", "id": "a1", "label": "Go", "link": "https://example.com/docs",
          "entity_id": "APC@1.orders"},
     ]})
-    assert ":Go [[https://example.com/docs]] [[arch://APC@1.orders]];" in puml
+    assert ":[[arch://APC@1.orders Go]] [[https://example.com/docs]];" in puml
 
 
 def test_decision_sentinel_in_condition_line() -> None:
@@ -37,14 +40,14 @@ def test_decision_sentinel_in_condition_line() -> None:
         {"type": "decision", "id": "d1", "condition": "Valid", "then_label": "yes", "else_label": "no",
          "entity_id": "GRF@1.gate"},
     ]})
-    assert "if (Valid? [[arch://GRF@1.gate]]) then (yes)" in puml
+    assert "if ([[arch://GRF@1.gate Valid?]]) then (yes)" in puml
 
 
 def test_decision_sentinel_falls_back_to_local_id_when_unbound() -> None:
     puml = _render({"decision": [
         {"type": "decision", "id": "d1", "condition": "Valid", "then_label": "yes", "else_label": "no"},
     ]})
-    assert "if (Valid? [[arch://d1]]) then (yes)" in puml
+    assert "if ([[arch://d1 Valid?]]) then (yes)" in puml
 
 
 def test_partition_sentinel_after_label() -> None:
@@ -71,4 +74,10 @@ def test_fork_emits_no_link_syntax() -> None:
     # No trailing " [[...]]" was appended to the `fork` line itself — if it had been, this
     # exact substring (fork immediately followed by a newline) would not be found.
     assert "fork\n" in puml
-    assert ":Branch A [[arch://a1]];" in puml
+    assert ":[[arch://a1 Branch A]];" in puml
+
+
+def test_hyperlinks_styled_as_plain_text_in_preamble() -> None:
+    puml = _render({"action": [{"type": "action", "id": "a1", "label": "Go"}]})
+    assert "skinparam hyperlinkColor #252327" in puml
+    assert "skinparam hyperlinkUnderline false" in puml
