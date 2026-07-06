@@ -138,9 +138,6 @@ onMounted(async () => {
           <RouterLink to="/diagrams">
             Diagrams
           </RouterLink>
-          <RouterLink to="/model/wizard">
-            Wizard
-          </RouterLink>
           <RouterLink
             to="/promote"
             class="nav__promote"

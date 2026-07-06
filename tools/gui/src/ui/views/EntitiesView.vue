@@ -302,6 +302,14 @@ const displayCount = computed(() => {
           >
             + Create Entity
           </RouterLink>
+          <RouterLink
+            v-if="!isGlobal"
+            to="/model/wizard"
+            class="wizard-link"
+            title="Guided modeling — questionnaires that walk you from motivation to application"
+          >
+            ✨ Guided
+          </RouterLink>
         </div>
       </div>
 
@@ -500,6 +508,11 @@ const displayCount = computed(() => {
 .toggle-btn--active { background: #2563eb; border-color: #2563eb; color: white; }
 .create-btn { padding: 8px 14px; border-radius: 6px; background: #16a34a; color: white; font-size: 13px; font-weight: 500; white-space: nowrap; }
 .create-btn:hover { background: #15803d; text-decoration: none; }
+.wizard-link {
+  padding: 8px 12px; border-radius: 6px; border: 1px solid #bfdbfe; color: #1d4ed8;
+  font-size: 13px; white-space: nowrap; background: #fff;
+}
+.wizard-link:hover { background: #eff6ff; text-decoration: none; }
 
 .entity-table { width: 100%; border-collapse: collapse; background: white; border: 1px solid #e5e7eb; border-radius: 8px; overflow: hidden; }
 .entity-table th, .entity-table td { padding: 10px 14px; text-align: left; }
