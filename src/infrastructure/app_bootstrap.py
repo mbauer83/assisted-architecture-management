@@ -27,12 +27,16 @@ from src.infrastructure.rendering._svg_sprite_convert import browser_markup_to_p
 from src.ontologies.archimate_4._loader import _PACKAGE_DIR as _ARCH_PACKAGE_DIR
 from src.ontologies.archimate_4._loader import META_ONTOLOGY_ALIAS as _ARCHIMATE_META_ALIAS
 from src.ontologies.archimate_4._loader import load_archimate_4_module
-from src.ontologies.assurance import module as assurance_module
-from src.ontologies.sysml_v2_min import module as sysml_v2_min_module
+from src.ontologies.assurance._loader import _PACKAGE_DIR as _ASSURANCE_PACKAGE_DIR
+from src.ontologies.assurance._loader import META_ONTOLOGY_ALIAS as _ASSURANCE_META_ALIAS
+from src.ontologies.assurance._loader import load_assurance_module
+from src.ontologies.sysml_v2_min._loader import _PACKAGE_DIR as _SYSML_PACKAGE_DIR
+from src.ontologies.sysml_v2_min._loader import META_ONTOLOGY_ALIAS as _SYSML_META_ALIAS
+from src.ontologies.sysml_v2_min._loader import load_sysml_module
 
 
-def _load_archimate_guidance_overlay() -> GuidanceOverlay:
-    """Merge the enterprise and engagement guidance caches for the archimate-4 meta-ontology.
+def _load_guidance_overlay(alias: str) -> GuidanceOverlay:
+    """Merge the enterprise and engagement guidance caches for one meta-ontology alias.
 
     No workspace configured (e.g. code generation, most unit tests) ⇒ empty overlay, which
     is a no-op — entities keep whatever ``create_when``/``never_create_when`` text the
@@ -44,21 +48,24 @@ def _load_archimate_guidance_overlay() -> GuidanceOverlay:
     if roots is None:
         return GuidanceOverlay()
     engagement_root, enterprise_root = roots
-    return load_guidance_overlay_for_repos(
-        _ARCHIMATE_META_ALIAS, enterprise_root=enterprise_root, engagement_root=engagement_root
-    )
+    return load_guidance_overlay_for_repos(alias, enterprise_root=enterprise_root, engagement_root=engagement_root)
 
 
 _archimate_4_module = load_archimate_4_module(
-    _ARCH_PACKAGE_DIR, svg_converter=_svg_convert, guidance=_load_archimate_guidance_overlay()
+    _ARCH_PACKAGE_DIR, svg_converter=_svg_convert, guidance=_load_guidance_overlay(_ARCHIMATE_META_ALIAS)
 )
 _archimate_matrix_abbreviations = _archimate_4_module.matrix_abbreviations
+
+_sysml_v2_min_module = load_sysml_module(_SYSML_PACKAGE_DIR, guidance=_load_guidance_overlay(_SYSML_META_ALIAS))
+_assurance_module = load_assurance_module(
+    _ASSURANCE_PACKAGE_DIR, guidance=_load_guidance_overlay(_ASSURANCE_META_ALIAS)
+)
 
 _MODULE_REGISTRY_STATE_KEY = "module_registry"
 _RUNTIME_CATALOGS_STATE_KEY = "runtime_catalogs"
 _logger = logging.getLogger(__name__)
 
-_ALL_ONTOLOGY_MODULES = (_archimate_4_module, sysml_v2_min_module, assurance_module)
+_ALL_ONTOLOGY_MODULES = (_archimate_4_module, _sysml_v2_min_module, _assurance_module)
 
 _DEFAULT_ASSURANCE_DB = Path(__file__).resolve().parents[2] / ".arch-assurance" / "store.db"
 
@@ -214,8 +221,15 @@ def resolve_meta_ontology_artifact_types(
 
 
 def resolve_meta_ontology_module(meta_ontology: str, registry: ModuleRegistry) -> OntologyModule | None:
-    """Return the registered OntologyModule backing a meta-ontology alias, or None if the
-    alias is unknown or its module is inactive. Used where a caller needs the full module
-    (entity AND connection type vocabulary), not just the entity-type subset."""
-    module_name = _META_ONTOLOGY_ALIASES.get(meta_ontology)
-    return registry.find_ontology(module_name) if module_name else None
+    """Return the registered OntologyModule backing a guidance/meta-ontology alias, or None
+    if unknown or inactive. Used where a caller needs the full module (entity AND connection
+    type vocabulary), not just the entity-type subset — e.g. arch-import-guidance key
+    validation.
+
+    Falls back to treating ``meta_ontology`` as a literal registered module name for aliases
+    outside ``_META_ONTOLOGY_ALIASES`` (e.g. ``"assurance"``, whose module class is a
+    separate concept from the architecture-framework meta-ontology picker that dict serves —
+    it is not itself a selectable meta-ontology, but it can still carry its own guidance).
+    """
+    module_name = _META_ONTOLOGY_ALIASES.get(meta_ontology, meta_ontology)
+    return registry.find_ontology(module_name)

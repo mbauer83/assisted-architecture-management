@@ -154,6 +154,19 @@ def test_resolve_meta_ontology_module_returns_none_for_unknown_alias() -> None:
     assert resolve_meta_ontology_module("no-such-alias", registry) is None
 
 
+def test_resolve_meta_ontology_module_falls_back_to_literal_module_name() -> None:
+    """"assurance" is not in _META_ONTOLOGY_ALIASES (it isn't a selectable architecture-
+    framework meta-ontology), but it can still carry its own guidance, so the alias must
+    resolve directly against the registered module name."""
+    from src.infrastructure.app_bootstrap import resolve_meta_ontology_module
+
+    registry = build_module_registry(complete_vocabulary=True)
+    module = resolve_meta_ontology_module("assurance", registry)
+
+    assert module is not None
+    assert module.name == "assurance"
+
+
 def test_resolve_meta_ontology_module_returns_none_when_inactive(monkeypatch: pytest.MonkeyPatch) -> None:
     from src.infrastructure.app_bootstrap import resolve_meta_ontology_module
 

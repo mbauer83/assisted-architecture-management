@@ -104,3 +104,28 @@ def test_module_not_registered_without_store(monkeypatch: pytest.MonkeyPatch) ->
 
     assert not is_module_enabled(assurance_module, {}, set())
     assert is_module_enabled(assurance_module, {}, {"confidential_store"})
+
+
+class TestAssuranceLoaderGuidanceOverlay:
+    def test_absent_guidance_matches_current_behavior(self) -> None:
+        from src.ontologies.assurance._loader import _PACKAGE_DIR, load_assurance_module
+
+        default = load_assurance_module(_PACKAGE_DIR)
+        explicit_none = load_assurance_module(_PACKAGE_DIR, guidance=None)
+        assert default.entity_types["hazard"].create_when == explicit_none.entity_types["hazard"].create_when
+
+    def test_overlay_overrides_one_entity_types_guidance(self) -> None:
+        from src.domain.guidance import GuidanceEntry, GuidanceKey, GuidanceOverlay
+        from src.ontologies.assurance._loader import _PACKAGE_DIR, META_ONTOLOGY_ALIAS, load_assurance_module
+
+        overlay = GuidanceOverlay(
+            {
+                GuidanceKey(
+                    module_alias=META_ONTOLOGY_ALIAS, concept_kind="entity", type_name="hazard"
+                ): GuidanceEntry(create_when="OVERRIDDEN", never_create_when="OVERRIDDEN-NEVER"),
+            }
+        )
+        overridden = load_assurance_module(_PACKAGE_DIR, guidance=overlay)
+
+        assert overridden.entity_types["hazard"].create_when == "OVERRIDDEN"
+        assert overridden.entity_types["hazard"].never_create_when == "OVERRIDDEN-NEVER"

@@ -12,6 +12,7 @@ import pytest
 
 from src.infrastructure import app_bootstrap
 from src.ontologies.archimate_4._loader import _PACKAGE_DIR, load_archimate_4_module
+from src.ontologies.archimate_4._loader import META_ONTOLOGY_ALIAS as _ARCHIMATE_META_ALIAS
 
 
 def _write_cache(repo_root: Path, text: str) -> None:
@@ -23,7 +24,7 @@ def _write_cache(repo_root: Path, text: str) -> None:
 class TestLoadArchimateGuidanceOverlay:
     def test_no_workspace_configured_returns_empty_overlay(self, monkeypatch: pytest.MonkeyPatch) -> None:
         monkeypatch.setattr(app_bootstrap, "resolve_workspace_repo_roots", lambda: None)
-        overlay = app_bootstrap._load_archimate_guidance_overlay()
+        overlay = app_bootstrap._load_guidance_overlay(_ARCHIMATE_META_ALIAS)
         assert overlay.is_empty()
 
     def test_engagement_cache_wins_over_enterprise_cache(
@@ -53,7 +54,7 @@ class TestLoadArchimateGuidanceOverlay:
             app_bootstrap, "resolve_workspace_repo_roots", lambda: (engagement_root, enterprise_root)
         )
 
-        overlay = app_bootstrap._load_archimate_guidance_overlay()
+        overlay = app_bootstrap._load_guidance_overlay(_ARCHIMATE_META_ALIAS)
         module = load_archimate_4_module(_PACKAGE_DIR, guidance=overlay)
 
         assert module.entity_types["stakeholder"].create_when == "engagement"
@@ -68,7 +69,7 @@ class TestLoadArchimateGuidanceOverlay:
             app_bootstrap, "resolve_workspace_repo_roots", lambda: (engagement_root, enterprise_root)
         )
 
-        overlay = app_bootstrap._load_archimate_guidance_overlay()
+        overlay = app_bootstrap._load_guidance_overlay(_ARCHIMATE_META_ALIAS)
         assert overlay.is_empty()
 
         with_overlay = load_archimate_4_module(_PACKAGE_DIR, guidance=overlay)

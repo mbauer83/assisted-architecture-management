@@ -9,7 +9,7 @@ from typing import Any, Literal, cast
 
 import yaml  # type: ignore[import-untyped]
 
-from src.domain.guidance import GuidanceOverlay
+from src.domain.guidance import GuidanceKey, GuidanceOverlay
 from src.domain.module_types import ConnectionTypeName, ElementClassName, EntityTypeName
 from src.domain.ontology_types import ConnectionTypeInfo, ElementClassInfo, EntityTypeInfo
 from src.domain.permitted_relationships import (
@@ -18,6 +18,9 @@ from src.domain.permitted_relationships import (
 )
 
 DISPLAY_SECTION_ID = "sysml"
+
+_PACKAGE_DIR = Path(__file__).parent
+META_ONTOLOGY_ALIAS = "sysml-v2"
 
 
 class _SysmlV2MinModule:
@@ -103,18 +106,30 @@ class _SysmlV2MinModule:
         return None
 
 
-def _load_entity_types(data: dict[str, Any]) -> dict[EntityTypeName, EntityTypeInfo]:
+def _entity_guidance(guidance: GuidanceOverlay, artifact_type: str, info: dict[str, Any]) -> tuple[str, str]:
+    key = GuidanceKey(module_alias=META_ONTOLOGY_ALIAS, concept_kind="entity", type_name=artifact_type)
+    overlaid = guidance.get(key)
+    if overlaid is not None:
+        return overlaid.create_when, overlaid.never_create_when
+    return info.get("create_when", ""), info.get("never_create_when", "")
+
+
+def _load_entity_types(
+    data: dict[str, Any], guidance: GuidanceOverlay | None = None
+) -> dict[EntityTypeName, EntityTypeInfo]:
+    overlay = guidance if guidance is not None else GuidanceOverlay()
     out: dict[EntityTypeName, EntityTypeInfo] = {}
     for artifact_type, info in data["entity_types"].items():
         raw_hierarchy = info.get("hierarchy", [])
         hierarchy = tuple(raw_hierarchy) + (artifact_type,)
+        create_when, never_create_when = _entity_guidance(overlay, artifact_type, info)
         out[EntityTypeName(artifact_type)] = EntityTypeInfo(
             artifact_type=artifact_type,
             prefix=info["prefix"],
             hierarchy=hierarchy,
             classes=tuple(info.get("classes", ())),
-            create_when=info.get("create_when", ""),
-            never_create_when=info.get("never_create_when", ""),
+            create_when=create_when,
+            never_create_when=never_create_when,
             internal=bool(info.get("internal", False)),
         )
     return out
@@ -196,15 +211,12 @@ def _build_permitted_relationships(
 
 
 def load_sysml_module(package_dir: Path, *, guidance: GuidanceOverlay | None = None) -> _SysmlV2MinModule:
-    """``guidance`` is accepted for interface parity with the archimate_4 loader; sysml_v2_min
-    guidance is inline (not spec-derived text, see PLAN §4.3), so it is unused here.
-    """
     with open(package_dir / "entities.yaml") as fh:
         entity_data = yaml.safe_load(fh)
     with open(package_dir / "connections.yaml") as fh:
         conn_data = yaml.safe_load(fh)
 
-    entity_types = _load_entity_types(entity_data)
+    entity_types = _load_entity_types(entity_data, guidance)
     connection_types = _load_connection_types(conn_data)
     permitted = _build_permitted_relationships(conn_data, entity_types)
     element_classes = _load_element_classes(entity_data)

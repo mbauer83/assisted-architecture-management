@@ -358,3 +358,34 @@ def test_entity_types_globally_unique() -> None:
     all_types = registry.all_entity_types()
     for etype in EXPECTED_ENTITY_TYPES:
         assert EntityTypeName(etype) in all_types
+
+
+# ── Guidance overlay ──────────────────────────────────────────────────────────
+
+
+class TestSysmlLoaderGuidanceOverlay:
+    def test_absent_guidance_matches_current_behavior(self) -> None:
+        from src.ontologies.sysml_v2_min._loader import _PACKAGE_DIR, load_sysml_module
+
+        default = load_sysml_module(_PACKAGE_DIR)
+        explicit_none = load_sysml_module(_PACKAGE_DIR, guidance=None)
+        assert (
+            default.entity_types["part-definition"].create_when
+            == explicit_none.entity_types["part-definition"].create_when
+        )
+
+    def test_overlay_overrides_one_entity_types_guidance(self) -> None:
+        from src.domain.guidance import GuidanceEntry, GuidanceKey, GuidanceOverlay
+        from src.ontologies.sysml_v2_min._loader import _PACKAGE_DIR, META_ONTOLOGY_ALIAS, load_sysml_module
+
+        overlay = GuidanceOverlay(
+            {
+                GuidanceKey(
+                    module_alias=META_ONTOLOGY_ALIAS, concept_kind="entity", type_name="part-definition"
+                ): GuidanceEntry(create_when="OVERRIDDEN", never_create_when="OVERRIDDEN-NEVER"),
+            }
+        )
+        overridden = load_sysml_module(_PACKAGE_DIR, guidance=overlay)
+
+        assert overridden.entity_types["part-definition"].create_when == "OVERRIDDEN"
+        assert overridden.entity_types["part-definition"].never_create_when == "OVERRIDDEN-NEVER"
