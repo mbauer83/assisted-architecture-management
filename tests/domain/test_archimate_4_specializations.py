@@ -24,10 +24,6 @@ class TestArchimate4SpecializationLibrary:
         assert business_collaboration is not None
         assert business_collaboration.name == "Business Collaboration"
 
-        money_flow = catalog.get("connection", "archimate-flow", "money-flow", module_alias=META_ONTOLOGY_ALIAS)
-        assert money_flow is not None
-        assert money_flow.name == "Money Flow"
-
         assignment_specs = {
             spec.slug
             for spec in catalog.for_type(
@@ -37,6 +33,12 @@ class TestArchimate4SpecializationLibrary:
             )
         }
         assert {"responsibility-assignment", "behavior-assignment"} <= assignment_specs
+
+        component_specs = {
+            spec.slug
+            for spec in catalog.for_type("entity", "application-component", module_alias=META_ONTOLOGY_ALIAS)
+        }
+        assert {"service", "module", "endpoint"} <= component_specs
 
     def test_guidance_overlay_applies_to_entity_and_connection_specializations(self) -> None:
         overlay = GuidanceOverlay(
@@ -50,8 +52,8 @@ class TestArchimate4SpecializationLibrary:
                 GuidanceKey(
                     module_alias=META_ONTOLOGY_ALIAS,
                     concept_kind="connection",
-                    type_name="archimate-flow",
-                    specialization="money-flow",
+                    type_name="archimate-assignment",
+                    specialization="responsibility-assignment",
                 ): GuidanceEntry(create_when="connection-create", never_create_when="connection-never"),
             }
         )
@@ -61,7 +63,7 @@ class TestArchimate4SpecializationLibrary:
             "entity", "service", "business-service", module_alias=META_ONTOLOGY_ALIAS
         )
         connection = module.specialization_catalog.get(
-            "connection", "archimate-flow", "money-flow", module_alias=META_ONTOLOGY_ALIAS
+            "connection", "archimate-assignment", "responsibility-assignment", module_alias=META_ONTOLOGY_ALIAS
         )
 
         assert entity is not None

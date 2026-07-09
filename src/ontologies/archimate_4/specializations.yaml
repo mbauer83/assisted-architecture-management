@@ -53,10 +53,14 @@ specializations:
     assessment:
       - slug: gap
         name: Gap
+    application-component:
+      - slug: service
+        name: Service
+      - slug: module
+        name: Module
+      - slug: endpoint
+        name: Endpoint
   connection:
-    archimate-flow:
-      - slug: money-flow
-        name: Money Flow
     archimate-assignment:
       - slug: responsibility-assignment
         name: Responsibility Assignment
