@@ -2,12 +2,13 @@ from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
+from typing import Any
 
 import yaml  # type: ignore[import-untyped]
 
 from src.diagram_types._base import DiagramTypeBase
 from src.domain.artifact_types import ConnectionRecord, EntityRecord
+from src.domain.concept_scope import ConceptScope
 from src.domain.module_types import ConnectionTypeName, DiagramTypeName, EntityTypeName, FreeOntology
 from src.domain.ontology_protocol import (
     DiagramRenderer,
@@ -18,20 +19,8 @@ from src.domain.ontology_protocol import (
 from src.domain.ontology_types import ConnectionTypeInfo, EntityTypeInfo
 from src.domain.permitted_relationships import PermittedRelationshipSet
 
-if TYPE_CHECKING:
-    from src.domain.module_registry import ModuleRegistry
-
 _EMPTY_ENTITY_TYPES: dict[EntityTypeName, EntityTypeInfo] = {}
 _EMPTY_CONNECTION_TYPES: dict[ConnectionTypeName, ConnectionTypeInfo] = {}
-
-
-def _resolve_registry(registry: ModuleRegistry | None) -> ModuleRegistry:
-    """Use the injected registry; fall back to the process registry only when unset."""
-    if registry is not None:
-        return registry
-    from src.infrastructure.app_bootstrap import get_module_registry  # noqa: PLC0415
-
-    return get_module_registry()
 
 
 class _MatrixRenderer:
@@ -79,21 +68,9 @@ class _MatrixDiagramType(DiagramTypeBase):
     def primary_ontology(self):  # type: ignore[override]
         return FreeOntology
 
-    def accepts_entity_type(self, t: EntityTypeName) -> bool:
-        del t
-        return True
-
-    def accepts_connection_type(self, t: ConnectionTypeName) -> bool:
-        del t
-        return True
-
-    def effective_entity_types(self, registry: ModuleRegistry | None = None) -> dict[EntityTypeName, EntityTypeInfo]:
-        return dict(_resolve_registry(registry).all_entity_types())
-
-    def effective_connection_types(
-        self, registry: ModuleRegistry | None = None
-    ) -> dict[ConnectionTypeName, ConnectionTypeInfo]:
-        return dict(_resolve_registry(registry).all_connection_types())
+    def concept_scope(self, registry: object | None = None) -> ConceptScope:
+        del registry
+        return ConceptScope.unrestricted()
 
     @property
     def own_entity_types(self) -> dict[EntityTypeName, EntityTypeInfo]:

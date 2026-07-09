@@ -6,6 +6,7 @@ from collections.abc import Mapping
 from typing import TYPE_CHECKING, Any
 
 from src.domain.bridges import BridgeDeclaration
+from src.domain.concept_scope import ConceptScope
 from src.domain.diagram_type_config import DiagramTypeUiConfig, DiagramTypeWriteGuidance
 from src.domain.module_types import ConnectionTypeName, EntityTypeName, _FreeOntologyType
 from src.domain.ontology_protocol import ModuleClass, OntologyModule
@@ -19,9 +20,10 @@ if TYPE_CHECKING:
 class DiagramTypeBase:
     """Mixin providing default DiagramTypeModule implementations.
 
-    Subclasses must provide: name, primary_ontology, accepts_entity_type,
-    accepts_connection_type, own_entity_types, own_connection_types,
-    own_permitted_relationships, and _config.
+    Subclasses must provide: name, primary_ontology, own_entity_types,
+    own_connection_types, own_permitted_relationships, and _config. They may
+    override concept_scope when the default scope derived from ownership is not
+    expressive enough.
     """
 
     module_class: ModuleClass = "architecture"
@@ -33,6 +35,30 @@ class DiagramTypeBase:
     @property
     def element_classes(self) -> Mapping[str, ElementClassInfo]:
         return {}
+
+    def concept_scope(self, registry: ModuleRegistry | None = None) -> ConceptScope:
+        del registry
+        configured = getattr(self, "_concept_scope", None)
+        if isinstance(configured, ConceptScope):
+            return configured
+        if isinstance(self.primary_ontology, _FreeOntologyType):  # type: ignore[attr-defined]
+            return ConceptScope(
+                entity_types=frozenset(self.own_entity_types),  # type: ignore[attr-defined]
+                connection_types=frozenset(self.own_connection_types),  # type: ignore[attr-defined]
+            )
+        ontology: OntologyModule = self.primary_ontology  # type: ignore[assignment]
+        return ConceptScope(connection_types=frozenset(ontology.connection_types))
+
+    def accepts_entity_type(self, t: EntityTypeName) -> bool:
+        if isinstance(self.primary_ontology, _FreeOntologyType):  # type: ignore[attr-defined]
+            info = self.own_entity_types.get(t)  # type: ignore[attr-defined]
+            return self.concept_scope().admits_entity_type(t, info)
+        ontology: OntologyModule = self.primary_ontology  # type: ignore[assignment]
+        info = ontology.entity_types.get(t)
+        return info is not None and self.concept_scope().admits_entity_type(t, info)
+
+    def accepts_connection_type(self, t: ConnectionTypeName) -> bool:
+        return self.concept_scope().admits_connection_type(t)
 
     @property
     def effective_permitted_relationships(self) -> PermittedRelationshipSet:
@@ -60,30 +86,28 @@ class DiagramTypeBase:
         return inherited | self.own_permitted_relationships | diagram_conn_rules  # type: ignore[attr-defined]
 
     def effective_entity_types(self, registry: ModuleRegistry | None = None) -> Mapping[EntityTypeName, EntityTypeInfo]:
-        del registry  # ontology-bound types derive from primary_ontology, not the registry
+        scope = self.concept_scope(registry)
         if isinstance(self.primary_ontology, _FreeOntologyType):  # type: ignore[attr-defined]
-            return dict(self.own_entity_types)  # type: ignore[attr-defined]
+            candidates = dict(self.own_entity_types)  # type: ignore[attr-defined]
+            if scope.entity_types is None or scope.entity_types:
+                candidates.update(_resolve_registry(registry).all_entity_types())
+            return scope.admitted_entity_types(candidates)
         ontology: OntologyModule = self.primary_ontology  # type: ignore[assignment]
-        out = {
-            t: info
-            for t, info in ontology.entity_types.items()
-            if self.accepts_entity_type(t)  # type: ignore[attr-defined]
-        }
+        out = scope.admitted_entity_types(dict(ontology.entity_types))
         out.update(self.own_entity_types)  # type: ignore[attr-defined]
         return out
 
     def effective_connection_types(
         self, registry: ModuleRegistry | None = None
     ) -> Mapping[ConnectionTypeName, ConnectionTypeInfo]:
-        del registry  # ontology-bound types derive from primary_ontology, not the registry
+        scope = self.concept_scope(registry)
         if isinstance(self.primary_ontology, _FreeOntologyType):  # type: ignore[attr-defined]
-            return dict(self.own_connection_types)  # type: ignore[attr-defined]
+            candidates = dict(self.own_connection_types)  # type: ignore[attr-defined]
+            if scope.connection_types is None or scope.connection_types:
+                candidates.update(_resolve_registry(registry).all_connection_types())
+            return scope.admitted_connection_types(candidates)
         ontology: OntologyModule = self.primary_ontology  # type: ignore[assignment]
-        out = {
-            t: info
-            for t, info in ontology.connection_types.items()
-            if self.accepts_connection_type(t)  # type: ignore[attr-defined]
-        }
+        out = scope.admitted_connection_types(dict(ontology.connection_types))
         out.update(self.own_connection_types)  # type: ignore[attr-defined]
         return out
 
@@ -121,3 +145,11 @@ class DiagramTypeBase:
         self, diagram_entities: dict[str, Any], candidate: Any = None
     ) -> dict[str, Any]:
         return diagram_entities
+
+
+def _resolve_registry(registry: ModuleRegistry | None) -> ModuleRegistry:
+    if registry is not None:
+        return registry
+    from src.infrastructure.app_bootstrap import get_module_registry  # noqa: PLC0415
+
+    return get_module_registry()

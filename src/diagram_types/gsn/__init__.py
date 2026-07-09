@@ -35,14 +35,6 @@ class _GsnDiagramType(DiagramTypeBase):
     def primary_ontology(self):  # type: ignore[override]
         return FreeOntology
 
-    def accepts_entity_type(self, t: EntityTypeName) -> bool:
-        del t
-        return False
-
-    def accepts_connection_type(self, t: ConnectionTypeName) -> bool:
-        del t
-        return False
-
     @property
     def own_entity_types(self) -> dict[EntityTypeName, EntityTypeInfo]:
         return _EMPTY_ENTITY_TYPES

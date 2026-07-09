@@ -19,6 +19,7 @@ import src.diagram_types.c4._projection  # noqa: F401
 from src.diagram_types._base import DiagramTypeBase
 from src.diagram_types.c4.renderer import C4PumlRenderer
 from src.domain.bridges import BridgeDeclaration
+from src.domain.concept_scope import ConceptScope
 from src.domain.diagram_entities_schema import derive_diagram_entities_schema
 from src.domain.diagram_ontology_loader import DiagramOntology, load_diagram_ontology
 from src.domain.module_types import ConnectionTypeName, DiagramTypeName, EntityTypeName, FreeOntology
@@ -29,7 +30,7 @@ from src.domain.ontology_protocol import (
     diagram_type_ui_config_from_mapping,
 )
 from src.domain.ontology_types import ConnectionTypeInfo, ElementClassInfo, EntityTypeInfo
-from src.domain.permitted_mappings import resolve_model_entity_types_for_diagram_only_types
+from src.domain.permitted_mappings import concept_scope_for_diagram_only_types
 from src.domain.permitted_relationships import PermittedRelationshipSet
 
 _EMPTY_ENTITY_TYPES: dict[EntityTypeName, EntityTypeInfo] = {}
@@ -154,7 +155,6 @@ class _C4DiagramType(DiagramTypeBase):
             default_label=str(config.get("ui", {}).get("label") or self._name).replace("-", " ").title(),
         )
         self._renderer = C4PumlRenderer(self._config, person_archimate_types=_person_archimate_types(ontology))
-        self._mapped_model_entity_types: frozenset[EntityTypeName] | None = None
 
     @property
     def element_classes(self) -> dict[str, ElementClassInfo]:
@@ -168,25 +168,13 @@ class _C4DiagramType(DiagramTypeBase):
     def primary_ontology(self):  # type: ignore[override]
         return FreeOntology
 
-    def accepts_entity_type(self, t: EntityTypeName) -> bool:
-        return t in self._resolved_mapped_model_entity_types()
-
-    def accepts_connection_type(self, t: ConnectionTypeName) -> bool:
-        return _registry().find_connection_type(t) is not None
-
-    def effective_entity_types(self, registry: ModuleRegistry | None = None) -> dict[EntityTypeName, EntityTypeInfo]:
+    def concept_scope(self, registry: ModuleRegistry | None = None) -> ConceptScope:
         reg = registry if registry is not None else _registry()
-        return {
-            entity_type: reg.get_entity_type(entity_type)
-            for entity_type in sorted(self._resolved_mapped_model_entity_types())
-            if reg.find_entity_type(entity_type) is not None
-        }
-
-    def effective_connection_types(
-        self, registry: ModuleRegistry | None = None
-    ) -> dict[ConnectionTypeName, ConnectionTypeInfo]:
-        reg = registry if registry is not None else _registry()
-        return dict(reg.all_connection_types())
+        entity_scope = concept_scope_for_diagram_only_types(self._ui_config.diagram_only_types, reg)
+        return ConceptScope(
+            entity_types=entity_scope.entity_types,
+            connection_types=frozenset(reg.all_connection_types()),
+        )
 
     @property
     def own_entity_types(self) -> dict[EntityTypeName, EntityTypeInfo]:
@@ -249,15 +237,6 @@ class _C4DiagramType(DiagramTypeBase):
             ),
         }
         return {**base, "properties": props}
-
-    def _resolved_mapped_model_entity_types(self) -> frozenset[EntityTypeName]:
-        if self._mapped_model_entity_types is None:
-            self._mapped_model_entity_types = resolve_model_entity_types_for_diagram_only_types(
-                self._ui_config.diagram_only_types,
-                _registry(),
-            )
-        return self._mapped_model_entity_types
-
 
     def read_diagram_extras(self, parsed_source: dict[str, Any]) -> dict[str, Any]:
         """Inject _scope_entity_id from a 'scoped-by' binding when diagram-entities is empty.

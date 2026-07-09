@@ -84,12 +84,19 @@ class _StubOntology:
         return False
 
 
-def _diagram_entity_ui(etype: str, mapped_entity_types: tuple[str, ...] = ()) -> DiagramOwnEntityTypeUiConfig:
+def _diagram_entity_ui(
+    etype: str,
+    mapped_entity_types: tuple[str, ...] = (),
+    mapped_entity_classes: tuple[str, ...] = (),
+) -> DiagramOwnEntityTypeUiConfig:
     return DiagramOwnEntityTypeUiConfig(
         entity_type=etype,
         label=etype,
         plural=etype + "s",
-        permitted_mappings=PermittedMappingSpec(entity_types=mapped_entity_types),
+        permitted_mappings=PermittedMappingSpec(
+            entity_types=mapped_entity_types,
+            entity_classes=mapped_entity_classes,
+        ),
     )
 
 
@@ -101,13 +108,20 @@ class _StubDiagramType(DiagramTypeBase):
         *,
         bridge_decls: tuple[BridgeDeclaration, ...] = (),
         mapped_entity_types: dict[str, tuple[str, ...]] | None = None,
+        mapped_entity_classes: dict[str, tuple[str, ...]] | None = None,
     ) -> None:
         self._name_str = name
         mets = mapped_entity_types or {}
+        mecs = mapped_entity_classes or {}
         self._ui_config = DiagramTypeUiConfig(
             label=name,
             diagram_only_types=tuple(
-                _diagram_entity_ui(n, mapped_entity_types=mets.get(n, ())) for n in own_entity_type_names
+                _diagram_entity_ui(
+                    n,
+                    mapped_entity_types=mets.get(n, ()),
+                    mapped_entity_classes=mecs.get(n, ()),
+                )
+                for n in own_entity_type_names
             ),
         )
         self._bridges = bridge_decls
@@ -374,6 +388,18 @@ class TestBridgeValidation:
         with pytest.raises(RegistryConsistencyError) as exc_info:
             validate_registry_consistency(reg)
         assert any("permitted_mappings" in e or "contradicts" in e for e in exc_info.value.errors)
+
+    def test_descent_overlap_uses_class_based_permitted_mapping_scope(self) -> None:
+        bridge = _make_bridge(to_types=("app-component",))
+        diagram = _StubDiagramType(
+            "my-diagram",
+            ["container"],
+            bridge_decls=(bridge,),
+            mapped_entity_classes={"container": ("structure-element",)},
+        )
+        reg = _make_registry(self._ontology(), diagram)
+
+        validate_registry_consistency(reg)  # must not raise
 
     def test_no_bridges_no_errors(self) -> None:
         diagram = _StubDiagramType("my-diagram", ["container"], bridge_decls=())
