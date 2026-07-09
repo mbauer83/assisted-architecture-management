@@ -17,6 +17,12 @@ from src.domain.permitted_relationships import (
     PermittedRelationship,
     PermittedRelationshipSet,
 )
+from src.domain.specializations import (
+    SpecializationCatalog,
+    merge_specialization_catalogs,
+    overlay_specialization_guidance,
+    specialization_catalog_from_mapping,
+)
 
 _PACKAGE_DIR = Path(__file__).parent
 
@@ -52,6 +58,7 @@ class _ArchiMate4Module:
         permitted_relationships: PermittedRelationshipSet,
         matrix_abbreviations: dict[str, str],
         element_classes: dict[str, ElementClassInfo] | None = None,
+        specialization_catalog: SpecializationCatalog | None = None,
         svg_converter: Callable[[str], str] | None = None,
     ) -> None:
         self._entity_types = entity_types
@@ -59,6 +66,7 @@ class _ArchiMate4Module:
         self._permitted_relationships = permitted_relationships
         self._matrix_abbreviations = matrix_abbreviations
         self._element_classes: dict[str, ElementClassInfo] = element_classes or {}
+        self._specialization_catalog = specialization_catalog or SpecializationCatalog.empty()
         self._svg_converter = svg_converter
 
         self._class_index: dict[ElementClassName, frozenset[EntityTypeName]] = {}
@@ -102,6 +110,10 @@ class _ArchiMate4Module:
     @property
     def element_classes(self) -> dict[str, ElementClassInfo]:
         return self._element_classes
+
+    @property
+    def specialization_catalog(self) -> SpecializationCatalog:
+        return self._specialization_catalog
 
     def entity_types_with_class(self, cls: ElementClassName) -> frozenset[EntityTypeName]:
         return self._class_index.get(ElementClassName(cls), frozenset())
@@ -264,11 +276,48 @@ def _load_element_classes(data: dict[str, Any]) -> dict[str, ElementClassInfo]:
     return out
 
 
+def _load_module_specializations(package_dir: Path) -> SpecializationCatalog:
+    path = package_dir / "specializations.yaml"
+    if not path.exists():
+        return SpecializationCatalog.empty()
+    with path.open(encoding="utf-8") as handle:
+        loaded: Any = yaml.safe_load(handle) or {}
+    if not isinstance(loaded, dict):
+        raise ValueError(f"Invalid specialization declarations in {path}: top-level YAML value must be a mapping")
+    return specialization_catalog_from_mapping(loaded, module_alias=META_ONTOLOGY_ALIAS)
+
+
+def _specialization_guidance_entries(
+    guidance: GuidanceOverlay,
+) -> dict[tuple[str, Literal["entity", "connection"], str, str], tuple[str, str]]:
+    entries: dict[tuple[str, Literal["entity", "connection"], str, str], tuple[str, str]] = {}
+    for key, value in guidance.entries.items():
+        if key.module_alias == META_ONTOLOGY_ALIAS and key.specialization:
+            entries[(key.module_alias, key.concept_kind, key.type_name, key.specialization)] = (
+                value.create_when,
+                value.never_create_when,
+            )
+    return entries
+
+
+def _validate_specialization_parents(
+    catalog: SpecializationCatalog,
+    entity_types: dict[EntityTypeName, EntityTypeInfo],
+    connection_types: dict[ConnectionTypeName, ConnectionTypeInfo],
+) -> None:
+    for entry in catalog.entries:
+        if entry.concept_kind == "entity" and EntityTypeName(entry.parent_type) not in entity_types:
+            raise ValueError(f"Unknown parent entity type {entry.parent_type!r} for specialization {entry.slug!r}")
+        if entry.concept_kind == "connection" and ConnectionTypeName(entry.parent_type) not in connection_types:
+            raise ValueError(f"Unknown parent connection type {entry.parent_type!r} for specialization {entry.slug!r}")
+
+
 def load_archimate_4_module(
     package_dir: Path,
     *,
     svg_converter: Callable[[str], str] | None = None,
     guidance: GuidanceOverlay | None = None,
+    specializations: SpecializationCatalog | None = None,
 ) -> _ArchiMate4Module:
     with open(package_dir / "entities.yaml") as fh:
         entity_data = yaml.safe_load(fh)
@@ -280,6 +329,16 @@ def load_archimate_4_module(
     permitted = _build_permitted_relationships(conn_data, entity_types)
     matrix_abbreviations: dict[str, str] = dict(conn_data.get("matrix_abbreviations", {}))
     element_classes = _load_element_classes(entity_data)
+    overlay = guidance if guidance is not None else GuidanceOverlay()
+    module_specializations = overlay_specialization_guidance(
+        _load_module_specializations(package_dir),
+        _specialization_guidance_entries(overlay),
+    )
+    specialization_catalog = merge_specialization_catalogs(
+        module_specializations,
+        specializations or SpecializationCatalog.empty(),
+    )
+    _validate_specialization_parents(specialization_catalog, entity_types, connection_types)
 
     return _ArchiMate4Module(
         entity_types=entity_types,
@@ -287,5 +346,6 @@ def load_archimate_4_module(
         permitted_relationships=permitted,
         matrix_abbreviations=matrix_abbreviations,
         element_classes=element_classes,
+        specialization_catalog=specialization_catalog,
         svg_converter=svg_converter,
     )

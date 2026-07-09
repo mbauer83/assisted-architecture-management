@@ -21,9 +21,11 @@ from src.domain.module_catalog import ModuleCatalog, ModuleCatalogBuilder
 from src.domain.module_filter import is_module_enabled
 from src.domain.module_registry import ModuleRegistry
 from src.domain.ontology_protocol import OntologyModule
+from src.domain.specializations import SpecializationCatalog
 from src.infrastructure.assurance.capability import make_capability
 from src.infrastructure.guidance_cache import load_guidance_overlay_for_repos
 from src.infrastructure.rendering._svg_sprite_convert import browser_markup_to_plantuml_svg as _svg_convert
+from src.infrastructure.specialization_declarations import load_specialization_catalog_for_repos
 from src.ontologies.archimate_4._loader import _PACKAGE_DIR as _ARCH_PACKAGE_DIR
 from src.ontologies.archimate_4._loader import META_ONTOLOGY_ALIAS as _ARCHIMATE_META_ALIAS
 from src.ontologies.archimate_4._loader import load_archimate_4_module
@@ -51,8 +53,23 @@ def _load_guidance_overlay(alias: str) -> GuidanceOverlay:
     return load_guidance_overlay_for_repos(alias, enterprise_root=enterprise_root, engagement_root=engagement_root)
 
 
+def _load_archimate_specializations() -> SpecializationCatalog:
+    roots = resolve_workspace_repo_roots()
+    if roots is None:
+        return SpecializationCatalog.empty()
+    engagement_root, enterprise_root = roots
+    return load_specialization_catalog_for_repos(
+        _ARCHIMATE_META_ALIAS,
+        enterprise_root=enterprise_root,
+        engagement_root=engagement_root,
+    )
+
+
 _archimate_4_module = load_archimate_4_module(
-    _ARCH_PACKAGE_DIR, svg_converter=_svg_convert, guidance=_load_guidance_overlay(_ARCHIMATE_META_ALIAS)
+    _ARCH_PACKAGE_DIR,
+    svg_converter=_svg_convert,
+    guidance=_load_guidance_overlay(_ARCHIMATE_META_ALIAS),
+    specializations=_load_archimate_specializations(),
 )
 _archimate_matrix_abbreviations = _archimate_4_module.matrix_abbreviations
 

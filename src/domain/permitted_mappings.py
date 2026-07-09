@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Iterable
 
+from src.domain.concept_scope import ConceptScope
 from src.domain.module_registry import ModuleRegistry
 from src.domain.module_types import ElementClassName, EntityTypeName
 from src.domain.ontology_protocol import DiagramOwnEntityTypeUiConfig
@@ -15,8 +16,16 @@ def resolve_model_entity_types(
     registry: ModuleRegistry,
 ) -> frozenset[EntityTypeName]:
     """Return the registered model entity types allowed by one mapping spec."""
-    result: set[EntityTypeName] = {EntityTypeName(name) for name in spec.entity_types}
+    scope = concept_scope_from_mapping_spec(spec, registry)
+    return frozenset(scope.admitted_entity_types(dict(registry.all_entity_types())))
 
+
+def concept_scope_from_mapping_spec(
+    spec: PermittedMappingSpec,
+    registry: ModuleRegistry,
+) -> ConceptScope:
+    """Compile permitted_mappings source eligibility into a ConceptScope."""
+    result: set[EntityTypeName] = {EntityTypeName(name) for name in spec.entity_types}
     for cls in spec.entity_classes:
         result.update(registry.entity_types_with_class(ElementClassName(cls)))
 
@@ -34,7 +43,7 @@ def resolve_model_entity_types(
         if source.entity_class:
             result.update(ontology.entity_types_with_class(ElementClassName(source.entity_class)))
 
-    return frozenset(result)
+    return ConceptScope(entity_types=frozenset(result))
 
 
 def resolve_model_entity_types_for_diagram_only_types(
@@ -42,7 +51,16 @@ def resolve_model_entity_types_for_diagram_only_types(
     registry: ModuleRegistry,
 ) -> frozenset[EntityTypeName]:
     """Return the union of all model entity types accepted by diagram-owned entity types."""
+    scope = concept_scope_for_diagram_only_types(own_types, registry)
+    return frozenset(scope.admitted_entity_types(dict(registry.all_entity_types())))
+
+
+def concept_scope_for_diagram_only_types(
+    own_types: Iterable[DiagramOwnEntityTypeUiConfig],
+    registry: ModuleRegistry,
+) -> ConceptScope:
     result: set[EntityTypeName] = set()
     for own_type in own_types:
-        result.update(resolve_model_entity_types(own_type.permitted_mappings, registry))
-    return frozenset(result)
+        scope = concept_scope_from_mapping_spec(own_type.permitted_mappings, registry)
+        result.update(scope.entity_types or frozenset())
+    return ConceptScope(entity_types=frozenset(result))

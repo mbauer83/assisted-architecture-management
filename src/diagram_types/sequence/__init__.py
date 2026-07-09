@@ -148,12 +148,6 @@ class _SequenceDiagramType(DiagramTypeBase):
     def primary_ontology(self):  # type: ignore[override]
         return FreeOntology
 
-    def accepts_entity_type(self, t: EntityTypeName) -> bool:
-        return False
-
-    def accepts_connection_type(self, t: ConnectionTypeName) -> bool:
-        return t in self.own_connection_types
-
     @property
     def own_entity_types(self) -> dict[EntityTypeName, EntityTypeInfo]:
         return _OWN_ENTITY_TYPES

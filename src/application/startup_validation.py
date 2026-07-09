@@ -19,6 +19,7 @@ from itertools import chain
 from typing import TYPE_CHECKING
 
 from src.domain.bindings import CORE_CORRESPONDENCE_KINDS
+from src.domain.permitted_mappings import concept_scope_from_mapping_spec
 
 if TYPE_CHECKING:
     from src.application.artifact_repository import ArtifactRepository
@@ -178,7 +179,10 @@ def _collect_bridge_errors(registry: "ModuleRegistry") -> list[str]:
             continue
         diagram_entity_names = frozenset(oe.entity_type for oe in dt.ui_config.diagram_only_types)
         permitted_mappings: dict[str, frozenset[str]] = {
-            oe.entity_type: frozenset(oe.permitted_mappings.entity_types)
+            oe.entity_type: frozenset(
+                str(entity_type)
+                for entity_type in (concept_scope_from_mapping_spec(oe.permitted_mappings, registry).entity_types or ())
+            )
             for oe in dt.ui_config.diagram_only_types
         }
         for bridge in bridges:

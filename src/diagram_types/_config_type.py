@@ -9,6 +9,7 @@ from typing import Any
 import yaml  # type: ignore[import-untyped]
 
 from src.diagram_types._base import DiagramTypeBase
+from src.domain.concept_scope import ConceptScope, HierarchyPredicate
 from src.domain.module_types import ConnectionTypeName, DiagramTypeName, EntityTypeName
 from src.domain.ontology_protocol import (
     DiagramRenderer,
@@ -24,23 +25,24 @@ _EMPTY_ENTITY_TYPES: dict[EntityTypeName, EntityTypeInfo] = {}
 _EMPTY_CONNECTION_TYPES: dict[ConnectionTypeName, ConnectionTypeInfo] = {}
 
 
-def _build_entity_filter(filter_cfg: dict[str, Any]):
-    """Return a predicate that tests whether an EntityTypeInfo matches the filter config."""
+def _build_concept_scope(filter_cfg: dict[str, Any], ontology: OntologyModule) -> ConceptScope:
     hierarchy_cfg = filter_cfg.get("hierarchy_level")
     class_set = frozenset(str(c) for c in filter_cfg.get("classes", ()))
     type_set = frozenset(str(t) for t in filter_cfg.get("entity_types", ()))
-
-    def _matches(info: EntityTypeInfo) -> bool:
-        if hierarchy_cfg:
-            idx = int(hierarchy_cfg["index"])
-            values = frozenset(str(v) for v in hierarchy_cfg.get("values", ()))
-            if idx >= len(info.hierarchy) or info.hierarchy[idx] not in values:
-                return False
-        if class_set and not class_set.intersection(info.classes):
-            return False
-        return not type_set or info.artifact_type in type_set
-
-    return _matches
+    hierarchy_predicates: tuple[HierarchyPredicate, ...] = ()
+    if hierarchy_cfg:
+        hierarchy_predicates = (
+            HierarchyPredicate(
+                index=int(hierarchy_cfg["index"]),
+                values=frozenset(str(v) for v in hierarchy_cfg.get("values", ())),
+            ),
+        )
+    return ConceptScope(
+        entity_types=frozenset(EntityTypeName(t) for t in type_set) if type_set else None,
+        entity_class_predicates=(class_set,) if class_set else (),
+        hierarchy_predicates=hierarchy_predicates,
+        connection_types=frozenset(ontology.connection_types),
+    )
 
 
 def _load_config(package_dir: Path) -> dict[str, Any]:
@@ -67,7 +69,7 @@ class _ConfiguredOntologyDiagramType(DiagramTypeBase):
             default_label=str(self._name).replace("-", " ").title(),
         )
         filter_cfg: dict[str, Any] = config.get("filter", {})
-        self._entity_filter = _build_entity_filter(filter_cfg)
+        self._concept_scope = _build_concept_scope(filter_cfg, ontology)
         hierarchy_values = filter_cfg.get("hierarchy_level", {}).get("values", [])
         self._accepted_domains: tuple[str, ...] = tuple(str(v) for v in hierarchy_values)
 
@@ -78,13 +80,6 @@ class _ConfiguredOntologyDiagramType(DiagramTypeBase):
     @property
     def primary_ontology(self):  # type: ignore[override]
         return self._ontology
-
-    def accepts_entity_type(self, t: EntityTypeName) -> bool:
-        info = self._ontology.entity_types.get(t)
-        return info is not None and self._entity_filter(info)
-
-    def accepts_connection_type(self, t: ConnectionTypeName) -> bool:
-        return t in self._ontology.connection_types
 
     @property
     def own_entity_types(self) -> dict[EntityTypeName, EntityTypeInfo]:
