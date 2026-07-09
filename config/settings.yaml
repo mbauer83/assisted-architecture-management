@@ -7,6 +7,8 @@ diagrams:
   plantuml_limit_size: 16384
   render_dpi: 150
   sprite_scale: 1.5
+guidance:
+  default_source: ""
 modules:
   sysml_v2_min:
     enabled: false

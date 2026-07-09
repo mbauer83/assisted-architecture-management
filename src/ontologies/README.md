@@ -6,7 +6,7 @@ Each subdirectory is a self-contained *ontology module* — a pluggable vocabula
 
 ```
 src/ontologies/
-  archimate_next/     ← shipped module
+  archimate_4/     ← shipped module
   <your-ontology>/    ← your module here
   __init__.py
 
@@ -24,7 +24,7 @@ src/ontologies/my_ontology/
   __init__.py
   entities.yaml
   connections.yaml        (optional — only if the ontology defines connection types)
-  _loader.py              (optional — use the archimate_next loader as a template)
+  _loader.py              (optional — use the archimate_4 loader as a template)
 ```
 
 ### Step 2 — Define entity types in `entities.yaml`
@@ -147,16 +147,16 @@ class _MyOntologyModule:
 
 
 # Load at import time so `from src.ontologies.my_ontology import module` works
-# (same pattern as archimate_next)
+# (same pattern as archimate_4)
 def _load() -> _MyOntologyModule:
     # parse entities.yaml, connections.yaml → build entity_types, connection_types, permitted
-    # see src/ontologies/archimate_next/_loader.py for a full example
+    # see src/ontologies/archimate_4/_loader.py for a full example
     ...
 
 module = _load()
 ```
 
-See `src/ontologies/archimate_next/_loader.py` for a complete loader implementation including YAML parsing, `@class` expansion, and `permitted_relationships` rule processing.
+See `src/ontologies/archimate_4/_loader.py` for a complete loader implementation including YAML parsing, `@class` expansion, and `permitted_relationships` rule processing.
 
 ### Step 5 — Register the module
 
@@ -167,7 +167,7 @@ from src.ontologies.my_ontology import module as my_ontology_module
 
 def build_module_registry() -> ModuleRegistry:
     registry = ModuleRegistry()
-    registry.register_ontology(archimate_next_module)
+    registry.register_ontology(archimate_4_module)
     registry.register_ontology(my_ontology_module)   # ← add this line
     register_default_diagram_types(registry)
     return registry
@@ -238,10 +238,10 @@ element_classes:
 Diagram types declare their element classes in `config.yaml` under `element_classes:`. To reuse a class from another module, simply list it in `classes:` without redeclaring it:
 
 ```yaml
-# OK — sysml_v2_min reuses classes owned by archimate_next
+# OK — sysml_v2_min reuses classes owned by archimate_4
 entity_types:
   part-definition:
-    classes: [definition, structure-element]   # 'definition' declared here; 'structure-element' from archimate_next
+    classes: [definition, structure-element]   # 'definition' declared here; 'structure-element' from archimate_4
 ```
 
 ## Multi-module conventions

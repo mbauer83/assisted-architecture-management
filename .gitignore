@@ -41,6 +41,12 @@ plantuml.jar
 # PDFs — never commit reference documents; keep them local only
 *.pdf
 
+# Guidance-cache files — license-encumbered spec prose, imported per repo via
+# arch-import-guidance; the per-repo ignore lives in <repo>/.arch-repo/.gitignore, this is
+# a belt-and-braces guard against a stray extract/import landing at the workspace root
+*.guidance.yaml
+*.guidance.meta.yaml
+
 # Coverage analysis artifacts
 .coverage
 .coverage.*

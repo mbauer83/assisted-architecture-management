@@ -73,4 +73,4 @@ Current violation categories and their planned remediation:
 | `application → infrastructure` | `entity_type_predicates.py`, `_verifier_rules_bindings.py`, `_verifier_rules_semantic.py` (lazy `get_module_registry`) | Phase C (WU-05–06) |
 | `application → config` | `artifact_document_schema.py`, `group_registry.py`, `group_registry_validation.py`, `repo_path_helpers.py`, `artifact_verifier.py`, `artifact_verifier_incremental.py`, `artifact_verifier_rules.py` | Phase C/D (WU-05–07) |
 | `diagram_types → application` | `c4/_projection.py`, `c4/_type.py` (`derivation.*`) | Phase C/E (WU-05, WU-08) |
-| `ontologies → infrastructure` | `archimate_next/_loader.py` (lazy `_svg_sprite_convert`) | Phase D (WU-07) |
+| `ontologies → infrastructure` | `archimate_4/_loader.py` (lazy `_svg_sprite_convert`) | Phase D (WU-07) |

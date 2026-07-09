@@ -38,6 +38,9 @@ _DEFAULTS: dict[str, dict[str, object]] = {
     "validation": {
         "datatype_type_references_blocking": True,
     },
+    "guidance": {
+        "default_source": "",
+    },
 }
 
 _VALID_STORE_BACKENDS = frozenset({"sqlcipher", "pocketbase", "private-git"})
@@ -96,6 +99,10 @@ def load_settings() -> dict:
     validation_section: _SettingsSection = validation_raw if isinstance(validation_raw, dict) else {}
     validation = {**_DEFAULTS["validation"], **validation_section}
 
+    guidance_raw = data.get("guidance")
+    guidance_section: _SettingsSection = guidance_raw if isinstance(guidance_raw, dict) else {}
+    guidance = {**_DEFAULTS["guidance"], **guidance_section}
+
     return {
         "backend": backend,
         "diagrams": diagrams,
@@ -103,6 +110,7 @@ def load_settings() -> dict:
         "modules": modules_section,
         "storage": storage,
         "validation": validation,
+        "guidance": guidance,
     }
 
 
@@ -186,6 +194,16 @@ def datatype_type_references_blocking() -> bool:
     """Whether E332/E334/E335/E336 reject writes instead of remaining advisory."""
     value = load_settings()["validation"].get("datatype_type_references_blocking", True)
     return value if isinstance(value, bool) else True
+
+
+def guidance_default_source() -> str:
+    """Preconfigured ``--source`` default for ``arch-import-guidance`` (D2). Operational
+    default only — never a governance/customization surface."""
+    guidance = load_settings().get("guidance", {})
+    if not isinstance(guidance, dict):
+        return ""
+    value = guidance.get("default_source", "")
+    return value if isinstance(value, str) else ""
 
 
 def _repo_init_value(key: str, repo_kind: str | None = None) -> object:

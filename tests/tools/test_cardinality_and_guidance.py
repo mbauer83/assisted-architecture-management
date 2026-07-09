@@ -609,11 +609,12 @@ class TestGetTypeGuidance:
         assert total > 0, "requirement should have at least some permitted connections"
 
     def test_create_when_and_never_create_when_are_strings(self) -> None:
+        # archimate_4 ships create_when/never_create_when empty (license-encumbered spec
+        # prose, extracted out of the repo per D2/D3); this only asserts the field shape.
         result = get_type_guidance(filter=["capability"])
         entry = _guidance_entries(result)[0]
         assert isinstance(entry["create_when"], str)
         assert isinstance(entry["never_create_when"], str)
-        assert len(entry["create_when"]) > 0
 
     def test_multiple_domains_filter(self) -> None:
         r_mot = get_type_guidance(filter=["Motivation"])
@@ -637,7 +638,7 @@ class TestGetTypeGuidance:
 
         assert mappings["entity_types"] == ["role", "business-actor", "application-component"]
         sources = cast(list[dict[str, object]], mappings["sources"])
-        assert sources[0]["ontology"] == "archimate_next"
+        assert sources[0]["ontology"] == "archimate-4-0"
         assert sources[0]["entity_type"] == "role"
 
     def test_archimate_guidance_exposes_connection_annotation_notes(self) -> None:

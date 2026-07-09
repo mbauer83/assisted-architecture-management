@@ -1,15 +1,15 @@
 # Extensibility — Modularity Everywhere
 
-> Adapt the system to your organisation without forking the core. The ArchiMate NEXT
+> Adapt the system to your organisation without forking the core. The ArchiMate 4
 > vocabulary is the shipped default, and every layer below it is a plug-in point.
 
 Extensibility and configurability is a *Must* principle of the project. Repository behaviour —
 schemata, vocabularies, document structure, diagram notation — is configurable through
 git-based files at both enterprise and engagement scope, and the modelling ontology extends
-beyond the base ArchiMate NEXT element and connection types.
+beyond the base ArchiMate 4 element and connection types.
 
 The system already ships three ontology modules and nine diagram types, with the default
-configuration enabling ArchiMate NEXT and assurance while leaving the minimal SysML v2 module
+configuration enabling ArchiMate 4 and assurance while leaving the minimal SysML v2 module
 available but disabled. That is the extension story working in production rather than in
 theory.
 
@@ -35,7 +35,7 @@ promoted up still satisfies the enterprise constraints. See
 
 ## What ships today
 
-- **Ontologies** — `archimate_next` (the canonical default), `assurance` (STPA/CAST/GRC), and
+- **Ontologies** — `archimate_4` (the canonical default), `assurance` (STPA/CAST/GRC), and
   the optional `sysml_v2_min` module (a minimal SysML v2 vocabulary) when enabled through
   configuration. Runtime catalogs and GUI filters follow the active module set.
 - **Diagram types** — ArchiMate domain views (seven) plus layered, C4 (three levels),

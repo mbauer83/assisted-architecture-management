@@ -89,6 +89,23 @@ def _diagram_type_consistency_msgs(registry: "ModuleRegistry") -> Iterator[str]:
                            " is not a known entity type")
 
 
+def _permitted_mapping_source_msgs(registry: "ModuleRegistry") -> Iterator[str]:
+    """Every permitted_mappings source ontology token must resolve via registry.find_ontology.
+
+    Diagram-owned entity types declare cross-ontology mapping sources by module name
+    (e.g. ``ontology: archimate-4-0``); a stale or mistyped token (such as a package name)
+    would otherwise fail silently at first use instead of at startup.
+    """
+    for dt_name, dt in registry.all_diagram_types().items():
+        for oe in dt.ui_config.diagram_only_types:
+            for source in oe.permitted_mappings.sources:
+                if registry.find_ontology(source.ontology) is None:
+                    yield (
+                        f"Diagram type {dt_name!r}: permitted_mappings source ontology "
+                        f"{source.ontology!r} (entity type {oe.entity_type!r}) is not a registered ontology"
+                    )
+
+
 def _dedupe(messages: Iterable[str]) -> list[str]:
     """Preserve first-occurrence order while dropping duplicate messages."""
     seen: set[str] = set()
@@ -136,6 +153,7 @@ def _collect_consistency_errors(registry: "ModuleRegistry") -> list[str]:
         _ontology_consistency_msgs(registry),
         _diagram_type_consistency_msgs(registry),
         _id_prefix_consistency_msgs(registry),
+        _permitted_mapping_source_msgs(registry),
     ))
     errors.extend(_collect_bridge_errors(registry))
     return errors

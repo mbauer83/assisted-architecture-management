@@ -1,4 +1,4 @@
-"""Private loader: YAML → _ArchiMateNextModule instance."""
+"""Private loader: YAML → _ArchiMate4Module instance."""
 
 from __future__ import annotations
 
@@ -10,6 +10,7 @@ from typing import Any, Literal, cast
 
 import yaml  # type: ignore[import-untyped]
 
+from src.domain.guidance import GuidanceKey, GuidanceOverlay
 from src.domain.module_types import ConnectionTypeName, ElementClassName, EntityTypeName
 from src.domain.ontology_types import ConnectionTypeInfo, ElementClassInfo, EntityTypeInfo
 from src.domain.permitted_relationships import (
@@ -18,6 +19,8 @@ from src.domain.permitted_relationships import (
 )
 
 _PACKAGE_DIR = Path(__file__).parent
+
+META_ONTOLOGY_ALIAS = "archimate-4"
 _GLYPHS_PATH = _PACKAGE_DIR.parent.parent.parent / "tools" / "gui" / "src" / "ui" / "lib" / "archimateGlyphs.json"
 
 DISPLAY_SECTION_ID = "archimate"
@@ -34,8 +37,8 @@ def _load_glyphs() -> dict[str, Any]:
         return {}
 
 
-class _ArchiMateNextModule:
-    name = "archimate-next-snapshot1"
+class _ArchiMate4Module:
+    name = "archimate-4-0"
     display_section_id = DISPLAY_SECTION_ID
     module_class: Literal["architecture", "assurance"] = "architecture"
     enabled: bool = True
@@ -148,18 +151,30 @@ class _ArchiMateNextModule:
         return f"sprite $archimate_{key} {self._svg_converter(markup)}"
 
 
-def _load_entity_types(data: dict[str, Any]) -> dict[EntityTypeName, EntityTypeInfo]:
+def _entity_guidance(guidance: GuidanceOverlay, artifact_type: str, info: dict[str, Any]) -> tuple[str, str]:
+    key = GuidanceKey(module_alias=META_ONTOLOGY_ALIAS, concept_kind="entity", type_name=artifact_type)
+    overlaid = guidance.get(key)
+    if overlaid is not None:
+        return overlaid.create_when, overlaid.never_create_when
+    return info.get("create_when", ""), info.get("never_create_when", "")
+
+
+def _load_entity_types(
+    data: dict[str, Any], guidance: GuidanceOverlay | None = None
+) -> dict[EntityTypeName, EntityTypeInfo]:
+    overlay = guidance if guidance is not None else GuidanceOverlay()
     out: dict[EntityTypeName, EntityTypeInfo] = {}
     for artifact_type, info in data["entity_types"].items():
         raw_hierarchy = info.get("hierarchy", [])
         hierarchy = tuple(raw_hierarchy) + (artifact_type,)
+        create_when, never_create_when = _entity_guidance(overlay, artifact_type, info)
         out[EntityTypeName(artifact_type)] = EntityTypeInfo(
             artifact_type=artifact_type,
             prefix=info["prefix"],
             hierarchy=hierarchy,
             classes=tuple(info.get("classes", ())),
-            create_when=info.get("create_when", ""),
-            never_create_when=info.get("never_create_when", ""),
+            create_when=create_when,
+            never_create_when=never_create_when,
             internal=bool(info.get("internal", False)),
         )
     return out
@@ -249,23 +264,24 @@ def _load_element_classes(data: dict[str, Any]) -> dict[str, ElementClassInfo]:
     return out
 
 
-def load_archimate_next_module(
+def load_archimate_4_module(
     package_dir: Path,
     *,
     svg_converter: Callable[[str], str] | None = None,
-) -> _ArchiMateNextModule:
+    guidance: GuidanceOverlay | None = None,
+) -> _ArchiMate4Module:
     with open(package_dir / "entities.yaml") as fh:
         entity_data = yaml.safe_load(fh)
     with open(package_dir / "connections.yaml") as fh:
         conn_data = yaml.safe_load(fh)
 
-    entity_types = _load_entity_types(entity_data)
+    entity_types = _load_entity_types(entity_data, guidance)
     connection_types = _load_connection_types(conn_data)
     permitted = _build_permitted_relationships(conn_data, entity_types)
     matrix_abbreviations: dict[str, str] = dict(conn_data.get("matrix_abbreviations", {}))
     element_classes = _load_element_classes(entity_data)
 
-    return _ArchiMateNextModule(
+    return _ArchiMate4Module(
         entity_types=entity_types,
         connection_types=connection_types,
         permitted_relationships=permitted,

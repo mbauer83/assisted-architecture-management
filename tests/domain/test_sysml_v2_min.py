@@ -92,7 +92,7 @@ def test_owned_element_classes_declared() -> None:
 def test_borrowed_classes_not_redeclared() -> None:
     for cls in BORROWED_CLASSES:
         assert cls not in module.element_classes, (
-            f"Class {cls!r} is declared in archimate_next and must not be redeclared"
+            f"Class {cls!r} is declared in archimate_4 and must not be redeclared"
         )
 
 

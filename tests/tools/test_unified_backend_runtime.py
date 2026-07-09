@@ -562,7 +562,7 @@ def test_unified_backend_installs_module_registry_on_app_state() -> None:
     registry = module_registry_from_app(app)
 
     assert isinstance(registry, ModuleRegistry)
-    assert registry.find_ontology("archimate-next-snapshot1") is not None
+    assert registry.find_ontology("archimate-4-0") is not None
     assert registry.find_diagram_type("archimate-business") is not None
     assert registry.find_diagram_type("archimate-layered") is not None
 

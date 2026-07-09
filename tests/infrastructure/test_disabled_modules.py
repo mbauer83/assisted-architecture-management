@@ -130,8 +130,39 @@ def test_registered_meta_ontology_values_follow_active_registry(monkeypatch: pyt
         active_registry = build_module_registry()
         full_registry = build_module_registry(complete_vocabulary=True)
 
-        assert registered_meta_ontology_values(active_registry) == frozenset({"archimate-next"})
-        assert registered_meta_ontology_values(full_registry) == frozenset({"archimate-next", "sysml-v2"})
+        assert registered_meta_ontology_values(active_registry) == frozenset({"archimate-4"})
+        assert registered_meta_ontology_values(full_registry) == frozenset({"archimate-4", "sysml-v2"})
+    finally:
+        _clear_runtime_registry_caches()
+
+
+def test_resolve_meta_ontology_module_returns_the_backing_ontology() -> None:
+    from src.infrastructure.app_bootstrap import resolve_meta_ontology_module
+
+    registry = build_module_registry()
+    module = resolve_meta_ontology_module("archimate-4", registry)
+
+    assert module is not None
+    assert module.name == "archimate-4-0"
+    assert "stakeholder" in module.entity_types
+
+
+def test_resolve_meta_ontology_module_returns_none_for_unknown_alias() -> None:
+    from src.infrastructure.app_bootstrap import resolve_meta_ontology_module
+
+    registry = build_module_registry()
+    assert resolve_meta_ontology_module("no-such-alias", registry) is None
+
+
+def test_resolve_meta_ontology_module_returns_none_when_inactive(monkeypatch: pytest.MonkeyPatch) -> None:
+    from src.infrastructure.app_bootstrap import resolve_meta_ontology_module
+
+    _patch_sysml_disabled_settings(monkeypatch)
+    _clear_runtime_registry_caches()
+
+    try:
+        active_registry = build_module_registry()
+        assert resolve_meta_ontology_module("sysml-v2", active_registry) is None
     finally:
         _clear_runtime_registry_caches()
 

@@ -3,7 +3,7 @@ import { buildWizardDomainCards, recommendedNextDomain } from '../ModelWizardVie
 
 describe('buildWizardDomainCards', () => {
   it('scopes to ArchiMate domains only (excludes sysml)', () => {
-    const cards = buildWizardDomainCards({}, null, [{ name: 'archimate-next-snapshot1' }])
+    const cards = buildWizardDomainCards({}, null, [{ name: 'archimate-4-0' }])
     const keys = cards.map((c) => c.key)
     expect(keys).toEqual(['motivation', 'strategy', 'common', 'business', 'application', 'technology', 'implementation'])
     expect(keys).not.toContain('sysml')

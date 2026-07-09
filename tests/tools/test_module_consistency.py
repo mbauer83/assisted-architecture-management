@@ -90,7 +90,7 @@ def _registry_with(*ontologies: _StubOntology) -> ModuleRegistry:
 def test_all_registered_modules_are_internally_consistent() -> None:
     """build_module_registry() must not raise — proves current state is drift-free.
 
-    This calls validate_registry_consistency internally, covering both the archimate_next
+    This calls validate_registry_consistency internally, covering both the archimate_4
     ontology (full entity + connection type check) and all diagram types (entity type
     check against diagram_only_types).
     """

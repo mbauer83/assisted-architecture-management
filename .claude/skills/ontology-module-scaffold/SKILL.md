@@ -11,7 +11,7 @@ description: >
 
 Gather the following before creating any files. Ask all at once if not already provided:
 
-1. **Module name** — snake_case directory name (e.g. `archimate_next`, `domain_v2`).
+1. **Module name** — snake_case directory name (e.g. `archimate_4`, `domain_v2`).
 2. **Display name** — human-readable name used in the `OntologyModule.name` property.
 3. **Entity types** — list of entity types to define, each with: `prefix`, `hierarchy` path, `element_classes`, `create_when`, `never_create_when`.
 4. **Element classes** — abstract classification classes used by entity types (e.g. `motivation-element`, `active-structure-element`).
@@ -63,7 +63,7 @@ permitted_relationships:
 
 ### 3. `src/ontologies/<name>/_loader.py`
 
-Model after `src/ontologies/archimate_next/_loader.py`:
+Model after `src/ontologies/archimate_4/_loader.py`:
 - Load `entities.yaml` and `connections.yaml` with `yaml.safe_load`
 - Parse `element_classes`, `entity_types`, `connection_types`, and `permitted_relationships`
 - Build and return an `OntologyModule`-compatible object
@@ -93,7 +93,7 @@ from src.ontologies.<name> import module as <name>_module
 
 def build_module_registry() -> ModuleRegistry:
     registry = ModuleRegistry()
-    registry.register_ontology(archimate_next_module)
+    registry.register_ontology(archimate_4_module)
     registry.register_ontology(<name>_module)  # add here
     register_default_diagram_types(registry)
     return registry

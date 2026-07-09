@@ -7,10 +7,10 @@ entity_types:
         - business-actor
         - role
       sources:
-        - ontology: archimate-next-snapshot1
+        - ontology: archimate-4-0
           entity_type: business-actor
           transparent: true
-        - ontology: archimate-next-snapshot1
+        - ontology: archimate-4-0
           entity_type: role
           transparent: true
     properties:
@@ -31,10 +31,10 @@ entity_types:
         - application-component
         - service
       sources:
-        - ontology: archimate-next-snapshot1
+        - ontology: archimate-4-0
           entity_type: application-component
           transparent: true
-        - ontology: archimate-next-snapshot1
+        - ontology: archimate-4-0
           entity_type: service
           transparent: true
     properties:
@@ -59,13 +59,13 @@ entity_types:
         - service
         - data-object
       sources:
-        - ontology: archimate-next-snapshot1
+        - ontology: archimate-4-0
           entity_type: application-component
           transparent: true
-        - ontology: archimate-next-snapshot1
+        - ontology: archimate-4-0
           entity_type: service
           transparent: true
-        - ontology: archimate-next-snapshot1
+        - ontology: archimate-4-0
           entity_type: data-object
           transparent: true
     properties:
@@ -103,7 +103,7 @@ bridges:
     version: 1
     from: {module: c4-container, type: container}
     to:
-      module: archimate-next-snapshot1
+      module: archimate-4-0
       types: [application-component]
     preserves_classes: [active-structure-element]
     correspondence_kind: represents
@@ -111,7 +111,7 @@ bridges:
     version: 1
     from: {module: c4-container, type: container}
     to:
-      module: archimate-next-snapshot1
+      module: archimate-4-0
       types: [service]
     preserves_classes: [behavior-element]
     correspondence_kind: represents
@@ -119,7 +119,7 @@ bridges:
     version: 1
     from: {module: c4-container, type: container}
     to:
-      module: archimate-next-snapshot1
+      module: archimate-4-0
       types: [data-object]
     preserves_classes: [passive-structure-element]
     correspondence_kind: represents

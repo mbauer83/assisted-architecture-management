@@ -7,10 +7,10 @@ entity_types:
         - business-actor
         - role
       sources:
-        - ontology: archimate-next-snapshot1
+        - ontology: archimate-4-0
           entity_type: business-actor
           transparent: true
-        - ontology: archimate-next-snapshot1
+        - ontology: archimate-4-0
           entity_type: role
           transparent: true
     properties:
@@ -31,10 +31,10 @@ entity_types:
         - application-component
         - service
       sources:
-        - ontology: archimate-next-snapshot1
+        - ontology: archimate-4-0
           entity_type: application-component
           transparent: true
-        - ontology: archimate-next-snapshot1
+        - ontology: archimate-4-0
           entity_type: service
           transparent: true
     properties:
@@ -59,13 +59,13 @@ entity_types:
         - service
         - data-object
       sources:
-        - ontology: archimate-next-snapshot1
+        - ontology: archimate-4-0
           entity_type: application-component
           transparent: true
-        - ontology: archimate-next-snapshot1
+        - ontology: archimate-4-0
           entity_type: service
           transparent: true
-        - ontology: archimate-next-snapshot1
+        - ontology: archimate-4-0
           entity_type: data-object
           transparent: true
     properties:
@@ -94,13 +94,13 @@ entity_types:
         - function
         - service
       sources:
-        - ontology: archimate-next-snapshot1
+        - ontology: archimate-4-0
           entity_type: application-component
           transparent: true
-        - ontology: archimate-next-snapshot1
+        - ontology: archimate-4-0
           entity_type: function
           transparent: true
-        - ontology: archimate-next-snapshot1
+        - ontology: archimate-4-0
           entity_type: service
           transparent: true
     properties:

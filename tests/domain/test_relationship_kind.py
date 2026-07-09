@@ -10,7 +10,7 @@ from pathlib import Path
 
 from src.domain.diagram_ontology_loader import load_diagram_ontology
 from src.domain.ontology_types import RELATIONSHIP_KINDS
-from src.ontologies.archimate_next import module as archimate_module
+from src.ontologies.archimate_4 import module as archimate_module
 
 
 def _archimate_conn(name: str):

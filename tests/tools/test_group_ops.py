@@ -107,14 +107,14 @@ class TestGroupCreate:
         assert entry.type_filter == ()
 
     def test_model_project_stores_meta_ontology(self, repo: Path) -> None:
-        group_create(repo, axis="model-project", slug="mp2", name="MP2", meta_ontology="archimate-next")
+        group_create(repo, axis="model-project", slug="mp2", name="MP2", meta_ontology="archimate-4")
         registry = load_group_registry(repo)
         entry = registry.find("model-project", "mp2")
         assert entry is not None
-        assert entry.meta_ontology == "archimate-next"
+        assert entry.meta_ontology == "archimate-4"
 
     def test_collection_ignores_meta_ontology(self, repo: Path) -> None:
-        group_create(repo, axis="diagram-collection", slug="dc2", name="DC2", meta_ontology="archimate-next")
+        group_create(repo, axis="diagram-collection", slug="dc2", name="DC2", meta_ontology="archimate-4")
         registry = load_group_registry(repo)
         entry = registry.find("diagram-collection", "dc2")
         assert entry is not None

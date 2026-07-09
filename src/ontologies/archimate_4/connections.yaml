@@ -1,7 +1,7 @@
 # Connection Ontology — ArchiMate NEXT connection types & relationship rules
 #
 # Single source of truth for connection type definitions and permitted
-# entity-level relationships.  Loaded by src/ontologies/archimate_next/_loader.py.
+# entity-level relationships.  Loaded by src/ontologies/archimate_4/_loader.py.
 #
 # Rule format:  [source, target, [connection-short-names]]
 #   source / target = entity type name, list of names, or @class reference

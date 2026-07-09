@@ -45,9 +45,9 @@ export const friendlyEntityId = (id: string) => {
 
 export const FRAMEWORK_GROUPS = [
   {
-    key: 'archimate-next',
-    moduleName: 'archimate-next-snapshot1',
-    label: 'ArchiMate NEXT',
+    key: 'archimate-4',
+    moduleName: 'archimate-4-0',
+    label: 'ArchiMate 4',
     domains: ['motivation', 'strategy', 'common', 'business', 'application', 'technology', 'implementation'],
   },
   {
@@ -58,7 +58,7 @@ export const FRAMEWORK_GROUPS = [
   },
 ] as const
 
-const DEFAULT_MODULES: readonly ModuleLike[] = [{ name: 'archimate-next-snapshot1' }]
+const DEFAULT_MODULES: readonly ModuleLike[] = [{ name: 'archimate-4-0' }]
 
 const moduleNameSet = (modules?: readonly ModuleLike[]) =>
   new Set((modules ?? DEFAULT_MODULES).map((module) => module.name))

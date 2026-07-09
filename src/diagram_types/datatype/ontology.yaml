@@ -19,7 +19,7 @@ entity_types:
       entity_types: [data-object]
       entity_classes: []
       sources:
-        - ontology: archimate_next
+        - ontology: archimate-4-0
           entity_type: data-object
     mapping_required: false
     properties:

@@ -34,7 +34,7 @@ def _validate(
     repo: Path,
     *,
     read_only: bool = False,
-    valid_meta_ontologies: frozenset[str] = frozenset({"archimate-next"}),
+    valid_meta_ontologies: frozenset[str] = frozenset({"archimate-4"}),
 ) -> list[str]:
     return validate_and_repair_group_registry(
         repo,
@@ -83,7 +83,7 @@ class TestValidateAndRepairGroupRegistry:
     def test_valid_meta_ontology_passes(self, repo: Path) -> None:
         from src.infrastructure.write.artifact_write.group_ops import group_create  # noqa: PLC0415
 
-        group_create(repo, axis="model-project", slug="valid-mo", name="Valid MO", meta_ontology="archimate-next")
+        group_create(repo, axis="model-project", slug="valid-mo", name="Valid MO", meta_ontology="archimate-4")
         messages = _validate(repo)
         assert messages == []
 
@@ -92,14 +92,14 @@ class TestValidateAndRepairGroupRegistry:
 
         group_create(repo, axis="model-project", slug="sysml-mo", name="SysML MO", meta_ontology="sysml-v2")
         with pytest.raises(GroupRegistryError, match="sysml-v2") as exc_info:
-            _validate(repo, valid_meta_ontologies=frozenset({"archimate-next"}))
-        assert "valid values: 'archimate-next'" in str(exc_info.value)
+            _validate(repo, valid_meta_ontologies=frozenset({"archimate-4"}))
+        assert "valid values: 'archimate-4'" in str(exc_info.value)
 
     def test_enabled_meta_ontology_alias_passes(self, repo: Path) -> None:
         from src.infrastructure.write.artifact_write.group_ops import group_create  # noqa: PLC0415
 
         group_create(repo, axis="model-project", slug="sysml-mo", name="SysML MO", meta_ontology="sysml-v2")
-        messages = _validate(repo, valid_meta_ontologies=frozenset({"archimate-next", "sysml-v2"}))
+        messages = _validate(repo, valid_meta_ontologies=frozenset({"archimate-4", "sysml-v2"}))
         assert messages == []
 
     def test_orphaned_project_dir_auto_registered(self, repo: Path) -> None:

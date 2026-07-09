@@ -338,7 +338,7 @@ def _derive(
 MANIFEST = DiagramTypeModuleManifest(
     id="c4",
     version=1,
-    compatible_ontologies=("archimate-next-snapshot1", "sysml_v2_min"),
+    compatible_ontologies=("archimate-4-0", "sysml_v2_min"),
     ontology_role_mapping={},  # K2-followon: parameterise projection per active ontology
     strategies=((
         StrategySpec(name="c4.scope-projection", version=1, supported_filters=frozenset({"repo_scope"})),

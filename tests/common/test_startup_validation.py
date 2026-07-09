@@ -372,7 +372,7 @@ class TestMultiRepoMultiOntology:
         assert types_in_errors == {"bad-entity", "bad-conn", "bad-diagram"}
 
     def test_real_registry_accepts_archimate_types(self) -> None:
-        """The real archimate_next module registry passes with known entity/connection types."""
+        """The real archimate_4 module registry passes with known entity/connection types."""
         from src.infrastructure.app_bootstrap import build_module_registry
 
         reg = build_module_registry()

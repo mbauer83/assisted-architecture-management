@@ -1,7 +1,7 @@
 """Unit tests for the datatype correspondence predicate (§3.2).
 
 Covers: corresponds() and admissible_backing_kinds() using real
-ConnectionTypeInfo from the archimate_next and datatype modules.
+ConnectionTypeInfo from the archimate_4 and datatype modules.
 """
 
 from __future__ import annotations
@@ -10,7 +10,7 @@ import pytest
 
 from src.application.verification.datatype_consistency import admissible_backing_kinds, corresponds
 from src.diagram_types.datatype import module as datatype_module
-from src.ontologies.archimate_next import module as archimate_module
+from src.ontologies.archimate_4 import module as archimate_module
 
 
 def _arch(name: str):

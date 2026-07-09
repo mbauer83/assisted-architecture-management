@@ -6,7 +6,7 @@
 # surface are deliberately excluded.
 #
 # Classes structure-element, behavior-element, and passive-structure-element are
-# declared in archimate_next and re-used here — do not redeclare them.
+# declared in archimate_4 and re-used here — do not redeclare them.
 
 element_classes:
   definition:

@@ -1,5 +1,5 @@
 name: archimate-motivation
-ontology: archimate_next
+ontology: archimate_4
 filter:
   hierarchy_level:
     index: 0

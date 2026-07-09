@@ -6,7 +6,7 @@ would break verification of existing connection files.
 
 from __future__ import annotations
 
-from src.ontologies.archimate_next import module as archimate_module
+from src.ontologies.archimate_4 import module as archimate_module
 
 
 def test_er_types_still_present() -> None:

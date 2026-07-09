@@ -13,7 +13,12 @@ from src.domain.bridges import BridgeDeclaration, bridges_from_config
 from src.domain.module_registry import ModuleRegistry
 from src.domain.module_types import ConnectionTypeName, ElementClassName, EntityTypeName
 from src.domain.ontology_protocol import DiagramOwnEntityTypeUiConfig, DiagramTypeUiConfig
-from src.domain.ontology_types import ConnectionTypeInfo, EntityTypeInfo, PermittedMappingSpec
+from src.domain.ontology_types import (
+    ConnectionTypeInfo,
+    EntityTypeInfo,
+    MappingSourceSpec,
+    PermittedMappingSpec,
+)
 from src.domain.permitted_relationships import PermittedRelationshipSet
 
 # ── Stub helpers ──────────────────────────────────────────────────────────────
@@ -374,6 +379,43 @@ class TestBridgeValidation:
         diagram = _StubDiagramType("my-diagram", ["container"], bridge_decls=())
         reg = _make_registry(self._ontology(), diagram)
         validate_registry_consistency(reg)  # must not raise
+
+
+# ── permitted_mappings source-ontology validation ─────────────────────────────
+
+
+class TestPermittedMappingSourceValidation:
+    def _diagram_with_source(self, ontology_token: str) -> _StubDiagramType:
+        diagram = _StubDiagramType("my-diagram", [])
+        diagram._ui_config = DiagramTypeUiConfig(
+            label="my-diagram",
+            diagram_only_types=(
+                DiagramOwnEntityTypeUiConfig(
+                    entity_type="lane",
+                    label="lane",
+                    plural="lanes",
+                    permitted_mappings=PermittedMappingSpec(
+                        sources=(MappingSourceSpec(ontology=ontology_token, entity_type="role"),)
+                    ),
+                ),
+            ),
+        )
+        return diagram
+
+    def test_known_ontology_token_passes(self) -> None:
+        diagram = self._diagram_with_source("my-ontology")
+        reg = _make_registry(_StubOntology("my-ontology", ["role"]), diagram)
+        validate_registry_consistency(reg)  # must not raise
+
+    def test_unknown_ontology_token_raises(self) -> None:
+        diagram = self._diagram_with_source("nonexistent-ontology")
+        reg = _make_registry(_StubOntology("my-ontology", ["role"]), diagram)
+        with pytest.raises(RegistryConsistencyError) as exc_info:
+            validate_registry_consistency(reg)
+        assert any(
+            "permitted_mappings source ontology" in e and "nonexistent-ontology" in e
+            for e in exc_info.value.errors
+        )
 
 
 # ── real registry integration ─────────────────────────────────────────────────

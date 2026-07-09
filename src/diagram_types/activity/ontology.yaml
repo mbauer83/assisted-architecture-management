@@ -43,11 +43,11 @@ entity_types:
       entity_types: [role, business-actor, application-component]
       entity_classes: []
       sources:
-        - ontology: archimate_next
+        - ontology: archimate-4-0
           entity_type: role
-        - ontology: archimate_next
+        - ontology: archimate-4-0
           entity_type: business-actor
-        - ontology: archimate_next
+        - ontology: archimate-4-0
           entity_type: application-component
     mapping_required: false
     properties: {}

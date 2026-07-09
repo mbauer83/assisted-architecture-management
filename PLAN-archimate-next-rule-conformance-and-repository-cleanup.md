@@ -1,6 +1,11 @@
 # PLAN - ArchiMate NEXT Rule Conformance, Verification, and Repository Cleanup
 
-Status: draft / prerequisite to the C4 self-model narrative
+Status: draft / prerequisite to the C4 self-model narrative — **superseded by
+`PLAN-archimate-4-compliance.md` Phase C** (WU-C1 composition semantics verification, WU-C2
+Appendix B matrix recheck), which re-runs this plan's rule-conformance and repair work
+against the final ArchiMate 4.0 specification rather than the NEXT snapshot draft this plan
+targeted. Never executed (no companion TASKS ledger); kept as a record of the original
+findings and delivery sequence.
 Scope: ArchiMate NEXT ontology, all architecture write paths, and ENG-ARCH-REPO
 Normative source: `ArchiMate-NEXT-Snapshot-1-connection-rules.pdf`
 Created: 2026-06-06

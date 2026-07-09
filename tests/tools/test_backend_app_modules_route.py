@@ -11,5 +11,5 @@ def test_backend_app_serves_modules_route() -> None:
     response = TestClient(_build_app()).get("/api/modules")
     assert response.status_code == 200
     names = {entry["name"] for entry in response.json()}
-    assert "archimate-next-snapshot1" in names
+    assert "archimate-4-0" in names
     assert "sysml_v2_min" not in names

@@ -14,7 +14,7 @@ Full contract and a complete loader example:
 
 | Module | Vocabulary | Domain (`hierarchy[0]`) |
 |---|---|---|
-| `archimate_next` | ArchiMate NEXT Snapshot 1 — the canonical default | motivation, strategy, business, application, technology, implementation, common |
+| `archimate_4` | ArchiMate 4.0 — the canonical default | motivation, strategy, business, application, technology, implementation, common |
 | `sysml_v2_min` | A minimal SysML v2 vocabulary (parts, actions); shipped but disabled by default | its own domain when enabled |
 | `assurance` | STPA / CAST / GRC types (stored in the encrypted assurance store, not git) | assurance |
 
@@ -27,7 +27,7 @@ src/ontologies/my_ontology/
   __init__.py          # exposes `module` satisfying the OntologyModule protocol
   entities.yaml        # one entry per entity type
   connections.yaml     # connection types + permitted_relationships (optional)
-  _loader.py           # optional; archimate_next loader is the template
+  _loader.py           # optional; archimate_4 loader is the template
 ```
 
 An `entities.yaml` entry carries `prefix` (ID prefix, e.g. `PDF@…`), `hierarchy` (domain path

@@ -11,7 +11,7 @@ custom renderer. Full contract:
 
 ```yaml
 name: archimate-application      # registry key; matches diagram_type in artifacts
-ontology: archimate_next         # ontology package supplying the base vocabulary
+ontology: archimate_4            # ontology package supplying the base vocabulary
 filter:
   hierarchy_level: { index: 0, values: [application, common] }   # which entity types appear
 grouping:

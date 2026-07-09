@@ -17,7 +17,7 @@ assurance built in.
 [![Lint: Ruff](https://img.shields.io/badge/lint-ruff-261230?logo=ruff&logoColor=white)](pyproject.toml)
 [![Types: zuban](https://img.shields.io/badge/types-zuban_(strict)-2A6DB0)](pyproject.toml)
 [![MCP](https://img.shields.io/badge/MCP-enabled-000000?logo=anthropic&logoColor=white)](docs/03-modeling/interfaces-and-mcp.md)
-[![Model: ArchiMate NEXT (draft)](https://img.shields.io/badge/model-ArchiMate_NEXT_(draft)-6F42C1)](docs/01-motivation.md)
+[![Model: ArchiMate 4](https://img.shields.io/badge/model-ArchiMate_4-6F42C1)](docs/01-motivation.md)
 [![Assurance: STPA · CAST · GRC](https://img.shields.io/badge/assurance-STPA·CAST·GRC-B7472A)](docs/04-assurance/index.md)
 
 [Quickstart](#quickstart) · [Documentation](docs/index.md) · [Why it exists](docs/01-motivation.md) · [Assurance](docs/04-assurance/index.md)
@@ -61,7 +61,7 @@ app.
 **It isn't (yet), if…**
 
 - you need certified conformance to a **published ArchiMate standard** — the model follows the
-  ArchiMate NEXT draft and makes no conformance claim;
+  ArchiMate 4.0 standard and makes no conformance claim;
 - you want **WYSIWYG-first freeform diagramming** — diagrams here are typed views over the
   model, rendered by PlantUML;
 - you need a centralized modeling suite with fine-grained per-user accounts, RBAC workflows,
@@ -75,7 +75,7 @@ More on the audience in [Who it serves](docs/01-motivation.md#who-it-serves).
 
 | | Capability | Details |
 |---|---|---|
-| 🗺️ | **A typed architecture graph** | Entities and connections across motivation → strategy → business → application → technology, geared toward the ArchiMate NEXT draft | 
+| 🗺️ | **A typed architecture graph** | Entities and connections across motivation → strategy → business → application → technology, geared toward the ArchiMate 4.0 standard | 
 | 🔍 | **Browse and explore** | List, treemap, full-text search, and interactive graph navigation — *what connects to this, and how far to that?* |
 | 📐 | **Diagram families** | ArchiMate views, C4 (model-backed), UML activity, sequence & class (datatype), and relationship matrices |
 | ✅ | **Always-on verification** | Schema, referential integrity, cross-repo rules, and PlantUML syntax checked on every write |
@@ -181,9 +181,9 @@ The agent can then `artifact_query_search_artifacts`, walk the graph with
 
 ## Status
 
-Pre-1.0 and under active development. The model is geared toward the **ArchiMate NEXT draft**;
-it makes no claim of conformance with any published standard. The assurance capability spans
-STPA, STPA-Sec, CAST, GRC, and supply-chain signal ingestion.
+Pre-1.0 and under active development. The model is geared toward the **ArchiMate 4.0
+standard**; it makes no claim of conformance with any published standard. The assurance
+capability spans STPA, STPA-Sec, CAST, GRC, and supply-chain signal ingestion.
 
 &nbsp;
 

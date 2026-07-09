@@ -8,6 +8,7 @@ from typing import Any, Literal
 
 import yaml  # type: ignore[import-untyped]
 
+from src.domain.guidance import GuidanceOverlay
 from src.domain.module_types import ConnectionTypeName, ElementClassName, EntityTypeName
 from src.domain.ontology_types import ConnectionTypeInfo, ElementClassInfo, EntityTypeInfo
 from src.domain.permitted_relationships import (
@@ -281,7 +282,10 @@ def _build_permitted_relationships(
     return PermittedRelationshipSet(frozenset(rules))
 
 
-def load_assurance_module(package_dir: Path) -> _AssuranceModule:
+def load_assurance_module(package_dir: Path, *, guidance: GuidanceOverlay | None = None) -> _AssuranceModule:
+    """``guidance`` is accepted for interface parity with the archimate_4 loader; assurance
+    guidance is inline (not spec-derived text, see PLAN §4.3), so it is unused here.
+    """
     with open(package_dir / "entities.yaml") as fh:
         entity_data = yaml.safe_load(fh)
     with open(package_dir / "connections.yaml") as fh:

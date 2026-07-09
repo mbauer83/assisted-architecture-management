@@ -70,7 +70,7 @@ src/diagram_types/
 
 ```yaml
 name: archimate-application          # (required) registry key; matches diagram_type in artifacts
-ontology: archimate_next             # ontology package under src/ontologies/
+ontology: archimate_4                # ontology package under src/ontologies/
 
 filter:
   hierarchy_level:
@@ -165,7 +165,7 @@ entity_types:
       entity_types: [role, business-actor, application-component]
       entity_classes: []
       sources:
-        - ontology: archimate_next
+        - ontology: archimate-4-0
           entity_type: role
           transparent: false
     mapping_required: false
