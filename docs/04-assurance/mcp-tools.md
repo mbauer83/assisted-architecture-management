@@ -34,6 +34,63 @@ agent cannot, for example, mark a safety constraint as `accept`-risk-treated.
 
 &nbsp;
 
+## `arch-assurance-read`
+
+<!-- mcp-tools:begin assurance-read -->
+| Capability | Tool | Access | Purpose |
+|---|---|---|---|
+| STPA / CAST / GRC authoring | `assurance_guidance` | Read-only | Return per-step STPA/CAST/GRC method guidance: what the step means, why it matters, and which standard applies. |
+| Completeness & coverage | `assurance_verify` | Read-only | Run §17(A) hard structural validity checks on all assurance entities in the store. |
+| Completeness & coverage | `assurance_coverage` | Read-only | Return a coverage/gap summary across the assurance store: constraints without evidence, hazards without constraints, obligations without constraints, risks without treatment, unbound-pending CSNs, and orphan corrective-actions. |
+| Completeness & coverage | `assurance_stpa_complete` | Read-only | Run the §17(B) stpa-basic-complete coverage profile check on the assurance store. |
+| Completeness & coverage | `assurance_cast_complete` | Read-only | Run the §17(B) cast-complete coverage profile check. |
+| Completeness & coverage | `assurance_grc_complete` | Read-only | Run the §17(B) grc-control-coverage-complete profile check. |
+| Completeness & coverage | `assurance_case_completeness` | Read-only | Run argument-completeness checks for an assurance case. |
+| Completeness & coverage | `assurance_draft_gsn` | Read-only | Scaffold a GSN (Goal Structuring Notation) argument structure from the assurance store. |
+| Supply chain / AIBOM | `assurance_aibom_export` | Read-only | Emit a CycloneDX 1.6 ML-BOM/ASBOM JSON document from a list of AI-component dicts. |
+| Supply chain / AIBOM | `assurance_aibom_coverage` | Read-only | AI-BOM coverage/gap report: shows BOM components that have no anchor mapping (not linked to an architecture entity) and anchor mappings for entities that are not yet marked with an ai_role. |
+| Supply chain / AIBOM | `assurance_scan_ai_candidates` | Read-only | Heuristic AI-BOM candidate scan over a list of architecture entity dicts. |
+| Supply chain / AIBOM | `assurance_list_bom_components` | Read-only | List BOM components ingested via assurance_import_bom. |
+| Supply chain / AIBOM | `assurance_list_vulnerabilities` | Read-only | List vulnerability findings ingested via assurance_import_vulnerabilities. |
+| Security signals | `assurance_security_stats` | Read-only | Return counts of security signal data: BOM ingests, BOM components, vulnerability records, and anchor mappings. |
+| Security signals | `assurance_risk_register` | Read-only | Return a tabular view of all risk entities with their treatment, owner status, linked hazards/loss-scenarios (via assesses), and treating constraints (via treated-by). |
+| Store administration | `assurance_store_status` | Read-only | Return the current status of the confidential assurance store: whether it is configured, locked, or unlocked. |
+| Store administration | `assurance_stats` | Read-only | Return counts of assurance nodes and edges by type. |
+| Store administration | `assurance_list_analyses` | Read-only | List assurance analyses — the aggregate roots for units of STPA/CAST/GRC work. |
+| Store administration | `assurance_list_nodes` | Read-only | List assurance entities (losses, hazards, UCAs, constraints, etc.). |
+| Store administration | `assurance_read_node` | Read-only | Read a single assurance entity by node_id. |
+| Store administration | `assurance_list_edges` | Read-only | List assurance connections. |
+<!-- mcp-tools:end assurance-read -->
+
+## `arch-assurance-write`
+
+<!-- mcp-tools:begin assurance-write -->
+| Capability | Tool | Access | Purpose |
+|---|---|---|---|
+| STPA / CAST / GRC authoring | `assurance_create_analysis` | Write | Create an assurance analysis — the aggregate root for a unit of STPA/CAST/GRC work; every node is created within one analysis. |
+| STPA / CAST / GRC authoring | `assurance_update_analysis` | Write | Update an analysis's name, status (draft/active/completed/archived), or tlp. |
+| STPA / CAST / GRC authoring | `assurance_delete_analysis` | Destructive | Delete an assurance analysis. |
+| STPA / CAST / GRC authoring | `assurance_create_node` | Write | Create an assurance entity (loss, hazard, control-structure-node, control-action, unsafe-control-action, loss-scenario, assurance-constraint, risk, incident, corrective-action, obligation). |
+| STPA / CAST / GRC authoring | `assurance_edit_node` | Write | Update attributes of an existing assurance node. |
+| STPA / CAST / GRC authoring | `assurance_delete_node` | Destructive | Delete an assurance node and all its incoming/outgoing edges. |
+| STPA / CAST / GRC authoring | `assurance_add_edge` | Write | Add a typed assurance connection between two nodes. |
+| STPA / CAST / GRC authoring | `assurance_delete_edge` | Destructive | Delete a single assurance edge by its edge_id. |
+| STPA / CAST / GRC authoring | `assurance_seal_baseline` | Write | Seal a signed baseline of the current assurance analysis state. |
+| Completeness & coverage | `assurance_promotion_preflight` | Write | Pre-check safety/security assurance-constraints before promoting findings to a wider audience tier. |
+| Supply chain / AIBOM | `assurance_import_bom` | Write | Ingest a CycloneDX or SPDX BOM (as a JSON dict) and map its components to architecture entities via existing anchor_mappings. |
+| Supply chain / AIBOM | `assurance_import_vulnerabilities` | Write | Ingest vulnerability records (OSV / NVD / GitHub Advisory / CISA-KEV format). |
+| Supply chain / AIBOM | `assurance_reconcile_aibom` | Write | Diff a modeled AI-BOM (from the architecture model) against a discovered one (from a runtime discovery tool or an imported BOM file). |
+| Supply chain / AIBOM | `assurance_set_anchor` | Write | Map a component reference (typically a Package URL / PURL) to an architecture entity. |
+| Security signals | `assurance_register_arch_ref` | Write | Record an assurance→architecture cross-reference. |
+| Security signals | `assurance_model_this` | Write | Propose an architecture entity to bind an unbound-pending control-structure-node. |
+<!-- mcp-tools:end assurance-write -->
+
+The tables above are generated from the registered assurance MCP servers by
+`uv run tools/generate_mcp_docs.py`. Tool names and descriptions are the same metadata that
+an MCP client receives during handshake; they do not expose assurance-store contents.
+
+&nbsp;
+
 ## Classification gating
 
 The `max_classification` ceiling in `config/settings.yaml` (default `TLP:RED`) controls the

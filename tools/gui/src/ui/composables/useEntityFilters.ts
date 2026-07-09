@@ -1,6 +1,6 @@
 import { computed, inject, onMounted, ref } from 'vue'
 import { Effect } from 'effect'
-import { DOMAIN_OPTIONS } from '../lib/domains'
+import { domainOptionsForDomains } from '../lib/domains'
 import { modelServiceKey } from '../keys'
 import type { WriteHelp } from '../../domain'
 
@@ -30,7 +30,9 @@ export function useEntityFilters(options?: { fixedEntityTypes?: string[] }) {
   const selectedDomains = ref<string[]>([])
   const selectedEntityTypes = ref<string[]>([])
   const writeHelp = ref<WriteHelp | null>(null)
-  const domainOptions = DOMAIN_OPTIONS.filter((o) => o.key)
+  const domainOptions = computed(() =>
+    domainOptionsForDomains(Object.keys(writeHelp.value?.entity_types_by_domain ?? {})),
+  )
 
   const typeToDomain = computed(() =>
     buildTypeToDomain(writeHelp.value?.entity_types_by_domain ?? {}),

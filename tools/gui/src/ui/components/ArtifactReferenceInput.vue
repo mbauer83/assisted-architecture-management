@@ -2,7 +2,7 @@
 import { computed, inject, onMounted, ref, watch } from 'vue'
 import { Effect } from 'effect'
 import { modelServiceKey } from '../keys'
-import { DOMAIN_OPTIONS, getDomainLabel } from '../lib/domains'
+import { domainOptionsForDomains, getDomainLabel } from '../lib/domains'
 import { buildReferenceMarkdown } from '../lib/referenceLinks.js'
 import { formatEntityTypeTerm, rankedEntityTypeSet } from '../lib/documentSections'
 import type { DocumentType, ReferenceSearchHit, WriteHelp } from '../../domain'
@@ -41,8 +41,10 @@ const documentTypes = ref<DocumentType[]>([])
 const writeHelp = ref<WriteHelp | null>(null)
 let debounceTimer: ReturnType<typeof setTimeout> | null = null
 
-const domainOptions = DOMAIN_OPTIONS.filter((option) => option.key)
-const diagramDomainOptions = domainOptions.filter((option) => option.key !== 'common')
+const domainOptions = computed(() =>
+  domainOptionsForDomains(Object.keys(writeHelp.value?.entity_types_by_domain ?? {})),
+)
+const diagramDomainOptions = computed(() => domainOptions.value.filter((option) => option.key !== 'common'))
 
 const allKinds: ArtifactKind[] = ['entity', 'diagram', 'document']
 const availableKinds = computed(() =>

@@ -75,6 +75,15 @@ export const EntityDetailSchema = Schema.Struct({
   content_html: Schema.optional(Schema.String),
   display_blocks: Schema.optional(Schema.Record({ key: Schema.String, value: Schema.String })),
   extra: Schema.optional(Schema.Record({ key: Schema.String, value: Schema.Unknown })),
+  referenced_in_documents: Schema.optional(Schema.Array(Schema.Struct({
+    document_id: Schema.String,
+    title: Schema.String,
+    doc_type: Schema.String,
+    path: Schema.String,
+    section: Schema.String,
+    label: Schema.String,
+    href: Schema.String,
+  }))),
 })
 export type EntityDetail = typeof EntityDetailSchema.Type
 
@@ -753,6 +762,18 @@ export const ServerInfoSchema = Schema.Struct({
   enterprise_root: Schema.NullOr(Schema.String),
 })
 export type ServerInfo = typeof ServerInfoSchema.Type
+
+export const ModuleSummarySchema = Schema.Struct({
+  name: Schema.String,
+  module_class: Schema.String,
+  enabled: Schema.Boolean,
+  requires: Schema.Array(Schema.String),
+  entity_type_count: Schema.Number,
+  connection_type_count: Schema.Number,
+})
+export type ModuleSummary = typeof ModuleSummarySchema.Type
+
+export const ModuleSummaryListSchema = Schema.Array(ModuleSummarySchema)
 
 export const WriteHelpEntityTypeCatalogEntrySchema = Schema.Struct({
   prefix: Schema.String,

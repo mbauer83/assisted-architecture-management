@@ -48,6 +48,7 @@ const detail = computed(() => context.data.value?.entity ?? null)
 const outgoing = computed(() => context.data.value?.connections.outbound ?? [])
 const incoming = computed(() => context.data.value?.connections.inbound ?? [])
 const symmetric = computed(() => context.data.value?.connections.symmetric ?? [])
+const documentReferences = computed(() => detail.value?.referenced_in_documents ?? [])
 
 const load = () => {
   if (!entityId.value) return
@@ -671,6 +672,32 @@ const insertReference = (markdownLink: string) => {
         </div>
       </div>
 
+      <div
+        v-if="documentReferences.length"
+        class="card document-reference-card"
+      >
+        <h2 class="section-title">
+          Referenced in documents
+        </h2>
+        <ul class="document-reference-list">
+          <li
+            v-for="docRef in documentReferences"
+            :key="`${docRef.document_id}:${docRef.section}:${docRef.href}`"
+            class="document-reference-item"
+          >
+            <RouterLink
+              :to="{ path: `/documents/${encodeURIComponent(docRef.document_id)}` }"
+              class="document-reference-title"
+            >
+              {{ docRef.title }}
+            </RouterLink>
+            <span class="document-reference-meta">
+              {{ docRef.doc_type }}<template v-if="docRef.section"> · {{ docRef.section }}</template>
+            </span>
+          </li>
+        </ul>
+      </div>
+
       <!-- Connections: [INCOMING] [SYMMETRIC] [OUTGOING] on wide screens -->
       <div class="connections-section">
         <ConnectionsPanel
@@ -802,6 +829,13 @@ const insertReference = (markdownLink: string) => {
 .markdown-body :deep(ul) { padding-left: 1.5rem; }
 .markdown-body :deep(table) { inline-size: 100%; border-collapse: collapse; margin-block: 2rem; min-inline-size: max-content; }
 .markdown-body :deep(th), .markdown-body :deep(td) { padding-inline: 1.25rem; padding-block: 0.75rem; text-align: start; border-bottom: 1px solid var(--border-color, #eee); }
+
+.document-reference-card { padding: 14px 16px; margin-bottom: 24px; }
+.section-title { font-size: 14px; font-weight: 700; margin: 0 0 10px; color: #111827; }
+.document-reference-list { list-style: none; display: flex; flex-direction: column; gap: 8px; }
+.document-reference-item { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; }
+.document-reference-title { font-size: 13px; font-weight: 600; color: #1d4ed8; }
+.document-reference-meta { font-size: 12px; color: #64748b; }
 
 /* Edit form */
 .edit-form { padding: 20px; margin-bottom: 24px; }

@@ -177,6 +177,47 @@ def test_create_document_resolves_link_into_grouped_entity(tmp_path: Path) -> No
     assert result.wrote is True, result.verification
 
 
+def test_create_grouped_document_resolves_relative_entity_link(tmp_path: Path) -> None:
+    """Regression: the verification sandbox placed the document at docs/<subdir>/<file>,
+    dropping the group segment, so relative links written for the real depth
+    (docs/<subdir>/<group>/<file>) resolved one level short and reported W155 —
+    blocking the write even though the link is valid at the real location."""
+    repo = tmp_path / "engagements" / "ENG-T" / "architecture-repository"
+    _schema(repo)
+    grouped_entity = repo / "projects" / "my-group" / "model" / "motivation" / "requirement" / "REQ@1.a.probe.md"
+    _write(
+        grouped_entity,
+        "---\nartifact-id: REQ@1.a.probe\nartifact-type: requirement\nname: Probe\n"
+        "version: 0.1.0\nstatus: draft\nlast-updated: '2026-01-01'\n---\n\n## Probe\n",
+    )
+
+    result = create_document(
+        repo_root=repo,
+        verifier=_verifier(repo),
+        clear_repo_caches=lambda _path: None,
+        doc_type="adr",
+        title="Grouped Document With Entity Link",
+        body=(
+            "## Context\n\nContext.\n\n"
+            "## Decision\n\nSee "
+            "[Probe](../../../projects/my-group/model/motivation/requirement/REQ@1.a.probe.md).\n\n"
+            "## Consequences\n\nConsequences.\n"
+        ),
+        keywords=None,
+        extra_frontmatter=None,
+        artifact_id="ADR@1000000005.AbcDef.grouped-doc-link",
+        version="0.1.0",
+        status="draft",
+        last_updated="2026-04-22",
+        dry_run=False,
+        group="platform-core",
+    )
+
+    assert result.wrote is True, result.verification
+    assert result.path.parent.name == "platform-core"
+    assert result.path.exists()
+
+
 def test_edit_document_refuses_invalid_update(tmp_path: Path) -> None:
     repo = tmp_path / "engagements" / "ENG-T" / "architecture-repository"
     _schema(repo)

@@ -44,6 +44,33 @@ app.
 
 &nbsp;
 
+## Is this for you?
+
+**It probably is, if…**
+
+- you're a **single developer or small team** trying to move beyond ad-hoc prompts and
+  unstructured specs into architecture that can be queried, reviewed, and changed deliberately;
+- you want to **get into architecture modeling** without adopting a heavyweight modeling-tool
+  database before the model has proved its value;
+- you need **AI-native modeling tools** — GUI, REST, and MCP over the same typed model — without
+  requiring dedicated modeling-tool user accounts;
+- your team can collaborate around a **hosted engagement repository**: people and agents work
+  through the GUI and MCP against one working branch, then commit, push, review, and promote
+  when the architecture is ready.
+
+**It isn't (yet), if…**
+
+- you need certified conformance to a **published ArchiMate standard** — the model follows the
+  ArchiMate NEXT draft and makes no conformance claim;
+- you want **WYSIWYG-first freeform diagramming** — diagrams here are typed views over the
+  model, rendered by PlantUML;
+- you need a centralized modeling suite with fine-grained per-user accounts, RBAC workflows,
+  and live-cursor co-editing as the primary collaboration model.
+
+More on the audience in [Who it serves](docs/01-motivation.md#who-it-serves).
+
+&nbsp;
+
 ## What you get
 
 | | Capability | Details |
@@ -61,11 +88,17 @@ app.
 
 ## See it
 
-The model-backed **C4** view derives its content from the ArchiMate graph and verifies the
-result live before you save:
+The primary **ArchiMate** views are rendered from the typed model, so diagrams and catalog
+entries stay tied to the same entity and relationship graph:
 
-<!-- media: docs/media/diagram-c4-create.png -->
-![Creating a C4 system-context diagram with auto-derived entities and a live verification pass](docs/media/diagram-c4-create.png)
+<!-- media: docs/media/diagram-archimate.png -->
+![An ArchiMate diagram rendered from the architecture model](docs/media/diagram-archimate.png)
+
+UML-style behavior diagrams use the same verified diagram pipeline for activity, sequence,
+and datatype views:
+
+<!-- media: docs/media/diagram-activity.png -->
+![A UML activity diagram rendered through the verified diagram pipeline](docs/media/diagram-activity.png)
 
 The **entity catalog** is filterable by project, domain, and type, with connection counts and
 the specialization hierarchy shown inline:

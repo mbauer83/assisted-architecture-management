@@ -3,8 +3,10 @@
 from __future__ import annotations
 
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
+from fastapi import FastAPI, Request
 
 from src.application.artifact_query import ArtifactRepository
 from src.domain.artifact_id import stable_id
@@ -142,9 +144,9 @@ def test_entity_catalog_excludes_diagram_owned_entities(
     """
     from typing import cast
 
-    from fastapi import Request
-
+    from src.infrastructure.app_bootstrap import install_module_registry
     from src.infrastructure.gui.routers.entities import list_entities
+    from src.infrastructure.gui.routers.entity_search import get_entity_taxonomy
 
     model_req = "REQ@1000000000.EngAAA.eng-req"
     diagram_id = "ACT@1234567890.aBcDeF.my-process"
@@ -173,6 +175,18 @@ def test_entity_catalog_excludes_diagram_owned_entities(
     assert "action" not in catalog_types
     assert "swimlane" not in catalog_types
     assert all("#action/" not in i and "#swimlane/" not in i for i in catalog_ids)
+
+    app = FastAPI()
+    install_module_registry(app)
+    taxonomy = get_entity_taxonomy(request=cast("Request", SimpleNamespace(app=app)))
+    taxonomy_types = {
+        entry["name"]
+        for domain in taxonomy["domains"]
+        for entry in domain["types"]
+    }
+    assert "requirement" in taxonomy_types
+    assert "action" not in taxonomy_types
+    assert "swimlane" not in taxonomy_types
 
 
 def test_global_scope_listing_survives_root_entities_without_specialization_parent(

@@ -1,7 +1,13 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
 import { useGroupManagement, type GroupOption } from '../composables/useGroupManagement'
-import { DOMAIN_OPTIONS, FRAMEWORK_GROUPS, getDomainLabel } from '../lib/domains'
+import {
+  domainOptionsForModules,
+  FRAMEWORK_GROUPS,
+  frameworkGroupsForModules,
+  getDomainLabel,
+} from '../lib/domains'
+import type { ModuleSummary } from '../../domain'
 
 const props = defineProps<{
   groups: GroupOption[]
@@ -11,6 +17,7 @@ const props = defineProps<{
   axis?: string
   showArchived?: boolean
   domainCounts?: Record<string, number>
+  modules?: readonly ModuleSummary[]
 }>()
 
 const emit = defineEmits<{
@@ -51,11 +58,12 @@ const restrictedDomains = computed((): string[] | null => {
   const mo = activeGroupEntry.value?.meta_ontology
   if (!mo) return null
   const fw = FRAMEWORK_GROUPS.find(f => f.key === mo)
+  if (!fw || !frameworkGroups.value.some(group => group.key === mo)) return []
   return fw ? (fw.domains as readonly string[]).slice() : null
 })
 
 const domainOptionsForGroup = computed(() =>
-  DOMAIN_OPTIONS.filter(d => d.key !== ''),
+  domainOptionsForModules(props.modules),
 )
 
 const isDomainVisible = (domainKey: string): boolean => {
@@ -65,6 +73,8 @@ const isDomainVisible = (domainKey: string): boolean => {
 
 const hasDomainEntities = (domainKey: string): boolean =>
   !props.domainCounts || (props.domainCounts[domainKey] ?? 0) > 0
+
+const frameworkGroups = computed(() => frameworkGroupsForModules(props.modules))
 
 const visibleDomains = (fw: (typeof FRAMEWORK_GROUPS)[number]): readonly string[] =>
   props.domainCounts
@@ -133,7 +143,7 @@ const visibleDomains = (fw: (typeof FRAMEWORK_GROUPS)[number]): readonly string[
         <!-- Unrestricted: framework → domain tree (only frameworks with entities; single-domain shown flat) -->
         <template v-else>
           <div
-            v-for="fw in FRAMEWORK_GROUPS"
+            v-for="fw in frameworkGroups"
             :key="fw.key"
             class="framework-node"
           >

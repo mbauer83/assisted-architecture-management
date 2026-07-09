@@ -65,4 +65,10 @@ document-collections:
   name: Platform Core
   description: Core architecture/engineering decisions and standards for the repository
     platform itself.
+- slug: assurance
+  id: GRP@1783411088.Bmr1rG
+  name: Assurance
+- slug: promotion-and-tiering
+  id: GRP@1783411088.YSQzlI
+  name: Promotion And Tiering
 analysis-collections: []

@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, inject, onMounted, onUnmounted, ref, watch } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
-import type { EntityList, EntityTaxonomy, GroupList } from '../../domain'
+import type { EntityList, EntityTaxonomy, GroupList, ModuleSummary } from '../../domain'
 import type { RepoScope, RepoError } from '../../ports/ModelRepository'
 import { modelServiceKey } from '../keys'
 import { useQuery } from '../composables/useQuery'
@@ -29,6 +29,7 @@ const router = useRouter()
 const entityListState = useQuery<EntityList, RepoError>()
 const groupsState = useQuery<GroupList, RepoError>()
 const taxonomyState = useQuery<EntityTaxonomy, RepoError>()
+const modulesState = useQuery<readonly ModuleSummary[], RepoError>()
 
 const isGlobal = computed(() => props.scope === 'global')
 const basePath = computed(() => isGlobal.value ? '/global/entities' : '/entities')
@@ -41,12 +42,13 @@ const sortKey = ref<SortKey | null>(null)
 const sortOrder = ref<1 | -1>(1)
 const showArchivedGroups = ref(false)
 
-// Group view: named group selected (not 'uncategorized' or global).
+// Group view: any selected group, including the real empty "uncategorized" group.
 // All group entities are loaded at once (limit 1000); domain/type filters are client-side.
 // Non-group view: server-side domain+type filtering with PAGE_SIZE pagination.
 const isGroupView = computed(() =>
-  !isGlobal.value && Boolean(activeGroup.value) && activeGroup.value !== 'uncategorized'
+  !isGlobal.value && Boolean(activeGroup.value)
 )
+const listScope = computed<RepoScope | undefined>(() => isGroupView.value ? 'engagement' : props.scope)
 
 const { currentPage, pageCount, hasPrev, hasNext, goNext, goPrev, reset: resetPage, offset } =
   usePagination(computed(() => entityListState.data.value?.total ?? 0), PAGE_SIZE)
@@ -64,9 +66,9 @@ const setViewMode = (view: ViewMode) => replaceQuery({ view: view === 'table' ? 
 
 const loadCurrentPage = () => entityListState.run(
   isGroupView.value
-    ? svc.listEntities({ scope: props.scope, group: activeGroup.value, limit: 1000 })
+    ? svc.listEntities({ scope: listScope.value, group: activeGroup.value, limit: 1000 })
     : svc.listEntities({
-        scope: props.scope,
+        scope: listScope.value,
         domain: activeDomain.value || undefined,
         artifactType: typeFilter.value || undefined,
         limit: PAGE_SIZE,
@@ -76,8 +78,9 @@ const loadCurrentPage = () => entityListState.run(
 
 const load = () => { resetPage(); loadCurrentPage() }
 const loadGroups = () => groupsState.run(svc.listGroups('model-project'))
+const loadModules = () => modulesState.run(svc.listModules())
 const loadTaxonomy = () => taxonomyState.run(
-  svc.listEntityTaxonomy({ scope: props.scope, group: activeGroup.value || undefined })
+  svc.listEntityTaxonomy({ scope: listScope.value, group: activeGroup.value || undefined })
 )
 
 const goToNextPage = () => { goNext(); loadCurrentPage() }
@@ -96,6 +99,7 @@ onMounted(() => {
   }
   load()
   loadGroups()
+  loadModules()
   loadTaxonomy()
 })
 
@@ -191,7 +195,7 @@ const sortArrow = (key: SortKey) => sortKey.value === key ? (sortOrder.value ===
 
 const displayCount = computed(() => {
   const total = entityListState.data.value?.total ?? 0
-  if (isGroupView.value) return `${sortedEntities.value.length} / ${total}`
+  if (isGroupView.value && (activeDomain.value || typeFilter.value)) return `${sortedEntities.value.length} / ${total}`
   return String(total)
 })
 </script>
@@ -221,6 +225,7 @@ const displayCount = computed(() => {
         :manageable="true"
         :show-archived="showArchivedGroups"
         :domain-counts="activeDomainCounts"
+        :modules="modulesState.data.value ?? undefined"
         axis="model-project"
         @update:active-group="setGroup"
         @update:active-domain="setDomain"

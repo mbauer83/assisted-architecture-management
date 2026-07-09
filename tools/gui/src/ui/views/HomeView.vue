@@ -5,7 +5,7 @@ import { modelServiceKey } from '../keys'
 import { useQuery } from '../composables/useQuery'
 import type { Stats, EntityList } from '../../domain'
 import type { RepoError } from '../../ports/ModelRepository'
-import { DOMAIN_OPTIONS } from '../lib/domains'
+import { domainOptionsForDomains } from '../lib/domains'
 
 const svc = inject(modelServiceKey)!
 const statsState = useQuery<Stats, RepoError>()
@@ -21,6 +21,9 @@ onMounted(() => {
 const engCount = computed(() => engagementListState.data.value?.total ?? null)
 const gloCount = computed(() => globalListState.data.value?.total ?? null)
 const hasGlobal = computed(() => gloCount.value !== null && gloCount.value > 0)
+const activeDomainOptions = computed(() =>
+  domainOptionsForDomains(Object.keys(statsState.data.value?.entities_by_domain ?? {})),
+)
 </script>
 
 <template>
@@ -93,7 +96,7 @@ const hasGlobal = computed(() => gloCount.value !== null && gloCount.value > 0)
       </h2>
       <div class="domain-grid">
         <RouterLink
-          v-for="d in DOMAIN_OPTIONS.filter(opt => opt.key)"
+          v-for="d in activeDomainOptions"
           :key="d.key"
           :to="{ path: '/entities', query: { domain: d.key } }"
           class="card card--domain"

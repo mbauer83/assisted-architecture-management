@@ -59,7 +59,7 @@ New here? Start with the [Quickstart in the README](../README.md#quickstart), th
 - [CLI & backend](reference/cli-and-backend.md)
 - [Git sync & promotion](reference/git-sync-promotion.md)
 - [Docker Compose deployment](reference/docker-compose.md)
-- [Dependency policy](architecture/dependency-policy.md) · [Glossary](architecture/glossary.md)
+- [Architecture decision records](architecture/decisions.md) · [Dependency policy](architecture/dependency-policy.md) · [Glossary](architecture/glossary.md)
 
 &nbsp;
 

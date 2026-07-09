@@ -42,6 +42,7 @@ import {
   SyncStatusSchema,
   SyncSaveResultSchema,
   ServerInfoSchema,
+  ModuleSummaryListSchema,
   WriteHelpSchema,
   GroupListSchema,
   AuthoringGuidanceSchema,
@@ -233,6 +234,7 @@ export const makeHttpModelRepository = (): ModelRepository => ({
     catch: (e) =>
       e instanceof NetworkError ? e : new NetworkError({ status: 0, message: String(e) }),
   }).pipe(Effect.flatMap(Schema.decodeUnknown(ServerInfoSchema))),
+  listModules: () => fetchJson(buildUrl('/modules'), ModuleSummaryListSchema),
   getStats: () => fetchJson(buildUrl('/stats'), StatsSchema),
 
   listEntities: (params: ListParams = {}) =>

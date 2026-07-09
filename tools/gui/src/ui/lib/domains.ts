@@ -2,6 +2,7 @@ import type { EntitySummary } from '../../domain'
 import { DOMAIN_NAMES, type DomainName } from '../../domain/types.generated'
 
 type DomainDisplayConfig = { color: string; label: string }
+type ModuleLike = { readonly name: string }
 
 const DOMAIN_CONFIG: Partial<Record<DomainName, DomainDisplayConfig>> = {
   motivation:     { color: '#d8c1e4', label: 'Motivation' },
@@ -45,21 +46,43 @@ export const friendlyEntityId = (id: string) => {
 export const FRAMEWORK_GROUPS = [
   {
     key: 'archimate-next',
+    moduleName: 'archimate-next-snapshot1',
     label: 'ArchiMate NEXT',
     domains: ['motivation', 'strategy', 'common', 'business', 'application', 'technology', 'implementation'],
   },
   {
     key: 'sysml-v2',
+    moduleName: 'sysml_v2_min',
     label: 'SysML v2',
     domains: ['sysml'],
   },
 ] as const
 
-export const META_ONTOLOGY_OPTIONS = [
+const DEFAULT_MODULES: readonly ModuleLike[] = [{ name: 'archimate-next-snapshot1' }]
+
+const moduleNameSet = (modules?: readonly ModuleLike[]) =>
+  new Set((modules ?? DEFAULT_MODULES).map((module) => module.name))
+
+export const frameworkGroupsForModules = (modules?: readonly ModuleLike[]) => {
+  const enabled = moduleNameSet(modules)
+  return FRAMEWORK_GROUPS.filter((group) => enabled.has(group.moduleName))
+}
+
+export const metaOntologyOptionsForModules = (modules?: readonly ModuleLike[]) => [
   { value: '', label: 'No restriction' },
-  { value: 'archimate-next', label: 'ArchiMate NEXT' },
-  { value: 'sysml-v2', label: 'SysML v2' },
+  ...frameworkGroupsForModules(modules).map((group) => ({
+    value: group.key,
+    label: group.label,
+  })),
 ]
+
+export const domainOptionsForDomains = (domains: Iterable<string>) => {
+  const available = new Set(domains)
+  return DOMAIN_OPTIONS.filter((option) => option.key && available.has(option.key))
+}
+
+export const domainOptionsForModules = (modules?: readonly ModuleLike[]) =>
+  domainOptionsForDomains(frameworkGroupsForModules(modules).flatMap((group) => [...group.domains]))
 
 export const softTint = (hex: string, strength = 0.82) => {
   const value = hex.replace('#', '')

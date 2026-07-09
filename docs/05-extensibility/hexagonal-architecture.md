@@ -62,6 +62,10 @@ type found in repo content against the registered modules, and aborts startup wi
 if it finds an unknown type. Removing or renaming a module while repos still hold its
 artifacts fails loudly instead of corrupting data silently.
 
+The decision behind this structure — and the other load-bearing platform decisions — are
+recorded as [architecture decision records](../architecture/decisions.md) inside the
+self-model.
+
 ---
 
 *Back to [Extensibility overview](index.md) · Next: [Reference →](../reference/configuration.md)*

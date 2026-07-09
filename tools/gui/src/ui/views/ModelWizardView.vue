@@ -11,12 +11,13 @@ import WizardConnectionSuggestions from '../components/WizardConnectionSuggestio
 import { WIZARD_DRAFT_KEYWORD } from '../components/WizardDomainStage.helpers'
 import { SPINE } from '../lib/wizardQuestionnaires'
 import { getDomainLabel, friendlyEntityId } from '../lib/domains'
-import type { AuthoringGuidance, EntityDisplayInfo } from '../../domain'
+import type { AuthoringGuidance, EntityDisplayInfo, ModuleSummary } from '../../domain'
 import type { RepoError } from '../../ports/ModelRepository'
 
 const svc = inject(modelServiceKey)!
 const session = useWizardSession()
 const guidanceQuery = useQuery<AuthoringGuidance, RepoError>()
+const modulesQuery = useQuery<readonly ModuleSummary[], RepoError>()
 const reviewLaterCommit = useSuggestionCommit(session)
 
 const spineLabel = SPINE.map(getDomainLabel).join(' ↔ ')
@@ -24,7 +25,7 @@ const spineLabel = SPINE.map(getDomainLabel).join(' ↔ ')
 const lastDomain = computed(() =>
   session.state.createdEntities.at(-1)?.domain ?? session.state.activeDomain)
 const domainCards = computed(() =>
-  buildWizardDomainCards(createdCountByDomain(session.state), lastDomain.value))
+  buildWizardDomainCards(createdCountByDomain(session.state), lastDomain.value, modulesQuery.data.value ?? undefined))
 const activeDomain = computed(() => session.state.activeDomain)
 const hasProgress = computed(() =>
   session.state.createdEntities.length > 0 || session.state.reviewLaterQueue.length > 0)
@@ -45,6 +46,7 @@ const dismissReviewLater = (id: string) => session.resolveReviewLater(id)
 // This session's own creations are excluded; lookup failure just hides the banner.
 const priorDrafts = ref<readonly EntityDisplayInfo[]>([])
 onMounted(() => {
+  modulesQuery.run(svc.listModules())
   void Effect.runPromise(
     svc.searchEntityDisplay({ query: '', limit: 20, keywords: [WIZARD_DRAFT_KEYWORD] }),
   ).then((result) => {

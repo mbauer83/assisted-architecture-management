@@ -345,7 +345,7 @@ def test_sprite_for_returns_none() -> None:
 
 def test_no_element_class_conflict_with_archimate() -> None:
     from src.infrastructure.app_bootstrap import build_module_registry
-    registry = build_module_registry()
+    registry = build_module_registry(complete_vocabulary=True)
     # all_element_classes raises ValueError on duplicate — if it succeeds, no conflict
     classes = registry.all_element_classes()
     for cls in OWNED_CLASSES:
@@ -354,7 +354,7 @@ def test_no_element_class_conflict_with_archimate() -> None:
 
 def test_entity_types_globally_unique() -> None:
     from src.infrastructure.app_bootstrap import build_module_registry
-    registry = build_module_registry()
+    registry = build_module_registry(complete_vocabulary=True)
     all_types = registry.all_entity_types()
     for etype in EXPECTED_ENTITY_TYPES:
         assert EntityTypeName(etype) in all_types

@@ -71,12 +71,24 @@ storage:
     signals_backend: sqlcipher-colocated  # sqlcipher-colocated | sqlite | encrypted
     archive_backend: standard             # standard | worm | s3-worm | azure-blob-worm
     max_classification: TLP:RED           # TLP:WHITE | TLP:GREEN | TLP:AMBER | TLP:RED
+
+modules:
+  sysml_v2_min:
+    enabled: false
 ```
 
 These apply globally and are read at startup; they are not configurable via
 `arch-workspace.yaml`. The `storage.assurance` keys are written automatically by
 `arch-assurance init` and `arch-assurance use-backend` — see
 [Assurance: storage & confidentiality](../04-assurance/storage-and-confidentiality.md).
+
+`modules:` overrides ontology and diagram-type module manifests for the current runtime.
+Each key is a module name and currently supports one override: `enabled: true | false`.
+Unset modules use their manifest defaults (`enabled` plus any `requires` capability or
+module dependencies). Disabled modules stay in the complete vocabulary used for code
+generation and schema export, but they are absent from runtime authoring guidance, type
+validation, `/api/modules`, and write operations until the backend is restarted with the
+module enabled.
 
 &nbsp;
 

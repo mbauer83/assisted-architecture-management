@@ -25,7 +25,7 @@ each `config.yaml` sets the domain filter, grouping, and layout hints, and the s
 ArchiMate renderer handles stereotypes, glyphs, nesting, and flow arrows. Connection
 descriptions stay hidden unless a diagram explicitly opts in per connection.
 
-![ArchiMate diagram detail](../media/diagram-archimate.png)
+![Rendered ArchiMate diagram with entity labels](../media/diagram-archimate.png)
 
 &nbsp;
 

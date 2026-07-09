@@ -10,6 +10,11 @@ live through the GUI or the `arch-repo-read` MCP tools after a demo setup.
 
 Five durable trends shape the problem this project addresses.
 
+![Motivation diagram showing the forces shaping the system](media/motivation-forces.svg)
+
+*Rendered from the self-model. Open the diagram in a running app:
+[`the-forces-shaping-this-system`](http://localhost:8000/diagram?id=ARC%401777455142.cFB8Hs.the-forces-shaping-this-system).*
+
 **AI-assisted development as the dominant production mode.** LLM-based coding agents are vastly increasing the volume and velocity of code output. This shifts the economics of production, and creates new demands on architectural planning, governance, knowledge management, and assurance work. 
 
 **Rising software complexity and interdependence.** As systems grow, the dependencies
@@ -66,6 +71,10 @@ Avoiding such risks and costs enables teams to take full advantage of the veloci
 
 The goals fall into three groups:
 
+![Motivation diagram showing goals and outcomes](media/motivation-goals-outcomes.svg)
+
+*Rendered from the self-model. Open the diagram in a running app:
+[`what-we-are-trying-to-achieve`](http://localhost:8000/diagram?id=ARC%401777452513.d8jG_4.what-we-are-trying-to-achieve).*
 
 **Move faster without losing coherence**
 - Speed up architectural planning and governance for agentic work.
@@ -114,6 +123,11 @@ carry one-way references to architecture that are never reverse-persisted.
 ## Solution strategy
 
 The strategy follows directly from those goals and principles.
+
+![Motivation diagram showing the story in one view](media/motivation-story.svg)
+
+*Rendered from the self-model. Open the diagram in a running app:
+[`the-story-in-one-view`](http://localhost:8000/diagram?id=ARC%401780220700.Un4jQZ.the-story-in-one-view).*
 
 - **Treat architecture as code.** Artifacts are structured, version-controlled markdown with
   typed frontmatter, committed to git with authorship and history — queryable, diffable, and

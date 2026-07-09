@@ -650,41 +650,17 @@ class TestGetTypeGuidance:
         assert any("diagram_connections" in note for note in notes)
         assert any("include_description" in note for note in notes)
 
-    # ---- SysML v2 min entity / connection type guidance --------------------
+    # ---- Disabled module guidance ------------------------------------------
 
-    def test_sysml_domain_filter_returns_all_ten_types(self) -> None:
+    def test_disabled_sysml_domain_filter_returns_error(self) -> None:
         result = get_type_guidance(filter=["sysml"])
-        assert _guidance_total(result) == 10
+        assert "error" in result
+        assert result["unknown"] == ["sysml"]
 
-    def test_sysml_entity_types_have_required_fields(self) -> None:
-        result = get_type_guidance(filter=["sysml"])
-        for entry in _guidance_entries(result):
-            for field in ("name", "prefix", "classes", "create_when", "never_create_when"):
-                assert field in entry, f"{entry.get('name')!r} missing field {field!r}"
-
-    def test_sysml_entity_types_have_definition_or_usage_class(self) -> None:
-        result = get_type_guidance(filter=["sysml"])
-        for entry in _guidance_entries(result):
-            classes = cast(list[str], entry["classes"])
-            assert "definition" in classes or "usage" in classes, (
-                f"{entry['name']!r} must carry 'definition' or 'usage' class"
-            )
-
-    def test_sysml_connection_types_accessible_via_permitted_connections(self) -> None:
+    def test_disabled_sysml_entity_type_filter_returns_error(self) -> None:
         result = get_type_guidance(filter=["part-definition"])
-        entry = _guidance_entries(result)[0]
-        # permitted_connections: {direction: {target_type: [conn_type, ...]}}
-        conns = cast(dict[str, dict[str, list[str]]], entry["permitted_connections"])
-        all_conn_types = {
-            ct
-            for by_target in conns.values()
-            for conn_list in by_target.values()
-            for ct in conn_list
-        }
-        sysml_conn_types = {"feature-membership", "specialization"}
-        assert sysml_conn_types & all_conn_types, (
-            f"Expected at least one SysML connection type; got {sorted(all_conn_types)}"
-        )
+        assert "error" in result
+        assert result["unknown"] == ["part-definition"]
 
     # ---- Sequence diagram module allowed_bindings --------------------------
 

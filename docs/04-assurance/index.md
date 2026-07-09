@@ -20,6 +20,16 @@ specialist method and legal expertise — guidance-first, with method-completion
 
 ![Assurance overview with the store unlocked](../media/assurance-overview.png)
 
+The assurance capability is not a separate sidecar concern. It is motivated by the same
+forces as the architecture repository: agentic delivery raises change velocity, assurance
+obligations keep expanding, and small teams need a way to make safety, security, and GRC
+work traceable without building a dedicated assurance department.
+
+![Motivation chain explaining why assurance is part of the architecture tool](../media/assurance-why-motivation-chain.svg)
+
+*Rendered from the self-model. Open the diagram in a running app:
+[`why-assurance-motivation-chain`](http://localhost:8000/diagram?id=ARC%401780656714.9qoEQO.why-assurance-motivation-chain).*
+
 &nbsp;
 
 ## On this page set

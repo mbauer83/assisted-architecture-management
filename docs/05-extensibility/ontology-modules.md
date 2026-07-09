@@ -15,7 +15,7 @@ Full contract and a complete loader example:
 | Module | Vocabulary | Domain (`hierarchy[0]`) |
 |---|---|---|
 | `archimate_next` | ArchiMate NEXT Snapshot 1 — the canonical default | motivation, strategy, business, application, technology, implementation, common |
-| `sysml_v2_min` | A minimal SysML v2 vocabulary (parts, actions) | its own domain, shown as a GUI filter |
+| `sysml_v2_min` | A minimal SysML v2 vocabulary (parts, actions); shipped but disabled by default | its own domain when enabled |
 | `assurance` | STPA / CAST / GRC types (stored in the encrypted assurance store, not git) | assurance |
 
 &nbsp;

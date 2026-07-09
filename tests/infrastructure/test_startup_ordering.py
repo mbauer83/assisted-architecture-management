@@ -103,7 +103,7 @@ def _patch_initialise(monkeypatch: pytest.MonkeyPatch, order: list[str], index: 
     )
     monkeypatch.setattr(
         "src.application.group_registry_validation.validate_and_repair_group_registry",
-        lambda root, read_only=False: (order.append("group_repair"), [])[1],
+        lambda root, valid_meta_ontologies, read_only=False: (order.append("group_repair"), [])[1],
         raising=True,
     )
     monkeypatch.setattr(

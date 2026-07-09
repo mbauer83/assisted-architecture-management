@@ -40,6 +40,7 @@ import type {
   SyncStatus,
   SyncSaveResult,
   ServerInfo,
+  ModuleSummary,
   WriteHelp,
   GroupList,
   EntityTaxonomy,
@@ -69,6 +70,7 @@ export type RepoError = NetworkError | ParseResult.ParseError
 /** Outbound port: the application's view of the model backend. */
 export interface ModelRepository {
   readonly getServerInfo: () => Effect.Effect<ServerInfo, RepoError>
+  readonly listModules: () => Effect.Effect<readonly ModuleSummary[], RepoError>
   readonly getStats: () => Effect.Effect<Stats, RepoError>
   readonly listEntities: (params?: ListParams) => Effect.Effect<EntityList, RepoError>
   readonly listEntityTaxonomy: (params?: ListParams) => Effect.Effect<EntityTaxonomy, RepoError>

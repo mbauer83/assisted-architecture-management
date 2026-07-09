@@ -4,8 +4,8 @@ import { useRouter } from 'vue-router'
 import { Effect } from 'effect'
 import { modelServiceKey } from '../keys'
 import { useQuery } from '../composables/useQuery'
-import { META_ONTOLOGY_OPTIONS } from '../lib/domains'
-import type { GroupList } from '../../domain'
+import { metaOntologyOptionsForModules } from '../lib/domains'
+import type { GroupList, ModuleSummary } from '../../domain'
 import type { RepoError } from '../../ports/ModelRepository'
 import EntityGroupNavTree from '../components/EntityGroupNavTree.vue'
 import GroupSelector from '../components/GroupSelector.vue'
@@ -17,6 +17,7 @@ const props = defineProps<{ axis: Axis }>()
 const svc = inject(modelServiceKey)!
 const router = useRouter()
 const groupsState = useQuery<GroupList, RepoError>()
+const modulesState = useQuery<readonly ModuleSummary[], RepoError>()
 
 const STORAGE_KEYS: Record<Axis, string> = {
   'model-project': 'arch_group_model-project',
@@ -44,6 +45,7 @@ const REGISTRY_KEY: Record<Axis, keyof GroupList> = {
 }
 
 const groups = computed(() => groupsState.data.value?.[REGISTRY_KEY[props.axis]] ?? [])
+const metaOntologyOptions = computed(() => metaOntologyOptionsForModules(modulesState.data.value ?? undefined))
 const showArchived = ref(false)
 const visibleGroups = computed(() => groups.value.filter(g => showArchived.value || !g.archived))
 
@@ -206,6 +208,7 @@ const loadGroups = () => groupsState.run(svc.listGroups(props.axis))
 
 onMounted(async () => {
   loadGroups()
+  modulesState.run(svc.listModules())
   if (props.axis === 'diagram-collection') {
     const kinds = await Effect.runPromise(svc.listDiagramTypes()).catch(() => [])
     availableTypes.value = kinds.map((k: { key: string }) => k.key)
@@ -235,6 +238,7 @@ const label = computed(() => AXIS_LABELS[props.axis])
         active-group=""
         active-domain=""
         :manageable="false"
+        :modules="modulesState.data.value ?? undefined"
         axis="model-project"
         @update:active-group="onSidebarSelectGroup"
         @navigate-to-groups="() => {}"
@@ -321,7 +325,7 @@ const label = computed(() => AXIS_LABELS[props.axis])
                 class="field-input"
               >
                 <option
-                  v-for="o in META_ONTOLOGY_OPTIONS"
+                  v-for="o in metaOntologyOptions"
                   :key="o.value"
                   :value="o.value"
                 >{{ o.label }}</option>
@@ -420,7 +424,7 @@ const label = computed(() => AXIS_LABELS[props.axis])
                     <span
                       v-if="showMetaOntology && g.meta_ontology"
                       class="mo-badge"
-                    >{{ META_ONTOLOGY_OPTIONS.find(o => o.value === g.meta_ontology)?.label ?? g.meta_ontology }}</span>
+                    >{{ metaOntologyOptions.find(o => o.value === g.meta_ontology)?.label ?? g.meta_ontology }}</span>
                     <span
                       v-else-if="showTypeFilter && g.type_filter && g.type_filter.length > 0"
                       class="tf-badge"
@@ -518,7 +522,7 @@ const label = computed(() => AXIS_LABELS[props.axis])
                       class="field-input"
                     >
                       <option
-                        v-for="o in META_ONTOLOGY_OPTIONS"
+                        v-for="o in metaOntologyOptions"
                         :key="o.value"
                         :value="o.value"
                       >

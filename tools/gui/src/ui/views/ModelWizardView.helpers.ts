@@ -1,5 +1,5 @@
 // Pure helpers for the guided modeling wizard's hub shell — unit-testable without a DOM.
-import { DOMAIN_OPTIONS, FRAMEWORK_GROUPS, getDomainColor } from '../lib/domains'
+import { domainOptionsForModules, getDomainColor } from '../lib/domains'
 import { SPINE, DOMAIN_INTROS } from '../lib/wizardQuestionnaires'
 
 export interface WizardDomainCard {
@@ -12,8 +12,7 @@ export interface WizardDomainCard {
   readonly recommended: boolean
 }
 
-const ARCHIMATE_DOMAINS: readonly string[] =
-  FRAMEWORK_GROUPS.find((group) => group.key === 'archimate-next')?.domains ?? []
+type ModuleLike = { readonly name: string }
 
 /**
  * Omnidirectional "model this next" recommendation (decision D-7 — no mode toggle):
@@ -43,10 +42,10 @@ export const recommendedNextDomain = (
 export const buildWizardDomainCards = (
   createdCounts: Record<string, number>,
   lastDomain?: string | null,
+  modules?: readonly ModuleLike[],
 ): WizardDomainCard[] => {
   const recommended = recommendedNextDomain(createdCounts, lastDomain)
-  return DOMAIN_OPTIONS
-    .filter((option) => ARCHIMATE_DOMAINS.includes(option.key))
+  return domainOptionsForModules(modules)
     .map((option) => ({
       key: option.key,
       label: option.label,

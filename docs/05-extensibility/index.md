@@ -8,8 +8,10 @@ schemata, vocabularies, document structure, diagram notation — is configurable
 git-based files at both enterprise and engagement scope, and the modelling ontology extends
 beyond the base ArchiMate NEXT element and connection types.
 
-The system already ships three ontology modules and nine diagram types, which is the
-extension story working in production rather than in theory.
+The system already ships three ontology modules and nine diagram types, with the default
+configuration enabling ArchiMate NEXT and assurance while leaving the minimal SysML v2 module
+available but disabled. That is the extension story working in production rather than in
+theory.
 
 | Layer | What you can add or constrain | Page |
 |---|---|---|
@@ -33,9 +35,9 @@ promoted up still satisfies the enterprise constraints. See
 
 ## What ships today
 
-- **Ontologies** — `archimate_next` (the canonical default), `sysml_v2_min` (a minimal SysML
-  v2 vocabulary), and `assurance` (STPA/CAST/GRC). The SysML v2 domain appears as its own
-  filter in the GUI, alongside the ArchiMate domains.
+- **Ontologies** — `archimate_next` (the canonical default), `assurance` (STPA/CAST/GRC), and
+  the optional `sysml_v2_min` module (a minimal SysML v2 vocabulary) when enabled through
+  configuration. Runtime catalogs and GUI filters follow the active module set.
 - **Diagram types** — ArchiMate domain views (seven) plus layered, C4 (three levels),
   activity, sequence, datatype (UML class), matrix, and the four assurance views (bowtie,
   control structure, GSN, UCA matrix).

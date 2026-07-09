@@ -156,7 +156,7 @@ def create_document(
     preview_res = verify_content_in_temp_path(
         verifier=verifier,
         file_type="document",
-        desired_name=f"{doc_subdirectory}/{path.name}",
+        desired_name=path.relative_to(repo_root / DOCS).as_posix(),
         content=content,
         support_repo_root=repo_root,
     )

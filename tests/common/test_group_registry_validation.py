@@ -30,6 +30,19 @@ def _git_init(path: Path) -> None:
     subprocess.run(["git", "commit", "-m", "init"], cwd=path, check=True, capture_output=True)
 
 
+def _validate(
+    repo: Path,
+    *,
+    read_only: bool = False,
+    valid_meta_ontologies: frozenset[str] = frozenset({"archimate-next"}),
+) -> list[str]:
+    return validate_and_repair_group_registry(
+        repo,
+        valid_meta_ontologies=valid_meta_ontologies,
+        read_only=read_only,
+    )
+
+
 @pytest.fixture()
 def repo(tmp_path: Path) -> Path:
     root = tmp_path / "repo"
@@ -50,7 +63,7 @@ class TestGroupRegistryError:
 
 class TestValidateAndRepairGroupRegistry:
     def test_valid_empty_registry_returns_empty_messages(self, repo: Path) -> None:
-        messages = validate_and_repair_group_registry(repo)
+        messages = _validate(repo)
         assert messages == []
 
     def test_invalid_yaml_raises_group_registry_error(self, repo: Path) -> None:
@@ -58,27 +71,42 @@ class TestValidateAndRepairGroupRegistry:
         arch_dir.mkdir(parents=True, exist_ok=True)
         (arch_dir / "groups.yaml").write_text(": bad: yaml: [\n", encoding="utf-8")
         with pytest.raises(GroupRegistryError, match="invalid YAML"):
-            validate_and_repair_group_registry(repo)
+            _validate(repo)
 
     def test_invalid_meta_ontology_raises(self, repo: Path) -> None:
         from src.infrastructure.write.artifact_write.group_ops import group_create  # noqa: PLC0415
 
         group_create(repo, axis="model-project", slug="bad-mo", name="Bad MO", meta_ontology="invalid-ontology")
         with pytest.raises(GroupRegistryError, match="meta_ontology"):
-            validate_and_repair_group_registry(repo)
+            _validate(repo)
 
     def test_valid_meta_ontology_passes(self, repo: Path) -> None:
         from src.infrastructure.write.artifact_write.group_ops import group_create  # noqa: PLC0415
 
         group_create(repo, axis="model-project", slug="valid-mo", name="Valid MO", meta_ontology="archimate-next")
-        messages = validate_and_repair_group_registry(repo)
+        messages = _validate(repo)
+        assert messages == []
+
+    def test_disabled_meta_ontology_is_rejected(self, repo: Path) -> None:
+        from src.infrastructure.write.artifact_write.group_ops import group_create  # noqa: PLC0415
+
+        group_create(repo, axis="model-project", slug="sysml-mo", name="SysML MO", meta_ontology="sysml-v2")
+        with pytest.raises(GroupRegistryError, match="sysml-v2") as exc_info:
+            _validate(repo, valid_meta_ontologies=frozenset({"archimate-next"}))
+        assert "valid values: 'archimate-next'" in str(exc_info.value)
+
+    def test_enabled_meta_ontology_alias_passes(self, repo: Path) -> None:
+        from src.infrastructure.write.artifact_write.group_ops import group_create  # noqa: PLC0415
+
+        group_create(repo, axis="model-project", slug="sysml-mo", name="SysML MO", meta_ontology="sysml-v2")
+        messages = _validate(repo, valid_meta_ontologies=frozenset({"archimate-next", "sysml-v2"}))
         assert messages == []
 
     def test_orphaned_project_dir_auto_registered(self, repo: Path) -> None:
         orphan_dir = repo / "projects" / "orphan-project" / "model"
         orphan_dir.mkdir(parents=True)
         (orphan_dir / "entity.yaml").write_text("# orphan file")
-        messages = validate_and_repair_group_registry(repo, read_only=False)
+        messages = _validate(repo, read_only=False)
         assert any("orphan-project" in m for m in messages)
         from src.application.group_registry import load_group_registry  # noqa: PLC0415
 
@@ -89,7 +117,7 @@ class TestValidateAndRepairGroupRegistry:
         orphan_dir = repo / "projects" / "ro-orphan" / "model"
         orphan_dir.mkdir(parents=True)
         (orphan_dir / "entity.yaml").write_text("# orphan file")
-        messages = validate_and_repair_group_registry(repo, read_only=True)
+        messages = _validate(repo, read_only=True)
         assert any("ro-orphan" in m for m in messages)
         # In read-only mode, no registry change
         from src.application.group_registry import load_group_registry  # noqa: PLC0415
@@ -101,27 +129,27 @@ class TestValidateAndRepairGroupRegistry:
         dc_dir = repo / "diagram-catalog" / "diagrams" / "orphan-dc"
         dc_dir.mkdir(parents=True)
         (dc_dir / "diagram.puml").write_text("@startuml\n@enduml\n")
-        messages = validate_and_repair_group_registry(repo, read_only=False)
+        messages = _validate(repo, read_only=False)
         assert any("orphan-dc" in m for m in messages)
 
     def test_orphaned_document_collection_auto_registered(self, repo: Path) -> None:
         doc_dir = repo / "docs" / "adr" / "orphan-doc"
         doc_dir.mkdir(parents=True)
         (doc_dir / "decision.md").write_text("---\nartifact-id: DOC@1.x\n---\n")
-        messages = validate_and_repair_group_registry(repo, read_only=False)
+        messages = _validate(repo, read_only=False)
         assert any("orphan-doc" in m for m in messages)
 
     def test_empty_project_dir_not_auto_registered(self, repo: Path) -> None:
         empty_dir = repo / "projects" / "empty-proj"
         empty_dir.mkdir(parents=True)
-        messages = validate_and_repair_group_registry(repo, read_only=False)
+        messages = _validate(repo, read_only=False)
         assert not any("empty-proj" in m for m in messages)
 
     def test_uncategorized_dir_skipped(self, repo: Path) -> None:
         unc_dir = repo / "projects" / "uncategorized"
         unc_dir.mkdir(parents=True)
         (unc_dir / "entity.yaml").write_text("# file")
-        messages = validate_and_repair_group_registry(repo, read_only=False)
+        messages = _validate(repo, read_only=False)
         # uncategorized should not be auto-registered
         assert not any("uncategorized" in m and "Auto-registered" in m for m in messages)
 

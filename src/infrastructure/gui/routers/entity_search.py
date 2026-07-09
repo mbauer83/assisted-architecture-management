@@ -183,7 +183,9 @@ def get_entity_taxonomy(
 
     registry = module_registry_from_app(request.app)
     repo = s.get_repo()
-    entities = repo.list_entities(group=group)
+    # Keep taxonomy aligned with /api/entities: diagram-owned nodes are queryable by diagram
+    # tooling but are not standalone model catalog entries.
+    entities = [e for e in repo.list_entities(group=group) if e.host_diagram_id is None]
     if scope == "global":
         _cat = _catalogs()
         entities = [

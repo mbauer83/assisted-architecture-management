@@ -7,9 +7,8 @@ import uuid
 from collections.abc import Callable
 from pathlib import Path
 
+from src.application.document_links import MARKDOWN_LINK_RE, is_external_or_anchor_href
 from src.application.repo_path_helpers import all_model_roots, docs_root, rewrite_doc_link
-
-_MD_LINK_RE = re.compile(r"(\[[^\]]*\]\()([^)\s]+)(\))")
 
 
 def rewrite_document_links_for_moved_entity(
@@ -30,8 +29,8 @@ def rewrite_document_links_for_moved_entity(
         text = doc_path.read_text(encoding="utf-8")
 
         def _replace(match: re.Match[str]) -> str:
-            prefix, target, suffix = match.group(1), match.group(2), match.group(3)
-            if target.startswith(("http://", "https://", "#", "mailto:")):
+            prefix, target, suffix = match.group(1), match.group(3), match.group(4)
+            if is_external_or_anchor_href(target):
                 return match.group(0)
             rewritten = rewrite_doc_link(
                 target,
@@ -42,7 +41,7 @@ def rewrite_document_links_for_moved_entity(
             )
             return f"{prefix}{rewritten}{suffix}" if rewritten != target else match.group(0)
 
-        new_text = _MD_LINK_RE.sub(_replace, text)
+        new_text = MARKDOWN_LINK_RE.sub(_replace, text)
         if new_text != text:
             doc_path.write_text(new_text, encoding="utf-8")
             changed.append(doc_path)

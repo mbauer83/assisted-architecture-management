@@ -19,34 +19,56 @@ Configure them in `.mcp.json` — see [Installation §5](../02-installation.md#5
 
 ### `arch-repo-read` (query, navigate, verify)
 
-| Tool | Purpose |
-|---|---|
-| `artifact_query_stats` | Counts and breakdowns by domain / type / connection type / group |
-| `artifact_query_list_artifacts` | Metadata-only listing with AND-semantics filters and field projection |
-| `artifact_query_search_artifacts` | Ranked full-text search (with optional semantic supplement) |
-| `artifact_query_read_artifact` | Read one artifact (summary or full) by id |
-| `artifact_query_find_connections_for` | Connections touching an entity (inbound / outbound / any) |
-| `artifact_query_find_neighbors` | Graph neighbours for relationship walking |
-| `artifact_diagram_scaffold` | Generate a starting diagram skeleton for a type |
-| `artifact_verify` | Run the verifier over a scope and return structured findings |
+<!-- mcp-tools:begin arch-read -->
+| Tool | Access | Purpose |
+|---|---|---|
+| `artifact_diagram_scaffold` | Read-only | Generate a ready-to-edit @startuml…@enduml scaffold from a list of entity IDs. |
+| `artifact_query_datatype_types` | Read-only | List available attribute types for datatype diagrams. |
+| `artifact_query_find_connections_for` | Read-only | Find connection records that touch a given entity_id. |
+| `artifact_query_find_neighbors` | Read-only | Graph traversal: return entity_ids reachable from entity_id within max_hops using connections. |
+| `artifact_query_list_artifacts` | Read-only | List artifacts (metadata-only) with AND-semantics filters. |
+| `artifact_query_read_artifact` | Read-only | Read one artifact by artifact_id. |
+| `artifact_query_search_artifacts` | Read-only | Search artifacts by text query (keyword-scored; may include semantic supplement if configured). |
+| `artifact_query_stats` | Read-only | Return model statistics: total entity/connection/diagram counts and breakdowns by domain, connection type, and group. |
+| `artifact_verify` | Read-only | Verify one file or all model files. |
+<!-- mcp-tools:end arch-read -->
 
 ### `arch-repo-write` (author, edit, promote)
 
-| Group | Tools |
-|---|---|
-| **Entities** | `artifact_create_entity`, `artifact_edit_entity` |
-| **Connections** | `artifact_add_connection`, `artifact_edit_connection`, `artifact_edit_connection_associations` |
-| **Diagrams** | `artifact_create_diagram`, `artifact_edit_diagram`, `artifact_create_matrix` |
-| **Documents** | `artifact_create_document`, `artifact_edit_document` |
-| **Bulk** | `artifact_bulk_write`, `artifact_bulk_delete` |
-| **Grouping** | `artifact_group` |
-| **Promotion & sync** | `artifact_promote_to_enterprise`, `artifact_save_changes`, `artifact_submit_for_review`, `artifact_withdraw_changes` |
-| **Guidance & ops** | `artifact_authoring_guidance`, `artifact_help`, `artifact_get_operation` |
+<!-- mcp-tools:begin arch-write -->
+| Capability | Tool | Access | Purpose |
+|---|---|---|---|
+| Entities | `artifact_create_entity` | Write | Create a model entity file. |
+| Entities | `artifact_edit_entity` | Write | Edit an existing entity. |
+| Entities | `artifact_delete_entity` | Destructive | Delete a single entity (and its own .outgoing.md file, if any). |
+| Connections | `artifact_add_connection` | Write | Add a connection to an entity's .outgoing.md file. |
+| Connections | `artifact_edit_connection` | Write | Edit or remove a connection in an .outgoing.md file. |
+| Connections | `artifact_edit_connection_associations` | Write | Add or remove second-order association entity IDs from a connection. |
+| Diagrams | `artifact_create_diagram` | Write | Create a diagram. |
+| Diagrams | `artifact_edit_diagram` | Write | Edit an existing diagram. |
+| Diagrams | `artifact_delete_diagram` | Destructive | Delete a single diagram, including its rendered PNG/SVG output. |
+| Diagrams | `artifact_create_matrix` | Write | Create a markdown connection-matrix diagram. |
+| Documents | `artifact_create_document` | Write | Create a new architecture document (e.g. ADR, RFC). |
+| Documents | `artifact_edit_document` | Write | Edit an existing architecture document's frontmatter or body. |
+| Documents | `artifact_delete_document` | Destructive | Delete a single architecture document. |
+| Bulk | `artifact_bulk_write` | Write | Batch entity creates, connection adds, and edits in one call. |
+| Bulk | `artifact_bulk_delete` | Destructive | Batch destructive operations with dependency-aware planning and final repository verification. |
+| Grouping | `artifact_group` | Write | Manage artifact group containers across all three grouping axes. |
+| Promotion & sync | `artifact_promote_to_enterprise` | Write | Promote an explicit set of selected entities and connections from the engagement repo to the enterprise repo. |
+| Promotion & sync | `artifact_save_changes` | Write | Commit all accumulated architecture changes. |
+| Promotion & sync | `artifact_submit_for_review` | Write | Push the enterprise working branch to the remote for team review. |
+| Promotion & sync | `artifact_withdraw_changes` | Destructive | Permanently discard all pending enterprise changes (requires confirm=True). |
+| Guidance & ops | `artifact_authoring_guidance` | Write | Return authoring guidance before creating entities or diagrams. |
+| Guidance & ops | `artifact_help` | Write | Return the full catalog of artifact types, entity types (by domain), connection types (by language), and diagram types (with accepted domains). |
+| Guidance & ops | `artifact_get_operation` | Write | Return the latest recorded status, phase, timestamps, error, and final result for a prior bulk operation by operation_id. |
+| Guidance & ops | `artifact_admin_reindex` | Destructive | Rebuild the artifact index from disk. |
+<!-- mcp-tools:end arch-write -->
 
 The tool count is kept small with clear descriptions on purpose — fewer, well-described
 tools let an agent pick correctly. Every write tool validates against the verifier, supports
 a dry-run preview, and returns structured error codes with locations on failure. Structured
-output is returned as YAML for token efficiency.
+output is returned as YAML for token efficiency. The tables above are generated from the
+registered MCP servers by `uv run tools/generate_mcp_docs.py`.
 
 > The optional **assurance** MCP servers (`arch-assurance-read` / `arch-assurance-write`)
 > are documented separately under [Assurance MCP tools](../04-assurance/mcp-tools.md).

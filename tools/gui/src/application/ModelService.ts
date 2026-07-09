@@ -9,6 +9,7 @@ export type ModelService = ReturnType<typeof makeModelService>
 export const makeModelService = (repo: ModelRepository) =>
   ({
     getServerInfo: () => repo.getServerInfo(),
+    listModules: () => repo.listModules(),
     getStats: () => repo.getStats(),
     listEntities: (params: ListParams = {}) => repo.listEntities(params),
     listEntityTaxonomy: (params: ListParams = {}) => repo.listEntityTaxonomy(params),

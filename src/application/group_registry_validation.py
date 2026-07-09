@@ -25,7 +25,6 @@ from src.domain.groups import UNCATEGORIZED, GroupAxis, GroupEntry, GroupRegistr
 from src.domain.repo_layout import ARCH_REPO, DIAGRAM_CATALOG, DIAGRAMS, DOCS
 
 _GROUPS_FILE = "groups.yaml"
-_VALID_META_ONTOLOGIES = frozenset({"", "archimate-next", "sysml-v2"})
 
 
 class GroupRegistryError(ValueError):
@@ -39,6 +38,7 @@ class GroupRegistryError(ValueError):
 def validate_and_repair_group_registry(
     repo_root: Path,
     *,
+    valid_meta_ontologies: frozenset[str],
     read_only: bool = False,
 ) -> list[str]:
     """Validate and optionally repair the group registry for a repository root.
@@ -66,9 +66,9 @@ def validate_and_repair_group_registry(
 
     bad_ontologies = [
         f"Model-project {e.slug!r}: unknown meta_ontology {e.meta_ontology!r} — "
-        f"valid values: {', '.join(repr(v) for v in sorted(_VALID_META_ONTOLOGIES - {''}))}"
+        f"valid values: {_format_valid_meta_ontologies(valid_meta_ontologies)}"
         for e in registry.model_projects
-        if e.meta_ontology and e.meta_ontology not in _VALID_META_ONTOLOGIES
+        if e.meta_ontology and e.meta_ontology not in valid_meta_ontologies
     ]
     if bad_ontologies:
         raise GroupRegistryError(bad_ontologies)
@@ -113,6 +113,11 @@ def validate_and_repair_group_registry(
         _persist_registry(repo_root, registry, messages)
 
     return messages
+
+
+def _format_valid_meta_ontologies(values: frozenset[str]) -> str:
+    shown = sorted(v for v in values if v)
+    return ", ".join(repr(v) for v in shown) if shown else "<none>"
 
 
 # ── Internal helpers ──────────────────────────────────────────────────────────

@@ -7,7 +7,9 @@ diagrams:
   plantuml_limit_size: 16384
   render_dpi: 150
   sprite_scale: 1.5
-modules: {}
+modules:
+  sysml_v2_min:
+    enabled: false
 repo_init:
   commit_author_email: mbauer.mphil@googlemail.com
   commit_author_name: Michael Bauer

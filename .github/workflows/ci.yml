@@ -40,6 +40,9 @@ jobs:
           git diff --exit-code -- tools/gui/src/domain/types.generated.ts \
             || { echo "::error::types.generated.ts is stale — run 'uv run tools/generate_types.py' and commit"; exit 1; }
 
+      - name: Verify generated MCP documentation is in sync with registered tools
+        run: uv run tools/generate_mcp_docs.py --check
+
       - name: Fetch the PlantUML runtime
         run: uv run get-plantuml
 

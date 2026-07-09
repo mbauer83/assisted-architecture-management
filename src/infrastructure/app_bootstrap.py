@@ -167,6 +167,13 @@ _META_ONTOLOGY_ALIASES: dict[str, str] = {
 }
 
 
+def registered_meta_ontology_values(registry: ModuleRegistry) -> frozenset[str]:
+    """Return meta-ontology aliases whose backing ontology modules are active."""
+    return frozenset(
+        alias for alias, module_name in _META_ONTOLOGY_ALIASES.items() if registry.find_ontology(module_name)
+    )
+
+
 def resolve_meta_ontology_artifact_types(
     meta_ontology: str, registry: ModuleRegistry
 ) -> frozenset[str] | None:

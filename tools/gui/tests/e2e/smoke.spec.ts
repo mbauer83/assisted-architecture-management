@@ -29,7 +29,7 @@ type DiagramContext = {
 // render their lists, instead of the first-visit redirect to the group-management page.
 test.beforeEach(async ({ context }) => {
   await context.addInitScript(() => {
-    localStorage.setItem('arch_group_model-project', 'uncategorized')
+    localStorage.setItem('arch_group_model-project', 'platform-core')
     localStorage.setItem('arch_group_diagram-collection', 'uncategorized')
     localStorage.setItem('arch_group_document-collection', 'uncategorized')
   })
@@ -147,6 +147,44 @@ test('entity detail renders (exercises /api/ontology connection editor)', async 
   await firstEntity.waitFor({ timeout: 10000 })
   await firstEntity.click()
   await page.waitForTimeout(2000)
+  await expectHealthyMain(page, problems)
+})
+
+test('empty uncategorized group does not show stale ungrouped entities', async ({ page }) => {
+  const { problems } = watch(page)
+  await page.goto('/entities?group=uncategorized', { waitUntil: 'load' })
+  await expect(page.getByRole('heading', { name: /Entities\s+\(0\)/ })).toBeVisible()
+  await expect(page.getByText('No entities in "Uncategorized" yet.')).toBeVisible()
+  await expect(page.locator('main a[href*="/entity?id="]')).toHaveCount(0)
+  await expectHealthyMain(page, problems)
+})
+
+test('entity detail shows documents that reference the entity', async ({ page }) => {
+  const { problems } = watch(page)
+  await page.goto(
+    '/entity?id=REQ%401712870400.Kk6Ll6.verified-unique-identifiers-for-entities-connections-diagrams-and-documents',
+    { waitUntil: 'load' },
+  )
+  await expect(page.getByText('Referenced in documents')).toBeVisible()
+  await expect(page.getByRole('link', {
+    name: 'Artifact Identity: Typed Epoch-Random Identifiers in Filenames; Grouping by Directory',
+  })).toBeVisible()
+  await expectHealthyMain(page, problems)
+})
+
+test('disabled SysML module is not offered in frontend module surfaces', async ({ page }) => {
+  const { problems } = watch(page)
+  const groupsModules = page.waitForResponse((resp) => resp.url().includes('/api/modules') && resp.ok())
+  await page.goto('/entities/groups', { waitUntil: 'load' })
+  await groupsModules
+  await page.getByRole('button', { name: /\+ New project/i }).click()
+  await expect(page.getByText('SysML v2')).toHaveCount(0)
+  await expectHealthyMain(page, problems)
+
+  const wizardModules = page.waitForResponse((resp) => resp.url().includes('/api/modules') && resp.ok())
+  await page.goto('/model/wizard', { waitUntil: 'load' })
+  await wizardModules
+  await expect(page.getByText('SysML v2')).toHaveCount(0)
   await expectHealthyMain(page, problems)
 })
 
