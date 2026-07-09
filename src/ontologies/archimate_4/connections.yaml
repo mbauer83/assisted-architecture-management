@@ -136,7 +136,7 @@ connection_types:
 permitted_relationships:
 
   # ── General ────────────────────────────────────────────────────────────
-  - ["@all", "@same", [aggregation, specialization]]
+  - ["@all", "@same", [composition, aggregation, specialization]]
   - ["@all", "@all", [association]]
 
   # ── Junctions ──────────────────────────────────────────────────────────
@@ -154,13 +154,13 @@ permitted_relationships:
   - [service, service, [triggering, flow]]
   - [service, "@passive-structure-element", [access]]
   - [service, "@internal-behavior-element", [serving]]
-  - [role, "@external-active-structure-element", [aggregation]]
+  - [role, "@external-active-structure-element", [composition, aggregation]]
   - [role, event, [assignment]]
   - [role, "@internal-behavior-element", [assignment]]
   - ["@internal-behavior-element", event, [triggering, flow]]
   - ["@internal-behavior-element", service, [realization]]
   - ["@internal-behavior-element", "@passive-structure-element", [access]]
-  - ["@internal-behavior-element", "@internal-behavior-element", [aggregation, triggering, flow]]
+  - ["@internal-behavior-element", "@internal-behavior-element", [composition, aggregation, triggering, flow]]
 
   # ── Motivation Domain (internal) ───────────────────────────────────────
   - ["@motivation-element", "@motivation-element", [influence]]
@@ -179,7 +179,7 @@ permitted_relationships:
   - [value-stream, course-of-action, [realization]]
 
   # ── Business Domain (internal) ─────────────────────────────────────────
-  - [business-actor, business-interface, [aggregation]]
+  - [business-actor, business-interface, [composition, aggregation]]
   - [business-actor, business-object, [assignment]]
 
   # ── Application Domain (internal) ──────────────────────────────────────
@@ -189,15 +189,15 @@ permitted_relationships:
   - [application-component, [application-component, application-interface], [serving]]
 
   # ── Technology Domain (internal) ───────────────────────────────────────
-  - ["@technology-internal-active-structure-element", technology-interface, [aggregation]]
-  - [technology-node, [system-software, facility, device, equipment], [aggregation]]
+  - ["@technology-internal-active-structure-element", technology-interface, [composition, aggregation]]
+  - [technology-node, [system-software, facility, device, equipment], [composition, aggregation]]
   - [technology-node, artifact, [aggregation]]
   - [system-software, system-software, [assignment]]
   - [system-software, communication-network, [association]]
   - [device, system-software, [assignment]]
   - [device, communication-network, [association]]
-  - [equipment, device, [aggregation]]
-  - [facility, technology-node, [assignment, aggregation]]
+  - [equipment, device, [composition, aggregation]]
+  - [facility, technology-node, [assignment, composition, aggregation]]
   - [facility, distribution-network, [association]]
   - [facility, business-actor, [assignment]]
   - [business-actor, distribution-network, [association]]
@@ -225,19 +225,19 @@ permitted_relationships:
 
   # ── Common → Business ──────────────────────────────────────────────────
   - [[event, function, process], business-object, [access]]
-  - [role, business-interface, [aggregation]]
+  - [role, business-interface, [composition, aggregation]]
   - [service, [business-actor, business-interface], [serving]]
   - [service, business-object, [access]]
 
   # ── Common → Application ───────────────────────────────────────────────
   - [[event, function, process], data-object, [access]]
-  - [role, application-interface, [aggregation]]
+  - [role, application-interface, [composition, aggregation]]
   - [service, [application-component, application-interface], [serving]]
   - [service, data-object, [access]]
 
   # ── Common → Technology ────────────────────────────────────────────────
   - [[event, function, process, service], [artifact, material], [access]]
-  - [role, technology-interface, [aggregation]]
+  - [role, technology-interface, [composition, aggregation]]
   - [service, [communication-network, device, distribution-network, equipment, facility, technology-node, system-software, technology-interface], [serving]]
 
   # ── Common → Implementation ────────────────────────────────────────────
@@ -250,7 +250,7 @@ permitted_relationships:
   - [[business-actor, application-component], role, [assignment]]
   - [[business-interface, application-interface], path, [realization]]
   - [[business-interface, application-interface], service, [assignment]]
-  - [product, service, [aggregation]]
+  - [product, service, [composition, aggregation]]
 
   # ── Business & Application → Motivation ────────────────────────────────
   - [[business-actor, business-interface, business-object, product, application-component, application-interface, data-object], requirement, [influence, realization]]
@@ -259,7 +259,7 @@ permitted_relationships:
   - [[business-actor, business-interface, business-object, product, application-component, application-interface, data-object], resource, [influence, realization]]
 
   # ── Business & Application → Technology ────────────────────────────────
-  - [product, [artifact, material], [aggregation]]
+  - [product, [artifact, material], [composition, aggregation]]
 
   # ── Business & Application → Implementation ────────────────────────────
   - [[business-object, data-object], deliverable, [specialization]]
@@ -281,7 +281,7 @@ permitted_relationships:
   - [artifact, business-object, [specialization]]
   - [artifact, application-component, [realization]]
   - [artifact, data-object, [realization, specialization]]
-  - [distribution-network, business-actor, [aggregation]]
+  - [distribution-network, business-actor, [composition, aggregation]]
   - [facility, business-actor, [assignment]]
   - [material, [business-object], [realization, specialization]]
   - [material, data-object, [specialization]]
@@ -297,29 +297,29 @@ permitted_relationships:
 
   # ── Implementation → Common ────────────────────────────────────────────
   - [[deliverable, work-package], [event, function, path, process, role, service], [realization]]
-  - [plateau, [event, function, path, process, role, service], [aggregation, realization]]
+  - [plateau, [event, function, path, process, role, service], [composition, aggregation, realization]]
   - [plateau, event, [triggering]]
   - [work-package, event, [flow, triggering]]
 
   # ── Implementation → Motivation ────────────────────────────────────────
   - [deliverable, requirement, [realization]]
-  - [plateau, goal, [aggregation]]
-  - [plateau, requirement, [aggregation, influence, realization]]
+  - [plateau, goal, [composition, aggregation]]
+  - [plateau, requirement, [composition, aggregation, influence, realization]]
   - [work-package, requirement, [influence, realization]]
 
   # ── Implementation → Strategy ──────────────────────────────────────────
   - [[deliverable, work-package], [capability, course-of-action, resource, value-stream], [realization]]
-  - [plateau, [capability, course-of-action, resource, value-stream], [aggregation, realization]]
+  - [plateau, [capability, course-of-action, resource, value-stream], [composition, aggregation, realization]]
 
   # ── Implementation → Business & Application ────────────────────────────
   - [[deliverable, work-package], [business-actor, business-interface, business-object, product, application-component, application-interface, data-object], [realization]]
-  - [plateau, [business-actor, business-interface, business-object, product, application-component, application-interface, data-object], [aggregation, realization]]
+  - [plateau, [business-actor, business-interface, business-object, product, application-component, application-interface, data-object], [composition, aggregation, realization]]
 
   # ── Implementation → Technology ────────────────────────────────────────
   - [[deliverable, work-package], [artifact, communication-network, device, distribution-network, equipment, facility, material, technology-node, system-software, technology-interface], [realization]]
-  - [plateau, [artifact, communication-network, device, distribution-network, equipment, facility, material, technology-node, system-software, technology-interface], [aggregation, realization]]
+  - [plateau, [artifact, communication-network, device, distribution-network, equipment, facility, material, technology-node, system-software, technology-interface], [composition, aggregation, realization]]
 
   # ── Grouping & Location (cross-domain composite elements) ──────────────
   - [grouping, "@all", [composition, aggregation, assignment, realization, serving, access, influence, association, specialization, flow, triggering]]
   - ["@all", grouping, [composition, aggregation, assignment, realization, serving, access, influence, association, specialization, flow, triggering]]
-  - [location, "@all", [aggregation, association]]
+  - [location, "@all", [composition, aggregation, association]]

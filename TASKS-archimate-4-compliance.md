@@ -294,7 +294,7 @@ anchors, acceptance criteria, and dependencies. Markdown — no LoC limit.
 
 ## Phase C — Core semantics: composition, Appendix B, multiplicity
 
-- [ ] **WU-C1 Composition semantics verification** — against final §5.1.2: composition
+- [x] **WU-C1 Composition semantics verification** — against final §5.1.2: composition
   permitted wherever aggregation is (diff the two types' rows in
   `permitted_relationships`); strength ordering realization < assignment < aggregation <
   composition everywhere relationship strength/classification is consumed
@@ -1244,3 +1244,51 @@ reload test to run strictly last in collection order, which — under xdist's de
 afterward, without serializing anything else. Full suite green across three consecutive
 runs post-fix (3884-3888 passed depending on what else landed in the same pass), ruff
 clean, zuban clean, `generate_types.py`/`generate_mcp_docs.py --check` both no-op.
+
+2026-07-09 — WU-C1 — done — Source: `ArchiMate-4_compressed.pdf` (The Open Group, "ArchiMate®
+4 Specification", Evaluation Copy — gitignored via `*.pdf` + `*.pdf:Zone.Identifier`, never
+committed, confirmed via `git log --all -- '*.pdf'` = empty both before and after this WU).
+§5.1.2 (p.31 of the PDF, printed page 31): "A composition relationship is allowed in exactly
+the same cases where an aggregation relationship would be allowed." §B.5 Appendix B (Table
+legend, p.139): letters `a(g)gregation/composition` — the normative tables use ONE shared
+symbol for aggregation and composition, structurally proving the spec never distinguishes
+them for permission purposes. §B.2.2 (p.126): structural-relationship strength order
+confirmed verbatim — "Realization (weakest) < Assignment < Aggregation < Composition
+(strongest)". Searched the codebase for every consumer of that ordering
+(`hierarchy_priority`, `ConnectionSemantics.classify_connections`, "strength"/"derive"
+hits): **`hierarchy_priority` has zero consumers anywhere in `src/`, `tests/`, or
+`tools/gui`** — populated by both loaders, set for composition(1)/aggregation(2)/
+specialization(0) in `connections.yaml`, read nowhere. Nothing to reorder (dormant, not
+misordered); flagged here rather than removed — dead-surface removal needs the same
+call-path-verification rigor as WU-D7, out of C1's scope.
+
+Diffed `permitted_relationships` (composition-permitted pairs vs aggregation-permitted
+pairs via the loaded module, not by eyeballing YAML): 387 aggregation pairs, only 255 also
+had composition. Added composition alongside aggregation in `connections.yaml` wherever
+missing (22 YAML rule lines, incl. the `@all/@same`, `@internal-behavior-element` self,
+`role -> @external-active-structure-element`, `technology-node -> {system-software,
+facility, device, equipment}`, `plateau -> ...` cross-domain rules, `location -> @all`).
+
+**Per user direction, verified every added pair against the actual Appendix B relationship
+matrices (images — the tables have no extractable text layer in this PDF build; rendered
+via `pdftoppm` at 400 DPI and read directly)**, not just trusted the §5.1.2 general
+statement. Caught and corrected my own row/column mixup early (`From →` labels the
+**columns**, `To ↓` labels the **rows** — confirmed via the `location -> @all` blanket
+rule, whose "any concept" only reproduces when read as a `Location` *column*). Checked all
+~20 edited pairs (or their class expansions) directly: **21 of 22 fully confirmed** (a
+direct "G" cell in the source-column/target-row position). **One exception found**:
+`technology-node -> artifact` shows no "g"/"G" in either direction on the Technology-domain
+table — reverted the composition addition for this one pair only (aggregation itself left
+untouched; it may be a pre-existing rule the generic cross-domain table doesn't capture,
+similar to the documented Product/Plateau composite-element figure-specific exception on
+p.139 — needs the actual Chapter 10 metamodel figure to resolve, deferred to WU-C2's
+systematic recheck). Final diff: 387 aggregation pairs, 386 composition pairs, exactly one
+documented, tested exception.
+
+Structural test added: `tests/domain/test_archimate_4_composition_semantics.py` —
+`test_composition_permitted_wherever_aggregation_is` (asserts the diff is empty modulo the
+one documented exception) + `test_known_exception_is_still_aggregation_only` (guards the
+exception itself so a future fix is a deliberate, visible change to the exception set, not
+a silent regression). Full suite green (3890 passed / 9 skipped), ruff clean, zuban clean,
+`generate_types.py`/`generate_mcp_docs.py --check` both no-op (permitted-relationship data
+isn't part of the generated-types surface).

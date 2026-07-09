@@ -40,6 +40,7 @@ plantuml.jar
 
 # PDFs — never commit reference documents; keep them local only
 *.pdf
+*.pdf:Zone.Identifier
 
 # Guidance-cache files — license-encumbered spec prose, imported per repo via
 # arch-import-guidance; the per-repo ignore lives in <repo>/.arch-repo/.gitignore, this is
