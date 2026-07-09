@@ -157,6 +157,8 @@ permitted_relationships:
   - [role, "@external-active-structure-element", [composition, aggregation]]
   - [role, event, [assignment]]
   - [role, "@internal-behavior-element", [assignment]]
+  - [collaboration, "@external-active-structure-element", [composition, aggregation]]
+  - [collaboration, "@internal-behavior-element", [assignment]]
   - ["@internal-behavior-element", event, [triggering, flow]]
   - ["@internal-behavior-element", service, [realization]]
   - ["@internal-behavior-element", "@passive-structure-element", [access]]

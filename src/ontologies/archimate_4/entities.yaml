@@ -171,6 +171,13 @@ entity_types:
     create_when: ""
     never_create_when: ""
 
+  collaboration:
+    prefix: COL
+    hierarchy: [common]
+    classes: [active-structure-element, internal-active-structure-element]
+    create_when: ""
+    never_create_when: ""
+
   path:
     prefix: PTH
     hierarchy: [common]

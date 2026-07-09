@@ -7,7 +7,7 @@ specializations:
         name: Application Role
       - slug: technology-role
         name: Technology Role
-    grouping:
+    collaboration:
       - slug: business-collaboration
         name: Business Collaboration
       - slug: application-collaboration

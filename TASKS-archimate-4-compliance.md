@@ -1292,3 +1292,61 @@ exception itself so a future fix is a deliberate, visible change to the exceptio
 a silent regression). Full suite green (3890 passed / 9 skipped), ruff clean, zuban clean,
 `generate_types.py`/`generate_mcp_docs.py --check` both no-op (permitted-relationship data
 isn't part of the generated-types surface).
+
+2026-07-09 — WU-C2 — partial, NOT ticked — Built an image-OCR pipeline (poppler `pdftoppm`
++ tesseract, grid-line detection via numpy to crop all 42×42 Appendix B table cells
+precisely, verified against known-good WU-C1 cells) to attempt the full systematic diff
+against `permitted_relationships`. **Reliability finding, not a compliance finding**: OCR
+on this table format has a real, hard-to-eliminate error rate on single/near-single-character
+cells that a second refinement pass (4x upscale, multi-config union) made *worse* in some
+cases (confirmed concretely: `communication-network→artifact`, unambiguously "O" at 4x
+zoom, OCR'd as `"a"` then `"ar"` after the "fix"). A raw automated diff off this data would
+report ~180 false discrepancies. Per user direction: **did not** attempt to auto-apply the
+full relationship-table diff; the user will validate the remaining connection rules
+manually against their own reference. This WU stays unticked — the diff report + rule
+edits for the full Appendix B recheck remain outstanding.
+
+**One finding surfaced independently of the OCR reliability problem, high confidence** (a
+code-search fact, not a table-reading one): the **`collaboration` entity type was entirely
+missing** from `archimate_4/entities.yaml` — `grep -i collaboration` across
+`entities.yaml`/`connections.yaml` returned zero hits before this fix. Spec confirmation:
+§4.1.2 (p.19, Common Domain → Active Structure Elements) defines Collaboration as a peer of
+Role and Path; the *existing* Role guidance text (in the out-of-repo guidance extract,
+predating this session) already referenced "Actors, Application Components or
+**Collaborations**" — i.e. Collaboration was anticipated but never implemented. This also
+meant WU-D2's `business-collaboration`/`application-collaboration`/`technology-collaboration`
+specializations were mis-parented under `grouping` (the only vaguely-plausible existing
+parent at the time) instead of the correct, now-added `collaboration` parent.
+
+Fixed: added `collaboration` to `entities.yaml` (Common domain, `active-structure-element`
++ `internal-active-structure-element` classes, prefix `COL`); re-parented the three
+specializations in `specializations.yaml` from `grouping` to `collaboration`; added exactly
+the two relationships §4.1.2's text explicitly states (no invented/generalized rules):
+`collaboration -> @external-active-structure-element [aggregation, composition]`
+("may aggregate interfaces it provides to its environment") and
+`collaboration -> @internal-behavior-element [assignment]` ("may be assigned to one or
+more processes or functions") — mirroring Role's existing rule shape exactly. Authored
+fresh, non-spec-copied `create_when`/`never_create_when` guidance for `collaboration` in
+the out-of-repo extract (`~/.arch-guidance-extract/archimate-4.guidance.yaml`, WU-B3's
+location — `entities.yaml` itself stays empty by design), matching the sibling entries'
+voice: practical modeling heuristics (the "would collective behavior break down if you
+removed one participant" test) and common AI-agent pitfalls to avoid (labeling an org-chart
+grouping as a collaboration, using it for ordinary component-to-component calls, nesting it
+to fake an org hierarchy).
+
+Regenerated `EXPECTED_ENTITY_TYPES` in `tests/diagram_types/test_concept_scope_characterization.py`
+(WU-E1's characterization snapshot — `collaboration` now correctly appears wherever Role
+already does: archimate-application/business/strategy/technology/layered). Added
+`tests/domain/test_archimate_4_collaboration_entity.py` (entity classes, the two new
+permitted relationships) and fixed the specialization-parent assertion in
+`test_archimate_4_specializations.py`. Full suite green (3893 passed / 9 skipped), ruff
+clean, zuban clean, frontend `lint`+`typecheck` clean, `generate_types.py` picked up the
+new entity type (checked into `types.generated.ts`), `generate_mcp_docs.py --check` no-op.
+
+**Resume note for whoever picks up the rest of WU-C2**: the OCR extraction tooling and its
+intermediate JSON (`table_cells.json`, `table_direct.json`, `code_pairs.json`,
+`missing_in_code.json`, `extra_in_code.json`) lived only in the session's scratchpad
+(`/tmp/.../pdftools/`), not committed — they no longer exist for a fresh session. Re-running
+that pipeline is possible (poppler + tesseract are now installed) but every single/near-
+single-character cell result needs individual visual confirmation before being trusted;
+budget accordingly, or drive the recheck from the user's own manual reference instead.

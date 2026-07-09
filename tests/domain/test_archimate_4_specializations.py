@@ -19,7 +19,7 @@ class TestArchimate4SpecializationLibrary:
         assert business_service.never_create_when == ""
 
         business_collaboration = catalog.get(
-            "entity", "grouping", "business-collaboration", module_alias=META_ONTOLOGY_ALIAS
+            "entity", "collaboration", "business-collaboration", module_alias=META_ONTOLOGY_ALIAS
         )
         assert business_collaboration is not None
         assert business_collaboration.name == "Business Collaboration"

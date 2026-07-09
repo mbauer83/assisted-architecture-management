@@ -14,6 +14,7 @@ export const ENTITY_TYPE_NAMES = [
   "business-interface",
   "business-object",
   "capability",
+  "collaboration",
   "communication-network",
   "control-action",
   "control-structure-node",
