@@ -382,9 +382,9 @@ EXPECTED_CONNECTION_TYPES = {
     "archimate-strategy": ARCHIMATE_CONNECTION_TYPES,
     "archimate-technology": ARCHIMATE_CONNECTION_TYPES,
     "bowtie": (),
-    "c4-component": C4_ACCEPTS_CONNECTION_TYPES,
-    "c4-container": C4_ACCEPTS_CONNECTION_TYPES,
-    "c4-system-context": C4_ACCEPTS_CONNECTION_TYPES,
+    "c4-component": ALL_CONNECTION_TYPES,
+    "c4-container": ALL_CONNECTION_TYPES,
+    "c4-system-context": ALL_CONNECTION_TYPES,
     "control-structure": (),
     "datatype": ("dt-aggregation", "dt-association", "dt-composition", "dt-dependency", "dt-generalization"),
     "gsn": (),
@@ -405,8 +405,11 @@ def test_registered_diagram_type_effective_entity_types_snapshot() -> None:
     assert actual == EXPECTED_ENTITY_TYPES
 
 
-def test_registered_diagram_type_accepts_connection_type_snapshot() -> None:
+def test_registered_diagram_type_accepts_connection_type_snapshot(monkeypatch) -> None:
+    from src.infrastructure import app_bootstrap
+
     registry = build_module_registry(complete_vocabulary=True)
+    monkeypatch.setattr(app_bootstrap, "get_module_registry", lambda: registry)
     all_connection_types = tuple(registry.all_connection_types())
 
     actual = {

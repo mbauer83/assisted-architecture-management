@@ -1,0 +1,64 @@
+specializations:
+  entity:
+    role:
+      - slug: business-role
+        name: Business Role
+      - slug: application-role
+        name: Application Role
+      - slug: technology-role
+        name: Technology Role
+    grouping:
+      - slug: business-collaboration
+        name: Business Collaboration
+      - slug: application-collaboration
+        name: Application Collaboration
+      - slug: technology-collaboration
+        name: Technology Collaboration
+    service:
+      - slug: business-service
+        name: Business Service
+      - slug: application-service
+        name: Application Service
+      - slug: technology-service
+        name: Technology Service
+    process:
+      - slug: business-process
+        name: Business Process
+      - slug: application-process
+        name: Application Process
+      - slug: technology-process
+        name: Technology Process
+    function:
+      - slug: business-function
+        name: Business Function
+      - slug: application-function
+        name: Application Function
+      - slug: technology-function
+        name: Technology Function
+    event:
+      - slug: business-event
+        name: Business Event
+      - slug: application-event
+        name: Application Event
+      - slug: technology-event
+        name: Technology Event
+    business-object:
+      - slug: contract
+        name: Contract
+      - slug: representation
+        name: Representation
+    requirement:
+      - slug: constraint
+        name: Constraint
+    assessment:
+      - slug: gap
+        name: Gap
+  connection:
+    archimate-flow:
+      - slug: money-flow
+        name: Money Flow
+    archimate-assignment:
+      - slug: responsibility-assignment
+        name: Responsibility Assignment
+      - slug: behavior-assignment
+        name: Behavior Assignment

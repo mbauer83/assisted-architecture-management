@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Mapping
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from typing import Any, Literal
 
 ConceptKind = Literal["entity", "connection"]
@@ -76,6 +76,9 @@ class SpecializationCatalog:
                     f"{module}/{kind}/{parent}/{slug}; uniqueness is per module, concept kind, parent type, and slug"
                 )
             seen.add(entry.key)
+
+    def __or__(self, other: "SpecializationCatalog") -> "SpecializationCatalog":
+        return SpecializationCatalog(self.entries + other.entries)
 
     def for_type(
         self,
@@ -150,6 +153,33 @@ class SpecializationCatalog:
                             f"{_label(entry)} restrict_endpoints entry {restriction!r} is not permitted by parent"
                         )
         return tuple(issues)
+
+    @staticmethod
+    def empty() -> "SpecializationCatalog":
+        return SpecializationCatalog()
+
+
+def merge_specialization_catalogs(*catalogs: SpecializationCatalog) -> SpecializationCatalog:
+    entries: list[SpecializationInfo] = []
+    for catalog in catalogs:
+        entries.extend(catalog.entries)
+    return SpecializationCatalog(tuple(entries))
+
+
+def overlay_specialization_guidance(
+    catalog: SpecializationCatalog,
+    entries: Mapping[tuple[str, ConceptKind, str, str], tuple[str, str]],
+) -> SpecializationCatalog:
+    """Return a catalog with create/never guidance overlaid by specialization key."""
+    overlaid: list[SpecializationInfo] = []
+    for entry in catalog.entries:
+        guidance = entries.get(entry.key)
+        if guidance is None:
+            overlaid.append(entry)
+        else:
+            create_when, never_create_when = guidance
+            overlaid.append(replace(entry, create_when=create_when, never_create_when=never_create_when))
+    return SpecializationCatalog(tuple(overlaid))
 
 
 def specialization_infos_from_mapping(data: Mapping[str, Any], *, module_alias: str) -> tuple[SpecializationInfo, ...]:
