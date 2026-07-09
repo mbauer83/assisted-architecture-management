@@ -6,11 +6,13 @@
 from __future__ import annotations
 
 import urllib.request
+from collections.abc import Mapping
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import cast
 from urllib.parse import urlparse
 
+from src.domain.guidance import ConceptKind
 from src.domain.module_registry import ModuleRegistry
 from src.domain.ontology_protocol import OntologyModule
 from src.infrastructure.app_bootstrap import resolve_meta_ontology_module
@@ -87,19 +89,52 @@ def select_aliases(data: dict[str, object], module: str | None) -> dict[str, obj
     return {module: meta_ontologies[module]}
 
 
+_SECTION_CONCEPT_KINDS: dict[str, ConceptKind] = {"entity_types": "entity", "connection_types": "connection"}
+
+
 def _known_type_names(om: OntologyModule, section: str) -> frozenset[str]:
     return frozenset(str(t) for t in (om.entity_types if section == "entity_types" else om.connection_types))
+
+
+def _known_specialization_slugs(om: OntologyModule, section: str, type_name: str) -> frozenset[str]:
+    kind = _SECTION_CONCEPT_KINDS[section]
+    return frozenset(spec.slug for spec in om.specialization_catalog.for_type(kind, type_name))
+
+
+def _filter_type_entry(
+    om: OntologyModule, section: str, type_name: str, type_data: Mapping[str, object], *, key_prefix: str
+) -> tuple[dict[str, object], list[str], list[str]]:
+    """Filter one type's guidance entry, validating its optional ``specializations`` slugs
+    against the target module's SpecializationCatalog when present."""
+    matched = [key_prefix]
+    unmatched: list[str] = []
+    filtered: dict[str, object] = {k: v for k, v in type_data.items() if k != "specializations"}
+
+    specializations = type_data.get("specializations")
+    if isinstance(specializations, Mapping):
+        known_slugs = _known_specialization_slugs(om, section, type_name)
+        filtered_specializations: dict[str, object] = {}
+        for slug, slug_data in specializations.items():
+            slug_key = f"{key_prefix}.specializations.{slug}"
+            if slug in known_slugs:
+                matched.append(slug_key)
+                filtered_specializations[str(slug)] = slug_data
+            else:
+                unmatched.append(slug_key)
+        if filtered_specializations:
+            filtered["specializations"] = filtered_specializations
+
+    return filtered, matched, unmatched
 
 
 def filter_alias_document(
     alias: str, alias_data: object, registry: ModuleRegistry, *, strict: bool
 ) -> GuidanceImportSummary:
-    """Validate one alias's entity/connection type keys against the active registry.
-
-    Specialization-slug validation against the target repo's SpecializationCatalog is
-    deferred: that catalog (D2/D3) does not exist yet in this codebase. Unknown keys are
-    listed; they are dropped from the filtered document unless ``strict`` is set, in which
-    case any unknown key aborts the whole import.
+    """Validate one alias's entity/connection type keys — and, for each type, its optional
+    per-specialization guidance slugs — against the active registry's module (including its
+    SpecializationCatalog when the module carries one). Unknown keys are listed; they are
+    dropped from the filtered document unless ``strict`` is set, in which case any unknown
+    key aborts the whole import.
     """
     om = resolve_meta_ontology_module(alias, registry)
     if om is None:
@@ -118,11 +153,19 @@ def filter_alias_document(
         filtered_section: dict[str, object] = {}
         for type_name, type_data in section_data.items():
             key = f"{section}.{type_name}"
-            if type_name in known:
+            if type_name not in known:
+                unmatched.append(key)
+                continue
+            if not isinstance(type_data, Mapping):
                 matched.append(key)
                 filtered_section[type_name] = type_data
-            else:
-                unmatched.append(key)
+                continue
+            filtered_entry, entry_matched, entry_unmatched = _filter_type_entry(
+                om, section, type_name, type_data, key_prefix=key
+            )
+            matched.extend(entry_matched)
+            unmatched.extend(entry_unmatched)
+            filtered_section[type_name] = filtered_entry
         if filtered_section:
             filtered[section] = filtered_section
 

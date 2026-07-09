@@ -383,7 +383,7 @@ anchors, acceptance criteria, and dependencies. Markdown — no LoC limit.
 
 ## Phase D — Specializations & profiles (D4/D5/D6/D13/D14)
 
-- [ ] **WU-D1 SpecializationCatalog (domain, concept-level)** —
+- [x] **WU-D1 SpecializationCatalog (domain, concept-level)** —
   `src/domain/specializations.py`: `SpecializationInfo` (slug, name,
   `concept_kind: entity | connection`, parent_type, module_alias, description, notation
   icon/color, restrict_relationships (entity) / restrict_endpoints (connection),
@@ -392,7 +392,7 @@ anchors, acceptance criteria, and dependencies. Markdown — no LoC limit.
   restriction-narrowing validation hook). Parser for the PLAN §4.2 YAML shape
   (`specializations: {entity: …, connection: …}`, pure function). Unit tests for both
   kinds. Acceptance: dep-policy clean; tests green.
-- [ ] **WU-D2 Loading + informative library (two-tier)** — module-level
+- [x] **WU-D2 Loading + informative library (two-tier)** — module-level
   `specializations.yaml` loading in the archimate_4 loader; ship the §14.2.1 informative
   library: entity specializations (role/collaboration/service/process/function/event
   families + contract, constraint, gap, representation-like) AND connection
@@ -473,13 +473,13 @@ anchors, acceptance criteria, and dependencies. Markdown — no LoC limit.
 
 ## Phase E — Viewpoints (D7/D8)
 
-- [ ] **WU-E1 ConceptScope (domain)** — `src/domain/concept_scope.py`: frozen scope
+- [x] **WU-E1 ConceptScope (domain)** — `src/domain/concept_scope.py`: frozen scope
   (explicit type sets + class/hierarchy predicates + connection types + endpoint rules),
   `admits_entity_type/admits_connection_type/admits_connection`, intersection `&`.
   Characterization test capturing current `effective_entity_types` +
   `accepts_connection_type` behavior per registered diagram-type module (pre-refactor
   snapshot for E2). Unit tests. Acceptance: dep-policy clean; snapshot recorded.
-- [ ] **WU-E2 Re-base diagram-type filters (replacement)** — reimplement
+- [x] **WU-E2 Re-base diagram-type filters (replacement)** — reimplement
   `_config_type.py::_build_entity_filter` + `DiagramTypeBase.accepts_entity_type/
   accepts_connection_type/effective_*` over a module-derived `ConceptScope`; binding-target
   admissibility (`permitted_mappings` source eligibility) evaluates through the same
@@ -1175,3 +1175,72 @@ commits first.
 decisions, confirm Q2 has an answer (check Progress notes / ask the user) before touching
 WU-B5, confirm whether spec section text is available before attempting C1/C2, and check
 whether the `arch4-d1-e1` branch (WU-D1/E1) has merged before picking D2/E2.
+
+2026-07-09 — WU-D1/WU-D2/WU-E1/WU-E2 — done — Verified in the parallel worktree
+(`../scalable-architecture-for-humans-and-ai-arch4-d1-e1`, branch `arch4-d1-e1`) after
+`uv sync --all-groups` (fresh worktree venv was missing fastapi/anyio/etc.): full suite
+green (3839 passed / 49 skipped), ruff clean, zuban clean. Committed that worktree's
+uncommitted WU-D2 tail (specialization_declarations.py, archimate_4/specializations.yaml
+informative library, repo-level two-tier loading) as a separate commit, then merged the
+whole branch into `main` (`git merge --no-ff`). One conflict in `app_bootstrap.py`
+(this session's own concurrent WU-B2-completion commit — see below — vs. the branch's
+`specializations=` param); resolved by keeping both: `_load_guidance_overlay(alias)` (this
+session's rename) plus `specializations=_load_archimate_specializations()` (the branch's
+addition). Post-merge: full suite green (3862 passed / 9 skipped — two
+`test_entity_display_search_pagination` failures are pre-existing xdist-worker
+cross-test pollution from an unrelated `importlib.reload(app_bootstrap)` in
+`tests/cli/test_arch_import_guidance.py`, reproduced identically on a clean pre-merge
+checkout; tracked separately, not caused by this merge), ruff clean, zuban clean,
+`generate_types.py`/`generate_mcp_docs.py --check` both no-op (specializations not yet
+GUI/MCP-exposed — that's WU-D6). Guidance overlay for specializations (both entity and
+connection kind) is applied and tested in the merged commit
+(`tests/domain/test_archimate_4_specializations.py`) — the "entity-type specialization
+guidance" work the user had deferred pending this merge is therefore already satisfied by
+what merged; the remaining related gap is WU-B4's specialization-slug key validation in
+`arch_import_guidance`, tracked as a follow-up below.
+
+2026-07-09 — WU-B2 (follow-up) — done — Completed the generalization WU-B2 left
+"accepted, unused by default": `sysml_v2_min` and `assurance` loaders now apply their
+`GuidanceOverlay` to entity-type `create_when`/`never_create_when` (previously accepted
+but ignored); `app_bootstrap._load_archimate_guidance_overlay()` renamed to
+`_load_guidance_overlay(alias)` and reused for all three modules;
+`resolve_meta_ontology_module` falls back to treating the alias as a literal registered
+module name for aliases outside `_META_ONTOLOGY_ALIASES` (e.g. `"assurance"`, which
+carries its own guidance but isn't a selectable architecture-framework meta-ontology).
+Fixed a stale caller in `tests/common/test_guidance_bootstrap.py` (referenced the
+pre-rename function name). Full gates green pre-merge and post-merge.
+
+2026-07-09 — WU-B4 (follow-up) — done — Closed the "deferred by design" gap
+`filter_alias_document()` left in WU-B4: specialization-slug keys
+(`entity_types.<type>.specializations.<slug>` / `connection_types.<type>.specializations.
+<slug>`) are now validated against the target module's `SpecializationCatalog`, matching
+the original acceptance criterion ("key validation against registry + the target repo's
+SpecializationCatalog when present"). Added the missing capability at the correct layer
+per this repo's architectural-discipline rule: `specialization_catalog` was only present
+on the concrete `_ArchiMate4Module`, not declared on the `OntologyModule` Protocol, so
+`guidance_import.py` had no generic way to reach it — added the property to the Protocol
+plus an empty-catalog class-attribute default on `_SysmlV2MinModule`/`_AssuranceModule`
+(neither ships specializations yet), so `isinstance(module, OntologyModule)` and the
+existing `test_protocol_compliance.py` sweep stay satisfied for all three modules. Unknown
+slugs are listed/dropped (or abort under `--strict`) exactly like unknown type keys; 5 new
+tests in `tests/infrastructure/test_guidance_import.py` (known slug matched, unknown
+slug dropped/strict, and a module-without-a-catalog case using sysml-v2's empty
+catalog). Also applied the user's review of WU-D2's informative library while this was
+in flight: removed `money-flow` (archimate-flow) as not needed, added `application-
+component` → `service`/`module`/`endpoint` specializations (updated the one test that
+asserted against real shipped content, `test_archimate_4_specializations.py`; the
+generic-fixture tests in `test_specializations.py`/`test_guidance.py` still use
+`money-flow` as illustrative parser data and were left alone). Separately fixed real
+test-isolation flakiness (not caused by this session's changes, but blocking a clean
+gate): `tests/cli/test_arch_import_guidance.py::TestRestartEquivalentRebootstrap` calls
+`importlib.reload(app_bootstrap)`, which replaces that module's top-level function
+objects in place; any router module already imported at collection time (holding
+`Depends(<pre-reload object>)`) desyncs from a test fixture that re-imports
+`app_bootstrap` fresh afterward on the same xdist worker — intermittently broke
+`tests/tools/test_entity_display_search_pagination.py`. Fixed via sequencing, not
+skipping: a new `tests/conftest.py::pytest_collection_modifyitems` hook pins that one
+reload test to run strictly last in collection order, which — under xdist's default
+`--dist=load` scheduler — guarantees no other test is ever dispatched to its worker
+afterward, without serializing anything else. Full suite green across three consecutive
+runs post-fix (3884-3888 passed depending on what else landed in the same pass), ruff
+clean, zuban clean, `generate_types.py`/`generate_mcp_docs.py --check` both no-op.

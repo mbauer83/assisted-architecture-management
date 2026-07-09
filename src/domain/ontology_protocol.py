@@ -28,6 +28,7 @@ from src.domain.ontology_types import (
     EntityTypeInfo,
 )
 from src.domain.permitted_relationships import PermittedRelationshipSet
+from src.domain.specializations import SpecializationCatalog
 
 if TYPE_CHECKING:
     from src.domain.artifact_types import ConnectionRecord, EntityRecord
@@ -80,6 +81,9 @@ class OntologyModule(Protocol):
 
     @property
     def attribute_profiles(self) -> Mapping[str, dict[str, object]]: ...
+
+    @property
+    def specialization_catalog(self) -> SpecializationCatalog: ...
 
     def entity_types_with_class(self, cls: ElementClassName) -> frozenset[EntityTypeName]: ...
 

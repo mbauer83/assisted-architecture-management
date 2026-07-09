@@ -86,6 +86,41 @@ class TestFilterAliasDocument:
         summary = filter_alias_document("archimate-4", alias_data, registry, strict=False)
         assert summary.unmatched_keys == ("connection_types.not-a-real-connection",)
 
+    def test_known_specialization_slug_matched(self, registry: ModuleRegistry) -> None:
+        alias_data = {
+            "entity_types": {
+                "service": {"specializations": {"business-service": {"create_when": "c", "never_create_when": "n"}}}
+            }
+        }
+        summary = filter_alias_document("archimate-4", alias_data, registry, strict=False)
+        assert summary.matched_keys == (
+            "entity_types.service",
+            "entity_types.service.specializations.business-service",
+        )
+        assert summary.unmatched_keys == ()
+        filtered_service = summary.filtered_document["meta_ontologies"]["archimate-4"]["entity_types"]["service"]
+        assert filtered_service["specializations"]["business-service"]["create_when"] == "c"
+
+    def test_unknown_specialization_slug_listed_and_dropped_when_not_strict(self, registry: ModuleRegistry) -> None:
+        alias_data = {"entity_types": {"service": {"specializations": {"not-a-real-slug": {"create_when": "c"}}}}}
+        summary = filter_alias_document("archimate-4", alias_data, registry, strict=False)
+        assert summary.unmatched_keys == ("entity_types.service.specializations.not-a-real-slug",)
+        filtered_service = summary.filtered_document["meta_ontologies"]["archimate-4"]["entity_types"]["service"]
+        assert "specializations" not in filtered_service
+
+    def test_unknown_specialization_slug_raises_when_strict(self, registry: ModuleRegistry) -> None:
+        alias_data = {"entity_types": {"service": {"specializations": {"not-a-real-slug": {"create_when": "c"}}}}}
+        with pytest.raises(GuidanceImportError, match="not-a-real-slug"):
+            filter_alias_document("archimate-4", alias_data, registry, strict=True)
+
+    def test_specialization_slug_unmatched_for_module_without_catalog(self) -> None:
+        """sysml-v2 carries an empty SpecializationCatalog, so any specialization slug for
+        one of its types is unknown."""
+        complete_registry = build_module_registry(complete_vocabulary=True)
+        alias_data = {"entity_types": {"part-definition": {"specializations": {"anything": {"create_when": "c"}}}}}
+        summary = filter_alias_document("sysml-v2", alias_data, complete_registry, strict=False)
+        assert summary.unmatched_keys == ("entity_types.part-definition.specializations.anything",)
+
 
 class TestFetchSource:
     def test_reads_local_file(self, tmp_path: Path) -> None:

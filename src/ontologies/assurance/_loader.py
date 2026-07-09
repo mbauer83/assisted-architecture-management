@@ -15,6 +15,7 @@ from src.domain.permitted_relationships import (
     PermittedRelationship,
     PermittedRelationshipSet,
 )
+from src.domain.specializations import SpecializationCatalog
 
 DISPLAY_SECTION_ID = "assurance"
 
@@ -117,6 +118,7 @@ class _AssuranceModule:
     enabled: bool = True
     requires: list[str] = ["confidential_store"]
     attribute_profiles: Mapping[str, dict[str, object]] = _ATTRIBUTE_PROFILES
+    specialization_catalog: SpecializationCatalog = SpecializationCatalog.empty()
 
     def __init__(
         self,

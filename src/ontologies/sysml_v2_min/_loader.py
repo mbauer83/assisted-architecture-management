@@ -16,6 +16,7 @@ from src.domain.permitted_relationships import (
     PermittedRelationship,
     PermittedRelationshipSet,
 )
+from src.domain.specializations import SpecializationCatalog
 
 DISPLAY_SECTION_ID = "sysml"
 
@@ -30,6 +31,7 @@ class _SysmlV2MinModule:
     enabled: bool = True
     requires: list[str] = []
     attribute_profiles: Mapping[str, dict[str, object]] = {}
+    specialization_catalog: SpecializationCatalog = SpecializationCatalog.empty()
 
     def __init__(
         self,
