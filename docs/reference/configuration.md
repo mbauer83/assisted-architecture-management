@@ -75,10 +75,28 @@ storage:
 modules:
   sysml_v2_min:
     enabled: false
+
+validation:
+  viewpoint_enforcement: warn   # off | warn | ghost — default enforcement for a diagram/matrix's
+                                 # viewpoint: application; overridable per application
+
+guidance:
+  default_source: ""   # default --source for arch-import-guidance; empty until a hosting
+                        # location is chosen — every import must then pass --source explicitly
+
+viewpoints:
+  execution_max_entities: 500              # hard cap on entities in a viewpoint execution result
+  execution_default_entity_limit_mcp: 200  # MCP execute default when no limit argument is given
+  execution_timeout_seconds: 10
 ```
 
 These apply globally and are read at startup; they are not configurable via
-`arch-workspace.yaml`. The `storage.assurance` keys are written automatically by
+`arch-workspace.yaml`. `validation.viewpoint_enforcement` and the `viewpoints:` execution
+bounds are covered in full in [Viewpoints — schema
+reference](viewpoints-schema.md#execution-result--bounds); `guidance.default_source` in
+[Ontology modules → Guidance
+externalization](../05-extensibility/ontology-modules.md#guidance-externalization-license-compliance).
+The `storage.assurance` keys are written automatically by
 `arch-assurance init` and `arch-assurance use-backend` — see
 [Assurance: storage & confidentiality](../04-assurance/storage-and-confidentiality.md).
 

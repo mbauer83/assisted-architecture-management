@@ -2,7 +2,7 @@
 name: reverse-architecture
 description: >
   Use this skill whenever the user wants to reverse-engineer infrastructure-as-code (Terraform,
-  Pulumi, CloudFormation, Bicep, etc.) into ArchiMate Next model entities, connections, and
+  Pulumi, CloudFormation, Bicep, etc.) into ArchiMate 4.0 model entities, connections, and
   diagrams. Trigger on phrases like "map terraform to the model", "reverse architect this
   infrastructure", "analyse the terraform and update the architecture", "what ArchiMate entities
   should I create for this terraform", "sync the architecture with the infra code",
@@ -12,7 +12,7 @@ description: >
   do with it architecturally, or when they say "the terraform has changed, update the model".
 ---
 
-# Reverse Architecture — IaC → ArchiMate Next
+# Reverse Architecture — IaC → ArchiMate 4.0
 
 ## Phase 1 — Get live authoring guidance
 

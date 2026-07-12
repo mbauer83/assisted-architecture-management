@@ -60,8 +60,9 @@ app.
 
 **It isn't (yet), if…**
 
-- you need certified conformance to a **published ArchiMate standard** — the model follows the
-  ArchiMate 4.0 standard and makes no conformance claim;
+- you need certified conformance to a **published ArchiMate standard** — the model aims for
+  conformance with the [ArchiMate 4.0 standard](docs/reference/archimate-4-conformance.md),
+  but this has not been independently verified;
 - you want **WYSIWYG-first freeform diagramming** — diagrams here are typed views over the
   model, rendered by PlantUML;
 - you need a centralized modeling suite with fine-grained per-user accounts, RBAC workflows,
@@ -78,6 +79,7 @@ More on the audience in [Who it serves](docs/01-motivation.md#who-it-serves).
 | 🗺️ | **A typed architecture graph** | Entities and connections across motivation → strategy → business → application → technology, geared toward the ArchiMate 4.0 standard | 
 | 🔍 | **Browse and explore** | List, treemap, full-text search, and interactive graph navigation — *what connects to this, and how far to that?* |
 | 📐 | **Diagram families** | ArchiMate views, C4 (model-backed), UML activity, sequence & class (datatype), and relationship matrices |
+| 🎯 | **Viewpoints** | Saved, criteria-based ways of looking at the model — table/matrix/diagram/exploration, applied to existing diagrams or executed ad hoc |
 | ✅ | **Always-on verification** | Schema, referential integrity, cross-repo rules, and PlantUML syntax checked on every write |
 | 🤖 | **AI-native access** | A split read/write MCP server exposes the model as typed tools; the same capability is in the GUI, REST API, and CLI |
 | 🏢 | **Two-tier repositories** | Draft in an engagement repo, promote curated content to a shared enterprise baseline |
@@ -172,7 +174,7 @@ The agent can then `artifact_query_search_artifacts`, walk the graph with
 |---|---|---|
 | 1 | [Motivation, Ideas, Goals & Scope](docs/01-motivation.md) | Why the project exists; goals, principles, and explicit non-goals |
 | 2 | [Installation & Setup](docs/02-installation.md) | Per-OS prerequisites, dependency groups, backend, MCP, quality checks |
-| 3 | [Architecture Modeling](docs/03-modeling/index.md) | Projects, views, graph exploration, diagramming, the MCP/REST surface |
+| 3 | [Architecture Modeling](docs/03-modeling/index.md) | Projects, views, graph exploration, diagramming, viewpoints, the MCP/REST surface |
 | 4 | [Assurance — Safety, Security, GRC](docs/04-assurance/index.md) | STPA/CAST/GRC methods, assurance diagrams, confidential storage |
 | 5 | [Extensibility](docs/05-extensibility/index.md) | Profiles, document types, ontology & diagram-type modules, hexagonal core |
 | — | [Reference](docs/reference/configuration.md) | Configuration, CLI, git sync & promotion, [Docker Compose](docs/reference/docker-compose.md) |
@@ -181,9 +183,11 @@ The agent can then `artifact_query_search_artifacts`, walk the graph with
 
 ## Status
 
-Pre-1.0 and under active development. The model is geared toward the **ArchiMate 4.0
-standard**; it makes no claim of conformance with any published standard. The assurance
-capability spans STPA, STPA-Sec, CAST, GRC, and supply-chain signal ingestion.
+Pre-1.0 and under active development. The model aims for conformance with the
+[ArchiMate 4.0 standard](docs/reference/archimate-4-conformance.md); conformance has not
+been independently verified, so no conformance claim is made. The assurance capability
+spans STPA, STPA-Sec, CAST, GRC, and supply-chain signal
+ingestion.
 
 &nbsp;
 

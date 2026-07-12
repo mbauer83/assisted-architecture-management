@@ -238,6 +238,28 @@ docker compose down                   # stop (named volumes persist)
 
 Health is exposed at `/health` and wired into the container `HEALTHCHECK`.
 
+**Repository format upgrade on every restart.** Before starting the backend, the
+entrypoint runs `arch-repair upgrade --commit` against the resolved workspace
+roots — the guard that refuses to run against a repo a live backend is serving
+always passes here, since this *is* the process about to start that backend. A
+repo already on the current format sees zero writes (a true no-op), so this is
+safe on every single restart, not just after `docker compose pull`. Findings
+are applied, indexes rebuilt, and `.arch-repo/config.yaml` stamped
+automatically. Uncommitted model edits (the normal state of an actively-used
+repo) never block this — a step reads whatever is currently on disk and
+carries it forward, so nothing is lost; an unrecoverable pending transaction
+is the only thing besides a live backend that aborts startup, since that
+signals actual inconsistency rather than ordinary in-progress work. Controlled
+by:
+
+| Variable | Default | Effect |
+|---|---|---|
+| `ARCH_REPAIR_UPGRADE` | `true` | Set `false` to skip the check entirely (run `arch-repair upgrade` manually instead) |
+
+See `arch-repair upgrade --help` (or `PLAN-archimate-4-compliance.md` §3 D17)
+for the full CLI, including `--repo-root`/`--workspace` targeting and the
+`--json` report contract used for scripted checks.
+
 ---
 
 *See also: [Installation & Setup](../02-installation.md) · [Configuration Reference](configuration.md)*

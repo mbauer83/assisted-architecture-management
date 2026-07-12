@@ -107,7 +107,7 @@ authoring, and verification are reachable for people through a GUI and CLI-tools
 **Extensibility and configurability at multiple levels.** Frontmatter schemata, attribute
 schemata, valid entity and connection types, and directory conventions are all configurable
 through git-based config, at both enterprise and engagement scope. The ontology extends
-beyond the base ArchiMate NEXT vocabulary. The system adapts to an organisation without
+beyond the base ArchiMate 4.0 vocabulary. The system adapts to an organisation without
 forking the core.
 
 **Safety is never treated as subordinate to risk.** Safety constraints stay absolute — cost, schedule,
@@ -178,7 +178,7 @@ them — and the agents working alongside them — can reach the same model.
 ## Scope and non-goals
 
 **In scope**
-- Modelling architecture toward the ArchiMate NEXT draft vocabulary, plus extension
+- Modelling architecture toward the ArchiMate 4.0 vocabulary, plus extension
   ontologies and diagram families (UML activity, sequence, C4, matrices, and assurance views).
 - A git-versioned, two-tier artifact store with a verifier, exposed through MCP, REST, CLI,
   and a browser GUI.
@@ -186,8 +186,9 @@ them — and the agents working alongside them — can reach the same model.
   linked to the architecture model.
 
 **Out of scope / deliberate non-goals**
-- **Conformance claims.** The model is *geared toward* the ArchiMate NEXT draft. It does not
-  claim conformance with any published standard — the draft is moving, and so is this work.
+- **Conformance claims.** The model aims for conformance with the
+  [ArchiMate 4.0 standard](reference/archimate-4-conformance.md). Conformance has not been
+  independently verified, so no conformance claim is made.
 - **Full feature parity across every interface.** Each surface covers the core; depth varies
   by interface on purpose.
 - **A hosted multi-tenant service.** This is workspace-local tooling backed by your own git

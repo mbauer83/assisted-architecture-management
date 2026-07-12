@@ -1,7 +1,8 @@
 # Architecture Modeling
 
-> Modelling toward the **ArchiMate NEXT** draft — geared toward the draft vocabulary, and
-> importantly not a claim of conformance with any published standard.
+> Modelling aims for conformance with the
+> [ArchiMate 4.0](../reference/archimate-4-conformance.md) standard; conformance has not
+> been independently verified, so no conformance claim is made.
 
 The model is a graph of typed **entities** connected by typed **connections**, organised
 into **domains** (motivation, strategy, business, application, technology, implementation,
@@ -18,6 +19,7 @@ GUI, the REST API, the CLI, and the MCP tools.
 | [Projects & grouping](projects-and-grouping.md) | The three independent grouping axes and the group lifecycle |
 | [Views & exploration](views-and-exploration.md) | List view, treemap, grid, full-text search, and graph navigation |
 | [Diagramming](diagramming.md) | ArchiMate, matrix, activity, sequence, C4, and datatype (UML class) diagram families |
+| [Viewpoints](viewpoints.md) | Saved, criteria-based ways of looking at a slice of the model — definitions, applications to existing diagrams, and ad-hoc execution |
 | [Interfaces & MCP](interfaces-and-mcp.md) | The MCP read/write tool surface, REST API, and GUI parity |
 
 &nbsp;
@@ -30,7 +32,7 @@ Four kinds of artifact share one consistent metadata model (name, version,
 - **Entities** — typed nodes scoped to a domain (Goal, Requirement, Capability, Service,
   Application Component, Node, …). Each entity is a standalone file.
 - **Connections** — typed, directed relationships (realizes, supports, composes,
-  specializes, serves, …) with optional source/target cardinality and a description.
+  specializes, serves, …) with optional source/target multiplicity and a description.
 - **Diagrams** — views over the model, in one of the diagram families below.
 - **Documents** — ADRs, standards, specifications, and other structured docs with required
   sections and frontmatter (see [Document types](../05-extensibility/document-types.md)).

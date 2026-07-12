@@ -27,6 +27,25 @@ descriptions stay hidden unless a diagram explicitly opts in per connection.
 
 ![Rendered ArchiMate diagram with entity labels](../media/diagram-archimate.png)
 
+A diagram connection's frontmatter entry can opt in to an inline **multiplicity** annotation
+(`include_multiplicity`) rendering its source/target cardinality on the arrow — the ArchiMate
+4.0 term for what earlier releases of this project called "cardinality" (the annotation key
+itself was renamed for the same reason; there is no dual-key support, see
+[CLI & Backend → Deprecations](../reference/cli-and-backend.md#deprecations)). Entities and
+connections carrying a [specialization](../05-extensibility/ontology-modules.md#specializations)
+render an additional guillemet stereotype (`«Business Collaboration»`) alongside the type
+stereotype, with the specialization's own icon/color/line-style notation overriding the
+parent type's where declared.
+
+&nbsp;
+
+## Applying a viewpoint
+
+Any diagram or matrix can be pinned to a [viewpoint](viewpoints.md) definition via its
+`viewpoint:` frontmatter, non-destructively flagging placed entities/connections that fall
+outside the definition's scope or query — ghosted, warned, or ignored depending on the
+effective enforcement setting. See [Viewpoints](viewpoints.md) for the full model.
+
 &nbsp;
 
 ## Matrix
@@ -175,4 +194,4 @@ See [Interfaces & MCP](interfaces-and-mcp.md) for the full tool surface.
 
 ---
 
-*Next: [Interfaces & MCP →](interfaces-and-mcp.md)*
+*Next: [Viewpoints →](viewpoints.md)*

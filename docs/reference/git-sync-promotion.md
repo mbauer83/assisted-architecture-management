@@ -17,7 +17,18 @@ engagement to enterprise.
 - **Resolution strategies** — accept engagement version, accept enterprise version, or manual
   merge.
 - **Blocked** when the engagement repo's schemata are not supersets of the enterprise schemata
-  (per-violation error).
+  (per-violation error) — covers attribute/frontmatter/document schemas, and, for a promoted
+  entity or connection carrying a specialization, the specialization itself plus its attached
+  profile (inline attributes or attachment schema file): a specialization declared only in the
+  engagement repo's own `.arch-repo/specializations.yaml` (not shipped by the ontology module
+  and not also declared in the enterprise repo) blocks promotion with an actionable message.
+- **Blocked** when a promoted diagram or matrix carries a `viewpoint:` application referencing
+  an engagement-only [viewpoint](../03-modeling/viewpoints.md) definition: the definition, at
+  the exact pinned version, must be promoted alongside it. The match is **exact-version** — a
+  newer enterprise definition does not by itself satisfy an older engagement pin; re-pinning to
+  the enterprise version is a separate, explicit promotion step. A promoted viewpoint
+  definition is itself validated transitively (its own scope/query attribute references must
+  resolve in the enterprise repo).
 - **Asymmetric references** — enterprise entities may reference only enterprise entities;
   engagement entities may reference both. The verifier enforces this.
 

@@ -56,6 +56,120 @@ Adding a module is five steps: create the package, define `entities.yaml`, optio
 `src/infrastructure/app_bootstrap.py`. A scaffold helper generates the package skeleton so
 you start from a working module.
 
+&nbsp;
+
+## Guidance externalization (license compliance)
+
+`archimate_4` ships `create_when`/`never_create_when` **empty** in `entities.yaml` — the
+authored guidance text is licensed content and lives outside this repository, never
+committed (the same rule that keeps the ArchiMate 4 spec and other reference PDFs out of
+git). Full per-type creation guidance is still available via a two-tier overlay:
+
+- **Import**: `arch-import-guidance --source <url|path> [--module ALIAS] [--dry-run]
+  [--strict] [--allow-http]` fetches (HTTPS by default) or reads a guidance YAML, validates
+  it against the registered module and specialization catalog, and writes
+  `~/.config/arch-repo/guidance-cache/<alias>.guidance.yaml` plus a provenance sidecar
+  `<alias>.guidance.meta.yaml` (source, SHA-256, format version, matched/unmatched counts).
+  Guidance is a **deployment concern, not a per-repository-tier one**: one running instance
+  of this software imports one guidance source into one cache outside any repo, never split
+  per engagement/enterprise and never committed to either repo's git history. Restart the
+  backend to pick up a newly imported cache.
+- **Precedence**: module-inline (empty by default) < the imported deployment-level cache;
+  committed repo declarations are never overridden.
+- **Empty-state signalling**: until an import has run, `artifact_authoring_guidance` (MCP)
+  and `GET /api/authoring-guidance` (REST) return `guidance_status: "empty"` plus a
+  `guidance_hint` naming the import command — never a silent blank string that could be
+  misread as "no restrictions apply". The GUI modeling wizard surfaces the same hint.
+- **Hosting location — open, deferred**: where the published guidance YAML will be hosted
+  (a versioned location `arch-import-guidance --source`/`guidance_default_source` in
+  `config/settings.yaml` could point at by default) has not been decided yet. Until it is,
+  `guidance_default_source` stays empty and every import must pass `--source` explicitly —
+  this does not block importing, only the convenience default.
+
+&nbsp;
+
+## Specializations
+
+A specialization narrows a base entity or connection type — e.g. `business-collaboration`
+narrows `collaboration`, `responsibility-assignment` narrows `archimate-assignment`. Both
+kinds live in one catalog, keyed by `(module, concept_kind, parent_type, slug)`:
+
+- **Module-level library**: a module's `specializations.yaml` ships an informative starter
+  set (names + parent types; guidance text empty, subject to the same externalization rule
+  as `create_when`/`never_create_when` above).
+- **Repo-level extension**: `.arch-repo/specializations.yaml` at the enterprise and
+  engagement tiers adds repo-specific specializations on top of the module library.
+
+Each entry may declare `restrict_relationships` (entity specializations: an allow-list of
+`(connection-type, source-type, target-type)` triples the entity may participate in) or
+`restrict_endpoints` (connection specializations: an allow-list of source/target type pairs).
+A specialization's restrictions may only *narrow* what its parent type already permits, never
+broaden it — checked at catalog-load time.
+
+### Assigning a specialization
+
+An entity or connection carries **at most one** specialization slug at a time (an instance
+has exactly one parent type, so "one specialization" is the natural cardinality — the
+catalog itself stays plural, enumerating every *available* option per parent type).
+
+- **Entities**: the `specialization: <slug>` frontmatter field, set via
+  `artifact_create_entity`/`artifact_edit_entity` (empty string clears it).
+- **Connections**: a fenced YAML metadata block immediately under the connection's `### `
+  heading in `.outgoing.md` — never the file's shared frontmatter, which covers every
+  connection in the file — carrying `specialization: <slug>` (and open to future
+  per-connection metadata). Set via `artifact_add_connection`/`artifact_edit_connection`.
+
+The verifier checks every assignment:
+
+| Code | Severity | Meaning |
+|---|---|---|
+| E160 | error | Connection specialization slug is not declared in any catalog. |
+| E161 | error | Connection specialization slug is declared, but for a different connection type. |
+| E170 | error | Entity specialization slug is not declared in any catalog. |
+| E171 | error | Entity specialization slug is declared, but for a different entity type. |
+| W128 | warning | Connection specialization's `restrict_endpoints` doesn't cover the connection's actual (source-type, target-type) pair. |
+| W129 | warning | An endpoint entity's own specialization's `restrict_relationships` doesn't cover the connection's actual (type, source-type, target-type) triple for that entity's role. |
+
+Attribute constraints attach to a specialization inline or via a dedicated attachment file,
+never redefine it — see
+[Profiles are one-to-one with their specialization](schemata-and-profiles.md#profiles-are-one-to-one-with-their-specialization).
+
+### Discovery
+
+`artifact_authoring_guidance` (MCP) and `GET /api/authoring-guidance` (REST) enumerate every
+available specialization per type: each `entity_types[]` entry carries its own
+`specializations` list (empty when the type has none declared), and a top-level
+`connection_types` block lists connection types that have at least one specialization
+(connection types with none are omitted, since — unlike entity types — they have no other
+guidance entry to attach an empty list to). The GUI's entity create/edit forms and the
+connection-editing panel use this to populate a specialization picker scoped to the chosen
+type; entity listings, entity detail, and connection listings display the assigned
+specialization (as a `«slug»` badge) when one is set.
+
+### Rendering
+
+A specialization renders as a guillemet stereotype — `«Business Collaboration»`, e.g. —
+appended to the entity's or connection's label, distinct from the ASCII `<<connection-type>>`
+stereotype used for relationship types (both can appear together; the specialization
+guillemet renders even where the connection-type stereotype is suppressed by the existing
+`show_stereotype` heuristic). When the specialization declares its own notation, it overrides
+the parent type's: `icon` replaces the sprite glyph, `color` adds a background override on
+entity boxes, and `line_style`/`label_marker` style connections (a declared `line_style` is
+skipped on a connection whose arrow already carries an automatic layout-direction hint,
+rather than risk an incorrectly merged arrow token). Absent any of these, rendering falls
+back to the parent type's notation unchanged.
+
+&nbsp;
+
+## Viewpoints
+
+`ViewpointDefinition`s follow the identical two-tier pattern as specializations — a module's
+`viewpoints.yaml` ships a small starter library, `.arch-repo/viewpoints.yaml` extends it at
+the enterprise and engagement tiers, and the effective catalog is the merge. See
+[Viewpoints](../03-modeling/viewpoints.md) for the concept and
+[Viewpoints — schema reference](../reference/viewpoints-schema.md) for the full declaration
+grammar.
+
 ---
 
 *Next: [Diagram-type modules →](diagram-type-modules.md)*

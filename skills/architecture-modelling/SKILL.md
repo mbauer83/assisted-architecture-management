@@ -199,7 +199,7 @@ B1 -up-|> A1 : <<realization>>  ' concrete → abstract
 it play?* Avoid restating the name. A requirement summary states the actual constraint;
 a process summary states what it does and why it matters.
 
-**Cardinalities:** Add `src_cardinality` / `tgt_cardinality` on
+**Multiplicity:** Add `src_multiplicity` / `tgt_multiplicity` on
 `artifact_add_connection` only when multiplicity is architecturally significant.
 Valid values: `"1"`, `"0..1"`, `"1..*"`, `"*"`. Not permitted on junction connections.
 

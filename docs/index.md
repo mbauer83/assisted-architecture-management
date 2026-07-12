@@ -15,7 +15,7 @@ New here? Start with the [Quickstart in the README](../README.md#quickstart), th
 |---|---|---|
 | 1 | [Motivation, Ideas, Goals & Scope](01-motivation.md) | Understanding why the project exists and what it does not try to do |
 | 2 | [Installation & Setup](02-installation.md) | Getting it running on macOS, Linux, WSL2, or Docker |
-| 3 | [Architecture Modeling](03-modeling/index.md) | Projects, views, graph exploration, diagramming, and the MCP/REST surface |
+| 3 | [Architecture Modeling](03-modeling/index.md) | Projects, views, graph exploration, diagramming, viewpoints, and the MCP/REST surface |
 | 4 | [Assurance — Safety, Security, GRC](04-assurance/index.md) | STPA/CAST/GRC methods, assurance diagrams, confidential storage |
 | 5 | [Extensibility](05-extensibility/index.md) | Attribute profiles, document types, ontology & diagram-type modules, the hexagonal core |
 | — | [Reference](reference/configuration.md) | Configuration, CLI, and git sync/promotion facts |
@@ -28,6 +28,7 @@ New here? Start with the [Quickstart in the README](../README.md#quickstart), th
 - [Projects & grouping](03-modeling/projects-and-grouping.md)
 - [Views & exploration](03-modeling/views-and-exploration.md)
 - [Diagramming](03-modeling/diagramming.md)
+- [Viewpoints](03-modeling/viewpoints.md)
 - [Interfaces & MCP](03-modeling/interfaces-and-mcp.md)
 
 &nbsp;
@@ -59,6 +60,8 @@ New here? Start with the [Quickstart in the README](../README.md#quickstart), th
 - [CLI & backend](reference/cli-and-backend.md)
 - [Git sync & promotion](reference/git-sync-promotion.md)
 - [Docker Compose deployment](reference/docker-compose.md)
+- [Viewpoints — schema reference](reference/viewpoints-schema.md)
+- [ArchiMate 4.0 conformance](reference/archimate-4-conformance.md)
 - [Architecture decision records](architecture/decisions.md) · [Dependency policy](architecture/dependency-policy.md) · [Glossary](architecture/glossary.md)
 
 &nbsp;

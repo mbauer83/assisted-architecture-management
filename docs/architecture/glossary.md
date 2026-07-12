@@ -10,7 +10,7 @@ listed in dependency order (lower entries depend only on earlier ones).
 ## Module Catalog
 
 **What it is:** The immutable registry of all installed diagram-type modules (C4,
-ArchiMate NEXT, …) and the ontology/connection-type data they contribute.
+ArchiMate 4.0, …) and the ontology/connection-type data they contribute.
 
 **Key types:**
 - `src/domain/module_catalog.py` — `ModuleCatalog` (built by `ModuleCatalogBuilder`)

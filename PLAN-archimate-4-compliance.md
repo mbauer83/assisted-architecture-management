@@ -138,15 +138,16 @@ non-obvious ones.
   module's hardcoded profiles migrate to the declarative per-repo schemata mechanism via the
   repo-scaffolding defaults (`_repo_default_schemata.py`). No parallel mechanisms.
 - **D6 — Specialization is data on the concept, not a new type.** Entities keep their
-  concrete `artifact-type` and gain frontmatter `specializations: [slug, …]` (list —
-  ArchiMate allows multiple). Connections gain the equivalent via a **per-connection
-  metadata block** directly under each `###` connection heading in `.outgoing.md` — NOT
-  via the file-level frontmatter (which is shared by all connections in the file) and NOT
-  by further overloading the heading grammar (which already carries multiplicity). The
-  block is a small fenced YAML section parsed/written per connection; it becomes the
-  general home for future per-connection metadata, validated by the existing
+  concrete `artifact-type` and gain frontmatter `specialization: <slug>` (singular — an
+  instance has exactly one parent type, so it carries at most one specialization at a time;
+  resolves Q5, §10). Connections gain the equivalent via a **per-connection metadata
+  block** directly under each `###` connection heading in `.outgoing.md` — NOT via the
+  file-level frontmatter (which is shared by all connections in the file) and NOT by
+  further overloading the heading grammar (which already carries multiplicity). The block
+  is a small fenced YAML section parsed/written per connection; it becomes the general home
+  for future per-connection metadata, validated by the existing
   `connection-metadata.{connection-type}.schema.json` convention (extended with the
-  optional `specializations` property), not by `frontmatter.outgoing.schema.json`.
+  optional `specialization` property), not by `frontmatter.outgoing.schema.json`.
   Verifier enforces catalog membership, `concept_kind`, and parent-type match for both
   kinds. Stereotypes render on both boxes and relationships. Never a synthetic
   `BusinessService`-style metaclass or connection-type clone.
@@ -165,16 +166,22 @@ non-obvious ones.
   verifier *warnings* and GUI ghosting/filtering, never deletion or hard blocks. Enforcement
   mode is configurable (`off | warn | ghost`), default `ghost` in GUI, `warn` in verifier.
 - **D9 — Multiplicity rename is scoped to ArchiMate relationship ends, executed as a real
-  repository migration.** Persisted connection fields `src_cardinality`/`tgt_cardinality` →
-  `src_multiplicity`/`tgt_multiplicity`; the `include_cardinality` annotation →
-  `include_multiplicity`. The migration command is dry-run by default, recommends a
-  backup/branch, is idempotent with a count report, and runs through the standard
-  write/index machinery (index rebuild included). Legacy keys remain readable for **exactly
-  one release** (documented deprecation, distinct verifier code) — external user
-  repositories migrate on their own schedule within that window; REST/MCP payloads and
-  generated types switch with the release notes. Diagram-type structural participation
-  config (`RequiredConnection.cardinality_min/max`) is internal, non-ArchiMate surface and
-  keeps its name (documented decision, out of scope).
+  repository migration; no runtime backward-compatibility code.** Persisted connection
+  fields `src_cardinality`/`tgt_cardinality` → `src_multiplicity`/`tgt_multiplicity`; the
+  `include_cardinality` annotation → `include_multiplicity`. Application code (parsers,
+  renderers, verifiers, REST/MCP payloads, generated types) is renamed cleanly and reads
+  **only** the new names — no dual-key acceptance, no deprecation shim, no distinct
+  verifier warning code living in the runtime path. **`arch-repair upgrade` (D17) is the
+  sole content/metadata ↔ code compatibility mechanism**: a registered upgrade step
+  detects the legacy `include_cardinality` key (and any other legacy multiplicity-related
+  key) in persisted diagram frontmatter and rewrites it through the standard write/index
+  machinery (dry-run by default, backup/branch recommendation, idempotent count report,
+  index rebuild included). A repo that has not yet run the upgrade simply stops rendering
+  the (now-unrecognized) legacy key's effect — non-destructive, not a crash — until
+  migrated; external user repositories migrate on their own schedule by running the
+  command. Diagram-type structural participation config
+  (`RequiredConnection.cardinality_min/max`) is internal, non-ArchiMate surface and keeps
+  its name (documented decision, out of scope).
 - **D10 — Exchange is split into readiness (this plan's critical path) and implementation
   (gated milestone).** Readiness = the declarative mapping table, XSD acquisition/licensing
   resolution, and lossy-case policy — reviewed and signed off before any codec code.
@@ -188,26 +195,33 @@ non-obvious ones.
   ADR (history preserved, not rewritten), and rename of draft-era entity names/slugs via the
   rename machinery.
 - **D12 — No changelog bloat**: this document states current intent only.
-- **D13 — Profiles get a minimal first-class `ProfileDefinition`, with persistence decided
-  now.** A domain concept (slug, name, applicable concept types, typed attributes with
-  optional defaults), rendered/validated through JSON Schema. Persistence: named reusable
-  profiles live in **`.arch-repo/profiles.yaml`** (per repo, two-tier like
-  specializations); the existing `attributes.{artifact_type}.schema.json` files *are* the
-  base-type profiles under this model (unchanged on disk); a specialization's inline
-  `attributes:` compile to an anonymous profile. Attribute obligation levels are
-  `required | recommended | optional` in the YAML; compilation emits JSON Schema `required`
-  plus the extension keyword **`x-recommended: [names]`** (JSON Schema has no native
-  "recommended"), which the verifier consumes for warnings. Merge semantics are
-  deterministic: base-type profile first, then each carried specialization's profile in
-  declared frontmatter order; a conflicting property definition (same name, incompatible
-  schema) is a load/verify **error**, defaults resolve last-writer-wins along the same
-  order, and validation severity is: schema violation on values = error, missing
-  recommended attribute = warning. This keeps multiple specializations per concept
-  unambiguous.
+- **D13 — Profiles get a minimal first-class `ProfileDefinition`, one-to-one with its
+  specialization.** A domain concept (slug, name, applicable concept types, typed attributes
+  with optional defaults), rendered/validated through JSON Schema. **Profile and
+  specialization are one concept, not two separable ones**: there is no independent,
+  reusable named-profile registry a specialization looks up by slug — a specialization's own
+  profile is compiled directly from its inline `attributes:` mapping and/or its dedicated
+  `attributes.{artifact_type}.{slug}.schema.json` attachment file, both already 1:1 with that
+  one specialization by construction (embedded, or filename-scoped to that slug).
+  Existence-dependence confirms the direction: a specialization can exist with no profile at
+  all (pure taxonomy/notation, no `attributes:`), but a profile can never exist without a
+  specialization — specialization is the container, profile is the dependent part, not a
+  peer concept referenced by association. The one exception is the **default profile for
+  unspecialized elements**: the existing `attributes.{artifact_type}.schema.json` files *are*
+  the base-type profiles under this model (unchanged on disk). Attribute obligation levels
+  are `required | recommended | optional` in the YAML; compilation emits JSON Schema
+  `required` plus the extension keyword **`x-recommended: [names]`** (JSON Schema has no
+  native "recommended"), which the verifier consumes for warnings. Merge semantics are
+  deterministic: base-type profile first, then the entity's own specialization's profile, if
+  any (an instance carries at most one specialization — D6, Q5); a conflicting property
+  definition (same name, incompatible schema) is a load/verify **error**, defaults resolve
+  last-writer-wins along the same order, and validation severity is: schema violation on
+  values = error, missing recommended attribute = warning.
 - **D14 — Promotion governance extends the existing superset rule.** Enterprise
   `.arch-repo/` declarations are the baseline; engagement declarations must be a superset
   for promoted content: promotion fails when a promoted artifact depends on an
-  engagement-only specialization, profile, specialization-attached schema, **or viewpoint
+  engagement-only specialization (its one-to-one profile travels with it — there is no
+  separate profile dependency to check), specialization-attached schema file, **or viewpoint
   definition** unless that definition is promoted alongside or already exists in the
   enterprise repo (same governance model as today's attribute-profile superset check). For
   viewpoints this covers promoted diagrams/matrices whose `ViewpointApplication` references
@@ -215,9 +229,9 @@ non-obvious ones.
   is **exact-version** — a newer enterprise version does not satisfy promotion by itself
   (that would silently weaken the D8 pin), unless the promoted artifact is explicitly
   re-pinned to the enterprise version as a reviewed promotion step. Promoted viewpoint
-  definitions must themselves validate transitively (referenced specializations, profiles,
-  query schema version, derivation strategies incl. pinned versions, presentation
-  capabilities).
+  definitions must themselves validate transitively (referenced specializations, their
+  one-to-one profiles, query schema version, derivation strategies incl. pinned versions,
+  presentation capabilities).
 - **D15 — Viewpoints are also executable on demand (Bizzdesign-Horizzon-style), with a
   versioned query schema, a first-class result contract, and capability-checked
   presentation.**
@@ -305,17 +319,49 @@ non-obvious ones.
     `ApplyRepositoryUpgrade` over ports; step `detect` is pure where possible, `apply`
     goes through the write/index ports; CLI, backend probing, filesystem adapters, and
     index rebuild live in infrastructure.
-  - *Safety*: dry-run/report is the default and always allowed. `--commit` (a) refuses a
-    **dirty git worktree** by default, printing the files it would touch
-    (`--allow-dirty` exists but the report/rollback story is then the user's); (b)
-    refuses while a backend **serves the target repo**. The current REST surface cannot
-    answer that (`/api/stats` returns index stats without repo roots), so D17 **adds a
-    backend-identity endpoint** (e.g. `GET /api/backend-identity`: canonical
-    realpath-normalized served repo roots — engagement + enterprise — plus software
-    version); the guard probes it and fails **closed** with an actionable message when a
-    backend responds but its served roots cannot be confirmed (including pre-D17 backends
-    without the endpoint), and does not block on backends serving unrelated repos; (c)
-    recommends a backup/branch.
+  - *Safety*: dry-run/report is the default and always allowed. `--commit`'s **only**
+    hard, non-overridable gate is (a) refusing while a backend **serves the target
+    repo** — two writers touching the same files is the actual consistency risk. The
+    current REST surface cannot answer that (`/api/stats` returns index stats without
+    repo roots), so D17 **adds a backend-identity endpoint** (e.g.
+    `GET /api/backend-identity`: canonical realpath-normalized served repo roots —
+    engagement + enterprise — plus software version); the guard probes it and fails
+    **closed** with an actionable message when a backend responds but its served roots
+    cannot be confirmed (including pre-D17 backends without the endpoint), and does not
+    block on backends serving unrelated repos. (b) A dirty git worktree is **not** a
+    gate: an actively-used repo has uncommitted edits most of the time, including to
+    the exact files a step needs to touch, and every step reads current disk content
+    and rewrites it in place, so an uncommitted edit is carried forward, never
+    clobbered — git cleanliness has no bearing on correctness here. When a touched file
+    does have an uncommitted local edit, `--commit` prints an informational note (which
+    files) so the operator can review the combined diff before committing; it never
+    refuses, and there is no `--allow-dirty` flag because there is nothing to override.
+    (c) recommends a backup/branch regardless.
+  - *Supported floor, not unbounded history*: `format_contract_version`/
+    `applied_upgrade_steps` did not exist before this command did, so their *absence* is
+    a valid, ordinary starting state — detection is content-driven (does this specific
+    legacy pattern exist right now), never version-counter-driven, which is what makes
+    it work at all against a repo of unknown age. But the step inventory only covers
+    format changes this plan (and its successors) explicitly register; it cannot
+    discover a legacy shape nobody has written a detector for. `arch-repair upgrade`
+    therefore does **not** promise to bring an arbitrarily old repo (predating this
+    effort) fully current, and a **clean report means "no known issues," not "fully
+    current"** — that distinction must be stated in the CLI/docs, not left implied.
+    Repos older than the stated supported floor are explicitly out of scope; closing a
+    gap there means writing a new step once the gap is found in practice, or manual
+    remediation via the ordinary MCP write tools.
+  - *Catch-all anomaly detector*: alongside targeted rename/rewrite steps, one
+    registered step is a low-confidence, always-manual, always-`auto_migratable=False`
+    detector that flags file structure matching **no** currently-recognized shape
+    (current or known-legacy) — not a fixer, just converting an invisible gap into a
+    visible "review this by hand" finding, so an old-repo run doesn't read as falsely
+    clean.
+  - *Step-conformance obligation*: because every step's safety argument rests on
+    "reads current content, rewrites narrowly, unknown keys survive," this is a
+    contract every step must demonstrably satisfy, not merely a design intention —
+    enforced by a shared conformance test (fixture content with an extra, unknown key
+    round-tripped through the step's `apply`, asserting it survives byte-for-byte)
+    that every new step's tests must include.
   - *Repo scope*: the unit of upgrade is **one repository root** (each repo's
     `.arch-repo/config.yaml` carries its own format identity). The CLI accepts
     `--repo-root <path>` (repeatable) and `--workspace <path>` (resolves the workspace's
@@ -354,7 +400,7 @@ attribute-profile files, or should configuration enumerate them explicitly?
 | Enumerate via attribute-profile files only (`attributes.{type}.{spec}.schema.json` existing ⇒ specialization exists) | Minimal file count, but conflates two concerns: a specialization is an ontological identity (name, parent type, notation, guidance, optional relationship restrictions); a profile is a data schema. Pure-stereotype specializations (no extra attributes — most of the §14.2.1 library) would need empty schema files as existence markers. Module-shipped predefined specializations would have no natural home (schemata are per-repo). Enumeration/uniqueness validation would be a filesystem-glob side effect. Connection specializations would have no home at all (there is no per-specialization connection-schema convention). Rejected. |
 | Enumerate in the meta-ontology `entities.yaml` under each entity type | Puts per-repo user-defined specializations out of reach (module YAML is shipped code), or forces a merge of two syntaxes inside one file family. Also entity-only by construction. Rejected. |
 | Entity-only specialization catalog | Simpler, but inconsistent with the informative library itself (`money-flow` specializes Flow, `responsibility-assignment`/`behavior-assignment` specialize Assignment) and weaker than ArchiMate 4 customization, which applies to *concepts* — elements and relationships alike. Exchange mapping for the relationship rows of Appendix E.4 would have no target. Rejected. |
-| **Unified concept-level `specializations.yaml` at both sources, profiles attach by reference (chosen)** | One `SpecializationCatalog` with `concept_kind: entity \| connection`. Module-level file ships the informative ArchiMate 4 library (names/notation only, guidance empty — license-clean); repo-level files (`.arch-repo/specializations.yaml` in **enterprise and engagement** repos, enterprise = baseline, engagement = superset per the promotion governance model, D14) hold org-specific ones; the aggregate catalog gives one enumeration point for validation, GUI pickers, guidance import targeting, and exchange-format mapping. An attribute schema `attributes.{artifact_type}.{specialization-slug}.schema.json` is *optional* and is validated to reference a declared entity specialization. |
+| **Unified concept-level `specializations.yaml` at both sources, profile embedded 1:1, not referenced (chosen)** | One `SpecializationCatalog` with `concept_kind: entity \| connection`. Module-level file ships the informative ArchiMate 4 library (names/notation only, guidance empty — license-clean); repo-level files (`.arch-repo/specializations.yaml` in **enterprise and engagement** repos, enterprise = baseline, engagement = superset per the promotion governance model, D14) hold org-specific ones; the aggregate catalog gives one enumeration point for validation, GUI pickers, guidance import targeting, and exchange-format mapping. A specialization's own profile is compiled from its inline `attributes:` mapping — never a separate, reusable, named-profile registry a specialization references by slug (existence-dependence: a profile cannot exist without its one specialization). An attribute schema `attributes.{artifact_type}.{specialization-slug}.schema.json` is *optional* and is validated to reference a declared entity specialization. |
 
 This mirrors ArchiMate 4's own framing: the profile mechanism *implements* specialization,
 but the specialization's identity is a definition in its own right.
@@ -373,8 +419,9 @@ specializations:
           icon: ""                 # sprite/glyph key
           color: ""
         restrict_relationships: [] # optional allow-list narrowing (never broadening)
-        profile: ""                # optional ProfileDefinition slug (D13), or:
-        attributes: {}             # optional inline profile attributes
+        attributes: {}             # optional inline profile attributes (D13) — this
+                                   # specialization's own profile, 1:1, never a shared
+                                   # named-profile reference
         create_when: ""            # populated by guidance import, or by repo authors
         never_create_when: ""
   connection:
@@ -392,44 +439,48 @@ relationship/endpoint rules apply automatically; `restrict_relationships` /
 `restrict_endpoints` may only narrow (verifier rejects entries not permitted for the
 parent).
 
-Profile semantics (D13): a `ProfileDefinition` is a named, typed attribute set persisted per
-repo; the existing `attributes.{artifact_type}.schema.json` files are the base-type
-profiles. An entity's effective attribute schema = base-type profile ⊕ each carried
-specialization's profile (referenced or inline) in declared frontmatter order; incompatible
-redefinitions of the same property are a load/verify error; defaults resolve
-last-writer-wins along that order. This keeps «spec-a, spec-b» combinations deterministic.
+Profile semantics (D13): a `ProfileDefinition` is a named, typed attribute set, one-to-one
+with its specialization (never independently reusable); the existing
+`attributes.{artifact_type}.schema.json` files are the base-type profiles — the default for
+unspecialized elements. An entity's effective attribute schema = base-type profile ⊕ its own
+specialization's profile, if any (compiled from that specialization's inline `attributes:`
+and/or its dedicated attachment file; an entity carries at most one specialization — D6, Q5);
+incompatible redefinitions of the same property are a load/verify error; defaults resolve
+last-writer-wins along that order.
 
 ### 4.3 Guidance externalization architecture (D2/D3)
 
 Constraints: multiple meta-ontologies; specialization-level guidance (for both concept
 kinds) importable "to the right place"; in-repo default empty; configurable source; the
-extracted text must never re-enter the repo (gitignored landing zone); **no new governance
+extracted text must never re-enter any repo (out-of-repo landing zone); **no new governance
 tier** — customization authority remains enterprise + engagement repositories only, and
-imported guidance is authoring help, not configuration.
+imported guidance is authoring help, not configuration. **Guidance is a deployment concern,
+not a per-repository-tier one**: one running instance of this software pulls one guidance
+source, loaded into one local, out-of-repo cache file and integrated into the in-memory
+meta-ontology representation at bootstrap — never split per engagement/enterprise repo, and
+never committed to either repo's git history (there is nothing to gitignore, since the cache
+never lives inside a repo working directory at all).
 
 Chosen architecture:
 
 - Domain: `src/domain/guidance.py` — `GuidanceKey(module_alias, concept_kind, type_name, specialization?)`,
-  `GuidanceEntry(create_when, never_create_when)`, `GuidanceOverlay(Mapping[GuidanceKey, GuidanceEntry])`,
-  pure merge semantics: module-inline text < enterprise-repo cache < engagement-repo cache;
+  `GuidanceEntry(create_when, never_create_when)`, `GuidanceOverlay(Mapping[GuidanceKey, GuidanceEntry])`;
   committed repo declarations (e.g. guidance authored in `.arch-repo/specializations.yaml`)
   are never overridden by an imported cache; empty overlay = no-op.
 - Loading: module loaders accept an optional overlay parameter
-  (`load_archimate_4_module(guidance=…)`); `app_bootstrap` reads each active repo's
-  `.arch-repo/guidance-cache/*.guidance.yaml` (gitignored via the scaffolded
-  `.arch-repo/.gitignore`) in tier order and passes per-module slices.
+  (`load_archimate_4_module(guidance=…)`); `app_bootstrap` reads the one deployment-level
+  `~/.config/arch-repo/guidance-cache/*.guidance.yaml` and passes per-module slices.
   `SpecializationCatalog` construction consumes the same overlay for specialization-level
   entries. Bootstrap-time load means the existing `@lru_cache` registry pattern is
   untouched; a guidance import takes effect on backend restart (consistent with the
   established ops model; the CLI prints this).
-- Import CLI: `arch-import-guidance --source <url|path> [--module <alias>]
-  [--repo-scope engagement|enterprise] [--dry-run] [--strict]`
-  (new `src/infrastructure/cli/arch_import_guidance.py`, argparse-subcommand style, urllib
-  idiom from `get_plantuml.py`; `--repo-scope` defaults to engagement). Validates schema +
-  guidance keys against the registry and the **target repo's** specialization catalog
-  (unknown module/type/specialization ⇒ listed, non-matching entries skipped or `--strict`
-  fails), writes `<repo>/.arch-repo/guidance-cache/<alias>.guidance.yaml` plus a provenance
-  sidecar `<alias>.guidance.meta.yaml` (source, SHA-256, format version, timestamp,
+- Import CLI: `arch-import-guidance --source <url|path> [--module <alias>] [--dry-run]
+  [--strict]` (new `src/infrastructure/cli/arch_import_guidance.py`, argparse-subcommand
+  style, urllib idiom from `get_plantuml.py`). Validates schema + guidance keys against the
+  registry's specialization catalog (unknown module/type/specialization ⇒ listed,
+  non-matching entries skipped or `--strict` fails), writes
+  `~/.config/arch-repo/guidance-cache/<alias>.guidance.yaml` plus a provenance sidecar
+  `<alias>.guidance.meta.yaml` (source, SHA-256, format version, timestamp,
   matched/unmatched counts — D3a), prints an import summary.
 - Extraction (one-time, done first): `tools/extract_guidance.py` reads the *current*
   `entities.yaml` texts and emits the publishable guidance file to an **out-of-repo** path;
@@ -519,29 +570,23 @@ existing mechanisms on it rather than adding a parallel one:
   ghosting for out-of-scope existing content; a viewpoints management view (list/create/edit
   per-repo definitions) with an **Execute** action per D15; MCP — viewpoint fields included
   in `artifact_authoring_guidance` output and accepted by
-  `artifact_create_diagram`/`artifact_edit_diagram` frontmatter (no new tools;
-  guidance-first for agents).
+  `artifact_create_diagram`/`artifact_edit_diagram` frontmatter for *applying* a definition
+  (guidance-first for agents, no new tool needed for that); a definition is model content,
+  not hand-edited configuration, so agents must be able to define and execute viewpoints
+  through MCP, not only apply existing ones — the two new tools (one per server, mirroring
+  the existing read/write split) are specified in `PLAN-viewpoints-query-model.md` §8.
 - **On-demand execution (D15)**: a viewpoint with a `query` is executable from the
-  management view and selectable on the graph-exploration page (which supplies the
-  `execution_anchor` input where a definition's expansion rule asks for one). Boundaries
-  are explicit: the **domain** owns the query/presentation/result value objects; the
-  **application** owns the `EvaluateViewpoint` use case over the read ports and the
-  derivation-strategy catalog — including typed attribute-predicate evaluation and
-  `group_by` resolution against the D13 effective schemas, with attribute references
-  validated at definition save — producing the `ViewpointExecutionResult` DTO (sorted IDs,
-  per-node group keys where `group_by` is set, counts, warnings, truncation, limits,
-  duration — D15); **infrastructure** owns the read-only REST endpoint and the GUI
-  adapters, which call the use case only. Three
-  execution surfaces render the result, all reusing existing machinery and each declaring
-  its display capabilities: `exploration` — the cluster layout of `GraphExploreView.vue` /
-  `useForceGraph.ts`, mapping abstract style tokens to node shape/icon/color (defaults
-  where no rule matches); `table` — the filtered catalog view the entities list already
-  provides (columns/badges/sort); `matrix` — an ephemeral matrix rendering via the
-  existing matrix builder (row/column grouping, cell emphasis). The GUI shows execution
-  diagnostics: result counts, truncation/omission warnings, the active filter summary,
-  unsupported-display warnings, an explained empty state, and an explicit "re-run against
-  current model" action. Executions are ephemeral and read-only — a "generated view
-  filter" in the Horizzon sense, never persisted as a diagram.
+  management view and selectable on the graph-exploration page. Boundaries are explicit:
+  the **domain** owns the query/presentation/result value objects; the **application**
+  owns the `EvaluateViewpoint` use case over the read ports, producing the
+  `ViewpointExecutionResult` DTO (counts, warnings, truncation, limits, duration);
+  **infrastructure** owns the read-only REST endpoint and the GUI adapters, which call the
+  use case only. Executions are ephemeral and read-only — a "generated view filter" in the
+  Horizzon sense, never persisted as a diagram. **The detailed shape of the query model,
+  the presentation/styling model, the GUI execution surfaces, and the MCP tool split are
+  specified in full in `PLAN-viewpoints-query-model.md`** (companion plan; supersedes the
+  `ExecutableViewpointQueryV1`/`ExpansionRule`/discrete-only-`StyleRule` design originally
+  sketched in this section — draft, awaiting independent review, not yet implemented).
 - **UX commitments (viewpoint selection, filtering, and output customization)** — the
   viewpoint feature succeeds or fails on usability, so these are design requirements, not
   polish:
@@ -552,8 +597,9 @@ existing mechanisms on it rather than adding a parallel one:
     **debounced live result-count preview** (a tight-limit E7 execution) so "adjust filter
     → see effect" is one continuous flow.
   - *Progressive disclosure*: the common case (type + group filters, one representation)
-    is immediate; attribute predicates, expansion rules, and purpose/content/stakeholder
-    metadata sit behind clearly labeled advanced sections.
+    is immediate; nested/relational criteria and purpose/content/stakeholder metadata sit
+    behind clearly labeled advanced sections (criteria-tree shape per
+    `PLAN-viewpoints-query-model.md`).
   - *Capability-driven output customization*: the representation picker exposes only the
     chosen surface's declared capabilities (the form cannot express an unsupported
     option); styling rules show a **live legend preview** (token → resolved
@@ -584,6 +630,15 @@ start; "view ≠ diagram" is honoured minimally by making matrices viewpoint-gov
 implementation-defined manner, as the standard requires.
 
 ### 4.5 Exchange format (D10)
+
+Reference material is available locally at `/spec/` (gitignored — never committed, per the
+no-PDF/license-encumbered-reference-material rule that already governs the ArchiMate 4 spec
+and the extracted guidance text; see `TASKS-archimate-4-compliance.md`'s Anchors section):
+the three normative C19C v3.1 specs (model, diagram, and view exchange) plus
+`c19c-examples/` — real interoperability-test snippets and basic-model XML examples usable
+as local-only design references for the mapping table (WU-F1) and round-trip test design
+(WU-F2/F3a/F3b), never copied verbatim into committed fixtures. No machine-readable XSD is
+present yet, so Q3 (XSD acquisition/redistribution) remains open.
 
 Exchange is deliberately **two milestones**. Milestone 1 (readiness, on this plan's path):
 the declarative mapping table, XSD acquisition + licensing resolution (Q3), and the
@@ -648,9 +703,9 @@ Ordered for dependency and risk; details above.
   `types.generated.ts`; startup check for unresolvable `permitted_mappings` ontology tokens.
 - **WS-B License compliance** (D2/D3/D3a): extraction script + publishable YAML
   (out-of-repo), strip `entities.yaml` guidance to empty, `GuidanceOverlay` domain type +
-  loader threading, repo-local gitignored `.arch-repo/guidance-cache/` +
-  `guidance_default_source` setting, `arch-import-guidance` CLI with `--repo-scope` and
-  provenance sidecars, full shipped-artifact license audit (distinctive-phrase sampling).
+  loader threading, one deployment-level `~/.config/arch-repo/guidance-cache/` +
+  `guidance_default_source` setting, `arch-import-guidance` CLI with provenance sidecars,
+  full shipped-artifact license audit (distinctive-phrase sampling).
 - **WS-C Core semantics**: composition semantics verification against final §5.1.2/Appendix B
   (permitted wherever aggregation is; derivation-strength ordering
   realization < assignment < aggregation < composition wherever `hierarchy_priority` or
@@ -662,7 +717,7 @@ Ordered for dependency and risk; details above.
   `SpecializationCatalog` (domain, `concept_kind: entity | connection`), module + two-tier
   repo `specializations.yaml` loading, ArchiMate 4 §14.2.1 informative library shipped
   (guidance-empty, incl. relationship specializations), entity frontmatter + connection
-  record `specializations:` + verifier rules (existence, concept-kind/parent match,
+  record `specialization:` (singular) + verifier rules (existence, concept-kind/parent match,
   restriction narrowing), minimal `ProfileDefinition` + deterministic merge semantics,
   attribute-schema attachment by reference, guillemet stereotype + notation rendering on
   boxes and relationships (parent-notation fallback), GUI picker + display,
@@ -730,14 +785,14 @@ Ordered for dependency and risk; details above.
   clean worktree with no backend serving the target repo), and lists the rest as manual
   adaptations.
 - **Multiplicity field rename**: a real repository migration (D9), implemented as the
-  first registered D17 upgrade step — rewrites `src_cardinality`/`tgt_cardinality` keys
-  and `include_cardinality` annotations; dry-run by default with a full report,
+  first registered D17 upgrade step — rewrites the legacy `include_cardinality` diagram
+  frontmatter annotation to `include_multiplicity`; dry-run by default with a full report,
   recommends a backup/branch before `--commit`, idempotent (re-run = 0 changes), runs under
-  the standard write/index reconcile machinery with an index rebuild. Legacy keys stay
-  readable for exactly one release with a distinct deprecation verifier code, so **external
-  user repositories** (not just this workspace's two) migrate on their own schedule;
-  REST/MCP payload fields and `types.generated.ts` switch with the release; release notes
-  document the command.
+  the standard write/index reconcile machinery with an index rebuild. No runtime
+  backward-compatibility code reads the legacy key — `arch-repair upgrade` is the only
+  migration path, so **external user repositories** (not just this workspace's two) run it
+  on their own schedule; REST/MCP payload fields and `types.generated.ts` switch cleanly
+  with the release; release notes document the command.
 - **Promotion governance (D14)**: the existing attribute-profile superset check
   (`promote_schema_check.py`) is extended to specializations and specialization-attached
   schemata — promotion fails loudly listing engagement-only definitions a promoted artifact
@@ -746,7 +801,7 @@ Ordered for dependency and risk; details above.
 - **Self-model composition conversions** are ordinary model edits through MCP (aggregation →
   composition where existence-dependency holds), reviewed in batches; no schema change.
 - **Persisted-format additions** are optional — absent means today's behavior: entity
-  frontmatter `specializations:` and diagram frontmatter `viewpoint:` applications
+  frontmatter `specialization:` (singular) and diagram frontmatter `viewpoint:` applications
   (scaffolded `frontmatter.entity/diagram.schema.json` gain the optional properties);
   connection specializations live in the new per-connection metadata block under each
   connection heading (D6), validated via the `connection-metadata.{connection-type}`
@@ -795,11 +850,19 @@ Ordered for dependency and risk; details above.
   gist, site)? Determines `guidance_default_source`. — Owner: Michael
 - [ ] **Q3 — C19C XSD acquisition/licensing**: confirm the exchange-format XSDs may be
   fetched at dev/test time and whether they may ship in the repo (default assumption: fetch,
-  don't commit). **Hard gate for exchange implementation (D10).** — Owner: Michael
-- [ ] **Q4 — Conformance wording**: "implements/aligned with ArchiMate 4" vs. a conformance
-  claim (certification/trademark implications) in README/docs. — Owner: Michael
-- [ ] **Q5 — Multiple specializations per entity**: plan supports a list per spec; confirm
-  the GUI/UX should too, or restrict to one initially. — Owner: review
+  don't commit). The three normative C19C v3.1 specs (model/diagram/view exchange, as PDFs)
+  and example/interoperability-test XML are now available locally at `/spec/` (gitignored),
+  but no `.xsd` schema file is among them — this question is still open. **Hard gate for
+  exchange implementation (D10).** — Owner: Michael
+- [x] **Q4 — Conformance wording**: resolved — the system *aims for* conformance with the
+  ArchiMate 4.0 standard; it does not *claim* conformance, since that would require
+  independent verification never performed. README/docs use "aims for conformance... not
+  independently verified," never "implements"/"conforms to"/"certified." — Owner: Michael
+- [x] **Q5 — Multiple specializations per entity/connection**: resolved as singular — an
+  entity or connection carries at most one specialization slug at a time (an instance has
+  exactly one parent type, so "one specialization" is the natural cardinality). The catalog
+  (`SpecializationCatalog`/`SpecializationInfo`) stays plural, since it enumerates every
+  *available* option per parent type.
 - [ ] **Q6 — Deferred viewpoint scope**: executable viewpoints (declarative selection incl.
   profile-attribute predicates + expansion rules) rendering ephemerally into the
   graph-exploration cluster view, the filtered catalog table, and the matrix builder —
@@ -809,27 +872,40 @@ Ordered for dependency and risk; details above.
   view artifacts, publishing/pinning, *user-defined* parameterized viewpoints (the
   built-in `execution_anchor` input is in scope, D15) — goes to a follow-up plan.
   — Owner: review
+- [x] **Q7 — General named-binding / query-expression layer for `ValueRef`**: found during
+  the WU-E5-UX redo spike (2026-07-10) — the criteria engine's `ValueRef` (companion plan
+  §3) cannot express a comparison against an arbitrary *specifically-referenced* other
+  entity/connection (only same-item and connection-endpoint references exist). Confirmed
+  direction: build the general form — named sub-queries with a declared result type
+  (entity/set-of-entities/connection/set-of-connections/typed attribute), reference-only or
+  result-included, usable as a `ValueRef` target anywhere (the BiZZdesign Query Language
+  precedent) — see the non-foreclosure note in `PLAN-viewpoints-query-model.md` §3 for why
+  this is graph-query-engine-scale work (dependency-ordered evaluation, aggregation
+  semantics, plain-language summary of named-set references). **Deferred**: its own design
+  and implementation start only after the rest of this plan (all phases A–G) ships, as a
+  dedicated follow-up plan — not folded into Phase E. — Owner: Michael
 
 ## 11. Acceptance Criteria (plan-level)
 
-- [ ] No string `archimate_next` / `archimate-next` / "ArchiMate NEXT" remains in active
+- [x] No string `archimate_next` / `archimate-next` / "ArchiMate NEXT" remains in active
   code, config, tests, docs, skills, or generated types (historical PLAN/TASKS ledgers
   excepted, per convention); startup check rejects unresolvable `permitted_mappings` tokens.
-- [ ] Zero ArchiMate-derived guidance prose in **any shipped artifact** (entities.yaml,
+- [x] Zero ArchiMate-derived guidance prose in **any shipped artifact** (entities.yaml,
   docs, skills, fixtures, scaffolding defaults, generated payloads — verified by
   distinctive-phrase audit); `artifact_authoring_guidance` returns imported guidance after
   `arch-import-guidance` + restart, and a clear empty-state before.
-- [ ] The extracted guidance YAML exists outside the repo, validates against the v1 schema,
+- [x] The extracted guidance YAML exists outside the repo, validates against the v1 schema,
   and round-trips through the import CLI (including at least one entity and one connection
   specialization entry); every import leaves a provenance sidecar (source, SHA-256, version,
   counts); docs record the hosting location, terms, and expected hash.
-- [ ] Composition passes the Appendix-B-derived rule tests; derivation ordering includes it
+- [x] Composition passes the Appendix-B-derived rule tests; derivation ordering includes it
   as strongest; the self-model contains deliberate composition connections after review.
-- [ ] Multiplicity terminology is consistent in code/UI/docs; migration (dry-run, backup
-  recommendation, idempotent report, index rebuild) leaves zero legacy keys in this
-  workspace's repos; legacy keys readable for exactly one release with a deprecation
-  verifier code; junction rule fires in tests.
-- [ ] `arch-repair upgrade` reports repo-format findings against the current format
+- [x] Multiplicity terminology is consistent in code/UI/docs, with no runtime
+  backward-compatibility code anywhere in the path; migration (dry-run, backup
+  recommendation, idempotent report, index rebuild) via `arch-repair upgrade` leaves zero
+  legacy `include_cardinality` keys in this workspace's repos; junction rule fires in
+  tests.
+- [x] `arch-repair upgrade` reports repo-format findings against the current format
   contract (profiles, customizations, frontmatter, connection declarations) with a stable
   per-repo-root `--json` shape incl. step-registry identity and
   applied-steps-before/after; supports repeatable `--repo-root` and `--workspace`
@@ -842,14 +918,15 @@ Ordered for dependency and risk; details above.
   (software version as metadata only); every persisted-format change in this plan has a
   registered step or detector (coverage test); the legacy no-subcommand `arch-repair`
   invocation still runs git-repair with a deprecation notice.
-- [ ] Specializations: informative library loaded **including relationship
+- [x] Specializations: informative library loaded **including relationship
   specializations**, two-tier repo declarations validated, entity frontmatter and
   per-connection metadata blocks round-trip, stereotypes + notation render on boxes and
-  relationships, GUI picker works, `ProfileDefinition` (`.arch-repo/profiles.yaml` +
-  `x-recommended`) merge is deterministic with conflict errors, dormant profile surface
-  removed with assurance schemas migrated, promotion superset checks cover specializations
-  + attached schemata + profiles.
-- [ ] Viewpoints: `ConceptScope` is the single admissibility path (old filter code deleted),
+  relationships, GUI picker works, `ProfileDefinition` (one-to-one with its specialization —
+  inline `attributes:` and/or attachment schema, `x-recommended`) merge is deterministic with
+  conflict errors, dormant profile surface removed with assurance schemas migrated, promotion
+  superset checks cover specializations + attached schemata (a specialization's profile
+  travels with it — no separate profile dependency to check).
+- [x] Viewpoints: `ConceptScope` is the single admissibility path (old filter code deleted),
   viewpoint selection filters palette/pickers non-destructively, verifier warns on
   violations and on stale applications (pinned version < definition version), definitions
   ship + per-repo CRUD works; an executable viewpoint evaluates its `query_schema: 1`
@@ -862,25 +939,25 @@ Ordered for dependency and risk; details above.
   engagement-only viewpoint
   dependencies of promoted views with **exact-version** matching (re-pin only as an
   explicit promotion step).
-- [ ] The connection-declaration grammar has exactly one implementation
+- [x] The connection-declaration grammar has exactly one implementation
   (`src/domain/connection_declaration.py`); the read parser, write parser, and formatter
   delegate to it, and a shared round-trip property test covers heading + metadata block +
   assoc + description.
-- [ ] Exchange readiness gate passed (mapping table signed off, Q3 resolved) before any
+- [x] Exchange readiness gate passed (mapping table signed off, Q3 resolved) before any
   codec code; then: fixture model round-trips (export→import) losslessly for mapped
   concepts; Appendix E.4 migration cases covered by tests (incl. relationship
   specializations); composition never downgraded on either path.
-- [ ] Conformance documentation page describes every implementation-defined mechanism.
-- [ ] The self-model reflects the plan: a reviewed change-set (enrich-first discipline)
+- [x] Conformance documentation page describes every implementation-defined mechanism.
+- [x] The self-model reflects the plan: a reviewed change-set (enrich-first discipline)
   is applied via MCP; every D1–D17 capability is modeled or explicitly assessed as below
   granularity; the D14 promotion check appears in the promotion activity diagram;
   `artifact_verify` clean.
-- [ ] Documentation is current: `tools/generate_mcp_docs.py --check` passes (tool tables
+- [x] Documentation is current: `tools/generate_mcp_docs.py --check` passes (tool tables
   regenerated after all description changes); viewpoints (incl. executable viewpoints)
   and specializations + profiles have dedicated user-facing docs; the affected existing
   pages (views/diagramming/schemata/ontology-modules/CLI/configuration/promotion) reflect
   the new mechanisms; no page still documents pre-plan behavior.
-- [ ] Quality gates green throughout: `pytest` 0 failures, `ruff` 0 errors, `zuban check`
+- [x] Quality gates green throughout: `pytest` 0 failures, `ruff` 0 errors, `zuban check`
   pass, frontend `lint`/`typecheck`, `types.generated.ts` regenerated where required.
 
 ## 12. Implementation Checklist
