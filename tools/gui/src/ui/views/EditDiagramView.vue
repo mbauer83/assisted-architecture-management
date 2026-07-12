@@ -6,7 +6,7 @@ import { modelServiceKey, toastKey } from '../keys'
 import type {
   DiagramContext, EntitySummary, DiagramConnection,
   EntityDisplayInfo, EntityContextConnection, DiagramPreviewResult, WriteResult,
-  DiagramTypeUiConfig,
+  DiagramTypeUiConfig, ViewpointSummary, ViewpointProjection,
 } from '../../domain'
 import type { RepoError } from '../../ports/ModelRepository'
 import type { NotFoundError } from '../../domain'
@@ -16,12 +16,15 @@ import EntityPickerInput from '../components/EntityPickerInput.vue'
 import DiagramTypeConfigPanel from '../components/DiagramTypeConfigPanel.vue'
 import PreviewViewport from '../components/PreviewViewport.vue'
 import ArchimateOccurrenceControls from '../components/ArchimateOccurrenceControls.vue'
+import ViewpointSelect from '../components/ViewpointSelect.vue'
+import { findViewpointBySlug } from '../components/ViewpointSelect.helpers'
 import { useQuery } from '../composables/useQuery'
 import { useMutation } from '../composables/useMutation'
 import { toGlyphKey } from '../lib/glyphKey'
 import { isArchimateDiagramType } from '../lib/archimateOccurrences'
 import { resolveElementMap, neutralizeSentinelLink } from '../lib/diagramViewerExtensions'
 import { sanitizeDiagramSvg } from '../lib/svgSanitize'
+import { reasonHint, effectiveOcclusionState, projectionByItemId } from './EditDiagramView.helpers'
 
 const svc = inject(modelServiceKey)!
 const addToast = inject(toastKey)!
@@ -37,6 +40,44 @@ const saveMutation = useMutation<WriteResult, RepoError>()
 
 const diagramDetail = computed(() => contextQuery.data.value?.diagram ?? null)
 const uiConfig = ref<DiagramTypeUiConfig | null>(null)
+
+// ── Viewpoint selector + ghost/hide overlay (WU-E5a) ───────────────────────────
+
+const viewpoints = ref<ViewpointSummary[]>([])
+const viewpointSlug = ref<string | null>(null)
+const viewpointPinnedVersion = ref<number | null>(null)
+const viewpointProjection = ref<ViewpointProjection | null>(null)
+const hideInsteadOfGhost = ref(false)
+
+const loadViewpoints = async () => {
+  const guidance = await Effect.runPromise(svc.getAuthoringGuidance({})).catch(() => null)
+  viewpoints.value = guidance?.viewpoints ? [...guidance.viewpoints] : []
+}
+
+const loadProjection = async () => {
+  if (!diagramId.value) return
+  viewpointProjection.value = await Effect.runPromise(svc.getViewpointProjection(diagramId.value)).catch(() => null)
+}
+
+const onSelectViewpoint = (viewpoint: ViewpointSummary | null) => {
+  viewpointPinnedVersion.value = viewpoint?.version ?? null
+  void refreshDiscovery()
+}
+
+const currentDefinitionVersion = computed(
+  () => findViewpointBySlug(viewpoints.value, viewpointSlug.value)?.version ?? null,
+)
+const stalePin = computed(() => viewpointProjection.value?.stale_pin === true)
+
+const doRePin = () => {
+  if (currentDefinitionVersion.value !== null) viewpointPinnedVersion.value = currentDefinitionVersion.value
+}
+
+const dismissViewpoint = () => {
+  viewpointSlug.value = null
+  viewpointPinnedVersion.value = null
+  void refreshDiscovery()
+}
 const baseTypeEntityData = ref<Record<string, unknown>>({})
 const typeEntityPatch = ref<Record<string, unknown>>({})
 const typeEntityData = computed(() => ({ ...baseTypeEntityData.value, ...typeEntityPatch.value }))
@@ -200,12 +241,27 @@ const svgEntityElems = new Map<string, Element[]>()
 const svgConnElems = new Map<string, Element[]>()
 const svgContainer = ref<HTMLElement | null>(null)
 
+const applyViewpointOverlay = (id: string, elems: Element[]) => {
+  const occurrence = projectionByItemId(viewpointProjection.value).get(id)
+  const state = occurrence ? effectiveOcclusionState(occurrence, hideInsteadOfGhost.value) : 'visible'
+  const hint = occurrence ? reasonHint(occurrence.reasons) : null
+  for (const el of elems) {
+    el.classList.toggle('svg-viewpoint-ghosted', state === 'ghosted')
+    el.classList.toggle('svg-viewpoint-hidden', state === 'hidden')
+    if (hint) el.setAttribute('title', hint)
+    else el.removeAttribute('title')
+  }
+}
+
 const updateHighlights = () => {
-  for (const [id, elems] of svgEntityElems)
+  for (const [id, elems] of svgEntityElems) {
     for (const el of elems) el.classList.toggle('svg-remove', toRemoveEntityIds.value.has(id))
+    applyViewpointOverlay(id, elems)
+  }
   for (const [id, elems] of svgConnElems) {
     const excl = !isConnIncluded(id) && includedConnIds.value.has(id)
     for (const el of elems) el.classList.toggle('svg-remove', excl)
+    applyViewpointOverlay(id, elems)
   }
 }
 
@@ -295,6 +351,7 @@ const attachInteractivity = () => {
 
 watch([svgHtml, diagramEntities, diagramConnections, typeEntityData], attachInteractivity, { flush: 'post' })
 watch([toRemoveEntityIds, toRemoveConnIds, selectedNewConnIds], updateHighlights)
+watch([viewpointProjection, hideInsteadOfGhost], updateHighlights)
 
 // ── Search / discovery ────────────────────────────────────────────────────────
 
@@ -303,6 +360,7 @@ const refreshDiscovery = async () => {
     svc.discoverDiagramEntities({
       includedEntityIds: [...effectiveEntityIds.value],
       diagramType: diagramDetail.value?.diagram_type,
+      viewpoint: viewpointSlug.value ?? undefined,
       maxHops: 1, limit: 20,
     }),
   )
@@ -356,16 +414,19 @@ const load = async () => {
       includedConnIds.value = inc
       baseTypeEntityData.value = asRecord(context.diagram.diagram_entities)
       typeEntityPatch.value = {}
+      viewpointSlug.value = context.diagram.viewpoint?.slug ?? null
+      viewpointPinnedVersion.value = context.diagram.viewpoint?.version ?? null
       void Effect.runPromise(svc.getDiagramTypeUiConfig(context.diagram.diagram_type))
         .then((config) => { uiConfig.value = config })
         .catch(() => { uiConfig.value = null })
       void refreshDiscovery()
+      void loadProjection()
     },
     onFailure: () => {},
   })
 }
 
-onMounted(load)
+onMounted(() => { void load(); void loadViewpoints() })
 watch(diagramId, load)
 
 // ── Preview / Save ────────────────────────────────────────────────────────────
@@ -401,6 +462,9 @@ const doSave = async () => {
     entity_ids: finalEntityIds.value,
     connection_ids: finalConnIds.value,
     diagram_entities: typeEntityData.value,
+    viewpoint: viewpointSlug.value
+      ? { slug: viewpointSlug.value, version: viewpointPinnedVersion.value ?? currentDefinitionVersion.value ?? 1 }
+      : null,
     dry_run: false,
   }))
   if (!Exit.isSuccess(exit) || !exit.value.wrote) return
@@ -458,6 +522,48 @@ onUnmounted(() => {
       </div>
     </div>
 
+    <div
+      v-if="viewpointSlug || stalePin"
+      class="viewpoint-bar"
+    >
+      <span
+        v-if="viewpointSlug"
+        class="viewpoint-chip"
+      >
+        🔭 {{ findViewpointBySlug(viewpoints, viewpointSlug)?.name ?? viewpointSlug }}
+        <span class="viewpoint-chip-version">v{{ viewpointPinnedVersion ?? '?' }}</span>
+        <button
+          class="viewpoint-chip-dismiss"
+          title="Clear applied viewpoint"
+          @click="dismissViewpoint"
+        >
+          ×
+        </button>
+      </span>
+      <span
+        v-if="stalePin"
+        class="viewpoint-stale"
+      >
+        Pinned to an older version.
+        <button
+          class="viewpoint-repin-btn"
+          @click="doRePin"
+        >
+          Re-pin to current version
+        </button>
+      </span>
+      <label
+        v-if="viewpointSlug"
+        class="viewpoint-hide-toggle"
+      >
+        <input
+          v-model="hideInsteadOfGhost"
+          type="checkbox"
+        >
+        Hide instead of ghost
+      </label>
+    </div>
+
     <div class="main-grid">
       <div
         ref="containerRef"
@@ -504,6 +610,15 @@ onUnmounted(() => {
       </div>
 
       <aside class="sidebar card">
+        <div class="sb-search sb-viewpoint">
+          <label class="viewpoint-label">Viewpoint</label>
+          <ViewpointSelect
+            v-model="viewpointSlug"
+            :viewpoints="viewpoints"
+            @select="onSelectViewpoint"
+          />
+        </div>
+
         <div
           v-if="uiConfig?.entity_search_filter !== false"
           class="sb-search"
@@ -511,6 +626,7 @@ onUnmounted(() => {
           <EntityPickerInput
             :excluded-ids="effectiveEntityIds"
             :diagram-type="diagramDetail?.diagram_type"
+            :viewpoint="viewpointSlug ?? undefined"
             @select="addEntity"
           />
         </div>
@@ -716,10 +832,24 @@ onUnmounted(() => {
 .svg-wrap :deep([data-conn-id]) { cursor: pointer; }
 .svg-wrap :deep([data-conn-id]:hover) path,
 .svg-wrap :deep([data-conn-id]:hover) polygon { stroke: #6366f1 !important; stroke-width: 2 !important; }
+.svg-wrap :deep(.svg-viewpoint-ghosted) { opacity: 0.3; filter: grayscale(60%); }
+.svg-wrap :deep(.svg-viewpoint-hidden) { display: none; }
 
 .reset-btn { position: absolute; top: 8px; right: 8px; padding: 4px 10px; background: rgba(255,255,255,.92); border: 1px solid #d1d5db; border-radius: 5px; font-size: 12px; cursor: pointer; color: #374151; }
 .reset-btn:hover { background: white; }
 .zoom-hint { position: absolute; bottom: 6px; left: 50%; transform: translateX(-50%); font-size: 11px; color: #9ca3af; background: rgba(255,255,255,.8); padding: 2px 8px; border-radius: 4px; pointer-events: none; white-space: nowrap; }
+
+.viewpoint-bar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 10px; }
+.viewpoint-chip { display: inline-flex; align-items: center; gap: 5px; padding: 3px 8px; border-radius: 999px; background: #eef2ff; color: #3730a3; font-size: 12px; font-weight: 500; }
+.viewpoint-chip-version { color: #6366f1; font-weight: 400; }
+.viewpoint-chip-dismiss { background: none; border: none; cursor: pointer; color: #6366f1; font-size: 14px; line-height: 1; padding: 0 0 0 2px; }
+.viewpoint-chip-dismiss:hover { color: #3730a3; }
+.viewpoint-stale { font-size: 12px; color: #b45309; display: inline-flex; align-items: center; gap: 6px; }
+.viewpoint-repin-btn { font-size: 12px; color: #b45309; background: #fffbeb; border: 1px solid #fde68a; border-radius: 5px; padding: 2px 8px; cursor: pointer; }
+.viewpoint-repin-btn:hover { background: #fef3c7; }
+.viewpoint-hide-toggle { font-size: 12px; color: #6b7280; display: inline-flex; align-items: center; gap: 4px; cursor: pointer; }
+.viewpoint-label { display: block; font-size: 11px; font-weight: 700; color: #374151; margin-bottom: 4px; text-transform: uppercase; letter-spacing: .05em; }
+.sb-viewpoint { border-bottom: 1px solid #f3f4f6; }
 
 .card { background: white; border-radius: 8px; border: 1px solid #e5e7eb; }
 .sidebar { display: flex; flex-direction: column; position: sticky; top: 16px; max-height: calc(100vh - 80px); overflow: hidden; }

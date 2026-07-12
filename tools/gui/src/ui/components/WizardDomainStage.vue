@@ -63,6 +63,12 @@ watch(() => props.domain, () => { resetToTypeChoice(); questionnaireStarted.valu
       <p class="stage-hint">
         Or pick a type directly:
       </p>
+      <p
+        v-if="guidance?.guidance_status === 'empty'"
+        class="guidance-empty-hint"
+      >
+        {{ guidance.guidance_hint }}
+      </p>
       <div class="type-grid">
         <button
           v-for="t in (showAllTypes ? [...typeSplit.visible, ...typeSplit.rest] : typeSplit.visible)"
@@ -121,6 +127,10 @@ watch(() => props.domain, () => { resetToTypeChoice(); questionnaireStarted.valu
 }
 .questionnaire-cta:hover { background: #dbeafe; }
 .stage-hint { color: #4b5563; font-size: 13px; margin: 0; }
+.guidance-empty-hint {
+  font-size: 12px; color: #92400e; background: #fffbeb; border: 1px solid #fde68a;
+  border-radius: 6px; padding: 8px 10px; margin: 0;
+}
 .type-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 10px; }
 .type-btn {
   display: flex; flex-direction: column; gap: 3px; text-align: left; padding: 10px 12px;

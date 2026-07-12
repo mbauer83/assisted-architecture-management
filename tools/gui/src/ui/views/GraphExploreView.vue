@@ -5,8 +5,20 @@ import { Effect } from 'effect'
 import { modelServiceKey } from '../keys'
 import { useQuery } from '../composables/useQuery'
 import { useForceGraph, type GraphNode, type GraphEdge, type LayoutMode } from '../composables/useForceGraph'
+import { useViewpointExecution } from '../composables/useViewpointExecution'
 import ArchimateTypeGlyph from '../components/ArchimateTypeGlyph.vue'
-import type { EntityDetail, ConnectionList, NotFoundError } from '../../domain'
+import ViewpointSelect from '../components/ViewpointSelect.vue'
+import ViewpointExecutionDiagnostics from '../components/ViewpointExecutionDiagnostics.vue'
+import { computeExecutionDiagnostics, deriveLegend } from '../components/ViewpointExecutionDiagnostics.helpers'
+import {
+  groupKeyFor, nodeVisualFor, edgeVisualFor, nodeShapePoints,
+  buildConnectionStyleIndex, edgeStyleKey, projectionByItemId,
+} from './GraphExploreView.helpers'
+import { presentationFromMapping } from '../../domain/viewpointPresentationSerialization'
+import type { PresentationNode } from '../../domain/viewpointPresentation'
+import type {
+  EntityDetail, ConnectionList, NotFoundError, ViewpointSummary, ViewpointDefinitionEnvelope,
+} from '../../domain'
 import type { MarkdownError } from '../../application/MarkdownService'
 import type { RepoError } from '../../ports/ModelRepository'
 
@@ -23,11 +35,81 @@ const selectedDetail = useQuery<EntityDetail, RepoError | NotFoundError | Markdo
 const {
   nodes, edges, options, layoutMode,
   addNode, addEdge, markExpanded, collapseNode, spreadAroundParent, restart,
-  applyClusterLayout, applyForceLayout,
+  applyClusterLayout, applyGroupClusterLayout, applyForceLayout,
 } = useForceGraph(() => svgWidth.value, () => svgHeight.value)
 
 // Selected edge (connection) for sidebar
 const selectedEdge = ref<GraphEdge | null>(null)
+
+// ── Viewpoint-driven exploration (companion plan §5.1, WU-E8) ─────────────────
+
+const viewpoints = ref<ViewpointSummary[]>([])
+const viewpointDefinitions = ref<readonly ViewpointDefinitionEnvelope[]>([])
+const selectedViewpointSlug = ref<string | null>(null)
+const viewpointExecution = useViewpointExecution(svc)
+
+const loadViewpointCatalog = async () => {
+  const [guidance, definitions] = await Promise.all([
+    Effect.runPromise(svc.getAuthoringGuidance({})).catch(() => null),
+    Effect.runPromise(svc.listViewpointDefinitions()).catch(() => []),
+  ])
+  viewpoints.value = guidance?.viewpoints ? [...guidance.viewpoints] : []
+  viewpointDefinitions.value = definitions
+}
+
+const selectedPresentation = computed<PresentationNode | null>(() => {
+  const envelope = viewpointDefinitions.value.find((d) => d.slug === selectedViewpointSlug.value)
+  return envelope ? presentationFromMapping(envelope.presentation) : null
+})
+const currentRepresentation = computed(() => selectedPresentation.value?.representation ?? 'exploration')
+const entityStyleById = computed(() => projectionByItemId(viewpointExecution.projection.value))
+const connectionStyleIndex = computed(() =>
+  buildConnectionStyleIndex(viewpointExecution.result.value?.connections ?? [], viewpointExecution.projection.value),
+)
+const diagnostics = computed(() => computeExecutionDiagnostics(
+  viewpointExecution.result.value, selectedPresentation.value, currentRepresentation.value,
+))
+const legend = computed(() => deriveLegend(selectedPresentation.value))
+
+const loadViewpointPopulation = async (slug: string) => {
+  nodes.value = []
+  edges.value = []
+  selectedId.value = null
+  selectedEdge.value = null
+  await viewpointExecution.execute({ slug })
+  const result = viewpointExecution.result.value
+  if (!result) return
+  for (const entity of result.entities) {
+    addNode({ id: entity.id, label: entity.name, type: entity.id.split('@')[0] })
+  }
+  for (const connection of result.connections) {
+    addEdge({ source: connection.source, target: connection.target, connType: connection.type })
+  }
+  for (const n of nodes.value) resolveNodeDomain(n)
+  const groupBy = selectedPresentation.value?.groupBy ?? null
+  const byId = new Map(result.entities.map((e) => [e.id, e]))
+  applyGroupClusterLayout((id) => {
+    const entity = byId.get(id)
+    return entity ? groupKeyFor(entity, groupBy) : 'other'
+  })
+}
+
+const onSelectViewpoint = (viewpoint: ViewpointSummary | null) => {
+  selectedViewpointSlug.value = viewpoint?.slug ?? null
+  if (viewpoint) {
+    void loadViewpointPopulation(viewpoint.slug)
+  } else {
+    viewpointExecution.clear()
+    loadRoot()
+  }
+}
+
+const rerunViewpoint = () => {
+  if (selectedViewpointSlug.value) void loadViewpointPopulation(selectedViewpointSlug.value)
+}
+
+const nodeVisual = (n: GraphNode) => nodeVisualFor(entityStyleById.value.get(n.id)?.style, nodeColor(n))
+const edgeVisual = (e: GraphEdge) => edgeVisualFor(connectionStyleIndex.value.get(edgeStyleKey(e.source, e.target, e.connType)))
 
 const SPACING_PRESETS = [
   { label: 'Compact', repulsion: 1500, idealDist: 150 },
@@ -90,8 +172,8 @@ const expandNode = (entityId: string) => {
           target: c.target,
           connType: c.conn_type,
           description: c.content_text,
-          srcCardinality: c.src_cardinality || undefined,
-          tgtCardinality: c.tgt_cardinality || undefined,
+          srcMultiplicity: c.src_multiplicity || undefined,
+          tgtMultiplicity: c.tgt_multiplicity || undefined,
         })
     }
     markExpanded(entityId)
@@ -130,9 +212,14 @@ const loadRoot = () => {
 
 onMounted(() => {
   updateSvgSize()
+  void loadViewpointCatalog().then(() => {
+    const viewpointSlug = route.query.viewpoint as string | undefined
+    const preselected = viewpointSlug ? viewpoints.value.find((v) => v.slug === viewpointSlug) : undefined
+    if (preselected) onSelectViewpoint(preselected)
+  })
   loadRoot()
 })
-watch(rootId, loadRoot)
+watch(rootId, () => { if (selectedViewpointSlug.value === null) loadRoot() })
 
 const updateSvgSize = () => {
   if (!svgRef.value) return
@@ -160,6 +247,8 @@ const onEdgeClick = (e: typeof edges.value[number]) => {
 const onNodeClick = (n: GraphNode) => selectNode(n.id)
 
 const onNodeDblClick = (n: GraphNode) => {
+  // A viewpoint's result is a fixed population (§7.1) — no incremental expand/collapse.
+  if (selectedViewpointSlug.value !== null) return
   if (n.expanded) {
     collapseNode(n.id)
     if (layoutMode.value === 'cluster') applyClusterLayout(rootId.value)
@@ -247,7 +336,7 @@ const edgePath = (e: typeof edges.value[number]) => {
 const shownEdgeCount = (nodeId: string) =>
   edges.value.filter((e) => e.source === nodeId || e.target === nodeId).length
 
-// Returns SVG coords for a cardinality label at `frac` (0=source, 1=target) along edge.
+// Returns SVG coords for a multiplicity label at `frac` (0=source, 1=target) along edge.
 // Offset 8px perpendicular-ish above the line for legibility.
 const edgeCardPos = (e: typeof edges.value[number], frac: number) => {
   const src = nodes.value.find((n) => n.id === e.source)
@@ -276,6 +365,14 @@ const edgeCardPos = (e: typeof edges.value[number], frac: number) => {
         </RouterLink>
         <span class="canvas-title">Graph Explorer</span>
         <div class="spacing-controls">
+          <span class="spacing-label">Viewpoint:</span>
+          <ViewpointSelect
+            :model-value="selectedViewpointSlug"
+            :viewpoints="viewpoints"
+            @select="onSelectViewpoint"
+          />
+        </div>
+        <div class="spacing-controls">
           <span class="spacing-label">Layout:</span>
           <button
             v-for="m in LAYOUT_MODES"
@@ -303,6 +400,13 @@ const edgeCardPos = (e: typeof edges.value[number], frac: number) => {
           </button>
         </div>
       </div>
+      <ViewpointExecutionDiagnostics
+        v-if="selectedViewpointSlug !== null"
+        :diagnostics="diagnostics"
+        :legend="legend"
+        :query-summary="viewpointExecution.result.value?.query_summary ?? ''"
+        @rerun="rerunViewpoint"
+      />
       <svg
         ref="svgRef"
         class="graph-svg"
@@ -337,8 +441,9 @@ const edgeCardPos = (e: typeof edges.value[number], frac: number) => {
         >
           <path
             :d="edgePath(e)"
-            stroke="#d1d5db"
-            stroke-width="1.5"
+            :stroke="edgeVisual(e).stroke ?? '#d1d5db'"
+            :stroke-width="edgeVisual(e).strokeWidth ?? 1.5"
+            :stroke-dasharray="edgeVisual(e).dashArray"
             fill="none"
             marker-end="url(#arrowhead)"
           />
@@ -350,13 +455,13 @@ const edgeCardPos = (e: typeof edges.value[number], frac: number) => {
             :class="{ 'edge-selected': selectedEdge === e }"
           />
         </g>
-        <!-- Cardinality labels (rendered above edges, below nodes) -->
+        <!-- Multiplicity labels (rendered above edges, below nodes) -->
         <template
           v-for="(e, i) in edges"
           :key="'card'+i"
         >
           <text
-            v-if="e.srcCardinality"
+            v-if="e.srcMultiplicity"
             :x="edgeCardPos(e, 0.2).x"
             :y="edgeCardPos(e, 0.2).y"
             text-anchor="middle"
@@ -366,9 +471,9 @@ const edgeCardPos = (e: typeof edges.value[number], frac: number) => {
             stroke-width="3"
             paint-order="stroke"
             pointer-events="none"
-          >{{ e.srcCardinality }}</text>
+          >{{ e.srcMultiplicity }}</text>
           <text
-            v-if="e.tgtCardinality"
+            v-if="e.tgtMultiplicity"
             :x="edgeCardPos(e, 0.8).x"
             :y="edgeCardPos(e, 0.8).y"
             text-anchor="middle"
@@ -378,7 +483,7 @@ const edgeCardPos = (e: typeof edges.value[number], frac: number) => {
             stroke-width="3"
             paint-order="stroke"
             pointer-events="none"
-          >{{ e.tgtCardinality }}</text>
+          >{{ e.tgtMultiplicity }}</text>
         </template>
         <!-- Nodes -->
         <g
@@ -390,9 +495,9 @@ const edgeCardPos = (e: typeof edges.value[number], frac: number) => {
           @click.stop="onNodeClick(n)"
           @dblclick.stop="onNodeDblClick(n)"
         >
-          <circle
-            r="24"
-            :fill="nodeColor(n)"
+          <polygon
+            :points="nodeShapePoints(nodeVisual(n).shape, 24)"
+            :fill="nodeVisual(n).color"
             :opacity="selectedId === n.id ? 1 : 0.8"
             :stroke="selectedId === n.id ? '#1e293b' : 'white'"
             :stroke-width="selectedId === n.id ? 3 : 2"
@@ -414,9 +519,19 @@ const edgeCardPos = (e: typeof edges.value[number], frac: number) => {
           >
             {{ truncLabel(n.label) }}
           </text>
-          <!-- + badge: show if unexpanded AND there are connections not yet shown -->
+          <text
+            v-if="nodeVisual(n).iconLetter"
+            x="-17"
+            y="-14"
+            text-anchor="middle"
+            fill="#252327"
+            font-size="9"
+            font-weight="bold"
+            pointer-events="none"
+          >{{ nodeVisual(n).iconLetter }}</text>
+          <!-- + badge: show if unexpanded AND there are connections not yet shown (not in viewpoint mode: a viewpoint's population is fixed, no incremental expand) -->
           <circle
-            v-if="!n.expanded && (n.totalConns === undefined || n.totalConns > shownEdgeCount(n.id))"
+            v-if="selectedViewpointSlug === null && !n.expanded && (n.totalConns === undefined || n.totalConns > shownEdgeCount(n.id))"
             cx="17"
             cy="-17"
             r="7"
@@ -426,7 +541,7 @@ const edgeCardPos = (e: typeof edges.value[number], frac: number) => {
             cursor="pointer"
           />
           <text
-            v-if="!n.expanded && (n.totalConns === undefined || n.totalConns > shownEdgeCount(n.id))"
+            v-if="selectedViewpointSlug === null && !n.expanded && (n.totalConns === undefined || n.totalConns > shownEdgeCount(n.id))"
             x="17"
             y="-14"
             text-anchor="middle"
@@ -456,12 +571,12 @@ const edgeCardPos = (e: typeof edges.value[number], frac: number) => {
           <label>Connection type</label><span class="detail-value mono">{{ selectedEdge.connType }}</span>
         </div>
         <div
-          v-if="selectedEdge.srcCardinality || selectedEdge.tgtCardinality"
+          v-if="selectedEdge.srcMultiplicity || selectedEdge.tgtMultiplicity"
           class="detail-field"
         >
-          <label>Cardinality</label>
+          <label>Multiplicity</label>
           <span class="detail-value mono">
-            {{ selectedEdge.srcCardinality || '?' }} → {{ selectedEdge.tgtCardinality || '?' }}
+            {{ selectedEdge.srcMultiplicity || '?' }} → {{ selectedEdge.tgtMultiplicity || '?' }}
           </span>
         </div>
         <div class="detail-field">

@@ -46,6 +46,14 @@ import {
   WriteHelpSchema,
   GroupListSchema,
   AuthoringGuidanceSchema,
+  ViewpointProjectionSchema,
+  ViewpointDiagramResultSchema,
+  ViewpointDefinitionListSchema,
+  CriteriaCatalogSchema,
+  ViewpointSummarizeResultSchema,
+  ViewpointPersistResultSchema,
+  ViewpointReferencerListSchema,
+  ViewpointExecutionResultSchema,
 } from '../../domain/schemas'
 import { SyncChangesResultSchema } from '../../domain/schemas-changes'
 import { parseMarkdown } from '../../application/MarkdownService'
@@ -411,16 +419,16 @@ export const makeHttpModelRepository = (): ModelRepository => ({
   getEntityDisplayItem: (artifactId: string) =>
     fetchJson(buildUrl('/entity-display-item', { id: artifactId }), EntityDisplayInfoSchema),
 
-  searchEntityDisplay: ({ query, limit = 20, diagramType, domains, entityTypes, keywords, cursor }) =>
+  searchEntityDisplay: ({ query, limit = 20, diagramType, domains, entityTypes, keywords, cursor, viewpoint }) =>
     fetchJson(buildUrl('/entity-display-search', {
       q: query, limit, diagram_type: diagramType,
       domains: domains?.join(','), entity_types: entityTypes?.join(','),
-      keywords: keywords?.join(','), cursor,
+      keywords: keywords?.join(','), cursor, viewpoint,
     }), EntityDisplaySearchResultSchema),
-  discoverDiagramEntities: ({ includedEntityIds = [], query, diagramType, maxHops = 2, limit = 20 }) =>
+  discoverDiagramEntities: ({ includedEntityIds = [], query, diagramType, maxHops = 2, limit = 20, viewpoint }) =>
     fetchJson(buildUrl('/diagram-entity-discovery', {
       q: query, diagram_type: diagramType, max_hops: maxHops, limit,
-      included_entity_ids: includedEntityIds.join(','),
+      included_entity_ids: includedEntityIds.join(','), viewpoint,
     }), DiagramEntityDiscoverySchema),
 
   previewDiagram: (body) =>
@@ -433,6 +441,27 @@ export const makeHttpModelRepository = (): ModelRepository => ({
     postJson(buildUrl('/diagram/edit'), body, WriteResultSchema),
   deleteDiagram: (body) =>
     postJson(buildUrl('/diagram/remove'), body, WriteResultSchema),
+  getViewpointProjection: (diagramId: string) =>
+    fetchJson(buildUrl(`/diagrams/${encodeURIComponent(diagramId)}/viewpoint-projection`), ViewpointProjectionSchema),
+  listViewpointDefinitions: () =>
+    fetchJson(buildUrl('/viewpoints'), ViewpointDefinitionListSchema).pipe(Effect.map((r) => r.viewpoints)),
+  getCriteriaCatalog: () => fetchJson(buildUrl('/viewpoints/criteria-catalog'), CriteriaCatalogSchema),
+  executeViewpoint: (request) => postJson(buildUrl('/viewpoints/execute'), request, ViewpointExecutionResultSchema),
+  executeViewpointProjection: (request) =>
+    postJson(buildUrl('/viewpoints/execute-projection'), request, ViewpointProjectionSchema),
+  executeViewpointDiagram: (request) =>
+    postJson(buildUrl('/viewpoints/execute-diagram'), request, ViewpointDiagramResultSchema),
+  summarizeViewpointQuery: (query: unknown) =>
+    postJson(buildUrl('/viewpoints/summarize'), { query }, ViewpointSummarizeResultSchema).pipe(
+      Effect.map((r) => r.summary),
+    ),
+  createViewpointDefinition: (body) => postJson(buildUrl('/viewpoints'), body, ViewpointPersistResultSchema),
+  editViewpointDefinition: (body) => postJson(buildUrl('/viewpoints/edit'), body, ViewpointPersistResultSchema),
+  deleteViewpointDefinition: (body) => postJson(buildUrl('/viewpoints/remove'), body, ViewpointPersistResultSchema),
+  getViewpointReferencers: (slug: string) =>
+    fetchJson(buildUrl(`/viewpoints/${encodeURIComponent(slug)}/referencers`), ViewpointReferencerListSchema).pipe(
+      Effect.map((r) => r.referencers),
+    ),
   syncDiagramToModel: (body) =>
     postJson(buildUrl('/diagram/sync'), body, SyncDiagramToModelResultSchema),
 

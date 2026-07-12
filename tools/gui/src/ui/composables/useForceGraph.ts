@@ -23,8 +23,8 @@ export interface GraphEdge {
   target: string
   connType: string
   description?: string  // raw content_text from the connection
-  srcCardinality?: string
-  tgtCardinality?: string
+  srcMultiplicity?: string
+  tgtMultiplicity?: string
 }
 
 export interface ForceOptions {
@@ -261,11 +261,28 @@ export function useForceGraph(width: () => number, height: () => number) {
     return walk(rootId)
   }
 
-  const applyClusterLayout = (rootId: string, centerId?: string): { cx?: number; cy?: number } => {
-    stop()
-    layoutMode.value = 'cluster'
-    if (nodes.value.length === 0) return {}
-    const tree = buildTree(rootId)
+  /** Group nodes into a synthetic two-level tree (root -> one child per distinct group
+   *  key -> leaf entities) so `layoutTree`'s dendrogram positioning applies to a
+   *  viewpoint's flat, possibly-disconnected result population exactly as it does to a
+   *  graph-adjacency tree — one positioning algorithm, two tree sources. */
+  const buildGroupTree = (groupOf: (id: string) => string): TreeNode => {
+    const groups = new Map<string, string[]>()
+    for (const n of nodes.value) {
+      const key = groupOf(n.id)
+      if (!groups.has(key)) groups.set(key, [])
+      groups.get(key)!.push(n.id)
+    }
+    const sortedGroups = [...groups.entries()].sort(([a], [b]) => a.localeCompare(b))
+    return {
+      id: '__root__',
+      children: sortedGroups.map(([key, ids]) => ({
+        id: `__group__${key}`,
+        children: ids.map((id) => ({ id })),
+      })),
+    }
+  }
+
+  const layoutTree = (tree: TreeNode): { posMap: Map<string, { x: number; y: number }>; cx: number; cy: number } => {
     const root = hierarchy(tree)
     const leftPad = 140
     const topPad = 110
@@ -277,9 +294,17 @@ export function useForceGraph(width: () => number, height: () => number) {
     const totalWidth = computeTreeMetrics(tree, 0, metrics)
     const posMap = new Map<string, { x: number; y: number }>()
     assignTreePositions(tree, leftPad, metrics, posMap, levelGap, topPad)
-
     const canvasWidth = Math.max(width(), totalWidth + leftPad + rightPad)
     const canvasHeight = Math.max(height(), topPad + bottomPad + maxDepth * levelGap)
+    return { posMap, cx: canvasWidth, cy: canvasHeight }
+  }
+
+  const applyClusterLayout = (rootId: string, centerId?: string): { cx?: number; cy?: number } => {
+    stop()
+    layoutMode.value = 'cluster'
+    if (nodes.value.length === 0) return {}
+    const tree = buildTree(rootId)
+    const { posMap, cx: canvasWidth, cy: canvasHeight } = layoutTree(tree)
     for (const nd of nodes.value) {
       const pos = posMap.get(nd.id)
       if (pos) { nd.x = pos.x; nd.y = pos.y }
@@ -288,6 +313,22 @@ export function useForceGraph(width: () => number, height: () => number) {
     const target = centerId ?? rootId
     const pos = posMap.get(target)
     return pos ? { cx: Math.min(Math.max(pos.x, 0), canvasWidth), cy: Math.min(Math.max(pos.y, 0), canvasHeight) } : {}
+  }
+
+  /** Positions the current node set into clusters by `groupOf(id)` — the viewpoint
+   *  exploration mode's `group_by`-driven layout (companion plan §5.1): no root/expand
+   *  adjacency is assumed, unlike `applyClusterLayout`. */
+  const applyGroupClusterLayout = (groupOf: (id: string) => string): void => {
+    stop()
+    layoutMode.value = 'cluster'
+    if (nodes.value.length === 0) return
+    const tree = buildGroupTree(groupOf)
+    const { posMap } = layoutTree(tree)
+    for (const nd of nodes.value) {
+      const pos = posMap.get(nd.id)
+      if (pos) { nd.x = pos.x; nd.y = pos.y }
+      nd.vx = 0; nd.vy = 0
+    }
   }
 
   /** Remove a node and all nodes that were added exclusively by its expansion. */
@@ -334,6 +375,6 @@ export function useForceGraph(width: () => number, height: () => number) {
     nodes, edges, options, layoutMode,
     addNode, addEdge, markExpanded, collapseNode, spreadAroundParent,
     start, stop, restart,
-    applyClusterLayout, applyForceLayout,
+    applyClusterLayout, applyGroupClusterLayout, applyForceLayout,
   }
 }

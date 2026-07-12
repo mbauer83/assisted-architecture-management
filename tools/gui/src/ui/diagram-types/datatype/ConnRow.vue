@@ -118,25 +118,25 @@ async function applyFix() {
         </option>
       </select>
       <label class="field-stack">
-        <span>Source cardinality</span>
+        <span>Source multiplicity</span>
         <input
-          class="card-in"
+          class="mult-in"
           type="text"
-          :value="conn.src_cardinality ?? ''"
+          :value="conn.src_multiplicity ?? ''"
           placeholder="0..1"
-          title="Source cardinality (for example: 1, 0..1, 1..*, *)"
-          @input="emit('updateConn', conn.id, { src_cardinality: ($event.target as HTMLInputElement).value || undefined })"
+          title="Source multiplicity (for example: 1, 0..1, 1..*, *)"
+          @input="emit('updateConn', conn.id, { src_multiplicity: ($event.target as HTMLInputElement).value || undefined })"
         >
       </label>
       <label class="field-stack">
-        <span>Target cardinality</span>
+        <span>Target multiplicity</span>
         <input
-          class="card-in"
+          class="mult-in"
           type="text"
-          :value="conn.tgt_cardinality ?? ''"
+          :value="conn.tgt_multiplicity ?? ''"
           placeholder="1..*"
-          title="Target cardinality (for example: 1, 0..1, 1..*, *)"
-          @input="emit('updateConn', conn.id, { tgt_cardinality: ($event.target as HTMLInputElement).value || undefined })"
+          title="Target multiplicity (for example: 1, 0..1, 1..*, *)"
+          @input="emit('updateConn', conn.id, { tgt_multiplicity: ($event.target as HTMLInputElement).value || undefined })"
         >
       </label>
       <input
@@ -208,7 +208,7 @@ async function applyFix() {
 .conn-type { font-size: 11px; border: 1px solid #e2e8f0; border-radius: 3px; padding: 1px 3px; background: #f8fafc; min-width: 120px; }
 .conn-end { font-size: 11px; border: 1px solid #e2e8f0; border-radius: 3px; padding: 1px 3px; min-width: 80px; }
 .rl-arrow { font-size: 11px; color: #6b7280; }
-.card-in { width: 52px; font-size: 11px; border: 1px solid #e2e8f0; border-radius: 3px; padding: 1px 3px; }
+.mult-in { width: 52px; font-size: 11px; border: 1px solid #e2e8f0; border-radius: 3px; padding: 1px 3px; }
 .field-stack { display: flex; flex-direction: column; gap: 1px; font-size: 9px; color: #6b7280; }
 .lbl-in { flex: 1; min-width: 60px; font-size: 11px; border: 1px solid #e2e8f0; border-radius: 3px; padding: 1px 4px; }
 .gset-sel { font-size: 11px; border: 1px solid #c7d2fe; border-radius: 3px; padding: 1px 3px; background: #eef2ff; }

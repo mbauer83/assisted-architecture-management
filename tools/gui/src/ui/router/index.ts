@@ -33,6 +33,9 @@ export const router = createRouter({
     { path: '/diagram/edit', component: EditDiagramView },
     { path: '/diagram', component: DiagramDetailView },
     { path: '/graph', component: GraphExploreView },
+    { path: '/viewpoints', component: () => import('../views/ViewpointsManagementView.vue') },
+    { path: '/viewpoints/matrix', component: () => import('../views/ViewpointMatrixView.vue') },
+    { path: '/viewpoints/diagram', component: () => import('../views/ViewpointDiagramView.vue') },
     // Global (enterprise) repo routes — reuse same views with scope param
     { path: '/global/entities', component: EntitiesView, props: () => ({ scope: 'global' }) },
     { path: '/global/diagrams', component: DiagramsView, props: () => ({ scope: 'global' }) },

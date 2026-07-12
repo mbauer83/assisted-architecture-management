@@ -9,11 +9,12 @@ import ArchimateTypeGlyph from '../components/ArchimateTypeGlyph.vue'
 import ArtifactReferenceInput from '../components/ArtifactReferenceInput.vue'
 import TypedPropertyInput from '../components/TypedPropertyInput.vue'
 import AssuranceLens from '../components/AssuranceLens.vue'
-import type { EntityContext, WriteResult, EntityAttributeDescriptor } from '../../domain'
+import type { EntityContext, WriteResult, EntityAttributeDescriptor, AuthoringGuidance } from '../../domain'
 import type { NotFoundError } from '../../domain'
 import type { MarkdownError } from '../../application/MarkdownService'
 import type { RepoError } from '../../ports/ModelRepository'
 import { readErrorMessage } from '../lib/errors'
+import { specializationOptionsForEntityType, specializationOptionLabel } from '../lib/specializationOptions'
 
 const svc = inject(modelServiceKey)!
 const addToast = inject(toastKey)!
@@ -70,6 +71,11 @@ const editKeywords = ref('')
 const editStatus = ref('')
 const editProperties = ref<{ key: string; value: string; adHocType: AdHocType }[]>([])
 const editNotes = ref('')
+const editSpecialization = ref('')
+const editTypeGuidance = ref<AuthoringGuidance | null>(null)
+const editSpecializationOptions = computed(() =>
+  detail.value ? specializationOptionsForEntityType(editTypeGuidance.value, detail.value.artifact_type) : [],
+)
 const editBusy = ref(false)
 const editError = ref<string | null>(null)
 const editPreview = ref<{ content: string | null; warnings: string[] } | null>(null)
@@ -110,6 +116,15 @@ const startEdit = () => {
   editKeywords.value = (d.keywords ?? []).join(', ')
   editStatus.value = d.status
   editNotes.value = d.notes ?? ''
+  editSpecialization.value = d.specialization ?? ''
+  editTypeGuidance.value = null
+  void Effect.runPromise(svc.getAuthoringGuidance({ entityTypes: [d.artifact_type] }))
+    .then((info) => {
+      editTypeGuidance.value = info
+    })
+    .catch(() => {
+      editTypeGuidance.value = null
+    })
   const rawAttrTypes = d.extra?.['attribute-types']
   const savedAttrTypes: Record<string, AdHocType> =
     rawAttrTypes && typeof rawAttrTypes === 'object' && !Array.isArray(rawAttrTypes)
@@ -174,6 +189,7 @@ const buildEditBody = (dryRun: boolean) => {
     properties: props,
     attribute_types: Object.keys(adhocTypes).length ? adhocTypes : undefined,
     notes: editNotes.value || undefined,
+    specialization: editSpecialization.value || undefined,
     dry_run: dryRun,
   }
 }
@@ -428,6 +444,10 @@ const insertReference = (markdownLink: string) => {
           >/ {{ detail.subdomain }}</span>
           <span class="sep">·</span>
           <span class="meta-item">v{{ detail.version }}</span>
+          <template v-if="detail.specialization">
+            <span class="sep">·</span>
+            <span class="specialization-badge">«{{ detail.specialization }}»</span>
+          </template>
         </div>
         <div class="artifact-id mono">
           {{ detail.artifact_id }}
@@ -464,6 +484,27 @@ const insertReference = (markdownLink: string) => {
             class="edit-input"
             placeholder="e.g. model, tooling, automation"
           >
+        </div>
+        <div
+          v-if="editSpecializationOptions.length"
+          class="form-row"
+        >
+          <label class="form-label">Specialization <span class="form-hint">(optional)</span></label>
+          <select
+            v-model="editSpecialization"
+            class="edit-select"
+          >
+            <option value="">
+              None
+            </option>
+            <option
+              v-for="spec in editSpecializationOptions"
+              :key="spec.slug"
+              :value="spec.slug"
+            >
+              {{ specializationOptionLabel(spec) }}
+            </option>
+          </select>
         </div>
         <div class="form-row">
           <label class="form-label">Notes</label>
@@ -819,6 +860,7 @@ const insertReference = (markdownLink: string) => {
 .meta-type { display: inline-flex; align-items: center; gap: 8px; }
 .meta-glyph { color: #374151; fill: none; flex: 0 0 auto; }
 .sep { color: #9ca3af; }
+.specialization-badge { font-style: italic; color: #6d28d9; }
 .artifact-id { font-size: 11px; color: #9ca3af; }
 .mono { font-family: monospace; }
 
@@ -853,6 +895,11 @@ const insertReference = (markdownLink: string) => {
   font-size: 13px; outline: none; box-sizing: border-box;
 }
 .edit-input:focus { border-color: #2563eb; }
+.edit-select {
+  width: 100%; padding: 7px 10px; border-radius: 6px; border: 1px solid #d1d5db;
+  font-size: 13px; outline: none; box-sizing: border-box; background: white;
+}
+.edit-select:focus { border-color: #2563eb; }
 .edit-textarea {
   width: 100%; padding: 7px 10px; border-radius: 6px; border: 1px solid #d1d5db;
   font-size: 13px; outline: none; resize: vertical; box-sizing: border-box; font-family: inherit;

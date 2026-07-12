@@ -1,19 +1,28 @@
 <script setup lang="ts">
 import { computed, inject, onMounted, onUnmounted, ref, watch } from 'vue'
+import { Effect } from 'effect'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
-import type { EntityList, EntityTaxonomy, GroupList, ModuleSummary } from '../../domain'
+import type { EntityList, EntityTaxonomy, GroupList, ModuleSummary, ViewpointDefinitionEnvelope } from '../../domain'
 import type { RepoScope, RepoError } from '../../ports/ModelRepository'
 import { modelServiceKey } from '../keys'
 import { useQuery } from '../composables/useQuery'
 import { usePagination } from '../composables/usePagination'
+import { useViewpointExecution } from '../composables/useViewpointExecution'
 import EntitiesTreemap from '../components/EntitiesTreemap.vue'
 import ArchimateTypeGlyph from '../components/ArchimateTypeGlyph.vue'
 import EntityGroupNavTree from '../components/EntityGroupNavTree.vue'
+import ViewpointExecutionDiagnostics from '../components/ViewpointExecutionDiagnostics.vue'
+import { computeExecutionDiagnostics, deriveLegend } from '../components/ViewpointExecutionDiagnostics.helpers'
+import { presentationFromMapping } from '../../domain/viewpointPresentationSerialization'
 import {
   friendlyEntityId,
   getEntityConnectionTotal,
   getDomainLabel,
 } from '../lib/domains'
+import {
+  effectiveTableColumns, filtersToEntityCriteriaMapping, groupTableRows,
+  isColumnSourceResolvable, projectionByItemId, resolveSummaryColumnValue,
+} from './EntitiesView.helpers'
 
 const props = defineProps<{ scope?: RepoScope }>()
 
@@ -64,6 +73,11 @@ const setGroup = (group: string) => {
 const goToGroups = () => { localStorage.removeItem(STORAGE_KEY); void router.push('/entities/groups') }
 const setViewMode = (view: ViewMode) => replaceQuery({ view: view === 'table' ? undefined : view })
 
+const saveFiltersAsViewpoint = () => {
+  const mapping = filtersToEntityCriteriaMapping(activeDomain.value, typeFilter.value)
+  void router.push({ path: '/viewpoints', query: { seedEntityCriteria: JSON.stringify(mapping) } })
+}
+
 const loadCurrentPage = () => entityListState.run(
   isGroupView.value
     ? svc.listEntities({ scope: listScope.value, group: activeGroup.value, limit: 1000 })
@@ -86,7 +100,36 @@ const loadTaxonomy = () => taxonomyState.run(
 const goToNextPage = () => { goNext(); loadCurrentPage() }
 const goToPrevPage = () => { goPrev(); loadCurrentPage() }
 
+// ── Viewpoint-driven table execution (companion plan §5.1/§5.3, WU-E9) ──────────
+// Drives this same catalog view from a fixed viewpoint population instead of the
+// domain/group/pagination browsing above — mirrors GraphExploreView's WU-E8 viewpoint mode.
+const viewpointSlug = computed(() => (route.query.viewpoint as string | undefined) ?? null)
+const viewpointDefinitions = ref<readonly ViewpointDefinitionEnvelope[]>([])
+const viewpointExecution = useViewpointExecution(svc)
+
+const selectedViewpointPresentation = computed(() => {
+  const envelope = viewpointDefinitions.value.find((d) => d.slug === viewpointSlug.value)
+  return envelope ? presentationFromMapping(envelope.presentation) : null
+})
+const viewpointDiagnostics = computed(() => computeExecutionDiagnostics(
+  viewpointExecution.result.value, selectedViewpointPresentation.value, 'table',
+))
+const viewpointLegend = computed(() => deriveLegend(selectedViewpointPresentation.value))
+const viewpointEntityStyleById = computed(() => projectionByItemId(viewpointExecution.projection.value))
+const viewpointColumns = computed(() => effectiveTableColumns(selectedViewpointPresentation.value?.columns ?? null))
+const viewpointRowGroups = computed(() => groupTableRows(
+  viewpointExecution.result.value?.entities ?? [], selectedViewpointPresentation.value?.groupBy ?? null,
+))
+
+const loadViewpointTable = async (slug: string) => {
+  viewpointDefinitions.value = await Effect.runPromise(svc.listViewpointDefinitions()).catch(() => [])
+  await viewpointExecution.execute({ slug })
+}
+
+const rerunViewpointTable = () => { if (viewpointSlug.value) void loadViewpointTable(viewpointSlug.value) }
+
 onMounted(() => {
+  if (viewpointSlug.value) { void loadViewpointTable(viewpointSlug.value); return }
   if (!isGlobal.value) {
     const saved = localStorage.getItem(STORAGE_KEY)
     if (saved === null && !route.query.group && !route.query.domain) {
@@ -201,7 +244,101 @@ const displayCount = computed(() => {
 </script>
 
 <template>
-  <div class="layout">
+  <div
+    v-if="viewpointSlug"
+    class="vp-table-page"
+  >
+    <div class="vp-table-header">
+      <h1 class="page-title">
+        {{ viewpointSlug }} <span class="count">(table)</span>
+      </h1>
+      <RouterLink
+        to="/viewpoints"
+        class="back-link"
+      >
+        ← Viewpoints
+      </RouterLink>
+    </div>
+
+    <ViewpointExecutionDiagnostics
+      :diagnostics="viewpointDiagnostics"
+      :legend="viewpointLegend"
+      :query-summary="viewpointExecution.result.value?.query_summary ?? ''"
+      @rerun="rerunViewpointTable"
+    />
+
+    <div
+      v-if="viewpointExecution.loading.value"
+      class="state-msg"
+    >
+      Loading…
+    </div>
+    <div
+      v-else-if="viewpointExecution.errorMessage.value"
+      class="state-msg state-msg--error"
+    >
+      {{ viewpointExecution.errorMessage.value }}
+    </div>
+    <table
+      v-else-if="viewpointRowGroups.length > 0"
+      class="entity-table"
+    >
+      <thead>
+        <tr>
+          <th
+            v-for="col in viewpointColumns"
+            :key="col.source"
+          >
+            {{ col.label }}
+          </th>
+          <th>Style</th>
+        </tr>
+      </thead>
+      <tbody>
+        <template
+          v-for="group in viewpointRowGroups"
+          :key="group.groupKey || '(all)'"
+        >
+          <tr
+            v-if="group.groupKey"
+            class="vp-group-row"
+          >
+            <td :colspan="viewpointColumns.length + 1">
+              {{ group.groupKey }}
+            </td>
+          </tr>
+          <tr
+            v-for="entity in group.entities"
+            :key="entity.id"
+          >
+            <td
+              v-for="col in viewpointColumns"
+              :key="col.source"
+            >
+              <span
+                v-if="!isColumnSourceResolvable(col.source)"
+                class="vp-col-unavailable"
+                title="Not available in this view — profile attributes aren't carried by the fixed execution summary"
+              >—</span>
+              <template v-else>
+                {{ resolveSummaryColumnValue(entity, col.source) ?? '—' }}
+              </template>
+            </td>
+            <td>
+              <span
+                v-if="viewpointEntityStyleById.get(entity.id)?.style.badges"
+                class="vp-badge"
+              >{{ viewpointEntityStyleById.get(entity.id)?.style.badges }}</span>
+            </td>
+          </tr>
+        </template>
+      </tbody>
+    </table>
+  </div>
+  <div
+    v-else
+    class="layout"
+  >
     <aside class="sidebar">
       <div class="sidebar-header">
         <h2 class="sidebar-title">
@@ -329,6 +466,15 @@ const displayCount = computed(() => {
             >{{ type }}</option>
           </select>
         </label>
+        <button
+          v-if="!isGlobal"
+          type="button"
+          class="save-as-viewpoint-btn"
+          title="Turn the current domain/type filters into a reusable viewpoint definition"
+          @click="saveFiltersAsViewpoint"
+        >
+          💾 Save as viewpoint…
+        </button>
       </div>
 
       <div
@@ -432,6 +578,10 @@ const displayCount = computed(() => {
                       class="type-glyph"
                     />
                     <span class="mono">{{ entity.artifact_type }}</span>
+                    <span
+                      v-if="entity.specialization"
+                      class="type-specialization"
+                    >«{{ entity.specialization }}»</span>
                   </span>
                 </td>
                 <td v-if="!activeDomain">
@@ -507,6 +657,11 @@ const displayCount = computed(() => {
 .toolbar-select { min-width: 180px; padding: 7px 10px; }
 .toggle-btn { padding: 7px 12px; cursor: pointer; font-size: 13px; }
 .toggle-btn--active { background: #2563eb; border-color: #2563eb; color: white; }
+.save-as-viewpoint-btn {
+  appearance: none; border: 1px dashed #d1d5db; background: #fff; color: #6b7280;
+  border-radius: 7px; padding: 7px 12px; font-size: 12.5px; font-weight: 600; cursor: pointer;
+}
+.save-as-viewpoint-btn:hover { border-color: #6366f1; color: #4338ca; }
 .create-btn { padding: 8px 14px; border-radius: 6px; background: #16a34a; color: white; font-size: 13px; font-weight: 500; white-space: nowrap; }
 .create-btn:hover { background: #15803d; text-decoration: none; }
 .wizard-link {
@@ -526,6 +681,7 @@ const displayCount = computed(() => {
 .th-conn-sub { display: block; margin-top: 2px; font-size: 9px; font-weight: 400; letter-spacing: 0; text-transform: none; color: #9ca3af; }
 .type-cell { display: inline-flex; align-items: center; gap: 8px; }
 .type-glyph { color: #374151; fill: none; flex: 0 0 auto; }
+.type-specialization { font-size: 11px; font-style: italic; color: #6d28d9; }
 .mono, .conn-counts { font-family: monospace; }
 .mono { font-size: 12px; color: #374151; }
 .conn-counts { font-size: 12px; white-space: nowrap; }
@@ -542,4 +698,12 @@ const displayCount = computed(() => {
 .page-btn:hover:not(:disabled) { background: #f3f4f6; }
 .page-btn:disabled { opacity: 0.4; cursor: not-allowed; }
 .page-info { font-size: 13px; color: #6b7280; }
+
+.vp-table-page { max-width: 1100px; margin: 0 auto; }
+.vp-table-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; }
+.back-link { font-size: 13px; color: #6b7280; text-decoration: none; }
+.back-link:hover { color: #374151; }
+.vp-group-row td { background: #f3f4f6; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; color: #6b7280; }
+.vp-col-unavailable { color: #d1d5db; cursor: help; }
+.vp-badge { display: inline-block; padding: 1px 8px; border-radius: 10px; font-size: 11px; font-weight: 600; background: #eef2ff; color: #4338ca; }
 </style>

@@ -56,8 +56,8 @@ export interface DtConn {
   conn_type: DtConnType
   source: string
   target: string
-  src_cardinality?: string
-  tgt_cardinality?: string
+  src_multiplicity?: string
+  tgt_multiplicity?: string
   label?: string
   backing_conn_id?: string
   generalization_set?: string

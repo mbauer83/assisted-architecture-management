@@ -24,6 +24,8 @@ const props = defineProps<{
   widenableTo?: WidenableTo
   acceptedTypes?: Set<string>
   diagramType?: string
+  /** Narrow the palette/picker to this viewpoint's scope, intersected with diagramType's. */
+  viewpoint?: string
 }>()
 const emit = defineEmits<{ select: [entity: EntityDisplayInfo] }>()
 
@@ -124,6 +126,7 @@ const searchParams = (cursor?: string) => ({
   query: query.value.trim() || '',
   limit: 30,
   diagramType: props.diagramType,
+  viewpoint: props.viewpoint,
   domains: effectiveDomains.value.length ? effectiveDomains.value : undefined,
   entityTypes: effectiveEntityTypes.value.length ? effectiveEntityTypes.value : undefined,
   cursor,

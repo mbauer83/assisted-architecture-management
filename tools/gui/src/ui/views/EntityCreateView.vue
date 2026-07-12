@@ -4,8 +4,9 @@ import { useRouter } from 'vue-router'
 import { Effect } from 'effect'
 import { modelServiceKey } from '../keys'
 import TypedPropertyInput from '../components/TypedPropertyInput.vue'
-import type { WriteHelp, WriteResult, EntityAttributeDescriptor } from '../../domain'
+import type { WriteHelp, WriteResult, EntityAttributeDescriptor, AuthoringGuidance } from '../../domain'
 import { hasVerificationErrors, readErrorMessage, collectVerificationIssues } from '../lib/errors'
+import { specializationOptionsForEntityType, specializationOptionLabel } from '../lib/specializationOptions'
 
 const svc = inject(modelServiceKey)!
 const router = useRouter()
@@ -34,6 +35,11 @@ const status = ref('draft')
 const version = ref('0.1.0')
 const properties = ref<{ key: string; value: string; adHocType: AdHocType }[]>([])
 const notes = ref('')
+const specialization = ref('')
+const typeGuidance = ref<AuthoringGuidance | null>(null)
+const specializationOptions = computed(() =>
+  specializationOptionsForEntityType(typeGuidance.value, artifactType.value),
+)
 
 const busy = ref(false)
 const formError = ref<string | null>(null)
@@ -55,6 +61,8 @@ const createRequiredMissing = computed(() =>
 )
 
 watch(artifactType, (newType) => {
+  specialization.value = ''
+  typeGuidance.value = null
   if (!newType) {
     schemaProps.value = []
     schemaRequired.value = new Set()
@@ -79,6 +87,13 @@ watch(artifactType, (newType) => {
       schemaRequired.value = new Set()
       schemaDescriptors.value = {}
       formError.value = readErrorMessage(error)
+    })
+  void Effect.runPromise(svc.getAuthoringGuidance({ entityTypes: [newType] }))
+    .then((info) => {
+      typeGuidance.value = info
+    })
+    .catch(() => {
+      typeGuidance.value = null
     })
 })
 
@@ -117,6 +132,7 @@ const buildBody = (dryRun: boolean) => {
     properties: Object.keys(props).length ? props : undefined,
     attribute_types: Object.keys(adhocTypes).length ? adhocTypes : undefined,
     notes: notes.value || undefined,
+    specialization: specialization.value || undefined,
     dry_run: dryRun,
   }
 }
@@ -213,6 +229,28 @@ const doCreate = () => {
                 </option>
               </optgroup>
             </template>
+          </select>
+        </div>
+
+        <div
+          v-if="specializationOptions.length"
+          class="form-row"
+        >
+          <label class="form-label">Specialization <span class="form-hint">(optional)</span></label>
+          <select
+            v-model="specialization"
+            class="form-select"
+          >
+            <option value="">
+              None
+            </option>
+            <option
+              v-for="spec in specializationOptions"
+              :key="spec.slug"
+              :value="spec.slug"
+            >
+              {{ specializationOptionLabel(spec) }}
+            </option>
           </select>
         </div>
 

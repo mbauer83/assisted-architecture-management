@@ -71,6 +71,22 @@ export const makeModelService = (repo: ModelRepository) =>
     previewDiagram: (body: Parameters<ModelRepository['previewDiagram']>[0]) => repo.previewDiagram(body),
     createDiagram: (body: Parameters<ModelRepository['createDiagram']>[0]) => repo.createDiagram(body),
     editDiagram: (body: Parameters<ModelRepository['editDiagram']>[0]) => repo.editDiagram(body),
+    getViewpointProjection: (diagramId: string) => repo.getViewpointProjection(diagramId),
+    listViewpointDefinitions: () => repo.listViewpointDefinitions(),
+    getCriteriaCatalog: () => repo.getCriteriaCatalog(),
+    executeViewpoint: (request: Parameters<ModelRepository['executeViewpoint']>[0]) => repo.executeViewpoint(request),
+    executeViewpointProjection: (request: Parameters<ModelRepository['executeViewpointProjection']>[0]) =>
+      repo.executeViewpointProjection(request),
+    executeViewpointDiagram: (request: Parameters<ModelRepository['executeViewpointDiagram']>[0]) =>
+      repo.executeViewpointDiagram(request),
+    summarizeViewpointQuery: (query: unknown) => repo.summarizeViewpointQuery(query),
+    createViewpointDefinition: (body: Parameters<ModelRepository['createViewpointDefinition']>[0]) =>
+      repo.createViewpointDefinition(body),
+    editViewpointDefinition: (body: Parameters<ModelRepository['editViewpointDefinition']>[0]) =>
+      repo.editViewpointDefinition(body),
+    deleteViewpointDefinition: (body: Parameters<ModelRepository['deleteViewpointDefinition']>[0]) =>
+      repo.deleteViewpointDefinition(body),
+    getViewpointReferencers: (slug: string) => repo.getViewpointReferencers(slug),
     deleteDiagram: (body: Parameters<ModelRepository['deleteDiagram']>[0]) => repo.deleteDiagram(body),
     syncDiagramToModel: (body: Parameters<ModelRepository['syncDiagramToModel']>[0]) => repo.syncDiagramToModel(body),
     setEdgeLabel: (body: Parameters<ModelRepository['setEdgeLabel']>[0]) => repo.setEdgeLabel(body),

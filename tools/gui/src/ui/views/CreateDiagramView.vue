@@ -5,7 +5,7 @@ import { Effect } from 'effect'
 import { modelServiceKey } from '../keys'
 import type {
   EntityDisplayInfo, EntityContextConnection, DiagramPreviewResult, WriteResult,
-  DiagramTypeUiConfig,
+  DiagramTypeUiConfig, ViewpointSummary,
 } from '../../domain'
 import EntitySelectionList from '../components/EntitySelectionList.vue'
 import EntityPickerInput from '../components/EntityPickerInput.vue'
@@ -13,6 +13,8 @@ import DiagramTypeSelect from '../components/DiagramTypeSelect.vue'
 import DiagramTypeConfigPanel from '../components/DiagramTypeConfigPanel.vue'
 import PreviewViewport from '../components/PreviewViewport.vue'
 import ArchimateOccurrenceControls from '../components/ArchimateOccurrenceControls.vue'
+import ViewpointSelect from '../components/ViewpointSelect.vue'
+import { findViewpointBySlug } from '../components/ViewpointSelect.helpers'
 import { isArchimateDiagramType } from '../lib/archimateOccurrences'
 
 const svc = inject(modelServiceKey)!
@@ -23,7 +25,14 @@ const name = ref('')
 const diagramType = ref((route.query.type as string | undefined) ?? 'archimate-business')
 const uiConfig = ref<DiagramTypeUiConfig | null>(null)
 const diagramEntities = ref<Record<string, unknown>>({})
+const viewpoints = ref<ViewpointSummary[]>([])
+const viewpointSlug = ref<string | null>(null)
 let _lastSuggestedName = ''
+
+const loadViewpoints = async () => {
+  const guidance = await Effect.runPromise(svc.getAuthoringGuidance({})).catch(() => null)
+  viewpoints.value = guidance?.viewpoints ? [...guidance.viewpoints] : []
+}
 
 const mergeDiagramEntities = (patch: Record<string, unknown>) => {
   diagramEntities.value = { ...diagramEntities.value, ...patch }
@@ -116,6 +125,7 @@ const refreshDiscovery = async () => {
     svc.discoverDiagramEntities({
       includedEntityIds: includedEntities.value.map((e) => e.artifact_id),
       diagramType: diagramType.value,
+      viewpoint: viewpointSlug.value ?? undefined,
       maxHops: 1,
       limit: 20,
     }),
@@ -248,6 +258,7 @@ const writeFailureMessage = (result: WriteResult): string => {
 const doCreate = () => {
   createBusy.value = true
   createError.value = null
+  const selectedViewpoint = findViewpointBySlug(viewpoints.value, viewpointSlug.value)
   void Effect.runPromise(
     svc.createDiagram({
       diagram_type: diagramType.value,
@@ -255,6 +266,7 @@ const doCreate = () => {
       entity_ids: mergedEntityIds(),
       connection_ids: [...includedConnIds.value],
       diagram_entities: diagramEntities.value,
+      viewpoint: selectedViewpoint ? { slug: selectedViewpoint.slug, version: selectedViewpoint.version } : null,
       dry_run: false,
     }),
   )
@@ -267,7 +279,8 @@ const doCreate = () => {
 }
 
 
-onMounted(() => { void refreshDiscovery() })
+onMounted(() => { void refreshDiscovery(); void loadViewpoints() })
+watch(viewpointSlug, () => { void refreshDiscovery() })
 watch(diagramType, () => {
   diagramEntities.value = {}
   preview.value = null
@@ -310,6 +323,14 @@ watch(diagramType, () => {
           />
         </div>
 
+        <div class="form-row">
+          <label class="lbl">Viewpoint</label>
+          <ViewpointSelect
+            v-model="viewpointSlug"
+            :viewpoints="viewpoints"
+          />
+        </div>
+
         <DiagramTypeConfigPanel
           :ui-config="uiConfig"
           :diagram-entities="diagramEntities"
@@ -337,6 +358,7 @@ watch(diagramType, () => {
           <EntityPickerInput
             :excluded-ids="includedEntityIds"
             :diagram-type="diagramType"
+            :viewpoint="viewpointSlug ?? undefined"
             @select="addEntity"
           />
         </div>

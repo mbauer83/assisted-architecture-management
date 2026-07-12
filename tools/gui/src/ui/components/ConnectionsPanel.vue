@@ -11,11 +11,13 @@ import type {
   OntologyPair,
   WriteHelp,
   WriteResult,
+  AuthoringGuidance,
 } from '../../domain'
 import type { RepoError } from '../../ports/ModelRepository'
 import EntitySearchInput from './EntitySearchInput.vue'
 import { useQuery } from '../composables/useQuery'
 import { useMutation } from '../composables/useMutation'
+import { specializationOptionsForConnectionType, specializationOptionLabel } from '../lib/specializationOptions'
 
 const props = defineProps<{
   entityId: string
@@ -43,6 +45,7 @@ const svc = inject(modelServiceKey)!
 
 const ontologyQuery = useQuery<OntologyClassification, RepoError>()
 const writeHelpQuery = useQuery<WriteHelp, RepoError>()
+const guidanceQuery = useQuery<AuthoringGuidance, RepoError>()
 
 const ontology = computed(() => ontologyQuery.data.value)
 
@@ -59,6 +62,11 @@ const prefixToType = computed((): Record<string, string> => {
 onMounted(() => {
   writeHelpQuery.run(svc.getWriteHelp())
   ontologyQuery.run(svc.getOntologyClassification(props.entityType))
+  // The connection_types specialization block is independent of any entity-type filter
+  // (see `_connection_type_guidance` in `type_guidance.py`) — filtering by this panel's own
+  // entity type just keeps the accompanying entity_types payload small, matching the
+  // ontologyQuery call just above.
+  guidanceQuery.run(svc.getAuthoringGuidance({ entityTypes: [props.entityType] }))
 })
 
 watch(() => props.entityType, () => {
@@ -194,13 +202,22 @@ const addingFor = ref<string | null>(null)
 const selectedTarget = ref<{ id: string; name: string } | null>(null)
 const connTypeSelected = ref('')
 const descInput = ref('')
-const srcCardInput = ref('')
-const tgtCardInput = ref('')
+const srcMultInput = ref('')
+const tgtMultInput = ref('')
+const specSelected = ref('')
 
-const CARDINALITY_RE = /^\d+$|^\d+\.\.\d+$|^\d+\.\.\*$|^\*$/
-const cardError = (v: string) => v.trim() && !CARDINALITY_RE.test(v.trim()) ? 'Use: n, n..m, n..*, or *' : ''
-const srcCardError = computed(() => cardError(srcCardInput.value))
-const tgtCardError = computed(() => cardError(tgtCardInput.value))
+const specOptions = computed(() =>
+  specializationOptionsForConnectionType(guidanceQuery.data.value, connTypeSelected.value),
+)
+
+watch(connTypeSelected, () => {
+  specSelected.value = ''
+})
+
+const MULTIPLICITY_RE = /^\d+$|^\d+\.\.\d+$|^\d+\.\.\*$|^\*$/
+const multError = (v: string) => v.trim() && !MULTIPLICITY_RE.test(v.trim()) ? 'Use: n, n..m, n..*, or *' : ''
+const srcMultError = computed(() => multError(srcMultInput.value))
+const tgtMultError = computed(() => multError(tgtMultInput.value))
 
 const pairQuery = useQuery<OntologyPair, RepoError>()
 const addMutation = useMutation<WriteResult, RepoError>()
@@ -236,8 +253,9 @@ const startAdd = (typeKey: string) => {
   selectedTarget.value = null
   connTypeSelected.value = ''
   descInput.value = ''
-  srcCardInput.value = ''
-  tgtCardInput.value = ''
+  srcMultInput.value = ''
+  tgtMultInput.value = ''
+  specSelected.value = ''
   addMutation.reset()
   pairQuery.run(svc.getOntologyPair(props.entityType, typeKey))
 }
@@ -263,8 +281,9 @@ const confirmAdd = () => {
     connection_type: connTypeSelected.value,
     target_entity: target,
     description: descInput.value.trim() || undefined,
-    src_cardinality: srcCardInput.value.trim() || undefined,
-    tgt_cardinality: tgtCardInput.value.trim() || undefined,
+    src_multiplicity: srcMultInput.value.trim() || undefined,
+    tgt_multiplicity: tgtMultInput.value.trim() || undefined,
+    specialization: specSelected.value || undefined,
     dry_run: false,
   })).then((exit) => Exit.match(exit, {
     onSuccess: (r) => {
@@ -366,9 +385,13 @@ const confirmRemove = () => {
               <div class="conn-item">
                 <span class="conn-type-badge">{{ c.conn_type.replace('archimate-', '') }}</span>
                 <span
-                  v-if="c.src_cardinality || c.tgt_cardinality"
-                  class="conn-card-badge"
-                >{{ c.src_cardinality ? `[${c.src_cardinality}]` : '' }}→{{ c.tgt_cardinality ? `[${c.tgt_cardinality}]` : '' }}</span>
+                  v-if="c.specialization"
+                  class="conn-spec-badge"
+                >«{{ c.specialization }}»</span>
+                <span
+                  v-if="c.src_multiplicity || c.tgt_multiplicity"
+                  class="conn-mult-badge"
+                >{{ c.src_multiplicity ? `[${c.src_multiplicity}]` : '' }}→{{ c.tgt_multiplicity ? `[${c.tgt_multiplicity}]` : '' }}</span>
                 <RouterLink
                   :to="{ path: '/entity', query: { id: otherEnd(c) } }"
                   class="conn-target"
@@ -487,6 +510,26 @@ const confirmRemove = () => {
             >
               Loading connection types...
             </div>
+            <div
+              v-if="specOptions.length"
+              class="add-row"
+            >
+              <select
+                v-model="specSelected"
+                class="conn-type-select"
+              >
+                <option value="">
+                  No specialization
+                </option>
+                <option
+                  v-for="spec in specOptions"
+                  :key="spec.slug"
+                  :value="spec.slug"
+                >
+                  {{ specializationOptionLabel(spec) }}
+                </option>
+              </select>
+            </div>
             <div class="add-row">
               <EntitySearchInput
                 :artifact-type="typeKey"
@@ -507,31 +550,31 @@ const confirmRemove = () => {
                 placeholder="Description (optional)"
               >
             </div>
-            <div class="add-row add-row--card">
-              <label class="card-label">source</label>
+            <div class="add-row add-row--mult">
+              <label class="mult-label">source</label>
               <input
-                v-model="srcCardInput"
-                class="card-input"
-                :class="{ 'card-input--error': srcCardError }"
+                v-model="srcMultInput"
+                class="mult-input"
+                :class="{ 'mult-input--error': srcMultError }"
                 placeholder="e.g. 1..*"
                 maxlength="20"
               >
-              <span class="card-sep">→</span>
-              <label class="card-label">target</label>
+              <span class="mult-sep">→</span>
+              <label class="mult-label">target</label>
               <input
-                v-model="tgtCardInput"
-                class="card-input"
-                :class="{ 'card-input--error': tgtCardError }"
+                v-model="tgtMultInput"
+                class="mult-input"
+                :class="{ 'mult-input--error': tgtMultError }"
                 placeholder="e.g. 0..*"
                 maxlength="20"
               >
-              <span class="card-hint">cardinality range, e.g. 1, 0..1, 1..*, * (optional)</span>
+              <span class="mult-hint">multiplicity range, e.g. 1, 0..1, 1..*, * (optional)</span>
             </div>
             <div
-              v-if="srcCardError || tgtCardError"
+              v-if="srcMultError || tgtMultError"
               class="state-msg state-msg--error"
             >
-              {{ srcCardError || tgtCardError }}
+              {{ srcMultError || tgtMultError }}
             </div>
             <div class="add-actions">
               <button
@@ -542,7 +585,7 @@ const confirmRemove = () => {
               </button>
               <button
                 class="add-confirm-btn"
-                :disabled="!selectedTarget || !connTypeSelected || !!srcCardError || !!tgtCardError || addMutation.running.value"
+                :disabled="!selectedTarget || !connTypeSelected || !!srcMultError || !!tgtMultError || addMutation.running.value"
                 @click="confirmAdd"
               >
                 Add
@@ -655,7 +698,8 @@ const confirmRemove = () => {
   background: #f3f4f6; color: #374151; white-space: nowrap;
 }
 .conn-target { font-weight: 500; }
-.conn-card-badge {
+.conn-spec-badge { font-size: 11px; font-style: italic; color: #6d28d9; white-space: nowrap; }
+.conn-mult-badge {
   font-size: 10px; color: #6b7280; font-family: monospace; white-space: nowrap;
   background: #f3f4f6; padding: 1px 4px; border-radius: 3px;
 }
@@ -718,16 +762,16 @@ const confirmRemove = () => {
 .assoc-add-btn:disabled { opacity: 0.5; cursor: not-allowed; }
 .assoc-add-btn:hover:not(:disabled) { background: #1d4ed8; }
 
-/* Cardinality row in add form */
-.add-row--card { align-items: center; gap: 4px; }
-.card-label { font-size: 11px; color: #6b7280; white-space: nowrap; }
-.card-input {
+/* Multiplicity row in add form */
+.add-row--mult { align-items: center; gap: 4px; }
+.mult-label { font-size: 11px; color: #6b7280; white-space: nowrap; }
+.mult-input {
   width: 52px; padding: 4px 6px; border-radius: 4px; border: 1px solid #d1d5db;
   font-size: 11px; font-family: monospace; outline: none;
 }
-.card-input:focus { border-color: #2563eb; }
-.card-sep { color: #9ca3af; font-size: 11px; margin: 0 2px; }
-.card-hint { font-size: 10px; color: #9ca3af; margin-left: 4px; }
+.mult-input:focus { border-color: #2563eb; }
+.mult-sep { color: #9ca3af; font-size: 11px; margin: 0 2px; }
+.mult-hint { font-size: 10px; color: #9ca3af; margin-left: 4px; }
 
 .add-form { margin-top: 8px; padding: 10px; background: #f9fafb; border-radius: 6px; }
 .add-row { display: flex; gap: 6px; margin-bottom: 6px; align-items: center; }

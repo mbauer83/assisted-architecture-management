@@ -45,6 +45,14 @@ import type {
   GroupList,
   EntityTaxonomy,
   AuthoringGuidance,
+  ViewpointProjection,
+  ViewpointDefinitionEnvelope,
+  CriteriaCatalog,
+  ViewpointPersistResult,
+  ViewpointReferencer,
+  ViewpointExecutionRequest,
+  ViewpointExecutionResult,
+  ViewpointDiagramResult,
 } from '../domain'
 import type { NetworkError, NotFoundError } from '../domain'
 import type { MarkdownError } from '../application/MarkdownService'
@@ -106,12 +114,14 @@ export interface ModelRepository {
   ) => Effect.Effect<DiagramRefs, RepoError>
   readonly addConnection: (body: {
     source_entity: string; connection_type: string; target_entity: string;
-    description?: string; src_cardinality?: string; tgt_cardinality?: string;
+    description?: string; src_multiplicity?: string; tgt_multiplicity?: string;
+    specialization?: string;
     dry_run?: boolean;
   }) => Effect.Effect<WriteResult, RepoError>
   readonly editConnection: (body: {
     source_entity: string; connection_type: string; target_entity: string;
-    description?: string; src_cardinality?: string; tgt_cardinality?: string;
+    description?: string; src_multiplicity?: string; tgt_multiplicity?: string;
+    specialization?: string;
     dry_run?: boolean;
   }) => Effect.Effect<WriteResult, RepoError>
   readonly removeConnection: (body: {
@@ -132,13 +142,13 @@ export interface ModelRepository {
   readonly createEntity: (body: {
     artifact_type: string; name: string; summary?: string;
     properties?: Record<string, string>; attribute_types?: Record<string, string>;
-    notes?: string; keywords?: string[]; version?: string; status?: string;
+    notes?: string; keywords?: string[]; specialization?: string; version?: string; status?: string;
     dry_run?: boolean;
   }) => Effect.Effect<WriteResult, RepoError>
   readonly editEntity: (body: {
     artifact_id: string; name?: string; summary?: string;
     properties?: Record<string, string>; attribute_types?: Record<string, string>;
-    notes?: string; keywords?: string[]; version?: string; status?: string;
+    notes?: string; keywords?: string[]; specialization?: string; version?: string; status?: string;
     dry_run?: boolean;
   }) => Effect.Effect<WriteResult, RepoError>
   readonly deleteEntity: (body: {
@@ -158,6 +168,8 @@ export interface ModelRepository {
     /** Exact keyword facet — every listed keyword must be on the entity. */
     keywords?: string[]
     cursor?: string
+    /** Narrow the accepted entity types by this viewpoint's scope, intersected with diagramType's. */
+    viewpoint?: string
   }) => Effect.Effect<EntityDisplaySearchResult, RepoError>
   readonly discoverDiagramEntities: (params: {
     includedEntityIds?: string[]
@@ -165,6 +177,7 @@ export interface ModelRepository {
     diagramType?: string
     maxHops?: number
     limit?: number
+    viewpoint?: string
   }) => Effect.Effect<DiagramEntityDiscovery, RepoError>
   readonly previewDiagram: (body: {
     diagram_type: string; name: string;
@@ -175,14 +188,44 @@ export interface ModelRepository {
     diagram_type: string; name: string;
     entity_ids: string[]; connection_ids: string[];
     diagram_entities?: Record<string, unknown>;
-    keywords?: string[]; version?: string; status?: string; dry_run?: boolean;
+    keywords?: string[]; version?: string; status?: string;
+    viewpoint?: { slug: string; version: number; enforcement_override?: 'off' | 'warn' | 'ghost' } | null;
+    dry_run?: boolean;
   }) => Effect.Effect<WriteResult, RepoError>
   readonly editDiagram: (body: {
     artifact_id: string; diagram_type: string; name: string;
     entity_ids: string[]; connection_ids: string[];
     diagram_entities?: Record<string, unknown>;
-    version?: string; status?: string; dry_run?: boolean;
+    version?: string; status?: string;
+    viewpoint?: { slug: string; version: number; enforcement_override?: 'off' | 'warn' | 'ghost' } | null;
+    dry_run?: boolean;
   }) => Effect.Effect<WriteResult, RepoError>
+  readonly getViewpointProjection: (diagramId: string) => Effect.Effect<ViewpointProjection, RepoError>
+  readonly listViewpointDefinitions: () => Effect.Effect<readonly ViewpointDefinitionEnvelope[], RepoError>
+  /** Fixed, unstyled §7.1 content (companion plan) — repository-context execution by
+   * slug or ad-hoc query. */
+  readonly executeViewpoint: (request: ViewpointExecutionRequest) => Effect.Effect<ViewpointExecutionResult, RepoError>
+  /** GUI-only styled sibling of `executeViewpoint` (§6.1) — never exposed to MCP. */
+  readonly executeViewpointProjection: (
+    request: ViewpointExecutionRequest,
+  ) => Effect.Effect<ViewpointProjection, RepoError>
+  /** GUI-only ad-hoc ArchiMate-notation rendering behind the `diagram` execution
+   * representation (§5.1) — never exposed to MCP, never persisted. */
+  readonly executeViewpointDiagram: (
+    request: ViewpointExecutionRequest,
+  ) => Effect.Effect<ViewpointDiagramResult, RepoError>
+  readonly getCriteriaCatalog: () => Effect.Effect<CriteriaCatalog, RepoError>
+  readonly summarizeViewpointQuery: (query: unknown) => Effect.Effect<string, RepoError>
+  readonly createViewpointDefinition: (body: {
+    definition: Record<string, unknown>; dry_run?: boolean
+  }) => Effect.Effect<ViewpointPersistResult, RepoError>
+  readonly editViewpointDefinition: (body: {
+    definition: Record<string, unknown>; dry_run?: boolean
+  }) => Effect.Effect<ViewpointPersistResult, RepoError>
+  readonly deleteViewpointDefinition: (body: {
+    slug: string; dry_run?: boolean
+  }) => Effect.Effect<ViewpointPersistResult, RepoError>
+  readonly getViewpointReferencers: (slug: string) => Effect.Effect<readonly ViewpointReferencer[], RepoError>
   readonly deleteDiagram: (body: {
     artifact_id: string; dry_run?: boolean;
   }) => Effect.Effect<WriteResult, RepoError>
@@ -201,14 +244,16 @@ export interface ModelRepository {
   readonly adminEditEntity: (body: {
     artifact_id: string; name?: string; summary?: string;
     properties?: Record<string, string>; attribute_types?: Record<string, string>;
-    notes?: string; keywords?: string[]; version?: string; status?: string; dry_run?: boolean;
+    notes?: string; keywords?: string[]; specialization?: string; version?: string; status?: string;
+    dry_run?: boolean;
   }) => Effect.Effect<WriteResult, RepoError>
   readonly adminDeleteEntity: (body: {
     artifact_id: string; dry_run?: boolean;
   }) => Effect.Effect<WriteResult, RepoError>
   readonly adminAddConnection: (body: {
     source_entity: string; connection_type: string; target_entity: string;
-    description?: string; src_cardinality?: string; tgt_cardinality?: string;
+    description?: string; src_multiplicity?: string; tgt_multiplicity?: string;
+    specialization?: string;
     dry_run?: boolean;
   }) => Effect.Effect<WriteResult, RepoError>
   readonly adminRemoveConnection: (body: {
