@@ -1,0 +1,66 @@
+/**
+ * Pure helpers for the ad-hoc `diagram` execution representation (companion plan §5.1,
+ * WU-E9): synthesizes the minimal `EntitySummary`/`DiagramConnection` shapes the generic
+ * graphviz/PlantUML element mapper (`graphvizElementMapping.ts`) needs to resolve SVG
+ * elements back to artifact ids, plus the `node_color`/`edge_color`/`edge_emphasis`
+ * highlight-overlay application — the same client-side technique WU-E5a's ghost/hide
+ * overlay uses on a real diagram's SVG, never baked into the rendered PUML.
+ */
+
+import type { ConnectionItemSummary, DiagramConnection, EntityItemSummary, EntitySummary, ProjectedOccurrence } from '../../domain'
+import { tokenColor, tokenEdgeEmphasis } from '../lib/viewpointStyleTokens'
+
+/** `graphvizMapElements` reads only `artifact_id`/`display_alias`; the ArchiMate renderer's
+ * convention is alias === artifact_id (see `_ConfiguredArchimateDiagramType`'s write
+ * guidance), so the stub only needs those two fields populated meaningfully — the rest are
+ * placeholders never read by the mapper, following the same stub convention
+ * `EditMatrixView.vue` already uses for its entity picker. */
+export const toEntitySummaryStub = (entity: EntityItemSummary): EntitySummary => ({
+  artifact_id: entity.id, artifact_type: entity.type, name: entity.name,
+  display_alias: entity.id, version: '', status: '', domain: '', subdomain: '', path: '',
+})
+
+export const toDiagramConnectionStub = (connection: ConnectionItemSummary): DiagramConnection => ({
+  artifact_id: connection.id, source: connection.source, target: connection.target, conn_type: connection.type,
+  source_alias: connection.source, target_alias: connection.target,
+  version: '', status: '', path: '', content_text: '', source_name: '', target_name: '',
+})
+
+const setOrClearStroke = (shape: SVGElement, color: string | null, width: string | null): void => {
+  if (color !== null) shape.style.setProperty('stroke', color, 'important')
+  else shape.style.removeProperty('stroke')
+  if (width !== null) shape.style.setProperty('stroke-width', width, 'important')
+  else shape.style.removeProperty('stroke-width')
+}
+
+const shapeChildren = (el: Element): SVGElement[] =>
+  [...el.querySelectorAll('rect, polygon, path')].filter((n): n is SVGElement => n instanceof SVGElement)
+
+/** `node_color` highlight overlay: a colored outline on the node's shape children, fixed
+ * notation (fill/shape) otherwise untouched — "an overlay, not a notation change" (§5.1). */
+export const applyNodeColorOverlay = (elems: readonly Element[], token: string | undefined): void => {
+  for (const el of elems) {
+    for (const shape of shapeChildren(el)) setOrClearStroke(shape, token !== undefined ? tokenColor(token) : null, token !== undefined ? '3' : null)
+  }
+}
+
+/** `edge_color`/`edge_emphasis` highlight overlay, mirroring the exploration surface's
+ * `edgeVisualFor` mapping (`GraphExploreView.helpers.ts`) but applied to real SVG path
+ * elements instead of the custom force-graph renderer. */
+export const applyEdgeHighlightOverlay = (
+  elems: readonly Element[],
+  colorToken: string | undefined,
+  emphasisToken: string | undefined,
+): void => {
+  const emphasis = emphasisToken !== undefined ? tokenEdgeEmphasis(emphasisToken) : null
+  for (const el of elems) {
+    for (const shape of shapeChildren(el)) {
+      setOrClearStroke(shape, colorToken !== undefined ? tokenColor(colorToken) : null, emphasis ? String(emphasis.strokeWidth) : null)
+      if (emphasis?.dashArray !== undefined) shape.style.setProperty('stroke-dasharray', emphasis.dashArray, 'important')
+      else shape.style.removeProperty('stroke-dasharray')
+    }
+  }
+}
+
+export const projectionByItemId = (items: readonly ProjectedOccurrence[]): ReadonlyMap<string, ProjectedOccurrence> =>
+  new Map(items.map((item) => [item.item_id, item]))

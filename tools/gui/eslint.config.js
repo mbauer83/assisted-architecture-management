@@ -65,6 +65,7 @@ export default tseslint.config(
       'src/ui/views/EditMatrixView.vue',
       'src/ui/views/EntityDetailView.vue',
       'src/ui/views/GraphExploreView.vue',
+      'src/ui/views/ViewpointDiagramView.vue',
     ],
     rules: {
       'vue/no-v-html': 'off',
