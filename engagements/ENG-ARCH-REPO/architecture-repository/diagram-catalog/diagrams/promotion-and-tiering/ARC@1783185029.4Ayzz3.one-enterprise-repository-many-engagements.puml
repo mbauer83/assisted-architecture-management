@@ -51,7 +51,7 @@ diagram-entities:
   - id: occ-ai-agent-team-b
 connections:
 - artifact_id: BOB@1712870400.6Uok0b---BOB@1712870400.so7gfN@@archimate-association
-  include_cardinality: true
+  include_multiplicity: true
   include_description: true
 bindings:
 - id: bind-occ-engagement-repository-team-b

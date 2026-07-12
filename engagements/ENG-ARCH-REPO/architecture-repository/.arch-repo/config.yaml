@@ -1,4 +1,4 @@
-# Repository authoring policy.
-# required_defaults_policy: strict  — every required attribute must declare a valid default
-# required_defaults_policy: non-strict  — recommended but not enforced at startup
+applied_upgrade_steps:
+- d9-multiplicity-rename
+format_contract_version: '1'
 required_defaults_policy: strict
