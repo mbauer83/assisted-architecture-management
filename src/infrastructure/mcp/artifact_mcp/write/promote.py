@@ -33,6 +33,7 @@ def artifact_promote_to_enterprise(
     After promotion, promoted engagement artifacts are replaced by GAR proxies.
     dry_run=true returns the plan without modifying any files.
     """
+    from src.infrastructure.app_bootstrap import build_runtime_catalogs, get_module_registry
     from src.infrastructure.mcp.artifact_mcp.context import resolve_enterprise_repo_root
     from src.infrastructure.write.artifact_write.promote_execute import execute_promotion
     from src.infrastructure.write.artifact_write.promote_to_enterprise import ConflictResolution, plan_promotion
@@ -64,6 +65,7 @@ def artifact_promote_to_enterprise(
         exclude_connection_ids=set(exclude_connections) if exclude_connections else None,
         document_ids=document_ids or None,
         diagram_ids=diagram_ids or None,
+        catalogs=build_runtime_catalogs(get_module_registry()),
     )
 
     out: dict[str, object] = {

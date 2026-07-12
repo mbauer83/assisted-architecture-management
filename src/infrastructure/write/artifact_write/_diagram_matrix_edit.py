@@ -36,6 +36,7 @@ def edit_matrix_diagram(
     bindings: list[dict[str, object]] | None,
     replace_bindings: bool,
     edge_labels_given: bool,
+    viewpoint: dict[str, object] | None = None,
 ) -> WriteResult:
     """Matrix-diagram branch of ``edit_diagram``: metadata + group move only.
 
@@ -50,6 +51,7 @@ def edit_matrix_diagram(
             ("diagram_connections", diagram_connections),
             ("entity_ids_used", entity_ids_used), ("connection_ids_used", connection_ids_used),
             ("view_derivations", view_derivations), ("bindings", bindings),
+            ("viewpoint", viewpoint),
         ) if pval is not None
     ]
     if replace_bindings:

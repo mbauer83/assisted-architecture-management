@@ -5,7 +5,10 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
-import src.application.verification._workspace_identity_rules  # noqa: F401  # ensure E335 registered
+from src.application.verification import (
+    _orphan_attachment_schema_rule,  # noqa: F401  # ensure W044 registered
+    _workspace_identity_rules,  # noqa: F401  # ensure E335 registered
+)
 from src.application.verification.artifact_verifier_types import VerificationResult
 
 

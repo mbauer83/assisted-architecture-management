@@ -29,6 +29,7 @@ class MergedFields:
     version: str
     status: str
     keywords: list[str] | None
+    specialization: str | None
     summary: str | None
     properties: dict[str, Any] | None
     attribute_types: dict[str, str] | None
@@ -42,6 +43,7 @@ def merge_fields(
     version: str | None,
     status: str | None,
     keywords: object,
+    specialization: object = _UNSET,
     summary: object,
     properties: object,
     attribute_types: object,
@@ -54,6 +56,9 @@ def merge_fields(
         version=version if version is not None else str(fm.get("version", "0.1.0")),
         status=status if status is not None else str(fm.get("status", "draft")),
         keywords=as_optional_str_list(keywords if keywords is not _UNSET else fm.get("keywords")),
+        specialization=as_optional_str(
+            specialization if specialization is not _UNSET else fm.get("specialization")
+        ),
         summary=as_optional_str(summary) if summary is not _UNSET else parsed.summary,
         properties=(
             as_optional_typed_dict(properties) if properties is not _UNSET else (parsed.properties or None)

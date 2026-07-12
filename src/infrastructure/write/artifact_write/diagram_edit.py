@@ -46,6 +46,7 @@ def _extract_workspace_ids(fm: dict, module: object) -> set[str]:
 
 
 _EDGE_LABELS_UNSET = object()
+_VIEWPOINT_UNSET = object()
 
 
 def edit_diagram(
@@ -67,6 +68,7 @@ def edit_diagram(
     version: str | None = None,
     status: str | None = None,
     tlp: str | None = None,
+    viewpoint: dict[str, object] | None = _VIEWPOINT_UNSET,  # type: ignore[assignment]
     edge_labels: dict[str, str | None] | None = _EDGE_LABELS_UNSET,  # type: ignore[assignment]
     group: str | None = None,
     dry_run: bool,
@@ -80,9 +82,15 @@ def edit_diagram(
     (moving the source file and its rendered outputs); omit to leave it in
     place. Always re-verifies and re-renders PNG on successful write.
 
+    ``viewpoint``: the ``ViewpointApplication`` frontmatter mapping (``{slug, version,
+    enforcement_override?, derivation_params?}``) — omit to keep the diagram's existing
+    application (if any) unchanged; pass a mapping to replace it; pass ``None`` explicitly
+    to clear it (e.g. a GUI viewpoint selector set back to "none"). Validated and normalized
+    through the same parse/serialize grammar the verifier reads back.
+
     Matrix diagrams (``diagram-type: matrix``) are markdown tables, not PUML:
     only name/keywords/version/status/tlp/group are supported (metadata + group
-    move, table content preserved); ``puml``/``diagram_entities``/etc. raise
+    move, table content preserved); ``puml``/``diagram_entities``/``viewpoint``/etc. raise
     ``ValueError`` — use ``create_matrix`` (the ``artifact_create_matrix`` MCP
     tool) with ``artifact_id`` set instead.
     """
@@ -126,6 +134,7 @@ def edit_diagram(
             entity_ids_used=entity_ids_used, connection_ids_used=connection_ids_used,
             view_derivations=view_derivations, bindings=bindings, replace_bindings=replace_bindings,
             edge_labels_given=edge_labels is not _EDGE_LABELS_UNSET,
+            viewpoint=None if viewpoint is _VIEWPOINT_UNSET else viewpoint,
         )
 
     raw_format_version = fm.get("diagram-format-version")
@@ -301,6 +310,11 @@ def edit_diagram(
         verifier.registry, eff_entity_ids_used, eff_connection_ids_used
     )
 
+    from src.domain.viewpoint_application_parsing import normalize_viewpoint_frontmatter
+
+    eff_viewpoint_raw = fm.get("viewpoint") if viewpoint is _VIEWPOINT_UNSET else viewpoint
+    eff_viewpoint = normalize_viewpoint_frontmatter(eff_viewpoint_raw, target_kind="diagram", target_id=artifact_id)
+
     content = format_diagram_puml(
         artifact_id=artifact_id,
         diagram_type=diagram_type,
@@ -318,6 +332,7 @@ def edit_diagram(
         edge_labels=eff_edge_labels or None,
         puml_body=puml_body,
         tlp=eff_tlp,
+        viewpoint=eff_viewpoint,
         diagram_format_version=eff_format_version,
     )
 

@@ -16,9 +16,12 @@ from __future__ import annotations
 
 from functools import lru_cache
 
+from src.application.runtime_catalogs import RuntimeCatalogs
 from src.domain.allowed_bindings import serialize_allowed_bindings
-from src.domain.module_types import EntityTypeName
+from src.domain.module_types import ConnectionTypeName, EntityTypeName
 from src.domain.ontology_protocol import DiagramTypeWriteGuidance
+from src.domain.specializations import SpecializationCatalog, SpecializationInfo
+from src.infrastructure.write.artifact_write.viewpoint_type_guidance import viewpoint_guidance
 
 
 def pair_connection_guidance(source_type: str, target_type: str) -> dict[str, object]:
@@ -53,10 +56,15 @@ def _registry():
     return get_module_registry()
 
 
+@lru_cache(maxsize=1)
+def _default_catalogs() -> RuntimeCatalogs:
+    from src.infrastructure.app_bootstrap import build_runtime_catalogs, get_module_registry  # noqa: PLC0415
+
+    return build_runtime_catalogs(get_module_registry())
+
+
 def _classify_connections(source_type: str) -> dict[str, dict[str, list[str]]]:
     """Classify permissible connections into outgoing/incoming/symmetric."""
-    from src.domain.module_types import ConnectionTypeName  # noqa: PLC0415
-
     prs = _registry().aggregated_permitted_relationships()
     src = EntityTypeName(source_type)
     outgoing: dict[str, list[str]] = {}
@@ -85,6 +93,7 @@ def get_type_guidance(
     filter: list[str] | None = None,  # noqa: A002
     diagram_type: str | None = None,
     target: str | None = None,
+    catalogs: RuntimeCatalogs | None = None,
 ) -> dict[str, object]:
     """Return focused modeling guidelines for the requested entity types, domains, or diagram type.
 
@@ -103,8 +112,14 @@ def get_type_guidance(
 
     Passing both ``diagram_type`` and ``filter`` returns the diagram type block plus entity type
     guidance for the filtered subset.  Omit both to return guidance for all entity types.
+
+    ``catalogs`` supplies the specialization catalog used to enumerate per-type specializations
+    (entity ``entity_types[].specializations`` and connection ``connection_types``); callers with
+    an injected ``RuntimeCatalogs`` (REST) pass it, callers without one (MCP) omit it and a
+    process-wide default is built lazily.
     """
-    result: dict[str, object] = {}
+    cats = catalogs if catalogs is not None else _default_catalogs()
+    result: dict[str, object] = {"viewpoints": viewpoint_guidance(cats.viewpoints)}
 
     if target is not None:
         if filter is None:
@@ -134,10 +149,23 @@ def get_type_guidance(
         )
 
     if filter is not None or diagram_type is None:
-        entity_section = _entity_type_guidance(filter)
+        entity_section = _entity_type_guidance(filter, cats.specializations)
         result.update(entity_section)
+        result["connection_types"] = _connection_type_guidance(cats.specializations)
 
     return result
+
+
+GUIDANCE_EMPTY_HINT = (
+    "No create_when/never_create_when creation guidance has been imported for these entity "
+    "types yet — the shipped ontology ships with this text stripped for license reasons. "
+    "Run `arch-import-guidance` to import the published guidance file, then restart the "
+    "backend. See docs/05-extensibility/schemata-and-profiles.md."
+)
+
+
+def _entity_type_guidance_is_empty(entries: list[dict[str, object]]) -> bool:
+    return bool(entries) and all(not e.get("create_when") and not e.get("never_create_when") for e in entries)
 
 
 def _serialize_diagram_type_guidance(
@@ -154,7 +182,11 @@ def _serialize_diagram_type_guidance(
     if g.diagram_entities_schema is not None:
         out["diagram_entities_schema"] = g.diagram_entities_schema
     if g.own_entity_types:
-        out["own_entity_types"] = [_serialize_own_entity_type(oe) for oe in g.own_entity_types]
+        own_entries = [_serialize_own_entity_type(oe) for oe in g.own_entity_types]
+        out["own_entity_types"] = own_entries
+        if _entity_type_guidance_is_empty(own_entries):
+            out["guidance_status"] = "empty"
+            out["guidance_hint"] = GUIDANCE_EMPTY_HINT
     if g.puml_notes:
         out["puml_notes"] = list(g.puml_notes)
     if g.allowed_bindings is not None:
@@ -202,8 +234,42 @@ def _serialize_own_entity_type(oe) -> dict[str, object]:  # type: ignore[no-unty
     return entry
 
 
+def _serialize_specialization(info: SpecializationInfo) -> dict[str, object]:
+    entry: dict[str, object] = {
+        "slug": info.slug,
+        "name": info.name,
+        "description": info.description,
+        "create_when": info.create_when,
+        "never_create_when": info.never_create_when,
+    }
+    if info.notation.icon or info.notation.color:
+        notation = {k: v for k, v in (("icon", info.notation.icon), ("color", info.notation.color)) if v}
+        entry["notation"] = notation
+    return entry
+
+
+def _connection_type_guidance(specialization_catalog: SpecializationCatalog) -> list[dict[str, object]]:
+    """Per-connection-type specialization enumeration, restricted to types that have any —
+
+    unlike entity types (each already gets its own guidance entry, so an empty
+    ``specializations`` list costs nothing extra), connection types have no other guidance
+    entry here; listing every known connection type regardless of specialization would add a
+    long, mostly-empty block to every guidance response."""
+    entries: list[dict[str, object]] = []
+    for name in sorted(_registry().all_connection_types()):
+        specializations = specialization_catalog.for_type("connection", str(name))
+        if not specializations:
+            continue
+        entries.append({
+            "name": str(name),
+            "specializations": [_serialize_specialization(s) for s in specializations],
+        })
+    return entries
+
+
 def _entity_type_guidance(
     filter: list[str] | None,  # noqa: A002
+    specialization_catalog: SpecializationCatalog,
 ) -> dict[str, object]:
     # Internal entity types (e.g. global-artifact-reference) are never manually created — they
     # are produced exclusively by mechanisms like artifact promotion. Excluding them here keeps
@@ -259,9 +325,15 @@ def _entity_type_guidance(
         entry["create_when"] = info.create_when
         entry["never_create_when"] = info.never_create_when
         entry["permitted_connections"] = connections
+        entry["specializations"] = [
+            _serialize_specialization(s) for s in specialization_catalog.for_type("entity", info.artifact_type)
+        ]
         entries.append(entry)
 
     out: dict[str, object] = {"entity_types": entries, "total": len(entries)}
     if domain_context:
         out["domains"] = domain_context
+    if _entity_type_guidance_is_empty(entries):
+        out["guidance_status"] = "empty"
+        out["guidance_hint"] = GUIDANCE_EMPTY_HINT
     return out

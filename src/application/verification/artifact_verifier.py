@@ -23,6 +23,8 @@ from src.application.verification._verifier_rules_schema import (
     check_frontmatter_schema,
     check_module_source_path,
 )
+from src.application.verification._verifier_rules_specialization import check_entity_specialization
+from src.application.verification._verifier_rules_viewpoint import check_viewpoint_for_diagram_type
 from src.application.verification._verifier_serde import merge_results, results_from_state
 from src.application.verification.artifact_verifier_incremental import (
     FileInventory,
@@ -43,6 +45,7 @@ from src.application.verification.artifact_verifier_rules import (
     check_diagram_artifact_type,
     check_diagram_references_scoped,
     check_enum,
+    check_matrix_markdown_shape,
     check_puml_structure,
     check_required_fields,
     check_section,
@@ -64,6 +67,7 @@ from src.application.verification.verifier_ports import (
     PumlSyntaxPort,
     VerifierScheduler,
 )
+from src.application.viewpoints.registry_snapshot import build_registry_snapshot as registry_snapshot
 
 
 class ArtifactVerifier:
@@ -91,10 +95,7 @@ class ArtifactVerifier:
     @functools.cached_property
     def _runtime_catalogs(self) -> RuntimeCatalogs:
         if self._catalogs is None:
-            raise RuntimeError(
-                "ArtifactVerifier requires 'catalogs'; "
-                "pass catalogs=build_runtime_catalogs(get_module_registry())"
-            )
+            raise RuntimeError("ArtifactVerifier requires catalogs from build_runtime_catalogs(get_module_registry())")
         return self._catalogs
 
     @functools.cached_property
@@ -120,6 +121,10 @@ class ArtifactVerifier:
         from src.application.verification._verifier_stdlib_adapters import FilesystemInventoryAdapter  # noqa: PLC0415
 
         return FilesystemInventoryAdapter()
+
+    @functools.cached_property
+    def _registry_snapshot(self):
+        return registry_snapshot(self._runtime_catalogs, () if self.registry is None else self.registry.repo_roots)
 
     @functools.cached_property
     def _incremental(self) -> IncrementalStatePort:
@@ -156,6 +161,7 @@ class ArtifactVerifier:
         check_required_fields(fm, ENTITY_REQUIRED, result, loc)
         check_artifact_id_entity(fm, result, loc)
         check_artifact_type(fm, self._runtime_catalogs.ontology.all_entity_type_names(), "entity type", result, loc)
+        check_entity_specialization(fm, self._runtime_catalogs.specializations, result, loc)
         check_enum(fm, "status", VALID_STATUSES, result, loc)
         check_section(content, "§content", required=True, result=result, loc=loc)
         check_section(content, "§display", required=True, result=result, loc=loc)
@@ -166,7 +172,8 @@ class ArtifactVerifier:
         repo_root = self._repo_root_for_path(path)
         if repo_root is not None:
             check_frontmatter_schema(fm, repo_root, "entity", result, loc)
-            check_attribute_schema(content, fm, repo_root, result, loc)
+            check_attribute_schema(content, fm, repo_root, result, loc,
+                specialization_catalog=self._runtime_catalogs.specializations)
 
         check_module_source_path(content, path, result, loc)
 
@@ -218,21 +225,19 @@ class ArtifactVerifier:
             check_diagram_references_scoped(
                 fm, self.registry, scope, result, loc,
                 diagram_type_catalog=self._runtime_catalogs.diagram_types,
-                derivation_catalog=self._runtime_catalogs.derivation,
-            )
+                derivation_catalog=self._runtime_catalogs.derivation)
             check_diagram_relation_references(
                 content, fm, self.registry, scope, result, loc,
-                stereotype_map=self._runtime_catalogs.ontology.archimate_stereotype_to_connection_type(),
-            )
+                stereotype_map=self._runtime_catalogs.ontology.archimate_stereotype_to_connection_type())
+            module = check_viewpoint_for_diagram_type(
+                fm, target_kind="diagram", runtime_catalogs=self._runtime_catalogs,
+                registry=self.registry, registry_snapshot=self._registry_snapshot, result=result, loc=loc)
             candidate = self._candidate_repo
-            if candidate is not None:
-                diag_type = str(fm.get("diagram-type", ""))
-                module = self._runtime_catalogs.diagram_types.find_diagram_type(diag_type)
-                if module is not None:
-                    run_diagram_contributions(
-                        module=module, candidate=candidate, fm=fm, registry=self.registry,
-                        scope=scope, runtime_catalogs=self._runtime_catalogs, result=result, loc=loc,
-                    )
+            if candidate is not None and module is not None:
+                run_diagram_contributions(
+                    module=module, candidate=candidate, fm=fm, registry=self.registry,
+                    scope=scope, runtime_catalogs=self._runtime_catalogs, result=result, loc=loc,
+                )
         else:
             result.issues.append(Issue(
                 Severity.WARNING, "W002",
@@ -271,22 +276,16 @@ class ArtifactVerifier:
                 diagram_type_catalog=self._runtime_catalogs.diagram_types,
                 derivation_catalog=self._runtime_catalogs.derivation,
             )
+            check_viewpoint_for_diagram_type(
+                fm, target_kind="matrix", runtime_catalogs=self._runtime_catalogs,
+                registry=self.registry, registry_snapshot=self._registry_snapshot, result=result, loc=loc)
         else:
             result.issues.append(Issue(
                 Severity.WARNING, "W002",
                 "No ArtifactRegistry provided; entity/connection reference checks skipped", loc,
             ))
 
-        if "diagram-type" in fm and str(fm.get("diagram-type")) != "matrix":
-            result.issues.append(Issue(
-                Severity.WARNING, "W321",
-                "Markdown diagram file under diagram-catalog/diagrams should use diagram-type: matrix", loc,
-            ))
-        if "|" not in content:
-            result.issues.append(Issue(
-                Severity.WARNING, "W322",
-                "Matrix diagram markdown has no table markup; expected at least one matrix table", loc,
-            ))
+        check_matrix_markdown_shape(fm, content, result, loc)
         return result
 
     def verify_all(self, repo_path: Path, *, include_diagrams: bool = True) -> list[VerificationResult]:
@@ -382,8 +381,7 @@ class ArtifactVerifier:
             prev is None
             or prev.include_diagrams != include_diagrams
             or prev.git_head != head
-            or prev.engine_signature != engine_sig
-            or prev.include_registry != (self.registry is not None)
+            or prev.engine_signature != engine_sig or prev.include_registry != (self.registry is not None)
         )
 
     def _verify_from_incremental_state(

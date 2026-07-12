@@ -64,7 +64,9 @@ alias: REQ_{slug}
 """
 
 
-def _diagram_md(artifact_id: str, name: str, diagram_type: str = "archimate-application") -> str:
+def _diagram_md(
+    artifact_id: str, name: str, diagram_type: str = "archimate-application", *, extra_frontmatter: str = ""
+) -> str:
     return f"""\
 ---
 artifact-id: {artifact_id}
@@ -74,7 +76,7 @@ name: "{name}"
 version: 0.1.0
 status: draft
 last-updated: '2026-01-01'
----
+{extra_frontmatter}---
 @startuml
 component "Comp A" as compA
 @enduml
@@ -87,6 +89,7 @@ ENT_ID = "REQ@1000000020.EntDia.entity-for-diag"
 DIAG_ID = "DIAG@1000000020.DiagTst.test-diagram"
 ASSURANCE_DIAG_ID = "DIAG@1000000021.BowTest.legacy-bowtie"
 GSN_DIAG_ID = "GSN@1000000022.GsnTst.selectable-gsn"
+VIEWPOINT_DIAG_ID = "DIAG@1000000023.VptTst.viewpoint-applied"
 
 
 # ── fixtures ──────────────────────────────────────────────────────────────────
@@ -101,6 +104,13 @@ def populated_root(tmp_path: Path) -> Path:
     _write(
         diag_dir / f"{ASSURANCE_DIAG_ID}.md",
         _diagram_md(ASSURANCE_DIAG_ID, "Legacy Bowtie", "bowtie"),
+    )
+    _write(
+        diag_dir / f"{VIEWPOINT_DIAG_ID}.md",
+        _diagram_md(
+            VIEWPOINT_DIAG_ID, "Viewpoint Applied",
+            extra_frontmatter="viewpoint: {slug: motivation, version: 1}\n",
+        ),
     )
     _write(
         diag_dir / f"{GSN_DIAG_ID}.puml",
@@ -215,6 +225,16 @@ class TestReadDiagram:
         assert "name" in data
         assert "diagram_type" in data
 
+    def test_viewpoint_is_none_when_not_applied(self, sync_client) -> None:
+        r = sync_client.get(f"/api/diagram?id={DIAG_ID}")
+        assert r.status_code == 200
+        assert r.json()["viewpoint"] is None
+
+    def test_viewpoint_surfaces_when_applied(self, sync_client) -> None:
+        r = sync_client.get(f"/api/diagram?id={VIEWPOINT_DIAG_ID}")
+        assert r.status_code == 200
+        assert r.json()["viewpoint"] == {"slug": "motivation", "version": 1}
+
 
 def test_gsn_context_includes_selectable_diagram_owned_nodes_and_edges(sync_client) -> None:
     response = sync_client.get(f"/api/diagram-context?id={GSN_DIAG_ID}")
@@ -270,6 +290,76 @@ class TestDiagramConnectionTypes:
         r = sync_client.get("/api/diagram-types/archimate-application/connection-types")
         assert r.status_code == 200
         assert isinstance(r.json(), list)
+
+
+# ── viewpoint-narrowed palette/picker (WU-E5a) ───────────────────────────────
+# Unit coverage for the narrowing logic itself lives in
+# tests/tools/test_viewpoint_scope_narrowing.py; these are endpoint-wiring smoke tests.
+
+
+@pytest.fixture()
+def sync_client_with_viewpoint(populated_root: Path):
+    import dataclasses
+
+    from starlette.testclient import TestClient
+
+    from src.domain.concept_scope import ConceptScope
+    from src.domain.viewpoints import ViewpointCatalog, ViewpointDefinition
+    from src.infrastructure.app_bootstrap import (
+        build_runtime_catalogs,
+        get_module_registry,
+        runtime_catalogs_dependency,
+    )
+
+    repo = ArtifactRepository(shared_artifact_index([populated_root]))
+    gui_state.init_state(repo, populated_root, None)
+    app = FastAPI()
+    definition = ViewpointDefinition(
+        slug="narrow-app",
+        version=1,
+        name="Narrow Application",
+        scope=ConceptScope(entity_types=frozenset({"application-component"}), connection_types=frozenset()),
+    )
+    catalogs = dataclasses.replace(
+        build_runtime_catalogs(get_module_registry()), viewpoints=ViewpointCatalog(entries=(definition,))
+    )
+    app.dependency_overrides[runtime_catalogs_dependency] = lambda: catalogs
+    app.include_router(diagrams_router)
+    return TestClient(app)
+
+
+class TestViewpointNarrowedPalette:
+    def test_entity_types_narrowed_by_viewpoint(self, sync_client_with_viewpoint) -> None:
+        r = sync_client_with_viewpoint.get(
+            "/api/diagram-types/archimate-application/entity-types?viewpoint=narrow-app"
+        )
+        assert r.status_code == 200
+        assert {item["artifact_type"] for item in r.json()} == {"application-component"}
+
+    def test_connection_types_narrowed_to_empty(self, sync_client_with_viewpoint) -> None:
+        r = sync_client_with_viewpoint.get(
+            "/api/diagram-types/archimate-application/connection-types?viewpoint=narrow-app"
+        )
+        assert r.status_code == 200
+        assert r.json() == []
+
+    def test_unknown_viewpoint_is_404(self, sync_client_with_viewpoint) -> None:
+        r = sync_client_with_viewpoint.get(
+            "/api/diagram-types/archimate-application/entity-types?viewpoint=does-not-exist"
+        )
+        assert r.status_code == 404
+
+    def test_entity_display_search_accepts_viewpoint_param(self, sync_client_with_viewpoint) -> None:
+        r = sync_client_with_viewpoint.get(
+            "/api/entity-display-search?q=&diagram_type=archimate-application&viewpoint=narrow-app"
+        )
+        assert r.status_code == 200
+
+    def test_diagram_entity_discovery_accepts_viewpoint_param(self, sync_client_with_viewpoint) -> None:
+        r = sync_client_with_viewpoint.get(
+            "/api/diagram-entity-discovery?diagram_type=archimate-application&viewpoint=narrow-app"
+        )
+        assert r.status_code == 200
 
 
 # ── GET /api/diagram-context ─────────────────────────────────────────────────

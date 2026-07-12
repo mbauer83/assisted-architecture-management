@@ -6,12 +6,14 @@ from pathlib import Path
 from typing import Any
 
 from src.application.artifact_schema import (
-    load_attribute_schema,
+    compute_effective_attribute_schema,
+    load_connection_metadata_schema,
     load_frontmatter_schema,
     validate_against_schema,
 )
 from src.application.verification.artifact_verifier_types import Issue, Severity, VerificationResult
 from src.domain.property_value import decode_lenient, get_adhoc_type
+from src.domain.specializations import SpecializationCatalog
 
 # ---------------------------------------------------------------------------
 # Configurable JSON Schema checks (WS-C)
@@ -52,20 +54,32 @@ def check_attribute_schema(
     repo_root: Path,
     result: VerificationResult,
     loc: str,
+    *,
+    specialization_catalog: SpecializationCatalog | None = None,
 ) -> None:
-    """Validate Properties table attributes against the per-type attribute schema.
+    """Validate Properties table attributes against the effective per-type attribute schema.
 
-    Extracts key-value pairs from the ``## Properties`` markdown table and
-    validates them against ``attributes.{artifact-type}.schema.json``.
+    Extracts key-value pairs from the ``## Properties`` markdown table and validates them
+    against the base-type schema (``attributes.{artifact-type}.schema.json``) merged with
+    the entity's own specialization's profile, if any (D13) — see
+    ``compute_effective_attribute_schema``. A property redefined incompatibly between the
+    base schema and the specialization's contribution is a blocking E043 error.
 
     Cells are decoded using the schema's declared type (schema-driven decode).
     Decode failures produce a blocking E042 error; other constraint violations
-    remain W042 warnings until schemas are fully remediated (see WU-B2).
+    remain W042 warnings until schemas are fully remediated.
     """
     artifact_type = fm.get("artifact-type", "")
     if not artifact_type:
         return
-    schema = load_attribute_schema(repo_root, str(artifact_type))
+    schema, conflicts = compute_effective_attribute_schema(
+        repo_root,
+        str(artifact_type),
+        str(fm.get("specialization", "") or ""),
+        specialization_catalog=specialization_catalog or SpecializationCatalog.empty(),
+    )
+    for msg in conflicts:
+        result.issues.append(Issue(Severity.ERROR, "E043", f"Attribute schema ({artifact_type}): {msg}", loc))
     if schema is None:
         return
     props = parse_properties_table(content)
@@ -112,6 +126,44 @@ def check_attribute_schema(
                 Severity.WARNING,
                 "W042",
                 f"Attribute schema ({artifact_type}): {msg}",
+                loc,
+            )
+        )
+
+    missing_recommended = [name for name in schema.get("x-recommended", []) if name not in decoded]
+    if missing_recommended:
+        result.issues.append(
+            Issue(
+                Severity.WARNING,
+                "W042",
+                f"Attribute schema ({artifact_type}): missing recommended attribute(s): {missing_recommended}",
+                loc,
+            )
+        )
+
+
+def check_connection_metadata_schema(
+    metadata: dict[str, Any],
+    connection_type: str,
+    repo_root: Path,
+    result: VerificationResult,
+    loc: str,
+) -> None:
+    """Validate a connection's per-connection metadata block against
+    ``connection-metadata.{connection-type}.schema.json``.
+
+    If no schema file exists for the connection type, validation is silently
+    skipped (free schema, matching the other schema conventions in this module).
+    """
+    schema = load_connection_metadata_schema(repo_root, connection_type)
+    if schema is None:
+        return
+    for msg in validate_against_schema(metadata, schema):
+        result.issues.append(
+            Issue(
+                Severity.WARNING,
+                "W043",
+                f"Connection metadata schema ({connection_type}): {msg}",
                 loc,
             )
         )

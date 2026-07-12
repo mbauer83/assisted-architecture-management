@@ -9,7 +9,7 @@ from src.application.ports import ArtifactStorePort, Candidate
 from src.application.verification.artifact_verifier_registry import ArtifactRegistry
 from src.application.verification.artifact_verifier_types import entity_id_from_path
 from src.config.repo_paths import DIAGRAM_CATALOG, DIAGRAMS, DOCS, MODEL
-from src.domain.artifact_id import stable_id
+from src.domain.artifact_id import stable_conn_id, stable_id
 from src.domain.artifact_types import ArtifactSummary, ConnectionRecord, DiagramRecord, DocumentRecord, EntityRecord
 from src.infrastructure.mcp.artifact_mcp.bulk.candidate_lists import CandidateListMixin
 from src.infrastructure.write.artifact_write.staged_workspace import stage_live_path
@@ -146,9 +146,20 @@ class CandidateStore(CandidateListMixin):
         return self._entities.get(artifact_id) or self._map_entity(self._live.get_entity(artifact_id))
 
     def get_connection(self, artifact_id: str) -> ConnectionRecord | None:
-        if artifact_id in self._deleted_connections:
+        # `_deleted_connections`/`_connections` are always keyed by the canonical
+        # (stale-slug-free) connection id — parse_outgoing_file builds every
+        # ConnectionRecord.artifact_id that way. A caller may still query with a
+        # stale-slug or otherwise non-canonical endpoint form (e.g. a diagram's
+        # `connection-ids-used` entry written before a rename), so the query is
+        # normalized the same way before either membership check.
+        canonical = stable_conn_id(artifact_id)
+        if artifact_id in self._deleted_connections or canonical in self._deleted_connections:
             return None
-        return self._connections.get(artifact_id) or self._map_connection(self._live.get_connection(artifact_id))
+        return (
+            self._connections.get(artifact_id)
+            or self._connections.get(canonical)
+            or self._map_connection(self._live.get_connection(artifact_id))
+        )
 
     def get_diagram(self, artifact_id: str) -> DiagramRecord | None:
         if artifact_id in self._deleted_diagrams:

@@ -24,14 +24,15 @@ def _add_connection_impl(
     connection_type: str,
     target_entity: str,
     description: str | None,
-    src_cardinality: str | None,
-    tgt_cardinality: str | None,
+    src_multiplicity: str | None,
+    tgt_multiplicity: str | None,
     version: str,
     status: str,
     dry_run: bool,
     repo_root: str | None,
     provisional_ids: frozenset[str],
     clear_repo_caches=None,
+    specialization: str | None = None,
 ) -> dict[str, object]:
     """Internal implementation shared by the MCP tool and bulk_write."""
     scope: Literal["engagement", "both"] = "engagement" if repo_root else "both"
@@ -108,8 +109,9 @@ def _add_connection_impl(
         connection_type=connection_type,
         target_entity=effective_target,
         description=description,
-        src_cardinality=src_cardinality,
-        tgt_cardinality=tgt_cardinality,
+        src_multiplicity=src_multiplicity,
+        tgt_multiplicity=tgt_multiplicity,
+        specialization=specialization,
         version=version,
         status=status,
         last_updated=None,
@@ -135,8 +137,9 @@ def artifact_add_connection(
     connection_type: str,
     target_entity: str = "",
     description: str | None = None,
-    src_cardinality: str | None = None,
-    tgt_cardinality: str | None = None,
+    src_multiplicity: str | None = None,
+    tgt_multiplicity: str | None = None,
+    specialization: str | None = None,
     version: str = "0.1.0",
     status: str = "draft",
     from_diagram_element: dict[str, object] | None = None,
@@ -197,8 +200,9 @@ def artifact_add_connection(
         connection_type=connection_type,
         target_entity=target_entity,
         description=description,
-        src_cardinality=src_cardinality,
-        tgt_cardinality=tgt_cardinality,
+        src_multiplicity=src_multiplicity,
+        tgt_multiplicity=tgt_multiplicity,
+        specialization=specialization,
         version=version,
         status=status,
         dry_run=dry_run,
@@ -223,9 +227,9 @@ def register(mcp: FastMCP) -> None:
             "Connecting from/to a global entity automatically creates a per-engagement "
             "proxy (global-entity-reference) if one does not already exist — handles "
             "outgoing, incoming, and symmetric connections transparently. "
-            "Optional src_cardinality / tgt_cardinality annotate the source or target end "
+            "Optional src_multiplicity / tgt_multiplicity annotate the source or target end "
             "of the connection (e.g. '1', '0..1', '1..*', '*'). "
-            "Junction endpoints: cardinalities prohibited; all connections at a junction "
+            "Junction endpoints: multiplicities prohibited; all connections at a junction "
             "must share the same type (first connection locks it). "
             "dry_run=true returns would-be content without writing. "
             "source_entity/target_entity: full (PREFIX@epoch.random.slug) or short (PREFIX@epoch.random) form."

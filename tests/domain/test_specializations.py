@@ -31,7 +31,6 @@ def test_parse_entity_and_connection_specializations() -> None:
                                     "target_type": "service",
                                 },
                             ],
-                            "profile": "service-profile",
                             "attributes": {"criticality": {"type": "string"}},
                             "create_when": "Use for business-facing services.",
                             "never_create_when": "Do not use for implementation APIs.",
@@ -63,7 +62,6 @@ def test_parse_entity_and_connection_specializations() -> None:
         RelationshipRestriction("archimate-serving"),
         RelationshipRestriction("archimate-realization", source_type="process", target_type="service"),
     )
-    assert entity.profile == "service-profile"
     assert entity.attributes["criticality"] == {"type": "string"}
 
     connection = catalog.get("connection", "archimate-flow", "money-flow", module_alias="archimate-4")

@@ -11,8 +11,8 @@ EDIT_ENTITY_DESCRIPTION = (
 EDIT_CONNECTION_DESCRIPTION = (
     "Edit or remove a connection in an .outgoing.md file. "
     "Identify by source_entity + target_entity + connection_type. "
-    "operation='update' (default) changes description, src_cardinality, and/or "
-    "tgt_cardinality; pass '' to remove an existing cardinality, omit (null) to "
+    "operation='update' (default) changes description, src_multiplicity, and/or "
+    "tgt_multiplicity; pass '' to remove an existing multiplicity, omit (null) to "
     "preserve it. operation='remove' deletes the connection. "
     "source_entity/target_entity: full (PREFIX@epoch.random.slug) or short (PREFIX@epoch.random) form."
 )
@@ -41,14 +41,18 @@ EDIT_DIAGRAM_DESCRIPTION = (
     "the occurrence id distinguishes the diagram element and visual_role is optional metadata. "
     "edge_labels: per-diagram edge-label overrides keyed by '{src_alias}:{tgt_alias}'; "
     "omit to preserve existing overrides; pass {} to clear all. "
+    "viewpoint: replace the diagram's ViewpointApplication frontmatter — "
+    "{slug, version, enforcement_override?, derivation_params?}; omit to keep the existing "
+    "application (if any) unchanged. Call artifact_authoring_guidance to discover slugs/versions "
+    "via its 'viewpoints' list. "
     "group (str|None — re-home to a different diagram-collection slug; moves the source "
     "file and its rendered PNG/SVG; only applies to the default write path, not mode= "
     "dispatch or puml='auto-sync'). "
     "Re-verifies and re-renders PNG on every write. "
     "Matrix diagrams (diagram-type: matrix) are markdown tables, not PUML: only "
     "name/keywords/version/status/tlp/group are supported here (metadata + group move, "
-    "table content preserved); puml/diagram_entities/diagram_connections/bindings/etc. are "
-    "rejected — call artifact_create_matrix with artifact_id set to change table content. "
+    "table content preserved); puml/diagram_entities/diagram_connections/bindings/viewpoint/etc. "
+    "are rejected — call artifact_create_matrix with artifact_id set to change table content. "
     "artifact_id: full (PREFIX@epoch.random.slug) or short (PREFIX@epoch.random) form."
 )
 

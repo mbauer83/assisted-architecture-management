@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
@@ -19,6 +20,7 @@ from src.infrastructure.write.artifact_write._promote_file_ops import (
     update_body_references,
     update_outgoing_references,
 )
+from src.infrastructure.write.artifact_write._promote_viewpoints import ViewpointResolution, apply_viewpoint_resolutions
 from src.infrastructure.write.artifact_write.parse_existing import parse_entity_file
 from src.infrastructure.write.artifact_write.promote_to_enterprise import (
     ConflictResolution,
@@ -130,6 +132,7 @@ def execute_promotion(
     *,
     conflict_resolutions: list[ConflictResolution] | None = None,
     group_mapping_resolutions: dict[str, str] | None = None,
+    viewpoint_resolutions: Mapping[str, ViewpointResolution] | None = None,
 ) -> PromotionResult:
     result = PromotionResult(plan=plan, executed=False)
     if plan.schema_errors:
@@ -158,6 +161,14 @@ def execute_promotion(
         _copy_entities(ctx)
         _apply_entity_conflicts(ctx)
         _copy_simple_artifacts(ctx)
+        apply_viewpoint_resolutions(
+            plan.viewpoint_dependencies,
+            viewpoint_resolutions,
+            engagement_root=engagement_root,
+            enterprise_root=enterprise_root,
+            registry=registry,
+            backups=ctx.ent_backups,
+        )
         if ctx.ent_copied:
             notify_paths_changed(ctx.ent_copied)
 

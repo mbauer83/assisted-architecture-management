@@ -9,15 +9,28 @@ from __future__ import annotations
 
 from collections.abc import Callable, Iterable
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Literal
 
-from src.application.artifact_schema import load_attribute_schema, load_frontmatter_schema
+from src.application.artifact_schema import (
+    load_attribute_schema,
+    load_frontmatter_schema,
+    load_specialization_attachment_schema,
+)
+from src.application.runtime_catalogs import RuntimeCatalogs
 from src.config.workspace_paths import infer_repo_scope
+from src.domain.specializations import SpecializationInfo
+from src.infrastructure.specialization_declarations import load_specialization_catalog_file
 
 if TYPE_CHECKING:
     from src.application.artifact_document_schema import DocumentSchema
     from src.application.artifact_query import ArtifactRepository
     from src.application.verification.artifact_verifier import ArtifactRegistry
+
+
+def _default_catalogs() -> RuntimeCatalogs:
+    from src.infrastructure.app_bootstrap import build_runtime_catalogs, get_module_registry  # noqa: PLC0415
+
+    return build_runtime_catalogs(get_module_registry())
 
 
 def _schema_superset_errors(
@@ -83,6 +96,102 @@ def _attribute_schema_errors(
         ),
         scope_label=lambda atype: f"attribute profile '{atype}'",
     )
+
+
+def _specialization_engagement_only(entry: SpecializationInfo, *, eng_root: Path, ent_root: Path) -> bool:
+    """True when *entry* is declared only in the engagement repo's own `specializations.yaml` —
+
+    not shipped by the ontology module (module-shipped entries never appear in a repo's own
+    declarations file at all, so they can never test positive here) and not independently
+    declared in the enterprise repo's own file either."""
+    eng_keys = {e.key for e in load_specialization_catalog_file(eng_root, entry.module_alias).entries}
+    if entry.key not in eng_keys:
+        return False
+    ent_keys = {e.key for e in load_specialization_catalog_file(ent_root, entry.module_alias).entries}
+    return entry.key not in ent_keys
+
+
+def _specialization_attachment_errors(
+    entry: SpecializationInfo, artifact_type: str, slug: str, eng_root: Path, ent_root: Path
+) -> list[str]:
+    """Superset-check the specialization's attachment schema file, if any.
+
+    A specialization's profile is one-to-one with it (inline `attributes:` or this
+    attachment file) — never a separately reusable, named registry entry — so there is no
+    independent "named profile" to check beyond the specialization itself (already covered
+    by `_specialization_engagement_only`) and this attachment file.
+    """
+    errors: list[str] = []
+    ent_attachment = load_specialization_attachment_schema(ent_root, artifact_type, slug)
+    if ent_attachment is not None:
+        scope = f"specialization attachment schema '{artifact_type}.{slug}'"
+        eng_attachment = load_specialization_attachment_schema(eng_root, artifact_type, slug)
+        if eng_attachment is None:
+            errors.append(
+                f"{scope}: engagement repo missing schema — "
+                f"add .arch-repo/schemata/attributes.{artifact_type}.{slug}.schema.json"
+            )
+        else:
+            errors.extend(_schema_superset_errors(eng_attachment, ent_attachment, scope))
+    return errors
+
+
+def _specialization_dependency_errors(
+    kind: Literal["entity", "connection"],
+    parent_type: str,
+    slug: str,
+    label: str,
+    *,
+    eng_root: Path,
+    ent_root: Path,
+    catalogs: RuntimeCatalogs,
+) -> list[str]:
+    entry = catalogs.specializations.get(kind, parent_type, slug)
+    if entry is None:
+        # Unknown anywhere — E160/E170 (unknown specialization) is the verifier's concern,
+        # not this promotion-superset check's.
+        return []
+    if _specialization_engagement_only(entry, eng_root=eng_root, ent_root=ent_root):
+        return [
+            f"{kind} specialization '{slug}' (type '{parent_type}', {label}): declared only in the "
+            "engagement repo's .arch-repo/specializations.yaml — add it to the enterprise repo's "
+            "specializations.yaml (or ship it in the ontology module) before promoting"
+        ]
+    if kind == "entity":
+        return _specialization_attachment_errors(entry, parent_type, slug, eng_root, ent_root)
+    return []
+
+
+def _specialization_errors(
+    eng_root: Path,
+    ent_root: Path,
+    entity_ids: list[str],
+    connection_ids: list[str],
+    repo: "ArtifactRepository",
+    catalogs: RuntimeCatalogs,
+) -> list[str]:
+    errors: list[str] = []
+    for eid in entity_ids:
+        rec = repo.get_entity(eid)
+        if rec is None or not rec.specialization:
+            continue
+        errors.extend(
+            _specialization_dependency_errors(
+                "entity", rec.artifact_type, rec.specialization, f"entity {eid}",
+                eng_root=eng_root, ent_root=ent_root, catalogs=catalogs,
+            )
+        )
+    for cid in connection_ids:
+        conn = repo.get_connection(cid)
+        if conn is None or not conn.specialization:
+            continue
+        errors.extend(
+            _specialization_dependency_errors(
+                "connection", conn.conn_type, conn.specialization, f"connection {cid}",
+                eng_root=eng_root, ent_root=ent_root, catalogs=catalogs,
+            )
+        )
+    return errors
 
 
 def _frontmatter_schema_errors(
@@ -164,11 +273,14 @@ def check_promotion_schema_compatibility(
     document_ids: list[str],
     registry: "ArtifactRegistry",
     repo: "ArtifactRepository",
+    connection_ids: list[str] | None = None,
+    catalogs: RuntimeCatalogs | None = None,
 ) -> list[str]:
     """Check that engagement schemata are supersets of enterprise schemata.
 
-    Inspects attribute profiles, frontmatter schemas, and document schemas for all
-    artifact types present in the promotion set.
+    Inspects attribute profiles, frontmatter schemas, document schemas, and — for entities
+    and connections carrying a specialization — the specialization itself plus its attached
+    schema/named-profile, for all artifact types present in the promotion set.
 
     Returns a list of blocking error strings (empty = no violations).
     """
@@ -180,6 +292,9 @@ def check_promotion_schema_compatibility(
 
     return [
         *_attribute_schema_errors(eng_root, ent_root, entity_ids, repo),
+        *_specialization_errors(
+            eng_root, ent_root, entity_ids, connection_ids or [], repo, catalogs or _default_catalogs()
+        ),
         *_frontmatter_schema_errors(eng_root, ent_root, bool(entity_ids), has_diagrams),
         *_document_schema_errors(eng_root, ent_root, document_ids, repo),
     ]

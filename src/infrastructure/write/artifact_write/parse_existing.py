@@ -10,6 +10,8 @@ from pathlib import Path
 
 import yaml  # type: ignore[import-untyped]
 
+from src.domain.connection_declaration import ConnectionDeclaration, parse_connection_declarations
+
 
 @dataclass
 class ParsedEntity:
@@ -31,7 +33,7 @@ class ParsedOutgoing:
     frontmatter: dict[str, object]
     connections: list[
         dict[str, object]
-    ]  # keys: connection_type, target_entity, description, optional src/tgt_cardinality, associated_entities
+    ]  # keys: connection_type, target_entity, description, optional src/tgt_multiplicity, associated_entities
     raw_text: str
 
 
@@ -244,52 +246,36 @@ def _extract_display_block(display_section: str) -> tuple[str, str]:
     return section_id, content
 
 
-# Connection header: "conn-type [[src_card]] → [[tgt_card] ]target_id"
-_CONN_HEADER_RE = re.compile(
-    r"^(?P<conn_type>[a-z][a-z0-9-]+)"
-    r"(?:\s+\[(?P<src_card>[^\]]+)\])?"
-    r"\s+→\s+"
-    r"(?:\[(?P<tgt_card>[^\]]+)\]\s+)?"
-    r"(?P<target_id>\S+)$"
-)
+def _declaration_to_dict(decl: ConnectionDeclaration) -> dict[str, object]:
+    """Convert a parsed declaration to the legacy connections-dict shape.
+
+    Keys: connection_type, target_entity, description. src_multiplicity,
+    tgt_multiplicity, and specialization are included only when present so that
+    round-trip reformatting preserves them exactly — specialization comes from the
+    per-connection metadata block, never from ``description``.
+    """
+    conn: dict[str, object] = {
+        "connection_type": decl.conn_type,
+        "target_entity": decl.target_id,
+        "description": decl.description,
+    }
+    if decl.src_multiplicity:
+        conn["src_multiplicity"] = decl.src_multiplicity
+    if decl.tgt_multiplicity:
+        conn["tgt_multiplicity"] = decl.tgt_multiplicity
+    if decl.associated_entities:
+        conn["associated_entities"] = list(decl.associated_entities)
+    specialization = decl.metadata.get("specialization")
+    if isinstance(specialization, str) and specialization:
+        conn["specialization"] = specialization
+    return conn
 
 
 def _parse_connection_sections(connections_text: str) -> list[dict[str, object]]:
     """Parse H3 connection sections from the connections area of an .outgoing.md file.
 
     Each returned dict has keys: connection_type, target_entity, description.
-    When cardinalities are present, src_cardinality and tgt_cardinality are
+    When multiplicities are present, src_multiplicity and tgt_multiplicity are
     also included so that round-trip reformatting preserves them.
     """
-    connections: list[dict[str, object]] = []
-    sections = re.split(r"^### ", connections_text, flags=re.MULTILINE)
-
-    for section in sections:
-        section = section.strip()
-        if not section:
-            continue
-
-        first_line, *rest = section.split("\n", 1)
-        m = _CONN_HEADER_RE.match(first_line.strip())
-        if not m:
-            continue
-
-        raw_body = rest[0].strip() if rest else ""
-        _assoc_re = re.compile(r"<!--\s*§assoc\s+(\S+)\s*-->")
-        assoc_ids = _assoc_re.findall(raw_body)
-        clean_desc = _assoc_re.sub("", raw_body).strip()
-
-        conn: dict[str, object] = {
-            "connection_type": m.group("conn_type"),
-            "target_entity": m.group("target_id"),
-            "description": clean_desc,
-        }
-        if m.group("src_card"):
-            conn["src_cardinality"] = m.group("src_card")
-        if m.group("tgt_card"):
-            conn["tgt_cardinality"] = m.group("tgt_card")
-        if assoc_ids:
-            conn["associated_entities"] = assoc_ids
-        connections.append(conn)
-
-    return connections
+    return [_declaration_to_dict(decl) for decl in parse_connection_declarations(connections_text)]

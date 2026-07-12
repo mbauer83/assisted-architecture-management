@@ -4,9 +4,11 @@ from __future__ import annotations
 
 from typing import Any, Literal
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 
+from src.application.runtime_catalogs import RuntimeCatalogs
+from src.infrastructure.app_bootstrap import runtime_catalogs_dependency
 from src.infrastructure.gui.routers import state as s
 
 router = APIRouter()
@@ -20,6 +22,7 @@ class PromotionPlanBody(BaseModel):
     exclude_connection_ids: list[str] = []
     document_ids: list[str] = []
     diagram_ids: list[str] = []
+    viewpoint_resolutions: dict[str, Literal["promote_alongside", "repin"]] = {}
 
 
 class ConflictResolutionBody(BaseModel):
@@ -38,11 +41,15 @@ class PromotionExecuteBody(BaseModel):
     diagram_ids: list[str] = []
     conflict_resolutions: list[ConflictResolutionBody] = []
     group_mapping_resolutions: dict[str, str] = {}
+    viewpoint_resolutions: dict[str, Literal["promote_alongside", "repin"]] = {}
     dry_run: bool = True
 
 
 @router.post("/api/promote/plan")
-def promotion_plan(body: PromotionPlanBody) -> dict[str, Any]:
+def promotion_plan(
+    body: PromotionPlanBody,
+    catalogs: RuntimeCatalogs = Depends(runtime_catalogs_dependency),
+) -> dict[str, Any]:
     """Compute the promotion plan for an explicit selection of entities and connections."""
     from src.application.verification.artifact_verifier_registry import ArtifactRegistry
     from src.infrastructure.artifact_index import combined_artifact_index
@@ -64,6 +71,8 @@ def promotion_plan(body: PromotionPlanBody) -> dict[str, Any]:
             diagram_ids=body.diagram_ids or None,
             engagement_root=eng_root,
             enterprise_root=ent_root,
+            catalogs=catalogs,
+            viewpoint_resolutions=body.viewpoint_resolutions or None,
         )
     except ValueError as e:
         raise HTTPException(400, str(e))
@@ -119,11 +128,25 @@ def promotion_plan(body: PromotionPlanBody) -> dict[str, Any]:
             for m in plan.group_mapping
         ],
         "available_enterprise_groups": plan.available_enterprise_groups,
+        "viewpoint_dependencies": [
+            {
+                "target_id": d.target_id,
+                "target_kind": d.target_kind,
+                "slug": d.slug,
+                "pinned_version": d.pinned_version,
+                "status": d.status,
+                "enterprise_version": d.enterprise_version,
+            }
+            for d in plan.viewpoint_dependencies
+        ],
     }
 
 
 @router.post("/api/promote/execute")
-def promotion_execute(body: PromotionExecuteBody) -> dict[str, Any]:
+def promotion_execute(
+    body: PromotionExecuteBody,
+    catalogs: RuntimeCatalogs = Depends(runtime_catalogs_dependency),
+) -> dict[str, Any]:
     """Execute a promotion plan built from an explicit selection of entities and connections."""
     from src.application.verification.artifact_verifier_registry import ArtifactRegistry
     from src.infrastructure.artifact_index import combined_artifact_index
@@ -146,6 +169,8 @@ def promotion_execute(body: PromotionExecuteBody) -> dict[str, Any]:
             diagram_ids=body.diagram_ids or None,
             engagement_root=eng_root,
             enterprise_root=ent_root,
+            catalogs=catalogs,
+            viewpoint_resolutions=body.viewpoint_resolutions or None,
         )
     except ValueError as e:
         raise HTTPException(400, str(e))
@@ -179,6 +204,7 @@ def promotion_execute(body: PromotionExecuteBody) -> dict[str, Any]:
         registry,
         conflict_resolutions=resolutions,
         group_mapping_resolutions=body.group_mapping_resolutions or None,
+        viewpoint_resolutions=body.viewpoint_resolutions or None,
     )
     if result.executed:
         repo.refresh()

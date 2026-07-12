@@ -104,7 +104,7 @@ class TestEditConnectionDryRun:
         assert result.content is not None
         assert "New description" in result.content
 
-    def test_dry_run_preserves_src_cardinality_unset(self, repo) -> None:
+    def test_dry_run_preserves_src_multiplicity_unset(self, repo) -> None:
         repo_root, entity_file, outgoing = repo
         registry = _FakeRegistry("ENT@1.src.entity", entity_file)
         verifier = _FakeVerifier()
@@ -366,8 +366,8 @@ class TestEditConnectionAssociations:
 # ---------------------------------------------------------------------------
 
 
-class TestEditConnectionCardinalities:
-    def test_set_src_cardinality(self, repo) -> None:
+class TestEditConnectionMultiplicities:
+    def test_set_src_multiplicity(self, repo) -> None:
         repo_root, entity_file, outgoing = repo
         registry = _FakeRegistry("ENT@1.src.entity", entity_file)
         result = edit_connection(
@@ -378,15 +378,15 @@ class TestEditConnectionCardinalities:
             source_entity="ENT@1.src.entity",
             target_entity="ENT@2.tgt.entity",
             connection_type="uses",
-            src_cardinality="1:n",
+            src_multiplicity="1:n",
             dry_run=True,
         )
         assert result.wrote is False
         assert "1:n" in (result.content or "")
 
-    def test_clear_src_cardinality(self, repo) -> None:
+    def test_clear_src_multiplicity(self, repo) -> None:
         repo_root, entity_file, outgoing = repo
-        # First add a cardinality
+        # First add a multiplicity
         outgoing.write_text(
             "---\nartifact-id: ENT@1.src.entity\nversion: 0.1.0\nstatus: draft\n---\n\n"
             "<!-- §connections -->\n\n### uses [1:n] → ENT@2.tgt.entity\n\nDesc.\n"
@@ -400,12 +400,12 @@ class TestEditConnectionCardinalities:
             source_entity="ENT@1.src.entity",
             target_entity="ENT@2.tgt.entity",
             connection_type="uses",
-            src_cardinality="",
+            src_multiplicity="",
             dry_run=True,
         )
         assert result.wrote is False
 
-    def test_set_tgt_cardinality(self, repo) -> None:
+    def test_set_tgt_multiplicity(self, repo) -> None:
         repo_root, entity_file, outgoing = repo
         registry = _FakeRegistry("ENT@1.src.entity", entity_file)
         result = edit_connection(
@@ -416,7 +416,7 @@ class TestEditConnectionCardinalities:
             source_entity="ENT@1.src.entity",
             target_entity="ENT@2.tgt.entity",
             connection_type="uses",
-            tgt_cardinality="0:1",
+            tgt_multiplicity="0:1",
             dry_run=True,
         )
         assert "0:1" in (result.content or "")

@@ -63,7 +63,6 @@ def _ct(
 class _StubOntology:
     module_class = "architecture"
     display_section_id = "stub"
-    attribute_profiles: Mapping[str, dict[str, object]] = {}
     element_classes: Mapping[str, ElementClassInfo] = {}
 
     def __init__(

@@ -25,15 +25,19 @@ def edit_connection(
     target_entity: str,
     connection_type: str,
     description: str | None = None,
-    src_cardinality: str | None | object = _UNSET,
-    tgt_cardinality: str | None | object = _UNSET,
+    src_multiplicity: str | None | object = _UNSET,
+    tgt_multiplicity: str | None | object = _UNSET,
+    specialization: str | None | object = _UNSET,
     dry_run: bool,
 ) -> WriteResult:
-    """Update an existing connection (description and/or cardinalities).
+    """Update an existing connection (description, multiplicities, and/or specialization).
 
     Identifies the connection by (source, target, type) triple.
-    Rebuilds the .outgoing.md file with the updated fields.
-    Pass src_cardinality="" or tgt_cardinality="" to remove an existing cardinality.
+    Rebuilds the .outgoing.md file with the updated fields — every other connection's dict
+    (incl. its own specialization, if any) is carried through `parsed.connections`
+    unmodified, so a sibling's metadata block round-trips byte-for-byte.
+    Pass src_multiplicity="" or tgt_multiplicity="" to remove an existing multiplicity, or
+    specialization="" to remove an existing specialization.
     Omit (leave as _UNSET) to preserve the existing value.
     """
     assert_engagement_write_root(repo_root)
@@ -52,16 +56,21 @@ def edit_connection(
         if (conn["connection_type"] == connection_type
                 and stable_id(str(conn["target_entity"])) == stable_id(target_entity)):
             conn["description"] = description or ""
-            if src_cardinality is not _UNSET:
-                if src_cardinality:
-                    conn["src_cardinality"] = str(src_cardinality)
+            if src_multiplicity is not _UNSET:
+                if src_multiplicity:
+                    conn["src_multiplicity"] = str(src_multiplicity)
                 else:
-                    conn.pop("src_cardinality", None)
-            if tgt_cardinality is not _UNSET:
-                if tgt_cardinality:
-                    conn["tgt_cardinality"] = str(tgt_cardinality)
+                    conn.pop("src_multiplicity", None)
+            if tgt_multiplicity is not _UNSET:
+                if tgt_multiplicity:
+                    conn["tgt_multiplicity"] = str(tgt_multiplicity)
                 else:
-                    conn.pop("tgt_cardinality", None)
+                    conn.pop("tgt_multiplicity", None)
+            if specialization is not _UNSET:
+                if specialization:
+                    conn["specialization"] = str(specialization)
+                else:
+                    conn.pop("specialization", None)
             found = True
             break
 

@@ -16,6 +16,7 @@ from src.application.entity_type_predicates import is_internal_entity_type
 from src.domain.artifact_types import DiagramRecord, EntityRecord
 from src.domain.module_types import EntityTypeName
 from src.infrastructure.gui.routers import state as s
+from src.infrastructure.gui.routers._viewpoint_scope import resolve_viewpoint_scope
 
 if TYPE_CHECKING:
     from src.application.runtime_catalogs import RuntimeCatalogs
@@ -281,8 +282,11 @@ def fuzzy_entity_hits(
     return [entity_display_item(rec, catalogs) for _, rec in scored[:limit]]
 
 
-def diagram_kind_entity_type_items(diagram_type: str, catalogs: RuntimeCatalogs) -> list[dict[str, Any]]:
+def diagram_kind_entity_type_items(
+    diagram_type: str, catalogs: RuntimeCatalogs, *, viewpoint: str | None = None
+) -> list[dict[str, Any]]:
     kind = catalogs.diagram_types.get_diagram_type(diagram_type)
+    viewpoint_scope = resolve_viewpoint_scope(viewpoint, catalogs)
     ordered_domains = catalogs.ontology.domain_order()
     items = [
         {
@@ -292,7 +296,7 @@ def diagram_kind_entity_type_items(diagram_type: str, catalogs: RuntimeCatalogs)
             "classes": list(info.classes),
         }
         for artifact_type, info in kind.effective_entity_types().items()
-        if not info.internal
+        if not info.internal and (viewpoint_scope is None or viewpoint_scope.admits_entity_type(artifact_type, info))
     ]
     items.sort(
         key=lambda item: (
@@ -303,8 +307,11 @@ def diagram_kind_entity_type_items(diagram_type: str, catalogs: RuntimeCatalogs)
     return items
 
 
-def diagram_kind_connection_type_items(diagram_type: str, catalogs: RuntimeCatalogs) -> list[dict[str, Any]]:
+def diagram_kind_connection_type_items(
+    diagram_type: str, catalogs: RuntimeCatalogs, *, viewpoint: str | None = None
+) -> list[dict[str, Any]]:
     kind = catalogs.diagram_types.get_diagram_type(diagram_type)
+    viewpoint_scope = resolve_viewpoint_scope(viewpoint, catalogs)
     items = [
         {
             "connection_type": connection_type,
@@ -313,6 +320,7 @@ def diagram_kind_connection_type_items(diagram_type: str, catalogs: RuntimeCatal
             "classes": list(info.classes),
         }
         for connection_type, info in kind.effective_connection_types().items()
+        if viewpoint_scope is None or viewpoint_scope.admits_connection_type(connection_type)
     ]
     items.sort(key=lambda item: item["connection_type"])
     return items

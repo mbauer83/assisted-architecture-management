@@ -5,6 +5,7 @@ from pathlib import Path
 import yaml  # type: ignore[import-untyped]
 
 from src.domain.classification import TLP_ORDER
+from src.domain.viewpoints import EnforcementSetting
 
 _CONFIG_DIR = Path(__file__).resolve().parent.parent.parent / "config"
 _DEFAULT_ENGAGEMENT: dict[str, object] = {}
@@ -37,9 +38,18 @@ _DEFAULTS: dict[str, dict[str, object]] = {
     },
     "validation": {
         "datatype_type_references_blocking": True,
+        "viewpoint_enforcement": "warn",
     },
     "guidance": {
         "default_source": "",
+    },
+    "viewpoints": {
+        "execution_max_entities": 500,
+        "execution_default_entity_limit_mcp": 200,
+        "execution_timeout_seconds": 10,
+    },
+    "exchange": {
+        "max_document_bytes": 10_000_000,
     },
 }
 
@@ -103,6 +113,14 @@ def load_settings() -> dict:
     guidance_section: _SettingsSection = guidance_raw if isinstance(guidance_raw, dict) else {}
     guidance = {**_DEFAULTS["guidance"], **guidance_section}
 
+    viewpoints_raw = data.get("viewpoints")
+    viewpoints_section: _SettingsSection = viewpoints_raw if isinstance(viewpoints_raw, dict) else {}
+    viewpoints = {**_DEFAULTS["viewpoints"], **viewpoints_section}
+
+    exchange_raw = data.get("exchange")
+    exchange_section: _SettingsSection = exchange_raw if isinstance(exchange_raw, dict) else {}
+    exchange = {**_DEFAULTS["exchange"], **exchange_section}
+
     return {
         "backend": backend,
         "diagrams": diagrams,
@@ -111,6 +129,8 @@ def load_settings() -> dict:
         "storage": storage,
         "validation": validation,
         "guidance": guidance,
+        "viewpoints": viewpoints,
+        "exchange": exchange,
     }
 
 
@@ -194,6 +214,62 @@ def datatype_type_references_blocking() -> bool:
     """Whether E332/E334/E335/E336 reject writes instead of remaining advisory."""
     value = load_settings()["validation"].get("datatype_type_references_blocking", True)
     return value if isinstance(value, bool) else True
+
+
+def viewpoint_enforcement_setting() -> EnforcementSetting:
+    """Default viewpoint-application enforcement (W180/W181), overridable per-application."""
+    value = str(load_settings()["validation"].get("viewpoint_enforcement", "warn"))
+    if value not in ("off", "warn", "ghost"):
+        return "warn"
+    return value
+
+
+def _viewpoints_value(key: str) -> object:
+    viewpoints = load_settings().get("viewpoints", {})
+    if not isinstance(viewpoints, dict):
+        return _DEFAULTS["viewpoints"][key]  # type: ignore[index]
+    return viewpoints.get(key, _DEFAULTS["viewpoints"][key])  # type: ignore[index]
+
+
+def viewpoints_execution_max_entities() -> int:
+    """Hard cap on entities in a viewpoint execution result, all transports (companion
+    plan §7.1). GUI/REST default to this cap; MCP defaults lower (see below)."""
+    value = _viewpoints_value("execution_max_entities")
+    try:
+        return max(1, int(value))  # type: ignore[call-overload]
+    except (TypeError, ValueError):
+        return 500
+
+
+def viewpoints_execution_default_entity_limit_mcp() -> int:
+    """MCP ``execute`` action default entity limit when no ``limit`` argument is given —
+    smaller than the hard cap to protect agent context windows."""
+    value = _viewpoints_value("execution_default_entity_limit_mcp")
+    try:
+        return max(1, int(value))  # type: ignore[call-overload]
+    except (TypeError, ValueError):
+        return 200
+
+
+def viewpoints_execution_timeout_seconds() -> float:
+    """Wall-clock budget for one viewpoint execution before it fails as a typed timeout
+    error rather than returning a partial result."""
+    value = _viewpoints_value("execution_timeout_seconds")
+    try:
+        return max(0.1, float(value))  # type: ignore[arg-type]
+    except (TypeError, ValueError):
+        return 10.0
+
+
+def exchange_max_document_bytes() -> int:
+    """Hard size cap on an incoming C19C model-exchange document (parent plan §4.5) —
+    rejected before any parsing is attempted, independent of the parser's own
+    entity-expansion defenses."""
+    value = load_settings()["exchange"]["max_document_bytes"]
+    try:
+        return max(1, int(value))  # type: ignore[call-overload]
+    except (TypeError, ValueError):
+        return 10_000_000
 
 
 def guidance_default_source() -> str:

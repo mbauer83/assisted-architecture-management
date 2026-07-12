@@ -9,8 +9,8 @@ def test_mapping_spec_from_config_supports_structured_sources() -> None:
             "entity_types": ["role"],
             "entity_classes": ["active-structure-element"],
             "sources": [
-                {"ontology": "archimate_next", "entity_type": "role", "transparent": True},
-                {"ontology": "archimate_next", "entity_class": "active-structure-element"},
+                {"ontology": "archimate_4", "entity_type": "role", "transparent": True},
+                {"ontology": "archimate_4", "entity_class": "active-structure-element"},
             ],
         }
     )
@@ -18,13 +18,13 @@ def test_mapping_spec_from_config_supports_structured_sources() -> None:
     assert spec.entity_types == ("role",)
     assert spec.entity_classes == ("active-structure-element",)
     assert len(spec.sources) == 2
-    assert spec.sources[0].ontology == "archimate_next"
+    assert spec.sources[0].ontology == "archimate_4"
     assert spec.sources[0].entity_type == "role"
     assert spec.sources[0].transparent is True
     assert spec.sources[1].entity_class == "active-structure-element"
 
 
 def test_mapping_spec_has_any_detects_sources_only() -> None:
-    spec = mapping_spec_from_config({"sources": [{"ontology": "archimate_next", "entity_type": "role"}]})
+    spec = mapping_spec_from_config({"sources": [{"ontology": "archimate_4", "entity_type": "role"}]})
 
     assert spec.has_any() is True

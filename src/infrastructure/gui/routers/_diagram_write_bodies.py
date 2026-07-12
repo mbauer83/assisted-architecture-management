@@ -25,6 +25,7 @@ class CreateDiagramGuiBody(BaseModel):
     version: str = "0.1.0"
     status: str = "draft"
     tlp: str | None = None
+    viewpoint: dict[str, Any] | None = None
     dry_run: bool = True
 
 
@@ -38,6 +39,7 @@ class EditDiagramGuiBody(BaseModel):
     version: str | None = None
     status: str | None = None
     tlp: str | None = None
+    viewpoint: dict[str, Any] | None = None
     dry_run: bool = True
 
 

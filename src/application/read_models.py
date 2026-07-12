@@ -22,8 +22,9 @@ class EntityContextConnection(TypedDict):
     path: str
     content_text: str
     associated_entities: list[str]
-    src_cardinality: str
-    tgt_cardinality: str
+    src_multiplicity: str
+    tgt_multiplicity: str
+    specialization: str
     source_name: str
     target_name: str
     source_artifact_type: str

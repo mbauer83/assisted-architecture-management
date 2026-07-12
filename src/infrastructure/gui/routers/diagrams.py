@@ -64,6 +64,7 @@ def _read_diagram_impl(id: str, catalogs: RuntimeCatalogs) -> dict[str, Any]:
             result["entity_ids_used"] = [str(x) for x in entity_ids_used]
         if isinstance(connection_ids_used, list):
             result["connection_ids_used"] = [str(x) for x in connection_ids_used]
+        result["viewpoint"] = frontmatter.get("viewpoint")
         dt = catalogs.diagram_types.find_diagram_type(diag_rec.diagram_type)
         if dt:
             result.update(dt.read_diagram_extras(parsed))
@@ -191,10 +192,11 @@ def get_diagram_context(
 @router.get("/api/diagram-types/{name}/entity-types")
 def get_diagram_kind_entity_types(
     name: str,
+    viewpoint: str | None = None,
     catalogs: RuntimeCatalogs = Depends(runtime_catalogs_dependency),
 ) -> list[dict[str, Any]]:
     try:
-        return diagram_kind_entity_type_items(name, catalogs)
+        return diagram_kind_entity_type_items(name, catalogs, viewpoint=viewpoint)
     except KeyError:
         raise HTTPException(404, f"Diagram type not found: {name!r}")
 
@@ -202,10 +204,11 @@ def get_diagram_kind_entity_types(
 @router.get("/api/diagram-types/{name}/connection-types")
 def get_diagram_kind_connection_types(
     name: str,
+    viewpoint: str | None = None,
     catalogs: RuntimeCatalogs = Depends(runtime_catalogs_dependency),
 ) -> list[dict[str, Any]]:
     try:
-        return diagram_kind_connection_type_items(name, catalogs)
+        return diagram_kind_connection_type_items(name, catalogs, viewpoint=viewpoint)
     except KeyError:
         raise HTTPException(404, f"Diagram type not found: {name!r}")
 
@@ -231,11 +234,12 @@ def entity_display_search(
     entity_types: str | None = None,
     keywords: str | None = None,
     cursor: str | None = None,
+    viewpoint: str | None = None,
     catalogs: RuntimeCatalogs = Depends(runtime_catalogs_dependency),
 ) -> dict[str, Any]:
     result = entity_display_search_impl(
         q, limit, diagram_type, catalogs,
-        domains=domains, entity_types=entity_types, keywords=keywords, cursor=cursor,
+        domains=domains, entity_types=entity_types, keywords=keywords, cursor=cursor, viewpoint=viewpoint,
     )
     return {"items": result.items, "next_cursor": result.next_cursor}
 
@@ -247,6 +251,7 @@ def diagram_entity_discovery(
     diagram_type: str | None = None,
     max_hops: int = Query(default=2, ge=1, le=4),
     limit: int = Query(default=20, ge=1, le=50),
+    viewpoint: str | None = None,
     catalogs: RuntimeCatalogs = Depends(runtime_catalogs_dependency),
 ) -> dict[str, Any]:
     repo = s.get_repo()
@@ -257,7 +262,8 @@ def diagram_entity_discovery(
     ]
     excluded = set(included)
     search_results: list[dict[str, Any]] = (
-        entity_display_search_impl(q or "", limit, diagram_type, catalogs).items if (q or "").strip() else []
+        entity_display_search_impl(q or "", limit, diagram_type, catalogs, viewpoint=viewpoint).items
+        if (q or "").strip() else []
     )
     search_results = [item for item in search_results if str(item["artifact_id"]) not in excluded][:limit]
     return {

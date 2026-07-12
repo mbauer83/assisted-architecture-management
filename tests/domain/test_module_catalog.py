@@ -78,10 +78,6 @@ class _StubOntology:
     def display_section_id(self) -> str:
         return self._name
 
-    @property
-    def attribute_profiles(self) -> Mapping[str, dict[str, object]]:
-        return {}
-
     def entity_types_with_class(self, cls: ElementClassName) -> frozenset[EntityTypeName]:
         return frozenset(n for n, info in self._entity_types.items() if cls in info.classes)
 

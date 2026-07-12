@@ -24,6 +24,12 @@ class ArtifactRegistry:
     def find_file_by_id(self, artifact_id: str) -> Path | None:
         return self._store.find_file_by_id(artifact_id)
 
+    def get_entity(self, artifact_id: str) -> EntityRecord | None:
+        return self._store.get_entity(artifact_id)
+
+    def get_connection(self, artifact_id: str) -> ConnectionRecord | None:
+        return self._store.get_connection(artifact_id)
+
     def entity_ids(self) -> set[str]:
         return self._store.entity_ids()
 

@@ -10,6 +10,7 @@ import pytest
 from fastapi import FastAPI
 from starlette.testclient import TestClient
 
+from src.infrastructure.app_bootstrap import install_module_registry
 from src.infrastructure.gui.routers.authoring_guidance import router as authoring_guidance_router
 from src.infrastructure.write.artifact_write.type_guidance import get_type_guidance
 
@@ -18,6 +19,7 @@ from src.infrastructure.write.artifact_write.type_guidance import get_type_guida
 def client() -> TestClient:
     app = FastAPI()
     app.include_router(authoring_guidance_router)
+    install_module_registry(app)
     return TestClient(app)
 
 

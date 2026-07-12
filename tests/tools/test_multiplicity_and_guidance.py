@@ -1,4 +1,4 @@
-"""Tests for connection cardinalities (feature i) and modeling guidance tool (feature iii).
+"""Tests for connection multiplicities (feature i) and modeling guidance tool (feature iii).
 
 Also covers the removal of element_category from EntityTypeInfo (feature ii).
 """
@@ -127,14 +127,14 @@ def _setup_two_entities(repo: Path) -> tuple[str, str]:
 
 
 # ===========================================================================
-# Feature i: Cardinality support
+# Feature i: multiplicity support
 # ===========================================================================
 
 
-class TestFormatOutgoingWithCardinality:
+class TestFormatOutgoingWithMultiplicity:
     """Unit tests for the formatter — no file I/O."""
 
-    def test_no_cardinality_unchanged(self) -> None:
+    def test_no_multiplicity_unchanged(self) -> None:
         content = format_outgoing_markdown(
             source_entity="REQ@1.A.src",
             version="0.1.0",
@@ -144,7 +144,7 @@ class TestFormatOutgoingWithCardinality:
         )
         assert "### archimate-realization → REQ@2.B.tgt" in content
 
-    def test_src_cardinality_only(self) -> None:
+    def test_src_multiplicity_only(self) -> None:
         content = format_outgoing_markdown(
             source_entity="REQ@1.A.src",
             version="0.1.0",
@@ -154,13 +154,13 @@ class TestFormatOutgoingWithCardinality:
                 {
                     "connection_type": "archimate-realization",
                     "target_entity": "REQ@2.B.tgt",
-                    "src_cardinality": "1",
+                    "src_multiplicity": "1",
                 }
             ],
         )
         assert "### archimate-realization [1] → REQ@2.B.tgt" in content
 
-    def test_tgt_cardinality_only(self) -> None:
+    def test_tgt_multiplicity_only(self) -> None:
         content = format_outgoing_markdown(
             source_entity="REQ@1.A.src",
             version="0.1.0",
@@ -170,13 +170,13 @@ class TestFormatOutgoingWithCardinality:
                 {
                     "connection_type": "archimate-realization",
                     "target_entity": "REQ@2.B.tgt",
-                    "tgt_cardinality": "0..*",
+                    "tgt_multiplicity": "0..*",
                 }
             ],
         )
         assert "### archimate-realization → [0..*] REQ@2.B.tgt" in content
 
-    def test_both_cardinalities(self) -> None:
+    def test_both_multiplicities(self) -> None:
         content = format_outgoing_markdown(
             source_entity="REQ@1.A.src",
             version="0.1.0",
@@ -186,14 +186,14 @@ class TestFormatOutgoingWithCardinality:
                 {
                     "connection_type": "archimate-realization",
                     "target_entity": "REQ@2.B.tgt",
-                    "src_cardinality": "1",
-                    "tgt_cardinality": "0..*",
+                    "src_multiplicity": "1",
+                    "tgt_multiplicity": "0..*",
                 }
             ],
         )
         assert "### archimate-realization [1] → [0..*] REQ@2.B.tgt" in content
 
-    def test_wildcard_src_cardinality(self) -> None:
+    def test_wildcard_src_multiplicity(self) -> None:
         content = format_outgoing_markdown(
             source_entity="REQ@1.A.src",
             version="0.1.0",
@@ -203,13 +203,13 @@ class TestFormatOutgoingWithCardinality:
                 {
                     "connection_type": "archimate-association",
                     "target_entity": "REQ@2.B.tgt",
-                    "src_cardinality": "*",
+                    "src_multiplicity": "*",
                 }
             ],
         )
         assert "### archimate-association [*] → REQ@2.B.tgt" in content
 
-    def test_range_cardinality(self) -> None:
+    def test_range_multiplicity(self) -> None:
         content = format_outgoing_markdown(
             source_entity="REQ@1.A.src",
             version="0.1.0",
@@ -219,18 +219,18 @@ class TestFormatOutgoingWithCardinality:
                 {
                     "connection_type": "archimate-realization",
                     "target_entity": "REQ@2.B.tgt",
-                    "src_cardinality": "1..5",
-                    "tgt_cardinality": "1..*",
+                    "src_multiplicity": "1..5",
+                    "tgt_multiplicity": "1..*",
                 }
             ],
         )
         assert "### archimate-realization [1..5] → [1..*] REQ@2.B.tgt" in content
 
 
-class TestParseOutgoingWithCardinality:
-    """Round-trip parsing of cardinalities from .outgoing.md files."""
+class TestParseOutgoingWithMultiplicity:
+    """Round-trip parsing of multiplicities from .outgoing.md files."""
 
-    def test_parse_no_cardinality(self, tmp_path: Path) -> None:
+    def test_parse_no_multiplicity(self, tmp_path: Path) -> None:
         path = tmp_path / "REQ@1.A.src.outgoing.md"
         path.write_text(
             _outgoing("REQ@1.A.src", ["### archimate-realization → REQ@2.B.tgt"]),
@@ -241,10 +241,10 @@ class TestParseOutgoingWithCardinality:
         conn = parsed.connections[0]
         assert conn["connection_type"] == "archimate-realization"
         assert conn["target_entity"] == "REQ@2.B.tgt"
-        assert "src_cardinality" not in conn
-        assert "tgt_cardinality" not in conn
+        assert "src_multiplicity" not in conn
+        assert "tgt_multiplicity" not in conn
 
-    def test_parse_src_cardinality(self, tmp_path: Path) -> None:
+    def test_parse_src_multiplicity(self, tmp_path: Path) -> None:
         path = tmp_path / "REQ@1.A.src.outgoing.md"
         path.write_text(
             _outgoing("REQ@1.A.src", ["### archimate-realization [1] → REQ@2.B.tgt"]),
@@ -254,10 +254,10 @@ class TestParseOutgoingWithCardinality:
         conn = parsed.connections[0]
         assert conn["connection_type"] == "archimate-realization"
         assert conn["target_entity"] == "REQ@2.B.tgt"
-        assert conn.get("src_cardinality") == "1"
-        assert "tgt_cardinality" not in conn
+        assert conn.get("src_multiplicity") == "1"
+        assert "tgt_multiplicity" not in conn
 
-    def test_parse_tgt_cardinality(self, tmp_path: Path) -> None:
+    def test_parse_tgt_multiplicity(self, tmp_path: Path) -> None:
         path = tmp_path / "REQ@1.A.src.outgoing.md"
         path.write_text(
             _outgoing("REQ@1.A.src", ["### archimate-realization → [0..*] REQ@2.B.tgt"]),
@@ -266,10 +266,10 @@ class TestParseOutgoingWithCardinality:
         parsed = parse_outgoing_file(path)
         conn = parsed.connections[0]
         assert conn["target_entity"] == "REQ@2.B.tgt"
-        assert "src_cardinality" not in conn
-        assert conn.get("tgt_cardinality") == "0..*"
+        assert "src_multiplicity" not in conn
+        assert conn.get("tgt_multiplicity") == "0..*"
 
-    def test_parse_both_cardinalities(self, tmp_path: Path) -> None:
+    def test_parse_both_multiplicities(self, tmp_path: Path) -> None:
         path = tmp_path / "REQ@1.A.src.outgoing.md"
         path.write_text(
             _outgoing("REQ@1.A.src", ["### archimate-realization [1] → [0..*] REQ@2.B.tgt"]),
@@ -277,11 +277,11 @@ class TestParseOutgoingWithCardinality:
         )
         parsed = parse_outgoing_file(path)
         conn = parsed.connections[0]
-        assert conn.get("src_cardinality") == "1"
-        assert conn.get("tgt_cardinality") == "0..*"
+        assert conn.get("src_multiplicity") == "1"
+        assert conn.get("tgt_multiplicity") == "0..*"
 
-    def test_roundtrip_preserves_cardinalities(self, tmp_path: Path) -> None:
-        """Parse → format → parse round-trip preserves both cardinalities."""
+    def test_roundtrip_preserves_multiplicities(self, tmp_path: Path) -> None:
+        """Parse → format → parse round-trip preserves both multiplicities."""
         path = tmp_path / "REQ@1.A.src.outgoing.md"
         path.write_text(
             _outgoing("REQ@1.A.src", ["### archimate-realization [1..3] → [1..*] REQ@2.B.tgt"]),
@@ -298,14 +298,14 @@ class TestParseOutgoingWithCardinality:
         path2 = tmp_path / "roundtrip.outgoing.md"
         path2.write_text(reformatted, encoding="utf-8")
         parsed2 = parse_outgoing_file(path2)
-        assert parsed2.connections[0].get("src_cardinality") == "1..3"
-        assert parsed2.connections[0].get("tgt_cardinality") == "1..*"
+        assert parsed2.connections[0].get("src_multiplicity") == "1..3"
+        assert parsed2.connections[0].get("tgt_multiplicity") == "1..*"
 
 
-class TestVerifierCardinality:
-    """Tests for verifier's cardinality validation rules."""
+class TestVerifierMultiplicity:
+    """Tests for verifier's multiplicity validation rules."""
 
-    def test_valid_cardinality_passes_verification(self, repo: Path) -> None:
+    def test_valid_multiplicity_passes_verification(self, repo: Path) -> None:
         src, tgt = _setup_two_entities(repo)
         out_path = repo / "model/motivation/requirements" / f"{src}.outgoing.md"
         _write(out_path, _outgoing(src, [f"### archimate-aggregation [1] → [0..*] {tgt}"]))
@@ -314,7 +314,7 @@ class TestVerifierCardinality:
         result = verifier.verify_outgoing_file(out_path)
         assert result.valid, [i.message for i in result.issues]
 
-    def test_all_cardinality_formats_valid(self, repo: Path) -> None:
+    def test_all_multiplicity_formats_valid(self, repo: Path) -> None:
         src, tgt = _setup_two_entities(repo)
         for card in ["1", "0", "0..1", "1..5", "*", "1..*", "0..*"]:
             out_path = repo / "model/motivation/requirements" / f"{src}.outgoing.md"
@@ -322,9 +322,9 @@ class TestVerifierCardinality:
             registry = ArtifactRegistry(shared_artifact_index(repo))
             verifier = ArtifactVerifier(registry, catalogs=_catalogs())
             result = verifier.verify_outgoing_file(out_path)
-            assert result.valid, f"Cardinality '{card}' failed: {[i.message for i in result.issues]}"
+            assert result.valid, f"multiplicity '{card}' failed: {[i.message for i in result.issues]}"
 
-    def test_invalid_cardinality_rejected(self, repo: Path) -> None:
+    def test_invalid_multiplicity_rejected(self, repo: Path) -> None:
         src, tgt = _setup_two_entities(repo)
         out_path = repo / "model/motivation/requirements" / f"{src}.outgoing.md"
         _write(out_path, _outgoing(src, [f"### archimate-realization [1:n] → {tgt}"]))
@@ -334,7 +334,7 @@ class TestVerifierCardinality:
         assert not result.valid
         assert any(i.code == "E125" for i in result.issues)
 
-    def test_invalid_tgt_cardinality_rejected(self, repo: Path) -> None:
+    def test_invalid_tgt_multiplicity_rejected(self, repo: Path) -> None:
         src, tgt = _setup_two_entities(repo)
         out_path = repo / "model/motivation/requirements" / f"{src}.outgoing.md"
         _write(out_path, _outgoing(src, [f"### archimate-realization → [many] {tgt}"]))
@@ -345,10 +345,10 @@ class TestVerifierCardinality:
         assert any(i.code == "E125" for i in result.issues)
 
 
-class TestAddConnectionWithCardinality:
-    """Integration tests: add_connection writes and verifies cardinalities."""
+class TestAddConnectionWithMultiplicity:
+    """Integration tests: add_connection writes and verifies multiplicities."""
 
-    def test_add_connection_with_src_cardinality(self, repo: Path) -> None:
+    def test_add_connection_with_src_multiplicity(self, repo: Path) -> None:
         from src.infrastructure.write.artifact_write.connection import add_connection
 
         src, tgt = _setup_two_entities(repo)
@@ -371,14 +371,14 @@ class TestAddConnectionWithCardinality:
             status="draft",
             last_updated="2026-04-17",
             dry_run=False,
-            src_cardinality="1",
+            src_multiplicity="1",
         )
         assert result.wrote
         out_path = repo / "model/motivation/requirements" / f"{src}.outgoing.md"
         content = out_path.read_text()
         assert "### archimate-influence [1] →" in content
 
-    def test_add_connection_with_both_cardinalities(self, repo: Path) -> None:
+    def test_add_connection_with_both_multiplicities(self, repo: Path) -> None:
         from src.infrastructure.write.artifact_write.connection import add_connection
 
         src, tgt = _setup_two_entities(repo)
@@ -401,8 +401,8 @@ class TestAddConnectionWithCardinality:
             status="draft",
             last_updated="2026-04-17",
             dry_run=False,
-            src_cardinality="1",
-            tgt_cardinality="0..*",
+            src_multiplicity="1",
+            tgt_multiplicity="0..*",
         )
         assert result.wrote
         out_path = repo / "model/motivation/requirements" / f"{src}.outgoing.md"
@@ -411,12 +411,12 @@ class TestAddConnectionWithCardinality:
 
 
 # ===========================================================================
-# Feature i (extended): API body cardinality validation (Pydantic)
+# Feature i (extended): API body multiplicity validation (Pydantic)
 # ===========================================================================
 
 
-class TestConnectionBodyCardinality:
-    """Pydantic-level validation of cardinality fields on Add/Edit request bodies."""
+class TestConnectionBodyMultiplicity:
+    """Pydantic-level validation of multiplicity fields on Add/Edit request bodies."""
 
     def test_add_body_accepts_valid_formats(self) -> None:
         from src.infrastructure.gui.routers.connections import AddConnectionBody
@@ -426,17 +426,17 @@ class TestConnectionBodyCardinality:
                 source_entity="A",
                 connection_type="archimate-realization",
                 target_entity="B",
-                src_cardinality=card,
+                src_multiplicity=card,
             )
-            assert body.src_cardinality == card
+            assert body.src_multiplicity == card
 
             body = AddConnectionBody(
                 source_entity="A",
                 connection_type="archimate-realization",
                 target_entity="B",
-                tgt_cardinality=card,
+                tgt_multiplicity=card,
             )
-            assert body.tgt_cardinality == card
+            assert body.tgt_multiplicity == card
 
     def test_add_body_rejects_invalid_formats(self) -> None:
         from pydantic import ValidationError
@@ -444,19 +444,19 @@ class TestConnectionBodyCardinality:
         from src.infrastructure.gui.routers.connections import AddConnectionBody
 
         for bad in ["1:n", "many", "1-5", "n", "one", "1..n", "*..1", "1..2..3"]:
-            with pytest.raises(ValidationError, match="Invalid cardinality"):
+            with pytest.raises(ValidationError, match="Invalid multiplicity"):
                 AddConnectionBody(
                     source_entity="A",
                     connection_type="archimate-realization",
                     target_entity="B",
-                    src_cardinality=bad,
+                    src_multiplicity=bad,
                 )
-            with pytest.raises(ValidationError, match="Invalid cardinality"):
+            with pytest.raises(ValidationError, match="Invalid multiplicity"):
                 AddConnectionBody(
                     source_entity="A",
                     connection_type="archimate-realization",
                     target_entity="B",
-                    tgt_cardinality=bad,
+                    tgt_multiplicity=bad,
                 )
 
     def test_add_body_accepts_none(self) -> None:
@@ -467,8 +467,8 @@ class TestConnectionBodyCardinality:
             connection_type="archimate-realization",
             target_entity="B",
         )
-        assert body.src_cardinality is None
-        assert body.tgt_cardinality is None
+        assert body.src_multiplicity is None
+        assert body.tgt_multiplicity is None
 
     def test_edit_body_accepts_valid_formats(self) -> None:
         from src.infrastructure.gui.routers.connections import EditConnectionBody
@@ -477,45 +477,45 @@ class TestConnectionBodyCardinality:
             source_entity="A",
             connection_type="archimate-realization",
             target_entity="B",
-            src_cardinality="1..*",
-            tgt_cardinality="0..1",
+            src_multiplicity="1..*",
+            tgt_multiplicity="0..1",
         )
-        assert body.src_cardinality == "1..*"
-        assert body.tgt_cardinality == "0..1"
+        assert body.src_multiplicity == "1..*"
+        assert body.tgt_multiplicity == "0..1"
 
     def test_edit_body_rejects_invalid_formats(self) -> None:
         from pydantic import ValidationError
 
         from src.infrastructure.gui.routers.connections import EditConnectionBody
 
-        with pytest.raises(ValidationError, match="Invalid cardinality"):
+        with pytest.raises(ValidationError, match="Invalid multiplicity"):
             EditConnectionBody(
                 source_entity="A",
                 connection_type="archimate-realization",
                 target_entity="B",
-                src_cardinality="1:n",
+                src_multiplicity="1:n",
             )
-        with pytest.raises(ValidationError, match="Invalid cardinality"):
+        with pytest.raises(ValidationError, match="Invalid multiplicity"):
             EditConnectionBody(
                 source_entity="A",
                 connection_type="archimate-realization",
                 target_entity="B",
-                tgt_cardinality="many",
+                tgt_multiplicity="many",
             )
 
     def test_edit_body_accepts_none_to_clear(self) -> None:
-        """None is valid for edit — it signals 'remove this cardinality'."""
+        """None is valid for edit — it signals 'remove this multiplicity'."""
         from src.infrastructure.gui.routers.connections import EditConnectionBody
 
         body = EditConnectionBody(
             source_entity="A",
             connection_type="archimate-realization",
             target_entity="B",
-            src_cardinality=None,
-            tgt_cardinality=None,
+            src_multiplicity=None,
+            tgt_multiplicity=None,
         )
-        assert body.src_cardinality is None
-        assert body.tgt_cardinality is None
+        assert body.src_multiplicity is None
+        assert body.tgt_multiplicity is None
 
 
 # ===========================================================================
@@ -592,7 +592,10 @@ class TestGetTypeGuidance:
     def test_each_entry_has_required_fields(self) -> None:
         result = get_type_guidance(filter=["requirement"])
         entry = _guidance_entries(result)[0]
-        for field in ("name", "prefix", "classes", "create_when", "never_create_when", "permitted_connections"):
+        for field in (
+            "name", "prefix", "classes", "create_when", "never_create_when",
+            "permitted_connections", "specializations",
+        ):
             assert field in entry, f"Missing field: {field}"
 
     def test_permitted_connections_structure(self) -> None:
@@ -610,11 +613,35 @@ class TestGetTypeGuidance:
 
     def test_create_when_and_never_create_when_are_strings(self) -> None:
         # archimate_4 ships create_when/never_create_when empty (license-encumbered spec
-        # prose, extracted out of the repo per D2/D3); this only asserts the field shape.
+        # prose, extracted out of the repo via the guidance-externalization mechanism);
+        # this only asserts the field shape.
         result = get_type_guidance(filter=["capability"])
         entry = _guidance_entries(result)[0]
         assert isinstance(entry["create_when"], str)
         assert isinstance(entry["never_create_when"], str)
+
+    def test_guidance_status_empty_when_no_guidance_cache_imported(self) -> None:
+        # No repo in this test environment has run arch-import-guidance, so every
+        # entity type's create_when/never_create_when is empty — the response must state
+        # that explicitly rather than let it read as "no restrictions apply".
+        result = get_type_guidance(filter=["capability"])
+        assert result.get("guidance_status") == "empty"
+        assert "arch-import-guidance" in cast(str, result.get("guidance_hint"))
+
+    def test_guidance_status_absent_on_error_response(self) -> None:
+        result = get_type_guidance(filter=["nonexistent-thing"])
+        assert "guidance_status" not in result
+
+    def test_own_entity_type_guidance_empty_detection_is_pure(self) -> None:
+        # Own_entity_types guidance is diagram-type-authored (e.g. activity's swimlane/action),
+        # not sourced from the license-stripped ArchiMate extraction, so it isn't universally
+        # empty in this environment — test the detection helper directly instead of coupling
+        # to which real diagram type happens to have all-empty own_entity_types guidance.
+        from src.infrastructure.write.artifact_write.type_guidance import _entity_type_guidance_is_empty
+
+        assert _entity_type_guidance_is_empty([{"create_when": "", "never_create_when": ""}]) is True
+        assert _entity_type_guidance_is_empty([{"create_when": "x", "never_create_when": ""}]) is False
+        assert _entity_type_guidance_is_empty([]) is False
 
     def test_multiple_domains_filter(self) -> None:
         r_mot = get_type_guidance(filter=["Motivation"])
@@ -697,3 +724,39 @@ class TestGetTypeGuidance:
         assert "represents" in kinds
         assert "abstracts" in kinds
         assert "connection-id" in cast(list[str], message["target_forms"])
+
+    # ---- Specialization enumeration (entity + connection) -------------------
+
+    def test_entity_type_specializations_populated_for_real_type(self) -> None:
+        result = get_type_guidance(filter=["collaboration"])
+        entry = _guidance_entries(result)[0]
+        slugs = {cast(str, s["slug"]) for s in cast(list[dict[str, object]], entry["specializations"])}
+        assert {"business-collaboration", "application-collaboration"} <= slugs
+
+    def test_entity_type_specializations_empty_list_when_none_declared(self) -> None:
+        result = get_type_guidance(filter=["goal"])
+        entry = _guidance_entries(result)[0]
+        assert entry["specializations"] == []
+
+    def test_connection_types_block_lists_specializations_for_real_type(self) -> None:
+        result = get_type_guidance(filter=["requirement"])
+        conn_types = {
+            cast(str, e["name"]): e
+            for e in cast(list[dict[str, object]], result["connection_types"])
+        }
+        assert "archimate-assignment" in conn_types
+        slugs = {
+            cast(str, s["slug"])
+            for s in cast(list[dict[str, object]], conn_types["archimate-assignment"]["specializations"])
+        }
+        assert slugs == {"responsibility-assignment", "behavior-assignment"}
+
+    def test_connection_types_block_excludes_types_without_specializations(self) -> None:
+        result = get_type_guidance(filter=["requirement"])
+        names = {cast(str, e["name"]) for e in cast(list[dict[str, object]], result["connection_types"])}
+        assert "archimate-association" not in names
+
+    def test_explicit_catalogs_param_matches_default(self) -> None:
+        result_default = get_type_guidance(filter=["collaboration"])
+        result_explicit = get_type_guidance(filter=["collaboration"], catalogs=_catalogs())
+        assert result_default == result_explicit

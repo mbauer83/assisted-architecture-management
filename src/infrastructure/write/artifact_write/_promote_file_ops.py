@@ -7,6 +7,8 @@ import shutil
 from pathlib import Path
 from typing import Any, Callable
 
+import yaml  # type: ignore[import-untyped]
+
 from src.config.repo_paths import DOCS, MODEL
 
 TargetResolver = Callable[[str], str | None]
@@ -179,6 +181,25 @@ def rewrite_outgoing(
             continue
         out.append(line)
     return "".join(out)
+
+
+def rewrite_viewpoint_pin(path: Path, new_version: int) -> None:
+    """Patch a promoted diagram/matrix file's ``viewpoint.version`` frontmatter field to
+    *new_version* in place (an explicit promotion-time re-pin, D14) — every other
+    frontmatter field and the body are preserved verbatim."""
+    text = path.read_text(encoding="utf-8")
+    match = re.match(r"^---\n(.*?\n)---\n", text, re.DOTALL)
+    if not match:
+        return
+    frontmatter: dict[str, Any] = yaml.safe_load(match.group(1)) or {}
+    viewpoint = frontmatter.get("viewpoint")
+    if not isinstance(viewpoint, dict):
+        return
+    frontmatter["viewpoint"] = {**viewpoint, "version": new_version}
+    dumped = yaml.safe_dump(frontmatter, sort_keys=False)
+    if not isinstance(dumped, str):
+        raise TypeError("yaml.safe_dump returned non-string output")
+    path.write_text(f"---\n{dumped.strip()}\n---\n{text[match.end():]}", encoding="utf-8")
 
 
 def rollback(copied: list[Path], backups: list[tuple[Path, bytes | None]]) -> None:

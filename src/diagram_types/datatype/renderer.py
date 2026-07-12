@@ -13,8 +13,8 @@ diagram_connections (all with conn_type from the dt-* vocabulary):
   dt-generalization — hollow triangle at target (child → parent)
   dt-dependency    — dashed arrow (source uses/depends-on target)
 
-  Each connection dict: {source, target, conn_type, src_cardinality?,
-                         tgt_cardinality?, label?}
+  Each connection dict: {source, target, conn_type, src_multiplicity?,
+                         tgt_multiplicity?, label?}
 """
 
 from __future__ import annotations
@@ -189,8 +189,8 @@ def _render_connection(kc: dict[str, Any]) -> list[str]:
     tgt = _safe_alias(str(kc.get("target") or ""))
     conn_type = str(kc.get("conn_type") or "dt-association")
     arrow = _PUML_ARROWS.get(conn_type, "--")
-    src_card = str(kc.get("src_cardinality") or "")
-    tgt_card = str(kc.get("tgt_cardinality") or "")
+    src_card = str(kc.get("src_multiplicity") or "")
+    tgt_card = str(kc.get("tgt_multiplicity") or "")
     label = _safe_text(str(kc.get("label") or ""))
 
     src_part = f' "{src_card}"' if src_card else ""

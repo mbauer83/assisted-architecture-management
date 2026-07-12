@@ -50,8 +50,8 @@ def _conn(
     conn_type: str = "archimate-realization",
     *,
     content_text: str = "",
-    src_cardinality: str = "",
-    tgt_cardinality: str = "",
+    src_multiplicity: str = "",
+    tgt_multiplicity: str = "",
 ) -> ConnectionRecord:
     return ConnectionRecord(
         artifact_id=f"{source}---{target}@@{conn_type}",
@@ -63,8 +63,8 @@ def _conn(
         path=Path("/tmp/test.outgoing.md"),
         extra={},
         content_text=content_text,
-        src_cardinality=src_cardinality,
-        tgt_cardinality=tgt_cardinality,
+        src_multiplicity=src_multiplicity,
+        tgt_multiplicity=tgt_multiplicity,
     )
 
 
@@ -172,8 +172,8 @@ def test_archimate_renderer_renders_only_selected_connection_annotation_content(
         target.artifact_id,
         "archimate-serving",
         content_text="Registry pulls over HTTPS 443",
-        src_cardinality="1",
-        tgt_cardinality="0..*",
+        src_multiplicity="1",
+        tgt_multiplicity="0..*",
     )
 
     puml = renderer.render_body(
@@ -194,7 +194,7 @@ def test_archimate_renderer_renders_only_selected_connection_annotation_content(
     assert "SSW_REG -up-> NOD_CLU : Registry pulls over HTTPS 443 | Outbound TCP" in puml
 
 
-def test_archimate_renderer_can_opt_in_cardinality_for_annotated_connections(tmp_path: Path) -> None:
+def test_archimate_renderer_can_opt_in_multiplicity_for_annotated_connections(tmp_path: Path) -> None:
     renderer = ArchimatePumlRenderer(_ARCHIMATE_CONFIG)
     source = _entity("OUT@1.a.outcome", "outcome", "Outcome A", "OUT_A")
     target = _entity("GOL@1.a.goal", "goal", "Goal A", "GOL_A", subdomain="goals")
@@ -202,8 +202,8 @@ def test_archimate_renderer_can_opt_in_cardinality_for_annotated_connections(tmp
         source.artifact_id,
         target.artifact_id,
         "archimate-realization",
-        src_cardinality="1",
-        tgt_cardinality="0..*",
+        src_multiplicity="1",
+        tgt_multiplicity="0..*",
     )
 
     puml = renderer.render_body(
@@ -215,7 +215,7 @@ def test_archimate_renderer_can_opt_in_cardinality_for_annotated_connections(tmp
         diagram_connections=[
             {
                 "artifact_id": connection.artifact_id,
-                "include_cardinality": True,
+                "include_multiplicity": True,
                 "label": "Required path",
             }
         ],

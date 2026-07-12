@@ -11,12 +11,14 @@ from typing import Any
 from src.application.artifact_parsing import normalize_puml_alias
 from src.domain.archimate_relation_rendering import (
     display_connection_label,
-    format_cardinality_label,
+    format_multiplicity_label,
+    format_specialization_guillemet,
 )
 from src.domain.artifact_types import ConnectionRecord, EntityRecord
 from src.domain.module_types import ConnectionTypeName, ElementClassName
 from src.domain.ontology_protocol import DiagramRendererReferences
 from src.domain.ontology_types import ConnectionTypeInfo
+from src.domain.specializations import SpecializationCatalog, merge_specialization_catalogs
 from src.infrastructure.rendering._archimate_includes import (
     inject_archimate_includes,
 )
@@ -24,7 +26,7 @@ from src.infrastructure.rendering._diagram_layout import (
     build_branch_direction_hints,
     build_nested_layout_lines,
 )
-from src.infrastructure.rendering._diagram_text import insert_arrow_direction
+from src.infrastructure.rendering._diagram_text import insert_arrow_direction, insert_arrow_line_style
 from src.infrastructure.rendering.archimate_entity_declarations import (
     entity_declaration,
     entity_nest_declaration,
@@ -122,15 +124,18 @@ class GenericPumlRenderer:
                 if normalize_puml_alias(entity.display_alias) not in nested_aliases
             ]
 
+        specialization_catalog = self._specialization_catalog()
+
         def render_entity(entity: EntityRecord, indent: str) -> list[str]:
             alias = normalize_puml_alias(entity.display_alias)
             if not alias:
                 return []
             children = children_map.get(alias, [])
+            decl_args = (entity, alias, _registry(), self._junction_types(), specialization_catalog)
             if not children:
-                return [f"{indent}{entity_declaration(entity, alias, _registry(), self._junction_types())}"]
+                return [f"{indent}{entity_declaration(*decl_args)}"]
             inner = indent + "  "
-            rendered = [f"{indent}{entity_nest_declaration(entity, alias, _registry(), self._junction_types())}"]
+            rendered = [f"{indent}{entity_nest_declaration(*decl_args)}"]
             for child in children:
                 rendered.extend(render_entity(child, inner))
             child_als = [normalize_puml_alias(child.display_alias) for child in children if child.display_alias]
@@ -206,7 +211,14 @@ class GenericPumlRenderer:
                 tgt_group = group_index_by_alias.get(tgt)
                 if direction is None and src_group is not None and tgt_group is not None and src_group != tgt_group:
                     direction = "down" if src_group < tgt_group else "up"
+            conn_spec = (
+                specialization_catalog.get("connection", conn.conn_type, conn.specialization)
+                if conn.specialization
+                else None
+            )
             arrow = conn_info.puml_arrow if conn_info else "-->"
+            if conn_spec is not None and conn_spec.notation.line_style and not direction:
+                arrow = insert_arrow_line_style(arrow, conn_spec.notation.line_style)
             if direction:
                 arrow = insert_arrow_direction(arrow, direction)
             override = edge_labels.get(f"{src}:{tgt}") if edge_labels else None
@@ -214,6 +226,8 @@ class GenericPumlRenderer:
                 label = override
             else:
                 visible_label = self.visible_connection_label(conn, diagram_connections)
+                if conn_spec is not None and conn_spec.notation.label_marker:
+                    visible_label = f"{conn_spec.notation.label_marker} {visible_label}".strip()
                 show_stereo = conn_info.show_stereotype if conn_info is not None else True
                 if show_stereo:
                     label = f"<<{display_connection_label(conn.conn_type)}>>"
@@ -221,6 +235,9 @@ class GenericPumlRenderer:
                         label = f"{label} {visible_label}"
                 else:
                     label = visible_label
+                if conn_spec is not None:
+                    guillemet = format_specialization_guillemet(conn_spec.name)
+                    label = f"{label} {guillemet}".strip() if label else guillemet
             if label:
                 conn_lines.append(f"{src} {arrow} {tgt} : {label}")
             else:
@@ -262,13 +279,21 @@ class GenericPumlRenderer:
         diagram_connections: list[dict[str, object]] | None = None,
     ) -> str:
         del diagram_connections
-        return format_cardinality_label(conn.src_cardinality, conn.tgt_cardinality)
+        return format_multiplicity_label(conn.src_multiplicity, conn.tgt_multiplicity)
 
     def _includes(self) -> list[str]:
         return [str(value) for value in self._config.get("includes", ())]
 
     def _connection_info(self, conn_type: str) -> ConnectionTypeInfo | None:
         return _registry().find_connection_type(ConnectionTypeName(conn_type))
+
+    def _specialization_catalog(self) -> SpecializationCatalog:
+        """The merged specialization catalog across every registered ontology — same
+        module-registry-singleton pattern already used by `_connection_info`/
+        `_junction_types` above, not a new service-locator surface."""
+        return merge_specialization_catalogs(
+            *(module.specialization_catalog for module in _registry().all_ontologies().values())
+        )
 
     def _junction_types(self) -> frozenset[str]:
         return frozenset(_registry().entity_types_with_class(ElementClassName("junction")))

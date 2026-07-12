@@ -202,6 +202,8 @@ def _build_app(credentials: "GitCredentials | None" = None):  # type: ignore[no-
     from src.infrastructure.gui.routers.modules import router as modules_router
     from src.infrastructure.gui.routers.promote import router as promote_router
     from src.infrastructure.gui.routers.sync import router as sync_router
+    from src.infrastructure.gui.routers.viewpoint_authoring import router as viewpoint_authoring_router
+    from src.infrastructure.gui.routers.viewpoints import router as viewpoints_router
 
     mcp_read.streamable_http_app()
     mcp_write.streamable_http_app()
@@ -270,6 +272,7 @@ def _build_app(credentials: "GitCredentials | None" = None):  # type: ignore[no-
         entities_router, entity_search_router, connections_router, diagram_types_router,
         diagrams_router, documents_router, groups_router, identifiers_router, modules_router, promote_router,
         sync_router, admin_router, events_router, assurance_router, authoring_guidance_router,
+        viewpoints_router, viewpoint_authoring_router,
     ):
         app.include_router(router)
 

@@ -88,6 +88,44 @@ class TestEditDiagramToolSchema:
         for mode in ("refresh-derivation", "apply-diff", "propose-bindings", "detach-binding"):
             assert mode in desc, f"Binding mode '{mode}' missing from description"
 
+    def test_viewpoint_parameter_present(self, tool) -> None:
+        assert "viewpoint" in _param_names(tool), (
+            "viewpoint parameter missing — WU-E6 regression"
+        )
+
+    def test_description_mentions_viewpoint(self, tool) -> None:
+        desc = tool.description
+        assert "viewpoint" in desc, "Description must document the viewpoint parameter"
+        assert "ViewpointApplication" in desc, "Description must name the ViewpointApplication frontmatter"
+        assert "viewpoint" in desc.split("Matrix diagrams")[1], (
+            "Description must state viewpoint is rejected for matrix diagrams"
+        )
+
+
+# ---------------------------------------------------------------------------
+# artifact_create_diagram
+# ---------------------------------------------------------------------------
+
+
+class TestCreateDiagramToolSchema:
+    @pytest.fixture(scope="class")
+    def tool(self):
+        tools = _get_write_tools()
+        assert "artifact_create_diagram" in tools, "artifact_create_diagram not registered"
+        return tools["artifact_create_diagram"]
+
+    def test_viewpoint_parameter_present(self, tool) -> None:
+        assert "viewpoint" in _param_names(tool), (
+            "viewpoint parameter missing — WU-E6 regression"
+        )
+
+    def test_description_mentions_viewpoint(self, tool) -> None:
+        desc = tool.description
+        assert "viewpoint" in desc, "Description must document the viewpoint parameter"
+        assert "artifact_authoring_guidance" in desc, (
+            "Description must point at artifact_authoring_guidance for viewpoint discovery"
+        )
+
 
 # ---------------------------------------------------------------------------
 # artifact_authoring_guidance
@@ -127,3 +165,9 @@ class TestAuthoringGuidanceToolSchema:
         assert "diagram_type" in desc, "Description must cover diagram_type param"
         assert "filter" in desc, "Description must cover filter param"
         assert "target" in desc, "Description must cover target param"
+
+    def test_description_mentions_viewpoints_response_field(self, tool) -> None:
+        desc = tool.description
+        assert "viewpoints" in desc, (
+            "Description must document the always-present 'viewpoints' response field — WU-E6 regression"
+        )

@@ -230,14 +230,14 @@ class TestAddConnectionDuplicate:
                 dry_run=True,
             )
 
-    def test_duplicate_with_cardinality_strips_and_matches(self, tmp_path: Path) -> None:
-        """Duplicate check should strip cardinalities before comparing targets."""
+    def test_duplicate_with_multiplicity_strips_and_matches(self, tmp_path: Path) -> None:
+        """Duplicate check should strip multiplicities before comparing targets."""
         root = _eng_root(tmp_path, "ACTE5")
         src = "REQ@1000000216.DupCard.dup-card"
         tgt = "REQ@1000000217.DupCardTgt.dup-card-tgt"
         _write(root / "model" / "motivation" / "requirement" / f"{src}.md", _entity_md(src, "Dup Card"))
         _write(root / "model" / "motivation" / "requirement" / f"{tgt}.md", _entity_md(tgt, "Dup Card Tgt"))
-        # Write outgoing file with cardinality syntax
+        # Write outgoing file with multiplicity syntax
         outgoing_text = f"""\
 ---
 artifact-id: {src}
@@ -306,14 +306,14 @@ class TestJunctionHomogeneity:
                 dry_run=True,
             )
 
-    def test_cardinality_at_junction_raises_value_error(self, tmp_path: Path) -> None:
+    def test_multiplicity_at_junction_raises_value_error(self, tmp_path: Path) -> None:
         root = _eng_root(tmp_path, "JUNC2")
         junc = "AND@1000000221.Junc2.junc-two"
         tgt = "REQ@1000000222.JuncTgt3.junc-tgt-three"
         _write(root / "model" / "motivation" / "and-junction" / f"{junc}.md", _junction_md(junc, "Junc Two"))
         _write(root / "model" / "motivation" / "requirement" / f"{tgt}.md", _entity_md(tgt, "Junc Tgt 3"))
         registry, verifier = _build_deps(root)
-        with pytest.raises(ValueError, match="Cardinalities are not permitted"):
+        with pytest.raises(ValueError, match="Multiplicities are not permitted"):
             add_connection(
                 repo_root=root,
                 registry=registry,
@@ -327,5 +327,5 @@ class TestJunctionHomogeneity:
                 status="draft",
                 last_updated=None,
                 dry_run=True,
-                src_cardinality="1",
+                src_multiplicity="1",
             )

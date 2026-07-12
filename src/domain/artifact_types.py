@@ -55,6 +55,7 @@ class EntityRecord:
     host_diagram_id: str | None = None
     """None for model entities; the owning diagram's artifact_id for diagram-only entities."""
     group: str = "uncategorized"
+    specialization: str = ""
 
     def __str__(self) -> str:
         return (
@@ -76,9 +77,10 @@ class ConnectionRecord:
     extra: Mapping[str, object]
     content_text: str
     associated_entities: tuple[str, ...] = field(default_factory=tuple)
-    src_cardinality: str = ""
-    tgt_cardinality: str = ""
+    src_multiplicity: str = ""
+    tgt_multiplicity: str = ""
     group: str = "uncategorized"
+    specialization: str = ""
 
     @property
     def source_ids(self) -> list[str]:
@@ -254,6 +256,7 @@ STANDARD_ENTITY_FIELDS = frozenset(
         "status",
         "last-updated",
         "keywords",
+        "specialization",
     }
 )
 

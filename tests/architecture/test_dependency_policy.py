@@ -23,6 +23,7 @@ _MUTATION_ADAPTER_IMPORTERS = frozenset(
         "src/infrastructure/git/enterprise_git_ops.py",
         "src/infrastructure/git/git_sync_m4.py",
         "src/infrastructure/git/repair_adapter.py",
+        "src/infrastructure/repository_upgrade/guard.py",
         "src/infrastructure/write/artifact_write/_cascade_helpers.py",
         "src/infrastructure/write/artifact_write/_group_fs.py",
         "src/infrastructure/write/artifact_write/cascade_delete.py",

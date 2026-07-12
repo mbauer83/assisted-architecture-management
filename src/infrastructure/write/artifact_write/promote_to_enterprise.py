@@ -17,11 +17,13 @@ Execution logic lives in promote_execute.py.
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Literal
 
 from src.application.artifact_query import ArtifactRepository
+from src.application.runtime_catalogs import RuntimeCatalogs
 from src.application.verification.artifact_verifier import ArtifactRegistry
 from src.infrastructure.write.artifact_write._promote_groups import GroupMappingEntry
 from src.infrastructure.write.artifact_write._promote_planning import (
@@ -34,6 +36,12 @@ from src.infrastructure.write.artifact_write._promote_planning import (
     _partition_selected,
     build_enterprise_classifier_indexes,
 )
+from src.infrastructure.write.artifact_write._promote_viewpoints import (
+    ViewpointDependency,
+    ViewpointResolution,
+    collect_viewpoint_dependencies,
+    viewpoint_dependency_errors,
+)
 from src.infrastructure.write.artifact_write.promote_schema_check import check_promotion_schema_compatibility
 from src.infrastructure.write.artifact_write.promote_type_closure import compute_type_closure
 
@@ -44,6 +52,8 @@ __all__ = [
     "PromotionConflict",
     "PromotionPlan",
     "PromotionResult",
+    "ViewpointDependency",
+    "ViewpointResolution",
     "_normalize_name",
     "plan_promotion",
 ]
@@ -113,6 +123,7 @@ class PromotionPlan:
     type_closure_additions: list[str] = field(default_factory=list)
     type_closure_reasons: dict[str, str] = field(default_factory=dict)
     broken_type_closure: list[str] = field(default_factory=list)
+    viewpoint_dependencies: list[ViewpointDependency] = field(default_factory=list)
 
 
 @dataclass
@@ -178,6 +189,8 @@ def plan_promotion(
     diagram_ids: list[str] | None = None,
     engagement_root: Path | None = None,
     enterprise_root: Path | None = None,
+    catalogs: RuntimeCatalogs | None = None,
+    viewpoint_resolutions: Mapping[str, ViewpointResolution] | None = None,
 ) -> PromotionPlan:
     """Compute an explicit promotion plan from a caller-selected artifact set."""
     all_entities = registry.entity_ids()
@@ -245,6 +258,8 @@ def plan_promotion(
         document_ids=docs_to_add + [c.engagement_id for c in doc_conflicts],
         registry=registry,
         repo=repo,
+        connection_ids=list(conn_ids),
+        catalogs=catalogs,
     )
     for clf_id in broken_type_closure:
         schema_errors.append(
@@ -262,6 +277,22 @@ def plan_promotion(
             all_entity_ids, registry, engagement_root, enterprise_root
         )
 
+    viewpoint_dependencies: list[ViewpointDependency] = []
+    if engagement_root is not None and enterprise_root is not None:
+        promoted_diagram_ids = diags_to_add + [c.engagement_id for c in diagram_conflicts]
+        viewpoint_dependencies = collect_viewpoint_dependencies(
+            promoted_diagram_ids, repo=repo, ent_root=enterprise_root
+        )
+        schema_errors.extend(
+            viewpoint_dependency_errors(
+                viewpoint_dependencies,
+                eng_root=engagement_root,
+                ent_root=enterprise_root,
+                catalogs=catalogs,
+                resolutions=viewpoint_resolutions,
+            )
+        )
+
     return PromotionPlan(
         root_entity=selected_ids[0] if selected_ids else (document_ids or diagram_ids or [""])[0],
         entities_to_add=to_add,
@@ -276,6 +307,7 @@ def plan_promotion(
         schema_errors=schema_errors,
         group_mapping=group_mapping,
         available_enterprise_groups=available_enterprise_groups,
+        viewpoint_dependencies=viewpoint_dependencies,
         type_closure_additions=type_closure_additions,
         type_closure_reasons=type_closure_reasons,
         broken_type_closure=broken_type_closure,

@@ -17,6 +17,7 @@ from src.application.candidate_repository import CandidateRepository
 from src.application.runtime_catalogs import RuntimeCatalogs
 from src.application.verification.artifact_verifier import ArtifactVerifier
 from src.application.verification.artifact_verifier_types import VerificationResult
+from src.domain.concept_scope import ConceptScope
 from src.domain.diagram_verification import BaseDiagramVerificationContext
 
 # ── Minimal stubs ─────────────────────────────────────────────────────────────
@@ -77,6 +78,9 @@ class _FakeModule:
     @property
     def element_classes(self) -> dict:
         return {}
+
+    def concept_scope(self, registry: Any = None) -> ConceptScope:
+        return ConceptScope.unrestricted()
 
     def accepts_entity_type(self, t: Any) -> bool:
         return False
@@ -197,6 +201,12 @@ class _FakeRegistry:
         return "engagement"
 
     def find_file_by_id(self, artifact_id: str) -> None:
+        return None
+
+    def get_entity(self, artifact_id: str) -> None:
+        return None
+
+    def get_connection(self, artifact_id: str) -> None:
         return None
 
     def refresh(self) -> None:

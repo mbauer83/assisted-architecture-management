@@ -30,6 +30,7 @@ Configure them in `.mcp.json` — see [Installation §5](../02-installation.md#5
 | `artifact_query_read_artifact` | Read-only | Read one artifact by artifact_id. |
 | `artifact_query_search_artifacts` | Read-only | Search artifacts by text query (keyword-scored; may include semantic supplement if configured). |
 | `artifact_query_stats` | Read-only | Return model statistics: total entity/connection/diagram counts and breakdowns by domain, connection type, and group. |
+| `artifact_query_viewpoint` | Read-only | action='list': browse the effective merged viewpoint catalog — slug/version/name/purpose/content/stakeholders/concerns, a scope summary, and a plain-language query_summary so you see what a viewpoint means, not just that it exists. |
 | `artifact_verify` | Read-only | Verify one file or all model files. |
 <!-- mcp-tools:end arch-read -->
 
@@ -62,6 +63,7 @@ Configure them in `.mcp.json` — see [Installation §5](../02-installation.md#5
 | Guidance & ops | `artifact_help` | Write | Return the full catalog of artifact types, entity types (by domain), connection types (by language), and diagram types (with accepted domains). |
 | Guidance & ops | `artifact_get_operation` | Write | Return the latest recorded status, phase, timestamps, error, and final result for a prior bulk operation by operation_id. |
 | Guidance & ops | `artifact_admin_reindex` | Destructive | Rebuild the artifact index from disk. |
+| Other | `artifact_viewpoint` | Write | Create/edit/delete a ViewpointDefinition in the engagement repo's own catalog — the same validate/persist path a GUI builder's save flow uses. |
 <!-- mcp-tools:end arch-write -->
 
 The tool count is kept small with clear descriptions on purpose — fewer, well-described

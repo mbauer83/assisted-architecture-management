@@ -81,6 +81,7 @@ def artifact_create_diagram(
     version: str = "0.1.0",
     status: str = "draft",
     tlp: str | None = None,
+    viewpoint: dict[str, object] | None = None,
     group: str | None = None,
     connection_inference: DiagramConnectionInferenceMode = "none",
     auto_include_stereotypes: bool = True,
@@ -153,6 +154,7 @@ def artifact_create_diagram(
         status=status,
         last_updated=None,
         tlp=tlp,
+        viewpoint=viewpoint,
         connection_inference=connection_inference,
         auto_include_stereotypes=auto_include_stereotypes,
         dry_run=dry_run,
@@ -196,7 +198,7 @@ def register(mcp: FastMCP) -> None:
             "(artifact_query_read_artifact mode='full') for custom layouts.\n"
             "For ArchiMate views, diagram_connections is optional per-diagram connection annotation metadata keyed by "
             "model connection artifact_id. It does not create diagram-owned connections. Supported opt-in keys are "
-            "artifact_id (or connection_id), include_description, include_cardinality, and label.\n"
+            "artifact_id (or connection_id), include_description, include_multiplicity, and label.\n"
             "For additional occurrences of an already included model entity, pass "
             "diagram_entities={'occurrence': [{'id': '<occurrence-id>', 'backing_entity_id': '<model-entity-id>'}]}. "
             "The occurrence id distinguishes the diagram element; backing_entity_id preserves the single model "
@@ -214,6 +216,9 @@ def register(mcp: FastMCP) -> None:
             "publishable (rendered + source persisted to the shared catalog); TLP:AMBER/RED (or unset) are "
             "confidential — source is redirected to a gitignored confidential/ root and rendering to disk is "
             "withheld. Ignored for non-assurance diagram types.\n\n"
+            "viewpoint: apply a ViewpointDefinition to narrow this diagram's authoring scope — "
+            "{slug, version, enforcement_override?, derivation_params?}. Call artifact_authoring_guidance "
+            "to discover slugs/versions via its 'viewpoints' list.\n\n"
             "dry_run=true validates without writing."
         ),
         annotations=LOCAL_WRITE,

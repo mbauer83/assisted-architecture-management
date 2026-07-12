@@ -9,8 +9,10 @@ from __future__ import annotations
 
 from typing import Any
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
 
+from src.application.runtime_catalogs import RuntimeCatalogs
+from src.infrastructure.app_bootstrap import runtime_catalogs_dependency
 from src.infrastructure.gui.routers._entity_filter import parse_csv_filter
 from src.infrastructure.write import artifact_write_ops
 
@@ -23,10 +25,12 @@ def read_authoring_guidance(
     domain: str | None = None,
     diagram_type: str | None = None,
     target: str | None = None,
+    catalogs: RuntimeCatalogs = Depends(runtime_catalogs_dependency),
 ) -> dict[str, Any]:
     terms = parse_csv_filter(entity_type) | parse_csv_filter(domain)
     return artifact_write_ops.get_type_guidance(
         filter=sorted(terms) if terms else None,
         diagram_type=diagram_type,
         target=target,
+        catalogs=catalogs,
     )

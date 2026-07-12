@@ -6,6 +6,7 @@ from pathlib import Path
 import pytest
 import yaml
 
+import src.infrastructure.guidance_cache as guidance_cache_module
 from src.infrastructure.cli import arch_import_guidance as cli
 from src.infrastructure.guidance_import import GuidanceImportError
 
@@ -30,30 +31,21 @@ def source_file(tmp_path: Path) -> Path:
     return path
 
 
-@pytest.fixture
-def workspace(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> tuple[Path, Path]:
-    engagement_root = tmp_path / "engagement"
-    enterprise_root = tmp_path / "enterprise"
-    engagement_root.mkdir()
-    enterprise_root.mkdir()
-    monkeypatch.setattr(cli, "resolve_workspace_repo_roots", lambda: (engagement_root, enterprise_root))
-    return engagement_root, enterprise_root
+@pytest.fixture(autouse=True)
+def _isolated_cache_dir(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
+    config_dir = tmp_path / ".config" / "arch-repo"
+    monkeypatch.setattr(guidance_cache_module, "_CONFIG_DIR", config_dir)
+    return config_dir / guidance_cache_module.GUIDANCE_CACHE_DIRNAME
 
 
 class TestRunImportHappyPath:
-    def test_writes_cache_and_sidecar_for_engagement_scope(
-        self, source_file: Path, workspace: tuple[Path, Path]
-    ) -> None:
-        engagement_root, enterprise_root = workspace
-        summaries = cli.run_import(
-            source=str(source_file), module=None, repo_scope="engagement", dry_run=False, strict=False,
-            allow_http=False,
-        )
+    def test_writes_cache_and_sidecar(self, source_file: Path, _isolated_cache_dir: Path) -> None:
+        summaries = cli.run_import(source=str(source_file), module=None, dry_run=False, strict=False, allow_http=False)
         assert len(summaries) == 1
         assert summaries[0].matched_keys == ("entity_types.stakeholder",)
         assert summaries[0].unmatched_keys == ("entity_types.not-a-real-type",)
 
-        cache_file = engagement_root / ".arch-repo" / "guidance-cache" / "archimate-4.guidance.yaml"
+        cache_file = _isolated_cache_dir / "archimate-4.guidance.yaml"
         assert cache_file.is_file()
         cached = yaml.safe_load(cache_file.read_text(encoding="utf-8"))
         assert cached["meta_ontologies"]["archimate-4"]["entity_types"]["stakeholder"]["create_when"] == (
@@ -61,30 +53,12 @@ class TestRunImportHappyPath:
         )
         assert "not-a-real-type" not in cached["meta_ontologies"]["archimate-4"].get("entity_types", {})
 
-        # nothing written to the enterprise root
-        assert not (enterprise_root / ".arch-repo").exists()
-
-    def test_repo_scope_enterprise_targets_enterprise_root(
-        self, source_file: Path, workspace: tuple[Path, Path]
-    ) -> None:
-        engagement_root, enterprise_root = workspace
-        cli.run_import(
-            source=str(source_file), module=None, repo_scope="enterprise", dry_run=False, strict=False,
-            allow_http=False,
-        )
-        assert (enterprise_root / ".arch-repo" / "guidance-cache" / "archimate-4.guidance.yaml").is_file()
-        assert not (engagement_root / ".arch-repo").exists()
-
-    def test_dry_run_writes_nothing(self, source_file: Path, workspace: tuple[Path, Path]) -> None:
-        engagement_root, enterprise_root = workspace
-        summaries = cli.run_import(
-            source=str(source_file), module=None, repo_scope="engagement", dry_run=True, strict=False,
-            allow_http=False,
-        )
+    def test_dry_run_writes_nothing(self, source_file: Path, _isolated_cache_dir: Path) -> None:
+        summaries = cli.run_import(source=str(source_file), module=None, dry_run=True, strict=False, allow_http=False)
         assert summaries[0].matched_keys == ("entity_types.stakeholder",)
-        assert not (engagement_root / ".arch-repo").exists()
+        assert not _isolated_cache_dir.exists()
 
-    def test_module_filter_restricts_to_one_alias(self, tmp_path: Path, workspace: tuple[Path, Path]) -> None:
+    def test_module_filter_restricts_to_one_alias(self, tmp_path: Path, _isolated_cache_dir: Path) -> None:
         source = tmp_path / "multi.guidance.yaml"
         source.write_text(
             """
@@ -100,27 +74,19 @@ class TestRunImportHappyPath:
             encoding="utf-8",
         )
         summaries = cli.run_import(
-            source=str(source), module="archimate-4", repo_scope="engagement", dry_run=False, strict=False,
-            allow_http=False,
+            source=str(source), module="archimate-4", dry_run=False, strict=False, allow_http=False
         )
         assert [s.alias for s in summaries] == ["archimate-4"]
 
-    def test_strict_mode_raises_on_unknown_key(self, source_file: Path, workspace: tuple[Path, Path]) -> None:
+    def test_strict_mode_raises_on_unknown_key(self, source_file: Path, _isolated_cache_dir: Path) -> None:
         with pytest.raises(GuidanceImportError, match="not-a-real-type"):
-            cli.run_import(
-                source=str(source_file), module=None, repo_scope="engagement", dry_run=False, strict=True,
-                allow_http=False,
-            )
+            cli.run_import(source=str(source_file), module=None, dry_run=False, strict=True, allow_http=False)
 
 
 class TestProvenanceSidecar:
-    def test_sidecar_content(self, source_file: Path, workspace: tuple[Path, Path]) -> None:
-        engagement_root, _ = workspace
-        cli.run_import(
-            source=str(source_file), module=None, repo_scope="engagement", dry_run=False, strict=False,
-            allow_http=False,
-        )
-        sidecar_file = engagement_root / ".arch-repo" / "guidance-cache" / "archimate-4.guidance.meta.yaml"
+    def test_sidecar_content(self, source_file: Path, _isolated_cache_dir: Path) -> None:
+        cli.run_import(source=str(source_file), module=None, dry_run=False, strict=False, allow_http=False)
+        sidecar_file = _isolated_cache_dir / "archimate-4.guidance.meta.yaml"
         assert sidecar_file.is_file()
         sidecar = yaml.safe_load(sidecar_file.read_text(encoding="utf-8"))
         assert sidecar["source"] == str(source_file)
@@ -134,26 +100,16 @@ class TestProvenanceSidecar:
 
 class TestRestartEquivalentRebootstrap:
     def test_imported_guidance_surfaces_after_rebootstrap(
-        self, source_file: Path, workspace: tuple[Path, Path], monkeypatch: pytest.MonkeyPatch
+        self, source_file: Path, _isolated_cache_dir: Path
     ) -> None:
         """Import writes the cache; a fresh app_bootstrap import (restart-equivalent) must
-        pick it up and surface it through get_type_guidance."""
-        engagement_root, enterprise_root = workspace
-        cli.run_import(
-            source=str(source_file), module=None, repo_scope="engagement", dry_run=False, strict=False,
-            allow_http=False,
-        )
+        pick it up and surface it through get_type_guidance — regardless of which
+        engagement/enterprise repo happens to be active, since guidance is deployment-level."""
+        cli.run_import(source=str(source_file), module=None, dry_run=False, strict=False, allow_http=False)
 
-        from src.config import workspace_paths
         from src.infrastructure import app_bootstrap
         from src.infrastructure.write.artifact_write import type_guidance
 
-        # Patch the source module's attribute, not app_bootstrap's imported name — reload()
-        # re-executes app_bootstrap's `from ... import resolve_workspace_repo_roots` line,
-        # which would otherwise re-bind past a patch applied directly to app_bootstrap.
-        monkeypatch.setattr(
-            workspace_paths, "resolve_workspace_repo_roots", lambda: (engagement_root, enterprise_root)
-        )
         try:
             importlib.reload(app_bootstrap)
             app_bootstrap.get_module_registry.cache_clear()
@@ -165,7 +121,6 @@ class TestRestartEquivalentRebootstrap:
             entry = next(e for e in entries if e["name"] == "stakeholder")
             assert entry["create_when"] == "TEST-ONLY create_when text for stakeholder"
         finally:
-            monkeypatch.undo()
             importlib.reload(app_bootstrap)
             app_bootstrap.get_module_registry.cache_clear()
             type_guidance._registry.cache_clear()

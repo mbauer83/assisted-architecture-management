@@ -37,7 +37,7 @@ def test_strips_redundant_influence_and_realization_labels() -> None:
     assert out == "DRV_GR9prv ..> ASS_CK90bp\nOUT_AlZjX8 -up-|> GOL_5Fk9di\n"
 
 
-def test_keeps_association_and_cardinality_and_element_lines() -> None:
+def test_keeps_association_and_multiplicity_and_element_lines() -> None:
     for line in (
         "ASS_CK90bp -- GOL_FCfDuc",
         "A --> B : 1 -> *",

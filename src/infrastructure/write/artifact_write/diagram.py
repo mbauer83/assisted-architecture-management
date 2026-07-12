@@ -142,6 +142,7 @@ def create_diagram(
     status: str,
     last_updated: str | None,
     tlp: str | None = None,
+    viewpoint: dict[str, object] | None = None,
     connection_inference: DiagramConnectionInferenceMode = "none",
     auto_include_stereotypes: bool = True,
     dry_run: bool,
@@ -219,6 +220,10 @@ def create_diagram(
         )
     effective_id = build.effective_id
 
+    from src.domain.viewpoint_application_parsing import normalize_viewpoint_frontmatter
+
+    viewpoint_fm = normalize_viewpoint_frontmatter(viewpoint, target_kind="diagram", target_id=effective_id)
+
     content = format_diagram_puml(
         artifact_id=effective_id,
         diagram_type=diagram_type,
@@ -235,6 +240,7 @@ def create_diagram(
         bindings=bindings_to_raw(norm_bindings) if norm_bindings else None,
         puml_body=build.puml_body,
         tlp=tlp,
+        viewpoint=viewpoint_fm,
         diagram_format_version=2 if diagram_type == "datatype" else None,
     )
 

@@ -32,7 +32,7 @@ class _ConfiguredArchimateDiagramType(_ConfiguredOntologyDiagramType):
                 " Use --> for serving relations and -- for association relations.",
                 "For ArchiMate diagrams, diagram_connections may be used as per-diagram connection annotation"
                 " metadata keyed by model connection artifact_id. Supported opt-in keys are artifact_id"
-                " (or connection_id), include_description, include_cardinality, and label."
+                " (or connection_id), include_description, include_multiplicity, and label."
                 " The show_stereotype key is not needed since stereotype text is not required for selectability.",
                 "For additional occurrences of an already included model entity, add"
                 " diagram_entities.occurrence[] items with id and backing_entity_id. The id is the"

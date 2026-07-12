@@ -7,7 +7,10 @@ from pathlib import Path
 from typing import Literal
 
 from src.application.runtime_catalogs import RuntimeCatalogs
-from src.application.verification._verifier_rules_schema import check_frontmatter_schema
+from src.application.verification._verifier_rules_schema import (
+    check_connection_metadata_schema,
+    check_frontmatter_schema,
+)
 from src.application.verification._verifier_rules_semantic import check_connection_semantics
 from src.application.verification.artifact_verifier_parsing import parse_frontmatter, read_file
 from src.application.verification.artifact_verifier_registry import ArtifactRegistry
@@ -20,28 +23,31 @@ from src.application.verification.artifact_verifier_types import (
     VerificationResult,
 )
 from src.domain.artifact_id import stable_id
-
-_CARDINALITY_RE = re.compile(r"^\d+$|^\d+\.\.\d+$|^\d+\.\.\*$|^\*$")
-
-_CONN_HEADER_RE = re.compile(
-    r"^(?P<conn_type>[a-z][a-z0-9-]+)"
-    r"(?:\s+\[(?P<src_card>[^\]]+)\])?"
-    r"\s+→\s+"
-    r"(?:\[(?P<tgt_card>[^\]]+)\]\s+)?"
-    r"(?P<target_id>\S+)$"
+from src.domain.connection_declaration import (
+    ConnectionDeclaration,
+    parse_connection_declarations,
+    parse_connection_header,
 )
+from src.domain.specializations import SpecializationCatalog
+
+_MULTIPLICITY_RE = re.compile(r"^\d+$|^\d+\.\.\d+$|^\d+\.\.\*$|^\*$")
 
 
-def _parse_conn_header(header: str) -> tuple[str, str, str, str] | None:
-    m = _CONN_HEADER_RE.match(header)
-    if not m:
-        return None
-    return (
-        m.group("conn_type"),
-        m.group("src_card") or "",
-        m.group("tgt_card") or "",
-        m.group("target_id"),
-    )
+def _check_malformed_headers(content: str, result: VerificationResult, loc: str) -> None:
+    """Emit E122 for every ``### `` line whose header doesn't match the grammar.
+
+    ``parse_connection_declarations`` silently skips malformed sections (by design, for
+    lenient reading elsewhere) — the verifier is the one caller that must still surface
+    them, so this scans raw lines separately rather than relying on that parse.
+    """
+    for line in content.splitlines():
+        if not line.startswith("### "):
+            continue
+        header = line[4:].strip()
+        if parse_connection_header(header) is None:
+            result.issues.append(
+                Issue(Severity.ERROR, "E122", f"Connection header missing ' → ' separator: '{header}'", loc)
+            )
 
 
 def _target_issue(target_id: str, all_short_ids: set[str], scope: str, loc: str) -> Issue:
@@ -72,8 +78,34 @@ def _check_source_entity(
         )
 
 
+def _check_connection_specialization(
+    slug: str,
+    conn_type: str,
+    catalog: SpecializationCatalog,
+    result: VerificationResult,
+    loc: str,
+) -> None:
+    """Unknown slug (E160) or slug declared for a different concept-kind/parent-type (E161)."""
+    if catalog.get("connection", conn_type, slug) is not None:
+        return
+    matches = [e for e in catalog.entries if e.slug == slug]
+    if not matches:
+        result.issues.append(Issue(Severity.ERROR, "E160", f"Unknown specialization slug '{slug}'", loc))
+        return
+    declared_for = ", ".join(sorted({f"{e.concept_kind}/{e.parent_type}" for e in matches}))
+    result.issues.append(
+        Issue(
+            Severity.ERROR,
+            "E161",
+            f"Specialization '{slug}' is not declared for connection type '{conn_type}' "
+            f"(declared for: {declared_for}).",
+            loc,
+        )
+    )
+
+
 def _check_connection_block(
-    header: str,
+    decl: ConnectionDeclaration,
     *,
     catalogs: RuntimeCatalogs,
     has_registry: bool,
@@ -81,32 +113,26 @@ def _check_connection_block(
     all_short_ids: set[str],
     scope: str,
     seen_connections: set[str],
+    repo_root: Path | None,
     result: VerificationResult,
     loc: str,
-) -> tuple[str, str] | None:
-    """Validate a single ``### <header>`` connection block, appending any issues.
+) -> ConnectionDeclaration:
+    """Validate a single parsed connection declaration, appending any issues.
 
-    Returns ``(conn_type, target_id)`` for downstream semantic checks, or ``None``
-    when the header is malformed.
+    Malformed headers never reach here — ``_check_malformed_headers`` (E122) covers those
+    separately, since ``parse_connection_declarations`` silently skips them.
     """
-    parsed = _parse_conn_header(header)
-    if parsed is None:
-        result.issues.append(
-            Issue(Severity.ERROR, "E122", f"Connection header missing ' → ' separator: '{header}'", loc)
-        )
-        return None
-
-    conn_type, src_card, tgt_card, target_id = parsed
+    conn_type, target_id = decl.conn_type, decl.target_id
+    src_mult, tgt_mult = decl.src_multiplicity, decl.tgt_multiplicity
     if conn_type not in catalogs.ontology.all_connection_type_names():
         result.issues.append(Issue(Severity.ERROR, "E123", f"Unknown connection type '{conn_type}'", loc))
-    for card_label, card_val in (("source", src_card), ("target", tgt_card)):
-        if card_val and not _CARDINALITY_RE.match(card_val):
+    for mult_label, mult_val in (("source", src_mult), ("target", tgt_mult)):
+        if mult_val and not _MULTIPLICITY_RE.match(mult_val):
             result.issues.append(
                 Issue(
                     Severity.ERROR,
                     "E125",
-                    f"Invalid {card_label} cardinality '{card_val}' in '{header}' "
-                    f"— expected n, n..m, n..*, or *",
+                    f"Invalid {mult_label} multiplicity '{mult_val}' — expected n, n..m, n..*, or *",
                     loc,
                 )
             )
@@ -117,7 +143,15 @@ def _check_connection_block(
     if conn_key in seen_connections:
         result.issues.append(Issue(Severity.WARNING, "W120", f"Duplicate connection: '{conn_key}'", loc))
     seen_connections.add(conn_key)
-    return conn_type, target_id
+
+    specialization = str(decl.metadata.get("specialization") or "")
+    if specialization:
+        _check_connection_specialization(specialization, conn_type, catalogs.specializations, result, loc)
+
+    if decl.metadata and repo_root is not None:
+        check_connection_metadata_schema(decl.metadata, conn_type, repo_root, result, loc)
+
+    return decl
 
 
 def verify_outgoing(
@@ -167,24 +201,25 @@ def verify_outgoing(
             Issue(Severity.ERROR, "E121", "Missing <!-- §connections --> section marker", loc)
         )
 
+    _check_malformed_headers(content, result, loc)
+
     seen_connections: set[str] = set()
-    parsed_connections: list[tuple[str, str]] = []
-    for line in content.splitlines():
-        if not line.startswith("### "):
-            continue
-        conn = _check_connection_block(
-            line[4:].strip(),
-            catalogs=catalogs,
-            has_registry=registry is not None,
-            allowed_short_ids=allowed_short_ids,
-            all_short_ids=all_short_ids,
-            scope=scope,
-            seen_connections=seen_connections,
-            result=result,
-            loc=loc,
+    parsed_connections: list[ConnectionDeclaration] = []
+    for decl in parse_connection_declarations(content):
+        parsed_connections.append(
+            _check_connection_block(
+                decl,
+                catalogs=catalogs,
+                has_registry=registry is not None,
+                allowed_short_ids=allowed_short_ids,
+                all_short_ids=all_short_ids,
+                scope=scope,
+                seen_connections=seen_connections,
+                repo_root=repo_root,
+                result=result,
+                loc=loc,
+            )
         )
-        if conn is not None:
-            parsed_connections.append(conn)
 
     if registry is not None and source and parsed_connections:
         check_connection_semantics(
@@ -195,6 +230,7 @@ def verify_outgoing(
             loc,
             connections_catalog=catalogs.connections,
             ontology_catalog=catalogs.ontology,
+            specialization_catalog=catalogs.specializations,
         )
 
     if repo_root is not None:

@@ -1,11 +1,11 @@
-"""ArchiMate NEXT Snapshot 1 connection-rule conformance.
+"""ArchiMate 4.0 connection-rule conformance.
 
-Sentinel cases transcribed from the ArchiMate NEXT Snapshot 1 connection-rule
+Sentinel cases transcribed from the ArchiMate 4.0 specification's connection-rule
 matrix — Appendix B.5 (direct relationships) and B.6 (grouping/junction). These
 pin the loaded ontology to the normative matrix: every PERMITTED triple must be
 allowed and every PROHIBITED triple must be absent. The knowledge is embedded
 inline here on purpose (no external fixture file): the normative source is the
-snapshot matrix, and these tests are its executable transcription.
+specification's matrix, and these tests are its executable transcription.
 
 Key rules exercised:
   - internal behaviour (function / process) --realization--> service is PERMITTED

@@ -141,6 +141,7 @@ def create_diagram_gui(body: CreateDiagramGuiBody) -> dict[str, Any]:
             tlp=body.tlp,
             connection_inference="none",
             bindings=conn_bindings or None,
+            viewpoint=body.viewpoint,
             dry_run=body.dry_run,
         )
     except ValueError as e:
@@ -190,6 +191,7 @@ def edit_diagram_gui(body: EditDiagramGuiBody) -> dict[str, Any]:
             status=body.status,
             tlp=body.tlp,
             bindings=conn_bindings or None,
+            viewpoint=body.viewpoint,
             dry_run=body.dry_run,
             committed_repo=committed_repository(repo),
         )

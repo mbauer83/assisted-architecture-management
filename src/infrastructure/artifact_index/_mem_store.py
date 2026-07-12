@@ -4,7 +4,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from src.application.ports import Candidate
-from src.domain.artifact_id import stable_id
+from src.domain.artifact_id import stable_conn_id, stable_id
 from src.domain.artifact_types import ConnectionRecord, DiagramRecord, DocumentRecord, EntityRecord
 
 
@@ -39,10 +39,22 @@ class _MemStore:
         record whose stable id matches is returned. Falls back to *artifact_id*
         unchanged when it is absent or ambiguous across mounts (so the caller's
         own lookup then misses safely). Must be called under the index read lock.
+
+        Connection ids (``source---target@@type``) are not entity-shaped and are
+        handled separately: ``stable_id()`` finds the *last* dot in a string, which
+        for a composite connection id falls inside the target segment, not after a
+        connection-type suffix. Applying it to the whole composite string (as the
+        generic fallback below does for entities/diagrams/documents) silently drops
+        the type and makes two different connection types between the same two
+        entities collide on the same "stable id" — a real bug this branch exists to
+        avoid, not a hypothetical one (caught by WU-F3a's exchange re-import test).
         """
         stores = (self.entities, self.connections, self.diagrams, self.documents)
         if any(artifact_id in store for store in stores):
             return artifact_id
+        if "---" in artifact_id and "@@" in artifact_id:
+            normalized_connection_id = stable_conn_id(artifact_id)
+            return normalized_connection_id if normalized_connection_id in self.connections else artifact_id
         short = stable_id(artifact_id)
         for store in stores:
             matches = [key for key in store if stable_id(key) == short]

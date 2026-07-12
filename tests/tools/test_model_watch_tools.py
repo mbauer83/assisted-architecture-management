@@ -1,6 +1,6 @@
 """Tests for model watch tools fingerprinting.
 
-Updated for ArchiMate NEXT conventions:
+Updated for ArchiMate 4.0 conventions:
 - model/ directory (not model-entities/)
 - .outgoing.md connections (not connections/ directory)
 """

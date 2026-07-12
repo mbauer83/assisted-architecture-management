@@ -3,7 +3,7 @@
 These tests call the tool functions directly (without starting an MCP server)
 so we can validate deterministic content generation and verifier-gated writes.
 
-Updated for ArchiMate NEXT conventions:
+Updated for ArchiMate 4.0 conventions:
 - model/ directory (not model-entities/)
 - .outgoing.md connections (not connections/ directory)
 - New ID format: TYPE@epoch.random.friendly-name

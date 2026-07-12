@@ -58,39 +58,6 @@ class TestGuidanceKeyShape:
         assert overlay.get(connection_key) is None
 
 
-class TestGuidanceOverlayMerge:
-    def test_merge_with_no_layers_is_empty(self) -> None:
-        assert GuidanceOverlay.merge().is_empty()
-
-    def test_merge_single_layer_passes_through(self) -> None:
-        key = GuidanceKey(module_alias="archimate-4", concept_kind="entity", type_name="stakeholder")
-        layer = GuidanceOverlay({key: _entry("layer")})
-        merged = GuidanceOverlay.merge(layer)
-        assert merged.get(key) == _entry("layer")
-
-    def test_later_layer_wins_on_collision(self) -> None:
-        key = GuidanceKey(module_alias="archimate-4", concept_kind="entity", type_name="stakeholder")
-        enterprise = GuidanceOverlay({key: _entry("enterprise")})
-        engagement = GuidanceOverlay({key: _entry("engagement")})
-        merged = GuidanceOverlay.merge(enterprise, engagement)
-        assert merged.get(key) == _entry("engagement")
-
-    def test_disjoint_keys_from_both_layers_survive(self) -> None:
-        enterprise_key = GuidanceKey(module_alias="archimate-4", concept_kind="entity", type_name="stakeholder")
-        engagement_key = GuidanceKey(module_alias="archimate-4", concept_kind="entity", type_name="capability")
-        enterprise = GuidanceOverlay({enterprise_key: _entry("enterprise")})
-        engagement = GuidanceOverlay({engagement_key: _entry("engagement")})
-        merged = GuidanceOverlay.merge(enterprise, engagement)
-        assert merged.get(enterprise_key) == _entry("enterprise")
-        assert merged.get(engagement_key) == _entry("engagement")
-
-    def test_empty_layer_is_true_noop_in_merge(self) -> None:
-        key = GuidanceKey(module_alias="archimate-4", concept_kind="entity", type_name="stakeholder")
-        enterprise = GuidanceOverlay({key: _entry("enterprise")})
-        merged = GuidanceOverlay.merge(enterprise, GuidanceOverlay())
-        assert merged.get(key) == _entry("enterprise")
-
-
 class TestGuidanceOverlayFromMapping:
     def test_entity_base_guidance(self) -> None:
         data = {

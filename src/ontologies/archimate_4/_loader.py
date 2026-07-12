@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import json
 import re
-from collections.abc import Callable, Mapping
+from collections.abc import Callable
 from pathlib import Path
 from typing import Any, Literal, cast
 
@@ -49,7 +49,6 @@ class _ArchiMate4Module:
     module_class: Literal["architecture", "assurance"] = "architecture"
     enabled: bool = True
     requires: list[str] = []
-    attribute_profiles: Mapping[str, dict[str, object]] = {}
 
     def __init__(
         self,

@@ -15,7 +15,7 @@ from fastapi import FastAPI
 from src.application.artifact_query import ArtifactRepository
 from src.infrastructure.artifact_index import shared_artifact_index
 from src.infrastructure.gui.routers import state as gui_state
-from src.infrastructure.gui.routers.connections import _check_cardinality
+from src.infrastructure.gui.routers.connections import _check_multiplicity
 from src.infrastructure.gui.routers.connections import router as connections_router
 
 httpx = pytest.importorskip("httpx")
@@ -139,31 +139,31 @@ def sync_client(populated_root: Path):
     return TestClient(app)
 
 
-# ── _check_cardinality ────────────────────────────────────────────────────────
+# ── _check_multiplicity ────────────────────────────────────────────────────────
 
 
-class TestCheckCardinality:
+class TestCheckMultiplicity:
     def test_none_accepted(self) -> None:
-        assert _check_cardinality(None) is None
+        assert _check_multiplicity(None) is None
 
     def test_empty_string_accepted(self) -> None:
-        assert _check_cardinality("") == ""
+        assert _check_multiplicity("") == ""
 
     def test_digit_accepted(self) -> None:
-        assert _check_cardinality("1") == "1"
+        assert _check_multiplicity("1") == "1"
 
     def test_range_accepted(self) -> None:
-        assert _check_cardinality("1..5") == "1..5"
+        assert _check_multiplicity("1..5") == "1..5"
 
     def test_open_range_accepted(self) -> None:
-        assert _check_cardinality("0..*") == "0..*"
+        assert _check_multiplicity("0..*") == "0..*"
 
     def test_wildcard_accepted(self) -> None:
-        assert _check_cardinality("*") == "*"
+        assert _check_multiplicity("*") == "*"
 
     def test_invalid_raises(self) -> None:
-        with pytest.raises(ValueError, match="Invalid cardinality"):
-            _check_cardinality("bad")
+        with pytest.raises(ValueError, match="Invalid multiplicity"):
+            _check_multiplicity("bad")
 
 
 # ── GET endpoints ─────────────────────────────────────────────────────────────
@@ -268,16 +268,34 @@ class TestAddConnection:
         data = r.json()
         assert "wrote" in data
 
-    def test_invalid_cardinality_rejected(self, sync_client) -> None:
+    def test_invalid_multiplicity_rejected(self, sync_client) -> None:
         payload = {
             "source_entity": TGT_ID,
             "connection_type": "archimate-association",
             "target_entity": SRC_ID,
-            "src_cardinality": "bad-value",
+            "src_multiplicity": "bad-value",
             "dry_run": True,
         }
         r = sync_client.post("/api/connection", json=payload)
         assert r.status_code == 422
+
+    def test_specialization_field_accepted_and_passed_through(self, sync_client) -> None:
+        # archimate-association carries no specialization catalog entries for the
+        # requirement/requirement fixture pair — this proves the field round-trips through
+        # the REST schema without erroring, not that any particular slug is legal here
+        # (application-level specialization validity is covered by
+        # tests/tools/test_specialization_persistence.py and
+        # test_specialization_verifier_rules.py against real permitted-pair fixtures).
+        payload = {
+            "source_entity": TGT_ID,
+            "connection_type": "archimate-association",
+            "target_entity": SRC_ID,
+            "specialization": "",
+            "dry_run": True,
+        }
+        r = sync_client.post("/api/connection", json=payload)
+        assert r.status_code == 200
+        assert "wrote" in r.json()
 
 
 class TestEditConnection:
@@ -287,6 +305,18 @@ class TestEditConnection:
             "connection_type": "archimate-association",
             "target_entity": TGT_ID,
             "description": "Updated description",
+            "dry_run": True,
+        }
+        r = sync_client.post("/api/connection/edit", json=payload)
+        assert r.status_code == 200
+        assert "wrote" in r.json()
+
+    def test_specialization_field_accepted_and_passed_through(self, sync_client) -> None:
+        payload = {
+            "source_entity": SRC_ID,
+            "connection_type": "archimate-association",
+            "target_entity": TGT_ID,
+            "specialization": "",
             "dry_run": True,
         }
         r = sync_client.post("/api/connection/edit", json=payload)

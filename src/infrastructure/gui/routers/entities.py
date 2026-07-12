@@ -49,6 +49,27 @@ def get_stats() -> dict[str, Any]:
     return s.get_repo().stats()
 
 
+@router.get("/api/backend-identity")
+def get_backend_identity() -> dict[str, Any]:
+    """Realpath-normalized served repo roots + software version.
+
+    Consumed by `arch-repair upgrade --commit`'s guard, which refuses to run against a repo a
+    running backend is currently serving; `/api/stats` carries no repo roots, hence this
+    dedicated endpoint.
+    """
+    from importlib.metadata import PackageNotFoundError  # noqa: PLC0415
+    from importlib.metadata import version as _pkg_version  # noqa: PLC0415
+
+    try:
+        software_version = _pkg_version("architectonic")
+    except PackageNotFoundError:
+        software_version = "unknown"
+    return {
+        "repo_roots": [str(root) for root in s.configured_roots()],
+        "software_version": software_version,
+    }
+
+
 @router.get("/api/entities")
 def list_entities(
     request: Request,
@@ -218,6 +239,7 @@ class CreateEntityBody(BaseModel):
     attribute_types: dict[str, str] | None = None
     notes: str | None = None
     keywords: list[str] | None = None
+    specialization: str | None = None
     version: str = "0.1.0"
     status: str = "draft"
     dry_run: bool = True
@@ -231,6 +253,7 @@ class EditEntityBody(BaseModel):
     attribute_types: dict[str, str] | None = None
     notes: str | None = None
     keywords: list[str] | None = None
+    specialization: str | None = None
     version: str | None = None
     status: str | None = None
     dry_run: bool = True
@@ -261,6 +284,7 @@ def create_entity(body: CreateEntityBody) -> dict[str, Any]:
             attribute_types=body.attribute_types,
             notes=body.notes,
             keywords=body.keywords,
+            specialization=body.specialization,
             artifact_id=None,
             version=body.version,
             status=body.status,
@@ -293,6 +317,7 @@ def edit_entity(body: EditEntityBody) -> dict[str, Any]:
             attribute_types=body.attribute_types if "attribute_types" in provided else _UNSET,
             notes=body.notes if "notes" in provided else _UNSET,
             keywords=body.keywords if "keywords" in provided else _UNSET,
+            specialization=body.specialization if "specialization" in provided else _UNSET,
             version=body.version,
             status=body.status,
             dry_run=body.dry_run,

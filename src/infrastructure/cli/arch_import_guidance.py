@@ -1,10 +1,13 @@
-"""Import a hosted/local guidance-cache document into a repo's ``.arch-repo/guidance-cache/``
-(D2/D3/D3a). Guidance is authoring help, never a governance tier: unknown keys are dropped
-(or, with ``--strict``, abort the import) rather than silently accepted.
+"""Import a hosted/local guidance-cache document into the one deployment-level
+``~/.config/arch-repo/guidance-cache/`` (D2/D3/D3a). Guidance is a deployment concern, not a
+per-repository-tier one — one running instance of this software pulls one guidance source,
+never split per engagement/enterprise repo and never committed to either repo's git history.
+Guidance is authoring help, never a governance tier: unknown keys are dropped (or, with
+``--strict``, abort the import) rather than silently accepted.
 
 Usage:
-    arch-import-guidance --source <url|path> [--module ALIAS]
-        [--repo-scope engagement|enterprise] [--dry-run] [--strict] [--allow-http]
+    arch-import-guidance --source <url|path> [--module ALIAS] [--dry-run] [--strict]
+        [--allow-http]
 """
 
 from __future__ import annotations
@@ -17,10 +20,9 @@ from typing import cast
 import yaml  # type: ignore[import-untyped]
 
 from src.config.settings import guidance_default_source
-from src.config.workspace_paths import resolve_workspace_repo_roots
 from src.domain.clock import utc_now_iso
 from src.infrastructure.app_bootstrap import build_module_registry
-from src.infrastructure.guidance_cache import ensure_guidance_cache_gitignored
+from src.infrastructure.guidance_cache import guidance_cache_root
 from src.infrastructure.guidance_import import (
     GuidanceImportError,
     GuidanceImportSummary,
@@ -33,19 +35,10 @@ from src.infrastructure.guidance_import import (
 _GUIDANCE_FORMAT_VERSION = 1
 
 
-def _resolve_repo_root(repo_scope: str) -> Path:
-    roots = resolve_workspace_repo_roots()
-    if roots is None:
-        raise GuidanceImportError("no workspace configuration found (arch-workspace.yaml or init state)")
-    engagement_root, enterprise_root = roots
-    return engagement_root if repo_scope == "engagement" else enterprise_root
-
-
 def run_import(
     *,
     source: str,
     module: str | None,
-    repo_scope: str,
     dry_run: bool,
     strict: bool,
     allow_http: bool,
@@ -63,8 +56,8 @@ def run_import(
     if dry_run:
         return summaries
 
-    repo_root = _resolve_repo_root(repo_scope)
-    cache_root = ensure_guidance_cache_gitignored(repo_root)
+    cache_root = guidance_cache_root()
+    cache_root.mkdir(parents=True, exist_ok=True)
     for summary in summaries:
         _write_cache_and_sidecar(cache_root, summary, source=source, sha256=sha256)
     return summaries
@@ -100,9 +93,6 @@ def _build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--source", default=None, help="Guidance document URL or local path")
     parser.add_argument("--module", default=None, metavar="ALIAS", help="Import only this meta-ontology alias")
-    parser.add_argument(
-        "--repo-scope", choices=("engagement", "enterprise"), default="engagement", help="Target repo tier"
-    )
     parser.add_argument("--dry-run", action="store_true", help="Validate and report; write nothing")
     parser.add_argument("--strict", action="store_true", help="Fail on any unknown key instead of skipping it")
     parser.add_argument("--allow-http", action="store_true", help="Allow plain-HTTP sources (HTTPS is the default)")
@@ -120,7 +110,6 @@ def main(argv: list[str] | None = None) -> int:
         summaries = run_import(
             source=cast(str, source),
             module=args.module,
-            repo_scope=args.repo_scope,
             dry_run=args.dry_run,
             strict=args.strict,
             allow_http=args.allow_http,

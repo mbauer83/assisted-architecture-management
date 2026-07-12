@@ -17,15 +17,23 @@ from src.domain.artifact_types import EntityRecord
 from src.infrastructure.gui.routers import state as s
 from src.infrastructure.gui.routers._diagram_context import entity_display_item, fuzzy_entity_hits
 from src.infrastructure.gui.routers._entity_filter import EntityFilter
+from src.infrastructure.gui.routers._viewpoint_scope import resolve_viewpoint_scope
 
 
-def accepted_entity_types(diagram_type: str | None, catalogs: RuntimeCatalogs) -> set[str] | None:
+def accepted_entity_types(
+    diagram_type: str | None, catalogs: RuntimeCatalogs, *, viewpoint: str | None = None
+) -> set[str] | None:
     if diagram_type is None:
         return None
     kind = catalogs.diagram_types.find_diagram_type(diagram_type)
     if kind is None:
         raise HTTPException(404, f"Diagram type not found: {diagram_type!r}")
-    types = {str(entity_type) for entity_type in kind.effective_entity_types()}
+    viewpoint_scope = resolve_viewpoint_scope(viewpoint, catalogs)
+    types = {
+        str(entity_type)
+        for entity_type, info in kind.effective_entity_types().items()
+        if viewpoint_scope is None or viewpoint_scope.admits_entity_type(entity_type, info)
+    }
     return types if types else None
 
 
@@ -45,10 +53,11 @@ def entity_display_search_impl(
     entity_types: str | None = None,
     keywords: str | None = None,
     cursor: str | None = None,
+    viewpoint: str | None = None,
 ) -> EntityDisplaySearchResult:
     repo = s.get_repo()
     ontology = catalogs.ontology
-    accepted_types = accepted_entity_types(diagram_type, catalogs)
+    accepted_types = accepted_entity_types(diagram_type, catalogs, viewpoint=viewpoint)
     entity_filter = EntityFilter.from_params(domains=domains, entity_types=entity_types, keywords=keywords)
     offset = int(cursor) if cursor and cursor.isdigit() else 0
 

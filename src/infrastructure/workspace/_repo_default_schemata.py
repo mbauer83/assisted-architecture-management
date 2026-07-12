@@ -7,6 +7,8 @@ by the template; here we keep only the base set and the attribute/frontmatter sc
 
 from __future__ import annotations
 
+from src.infrastructure.workspace._repo_default_assurance_schemata import ASSURANCE_ATTRIBUTE_SCHEMATA
+
 BASE_DOCUMENT_SCHEMAS: dict[str, dict] = {
     "adr": {
         "abbreviation": "ADR",
@@ -85,6 +87,7 @@ BASE_DOCUMENT_SCHEMAS: dict[str, dict] = {
 }
 
 DEFAULT_SCHEMATA: dict[str, dict] = {
+    **ASSURANCE_ATTRIBUTE_SCHEMATA,
     "attributes.capability.schema.json": {
         "$schema": "https://json-schema.org/draft/2020-12/schema",
         "$id": "attributes.capability.schema.json",
@@ -200,6 +203,16 @@ DEFAULT_SCHEMATA: dict[str, dict] = {
             "status": {"type": "string", "enum": ["draft", "active", "deprecated"]},
             "keywords": {"type": "array", "items": {"type": "string"}},
             "last-updated": {"type": "string"},
+            "viewpoint": {
+                "type": "object",
+                "required": ["slug", "version"],
+                "properties": {
+                    "slug": {"type": "string"},
+                    "version": {"type": "integer"},
+                    "enforcement_override": {"type": "string", "enum": ["off", "warn", "ghost"]},
+                    "derivation_params": {"type": "object"},
+                },
+            },
         },
         "additionalProperties": True,
     },
@@ -220,6 +233,7 @@ DEFAULT_SCHEMATA: dict[str, dict] = {
             "version": {"type": "string", "pattern": "^\\d+\\.\\d+\\.\\d+$"},
             "status": {"type": "string", "enum": ["draft", "active", "deprecated"]},
             "keywords": {"type": "array", "items": {"type": "string"}},
+            "specialization": {"type": "string"},
             "last-updated": {"type": "string"},
         },
         "additionalProperties": True,

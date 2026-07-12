@@ -82,6 +82,12 @@ class ArtifactRepository:
     def connection_ids(self) -> set[str]:
         return self._store.connection_ids()
 
+    def enterprise_entity_ids(self) -> set[str]:
+        return self._store.enterprise_entity_ids()
+
+    def engagement_entity_ids(self) -> set[str]:
+        return self._store.engagement_entity_ids()
+
     def get_entity(self, artifact_id: str) -> EntityRecord | None:
         return self._store.get_entity(artifact_id)
 

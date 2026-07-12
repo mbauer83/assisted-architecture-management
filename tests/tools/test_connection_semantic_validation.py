@@ -1,4 +1,4 @@
-"""Tests for ArchiMate NEXT semantic triple validation.
+"""Tests for ArchiMate 4.0 semantic triple validation.
 
 Covers:
 - Write path (add_connection) rejects prohibited triples

@@ -12,7 +12,7 @@ from fastapi import Request
 from src.application.derivation.strategy_registry import DerivationStrategyCatalogBuilder
 from src.application.runtime_catalogs import RuntimeCatalogs
 from src.application.startup_validation import validate_registry_consistency
-from src.config.settings import datatype_type_references_blocking
+from src.config.settings import datatype_type_references_blocking, viewpoint_enforcement_setting
 from src.config.workspace_paths import resolve_workspace_repo_roots
 from src.diagram_types import register_default_diagram_types
 from src.domain.catalogs import ConnectionSemanticsImpl, DiagramTypeCatalogImpl, OntologyCatalogImpl
@@ -21,11 +21,16 @@ from src.domain.module_catalog import ModuleCatalog, ModuleCatalogBuilder
 from src.domain.module_filter import is_module_enabled
 from src.domain.module_registry import ModuleRegistry
 from src.domain.ontology_protocol import OntologyModule
-from src.domain.specializations import SpecializationCatalog
+from src.domain.specializations import SpecializationCatalog, merge_specialization_catalogs
+from src.domain.viewpoints import ViewpointCatalog
 from src.infrastructure.assurance.capability import make_capability
-from src.infrastructure.guidance_cache import load_guidance_overlay_for_repos
+from src.infrastructure.guidance_cache import load_guidance_overlay
 from src.infrastructure.rendering._svg_sprite_convert import browser_markup_to_plantuml_svg as _svg_convert
 from src.infrastructure.specialization_declarations import load_specialization_catalog_for_repos
+from src.infrastructure.viewpoint_declarations import (
+    load_module_viewpoint_catalog,
+    load_viewpoint_catalog_for_repos,
+)
 from src.ontologies.archimate_4._loader import _PACKAGE_DIR as _ARCH_PACKAGE_DIR
 from src.ontologies.archimate_4._loader import META_ONTOLOGY_ALIAS as _ARCHIMATE_META_ALIAS
 from src.ontologies.archimate_4._loader import load_archimate_4_module
@@ -38,19 +43,18 @@ from src.ontologies.sysml_v2_min._loader import load_sysml_module
 
 
 def _load_guidance_overlay(alias: str) -> GuidanceOverlay:
-    """Merge the enterprise and engagement guidance caches for one meta-ontology alias.
+    """Load the one deployment-level guidance cache for one meta-ontology alias.
 
-    No workspace configured (e.g. code generation, most unit tests) ⇒ empty overlay, which
-    is a no-op — entities keep whatever ``create_when``/``never_create_when`` text the
-    module ships inline. A guidance import takes effect on the next backend restart, since
-    this runs once at process/module-import time (consistent with the existing
-    ``@lru_cache`` registry pattern).
+    Guidance is a deployment concern, not a per-repository-tier one: one running instance of
+    this software pulls one guidance source, imported once into a local, out-of-repo cache
+    file and integrated into the in-memory meta-ontology representation at bootstrap — never
+    per engagement/enterprise repo. No cache present (e.g. code generation, most unit tests,
+    or before the first import) ⇒ empty overlay, a no-op — entities keep whatever
+    ``create_when``/``never_create_when`` text the module ships inline. A guidance import
+    takes effect on the next backend restart, since this runs once at process/module-import
+    time (consistent with the existing ``@lru_cache`` registry pattern).
     """
-    roots = resolve_workspace_repo_roots()
-    if roots is None:
-        return GuidanceOverlay()
-    engagement_root, enterprise_root = roots
-    return load_guidance_overlay_for_repos(alias, enterprise_root=enterprise_root, engagement_root=engagement_root)
+    return load_guidance_overlay(alias)
 
 
 def _load_archimate_specializations() -> SpecializationCatalog:
@@ -63,6 +67,19 @@ def _load_archimate_specializations() -> SpecializationCatalog:
         enterprise_root=enterprise_root,
         engagement_root=engagement_root,
     )
+
+
+def _load_viewpoints() -> ViewpointCatalog:
+    """Module-shipped starter library merged with the repo two-tier override, like
+    specializations. Registry-aware validation runs separately once the full runtime
+    catalogs are assembled, not here."""
+    module_catalog = load_module_viewpoint_catalog(_ARCH_PACKAGE_DIR)
+    roots = resolve_workspace_repo_roots()
+    if roots is None:
+        return module_catalog
+    engagement_root, enterprise_root = roots
+    repo_catalog = load_viewpoint_catalog_for_repos(enterprise_root=enterprise_root, engagement_root=engagement_root)
+    return module_catalog | repo_catalog
 
 
 _archimate_4_module = load_archimate_4_module(
@@ -162,12 +179,18 @@ def _build_derivation_catalog():
 def build_runtime_catalogs(registry: ModuleRegistry) -> RuntimeCatalogs:
     """Build a frozen RuntimeCatalogs from a fully-built ModuleRegistry."""
     module_catalog = build_module_catalog(registry)
+    specializations = merge_specialization_catalogs(
+        *(module.specialization_catalog for module in module_catalog.all_ontologies().values())
+    )
     return RuntimeCatalogs(
         module_catalog=module_catalog,
         ontology=OntologyCatalogImpl(module_catalog, _archimate_matrix_abbreviations),
         connections=ConnectionSemanticsImpl(module_catalog),
         diagram_types=DiagramTypeCatalogImpl(module_catalog),
         derivation=_build_derivation_catalog(),
+        specializations=specializations,
+        viewpoints=_load_viewpoints(),
+        viewpoint_enforcement=viewpoint_enforcement_setting(),
         datatype_type_references_blocking=datatype_type_references_blocking(),
     )
 

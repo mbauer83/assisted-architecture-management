@@ -9,6 +9,7 @@ from src.application.artifact_schema import (
     schema_all_properties,
     schema_required_properties,
 )
+from src.domain.connection_declaration import ConnectionDeclaration, format_connection_declaration
 from src.domain.property_value import encode as _encode_cell
 
 
@@ -28,6 +29,7 @@ def format_entity_markdown(
     status: str,
     last_updated: str,
     keywords: list[str] | None = None,
+    specialization: str | None = None,
     summary: str | None,
     properties: dict[str, Any] | None,
     attribute_types: dict[str, str] | None = None,
@@ -52,6 +54,8 @@ def format_entity_markdown(
     }
     if keywords:
         frontmatter["keywords"] = keywords
+    if specialization:
+        frontmatter["specialization"] = specialization
     if attribute_types:
         frontmatter["attribute-types"] = attribute_types
     frontmatter["last-updated"] = last_updated
@@ -63,6 +67,7 @@ def format_entity_markdown(
         "version",
         "status",
         "keywords",
+        "specialization",
         "attribute-types",
         "last-updated",
     ]
@@ -123,11 +128,13 @@ def format_outgoing_markdown(
       - ``connection_type``: e.g. ``archimate-realization``
       - ``target_entity``: target artifact-id
       - ``description``: prose description of the relationship (optional)
-      - ``src_cardinality``: source-end cardinality (optional, e.g. "1", "0..1", "1..*", "*")
-      - ``tgt_cardinality``: target-end cardinality (optional, same format)
+      - ``src_multiplicity``: source-end multiplicity (optional, e.g. "1", "0..1", "1..*", "*")
+      - ``tgt_multiplicity``: target-end multiplicity (optional, same format)
+      - ``specialization``: a specialization slug (optional) — persisted in the
+        per-connection metadata block, never folded into ``description``
 
-    Header format:  ### conn-type [src_card] → [tgt_card] target_id
-    Both cardinality parts are omitted when absent.  Cardinalities are not
+    Header format:  ### conn-type [src_mult] → [tgt_mult] target_id
+    Both multiplicity parts are omitted when absent.  Multiplicities are not
     permitted on junction connections.
     """
     frontmatter = {
@@ -140,23 +147,20 @@ def format_outgoing_markdown(
 
     sections: list[str] = ["<!-- §connections -->"]
     for conn in connections:
-        conn_type = str(conn["connection_type"])
-        target = str(conn["target_entity"])
-        desc = str(conn.get("description", "")).strip()
-        src_card = str(conn.get("src_cardinality", "")).strip()
-        tgt_card = str(conn.get("tgt_cardinality", "")).strip()
-
-        src_part = f" [{src_card}]" if src_card else ""
-        tgt_part = f"[{tgt_card}] " if tgt_card else ""
-        sections.append("")
-        sections.append(f"### {conn_type}{src_part} → {tgt_part}{target}")
-        if desc:
-            sections.append("")
-            sections.append(desc)
         assoc_ids = conn.get("associated_entities")
-        if isinstance(assoc_ids, list):
-            for assoc_id in assoc_ids:
-                sections.append(f"<!-- §assoc {assoc_id} -->")
+        specialization = conn.get("specialization")
+        metadata: dict[str, Any] = {"specialization": str(specialization)} if specialization else {}
+        decl = ConnectionDeclaration(
+            conn_type=str(conn["connection_type"]),
+            target_id=str(conn["target_entity"]),
+            src_multiplicity=str(conn.get("src_multiplicity", "")).strip(),
+            tgt_multiplicity=str(conn.get("tgt_multiplicity", "")).strip(),
+            description=str(conn.get("description", "")).strip(),
+            associated_entities=tuple(assoc_ids) if isinstance(assoc_ids, list) else (),
+            metadata=metadata,
+        )
+        sections.append("")
+        sections.append(format_connection_declaration(decl))
 
     return "---\n" + frontmatter_text + "\n---\n\n" + "\n".join(sections) + "\n"
 
@@ -180,6 +184,7 @@ def format_diagram_puml(
     edge_labels: dict[str, str] | None = None,
     tlp: str | None = None,
     diagram_format_version: int | None = None,
+    viewpoint: dict[str, object] | None = None,
 ) -> str:
     frontmatter: dict[str, object] = {
         "artifact-id": artifact_id,
@@ -195,6 +200,8 @@ def format_diagram_puml(
         frontmatter["diagram-format-version"] = diagram_format_version
     if tlp:
         frontmatter["tlp"] = tlp
+    if viewpoint is not None:
+        frontmatter["viewpoint"] = viewpoint
     if entity_ids_used:
         frontmatter["entity-ids-used"] = entity_ids_used
     if connection_ids_used:
@@ -221,6 +228,7 @@ def format_diagram_puml(
         "diagram-type",
         "diagram-format-version",
         "tlp",
+        "viewpoint",
         "entity-ids-used",
         "connection-ids-used",
         "diagram-entities",

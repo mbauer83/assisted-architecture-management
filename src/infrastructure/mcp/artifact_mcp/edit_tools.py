@@ -66,6 +66,7 @@ def artifact_edit_entity(
     attribute_types: dict[str, str] | None = None,
     notes: str | None = None,
     keywords: list[str] | None = None,
+    specialization: str | None = None,
     version: str | None = None,
     status: str | None = None,
     group: str | None = None,
@@ -81,8 +82,8 @@ def artifact_edit_entity(
         k: v for k, v in (
             ("name", name), ("summary", summary), ("properties", properties),
             ("attribute_types", attribute_types),
-            ("notes", notes), ("keywords", keywords), ("version", version),
-            ("status", status), ("group", group),
+            ("notes", notes), ("keywords", keywords), ("specialization", specialization),
+            ("version", version), ("status", status), ("group", group),
         ) if v is not None
     }
 
@@ -108,15 +109,17 @@ def artifact_edit_connection(
     connection_type: str,
     operation: str = "update",
     description: str | None = None,
-    src_cardinality: str | None = None,
-    tgt_cardinality: str | None = None,
+    src_multiplicity: str | None = None,
+    tgt_multiplicity: str | None = None,
+    specialization: str | None = None,
     dry_run: bool = True,
     repo_root: str | None = None,
 ) -> dict[str, object]:
     """Edit or remove a connection.
 
-    For operation='update': description, src_cardinality, tgt_cardinality are
-    applied. Pass "" for a cardinality to remove it; omit (None) to preserve it.
+    For operation='update': description, src_multiplicity, tgt_multiplicity, specialization
+    are applied. Pass "" for a multiplicity or specialization to remove it; omit (None) to
+    preserve it.
     """
     root, registry, verifier = _resolve(repo_root, need_registry=True)
     registry = _require_registry(registry)
@@ -147,8 +150,9 @@ def artifact_edit_connection(
             target_entity=target_entity,
             connection_type=connection_type,
             description=description,
-            src_cardinality=src_cardinality if src_cardinality is not None else _UNSET,
-            tgt_cardinality=tgt_cardinality if tgt_cardinality is not None else _UNSET,
+            src_multiplicity=src_multiplicity if src_multiplicity is not None else _UNSET,
+            tgt_multiplicity=tgt_multiplicity if tgt_multiplicity is not None else _UNSET,
+            specialization=specialization if specialization is not None else _UNSET,
             dry_run=dry_run,
         )
     return _finalize_authoritative_write(dry_run, result, mutation_context)
@@ -168,6 +172,7 @@ def artifact_edit_diagram(
     version: str | None = None,
     status: str | None = None,
     tlp: str | None = None,
+    viewpoint: dict[str, object] | None = None,
     edge_labels: dict[str, str | None] | None = None,
     derivation_id: str | None = None,
     diff: dict[str, object] | None = None,
@@ -219,6 +224,7 @@ def artifact_edit_diagram(
             ("diagram_entities", diagram_entities), ("diagram_connections", diagram_connections),
             ("view_derivations", view_derivations), ("bindings", bindings),
             ("version", version), ("status", status), ("tlp", tlp), ("group", group),
+            ("viewpoint", viewpoint),
         ) if v is not None
     }
     if edge_labels is not None:

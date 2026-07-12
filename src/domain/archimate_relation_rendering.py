@@ -7,6 +7,13 @@ def display_connection_label(conn_type: str) -> str:
     return conn_type.removeprefix("archimate-")
 
 
+def format_specialization_guillemet(specialization_name: str) -> str:
+    """Render a specialization's display name as a guillemet stereotype, e.g. ``«Business
+    Service»`` — visually distinct from the ``<<connection-type>>`` ASCII-bracket
+    stereotype used for relationship types, so a reader can tell them apart at a glance."""
+    return f"«{specialization_name}»"
+
+
 _STEREOTYPE_TOKEN_RE = re.compile(r"<<\s*([A-Za-z][A-Za-z0-9_-]*)\s*>>")
 _EDGE_LABEL_RE = re.compile(r"^(?P<head>.*?)(?P<sep>\s*:\s*)(?P<label>\S.*?)\s*$")
 
@@ -35,14 +42,14 @@ def strip_suppressed_relation_labels(body: str, suppressed: frozenset[str]) -> s
     return "\n".join(out)
 
 
-def format_cardinality_label(src_cardinality: str, tgt_cardinality: str) -> str:
-    """Return a compact cardinality label for a connection, or '' when neither end is set."""
-    has_src = bool(src_cardinality)
-    has_tgt = bool(tgt_cardinality)
+def format_multiplicity_label(src_multiplicity: str, tgt_multiplicity: str) -> str:
+    """Return a compact multiplicity label for a connection, or '' when neither end is set."""
+    has_src = bool(src_multiplicity)
+    has_tgt = bool(tgt_multiplicity)
     if has_src and has_tgt:
-        return f"{src_cardinality} -> {tgt_cardinality}"
+        return f"{src_multiplicity} -> {tgt_multiplicity}"
     if has_src:
-        return f"{src_cardinality} ->"
+        return f"{src_multiplicity} ->"
     if has_tgt:
-        return f"-> {tgt_cardinality}"
+        return f"-> {tgt_multiplicity}"
     return ""

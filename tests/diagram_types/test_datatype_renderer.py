@@ -2,7 +2,7 @@
 
 Covers: classifier kinds, is_abstract, attribute compartment, optional marker,
 identity / unique_keys key markers + composite key note, enumeration literals,
-all five dt-* connection arrows, src/tgt cardinality labels, generalization_set
+all five dt-* connection arrows, src/tgt multiplicity labels, generalization_set
 constraint note, and collect_references binding extraction.
 """
 
@@ -202,22 +202,22 @@ class TestConnectionArrows:
 
 
 # ---------------------------------------------------------------------------
-# Cardinality labels
+# Multiplicity labels
 # ---------------------------------------------------------------------------
 
 
-class TestCardinality:
-    def test_tgt_cardinality_in_output(self):
+class TestMultiplicity:
+    def test_tgt_multiplicity_in_output(self):
         out = _render(connections=[{
             "id": "e1", "source": "a", "target": "b",
-            "conn_type": "dt-association", "tgt_cardinality": "0..*",
+            "conn_type": "dt-association", "tgt_multiplicity": "0..*",
         }])
         assert '"0..*"' in out
 
-    def test_src_cardinality_in_output(self):
+    def test_src_multiplicity_in_output(self):
         out = _render(connections=[{
             "id": "e1", "source": "a", "target": "b",
-            "conn_type": "dt-association", "src_cardinality": "1",
+            "conn_type": "dt-association", "src_multiplicity": "1",
         }])
         assert '"1"' in out
 

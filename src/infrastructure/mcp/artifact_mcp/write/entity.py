@@ -22,7 +22,14 @@ def artifact_authoring_guidance(
     diagram_type: str | None = None,
     target: str | None = None,
 ) -> dict[str, object]:
-    return artifact_write_ops.get_type_guidance(filter=filter, diagram_type=diagram_type, target=target)
+    from src.infrastructure.app_bootstrap import build_runtime_catalogs, get_module_registry  # noqa: PLC0415
+
+    return artifact_write_ops.get_type_guidance(
+        filter=filter,
+        diagram_type=diagram_type,
+        target=target,
+        catalogs=build_runtime_catalogs(get_module_registry()),
+    )
 
 
 def artifact_create_entity(
@@ -34,6 +41,7 @@ def artifact_create_entity(
     attribute_types: dict[str, str] | None = None,
     notes: str | None = None,
     keywords: list[str] | None = None,
+    specialization: str | None = None,
     artifact_id: str | None = None,
     version: str = "0.1.0",
     status: str = "draft",
@@ -99,6 +107,7 @@ def artifact_create_entity(
         attribute_types=attribute_types,
         notes=notes,
         keywords=keywords,
+        specialization=specialization,
         artifact_id=artifact_id,
         version=version,
         status=status,
@@ -136,15 +145,21 @@ def register(mcp: FastMCP) -> None:
             "• diagram_type (str): diagram type block — when_to_use, when_not_to_use, "
             "accepted_domains, own entity types, diagram_entities schema, and optional puml_notes.\n"
             "• filter (list[str]): entity type guidance — create_when, never_create_when, "
-            "permitted_connections. Pass type names (e.g. ['requirement', 'goal']) "
-            "or domain names (e.g. ['motivation', 'strategy']) — not mixed.\n"
+            "permitted_connections, specializations (available specialization slugs for that "
+            "type, with their own guidance). Pass type names (e.g. ['requirement', 'goal']) "
+            "or domain names (e.g. ['motivation', 'strategy']) — not mixed. The response also "
+            "includes connection_types: connection types that have specializations declared.\n"
             "• target (str): pair-legality — requires filter with exactly one concrete type name; "
             "returns pair_guidance {outgoing, incoming, symmetric} for the (source, target) pair.\n"
             "Omit all to return all entity type guidance (large; prefer filtering).\n\n"
             "Datatype diagrams — attribute type contract: each attribute's 'type' field is either "
             "{kind: 'primitive', name: '<name>'} for built-in scalar types, or "
             "{kind: 'classifier', id: '<type_id>'} for a named classifier type. "
-            "Call artifact_query_datatype_types to discover available type_ids."
+            "Call artifact_query_datatype_types to discover available type_ids.\n\n"
+            "The response always includes 'viewpoints': the effective merged viewpoint catalog "
+            "(slug, version, name, description, purpose, content, scope summary) — purely "
+            "descriptive, for choosing a viewpoint to apply via artifact_create_diagram/"
+            "artifact_edit_diagram's 'viewpoint' parameter."
         ),
         annotations=READ_ONLY,
         structured_output=False,

@@ -12,6 +12,7 @@ Progressive discovery pattern:
 from functools import lru_cache
 
 from src.domain.module_types import ElementClassName
+from src.infrastructure.write.artifact_write.viewpoint_help_topic import viewpoints_help_topic
 
 
 @lru_cache(maxsize=1)
@@ -44,6 +45,7 @@ def write_help() -> dict[str, object]:
         "connection_type_catalog": _connection_type_catalog(),
         "diagram_types": _diagram_types_catalog(),
         "archimate_stereotypes": sorted(_archimate_stereotype_keys()),
+        "viewpoints": viewpoints_help_topic(),
         "conventions": {
             "entity_id_format": "TYPE@epoch.random.friendly-name (auto-generated)",
             "puml_alias_format": "TYPE_random (e.g. DRV_Qw7Er1)",

@@ -22,8 +22,8 @@ Rel_Association(B, C, "")
     assert ("B", "C") in pairs
 
 
-def test_parse_explicit_connection_pairs_handles_cardinality_labels() -> None:
-    """Cardinality labels in macro calls must not affect connection pair extraction."""
+def test_parse_explicit_connection_pairs_handles_multiplicity_labels() -> None:
+    """Multiplicity labels in macro calls must not affect connection pair extraction."""
     puml = """\
 @startuml test
 rectangle "A" as A

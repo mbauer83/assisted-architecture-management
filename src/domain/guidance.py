@@ -1,8 +1,9 @@
 """Guidance overlay domain types (D2/D3): imported authoring help, never a governance tier.
 
 Guidance text (``create_when``/``never_create_when``) ships empty in ontology modules for
-license reasons and is optionally restored at bootstrap from repo-local, gitignored caches.
-This module only defines the merge; loading the caches and threading the result into
+license reasons and is optionally restored at bootstrap from one deployment-level,
+out-of-repo cache (never per engagement/enterprise repo). This module only defines the
+overlay shape and parsing; loading the cache and threading the result into
 ``EntityTypeInfo`` is application/infrastructure wiring (WU-B2+). Guidance authored directly
 in committed declarations (e.g. specialization guidance in ``.arch-repo/specializations.yaml``)
 does not flow through ``GuidanceOverlay`` at all, so it is never at risk of being overridden
@@ -52,19 +53,6 @@ class GuidanceOverlay:
 
     def get(self, key: GuidanceKey) -> GuidanceEntry | None:
         return self.entries.get(key)
-
-    @staticmethod
-    def merge(*layers: "GuidanceOverlay") -> "GuidanceOverlay":
-        """Merge overlays lowest-precedence first; later layers' entries win on key collision.
-
-        Precedence per D2: module-inline guidance (not itself an overlay layer; it is the
-        loader's fallback when a lookup misses here) < enterprise-repo cache <
-        engagement-repo cache. Callers pass exactly those two cache layers in that order.
-        """
-        merged: dict[GuidanceKey, GuidanceEntry] = {}
-        for layer in layers:
-            merged.update(layer.entries)
-        return GuidanceOverlay(merged)
 
 
 _CONCEPT_SECTIONS: dict[str, ConceptKind] = {"entity_types": "entity", "connection_types": "connection"}

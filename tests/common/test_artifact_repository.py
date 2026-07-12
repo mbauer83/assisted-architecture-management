@@ -662,3 +662,17 @@ def test_repo_connection_ids_delegates_to_store() -> None:
 def test_repo_connection_ids_empty_when_no_connections() -> None:
     repo = ArtifactRepository(FakeStore())
     assert repo.connection_ids() == set()
+
+
+def test_repo_enterprise_entity_ids_delegates_to_store() -> None:
+    """WU-E7: the viewpoint execution use case's ``repo_scope`` filtering needs this on the
+    facade, not just the underlying index — regression guard for the missing delegation."""
+    store = FakeStore(entities=[_entity("e1")])
+    repo = ArtifactRepository(store)
+    assert repo.enterprise_entity_ids() == store.enterprise_entity_ids()
+
+
+def test_repo_engagement_entity_ids_delegates_to_store() -> None:
+    store = FakeStore(entities=[_entity("e1")])
+    repo = ArtifactRepository(store)
+    assert repo.engagement_entity_ids() == store.engagement_entity_ids()

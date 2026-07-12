@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-from collections.abc import Mapping
 from pathlib import Path
 from typing import Any, Literal
 
@@ -22,102 +21,12 @@ DISPLAY_SECTION_ID = "assurance"
 _PACKAGE_DIR = Path(__file__).parent
 META_ONTOLOGY_ALIAS = "assurance"
 
-_ATTRIBUTE_PROFILES: Mapping[str, dict[str, object]] = {
-    "hazard": {
-        "type": "object",
-        "properties": {
-            "concern_class": {
-                "type": "string",
-                "enum": ["safety", "security", "operational", "financial", "privacy"],
-            },
-            "tlp": {
-                "type": "string",
-                "enum": ["TLP:WHITE", "TLP:GREEN", "TLP:AMBER", "TLP:RED"],
-                "default": "TLP:WHITE",
-            },
-            "classification_scheme": {"type": "string"},
-            "classification_code": {"type": "string"},
-        },
-    },
-    "assurance-constraint": {
-        "type": "object",
-        "properties": {
-            "concern_class": {
-                "type": "string",
-                "enum": ["safety", "security", "operational", "financial", "privacy"],
-            },
-            "disposition": {
-                "type": "string",
-                "enum": [
-                    "eliminated",
-                    "prevented-by-design",
-                    "controlled-with-evidence",
-                    "alarp-justified",
-                    "accepted",
-                    "mitigate",
-                    "transfer",
-                    "avoid",
-                ],
-            },
-            "level": {"type": "string", "enum": ["system", "controller", "technical"]},
-            "tlp": {
-                "type": "string",
-                "enum": ["TLP:WHITE", "TLP:GREEN", "TLP:AMBER", "TLP:RED"],
-            },
-            "enforcement_status": {"type": "string"},
-        },
-    },
-    "unsafe-control-action": {
-        "type": "object",
-        "properties": {
-            "uca_type": {
-                "type": "string",
-                "enum": ["not-provided", "provided", "wrong-timing", "stopped-too-soon"],
-            },
-            "mode": {"type": "string", "enum": ["hypothesized", "observed"]},
-            "context": {"type": "string"},
-            "concern_class": {
-                "type": "string",
-                "enum": ["safety", "security", "operational", "financial", "privacy"],
-            },
-        },
-    },
-    "control-structure-node": {
-        "type": "object",
-        "properties": {
-            "node_role": {
-                "type": "string",
-                "enum": ["controller", "controlled-process", "actuator", "sensor"],
-            },
-            "binding_status": {
-                "type": "string",
-                "enum": ["bound", "unbound-pending", "out-of-scope"],
-                "default": "unbound-pending",
-            },
-            "granularity_note": {"type": "string"},
-        },
-    },
-    "risk": {
-        "type": "object",
-        "properties": {
-            "likelihood": {"type": "string", "enum": ["rare", "unlikely", "possible", "likely", "almost-certain"]},
-            "impact": {"type": "string", "enum": ["negligible", "minor", "moderate", "major", "catastrophic"]},
-            "treatment": {"type": "string", "enum": ["mitigate", "transfer", "avoid", "accept"]},
-            "residual_likelihood": {"type": "string"},
-            "residual_impact": {"type": "string"},
-            "review_date": {"type": "string", "format": "date"},
-        },
-    },
-}
-
-
 class _AssuranceModule:
     name = "assurance"
     display_section_id = DISPLAY_SECTION_ID
     module_class: Literal["architecture", "assurance"] = "assurance"
     enabled: bool = True
     requires: list[str] = ["confidential_store"]
-    attribute_profiles: Mapping[str, dict[str, object]] = _ATTRIBUTE_PROFILES
     specialization_catalog: SpecializationCatalog = SpecializationCatalog.empty()
 
     def __init__(

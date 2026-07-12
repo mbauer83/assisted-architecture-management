@@ -364,3 +364,17 @@ def _extract_declared_puml_aliases(content: str) -> set[str]:
 
 def check_diagram_artifact_type(fm: dict, result: VerificationResult, loc: str) -> None:
     check_artifact_type(fm, DIAGRAM_ARTIFACT_TYPES, "diagram artifact type", result, loc)
+
+
+def check_matrix_markdown_shape(fm: dict, content: str, result: VerificationResult, loc: str) -> None:
+    """W321 (should declare diagram-type: matrix) and W322 (no table markup found)."""
+    if "diagram-type" in fm and str(fm.get("diagram-type")) != "matrix":
+        result.issues.append(Issue(
+            Severity.WARNING, "W321",
+            "Markdown diagram file under diagram-catalog/diagrams should use diagram-type: matrix", loc,
+        ))
+    if "|" not in content:
+        result.issues.append(Issue(
+            Severity.WARNING, "W322",
+            "Matrix diagram markdown has no table markup; expected at least one matrix table", loc,
+        ))

@@ -5,7 +5,11 @@ Schema files are stored in ``.arch-repo/schemata/`` within a repository root.
 File conventions
 ----------------
 - ``frontmatter.{file-type}.schema.json``  — entity, outgoing, diagram
-- ``attributes.{artifact-type}.schema.json`` — per entity-type attribute schema
+- ``attributes.{artifact-type}.schema.json`` — per entity-type base attribute schema
+- ``attributes.{artifact-type}.{specialization-slug}.schema.json`` — schema attached to one
+  specialization of that entity type (D13); merges into the base schema for entities
+  carrying that specialization; orphaned (no matching declared specialization) is a
+  verifier warning, never silently ignored.
 - ``connection-metadata.{connection-type}.schema.json`` — per connection-type metadata
 
 Default behaviour: when no schema file exists for a given scope/type,
@@ -18,6 +22,13 @@ from pathlib import Path
 from typing import Any
 
 import jsonschema  # type: ignore[import-untyped]
+
+from src.domain.profiles import (
+    compile_profile_schema,
+    merge_property_schemas,
+    profile_from_inline_attributes,
+)
+from src.domain.specializations import SpecializationCatalog
 
 SCHEMATA_DIR = ".arch-repo/schemata"
 
@@ -49,6 +60,72 @@ def load_connection_metadata_schema(repo_root: Path, connection_type: str) -> di
     Returns ``None`` when no schema file exists (free schema — skip validation).
     """
     return _load_schema_file(repo_root, f"connection-metadata.{connection_type}.schema.json")
+
+
+def load_specialization_attachment_schema(
+    repo_root: Path, artifact_type: str, specialization_slug: str
+) -> dict[str, Any] | None:
+    """Load the `attributes.{artifact_type}.{specialization_slug}.schema.json` attachment file.
+
+    Returns ``None`` when no such file exists (free schema — skip validation).
+    """
+    return _load_schema_file(repo_root, f"attributes.{artifact_type}.{specialization_slug}.schema.json")
+
+
+def compute_effective_attribute_schema(
+    repo_root: Path,
+    artifact_type: str,
+    specialization_slug: str,
+    *,
+    specialization_catalog: SpecializationCatalog,
+) -> tuple[dict[str, Any] | None, list[str]]:
+    """Merge the base-type attribute schema with an entity's own specialization's profile.
+
+    An entity carries at most one specialization (D6), so this is base ⊕ (at most) one
+    specialization-contributed fragment. A specialization's profile is one-to-one with it —
+    never a separately reusable, named registry entry — sourced from inline `attributes:`
+    and/or its dedicated `attributes.{artifact_type}.{slug}.schema.json` attachment file,
+    both already scoped to that one specialization by construction. Returns
+    ``(merged_schema, conflict_messages)`` — ``merged_schema`` is ``None`` only when there is
+    no base schema, no specialization, and no attachment file (free schema).
+    """
+    fragments: list[dict[str, Any]] = []
+    base = load_attribute_schema(repo_root, artifact_type)
+    if base is not None:
+        fragments.append(base)
+
+    if specialization_slug:
+        spec_info = specialization_catalog.get("entity", artifact_type, specialization_slug)
+        if spec_info is not None and spec_info.attributes:
+            inline = profile_from_inline_attributes(specialization_slug, spec_info.attributes)
+            fragments.append(compile_profile_schema(inline))
+        attachment = load_specialization_attachment_schema(repo_root, artifact_type, specialization_slug)
+        if attachment is not None:
+            fragments.append(attachment)
+
+    if not fragments:
+        return None, []
+    merged, conflicts = merge_property_schemas(fragments)
+    return merged, conflicts
+
+
+def find_orphan_attachment_schemata(repo_root: Path, specialization_catalog: SpecializationCatalog) -> list[str]:
+    """Return `attributes.{artifact_type}.{slug}.schema.json` filenames whose `slug` is not a
+    declared entity specialization of `artifact_type` in *specialization_catalog*."""
+    schemata_dir = repo_root / SCHEMATA_DIR
+    if not schemata_dir.is_dir():
+        return []
+    prefix, suffix = "attributes.", ".schema.json"
+    orphans: list[str] = []
+    for path in sorted(schemata_dir.glob(f"{prefix}*{suffix}")):
+        middle = path.name[len(prefix) : -len(suffix)]
+        parts = middle.split(".")
+        if len(parts) != 2:
+            continue
+        artifact_type, slug = parts
+        if specialization_catalog.get("entity", artifact_type, slug) is None:
+            orphans.append(path.name)
+    return orphans
 
 
 def validate_against_schema(instance: dict[str, Any], schema: dict[str, Any]) -> list[str]:

@@ -13,6 +13,7 @@ be registered (fail-closed).
 from __future__ import annotations
 
 import logging
+from functools import lru_cache
 from pathlib import Path
 
 logger = logging.getLogger(__name__)
@@ -102,7 +103,19 @@ class _ConfidentialStoreCapability:
         return self._available
 
 
+@lru_cache(maxsize=None)
 def make_capability(db_path: Path) -> _ConfidentialStoreCapability:
-    """Construct capability sentinel. db_path is interpreted as workspace root."""
+    """Construct capability sentinel. db_path is interpreted as workspace root.
+
+    Cached per `db_path` for the process's lifetime: the underlying probe
+    (`_store_available`) can shell out to a real credential backend (e.g. the WSL2 DPAPI
+    bridge spawns `powershell.exe`), which is both expensive and, under many concurrent
+    callers (parallel test workers each building a fresh `ModuleRegistry`), prone to
+    transient failures — without this cache, two probes in the very same process could
+    legitimately disagree, which is what made `build_module_registry()`'s confidential_store
+    detection appear flaky under `pytest -n auto`. `get_module_registry()` already caches
+    the whole registry the same way for the long-running backend process; this brings ad
+    hoc `build_module_registry()` callers (tests, one-off CLI probes) in line with that.
+    """
     workspace_root = db_path.parent.parent if db_path.name == "store.db" else db_path.parent
     return _ConfidentialStoreCapability(workspace_root)

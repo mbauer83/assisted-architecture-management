@@ -1,4 +1,4 @@
-# Connection Ontology — ArchiMate NEXT connection types & relationship rules
+# Connection Ontology — ArchiMate 4.0 connection types & relationship rules
 #
 # Single source of truth for connection type definitions and permitted
 # entity-level relationships.  Loaded by src/ontologies/archimate_4/_loader.py.
@@ -129,7 +129,7 @@ connection_types:
     usecase-generalization: {}
 
 # ── Permitted relationship rules ───────────────────────────────────────────
-# Encoded from the ArchiMate NEXT specification.
+# Encoded from the ArchiMate 4.0 specification.
 # Each rule is [source, target, [short connection types]].
 # Rules are additive — the loader merges all rules for each (src, tgt) pair.
 

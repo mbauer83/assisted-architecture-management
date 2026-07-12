@@ -6,6 +6,7 @@ from pathlib import Path
 from src.application.modeling.artifact_write import format_outgoing_markdown
 from src.application.verification.artifact_verifier import ArtifactRegistry, ArtifactVerifier
 from src.domain.artifact_id import stable_id
+from src.domain.connection_declaration import ConnectionDeclaration, format_connection_declaration
 from src.domain.module_types import ConnectionTypeName, ElementClassName
 
 from .boundary import assert_engagement_write_root, today_iso
@@ -148,16 +149,13 @@ def _build_content(
     version: str,
     status: str,
     last_updated: str,
-    src_cardinality: str | None = None,
-    tgt_cardinality: str | None = None,
+    src_multiplicity: str | None = None,
+    tgt_multiplicity: str | None = None,
+    specialization: str | None = None,
 ) -> str:
-    src_part = f" [{src_cardinality}]" if src_cardinality else ""
-    tgt_part = f"[{tgt_cardinality}] " if tgt_cardinality else ""
-    conn_header = f"### {connection_type}{src_part} → {tgt_part}{target_entity}"
-
     if outgoing_path.exists():
         existing = outgoing_path.read_text(encoding="utf-8")
-        # Duplicate check ignores cardinalities — same (conn_type, target) pair is a duplicate
+        # Duplicate check ignores multiplicities — same (conn_type, target) pair is a duplicate
         dup_marker = f"### {connection_type} → "
         dup_marker_with_card = f"### {connection_type} ["
         for line in existing.splitlines():
@@ -172,20 +170,33 @@ def _build_content(
                     raise ValueError(
                         f"Connection '{connection_type} → {target_entity}' already exists in {outgoing_path.name}"
                     )
-        new_section = f"\n\n{conn_header}\n"
-        if description and description.strip():
-            new_section += f"\n{description.strip()}\n"
-        return existing.rstrip("\n") + new_section
+        # Appends the new section's formatted text without reparsing/redumping the rest of
+        # the file — every other connection's byte content (incl. any uncommitted edit or
+        # metadata block) is left untouched. Goes through the one shared grammar
+        # component (format_connection_declaration) rather than hand-rolling the header/
+        # metadata/description text, so this path and the "new file" path below can never
+        # silently diverge in shape (e.g. one supporting the metadata block, the other not).
+        decl = ConnectionDeclaration(
+            conn_type=connection_type,
+            target_id=target_entity,
+            src_multiplicity=src_multiplicity or "",
+            tgt_multiplicity=tgt_multiplicity or "",
+            description=(description or "").strip(),
+            metadata={"specialization": specialization} if specialization else {},
+        )
+        return existing.rstrip("\n") + "\n\n" + format_connection_declaration(decl) + "\n"
 
     conn_dict: dict[str, object] = {
         "connection_type": connection_type,
         "target_entity": target_entity,
         "description": description or "",
     }
-    if src_cardinality:
-        conn_dict["src_cardinality"] = src_cardinality
-    if tgt_cardinality:
-        conn_dict["tgt_cardinality"] = tgt_cardinality
+    if src_multiplicity:
+        conn_dict["src_multiplicity"] = src_multiplicity
+    if tgt_multiplicity:
+        conn_dict["tgt_multiplicity"] = tgt_multiplicity
+    if specialization:
+        conn_dict["specialization"] = specialization
     return format_outgoing_markdown(
         source_entity=source_entity,
         version=version,
@@ -255,19 +266,20 @@ def add_connection(
     status: str,
     last_updated: str | None,
     dry_run: bool,
-    src_cardinality: str | None = None,
-    tgt_cardinality: str | None = None,
+    src_multiplicity: str | None = None,
+    tgt_multiplicity: str | None = None,
+    specialization: str | None = None,
     extra_known_ids: frozenset[str] = frozenset(),
 ) -> WriteResult:
     """Add a connection to the source entity's .outgoing.md file."""
     assert_engagement_write_root(repo_root)
     _validate_inputs(registry, connection_type, source_entity, target_entity, extra_known_ids)
 
-    if src_cardinality or tgt_cardinality:
+    if src_multiplicity or tgt_multiplicity:
         for eid, label in ((source_entity, "source"), (target_entity, "target")):
             if _entity_artifact_type(registry, eid) in _junction_types():
                 raise ValueError(
-                    f"Cardinalities are not permitted at junction connection-ends "
+                    f"Multiplicities are not permitted at junction connection-ends "
                     f"(the {label} entity '{eid}' is a junction)."
                 )
 
@@ -284,8 +296,9 @@ def add_connection(
         version,
         status,
         last,
-        src_cardinality=src_cardinality,
-        tgt_cardinality=tgt_cardinality,
+        src_multiplicity=src_multiplicity,
+        tgt_multiplicity=tgt_multiplicity,
+        specialization=specialization,
     )
 
     if dry_run:

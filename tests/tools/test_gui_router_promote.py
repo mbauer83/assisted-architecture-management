@@ -12,6 +12,7 @@ import pytest
 from fastapi import FastAPI
 
 from src.application.artifact_query import ArtifactRepository
+from src.infrastructure.app_bootstrap import install_module_registry
 from src.infrastructure.artifact_index import shared_artifact_index
 from src.infrastructure.gui.routers import state as gui_state
 from src.infrastructure.gui.routers.promote import router as promote_router
@@ -93,6 +94,7 @@ def no_enterprise_client(eng_root: Path):
     gui_state.init_state(repo, eng_root, None)
     app = FastAPI()
     app.include_router(promote_router)
+    install_module_registry(app)
     return TestClient(app)
 
 
@@ -104,6 +106,7 @@ def both_roots_client(eng_root: Path, ent_root: Path):
     gui_state.init_state(repo, eng_root, ent_root)
     app = FastAPI()
     app.include_router(promote_router)
+    install_module_registry(app)
     return TestClient(app)
 
 

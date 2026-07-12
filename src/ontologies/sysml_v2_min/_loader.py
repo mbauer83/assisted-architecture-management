@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import re
-from collections.abc import Mapping
 from pathlib import Path
 from typing import Any, Literal, cast
 
@@ -30,7 +29,6 @@ class _SysmlV2MinModule:
     module_class: Literal["architecture", "assurance"] = "architecture"
     enabled: bool = True
     requires: list[str] = []
-    attribute_profiles: Mapping[str, dict[str, object]] = {}
     specialization_catalog: SpecializationCatalog = SpecializationCatalog.empty()
 
     def __init__(

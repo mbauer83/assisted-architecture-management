@@ -50,7 +50,6 @@ class SpecializationInfo:
     notation: SpecializationNotation = field(default_factory=SpecializationNotation)
     restrict_relationships: tuple[RelationshipRestriction, ...] = ()
     restrict_endpoints: tuple[EndpointRestriction, ...] = ()
-    profile: str | None = None
     attributes: Mapping[str, Any] = field(default_factory=dict)
     create_when: str = ""
     never_create_when: str = ""
@@ -216,7 +215,6 @@ def _info_from_mapping(
 ) -> SpecializationInfo:
     slug = str(raw["slug"])
     name = str(raw.get("name") or slug.replace("-", " ").title())
-    profile_raw = raw.get("profile")
     return SpecializationInfo(
         slug=slug,
         name=name,
@@ -227,7 +225,6 @@ def _info_from_mapping(
         notation=_notation_from_mapping(raw.get("notation")),
         restrict_relationships=_relationship_restrictions(raw.get("restrict_relationships")),
         restrict_endpoints=_endpoint_restrictions(raw.get("restrict_endpoints")),
-        profile=str(profile_raw) if profile_raw else None,
         attributes=_attributes_from_mapping(raw.get("attributes")),
         create_when=str(raw.get("create_when") or ""),
         never_create_when=str(raw.get("never_create_when") or ""),

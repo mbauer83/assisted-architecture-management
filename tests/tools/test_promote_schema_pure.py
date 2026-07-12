@@ -11,12 +11,19 @@ import json
 from pathlib import Path
 from unittest.mock import MagicMock
 
+import yaml
+
 from src.domain.artifact_types import DocumentRecord
+from src.domain.specializations import SpecializationInfo
 from src.infrastructure.write.artifact_write._promote_conflicts import build_handler
 from src.infrastructure.write.artifact_write.promote_schema_check import (
     _compare_schema_pairs,
     _document_schema_errors,
     _schema_superset_errors,
+    _specialization_attachment_errors,
+    _specialization_dependency_errors,
+    _specialization_engagement_only,
+    _specialization_errors,
     check_promotion_schema_compatibility,
 )
 from src.infrastructure.write.artifact_write.promote_to_enterprise import ConflictResolution
@@ -324,3 +331,188 @@ class TestCheckPromotionSchemaCompatibility:
             repo=repo,
         )
         assert isinstance(errors, list)
+
+    def test_engagement_only_specialization_blocks_end_to_end(self, tmp_path: Path) -> None:
+        eng = tmp_path / "engagements" / "ENG-SCHK3" / "architecture-repository"
+        ent = tmp_path / "enterprise-repository"
+        eng.mkdir(parents=True)
+        ent.mkdir(parents=True)
+        (eng / ".arch-repo").mkdir()
+        payload = {"specializations": {"entity": {"requirement": [{"slug": "constraint", "name": "Constraint"}]}}}
+        (eng / ".arch-repo" / "specializations.yaml").write_text(yaml.safe_dump(payload), encoding="utf-8")
+
+        registry = MagicMock()
+        registry.repo_roots = [eng, ent]
+        repo = MagicMock()
+        repo.get_entity.return_value = MagicMock(artifact_type="requirement", specialization="constraint")
+        repo.get_document = lambda did: None
+        catalogs = MagicMock()
+        catalogs.specializations.get.return_value = _spec_info()
+
+        errors = check_promotion_schema_compatibility(
+            entity_ids=["REQ@1"],
+            has_diagrams=False,
+            document_ids=[],
+            registry=registry,
+            repo=repo,
+            connection_ids=[],
+            catalogs=catalogs,
+        )
+        assert any("constraint" in e and "engagement" in e for e in errors)
+
+
+# ---------------------------------------------------------------------------
+# Specialization superset checks (D14/WU-D8)
+# ---------------------------------------------------------------------------
+
+
+def _write_specializations_yaml(root: Path, *, kind: str, parent_type: str, slug: str) -> None:
+    arch = root / ".arch-repo"
+    arch.mkdir(parents=True, exist_ok=True)
+    payload = {"specializations": {kind: {parent_type: [{"slug": slug, "name": slug.title()}]}}}
+    (arch / "specializations.yaml").write_text(yaml.safe_dump(payload), encoding="utf-8")
+
+
+def _spec_info(
+    *,
+    slug: str = "constraint",
+    parent_type: str = "requirement",
+    kind: str = "entity",
+    module_alias: str = "archimate-4",
+) -> SpecializationInfo:
+    return SpecializationInfo(
+        slug=slug, name=slug.title(), concept_kind=kind, parent_type=parent_type,
+        module_alias=module_alias,
+    )
+
+
+class TestSpecializationEngagementOnly:
+    def test_not_declared_anywhere_is_not_engagement_only(self, tmp_path: Path) -> None:
+        # Module-shipped entries never appear in a repo's own declarations file, so this also
+        # covers the module-shipped case: it can never test positive here.
+        eng, ent = tmp_path / "eng", tmp_path / "ent"
+        eng.mkdir()
+        ent.mkdir()
+        assert _specialization_engagement_only(_spec_info(), eng_root=eng, ent_root=ent) is False
+
+    def test_declared_only_in_engagement_is_engagement_only(self, tmp_path: Path) -> None:
+        eng, ent = tmp_path / "eng", tmp_path / "ent"
+        eng.mkdir()
+        ent.mkdir()
+        _write_specializations_yaml(eng, kind="entity", parent_type="requirement", slug="constraint")
+        assert _specialization_engagement_only(_spec_info(), eng_root=eng, ent_root=ent) is True
+
+    def test_declared_in_both_is_not_engagement_only(self, tmp_path: Path) -> None:
+        # "Definition promoted alongside": the specialization is already independently
+        # declared in the enterprise repo's own specializations.yaml too.
+        eng, ent = tmp_path / "eng", tmp_path / "ent"
+        eng.mkdir()
+        ent.mkdir()
+        _write_specializations_yaml(eng, kind="entity", parent_type="requirement", slug="constraint")
+        _write_specializations_yaml(ent, kind="entity", parent_type="requirement", slug="constraint")
+        assert _specialization_engagement_only(_spec_info(), eng_root=eng, ent_root=ent) is False
+
+    def test_connection_kind_checked_independently_of_entity_kind(self, tmp_path: Path) -> None:
+        eng, ent = tmp_path / "eng", tmp_path / "ent"
+        eng.mkdir()
+        ent.mkdir()
+        _write_specializations_yaml(
+            eng, kind="connection", parent_type="archimate-assignment", slug="responsibility-assignment"
+        )
+        entry = _spec_info(slug="responsibility-assignment", parent_type="archimate-assignment", kind="connection")
+        assert _specialization_engagement_only(entry, eng_root=eng, ent_root=ent) is True
+
+
+class TestSpecializationAttachmentErrors:
+    def test_no_errors_when_no_attachment_or_profile(self, tmp_path: Path) -> None:
+        eng, ent = tmp_path / "eng", tmp_path / "ent"
+        eng.mkdir()
+        ent.mkdir()
+        assert _specialization_attachment_errors(_spec_info(), "requirement", "constraint", eng, ent) == []
+
+    def test_enterprise_attachment_missing_from_engagement_reported(self, tmp_path: Path) -> None:
+        eng, ent = tmp_path / "eng", tmp_path / "ent"
+        eng.mkdir()
+        ent_schemata = ent / ".arch-repo" / "schemata"
+        ent_schemata.mkdir(parents=True)
+        (ent_schemata / "attributes.requirement.constraint.schema.json").write_text(
+            json.dumps({"properties": {"x": {}}})
+        )
+        errors = _specialization_attachment_errors(_spec_info(), "requirement", "constraint", eng, ent)
+        assert any("constraint" in e for e in errors)
+
+    def test_attachment_superset_reports_no_error(self, tmp_path: Path) -> None:
+        eng, ent = tmp_path / "eng", tmp_path / "ent"
+        for root in (eng, ent):
+            (root / ".arch-repo" / "schemata").mkdir(parents=True)
+        (ent / ".arch-repo" / "schemata" / "attributes.requirement.constraint.schema.json").write_text(
+            json.dumps({"properties": {"x": {}}})
+        )
+        (eng / ".arch-repo" / "schemata" / "attributes.requirement.constraint.schema.json").write_text(
+            json.dumps({"properties": {"x": {}, "y": {}}})
+        )
+        assert _specialization_attachment_errors(_spec_info(), "requirement", "constraint", eng, ent) == []
+
+
+
+class TestSpecializationDependencyErrors:
+    def test_unknown_slug_is_not_this_checks_concern(self, tmp_path: Path) -> None:
+        eng, ent = tmp_path / "eng", tmp_path / "ent"
+        eng.mkdir()
+        ent.mkdir()
+        catalogs = MagicMock()
+        catalogs.specializations.get.return_value = None
+        errors = _specialization_dependency_errors(
+            "entity", "requirement", "nonexistent-slug", "entity REQ@1",
+            eng_root=eng, ent_root=ent, catalogs=catalogs,
+        )
+        assert errors == []
+
+    def test_engagement_only_blocks_with_actionable_message(self, tmp_path: Path) -> None:
+        eng, ent = tmp_path / "eng", tmp_path / "ent"
+        eng.mkdir()
+        ent.mkdir()
+        _write_specializations_yaml(eng, kind="entity", parent_type="requirement", slug="constraint")
+        catalogs = MagicMock()
+        catalogs.specializations.get.return_value = _spec_info()
+        errors = _specialization_dependency_errors(
+            "entity", "requirement", "constraint", "entity REQ@1",
+            eng_root=eng, ent_root=ent, catalogs=catalogs,
+        )
+        assert len(errors) == 1
+        assert "constraint" in errors[0]
+        assert "REQ@1" in errors[0]
+        assert "engagement" in errors[0]
+
+
+class TestSpecializationErrorsCoversConnections:
+    def test_baseline_no_specializations_yields_no_errors(self, tmp_path: Path) -> None:
+        eng, ent = tmp_path / "eng", tmp_path / "ent"
+        eng.mkdir()
+        ent.mkdir()
+        repo = MagicMock()
+        repo.get_entity.return_value = MagicMock(artifact_type="requirement", specialization="")
+        repo.get_connection.return_value = MagicMock(conn_type="archimate-association", specialization="")
+        errors = _specialization_errors(eng, ent, ["REQ@1"], ["CONN@1"], repo, MagicMock())
+        assert errors == []
+
+    def test_connection_specialization_checked_via_promoted_connection_records(self, tmp_path: Path) -> None:
+        eng, ent = tmp_path / "eng", tmp_path / "ent"
+        eng.mkdir()
+        ent.mkdir()
+        _write_specializations_yaml(
+            eng, kind="connection", parent_type="archimate-assignment", slug="responsibility-assignment"
+        )
+        repo = MagicMock()
+        repo.get_entity.return_value = None
+        repo.get_connection.return_value = MagicMock(
+            conn_type="archimate-assignment", specialization="responsibility-assignment"
+        )
+        catalogs = MagicMock()
+        catalogs.specializations.get.return_value = _spec_info(
+            slug="responsibility-assignment", parent_type="archimate-assignment", kind="connection"
+        )
+        errors = _specialization_errors(eng, ent, [], ["CONN@1"], repo, catalogs)
+        assert len(errors) == 1
+        assert "responsibility-assignment" in errors[0]
+        assert "connection" in errors[0]

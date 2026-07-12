@@ -1,6 +1,6 @@
 """Tests for model query MCP improvements.
 
-Updated for ArchiMate NEXT conventions:
+Updated for ArchiMate 4.0 conventions:
 - model/ directory (not model-entities/)
 - New ID format: TYPE@epoch.random.friendly-name
 - New frontmatter: removed engagement, phase-produced, owner-agent, safety-relevant

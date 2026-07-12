@@ -22,7 +22,8 @@ CREATE TABLE IF NOT EXISTS connections (
     version TEXT NOT NULL, status TEXT NOT NULL, path TEXT NOT NULL,
     scope TEXT NOT NULL, extra_json TEXT NOT NULL, content_text TEXT NOT NULL,
     associated_entities_json TEXT NOT NULL,
-    src_cardinality TEXT NOT NULL, tgt_cardinality TEXT NOT NULL,
+    src_multiplicity TEXT NOT NULL, tgt_multiplicity TEXT NOT NULL,
+    specialization TEXT NOT NULL,
     group_name TEXT NOT NULL DEFAULT 'uncategorized'
 );
 CREATE TABLE IF NOT EXISTS diagrams (
@@ -50,7 +51,8 @@ CREATE TABLE IF NOT EXISTS entity_context_edges (
     source_scope TEXT NOT NULL, target_scope TEXT NOT NULL,
     path TEXT NOT NULL, content_text TEXT NOT NULL,
     associated_entities_json TEXT NOT NULL,
-    src_cardinality TEXT NOT NULL, tgt_cardinality TEXT NOT NULL,
+    src_multiplicity TEXT NOT NULL, tgt_multiplicity TEXT NOT NULL,
+    specialization TEXT NOT NULL,
     PRIMARY KEY (entity_id, connection_id, direction_bucket)
 );
 CREATE TABLE IF NOT EXISTS entity_context_stats (

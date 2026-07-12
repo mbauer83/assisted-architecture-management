@@ -1,13 +1,13 @@
-# Entity Ontology — ArchiMate NEXT entity type definitions
+# Entity Ontology — ArchiMate 4.0 entity type definitions
 #
 # Single source of truth for entity type metadata, classification hierarchy,
-# and domain assignments.  Loaded by src/ontologies/archimate_next/_loader.py.
+# and domain assignments.  Loaded by src/ontologies/archimate_4/_loader.py.
 #
 # Fields per entity type:
 #   prefix              – short ID prefix (e.g. STK, DRV)
 #   hierarchy           – domain-level path segments under model/; the loader
 #                         appends the artifact_type name as the final segment
-#   element_classes     – ArchiMate NEXT abstract classification classes
+#   element_classes     – ArchiMate 4.0 abstract classification classes
 #   create_when         - A brief description for when to model something as this type
 #   never_create_when   - A brief description for when never to model something as this type
 

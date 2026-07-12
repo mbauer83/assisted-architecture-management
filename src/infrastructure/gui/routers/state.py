@@ -129,6 +129,7 @@ def entity_to_summary(
         "path": str(e.path),
         "is_global": is_global(e.path),
         "group": e.group,
+        "specialization": e.specialization,
     }
     if e.host_diagram_id is not None:
         d["host_diagram_id"] = e.host_diagram_id
@@ -185,8 +186,8 @@ def connection_to_dict(c: ConnectionRecord) -> dict[str, Any]:
         "path": str(c.path),
         "content_text": c.content_text,
         "associated_entities": list(c.associated_entities),
-        "src_cardinality": c.src_cardinality,
-        "tgt_cardinality": c.tgt_cardinality,
+        "src_multiplicity": c.src_multiplicity,
+        "tgt_multiplicity": c.tgt_multiplicity,
         "source_name": src_name,
         "target_name": tgt_name,
     }

@@ -51,35 +51,6 @@ def test_core_connection_types_present() -> None:
         assert expected in conns, f"Expected connection type '{expected}' in assurance module"
 
 
-def test_attribute_profiles_present() -> None:
-    profiles = assurance_module.attribute_profiles
-    assert "hazard" in profiles
-    assert "assurance-constraint" in profiles
-    assert "unsafe-control-action" in profiles
-    assert "control-structure-node" in profiles
-
-
-def test_concern_class_in_hazard_profile() -> None:
-    profile = assurance_module.attribute_profiles["hazard"]
-    props = profile.get("properties", {})
-    assert isinstance(props, dict)
-    assert "concern_class" in props
-    enum = props["concern_class"].get("enum", [])  # type: ignore[union-attr]
-    assert "safety" in enum
-    assert "security" in enum
-
-
-def test_disposition_in_constraint_profile() -> None:
-    profile = assurance_module.attribute_profiles["assurance-constraint"]
-    props = profile.get("properties", {})
-    assert isinstance(props, dict)
-    disp = props.get("disposition", {})
-    assert isinstance(disp, dict)
-    enum = disp.get("enum", [])
-    assert "eliminated" in enum
-    assert "accepted" in enum
-
-
 def test_element_classes_declared() -> None:
     classes = assurance_module.element_classes
     assert "assurance-element" in classes

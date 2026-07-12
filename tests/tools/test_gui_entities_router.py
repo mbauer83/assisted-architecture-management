@@ -291,6 +291,8 @@ def test_entity_context_read_model_groups_connections_and_counts(
         f"{stable_id(peer_id)}---{stable_id(src_id)}@@archimate-association",
     }
     assert payload["generation"] >= 1
+    assert payload["entity"]["specialization"] == ""
+    assert all(conn["specialization"] == "" for conn in payload["connections"]["outbound"])
 
 
 def test_clear_caches_applies_incremental_outgoing_changes(

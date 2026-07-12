@@ -3,7 +3,7 @@ from __future__ import annotations
 from collections.abc import Mapping
 from pathlib import Path
 
-from src.domain.archimate_relation_rendering import format_cardinality_label
+from src.domain.archimate_relation_rendering import format_multiplicity_label
 from src.domain.artifact_id import stable_conn_id
 from src.domain.artifact_types import ConnectionRecord
 from src.domain.ontology_protocol import DiagramRendererReferences
@@ -23,10 +23,10 @@ class ArchimatePumlRenderer(GenericPumlRenderer):
             return super().visible_connection_label(conn, diagram_connections)
 
         label_parts: list[str] = []
-        if bool(spec.get("include_cardinality")):
-            cardinality = format_cardinality_label(conn.src_cardinality, conn.tgt_cardinality)
-            if cardinality:
-                label_parts.append(cardinality)
+        if bool(spec.get("include_multiplicity")):
+            multiplicity = format_multiplicity_label(conn.src_multiplicity, conn.tgt_multiplicity)
+            if multiplicity:
+                label_parts.append(multiplicity)
         if bool(spec.get("include_description")) and conn.content_text.strip():
             label_parts.append(conn.content_text.strip())
         extra = str(spec.get("label") or "").strip()

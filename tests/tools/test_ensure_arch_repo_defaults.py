@@ -38,6 +38,25 @@ def test_populates_missing_documents_schemata_and_config(tmp_path: Path) -> None
     assert summary["config"] == ["config.yaml"]
 
 
+def test_new_repo_receives_assurance_attribute_schemas(tmp_path: Path) -> None:
+    # Content migrated off the dormant OntologyModule.attribute_profiles surface (removed —
+    # no live consumer had ever read it besides these very schemata-scaffolding defaults).
+    repo = _make_repo(tmp_path)
+    ensure_arch_repo_defaults(repo)
+
+    schem = repo / ".arch-repo" / "schemata"
+    for filename in (
+        "attributes.hazard.schema.json",
+        "attributes.risk.schema.json",
+        "attributes.unsafe-control-action.schema.json",
+        "attributes.assurance-constraint.schema.json",
+        "attributes.control-structure-node.schema.json",
+    ):
+        assert (schem / filename).is_file(), f"Expected {filename} to be scaffolded into a new repo"
+        schema = json.loads((schem / filename).read_text(encoding="utf-8"))
+        assert schema["properties"], f"{filename} should declare at least one property"
+
+
 def test_migrates_canonical_flat_files_and_drops_legacy_junk(tmp_path: Path) -> None:
     repo = _make_repo(tmp_path)
     arch = repo / ".arch-repo"

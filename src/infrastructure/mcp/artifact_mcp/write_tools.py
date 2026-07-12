@@ -21,6 +21,7 @@ from src.infrastructure.mcp.artifact_mcp.write.entity import (
 )
 from src.infrastructure.mcp.artifact_mcp.write.group import artifact_group
 from src.infrastructure.mcp.artifact_mcp.write.promote import artifact_promote_to_enterprise
+from src.infrastructure.mcp.artifact_mcp.write.viewpoint import artifact_viewpoint
 
 __all__ = [
     "DiagramConnectionInferenceMode",
@@ -37,12 +38,21 @@ __all__ = [
     "artifact_group",
     "artifact_help",
     "artifact_promote_to_enterprise",
+    "artifact_viewpoint",
 ]
 
 
 def register_write_tools(mcp: FastMCP) -> None:
     from src.infrastructure.mcp.artifact_mcp import admin_tools, bulk_tools
-    from src.infrastructure.mcp.artifact_mcp.write import connection, diagram, document, entity, group, promote
+    from src.infrastructure.mcp.artifact_mcp.write import (
+        connection,
+        diagram,
+        document,
+        entity,
+        group,
+        promote,
+        viewpoint,
+    )
 
     entity.register(mcp)
     connection.register(mcp)
@@ -50,5 +60,6 @@ def register_write_tools(mcp: FastMCP) -> None:
     document.register(mcp)
     promote.register(mcp)
     group.register(mcp)
+    viewpoint.register(mcp)
     bulk_tools.register(mcp)
     admin_tools.register_admin_tools(mcp)

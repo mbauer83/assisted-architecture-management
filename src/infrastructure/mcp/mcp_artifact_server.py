@@ -48,6 +48,7 @@ from src.infrastructure.mcp.artifact_mcp.write_tools import (  # noqa: F401
     artifact_edit_document,
     artifact_help,
     artifact_promote_to_enterprise,
+    artifact_viewpoint,
 )
 from src.infrastructure.mcp.transport_security import build_transport_security
 

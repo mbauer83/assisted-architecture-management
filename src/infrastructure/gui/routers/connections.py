@@ -21,13 +21,13 @@ def _catalogs():
 
     return build_runtime_catalogs(get_module_registry())
 
-# Accepted cardinality formats: n  |  n..m  |  n..*  |  *
-_CARDINALITY_RE = re.compile(r"^\d+$|^\d+\.\.\d+$|^\d+\.\.\*$|^\*$")
+# Accepted multiplicity formats: n  |  n..m  |  n..*  |  *
+_MULTIPLICITY_RE = re.compile(r"^\d+$|^\d+\.\.\d+$|^\d+\.\.\*$|^\*$")
 
 
-def _check_cardinality(v: str | None) -> str | None:
-    if v is not None and v != "" and not _CARDINALITY_RE.match(v):
-        raise ValueError(f"Invalid cardinality '{v}': accepted forms are n, n..m, n..*, or *")
+def _check_multiplicity(v: str | None) -> str | None:
+    if v is not None and v != "" and not _MULTIPLICITY_RE.match(v):
+        raise ValueError(f"Invalid multiplicity '{v}': accepted forms are n, n..m, n..*, or *")
     return v
 
 
@@ -122,14 +122,15 @@ class AddConnectionBody(BaseModel):
     connection_type: str
     target_entity: str
     description: str | None = None
-    src_cardinality: str | None = None
-    tgt_cardinality: str | None = None
+    src_multiplicity: str | None = None
+    tgt_multiplicity: str | None = None
+    specialization: str | None = None
     dry_run: bool = True
 
-    @field_validator("src_cardinality", "tgt_cardinality")
+    @field_validator("src_multiplicity", "tgt_multiplicity")
     @classmethod
-    def validate_cardinality(cls, v: str | None) -> str | None:
-        return _check_cardinality(v)
+    def validate_multiplicity(cls, v: str | None) -> str | None:
+        return _check_multiplicity(v)
 
 
 class RemoveConnectionBody(BaseModel):
@@ -217,8 +218,9 @@ def add_connection(body: AddConnectionBody) -> dict[str, Any]:
             connection_type=body.connection_type,
             target_entity=effective_target,
             description=body.description,
-            src_cardinality=body.src_cardinality,
-            tgt_cardinality=body.tgt_cardinality,
+            src_multiplicity=body.src_multiplicity,
+            tgt_multiplicity=body.tgt_multiplicity,
+            specialization=body.specialization,
             version="0.1.0",
             status="draft",
             last_updated=None,
@@ -244,14 +246,15 @@ class EditConnectionBody(BaseModel):
     connection_type: str
     target_entity: str
     description: str | None = None
-    src_cardinality: str | None = None
-    tgt_cardinality: str | None = None
+    src_multiplicity: str | None = None
+    tgt_multiplicity: str | None = None
+    specialization: str | None = None
     dry_run: bool = True
 
-    @field_validator("src_cardinality", "tgt_cardinality")
+    @field_validator("src_multiplicity", "tgt_multiplicity")
     @classmethod
-    def validate_cardinality(cls, v: str | None) -> str | None:
-        return _check_cardinality(v)
+    def validate_multiplicity(cls, v: str | None) -> str | None:
+        return _check_multiplicity(v)
 
 
 class ConnectionAssociateBody(BaseModel):
@@ -281,8 +284,9 @@ def edit_connection(body: EditConnectionBody) -> dict[str, Any]:
             connection_type=body.connection_type,
             target_entity=body.target_entity,
             description=body.description,
-            src_cardinality=body.src_cardinality if "src_cardinality" in provided else _UNSET,
-            tgt_cardinality=body.tgt_cardinality if "tgt_cardinality" in provided else _UNSET,
+            src_multiplicity=body.src_multiplicity if "src_multiplicity" in provided else _UNSET,
+            tgt_multiplicity=body.tgt_multiplicity if "tgt_multiplicity" in provided else _UNSET,
+            specialization=body.specialization if "specialization" in provided else _UNSET,
             dry_run=body.dry_run,
         )
     except ValueError as e:

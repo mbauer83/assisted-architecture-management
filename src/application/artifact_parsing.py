@@ -18,6 +18,7 @@ from src.domain.artifact_types import (
     Domain,
     EntityRecord,
 )
+from src.domain.connection_declaration import parse_connection_declarations
 from src.domain.property_value import decode_lenient, get_adhoc_type
 
 
@@ -217,6 +218,9 @@ def parse_entity(
     kw_raw: object = frontmatter.get("keywords") or []
     keywords: tuple[str, ...] = tuple(str(k) for k in kw_raw) if isinstance(kw_raw, list) else ()
 
+    spec_raw = frontmatter.get("specialization")
+    specialization = spec_raw if isinstance(spec_raw, str) else ""
+
     return EntityRecord(
         artifact_id=str(frontmatter.get("artifact-id", entity_id_from_path(path))),
         artifact_type=str(frontmatter.get("artifact-type", "")),
@@ -226,6 +230,7 @@ def parse_entity(
         domain=domain,
         subdomain=subdomain,
         keywords=keywords,
+        specialization=specialization,
         path=path,
         extra={key: value for key, value in frontmatter.items() if key not in STANDARD_ENTITY_FIELDS},
         content_text=extract_section(content, "content"),
@@ -233,17 +238,6 @@ def parse_entity(
         display_label=display_label,
         display_alias=display_alias,
     )
-
-
-_CONN_HEADER_RE = re.compile(
-    r"^###\s+(\S+)"  # conn_type
-    r"(?:\s+\[([^\]]+)\])?"  # optional [src_card]
-    r"\s+→\s+"  # arrow
-    r"(?:\[([^\]]+)\]\s+)?"  # optional [tgt_card]
-    r"(.+)$",  # target_id
-    re.MULTILINE,
-)
-_ASSOC_RE = re.compile(r"<!--\s*§assoc\s+(\S+)\s*-->")
 
 
 def parse_outgoing_file(path: Path) -> list[ConnectionRecord]:
@@ -263,33 +257,25 @@ def parse_outgoing_file(path: Path) -> list[ConnectionRecord]:
     extra = {k: v for k, v in frontmatter.items() if k not in STANDARD_OUTGOING_FIELDS}
 
     records: list[ConnectionRecord] = []
-    headers = list(_CONN_HEADER_RE.finditer(content))
-    for i, m in enumerate(headers):
-        conn_type = m.group(1).strip()
-        src_card = (m.group(2) or "").strip()
-        tgt_card = (m.group(3) or "").strip()
-        target = m.group(4).strip()
-        body_start = m.end()
-        body_end = headers[i + 1].start() if i + 1 < len(headers) else len(content)
-        body = content[body_start:body_end].strip()
-        assoc = tuple(_ASSOC_RE.findall(body))
-        clean_body = _ASSOC_RE.sub("", body).strip()
-
-        artifact_id = f"{stable_id(source_entity)}---{stable_id(target)}@@{conn_type}"
+    for decl in parse_connection_declarations(content):
+        artifact_id = f"{stable_id(source_entity)}---{stable_id(decl.target_id)}@@{decl.conn_type}"
+        conn_spec_raw = decl.metadata.get("specialization")
+        specialization = conn_spec_raw if isinstance(conn_spec_raw, str) else ""
         records.append(
             ConnectionRecord(
                 artifact_id=artifact_id,
                 source=source_entity,
-                target=target,
-                conn_type=conn_type,
+                target=decl.target_id,
+                conn_type=decl.conn_type,
                 version=version,
                 status=status,
                 path=path,
                 extra=extra,
-                content_text=clean_body,
-                associated_entities=assoc,
-                src_cardinality=src_card,
-                tgt_cardinality=tgt_card,
+                content_text=decl.description,
+                associated_entities=decl.associated_entities,
+                src_multiplicity=decl.src_multiplicity,
+                tgt_multiplicity=decl.tgt_multiplicity,
+                specialization=specialization,
             )
         )
     return records

@@ -19,6 +19,23 @@ def pluralize_label(label: str) -> str:
     return " ".join(words)
 
 
+def insert_arrow_line_style(arrow: str, line_style: str) -> str:
+    """Insert a PlantUML line-style modifier (e.g. ``dashed``, ``dotted``) into a plain arrow
+    token, e.g. ``-->`` -> ``-[dashed]->``.
+
+    Skipped (returns *arrow* unchanged) when it already carries a bracket or a direction
+    word — merging a line style with a pre-existing direction hint correctly needs the
+    style and direction combined inside one bracket (``-[dashed,down]->``), which no real
+    specialization exercises today; callers apply direction hints and line styles as
+    mutually exclusive on one connection rather than risk a malformed merge.
+    """
+    if not line_style or "[" in arrow or re.search(r"(up|down|left|right|hidden)", arrow):
+        return arrow
+    if arrow.startswith((".", "-")):
+        return arrow[0] + f"[{line_style}]" + arrow[1:]
+    return arrow
+
+
 def insert_arrow_direction(arrow: str, direction: str) -> str:
     if "[hidden]" in arrow or re.search(r"(up|down|left|right)", arrow):
         return arrow
