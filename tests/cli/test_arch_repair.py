@@ -168,6 +168,64 @@ def test_repair_requires_explicit_confirmation(repo: Path) -> None:
         )
 
 
+def test_main_legacy_no_subcommand_is_deprecated_alias_for_git_repair(
+    repo: Path,
+    monkeypatch,
+    capsys,
+) -> None:
+    calls: list[tuple[str, ...]] = []
+    askpass = repo / "askpass.sh"
+    askpass.write_text("", encoding="utf-8")
+    monkeypatch.setattr(arch_repair, "collect_credentials", lambda targets: None)
+    monkeypatch.setattr(arch_repair, "create_askpass_script", lambda: askpass)
+    monkeypatch.setattr(
+        repair_adapter,
+        "run_git",
+        lambda _repo, args, *, timeout, env: (calls.append(tuple(args)), _result_for(args))[1],
+    )
+
+    exit_code = arch_repair.main(
+        ["--repo-root", str(repo), "--repair-branch", "repair/legacy", "--message", "m", "--confirm"]
+    )
+
+    assert exit_code == 0
+    assert ("push", "origin", "main") in calls
+    assert "DEPRECATED" in capsys.readouterr().err
+
+
+def test_main_explicit_git_repair_subcommand(repo: Path, monkeypatch, capsys) -> None:
+    calls: list[tuple[str, ...]] = []
+    askpass = repo / "askpass.sh"
+    askpass.write_text("", encoding="utf-8")
+    monkeypatch.setattr(arch_repair, "collect_credentials", lambda targets: None)
+    monkeypatch.setattr(arch_repair, "create_askpass_script", lambda: askpass)
+    monkeypatch.setattr(
+        repair_adapter,
+        "run_git",
+        lambda _repo, args, *, timeout, env: (calls.append(tuple(args)), _result_for(args))[1],
+    )
+
+    exit_code = arch_repair.main(
+        ["git-repair", "--repo-root", str(repo), "--repair-branch", "repair/x", "--message", "m", "--confirm"]
+    )
+
+    assert exit_code == 0
+    assert ("push", "origin", "main") in calls
+    assert "DEPRECATED" not in capsys.readouterr().err
+
+
+def test_main_dispatches_upgrade_subcommand(monkeypatch) -> None:
+    from src.infrastructure.cli import arch_repair_upgrade
+
+    seen: list[list[str]] = []
+    monkeypatch.setattr(arch_repair_upgrade, "main_upgrade", lambda rest: (seen.append(rest), 0)[1])
+
+    exit_code = arch_repair.main(["upgrade", "--repo-root", "/tmp/x"])
+
+    assert exit_code == 0
+    assert seen == [["--repo-root", "/tmp/x"]]
+
+
 def _result_for(
     args,
     *,

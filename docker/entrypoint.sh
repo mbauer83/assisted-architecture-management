@@ -38,6 +38,32 @@ else
     log "No workspace config at $WORKSPACE_CONFIG — relying on ARCH_REPO_ROOT/ARCH_ENTERPRISE_ROOT"
 fi
 
+# ── 1.5 Repository format upgrade (D17) ──────────────────────────────────────
+# Runs before the backend starts, so the guard's "no backend may be serving the target
+# repo" check always passes in this single-container deployment, and a repo that is
+# already current is a true no-op (no writes) — safe to run on every single restart,
+# code-update or not. Opt out with ARCH_REPAIR_UPGRADE=false (e.g. to defer to a
+# manually-run `arch-repair upgrade` step instead).
+if is_enabled "${ARCH_REPAIR_UPGRADE:-true}"; then
+    upgrade_roots=""
+    if [ -f "$WORKSPACE_CONFIG" ]; then
+        upgrade_roots="--workspace $(dirname "$WORKSPACE_CONFIG")"
+    else
+        [ -n "${ARCH_REPO_ROOT:-}" ] && upgrade_roots="$upgrade_roots --repo-root $ARCH_REPO_ROOT"
+        [ -n "${ARCH_ENTERPRISE_ROOT:-}" ] && upgrade_roots="$upgrade_roots --repo-root $ARCH_ENTERPRISE_ROOT"
+    fi
+    if [ -n "$upgrade_roots" ]; then
+        upgrade_args="--commit $upgrade_roots"
+        log "Checking repository format (arch-repair upgrade $upgrade_args)"
+        # shellcheck disable=SC2086
+        arch-repair upgrade $upgrade_args
+    else
+        log "Repository format upgrade skipped — no workspace config and no ARCH_REPO_ROOT/ARCH_ENTERPRISE_ROOT"
+    fi
+else
+    log "Repository format upgrade skipped (ARCH_REPAIR_UPGRADE=false)"
+fi
+
 # ── 2. Assurance (opt-in; the default deployment runs without it) ─────────────
 # Reconcile the module-enabled flag with the toggle every start so the state is
 # deterministic regardless of what a previous run wrote to settings.yaml.
