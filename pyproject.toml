@@ -17,6 +17,8 @@ dependencies = [
     "keyrings.alt>=4.0",
     "httpx>=0.25",
     "cryptography>=42.0",
+    "defusedxml>=0.7.1",
+    "lxml>=6.1.1",
 ]
 
 
@@ -36,6 +38,7 @@ arch-repair = "src.infrastructure.cli.arch_repair:main"
 arch-mcp-stdio-assurance-read = "src.infrastructure.mcp.arch_mcp_stdio_assurance:main_read"
 arch-mcp-stdio-assurance-write = "src.infrastructure.mcp.arch_mcp_stdio_assurance:main_write"
 arch-import-guidance = "src.infrastructure.cli.arch_import_guidance:main"
+arch-exchange = "src.infrastructure.cli.arch_exchange:main"
 
 [build-system]
 requires = ["hatchling"]

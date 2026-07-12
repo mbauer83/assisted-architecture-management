@@ -42,6 +42,11 @@ plantuml.jar
 *.pdf
 *.pdf:Zone.Identifier
 
+# C19C model/diagram/view exchange specs + example/interoperability-test snippets
+# (license-encumbered reference material for the ArchiMate 4 compliance plan's
+# WU-F1/F2/F3a/F3b exchange work — local reference only, never committed)
+/spec/
+
 # Guidance-cache files — license-encumbered spec prose, imported per repo via
 # arch-import-guidance; the per-repo ignore lives in <repo>/.arch-repo/.gitignore, this is
 # a belt-and-braces guard against a stray extract/import landing at the workspace root
