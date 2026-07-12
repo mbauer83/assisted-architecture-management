@@ -1,0 +1,68 @@
+# Small, informative starter library of viewpoint definitions shipped with the ArchiMate
+# module. Names and scope only — non-mandatory, and repo authors are free to add their own
+# in .arch-repo/viewpoints.yaml.
+viewpoints:
+  - slug: motivation
+    version: 1
+    name: Motivation
+    description: Stakeholders, drivers, goals, and requirements behind the architecture.
+    purpose: deciding
+    content: coherence
+    stakeholders: [business-management, enterprise-architects]
+    concerns: ["why are we doing this", "which requirements does this satisfy"]
+    scope:
+      entity_types:
+        - stakeholder
+        - driver
+        - assessment
+        - goal
+        - outcome
+        - principle
+        - requirement
+        - meaning
+        - value
+    representation_types: [archimate-motivation]
+
+  - slug: application-structure
+    version: 1
+    name: Application Structure
+    description: Application components, their interfaces, and the data objects they use.
+    purpose: designing
+    content: details
+    stakeholders: [application-architects, developers]
+    concerns: ["how are applications structured", "what data do they use"]
+    scope:
+      entity_types:
+        - application-component
+        - application-interface
+        - data-object
+        - service
+        - function
+    representation_types: [archimate-application]
+
+  - slug: layered
+    version: 1
+    name: Layered
+    description: A cross-layer overview relating business, application, and technology.
+    purpose: informing
+    content: overview
+    stakeholders: [enterprise-architects]
+    concerns: ["how do the layers relate"]
+    representation_types: [archimate-layered]
+
+  - slug: technology-usage
+    version: 1
+    name: Technology Usage
+    description: Application components mapped onto the technology nodes and infrastructure they run on.
+    purpose: designing
+    content: details
+    stakeholders: [technology-architects, operations]
+    concerns: ["what runs where"]
+    scope:
+      entity_types:
+        - technology-node
+        - device
+        - system-software
+        - artifact
+        - application-component
+    representation_types: [archimate-technology]

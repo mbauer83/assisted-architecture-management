@@ -1,0 +1,215 @@
+"""REST tests for the viewpoints management view's backend: full-catalog listing
+(tier-tagged), the criteria-catalog registries snapshot, the plain-language summarize
+endpoint, and create/edit/delete — the same ``persist_edit`` write path as the MCP
+``artifact_viewpoint`` tool, mirrored here for the GUI's own save flow.
+"""
+
+from __future__ import annotations
+
+from pathlib import Path
+
+import pytest
+from fastapi import FastAPI
+
+from src.application.artifact_repository import ArtifactRepository
+from src.infrastructure.artifact_index import shared_artifact_index
+from src.infrastructure.gui.routers import state as gui_state
+from src.infrastructure.gui.routers.viewpoint_authoring import router as viewpoint_authoring_router
+
+httpx = pytest.importorskip("httpx")
+
+_MINIMAL_DEFINITION = {"slug": "test-viewpoint", "version": 1, "name": "Test Viewpoint"}
+
+
+@pytest.fixture()
+def engagement_root(tmp_path: Path) -> Path:
+    root = tmp_path / "engagements" / "ENG-T" / "architecture-repository"
+    (root / "model").mkdir(parents=True)
+    (root / "diagram-catalog" / "diagrams").mkdir(parents=True)
+    return root
+
+
+@pytest.fixture()
+def client(engagement_root: Path):
+    from starlette.testclient import TestClient
+
+    repo = ArtifactRepository(shared_artifact_index([engagement_root]))
+    gui_state.init_state(repo, engagement_root, None)
+    app = FastAPI()
+    app.include_router(viewpoint_authoring_router)
+    return TestClient(app)
+
+
+class TestCriteriaCatalog:
+    def test_shape(self, client) -> None:
+        resp = client.get("/api/viewpoints/criteria-catalog")
+        assert resp.status_code == 200
+        body = resp.json()
+        assert set(body.keys()) == {
+            "entity_types", "connection_types", "specialization_slugs",
+            "entity_attribute_types", "connection_attribute_types", "symmetric_connection_types",
+            "reserved_entity_paths", "reserved_connection_paths", "depth_cap",
+        }
+        assert "application-component" in body["entity_types"]
+        assert "type" in body["reserved_entity_paths"]
+
+
+class TestReferencers:
+    def test_empty_when_unreferenced(self, client) -> None:
+        client.post("/api/viewpoints", json={"definition": _MINIMAL_DEFINITION, "dry_run": False})
+        resp = client.get("/api/viewpoints/test-viewpoint/referencers")
+        assert resp.status_code == 200
+        assert resp.json() == {"referencers": []}
+
+    def test_lists_referencing_diagram(self, client, engagement_root: Path) -> None:
+        from src.infrastructure.gui.routers import state as gui_state
+
+        client.post("/api/viewpoints", json={"definition": _MINIMAL_DEFINITION, "dry_run": False})
+        diagram_path = engagement_root / "diagram-catalog" / "diagrams" / "ARC@1000000042.DiagSch.ref.puml"
+        diagram_path.write_text(
+            """\
+---
+artifact-id: ARC@1000000042.DiagSch.ref
+artifact-type: diagram
+diagram-type: archimate-motivation
+name: "Referencing Diagram"
+version: 0.1.0
+status: draft
+last-updated: '2026-01-01'
+viewpoint:
+  slug: test-viewpoint
+  version: 1
+---
+@startuml
+title Referencing Diagram
+@enduml
+""",
+            encoding="utf-8",
+        )
+        gui_state.maybe_get_repo().refresh()
+        resp = client.get("/api/viewpoints/test-viewpoint/referencers")
+        assert resp.json() == {"referencers": [{"artifact_id": "ARC@1000000042.DiagSch.ref", "target_kind": "diagram"}]}
+
+
+class TestSummarize:
+    def test_renders_summary(self, client) -> None:
+        resp = client.post(
+            "/api/viewpoints/summarize",
+            json={"query": {"entity_criteria": {"kind": "group", "conjunction": "and", "children": []}}},
+        )
+        assert resp.status_code == 200
+        assert "Entities where" in resp.json()["summary"]
+
+    def test_malformed_query_is_400(self, client) -> None:
+        resp = client.post("/api/viewpoints/summarize", json={"query": {"entity_criteria": {"kind": "nope"}}})
+        assert resp.status_code == 400
+
+
+class TestCreate:
+    def test_dry_run_does_not_persist(self, client, engagement_root: Path) -> None:
+        from src.infrastructure.viewpoint_declarations import load_viewpoint_catalog_file
+
+        resp = client.post("/api/viewpoints", json={"definition": _MINIMAL_DEFINITION})
+        assert resp.status_code == 200
+        body = resp.json()
+        assert body["ok"] is True
+        assert load_viewpoint_catalog_file(engagement_root).get("test-viewpoint") is None
+
+    def test_applies_when_dry_run_false(self, client, engagement_root: Path) -> None:
+        from src.infrastructure.viewpoint_declarations import load_viewpoint_catalog_file
+
+        resp = client.post("/api/viewpoints", json={"definition": _MINIMAL_DEFINITION, "dry_run": False})
+        assert resp.json()["ok"] is True
+        assert load_viewpoint_catalog_file(engagement_root).get("test-viewpoint") is not None
+
+    def test_slug_collision_rejected(self, client) -> None:
+        client.post("/api/viewpoints", json={"definition": _MINIMAL_DEFINITION, "dry_run": False})
+        resp = client.post("/api/viewpoints", json={"definition": _MINIMAL_DEFINITION, "dry_run": False})
+        body = resp.json()
+        assert body["ok"] is False
+        assert body["issues"][0]["code"] == "slug-collision"
+
+    def test_create_then_list_round_trip(self, client) -> None:
+        client.post("/api/viewpoints", json={"definition": _MINIMAL_DEFINITION, "dry_run": False})
+        listed = client.get("/api/viewpoints").json()
+        entry = next(e for e in listed["viewpoints"] if e["slug"] == "test-viewpoint")
+        assert entry["tier"] == "engagement"
+        assert entry["name"] == "Test Viewpoint"
+
+
+class TestEdit:
+    def _seed(self, client) -> None:
+        client.post("/api/viewpoints", json={"definition": _MINIMAL_DEFINITION, "dry_run": False})
+
+    def test_descriptive_edit_without_bump_succeeds(self, client, engagement_root: Path) -> None:
+        from src.infrastructure.viewpoint_declarations import load_viewpoint_catalog_file
+
+        self._seed(client)
+        edited = {**_MINIMAL_DEFINITION, "description": "now described"}
+        resp = client.post("/api/viewpoints/edit", json={"definition": edited, "dry_run": False})
+        assert resp.json()["ok"] is True
+        assert load_viewpoint_catalog_file(engagement_root).get("test-viewpoint").description == "now described"
+
+    def test_semantic_edit_without_bump_rejected(self, client) -> None:
+        self._seed(client)
+        edited = {**_MINIMAL_DEFINITION, "scope": {"entity_types": ["application-component"]}}
+        resp = client.post("/api/viewpoints/edit", json={"definition": edited, "dry_run": False})
+        body = resp.json()
+        assert body["ok"] is False
+        assert any(i["code"] == "version-not-bumped" for i in body["issues"])
+
+    def test_unknown_slug_rejected(self, client) -> None:
+        resp = client.post(
+            "/api/viewpoints/edit",
+            json={"definition": {"slug": "never-created", "version": 1, "name": "X"}, "dry_run": False},
+        )
+        assert resp.json()["issues"][0]["code"] == "unknown-slug"
+
+
+class TestDelete:
+    def test_deletes_existing(self, client, engagement_root: Path) -> None:
+        from src.infrastructure.viewpoint_declarations import load_viewpoint_catalog_file
+
+        client.post("/api/viewpoints", json={"definition": _MINIMAL_DEFINITION, "dry_run": False})
+        resp = client.post("/api/viewpoints/remove", json={"slug": "test-viewpoint", "dry_run": False})
+        assert resp.json()["ok"] is True
+        assert load_viewpoint_catalog_file(engagement_root).get("test-viewpoint") is None
+
+    def test_dry_run_does_not_delete(self, client, engagement_root: Path) -> None:
+        from src.infrastructure.viewpoint_declarations import load_viewpoint_catalog_file
+
+        client.post("/api/viewpoints", json={"definition": _MINIMAL_DEFINITION, "dry_run": False})
+        resp = client.post("/api/viewpoints/remove", json={"slug": "test-viewpoint"})
+        assert resp.json()["ok"] is True
+        assert resp.json()["dry_run"] is True
+        assert load_viewpoint_catalog_file(engagement_root).get("test-viewpoint") is not None
+
+    def test_blocked_while_referenced(self, client, engagement_root: Path) -> None:
+        client.post("/api/viewpoints", json={"definition": _MINIMAL_DEFINITION, "dry_run": False})
+        diagram_path = engagement_root / "diagram-catalog" / "diagrams" / "ARC@1000000042.DiagSch.ref.puml"
+        diagram_path.write_text(
+            """\
+---
+artifact-id: ARC@1000000042.DiagSch.ref
+artifact-type: diagram
+diagram-type: archimate-motivation
+name: "Referencing Diagram"
+version: 0.1.0
+status: draft
+last-updated: '2026-01-01'
+viewpoint:
+  slug: test-viewpoint
+  version: 1
+---
+@startuml
+title Referencing Diagram
+@enduml
+""",
+            encoding="utf-8",
+        )
+        gui_state.maybe_get_repo().refresh()
+        resp = client.post("/api/viewpoints/remove", json={"slug": "test-viewpoint", "dry_run": False})
+        body = resp.json()
+        assert body["ok"] is False
+        assert body["issues"][0]["code"] == "delete-blocked-referenced"
+        assert body["referencers"][0]["artifact_id"] == "ARC@1000000042.DiagSch.ref"

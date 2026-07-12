@@ -1,0 +1,185 @@
+"""REST endpoints for viewpoint execution and artifact-local projection (companion plan
+§7, §6.2): read-only, call ``EvaluateViewpoint``/``project_artifact_by_frontmatter`` only —
+no write-queue involvement. The execution endpoint backs MCP's ``artifact_query_viewpoint
+execute`` (WU-E7a); the projection endpoint backs the WU-E5a GUI ghost/hide overlay — both
+so REST/MCP and REST/GUI can never diverge from their shared application-layer service.
+"""
+
+from __future__ import annotations
+
+from dataclasses import asdict
+from typing import Annotated, Any
+
+from fastapi import APIRouter, Body, Depends, HTTPException
+
+from src.application.runtime_catalogs import RuntimeCatalogs
+from src.application.viewpoints.artifact_projection import project_artifact_by_frontmatter
+from src.application.viewpoints.evaluate_viewpoint import (
+    UnknownViewpointSlugError,
+    ViewpointExecutionRequest,
+    ViewpointExecutionTimeoutError,
+    evaluate_viewpoint,
+    project_viewpoint_repository,
+)
+from src.application.viewpoints.registry_snapshot import build_registry_snapshot
+from src.config.settings import viewpoints_execution_max_entities, viewpoints_execution_timeout_seconds
+from src.domain.viewpoint_query_parsing import query_from_mapping
+from src.domain.viewpoints import TargetKind
+from src.infrastructure.app_bootstrap import runtime_catalogs_dependency
+from src.infrastructure.gui.routers import state as s
+from src.infrastructure.gui.routers._diagram_selection import resolve_diagram_selection
+
+router = APIRouter()
+
+# Fixed, non-overridable notation for the ad-hoc `diagram` execution representation
+# (companion plan §5.1): the cross-layer ArchiMate view, since a viewpoint's population may
+# span any layer. `node_color`/`edge_color`/`edge_emphasis` overlays are applied by the GUI
+# client-side onto the returned SVG (same technique as the WU-E5a ghost/hide overlay) —
+# this endpoint returns unstyled notation only.
+_AD_HOC_DIAGRAM_TYPE = "archimate-layered"
+
+
+@router.post("/api/viewpoints/execute")
+def execute_viewpoint(
+    slug: Annotated[str | None, Body()] = None,
+    query: Annotated[dict[str, object] | None, Body()] = None,
+    limit: Annotated[int | None, Body()] = None,
+    catalogs: RuntimeCatalogs = Depends(runtime_catalogs_dependency),
+) -> dict[str, object]:
+    """Execute a viewpoint by ``slug`` (catalog definition) or ``query`` (ad-hoc, no
+    presentation/styling/column parameters — the locked D15 MCP-boundary shape, kept
+    identical on REST so both transports return the same content, per §9.1)."""
+    if (slug is None) == (query is None):
+        raise HTTPException(400, "exactly one of 'slug' or 'query' must be provided")
+
+    parsed_query = query_from_mapping(query, label="query") if query is not None else None
+    request = ViewpointExecutionRequest(slug=slug, query=parsed_query, limit=limit)
+    repo = s.get_repo()
+    registries = build_registry_snapshot(catalogs, repo.repo_roots)
+    max_entities = viewpoints_execution_max_entities()
+    try:
+        result = evaluate_viewpoint(
+            request,
+            catalog=catalogs.viewpoints,
+            read_access=repo,
+            registries=registries,
+            index_generation=repo.read_model_version().generation,
+            max_entities=max_entities,
+            default_limit=max_entities,
+            timeout_seconds=viewpoints_execution_timeout_seconds(),
+        )
+    except UnknownViewpointSlugError as exc:
+        raise HTTPException(400, str(exc)) from exc
+    except ViewpointExecutionTimeoutError as exc:
+        raise HTTPException(504, str(exc)) from exc
+    return asdict(result)
+
+
+@router.post("/api/viewpoints/execute-projection")
+def execute_viewpoint_projection(
+    slug: Annotated[str | None, Body()] = None,
+    query: Annotated[dict[str, object] | None, Body()] = None,
+    catalogs: RuntimeCatalogs = Depends(runtime_catalogs_dependency),
+) -> dict[str, Any]:
+    """GUI-only repository-context ``ViewpointProjection`` (companion plan §6.1) carrying
+    per-item style tokens — the styled sibling of ``/api/viewpoints/execute``'s
+    deliberately unstyled §7.1 content, feeding the exploration/table/matrix/diagram
+    representations (WU-E8/E9). Never called by MCP, keeping the D15 boundary intact
+    there (§9.1's ``artifact_query_viewpoint`` never exposes style tokens)."""
+    if (slug is None) == (query is None):
+        raise HTTPException(400, "exactly one of 'slug' or 'query' must be provided")
+    parsed_query = query_from_mapping(query, label="query") if query is not None else None
+    repo = s.get_repo()
+    registries = build_registry_snapshot(catalogs, repo.repo_roots)
+    try:
+        projection = project_viewpoint_repository(
+            slug, parsed_query, catalog=catalogs.viewpoints, read_access=repo, registries=registries
+        )
+    except UnknownViewpointSlugError as exc:
+        raise HTTPException(400, str(exc)) from exc
+    return {"applied": True, **asdict(projection)}
+
+
+@router.post("/api/viewpoints/execute-diagram")
+def execute_viewpoint_diagram(
+    slug: Annotated[str | None, Body()] = None,
+    query: Annotated[dict[str, object] | None, Body()] = None,
+    catalogs: RuntimeCatalogs = Depends(runtime_catalogs_dependency),
+) -> dict[str, Any]:
+    """GUI-only ad-hoc ArchiMate-notation rendering of a viewpoint's repository-context
+    population (companion plan §5.1's `diagram` representation) — same rendering engine as a
+    real diagram (fixed `archimate-layered` notation), never persisted as a `.puml` artifact,
+    no `ViewpointApplication`. Read-only: resolves the population via `evaluate_viewpoint`
+    only, then renders — no write-queue/artifact-file access."""
+    if (slug is None) == (query is None):
+        raise HTTPException(400, "exactly one of 'slug' or 'query' must be provided")
+    parsed_query = query_from_mapping(query, label="query") if query is not None else None
+    repo = s.get_repo()
+    repo_root = s.maybe_engagement_root()
+    if repo_root is None:
+        raise HTTPException(500, "Repository not initialized")
+    registries = build_registry_snapshot(catalogs, repo.repo_roots)
+    max_entities = viewpoints_execution_max_entities()
+    request = ViewpointExecutionRequest(slug=slug, query=parsed_query, limit=max_entities)
+    try:
+        result = evaluate_viewpoint(
+            request,
+            catalog=catalogs.viewpoints,
+            read_access=repo,
+            registries=registries,
+            index_generation=repo.read_model_version().generation,
+            max_entities=max_entities,
+            default_limit=max_entities,
+            timeout_seconds=viewpoints_execution_timeout_seconds(),
+        )
+    except UnknownViewpointSlugError as exc:
+        raise HTTPException(400, str(exc)) from exc
+    except ViewpointExecutionTimeoutError as exc:
+        raise HTTPException(504, str(exc)) from exc
+
+    from src.infrastructure.rendering.diagram_builder import generate_archimate_puml_body, render_puml_svg
+
+    entities, connections, _, _ = resolve_diagram_selection(repo, list(result.entity_ids), list(result.connection_ids))
+    puml = generate_archimate_puml_body(
+        result.slug or "viewpoint-preview",
+        entities,
+        connections,
+        diagram_type=_AD_HOC_DIAGRAM_TYPE,
+        repo_root=repo_root,
+    )
+    svg, render_warnings = render_puml_svg(puml, repo_root, _AD_HOC_DIAGRAM_TYPE)
+    return {"svg": svg, "warnings": [*result.warnings, *render_warnings]}
+
+
+@router.get("/api/diagrams/{artifact_id}/viewpoint-projection")
+def get_diagram_viewpoint_projection(
+    artifact_id: str,
+    catalogs: RuntimeCatalogs = Depends(runtime_catalogs_dependency),
+) -> dict[str, Any]:
+    """Artifact-local ``ViewpointProjection`` (§6.2) driving the GUI's ghost/hide/highlight
+    overlay for one diagram/matrix. ``{"applied": false}`` when the artifact carries no
+    ``viewpoint`` application (nothing to overlay)."""
+    repo = s.get_repo()
+    diag_rec = repo.get_diagram(artifact_id)
+    if diag_rec is None:
+        raise HTTPException(404, f"Diagram not found: {artifact_id!r}")
+    target_kind: TargetKind = "matrix" if diag_rec.diagram_type == "matrix" else "diagram"
+    module = catalogs.diagram_types.find_diagram_type(diag_rec.diagram_type if target_kind == "diagram" else "matrix")
+    if module is None:
+        raise HTTPException(404, f"Diagram type not found: {diag_rec.diagram_type!r}")
+    _, registry, _ = s.get_write_deps()
+    registries = build_registry_snapshot(catalogs, repo.repo_roots)
+    projection = project_artifact_by_frontmatter(
+        diag_rec.extra,
+        target_kind=target_kind,
+        target_id=diag_rec.artifact_id,
+        catalog=catalogs.viewpoints,
+        module=module,
+        entity_type_infos=catalogs.ontology.all_entity_types(),
+        default_enforcement=catalogs.viewpoint_enforcement,
+        registry=registry,
+        registries=registries,
+    )
+    if projection is None:
+        return {"applied": False}
+    return {"applied": True, **asdict(projection)}
