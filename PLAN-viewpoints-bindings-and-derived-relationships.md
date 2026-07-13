@@ -543,9 +543,9 @@ archimate-influence:
 archimate-association:
   derivation: {role: dependency, strength: 1}
 archimate-triggering:
-  derivation: {role: dynamic, strength: 2}
+  derivation: {role: dynamic}
 archimate-flow:
-  derivation: {role: dynamic, strength: 1}
+  derivation: {role: dynamic}
 archimate-specialization:
   derivation: {role: specialization}
 ```

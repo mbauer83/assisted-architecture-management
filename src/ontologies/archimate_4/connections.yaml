@@ -35,6 +35,7 @@ matrix_abbreviations:
 connection_types:
   archimate:
     archimate-composition:
+      derivation: {role: structural, strength: 4}
       archimate_relationship_type: Composition
       puml_arrow: "-->"
       symmetric: false
@@ -43,6 +44,7 @@ connection_types:
       hierarchy_label: composition
       relationship_kind: containment
     archimate-aggregation:
+      derivation: {role: structural, strength: 3}
       archimate_relationship_type: Aggregation
       puml_arrow: "-->"
       symmetric: false
@@ -51,38 +53,45 @@ connection_types:
       hierarchy_label: aggregation
       relationship_kind: containment
     archimate-assignment:
+      derivation: {role: structural, strength: 2}
       archimate_relationship_type: Assignment
       puml_arrow: "-->"
       symmetric: false
       classes: []
     archimate-realization:
+      derivation: {role: structural, strength: 1}
       archimate_relationship_type: Realization
       puml_arrow: "..|>"
       symmetric: false
       classes: []
       bidirectional_sync: true
     archimate-serving:
+      derivation: {role: dependency, strength: 4}
       archimate_relationship_type: Serving
       puml_arrow: "-->"
       symmetric: false
       classes: []
     archimate-access:
+      derivation: {role: dependency, strength: 3}
       archimate_relationship_type: Access
       puml_arrow: "-->"
       symmetric: false
       classes: []
     archimate-influence:
+      derivation: {role: dependency, strength: 2}
       archimate_relationship_type: Influence
       puml_arrow: "..>"
       symmetric: false
       classes: []
     archimate-association:
+      derivation: {role: dependency, strength: 1}
       archimate_relationship_type: Association
       puml_arrow: "--"
       symmetric: true
       classes: []
       relationship_kind: association
     archimate-specialization:
+      derivation: {role: specialization}
       archimate_relationship_type: Specialization
       puml_arrow: "--|>"
       symmetric: false
@@ -91,11 +100,13 @@ connection_types:
       hierarchy_label: specialization
       relationship_kind: generalization
     archimate-flow:
+      derivation: {role: dynamic}
       archimate_relationship_type: Flow
       puml_arrow: "..>"
       symmetric: false
       classes: [dynamic]
     archimate-triggering:
+      derivation: {role: dynamic}
       archimate_relationship_type: Triggering
       puml_arrow: "-->"
       symmetric: false

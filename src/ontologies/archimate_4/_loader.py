@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import json
 import re
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
 from pathlib import Path
 from typing import Any, Literal, cast
 
@@ -30,6 +30,7 @@ META_ONTOLOGY_ALIAS = "archimate-4"
 _GLYPHS_PATH = _PACKAGE_DIR.parent.parent.parent / "tools" / "gui" / "src" / "ui" / "lib" / "archimateGlyphs.json"
 
 DISPLAY_SECTION_ID = "archimate"
+DerivationRole = Literal["structural", "dependency", "dynamic", "specialization"]
 
 
 def _sprite_key(artifact_type: str) -> str:
@@ -193,10 +194,18 @@ def _load_entity_types(
 
 def _load_connection_types(data: dict[str, Any]) -> dict[ConnectionTypeName, ConnectionTypeInfo]:
     out: dict[ConnectionTypeName, ConnectionTypeInfo] = {}
+    derivation_strengths: dict[str, set[int]] = {}
     for lang, types in data["connection_types"].items():
         for name, info in cast(dict[str, Any | None], types or {}).items():
             raw: dict[str, Any] = info or {}
             hp_raw = raw.get("hierarchy_priority")
+            derivation_role, derivation_strength = _parse_derivation(raw.get("derivation"), name)
+            if derivation_strength is not None:
+                assert derivation_role is not None
+                strengths = derivation_strengths.setdefault(derivation_role, set())
+                if derivation_strength in strengths:
+                    raise ValueError(f"connection type {name!r}: duplicate derivation strength {derivation_strength}")
+                strengths.add(derivation_strength)
             out[ConnectionTypeName(name)] = ConnectionTypeInfo(
                 artifact_type=name,
                 conn_lang=lang,
@@ -209,8 +218,30 @@ def _load_connection_types(data: dict[str, Any]) -> dict[ConnectionTypeName, Con
                 hierarchy_label=str(raw["hierarchy_label"]) if raw.get("hierarchy_label") else None,
                 bidirectional_sync=bool(raw.get("bidirectional_sync", False)),
                 relationship_kind=str(raw["relationship_kind"]) if raw.get("relationship_kind") else None,
+                derivation_role=derivation_role,
+                derivation_strength=derivation_strength,
             )
     return out
+
+
+def _parse_derivation(raw: object, name: str) -> tuple[DerivationRole | None, int | None]:
+    if raw is None:
+        return None, None
+    if not isinstance(raw, Mapping):
+        raise ValueError(f"connection type {name!r}: derivation must be a mapping")
+    role = raw.get("role")
+    valid_roles = {"structural", "dependency", "dynamic", "specialization"}
+    if role not in valid_roles:
+        raise ValueError(f"connection type {name!r}: unknown derivation role {role!r}")
+    has_strength = "strength" in raw
+    strength = raw.get("strength")
+    if role in {"structural", "dependency"}:
+        if not isinstance(strength, int) or isinstance(strength, bool):
+            raise ValueError(f"connection type {name!r}: derivation role {role!r} requires an integer strength")
+        return cast(DerivationRole, role), strength
+    if has_strength:
+        raise ValueError(f"connection type {name!r}: derivation role {role!r} forbids strength")
+    return cast(DerivationRole, role), None
 
 
 def _expand_ref(

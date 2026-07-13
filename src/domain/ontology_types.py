@@ -118,3 +118,5 @@ class ConnectionTypeInfo:
     embed_key: str | None = None
     cascade_delete_source: bool = False
     relationship_kind: str | None = None
+    derivation_role: Literal["structural", "dependency", "dynamic", "specialization"] | None = None
+    derivation_strength: int | None = None

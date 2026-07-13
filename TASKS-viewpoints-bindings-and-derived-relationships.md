@@ -93,7 +93,7 @@ the binding layer, and G1 waits on neither derivation nor presentation work.
     section updated in WU-I2 (note only here).
   - Deps: none.
 
-- [ ] **WU-A2 — Ontology derivation classification**
+- [x] **WU-A2 — Ontology derivation classification**
   - Files: `src/ontologies/archimate_4/connections.yaml`,
     `src/domain/ontology_types.py` (`ConnectionTypeInfo`),
     `src/ontologies/archimate_4/_loader.py`, new
@@ -870,3 +870,4 @@ Anything short of this is "in progress", regardless of how many WUs are ticked.
   on the concurrent frontend rewrite (Phase H).
 - 2026-07-13 — WU-A1 — Settings accessors and fallback validation shipped; pre-existing file-length-policy failures remain user-authorized non-blocking baseline.
 - 2026-07-13 — WU-A3 — Scope-only definitions now execute through an implicit, scope-admissible query; baseline file-length-policy failures remain user-authorized non-blocking.
+- 2026-07-13 — WU-A2 — Source Appendix B confirms strength orderings only for structural/dependency relationships; dynamic roles now intentionally carry no strength and the plan table was corrected.
