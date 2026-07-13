@@ -19,6 +19,7 @@ from src.application.viewpoints.execution_result import (
 )
 from src.application.viewpoints.ports import RepositoryReadAccess
 from src.application.viewpoints.repository_projection import project_repository
+from src.application.viewpoints.scope_query import definition_with_scope_query
 from src.domain.artifact_types import EntityRecord
 from src.domain.clock import utc_now_iso
 from src.domain.viewpoint_condition_validation import RegistrySnapshot
@@ -31,8 +32,6 @@ from src.domain.viewpoints import (
     ViewpointCatalog,
     ViewpointDefinition,
 )
-
-_NO_QUERY_SUMMARY = "This viewpoint defines a scope only — it has no executable query."
 
 logger = logging.getLogger(__name__)
 
@@ -108,7 +107,13 @@ def project_viewpoint_repository(
     execution result already uses internally.
     """
     definition, _, _ = resolve_viewpoint_definition(slug, query, catalog=catalog)
-    return project_repository(definition, read_access=read_access, registries=registries)
+    executable_definition, scope_derived = definition_with_scope_query(definition)
+    return project_repository(
+        executable_definition,
+        read_access=read_access,
+        registries=registries,
+        scope_filter=definition.scope if scope_derived else None,
+    )
 
 
 def _matrix_axis_ids(
@@ -155,11 +160,17 @@ def evaluate_viewpoint(
     start = time.monotonic()
 
     definition, slug, version = resolve_viewpoint_definition(request.slug, request.query, catalog=catalog)
+    executable_definition, scope_derived = definition_with_scope_query(definition)
 
     requested_limit = request.limit if request.limit is not None else default_limit
     limit = max(0, min(requested_limit, max_entities))
 
-    projection = project_repository(definition, read_access=read_access, registries=registries)
+    projection = project_repository(
+        executable_definition,
+        read_access=read_access,
+        registries=registries,
+        scope_filter=definition.scope if scope_derived else None,
+    )
 
     primary_ids = sorted(
         item.item_id for item in projection.items if item.item_kind == "entity" and item.membership == "primary"
@@ -207,11 +218,12 @@ def evaluate_viewpoint(
     connection_summaries.sort(key=lambda summary: summary.id)
 
     matrix_axes, matrix_drift = _matrix_axis_ids(
-        definition.presentation, retained_entities, read_access=read_access, registries=registries
+        executable_definition.presentation, retained_entities, read_access=read_access, registries=registries
     )
     warnings = tuple(projection.warnings) + drift_warnings(frozenset(matrix_drift))
 
-    query = definition.query
+    query = executable_definition.query
+    assert query is not None
     result = ViewpointExecutionResult(
         slug=slug,
         version=version,
@@ -232,7 +244,11 @@ def evaluate_viewpoint(
         matrix_axes=matrix_axes,
         warnings=warnings,
         duration_ms=(time.monotonic() - start) * 1000,
-        query_summary=render_query_summary(query) if query is not None else _NO_QUERY_SUMMARY,
+        query_summary=(
+            f"Selection derived from the viewpoint's concept scope: {render_query_summary(query)}"
+            if scope_derived
+            else render_query_summary(query)
+        ),
     )
 
     elapsed = time.monotonic() - start

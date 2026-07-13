@@ -7,9 +7,10 @@ recursion and leaf checks each independently readable.
 from __future__ import annotations
 
 from collections.abc import Mapping
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Literal
 
+from src.domain.ontology_types import EntityTypeInfo
 from src.domain.viewpoint_criteria import (
     NUMERIC_ATTRIBUTE_TYPES,
     NUMERIC_OPERATORS,
@@ -33,6 +34,7 @@ class RegistrySnapshot:
     entity_attribute_types: Mapping[str, str]
     connection_attribute_types: Mapping[str, str]
     symmetric_connection_types: frozenset[str] = frozenset()
+    entity_type_infos: Mapping[str, EntityTypeInfo] = field(default_factory=dict)
     depth_cap: int = 4
 
 

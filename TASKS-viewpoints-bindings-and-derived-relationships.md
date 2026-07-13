@@ -110,7 +110,7 @@ the binding layer, and G1 waits on neither derivation nor presentation work.
     `types.generated.ts` regenerated & committed.
   - Deps: none.
 
-- [ ] **WU-A3 — Scope-fallback execution (D9, defect remediation)**
+- [x] **WU-A3 — Scope-fallback execution (D9, defect remediation)**
   - Files: `src/application/viewpoints/evaluate_viewpoint.py` (retire
     `_NO_QUERY_SUMMARY` path), new helper in `src/application/viewpoints/` (e.g.
     `scope_query.py`) so `evaluate_viewpoint.py` stays under LoC limits;
@@ -869,3 +869,4 @@ Anything short of this is "in progress", regardless of how many WUs are ticked.
   scope-only (query_summary null) — remediation = WU-A3 + WU-G1; GUI-side behavior gated
   on the concurrent frontend rewrite (Phase H).
 - 2026-07-13 — WU-A1 — Settings accessors and fallback validation shipped; pre-existing file-length-policy failures remain user-authorized non-blocking baseline.
+- 2026-07-13 — WU-A3 — Scope-only definitions now execute through an implicit, scope-admissible query; baseline file-length-policy failures remain user-authorized non-blocking.

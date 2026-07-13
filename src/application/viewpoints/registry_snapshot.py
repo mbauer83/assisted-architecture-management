@@ -76,4 +76,5 @@ def build_registry_snapshot(runtime_catalogs: RuntimeCatalogs, repo_roots: Seque
         entity_attribute_types=_entity_attribute_types(runtime_catalogs, repo_roots),
         connection_attribute_types=_connection_attribute_types(runtime_catalogs, repo_roots),
         symmetric_connection_types=symmetric_connection_types,
+        entity_type_infos=runtime_catalogs.ontology.all_entity_types(),
     )

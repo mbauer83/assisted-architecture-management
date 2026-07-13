@@ -7,6 +7,8 @@ table/matrix/exploration/diagram representations.
 from __future__ import annotations
 
 from src.application.viewpoints.ports import RepositoryReadAccess
+from src.domain.concept_scope import ConceptScope
+from src.domain.module_types import EntityTypeName
 from src.domain.viewpoint_condition_validation import RegistrySnapshot
 from src.domain.viewpoint_criteria_evaluation import evaluate_entity_criteria
 from src.domain.viewpoint_population_evaluation import resolve_neighbor_inclusions, select_connections
@@ -28,6 +30,7 @@ def project_repository(
     *,
     read_access: RepositoryReadAccess,
     registries: RegistrySnapshot,
+    scope_filter: ConceptScope | None = None,
 ) -> ViewpointProjection:
     query = definition.query
     if query is None:
@@ -38,6 +41,10 @@ def project_repository(
     for entity_id in _population_entity_ids(read_access, query.repo_scope):
         entity = read_access.get_entity(entity_id)
         if entity is None:
+            continue
+        if scope_filter is not None and not scope_filter.admits_entity_type(
+            EntityTypeName(entity.artifact_type), registries.entity_type_infos.get(entity.artifact_type)
+        ):
             continue
         outcome = evaluate_entity_criteria(
             query.entity_criteria, entity, read_access=read_access, registries=registries
