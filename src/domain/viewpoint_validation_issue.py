@@ -1,4 +1,4 @@
-"""The structured issue type ``validate_viewpoint_definition`` returns (companion plan §7.2).
+"""The structured issue type ``validate_viewpoint_definition`` returns.
 
 Deliberately distinct from the artifact verifier's ``Issue`` (E180/W180/W181/W182): the
 verifier judges *artifacts against the model*; this type judges *definitions against the

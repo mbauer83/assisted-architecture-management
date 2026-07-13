@@ -991,18 +991,25 @@ REST + Playwright, not against current components):
   presentation — at parity with `artifact_viewpoint`; semantic edits surface the version
   bump; delete shows referencers. The Query tab renders the existing query of every
   catalog definition (regression of the 2026-07-13 defect report).
-- **Scope editor is a designed picker, not an unstyled checkbox list**: entity/connection
-  type selection grouped by domain in collapsible sections with per-domain
-  select-all/none, type-ahead search across names and slugs, selected types as removable
-  chips, live counts ("12 of 61 types") and a live scope summary sentence, and a clear
-  visual distinction between entity types and connection types (and between
-  unrestricted-vs-restricted axes). Visual grammar consistent with the existing
-  entity-picker patterns; specific layout is the frontend rewrite's call, but "flat
-  unstyled checkbox list" is explicitly a rejected implementation.
-- **Builder**: bindings/parameters/derived-attributes panels reuse `CriteriaTreeBuilder`;
-  binding references appear in the `ValueRef` picker with quantifier/aggregate selects;
-  live summary shows the §4.6 sentences; validation issues map by path into the new
-  panels. No formula/text escape hatch (D4).
+- **Scope editor is a designed hierarchy-aware picker, not an unstyled checkbox list**:
+  entity and connection type scopes support an explicit unrestricted / include-only /
+  exclude-from-all mode. The picker follows the meta-ontology hierarchy (domain →
+  category → type, with connection types separately), lets a parent inclusion or
+  exclusion be expanded, overridden, and inspected at child level, and makes inherited
+  versus explicit decisions visible. It provides type-ahead across names and slugs,
+  selected and excluded chips, live included/excluded counts, and a live natural-language
+  scope summary. Bulk actions operate on the visible hierarchical branch, never silently
+  discard child overrides. The editor also exposes the scope-related viewpoint options
+  retained from the earlier Q6 decision: type/specialization/group/discrete-profile
+  grouping and representation-appropriate shape/icon/color styling. Visual grammar is
+  consistent with existing entity pickers; a flat checkbox list with all/none is rejected.
+- **Query builder is a complete query editor, not an entity-filter label**: it presents
+  primary entity selection, connection selection, neighboring context, named bindings,
+  parameters, and item-scoped derived attributes as distinct, intelligible panels.
+  Binding references appear in the `ValueRef` picker with quantifier/aggregate selects;
+  connection-selecting bindings are visibly distinct from entity-selecting bindings; live
+  summary text names each construct in plain language. Panels reuse `CriteriaTreeBuilder`;
+  validation issues map by path into the relevant panel. No formula/text escape hatch.
 - **Impact exploration**: `GraphExploreView` gains a derived-traversal toggle +
   potential-inclusion checkbox + hop bound; derived edges render dashed with certainty
   badge and a "show chain" affordance (path ids from the summary); "materialize

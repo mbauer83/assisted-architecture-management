@@ -95,7 +95,12 @@ class TestSummarize:
     def test_renders_summary(self, client) -> None:
         resp = client.post(
             "/api/viewpoints/summarize",
-            json={"query": {"entity_criteria": {"kind": "group", "conjunction": "and", "children": []}}},
+            json={
+                "query": {
+                    "query_schema": 1,
+                    "entity_criteria": {"kind": "group", "conjunction": "and", "children": []},
+                }
+            },
         )
         assert resp.status_code == 200
         assert "Entities where" in resp.json()["summary"]

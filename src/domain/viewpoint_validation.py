@@ -1,5 +1,5 @@
-"""Registry-aware validation for viewpoint definitions, three modes (companion plan §7.2,
-§10): ``load`` (catalog load — structural only, registry findings downgraded to warnings),
+"""Registry-aware validation for viewpoint definitions, with three modes: ``load`` (catalog
+load — structural only, registry findings downgraded to warnings),
 ``save`` (GUI/MCP payload — registry findings become errors, plus authoring-ergonomics
 checks), ``persist_edit`` (``save`` plus lifecycle rules against prior state).
 
@@ -12,6 +12,7 @@ Structural correctness (enum values, the query_schema tag) is already enforced b
 from __future__ import annotations
 
 from src.domain.concept_scope import ConceptScope
+from src.domain.viewpoint_binding_validation import validate_query_values
 from src.domain.viewpoint_condition_validation import RegistrySnapshot, issue
 from src.domain.viewpoint_criteria_validation import (
     validate_connection_selection,
@@ -21,7 +22,8 @@ from src.domain.viewpoint_criteria_validation import (
 )
 from src.domain.viewpoint_presentation_validation import validate_presentation
 from src.domain.viewpoint_validation_issue import ValidationMode, ViewpointValidationIssue
-from src.domain.viewpoints import ExecutableViewpointQuery, ViewpointCatalog, ViewpointDefinition
+from src.domain.viewpoint_value_reference_validation import validate_query_value_references
+from src.domain.viewpoints import ExecutableViewpointQuery, PresentationSpec, ViewpointCatalog, ViewpointDefinition
 
 _SEMANTIC_FIELDS = ("scope", "query", "presentation", "representation_types")
 
@@ -39,8 +41,8 @@ _REGISTRY_FINDING_CODES = frozenset(
 
 def _downgrade_registry_findings(issues: list[ViewpointValidationIssue]) -> tuple[ViewpointValidationIssue, ...]:
     """`load` mode: registry-dependent findings become warnings — a definition that fails a
-    registry lookup still loads and degrades loudly at evaluation time (§3.4's schema-drift
-    rule). Structural/value-shape issues (not in the registry-finding code set) stay errors —
+    registry lookup still loads and degrades loudly at evaluation time. Structural/value-shape
+    issues (not in the registry-finding code set) stay errors —
     ergonomics-only codes never appear here since ``check_ergonomics`` is False at load."""
     return tuple(
         ViewpointValidationIssue(
@@ -75,9 +77,37 @@ def _validate_scope(scope: ConceptScope, *, path: str, registries: RegistrySnaps
 
 
 def _validate_query(
-    query: ExecutableViewpointQuery, *, path: str, registries: RegistrySnapshot, check_ergonomics: bool
+    query: ExecutableViewpointQuery,
+    *,
+    path: str,
+    registries: RegistrySnapshot,
+    check_ergonomics: bool,
+    max_bindings: int,
+    max_parameters: int,
+    max_derived_attributes: int,
+    presentation: PresentationSpec | None,
 ) -> list[ViewpointValidationIssue]:
-    issues = validate_entity_criteria(
+    value_issues, value_types = validate_query_values(
+        bindings=query.bindings,
+        parameters=query.parameters,
+        derived=query.derived,
+        path=path,
+        registries=registries,
+        check_ergonomics=check_ergonomics,
+        max_bindings=max_bindings,
+        max_parameters=max_parameters,
+        max_derived_attributes=max_derived_attributes,
+    )
+    value_issues.extend(
+        validate_query_value_references(
+            query,
+            values=value_types,
+            path=path,
+            registries=registries,
+            presentation=presentation,
+        )
+    )
+    issues = value_issues + validate_entity_criteria(
         query.entity_criteria,
         path=f"{path}/entity_criteria",
         is_root=True,
@@ -156,6 +186,9 @@ def validate_viewpoint_definition(
     connection_attribute_types: dict[str, str] | None = None,
     symmetric_connection_types: frozenset[str] = frozenset(),
     depth_cap: int = 4,
+    max_query_bindings: int = 8,
+    max_query_parameters: int = 4,
+    max_derived_attributes: int = 8,
     prior_definition: ViewpointDefinition | None = None,
     catalog: ViewpointCatalog | None = None,
 ) -> tuple[ViewpointValidationIssue, ...]:
@@ -174,7 +207,16 @@ def validate_viewpoint_definition(
     registry_issues: list[ViewpointValidationIssue] = []
     if definition.query is not None:
         registry_issues.extend(
-            _validate_query(definition.query, path="/query", registries=registries, check_ergonomics=check_ergonomics)
+            _validate_query(
+                definition.query,
+                path="/query",
+                registries=registries,
+                check_ergonomics=check_ergonomics,
+                max_bindings=max_query_bindings,
+                max_parameters=max_query_parameters,
+                max_derived_attributes=max_derived_attributes,
+                presentation=definition.presentation,
+            )
         )
     if definition.presentation is not None:
         registry_issues.extend(

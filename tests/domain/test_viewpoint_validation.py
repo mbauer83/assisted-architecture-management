@@ -1,4 +1,4 @@
-"""Tests for the three-mode registry-aware viewpoint validator (companion plan §7.2, §10):
+"""Tests for the three-mode registry-aware viewpoint validator:
 `load` downgrades registry findings to warnings and skips ergonomics/lifecycle checks,
 `save` promotes them to errors and adds ergonomics checks, `persist_edit` adds lifecycle
 rules against prior state."""
@@ -264,12 +264,32 @@ _KNOWN_ISSUE_CODES = frozenset(
         "matrix-without-connections",
         "version-not-bumped",
         "slug-collision",
+        "unknown-binding",
+        "binding-cycle",
+        "duplicate-binding-name",
+        "binding-type-mismatch",
+        "binding-attribute-type-ambiguous",
+        "binding-count-exceeded",
+        "binding-derived-reference-unsupported",
+        "aggregate-over-instance",
+        "include-in-result-shape-unsupported",
+        "unquantified-set-comparison",
+        "tuple-comparator-unsupported",
+        "unknown-parameter",
+        "duplicate-parameter-name",
+        "parameter-type-mismatch",
+        "parameter-count-exceeded",
+        "derived-attribute-unknown",
+        "derived-attribute-count-exceeded",
+        "derived-attribute-reference-unsupported",
+        "derived-of-missing",
+        "derived-reduce-type-mismatch",
     }
 )
 
 
 class TestIssueCodeStability:
-    """Codes are a public contract (companion plan §9.1: agents converge on them). This is a
+    """Codes are a public contract. This is a
     snapshot, not an exhaustive check — a new code is fine to add; renaming or removing one is
     a breaking change that must be a deliberate, visible diff to this set."""
 

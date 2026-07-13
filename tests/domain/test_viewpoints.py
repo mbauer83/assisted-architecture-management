@@ -178,6 +178,15 @@ class TestQueryShapeParsing:
         with pytest.raises(ValueError, match="query_schema is required"):
             viewpoint_catalog_from_mapping({"viewpoints": [mapping]})
 
+    def test_empty_ad_hoc_query_normalizes_to_current_schema(self) -> None:
+        catalog = viewpoint_catalog_from_mapping(
+            {"viewpoints": [{"slug": "ad-hoc", "version": 1, "name": "Ad hoc", "query": {}}]}
+        )
+        definition = catalog.get("ad-hoc")
+        assert definition is not None
+        assert definition.query is not None
+        assert definition.query.query_schema == 1
+
     def test_invalid_comparator_rejected_loudly(self) -> None:
         mapping = self._query_mapping()
         mapping["query"]["entity_criteria"]["children"][0]["comparator"] = "matches"

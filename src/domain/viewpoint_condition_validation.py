@@ -1,5 +1,5 @@
-"""Leaf-level validation for one ``AttributeCondition`` (companion plan §3.3, §3.4): value
-shape per comparator, attribute resolution (reserved path vs. effective schema), and
+"""Leaf-level validation for one ``AttributeCondition``: value shape per comparator,
+attribute resolution (reserved path vs. effective schema), and
 comparator/type gating. Split out of ``viewpoint_criteria_validation.py`` to keep tree
 recursion and leaf checks each independently readable.
 """
@@ -22,6 +22,31 @@ from src.domain.viewpoint_validation_issue import ViewpointValidationIssue
 
 CriteriaContext = Literal["entity", "connection"]
 
+_DECLARATION_CODES = frozenset(
+    {
+        "unknown-binding",
+        "binding-cycle",
+        "duplicate-binding-name",
+        "binding-type-mismatch",
+        "binding-attribute-type-ambiguous",
+        "binding-count-exceeded",
+        "binding-derived-reference-unsupported",
+        "aggregate-over-instance",
+        "include-in-result-shape-unsupported",
+        "unquantified-set-comparison",
+        "tuple-comparator-unsupported",
+        "unknown-parameter",
+        "duplicate-parameter-name",
+        "parameter-type-mismatch",
+        "parameter-count-exceeded",
+        "derived-attribute-unknown",
+        "derived-attribute-count-exceeded",
+        "derived-attribute-reference-unsupported",
+        "derived-of-missing",
+        "derived-reduce-type-mismatch",
+    }
+)
+
 
 @dataclass(frozen=True)
 class RegistrySnapshot:
@@ -38,15 +63,33 @@ class RegistrySnapshot:
     depth_cap: int = 4
 
 
-def issue(severity: Literal["error", "warning"], code: str, path: str, message: str) -> ViewpointValidationIssue:
-    return ViewpointValidationIssue(severity=severity, code=code, path=path, message=message)
+def issue(
+    severity: Literal["error", "warning"],
+    code: str,
+    path: str,
+    message: str,
+    *,
+    expected: str | None = None,
+    found: str | None = None,
+) -> ViewpointValidationIssue:
+    if code in _DECLARATION_CODES:
+        expected = expected or "valid declaration"
+        found = found or "invalid declaration"
+    return ViewpointValidationIssue(
+        severity=severity,
+        code=code,
+        path=path,
+        message=message,
+        expected=expected,
+        found=found,
+    )
 
 
 def resolve_attribute_path(
     attribute: str, *, context: CriteriaContext, registries: RegistrySnapshot
 ) -> str | Literal["reserved"] | None:
-    """Resolve a dotted attribute path's declared type: ``"reserved"`` for a §3.3 reserved
-    path, the declared schema type string for a known profile attribute, or ``None`` if
+    """Resolve a dotted attribute path's declared type: ``"reserved"`` for a reserved path,
+    the declared schema type string for a known profile attribute, or ``None`` if
     unknown against both."""
     head = attribute.split(".", 1)[0]
     reserved = RESERVED_ENTITY_PATHS if context == "entity" else RESERVED_CONNECTION_PATHS

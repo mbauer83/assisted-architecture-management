@@ -55,6 +55,8 @@ def _require_direction(value: object) -> IncidentDirection:
 def query_from_mapping(raw: object, *, label: str) -> ExecutableViewpointQuery:
     if not isinstance(raw, Mapping):
         return ExecutableViewpointQuery()
+    if not raw:
+        return ExecutableViewpointQuery()
     unknown = set(raw.keys()) - _QUERY_KEYS
     if unknown:
         raise ValueError(f"{label}: query: unknown key(s) {sorted(unknown)}")

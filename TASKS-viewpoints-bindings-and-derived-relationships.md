@@ -299,7 +299,7 @@ the binding layer, and G1 waits on neither derivation nor presentation work.
     Appendix-A examples 1–3 of the new PLAN parse.
   - Deps: C1.
 
-- [ ] **WU-C3 — Validation: codes, caps, modes, paths**
+- [x] **WU-C3 — Validation: codes, caps, modes, paths**
   - Files: `src/domain/viewpoint_binding_validation.py` (new),
     `viewpoint_validation.py`, `viewpoint_condition_validation.py` (ValueRef typing),
     `viewpoint_criteria_validation.py` (traversal path restrictions);
@@ -682,13 +682,16 @@ component names are not.
 - [ ] **WU-H0 — Definition editor: full lifecycle + designed scope picker**
   - Files: `tools/gui/src/ui/` viewpoint editor views/components (against the rewritten
     component set), `tools/gui/src/domain/viewpoint*` mirrors.
-  - Changes: PLAN §10 — create/edit/delete of complete definitions (metadata, scope,
-    query, presentation) at MCP parity; semantic-edit version-bump surfacing; delete
-    shows referencers. Scope (domain/type filter) editor per the PLAN contract:
-    domain-grouped collapsible sections, per-domain select-all/none, type-ahead search
-    over names+slugs, removable selection chips, live counts and scope-summary sentence,
-    entity-vs-connection-type distinction. **A flat unstyled checkbox list fails this
-    WU.** Load the frontend-design guidance before building.
+  - Changes: create/edit/delete of complete definitions (metadata, scope, query,
+    presentation) at MCP parity; semantic-edit version-bump surfacing; delete shows
+    referencers. Scope editor is hierarchy-aware across domain/category/type and has
+    explicit unrestricted / include-only / exclude-from-all modes. Parent selections may
+    be expanded and overridden by child decisions; inherited and explicit decisions remain
+    visible. It separates entity from connection types, supports type-ahead, selected and
+    excluded chips, branch-local bulk actions, live included/excluded counts, and a scope
+    summary. It also exposes the retained grouping and styling options by type,
+    specialization, group, and discrete profile attribute. **A flat checkbox list with an
+    all/none toggle fails this WU.** Load the frontend-design guidance before building.
   - Acceptance (Playwright unless noted): create a definition with a restricted scope
     via the picker **plus a query containing type/domain criteria**; save, reload, and
     assert the **exact semantic payload round-trips** (serialized definition equality,
@@ -697,16 +700,22 @@ component names are not.
     verify the path-addressed error renders on the offending widget; attempt delete of a
     referenced definition and verify the blocked state lists the referencers actionably;
     Query tab renders the existing query for EVERY shipped catalog definition (defect
-    regression); scope picker driven by keyboard end-to-end (typeahead, chip removal,
-    per-domain bulk select); Vitest per component; lint/typecheck green.
+    regression); scope picker driven by keyboard end-to-end (typeahead, include/exclude
+    mode, parent selection, child override, chip removal, branch bulk action); Vitest per
+    component; lint/typecheck green.
   - Deps: E2, E4, frontend-rewrite gate.
 
 - [ ] **WU-H1 — Builder: bindings, parameters, derived attributes**
   - Files: `tools/gui/src/domain/viewpoint*` mirrors, builder components (against the
     rewritten component set; reuse `CriteriaTreeBuilder` or its successor).
-  - Acceptance: author Appendix-A example 1 entirely in the GUI; validation issues map
-    by path into the new panels; live summary shows Let-sentences; no text/formula input
-    exists anywhere (D4); Vitest per component; `npm run lint`/`typecheck` green.
+  - Changes: replace entity-only wording such as "Show entities where" with a query
+    structure that distinguishes primary entity selection, connection selection,
+    neighboring context, named bindings, parameters, and derived attributes. Bindings
+    visibly declare entity or connection selection and whether their result is included.
+  - Acceptance: author a declaration containing an entity binding, a connection binding,
+    a parameter, and a derived attribute entirely in the GUI; validation issues map by
+    path into the relevant panels; live summary explains each construct; no text/formula
+    input exists anywhere; Vitest per component; `npm run lint`/`typecheck` green.
   - Deps: H0.
 - [ ] **WU-H2 — Execution UX: parameters, empty states, non-empty smoke**
   - Files (expected; verify against the rewritten frontend per the phase preamble):
@@ -879,3 +888,4 @@ Anything short of this is "in progress", regardless of how many WUs are ticked.
 - 2026-07-13 — WU-B7 — Recorded witness paths reconstruct through the shared composition logic; broken and no-longer-derived states are explicit.
 - 2026-07-13 — WU-C1 — Canonical result types and conservative inference cover cardinality, projections, aggregates, and tuple compatibility.
 - 2026-07-13 — WU-C2 — Bindings, parameters, derived attributes, and ValueRefs now parse and serialize declaratively; the pre-release query language is explicitly schema 1 only, with all persisted examples and GUI fixtures migrated.
+- 2026-07-13 — WU-C3 — Typed declarations and ValueRefs validate across query and presentation criteria with stable paths, mode-aware caps, and declared-type checks.
