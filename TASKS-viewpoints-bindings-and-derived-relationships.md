@@ -198,7 +198,7 @@ the binding layer, and G1 waits on neither derivation nor presentation work.
     traversed; pure (no I/O beyond `read_access`).
   - Deps: B1–B3.
 
-- [ ] **WU-B5 — Spec worked examples & permitted-set property**
+- [x] **WU-B5 — Spec worked examples & direct-model boundary**
   - Files: new `tests/domain/test_relationship_derivation_worked_examples.py`,
     `tests/fixtures/viewpoints/derivation_examples.py` (fixture model builders).
   - Changes: encode Appendix-B examples B-3 (assignment–aggregation–realization ⇒
@@ -207,11 +207,11 @@ the binding layer, and G1 waits on neither derivation nor presentation work.
     Back-End, Database/Website Hosting serve Suite; all four serving candidates
     derivable, tagged potential; `spec/viewpoints/Figure-B-12.jpg` shows the spec's
     accepted/rejected split, the precedent for the per-occurrence acceptance defaults),
-    B-17 (project-team specialization cases PDR1–4) as executable fixtures;
-    property test: every emitted derived relationship is admitted by
-    `permitted_relationships` over the dogfood-shaped fixture.
+    B-17 (project-team specialization cases PDR1–4) as executable fixtures; regression
+    test that the B-3 Financial Application realization remains an indirect result even
+    though the same type pair is not directly admitted by `permitted_relationships`.
   - Acceptance: all five examples produce exactly the spec's stated derivations (and no
-    uncited extras at the tested hop bounds); property test green.
+    uncited extras at the tested hop bounds); direct-model-boundary regression green.
   - Deps: B4.
 
 - [ ] **WU-B6 — Rule-correctness verification battery (PLAN §5.3a — the crux gate)**
@@ -230,8 +230,9 @@ the binding layer, and G1 waits on neither derivation nor presentation work.
     stated preference, not an acceptance gate. A structural comparison test asserts
     cell-by-cell agreement with the runtime tables;
     (b) **exhaustive metamodel sweep** — generated over every permitted input pair ×
-    orientation across all shipped types, asserting every composition output is itself a
-    permitted relationship; (c) **semantic invariants** on engine output over generated
+    orientation across all shipped types, asserting each composition output's stated
+    classification, certainty, and restrictions, with the direct-permission condition
+    enforced specifically for PDR12; (c) **semantic invariants** on engine output over generated
     random models, stated independently of any rule table: derived Access ⇒ target is
     passive-structure; derived Influence ⇒ target ∈ Motivation; junction-sourced derived
     relations only Association; any PDR step ⇒ certainty `potential`; derived structural
@@ -407,8 +408,8 @@ the binding layer, and G1 waits on neither derivation nor presentation work.
   - Changes: derived relationships between included entities join the display set under
     both invariants; synthetic ids sort stably; `certainty`/`hops`/`via_connection_ids`
     on connection summaries (None/empty for modeled); `via` on entity summaries +
-    occurrences; the warning `derived-relationship-outside-permitted-set` (runtime drop
-    path, defense in depth). **Hitting `derivation_max_relationships` is
+    occurrences; derived results remain distinct from direct modeled connections even
+    when their type pair is not directly permitted. **Hitting `derivation_max_relationships` is
     `DerivationLimitError` — typed error, whole execution aborts, no partial result
     (PLAN §5.5)** — there is no derivation-truncation warning anywhere.
   - Acceptance: matrix bridging over derived edges (requirements × components realization
@@ -788,8 +789,8 @@ component names are not.
 - [ ] **WU-I5 — Closeout sweep (global acceptance)**
   - Run and record: full `pytest` (0 failures), `ruff` (0), `zuban` (pass); all four
     `tests/architecture/` fitness tests green; spec-fidelity suites green (Appendix-B
-    per-rule tests + worked examples; Appendix-C table fidelity; permitted-set
-    property); round-trip identity suite green incl. schema-2 byte-stability; dogfood
+    per-rule tests + worked examples; Appendix-C table fidelity; direct-model-boundary
+    and PDR12-guard properties); round-trip identity suite green incl. schema-2 byte-stability; dogfood
     verification via MCP against the restarted backend — `artifact_query_viewpoint list`
     shows the full library with `query_summary` non-null for every entry,
     `execute` of `element-dependents` on a real entity returns non-empty dependents,
@@ -875,3 +876,4 @@ Anything short of this is "in progress", regardless of how many WUs are ticked.
 - 2026-07-13 — WU-B2 — YAML rules now cover all potential compositions; the Grouping aggregation rule requires a permitted result, and chain certainty records potential steps.
 - 2026-07-13 — WU-B3 — Declarative restriction review passed: R1–R14 and RJ1–RJ2 were checked line-by-line against Appendix B and exercised with admitting and rejecting cases.
 - 2026-07-13 — WU-B4 — Bounded relationship enumeration now emits deterministic, deduplicated ephemeral witness paths and raises a typed limit error before any partial result.
+- 2026-07-13 — WU-B5 — Appendix-B examples are executable; Financial Application proves DR2-derived realization is indirect rather than a direct-table defect.

@@ -652,19 +652,24 @@ The rule tables and this restriction table are the code — the implementation t
 them as data structures with these ids; a reviewer diffs implementation against this
 table, not against re-derived prose.
 
-**Property check (spec fidelity):** every derived relationship the engine emits must be
-admitted by the existing `permitted_relationships` tables ("the resulting relationship will
-then always be allowed by definition"). Correctness is established by an **exhaustive
-metamodel-level generated test**, not by fixtures alone: enumerate every permitted input
-relationship pair `p(a,b): S`, `q(b,c): T` (and each opposing-join orientation) over all
-shipped entity types × classified connection types, apply `compose` + restrictions, and
-assert each emitted result is itself permitted — the full composition space, thousands of
-cases, generated from the ontology tables rather than hand-picked. The worked-example
-fixtures (§WU-B5) then pin *specific expected outputs*; the exhaustive test pins *global
-soundness*. The runtime check (violating result → dropped + execution warning
-`derived-relationship-outside-permitted-set`) is **defense in depth only** — its firing in
-production indicates a rule-table bug that the exhaustive test should have caught, and its
-warning text says so; it is never the correctness mechanism.
+**Direct-versus-derived boundary (spec fidelity):** the Appendix-B relationship tables
+are the allowed-relationship closure obtained by applying direct metamodel relationships,
+derivation rules, and restrictions. The YAML `permitted_relationships` data intentionally
+records only directly modelable relationships; the engine derives the indirect portion of
+that closure rather than redundantly listing it. Appendix B's Financial Application
+example therefore derives a realization from an application component to an application
+service even though that realization may not be modeled directly. PDR12 is deliberately
+narrower: its own rule requires its result to be permitted directly, and the engine
+enforces that explicit precondition.
+
+Correctness is established by an **exhaustive metamodel-level generated test**, not by
+fixtures alone: enumerate every permitted input relationship pair `p(a,b): S`,
+`q(b,c): T` (and each opposing-join orientation) over all shipped entity types ×
+classified connection types, apply `compose` + restrictions, and assert the result has
+the rule's stated classification, certainty, and restriction behaviour. The sweep also
+asserts the PDR12-specific direct-permission guard. Worked-example fixtures (§WU-B5)
+pin *specific expected outputs* and the distinction between directly modeled and
+indirectly derived relationships.
 
 ### 5.3 Bounded reachability & enumeration
 
@@ -735,8 +740,9 @@ gates, none is optional:
    means one transcriber misread the spec — exactly the error class single encodings
    cannot catch.
 3. **Exhaustive metamodel sweep.** The §5.2 generated test over every permitted input
-   pair × orientation: all outputs must be permitted relationships ("allowed by
-   definition" is the spec's own soundness criterion for these rules).
+   pair × orientation verifies each rule's result classification, certainty, and
+   restrictions, including PDR12's explicit direct-permission precondition. It also
+   verifies that an indirect result is never reclassified as a directly modeled edge.
 4. **Semantic invariants, encoding-independent.** Property tests asserting restriction
    *meanings* directly on engine output over generated random models, without reference
    to the rule tables: no derived Access whose target is not passive-structure; no derived
@@ -793,8 +799,9 @@ The ledger's Phase B closeout additionally requires a recorded line-by-line revi
   result**: `DerivationLimitError` aborts the whole execution, exactly like the timeout —
   impact analysis must never return partial graph facts dressed as a result. (The entity
   `limit`/truncation machinery is unrelated: it truncates a *complete* result for
-  transport, with honest counts.) The one execution *warning* in this feature is
-  `derived-relationship-outside-permitted-set` (§5.2, defense in depth).
+  transport, with honest counts.) Derived relationships are reported as derivation
+  results, not rejected or warned on merely because their type pair is not directly
+  modelable.
 - MCP `execute` output includes the new summary fields (descriptive content — the D15
   boundary is intact; certainty/hops/path are selection facts, not styling).
 
@@ -1091,7 +1098,7 @@ verify with `artifact_verify` after each batch.
 | Risk | Mitigation |
 |---|---|
 | Derivation explosion on dense models | Hop cap + relationship cap + timeout, all typed/loud (§5.3); BFS memoization; per-rule tables are O(1) lookups. |
-| Rule-table transcription errors vs the spec | The §5.3a five-method protocol: spec_ref-traceable data, independently-authored dual encoding, exhaustive metamodel sweep, encoding-independent semantic invariants, worked-example fixtures — plus a recorded line-by-line review pass gating Phase D. Runtime permitted-set check is defense in depth only. |
+| Rule-table transcription errors vs the spec | The §5.3a five-method protocol: spec_ref-traceable data, independently-authored dual encoding, exhaustive metamodel sweep, encoding-independent semantic invariants, worked-example fixtures — plus a recorded line-by-line review pass gating Phase D. PDR12 retains its explicit direct-permission guard; other derived results remain indirect values. |
 | Type-inference too clever / opaque errors | Conservative inference only (§4.1); every mismatch error carries expected/found type strings; declared types are always written back canonically. |
 | Binding evaluation cost on large repos | Bindings evaluated once (D1); count cap; same entity population machinery as the primary query (no second scan path). |
 | GUI churn against the concurrent rewrite | D12: contracts + REST first, Vue last, acceptance via Playwright against the rewritten shell; no edits to legacy components. |
@@ -1275,7 +1282,7 @@ explicit, `parse ∘ serialize = id`.
 | Appendix B derivation rules DR 1–8 | rule tables + fold (§5.2) | one test per rule + worked-example fixtures |
 | Appendix B potential rules PDR 1–12, opt-in modeler judgment | certainty model + `include_potential` + materialize flow | per-rule tests; GUI/Playwright certainty rendering |
 | §B.4 restrictions | restriction predicates R1–R14, RJ1–RJ2 | one test per bullet |
-| Derived results always in the allowed-relationship tables | permitted-set property check | property test + runtime warning path test |
+| Direct versus indirect relationship boundary | direct-table boundary and PDR12 guard | Financial Application regression + PDR12 property test |
 | Appendix C example viewpoints | module library (§6.2) | library load + spec-fidelity fixture test |
 | §13.4.2 profile-based representations (heat maps) | scale-mode style rules | style evaluation + legend tests |
 | §13.4.1 purpose/content classification on all defaults | library metadata | fidelity test |
