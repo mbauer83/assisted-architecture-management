@@ -10,11 +10,11 @@ from src.application.viewpoints.evaluate_viewpoint import (
     UnknownViewpointSlugError,
     ViewpointExecutionRequest,
     ViewpointExecutionTimeoutError,
-    ViewpointParameterError,
     evaluate_viewpoint,
     project_viewpoint_repository,
     resolve_viewpoint_definition,
 )
+from src.application.viewpoints.parameter_binding import ViewpointParameterError
 from src.domain.viewpoint_bindings import QueryParameter
 from src.domain.viewpoint_criteria import AttributeCondition, EntityCriteriaGroup, NeighborInclusion, ValueRef
 from src.domain.viewpoints import (

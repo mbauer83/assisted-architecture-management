@@ -76,7 +76,7 @@ def _full_entry(definition: ViewpointDefinition, *, tier: str) -> dict[str, Any]
 @router.get("/api/viewpoints")
 def list_viewpoint_definitions() -> dict[str, Any]:
     """The effective merged catalog (module + enterprise + engagement), each entry
-    carrying its full Appendix-A mapping (to populate an edit form) and a ``tier`` so the
+    carrying its full serialized mapping (to populate an edit form) and a ``tier`` so the
     GUI can mark enterprise/module definitions read-only."""
     engagement_root = _engagement_root()
     enterprise_root = s.maybe_enterprise_root()
@@ -108,6 +108,21 @@ def get_criteria_catalog() -> dict[str, Any]:
         "reserved_entity_paths": sorted(RESERVED_ENTITY_PATHS),
         "reserved_connection_paths": sorted(RESERVED_CONNECTION_PATHS),
         "depth_cap": registries.depth_cap,
+        "bindings": {
+            "select": ["entity", "connection"],
+            "aggregate": ["count", "min", "max", "sum", "average", "first", "last"],
+            "result_types": [
+                "entity[type-slug]", "connection[type-slug]", "entities[type-slug]", "connections[type-slug]",
+                "string", "integer", "number", "date", "boolean", "slug", "optional[result-type]",
+                "list[result-type]", "tuple[result-type, ...]",
+            ],
+        },
+        "parameters": {"types": ["string", "integer", "number", "date", "boolean", "slug", "entity-id"]},
+        "derived": {
+            "traversal": ["direct", "derived"],
+            "certainty": ["certain", "potential"],
+            "reduce": ["count", "min", "max", "sum", "average", "first", "last"],
+        },
     }
 
 

@@ -18,6 +18,7 @@ from src.application.viewpoints.execution_result import (
     Membership,
     ViewpointExecutionResult,
 )
+from src.application.viewpoints.parameter_binding import bind_parameters
 from src.application.viewpoints.ports import RepositoryReadAccess
 from src.application.viewpoints.repository_projection import project_repository
 from src.application.viewpoints.scope_query import definition_with_scope_query
@@ -60,53 +61,6 @@ class ViewpointExecutionTimeoutError(RuntimeError):
         super().__init__(f"viewpoint execution exceeded {timeout_seconds}s (took {elapsed_seconds:.2f}s)")
         self.elapsed_seconds = elapsed_seconds
         self.timeout_seconds = timeout_seconds
-
-
-class ViewpointParameterError(ValueError):
-    """Raised when supplied query parameters do not match the declaration."""
-
-    def __init__(self, code: str, parameter: str) -> None:
-        super().__init__(f"{code}: {parameter}")
-        self.code = code
-        self.parameter = parameter
-
-
-def _bind_parameters(
-    query: ExecutableViewpointQuery, supplied: Mapping[str, object] | None, read_access: RepositoryReadAccess
-) -> dict[str, object]:
-    values = dict(supplied or {})
-    declared = {parameter.name: parameter for parameter in query.parameters}
-    for name in values:
-        if name not in declared:
-            raise ViewpointParameterError("unknown-parameter", name)
-    resolved: dict[str, object] = {}
-    for name, parameter in declared.items():
-        if name not in values:
-            if parameter.default is not None:
-                resolved[name] = parameter.default
-                continue
-            if parameter.required:
-                raise ViewpointParameterError("missing-parameter", name)
-            continue
-        value = values[name]
-        if not _matches_parameter(value, parameter.value_type):
-            raise ViewpointParameterError("parameter-type-mismatch", name)
-        if parameter.value_type == "entity-id" and isinstance(value, str) and read_access.get_entity(value) is None:
-            continue
-        resolved[name] = value
-    return resolved
-
-
-def _matches_parameter(value: object, value_type: str) -> bool:
-    if value_type in {"string", "slug", "date", "entity-id"}:
-        return isinstance(value, str)
-    if value_type == "integer":
-        return isinstance(value, int) and not isinstance(value, bool)
-    if value_type == "number":
-        return isinstance(value, (int, float)) and not isinstance(value, bool)
-    if value_type == "boolean":
-        return isinstance(value, bool)
-    return False
 
 
 @dataclass(frozen=True)
@@ -152,6 +106,7 @@ def project_viewpoint_repository(
     catalog: ViewpointCatalog,
     read_access: RepositoryReadAccess,
     registries: RegistrySnapshot,
+    parameters: Mapping[str, object] | None = None,
 ) -> ViewpointProjection:
     """GUI-only repository-context ``ViewpointProjection`` carrying
     per-item style tokens — the styled sibling of ``evaluate_viewpoint``'s deliberately
@@ -161,12 +116,16 @@ def project_viewpoint_repository(
     execution result already uses internally.
     """
     definition, _, _ = resolve_viewpoint_definition(slug, query, catalog=catalog)
-    executable_definition, scope_derived = definition_with_scope_query(definition)
+    executable_definition, scope_derived, entity_candidates, environment = _prepare_query_environment(
+        definition, parameters, read_access, registries
+    )
     return project_repository(
         executable_definition,
         read_access=read_access,
         registries=registries,
         scope_filter=definition.scope if scope_derived else None,
+        environment=environment,
+        candidate_entity_ids=entity_candidates,
     )
 
 
@@ -214,24 +173,8 @@ def evaluate_viewpoint(
     start = time.monotonic()
 
     definition, slug, version = resolve_viewpoint_definition(request.slug, request.query, catalog=catalog)
-    executable_definition, scope_derived = definition_with_scope_query(definition)
-    assert executable_definition.query is not None
-    parameters = _bind_parameters(executable_definition.query, request.parameters, read_access)
-    entity_candidates = _scoped_entity_ids(read_access, executable_definition.query.repo_scope)
-    connection_candidates = _scoped_connection_ids(read_access, executable_definition.query.repo_scope)
-    binding_input = BindingEvaluationInput(
-        tuple(sorted(entity_candidates)), tuple(sorted(connection_candidates)), read_access, registries
-    )
-    binding_result = evaluate_bindings(
-        executable_definition.query.bindings,
-        parameters=parameters,
-        input=binding_input,
-    )
-    environment = evaluate_derived_attributes(
-        executable_definition.query.derived,
-        tuple(sorted(entity_candidates)),
-        input=binding_input,
-        environment=binding_result.environment,
+    executable_definition, scope_derived, entity_candidates, environment = _prepare_query_environment(
+        definition, request.parameters, read_access, registries
     )
 
     requested_limit = request.limit if request.limit is not None else default_limit
@@ -243,7 +186,7 @@ def evaluate_viewpoint(
         registries=registries,
         scope_filter=definition.scope if scope_derived else None,
         environment=environment,
-        candidate_entity_ids=frozenset(entity_candidates),
+        candidate_entity_ids=entity_candidates,
     )
 
     primary_ids = sorted(
@@ -350,6 +293,29 @@ def evaluate_viewpoint(
         result.duration_ms,
     )
     return result
+
+
+def _prepare_query_environment(
+    definition: ViewpointDefinition,
+    parameters: Mapping[str, object] | None,
+    read_access: RepositoryReadAccess,
+    registries: RegistrySnapshot,
+):
+    executable_definition, scope_derived = definition_with_scope_query(definition)
+    assert executable_definition.query is not None
+    query = executable_definition.query
+    entity_ids = _scoped_entity_ids(read_access, query.repo_scope)
+    connection_ids = _scoped_connection_ids(read_access, query.repo_scope)
+    binding_input = BindingEvaluationInput(
+        tuple(sorted(entity_ids)), tuple(sorted(connection_ids)), read_access, registries
+    )
+    bindings = evaluate_bindings(
+        query.bindings, parameters=bind_parameters(query, parameters, read_access), input=binding_input
+    )
+    environment = evaluate_derived_attributes(
+        query.derived, tuple(sorted(entity_ids)), input=binding_input, environment=bindings.environment
+    )
+    return executable_definition, scope_derived, frozenset(entity_ids), environment
 
 
 def _scoped_entity_ids(read_access: RepositoryReadAccess, scope: str) -> set[str]:

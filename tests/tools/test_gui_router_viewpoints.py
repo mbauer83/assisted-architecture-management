@@ -1,7 +1,4 @@
-"""Tests for POST /api/viewpoints/execute (companion plan §7): read-only REST wrapper
-around ``evaluate_viewpoint`` — endpoint shape stability, slug and ad-hoc execution,
-and the "no write-queue access" boundary.
-"""
+"""Tests for read-only viewpoint execution REST endpoints."""
 
 from __future__ import annotations
 
@@ -152,9 +149,18 @@ class TestRequestShape:
         assert all("style" not in entity for entity in body["entities"])
 
 
+class TestParameters:
+    def test_parameter_errors_have_one_payload_shape_on_every_execution_route(self, client) -> None:
+        for endpoint in ("execute", "execute-projection", "execute-diagram"):
+            response = client.post(f"/api/viewpoints/{endpoint}", json={"slug": "exec-test", "parameters": {"x": 1}})
+            assert response.status_code == 400
+            assert response.json()["detail"] == {
+                "code": "unknown-parameter", "path": "parameters/x", "message": "unknown-parameter: x"
+            }
+
+
 class TestExecuteProjection:
-    """POST /api/viewpoints/execute-projection: the GUI-only styled sibling of
-    ``execute`` (companion plan §6.1) — never called by MCP."""
+    """The GUI-only styled sibling of ``execute``."""
 
     def test_executes_known_slug_with_style(self, client) -> None:
         resp = client.post("/api/viewpoints/execute-projection", json={"slug": "exec-test"})
@@ -185,9 +191,7 @@ class TestExecuteProjection:
 
 
 class TestExecuteDiagram:
-    """POST /api/viewpoints/execute-diagram: the GUI-only ad-hoc ArchiMate-notation
-    rendering behind the `diagram` execution representation (companion plan §5.1) —
-    never persisted, no `ViewpointApplication`, no write-queue/artifact-file access."""
+    """The GUI-only unpersisted ArchiMate diagram rendering route."""
 
     def test_renders_known_slug_to_svg(self, client) -> None:
         resp = client.post("/api/viewpoints/execute-diagram", json={"slug": "exec-test"})

@@ -48,10 +48,13 @@ class TestCriteriaCatalog:
         assert set(body.keys()) == {
             "entity_types", "connection_types", "specialization_slugs",
             "entity_attribute_types", "connection_attribute_types", "symmetric_connection_types",
-            "reserved_entity_paths", "reserved_connection_paths", "depth_cap",
+            "reserved_entity_paths", "reserved_connection_paths", "depth_cap", "bindings", "parameters", "derived",
         }
         assert "application-component" in body["entity_types"]
         assert "type" in body["reserved_entity_paths"]
+        assert body["bindings"]["select"] == ["entity", "connection"]
+        assert "entity-id" in body["parameters"]["types"]
+        assert body["derived"]["certainty"] == ["certain", "potential"]
 
 
 class TestReferencers:
@@ -103,7 +106,7 @@ class TestSummarize:
             },
         )
         assert resp.status_code == 200
-        assert "Entities where" in resp.json()["summary"]
+        assert "Entity selection" in resp.json()["summary"]
 
     def test_malformed_query_is_400(self, client) -> None:
         resp = client.post("/api/viewpoints/summarize", json={"query": {"entity_criteria": {"kind": "nope"}}})
