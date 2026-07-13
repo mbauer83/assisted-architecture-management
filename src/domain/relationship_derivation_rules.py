@@ -2,10 +2,20 @@
 
 from __future__ import annotations
 
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
-from typing import Literal
+from pathlib import Path
+from typing import Literal, cast
+
+import yaml  # type: ignore[import-untyped]
 
 Certainty = Literal["certain", "potential"]
+Join = Literal["target-source", "target-target", "source-source", "source-target"]
+Endpoint = Literal["first-source", "first-target", "second-source", "second-target"]
+_CERTAINTIES = frozenset({"certain", "potential"})
+_JOINS = frozenset({"target-source", "target-target", "source-source", "source-target"})
+_ENDPOINTS = frozenset({"first-source", "first-target", "second-source", "second-target"})
+_RESULTS = frozenset({"first", "second", "weakest", "specialization", "triggering", "flow"})
 
 
 @dataclass(frozen=True)
@@ -17,16 +27,69 @@ class CompositionRule:
     first_role: str
     second_role: str
     result: Literal["first", "second", "weakest", "specialization", "triggering", "flow"]
-    second_orientation: Literal["forward", "reverse", "either"] = "forward"
+    join: Join = "target-source"
+    result_source: Endpoint = "first-source"
+    result_target: Endpoint = "second-target"
+    first_artifact_type: str | None = None
+    second_artifact_type: str | None = None
 
 
-CERTAIN_COMPOSITION_RULES: tuple[CompositionRule, ...] = (
-    CompositionRule("DR1", "certain", "specialization", "specialization", "specialization"),
-    CompositionRule("DR2", "certain", "structural", "structural", "weakest"),
-    CompositionRule("DR3", "certain", "structural", "dependency", "second"),
-    CompositionRule("DR4", "certain", "structural", "dependency", "second", "reverse"),
-    CompositionRule("DR5", "certain", "structural", "dynamic", "second"),
-    CompositionRule("DR6", "certain", "structural", "dynamic", "flow", "reverse"),
-    CompositionRule("DR7", "certain", "dynamic", "structural", "triggering"),
-    CompositionRule("DR8", "certain", "dynamic", "dynamic", "triggering"),
-)
+def composition_rules_from_mapping(raw: object) -> tuple[CompositionRule, ...]:
+    """Validate ontology-supplied relationship composition data."""
+    if not isinstance(raw, Sequence) or isinstance(raw, (str, bytes)):
+        raise ValueError("relationship derivation rules must be a sequence")
+    rules: list[CompositionRule] = []
+    for item in raw:
+        if not isinstance(item, Mapping):
+            raise ValueError("relationship derivation rule must be a mapping")
+        try:
+            certainty = str(item["certainty"])
+            result = str(item["result"])
+            join = str(item.get("join", "target-source"))
+            result_source = str(item.get("result_source", "first-source"))
+            result_target = str(item.get("result_target", "second-target"))
+            if certainty not in _CERTAINTIES:
+                raise ValueError(f"unknown derivation certainty {certainty!r}")
+            if result not in _RESULTS:
+                raise ValueError(f"unknown derivation result selector {result!r}")
+            if join not in _JOINS:
+                raise ValueError(f"unknown derivation join {join!r}")
+            if result_source not in _ENDPOINTS or result_target not in _ENDPOINTS:
+                raise ValueError("unknown derivation result endpoint")
+            rules.append(
+                CompositionRule(
+                    spec_ref=str(item["spec_ref"]),
+                    certainty=cast(Certainty, certainty),
+                    first_role=str(item["first_role"]),
+                    second_role=str(item["second_role"]),
+                    result=cast(Literal["first", "second", "weakest", "specialization", "triggering", "flow"], result),
+                    join=cast(Join, join),
+                    result_source=cast(Endpoint, result_source),
+                    result_target=cast(Endpoint, result_target),
+                    first_artifact_type=_optional_string(item.get("first_artifact_type")),
+                    second_artifact_type=_optional_string(item.get("second_artifact_type")),
+                )
+            )
+        except KeyError as exc:
+            raise ValueError(f"relationship derivation rule misses {exc.args[0]!r}") from exc
+    return tuple(rules)
+
+
+def _optional_string(value: object) -> str | None:
+    if value is None:
+        return None
+    if not isinstance(value, str):
+        raise ValueError("relationship derivation artifact type must be a string")
+    return value
+
+
+def load_composition_rules(package_dir: Path) -> tuple[CompositionRule, ...]:
+    """Load an ontology's optional declarative relationship-composition rules."""
+    path = package_dir / "relationship_derivation.yaml"
+    if not path.is_file():
+        return ()
+    with path.open(encoding="utf-8") as stream:
+        raw: object = yaml.safe_load(stream) or {}
+    if not isinstance(raw, Mapping):
+        raise ValueError("relationship derivation data must be a mapping")
+    return composition_rules_from_mapping(raw.get("composition_rules", ()))

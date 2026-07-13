@@ -2,20 +2,34 @@
 
 from __future__ import annotations
 
+from pathlib import Path
+from typing import Literal
+
 import pytest
 
 from src.domain.ontology_types import ConnectionTypeInfo, EntityTypeInfo
 from src.domain.relationship_derivation import OrientedRelation, compose, fold_chain
+from src.domain.relationship_derivation_rules import load_composition_rules
+from src.ontologies.archimate_4._loader import _PACKAGE_DIR, load_archimate_4_module
 
 
-def _connection(name: str, role: str, strength: int | None = None) -> ConnectionTypeInfo:
+def _connection(
+    name: str,
+    role: Literal["structural", "dependency", "dynamic", "specialization"],
+    strength: int | None = None,
+) -> ConnectionTypeInfo:
     return ConnectionTypeInfo(
         artifact_type=name, conn_lang="archimate", derivation_role=role, derivation_strength=strength
-    )  # type: ignore[arg-type]
+    )
 
 
 def _relation(
-    name: str, role: str, source: str, target: str, strength: int | None = None, reverse: bool = False
+    name: str,
+    role: Literal["structural", "dependency", "dynamic", "specialization"],
+    source: str,
+    target: str,
+    strength: int | None = None,
+    reverse: bool = False,
 ) -> OrientedRelation:
     return OrientedRelation(
         name, _connection(name, role, strength), source, target, "reverse" if reverse else "forward"
@@ -23,6 +37,21 @@ def _relation(
 
 
 _CORE = EntityTypeInfo("component", "APP", ("application",), (), "", "")
+_RULES = load_archimate_4_module(_PACKAGE_DIR).derivation_rules
+
+
+def test_ontology_can_supply_composition_rules_from_its_own_yaml(tmp_path: Path) -> None:
+    rules_path = tmp_path / "relationship_derivation.yaml"
+    rules_path.write_text(
+        "composition_rules:\n"
+        "  - {spec_ref: EX-1, certainty: certain, first_role: structural, second_role: dependency, result: second}\n",
+        encoding="utf-8",
+    )
+
+    rules = load_composition_rules(tmp_path)
+
+    assert len(rules) == 1
+    assert rules[0].spec_ref == "EX-1"
 
 
 @pytest.mark.parametrize(
@@ -85,7 +114,7 @@ def test_joined_relationships_derive_the_expected_certain_type(
     expected_type: str,
     expected_endpoints: tuple[str, str],
 ) -> None:
-    derived = compose(first, second, _CORE)
+    derived = compose(first, second, _CORE, _RULES)
 
     assert derived is not None
     assert derived.connection_type.artifact_type == expected_type
@@ -100,7 +129,7 @@ def test_structural_chain_derives_the_weakest_relationship() -> None:
         _relation("archimate-realization", "structural", "c", "d", 1),
     )
 
-    derived = fold_chain(relations, (_CORE, _CORE), {})
+    derived = fold_chain(relations, (_CORE, _CORE), _RULES)
 
     assert derived is not None
     assert derived.connection_type.artifact_type == "archimate-realization"
@@ -112,5 +141,5 @@ def test_junction_and_self_loop_do_not_produce_a_derived_relationship() -> None:
     second = _relation("archimate-serving", "dependency", "b", "a", 4)
     junction = EntityTypeInfo("and-junction", "JNC", ("common",), ("junction",), "", "")
 
-    assert compose(first, second, _CORE) is None
-    assert compose(first, _relation("archimate-serving", "dependency", "b", "c", 4), junction) is None
+    assert compose(first, second, _CORE, _RULES) is None
+    assert compose(first, _relation("archimate-serving", "dependency", "b", "c", 4), junction, _RULES) is None

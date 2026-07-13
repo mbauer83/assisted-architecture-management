@@ -24,6 +24,7 @@ src/ontologies/my_ontology/
   __init__.py
   entities.yaml
   connections.yaml        (optional — only if the ontology defines connection types)
+  relationship_derivation.yaml  (optional — indirect-relationship rules)
   _loader.py              (optional — use the archimate_4 loader as a template)
 ```
 
@@ -157,6 +158,28 @@ module = _load()
 ```
 
 See `src/ontologies/archimate_4/_loader.py` for a complete loader implementation including YAML parsing, `@class` expansion, and `permitted_relationships` rule processing.
+
+### Optional: define indirect-relationship rules declaratively
+
+An ontology can add `relationship_derivation.yaml`. Every registered ontology exposes
+`derivation_rules`; modules without this file expose an empty tuple. The evaluator receives
+these rules from the module rather than containing ontology-specific rule tables in Python.
+
+```yaml
+composition_rules:
+  - spec_ref: MY-1
+    certainty: certain
+    first_role: structural
+    second_role: dependency
+    result: second
+    join: target-source
+    result_source: first-source
+    result_target: second-target
+```
+
+`first_role` and `second_role` match the ontology's connection derivation roles. `result`
+selects `first`, `second`, `weakest`, `specialization`, `triggering`, or `flow`; the optional
+join and endpoint fields describe how the two stored relationships are oriented.
 
 ### Step 5 — Register the module
 

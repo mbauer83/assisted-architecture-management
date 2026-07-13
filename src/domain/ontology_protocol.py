@@ -29,6 +29,7 @@ from src.domain.ontology_types import (
     EntityTypeInfo,
 )
 from src.domain.permitted_relationships import PermittedRelationshipSet
+from src.domain.relationship_derivation_rules import CompositionRule
 from src.domain.specializations import SpecializationCatalog
 
 if TYPE_CHECKING:
@@ -73,6 +74,9 @@ class OntologyModule(Protocol):
 
     @property
     def permitted_relationships(self) -> PermittedRelationshipSet: ...
+
+    @property
+    def derivation_rules(self) -> tuple[CompositionRule, ...]: ...
 
     @property
     def element_classes(self) -> Mapping[str, ElementClassInfo]: ...
@@ -196,7 +200,4 @@ class DiagramTypeModule(Protocol):
 
     def repository_verification_contributions(self) -> tuple[RepositoryVerificationContribution, ...]: ...
 
-    def prepare_render_model(
-        self, diagram_entities: dict[str, Any], candidate: Any
-    ) -> dict[str, Any]: ...
-
+    def prepare_render_model(self, diagram_entities: dict[str, Any], candidate: Any) -> dict[str, Any]: ...

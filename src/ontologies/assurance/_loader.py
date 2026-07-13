@@ -14,12 +14,14 @@ from src.domain.permitted_relationships import (
     PermittedRelationship,
     PermittedRelationshipSet,
 )
+from src.domain.relationship_derivation_rules import CompositionRule, load_composition_rules
 from src.domain.specializations import SpecializationCatalog
 
 DISPLAY_SECTION_ID = "assurance"
 
 _PACKAGE_DIR = Path(__file__).parent
 META_ONTOLOGY_ALIAS = "assurance"
+
 
 class _AssuranceModule:
     name = "assurance"
@@ -35,11 +37,13 @@ class _AssuranceModule:
         connection_types: dict[ConnectionTypeName, ConnectionTypeInfo],
         permitted_relationships: PermittedRelationshipSet,
         element_classes: dict[str, ElementClassInfo],
+        derivation_rules: tuple[CompositionRule, ...] = (),
     ) -> None:
         self._entity_types = entity_types
         self._connection_types = connection_types
         self._permitted_relationships = permitted_relationships
         self._element_classes = element_classes
+        self._derivation_rules = derivation_rules
 
         self._class_index: dict[ElementClassName, frozenset[EntityTypeName]] = {}
         _cb: dict[ElementClassName, set[EntityTypeName]] = {}
@@ -66,6 +70,10 @@ class _AssuranceModule:
     @property
     def permitted_relationships(self) -> PermittedRelationshipSet:
         return self._permitted_relationships
+
+    @property
+    def derivation_rules(self) -> tuple[CompositionRule, ...]:
+        return self._derivation_rules
 
     @property
     def element_classes(self) -> dict[str, ElementClassInfo]:
@@ -138,7 +146,7 @@ def _load_connection_types(data: dict[str, Any]) -> dict[ConnectionTypeName, Con
     conn_name: str
     conn_entry: dict[str, Any]
     for _lang, types in data.get("connection_types", {}).items():
-        for conn_name, conn_entry in ((types or {}).items()):
+        for conn_name, conn_entry in (types or {}).items():
             raw: dict[str, Any] = conn_entry or {}
             hp_raw = raw.get("hierarchy_priority")
             out[ConnectionTypeName(conn_name)] = ConnectionTypeInfo(
@@ -200,11 +208,13 @@ def _build_permitted_relationships(
         for src in _expand(raw_src):
             for tgt in _expand(raw_tgt):
                 for ct in conn_types:
-                    rules.add(PermittedRelationship(
-                        source_type=EntityTypeName(src),
-                        target_type=EntityTypeName(tgt),
-                        connection_type=ct,
-                    ))
+                    rules.add(
+                        PermittedRelationship(
+                            source_type=EntityTypeName(src),
+                            target_type=EntityTypeName(tgt),
+                            connection_type=ct,
+                        )
+                    )
     return PermittedRelationshipSet(frozenset(rules))
 
 
@@ -224,4 +234,5 @@ def load_assurance_module(package_dir: Path, *, guidance: GuidanceOverlay | None
         connection_types=connection_types,
         permitted_relationships=permitted,
         element_classes=element_classes,
+        derivation_rules=load_composition_rules(package_dir),
     )

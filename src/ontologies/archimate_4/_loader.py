@@ -17,6 +17,7 @@ from src.domain.permitted_relationships import (
     PermittedRelationship,
     PermittedRelationshipSet,
 )
+from src.domain.relationship_derivation_rules import CompositionRule, load_composition_rules
 from src.domain.specializations import (
     SpecializationCatalog,
     merge_specialization_catalogs,
@@ -59,6 +60,7 @@ class _ArchiMate4Module:
         matrix_abbreviations: dict[str, str],
         element_classes: dict[str, ElementClassInfo] | None = None,
         specialization_catalog: SpecializationCatalog | None = None,
+        derivation_rules: tuple[CompositionRule, ...] = (),
         svg_converter: Callable[[str], str] | None = None,
     ) -> None:
         self._entity_types = entity_types
@@ -68,6 +70,7 @@ class _ArchiMate4Module:
         self._element_classes: dict[str, ElementClassInfo] = element_classes or {}
         self._specialization_catalog = specialization_catalog or SpecializationCatalog.empty()
         self._svg_converter = svg_converter
+        self._derivation_rules = derivation_rules
 
         self._class_index: dict[ElementClassName, frozenset[EntityTypeName]] = {}
         _class_build: dict[ElementClassName, set[EntityTypeName]] = {}
@@ -114,6 +117,10 @@ class _ArchiMate4Module:
     @property
     def specialization_catalog(self) -> SpecializationCatalog:
         return self._specialization_catalog
+
+    @property
+    def derivation_rules(self) -> tuple[CompositionRule, ...]:
+        return self._derivation_rules
 
     def entity_types_with_class(self, cls: ElementClassName) -> frozenset[EntityTypeName]:
         return self._class_index.get(ElementClassName(cls), frozenset())
@@ -356,6 +363,7 @@ def load_archimate_4_module(
 
     entity_types = _load_entity_types(entity_data, guidance)
     connection_types = _load_connection_types(conn_data)
+    derivation_rules = load_composition_rules(package_dir)
     permitted = _build_permitted_relationships(conn_data, entity_types)
     matrix_abbreviations: dict[str, str] = dict(conn_data.get("matrix_abbreviations", {}))
     element_classes = _load_element_classes(entity_data)
@@ -377,5 +385,6 @@ def load_archimate_4_module(
         matrix_abbreviations=matrix_abbreviations,
         element_classes=element_classes,
         specialization_catalog=specialization_catalog,
+        derivation_rules=derivation_rules,
         svg_converter=svg_converter,
     )
