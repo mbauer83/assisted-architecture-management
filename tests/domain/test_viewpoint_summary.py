@@ -1,10 +1,8 @@
-"""Unit tests for the plain-language summary renderer (companion plan §9.1): Appendix-C
-"Intelligibility (MCP/GUI parity)" cluster, renderer half — every node kind incl. §3.4's
-negate phrasing.
-"""
+"""Unit tests for the shared plain-language summary renderer."""
 
 from __future__ import annotations
 
+from src.domain.viewpoint_bindings import DerivedAttribute, QueryBinding, QueryParameter
 from src.domain.viewpoint_criteria import (
     AttributeCondition,
     ConnectionCriteriaGroup,
@@ -22,6 +20,7 @@ from src.domain.viewpoint_summary import (
     render_neighbor_inclusion,
     render_query_summary,
 )
+from src.domain.viewpoint_value_types import EntitySetType
 from src.domain.viewpoints import ExecutableViewpointQuery
 
 
@@ -58,7 +57,7 @@ class TestConditionRendering:
         assert render_condition(condition) == "strength is at least 3"
 
     def test_eq_negate_uses_special_phrasing(self) -> None:
-        """§3.4: eq + negate on a missing attribute still matches (strict complement) — the
+        """Eq + negate on a missing attribute still matches (strict complement) — the
         summary must read as inclusive of "no value", not a plain double-negative."""
         condition = AttributeCondition(
             attribute="status", comparator="eq", value=ValueRef(literal="deprecated"), negate=True
@@ -133,7 +132,7 @@ class TestIncidentRendering:
         assert rendered == "has an outgoing connection (type is archimate-serving) to an entity where (type is process)"
 
     def test_negated_incident_reads_has_no_such_connection(self) -> None:
-        """§3.4: incident negate = strict complement, spelled 'has no such connection'."""
+        """Incident negate is strict complement, spelled 'has no such connection'."""
         condition = IncidentConnectionCondition(negate=True)
         assert render_incident(condition) == "has no such connection"
 
@@ -183,20 +182,15 @@ class TestConnectionSelectionRendering:
 
 
 class TestFullQuerySummary:
-    def test_matches_the_appendix_a_components_serving_processes_shape(self) -> None:
-        """Companion plan §9.1's own motivating example: "Application Components that serve
-        at least one Business Process, and all Business Processes they serve" — this checks
-        the renderer produces one coherent sentence set for that exact query shape (Appendix
-        A example 3), not the literal display-name prose (types render as raw slugs)."""
+    def test_matches_components_serving_processes_shape(self) -> None:
+        """The renderer produces a coherent sentence set for a connected selection."""
         query = ExecutableViewpointQuery(
             entity_criteria=EntityCriteriaGroup(
                 children=(
                     _eq("type", "application-component"),
                     IncidentConnectionCondition(
                         direction="outgoing",
-                        connection_criteria=ConnectionCriteriaGroup(
-                            children=(_eq("type", "archimate-serving"),)
-                        ),
+                        connection_criteria=ConnectionCriteriaGroup(children=(_eq("type", "archimate-serving"),)),
                         endpoint_criteria=EntityCriteriaGroup(
                             children=(_eq("type", "process"), _eq("specialization", "business-process"))
                         ),
@@ -214,6 +208,24 @@ class TestFullQuerySummary:
             ),
         )
         summary = render_query_summary(query)
-        assert summary.startswith("Entities where (type is application-component and has an outgoing connection")
+        assert summary.startswith("Entity selection: (type is application-component and has an outgoing connection")
         assert "Also include entities where" in summary
         assert summary.endswith("All connections between included entities are displayed.")
+
+    def test_renders_parameter_binding_and_derived_attribute(self) -> None:
+        query = ExecutableViewpointQuery(
+            parameters=(QueryParameter("anchor", "entity-id"),),
+            bindings=(
+                QueryBinding(
+                    "critical",
+                    result_type=EntitySetType(frozenset()),
+                    select="entities",
+                    criteria=EntityCriteriaGroup(),
+                ),
+            ),
+            derived=(DerivedAttribute("impact", direction="outgoing"),),
+        )
+        summary = render_query_summary(query)
+        assert "Takes a required entity-id input ⟨anchor⟩." in summary
+        assert "Let critical be entities where any entity." in summary
+        assert "Derived impact: count connections for directly connected outgoing." in summary

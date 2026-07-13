@@ -347,7 +347,7 @@ the binding layer, and G1 waits on neither derivation nor presentation work.
     dependency-policy fitness green (no application imports from domain).
   - Deps: C2, C3.
 
-- [ ] **WU-C5 — Plain-language summary extension**
+- [x] **WU-C5 — Plain-language summary extension**
   - Files: `src/domain/viewpoint_summary.py` (split a
     `viewpoint_summary_bindings.py` helper if LoC demands),
     `tests/domain/test_viewpoint_summary.py` (extend).
@@ -890,3 +890,4 @@ Anything short of this is "in progress", regardless of how many WUs are ticked.
 - 2026-07-13 — WU-C2 — Bindings, parameters, derived attributes, and ValueRefs now parse and serialize declaratively; the pre-release query language is explicitly schema 1 only, with all persisted examples and GUI fixtures migrated.
 - 2026-07-13 — WU-C3 — Typed declarations and ValueRefs validate across query and presentation criteria with stable paths, mode-aware caps, and declared-type checks.
 - 2026-07-13 — WU-C4 — Pure binding execution, runtime cardinality checks, ValueRef environments, and direct derived attributes are deterministic and covered.
+- 2026-07-13 — WU-C5 — Shared summaries now describe parameters, bindings, ValueRef forms, and derived attributes for every surface.

@@ -1,10 +1,10 @@
-"""Plain-language summary renderer (companion plan §9.1): one pure domain function turning
+"""Plain-language summary renderer: one pure domain function turning
 a query's criteria trees, neighbor inclusions, and connection selection into a single
 human-readable sentence set — shared verbatim by GUI live preview, REST, and MCP
 ``list``/``execute`` so the three surfaces can never disagree.
 
-Renders every node kind over the read-model attribute-path namespace (§3.3): conditions
-(incl. the §3.4 negate rule — ``eq`` + ``negate`` reads as "is not X, or has no value", the
+Renders every node kind over the read-model attribute-path namespace: conditions
+(including the strict-complement negate rule — ``eq`` + ``negate`` reads as "is not X, or has no value", the
 strict-complement wording the plan calls out explicitly), incident predicates, boolean
 groups, neighbor-inclusion terms, and connection selection. No type-name humanization: it
 renders the addressable attribute paths and values verbatim, which keeps the renderer
@@ -14,6 +14,7 @@ specify.
 
 from __future__ import annotations
 
+from src.domain.viewpoint_bindings import DerivedAttribute, QueryBinding, QueryParameter
 from src.domain.viewpoint_criteria import (
     AttributeCondition,
     ConnectionCriteriaGroup,
@@ -36,7 +37,10 @@ _INCIDENT_DIRECTION_WORDS: dict[IncidentDirection, str] = {
 
 
 def render_query_summary(query: ExecutableViewpointQuery) -> str:
-    sentences = [f"Entities where {render_entity_group(query.entity_criteria)}."]
+    sentences = [render_parameter(parameter) for parameter in query.parameters]
+    sentences.extend(render_binding(binding) for binding in query.bindings)
+    sentences.extend(render_derived_attribute(attribute) for attribute in query.derived)
+    sentences.append(f"Entity selection: {render_entity_group(query.entity_criteria)}.")
     sentences.extend(f"{render_neighbor_inclusion(inclusion)}." for inclusion in query.include_connected)
     sentences.append(f"{render_connection_selection(query.connections)}.")
     return " ".join(sentences)
@@ -47,6 +51,18 @@ def render_value(value: ValueRef) -> str:
         return f"its own {value.attribute}"
     if value.kind == "attribute_of_endpoint":
         return f"the {value.endpoint} entity's {value.attribute}"
+    if value.kind == "parameter":
+        return f"the supplied ⟨{value.parameter}⟩"
+    if value.kind == "binding":
+        name = value.binding or "binding"
+        phrase = name
+        if value.aggregate is not None:
+            phrase = f"the {value.aggregate} of {phrase}"
+        if value.project is not None:
+            phrase = f"{phrase}'s {value.project}"
+        if value.quantifier is not None:
+            phrase = f"{value.quantifier} of {phrase}"
+        return phrase
     literal = value.literal
     if isinstance(literal, (list, tuple)):
         return ", ".join(str(item) for item in literal)
@@ -69,7 +85,7 @@ def _condition_phrase(condition: AttributeCondition) -> str:
 
 
 def render_condition(condition: AttributeCondition) -> str:
-    """§3.4: ``negate`` is the strict logical complement. ``eq`` + ``negate`` is special-cased
+    """``negate`` is the strict logical complement. ``eq`` + ``negate`` is special-cased
     to the plan's own required wording ("is not X, or has no value") rather than a generic
     "NOT (...)" wrapper, since that is the case the plan calls out as easy to get wrong."""
     if not condition.negate:
@@ -146,3 +162,39 @@ def render_connection_selection(selection: ConnectionSelection) -> str:
     if not selection.criteria.children:
         return "All connections between included entities are displayed"
     return f"Connections are displayed where {render_connection_group(selection.criteria)}"
+
+
+def render_parameter(parameter: QueryParameter) -> str:
+    requirement = "required" if parameter.required else "optional"
+    return f"Takes a {requirement} {parameter.value_type} input ⟨{parameter.name}⟩."
+
+
+def render_binding(binding: QueryBinding) -> str:
+    if binding.tuple_of:
+        return f"Let {binding.name} be the tuple ({', '.join(binding.tuple_of)})."
+    selected = binding.select or "values"
+    criteria = binding.criteria
+    if criteria is None:
+        phrase = f"all {selected}"
+    elif binding.select == "connections" and isinstance(criteria, ConnectionCriteriaGroup):
+        phrase = f"{selected} where {render_connection_group(criteria)}"
+    elif isinstance(criteria, EntityCriteriaGroup):
+        phrase = f"{selected} where {render_entity_group(criteria)}"
+    else:
+        phrase = f"{selected} where matching criteria"
+    if binding.project is not None:
+        phrase = f"the {binding.project} of {phrase}"
+    if binding.aggregate is not None:
+        phrase = f"the {binding.aggregate} of {phrase}"
+    return f"Let {binding.name} be {phrase}."
+
+
+def render_derived_attribute(attribute: DerivedAttribute) -> str:
+    direction = "" if attribute.direction == "either" else f" {attribute.direction}"
+    source = "connections" if attribute.of is None else attribute.of
+    traversal = "directly connected"
+    if attribute.traversal == "derived":
+        traversal = f"connected directly or indirectly (up to {attribute.max_hops or 1} steps)"
+        if attribute.include_potential:
+            traversal += ", including potential derivations"
+    return f"Derived {attribute.name}: {attribute.reduce} {source} for {traversal}{direction}."
