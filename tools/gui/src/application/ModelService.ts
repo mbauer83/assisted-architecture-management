@@ -87,6 +87,8 @@ export const makeModelService = (repo: ModelRepository) =>
     deleteViewpointDefinition: (body: Parameters<ModelRepository['deleteViewpointDefinition']>[0]) =>
       repo.deleteViewpointDefinition(body),
     getViewpointReferencers: (slug: string) => repo.getViewpointReferencers(slug),
+    getViewpointPins: () => repo.getViewpointPins(),
+    setViewpointPins: (slugs: readonly string[]) => repo.setViewpointPins(slugs),
     deleteDiagram: (body: Parameters<ModelRepository['deleteDiagram']>[0]) => repo.deleteDiagram(body),
     syncDiagramToModel: (body: Parameters<ModelRepository['syncDiagramToModel']>[0]) => repo.syncDiagramToModel(body),
     setEdgeLabel: (body: Parameters<ModelRepository['setEdgeLabel']>[0]) => repo.setEdgeLabel(body),

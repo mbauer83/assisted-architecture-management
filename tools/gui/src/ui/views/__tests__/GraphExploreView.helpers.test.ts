@@ -1,9 +1,16 @@
 import { describe, it, expect } from 'vitest'
 import {
   groupKeyFor, nodeVisualFor, edgeVisualFor, projectionByItemId, edgeStyleKey, buildConnectionStyleIndex,
-  nodeShapePoints,
+  nodeShapePoints, explorationRedirectFor,
 } from '../GraphExploreView.helpers'
 import { tokenColor, tokenShape, tokenIconLetter, tokenEdgeEmphasis } from '../../lib/viewpointStyleTokens'
+import type { ViewpointDefinitionEnvelope } from '../../../domain'
+
+const mkEnvelope = (representation: string | null): ViewpointDefinitionEnvelope => ({
+  slug: 'application-structure', version: 1, name: 'Application Structure', tier: 'module',
+  scope_summary: { unrestricted: true }, query_summary: null,
+  presentation: representation === null ? undefined : { representation },
+})
 
 const entity = { type: 'application-component', group: 'core', specialization_slugs: ['custom-spec'] }
 
@@ -94,6 +101,31 @@ describe('buildConnectionStyleIndex', () => {
   it('omits connections absent from the projection', () => {
     const connections = [{ id: 'CON@ab', type: 'archimate-serving', source: 'ENT@A', target: 'ENT@B', certainty: null, hops: null, via_connection_ids: [] }]
     expect(buildConnectionStyleIndex(connections, null).size).toBe(0)
+  })
+})
+
+describe('explorationRedirectFor', () => {
+  it('stays put (returns null) for an exploration-representation definition', () => {
+    expect(explorationRedirectFor(mkEnvelope('exploration'))).toBeNull()
+  })
+
+  it('stays put when the definition carries no presentation at all', () => {
+    expect(explorationRedirectFor(mkEnvelope(null))).toBeNull()
+  })
+
+  it('redirects to the diagram surface for a diagram-representation definition', () => {
+    expect(explorationRedirectFor(mkEnvelope('diagram'))).toEqual({
+      path: '/viewpoints/diagram', query: { viewpoint: 'application-structure' },
+    })
+  })
+
+  it('redirects to the matrix/table surfaces for matrix/table representations', () => {
+    expect(explorationRedirectFor(mkEnvelope('matrix'))?.path).toBe('/viewpoints/matrix')
+    expect(explorationRedirectFor(mkEnvelope('table'))?.path).toBe('/entities')
+  })
+
+  it('stays put when no envelope was found for the selected slug', () => {
+    expect(explorationRedirectFor(undefined)).toBeNull()
   })
 })
 

@@ -225,6 +225,16 @@ export const ViewpointReferencerListSchema = Schema.Struct({
   referencers: Schema.Array(ViewpointReferencerSchema),
 })
 
+/** `pruned` slugs were pinned but have since dropped out of the effective catalog (e.g. a
+ * deleted engagement-repo definition) — reported so the GUI can surface that a pin was
+ * silently dropped, rather than the pin list just quietly shrinking. Only `GET` reports
+ * it; `PUT`'s response echoes just the saved `slugs`. */
+export const ViewpointPinsSchema = Schema.Struct({
+  slugs: Schema.Array(Schema.String),
+  pruned: Schema.optional(Schema.Array(Schema.String)),
+})
+export type ViewpointPins = typeof ViewpointPinsSchema.Type
+
 export const ViewpointPersistResultSchema = Schema.Struct({
   ok: Schema.Boolean,
   action: Schema.Literal('create', 'edit', 'delete'),

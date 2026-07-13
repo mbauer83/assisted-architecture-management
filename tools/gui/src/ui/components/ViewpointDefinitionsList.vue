@@ -6,16 +6,14 @@
  * things the parent must react to: switching into create/edit mode, and a delete having
  * changed the catalog.
  */
-import { inject, ref } from 'vue'
+import { inject, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { Effect } from 'effect'
 import { modelServiceKey } from '../keys'
 import { useWriteBlock } from '../composables/useWriteBlock'
 import { readErrorMessage } from '../lib/errors'
 import type { ViewpointDefinitionEnvelope, ViewpointReferencer } from '../../domain'
-import { presentationFromMapping } from '../../domain/viewpointPresentationSerialization'
-import type { Representation } from '../../domain/viewpointPresentation'
-import { formatScopeSummary } from '../views/ViewpointsManagementView.helpers'
+import { executionRouteFor, formatScopeSummary } from '../views/ViewpointsManagementView.helpers'
 
 defineProps<{ definitions: readonly ViewpointDefinitionEnvelope[] }>()
 const emit = defineEmits<{ create: []; edit: [envelope: ViewpointDefinitionEnvelope]; refresh: []; error: [message: string] }>()
@@ -24,15 +22,19 @@ const svc = inject(modelServiceKey)!
 const writeBlocked = useWriteBlock()
 const router = useRouter()
 
-/** Route to the representation-appropriate execution surface, pre-loaded with this
- * viewpoint's repository-context population — no separate anchor entity required. */
-const EXECUTION_ROUTE_BY_REPRESENTATION: Record<Representation, string> = {
-  exploration: '/graph', table: '/entities', matrix: '/viewpoints/matrix', diagram: '/viewpoints/diagram',
-}
+const executeViewpoint = (envelope: ViewpointDefinitionEnvelope) => void router.push(executionRouteFor(envelope))
 
-const executeViewpoint = (envelope: ViewpointDefinitionEnvelope) => {
-  const representation = presentationFromMapping(envelope.presentation)?.representation ?? 'exploration'
-  void router.push({ path: EXECUTION_ROUTE_BY_REPRESENTATION[representation], query: { viewpoint: envelope.slug } })
+// ── Pins (Home quick access) ─────────────────────────────────────────────────
+const pinnedSlugs = ref<Set<string>>(new Set())
+onMounted(() => {
+  void Effect.runPromise(svc.getViewpointPins()).then((pins) => { pinnedSlugs.value = new Set(pins.slugs) })
+})
+const isPinned = (slug: string) => pinnedSlugs.value.has(slug)
+const togglePin = (slug: string) => {
+  const next = new Set(pinnedSlugs.value)
+  if (next.has(slug)) next.delete(slug)
+  else next.add(slug)
+  void Effect.runPromise(svc.setViewpointPins([...next])).then((pins) => { pinnedSlugs.value = new Set(pins.slugs) })
 }
 
 /** Delete-blocked-while-referenced state: kept local (not just bubbled up as a flat error
@@ -117,6 +119,16 @@ const deleteDefinition = (envelope: ViewpointDefinitionEnvelope) => {
           <td>
             <button
               type="button"
+              class="pin-btn"
+              :class="{ 'pin-btn--active': isPinned(def.slug) }"
+              :aria-label="isPinned(def.slug) ? `Unpin ${def.slug}` : `Pin ${def.slug}`"
+              :aria-pressed="isPinned(def.slug)"
+              @click="togglePin(def.slug)"
+            >
+              {{ isPinned(def.slug) ? '★' : '☆' }}
+            </button>
+            <button
+              type="button"
               @click="executeViewpoint(def)"
             >
               Execute
@@ -163,4 +175,6 @@ const deleteDefinition = (envelope: ViewpointDefinitionEnvelope) => {
 .tier-engagement { background: #dcfce7; color: #166534; }
 .tier-enterprise { background: #dbeafe; color: #1e40af; }
 .tier-module { background: #f3f4f6; color: #6b7280; }
+.pin-btn { border: none; background: none; cursor: pointer; font-size: 15px; color: #d1d5db; padding: 0 4px; }
+.pin-btn--active { color: #d97706; }
 </style>

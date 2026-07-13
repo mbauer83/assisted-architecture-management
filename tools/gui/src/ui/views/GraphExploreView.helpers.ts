@@ -4,9 +4,25 @@
  * `viewpointStyleTokens.ts`'s fixed vocabulary.
  */
 
-import type { ConnectionItemSummary, EntityItemSummary, ProjectedOccurrence, ViewpointProjection } from '../../domain'
+import type {
+  ConnectionItemSummary, EntityItemSummary, ProjectedOccurrence, ViewpointDefinitionEnvelope, ViewpointProjection,
+} from '../../domain'
 import type { StyleValue } from '../../domain/schemas/viewpoints'
 import { resolveStyleColor, styleTokenString, tokenShape, tokenIconLetter, tokenEdgeEmphasis } from '../lib/viewpointStyleTokens'
+import { presentationFromMapping } from '../../domain/viewpointPresentationSerialization'
+import { executionRouteFor } from './ViewpointsManagementView.helpers'
+
+/** The in-page viewpoint selector executes exploration-representation definitions
+ * in place; anything else (table/matrix/diagram) must redirect to its own dedicated
+ * surface instead of being force-rendered as a graph, which is how it declared its
+ * intended presentation. `null` means "stay here and execute as exploration". */
+export const explorationRedirectFor = (
+  envelope: ViewpointDefinitionEnvelope | undefined,
+): { path: string; query: { viewpoint: string } } | null => {
+  if (!envelope) return null
+  const representation = presentationFromMapping(envelope.presentation)?.representation ?? 'exploration'
+  return representation === 'exploration' ? null : executionRouteFor(envelope)
+}
 
 /** Same shape as `EditDiagramView.helpers.ts`'s function of the same name — kept as a
  * small local duplicate rather than a cross-view import so this view's helper module has

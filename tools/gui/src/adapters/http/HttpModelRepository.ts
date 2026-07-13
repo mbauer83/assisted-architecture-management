@@ -52,6 +52,7 @@ import {
   CriteriaCatalogSchema,
   ViewpointSummarizeResultSchema,
   ViewpointPersistResultSchema,
+  ViewpointPinsSchema,
   ViewpointReferencerListSchema,
   ViewpointExecutionResultSchema,
 } from '../../domain/schemas'
@@ -477,6 +478,9 @@ export const makeHttpModelRepository = (): ModelRepository => ({
     fetchJson(buildUrl(`/viewpoints/${encodeURIComponent(slug)}/referencers`), ViewpointReferencerListSchema).pipe(
       Effect.map((r) => r.referencers),
     ),
+  getViewpointPins: () => fetchJson(buildUrl('/viewpoints/pins'), ViewpointPinsSchema),
+  setViewpointPins: (slugs: readonly string[]) =>
+    putJson(buildUrl('/viewpoints/pins'), { slugs: [...slugs] }, ViewpointPinsSchema),
   syncDiagramToModel: (body) =>
     postJson(buildUrl('/diagram/sync'), body, SyncDiagramToModelResultSchema),
 

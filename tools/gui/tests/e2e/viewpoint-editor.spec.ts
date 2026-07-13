@@ -95,7 +95,7 @@ test.describe('semantic vs descriptive edits', () => {
     })
 
     await page.goto('/viewpoints')
-    await page.locator('tr', { hasText: slug }).getByRole('button', { name: 'Edit' }).click()
+    await page.locator('tr', { hasText: slug }).getByRole('button', { name: 'Edit', exact: true }).click()
     await page.getByRole('textbox', { name: 'description' }).fill('now described')
     await expect(page.getByText(/semantic edit/i)).toHaveCount(0)
 
@@ -122,6 +122,15 @@ test.describe('path-addressed validation errors', () => {
     await page.getByRole('button', { name: 'Save', exact: true }).click()
     await expect(page.getByText(/unknown attribute|not a known slug/i)).toBeVisible()
     await expect(page.locator('.group-box.root > .row.highlighted')).toHaveCount(1)
+  })
+})
+
+test.describe('non-engagement tiers are read-only', () => {
+  test('viewing a module-tier definition shows no Save button and explains why', async ({ page }) => {
+    await page.goto('/viewpoints')
+    await page.locator('tr', { hasText: 'capability-map' }).getByRole('button', { name: 'View' }).click()
+    await expect(page.getByText(/module-tier definition — only engagement-tier definitions can be edited here/)).toBeVisible()
+    await expect(page.getByRole('button', { name: /^Save/ })).toHaveCount(0)
   })
 })
 
@@ -175,7 +184,7 @@ test.describe('query tab renders for every shipped definition', () => {
     const slug = uniqueSlug('scope-only')
     await createViewpoint(request, { slug, version: 1, name: 'Scope Only Test' })
     await page.reload()
-    await page.locator('tr', { hasText: slug }).getByRole('button', { name: 'Edit' }).click()
+    await page.locator('tr', { hasText: slug }).getByRole('button', { name: 'Edit', exact: true }).click()
     await page.getByRole('button', { name: 'Query' }).click()
     await expect(page.getByText('Scope-only viewpoint — executes via its concept scope. Add a query to refine.')).toBeVisible()
     await removeViewpoint(request, slug)

@@ -21,6 +21,24 @@ test.describe('shipped default executes non-empty', () => {
     const nodeCount = await page.locator('.graph-svg .graph-node').count()
     expect(nodeCount).toBeGreaterThan(0)
   })
+
+  test('the cluster layout spreads a multi-group population across more than one row instead of one long line', async ({ page }) => {
+    await page.goto('/graph?viewpoint=goal-realization')
+    await expect(page.getByText(/entities?:\s*\d+/i)).toBeVisible({ timeout: 15000 })
+    const nodes = page.locator('.graph-svg .graph-node')
+    await expect(nodes.first()).toBeVisible()
+    const ys = await nodes.evaluateAll((els) =>
+      els.map((el) => Number(el.getAttribute('transform')?.match(/,\s*([-\d.]+)\)/)?.[1])))
+    expect(new Set(ys).size).toBeGreaterThan(1)
+  })
+})
+
+test.describe('a non-exploration definition redirects off the graph explorer', () => {
+  test('selecting a diagram-representation viewpoint on /graph redirects to the diagram surface', async ({ page }) => {
+    await page.goto('/graph?viewpoint=application-structure')
+    await expect(page).toHaveURL(/\/viewpoints\/diagram\?viewpoint=application-structure/)
+    await expect(page.getByRole('heading', { name: 'application-structure (diagram)' })).toBeVisible()
+  })
 })
 
 test.describe('parameterized execution prompts typed inputs', () => {

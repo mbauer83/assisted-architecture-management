@@ -6,6 +6,7 @@ import { useQuery } from '../composables/useQuery'
 import type { Stats, EntityList } from '../../domain'
 import type { RepoError } from '../../ports/ModelRepository'
 import { domainOptionsForDomains } from '../lib/domains'
+import PinnedViewpointsSection from '../components/PinnedViewpointsSection.vue'
 
 const svc = inject(modelServiceKey)!
 const statsState = useQuery<Stats, RepoError>()
@@ -91,6 +92,8 @@ const activeDomainOptions = computed(() =>
       </div>
 
       <!-- Domain breakdown for engagement repo -->
+      <PinnedViewpointsSection />
+
       <h2 class="section-title">
         Engagement — Entities by Domain
       </h2>

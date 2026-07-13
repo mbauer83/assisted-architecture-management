@@ -2,7 +2,7 @@ import { nextTick, ref, watch, type Ref } from 'vue'
 import type { Router } from 'vue-router'
 import { Exit } from 'effect'
 import type { ModelService } from '../../application/ModelService'
-import type { DiagramConnection, DiagramContext, EntityDetail, EntitySummary } from '../../domain'
+import type { DiagramConnection, EntityDetail, EntitySummary } from '../../domain'
 import { useQuery } from './useQuery'
 import { useMutation } from './useMutation'
 import type { WriteResult } from '../../domain'
@@ -11,6 +11,15 @@ import type { NotFoundError } from '../../domain'
 import type { MarkdownError } from '../../application/MarkdownService'
 import { lookupViewerExtension, resolveElementMap, neutralizeSentinelLink } from '../lib/diagramViewerExtensions'
 import { SVG_MARKER_ATTRIBUTES } from '../lib/svgHitAreas'
+
+/** The only two `DiagramContext['diagram']` fields this composable actually reads — a real
+ * persisted diagram's full detail record satisfies this structurally, but so does an
+ * ephemeral, never-persisted rendering (a viewpoint's ad-hoc `diagram` execution) that has
+ * no artifact id/version/status of its own to report. */
+export interface DiagramSvgSelectionDetail {
+  diagram_type: string
+  diagram_entities?: unknown
+}
 
 /**
  * Wires click-to-select interactivity into a rendered diagram SVG (entities, connections,
@@ -24,7 +33,7 @@ export function useDiagramSvgSelection(options: {
   svc: ModelService
   router: Router
   svgHtml: Ref<string | null>
-  detail: Ref<DiagramContext['diagram'] | null>
+  detail: Ref<DiagramSvgSelectionDetail | null>
   diagramEntities: Ref<readonly EntitySummary[]>
   diagramConnections: Ref<readonly DiagramConnection[]>
   drilldownByEntityId: Ref<Record<string, string>>

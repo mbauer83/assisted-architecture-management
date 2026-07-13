@@ -21,10 +21,17 @@ export const toEntitySummaryStub = (entity: EntityItemSummary): EntitySummary =>
   display_alias: entity.id, version: '', status: '', domain: '', subdomain: '', path: '',
 })
 
-export const toDiagramConnectionStub = (connection: ConnectionItemSummary): DiagramConnection => ({
+/** `nameById` fills in the sidebar's connection-flow display (`source_name`/`target_name`);
+ * omitted lookups fall back to the raw id rather than leaving the flow line blank. */
+export const toDiagramConnectionStub = (
+  connection: ConnectionItemSummary,
+  nameById: ReadonlyMap<string, string> = new Map(),
+): DiagramConnection => ({
   artifact_id: connection.id, source: connection.source, target: connection.target, conn_type: connection.type,
   source_alias: connection.source, target_alias: connection.target,
-  version: '', status: '', path: '', content_text: '', source_name: '', target_name: '',
+  version: '', status: '', path: '', content_text: '',
+  source_name: nameById.get(connection.source) ?? connection.source,
+  target_name: nameById.get(connection.target) ?? connection.target,
 })
 
 const setOrClearStroke = (shape: SVGElement, color: string | null, width: string | null): void => {

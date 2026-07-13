@@ -261,11 +261,11 @@ export function useForceGraph(width: () => number, height: () => number) {
     return walk(rootId)
   }
 
-  /** Group nodes into a synthetic two-level tree (root -> one child per distinct group
-   *  key -> leaf entities) so `layoutTree`'s dendrogram positioning applies to a
-   *  viewpoint's flat, possibly-disconnected result population exactly as it does to a
-   *  graph-adjacency tree — one positioning algorithm, two tree sources. */
-  const buildGroupTree = (groupOf: (id: string) => string): TreeNode => {
+  interface ClusterBox { ids: string[]; cols: number; cellW: number; cellH: number; width: number; height: number }
+
+  /** Buckets the current node set by `groupOf(id)` and sizes each bucket as its own
+   *  roughly-square grid of cells — the member layout a group gets once it's placed. */
+  const buildClusterBoxes = (groupOf: (id: string) => string): ClusterBox[] => {
     const groups = new Map<string, string[]>()
     for (const n of nodes.value) {
       const key = groupOf(n.id)
@@ -273,13 +273,50 @@ export function useForceGraph(width: () => number, height: () => number) {
       groups.get(key)!.push(n.id)
     }
     const sortedGroups = [...groups.entries()].sort(([a], [b]) => a.localeCompare(b))
-    return {
-      id: '__root__',
-      children: sortedGroups.map(([key, ids]) => ({
-        id: `__group__${key}`,
-        children: ids.map((id) => ({ id })),
-      })),
+    return sortedGroups.map(([, ids]) => {
+      const cellW = Math.max(140, ...ids.map(estimateNodeWidth)) + 24
+      const cellH = 90
+      const cols = Math.max(1, Math.ceil(Math.sqrt(ids.length)))
+      const rows = Math.ceil(ids.length / cols)
+      return { ids, cellW, cellH, cols, width: cols * cellW, height: rows * cellH }
+    })
+  }
+
+  /** Shelf-packs each group's box left to right, wrapping to a new row once the row
+   *  outgrows a roughly-square target width — a group never shares a row-band with so many
+   *  neighbours that it gets squeezed onto one axis, which is what a depth-keyed dendrogram
+   *  layout did here previously: every leaf entity sat at the same tree depth regardless of
+   *  its group, so they all collapsed onto one shared Y and only spread out along X. */
+  const layoutGroupClusters = (
+    boxes: readonly ClusterBox[],
+  ): { posMap: Map<string, { x: number; y: number }>; cx: number; cy: number } => {
+    const leftPad = 140
+    const topPad = 110
+    const groupGap = 80
+    const totalArea = boxes.reduce((sum, box) => sum + box.width * box.height, 0)
+    const targetRowWidth = Math.max(width(), Math.sqrt(totalArea) * 1.4)
+
+    const posMap = new Map<string, { x: number; y: number }>()
+    let rowX = leftPad
+    let rowY = topPad
+    let rowHeight = 0
+    let maxX = leftPad
+    for (const box of boxes) {
+      if (rowX > leftPad && rowX + box.width > targetRowWidth) {
+        rowX = leftPad
+        rowY += rowHeight + groupGap
+        rowHeight = 0
+      }
+      box.ids.forEach((id, i) => {
+        const col = i % box.cols
+        const row = Math.floor(i / box.cols)
+        posMap.set(id, { x: rowX + col * box.cellW + box.cellW / 2, y: rowY + row * box.cellH + box.cellH / 2 })
+      })
+      rowX += box.width + groupGap
+      rowHeight = Math.max(rowHeight, box.height)
+      maxX = Math.max(maxX, rowX)
     }
+    return { posMap, cx: Math.max(width(), maxX), cy: Math.max(height(), rowY + rowHeight + topPad) }
   }
 
   const layoutTree = (tree: TreeNode): { posMap: Map<string, { x: number; y: number }>; cx: number; cy: number } => {
@@ -316,14 +353,15 @@ export function useForceGraph(width: () => number, height: () => number) {
   }
 
   /** Positions the current node set into clusters by `groupOf(id)` — the viewpoint
-   *  exploration mode's `group_by`-driven layout (companion plan §5.1): no root/expand
-   *  adjacency is assumed, unlike `applyClusterLayout`. */
+   *  exploration mode's `group_by`-driven layout: no root/expand adjacency is assumed,
+   *  unlike `applyClusterLayout`, so groups are packed as 2D boxes rather than laid out by
+   *  tree depth. */
   const applyGroupClusterLayout = (groupOf: (id: string) => string): void => {
     stop()
     layoutMode.value = 'cluster'
     if (nodes.value.length === 0) return
-    const tree = buildGroupTree(groupOf)
-    const { posMap } = layoutTree(tree)
+    const boxes = buildClusterBoxes(groupOf)
+    const { posMap } = layoutGroupClusters(boxes)
     for (const nd of nodes.value) {
       const pos = posMap.get(nd.id)
       if (pos) { nd.x = pos.x; nd.y = pos.y }

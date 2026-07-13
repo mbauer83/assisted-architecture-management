@@ -33,15 +33,25 @@ describe('toEntitySummaryStub', () => {
 })
 
 describe('toDiagramConnectionStub', () => {
+  const conn: ConnectionItemSummary = {
+    id: 'c1', type: 'serving', source: 'a', target: 'b', certainty: null, hops: null, via_connection_ids: [],
+  }
+
   it('sets source_alias/target_alias to the source/target artifact ids', () => {
-    const conn: ConnectionItemSummary = {
-      id: 'c1', type: 'serving', source: 'a', target: 'b', certainty: null, hops: null, via_connection_ids: [],
-    }
     const stub = toDiagramConnectionStub(conn)
     expect(stub.artifact_id).toBe('c1')
     expect(stub.source_alias).toBe('a')
     expect(stub.target_alias).toBe('b')
     expect(stub.conn_type).toBe('serving')
+  })
+
+  it('falls back to the raw id when no name lookup is given', () => {
+    expect(toDiagramConnectionStub(conn)).toMatchObject({ source_name: 'a', target_name: 'b' })
+  })
+
+  it('resolves source_name/target_name from the given lookup', () => {
+    const nameById = new Map([['a', 'Alpha'], ['b', 'Beta']])
+    expect(toDiagramConnectionStub(conn, nameById)).toMatchObject({ source_name: 'Alpha', target_name: 'Beta' })
   })
 })
 

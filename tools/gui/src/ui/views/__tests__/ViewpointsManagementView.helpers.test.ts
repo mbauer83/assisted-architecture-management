@@ -1,9 +1,35 @@
 import { describe, expect, it } from 'vitest'
 import {
-  csvToList, firstErrorNodeId, formatPreviewCounts, formatScopeSummary, isSemanticEdit, listToCsv,
+  csvToList, executionRouteFor, firstErrorNodeId, formatPreviewCounts, formatScopeSummary, isSemanticEdit, listToCsv,
 } from '../ViewpointsManagementView.helpers'
 import { mkDefinitionDraft, mkScope } from '../../../domain/viewpointDefinitionDraft'
-import type { ViewpointValidationIssue } from '../../../domain'
+import { mkPresentation } from '../../../domain/viewpointPresentation'
+import { presentationToMapping } from '../../../domain/viewpointPresentationSerialization'
+import type { ViewpointDefinitionEnvelope, ViewpointValidationIssue } from '../../../domain'
+
+const mkEnvelope = (representation: Parameters<typeof mkPresentation>[0] | null): ViewpointDefinitionEnvelope => ({
+  slug: 'goal-realization', version: 1, name: 'Goal Realization', tier: 'module',
+  scope_summary: { unrestricted: true }, query_summary: null,
+  presentation: representation === null ? undefined : presentationToMapping(mkPresentation(representation)),
+})
+
+describe('executionRouteFor', () => {
+  it('routes exploration-representation definitions to /graph', () => {
+    expect(executionRouteFor(mkEnvelope('exploration'))).toEqual({
+      path: '/graph', query: { viewpoint: 'goal-realization' },
+    })
+  })
+
+  it('routes table/matrix/diagram representations to their dedicated surfaces', () => {
+    expect(executionRouteFor(mkEnvelope('table')).path).toBe('/entities')
+    expect(executionRouteFor(mkEnvelope('matrix')).path).toBe('/viewpoints/matrix')
+    expect(executionRouteFor(mkEnvelope('diagram')).path).toBe('/viewpoints/diagram')
+  })
+
+  it('falls back to exploration when the definition carries no presentation', () => {
+    expect(executionRouteFor(mkEnvelope(null)).path).toBe('/graph')
+  })
+})
 
 describe('isSemanticEdit', () => {
   it('is false when only descriptive fields change', () => {

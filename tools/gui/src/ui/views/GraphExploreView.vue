@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { inject, onMounted, watch, computed, ref } from 'vue'
-import { useRoute, RouterLink } from 'vue-router'
+import { useRoute, useRouter, RouterLink } from 'vue-router'
 import { Effect } from 'effect'
 import { modelServiceKey } from '../keys'
 import { useQuery } from '../composables/useQuery'
@@ -16,7 +16,7 @@ import ViewpointParameterPrompt from '../components/ViewpointParameterPrompt.vue
 import { computeExecutionDiagnostics, deriveLegend, deriveScaleGradients } from '../components/ViewpointExecutionDiagnostics.helpers'
 import {
   groupKeyFor, nodeVisualFor, edgeVisualFor, nodeShapePoints,
-  buildConnectionStyleIndex, edgeStyleKey, projectionByItemId,
+  buildConnectionStyleIndex, edgeStyleKey, projectionByItemId, explorationRedirectFor,
 } from './GraphExploreView.helpers'
 import { presentationFromMapping } from '../../domain/viewpointPresentationSerialization'
 import type { PresentationNode } from '../../domain/viewpointPresentation'
@@ -28,6 +28,7 @@ import type { RepoError } from '../../ports/ModelRepository'
 
 const svc = inject(modelServiceKey)!
 const route = useRoute()
+const router = useRouter()
 const rootId = computed(() => (route.query.id as string | undefined) ?? '')
 
 const svgRef = ref<SVGSVGElement | null>(null)
@@ -103,12 +104,18 @@ const loadViewpointPopulation = (slug: string) => viewpointPrompt.run(slug)
 
 const onSelectViewpoint = (viewpoint: ViewpointSummary | null) => {
   selectedViewpointSlug.value = viewpoint?.slug ?? null
-  if (viewpoint) {
-    void loadViewpointPopulation(viewpoint.slug)
-  } else {
+  if (!viewpoint) {
     viewpointExecution.clear()
     loadRoot()
+    return
   }
+  const envelope = viewpointDefinitions.value.find((d) => d.slug === viewpoint.slug)
+  const redirect = explorationRedirectFor(envelope)
+  if (redirect) {
+    void router.push(redirect)
+    return
+  }
+  void loadViewpointPopulation(viewpoint.slug)
 }
 
 const rerunViewpoint = () => {

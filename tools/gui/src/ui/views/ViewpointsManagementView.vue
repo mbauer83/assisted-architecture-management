@@ -48,6 +48,8 @@ const loadError = ref<string | null>(null)
 const draft = ref<ViewpointDefinitionDraft | null>(null)
 const originalDraft = ref<ViewpointDefinitionDraft | null>(null)
 const isCreating = ref(false)
+const viewingTier = ref<ViewpointDefinitionEnvelope['tier'] | null>(null)
+const isReadOnly = computed(() => viewingTier.value !== null && viewingTier.value !== 'engagement')
 const activeTab = ref<'general' | 'scope' | 'query' | 'presentation'>('general')
 const issues = ref<readonly ViewpointValidationIssue[]>([])
 const referencers = ref<readonly ViewpointReferencer[]>([])
@@ -76,6 +78,7 @@ const startCreate = () => {
   draft.value = mkDefinitionDraft()
   originalDraft.value = null
   isCreating.value = true
+  viewingTier.value = 'engagement'
   issues.value = []
   referencers.value = []
   activeTab.value = 'general'
@@ -86,6 +89,7 @@ const startEdit = (envelope: ViewpointDefinitionEnvelope) => {
   draft.value = definitionFromMapping(envelope)
   originalDraft.value = definitionFromMapping(envelope)
   isCreating.value = false
+  viewingTier.value = envelope.tier
   issues.value = []
   activeTab.value = 'general'
   mode.value = 'edit'
@@ -96,6 +100,7 @@ const backToList = () => {
   mode.value = 'list'
   draft.value = null
   originalDraft.value = null
+  viewingTier.value = null
   void loadDefinitions()
 }
 
@@ -104,7 +109,7 @@ const versionBumped = computed(() => draft.value && originalDraft.value && draft
 const showVersionBumpHint = computed(() => !isCreating.value && isSemantic.value && !versionBumped.value)
 
 const save = () => {
-  if (!draft.value || !catalog.value) return
+  if (!draft.value || !catalog.value || isReadOnly.value) return
   saving.value = true
   const body = { definition: definitionToMapping(draft.value, attributeTypeTablesFromCatalog(catalog.value)), dry_run: false }
   const call = isCreating.value ? svc.createViewpointDefinition(body) : svc.editViewpointDefinition(body)
@@ -153,6 +158,14 @@ const focusIssue = (issue: ViewpointValidationIssue) => {
       >
         ← Back
       </button>
+
+      <p
+        v-if="isReadOnly"
+        class="hint hint--readonly"
+      >
+        This is a {{ viewingTier }}-tier definition — only engagement-tier definitions can be
+        edited here. Promote a copy into the engagement repository to customize it.
+      </p>
 
       <p
         v-if="showVersionBumpHint"
@@ -231,7 +244,10 @@ const focusIssue = (issue: ViewpointValidationIssue) => {
         :catalog="catalog"
       />
 
-      <div class="save-row">
+      <div
+        v-if="!isReadOnly"
+        class="save-row"
+      >
         <button
           type="button"
           class="primary-btn"
@@ -251,6 +267,7 @@ const focusIssue = (issue: ViewpointValidationIssue) => {
 .primary-btn { background: #6366f1; color: #fff; border: none; border-radius: 7px; padding: 8px 16px; font-weight: 600; cursor: pointer; margin-bottom: 12px; }
 .primary-btn:disabled { opacity: .5; cursor: not-allowed; }
 .hint { background: #fef3c7; color: #92400e; padding: 8px 12px; border-radius: 6px; }
+.hint--readonly { background: #f3f4f6; color: #374151; }
 .issue-list { list-style: none; padding: 0; }
 .issue-list li { padding: 6px 10px; border-radius: 6px; margin: 4px 0; cursor: pointer; font-size: 12.5px; }
 .issue-list li.error { background: #fee2e2; color: #991b1b; }

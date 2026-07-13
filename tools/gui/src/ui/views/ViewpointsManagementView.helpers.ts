@@ -9,6 +9,22 @@ import { definitionToMapping } from '../../domain/viewpointDefinitionSerializati
 import type { ViewpointDefinitionDraft } from '../../domain/viewpointDefinitionDraft'
 import { resolveIssuePathNodeId } from '../../domain/viewpointIssuePath'
 import type { ScopeSummary, ViewpointExecutionResult, ViewpointValidationIssue } from '../../domain'
+import type { Representation } from '../../domain/viewpointPresentation'
+import { presentationFromMapping } from '../../domain/viewpointPresentationSerialization'
+import type { ViewpointDefinitionEnvelope } from '../../domain'
+
+/** Route to the representation-appropriate execution surface, pre-loaded with a
+ * viewpoint's repository-context population — no separate anchor entity required.
+ * Shared by the management list and the Home pinned-definitions section so a slug always
+ * lands on the same surface regardless of which page linked to it. */
+const EXECUTION_ROUTE_BY_REPRESENTATION: Record<Representation, string> = {
+  exploration: '/graph', table: '/entities', matrix: '/viewpoints/matrix', diagram: '/viewpoints/diagram',
+}
+
+export const executionRouteFor = (envelope: ViewpointDefinitionEnvelope): { path: string; query: { viewpoint: string } } => {
+  const representation = presentationFromMapping(envelope.presentation)?.representation ?? 'exploration'
+  return { path: EXECUTION_ROUTE_BY_REPRESENTATION[representation], query: { viewpoint: envelope.slug } }
+}
 
 const SEMANTIC_KEYS = ['scope', 'query', 'presentation', 'representation_types'] as const
 

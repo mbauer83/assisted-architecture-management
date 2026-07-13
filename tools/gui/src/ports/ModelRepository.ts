@@ -49,6 +49,7 @@ import type {
   ViewpointDefinitionEnvelope,
   CriteriaCatalog,
   ViewpointPersistResult,
+  ViewpointPins,
   ViewpointReferencer,
   ViewpointExecutionRequest,
   ViewpointExecutionResult,
@@ -202,15 +203,14 @@ export interface ModelRepository {
   }) => Effect.Effect<WriteResult, RepoError>
   readonly getViewpointProjection: (diagramId: string) => Effect.Effect<ViewpointProjection, RepoError>
   readonly listViewpointDefinitions: () => Effect.Effect<readonly ViewpointDefinitionEnvelope[], RepoError>
-  /** Fixed, unstyled §7.1 content (companion plan) — repository-context execution by
-   * slug or ad-hoc query. */
+  /** Fixed, unstyled content — repository-context execution by slug or ad-hoc query. */
   readonly executeViewpoint: (request: ViewpointExecutionRequest) => Effect.Effect<ViewpointExecutionResult, RepoError>
-  /** GUI-only styled sibling of `executeViewpoint` (§6.1) — never exposed to MCP. */
+  /** GUI-only styled sibling of `executeViewpoint` — never exposed to MCP. */
   readonly executeViewpointProjection: (
     request: ViewpointExecutionRequest,
   ) => Effect.Effect<ViewpointProjection, RepoError>
   /** GUI-only ad-hoc ArchiMate-notation rendering behind the `diagram` execution
-   * representation (§5.1) — never exposed to MCP, never persisted. */
+   * representation — never exposed to MCP, never persisted. */
   readonly executeViewpointDiagram: (
     request: ViewpointExecutionRequest,
   ) => Effect.Effect<ViewpointDiagramResult, RepoError>
@@ -226,6 +226,8 @@ export interface ModelRepository {
     slug: string; dry_run?: boolean
   }) => Effect.Effect<ViewpointPersistResult, RepoError>
   readonly getViewpointReferencers: (slug: string) => Effect.Effect<readonly ViewpointReferencer[], RepoError>
+  readonly getViewpointPins: () => Effect.Effect<ViewpointPins, RepoError>
+  readonly setViewpointPins: (slugs: readonly string[]) => Effect.Effect<ViewpointPins, RepoError>
   readonly deleteDiagram: (body: {
     artifact_id: string; dry_run?: boolean;
   }) => Effect.Effect<WriteResult, RepoError>
