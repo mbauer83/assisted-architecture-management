@@ -6,9 +6,13 @@ import { modelServiceKey } from '../keys'
 import { useQuery } from '../composables/useQuery'
 import { useForceGraph, type GraphNode, type GraphEdge, type LayoutMode } from '../composables/useForceGraph'
 import { useViewpointExecution } from '../composables/useViewpointExecution'
+import { useViewpointParameterPrompt } from '../composables/useViewpointParameterPrompt'
+import type { ResolvedViewpointExecution } from '../composables/useViewpointParameterPrompt'
 import ArchimateTypeGlyph from '../components/ArchimateTypeGlyph.vue'
 import ViewpointSelect from '../components/ViewpointSelect.vue'
 import ViewpointExecutionDiagnostics from '../components/ViewpointExecutionDiagnostics.vue'
+import ViewpointExecutionError from '../components/ViewpointExecutionError.vue'
+import ViewpointParameterPrompt from '../components/ViewpointParameterPrompt.vue'
 import { computeExecutionDiagnostics, deriveLegend } from '../components/ViewpointExecutionDiagnostics.helpers'
 import {
   groupKeyFor, nodeVisualFor, edgeVisualFor, nodeShapePoints,
@@ -41,7 +45,7 @@ const {
 // Selected edge (connection) for sidebar
 const selectedEdge = ref<GraphEdge | null>(null)
 
-// ── Viewpoint-driven exploration (companion plan §5.1, WU-E8) ─────────────────
+// ── Viewpoint-driven exploration ────────────────────────────────────────────
 
 const viewpoints = ref<ViewpointSummary[]>([])
 const viewpointDefinitions = ref<readonly ViewpointDefinitionEnvelope[]>([])
@@ -71,12 +75,12 @@ const diagnostics = computed(() => computeExecutionDiagnostics(
 ))
 const legend = computed(() => deriveLegend(selectedPresentation.value))
 
-const loadViewpointPopulation = async (slug: string) => {
+const runViewpointExecution = async (resolved: ResolvedViewpointExecution) => {
   nodes.value = []
   edges.value = []
   selectedId.value = null
   selectedEdge.value = null
-  await viewpointExecution.execute({ slug })
+  await viewpointExecution.execute(resolved)
   const result = viewpointExecution.result.value
   if (!result) return
   for (const entity of result.entities) {
@@ -93,6 +97,8 @@ const loadViewpointPopulation = async (slug: string) => {
     return entity ? groupKeyFor(entity, groupBy) : 'other'
   })
 }
+const viewpointPrompt = useViewpointParameterPrompt(runViewpointExecution, viewpointDefinitions)
+const loadViewpointPopulation = (slug: string) => viewpointPrompt.run(slug)
 
 const onSelectViewpoint = (viewpoint: ViewpointSummary | null) => {
   selectedViewpointSlug.value = viewpoint?.slug ?? null
@@ -401,11 +407,23 @@ const edgeCardPos = (e: typeof edges.value[number], frac: number) => {
         </div>
       </div>
       <ViewpointExecutionDiagnostics
-        v-if="selectedViewpointSlug !== null"
+        v-if="selectedViewpointSlug !== null && !viewpointPrompt.visible.value"
         :diagnostics="diagnostics"
         :legend="legend"
         :query-summary="viewpointExecution.result.value?.query_summary ?? ''"
         @rerun="rerunViewpoint"
+      />
+      <ViewpointParameterPrompt
+        v-if="viewpointPrompt.visible.value"
+        :parameters="viewpointPrompt.parameters.value"
+        @submit="viewpointPrompt.submit"
+        @cancel="viewpointPrompt.cancel"
+      />
+      <ViewpointExecutionError
+        v-if="selectedViewpointSlug !== null && viewpointExecution.errorMessage.value"
+        :typed-error="viewpointExecution.typedError.value"
+        :fallback-message="viewpointExecution.errorMessage.value"
+        @retry="rerunViewpoint"
       />
       <svg
         ref="svgRef"

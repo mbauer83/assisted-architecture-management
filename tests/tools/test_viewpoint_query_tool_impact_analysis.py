@@ -56,9 +56,9 @@ class TestRestMcpParity:
         from starlette.testclient import TestClient
 
         from src.application.artifact_repository import ArtifactRepository
-        from src.infrastructure.app_bootstrap import runtime_catalogs_dependency
         from src.infrastructure.artifact_index import shared_artifact_index
         from src.infrastructure.gui.routers import state as gui_state
+        from src.infrastructure.gui.routers.viewpoints import fresh_viewpoints_runtime_catalogs_dependency
         from src.infrastructure.gui.routers.viewpoints import router as viewpoints_router
 
         anchor_id = mcp.artifact_create_entity(
@@ -73,7 +73,7 @@ class TestRestMcpParity:
         gui_repo = ArtifactRepository(shared_artifact_index([repo]))
         gui_state.init_state(gui_repo, repo, None)
         app = FastAPI()
-        app.dependency_overrides[runtime_catalogs_dependency] = lambda: _CATALOGS
+        app.dependency_overrides[fresh_viewpoints_runtime_catalogs_dependency] = lambda: _CATALOGS
         app.include_router(viewpoints_router)
         client = TestClient(app)
         rest_result = client.post(

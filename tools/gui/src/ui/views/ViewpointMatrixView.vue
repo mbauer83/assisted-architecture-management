@@ -1,6 +1,6 @@
 <script setup lang="ts">
 /**
- * Ephemeral viewpoint-execution matrix (companion plan §5.1/§5.4, WU-E9): read-only
+ * Ephemeral viewpoint-execution matrix: read-only
  * rendering via the viewpoint's `matrix` presentation — grouped axes (one population,
  * displayed with row/column grouping) or criteria axes (two independent populations,
  * `result.matrix_axes`). Never persisted, no `ViewpointApplication`.
@@ -10,7 +10,10 @@ import { Effect } from 'effect'
 import { RouterLink, useRoute } from 'vue-router'
 import { modelServiceKey } from '../keys'
 import { useViewpointExecution } from '../composables/useViewpointExecution'
+import { useViewpointParameterPrompt } from '../composables/useViewpointParameterPrompt'
 import ViewpointExecutionDiagnostics from '../components/ViewpointExecutionDiagnostics.vue'
+import ViewpointExecutionError from '../components/ViewpointExecutionError.vue'
+import ViewpointParameterPrompt from '../components/ViewpointParameterPrompt.vue'
 import { computeExecutionDiagnostics, deriveLegend } from '../components/ViewpointExecutionDiagnostics.helpers'
 import { presentationFromMapping } from '../../domain/viewpointPresentationSerialization'
 import {
@@ -25,6 +28,7 @@ const slug = computed(() => (route.query.viewpoint as string | undefined) ?? '')
 
 const definitions = ref<readonly ViewpointDefinitionEnvelope[]>([])
 const execution = useViewpointExecution(svc)
+const prompt = useViewpointParameterPrompt((resolved) => execution.execute(resolved), definitions)
 
 const presentation = computed(() => {
   const envelope = definitions.value.find((d) => d.slug === slug.value)
@@ -52,7 +56,7 @@ const cellTitle = (rowId: string, columnId: string): string | undefined => {
 
 const load = async () => {
   definitions.value = await Effect.runPromise(svc.listViewpointDefinitions()).catch(() => [])
-  await execution.execute({ slug: slug.value })
+  await prompt.run(slug.value)
 }
 const rerun = () => void load()
 
@@ -74,10 +78,18 @@ onMounted(() => { if (slug.value) void load() })
     </div>
 
     <ViewpointExecutionDiagnostics
+      v-if="!prompt.visible.value"
       :diagnostics="diagnostics"
       :legend="legend"
       :query-summary="execution.result.value?.query_summary ?? ''"
       @rerun="rerun"
+    />
+
+    <ViewpointParameterPrompt
+      v-if="prompt.visible.value"
+      :parameters="prompt.parameters.value"
+      @submit="prompt.submit"
+      @cancel="prompt.cancel"
     />
 
     <div
@@ -86,12 +98,12 @@ onMounted(() => { if (slug.value) void load() })
     >
       Loading…
     </div>
-    <div
+    <ViewpointExecutionError
       v-else-if="execution.errorMessage.value"
-      class="state-msg state-msg--error"
-    >
-      {{ execution.errorMessage.value }}
-    </div>
+      :typed-error="execution.typedError.value"
+      :fallback-message="execution.errorMessage.value"
+      @retry="rerun"
+    />
     <div
       v-else-if="axes.rowIds.length > 0 && axes.columnIds.length > 0"
       class="matrix-scroll"

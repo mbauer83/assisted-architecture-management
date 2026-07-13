@@ -6,6 +6,7 @@ from __future__ import annotations
 
 import pytest
 
+import src.domain.viewpoint_derived_relationship_batch as viewpoint_derived_relationship_batch_module
 from src.application.viewpoints.evaluate_viewpoint import (
     UnknownViewpointSlugError,
     ViewpointExecutionRequest,
@@ -15,7 +16,8 @@ from src.application.viewpoints.evaluate_viewpoint import (
     resolve_viewpoint_definition,
 )
 from src.application.viewpoints.parameter_binding import ViewpointParameterError
-from src.domain.viewpoint_bindings import QueryParameter
+from src.domain.viewpoint_bindings import DerivedAttribute, QueryParameter
+from src.domain.viewpoint_condition_validation import RegistrySnapshot
 from src.domain.viewpoint_criteria import AttributeCondition, EntityCriteriaGroup, NeighborInclusion, ValueRef
 from src.domain.viewpoints import (
     ExecutableViewpointQuery,
@@ -25,6 +27,7 @@ from src.domain.viewpoints import (
     ViewpointDefinition,
 )
 from tests.application.viewpoints._fixtures import REGISTRIES, Store, connection, entity
+from tests.fixtures.viewpoints import derivation_examples
 
 _DEFAULTS: dict[str, object] = dict(max_entities=500, default_limit=500, timeout_seconds=10.0, index_generation=None)
 
@@ -322,3 +325,130 @@ class TestProjectViewpointRepository:
             project_viewpoint_repository(
                 "missing", None, catalog=ViewpointCatalog.empty(), read_access=Store(), registries=REGISTRIES
             )
+
+
+class TestDeferredDerivedAttributes:
+    """A `traversal: derived` derived attribute that no criteria condition ever
+    references (the common case — used only by a presentation style rule) must not be
+    evaluated for the whole scoped population: each evaluation is a full bounded
+    relationship-derivation search, so doing it for every scoped entity instead of only
+    the entities that end up retained turns population size into per-execution cost
+    regardless of how selective the query actually is."""
+
+    def _store_with_noise(self, *, noise_count: int, matched_ids: tuple[str, ...]) -> Store:
+        entities = {
+            entity_id: entity(artifact_id=entity_id, artifact_type="application-component", group="matched")
+            for entity_id in matched_ids
+        }
+        entities.update(
+            {
+                f"ENT@noise-{i}": entity(
+                    artifact_id=f"ENT@noise-{i}", artifact_type="application-component", group="noise"
+                )
+                for i in range(noise_count)
+            }
+        )
+        return Store(entities=entities)
+
+    def _registries_with_derivation_catalog(self) -> RegistrySnapshot:
+        return RegistrySnapshot(
+            known_entity_types=frozenset({"application-component"}),
+            known_connection_types=frozenset(),
+            known_specialization_slugs=frozenset(),
+            entity_attribute_types={},
+            connection_attribute_types={},
+            derivation_catalog=derivation_examples.catalog(),
+        )
+
+    def _spy_on_derive_relationships(self, monkeypatch: pytest.MonkeyPatch) -> tuple[list[str], list[int]]:
+        """Returns `(anchors_seen, call_sizes)`: every anchor id passed across all calls
+        (for asserting which entities were derived for), and the size of each individual
+        call's own anchor set (for asserting derivation is batched into one combined call,
+        not one call per entity — the whole point of this optimization)."""
+        anchors_seen: list[str] = []
+        call_sizes: list[int] = []
+        real_derive_relationships = viewpoint_derived_relationship_batch_module.derive_relationships
+
+        def _counting_derive_relationships(request: object, **kwargs: object) -> object:
+            anchors_seen.extend(request.anchors)  # type: ignore[attr-defined]
+            call_sizes.append(len(request.anchors))  # type: ignore[attr-defined]
+            return real_derive_relationships(request, **kwargs)  # type: ignore[arg-type]
+
+        monkeypatch.setattr(
+            viewpoint_derived_relationship_batch_module, "derive_relationships", _counting_derive_relationships
+        )
+        return anchors_seen, call_sizes
+
+    def test_a_presentation_only_derived_attribute_is_not_evaluated_for_unmatched_entities(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        matched_ids = ("ENT@match-1", "ENT@match-2")
+        store = self._store_with_noise(noise_count=20, matched_ids=matched_ids)
+        registries = self._registries_with_derivation_catalog()
+        anchors_seen, call_sizes = self._spy_on_derive_relationships(monkeypatch)
+
+        definition = _definition(
+            query=ExecutableViewpointQuery(
+                entity_criteria=EntityCriteriaGroup(
+                    children=(
+                        AttributeCondition(attribute="group", comparator="eq", value=ValueRef(literal="matched")),
+                    )
+                ),
+                derived=(
+                    DerivedAttribute("impact-distance", traversal="derived", direction="outgoing", reduce="min",
+                                      of="relationship.hops"),
+                ),
+            ),
+            presentation=PresentationSpec(
+                representation="exploration",
+                styling_rules=(
+                    StyleRule(
+                        capability="node_color", mode="scale", scale_attribute="derived.impact-distance",
+                        scale_min=1, scale_max=4, scale_tokens=("heat-near", "heat-far"),
+                    ),
+                ),
+            ),
+        )
+        catalog = ViewpointCatalog(entries=(definition,))
+        projection = project_viewpoint_repository(
+            "test-viewpoint", None, catalog=catalog, read_access=store, registries=registries
+        )
+        assert {item.item_id for item in projection.items} == set(matched_ids)
+        # Only the two matched entities were ever handed to the derivation engine — never
+        # the twenty unmatched "noise" entities also present in scope.
+        assert set(anchors_seen) == set(matched_ids)
+        # And both were folded into one combined call, not one call per entity.
+        assert call_sizes == [2]
+
+    def test_a_criteria_referenced_derived_attribute_still_evaluates_over_the_full_scope(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        # A derived attribute a condition actually filters on must stay evaluated before
+        # filtering happens — there is no way to know who matches without it.
+        matched_ids = ("ENT@match-1",)
+        store = self._store_with_noise(noise_count=5, matched_ids=matched_ids)
+        registries = self._registries_with_derivation_catalog()
+        anchors_seen, call_sizes = self._spy_on_derive_relationships(monkeypatch)
+
+        definition = _definition(
+            query=ExecutableViewpointQuery(
+                entity_criteria=EntityCriteriaGroup(
+                    children=(AttributeCondition(attribute="derived.impact-distance", comparator="exists"),)
+                ),
+                derived=(
+                    DerivedAttribute("impact-distance", traversal="derived", direction="outgoing", reduce="min",
+                                      of="relationship.hops"),
+                ),
+            ),
+        )
+        catalog = ViewpointCatalog(entries=(definition,))
+        evaluate_viewpoint(
+            ViewpointExecutionRequest(slug="test-viewpoint"), catalog=catalog, read_access=store, registries=registries,
+            **_DEFAULTS,
+        )
+        # Six scoped entities (one matched, five noise) — the attribute is referenced by
+        # the primary criteria, so every one of them had to be evaluated to decide who
+        # matches the "derived.impact-distance exists" condition — but still folded into
+        # one combined call, not six separate ones.
+        assert set(anchors_seen) == {"ENT@match-1", *(f"ENT@noise-{i}" for i in range(5))}
+        assert call_sizes == [6]

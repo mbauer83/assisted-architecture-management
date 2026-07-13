@@ -12,9 +12,11 @@ from src.application.viewpoints.ports import RepositoryReadAccess
 from src.domain.artifact_types import ConnectionRecord, EntityRecord
 from src.domain.concept_scope import ConceptScope
 from src.domain.module_types import EntityTypeName
+from src.domain.viewpoint_binding_evaluation import evaluate_derived_attributes
+from src.domain.viewpoint_bindings import DerivedAttribute
 from src.domain.viewpoint_condition_validation import RegistrySnapshot
 from src.domain.viewpoint_criteria_evaluation import evaluate_entity_criteria
-from src.domain.viewpoint_evaluation_context import EvaluationEnvironment
+from src.domain.viewpoint_evaluation_context import BindingEvaluationInput, EvaluationEnvironment
 from src.domain.viewpoint_population_evaluation import resolve_neighbor_inclusions, select_connections
 from src.domain.viewpoint_projection import (
     Membership,
@@ -43,6 +45,7 @@ def project_repository(
     scope_filter: ConceptScope | None = None,
     environment: EvaluationEnvironment = EvaluationEnvironment(),
     candidate_entity_ids: frozenset[str] | None = None,
+    deferred_derived: tuple[DerivedAttribute, ...] = (),
 ) -> ViewpointProjection:
     query = definition.query
     if query is None:
@@ -84,6 +87,20 @@ def project_repository(
     entity_records = tuple(
         entity for entity_id in sorted(included_ids) if (entity := read_access.get_entity(entity_id)) is not None
     )
+    if deferred_derived:
+        # Presentation-only derived attributes (never referenced by a criteria tree, so
+        # they had no bearing on which entities matched) are evaluated here, for the
+        # retained population only — never for the full scoped candidate set, which
+        # `_prepare_query_environment` already established these are exempt from.
+        deferred_input = BindingEvaluationInput(
+            tuple(entity.artifact_id for entity in entity_records), (), read_access, registries
+        )
+        environment = evaluate_derived_attributes(
+            deferred_derived,
+            tuple(entity.artifact_id for entity in entity_records),
+            input=deferred_input,
+            environment=environment,
+        )
     styled_items_list: list[tuple[EntityRecord | ConnectionRecord, Literal["entity", "connection"]]] = []
     for entity in entity_records:
         styled_items_list.append((entity, "entity"))

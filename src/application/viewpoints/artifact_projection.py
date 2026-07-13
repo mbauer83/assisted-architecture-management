@@ -1,7 +1,7 @@
-"""Artifact-local projection (companion plan §6.2): every placed occurrence of a diagram or
-matrix, resolved exactly as the verifier resolves them, carrying an exclusion reason when it
-fails effective scope or the definition's query criteria. The WU-E16 verifier rebase and the
-WU-E5a GUI ghost/hide overlay both consume this — one service, never re-implemented.
+"""Artifact-local projection: every placed occurrence of a diagram or matrix, resolved
+exactly as the verifier resolves them, carrying an exclusion reason when it fails
+effective scope or the definition's query criteria. The verifier and the GUI ghost/hide
+overlay both consume this — one service, never re-implemented.
 """
 
 from __future__ import annotations
@@ -26,7 +26,7 @@ from src.domain.viewpoint_projection import (
     ViewpointProjection,
     drift_warnings,
 )
-from src.domain.viewpoint_style_evaluation import evaluate_item_style
+from src.domain.viewpoint_style_evaluation import StyleValue, evaluate_item_style
 from src.domain.viewpoints import (
     EnforcementSetting,
     TargetKind,
@@ -140,7 +140,7 @@ def project_artifact_local(
         drift |= entity_drift
         entity_reasons[entity.artifact_id] = reasons
         effective_reasons = () if enforcement == "off" else reasons
-        style: Mapping[str, str] = {}
+        style: Mapping[str, StyleValue] = {}
         if not effective_reasons:
             style, style_drift = evaluate_item_style(
                 entity, "entity", definition.presentation, read_access=read_access, registries=registries
@@ -198,12 +198,12 @@ def project_artifact_by_frontmatter(
     registries: RegistrySnapshot,
 ) -> ViewpointProjection | None:
     """Assemble the artifact-local projection for one diagram/matrix from its raw
-    frontmatter — the second consumer of this service (alongside the WU-E16 verifier rule),
-    used by the WU-E5a GUI ghost/hide overlay endpoint. Returns ``None`` when the artifact
-    carries no ``viewpoint`` application (nothing to project). Unlike the verifier (which
+    frontmatter — the second consumer of this service (alongside the verifier rule), used
+    by the GUI ghost/hide overlay endpoint. Returns ``None`` when the artifact carries no
+    ``viewpoint`` application (nothing to project). Unlike the verifier (which
     special-cases an unknown slug into its own E180 error and skips work under `off`
     enforcement), this always delegates to `project_artifact_local`, which already
-    implements both cases per §6.2 (identity projection + warning; occlusion-only `off`).
+    implements both cases (identity projection + warning; occlusion-only `off`).
     """
     raw = fm.get("viewpoint")
     if raw is None:

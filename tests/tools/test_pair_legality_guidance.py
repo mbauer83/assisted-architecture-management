@@ -180,27 +180,40 @@ class TestMcpAuthoringGuidancePairLegality:
 # ---------------------------------------------------------------------------
 
 
+def _ontology_rest_client():
+    from fastapi import FastAPI
+    from starlette.testclient import TestClient
+
+    from src.infrastructure.app_bootstrap import runtime_catalogs_dependency
+    from src.infrastructure.gui.routers.connections import router as connections_router
+
+    app = FastAPI()
+    app.dependency_overrides[runtime_catalogs_dependency] = _catalogs
+    app.include_router(connections_router)
+    return TestClient(app)
+
+
 class TestRestOntologyEndpointParity:
     """The pair_connection_guidance domain function must agree with /api/ontology REST output."""
 
     def test_rest_ontology_endpoint_returns_connection_types(self) -> None:
-        from src.infrastructure.gui.routers.connections import get_ontology
+        client = _ontology_rest_client()
 
-        result = get_ontology(source_type="requirement", target_type="goal", catalogs=_catalogs())
-        assert "connection_types" in result, (
+        response = client.get("/api/ontology", params={"source_type": "requirement", "target_type": "goal"})
+        assert "connection_types" in response.json(), (
             "REST /api/ontology with source+target must return connection_types"
         )
 
     def test_rest_and_domain_agree_on_permitted_types(self) -> None:
         """REST /api/ontology and pair_connection_guidance outgoing+symmetric must cover the same types."""
-        from src.infrastructure.gui.routers.connections import get_ontology
+        client = _ontology_rest_client()
 
         source, target = "application-component", "data-object"
         pg = pair_connection_guidance(source, target)
         guidance_types = set(pg.get("outgoing", [])) | set(pg.get("symmetric", []))
 
-        rest_result = get_ontology(source_type=source, target_type=target, catalogs=_catalogs())
-        rest_types = set(rest_result.get("connection_types", []))
+        response = client.get("/api/ontology", params={"source_type": source, "target_type": target})
+        rest_types = set(response.json().get("connection_types", []))
 
         assert guidance_types == rest_types, (
             f"Pair guidance (outgoing+symmetric) {sorted(guidance_types)!r} "

@@ -18,6 +18,7 @@ from dataclasses import dataclass, field
 from typing import Literal, Protocol
 
 from src.domain.artifact_types import ConnectionRecord, EntityRecord
+from src.domain.viewpoint_condition_validation import RegistrySnapshot
 
 
 class CriteriaReadAccess(Protocol):
@@ -52,3 +53,15 @@ class EvaluationEnvironment:
     bindings: Mapping[str, object] = field(default_factory=dict)
     parameters: Mapping[str, object] = field(default_factory=dict)
     derived_values: Mapping[tuple[str, str], object] = field(default_factory=dict)
+
+
+@dataclass(frozen=True)
+class BindingEvaluationInput:
+    """The scope-partitioned candidate ids plus read access/registries every binding and
+    derived-attribute evaluator needs — resolved once by the application layer and shared
+    across primary matching, all bindings, and all derived attributes in one execution."""
+
+    entity_ids: tuple[str, ...]
+    connection_ids: tuple[str, ...]
+    read_access: CriteriaReadAccess
+    registries: RegistrySnapshot

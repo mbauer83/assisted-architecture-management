@@ -6,12 +6,12 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from src.domain.artifact_types import ConnectionRecord, EntityRecord
-from src.domain.viewpoint_binding_evaluation import BindingEvaluationInput, evaluate_derived_attributes
+from src.domain.viewpoint_binding_evaluation import evaluate_derived_attributes
 from src.domain.viewpoint_bindings import DerivedAttribute
 from src.domain.viewpoint_condition_validation import RegistrySnapshot
 from src.domain.viewpoint_criteria import AttributeCondition, EntityCriteriaGroup, ValueRef
 from src.domain.viewpoint_criteria_evaluation import evaluate_entity_criteria
-from src.domain.viewpoint_evaluation_context import EvaluationEnvironment
+from src.domain.viewpoint_evaluation_context import BindingEvaluationInput, EvaluationEnvironment
 from tests.fixtures.viewpoints.derivation_examples import catalog, financial_application
 
 

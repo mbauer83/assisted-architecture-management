@@ -8,10 +8,13 @@ import { modelServiceKey } from '../keys'
 import { useQuery } from '../composables/useQuery'
 import { usePagination } from '../composables/usePagination'
 import { useViewpointExecution } from '../composables/useViewpointExecution'
+import { useViewpointParameterPrompt } from '../composables/useViewpointParameterPrompt'
 import EntitiesTreemap from '../components/EntitiesTreemap.vue'
 import ArchimateTypeGlyph from '../components/ArchimateTypeGlyph.vue'
 import EntityGroupNavTree from '../components/EntityGroupNavTree.vue'
 import ViewpointExecutionDiagnostics from '../components/ViewpointExecutionDiagnostics.vue'
+import ViewpointExecutionError from '../components/ViewpointExecutionError.vue'
+import ViewpointParameterPrompt from '../components/ViewpointParameterPrompt.vue'
 import { computeExecutionDiagnostics, deriveLegend } from '../components/ViewpointExecutionDiagnostics.helpers'
 import { presentationFromMapping } from '../../domain/viewpointPresentationSerialization'
 import {
@@ -100,12 +103,13 @@ const loadTaxonomy = () => taxonomyState.run(
 const goToNextPage = () => { goNext(); loadCurrentPage() }
 const goToPrevPage = () => { goPrev(); loadCurrentPage() }
 
-// ── Viewpoint-driven table execution (companion plan §5.1/§5.3, WU-E9) ──────────
+// ── Viewpoint-driven table execution ────────────────────────────────────────
 // Drives this same catalog view from a fixed viewpoint population instead of the
-// domain/group/pagination browsing above — mirrors GraphExploreView's WU-E8 viewpoint mode.
+// domain/group/pagination browsing above — mirrors GraphExploreView's viewpoint mode.
 const viewpointSlug = computed(() => (route.query.viewpoint as string | undefined) ?? null)
 const viewpointDefinitions = ref<readonly ViewpointDefinitionEnvelope[]>([])
 const viewpointExecution = useViewpointExecution(svc)
+const viewpointPrompt = useViewpointParameterPrompt((resolved) => viewpointExecution.execute(resolved), viewpointDefinitions)
 
 const selectedViewpointPresentation = computed(() => {
   const envelope = viewpointDefinitions.value.find((d) => d.slug === viewpointSlug.value)
@@ -123,7 +127,7 @@ const viewpointRowGroups = computed(() => groupTableRows(
 
 const loadViewpointTable = async (slug: string) => {
   viewpointDefinitions.value = await Effect.runPromise(svc.listViewpointDefinitions()).catch(() => [])
-  await viewpointExecution.execute({ slug })
+  await viewpointPrompt.run(slug)
 }
 
 const rerunViewpointTable = () => { if (viewpointSlug.value) void loadViewpointTable(viewpointSlug.value) }
@@ -261,10 +265,18 @@ const displayCount = computed(() => {
     </div>
 
     <ViewpointExecutionDiagnostics
+      v-if="!viewpointPrompt.visible.value"
       :diagnostics="viewpointDiagnostics"
       :legend="viewpointLegend"
       :query-summary="viewpointExecution.result.value?.query_summary ?? ''"
       @rerun="rerunViewpointTable"
+    />
+
+    <ViewpointParameterPrompt
+      v-if="viewpointPrompt.visible.value"
+      :parameters="viewpointPrompt.parameters.value"
+      @submit="viewpointPrompt.submit"
+      @cancel="viewpointPrompt.cancel"
     />
 
     <div
@@ -273,12 +285,12 @@ const displayCount = computed(() => {
     >
       Loading…
     </div>
-    <div
+    <ViewpointExecutionError
       v-else-if="viewpointExecution.errorMessage.value"
-      class="state-msg state-msg--error"
-    >
-      {{ viewpointExecution.errorMessage.value }}
-    </div>
+      :typed-error="viewpointExecution.typedError.value"
+      :fallback-message="viewpointExecution.errorMessage.value"
+      @retry="rerunViewpointTable"
+    />
     <table
       v-else-if="viewpointRowGroups.length > 0"
       class="entity-table"

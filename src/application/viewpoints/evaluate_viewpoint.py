@@ -31,6 +31,7 @@ from src.domain.viewpoint_binding_evaluation import (
 )
 from src.domain.viewpoint_condition_validation import RegistrySnapshot
 from src.domain.viewpoint_criteria_evaluation import evaluate_entity_criteria
+from src.domain.viewpoint_derived_attribute_deferral import split_eager_and_deferred_derived_attributes
 from src.domain.viewpoint_projection import ViewpointProjection, drift_warnings
 from src.domain.viewpoint_summary import render_query_summary
 from src.domain.viewpoints import (
@@ -116,7 +117,7 @@ def project_viewpoint_repository(
     execution result already uses internally.
     """
     definition, _, _ = resolve_viewpoint_definition(slug, query, catalog=catalog)
-    executable_definition, scope_derived, entity_candidates, environment = _prepare_query_environment(
+    executable_definition, scope_derived, entity_candidates, environment, deferred_derived = _prepare_query_environment(
         definition, parameters, read_access, registries
     )
     return project_repository(
@@ -126,6 +127,7 @@ def project_viewpoint_repository(
         scope_filter=definition.scope if scope_derived else None,
         environment=environment,
         candidate_entity_ids=entity_candidates,
+        deferred_derived=deferred_derived,
     )
 
 
@@ -173,7 +175,7 @@ def evaluate_viewpoint(
     start = time.monotonic()
 
     definition, slug, version = resolve_viewpoint_definition(request.slug, request.query, catalog=catalog)
-    executable_definition, scope_derived, entity_candidates, environment = _prepare_query_environment(
+    executable_definition, scope_derived, entity_candidates, environment, deferred_derived = _prepare_query_environment(
         definition, request.parameters, read_access, registries
     )
 
@@ -187,6 +189,7 @@ def evaluate_viewpoint(
         scope_filter=definition.scope if scope_derived else None,
         environment=environment,
         candidate_entity_ids=entity_candidates,
+        deferred_derived=deferred_derived,
     )
 
     primary_ids = sorted(
@@ -312,10 +315,11 @@ def _prepare_query_environment(
     bindings = evaluate_bindings(
         query.bindings, parameters=bind_parameters(query, parameters, read_access), input=binding_input
     )
+    eager_derived, deferred_derived = split_eager_and_deferred_derived_attributes(query)
     environment = evaluate_derived_attributes(
-        query.derived, tuple(sorted(entity_ids)), input=binding_input, environment=bindings.environment
+        eager_derived, tuple(sorted(entity_ids)), input=binding_input, environment=bindings.environment
     )
-    return executable_definition, scope_derived, frozenset(entity_ids), environment
+    return executable_definition, scope_derived, frozenset(entity_ids), environment, deferred_derived
 
 
 def _scoped_entity_ids(read_access: RepositoryReadAccess, scope: str) -> set[str]:

@@ -82,11 +82,8 @@ def populated_root(tmp_path: Path) -> Path:
 def client(populated_root: Path):
     from starlette.testclient import TestClient
 
-    from src.infrastructure.app_bootstrap import (
-        build_runtime_catalogs,
-        get_module_registry,
-        runtime_catalogs_dependency,
-    )
+    from src.infrastructure.app_bootstrap import build_runtime_catalogs, get_module_registry
+    from src.infrastructure.gui.routers.viewpoints import fresh_viewpoints_runtime_catalogs_dependency
 
     repo = ArtifactRepository(shared_artifact_index([populated_root]))
     gui_state.init_state(repo, populated_root, None)
@@ -101,7 +98,7 @@ def client(populated_root: Path):
     catalogs = dataclasses.replace(catalogs, viewpoints=ViewpointCatalog(entries=(definition,)))
 
     app = FastAPI()
-    app.dependency_overrides[runtime_catalogs_dependency] = lambda: catalogs
+    app.dependency_overrides[fresh_viewpoints_runtime_catalogs_dependency] = lambda: catalogs
     app.include_router(viewpoints_router)
     return TestClient(app)
 
@@ -366,9 +363,9 @@ class TestExecuteDiagram:
         )
         catalogs = dataclasses.replace(catalogs, viewpoints=ViewpointCatalog(entries=(definition,)))
         app = FastAPI()
-        from src.infrastructure.app_bootstrap import runtime_catalogs_dependency
+        from src.infrastructure.gui.routers.viewpoints import fresh_viewpoints_runtime_catalogs_dependency
 
-        app.dependency_overrides[runtime_catalogs_dependency] = lambda: catalogs
+        app.dependency_overrides[fresh_viewpoints_runtime_catalogs_dependency] = lambda: catalogs
         app.include_router(viewpoints_router)
         labelled_client = TestClient(app)
 

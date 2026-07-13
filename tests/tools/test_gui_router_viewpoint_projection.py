@@ -1,6 +1,6 @@
-"""Tests for GET /api/diagrams/{id}/viewpoint-projection (companion plan §6.2): the WU-E5a
-GUI ghost/hide overlay's data source — read-only REST wrapper around
-``project_artifact_by_frontmatter``, the second consumer of the WU-E15 projection service.
+"""Tests for GET /api/diagrams/{id}/viewpoint-projection: the GUI ghost/hide overlay's data
+source — read-only REST wrapper around ``project_artifact_by_frontmatter``, the second
+consumer of the projection service.
 """
 
 from __future__ import annotations
@@ -87,11 +87,8 @@ def populated_root(tmp_path: Path) -> Path:
 def client(populated_root: Path):
     from starlette.testclient import TestClient
 
-    from src.infrastructure.app_bootstrap import (
-        build_runtime_catalogs,
-        get_module_registry,
-        runtime_catalogs_dependency,
-    )
+    from src.infrastructure.app_bootstrap import build_runtime_catalogs, get_module_registry
+    from src.infrastructure.gui.routers.viewpoints import fresh_viewpoints_runtime_catalogs_dependency
 
     repo = ArtifactRepository(shared_artifact_index([populated_root]))
     gui_state.init_state(repo, populated_root, None)
@@ -102,7 +99,7 @@ def client(populated_root: Path):
     catalogs = dataclasses.replace(catalogs, viewpoints=ViewpointCatalog(entries=(definition,)))
 
     app = FastAPI()
-    app.dependency_overrides[runtime_catalogs_dependency] = lambda: catalogs
+    app.dependency_overrides[fresh_viewpoints_runtime_catalogs_dependency] = lambda: catalogs
     app.include_router(viewpoints_router)
     return TestClient(app)
 

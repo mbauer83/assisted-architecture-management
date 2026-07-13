@@ -97,6 +97,7 @@ export interface ViewpointExecutionRequest {
   readonly slug?: string
   readonly query?: unknown
   readonly limit?: number
+  readonly parameters?: Record<string, unknown>
 }
 
 /** GUI-only ad-hoc ArchiMate-notation rendering (the ad-hoc `diagram` representation) —

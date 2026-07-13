@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from dataclasses import asdict
+from dataclasses import asdict, replace
 from typing import Annotated
 
 from fastapi import APIRouter, Body, Depends, HTTPException
@@ -27,12 +27,29 @@ from src.domain.viewpoints import TargetKind
 from src.infrastructure.app_bootstrap import runtime_catalogs_dependency
 from src.infrastructure.gui.routers import state as s
 from src.infrastructure.gui.routers._diagram_selection import resolve_diagram_selection
+from src.infrastructure.viewpoint_declarations import load_effective_viewpoint_catalog
 
 router = APIRouter()
 
 # Fixed notation for unpersisted diagram previews. Styling overlays are applied by the
 # client to the returned SVG, so this endpoint returns unstyled notation only.
 _AD_HOC_DIAGRAM_TYPE = "archimate-layered"
+
+
+def fresh_viewpoints_runtime_catalogs_dependency(
+    catalogs: RuntimeCatalogs = Depends(runtime_catalogs_dependency),
+) -> RuntimeCatalogs:
+    """The installed `RuntimeCatalogs` with only `viewpoints` reloaded for this request —
+    every execution/projection endpoint below needs this. The module registry, ontology,
+    and specialization catalogs are expensive to rebuild and change only on a real code/
+    module change (a restart is the right time to pick those up), but an engagement-repo-
+    authored viewpoint definition is ordinary data a user just wrote through the same
+    request/response cycle. Without this, a newly-created definition could never be
+    executed by slug until the process restarted — the exact staleness
+    ``viewpoint_authoring.py``'s own endpoints already avoid (see its module docstring),
+    using the same request-scoped ``load_effective_viewpoint_catalog`` rather than the
+    fixed-workspace-config resolution ``app_bootstrap._load_viewpoints`` uses at startup."""
+    return replace(catalogs, viewpoints=load_effective_viewpoint_catalog(list(s.get_repo().repo_roots)))
 
 
 def _parameter_error(exc: ViewpointParameterError) -> HTTPException:
@@ -61,7 +78,7 @@ def execute_viewpoint(
     query: Annotated[dict[str, object] | None, Body()] = None,
     limit: Annotated[int | None, Body()] = None,
     parameters: Annotated[dict[str, object] | None, Body()] = None,
-    catalogs: RuntimeCatalogs = Depends(runtime_catalogs_dependency),
+    catalogs: RuntimeCatalogs = Depends(fresh_viewpoints_runtime_catalogs_dependency),
 ) -> dict[str, object]:
     """Execute a viewpoint by ``slug`` (catalog definition) or ``query`` (ad-hoc, no
     presentation/styling/column parameters. Its response matches the MCP result."""
@@ -102,7 +119,7 @@ def execute_viewpoint_projection(
     slug: Annotated[str | None, Body()] = None,
     query: Annotated[dict[str, object] | None, Body()] = None,
     parameters: Annotated[dict[str, object] | None, Body()] = None,
-    catalogs: RuntimeCatalogs = Depends(runtime_catalogs_dependency),
+    catalogs: RuntimeCatalogs = Depends(fresh_viewpoints_runtime_catalogs_dependency),
 ) -> dict[str, object]:
     """Return GUI projection items with style tokens for the selected population."""
     if (slug is None) == (query is None):
@@ -135,7 +152,7 @@ def execute_viewpoint_diagram(
     slug: Annotated[str | None, Body()] = None,
     query: Annotated[dict[str, object] | None, Body()] = None,
     parameters: Annotated[dict[str, object] | None, Body()] = None,
-    catalogs: RuntimeCatalogs = Depends(runtime_catalogs_dependency),
+    catalogs: RuntimeCatalogs = Depends(fresh_viewpoints_runtime_catalogs_dependency),
 ) -> dict[str, object]:
     """Render an unpersisted ArchiMate diagram for the evaluated population."""
     if (slug is None) == (query is None):
@@ -192,7 +209,7 @@ def execute_viewpoint_diagram(
 @router.get("/api/diagrams/{artifact_id}/viewpoint-projection")
 def get_diagram_viewpoint_projection(
     artifact_id: str,
-    catalogs: RuntimeCatalogs = Depends(runtime_catalogs_dependency),
+    catalogs: RuntimeCatalogs = Depends(fresh_viewpoints_runtime_catalogs_dependency),
 ) -> dict[str, object]:
     """Return the optional saved viewpoint projection for one diagram or matrix."""
     repo = s.get_repo()

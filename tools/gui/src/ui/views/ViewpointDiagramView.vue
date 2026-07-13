@@ -1,10 +1,10 @@
 <script setup lang="ts">
 /**
- * Ad-hoc `diagram` execution representation (companion plan §5.1, WU-E9): renders a
+ * Ad-hoc `diagram` execution representation: renders a
  * viewpoint's repository-context population through the same rendering engine as a real
  * diagram (fixed cross-layer ArchiMate notation), never persisted as a `.puml` artifact, no
  * `ViewpointApplication`. `node_color`/`edge_color`/`edge_emphasis` are highlight overlays
- * applied client-side onto the returned SVG — the same technique WU-E5a's ghost/hide
+ * applied client-side onto the returned SVG — the same technique the ghost/hide
  * overlay uses on a real diagram, never baked into the rendered notation.
  */
 import { computed, inject, nextTick, onMounted, ref } from 'vue'
@@ -12,7 +12,11 @@ import { Effect } from 'effect'
 import { RouterLink, useRoute } from 'vue-router'
 import { modelServiceKey } from '../keys'
 import { useViewpointExecution } from '../composables/useViewpointExecution'
+import { useViewpointParameterPrompt } from '../composables/useViewpointParameterPrompt'
+import type { ResolvedViewpointExecution } from '../composables/useViewpointParameterPrompt'
 import ViewpointExecutionDiagnostics from '../components/ViewpointExecutionDiagnostics.vue'
+import ViewpointExecutionError from '../components/ViewpointExecutionError.vue'
+import ViewpointParameterPrompt from '../components/ViewpointParameterPrompt.vue'
 import { computeExecutionDiagnostics, deriveLegend } from '../components/ViewpointExecutionDiagnostics.helpers'
 import { presentationFromMapping } from '../../domain/viewpointPresentationSerialization'
 import { resolveElementMap } from '../lib/diagramViewerExtensions'
@@ -58,12 +62,11 @@ const applyOverlay = () => {
   }
 }
 
-const load = async () => {
-  definitions.value = await Effect.runPromise(svc.listViewpointDefinitions()).catch(() => [])
-  await execution.execute({ slug: slug.value })
+const runExecution = async (resolved: ResolvedViewpointExecution) => {
+  await execution.execute(resolved)
   diagramLoading.value = true
   diagramError.value = null
-  const exit = await Effect.runPromiseExit(svc.executeViewpointDiagram({ slug: slug.value }))
+  const exit = await Effect.runPromiseExit(svc.executeViewpointDiagram(resolved))
   diagramLoading.value = false
   if (exit._tag === 'Success') {
     svgMarkup.value = exit.value.svg
@@ -73,6 +76,12 @@ const load = async () => {
   }
   await nextTick()
   applyOverlay()
+}
+const prompt = useViewpointParameterPrompt(runExecution, definitions)
+
+const load = async () => {
+  definitions.value = await Effect.runPromise(svc.listViewpointDefinitions()).catch(() => [])
+  await prompt.run(slug.value)
 }
 const rerun = () => void load()
 
@@ -94,6 +103,7 @@ onMounted(() => { if (slug.value) void load() })
     </div>
 
     <ViewpointExecutionDiagnostics
+      v-if="!prompt.visible.value"
       :diagnostics="diagnostics"
       :legend="legend"
       :query-summary="execution.result.value?.query_summary ?? ''"
@@ -108,18 +118,25 @@ onMounted(() => { if (slug.value) void load() })
       {{ warning }}
     </div>
 
+    <ViewpointParameterPrompt
+      v-if="prompt.visible.value"
+      :parameters="prompt.parameters.value"
+      @submit="prompt.submit"
+      @cancel="prompt.cancel"
+    />
+
     <div
       v-if="execution.loading.value || diagramLoading"
       class="state-msg"
     >
       Rendering…
     </div>
-    <div
+    <ViewpointExecutionError
       v-else-if="execution.errorMessage.value || diagramError"
-      class="state-msg state-msg--error"
-    >
-      {{ execution.errorMessage.value || diagramError }}
-    </div>
+      :typed-error="execution.typedError.value"
+      :fallback-message="execution.errorMessage.value || diagramError || 'Execution failed'"
+      @retry="rerun"
+    />
     <div
       v-else-if="svgHtml"
       ref="svgContainer"

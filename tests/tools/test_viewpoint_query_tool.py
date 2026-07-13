@@ -153,9 +153,9 @@ class TestMcpRestParity:
         from starlette.testclient import TestClient
 
         from src.application.artifact_repository import ArtifactRepository
-        from src.infrastructure.app_bootstrap import runtime_catalogs_dependency
         from src.infrastructure.artifact_index import shared_artifact_index
         from src.infrastructure.gui.routers import state as gui_state
+        from src.infrastructure.gui.routers.viewpoints import fresh_viewpoints_runtime_catalogs_dependency
         from src.infrastructure.gui.routers.viewpoints import router as viewpoints_router
 
         entity_id = _make(repo, "application-component", "Parameterized Entity")
@@ -186,7 +186,7 @@ class TestMcpRestParity:
         gui_repo = ArtifactRepository(shared_artifact_index([repo]))
         gui_state.init_state(gui_repo, repo, None)
         app = FastAPI()
-        app.dependency_overrides[runtime_catalogs_dependency] = lambda: catalogs
+        app.dependency_overrides[fresh_viewpoints_runtime_catalogs_dependency] = lambda: catalogs
         app.include_router(viewpoints_router)
         rest_result = TestClient(app).post(
             "/api/viewpoints/execute", json={"query": query, "parameters": parameters, "limit": 500}
@@ -202,9 +202,9 @@ class TestMcpRestParity:
         from starlette.testclient import TestClient
 
         from src.application.artifact_repository import ArtifactRepository
-        from src.infrastructure.app_bootstrap import runtime_catalogs_dependency
         from src.infrastructure.artifact_index import shared_artifact_index
         from src.infrastructure.gui.routers import state as gui_state
+        from src.infrastructure.gui.routers.viewpoints import fresh_viewpoints_runtime_catalogs_dependency
         from src.infrastructure.gui.routers.viewpoints import router as viewpoints_router
 
         entity_id = _make(repo, "application-component", "Parity Entity")
@@ -224,7 +224,7 @@ class TestMcpRestParity:
         gui_repo = ArtifactRepository(shared_artifact_index([repo]))
         gui_state.init_state(gui_repo, repo, None)
         app = FastAPI()
-        app.dependency_overrides[runtime_catalogs_dependency] = lambda: patched_catalogs
+        app.dependency_overrides[fresh_viewpoints_runtime_catalogs_dependency] = lambda: patched_catalogs
         app.include_router(viewpoints_router)
         client = TestClient(app)
         rest_result = client.post("/api/viewpoints/execute", json={"slug": "parity-test", "limit": 500}).json()
