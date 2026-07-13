@@ -360,13 +360,13 @@ def test_document_router_marks_global_documents(tmp_path: Path) -> None:
 
 
 def test_entity_detail_view_supports_reference_picker_for_summary_and_notes() -> None:
-    view_path = Path("tools/gui/src/ui/views/EntityDetailView.vue")
-    content = view_path.read_text(encoding="utf-8")
+    view_content = Path("tools/gui/src/ui/views/EntityDetailView.vue").read_text(encoding="utf-8")
+    edit_form_content = Path("tools/gui/src/ui/components/EntityEditFormCard.vue").read_text(encoding="utf-8")
 
-    assert "ArtifactReferenceInput" in content
-    assert "openReferencePicker('summary')" in content
-    assert "openReferencePicker('notes')" in content
-    assert "addToast('Entity saved')" in content
+    assert "ArtifactReferenceInput" in view_content
+    assert "addToast('Entity saved')" in view_content
+    assert "open-reference-picker', 'summary'" in edit_form_content
+    assert "open-reference-picker', 'notes'" in edit_form_content
 
 
 def test_document_detail_view_keeps_reference_insert_near_editor_and_confirms_save() -> None:
@@ -379,11 +379,11 @@ def test_document_detail_view_keeps_reference_insert_near_editor_and_confirms_sa
 
 
 def test_edit_diagram_view_shows_header_save_actions_and_confirms_save() -> None:
-    view_path = Path("tools/gui/src/ui/views/EditDiagramView.vue")
-    content = view_path.read_text(encoding="utf-8")
+    view_content = Path("tools/gui/src/ui/views/EditDiagramView.vue").read_text(encoding="utf-8")
+    header_content = Path("tools/gui/src/ui/components/DiagramEditHeader.vue").read_text(encoding="utf-8")
 
-    assert 'class="hdr-actions"' in content
-    assert "addToast('Diagram saved')" in content
+    assert 'class="hdr-actions"' in header_content
+    assert "addToast('Diagram saved')" in view_content
 
 
 def test_promote_view_supports_document_and_diagram_promotion() -> None:
@@ -398,14 +398,14 @@ def test_promote_view_supports_document_and_diagram_promotion() -> None:
 
 
 def test_diagram_detail_view_queues_connection_matches_and_promote_button() -> None:
-    view_path = Path("tools/gui/src/ui/views/DiagramDetailView.vue")
-    content = view_path.read_text(encoding="utf-8")
+    selection_content = Path("tools/gui/src/ui/composables/useDiagramSvgSelection.ts").read_text(encoding="utf-8")
+    header_content = Path("tools/gui/src/ui/components/DiagramDetailHeader.vue").read_text(encoding="utf-8")
 
     # Connection matching is delegated to the viewer-extension contract (mapElements), which
     # itself calls buildConnectionAliasMap/resolveConnection — see graphvizElementMapping.ts.
-    assert "resolveElementMap" in content
-    assert "selectedConnectionGroup" in content
-    assert "query: { diagram_id: diagramId }" in content
+    assert "resolveElementMap" in selection_content
+    assert "selectedConnectionGroup" in selection_content
+    assert "query: { diagram_id: diagramId }" in header_content
 
 
 def test_graphviz_element_mapping_matches_connections_via_alias_helpers() -> None:
