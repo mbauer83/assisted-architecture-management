@@ -1,4 +1,4 @@
-"""Shared context types for the pure criteria evaluator (companion plan §3.4): the
+"""Shared context types for the pure criteria evaluator: the
 read-access surface it needs for adjacency/endpoint lookups, and the outcome shape every
 evaluation function returns.
 
@@ -13,7 +13,8 @@ normalization lives in ``viewpoint_criteria_evaluation.py``), so callers only ev
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from collections.abc import Mapping
+from dataclasses import dataclass, field
 from typing import Literal, Protocol
 
 from src.domain.artifact_types import ConnectionRecord, EntityRecord
@@ -21,6 +22,8 @@ from src.domain.artifact_types import ConnectionRecord, EntityRecord
 
 class CriteriaReadAccess(Protocol):
     def get_entity(self, artifact_id: str) -> EntityRecord | None: ...
+
+    def get_connection(self, artifact_id: str) -> ConnectionRecord | None: ...
 
     def find_connections_for(
         self,
@@ -40,3 +43,12 @@ class EvaluationOutcome:
 
     matched: bool
     schema_drift: frozenset[str] = frozenset()
+
+
+@dataclass(frozen=True)
+class EvaluationEnvironment:
+    """Execution-local values made available to criteria evaluation."""
+
+    bindings: Mapping[str, object] = field(default_factory=dict)
+    parameters: Mapping[str, object] = field(default_factory=dict)
+    derived_values: Mapping[tuple[str, str], object] = field(default_factory=dict)

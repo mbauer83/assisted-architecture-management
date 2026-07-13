@@ -1,7 +1,6 @@
-"""Unit tests for leaf ``AttributeCondition`` evaluation (companion plan §3.4): the
+"""Unit tests for leaf ``AttributeCondition`` evaluation: the
 per-comparator × presence semantics table, ``negate`` complement, ``ValueRef`` resolution,
-no-coercion behavior, and schema-drift detection. Appendix-C "Criteria evaluator" cluster
-(leaf portion) — group/tree recursion and ``IncidentConnectionCondition`` live in
+no-coercion behavior, and schema-drift detection. Group/tree recursion and ``IncidentConnectionCondition`` live in
 ``test_viewpoint_criteria_evaluation.py``; population widening/connection selection in
 ``test_viewpoint_population_evaluation.py``.
 """

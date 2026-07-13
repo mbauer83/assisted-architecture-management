@@ -1,4 +1,4 @@
-"""Leaf-level evaluation for one ``AttributeCondition`` (companion plan §3.4): resolves the
+"""Leaf-level evaluation for one ``AttributeCondition``: resolves the
 condition's attribute and comparison value against a live entity/connection record, then
 applies the normative per-comparator × presence semantics table. No coercion — types are
 compared as parsed (validation gates comparator/type mismatches at save time); a
@@ -10,6 +10,7 @@ execution.
 from __future__ import annotations
 
 from collections.abc import Mapping
+from typing import cast
 
 from src.domain.artifact_types import ConnectionRecord, EntityRecord
 from src.domain.viewpoint_condition_validation import (
@@ -23,7 +24,7 @@ from src.domain.viewpoint_criteria import (
     AttributeCondition,
     ValueRef,
 )
-from src.domain.viewpoint_evaluation_context import CriteriaReadAccess, EvaluationOutcome
+from src.domain.viewpoint_evaluation_context import CriteriaReadAccess, EvaluationEnvironment, EvaluationOutcome
 
 Record = EntityRecord | ConnectionRecord
 
@@ -75,12 +76,19 @@ def _reserved_connection_field(record: ConnectionRecord, head: str) -> tuple[obj
     raise AssertionError(f"unhandled reserved connection path {head!r}")
 
 
-def read_attribute_value(record: Record, attribute: str, *, context: CriteriaContext) -> tuple[object, bool]:
+def read_attribute_value(
+    record: Record, attribute: str, *, context: CriteriaContext, environment: EvaluationEnvironment | None = None
+) -> tuple[object, bool]:
     """Read a dotted attribute path off a record: reserved fields first, then ``extra``.
     Returns ``(value, present)`` — shared by condition evaluation and style-rule range
     lookups (``viewpoint_style_evaluation.py``), so both read attributes identically.
     """
     head, _, rest = attribute.partition(".")
+    if head == "derived":
+        if not isinstance(record, EntityRecord) or not rest or environment is None:
+            return None, False
+        key = (record.artifact_id, rest)
+        return (environment.derived_values[key], True) if key in environment.derived_values else (None, False)
     reserved = RESERVED_ENTITY_PATHS if context == "entity" else RESERVED_CONNECTION_PATHS
     if head in reserved:
         if context == "entity":
@@ -121,6 +129,7 @@ def _resolve_value(
     read_access: CriteriaReadAccess,
     registries: RegistrySnapshot,
     connection: ConnectionRecord | None,
+    environment: EvaluationEnvironment,
 ) -> tuple[object, frozenset[str], bool]:
     if value.kind == "literal":
         return value.literal, frozenset(), True
@@ -136,10 +145,59 @@ def _resolve_value(
         return _resolve_attribute_ref(
             value.attribute or "", record=endpoint_entity, context="entity", registries=registries
         )
+    if value.kind == "parameter":
+        name = value.parameter or ""
+        if name in environment.parameters:
+            return environment.parameters[name], frozenset(), True
+        return None, frozenset(), False
+    if value.kind == "binding":
+        name = value.binding or ""
+        if name not in environment.bindings:
+            return None, frozenset(), False
+        resolved = environment.bindings[name]
+        if value.project is not None:
+            resolved = _project_binding(resolved, value.project, context, environment)
+        if value.aggregate is not None:
+            resolved = _aggregate(resolved, value.aggregate)
+        return (resolved, frozenset(), resolved is not None)
     raise AssertionError(f"unhandled value ref kind {value.kind!r}")
 
 
-def _compare(comparator: str, actual: object, expected: object) -> bool:
+def _project_binding(
+    value: object, attribute: str, context: CriteriaContext, environment: EvaluationEnvironment
+) -> object:
+    items = value if isinstance(value, tuple) else (value,)
+    projected = tuple(
+        found
+        for item in items
+        if isinstance(item, (EntityRecord, ConnectionRecord))
+        for found, present in (read_attribute_value(item, attribute, context=context, environment=environment),)
+        if present
+    )
+    return projected if isinstance(value, tuple) else (projected[0] if projected else None)
+
+
+def _aggregate(value: object, aggregate: str) -> object:
+    items = value if isinstance(value, tuple) else (value,)
+    values = tuple(item for item in items if item is not None)
+    if aggregate == "count":
+        return len(values)
+    if aggregate == "sum":
+        return sum(cast(tuple[int | float, ...], values)) if values else 0
+    if aggregate == "avg":
+        return sum(cast(tuple[int | float, ...], values)) / len(values) if values else None
+    if aggregate == "min":
+        return min(cast(tuple[str | int | float, ...], values)) if values else None
+    if aggregate == "max":
+        return max(cast(tuple[str | int | float, ...], values)) if values else None
+    raise AssertionError(f"unhandled aggregate {aggregate!r}")
+
+
+def _compare(comparator: str, actual: object, expected: object, quantifier: str | None = None) -> bool:
+    if quantifier is not None:
+        values = expected if isinstance(expected, tuple) else ()
+        matches = tuple(_compare(comparator, actual, value) for value in values)
+        return any(matches) if quantifier == "any" else all(matches)
     if comparator == "eq":
         if isinstance(actual, (list, tuple)):
             return any(element == expected for element in actual)
@@ -167,14 +225,20 @@ def evaluate_attribute_condition(
     read_access: CriteriaReadAccess,
     registries: RegistrySnapshot,
     connection: ConnectionRecord | None,
+    environment: EvaluationEnvironment = EvaluationEnvironment(),
 ) -> EvaluationOutcome:
-    declared = resolve_attribute_path(condition.attribute, context=context, registries=registries)
+    derived_path = condition.attribute.startswith("derived.") and isinstance(record, EntityRecord)
+    declared = (
+        "derived"
+        if derived_path
+        else resolve_attribute_path(condition.attribute, context=context, registries=registries)
+    )
     drift: frozenset[str] = frozenset()
     if declared is None:
         drift = frozenset({condition.attribute})
         actual, present = None, False
     else:
-        actual, present = read_attribute_value(record, condition.attribute, context=context)
+        actual, present = read_attribute_value(record, condition.attribute, context=context, environment=environment)
 
     if condition.comparator == "exists":
         matched = present
@@ -190,9 +254,10 @@ def evaluate_attribute_condition(
             read_access=read_access,
             registries=registries,
             connection=connection,
+            environment=environment,
         )
         drift = drift | ref_drift
-        matched = resolved and _compare(condition.comparator, actual, expected)
+        matched = resolved and _compare(condition.comparator, actual, expected, condition.value.quantifier)
 
     if condition.negate:
         matched = not matched

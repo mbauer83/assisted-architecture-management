@@ -319,7 +319,7 @@ the binding layer, and G1 waits on neither derivation nor presentation work.
     test updated (stability); every new error carries resolvable path + expected/found.
   - Deps: C2.
 
-- [ ] **WU-C4 — Evaluation: bindings pipeline, ValueRef resolution, derived attributes**
+- [x] **WU-C4 — Evaluation: bindings pipeline, ValueRef resolution, derived attributes**
   - Files: new `src/domain/viewpoint_binding_evaluation.py`;
     `viewpoint_condition_evaluation.py` (`_resolve_value` gains binding/parameter kinds +
     quantifier application), `viewpoint_criteria_evaluation.py` (threading an immutable
@@ -889,3 +889,4 @@ Anything short of this is "in progress", regardless of how many WUs are ticked.
 - 2026-07-13 — WU-C1 — Canonical result types and conservative inference cover cardinality, projections, aggregates, and tuple compatibility.
 - 2026-07-13 — WU-C2 — Bindings, parameters, derived attributes, and ValueRefs now parse and serialize declaratively; the pre-release query language is explicitly schema 1 only, with all persisted examples and GUI fixtures migrated.
 - 2026-07-13 — WU-C3 — Typed declarations and ValueRefs validate across query and presentation criteria with stable paths, mode-aware caps, and declared-type checks.
+- 2026-07-13 — WU-C4 — Pure binding execution, runtime cardinality checks, ValueRef environments, and direct derived attributes are deterministic and covered.

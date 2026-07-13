@@ -1,5 +1,5 @@
-"""Tree-recursive evaluation over ``EntityCriteriaGroup``/``ConnectionCriteriaGroup``
-(companion plan §3.4): the pure entry points ``evaluate_entity_criteria``/
+"""Tree-recursive evaluation over ``EntityCriteriaGroup``/``ConnectionCriteriaGroup``:
+the pure entry points ``evaluate_entity_criteria``/
 ``evaluate_connection_criteria`` that ``NeighborInclusion``/``ConnectionSelection``
 resolution (``viewpoint_population_evaluation.py``) and the eventual execution use case
 build on. Leaf conditions delegate to ``viewpoint_condition_evaluation.py``.
@@ -19,7 +19,7 @@ from src.domain.viewpoint_criteria import (
     IncidentConnectionCondition,
     IncidentDirection,
 )
-from src.domain.viewpoint_evaluation_context import CriteriaReadAccess, EvaluationOutcome
+from src.domain.viewpoint_evaluation_context import CriteriaReadAccess, EvaluationEnvironment, EvaluationOutcome
 
 
 def direction_matches(
@@ -46,24 +46,41 @@ def _combine(outcomes: tuple[EvaluationOutcome, ...], *, conjunction: str, negat
 
 
 def evaluate_entity_criteria(
-    group: EntityCriteriaGroup, entity: EntityRecord, *, read_access: CriteriaReadAccess, registries: RegistrySnapshot
+    group: EntityCriteriaGroup,
+    entity: EntityRecord,
+    *,
+    read_access: CriteriaReadAccess,
+    registries: RegistrySnapshot,
+    environment: EvaluationEnvironment = EvaluationEnvironment(),
 ) -> EvaluationOutcome:
     outcomes = tuple(
-        _evaluate_entity_node(child, entity, read_access=read_access, registries=registries) for child in group.children
+        _evaluate_entity_node(child, entity, read_access, registries, environment) for child in group.children
     )
     return _combine(outcomes, conjunction=group.conjunction, negate=group.negate)
 
 
 def _evaluate_entity_node(
-    node: EntityCriteriaNode, entity: EntityRecord, *, read_access: CriteriaReadAccess, registries: RegistrySnapshot
+    node: EntityCriteriaNode,
+    entity: EntityRecord,
+    read_access: CriteriaReadAccess,
+    registries: RegistrySnapshot,
+    environment: EvaluationEnvironment,
 ) -> EvaluationOutcome:
     if isinstance(node, EntityCriteriaGroup):
-        return evaluate_entity_criteria(node, entity, read_access=read_access, registries=registries)
+        return evaluate_entity_criteria(
+            node, entity, read_access=read_access, registries=registries, environment=environment
+        )
     if isinstance(node, IncidentConnectionCondition):
-        return _evaluate_incident(node, entity, read_access=read_access, registries=registries)
+        return _evaluate_incident(node, entity, read_access=read_access, registries=registries, environment=environment)
     if isinstance(node, AttributeCondition):
         return evaluate_attribute_condition(
-            node, record=entity, context="entity", read_access=read_access, registries=registries, connection=None
+            node,
+            record=entity,
+            context="entity",
+            read_access=read_access,
+            registries=registries,
+            connection=None,
+            environment=environment,
         )
     raise AssertionError(f"unhandled entity criteria node {node!r}")
 
@@ -74,9 +91,12 @@ def evaluate_connection_criteria(
     *,
     read_access: CriteriaReadAccess,
     registries: RegistrySnapshot,
+    environment: EvaluationEnvironment = EvaluationEnvironment(),
 ) -> EvaluationOutcome:
     outcomes = tuple(
-        _evaluate_connection_node(child, connection, read_access=read_access, registries=registries)
+        _evaluate_connection_node(
+            child, connection, read_access=read_access, registries=registries, environment=environment
+        )
         for child in group.children
     )
     return _combine(outcomes, conjunction=group.conjunction, negate=group.negate)
@@ -88,9 +108,12 @@ def _evaluate_connection_node(
     *,
     read_access: CriteriaReadAccess,
     registries: RegistrySnapshot,
+    environment: EvaluationEnvironment,
 ) -> EvaluationOutcome:
     if isinstance(node, ConnectionCriteriaGroup):
-        return evaluate_connection_criteria(node, connection, read_access=read_access, registries=registries)
+        return evaluate_connection_criteria(
+            node, connection, read_access=read_access, registries=registries, environment=environment
+        )
     if isinstance(node, AttributeCondition):
         return evaluate_attribute_condition(
             node,
@@ -99,6 +122,7 @@ def _evaluate_connection_node(
             read_access=read_access,
             registries=registries,
             connection=connection,
+            environment=environment,
         )
     raise AssertionError(f"unhandled connection criteria node {node!r}")
 
@@ -109,13 +133,18 @@ def _evaluate_incident(
     *,
     read_access: CriteriaReadAccess,
     registries: RegistrySnapshot,
+    environment: EvaluationEnvironment,
 ) -> EvaluationOutcome:
     drift: set[str] = set()
     any_match = False
     for connection in read_access.find_connections_for(entity.artifact_id, direction="any"):
         if condition.connection_criteria is not None:
             outcome = evaluate_connection_criteria(
-                condition.connection_criteria, connection, read_access=read_access, registries=registries
+                condition.connection_criteria,
+                connection,
+                read_access=read_access,
+                registries=registries,
+                environment=environment,
             )
             drift |= outcome.schema_drift
             if not outcome.matched:
@@ -128,7 +157,11 @@ def _evaluate_incident(
             continue  # dangling endpoint never matches
         if condition.endpoint_criteria is not None:
             outcome = evaluate_entity_criteria(
-                condition.endpoint_criteria, other_entity, read_access=read_access, registries=registries
+                condition.endpoint_criteria,
+                other_entity,
+                read_access=read_access,
+                registries=registries,
+                environment=environment,
             )
             drift |= outcome.schema_drift
             if not outcome.matched:

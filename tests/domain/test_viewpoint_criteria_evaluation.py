@@ -1,8 +1,7 @@
-"""Unit tests for tree-recursive criteria evaluation (companion plan §3.4): group
+"""Unit tests for tree-recursive criteria evaluation: group
 conjunction/negate semantics, empty-group behavior, and ``IncidentConnectionCondition``
 (direction, connection/endpoint narrowing, recursion, negate, dangling endpoints, symmetric
-normalization). Appendix-C "Criteria evaluator" cluster (tree/incident portion) — leaf
-comparator semantics live in ``test_viewpoint_condition_evaluation.py``.
+normalization). Leaf comparator semantics live in ``test_viewpoint_condition_evaluation.py``.
 """
 
 from __future__ import annotations
