@@ -1,4 +1,4 @@
-"""``ViewpointExecutionResult`` (companion plan §7.1): the ephemeral, never-persisted DTO
+"""``ViewpointExecutionResult``: the ephemeral, never-persisted DTO
 ``EvaluateViewpoint`` returns. Identical shape for REST and both MCP tools — one contract,
 no per-transport reshaping.
 """
@@ -13,7 +13,7 @@ Membership = Literal["primary", "expanded"]
 
 @dataclass(frozen=True)
 class EntityItemSummary:
-    """Fixed, non-customizable per-entity summary (§7.1 "Content")."""
+    """Fixed, non-customizable per-entity summary."""
 
     id: str
     name: str
@@ -25,17 +25,20 @@ class EntityItemSummary:
 
 @dataclass(frozen=True)
 class ConnectionItemSummary:
-    """Fixed, non-customizable per-connection summary (§7.1 "Content")."""
+    """Fixed, non-customizable per-connection summary."""
 
     id: str
     type: str
     source: str
     target: str
+    certainty: Literal["certain", "potential"] | None = None
+    hops: int | None = None
+    via_connection_ids: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)
 class MatrixAxisIds:
-    """Present iff the executed definition's presentation is a criteria-axes matrix (§5.4).
+    """Present iff the executed definition's presentation is a criteria-axes matrix.
     Sorted subsets of the result's returned entity ids; unrendered entities are the
     complement, derivable, so not duplicated here."""
 

@@ -1,6 +1,6 @@
-"""``EvaluateViewpoint`` (companion plan §7): the one use case that resolves a viewpoint
-(by slug, or an ad-hoc query) and executes it against the live model, wrapping the WU-E15
-repository projection in the §7.1 execution result. REST and both MCP tools (WU-E7a) call
+"""``EvaluateViewpoint``: the one use case that resolves a viewpoint
+(by slug, or an ad-hoc query) and executes it against the live model, wrapping repository
+projection in the execution result. REST and both MCP tools call
 this — none re-implement evaluation.
 """
 
@@ -59,7 +59,7 @@ class ViewpointExecutionTimeoutError(RuntimeError):
 @dataclass(frozen=True)
 class ViewpointExecutionRequest:
     """Exactly one of ``slug``/``query`` is set: a catalog definition, or an ad-hoc query
-    with no identity/provenance. ``limit`` is entity-denominated (§7.1); ``None`` defers to
+    with no identity/provenance. ``limit`` is entity-denominated; ``None`` defers to
     the caller-supplied default."""
 
     slug: str | None = None
@@ -99,9 +99,9 @@ def project_viewpoint_repository(
     read_access: RepositoryReadAccess,
     registries: RegistrySnapshot,
 ) -> ViewpointProjection:
-    """GUI-only repository-context ``ViewpointProjection`` (companion plan §6.1) carrying
+    """GUI-only repository-context ``ViewpointProjection`` carrying
     per-item style tokens — the styled sibling of ``evaluate_viewpoint``'s deliberately
-    unstyled §7.1 execution result. Never called by MCP: the D15 boundary (§2) keeps
+    unstyled execution result. Never called by MCP: the boundary keeps
     style tokens out of the MCP/REST-shared execution-result contract, so this is a
     separate GUI-only entry point over the same ``project_repository`` service the
     execution result already uses internally.
@@ -179,7 +179,7 @@ def evaluate_viewpoint(
         item.item_id for item in projection.items if item.item_kind == "entity" and item.membership == "expanded"
     )
     total_entity_count = len(primary_ids) + len(expanded_ids)
-    # Primary-before-expanded retention order (§7.1): context neighbors drop first.
+    # Primary-before-expanded retention order: context neighbors drop first.
     retained_id_set = frozenset((primary_ids + expanded_ids)[:limit])
     membership_by_id: dict[str, Membership] = {entity_id: "primary" for entity_id in primary_ids}
     membership_by_id.update({entity_id: "expanded" for entity_id in expanded_ids})
@@ -208,11 +208,22 @@ def evaluate_viewpoint(
     connection_summaries: list[ConnectionItemSummary] = []
     for item in connection_items:
         connection = read_access.get_connection(item.item_id)
-        if connection is None or connection.source not in retained_id_set or connection.target not in retained_id_set:
+        source = connection.source if connection is not None else item.source_id
+        target = connection.target if connection is not None else item.target_id
+        connection_type = connection.conn_type if connection is not None else item.connection_type
+        if source is None or target is None or connection_type is None:
+            continue
+        if source not in retained_id_set or target not in retained_id_set:
             continue
         connection_summaries.append(
             ConnectionItemSummary(
-                id=connection.artifact_id, type=connection.conn_type, source=connection.source, target=connection.target
+                id=item.item_id,
+                type=connection_type,
+                source=source,
+                target=target,
+                certainty=item.certainty,
+                hops=item.hops,
+                via_connection_ids=item.via_connection_ids,
             )
         )
     connection_summaries.sort(key=lambda summary: summary.id)

@@ -11,10 +11,16 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 
 from src.domain.artifact_types import ConnectionRecord
-from src.domain.relationship_reachability import DerivationBounds, RelationshipDerivationRequest, derive_relationships
+from src.domain.relationship_reachability import (
+    DerivationBounds,
+    DerivedRelationship,
+    RelationshipDerivationRequest,
+    derive_relationships,
+)
 from src.domain.viewpoint_condition_validation import RegistrySnapshot
 from src.domain.viewpoint_criteria import ConnectionSelection, NeighborInclusion
 from src.domain.viewpoint_criteria_evaluation import (
+    _derived_matches,
     direction_matches,
     evaluate_connection_criteria,
     evaluate_entity_criteria,
@@ -35,6 +41,7 @@ class NeighborInclusionResult:
 @dataclass(frozen=True)
 class ConnectionSelectionResult:
     connections: tuple[ConnectionRecord, ...]
+    derived_connections: tuple[DerivedRelationship, ...] = ()
     schema_drift: frozenset[str] = frozenset()
 
 
@@ -178,24 +185,63 @@ def _select(
 ) -> ConnectionSelectionResult:
     seen: dict[str, ConnectionRecord] = {}
     drift: set[str] = set()
-    for entity_id in scan_ids:
-        for connection in read_access.find_connections_for(entity_id, direction="any"):
-            if connection.artifact_id in seen:
-                continue
-            if bridging is None:
-                structurally_included = connection.source in scan_ids and connection.target in scan_ids
-            else:
-                rows, columns = bridging
-                structurally_included = (connection.source in rows and connection.target in columns) or (
-                    connection.source in columns and connection.target in rows
+    if selection.traversal in {"direct", "both"}:
+        for entity_id in scan_ids:
+            for connection in read_access.find_connections_for(entity_id, direction="any"):
+                if connection.artifact_id in seen:
+                    continue
+                if bridging is None:
+                    structurally_included = connection.source in scan_ids and connection.target in scan_ids
+                else:
+                    rows, columns = bridging
+                    structurally_included = (connection.source in rows and connection.target in columns) or (
+                        connection.source in columns and connection.target in rows
+                    )
+                if not structurally_included:
+                    continue
+                outcome = evaluate_connection_criteria(
+                    selection.criteria, connection, read_access=read_access, registries=registries
                 )
-            if not structurally_included:
-                continue
-            outcome = evaluate_connection_criteria(
-                selection.criteria, connection, read_access=read_access, registries=registries
-            )
-            drift |= outcome.schema_drift
-            if outcome.matched:
-                seen[connection.artifact_id] = connection
+                drift |= outcome.schema_drift
+                if outcome.matched:
+                    seen[connection.artifact_id] = connection
     ordered = tuple(sorted(seen.values(), key=lambda connection: connection.artifact_id))
-    return ConnectionSelectionResult(ordered, frozenset(drift))
+    derived = _select_derived(scan_ids, selection, read_access, registries, bridging)
+    return ConnectionSelectionResult(ordered, derived, frozenset(drift))
+
+
+def _select_derived(
+    scan_ids: frozenset[str],
+    selection: ConnectionSelection,
+    read_access: CriteriaReadAccess,
+    registries: RegistrySnapshot,
+    bridging: tuple[frozenset[str], frozenset[str]] | None,
+) -> tuple[DerivedRelationship, ...]:
+    if selection.traversal not in {"derived", "both"} or registries.derivation_catalog is None:
+        return ()
+    relationships = derive_relationships(
+        RelationshipDerivationRequest(
+            scan_ids,
+            "either",
+            "include_potential" if selection.include_potential else "certain_only",
+            DerivationBounds(
+                selection.max_hops or registries.derivation_max_hops, registries.derivation_max_relationships
+            ),
+        ),
+        read_access=read_access,
+        registries=registries.derivation_catalog,
+    ).relationships
+    included: list[DerivedRelationship] = []
+    for relationship in relationships:
+        if bridging is None:
+            structural = relationship.source_id in scan_ids and relationship.target_id in scan_ids
+        else:
+            rows, columns = bridging
+            structural = (relationship.source_id in rows and relationship.target_id in columns) or (
+                relationship.source_id in columns and relationship.target_id in rows
+            )
+        if structural and _derived_matches(
+            selection.criteria, relationship.connection_type, relationship.certainty, relationship.hops
+        ):
+            included.append(relationship)
+    return tuple(sorted(included, key=lambda relationship: relationship.artifact_id))

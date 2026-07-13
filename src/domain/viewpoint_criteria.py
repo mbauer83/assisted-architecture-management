@@ -111,6 +111,9 @@ class ConnectionSelection:
 
     enabled: bool = True
     criteria: ConnectionCriteriaGroup = ConnectionCriteriaGroup()
+    traversal: Literal["direct", "derived", "both"] = "direct"
+    include_potential: bool = False
+    max_hops: int | None = None
 
 
 @dataclass(frozen=True)

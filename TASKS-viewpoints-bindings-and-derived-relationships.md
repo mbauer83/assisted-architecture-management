@@ -394,7 +394,7 @@ the binding layer, and G1 waits on neither derivation nor presentation work.
     minimal hop count; direct-traversal derived attributes unaffected (regression).
   - Deps: C4, D1a.
 
-- [ ] **WU-D2 — Connection selection, matrix bridging, provenance fields**
+- [x] **WU-D2 — Connection selection, matrix bridging, provenance fields**
   - Files: `viewpoint_criteria.py` (`ConnectionSelection.traversal`),
     `viewpoint_population_evaluation.py` (`select_connections`/
     `select_matrix_connections` derived/both branches),
@@ -901,3 +901,4 @@ Anything short of this is "in progress", regardless of how many WUs are ticked.
 - 2026-07-13 — WU-C5 — Shared summaries now describe parameters, bindings, ValueRef forms, and derived attributes for every surface.
 - 2026-07-13 — WU-D1a — Derived incident and neighbor traversal use bounded relationship derivation with declarative grammar, validation, and direct-mode regressions.
 - 2026-07-13 — WU-D1b — Relationship-derived attributes now reduce bounded witnesses, including minimum hop counts, without changing direct attributes.
+- 2026-07-13 — WU-D2 — Derived connections remain ephemeral while selection, matrices, projection, and execution summaries retain deterministic witness provenance.

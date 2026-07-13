@@ -7,7 +7,7 @@ shorthand (plain scalar/list) or a ``{from: self|source|target, attribute: ...}`
 from __future__ import annotations
 
 from collections.abc import Mapping
-from typing import cast
+from typing import Literal, cast
 
 from src.domain.viewpoint_criteria import (
     VALID_COMPARATORS,
@@ -46,7 +46,7 @@ _VALUE_REF_KEYS = frozenset({"from", "attribute", "name", "project", "aggregate"
 _NEIGHBOR_INCLUSION_KEYS = frozenset(
     {"connection_criteria", "direction", "neighbor_criteria", "traversal", "include_potential", "max_hops"}
 )
-_CONNECTION_SELECTION_KEYS = frozenset({"enabled", "criteria"})
+_CONNECTION_SELECTION_KEYS = frozenset({"enabled", "criteria", "traversal", "include_potential", "max_hops"})
 
 
 def _check_keys(raw: Mapping[str, object], allowed: frozenset[str], *, label: str) -> None:
@@ -88,6 +88,12 @@ def _optional_hops(raw: object) -> int | None:
     if not isinstance(raw, int) or isinstance(raw, bool) or raw < 2:
         raise ValueError("max_hops must be an integer of at least 2")
     return raw
+
+
+def _require_connection_traversal(value: object) -> Literal["direct", "derived", "both"]:
+    if value not in {"direct", "derived", "both"}:
+        raise ValueError("connection traversal must be direct, derived, or both")
+    return cast(Literal["direct", "derived", "both"], value)
 
 
 def _value_ref_from_raw(raw: object) -> ValueRef:
@@ -239,4 +245,7 @@ def parse_connection_selection(raw: object) -> ConnectionSelection:
         criteria=parse_connection_criteria_group(criteria_raw)
         if criteria_raw is not None
         else ConnectionCriteriaGroup(),
+        traversal=_require_connection_traversal(raw.get("traversal", "direct")),
+        include_potential=bool(raw.get("include_potential", False)),
+        max_hops=_optional_hops(raw.get("max_hops")),
     )

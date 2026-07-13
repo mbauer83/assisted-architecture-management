@@ -1,5 +1,5 @@
 """The viewpoint projection: the unifying contract between repository execution, the
-verifier's artifact-local checks, and the GUI's ghost/hide overlay (companion plan §6).
+verifier's artifact-local checks, and the GUI's ghost/hide overlay.
 
 Deliberately parallel to ``view_projection.py``'s opacity contract — same philosophy
 (opaque display tokens, generic code never interprets them), different concern (derivation
@@ -39,6 +39,12 @@ class ProjectedOccurrence:
     membership: Membership = "primary"  # connections are always "primary"
     reasons: tuple[ExclusionReason, ...] = ()  # empty iff the item fully matches
     style: Mapping[str, str] = field(default_factory=dict)  # capability -> opaque token
+    connection_type: str | None = None
+    source_id: str | None = None
+    target_id: str | None = None
+    certainty: Literal["certain", "potential"] | None = None
+    hops: int | None = None
+    via_connection_ids: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -50,6 +56,6 @@ class ViewpointProjection:
 
 
 def drift_warnings(drift: frozenset[str]) -> tuple[str, ...]:
-    """One human-readable warning per schema-drifted attribute path (§3.4: "degraded loudly,
+    """One human-readable warning per schema-drifted attribute path (degraded loudly,
     never silently"), sorted for deterministic output."""
     return tuple(f"schema drift: attribute '{attribute}' is no longer resolvable" for attribute in sorted(drift))

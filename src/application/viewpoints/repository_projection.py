@@ -1,6 +1,6 @@
-"""Repository-context projection (companion plan §6.1): evaluate a definition's query
+"""Repository-context projection: evaluate a definition's query
 against the whole repo-scope-admitted population and produce a ``ViewpointProjection``
-containing only matches, all visible, styled. Feeds the WU-E7 execution result and the
+containing only matches, all visible, styled. Feeds the execution result and the
 table/matrix/exploration/diagram representations.
 """
 
@@ -85,7 +85,29 @@ def project_repository(
         )
         drift |= style_drift
         items.append(
-            ProjectedOccurrence(item_id=connection.artifact_id, item_kind="connection", state="visible", style=style)
+            ProjectedOccurrence(
+                item_id=connection.artifact_id,
+                item_kind="connection",
+                state="visible",
+                style=style,
+                connection_type=connection.conn_type,
+                source_id=connection.source,
+                target_id=connection.target,
+            )
+        )
+    for connection in connections_result.derived_connections:
+        items.append(
+            ProjectedOccurrence(
+                item_id=connection.artifact_id,
+                item_kind="connection",
+                state="visible",
+                connection_type=connection.connection_type,
+                source_id=connection.source_id,
+                target_id=connection.target_id,
+                certainty=connection.certainty,
+                hops=connection.hops,
+                via_connection_ids=connection.via_connection_ids,
+            )
         )
 
     return ViewpointProjection(target="repository", items=tuple(items), warnings=drift_warnings(frozenset(drift)))

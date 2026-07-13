@@ -256,6 +256,18 @@ def validate_neighbor_inclusion(
 def validate_connection_selection(
     selection: ConnectionSelection, *, path: str, registries: RegistrySnapshot, check_ergonomics: bool
 ) -> list[ViewpointValidationIssue]:
+    if selection.traversal != "direct":
+        issues = _validate_derived_paths(selection.criteria, path=f"{path}/criteria")
+        if selection.max_hops is not None and selection.max_hops < 2:
+            issues.append(
+                issue(
+                    "error",
+                    "derivation-hops-exceeded",
+                    f"{path}/max_hops",
+                    "derived traversal needs at least two hops",
+                )
+            )
+        return issues
     issues = validate_connection_criteria(
         selection.criteria,
         path=f"{path}/criteria",

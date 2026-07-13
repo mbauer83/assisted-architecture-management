@@ -1,7 +1,6 @@
-"""Unit tests for population-level evaluation (companion plan §4.1, §3.1, §5.4):
+"""Unit tests for population-level evaluation:
 ``NeighborInclusion`` widening and ``ConnectionSelection``/matrix-bridging connection
-selection. Appendix-C "NeighborInclusion" and "Connection inclusion & matrix (evaluator
-half)" clusters.
+selection.
 """
 
 from __future__ import annotations
@@ -24,6 +23,7 @@ from src.domain.viewpoint_population_evaluation import (
     select_connections,
     select_matrix_connections,
 )
+from tests.fixtures.viewpoints.derivation_examples import catalog, financial_application
 
 
 def _entity(**kw: object) -> EntityRecord:
@@ -306,3 +306,54 @@ class TestMatrixBridging:
             registries=_REGISTRIES,
         )
         assert result.connections == ()
+
+
+class TestDerivedConnectionSelection:
+    def test_derived_connection_respects_structural_endpoints(self) -> None:
+        graph = financial_application()
+        relationship_catalog = catalog()
+        registries = RegistrySnapshot(
+            frozenset(relationship_catalog.all_entity_types()),
+            frozenset(relationship_catalog.all_connection_types()),
+            frozenset(),
+            {},
+            {},
+            derivation_catalog=relationship_catalog,
+        )
+        selection = ConnectionSelection(
+            traversal="derived",
+            max_hops=3,
+            criteria=ConnectionCriteriaGroup(children=(_type_condition("archimate-realization"),)),
+        )
+        result = select_connections(
+            frozenset({"financial-application", "payment-service"}),
+            selection,
+            read_access=graph,
+            registries=registries,
+        )
+        assert result.connections == ()
+        assert [(item.source_id, item.target_id, item.connection_type) for item in result.derived_connections] == [
+            ("financial-application", "payment-service", "archimate-realization")
+        ]
+
+    def test_derived_connection_obeys_matrix_bridging(self) -> None:
+        graph = financial_application()
+        relationship_catalog = catalog()
+        registries = RegistrySnapshot(
+            frozenset(relationship_catalog.all_entity_types()),
+            frozenset(relationship_catalog.all_connection_types()),
+            frozenset(),
+            {},
+            {},
+            derivation_catalog=relationship_catalog,
+        )
+        result = select_matrix_connections(
+            frozenset({"financial-application"}),
+            frozenset({"payment-service"}),
+            ConnectionSelection(traversal="derived", max_hops=3),
+            read_access=graph,
+            registries=registries,
+        )
+        assert [(item.source_id, item.target_id) for item in result.derived_connections] == [
+            ("financial-application", "payment-service")
+        ]

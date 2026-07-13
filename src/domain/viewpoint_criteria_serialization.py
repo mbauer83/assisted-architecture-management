@@ -128,4 +128,10 @@ def connection_selection_to_mapping(selection: ConnectionSelection) -> dict[str,
         result["enabled"] = False
     if selection.criteria != ConnectionCriteriaGroup():
         result["criteria"] = connection_criteria_group_to_mapping(selection.criteria)
+    if selection.traversal != "direct":
+        result["traversal"] = selection.traversal
+    if selection.include_potential:
+        result["include_potential"] = True
+    if selection.max_hops is not None:
+        result["max_hops"] = selection.max_hops
     return result
