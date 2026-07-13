@@ -5,7 +5,9 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Literal, cast
 
+from src.domain.module_types import ConnectionTypeName, EntityTypeName
 from src.domain.ontology_types import ConnectionTypeInfo, EntityTypeInfo
+from src.domain.permitted_relationships import PermittedRelationshipSet
 from src.domain.relationship_derivation_rules import Certainty, CompositionRule
 
 DerivationDomain = Literal["motivation", "strategy", "core", "implementation_migration", "relationships"]
@@ -19,6 +21,8 @@ class OrientedRelation:
     source_id: str
     target_id: str
     orientation: Orientation = "forward"
+    source_type: EntityTypeName | None = None
+    target_type: EntityTypeName | None = None
 
 
 @dataclass(frozen=True)
@@ -50,18 +54,27 @@ def compose(
     second: OrientedRelation,
     intermediate: EntityTypeInfo,
     rules: tuple[CompositionRule, ...],
+    permitted_relationships: PermittedRelationshipSet | None = None,
 ) -> DerivedStep | None:
     """Derive one relationship from an oriented, joined pair."""
     if "junction" in intermediate.classes:
         return None
     for rule in rules:
-        if not _matches(rule, first, second):
+        if not _matches(rule, first, second, intermediate):
             continue
         result = _result_type(rule, first.connection_type, second.connection_type)
         if result is None:
             continue
         source_id, target_id = _endpoints(rule, first, second)
         if source_id == target_id:
+            return None
+        source_type, target_type = _endpoint_types(rule, first, second)
+        if rule.requires_permitted_result and (
+            source_type is None
+            or target_type is None
+            or permitted_relationships is None
+            or not permitted_relationships.permits(source_type, target_type, ConnectionTypeName(result.artifact_type))
+        ):
             return None
         return DerivedStep(source_id, target_id, result, rule.certainty, int(rule.certainty == "potential"))
     return None
@@ -94,7 +107,12 @@ def fold_chain(
     return DerivedStep(current.source_id, current.target_id, current.connection_type, certainty, potential_steps)
 
 
-def _matches(rule: CompositionRule, first: OrientedRelation, second: OrientedRelation) -> bool:
+def _matches(
+    rule: CompositionRule,
+    first: OrientedRelation,
+    second: OrientedRelation,
+    intermediate: EntityTypeInfo,
+) -> bool:
     if first.connection_type.derivation_role != rule.first_role:
         return False
     if second.connection_type.derivation_role != rule.second_role:
@@ -103,7 +121,11 @@ def _matches(rule: CompositionRule, first: OrientedRelation, second: OrientedRel
         return False
     if rule.first_artifact_type is not None and first.connection_type.artifact_type != rule.first_artifact_type:
         return False
-    return rule.second_artifact_type is None or second.connection_type.artifact_type == rule.second_artifact_type
+    if rule.second_artifact_type is not None and second.connection_type.artifact_type != rule.second_artifact_type:
+        return False
+    if rule.second_artifact_types and second.connection_type.artifact_type not in rule.second_artifact_types:
+        return False
+    return rule.intermediate_artifact_type is None or intermediate.artifact_type == rule.intermediate_artifact_type
 
 
 def _result_type(
@@ -134,6 +156,20 @@ def _endpoints(rule: CompositionRule, first: OrientedRelation, second: OrientedR
     return values[rule.result_source], values[rule.result_target]
 
 
+def _endpoint_types(
+    rule: CompositionRule,
+    first: OrientedRelation,
+    second: OrientedRelation,
+) -> tuple[EntityTypeName | None, EntityTypeName | None]:
+    values = {
+        "first-source": _source_type(first),
+        "first-target": _target_type(first),
+        "second-source": _source_type(second),
+        "second-target": _target_type(second),
+    }
+    return values[rule.result_source], values[rule.result_target]
+
+
 def _joins(join: str, first: OrientedRelation, second: OrientedRelation) -> bool:
     endpoints = {
         "target-source": (_target(first), _source(second)),
@@ -151,3 +187,11 @@ def _source(relation: OrientedRelation) -> str:
 
 def _target(relation: OrientedRelation) -> str:
     return relation.target_id if relation.orientation == "forward" else relation.source_id
+
+
+def _source_type(relation: OrientedRelation) -> EntityTypeName | None:
+    return relation.source_type if relation.orientation == "forward" else relation.target_type
+
+
+def _target_type(relation: OrientedRelation) -> EntityTypeName | None:
+    return relation.target_type if relation.orientation == "forward" else relation.source_type

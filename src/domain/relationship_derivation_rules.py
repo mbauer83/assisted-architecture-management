@@ -32,6 +32,9 @@ class CompositionRule:
     result_target: Endpoint = "second-target"
     first_artifact_type: str | None = None
     second_artifact_type: str | None = None
+    second_artifact_types: tuple[str, ...] = ()
+    intermediate_artifact_type: str | None = None
+    requires_permitted_result: bool = False
 
 
 def composition_rules_from_mapping(raw: object) -> tuple[CompositionRule, ...]:
@@ -68,6 +71,9 @@ def composition_rules_from_mapping(raw: object) -> tuple[CompositionRule, ...]:
                     result_target=cast(Endpoint, result_target),
                     first_artifact_type=_optional_string(item.get("first_artifact_type")),
                     second_artifact_type=_optional_string(item.get("second_artifact_type")),
+                    second_artifact_types=_string_sequence(item.get("second_artifact_types", ())),
+                    intermediate_artifact_type=_optional_string(item.get("intermediate_artifact_type")),
+                    requires_permitted_result=_optional_bool(item.get("requires_permitted_result", False)),
                 )
             )
         except KeyError as exc:
@@ -80,6 +86,20 @@ def _optional_string(value: object) -> str | None:
         return None
     if not isinstance(value, str):
         raise ValueError("relationship derivation artifact type must be a string")
+    return value
+
+
+def _string_sequence(value: object) -> tuple[str, ...]:
+    if not isinstance(value, Sequence) or isinstance(value, (str, bytes)):
+        raise ValueError("relationship derivation artifact types must be a sequence")
+    if not all(isinstance(item, str) for item in value):
+        raise ValueError("relationship derivation artifact types must be strings")
+    return tuple(value)
+
+
+def _optional_bool(value: object) -> bool:
+    if not isinstance(value, bool):
+        raise ValueError("relationship derivation permitted-result flag must be a boolean")
     return value
 
 
