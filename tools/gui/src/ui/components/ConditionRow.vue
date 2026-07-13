@@ -2,15 +2,17 @@
 import { computed, inject, ref } from 'vue'
 import type { CriteriaCatalog } from '../../domain'
 import type { Comparator, ConditionNode, GroupKind, ValueRef } from '../../domain/viewpointCriteria'
-import { literalValue } from '../../domain/viewpointCriteria'
+import { bindingValue, literalValue } from '../../domain/viewpointCriteria'
 import { HIGHLIGHTED_NODE_ID_KEY, attributeOptions, comparatorsFor, enumChoicesFor } from './CriteriaTreeBuilder.helpers'
 import ValueRefInput from './ValueRefInput.vue'
 
-const props = defineProps<{
+const props = withDefaults(defineProps<{
   modelValue: ConditionNode
   groupKind: GroupKind
   catalog: CriteriaCatalog
-}>()
+  bindingNames?: readonly string[]
+  parameterNames?: readonly string[]
+}>(), { bindingNames: () => [], parameterNames: () => [] })
 const emit = defineEmits<{ 'update:modelValue': [value: ConditionNode]; remove: [] }>()
 
 const highlightedNodeId = inject(HIGHLIGHTED_NODE_ID_KEY, ref(null))
@@ -23,11 +25,16 @@ const currentAttribute = computed(
 const comparatorChoices = computed(() => comparatorsFor(currentAttribute.value))
 const literalChoices = computed(() => enumChoicesFor(props.modelValue.attribute, props.groupKind, props.catalog))
 const valueTakesNoInput = computed(() => props.modelValue.comparator === 'exists' || props.modelValue.comparator === 'absent')
-const valueTakesList = computed(() => props.modelValue.comparator === 'in')
+const valueTakesList = computed(() => props.modelValue.comparator === 'in' || props.modelValue.comparator === 'not_in')
 const listValueText = computed(() => {
   const value = props.modelValue.value
   return value.kind === 'literal' && Array.isArray(value.literal) ? value.literal.join(', ') : ''
 })
+/** `in`/`not_in` accept either a fixed list of values or a set-valued binding, projected
+ * to a scalar list (`{from: binding, name: x, project: id}` — "entity is in set x", no new
+ * node kind per the spec). No aggregate/quantifier here: an aggregated binding collapses
+ * to a scalar, and a membership test's right-hand side is the whole list itself. */
+const listValueIsBinding = computed(() => props.modelValue.value.kind === 'binding')
 
 const update = (patch: Partial<ConditionNode>) => emit('update:modelValue', { ...props.modelValue, ...patch })
 
@@ -40,12 +47,20 @@ const onAttributeChange = (event: Event) => {
 
 const onComparatorChange = (event: Event) => {
   const comparator = (event.target as HTMLSelectElement).value as Comparator
-  update({ comparator, value: comparator === 'in' ? literalValue([]) : literalValue('') })
+  const takesList = comparator === 'in' || comparator === 'not_in'
+  update({ comparator, value: takesList ? literalValue([]) : literalValue('') })
 }
 
 const onValueChange = (value: ValueRef) => update({ value })
 const onListValueChange = (raw: string) =>
   update({ value: literalValue(raw.split(',').map((v) => v.trim()).filter((v) => v.length > 0)) })
+const onListSourceChange = (source: 'literal' | 'binding') =>
+  update({ value: source === 'binding' ? bindingValue(props.bindingNames[0] ?? '') : literalValue([]) })
+const onListBindingChange = (patch: { binding?: string; project?: string }) => {
+  if (props.modelValue.value.kind !== 'binding') return
+  const current = props.modelValue.value
+  update({ value: bindingValue(patch.binding ?? current.binding, { project: patch.project !== undefined ? (patch.project || null) : current.project }) })
+}
 </script>
 
 <template>
@@ -81,20 +96,59 @@ const onListValueChange = (raw: string) =>
       </option>
     </select>
 
-    <input
-      v-if="valueTakesList"
-      class="inp val"
-      type="text"
-      placeholder="comma-separated values"
-      :value="listValueText"
-      @input="onListValueChange(($event.target as HTMLInputElement).value)"
-    >
+    <template v-if="valueTakesList">
+      <select
+        v-if="bindingNames.length > 0"
+        class="inp list-source"
+        :value="listValueIsBinding ? 'binding' : 'literal'"
+        @change="onListSourceChange(($event.target as HTMLSelectElement).value as 'literal' | 'binding')"
+      >
+        <option value="literal">
+          fixed values
+        </option>
+        <option value="binding">
+          a named binding's values
+        </option>
+      </select>
+      <input
+        v-if="!listValueIsBinding"
+        class="inp val"
+        type="text"
+        placeholder="comma-separated values"
+        :value="listValueText"
+        @input="onListValueChange(($event.target as HTMLInputElement).value)"
+      >
+      <template v-else-if="modelValue.value.kind === 'binding'">
+        <select
+          class="inp val"
+          :value="modelValue.value.binding"
+          @change="onListBindingChange({ binding: ($event.target as HTMLSelectElement).value })"
+        >
+          <option
+            v-for="name in bindingNames"
+            :key="name"
+            :value="name"
+          >
+            {{ name }}
+          </option>
+        </select>
+        <input
+          class="inp val"
+          type="text"
+          placeholder="project attribute (required)"
+          :value="modelValue.value.project ?? ''"
+          @input="onListBindingChange({ project: ($event.target as HTMLInputElement).value })"
+        >
+      </template>
+    </template>
     <ValueRefInput
       v-else-if="!valueTakesNoInput"
       :model-value="modelValue.value"
       :group-kind="groupKind"
       :attribute-paths="attributePaths"
       :literal-choices="literalChoices"
+      :binding-names="bindingNames"
+      :parameter-names="parameterNames"
       @update:model-value="onValueChange"
     />
 

@@ -29,7 +29,9 @@ const props = withDefaults(defineProps<{
   catalog: CriteriaCatalog
   depth?: number
   isRoot?: boolean
-}>(), { depth: 0, isRoot: false })
+  bindingNames?: readonly string[]
+  parameterNames?: readonly string[]
+}>(), { depth: 0, isRoot: false, bindingNames: () => [], parameterNames: () => [] })
 const emit = defineEmits<{ 'update:modelValue': [value: GroupNode]; remove: [] }>()
 
 const emitUpdate = (patch: Partial<GroupNode>) => emit('update:modelValue', { ...props.modelValue, ...patch })
@@ -120,6 +122,8 @@ const atCap = computed(() => atDepthCap(props.depth))
         :model-value="child"
         :group-kind="groupKind"
         :catalog="catalog"
+        :binding-names="bindingNames"
+        :parameter-names="parameterNames"
         @update:model-value="updateChild(index, $event)"
         @remove="removeChild(index)"
       />
@@ -129,6 +133,8 @@ const atCap = computed(() => atDepthCap(props.depth))
         :group-kind="groupKind"
         :catalog="catalog"
         :depth="depth + 1"
+        :binding-names="bindingNames"
+        :parameter-names="parameterNames"
         @update:model-value="updateChild(index, $event)"
         @remove="removeChild(index)"
       />
@@ -178,6 +184,8 @@ const atCap = computed(() => atDepthCap(props.depth))
             group-kind="connection"
             :catalog="catalog"
             :depth="depth + 1"
+            :binding-names="bindingNames"
+            :parameter-names="parameterNames"
             field-label="connection_criteria"
             unrestricted-label="any connection"
             @update:model-value="updateIncident(index, { connectionCriteria: $event })"
@@ -188,6 +196,8 @@ const atCap = computed(() => atDepthCap(props.depth))
             group-kind="entity"
             :catalog="catalog"
             :depth="depth + 1"
+            :binding-names="bindingNames"
+            :parameter-names="parameterNames"
             field-label="endpoint_criteria"
             unrestricted-label="any entity"
             @update:model-value="updateIncident(index, { endpointCriteria: $event })"

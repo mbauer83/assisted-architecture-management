@@ -4,16 +4,18 @@ import type { GroupKind, GroupNode } from '../../domain/viewpointCriteria'
 import { mkGroup } from '../../domain/viewpointCriteria'
 import CriteriaTreeBuilder from './CriteriaTreeBuilder.vue'
 
-defineProps<{
+withDefaults(defineProps<{
   modelValue: GroupNode | null
   groupKind: GroupKind
   catalog: CriteriaCatalog
   depth: number
+  bindingNames?: readonly string[]
+  parameterNames?: readonly string[]
   /** Field label shown in the panel header, e.g. `connection_criteria`. */
   fieldLabel: string
   /** "any connection" / "any entity" — what a null value means. */
   unrestrictedLabel: string
-}>()
+}>(), { bindingNames: () => [], parameterNames: () => [] })
 const emit = defineEmits<{ 'update:modelValue': [value: GroupNode | null] }>()
 </script>
 
@@ -50,6 +52,8 @@ const emit = defineEmits<{ 'update:modelValue': [value: GroupNode | null] }>()
       :group-kind="groupKind"
       :catalog="catalog"
       :depth="depth"
+      :binding-names="bindingNames"
+      :parameter-names="parameterNames"
       is-root
       @update:model-value="emit('update:modelValue', $event)"
     />

@@ -17,6 +17,7 @@
 import type { CriteriaNode, ConnectionSelectionNode, ExecutableQueryNode, GroupNode, NeighborInclusionNode } from './viewpointCriteria'
 import type { PresentationNode, StyleRuleNode } from './viewpointPresentation'
 import type { ViewpointDefinitionDraft } from './viewpointDefinitionDraft'
+import type { DerivedAttributeNode, QueryBindingNode, QueryParameterNode } from './viewpointBindings'
 
 type Cursor =
   | ViewpointDefinitionDraft
@@ -26,9 +27,15 @@ type Cursor =
   | NeighborInclusionNode
   | StyleRuleNode
   | CriteriaNode
+  | QueryBindingNode
+  | QueryParameterNode
+  | DerivedAttributeNode
   | readonly CriteriaNode[]
   | readonly NeighborInclusionNode[]
   | readonly StyleRuleNode[]
+  | readonly QueryBindingNode[]
+  | readonly QueryParameterNode[]
+  | readonly DerivedAttributeNode[]
   | GroupNode
   | undefined
 
@@ -39,6 +46,8 @@ const isNeighborInclusion = (v: object): v is NeighborInclusionNode => 'neighbor
 const isPresentation = (v: object): v is PresentationNode => 'stylingRules' in v
 const isStyleRule = (v: object): v is StyleRuleNode => 'matchCriteria' in v
 const isCriteriaNode = (v: object): v is CriteriaNode => 'kind' in v
+const isQueryBinding = (v: object): v is QueryBindingNode => 'select' in v && 'tupleOf' in v
+const isDerivedAttribute = (v: object): v is DerivedAttributeNode => 'ofHead' in v
 
 const step = (cursor: Cursor, segment: string): Cursor => {
   if (cursor == null) return undefined
@@ -54,6 +63,9 @@ const step = (cursor: Cursor, segment: string): Cursor => {
     if (segment === 'entity_criteria') return cursor.entityCriteria
     if (segment === 'include_connected') return cursor.includeConnected
     if (segment === 'connections') return cursor.connections
+    if (segment === 'bindings') return cursor.bindings
+    if (segment === 'parameters') return cursor.parameters
+    if (segment === 'derived') return cursor.derived
     return undefined
   }
   if (isConnectionSelection(cursor)) {
@@ -79,6 +91,14 @@ const step = (cursor: Cursor, segment: string): Cursor => {
       if (segment === 'connection_criteria') return cursor.connectionCriteria ?? undefined
       if (segment === 'endpoint_criteria') return cursor.endpointCriteria ?? undefined
     }
+    return undefined
+  }
+  if (isQueryBinding(cursor)) {
+    return segment === 'criteria' ? cursor.criteria : undefined
+  }
+  if (isDerivedAttribute(cursor)) {
+    if (segment === 'connection_criteria') return cursor.connectionCriteria ?? undefined
+    if (segment === 'endpoint_criteria') return cursor.endpointCriteria ?? undefined
     return undefined
   }
   return undefined

@@ -9,7 +9,7 @@
  * emitted up so the parent's shared issue-list/highlight-on-click stays in sync with both a
  * test-run and a real save attempt.
  */
-import { inject, ref, watch } from 'vue'
+import { computed, inject, ref, watch } from 'vue'
 import { Effect } from 'effect'
 import { modelServiceKey } from '../keys'
 import { readErrorMessage } from '../lib/errors'
@@ -19,11 +19,15 @@ import { definitionToMapping } from '../../domain/viewpointDefinitionSerializati
 import { queryToMapping } from '../../domain/viewpointCriteriaSerialization'
 import { mkNeighborInclusion } from '../../domain/viewpointCriteria'
 import type { ExecutableQueryNode, NeighborInclusionNode } from '../../domain/viewpointCriteria'
+import { attributeTypeTablesFromCatalog } from '../../domain/viewpointBindings'
 import { HIGHLIGHTED_NODE_ID_KEY } from './CriteriaTreeBuilder.helpers'
 import { createDebouncer } from '../lib/debounce'
 import { firstErrorNodeId, formatPreviewCounts } from '../views/ViewpointsManagementView.helpers'
 import CriteriaTreeBuilder from './CriteriaTreeBuilder.vue'
 import OptionalCriteriaSlot from './OptionalCriteriaSlot.vue'
+import QueryBindingsPanel from './QueryBindingsPanel.vue'
+import QueryParametersPanel from './QueryParametersPanel.vue'
+import QueryDerivedAttributesPanel from './QueryDerivedAttributesPanel.vue'
 
 const props = defineProps<{
   draft: ViewpointDefinitionDraft
@@ -49,12 +53,16 @@ const emitQueryUpdate = (patch: Partial<ExecutableQueryNode>) => {
   emit('update:query', { ...props.draft.query, ...patch })
 }
 
+const attributeTypes = computed(() => attributeTypeTablesFromCatalog(props.catalog))
+const bindingNames = computed(() => props.draft.query?.bindings.filter((b) => b.name.length > 0).map((b) => b.name) ?? [])
+const parameterNames = computed(() => props.draft.query?.parameters.filter((p) => p.name.length > 0).map((p) => p.name) ?? [])
+
 let summaryTimer: ReturnType<typeof setTimeout> | undefined
 watch(() => props.draft.query, (query) => {
   if (summaryTimer) clearTimeout(summaryTimer)
   if (!query) { summary.value = ''; return }
   summaryTimer = setTimeout(() => {
-    Effect.runPromise(svc.summarizeViewpointQuery(queryToMapping(query))).then((s) => { summary.value = s }).catch(() => {})
+    Effect.runPromise(svc.summarizeViewpointQuery(queryToMapping(query, attributeTypes.value))).then((s) => { summary.value = s }).catch(() => {})
   }, 250)
 }, { deep: true, immediate: true })
 
@@ -65,13 +73,13 @@ const debouncePreview = createDebouncer(400)
 watch(() => props.draft.query, (query) => {
   if (!query) { previewResult.value = null; return }
   debouncePreview(() => {
-    Effect.runPromise(svc.executeViewpoint({ query: queryToMapping(query), limit: 0 }))
+    Effect.runPromise(svc.executeViewpoint({ query: queryToMapping(query, attributeTypes.value), limit: 0 }))
       .then((result) => { previewResult.value = result })
       .catch(() => { previewResult.value = null })
   })
 }, { deep: true, immediate: true })
 
-/** Full test-run: the real §7.1 counts + warnings the query would return today (default
+/** Full test-run: the real counts + warnings the query would return today (default
  * limit — the actual execution bound, not the tight preview limit), plus a `dry_run`
  * save-mode validation pass so a definition that would fail to persist is caught, and
  * highlighted at its offending node, before the user attempts to save. */
@@ -81,9 +89,11 @@ const testRun = async () => {
   testRunResult.value = null
   try {
     if (props.draft.query) {
-      testRunResult.value = await Effect.runPromise(svc.executeViewpoint({ query: queryToMapping(props.draft.query) }))
+      testRunResult.value = await Effect.runPromise(
+        svc.executeViewpoint({ query: queryToMapping(props.draft.query, attributeTypes.value) }),
+      )
     }
-    const body = { definition: definitionToMapping(props.draft), dry_run: true }
+    const body = { definition: definitionToMapping(props.draft, attributeTypes.value), dry_run: true }
     const call = props.isCreating ? svc.createViewpointDefinition(body) : svc.editViewpointDefinition(body)
     const result = await Effect.runPromise(call)
     emit('issues', result.issues)
@@ -119,13 +129,36 @@ const updateInclusion = (index: number, patch: Partial<NeighborInclusionNode>) =
     Scope-only viewpoint — executes via its concept scope. Add a query to refine.
   </p>
   <div v-else>
+    <QueryParametersPanel
+      :model-value="draft.query.parameters"
+      :catalog="catalog"
+      @update:model-value="emitQueryUpdate({ parameters: $event })"
+    />
+
+    <QueryBindingsPanel
+      :model-value="draft.query.bindings"
+      :catalog="catalog"
+      :parameter-names="parameterNames"
+      @update:model-value="emitQueryUpdate({ bindings: $event })"
+    />
+
     <h3>Show entities where…</h3>
     <CriteriaTreeBuilder
       :model-value="draft.query.entityCriteria"
       group-kind="entity"
       :catalog="catalog"
+      :binding-names="bindingNames"
+      :parameter-names="parameterNames"
       is-root
       @update:model-value="emitQueryUpdate({ entityCriteria: $event })"
+    />
+
+    <QueryDerivedAttributesPanel
+      :model-value="draft.query.derived"
+      :catalog="catalog"
+      :binding-names="bindingNames"
+      :parameter-names="parameterNames"
+      @update:model-value="emitQueryUpdate({ derived: $event })"
     />
 
     <h3>Neighbor inclusions (widen the population)</h3>
@@ -159,6 +192,8 @@ const updateInclusion = (index: number, patch: Partial<NeighborInclusionNode>) =
         group-kind="connection"
         :catalog="catalog"
         :depth="0"
+        :binding-names="bindingNames"
+        :parameter-names="parameterNames"
         field-label="connection_criteria"
         unrestricted-label="any connection"
         @update:model-value="updateInclusion(index, { connectionCriteria: $event })"
@@ -168,6 +203,8 @@ const updateInclusion = (index: number, patch: Partial<NeighborInclusionNode>) =
         group-kind="entity"
         :catalog="catalog"
         :depth="0"
+        :binding-names="bindingNames"
+        :parameter-names="parameterNames"
         field-label="neighbor_criteria"
         unrestricted-label="any entity"
         @update:model-value="updateInclusion(index, { neighborCriteria: $event })"
@@ -193,6 +230,8 @@ const updateInclusion = (index: number, patch: Partial<NeighborInclusionNode>) =
       :model-value="draft.query.connections.criteria"
       group-kind="connection"
       :catalog="catalog"
+      :binding-names="bindingNames"
+      :parameter-names="parameterNames"
       is-root
       @update:model-value="emitQueryUpdate({ connections: { ...draft.query.connections, criteria: $event } })"
     />

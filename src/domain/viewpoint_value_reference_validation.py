@@ -235,7 +235,14 @@ def _validate_reference_type(
     if left is None:
         return []
     left_kind = "string" if left == "reserved" else left
+    # Tracked separately from `reference_type` because the list branch below unwraps a
+    # `ListType` down to its scalar element for the rest of this function's checks — losing
+    # that flag would make every `in`/`not_in` reference look scalar by the time the
+    # "requires a list reference" check runs, rejecting the exact list references it exists
+    # to accept.
+    was_list = False
     if isinstance(reference_type, ListType):
+        was_list = True
         if value.quantifier is None and condition.comparator not in ("in", "not_in"):
             return [
                 issue(
@@ -263,7 +270,7 @@ def _validate_reference_type(
         return []
     if not isinstance(reference_type, ScalarType):
         return [issue("error", "operator-type-mismatch", f"{path}/value", "reference is not scalar")]
-    if condition.comparator in ("in", "not_in"):
+    if condition.comparator in ("in", "not_in") and not was_list:
         message = f"{condition.comparator} requires a list reference"
         return [issue("error", "operator-type-mismatch", f"{path}/comparator", message)]
     if condition.comparator in ("like", "ilike") and reference_type.kind != "string":

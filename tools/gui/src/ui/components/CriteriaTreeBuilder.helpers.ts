@@ -5,9 +5,13 @@
  */
 
 import type { InjectionKey, Ref } from 'vue'
-import type { Comparator, GroupKind, ValueRefKind } from '../../domain/viewpointCriteria'
-import { NUMERIC_COMPARATORS, RESERVED_CONNECTION_PATHS, RESERVED_ENTITY_PATHS } from '../../domain/viewpointCriteria'
+import type { Comparator, GroupKind, Quantifier, ValueRefKind } from '../../domain/viewpointCriteria'
+import { NUMERIC_COMPARATORS, RESERVED_CONNECTION_PATHS, RESERVED_ENTITY_PATHS, STRING_PATTERN_COMPARATORS } from '../../domain/viewpointCriteria'
+import type { AggregateKind } from '../../domain/viewpointBindings'
 import type { CriteriaCatalog } from '../../domain'
+
+export const AGGREGATE_CHOICES: readonly AggregateKind[] = ['count', 'sum', 'avg', 'min', 'max']
+export const QUANTIFIER_CHOICES: readonly Quantifier[] = ['any', 'all']
 
 /** Provided by the management view, injected by every builder node so a save-time
  * validation issue can highlight the exact widget it names without prop-drilling a
@@ -39,11 +43,16 @@ export const attributeOptions = (groupKind: GroupKind, catalog: CriteriaCatalog)
 const NUMERIC_TYPES = new Set(['integer', 'number', 'date'])
 
 /** Reserved paths take string comparators only (none of them are numeric/date); a schema
- * attribute's numeric comparators gate on its declared type. */
+ * attribute's numeric comparators gate on its declared type. `like`/`ilike` are only
+ * offered for string-typed attributes (reserved paths are all string-shaped; a schema
+ * attribute needs a declared `string` type) — pattern matching against a number/date/
+ * boolean is never a legal comparison. */
 export const comparatorsFor = (attribute: AttributeOption): readonly Comparator[] => {
-  const allComparators: Comparator[] = ['eq', 'neq', 'in', 'exists', 'absent', 'lt', 'lte', 'gt', 'gte']
+  const allComparators: Comparator[] = ['eq', 'neq', 'in', 'not_in', 'exists', 'absent', 'lt', 'lte', 'gt', 'gte']
   const isNumeric = attribute.declaredType !== null && NUMERIC_TYPES.has(attribute.declaredType)
-  return isNumeric ? allComparators : allComparators.filter((c) => !NUMERIC_COMPARATORS.includes(c))
+  const isString = attribute.declaredType === null || attribute.declaredType === 'string'
+  const base = isNumeric ? allComparators : allComparators.filter((c) => !NUMERIC_COMPARATORS.includes(c))
+  return isString ? [...base, ...STRING_PATTERN_COMPARATORS] : base
 }
 
 /** Reserved paths with a real enumerable value set in the registries snapshot — anything
@@ -62,8 +71,9 @@ export interface ValueKindOption {
 
 /** `attribute_of_endpoint` (source/target) is connection-condition-only: it reads an
  * attribute off the OTHER endpoint of the connection being evaluated — meaningless for an
- * entity condition, which has no endpoints. */
-export const valueKindOptions = (groupKind: GroupKind): ValueKindOption[] => {
+ * entity condition, which has no endpoints. `binding`/`parameter` are only offered once at
+ * least one exists (nothing to reference otherwise — never a dead-end selection). */
+export const valueKindOptions = (groupKind: GroupKind, hasBindings = false, hasParameters = false): ValueKindOption[] => {
   const options: ValueKindOption[] = [
     { kind: 'literal', label: 'a fixed value' },
     { kind: 'self', label: `another attribute of this ${groupKind === 'connection' ? 'connection' : 'entity'}` },
@@ -74,6 +84,8 @@ export const valueKindOptions = (groupKind: GroupKind): ValueKindOption[] => {
       { kind: 'target', label: "the target entity's attribute" },
     )
   }
+  if (hasBindings) options.push({ kind: 'binding', label: 'a named binding' })
+  if (hasParameters) options.push({ kind: 'parameter', label: 'a supplied parameter' })
   return options
 }
 

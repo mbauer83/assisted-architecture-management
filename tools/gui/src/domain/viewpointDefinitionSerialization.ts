@@ -6,6 +6,7 @@
 
 import { queryFromMapping, queryToMapping } from './viewpointCriteriaSerialization'
 import { presentationFromMapping, presentationToMapping } from './viewpointPresentationSerialization'
+import type { AttributeTypeTables } from './viewpointBindings'
 import {
   type Content,
   type Purpose,
@@ -60,7 +61,17 @@ const scopeFromMapping = (raw: unknown): ScopeDraft => {
   }
 }
 
-export const definitionToMapping = (draft: ViewpointDefinitionDraft): Record<string, unknown> => {
+const EMPTY_ATTRIBUTE_TYPES: AttributeTypeTables = { entity: {}, connection: {} }
+
+/** `attributeTypes` defaults to empty tables, matching `queryToMapping`'s own default —
+ * safe unless the draft has a binding with `project` set, in which case its declared
+ * `result_type` needs the real schema kind (the criteria catalog's
+ * `entity_attribute_types`/`connection_attribute_types`) to serialize accurately. Every
+ * real save/test-run call site has the catalog in scope and should pass it. */
+export const definitionToMapping = (
+  draft: ViewpointDefinitionDraft,
+  attributeTypes: AttributeTypeTables = EMPTY_ATTRIBUTE_TYPES,
+): Record<string, unknown> => {
   const result: Record<string, unknown> = {
     slug: draft.slug,
     version: draft.version,
@@ -76,7 +87,7 @@ export const definitionToMapping = (draft: ViewpointDefinitionDraft): Record<str
   if (Object.keys(scope).length > 0) result.scope = scope
   if (draft.representationTypes.length > 0) result.representation_types = draft.representationTypes
   if (Object.keys(draft.derivationDefaults).length > 0) result.derivation_defaults = draft.derivationDefaults
-  if (draft.query !== null) result.query = queryToMapping(draft.query)
+  if (draft.query !== null) result.query = queryToMapping(draft.query, attributeTypes)
   if (draft.presentation !== null) result.presentation = presentationToMapping(draft.presentation)
   return result
 }

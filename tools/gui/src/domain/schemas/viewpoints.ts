@@ -149,6 +149,22 @@ export const ViewpointDefinitionListSchema = Schema.Struct({
   viewpoints: Schema.Array(ViewpointDefinitionEnvelopeSchema),
 })
 
+const BindingCatalogSchema = Schema.Struct({
+  select: Schema.Array(Schema.String),
+  aggregate: Schema.Array(Schema.String),
+  result_types: Schema.Array(Schema.String),
+})
+
+const ParameterCatalogSchema = Schema.Struct({ types: Schema.Array(Schema.String) })
+
+const DerivedCatalogSchema = Schema.Struct({
+  traversal: Schema.Array(Schema.String),
+  certainty: Schema.Array(Schema.String),
+  reduce: Schema.Array(Schema.String),
+})
+
+const ConnectionDerivationEntrySchema = Schema.Struct({ role: Schema.String, strength: Schema.NullOr(Schema.Number) })
+
 export const CriteriaCatalogSchema = Schema.Struct({
   entity_types: Schema.Array(Schema.String),
   connection_types: Schema.Array(Schema.String),
@@ -162,6 +178,12 @@ export const CriteriaCatalogSchema = Schema.Struct({
   // entity type slug -> owning domain (hierarchy[0]) — lets the scope picker group entity
   // types by domain and support "exclude this whole domain" bulk actions.
   entity_type_domains: Schema.Record({ key: Schema.String, value: Schema.String }),
+  // Registries snapshot for the bindings/parameters/derived-attribute panels' own pickers —
+  // same "one snapshot, every picker" convention as the entity/connection type lists above.
+  bindings: BindingCatalogSchema,
+  parameters: ParameterCatalogSchema,
+  derived: DerivedCatalogSchema,
+  connection_derivation: Schema.Record({ key: Schema.String, value: ConnectionDerivationEntrySchema }),
 })
 export type CriteriaCatalog = typeof CriteriaCatalogSchema.Type
 

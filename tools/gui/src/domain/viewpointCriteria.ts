@@ -6,16 +6,20 @@
  * is the counterpart that converts to/from the canonical wire mapping.
  */
 
+import type { AggregateKind, DerivedAttributeNode, QueryBindingNode, QueryParameterNode } from './viewpointBindings'
+
 let uidCounter = 0
 export const nextNodeId = (): string => `n${++uidCounter}`
 
 export type Conjunction = 'and' | 'or'
-export type Comparator = 'eq' | 'neq' | 'in' | 'exists' | 'absent' | 'lt' | 'lte' | 'gt' | 'gte'
+export type Comparator = 'eq' | 'neq' | 'in' | 'not_in' | 'exists' | 'absent' | 'lt' | 'lte' | 'gt' | 'gte' | 'like' | 'ilike'
 export type IncidentDirection = 'outgoing' | 'incoming' | 'either'
 export type GroupKind = 'entity' | 'connection'
-export type ValueRefKind = 'literal' | 'self' | 'source' | 'target'
+export type ValueRefKind = 'literal' | 'self' | 'source' | 'target' | 'binding' | 'parameter'
+export type Quantifier = 'any' | 'all'
 
 export const NUMERIC_COMPARATORS: readonly Comparator[] = ['lt', 'lte', 'gt', 'gte']
+export const STRING_PATTERN_COMPARATORS: readonly Comparator[] = ['like', 'ilike']
 export const RESERVED_ENTITY_PATHS: readonly string[] = [
   'id', 'name', 'type', 'specialization', 'group', 'domain', 'subdomain', 'status', 'version',
 ]
@@ -29,13 +33,32 @@ export interface ValueRefAttribute {
   readonly kind: 'self' | 'source' | 'target'
   readonly attribute: string
 }
-export type ValueRef = ValueRefLiteral | ValueRefAttribute
+export interface ValueRefBinding {
+  readonly kind: 'binding'
+  readonly binding: string
+  readonly project: string | null
+  readonly aggregate: AggregateKind | null
+  readonly quantifier: Quantifier | null
+}
+export interface ValueRefParameter {
+  readonly kind: 'parameter'
+  readonly parameter: string
+}
+export type ValueRef = ValueRefLiteral | ValueRefAttribute | ValueRefBinding | ValueRefParameter
 
 export const literalValue = (literal: unknown): ValueRef => ({ kind: 'literal', literal })
 export const selfValue = (attribute: string): ValueRef => ({ kind: 'self', attribute })
 export const endpointValue = (endpoint: 'source' | 'target', attribute: string): ValueRef => ({
   kind: endpoint, attribute,
 })
+export const bindingValue = (
+  binding: string,
+  options: { project?: string | null; aggregate?: AggregateKind | null; quantifier?: Quantifier | null } = {},
+): ValueRef => ({
+  kind: 'binding', binding, project: options.project ?? null, aggregate: options.aggregate ?? null,
+  quantifier: options.quantifier ?? null,
+})
+export const parameterValue = (parameter: string): ValueRef => ({ kind: 'parameter', parameter })
 
 export interface ConditionNode {
   readonly kind: 'condition'
@@ -102,6 +125,9 @@ export interface ExecutableQueryNode {
   entityCriteria: GroupNode
   includeConnected: NeighborInclusionNode[]
   connections: ConnectionSelectionNode
+  bindings: QueryBindingNode[]
+  parameters: QueryParameterNode[]
+  derived: DerivedAttributeNode[]
 }
 
 export const QUERY_SCHEMA_VERSION = 1
@@ -111,4 +137,7 @@ export const mkQuery = (): ExecutableQueryNode => ({
   entityCriteria: mkGroup('entity'),
   includeConnected: [],
   connections: mkConnectionSelection(),
+  bindings: [],
+  parameters: [],
+  derived: [],
 })

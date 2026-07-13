@@ -21,6 +21,7 @@ import type {
 import { mkDefinitionDraft } from '../../domain/viewpointDefinitionDraft'
 import type { ViewpointDefinitionDraft } from '../../domain/viewpointDefinitionDraft'
 import { definitionFromMapping, definitionToMapping } from '../../domain/viewpointDefinitionSerialization'
+import { attributeTypeTablesFromCatalog } from '../../domain/viewpointBindings'
 import { groupFromMapping } from '../../domain/viewpointCriteriaSerialization'
 import { resolveIssuePathNodeId } from '../../domain/viewpointIssuePath'
 import { HIGHLIGHTED_NODE_ID_KEY } from '../components/CriteriaTreeBuilder.helpers'
@@ -103,9 +104,9 @@ const versionBumped = computed(() => draft.value && originalDraft.value && draft
 const showVersionBumpHint = computed(() => !isCreating.value && isSemantic.value && !versionBumped.value)
 
 const save = () => {
-  if (!draft.value) return
+  if (!draft.value || !catalog.value) return
   saving.value = true
-  const body = { definition: definitionToMapping(draft.value), dry_run: false }
+  const body = { definition: definitionToMapping(draft.value, attributeTypeTablesFromCatalog(catalog.value)), dry_run: false }
   const call = isCreating.value ? svc.createViewpointDefinition(body) : svc.editViewpointDefinition(body)
   Effect.runPromise(call).then((result: ViewpointPersistResult) => {
     saving.value = false

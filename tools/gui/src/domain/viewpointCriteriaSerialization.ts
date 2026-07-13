@@ -16,19 +16,44 @@ import {
   type IncidentDirection,
   type IncidentNode,
   type NeighborInclusionNode,
+  type Quantifier,
   type ValueRef,
+  bindingValue,
   endpointValue,
   literalValue,
   mkGroup,
   mkQuery,
   nextNodeId,
+  parameterValue,
   selfValue,
 } from './viewpointCriteria'
+import type { AggregateKind, AttributeTypeTables } from './viewpointBindings'
+import {
+  bindingFromMapping,
+  bindingToMapping,
+  derivedAttributeFromMapping,
+  derivedAttributeToMapping,
+  parameterFromMapping,
+  parameterToMapping,
+} from './viewpointBindingsSerialization'
+
+/** See `viewpointDefinitionSerialization.ts`'s `stringOr` for why this exists: `String()`
+ * on an `unknown` narrowed by `!= null` trips `@typescript-eslint/no-base-to-string`. */
+const stringOrNull = (v: unknown): string | null =>
+  typeof v === 'string' || typeof v === 'number' ? String(v) : null
 
 // ── to mapping ────────────────────────────────────────────────────────────────
 
-const valueRefToRaw = (value: ValueRef): unknown => {
+export const valueRefToRaw = (value: ValueRef): unknown => {
   if (value.kind === 'literal') return value.literal
+  if (value.kind === 'parameter') return { from: 'parameter', name: value.parameter }
+  if (value.kind === 'binding') {
+    const result: Record<string, unknown> = { from: 'binding', name: value.binding }
+    if (value.project !== null) result.project = value.project
+    if (value.aggregate !== null) result.aggregate = value.aggregate
+    if (value.quantifier !== null) result.quantifier = value.quantifier
+    return result
+  }
   const from = value.kind === 'self' ? 'self' : value.kind
   return { from, attribute: value.attribute }
 }
@@ -89,10 +114,19 @@ export const connectionSelectionToMapping = (selection: ConnectionSelectionNode)
 
 // ── from mapping ──────────────────────────────────────────────────────────────
 
-const valueRefFromRaw = (raw: unknown): ValueRef => {
+export const valueRefFromRaw = (raw: unknown): ValueRef => {
   if (raw !== null && typeof raw === 'object' && 'from' in (raw as Record<string, unknown>)) {
-    const from = String((raw as Record<string, unknown>).from)
-    const attribute = String((raw as Record<string, unknown>).attribute)
+    const rec = raw as Record<string, unknown>
+    const from = String(rec.from)
+    if (from === 'parameter') return parameterValue(String(rec.name))
+    if (from === 'binding') {
+      return bindingValue(String(rec.name), {
+        project: stringOrNull(rec.project),
+        aggregate: rec.aggregate != null ? (stringOrNull(rec.aggregate) as AggregateKind) : null,
+        quantifier: rec.quantifier != null ? (stringOrNull(rec.quantifier) as Quantifier) : null,
+      })
+    }
+    const attribute = String(rec.attribute)
     return from === 'self' ? selfValue(attribute) : endpointValue(from as 'source' | 'target', attribute)
   }
   return literalValue(raw ?? null)
@@ -145,7 +179,14 @@ export const connectionSelectionFromMapping = (raw: unknown): ConnectionSelectio
   }
 }
 
-export const queryToMapping = (query: ExecutableQueryNode): Record<string, unknown> => {
+/** `attributeTypes` defaults to empty tables — safe whenever no binding actually `project`s
+ * an attribute, since it is only consulted for that. Callers authoring bindings with
+ * `project` should pass the criteria catalog's real `entity_attribute_types`/
+ * `connection_attribute_types` for an accurate declared `result_type`. */
+export const queryToMapping = (
+  query: ExecutableQueryNode,
+  attributeTypes: AttributeTypeTables = { entity: {}, connection: {} },
+): Record<string, unknown> => {
   const result: Record<string, unknown> = {
     query_schema: query.querySchema,
     entity_criteria: groupToMapping(query.entityCriteria),
@@ -155,6 +196,11 @@ export const queryToMapping = (query: ExecutableQueryNode): Record<string, unkno
   }
   const connections = connectionSelectionToMapping(query.connections)
   if (Object.keys(connections).length > 0) result.connections = connections
+  if (query.bindings.length > 0) {
+    result.bindings = query.bindings.map((b) => bindingToMapping(b, query.bindings, attributeTypes))
+  }
+  if (query.parameters.length > 0) result.parameters = query.parameters.map(parameterToMapping)
+  if (query.derived.length > 0) result.derived = query.derived.map(derivedAttributeToMapping)
   return result
 }
 
@@ -167,5 +213,8 @@ export const queryFromMapping = (raw: unknown): ExecutableQueryNode => {
     ? rec.include_connected.map((i) => neighborInclusionFromMapping(asRecord(i)))
     : []
   query.connections = connectionSelectionFromMapping(rec.connections)
+  query.bindings = Array.isArray(rec.bindings) ? rec.bindings.map(bindingFromMapping) : []
+  query.parameters = Array.isArray(rec.parameters) ? rec.parameters.map(parameterFromMapping) : []
+  query.derived = Array.isArray(rec.derived) ? rec.derived.map(derivedAttributeFromMapping) : []
   return query
 }

@@ -179,7 +179,8 @@ class TestMcpRestParity:
         }
         parameters = {"entity_type": "application-component"}
         mcp_result = _fn()(
-            action="execute", query=query, parameters=parameters, limit=500, repo_root=str(repo), repo_scope="engagement"
+            action="execute", query=query, parameters=parameters, limit=500,
+            repo_root=str(repo), repo_scope="engagement",
         )
 
         gui_repo = ArtifactRepository(shared_artifact_index([repo]))

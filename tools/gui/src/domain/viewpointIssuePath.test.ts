@@ -29,6 +29,19 @@ const EXAMPLE = {
         neighbor_criteria: { kind: 'group', conjunction: 'and', children: [{ kind: 'condition', attribute: 'type', comparator: 'eq', value: 'process' }] },
       },
     ],
+    bindings: [
+      {
+        name: 'critical-processes', result_type: 'entities[process]', select: 'entities',
+        criteria: { kind: 'group', conjunction: 'and', children: [{ kind: 'condition', attribute: 'type', comparator: 'eq', value: 'process' }] },
+      },
+    ],
+    parameters: [{ name: 'anchor', type: 'entity-id' }],
+    derived: [
+      {
+        name: 'outgoing-count',
+        connection_criteria: { kind: 'group', conjunction: 'and', children: [{ kind: 'condition', attribute: 'type', comparator: 'eq', value: 'archimate-serving' }] },
+      },
+    ],
   },
   presentation: {
     representation: 'table',
@@ -74,5 +87,33 @@ describe('resolveIssuePathNodeId', () => {
   it('returns null for a top-level leaf field with no builder node', () => {
     expect(resolveIssuePathNodeId('/slug', draft)).toBeNull()
     expect(resolveIssuePathNodeId('/version', draft)).toBeNull()
+  })
+
+  it('resolves into a binding criteria condition', () => {
+    const binding = draft.query!.bindings[0]
+    const id = resolveIssuePathNodeId('/query/bindings/0/criteria/children/0/attribute', draft)
+    expect(id).toBe(binding.criteria.children[0].id)
+  })
+
+  it('resolves a binding leaf field (result_type) to the binding node itself', () => {
+    const binding = draft.query!.bindings[0]
+    expect(resolveIssuePathNodeId('/query/bindings/0/result_type', draft)).toBe(binding.id)
+  })
+
+  it('resolves a parameter leaf field (default) to the parameter node itself', () => {
+    const parameter = draft.query!.parameters[0]
+    expect(resolveIssuePathNodeId('/query/parameters/0/default', draft)).toBe(parameter.id)
+  })
+
+  it('resolves into a derived attribute connection_criteria condition', () => {
+    const attribute = draft.query!.derived[0]
+    const id = resolveIssuePathNodeId('/query/derived/0/connection_criteria/children/0/comparator', draft)
+    expect(id).toBe(attribute.connectionCriteria!.children[0].id)
+  })
+
+  it('resolves a bindings/parameters/derived cap issue to no node (path names the array itself)', () => {
+    expect(resolveIssuePathNodeId('/query/bindings', draft)).toBeNull()
+    expect(resolveIssuePathNodeId('/query/parameters', draft)).toBeNull()
+    expect(resolveIssuePathNodeId('/query/derived', draft)).toBeNull()
   })
 })

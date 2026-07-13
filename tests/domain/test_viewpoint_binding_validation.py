@@ -120,7 +120,10 @@ def test_list_binding_reference_accepts_in_and_not_in_without_a_quantifier() -> 
             ),
         )
         definition = ViewpointDefinition(slug="typed-query", version=1, name="Typed query", query=query)
-        assert "unquantified-set-comparison" not in _codes(definition)
+        # A projected-list binding reference is exactly what in/not_in exist to accept —
+        # zero issues, not just an absent unquantified-set-comparison (a well-typed list
+        # reference must not also be rejected as "not a list").
+        assert _codes(definition) == set()
 
 
 def test_tuple_binding_reference_supports_eq_in_not_in_but_rejects_other_comparators() -> None:

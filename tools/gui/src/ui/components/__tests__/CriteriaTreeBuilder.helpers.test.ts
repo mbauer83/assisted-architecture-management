@@ -20,6 +20,10 @@ const CATALOG: CriteriaCatalog = {
   reserved_connection_paths: ['id', 'type', 'specialization'],
   depth_cap: 4,
   entity_type_domains: { 'application-component': 'application', process: 'common' },
+  bindings: { select: ['entities', 'connections'], aggregate: ['count', 'sum', 'avg', 'min', 'max'], result_types: [] },
+  parameters: { types: ['string', 'integer', 'number', 'date', 'boolean', 'slug', 'entity-id'] },
+  derived: { traversal: ['direct', 'derived'], certainty: ['certain', 'potential'], reduce: ['count', 'sum', 'avg', 'min', 'max'] },
+  connection_derivation: {},
 }
 
 describe('attributeOptions', () => {

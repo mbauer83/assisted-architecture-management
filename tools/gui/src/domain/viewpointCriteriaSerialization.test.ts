@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { endpointValue, literalValue, mkGroup, selfValue } from './viewpointCriteria'
+import { bindingValue, endpointValue, literalValue, mkGroup, mkQuery, parameterValue, selfValue } from './viewpointCriteria'
 import {
   connectionSelectionFromMapping,
   connectionSelectionToMapping,
@@ -7,7 +7,10 @@ import {
   groupToMapping,
   neighborInclusionFromMapping,
   neighborInclusionToMapping,
+  queryFromMapping,
+  queryToMapping,
 } from './viewpointCriteriaSerialization'
+import { mkQueryBinding, mkQueryParameter } from './viewpointBindings'
 
 describe('condition value refs', () => {
   it('serializes a literal value as a plain scalar', () => {
@@ -40,6 +43,34 @@ describe('condition value refs', () => {
     const condition = parsed.children[0]
     expect(condition.kind).toBe('condition')
     expect(condition.kind === 'condition' && condition.value).toEqual(selfValue('start_date'))
+  })
+
+  it('serializes a parameter reference as {from: parameter, name}', () => {
+    const group = mkGroup('entity')
+    group.children = [{ kind: 'condition', id: 'c1', attribute: 'status', comparator: 'eq', value: parameterValue('anchor'), negate: false }]
+    expect(groupToMapping(group).children).toEqual([
+      { kind: 'condition', attribute: 'status', comparator: 'eq', value: { from: 'parameter', name: 'anchor' } },
+    ])
+  })
+
+  it('serializes a binding reference with project/aggregate/quantifier, omitting unset ones', () => {
+    const group = mkGroup('entity')
+    group.children = [{
+      kind: 'condition', id: 'c1', attribute: 'strength', comparator: 'gte',
+      value: bindingValue('critical-processes', { project: 'threshold', aggregate: 'max' }), negate: false,
+    }]
+    expect(groupToMapping(group).children).toEqual([{
+      kind: 'condition', attribute: 'strength', comparator: 'gte',
+      value: { from: 'binding', name: 'critical-processes', project: 'threshold', aggregate: 'max' },
+    }])
+  })
+
+  it('round-trips a binding reference with a quantifier through from-mapping', () => {
+    const raw = { from: 'binding', name: 'critical-processes', project: 'id', quantifier: 'any' }
+    const parsed = groupFromMapping({ kind: 'group', conjunction: 'and', children: [{ kind: 'condition', attribute: 'id', comparator: 'in', value: raw }] }, 'entity')
+    const condition = parsed.children[0]
+    expect(condition.kind === 'condition' && condition.value).toEqual(bindingValue('critical-processes', { project: 'id', quantifier: 'any' }))
+    expect(groupToMapping(parsed).children).toEqual([{ kind: 'condition', attribute: 'id', comparator: 'in', value: raw }])
   })
 
   it('omits negate when false and includes it when true', () => {
@@ -105,5 +136,76 @@ describe('connection selection', () => {
     }
     const parsed = connectionSelectionFromMapping(raw)
     expect(connectionSelectionToMapping(parsed)).toEqual(raw)
+  })
+})
+
+describe('query bindings/parameters/derived', () => {
+  it('omits bindings/parameters/derived entirely when the query declares none', () => {
+    expect(queryToMapping(mkQuery())).not.toHaveProperty('bindings')
+    expect(queryToMapping(mkQuery())).not.toHaveProperty('parameters')
+    expect(queryToMapping(mkQuery())).not.toHaveProperty('derived')
+  })
+
+  it('round-trips a set-cardinality entity binding through query mapping', () => {
+    const query = mkQuery()
+    const binding = mkQueryBinding()
+    binding.name = 'critical-processes'
+    binding.criteria.children = [{ kind: 'condition', id: 'c1', attribute: 'type', comparator: 'eq', value: literalValue('process'), negate: false }]
+    query.bindings = [binding]
+    const mapped = queryToMapping(query)
+    expect(mapped.bindings).toEqual([{
+      name: 'critical-processes', result_type: 'entities[process]', select: 'entities',
+      criteria: { kind: 'group', conjunction: 'and', children: [{ kind: 'condition', attribute: 'type', comparator: 'eq', value: 'process' }] },
+    }])
+    const parsed = queryFromMapping(mapped)
+    expect(parsed.bindings[0].name).toBe('critical-processes')
+    expect(parsed.bindings[0].select).toBe('entities')
+    expect(parsed.bindings[0].cardinality).toBe('set')
+  })
+
+  it('round-trips a tuple binding referencing earlier bindings by name', () => {
+    const query = mkQuery()
+    const first = mkQueryBinding()
+    first.name = 'a'
+    const second = mkQueryBinding()
+    second.name = 'b'
+    const tupleBinding = mkQueryBinding()
+    tupleBinding.name = 'pair'
+    tupleBinding.mode = 'tuple'
+    tupleBinding.tupleOf = ['a', 'b']
+    query.bindings = [first, second, tupleBinding]
+    const mapped = queryToMapping(query)
+    const pairMapping = (mapped.bindings as Record<string, unknown>[])[2]
+    expect(pairMapping.tuple).toEqual(['a', 'b'])
+    expect(pairMapping.result_type).toBe('tuple[entities[], entities[]]')
+    const parsed = queryFromMapping(mapped)
+    expect(parsed.bindings[2].mode).toBe('tuple')
+    expect(parsed.bindings[2].tupleOf).toEqual(['a', 'b'])
+  })
+
+  it('round-trips a parameter, omitting required:true and an empty default/description', () => {
+    const query = mkQuery()
+    const parameter = mkQueryParameter()
+    parameter.name = 'anchor'
+    parameter.valueType = 'entity-id'
+    query.parameters = [parameter]
+    const mapped = queryToMapping(query)
+    expect(mapped.parameters).toEqual([{ name: 'anchor', type: 'entity-id' }])
+    const parsed = queryFromMapping(mapped)
+    expect(parsed.parameters[0]).toMatchObject({ name: 'anchor', valueType: 'entity-id', required: true })
+  })
+
+  it('round-trips a derived attribute with a connection.<attr> source', () => {
+    const query = mkQuery()
+    const attribute = {
+      id: 'd1', name: 'impact-distance', direction: 'either' as const, traversal: 'derived' as const,
+      includePotential: false, maxHops: 3, connectionCriteria: null, endpointCriteria: null,
+      reduce: 'min' as const, ofHead: 'relationship-hops' as const, ofAttribute: null,
+    }
+    query.derived = [attribute]
+    const mapped = queryToMapping(query)
+    expect(mapped.derived).toEqual([{ name: 'impact-distance', traversal: 'derived', max_hops: 3, reduce: 'min', of: 'relationship.hops' }])
+    const parsed = queryFromMapping(mapped)
+    expect(parsed.derived[0]).toMatchObject({ name: 'impact-distance', traversal: 'derived', maxHops: 3, reduce: 'min', ofHead: 'relationship-hops' })
   })
 })
