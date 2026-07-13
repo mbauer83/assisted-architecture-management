@@ -57,6 +57,8 @@ export default tseslint.config(
     files: [
       'src/ui/components/ArchimateTypeGlyph.vue',
       'src/ui/components/AssuranceDiagramPanel.vue',
+      'src/ui/components/DiagramEntitySidebar.vue',
+      'src/ui/components/DiagramMatrixView.vue',
       'src/ui/components/MarkdownEditor.vue',
       'src/ui/views/CreateMatrixView.vue',
       'src/ui/views/DiagramDetailView.vue',

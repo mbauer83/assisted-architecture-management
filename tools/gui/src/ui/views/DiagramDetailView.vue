@@ -1,27 +1,25 @@
 <script setup lang="ts">
-import { inject, onMounted, onUnmounted, watch, computed, ref, nextTick } from 'vue'
-import { useRoute, useRouter, RouterLink } from 'vue-router'
+import { computed, inject, onMounted, ref, watch } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import { Effect, Exit } from 'effect'
 import { modelServiceKey } from '../keys'
-import type { DiagramContext, EntityDetail, DiagramConnection, WriteResult, SyncDiagramToModelResult } from '../../domain'
+import type { DiagramContext } from '../../domain'
 import type { RepoError } from '../../ports/ModelRepository'
 import type { NotFoundError } from '../../domain'
-import type { MarkdownError } from '../../application/MarkdownService'
-import { getDomainColor } from '../lib/domains'
-import ArchimateTypeGlyph from '../components/ArchimateTypeGlyph.vue'
-import DownloadMenu from '../components/DownloadMenu.vue'
 import { useQuery } from '../composables/useQuery'
-import { useMutation } from '../composables/useMutation'
-import { toGlyphKey } from '../lib/glyphKey'
 import { renderMatrixMarkdown } from '../lib/matrixMarkdown'
 import type { C4Navigation } from '../../domain'
-import {
-  buildDrilldownByEntityId,
-  diagramNeedsSvg,
-} from './DiagramDetailView.helpers'
-import { lookupViewerExtension, resolveElementMap, neutralizeSentinelLink } from '../lib/diagramViewerExtensions'
-import { SVG_MARKER_ATTRIBUTES } from '../lib/svgHitAreas'
+import { buildDrilldownByEntityId, diagramNeedsSvg } from './DiagramDetailView.helpers'
 import { sanitizeDiagramSvg } from '../lib/svgSanitize'
+import { useFittedPanZoom } from '../composables/useFittedPanZoom'
+import { useSidebarResize } from '../composables/useSidebarResize'
+import { useDiagramSvgSelection } from '../composables/useDiagramSvgSelection'
+import DiagramDetailHeader from '../components/DiagramDetailHeader.vue'
+import DiagramC4Navigation from '../components/DiagramC4Navigation.vue'
+import DiagramEntitySidebar from '../components/DiagramEntitySidebar.vue'
+import DiagramSyncPanel from '../components/DiagramSyncPanel.vue'
+import DiagramDeletePanel from '../components/DiagramDeletePanel.vue'
+import DiagramMatrixView from '../components/DiagramMatrixView.vue'
 
 const svc = inject(modelServiceKey)!
 const route = useRoute()
@@ -32,9 +30,6 @@ const diagramId = computed(() => (route.query.id as string | undefined) ?? '')
 
 const contextQuery = useQuery<DiagramContext, RepoError | NotFoundError>()
 const svgQuery = useQuery<string, RepoError>()
-const entityQuery = useQuery<EntityDetail, RepoError | NotFoundError | MarkdownError>()
-const deleteMutation = useMutation<WriteResult, RepoError>()
-const syncMutation = useMutation<SyncDiagramToModelResult, RepoError>()
 
 const detail = computed(() => contextQuery.data.value?.diagram ?? null)
 const c4Nav = computed<C4Navigation | null>(() => contextQuery.data.value?.c4_navigation ?? null)
@@ -45,577 +40,72 @@ const diagramEntities = computed(() =>
     .sort((a, b) => a.domain.localeCompare(b.domain) || a.artifact_type.localeCompare(b.artifact_type) || a.name.localeCompare(b.name))
 )
 const diagramConnections = computed(() => contextQuery.data.value?.connections ?? [])
-// Per-diagram-type viewer extension (e.g. datatype: selectable attribute rows). The generic
-// viewer stays type-agnostic — it only knows a type may contribute selectable node sub-parts.
-const viewerExtension = computed(() => lookupViewerExtension(detail.value?.diagram_type))
 
-const svgHtml = computed(() =>
-  svgQuery.data.value ? sanitizeDiagramSvg(svgQuery.data.value) : null
-)
-
+const svgHtml = computed(() => svgQuery.data.value ? sanitizeDiagramSvg(svgQuery.data.value) : null)
 const matrixHtml = computed(() => {
   const body = (detail.value as Record<string, unknown> | null)?.matrix_body
   if (!body || detail.value?.diagram_type !== 'matrix') return null
   return renderMatrixMarkdown(body as string)
 })
-
-const editPath = computed(() =>
-  detail.value?.diagram_type === 'matrix' ? '/diagram/edit/matrix' : '/diagram/edit',
-)
+const editPath = computed(() => detail.value?.diagram_type === 'matrix' ? '/diagram/edit/matrix' : '/diagram/edit')
+const isGlobalDiagram = computed(() => detail.value?.is_global ?? false)
 
 const showSource = ref(false)
-const deletePreview = ref<{ content: string | null; warnings: string[] } | null>(null)
-const confirmDelete = ref(false)
-const mainGridRef = ref<HTMLElement | null>(null)
-const sidebarWidth = ref(320)
-const isGlobalDiagram = computed(() => detail.value?.is_global ?? false)
-const deleteFn = computed(() =>
-  (isGlobalDiagram.value && adminMode.value) ? svc.adminDeleteDiagram : svc.deleteDiagram,
-)
-const deleteError = computed(() => {
-  const r = deleteMutation.result.value
-  if (r && !r.wrote) return r.content ?? 'Delete failed'
-  return deleteMutation.errorMessage.value
-})
-
-const confirmSync = ref(false)
-const syncPreview = ref<SyncDiagramToModelResult | null>(null)
-const syncError = computed(() => {
-  const r = syncMutation.result.value
-  if (r && !r.wrote) return r.content ?? 'Sync failed'
-  return syncMutation.errorMessage.value
-})
-
-const selectedEntityDetailHtml = computed(() => {
-  const entity = entityQuery.data.value
-  const html = entity?.content_html
-  if (!entity || !html) return null
-  if (typeof window === 'undefined') return html
-
-  const doc = new DOMParser().parseFromString(`<div>${html}</div>`, 'text/html')
-  const wrapper = doc.body.firstElementChild
-  if (!wrapper) return html
-  const firstHeading = wrapper.querySelector('h1, h2, h3, h4, h5, h6')
-  if (!firstHeading) return html
-
-  const headingText = firstHeading.textContent?.trim().replace(/\s+/g, ' ') ?? ''
-  const entityName = entity.name.trim().replace(/\s+/g, ' ')
-  if (headingText === entityName) firstHeading.remove()
-  return wrapper.innerHTML
-})
-
-// ── SVG rendering ─────────────────────────────────────────────────────────────
-
-const svgContainer = ref<HTMLElement | null>(null)
-const svgNodeElems = ref(new Map<string, Element[]>())
-const prevHighlighted = ref<Element[]>([])
-const selectedConnectionGroup = ref<SVGGElement | null>(null)
-let _interactivityController: AbortController | null = null
-let _attachRun = 0
 
 const load = () => {
   if (!diagramId.value) return
-  selectedSubPart.value = null
+  selection.selectedId.value = null
   contextQuery.reset()
   svgQuery.reset()
   contextQuery.run(svc.getDiagramContext(diagramId.value))
 }
 
+const selection = useDiagramSvgSelection({
+  svc, router, svgHtml, detail, diagramEntities, diagramConnections, drilldownByEntityId, diagramId, reload: load,
+})
+// Template ref binding (`ref="svgContainer"`) requires a top-level `<script setup>` binding
+// by that exact name — aliasing the composable's ref, not copying it.
+const { svgContainer } = selection
+
+const containerRef = ref<HTMLElement | null>(null)
+const panZoom = useFittedPanZoom(containerRef, svgContainer)
+
+const mainGridRef = ref<HTMLElement | null>(null)
+const sidebarResize = useSidebarResize(mainGridRef)
+
+const syncPanel = ref<InstanceType<typeof DiagramSyncPanel> | null>(null)
+const deletePanel = ref<InstanceType<typeof DiagramDeletePanel> | null>(null)
+
 onMounted(() => {
   void Effect.runPromiseExit(svc.getServerInfo()).then((exit) =>
-    Exit.match(exit, {
-      onSuccess: (info) => { adminMode.value = info.admin_mode },
-      onFailure: () => {},
-    }),
+    Exit.match(exit, { onSuccess: (info) => { adminMode.value = info.admin_mode }, onFailure: () => {} }),
   )
   load()
 })
 
-const addConnectionHitAreas = (group: SVGGElement) => {
-  for (const oldHit of Array.from(group.querySelectorAll('[data-conn-hit]'))) oldHit.remove()
-  const segments = Array.from(group.querySelectorAll<SVGElement>('path, line, polyline'))
-  for (const segment of segments) {
-    if (segment.closest('[data-entity-id]')) continue
-    const tag = segment.tagName.toLowerCase()
-    const hit = document.createElementNS('http://www.w3.org/2000/svg', tag)
-    const skippedAttrs: readonly string[] = ['id', 'class', 'style', ...SVG_MARKER_ATTRIBUTES]
-    for (const attr of Array.from(segment.attributes)) {
-      if (skippedAttrs.includes(attr.name)) continue
-      hit.setAttribute(attr.name, attr.value)
-    }
-    const strokeWidth = Number(segment.getAttribute('stroke-width') ?? '')
-    const hitWidth = Math.max(Number.isFinite(strokeWidth) ? strokeWidth * 4 : 0, 12)
-    hit.setAttribute('data-conn-hit', 'true')
-    hit.setAttribute('fill', 'none')
-    hit.setAttribute('stroke', 'transparent')
-    hit.setAttribute('stroke-width', String(hitWidth))
-    hit.setAttribute('pointer-events', 'stroke')
-    hit.setAttribute('vector-effect', 'non-scaling-stroke')
-    group.appendChild(hit)
-  }
-}
-
-// Delegate selectable node sub-parts (e.g. datatype attribute rows) to the diagram type's
-// viewer extension, if any — keeps all type-specific knowledge out of this generic view.
-const attachNodeSubParts = (g: SVGGElement, entityId: string, signal: AbortSignal) => {
-  const ext = viewerExtension.value
-  const diagramEntities = detail.value?.diagram_entities
-  if (!ext || typeof diagramEntities !== 'object' || diagramEntities === null) return
-  ext.attachNodeSubParts({
-    entityId,
-    node: g,
-    diagramEntities: diagramEntities as Record<string, unknown>,
-    signal,
-    onSelect: selectSubPart,
-  })
-}
-
-const attachInteractivity = async () => {
-  const runId = ++_attachRun
-  _interactivityController?.abort()
-  _interactivityController = new AbortController()
-  const { signal } = _interactivityController
-  svgNodeElems.value.clear()
-  prevHighlighted.value = []
-  await nextTick()
-  await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()))
-  if (runId !== _attachRun || signal.aborted) return
-  const svgEl = svgContainer.value?.querySelector('svg')
-  if (!svgEl || !diagramEntities.value.length) return
-
-  // Renderer-specific SVG↔artifact matching lives behind the viewer-extension contract; this
-  // view only consumes the resulting maps, never the diagram type's SVG conventions directly.
-  const rawDiagramEntities = detail.value?.diagram_entities
-  const { nodes, edges } = resolveElementMap(detail.value?.diagram_type, svgEl, {
-    entities: diagramEntities.value,
-    connections: diagramConnections.value,
-    diagramEntities: typeof rawDiagramEntities === 'object' && rawDiagramEntities !== null
-      ? (rawDiagramEntities as Record<string, unknown>)
-      : undefined,
-  })
-
-  for (const [artifactId, elems] of nodes) {
-    svgNodeElems.value.set(artifactId, elems)
-    for (const g of elems) {
-      // Mapped representatives may be group/anchor elements OR bare shapes (an activity
-      // step's rect/polygon, mapped so the whole step is clickable, not only its label).
-      if (!(g instanceof SVGElement)) continue
-      g.setAttribute('data-entity-id', artifactId)
-      g.addEventListener('click', (ev) => { ev.stopPropagation(); ev.preventDefault(); selectEntity(artifactId) }, { signal })
-      if (g instanceof SVGGElement) attachNodeSubParts(g, artifactId, signal)
-      else if (g instanceof SVGAElement) neutralizeSentinelLink(g)
-    }
-  }
-
-  // Inject drill-down badges for entities that scope a child C4 diagram.
-  // Badges sit at the node's top-right corner inside the SVG coordinate space (first occurrence).
-  const drillTargets = drilldownByEntityId.value
-  for (const [artifactId, targetId] of Object.entries(drillTargets)) {
-    const entityEl = svgNodeElems.value.get(artifactId)?.[0]
-    if (!(entityEl instanceof SVGGraphicsElement)) continue
-    try {
-      const bbox = entityEl.getBBox()
-      if (!bbox.width || !bbox.height) continue
-      const badgeG = document.createElementNS('http://www.w3.org/2000/svg', 'g')
-      badgeG.setAttribute('class', 'c4-drill-badge')
-      badgeG.setAttribute('transform', `translate(${bbox.x + bbox.width - 18},${bbox.y + 2})`)
-      const br = document.createElementNS('http://www.w3.org/2000/svg', 'rect')
-      br.setAttribute('width', '16'); br.setAttribute('height', '14'); br.setAttribute('rx', '3')
-      br.setAttribute('fill', '#1e40af'); br.setAttribute('opacity', '0.85')
-      br.setAttribute('cursor', 'pointer')
-      badgeG.appendChild(br)
-      const bt = document.createElementNS('http://www.w3.org/2000/svg', 'text')
-      bt.setAttribute('x', '8'); bt.setAttribute('y', '11')
-      bt.setAttribute('text-anchor', 'middle'); bt.setAttribute('font-size', '10')
-      bt.setAttribute('fill', 'white'); bt.setAttribute('pointer-events', 'none')
-      bt.textContent = '⤵'
-      badgeG.appendChild(bt)
-      svgEl.appendChild(badgeG)
-      badgeG.addEventListener('click', (ev) => {
-        ev.stopPropagation()
-        void router.push({ path: '/diagram', query: { id: targetId } })
-      }, { signal })
-    } catch { /* getBBox unavailable in non-rendered contexts */ }
-  }
-
-  for (const [connArtifactId, elems] of edges) {
-    const conn = diagramConnections.value.find((c) => c.artifact_id === connArtifactId)
-    if (!conn) continue
-    for (const g of elems) {
-      if (!(g instanceof SVGGElement) || g.hasAttribute('data-conn-id')) continue
-      addConnectionHitAreas(g)
-      g.setAttribute('data-conn-id', conn.artifact_id)
-      g.addEventListener('click', (ev) => { ev.stopPropagation(); selectConnection(conn, g) }, { signal })
-    }
-  }
-}
-
-watch([svgHtml, diagramEntities, diagramConnections], () => { void attachInteractivity() }, { flush: 'post' })
-
-// ── Selection ─────────────────────────────────────────────────────────────────
-
-const selectedId = ref<string | null>(null)
-const selectedConnection = ref<DiagramConnection | null>(null)
-// Opaque payload from the diagram type's viewer extension; rendered by its detailComponent.
-const selectedSubPart = ref<unknown>(null)
-let selectedSubPartEls: Element[] = []
-const edgeLabelInput = ref('')
-const edgeLabelMutation = useMutation<WriteResult, RepoError>()
-
-watch(selectedConnection, (conn) => {
-  edgeLabelInput.value = conn?.edge_label_override ?? ''
-})
-
-watch(selectedId, (newId) => {
-  for (const el of prevHighlighted.value) el.classList.remove('svg-selected')
-  prevHighlighted.value = []
-  if (!newId) return
-  const els = svgNodeElems.value.get(newId) ?? []
-  for (const el of els) el.classList.add('svg-selected')
-  prevHighlighted.value = els
-})
-
-const clearConnection = () => {
-  selectedConnectionGroup.value?.classList.remove('svg-conn-selected')
-  selectedConnectionGroup.value = null
-  selectedConnection.value = null
-}
-const clearSubPart = () => {
-  for (const el of selectedSubPartEls) el.classList.remove('svg-subpart-selected')
-  selectedSubPartEls = []
-  selectedSubPart.value = null
-}
-const selectConnection = (conn: DiagramConnection, el: SVGGElement) => {
-  if (selectedId.value) selectedId.value = null
-  clearSubPart()
-  const same = selectedConnection.value?.artifact_id === conn.artifact_id
-  clearConnection()
-  if (!same) {
-    selectedConnection.value = conn
-    selectedConnectionGroup.value = el
-    el.classList.add('svg-conn-selected')
-  }
-}
-const selectSubPart = (detail: unknown, elements: Element[] = []) => {
-  clearConnection()
-  if (selectedId.value) { selectedId.value = null; entityQuery.reset() }
-  clearSubPart()
-  selectedSubPart.value = detail
-  selectedSubPartEls = elements
-  for (const el of elements) el.classList.add('svg-subpart-selected')
-}
-const selectEntity = (id: string) => {
-  clearConnection()
-  clearSubPart()
-  if (selectedId.value === id) {
-    selectedId.value = null
-    entityQuery.reset()
-    return
-  }
-  selectedId.value = id
-  entityQuery.run(svc.getEntity(id))
-}
-
-let _savingEdgeLabel = false
-
-const saveEdgeLabel = async () => {
-  if (_savingEdgeLabel) return
-  const conn = selectedConnection.value
-  if (!conn?.edge_key || !diagramId.value) return
-  const rawLabel = edgeLabelInput.value.trim()
-  const label = rawLabel.length > 0 ? rawLabel : null
-  _savingEdgeLabel = true
-  try {
-    const exit = await edgeLabelMutation.run(
-      svc.setEdgeLabel({ artifact_id: diagramId.value, edge_key: conn.edge_key, label, dry_run: false }),
-    )
-    if (Exit.isSuccess(exit)) load()
-  } finally {
-    _savingEdgeLabel = false
-  }
-}
-
-// ── Sidebar resize ────────────────────────────────────────────────────────────
-
-const mainGridStyle = computed(() => ({
-  '--sidebar-width': `${sidebarWidth.value}px`,
-}))
-
-const clampSidebarWidth = (nextWidth: number): number => {
-  const gridWidth = mainGridRef.value?.getBoundingClientRect().width ?? window.innerWidth
-  const minWidth = 260
-  const maxWidth = Math.min(520, Math.max(minWidth, Math.floor(gridWidth * 0.45)))
-  return Math.min(maxWidth, Math.max(minWidth, nextWidth))
-}
-
-let resizingSidebar = false
-
-const onSidebarResizeMove = (e: MouseEvent) => {
-  if (!resizingSidebar || !mainGridRef.value) return
-  const rect = mainGridRef.value.getBoundingClientRect()
-  sidebarWidth.value = clampSidebarWidth(rect.right - e.clientX)
-}
-
-const stopSidebarResize = () => {
-  resizingSidebar = false
-  document.body.classList.remove('diagram-split-resizing')
-  window.removeEventListener('mousemove', onSidebarResizeMove)
-  window.removeEventListener('mouseup', stopSidebarResize)
-}
-
-const startSidebarResize = (e: MouseEvent) => {
-  if (!mainGridRef.value) return
-  const rect = mainGridRef.value.getBoundingClientRect()
-  if (rect.width < 900) return
-  e.preventDefault()
-  resizingSidebar = true
-  document.body.classList.add('diagram-split-resizing')
-  window.addEventListener('mousemove', onSidebarResizeMove)
-  window.addEventListener('mouseup', stopSidebarResize)
-}
-
-
-// ── Pan / Zoom ────────────────────────────────────────────────────────────────
-
-const containerRef = ref<HTMLElement | null>(null)
-const scale = ref(1)
-const tx = ref(0)
-const ty = ref(0)
-const fitScale = ref(1)
-const fitTx = ref(0)
-const fitTy = ref(0)
-let resizeObserver: ResizeObserver | null = null
-let dragging = false
-let drag = { x: 0, y: 0, tx: 0, ty: 0 }
-
-const canvasStyle = computed(() => ({
-  transform: `translate(${tx.value}px, ${ty.value}px) scale(${scale.value})`,
-  transformOrigin: '0 0',
-  willChange: 'transform',
-  display: 'inline-block',
-}))
-const isTransformed = computed(() =>
-  Math.abs(scale.value - fitScale.value) > 0.001
-  || Math.abs(tx.value - fitTx.value) > 0.5
-  || Math.abs(ty.value - fitTy.value) > 0.5,
-)
-
-const fitDiagramToViewport = async () => {
-  await nextTick()
-  const container = containerRef.value
-  const svgEl = svgContainer.value?.querySelector('svg') as SVGSVGElement | null
-  if (!container || !svgEl) return
-
-  let contentWidth = 0, contentHeight = 0, contentX = 0, contentY = 0
-  try {
-    const graphRoot = svgEl.querySelector('g')
-    const bbox = (graphRoot ?? svgEl).getBBox()
-    contentX = bbox.x; contentY = bbox.y
-    contentWidth = bbox.width; contentHeight = bbox.height
-  } catch {
-    const viewBox = svgEl.viewBox?.baseVal
-    if (viewBox && viewBox.width > 0 && viewBox.height > 0) {
-      contentX = viewBox.x; contentY = viewBox.y
-      contentWidth = viewBox.width; contentHeight = viewBox.height
-    } else {
-      const widthAttr = Number(svgEl.getAttribute('width') ?? '')
-      const heightAttr = Number(svgEl.getAttribute('height') ?? '')
-      contentWidth = Number.isFinite(widthAttr) && widthAttr > 0 ? widthAttr : svgEl.clientWidth
-      contentHeight = Number.isFinite(heightAttr) && heightAttr > 0 ? heightAttr : svgEl.clientHeight
-    }
-  }
-  if (!contentWidth || !contentHeight) return
-
-  const rect = container.getBoundingClientRect()
-  const horizontalPadding = 24
-  const topPadding = Math.min(Math.max(rect.height * 0.035, 16), 40)
-  const bottomPadding = 24
-  const availableWidth = Math.max(rect.width - horizontalPadding * 2, 80)
-  const availableHeight = Math.max(rect.height - topPadding - bottomPadding, 80)
-  const fittedScale = Math.min(availableWidth / contentWidth, availableHeight / contentHeight)
-  if (!Number.isFinite(fittedScale) || fittedScale <= 0) return
-
-  fitScale.value = fittedScale
-  fitTx.value = (rect.width - contentWidth * fittedScale) / 2 - contentX * fittedScale
-  fitTy.value = topPadding - contentY * fittedScale
-  scale.value = fitScale.value
-  tx.value = fitTx.value
-  ty.value = fitTy.value
-}
-
-const onWheel = (e: WheelEvent) => {
-  e.preventDefault()
-  const factor = e.deltaY < 0 ? 1.15 : 1 / 1.15
-  const ns = Math.min(8, Math.max(0.2, scale.value * factor))
-  const r = ns / scale.value
-  const rect = containerRef.value!.getBoundingClientRect()
-  tx.value = (e.clientX - rect.left) * (1 - r) + tx.value * r
-  ty.value = (e.clientY - rect.top) * (1 - r) + ty.value * r
-  scale.value = ns
-}
-
-const onMouseDown = (e: MouseEvent) => {
-  if ((e.target as HTMLElement).closest('[data-entity-id], [data-conn-id], button, a')) return
-  dragging = true
-  drag = { x: e.clientX, y: e.clientY, tx: tx.value, ty: ty.value }
-  window.addEventListener('mousemove', onMouseMove)
-  window.addEventListener('mouseup', onMouseUp)
-}
-const onMouseMove = (e: MouseEvent) => {
-  if (!dragging) return
-  tx.value = drag.tx + (e.clientX - drag.x)
-  ty.value = drag.ty + (e.clientY - drag.y)
-}
-const onMouseUp = () => {
-  dragging = false
-  window.removeEventListener('mousemove', onMouseMove)
-  window.removeEventListener('mouseup', onMouseUp)
-}
-const resetView = () => {
-  scale.value = fitScale.value
-  tx.value = fitTx.value
-  ty.value = fitTy.value
-}
-
-// ── Delete ────────────────────────────────────────────────────────────────────
-
-const previewDelete = () => {
-  if (!diagramId.value) return
-  confirmDelete.value = true
-  deletePreview.value = null
-  deleteMutation.reset()
-  void deleteMutation.run(deleteFn.value({ artifact_id: diagramId.value, dry_run: true }))
-    .then((exit) => Exit.match(exit, {
-      onSuccess: (r) => { deletePreview.value = { content: r.content, warnings: [...r.warnings] } },
-      onFailure: () => {},
-    }))
-}
-
-const cancelDelete = () => {
-  confirmDelete.value = false
-  deletePreview.value = null
-  deleteMutation.reset()
-}
-
-const executeDelete = () => {
-  if (!diagramId.value) return
-  void deleteMutation.run(deleteFn.value({ artifact_id: diagramId.value, dry_run: false }))
-    .then((exit) => Exit.match(exit, {
-      onSuccess: (r) => { if (r.wrote) void router.push(isGlobalDiagram.value ? '/global/diagrams' : '/diagrams') },
-      onFailure: () => {},
-    }))
-}
-
-// ── Sync to model ─────────────────────────────────────────────────────────────
-
-const previewSync = () => {
-  if (!diagramId.value) return
-  confirmSync.value = true
-  syncPreview.value = null
-  syncMutation.reset()
-  void syncMutation.run(svc.syncDiagramToModel({ artifact_id: diagramId.value, dry_run: true }))
-    .then((exit) => Exit.match(exit, {
-      onSuccess: (r) => { syncPreview.value = r },
-      onFailure: () => {},
-    }))
-}
-
-const cancelSync = () => {
-  confirmSync.value = false
-  syncPreview.value = null
-  syncMutation.reset()
-}
-
-const executeSync = () => {
-  if (!diagramId.value) return
-  void syncMutation.run(svc.syncDiagramToModel({ artifact_id: diagramId.value, dry_run: false }))
-    .then((exit) => Exit.match(exit, {
-      onSuccess: (r) => {
-        if (r.wrote) {
-          confirmSync.value = false
-          syncPreview.value = null
-          load()
-        }
-      },
-      onFailure: () => {},
-    }))
-}
-
-watch(containerRef, (el, prev) => {
-  prev?.removeEventListener('wheel', onWheel)
-  el?.addEventListener('wheel', onWheel, { passive: false })
-  resizeObserver?.disconnect()
-  resizeObserver = null
-  if (!el) return
-  resizeObserver = new ResizeObserver(() => {
-    if (!isTransformed.value) void fitDiagramToViewport()
-  })
-  resizeObserver.observe(el)
-})
-watch(svgHtml, (svg) => { if (svg) void fitDiagramToViewport() })
+watch(svgHtml, (svg) => { if (svg) void panZoom.fitDiagramToViewport() })
 watch(detail, (next) => {
   if (diagramNeedsSvg(next?.diagram_type)) svgQuery.run(svc.getDiagramSvg(diagramId.value))
 })
 watch(diagramId, load)
-onUnmounted(() => {
-  resizeObserver?.disconnect()
-  containerRef.value?.removeEventListener('wheel', onWheel)
-  window.removeEventListener('mousemove', onMouseMove)
-  window.removeEventListener('mouseup', onMouseUp)
-  stopSidebarResize()
-  _interactivityController?.abort()
-})
+
+const executeDelete = () => {
+  void router.push(isGlobalDiagram.value ? '/global/diagrams' : '/diagrams')
+}
 </script>
 
 <template>
   <div class="page">
-    <div class="page-hdr">
-      <RouterLink
-        to="/diagrams"
-        class="back"
-      >
-        ← Diagrams
-      </RouterLink>
-      <h1
-        v-if="detail"
-        class="pg-title"
-      >
-        {{ detail.name }}
-      </h1>
-      <DownloadMenu
-        v-if="detail"
-        :diagram-id="diagramId"
-        :diagram-name="detail.name"
-      />
-      <RouterLink
-        v-if="detail && !isGlobalDiagram"
-        :to="{ path: '/promote', query: { diagram_id: diagramId } }"
-        class="promote-btn"
-      >
-        ↑ Promote to Global
-      </RouterLink>
-      <RouterLink
-        v-if="detail"
-        :to="{ path: editPath, query: { id: diagramId } }"
-        class="edit-btn"
-      >
-        Edit
-      </RouterLink>
-      <button
-        v-if="detail && !isGlobalDiagram"
-        class="sync-btn"
-        @click="previewSync"
-      >
-        Sync to model
-      </button>
-      <button
-        v-if="detail && (!isGlobalDiagram || adminMode)"
-        class="delete-btn"
-        @click="previewDelete"
-      >
-        Delete{{ isGlobalDiagram && adminMode ? ' ⚠' : '' }}
-      </button>
-    </div>
+    <DiagramDetailHeader
+      v-if="detail"
+      :detail="detail"
+      :diagram-id="diagramId"
+      :edit-path="editPath"
+      :is-global-diagram="isGlobalDiagram"
+      :admin-mode="adminMode"
+      @sync="syncPanel?.requestSync()"
+      @delete="deletePanel?.requestDelete()"
+    />
 
     <div
       v-if="contextQuery.loading.value"
@@ -640,63 +130,28 @@ onUnmounted(() => {
         <span class="mono faded">v{{ detail.version }} · {{ detail.artifact_id }}</span>
       </div>
 
-      <!-- C4 up-banner: sticky breadcrumb showing parent C4 diagrams -->
-      <div
-        v-if="c4Nav?.parent_diagrams.length"
-        class="c4-up-banner"
-      >
-        <span class="c4-level-badge">L{{ c4Nav.current_level }}</span>
-        <span
-          v-if="c4Nav.scope_entity_name"
-          class="c4-scope-name"
-        >{{ c4Nav.scope_entity_name }}</span>
-        <span class="c4-sep">·</span>
-        <RouterLink
-          v-for="p in c4Nav.parent_diagrams"
-          :key="p.diagram_id"
-          :to="{ path: '/diagram', query: { id: p.diagram_id } }"
-          class="c4-up-link"
-        >
-          ↑ {{ p.diagram_name }}
-        </RouterLink>
-      </div>
-
-      <!-- C4 child links (de-emphasised; primary drill-down is via on-node badges) -->
-      <div
-        v-if="c4Nav?.child_diagrams.length"
-        class="c4-child-nav"
-      >
-        <span class="c4-nav-dir">Drill down:</span>
-        <RouterLink
-          v-for="child in c4Nav.child_diagrams"
-          :key="child.diagram_id"
-          :to="{ path: '/diagram', query: { id: child.diagram_id } }"
-          class="c4-nav-link"
-        >
-          ⤵ {{ child.diagram_name }}
-        </RouterLink>
-      </div>
+      <DiagramC4Navigation
+        v-if="c4Nav"
+        :c4-navigation="c4Nav"
+      />
 
       <div
         ref="mainGridRef"
         class="main-grid"
-        :style="mainGridStyle"
+        :style="sidebarResize.gridStyle.value"
       >
-        <!-- Matrix: rendered markdown tables -->
-        <div
+        <DiagramMatrixView
           v-if="detail?.diagram_type === 'matrix' && matrixHtml"
-          class="matrix-view"
-          v-html="matrixHtml"
+          :html="matrixHtml"
         />
-        <!-- ArchiMate: pan+zoom SVG canvas -->
         <div
           v-else
           ref="containerRef"
           class="img-container"
-          @mousedown="onMouseDown"
-          @dblclick="resetView"
+          @mousedown="panZoom.onMouseDown"
+          @dblclick="panZoom.resetView"
         >
-          <div :style="canvasStyle">
+          <div :style="panZoom.canvasStyle.value">
             <div
               v-if="svgQuery.loading.value"
               class="no-img"
@@ -723,10 +178,10 @@ onUnmounted(() => {
             </div>
           </div>
           <button
-            v-if="isTransformed"
+            v-if="panZoom.isTransformed.value"
             class="reset-btn"
             title="Reset view"
-            @click.stop="resetView"
+            @click.stop="panZoom.resetView"
           >
             ⊙ Reset
           </button>
@@ -740,251 +195,41 @@ onUnmounted(() => {
           role="separator"
           aria-orientation="vertical"
           aria-label="Resize sidebar"
-          @mousedown="startSidebarResize"
+          @mousedown="sidebarResize.startResize"
         />
 
-        <!-- Sidebar: entity list + inline detail -->
-        <aside class="sidebar card">
-          <div class="sb-hdr">
-            <span class="sb-title">Entities</span>
-            <span class="sb-count">{{ diagramEntities.length }}</span>
-          </div>
-          <ul class="ent-list">
-            <li
-              v-for="e in diagramEntities"
-              :key="e.artifact_id"
-              class="ent-item"
-              :class="{ 'ent--active': selectedId === e.artifact_id }"
-              @click="selectEntity(e.artifact_id)"
-            >
-              <span
-                class="ent-glyph"
-                :title="e.artifact_type"
-              >
-                <ArchimateTypeGlyph
-                  :type="toGlyphKey(e.artifact_type)"
-                  :size="13"
-                />
-              </span>
-              <span
-                class="ent-dot"
-                :style="{ background: getDomainColor(e.domain) }"
-              />
-              <span class="ent-name">{{ e.name }}</span>
-            </li>
-          </ul>
-
-          <component
-            :is="viewerExtension.detailComponent"
-            v-if="selectedSubPart && viewerExtension"
-            :detail="selectedSubPart"
-            @close="clearSubPart()"
-          />
-
-          <div
-            v-if="selectedConnection"
-            class="ent-det"
-          >
-            <div class="det-hdr">
-              <span class="det-name">{{ selectedConnection.conn_type }}</span>
-              <button
-                class="det-close"
-                @click="clearConnection()"
-              >
-                ×
-              </button>
-            </div>
-            <div class="conn-flow">
-              {{ selectedConnection.source_name }} → {{ selectedConnection.target_name }}
-            </div>
-            <div
-              v-if="selectedConnection.content_text?.trim()"
-              class="det-content"
-            >
-              {{ selectedConnection.content_text }}
-            </div>
-            <div
-              v-if="selectedConnection.edge_key"
-              class="det-edge-label"
-            >
-              <label class="det-label-text">Diagram label</label>
-              <input
-                v-model="edgeLabelInput"
-                class="det-label-input"
-                placeholder="(derived)"
-                @keydown.enter.prevent="saveEdgeLabel"
-                @blur="saveEdgeLabel"
-              >
-              <div
-                v-if="edgeLabelMutation.errorMessage.value"
-                class="det-label-err"
-              >
-                {{ edgeLabelMutation.errorMessage.value }}
-              </div>
-            </div>
-          </div>
-          <div
-            v-if="selectedId && entityQuery.loading.value"
-            class="ent-det ent-det--loading"
-          >
-            Loading…
-          </div>
-          <div
-            v-if="entityQuery.data.value"
-            class="ent-det"
-          >
-            <div class="det-hdr">
-              <RouterLink
-                :to="{ path: '/entity', query: { id: entityQuery.data.value.artifact_id } }"
-                class="det-name"
-              >
-                {{ entityQuery.data.value.name }}
-              </RouterLink>
-              <button
-                class="det-close"
-                @click="selectEntity(selectedId!)"
-              >
-                ×
-              </button>
-            </div>
-            <div class="det-chips">
-              <span
-                class="chip"
-                :class="`domain--${entityQuery.data.value.domain}`"
-              >{{ entityQuery.data.value.domain }}</span>
-              <span
-                class="chip"
-                :class="`status--${entityQuery.data.value.status}`"
-              >{{ entityQuery.data.value.status }}</span>
-              <span class="chip chip-type">{{ entityQuery.data.value.artifact_type }}</span>
-            </div>
-            <div
-              v-if="selectedEntityDetailHtml"
-              class="det-content markdown-body"
-              v-html="selectedEntityDetailHtml"
-            />
-            <RouterLink
-              :to="{ path: '/graph', query: { id: entityQuery.data.value.artifact_id } }"
-              class="explore-lnk"
-            >
-              Explore in graph →
-            </RouterLink>
-          </div>
-        </aside>
+        <DiagramEntitySidebar
+          :entities="diagramEntities"
+          :viewer-extension="selection.viewerExtension.value"
+          :selected-id="selection.selectedId.value"
+          :selected-connection="selection.selectedConnection.value"
+          :selected-sub-part="selection.selectedSubPart.value"
+          :entity-query="selection.entityQuery"
+          :edge-label-input="selection.edgeLabelInput.value"
+          :edge-label-error="selection.edgeLabelMutation.errorMessage.value"
+          @select-entity="selection.selectEntity($event)"
+          @clear-connection="selection.clearConnection()"
+          @clear-sub-part="selection.clearSubPart()"
+          @update:edge-label-input="selection.edgeLabelInput.value = $event"
+          @save-edge-label="selection.saveEdgeLabel()"
+        />
       </div>
 
-      <div
-        v-if="confirmSync"
-        class="sync-panel"
-      >
-        <div class="sync-title">
-          Sync diagram to model
-        </div>
-        <div class="sync-text">
-          Entities and connections no longer in the model will be removed; names will be refreshed.
-        </div>
-        <template v-if="syncPreview">
-          <div
-            v-if="syncPreview.removed_entity_ids.length || syncPreview.removed_connection_ids.length"
-            class="sync-removed"
-          >
-            <span v-if="syncPreview.removed_entity_ids.length">
-              {{ syncPreview.removed_entity_ids.length }} stale
-              {{ syncPreview.removed_entity_ids.length === 1 ? 'entity' : 'entities' }} will be removed.
-            </span>
-            <span v-if="syncPreview.removed_connection_ids.length">
-              {{ syncPreview.removed_connection_ids.length }} stale
-              {{ syncPreview.removed_connection_ids.length === 1 ? 'connection' : 'connections' }} will be removed.
-            </span>
-          </div>
-          <div
-            v-else
-            class="sync-uptodate"
-          >
-            Diagram is already up to date — no stale references found.
-          </div>
-          <div
-            v-if="syncPreview.warnings.length"
-            class="preview-warnings"
-          >
-            <div
-              v-for="w in syncPreview.warnings"
-              :key="w"
-              class="preview-warn"
-            >
-              {{ w }}
-            </div>
-          </div>
-        </template>
-        <pre
-          v-if="syncError"
-          class="state err state-block"
-        >{{ syncError }}</pre>
-        <div class="sync-actions">
-          <button
-            class="toggle-btn"
-            :disabled="syncMutation.running.value"
-            @click="cancelSync"
-          >
-            Cancel
-          </button>
-          <button
-            class="sync-confirm-btn"
-            :disabled="syncMutation.running.value || !syncPreview"
-            @click="executeSync"
-          >
-            {{ syncMutation.running.value ? 'Syncing…' : 'Apply sync' }}
-          </button>
-        </div>
-      </div>
+      <DiagramSyncPanel
+        v-if="!isGlobalDiagram"
+        ref="syncPanel"
+        :diagram-id="diagramId"
+        @synced="load"
+      />
 
-      <div
-        v-if="confirmDelete"
-        class="delete-panel"
-      >
-        <div class="delete-title">
-          Delete Diagram
-        </div>
-        <div class="delete-text">
-          Deletion removes the diagram source file and any rendered PNG/SVG siblings.
-        </div>
-        <div
-          v-if="deletePreview?.warnings.length"
-          class="preview-warnings"
-        >
-          <div
-            v-for="w in deletePreview.warnings"
-            :key="w"
-            class="preview-warn"
-          >
-            {{ w }}
-          </div>
-        </div>
-        <pre
-          v-if="deletePreview?.content"
-          class="delete-preview"
-        >{{ deletePreview.content }}</pre>
-        <pre
-          v-if="deleteError"
-          class="state err state-block"
-        >{{ deleteError }}</pre>
-        <div class="delete-actions">
-          <button
-            class="toggle-btn"
-            :disabled="deleteMutation.running.value"
-            @click="cancelDelete"
-          >
-            Cancel
-          </button>
-          <button
-            class="delete-confirm-btn"
-            :disabled="deleteMutation.running.value"
-            @click="executeDelete"
-          >
-            {{ deleteMutation.running.value ? 'Deleting…' : 'Delete Diagram' }}
-          </button>
-        </div>
-      </div>
+      <DiagramDeletePanel
+        v-if="!isGlobalDiagram || adminMode"
+        ref="deletePanel"
+        :diagram-id="diagramId"
+        :is-global-diagram="isGlobalDiagram"
+        :admin-mode="adminMode"
+        @deleted="executeDelete"
+      />
 
       <div
         v-if="detail.puml_source"
@@ -1007,21 +252,9 @@ onUnmounted(() => {
 
 <style scoped>
 .page { max-width: 100%; }
-.page-hdr { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; }
-.back { font-size: 13px; color: #6b7280; } .back:hover { color: #374151; text-decoration: none; }
-.pg-title { font-size: 20px; font-weight: 700; flex: 1; margin: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.promote-btn {
-  padding: 5px 16px; background: #fef3c7; border: 1px solid #fde68a; border-radius: 6px;
-  font-size: 13px; font-weight: 500; color: #92400e; text-decoration: none; flex-shrink: 0;
-}
-.promote-btn:hover { background: #fde68a; text-decoration: none; }
-.edit-btn { padding: 5px 16px; background: #f3f4f6; border: 1px solid #d1d5db; border-radius: 6px; font-size: 13px; font-weight: 500; color: #374151; text-decoration: none; flex-shrink: 0; } .edit-btn:hover { background: #e5e7eb; }
-.delete-btn { padding: 5px 16px; background: #fef2f2; border: 1px solid #fecaca; border-radius: 6px; font-size: 13px; font-weight: 600; color: #b91c1c; cursor: pointer; flex-shrink: 0; }
-.delete-btn:hover { background: #fee2e2; }
 .meta { display: flex; align-items: center; gap: 8px; margin-bottom: 14px; font-size: 12px; }
 .faded { color: #9ca3af; } .mono { font-family: monospace; }
 .state { color: #6b7280; } .err { color: #dc2626; }
-.state-block { white-space: pre-wrap; overflow-x: auto; }
 .type-badge { padding: 2px 8px; border-radius: 4px; font-size: 11px; background: #dbeafe; color: #1e40af; font-weight: 500; }
 
 .main-grid { --sidebar-width: 320px; display: grid; grid-template-columns: minmax(0, 1fr) 12px var(--sidebar-width); gap: 0; align-items: start; }
@@ -1076,32 +309,6 @@ onUnmounted(() => {
 .reset-btn:hover { background: white; }
 .zoom-hint { position: absolute; bottom: 6px; left: 50%; transform: translateX(-50%); font-size: 11px; color: #9ca3af; background: rgba(255,255,255,.8); padding: 2px 8px; border-radius: 4px; pointer-events: none; white-space: nowrap; }
 
-.card { background: white; border-radius: 8px; border: 1px solid #e5e7eb; }
-.sync-btn { padding: 5px 16px; background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 6px; font-size: 13px; font-weight: 600; color: #1d4ed8; cursor: pointer; flex-shrink: 0; }
-.sync-btn:hover { background: #dbeafe; }
-.sync-panel { margin-top: 16px; padding: 16px; background: #f0f9ff; border: 1px solid #bae6fd; border-radius: 8px; }
-.sync-title { font-size: 14px; font-weight: 700; color: #0c4a6e; margin-bottom: 6px; }
-.sync-text { font-size: 13px; color: #0369a1; margin-bottom: 10px; }
-.sync-removed { font-size: 13px; color: #b45309; background: #fffbeb; border: 1px solid #fde68a; border-radius: 6px; padding: 8px 10px; margin-bottom: 10px; display: flex; flex-direction: column; gap: 2px; }
-.sync-uptodate { font-size: 13px; color: #166534; background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 6px; padding: 8px 10px; margin-bottom: 10px; }
-.sync-actions { display: flex; gap: 8px; justify-content: flex-end; }
-.sync-confirm-btn { padding: 5px 16px; background: #2563eb; border: none; border-radius: 6px; font-size: 13px; font-weight: 600; color: white; cursor: pointer; }
-.sync-confirm-btn:hover:not(:disabled) { background: #1d4ed8; }
-.sync-confirm-btn:disabled { opacity: .5; cursor: not-allowed; }
-.delete-panel { margin-top: 16px; padding: 16px; background: #fff7f7; border: 1px solid #fecaca; border-radius: 8px; }
-.delete-title { font-size: 14px; font-weight: 700; color: #991b1b; margin-bottom: 6px; }
-.delete-text { font-size: 13px; color: #7f1d1d; margin-bottom: 10px; }
-.delete-preview {
-  font-size: 11px; color: #374151; white-space: pre-wrap; max-height: 260px; overflow-y: auto;
-  font-family: monospace; background: white; border: 1px solid #fecaca; border-radius: 6px; padding: 10px; margin-bottom: 10px;
-}
-.delete-actions { display: flex; gap: 8px; justify-content: flex-end; }
-.delete-confirm-btn {
-  padding: 5px 16px; background: #dc2626; border: none; border-radius: 6px; font-size: 13px; font-weight: 600; color: white; cursor: pointer;
-}
-.delete-confirm-btn:hover:not(:disabled) { background: #b91c1c; }
-.delete-confirm-btn:disabled { opacity: .5; cursor: not-allowed; }
-.sidebar { display: flex; flex-direction: column; position: sticky; top: 16px; margin-left: 16px; min-width: 0; }
 .sidebar-splitter {
   position: sticky;
   top: 16px;
@@ -1121,112 +328,10 @@ onUnmounted(() => {
 }
 .sidebar-splitter:hover::before { background: #93c5fd; }
 @media (max-width: 800px) {
-  .sidebar { margin-left: 0; margin-top: 16px; position: static; }
   .sidebar-splitter { display: none; }
 }
-.sb-hdr { display: flex; align-items: center; justify-content: space-between; padding: 10px 12px 8px; border-bottom: 1px solid #f3f4f6; }
-.sb-title { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; color: #6b7280; }
-.sb-count { font-size: 11px; color: #9ca3af; }
-.ent-list { list-style: none; overflow-y: auto; max-height: 320px; padding: 4px 0; margin: 0; }
-.ent-item { display: flex; align-items: center; gap: 5px; padding: 5px 10px; cursor: pointer; font-size: 12px; color: #374151; }
-.ent-item:hover { background: #f9fafb; }
-.ent--active { background: #eff6ff; color: #1d4ed8; }
-.ent-glyph { display: flex; align-items: center; flex-shrink: 0; color: #6b7280; }
-.ent-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
-.ent-name { flex: 1; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
-.ent-det { padding: 10px 12px 12px; border-top: 1px solid #e5e7eb; }
-.conn-flow { font-size: 12px; color: #374151; margin-bottom: 6px; }
-.ent-det--loading { color: #9ca3af; font-size: 12px; }
-.det-hdr { display: flex; align-items: flex-start; gap: 4px; margin-bottom: 12px; }
-.det-name { font-size: 18px; font-weight: 700; color: #1d4ed8; flex: 1; line-height: 1.25; text-decoration: none; }
-.det-name:hover { text-decoration: underline; }
-.det-close { background: none; border: none; font-size: 16px; cursor: pointer; color: #9ca3af; line-height: 1; padding: 0 2px; flex-shrink: 0; } .det-close:hover { color: #374151; }
-.det-chips { display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 8px; }
-.chip { font-size: 10px; padding: 2px 6px; border-radius: 3px; font-weight: 500; background: #f3f4f6; color: #374151; }
-.det-content { font-size: 12px; line-height: 1.5; color: #374151; margin-bottom: 8px; max-height: 220px; overflow-y: auto; }
-.det-edge-label { margin-top: 8px; }
-.det-label-text { display: block; font-size: 11px; color: #6b7280; margin-bottom: 3px; }
-.det-label-input { width: 100%; padding: 4px 6px; font-size: 12px; border: 1px solid #d1d5db; border-radius: 4px; box-sizing: border-box; }
-.det-label-input:focus { outline: none; border-color: #2563eb; }
-.det-label-err { font-size: 11px; color: #dc2626; margin-top: 3px; }
-.det-content :deep(p) { margin: 0.35rem 0; }
-.det-content :deep(h1),
-.det-content :deep(h2),
-.det-content :deep(h3) { margin-top: 0; }
-.explore-lnk { font-size: 12px; color: #2563eb; } .explore-lnk:hover { text-decoration: underline; }
 .src-row { margin-top: 16px; }
 .toggle-btn { padding: 5px 14px; border-radius: 6px; border: 1px solid #d1d5db; background: white; font-size: 13px; cursor: pointer; color: #374151; margin-bottom: 8px; } .toggle-btn:hover { background: #f9fafb; }
 .puml-src { background: #1e293b; color: #e2e8f0; padding: 16px; border-radius: 8px; font-size: 12px; line-height: 1.5; overflow-x: auto; white-space: pre; }
-.matrix-view {
-  overflow: auto;
-  max-height: clamp(420px, 72vh, 880px);
-  padding: 16px;
-  background: white;
-  border-radius: 8px;
-  border: 1px solid #e5e7eb;
-}
-.matrix-view :deep(table) { border-collapse: collapse; margin-bottom: 20px; }
-.matrix-view :deep(th) {
-  border: 1px solid #e2e8f0;
-  padding: 6px 8px;
-  font-size: 11px;
-  font-weight: 600;
-  min-width: 5rem;
-  max-width: 9rem;
-  text-align: center;
-  vertical-align: bottom;
-  white-space: normal;
-  overflow-wrap: break-word;
-  word-break: normal;
-}
-.matrix-view :deep(th:first-child) {
-  position: sticky;
-  left: 0;
-  z-index: 2;
-  text-align: left;
-  min-width: 11rem;
-  max-width: 18rem;
-  background: white;
-  border-right: 2px solid #d1d5db;
-}
-.matrix-view :deep(td) { border: 1px solid #e2e8f0; padding: 4px 8px; font-size: 12px; }
-.matrix-view :deep(td:first-child) {
-  position: sticky;
-  left: 0;
-  z-index: 1;
-  background: white;
-  font-size: 11px;
-  font-weight: 500;
-  min-width: 11rem;
-  max-width: 18rem;
-  overflow-wrap: break-word;
-  word-break: normal;
-  border-right: 2px solid #d1d5db;
-}
-.matrix-view :deep(td:not(:first-child)) { text-align: center; }
-.matrix-view :deep(h2) { font-size: 13px; font-weight: 700; margin: 16px 0 6px; color: #374151; }
-
-.c4-up-banner {
-  display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
-  padding: 7px 12px; margin-bottom: 8px;
-  background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 6px;
-  position: sticky; top: 0; z-index: 10;
-}
-.c4-scope-name { font-size: 12px; color: #1e40af; font-weight: 500; }
-.c4-sep { font-size: 11px; color: #9ca3af; }
-.c4-up-link {
-  font-size: 12px; color: #1d4ed8; text-decoration: none; font-weight: 600;
-  padding: 2px 8px; background: white; border: 1px solid #bfdbfe; border-radius: 4px;
-}
-.c4-up-link:hover { background: #dbeafe; text-decoration: none; }
-.c4-child-nav {
-  display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
-  padding: 5px 10px; margin-bottom: 10px;
-  background: #f8fafc; border: 1px solid #e5e7eb; border-radius: 6px;
-}
-.c4-level-badge { padding: 2px 8px; border-radius: 4px; background: #0ea5e9; color: white; font-size: 11px; font-weight: 700; }
-.c4-nav-dir { font-size: 11px; font-weight: 700; color: #6b7280; white-space: nowrap; }
-.c4-nav-link { font-size: 12px; color: #0369a1; text-decoration: none; padding: 2px 8px; border: 1px solid #bae6fd; border-radius: 4px; background: white; }
-.c4-nav-link:hover { background: #e0f2fe; text-decoration: none; }
 </style>

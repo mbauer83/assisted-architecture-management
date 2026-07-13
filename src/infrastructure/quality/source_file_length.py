@@ -1,8 +1,11 @@
-"""Source-file length policy checks for non-test Python code.
+"""Source-file length policy checks for non-test backend (Python) and frontend
+(TypeScript/Vue) code.
 
-Ruff does not provide a native max-file-length rule. This module implements the
-project's local policy so it can be enforced in tests and CI without expanding
-the linter stack.
+Neither Ruff nor this project's ESLint config provides a native, baseline-ratcheting
+max-file-length rule (ESLint's built-in `max-lines` has no clean per-file grandfather
+mechanism short of one config override per oversized file). This module implements the
+project's local policy once, for both languages, so it can be enforced in tests and CI
+without expanding either lint stack.
 """
 
 from __future__ import annotations
@@ -12,15 +15,14 @@ from pathlib import Path
 
 SOURCE_FILE_SOFT_LIMIT = 250
 SOURCE_FILE_HARD_LIMIT = 350
-# Grandfathered files still above the 350-line hard limit. Each entry is a ratchet: the
-# recorded number is the current counted length, and the policy test fails if the file grows
-# past it — so these only ever shrink. Files driven back under 350 are removed entirely.
-SOURCE_FILE_BASELINE_LIMITS: dict[str, int] = {
-    "src/application/verification/artifact_verifier.py": 406,
-    "src/infrastructure/artifact_index/_sqlite_store.py": 408,
-    "src/infrastructure/artifact_index/service.py": 548,
-    "src/infrastructure/gui/routers/_diagram_write.py": 353,
-}
+
+_FRONTEND_ROOT = "tools/gui/src"
+_FRONTEND_EXTENSIONS = (".ts", ".vue")
+_FRONTEND_EXCLUDED_SUFFIXES = (".test.ts", ".d.ts")
+_FRONTEND_GENERATED_NAMES = frozenset({"types.generated.ts"})
+
+# No grandfathered files: every source file must satisfy SOURCE_FILE_HARD_LIMIT outright.
+SOURCE_FILE_BASELINE_LIMITS: dict[str, int] = {}
 
 
 @dataclass(frozen=True)
@@ -31,15 +33,32 @@ class SourceLengthViolation:
     reason: str
 
 
-def iter_policy_source_files(repo_root: Path) -> list[Path]:
+def _iter_backend_source_files(repo_root: Path) -> list[Path]:
     return sorted((repo_root / "src").rglob("*.py"))
 
 
+def _iter_frontend_source_files(repo_root: Path) -> list[Path]:
+    frontend_root = repo_root / _FRONTEND_ROOT
+    return sorted(
+        path
+        for extension in _FRONTEND_EXTENSIONS
+        for path in frontend_root.rglob(f"*{extension}")
+        if "__tests__" not in path.parts
+        and path.name not in _FRONTEND_GENERATED_NAMES
+        and not path.name.endswith(_FRONTEND_EXCLUDED_SUFFIXES)
+    )
+
+
+def iter_policy_source_files(repo_root: Path) -> list[Path]:
+    return [*_iter_backend_source_files(repo_root), *_iter_frontend_source_files(repo_root)]
+
+
 def counted_source_lines(path: Path) -> int:
+    comment_prefix = "#" if path.suffix == ".py" else "//"
     return sum(
         1
         for line in path.read_text(encoding="utf-8").splitlines()
-        if line.strip() and not line.lstrip().startswith("#")
+        if line.strip() and not line.lstrip().startswith(comment_prefix)
     )
 
 

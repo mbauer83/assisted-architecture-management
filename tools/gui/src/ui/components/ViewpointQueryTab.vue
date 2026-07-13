@@ -1,0 +1,238 @@
+<script setup lang="ts">
+/**
+ * "Query" tab of the viewpoint definition editor: entity criteria, neighbor inclusions,
+ * connections displayed, a debounced live-preview count, and a full test-run (real §7.1
+ * counts/warnings + a dry-run save-mode validation pass) before the user attempts to save.
+ * Owns all of that state locally — it's only ever rendered/consumed here. `draft` is
+ * read-only (query edits are emitted as `update:query` patches for the parent to apply to
+ * its own draft ref — never mutate a prop, `vue/no-mutating-props`); `issues` is likewise
+ * emitted up so the parent's shared issue-list/highlight-on-click stays in sync with both a
+ * test-run and a real save attempt.
+ */
+import { inject, ref, watch } from 'vue'
+import { Effect } from 'effect'
+import { modelServiceKey } from '../keys'
+import { readErrorMessage } from '../lib/errors'
+import type { CriteriaCatalog, ViewpointExecutionResult, ViewpointValidationIssue } from '../../domain'
+import type { ViewpointDefinitionDraft } from '../../domain/viewpointDefinitionDraft'
+import { definitionToMapping } from '../../domain/viewpointDefinitionSerialization'
+import { queryToMapping } from '../../domain/viewpointCriteriaSerialization'
+import { mkNeighborInclusion } from '../../domain/viewpointCriteria'
+import type { ExecutableQueryNode, NeighborInclusionNode } from '../../domain/viewpointCriteria'
+import { HIGHLIGHTED_NODE_ID_KEY } from './CriteriaTreeBuilder.helpers'
+import { createDebouncer } from '../lib/debounce'
+import { firstErrorNodeId, formatPreviewCounts } from '../views/ViewpointsManagementView.helpers'
+import CriteriaTreeBuilder from './CriteriaTreeBuilder.vue'
+import OptionalCriteriaSlot from './OptionalCriteriaSlot.vue'
+
+const props = defineProps<{
+  draft: ViewpointDefinitionDraft
+  catalog: CriteriaCatalog
+  isCreating: boolean
+}>()
+const emit = defineEmits<{
+  'update:query': [value: ExecutableQueryNode]
+  issues: [issues: readonly ViewpointValidationIssue[]]
+}>()
+
+const svc = inject(modelServiceKey)!
+const highlightedNodeId = inject(HIGHLIGHTED_NODE_ID_KEY)!
+
+const summary = ref('')
+const previewResult = ref<ViewpointExecutionResult | null>(null)
+const testRunResult = ref<ViewpointExecutionResult | null>(null)
+const testRunning = ref(false)
+const testRunError = ref<string | null>(null)
+
+const emitQueryUpdate = (patch: Partial<ExecutableQueryNode>) => {
+  if (!props.draft.query) return
+  emit('update:query', { ...props.draft.query, ...patch })
+}
+
+let summaryTimer: ReturnType<typeof setTimeout> | undefined
+watch(() => props.draft.query, (query) => {
+  if (summaryTimer) clearTimeout(summaryTimer)
+  if (!query) { summary.value = ''; return }
+  summaryTimer = setTimeout(() => {
+    Effect.runPromise(svc.summarizeViewpointQuery(queryToMapping(query))).then((s) => { summary.value = s }).catch(() => {})
+  }, 250)
+}, { deep: true, immediate: true })
+
+/** Debounced live-preview counts (companion plan §7.1): a `limit: 0` execution of the
+ * draft's ad-hoc query — cheap enough (no entity/connection records fetched) to run on
+ * every settled keystroke while building criteria. */
+const debouncePreview = createDebouncer(400)
+watch(() => props.draft.query, (query) => {
+  if (!query) { previewResult.value = null; return }
+  debouncePreview(() => {
+    Effect.runPromise(svc.executeViewpoint({ query: queryToMapping(query), limit: 0 }))
+      .then((result) => { previewResult.value = result })
+      .catch(() => { previewResult.value = null })
+  })
+}, { deep: true, immediate: true })
+
+/** Full test-run: the real §7.1 counts + warnings the query would return today (default
+ * limit — the actual execution bound, not the tight preview limit), plus a `dry_run`
+ * save-mode validation pass so a definition that would fail to persist is caught, and
+ * highlighted at its offending node, before the user attempts to save. */
+const testRun = async () => {
+  testRunning.value = true
+  testRunError.value = null
+  testRunResult.value = null
+  try {
+    if (props.draft.query) {
+      testRunResult.value = await Effect.runPromise(svc.executeViewpoint({ query: queryToMapping(props.draft.query) }))
+    }
+    const body = { definition: definitionToMapping(props.draft), dry_run: true }
+    const call = props.isCreating ? svc.createViewpointDefinition(body) : svc.editViewpointDefinition(body)
+    const result = await Effect.runPromise(call)
+    emit('issues', result.issues)
+    highlightedNodeId.value = firstErrorNodeId(result.issues, props.draft)
+  } catch (reason) {
+    testRunError.value = readErrorMessage(reason)
+  } finally {
+    testRunning.value = false
+  }
+}
+
+const addInclusion = () => {
+  if (!props.draft.query) return
+  emitQueryUpdate({ includeConnected: [...props.draft.query.includeConnected, mkNeighborInclusion()] })
+}
+const removeInclusion = (index: number) => {
+  if (!props.draft.query) return
+  emitQueryUpdate({ includeConnected: props.draft.query.includeConnected.filter((_, i) => i !== index) })
+}
+const updateInclusion = (index: number, patch: Partial<NeighborInclusionNode>) => {
+  if (!props.draft.query) return
+  const includeConnected = [...props.draft.query.includeConnected]
+  includeConnected[index] = { ...includeConnected[index], ...patch }
+  emitQueryUpdate({ includeConnected })
+}
+</script>
+
+<template>
+  <div v-if="draft.query">
+    <h3>Show entities where…</h3>
+    <CriteriaTreeBuilder
+      :model-value="draft.query.entityCriteria"
+      group-kind="entity"
+      :catalog="catalog"
+      is-root
+      @update:model-value="emitQueryUpdate({ entityCriteria: $event })"
+    />
+
+    <h3>Neighbor inclusions (widen the population)</h3>
+    <div
+      v-for="(inclusion, index) in draft.query.includeConnected"
+      :key="inclusion.id"
+      class="inclusion"
+    >
+      <select
+        :value="inclusion.direction"
+        @change="updateInclusion(index, { direction: ($event.target as HTMLSelectElement).value as NeighborInclusionNode['direction'] })"
+      >
+        <option value="either">
+          either direction
+        </option>
+        <option value="outgoing">
+          outgoing — connections FROM the selected entities
+        </option>
+        <option value="incoming">
+          incoming — connections TO the selected entities
+        </option>
+      </select>
+      <button
+        type="button"
+        @click="removeInclusion(index)"
+      >
+        ✕ remove
+      </button>
+      <OptionalCriteriaSlot
+        :model-value="inclusion.connectionCriteria"
+        group-kind="connection"
+        :catalog="catalog"
+        :depth="0"
+        field-label="connection_criteria"
+        unrestricted-label="any connection"
+        @update:model-value="updateInclusion(index, { connectionCriteria: $event })"
+      />
+      <OptionalCriteriaSlot
+        :model-value="inclusion.neighborCriteria"
+        group-kind="entity"
+        :catalog="catalog"
+        :depth="0"
+        field-label="neighbor_criteria"
+        unrestricted-label="any entity"
+        @update:model-value="updateInclusion(index, { neighborCriteria: $event })"
+      />
+    </div>
+    <button
+      type="button"
+      class="add-btn"
+      @click="addInclusion"
+    >
+      + Add neighbor inclusion
+    </button>
+
+    <h3>Connections displayed</h3>
+    <label>
+      <input
+        :checked="draft.query.connections.enabled"
+        type="checkbox"
+        @change="emitQueryUpdate({ connections: { ...draft.query.connections, enabled: ($event.target as HTMLInputElement).checked } })"
+      > enabled
+    </label>
+    <CriteriaTreeBuilder
+      :model-value="draft.query.connections.criteria"
+      group-kind="connection"
+      :catalog="catalog"
+      is-root
+      @update:model-value="emitQueryUpdate({ connections: { ...draft.query.connections, criteria: $event } })"
+    />
+
+    <div class="summary-panel">
+      {{ summary }}
+      <span
+        v-if="formatPreviewCounts(previewResult)"
+        class="preview-counts"
+      >— {{ formatPreviewCounts(previewResult) }}</span>
+    </div>
+
+    <div class="test-run-row">
+      <button
+        type="button"
+        :disabled="testRunning"
+        @click="testRun"
+      >
+        {{ testRunning ? 'Running…' : 'Test run' }}
+      </button>
+      <span
+        v-if="testRunError"
+        class="error"
+      >{{ testRunError }}</span>
+      <template v-else-if="testRunResult">
+        <span class="test-run-counts">
+          Entities: {{ testRunResult.returned_entity_count }} / {{ testRunResult.total_entity_count }} ·
+          Connections: {{ testRunResult.returned_connection_count }} / {{ testRunResult.total_connection_count }}
+        </span>
+        <span
+          v-for="warning in testRunResult.warnings"
+          :key="warning"
+          class="test-run-warning"
+        >{{ warning }}</span>
+      </template>
+    </div>
+  </div>
+</template>
+
+<style scoped>
+.error { color: #991b1b; background: #fee2e2; padding: 8px 12px; border-radius: 6px; }
+.inclusion { border: 1px solid #d1d5db; border-radius: 8px; padding: 10px; margin: 8px 0; }
+.summary-panel { margin-top: 12px; padding: 10px 14px; border-radius: 8px; background: #eef2ff; color: #4338ca; font-size: 13px; }
+.preview-counts { margin-left: 6px; font-weight: 600; }
+.test-run-row { display: flex; align-items: center; gap: 10px; margin-top: 8px; flex-wrap: wrap; }
+.test-run-counts { font-size: 12.5px; color: #374151; }
+.test-run-warning { font-size: 12px; color: #92400e; background: #fef3c7; padding: 2px 8px; border-radius: 4px; }
+.add-btn { appearance: none; border: 1px dashed #d1d5db; background: #fff; color: #6b7280; border-radius: 7px; padding: 5px 10px; font-size: 12px; font-weight: 600; cursor: pointer; margin-top: 8px; }
+</style>
