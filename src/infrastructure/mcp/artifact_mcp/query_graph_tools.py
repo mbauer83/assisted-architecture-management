@@ -2,7 +2,10 @@ from typing import Literal
 
 from mcp.server.fastmcp import FastMCP  # type: ignore[import-not-found]
 
-from src.config.settings import viewpoints_derivation_max_relationships
+from src.config.viewpoints_settings import (
+    viewpoints_derivation_max_relationships,
+    viewpoints_derivation_time_budget_seconds,
+)
 from src.domain.relationship_reachability import (
     DerivationBounds,
     DerivationCertaintyPolicy,
@@ -142,6 +145,7 @@ def register_query_graph_tools(mcp: FastMCP) -> None:
                         bounds=DerivationBounds(
                             max_hops=max_hops,
                             max_relationships=viewpoints_derivation_max_relationships(),
+                            time_budget_seconds=viewpoints_derivation_time_budget_seconds(),
                         ),
                     ),
                     read_access=repo,

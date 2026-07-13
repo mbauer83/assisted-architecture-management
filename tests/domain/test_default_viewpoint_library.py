@@ -15,6 +15,8 @@ from src.application.viewpoints.evaluate_viewpoint import ViewpointExecutionRequ
 from src.application.viewpoints.registry_snapshot import build_registry_snapshot
 from src.domain.viewpoint_validation import validate_viewpoint_definition
 from src.infrastructure.app_bootstrap import build_runtime_catalogs, get_module_registry
+from src.infrastructure.viewpoint_declarations import load_module_viewpoint_catalog
+from src.ontologies.archimate_4._loader import _PACKAGE_DIR as _ARCH_PACKAGE_DIR
 from tests.application.viewpoints._fixtures import Store, entity
 from tests.fixtures.viewpoints.standard_viewpoint_tables import STANDARD_VIEWPOINT_TABLES
 
@@ -61,7 +63,13 @@ _CUSTOM_SLUGS = {"element-dependents", "element-dependencies", "process-technolo
 
 
 def test_library_covers_the_25_standard_slugs_plus_the_custom_impact_analysis_set() -> None:
-    slugs = {d.slug for d in _CATALOGS.viewpoints.entries}
+    # The pure module-shipped catalog, never merged with whatever real engagement/enterprise
+    # content this environment's configured workspace happens to have — `_CATALOGS.viewpoints`
+    # is the merged two-tier catalog (see `app_bootstrap._load_viewpoints`), which is right for
+    # every other test in this module (they only care that shipped definitions behave, real
+    # extra content alongside them is fine) but wrong for an exact-membership assertion.
+    shipped_only = load_module_viewpoint_catalog(_ARCH_PACKAGE_DIR)
+    slugs = {d.slug for d in shipped_only.entries}
     assert slugs == _KNOWN_SLUGS | _CUSTOM_SLUGS
     assert len(slugs) == 28
     # The 3 custom slugs are this tool's own capability, never presented as part of the

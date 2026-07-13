@@ -21,6 +21,7 @@ from src.domain.viewpoint_condition_validation import RegistrySnapshot
 _DEFAULT_ATTRIBUTE_TYPE = "string"
 _DEFAULT_DERIVATION_MAX_HOPS = 4
 _DEFAULT_DERIVATION_MAX_RELATIONSHIPS = 2000
+_DEFAULT_DERIVATION_TIME_BUDGET_SECONDS = 2.0
 
 
 def _property_types(schema: Mapping[str, object] | None) -> dict[str, str]:
@@ -67,6 +68,7 @@ def build_registry_snapshot(
     *,
     derivation_max_hops: int = _DEFAULT_DERIVATION_MAX_HOPS,
     derivation_max_relationships: int = _DEFAULT_DERIVATION_MAX_RELATIONSHIPS,
+    derivation_time_budget_seconds: float = _DEFAULT_DERIVATION_TIME_BUDGET_SECONDS,
 ) -> RegistrySnapshot:
     """One snapshot for the lifetime of a verification run — callers should build this once
     (e.g. a ``functools.cached_property``) rather than per file, since it scans every entity
@@ -88,4 +90,5 @@ def build_registry_snapshot(
         derivation_catalog=runtime_catalogs.module_catalog,
         derivation_max_hops=derivation_max_hops,
         derivation_max_relationships=derivation_max_relationships,
+        derivation_time_budget_seconds=derivation_time_budget_seconds,
     )

@@ -5,6 +5,7 @@ from __future__ import annotations
 from collections import deque
 from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
+from time import monotonic
 from typing import Literal
 
 from src.domain.artifact_types import ConnectionRecord, EntityRecord
@@ -98,6 +99,14 @@ def derive_relationship_for_path(
 class DerivationBounds:
     max_hops: int
     max_relationships: int
+    # `max_relationships` alone doesn't track real cost: a multi-anchor query (e.g. every
+    # motivation-domain entity in a repo) can legitimately produce thousands of distinct
+    # derived relationships in about a second of real work — rejecting it outright at an
+    # arbitrary result count throws away a perfectly tractable query. The time budget is the
+    # PRACTICAL limit (graceful: stop and return whatever's found so far, flagged
+    # `truncated`); `max_relationships` stays only as a hard memory-protection ceiling that
+    # should not realistically fire once a time budget is in place.
+    time_budget_seconds: float = 2.0
 
 
 @dataclass(frozen=True)
@@ -123,6 +132,10 @@ class DerivedRelationship:
 @dataclass(frozen=True)
 class DerivedRelationshipSet:
     relationships: tuple[DerivedRelationship, ...]
+    # True when the time budget (not the hard `max_relationships` ceiling) stopped the
+    # search early — `relationships` is a genuine, correct partial result (every entry in it
+    # was validly composed), just not necessarily complete.
+    truncated: bool = False
 
 
 class DerivationLimitError(ValueError):
@@ -176,8 +189,13 @@ def derive_relationships(
     )
     results: dict[tuple[str, str, str], DerivedRelationship] = {}
     seen_paths: set[tuple[str, ...]] = set()
+    start_time = monotonic()
+    truncated = False
 
     while queue:
+        if monotonic() - start_time > request.bounds.time_budget_seconds:
+            truncated = True
+            break
         current = queue.popleft()
         if len(current.path) >= request.bounds.max_hops:
             continue
@@ -219,7 +237,7 @@ def derive_relationships(
                 if len(results) > request.bounds.max_relationships:
                     raise DerivationLimitError(request.bounds.max_relationships)
     ordered = tuple(sorted(results.values(), key=lambda relationship: relationship.artifact_id))
-    return DerivedRelationshipSet(ordered)
+    return DerivedRelationshipSet(ordered, truncated=truncated)
 
 
 def _initial_frontier(

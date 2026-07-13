@@ -27,6 +27,11 @@ from src.application.viewpoints.persist_definition import (
 )
 from src.application.viewpoints.pins import load_pinned_slugs, save_pinned_slugs
 from src.application.viewpoints.registry_snapshot import build_registry_snapshot
+from src.config.viewpoints_settings import (
+    viewpoints_derivation_max_hops,
+    viewpoints_derivation_max_relationships,
+    viewpoints_derivation_time_budget_seconds,
+)
 from src.domain.viewpoint_condition_validation import RegistrySnapshot
 from src.domain.viewpoint_criteria import RESERVED_CONNECTION_PATHS, RESERVED_ENTITY_PATHS
 from src.domain.viewpoint_parsing import viewpoint_definition_from_mapping
@@ -98,7 +103,13 @@ def get_criteria_catalog() -> dict[str, Any]:
     """Registries snapshot the criteria-tree builder's pickers are fed from — the same
     ``RegistrySnapshot`` save-mode validation itself resolves attribute paths against."""
     catalogs = build_runtime_catalogs(get_module_registry())
-    registries: RegistrySnapshot = build_registry_snapshot(catalogs, _both_roots())
+    registries: RegistrySnapshot = build_registry_snapshot(
+        catalogs,
+        _both_roots(),
+        derivation_max_hops=viewpoints_derivation_max_hops(),
+        derivation_max_relationships=viewpoints_derivation_max_relationships(),
+        derivation_time_budget_seconds=viewpoints_derivation_time_budget_seconds(),
+    )
     derivation = {
         str(name): {"role": info.derivation_role, "strength": info.derivation_strength}
         for name, info in catalogs.ontology.all_connection_types().items()
@@ -213,7 +224,13 @@ def _persist(action: PersistAction, body: ViewpointWriteBody) -> dict[str, Any]:
     catalogs = build_runtime_catalogs(get_module_registry())
     merged_catalog = load_effective_viewpoint_catalog(both_roots)
     local_catalog = load_viewpoint_catalog_file(engagement_root)
-    registries = build_registry_snapshot(catalogs, both_roots)
+    registries = build_registry_snapshot(
+        catalogs,
+        both_roots,
+        derivation_max_hops=viewpoints_derivation_max_hops(),
+        derivation_max_relationships=viewpoints_derivation_max_relationships(),
+        derivation_time_budget_seconds=viewpoints_derivation_time_budget_seconds(),
+    )
     try:
         parsed = viewpoint_definition_from_mapping(body.definition)
     except ValueError as exc:

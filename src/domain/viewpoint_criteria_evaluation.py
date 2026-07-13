@@ -191,7 +191,9 @@ def _evaluate_derived_incident(
             condition.direction,
             "include_potential" if condition.include_potential else "certain_only",
             DerivationBounds(
-                condition.max_hops or registries.derivation_max_hops, registries.derivation_max_relationships
+                condition.max_hops or registries.derivation_max_hops,
+                registries.derivation_max_relationships,
+                registries.derivation_time_budget_seconds,
             ),
         ),
         read_access=read_access,

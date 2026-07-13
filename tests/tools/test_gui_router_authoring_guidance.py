@@ -6,33 +6,72 @@ error passthrough for unknown types, and REST/domain-function parity.
 
 from __future__ import annotations
 
+import dataclasses
+from pathlib import Path
+
 import pytest
 from fastapi import FastAPI
 from starlette.testclient import TestClient
 
-from src.infrastructure.app_bootstrap import install_module_registry
+from src.application.artifact_repository import ArtifactRepository
+from src.application.runtime_catalogs import RuntimeCatalogs
+from src.infrastructure.app_bootstrap import build_runtime_catalogs, get_module_registry, install_module_registry
+from src.infrastructure.artifact_index import shared_artifact_index
+from src.infrastructure.gui.routers import state as gui_state
 from src.infrastructure.gui.routers.authoring_guidance import router as authoring_guidance_router
+from src.infrastructure.gui.routers.viewpoint_authoring import router as viewpoint_authoring_router
+from src.infrastructure.viewpoint_declarations import load_effective_viewpoint_catalog
 from src.infrastructure.write.artifact_write.type_guidance import get_type_guidance
+
+httpx = pytest.importorskip("httpx")
 
 
 @pytest.fixture
-def client() -> TestClient:
+def engagement_root(tmp_path: Path) -> Path:
+    root = tmp_path / "engagements" / "ENG-T" / "architecture-repository"
+    (root / "model").mkdir(parents=True)
+    (root / "diagram-catalog" / "diagrams").mkdir(parents=True)
+    return root
+
+
+@pytest.fixture
+def client(engagement_root: Path) -> TestClient:
+    repo = ArtifactRepository(shared_artifact_index([engagement_root]))
+    gui_state.init_state(repo, engagement_root, None)
     app = FastAPI()
-    app.include_router(authoring_guidance_router)
     install_module_registry(app)
+    app.include_router(authoring_guidance_router)
+    app.include_router(viewpoint_authoring_router)
     return TestClient(app)
 
 
+@pytest.fixture
+def isolated_catalogs(engagement_root: Path) -> RuntimeCatalogs:
+    """The same fresh-viewpoints catalogs the REST endpoint builds for `engagement_root` —
+    needed so the REST/domain-function parity tests below compare against this isolated
+    repo rather than `get_type_guidance`'s own no-`catalogs`-given default, which resolves
+    the ambient configured workspace (whatever real repo this machine happens to have set
+    up) rather than the test's isolated one."""
+    return dataclasses.replace(
+        build_runtime_catalogs(get_module_registry()),
+        viewpoints=load_effective_viewpoint_catalog([engagement_root]),
+    )
+
+
 class TestEntityTypeAndDomainFilters:
-    def test_entity_type_filter_matches_domain_function(self, client: TestClient) -> None:
+    def test_entity_type_filter_matches_domain_function(
+        self, client: TestClient, isolated_catalogs: RuntimeCatalogs,
+    ) -> None:
         resp = client.get("/api/authoring-guidance", params={"entity_type": "requirement"})
         assert resp.status_code == 200
-        assert resp.json() == get_type_guidance(filter=["requirement"])
+        assert resp.json() == get_type_guidance(filter=["requirement"], catalogs=isolated_catalogs)
 
-    def test_domain_filter_matches_domain_function(self, client: TestClient) -> None:
+    def test_domain_filter_matches_domain_function(
+        self, client: TestClient, isolated_catalogs: RuntimeCatalogs,
+    ) -> None:
         resp = client.get("/api/authoring-guidance", params={"domain": "motivation"})
         assert resp.status_code == 200
-        assert resp.json() == get_type_guidance(filter=["motivation"])
+        assert resp.json() == get_type_guidance(filter=["motivation"], catalogs=isolated_catalogs)
 
     def test_no_params_returns_all_entity_types(self, client: TestClient) -> None:
         resp = client.get("/api/authoring-guidance")
@@ -76,6 +115,26 @@ class TestPairLegality:
         resp = client.get("/api/authoring-guidance", params={"target": "goal"})
         assert resp.status_code == 200
         assert "error" in resp.json()
+
+
+class TestViewpointFreshness:
+    """A viewpoint definition created through the GUI authoring endpoint must appear in
+    guidance's own `viewpoints` list on the very next request — no restart. `catalogs`
+    previously came from the app-state-cached `runtime_catalogs_dependency`, frozen at
+    process startup, so a definition written moments earlier was invisible here (though
+    already visible to `/api/viewpoints`) until the process restarted — the exact
+    staleness class `execute_viewpoint`/friends already had fixed in
+    `viewpoints.py` (see `test_viewpoint_execute_after_create.py`), just never applied here."""
+
+    def test_a_freshly_created_definition_appears_in_guidance_without_a_restart(self, client: TestClient) -> None:
+        definition = {"slug": "just-created-guidance", "version": 1, "name": "Just Created"}
+        create_resp = client.post("/api/viewpoints", json={"definition": definition, "dry_run": False})
+        assert create_resp.json()["ok"] is True, create_resp.json()
+
+        resp = client.get("/api/authoring-guidance")
+        assert resp.status_code == 200
+        slugs = {v["slug"] for v in resp.json()["viewpoints"]}
+        assert "just-created-guidance" in slugs
 
 
 class TestInternalTypesExcluded:

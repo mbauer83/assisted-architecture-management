@@ -23,6 +23,7 @@ from src.domain.viewpoint_projection import (
     ProjectedOccurrence,
     ScaleLegendData,
     ViewpointProjection,
+    derivation_truncation_warnings,
     drift_warnings,
 )
 from src.domain.viewpoint_style_evaluation import calculate_scale_bounds, evaluate_item_style
@@ -83,6 +84,7 @@ def project_repository(
         included_ids, query.connections, read_access=read_access, registries=registries, environment=environment
     )
     drift |= connections_result.schema_drift
+    derivation_truncated = inclusion_result.derivation_truncated or connections_result.derivation_truncated
 
     entity_records = tuple(
         entity for entity_id in sorted(included_ids) if (entity := read_access.get_entity(entity_id)) is not None
@@ -174,7 +176,7 @@ def project_repository(
     return ViewpointProjection(
         target="repository",
         items=tuple(items),
-        warnings=drift_warnings(frozenset(drift)),
+        warnings=drift_warnings(frozenset(drift)) + derivation_truncation_warnings(derivation_truncated),
         scale_legends=tuple(
             ScaleLegendData(
                 capability=legend.capability,

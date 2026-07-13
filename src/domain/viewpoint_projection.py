@@ -71,3 +71,11 @@ def drift_warnings(drift: frozenset[str]) -> tuple[str, ...]:
     """One human-readable warning per schema-drifted attribute path (degraded loudly,
     never silently"), sorted for deterministic output."""
     return tuple(f"schema drift: attribute '{attribute}' is no longer resolvable" for attribute in sorted(drift))
+
+
+def derivation_truncation_warnings(truncated: bool) -> tuple[str, ...]:
+    """A derived-relationship search stopped at its time budget before finishing — the
+    result is genuine and correct, just not necessarily complete."""
+    if not truncated:
+        return ()
+    return ("derived-relationship search stopped early after its time budget; results may be incomplete",)

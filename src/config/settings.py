@@ -51,7 +51,8 @@ _DEFAULTS: dict[str, dict[str, object]] = {
         "max_query_parameters": 4,
         "max_derived_attributes": 8,
         "derivation_max_hops": 4,
-        "derivation_max_relationships": 2000,
+        "derivation_max_relationships": 20000,
+        "derivation_time_budget_seconds": 2.0,
     },
     "exchange": {
         "max_document_bytes": 10_000_000,
@@ -227,75 +228,6 @@ def viewpoint_enforcement_setting() -> EnforcementSetting:
     if value not in ("off", "warn", "ghost"):
         return "warn"
     return value
-
-
-def _viewpoints_value(key: str) -> object:
-    viewpoints = load_settings().get("viewpoints", {})
-    if not isinstance(viewpoints, dict):
-        return _DEFAULTS["viewpoints"][key]  # type: ignore[index]
-    return viewpoints.get(key, _DEFAULTS["viewpoints"][key])  # type: ignore[index]
-
-
-def viewpoints_execution_max_entities() -> int:
-    """Hard cap on entities in a viewpoint execution result, all transports (companion
-    plan §7.1). GUI/REST default to this cap; MCP defaults lower (see below)."""
-    value = _viewpoints_value("execution_max_entities")
-    try:
-        return max(1, int(value))  # type: ignore[call-overload]
-    except (TypeError, ValueError):
-        return 500
-
-
-def viewpoints_execution_default_entity_limit_mcp() -> int:
-    """MCP ``execute`` action default entity limit when no ``limit`` argument is given —
-    smaller than the hard cap to protect agent context windows."""
-    value = _viewpoints_value("execution_default_entity_limit_mcp")
-    try:
-        return max(1, int(value))  # type: ignore[call-overload]
-    except (TypeError, ValueError):
-        return 200
-
-
-def viewpoints_execution_timeout_seconds() -> float:
-    """Wall-clock budget for one viewpoint execution before it fails as a typed timeout
-    error rather than returning a partial result."""
-    value = _viewpoints_value("execution_timeout_seconds")
-    try:
-        return max(0.1, float(value))  # type: ignore[arg-type]
-    except (TypeError, ValueError):
-        return 10.0
-
-
-def _viewpoints_positive_integer(key: str, default: int) -> int:
-    value = _viewpoints_value(key)
-    try:
-        return max(1, int(value))  # type: ignore[call-overload]
-    except (TypeError, ValueError):
-        return default
-
-
-def viewpoints_max_query_bindings() -> int:
-    return _viewpoints_positive_integer("max_query_bindings", 8)
-
-
-def viewpoints_max_query_parameters() -> int:
-    """Maximum number of execution parameters in one viewpoint definition."""
-    return _viewpoints_positive_integer("max_query_parameters", 4)
-
-
-def viewpoints_max_derived_attributes() -> int:
-    """Maximum number of item-scoped derived attributes in one viewpoint definition."""
-    return _viewpoints_positive_integer("max_derived_attributes", 8)
-
-
-def viewpoints_derivation_max_hops() -> int:
-    """Maximum modeled-relationship hops used to derive a relationship."""
-    return _viewpoints_positive_integer("derivation_max_hops", 4)
-
-
-def viewpoints_derivation_max_relationships() -> int:
-    """Maximum derived relationships returned by one derivation request."""
-    return _viewpoints_positive_integer("derivation_max_relationships", 2000)
 
 
 def exchange_max_document_bytes() -> int:

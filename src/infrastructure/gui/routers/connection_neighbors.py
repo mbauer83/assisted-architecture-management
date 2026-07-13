@@ -3,7 +3,10 @@
 from __future__ import annotations
 
 from src.application.runtime_catalogs import RuntimeCatalogs
-from src.config.settings import viewpoints_derivation_max_relationships
+from src.config.viewpoints_settings import (
+    viewpoints_derivation_max_relationships,
+    viewpoints_derivation_time_budget_seconds,
+)
 from src.domain.relationship_reachability import (
     DerivationBounds,
     DerivationLimitError,
@@ -30,6 +33,7 @@ def derive_neighbor_response(
             bounds=DerivationBounds(
                 max_hops=max_hops,
                 max_relationships=viewpoints_derivation_max_relationships(),
+                time_budget_seconds=viewpoints_derivation_time_budget_seconds(),
             ),
         ),
         read_access=read_access,

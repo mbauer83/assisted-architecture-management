@@ -249,10 +249,23 @@ class TestExecuteDiagram:
         resp = client.post("/api/viewpoints/execute-diagram", json={"slug": "exec-test"})
         assert resp.status_code == 200
         body = resp.json()
-        assert set(body.keys()) == {"svg", "warnings"}
+        assert set(body.keys()) == {"svg", "warnings", "entity_aliases"}
         assert body["svg"] is not None
         assert "<svg" in body["svg"]
         assert isinstance(body["warnings"], list)
+        # The rendered SVG's node ids are PlantUML aliases normalized from each entity's
+        # `display_alias`, never the raw artifact id — the client needs this mapping to
+        # resolve SVG elements back to artifact ids for click-to-select.
+        aliases = body["entity_aliases"]
+        assert aliases, "expected at least one entity in the rendered diagram"
+        for artifact_id, alias in aliases.items():
+            assert isinstance(artifact_id, str) and artifact_id
+            assert isinstance(alias, str) and alias
+        # At least one alias must actually appear in the SVG's `data-qualified-name`
+        # (`Namespace.Alias` — the frontend's real matching convention, since PlantUML's own
+        # `id="entNNNN"` is an unrelated auto-generated sequence, not the declared alias) —
+        # proves the mapping is real, not just present.
+        assert any(f".{alias}" in body["svg"] for alias in aliases.values())
 
     def test_renders_inline_query(self, client) -> None:
         resp = client.post("/api/viewpoints/execute-diagram", json={"query": {}})

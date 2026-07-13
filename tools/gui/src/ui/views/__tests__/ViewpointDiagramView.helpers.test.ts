@@ -19,16 +19,22 @@ const groupWith = (childTag: string): { group: SVGElement; child: SVGElement } =
 }
 
 describe('toEntitySummaryStub', () => {
-  it('carries artifact_id/name/type and sets display_alias to the artifact id', () => {
-    const entity: EntityItemSummary = {
-      id: 'APC@1.EntSch.a', name: 'Alpha', type: 'application-component',
-      specialization_slugs: [], group: 'uncategorized', membership: 'primary',
-    }
+  const entity: EntityItemSummary = {
+    id: 'APC@1.EntSch.a', name: 'Alpha', type: 'application-component',
+    specialization_slugs: [], group: 'uncategorized', membership: 'primary',
+  }
+
+  it('falls back to the raw artifact id when no alias lookup is given', () => {
     const stub = toEntitySummaryStub(entity)
     expect(stub.artifact_id).toBe('APC@1.EntSch.a')
     expect(stub.display_alias).toBe('APC@1.EntSch.a')
     expect(stub.name).toBe('Alpha')
     expect(stub.artifact_type).toBe('application-component')
+  })
+
+  it('resolves display_alias from the given entity_aliases lookup — the rendered SVG PlantUML alias, not the artifact id', () => {
+    const aliasById = new Map([['APC@1.EntSch.a', 'JNA_zGOowi']])
+    expect(toEntitySummaryStub(entity, aliasById).display_alias).toBe('JNA_zGOowi')
   })
 })
 
@@ -37,12 +43,19 @@ describe('toDiagramConnectionStub', () => {
     id: 'c1', type: 'serving', source: 'a', target: 'b', certainty: null, hops: null, via_connection_ids: [],
   }
 
-  it('sets source_alias/target_alias to the source/target artifact ids', () => {
+  it('falls back to the raw source/target artifact ids when no alias lookup is given', () => {
     const stub = toDiagramConnectionStub(conn)
     expect(stub.artifact_id).toBe('c1')
     expect(stub.source_alias).toBe('a')
     expect(stub.target_alias).toBe('b')
     expect(stub.conn_type).toBe('serving')
+  })
+
+  it('resolves source_alias/target_alias from the given alias lookup', () => {
+    const aliasById = new Map([['a', 'ent0042'], ['b', 'ent0099']])
+    const stub = toDiagramConnectionStub(conn, new Map(), aliasById)
+    expect(stub.source_alias).toBe('ent0042')
+    expect(stub.target_alias).toBe('ent0099')
   })
 
   it('falls back to the raw id when no name lookup is given', () => {
@@ -64,12 +77,12 @@ describe('applyNodeColorOverlay', () => {
     expect(child.style.getPropertyValue('stroke-width')).toBe('3')
   })
 
-  it('clears any override when no token is given', () => {
+  it('never touches the shape\'s native stroke when no token is given — PlantUML relies on it for visibility', () => {
     const { group, child } = groupWith('polygon')
-    applyNodeColorOverlay([group], 'positive')
+    child.setAttribute('style', 'stroke:#181818;stroke-width:1;')
     applyNodeColorOverlay([group], undefined)
-    expect(child.style.getPropertyValue('stroke')).toBe('')
-    expect(child.style.getPropertyValue('stroke-width')).toBe('')
+    expect(child.style.getPropertyValue('stroke')).toBe('rgb(24, 24, 24)')
+    expect(child.style.getPropertyValue('stroke-width')).toBe('1')
   })
 
   it('only targets rect/polygon/path descendants, not the group itself', () => {
@@ -88,17 +101,18 @@ describe('applyEdgeHighlightOverlay', () => {
     expect(child.style.getPropertyValue('stroke-dasharray')).toBe('6 3')
   })
 
-  it('clears the dash pattern when the emphasis token has none', () => {
+  it('sets no dash pattern when the emphasis token has none', () => {
     const { group, child } = groupWith('path')
-    applyEdgeHighlightOverlay([group], undefined, 'caution')
     applyEdgeHighlightOverlay([group], undefined, 'emphasis')
     expect(child.style.getPropertyValue('stroke-dasharray')).toBe('')
   })
 
-  it('leaves stroke untouched when no color token is given', () => {
+  it('never touches the shape\'s native stroke when neither color nor emphasis is given — a connector line has no fill and relies entirely on its native stroke for visibility', () => {
     const { group, child } = groupWith('path')
+    child.setAttribute('style', 'stroke:#181818;stroke-width:1;')
     applyEdgeHighlightOverlay([group], undefined, undefined)
-    expect(child.style.getPropertyValue('stroke')).toBe('')
+    expect(child.style.getPropertyValue('stroke')).toBe('rgb(24, 24, 24)')
+    expect(child.style.getPropertyValue('stroke-width')).toBe('1')
   })
 })
 

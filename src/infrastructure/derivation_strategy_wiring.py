@@ -21,9 +21,10 @@ from src.application.derivation.types import CandidateSet, ModelQuery
 from src.application.derivation.viewpoint_execution import evaluate_candidates
 from src.application.runtime_catalogs import RuntimeCatalogs
 from src.application.viewpoints.registry_snapshot import build_registry_snapshot
-from src.config.settings import (
+from src.config.viewpoints_settings import (
     viewpoints_derivation_max_hops,
     viewpoints_derivation_max_relationships,
+    viewpoints_derivation_time_budget_seconds,
     viewpoints_execution_default_entity_limit_mcp,
     viewpoints_execution_max_entities,
     viewpoints_execution_timeout_seconds,
@@ -57,7 +58,13 @@ def viewpoint_execution_derive(
         params,
         catalog=load_effective_viewpoint_catalog(roots),
         read_access=read_access,
-        registries=build_registry_snapshot(runtime_catalogs, roots),
+        registries=build_registry_snapshot(
+            runtime_catalogs,
+            roots,
+            derivation_max_hops=viewpoints_derivation_max_hops(),
+            derivation_max_relationships=viewpoints_derivation_max_relationships(),
+            derivation_time_budget_seconds=viewpoints_derivation_time_budget_seconds(),
+        ),
         max_entities=viewpoints_execution_max_entities(),
         default_limit=viewpoints_execution_default_entity_limit_mcp(),
         timeout_seconds=viewpoints_execution_timeout_seconds(),

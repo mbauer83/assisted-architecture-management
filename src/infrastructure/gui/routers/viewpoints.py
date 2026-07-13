@@ -2,7 +2,8 @@
 
 from __future__ import annotations
 
-from dataclasses import asdict, replace
+from dataclasses import asdict
+from pathlib import Path
 from typing import Annotated
 
 from fastapi import APIRouter, Body, Depends, HTTPException
@@ -19,15 +20,21 @@ from src.application.viewpoints.evaluate_viewpoint import (
 )
 from src.application.viewpoints.parameter_binding import ViewpointParameterError
 from src.application.viewpoints.registry_snapshot import build_registry_snapshot
-from src.config.settings import viewpoints_execution_max_entities, viewpoints_execution_timeout_seconds
+from src.config.viewpoints_settings import (
+    viewpoints_derivation_max_hops,
+    viewpoints_derivation_max_relationships,
+    viewpoints_derivation_time_budget_seconds,
+    viewpoints_execution_max_entities,
+    viewpoints_execution_timeout_seconds,
+)
 from src.domain.relationship_reachability import DerivationLimitError, is_derived_connection_id
 from src.domain.viewpoint_binding_evaluation import BindingCardinalityError
+from src.domain.viewpoint_condition_validation import RegistrySnapshot
 from src.domain.viewpoint_query_parsing import query_from_mapping
 from src.domain.viewpoints import TargetKind
-from src.infrastructure.app_bootstrap import runtime_catalogs_dependency
 from src.infrastructure.gui.routers import state as s
 from src.infrastructure.gui.routers._diagram_selection import resolve_diagram_selection
-from src.infrastructure.viewpoint_declarations import load_effective_viewpoint_catalog
+from src.infrastructure.gui.routers._viewpoint_freshness import fresh_viewpoints_runtime_catalogs_dependency
 
 router = APIRouter()
 
@@ -36,28 +43,22 @@ router = APIRouter()
 _AD_HOC_DIAGRAM_TYPE = "archimate-layered"
 
 
-def fresh_viewpoints_runtime_catalogs_dependency(
-    catalogs: RuntimeCatalogs = Depends(runtime_catalogs_dependency),
-) -> RuntimeCatalogs:
-    """The installed `RuntimeCatalogs` with only `viewpoints` reloaded for this request —
-    every execution/projection endpoint below needs this. The module registry, ontology,
-    and specialization catalogs are expensive to rebuild and change only on a real code/
-    module change (a restart is the right time to pick those up), but an engagement-repo-
-    authored viewpoint definition is ordinary data a user just wrote through the same
-    request/response cycle. Without this, a newly-created definition could never be
-    executed by slug until the process restarted — the exact staleness
-    ``viewpoint_authoring.py``'s own endpoints already avoid (see its module docstring),
-    using the same request-scoped ``load_effective_viewpoint_catalog`` rather than the
-    fixed-workspace-config resolution ``app_bootstrap._load_viewpoints`` uses at startup."""
-    return replace(catalogs, viewpoints=load_effective_viewpoint_catalog(list(s.get_repo().repo_roots)))
-
-
 def _parameter_error(exc: ViewpointParameterError) -> HTTPException:
     return HTTPException(400, {"code": exc.code, "path": f"parameters/{exc.parameter}", "message": str(exc)})
 
 
 def _execution_error(code: str, message: str, *, path: str = "query") -> HTTPException:
     return HTTPException(400, {"code": code, "path": path, "message": message})
+
+
+def _registry_snapshot(catalogs: RuntimeCatalogs, repo_roots: list[Path]) -> RegistrySnapshot:
+    return build_registry_snapshot(
+        catalogs,
+        repo_roots,
+        derivation_max_hops=viewpoints_derivation_max_hops(),
+        derivation_max_relationships=viewpoints_derivation_max_relationships(),
+        derivation_time_budget_seconds=viewpoints_derivation_time_budget_seconds(),
+    )
 
 
 def _definition_label_attribute(slug: str | None, catalogs: RuntimeCatalogs) -> str | None:
@@ -88,7 +89,7 @@ def execute_viewpoint(
     parsed_query = query_from_mapping(query, label="query") if query is not None else None
     request = ViewpointExecutionRequest(slug=slug, query=parsed_query, limit=limit, parameters=parameters)
     repo = s.get_repo()
-    registries = build_registry_snapshot(catalogs, repo.repo_roots)
+    registries = _registry_snapshot(catalogs, repo.repo_roots)
     max_entities = viewpoints_execution_max_entities()
     try:
         result = evaluate_viewpoint(
@@ -126,7 +127,7 @@ def execute_viewpoint_projection(
         raise HTTPException(400, "exactly one of 'slug' or 'query' must be provided")
     parsed_query = query_from_mapping(query, label="query") if query is not None else None
     repo = s.get_repo()
-    registries = build_registry_snapshot(catalogs, repo.repo_roots)
+    registries = _registry_snapshot(catalogs, repo.repo_roots)
     try:
         projection = project_viewpoint_repository(
             slug,
@@ -162,7 +163,7 @@ def execute_viewpoint_diagram(
     repo_root = s.maybe_engagement_root()
     if repo_root is None:
         raise HTTPException(500, "Repository not initialized")
-    registries = build_registry_snapshot(catalogs, repo.repo_roots)
+    registries = _registry_snapshot(catalogs, repo.repo_roots)
     max_entities = viewpoints_execution_max_entities()
     request = ViewpointExecutionRequest(slug=slug, query=parsed_query, limit=max_entities, parameters=parameters)
     try:
@@ -187,6 +188,7 @@ def execute_viewpoint_diagram(
     except DerivationLimitError as exc:
         raise _execution_error("derivation-limit", str(exc)) from exc
 
+    from src.application.artifact_parsing import normalize_puml_alias
     from src.infrastructure.rendering.diagram_builder import generate_archimate_puml_body, render_puml_svg
 
     modeled_connection_ids = [cid for cid in result.connection_ids if not is_derived_connection_id(cid)]
@@ -203,7 +205,12 @@ def execute_viewpoint_diagram(
         label_attribute=_definition_label_attribute(slug, catalogs),
     )
     svg, render_warnings = render_puml_svg(puml, repo_root, _AD_HOC_DIAGRAM_TYPE)
-    return {"svg": svg, "warnings": [*result.warnings, *render_warnings]}
+    # The rendered SVG's node/edge ids are PlantUML aliases (`normalize_puml_alias`'d from
+    # each entity's `display_alias`), never the raw artifact id — the client-side click-to-
+    # select overlay needs this mapping to resolve SVG elements back to artifact ids, the
+    # same way a real persisted diagram's viewer already does from its own diagram_entities.
+    entity_aliases = {e.artifact_id: normalize_puml_alias(e.display_alias) for e in entities if e.display_alias}
+    return {"svg": svg, "warnings": [*result.warnings, *render_warnings], "entity_aliases": entity_aliases}
 
 
 @router.get("/api/diagrams/{artifact_id}/viewpoint-projection")
@@ -221,7 +228,7 @@ def get_diagram_viewpoint_projection(
     if module is None:
         raise HTTPException(404, f"Diagram type not found: {diag_rec.diagram_type!r}")
     _, registry, _ = s.get_write_deps()
-    registries = build_registry_snapshot(catalogs, repo.repo_roots)
+    registries = _registry_snapshot(catalogs, repo.repo_roots)
     projection = project_artifact_by_frontmatter(
         diag_rec.extra,
         target_kind=target_kind,

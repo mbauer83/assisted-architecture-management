@@ -7,6 +7,8 @@ from __future__ import annotations
 
 from src.domain.viewpoint_criteria import AttributeCondition
 from src.infrastructure.app_bootstrap import build_runtime_catalogs, get_module_registry
+from src.infrastructure.viewpoint_declarations import load_module_viewpoint_catalog
+from src.ontologies.archimate_4._loader import _PACKAGE_DIR as _ARCH_PACKAGE_DIR
 from tests.fixtures.viewpoints.standard_viewpoint_tables import STANDARD_VIEWPOINT_TABLES
 
 _CATALOGS = build_runtime_catalogs(get_module_registry())
@@ -19,7 +21,12 @@ _CUSTOM_SLUGS = frozenset({"element-dependents", "element-dependencies", "proces
 
 
 def test_every_table_has_a_shipped_definition() -> None:
-    shipped = set(_DEFINITIONS_BY_SLUG) - _CUSTOM_SLUGS
+    # Pure module-shipped catalog — `_DEFINITIONS_BY_SLUG` (built from the merged two-tier
+    # catalog) is right for the per-slug lookups below, but an exact-membership assertion
+    # must not be sensitive to whatever real engagement/enterprise content this
+    # environment's configured workspace happens to have alongside the shipped library.
+    shipped_only = load_module_viewpoint_catalog(_ARCH_PACKAGE_DIR)
+    shipped = {d.slug for d in shipped_only.entries} - _CUSTOM_SLUGS
     tables = {table.slug for table in STANDARD_VIEWPOINT_TABLES}
     assert shipped == tables
 

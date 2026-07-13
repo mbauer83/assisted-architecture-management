@@ -1,8 +1,8 @@
-"""MCP write tool: artifact_viewpoint — create/edit/delete viewpoint definitions (companion
-plan §9/§10). A definition is model content, not hand-edited configuration: this runs the
-same ``persist_edit``-mode validation and catalog-file persistence a GUI builder's save flow
+"""MCP write tool: artifact_viewpoint — create/edit/delete viewpoint definitions. A
+definition is model content, not hand-edited configuration: this runs the same
+``persist_edit``-mode validation and catalog-file persistence a GUI builder's save flow
 would use — one write path, two front ends. Engagement-repo scope only; read the effective
-merged catalog via ``artifact_query_viewpoint`` (arch-repo-read, WU-E7a).
+merged catalog via ``artifact_query_viewpoint``.
 """
 
 from __future__ import annotations
@@ -18,6 +18,11 @@ from src.application.viewpoints.persist_definition import (
     persist_viewpoint_definition,
 )
 from src.application.viewpoints.registry_snapshot import build_registry_snapshot
+from src.config.viewpoints_settings import (
+    viewpoints_derivation_max_hops,
+    viewpoints_derivation_max_relationships,
+    viewpoints_derivation_time_budget_seconds,
+)
 from src.domain.viewpoint_parsing import viewpoint_definition_from_mapping
 from src.infrastructure.mcp.artifact_mcp.context import repo_cached, resolve_repo_roots, roots_key, runtime_catalogs
 from src.infrastructure.mcp.artifact_mcp.tool_annotations import LOCAL_WRITE
@@ -63,7 +68,13 @@ def artifact_viewpoint(
     both_roots = resolve_repo_roots(repo_scope="both", repo_root=repo_root, repo_preset=None, enterprise_root=None)
     merged_catalog = load_effective_viewpoint_catalog(both_roots)
     local_catalog = load_viewpoint_catalog_file(engagement_root)
-    registries = build_registry_snapshot(runtime_catalogs(), both_roots)
+    registries = build_registry_snapshot(
+        runtime_catalogs(),
+        both_roots,
+        derivation_max_hops=viewpoints_derivation_max_hops(),
+        derivation_max_relationships=viewpoints_derivation_max_relationships(),
+        derivation_time_budget_seconds=viewpoints_derivation_time_budget_seconds(),
+    )
 
     if action == "delete":
         if slug is None:

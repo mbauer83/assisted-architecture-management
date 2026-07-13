@@ -121,6 +121,10 @@ export interface ViewpointExecutionRequest {
 export const ViewpointDiagramResultSchema = Schema.Struct({
   svg: Schema.NullOr(Schema.String),
   warnings: Schema.Array(Schema.String),
+  // Entity id -> the rendered SVG's PlantUML alias (never the raw artifact id) — needed to
+  // resolve SVG elements back to artifact ids for click-to-select, the same way a real
+  // persisted diagram's viewer already does from its own diagram_entities.
+  entity_aliases: Schema.optional(Schema.Record({ key: Schema.String, value: Schema.String })),
 })
 export type ViewpointDiagramResult = typeof ViewpointDiagramResultSchema.Type
 

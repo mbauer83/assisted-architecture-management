@@ -36,6 +36,10 @@ class NeighborInclusionResult:
 
     expanded_ids: frozenset[str]
     schema_drift: frozenset[str] = frozenset()
+    # True when a `traversal: derived` inclusion term's search hit its time budget before
+    # finishing — `expanded_ids` is a genuine, correct partial result (nothing incorrect was
+    # included), just not necessarily the complete reachable set.
+    derivation_truncated: bool = False
 
 
 @dataclass(frozen=True)
@@ -43,6 +47,9 @@ class ConnectionSelectionResult:
     connections: tuple[ConnectionRecord, ...]
     derived_connections: tuple[DerivedRelationship, ...] = ()
     schema_drift: frozenset[str] = frozenset()
+    # See `NeighborInclusionResult.derivation_truncated` — same meaning, for the
+    # derived/both-traversal connection-display search.
+    derivation_truncated: bool = False
 
 
 def resolve_neighbor_inclusions(
@@ -57,11 +64,13 @@ def resolve_neighbor_inclusions(
     results, so this is one evaluation pass, deterministic."""
     expanded: set[str] = set()
     drift: set[str] = set()
+    truncated = False
     for inclusion in inclusions:
         if inclusion.traversal == "derived":
             derived_result = _resolve_derived_inclusion(inclusion, primary_ids, read_access, registries, environment)
             expanded |= derived_result.expanded_ids
             drift |= derived_result.schema_drift
+            truncated = truncated or derived_result.derivation_truncated
             continue
         for anchor_id in primary_ids:
             for connection in read_access.find_connections_for(anchor_id, direction="any"):
@@ -96,7 +105,7 @@ def resolve_neighbor_inclusions(
                     if not outcome.matched:
                         continue
                 expanded.add(neighbor_id)
-    return NeighborInclusionResult(frozenset(expanded), frozenset(drift))
+    return NeighborInclusionResult(frozenset(expanded), frozenset(drift), truncated)
 
 
 def _resolve_derived_inclusion(
@@ -108,21 +117,23 @@ def _resolve_derived_inclusion(
 ) -> NeighborInclusionResult:
     if registries.derivation_catalog is None:
         return NeighborInclusionResult(frozenset())
-    relationships = derive_relationships(
+    derived_set = derive_relationships(
         RelationshipDerivationRequest(
             primary_ids,
             inclusion.direction,
             "include_potential" if inclusion.include_potential else "certain_only",
             DerivationBounds(
-                inclusion.max_hops or registries.derivation_max_hops, registries.derivation_max_relationships
+                inclusion.max_hops or registries.derivation_max_hops,
+                registries.derivation_max_relationships,
+                registries.derivation_time_budget_seconds,
             ),
         ),
         read_access=read_access,
         registries=registries.derivation_catalog,
-    ).relationships
+    )
     expanded: set[str] = set()
     drift: set[str] = set()
-    for relationship in relationships:
+    for relationship in derived_set.relationships:
         neighbor_id = relationship.target_id if relationship.source_id in primary_ids else relationship.source_id
         if neighbor_id in primary_ids:
             continue
@@ -148,7 +159,7 @@ def _resolve_derived_inclusion(
             if not outcome.matched:
                 continue
         expanded.add(neighbor_id)
-    return NeighborInclusionResult(frozenset(expanded), frozenset(drift))
+    return NeighborInclusionResult(frozenset(expanded), frozenset(drift), derived_set.truncated)
 
 
 def select_connections(
@@ -235,8 +246,8 @@ def _select(
                 if outcome.matched:
                     seen[connection.artifact_id] = connection
     ordered = tuple(sorted(seen.values(), key=lambda connection: connection.artifact_id))
-    derived = _select_derived(scan_ids, selection, read_access, registries, bridging)
-    return ConnectionSelectionResult(ordered, derived, frozenset(drift))
+    derived, derivation_truncated = _select_derived(scan_ids, selection, read_access, registries, bridging)
+    return ConnectionSelectionResult(ordered, derived, frozenset(drift), derivation_truncated)
 
 
 def _select_derived(
@@ -245,23 +256,25 @@ def _select_derived(
     read_access: CriteriaReadAccess,
     registries: RegistrySnapshot,
     bridging: tuple[frozenset[str], frozenset[str]] | None,
-) -> tuple[DerivedRelationship, ...]:
+) -> tuple[tuple[DerivedRelationship, ...], bool]:
     if selection.traversal not in {"derived", "both"} or registries.derivation_catalog is None:
-        return ()
-    relationships = derive_relationships(
+        return (), False
+    derived_set = derive_relationships(
         RelationshipDerivationRequest(
             scan_ids,
             "either",
             "include_potential" if selection.include_potential else "certain_only",
             DerivationBounds(
-                selection.max_hops or registries.derivation_max_hops, registries.derivation_max_relationships
+                selection.max_hops or registries.derivation_max_hops,
+                registries.derivation_max_relationships,
+                registries.derivation_time_budget_seconds,
             ),
         ),
         read_access=read_access,
         registries=registries.derivation_catalog,
-    ).relationships
+    )
     included: list[DerivedRelationship] = []
-    for relationship in relationships:
+    for relationship in derived_set.relationships:
         if bridging is None:
             structural = relationship.source_id in scan_ids and relationship.target_id in scan_ids
         else:
@@ -273,4 +286,4 @@ def _select_derived(
             selection.criteria, relationship.connection_type, relationship.certainty, relationship.hops
         ):
             included.append(relationship)
-    return tuple(sorted(included, key=lambda relationship: relationship.artifact_id))
+    return tuple(sorted(included, key=lambda relationship: relationship.artifact_id)), derived_set.truncated

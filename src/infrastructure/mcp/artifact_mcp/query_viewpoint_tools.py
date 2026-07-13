@@ -16,7 +16,10 @@ from src.application.viewpoints.evaluate_viewpoint import (
 from src.application.viewpoints.parameter_binding import ViewpointParameterError
 from src.application.viewpoints.pins import load_pinned_slugs
 from src.application.viewpoints.registry_snapshot import build_registry_snapshot
-from src.config.settings import (
+from src.config.viewpoints_settings import (
+    viewpoints_derivation_max_hops,
+    viewpoints_derivation_max_relationships,
+    viewpoints_derivation_time_budget_seconds,
     viewpoints_execution_default_entity_limit_mcp,
     viewpoints_execution_max_entities,
     viewpoints_execution_timeout_seconds,
@@ -108,7 +111,13 @@ def register_query_viewpoint_tools(mcp: FastMCP) -> None:
 
         catalogs = runtime_catalogs()
         repo = repo_cached(roots_key(roots))
-        registries = build_registry_snapshot(catalogs, repo.repo_roots)
+        registries = build_registry_snapshot(
+            catalogs,
+            repo.repo_roots,
+            derivation_max_hops=viewpoints_derivation_max_hops(),
+            derivation_max_relationships=viewpoints_derivation_max_relationships(),
+            derivation_time_budget_seconds=viewpoints_derivation_time_budget_seconds(),
+        )
         try:
             result = evaluate_viewpoint(
                 request,

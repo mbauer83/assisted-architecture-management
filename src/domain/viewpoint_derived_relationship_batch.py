@@ -65,6 +65,7 @@ def evaluate_relationship_derived_batch(
             DerivationBounds(
                 attribute.max_hops or input.registries.derivation_max_hops,
                 input.registries.derivation_max_relationships,
+                input.registries.derivation_time_budget_seconds,
             ),
         ),
         read_access=input.read_access,

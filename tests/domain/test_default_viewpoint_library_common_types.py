@@ -9,6 +9,8 @@ from __future__ import annotations
 from src.application.viewpoints.evaluate_viewpoint import ViewpointExecutionRequest, evaluate_viewpoint
 from src.application.viewpoints.registry_snapshot import build_registry_snapshot
 from src.infrastructure.app_bootstrap import build_runtime_catalogs, get_module_registry
+from src.infrastructure.viewpoint_declarations import load_module_viewpoint_catalog
+from src.ontologies.archimate_4._loader import _PACKAGE_DIR as _ARCH_PACKAGE_DIR
 from tests.application.viewpoints._fixtures import Store, entity
 
 _CATALOGS = build_runtime_catalogs(get_module_registry())
@@ -74,8 +76,13 @@ def test_no_common_type_scope_ever_uses_a_domain_condition_to_layer_scope() -> N
     is one of the explicit "Core element" (domain-union) viewpoints."""
     from src.domain.viewpoint_criteria import AttributeCondition
 
+    # Pure module-shipped catalog: Rule 2 is a shipped-library authoring convention (never
+    # layer-scope via a `domain` condition, since it would silently exclude domain-neutral
+    # common entities) — it doesn't bind a real, user-authored engagement viewpoint that
+    # may exist alongside the shipped library in this environment's configured workspace.
+    shipped_only = load_module_viewpoint_catalog(_ARCH_PACKAGE_DIR)
     core_element_slugs = {"layered", "requirements-realization", "outcome-realization"}
-    for definition in _CATALOGS.viewpoints.entries:
+    for definition in shipped_only.entries:
         if definition.slug in core_element_slugs or definition.query is None:
             continue
         for child in definition.query.entity_criteria.children:

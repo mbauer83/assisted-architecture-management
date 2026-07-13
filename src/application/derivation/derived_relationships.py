@@ -68,6 +68,7 @@ def _derive(
     catalog: ModuleCatalog,
     default_max_hops: int,
     max_relationships: int,
+    time_budget_seconds: float = 2.0,
 ) -> tuple[DerivedRelationship, ...]:
     roots = _roots(params)
     if not roots:
@@ -75,7 +76,7 @@ def _derive(
     max_hops_raw = params.get("max_hops")
     max_hops = int(max_hops_raw) if isinstance(max_hops_raw, (int, float)) else default_max_hops
     request = RelationshipDerivationRequest(
-        roots, _direction(params), _certainty(params), DerivationBounds(max_hops, max_relationships)
+        roots, _direction(params), _certainty(params), DerivationBounds(max_hops, max_relationships, time_budget_seconds)
     )
     return derive_relationships(request, read_access=read_access, registries=catalog).relationships
 

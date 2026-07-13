@@ -68,6 +68,7 @@ class RegistrySnapshot:
     derivation_catalog: ModuleCatalog | None = None
     derivation_max_hops: int = 4
     derivation_max_relationships: int = 2000
+    derivation_time_budget_seconds: float = 2.0
 
 
 def issue(

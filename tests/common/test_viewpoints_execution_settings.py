@@ -1,12 +1,13 @@
-"""Tests for the ``viewpoints.execution_*`` settings (companion plan §7.1 bounds)."""
+"""Tests for the ``viewpoints.execution_*``/``derivation_*`` settings."""
 
 from __future__ import annotations
 
 import pytest
 
-from src.config.settings import (
+from src.config.viewpoints_settings import (
     viewpoints_derivation_max_hops,
     viewpoints_derivation_max_relationships,
+    viewpoints_derivation_time_budget_seconds,
     viewpoints_execution_default_entity_limit_mcp,
     viewpoints_execution_max_entities,
     viewpoints_execution_timeout_seconds,
@@ -27,7 +28,8 @@ def test_defaults(monkeypatch: pytest.MonkeyPatch) -> None:
     assert viewpoints_max_query_parameters() == 4
     assert viewpoints_max_derived_attributes() == 8
     assert viewpoints_derivation_max_hops() == 4
-    assert viewpoints_derivation_max_relationships() == 2000
+    assert viewpoints_derivation_max_relationships() == 20000
+    assert viewpoints_derivation_time_budget_seconds() == 2.0
 
 
 def test_reads_configured_values(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -46,6 +48,7 @@ def test_reads_configured_values(monkeypatch: pytest.MonkeyPatch) -> None:
                 "max_derived_attributes": 5,
                 "derivation_max_hops": 6,
                 "derivation_max_relationships": 100,
+                "derivation_time_budget_seconds": 5.5,
             }
         },
     )
@@ -57,6 +60,7 @@ def test_reads_configured_values(monkeypatch: pytest.MonkeyPatch) -> None:
     assert viewpoints_max_derived_attributes() == 5
     assert viewpoints_derivation_max_hops() == 6
     assert viewpoints_derivation_max_relationships() == 100
+    assert viewpoints_derivation_time_budget_seconds() == 5.5
 
 
 def test_invalid_values_fall_back_to_defaults(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -75,6 +79,7 @@ def test_invalid_values_fall_back_to_defaults(monkeypatch: pytest.MonkeyPatch) -
                 "max_derived_attributes": "not-a-number",
                 "derivation_max_hops": "not-a-number",
                 "derivation_max_relationships": "not-a-number",
+                "derivation_time_budget_seconds": "not-a-number",
             }
         },
     )
@@ -85,4 +90,5 @@ def test_invalid_values_fall_back_to_defaults(monkeypatch: pytest.MonkeyPatch) -
     assert viewpoints_max_query_parameters() == 4
     assert viewpoints_max_derived_attributes() == 8
     assert viewpoints_derivation_max_hops() == 4
-    assert viewpoints_derivation_max_relationships() == 2000
+    assert viewpoints_derivation_max_relationships() == 20000
+    assert viewpoints_derivation_time_budget_seconds() == 2.0

@@ -41,6 +41,7 @@ const svgMarkup = ref<string | null>(null)
 const diagramWarnings = ref<readonly string[]>([])
 const diagramLoading = ref(false)
 const diagramError = ref<string | null>(null)
+const entityAliases = ref<Readonly<Record<string, string>>>({})
 
 const presentation = computed(() => {
   const envelope = definitions.value.find((d) => d.slug === slug.value)
@@ -55,12 +56,13 @@ const svgHtml = computed(() => (svgMarkup.value ? sanitizeDiagramSvg(svgMarkup.v
 // persisted diagram) — this rendering is ephemeral, but the viewport/interactivity needs
 // are identical, so nothing type-specific is duplicated here. ──────────────────────────
 const detail = computed<DiagramSvgSelectionDetail>(() => ({ diagram_type: 'archimate-layered' }))
-const diagramEntities = computed(() => execution.result.value?.entities.map(toEntitySummaryStub) ?? [])
+const aliasById = computed(() => new Map(Object.entries(entityAliases.value)))
+const diagramEntities = computed(() => execution.result.value?.entities.map((e) => toEntitySummaryStub(e, aliasById.value)) ?? [])
 const diagramConnections = computed(() => {
   const result = execution.result.value
   if (!result) return []
   const nameById = new Map(result.entities.map((e) => [e.id, e.name]))
-  return result.connections.map((c) => toDiagramConnectionStub(c, nameById))
+  return result.connections.map((c) => toDiagramConnectionStub(c, nameById, aliasById.value))
 })
 const noDrilldown = ref({})
 const diagramIdRef = ref('')
@@ -105,6 +107,7 @@ const runExecution = async (resolved: ResolvedViewpointExecution) => {
   if (exit._tag === 'Success') {
     svgMarkup.value = exit.value.svg
     diagramWarnings.value = exit.value.warnings
+    entityAliases.value = exit.value.entity_aliases ?? {}
   } else {
     diagramError.value = String(exit.cause)
   }
