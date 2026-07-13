@@ -563,7 +563,7 @@ the binding layer, and G1 waits on neither derivation nor presentation work.
     pinnable; promotion untouched.
   - Deps: E2/E3b for surfacing (storage part independent).
 
-- [ ] **WU-F4 — `viewpoint_execution` view-derivation strategy (persistent results)**
+- [x] **WU-F4 — `viewpoint_execution` view-derivation strategy (persistent results)**
   - Files: new `src/application/derivation/viewpoint_execution.py`, registration at the
     composition root (`src/infrastructure/app_bootstrap.py`, beside existing strategy
     registrations); tests: new `tests/application/derivation/test_viewpoint_execution_strategy.py`.
@@ -940,3 +940,4 @@ Anything short of this is "in progress", regardless of how many WUs are ticked.
 - 2026-07-13 — WU-C6 — User resolved the escalation: reopen the lock narrowly for `not_in`/`like`/`ilike` (PLAN §2 updated accordingly); comparators added end-to-end (parse/validate/evaluate/summarize) with SQL-style pattern matching applied uniformly to scalar and multi-valued attributes, and to literal/parameter/binding/attribute-reference operands alike.
 - 2026-07-13 — WU-F2 — `label_attribute` validated as a display option distinct from the styling-capability namespace: allowed only on `exploration`/`diagram`, its value resolved through the same reserved/profile/`derived.` attribute-path machinery as every other attribute reference.
 - 2026-07-13 — WU-F3 — Pins are an engagement-repo-local sidecar list (CRUD via REST, surfaced on MCP `list`); a direct `plan_promotion`/`execute_promotion` run (no git dependency at that layer) confirms the sidecar is never copied to the enterprise repo.
+- 2026-07-13 — WU-F4 — Design gap: the shared `DeriveFn`/`ModelQuery` contract every strategy implements against carries no repo-root paths, so a pure `derive()` cannot reach a `ViewpointCatalog`/`RegistrySnapshot`. User-approved resolution: generation-time `params["repo_roots"]` (plain data, no shared-type change) plus a composition-root closure (`src/infrastructure/derivation_strategy_wiring.py`) that builds the real catalog/registries/read-access and calls the pure `evaluate_candidates`/`default_selection` in `viewpoint_execution.py`; entity/connection inclusion still follows the read-access's own cross-repo enumeration, only the catalog/registries load is roots-scoped.

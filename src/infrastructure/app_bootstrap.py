@@ -163,14 +163,17 @@ def _build_derivation_catalog():
         incident_connections,
         local_neighborhood,
         path_projection,
+        viewpoint_execution,
     )
     from src.diagram_types.c4._projection import MANIFEST as _c4_manifest  # noqa: PLC0415
+    from src.infrastructure.derivation_strategy_wiring import viewpoint_execution_derive  # noqa: PLC0415
 
     builder = DerivationStrategyCatalogBuilder()
     builder.register(explicit_selection.SPEC, explicit_selection.derive)
     builder.register(local_neighborhood.SPEC, local_neighborhood.derive)
     builder.register(incident_connections.SPEC, incident_connections.derive)
     builder.register(path_projection.SPEC, path_projection.derive)
+    builder.register(viewpoint_execution.SPEC, viewpoint_execution_derive)
     for spec, fn in _c4_manifest.strategies:
         builder.register(spec, fn)
     return builder.build()
