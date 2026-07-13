@@ -1,68 +1,1348 @@
-# Small, informative starter library of viewpoint definitions shipped with the ArchiMate
-# module. Names and scope only — non-mandatory, and repo authors are free to add their own
-# in .arch-repo/viewpoints.yaml.
+# Appendix-C standard viewpoint library shipped with the ArchiMate module — 25 example
+# viewpoint definitions transcribed from the ArchiMate specification's Table C-2 through
+# Table C-26 (Appendix C.1 intro: grouping and junction elements are admitted in every
+# viewpoint's scope). These are starting points for modeling efforts, not a normative or
+# exhaustive list — repo authors are free to add their own in .arch-repo/viewpoints.yaml.
 viewpoints:
-  - slug: motivation
-    version: 1
-    name: Motivation
-    description: Stakeholders, drivers, goals, and requirements behind the architecture.
-    purpose: deciding
-    content: coherence
-    stakeholders: [business-management, enterprise-architects]
-    concerns: ["why are we doing this", "which requirements does this satisfy"]
-    scope:
-      entity_types:
-        - stakeholder
-        - driver
+- slug: organization
+  version: 1
+  name: Organization
+  description: Organization (Table C-2, composition). Starting point for modeling, not a normative or
+    exhaustive list.
+  purpose:
+  - designing
+  - deciding
+  - informing
+  content:
+  - details
+  stakeholders:
+  - Enterprise Architects
+  - Process Architects
+  - Domain Architects
+  - managers
+  - employees
+  - shareholders
+  concerns:
+  - identification of competencies, authority, and responsibilities
+  scope:
+    entity_types:
+    - and-junction
+    - business-actor
+    - business-interface
+    - collaboration
+    - grouping
+    - location
+    - or-junction
+    - role
+  query:
+    query_schema: 1
+    entity_criteria:
+      kind: group
+      conjunction: and
+      children:
+      - kind: condition
+        attribute: type
+        comparator: in
+        value:
+        - and-junction
+        - business-actor
+        - business-interface
+        - collaboration
+        - grouping
+        - location
+        - or-junction
+        - role
+  presentation:
+    representation: diagram
+  representation_types:
+  - archimate-business
+- slug: application-structure
+  version: 2
+  name: Application Structure
+  description: Application Structure (Table C-3, composition). Starting point for modeling, not a normative
+    or exhaustive list.
+  purpose:
+  - designing
+  content:
+  - details
+  stakeholders:
+  - Application Architects
+  - Solution Architects
+  concerns:
+  - application structure
+  - consistency and completeness
+  - reduction of complexity
+  scope:
+    entity_types:
+    - and-junction
+    - application-component
+    - application-interface
+    - collaboration
+    - data-object
+    - grouping
+    - or-junction
+  query:
+    query_schema: 1
+    entity_criteria:
+      kind: group
+      conjunction: and
+      children:
+      - kind: condition
+        attribute: type
+        comparator: in
+        value:
+        - and-junction
+        - application-component
+        - application-interface
+        - collaboration
+        - data-object
+        - grouping
+        - or-junction
+  presentation:
+    representation: diagram
+  representation_types:
+  - archimate-application
+- slug: information-structure
+  version: 1
+  name: Information Structure
+  description: Information Structure (Table C-4, composition). Starting point for modeling, not a normative
+    or exhaustive list.
+  purpose:
+  - designing
+  content:
+  - details
+  stakeholders:
+  - Domain Architects
+  - Information Architects
+  concerns:
+  - structure and dependencies of the used data and information
+  - consistency
+  - completeness
+  scope:
+    entity_types:
+    - and-junction
+    - artifact
+    - business-object
+    - data-object
+    - grouping
+    - meaning
+    - or-junction
+  query:
+    query_schema: 1
+    entity_criteria:
+      kind: group
+      conjunction: and
+      children:
+      - kind: condition
+        attribute: type
+        comparator: in
+        value:
+        - and-junction
+        - artifact
+        - business-object
+        - data-object
+        - grouping
+        - meaning
+        - or-junction
+  presentation:
+    representation: diagram
+  representation_types:
+  - archimate-layered
+- slug: technology
+  version: 1
+  name: Technology
+  description: Technology (Table C-5, composition). Starting point for modeling, not a normative or exhaustive
+    list.
+  purpose:
+  - designing
+  content:
+  - details
+  stakeholders:
+  - Infrastructure Architects
+  - Operational Managers
+  concerns:
+  - stability
+  - security
+  - dependencies
+  - costs of the infrastructure
+  scope:
+    entity_types:
+    - and-junction
+    - artifact
+    - collaboration
+    - communication-network
+    - device
+    - event
+    - function
+    - grouping
+    - location
+    - or-junction
+    - path
+    - process
+    - service
+    - system-software
+    - technology-interface
+    - technology-node
+  query:
+    query_schema: 1
+    entity_criteria:
+      kind: group
+      conjunction: and
+      children:
+      - kind: condition
+        attribute: type
+        comparator: in
+        value:
+        - and-junction
+        - artifact
+        - collaboration
+        - communication-network
+        - device
+        - event
+        - function
+        - grouping
+        - location
+        - or-junction
+        - path
+        - process
+        - service
+        - system-software
+        - technology-interface
+        - technology-node
+  presentation:
+    representation: diagram
+  representation_types:
+  - archimate-technology
+- slug: layered
+  version: 2
+  name: Layered
+  description: Layered (Table C-6, composition). Starting point for modeling, not a normative or exhaustive
+    list.
+  purpose:
+  - designing
+  - deciding
+  - informing
+  content:
+  - overview
+  stakeholders:
+  - Enterprise Architects
+  - Process Architects
+  - Application Architects
+  - Infrastructure Architects
+  - Domain Architects
+  concerns:
+  - consistency
+  - reduction of complexity
+  - impact of change
+  - flexibility
+  query:
+    query_schema: 1
+    entity_criteria:
+      kind: group
+      conjunction: and
+      children:
+      - kind: condition
+        attribute: domain
+        comparator: in
+        value:
+        - application
+        - business
+        - common
+        - technology
+  presentation:
+    representation: exploration
+  representation_types:
+  - archimate-layered
+- slug: physical
+  version: 1
+  name: Physical
+  description: Physical (Table C-7, composition). Starting point for modeling, not a normative or exhaustive
+    list.
+  purpose:
+  - designing
+  content:
+  - details
+  stakeholders:
+  - Infrastructure Architects
+  - Operational Managers
+  concerns:
+  - relationships and dependencies of the physical environment and how this relates to IT infrastructure
+  scope:
+    entity_types:
+    - and-junction
+    - communication-network
+    - device
+    - distribution-network
+    - equipment
+    - facility
+    - grouping
+    - location
+    - material
+    - or-junction
+    - path
+    - technology-node
+  query:
+    query_schema: 1
+    entity_criteria:
+      kind: group
+      conjunction: and
+      children:
+      - kind: condition
+        attribute: type
+        comparator: in
+        value:
+        - and-junction
+        - communication-network
+        - device
+        - distribution-network
+        - equipment
+        - facility
+        - grouping
+        - location
+        - material
+        - or-junction
+        - path
+        - technology-node
+  presentation:
+    representation: diagram
+  representation_types:
+  - archimate-technology
+- slug: product
+  version: 1
+  name: Product
+  description: Product (Table C-8, support). Starting point for modeling, not a normative or exhaustive
+    list.
+  purpose:
+  - designing
+  - deciding
+  content:
+  - overview
+  stakeholders:
+  - Product Developers
+  - Product Managers
+  - Process Architects
+  - Domain Architects
+  concerns:
+  - product development
+  - value offered by the products of the enterprise
+  scope:
+    entity_types:
+    - and-junction
+    - application-component
+    - application-interface
+    - artifact
+    - business-actor
+    - business-interface
+    - business-object
+    - collaboration
+    - data-object
+    - event
+    - function
+    - grouping
+    - material
+    - or-junction
+    - process
+    - product
+    - role
+    - service
+    - value
+  query:
+    query_schema: 1
+    entity_criteria:
+      kind: group
+      conjunction: and
+      children:
+      - kind: condition
+        attribute: type
+        comparator: in
+        value:
+        - and-junction
+        - application-component
+        - application-interface
+        - artifact
+        - business-actor
+        - business-interface
+        - business-object
+        - collaboration
+        - data-object
+        - event
+        - function
+        - grouping
+        - material
+        - or-junction
+        - process
+        - product
+        - role
+        - service
+        - value
+  presentation:
+    representation: exploration
+  representation_types:
+  - archimate-layered
+- slug: application-usage
+  version: 1
+  name: Application Usage
+  description: Application Usage (Table C-9, support). Starting point for modeling, not a normative or
+    exhaustive list.
+  purpose:
+  - designing
+  - deciding
+  content:
+  - overview
+  stakeholders:
+  - Enterprise Architects
+  - Process Architects
+  - Application Architects
+  - Operational Managers
+  concerns:
+  - consistency and completeness
+  - reduction of complexity
+  scope:
+    entity_types:
+    - and-junction
+    - application-component
+    - application-interface
+    - business-actor
+    - business-object
+    - collaboration
+    - data-object
+    - event
+    - function
+    - grouping
+    - or-junction
+    - process
+    - role
+    - service
+  query:
+    query_schema: 1
+    entity_criteria:
+      kind: group
+      conjunction: and
+      children:
+      - kind: condition
+        attribute: type
+        comparator: in
+        value:
+        - and-junction
+        - application-component
+        - application-interface
+        - business-actor
+        - business-object
+        - collaboration
+        - data-object
+        - event
+        - function
+        - grouping
+        - or-junction
+        - process
+        - role
+        - service
+  presentation:
+    representation: exploration
+  representation_types:
+  - archimate-layered
+- slug: technology-usage
+  version: 2
+  name: Technology Usage
+  description: Technology Usage (Table C-10, support). Starting point for modeling, not a normative or
+    exhaustive list.
+  purpose:
+  - designing
+  content:
+  - details
+  stakeholders:
+  - Application Architects
+  - Infrastructure Architects
+  - Operational Managers
+  concerns:
+  - dependencies
+  - performance
+  - scalability
+  scope:
+    entity_types:
+    - and-junction
+    - application-component
+    - artifact
+    - collaboration
+    - communication-network
+    - data-object
+    - device
+    - event
+    - function
+    - grouping
+    - or-junction
+    - path
+    - process
+    - service
+    - system-software
+    - technology-interface
+    - technology-node
+  query:
+    query_schema: 1
+    entity_criteria:
+      kind: group
+      conjunction: and
+      children:
+      - kind: condition
+        attribute: type
+        comparator: in
+        value:
+        - and-junction
+        - application-component
+        - artifact
+        - collaboration
+        - communication-network
+        - data-object
+        - device
+        - event
+        - function
+        - grouping
+        - or-junction
+        - path
+        - process
+        - service
+        - system-software
+        - technology-interface
+        - technology-node
+  presentation:
+    representation: diagram
+  representation_types:
+  - archimate-technology
+- slug: process-cooperation
+  version: 1
+  name: Process Cooperation
+  description: Process Cooperation (Table C-11, cooperation). Starting point for modeling, not a normative
+    or exhaustive list.
+  purpose:
+  - designing
+  - deciding
+  content:
+  - coherence
+  stakeholders:
+  - Process Architects
+  - Domain Architects
+  - Operational Managers
+  concerns:
+  - dependencies between processes
+  - consistency and completeness
+  - responsibilities
+  scope:
+    entity_types:
+    - and-junction
+    - application-component
+    - application-interface
+    - business-actor
+    - business-interface
+    - business-object
+    - collaboration
+    - data-object
+    - event
+    - function
+    - grouping
+    - location
+    - or-junction
+    - process
+    - role
+    - service
+  query:
+    query_schema: 1
+    entity_criteria:
+      kind: group
+      conjunction: and
+      children:
+      - kind: condition
+        attribute: type
+        comparator: in
+        value:
+        - and-junction
+        - application-component
+        - application-interface
+        - business-actor
+        - business-interface
+        - business-object
+        - collaboration
+        - data-object
+        - event
+        - function
+        - grouping
+        - location
+        - or-junction
+        - process
+        - role
+        - service
+  presentation:
+    representation: exploration
+  representation_types:
+  - archimate-layered
+- slug: application-cooperation
+  version: 1
+  name: Application Cooperation
+  description: Application Cooperation (Table C-12, cooperation). Starting point for modeling, not a normative
+    or exhaustive list.
+  purpose:
+  - designing
+  content:
+  - coherence
+  stakeholders:
+  - Enterprise Architects
+  - Process Architects
+  - Application Architects
+  - Domain Architects
+  concerns:
+  - relationships and dependencies between applications
+  - orchestration/choreography of services
+  - consistency and completeness
+  - reduction of complexity
+  scope:
+    entity_types:
+    - and-junction
+    - application-component
+    - application-interface
+    - collaboration
+    - data-object
+    - event
+    - function
+    - grouping
+    - location
+    - or-junction
+    - process
+    - service
+  query:
+    query_schema: 1
+    entity_criteria:
+      kind: group
+      conjunction: and
+      children:
+      - kind: condition
+        attribute: type
+        comparator: in
+        value:
+        - and-junction
+        - application-component
+        - application-interface
+        - collaboration
+        - data-object
+        - event
+        - function
+        - grouping
+        - location
+        - or-junction
+        - process
+        - service
+  presentation:
+    representation: exploration
+  representation_types:
+  - archimate-application
+- slug: service-realization
+  version: 1
+  name: Service Realization
+  description: Service Realization (Table C-13, realization). Starting point for modeling, not a normative
+    or exhaustive list.
+  purpose:
+  - designing
+  - deciding
+  content:
+  - coherence
+  stakeholders:
+  - Process Architects
+  - Domain Architects
+  - Product Managers
+  - Operational Managers
+  concerns:
+  - added value of processes
+  - consistency and completeness
+  - responsibilities
+  scope:
+    entity_types:
+    - and-junction
+    - application-component
+    - application-interface
+    - business-actor
+    - business-interface
+    - business-object
+    - collaboration
+    - data-object
+    - event
+    - function
+    - grouping
+    - or-junction
+    - process
+    - role
+    - service
+  query:
+    query_schema: 1
+    entity_criteria:
+      kind: group
+      conjunction: and
+      children:
+      - kind: condition
+        attribute: type
+        comparator: in
+        value:
+        - and-junction
+        - application-component
+        - application-interface
+        - business-actor
+        - business-interface
+        - business-object
+        - collaboration
+        - data-object
+        - event
+        - function
+        - grouping
+        - or-junction
+        - process
+        - role
+        - service
+  presentation:
+    representation: exploration
+  representation_types:
+  - archimate-layered
+- slug: implementation-and-deployment
+  version: 1
+  name: Implementation and Deployment
+  description: Implementation and Deployment (Table C-14, realization). Starting point for modeling, not
+    a normative or exhaustive list.
+  purpose:
+  - designing
+  - deciding
+  content:
+  - coherence
+  stakeholders:
+  - Application Architects
+  - Domain Architects
+  concerns:
+  - structure of application platforms and how they relate to supporting technology
+  scope:
+    entity_types:
+    - and-junction
+    - application-component
+    - application-interface
+    - artifact
+    - collaboration
+    - data-object
+    - event
+    - function
+    - grouping
+    - or-junction
+    - path
+    - process
+    - service
+    - system-software
+    - technology-interface
+  query:
+    query_schema: 1
+    entity_criteria:
+      kind: group
+      conjunction: and
+      children:
+      - kind: condition
+        attribute: type
+        comparator: in
+        value:
+        - and-junction
+        - application-component
+        - application-interface
+        - artifact
+        - collaboration
+        - data-object
+        - event
+        - function
+        - grouping
+        - or-junction
+        - path
+        - process
+        - service
+        - system-software
+        - technology-interface
+  presentation:
+    representation: exploration
+  representation_types:
+  - archimate-layered
+- slug: stakeholder
+  version: 1
+  name: Stakeholder
+  description: Stakeholder (Table C-15, motivation). Starting point for modeling, not a normative or exhaustive
+    list.
+  purpose:
+  - designing
+  - deciding
+  - informing
+  content:
+  - coherence
+  stakeholders:
+  - Stakeholders
+  - Business Managers
+  - Enterprise Architects
+  - ICT Architects
+  - Business Analysts
+  - Requirements Managers
+  concerns:
+  - architecture mission and strategy
+  - motivation
+  scope:
+    entity_types:
+    - and-junction
+    - assessment
+    - driver
+    - goal
+    - grouping
+    - or-junction
+    - outcome
+    - stakeholder
+  query:
+    query_schema: 1
+    entity_criteria:
+      kind: group
+      conjunction: and
+      children:
+      - kind: condition
+        attribute: type
+        comparator: in
+        value:
+        - and-junction
         - assessment
+        - driver
         - goal
+        - grouping
+        - or-junction
+        - outcome
+        - stakeholder
+  presentation:
+    representation: exploration
+  representation_types:
+  - archimate-motivation
+- slug: goal-realization
+  version: 1
+  name: Goal Realization
+  description: Goal Realization (Table C-16, realization). Starting point for modeling, not a normative
+    or exhaustive list.
+  purpose:
+  - designing
+  - deciding
+  content:
+  - coherence
+  stakeholders:
+  - Stakeholders
+  - Business Managers
+  - Enterprise Architects
+  - ICT Architects
+  - Business Analysts
+  - Requirements Managers
+  concerns:
+  - architecture mission, strategy and tactics
+  - motivation
+  scope:
+    entity_types:
+    - and-junction
+    - goal
+    - grouping
+    - or-junction
+    - outcome
+    - principle
+    - requirement
+  query:
+    query_schema: 1
+    entity_criteria:
+      kind: group
+      conjunction: and
+      children:
+      - kind: condition
+        attribute: type
+        comparator: in
+        value:
+        - and-junction
+        - goal
+        - grouping
+        - or-junction
         - outcome
         - principle
         - requirement
+  presentation:
+    representation: exploration
+  representation_types:
+  - archimate-motivation
+- slug: requirements-realization
+  version: 1
+  name: Requirements Realization
+  description: Requirements Realization (Table C-17, realization). Starting point for modeling, not a
+    normative or exhaustive list.
+  purpose:
+  - designing
+  - deciding
+  - informing
+  content:
+  - coherence
+  stakeholders:
+  - Enterprise Architects
+  - ICT Architects
+  - Business Analysts
+  - Requirements Managers
+  concerns:
+  - architecture strategy and tactics
+  - motivation
+  query:
+    query_schema: 1
+    entity_criteria:
+      kind: group
+      conjunction: and
+      children:
+      - kind: condition
+        attribute: domain
+        comparator: in
+        value:
+        - application
+        - business
+        - common
+        - motivation
+        - strategy
+        - technology
+  presentation:
+    representation: exploration
+  representation_types:
+  - archimate-motivation
+- slug: motivation
+  version: 2
+  name: Motivation
+  description: Motivation (Table C-18, motivation). Starting point for modeling, not a normative or exhaustive
+    list.
+  purpose:
+  - designing
+  - deciding
+  - informing
+  content:
+  - coherence
+  stakeholders:
+  - Enterprise Architects
+  - ICT Architects
+  - Business Analysts
+  - Requirements Managers
+  concerns:
+  - architecture strategy and tactics
+  - motivation
+  scope:
+    entity_types:
+    - and-junction
+    - assessment
+    - driver
+    - goal
+    - grouping
+    - meaning
+    - or-junction
+    - outcome
+    - principle
+    - requirement
+    - stakeholder
+    - value
+  query:
+    query_schema: 1
+    entity_criteria:
+      kind: group
+      conjunction: and
+      children:
+      - kind: condition
+        attribute: type
+        comparator: in
+        value:
+        - and-junction
+        - assessment
+        - driver
+        - goal
+        - grouping
         - meaning
+        - or-junction
+        - outcome
+        - principle
+        - requirement
+        - stakeholder
         - value
-    representation_types: [archimate-motivation]
-
-  - slug: application-structure
-    version: 1
-    name: Application Structure
-    description: Application components, their interfaces, and the data objects they use.
-    purpose: designing
-    content: details
-    stakeholders: [application-architects, developers]
-    concerns: ["how are applications structured", "what data do they use"]
-    scope:
-      entity_types:
-        - application-component
-        - application-interface
-        - data-object
-        - service
-        - function
-    representation_types: [archimate-application]
-
-  - slug: layered
-    version: 1
-    name: Layered
-    description: A cross-layer overview relating business, application, and technology.
-    purpose: informing
-    content: overview
-    stakeholders: [enterprise-architects]
-    concerns: ["how do the layers relate"]
-    representation_types: [archimate-layered]
-
-  - slug: technology-usage
-    version: 1
-    name: Technology Usage
-    description: Application components mapped onto the technology nodes and infrastructure they run on.
-    purpose: designing
-    content: details
-    stakeholders: [technology-architects, operations]
-    concerns: ["what runs where"]
-    scope:
-      entity_types:
-        - technology-node
-        - device
-        - system-software
-        - artifact
-        - application-component
-    representation_types: [archimate-technology]
+  presentation:
+    representation: exploration
+  representation_types:
+  - archimate-motivation
+- slug: strategy
+  version: 1
+  name: Strategy
+  description: Strategy (Table C-19, strategy). Starting point for modeling, not a normative or exhaustive
+    list.
+  purpose:
+  - designing
+  - deciding
+  content:
+  - overview
+  stakeholders:
+  - CxOs
+  - Business Managers
+  - Enterprise Architects
+  - Business Architects
+  concerns:
+  - strategy development
+  scope:
+    entity_types:
+    - and-junction
+    - capability
+    - course-of-action
+    - grouping
+    - or-junction
+    - outcome
+    - resource
+    - value-stream
+  query:
+    query_schema: 1
+    entity_criteria:
+      kind: group
+      conjunction: and
+      children:
+      - kind: condition
+        attribute: type
+        comparator: in
+        value:
+        - and-junction
+        - capability
+        - course-of-action
+        - grouping
+        - or-junction
+        - outcome
+        - resource
+        - value-stream
+  presentation:
+    representation: exploration
+  representation_types:
+  - archimate-strategy
+- slug: capability-map
+  version: 1
+  name: Capability Map
+  description: Capability Map (Table C-20, strategy). Starting point for modeling, not a normative or
+    exhaustive list.
+  purpose:
+  - designing
+  - deciding
+  content:
+  - overview
+  stakeholders:
+  - Business Managers
+  - Enterprise Architects
+  - Business Architects
+  concerns:
+  - architecture strategy and tactics
+  - motivation
+  scope:
+    entity_types:
+    - and-junction
+    - capability
+    - grouping
+    - or-junction
+    - outcome
+    - resource
+  query:
+    query_schema: 1
+    entity_criteria:
+      kind: group
+      conjunction: and
+      children:
+      - kind: condition
+        attribute: type
+        comparator: in
+        value:
+        - and-junction
+        - capability
+        - grouping
+        - or-junction
+        - outcome
+        - resource
+  presentation:
+    representation: exploration
+  representation_types:
+  - archimate-strategy
+- slug: value-stream
+  version: 1
+  name: Value Stream
+  description: Value Stream (Table C-21, strategy). Starting point for modeling, not a normative or exhaustive
+    list.
+  purpose:
+  - designing
+  - deciding
+  content:
+  - overview
+  stakeholders:
+  - Business Managers
+  - Enterprise Architects
+  - Business Architects
+  concerns:
+  - architecture strategy and tactics
+  - motivation
+  scope:
+    entity_types:
+    - and-junction
+    - capability
+    - grouping
+    - or-junction
+    - outcome
+    - stakeholder
+    - value
+    - value-stream
+  query:
+    query_schema: 1
+    entity_criteria:
+      kind: group
+      conjunction: and
+      children:
+      - kind: condition
+        attribute: type
+        comparator: in
+        value:
+        - and-junction
+        - capability
+        - grouping
+        - or-junction
+        - outcome
+        - stakeholder
+        - value
+        - value-stream
+  presentation:
+    representation: exploration
+  representation_types:
+  - archimate-strategy
+- slug: outcome-realization
+  version: 1
+  name: Outcome Realization
+  description: Outcome Realization (Table C-22, strategy). Starting point for modeling, not a normative
+    or exhaustive list.
+  purpose:
+  - designing
+  - deciding
+  content:
+  - coherence
+  stakeholders:
+  - Business Managers
+  - Enterprise Architects
+  - Business Architects
+  concerns:
+  - business-oriented results
+  query:
+    query_schema: 1
+    entity_criteria:
+      kind: group
+      conjunction: and
+      children:
+      - kind: condition
+        attribute: domain
+        comparator: in
+        value:
+        - application
+        - business
+        - common
+        - strategy
+        - technology
+  presentation:
+    representation: exploration
+  representation_types:
+  - archimate-strategy
+- slug: resource-map
+  version: 1
+  name: Resource Map
+  description: Resource Map (Table C-23, strategy). Starting point for modeling, not a normative or exhaustive
+    list.
+  purpose:
+  - designing
+  - deciding
+  content:
+  - overview
+  stakeholders:
+  - Business Managers
+  - Enterprise Architects
+  - Business Architects
+  concerns:
+  - architecture strategy and tactics
+  - motivation
+  scope:
+    entity_types:
+    - and-junction
+    - capability
+    - grouping
+    - or-junction
+    - resource
+    - work-package
+  query:
+    query_schema: 1
+    entity_criteria:
+      kind: group
+      conjunction: and
+      children:
+      - kind: condition
+        attribute: type
+        comparator: in
+        value:
+        - and-junction
+        - capability
+        - grouping
+        - or-junction
+        - resource
+        - work-package
+  presentation:
+    representation: exploration
+  representation_types:
+  - archimate-strategy
+- slug: project
+  version: 1
+  name: Project
+  description: Project (Table C-24, implementation-and-migration). Starting point for modeling, not a
+    normative or exhaustive list.
+  purpose:
+  - deciding
+  - informing
+  content:
+  - overview
+  stakeholders:
+  - Operational Managers
+  - Enterprise Architects
+  - ICT Architects
+  - employees
+  - shareholders
+  concerns:
+  - architecture vision and policies
+  - motivation
+  scope:
+    entity_types:
+    - and-junction
+    - business-actor
+    - deliverable
+    - event
+    - goal
+    - grouping
+    - or-junction
+    - outcome
+    - role
+    - work-package
+  query:
+    query_schema: 1
+    entity_criteria:
+      kind: group
+      conjunction: and
+      children:
+      - kind: condition
+        attribute: type
+        comparator: in
+        value:
+        - and-junction
+        - business-actor
+        - deliverable
+        - event
+        - goal
+        - grouping
+        - or-junction
+        - outcome
+        - role
+        - work-package
+  presentation:
+    representation: table
+  representation_types:
+  - archimate-implementation
+- slug: migration
+  version: 1
+  name: Migration
+  description: Migration (Table C-25, implementation-and-migration). Starting point for modeling, not
+    a normative or exhaustive list.
+  purpose:
+  - designing
+  - deciding
+  - informing
+  content:
+  - overview
+  stakeholders:
+  - Enterprise Architects
+  - Process Architects
+  - Application Architects
+  - Infrastructure Architects
+  - Domain Architects
+  - employees
+  - shareholders
+  concerns:
+  - history of models
+  scope:
+    entity_types:
+    - and-junction
+    - deliverable
+    - grouping
+    - or-junction
+    - plateau
+    - work-package
+  query:
+    query_schema: 1
+    entity_criteria:
+      kind: group
+      conjunction: and
+      children:
+      - kind: condition
+        attribute: type
+        comparator: in
+        value:
+        - and-junction
+        - deliverable
+        - grouping
+        - or-junction
+        - plateau
+        - work-package
+  presentation:
+    representation: table
+  representation_types:
+  - archimate-implementation
+- slug: implementation-and-migration
+  version: 1
+  name: Implementation and Migration
+  description: Implementation and Migration (Table C-26, implementation-and-migration). Starting point
+    for modeling, not a normative or exhaustive list.
+  purpose:
+  - deciding
+  - informing
+  content:
+  - overview
+  stakeholders:
+  - Operational Managers
+  - Enterprise Architects
+  - ICT Architects
+  - employees
+  - shareholders
+  concerns:
+  - architecture vision and policies
+  - motivation
+  scope:
+    entity_types:
+    - and-junction
+    - business-actor
+    - deliverable
+    - event
+    - goal
+    - grouping
+    - location
+    - or-junction
+    - plateau
+    - requirement
+    - role
+    - work-package
+  query:
+    query_schema: 1
+    entity_criteria:
+      kind: group
+      conjunction: and
+      children:
+      - kind: condition
+        attribute: type
+        comparator: in
+        value:
+        - and-junction
+        - business-actor
+        - deliverable
+        - event
+        - goal
+        - grouping
+        - location
+        - or-junction
+        - plateau
+        - requirement
+        - role
+        - work-package
+  presentation:
+    representation: table
+  representation_types:
+  - archimate-implementation

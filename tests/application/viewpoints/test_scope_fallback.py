@@ -1,21 +1,21 @@
-"""Repository execution for viewpoint definitions that declare only a concept scope."""
+"""Repository execution for viewpoint definitions that declare only a concept scope.
+
+The shipped Appendix-C default library now ships a real ``query`` on every definition
+(see ``tests/domain/test_default_viewpoint_library.py``), so scope-fallback regression
+coverage here uses synthetic scope-only definitions shaped like the library's earlier,
+pre-uplift definitions rather than depending on the shipped file staying scope-only.
+"""
 
 from __future__ import annotations
-
-from pathlib import Path
-
-import yaml  # type: ignore[import-untyped]
 
 from src.application.viewpoints.evaluate_viewpoint import ViewpointExecutionRequest, evaluate_viewpoint
 from src.domain.concept_scope import ConceptScope, HierarchyPredicate
 from src.domain.ontology_types import EntityTypeInfo
 from src.domain.viewpoint_condition_validation import RegistrySnapshot
 from src.domain.viewpoint_criteria import AttributeCondition, EntityCriteriaGroup, ValueRef
-from src.domain.viewpoint_parsing import viewpoint_catalog_from_mapping
 from src.domain.viewpoints import ExecutableViewpointQuery, ViewpointCatalog, ViewpointDefinition
 from tests.application.viewpoints._fixtures import REGISTRIES, Store, connection, entity
 
-_VIEWPOINTS_PATH = Path("src/ontologies/archimate_4/viewpoints.yaml")
 _EXECUTION_DEFAULTS: dict[str, object] = {
     "max_entities": 500,
     "default_limit": 500,
@@ -34,14 +34,26 @@ def _execute(definition: ViewpointDefinition, store: Store, *, registries: Regis
     )
 
 
-def _starter_catalog() -> ViewpointCatalog:
-    raw = yaml.safe_load(_VIEWPOINTS_PATH.read_text(encoding="utf-8"))
-    assert isinstance(raw, dict)
-    return viewpoint_catalog_from_mapping(raw)
+def _scope_only_catalog() -> ViewpointCatalog:
+    return ViewpointCatalog((
+        ViewpointDefinition(
+            slug="motivation", version=1, name="Motivation",
+            scope=ConceptScope(entity_types=frozenset({"goal"})),
+        ),
+        ViewpointDefinition(
+            slug="application-structure", version=1, name="Application Structure",
+            scope=ConceptScope(entity_types=frozenset({"application-component"})),
+        ),
+        ViewpointDefinition(slug="layered", version=1, name="Layered"),  # unrestricted
+        ViewpointDefinition(
+            slug="technology-usage", version=1, name="Technology Usage",
+            scope=ConceptScope(entity_types=frozenset({"application-component", "technology-node"})),
+        ),
+    ))
 
 
-def test_each_shipped_scope_only_definition_selects_its_seeded_population() -> None:
-    catalog = _starter_catalog()
+def test_each_scope_only_definition_selects_its_seeded_population() -> None:
+    catalog = _scope_only_catalog()
     store = Store(
         entities={
             "ENT@motivation": entity(artifact_id="ENT@motivation", artifact_type="goal"),

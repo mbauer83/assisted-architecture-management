@@ -616,7 +616,7 @@ the binding layer, and G1 waits on neither derivation nor presentation work.
 
 ## Phase G — Default viewpoint library
 
-- [ ] **WU-G1 — Appendix-C library uplift**
+- [x] **WU-G1 — Appendix-C library uplift**
   - Files: `src/ontologies/archimate_4/viewpoints.yaml`, new
     `tests/fixtures/viewpoints/standard_viewpoint_tables.py` (transcription of the
     standard's viewpoint-description tables), new
@@ -943,3 +943,4 @@ Anything short of this is "in progress", regardless of how many WUs are ticked.
 - 2026-07-13 — WU-F4 — Design gap: the shared `DeriveFn`/`ModelQuery` contract every strategy implements against carries no repo-root paths, so a pure `derive()` cannot reach a `ViewpointCatalog`/`RegistrySnapshot`. User-approved resolution: generation-time `params["repo_roots"]` (plain data, no shared-type change) plus a composition-root closure (`src/infrastructure/derivation_strategy_wiring.py`) that builds the real catalog/registries/read-access and calls the pure `evaluate_candidates`/`default_selection` in `viewpoint_execution.py`; entity/connection inclusion still follows the read-access's own cross-repo enumeration, only the catalog/registries load is roots-scoped.
 - 2026-07-13 — WU-F5 — Reused the same composition-root-closure resolution as WU-F4 for the ontology `ModuleCatalog` (roots-independent, but still infra-built); reachable entities also pull in every witness-chain hop (not just each derived relationship's own endpoints) so included connections always satisfy the structural invariant.
 - 2026-07-13 — WU-F6 — User-approved data-model extension (`DerivationSelection.path_provenance`) closed the certainty/type-drift gap; refresh now reconstructs every accepted path for real. Both render contexts (ad-hoc diagram, and a resolve-accepted-paths function proven against the real renderer) draw derived connections dashed/dotted with certainty distinguished — the "regenerate and persist a diagram from a strategy" orchestration itself doesn't exist anywhere in the codebase yet (confirmed by investigation, not introduced or removed here), so the resolver is built and tested standalone pending that wiring.
+- 2026-07-13 — WU-G1 — 25 definitions transcribed (4 uplifted to v2, 21 new); no viewpoint needed the specialization-narrowing fallback since no spec table actually said "Business Process" unqualified. Fixed a genuine pre-existing regression in `test_scope_fallback.py`, which hardcoded the shipped catalog's now-obsolete scope-only shape; replaced with synthetic fixtures preserving the same D9 coverage.
