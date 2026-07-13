@@ -85,6 +85,32 @@ class TestUnknownKeys:
             )
 
 
+class TestComparatorVocabulary:
+    @pytest.mark.parametrize("comparator", ["not_in", "like", "ilike"])
+    def test_new_comparators_parse(self, comparator: str) -> None:
+        node = parse_entity_criteria_node(
+            {"kind": "condition", "attribute": "name", "comparator": comparator, "value": "x"}
+        )
+        assert isinstance(node, AttributeCondition)
+        assert node.comparator == comparator
+
+    def test_unknown_comparator_rejected(self) -> None:
+        with pytest.raises(ValueError, match="comparator"):
+            parse_entity_criteria_node({"kind": "condition", "attribute": "name", "comparator": "bogus", "value": "x"})
+
+    def test_not_in_like_ilike_round_trip(self) -> None:
+        group = EntityCriteriaGroup(
+            children=(
+                AttributeCondition(attribute="type", comparator="not_in", value=ValueRef(literal=["a", "b"])),
+                AttributeCondition(attribute="name", comparator="like", value=ValueRef(literal="%Service")),
+                AttributeCondition(attribute="name", comparator="ilike", value=ValueRef(literal="%service%")),
+            )
+        )
+        mapping = entity_criteria_group_to_mapping(group)
+        reparsed = parse_entity_criteria_group(mapping)
+        assert reparsed == group
+
+
 class TestValueRefForms:
     def test_literal_shorthand(self) -> None:
         condition = parse_entity_criteria_node(

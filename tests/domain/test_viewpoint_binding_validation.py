@@ -7,7 +7,7 @@ import pytest
 from src.domain.viewpoint_bindings import DerivedAttribute, QueryBinding, QueryParameter
 from src.domain.viewpoint_criteria import AttributeCondition, EntityCriteriaGroup, ValueRef
 from src.domain.viewpoint_validation import validate_viewpoint_definition
-from src.domain.viewpoint_value_types import EntitySetType, ScalarType
+from src.domain.viewpoint_value_types import EntitySetType, ScalarType, TupleType
 from src.domain.viewpoints import ExecutableViewpointQuery, PresentationSpec, StyleRule, ViewpointDefinition
 
 
@@ -102,6 +102,53 @@ def test_list_binding_reference_requires_a_quantifier_or_aggregate() -> None:
     )
     definition = ViewpointDefinition(slug="typed-query", version=1, name="Typed query", query=query)
     assert "unquantified-set-comparison" in _codes(definition)
+
+
+def test_list_binding_reference_accepts_in_and_not_in_without_a_quantifier() -> None:
+    items = QueryBinding("items", EntitySetType(frozenset({"requirement"})), select="entities")
+    for comparator in ("in", "not_in"):
+        query = ExecutableViewpointQuery(
+            bindings=(items,),
+            entity_criteria=EntityCriteriaGroup(
+                children=(
+                    AttributeCondition(
+                        attribute="priority",
+                        comparator=comparator,
+                        value=ValueRef(kind="binding", binding="items", project="priority"),
+                    ),
+                )
+            ),
+        )
+        definition = ViewpointDefinition(slug="typed-query", version=1, name="Typed query", query=query)
+        assert "unquantified-set-comparison" not in _codes(definition)
+
+
+def test_tuple_binding_reference_supports_eq_in_not_in_but_rejects_other_comparators() -> None:
+    identifiers = QueryBinding("identifiers", EntitySetType(frozenset({"requirement"})), select="entities")
+    priorities = QueryBinding("priorities", EntitySetType(frozenset({"requirement"})), select="entities")
+    pair = QueryBinding(
+        "pair",
+        TupleType((ScalarType("string"), ScalarType("integer"))),
+        tuple_of=("identifiers", "priorities"),
+    )
+
+    def _codes_for(comparator: str) -> set[str]:
+        query = ExecutableViewpointQuery(
+            bindings=(identifiers, priorities, pair),
+            entity_criteria=EntityCriteriaGroup(
+                children=(
+                    AttributeCondition(
+                        attribute="priority", comparator=comparator, value=ValueRef(kind="binding", binding="pair")
+                    ),
+                )
+            ),
+        )
+        definition = ViewpointDefinition(slug="typed-query", version=1, name="Typed query", query=query)
+        return _codes(definition)
+
+    for comparator in ("eq", "in", "not_in"):
+        assert "tuple-comparator-unsupported" not in _codes_for(comparator)
+    assert "tuple-comparator-unsupported" in _codes_for("lt")
 
 
 def test_unknown_parameter_reference_has_criteria_path() -> None:

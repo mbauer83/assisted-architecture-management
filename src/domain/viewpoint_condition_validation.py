@@ -17,6 +17,8 @@ from src.domain.viewpoint_criteria import (
     NUMERIC_OPERATORS,
     RESERVED_CONNECTION_PATHS,
     RESERVED_ENTITY_PATHS,
+    STRING_ATTRIBUTE_TYPES,
+    STRING_PATTERN_OPERATORS,
     AttributeCondition,
 )
 from src.domain.viewpoint_validation_issue import ViewpointValidationIssue
@@ -133,15 +135,21 @@ def _validate_value_shape(
         issues.append(
             issue("error", "value-ref-missing-attribute", f"{path}/value", f"{value.kind} requires attribute")
         )
-    if condition.comparator == "in" and value.kind == "literal" and not isinstance(value.literal, (list, tuple)):
-        issues.append(issue("error", "unsupported-value-shape", f"{path}/value", "'in' requires a list value"))
+    is_list_comparator = condition.comparator in ("in", "not_in")
+    if is_list_comparator and value.kind == "literal" and not isinstance(value.literal, (list, tuple)):
+        message = f"{condition.comparator!r} requires a list value"
+        issues.append(issue("error", "unsupported-value-shape", f"{path}/value", message))
+    is_pattern_comparator = condition.comparator in STRING_PATTERN_OPERATORS
+    if is_pattern_comparator and value.kind == "literal" and not isinstance(value.literal, str):
+        message = f"{condition.comparator!r} requires a string pattern value"
+        issues.append(issue("error", "unsupported-value-shape", f"{path}/value", message))
     return issues
 
 
 def _validate_reserved_value(
     condition: AttributeCondition, *, path: str, context: CriteriaContext, registries: RegistrySnapshot
 ) -> list[ViewpointValidationIssue]:
-    if condition.value.kind != "literal" or condition.comparator not in ("eq", "neq", "in"):
+    if condition.value.kind != "literal" or condition.comparator not in ("eq", "neq", "in", "not_in"):
         return []
     head = condition.attribute.split(".", 1)[0]
     values = (
@@ -180,6 +188,10 @@ def validate_condition(
         issues.extend(_validate_reserved_value(condition, path=path, context=context, registries=registries))
         return issues
     if condition.comparator in NUMERIC_OPERATORS and declared not in NUMERIC_ATTRIBUTE_TYPES:
+        comparator, attribute = condition.comparator, condition.attribute
+        message = f"comparator {comparator!r} invalid for attribute {attribute!r} of type {declared!r}"
+        issues.append(issue("error", "operator-type-mismatch", f"{path}/comparator", message))
+    if condition.comparator in STRING_PATTERN_OPERATORS and declared not in STRING_ATTRIBUTE_TYPES:
         comparator, attribute = condition.comparator, condition.attribute
         message = f"comparator {comparator!r} invalid for attribute {attribute!r} of type {declared!r}"
         issues.append(issue("error", "operator-type-mismatch", f"{path}/comparator", message))

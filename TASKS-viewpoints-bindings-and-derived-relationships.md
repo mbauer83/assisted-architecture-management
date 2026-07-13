@@ -358,7 +358,7 @@ the binding layer, and G1 waits on neither derivation nor presentation work.
     pinned; REST/MCP shared-fixture parity test extended.
   - Deps: C4 (types only; may start after C2).
 
-- [ ] **WU-C6 — Expressive typed comparison operators**
+- [x] **WU-C6 — Expressive typed comparison operators**
   - Files: `src/domain/viewpoint_criteria.py`, `viewpoint_criteria_parsing.py`,
     `viewpoint_condition_validation.py`, `viewpoint_condition_evaluation.py`,
     `viewpoint_value_reference_validation.py`, `viewpoint_summary.py`; tests: new
@@ -936,3 +936,5 @@ Anything short of this is "in progress", regardless of how many WUs are ticked.
 - 2026-07-13 — WU-E4 — Shared persist validation accepts the full query grammar and lifecycle tests cover binding cycles and parameter version bumps.
 - 2026-07-13 — WU-E5 — REST neighbor traversal shares MCP's derived witness metadata and atomic derivation-limit behavior.
 - 2026-07-13 — WU-F1 — Scale styles now emit deterministic bounds, opaque endpoint tokens, normalized adapter positions, and projection legend data.
+- 2026-07-13 — WU-C6 — Blocked before implementation: PLAN §2 locks the comparator vocabulary as `eq neq in exists absent lt lte gt gte` ("no new comparators … not reopened"), directly contradicting WU-C6's proposal to add `not_in`/`like`/`ilike`; the runtime already omits `not_in` on purpose (`negate`+`in` covers it, "one spelling per meaning"). Escalated to the user rather than improvising around a locked decision.
+- 2026-07-13 — WU-C6 — User resolved the escalation: reopen the lock narrowly for `not_in`/`like`/`ilike` (PLAN §2 updated accordingly); comparators added end-to-end (parse/validate/evaluate/summarize) with SQL-style pattern matching applied uniformly to scalar and multi-valued attributes, and to literal/parameter/binding/attribute-reference operands alike.

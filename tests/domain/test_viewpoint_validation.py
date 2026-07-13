@@ -113,6 +113,40 @@ class TestQueryValidation:
         )
         assert _validate(_base_definition(query=query)) == ()
 
+    def test_like_operator_on_numeric_attribute_is_a_type_mismatch(self) -> None:
+        query = ExecutableViewpointQuery(
+            entity_criteria=EntityCriteriaGroup(children=(_condition("priority", "like", "%1%"),))
+        )
+        issues = _validate(_base_definition(query=query))
+        assert any(i.code == "operator-type-mismatch" for i in issues)
+
+    def test_ilike_operator_on_string_attribute_is_valid(self) -> None:
+        query = ExecutableViewpointQuery(
+            entity_criteria=EntityCriteriaGroup(children=(_condition("criticality", "ilike", "%high%"),))
+        )
+        assert _validate(_base_definition(query=query)) == ()
+
+    def test_not_in_on_string_attribute_checks_known_slugs(self) -> None:
+        query = ExecutableViewpointQuery(
+            entity_criteria=EntityCriteriaGroup(children=(_condition("type", "not_in", ["bogus"]),))
+        )
+        issues = _validate(_base_definition(query=query))
+        assert any(i.code == "unknown-value" for i in issues)
+
+    def test_not_in_with_scalar_value_is_an_unsupported_shape(self) -> None:
+        query = ExecutableViewpointQuery(
+            entity_criteria=EntityCriteriaGroup(children=(_condition("priority", "not_in", 1),))
+        )
+        issues = _validate(_base_definition(query=query))
+        assert any(i.code == "unsupported-value-shape" for i in issues)
+
+    def test_like_with_non_string_literal_is_an_unsupported_shape(self) -> None:
+        query = ExecutableViewpointQuery(
+            entity_criteria=EntityCriteriaGroup(children=(_condition("criticality", "like", 5),))
+        )
+        issues = _validate(_base_definition(query=query))
+        assert any(i.code == "unsupported-value-shape" for i in issues)
+
     def test_load_mode_downgrades_registry_findings_to_warnings(self) -> None:
         query = ExecutableViewpointQuery(
             entity_criteria=EntityCriteriaGroup(children=(_condition("bogus", "eq", "x"),))

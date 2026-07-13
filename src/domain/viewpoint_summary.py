@@ -81,6 +81,12 @@ def _condition_phrase(condition: AttributeCondition) -> str:
         return f"{condition.attribute} is not {value_text}"
     if condition.comparator == "in":
         return f"{condition.attribute} is one of {value_text}"
+    if condition.comparator == "not_in":
+        return f"{condition.attribute} is not one of {value_text}"
+    if condition.comparator == "like":
+        return f"{condition.attribute} matches the pattern {value_text}"
+    if condition.comparator == "ilike":
+        return f"{condition.attribute} matches the pattern {value_text} (case-insensitive)"
     return f"{condition.attribute} is {_COMPARATOR_WORDS[condition.comparator]} {value_text}"
 
 

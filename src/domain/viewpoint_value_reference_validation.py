@@ -236,7 +236,7 @@ def _validate_reference_type(
         return []
     left_kind = "string" if left == "reserved" else left
     if isinstance(reference_type, ListType):
-        if value.quantifier is None and condition.comparator != "in":
+        if value.quantifier is None and condition.comparator not in ("in", "not_in"):
             return [
                 issue(
                     "error",
@@ -251,17 +251,32 @@ def _validate_reference_type(
             return [issue("error", "operator-type-mismatch", f"{path}/value", "list elements must be scalar")]
         reference_type = reference_type.element
     if isinstance(reference_type, TupleType):
-        if condition.comparator not in {"eq", "in"}:
+        if condition.comparator not in {"eq", "in", "not_in"}:
             return [
                 issue(
-                    "error", "tuple-comparator-unsupported", f"{path}/comparator", "tuple values support eq or in only"
+                    "error",
+                    "tuple-comparator-unsupported",
+                    f"{path}/comparator",
+                    "tuple values support eq, in, or not_in only",
                 )
             ]
         return []
     if not isinstance(reference_type, ScalarType):
         return [issue("error", "operator-type-mismatch", f"{path}/value", "reference is not scalar")]
-    if condition.comparator == "in":
-        return [issue("error", "operator-type-mismatch", f"{path}/comparator", "in requires a list reference")]
+    if condition.comparator in ("in", "not_in"):
+        message = f"{condition.comparator} requires a list reference"
+        return [issue("error", "operator-type-mismatch", f"{path}/comparator", message)]
+    if condition.comparator in ("like", "ilike") and reference_type.kind != "string":
+        return [
+            issue(
+                "error",
+                "operator-type-mismatch",
+                f"{path}/value",
+                f"{condition.comparator} requires a string reference",
+                expected="string",
+                found=reference_type.kind,
+            )
+        ]
     if reference_type.kind != left_kind:
         return [
             issue(

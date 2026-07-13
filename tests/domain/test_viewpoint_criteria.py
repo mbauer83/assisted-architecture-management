@@ -1,4 +1,5 @@
-"""Unit tests for the criteria-engine value objects (companion plan §3, §3.1, §4.1)."""
+"""Unit tests for the criteria-engine value objects: comparator vocabulary, value
+references, and criteria-tree node shapes."""
 
 from __future__ import annotations
 
@@ -36,7 +37,20 @@ class TestAttributeCondition:
         assert condition.negate is False
 
     def test_comparator_vocabulary_matches_valid_comparators(self) -> None:
-        assert VALID_COMPARATORS == {"eq", "neq", "in", "exists", "absent", "lt", "lte", "gt", "gte"}
+        assert VALID_COMPARATORS == {
+            "eq",
+            "neq",
+            "in",
+            "not_in",
+            "exists",
+            "absent",
+            "lt",
+            "lte",
+            "gt",
+            "gte",
+            "like",
+            "ilike",
+        }
 
 
 class TestCriteriaGroups:

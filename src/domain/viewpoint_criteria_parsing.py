@@ -57,7 +57,7 @@ def _check_keys(raw: Mapping[str, object], allowed: frozenset[str], *, label: st
 
 def _require_comparator(value: object) -> Comparator:
     text = str(value)
-    if text not in ("eq", "neq", "in", "exists", "absent", "lt", "lte", "gt", "gte"):
+    if text not in ("eq", "neq", "in", "not_in", "exists", "absent", "lt", "lte", "gt", "gte", "like", "ilike"):
         raise ValueError(f"comparator {text!r} is not one of {sorted(VALID_COMPARATORS)}")
     return text
 

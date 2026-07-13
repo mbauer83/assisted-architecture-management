@@ -9,6 +9,7 @@ execution.
 
 from __future__ import annotations
 
+import re
 from collections.abc import Mapping
 from typing import cast
 
@@ -42,6 +43,35 @@ def _numeric_compare(comparator: str, candidate: object, expected: object) -> bo
         return candidate >= expected  # type: ignore[operator]
     except TypeError:
         return False
+
+
+def _compile_like_pattern(pattern: str, *, ignore_case: bool) -> re.Pattern[str]:
+    """Translate a SQL-style pattern (``%`` = any run, ``_`` = one character, ``\\`` escapes
+    either) into an anchored regex. A trailing lone backslash is treated as a literal
+    backslash rather than raising — evaluation never crashes on a malformed pattern."""
+    parts: list[str] = []
+    index = 0
+    while index < len(pattern):
+        char = pattern[index]
+        if char == "\\" and index + 1 < len(pattern):
+            parts.append(re.escape(pattern[index + 1]))
+            index += 2
+            continue
+        if char == "%":
+            parts.append(".*")
+        elif char == "_":
+            parts.append(".")
+        else:
+            parts.append(re.escape(char))
+        index += 1
+    flags = re.DOTALL | (re.IGNORECASE if ignore_case else 0)
+    return re.compile("^" + "".join(parts) + "$", flags)
+
+
+def _like_match(pattern: object, text: object, *, ignore_case: bool) -> bool:
+    if not isinstance(pattern, str) or not isinstance(text, str):
+        return False
+    return _compile_like_pattern(pattern, ignore_case=ignore_case).match(text) is not None
 
 
 def _reserved_entity_field(record: EntityRecord, head: str) -> tuple[object, bool]:
@@ -211,6 +241,15 @@ def _compare(comparator: str, actual: object, expected: object, quantifier: str 
         if isinstance(actual, (list, tuple)):
             return any(element in options for element in actual)
         return actual in options
+    if comparator == "not_in":
+        options = expected if isinstance(expected, (list, tuple)) else ()
+        if isinstance(actual, (list, tuple)):
+            return not any(element in options for element in actual)
+        return actual not in options
+    if comparator in ("like", "ilike"):
+        candidates = actual if isinstance(actual, (list, tuple)) else (actual,)
+        ignore_case = comparator == "ilike"
+        return any(_like_match(expected, candidate, ignore_case=ignore_case) for candidate in candidates)
     if comparator in _NUMERIC_COMPARATORS:
         candidates = actual if isinstance(actual, (list, tuple)) else (actual,)
         return any(_numeric_compare(comparator, candidate, expected) for candidate in candidates)

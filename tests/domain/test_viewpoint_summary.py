@@ -44,6 +44,24 @@ class TestConditionRendering:
         condition = AttributeCondition(attribute="type", comparator="in", value=ValueRef(literal=["a", "b"]))
         assert render_condition(condition) == "type is one of a, b"
 
+    def test_not_in(self) -> None:
+        condition = AttributeCondition(attribute="type", comparator="not_in", value=ValueRef(literal=["a", "b"]))
+        assert render_condition(condition) == "type is not one of a, b"
+
+    def test_like(self) -> None:
+        condition = AttributeCondition(attribute="name", comparator="like", value=ValueRef(literal="%Service"))
+        assert render_condition(condition) == "name matches the pattern %Service"
+
+    def test_ilike(self) -> None:
+        condition = AttributeCondition(attribute="name", comparator="ilike", value=ValueRef(literal="%service%"))
+        assert render_condition(condition) == "name matches the pattern %service% (case-insensitive)"
+
+    def test_not_in_negate_wraps_in_not(self) -> None:
+        condition = AttributeCondition(
+            attribute="type", comparator="not_in", value=ValueRef(literal=["a", "b"]), negate=True
+        )
+        assert render_condition(condition) == "NOT (type is not one of a, b)"
+
     def test_exists(self) -> None:
         condition = AttributeCondition(attribute="risk_score", comparator="exists")
         assert render_condition(condition) == "risk_score is present"

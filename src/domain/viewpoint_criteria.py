@@ -15,18 +15,23 @@ from dataclasses import dataclass
 from typing import Literal
 
 Conjunction = Literal["and", "or"]
-Comparator = Literal["eq", "neq", "in", "exists", "absent", "lt", "lte", "gt", "gte"]
+Comparator = Literal["eq", "neq", "in", "not_in", "exists", "absent", "lt", "lte", "gt", "gte", "like", "ilike"]
 ValueRefKind = Literal["literal", "attribute_of_self", "attribute_of_endpoint", "binding", "parameter"]
 IncidentDirection = Literal["outgoing", "incoming", "either"]
 RelationshipTraversal = Literal["direct", "derived"]
 
-# Exactly today's operator vocabulary — the criteria-tree redesign restructures how
-# conditions nest, it does not expand the comparator set. There is deliberately no
-# `not_in`: per-condition `negate` already expresses it as `in` + negate, keeping one
-# spelling per meaning.
+# Not every comparator needs a negated dual — `exists`/`absent` already form the
+# null/not-null pair via `negate`. `not_in` is the deliberate exception: list membership
+# is common enough, and reads badly as `negate` + `in`, that it earns a direct spelling.
+# `like` (case-sensitive) and `ilike` (case-insensitive) add SQL-style pattern matching —
+# `%` matches any run of characters, `_` matches exactly one, `\` escapes either.
 NUMERIC_OPERATORS: frozenset[str] = frozenset({"lt", "lte", "gt", "gte"})
+STRING_PATTERN_OPERATORS: frozenset[str] = frozenset({"like", "ilike"})
 NUMERIC_ATTRIBUTE_TYPES: frozenset[str] = frozenset({"integer", "number", "date"})
-VALID_COMPARATORS: frozenset[str] = frozenset({"eq", "neq", "in", "exists", "absent"}) | NUMERIC_OPERATORS
+STRING_ATTRIBUTE_TYPES: frozenset[str] = frozenset({"string"})
+VALID_COMPARATORS: frozenset[str] = (
+    frozenset({"eq", "neq", "in", "not_in", "exists", "absent"}) | NUMERIC_OPERATORS | STRING_PATTERN_OPERATORS
+)
 VALID_VALUE_REF_KINDS: frozenset[str] = frozenset(
     {"literal", "attribute_of_self", "attribute_of_endpoint", "binding", "parameter"}
 )

@@ -101,8 +101,12 @@ Four forces converge:
 
 ## 2. What stays unchanged (locked by the companion plan, not reopened)
 
-- Criteria trees, comparator vocabulary (no new comparators — `eq neq in exists absent lt
-  lte gt gte`), per-condition `negate`, §3.4 evaluation semantics for existing constructs.
+- Criteria trees, per-condition `negate`, §3.4 evaluation semantics for existing
+  constructs. **Comparator vocabulary is locked at `eq neq in exists absent lt lte gt
+  gte` except for the narrow, deliberate reopening in §4.2.1/WU-C6**, which adds
+  `not_in`, `like`, and `ilike` — pattern matching (`like`/`ilike`) has no existing
+  equivalent, and `not_in` is included alongside them for symmetry with `in` rather than
+  reopened independently. No further comparators are in scope.
 - One attribute-path namespace (§3.3 reserved paths ⊕ D13 effective schema) used for
   filters, columns, `ValueRef` references, summaries — this plan *extends* the namespace
   (`derived.` prefix, §4.3) but adds no parallel vocabulary.
