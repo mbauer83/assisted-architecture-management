@@ -594,7 +594,7 @@ the binding layer, and G1 waits on neither derivation nor presentation work.
     candidates excluded until accepted.
   - Deps: B4, B6.
 
-- [ ] **WU-F6 — Rendering derived connections on genuine diagrams (+ refresh staleness)**
+- [x] **WU-F6 — Rendering derived connections on genuine diagrams (+ refresh staleness)**
   - Files: `src/infrastructure/rendering/` (ArchiMate renderer path —
     `archimate_puml_renderer.py` / `archimate_occurrences.py`; verify exact seam with
     `rg "connection" src/infrastructure/rendering/` before editing),
@@ -942,3 +942,4 @@ Anything short of this is "in progress", regardless of how many WUs are ticked.
 - 2026-07-13 — WU-F3 — Pins are an engagement-repo-local sidecar list (CRUD via REST, surfaced on MCP `list`); a direct `plan_promotion`/`execute_promotion` run (no git dependency at that layer) confirms the sidecar is never copied to the enterprise repo.
 - 2026-07-13 — WU-F4 — Design gap: the shared `DeriveFn`/`ModelQuery` contract every strategy implements against carries no repo-root paths, so a pure `derive()` cannot reach a `ViewpointCatalog`/`RegistrySnapshot`. User-approved resolution: generation-time `params["repo_roots"]` (plain data, no shared-type change) plus a composition-root closure (`src/infrastructure/derivation_strategy_wiring.py`) that builds the real catalog/registries/read-access and calls the pure `evaluate_candidates`/`default_selection` in `viewpoint_execution.py`; entity/connection inclusion still follows the read-access's own cross-repo enumeration, only the catalog/registries load is roots-scoped.
 - 2026-07-13 — WU-F5 — Reused the same composition-root-closure resolution as WU-F4 for the ontology `ModuleCatalog` (roots-independent, but still infra-built); reachable entities also pull in every witness-chain hop (not just each derived relationship's own endpoints) so included connections always satisfy the structural invariant.
+- 2026-07-13 — WU-F6 — User-approved data-model extension (`DerivationSelection.path_provenance`) closed the certainty/type-drift gap; refresh now reconstructs every accepted path for real. Both render contexts (ad-hoc diagram, and a resolve-accepted-paths function proven against the real renderer) draw derived connections dashed/dotted with certainty distinguished — the "regenerate and persist a diagram from a strategy" orchestration itself doesn't exist anywhere in the codebase yet (confirmed by investigation, not introduced or removed here), so the resolver is built and tested standalone pending that wiring.

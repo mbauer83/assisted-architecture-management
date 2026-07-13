@@ -26,6 +26,15 @@ from src.domain.viewpoint_evaluation_context import CriteriaReadAccess
 
 DerivationCertaintyPolicy = Literal["certain_only", "include_potential"]
 
+DERIVED_CONNECTION_ID_PREFIX = "derived::"
+
+
+def is_derived_connection_id(artifact_id: str) -> bool:
+    """Whether ``artifact_id`` is a synthetic derived-relationship id
+    (``derived::<type-slug>::<path-key>``) rather than a real, persisted connection —
+    never written to a model file, the artifact index, or a ``CandidateSet``."""
+    return artifact_id.startswith(DERIVED_CONNECTION_ID_PREFIX)
+
 
 def derive_relationship_for_path(
     path_key: str,

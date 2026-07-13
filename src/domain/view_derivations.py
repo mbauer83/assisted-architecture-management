@@ -10,6 +10,7 @@ Serialisation: top-level ``view_derivations:`` frontmatter key on diagrams.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from typing import Mapping
 
 VALID_REPO_SCOPES: frozenset[str] = frozenset({"enterprise", "engagement", "both"})
 
@@ -22,6 +23,16 @@ class SourceModelSnapshot:
 
 
 @dataclass(frozen=True)
+class PathProvenance:
+    """What a witness path was accepted (or reviewed) as, at generation/acceptance
+    time — the baseline refresh compares a fresh reconstruction against to detect
+    certainty/type drift, distinct from an outright-broken or no-longer-derives path."""
+
+    certainty: str  # "certain" | "potential"
+    connection_type: str
+
+
+@dataclass(frozen=True)
 class DerivationSelection:
     included_entity_ids: tuple[str, ...] = ()
     excluded_entity_ids: tuple[str, ...] = ()
@@ -29,6 +40,7 @@ class DerivationSelection:
     excluded_connection_ids: tuple[str, ...] = ()
     included_paths: tuple[str, ...] = ()  # canonical path keys: id1@fwd|id2@rev|...
     excluded_paths: tuple[str, ...] = ()
+    path_provenance: Mapping[str, PathProvenance] = field(default_factory=dict)  # path key -> accepted-as record
 
 
 @dataclass(frozen=True)
@@ -74,6 +86,17 @@ VIEW_DERIVATIONS_SCHEMA: dict[str, object] = {
                     "excluded_connection_ids": {"type": "array", "items": {"type": "string"}},
                     "included_paths": {"type": "array", "items": {"type": "string"}},
                     "excluded_paths": {"type": "array", "items": {"type": "string"}},
+                    "path_provenance": {
+                        "type": "object",
+                        "additionalProperties": {
+                            "type": "object",
+                            "required": ["certainty", "connection_type"],
+                            "properties": {
+                                "certainty": {"type": "string", "enum": ["certain", "potential"]},
+                                "connection_type": {"type": "string"},
+                            },
+                        },
+                    },
                 },
             },
             "generated_at": {"type": "string"},
@@ -98,6 +121,20 @@ def _parse_source_model_snapshot(raw: dict[str, object]) -> SourceModelSnapshot:
     )
 
 
+def _parse_path_provenance(raw: object) -> dict[str, PathProvenance]:
+    if not isinstance(raw, dict):
+        return {}
+    provenance: dict[str, PathProvenance] = {}
+    for path_key, entry in raw.items():
+        if not isinstance(entry, dict):
+            continue
+        certainty = entry.get("certainty")
+        connection_type = entry.get("connection_type")
+        if isinstance(certainty, str) and isinstance(connection_type, str):
+            provenance[str(path_key)] = PathProvenance(certainty=certainty, connection_type=connection_type)
+    return provenance
+
+
 def _parse_selection(raw: dict[str, object]) -> DerivationSelection:
     def _ids(key: str) -> tuple[str, ...]:
         v = raw.get(key)
@@ -110,6 +147,7 @@ def _parse_selection(raw: dict[str, object]) -> DerivationSelection:
         excluded_connection_ids=_ids("excluded_connection_ids"),
         included_paths=_ids("included_paths"),
         excluded_paths=_ids("excluded_paths"),
+        path_provenance=_parse_path_provenance(raw.get("path_provenance")),
     )
 
 
@@ -167,6 +205,11 @@ def _selection_to_dict(sel: DerivationSelection) -> dict[str, object]:
         result["included_paths"] = list(sel.included_paths)
     if sel.excluded_paths:
         result["excluded_paths"] = list(sel.excluded_paths)
+    if sel.path_provenance:
+        result["path_provenance"] = {
+            path_key: {"certainty": entry.certainty, "connection_type": entry.connection_type}
+            for path_key, entry in sel.path_provenance.items()
+        }
     return result
 
 

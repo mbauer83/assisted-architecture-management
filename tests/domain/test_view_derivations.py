@@ -27,6 +27,7 @@ from src.application.verification.artifact_verifier_types import VerificationRes
 from src.domain.view_derivations import (
     VIEW_DERIVATIONS_SCHEMA,
     DerivationSelection,
+    PathProvenance,
     SourceModelSnapshot,
     ViewDerivation,
     parse_view_derivation,
@@ -76,6 +77,15 @@ class TestDerivationSelection:
         sel = DerivationSelection(included_entity_ids=("A@1.a.b",), excluded_entity_ids=("B@2.c.d",))
         assert "A@1.a.b" in sel.included_entity_ids
         assert "B@2.c.d" in sel.excluded_entity_ids
+
+    def test_default_path_provenance_is_empty(self) -> None:
+        assert DerivationSelection().path_provenance == {}
+
+    def test_with_path_provenance(self) -> None:
+        provenance = PathProvenance(certainty="certain", connection_type="archimate-realization")
+        sel = DerivationSelection(included_paths=("A@fwd|B@fwd",), path_provenance={"A@fwd|B@fwd": provenance})
+        assert sel.path_provenance["A@fwd|B@fwd"].certainty == "certain"
+        assert sel.path_provenance["A@fwd|B@fwd"].connection_type == "archimate-realization"
 
 
 class TestViewDerivation:
@@ -146,6 +156,23 @@ class TestParseViewDerivation:
         assert "APP@1.a.b" in vd.selection.included_entity_ids
         assert "A@1---B@2@@serving" in vd.selection.excluded_connection_ids
 
+    def test_parse_with_path_provenance(self) -> None:
+        raw = self._raw(selection={
+            "included_paths": ["A@fwd|B@fwd"],
+            "path_provenance": {"A@fwd|B@fwd": {"certainty": "certain", "connection_type": "archimate-realization"}},
+        })
+        vd = parse_view_derivation(raw)
+        assert vd.selection is not None
+        entry = vd.selection.path_provenance["A@fwd|B@fwd"]
+        assert entry.certainty == "certain"
+        assert entry.connection_type == "archimate-realization"
+
+    def test_parse_with_malformed_path_provenance_entry_skipped(self) -> None:
+        raw = self._raw(selection={"path_provenance": {"A@fwd": {"certainty": "certain"}}})
+        vd = parse_view_derivation(raw)
+        assert vd.selection is not None
+        assert vd.selection.path_provenance == {}
+
     def test_parse_with_generated_at(self) -> None:
         raw = self._raw(generated_at="2026-05-30")
         vd = parse_view_derivation(raw)
@@ -174,6 +201,19 @@ class TestParseViewDerivation:
         vd = parse_view_derivation(raw)
         d = view_derivation_to_dict(vd)
         vd2 = parse_view_derivation(d)
+        assert vd == vd2
+
+    def test_roundtrip_with_path_provenance(self) -> None:
+        raw = self._raw(
+            selection={
+                "included_paths": ["A@fwd|B@fwd"],
+                "path_provenance": {
+                    "A@fwd|B@fwd": {"certainty": "certain", "connection_type": "archimate-realization"}
+                },
+            },
+        )
+        vd = parse_view_derivation(raw)
+        vd2 = parse_view_derivation(view_derivation_to_dict(vd))
         assert vd == vd2
 
 

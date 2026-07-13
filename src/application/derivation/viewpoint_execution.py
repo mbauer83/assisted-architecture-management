@@ -20,7 +20,7 @@ from src.application.viewpoints.evaluate_viewpoint import ViewpointExecutionRequ
 from src.application.viewpoints.execution_result import ViewpointExecutionResult
 from src.application.viewpoints.ports import RepositoryReadAccess
 from src.domain.derivation_types import StrategySpec
-from src.domain.view_derivations import DerivationSelection
+from src.domain.view_derivations import DerivationSelection, PathProvenance
 from src.domain.viewpoint_condition_validation import RegistrySnapshot
 from src.domain.viewpoint_query_parsing import query_from_mapping
 from src.domain.viewpoints import ViewpointCatalog
@@ -101,7 +101,7 @@ def default_selection(
     default_limit: int,
     timeout_seconds: float,
 ) -> DerivationSelection:
-    """Initial acceptance state for a freshly generated diagram (PLAN §5.7): certain
+    """Initial acceptance state for a freshly generated diagram: certain
     derived candidates pre-included, potential ones pre-excluded until explicitly
     accepted. Modeled entities/connections carry no certainty ambiguity, so they are
     simply part of the generated result."""
@@ -115,11 +115,21 @@ def default_selection(
         timeout_seconds=timeout_seconds,
     )
     modeled_connection_ids = sorted(cid for cid in result.connection_ids if not cid.startswith("derived::"))
-    included_paths = sorted(_path_key(s.id) for s in result.connections if s.certainty == "certain")
-    excluded_paths = sorted(_path_key(s.id) for s in result.connections if s.certainty == "potential")
+    included_paths: list[str] = []
+    excluded_paths: list[str] = []
+    provenance: dict[str, PathProvenance] = {}
+    for summary in result.connections:
+        if summary.certainty is None:
+            continue
+        path_key = _path_key(summary.id)
+        (included_paths if summary.certainty == "certain" else excluded_paths).append(path_key)
+        provenance[path_key] = PathProvenance(certainty=summary.certainty, connection_type=summary.type)
+    included_paths.sort()
+    excluded_paths.sort()
     return DerivationSelection(
         included_entity_ids=tuple(sorted(result.entity_ids)),
         included_connection_ids=tuple(modeled_connection_ids),
         included_paths=tuple(included_paths),
         excluded_paths=tuple(excluded_paths),
+        path_provenance=provenance,
     )

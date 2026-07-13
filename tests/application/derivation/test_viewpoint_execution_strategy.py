@@ -170,6 +170,9 @@ class TestAcceptanceDefaults:
         assert selection.included_connection_ids == ("C1",)
         assert selection.included_paths == ("C1@fwd|C2@fwd",)
         assert selection.excluded_paths == ("C3@fwd",)
+        assert selection.path_provenance["C1@fwd|C2@fwd"].certainty == "certain"
+        assert selection.path_provenance["C1@fwd|C2@fwd"].connection_type == "archimate-realization"
+        assert selection.path_provenance["C3@fwd"].certainty == "potential"
 
 
 class TestGenerateReviewRefreshCycle:

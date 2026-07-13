@@ -11,23 +11,11 @@ from src.application.derivation.derived_relationships import SPEC, default_selec
 from src.application.derivation.refresh import compute_derivation_diff
 from src.application.derivation.strategy_registry import DerivationStrategyCatalogBuilder
 from src.domain.view_derivations import SourceModelSnapshot, ViewDerivation
-from tests.fixtures.viewpoints.derivation_examples import ExampleGraph, catalog, financial_application, hosting_suite
+from tests.fixtures.viewpoints.derivation_examples import catalog, financial_application, hosting_suite
 
 _CATALOG = catalog()
 _DEFAULT_HOPS = 4
 _MAX_RELATIONSHIPS = 100
-
-
-class _ModelQueryGraph(ExampleGraph):
-    """``ExampleGraph`` plus the enumeration methods ``compute_derivation_diff`` needs
-    (``ModelQuery``) but the strategy's own derivation logic (``CriteriaReadAccess``)
-    does not."""
-
-    def entity_ids(self) -> set[str]:
-        return set(self.entities)
-
-    def connection_ids(self) -> set[str]:
-        return {c.artifact_id for c in self.connections}
 
 
 def _candidates(params: dict[str, object], graph):
@@ -92,6 +80,8 @@ class TestAcceptanceDefaults:
         selection = _selection(params, graph)
         assert len(selection.included_paths) == 2
         assert selection.excluded_paths == ()
+        for path_key in selection.included_paths:
+            assert selection.path_provenance[path_key].certainty == "certain"
 
 
 class TestGenerateReviewRefreshCycle:
@@ -106,8 +96,7 @@ class TestGenerateReviewRefreshCycle:
         return builder.build()
 
     def test_fully_accepted_selection_yields_empty_refresh_diff(self, tmp_path: Path) -> None:
-        base = financial_application()
-        graph = _ModelQueryGraph(entities=base.entities, connections=base.connections)
+        graph = financial_application()
         params: dict[str, object] = {
             "root_entity_ids": ["financial-application"], "direction": "outgoing", "max_hops": 3,
         }
@@ -120,8 +109,7 @@ class TestGenerateReviewRefreshCycle:
         assert diff.is_empty is True
 
     def test_narrowing_max_hops_after_seeding_yields_non_empty_diff(self, tmp_path: Path) -> None:
-        base = financial_application()
-        graph = _ModelQueryGraph(entities=base.entities, connections=base.connections)
+        graph = financial_application()
         wide_params: dict[str, object] = {
             "root_entity_ids": ["financial-application"], "direction": "outgoing", "max_hops": 3,
         }

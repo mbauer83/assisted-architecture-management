@@ -1,7 +1,7 @@
 """Viewpoint pins: an engagement-repo-local sidecar list of pinned definition slugs for
 quick access (Home surfacing, management-view rows). Not definition content — pinning a
 module/enterprise-shipped (read-only) definition is fine, and pins are never promoted
-(promotion transfers artifact files; this sidecar list is never one, PLAN §7).
+(promotion transfers artifact files; this sidecar list is never one).
 """
 
 from __future__ import annotations

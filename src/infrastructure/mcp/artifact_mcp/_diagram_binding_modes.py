@@ -96,8 +96,9 @@ def _refresh_derivation(
 
     roots = [Path(p) for p in key.split("|") if p]
     index = shared_artifact_index(roots)
+    catalogs = runtime_catalogs()
     diff = compute_derivation_diff(
-        path, parsed.frontmatter, vd_entry, index, runtime_catalogs().derivation,
+        path, parsed.frontmatter, vd_entry, index, catalogs.derivation, ontology_catalog=catalogs.module_catalog,
     )
     return diff.to_dict()
 

@@ -411,6 +411,76 @@ def test_render_body_connections_default_to_primary_occurrence(tmp_path: Path) -
     assert all("BOB_REPO__2" not in line for line in conn_lines)
 
 
+def _derived_conn(source: str, target: str, conn_type: str, *, path_key: str, certainty: str) -> ConnectionRecord:
+    return ConnectionRecord(
+        artifact_id=f"derived::{conn_type}::{path_key}",
+        source=source,
+        target=target,
+        conn_type=conn_type,
+        version="",
+        status="",
+        path=Path(),
+        extra={"certainty": certainty},
+        content_text="",
+    )
+
+
+def test_derived_connection_renders_dashed_when_certain(tmp_path: Path) -> None:
+    renderer = GenericPumlRenderer(_ARCHIMATE_CONFIG)
+    src = _entity("GOL@1.a.goal", "goal", "Goal", "GOL_A")
+    tgt = _entity("OUT@1.b.outcome", "outcome", "Outcome", "OUT_A", subdomain="outcomes")
+
+    puml = renderer.render_body(
+        "Test",
+        [src, tgt],
+        [
+            _derived_conn(
+                src.artifact_id, tgt.artifact_id, "archimate-realization", path_key="c1@fwd", certainty="certain"
+            )
+        ],
+        "archimate-motivation",
+        tmp_path,
+    )
+
+    conn_lines = [ln for ln in puml.splitlines() if "GOL_A" in ln and "OUT_A" in ln]
+    assert any("[dashed]" in ln for ln in conn_lines)
+
+
+def test_derived_connection_renders_dotted_when_potential(tmp_path: Path) -> None:
+    renderer = GenericPumlRenderer(_ARCHIMATE_CONFIG)
+    src = _entity("GOL@1.a.goal", "goal", "Goal", "GOL_A")
+    tgt = _entity("OUT@1.b.outcome", "outcome", "Outcome", "OUT_A", subdomain="outcomes")
+
+    puml = renderer.render_body(
+        "Test",
+        [src, tgt],
+        [
+            _derived_conn(
+                src.artifact_id, tgt.artifact_id, "archimate-serving", path_key="c1@fwd", certainty="potential"
+            )
+        ],
+        "archimate-motivation",
+        tmp_path,
+    )
+
+    conn_lines = [ln for ln in puml.splitlines() if "GOL_A" in ln and "OUT_A" in ln]
+    assert any("[dotted]" in ln for ln in conn_lines)
+
+
+def test_modeled_connection_unaffected_by_derived_marker_logic(tmp_path: Path) -> None:
+    renderer = GenericPumlRenderer(_ARCHIMATE_CONFIG)
+    src = _entity("GOL@1.a.goal", "goal", "Goal", "GOL_A")
+    tgt = _entity("OUT@1.b.outcome", "outcome", "Outcome", "OUT_A", subdomain="outcomes")
+
+    puml = renderer.render_body(
+        "Test", [src, tgt], [_conn(src.artifact_id, tgt.artifact_id, "archimate-serving")], "archimate-motivation",
+        tmp_path,
+    )
+
+    conn_lines = [ln for ln in puml.splitlines() if "GOL_A" in ln and "OUT_A" in ln]
+    assert all("[dashed]" not in ln and "[dotted]" not in ln for ln in conn_lines)
+
+
 def test_inject_includes_inlines_only_needed_stereotypes_and_sprites(tmp_path: Path) -> None:
     repo_root = tmp_path / "repo"
     catalog = repo_root / "diagram-catalog"

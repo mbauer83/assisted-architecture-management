@@ -17,8 +17,10 @@ import hashlib
 from dataclasses import dataclass, field
 from pathlib import Path
 
+from src.application.derivation.path_staleness import classify_accepted_path_staleness
 from src.application.derivation.strategy_registry import DerivationStrategyCatalog
 from src.application.derivation.types import ModelQuery
+from src.domain.module_catalog import ModuleCatalog
 from src.domain.view_derivations import ViewDerivation
 
 
@@ -114,6 +116,7 @@ class DerivationDiff:
     gone_paths: list[str] = field(default_factory=list)
     drifted_paths: list[str] = field(default_factory=list)
     broken_paths: list[str] = field(default_factory=list)
+    no_longer_derives_paths: list[str] = field(default_factory=list)
 
     @property
     def is_empty(self) -> bool:
@@ -141,6 +144,7 @@ class DerivationDiff:
             result["gone_paths"] = self.gone_paths
             result["drifted_paths"] = self.drifted_paths
             result["broken_paths"] = self.broken_paths
+            result["no_longer_derives_paths"] = self.no_longer_derives_paths
         return result
 
 
@@ -155,12 +159,20 @@ def compute_derivation_diff(
     vd: ViewDerivation,
     query: ModelQuery,
     catalog: DerivationStrategyCatalog | None = None,
+    *,
+    ontology_catalog: ModuleCatalog | None = None,
 ) -> DerivationDiff:
     """Run the strategy and compute the diff vs the stored selection.
 
     Raises ValueError if no derive function is found for the strategy.
     Manual-beats-refresh: only bindings with derived_from == vd.id targeting gone
     entities are proposed for removal; manual bindings are never touched.
+
+    ``ontology_catalog``, when supplied, switches accepted-path staleness from the
+    shallow connection-existence check to full reconstruction (broken /
+    no-longer-derives / certainty-or-type drift) via ``classify_accepted_path_staleness``
+    — the only way to see drift at all, since a path key names which connections form a
+    chain, never what it currently resolves to.
     """
     base_revision = compute_revision(diagram_path)
 
@@ -191,13 +203,23 @@ def compute_derivation_diff(
     gone_entity_ids = sorted(eid for eid in inc_entities if eid not in candidate_set.entity_ids)
     gone_connection_ids = sorted(cid for cid in inc_connections if cid not in candidate_set.connection_ids)
 
-    # Path diff: classify gone paths as drifted or broken
-    known_conn_ids = query.connection_ids()
+    # Path diff: new candidates are a plain set difference; staleness of already-accepted
+    # paths uses full reconstruction when an ontology catalog is available (the only way
+    # to see certainty/type drift), else falls back to the shallow well-formedness check.
     new_paths = sorted(pk for pk in candidate_set.paths if pk not in inc_paths and pk not in exc_paths)
-    gone_path_keys = [pk for pk in inc_paths if pk not in candidate_set.paths]
-    drifted_paths = sorted(pk for pk in gone_path_keys if _is_path_well_formed(pk, known_conn_ids))
-    broken_paths = sorted(pk for pk in gone_path_keys if not _is_path_well_formed(pk, known_conn_ids))
-    gone_paths = sorted(gone_path_keys)
+    if ontology_catalog is not None:
+        staleness = classify_accepted_path_staleness(sel, read_access=query, catalog=ontology_catalog)
+        broken_paths = list(staleness.broken_paths)
+        no_longer_derives_paths = list(staleness.no_longer_derives_paths)
+        drifted_paths = list(staleness.drifted_paths)
+        gone_paths = sorted(staleness.stale_paths)
+    else:
+        known_conn_ids = query.connection_ids()
+        gone_path_keys = [pk for pk in inc_paths if pk not in candidate_set.paths]
+        drifted_paths = sorted(pk for pk in gone_path_keys if _is_path_well_formed(pk, known_conn_ids))
+        broken_paths = sorted(pk for pk in gone_path_keys if not _is_path_well_formed(pk, known_conn_ids))
+        no_longer_derives_paths = []
+        gone_paths = sorted(gone_path_keys)
 
     delta = SelectionDelta(
         add_included_entity_ids=new_entity_ids,
@@ -252,6 +274,7 @@ def compute_derivation_diff(
         gone_paths=gone_paths,
         drifted_paths=drifted_paths,
         broken_paths=broken_paths,
+        no_longer_derives_paths=no_longer_derives_paths,
     )
 
 

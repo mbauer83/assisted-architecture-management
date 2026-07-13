@@ -285,3 +285,66 @@ class TestExecuteDiagram:
         monkeypatch.setattr(state_mod, "get_write_deps", _boom, raising=True)
         resp = client.post("/api/viewpoints/execute-diagram", json={"slug": "exec-test"})
         assert resp.status_code == 200
+
+    def test_derived_connections_reach_the_renderer(self, client, monkeypatch) -> None:
+        """Regression: a derived connection's synthetic id must never be silently dropped
+        by diagram-selection resolution — it should reach the renderer as a synthetic,
+        renderer-only ConnectionRecord."""
+        import src.infrastructure.gui.routers.viewpoints as viewpoints_mod
+        from src.application.viewpoints.execution_result import (
+            ConnectionItemSummary,
+            EntityItemSummary,
+            ViewpointExecutionResult,
+        )
+
+        other_id = "APC@1000000042.EntSch.viewpoint-exec-other"
+        path_key = "SOME@1---OTHER@2@@archimate-serving@fwd"
+        derived_id = f"derived::archimate-realization::{path_key}"
+        result = ViewpointExecutionResult(
+            slug=None, version=None, query_schema=1, repo_scope="both", executed_at="2026-01-01T00:00:00Z",
+            index_generation=None, entity_ids=(ENT_ID, other_id), connection_ids=(derived_id,),
+            entities=(
+                EntityItemSummary(
+                    id=ENT_ID, name="Exec Entity", type="application-component", specialization_slugs=(),
+                    group="uncategorized", membership="primary",
+                ),
+                EntityItemSummary(
+                    id=other_id, name="Other", type="application-component", specialization_slugs=(),
+                    group="uncategorized", membership="expanded",
+                ),
+            ),
+            connections=(
+                ConnectionItemSummary(
+                    id=derived_id, type="archimate-realization", source=ENT_ID, target=other_id, certainty="certain",
+                    hops=2, via_connection_ids=("c1", "c2"),
+                ),
+            ),
+            total_entity_count=2, returned_entity_count=2, total_connection_count=1, returned_connection_count=1,
+            truncated=False, entity_limit=1000, matrix_axes=None, warnings=(), duration_ms=1.0, query_summary="t",
+        )
+        monkeypatch.setattr(viewpoints_mod, "evaluate_viewpoint", lambda *a, **kw: result)
+
+        from src.domain.artifact_types import ConnectionRecord, EntityRecord
+
+        captured: dict[str, list[ConnectionRecord]] = {}
+
+        def _capture(
+            name: str,
+            entities: list[EntityRecord],
+            connections: list[ConnectionRecord],
+            *,
+            diagram_type: str,
+            repo_root: Path,
+        ) -> str:
+            captured["connections"] = connections
+            return "@startuml\n@enduml\n"
+
+        import src.infrastructure.rendering.diagram_builder as diagram_builder_mod
+
+        monkeypatch.setattr(diagram_builder_mod, "generate_archimate_puml_body", _capture)
+        monkeypatch.setattr(diagram_builder_mod, "render_puml_svg", lambda *a, **kw: ("<svg/>", []))
+
+        resp = client.post("/api/viewpoints/execute-diagram", json={"query": {}})
+        assert resp.status_code == 200
+        connection_ids = {c.artifact_id for c in captured["connections"]}
+        assert derived_id in connection_ids

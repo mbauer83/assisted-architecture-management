@@ -18,6 +18,7 @@ from src.domain.artifact_types import ConnectionRecord, EntityRecord
 from src.domain.module_types import ConnectionTypeName, ElementClassName
 from src.domain.ontology_protocol import DiagramRendererReferences
 from src.domain.ontology_types import ConnectionTypeInfo
+from src.domain.relationship_reachability import is_derived_connection_id
 from src.domain.specializations import SpecializationCatalog, merge_specialization_catalogs
 from src.infrastructure.rendering._archimate_includes import (
     inject_archimate_includes,
@@ -217,7 +218,10 @@ class GenericPumlRenderer:
                 else None
             )
             arrow = conn_info.puml_arrow if conn_info else "-->"
-            if conn_spec is not None and conn_spec.notation.line_style and not direction:
+            if is_derived_connection_id(conn.artifact_id):
+                certainty = conn.extra.get("certainty") if isinstance(conn.extra, Mapping) else None
+                arrow = insert_arrow_line_style(arrow, "dashed" if certainty == "certain" else "dotted")
+            elif conn_spec is not None and conn_spec.notation.line_style and not direction:
                 arrow = insert_arrow_line_style(arrow, conn_spec.notation.line_style)
             if direction:
                 arrow = insert_arrow_direction(arrow, direction)

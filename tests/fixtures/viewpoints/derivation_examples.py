@@ -49,6 +49,12 @@ class ExampleGraph:
     ) -> list[ConnectionRecord]:
         return [item for item in self.connections if entity_id in {item.source, item.target}]
 
+    def entity_ids(self) -> set[str]:
+        return set(self.entities)
+
+    def connection_ids(self) -> set[str]:
+        return {item.artifact_id for item in self.connections}
+
 
 def catalog() -> ModuleCatalog:
     builder = ModuleCatalogBuilder()

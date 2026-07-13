@@ -2,7 +2,7 @@
 from ``root_entity_ids`` via bounded relationship derivation (Appendix B) — modeled
 connections along witness chains flow through by id; derived relationships flow through
 as candidate witness paths, never as synthetic connection ids (the standing "derived
-relationships are never persisted" invariant). Same PLAN §5.7 acceptance defaults as
+relationships are never persisted" invariant). Same acceptance defaults as
 ``viewpoint_execution``: certain candidates pre-included, potential ones pre-excluded
 until explicitly accepted.
 
@@ -16,6 +16,7 @@ composition root; same gap, same resolution, as ``viewpoint_execution``).
 from __future__ import annotations
 
 from collections.abc import Mapping
+from dataclasses import dataclass
 
 from src.application.derivation.types import CandidateSet
 from src.domain.derivation_types import StrategySpec
@@ -27,7 +28,7 @@ from src.domain.relationship_reachability import (
     RelationshipDerivationRequest,
     derive_relationships,
 )
-from src.domain.view_derivations import DerivationSelection
+from src.domain.view_derivations import DerivationSelection, PathProvenance
 from src.domain.viewpoint_criteria import IncidentDirection
 from src.domain.viewpoint_evaluation_context import CriteriaReadAccess
 
@@ -79,9 +80,16 @@ def _derive(
     return derive_relationships(request, read_access=read_access, registries=catalog).relationships
 
 
-def _collect(
-    relationships: tuple[DerivedRelationship, ...], *, read_access: CriteriaReadAccess
-) -> tuple[set[str], set[str], list[str], list[str]]:
+@dataclass(frozen=True)
+class _Collected:
+    entity_ids: frozenset[str]
+    connection_ids: frozenset[str]
+    certain_paths: tuple[str, ...]
+    potential_paths: tuple[str, ...]
+    provenance: Mapping[str, PathProvenance]
+
+
+def _collect(relationships: tuple[DerivedRelationship, ...], *, read_access: CriteriaReadAccess) -> _Collected:
     """Reachable entities include every witness-chain hop, not just each derived
     relationship's own endpoints — a witness connection is only displayable if both of
     its own endpoints are in the included entity set (the structural invariant every
@@ -90,6 +98,7 @@ def _collect(
     connection_ids: set[str] = set()
     certain_paths: list[str] = []
     potential_paths: list[str] = []
+    provenance: dict[str, PathProvenance] = {}
     for relationship in relationships:
         entity_ids.add(relationship.source_id)
         entity_ids.add(relationship.target_id)
@@ -101,7 +110,16 @@ def _collect(
                 entity_ids.add(connection.target)
         path_key = _path_key(relationship.artifact_id)
         (certain_paths if relationship.certainty == "certain" else potential_paths).append(path_key)
-    return entity_ids, connection_ids, certain_paths, potential_paths
+        provenance[path_key] = PathProvenance(
+            certainty=relationship.certainty, connection_type=relationship.connection_type
+        )
+    return _Collected(
+        entity_ids=frozenset(entity_ids),
+        connection_ids=frozenset(connection_ids),
+        certain_paths=tuple(sorted(certain_paths)),
+        potential_paths=tuple(sorted(potential_paths)),
+        provenance=provenance,
+    )
 
 
 def evaluate_candidates(
@@ -116,11 +134,11 @@ def evaluate_candidates(
         params, read_access=read_access, catalog=catalog, default_max_hops=default_max_hops,
         max_relationships=max_relationships,
     )
-    entity_ids, connection_ids, certain_paths, potential_paths = _collect(relationships, read_access=read_access)
+    collected = _collect(relationships, read_access=read_access)
     return CandidateSet(
-        entity_ids=frozenset(entity_ids | _roots(params)),
-        connection_ids=frozenset(connection_ids),
-        paths=frozenset(certain_paths) | frozenset(potential_paths),
+        entity_ids=collected.entity_ids | _roots(params),
+        connection_ids=collected.connection_ids,
+        paths=frozenset(collected.certain_paths) | frozenset(collected.potential_paths),
     )
 
 
@@ -132,15 +150,16 @@ def default_selection(
     default_max_hops: int,
     max_relationships: int,
 ) -> DerivationSelection:
-    """Initial acceptance state for a freshly generated diagram (PLAN §5.7)."""
+    """Initial acceptance state for a freshly generated diagram."""
     relationships = _derive(
         params, read_access=read_access, catalog=catalog, default_max_hops=default_max_hops,
         max_relationships=max_relationships,
     )
-    entity_ids, connection_ids, certain_paths, potential_paths = _collect(relationships, read_access=read_access)
+    collected = _collect(relationships, read_access=read_access)
     return DerivationSelection(
-        included_entity_ids=tuple(sorted(entity_ids | _roots(params))),
-        included_connection_ids=tuple(sorted(connection_ids)),
-        included_paths=tuple(sorted(certain_paths)),
-        excluded_paths=tuple(sorted(potential_paths)),
+        included_entity_ids=tuple(sorted(collected.entity_ids | _roots(params))),
+        included_connection_ids=tuple(sorted(collected.connection_ids)),
+        included_paths=collected.certain_paths,
+        excluded_paths=collected.potential_paths,
+        path_provenance=collected.provenance,
     )

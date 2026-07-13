@@ -9,6 +9,7 @@ from fastapi import APIRouter, Body, Depends, HTTPException
 
 from src.application.runtime_catalogs import RuntimeCatalogs
 from src.application.viewpoints.artifact_projection import project_artifact_by_frontmatter
+from src.application.viewpoints.derived_connection_records import derived_connection_record
 from src.application.viewpoints.evaluate_viewpoint import (
     UnknownViewpointSlugError,
     ViewpointExecutionRequest,
@@ -19,7 +20,7 @@ from src.application.viewpoints.evaluate_viewpoint import (
 from src.application.viewpoints.parameter_binding import ViewpointParameterError
 from src.application.viewpoints.registry_snapshot import build_registry_snapshot
 from src.config.settings import viewpoints_execution_max_entities, viewpoints_execution_timeout_seconds
-from src.domain.relationship_reachability import DerivationLimitError
+from src.domain.relationship_reachability import DerivationLimitError, is_derived_connection_id
 from src.domain.viewpoint_binding_evaluation import BindingCardinalityError
 from src.domain.viewpoint_query_parsing import query_from_mapping
 from src.domain.viewpoints import TargetKind
@@ -159,11 +160,15 @@ def execute_viewpoint_diagram(
 
     from src.infrastructure.rendering.diagram_builder import generate_archimate_puml_body, render_puml_svg
 
-    entities, connections, _, _ = resolve_diagram_selection(repo, list(result.entity_ids), list(result.connection_ids))
+    modeled_connection_ids = [cid for cid in result.connection_ids if not is_derived_connection_id(cid)]
+    entities, connections, _, _ = resolve_diagram_selection(repo, list(result.entity_ids), modeled_connection_ids)
+    derived_records = [
+        derived_connection_record(summary) for summary in result.connections if summary.certainty is not None
+    ]
     puml = generate_archimate_puml_body(
         result.slug or "viewpoint-preview",
         entities,
-        connections,
+        [*connections, *derived_records],
         diagram_type=_AD_HOC_DIAGRAM_TYPE,
         repo_root=repo_root,
     )
