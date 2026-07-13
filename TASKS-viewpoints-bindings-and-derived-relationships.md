@@ -131,7 +131,7 @@ the binding layer, and G1 waits on neither derivation nor presentation work.
 
 ## Phase B — Relationship-derivation engine (pure domain)
 
-- [ ] **WU-B1 — Derivation-domain classifier & pairwise composition (DR 1–8)**
+- [x] **WU-B1 — Derivation-domain classifier & pairwise composition (DR 1–8)**
   - Files: new `src/domain/relationship_derivation.py`,
     `src/domain/relationship_derivation_rules.py`; new
     `tests/domain/test_relationship_derivation_rules.py`,
@@ -871,3 +871,4 @@ Anything short of this is "in progress", regardless of how many WUs are ticked.
 - 2026-07-13 — WU-A1 — Settings accessors and fallback validation shipped; pre-existing file-length-policy failures remain user-authorized non-blocking baseline.
 - 2026-07-13 — WU-A3 — Scope-only definitions now execute through an implicit, scope-admissible query; baseline file-length-policy failures remain user-authorized non-blocking.
 - 2026-07-13 — WU-A2 — Source Appendix B confirms strength orderings only for structural/dependency relationships; dynamic roles now intentionally carry no strength and the plan table was corrected.
+- 2026-07-13 — WU-B1 — Shipped taxonomy classification and all certain pairwise composition rules are covered by pure-domain tests.
