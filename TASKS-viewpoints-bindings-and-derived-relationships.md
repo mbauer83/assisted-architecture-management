@@ -214,7 +214,7 @@ the binding layer, and G1 waits on neither derivation nor presentation work.
     uncited extras at the tested hop bounds); direct-model-boundary regression green.
   - Deps: B4.
 
-- [ ] **WU-B6 — Rule-correctness verification battery (PLAN §5.3a — the crux gate)**
+- [x] **WU-B6 — Rule-correctness verification battery (PLAN §5.3a — the crux gate)**
   - Files: new `tests/domain/test_relationship_derivation_dual_encoding.py`,
     `tests/domain/test_relationship_derivation_exhaustive.py`,
     `tests/domain/test_relationship_derivation_invariants.py`; test-only fixture module
@@ -877,3 +877,4 @@ Anything short of this is "in progress", regardless of how many WUs are ticked.
 - 2026-07-13 — WU-B3 — Declarative restriction review passed: R1–R14 and RJ1–RJ2 were checked line-by-line against Appendix B and exercised with admitting and rejecting cases.
 - 2026-07-13 — WU-B4 — Bounded relationship enumeration now emits deterministic, deduplicated ephemeral witness paths and raises a typed limit error before any partial result.
 - 2026-07-13 — WU-B5 — Appendix-B examples are executable; Financial Application proves DR2-derived realization is indirect rather than a direct-table defect.
+- 2026-07-13 — WU-B6 — Transcriber/reviewer: Codex; line-by-line spec-to-literal-fixture/runtime review passed with exhaustive and invariant batteries.
