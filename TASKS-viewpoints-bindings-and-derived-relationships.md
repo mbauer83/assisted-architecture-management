@@ -659,7 +659,10 @@ the binding layer, and G1 waits on neither derivation nor presentation work.
     serving ← tech service ← realization ← node) returns the process + technology
     elements with the derived support connections and NO application-layer elements;
     parameter signatures listed via MCP `list`; all three execute end-to-end via the
-    REST parity fixture.
+    REST parity fixture. The same generic support-exploration fixture is reconfigured
+    with a requirement anchor and process/function/event/service/application neighbor
+    types; it proves indirect support and that changing the certainty policy includes or
+    omits potential derived relationships without obscuring which relationship is which.
   - Deps: G1, E1, E2, E3b, D1a, D1b, D2.
 
 - [ ] **WU-G3 — Heat-map defaults (`capability-map`, `resource-map`)**
@@ -742,13 +745,19 @@ component names are not.
     defaults; materialize pre-fill; witness-chain popover from `via_connection_ids`.
     This also supports a non-persisted layered diagram: select named processes/services
     or use criteria, include indirectly connected technology entities, and render only
-    those elements plus derived arrows.
+    those elements plus derived arrows. The same controls also support motivation
+    analysis: select requirements or other motivation elements and choose supporting
+    process/function/event/service/application neighbor types before rendering a report
+    or diagram.
   - Acceptance: derived edges dashed + certainty badge + witness-chain popover;
     Playwright quality flow selects processes/services by name/id (and repeats using
     criteria), chooses a layered diagram without saving, asserts that only the selected
     elements plus indirectly connected technology elements render, and selects a derived
     arrow to see generated witness-chain prose with every entity name as a clickable
-    sidebar link; no YAML or formula/text query input is required;
+    sidebar link; no YAML or formula/text query input is required; Playwright
+    motivation-support flow selects a requirement, renders its indirect supporting
+    elements, changes the certainty inclusion control, and verifies the result and
+    legend distinguish certain from potential relationships;
     per-occurrence accept/reject with certain pre-accepted / potential pre-rejected and
     type/certainty/witness chain visible at decision time; stale-path refresh findings
     actionable; "materialize connection" pre-fills type/endpoints/description;

@@ -1022,6 +1022,12 @@ REST + Playwright, not against current components):
   ArchiMate notation and retain a derived/certainty marker. Selecting an arrow opens a
   sidebar explanation with generated prose for its witness chain and clickable entity
   names; the flow requires neither YAML/formula input nor saving a viewpoint.
+- **Motivation-support scenario within the same support-exploration flow**: the layered
+  support flow is not technology-specific or a separate mechanism. With motivation
+  elements, including requirements, as anchors and process/function/event/service/
+  application types as the included neighbors, it clearly shows how those elements support
+  the anchors. The same relationship direction, type, traversal, and certain/potential
+  inclusion controls apply, and results and explanations visibly distinguish certainty.
 - **Derived-candidate review (§5.7)**: the generated-diagram flow presents derived
   connections as reviewable candidates — certain pre-accepted, potential pre-rejected —
   showing derived type, certainty, and witness chain at decision time; refresh staleness
