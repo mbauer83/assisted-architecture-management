@@ -552,7 +552,7 @@ the binding layer, and G1 waits on neither derivation nor presentation work.
     representations reject it.
   - Deps: C4.
 
-- [ ] **WU-F3 — Viewpoint pins**
+- [x] **WU-F3 — Viewpoint pins**
   - Files: new `src/application/viewpoints/pins.py` (load/save via existing repo-write
     port), `.arch-repo/viewpoint-pins.yaml` convention, `viewpoint_authoring.py`
     (`GET/PUT /api/viewpoints/pins`), `query_viewpoint_tools.py` (`list` pinned flag);
@@ -939,3 +939,4 @@ Anything short of this is "in progress", regardless of how many WUs are ticked.
 - 2026-07-13 — WU-C6 — Blocked before implementation: PLAN §2 locks the comparator vocabulary as `eq neq in exists absent lt lte gt gte` ("no new comparators … not reopened"), directly contradicting WU-C6's proposal to add `not_in`/`like`/`ilike`; the runtime already omits `not_in` on purpose (`negate`+`in` covers it, "one spelling per meaning"). Escalated to the user rather than improvising around a locked decision.
 - 2026-07-13 — WU-C6 — User resolved the escalation: reopen the lock narrowly for `not_in`/`like`/`ilike` (PLAN §2 updated accordingly); comparators added end-to-end (parse/validate/evaluate/summarize) with SQL-style pattern matching applied uniformly to scalar and multi-valued attributes, and to literal/parameter/binding/attribute-reference operands alike.
 - 2026-07-13 — WU-F2 — `label_attribute` validated as a display option distinct from the styling-capability namespace: allowed only on `exploration`/`diagram`, its value resolved through the same reserved/profile/`derived.` attribute-path machinery as every other attribute reference.
+- 2026-07-13 — WU-F3 — Pins are an engagement-repo-local sidecar list (CRUD via REST, surfaced on MCP `list`); a direct `plan_promotion`/`execute_promotion` run (no git dependency at that layer) confirms the sidecar is never copied to the enterprise repo.

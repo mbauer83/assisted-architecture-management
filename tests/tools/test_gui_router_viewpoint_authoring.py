@@ -223,3 +223,41 @@ title Referencing Diagram
         assert body["ok"] is False
         assert body["issues"][0]["code"] == "delete-blocked-referenced"
         assert body["referencers"][0]["artifact_id"] == "ARC@1000000042.DiagSch.ref"
+
+
+class TestPins:
+    def test_absence_is_empty(self, client) -> None:
+        resp = client.get("/api/viewpoints/pins")
+        assert resp.status_code == 200
+        assert resp.json() == {"slugs": [], "pruned": []}
+
+    def test_crud_round_trip(self, client) -> None:
+        client.post("/api/viewpoints", json={"definition": _MINIMAL_DEFINITION, "dry_run": False})
+        put_resp = client.put("/api/viewpoints/pins", json={"slugs": ["test-viewpoint"]})
+        assert put_resp.status_code == 200
+        assert put_resp.json() == {"slugs": ["test-viewpoint"]}
+
+        get_resp = client.get("/api/viewpoints/pins")
+        assert get_resp.json() == {"slugs": ["test-viewpoint"], "pruned": []}
+
+        unpin_resp = client.put("/api/viewpoints/pins", json={"slugs": []})
+        assert unpin_resp.json() == {"slugs": []}
+        assert client.get("/api/viewpoints/pins").json() == {"slugs": [], "pruned": []}
+
+    def test_module_shipped_definition_is_pinnable(self, client) -> None:
+        resp = client.get("/api/viewpoints")
+        module_slug = next(v["slug"] for v in resp.json()["viewpoints"] if v["tier"] == "module")
+        put_resp = client.put("/api/viewpoints/pins", json={"slugs": [module_slug]})
+        assert put_resp.status_code == 200
+        assert client.get("/api/viewpoints/pins").json()["slugs"] == [module_slug]
+
+    def test_unknown_slug_is_rejected(self, client) -> None:
+        resp = client.put("/api/viewpoints/pins", json={"slugs": ["not-a-real-viewpoint"]})
+        assert resp.status_code == 400
+
+    def test_slug_removed_from_catalog_after_pinning_is_pruned_with_a_warning(self, client) -> None:
+        client.post("/api/viewpoints", json={"definition": _MINIMAL_DEFINITION, "dry_run": False})
+        client.put("/api/viewpoints/pins", json={"slugs": ["test-viewpoint"]})
+        client.post("/api/viewpoints/remove", json={"slug": "test-viewpoint", "dry_run": False})
+        resp = client.get("/api/viewpoints/pins")
+        assert resp.json() == {"slugs": [], "pruned": ["test-viewpoint"]}

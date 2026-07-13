@@ -1,6 +1,6 @@
-"""Functional tests for MCP read tool ``artifact_query_viewpoint`` (WU-E7a): ``list``/
+"""Functional tests for MCP read tool ``artifact_query_viewpoint``: ``list``/
 ``execute`` actions, limit default/explicit/clamp, and MCP/REST parity (one shared fixture,
-both transports, per Appendix-C "Lifecycle & tools").
+both transports).
 """
 
 from __future__ import annotations
@@ -12,6 +12,7 @@ from pathlib import Path
 import pytest
 
 import src.infrastructure.mcp.artifact_mcp.query_viewpoint_tools as qvt
+from src.application.viewpoints.pins import save_pinned_slugs
 from src.domain.viewpoints import ExecutableViewpointQuery, ViewpointCatalog, ViewpointDefinition
 from src.infrastructure.mcp import mcp_artifact_server as mcp
 
@@ -46,9 +47,9 @@ def catalogs():
 
 
 def _install_catalog(monkeypatch: pytest.MonkeyPatch, catalogs, catalog: ViewpointCatalog) -> None:
-    # merged_catalog comes from load_effective_viewpoint_catalog(roots) now (WU-E6a fix: it
-    # must be scoped to the request's own repo_root, not the workspace-singleton catalogs) —
-    # patch that instead of runtime_catalogs, which still supplies ontology/registries only.
+    # merged_catalog comes from load_effective_viewpoint_catalog(roots), scoped to the
+    # request's own repo_root rather than the workspace-singleton catalogs — patch that
+    # instead of runtime_catalogs, which still supplies ontology/registries only.
     monkeypatch.setattr(qvt, "load_effective_viewpoint_catalog", lambda roots: catalog)
     monkeypatch.setattr(qvt, "runtime_catalogs", lambda: catalogs)
 
@@ -72,6 +73,16 @@ class TestListAction:
 
         a_entry = next(e for e in result["viewpoints"] if e["slug"] == "a-viewpoint")
         assert a_entry["query_summary"] is None
+
+    def test_pinned_flag_reflects_the_engagement_repo_local_pins_file(self, monkeypatch, catalogs, repo: Path) -> None:
+        definition_a = ViewpointDefinition(slug="a-viewpoint", version=1, name="A")
+        definition_b = ViewpointDefinition(slug="b-viewpoint", version=1, name="B")
+        _install_catalog(monkeypatch, catalogs, _catalog_with(definition_a, definition_b))
+        save_pinned_slugs(repo, ("a-viewpoint",))
+
+        result = _fn()(action="list", repo_root=str(repo), repo_scope="engagement")
+        pinned = {entry["slug"]: entry["pinned"] for entry in result["viewpoints"]}
+        assert pinned == {"a-viewpoint": True, "b-viewpoint": False}
 
 
 class TestExecuteAction:

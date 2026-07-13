@@ -25,6 +25,7 @@ from src.application.viewpoints.persist_definition import (
     find_viewpoint_referencers,
     persist_viewpoint_definition,
 )
+from src.application.viewpoints.pins import load_pinned_slugs, save_pinned_slugs
 from src.application.viewpoints.registry_snapshot import build_registry_snapshot
 from src.domain.viewpoint_condition_validation import RegistrySnapshot
 from src.domain.viewpoint_criteria import RESERVED_CONNECTION_PATHS, RESERVED_ENTITY_PATHS
@@ -130,6 +131,34 @@ def get_criteria_catalog() -> dict[str, Any]:
         },
         "connection_derivation": derivation,
     }
+
+
+@router.get("/api/viewpoints/pins")
+def get_viewpoint_pins() -> dict[str, Any]:
+    """Pinned definition slugs (Home/management quick access) — an engagement-repo-local
+    sidecar list, never definition content and never promoted. Slugs no longer in the
+    effective catalog are dropped and reported under ``pruned``."""
+    engagement_root = _engagement_root()
+    merged = load_effective_viewpoint_catalog(_both_roots())
+    known = frozenset(d.slug for d in merged.entries)
+    pinned = load_pinned_slugs(engagement_root, known_slugs=known)
+    return {"slugs": list(pinned.slugs), "pruned": list(pinned.pruned)}
+
+
+class ViewpointPinsBody(BaseModel):
+    slugs: list[str]
+
+
+@router.put("/api/viewpoints/pins")
+def put_viewpoint_pins(body: ViewpointPinsBody) -> dict[str, Any]:
+    engagement_root = _engagement_root()
+    merged = load_effective_viewpoint_catalog(_both_roots())
+    known = frozenset(d.slug for d in merged.entries)
+    unknown = [slug for slug in body.slugs if slug not in known]
+    if unknown:
+        raise HTTPException(400, f"unknown viewpoint slug(s): {', '.join(unknown)}")
+    save_pinned_slugs(engagement_root, tuple(body.slugs))
+    return {"slugs": body.slugs}
 
 
 @router.get("/api/viewpoints/{slug}/referencers")

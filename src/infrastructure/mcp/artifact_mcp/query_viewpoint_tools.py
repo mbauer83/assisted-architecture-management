@@ -14,6 +14,7 @@ from src.application.viewpoints.evaluate_viewpoint import (
     evaluate_viewpoint,
 )
 from src.application.viewpoints.parameter_binding import ViewpointParameterError
+from src.application.viewpoints.pins import load_pinned_slugs
 from src.application.viewpoints.registry_snapshot import build_registry_snapshot
 from src.config.settings import (
     viewpoints_execution_default_entity_limit_mcp,
@@ -28,6 +29,7 @@ from src.domain.viewpoints import ViewpointDefinition
 from src.infrastructure.mcp.artifact_mcp.context import (
     RepoScope,
     repo_cached,
+    resolve_repo_root,
     resolve_repo_roots,
     roots_key,
     runtime_catalogs,
@@ -37,7 +39,7 @@ from src.infrastructure.viewpoint_declarations import load_effective_viewpoint_c
 from src.infrastructure.write.artifact_write.viewpoint_type_guidance import summarize_scope
 
 
-def _list_entry(definition: ViewpointDefinition) -> dict[str, object]:
+def _list_entry(definition: ViewpointDefinition, *, pinned_slugs: frozenset[str]) -> dict[str, object]:
     return {
         "slug": definition.slug,
         "version": definition.version,
@@ -53,6 +55,7 @@ def _list_entry(definition: ViewpointDefinition) -> dict[str, object]:
             {"name": parameter.name, "type": parameter.value_type, "required": parameter.required}
             for parameter in (() if definition.query is None else definition.query.parameters)
         ],
+        "pinned": definition.slug in pinned_slugs,
     }
 
 
@@ -62,8 +65,9 @@ def register_query_viewpoint_tools(mcp: FastMCP) -> None:
         title="Artifact Query: Viewpoints",
         description=(
             "action='list': browse the effective merged viewpoint catalog — slug/version/name/"
-            "purpose/content/stakeholders/concerns, a scope summary, and a plain-language "
-            "query_summary so you see what a viewpoint means, not just that it exists. "
+            "purpose/content/stakeholders/concerns, a scope summary, a plain-language "
+            "query_summary so you see what a viewpoint means, not just that it exists, and "
+            "whether it is pinned (engagement-repo-local quick access). "
             "action='execute': run a definition's query (slug=...) or an ad-hoc query "
             "(query=..., Appendix-A shape — see artifact_help's 'viewpoints' topic for the "
             "grammar); returns sorted entity/connection ids with fixed summaries, four counts, "
@@ -89,7 +93,12 @@ def register_query_viewpoint_tools(mcp: FastMCP) -> None:
         merged_catalog = load_effective_viewpoint_catalog(roots)
 
         if action == "list":
-            entries = [_list_entry(d) for d in sorted(merged_catalog.entries, key=lambda d: d.slug)]
+            engagement_root = resolve_repo_root(repo_root=repo_root, repo_preset=None)
+            known_slugs = frozenset(d.slug for d in merged_catalog.entries)
+            pinned_slugs = frozenset(load_pinned_slugs(engagement_root, known_slugs=known_slugs).slugs)
+            entries = [
+                _list_entry(d, pinned_slugs=pinned_slugs) for d in sorted(merged_catalog.entries, key=lambda d: d.slug)
+            ]
             return {"viewpoints": entries}
 
         if (slug is None) == (query is None):
