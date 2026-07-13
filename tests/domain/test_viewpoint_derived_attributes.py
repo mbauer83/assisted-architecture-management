@@ -12,6 +12,7 @@ from src.domain.viewpoint_condition_validation import RegistrySnapshot
 from src.domain.viewpoint_criteria import AttributeCondition, EntityCriteriaGroup, ValueRef
 from src.domain.viewpoint_criteria_evaluation import evaluate_entity_criteria
 from src.domain.viewpoint_evaluation_context import EvaluationEnvironment
+from tests.fixtures.viewpoints.derivation_examples import catalog, financial_application
 
 
 def _entity(identifier: str, *, score: int = 0) -> EntityRecord:
@@ -68,3 +69,31 @@ def test_direct_derived_attribute_is_available_as_a_criteria_path() -> None:
     assert evaluate_entity_criteria(
         criteria, graph.entities["A"], read_access=graph, registries=_REGISTRIES, environment=environment
     ).matched
+
+
+def test_relationship_derived_attribute_reduces_minimum_hop_count() -> None:
+    graph = financial_application()
+    relationship_catalog = catalog()
+    registries = RegistrySnapshot(
+        frozenset(relationship_catalog.all_entity_types()),
+        frozenset(relationship_catalog.all_connection_types()),
+        frozenset(),
+        {},
+        {},
+        derivation_catalog=relationship_catalog,
+    )
+    input = BindingEvaluationInput(
+        tuple(graph.entities), tuple(item.artifact_id for item in graph.connections), graph, registries
+    )
+    attribute = DerivedAttribute(
+        "impact-distance",
+        direction="outgoing",
+        traversal="derived",
+        max_hops=3,
+        reduce="min",
+        of="relationship.hops",
+    )
+    environment = evaluate_derived_attributes(
+        (attribute,), ("financial-application",), input=input, environment=EvaluationEnvironment()
+    )
+    assert environment.derived_values[("financial-application", "impact-distance")] == 2

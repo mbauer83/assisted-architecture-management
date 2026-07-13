@@ -384,7 +384,7 @@ the binding layer, and G1 waits on neither derivation nor presentation work.
   - Deps: B4, B6 (the rule-verification battery gates ALL consumers of the engine —
     enforced as a dependency, not just prose). (No Phase C dependency.)
 
-- [ ] **WU-D1b — Derived traversal for derived attributes (`relationship.hops`)**
+- [x] **WU-D1b — Derived traversal for derived attributes (`relationship.hops`)**
   - Files: `viewpoint_binding_evaluation.py` (derived-attribute derived branch);
     tests: extend `tests/domain/test_viewpoint_derived_attributes.py`.
   - Changes: the derived-attribute derived branch + the `relationship.hops` source
@@ -892,3 +892,4 @@ Anything short of this is "in progress", regardless of how many WUs are ticked.
 - 2026-07-13 — WU-C4 — Pure binding execution, runtime cardinality checks, ValueRef environments, and direct derived attributes are deterministic and covered.
 - 2026-07-13 — WU-C5 — Shared summaries now describe parameters, bindings, ValueRef forms, and derived attributes for every surface.
 - 2026-07-13 — WU-D1a — Derived incident and neighbor traversal use bounded relationship derivation with declarative grammar, validation, and direct-mode regressions.
+- 2026-07-13 — WU-D1b — Relationship-derived attributes now reduce bounded witnesses, including minimum hop counts, without changing direct attributes.

@@ -45,6 +45,7 @@ _DECLARATION_CODES = frozenset(
         "derived-attribute-reference-unsupported",
         "derived-of-missing",
         "derived-reduce-type-mismatch",
+        "derived-of-source-traversal-mismatch",
     }
 )
 

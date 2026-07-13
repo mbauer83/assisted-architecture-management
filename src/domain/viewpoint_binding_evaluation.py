@@ -6,11 +6,13 @@ from dataclasses import dataclass
 from typing import cast
 
 from src.domain.artifact_types import ConnectionRecord, EntityRecord
+from src.domain.relationship_reachability import DerivationBounds, RelationshipDerivationRequest, derive_relationships
 from src.domain.viewpoint_bindings import DerivedAttribute, QueryBinding
 from src.domain.viewpoint_condition_evaluation import read_attribute_value
 from src.domain.viewpoint_condition_validation import CriteriaContext, RegistrySnapshot
 from src.domain.viewpoint_criteria import ConnectionCriteriaGroup, EntityCriteriaGroup
 from src.domain.viewpoint_criteria_evaluation import (
+    _derived_matches,
     direction_matches,
     evaluate_connection_criteria,
     evaluate_entity_criteria,
@@ -178,8 +180,8 @@ def _evaluate_derived(
     input: BindingEvaluationInput,
     environment: EvaluationEnvironment,
 ) -> object:
-    if attribute.traversal != "direct":
-        return None
+    if attribute.traversal == "derived":
+        return _evaluate_relationship_derived(attribute, entity, input, environment)
     values: list[object] = []
     count = 0
     for connection in input.read_access.find_connections_for(entity.artifact_id, direction="any"):
@@ -217,6 +219,62 @@ def _evaluate_derived(
             record = connection if head == "connection" else endpoint
             context = cast(CriteriaContext, "connection" if head == "connection" else "entity")
             value, present = read_attribute_value(record, path, context=context, environment=environment)
+            if present:
+                values.append(value)
+    return count if attribute.reduce == "count" else _reduce(tuple(values), attribute.reduce)
+
+
+def _evaluate_relationship_derived(
+    attribute: DerivedAttribute,
+    entity: EntityRecord,
+    input: BindingEvaluationInput,
+    environment: EvaluationEnvironment,
+) -> object:
+    catalog = input.registries.derivation_catalog
+    if catalog is None:
+        return None
+    relationships = derive_relationships(
+        RelationshipDerivationRequest(
+            frozenset({entity.artifact_id}),
+            attribute.direction,
+            "include_potential" if attribute.include_potential else "certain_only",
+            DerivationBounds(
+                attribute.max_hops or input.registries.derivation_max_hops,
+                input.registries.derivation_max_relationships,
+            ),
+        ),
+        read_access=input.read_access,
+        registries=catalog,
+    ).relationships
+    values: list[object] = []
+    count = 0
+    for relationship in relationships:
+        if attribute.connection_criteria is not None and not _derived_matches(
+            attribute.connection_criteria, relationship.connection_type, relationship.certainty, relationship.hops
+        ):
+            continue
+        other_id = relationship.target_id if relationship.source_id == entity.artifact_id else relationship.source_id
+        endpoint = input.read_access.get_entity(other_id)
+        if endpoint is None:
+            continue
+        if (
+            attribute.endpoint_criteria is not None
+            and not evaluate_entity_criteria(
+                attribute.endpoint_criteria,
+                endpoint,
+                read_access=input.read_access,
+                registries=input.registries,
+                environment=environment,
+            ).matched
+        ):
+            continue
+        count += 1
+        if attribute.of == "relationship.hops":
+            values.append(relationship.hops)
+        elif attribute.of is not None and attribute.of.startswith("endpoint."):
+            value, present = read_attribute_value(
+                endpoint, attribute.of.removeprefix("endpoint."), context="entity", environment=environment
+            )
             if present:
                 values.append(value)
     return count if attribute.reduce == "count" else _reduce(tuple(values), attribute.reduce)

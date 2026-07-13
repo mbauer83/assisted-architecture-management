@@ -264,6 +264,15 @@ def _validate_derived(
                 )
             )
         else:
+            if attribute.of == "relationship.hops" and attribute.traversal != "derived":
+                issues.append(
+                    issue(
+                        "error",
+                        "derived-of-source-traversal-mismatch",
+                        f"{item_path}/of",
+                        "relationship.hops requires relationship-derived traversal",
+                    )
+                )
             source_type = _derived_source_type(attribute, registries)
             if source_type is None:
                 issues.append(
