@@ -159,6 +159,7 @@ def build_module_catalog(registry: ModuleRegistry) -> ModuleCatalog:
 
 def _build_derivation_catalog():
     from src.application.derivation import (  # noqa: PLC0415
+        derived_relationships,
         explicit_selection,
         incident_connections,
         local_neighborhood,
@@ -166,7 +167,10 @@ def _build_derivation_catalog():
         viewpoint_execution,
     )
     from src.diagram_types.c4._projection import MANIFEST as _c4_manifest  # noqa: PLC0415
-    from src.infrastructure.derivation_strategy_wiring import viewpoint_execution_derive  # noqa: PLC0415
+    from src.infrastructure.derivation_strategy_wiring import (  # noqa: PLC0415
+        derived_relationships_derive,
+        viewpoint_execution_derive,
+    )
 
     builder = DerivationStrategyCatalogBuilder()
     builder.register(explicit_selection.SPEC, explicit_selection.derive)
@@ -174,6 +178,7 @@ def _build_derivation_catalog():
     builder.register(incident_connections.SPEC, incident_connections.derive)
     builder.register(path_projection.SPEC, path_projection.derive)
     builder.register(viewpoint_execution.SPEC, viewpoint_execution_derive)
+    builder.register(derived_relationships.SPEC, derived_relationships_derive)
     for spec, fn in _c4_manifest.strategies:
         builder.register(spec, fn)
     return builder.build()

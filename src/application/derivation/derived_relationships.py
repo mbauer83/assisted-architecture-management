@@ -1,0 +1,146 @@
+"""derived-relationships/v1 strategy: candidate set = entities/connections reachable
+from ``root_entity_ids`` via bounded relationship derivation (Appendix B) — modeled
+connections along witness chains flow through by id; derived relationships flow through
+as candidate witness paths, never as synthetic connection ids (the standing "derived
+relationships are never persisted" invariant). Same PLAN §5.7 acceptance defaults as
+``viewpoint_execution``: certain candidates pre-included, potential ones pre-excluded
+until explicitly accepted.
+
+Pure application logic only: ``catalog`` (the ontology ``ModuleCatalog`` the derivation
+engine reads its rule tables from) is injected by the composition-root registration
+closure (``src.infrastructure.derivation_strategy_wiring``) — a ``ModelQuery``-only
+``derive_fn`` cannot build one itself (ontology-catalog construction lives at the
+composition root; same gap, same resolution, as ``viewpoint_execution``).
+"""
+
+from __future__ import annotations
+
+from collections.abc import Mapping
+
+from src.application.derivation.types import CandidateSet
+from src.domain.derivation_types import StrategySpec
+from src.domain.module_catalog import ModuleCatalog
+from src.domain.relationship_reachability import (
+    DerivationBounds,
+    DerivationCertaintyPolicy,
+    DerivedRelationship,
+    RelationshipDerivationRequest,
+    derive_relationships,
+)
+from src.domain.view_derivations import DerivationSelection
+from src.domain.viewpoint_criteria import IncidentDirection
+from src.domain.viewpoint_evaluation_context import CriteriaReadAccess
+
+SPEC = StrategySpec(
+    name="derived_relationships",
+    version=1,
+    supported_filters=frozenset({"direction", "include_potential", "max_hops"}),
+)
+
+
+def _roots(params: Mapping[str, object]) -> frozenset[str]:
+    raw = params.get("root_entity_ids")
+    return frozenset(str(r) for r in raw) if isinstance(raw, list) else frozenset()
+
+
+def _direction(params: Mapping[str, object]) -> IncidentDirection:
+    raw = params.get("direction", "either")
+    if raw not in ("outgoing", "incoming", "either"):
+        return "either"
+    return raw
+
+
+def _certainty(params: Mapping[str, object]) -> DerivationCertaintyPolicy:
+    return "include_potential" if params.get("include_potential") else "certain_only"
+
+
+def _path_key(synthetic_relationship_id: str) -> str:
+    """Recover the canonical witness-path key from a derived relationship's synthetic id
+    (``derived::<type-slug>::<path-key>``)."""
+    return synthetic_relationship_id.split("::", 2)[2]
+
+
+def _derive(
+    params: Mapping[str, object],
+    *,
+    read_access: CriteriaReadAccess,
+    catalog: ModuleCatalog,
+    default_max_hops: int,
+    max_relationships: int,
+) -> tuple[DerivedRelationship, ...]:
+    roots = _roots(params)
+    if not roots:
+        return ()
+    max_hops_raw = params.get("max_hops")
+    max_hops = int(max_hops_raw) if isinstance(max_hops_raw, (int, float)) else default_max_hops
+    request = RelationshipDerivationRequest(
+        roots, _direction(params), _certainty(params), DerivationBounds(max_hops, max_relationships)
+    )
+    return derive_relationships(request, read_access=read_access, registries=catalog).relationships
+
+
+def _collect(
+    relationships: tuple[DerivedRelationship, ...], *, read_access: CriteriaReadAccess
+) -> tuple[set[str], set[str], list[str], list[str]]:
+    """Reachable entities include every witness-chain hop, not just each derived
+    relationship's own endpoints — a witness connection is only displayable if both of
+    its own endpoints are in the included entity set (the structural invariant every
+    other consumer of a candidate set relies on)."""
+    entity_ids: set[str] = set()
+    connection_ids: set[str] = set()
+    certain_paths: list[str] = []
+    potential_paths: list[str] = []
+    for relationship in relationships:
+        entity_ids.add(relationship.source_id)
+        entity_ids.add(relationship.target_id)
+        for connection_id in relationship.via_connection_ids:
+            connection_ids.add(connection_id)
+            connection = read_access.get_connection(connection_id)
+            if connection is not None:
+                entity_ids.add(connection.source)
+                entity_ids.add(connection.target)
+        path_key = _path_key(relationship.artifact_id)
+        (certain_paths if relationship.certainty == "certain" else potential_paths).append(path_key)
+    return entity_ids, connection_ids, certain_paths, potential_paths
+
+
+def evaluate_candidates(
+    params: Mapping[str, object],
+    *,
+    read_access: CriteriaReadAccess,
+    catalog: ModuleCatalog,
+    default_max_hops: int,
+    max_relationships: int,
+) -> CandidateSet:
+    relationships = _derive(
+        params, read_access=read_access, catalog=catalog, default_max_hops=default_max_hops,
+        max_relationships=max_relationships,
+    )
+    entity_ids, connection_ids, certain_paths, potential_paths = _collect(relationships, read_access=read_access)
+    return CandidateSet(
+        entity_ids=frozenset(entity_ids | _roots(params)),
+        connection_ids=frozenset(connection_ids),
+        paths=frozenset(certain_paths) | frozenset(potential_paths),
+    )
+
+
+def default_selection(
+    params: Mapping[str, object],
+    *,
+    read_access: CriteriaReadAccess,
+    catalog: ModuleCatalog,
+    default_max_hops: int,
+    max_relationships: int,
+) -> DerivationSelection:
+    """Initial acceptance state for a freshly generated diagram (PLAN §5.7)."""
+    relationships = _derive(
+        params, read_access=read_access, catalog=catalog, default_max_hops=default_max_hops,
+        max_relationships=max_relationships,
+    )
+    entity_ids, connection_ids, certain_paths, potential_paths = _collect(relationships, read_access=read_access)
+    return DerivationSelection(
+        included_entity_ids=tuple(sorted(entity_ids | _roots(params))),
+        included_connection_ids=tuple(sorted(connection_ids)),
+        included_paths=tuple(sorted(certain_paths)),
+        excluded_paths=tuple(sorted(potential_paths)),
+    )

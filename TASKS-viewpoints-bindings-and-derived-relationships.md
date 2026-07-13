@@ -581,7 +581,7 @@ the binding layer, and G1 waits on neither derivation nor presentation work.
     existing refresh flow.
   - Deps: E1, D2.
 
-- [ ] **WU-F5 — `derived_relationships` view-derivation strategy**
+- [x] **WU-F5 — `derived_relationships` view-derivation strategy**
   - Files: new `src/application/derivation/derived_relationships.py` + registration;
     tests: new `tests/application/derivation/test_derived_relationships_strategy.py`.
   - Changes: PLAN §5.6.3/§5.7 — params `{root_entity_ids, direction, include_potential,
@@ -941,3 +941,4 @@ Anything short of this is "in progress", regardless of how many WUs are ticked.
 - 2026-07-13 — WU-F2 — `label_attribute` validated as a display option distinct from the styling-capability namespace: allowed only on `exploration`/`diagram`, its value resolved through the same reserved/profile/`derived.` attribute-path machinery as every other attribute reference.
 - 2026-07-13 — WU-F3 — Pins are an engagement-repo-local sidecar list (CRUD via REST, surfaced on MCP `list`); a direct `plan_promotion`/`execute_promotion` run (no git dependency at that layer) confirms the sidecar is never copied to the enterprise repo.
 - 2026-07-13 — WU-F4 — Design gap: the shared `DeriveFn`/`ModelQuery` contract every strategy implements against carries no repo-root paths, so a pure `derive()` cannot reach a `ViewpointCatalog`/`RegistrySnapshot`. User-approved resolution: generation-time `params["repo_roots"]` (plain data, no shared-type change) plus a composition-root closure (`src/infrastructure/derivation_strategy_wiring.py`) that builds the real catalog/registries/read-access and calls the pure `evaluate_candidates`/`default_selection` in `viewpoint_execution.py`; entity/connection inclusion still follows the read-access's own cross-repo enumeration, only the catalog/registries load is roots-scoped.
+- 2026-07-13 — WU-F5 — Reused the same composition-root-closure resolution as WU-F4 for the ontology `ModuleCatalog` (roots-independent, but still infra-built); reachable entities also pull in every witness-chain hop (not just each derived relationship's own endpoints) so included connections always satisfy the structural invariant.
