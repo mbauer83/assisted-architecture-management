@@ -38,11 +38,17 @@ def _seeded_store() -> Store:
     return Store(entities=entities)
 
 
-def test_library_covers_exactly_the_25_standard_slugs() -> None:
+_CUSTOM_SLUGS = {"element-dependents", "element-dependencies", "process-technology-support"}
+
+
+def test_library_covers_the_25_standard_slugs_plus_the_custom_impact_analysis_set() -> None:
     slugs = {d.slug for d in _CATALOGS.viewpoints.entries}
-    assert slugs == _KNOWN_SLUGS
-    assert len(slugs) == 25
-    assert not (slugs & {"element-dependents", "element-dependencies", "process-technology-support"})
+    assert slugs == _KNOWN_SLUGS | _CUSTOM_SLUGS
+    assert len(slugs) == 28
+    # The 3 custom slugs are this tool's own capability, never presented as part of the
+    # ArchiMate standard's example set (see standard_viewpoint_tables.py, which only
+    # transcribes the 25 spec-derived definitions).
+    assert not (_CUSTOM_SLUGS & _KNOWN_SLUGS)
 
 
 def test_every_definition_passes_save_mode_validation() -> None:
@@ -62,9 +68,14 @@ def test_every_definition_passes_save_mode_validation() -> None:
         assert issues == (), f"{definition.slug}: {issues}"
 
 
-def test_every_definition_returns_a_non_empty_population() -> None:
+def test_every_standard_definition_returns_a_non_empty_population() -> None:
+    """The 25 standard definitions take no parameters; the 3 custom impact-analysis
+    definitions require an anchor and are exercised separately in
+    test_default_viewpoint_library_impact_analysis.py."""
     store = _seeded_store()
     for definition in _CATALOGS.viewpoints.entries:
+        if definition.slug in _CUSTOM_SLUGS:
+            continue
         result = evaluate_viewpoint(
             ViewpointExecutionRequest(slug=definition.slug),
             catalog=_CATALOGS.viewpoints,

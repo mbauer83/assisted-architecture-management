@@ -13,10 +13,13 @@ _CATALOGS = build_runtime_catalogs(get_module_registry())
 _DEFINITIONS_BY_SLUG = {d.slug: d for d in _CATALOGS.viewpoints.entries}
 
 _CORE_ELEMENT_SLUGS = frozenset({"layered", "requirements-realization", "outcome-realization"})
+# Custom, non-spec impact-analysis definitions shipped alongside the standard library —
+# they have no ArchiMate spec table to compare against, so they're excluded here.
+_CUSTOM_SLUGS = frozenset({"element-dependents", "element-dependencies", "process-technology-support"})
 
 
 def test_every_table_has_a_shipped_definition() -> None:
-    shipped = set(_DEFINITIONS_BY_SLUG)
+    shipped = set(_DEFINITIONS_BY_SLUG) - _CUSTOM_SLUGS
     tables = {table.slug for table in STANDARD_VIEWPOINT_TABLES}
     assert shipped == tables
 

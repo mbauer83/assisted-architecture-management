@@ -1346,3 +1346,176 @@ viewpoints:
     representation: table
   representation_types:
   - archimate-implementation
+- slug: element-dependents
+  version: 1
+  name: Element Dependents (Impact of Change)
+  description: A tool-specific capability, not part of the ArchiMate standard's example
+    viewpoints. Shows every element that transitively depends on a chosen element, so an
+    architect can see what is affected if it changes.
+  purpose:
+  - deciding
+  content:
+  - coherence
+  stakeholders:
+  - enterprise-architects
+  - operational-managers
+  concerns:
+  - what is affected if this element changes
+  query:
+    query_schema: 1
+    parameters:
+    - name: anchor
+      type: entity-id
+      required: true
+      description: The element whose dependents are analyzed
+    entity_criteria:
+      kind: group
+      conjunction: and
+      children:
+      - kind: condition
+        attribute: id
+        comparator: eq
+        value:
+          from: parameter
+          name: anchor
+    include_connected:
+    - traversal: derived
+      include_potential: false
+      max_hops: 4
+      direction: incoming
+    connections:
+      enabled: true
+      traversal: both
+    derived:
+    - name: impact-distance
+      traversal: derived
+      direction: incoming
+      reduce: min
+      of: relationship.hops
+  presentation:
+    representation: exploration
+    styling_rules:
+    - capability: node_color
+      mode: scale
+      scale_attribute: derived.impact-distance
+      scale_min: 1
+      scale_max: 4
+      scale_tokens:
+      - heat-near
+      - heat-far
+  representation_types:
+  - archimate-layered
+
+- slug: element-dependencies
+  version: 1
+  name: Element Dependencies
+  description: A tool-specific capability, not part of the ArchiMate standard's example
+    viewpoints. Shows every element a chosen element transitively depends on, mirroring
+    element-dependents outward instead of inward.
+  purpose:
+  - deciding
+  content:
+  - coherence
+  stakeholders:
+  - enterprise-architects
+  - operational-managers
+  concerns:
+  - what does this element depend on
+  query:
+    query_schema: 1
+    parameters:
+    - name: anchor
+      type: entity-id
+      required: true
+      description: The element whose dependencies are analyzed
+    entity_criteria:
+      kind: group
+      conjunction: and
+      children:
+      - kind: condition
+        attribute: id
+        comparator: eq
+        value:
+          from: parameter
+          name: anchor
+    include_connected:
+    - traversal: derived
+      include_potential: false
+      max_hops: 4
+      direction: outgoing
+    connections:
+      enabled: true
+      traversal: both
+    derived:
+    - name: impact-distance
+      traversal: derived
+      direction: outgoing
+      reduce: min
+      of: relationship.hops
+  presentation:
+    representation: exploration
+    styling_rules:
+    - capability: node_color
+      mode: scale
+      scale_attribute: derived.impact-distance
+      scale_min: 1
+      scale_max: 4
+      scale_tokens:
+      - heat-near
+      - heat-far
+  representation_types:
+  - archimate-layered
+
+- slug: process-technology-support
+  version: 1
+  name: Process Technology Support
+  description: A tool-specific capability, not part of the ArchiMate standard's example
+    viewpoints. Shows which technology-domain elements indirectly support a chosen
+    business process, skipping the intervening application layer so the focus stays on
+    infrastructure dependency.
+  purpose:
+  - deciding
+  content:
+  - coherence
+  stakeholders:
+  - enterprise-architects
+  - infrastructure-architects
+  concerns:
+  - what technology indirectly supports this process
+  query:
+    query_schema: 1
+    parameters:
+    - name: anchor
+      type: entity-id
+      required: true
+      description: The process whose technology support is analyzed
+    entity_criteria:
+      kind: group
+      conjunction: and
+      children:
+      - kind: condition
+        attribute: id
+        comparator: eq
+        value:
+          from: parameter
+          name: anchor
+    include_connected:
+    - traversal: derived
+      include_potential: true
+      max_hops: 4
+      direction: incoming
+      neighbor_criteria:
+        kind: group
+        conjunction: and
+        children:
+        - kind: condition
+          attribute: domain
+          comparator: eq
+          value: technology
+    connections:
+      enabled: true
+      traversal: both
+  presentation:
+    representation: diagram
+  representation_types:
+  - archimate-layered
