@@ -1015,6 +1015,13 @@ REST + Playwright, not against current components):
   badge and a "show chain" affordance (path ids from the summary); "materialize
   connection" pre-fills the creation flow (§5.6.4). Legends derive from style rules incl.
   scale gradients.
+- **Ad-hoc layered support view quality gate**: a user can select named processes and/or
+  services (by name or id) or describe them with criteria, then execute an unpersisted
+  `diagram` query that adds every indirectly connected technology entity while omitting
+  intermediate layers. The visible arrows use the derived relationship type's ordinary
+  ArchiMate notation and retain a derived/certainty marker. Selecting an arrow opens a
+  sidebar explanation with generated prose for its witness chain and clickable entity
+  names; the flow requires neither YAML/formula input nor saving a viewpoint.
 - **Derived-candidate review (§5.7)**: the generated-diagram flow presents derived
   connections as reviewable candidates — certain pre-accepted, potential pre-rejected —
   showing derived type, certainty, and witness chain at decision time; refresh staleness

@@ -740,7 +740,15 @@ component names are not.
   - Changes: derived-traversal toggle + potential checkbox + hop bound on the explore
     surface (wired to `/api/neighbors`); candidate accept/reject review per §5.7
     defaults; materialize pre-fill; witness-chain popover from `via_connection_ids`.
+    This also supports a non-persisted layered diagram: select named processes/services
+    or use criteria, include indirectly connected technology entities, and render only
+    those elements plus derived arrows.
   - Acceptance: derived edges dashed + certainty badge + witness-chain popover;
+    Playwright quality flow selects processes/services by name/id (and repeats using
+    criteria), chooses a layered diagram without saving, asserts that only the selected
+    elements plus indirectly connected technology elements render, and selects a derived
+    arrow to see generated witness-chain prose with every entity name as a clickable
+    sidebar link; no YAML or formula/text query input is required;
     per-occurrence accept/reject with certain pre-accepted / potential pre-rejected and
     type/certainty/witness chain visible at decision time; stale-path refresh findings
     actionable; "materialize connection" pre-fills type/endpoints/description;
