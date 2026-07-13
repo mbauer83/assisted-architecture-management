@@ -1,23 +1,19 @@
 <script setup lang="ts">
 import { computed, inject, onMounted, ref, watch } from 'vue'
 import { RouterLink } from 'vue-router'
-import { Effect, Exit } from 'effect'
 import { modelServiceKey } from '../keys'
 import type {
   ConnectionRecord,
   ConnectionList,
-  DiagramRefs,
   OntologyClassification,
-  OntologyPair,
   WriteHelp,
-  WriteResult,
   AuthoringGuidance,
 } from '../../domain'
 import type { RepoError } from '../../ports/ModelRepository'
-import EntitySearchInput from './EntitySearchInput.vue'
 import { useQuery } from '../composables/useQuery'
-import { useMutation } from '../composables/useMutation'
-import { specializationOptionsForConnectionType, specializationOptionLabel } from '../lib/specializationOptions'
+import ConnectionAssociationsPanel from './ConnectionAssociationsPanel.vue'
+import ConnectionAddForm from './ConnectionAddForm.vue'
+import ConnectionRemoveModal from './ConnectionRemoveModal.vue'
 
 const props = defineProps<{
   entityId: string
@@ -139,12 +135,9 @@ const titleLabel = computed(() => {
   return 'Symmetric'
 })
 
-// ── Association expand/edit ───────────────────────────────────────────────────
+// ── Association expand ───────────────────────────────────────────────────────
 
 const expandedAssoc = ref<Set<string>>(new Set())
-const assocAddTarget = ref<Record<string, { id: string; name: string } | null>>({})
-const assocBusy = ref<Record<string, boolean>>({})
-const assocError = ref<Record<string, string | null>>({})
 
 const toggleAssoc = (connId: string) => {
   const next = new Set(expandedAssoc.value)
@@ -153,185 +146,21 @@ const toggleAssoc = (connId: string) => {
   expandedAssoc.value = next
 }
 
-const onAssocTargetSelect = (connId: string, id: string, name: string) => {
-  assocAddTarget.value = { ...assocAddTarget.value, [connId]: { id, name } }
-}
-
-const addAssociation = (c: ConnectionRecord) => {
-  const picked = assocAddTarget.value[c.artifact_id]
-  if (!picked) return
-  assocBusy.value = { ...assocBusy.value, [c.artifact_id]: true }
-  assocError.value = { ...assocError.value, [c.artifact_id]: null }
-  Effect.runPromise(
-    svc.manageConnectionAssociations({
-      source_entity: c.source, connection_type: c.conn_type, target_entity: c.target,
-      add_entities: [picked.id], dry_run: false,
-    }),
-  ).then((r) => {
-    assocBusy.value = { ...assocBusy.value, [c.artifact_id]: false }
-    if (r.wrote) {
-      assocAddTarget.value = { ...assocAddTarget.value, [c.artifact_id]: null }
-      emit('refresh')
-    } else {
-      assocError.value = { ...assocError.value, [c.artifact_id]: r.content ?? 'Failed' }
-    }
-  }).catch((e) => {
-    assocBusy.value = { ...assocBusy.value, [c.artifact_id]: false }
-    assocError.value = { ...assocError.value, [c.artifact_id]: String(e) }
-  })
-}
-
-const removeAssociation = (c: ConnectionRecord, entityId: string) => {
-  assocBusy.value = { ...assocBusy.value, [c.artifact_id]: true }
-  Effect.runPromise(
-    svc.manageConnectionAssociations({
-      source_entity: c.source, connection_type: c.conn_type, target_entity: c.target,
-      remove_entities: [entityId], dry_run: false,
-    }),
-  ).then((r) => {
-    assocBusy.value = { ...assocBusy.value, [c.artifact_id]: false }
-    if (r.wrote) emit('refresh')
-  }).catch(() => {
-    assocBusy.value = { ...assocBusy.value, [c.artifact_id]: false }
-  })
-}
-
 // ── Add connection ─────────────────────────────────────────────────────────────
 
 const addingFor = ref<string | null>(null)
-const selectedTarget = ref<{ id: string; name: string } | null>(null)
-const connTypeSelected = ref('')
-const descInput = ref('')
-const srcMultInput = ref('')
-const tgtMultInput = ref('')
-const specSelected = ref('')
-
-const specOptions = computed(() =>
-  specializationOptionsForConnectionType(guidanceQuery.data.value, connTypeSelected.value),
-)
-
-watch(connTypeSelected, () => {
-  specSelected.value = ''
-})
-
-const MULTIPLICITY_RE = /^\d+$|^\d+\.\.\d+$|^\d+\.\.\*$|^\*$/
-const multError = (v: string) => v.trim() && !MULTIPLICITY_RE.test(v.trim()) ? 'Use: n, n..m, n..*, or *' : ''
-const srcMultError = computed(() => multError(srcMultInput.value))
-const tgtMultError = computed(() => multError(tgtMultInput.value))
-
-const pairQuery = useQuery<OntologyPair, RepoError>()
-const addMutation = useMutation<WriteResult, RepoError>()
-
-const connTypeOptions = computed((): string[] => {
-  const pair = pairQuery.data.value
-  if (!pair) return []
-  return props.direction === 'symmetric'
-    ? pair.connection_types.filter(ct => symmetricConnTypes.value.has(ct))
-    : [...pair.connection_types]
-})
-
-watch(() => pairQuery.data.value, (pair) => {
-  if (!pair) return
-  const types = connTypeOptions.value
-  if (types.length === 1) connTypeSelected.value = types[0]
-  else if (props.direction === 'symmetric') connTypeSelected.value = 'archimate-association'
-})
-
-const addError = computed(() =>
-  addMutation.result.value?.wrote === false
-    ? (addMutation.result.value.content ?? 'Verification failed')
-    : addMutation.errorMessage.value
-)
 
 const startAdd = (typeKey: string) => {
-  if (addingFor.value === typeKey) {
-    addingFor.value = null
-    pairQuery.reset()
-    return
-  }
-  addingFor.value = typeKey
-  selectedTarget.value = null
-  connTypeSelected.value = ''
-  descInput.value = ''
-  srcMultInput.value = ''
-  tgtMultInput.value = ''
-  specSelected.value = ''
-  addMutation.reset()
-  pairQuery.run(svc.getOntologyPair(props.entityType, typeKey))
+  addingFor.value = addingFor.value === typeKey ? null : typeKey
 }
-
-const cancelAdd = () => {
+const onAdded = () => {
   addingFor.value = null
-  selectedTarget.value = null
-  pairQuery.reset()
-}
-
-const onSelectTarget = (id: string, name: string) => {
-  selectedTarget.value = { id, name }
-}
-
-const confirmAdd = () => {
-  if (!selectedTarget.value || !connTypeSelected.value) return
-  const isIncoming = props.direction === 'incoming'
-  const source = isIncoming ? selectedTarget.value.id : props.entityId
-  const target = isIncoming ? props.entityId : selectedTarget.value.id
-  const addFn = props.adminMode ? svc.adminAddConnection : svc.addConnection
-  void addMutation.run(addFn({
-    source_entity: source,
-    connection_type: connTypeSelected.value,
-    target_entity: target,
-    description: descInput.value.trim() || undefined,
-    src_multiplicity: srcMultInput.value.trim() || undefined,
-    tgt_multiplicity: tgtMultInput.value.trim() || undefined,
-    specialization: specSelected.value || undefined,
-    dry_run: false,
-  })).then((exit) => Exit.match(exit, {
-    onSuccess: (r) => {
-      if (r.wrote) { addingFor.value = null; selectedTarget.value = null; emit('refresh') }
-    },
-    onFailure: () => {},
-  }))
+  emit('refresh')
 }
 
 // ── Remove connection ──────────────────────────────────────────────────────────
 
-const removingConn = ref<ConnectionRecord | null>(null)
-const diagramRefsQuery = useQuery<DiagramRefs, RepoError>()
-const removeMutation = useMutation<WriteResult, RepoError>()
-
-const removeError = computed(() =>
-  removeMutation.result.value?.wrote === false
-    ? (removeMutation.result.value.content ?? 'Verification failed')
-    : removeMutation.errorMessage.value
-)
-
-const startRemove = (c: ConnectionRecord) => {
-  removingConn.value = c
-  removeMutation.reset()
-  diagramRefsQuery.run(svc.getDiagramRefs(c.source, c.target))
-}
-
-const cancelRemove = () => {
-  removingConn.value = null
-  diagramRefsQuery.reset()
-}
-
-const confirmRemove = () => {
-  if (!removingConn.value) return
-  const c = removingConn.value
-  const removeFn = props.adminMode ? svc.adminRemoveConnection : svc.removeConnection
-  void removeMutation.run(removeFn({
-    source_entity: c.source,
-    connection_type: c.conn_type,
-    target_entity: c.target,
-    dry_run: false,
-  })).then((exit) => Exit.match(exit, {
-    onSuccess: (r) => {
-      if (r.wrote) { removingConn.value = null; emit('refresh') }
-    },
-    onFailure: () => {},
-  }))
-}
+const removeModal = ref<InstanceType<typeof ConnectionRemoveModal> | null>(null)
 </script>
 
 <template>
@@ -421,183 +250,32 @@ const confirmRemove = () => {
                   v-if="!readonly"
                   class="icon-btn remove-btn"
                   title="Remove connection"
-                  @click="startRemove(c)"
+                  @click="removeModal?.requestRemove(c)"
                 >
                   ×
                 </button>
               </div>
 
-              <!-- Second-order associations panel -->
-              <div
+              <ConnectionAssociationsPanel
                 v-if="!readonly && expandedAssoc.has(c.artifact_id)"
-                class="assoc-panel"
-              >
-                <div class="assoc-chips">
-                  <span
-                    v-for="eid in (c.associated_entities ?? [])"
-                    :key="eid"
-                    class="assoc-chip"
-                  >
-                    <RouterLink
-                      :to="{ path: '/entity', query: { id: eid } }"
-                      class="assoc-chip-link"
-                    >{{ friendlyName(eid) }}</RouterLink>
-                    <button
-                      class="assoc-chip-remove"
-                      :disabled="assocBusy[c.artifact_id]"
-                      @click="removeAssociation(c, eid)"
-                    >×</button>
-                  </span>
-                  <span
-                    v-if="!(c.associated_entities?.length)"
-                    class="assoc-empty"
-                  >No associations</span>
-                </div>
-                <div class="assoc-add-row">
-                  <EntitySearchInput
-                    placeholder="Associate entity..."
-                    @select="(id, name) => onAssocTargetSelect(c.artifact_id, id, name)"
-                  />
-                  <button
-                    class="assoc-add-btn"
-                    :disabled="!assocAddTarget[c.artifact_id] || assocBusy[c.artifact_id]"
-                    @click="addAssociation(c)"
-                  >
-                    +
-                  </button>
-                </div>
-                <div
-                  v-if="assocError[c.artifact_id]"
-                  class="state-msg state-msg--error"
-                >
-                  {{ assocError[c.artifact_id] }}
-                </div>
-              </div>
+                :connection="c"
+                @refresh="emit('refresh')"
+              />
             </li>
           </ul>
 
-          <!-- Add form for this type group -->
-          <div
+          <ConnectionAddForm
             v-if="addingFor === typeKey"
-            class="add-form"
-          >
-            <div
-              v-if="connTypeOptions.length"
-              class="add-row"
-            >
-              <select
-                v-model="connTypeSelected"
-                class="conn-type-select"
-              >
-                <option
-                  value=""
-                  disabled
-                >
-                  Select connection type...
-                </option>
-                <option
-                  v-for="ct in connTypeOptions"
-                  :key="ct"
-                  :value="ct"
-                >
-                  {{ ct.replace('archimate-', '') }}
-                </option>
-              </select>
-            </div>
-            <div
-              v-else
-              class="state-msg"
-            >
-              Loading connection types...
-            </div>
-            <div
-              v-if="specOptions.length"
-              class="add-row"
-            >
-              <select
-                v-model="specSelected"
-                class="conn-type-select"
-              >
-                <option value="">
-                  No specialization
-                </option>
-                <option
-                  v-for="spec in specOptions"
-                  :key="spec.slug"
-                  :value="spec.slug"
-                >
-                  {{ specializationOptionLabel(spec) }}
-                </option>
-              </select>
-            </div>
-            <div class="add-row">
-              <EntitySearchInput
-                :artifact-type="typeKey"
-                placeholder="Search target entity..."
-                @select="onSelectTarget"
-              />
-            </div>
-            <div
-              v-if="selectedTarget"
-              class="selected-target"
-            >
-              Selected: <strong>{{ selectedTarget.name }}</strong>
-            </div>
-            <div class="add-row">
-              <input
-                v-model="descInput"
-                class="desc-input"
-                placeholder="Description (optional)"
-              >
-            </div>
-            <div class="add-row add-row--mult">
-              <label class="mult-label">source</label>
-              <input
-                v-model="srcMultInput"
-                class="mult-input"
-                :class="{ 'mult-input--error': srcMultError }"
-                placeholder="e.g. 1..*"
-                maxlength="20"
-              >
-              <span class="mult-sep">→</span>
-              <label class="mult-label">target</label>
-              <input
-                v-model="tgtMultInput"
-                class="mult-input"
-                :class="{ 'mult-input--error': tgtMultError }"
-                placeholder="e.g. 0..*"
-                maxlength="20"
-              >
-              <span class="mult-hint">multiplicity range, e.g. 1, 0..1, 1..*, * (optional)</span>
-            </div>
-            <div
-              v-if="srcMultError || tgtMultError"
-              class="state-msg state-msg--error"
-            >
-              {{ srcMultError || tgtMultError }}
-            </div>
-            <div class="add-actions">
-              <button
-                class="cancel-btn"
-                @click="cancelAdd"
-              >
-                Cancel
-              </button>
-              <button
-                class="add-confirm-btn"
-                :disabled="!selectedTarget || !connTypeSelected || !!srcMultError || !!tgtMultError || addMutation.running.value"
-                @click="confirmAdd"
-              >
-                Add
-              </button>
-            </div>
-            <div
-              v-if="addError"
-              class="state-msg state-msg--error"
-            >
-              {{ addError }}
-            </div>
-          </div>
+            :entity-id="entityId"
+            :entity-type="entityType"
+            :type-key="typeKey"
+            :direction="direction"
+            :admin-mode="adminMode"
+            :symmetric-conn-types="symmetricConnTypes"
+            :guidance="guidanceQuery.data.value"
+            @added="onAdded"
+            @cancel="addingFor = null"
+          />
         </div>
       </template>
 
@@ -610,65 +288,11 @@ const confirmRemove = () => {
       </div>
     </template>
 
-    <!-- Remove confirmation dialog -->
-    <div
-      v-if="removingConn"
-      class="modal-overlay"
-      @click.self="cancelRemove"
-    >
-      <div class="modal">
-        <h3 class="modal-title">
-          Remove connection?
-        </h3>
-        <p class="modal-desc">
-          <strong>{{ removingConn.conn_type.replace('archimate-', '') }}</strong>
-          {{ removingConn.source }} → {{ removingConn.target }}
-        </p>
-        <div
-          v-if="diagramRefsQuery.loading.value"
-          class="state-msg"
-        >
-          Checking diagram references...
-        </div>
-        <template v-else-if="(diagramRefsQuery.data.value ?? []).length">
-          <p class="modal-warn">
-            This connection is referenced in {{ (diagramRefsQuery.data.value ?? []).length }} diagram(s):
-          </p>
-          <ul class="diagram-ref-list">
-            <li
-              v-for="d in (diagramRefsQuery.data.value ?? [])"
-              :key="d.artifact_id"
-            >
-              {{ d.name }}
-            </li>
-          </ul>
-          <p class="modal-warn">
-            Those diagram references will become dangling.
-          </p>
-        </template>
-        <div
-          v-if="removeError"
-          class="state-msg state-msg--error"
-        >
-          {{ removeError }}
-        </div>
-        <div class="modal-actions">
-          <button
-            class="modal-btn modal-btn--cancel"
-            @click="cancelRemove"
-          >
-            Cancel
-          </button>
-          <button
-            class="modal-btn modal-btn--danger"
-            :disabled="removeMutation.running.value || diagramRefsQuery.loading.value"
-            @click="confirmRemove"
-          >
-            Remove
-          </button>
-        </div>
-      </div>
-    </div>
+    <ConnectionRemoveModal
+      ref="removeModal"
+      :admin-mode="adminMode"
+      @removed="emit('refresh')"
+    />
   </div>
 </template>
 
@@ -734,92 +358,4 @@ const confirmRemove = () => {
 }
 .assoc-btn:hover { background: #eff6ff; }
 .assoc-btn--active { background: #eff6ff; }
-
-/* Association panel */
-.assoc-panel {
-  margin-left: 12px; padding: 6px 10px; background: #f0f9ff;
-  border-radius: 6px; border: 1px solid #bae6fd; font-size: 12px;
-}
-.assoc-chips { display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 6px; align-items: center; }
-.assoc-chip {
-  display: inline-flex; align-items: center; gap: 2px;
-  background: #dbeafe; border: 1px solid #93c5fd; border-radius: 12px;
-  padding: 1px 6px; font-size: 11px;
-}
-.assoc-chip-link { color: #1d4ed8; text-decoration: none; }
-.assoc-chip-link:hover { text-decoration: underline; }
-.assoc-chip-remove {
-  background: none; border: none; color: #64748b; cursor: pointer;
-  padding: 0 1px; font-size: 12px; line-height: 1;
-}
-.assoc-chip-remove:hover { color: #dc2626; }
-.assoc-empty { color: #94a3b8; font-style: italic; }
-.assoc-add-row { display: flex; gap: 4px; align-items: center; }
-.assoc-add-btn {
-  padding: 4px 8px; background: #2563eb; color: white; border: none;
-  border-radius: 4px; font-size: 12px; cursor: pointer; flex-shrink: 0;
-}
-.assoc-add-btn:disabled { opacity: 0.5; cursor: not-allowed; }
-.assoc-add-btn:hover:not(:disabled) { background: #1d4ed8; }
-
-/* Multiplicity row in add form */
-.add-row--mult { align-items: center; gap: 4px; }
-.mult-label { font-size: 11px; color: #6b7280; white-space: nowrap; }
-.mult-input {
-  width: 52px; padding: 4px 6px; border-radius: 4px; border: 1px solid #d1d5db;
-  font-size: 11px; font-family: monospace; outline: none;
-}
-.mult-input:focus { border-color: #2563eb; }
-.mult-sep { color: #9ca3af; font-size: 11px; margin: 0 2px; }
-.mult-hint { font-size: 10px; color: #9ca3af; margin-left: 4px; }
-
-.add-form { margin-top: 8px; padding: 10px; background: #f9fafb; border-radius: 6px; }
-.add-row { display: flex; gap: 6px; margin-bottom: 6px; align-items: center; }
-.conn-type-select {
-  flex: 1; padding: 6px 10px; border-radius: 6px; border: 1px solid #d1d5db;
-  font-size: 12px; outline: none; background: white;
-}
-.conn-type-select:focus { border-color: #2563eb; }
-.desc-input {
-  flex: 1; padding: 6px 10px; border-radius: 6px; border: 1px solid #d1d5db;
-  font-size: 12px; outline: none;
-}
-.desc-input:focus { border-color: #2563eb; }
-.add-actions { display: flex; gap: 6px; justify-content: flex-end; margin-top: 4px; }
-.add-confirm-btn {
-  padding: 6px 14px; background: #2563eb; color: white; border: none;
-  border-radius: 6px; font-size: 13px; font-weight: 500; cursor: pointer; white-space: nowrap;
-}
-.add-confirm-btn:disabled { opacity: 0.5; cursor: not-allowed; }
-.add-confirm-btn:hover:not(:disabled) { background: #1d4ed8; }
-.cancel-btn {
-  padding: 6px 14px; background: #f3f4f6; color: #374151; border: 1px solid #d1d5db;
-  border-radius: 6px; font-size: 13px; cursor: pointer;
-}
-.cancel-btn:hover { background: #e5e7eb; }
-.selected-target { font-size: 12px; color: #374151; margin-bottom: 4px; }
-
-/* Remove modal */
-.modal-overlay {
-  position: fixed; inset: 0; background: rgba(0,0,0,.4); z-index: 100;
-  display: flex; align-items: center; justify-content: center;
-}
-.modal {
-  background: white; border-radius: 10px; padding: 24px; max-width: 480px;
-  width: 90%; box-shadow: 0 8px 24px rgba(0,0,0,.2);
-}
-.modal-title { font-size: 16px; font-weight: 600; margin-bottom: 8px; }
-.modal-desc { font-size: 13px; color: #374151; margin-bottom: 12px; word-break: break-all; }
-.modal-warn { font-size: 13px; color: #b45309; margin-bottom: 8px; }
-.diagram-ref-list { list-style: disc; padding-left: 20px; font-size: 13px; margin-bottom: 12px; }
-.modal-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 16px; }
-.modal-btn {
-  padding: 8px 16px; border-radius: 6px; font-size: 13px; font-weight: 500;
-  cursor: pointer; border: none;
-}
-.modal-btn--cancel { background: #f3f4f6; color: #374151; }
-.modal-btn--cancel:hover { background: #e5e7eb; }
-.modal-btn--danger { background: #dc2626; color: white; }
-.modal-btn--danger:hover:not(:disabled) { background: #b91c1c; }
-.modal-btn--danger:disabled { opacity: 0.5; cursor: not-allowed; }
 </style>
