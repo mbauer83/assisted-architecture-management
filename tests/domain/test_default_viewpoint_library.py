@@ -7,6 +7,10 @@ lives in ``test_default_viewpoint_library_common_types.py``.
 
 from __future__ import annotations
 
+import shutil
+import tempfile
+from pathlib import Path
+
 from src.application.viewpoints.evaluate_viewpoint import ViewpointExecutionRequest, evaluate_viewpoint
 from src.application.viewpoints.registry_snapshot import build_registry_snapshot
 from src.domain.viewpoint_validation import validate_viewpoint_definition
@@ -15,7 +19,22 @@ from tests.application.viewpoints._fixtures import Store, entity
 from tests.fixtures.viewpoints.standard_viewpoint_tables import STANDARD_VIEWPOINT_TABLES
 
 _CATALOGS = build_runtime_catalogs(get_module_registry())
-_REGISTRIES = build_registry_snapshot(_CATALOGS, [])
+_FIXTURE_SCHEMATA = Path(__file__).parents[1] / "fixtures" / "viewpoints" / "schemata"
+
+
+def _repo_root_with_fixture_profiles() -> Path:
+    """A throwaway repo root with every fixture profile installed (e.g.
+    `investment_level` on capability/resource, for the heat-map style rules) — never
+    cleaned up, since the process exits once tests finish."""
+    root = Path(tempfile.mkdtemp())
+    schemata_dir = root / ".arch-repo" / "schemata"
+    schemata_dir.mkdir(parents=True)
+    for source in _FIXTURE_SCHEMATA.glob("*.schema.json"):
+        shutil.copy(source, schemata_dir / source.name)
+    return root
+
+
+_REGISTRIES = build_registry_snapshot(_CATALOGS, [_repo_root_with_fixture_profiles()])
 _KNOWN_SLUGS = {table.slug for table in STANDARD_VIEWPOINT_TABLES}
 
 # One entity per ArchiMate type referenced anywhere in the library, unspecialized, domain

@@ -192,10 +192,19 @@ def _scale_value(
     item: Item,
     context: CriteriaContext,
     *,
+    registries: RegistrySnapshot,
     environment: EvaluationEnvironment,
     bounds: Mapping[int, ScaleBounds],
 ) -> ScaleStyleValue | None:
     if rule.scale_attribute is None or len(rule.scale_tokens) != 2 or index not in bounds:
+        return None
+    # Same schema-drift contract as every other comparator/style path: an attribute path
+    # the registries don't know (and isn't a derived. path, which bypasses schema lookup
+    # by design) is treated as absent, not read straight off raw extra data.
+    if (
+        not rule.scale_attribute.startswith("derived.")
+        and resolve_attribute_path(rule.scale_attribute, context=context, registries=registries) is None
+    ):
         return None
     value, present = read_attribute_value(item, rule.scale_attribute, context=context, environment=environment)
     numeric = _number(value) if present else None
@@ -246,7 +255,9 @@ def evaluate_item_style(
                 resolved[rule.capability] = token
                 decided.add(rule.capability)
         else:
-            value = _scale_value(rule, index, item, context, environment=environment, bounds=scale_bounds)
+            value = _scale_value(
+                rule, index, item, context, registries=registries, environment=environment, bounds=scale_bounds
+            )
             if value is not None:
                 resolved[rule.capability] = value
                 decided.add(rule.capability)

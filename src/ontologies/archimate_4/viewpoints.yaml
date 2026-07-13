@@ -1010,10 +1010,12 @@ viewpoints:
   representation_types:
   - archimate-strategy
 - slug: capability-map
-  version: 1
+  version: 2
   name: Capability Map
   description: Capability Map (Table C-20, strategy). Starting point for modeling, not a normative or
-    exhaustive list.
+    exhaustive list. Per C.3.2, "can be used as a heat map to identify areas of investment" —
+    ships a heat-map style rule on a repo-defined `investment_level` profile attribute
+    (1 low to 5 high); absent the attribute, capabilities render in the default style.
   purpose:
   - designing
   - deciding
@@ -1052,6 +1054,15 @@ viewpoints:
         - resource
   presentation:
     representation: exploration
+    styling_rules:
+    - capability: node_color
+      mode: scale
+      scale_attribute: investment_level
+      scale_min: 1
+      scale_max: 5
+      scale_tokens:
+      - heat-low
+      - heat-high
   representation_types:
   - archimate-strategy
 - slug: value-stream
@@ -1139,10 +1150,12 @@ viewpoints:
   representation_types:
   - archimate-strategy
 - slug: resource-map
-  version: 1
+  version: 2
   name: Resource Map
   description: Resource Map (Table C-23, strategy). Starting point for modeling, not a normative or exhaustive
-    list.
+    list. Per C.3.5, "can be used as a heat map to identify areas of investment" — ships
+    a heat-map style rule on a repo-defined `investment_level` profile attribute (1 low
+    to 5 high); absent the attribute, resources render in the default style.
   purpose:
   - designing
   - deciding
@@ -1181,6 +1194,15 @@ viewpoints:
         - work-package
   presentation:
     representation: exploration
+    styling_rules:
+    - capability: node_color
+      mode: scale
+      scale_attribute: investment_level
+      scale_min: 1
+      scale_max: 5
+      scale_tokens:
+      - heat-low
+      - heat-high
   representation_types:
   - archimate-strategy
 - slug: project
