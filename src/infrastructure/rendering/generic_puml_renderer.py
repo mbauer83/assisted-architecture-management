@@ -69,6 +69,7 @@ class GenericPumlRenderer:
         diagram_entities: Mapping[str, object] | None = None,
         diagram_connections: list[dict[str, object]] | None = None,
         edge_labels: dict[str, str] | None = None,
+        label_attribute: str | None = None,
     ) -> str:
         del repo_root
         diagram_name = re.sub(r"[^a-zA-Z0-9_-]", "-", name.lower()).strip("-") or "diagram"
@@ -134,9 +135,9 @@ class GenericPumlRenderer:
             children = children_map.get(alias, [])
             decl_args = (entity, alias, _registry(), self._junction_types(), specialization_catalog)
             if not children:
-                return [f"{indent}{entity_declaration(*decl_args)}"]
+                return [f"{indent}{entity_declaration(*decl_args, label_attribute=label_attribute)}"]
             inner = indent + "  "
-            rendered = [f"{indent}{entity_nest_declaration(*decl_args)}"]
+            rendered = [f"{indent}{entity_nest_declaration(*decl_args, label_attribute=label_attribute)}"]
             for child in children:
                 rendered.extend(render_entity(child, inner))
             child_als = [normalize_puml_alias(child.display_alias) for child in children if child.display_alias]

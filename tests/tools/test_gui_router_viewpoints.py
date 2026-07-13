@@ -335,6 +335,7 @@ class TestExecuteDiagram:
             *,
             diagram_type: str,
             repo_root: Path,
+            label_attribute: str | None = None,
         ) -> str:
             captured["connections"] = connections
             return "@startuml\n@enduml\n"
@@ -348,3 +349,54 @@ class TestExecuteDiagram:
         assert resp.status_code == 200
         connection_ids = {c.artifact_id for c in captured["connections"]}
         assert derived_id in connection_ids
+
+    def test_slug_definitions_label_attribute_reaches_the_renderer(self, populated_root: Path, monkeypatch) -> None:
+        """A definition's saved ``display_options.label_attribute`` must reach the
+        renderer when executing by slug — an ad-hoc query has no saved presentation."""
+        from starlette.testclient import TestClient
+
+        from src.infrastructure.app_bootstrap import build_runtime_catalogs, get_module_registry
+
+        repo = ArtifactRepository(shared_artifact_index([populated_root]))
+        gui_state.init_state(repo, populated_root, None)
+        catalogs = build_runtime_catalogs(get_module_registry())
+        definition = ViewpointDefinition(
+            slug="labelled", version=1, name="Labelled", query=ExecutableViewpointQuery(),
+            presentation=PresentationSpec(representation="diagram", display_options={"label_attribute": "owner"}),
+        )
+        catalogs = dataclasses.replace(catalogs, viewpoints=ViewpointCatalog(entries=(definition,)))
+        app = FastAPI()
+        from src.infrastructure.app_bootstrap import runtime_catalogs_dependency
+
+        app.dependency_overrides[runtime_catalogs_dependency] = lambda: catalogs
+        app.include_router(viewpoints_router)
+        labelled_client = TestClient(app)
+
+        captured: dict[str, object] = {}
+        import src.infrastructure.rendering.diagram_builder as diagram_builder_mod
+
+        def _capture(*args: object, **kwargs: object) -> str:
+            captured["label_attribute"] = kwargs.get("label_attribute")
+            return "@startuml\n@enduml\n"
+
+        monkeypatch.setattr(diagram_builder_mod, "generate_archimate_puml_body", _capture)
+        monkeypatch.setattr(diagram_builder_mod, "render_puml_svg", lambda *a, **kw: ("<svg/>", []))
+
+        resp = labelled_client.post("/api/viewpoints/execute-diagram", json={"slug": "labelled"})
+        assert resp.status_code == 200
+        assert captured["label_attribute"] == "owner"
+
+    def test_ad_hoc_query_has_no_label_attribute(self, client, monkeypatch) -> None:
+        captured: dict[str, object] = {}
+        import src.infrastructure.rendering.diagram_builder as diagram_builder_mod
+
+        def _capture(*args: object, **kwargs: object) -> str:
+            captured["label_attribute"] = kwargs.get("label_attribute")
+            return "@startuml\n@enduml\n"
+
+        monkeypatch.setattr(diagram_builder_mod, "generate_archimate_puml_body", _capture)
+        monkeypatch.setattr(diagram_builder_mod, "render_puml_svg", lambda *a, **kw: ("<svg/>", []))
+
+        resp = client.post("/api/viewpoints/execute-diagram", json={"query": {}})
+        assert resp.status_code == 200
+        assert captured["label_attribute"] is None

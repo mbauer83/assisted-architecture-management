@@ -10,6 +10,7 @@ from src.domain.artifact_types import EntityRecord
 from src.domain.module_types import EntityTypeName
 from src.domain.ontology_types import EntityTypeInfo
 from src.domain.specializations import SpecializationCatalog, SpecializationInfo
+from src.domain.viewpoint_condition_evaluation import read_attribute_value
 from src.infrastructure.rendering._archimate_includes import parse_archimate_display_block
 from src.infrastructure.rendering._diagram_text import pluralize_label
 from src.infrastructure.rendering.generic_puml_layout import ordered_type_groups
@@ -56,10 +57,14 @@ def entity_declaration(
     registry: Any,
     junction_types: frozenset[str],
     specialization_catalog: SpecializationCatalog = SpecializationCatalog.empty(),
+    *,
+    label_attribute: str | None = None,
 ) -> str:
     if entity.artifact_type in junction_types:
         return f'circle " " as {alias}'
-    label, stereotype, spec = entity_label_and_stereotype(entity, registry, specialization_catalog)
+    label, stereotype, spec = entity_label_and_stereotype(
+        entity, registry, specialization_catalog, label_attribute=label_attribute
+    )
     icon_key, color_suffix, show_icon = _specialization_notation(stereotype, spec, entity_has_sprite(entity, registry))
     if show_icon and icon_key:
         return f'rectangle "<$archimate_{icon_key}{{scale=1.5}}> {label}" <<{stereotype}>> as {alias}{color_suffix}'
@@ -74,10 +79,14 @@ def entity_nest_declaration(
     registry: Any,
     junction_types: frozenset[str],
     specialization_catalog: SpecializationCatalog = SpecializationCatalog.empty(),
+    *,
+    label_attribute: str | None = None,
 ) -> str:
     if entity.artifact_type in junction_types:
         return f'circle " " as {alias}'
-    label, stereotype, spec = entity_label_and_stereotype(entity, registry, specialization_catalog)
+    label, stereotype, spec = entity_label_and_stereotype(
+        entity, registry, specialization_catalog, label_attribute=label_attribute
+    )
     icon_key, color_suffix, show_icon = _specialization_notation(stereotype, spec, entity_has_sprite(entity, registry))
     if show_icon and icon_key:
         return (
@@ -120,6 +129,8 @@ def entity_label_and_stereotype(
     entity: EntityRecord,
     registry: Any,
     specialization_catalog: SpecializationCatalog = SpecializationCatalog.empty(),
+    *,
+    label_attribute: str | None = None,
 ) -> tuple[str, str | None, SpecializationInfo | None]:
     section_id = display_section_id(entity, registry)
     raw_block = entity.display_blocks.get(section_id, "")
@@ -132,6 +143,11 @@ def entity_label_and_stereotype(
         spec = specialization_catalog.get("entity", entity.artifact_type, entity.specialization)
     if spec is not None:
         label = f"{label} {format_specialization_guillemet(spec.name)}"
+    if label_attribute:
+        value, present = read_attribute_value(entity, label_attribute, context="entity")
+        if present and value is not None:
+            value_text = str(value).replace('"', "'")
+            label = f"{label}\\n{value_text}"
     return label, stereotype, spec
 
 

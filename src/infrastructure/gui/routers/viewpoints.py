@@ -43,6 +43,18 @@ def _execution_error(code: str, message: str, *, path: str = "query") -> HTTPExc
     return HTTPException(400, {"code": code, "path": path, "message": message})
 
 
+def _definition_label_attribute(slug: str | None, catalogs: RuntimeCatalogs) -> str | None:
+    """The saved definition's ``label_attribute`` display option, when executing by slug —
+    an ad-hoc query has no persisted presentation to read one from."""
+    if slug is None:
+        return None
+    definition = catalogs.viewpoints.get(slug)
+    if definition is None or definition.presentation is None:
+        return None
+    value = definition.presentation.display_options.get("label_attribute")
+    return value if isinstance(value, str) and value else None
+
+
 @router.post("/api/viewpoints/execute")
 def execute_viewpoint(
     slug: Annotated[str | None, Body()] = None,
@@ -171,6 +183,7 @@ def execute_viewpoint_diagram(
         [*connections, *derived_records],
         diagram_type=_AD_HOC_DIAGRAM_TYPE,
         repo_root=repo_root,
+        label_attribute=_definition_label_attribute(slug, catalogs),
     )
     svg, render_warnings = render_puml_svg(puml, repo_root, _AD_HOC_DIAGRAM_TYPE)
     return {"svg": svg, "warnings": [*result.warnings, *render_warnings]}

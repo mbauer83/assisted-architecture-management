@@ -614,6 +614,36 @@ the binding layer, and G1 waits on neither derivation nor presentation work.
     stale path; rule-change staleness case pinned (fixture flips a connection type).
   - Deps: D2, B7, F4/F5 (any one).
 
+- [x] **WU-F7 — Wire `label_attribute` into actual rendering**
+  - Files: `src/infrastructure/rendering/archimate_entity_declarations.py`,
+    `generic_puml_renderer.py`, `diagram_builder.py`,
+    `src/infrastructure/gui/routers/viewpoints.py`; tests:
+    `tests/rendering/test_generic_puml_renderer.py`, `tests/tools/test_gui_router_viewpoints.py`
+    (extend).
+  - Changes: WU-F2 validated `display_options.label_attribute` as an accepted display
+    option but never consumed it anywhere — an entity never actually showed the
+    attribute value, only the styling side of "control display by attribute value"
+    (`StyleRule`) was wired. `entity_declaration`/`entity_nest_declaration`/
+    `entity_label_and_stereotype` gain an optional `label_attribute` parameter, reusing
+    the shared domain `read_attribute_value` reader (never re-deriving attribute-path
+    resolution); the value, when present, appends as a second PUML label line
+    (`Label\nvalue`). Threaded through `render_body` → `generate_archimate_puml_body` →
+    the ad-hoc `execute-diagram` REST endpoint, which reads the option off the resolved
+    definition's `presentation.display_options` when executing by slug (an ad-hoc query
+    has no saved presentation to read one from, so it never shows one).
+  - Acceptance: entity renders with the attribute value as a second label line when
+    present on the entity; silent no-op (never a crash) when the attribute is absent or
+    no `label_attribute` is configured; slug-executed diagrams pick up the definition's
+    saved option; ad-hoc queries never do.
+  - Known follow-ups (explicitly out of this WU's scope, not silently dropped):
+    `derived.*` label attributes validate (WU-F2) but do not yet render — no derived
+    per-candidate value data reaches the renderer at all, which would need an
+    `EvaluationEnvironment`-shaped structure threaded through to render time; persisted
+    (non-ad-hoc) diagrams do not read `label_attribute` yet, since — per WU-F6 — no
+    "regenerate a persisted diagram from its viewpoint definition" pipeline exists in the
+    codebase at all; only a single attribute is supported, never a multi-attribute list.
+  - Deps: none (extends WU-F2's validated-but-unwired option).
+
 ## Phase G — Default viewpoint library
 
 - [x] **WU-G1 — Appendix-C library uplift**
@@ -944,3 +974,4 @@ Anything short of this is "in progress", regardless of how many WUs are ticked.
 - 2026-07-13 — WU-F5 — Reused the same composition-root-closure resolution as WU-F4 for the ontology `ModuleCatalog` (roots-independent, but still infra-built); reachable entities also pull in every witness-chain hop (not just each derived relationship's own endpoints) so included connections always satisfy the structural invariant.
 - 2026-07-13 — WU-F6 — User-approved data-model extension (`DerivationSelection.path_provenance`) closed the certainty/type-drift gap; refresh now reconstructs every accepted path for real. Both render contexts (ad-hoc diagram, and a resolve-accepted-paths function proven against the real renderer) draw derived connections dashed/dotted with certainty distinguished — the "regenerate and persist a diagram from a strategy" orchestration itself doesn't exist anywhere in the codebase yet (confirmed by investigation, not introduced or removed here), so the resolver is built and tested standalone pending that wiring.
 - 2026-07-13 — WU-G1 — 25 definitions transcribed (4 uplifted to v2, 21 new); no viewpoint needed the specialization-narrowing fallback since no spec table actually said "Business Process" unqualified. Fixed a genuine pre-existing regression in `test_scope_fallback.py`, which hardcoded the shipped catalog's now-obsolete scope-only shape; replaced with synthetic fixtures preserving the same D9 coverage.
+- 2026-07-13 — WU-F7 — User flagged that "showing attribute values with entities" (as distinct from styling by attribute value, already wired) had no renderer consumer despite WU-F2 validating it; added and closed same-session. `derived.*` label attributes and persisted-diagram rendering remain explicit, undropped follow-ups (both blocked on data/pipelines that don't exist yet, not on this WU).

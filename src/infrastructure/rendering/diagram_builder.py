@@ -227,11 +227,14 @@ def generate_archimate_puml_body(
     diagram_entities: dict[str, object] | None = None,
     diagram_connections: list[dict[str, object]] | None = None,
     edge_labels: dict[str, str] | None = None,
+    label_attribute: str | None = None,
 ) -> str:
     diagram_type_mod = get_diagram_type(diagram_type)
     extra: dict[str, object] = {}
     if edge_labels:
         extra["edge_labels"] = edge_labels
+    if label_attribute:
+        extra["label_attribute"] = label_attribute
     return diagram_type_mod.renderer.render_body(
         name,
         entity_records,

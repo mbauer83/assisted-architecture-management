@@ -24,6 +24,7 @@ def _entity(
     *,
     domain: str = "motivation",
     subdomain: str = "goals",
+    extra: dict[str, object] | None = None,
 ) -> EntityRecord:
     display_blocks = {"archimate": f'```yaml\nlabel: "{name}"\nalias: {alias}\n```'}
     return EntityRecord(
@@ -36,7 +37,7 @@ def _entity(
         subdomain=subdomain,
         path=Path(f"/tmp/{artifact_id}.md"),
         keywords=(),
-        extra={},
+        extra=extra or {},
         content_text="",
         display_blocks=display_blocks,
         display_label=name,
@@ -479,6 +480,37 @@ def test_modeled_connection_unaffected_by_derived_marker_logic(tmp_path: Path) -
 
     conn_lines = [ln for ln in puml.splitlines() if "GOL_A" in ln and "OUT_A" in ln]
     assert all("[dashed]" not in ln and "[dotted]" not in ln for ln in conn_lines)
+
+
+def test_label_attribute_shows_the_attribute_value_under_the_entity_label(tmp_path: Path) -> None:
+    renderer = GenericPumlRenderer(_ARCHIMATE_CONFIG)
+    entity = _entity("GOL@1.a.goal", "goal", "Goal A", "GOL_A", extra={"risk_score": 5})
+
+    puml = renderer.render_body("Test", [entity], [], "archimate-motivation", tmp_path, label_attribute="risk_score")
+
+    entity_lines = [ln for ln in puml.splitlines() if "GOL_A" in ln]
+    assert any('Goal A\\n5"' in ln for ln in entity_lines)
+
+
+def test_label_attribute_omitted_by_default(tmp_path: Path) -> None:
+    renderer = GenericPumlRenderer(_ARCHIMATE_CONFIG)
+    entity = _entity("GOL@1.a.goal", "goal", "Goal A", "GOL_A", extra={"risk_score": 5})
+
+    puml = renderer.render_body("Test", [entity], [], "archimate-motivation", tmp_path)
+
+    entity_lines = [ln for ln in puml.splitlines() if "GOL_A" in ln]
+    assert all("risk_score" not in ln and "\\n5" not in ln for ln in entity_lines)
+
+
+def test_label_attribute_missing_on_entity_is_a_silent_no_op(tmp_path: Path) -> None:
+    renderer = GenericPumlRenderer(_ARCHIMATE_CONFIG)
+    entity = _entity("GOL@1.a.goal", "goal", "Goal A", "GOL_A", extra={})
+
+    puml = renderer.render_body("Test", [entity], [], "archimate-motivation", tmp_path, label_attribute="risk_score")
+
+    entity_lines = [ln for ln in puml.splitlines() if "GOL_A" in ln]
+    assert any("Goal A" in ln for ln in entity_lines)
+    assert all("\\n" not in ln for ln in entity_lines)
 
 
 def test_inject_includes_inlines_only_needed_stereotypes_and_sprites(tmp_path: Path) -> None:
