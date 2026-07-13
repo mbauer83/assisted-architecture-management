@@ -1,10 +1,10 @@
-"""Builds a ``RegistrySnapshot`` (companion plan §3.4/§7.2) from the real runtime catalogs
+"""Builds a ``RegistrySnapshot`` from the real runtime catalogs
 and a repository's ``.arch-repo/schemata/`` files — the wiring the pure criteria evaluator
 needs to tell a known attribute path from schema drift, and to normalize incident-condition
-direction against symmetric connection types (§3.4).
+direction against symmetric connection types.
 
-Attribute declarations are D13-scoped per (entity type, specialization) but the evaluator's
-attribute-path namespace is deliberately flat (companion plan §3.3: "one namespace, used
+Attribute declarations are scoped per (entity type, specialization) but the evaluator's
+attribute-path namespace is deliberately flat (one namespace, used
 everywhere a path appears") — so this merges every entity/connection type's effective
 attribute schema, across every repo tier, into the two flat maps ``RegistrySnapshot`` wants.
 """
@@ -16,6 +16,7 @@ from pathlib import Path
 
 from src.application.artifact_schema import compute_effective_attribute_schema, load_connection_metadata_schema
 from src.application.runtime_catalogs import RuntimeCatalogs
+from src.config.settings import viewpoints_derivation_max_hops, viewpoints_derivation_max_relationships
 from src.domain.viewpoint_condition_validation import RegistrySnapshot
 
 _DEFAULT_ATTRIBUTE_TYPE = "string"
@@ -77,4 +78,7 @@ def build_registry_snapshot(runtime_catalogs: RuntimeCatalogs, repo_roots: Seque
         connection_attribute_types=_connection_attribute_types(runtime_catalogs, repo_roots),
         symmetric_connection_types=symmetric_connection_types,
         entity_type_infos=runtime_catalogs.ontology.all_entity_types(),
+        derivation_catalog=runtime_catalogs.module_catalog,
+        derivation_max_hops=viewpoints_derivation_max_hops(),
+        derivation_max_relationships=viewpoints_derivation_max_relationships(),
     )

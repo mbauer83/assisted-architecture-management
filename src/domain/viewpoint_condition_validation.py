@@ -10,6 +10,7 @@ from collections.abc import Mapping
 from dataclasses import dataclass, field
 from typing import Literal
 
+from src.domain.module_catalog import ModuleCatalog
 from src.domain.ontology_types import EntityTypeInfo
 from src.domain.viewpoint_criteria import (
     NUMERIC_ATTRIBUTE_TYPES,
@@ -61,6 +62,9 @@ class RegistrySnapshot:
     symmetric_connection_types: frozenset[str] = frozenset()
     entity_type_infos: Mapping[str, EntityTypeInfo] = field(default_factory=dict)
     depth_cap: int = 4
+    derivation_catalog: ModuleCatalog | None = None
+    derivation_max_hops: int = 4
+    derivation_max_relationships: int = 2000
 
 
 def issue(

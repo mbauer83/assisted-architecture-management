@@ -360,7 +360,7 @@ the binding layer, and G1 waits on neither derivation nor presentation work.
 
 ## Phase D — Derived traversal in the query model
 
-- [ ] **WU-D1a — Derived traversal on incident predicate & neighbor inclusion**
+- [x] **WU-D1a — Derived traversal on incident predicate & neighbor inclusion**
   - Files: `src/domain/viewpoint_criteria.py` (`IncidentConnectionCondition`,
     `NeighborInclusion` gain `traversal`/`include_potential`/`max_hops` — parsed but
     inert until here), `viewpoint_criteria_evaluation.py`,
@@ -891,3 +891,4 @@ Anything short of this is "in progress", regardless of how many WUs are ticked.
 - 2026-07-13 — WU-C3 — Typed declarations and ValueRefs validate across query and presentation criteria with stable paths, mode-aware caps, and declared-type checks.
 - 2026-07-13 — WU-C4 — Pure binding execution, runtime cardinality checks, ValueRef environments, and direct derived attributes are deterministic and covered.
 - 2026-07-13 — WU-C5 — Shared summaries now describe parameters, bindings, ValueRef forms, and derived attributes for every surface.
+- 2026-07-13 — WU-D1a — Derived incident and neighbor traversal use bounded relationship derivation with declarative grammar, validation, and direct-mode regressions.

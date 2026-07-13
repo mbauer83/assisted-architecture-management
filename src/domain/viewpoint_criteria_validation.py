@@ -1,5 +1,6 @@
-"""Registry-aware, recursive validation of criteria trees (companion plan §3.2, §3.4,
-§4.1). Pure and side-effect-free: callers supply the current registries and get back a tuple
+"""Registry-aware, recursive validation of criteria trees.
+
+Pure and side-effect-free: callers supply the current registries and get back a tuple
 of ``ViewpointValidationIssue``; severities are mode-dependent (``viewpoint_validation.py``
 owns the mode dispatch, this module always reasons in "save" terms — the caller downgrades
 registry findings to warnings for ``load`` mode). Leaf-condition checks live in
@@ -31,7 +32,7 @@ __all__ = [
 
 
 def criteria_tree_depth(node: object) -> int:
-    """Combined boolean-nesting + relational-hop depth (§3.2): a group counts one level,
+    """Combined boolean-nesting + relational-hop depth: a group counts one level,
     an incident hop counts one level for the deeper of its two sub-trees."""
     if isinstance(node, (EntityCriteriaGroup, ConnectionCriteriaGroup)):
         return 1 + max((criteria_tree_depth(c) for c in node.children), default=0)
@@ -90,6 +91,51 @@ def _symmetric_direction_warning(
     return []
 
 
+def _validate_derived_traversal(
+    connection_criteria: ConnectionCriteriaGroup | None, *, traversal: str, max_hops: int | None, path: str
+) -> list[ViewpointValidationIssue]:
+    if traversal == "direct":
+        return []
+    issues: list[ViewpointValidationIssue] = []
+    if max_hops is not None and max_hops < 2:
+        issues.append(
+            issue("error", "derivation-hops-exceeded", f"{path}/max_hops", "derived traversal needs at least two hops")
+        )
+    if connection_criteria is not None:
+        issues.extend(_validate_derived_paths(connection_criteria, path=f"{path}/connection_criteria"))
+    return issues
+
+
+def _validate_derived_paths(node: object, *, path: str) -> list[ViewpointValidationIssue]:
+    if isinstance(node, AttributeCondition):
+        if node.attribute not in {"type", "certainty", "hops"}:
+            return [
+                issue(
+                    "error",
+                    "derived-traversal-path-unsupported",
+                    path,
+                    "derived relationships expose type, certainty, and hops only",
+                )
+            ]
+        if node.value.kind == "attribute_of_endpoint":
+            return [
+                issue(
+                    "error",
+                    "derived-traversal-path-unsupported",
+                    f"{path}/value",
+                    "derived relationships have no endpoint value references",
+                )
+            ]
+        return []
+    if isinstance(node, ConnectionCriteriaGroup):
+        return [
+            issue
+            for index, child in enumerate(node.children)
+            for issue in _validate_derived_paths(child, path=f"{path}/children/{index}")
+        ]
+    return []
+
+
 def validate_entity_criteria(
     node: object, *, path: str, is_root: bool, registries: RegistrySnapshot, check_ergonomics: bool
 ) -> list[ViewpointValidationIssue]:
@@ -97,6 +143,11 @@ def validate_entity_criteria(
     if isinstance(node, AttributeCondition):
         return validate_condition(node, path=path, context="entity", registries=registries)
     if isinstance(node, IncidentConnectionCondition):
+        issues.extend(
+            _validate_derived_traversal(
+                node.connection_criteria, traversal=node.traversal, max_hops=node.max_hops, path=path
+            )
+        )
         if node.connection_criteria is not None:
             issues.extend(
                 validate_connection_criteria(
@@ -164,6 +215,11 @@ def validate_neighbor_inclusion(
     inclusion: NeighborInclusion, *, path: str, registries: RegistrySnapshot, check_ergonomics: bool
 ) -> list[ViewpointValidationIssue]:
     issues: list[ViewpointValidationIssue] = []
+    issues.extend(
+        _validate_derived_traversal(
+            inclusion.connection_criteria, traversal=inclusion.traversal, max_hops=inclusion.max_hops, path=path
+        )
+    )
     if inclusion.connection_criteria is not None:
         issues.extend(
             validate_connection_criteria(

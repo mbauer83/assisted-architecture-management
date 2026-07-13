@@ -18,6 +18,7 @@ Conjunction = Literal["and", "or"]
 Comparator = Literal["eq", "neq", "in", "exists", "absent", "lt", "lte", "gt", "gte"]
 ValueRefKind = Literal["literal", "attribute_of_self", "attribute_of_endpoint", "binding", "parameter"]
 IncidentDirection = Literal["outgoing", "incoming", "either"]
+RelationshipTraversal = Literal["direct", "derived"]
 
 # Exactly today's operator vocabulary — the criteria-tree redesign restructures how
 # conditions nest, it does not expand the comparator set. There is deliberately no
@@ -96,6 +97,9 @@ class IncidentConnectionCondition:
     direction: IncidentDirection = "either"
     endpoint_criteria: EntityCriteriaGroup | None = None  # None = any entity
     negate: bool = False
+    traversal: RelationshipTraversal = "direct"
+    include_potential: bool = False
+    max_hops: int | None = None
 
 
 @dataclass(frozen=True)
@@ -120,6 +124,9 @@ class NeighborInclusion:
     connection_criteria: ConnectionCriteriaGroup | None = None  # None = any connection
     direction: IncidentDirection = "either"  # relative to the anchor
     neighbor_criteria: EntityCriteriaGroup | None = None  # None = any entity
+    traversal: RelationshipTraversal = "direct"
+    include_potential: bool = False
+    max_hops: int | None = None
 
 
 EntityCriteriaNode = AttributeCondition | IncidentConnectionCondition | EntityCriteriaGroup

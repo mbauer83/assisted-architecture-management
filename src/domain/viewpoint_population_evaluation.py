@@ -1,4 +1,4 @@
-"""Population-level evaluation (companion plan §4.1, §3.1, §5.4): widening the primary
+"""Population-level evaluation: widening the primary
 entity population via ``NeighborInclusion`` terms, and selecting the connections displayed
 for a resolved entity population (the ordinary structural invariant and the sharper matrix
 bridging form). Built entirely on the pure per-record predicates in
@@ -11,6 +11,7 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 
 from src.domain.artifact_types import ConnectionRecord
+from src.domain.relationship_reachability import DerivationBounds, RelationshipDerivationRequest, derive_relationships
 from src.domain.viewpoint_condition_validation import RegistrySnapshot
 from src.domain.viewpoint_criteria import ConnectionSelection, NeighborInclusion
 from src.domain.viewpoint_criteria_evaluation import (
@@ -49,6 +50,11 @@ def resolve_neighbor_inclusions(
     expanded: set[str] = set()
     drift: set[str] = set()
     for inclusion in inclusions:
+        if inclusion.traversal == "derived":
+            derived_result = _resolve_derived_inclusion(inclusion, primary_ids, read_access, registries)
+            expanded |= derived_result.expanded_ids
+            drift |= derived_result.schema_drift
+            continue
         for anchor_id in primary_ids:
             for connection in read_access.find_connections_for(anchor_id, direction="any"):
                 if inclusion.connection_criteria is not None:
@@ -77,6 +83,53 @@ def resolve_neighbor_inclusions(
     return NeighborInclusionResult(frozenset(expanded), frozenset(drift))
 
 
+def _resolve_derived_inclusion(
+    inclusion: NeighborInclusion,
+    primary_ids: frozenset[str],
+    read_access: CriteriaReadAccess,
+    registries: RegistrySnapshot,
+) -> NeighborInclusionResult:
+    if registries.derivation_catalog is None:
+        return NeighborInclusionResult(frozenset())
+    relationships = derive_relationships(
+        RelationshipDerivationRequest(
+            primary_ids,
+            inclusion.direction,
+            "include_potential" if inclusion.include_potential else "certain_only",
+            DerivationBounds(
+                inclusion.max_hops or registries.derivation_max_hops, registries.derivation_max_relationships
+            ),
+        ),
+        read_access=read_access,
+        registries=registries.derivation_catalog,
+    ).relationships
+    expanded: set[str] = set()
+    drift: set[str] = set()
+    for relationship in relationships:
+        neighbor_id = relationship.target_id if relationship.source_id in primary_ids else relationship.source_id
+        if neighbor_id in primary_ids:
+            continue
+        if inclusion.connection_criteria is not None:
+            from src.domain.viewpoint_criteria_evaluation import _derived_matches
+
+            if not _derived_matches(
+                inclusion.connection_criteria, relationship.connection_type, relationship.certainty, relationship.hops
+            ):
+                continue
+        neighbor = read_access.get_entity(neighbor_id)
+        if neighbor is None:
+            continue
+        if inclusion.neighbor_criteria is not None:
+            outcome = evaluate_entity_criteria(
+                inclusion.neighbor_criteria, neighbor, read_access=read_access, registries=registries
+            )
+            drift |= outcome.schema_drift
+            if not outcome.matched:
+                continue
+        expanded.add(neighbor_id)
+    return NeighborInclusionResult(frozenset(expanded), frozenset(drift))
+
+
 def select_connections(
     included_entity_ids: frozenset[str],
     selection: ConnectionSelection,
@@ -84,7 +137,7 @@ def select_connections(
     read_access: CriteriaReadAccess,
     registries: RegistrySnapshot,
 ) -> ConnectionSelectionResult:
-    """Structural invariant (§3.1): a connection is included only if both endpoints are in
+    """Structural invariant: a connection is included only if both endpoints are in
     ``included_entity_ids``; ``selection.criteria`` narrows within that set and can never
     widen past it."""
     if not selection.enabled:
@@ -100,7 +153,7 @@ def select_matrix_connections(
     read_access: CriteriaReadAccess,
     registries: RegistrySnapshot,
 ) -> ConnectionSelectionResult:
-    """Matrix bridging invariant (§5.4): included only if one endpoint is in the row
+    """Matrix bridging invariant: included only if one endpoint is in the row
     population and the OTHER is in the column population — row↔column only, never row↔row
     or column↔column."""
     if not selection.enabled:

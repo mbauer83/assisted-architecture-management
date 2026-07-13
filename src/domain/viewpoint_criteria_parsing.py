@@ -7,6 +7,7 @@ shorthand (plain scalar/list) or a ``{from: self|source|target, attribute: ...}`
 from __future__ import annotations
 
 from collections.abc import Mapping
+from typing import cast
 
 from src.domain.viewpoint_criteria import (
     VALID_COMPARATORS,
@@ -23,14 +24,28 @@ from src.domain.viewpoint_criteria import (
     IncidentConnectionCondition,
     IncidentDirection,
     NeighborInclusion,
+    RelationshipTraversal,
     ValueRef,
 )
 
 _CONDITION_KEYS = frozenset({"kind", "attribute", "comparator", "value", "negate"})
 _GROUP_KEYS = frozenset({"kind", "conjunction", "children", "negate"})
-_INCIDENT_KEYS = frozenset({"kind", "direction", "connection_criteria", "endpoint_criteria", "negate"})
+_INCIDENT_KEYS = frozenset(
+    {
+        "kind",
+        "direction",
+        "connection_criteria",
+        "endpoint_criteria",
+        "negate",
+        "traversal",
+        "include_potential",
+        "max_hops",
+    }
+)
 _VALUE_REF_KEYS = frozenset({"from", "attribute", "name", "project", "aggregate", "quantifier"})
-_NEIGHBOR_INCLUSION_KEYS = frozenset({"connection_criteria", "direction", "neighbor_criteria"})
+_NEIGHBOR_INCLUSION_KEYS = frozenset(
+    {"connection_criteria", "direction", "neighbor_criteria", "traversal", "include_potential", "max_hops"}
+)
 _CONNECTION_SELECTION_KEYS = frozenset({"enabled", "criteria"})
 
 
@@ -59,6 +74,20 @@ def _require_direction(value: object) -> IncidentDirection:
     if text not in ("outgoing", "incoming", "either"):
         raise ValueError(f"direction {text!r} is not one of {sorted(VALID_INCIDENT_DIRECTIONS)}")
     return text
+
+
+def _require_traversal(value: object) -> RelationshipTraversal:
+    if value not in {"direct", "derived"}:
+        raise ValueError("traversal must be direct or derived")
+    return cast(RelationshipTraversal, value)
+
+
+def _optional_hops(raw: object) -> int | None:
+    if raw is None:
+        return None
+    if not isinstance(raw, int) or isinstance(raw, bool) or raw < 2:
+        raise ValueError("max_hops must be an integer of at least 2")
+    return raw
 
 
 def _value_ref_from_raw(raw: object) -> ValueRef:
@@ -149,6 +178,9 @@ def _incident_from_raw(raw: Mapping[str, object]) -> IncidentConnectionCondition
         if endpoint_criteria_raw is not None
         else None,
         negate=bool(raw.get("negate", False)),
+        traversal=_require_traversal(raw.get("traversal", "direct")),
+        include_potential=bool(raw.get("include_potential", False)),
+        max_hops=_optional_hops(raw.get("max_hops")),
     )
 
 
@@ -189,6 +221,9 @@ def parse_neighbor_inclusion(raw: object) -> NeighborInclusion:
         neighbor_criteria=parse_entity_criteria_group(neighbor_criteria_raw)
         if neighbor_criteria_raw is not None
         else None,
+        traversal=_require_traversal(raw.get("traversal", "direct")),
+        include_potential=bool(raw.get("include_potential", False)),
+        max_hops=_optional_hops(raw.get("max_hops")),
     )
 
 

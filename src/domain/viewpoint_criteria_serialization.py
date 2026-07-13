@@ -77,6 +77,12 @@ def _incident_to_mapping(condition: IncidentConnectionCondition) -> dict[str, An
         result["endpoint_criteria"] = entity_criteria_group_to_mapping(condition.endpoint_criteria)
     if condition.negate:
         result["negate"] = True
+    if condition.traversal != "direct":
+        result["traversal"] = condition.traversal
+    if condition.include_potential:
+        result["include_potential"] = True
+    if condition.max_hops is not None:
+        result["max_hops"] = condition.max_hops
     return result
 
 
@@ -107,6 +113,12 @@ def neighbor_inclusion_to_mapping(inclusion: NeighborInclusion) -> dict[str, Any
         result["connection_criteria"] = connection_criteria_group_to_mapping(inclusion.connection_criteria)
     if inclusion.neighbor_criteria is not None:
         result["neighbor_criteria"] = entity_criteria_group_to_mapping(inclusion.neighbor_criteria)
+    if inclusion.traversal != "direct":
+        result["traversal"] = inclusion.traversal
+    if inclusion.include_potential:
+        result["include_potential"] = True
+    if inclusion.max_hops is not None:
+        result["max_hops"] = inclusion.max_hops
     return result
 
 
