@@ -37,7 +37,11 @@ describe('derivedLegend', () => {
   it('counts match-mode rule values and range-band values, deduping tokens', () => {
     const presentation = mkPresentation('table')
     presentation.stylingRules = [
-      { id: 'r1', capability: 'badges', appliesTo: [], mode: 'match', matchCriteria: mkGroup('entity'), rangeAttribute: null, rangeBands: [], value: 'critical' },
+      {
+        id: 'r1', capability: 'badges', appliesTo: [], mode: 'match', matchCriteria: mkGroup('entity'),
+        rangeAttribute: null, rangeBands: [], value: 'critical',
+        scaleAttribute: null, scaleMin: null, scaleMax: null, scaleTokens: null,
+      },
       {
         id: 'r2', capability: 'badges', appliesTo: [], mode: 'range', matchCriteria: null, rangeAttribute: 'risk_score',
         rangeBands: [
@@ -45,6 +49,7 @@ describe('derivedLegend', () => {
           { id: 'b2', minimum: 4, maximum: null, value: 'critical' },
         ],
         value: null,
+        scaleAttribute: null, scaleMin: null, scaleMax: null, scaleTokens: null,
       },
     ]
     presentation.defaultStyle = { badges: 'neutral' }

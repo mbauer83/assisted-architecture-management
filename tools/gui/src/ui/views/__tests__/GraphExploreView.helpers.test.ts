@@ -77,7 +77,7 @@ describe('projectionByItemId', () => {
 
 describe('buildConnectionStyleIndex', () => {
   it('joins a connection style back onto its source/target/type key', () => {
-    const connections = [{ id: 'CON@ab', type: 'archimate-serving', source: 'ENT@A', target: 'ENT@B' }]
+    const connections = [{ id: 'CON@ab', type: 'archimate-serving', source: 'ENT@A', target: 'ENT@B', certainty: null, hops: null, via_connection_ids: [] }]
     const projection = {
       applied: true, target: 'repository' as const,
       items: [
@@ -92,7 +92,7 @@ describe('buildConnectionStyleIndex', () => {
   })
 
   it('omits connections absent from the projection', () => {
-    const connections = [{ id: 'CON@ab', type: 'archimate-serving', source: 'ENT@A', target: 'ENT@B' }]
+    const connections = [{ id: 'CON@ab', type: 'archimate-serving', source: 'ENT@A', target: 'ENT@B', certainty: null, hops: null, via_connection_ids: [] }]
     expect(buildConnectionStyleIndex(connections, null).size).toBe(0)
   })
 })

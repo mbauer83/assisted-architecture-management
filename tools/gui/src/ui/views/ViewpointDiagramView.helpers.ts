@@ -1,14 +1,15 @@
 /**
- * Pure helpers for the ad-hoc `diagram` execution representation (companion plan §5.1,
- * WU-E9): synthesizes the minimal `EntitySummary`/`DiagramConnection` shapes the generic
- * graphviz/PlantUML element mapper (`graphvizElementMapping.ts`) needs to resolve SVG
- * elements back to artifact ids, plus the `node_color`/`edge_color`/`edge_emphasis`
- * highlight-overlay application — the same client-side technique WU-E5a's ghost/hide
- * overlay uses on a real diagram's SVG, never baked into the rendered PUML.
+ * Pure helpers for the ad-hoc `diagram` execution representation: synthesizes the minimal
+ * `EntitySummary`/`DiagramConnection` shapes the generic graphviz/PlantUML element mapper
+ * (`graphvizElementMapping.ts`) needs to resolve SVG elements back to artifact ids, plus
+ * the `node_color`/`edge_color`/`edge_emphasis` highlight-overlay application — the same
+ * client-side technique a real diagram's ghost/hide overlay uses, never baked into the
+ * rendered PUML.
  */
 
 import type { ConnectionItemSummary, DiagramConnection, EntityItemSummary, EntitySummary, ProjectedOccurrence } from '../../domain'
-import { tokenColor, tokenEdgeEmphasis } from '../lib/viewpointStyleTokens'
+import type { StyleValue } from '../../domain/schemas/viewpoints'
+import { resolveStyleColor, styleTokenString, tokenEdgeEmphasis } from '../lib/viewpointStyleTokens'
 
 /** `graphvizMapElements` reads only `artifact_id`/`display_alias`; the ArchiMate renderer's
  * convention is alias === artifact_id (see `_ConfiguredArchimateDiagramType`'s write
@@ -37,10 +38,10 @@ const shapeChildren = (el: Element): SVGElement[] =>
   [...el.querySelectorAll('rect, polygon, path')].filter((n): n is SVGElement => n instanceof SVGElement)
 
 /** `node_color` highlight overlay: a colored outline on the node's shape children, fixed
- * notation (fill/shape) otherwise untouched — "an overlay, not a notation change" (§5.1). */
-export const applyNodeColorOverlay = (elems: readonly Element[], token: string | undefined): void => {
+ * notation (fill/shape) otherwise untouched — an overlay, not a notation change. */
+export const applyNodeColorOverlay = (elems: readonly Element[], value: StyleValue | undefined): void => {
   for (const el of elems) {
-    for (const shape of shapeChildren(el)) setOrClearStroke(shape, token !== undefined ? tokenColor(token) : null, token !== undefined ? '3' : null)
+    for (const shape of shapeChildren(el)) setOrClearStroke(shape, value !== undefined ? resolveStyleColor(value) : null, value !== undefined ? '3' : null)
   }
 }
 
@@ -49,13 +50,13 @@ export const applyNodeColorOverlay = (elems: readonly Element[], token: string |
  * elements instead of the custom force-graph renderer. */
 export const applyEdgeHighlightOverlay = (
   elems: readonly Element[],
-  colorToken: string | undefined,
-  emphasisToken: string | undefined,
+  colorValue: StyleValue | undefined,
+  emphasisValue: StyleValue | undefined,
 ): void => {
-  const emphasis = emphasisToken !== undefined ? tokenEdgeEmphasis(emphasisToken) : null
+  const emphasis = emphasisValue !== undefined ? tokenEdgeEmphasis(styleTokenString(emphasisValue)) : null
   for (const el of elems) {
     for (const shape of shapeChildren(el)) {
-      setOrClearStroke(shape, colorToken !== undefined ? tokenColor(colorToken) : null, emphasis ? String(emphasis.strokeWidth) : null)
+      setOrClearStroke(shape, colorValue !== undefined ? resolveStyleColor(colorValue) : null, emphasis ? String(emphasis.strokeWidth) : null)
       if (emphasis?.dashArray !== undefined) shape.style.setProperty('stroke-dasharray', emphasis.dashArray, 'important')
       else shape.style.removeProperty('stroke-dasharray')
     }

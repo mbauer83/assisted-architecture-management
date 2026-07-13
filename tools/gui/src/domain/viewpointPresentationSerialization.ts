@@ -41,9 +41,14 @@ const styleRuleToMapping = (rule: StyleRuleNode): Record<string, unknown> => {
   if (rule.mode === 'match') {
     if (rule.matchCriteria !== null) result.match_criteria = groupToMapping(rule.matchCriteria)
     if (rule.value !== null) result.value = rule.value
-  } else {
+  } else if (rule.mode === 'range') {
     if (rule.rangeAttribute !== null) result.range_attribute = rule.rangeAttribute
     if (rule.rangeBands.length > 0) result.range_bands = rule.rangeBands.map(rangeBandToMapping)
+  } else {
+    if (rule.scaleAttribute !== null) result.scale_attribute = rule.scaleAttribute
+    if (rule.scaleMin !== null) result.scale_min = rule.scaleMin
+    if (rule.scaleMax !== null) result.scale_max = rule.scaleMax
+    if (rule.scaleTokens !== null) result.scale_tokens = [...rule.scaleTokens]
   }
   return result
 }
@@ -84,23 +89,40 @@ const matchCriteriaGroup = (raw: unknown, capability: string): GroupNode | null 
   return groupFromMapping(asRecord(raw), isEdgeCapability(capability) ? 'connection' : 'entity')
 }
 
+const numberOr = (v: unknown, fallback: number | null): number | null => typeof v === 'number' ? v : fallback
+
+const scaleTokensFromMapping = (raw: unknown): readonly [string, string] | null => {
+  if (!Array.isArray(raw) || raw.length !== 2) return null
+  return [String(raw[0]), String(raw[1])]
+}
+
 const styleRuleFromMapping = (raw: Record<string, unknown>): StyleRuleNode => {
   const capability = String(raw.capability)
   const mode = (raw.mode as StyleMode) ?? 'match'
   const appliesTo = Array.isArray(raw.applies_to) ? raw.applies_to.map(String) : []
-  return mode === 'match'
-    ? {
-        id: nextNodeId(), capability, appliesTo, mode,
-        matchCriteria: matchCriteriaGroup(raw.match_criteria, capability),
-        value: stringOr(raw.value, null),
-        rangeAttribute: null, rangeBands: [],
-      }
-    : {
-        id: nextNodeId(), capability, appliesTo, mode,
-        matchCriteria: null, value: null,
-        rangeAttribute: stringOr(raw.range_attribute, null),
-        rangeBands: Array.isArray(raw.range_bands) ? raw.range_bands.map((b) => rangeBandFromMapping(asRecord(b))) : [],
-      }
+  const base = {
+    id: nextNodeId(), capability, appliesTo, mode,
+    matchCriteria: null, value: null,
+    rangeAttribute: null, rangeBands: [],
+    scaleAttribute: null, scaleMin: null, scaleMax: null, scaleTokens: null,
+  }
+  if (mode === 'match') {
+    return { ...base, matchCriteria: matchCriteriaGroup(raw.match_criteria, capability), value: stringOr(raw.value, null) }
+  }
+  if (mode === 'range') {
+    return {
+      ...base,
+      rangeAttribute: stringOr(raw.range_attribute, null),
+      rangeBands: Array.isArray(raw.range_bands) ? raw.range_bands.map((b) => rangeBandFromMapping(asRecord(b))) : [],
+    }
+  }
+  return {
+    ...base,
+    scaleAttribute: stringOr(raw.scale_attribute, null),
+    scaleMin: typeof raw.scale_min === 'string' ? raw.scale_min : numberOr(raw.scale_min, null),
+    scaleMax: typeof raw.scale_max === 'string' ? raw.scale_max : numberOr(raw.scale_max, null),
+    scaleTokens: scaleTokensFromMapping(raw.scale_tokens),
+  }
 }
 
 export const presentationFromMapping = (raw: unknown): PresentationNode | null => {

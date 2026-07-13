@@ -21,13 +21,25 @@ export const ViewpointSummarySchema = Schema.Struct({
 })
 export type ViewpointSummary = typeof ViewpointSummarySchema.Type
 
+/** A `mode: "scale"` style rule's per-item value: interpolate between `tokens` at
+ * `position` (0..1) — never a discrete token, since the rule declares a continuous
+ * spectrum rather than named bands. */
+export const ScaleStyleValueSchema = Schema.Struct({
+  position: Schema.Number,
+  tokens: Schema.Tuple(Schema.String, Schema.String),
+})
+export type ScaleStyleValue = typeof ScaleStyleValueSchema.Type
+
+export const StyleValueSchema = Schema.Union(Schema.String, ScaleStyleValueSchema)
+export type StyleValue = typeof StyleValueSchema.Type
+
 export const ProjectedOccurrenceSchema = Schema.Struct({
   item_id: Schema.String,
   item_kind: Schema.Literal('entity', 'connection'),
   state: Schema.Literal('visible', 'ghosted'),
   membership: Schema.Literal('primary', 'expanded'),
   reasons: Schema.Array(Schema.Literal('out_of_scope', 'criteria_mismatch', 'endpoint_excluded')),
-  style: Schema.Record({ key: Schema.String, value: Schema.String }),
+  style: Schema.Record({ key: Schema.String, value: StyleValueSchema }),
 })
 export type ProjectedOccurrence = typeof ProjectedOccurrenceSchema.Type
 
@@ -41,7 +53,7 @@ export const ViewpointProjectionSchema = Schema.Struct({
 export type ViewpointProjection = typeof ViewpointProjectionSchema.Type
 
 // ── Viewpoint execution ────────────────────────────────────────────────────────
-// Fixed, non-customizable per-item summaries — deliberately unstyled (D15 boundary, §2).
+// Fixed, non-customizable per-item summaries — deliberately unstyled.
 // Style tokens come from the separate `execute-projection` endpoint (`ViewpointProjectionSchema`
 // above), never from this contract, so MCP/REST content can never disagree with the GUI.
 
@@ -60,6 +72,9 @@ export const ConnectionItemSummarySchema = Schema.Struct({
   type: Schema.String,
   source: Schema.String,
   target: Schema.String,
+  certainty: Schema.NullOr(Schema.Literal('certain', 'potential')),
+  hops: Schema.NullOr(Schema.Number),
+  via_connection_ids: Schema.Array(Schema.String),
 })
 export type ConnectionItemSummary = typeof ConnectionItemSummarySchema.Type
 

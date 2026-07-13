@@ -131,6 +131,46 @@ def test_reachability_respects_direction_hop_and_certainty_policies() -> None:
     assert incoming.relationships[0].source_id == "A"
 
 
+@dataclass
+class _CountingGraph(_Graph):
+    """Wraps `_Graph` to record how many times each entity's adjacency is actually
+    fetched from the backing store — used to prove the BFS memoizes rather than
+    re-fetching the same entity's connections every time it's revisited across
+    different partial paths."""
+
+    calls_by_entity: dict[str, int] = field(default_factory=dict)
+
+    def find_connections_for(
+        self, entity_id: str, *, direction: str = "any", conn_type: str | None = None
+    ) -> list[ConnectionRecord]:
+        self.calls_by_entity[entity_id] = self.calls_by_entity.get(entity_id, 0) + 1
+        return super().find_connections_for(entity_id, direction=direction, conn_type=conn_type)
+
+
+def test_reachability_fetches_each_entitys_adjacency_at_most_once_even_when_revisited() -> None:
+    # Diamond topology: D is reachable from A via two distinct 2-hop paths
+    # (A-B-D and A-C-D), so a naive (non-memoized) BFS would fetch D's connections
+    # once per path that reaches it; a properly memoized BFS fetches it once, period.
+    graph = _CountingGraph(
+        {identifier: _entity(identifier) for identifier in ("A", "B", "C", "D", "E")},
+        [
+            _connection("CON@ab", "A", "B", "archimate-assignment"),
+            _connection("CON@ac", "A", "C", "archimate-assignment"),
+            _connection("CON@bd", "B", "D", "archimate-assignment"),
+            _connection("CON@cd", "C", "D", "archimate-assignment"),
+            _connection("CON@de", "D", "E", "archimate-realization"),
+        ],
+    )
+
+    derive_relationships(
+        _request(frozenset({"A"}), "outgoing", hops=4), read_access=graph, registries=_catalog()
+    )
+
+    assert graph.calls_by_entity, "expected at least one adjacency fetch"
+    over_fetched = {entity_id: count for entity_id, count in graph.calls_by_entity.items() if count > 1}
+    assert not over_fetched, f"entities fetched more than once (memoization not engaging): {over_fetched}"
+
+
 def test_reachability_never_traverses_dangling_connections_or_returns_partial_results() -> None:
     graph = _Graph(
         {identifier: _entity(identifier) for identifier in ("A", "B", "C", "D", "E")},

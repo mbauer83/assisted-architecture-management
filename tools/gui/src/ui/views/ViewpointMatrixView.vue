@@ -14,12 +14,12 @@ import { useViewpointParameterPrompt } from '../composables/useViewpointParamete
 import ViewpointExecutionDiagnostics from '../components/ViewpointExecutionDiagnostics.vue'
 import ViewpointExecutionError from '../components/ViewpointExecutionError.vue'
 import ViewpointParameterPrompt from '../components/ViewpointParameterPrompt.vue'
-import { computeExecutionDiagnostics, deriveLegend } from '../components/ViewpointExecutionDiagnostics.helpers'
+import { computeExecutionDiagnostics, deriveLegend, deriveScaleGradients } from '../components/ViewpointExecutionDiagnostics.helpers'
 import { presentationFromMapping } from '../../domain/viewpointPresentationSerialization'
 import {
   buildMatrixCells, cellEmphasisToken, cellKey, projectionByItemId, resolveMatrixAxes,
 } from './ViewpointMatrixView.helpers'
-import { tokenColor, tokenLabel } from '../lib/viewpointStyleTokens'
+import { resolveStyleColor, styleTokenString, tokenLabel } from '../lib/viewpointStyleTokens'
 import type { ViewpointDefinitionEnvelope } from '../../domain'
 
 const svc = inject(modelServiceKey)!
@@ -36,6 +36,7 @@ const presentation = computed(() => {
 })
 const diagnostics = computed(() => computeExecutionDiagnostics(execution.result.value, presentation.value, 'matrix'))
 const legend = computed(() => deriveLegend(presentation.value))
+const scaleGradients = computed(() => deriveScaleGradients(presentation.value))
 const entityStyleById = computed(() => projectionByItemId(execution.projection.value))
 const axes = computed(() => resolveMatrixAxes(presentation.value, execution.result.value))
 const cells = computed(() => buildMatrixCells(axes.value.rowIds, axes.value.columnIds, execution.result.value?.connections ?? []))
@@ -47,11 +48,11 @@ const cellLabel = (rowId: string, columnId: string): string => {
 }
 const cellColor = (rowId: string, columnId: string): string | null => {
   const token = cellEmphasisToken(rowId, columnId, entityStyleById.value)
-  return token !== undefined ? tokenColor(token) : null
+  return token !== undefined ? resolveStyleColor(token) : null
 }
 const cellTitle = (rowId: string, columnId: string): string | undefined => {
   const token = cellEmphasisToken(rowId, columnId, entityStyleById.value)
-  return token !== undefined ? tokenLabel(token) : undefined
+  return token !== undefined ? tokenLabel(styleTokenString(token)) : undefined
 }
 
 const load = async () => {
@@ -81,6 +82,7 @@ onMounted(() => { if (slug.value) void load() })
       v-if="!prompt.visible.value && !execution.errorMessage.value"
       :diagnostics="diagnostics"
       :legend="legend"
+      :scale-gradients="scaleGradients"
       :query-summary="execution.result.value?.query_summary ?? ''"
       @rerun="rerun"
     />

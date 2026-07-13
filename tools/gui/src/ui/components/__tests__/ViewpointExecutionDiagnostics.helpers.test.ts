@@ -3,6 +3,7 @@ import {
   computeExecutionDiagnostics,
   computeUnsupportedCapabilities,
   deriveLegend,
+  deriveScaleGradients,
 } from '../ViewpointExecutionDiagnostics.helpers'
 import { mkPresentation, mkStyleRule } from '../../../domain/viewpointPresentation'
 import { mkGroup } from '../../../domain/viewpointCriteria'
@@ -136,5 +137,59 @@ describe('deriveLegend', () => {
     const presentation = mkPresentation('exploration')
     presentation.defaultStyle = { node_color: 'neutral' }
     expect(deriveLegend(presentation)).toEqual([{ capability: 'node_color', token: 'neutral', label: 'default' }])
+  })
+})
+
+describe('deriveScaleGradients', () => {
+  it('is empty when there is no presentation', () => {
+    expect(deriveScaleGradients(null)).toEqual([])
+  })
+
+  it('ignores match- and range-mode rules', () => {
+    const presentation = mkPresentation('exploration')
+    const matchRule = mkStyleRule('exploration')
+    const rangeRule = mkStyleRule('exploration')
+    rangeRule.mode = 'range'
+    rangeRule.rangeBands = [{ id: 'b1', minimum: 0, maximum: 5, value: 'positive' }]
+    presentation.stylingRules = [matchRule, rangeRule]
+    expect(deriveScaleGradients(presentation)).toEqual([])
+  })
+
+  it('ignores a scale rule with no scale_tokens (unauthored)', () => {
+    const presentation = mkPresentation('exploration')
+    const rule = mkStyleRule('exploration')
+    rule.mode = 'scale'
+    presentation.stylingRules = [rule]
+    expect(deriveScaleGradients(presentation)).toEqual([])
+  })
+
+  it('builds a gradient between the two declared scale_tokens, labelled with data-driven (null) bounds as unbounded', () => {
+    const presentation = mkPresentation('exploration')
+    const rule = mkStyleRule('exploration')
+    rule.capability = 'node_color'
+    rule.mode = 'scale'
+    rule.scaleAttribute = 'derived.impact-distance'
+    rule.scaleTokens = ['heat-near', 'heat-far']
+    presentation.stylingRules = [rule]
+    const gradients = deriveScaleGradients(presentation)
+    expect(gradients).toEqual([{
+      capability: 'node_color',
+      gradientCss: 'linear-gradient(to right, #0891b2, #dc2626)',
+      minLabel: '−∞',
+      maxLabel: '∞',
+    }])
+  })
+
+  it('labels finite scale_min/scale_max bounds with their numeric value', () => {
+    const presentation = mkPresentation('exploration')
+    const rule = mkStyleRule('exploration')
+    rule.mode = 'scale'
+    rule.scaleMin = 1
+    rule.scaleMax = 4
+    rule.scaleTokens = ['heat-near', 'heat-far']
+    presentation.stylingRules = [rule]
+    const gradients = deriveScaleGradients(presentation)
+    expect(gradients[0].minLabel).toBe('1')
+    expect(gradients[0].maxLabel).toBe('4')
   })
 })

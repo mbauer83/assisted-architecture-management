@@ -17,10 +17,12 @@ import {
   type IncidentNode,
   type NeighborInclusionNode,
   type Quantifier,
+  type RelationshipTraversal,
   type ValueRef,
   bindingValue,
   endpointValue,
   literalValue,
+  mkConnectionSelection,
   mkGroup,
   mkQuery,
   nextNodeId,
@@ -99,6 +101,9 @@ export const neighborInclusionToMapping = (inclusion: NeighborInclusionNode): Re
   if (inclusion.direction !== 'either') result.direction = inclusion.direction
   if (inclusion.connectionCriteria !== null) result.connection_criteria = groupToMapping(inclusion.connectionCriteria)
   if (inclusion.neighborCriteria !== null) result.neighbor_criteria = groupToMapping(inclusion.neighborCriteria)
+  if (inclusion.traversal !== 'direct') result.traversal = inclusion.traversal
+  if (inclusion.includePotential) result.include_potential = true
+  if (inclusion.maxHops !== null) result.max_hops = inclusion.maxHops
   return result
 }
 
@@ -109,6 +114,9 @@ export const connectionSelectionToMapping = (selection: ConnectionSelectionNode)
   const result: Record<string, unknown> = {}
   if (!selection.enabled) result.enabled = false
   if (!isDefaultConnectionGroup(selection.criteria)) result.criteria = groupToMapping(selection.criteria)
+  if (selection.traversal !== 'direct') result.traversal = selection.traversal
+  if (selection.includePotential) result.include_potential = true
+  if (selection.maxHops !== null) result.max_hops = selection.maxHops
   return result
 }
 
@@ -168,14 +176,20 @@ export const neighborInclusionFromMapping = (raw: Record<string, unknown>): Neig
   direction: (raw.direction as IncidentDirection) ?? 'either',
   connectionCriteria: raw.connection_criteria != null ? groupFromMapping(asRecord(raw.connection_criteria), 'connection') : null,
   neighborCriteria: raw.neighbor_criteria != null ? groupFromMapping(asRecord(raw.neighbor_criteria), 'entity') : null,
+  traversal: (raw.traversal as RelationshipTraversal) ?? 'direct',
+  includePotential: Boolean(raw.include_potential ?? false),
+  maxHops: typeof raw.max_hops === 'number' ? raw.max_hops : null,
 })
 
 export const connectionSelectionFromMapping = (raw: unknown): ConnectionSelectionNode => {
-  if (raw == null) return { enabled: true, criteria: mkGroup('connection') }
+  if (raw == null) return mkConnectionSelection()
   const rec = asRecord(raw)
   return {
     enabled: Boolean(rec.enabled ?? true),
     criteria: rec.criteria != null ? groupFromMapping(asRecord(rec.criteria), 'connection') : mkGroup('connection'),
+    traversal: (rec.traversal as RelationshipTraversal) ?? 'direct',
+    includePotential: Boolean(rec.include_potential ?? false),
+    maxHops: typeof rec.max_hops === 'number' ? rec.max_hops : null,
   }
 }
 

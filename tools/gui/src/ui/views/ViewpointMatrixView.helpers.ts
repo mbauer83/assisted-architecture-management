@@ -1,16 +1,17 @@
 /**
- * Pure helpers for the ephemeral viewpoint-execution matrix (companion plan §5.1/§5.4,
- * WU-E9): axis resolution for both axis modes, the bridging-invariant cell population, and
- * the `cell_emphasis` style lookup. Never persisted, no `ViewpointApplication` — this is a
- * read-only representation of a `EvaluateViewpoint` result.
+ * Pure helpers for the ephemeral viewpoint-execution matrix: axis resolution for both axis
+ * modes, the bridging-invariant cell population, and the `cell_emphasis` style lookup.
+ * Never persisted, no `ViewpointApplication` — this is a read-only representation of a
+ * `EvaluateViewpoint` result.
  */
 
 import { matrixAxisMode } from '../../domain/viewpointPresentation'
 import type { PresentationNode } from '../../domain/viewpointPresentation'
 import type { ConnectionItemSummary, ProjectedOccurrence, ViewpointExecutionResult, ViewpointProjection } from '../../domain'
+import type { StyleValue } from '../../domain/schemas/viewpoints'
 
 /** Same shape as `EntitiesView.helpers.ts`'s function of the same name — kept as a small
- * local duplicate rather than a cross-view import (established WU-E8 convention). */
+ * local duplicate rather than a cross-view import. */
 export const projectionByItemId = (projection: ViewpointProjection | null): ReadonlyMap<string, ProjectedOccurrence> =>
   new Map((projection?.items ?? []).map((item) => [item.item_id, item]))
 
@@ -19,10 +20,10 @@ export interface MatrixAxes {
   readonly columnIds: readonly string[]
 }
 
-/** Grouped mode (§5.4): one population on both axes — the existing symmetric matrix
- * builder's behavior; `row_by`/`column_by` are a display-only row/column grouping, not a
- * different axis population. Criteria mode: the two independent, possibly-disjoint
- * populations the execution result already computed (`matrix_axes`). */
+/** Grouped mode: one population on both axes — the existing symmetric matrix builder's
+ * behavior; `row_by`/`column_by` are a display-only row/column grouping, not a different
+ * axis population. Criteria mode: the two independent, possibly-disjoint populations the
+ * execution result already computed (`matrix_axes`). */
 export const resolveMatrixAxes = (
   presentation: PresentationNode | null,
   result: ViewpointExecutionResult | null,
@@ -42,8 +43,8 @@ export interface MatrixCell {
 
 export const cellKey = (rowId: string, columnId: string): string => `${rowId}|${columnId}`
 
-/** Bridging invariant (§5.4): a connection appears in a cell iff one endpoint is in the row
- * set and the other in the column set, in either orientation — evaluated independently per
+/** Bridging invariant: a connection appears in a cell iff one endpoint is in the row set
+ * and the other in the column set, in either orientation — evaluated independently per
  * orientation so a self-loop entity (source === target, both sets containing it) is not
  * double-counted into the same cell. */
 export const buildMatrixCells = (
@@ -81,5 +82,5 @@ export const cellEmphasisToken = (
   rowId: string,
   columnId: string,
   entityStyleById: ReadonlyMap<string, ProjectedOccurrence>,
-): string | undefined =>
+): StyleValue | undefined =>
   entityStyleById.get(rowId)?.style.cell_emphasis ?? entityStyleById.get(columnId)?.style.cell_emphasis

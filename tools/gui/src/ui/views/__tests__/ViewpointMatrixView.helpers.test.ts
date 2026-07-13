@@ -8,7 +8,8 @@ import type { PresentationNode } from '../../../domain/viewpointPresentation'
 import type { ConnectionItemSummary, ProjectedOccurrence, ViewpointExecutionResult, ViewpointProjection } from '../../../domain'
 
 const conn = (overrides: Partial<ConnectionItemSummary> = {}): ConnectionItemSummary => ({
-  id: 'c1', type: 'serving', source: 'a', target: 'b', ...overrides,
+  id: 'c1', type: 'serving', source: 'a', target: 'b',
+  certainty: null, hops: null, via_connection_ids: [], ...overrides,
 })
 
 const baseResult = (overrides: Partial<ViewpointExecutionResult> = {}): ViewpointExecutionResult => ({

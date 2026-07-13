@@ -33,6 +33,7 @@ export const router = createRouter({
     { path: '/diagram/edit', component: EditDiagramView },
     { path: '/diagram', component: DiagramDetailView },
     { path: '/graph', component: GraphExploreView },
+    { path: '/graph/layered', component: () => import('../views/LayeredExplorationView.vue') },
     { path: '/viewpoints', component: () => import('../views/ViewpointsManagementView.vue') },
     { path: '/viewpoints/matrix', component: () => import('../views/ViewpointMatrixView.vue') },
     { path: '/viewpoints/diagram', component: () => import('../views/ViewpointDiagramView.vue') },

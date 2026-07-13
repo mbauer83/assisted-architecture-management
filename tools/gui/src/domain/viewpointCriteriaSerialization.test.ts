@@ -121,6 +121,21 @@ describe('neighbor inclusion', () => {
     const parsed = neighborInclusionFromMapping(raw)
     expect(neighborInclusionToMapping(parsed)).toEqual(raw)
   })
+
+  it('defaults traversal to direct and omits it, include_potential, and max_hops when unset', () => {
+    const parsed = neighborInclusionFromMapping({})
+    expect(parsed.traversal).toBe('direct')
+    expect(parsed.includePotential).toBe(false)
+    expect(parsed.maxHops).toBeNull()
+    expect(neighborInclusionToMapping(parsed)).toEqual({})
+  })
+
+  it('round-trips a derived traversal with include_potential and max_hops', () => {
+    const raw = { traversal: 'derived', include_potential: true, max_hops: 4 }
+    const parsed = neighborInclusionFromMapping(raw)
+    expect(parsed).toMatchObject({ traversal: 'derived', includePotential: true, maxHops: 4 })
+    expect(neighborInclusionToMapping(parsed)).toEqual(raw)
+  })
 })
 
 describe('connection selection', () => {
@@ -135,6 +150,13 @@ describe('connection selection', () => {
       criteria: { kind: 'group', conjunction: 'and', children: [{ kind: 'condition', attribute: 'type', comparator: 'eq', value: 'archimate-serving' }] },
     }
     const parsed = connectionSelectionFromMapping(raw)
+    expect(connectionSelectionToMapping(parsed)).toEqual(raw)
+  })
+
+  it('round-trips a both-traversal connection selection', () => {
+    const raw = { traversal: 'both', include_potential: true, max_hops: 2 }
+    const parsed = connectionSelectionFromMapping(raw)
+    expect(parsed).toMatchObject({ traversal: 'both', includePotential: true, maxHops: 2 })
     expect(connectionSelectionToMapping(parsed)).toEqual(raw)
   })
 })

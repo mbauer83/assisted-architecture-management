@@ -15,7 +15,7 @@ import EntityGroupNavTree from '../components/EntityGroupNavTree.vue'
 import ViewpointExecutionDiagnostics from '../components/ViewpointExecutionDiagnostics.vue'
 import ViewpointExecutionError from '../components/ViewpointExecutionError.vue'
 import ViewpointParameterPrompt from '../components/ViewpointParameterPrompt.vue'
-import { computeExecutionDiagnostics, deriveLegend } from '../components/ViewpointExecutionDiagnostics.helpers'
+import { computeExecutionDiagnostics, deriveLegend, deriveScaleGradients } from '../components/ViewpointExecutionDiagnostics.helpers'
 import { presentationFromMapping } from '../../domain/viewpointPresentationSerialization'
 import {
   friendlyEntityId,
@@ -119,6 +119,7 @@ const viewpointDiagnostics = computed(() => computeExecutionDiagnostics(
   viewpointExecution.result.value, selectedViewpointPresentation.value, 'table',
 ))
 const viewpointLegend = computed(() => deriveLegend(selectedViewpointPresentation.value))
+const viewpointScaleGradients = computed(() => deriveScaleGradients(selectedViewpointPresentation.value))
 const viewpointEntityStyleById = computed(() => projectionByItemId(viewpointExecution.projection.value))
 const viewpointColumns = computed(() => effectiveTableColumns(selectedViewpointPresentation.value?.columns ?? null))
 const viewpointRowGroups = computed(() => groupTableRows(
@@ -268,6 +269,7 @@ const displayCount = computed(() => {
       v-if="!viewpointPrompt.visible.value && !viewpointExecution.errorMessage.value"
       :diagnostics="viewpointDiagnostics"
       :legend="viewpointLegend"
+      :scale-gradients="viewpointScaleGradients"
       :query-summary="viewpointExecution.result.value?.query_summary ?? ''"
       @rerun="rerunViewpointTable"
     />

@@ -34,7 +34,9 @@ describe('toEntitySummaryStub', () => {
 
 describe('toDiagramConnectionStub', () => {
   it('sets source_alias/target_alias to the source/target artifact ids', () => {
-    const conn: ConnectionItemSummary = { id: 'c1', type: 'serving', source: 'a', target: 'b' }
+    const conn: ConnectionItemSummary = {
+      id: 'c1', type: 'serving', source: 'a', target: 'b', certainty: null, hops: null, via_connection_ids: [],
+    }
     const stub = toDiagramConnectionStub(conn)
     expect(stub.artifact_id).toBe('c1')
     expect(stub.source_alias).toBe('a')

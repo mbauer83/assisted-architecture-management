@@ -24,14 +24,20 @@ const props = defineProps<{
   adminMode?: boolean
   symmetricConnTypes: ReadonlySet<string>
   guidance: AuthoringGuidance | null
+  /** Pre-seed the target/type pickers — e.g. materializing a derived relationship into
+   * a real connection, where the source/target/type are already known and only need
+   * confirming, not searching for. Left unset, the form starts empty as before. */
+  initialTarget?: { id: string; name: string }
+  initialConnType?: string
+  initialDescription?: string
 }>()
 const emit = defineEmits<{ added: []; cancel: [] }>()
 
 const svc = inject(modelServiceKey)!
 
-const selectedTarget = ref<{ id: string; name: string } | null>(null)
-const connTypeSelected = ref('')
-const descInput = ref('')
+const selectedTarget = ref<{ id: string; name: string } | null>(props.initialTarget ?? null)
+const connTypeSelected = ref(props.initialConnType ?? '')
+const descInput = ref(props.initialDescription ?? '')
 const srcMultInput = ref('')
 const tgtMultInput = ref('')
 const specSelected = ref('')
@@ -59,7 +65,7 @@ const connTypeOptions = computed((): string[] => {
 })
 
 watch(() => pairQuery.data.value, (pair) => {
-  if (!pair) return
+  if (!pair || props.initialConnType) return
   const types = connTypeOptions.value
   if (types.length === 1) connTypeSelected.value = types[0]
   else if (props.direction === 'symmetric') connTypeSelected.value = 'archimate-association'

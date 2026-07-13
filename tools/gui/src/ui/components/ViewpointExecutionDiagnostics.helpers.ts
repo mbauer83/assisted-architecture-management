@@ -1,12 +1,13 @@
 /**
- * Pure diagnostics/legend logic for the viewpoint-execution diagnostics panel (companion
- * plan §7.1/§5.2) — shared by every execution representation (WU-E8 exploration,
- * WU-E9 table/matrix/diagram) so "empty", "truncated", and "unsupported capability"
- * states, and the derived legend, are computed identically everywhere.
+ * Pure diagnostics/legend logic for the viewpoint-execution diagnostics panel — shared by
+ * every execution representation (exploration, table, matrix, diagram) so "empty",
+ * "truncated", and "unsupported capability" states, and the derived legend, are computed
+ * identically everywhere.
  */
 
 import { REPRESENTATION_CAPABILITIES, type PresentationNode, type Representation } from '../../domain/viewpointPresentation'
 import type { ViewpointExecutionResult } from '../../domain'
+import { tokenColor } from '../lib/viewpointStyleTokens'
 
 export interface ExecutionDiagnostics {
   readonly isEmpty: boolean
@@ -79,8 +80,10 @@ export interface LegendEntry {
   readonly label: string
 }
 
-/** "Every surface renders its legend mechanically from styling_rules + range_bands +
- * default_style, nothing to author" (§5.1) — this is that mechanical derivation. */
+/** Every surface renders its legend mechanically from `styling_rules` + `range_bands` +
+ * `default_style` — nothing to author separately. `scale` mode has no discrete bands to
+ * enumerate here; its own continuous spectrum is rendered by `deriveScaleGradients`
+ * instead, never as fabricated per-band entries. */
 export const deriveLegend = (presentation: PresentationNode | null): readonly LegendEntry[] => {
   if (!presentation) return []
   const entries: LegendEntry[] = []
@@ -93,7 +96,7 @@ export const deriveLegend = (presentation: PresentationNode | null): readonly Le
           label: rule.appliesTo.length > 0 ? rule.appliesTo.join(', ') : 'matching criteria',
         })
       }
-    } else {
+    } else if (rule.mode === 'range') {
       for (const band of rule.rangeBands) {
         const lo = band.minimum ?? '-∞'
         const hi = band.maximum ?? '∞'
@@ -109,4 +112,31 @@ export const deriveLegend = (presentation: PresentationNode | null): readonly Le
     entries.push({ capability, token, label: 'default' })
   }
   return entries
+}
+
+export interface ScaleGradientLegend {
+  readonly capability: string
+  readonly gradientCss: string
+  readonly minLabel: string
+  readonly maxLabel: string
+}
+
+/** A `mode: "scale"` rule declares a continuous spectrum (`scale_min`..`scale_max`
+ * interpolating between its two `scale_tokens` endpoints) rather than discrete bands —
+ * this renders that spectrum as a single gradient bar labelled with its two endpoints.
+ * `null` bounds are data-driven (computed server-side per execution, not known here), so
+ * they render as unbounded (±∞) rather than a guessed number. */
+export const deriveScaleGradients = (presentation: PresentationNode | null): readonly ScaleGradientLegend[] => {
+  if (!presentation) return []
+  const gradients: ScaleGradientLegend[] = []
+  for (const rule of presentation.stylingRules) {
+    if (rule.mode !== 'scale' || rule.scaleTokens === null) continue
+    gradients.push({
+      capability: rule.capability,
+      gradientCss: `linear-gradient(to right, ${tokenColor(rule.scaleTokens[0])}, ${tokenColor(rule.scaleTokens[1])})`,
+      minLabel: rule.scaleMin !== null ? String(rule.scaleMin) : '−∞',
+      maxLabel: rule.scaleMax !== null ? String(rule.scaleMax) : '∞',
+    })
+  }
+  return gradients
 }

@@ -56,6 +56,28 @@ export default defineConfig({
         target: backendTarget,
         changeOrigin: true,
       },
+      // Viewpoint execution/derived-neighbor lookups can legitimately take several
+      // seconds (bounded relationship derivation over the scoped population), and every
+      // execution surface fires two of these concurrently (content + projection) — the
+      // generic 10s timeout below was silently killing both mid-flight under that
+      // concurrent load (ERR_EMPTY_RESPONSE in the browser even though the backend
+      // itself completes in ~5-6s; reproduced directly against this proxy with two
+      // simultaneous curl requests). Matches the frontend's own longer client-side fetch
+      // timeout for these same routes (`VIEWPOINT_EXECUTION_TIMEOUT_MS` in
+      // `HttpModelRepository.ts`). Listed before '/api' so the more specific context
+      // matches first.
+      '/api/viewpoints/execute': {
+        target: backendTarget,
+        changeOrigin: true,
+        timeout: 65000,
+        proxyTimeout: 65000,
+      },
+      '/api/neighbors': {
+        target: backendTarget,
+        changeOrigin: true,
+        timeout: 65000,
+        proxyTimeout: 65000,
+      },
       '/api': {
         target: backendTarget,
         changeOrigin: true,

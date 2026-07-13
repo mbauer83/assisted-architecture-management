@@ -7,11 +7,12 @@ from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
 from typing import Literal
 
-from src.domain.artifact_types import ConnectionRecord
+from src.domain.artifact_types import ConnectionRecord, EntityRecord
 from src.domain.module_catalog import ModuleCatalog
 from src.domain.module_types import ConnectionTypeName, EntityTypeName
 from src.domain.ontology_types import ConnectionTypeInfo, EntityTypeInfo
 from src.domain.relationship_derivation import DerivedStep, OrientedRelation, compose
+from src.domain.relationship_derivation_rules import CompositionRule
 from src.domain.relationship_path_reconstruction import (
     PathDerivationOutcome,
     RelationshipPathReadAccess,
@@ -23,6 +24,53 @@ from src.domain.relationship_path_reconstruction import (
 )
 from src.domain.viewpoint_criteria import IncidentDirection
 from src.domain.viewpoint_evaluation_context import CriteriaReadAccess
+
+
+class _MemoizedReadAccess:
+    """Wraps a `CriteriaReadAccess` with a per-call cache, scoped to the lifetime of one
+    `derive_relationships` invocation — safe because the read-model never changes
+    mid-request. Without this, `_adjacent_connections` re-fetches the same entity's
+    connections from the underlying (dual-repo, thread-dispatched) store every time that
+    entity is revisited across different partial BFS paths; for a bounded traversal that
+    is genuinely the standard graph-search invariant every BFS/Dijkstra/A* relies on
+    (each node's adjacency list is read at most once), not an optional optimization —
+    without it, redundant re-fetching turns a bounded-hop traversal into work proportional
+    to the number of *paths* examined rather than the number of *entities* touched.
+
+    Correctness depends entirely on this cache never outliving one call: construct it
+    fresh inside `derive_relationships` and never elsewhere — never store an instance on
+    a longer-lived object, pass it in as a parameter, or reuse it across calls. A cache
+    that outlives a single call would observe stale reads across write events; a cache
+    scoped to one call never can, since the read-model cannot change mid-call and each
+    new call starts from empty dicts against the (by-then current) repository."""
+
+    def __init__(self, inner: CriteriaReadAccess) -> None:
+        self._inner = inner
+        self._entities: dict[str, EntityRecord | None] = {}
+        self._connections: dict[str, ConnectionRecord | None] = {}
+        self._adjacency: dict[tuple[str, str, str | None], list[ConnectionRecord]] = {}
+
+    def get_entity(self, artifact_id: str) -> EntityRecord | None:
+        if artifact_id not in self._entities:
+            self._entities[artifact_id] = self._inner.get_entity(artifact_id)
+        return self._entities[artifact_id]
+
+    def get_connection(self, artifact_id: str) -> ConnectionRecord | None:
+        if artifact_id not in self._connections:
+            self._connections[artifact_id] = self._inner.get_connection(artifact_id)
+        return self._connections[artifact_id]
+
+    def find_connections_for(
+        self,
+        entity_id: str,
+        *,
+        direction: Literal["any", "outbound", "inbound"] = "any",
+        conn_type: str | None = None,
+    ) -> list[ConnectionRecord]:
+        key = (entity_id, direction, conn_type)
+        if key not in self._adjacency:
+            self._adjacency[key] = self._inner.find_connections_for(entity_id, direction=direction, conn_type=conn_type)
+        return self._adjacency[key]
 
 DerivationCertaintyPolicy = Literal["certain_only", "include_potential"]
 
@@ -101,15 +149,30 @@ def derive_relationships(
     """Enumerate bounded relationship compositions adjacent to the requested anchors."""
     if request.bounds.max_hops < 2 or not request.anchors:
         return DerivedRelationshipSet(())
+    # Every helper below reads the same handful of entities'/connections' adjacency
+    # repeatedly as the BFS revisits them across different partial paths — memoizing here
+    # is what makes this call cost proportional to entities touched, not paths examined.
+    memoized = _MemoizedReadAccess(read_access)
     entity_types = registries.all_entity_types()
     connection_types = registries.all_connection_types()
     rules = tuple(rule for module in registries.all_ontologies().values() for rule in module.derivation_rules)
+    # `compose`'s own first two checks reject a rule outright unless
+    # (first.connection_type.derivation_role, second.connection_type.derivation_role)
+    # exactly matches (rule.first_role, rule.second_role) — indexing on that pair once,
+    # rather than linearly scanning every rule against every one of the ~100K candidate
+    # compositions a bounded BFS considers, is the standard discrimination-network
+    # technique for rule-matching engines (e.g. RETE): narrow to the small matching
+    # bucket before running any of the remaining, more expensive checks.
+    rules_by_role_lists: dict[tuple[str | None, str | None], list[CompositionRule]] = {}
+    for rule in rules:
+        rules_by_role_lists.setdefault((rule.first_role, rule.second_role), []).append(rule)
+    rules_by_role = {key: tuple(bucket) for key, bucket in rules_by_role_lists.items()}
     restrictions = tuple(
         rule for module in registries.all_ontologies().values() for rule in module.derivation_restrictions
     )
     permitted = registries.aggregated_permitted_relationships()
     queue = deque(
-        _initial_frontier(request.anchors, request.bounds.max_hops, read_access, entity_types, connection_types)
+        _initial_frontier(request.anchors, request.bounds.max_hops, memoized, entity_types, connection_types)
     )
     results: dict[tuple[str, str, str], DerivedRelationship] = {}
     seen_paths: set[tuple[str, ...]] = set()
@@ -118,19 +181,24 @@ def derive_relationships(
         current = queue.popleft()
         if len(current.path) >= request.bounds.max_hops:
             continue
-        for connection in _adjacent_connections(current.relation, read_access):
+        for connection in _adjacent_connections(current.relation, memoized):
             if connection.artifact_id in current.used_connection_ids:
                 continue
-            next_relation = oriented_relation(connection, read_access, entity_types, connection_types)
+            next_relation = oriented_relation(connection, memoized, entity_types, connection_types)
             if next_relation is None:
                 continue
-            intermediate = shared_entity_info(current.relation, next_relation, read_access, entity_types)
+            intermediate = shared_entity_info(current.relation, next_relation, memoized, entity_types)
             if intermediate is not None:
+                role_key = (
+                    current.relation.connection_type.derivation_role,
+                    next_relation.connection_type.derivation_role,
+                )
+                candidate_rules = rules_by_role.get(role_key, ())
                 step = compose(
                     current.relation,
                     next_relation,
                     intermediate,
-                    rules,
+                    candidate_rules,
                     permitted,
                     restrictions,
                 )

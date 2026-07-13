@@ -17,7 +17,7 @@ import type { ResolvedViewpointExecution } from '../composables/useViewpointPara
 import ViewpointExecutionDiagnostics from '../components/ViewpointExecutionDiagnostics.vue'
 import ViewpointExecutionError from '../components/ViewpointExecutionError.vue'
 import ViewpointParameterPrompt from '../components/ViewpointParameterPrompt.vue'
-import { computeExecutionDiagnostics, deriveLegend } from '../components/ViewpointExecutionDiagnostics.helpers'
+import { computeExecutionDiagnostics, deriveLegend, deriveScaleGradients } from '../components/ViewpointExecutionDiagnostics.helpers'
 import { presentationFromMapping } from '../../domain/viewpointPresentationSerialization'
 import { resolveElementMap } from '../lib/diagramViewerExtensions'
 import { sanitizeDiagramSvg } from '../lib/svgSanitize'
@@ -44,6 +44,7 @@ const presentation = computed(() => {
 })
 const diagnostics = computed(() => computeExecutionDiagnostics(execution.result.value, presentation.value, 'diagram'))
 const legend = computed(() => deriveLegend(presentation.value))
+const scaleGradients = computed(() => deriveScaleGradients(presentation.value))
 const svgHtml = computed(() => (svgMarkup.value ? sanitizeDiagramSvg(svgMarkup.value) : null))
 
 const applyOverlay = () => {
@@ -106,6 +107,7 @@ onMounted(() => { if (slug.value) void load() })
       v-if="!prompt.visible.value && !execution.errorMessage.value && !diagramError"
       :diagnostics="diagnostics"
       :legend="legend"
+      :scale-gradients="scaleGradients"
       :query-summary="execution.result.value?.query_summary ?? ''"
       @rerun="rerun"
     />

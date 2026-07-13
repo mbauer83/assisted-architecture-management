@@ -102,23 +102,34 @@ export const mkIncident = (): IncidentNode => ({
   connectionCriteria: mkGroup('connection'), endpointCriteria: mkGroup('entity'),
 })
 
+export type RelationshipTraversal = 'direct' | 'derived' | 'both'
+
 export interface NeighborInclusionNode {
   readonly id: string
   direction: IncidentDirection
   connectionCriteria: GroupNode | null
   neighborCriteria: GroupNode | null
+  traversal: RelationshipTraversal
+  includePotential: boolean
+  maxHops: number | null
 }
 
 export const mkNeighborInclusion = (): NeighborInclusionNode => ({
   id: nextNodeId(), direction: 'either', connectionCriteria: mkGroup('connection'), neighborCriteria: mkGroup('entity'),
+  traversal: 'direct', includePotential: false, maxHops: null,
 })
 
 export interface ConnectionSelectionNode {
   enabled: boolean
   criteria: GroupNode
+  traversal: RelationshipTraversal
+  includePotential: boolean
+  maxHops: number | null
 }
 
-export const mkConnectionSelection = (): ConnectionSelectionNode => ({ enabled: true, criteria: mkGroup('connection') })
+export const mkConnectionSelection = (): ConnectionSelectionNode => ({
+  enabled: true, criteria: mkGroup('connection'), traversal: 'direct', includePotential: false, maxHops: null,
+})
 
 export interface ExecutableQueryNode {
   querySchema: number

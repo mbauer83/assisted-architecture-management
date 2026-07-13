@@ -8,7 +8,7 @@
 import { type GroupNode, mkGroup, nextNodeId } from './viewpointCriteria'
 
 export type Representation = 'exploration' | 'table' | 'matrix' | 'diagram'
-export type StyleMode = 'match' | 'range'
+export type StyleMode = 'match' | 'range' | 'scale'
 
 export const REPRESENTATION_CAPABILITIES: Readonly<Record<Representation, readonly string[]>> = {
   exploration: ['node_shape', 'node_icon', 'node_color', 'edge_color', 'edge_emphasis', 'cluster_grouping'],
@@ -42,6 +42,13 @@ export interface StyleRuleNode {
   rangeAttribute: string | null
   rangeBands: RangeBandNode[]
   value: string | null
+  /** `mode === 'scale'`: the numeric/date attribute path driving a continuous
+   * interpolation, its bounds (`null` = data-driven), and its two gradient-endpoint
+   * tokens — an author-chosen opaque pair, not restricted to `STYLE_TOKENS`. */
+  scaleAttribute: string | null
+  scaleMin: number | string | null
+  scaleMax: number | string | null
+  scaleTokens: readonly [string, string] | null
 }
 
 /** An `edge_*` capability's `match_criteria` is connection criteria; every other
@@ -54,6 +61,7 @@ export const mkStyleRule = (representation: Representation): StyleRuleNode => {
     id: nextNodeId(), capability, appliesTo: [], mode: 'match',
     matchCriteria: mkGroup(isEdgeCapability(capability) ? 'connection' : 'entity'),
     rangeAttribute: null, rangeBands: [], value: STYLE_TOKENS[0],
+    scaleAttribute: null, scaleMin: null, scaleMax: null, scaleTokens: null,
   }
 }
 

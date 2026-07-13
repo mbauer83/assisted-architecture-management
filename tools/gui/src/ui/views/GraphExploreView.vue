@@ -13,7 +13,7 @@ import ViewpointSelect from '../components/ViewpointSelect.vue'
 import ViewpointExecutionDiagnostics from '../components/ViewpointExecutionDiagnostics.vue'
 import ViewpointExecutionError from '../components/ViewpointExecutionError.vue'
 import ViewpointParameterPrompt from '../components/ViewpointParameterPrompt.vue'
-import { computeExecutionDiagnostics, deriveLegend } from '../components/ViewpointExecutionDiagnostics.helpers'
+import { computeExecutionDiagnostics, deriveLegend, deriveScaleGradients } from '../components/ViewpointExecutionDiagnostics.helpers'
 import {
   groupKeyFor, nodeVisualFor, edgeVisualFor, nodeShapePoints,
   buildConnectionStyleIndex, edgeStyleKey, projectionByItemId,
@@ -74,6 +74,7 @@ const diagnostics = computed(() => computeExecutionDiagnostics(
   viewpointExecution.result.value, selectedPresentation.value, currentRepresentation.value,
 ))
 const legend = computed(() => deriveLegend(selectedPresentation.value))
+const scaleGradients = computed(() => deriveScaleGradients(selectedPresentation.value))
 
 const runViewpointExecution = async (resolved: ResolvedViewpointExecution) => {
   nodes.value = []
@@ -253,7 +254,7 @@ const onEdgeClick = (e: typeof edges.value[number]) => {
 const onNodeClick = (n: GraphNode) => selectNode(n.id)
 
 const onNodeDblClick = (n: GraphNode) => {
-  // A viewpoint's result is a fixed population (§7.1) — no incremental expand/collapse.
+  // A viewpoint's result is a fixed population — no incremental expand/collapse.
   if (selectedViewpointSlug.value !== null) return
   if (n.expanded) {
     collapseNode(n.id)
@@ -410,6 +411,7 @@ const edgeCardPos = (e: typeof edges.value[number], frac: number) => {
         v-if="selectedViewpointSlug !== null && !viewpointPrompt.visible.value && !viewpointExecution.errorMessage.value"
         :diagnostics="diagnostics"
         :legend="legend"
+        :scale-gradients="scaleGradients"
         :query-summary="viewpointExecution.result.value?.query_summary ?? ''"
         @rerun="rerunViewpoint"
       />

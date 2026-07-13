@@ -1,17 +1,18 @@
 <script setup lang="ts">
 /**
- * Shared execution-diagnostics panel (companion plan §7.1/§5.1) — the four counts,
- * truncation/empty/unsupported-capability states, the plain-language query summary as
- * the active-filter display, and the derived legend. Reused by every execution
- * representation (WU-E8 exploration; WU-E9 table/matrix/diagram) so diagnostics never
- * drift between surfaces. Ephemeral/read-only: nothing here is persisted.
+ * Shared execution-diagnostics panel — the four counts, truncation/empty/unsupported-
+ * capability states, the plain-language query summary as the active-filter display, and
+ * the derived legend. Reused by every execution representation (exploration, table,
+ * matrix, diagram) so diagnostics never drift between surfaces. Ephemeral/read-only:
+ * nothing here is persisted.
  */
-import type { ExecutionDiagnostics, LegendEntry } from './ViewpointExecutionDiagnostics.helpers'
+import type { ExecutionDiagnostics, LegendEntry, ScaleGradientLegend } from './ViewpointExecutionDiagnostics.helpers'
 import { tokenColor, tokenLabel } from '../lib/viewpointStyleTokens'
 
 defineProps<{
   diagnostics: ExecutionDiagnostics
   legend: readonly LegendEntry[]
+  scaleGradients?: readonly ScaleGradientLegend[]
   querySummary: string
 }>()
 const emit = defineEmits<{ rerun: [] }>()
@@ -83,6 +84,20 @@ const emit = defineEmits<{ rerun: [] }>()
         {{ entry.capability }}: {{ tokenLabel(entry.token) }} ({{ entry.label }})
       </span>
     </div>
+
+    <div
+      v-for="gradient in scaleGradients ?? []"
+      :key="gradient.capability"
+      class="vp-scale-gradient"
+    >
+      <span class="vp-scale-label">{{ gradient.capability }}:</span>
+      <span class="vp-scale-endpoint">{{ gradient.minLabel }}</span>
+      <span
+        class="vp-scale-bar"
+        :style="{ background: gradient.gradientCss }"
+      />
+      <span class="vp-scale-endpoint">{{ gradient.maxLabel }}</span>
+    </div>
   </div>
 </template>
 
@@ -105,4 +120,8 @@ const emit = defineEmits<{ rerun: [] }>()
 .vp-legend { display: flex; flex-wrap: wrap; gap: 10px; }
 .vp-legend-entry { display: inline-flex; align-items: center; gap: 4px; color: #374151; }
 .vp-legend-swatch { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }
+.vp-scale-gradient { display: flex; align-items: center; gap: 6px; color: #374151; }
+.vp-scale-label { font-weight: 600; color: #6b7280; }
+.vp-scale-endpoint { font-size: 11px; color: #6b7280; }
+.vp-scale-bar { width: 80px; height: 8px; border-radius: 4px; display: inline-block; }
 </style>
