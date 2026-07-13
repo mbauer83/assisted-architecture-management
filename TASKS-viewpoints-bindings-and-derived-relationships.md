@@ -182,7 +182,7 @@ the binding layer, and G1 waits on neither derivation nor presentation work.
     ledger note).
   - Deps: B1, B2.
 
-- [ ] **WU-B4 — Bounded reachability & enumeration**
+- [x] **WU-B4 — Bounded reachability & enumeration**
   - Files: new `src/domain/relationship_reachability.py`,
     `tests/domain/test_relationship_reachability.py`.
   - Changes: the PLAN §5.3 policy value objects — `RelationshipDerivationRequest`,
@@ -874,3 +874,4 @@ Anything short of this is "in progress", regardless of how many WUs are ticked.
 - 2026-07-13 — WU-B1 — Shipped taxonomy classification and all certain pairwise composition rules are covered by pure-domain tests; every ontology now exposes optional YAML-loaded derivation rules, with no ontology-specific rule table or predicate in the evaluator.
 - 2026-07-13 — WU-B2 — YAML rules now cover all potential compositions; the Grouping aggregation rule requires a permitted result, and chain certainty records potential steps.
 - 2026-07-13 — WU-B3 — Declarative restriction review passed: R1–R14 and RJ1–RJ2 were checked line-by-line against Appendix B and exercised with admitting and rejecting cases.
+- 2026-07-13 — WU-B4 — Bounded relationship enumeration now emits deterministic, deduplicated ephemeral witness paths and raises a typed limit error before any partial result.

@@ -135,7 +135,9 @@ def _matches(
         ):
             return True
         return False
-    return not rule.intermediate_domain_must_match_endpoint or intermediate_domain in {source_domain, target_domain}
+    if rule.intermediate_domain_must_match_endpoint:
+        return False
+    return True
 
 
 def _is_passive(info: EntityTypeInfo) -> bool:
