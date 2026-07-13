@@ -259,7 +259,7 @@ the binding layer, and G1 waits on neither derivation nor presentation work.
 
 ## Phase C — Typed value & binding layer (pure domain)
 
-- [ ] **WU-C1 — Result-type algebra & inference**
+- [x] **WU-C1 — Result-type algebra & inference**
   - Files: new `src/domain/viewpoint_value_types.py`,
     `tests/domain/test_viewpoint_value_types.py`.
   - Changes: PLAN §4.1 types **incl. cardinality as a type distinction** —
@@ -879,3 +879,4 @@ Anything short of this is "in progress", regardless of how many WUs are ticked.
 - 2026-07-13 — WU-B5 — Appendix-B examples are executable; Financial Application proves DR2-derived realization is indirect rather than a direct-table defect.
 - 2026-07-13 — WU-B6 — Transcriber/reviewer: Codex; line-by-line spec-to-literal-fixture/runtime review passed with exhaustive and invariant batteries.
 - 2026-07-13 — WU-B7 — Recorded witness paths reconstruct through the shared composition logic; broken and no-longer-derived states are explicit.
+- 2026-07-13 — WU-C1 — Canonical result types and conservative inference cover cardinality, projections, aggregates, and tuple compatibility.
