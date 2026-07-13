@@ -722,13 +722,17 @@ the binding layer, and G1 waits on neither derivation nor presentation work.
     default style with a drift warning (not an error); version bump on both.
   - Deps: G1, F1.
 
-## Phase H — GUI (GATED: starts only after the frontend rewrite stabilizes — PLAN §10/D12, open question Q4)
+## Phase H — GUI (ungated 2026-07-13, Q4 resolved — see PLAN §10/D12)
 
-Phase-H file anchors name today's components as *expected* locations; the concurrent
-frontend rewrite may rename or replace them. **Before starting any H WU, re-verify its
-Files list against the rewritten frontend and re-expand the WU in this ledger if the
-anchors moved** — the PLAN §10 contracts and each WU's acceptance are the invariants;
-component names are not.
+Q4 resolved: the only concurrent frontend effort was a LoC-limit file-splitting refactor,
+deliberately paused until this plan completes — not a competing UI redesign. Phase H
+targets today's `tools/gui/` components directly, in normal ledger order once each WU's
+own deps are met. File anchors below still name today's components as *expected*
+locations; **before starting any H WU, re-verify its Files list against the current
+codebase and re-expand the WU in this ledger if a file has moved or been split** (the
+paused LoC refactor may still resume mid-Phase-H and rename/split files without changing
+behavior) — the PLAN §10 contracts and each WU's acceptance are the invariants; exact
+file paths are not.
 
 - [ ] **WU-H0 — Definition editor: full lifecycle + designed scope picker**
   - Files: `tools/gui/src/ui/` viewpoint editor views/components (against the rewritten
@@ -877,8 +881,9 @@ The plan is **fully implemented** exactly when all of the following hold, eviden
 the WU-I5 closeout note:
 
 1. Every WU checkbox in Phases A–G and I is ticked. Phase H is either fully ticked, or
-   explicitly re-gated with a dated ledger note naming the blocking frontend-rewrite
-   state (the only permitted outstanding phase).
+   explicitly re-gated with a dated ledger note naming the specific blocking condition
+   (the only permitted outstanding phase) — e.g. if the paused LoC-limit refactor resumes
+   mid-Phase-H and genuinely disrupts a WU's anchors before that WU is done.
 2. Every checkbox under "Global acceptance criteria" and "Consistency & failure-mode
    invariants" below is ticked, each backed by a named test/suite or a recorded
    verification step — no criterion is satisfied by assertion alone.

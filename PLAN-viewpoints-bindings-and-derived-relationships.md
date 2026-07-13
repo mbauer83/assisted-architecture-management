@@ -185,11 +185,13 @@ Four forces converge:
   the view-derivation strategy system; pinning → a repo-local sidecar, not definition
   content; heat maps → a third `StyleRule` mode; labels → a validated display option.
   Nothing gets a new subsystem (§7).
-- **D12 — GUI work is contract-first and gated on the concurrent frontend rewrite.** This
-  plan specifies REST/domain contracts and acceptance criteria (including the empty-state
-  and non-empty-execution behaviors the 2026-07-13 defect report exposed); the Vue
-  implementation WUs land only after the rewrite stabilizes, against those contracts
-  (§10, Phase H in the ledger).
+- **D12 — GUI work is contract-first, targeting today's components.** This plan specifies
+  REST/domain contracts and acceptance criteria (including the empty-state and
+  non-empty-execution behaviors the 2026-07-13 defect report exposed); the Vue
+  implementation WUs (§10, Phase H in the ledger) are built and tested against those
+  contracts directly on the current `tools/gui/` component set. (Resolved 2026-07-13, Q4:
+  the only concurrent frontend effort was a LoC-limit file-splitting refactor, deliberately
+  paused until this plan completes — no competing redesign to hand off to.)
 
 ## 4. Feature I — the typed value & binding layer (Q7)
 
@@ -1144,13 +1146,21 @@ executable checks). The ledger is authoritative for numbering and sequencing.
 - [x] **Q3 — `layered`/`application-structure` query uplift**: resolved 2026-07-13 —
   tables C-3 and C-6 added to the extract (with the rest of C.1); §6.2 specifies both
   from the spec tables directly.
-- [ ] **Q4 — Frontend rewrite handshake**: which branch/PR to target for Phase H, and
-  whether the rewrite adopts the §10 contracts directly. — Owner: Michael + frontend
-  effort
-- [ ] **Q5 — Junction traversal**: v1 excludes chains through junctions (§5.2); confirm
-  acceptable or schedule junction-aware derivation as a follow-up. Note the C.1 intro
-  admits junctions into every viewpoint's *scope* — that is unaffected (junctions remain
-  placeable); only derivation *chains through* them are excluded. — Owner: review
+- [x] **Q4 — Frontend rewrite handshake**: resolved 2026-07-13 — there is no concurrent
+  UI redesign. The "rewrite" this plan's D12 gate anticipated was the LoC-limit file-
+  splitting refactor (splitting oversized `.vue` files below the 350-line hard limit),
+  deliberately paused until this plan completes so the two efforts don't collide. Phase H
+  therefore targets **today's** `tools/gui/` components directly — no branch/PR handshake
+  needed, no retrofit-onto-a-redesign risk, since the paused refactor is file-structure
+  only and does not change component behavior/contracts. The D12 gate is lifted: Phase H
+  proceeds in its normal ledger position once its deps (E2, E4, E5, F1, F3–F6) are met.
+- [x] **Q5 — Junction traversal**: resolved 2026-07-13 — derivation should be both
+  grouping- and junction-aware; v1's exclusion of chains through junctions (and grouping)
+  is a real gap, not an acceptable limitation. Scheduled as a follow-up WU (grouping-
+  and-junction-aware derivation chaining) — not implemented in this plan's WU set; needs
+  its own design pass (junction fan-in/fan-out semantics affect which DR/PDR rules can
+  even apply through a junction, and grouping composition needs the same scrutiny given
+  it is itself a relationship-bearing element in ArchiMate 4).
 
 ---
 
