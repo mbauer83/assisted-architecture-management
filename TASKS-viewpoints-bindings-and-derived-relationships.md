@@ -167,7 +167,7 @@ the binding layer, and G1 waits on neither derivation nor presentation work.
     pair; certain/potential mixing pinned.
   - Deps: B1.
 
-- [ ] **WU-B3 — §B.4 restrictions**
+- [x] **WU-B3 — §B.4 restrictions**
   - Files: new `src/domain/relationship_derivation_restrictions.py`,
     `tests/domain/test_relationship_derivation_restrictions.py`.
   - Changes: predicates R1–R14 + RJ1–RJ2 transcribed **from the PLAN §5.2 restriction
@@ -873,3 +873,4 @@ Anything short of this is "in progress", regardless of how many WUs are ticked.
 - 2026-07-13 — WU-A2 — Source Appendix B confirms strength orderings only for structural/dependency relationships; dynamic roles now intentionally carry no strength and the plan table was corrected.
 - 2026-07-13 — WU-B1 — Shipped taxonomy classification and all certain pairwise composition rules are covered by pure-domain tests; every ontology now exposes optional YAML-loaded derivation rules, with no ontology-specific rule table or predicate in the evaluator.
 - 2026-07-13 — WU-B2 — YAML rules now cover all potential compositions; the Grouping aggregation rule requires a permitted result, and chain certainty records potential steps.
+- 2026-07-13 — WU-B3 — Declarative restriction review passed: R1–R14 and RJ1–RJ2 were checked line-by-line against Appendix B and exercised with admitting and rejecting cases.

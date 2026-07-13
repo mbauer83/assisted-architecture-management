@@ -15,7 +15,12 @@ from src.domain.permitted_relationships import (
     PermittedRelationship,
     PermittedRelationshipSet,
 )
-from src.domain.relationship_derivation_rules import CompositionRule, load_composition_rules
+from src.domain.relationship_derivation_restrictions import DerivationRestriction
+from src.domain.relationship_derivation_rules import (
+    CompositionRule,
+    load_composition_rules,
+    load_derivation_restrictions,
+)
 from src.domain.specializations import SpecializationCatalog
 
 DISPLAY_SECTION_ID = "sysml"
@@ -39,12 +44,14 @@ class _SysmlV2MinModule:
         permitted_relationships: PermittedRelationshipSet,
         element_classes: dict[str, ElementClassInfo],
         derivation_rules: tuple[CompositionRule, ...] = (),
+        derivation_restrictions: tuple[DerivationRestriction, ...] = (),
     ) -> None:
         self._entity_types = entity_types
         self._connection_types = connection_types
         self._permitted_relationships = permitted_relationships
         self._element_classes = element_classes
         self._derivation_rules = derivation_rules
+        self._derivation_restrictions = derivation_restrictions
 
         _class_build: dict[ElementClassName, set[EntityTypeName]] = {}
         for ename, info in entity_types.items():
@@ -77,6 +84,10 @@ class _SysmlV2MinModule:
     @property
     def derivation_rules(self) -> tuple[CompositionRule, ...]:
         return self._derivation_rules
+
+    @property
+    def derivation_restrictions(self) -> tuple[DerivationRestriction, ...]:
+        return self._derivation_restrictions
 
     @property
     def element_classes(self) -> dict[str, ElementClassInfo]:
@@ -234,4 +245,5 @@ def load_sysml_module(package_dir: Path, *, guidance: GuidanceOverlay | None = N
         permitted_relationships=permitted,
         element_classes=element_classes,
         derivation_rules=load_composition_rules(package_dir),
+        derivation_restrictions=load_derivation_restrictions(package_dir),
     )

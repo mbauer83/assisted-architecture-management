@@ -9,6 +9,11 @@ from typing import Literal, cast
 
 import yaml  # type: ignore[import-untyped]
 
+from src.domain.relationship_derivation_restrictions import (
+    DerivationRestriction,
+    restriction_rules_from_mapping,
+)
+
 Certainty = Literal["certain", "potential"]
 Join = Literal["target-source", "target-target", "source-source", "source-target"]
 Endpoint = Literal["first-source", "first-target", "second-source", "second-target"]
@@ -113,3 +118,15 @@ def load_composition_rules(package_dir: Path) -> tuple[CompositionRule, ...]:
     if not isinstance(raw, Mapping):
         raise ValueError("relationship derivation data must be a mapping")
     return composition_rules_from_mapping(raw.get("composition_rules", ()))
+
+
+def load_derivation_restrictions(package_dir: Path) -> tuple[DerivationRestriction, ...]:
+    """Load an ontology's optional declarative relationship restrictions."""
+    path = package_dir / "relationship_derivation.yaml"
+    if not path.is_file():
+        return ()
+    with path.open(encoding="utf-8") as stream:
+        raw: object = yaml.safe_load(stream) or {}
+    if not isinstance(raw, Mapping):
+        raise ValueError("relationship derivation data must be a mapping")
+    return restriction_rules_from_mapping(raw.get("restrictions", ()))
