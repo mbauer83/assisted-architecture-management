@@ -104,6 +104,9 @@ def get_criteria_catalog() -> dict[str, Any]:
         for name, info in catalogs.ontology.all_connection_types().items()
         if info.derivation_role is not None
     }
+    entity_type_domains = {
+        str(name): info.hierarchy[0] for name, info in registries.entity_type_infos.items() if info.hierarchy
+    }
     return {
         "entity_types": sorted(registries.known_entity_types),
         "connection_types": sorted(registries.known_connection_types),
@@ -114,6 +117,7 @@ def get_criteria_catalog() -> dict[str, Any]:
         "reserved_entity_paths": sorted(RESERVED_ENTITY_PATHS),
         "reserved_connection_paths": sorted(RESERVED_CONNECTION_PATHS),
         "depth_cap": registries.depth_cap,
+        "entity_type_domains": entity_type_domains,
         "bindings": {
             "select": ["entity", "connection"],
             "aggregate": ["count", "min", "max", "sum", "average", "first", "last"],

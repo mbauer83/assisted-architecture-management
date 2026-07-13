@@ -156,6 +156,9 @@ export const CriteriaCatalogSchema = Schema.Struct({
   reserved_entity_paths: Schema.Array(Schema.String),
   reserved_connection_paths: Schema.Array(Schema.String),
   depth_cap: Schema.Number,
+  // entity type slug -> owning domain (hierarchy[0]) — lets the scope picker group entity
+  // types by domain and support "exclude this whole domain" bulk actions.
+  entity_type_domains: Schema.Record({ key: Schema.String, value: Schema.String }),
 })
 export type CriteriaCatalog = typeof CriteriaCatalogSchema.Type
 

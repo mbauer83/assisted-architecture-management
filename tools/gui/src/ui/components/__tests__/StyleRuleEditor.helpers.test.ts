@@ -9,6 +9,7 @@ const CATALOG: CriteriaCatalog = {
   entity_attribute_types: { risk_score: 'number', lifecycle_stage: 'string', launched_on: 'date' },
   connection_attribute_types: {},
   symmetric_connection_types: [], reserved_entity_paths: [], reserved_connection_paths: [], depth_cap: 4,
+  entity_type_domains: {},
 }
 
 describe('capabilitiesFor', () => {

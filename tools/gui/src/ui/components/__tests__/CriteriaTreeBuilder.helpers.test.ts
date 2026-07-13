@@ -19,6 +19,7 @@ const CATALOG: CriteriaCatalog = {
   reserved_entity_paths: ['id', 'name', 'type', 'specialization', 'group', 'domain', 'subdomain', 'status', 'version'],
   reserved_connection_paths: ['id', 'type', 'specialization'],
   depth_cap: 4,
+  entity_type_domains: { 'application-component': 'application', process: 'common' },
 }
 
 describe('attributeOptions', () => {

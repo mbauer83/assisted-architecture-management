@@ -49,7 +49,7 @@ class TestCriteriaCatalog:
             "entity_types", "connection_types", "specialization_slugs",
             "entity_attribute_types", "connection_attribute_types", "symmetric_connection_types",
             "reserved_entity_paths", "reserved_connection_paths", "depth_cap", "bindings", "parameters", "derived",
-            "connection_derivation",
+            "connection_derivation", "entity_type_domains",
         }
         assert "application-component" in body["entity_types"]
         assert "type" in body["reserved_entity_paths"]
@@ -57,6 +57,7 @@ class TestCriteriaCatalog:
         assert "entity-id" in body["parameters"]["types"]
         assert body["derived"]["certainty"] == ["certain", "potential"]
         assert body["connection_derivation"]["archimate-realization"]["role"] == "structural"
+        assert body["entity_type_domains"]["application-component"] == "application"
 
 
 class TestReferencers:
