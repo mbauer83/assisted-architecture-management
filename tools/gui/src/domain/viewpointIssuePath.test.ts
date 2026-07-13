@@ -5,7 +5,7 @@ import { resolveIssuePathNodeId } from './viewpointIssuePath'
 const EXAMPLE = {
   slug: 'components-serving-processes', version: 2, name: 'Components Serving Processes',
   query: {
-    query_schema: 2,
+    query_schema: 1,
     entity_criteria: {
       kind: 'group', conjunction: 'and',
       children: [

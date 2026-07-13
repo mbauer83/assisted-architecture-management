@@ -1,4 +1,4 @@
-"""Parsing for criteria trees (companion plan Appendix A): nodes are discriminated by
+"""Parsing for criteria trees: nodes are discriminated by
 ``kind: condition | incident | group``; a condition's ``value`` is either a literal
 shorthand (plain scalar/list) or a ``{from: self|source|target, attribute: ...}`` mapping
 (a ``ValueRef`` reference). Unknown keys are a parse error — never ignored.
@@ -29,7 +29,7 @@ from src.domain.viewpoint_criteria import (
 _CONDITION_KEYS = frozenset({"kind", "attribute", "comparator", "value", "negate"})
 _GROUP_KEYS = frozenset({"kind", "conjunction", "children", "negate"})
 _INCIDENT_KEYS = frozenset({"kind", "direction", "connection_criteria", "endpoint_criteria", "negate"})
-_VALUE_REF_KEYS = frozenset({"from", "attribute"})
+_VALUE_REF_KEYS = frozenset({"from", "attribute", "name", "project", "aggregate", "quantifier"})
 _NEIGHBOR_INCLUSION_KEYS = frozenset({"connection_criteria", "direction", "neighbor_criteria"})
 _CONNECTION_SELECTION_KEYS = frozenset({"enabled", "criteria"})
 
@@ -65,8 +65,27 @@ def _value_ref_from_raw(raw: object) -> ValueRef:
     if isinstance(raw, Mapping) and "from" in raw:
         _check_keys(raw, _VALUE_REF_KEYS, label="value reference")
         from_ = str(raw["from"])
+        if from_ in {"binding", "parameter"}:
+            name = raw.get("name")
+            if not isinstance(name, str) or not name:
+                raise ValueError(f"{from_} value reference requires 'name'")
+            if from_ == "parameter":
+                return ValueRef(kind="parameter", parameter=name)
+            aggregate = raw.get("aggregate")
+            quantifier = raw.get("quantifier")
+            if aggregate not in {None, "count", "sum", "avg", "min", "max"}:
+                raise ValueError("binding value reference has an unknown aggregate")
+            if quantifier not in {None, "any", "all"}:
+                raise ValueError("binding value reference has an unknown quantifier")
+            return ValueRef(
+                kind="binding",
+                binding=name,
+                project=str(raw["project"]) if raw.get("project") is not None else None,
+                aggregate=aggregate,
+                quantifier=quantifier,
+            )
         if from_ not in ("self", "source", "target"):
-            raise ValueError(f"value 'from' must be one of self/source/target, got {from_!r}")
+            raise ValueError(f"value 'from' must be one of self/source/target/binding/parameter, got {from_!r}")
         attribute = raw.get("attribute")
         if not attribute:
             raise ValueError("value reference requires 'attribute'")

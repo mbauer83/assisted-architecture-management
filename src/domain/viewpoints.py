@@ -19,6 +19,7 @@ from dataclasses import dataclass, field
 from typing import Literal
 
 from src.domain.concept_scope import ConceptScope
+from src.domain.viewpoint_bindings import DerivedAttribute, QueryBinding, QueryParameter
 from src.domain.viewpoint_criteria import (
     ConnectionCriteriaGroup,
     ConnectionSelection,
@@ -34,7 +35,7 @@ StyleConditionMode = Literal["match", "range"]
 TargetKind = Literal["diagram", "matrix"]
 EnforcementSetting = Literal["off", "warn", "ghost"]
 
-QUERY_SCHEMA_VERSION = 2
+QUERY_SCHEMA_VERSION = 1
 VALID_PURPOSES: frozenset[str] = frozenset({"designing", "deciding", "informing"})
 VALID_CONTENTS: frozenset[str] = frozenset({"details", "coherence", "overview"})
 VALID_REPO_SCOPES: frozenset[str] = frozenset({"enterprise", "engagement", "both"})
@@ -50,7 +51,7 @@ REPRESENTATION_CAPABILITIES: Mapping[Representation, frozenset[str]] = {
     "matrix": frozenset({"row_by", "column_by", "cell_emphasis"}),
     "diagram": frozenset({"node_color", "edge_color", "edge_emphasis", "cluster_grouping"}),
 }
-"""Capability vocabulary per representation (companion plan §5.1). ``node_*``/``cluster_*``
+"""Capability vocabulary per representation. ``node_*``/``cluster_*``
 capabilities and table columns take ``EntityCriteriaGroup`` match criteria; ``edge_*``
 capabilities take ``ConnectionCriteriaGroup`` — a mismatch is a save-time validation error.
 """
@@ -90,7 +91,7 @@ class StyleRule:
 @dataclass(frozen=True)
 class ColumnSpec:
     label: str
-    source: str  # dotted attribute path (§3.3) — the only supported column source today
+    source: str  # dotted attribute path — the only supported column source today
 
 
 @dataclass(frozen=True)
@@ -110,8 +111,8 @@ class PresentationSpec:
 @dataclass(frozen=True)
 class ExecutableViewpointQuery:
     """Selects one included entity population — the primary ``entity_criteria`` matches
-    plus any ``include_connected`` neighbors — and its constrained connections (companion
-    plan §4). Representation-specific projection lives in ``PresentationSpec``.
+    plus any ``include_connected`` neighbors — and its constrained connections.
+    Representation-specific projection lives in ``PresentationSpec``.
     """
 
     query_schema: int = QUERY_SCHEMA_VERSION
@@ -119,6 +120,9 @@ class ExecutableViewpointQuery:
     include_connected: tuple[NeighborInclusion, ...] = ()
     connections: ConnectionSelection = ConnectionSelection()
     repo_scope: RepoScope = "both"
+    bindings: tuple[QueryBinding, ...] = ()
+    parameters: tuple[QueryParameter, ...] = ()
+    derived: tuple[DerivedAttribute, ...] = ()
 
 
 @dataclass(frozen=True)

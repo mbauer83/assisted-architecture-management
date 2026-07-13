@@ -348,7 +348,7 @@ The evaluator is a pure recursive function; these rules are the contract its tes
 ```python
 @dataclass(frozen=True)
 class ExecutableViewpointQuery:
-    query_schema: int = 2                     # was 1; breaking redesign, not migrated in place
+    query_schema: int = 1                     # pre-release current grammar; no compatibility path
     entity_criteria: EntityCriteriaGroup = EntityCriteriaGroup()
     include_connected: tuple["NeighborInclusion", ...] = ()   # additive neighbor terms, §4.1
     connections: ConnectionSelection = ConnectionSelection()
@@ -1043,7 +1043,7 @@ viewpoints:
     purpose: informing
     content: overview
     query:
-      query_schema: 2
+      query_schema: 1
       entity_criteria:
         kind: group
         conjunction: and
@@ -1059,7 +1059,7 @@ viewpoints:
     version: 1
     name: Active Application & Technology
     query:
-      query_schema: 2
+      query_schema: 1
       entity_criteria:
         kind: group
         conjunction: and
@@ -1090,7 +1090,7 @@ viewpoints:
     version: 2
     name: Components Serving Processes
     query:
-      query_schema: 2
+      query_schema: 1
       entity_criteria:
         kind: group
         conjunction: and
@@ -1167,7 +1167,7 @@ viewpoints:
     version: 1
     name: Component Lifecycle
     query:
-      query_schema: 2
+      query_schema: 1
       entity_criteria:
         kind: group
         conjunction: and
@@ -1209,7 +1209,7 @@ viewpoints:
     version: 1
     name: Requirement Coverage
     query:
-      query_schema: 2
+      query_schema: 1
       entity_criteria:
         kind: group        # match-all base: each axis carries the full selection
         conjunction: and

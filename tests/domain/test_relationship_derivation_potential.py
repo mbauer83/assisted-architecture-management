@@ -1,4 +1,4 @@
-"""Potential relationship composition behavior from the Appendix-B rule set."""
+"""Potential relationship composition behavior."""
 
 from __future__ import annotations
 

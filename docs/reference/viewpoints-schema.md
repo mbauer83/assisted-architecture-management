@@ -22,7 +22,7 @@ viewpoints:
     purpose: informing        # informing | designing | deciding
     content: overview          # overview | coherence | details
     query:
-      query_schema: 2
+      query_schema: 1
       entity_criteria:
         kind: group
         conjunction: and
@@ -37,7 +37,7 @@ viewpoints:
     version: 2
     name: Components Serving Processes
     query:
-      query_schema: 2
+      query_schema: 1
       entity_criteria:
         kind: group
         conjunction: and
@@ -107,7 +107,7 @@ viewpoints:
     version: 1
     name: Requirement Coverage
     query:
-      query_schema: 2
+      query_schema: 1
       entity_criteria: {kind: group, conjunction: and, children: []}   # match-all base
       connections:
         enabled: true

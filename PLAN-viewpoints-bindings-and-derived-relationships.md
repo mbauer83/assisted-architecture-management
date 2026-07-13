@@ -174,12 +174,9 @@ Four forces converge:
   unrestricted scope ⇒ match-all). The result's `query_summary` states the derivation
   ("Selection derived from the viewpoint's concept scope: …"). Fixes the observed
   "execution finds no entities"; `_NO_QUERY_SUMMARY` path is retired.
-- **D10 — `query_schema` 3, additive.** Parser accepts 2 and 3; any new construct
-  (bindings/derived/parameters/traversal≠direct/scale-mode/…) requires 3 (schema-2 payload
-  using one is a parse error naming the construct); serializer writes 2 when no new
-  construct is present (existing files stay byte-stable), else 3. No repository migration:
-  a D17 coverage note records the no-op decision with a test proving schema-2 files load
-  unchanged.
+- **D10 — `query_schema` 1, single current grammar.** This pre-release repository has no
+  query-format compatibility commitment: parser and serializer use schema 1 only. Every
+  persisted query is migrated with the implementation; unknown keys remain parse errors.
 - **D11 — Every included Q6 feature reuses an existing mechanism.** Persistent results →
   the view-derivation strategy system; pinning → a repo-local sidecar, not definition
   content; heat maps → a third `StyleRule` mode; labels → a validated display option.
@@ -1033,12 +1030,12 @@ REST + Playwright, not against current components):
 
 - **Versioning/promotion**: bindings/parameters/derived/traversal/presentation additions
   are semantic content — edits bump versions exactly as today; D14 exact-version promotion
-  is unchanged (one new test: promoting a diagram whose pinned definition uses schema-3
+  is unchanged (one new test: promoting a diagram whose pinned definition uses schema-1
   constructs). Pins are repo-local state and never promote.
 - **Serialization**: D10. Round-trip identity (`parse ∘ serialize = id`) extends over
   every new construct; unknown keys remain parse errors; defaults omitted on write.
-- **D17 coverage invariant**: no persisted-format change to existing files (schema-2 files
-  remain valid and byte-stable) ⇒ documented no-op decision + regression test; the new
+- **D17 coverage invariant**: every persisted query uses the current schema-1 grammar;
+  migration is explicit and regression-tested; the new
   `viewpoint-pins.yaml` sidecar is a *new* optional file (absence = no pins), no upgrade
   step required.
 - **Security/auth**: no new trust boundaries — all new surfaces ride existing REST/MCP
@@ -1149,7 +1146,7 @@ viewpoints:
     version: 1
     name: Components Above Fleet Median Risk
     query:
-      query_schema: 3
+      query_schema: 1
       bindings:
         - name: all-components
           result_type: entities[application-component]
@@ -1191,7 +1188,7 @@ viewpoints:
     stakeholders: [enterprise-architects, operational-managers]
     concerns: [what is affected if this element changes]
     query:
-      query_schema: 3
+      query_schema: 1
       parameters:
         - {name: anchor, type: entity-id, required: true,
            description: The element whose dependents are analyzed}
@@ -1242,7 +1239,7 @@ viewpoints:
     version: 1
     name: Requirement Realization Load
     query:
-      query_schema: 3
+      query_schema: 1
       derived:
         - name: realizer-count
           direction: incoming
@@ -1317,7 +1314,7 @@ style-match, matrix-axis).
 **ValueRef extension** — every new kind × comparator typing rule (incl.
 `unquantified-set-comparison`, tuple rules); quantifier evaluation; parameter resolution,
 missing/mistyped/unknown-parameter typed errors; dangling `entity-id` → warning +
-no-match; schema-2 payload using new constructs → parse error naming the construct.
+no-match; unsupported query-schema payloads → parse error naming the version.
 
 **Derived attributes** — count/sum/avg/min/max over connection- and endpoint-sourced
 attributes; direct vs derived traversal; memoization (call-count spy); `derived.` paths in

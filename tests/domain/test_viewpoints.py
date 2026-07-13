@@ -1,5 +1,4 @@
-"""Tests for viewpoint definitions/applications: catalog uniqueness and structural parsing
-of the query and presentation shapes (Appendix-A canonical form)."""
+"""Tests for viewpoint definitions/applications and structural parsing."""
 
 from __future__ import annotations
 
@@ -129,7 +128,7 @@ class TestQueryShapeParsing:
             "version": 1,
             "name": "Filtered",
             "query": {
-                "query_schema": 2,
+                "query_schema": 1,
                 "entity_criteria": {
                     "kind": "group",
                     "conjunction": "and",
@@ -169,8 +168,14 @@ class TestQueryShapeParsing:
 
     def test_invalid_query_schema_version_rejected_loudly(self) -> None:
         mapping = self._query_mapping()
-        mapping["query"]["query_schema"] = 1
+        mapping["query"]["query_schema"] = 2
         with pytest.raises(ValueError, match="query_schema"):
+            viewpoint_catalog_from_mapping({"viewpoints": [mapping]})
+
+    def test_query_schema_is_required(self) -> None:
+        mapping = self._query_mapping()
+        del mapping["query"]["query_schema"]
+        with pytest.raises(ValueError, match="query_schema is required"):
             viewpoint_catalog_from_mapping({"viewpoints": [mapping]})
 
     def test_invalid_comparator_rejected_loudly(self) -> None:

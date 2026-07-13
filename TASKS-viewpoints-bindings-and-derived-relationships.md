@@ -278,13 +278,13 @@ the binding layer, and G1 waits on neither derivation nor presentation work.
     date, singular projection, tuple arity mismatch static error).
   - Deps: none (parallel to Phase B).
 
-- [ ] **WU-C2 — Binding/parameter/derived value objects + parsing/serialization**
+- [x] **WU-C2 — Binding/parameter/derived value objects + parsing/serialization**
   - Files: new `src/domain/viewpoint_bindings.py`; `src/domain/viewpoint_criteria.py`
     (`ValueRef` new kinds/fields, `VALID_VALUE_REF_KINDS`),
     `viewpoint_criteria_parsing.py`/`viewpoint_criteria_serialization.py` (ValueRef
     mapping forms `{from: binding|parameter, …}`),
     `viewpoint_query_parsing.py`/`viewpoint_query_serialization.py` (top-level
-    `bindings`/`parameters`/`derived`, `query_schema` 2/3 rules per D10);
+    `bindings`/`parameters`/`derived`, schema-1 query grammar per D10);
     `src/domain/viewpoints.py` (`ExecutableViewpointQuery` fields); tests:
     `test_viewpoint_criteria_parsing.py`, `test_viewpoint_serialization.py` (extend), new
     `tests/domain/test_viewpoint_bindings_parsing.py`.
@@ -292,12 +292,10 @@ the binding layer, and G1 waits on neither derivation nor presentation work.
     with `traversal`/`include_potential`/`max_hops` fields (used from Phase D) and the
     three-headed `of` grammar (`connection.<attr>` | `endpoint.<attr>` |
     `relationship.hops` — the reserved derived-hop source, PLAN §4.3);
-    schema-2 payload using any new construct ⇒ parse error naming the construct;
-    serializer writes minimal schema (2 when no new construct). (The base
-    accept-schema-2-and-3 parser change is shared with WU-D1a — whichever of the two
-    lands first introduces it; the other extends the construct list.)
-  - Acceptance: `parse ∘ serialize = id` over maximal new-shape definitions AND all
-    pre-existing Appendix-A fixtures byte-stable at schema 2; unknown keys error;
+    parser and serializer use schema 1 only. (The base parser change is shared with
+    WU-D1a — whichever of the two lands first introduces it; the other extends the
+    construct list.)
+  - Acceptance: `parse ∘ serialize = id` over maximal new-shape definitions; unknown keys error;
     Appendix-A examples 1–3 of the new PLAN parse.
   - Deps: C1.
 
@@ -373,7 +371,7 @@ the binding layer, and G1 waits on neither derivation nor presentation work.
     candidate/anchor; criteria against them restricted to `type|certainty|hops`.
     **Parsing and save-mode validation of the traversal fields land HERE** (extending
     the shipped `viewpoint_criteria_parsing.py`/`viewpoint_criteria_validation.py`):
-    `derived-traversal-path-unsupported`, `derivation-hops-exceeded`, and the schema-3
+    `derived-traversal-path-unsupported`, `derivation-hops-exceeded`, and the schema-1
     gating for `traversal != direct` — independent of the Phase-C binding grammar, so R2
     is self-contained. Depth cap counts the node as one level; `via` =
     `"derived-traversal"` for derived-included neighbors. No binding/derived-attribute
@@ -497,7 +495,7 @@ the binding layer, and G1 waits on neither derivation nor presentation work.
     `bindings`/`parameters`/`derived`/traversal/presentation-scale are semantic content.
   - Acceptance: create→error→fix loop over a binding-cycle payload converges on paths;
     semantic-vs-descriptive bump matrix extended; D14 exact-version promotion regression
-    with a schema-3 definition.
+    with a schema-1 definition.
   - Deps: C3, E1.
 
 - [ ] **WU-E5 — `GET /api/neighbors` derived mode**
@@ -790,7 +788,7 @@ component names are not.
   - Run and record: full `pytest` (0 failures), `ruff` (0), `zuban` (pass); all four
     `tests/architecture/` fitness tests green; spec-fidelity suites green (Appendix-B
     per-rule tests + worked examples; Appendix-C table fidelity; direct-model-boundary
-    and PDR12-guard properties); round-trip identity suite green incl. schema-2 byte-stability; dogfood
+    and PDR12-guard properties); round-trip identity suite green for schema 1; dogfood
     verification via MCP against the restarted backend — `artifact_query_viewpoint list`
     shows the full library with `query_summary` non-null for every entry,
     `execute` of `element-dependents` on a real entity returns non-empty dependents,
@@ -832,7 +830,7 @@ Anything short of this is "in progress", regardless of how many WUs are ticked.
 - [ ] No new MCP tools; no formula/text query input anywhere; derived relationships are
   never persisted or indexed.
 - [ ] All quality gates + all four architectural fitness functions green; generated
-  types/MCP docs current; schema-2 definitions parse and re-serialize byte-stable.
+  types/MCP docs current; schema-1 definitions parse and re-serialize byte-stable.
 - [ ] Zero references to plan/phase/WU identifiers in shipped code, tests, or docs pages.
 
 ### Consistency & failure-mode invariants (hold at every release cut, asserted by tests)
@@ -852,9 +850,9 @@ Anything short of this is "in progress", regardless of how many WUs are ticked.
   (asserted on written frontmatter); rendering/refresh consume reconstruction outcomes
   only (`Derived | Broken | NoLongerDerives`) — staleness is reported, never
   auto-resolved.
-- [ ] **Serialization stability**: schema-2 definitions parse and re-serialize
-  byte-stable; `parse ∘ serialize = id` over every valid definition; schema-3 constructs
-  in a schema-2 payload are parse errors naming the construct.
+- [ ] **Serialization stability**: schema-1 definitions parse and re-serialize
+  byte-stable; `parse ∘ serialize = id` over every valid definition; unsupported schema
+  versions are parse errors naming the version.
 - [ ] **Evaluation determinism**: stable item-id ordering everywhere (results, binding
   values, witness-path selection); no wall-clock/randomness outside
   `src/domain/clock.py`; identical model state ⇒ identical execution result.
@@ -880,3 +878,4 @@ Anything short of this is "in progress", regardless of how many WUs are ticked.
 - 2026-07-13 — WU-B6 — Transcriber/reviewer: Codex; line-by-line spec-to-literal-fixture/runtime review passed with exhaustive and invariant batteries.
 - 2026-07-13 — WU-B7 — Recorded witness paths reconstruct through the shared composition logic; broken and no-longer-derived states are explicit.
 - 2026-07-13 — WU-C1 — Canonical result types and conservative inference cover cardinality, projections, aggregates, and tuple compatibility.
+- 2026-07-13 — WU-C2 — Bindings, parameters, derived attributes, and ValueRefs now parse and serialize declaratively; the pre-release query language is explicitly schema 1 only, with all persisted examples and GUI fixtures migrated.

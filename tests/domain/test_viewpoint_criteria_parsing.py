@@ -1,4 +1,4 @@
-"""Direct tests for the criteria-tree parser/serializer (companion plan Appendix A):
+"""Direct tests for the criteria-tree parser/serializer:
 kind discrimination, ValueRef literal-vs-mapping forms, unknown-key rejection, and
 round-trip identity, independent of the top-level definition parsing tested elsewhere."""
 
@@ -123,6 +123,30 @@ class TestValueRefForms:
         )
         assert isinstance(condition, AttributeCondition)
         assert condition.value == ValueRef(kind="attribute_of_endpoint", attribute="threshold", endpoint="target")
+
+    def test_binding_reference_mapping_form(self) -> None:
+        condition = parse_entity_criteria_node(
+            {
+                "kind": "condition",
+                "attribute": "owner",
+                "comparator": "eq",
+                "value": {"from": "binding", "name": "owners", "project": "id", "quantifier": "any"},
+            }
+        )
+        assert isinstance(condition, AttributeCondition)
+        assert condition.value == ValueRef(kind="binding", binding="owners", project="id", quantifier="any")
+
+    def test_parameter_reference_mapping_form(self) -> None:
+        condition = parse_entity_criteria_node(
+            {
+                "kind": "condition",
+                "attribute": "criticality",
+                "comparator": "eq",
+                "value": {"from": "parameter", "name": "minimum_criticality"},
+            }
+        )
+        assert isinstance(condition, AttributeCondition)
+        assert condition.value == ValueRef(kind="parameter", parameter="minimum_criticality")
 
     def test_invalid_from_value_rejected(self) -> None:
         with pytest.raises(ValueError, match="from"):

@@ -1,9 +1,8 @@
-"""Appendix-A examples are executable fixtures (companion plan Appendix A/C): they parse,
-round-trip through the serializer, and pass save-mode validation against the shipped
-`archimate_4` catalog plus the fixture attribute profiles under
-`tests/fixtures/viewpoints/schemata/` — installed into a test repo's `.arch-repo/schemata/`
-to exercise the real ``load_attribute_schema`` path rather than a shortcut. Removing a
-fixture profile makes the corresponding example fail, proving the path is real.
+"""Representative viewpoint declarations parse, round-trip, and validate.
+
+The profile fixtures are installed into a temporary repository so validation exercises the
+normal attribute-schema loading path. Removing a fixture profile must make its declaration
+fail validation.
 """
 
 from __future__ import annotations
@@ -23,7 +22,7 @@ from src.ontologies.archimate_4._loader import load_archimate_4_module
 _ARCHIMATE_PACKAGE_DIR = Path(__file__).parents[2] / "src" / "ontologies" / "archimate_4"
 _FIXTURE_SCHEMATA = Path(__file__).parents[1] / "fixtures" / "viewpoints" / "schemata"
 
-_APPENDIX_A_YAML = (Path(__file__).parents[1] / "fixtures" / "viewpoints" / "appendix_a_examples.yaml").read_text()
+_EXAMPLES_YAML = (Path(__file__).parents[1] / "fixtures" / "viewpoints" / "viewpoint_examples.yaml").read_text()
 
 
 def _flat_attribute_types(schema: dict[str, object] | None) -> dict[str, str]:
@@ -59,16 +58,16 @@ def _registries(repo_root: Path) -> dict[str, object]:
     }
 
 
-class TestAppendixAExamples:
+class TestViewpointExamples:
     def test_every_example_parses_and_round_trips(self) -> None:
-        data = yaml.safe_load(_APPENDIX_A_YAML)
+        data = yaml.safe_load(_EXAMPLES_YAML)
         catalog = viewpoint_catalog_from_mapping(data)
         assert len(catalog.entries) == 5
         reparsed = viewpoint_catalog_from_mapping(viewpoint_catalog_to_mapping(catalog))
         assert reparsed == catalog
 
     def test_every_example_passes_save_mode_validation(self, repo_with_fixture_profiles: Path) -> None:
-        data = yaml.safe_load(_APPENDIX_A_YAML)
+        data = yaml.safe_load(_EXAMPLES_YAML)
         catalog = viewpoint_catalog_from_mapping(data)
         registries = _registries(repo_with_fixture_profiles)
         for definition in catalog.entries:
@@ -80,7 +79,7 @@ class TestAppendixAExamples:
         (
             repo_with_fixture_profiles / ".arch-repo" / "schemata" / "attributes.application-component.schema.json"
         ).unlink()
-        data = yaml.safe_load(_APPENDIX_A_YAML)
+        data = yaml.safe_load(_EXAMPLES_YAML)
         catalog = viewpoint_catalog_from_mapping(data)
         definition = catalog.get("component-lifecycle-table")
         assert definition is not None

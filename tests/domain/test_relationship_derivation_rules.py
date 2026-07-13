@@ -1,4 +1,4 @@
-"""Certain relationship-composition behavior from the Appendix-B rule set."""
+"""Certain relationship-composition behavior."""
 
 from __future__ import annotations
 

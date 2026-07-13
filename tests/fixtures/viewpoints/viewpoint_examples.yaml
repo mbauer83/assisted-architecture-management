@@ -1,6 +1,5 @@
-# Verbatim from PLAN-viewpoints-query-model.md Appendix A — these five definitions are
-# executable fixtures (companion plan Appendix A/C): parsed, round-tripped, and validated
-# against tests/fixtures/viewpoints/schemata/ by tests/domain/test_viewpoint_appendix_a_examples.py.
+# Representative declarations are parsed, round-tripped, and validated against the profile
+# fixtures in this directory.
 viewpoints:
   # 1. Simple: all application components (flat AND, one condition)
   - slug: application-components
@@ -9,7 +8,7 @@ viewpoints:
     purpose: informing
     content: overview
     query:
-      query_schema: 2
+      query_schema: 1
       entity_criteria:
         kind: group
         conjunction: and
@@ -25,7 +24,7 @@ viewpoints:
     version: 1
     name: Active Application & Technology
     query:
-      query_schema: 2
+      query_schema: 1
       entity_criteria:
         kind: group
         conjunction: and
@@ -56,7 +55,7 @@ viewpoints:
     version: 2
     name: Components Serving Processes
     query:
-      query_schema: 2
+      query_schema: 1
       entity_criteria:
         kind: group
         conjunction: and
@@ -133,7 +132,7 @@ viewpoints:
     version: 1
     name: Component Lifecycle
     query:
-      query_schema: 2
+      query_schema: 1
       entity_criteria:
         kind: group
         conjunction: and
@@ -175,7 +174,7 @@ viewpoints:
     version: 1
     name: Requirement Coverage
     query:
-      query_schema: 2
+      query_schema: 1
       entity_criteria:
         kind: group # match-all base: each axis carries the full selection
         conjunction: and

@@ -12,7 +12,7 @@ const conn = (overrides: Partial<ConnectionItemSummary> = {}): ConnectionItemSum
 })
 
 const baseResult = (overrides: Partial<ViewpointExecutionResult> = {}): ViewpointExecutionResult => ({
-  slug: 'vp', version: 1, query_schema: 2, repo_scope: 'both', executed_at: '2026-01-01T00:00:00Z',
+  slug: 'vp', version: 1, query_schema: 1, repo_scope: 'both', executed_at: '2026-01-01T00:00:00Z',
   index_generation: 1, entity_ids: ['a', 'b', 'c'], connection_ids: [], entities: [], connections: [],
   total_entity_count: 3, returned_entity_count: 3, total_connection_count: 0, returned_connection_count: 0,
   truncated: false, entity_limit: 500, matrix_axes: null, warnings: [], duration_ms: 1, query_summary: '',

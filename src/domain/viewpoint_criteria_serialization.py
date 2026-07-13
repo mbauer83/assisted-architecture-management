@@ -1,4 +1,4 @@
-"""Serialize criteria trees back to the Appendix-A canonical YAML shape: field defaults are
+"""Serialize criteria trees to their canonical YAML shape: field defaults are
 omitted on write, ``negate`` is written only when true, and a condition's default
 (``ValueRef()``) value is omitted entirely (matching the parser reading an absent ``value``
 key as that same default) — the counterpart to ``viewpoint_criteria_parsing.py``.
@@ -22,6 +22,17 @@ from src.domain.viewpoint_criteria import (
 def _value_ref_to_raw(value: ValueRef) -> Any:
     if value.kind == "literal":
         return value.literal
+    if value.kind == "parameter":
+        return {"from": "parameter", "name": value.parameter}
+    if value.kind == "binding":
+        result: dict[str, Any] = {"from": "binding", "name": value.binding}
+        if value.project is not None:
+            result["project"] = value.project
+        if value.aggregate is not None:
+            result["aggregate"] = value.aggregate
+        if value.quantifier is not None:
+            result["quantifier"] = value.quantifier
+        return result
     from_ = "self" if value.kind == "attribute_of_self" else value.endpoint
     return {"from": from_, "attribute": value.attribute}
 

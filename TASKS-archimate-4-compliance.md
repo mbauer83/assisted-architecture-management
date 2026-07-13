@@ -765,7 +765,7 @@ WUs above depend on; deps drive execution order per the resume protocol, not fil
   `VALID_OPERATORS`, no `not_in`), `IncidentConnectionCondition` (full
   `ConnectionCriteriaGroup` on the traversed connection + recursive `endpoint_criteria` +
   direction), `ValueRef` (`literal|attribute_of_self|attribute_of_endpoint`),
-  `ConnectionSelection`. In `viewpoints.py`: `ExecutableViewpointQuery` (`query_schema: 2`,
+  `ConnectionSelection`. In `viewpoints.py`: `ExecutableViewpointQuery` (`query_schema: 1`,
   `entity_criteria`, `include_connected: tuple[NeighborInclusion, ...]`, `connections`,
   `repo_scope`), new `PresentationSpec`/`StyleRule`/`RangeBand`/`ColumnSpec` (§5, incl.
   matrix `row_by`/`column_by` XOR `row_criteria`/`column_criteria`), updated
@@ -2778,7 +2778,7 @@ invariant is documented, not structurally enforced, per the WU text deferring en
 E15). `src/domain/viewpoints.py` rewritten in place: deleted `ExecutableViewpointQueryV1`,
 `ExpansionRule`, `EntityQueryFilter`/`ConnectionQueryFilter`, `IncludeConnectionsPolicy`,
 `ExpansionRoots`, `AttributePredicate`, old `StyleRule`/`StyleRuleBy` (no parallel path); added
-`ExecutableViewpointQuery` (`query_schema=2`), new `PresentationSpec`/`StyleRule`/`RangeBand`/
+`ExecutableViewpointQuery` (`query_schema=1`), new `PresentationSpec`/`StyleRule`/`RangeBand`/
 `ColumnSpec`, `REPRESENTATION_CAPABILITIES` gains `diagram` + `edge_color`/`edge_emphasis`;
 `ViewpointDefinition.purpose`/`.content` widened to tuples (§8). `NeighborInclusion` placed in
 `viewpoint_criteria.py` (not `viewpoints.py`) — the WU text names it in `viewpoints.py`'s

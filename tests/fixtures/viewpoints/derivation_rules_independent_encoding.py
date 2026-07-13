@@ -1,4 +1,4 @@
-"""Literal Appendix-B relationship-rule transcription used only by tests."""
+"""Independent literal relationship-rule encoding used only by tests."""
 
 COMPOSITION_RULES = (
     {

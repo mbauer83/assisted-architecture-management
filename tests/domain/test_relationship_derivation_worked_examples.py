@@ -1,4 +1,4 @@
-"""Executable Appendix-B relationship-derivation examples."""
+"""Executable relationship-derivation examples."""
 
 from __future__ import annotations
 

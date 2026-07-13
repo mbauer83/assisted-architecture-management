@@ -1,15 +1,14 @@
 import { describe, expect, it } from 'vitest'
 import { definitionFromMapping, definitionToMapping } from './viewpointDefinitionSerialization'
 
-// Same five example definitions exercised by tests/domain/test_viewpoint_appendix_a_examples.py
-// (verbatim from tests/fixtures/viewpoints/appendix_a_examples.yaml) — one canonical wire
+// Same five representative definitions exercised by the Python fixture suite — one canonical
 // mapping shared by both the Python and TypeScript parsers/serializers.
 const CANONICAL_EXAMPLES: Record<string, unknown>[] = [
   {
     slug: 'application-components', version: 1, name: 'Application Components',
     purpose: 'informing', content: 'overview',
     query: {
-      query_schema: 2,
+      query_schema: 1,
       entity_criteria: {
         kind: 'group', conjunction: 'and',
         children: [{ kind: 'condition', attribute: 'type', comparator: 'in', value: ['application-component'] }],
@@ -19,7 +18,7 @@ const CANONICAL_EXAMPLES: Record<string, unknown>[] = [
   {
     slug: 'active-app-tech', version: 1, name: 'Active Application & Technology',
     query: {
-      query_schema: 2,
+      query_schema: 1,
       entity_criteria: {
         kind: 'group', conjunction: 'and',
         children: [
@@ -38,7 +37,7 @@ const CANONICAL_EXAMPLES: Record<string, unknown>[] = [
   {
     slug: 'components-serving-processes', version: 2, name: 'Components Serving Processes',
     query: {
-      query_schema: 2,
+      query_schema: 1,
       entity_criteria: {
         kind: 'group', conjunction: 'and',
         children: [
@@ -93,7 +92,7 @@ const CANONICAL_EXAMPLES: Record<string, unknown>[] = [
   {
     slug: 'component-lifecycle-table', version: 1, name: 'Component Lifecycle',
     query: {
-      query_schema: 2,
+      query_schema: 1,
       entity_criteria: {
         kind: 'group', conjunction: 'and',
         children: [{ kind: 'condition', attribute: 'type', comparator: 'eq', value: 'application-component' }],
@@ -130,7 +129,7 @@ const CANONICAL_EXAMPLES: Record<string, unknown>[] = [
   {
     slug: 'requirement-coverage', version: 1, name: 'Requirement Coverage',
     query: {
-      query_schema: 2,
+      query_schema: 1,
       entity_criteria: { kind: 'group', conjunction: 'and', children: [] },
       connections: {
         enabled: true,
@@ -155,7 +154,7 @@ const CANONICAL_EXAMPLES: Record<string, unknown>[] = [
 ]
 
 describe('canonical example round-trip', () => {
-  // Mirrors tests/domain/test_viewpoint_appendix_a_examples.py's own property: `parse` fills
+  // Mirrors the Python fixture suite's own property: `parse` fills
   // in defaults the fixture omits (e.g. `purpose`/`content`, `connections.enabled: true`) and
   // `serialize` omits-on-write anything equal to a default, so the fixture's raw mapping and
   // its serialization legitimately differ. What must hold — and is id-noise-free, since a

@@ -1,12 +1,12 @@
 """The criteria engine: reusable condition trees for viewpoint query filtering, neighbor
-inclusion, and style-rule matching (companion plan §3, §3.1, §3.3, §4.1).
+inclusion, and style-rule matching.
 
 ``EntityCriteriaGroup``/``ConnectionCriteriaGroup`` are the ONE condition-building concept
 used everywhere a boolean tree of attribute predicates appears — query filters, style-rule
 ``mode="match"`` criteria, and matrix axis criteria all reuse these same types rather than
 parallel structures. Pure shapes only: parsing lives in ``viewpoint_criteria_parsing.py``,
 registry-aware validation in ``viewpoint_criteria_validation.py``, evaluation semantics are
-normative (companion plan §3.4) but implemented by a later work unit.
+implemented by the evaluator.
 """
 
 from __future__ import annotations
@@ -16,7 +16,7 @@ from typing import Literal
 
 Conjunction = Literal["and", "or"]
 Comparator = Literal["eq", "neq", "in", "exists", "absent", "lt", "lte", "gt", "gte"]
-ValueRefKind = Literal["literal", "attribute_of_self", "attribute_of_endpoint"]
+ValueRefKind = Literal["literal", "attribute_of_self", "attribute_of_endpoint", "binding", "parameter"]
 IncidentDirection = Literal["outgoing", "incoming", "either"]
 
 # Exactly today's operator vocabulary — the criteria-tree redesign restructures how
@@ -26,11 +26,13 @@ IncidentDirection = Literal["outgoing", "incoming", "either"]
 NUMERIC_OPERATORS: frozenset[str] = frozenset({"lt", "lte", "gt", "gte"})
 NUMERIC_ATTRIBUTE_TYPES: frozenset[str] = frozenset({"integer", "number", "date"})
 VALID_COMPARATORS: frozenset[str] = frozenset({"eq", "neq", "in", "exists", "absent"}) | NUMERIC_OPERATORS
-VALID_VALUE_REF_KINDS: frozenset[str] = frozenset({"literal", "attribute_of_self", "attribute_of_endpoint"})
+VALID_VALUE_REF_KINDS: frozenset[str] = frozenset(
+    {"literal", "attribute_of_self", "attribute_of_endpoint", "binding", "parameter"}
+)
 VALID_INCIDENT_DIRECTIONS: frozenset[str] = frozenset({"outgoing", "incoming", "either"})
 VALID_CONJUNCTIONS: frozenset[str] = frozenset({"and", "or"})
 
-# Addressable properties (companion plan §3.3): reserved read-model paths, resolved before
+# Addressable properties: reserved read-model paths, resolved before
 # the effective schema. None are numeric/date, so numeric comparators are always a save-mode
 # error against a reserved path (`version` is explicitly "string comparators only").
 RESERVED_ENTITY_PATHS: frozenset[str] = frozenset(
@@ -53,14 +55,19 @@ class ValueRef:
     literal: object = None
     attribute: str | None = None  # required when kind != "literal"
     endpoint: Literal["source", "target"] | None = None  # required when kind == "attribute_of_endpoint"
+    binding: str | None = None
+    parameter: str | None = None
+    project: str | None = None
+    aggregate: Literal["count", "sum", "avg", "min", "max"] | None = None
+    quantifier: Literal["any", "all"] | None = None
 
 
 @dataclass(frozen=True)
 class AttributeCondition:
-    attribute: str  # dotted path, §3.3
+    attribute: str  # dotted path
     comparator: Comparator
     value: ValueRef = ValueRef()
-    negate: bool = False  # strict logical complement — see §3.4 for the missing-attribute case
+    negate: bool = False  # strict logical complement, including a missing attribute
 
 
 @dataclass(frozen=True)
@@ -93,7 +100,7 @@ class IncidentConnectionCondition:
 
 @dataclass(frozen=True)
 class ConnectionSelection:
-    """Which connections a query displays, within the structural invariant (§3.1): a
+    """Which connections a query displays, within the structural invariant: a
     connection is included only if both its source and target entities are in the included
     entity set. ``criteria`` narrows within that set; it can never widen past it.
     """
@@ -104,7 +111,7 @@ class ConnectionSelection:
 
 @dataclass(frozen=True)
 class NeighborInclusion:
-    """Additive population term (§4.1): include entities matching ``neighbor_criteria`` that
+    """Additive population term: include entities matching ``neighbor_criteria`` that
     are connected — by a connection matching ``connection_criteria``, in ``direction``
     relative to the anchor — to at least one entity of the query's PRIMARY result set.
     Anchors are always the primary set; inclusions never chain off other inclusions' results.

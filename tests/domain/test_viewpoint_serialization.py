@@ -21,7 +21,7 @@ _FULL_DEFINITION_MAPPING = {
     "representation_types": ["archimate-motivation"],
     "derivation_defaults": {"depth": 2},
     "query": {
-        "query_schema": 2,
+        "query_schema": 1,
         "entity_criteria": {
             "kind": "group",
             "conjunction": "and",
@@ -121,7 +121,7 @@ def test_defaults_omitted_and_negate_only_when_true() -> None:
                     "version": 1,
                     "name": "Simple",
                     "query": {
-                        "query_schema": 2,
+                        "query_schema": 1,
                         "entity_criteria": {
                             "kind": "group",
                             "conjunction": "and",
@@ -139,3 +139,54 @@ def test_defaults_omitted_and_negate_only_when_true() -> None:
     condition = viewpoint_definition_to_mapping(definition)["query"]["entity_criteria"]["children"][0]
     assert "negate" not in condition
     assert "value" in condition
+
+
+def test_maximal_binding_parameter_and_derived_query_round_trips() -> None:
+    definition_mapping = {
+        "slug": "bound",
+        "version": 1,
+        "name": "Bound",
+        "query": {
+            "query_schema": 1,
+            "entity_criteria": {"kind": "group", "conjunction": "and", "children": []},
+            "bindings": [
+                {
+                    "name": "services",
+                    "result_type": "list[entity[application-service]]",
+                    "select": "entities",
+                    "criteria": {"kind": "group", "conjunction": "and", "children": []},
+                    "project": "name",
+                    "aggregate": "count",
+                    "tuple": ["service", "owner"],
+                    "include_in_result": True,
+                }
+            ],
+            "parameters": [
+                {
+                    "name": "minimum_criticality",
+                    "type": "integer",
+                    "required": False,
+                    "default": 2,
+                    "description": "Minimum criticality to include.",
+                }
+            ],
+            "derived": [
+                {
+                    "name": "reachable_services",
+                    "direction": "outgoing",
+                    "traversal": "derived",
+                    "include_potential": True,
+                    "max_hops": 3,
+                    "connection_criteria": {"kind": "group", "conjunction": "and", "children": []},
+                    "endpoint_criteria": {"kind": "group", "conjunction": "and", "children": []},
+                    "reduce": "sum",
+                    "of": "services",
+                }
+            ],
+        },
+    }
+    catalog = viewpoint_catalog_from_mapping({"viewpoints": [definition_mapping]})
+    definition = catalog.get("bound")
+    assert definition is not None
+
+    assert viewpoint_definition_to_mapping(definition)["query"] == definition_mapping["query"]
