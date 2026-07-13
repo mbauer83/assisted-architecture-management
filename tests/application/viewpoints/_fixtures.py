@@ -76,6 +76,15 @@ class Store:
     def engagement_entity_ids(self) -> set[str]:
         return set(self.entities) - set(self.enterprise_ids)
 
+    def connection_ids(self) -> set[str]:
+        return {item.artifact_id for item in self.connections}
+
+    def enterprise_connection_ids(self) -> set[str]:
+        return set()
+
+    def engagement_connection_ids(self) -> set[str]:
+        return self.connection_ids()
+
 
 REGISTRIES = RegistrySnapshot(
     known_entity_types=frozenset({"application-component", "process"}),

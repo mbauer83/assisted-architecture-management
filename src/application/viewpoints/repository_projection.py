@@ -7,14 +7,16 @@ table/matrix/exploration/diagram representations.
 from __future__ import annotations
 
 from src.application.viewpoints.ports import RepositoryReadAccess
+from src.domain.artifact_types import EntityRecord
 from src.domain.concept_scope import ConceptScope
 from src.domain.module_types import EntityTypeName
 from src.domain.viewpoint_condition_validation import RegistrySnapshot
 from src.domain.viewpoint_criteria_evaluation import evaluate_entity_criteria
+from src.domain.viewpoint_evaluation_context import EvaluationEnvironment
 from src.domain.viewpoint_population_evaluation import resolve_neighbor_inclusions, select_connections
 from src.domain.viewpoint_projection import Membership, ProjectedOccurrence, ViewpointProjection, drift_warnings
 from src.domain.viewpoint_style_evaluation import evaluate_item_style
-from src.domain.viewpoints import RepoScope, ViewpointDefinition
+from src.domain.viewpoints import ExecutableViewpointQuery, RepoScope, ViewpointDefinition
 
 
 def _population_entity_ids(read_access: RepositoryReadAccess, repo_scope: RepoScope) -> set[str]:
@@ -31,6 +33,8 @@ def project_repository(
     read_access: RepositoryReadAccess,
     registries: RegistrySnapshot,
     scope_filter: ConceptScope | None = None,
+    environment: EvaluationEnvironment = EvaluationEnvironment(),
+    candidate_entity_ids: frozenset[str] | None = None,
 ) -> ViewpointProjection:
     query = definition.query
     if query is None:
@@ -38,7 +42,7 @@ def project_repository(
 
     drift: set[str] = set()
     primary_ids: set[str] = set()
-    for entity_id in _population_entity_ids(read_access, query.repo_scope):
+    for entity_id in candidate_entity_ids or _population_entity_ids(read_access, query.repo_scope):
         entity = read_access.get_entity(entity_id)
         if entity is None:
             continue
@@ -47,20 +51,25 @@ def project_repository(
         ):
             continue
         outcome = evaluate_entity_criteria(
-            query.entity_criteria, entity, read_access=read_access, registries=registries
+            query.entity_criteria, entity, read_access=read_access, registries=registries, environment=environment
         )
         drift |= outcome.schema_drift
         if outcome.matched:
             primary_ids.add(entity_id)
 
     inclusion_result = resolve_neighbor_inclusions(
-        frozenset(primary_ids), query.include_connected, read_access=read_access, registries=registries
+        frozenset(primary_ids),
+        query.include_connected,
+        read_access=read_access,
+        registries=registries,
+        environment=environment,
     )
     drift |= inclusion_result.schema_drift
-    included_ids = frozenset(primary_ids) | inclusion_result.expanded_ids
+    binding_ids = _result_included_binding_ids(query, environment)
+    included_ids = frozenset(primary_ids) | inclusion_result.expanded_ids | binding_ids
 
     connections_result = select_connections(
-        included_ids, query.connections, read_access=read_access, registries=registries
+        included_ids, query.connections, read_access=read_access, registries=registries, environment=environment
     )
     drift |= connections_result.schema_drift
 
@@ -111,3 +120,14 @@ def project_repository(
         )
 
     return ViewpointProjection(target="repository", items=tuple(items), warnings=drift_warnings(frozenset(drift)))
+
+
+def _result_included_binding_ids(query: ExecutableViewpointQuery, environment: EvaluationEnvironment) -> frozenset[str]:
+    ids: set[str] = set()
+    for binding in query.bindings:
+        if not binding.include_in_result:
+            continue
+        value = environment.bindings.get(binding.name)
+        values = value if isinstance(value, tuple) else (value,)
+        ids |= {item.artifact_id for item in values if isinstance(item, EntityRecord)}
+    return frozenset(ids)

@@ -1,5 +1,4 @@
-"""Tests for ``EvaluateViewpoint`` (companion plan §7, §7.1): Appendix-C "Execution result"
-cluster — sorted ids/summaries, entity-denominated truncation, four counts, matrix axis
+"""Tests for ``EvaluateViewpoint``: sorted ids/summaries, entity-denominated truncation, four counts, matrix axis
 complement property, timeout, repo_scope, index revision, duration.
 """
 
@@ -11,10 +10,12 @@ from src.application.viewpoints.evaluate_viewpoint import (
     UnknownViewpointSlugError,
     ViewpointExecutionRequest,
     ViewpointExecutionTimeoutError,
+    ViewpointParameterError,
     evaluate_viewpoint,
     project_viewpoint_repository,
     resolve_viewpoint_definition,
 )
+from src.domain.viewpoint_bindings import QueryParameter
 from src.domain.viewpoint_criteria import AttributeCondition, EntityCriteriaGroup, NeighborInclusion, ValueRef
 from src.domain.viewpoints import (
     ExecutableViewpointQuery,
@@ -66,6 +67,23 @@ class TestSlugResolution:
             _run(ViewpointExecutionRequest(), catalog=ViewpointCatalog.empty(), read_access=Store())
 
 
+class TestParameters:
+    def test_missing_unknown_and_mistyped_parameters_raise_typed_errors(self) -> None:
+        query = ExecutableViewpointQuery(parameters=(QueryParameter("limit", "integer"),))
+        for supplied, code in (
+            (None, "missing-parameter"),
+            ({"other": 1}, "unknown-parameter"),
+            ({"limit": "1"}, "parameter-type-mismatch"),
+        ):
+            with pytest.raises(ViewpointParameterError) as error:
+                _run(
+                    ViewpointExecutionRequest(query=query, parameters=supplied),
+                    catalog=ViewpointCatalog.empty(),
+                    read_access=Store(),
+                )
+            assert error.value.code == code
+
+
 class TestSummaries:
     def test_entity_and_connection_summaries(self) -> None:
         store = Store(
@@ -99,9 +117,7 @@ class TestTruncation:
         neighbor2 = entity(artifact_id="ENT@N2", artifact_type="process")
         link1 = connection(artifact_id="CON@1", source="ENT@A", target="ENT@N1")
         link2 = connection(artifact_id="CON@2", source="ENT@A", target="ENT@N2")
-        return Store(
-            entities={"ENT@A": primary, "ENT@N1": neighbor1, "ENT@N2": neighbor2}, connections=[link1, link2]
-        )
+        return Store(entities={"ENT@A": primary, "ENT@N1": neighbor1, "ENT@N2": neighbor2}, connections=[link1, link2])
 
     def _definition_with_inclusion(self) -> ViewpointDefinition:
         return _definition(
@@ -114,9 +130,7 @@ class TestTruncation:
     def test_expanded_dropped_before_primary(self) -> None:
         store = self._store_with_expanded_neighbors()
         catalog = ViewpointCatalog(entries=(self._definition_with_inclusion(),))
-        result = _run(
-            ViewpointExecutionRequest(slug="test-viewpoint", limit=2), catalog=catalog, read_access=store
-        )
+        result = _run(ViewpointExecutionRequest(slug="test-viewpoint", limit=2), catalog=catalog, read_access=store)
         assert result.entity_ids == ("ENT@A", "ENT@N1")
         assert result.returned_entity_count == 2
         assert result.total_entity_count == 3
@@ -126,9 +140,7 @@ class TestTruncation:
     def test_connections_refiltered_to_retained_entities(self) -> None:
         store = self._store_with_expanded_neighbors()
         catalog = ViewpointCatalog(entries=(self._definition_with_inclusion(),))
-        result = _run(
-            ViewpointExecutionRequest(slug="test-viewpoint", limit=2), catalog=catalog, read_access=store
-        )
+        result = _run(ViewpointExecutionRequest(slug="test-viewpoint", limit=2), catalog=catalog, read_access=store)
         assert result.total_connection_count == 2
         assert result.returned_connection_count == 1
         assert result.connection_ids == ("CON@1",)
@@ -172,9 +184,7 @@ class TestMatrixAxes:
                 representation="matrix",
                 row_criteria=EntityCriteriaGroup(children=(_type_condition("application-component"),)),
                 column_criteria=EntityCriteriaGroup(
-                    children=(
-                        AttributeCondition(attribute="name", comparator="eq", value=ValueRef(literal="Beta")),
-                    )
+                    children=(AttributeCondition(attribute="name", comparator="eq", value=ValueRef(literal="Beta")),)
                 ),
             ),
         )
@@ -285,7 +295,7 @@ class TestResolveViewpointDefinition:
 
 class TestProjectViewpointRepository:
     """``project_viewpoint_repository`` — the styled, GUI-only sibling of the unstyled
-    §7.1 execution result (WU-E8/E9's data source for exploration/table/matrix/diagram
+    execution result (the data source for exploration/table/matrix/diagram
     representations)."""
 
     def test_delegates_to_project_repository_with_resolved_definition(self) -> None:

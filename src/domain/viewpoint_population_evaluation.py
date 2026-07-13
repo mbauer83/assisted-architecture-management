@@ -25,7 +25,7 @@ from src.domain.viewpoint_criteria_evaluation import (
     evaluate_connection_criteria,
     evaluate_entity_criteria,
 )
-from src.domain.viewpoint_evaluation_context import CriteriaReadAccess
+from src.domain.viewpoint_evaluation_context import CriteriaReadAccess, EvaluationEnvironment
 
 
 @dataclass(frozen=True)
@@ -51,6 +51,7 @@ def resolve_neighbor_inclusions(
     *,
     read_access: CriteriaReadAccess,
     registries: RegistrySnapshot,
+    environment: EvaluationEnvironment = EvaluationEnvironment(),
 ) -> NeighborInclusionResult:
     """Anchors are always the primary set — inclusions never chain off other inclusions'
     results, so this is one evaluation pass, deterministic."""
@@ -58,7 +59,7 @@ def resolve_neighbor_inclusions(
     drift: set[str] = set()
     for inclusion in inclusions:
         if inclusion.traversal == "derived":
-            derived_result = _resolve_derived_inclusion(inclusion, primary_ids, read_access, registries)
+            derived_result = _resolve_derived_inclusion(inclusion, primary_ids, read_access, registries, environment)
             expanded |= derived_result.expanded_ids
             drift |= derived_result.schema_drift
             continue
@@ -66,7 +67,11 @@ def resolve_neighbor_inclusions(
             for connection in read_access.find_connections_for(anchor_id, direction="any"):
                 if inclusion.connection_criteria is not None:
                     outcome = evaluate_connection_criteria(
-                        inclusion.connection_criteria, connection, read_access=read_access, registries=registries
+                        inclusion.connection_criteria,
+                        connection,
+                        read_access=read_access,
+                        registries=registries,
+                        environment=environment,
                     )
                     drift |= outcome.schema_drift
                     if not outcome.matched:
@@ -81,7 +86,11 @@ def resolve_neighbor_inclusions(
                     continue  # dangling endpoint never matches
                 if inclusion.neighbor_criteria is not None:
                     outcome = evaluate_entity_criteria(
-                        inclusion.neighbor_criteria, neighbor_entity, read_access=read_access, registries=registries
+                        inclusion.neighbor_criteria,
+                        neighbor_entity,
+                        read_access=read_access,
+                        registries=registries,
+                        environment=environment,
                     )
                     drift |= outcome.schema_drift
                     if not outcome.matched:
@@ -95,6 +104,7 @@ def _resolve_derived_inclusion(
     primary_ids: frozenset[str],
     read_access: CriteriaReadAccess,
     registries: RegistrySnapshot,
+    environment: EvaluationEnvironment,
 ) -> NeighborInclusionResult:
     if registries.derivation_catalog is None:
         return NeighborInclusionResult(frozenset())
@@ -128,7 +138,11 @@ def _resolve_derived_inclusion(
             continue
         if inclusion.neighbor_criteria is not None:
             outcome = evaluate_entity_criteria(
-                inclusion.neighbor_criteria, neighbor, read_access=read_access, registries=registries
+                inclusion.neighbor_criteria,
+                neighbor,
+                read_access=read_access,
+                registries=registries,
+                environment=environment,
             )
             drift |= outcome.schema_drift
             if not outcome.matched:
@@ -143,13 +157,21 @@ def select_connections(
     *,
     read_access: CriteriaReadAccess,
     registries: RegistrySnapshot,
+    environment: EvaluationEnvironment = EvaluationEnvironment(),
 ) -> ConnectionSelectionResult:
     """Structural invariant: a connection is included only if both endpoints are in
     ``included_entity_ids``; ``selection.criteria`` narrows within that set and can never
     widen past it."""
     if not selection.enabled:
         return ConnectionSelectionResult(())
-    return _select(included_entity_ids, selection, read_access=read_access, registries=registries, bridging=None)
+    return _select(
+        included_entity_ids,
+        selection,
+        read_access=read_access,
+        registries=registries,
+        bridging=None,
+        environment=environment,
+    )
 
 
 def select_matrix_connections(
@@ -159,6 +181,7 @@ def select_matrix_connections(
     *,
     read_access: CriteriaReadAccess,
     registries: RegistrySnapshot,
+    environment: EvaluationEnvironment = EvaluationEnvironment(),
 ) -> ConnectionSelectionResult:
     """Matrix bridging invariant: included only if one endpoint is in the row
     population and the OTHER is in the column population — row↔column only, never row↔row
@@ -172,6 +195,7 @@ def select_matrix_connections(
         read_access=read_access,
         registries=registries,
         bridging=(row_entity_ids, column_entity_ids),
+        environment=environment,
     )
 
 
@@ -182,6 +206,7 @@ def _select(
     read_access: CriteriaReadAccess,
     registries: RegistrySnapshot,
     bridging: tuple[frozenset[str], frozenset[str]] | None,
+    environment: EvaluationEnvironment,
 ) -> ConnectionSelectionResult:
     seen: dict[str, ConnectionRecord] = {}
     drift: set[str] = set()
@@ -200,7 +225,11 @@ def _select(
                 if not structurally_included:
                     continue
                 outcome = evaluate_connection_criteria(
-                    selection.criteria, connection, read_access=read_access, registries=registries
+                    selection.criteria,
+                    connection,
+                    read_access=read_access,
+                    registries=registries,
+                    environment=environment,
                 )
                 drift |= outcome.schema_drift
                 if outcome.matched:

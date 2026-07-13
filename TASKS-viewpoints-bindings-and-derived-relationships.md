@@ -418,7 +418,7 @@ the binding layer, and G1 waits on neither derivation nor presentation work.
 
 ## Phase E — Application layer & transports
 
-- [ ] **WU-E1 — `EvaluateViewpoint` pipeline, parameters, typed errors**
+- [x] **WU-E1 — `EvaluateViewpoint` pipeline, parameters, typed errors**
   - Files: `src/application/viewpoints/evaluate_viewpoint.py` (+ split helpers),
     `execution_result.py`; tests: extend `test_evaluate_viewpoint.py`, new
     `test_viewpoint_parameters.py` under `tests/application/viewpoints/`.
@@ -902,3 +902,4 @@ Anything short of this is "in progress", regardless of how many WUs are ticked.
 - 2026-07-13 — WU-D1a — Derived incident and neighbor traversal use bounded relationship derivation with declarative grammar, validation, and direct-mode regressions.
 - 2026-07-13 — WU-D1b — Relationship-derived attributes now reduce bounded witnesses, including minimum hop counts, without changing direct attributes.
 - 2026-07-13 — WU-D2 — Derived connections remain ephemeral while selection, matrices, projection, and execution summaries retain deterministic witness provenance.
+- 2026-07-13 — WU-E1 — Execution binds typed parameters, resolves scoped candidates once, and shares binding/derived values throughout criteria evaluation.
