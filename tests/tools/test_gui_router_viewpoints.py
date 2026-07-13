@@ -9,6 +9,9 @@ import pytest
 from fastapi import FastAPI
 
 from src.application.artifact_repository import ArtifactRepository
+from src.application.viewpoints.evaluate_viewpoint import ViewpointExecutionTimeoutError
+from src.domain.relationship_reachability import DerivationLimitError
+from src.domain.viewpoint_binding_evaluation import BindingCardinalityError
 from src.domain.viewpoint_criteria import EntityCriteriaGroup
 from src.domain.viewpoints import (
     ExecutableViewpointQuery,
@@ -126,6 +129,33 @@ class TestAdHocExecution:
         assert body["version"] is None
         assert ENT_ID in body["entity_ids"]
 
+    def test_executes_parameterized_derived_traversal_query(self, client) -> None:
+        response = client.post(
+            "/api/viewpoints/execute",
+            json={
+                "parameters": {"entity_type": "application-component"},
+                "query": {
+                    "query_schema": 1,
+                    "parameters": [{"name": "entity_type", "type": "string"}],
+                    "entity_criteria": {
+                        "kind": "group",
+                        "conjunction": "and",
+                        "children": [
+                            {
+                                "kind": "condition",
+                                "attribute": "type",
+                                "comparator": "eq",
+                                "value": {"from": "parameter", "name": "entity_type"},
+                            }
+                        ],
+                    },
+                    "connections": {"enabled": True, "traversal": "derived", "max_hops": 2},
+                },
+            },
+        )
+        assert response.status_code == 200
+        assert ENT_ID in response.json()["entity_ids"]
+
 
 class TestRequestShape:
     def test_both_slug_and_query_is_400(self, client) -> None:
@@ -157,6 +187,31 @@ class TestParameters:
             assert response.json()["detail"] == {
                 "code": "unknown-parameter", "path": "parameters/x", "message": "unknown-parameter: x"
             }
+
+
+class TestTypedExecutionErrors:
+    @pytest.mark.parametrize(
+        ("error", "status", "code"),
+        [
+            (BindingCardinalityError("binding 'one' requires one result, got 2"), 400, "binding-cardinality-violation"),
+            (DerivationLimitError(1), 400, "derivation-limit"),
+            (ViewpointExecutionTimeoutError(2, 1), 504, "execution-timeout"),
+        ],
+    )
+    def test_returns_issue_payload_without_result(
+        self, client, monkeypatch, error: Exception, status: int, code: str
+    ) -> None:
+        import src.infrastructure.gui.routers.viewpoints as viewpoints_module
+
+        def _raise(*_args: object, **_kwargs: object) -> object:
+            raise error
+
+        monkeypatch.setattr(viewpoints_module, "evaluate_viewpoint", _raise)
+        response = client.post("/api/viewpoints/execute", json={"slug": "exec-test"})
+        assert response.status_code == status
+        assert response.json()["detail"]["code"] == code
+        assert response.json()["detail"]["path"] == "query"
+        assert "entity_ids" not in response.json()
 
 
 class TestExecuteProjection:

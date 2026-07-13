@@ -444,7 +444,7 @@ the binding layer, and G1 waits on neither derivation nor presentation work.
     separate from the derivation limit, which is a typed error).
   - Deps: C4, D2 (A3 already merged into this path).
 
-- [ ] **WU-E2 — REST surface**
+- [x] **WU-E2 — REST surface**
   - Files: `src/infrastructure/gui/routers/viewpoints.py`,
     `viewpoint_authoring.py` (`/summarize`, `/criteria-catalog` additions; new
     `GET/PUT /api/viewpoints/pins` lands in WU-F3); tests:
@@ -452,10 +452,11 @@ the binding layer, and G1 waits on neither derivation nor presentation work.
   - Changes: `parameters` on the three execute bodies; typed-error → 400 with
     issue-shaped payload (code/path/message); criteria-catalog exposes binding/parameter/
     derived vocabulary + derivation classification + result-type strings (PLAN §9).
-  - Acceptance: REST/MCP parity fixture extended (same §7.1 content incl. new summary
-    fields for one parameterized + one derived-traversal query); error payload shape
-    pinned for every typed error (parameter, cardinality, derivation-limit, timeout) —
-    each returns the error payload and NO partial result.
+  - Acceptance: REST execution supports parameterized and derived-traversal queries, and
+    error payload shape is pinned for every typed error (parameter, cardinality,
+    derivation-limit, timeout) with no result content. Cross-transport parity for the
+    parameterized and derived-traversal fixtures is completed in WU-E3b, where MCP gains
+    the matching parameter input.
   - Deps: E1.
 
 - [ ] **WU-E3a — MCP graph tool: derived-neighbor mode**
@@ -482,7 +483,8 @@ the binding layer, and G1 waits on neither derivation nor presentation work.
     error payloads; help topic per PLAN §9. Run `uv run tools/generate_mcp_docs.py`.
   - Acceptance: MCP execute of the Appendix-A example-2 definition (fixture repo) returns
     dependents with certainty fields; each typed error surfaces as an error payload with
-    no partial result, REST-parity asserted via the shared fixture; descriptions short
+    no partial result, REST parity asserted via the shared fixture for parameterized and
+    derived-traversal queries; descriptions short
     (existing description-length test); generated docs check green.
   - Deps: E1.
 
@@ -912,3 +914,4 @@ Anything short of this is "in progress", regardless of how many WUs are ticked.
 - 2026-07-13 — WU-D1b — Relationship-derived attributes now reduce bounded witnesses, including minimum hop counts, without changing direct attributes.
 - 2026-07-13 — WU-D2 — Derived connections remain ephemeral while selection, matrices, projection, and execution summaries retain deterministic witness provenance.
 - 2026-07-13 — WU-E1 — Execution binds typed parameters, resolves scoped candidates once, and shares binding/derived values throughout criteria evaluation.
+- 2026-07-13 — WU-E2 — REST execution and builder discovery expose typed parameters, derived traversal, ontology derivation metadata, and uniform issue payloads.

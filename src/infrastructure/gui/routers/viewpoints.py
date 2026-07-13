@@ -19,6 +19,8 @@ from src.application.viewpoints.evaluate_viewpoint import (
 from src.application.viewpoints.parameter_binding import ViewpointParameterError
 from src.application.viewpoints.registry_snapshot import build_registry_snapshot
 from src.config.settings import viewpoints_execution_max_entities, viewpoints_execution_timeout_seconds
+from src.domain.relationship_reachability import DerivationLimitError
+from src.domain.viewpoint_binding_evaluation import BindingCardinalityError
 from src.domain.viewpoint_query_parsing import query_from_mapping
 from src.domain.viewpoints import TargetKind
 from src.infrastructure.app_bootstrap import runtime_catalogs_dependency
@@ -34,6 +36,10 @@ _AD_HOC_DIAGRAM_TYPE = "archimate-layered"
 
 def _parameter_error(exc: ViewpointParameterError) -> HTTPException:
     return HTTPException(400, {"code": exc.code, "path": f"parameters/{exc.parameter}", "message": str(exc)})
+
+
+def _execution_error(code: str, message: str, *, path: str = "query") -> HTTPException:
+    return HTTPException(400, {"code": code, "path": path, "message": message})
 
 
 @router.post("/api/viewpoints/execute")
@@ -68,9 +74,13 @@ def execute_viewpoint(
     except UnknownViewpointSlugError as exc:
         raise HTTPException(400, str(exc)) from exc
     except ViewpointExecutionTimeoutError as exc:
-        raise HTTPException(504, str(exc)) from exc
+        raise HTTPException(504, {"code": "execution-timeout", "path": "query", "message": str(exc)}) from exc
     except ViewpointParameterError as exc:
         raise _parameter_error(exc) from exc
+    except BindingCardinalityError as exc:
+        raise _execution_error(exc.code, str(exc)) from exc
+    except DerivationLimitError as exc:
+        raise _execution_error("derivation-limit", str(exc)) from exc
     return asdict(result)
 
 
@@ -100,6 +110,10 @@ def execute_viewpoint_projection(
         raise HTTPException(400, str(exc)) from exc
     except ViewpointParameterError as exc:
         raise _parameter_error(exc) from exc
+    except BindingCardinalityError as exc:
+        raise _execution_error(exc.code, str(exc)) from exc
+    except DerivationLimitError as exc:
+        raise _execution_error("derivation-limit", str(exc)) from exc
     return {"applied": True, **asdict(projection)}
 
 
@@ -135,9 +149,13 @@ def execute_viewpoint_diagram(
     except UnknownViewpointSlugError as exc:
         raise HTTPException(400, str(exc)) from exc
     except ViewpointExecutionTimeoutError as exc:
-        raise HTTPException(504, str(exc)) from exc
+        raise HTTPException(504, {"code": "execution-timeout", "path": "query", "message": str(exc)}) from exc
     except ViewpointParameterError as exc:
         raise _parameter_error(exc) from exc
+    except BindingCardinalityError as exc:
+        raise _execution_error(exc.code, str(exc)) from exc
+    except DerivationLimitError as exc:
+        raise _execution_error("derivation-limit", str(exc)) from exc
 
     from src.infrastructure.rendering.diagram_builder import generate_archimate_puml_body, render_puml_svg
 

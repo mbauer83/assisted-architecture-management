@@ -16,10 +16,11 @@ from pathlib import Path
 
 from src.application.artifact_schema import compute_effective_attribute_schema, load_connection_metadata_schema
 from src.application.runtime_catalogs import RuntimeCatalogs
-from src.config.settings import viewpoints_derivation_max_hops, viewpoints_derivation_max_relationships
 from src.domain.viewpoint_condition_validation import RegistrySnapshot
 
 _DEFAULT_ATTRIBUTE_TYPE = "string"
+_DEFAULT_DERIVATION_MAX_HOPS = 4
+_DEFAULT_DERIVATION_MAX_RELATIONSHIPS = 2000
 
 
 def _property_types(schema: Mapping[str, object] | None) -> dict[str, str]:
@@ -60,7 +61,13 @@ def _connection_attribute_types(runtime_catalogs: RuntimeCatalogs, repo_roots: S
     return types
 
 
-def build_registry_snapshot(runtime_catalogs: RuntimeCatalogs, repo_roots: Sequence[Path]) -> RegistrySnapshot:
+def build_registry_snapshot(
+    runtime_catalogs: RuntimeCatalogs,
+    repo_roots: Sequence[Path],
+    *,
+    derivation_max_hops: int = _DEFAULT_DERIVATION_MAX_HOPS,
+    derivation_max_relationships: int = _DEFAULT_DERIVATION_MAX_RELATIONSHIPS,
+) -> RegistrySnapshot:
     """One snapshot for the lifetime of a verification run — callers should build this once
     (e.g. a ``functools.cached_property``) rather than per file, since it scans every entity
     type's effective attribute schema across every repo tier."""
@@ -79,6 +86,6 @@ def build_registry_snapshot(runtime_catalogs: RuntimeCatalogs, repo_roots: Seque
         symmetric_connection_types=symmetric_connection_types,
         entity_type_infos=runtime_catalogs.ontology.all_entity_types(),
         derivation_catalog=runtime_catalogs.module_catalog,
-        derivation_max_hops=viewpoints_derivation_max_hops(),
-        derivation_max_relationships=viewpoints_derivation_max_relationships(),
+        derivation_max_hops=derivation_max_hops,
+        derivation_max_relationships=derivation_max_relationships,
     )

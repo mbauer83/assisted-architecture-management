@@ -98,6 +98,11 @@ def get_criteria_catalog() -> dict[str, Any]:
     ``RegistrySnapshot`` save-mode validation itself resolves attribute paths against."""
     catalogs = build_runtime_catalogs(get_module_registry())
     registries: RegistrySnapshot = build_registry_snapshot(catalogs, _both_roots())
+    derivation = {
+        str(name): {"role": info.derivation_role, "strength": info.derivation_strength}
+        for name, info in catalogs.ontology.all_connection_types().items()
+        if info.derivation_role is not None
+    }
     return {
         "entity_types": sorted(registries.known_entity_types),
         "connection_types": sorted(registries.known_connection_types),
@@ -123,6 +128,7 @@ def get_criteria_catalog() -> dict[str, Any]:
             "certainty": ["certain", "potential"],
             "reduce": ["count", "min", "max", "sum", "average", "first", "last"],
         },
+        "connection_derivation": derivation,
     }
 
 
