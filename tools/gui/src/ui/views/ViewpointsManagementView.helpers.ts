@@ -29,12 +29,15 @@ export const formatScopeSummary = (summary: ScopeSummary): string => {
   const parts: string[] = []
   if (summary.entity_types) parts.push(`entities: ${summary.entity_types.join(', ')}`)
   if (summary.connection_types) parts.push(`connections: ${summary.connection_types.join(', ')}`)
+  if (summary.excluded_domains) parts.push(`excludes domains: ${summary.excluded_domains.join(', ')}`)
+  if (summary.excluded_entity_types) parts.push(`excludes entities: ${summary.excluded_entity_types.join(', ')}`)
+  if (summary.excluded_connection_types) parts.push(`excludes connections: ${summary.excluded_connection_types.join(', ')}`)
   return parts.join('; ') || 'unrestricted'
 }
 
-// ── WU-E5c: live preview + test-run before save ──────────────────────────────
+// ── Live preview + test-run before save ──────────────────────────────────────
 
-/** Debounced live-preview counts (§7.1's total counts only — a `limit: 0` execution never
+/** Debounced live-preview counts (total counts only — a `limit: 0` execution never
  * fetches entity/connection records, so it stays cheap enough to run on every settled
  * keystroke while building criteria). */
 export const formatPreviewCounts = (

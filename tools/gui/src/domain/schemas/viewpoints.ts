@@ -1,6 +1,6 @@
 import { Schema } from 'effect'
 
-// ── Viewpoints (companion plan; WU-E5a GUI selector/overlay) ─────────────────
+// ── Viewpoints (GUI selector/overlay) ─────────────────────────────────────────
 
 export const ViewpointApplicationSchema = Schema.Struct({
   slug: Schema.String,
@@ -40,7 +40,7 @@ export const ViewpointProjectionSchema = Schema.Struct({
 })
 export type ViewpointProjection = typeof ViewpointProjectionSchema.Type
 
-// ── Viewpoint execution (companion plan §7.1; WU-E7/E8/E9) ───────────────────
+// ── Viewpoint execution ────────────────────────────────────────────────────────
 // Fixed, non-customizable per-item summaries — deliberately unstyled (D15 boundary, §2).
 // Style tokens come from the separate `execute-projection` endpoint (`ViewpointProjectionSchema`
 // above), never from this contract, so MCP/REST content can never disagree with the GUI.
@@ -99,9 +99,9 @@ export interface ViewpointExecutionRequest {
   readonly limit?: number
 }
 
-/** GUI-only ad-hoc ArchiMate-notation rendering (companion plan §5.1's `diagram`
- * representation) — unstyled; `node_color`/`edge_color`/`edge_emphasis` overlays are
- * applied client-side onto the returned SVG. */
+/** GUI-only ad-hoc ArchiMate-notation rendering (the ad-hoc `diagram` representation) —
+ * unstyled; `node_color`/`edge_color`/`edge_emphasis` overlays are applied client-side
+ * onto the returned SVG. */
 export const ViewpointDiagramResultSchema = Schema.Struct({
   svg: Schema.NullOr(Schema.String),
   warnings: Schema.Array(Schema.String),
@@ -118,6 +118,9 @@ export const ScopeSummarySchema = Schema.Struct({
   unrestricted: Schema.Boolean,
   entity_types: Schema.optional(Schema.Array(Schema.String)),
   connection_types: Schema.optional(Schema.Array(Schema.String)),
+  excluded_entity_types: Schema.optional(Schema.Array(Schema.String)),
+  excluded_domains: Schema.optional(Schema.Array(Schema.String)),
+  excluded_connection_types: Schema.optional(Schema.Array(Schema.String)),
 })
 export type ScopeSummary = typeof ScopeSummarySchema.Type
 

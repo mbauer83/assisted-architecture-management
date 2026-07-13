@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import {
   csvToList, firstErrorNodeId, formatPreviewCounts, formatScopeSummary, isSemanticEdit, listToCsv,
 } from '../ViewpointsManagementView.helpers'
-import { mkDefinitionDraft } from '../../../domain/viewpointDefinitionDraft'
+import { mkDefinitionDraft, mkScope } from '../../../domain/viewpointDefinitionDraft'
 import type { ViewpointValidationIssue } from '../../../domain'
 
 describe('isSemanticEdit', () => {
@@ -17,7 +17,14 @@ describe('isSemanticEdit', () => {
   it('is true when scope changes', () => {
     const original = mkDefinitionDraft()
     original.slug = 'x'
-    const current = { ...original, scope: { entityTypes: ['application-component'], connectionTypes: null } }
+    const current = { ...original, scope: { ...mkScope(), entityTypes: ['application-component'] } }
+    expect(isSemanticEdit(current, original)).toBe(true)
+  })
+
+  it('is true when an exclusion field changes', () => {
+    const original = mkDefinitionDraft()
+    original.slug = 'x'
+    const current = { ...original, scope: { ...mkScope(), excludedDomains: ['application'] } }
     expect(isSemanticEdit(current, original)).toBe(true)
   })
 
@@ -53,6 +60,14 @@ describe('formatScopeSummary', () => {
       .toBe('entities: application-component')
     expect(formatScopeSummary({ unrestricted: false, entity_types: ['a'], connection_types: ['b'] }))
       .toBe('entities: a; connections: b')
+  })
+
+  it('describes exclusion fields', () => {
+    expect(formatScopeSummary({ unrestricted: false, excluded_domains: ['application'] }))
+      .toBe('excludes domains: application')
+    expect(formatScopeSummary({
+      unrestricted: false, excluded_entity_types: ['a'], excluded_connection_types: ['b'],
+    })).toBe('excludes entities: a; excludes connections: b')
   })
 })
 

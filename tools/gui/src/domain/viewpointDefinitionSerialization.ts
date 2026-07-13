@@ -35,15 +35,28 @@ const scopeToMapping = (scope: ScopeDraft): Record<string, unknown> => {
   const result: Record<string, unknown> = {}
   if (scope.entityTypes !== null) result.entity_types = [...scope.entityTypes].sort()
   if (scope.connectionTypes !== null) result.connection_types = [...scope.connectionTypes].sort()
+  if (scope.excludedEntityTypes.length > 0) result.excluded_entity_types = [...scope.excludedEntityTypes].sort()
+  if (scope.excludedDomains.length > 0) result.excluded_domains = [...scope.excludedDomains].sort()
+  if (scope.excludedConnectionTypes.length > 0) {
+    result.excluded_connection_types = [...scope.excludedConnectionTypes].sort()
+  }
   return result
 }
 
 const scopeFromMapping = (raw: unknown): ScopeDraft => {
-  if (raw == null || typeof raw !== 'object') return { entityTypes: null, connectionTypes: null }
+  if (raw == null || typeof raw !== 'object') {
+    return {
+      entityTypes: null, connectionTypes: null,
+      excludedEntityTypes: [], excludedDomains: [], excludedConnectionTypes: [],
+    }
+  }
   const rec = asRecord(raw)
   return {
     entityTypes: Array.isArray(rec.entity_types) ? rec.entity_types.map(String) : null,
     connectionTypes: Array.isArray(rec.connection_types) ? rec.connection_types.map(String) : null,
+    excludedEntityTypes: stringList(rec.excluded_entity_types, []),
+    excludedDomains: stringList(rec.excluded_domains, []),
+    excludedConnectionTypes: stringList(rec.excluded_connection_types, []),
   }
 }
 

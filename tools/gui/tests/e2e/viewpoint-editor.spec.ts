@@ -1,0 +1,230 @@
+import { type APIRequestContext } from '@playwright/test'
+import { test, expect } from './coverage-fixture'
+
+/**
+ * Viewpoint definition editor: full authoring lifecycle (create/edit/delete, semantic vs
+ * descriptive edits, path-addressed validation errors) plus the scope picker's
+ * hierarchy-aware include/exclude modes, chips, type-ahead, and domain bulk actions.
+ */
+
+test.beforeEach(async ({ context }) => {
+  await context.addInitScript(() => {
+    localStorage.setItem('arch_group_model-project', 'platform-core')
+    localStorage.setItem('arch_group_diagram-collection', 'uncategorized')
+    localStorage.setItem('arch_group_document-collection', 'uncategorized')
+  })
+})
+
+const uniqueSlug = (label: string) => `viewpoint-editor-e2e-${label}-${Date.now()}`
+
+const removeViewpoint = async (request: APIRequestContext, slug: string) => {
+  await request.post('/api/viewpoints/remove', { data: { slug, dry_run: false } })
+}
+
+const createViewpoint = async (request: APIRequestContext, definition: Record<string, unknown>) => {
+  const resp = await request.post('/api/viewpoints', { data: { definition, dry_run: false } })
+  const body = await resp.json()
+  expect(body.ok, JSON.stringify(body)).toBe(true)
+  return body
+}
+
+const getCatalog = async (request: APIRequestContext) => {
+  const resp = await request.get('/api/viewpoints/criteria-catalog')
+  return resp.json()
+}
+
+const findEntry = async (request: APIRequestContext, slug: string) => {
+  const resp = await request.get('/api/viewpoints')
+  const body = await resp.json()
+  return body.viewpoints.find((v: { slug: string }) => v.slug === slug)
+}
+
+test.describe('create/edit lifecycle with scope + query round-trip', () => {
+  test('restricted scope + query condition round-trips exactly through save/reload', async ({ page, request }) => {
+    const slug = uniqueSlug('roundtrip')
+    const catalog = await getCatalog(request)
+    const motivationTypes = Object.entries(catalog.entity_type_domains as Record<string, string>)
+      .filter(([, domain]) => domain === 'motivation')
+      .map(([type]) => type)
+      .sort()
+    expect(motivationTypes.length).toBeGreaterThan(0)
+
+    await page.goto('/viewpoints')
+    await page.getByRole('button', { name: '+ New viewpoint' }).click()
+    await page.getByRole('textbox', { name: 'slug' }).fill(slug)
+    await page.getByRole('textbox', { name: 'name' }).fill('Roundtrip Test')
+
+    await page.getByRole('button', { name: 'Scope' }).click()
+    await page.getByRole('radio', { name: 'Include only selected entity types' }).click()
+    const motivationGroup = page.locator('fieldset', { hasText: 'Entity types' }).locator('div', { hasText: 'motivation' }).first()
+    await motivationGroup.getByRole('button', { name: 'Include all of this domain' }).click()
+    await expect(page.getByText(`${motivationTypes.length} type(s) included`)).toBeVisible()
+
+    await page.getByRole('button', { name: 'Query' }).click()
+    await page.getByRole('button', { name: '+ Add condition' }).first().click()
+    const conditionRow = page.locator('.group-box.root > .row').first()
+    await conditionRow.locator('select.attr').selectOption('domain')
+    await conditionRow.locator('input.val').fill('motivation')
+
+    await page.getByRole('button', { name: 'Save', exact: true }).click()
+    await expect(page.getByRole('heading', { name: 'Viewpoints' })).toBeVisible()
+    await expect(page.locator('tr', { hasText: slug })).toBeVisible()
+
+    const entry = await findEntry(request, slug)
+    expect(entry.scope).toEqual({ entity_types: motivationTypes })
+    // `negate: false` is the wire-format default and is elided entirely, not written as `false`.
+    expect(entry.query.entity_criteria.children).toEqual([
+      { kind: 'condition', attribute: 'domain', comparator: 'eq', value: 'motivation' },
+    ])
+
+    await page.reload()
+    const reloadedEntry = await findEntry(request, slug)
+    expect(reloadedEntry.scope).toEqual(entry.scope)
+    expect(reloadedEntry.query).toEqual(entry.query)
+
+    await removeViewpoint(request, slug)
+  })
+})
+
+test.describe('semantic vs descriptive edits', () => {
+  test('descriptive-only edit stays quiet; a semantic edit surfaces the version-bump hint', async ({ page, request }) => {
+    const slug = uniqueSlug('semantic-edit')
+    await createViewpoint(request, {
+      slug, version: 1, name: 'Semantic Edit Test',
+      query: { query_schema: 1, entity_criteria: { kind: 'group', conjunction: 'and', children: [] } },
+    })
+
+    await page.goto('/viewpoints')
+    await page.locator('tr', { hasText: slug }).getByRole('button', { name: 'Edit' }).click()
+    await page.getByRole('textbox', { name: 'description' }).fill('now described')
+    await expect(page.getByText(/semantic edit/i)).toHaveCount(0)
+
+    await page.getByRole('button', { name: 'Scope' }).click()
+    await page.getByRole('radio', { name: 'Include only selected entity types' }).click()
+    await expect(page.getByText(/semantic edit/i)).toBeVisible()
+
+    await page.getByRole('button', { name: '← Back' }).click()
+    await removeViewpoint(request, slug)
+  })
+})
+
+test.describe('path-addressed validation errors', () => {
+  test('an invalid query condition highlights its own row, not just a flat error string', async ({ page }) => {
+    const invalidCriteria = {
+      kind: 'group', conjunction: 'and',
+      children: [{ kind: 'condition', attribute: 'type', comparator: 'eq', value: 'not-a-real-entity-type', negate: false }],
+    }
+    await page.goto(`/viewpoints?seedEntityCriteria=${encodeURIComponent(JSON.stringify(invalidCriteria))}`)
+    await page.getByRole('textbox', { name: 'slug' }).fill(uniqueSlug('invalid-query'))
+    await page.getByRole('textbox', { name: 'name' }).fill('Invalid Query Test')
+
+    await page.getByRole('button', { name: 'Query' }).click()
+    await page.getByRole('button', { name: 'Save', exact: true }).click()
+    await expect(page.getByText(/unknown attribute|not a known slug/i)).toBeVisible()
+    await expect(page.locator('.group-box.root > .row.highlighted')).toHaveCount(1)
+  })
+})
+
+test.describe('delete lifecycle', () => {
+  test('deleting a definition referenced by a diagram is blocked with an actionable referencer list', async ({ page, request }) => {
+    const slug = uniqueSlug('referenced')
+    await createViewpoint(request, { slug, version: 1, name: 'Referenced Test' })
+
+    const entitiesResp = await request.get('/api/entities?limit=1')
+    const anyEntityId = (await entitiesResp.json()).items[0].artifact_id as string
+    const diagramResp = await request.post('/api/diagram', {
+      data: {
+        diagram_type: 'archimate-motivation', name: 'Viewpoint Editor E2E Referencer',
+        entity_ids: [anyEntityId], connection_ids: [], viewpoint: { slug, version: 1 }, dry_run: false,
+      },
+    })
+    const diagramBody = await diagramResp.json()
+    expect(diagramBody.wrote, JSON.stringify(diagramBody)).toBe(true)
+    const diagramId = diagramBody.artifact_id as string
+
+    try {
+      await page.goto('/viewpoints')
+      page.once('dialog', (dialog) => void dialog.accept())
+      await page.locator('tr', { hasText: slug }).getByRole('button', { name: 'Delete' }).click()
+      await expect(page.getByText(`Can't delete '${slug}'`)).toBeVisible()
+      await expect(page.getByRole('button', { name: new RegExp(diagramId) })).toBeVisible()
+      await expect(page.locator('tr', { hasText: slug })).toBeVisible()
+    } finally {
+      await request.post('/api/diagram/remove', { data: { artifact_id: diagramId, dry_run: false } })
+      await removeViewpoint(request, slug)
+    }
+  })
+})
+
+test.describe('query tab renders for every shipped definition', () => {
+  test('every catalog definition shows a non-blank criteria tree; a query-less draft shows the empty state', async ({ page, request }) => {
+    await page.goto('/viewpoints')
+    const listResp = await request.get('/api/viewpoints')
+    const definitions = (await listResp.json()).viewpoints as { slug: string }[]
+    expect(definitions.length).toBeGreaterThan(0)
+
+    for (const def of definitions) {
+      const row = page.locator('tr').filter({ has: page.getByRole('cell', { name: def.slug, exact: true }) })
+      await row.getByRole('button', { name: /^(Edit|View)$/ }).click()
+      await page.getByRole('button', { name: 'Query' }).click()
+      await expect(page.getByText('Scope-only viewpoint', { exact: false })).toHaveCount(0)
+      await expect(page.getByRole('heading', { name: 'Show entities where…' })).toBeVisible()
+      await page.getByRole('button', { name: '← Back' }).click()
+    }
+
+    const slug = uniqueSlug('scope-only')
+    await createViewpoint(request, { slug, version: 1, name: 'Scope Only Test' })
+    await page.reload()
+    await page.locator('tr', { hasText: slug }).getByRole('button', { name: 'Edit' }).click()
+    await page.getByRole('button', { name: 'Query' }).click()
+    await expect(page.getByText('Scope-only viewpoint — executes via its concept scope. Add a query to refine.')).toBeVisible()
+    await removeViewpoint(request, slug)
+  })
+})
+
+test.describe('scope picker keyboard operability', () => {
+  test('type-ahead, mode switching, domain bulk action, per-type override, and chip removal all work via keyboard', async ({ page }) => {
+    await page.goto('/viewpoints')
+    await page.getByRole('button', { name: '+ New viewpoint' }).click()
+    await page.getByRole('button', { name: 'Scope' }).click()
+
+    // Native radio-group arrow-key navigation moves focus+checked together starting from
+    // whichever radio is currently focused, so start from the first radio in the group
+    // ("Include all") rather than focusing the target directly.
+    const unrestrictedRadio = page.getByRole('radio', { name: 'Include all entity types' })
+    const excludeRadio = page.getByRole('radio', { name: 'Exclude selected entity types' })
+    await unrestrictedRadio.focus()
+    await page.keyboard.press('ArrowRight')
+    await page.keyboard.press('ArrowRight')
+    await expect(excludeRadio).toBeChecked()
+
+    const searchBox = page.getByRole('searchbox', { name: 'Search entity types' })
+    await searchBox.focus()
+    await page.keyboard.type('application')
+    await expect(page.getByRole('button', { name: 'application-component' })).toBeVisible()
+    await expect(page.getByRole('button', { name: 'business-actor' })).toHaveCount(0)
+
+    const bulkExcludeBtn = page.getByRole('button', { name: 'Exclude all of this domain' }).first()
+    await bulkExcludeBtn.focus()
+    await expect(bulkExcludeBtn).toHaveCSS('outline-style', 'solid')
+    await page.keyboard.press('Enter')
+    const componentChip = page.getByRole('button', { name: 'application-component' })
+    const interfaceChip = page.getByRole('button', { name: 'application-interface' })
+    await expect(componentChip).toHaveAttribute('aria-pressed', 'true')
+    await expect(interfaceChip).toHaveAttribute('aria-pressed', 'true')
+
+    // Per-type override: carve application-interface back out of the domain exclusion.
+    await interfaceChip.focus()
+    await page.keyboard.press('Enter')
+    await expect(interfaceChip).toHaveAttribute('aria-pressed', 'false')
+    await expect(componentChip).toHaveAttribute('aria-pressed', 'true')
+
+    // Keyboard chip removal: Delete on an unselected chip is a no-op; on a selected one it removes.
+    await interfaceChip.focus()
+    await page.keyboard.press('Delete')
+    await expect(interfaceChip).toHaveAttribute('aria-pressed', 'false')
+    await componentChip.focus()
+    await page.keyboard.press('Delete')
+    await expect(componentChip).toHaveAttribute('aria-pressed', 'false')
+  })
+})

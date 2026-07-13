@@ -104,7 +104,7 @@ export interface ExecutableQueryNode {
   connections: ConnectionSelectionNode
 }
 
-export const QUERY_SCHEMA_VERSION = 2
+export const QUERY_SCHEMA_VERSION = 1
 
 export const mkQuery = (): ExecutableQueryNode => ({
   querySchema: QUERY_SCHEMA_VERSION,

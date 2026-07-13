@@ -6,13 +6,13 @@
  * things the parent must react to: switching into create/edit mode, and a delete having
  * changed the catalog.
  */
-import { inject } from 'vue'
+import { inject, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { Effect } from 'effect'
 import { modelServiceKey } from '../keys'
 import { useWriteBlock } from '../composables/useWriteBlock'
 import { readErrorMessage } from '../lib/errors'
-import type { ViewpointDefinitionEnvelope } from '../../domain'
+import type { ViewpointDefinitionEnvelope, ViewpointReferencer } from '../../domain'
 import { presentationFromMapping } from '../../domain/viewpointPresentationSerialization'
 import type { Representation } from '../../domain/viewpointPresentation'
 import { formatScopeSummary } from '../views/ViewpointsManagementView.helpers'
@@ -35,10 +35,21 @@ const executeViewpoint = (envelope: ViewpointDefinitionEnvelope) => {
   void router.push({ path: EXECUTION_ROUTE_BY_REPRESENTATION[representation], query: { viewpoint: envelope.slug } })
 }
 
+/** Delete-blocked-while-referenced state: kept local (not just bubbled up as a flat error
+ * string) so the referencers can be rendered as actionable links to the diagram/matrix
+ * pinning this definition, not just named in prose. */
+const blockedDelete = ref<{ slug: string; referencers: readonly ViewpointReferencer[] } | null>(null)
+
+const openReferencer = (referencer: ViewpointReferencer) => {
+  void router.push({ path: '/diagram', query: { id: referencer.artifact_id } })
+}
+
 const deleteDefinition = (envelope: ViewpointDefinitionEnvelope) => {
   if (!window.confirm(`Delete viewpoint '${envelope.slug}'?`)) return
+  blockedDelete.value = null
   Effect.runPromise(svc.deleteViewpointDefinition({ slug: envelope.slug, dry_run: false })).then((result) => {
     if (result.ok) { emit('refresh'); return }
+    if (result.referencers.length > 0) { blockedDelete.value = { slug: envelope.slug, referencers: result.referencers }; return }
     emit('error', result.issues[0]?.message ?? 'Delete failed')
   }).catch((reason: unknown) => { emit('error', readErrorMessage(reason)) })
 }
@@ -54,6 +65,34 @@ const deleteDefinition = (envelope: ViewpointDefinitionEnvelope) => {
     >
       + New viewpoint
     </button>
+    <div
+      v-if="blockedDelete"
+      class="blocked-panel"
+    >
+      <p>
+        Can't delete '{{ blockedDelete.slug }}' — still referenced by:
+      </p>
+      <ul>
+        <li
+          v-for="referencer in blockedDelete.referencers"
+          :key="referencer.artifact_id"
+        >
+          <button
+            type="button"
+            class="referencer-link"
+            @click="openReferencer(referencer)"
+          >
+            {{ referencer.artifact_id }} ({{ referencer.target_kind }})
+          </button>
+        </li>
+      </ul>
+      <button
+        type="button"
+        @click="blockedDelete = null"
+      >
+        Dismiss
+      </button>
+    </div>
     <table class="def-table">
       <thead>
         <tr>
@@ -115,6 +154,9 @@ const deleteDefinition = (envelope: ViewpointDefinitionEnvelope) => {
 <style scoped>
 .primary-btn { background: #6366f1; color: #fff; border: none; border-radius: 7px; padding: 8px 16px; font-weight: 600; cursor: pointer; margin-bottom: 12px; }
 .primary-btn:disabled { opacity: .5; cursor: not-allowed; }
+.blocked-panel { background: #fee2e2; color: #991b1b; border-radius: 8px; padding: 10px 14px; margin-bottom: 12px; font-size: 13px; }
+.blocked-panel ul { margin: 6px 0; padding-left: 18px; }
+.referencer-link { appearance: none; border: none; background: none; color: #991b1b; text-decoration: underline; cursor: pointer; font-size: 13px; padding: 0; }
 .def-table { width: 100%; border-collapse: collapse; }
 .def-table th, .def-table td { text-align: left; padding: 6px 10px; border-bottom: 1px solid #e5e7eb; font-size: 13px; }
 .tier-tag { font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 99px; }

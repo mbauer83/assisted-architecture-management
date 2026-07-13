@@ -1,7 +1,7 @@
 <script setup lang="ts">
 /**
  * "Query" tab of the viewpoint definition editor: entity criteria, neighbor inclusions,
- * connections displayed, a debounced live-preview count, and a full test-run (real §7.1
+ * connections displayed, a debounced live-preview count, and a full test-run (real
  * counts/warnings + a dry-run save-mode validation pass) before the user attempts to save.
  * Owns all of that state locally — it's only ever rendered/consumed here. `draft` is
  * read-only (query edits are emitted as `update:query` patches for the parent to apply to
@@ -58,7 +58,7 @@ watch(() => props.draft.query, (query) => {
   }, 250)
 }, { deep: true, immediate: true })
 
-/** Debounced live-preview counts (companion plan §7.1): a `limit: 0` execution of the
+/** Debounced live-preview counts: a `limit: 0` execution of the
  * draft's ad-hoc query — cheap enough (no entity/connection records fetched) to run on
  * every settled keystroke while building criteria. */
 const debouncePreview = createDebouncer(400)
@@ -112,7 +112,13 @@ const updateInclusion = (index: number, patch: Partial<NeighborInclusionNode>) =
 </script>
 
 <template>
-  <div v-if="draft.query">
+  <p
+    v-if="!draft.query"
+    class="empty-state"
+  >
+    Scope-only viewpoint — executes via its concept scope. Add a query to refine.
+  </p>
+  <div v-else>
     <h3>Show entities where…</h3>
     <CriteriaTreeBuilder
       :model-value="draft.query.entityCriteria"
@@ -227,6 +233,7 @@ const updateInclusion = (index: number, patch: Partial<NeighborInclusionNode>) =
 </template>
 
 <style scoped>
+.empty-state { font-size: 13px; color: #6b7280; background: #f9fafb; border: 1px dashed #d1d5db; border-radius: 8px; padding: 14px 16px; }
 .error { color: #991b1b; background: #fee2e2; padding: 8px 12px; border-radius: 6px; }
 .inclusion { border: 1px solid #d1d5db; border-radius: 8px; padding: 10px; margin: 8px 0; }
 .summary-panel { margin-top: 12px; padding: 10px 14px; border-radius: 8px; background: #eef2ff; color: #4338ca; font-size: 13px; }

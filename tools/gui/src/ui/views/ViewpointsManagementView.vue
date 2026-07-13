@@ -217,7 +217,7 @@ const focusIssue = (issue: ViewpointValidationIssue) => {
         :catalog="catalog"
       />
       <ViewpointQueryTab
-        v-else-if="activeTab === 'query' && draft.query"
+        v-else-if="activeTab === 'query'"
         :draft="draft"
         :catalog="catalog"
         :is-creating="isCreating"

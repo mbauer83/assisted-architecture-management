@@ -1,9 +1,11 @@
 /**
  * The management view's editable draft — mirrors `ViewpointDefinition` in
- * `src/domain/viewpoints.py`. `scope` is the simple entity/connection-type allow-list
- * shape the authoring surface supports (`viewpoint_serialization._scope_to_mapping`) —
- * `ConceptScope`'s hierarchy/endpoint predicates are not part of the authored shape and
- * so are not editable here.
+ * `src/domain/viewpoints.py`. `scope` is the authored subset of `ConceptScope`
+ * (`viewpoint_serialization._scope_to_mapping`): entity/connection-type allow-lists
+ * (`null` = unrestricted), plus the exclusion fields (`excludedEntityTypes`,
+ * `excludedDomains`, `excludedConnectionTypes`) that subtract from whatever the allow
+ * side admits. `ConceptScope`'s class/hierarchy-inclusion predicates and endpoint rules
+ * are not part of the authored shape and so are not editable here.
  */
 
 import { type ExecutableQueryNode, mkQuery } from './viewpointCriteria'
@@ -18,9 +20,18 @@ export const VALID_CONTENTS: readonly Content[] = ['details', 'coherence', 'over
 export interface ScopeDraft {
   entityTypes: string[] | null
   connectionTypes: string[] | null
+  excludedEntityTypes: string[]
+  excludedDomains: string[]
+  excludedConnectionTypes: string[]
 }
 
-export const mkScope = (): ScopeDraft => ({ entityTypes: null, connectionTypes: null })
+export const mkScope = (): ScopeDraft => ({
+  entityTypes: null,
+  connectionTypes: null,
+  excludedEntityTypes: [],
+  excludedDomains: [],
+  excludedConnectionTypes: [],
+})
 
 export interface ViewpointDefinitionDraft {
   slug: string
