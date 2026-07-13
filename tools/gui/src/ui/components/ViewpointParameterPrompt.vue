@@ -48,6 +48,7 @@ const onSubmit = () => { if (missing().length === 0) emit('submit', draft.value)
         <EntityPickerInput
           v-if="parameter.valueType === 'entity-id'"
           :placeholder="`select an entity for ${parameter.name}`"
+          close-on-select
           @select="(entity: EntityDisplayInfo) => setValue(parameter.name, entity.artifact_id)"
         />
         <input

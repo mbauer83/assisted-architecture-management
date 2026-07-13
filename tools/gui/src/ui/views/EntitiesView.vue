@@ -265,7 +265,7 @@ const displayCount = computed(() => {
     </div>
 
     <ViewpointExecutionDiagnostics
-      v-if="!viewpointPrompt.visible.value"
+      v-if="!viewpointPrompt.visible.value && !viewpointExecution.errorMessage.value"
       :diagnostics="viewpointDiagnostics"
       :legend="viewpointLegend"
       :query-summary="viewpointExecution.result.value?.query_summary ?? ''"

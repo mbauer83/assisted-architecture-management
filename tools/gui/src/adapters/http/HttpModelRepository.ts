@@ -61,6 +61,10 @@ import { parseMarkdown } from '../../application/MarkdownService'
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 const REQUEST_TIMEOUT_MS = 10000
+// Viewpoint execution runs bounded graph derivation over the scoped population — legitimately
+// slower than the CRUD/read endpoints above, especially against a cold index. The 10s default
+// exists to fail fast on a genuinely hung request; that's the wrong bound for these routes.
+const VIEWPOINT_EXECUTION_TIMEOUT_MS = 60000
 let serverInfoPromise: Promise<unknown> | null = null
 
 const buildUrl = (
@@ -77,16 +81,20 @@ const buildUrl = (
   return url.toString()
 }
 
-const fetchWithTimeout = async (url: string, init?: RequestInit): Promise<Response> => {
+const fetchWithTimeout = async (
+  url: string,
+  init?: RequestInit,
+  timeoutMs: number = REQUEST_TIMEOUT_MS,
+): Promise<Response> => {
   const controller = new AbortController()
-  const timeout = window.setTimeout(() => controller.abort(new DOMException(`Timed out after ${REQUEST_TIMEOUT_MS}ms`, 'TimeoutError')), REQUEST_TIMEOUT_MS)
+  const timeout = window.setTimeout(() => controller.abort(new DOMException(`Timed out after ${timeoutMs}ms`, 'TimeoutError')), timeoutMs)
   try {
     return await fetch(url, { ...init, signal: controller.signal })
   } catch (error) {
     console.error('HTTP request failed', {
       url,
       method: init?.method ?? 'GET',
-      timeoutMs: REQUEST_TIMEOUT_MS,
+      timeoutMs,
       error,
     })
     throw error
@@ -98,10 +106,11 @@ const fetchWithTimeout = async (url: string, init?: RequestInit): Promise<Respon
 const fetchJson = <A, I>(
   url: string,
   schema: Schema.Schema<A, I>,
+  timeoutMs?: number,
 ): Effect.Effect<A, NetworkError | ParseResult.ParseError> =>
   Effect.tryPromise({
     try: async () => {
-      const resp = await fetchWithTimeout(url)
+      const resp = await fetchWithTimeout(url, undefined, timeoutMs)
       if (resp.status === 404) throw new NotFoundError({ id: url })
       if (!resp.ok) throw new NetworkError({ status: resp.status, message: resp.statusText })
       return resp.json() as Promise<unknown>
@@ -142,6 +151,7 @@ const postJson = <A, I>(
   url: string,
   body: unknown,
   schema: Schema.Schema<A, I>,
+  timeoutMs?: number,
 ): Effect.Effect<A, NetworkError | ParseResult.ParseError> =>
   Effect.tryPromise({
     try: async () => {
@@ -149,7 +159,7 @@ const postJson = <A, I>(
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),
-      })
+      }, timeoutMs)
       if (!resp.ok) {
         const text = await resp.text().catch(() => resp.statusText)
         throw new NetworkError({ status: resp.status, message: text })
@@ -442,15 +452,20 @@ export const makeHttpModelRepository = (): ModelRepository => ({
   deleteDiagram: (body) =>
     postJson(buildUrl('/diagram/remove'), body, WriteResultSchema),
   getViewpointProjection: (diagramId: string) =>
-    fetchJson(buildUrl(`/diagrams/${encodeURIComponent(diagramId)}/viewpoint-projection`), ViewpointProjectionSchema),
+    fetchJson(
+      buildUrl(`/diagrams/${encodeURIComponent(diagramId)}/viewpoint-projection`),
+      ViewpointProjectionSchema,
+      VIEWPOINT_EXECUTION_TIMEOUT_MS,
+    ),
   listViewpointDefinitions: () =>
     fetchJson(buildUrl('/viewpoints'), ViewpointDefinitionListSchema).pipe(Effect.map((r) => r.viewpoints)),
   getCriteriaCatalog: () => fetchJson(buildUrl('/viewpoints/criteria-catalog'), CriteriaCatalogSchema),
-  executeViewpoint: (request) => postJson(buildUrl('/viewpoints/execute'), request, ViewpointExecutionResultSchema),
+  executeViewpoint: (request) =>
+    postJson(buildUrl('/viewpoints/execute'), request, ViewpointExecutionResultSchema, VIEWPOINT_EXECUTION_TIMEOUT_MS),
   executeViewpointProjection: (request) =>
-    postJson(buildUrl('/viewpoints/execute-projection'), request, ViewpointProjectionSchema),
+    postJson(buildUrl('/viewpoints/execute-projection'), request, ViewpointProjectionSchema, VIEWPOINT_EXECUTION_TIMEOUT_MS),
   executeViewpointDiagram: (request) =>
-    postJson(buildUrl('/viewpoints/execute-diagram'), request, ViewpointDiagramResultSchema),
+    postJson(buildUrl('/viewpoints/execute-diagram'), request, ViewpointDiagramResultSchema, VIEWPOINT_EXECUTION_TIMEOUT_MS),
   summarizeViewpointQuery: (query: unknown) =>
     postJson(buildUrl('/viewpoints/summarize'), { query }, ViewpointSummarizeResultSchema).pipe(
       Effect.map((r) => r.summary),

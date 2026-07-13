@@ -103,7 +103,7 @@ onMounted(() => { if (slug.value) void load() })
     </div>
 
     <ViewpointExecutionDiagnostics
-      v-if="!prompt.visible.value"
+      v-if="!prompt.visible.value && !execution.errorMessage.value && !diagramError"
       :diagnostics="diagnostics"
       :legend="legend"
       :query-summary="execution.result.value?.query_summary ?? ''"

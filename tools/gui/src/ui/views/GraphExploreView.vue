@@ -407,7 +407,7 @@ const edgeCardPos = (e: typeof edges.value[number], frac: number) => {
         </div>
       </div>
       <ViewpointExecutionDiagnostics
-        v-if="selectedViewpointSlug !== null && !viewpointPrompt.visible.value"
+        v-if="selectedViewpointSlug !== null && !viewpointPrompt.visible.value && !viewpointExecution.errorMessage.value"
         :diagnostics="diagnostics"
         :legend="legend"
         :query-summary="viewpointExecution.result.value?.query_summary ?? ''"

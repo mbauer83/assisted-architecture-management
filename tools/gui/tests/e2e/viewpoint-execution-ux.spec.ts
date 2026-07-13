@@ -42,17 +42,23 @@ test.describe('parameterized execution prompts typed inputs', () => {
   })
 })
 
-// Execution error-state coverage: a URL/dropdown viewpoint selection that doesn't match
-// any known definition never reaches the execution call at all — the selector silently
-// falls back to "None (unrestricted)" instead (confirmed by direct browser inspection;
-// tracked separately as a UX question, not fixed here since it's outside this change's
-// scope) — so it cannot be used to reach ViewpointExecutionError. Every typed execution
-// error code (missing-parameter, parameter-type-mismatch, execution-timeout,
-// derivation-limit, binding-cardinality-violation) has its own per-code display text
-// unit-tested in viewpointExecutionErrorText.test.ts, and its REST {code, path, message}
-// payload shape proven identical across all four execution routes in the backend's
-// TestTypedExecutionErrors suite. A live-browser trigger for an actually-rendered typed
-// error needs either a freshly-created definition (blocked until the newly-created-
-// definition-is-immediately-executable fix lands in a running backend) or a genuinely
-// slow real derivation, so end-to-end coverage of the rendered typed-error path is
-// deferred, not silently dropped.
+// Every typed execution error code (missing-parameter, parameter-type-mismatch,
+// execution-timeout, derivation-limit, binding-cardinality-violation) has its own per-code
+// display text unit-tested in viewpointExecutionErrorText.test.ts, and its REST
+// {code, path, message} payload shape proven identical across all four execution routes in
+// the backend's TestTypedExecutionErrors suite. The test below covers the one thing those
+// unit tests can't: what actually renders on screen when a real execution call fails.
+
+test.describe('execution failure does not show a misleading empty-result state', () => {
+  test('a failed execution shows only the error banner, never the "no entities matched" diagnostics text', async ({ page }) => {
+    await page.route('**/api/viewpoints/execute', (route) => route.abort('failed'))
+    await page.route('**/api/viewpoints/execute-projection', (route) => route.abort('failed'))
+    await page.goto('/graph?viewpoint=element-dependents')
+    await expect(page.getByRole('dialog', { name: 'Viewpoint parameters' })).toBeVisible()
+    await page.getByPlaceholder(/select an entity for anchor/i).fill('Architect')
+    await page.locator('[data-result]').first().click()
+    await page.getByRole('button', { name: 'Run' }).click()
+    await expect(page.getByText('Execution failed')).toBeVisible()
+    await expect(page.getByText(/No entities in the current model match/i)).toHaveCount(0)
+  })
+})

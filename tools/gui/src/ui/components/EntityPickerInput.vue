@@ -26,6 +26,12 @@ const props = defineProps<{
   diagramType?: string
   /** Narrow the palette/picker to this viewpoint's scope, intersected with diagramType's. */
   viewpoint?: string
+  /** Collapse the results dropdown once a pick is made — off by default so the many
+   * "add several entities in a row" consumers (diagram/matrix creation) keep browsing
+   * without re-opening; a single-value consumer (e.g. a parameter prompt) opts in so its
+   * own controls below the picker aren't left covered by a dropdown with nothing left to
+   * do. */
+  closeOnSelect?: boolean
 }>()
 const emit = defineEmits<{ select: [entity: EntityDisplayInfo] }>()
 
@@ -185,6 +191,7 @@ const pick = async (hit: ReferenceSearchHit) => {
   // from DOM (which would shift focus to <body> and reset window scroll).
   inputRef.value?.focus({ preventScroll: true })
   activeResultIdx.value = -1
+  if (props.closeOnSelect) open.value = false
   emit('select', exit.value)
   // excludedIds watcher removes the picked item reactively — no full re-fetch
   // needed, which avoids flickering from replacing the entire results array.
