@@ -1,9 +1,4 @@
-"""MCP read tool: ``artifact_query_viewpoint`` (companion plan §9, §9.1) — browse the
-effective merged viewpoint catalog or execute a definition/ad-hoc query, calling the same
-``EvaluateViewpoint`` use case as REST (WU-E7) and MCP write's ``artifact_viewpoint``
-(WU-E6a). No presentation/styling/column parameters exist on this tool — the locked D15
-MCP boundary; the full query grammar lives in ``artifact_help``'s ``viewpoints`` topic.
-"""
+"""MCP read tool for listing and executing viewpoint definitions."""
 
 from __future__ import annotations
 
@@ -15,14 +10,18 @@ from mcp.server.fastmcp import FastMCP  # type: ignore[import-not-found]
 from src.application.viewpoints.evaluate_viewpoint import (
     UnknownViewpointSlugError,
     ViewpointExecutionRequest,
+    ViewpointExecutionTimeoutError,
     evaluate_viewpoint,
 )
+from src.application.viewpoints.parameter_binding import ViewpointParameterError
 from src.application.viewpoints.registry_snapshot import build_registry_snapshot
 from src.config.settings import (
     viewpoints_execution_default_entity_limit_mcp,
     viewpoints_execution_max_entities,
     viewpoints_execution_timeout_seconds,
 )
+from src.domain.relationship_reachability import DerivationLimitError
+from src.domain.viewpoint_binding_evaluation import BindingCardinalityError
 from src.domain.viewpoint_query_parsing import query_from_mapping
 from src.domain.viewpoint_summary import render_query_summary
 from src.domain.viewpoints import ViewpointDefinition
@@ -50,6 +49,10 @@ def _list_entry(definition: ViewpointDefinition) -> dict[str, object]:
         "concerns": list(definition.concerns),
         "scope_summary": summarize_scope(definition.scope),
         "query_summary": render_query_summary(definition.query) if definition.query is not None else None,
+        "parameters": [
+            {"name": parameter.name, "type": parameter.value_type, "required": parameter.required}
+            for parameter in (() if definition.query is None else definition.query.parameters)
+        ],
     }
 
 
@@ -78,6 +81,7 @@ def register_query_viewpoint_tools(mcp: FastMCP) -> None:
         slug: str | None = None,
         query: dict[str, object] | None = None,
         limit: int | None = None,
+        parameters: dict[str, object] | None = None,
         repo_root: str | None = None,
         repo_scope: RepoScope = "both",
     ) -> dict[str, object]:
@@ -91,7 +95,7 @@ def register_query_viewpoint_tools(mcp: FastMCP) -> None:
         if (slug is None) == (query is None):
             raise ValueError("action='execute' requires exactly one of 'slug' or 'query'")
         parsed_query = query_from_mapping(query, label="query") if query is not None else None
-        request = ViewpointExecutionRequest(slug=slug, query=parsed_query, limit=limit)
+        request = ViewpointExecutionRequest(slug=slug, query=parsed_query, limit=limit, parameters=parameters)
 
         catalogs = runtime_catalogs()
         repo = repo_cached(roots_key(roots))
@@ -109,4 +113,12 @@ def register_query_viewpoint_tools(mcp: FastMCP) -> None:
             )
         except UnknownViewpointSlugError as exc:
             raise ValueError(str(exc)) from exc
+        except ViewpointParameterError as exc:
+            return {"error": {"code": exc.code, "path": f"parameters/{exc.parameter}", "message": str(exc)}}
+        except BindingCardinalityError as exc:
+            return {"error": {"code": exc.code, "path": "query", "message": str(exc)}}
+        except DerivationLimitError as exc:
+            return {"error": {"code": "derivation-limit", "path": "query", "message": str(exc)}}
+        except ViewpointExecutionTimeoutError as exc:
+            return {"error": {"code": "execution-timeout", "path": "query", "message": str(exc)}}
         return asdict(result)

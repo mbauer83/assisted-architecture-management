@@ -472,7 +472,7 @@ the binding layer, and G1 waits on neither derivation nor presentation work.
     docs check green.
   - Deps: B4, B6.
 
-- [ ] **WU-E3b — MCP viewpoint read tool & help topic**
+- [x] **WU-E3b — MCP viewpoint read tool & help topic**
   - Files: `src/infrastructure/mcp/artifact_mcp/query_viewpoint_tools.py`, the
     `artifact_help` viewpoints topic source, `edit_tool_descriptions.py` if touched;
     tests: `test_viewpoint_query_tool.py`, `test_viewpoint_query_tool_descriptions.py`
@@ -916,3 +916,4 @@ Anything short of this is "in progress", regardless of how many WUs are ticked.
 - 2026-07-13 — WU-E1 — Execution binds typed parameters, resolves scoped candidates once, and shares binding/derived values throughout criteria evaluation.
 - 2026-07-13 — WU-E2 — REST execution and builder discovery expose typed parameters, derived traversal, ontology derivation metadata, and uniform issue payloads.
 - 2026-07-13 — WU-E3a — MCP neighbor queries expose bounded derived witnesses and fail atomically on derivation limits.
+- 2026-07-13 — WU-E3b — MCP viewpoint execution accepts typed parameters, surfaces structured errors, and matches REST for parameterized derived traversal.

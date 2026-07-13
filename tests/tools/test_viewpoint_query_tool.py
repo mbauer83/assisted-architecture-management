@@ -137,6 +137,54 @@ class TestLimit:
 
 
 class TestMcpRestParity:
+    def test_parameterized_derived_query_has_same_content(self, monkeypatch, catalogs, repo: Path) -> None:
+        from fastapi import FastAPI
+        from starlette.testclient import TestClient
+
+        from src.application.artifact_repository import ArtifactRepository
+        from src.infrastructure.app_bootstrap import runtime_catalogs_dependency
+        from src.infrastructure.artifact_index import shared_artifact_index
+        from src.infrastructure.gui.routers import state as gui_state
+        from src.infrastructure.gui.routers.viewpoints import router as viewpoints_router
+
+        entity_id = _make(repo, "application-component", "Parameterized Entity")
+        _install_catalog(monkeypatch, catalogs, ViewpointCatalog.empty())
+        query = {
+            "query_schema": 1,
+            "parameters": [{"name": "entity_type", "type": "string"}],
+            "entity_criteria": {
+                "kind": "group",
+                "conjunction": "and",
+                "children": [
+                    {
+                        "kind": "condition",
+                        "attribute": "type",
+                        "comparator": "eq",
+                        "value": {"from": "parameter", "name": "entity_type"},
+                    }
+                ],
+            },
+            "connections": {"enabled": True, "traversal": "derived", "max_hops": 2},
+        }
+        parameters = {"entity_type": "application-component"}
+        mcp_result = _fn()(
+            action="execute", query=query, parameters=parameters, limit=500, repo_root=str(repo), repo_scope="engagement"
+        )
+
+        gui_repo = ArtifactRepository(shared_artifact_index([repo]))
+        gui_state.init_state(gui_repo, repo, None)
+        app = FastAPI()
+        app.dependency_overrides[runtime_catalogs_dependency] = lambda: catalogs
+        app.include_router(viewpoints_router)
+        rest_result = TestClient(app).post(
+            "/api/viewpoints/execute", json={"query": query, "parameters": parameters, "limit": 500}
+        ).json()
+
+        assert entity_id in mcp_result["entity_ids"]
+        mcp_json = json.loads(json.dumps(mcp_result))
+        for key in set(mcp_json) - {"executed_at", "duration_ms", "index_generation"}:
+            assert mcp_json[key] == rest_result[key], key
+
     def test_same_query_same_content_both_transports(self, monkeypatch, catalogs, repo: Path) -> None:
         from fastapi import FastAPI
         from starlette.testclient import TestClient
@@ -186,3 +234,6 @@ class TestHelpTopic:
         assert "comparators" in topic
         assert "reserved_entity_paths" in topic
         assert "canonical_form_example" in topic
+        assert topic["parameters"]["types"]
+        assert topic["bindings"]["quantifiers"] == ["any", "all"]
+        assert topic["derived_attributes"]["traversal"] == ["direct", "derived"]

@@ -34,7 +34,7 @@ class TestParameters:
     def test_expected_parameters_present(self) -> None:
         tool = _get_read_tools()["artifact_query_viewpoint"]
         params = _param_names(tool)
-        assert {"action", "slug", "query", "limit", "repo_root", "repo_scope"} <= params
+        assert {"action", "slug", "query", "limit", "parameters", "repo_root", "repo_scope"} <= params
 
     def test_no_presentation_styling_or_column_parameters(self) -> None:
         """Locked D15 boundary: presentation is authored only, never an execution parameter."""

@@ -1,8 +1,4 @@
-"""Viewpoints help topic (companion plan §9.1): the Appendix-A schema pointer, comparator
-semantics (§3.4), reserved attribute paths (§3.3), and representation capabilities, exposed
-via ``artifact_help`` so the ``artifact_query_viewpoint``/``artifact_viewpoint`` tool
-descriptions can stay short while the full grammar is one deliberate hop away.
-"""
+"""Structured grammar reference for viewpoint authoring and execution."""
 
 from __future__ import annotations
 
@@ -25,8 +21,6 @@ _COMPARATOR_SEMANTICS: dict[str, str] = {
     "gte": "at least (numeric/date attributes only)",
 }
 
-# Appendix A example 1 — the simplest worked example (flat AND, one condition), copied
-# verbatim so this topic's example never drifts from the canonical form the parser accepts.
 _CANONICAL_FORM_EXAMPLE: dict[str, object] = {
     "query_schema": QUERY_SCHEMA_VERSION,
     "entity_criteria": {
@@ -40,8 +34,7 @@ _CANONICAL_FORM_EXAMPLE: dict[str, object] = {
 
 
 def viewpoints_help_topic() -> dict[str, object]:
-    """§3.3/§3.4 reference tables plus one canonical worked example — everything an agent
-    needs to author or read a viewpoint query without re-deriving the grammar from source."""
+    """Return the grammar, comparator behavior, and structured query vocabulary."""
     return {
         "query_schema": QUERY_SCHEMA_VERSION,
         "comparators": _COMPARATOR_SEMANTICS,
@@ -52,8 +45,19 @@ def viewpoints_help_topic() -> dict[str, object]:
             representation: sorted(capabilities) for representation, capabilities in REPRESENTATION_CAPABILITIES.items()
         },
         "canonical_form_example": _CANONICAL_FORM_EXAMPLE,
+        "bindings": {
+            "select": ["entities", "connections"],
+            "result_types": ["entity[type]", "connection[type]", "entities[type]", "connections[type]", "scalar"],
+            "quantifiers": ["any", "all"],
+        },
+        "parameters": {"types": ["string", "integer", "number", "date", "boolean", "slug", "entity-id"]},
+        "derived_attributes": {
+            "traversal": ["direct", "derived"],
+            "certainty": ["certain", "potential"],
+            "sources": ["connection.attribute", "endpoint.attribute", "relationship.hops"],
+        },
         "notes": (
-            "negate is the strict logical complement (§3.4): 'eq' + negate on a missing attribute "
+            "negate is the strict logical complement: 'eq' + negate on a missing attribute "
             "matches — it reads as 'is not X, or has no value', not 'has X removed'. Connection "
             "endpoints are not addressable as left-hand condition paths; compare against an "
             "endpoint's attribute with a ValueRef(kind=attribute_of_endpoint) value instead."
