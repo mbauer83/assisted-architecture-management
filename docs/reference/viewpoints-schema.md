@@ -220,6 +220,11 @@ A `StyleRule.capability` prefixed `node_*`/`cluster_*`/a table capability takes
 a save-time error. `RangeBand.minimum`/`maximum` are `[minimum, maximum)` — inclusive lower
 bound, exclusive upper bound, `null` for unbounded.
 
+`display_options.label_attribute` (`exploration`/`diagram` only) names an attribute path —
+a reserved path, a declared profile attribute, or a `derived.` path — shown under an
+occurrence's name. Other representations reject it; an unresolvable path is a save-time
+`unknown-attribute` error, same as any other attribute reference.
+
 &nbsp;
 
 ## Lifecycle & validation

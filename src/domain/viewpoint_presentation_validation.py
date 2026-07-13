@@ -13,7 +13,16 @@ from src.domain.viewpoint_criteria_validation import (
     validate_entity_criteria,
 )
 from src.domain.viewpoint_validation_issue import ViewpointValidationIssue
-from src.domain.viewpoints import GROUP_BY_DIMENSIONS, REPRESENTATION_CAPABILITIES, PresentationSpec, StyleRule
+from src.domain.viewpoints import (
+    GROUP_BY_DIMENSIONS,
+    REPRESENTATION_CAPABILITIES,
+    PresentationSpec,
+    Representation,
+    StyleRule,
+)
+
+LABEL_ATTRIBUTE_OPTION = "label_attribute"
+_LABEL_ATTRIBUTE_REPRESENTATIONS: frozenset[Representation] = frozenset({"exploration", "diagram"})
 
 
 def _validate_group_by_field(
@@ -187,12 +196,33 @@ def _validate_mode_fields(rule: StyleRule, *, path: str) -> list[ViewpointValida
     ]
 
 
+def _validate_label_attribute(
+    presentation: PresentationSpec, *, path: str, registries: RegistrySnapshot
+) -> list[ViewpointValidationIssue]:
+    if LABEL_ATTRIBUTE_OPTION not in presentation.display_options:
+        return []
+    option_path = f"{path}/display_options/{LABEL_ATTRIBUTE_OPTION}"
+    if presentation.representation not in _LABEL_ATTRIBUTE_REPRESENTATIONS:
+        representation = presentation.representation
+        message = f"display option {LABEL_ATTRIBUTE_OPTION!r} is unsupported by representation {representation!r}"
+        return [issue("error", "unsupported-display-option", option_path, message)]
+    value = presentation.display_options[LABEL_ATTRIBUTE_OPTION]
+    if not isinstance(value, str) or not value:
+        return [issue("error", "unknown-attribute", option_path, "label_attribute must be an attribute path")]
+    declared = resolve_attribute_path(value, context="entity", registries=registries)
+    if declared is None and not value.startswith("derived."):
+        return [issue("error", "unknown-attribute", option_path, f"unknown label attribute {value!r}")]
+    return []
+
+
 def validate_presentation(
     presentation: PresentationSpec, *, path: str, registries: RegistrySnapshot, check_ergonomics: bool
 ) -> list[ViewpointValidationIssue]:
     issues: list[ViewpointValidationIssue] = []
     capabilities = REPRESENTATION_CAPABILITIES[presentation.representation]
     for option in presentation.display_options:
+        if option == LABEL_ATTRIBUTE_OPTION:
+            continue
         if option not in capabilities:
             issues.append(
                 issue(
@@ -202,6 +232,7 @@ def validate_presentation(
                     f"display option {option!r} is unsupported by representation {presentation.representation!r}",
                 )
             )
+    issues.extend(_validate_label_attribute(presentation, path=path, registries=registries))
     for key in presentation.default_style:
         if key not in capabilities:
             issues.append(

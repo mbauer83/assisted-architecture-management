@@ -5,6 +5,8 @@ rules against prior state."""
 
 from __future__ import annotations
 
+import pytest
+
 from src.domain.concept_scope import ConceptScope
 from src.domain.viewpoint_criteria import (
     AttributeCondition,
@@ -211,6 +213,28 @@ class TestPresentationValidation:
 
     def test_unknown_column_source_is_rejected(self) -> None:
         presentation = PresentationSpec(representation="table", columns=(ColumnSpec(label="X", source="not-real"),))
+        issues = _validate(_base_definition(presentation=presentation))
+        assert any(i.code == "unknown-attribute" for i in issues)
+
+    @pytest.mark.parametrize("representation", ["exploration", "diagram"])
+    def test_label_attribute_accepted_on_exploration_and_diagram(self, representation: str) -> None:
+        presentation = PresentationSpec(representation=representation, display_options={"label_attribute": "priority"})
+        assert _validate(_base_definition(presentation=presentation)) == ()
+
+    def test_label_attribute_accepts_derived_path_without_registry_lookup(self) -> None:
+        presentation = PresentationSpec(
+            representation="exploration", display_options={"label_attribute": "derived.impact-distance"}
+        )
+        assert _validate(_base_definition(presentation=presentation)) == ()
+
+    @pytest.mark.parametrize("representation", ["table", "matrix"])
+    def test_label_attribute_rejected_on_other_representations(self, representation: str) -> None:
+        presentation = PresentationSpec(representation=representation, display_options={"label_attribute": "priority"})
+        issues = _validate(_base_definition(presentation=presentation))
+        assert any(i.code == "unsupported-display-option" for i in issues)
+
+    def test_label_attribute_unknown_path_is_rejected(self) -> None:
+        presentation = PresentationSpec(representation="exploration", display_options={"label_attribute": "not-real"})
         issues = _validate(_base_definition(presentation=presentation))
         assert any(i.code == "unknown-attribute" for i in issues)
 
