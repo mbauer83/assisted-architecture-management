@@ -500,7 +500,7 @@ the binding layer, and G1 waits on neither derivation nor presentation work.
     with a schema-1 definition.
   - Deps: C3, E1.
 
-- [ ] **WU-E5 — `GET /api/neighbors` derived mode**
+- [x] **WU-E5 — `GET /api/neighbors` derived mode**
   - Files: `src/infrastructure/gui/routers/connections.py`; tests:
     `tests/tools/` router test beside existing neighbors coverage (extend or add
     `test_gui_router_neighbors_derived.py`).
@@ -918,3 +918,4 @@ Anything short of this is "in progress", regardless of how many WUs are ticked.
 - 2026-07-13 — WU-E3a — MCP neighbor queries expose bounded derived witnesses and fail atomically on derivation limits.
 - 2026-07-13 — WU-E3b — MCP viewpoint execution accepts typed parameters, surfaces structured errors, and matches REST for parameterized derived traversal.
 - 2026-07-13 — WU-E4 — Shared persist validation accepts the full query grammar and lifecycle tests cover binding cycles and parameter version bumps.
+- 2026-07-13 — WU-E5 — REST neighbor traversal shares MCP's derived witness metadata and atomic derivation-limit behavior.

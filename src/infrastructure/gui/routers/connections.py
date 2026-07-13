@@ -11,6 +11,13 @@ from pydantic import BaseModel, field_validator
 
 from src.application.entity_type_predicates import is_internal_entity_type
 from src.application.runtime_catalogs import RuntimeCatalogs
+from src.config.settings import viewpoints_derivation_max_relationships
+from src.domain.relationship_reachability import (
+    DerivationBounds,
+    DerivationLimitError,
+    RelationshipDerivationRequest,
+    derive_relationships,
+)
 from src.infrastructure.app_bootstrap import runtime_catalogs_dependency
 from src.infrastructure.gui.routers import state as s
 
@@ -45,9 +52,47 @@ def get_connections(
 
 
 @router.get("/api/neighbors")
-def get_neighbors(entity_id: str, max_hops: int = 1) -> dict[str, list[str]]:
-    result = s.get_repo().find_neighbors(entity_id, max_hops=max_hops)
-    return {hop: list(ids) for hop, ids in result.items()}
+def get_neighbors(
+    entity_id: str,
+    max_hops: int = 1,
+    traversal: Literal["direct", "derived"] = "direct",
+    include_potential: bool = False,
+    catalogs: RuntimeCatalogs = Depends(runtime_catalogs_dependency),
+) -> dict[str, object]:
+    repo = s.get_repo()
+    if traversal == "direct":
+        result = repo.find_neighbors(entity_id, max_hops=max_hops)
+        return {hop: sorted(ids) for hop, ids in result.items()}
+    try:
+        relationships = derive_relationships(
+            RelationshipDerivationRequest(
+                anchors=frozenset({entity_id}),
+                direction="either",
+                certainty="include_potential" if include_potential else "certain_only",
+                bounds=DerivationBounds(
+                    max_hops=max_hops,
+                    max_relationships=viewpoints_derivation_max_relationships(),
+                ),
+            ),
+            read_access=repo,
+            registries=catalogs.module_catalog,
+        ).relationships
+    except DerivationLimitError as exc:
+        raise HTTPException(400, {"code": "derivation-limit", "path": "query", "message": str(exc)}) from exc
+    return {
+        "traversal": traversal,
+        "neighbors": [
+            {
+                "entity_id": relation.target_id if relation.source_id == entity_id else relation.source_id,
+                "type": relation.connection_type,
+                "certainty": relation.certainty,
+                "hops": relation.hops,
+                "via_connection_ids": list(relation.via_connection_ids),
+                "path": relation.path_key,
+            }
+            for relation in relationships
+        ],
+    }
 
 
 @router.get("/api/search")
