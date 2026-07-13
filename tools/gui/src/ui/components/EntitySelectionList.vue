@@ -4,9 +4,9 @@ import type { EntityDisplayInfo, EntityContextConnection } from '../../domain'
 import ArchimateTypeGlyph from './ArchimateTypeGlyph.vue'
 import { toGlyphKey } from '../lib/glyphKey'
 
-type EntityRowActionKind = 'remove' | 'mark-remove'
+export type EntityRowActionKind = 'remove' | 'mark-remove'
 
-interface EntityRow {
+export interface EntityRow {
   entity: EntityDisplayInfo
   newInclusion?: boolean
   badgeText?: string
