@@ -7,7 +7,8 @@ from __future__ import annotations
 
 import pytest
 
-from src.domain.concept_scope import ConceptScope
+from src.domain.concept_scope import ConceptScope, HierarchyPredicate
+from src.domain.ontology_types import EntityTypeInfo
 from src.domain.viewpoint_criteria import (
     AttributeCondition,
     ConnectionCriteriaGroup,
@@ -78,6 +79,37 @@ class TestScopeValidation:
         definition = _base_definition(scope=ConceptScope(connection_types=frozenset({"bogus-conn"})))
         issues = _validate(definition)
         assert any("bogus-conn" in i.message for i in issues)
+
+    def test_valid_excluded_entity_type_has_no_issues(self) -> None:
+        definition = _base_definition(scope=ConceptScope(excluded_entity_types=frozenset({"requirement"})))
+        assert _validate(definition) == ()
+
+    def test_unknown_excluded_entity_type_is_rejected(self) -> None:
+        definition = _base_definition(scope=ConceptScope(excluded_entity_types=frozenset({"bogus-type"})))
+        issues = _validate(definition)
+        assert any("bogus-type" in i.message for i in issues)
+
+    def test_unknown_excluded_connection_type_is_rejected(self) -> None:
+        definition = _base_definition(scope=ConceptScope(excluded_connection_types=frozenset({"bogus-conn"})))
+        issues = _validate(definition)
+        assert any("bogus-conn" in i.message for i in issues)
+
+    def test_valid_excluded_domain_has_no_issues(self) -> None:
+        info = EntityTypeInfo(
+            artifact_type="requirement", prefix="REQ", hierarchy=("motivation", "requirement"), classes=(),
+            create_when="", never_create_when="",
+        )
+        motivation_predicate = HierarchyPredicate(index=0, values=frozenset({"motivation"}))
+        scope = ConceptScope(excluded_hierarchy_predicates=(motivation_predicate,))
+        definition = _base_definition(scope=scope)
+        assert _validate(definition, entity_type_infos={"requirement": info}) == ()
+
+    def test_unknown_excluded_domain_is_rejected(self) -> None:
+        bogus_predicate = HierarchyPredicate(index=0, values=frozenset({"bogus-domain"}))
+        scope = ConceptScope(excluded_hierarchy_predicates=(bogus_predicate,))
+        definition = _base_definition(scope=scope)
+        issues = _validate(definition)
+        assert any("bogus-domain" in i.message for i in issues)
 
 
 class TestQueryValidation:

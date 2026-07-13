@@ -25,6 +25,15 @@ def _scope_to_mapping(scope: ConceptScope) -> dict[str, Any]:
         result["entity_types"] = sorted(scope.entity_types)
     if scope.connection_types is not None:
         result["connection_types"] = sorted(scope.connection_types)
+    if scope.excluded_entity_types:
+        result["excluded_entity_types"] = sorted(scope.excluded_entity_types)
+    excluded_domains = {
+        value for predicate in scope.excluded_hierarchy_predicates if predicate.index == 0 for value in predicate.values
+    }
+    if excluded_domains:
+        result["excluded_domains"] = sorted(excluded_domains)
+    if scope.excluded_connection_types:
+        result["excluded_connection_types"] = sorted(scope.excluded_connection_types)
     return result
 
 

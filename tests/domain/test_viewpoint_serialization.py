@@ -90,6 +90,44 @@ def test_definition_round_trips_through_parse_and_serialize() -> None:
     assert reparsed == definition
 
 
+def test_scope_exclusion_fields_round_trip() -> None:
+    raw = {
+        "slug": "excluding",
+        "version": 1,
+        "name": "Excluding",
+        "scope": {
+            "excluded_entity_types": ["assessment"],
+            "excluded_domains": ["assurance"],
+            "excluded_connection_types": ["archimate-association"],
+        },
+    }
+    catalog = viewpoint_catalog_from_mapping({"viewpoints": [raw]})
+    definition = catalog.get("excluding")
+    assert definition is not None
+    assert definition.scope.excluded_entity_types == frozenset({"assessment"})
+    assert definition.scope.excluded_connection_types == frozenset({"archimate-association"})
+
+    reserialized = viewpoint_definition_to_mapping(definition)
+    assert reserialized["scope"]["excluded_entity_types"] == ["assessment"]
+    assert reserialized["scope"]["excluded_domains"] == ["assurance"]
+    assert reserialized["scope"]["excluded_connection_types"] == ["archimate-association"]
+
+    reparsed = viewpoint_catalog_from_mapping({"viewpoints": [reserialized]}).get("excluding")
+    assert reparsed == definition
+
+
+def test_scope_without_exclusions_omits_exclusion_keys() -> None:
+    raw = {"slug": "plain", "version": 1, "name": "Plain", "scope": {"entity_types": ["goal"]}}
+    catalog = viewpoint_catalog_from_mapping({"viewpoints": [raw]})
+    definition = catalog.get("plain")
+    assert definition is not None
+
+    reserialized = viewpoint_definition_to_mapping(definition)
+    assert "excluded_entity_types" not in reserialized["scope"]
+    assert "excluded_domains" not in reserialized["scope"]
+    assert "excluded_connection_types" not in reserialized["scope"]
+
+
 def test_catalog_to_mapping_serializes_every_entry() -> None:
     catalog = viewpoint_catalog_from_mapping(
         {"viewpoints": [{"slug": "a", "version": 1, "name": "A"}, {"slug": "b", "version": 1, "name": "B"}]}

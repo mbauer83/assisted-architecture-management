@@ -11,7 +11,10 @@ Structural correctness (enum values, the query_schema tag) is already enforced b
 
 from __future__ import annotations
 
+from collections.abc import Mapping
+
 from src.domain.concept_scope import ConceptScope
+from src.domain.ontology_types import EntityTypeInfo
 from src.domain.viewpoint_binding_validation import validate_query_values
 from src.domain.viewpoint_condition_validation import RegistrySnapshot, issue
 from src.domain.viewpoint_criteria_validation import (
@@ -54,6 +57,10 @@ def _downgrade_registry_findings(issues: list[ViewpointValidationIssue]) -> tupl
     )
 
 
+def _known_domains(registries: RegistrySnapshot) -> frozenset[str]:
+    return frozenset(info.hierarchy[0] for info in registries.entity_type_infos.values() if info.hierarchy)
+
+
 def _validate_scope(scope: ConceptScope, *, path: str, registries: RegistrySnapshot) -> list[ViewpointValidationIssue]:
     issues: list[ViewpointValidationIssue] = []
     if scope.entity_types is not None:
@@ -73,6 +80,33 @@ def _validate_scope(scope: ConceptScope, *, path: str, registries: RegistrySnaps
                     f"scope references unknown connection type {unknown!r}",
                 )
             )
+    for unknown in sorted(frozenset(str(t) for t in scope.excluded_entity_types) - registries.known_entity_types):
+        issues.append(
+            issue(
+                "error",
+                "unknown-type",
+                f"{path}/excluded_entity_types",
+                f"scope references unknown entity type {unknown!r}",
+            )
+        )
+    for unknown in sorted(
+        frozenset(str(t) for t in scope.excluded_connection_types) - registries.known_connection_types
+    ):
+        issues.append(
+            issue(
+                "error",
+                "unknown-type",
+                f"{path}/excluded_connection_types",
+                f"scope references unknown connection type {unknown!r}",
+            )
+        )
+    excluded_domains = {
+        value for predicate in scope.excluded_hierarchy_predicates if predicate.index == 0 for value in predicate.values
+    }
+    for unknown in sorted(excluded_domains - _known_domains(registries)):
+        issues.append(
+            issue("error", "unknown-value", f"{path}/excluded_domains", f"scope references unknown domain {unknown!r}")
+        )
     return issues
 
 
@@ -185,6 +219,7 @@ def validate_viewpoint_definition(
     entity_attribute_types: dict[str, str] | None = None,
     connection_attribute_types: dict[str, str] | None = None,
     symmetric_connection_types: frozenset[str] = frozenset(),
+    entity_type_infos: Mapping[str, EntityTypeInfo] | None = None,
     depth_cap: int = 4,
     max_query_bindings: int = 8,
     max_query_parameters: int = 4,
@@ -200,6 +235,7 @@ def validate_viewpoint_definition(
         entity_attribute_types=entity_attribute_types or {},
         connection_attribute_types=connection_attribute_types or {},
         symmetric_connection_types=symmetric_connection_types,
+        entity_type_infos=entity_type_infos or {},
         depth_cap=depth_cap,
     )
     check_ergonomics = mode != "load"

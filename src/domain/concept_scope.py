@@ -49,6 +49,15 @@ class ConceptScope:
 
     ``None`` type sets mean "unrestricted". Empty frozensets are valid and mean
     "admits nothing" for that axis.
+
+    ``excluded_*`` fields are a genuine subtraction, not a second allow-list: they carve
+    exceptions out of whatever the include-side already admits (unrestricted or an
+    explicit allow-list), including any entity/connection type added to the ontology
+    *after* a scope was authored — unlike a plain enumerated exclude list frozen against
+    today's known types, ``excluded_hierarchy_predicates`` (reusing the same predicate
+    class as inclusion) keeps excluding a whole hierarchy branch (e.g. a domain) as new
+    types are added under it. Composed via ``__and__`` as a union of both sides'
+    exclusions: if either input scope would exclude a concept, so does the intersection.
     """
 
     entity_types: frozenset[EntityTypeName] | None = None
@@ -56,20 +65,33 @@ class ConceptScope:
     hierarchy_predicates: tuple[HierarchyPredicate, ...] = ()
     connection_types: frozenset[ConnectionTypeName] | None = None
     endpoint_rules: tuple[EndpointRule, ...] = field(default_factory=tuple)
+    excluded_entity_types: frozenset[EntityTypeName] = frozenset()
+    excluded_hierarchy_predicates: tuple[HierarchyPredicate, ...] = ()
+    excluded_connection_types: frozenset[ConnectionTypeName] = frozenset()
+
+    def _entity_excluded(self, entity_type: EntityTypeName, info: EntityTypeInfo | None) -> bool:
+        if entity_type in self.excluded_entity_types:
+            return True
+        if info is None:
+            return False
+        return any(predicate.admits(info) for predicate in self.excluded_hierarchy_predicates)
 
     def admits_entity_type(self, entity_type: EntityTypeName, info: EntityTypeInfo | None = None) -> bool:
         if self.entity_types is not None and entity_type not in self.entity_types:
             return False
-        if not self.entity_class_predicates and not self.hierarchy_predicates:
-            return True
-        if info is None:
-            return False
-        if any(not classes.intersection(info.classes) for classes in self.entity_class_predicates):
-            return False
-        return all(predicate.admits(info) for predicate in self.hierarchy_predicates)
+        if self.entity_class_predicates or self.hierarchy_predicates:
+            if info is None:
+                return False
+            if any(not classes.intersection(info.classes) for classes in self.entity_class_predicates):
+                return False
+            if not all(predicate.admits(info) for predicate in self.hierarchy_predicates):
+                return False
+        return not self._entity_excluded(entity_type, info)
 
     def admits_connection_type(self, connection_type: ConnectionTypeName) -> bool:
-        return self.connection_types is None or connection_type in self.connection_types
+        if self.connection_types is not None and connection_type not in self.connection_types:
+            return False
+        return connection_type not in self.excluded_connection_types
 
     def admits_connection(
         self,
@@ -80,6 +102,8 @@ class ConceptScope:
         if self.entity_types is not None and (
             source_type not in self.entity_types or target_type not in self.entity_types
         ):
+            return False
+        if self._entity_excluded(source_type, None) or self._entity_excluded(target_type, None):
             return False
         if not self.admits_connection_type(connection_type):
             return False
@@ -119,6 +143,9 @@ class ConceptScope:
                 other.endpoint_rules,
                 _intersect_optional(self.connection_types, other.connection_types),
             ),
+            excluded_entity_types=self.excluded_entity_types | other.excluded_entity_types,
+            excluded_hierarchy_predicates=self.excluded_hierarchy_predicates + other.excluded_hierarchy_predicates,
+            excluded_connection_types=self.excluded_connection_types | other.excluded_connection_types,
         )
 
     @staticmethod

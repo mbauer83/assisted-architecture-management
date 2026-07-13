@@ -14,7 +14,7 @@ from __future__ import annotations
 from collections.abc import Mapping
 from typing import Any
 
-from src.domain.concept_scope import ConceptScope
+from src.domain.concept_scope import ConceptScope, HierarchyPredicate
 from src.domain.module_types import ConnectionTypeName, EntityTypeName
 from src.domain.viewpoint_presentation_parsing import presentation_from_mapping
 from src.domain.viewpoint_query_parsing import query_from_mapping
@@ -95,11 +95,18 @@ def _string_frozenset(raw: object) -> frozenset[str]:
     return frozenset(str(v) for v in raw) if isinstance(raw, (list, tuple)) else frozenset()
 
 
+_SCOPE_KEYS = frozenset(
+    {"entity_types", "connection_types", "excluded_entity_types", "excluded_domains", "excluded_connection_types"}
+)
+
+
 def _scope_from_mapping(raw: object) -> ConceptScope:
     if not isinstance(raw, Mapping):
         return ConceptScope.unrestricted()
+    _check_keys(raw, _SCOPE_KEYS, label="scope")
     entity_types = raw.get("entity_types")
     connection_types = raw.get("connection_types")
+    excluded_domains = _string_frozenset(raw.get("excluded_domains"))
     return ConceptScope(
         entity_types=(
             frozenset(EntityTypeName(t) for t in _string_frozenset(entity_types)) if entity_types is not None else None
@@ -108,6 +115,13 @@ def _scope_from_mapping(raw: object) -> ConceptScope:
             frozenset(ConnectionTypeName(t) for t in _string_frozenset(connection_types))
             if connection_types is not None
             else None
+        ),
+        excluded_entity_types=frozenset(EntityTypeName(t) for t in _string_frozenset(raw.get("excluded_entity_types"))),
+        excluded_hierarchy_predicates=(
+            (HierarchyPredicate(index=0, values=excluded_domains),) if excluded_domains else ()
+        ),
+        excluded_connection_types=frozenset(
+            ConnectionTypeName(t) for t in _string_frozenset(raw.get("excluded_connection_types"))
         ),
     )
 

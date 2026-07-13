@@ -136,6 +136,7 @@ def _promote_alongside_errors(slug: str, *, eng_root: Path, ent_root: Path, cata
         entity_attribute_types=dict(snapshot.entity_attribute_types),
         connection_attribute_types=dict(snapshot.connection_attribute_types),
         symmetric_connection_types=snapshot.symmetric_connection_types,
+        entity_type_infos=snapshot.entity_type_infos,
     )
     return [
         f"viewpoint '{slug}' (promoted alongside): {issue.code} at {issue.path}: {issue.message}"

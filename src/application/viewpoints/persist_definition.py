@@ -1,9 +1,9 @@
-"""``persist_viewpoint_definition``/``delete_viewpoint_definition`` (companion plan §10): the
-one write path a GUI save flow and the ``artifact_viewpoint`` MCP tool (WU-E6a) both go
-through for authoring engagement-repo viewpoint definitions — ``persist_edit``-mode
-validation (WU-E13) plus the lifecycle rules against prior state: version bump on semantic
-edit, slug uniqueness against the effective merged catalog, enterprise/module definitions
-read-only, delete blocked while referenced.
+"""``persist_viewpoint_definition``/``delete_viewpoint_definition``: the one write path a
+GUI save flow and the ``artifact_viewpoint`` MCP tool both go through for authoring
+engagement-repo viewpoint definitions — ``persist_edit``-mode validation plus the
+lifecycle rules against prior state: version bump on semantic edit, slug uniqueness
+against the effective merged catalog, enterprise/module definitions read-only, delete
+blocked while referenced.
 
 Pure orchestration, no file I/O (hexagonal boundary: application never imports infrastructure
 adapters directly) — callers load ``local_catalog`` via
@@ -68,6 +68,7 @@ def _validate(
         entity_attribute_types=dict(registries.entity_attribute_types),
         connection_attribute_types=dict(registries.connection_attribute_types),
         symmetric_connection_types=registries.symmetric_connection_types,
+        entity_type_infos=registries.entity_type_infos,
         depth_cap=registries.depth_cap,
         prior_definition=prior_definition,
         catalog=catalog,

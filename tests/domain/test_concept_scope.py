@@ -115,3 +115,75 @@ def test_intersection_combines_type_sets_and_predicates() -> None:
         EntityTypeName("role"),
         ConnectionTypeName("archimate-flow"),
     )
+
+
+def test_excluded_entity_types_carve_an_exception_out_of_unrestricted_scope() -> None:
+    scope = ConceptScope(excluded_entity_types=frozenset({EntityTypeName("assessment")}))
+
+    assert scope.admits_entity_type(EntityTypeName("goal")) is True
+    assert scope.admits_entity_type(EntityTypeName("assessment")) is False
+
+
+def test_excluded_hierarchy_predicate_excludes_a_whole_domain_including_future_types() -> None:
+    scope = ConceptScope(excluded_hierarchy_predicates=(HierarchyPredicate(index=0, values=frozenset({"assurance"})),))
+    existing_assurance_type = _entity_info("risk", ("assurance", "risk"))
+    a_new_assurance_type_added_later = _entity_info("control", ("assurance", "control"))
+    unrelated_type = _entity_info("goal", ("motivation", "goal"))
+
+    assert scope.admits_entity_type(EntityTypeName("risk"), existing_assurance_type) is False
+    assert scope.admits_entity_type(EntityTypeName("control"), a_new_assurance_type_added_later) is False
+    assert scope.admits_entity_type(EntityTypeName("goal"), unrelated_type) is True
+
+
+def test_exclusion_overrides_an_explicit_allow_list_entry() -> None:
+    scope = ConceptScope(
+        entity_types=frozenset({EntityTypeName("goal"), EntityTypeName("assessment")}),
+        excluded_entity_types=frozenset({EntityTypeName("assessment")}),
+    )
+
+    assert scope.admits_entity_type(EntityTypeName("goal")) is True
+    assert scope.admits_entity_type(EntityTypeName("assessment")) is False
+
+
+def test_excluded_connection_types_carve_an_exception_out_of_unrestricted_scope() -> None:
+    scope = ConceptScope(excluded_connection_types=frozenset({ConnectionTypeName("archimate-association")}))
+
+    assert scope.admits_connection_type(ConnectionTypeName("archimate-serving")) is True
+    assert scope.admits_connection_type(ConnectionTypeName("archimate-association")) is False
+
+
+def test_excluded_entity_type_blocks_a_connection_through_that_endpoint() -> None:
+    scope = ConceptScope(excluded_entity_types=frozenset({EntityTypeName("role")}))
+
+    assert not scope.admits_connection(
+        EntityTypeName("service"), EntityTypeName("role"), ConnectionTypeName("archimate-serving")
+    )
+    assert scope.admits_connection(
+        EntityTypeName("service"), EntityTypeName("process"), ConnectionTypeName("archimate-serving")
+    )
+
+
+def test_intersection_unions_exclusions_from_both_sides() -> None:
+    left = ConceptScope(excluded_entity_types=frozenset({EntityTypeName("assessment")}))
+    right = ConceptScope(excluded_entity_types=frozenset({EntityTypeName("driver")}))
+
+    scope = left & right
+
+    assert scope.excluded_entity_types == frozenset({EntityTypeName("assessment"), EntityTypeName("driver")})
+    assert scope.admits_entity_type(EntityTypeName("assessment")) is False
+    assert scope.admits_entity_type(EntityTypeName("driver")) is False
+    assert scope.admits_entity_type(EntityTypeName("goal")) is True
+
+
+def test_intersection_unions_excluded_hierarchy_predicates_from_both_sides() -> None:
+    left = ConceptScope(excluded_hierarchy_predicates=(HierarchyPredicate(index=0, values=frozenset({"assurance"})),))
+    right = ConceptScope(excluded_hierarchy_predicates=(HierarchyPredicate(index=0, values=frozenset({"legacy"})),))
+    assurance_type = _entity_info("risk", ("assurance", "risk"))
+    legacy_type = _entity_info("archived", ("legacy", "archived"))
+    unrelated_type = _entity_info("goal", ("motivation", "goal"))
+
+    scope = left & right
+
+    assert scope.admits_entity_type(EntityTypeName("risk"), assurance_type) is False
+    assert scope.admits_entity_type(EntityTypeName("archived"), legacy_type) is False
+    assert scope.admits_entity_type(EntityTypeName("goal"), unrelated_type) is True
