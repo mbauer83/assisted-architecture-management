@@ -488,7 +488,7 @@ the binding layer, and G1 waits on neither derivation nor presentation work.
     (existing description-length test); generated docs check green.
   - Deps: E1.
 
-- [ ] **WU-E4 — MCP write tool & lifecycle**
+- [x] **WU-E4 — MCP write tool & lifecycle**
   - Files: `src/infrastructure/mcp/artifact_mcp/write/viewpoint.py`,
     `src/application/viewpoints/persist_definition.py`; tests:
     `test_viewpoint_write_tool.py`, `test_promote_viewpoints.py` (extend).
@@ -917,3 +917,4 @@ Anything short of this is "in progress", regardless of how many WUs are ticked.
 - 2026-07-13 — WU-E2 — REST execution and builder discovery expose typed parameters, derived traversal, ontology derivation metadata, and uniform issue payloads.
 - 2026-07-13 — WU-E3a — MCP neighbor queries expose bounded derived witnesses and fail atomically on derivation limits.
 - 2026-07-13 — WU-E3b — MCP viewpoint execution accepts typed parameters, surfaces structured errors, and matches REST for parameterized derived traversal.
+- 2026-07-13 — WU-E4 — Shared persist validation accepts the full query grammar and lifecycle tests cover binding cycles and parameter version bumps.

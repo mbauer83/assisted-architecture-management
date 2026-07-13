@@ -61,6 +61,53 @@ class TestCreate:
         slugs = [entry["slug"] for entry in listed["viewpoints"]]
         assert "test-viewpoint" in slugs
 
+    def test_binding_cycle_is_reported_with_definition_path(self, repo: Path) -> None:
+        definition = {
+            **_MINIMAL_DEFINITION,
+            "query": {
+                "query_schema": 1,
+                "bindings": [
+                    {
+                        "name": "first",
+                        "result_type": "entities[]",
+                        "select": "entities",
+                        "criteria": {
+                            "kind": "group",
+                            "conjunction": "and",
+                            "children": [
+                                {
+                                    "kind": "condition",
+                                    "attribute": "type",
+                                    "comparator": "eq",
+                                    "value": {"from": "binding", "name": "second"},
+                                }
+                            ],
+                        },
+                    },
+                    {
+                        "name": "second",
+                        "result_type": "entities[]",
+                        "select": "entities",
+                        "criteria": {
+                            "kind": "group",
+                            "conjunction": "and",
+                            "children": [
+                                {
+                                    "kind": "condition",
+                                    "attribute": "type",
+                                    "comparator": "eq",
+                                    "value": {"from": "binding", "name": "first"},
+                                }
+                            ],
+                        },
+                    },
+                ],
+            },
+        }
+        result = mcp.artifact_viewpoint(action="create", definition=definition, repo_root=str(repo))
+        cycle = next(issue for issue in result["issues"] if issue["code"] == "binding-cycle")
+        assert cycle["path"] == "/query/bindings"
+
 
 class TestEdit:
     def _seed(self, repo: Path) -> None:
@@ -85,6 +132,25 @@ class TestEdit:
         edited = {**_MINIMAL_DEFINITION, "version": 2, "scope": {"entity_types": ["application-component"]}}
         result = mcp.artifact_viewpoint(action="edit", definition=edited, dry_run=False, repo_root=str(repo))
         assert result["ok"] is True
+
+    def test_parameter_declaration_change_requires_bump(self, repo: Path) -> None:
+        definition = {
+            **_MINIMAL_DEFINITION,
+            "query": {"query_schema": 1, "parameters": [{"name": "limit", "type": "integer"}]},
+        }
+        assert mcp.artifact_viewpoint(action="create", definition=definition, dry_run=False, repo_root=str(repo))["ok"]
+        edited = {
+            **definition,
+            "query": {
+                "query_schema": 1,
+                "parameters": [
+                    {"name": "limit", "type": "integer"},
+                    {"name": "include_archived", "type": "boolean", "required": False},
+                ],
+            },
+        }
+        result = mcp.artifact_viewpoint(action="edit", definition=edited, dry_run=False, repo_root=str(repo))
+        assert any(issue["code"] == "version-not-bumped" for issue in result["issues"])
 
     def test_unknown_slug_rejected(self, repo: Path) -> None:
         result = mcp.artifact_viewpoint(
