@@ -459,7 +459,7 @@ the binding layer, and G1 waits on neither derivation nor presentation work.
     the matching parameter input.
   - Deps: E1.
 
-- [ ] **WU-E3a — MCP graph tool: derived-neighbor mode**
+- [x] **WU-E3a — MCP graph tool: derived-neighbor mode**
   - Files: `src/infrastructure/mcp/artifact_mcp/query_graph_tools.py`
     (`artifact_query_find_neighbors` gains `traversal`/`include_potential`, translated
     to `DerivationCertaintyPolicy`/`RelationshipDerivationRequest` at the boundary);
@@ -915,3 +915,4 @@ Anything short of this is "in progress", regardless of how many WUs are ticked.
 - 2026-07-13 — WU-D2 — Derived connections remain ephemeral while selection, matrices, projection, and execution summaries retain deterministic witness provenance.
 - 2026-07-13 — WU-E1 — Execution binds typed parameters, resolves scoped candidates once, and shares binding/derived values throughout criteria evaluation.
 - 2026-07-13 — WU-E2 — REST execution and builder discovery expose typed parameters, derived traversal, ontology derivation metadata, and uniform issue payloads.
+- 2026-07-13 — WU-E3a — MCP neighbor queries expose bounded derived witnesses and fail atomically on derivation limits.

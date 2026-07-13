@@ -2,6 +2,14 @@ from typing import Literal
 
 from mcp.server.fastmcp import FastMCP  # type: ignore[import-not-found]
 
+from src.config.settings import viewpoints_derivation_max_relationships
+from src.domain.relationship_reachability import (
+    DerivationBounds,
+    DerivationCertaintyPolicy,
+    DerivationLimitError,
+    RelationshipDerivationRequest,
+    derive_relationships,
+)
 from src.infrastructure.mcp.artifact_mcp.context import (
     RepoScope,
     expand_artifact_id,
@@ -86,7 +94,7 @@ def register_query_graph_tools(mcp: FastMCP) -> None:
         name="artifact_query_find_neighbors",
         title="Artifact Query: Find Neighbors",
         description=(
-            "Graph traversal: return entity_ids reachable from entity_id within max_hops using connections. "
+            "Graph traversal: return direct or derived neighbors within max_hops. "
             "Optionally restrict by conn_type. "
             "Pass diagram_type to receive binding_guidance for each neighbor — lists admissible "
             "diagram entity types, default and admissible correspondence kinds — so results can be "
@@ -102,6 +110,8 @@ def register_query_graph_tools(mcp: FastMCP) -> None:
         *,
         max_hops: int = 1,
         conn_type: str | None = None,
+        traversal: Literal["direct", "derived"] = "direct",
+        include_potential: bool = False,
         diagram_type: str | None = None,
         repo_root: str | None = None,
         repo_scope: RepoScope = "both",
@@ -118,8 +128,42 @@ def register_query_graph_tools(mcp: FastMCP) -> None:
         repo = repo_cached(key)
         entity_id = expand_artifact_id(repo, entity_id)
 
-        neighbors = repo.find_neighbors(entity_id, max_hops=max_hops, conn_type=conn_type)
-        normalized = {k: sorted(list(v)) for k, v in neighbors.items()}
+        if traversal == "direct":
+            neighbors = repo.find_neighbors(entity_id, max_hops=max_hops, conn_type=conn_type)
+            normalized: dict[str, object] = {key: sorted(values) for key, values in neighbors.items()}
+        else:
+            certainty: DerivationCertaintyPolicy = "include_potential" if include_potential else "certain_only"
+            try:
+                relationships = derive_relationships(
+                    RelationshipDerivationRequest(
+                        anchors=frozenset({entity_id}),
+                        direction="either",
+                        certainty=certainty,
+                        bounds=DerivationBounds(
+                            max_hops=max_hops,
+                            max_relationships=viewpoints_derivation_max_relationships(),
+                        ),
+                    ),
+                    read_access=repo,
+                    registries=runtime_catalogs().module_catalog,
+                ).relationships
+            except DerivationLimitError as exc:
+                return {"error": {"code": "derivation-limit", "message": str(exc)}}
+            normalized = {
+                "derived": [
+                    {
+                        "entity_id": (
+                            relationship.target_id if relationship.source_id == entity_id else relationship.source_id
+                        ),
+                        "type": relationship.connection_type,
+                        "certainty": relationship.certainty,
+                        "hops": relationship.hops,
+                        "via_connection_ids": list(relationship.via_connection_ids),
+                        "path": relationship.path_key,
+                    }
+                    for relationship in relationships
+                ]
+            }
 
         ab = _allowed_bindings_for(diagram_type)
         result: dict[str, object] = {
@@ -127,13 +171,17 @@ def register_query_graph_tools(mcp: FastMCP) -> None:
             "repo_scope": repo_scope,
             "entity_id": entity_id,
             "max_hops": max_hops,
+            "traversal": traversal,
             "neighbors": normalized,
         }
         if ab is not None:
             result["diagram_type"] = diagram_type
             guidance: dict[str, list[dict[str, object]]] = {}
             for hop_eids in normalized.values():
-                for eid in hop_eids:
+                for item in hop_eids if isinstance(hop_eids, list) else []:
+                    eid = item["entity_id"] if isinstance(item, dict) else item
+                    if not isinstance(eid, str):
+                        continue
                     if eid in guidance:
                         continue
                     summary = repo.summarize_artifact(eid)

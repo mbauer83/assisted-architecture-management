@@ -25,7 +25,7 @@ Configure them in `.mcp.json` — see [Installation §5](../02-installation.md#5
 | `artifact_diagram_scaffold` | Read-only | Generate a ready-to-edit @startuml…@enduml scaffold from a list of entity IDs. |
 | `artifact_query_datatype_types` | Read-only | List available attribute types for datatype diagrams. |
 | `artifact_query_find_connections_for` | Read-only | Find connection records that touch a given entity_id. |
-| `artifact_query_find_neighbors` | Read-only | Graph traversal: return entity_ids reachable from entity_id within max_hops using connections. |
+| `artifact_query_find_neighbors` | Read-only | Graph traversal: return direct or derived neighbors within max_hops. |
 | `artifact_query_list_artifacts` | Read-only | List artifacts (metadata-only) with AND-semantics filters. |
 | `artifact_query_read_artifact` | Read-only | Read one artifact by artifact_id. |
 | `artifact_query_search_artifacts` | Read-only | Search artifacts by text query (keyword-scored; may include semantic supplement if configured). |
