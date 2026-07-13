@@ -26,6 +26,7 @@ class OrientedRelation:
     target_type: EntityTypeName | None = None
     source_info: EntityTypeInfo | None = None
     target_info: EntityTypeInfo | None = None
+    potential_steps: int = 0
 
 
 @dataclass(frozen=True)
@@ -89,12 +90,13 @@ def compose(
             or not permits_derived_relationship(source_info, target_info, result, intermediate, restrictions)
         ):
             return None
+        potential_steps = first.potential_steps + second.potential_steps + int(rule.certainty == "potential")
         return DerivedStep(
             source_id,
             target_id,
             result,
-            rule.certainty,
-            int(rule.certainty == "potential"),
+            "potential" if potential_steps else "certain",
+            potential_steps,
             source_info,
             target_info,
         )
@@ -111,24 +113,30 @@ def fold_chain(
     if len(relations) < 2 or len(intermediates) != len(relations) - 1:
         return None
     current = relations[0]
-    potential_steps = 0
-    certainty: Certainty = "certain"
     for next_relation, intermediate in zip(relations[1:], intermediates, strict=True):
         step = compose(current, next_relation, intermediate, rules, restrictions=restrictions)
         if step is None:
             return None
-        potential_steps += step.potential_steps
-        if step.certainty == "potential":
-            certainty = "potential"
         current = OrientedRelation(
             connection_id=f"derived:{current.connection_id}:{next_relation.connection_id}",
             connection_type=step.connection_type,
             source_id=step.source_id,
             target_id=step.target_id,
+            source_type=EntityTypeName(step.source_info.artifact_type) if step.source_info is not None else None,
+            target_type=EntityTypeName(step.target_info.artifact_type) if step.target_info is not None else None,
             source_info=step.source_info,
             target_info=step.target_info,
+            potential_steps=step.potential_steps,
         )
-    return DerivedStep(current.source_id, current.target_id, current.connection_type, certainty, potential_steps)
+    return DerivedStep(
+        current.source_id,
+        current.target_id,
+        current.connection_type,
+        "potential" if current.potential_steps else "certain",
+        current.potential_steps,
+        current.source_info,
+        current.target_info,
+    )
 
 
 def _matches(

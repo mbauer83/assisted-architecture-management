@@ -242,7 +242,7 @@ the binding layer, and G1 waits on neither derivation nor presentation work.
     before this WU is ticked.**
   - Deps: B1–B5.
 
-- [ ] **WU-B7 — Path reconstruction (`derive_relationship_for_path`)**
+- [x] **WU-B7 — Path reconstruction (`derive_relationship_for_path`)**
   - Files: `src/domain/relationship_reachability.py` (extend — same fold, one explicit
     chain); new `tests/domain/test_relationship_path_reconstruction.py`.
   - Changes: PLAN §5.3 reconstruction contract — parse canonical `id@fwd|id@rev|…` key,
@@ -878,3 +878,4 @@ Anything short of this is "in progress", regardless of how many WUs are ticked.
 - 2026-07-13 — WU-B4 — Bounded relationship enumeration now emits deterministic, deduplicated ephemeral witness paths and raises a typed limit error before any partial result.
 - 2026-07-13 — WU-B5 — Appendix-B examples are executable; Financial Application proves DR2-derived realization is indirect rather than a direct-table defect.
 - 2026-07-13 — WU-B6 — Transcriber/reviewer: Codex; line-by-line spec-to-literal-fixture/runtime review passed with exhaustive and invariant batteries.
+- 2026-07-13 — WU-B7 — Recorded witness paths reconstruct through the shared composition logic; broken and no-longer-derived states are explicit.

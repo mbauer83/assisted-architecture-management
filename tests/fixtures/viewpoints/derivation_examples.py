@@ -41,6 +41,9 @@ class ExampleGraph:
     def get_entity(self, artifact_id: str) -> EntityRecord | None:
         return self.entities.get(artifact_id)
 
+    def get_connection(self, artifact_id: str) -> ConnectionRecord | None:
+        return next((item for item in self.connections if item.artifact_id == artifact_id), None)
+
     def find_connections_for(
         self, entity_id: str, *, direction: str = "any", conn_type: str | None = None
     ) -> list[ConnectionRecord]:

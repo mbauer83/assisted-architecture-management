@@ -12,10 +12,29 @@ from src.domain.module_catalog import ModuleCatalog
 from src.domain.module_types import ConnectionTypeName, EntityTypeName
 from src.domain.ontology_types import ConnectionTypeInfo, EntityTypeInfo
 from src.domain.relationship_derivation import DerivedStep, OrientedRelation, compose
+from src.domain.relationship_path_reconstruction import (
+    PathDerivationOutcome,
+    RelationshipPathReadAccess,
+    oriented_relation,
+    shared_entity_info,
+)
+from src.domain.relationship_path_reconstruction import (
+    derive_relationship_for_path as _derive_relationship_for_path,
+)
 from src.domain.viewpoint_criteria import IncidentDirection
 from src.domain.viewpoint_evaluation_context import CriteriaReadAccess
 
 DerivationCertaintyPolicy = Literal["certain_only", "include_potential"]
+
+
+def derive_relationship_for_path(
+    path_key: str,
+    *,
+    read_access: RelationshipPathReadAccess,
+    registries: ModuleCatalog,
+) -> PathDerivationOutcome:
+    """Reconstruct one recorded relationship-derivation witness path."""
+    return _derive_relationship_for_path(path_key, read_access=read_access, registries=registries)
 
 
 @dataclass(frozen=True)
@@ -93,10 +112,11 @@ def derive_relationships(
         for connection in _adjacent_connections(current.relation, read_access):
             if connection.artifact_id in current.used_connection_ids:
                 continue
-            next_relation = _oriented_relation(connection, read_access, entity_types, connection_types)
+            next_relation = oriented_relation(connection, read_access, entity_types, connection_types)
             if next_relation is None:
                 continue
-            for intermediate in _shared_entities(current.relation, next_relation, read_access, entity_types):
+            intermediate = shared_entity_info(current.relation, next_relation, read_access, entity_types)
+            if intermediate is not None:
                 step = compose(
                     current.relation,
                     next_relation,
@@ -146,7 +166,7 @@ def _initial_frontier(
             if read_access.get_entity(neighbor) is not None:
                 pending.append((neighbor, depth + 1))
     for connection_id in sorted(discovered):
-        relation = _oriented_relation(discovered[connection_id], read_access, entity_types, connection_types)
+        relation = oriented_relation(discovered[connection_id], read_access, entity_types, connection_types)
         if relation is not None:
             yield _FrontierItem(relation, ((connection_id, "fwd"),), frozenset({connection_id}))
 
@@ -160,48 +180,6 @@ def _adjacent_connections(relation: OrientedRelation, read_access: CriteriaReadA
                 yield connection
 
 
-def _oriented_relation(
-    connection: ConnectionRecord,
-    read_access: CriteriaReadAccess,
-    entity_types: Mapping[EntityTypeName, EntityTypeInfo],
-    connection_types: Mapping[ConnectionTypeName, ConnectionTypeInfo],
-) -> OrientedRelation | None:
-    source = read_access.get_entity(connection.source)
-    target = read_access.get_entity(connection.target)
-    connection_type = connection_types.get(ConnectionTypeName(connection.conn_type))
-    if source is None or target is None or connection_type is None:
-        return None
-    source_info = entity_types.get(EntityTypeName(source.artifact_type))
-    target_info = entity_types.get(EntityTypeName(target.artifact_type))
-    if source_info is None or target_info is None or connection_type.derivation_role is None:
-        return None
-    return OrientedRelation(
-        connection.artifact_id,
-        connection_type,
-        connection.source,
-        connection.target,
-        source_type=EntityTypeName(source.artifact_type),
-        target_type=EntityTypeName(target.artifact_type),
-        source_info=source_info,
-        target_info=target_info,
-    )
-
-
-def _shared_entities(
-    first: OrientedRelation,
-    second: OrientedRelation,
-    read_access: CriteriaReadAccess,
-    entity_types: Mapping[EntityTypeName, EntityTypeInfo],
-) -> Iterable[EntityTypeInfo]:
-    shared = {first.source_id, first.target_id} & {second.source_id, second.target_id}
-    return tuple(
-        entity_types[EntityTypeName(entity.artifact_type)]
-        for entity_id in sorted(shared)
-        if (entity := read_access.get_entity(entity_id)) is not None
-        and EntityTypeName(entity.artifact_type) in entity_types
-    )
-
-
 def _derived_relation(step: DerivedStep, path: tuple[tuple[str, Literal["fwd", "rev"]], ...]) -> OrientedRelation:
     return OrientedRelation(
         f"derived:{step.connection_type.artifact_type}:{_path_key(path)}",
@@ -210,6 +188,9 @@ def _derived_relation(step: DerivedStep, path: tuple[tuple[str, Literal["fwd", "
         step.target_id,
         source_info=step.source_info,
         target_info=step.target_info,
+        source_type=EntityTypeName(step.source_info.artifact_type) if step.source_info is not None else None,
+        target_type=EntityTypeName(step.target_info.artifact_type) if step.target_info is not None else None,
+        potential_steps=step.potential_steps,
     )
 
 
