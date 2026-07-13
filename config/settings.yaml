@@ -25,3 +25,9 @@ storage:
   read_model: {}
 validation:
   datatype_type_references_blocking: true
+viewpoints:
+  derivation_max_hops: 4
+  derivation_max_relationships: 2000
+  max_derived_attributes: 8
+  max_query_bindings: 8
+  max_query_parameters: 4

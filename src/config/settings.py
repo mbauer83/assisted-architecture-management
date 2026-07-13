@@ -47,6 +47,11 @@ _DEFAULTS: dict[str, dict[str, object]] = {
         "execution_max_entities": 500,
         "execution_default_entity_limit_mcp": 200,
         "execution_timeout_seconds": 10,
+        "max_query_bindings": 8,
+        "max_query_parameters": 4,
+        "max_derived_attributes": 8,
+        "derivation_max_hops": 4,
+        "derivation_max_relationships": 2000,
     },
     "exchange": {
         "max_document_bytes": 10_000_000,
@@ -259,6 +264,38 @@ def viewpoints_execution_timeout_seconds() -> float:
         return max(0.1, float(value))  # type: ignore[arg-type]
     except (TypeError, ValueError):
         return 10.0
+
+
+def _viewpoints_positive_integer(key: str, default: int) -> int:
+    value = _viewpoints_value(key)
+    try:
+        return max(1, int(value))  # type: ignore[call-overload]
+    except (TypeError, ValueError):
+        return default
+
+
+def viewpoints_max_query_bindings() -> int:
+    return _viewpoints_positive_integer("max_query_bindings", 8)
+
+
+def viewpoints_max_query_parameters() -> int:
+    """Maximum number of execution parameters in one viewpoint definition."""
+    return _viewpoints_positive_integer("max_query_parameters", 4)
+
+
+def viewpoints_max_derived_attributes() -> int:
+    """Maximum number of item-scoped derived attributes in one viewpoint definition."""
+    return _viewpoints_positive_integer("max_derived_attributes", 8)
+
+
+def viewpoints_derivation_max_hops() -> int:
+    """Maximum modeled-relationship hops used to derive a relationship."""
+    return _viewpoints_positive_integer("derivation_max_hops", 4)
+
+
+def viewpoints_derivation_max_relationships() -> int:
+    """Maximum derived relationships returned by one derivation request."""
+    return _viewpoints_positive_integer("derivation_max_relationships", 2000)
 
 
 def exchange_max_document_bytes() -> int:

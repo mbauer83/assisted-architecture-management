@@ -80,7 +80,7 @@ the binding layer, and G1 waits on neither derivation nor presentation work.
 
 ## Phase A — Foundations & remediation
 
-- [ ] **WU-A1 — Settings for bindings & derivation bounds**
+- [x] **WU-A1 — Settings for bindings & derivation bounds**
   - Files: `config/settings.yaml`, `src/config/settings.py` (`_DEFAULTS["viewpoints"]`,
     accessor functions beside `viewpoints_execution_max_entities`),
     `tests/common/test_viewpoints_execution_settings.py` (extend in place — same concern).
@@ -868,3 +868,4 @@ Anything short of this is "in progress", regardless of how many WUs are ticked.
   Backend defect triage: evaluator healthy via MCP ad-hoc execute; shipped defaults are
   scope-only (query_summary null) — remediation = WU-A3 + WU-G1; GUI-side behavior gated
   on the concurrent frontend rewrite (Phase H).
+- 2026-07-13 — WU-A1 — Settings accessors and fallback validation shipped; pre-existing file-length-policy failures remain user-authorized non-blocking baseline.
