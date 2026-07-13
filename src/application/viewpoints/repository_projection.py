@@ -6,16 +6,24 @@ table/matrix/exploration/diagram representations.
 
 from __future__ import annotations
 
+from typing import Literal
+
 from src.application.viewpoints.ports import RepositoryReadAccess
-from src.domain.artifact_types import EntityRecord
+from src.domain.artifact_types import ConnectionRecord, EntityRecord
 from src.domain.concept_scope import ConceptScope
 from src.domain.module_types import EntityTypeName
 from src.domain.viewpoint_condition_validation import RegistrySnapshot
 from src.domain.viewpoint_criteria_evaluation import evaluate_entity_criteria
 from src.domain.viewpoint_evaluation_context import EvaluationEnvironment
 from src.domain.viewpoint_population_evaluation import resolve_neighbor_inclusions, select_connections
-from src.domain.viewpoint_projection import Membership, ProjectedOccurrence, ViewpointProjection, drift_warnings
-from src.domain.viewpoint_style_evaluation import evaluate_item_style
+from src.domain.viewpoint_projection import (
+    Membership,
+    ProjectedOccurrence,
+    ScaleLegendData,
+    ViewpointProjection,
+    drift_warnings,
+)
+from src.domain.viewpoint_style_evaluation import calculate_scale_bounds, evaluate_item_style
 from src.domain.viewpoints import ExecutableViewpointQuery, RepoScope, ViewpointDefinition
 
 
@@ -73,13 +81,34 @@ def project_repository(
     )
     drift |= connections_result.schema_drift
 
+    entity_records = tuple(
+        entity for entity_id in sorted(included_ids) if (entity := read_access.get_entity(entity_id)) is not None
+    )
+    styled_items_list: list[tuple[EntityRecord | ConnectionRecord, Literal["entity", "connection"]]] = []
+    for entity in entity_records:
+        styled_items_list.append((entity, "entity"))
+    for connection in connections_result.connections:
+        styled_items_list.append((connection, "connection"))
+    styled_items = tuple(styled_items_list)
+    scale_bounds, scale_legends, scale_drift = calculate_scale_bounds(
+        definition.presentation,
+        styled_items,
+        registries=registries,
+        environment=environment,
+    )
+    drift |= scale_drift
+
     items: list[ProjectedOccurrence] = []
-    for entity_id in sorted(included_ids):
-        entity = read_access.get_entity(entity_id)
-        if entity is None:
-            continue
+    for entity in entity_records:
+        entity_id = entity.artifact_id
         style, style_drift = evaluate_item_style(
-            entity, "entity", definition.presentation, read_access=read_access, registries=registries
+            entity,
+            "entity",
+            definition.presentation,
+            read_access=read_access,
+            registries=registries,
+            environment=environment,
+            scale_bounds=scale_bounds,
         )
         drift |= style_drift
         membership: Membership = "primary" if entity_id in primary_ids else "expanded"
@@ -90,7 +119,13 @@ def project_repository(
         )
     for connection in connections_result.connections:
         style, style_drift = evaluate_item_style(
-            connection, "connection", definition.presentation, read_access=read_access, registries=registries
+            connection,
+            "connection",
+            definition.presentation,
+            read_access=read_access,
+            registries=registries,
+            environment=environment,
+            scale_bounds=scale_bounds,
         )
         drift |= style_drift
         items.append(
@@ -119,7 +154,21 @@ def project_repository(
             )
         )
 
-    return ViewpointProjection(target="repository", items=tuple(items), warnings=drift_warnings(frozenset(drift)))
+    return ViewpointProjection(
+        target="repository",
+        items=tuple(items),
+        warnings=drift_warnings(frozenset(drift)),
+        scale_legends=tuple(
+            ScaleLegendData(
+                capability=legend.capability,
+                attribute=legend.attribute,
+                minimum=legend.minimum,
+                maximum=legend.maximum,
+                tokens=legend.tokens,
+            )
+            for legend in scale_legends
+        ),
+    )
 
 
 def _result_included_binding_ids(query: ExecutableViewpointQuery, environment: EvaluationEnvironment) -> frozenset[str]:

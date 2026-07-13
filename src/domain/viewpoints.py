@@ -31,7 +31,7 @@ Purpose = Literal["designing", "deciding", "informing"]
 Content = Literal["details", "coherence", "overview"]
 RepoScope = Literal["enterprise", "engagement", "both"]
 Representation = Literal["exploration", "table", "matrix", "diagram"]
-StyleConditionMode = Literal["match", "range"]
+StyleConditionMode = Literal["match", "range", "scale"]
 TargetKind = Literal["diagram", "matrix"]
 EnforcementSetting = Literal["off", "warn", "ghost"]
 
@@ -41,7 +41,7 @@ VALID_CONTENTS: frozenset[str] = frozenset({"details", "coherence", "overview"})
 VALID_REPO_SCOPES: frozenset[str] = frozenset({"enterprise", "engagement", "both"})
 VALID_TARGET_KINDS: frozenset[str] = frozenset({"diagram", "matrix"})
 VALID_ENFORCEMENT_SETTINGS: frozenset[str] = frozenset({"off", "warn", "ghost"})
-VALID_STYLE_CONDITION_MODES: frozenset[str] = frozenset({"match", "range"})
+VALID_STYLE_CONDITION_MODES: frozenset[str] = frozenset({"match", "range", "scale"})
 
 REPRESENTATION_CAPABILITIES: Mapping[Representation, frozenset[str]] = {
     "exploration": frozenset(
@@ -86,6 +86,10 @@ class StyleRule:
     range_attribute: str | None = None  # mode == "range": numeric/date attribute path
     range_bands: tuple[RangeBand, ...] = ()  # mode == "range"
     value: str | None = None  # mode == "match": token applied when matched
+    scale_attribute: str | None = None  # mode == "scale": numeric/date attribute path
+    scale_min: float | str | None = None  # None = data-driven bound
+    scale_max: float | str | None = None  # None = data-driven bound
+    scale_tokens: tuple[str, ...] = ()  # mode == "scale": adapter interpolation endpoints
 
 
 @dataclass(frozen=True)

@@ -38,7 +38,7 @@ class ProjectedOccurrence:
     state: OcclusionState
     membership: Membership = "primary"  # connections are always "primary"
     reasons: tuple[ExclusionReason, ...] = ()  # empty iff the item fully matches
-    style: Mapping[str, str] = field(default_factory=dict)  # capability -> opaque token
+    style: Mapping[str, object] = field(default_factory=dict)  # capability -> opaque token or scale position
     connection_type: str | None = None
     source_id: str | None = None
     target_id: str | None = None
@@ -53,6 +53,18 @@ class ViewpointProjection:
     items: tuple[ProjectedOccurrence, ...]
     stale_pin: bool = False  # artifact-local only: pinned_version < current definition version
     warnings: tuple[str, ...] = ()  # schema drift, capability drift, unresolved references
+    scale_legends: tuple["ScaleLegendData", ...] = ()
+
+
+@dataclass(frozen=True)
+class ScaleLegendData:
+    """A scale's resolved bounds and endpoint tokens for a presentation adapter."""
+
+    capability: str
+    attribute: str
+    minimum: float
+    maximum: float
+    tokens: tuple[str, str]
 
 
 def drift_warnings(drift: frozenset[str]) -> tuple[str, ...]:

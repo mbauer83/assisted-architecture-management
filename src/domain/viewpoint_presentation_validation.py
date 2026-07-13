@@ -1,12 +1,12 @@
-"""Registry-aware validation of a ``PresentationSpec`` (companion plan §5): capability
+"""Registry-aware validation of a ``PresentationSpec``: capability
 agreement per representation, style-rule mode shape (match vs. range), range-band overlap,
 matrix axis-mode exclusivity, and column/group_by attribute resolution.
 """
 
 from __future__ import annotations
 
-from src.domain.viewpoint_condition_validation import RegistrySnapshot, issue, resolve_attribute_path
-from src.domain.viewpoint_criteria import ConnectionCriteriaGroup, EntityCriteriaGroup
+from src.domain.viewpoint_condition_validation import CriteriaContext, RegistrySnapshot, issue, resolve_attribute_path
+from src.domain.viewpoint_criteria import NUMERIC_ATTRIBUTE_TYPES, ConnectionCriteriaGroup, EntityCriteriaGroup
 from src.domain.viewpoint_criteria_validation import (
     validate_connection_criteria,
     validate_depth_cap,
@@ -111,7 +111,7 @@ def _validate_style_rule(
             )
             if check_ergonomics:
                 issues.extend(validate_depth_cap(criteria, path=f"{path}/match_criteria", registries=registries))
-    else:
+    elif rule.mode == "range":
         if rule.range_attribute is None:
             issues.append(
                 issue(
@@ -123,7 +123,68 @@ def _validate_style_rule(
             )
         if check_ergonomics:
             issues.extend(_validate_range_bands(rule, path=path))
+    else:
+        issues.extend(_validate_scale_rule(rule, path=path, registries=registries))
+    issues.extend(_validate_mode_fields(rule, path=path))
     return issues
+
+
+def _validate_scale_rule(
+    rule: StyleRule, *, path: str, registries: RegistrySnapshot
+) -> list[ViewpointValidationIssue]:
+    if rule.scale_attribute is None:
+        return [
+            issue(
+                "error",
+                "missing-scale-attribute",
+                f"{path}/scale_attribute",
+                "mode='scale' requires scale_attribute",
+            )
+        ]
+    context: CriteriaContext = "connection" if rule.capability.startswith("edge_") else "entity"
+    declared = resolve_attribute_path(rule.scale_attribute, context=context, registries=registries)
+    if declared is None and not rule.scale_attribute.startswith("derived."):
+        return [issue("error", "unknown-attribute", f"{path}/scale_attribute", "unknown scale attribute")]
+    if declared not in (None, "reserved") and declared not in NUMERIC_ATTRIBUTE_TYPES:
+        return [
+            issue(
+                "error",
+                "operator-type-mismatch",
+                f"{path}/scale_attribute",
+                "scale attributes must be numeric or date values",
+            )
+        ]
+    if len(rule.scale_tokens) != 2:
+        return [issue("error", "scale-token-count", f"{path}/scale_tokens", "scale mode requires exactly two tokens")]
+    return []
+
+
+def _validate_mode_fields(rule: StyleRule, *, path: str) -> list[ViewpointValidationIssue]:
+    if rule.mode == "match":
+        mismatched = rule.range_attribute is not None or bool(rule.range_bands) or any(
+            value is not None for value in (rule.scale_attribute, rule.scale_min, rule.scale_max)
+        ) or bool(rule.scale_tokens)
+    elif rule.mode == "range":
+        mismatched = rule.match_criteria is not None or rule.value is not None or any(
+            value is not None for value in (rule.scale_attribute, rule.scale_min, rule.scale_max)
+        ) or bool(rule.scale_tokens)
+    else:
+        mismatched = (
+            rule.match_criteria is not None
+            or rule.value is not None
+            or rule.range_attribute is not None
+            or bool(rule.range_bands)
+        )
+    if not mismatched:
+        return []
+    return [
+        issue(
+            "error",
+            "style-mode-field-mismatch",
+            path,
+            f"style fields do not match mode {rule.mode!r}",
+        )
+    ]
 
 
 def validate_presentation(

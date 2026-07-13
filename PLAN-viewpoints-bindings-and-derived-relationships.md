@@ -388,10 +388,10 @@ Canonical YAML (extends the existing `{from: self|source|target}` mapping form):
 
 **Typing rules (save-time, D2/D3):** after applying `project`/`aggregate`, the reference's
 type must fit the comparator — scalar comparators need `ScalarType` (numeric ones need
-numeric/date, matching the left-hand attribute's schema type exactly), `in` needs
-`ListType(ScalarType)` whose element kind matches the left-hand attribute, `eq`/`in`
-against tuples per §4.1's tuple rules (eq: element-wise against a tuple literal/binding of
-identical `TupleType`; `in`: membership in `list[tuple[…]]`). A list-typed reference under
+numeric/date, matching the left-hand attribute's schema type exactly), `in`/`not_in` need
+`ListType(ScalarType)` whose element kind matches the left-hand attribute, and `like`/`ilike`
+need strings. `eq`/`in`/`not_in` against tuples follow §4.1's tuple rules (eq: element-wise
+against a tuple literal/binding of identical `TupleType`; membership: `list[tuple[…]]`). A list-typed reference under
 a scalar comparator without `quantifier` or `aggregate` is `unquantified-set-comparison`.
 Quantifier semantics: the condition (before `negate`) holds for `any`/`all` elements
 respectively. Set-membership tests need no new node kind — `id in {from: binding, name: x,

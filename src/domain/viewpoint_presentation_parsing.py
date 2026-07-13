@@ -1,4 +1,4 @@
-"""Parsing for the ``presentation:`` block (companion plan §5): representation, columns,
+"""Parsing for the ``presentation:`` block: representation, columns,
 matrix axes, and style rules, Appendix-A canonical form. A style rule's ``match_criteria``
 is entity or connection criteria depending on its capability (``edge_*`` => connection)."""
 
@@ -35,7 +35,10 @@ _PRESENTATION_KEYS = frozenset(
 _COLUMN_KEYS = frozenset({"label", "source"})
 _RANGE_BAND_KEYS = frozenset({"minimum", "maximum", "value"})
 _STYLE_RULE_KEYS = frozenset(
-    {"capability", "applies_to", "mode", "match_criteria", "range_attribute", "range_bands", "value"}
+    {
+        "capability", "applies_to", "mode", "match_criteria", "range_attribute", "range_bands", "value",
+        "scale_attribute", "scale_min", "scale_max", "scale_tokens",
+    }
 )
 
 
@@ -48,7 +51,7 @@ def _require_representation(value: object, *, label: str) -> Representation:
 
 def _require_style_mode(value: object, *, label: str) -> StyleConditionMode:
     text = str(value)
-    if text not in ("match", "range"):
+    if text not in ("match", "range", "scale"):
         raise ValueError(f"{label}: mode {text!r} is not one of {sorted(VALID_STYLE_CONDITION_MODES)}")
     return text
 
@@ -102,6 +105,18 @@ def _style_rule_from_mapping(raw: object, *, label: str) -> StyleRule:
             match_criteria=match_criteria,
             value=str(raw["value"]) if raw.get("value") is not None else None,
         )
+    if mode == "scale":
+        tokens_raw = raw.get("scale_tokens", ())
+        tokens = tuple(str(token) for token in tokens_raw) if isinstance(tokens_raw, (list, tuple)) else ()
+        return StyleRule(
+            capability=capability,
+            applies_to=applies_to,
+            mode="scale",
+            scale_attribute=str(raw["scale_attribute"]) if raw.get("scale_attribute") else None,
+            scale_min=_scale_bound(raw.get("scale_min")),
+            scale_max=_scale_bound(raw.get("scale_max")),
+            scale_tokens=tokens if len(tokens) == 2 else (),
+        )
     range_attribute = raw.get("range_attribute")
     range_bands = tuple(_range_band_from_mapping(b, label=label) for b in raw.get("range_bands", ()))
     return StyleRule(
@@ -111,6 +126,14 @@ def _style_rule_from_mapping(raw: object, *, label: str) -> StyleRule:
         range_attribute=str(range_attribute) if range_attribute else None,
         range_bands=range_bands,
     )
+
+
+def _scale_bound(value: object) -> float | str | None:
+    if value is None or isinstance(value, (float, str)):
+        return value
+    if isinstance(value, int):
+        return float(value)
+    raise ValueError("scale bound must be numeric or an ISO date")
 
 
 def presentation_from_mapping(raw: object, *, label: str) -> PresentationSpec | None:

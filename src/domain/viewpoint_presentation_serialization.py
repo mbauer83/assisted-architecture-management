@@ -37,9 +37,18 @@ def _style_rule_to_mapping(rule: StyleRule) -> dict[str, Any]:
         if rule.value is not None:
             result["value"] = rule.value
     else:
-        if rule.range_attribute is not None:
+        if rule.mode == "scale":
+            if rule.scale_attribute is not None:
+                result["scale_attribute"] = rule.scale_attribute
+            if rule.scale_min is not None:
+                result["scale_min"] = rule.scale_min
+            if rule.scale_max is not None:
+                result["scale_max"] = rule.scale_max
+            if rule.scale_tokens:
+                result["scale_tokens"] = list(rule.scale_tokens)
+        elif rule.range_attribute is not None:
             result["range_attribute"] = rule.range_attribute
-        if rule.range_bands:
+        if rule.mode == "range" and rule.range_bands:
             result["range_bands"] = [_range_band_to_mapping(b) for b in rule.range_bands]
     return result
 

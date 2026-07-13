@@ -358,6 +358,22 @@ the binding layer, and G1 waits on neither derivation nor presentation work.
     pinned; REST/MCP shared-fixture parity test extended.
   - Deps: C4 (types only; may start after C2).
 
+- [ ] **WU-C6 — Expressive typed comparison operators**
+  - Files: `src/domain/viewpoint_criteria.py`, `viewpoint_criteria_parsing.py`,
+    `viewpoint_condition_validation.py`, `viewpoint_condition_evaluation.py`,
+    `viewpoint_value_reference_validation.py`, `viewpoint_summary.py`; tests: new
+    `tests/domain/test_viewpoint_comparator_evaluation.py`, extend parsing/validation/
+    summary tests.
+  - Changes: add `not_in`, case-sensitive `like`, and case-insensitive `ilike` to the
+    schema-1 grammar. Patterns use SQL-style `%`/`_` wildcards with backslash escaping.
+    Apply the same comparator semantics to literal and `ValueRef` operands everywhere
+    criteria are accepted. Membership is type-checked for scalar arrays and fixed-arity
+    tuples, including `list[tuple[…]]`; tuple membership compares whole tuples.
+  - Acceptance: case and escaping behavior; missing-value and negate semantics; literal,
+    parameter, binding, and attribute-reference operands; typed list/tuple positive and
+    rejected mismatch cases; parser/serializer round-trip and plain-language summaries.
+  - Deps: C3, C4.
+
 ## Phase D — Derived traversal in the query model
 
 - [x] **WU-D1a — Derived traversal on incident predicate & neighbor inclusion**
@@ -513,7 +529,7 @@ the binding layer, and G1 waits on neither derivation nor presentation work.
 
 ## Phase F — Presentation additions & persistence integrations
 
-- [ ] **WU-F1 — Scale-mode style rules**
+- [x] **WU-F1 — Scale-mode style rules**
   - Files: `src/domain/viewpoints.py` (`StyleRule` scale fields, mode literal),
     `viewpoint_presentation_parsing.py`/`_serialization.py`/`_validation.py`,
     `viewpoint_style_evaluation.py`; tests: `test_viewpoint_style_evaluation.py`,
@@ -919,3 +935,4 @@ Anything short of this is "in progress", regardless of how many WUs are ticked.
 - 2026-07-13 — WU-E3b — MCP viewpoint execution accepts typed parameters, surfaces structured errors, and matches REST for parameterized derived traversal.
 - 2026-07-13 — WU-E4 — Shared persist validation accepts the full query grammar and lifecycle tests cover binding cycles and parameter version bumps.
 - 2026-07-13 — WU-E5 — REST neighbor traversal shares MCP's derived witness metadata and atomic derivation-limit behavior.
+- 2026-07-13 — WU-F1 — Scale styles now emit deterministic bounds, opaque endpoint tokens, normalized adapter positions, and projection legend data.

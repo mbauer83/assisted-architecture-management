@@ -103,12 +103,11 @@ one, they gain endpoint-attribute references instead).
 
 ```python
 Conjunction = Literal["and", "or"]
-Comparator = Literal["eq", "neq", "in", "exists", "absent", "lt", "lte", "gt", "gte"]
-# Exactly today's VALID_OPERATORS set — this redesign restructures the TREE, it does not
-# expand the comparator vocabulary. There is deliberately no `not_in`: per-condition
-# `negate` (below) already expresses it as `in` + negate, and one spelling per meaning
-# keeps the GUI builder and the semantics table (§3.4) smaller. NUMERIC_ATTRIBUTE_TYPES
-# gating (lt/lte/gt/gte only valid against numeric/date attributes) carries over unchanged.
+Comparator = Literal["eq", "neq", "in", "not_in", "like", "ilike", "exists", "absent", "lt", "lte", "gt", "gte"]
+# The structured language includes explicit `not_in` and SQL-inspired string patterns:
+# `like` is case-sensitive and `ilike` case-insensitive. `%` matches any sequence, `_`
+# matches one character, and `\\` escapes either wildcard. `negate` remains available for
+# strict logical complement, but the named operators make a user-facing selection clear.
 
 ValueRefKind = Literal["literal", "attribute_of_self", "attribute_of_endpoint"]
 
@@ -294,6 +293,9 @@ The evaluator is a pure recursive function; these rules are the contract its tes
 | `eq` | scalar | no match | `==` | any element `==` |
 | `neq` | scalar | no match | `!=` | **no** element `==` |
 | `in` | non-empty list | no match | value ∈ list | any element ∈ list |
+| `not_in` | non-empty list | no match | value ∉ list | no element ∈ list |
+| `like` | string pattern | no match | SQL-style case-sensitive match | any element matches |
+| `ilike` | string pattern | no match | SQL-style case-insensitive match | any element matches |
 | `exists` | none (error if given) | no match | match | match |
 | `absent` | none (error if given) | match | no match | no match |
 | `lt/lte/gt/gte` | scalar, numeric/date | no match | typed compare | any element satisfies |
@@ -311,14 +313,18 @@ The evaluator is a pure recursive function; these rules are the contract its tes
   error**. Group `negate` complements the group result. Evaluation may short-circuit
   (evaluation is pure, so this is unobservable).
 - **Type discipline, no coercion**: comparator/type mismatches (e.g. `lt` on a string
-  attribute, `in` with a scalar value, list literal where a scalar is required) are
+  attribute, `in`/`not_in` with a scalar value, list literal where a scalar is required,
+  or `like`/`ilike` on a non-string) are
   save-time validation errors against the effective schema. Dates are compared as dates
   (ISO-8601 in serialized form), numbers as numbers. Nothing is coerced at evaluation time.
 - **`ValueRef` resolution**: `attribute_of_self` / `attribute_of_endpoint` resolve at
   evaluation time; if the referenced attribute is missing on the referent, the condition is
   *no match* (then `negate` applies as usual). `attribute_of_endpoint` outside a connection
   condition is a save-time error. Type compatibility between the two attribute paths is
-  checked at save time against the effective schema.
+  checked at save time against the effective schema. Arrays are homogeneous lists and tuples
+  are fixed-arity typed values: `in`/`not_in` accept a list whose element type matches the
+  left value, including `list[tuple[…]]`; tuple equality is element-wise and tuple membership
+  compares the complete tuple, never its individual elements.
 - **Schema drift at evaluation time**: a saved definition can outlive a schema (profile
   removed, attribute renamed). An attribute path that validated at save time but is unknown
   at evaluation time behaves as *missing* (no match) **and** contributes a warning to the

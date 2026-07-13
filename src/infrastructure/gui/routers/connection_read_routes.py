@@ -1,0 +1,112 @@
+"""Read-only connection routes registered by the main connections router."""
+
+from __future__ import annotations
+
+from functools import lru_cache
+from typing import Any, Literal
+
+from fastapi import APIRouter, Depends, HTTPException
+
+from src.application.entity_type_predicates import is_internal_entity_type
+from src.application.runtime_catalogs import RuntimeCatalogs
+from src.infrastructure.app_bootstrap import runtime_catalogs_dependency
+from src.infrastructure.gui.routers import state as s
+from src.infrastructure.gui.routers.connection_neighbors import DerivationLimitError, derive_neighbor_response
+
+
+@lru_cache(maxsize=1)
+def _catalogs():
+    from src.infrastructure.app_bootstrap import build_runtime_catalogs, get_module_registry  # noqa: PLC0415
+
+    return build_runtime_catalogs(get_module_registry())
+
+
+def register_connection_read_routes(router: APIRouter) -> None:
+    """Attach read endpoints while keeping the write router within the file-size limit."""
+
+    @router.get("/api/connections")
+    def get_connections(
+        entity_id: str,
+        direction: Literal["any", "outbound", "inbound"] = "any",
+        conn_type: str | None = None,
+    ) -> list[dict[str, Any]]:
+        conns = s.get_repo().find_connections_for(entity_id, direction=direction, conn_type=conn_type)
+        return [s.connection_to_dict(c) for c in conns]
+
+    @router.get("/api/neighbors")
+    def get_neighbors(
+        entity_id: str,
+        max_hops: int = 1,
+        traversal: Literal["direct", "derived"] = "direct",
+        include_potential: bool = False,
+        catalogs: RuntimeCatalogs = Depends(runtime_catalogs_dependency),
+    ) -> dict[str, object]:
+        repo = s.get_repo()
+        if traversal == "direct":
+            return {hop: sorted(ids) for hop, ids in repo.find_neighbors(entity_id, max_hops=max_hops).items()}
+        try:
+            return derive_neighbor_response(
+                entity_id,
+                max_hops=max_hops,
+                include_potential=include_potential,
+                read_access=repo,
+                catalogs=catalogs,
+            )
+        except DerivationLimitError as exc:
+            raise HTTPException(400, {"code": "derivation-limit", "path": "query", "message": str(exc)}) from exc
+
+    @router.get("/api/search")
+    def search(q: str, limit: int = 20) -> dict[str, Any]:
+        result = s.get_repo().search_artifacts(q, limit=limit, include_connections=False)
+        return {"query": result.query, "hits": [s.search_hit_to_dict(hit) for hit in result.hits]}
+
+    @router.get("/api/ontology")
+    def get_ontology(
+        source_type: str,
+        target_type: str | None = None,
+        source_id: str | None = None,
+        target_id: str | None = None,
+        catalogs: RuntimeCatalogs = Depends(runtime_catalogs_dependency),
+    ) -> dict[str, Any]:
+        source, source_invalid = _resolve_effective_type(source_id, source_type)
+        target, target_invalid = _resolve_effective_type(target_id, target_type or "")
+        if source_invalid or target_invalid:
+            return {
+                "source_type": source_type,
+                "target_type": target_type,
+                "connection_types": [],
+                "error": "document/diagram global-artifact-references are not valid connection endpoints",
+            }
+        if target:
+            connection_types = catalogs.connections.permissible_connection_types(source, target)
+            return {
+                "source_type": source_type,
+                "target_type": target_type,
+                "connection_types": connection_types,
+                "symmetric": [item for item in connection_types if catalogs.connections.is_symmetric(item)],
+                "relationship_kind_map": {
+                    item: catalogs.connections.relationship_kind(item) for item in connection_types
+                },
+            }
+        return {"source_type": source_type, **catalogs.connections.classify_connections(source)}
+
+    @router.get("/api/write-help")
+    def get_write_help() -> dict[str, Any]:
+        from src.infrastructure.write.artifact_write.help import write_help
+
+        return write_help()
+
+
+def _resolve_effective_type(artifact_id: str | None, declared_type: str) -> tuple[str, bool]:
+    if artifact_id is None:
+        return declared_type, False
+    repo = s.maybe_get_repo()
+    if repo is None:
+        return declared_type, False
+    record = repo.get_entity(artifact_id)
+    if record is None or not is_internal_entity_type(record.artifact_type, _catalogs().ontology):
+        return declared_type, False
+    if record.extra.get("global-artifact-type") != "entity":
+        return declared_type, True
+    entity_type = record.extra.get("global-artifact-entity-type")
+    return (entity_type if isinstance(entity_type, str) and entity_type else declared_type), False
