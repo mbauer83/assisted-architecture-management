@@ -423,13 +423,17 @@ the binding layer, and G1 waits on neither derivation nor presentation work.
     both invariants; synthetic ids sort stably; `certainty`/`hops`/`via_connection_ids`
     on connection summaries (None/empty for modeled); `via` on entity summaries +
     occurrences; derived results remain distinct from direct modeled connections even
-    when their type pair is not directly permitted. **Hitting `derivation_max_relationships` is
-    `DerivationLimitError` — typed error, whole execution aborts, no partial result
-    (PLAN §5.5)** — there is no derivation-truncation warning anywhere.
+    when their type pair is not directly permitted. **Enforcement is primarily a
+    wall-clock time budget (revised post-hardening, PLAN §5.5): derivation stopping early
+    on `derivation_time_budget_seconds` returns its partial result flagged `truncated`,
+    always warned via `ViewpointProjection.warnings`; only the `derivation_max_relationships`
+    hard ceiling still raises `DerivationLimitError` (typed error, whole execution
+    aborts, no partial result).**
   - Acceptance: matrix bridging over derived edges (requirements × components realization
-    fixture); structural invariant holds for derived edges; limit overflow during
-    selection raises the typed error with no result; existing consumers see
-    unchanged shapes for modeled-only results (golden regression).
+    fixture); structural invariant holds for derived edges; the memory-ceiling overflow
+    raises the typed error with no result; time-budget truncation returns a warned partial
+    result; existing consumers see unchanged shapes for modeled-only results (golden
+    regression).
   - Deps: D1a, B6.
 
 ## Phase E — Application layer & transports
@@ -446,11 +450,12 @@ the binding layer, and G1 waits on neither derivation nor presentation work.
     layer per the standing rule — never route around); scope = declaring repo, same as
     entities; `ViewpointExecutionRequest.parameters`;
     `ViewpointParameterError` (missing/mistyped/unknown), `DerivationLimitError`
-    surfaced as typed errors like the timeout; dangling `entity-id` → warning +
-    no-match; success log line gains `binding_count`/`derived_edge_count` (NO
-    `derivation_truncated` — derivation never truncates); error path logs
-    `error_code=derivation-limit` + configured limit + count-at-failure, no result
-    payload.
+    (memory-ceiling overflow only, post-hardening) surfaced as typed errors like the
+    timeout; dangling `entity-id` → warning + no-match; success log line gains
+    `binding_count`/`derived_edge_count`; time-budget truncation is not a log field —
+    it surfaces as a `ViewpointProjection.warnings` entry on the successful response;
+    error path (memory-ceiling only) logs `error_code=derivation-limit` + configured
+    limit + count-at-failure, no result payload.
   - Acceptance: pipeline-order fixture; parameter error matrix; `select: connections`
     binding end-to-end (scoped enumeration; dangling-endpoint candidate evaluates own
     attributes, endpoint ValueRef no-match; enterprise/engagement/both partitions
@@ -919,10 +924,14 @@ Anything short of this is "in progress", regardless of how many WUs are ticked.
   repository (candidates arrive via `BindingEvaluationInput`); policy crosses the domain
   boundary only as value objects (`RelationshipDerivationRequest`/`DerivationBounds`/
   `DerivationCertaintyPolicy`), transport booleans only at API edges.
-- [ ] **No partial results, ever**: timeout, `ViewpointParameterError`,
-  `BindingCardinalityError`, and `DerivationLimitError` abort the whole execution with a
-  typed error; REST and MCP map every typed error to the same error payload shape (parity
-  fixture) with no result content alongside.
+- [ ] **No silent partial results**: timeout, `ViewpointParameterError`,
+  `BindingCardinalityError`, and `DerivationLimitError` (the `derivation_max_relationships`
+  hard ceiling) abort the whole execution with a typed error; REST and MCP map every typed
+  error to the same error payload shape (parity fixture) with no result content alongside.
+  The one sanctioned exception (revised from the original "never partial" design, PLAN
+  §5.5/§11): relationship derivation stopping early on its time budget returns its genuine
+  partial result flagged `truncated`, always accompanied by a `ViewpointProjection.warnings`
+  entry — never a silent truncation.
 - [ ] **Derived relationships never become model state**: no synthetic
   (`derived::…`) id is ever written to a model file, the artifact index, or a
   `CandidateSet.connection_ids`; generated diagrams persist witness *paths* only
