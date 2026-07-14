@@ -47,9 +47,17 @@ class SingleWriterQueue:
     # ── Executor lifecycle ─────────────────────────────────────────────────────
 
     def _get_executor(self) -> ThreadPoolExecutor:
-        if self._executor is None or self._executor._shutdown:  # noqa: SLF001
-            self._executor = ThreadPoolExecutor(max_workers=1, thread_name_prefix=self._name)
-        return self._executor
+        # Double-checked locking: the lazy (re)creation must be atomic, or concurrent
+        # first-time submits each see ``None`` and each build a *separate* single-worker
+        # executor — two live workers then run writes concurrently, defeating the whole
+        # single-writer guarantee. The unlocked fast path keeps the hot path lock-free.
+        executor = self._executor
+        if executor is not None and not executor._shutdown:  # noqa: SLF001
+            return executor
+        with self._lock:
+            if self._executor is None or self._executor._shutdown:  # noqa: SLF001
+                self._executor = ThreadPoolExecutor(max_workers=1, thread_name_prefix=self._name)
+            return self._executor
 
     # ── Submission ─────────────────────────────────────────────────────────────
 

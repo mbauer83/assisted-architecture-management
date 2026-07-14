@@ -35,6 +35,50 @@ def test_runs_serially_max_in_flight_one() -> None:
         q.shutdown()
 
 
+def test_concurrent_first_submits_build_only_one_executor(monkeypatch) -> None:
+    """Regression: concurrent first-time submits must build exactly one single-worker
+    executor. Lazy init was a check-then-act race — two callers could each see ``None``
+    and each build their own executor, yielding two live writers (the bug that made
+    ``max_observed_in_flight`` intermittently reach 2 under parallel load).
+
+    The window between the ``None`` check and the assignment is normally sub-microsecond,
+    so we widen it deterministically: a slow executor constructor guarantees every aligned
+    thread passes the check before the first assignment lands. With the fix the lock
+    serialises them and only one executor is ever constructed; without it, one per thread.
+    """
+    import src.infrastructure.concurrency.single_writer_queue as swq_module
+
+    real_ctor = swq_module.ThreadPoolExecutor
+    constructed: list[object] = []
+    n = 8
+    aligned = threading.Barrier(n)
+
+    def _slow_ctor(*args: object, **kwargs: object) -> object:
+        time.sleep(0.05)  # hold the check→assign window open across all callers
+        executor = real_ctor(*args, **kwargs)  # type: ignore[arg-type]
+        constructed.append(executor)
+        return executor
+
+    monkeypatch.setattr(swq_module, "ThreadPoolExecutor", _slow_ctor)
+
+    q = SingleWriterQueue("test-queue")
+    try:
+        def _worker() -> None:
+            aligned.wait()
+            q.run_sync(lambda: None)
+
+        threads = [threading.Thread(target=_worker) for _ in range(n)]
+        for t in threads:
+            t.start()
+        for t in threads:
+            t.join()
+
+        assert len(constructed) == 1
+        assert q.max_observed_in_flight == 1
+    finally:
+        q.shutdown()
+
+
 def test_run_sync_returns_result_and_propagates_errors() -> None:
     q = SingleWriterQueue("test-queue")
     try:
