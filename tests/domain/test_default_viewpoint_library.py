@@ -96,12 +96,16 @@ def test_every_definition_passes_save_mode_validation() -> None:
 
 
 def test_every_standard_definition_returns_a_non_empty_population() -> None:
-    """The 25 standard definitions take no parameters; the 3 custom impact-analysis
-    definitions require an anchor and are exercised separately in
-    test_default_viewpoint_library_impact_analysis.py."""
+    """The standard definitions take no parameters; parameterised definitions require an
+    anchor and are exercised separately in test_default_viewpoint_library_impact_analysis.py.
+
+    Skip by "declares parameters" rather than a hardcoded slug set: `_CATALOGS.viewpoints`
+    is the merged two-tier catalog, so it can contain engagement/enterprise-authored
+    parameterised viewpoints beyond the module-shipped custom trio — those must be skipped
+    here too, not just the known module slugs."""
     store = _seeded_store()
     for definition in _CATALOGS.viewpoints.entries:
-        if definition.slug in _CUSTOM_SLUGS:
+        if definition.query is not None and definition.query.parameters:
             continue
         result = evaluate_viewpoint(
             ViewpointExecutionRequest(slug=definition.slug),
