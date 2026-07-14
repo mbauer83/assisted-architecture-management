@@ -17,9 +17,9 @@ Three related but distinct things share the word "viewpoint":
 
 - **`ViewpointDefinition`** — the reusable, versioned thing: a slug, a name, a purpose/content/
   stakeholders/concerns description, a **query** (which entities/connections match), and a
-  **presentation** (how to show them). Definitions live in a two-tier catalog — a small,
-  informative starter library shipped by the `archimate_4` module (Motivation, Application
-  Structure, Layered, Technology Usage), plus repo-authored definitions in
+  **presentation** (how to show them). Definitions live in a two-tier catalog — an
+  informative library shipped by the `archimate_4` module (the ArchiMate Appendix-C example
+  viewpoints plus a few tool-specific impact-analysis ones), plus repo-authored definitions in
   `.arch-repo/viewpoints.yaml` at the enterprise and engagement tiers, merged the same way
   [specializations](../05-extensibility/ontology-modules.md#specializations) are.
 - **`ViewpointApplication`** — pinning an *existing* diagram or matrix to a definition (at a
@@ -157,6 +157,166 @@ connections with `strength >= 3`"); it can never widen past it.
 
 &nbsp;
 
+## Parameters: the same definition, different anchors
+
+A definition can declare typed **parameters**, filled in at execution time rather than
+baked into the saved query. This is what turns "what depends on this specific component"
+into one reusable definition instead of one hand-authored viewpoint per component:
+
+```yaml
+query:
+  parameters:
+    - {name: anchor, type: entity-id, required: true, description: The element whose impact is analyzed}
+  entity_criteria:
+    kind: group
+    conjunction: and
+    children:
+      - {kind: condition, attribute: id, comparator: eq, value: {from: parameter, name: anchor}}
+```
+
+Parameter types are `string`, `integer`, `number`, `date`, `boolean`, `slug`, or `entity-id`
+(the last resolved through the same entity picker used everywhere else in the GUI, never a
+free-text id field). A required parameter with no supplied value is a typed
+`ViewpointParameterError`, never a silent empty result — the GUI prompts for it before the
+first execution rather than letting it fail once and report an opaque error. See the shipped
+`element-dependents`/`element-dependencies` definitions for a complete worked example (an
+`anchor` parameter feeding a `derived`, `incoming`/`outgoing` neighbor inclusion).
+
+&nbsp;
+
+## Bindings: comparing against another selection
+
+A **binding** names a second, independent selection — entities or connections — that the
+primary query can then compare against, without a second saved viewpoint or a formula
+language. Every binding declares its `select` (`entities` or `connections`), a `criteria`
+tree exactly like the primary one, and an explicit `result_type` (`entity[type]` /
+`entities[type]` / `connection[type]` / `connections[type]` / `scalar`) — checked statically,
+so a condition that references a binding the wrong way (comparing a set where a scalar is
+expected, say) is a validation error at save time, not a runtime surprise.
+
+**Application components that serve at least one requirement** — a binding selects the
+requirement population, and an incident condition checks membership against it via
+`in`/`{from: binding, ...}` (the same value-reference kind a literal or a parameter uses):
+
+```yaml
+query:
+  bindings:
+    - name: open_requirements
+      select: entities
+      criteria:
+        kind: group
+        conjunction: and
+        children:
+          - {kind: condition, attribute: type, comparator: eq, value: requirement}
+      result_type: entities[requirement]
+  entity_criteria:
+    kind: group
+    conjunction: and
+    children:
+      - {kind: condition, attribute: type, comparator: eq, value: application-component}
+      - kind: incident
+        direction: outgoing
+        endpoint_criteria:
+          kind: group
+          conjunction: and
+          children:
+            - {kind: condition, attribute: id, comparator: in, value: {from: binding, name: open_requirements, project: id}}
+```
+
+An entity-selecting binding (`select: entities`) and a connection-selecting binding
+(`select: connections`) are visibly distinct everywhere a binding can be referenced — the GUI
+labels each accordingly, and a `ValueRef` picker only offers bindings whose result type is
+compatible with the comparator in play. `in`/`not_in` require a *list* result type
+(`entities[...]`/`connections[...]`, the plural forms); a scalar (`entity[...]`) binding
+projects a single comparable value instead.
+
+&nbsp;
+
+## Derived attributes: item-scoped facts about the result
+
+A **derived attribute** computes one extra fact per matched item — a count or an aggregate
+(`sum`/`avg`/`min`/`max`) over its incident connections/endpoints, or over
+`relationship.hops` (the shortest derived-relationship distance to a related selection) —
+referenceable from styling-rule criteria and range bands as `derived.<name>`, without a
+second query:
+
+```yaml
+query:
+  derived:
+    - name: hop_distance
+      traversal: derived        # relationship.hops only makes sense over derived traversal
+      reduce: min
+      of: relationship.hops
+presentation:
+  styling_rules:
+    - capability: node_color
+      mode: range
+      range_attribute: derived.hop_distance
+      range_bands:
+        - {minimum: null, maximum: 3, value: color-ok}
+        - {minimum: 3, maximum: null, value: color-warn}
+```
+
+`reduce` defaults to `count` (no `of` needed — it just counts matching connections or
+endpoints); any other reduction requires `of`. Table `columns` currently resolve against the
+entity attribute schema only — a derived attribute isn't yet a column source, only a styling
+input.
+
+Derived attributes referenced by the query's own criteria (filtering on a count, say) are
+computed eagerly, before the primary result is even assembled; attributes used only for
+display are deferred until after filtering, against the retained population only — this
+split is what keeps a derived-attribute-heavy definition fast on a real repo rather than
+computing every attribute for every candidate up front.
+
+&nbsp;
+
+## Traversal: direct vs. derived, certain vs. potential
+
+Every place a query looks at connections — the primary `incident` predicate, a neighbor
+inclusion, `connections`, or a `relationship.hops` derived attribute — takes a `traversal`
+mode:
+
+- **`direct`** (the default) — only a single, explicitly modeled connection counts.
+- **`derived`** — an indirect relationship, composed transitively across intermediate
+  elements per the ArchiMate derivation rules, counts too. See
+  [Impact analysis](impact-analysis.md) for what "derived" actually means and how certain vs.
+  potential derivations are distinguished.
+
+`derived` traversal also takes `include_potential` (whether lower-confidence derivations
+count, default `false`) and an optional `max_hops` bound. A derived-relationship search that
+would otherwise run unbounded stops gracefully at a wall-clock time budget and returns its
+genuine partial result flagged in the response's `warnings` — never a silent truncation, and
+never an error for what is, in a large repo, an entirely ordinary result.
+
+&nbsp;
+
+## Scope-only execution
+
+A definition with `scope` but no `query` is still executable — the scope fallback derives an
+implicit "everything admissible by scope" query automatically, so a starter definition
+authored before its criteria are worked out (or one that genuinely only needs "every
+application component," nothing more) never shows a blank pane. The GUI's Query tab makes
+this explicit rather than silently blank: *"Scope-only viewpoint — executes via its concept
+scope. Add a query to refine."*
+
+&nbsp;
+
+## Worked examples
+
+Runnable today against this repository's own self-model, via `artifact_query_viewpoint`
+(MCP) or the GUI's Viewpoints page:
+
+- **`element-dependents`** — "what is affected if ⟨anchor⟩ changes": a parameterized,
+  `traversal: derived` impact query (see [Impact analysis](impact-analysis.md)).
+- **`business-technology-support`** — "which business roles and services does this
+  technology indirectly support": business domain as the primary selection, technology as a
+  `derived` neighbor inclusion, skipping the intervening application layer — the "reduce
+  clutter" pattern for a cross-domain question, rather than one flat multi-domain dump.
+- **`goal-realization`** / **`motivation`** — plain domain-and-type filters, no traversal at
+  all, for the simplest end of the spectrum.
+
+&nbsp;
+
 ## The four representations
 
 | Representation | Shows | Styling capabilities |
@@ -221,4 +381,4 @@ GUI's live preview uses — so an agent (or a person reading raw YAML) sees what
 
 ---
 
-*Next: [Interfaces & MCP →](interfaces-and-mcp.md)*
+*Next: [Impact analysis →](impact-analysis.md)*

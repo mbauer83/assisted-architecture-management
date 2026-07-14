@@ -798,22 +798,18 @@ The ledger's Phase B closeout additionally requires a recorded line-by-line revi
   path) — `None`/empty for modeled connections, so existing consumers see no change.
   Derived ids use the D6 synthetic scheme and sort stably with the rest.
 - `EntityItemSummary` and `ProjectedOccurrence` gain `via` (§4.2).
-- **Enforcement is primarily a wall-clock time budget, not a relationship count**
-  (revised from the original "typed error, never partial" design after profiling a real
-  109-anchor query — `max_relationships=2000` rejected a perfectly tractable search that
-  completed in 1.16s; the count had no relationship to actual cost). `derive_relationships`
-  stops gracefully at `derivation_time_budget_seconds` (default 2.0s) and returns its
-  genuine partial result flagged `truncated`, surfaced as a warning
+- **Enforcement is primarily a wall-clock time budget, not a relationship count.**
+  `derive_relationships` stops gracefully at `derivation_time_budget_seconds` (default 2.0s)
+  and returns its genuine partial result flagged `truncated`, surfaced as a warning
   (`derivation-relationship search stopped early after its time budget; results may be
   incomplete`) through `NeighborInclusionResult`/`ConnectionSelectionResult` into
-  `ViewpointProjection.warnings` — never silently. `derivation_max_relationships` remains
-  as a hard memory-protection ceiling (raised 2000→20000) and still raises
-  `DerivationLimitError`, aborting the whole execution exactly as before, but is expected
-  to essentially never fire once the time budget is in place. (The entity
-  `limit`/truncation machinery is unrelated: it truncates a *complete* result for
-  transport, with honest counts.) Derived relationships are reported as derivation
-  results, not rejected or warned on merely because their type pair is not directly
-  modelable.
+  `ViewpointProjection.warnings` — never silently. `derivation_max_relationships` is a hard
+  memory-protection ceiling (20000) that still raises `DerivationLimitError`, aborting the
+  whole execution, but is expected to essentially never fire once the time budget is in
+  place. (The entity `limit`/truncation machinery is unrelated: it truncates a *complete*
+  result for transport, with honest counts.) Derived relationships are reported as
+  derivation results, not rejected or warned on merely because their type pair is not
+  directly modelable.
 - MCP `execute` output includes the new summary fields (descriptive content — the D15
   boundary is intact; certainty/hops/path are selection facts, not styling).
 
@@ -1085,11 +1081,11 @@ REST + Playwright, not against current components):
 - **Observability**: the *success* log line gains `binding_count` and
   `derived_edge_count`. Time-budget truncation (§5.5) is not an error path — it surfaces
   as a `ViewpointProjection.warnings` entry on an otherwise-successful response, carrying
-  the genuine partial result rather than a log field. The *error* path (now reachable only
-  via the `derivation_max_relationships` hard ceiling, expected to essentially never fire)
-  logs `error_code=derivation-limit`, the configured limit, and the count at failure —
-  with no result payload. Ordinary entity truncation (a complete result cut for transport,
-  with honest counts) is a separate, unchanged mechanism. New warnings enumerated in §5.5;
+  the genuine partial result rather than a log field. The *error* path (reachable only
+  via the `derivation_max_relationships` hard ceiling) logs `error_code=derivation-limit`,
+  the configured limit, and the count at failure — with no result payload. Ordinary entity
+  truncation (a complete result cut for transport, with honest counts) is a separate
+  mechanism. New warnings enumerated in §5.5;
   verifier codes unchanged
   (E180/W180/W181/W182 untouched — definitions validate at save, artifacts at verify).
 

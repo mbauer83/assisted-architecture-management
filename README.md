@@ -79,7 +79,8 @@ More on the audience in [Who it serves](docs/01-motivation.md#who-it-serves).
 | 🗺️ | **A typed architecture graph** | Entities and connections across motivation → strategy → business → application → technology, geared toward the ArchiMate 4.0 standard | 
 | 🔍 | **Browse and explore** | List, treemap, full-text search, and interactive graph navigation — *what connects to this, and how far to that?* |
 | 📐 | **Diagram families** | ArchiMate views, C4 (model-backed), UML activity, sequence & class (datatype), and relationship matrices |
-| 🎯 | **Viewpoints** | Saved, criteria-based ways of looking at the model — table/matrix/diagram/exploration, applied to existing diagrams or executed ad hoc |
+| 🎯 | **Viewpoints** | Saved, criteria-based ways of looking at the model — table/matrix/diagram/exploration, applied to existing diagrams or executed ad hoc, with the ArchiMate Appendix-C example library shipped ready to run |
+| 🧭 | **Impact analysis** | *What is affected if this changes?* — indirect relationships derived across real ones per the ArchiMate rules, as parameterized default viewpoints and ad-hoc graph exploration |
 | ✅ | **Always-on verification** | Schema, referential integrity, cross-repo rules, and PlantUML syntax checked on every write |
 | 🤖 | **AI-native access** | A split read/write MCP server exposes the model as typed tools; the same capability is in the GUI, REST API, and CLI |
 | 🏢 | **Two-tier repositories** | Draft in an engagement repo, promote curated content to a shared enterprise baseline |

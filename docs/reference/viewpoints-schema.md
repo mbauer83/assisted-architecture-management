@@ -206,6 +206,99 @@ entity side.
 
 &nbsp;
 
+## Bindings, parameters & derived attributes
+
+Extends the query grammar above without a formula/text escape hatch — every field here is
+also authorable through the GUI's query builder. See
+[Viewpoints → Parameters](../03-modeling/viewpoints.md#parameters-the-same-definition-different-anchors)
+and the sections following it for explanation and worked examples; this is the field-level
+grammar.
+
+**`parameters[]`** (`QueryParameter`):
+
+| Field | Type | Notes |
+|---|---|---|
+| `name` | string | unique within the definition |
+| `type` | `string` \| `integer` \| `number` \| `date` \| `boolean` \| `slug` \| `entity-id` | |
+| `required` | bool | default `true` |
+| `default` | matches `type` | only meaningful when `required: false` |
+| `description` | string | shown in the GUI's parameter prompt and every tool's `list` output |
+
+**`bindings[]`** (`QueryBinding`):
+
+| Field | Type | Notes |
+|---|---|---|
+| `name` | string | unique within the definition; referenced as `{from: binding, name: ...}` |
+| `select` | `entities` \| `connections` | which population `criteria` selects over |
+| `criteria` | criteria tree | same grammar as `entity_criteria`/`connection_criteria` |
+| `result_type` | see below | checked statically wherever the binding is referenced |
+| `project` | attribute path | optional; projects the selection down to one attribute per item |
+| `aggregate` | `count` \| `sum` \| `avg` \| `min` \| `max` | optional; collapses a set to a scalar |
+| `tuple_of` | list of binding names | optional; combines other bindings into one tuple-typed value |
+| `include_in_result` | bool | default `false`; entity-valued bindings only — folds the binding's matched entities into the primary result set as `membership: expanded`, same as a neighbor inclusion |
+
+**`derived[]`** (`DerivedAttribute`):
+
+| Field | Type | Notes |
+|---|---|---|
+| `name` | string | unique; referenced as `derived.<name>` in styling-rule criteria/range bands |
+| `direction` | `outgoing` \| `incoming` \| `either` | default `either` |
+| `traversal` | `direct` \| `derived` | default `direct` |
+| `include_potential` | bool | `derived` traversal only |
+| `max_hops` | int ≥ 2 | `derived` traversal only |
+| `connection_criteria` / `endpoint_criteria` | criteria tree | narrow which incident connections/endpoints count |
+| `reduce` | `count` \| `sum` \| `avg` \| `min` \| `max` | default `count` |
+| `of` | attribute path, or the special value `relationship.hops` | required unless `reduce: count`; `relationship.hops` requires `traversal: derived` |
+
+**Result-type strings** (bindings) and **value-reference kinds** (any condition's `value`):
+
+| Result type | Shape | `in`/`not_in` valid? |
+|---|---|---|
+| `entity[type]` / `connection[type]` | one item | no — scalar |
+| `entities[type]` / `connections[type]` | a list | yes |
+| `scalar` | one comparable value (from `project`/`aggregate`) | no |
+
+| `value.from` | Reads |
+|---|---|
+| *(bare literal)* / `literal` | the literal itself |
+| `attribute_of_self` | another attribute on the same entity/connection |
+| `attribute_of_endpoint` | an attribute on the connection's source/target — connection conditions only |
+| `parameter` | a declared parameter's supplied value |
+| `binding` | a declared binding's value, optionally `project`-ed and/or `quantifier`-ed |
+
+A list-typed reference used with a comparator other than `in`/`not_in` needs an explicit
+`quantifier` (`any` | `all`) — `any` over an **empty** set is `false` (nothing to satisfy
+"any of nothing"); `all` over an empty set is `true` (vacuously — nothing violates it). This
+is standard set-logic convention, not a special case this system invented, but worth stating
+plainly since it surprises people the first time a binding legitimately resolves empty.
+
+&nbsp;
+
+## Traversal & derivation
+
+`traversal: derived` (on an `incident` condition, a neighbor inclusion, `connections`, or a
+derived attribute) composes indirect relationships from real ones per the ArchiMate
+derivation rules — see
+[Impact analysis](../03-modeling/impact-analysis.md) for the semantics (certain vs.
+potential, role/strength composition, why Association can't be composed through).
+
+| Field | Applies to | Notes |
+|---|---|---|
+| `include_potential` | any `derived`-traversal node | default `false` — potential (PDR-rule) derivations excluded unless opted in |
+| `max_hops` | any `derived`-traversal node | integer ≥ 2; `derivation-hops-exceeded` below that |
+
+A derived connection's summary carries `certainty` (`certain` \| `potential`), `hops`
+(integer), and `via_connection_ids` (the witnessing real connections, in an order the
+consuming code reconstructs into a path — not guaranteed to already be source-to-target
+order in the raw list). These three fields are `null`/empty on a directly modeled
+connection, so existing consumers that only handle direct connections see no shape change.
+
+A `derived`-traversal node's own `connection_criteria` may only reference `type`,
+`certainty`, or `hops` — a derived relationship has no single connection artifact backing it
+for endpoint-attribute references (`derived-traversal-path-unsupported` otherwise).
+
+&nbsp;
+
 ## Representations & styling capabilities
 
 | Representation | Capabilities |
@@ -242,6 +335,49 @@ check a version bump or a delete reference against outside the write path. Every
 reported at any mode carries a stable `code`, a JSON-pointer-style `path` into the definition,
 and `expected`/`found` values, so both the GUI and an agent can converge on the same fix.
 
+**Validation codes for bindings, parameters, derived attributes, and derived traversal**
+(all `error` severity, `save`/`persist_edit` modes, except where noted):
+
+| Code | Fires when |
+|---|---|
+| `depth-cap-exceeded` | combined boolean-nesting + relational-hop depth exceeds the configured cap |
+| `symmetric-direction-ineffective` (*warning*) | an incident condition's `direction` is non-`either` but its `connection_criteria` restricts to only symmetric connection types — direction can't discriminate those |
+| `derivation-hops-exceeded` | a `derived`-traversal node's `max_hops < 2` |
+| `derived-traversal-path-unsupported` | a `derived`-traversal node's `connection_criteria` references an attribute other than `type`/`certainty`/`hops`, or uses an endpoint-attribute reference |
+| `unexpected-value` | `exists`/`absent` given a non-null value |
+| `value-ref-missing-endpoint` / `value-ref-endpoint-outside-connection` / `value-ref-missing-attribute` | `attribute_of_endpoint`/`attribute_of_self` used incorrectly (see [Value references](#bindings-parameters--derived-attributes) above) |
+| `unsupported-value-shape` | `in`/`not_in` given a non-list literal, or `like`/`ilike` given a non-string literal |
+| `unknown-value` | a literal `type`/`specialization` value isn't a known slug |
+| `unknown-binding` / `unknown-parameter` | a `{from: binding\|parameter}` reference names an undeclared binding/parameter |
+| `derived-attribute-unknown` | a `derived.<name>` path names an undeclared derived attribute (also reused for a duplicate derived-attribute name) |
+| `binding-type-mismatch` / `binding-attribute-type-ambiguous` | a binding's declared or inferred type can't be resolved statically |
+| `aggregate-over-instance` | `aggregate` applied to a binding that isn't a set/projected-list type |
+| `unquantified-set-comparison` | a list-typed reference used without `quantifier`, on a comparator other than `in`/`not_in` |
+| `operator-type-mismatch` | catch-all comparator/reference-type mismatch (non-scalar list elements, `in`/`not_in` against a non-list, `like`/`ilike` against a non-string, reference type disagrees with the compared attribute) |
+| `tuple-comparator-unsupported` | a tuple-typed reference used with a comparator other than `eq`/`in`/`not_in` |
+| `duplicate-parameter-name` / `duplicate-binding-name` | name collision within `parameters`/`bindings` |
+| `parameter-type-mismatch` | a parameter's `default` doesn't match its `type` |
+| `parameter-count-exceeded` / `binding-count-exceeded` / `derived-attribute-count-exceeded` | list length exceeds the configured cap |
+| `binding-derived-reference-unsupported` | a binding's `criteria` references a `derived.*` path (bindings can't depend on derived attributes) |
+| `include-in-result-shape-unsupported` | `include_in_result: true` on a binding whose `result_type` isn't entity-valued |
+| `binding-cycle` | the bindings' reference graph (via `tuple_of`/criteria references) has a cycle |
+| `derived-reduce-type-mismatch` | `reduce: count` given an `of` source, or `of`'s type can't be reduced |
+| `derived-of-missing` | a non-`count` reduction has no `of` |
+| `derived-of-source-traversal-mismatch` | `of: relationship.hops` used without `traversal: derived` |
+| `derived-attribute-reference-unsupported` | a derived attribute's own criteria references another `derived.*` path |
+
+**Execution-time errors** (typed, never a silent empty/partial result; mapped to a REST
+`{code, path, message}` body and the equivalent MCP error shape):
+
+| Code | HTTP | Fires when |
+|---|---|---|
+| `missing-parameter` | 400 | a required parameter has no supplied value and no default |
+| `unknown-parameter` | 400 | a supplied parameter name isn't declared |
+| `parameter-type-mismatch` | 400 | a supplied value doesn't match its parameter's declared type |
+| `binding-cardinality-violation` | 400 | a binding declared exactly-one/zero-or-one resolved to a different actual count |
+| `derivation-limit` | 400 | the `derivation_max_relationships` hard memory ceiling was hit — the ordinary case (a slow-but-tractable search) instead stops gracefully at the time budget and returns a genuine partial result flagged `truncated`, with a warning, not this error |
+| `execution-timeout` | 504 | whole-pipeline elapsed time exceeds `execution_timeout_seconds` |
+
 &nbsp;
 
 ## Execution result & bounds
@@ -264,9 +400,18 @@ viewpoints:
   execution_max_entities: 500              # hard cap, all transports
   execution_default_entity_limit_mcp: 200  # MCP default when execute's limit argument is omitted
   execution_timeout_seconds: 10
+  max_query_bindings: 8                    # save-time ergonomics cap
+  max_query_parameters: 4                  # save-time ergonomics cap
+  max_derived_attributes: 8                # save-time ergonomics cap
+  derivation_max_hops: 4                   # default max_hops when a derived-traversal node omits it
+  derivation_max_relationships: 20000      # hard memory-protection ceiling — raises derivation-limit
+  derivation_time_budget_seconds: 2.0      # the practical enforcement: derivation stops gracefully here
 ```
 
-A timeout is a typed error, never a silently partial result.
+A timeout is a typed error, never a silently partial result. Derivation-relationship search
+is the one place a genuinely partial, *warned* result is correct behavior rather than a typed
+error — see [Traversal & derivation](#traversal--derivation) above and
+[Impact analysis](../03-modeling/impact-analysis.md).
 
 &nbsp;
 
@@ -277,9 +422,12 @@ A timeout is a typed error, never a silently partial result.
   enterprise/module-shipped definitions are read-only here. `dry_run` (default `true`)
   validates and reports without writing.
 - **`artifact_query_viewpoint`** (`arch-repo-read`) — `action: list | execute`. `list` returns
-  every catalog entry's identity fields plus `scope_summary`/`query_summary`. `execute` runs
-  `slug=...` (a saved definition) or `query=...` (an ad-hoc query, same shape as above) and
-  returns the execution result described above; `limit` (entities) and `repo_scope`
+  every catalog entry's identity fields plus `scope_summary`/`query_summary` and a
+  `parameters` array — one entry per declared parameter (`name`, `type`, `required`, and
+  `description` when non-empty), so an agent can see what a parameterized definition needs
+  before attempting to execute it, without a failed call first. `execute` runs `slug=...` (a
+  saved definition) or `query=...` (an ad-hoc query, same shape as above) and returns the
+  execution result described above; `limit` (entities) and `repo_scope`
   (`engagement | enterprise | both`, default `both`) are optional.
 
 &nbsp;

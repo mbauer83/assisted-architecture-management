@@ -51,8 +51,8 @@ stereotype-badge rule.
 
 A `ConceptScope` primitive (entity types + connection types + a criteria tree) is the one
 thing diagram-type filters, binding admissibility, and viewpoint scope all compile to.
-`ViewpointDefinition`s are versioned and either module-shipped (a small informative starter
-library — Motivation, Application Structure, Layered, Technology Usage) or repo-authored;
+`ViewpointDefinition`s are versioned and either module-shipped (the Appendix-C example
+viewpoints plus a few tool-specific impact-analysis ones — see §6) or repo-authored;
 `ViewpointApplication`s pin a diagram to a specific definition version, non-destructively
 (`off`/`warn`/`ghost` enforcement, never a hard block), and flag drift the moment the pinned
 version and the diagram's actual content disagree. Four representations — table, matrix,
@@ -61,14 +61,14 @@ diagram, and graph exploration — read the same scope. See
 [Viewpoints — schema reference](viewpoints-schema.md) for the declaration grammar and the
 `artifact_viewpoint`/`artifact_query_viewpoint` MCP tools.
 
-**Known gap — indirect relationship handling.** The standard lets a viewpoint work with
-relationships derived across intermediate elements, not only direct ones. This
-implementation currently supports only the weaker case: a **path-based projection**
-(`src/application/derivation/path_projection.py`) that finds and displays an existing chain
-of real relationships between two entities in a generated view. It does **not** yet compute
-a new *derived* relationship from that chain per the standard's derivation rules, and there
-is no impact-analysis feature built on that computation. Closing this is tracked as
-follow-on work, not part of this compliance effort.
+**Indirect relationship handling.** A viewpoint's `traversal: derived` mode computes a new
+*derived* relationship across a chain of real ones, per Appendix B's derivation rules — not
+only the weaker path-based projection (`src/application/derivation/path_projection.py`,
+still used for the persisted-diagram generation flow) that merely finds and displays an
+existing chain. Every default-parameterized impact-analysis viewpoint
+(`element-dependents`/`element-dependencies`), the ad-hoc layered-exploration flow, and the
+`artifact_query_find_neighbors` MCP tool are built on this computation. See
+[Impact analysis](../03-modeling/impact-analysis.md) for the concept and how-to.
 
 &nbsp;
 
@@ -106,15 +106,57 @@ two relationship types' permitted rows directly, with a standing structural test
 (`composition permitted ⊇ aggregation permitted`) that fails if a future rule addition ever
 regresses it.
 
+Appendix B's **derivation rules** (DR1–DR8, certain; PDR1–PDR12, potential) are implemented
+as an executable engine (`src/domain/relationship_reachability.py`,
+`src/domain/relationship_derivation.py`), not a static table — every real chain of
+connections in a repository is a candidate for composition at query time. Verified by five
+independent methods, each its own test module under `tests/domain/`:
+
+| Method | Test module |
+|---|---|
+| Per-rule certain-composition behavior (DR1–DR8) | `test_relationship_derivation_rules.py` |
+| Per-rule potential-composition behavior (PDR1–PDR12) | `test_relationship_derivation_potential.py` |
+| Independent dual encoding of the rule table, checked cell-by-cell against the engine | `test_relationship_derivation_dual_encoding.py` |
+| Exhaustive metamodel-wide composition sweep from every direct-relationship pair | `test_relationship_derivation_exhaustive.py` |
+| Encoding-independent semantic invariants (role/strength ordering, the direct-model boundary, the PDR12 grouping-does-not-block-derivation guard) | `test_relationship_derivation_invariants.py` |
+| Admissibility restrictions (R1–R14, RJ1–RJ2) | `test_relationship_derivation_restrictions.py` |
+| The spec's own worked examples (B-3, B-9, B-11, B-12, B-17), executed against the real engine, not hand-traced | `test_relationship_derivation_worked_examples.py` |
+
+Association is deliberately excluded from further derivation composition (weakest dependency
+type, no directional semantics to propagate) — it can still be the outermost relationship a
+stronger chain composes *onto*, just never a link composed *across*. See
+[Impact analysis → Composing relationships](../03-modeling/impact-analysis.md#composing-relationships-role-and-strength)
+for the full role/strength table.
+
 &nbsp;
 
 ## 6 — Example viewpoints (Appendix C) — optional
 
-The module ships four starter `ViewpointDefinition`s (§3 above) informed by the standard's
-example-viewpoint concepts — not a re-implementation of the full Appendix C set, which the
-standard itself marks optional (**"may support"**). The viewpoint mechanism is fully open to
-repo-authored definitions, so covering more of Appendix C is an authoring exercise, not a
-code change.
+The module ships 28 `ViewpointDefinition`s (`src/ontologies/archimate_4/viewpoints.yaml`), 25
+of them transcribed from a specific Appendix C table (Application Cooperation/Structure/
+Usage, Capability Map, Goal Realization, Implementation & Deployment/Migration, Information
+Structure, Layered, Migration, Motivation, Organization, Outcome Realization, Physical,
+Process Cooperation, Product, Project, Requirements Realization, Resource Map, Service
+Realization, Stakeholder, Strategy, Technology, Technology Usage, Value Stream) — well beyond
+what the standard itself marks optional (**"may support"**). Each transcribed definition's
+purpose/content/stakeholders/concerns/scope is checked against its source table
+cell-by-cell, not asserted by review, in `test_default_viewpoint_library_spec_fidelity.py`;
+`test_default_viewpoint_library.py`/`test_default_viewpoint_library_common_types.py` cover
+the remaining membership/type-usage properties. The three non-table entries
+(`element-dependents`/`element-dependencies`/`process-technology-support`) are this
+implementation's own tool-specific impact-analysis capability, documented as such in their
+own `description`, not presented as part of the standard. The viewpoint mechanism remains
+fully open to repo-authored definitions beyond this starting set.
+
+&nbsp;
+
+## Conformance summary
+
+All six requirements above are addressed; the implementation defines no outstanding
+ArchiMate 4.0 language-conformance gap. (Conformance has not been independently verified, so
+this remains a self-assessment, not a certified claim.) Everything below this line is
+*outside* that assessment — a sibling interoperability standard that also happens to be
+supported, and a forward-looking roadmap — neither is an input to the conformance judgement.
 
 &nbsp;
 
@@ -128,17 +170,20 @@ Composition is never downgraded to association on either path, and every unmappe
 out-of-scope item is reported by kind and reason, never silently dropped. See
 [Model exchange](cli-and-backend.md#model-exchange) for usage.
 
-&nbsp;
+---
 
-## Deferred, explicitly
+# Roadmap (not conformance)
 
-Persistent diagrams generated from a viewpoint execution, the fuller presentation-rule
-engine (label/tooltip rules, attribute-driven heat maps beyond match/range styling), saved
-executions as first-class view artifacts, viewpoint publishing/pinning, parameterized
-viewpoints, and dedicated catalog/report view artifact kinds (today's table/matrix
-executions are ephemeral renderings, not new artifact types) are all deferred — the
-query/presentation split in the underlying model means they compose later without rework,
-but none of them exist today.
+The following are **product tooling ideas**, listed separately from the assessment above so
+that the absence of any of them is never read as a conformance gap — none is an ArchiMate
+4.0 requirement. They are recorded here only because the query/presentation split in the
+underlying model is designed to accommodate them without rework:
+
+- A fuller presentation-rule engine — label/tooltip rules and attribute-driven heat maps
+  beyond the current match/range/scale styling.
+- Saved executions as first-class view artifacts, rather than the ephemeral table/matrix
+  renderings executions produce today.
+- Dedicated catalog/report view artifact kinds.
 
 ---
 
