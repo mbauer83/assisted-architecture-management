@@ -57,6 +57,14 @@ def _build_pre_plan_drift_fixture(root: Path) -> None:
     # schema-file-scan: malformed JSON schema file.
     _write(root, ".arch-repo/schemata/attributes.requirement.schema.json", "{not valid json")
 
+    # group-meta-ontology-archimate-4-rename: legacy 'archimate-next' meta_ontology value.
+    _write(
+        root,
+        ".arch-repo/groups.yaml",
+        "model-projects:\n- slug: p1\n  id: GRP@1.a.p1\n  name: P1\n  meta_ontology: archimate-next\n"
+        "diagram-collections: []\ndocument-collections: []\n",
+    )
+
 
 def test_default_registry_reports_every_applicable_finding(tmp_path: Path) -> None:
     _build_pre_plan_drift_fixture(tmp_path)
@@ -72,6 +80,7 @@ def test_default_registry_reports_every_applicable_finding(tmp_path: Path) -> No
         "specialization-declaration-scan",
         "viewpoint-declaration-scan",
         "schema-file-scan",
+        "group-meta-ontology-archimate-4-rename",
     }
     assert report.has_errors is False
     assert all(r.outcome == "skipped" for r in report.results)

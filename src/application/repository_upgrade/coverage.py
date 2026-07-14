@@ -20,6 +20,7 @@ REQUIRED_STEP_IDS_BY_SURFACE: dict[ScannedSurface, tuple[str, ...]] = {
     "entity_frontmatter": ("unrecognized-structure-scan",),
     "connection_declarations": ("connection-metadata-scan",),
     "diagram_frontmatter": ("d9-multiplicity-rename", "viewpoint-application-scan"),
+    "group_registry": ("group-meta-ontology-archimate-4-rename",),
 }
 
 

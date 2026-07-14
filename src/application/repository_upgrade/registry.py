@@ -11,6 +11,7 @@ from __future__ import annotations
 
 from src.application.repository_upgrade.ports import UpgradeStep
 from src.application.repository_upgrade.steps.connection_metadata_scan import ConnectionMetadataScanStep
+from src.application.repository_upgrade.steps.group_meta_ontology_rename import GroupMetaOntologyRenameStep
 from src.application.repository_upgrade.steps.multiplicity_rename import MultiplicityRenameStep
 from src.application.repository_upgrade.steps.schema_file_scan import SchemaFileScanStep
 from src.application.repository_upgrade.steps.specialization_declaration_scan import (
@@ -43,6 +44,7 @@ class StepRegistry:
 def _build_default_registry() -> StepRegistry:
     registry = StepRegistry()
     registry.register(MultiplicityRenameStep())
+    registry.register(GroupMetaOntologyRenameStep())
     registry.register(UnrecognizedStructureScanStep())
     registry.register(SpecializationDeclarationScanStep())
     registry.register(ViewpointDeclarationScanStep())

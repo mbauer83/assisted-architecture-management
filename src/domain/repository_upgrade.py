@@ -18,6 +18,7 @@ ScannedSurface = Literal[
     "entity_frontmatter",
     "connection_declarations",
     "diagram_frontmatter",
+    "group_registry",
 ]
 FindingOutcome = Literal["applied", "skipped", "error"]
 
