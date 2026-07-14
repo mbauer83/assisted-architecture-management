@@ -236,4 +236,87 @@ test.describe('scope picker keyboard operability', () => {
     await page.keyboard.press('Delete')
     await expect(componentChip).toHaveAttribute('aria-pressed', 'false')
   })
+
+  test('a scope-picker search with zero matches shows an explicit no-matches state', async ({ page }) => {
+    await page.goto('/viewpoints')
+    await page.getByRole('button', { name: '+ New viewpoint' }).click()
+    await page.getByRole('button', { name: 'Scope' }).click()
+    await page.getByRole('radio', { name: 'Exclude selected entity types' }).check()
+
+    const searchBox = page.getByRole('searchbox', { name: 'Search entity types' })
+    await searchBox.fill('zzz-no-such-type')
+    await expect(page.getByText('No types match "zzz-no-such-type" — try a different domain or term.')).toBeVisible()
+    await expect(page.getByRole('button', { name: 'application-component' })).toHaveCount(0)
+
+    await page.getByRole('radio', { name: 'Exclude selected connection types' }).check()
+    const connectionSearchBox = page.getByRole('searchbox', { name: 'Search connection types' })
+    await connectionSearchBox.fill('zzz-no-such-type')
+    await expect(page.getByText('No types match "zzz-no-such-type" — try a different term.')).toBeVisible()
+  })
+})
+
+test.describe('criteria builder keyboard operability', () => {
+  test('Tab moves coherently through a condition row and NOT/remove are keyboard-operable', async ({ page }) => {
+    await page.goto('/viewpoints')
+    await page.getByRole('button', { name: '+ New viewpoint' }).click()
+    await page.getByRole('button', { name: 'Query' }).click()
+    await page.getByRole('button', { name: '+ Add condition' }).first().click()
+
+    const attrSelect = page.getByRole('combobox', { name: 'attribute' })
+    const cmpSelect = page.getByRole('combobox', { name: 'comparator' })
+    const notBtn = page.getByRole('button', { name: 'Negate this condition' })
+    const removeBtn = page.getByRole('button', { name: 'Remove condition' })
+
+    await attrSelect.focus()
+    await expect(attrSelect).toBeFocused()
+    await page.keyboard.press('Tab')
+    await expect(cmpSelect).toBeFocused()
+
+    await notBtn.focus()
+    await expect(notBtn).toHaveAttribute('aria-pressed', 'false')
+    await page.keyboard.press('Enter')
+    await expect(notBtn).toHaveAttribute('aria-pressed', 'true')
+    await page.keyboard.press('Space')
+    await expect(notBtn).toHaveAttribute('aria-pressed', 'false')
+
+    await removeBtn.focus()
+    await page.keyboard.press('Enter')
+    await expect(page.locator('.group-box.root > .row')).toHaveCount(0)
+  })
+})
+
+test.describe('failed save', () => {
+  test('a network error on save shows a retry affordance without losing edits', async ({ page, request }) => {
+    const slug = uniqueSlug('save-retry')
+    await page.goto('/viewpoints')
+    await page.getByRole('button', { name: '+ New viewpoint' }).click()
+    await page.getByRole('textbox', { name: 'slug' }).fill(slug)
+    await page.getByRole('textbox', { name: 'name' }).fill('Save Retry Test')
+
+    let intercepted = false
+    await page.route('**/api/viewpoints', async (route) => {
+      if (route.request().method() === 'POST' && !intercepted) {
+        intercepted = true
+        await route.abort('failed')
+        return
+      }
+      await route.continue()
+    })
+
+    await page.getByRole('button', { name: 'Save', exact: true }).click()
+    const retryBtn = page.getByRole('button', { name: '↻ Retry' })
+    await expect(retryBtn).toBeVisible()
+
+    // Edits are still there — the failed save never touched the draft.
+    await expect(page.getByRole('textbox', { name: 'slug' })).toHaveValue(slug)
+    await expect(page.getByRole('textbox', { name: 'name' })).toHaveValue('Save Retry Test')
+
+    await retryBtn.click()
+    await expect(page.getByRole('heading', { name: 'Viewpoints' })).toBeVisible()
+
+    const entry = await findEntry(request, slug)
+    expect(entry).toBeTruthy()
+
+    await removeViewpoint(request, slug)
+  })
 })

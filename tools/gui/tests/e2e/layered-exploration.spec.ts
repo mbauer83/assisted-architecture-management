@@ -132,6 +132,44 @@ test.describe('layered view: quality flow', () => {
   })
 })
 
+test.describe('stale-finding review after a re-run', () => {
+  test('a previously-accepted candidate that no longer derives is listed individually and can be re-reviewed or removed', async ({ page }) => {
+    let call = 0
+    await page.route('**/api/viewpoints/execute', (route) => {
+      call += 1
+      const result = call === 1
+        ? executionResult({
+            connections: [{
+              id: 'derived::archimate-association::x', type: 'archimate-association', source: TECH_ID, target: ROOT_ID,
+              certainty: 'certain', hops: 2, via_connection_ids: [CONN_A, CONN_B],
+            }],
+          })
+        : executionResult({ connections: [] })
+      return route.fulfill({ json: result })
+    })
+    await page.route('**/api/viewpoints/execute-projection', (route) => route.fulfill({ json: projectionResult() }))
+
+    await page.goto('/graph/layered')
+    await page.getByRole('button', { name: 'By criteria' }).click()
+    await page.getByRole('button', { name: 'Render' }).click()
+    await expect(page.locator('.rendered-entities')).toContainText('Tech Node')
+
+    // Re-run with the same params — this time the mocked response no longer includes the
+    // certain (auto-accepted) derived candidate, so it goes stale.
+    await page.getByRole('button', { name: 'Render' }).click()
+    await expect(page.getByText('1 previously-accepted relationship no longer derives after this re-run:')).toBeVisible()
+    await expect(page.getByText('Tech Node → Root Process (archimate-association)')).toBeVisible()
+
+    await page.getByRole('button', { name: 'Re-review' }).click()
+    await expect(page.getByRole('dialog', { name: 'Witness chain' })).toBeVisible()
+    await page.getByRole('button', { name: 'Close' }).click()
+    await expect(page.getByRole('dialog', { name: 'Witness chain' })).toHaveCount(0)
+
+    await page.getByRole('button', { name: 'Remove', exact: true }).click()
+    await expect(page.getByText(/previously-accepted relationship/)).toHaveCount(0)
+  })
+})
+
 test.describe('motivation-support flow', () => {
   // A single goal's indirect support spanning three different domains — business (a
   // process), application (a service), and common (a function) — to prove the

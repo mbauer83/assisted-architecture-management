@@ -14,7 +14,8 @@ import { useViewpointExecution } from '../composables/useViewpointExecution'
 import { buildLayeredViewQuery } from '../../domain/layeredViewQuery'
 import { queryToMapping } from '../../domain/viewpointCriteriaSerialization'
 import {
-  initialCandidateReview, withDecision, decisionFor, candidateKeyFor, staleAcceptedKeys, type CandidateReviewState,
+  initialCandidateReview, withDecision, decisionFor, candidateKeyFor, staleAcceptedFindings, clearDecision,
+  type CandidateReviewState, type StaleFinding,
 } from '../../domain/derivedCandidateReview'
 import { buildRenderGraph, derivedCandidates } from './LayeredExplorationView.helpers'
 import { certaintyDashArray, CERTAINTY_LABELS } from '../lib/viewpointStyleTokens'
@@ -33,11 +34,14 @@ const catalog = ref<CriteriaCatalog | null>(null)
 onMounted(() => { void Effect.runPromise(svc.getCriteriaCatalog()).then((c) => { catalog.value = c }) })
 
 const review = ref<CandidateReviewState>(initialCandidateReview([]))
-const staleKeys = ref<readonly string[]>([])
+const staleFindings = ref<readonly StaleFinding[]>([])
+const staleEntityNames = ref<ReadonlyMap<string, string>>(new Map())
 const hasRendered = ref(false)
 const explaining = ref<ConnectionItemSummary | null>(null)
 const materializing = ref<ConnectionItemSummary | null>(null)
 const entityById = computed(() => new Map((execution.result.value?.entities ?? []).map((e) => [e.id, e])))
+
+const entityLabel = (id: string): string => entityById.value.get(id)?.name ?? staleEntityNames.value.get(id) ?? id
 
 const edgeKeyOf = (source: string, target: string, type: string): string => `${source}|${target}|${type}`
 const connectionByKey = computed(() =>
@@ -64,11 +68,19 @@ interface RenderParams {
 }
 
 const runRender = async (params: RenderParams): Promise<void> => {
+  const previousConnections = execution.result.value?.connections ?? []
+  const previousEntities = execution.result.value?.entities ?? []
+  const previousReview = review.value
   const query = buildLayeredViewQuery(params)
   await execution.execute({ query: queryToMapping(query) })
   const result = execution.result.value
   if (!result) return
-  staleKeys.value = hasRendered.value ? staleAcceptedKeys(review.value, result.connections) : []
+  if (hasRendered.value) {
+    staleFindings.value = staleAcceptedFindings(previousReview, previousConnections, result.connections)
+    staleEntityNames.value = new Map(previousEntities.map((e) => [e.id, e.name]))
+  } else {
+    staleFindings.value = []
+  }
   review.value = initialCandidateReview(result.connections)
   hasRendered.value = true
   rebuildGraph()
@@ -81,7 +93,17 @@ const toggleDecision = (connection: ConnectionItemSummary): void => {
   rebuildGraph()
 }
 
-const dismissStale = (): void => { staleKeys.value = [] }
+/** Acknowledges one stale finding — clears its decision (so it isn't reported again on a
+ * future re-run) and removes it from the list. Every other finding is untouched. */
+const removeStaleFinding = (finding: StaleFinding): void => {
+  review.value = clearDecision(review.value, finding.key)
+  staleFindings.value = staleFindings.value.filter((f) => f.key !== finding.key)
+}
+
+/** Re-review: reopens the same witness-chain popover live candidates use, against the
+ * finding's last-known connection — reconstruction may now report `broken`, which is
+ * itself the informative answer to "why did this go stale". */
+const reReviewStaleFinding = (finding: StaleFinding): void => { explaining.value = finding.connection }
 
 const materializeTarget = computed(() => {
   const candidate = materializing.value
@@ -105,13 +127,33 @@ const materializeTarget = computed(() => {
     />
 
     <div
-      v-if="staleKeys.length > 0"
+      v-if="staleFindings.length > 0"
       class="stale-banner"
     >
-      {{ staleKeys.length }} previously-accepted relationship{{ staleKeys.length === 1 ? '' : 's' }} no longer derive{{ staleKeys.length === 1 ? 's' : '' }} after this re-run.
-      <button @click="dismissStale">
-        Dismiss
-      </button>
+      <p class="stale-banner-title">
+        {{ staleFindings.length }} previously-accepted relationship{{ staleFindings.length === 1 ? '' : 's' }} no longer derive{{ staleFindings.length === 1 ? 's' : '' }} after this re-run:
+      </p>
+      <ul class="stale-finding-list">
+        <li
+          v-for="finding in staleFindings"
+          :key="finding.key"
+          class="stale-finding"
+        >
+          <span class="stale-finding-desc">{{ entityLabel(finding.connection.source) }} → {{ entityLabel(finding.connection.target) }} ({{ finding.connection.type }})</span>
+          <button
+            type="button"
+            @click="reReviewStaleFinding(finding)"
+          >
+            Re-review
+          </button>
+          <button
+            type="button"
+            @click="removeStaleFinding(finding)"
+          >
+            Remove
+          </button>
+        </li>
+      </ul>
     </div>
 
     <template v-if="hasRendered">
@@ -201,7 +243,11 @@ const materializeTarget = computed(() => {
 <style scoped>
 .layered-view { padding: 0 0 24px; }
 .page-title { font-size: 16px; padding: 12px 16px 0; margin: 0; color: #374151; }
-.stale-banner { background: #fef3c7; color: #92400e; padding: 8px 16px; font-size: 12.5px; display: flex; gap: 10px; align-items: center; }
+.stale-banner { background: #fef3c7; color: #92400e; padding: 8px 16px; font-size: 12.5px; }
+.stale-banner-title { margin: 0 0 6px; font-weight: 600; }
+.stale-finding-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.stale-finding { display: flex; gap: 10px; align-items: center; }
+.stale-finding-desc { flex: 1; }
 .stale-banner button { border: 1px solid #d1d5db; background: white; border-radius: 5px; padding: 2px 8px; cursor: pointer; }
 .legend { display: flex; gap: 16px; padding: 8px 16px; font-size: 12px; color: #374151; }
 .legend-entry { display: inline-flex; align-items: center; gap: 4px; }

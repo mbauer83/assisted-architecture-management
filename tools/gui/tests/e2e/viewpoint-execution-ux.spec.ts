@@ -80,3 +80,43 @@ test.describe('execution failure does not show a misleading empty-result state',
     await expect(page.getByText(/No entities in the current model match/i)).toHaveCount(0)
   })
 })
+
+// Each typed execution error code renders its own distinct, actionable title — not the
+// generic "Execution failed" fallback the network-abort test above exercises. The per-code
+// prose itself is unit-tested in viewpointExecutionErrorText.test.ts; this proves each code
+// actually reaches the screen through a real (mocked) execution round-trip.
+test.describe('each typed execution error renders its own distinct, actionable state', () => {
+  const runWithTypedError = async (
+    page: import('@playwright/test').Page,
+    detail: { code: string; path: string; message: string },
+  ) => {
+    const body = JSON.stringify({ detail })
+    await page.route('**/api/viewpoints/execute', (route) => route.fulfill({ status: 400, contentType: 'application/json', body }))
+    await page.route('**/api/viewpoints/execute-projection', (route) => route.fulfill({ status: 400, contentType: 'application/json', body }))
+    await page.goto('/graph?viewpoint=element-dependents')
+    await expect(page.getByRole('dialog', { name: 'Viewpoint parameters' })).toBeVisible()
+    await page.getByPlaceholder(/select an entity for anchor/i).fill('Architect')
+    await page.locator('[data-result]').first().click()
+    await page.getByRole('button', { name: 'Run' }).click()
+  }
+
+  test('execution-timeout', async ({ page }) => {
+    await runWithTypedError(page, { code: 'execution-timeout', path: 'query', message: 'Execution exceeded the time budget.' })
+    await expect(page.getByText('This took too long to execute')).toBeVisible()
+  })
+
+  test('derivation-limit', async ({ page }) => {
+    await runWithTypedError(page, { code: 'derivation-limit', path: 'query', message: 'Too many relationships to derive.' })
+    await expect(page.getByText('Derived-relationship traversal limit exceeded')).toBeVisible()
+  })
+
+  test('binding-cardinality-violation', async ({ page }) => {
+    await runWithTypedError(page, { code: 'binding-cardinality-violation', path: 'query/bindings/0', message: 'Expected exactly one match, found 3.' })
+    await expect(page.getByText('A binding matched the wrong number of items')).toBeVisible()
+  })
+
+  test('parameter-type-mismatch', async ({ page }) => {
+    await runWithTypedError(page, { code: 'parameter-type-mismatch', path: 'parameters/anchor', message: 'Expected an entity id.' })
+    await expect(page.getByText("Parameter value doesn't match its type")).toBeVisible()
+  })
+})

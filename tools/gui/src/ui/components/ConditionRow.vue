@@ -70,6 +70,7 @@ const onListBindingChange = (patch: { binding?: string; project?: string }) => {
   >
     <select
       class="inp attr"
+      aria-label="attribute"
       :value="modelValue.attribute"
       @change="onAttributeChange"
     >
@@ -84,6 +85,7 @@ const onListBindingChange = (patch: { binding?: string; project?: string }) => {
 
     <select
       class="inp cmp"
+      aria-label="comparator"
       :value="modelValue.comparator"
       @change="onComparatorChange"
     >
@@ -100,6 +102,7 @@ const onListBindingChange = (patch: { binding?: string; project?: string }) => {
       <select
         v-if="bindingNames.length > 0"
         class="inp list-source"
+        aria-label="value source"
         :value="listValueIsBinding ? 'binding' : 'literal'"
         @change="onListSourceChange(($event.target as HTMLSelectElement).value as 'literal' | 'binding')"
       >
@@ -157,6 +160,8 @@ const onListBindingChange = (patch: { binding?: string; project?: string }) => {
       class="not-toggle"
       :class="{ on: modelValue.negate }"
       title="negate this condition"
+      :aria-pressed="modelValue.negate"
+      aria-label="Negate this condition"
       @click="update({ negate: !modelValue.negate })"
     >
       NOT
@@ -165,6 +170,7 @@ const onListBindingChange = (patch: { binding?: string; project?: string }) => {
       type="button"
       class="icon-btn"
       title="remove condition"
+      aria-label="Remove condition"
       @click="emit('remove')"
     >
       ✕

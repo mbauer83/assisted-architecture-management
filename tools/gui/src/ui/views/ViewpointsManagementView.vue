@@ -44,6 +44,7 @@ const mode = ref<'list' | 'edit'>('list')
 const definitions = ref<readonly ViewpointDefinitionEnvelope[]>([])
 const catalog = ref<CriteriaCatalog | null>(null)
 const loadError = ref<string | null>(null)
+const saveError = ref<string | null>(null)
 
 const draft = ref<ViewpointDefinitionDraft | null>(null)
 const originalDraft = ref<ViewpointDefinitionDraft | null>(null)
@@ -81,6 +82,7 @@ const startCreate = () => {
   viewingTier.value = 'engagement'
   issues.value = []
   referencers.value = []
+  saveError.value = null
   activeTab.value = 'general'
   mode.value = 'edit'
 }
@@ -91,6 +93,7 @@ const startEdit = (envelope: ViewpointDefinitionEnvelope) => {
   isCreating.value = false
   viewingTier.value = envelope.tier
   issues.value = []
+  saveError.value = null
   activeTab.value = 'general'
   mode.value = 'edit'
   void Effect.runPromise(svc.getViewpointReferencers(envelope.slug)).then((r) => { referencers.value = r })
@@ -111,6 +114,7 @@ const showVersionBumpHint = computed(() => !isCreating.value && isSemantic.value
 const save = () => {
   if (!draft.value || !catalog.value || isReadOnly.value) return
   saving.value = true
+  saveError.value = null
   const body = { definition: definitionToMapping(draft.value, attributeTypeTablesFromCatalog(catalog.value)), dry_run: false }
   const call = isCreating.value ? svc.createViewpointDefinition(body) : svc.editViewpointDefinition(body)
   Effect.runPromise(call).then((result: ViewpointPersistResult) => {
@@ -121,7 +125,7 @@ const save = () => {
     highlightedNodeId.value = draft.value ? firstErrorNodeId(result.issues, draft.value) : null
   }).catch((reason: unknown) => {
     saving.value = false
-    loadError.value = readErrorMessage(reason)
+    saveError.value = readErrorMessage(reason)
   })
 }
 
@@ -244,6 +248,20 @@ const focusIssue = (issue: ViewpointValidationIssue) => {
         :catalog="catalog"
       />
 
+      <p
+        v-if="saveError"
+        class="error save-error"
+      >
+        {{ saveError }}
+        <button
+          type="button"
+          class="retry-btn"
+          @click="save"
+        >
+          ↻ Retry
+        </button>
+      </p>
+
       <div
         v-if="!isReadOnly"
         class="save-row"
@@ -264,6 +282,9 @@ const focusIssue = (issue: ViewpointValidationIssue) => {
 <style scoped>
 .page { padding: 20px 28px; max-width: 980px; }
 .error { color: #991b1b; background: #fee2e2; padding: 8px 12px; border-radius: 6px; }
+.save-error { display: flex; align-items: center; gap: 10px; justify-content: space-between; }
+.retry-btn { appearance: none; border: 1px solid #991b1b; border-radius: 6px; background: #fff; color: #991b1b; font-size: 12px; padding: 3px 10px; cursor: pointer; flex-shrink: 0; }
+.retry-btn:hover { background: #fef2f2; }
 .primary-btn { background: #6366f1; color: #fff; border: none; border-radius: 7px; padding: 8px 16px; font-weight: 600; cursor: pointer; margin-bottom: 12px; }
 .primary-btn:disabled { opacity: .5; cursor: not-allowed; }
 .hint { background: #fef3c7; color: #92400e; padding: 8px 12px; border-radius: 6px; }

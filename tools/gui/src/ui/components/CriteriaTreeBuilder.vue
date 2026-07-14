@@ -75,6 +75,7 @@ const atCap = computed(() => atDepthCap(props.depth))
         Match
         <select
           class="conj-select"
+          aria-label="match mode"
           :value="modelValue.conjunction"
           @change="emitUpdate({ conjunction: ($event.target as HTMLSelectElement).value as Conjunction })"
         >
@@ -92,6 +93,8 @@ const atCap = computed(() => atDepthCap(props.depth))
         class="not-toggle"
         :class="{ on: modelValue.negate }"
         title="negate the whole group"
+        :aria-pressed="modelValue.negate"
+        aria-label="Negate this group"
         @click="emitUpdate({ negate: !modelValue.negate })"
       >
         NOT
@@ -100,6 +103,7 @@ const atCap = computed(() => atDepthCap(props.depth))
         type="button"
         class="icon-btn"
         title="remove group"
+        aria-label="Remove group"
         @click="emit('remove')"
       >
         ✕
@@ -147,6 +151,7 @@ const atCap = computed(() => atDepthCap(props.depth))
           <b>has a connection</b>
           <select
             class="conj-select"
+            aria-label="connection direction"
             :value="child.direction"
             @change="updateIncident(index, { direction: ($event.target as HTMLSelectElement).value as IncidentDirection })"
           >
@@ -165,6 +170,8 @@ const atCap = computed(() => atDepthCap(props.depth))
             class="not-toggle"
             :class="{ on: child.negate }"
             title="negate: has NO such connection"
+            :aria-pressed="child.negate"
+            aria-label="Negate: has no such connection"
             @click="updateIncident(index, { negate: !child.negate })"
           >
             NOT
@@ -173,6 +180,7 @@ const atCap = computed(() => atDepthCap(props.depth))
             type="button"
             class="icon-btn"
             title="remove"
+            aria-label="Remove connection condition"
             @click="removeChild(index)"
           >
             ✕

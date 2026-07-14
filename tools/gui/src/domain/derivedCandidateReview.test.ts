@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
-  acceptedConnections, candidateKeyFor, decisionFor, initialCandidateReview, staleAcceptedKeys, withDecision,
+  acceptedConnections, candidateKeyFor, clearDecision, decisionFor, initialCandidateReview, staleAcceptedFindings, withDecision,
 } from './derivedCandidateReview'
 import type { ConnectionItemSummary } from './schemas/viewpoints'
 
@@ -38,17 +38,28 @@ describe('acceptedConnections', () => {
   })
 })
 
-describe('staleAcceptedKeys', () => {
-  it('flags a previously-accepted candidate the fresh result no longer reproduces', () => {
+describe('staleAcceptedFindings', () => {
+  it('flags a previously-accepted candidate the fresh result no longer reproduces, carrying its last-known connection', () => {
     const certain = conn({ id: 'd1', certainty: 'certain', via_connection_ids: ['c1', 'c2'] })
     const state = initialCandidateReview([certain])
-    expect(staleAcceptedKeys(state, [])).toEqual([candidateKeyFor(certain)])
+    expect(staleAcceptedFindings(state, [certain], [])).toEqual([{ key: candidateKeyFor(certain), connection: certain }])
   })
 
   it('does not flag a rejected candidate as stale, or one the fresh result still reproduces', () => {
     const certain = conn({ id: 'd1', certainty: 'certain', via_connection_ids: ['c1', 'c2'] })
     const potential = conn({ id: 'd2', certainty: 'potential', via_connection_ids: ['c3', 'c4'] })
     const state = initialCandidateReview([certain, potential])
-    expect(staleAcceptedKeys(state, [certain])).toEqual([])
+    expect(staleAcceptedFindings(state, [certain, potential], [certain])).toEqual([])
+  })
+})
+
+describe('clearDecision', () => {
+  it('removes one key without touching any other decision', () => {
+    const certain = conn({ id: 'd1', certainty: 'certain', via_connection_ids: ['c1', 'c2'] })
+    const potential = conn({ id: 'd2', certainty: 'potential', via_connection_ids: ['c3', 'c4'] })
+    const state = initialCandidateReview([certain, potential])
+    const cleared = clearDecision(state, candidateKeyFor(certain))
+    expect(decisionFor(cleared, candidateKeyFor(certain))).toBeUndefined()
+    expect(decisionFor(cleared, candidateKeyFor(potential))).toBe('rejected')
   })
 })

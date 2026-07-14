@@ -50,16 +50,40 @@ export const acceptedConnections = (
 ): readonly ConnectionItemSummary[] =>
   connections.filter((connection) => !isDerivedConnection(connection) || decisionFor(state, candidateKeyFor(connection)) === 'accepted')
 
-/** A candidate the user had accepted before a Re-run, whose witness chain the fresh result
+/** A previously-accepted candidate the fresh result no longer reproduces, carrying its
+ * last-known connection (source/target/type) so the caller can show *which* relationship
+ * went stale, not just an opaque count. */
+export interface StaleFinding {
+  readonly key: string
+  readonly connection: ConnectionItemSummary
+}
+
+/** Candidates the user had accepted before a Re-run, whose witness chain the fresh result
  * no longer reproduces at all — the model changed under them, or the query parameters did.
- * Never silently dropped: the caller surfaces this list as an actionable finding (accept
- * the loss / re-review) rather than just shrinking the rendered graph. */
-export const staleAcceptedKeys = (
+ * Never silently dropped: the caller surfaces this list as per-finding actionable state
+ * (remove / re-review individually) rather than just shrinking the rendered graph or
+ * offering one all-or-nothing dismissal. */
+export const staleAcceptedFindings = (
   previous: CandidateReviewState,
+  previousConnections: readonly ConnectionItemSummary[],
   freshConnections: readonly ConnectionItemSummary[],
-): readonly string[] => {
+): readonly StaleFinding[] => {
   const freshKeys = new Set(freshConnections.filter(isDerivedConnection).map(candidateKeyFor))
-  return [...previous.decisions.entries()]
-    .filter(([key, decision]) => decision === 'accepted' && !freshKeys.has(key))
-    .map(([key]) => key)
+  const previousByKey = new Map(previousConnections.filter(isDerivedConnection).map((c) => [candidateKeyFor(c), c]))
+  const findings: StaleFinding[] = []
+  for (const [key, decision] of previous.decisions.entries()) {
+    if (decision !== 'accepted' || freshKeys.has(key)) continue
+    const connection = previousByKey.get(key)
+    if (connection) findings.push({ key, connection })
+  }
+  return findings
+}
+
+/** Clears one stale finding's decision so it stops being reported after the user has
+ * acknowledged it (removed it from the reviewed set) — without touching any other
+ * candidate's decision. */
+export const clearDecision = (state: CandidateReviewState, key: string): CandidateReviewState => {
+  const decisions = new Map(state.decisions)
+  decisions.delete(key)
+  return { decisions }
 }
