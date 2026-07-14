@@ -13,6 +13,7 @@ layout is never assumed.
 """
 from __future__ import annotations
 
+import subprocess
 from pathlib import Path
 
 import pytest
@@ -37,7 +38,23 @@ pytestmark = pytest.mark.skipif(
 
 def _committed_diagrams() -> list[Path]:
     # Recursive: group collections live in subdirectories of diagrams/.
-    return sorted(_DIAGRAMS_DIR.rglob("*.puml"))
+    all_puml = sorted(_DIAGRAMS_DIR.rglob("*.puml"))
+    # Honour the "committed" contract literally: only git-tracked diagrams. The renderer
+    # writes a `tmp*.puml` into this catalog so `!include`s resolve, then removes it in a
+    # `finally`; if a render process is hard-killed (SIGKILL) mid-run that cleanup is
+    # skipped, orphaning a frontmatter-less temp file here. Rendering that stray would fail
+    # with a spurious unknown-diagram-type error, so untracked files are excluded.
+    try:
+        listed = subprocess.run(
+            ["git", "-C", str(_DIAGRAMS_DIR), "ls-files", "-z", "--", "."],
+            capture_output=True,
+            timeout=30,
+            check=True,
+        ).stdout.decode("utf-8")
+    except (OSError, subprocess.SubprocessError):
+        return all_puml
+    tracked = {(_DIAGRAMS_DIR / rel).resolve() for rel in listed.split("\0") if rel.endswith(".puml")}
+    return [p for p in all_puml if p.resolve() in tracked]
 
 
 @pytest.mark.parametrize("diagram_path", _committed_diagrams(), ids=lambda p: p.stem)
