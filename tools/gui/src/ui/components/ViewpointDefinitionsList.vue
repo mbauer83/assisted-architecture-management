@@ -90,6 +90,7 @@ const deleteDefinition = (envelope: ViewpointDefinitionEnvelope) => {
       </ul>
       <button
         type="button"
+        class="btn"
         @click="blockedDelete = null"
       >
         Dismiss
@@ -117,45 +118,51 @@ const deleteDefinition = (envelope: ViewpointDefinitionEnvelope) => {
           </td>
           <td>{{ formatScopeSummary(def.scope_summary) }}</td>
           <td>
-            <button
-              type="button"
-              class="pin-btn"
-              :class="{ 'pin-btn--active': isPinned(def.slug) }"
-              :aria-label="isPinned(def.slug) ? `Unpin ${def.slug}` : `Pin ${def.slug}`"
-              :aria-pressed="isPinned(def.slug)"
-              @click="togglePin(def.slug)"
-            >
-              {{ isPinned(def.slug) ? '★' : '☆' }}
-            </button>
-            <button
-              type="button"
-              @click="executeViewpoint(def)"
-            >
-              Execute
-            </button>
-            <button
-              v-if="def.tier === 'engagement'"
-              type="button"
-              :disabled="writeBlocked"
-              @click="emit('edit', def)"
-            >
-              Edit
-            </button>
-            <button
-              v-if="def.tier === 'engagement'"
-              type="button"
-              :disabled="writeBlocked"
-              @click="deleteDefinition(def)"
-            >
-              Delete
-            </button>
-            <button
-              v-else
-              type="button"
-              @click="emit('edit', def)"
-            >
-              View
-            </button>
+            <div class="row-actions">
+              <button
+                type="button"
+                class="pin-btn"
+                :class="{ 'pin-btn--active': isPinned(def.slug) }"
+                :aria-label="isPinned(def.slug) ? `Unpin ${def.slug}` : `Pin ${def.slug}`"
+                :aria-pressed="isPinned(def.slug)"
+                @click="togglePin(def.slug)"
+              >
+                {{ isPinned(def.slug) ? '★' : '☆' }}
+              </button>
+              <button
+                type="button"
+                class="btn"
+                @click="executeViewpoint(def)"
+              >
+                Execute
+              </button>
+              <button
+                v-if="def.tier === 'engagement'"
+                type="button"
+                class="btn"
+                :disabled="writeBlocked"
+                @click="emit('edit', def)"
+              >
+                Edit
+              </button>
+              <button
+                v-if="def.tier === 'engagement'"
+                type="button"
+                class="btn btn--danger"
+                :disabled="writeBlocked"
+                @click="deleteDefinition(def)"
+              >
+                Delete
+              </button>
+              <button
+                v-else
+                type="button"
+                class="btn"
+                @click="emit('edit', def)"
+              >
+                View
+              </button>
+            </div>
           </td>
         </tr>
       </tbody>
@@ -177,4 +184,10 @@ const deleteDefinition = (envelope: ViewpointDefinitionEnvelope) => {
 .tier-module { background: #f3f4f6; color: #6b7280; }
 .pin-btn { border: none; background: none; cursor: pointer; font-size: 15px; color: #d1d5db; padding: 0 4px; }
 .pin-btn--active { color: #d97706; }
+.def-table td:last-child { white-space: nowrap; }
+.row-actions { display: flex; align-items: center; gap: 6px; }
+.btn { appearance: none; border: 1px solid #d1d5db; background: #fff; color: #374151; border-radius: 6px; padding: 5px 12px; font-size: 12.5px; font-weight: 600; cursor: pointer; }
+.btn:hover:not(:disabled) { border-color: #6366f1; color: #4338ca; }
+.btn:disabled { opacity: .5; cursor: not-allowed; }
+.btn--danger:hover:not(:disabled) { border-color: #dc2626; color: #b91c1c; background: #fef2f2; }
 </style>

@@ -55,14 +55,25 @@ export const comparatorsFor = (attribute: AttributeOption): readonly Comparator[
   return isString ? [...base, ...STRING_PATTERN_COMPARATORS] : base
 }
 
-/** Reserved paths with a real enumerable value set in the registries snapshot — anything
- * else (schema attributes, and reserved paths like `domain`/`status` the snapshot doesn't
- * enumerate) falls back to a free-text value input, never a fabricated choice list. */
+/** The enumerable value set for an attribute, or null for a free-text value input. `type`
+ * and `specialization` draw from their dedicated registry lists; every other enumerable
+ * path — schema attributes declaring a JSON-schema `enum`, plus the reserved read-model
+ * facets `domain`/`status` — is served from the catalog's per-kind `*_attribute_enums` map
+ * (the backend merges reserved facets into it). Anything absent stays free text; a
+ * fabricated choice list is never invented. */
 export const enumChoicesFor = (attribute: string, groupKind: GroupKind, catalog: CriteriaCatalog): string[] | null => {
   if (attribute === 'type') return groupKind === 'entity' ? [...catalog.entity_types] : [...catalog.connection_types]
   if (attribute === 'specialization') return [...catalog.specialization_slugs]
-  return null
+  const enums = groupKind === 'entity' ? catalog.entity_attribute_enums : catalog.connection_attribute_enums
+  const choices = enums[attribute]
+  return choices && choices.length > 0 ? [...choices] : null
 }
+
+/** Value paths that reference an entity by id — these take the entity picker (search over
+ * the real repository) rather than a text field or a dropdown, since the id space is open
+ * and large. Currently the reserved `id` path only (in both entity and connection
+ * contexts); no schema attribute declares an entity-reference type today. */
+export const isEntityReferencePath = (attribute: string): boolean => attribute === 'id'
 
 export interface ValueKindOption {
   kind: ValueRefKind

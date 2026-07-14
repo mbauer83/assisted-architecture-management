@@ -18,6 +18,7 @@ from typing import Any
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
+from src.application.verification.artifact_verifier_types import VALID_STATUSES
 from src.application.viewpoints.persist_definition import (
     PersistAction,
     ViewpointPersistResult,
@@ -118,12 +119,26 @@ def get_criteria_catalog() -> dict[str, Any]:
     entity_type_domains = {
         str(name): info.hierarchy[0] for name, info in registries.entity_type_infos.items() if info.hierarchy
     }
+    # Enumerable value sets for the criteria value picker, keyed by the flat attribute-path
+    # namespace: schema-declared ``enum`` attributes, plus the enumerable reserved read-model
+    # facets (``domain`` from the distinct owning-domain set, ``status`` from the canonical
+    # status vocabulary). Reserved facets take precedence over a like-named schema attribute.
+    entity_attribute_enums: dict[str, list[str]] = {
+        str(path): list(values) for path, values in registries.entity_attribute_enums.items()
+    }
+    entity_attribute_enums["domain"] = sorted(set(entity_type_domains.values()))
+    entity_attribute_enums["status"] = sorted(VALID_STATUSES)
+    connection_attribute_enums = {
+        str(path): list(values) for path, values in registries.connection_attribute_enums.items()
+    }
     return {
         "entity_types": sorted(registries.known_entity_types),
         "connection_types": sorted(registries.known_connection_types),
         "specialization_slugs": sorted(registries.known_specialization_slugs),
         "entity_attribute_types": dict(registries.entity_attribute_types),
         "connection_attribute_types": dict(registries.connection_attribute_types),
+        "entity_attribute_enums": entity_attribute_enums,
+        "connection_attribute_enums": connection_attribute_enums,
         "symmetric_connection_types": sorted(registries.symmetric_connection_types),
         "reserved_entity_paths": sorted(RESERVED_ENTITY_PATHS),
         "reserved_connection_paths": sorted(RESERVED_CONNECTION_PATHS),

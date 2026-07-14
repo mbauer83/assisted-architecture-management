@@ -158,6 +158,7 @@ const focusIssue = (issue: ViewpointValidationIssue) => {
     <template v-else-if="draft && catalog">
       <button
         type="button"
+        class="back-btn"
         @click="backToList"
       >
         ← Back
@@ -297,4 +298,6 @@ const focusIssue = (issue: ViewpointValidationIssue) => {
 .tabs button { appearance: none; border: none; background: none; padding: 8px 14px; font-size: 13px; font-weight: 600; color: #9ca3af; cursor: pointer; border-bottom: 2px solid transparent; }
 .tabs button.sel { color: #4338ca; border-color: #6366f1; }
 .save-row { margin-top: 20px; }
+.back-btn { appearance: none; border: 1px solid #d1d5db; background: #fff; color: #374151; border-radius: 6px; padding: 5px 12px; font-size: 12.5px; font-weight: 600; cursor: pointer; }
+.back-btn:hover { border-color: #6366f1; color: #4338ca; }
 </style>

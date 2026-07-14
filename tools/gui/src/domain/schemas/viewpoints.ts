@@ -191,6 +191,18 @@ export const CriteriaCatalogSchema = Schema.Struct({
   specialization_slugs: Schema.Array(Schema.String),
   entity_attribute_types: Schema.Record({ key: Schema.String, value: Schema.String }),
   connection_attribute_types: Schema.Record({ key: Schema.String, value: Schema.String }),
+  // Enumerable value sets per attribute path (schema-declared `enum` attributes, plus the
+  // enumerable reserved facets `domain`/`status`) — drives the criteria value picker's
+  // switch from free text to a dropdown / multi-select. Optional-with-default so the editor
+  // tolerates a backend that predates this field (falls back to free-text everywhere).
+  entity_attribute_enums: Schema.optionalWith(
+    Schema.Record({ key: Schema.String, value: Schema.Array(Schema.String) }),
+    { default: () => ({}) },
+  ),
+  connection_attribute_enums: Schema.optionalWith(
+    Schema.Record({ key: Schema.String, value: Schema.Array(Schema.String) }),
+    { default: () => ({}) },
+  ),
   symmetric_connection_types: Schema.Array(Schema.String),
   reserved_entity_paths: Schema.Array(Schema.String),
   reserved_connection_paths: Schema.Array(Schema.String),

@@ -37,8 +37,30 @@ def _property_types(schema: Mapping[str, object] | None) -> dict[str, str]:
     return types
 
 
-def _entity_attribute_types(runtime_catalogs: RuntimeCatalogs, repo_roots: Sequence[Path]) -> dict[str, str]:
+def _property_enums(schema: Mapping[str, object] | None) -> dict[str, tuple[str, ...]]:
+    """Enumerable value sets declared per attribute via JSON-schema ``enum``. Only string
+    enums are surfaced (the criteria value picker is string-shaped); a non-list or empty
+    ``enum`` is skipped, leaving that attribute a free-text value input."""
+    if schema is None:
+        return {}
+    properties = schema.get("properties")
+    if not isinstance(properties, Mapping):
+        return {}
+    enums: dict[str, tuple[str, ...]] = {}
+    for name, prop in properties.items():
+        if not isinstance(prop, Mapping):
+            continue
+        values = prop.get("enum")
+        if isinstance(values, Sequence) and not isinstance(values, str | bytes) and len(values) > 0:
+            enums[str(name)] = tuple(str(v) for v in values)
+    return enums
+
+
+def _entity_attribute_schema_facets(
+    runtime_catalogs: RuntimeCatalogs, repo_roots: Sequence[Path]
+) -> tuple[dict[str, str], dict[str, tuple[str, ...]]]:
     types: dict[str, str] = {}
+    enums: dict[str, tuple[str, ...]] = {}
     for entity_type in runtime_catalogs.ontology.all_entity_type_names():
         slugs = ("", *(spec.slug for spec in runtime_catalogs.specializations.for_type("entity", entity_type)))
         for repo_root in repo_roots:
@@ -50,16 +72,21 @@ def _entity_attribute_types(runtime_catalogs: RuntimeCatalogs, repo_roots: Seque
                     specialization_catalog=runtime_catalogs.specializations,
                 )
                 types.update(_property_types(schema))
-    return types
+                enums.update(_property_enums(schema))
+    return types, enums
 
 
-def _connection_attribute_types(runtime_catalogs: RuntimeCatalogs, repo_roots: Sequence[Path]) -> dict[str, str]:
+def _connection_attribute_schema_facets(
+    runtime_catalogs: RuntimeCatalogs, repo_roots: Sequence[Path]
+) -> tuple[dict[str, str], dict[str, tuple[str, ...]]]:
     types: dict[str, str] = {}
+    enums: dict[str, tuple[str, ...]] = {}
     for connection_type in runtime_catalogs.ontology.all_connection_type_names():
         for repo_root in repo_roots:
             schema = load_connection_metadata_schema(repo_root, connection_type)
             types.update(_property_types(schema))
-    return types
+            enums.update(_property_enums(schema))
+    return types, enums
 
 
 def build_registry_snapshot(
@@ -79,12 +106,18 @@ def build_registry_snapshot(
     symmetric_connection_types = frozenset(
         ct for ct in known_connection_types if runtime_catalogs.connections.is_symmetric(ct)
     )
+    entity_attribute_types, entity_attribute_enums = _entity_attribute_schema_facets(runtime_catalogs, repo_roots)
+    connection_attribute_types, connection_attribute_enums = _connection_attribute_schema_facets(
+        runtime_catalogs, repo_roots
+    )
     return RegistrySnapshot(
         known_entity_types=known_entity_types,
         known_connection_types=known_connection_types,
         known_specialization_slugs=known_specialization_slugs,
-        entity_attribute_types=_entity_attribute_types(runtime_catalogs, repo_roots),
-        connection_attribute_types=_connection_attribute_types(runtime_catalogs, repo_roots),
+        entity_attribute_types=entity_attribute_types,
+        connection_attribute_types=connection_attribute_types,
+        entity_attribute_enums=entity_attribute_enums,
+        connection_attribute_enums=connection_attribute_enums,
         symmetric_connection_types=symmetric_connection_types,
         entity_type_infos=runtime_catalogs.ontology.all_entity_types(),
         derivation_catalog=runtime_catalogs.module_catalog,

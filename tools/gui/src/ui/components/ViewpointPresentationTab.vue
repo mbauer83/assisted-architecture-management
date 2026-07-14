@@ -44,25 +44,16 @@ const updateColumn = (index: number, column: ColumnSpecNode) => {
 <template>
   <div>
     <div v-if="modelValue === null">
-      <p>No presentation — this definition is query-only (execution result has no fixed display).</p>
-      <select @change="addPresentation(($event.target as HTMLSelectElement).value as Representation)">
-        <option value="" />
-        <option
-          v-for="r in REPRESENTATIONS"
-          :key="r"
-          :value="r"
-        >
-          {{ r }}
-        </option>
-      </select>
-    </div>
-    <div v-else>
+      <p class="empty-hint">
+        No presentation — this definition is query-only (execution result has no fixed display).
+      </p>
       <label class="field">
-        representation
+        add presentation
         <select
-          :value="modelValue.representation"
-          @change="changeRepresentation(($event.target as HTMLSelectElement).value as Representation)"
+          class="inp"
+          @change="addPresentation(($event.target as HTMLSelectElement).value as Representation)"
         >
+          <option value="" />
           <option
             v-for="r in REPRESENTATIONS"
             :key="r"
@@ -72,12 +63,37 @@ const updateColumn = (index: number, column: ColumnSpecNode) => {
           </option>
         </select>
       </label>
-      <button
-        type="button"
-        @click="removePresentation"
-      >
-        Remove presentation
-      </button>
+    </div>
+    <div v-else>
+      <div class="representation-field">
+        <label
+          class="field-label"
+          for="vp-representation"
+        >representation</label>
+        <div class="representation-row">
+          <select
+            id="vp-representation"
+            class="inp"
+            :value="modelValue.representation"
+            @change="changeRepresentation(($event.target as HTMLSelectElement).value as Representation)"
+          >
+            <option
+              v-for="r in REPRESENTATIONS"
+              :key="r"
+              :value="r"
+            >
+              {{ r }}
+            </option>
+          </select>
+          <button
+            type="button"
+            class="btn btn--danger"
+            @click="removePresentation"
+          >
+            Remove presentation
+          </button>
+        </div>
+      </div>
 
       <div v-if="modelValue.representation === 'table'">
         <h3>Columns</h3>
@@ -88,16 +104,19 @@ const updateColumn = (index: number, column: ColumnSpecNode) => {
         >
           <input
             :value="column.label"
+            class="inp"
             placeholder="label"
             @input="updateColumn(index, { ...column, label: ($event.target as HTMLInputElement).value })"
           >
           <input
             :value="column.source"
+            class="inp"
             placeholder="source (attribute path)"
             @input="updateColumn(index, { ...column, source: ($event.target as HTMLInputElement).value })"
           >
           <button
             type="button"
+            class="icon-btn"
             @click="removeColumn(index)"
           >
             ✕
@@ -124,6 +143,7 @@ const updateColumn = (index: number, column: ColumnSpecNode) => {
         <label class="field">
           group_by
           <select
+            class="inp"
             :value="modelValue.groupBy ?? ''"
             @change="emitUpdate({ groupBy: ($event.target as HTMLSelectElement).value || null })"
           >
@@ -151,6 +171,20 @@ const updateColumn = (index: number, column: ColumnSpecNode) => {
 
 <style scoped>
 .field { display: block; margin: 8px 0; font-size: 12.5px; font-weight: 600; color: #6b7280; }
-.column-row { display: flex; gap: 6px; margin: 4px 0; }
+.empty-hint { font-size: 13px; color: #6b7280; background: #f9fafb; border: 1px dashed #d1d5db; border-radius: 8px; padding: 10px 12px; }
+.representation-field { margin: 8px 0; }
+.field-label { display: block; font-size: 12.5px; font-weight: 600; color: #6b7280; margin-bottom: 3px; }
+.representation-row { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.representation-row .inp, .representation-row .btn { min-height: 32px; margin-top: 0; }
+.inp { display: block; padding: 6px 8px; border-radius: 6px; border: 1px solid #d1d5db; font-size: 13px; font-family: inherit; background: #fff; box-sizing: border-box; margin-top: 3px; }
+select.inp { cursor: pointer; min-width: 160px; }
+.column-row { display: flex; gap: 6px; margin: 4px 0; align-items: center; }
+.column-row .inp { flex: 1; margin-top: 0; }
+.btn { appearance: none; border: 1px solid #d1d5db; background: #fff; color: #374151; border-radius: 6px; padding: 6px 12px; font-size: 12.5px; font-weight: 600; cursor: pointer; }
+.btn:hover { border-color: #6366f1; color: #4338ca; }
+.btn--danger:hover { border-color: #dc2626; color: #b91c1c; background: #fef2f2; }
+.icon-btn { appearance: none; border: none; background: none; color: #9ca3af; cursor: pointer; font-size: 15px; line-height: 1; padding: 2px 5px; border-radius: 5px; }
+.icon-btn:hover { background: #fee2e2; color: #991b1b; }
 .add-btn { appearance: none; border: 1px dashed #d1d5db; background: #fff; color: #6b7280; border-radius: 7px; padding: 5px 10px; font-size: 12px; font-weight: 600; cursor: pointer; margin-top: 8px; }
+.add-btn:hover { border-color: #6366f1; color: #4338ca; }
 </style>

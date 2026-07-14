@@ -62,6 +62,12 @@ class RegistrySnapshot:
     known_specialization_slugs: frozenset[str]
     entity_attribute_types: Mapping[str, str]
     connection_attribute_types: Mapping[str, str]
+    # Enumerable value sets for schema attributes that declare a JSON-schema ``enum`` —
+    # keyed by the same flat attribute-path namespace as ``*_attribute_types``. Feeds the
+    # criteria-builder's value picker (a dropdown instead of free text); validation ignores
+    # it, so an existing value outside the set is never retroactively rejected.
+    entity_attribute_enums: Mapping[str, tuple[str, ...]] = field(default_factory=dict)
+    connection_attribute_enums: Mapping[str, tuple[str, ...]] = field(default_factory=dict)
     symmetric_connection_types: frozenset[str] = frozenset()
     entity_type_infos: Mapping[str, EntityTypeInfo] = field(default_factory=dict)
     depth_cap: int = 4

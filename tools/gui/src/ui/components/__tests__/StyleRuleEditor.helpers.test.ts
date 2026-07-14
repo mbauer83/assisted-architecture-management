@@ -8,6 +8,7 @@ const CATALOG: CriteriaCatalog = {
   entity_types: [], connection_types: [], specialization_slugs: [],
   entity_attribute_types: { risk_score: 'number', lifecycle_stage: 'string', launched_on: 'date' },
   connection_attribute_types: {},
+  entity_attribute_enums: {}, connection_attribute_enums: {},
   symmetric_connection_types: [], reserved_entity_paths: [], reserved_connection_paths: [], depth_cap: 4,
   entity_type_domains: {},
   bindings: { select: ['entities', 'connections'], aggregate: ['count', 'sum', 'avg', 'min', 'max'], result_types: [] },

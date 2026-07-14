@@ -17,14 +17,13 @@ import type { CriteriaCatalog, ViewpointExecutionResult, ViewpointValidationIssu
 import type { ViewpointDefinitionDraft } from '../../domain/viewpointDefinitionDraft'
 import { definitionToMapping } from '../../domain/viewpointDefinitionSerialization'
 import { queryToMapping } from '../../domain/viewpointCriteriaSerialization'
-import { mkNeighborInclusion } from '../../domain/viewpointCriteria'
-import type { ExecutableQueryNode, NeighborInclusionNode } from '../../domain/viewpointCriteria'
+import type { ExecutableQueryNode } from '../../domain/viewpointCriteria'
 import { attributeTypeTablesFromCatalog } from '../../domain/viewpointBindings'
 import { HIGHLIGHTED_NODE_ID_KEY } from './CriteriaTreeBuilder.helpers'
 import { createDebouncer } from '../lib/debounce'
 import { firstErrorNodeId, formatPreviewCounts } from '../views/ViewpointsManagementView.helpers'
 import CriteriaTreeBuilder from './CriteriaTreeBuilder.vue'
-import OptionalCriteriaSlot from './OptionalCriteriaSlot.vue'
+import NeighborInclusionEditor from './NeighborInclusionEditor.vue'
 import QueryBindingsPanel from './QueryBindingsPanel.vue'
 import QueryParametersPanel from './QueryParametersPanel.vue'
 import QueryDerivedAttributesPanel from './QueryDerivedAttributesPanel.vue'
@@ -105,20 +104,6 @@ const testRun = async () => {
   }
 }
 
-const addInclusion = () => {
-  if (!props.draft.query) return
-  emitQueryUpdate({ includeConnected: [...props.draft.query.includeConnected, mkNeighborInclusion()] })
-}
-const removeInclusion = (index: number) => {
-  if (!props.draft.query) return
-  emitQueryUpdate({ includeConnected: props.draft.query.includeConnected.filter((_, i) => i !== index) })
-}
-const updateInclusion = (index: number, patch: Partial<NeighborInclusionNode>) => {
-  if (!props.draft.query) return
-  const includeConnected = [...props.draft.query.includeConnected]
-  includeConnected[index] = { ...includeConnected[index], ...patch }
-  emitQueryUpdate({ includeConnected })
-}
 </script>
 
 <template>
@@ -161,141 +146,60 @@ const updateInclusion = (index: number, patch: Partial<NeighborInclusionNode>) =
       @update:model-value="emitQueryUpdate({ derived: $event })"
     />
 
-    <h3>Neighbor inclusions (widen the population)</h3>
-    <div
-      v-for="(inclusion, index) in draft.query.includeConnected"
-      :key="inclusion.id"
-      class="inclusion"
-    >
+    <NeighborInclusionEditor
+      :model-value="draft.query.includeConnected"
+      :catalog="catalog"
+      :binding-names="bindingNames"
+      :parameter-names="parameterNames"
+      @update:model-value="emitQueryUpdate({ includeConnected: $event })"
+    />
+
+    <h3>Connections displayed</h3>
+    <div class="conn-controls">
+      <label class="check">
+        <input
+          :checked="draft.query.connections.enabled"
+          type="checkbox"
+          @change="emitQueryUpdate({ connections: { ...draft.query.connections, enabled: ($event.target as HTMLInputElement).checked } })"
+        > enabled
+      </label>
       <select
-        class="direction-select"
-        :value="inclusion.direction"
-        @change="updateInclusion(index, { direction: ($event.target as HTMLSelectElement).value as NeighborInclusionNode['direction'] })"
-      >
-        <option value="either">
-          either direction
-        </option>
-        <option value="outgoing">
-          outgoing — connections FROM the selected entities
-        </option>
-        <option value="incoming">
-          incoming — connections TO the selected entities
-        </option>
-      </select>
-      <select
-        class="traversal-select"
-        :value="inclusion.traversal"
-        @change="updateInclusion(index, { traversal: ($event.target as HTMLSelectElement).value as NeighborInclusionNode['traversal'] })"
+        class="inp conn-traversal-select"
+        :value="draft.query.connections.traversal"
+        @change="emitQueryUpdate({ connections: { ...draft.query.connections, traversal: ($event.target as HTMLSelectElement).value as ExecutableQueryNode['connections']['traversal'] } })"
       >
         <option value="direct">
-          direct — a single modeled connection only
+          direct only
         </option>
         <option value="derived">
-          derived — indirect, composed across intermediate elements
+          derived only — indirect, composed across intermediate elements
+        </option>
+        <option value="both">
+          direct and derived
         </option>
       </select>
-      <template v-if="inclusion.traversal === 'derived'">
-        <label>
+      <template v-if="draft.query.connections.traversal !== 'direct'">
+        <label class="check">
           <input
             class="include-potential-checkbox"
-            :checked="inclusion.includePotential"
+            :checked="draft.query.connections.includePotential"
             type="checkbox"
-            @change="updateInclusion(index, { includePotential: ($event.target as HTMLInputElement).checked })"
+            @change="emitQueryUpdate({ connections: { ...draft.query.connections, includePotential: ($event.target as HTMLInputElement).checked } })"
           > include potential (lower-confidence) relationships
         </label>
-        <label>
+        <label class="num-field">
           max hops
           <input
-            :value="inclusion.maxHops ?? ''"
+            :value="draft.query.connections.maxHops ?? ''"
             type="number"
             min="2"
             placeholder="default"
-            class="hops-input"
-            @change="updateInclusion(index, { maxHops: ($event.target as HTMLInputElement).value ? Number(($event.target as HTMLInputElement).value) : null })"
+            class="inp hops-input"
+            @change="emitQueryUpdate({ connections: { ...draft.query.connections, maxHops: ($event.target as HTMLInputElement).value ? Number(($event.target as HTMLInputElement).value) : null } } )"
           >
         </label>
       </template>
-      <button
-        type="button"
-        @click="removeInclusion(index)"
-      >
-        ✕ remove
-      </button>
-      <OptionalCriteriaSlot
-        :model-value="inclusion.connectionCriteria"
-        group-kind="connection"
-        :catalog="catalog"
-        :depth="0"
-        :binding-names="bindingNames"
-        :parameter-names="parameterNames"
-        field-label="connection_criteria"
-        unrestricted-label="any connection"
-        @update:model-value="updateInclusion(index, { connectionCriteria: $event })"
-      />
-      <OptionalCriteriaSlot
-        :model-value="inclusion.neighborCriteria"
-        group-kind="entity"
-        :catalog="catalog"
-        :depth="0"
-        :binding-names="bindingNames"
-        :parameter-names="parameterNames"
-        field-label="neighbor_criteria"
-        unrestricted-label="any entity"
-        @update:model-value="updateInclusion(index, { neighborCriteria: $event })"
-      />
     </div>
-    <button
-      type="button"
-      class="add-btn"
-      @click="addInclusion"
-    >
-      + Add neighbor inclusion
-    </button>
-
-    <h3>Connections displayed</h3>
-    <label>
-      <input
-        :checked="draft.query.connections.enabled"
-        type="checkbox"
-        @change="emitQueryUpdate({ connections: { ...draft.query.connections, enabled: ($event.target as HTMLInputElement).checked } })"
-      > enabled
-    </label>
-    <select
-      class="conn-traversal-select"
-      :value="draft.query.connections.traversal"
-      @change="emitQueryUpdate({ connections: { ...draft.query.connections, traversal: ($event.target as HTMLSelectElement).value as ExecutableQueryNode['connections']['traversal'] } })"
-    >
-      <option value="direct">
-        direct only
-      </option>
-      <option value="derived">
-        derived only — indirect, composed across intermediate elements
-      </option>
-      <option value="both">
-        direct and derived
-      </option>
-    </select>
-    <template v-if="draft.query.connections.traversal !== 'direct'">
-      <label>
-        <input
-          class="include-potential-checkbox"
-          :checked="draft.query.connections.includePotential"
-          type="checkbox"
-          @change="emitQueryUpdate({ connections: { ...draft.query.connections, includePotential: ($event.target as HTMLInputElement).checked } })"
-        > include potential (lower-confidence) relationships
-      </label>
-      <label>
-        max hops
-        <input
-          :value="draft.query.connections.maxHops ?? ''"
-          type="number"
-          min="2"
-          placeholder="default"
-          class="hops-input"
-          @change="emitQueryUpdate({ connections: { ...draft.query.connections, maxHops: ($event.target as HTMLInputElement).value ? Number(($event.target as HTMLInputElement).value) : null } } )"
-        >
-      </label>
-    </template>
     <CriteriaTreeBuilder
       :model-value="draft.query.connections.criteria"
       group-kind="connection"
@@ -317,6 +221,7 @@ const updateInclusion = (index: number, patch: Partial<NeighborInclusionNode>) =
     <div class="test-run-row">
       <button
         type="button"
+        class="btn"
         :disabled="testRunning"
         @click="testRun"
       >
@@ -344,12 +249,19 @@ const updateInclusion = (index: number, patch: Partial<NeighborInclusionNode>) =
 <style scoped>
 .empty-state { font-size: 13px; color: #6b7280; background: #f9fafb; border: 1px dashed #d1d5db; border-radius: 8px; padding: 14px 16px; }
 .error { color: #991b1b; background: #fee2e2; padding: 8px 12px; border-radius: 6px; }
-.inclusion { border: 1px solid #d1d5db; border-radius: 8px; padding: 10px; margin: 8px 0; }
+.inp { padding: 5px 8px; border-radius: 6px; border: 1px solid #d1d5db; font-size: 12.5px; font-family: inherit; background: #fff; box-sizing: border-box; }
+select.inp { cursor: pointer; max-width: 100%; }
+.check { display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; color: #374151; cursor: pointer; }
+.check input { margin: 0; cursor: pointer; }
+.num-field { display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; color: #6b7280; font-weight: 600; }
+.conn-controls { display: flex; flex-direction: column; align-items: flex-start; gap: 8px; margin: 8px 0; }
 .summary-panel { margin-top: 12px; padding: 10px 14px; border-radius: 8px; background: #eef2ff; color: #4338ca; font-size: 13px; }
 .preview-counts { margin-left: 6px; font-weight: 600; }
 .test-run-row { display: flex; align-items: center; gap: 10px; margin-top: 8px; flex-wrap: wrap; }
 .test-run-counts { font-size: 12.5px; color: #374151; }
 .test-run-warning { font-size: 12px; color: #92400e; background: #fef3c7; padding: 2px 8px; border-radius: 4px; }
-.add-btn { appearance: none; border: 1px dashed #d1d5db; background: #fff; color: #6b7280; border-radius: 7px; padding: 5px 10px; font-size: 12px; font-weight: 600; cursor: pointer; margin-top: 8px; }
-.hops-input { width: 64px; margin-left: 4px; }
+.btn { appearance: none; border: 1px solid #d1d5db; background: #fff; color: #374151; border-radius: 6px; padding: 5px 12px; font-size: 12.5px; font-weight: 600; cursor: pointer; }
+.btn:hover:not(:disabled) { border-color: #6366f1; color: #4338ca; }
+.btn:disabled { opacity: .5; cursor: not-allowed; }
+.hops-input { width: 72px; }
 </style>

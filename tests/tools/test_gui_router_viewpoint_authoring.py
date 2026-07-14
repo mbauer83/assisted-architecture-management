@@ -47,7 +47,8 @@ class TestCriteriaCatalog:
         body = resp.json()
         assert set(body.keys()) == {
             "entity_types", "connection_types", "specialization_slugs",
-            "entity_attribute_types", "connection_attribute_types", "symmetric_connection_types",
+            "entity_attribute_types", "connection_attribute_types",
+            "entity_attribute_enums", "connection_attribute_enums", "symmetric_connection_types",
             "reserved_entity_paths", "reserved_connection_paths", "depth_cap", "bindings", "parameters", "derived",
             "connection_derivation", "entity_type_domains",
         }
@@ -58,6 +59,9 @@ class TestCriteriaCatalog:
         assert body["derived"]["certainty"] == ["certain", "potential"]
         assert body["connection_derivation"]["archimate-realization"]["role"] == "structural"
         assert body["entity_type_domains"]["application-component"] == "application"
+        # Reserved enumerable facets are always populated for the value picker.
+        assert body["entity_attribute_enums"]["status"] == ["active", "deprecated", "draft"]
+        assert "application" in body["entity_attribute_enums"]["domain"]
 
 
 class TestReferencers:

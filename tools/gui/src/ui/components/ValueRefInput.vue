@@ -4,6 +4,7 @@ import type { AggregateKind } from '../../domain/viewpointBindings'
 import type { GroupKind, Quantifier, ValueRef, ValueRefKind } from '../../domain/viewpointCriteria'
 import { bindingValue, endpointValue, literalValue, parameterValue, selfValue } from '../../domain/viewpointCriteria'
 import { AGGREGATE_CHOICES, QUANTIFIER_CHOICES, valueKindOptions } from './CriteriaTreeBuilder.helpers'
+import EntityRefValueInput from './EntityRefValueInput.vue'
 
 const props = defineProps<{
   modelValue: ValueRef
@@ -14,6 +15,9 @@ const props = defineProps<{
   /** Fixed choices for a literal value (e.g. known entity/connection types), or null for
    * a free-text literal input. */
   literalChoices: readonly string[] | null
+  /** When true the literal value is an entity id — picked via the entity picker rather
+   * than typed. Takes precedence over `literalChoices` (an id space is not enumerable). */
+  entityReference?: boolean
   /** Names of bindings/parameters declared earlier in this query — empty when none exist
    * yet, in which case `valueKindOptions` omits those kinds entirely. */
   bindingNames: readonly string[]
@@ -152,6 +156,12 @@ const onBindingChange = (patch: { binding?: string; project?: string; aggregate?
         </option>
       </select>
     </template>
+
+    <EntityRefValueInput
+      v-else-if="modelValue.kind === 'literal' && entityReference"
+      :model-value="String(modelValue.literal ?? '')"
+      @update:model-value="onLiteralChange($event as string)"
+    />
 
     <select
       v-else-if="modelValue.kind === 'literal' && literalChoices"

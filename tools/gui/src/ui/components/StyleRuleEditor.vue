@@ -124,12 +124,14 @@ const onDefaultStyleChange = (capability: string, token: string) => {
           </div>
           <button
             type="button"
+            class="icon-btn move-btn"
             @click="moveRule(index, -1)"
           >
             ↑
           </button>
           <button
             type="button"
+            class="icon-btn move-btn"
             @click="moveRule(index, 1)"
           >
             ↓
@@ -321,6 +323,8 @@ const onDefaultStyleChange = (capability: string, token: string) => {
 .inp { padding: 4px 6px; border-radius: 5px; border: 1px solid #d1d5db; font-size: 12.5px; font-family: inherit; }
 .icon-btn { appearance: none; border: none; background: none; color: #9ca3af; cursor: pointer; font-size: 15px; line-height: 1; padding: 2px 5px; border-radius: 5px; }
 .icon-btn:hover { background: #fee2e2; color: #991b1b; }
+.move-btn { color: #6b7280; font-size: 13px; }
+.move-btn:hover { background: #eef2ff; color: #4338ca; }
 .add-row { margin-top: 8px; }
 .add-btn { appearance: none; border: 1px dashed #d1d5db; background: #fff; color: #6b7280; border-radius: 7px; padding: 5px 10px; font-size: 12px; font-weight: 600; cursor: pointer; }
 .add-btn:hover { border-color: #6366f1; color: #4338ca; }

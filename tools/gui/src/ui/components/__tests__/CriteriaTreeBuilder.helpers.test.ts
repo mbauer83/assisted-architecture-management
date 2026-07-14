@@ -5,6 +5,7 @@ import {
   comparatorsFor,
   depthLabel,
   enumChoicesFor,
+  isEntityReferencePath,
   valueKindOptions,
 } from '../CriteriaTreeBuilder.helpers'
 import type { CriteriaCatalog } from '../../../domain'
@@ -15,6 +16,12 @@ const CATALOG: CriteriaCatalog = {
   specialization_slugs: ['business-process'],
   entity_attribute_types: { risk_score: 'number', lifecycle_stage: 'string' },
   connection_attribute_types: { strength: 'integer' },
+  entity_attribute_enums: {
+    lifecycle_stage: ['alpha', 'beta', 'ga'],
+    domain: ['application', 'common'],
+    status: ['draft', 'active', 'deprecated'],
+  },
+  connection_attribute_enums: {},
   symmetric_connection_types: [],
   reserved_entity_paths: ['id', 'name', 'type', 'specialization', 'group', 'domain', 'subdomain', 'status', 'version'],
   reserved_connection_paths: ['id', 'type', 'specialization'],
@@ -74,9 +81,31 @@ describe('enumChoicesFor', () => {
     expect(enumChoicesFor('specialization', 'entity', CATALOG)).toEqual(['business-process'])
   })
 
+  it('offers a schema attribute\'s declared enum values', () => {
+    expect(enumChoicesFor('lifecycle_stage', 'entity', CATALOG)).toEqual(['alpha', 'beta', 'ga'])
+  })
+
+  it('offers the reserved domain/status facets from the entity enum map', () => {
+    expect(enumChoicesFor('domain', 'entity', CATALOG)).toEqual(['application', 'common'])
+    expect(enumChoicesFor('status', 'entity', CATALOG)).toEqual(['draft', 'active', 'deprecated'])
+  })
+
   it('returns null (free-text) for attributes with no enumerable value set', () => {
     expect(enumChoicesFor('risk_score', 'entity', CATALOG)).toBeNull()
-    expect(enumChoicesFor('domain', 'entity', CATALOG)).toBeNull()
+    expect(enumChoicesFor('name', 'entity', CATALOG)).toBeNull()
+    expect(enumChoicesFor('strength', 'connection', CATALOG)).toBeNull()
+  })
+})
+
+describe('isEntityReferencePath', () => {
+  it('treats the reserved id path as an entity reference', () => {
+    expect(isEntityReferencePath('id')).toBe(true)
+  })
+
+  it('treats non-id paths as non-references', () => {
+    expect(isEntityReferencePath('name')).toBe(false)
+    expect(isEntityReferencePath('type')).toBe(false)
+    expect(isEntityReferencePath('risk_score')).toBe(false)
   })
 })
 

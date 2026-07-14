@@ -3,8 +3,12 @@ import { computed, inject, ref } from 'vue'
 import type { CriteriaCatalog } from '../../domain'
 import type { Comparator, ConditionNode, GroupKind, ValueRef } from '../../domain/viewpointCriteria'
 import { bindingValue, literalValue } from '../../domain/viewpointCriteria'
-import { HIGHLIGHTED_NODE_ID_KEY, attributeOptions, comparatorsFor, enumChoicesFor } from './CriteriaTreeBuilder.helpers'
+import {
+  HIGHLIGHTED_NODE_ID_KEY, attributeOptions, comparatorsFor, enumChoicesFor, isEntityReferencePath,
+} from './CriteriaTreeBuilder.helpers'
 import ValueRefInput from './ValueRefInput.vue'
+import EnumChipMultiSelect from './EnumChipMultiSelect.vue'
+import EntityRefValueInput from './EntityRefValueInput.vue'
 
 const props = withDefaults(defineProps<{
   modelValue: ConditionNode
@@ -24,11 +28,18 @@ const currentAttribute = computed(
 )
 const comparatorChoices = computed(() => comparatorsFor(currentAttribute.value))
 const literalChoices = computed(() => enumChoicesFor(props.modelValue.attribute, props.groupKind, props.catalog))
+const isEntityRef = computed(() => isEntityReferencePath(props.modelValue.attribute))
 const valueTakesNoInput = computed(() => props.modelValue.comparator === 'exists' || props.modelValue.comparator === 'absent')
 const valueTakesList = computed(() => props.modelValue.comparator === 'in' || props.modelValue.comparator === 'not_in')
 const listValueText = computed(() => {
   const value = props.modelValue.value
   return value.kind === 'literal' && Array.isArray(value.literal) ? value.literal.join(', ') : ''
+})
+/** Current fixed-list values as a string array (empty unless a literal list is set) —
+ * feeds the chip/entity-picker list widgets when the attribute is enumerable / an id. */
+const listValues = computed<string[]>(() => {
+  const value = props.modelValue.value
+  return value.kind === 'literal' && Array.isArray(value.literal) ? value.literal.map((v) => String(v)) : []
 })
 /** `in`/`not_in` accept either a fixed list of values or a set-valued binding, projected
  * to a scalar list (`{from: binding, name: x, project: id}` — "entity is in set x", no new
@@ -54,6 +65,7 @@ const onComparatorChange = (event: Event) => {
 const onValueChange = (value: ValueRef) => update({ value })
 const onListValueChange = (raw: string) =>
   update({ value: literalValue(raw.split(',').map((v) => v.trim()).filter((v) => v.length > 0)) })
+const onListValuesChange = (values: string[]) => update({ value: literalValue(values) })
 const onListSourceChange = (source: 'literal' | 'binding') =>
   update({ value: source === 'binding' ? bindingValue(props.bindingNames[0] ?? '') : literalValue([]) })
 const onListBindingChange = (patch: { binding?: string; project?: string }) => {
@@ -113,8 +125,20 @@ const onListBindingChange = (patch: { binding?: string; project?: string }) => {
           a named binding's values
         </option>
       </select>
+      <EntityRefValueInput
+        v-if="!listValueIsBinding && isEntityRef"
+        multiple
+        :model-value="listValues"
+        @update:model-value="onListValuesChange($event as string[])"
+      />
+      <EnumChipMultiSelect
+        v-else-if="!listValueIsBinding && literalChoices"
+        :model-value="listValues"
+        :choices="literalChoices"
+        @update:model-value="onListValuesChange"
+      />
       <input
-        v-if="!listValueIsBinding"
+        v-else-if="!listValueIsBinding"
         class="inp val"
         type="text"
         placeholder="comma-separated values"
@@ -150,6 +174,7 @@ const onListBindingChange = (patch: { binding?: string; project?: string }) => {
       :group-kind="groupKind"
       :attribute-paths="attributePaths"
       :literal-choices="literalChoices"
+      :entity-reference="isEntityRef"
       :binding-names="bindingNames"
       :parameter-names="parameterNames"
       @update:model-value="onValueChange"

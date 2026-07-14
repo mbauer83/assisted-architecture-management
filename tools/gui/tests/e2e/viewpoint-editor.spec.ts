@@ -64,7 +64,8 @@ test.describe('create/edit lifecycle with scope + query round-trip', () => {
     await page.getByRole('button', { name: '+ Add condition' }).first().click()
     const conditionRow = page.locator('.group-box.root > .row').first()
     await conditionRow.locator('select.attr').selectOption('domain')
-    await conditionRow.locator('input.val').fill('motivation')
+    // `domain` is an enumerable reserved facet — its value is a dropdown, not free text.
+    await conditionRow.locator('select.val').selectOption('motivation')
 
     await page.getByRole('button', { name: 'Save', exact: true }).click()
     await expect(page.getByRole('heading', { name: 'Viewpoints' })).toBeVisible()

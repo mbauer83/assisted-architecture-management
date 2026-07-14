@@ -79,11 +79,12 @@ test.describe('extended comparator vocabulary', () => {
     await page.getByRole('textbox', { name: 'name' }).fill('Comparators Test')
     await page.getByRole('button', { name: 'Query' }).click()
 
+    // A free-text attribute keeps the comma-list text input for not_in.
     await page.getByRole('button', { name: '+ Add condition' }).first().click()
     const row = page.locator('.group-box.root > .row').first()
-    await row.locator('select.attr').selectOption('status')
+    await row.locator('select.attr').selectOption('name')
     await row.locator('select.cmp').selectOption('not_in')
-    await row.locator('input.val').fill('deprecated, archived')
+    await row.locator('input.val').fill('alpha, beta')
 
     await page.getByRole('button', { name: '+ Add condition' }).first().click()
     const secondRow = page.locator('.group-box.root > .row').nth(1)
@@ -96,11 +97,56 @@ test.describe('extended comparator vocabulary', () => {
 
     const entry = await findEntry(request, slug)
     expect(entry.query.entity_criteria.children).toEqual([
-      { kind: 'condition', attribute: 'status', comparator: 'not_in', value: ['deprecated', 'archived'] },
+      { kind: 'condition', attribute: 'name', comparator: 'not_in', value: ['alpha', 'beta'] },
       { kind: 'condition', attribute: 'name', comparator: 'ilike', value: '%gateway%' },
     ])
 
     await removeViewpoint(request, slug)
+  })
+})
+
+test.describe('enumerable and entity-reference value inputs', () => {
+  test('an enumerable attribute offers a dropdown (eq) and a chip multi-select (in), not free text', async ({ page, request }) => {
+    const slug = uniqueSlug('enum-value')
+    await page.goto('/viewpoints')
+    await page.getByRole('button', { name: '+ New viewpoint' }).click()
+    await page.getByRole('textbox', { name: 'slug' }).fill(slug)
+    await page.getByRole('textbox', { name: 'name' }).fill('Enum Value Test')
+    await page.getByRole('button', { name: 'Query' }).click()
+
+    // status is an enumerable reserved facet (draft/active/deprecated) — `in` renders
+    // toggleable chips instead of a comma-separated text field.
+    await page.getByRole('button', { name: '+ Add condition' }).first().click()
+    const row = page.locator('.group-box.root > .row').first()
+    await row.locator('select.attr').selectOption('status')
+    await row.locator('select.cmp').selectOption('in')
+    await expect(row.locator('input.val')).toHaveCount(0)
+    await row.getByRole('button', { name: 'active', exact: true }).click()
+    await row.getByRole('button', { name: 'deprecated', exact: true }).click()
+
+    await page.getByRole('button', { name: 'Save', exact: true }).click()
+    await expect(page.getByRole('heading', { name: 'Viewpoints' })).toBeVisible()
+
+    const entry = await findEntry(request, slug)
+    expect(entry.query.entity_criteria.children).toEqual([
+      { kind: 'condition', attribute: 'status', comparator: 'in', value: ['active', 'deprecated'] },
+    ])
+
+    await removeViewpoint(request, slug)
+  })
+
+  test('the reserved id path uses the entity picker rather than a text value field', async ({ page }) => {
+    await page.goto('/viewpoints')
+    await page.getByRole('button', { name: '+ New viewpoint' }).click()
+    await page.getByRole('textbox', { name: 'slug' }).fill(uniqueSlug('id-picker'))
+    await page.getByRole('textbox', { name: 'name' }).fill('Id Picker Test')
+    await page.getByRole('button', { name: 'Query' }).click()
+
+    await page.getByRole('button', { name: '+ Add condition' }).first().click()
+    const row = page.locator('.group-box.root > .row').first()
+    await row.locator('select.attr').selectOption('id')
+    await expect(row.locator('input[placeholder="select an entity"]')).toBeVisible()
+    await expect(row.locator('input.val')).toHaveCount(0)
   })
 })
 
