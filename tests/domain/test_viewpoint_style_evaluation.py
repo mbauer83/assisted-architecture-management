@@ -277,6 +277,44 @@ class TestConnectionStyling:
         )
         assert style == {"edge_color": "blue"}
 
+    def test_node_capability_rule_is_skipped_for_connections(self) -> None:
+        # Regression: a node-scoped rule (entity match criteria) must never be evaluated
+        # against a connection. Previously every rule was tried against every item, so a
+        # `node_color` match rule reached a connection and tripped the
+        # ConnectionCriteriaGroup assert, 500-ing the whole projection. status="draft"
+        # would *match* if evaluated — so an empty result proves it was skipped by kind,
+        # not merely unmatched.
+        connection = _connection(status="draft")
+        node_rule = _status_rule("node_color", "draft", "highlight")
+        presentation = PresentationSpec(representation="exploration", styling_rules=(node_rule,))
+        style, drift = evaluate_item_style(
+            connection, "connection", presentation, read_access=_Graph(), registries=_REGISTRIES
+        )
+        assert style == {}
+        assert drift == frozenset()
+
+    def test_mixed_node_and_edge_rules_apply_only_to_their_kind(self) -> None:
+        node_rule = _status_rule("node_color", "draft", "highlight")
+        edge_rule = StyleRule(
+            capability="edge_color",
+            mode="match",
+            match_criteria=ConnectionCriteriaGroup(
+                children=(
+                    AttributeCondition(attribute="type", comparator="eq", value=ValueRef(literal="archimate-serving")),
+                )
+            ),
+            value="blue",
+        )
+        presentation = PresentationSpec(representation="exploration", styling_rules=(node_rule, edge_rule))
+        entity_style, _ = evaluate_item_style(
+            _entity(status="draft"), "entity", presentation, read_access=_Graph(), registries=_REGISTRIES
+        )
+        connection_style, _ = evaluate_item_style(
+            _connection(status="draft"), "connection", presentation, read_access=_Graph(), registries=_REGISTRIES
+        )
+        assert entity_style == {"node_color": "highlight"}
+        assert connection_style == {"edge_color": "blue"}
+
 
 class TestNoPresentation:
     def test_none_presentation_yields_empty_style(self) -> None:

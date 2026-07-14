@@ -238,6 +238,14 @@ def evaluate_item_style(
     for index, rule in enumerate(presentation.styling_rules):
         if rule.capability in decided:
             continue
+        # A capability is node-scoped or edge-scoped by the same `edge_` convention the
+        # presentation validator enforces (an `edge_*` capability pairs with connection
+        # criteria, every other capability with entity criteria). Only evaluate a rule
+        # against the item kind it targets — otherwise a node rule's entity criteria would
+        # be matched against a connection (and vice versa), which is both meaningless and,
+        # for `mode='match'`, a criteria-kind mismatch.
+        if rule.capability.startswith("edge_") != (item_kind == "connection"):
+            continue
         if rule.applies_to and not (rule.applies_to & tags):
             continue
         if rule.mode == "match":
