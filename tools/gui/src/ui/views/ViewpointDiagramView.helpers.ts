@@ -27,7 +27,10 @@ export const toEntitySummaryStub = (
 
 /** `nameById` fills in the sidebar's connection-flow display (`source_name`/`target_name`);
  * `aliasById` resolves `source_alias`/`target_alias` the same way `toEntitySummaryStub`
- * does — both fall back to the raw id when the lookup has no entry. */
+ * does — both fall back to the raw id when the lookup has no entry. `certainty`/`hops`/
+ * `via_connection_ids` carry straight through from the execution result unchanged (`null`/
+ * empty for a real, modeled connection) — the sidebar uses `certainty` to decide whether
+ * to offer the witness chain. */
 export const toDiagramConnectionStub = (
   connection: ConnectionItemSummary,
   nameById: ReadonlyMap<string, string> = new Map(),
@@ -39,6 +42,9 @@ export const toDiagramConnectionStub = (
   version: '', status: '', path: '', content_text: '',
   source_name: nameById.get(connection.source) ?? connection.source,
   target_name: nameById.get(connection.target) ?? connection.target,
+  certainty: connection.certainty,
+  hops: connection.hops,
+  via_connection_ids: connection.via_connection_ids,
 })
 
 /** Applies an override only when a value is given — NEVER clears, since `shape.style` is
@@ -90,3 +96,19 @@ export const applyEdgeHighlightOverlay = (
 
 export const projectionByItemId = (items: readonly ProjectedOccurrence[]): ReadonlyMap<string, ProjectedOccurrence> =>
   new Map(items.map((item) => [item.item_id, item]))
+
+/** Tags each derived connection's matched SVG elements with `data-certainty` — nothing
+ * else reads the notation differently for a derived edge (PlantUML draws every connection
+ * the same way regardless of provenance), so this is purely a hook for the sidebar's own
+ * click handling and for tests to target a derived edge deterministically. */
+export const markDerivedConnections = (
+  edges: ReadonlyMap<string, readonly Element[]>,
+  connections: readonly DiagramConnection[],
+): void => {
+  const certaintyByConnId = new Map(connections.filter((c) => c.certainty).map((c) => [c.artifact_id, c.certainty!]))
+  for (const [connId, elems] of edges) {
+    const certainty = certaintyByConnId.get(connId)
+    if (!certainty) continue
+    for (const el of elems) el.setAttribute('data-certainty', certainty)
+  }
+}

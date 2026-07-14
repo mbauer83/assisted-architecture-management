@@ -17,6 +17,7 @@ import type { ResolvedViewpointExecution } from '../composables/useViewpointPara
 import { useFittedPanZoom } from '../composables/useFittedPanZoom'
 import { useSidebarResize } from '../composables/useSidebarResize'
 import { useDiagramSvgSelection, type DiagramSvgSelectionDetail } from '../composables/useDiagramSvgSelection'
+import { useWitnessChain, type WitnessChainDisplay } from '../composables/useWitnessChain'
 import DiagramEntitySidebar from '../components/DiagramEntitySidebar.vue'
 import ViewpointExecutionDiagnostics from '../components/ViewpointExecutionDiagnostics.vue'
 import ViewpointExecutionError from '../components/ViewpointExecutionError.vue'
@@ -26,7 +27,8 @@ import { presentationFromMapping } from '../../domain/viewpointPresentationSeria
 import { resolveElementMap } from '../lib/diagramViewerExtensions'
 import { sanitizeDiagramSvg } from '../lib/svgSanitize'
 import {
-  applyEdgeHighlightOverlay, applyNodeColorOverlay, projectionByItemId, toDiagramConnectionStub, toEntitySummaryStub,
+  applyEdgeHighlightOverlay, applyNodeColorOverlay, markDerivedConnections, projectionByItemId,
+  toDiagramConnectionStub, toEntitySummaryStub,
 } from './ViewpointDiagramView.helpers'
 import type { ViewpointDefinitionEnvelope } from '../../domain'
 
@@ -75,6 +77,22 @@ const selection = useDiagramSvgSelection({
 })
 const { svgContainer } = selection
 
+// ── Witness chain for a selected derived connection — a real modeled connection has no
+// composed chain to show, so this stays null for everything but a derived edge. ────────
+const witnessChain = useWitnessChain(svc)
+const witnessChainDisplay = computed<WitnessChainDisplay | null>(() => {
+  const conn = selection.selectedConnection.value
+  if (!conn?.certainty) return null
+  return { loading: witnessChain.loading.value, segments: witnessChain.segments.value, broken: witnessChain.broken.value }
+})
+watch(() => selection.selectedConnection.value, (conn) => {
+  if (conn?.certainty && conn.via_connection_ids?.length) {
+    void witnessChain.load(conn.source, conn.target, conn.via_connection_ids)
+  } else {
+    witnessChain.clear()
+  }
+})
+
 const containerRef = ref<HTMLElement | null>(null)
 const panZoom = useFittedPanZoom(containerRef, svgContainer)
 const mainGridRef = ref<HTMLElement | null>(null)
@@ -96,6 +114,7 @@ const applyOverlay = () => {
     const style = entityStyleById.get(connId)?.style
     applyEdgeHighlightOverlay(elems, style?.edge_color, style?.edge_emphasis)
   }
+  markDerivedConnections(edges, diagramConnections.value)
 }
 
 const runExecution = async (resolved: ResolvedViewpointExecution) => {
@@ -223,6 +242,7 @@ onMounted(() => { if (slug.value) void load() })
         :entity-query="selection.entityQuery"
         :edge-label-input="selection.edgeLabelInput.value"
         :edge-label-error="selection.edgeLabelMutation.errorMessage.value"
+        :witness-chain="witnessChainDisplay"
         @select-entity="selection.selectEntity($event)"
         @clear-connection="selection.clearConnection()"
         @clear-sub-part="selection.clearSubPart()"

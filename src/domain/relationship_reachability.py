@@ -187,7 +187,7 @@ def derive_relationships(
     queue = deque(
         _initial_frontier(request.anchors, request.bounds.max_hops, memoized, entity_types, connection_types)
     )
-    results: dict[tuple[str, str, str], DerivedRelationship] = {}
+    results: dict[tuple[str, str], DerivedRelationship] = {}
     seen_paths: set[tuple[str, ...]] = set()
     start_time = monotonic()
     truncated = False
@@ -293,7 +293,7 @@ def _record_if_incident(
     step: DerivedStep,
     path: tuple[tuple[str, Literal["fwd", "rev"]], ...],
     request: RelationshipDerivationRequest,
-    results: dict[tuple[str, str, str], DerivedRelationship],
+    results: dict[tuple[str, str], DerivedRelationship],
 ) -> None:
     if not _matches_direction(step, request.anchors, request.direction):
         return
@@ -308,7 +308,13 @@ def _record_if_incident(
         tuple(item[0] for item in path),
         path_key,
     )
-    key = (candidate.source_id, candidate.target_id, candidate.connection_type)
+    # One derived relationship per unordered entity PAIR, not per (pair, connection_type) —
+    # composing the same two elements through several intermediate paths can yield several
+    # plausible relationship types (e.g. both a derived aggregation and a derived
+    # association), but only the single best-evidenced one is a real finding; the rest are
+    # alternate explanations of the same underlying fact, not additional relationships.
+    first, second = sorted((candidate.source_id, candidate.target_id))
+    key = (first, second)
     existing = results.get(key)
     if existing is None or _is_better(candidate, existing):
         results[key] = candidate

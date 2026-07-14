@@ -4,9 +4,10 @@
 // application), which a node environment cannot construct.
 import { describe, expect, it } from 'vitest'
 import {
-  applyEdgeHighlightOverlay, applyNodeColorOverlay, projectionByItemId, toDiagramConnectionStub, toEntitySummaryStub,
+  applyEdgeHighlightOverlay, applyNodeColorOverlay, markDerivedConnections, projectionByItemId,
+  toDiagramConnectionStub, toEntitySummaryStub,
 } from '../ViewpointDiagramView.helpers'
-import type { ConnectionItemSummary, EntityItemSummary, ProjectedOccurrence } from '../../../domain'
+import type { ConnectionItemSummary, DiagramConnection, EntityItemSummary, ProjectedOccurrence } from '../../../domain'
 
 const SVG_NS = 'http://www.w3.org/2000/svg'
 const svgEl = (tag: string): SVGElement => document.createElementNS(SVG_NS, tag)
@@ -65,6 +66,53 @@ describe('toDiagramConnectionStub', () => {
   it('resolves source_name/target_name from the given lookup', () => {
     const nameById = new Map([['a', 'Alpha'], ['b', 'Beta']])
     expect(toDiagramConnectionStub(conn, nameById)).toMatchObject({ source_name: 'Alpha', target_name: 'Beta' })
+  })
+
+  it('carries certainty/hops/via_connection_ids straight through for a derived connection', () => {
+    const derived: ConnectionItemSummary = {
+      id: 'derived::archimate-serving::x', type: 'archimate-serving', source: 'a', target: 'b',
+      certainty: 'potential', hops: 3, via_connection_ids: ['CON@1', 'CON@2', 'CON@3'],
+    }
+    const stub = toDiagramConnectionStub(derived)
+    expect(stub.certainty).toBe('potential')
+    expect(stub.hops).toBe(3)
+    expect(stub.via_connection_ids).toEqual(['CON@1', 'CON@2', 'CON@3'])
+  })
+
+  it('carries a real (non-derived) connection\'s null certainty/hops and empty via_connection_ids through unchanged', () => {
+    const stub = toDiagramConnectionStub(conn)
+    expect(stub.certainty).toBeNull()
+    expect(stub.hops).toBeNull()
+    expect(stub.via_connection_ids).toEqual([])
+  })
+})
+
+describe('markDerivedConnections', () => {
+  const stubConnection = (overrides: Partial<DiagramConnection>): DiagramConnection => ({
+    artifact_id: 'c1', source: 'a', target: 'b', conn_type: 'serving',
+    version: '', status: '', path: '', content_text: '', source_name: 'a', target_name: 'b',
+    source_alias: null, target_alias: null, certainty: null, hops: null, via_connection_ids: [], ...overrides,
+  })
+
+  it('sets data-certainty on the SVG elements matched to a derived connection', () => {
+    const { group } = groupWith('path')
+    const edges = new Map([['c1', [group]]])
+    markDerivedConnections(edges, [stubConnection({ artifact_id: 'c1', certainty: 'potential' })])
+    expect(group.getAttribute('data-certainty')).toBe('potential')
+  })
+
+  it('leaves a real (non-derived) connection\'s elements untouched', () => {
+    const { group } = groupWith('path')
+    const edges = new Map([['c1', [group]]])
+    markDerivedConnections(edges, [stubConnection({ artifact_id: 'c1', certainty: null })])
+    expect(group.hasAttribute('data-certainty')).toBe(false)
+  })
+
+  it('ignores an edge whose connection id has no matching entry at all', () => {
+    const { group } = groupWith('path')
+    const edges = new Map([['unmatched', [group]]])
+    markDerivedConnections(edges, [stubConnection({ artifact_id: 'c1', certainty: 'certain' })])
+    expect(group.hasAttribute('data-certainty')).toBe(false)
   })
 })
 

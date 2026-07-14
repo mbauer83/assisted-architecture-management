@@ -53,5 +53,11 @@ export const DiagramConnectionSchema = Schema.Struct({
   target_alias: Schema.NullOr(Schema.String),
   edge_key: Schema.optional(Schema.NullOr(Schema.String)),
   edge_label_override: Schema.optional(Schema.NullOr(Schema.String)),
+  // Set only for the ephemeral viewpoint-diagram viewer's derived connections (a real
+  // persisted diagram's connections are always modeled, never composed) — `certainty`
+  // non-null is what the sidebar uses to decide whether to offer the witness chain.
+  certainty: Schema.optional(Schema.NullOr(Schema.Literal('certain', 'potential'))),
+  hops: Schema.optional(Schema.NullOr(Schema.Number)),
+  via_connection_ids: Schema.optional(Schema.Array(Schema.String)),
 })
 export type DiagramConnection = typeof DiagramConnectionSchema.Type

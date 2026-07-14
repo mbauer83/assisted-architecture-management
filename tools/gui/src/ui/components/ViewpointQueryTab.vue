@@ -168,6 +168,7 @@ const updateInclusion = (index: number, patch: Partial<NeighborInclusionNode>) =
       class="inclusion"
     >
       <select
+        class="direction-select"
         :value="inclusion.direction"
         @change="updateInclusion(index, { direction: ($event.target as HTMLSelectElement).value as NeighborInclusionNode['direction'] })"
       >
@@ -181,6 +182,39 @@ const updateInclusion = (index: number, patch: Partial<NeighborInclusionNode>) =
           incoming — connections TO the selected entities
         </option>
       </select>
+      <select
+        class="traversal-select"
+        :value="inclusion.traversal"
+        @change="updateInclusion(index, { traversal: ($event.target as HTMLSelectElement).value as NeighborInclusionNode['traversal'] })"
+      >
+        <option value="direct">
+          direct — a single modeled connection only
+        </option>
+        <option value="derived">
+          derived — indirect, composed across intermediate elements
+        </option>
+      </select>
+      <template v-if="inclusion.traversal === 'derived'">
+        <label>
+          <input
+            class="include-potential-checkbox"
+            :checked="inclusion.includePotential"
+            type="checkbox"
+            @change="updateInclusion(index, { includePotential: ($event.target as HTMLInputElement).checked })"
+          > include potential (lower-confidence) relationships
+        </label>
+        <label>
+          max hops
+          <input
+            :value="inclusion.maxHops ?? ''"
+            type="number"
+            min="2"
+            placeholder="default"
+            class="hops-input"
+            @change="updateInclusion(index, { maxHops: ($event.target as HTMLInputElement).value ? Number(($event.target as HTMLInputElement).value) : null })"
+          >
+        </label>
+      </template>
       <button
         type="button"
         @click="removeInclusion(index)"
@@ -226,6 +260,42 @@ const updateInclusion = (index: number, patch: Partial<NeighborInclusionNode>) =
         @change="emitQueryUpdate({ connections: { ...draft.query.connections, enabled: ($event.target as HTMLInputElement).checked } })"
       > enabled
     </label>
+    <select
+      class="conn-traversal-select"
+      :value="draft.query.connections.traversal"
+      @change="emitQueryUpdate({ connections: { ...draft.query.connections, traversal: ($event.target as HTMLSelectElement).value as ExecutableQueryNode['connections']['traversal'] } })"
+    >
+      <option value="direct">
+        direct only
+      </option>
+      <option value="derived">
+        derived only — indirect, composed across intermediate elements
+      </option>
+      <option value="both">
+        direct and derived
+      </option>
+    </select>
+    <template v-if="draft.query.connections.traversal !== 'direct'">
+      <label>
+        <input
+          class="include-potential-checkbox"
+          :checked="draft.query.connections.includePotential"
+          type="checkbox"
+          @change="emitQueryUpdate({ connections: { ...draft.query.connections, includePotential: ($event.target as HTMLInputElement).checked } })"
+        > include potential (lower-confidence) relationships
+      </label>
+      <label>
+        max hops
+        <input
+          :value="draft.query.connections.maxHops ?? ''"
+          type="number"
+          min="2"
+          placeholder="default"
+          class="hops-input"
+          @change="emitQueryUpdate({ connections: { ...draft.query.connections, maxHops: ($event.target as HTMLInputElement).value ? Number(($event.target as HTMLInputElement).value) : null } } )"
+        >
+      </label>
+    </template>
     <CriteriaTreeBuilder
       :model-value="draft.query.connections.criteria"
       group-kind="connection"
@@ -281,4 +351,5 @@ const updateInclusion = (index: number, patch: Partial<NeighborInclusionNode>) =
 .test-run-counts { font-size: 12.5px; color: #374151; }
 .test-run-warning { font-size: 12px; color: #92400e; background: #fef3c7; padding: 2px 8px; border-radius: 4px; }
 .add-btn { appearance: none; border: 1px dashed #d1d5db; background: #fff; color: #6b7280; border-radius: 7px; padding: 5px 10px; font-size: 12px; font-weight: 600; cursor: pointer; margin-top: 8px; }
+.hops-input { width: 64px; margin-left: 4px; }
 </style>

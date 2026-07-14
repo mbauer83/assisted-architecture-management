@@ -8,7 +8,7 @@ diagrams:
   render_dpi: 150
   sprite_scale: 1.5
 guidance:
-  default_source: ""
+  default_source: ''
 modules:
   sysml_v2_min:
     enabled: false
@@ -27,7 +27,8 @@ validation:
   datatype_type_references_blocking: true
 viewpoints:
   derivation_max_hops: 4
-  derivation_max_relationships: 2000
+  derivation_max_relationships: 20000
+  derivation_time_budget_seconds: 2.0
   max_derived_attributes: 8
   max_query_bindings: 8
   max_query_parameters: 4

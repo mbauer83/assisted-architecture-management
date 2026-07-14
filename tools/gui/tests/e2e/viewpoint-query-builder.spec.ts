@@ -123,3 +123,53 @@ test.describe('path-addressed validation into the new panels', () => {
     await expect(page.locator('.binding-row.highlighted')).toHaveCount(1)
   })
 })
+
+test.describe('derived-traversal authoring on neighbor inclusions and connections', () => {
+  test('traversal, include-potential, and max-hops all round-trip through save/reload', async ({ page, request }) => {
+    const slug = uniqueSlug('traversal')
+    await page.goto('/viewpoints')
+    await page.getByRole('button', { name: '+ New viewpoint' }).click()
+    await page.getByRole('textbox', { name: 'slug' }).fill(slug)
+    await page.getByRole('textbox', { name: 'name' }).fill('Traversal Test')
+    await page.getByRole('button', { name: 'Query' }).click()
+
+    await page.getByRole('button', { name: '+ Add neighbor inclusion' }).click()
+    const inclusion = page.locator('.inclusion').first()
+    await inclusion.locator('select.traversal-select').selectOption('derived')
+    await inclusion.locator('input.include-potential-checkbox').check()
+    await inclusion.locator('input.hops-input').fill('5')
+    await inclusion.locator('input.hops-input').blur()
+
+    await page.locator('select.conn-traversal-select').selectOption('both')
+    await page.locator('input.include-potential-checkbox').last().check()
+    await page.locator('input.hops-input').last().fill('5')
+    await page.locator('input.hops-input').last().blur()
+
+    await page.getByRole('button', { name: 'Save', exact: true }).click()
+    await expect(page.getByRole('heading', { name: 'Viewpoints' })).toBeVisible()
+
+    const entry = await findEntry(request, slug)
+    expect(entry.query.include_connected).toHaveLength(1)
+    expect(entry.query.include_connected[0]).toMatchObject({ traversal: 'derived', include_potential: true, max_hops: 5 })
+    expect(entry.query.connections).toMatchObject({ traversal: 'both', include_potential: true, max_hops: 5 })
+
+    await removeViewpoint(request, slug)
+  })
+
+  test("a direct-only neighbor inclusion hides include-potential and max-hops controls, since 'both' is not offered for inclusions", async ({ page }) => {
+    await page.goto('/viewpoints')
+    await page.getByRole('button', { name: '+ New viewpoint' }).click()
+    await page.getByRole('textbox', { name: 'slug' }).fill(uniqueSlug('direct-only'))
+    await page.getByRole('textbox', { name: 'name' }).fill('Direct Only Test')
+    await page.getByRole('button', { name: 'Query' }).click()
+
+    await page.getByRole('button', { name: '+ Add neighbor inclusion' }).click()
+    const inclusion = page.locator('.inclusion').first()
+    await expect(inclusion.locator('select.traversal-select')).toHaveValue('direct')
+    await expect(inclusion.locator('input.include-potential-checkbox')).toHaveCount(0)
+    await expect(inclusion.locator('input.hops-input')).toHaveCount(0)
+
+    const traversalOptions = await inclusion.locator('select.traversal-select option').allTextContents()
+    expect(traversalOptions.join(' ')).not.toContain('direct and derived')
+  })
+})

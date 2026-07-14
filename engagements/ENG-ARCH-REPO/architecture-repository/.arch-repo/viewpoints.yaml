@@ -1,0 +1,182 @@
+viewpoints:
+- slug: motivation-layer-support
+  version: 1
+  name: Motivation Layer Support
+  purpose:
+  - deciding
+  - designing
+  content: coherence
+  description: All motivation-domain elements plus the application- and common-domain
+    elements that support them (directly or via a derived multi-hop chain), with the
+    connecting relationships shown.
+  stakeholders:
+  - enterprise-architects
+  - business-architects
+  concerns:
+  - how application and common capabilities support motivation
+  representation_types:
+  - archimate-layered
+  query:
+    query_schema: 1
+    entity_criteria:
+      kind: group
+      conjunction: and
+      children:
+      - kind: condition
+        attribute: domain
+        comparator: eq
+        value: motivation
+    include_connected:
+    - neighbor_criteria:
+        kind: group
+        conjunction: and
+        children:
+        - kind: condition
+          attribute: domain
+          comparator: in
+          value:
+          - application
+          - common
+      include_potential: true
+    - neighbor_criteria:
+        kind: group
+        conjunction: and
+        children:
+        - kind: condition
+          attribute: domain
+          comparator: in
+          value:
+          - application
+          - common
+      traversal: derived
+      include_potential: true
+      max_hops: 3
+    connections:
+      traversal: both
+      include_potential: true
+      max_hops: 3
+  presentation:
+    representation: diagram
+- slug: motivation-technology-support
+  version: 6
+  name: Motivation as supported by Technology
+  purpose:
+  - informing
+  - deciding
+  content: overview
+  description: "All motivation-domain elements plus the technology-domain elements\
+    \ that support them via a derived (indirect) chain, skipping the intervening application\
+    \ layer. In the current model this technology set is empty: the only bridge found\
+    \ from any technology node toward the business/motivation layers passes through\
+    \ an Association relationship (architecture-backend \u2014 architecture-management-system),\
+    \ and Association is deliberately excluded from further derivation composition\
+    \ (ArchiMate Appendix B) since it carries no directional dependency semantics\
+    \ to propagate. Closing this gap requires a stronger real relationship (e.g. serving/realization)\
+    \ in the model itself, not a query change."
+  stakeholders:
+  - Solution Architects
+  - DevOps
+  concerns:
+  - what technology indirectly supports this motivation element
+  representation_types:
+  - archimate-layered
+  query:
+    query_schema: 1
+    entity_criteria:
+      kind: group
+      conjunction: and
+      children:
+      - kind: condition
+        attribute: domain
+        comparator: eq
+        value: motivation
+    include_connected:
+    - neighbor_criteria:
+        kind: group
+        conjunction: and
+        children:
+        - kind: condition
+          attribute: domain
+          comparator: eq
+          value: technology
+      traversal: derived
+      include_potential: true
+      max_hops: 4
+    connections:
+      traversal: both
+      include_potential: true
+      max_hops: 4
+  presentation:
+    representation: exploration
+- slug: business-technology-support
+  version: 1
+  name: Business as supported by Technology
+  purpose:
+  - informing
+  - deciding
+  content: coherence
+  description: All business-domain elements (actors, roles, services) plus the technology-domain
+    elements that support them via a derived multi-hop chain, skipping the intervening
+    application layer.
+  stakeholders:
+  - Solution Architects
+  - Infrastructure Architects
+  - Business Managers
+  concerns:
+  - what technology indirectly supports this business role or service
+  representation_types:
+  - archimate-layered
+  query:
+    query_schema: 1
+    entity_criteria:
+      kind: group
+      conjunction: and
+      children:
+      - kind: condition
+        attribute: domain
+        comparator: eq
+        value: business
+    include_connected:
+    - neighbor_criteria:
+        kind: group
+        conjunction: and
+        children:
+        - kind: condition
+          attribute: domain
+          comparator: eq
+          value: technology
+      traversal: derived
+      include_potential: true
+      max_hops: 4
+    connections:
+      traversal: both
+      include_potential: true
+      max_hops: 4
+  presentation:
+    representation: diagram
+- slug: viewpoint-query-builder-e2e-traversal-1784012999169
+  version: 1
+  name: Traversal Test
+  purpose: informing
+  content: overview
+  query:
+    query_schema: 1
+    entity_criteria:
+      kind: group
+      conjunction: and
+      children: []
+    include_connected:
+    - connection_criteria:
+        kind: group
+        conjunction: and
+        children: []
+      neighbor_criteria:
+        kind: group
+        conjunction: and
+        children: []
+      traversal: derived
+      include_potential: true
+    connections:
+      traversal: both
+      include_potential: true
+      max_hops: 5

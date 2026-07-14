@@ -12,6 +12,7 @@ import type { QueryHandle } from '../composables/useQuery'
 import type { RepoError } from '../../ports/ModelRepository'
 import type { NotFoundError } from '../../domain'
 import type { MarkdownError } from '../../application/MarkdownService'
+import type { WitnessChainDisplay } from '../composables/useWitnessChain'
 import { getDomainColor } from '../lib/domains'
 import { toGlyphKey } from '../lib/glyphKey'
 import ArchimateTypeGlyph from './ArchimateTypeGlyph.vue'
@@ -25,6 +26,9 @@ const props = defineProps<{
   entityQuery: QueryHandle<EntityDetail, RepoError | NotFoundError | MarkdownError>
   edgeLabelInput: string
   edgeLabelError: string | null
+  /** Set only when `selectedConnection` is a derived (composed) relationship — a real
+   * modeled connection has no witness chain to show. */
+  witnessChain?: WitnessChainDisplay | null
 }>()
 const emit = defineEmits<{
   'select-entity': [id: string]
@@ -108,6 +112,47 @@ const selectedEntityDetailHtml = computed(() => {
       </div>
       <div class="conn-flow">
         {{ selectedConnection.source_name }} → {{ selectedConnection.target_name }}
+      </div>
+      <div
+        v-if="selectedConnection.certainty"
+        class="det-derived"
+      >
+        <span
+          class="chip"
+          :class="`certainty--${selectedConnection.certainty}`"
+        >{{ selectedConnection.certainty }} · derived, {{ selectedConnection.hops }} hop{{ selectedConnection.hops === 1 ? '' : 's' }}</span>
+        <div
+          v-if="witnessChain?.loading"
+          class="chain-state-msg"
+        >
+          Loading witness chain…
+        </div>
+        <template v-else-if="witnessChain">
+          <p class="chain-prose">
+            <template
+              v-for="(segment, index) in witnessChain.segments"
+              :key="index"
+            >
+              <RouterLink
+                v-if="segment.entityId"
+                :to="{ path: '/entity', query: { id: segment.entityId } }"
+                class="chain-entity"
+              >
+                {{ segment.text }}
+              </RouterLink>
+              <span
+                v-else
+                class="chain-arrow"
+              >{{ segment.text }}</span>
+            </template>
+          </p>
+          <p
+            v-if="witnessChain.broken"
+            class="chain-broken"
+          >
+            This witness chain no longer fully resolves — part of it may have changed since it was derived.
+          </p>
+        </template>
       </div>
       <div
         v-if="selectedConnection.content_text?.trim()"
@@ -213,6 +258,14 @@ const selectedEntityDetailHtml = computed(() => {
 .det-chips { display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 8px; }
 .chip { font-size: 10px; padding: 2px 6px; border-radius: 3px; font-weight: 500; background: #f3f4f6; color: #374151; }
 .det-content { font-size: 12px; line-height: 1.5; color: #374151; margin-bottom: 8px; max-height: 220px; overflow-y: auto; }
+.det-derived { margin-bottom: 8px; }
+.certainty--certain { background: #dcfce7; color: #166534; }
+.certainty--potential { background: #fef3c7; color: #92400e; }
+.chain-state-msg { color: #9ca3af; font-size: 12px; margin-top: 6px; }
+.chain-prose { color: #374151; line-height: 1.6; margin: 6px 0 4px; font-size: 12px; }
+.chain-entity { color: #2563eb; font-weight: 600; }
+.chain-arrow { color: #6b7280; }
+.chain-broken { color: #92400e; background: #fef3c7; padding: 5px 7px; border-radius: 5px; margin: 4px 0; font-size: 11.5px; }
 .det-edge-label { margin-top: 8px; }
 .det-label-text { display: block; font-size: 11px; color: #6b7280; margin-bottom: 3px; }
 .det-label-input { width: 100%; padding: 4px 6px; font-size: 12px; border: 1px solid #d1d5db; border-radius: 4px; box-sizing: border-box; }

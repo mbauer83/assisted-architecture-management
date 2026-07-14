@@ -99,6 +99,33 @@ def test_reachability_prefers_the_lexicographically_first_minimal_witness() -> N
     assert relationship.artifact_id == "derived::archimate-realization::CON@a@fwd|CON@c@fwd"
 
 
+def test_reachability_collapses_multiple_composed_types_between_the_same_pair_to_one() -> None:
+    # Two independent, equally-valid 2-hop compositions between A and C, each producing a
+    # DIFFERENT connection type (DR1: specialization+specialization -> specialization;
+    # DR2: structural+structural -> weakest(assignment, assignment) = assignment) — a real
+    # pair of entities can be composable through more than one intermediate chain, but only
+    # the single best-evidenced relationship should be reported, not one per alternate type.
+    graph = _Graph(
+        {identifier: _entity(identifier) for identifier in ("A", "B", "C", "X", "Y")},
+        [
+            _connection("CON@a1", "A", "X", "archimate-assignment"),
+            _connection("CON@a2", "X", "C", "archimate-assignment"),
+            _connection("CON@b1", "A", "Y", "archimate-specialization"),
+            _connection("CON@b2", "Y", "C", "archimate-specialization"),
+        ],
+    )
+
+    result = derive_relationships(_request(frozenset({"A"}), "outgoing"), read_access=graph, registries=_catalog())
+
+    pairs = {(r.source_id, r.target_id) for r in result.relationships}
+    assert pairs == {("A", "C")}, "expected exactly one relationship for the A-C pair, not one per composed type"
+    assert len(result.relationships) == 1
+    # Deterministic tiebreak: both candidates are certain and 2 hops, so the lexicographically
+    # first path_key wins ("CON@a1..." < "CON@b1...").
+    assert result.relationships[0].connection_type == "archimate-assignment"
+    assert result.relationships[0].path_key == "CON@a1@fwd|CON@a2@fwd"
+
+
 def test_reachability_respects_direction_hop_and_certainty_policies() -> None:
     graph = _Graph(
         {identifier: _entity(identifier) for identifier in ("A", "B", "C")},

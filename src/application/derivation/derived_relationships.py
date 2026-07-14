@@ -75,9 +75,8 @@ def _derive(
         return ()
     max_hops_raw = params.get("max_hops")
     max_hops = int(max_hops_raw) if isinstance(max_hops_raw, (int, float)) else default_max_hops
-    request = RelationshipDerivationRequest(
-        roots, _direction(params), _certainty(params), DerivationBounds(max_hops, max_relationships, time_budget_seconds)
-    )
+    bounds = DerivationBounds(max_hops, max_relationships, time_budget_seconds)
+    request = RelationshipDerivationRequest(roots, _direction(params), _certainty(params), bounds)
     return derive_relationships(request, read_access=read_access, registries=catalog).relationships
 
 
