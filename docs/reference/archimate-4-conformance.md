@@ -7,7 +7,7 @@ not a usage guide; see the linked pages for how to use any of this.
 
 > The model aims for conformance with the **ArchiMate 4.0** standard; conformance has not
 > been independently verified, so no conformance claim is made. The Open Group's own
-> conformance section lists six requirements for an implementation; each is addressed below.
+> conformance section lists six requirements for an implementation; each is described below.
 
 &nbsp;
 
@@ -109,8 +109,9 @@ regresses it.
 Appendix B's **derivation rules** (DR1–DR8, certain; PDR1–PDR12, potential) are implemented
 as an executable engine (`src/domain/relationship_reachability.py`,
 `src/domain/relationship_derivation.py`), not a static table — every real chain of
-connections in a repository is a candidate for composition at query time. Verified by five
-independent methods, each its own test module under `tests/domain/`:
+connections in a repository is a candidate for composition at query time. The rules' behavior
+is exercised by these test modules under `tests/domain/` (test coverage of the
+implementation, not independent conformance verification):
 
 | Method | Test module |
 |---|---|
@@ -137,26 +138,16 @@ of them transcribed from a specific Appendix C table (Application Cooperation/St
 Usage, Capability Map, Goal Realization, Implementation & Deployment/Migration, Information
 Structure, Layered, Migration, Motivation, Organization, Outcome Realization, Physical,
 Process Cooperation, Product, Project, Requirements Realization, Resource Map, Service
-Realization, Stakeholder, Strategy, Technology, Technology Usage, Value Stream) — well beyond
-what the standard itself marks optional (**"may support"**). Each transcribed definition's
+Realization, Stakeholder, Strategy, Technology, Technology Usage, Value Stream). The standard
+marks this requirement optional (**"may support"**). Each transcribed definition's
 purpose/content/stakeholders/concerns/scope is checked against its source table
-cell-by-cell, not asserted by review, in `test_default_viewpoint_library_spec_fidelity.py`;
+cell-by-cell in `test_default_viewpoint_library_spec_fidelity.py`;
 `test_default_viewpoint_library.py`/`test_default_viewpoint_library_common_types.py` cover
 the remaining membership/type-usage properties. The three non-table entries
 (`element-dependents`/`element-dependencies`/`process-technology-support`) are this
 implementation's own tool-specific impact-analysis capability, documented as such in their
-own `description`, not presented as part of the standard. The viewpoint mechanism remains
-fully open to repo-authored definitions beyond this starting set.
-
-&nbsp;
-
-## Conformance summary
-
-All six requirements above are addressed; the implementation defines no outstanding
-ArchiMate 4.0 language-conformance gap. (Conformance has not been independently verified, so
-this remains a self-assessment, not a certified claim.) Everything below this line is
-*outside* that assessment — a sibling interoperability standard that also happens to be
-supported, and a forward-looking roadmap — neither is an input to the conformance judgement.
+own `description`, not presented as part of the standard. The viewpoint mechanism is open to
+repo-authored definitions beyond this starting set.
 
 &nbsp;
 
@@ -174,15 +165,14 @@ out-of-scope item is reported by kind and reason, never silently dropped. See
 
 # Roadmap (not conformance)
 
-The following are **product tooling ideas**, listed separately from the assessment above so
-that the absence of any of them is never read as a conformance gap — none is an ArchiMate
-4.0 requirement. They are recorded here only because the query/presentation split in the
-underlying model is designed to accommodate them without rework:
+Potential future tooling directions. None is an ArchiMate 4.0 requirement; they are recorded
+here, separate from the conformance material above, and the query/presentation split in the
+underlying model is intended to accommodate them later:
 
 - A fuller presentation-rule engine — label/tooltip rules and attribute-driven heat maps
   beyond the current match/range/scale styling.
-- Saved executions as first-class view artifacts, rather than the ephemeral table/matrix
-  renderings executions produce today.
+- Saved executions as their own persisted view artifacts, rather than the ephemeral
+  table/matrix renderings executions produce today.
 - Dedicated catalog/report view artifact kinds.
 
 ---

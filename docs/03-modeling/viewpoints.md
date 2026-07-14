@@ -178,8 +178,8 @@ Parameter types are `string`, `integer`, `number`, `date`, `boolean`, `slug`, or
 (the last resolved through the same entity picker used everywhere else in the GUI, never a
 free-text id field). A required parameter with no supplied value is a typed
 `ViewpointParameterError`, never a silent empty result — the GUI prompts for it before the
-first execution rather than letting it fail once and report an opaque error. See the shipped
-`element-dependents`/`element-dependencies` definitions for a complete worked example (an
+first execution rather than letting it fail once and report an opaque error. See the
+`element-dependents`/`element-dependencies` definitions for a worked example (an
 `anchor` parameter feeding a `derived`, `incoming`/`outgoing` neighbor inclusion).
 
 &nbsp;
