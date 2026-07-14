@@ -620,13 +620,20 @@ class TestGetTypeGuidance:
         assert isinstance(entry["create_when"], str)
         assert isinstance(entry["never_create_when"], str)
 
-    def test_guidance_status_empty_when_no_guidance_cache_imported(self) -> None:
-        # No repo in this test environment has run arch-import-guidance, so every
-        # entity type's create_when/never_create_when is empty — the response must state
-        # that explicitly rather than let it read as "no restrictions apply".
-        result = get_type_guidance(filter=["capability"])
-        assert result.get("guidance_status") == "empty"
-        assert "arch-import-guidance" in cast(str, result.get("guidance_hint"))
+    def test_empty_guidance_response_states_status_and_points_at_import(self) -> None:
+        # When an entity type's create_when/never_create_when is empty, the response must
+        # state that explicitly (rather than read as "no restrictions apply") and point at
+        # arch-import-guidance. Asserted against the pure detection helper + the hint
+        # constant so it holds regardless of whether this deployment has imported a guidance
+        # cache — the live get_type_guidance path is environment-coupled (guidance is baked
+        # into the module registry at import), so an all-empty filter can't be assumed here.
+        from src.infrastructure.write.artifact_write.type_guidance import (
+            GUIDANCE_EMPTY_HINT,
+            _entity_type_guidance_is_empty,
+        )
+
+        assert _entity_type_guidance_is_empty([{"create_when": "", "never_create_when": ""}]) is True
+        assert "arch-import-guidance" in GUIDANCE_EMPTY_HINT
 
     def test_guidance_status_absent_on_error_response(self) -> None:
         result = get_type_guidance(filter=["nonexistent-thing"])

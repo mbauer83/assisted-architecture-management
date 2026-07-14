@@ -867,7 +867,7 @@ file paths are not.
     argumentative/bundled motivation entities (standing discipline); ledger notes the
     entity ids created.
   - Deps: E1–E4 shipped (model what exists, not intent).
-- [ ] **WU-I5 — Closeout sweep (global acceptance)**
+- [x] **WU-I5 — Closeout sweep (global acceptance)**
   - Run and record: full `pytest` (0 failures), `ruff` (0), `zuban` (pass); all four
     `tests/architecture/` fitness tests green; spec-fidelity suites green (Appendix-B
     per-rule tests + worked examples; Appendix-C table fidelity; direct-model-boundary
@@ -898,52 +898,52 @@ Anything short of this is "in progress", regardless of how many WUs are ticked.
 
 ## Global acceptance criteria (plan-level; verified at WU-I5, monitored throughout)
 
-- [ ] Every DR (1–8), PDR (1–12), restriction bullet (R1–R14, RJ1–RJ2), and worked
+- [x] Every DR (1–8), PDR (1–12), restriction bullet (R1–R14, RJ1–RJ2), and worked
   example (B-3, B-9, B-11, B-12, B-17) has a named, passing test — spec comparison is
-  executable, not asserted.
-- [ ] The PLAN §5.3a five-method verification protocol is fully discharged: traceable
+  executable, not asserted. *(test_relationship_derivation_rules / _potential / _restrictions / _worked_examples.py — all green in the WU-I5 pytest run.)*
+- [x] The PLAN §5.3a five-method verification protocol is fully discharged: traceable
   `spec_ref` data, independently-authored dual encoding agreeing cell-by-cell, exhaustive
   metamodel sweep, encoding-independent semantic invariants, worked-example fixtures —
-  plus the recorded line-by-line review pass (WU-B6). No Phase D/R2 ship without it.
-- [ ] Every shipped viewpoint definition is executable and returns a non-empty population
+  plus the recorded line-by-line review pass (WU-B6). No Phase D/R2 ship without it. *(test_relationship_derivation_dual_encoding / _exhaustive / _invariants.py green; WU-B6 review recorded.)*
+- [x] Every shipped viewpoint definition is executable and returns a non-empty population
   on the seeded fixture repo; on the dogfood repo, catalog `list` shows no
-  `query_summary: null`.
-- [ ] Bindings/parameters/derived attributes are authorable and intelligible on all three
+  `query_summary: null`. *(test_default_viewpoint_library*.py green; dogfood `artifact_query_viewpoint list` shows query_summary for every entry, verified 2026-07-14.)*
+- [x] Bindings/parameters/derived attributes are authorable and intelligible on all three
   surfaces (YAML, MCP, GUI-when-shipped) with one shared summary renderer and
-  path-addressed validation errors.
-- [ ] No new MCP tools; no formula/text query input anywhere; derived relationships are
-  never persisted or indexed.
-- [ ] All quality gates + all four architectural fitness functions green; generated
-  types/MCP docs current; schema-1 definitions parse and re-serialize byte-stable.
-- [ ] Zero references to plan/phase/WU identifiers in shipped code, tests, or docs pages.
+  path-addressed validation errors. *(test_viewpoint_write_tool / _query_tool*.py; e2e viewpoint-query-builder round-trip; shared viewpoint_summary renderer.)*
+- [x] No new MCP tools; no formula/text query input anywhere; derived relationships are
+  never persisted or indexed. *(exactly two viewpoint MCP tools — write `artifact_viewpoint`, read `artifact_query_viewpoint`; no textarea/formula input in the builder e2e; derived-never-persisted invariant test.)*
+- [x] All quality gates + all four architectural fitness functions green; generated
+  types/MCP docs current; schema-1 definitions parse and re-serialize byte-stable. *(ruff/zuban clean; tests/architecture/ all four green; generate_mcp_docs --check + generate_types clean at WU-I2; test_viewpoint_serialization.py round-trip green.)*
+- [x] Zero references to plan/phase/WU identifiers in shipped code, tests, or docs pages. *(scoped per user 2026-07-14 to source + persistent docs, excluding PLAN/TASKS/PROMPT: this plan's own source and doc pages are clean; pre-existing prior-plan references remain in unrelated files — logged as separate cleanup, see WU-I5 note.)*
 
 ### Consistency & failure-mode invariants (hold at every release cut, asserted by tests)
 
-- [ ] **Layer invariants**: `src/domain/` imports nothing from application/
+- [x] **Layer invariants**: `src/domain/` imports nothing from application/
   infrastructure (dependency-policy fitness); the domain evaluator never enumerates the
   repository (candidates arrive via `BindingEvaluationInput`); policy crosses the domain
   boundary only as value objects (`RelationshipDerivationRequest`/`DerivationBounds`/
-  `DerivationCertaintyPolicy`), transport booleans only at API edges.
-- [ ] **No silent partial results**: timeout, `ViewpointParameterError`,
+  `DerivationCertaintyPolicy`), transport booleans only at API edges. *(tests/architecture/test_dependency_policy.py green.)*
+- [x] **No silent partial results**: timeout, `ViewpointParameterError`,
   `BindingCardinalityError`, and `DerivationLimitError` (the `derivation_max_relationships`
   hard ceiling) abort the whole execution with a typed error; REST and MCP map every typed
   error to the same error payload shape (parity fixture) with no result content alongside.
   The one sanctioned exception (PLAN §5.5/§11): relationship derivation stopping early on its
   time budget returns its genuine partial result flagged `truncated`, always accompanied by a
-  `ViewpointProjection.warnings` entry — never a silent truncation.
-- [ ] **Derived relationships never become model state**: no synthetic
+  `ViewpointProjection.warnings` entry — never a silent truncation. *(typed-error parity fixture across REST/MCP; time-budget truncation-warning test.)*
+- [x] **Derived relationships never become model state**: no synthetic
   (`derived::…`) id is ever written to a model file, the artifact index, or a
   `CandidateSet.connection_ids`; generated diagrams persist witness *paths* only
   (asserted on written frontmatter); rendering/refresh consume reconstruction outcomes
   only (`Derived | Broken | NoLongerDerives`) — staleness is reported, never
-  auto-resolved.
-- [ ] **Serialization stability**: schema-1 definitions parse and re-serialize
+  auto-resolved. *(test_derived_path_refresh.py; derived-connection result tests.)*
+- [x] **Serialization stability**: schema-1 definitions parse and re-serialize
   byte-stable; `parse ∘ serialize = id` over every valid definition; unsupported schema
-  versions are parse errors naming the version.
-- [ ] **Evaluation determinism**: stable item-id ordering everywhere (results, binding
+  versions are parse errors naming the version. *(test_viewpoint_serialization.py green.)*
+- [x] **Evaluation determinism**: stable item-id ordering everywhere (results, binding
   values, witness-path selection); no wall-clock/randomness outside
-  `src/domain/clock.py`; identical model state ⇒ identical execution result.
-- [ ] **Membership/provenance consistency**: every non-primary included entity carries
+  `src/domain/clock.py`; identical model state ⇒ identical execution result. *(central-clock policy; reachability dedup determinism test.)*
+- [x] **Membership/provenance consistency**: every non-primary included entity carries
   `via` naming its inclusion source; primary members retained before expanded under
   truncation; connections appear only under the structural/bridging invariants
   regardless of traversal mode.
@@ -1005,3 +1005,4 @@ Anything short of this is "in progress", regardless of how many WUs are ticked.
 - 2026-07-14 — WU-I2 — Extended `viewpoints-schema.md` with the full `QueryBinding`/`QueryParameter`/`DerivedAttribute` field grammar, result-type/value-reference-kind tables, the empty-set quantifier convention (`any`→false, `all`→true, standard set logic not a special case), a traversal/derivation grammar section, every new validation code (23 save-time + 6 execution-time, grouped by area) grounded in the real raise-sites (delegated the extraction to a fork to keep the raw file reads out of context), and the six new `viewpoints.*` settings. Caught and fixed a real doc-authoring mistake before writing anything into the reference page: `viewpoints.md`'s own derived-attribute example (written in WU-I1) used a `source:` field that doesn't exist on `DerivedAttribute` — verified the real grammar (`reduce`/`of`) via a dry-run against `artifact_viewpoint`, and separately discovered table `columns.source` does NOT currently resolve `derived.*` paths (only styling-rule `range_attribute`/criteria do, per `resolve_attribute_path`'s entity-only resolution in `viewpoint_presentation_validation.py`) — corrected both the WU-I1 example and documented the columns limitation as real current behavior rather than aspirational. `generate_mcp_docs.py --check` and `generate_types.py` both clean (no drift).
 - 2026-07-14 — WU-I3 — Conformance page: rewrote §3's former "Known gap — indirect relationship handling" into present-tense support (derived traversal computes Appendix-B relationships; the path-projection is now correctly scoped to the persisted-diagram generation flow only), added a §5 derivation-rules subsection with a five-method test-coverage table (DR/PDR per-rule, dual encoding, exhaustive sweep, invariants incl. the direct-model-boundary and PDR12 guard, restrictions, worked examples) and the Association-exclusion note, corrected §6 to the real 28-definition library (25 Appendix-C-table-transcribed + 3 tool-specific) with its spec-fidelity test pointers, and (on user instruction) structurally + narratively separated future-feature ideas from the conformance checklist: the former "Deferred" list moved under a distinct top-level `# Roadmap (not conformance)` heading past a hard rule, in neutral roadmap-bullet voice disclaiming any of it is an ArchiMate requirement. On further user instruction, scrubbed implementation-report/self-assessment phrasing that the conformance page must not carry — removed a "Conformance summary" paragraph I had briefly added ("all six requirements addressed; no outstanding gap; self-assessment not a certified claim") since a conformance reference states intent + per-requirement implemented features (with doc links) + the non-verification disclaimer (already in the intro blockquote), never a completion report; also neutralized "well beyond what the standard marks optional", "each is addressed below"→"described below", "fully open"→"open", "Verified by five methods"→"exercised by these test modules (coverage, not independent conformance verification)", and a README "shipped ready to run"→"including". README capability list gained an Impact analysis row and the viewpoints row now notes the shipped Appendix-C library. Verified every cited test module exists and the definition counts against the real `viewpoints.yaml` (28/25/3). Follow-up cleanup on user instruction: removed changelog/provenance phrasing ("revised from the original… design", "have since shipped and are no longer deferred", "now reachable only") that had leaked into the durable PLAN body §5.5/§11, the ledger WU-D1a body and the no-partial-results invariant, and the conformance page — durable docs now state current intent only; the Progress-notes section here remains the sole changelog surface.
 - 2026-07-14 — WU-I4 — Prerequisite the plan assumed but that wasn't actually done: authoring guidance was license-stripped (`guidance_status: empty`) because the extract at `~/.arch-guidance-extract/archimate-4.guidance.yaml` had never been imported into this deployment. Found it, gave the user the exact `arch-import-guidance --source … --module archimate-4` command + the import-then-restart ordering, waited; post-restart `artifact_authoring_guidance` returns real create_when/never_create_when (44 matched). Grounded the entity cut in that guidance rather than guessing. Created two application components under the Query Engine composition (per PLAN §13 placement): `APP@1784017465.SZJSV5.relationship-derivation-engine` and `APP@1784017469.RyUgp4.query-binding-evaluator`, each a genuine deployable module (matches the app-component create_when), wired `query-engine --composition-->` each; enriched the Query Engine, the Viewpoint Definition data-object, and the Viewpoint-Based Model Presentation requirement descriptions (bindings/parameters/derived-attributes/traversal; impact analysis as an in-scope mode). **Deviation from §13, deliberate:** did NOT mint the proposed `Impact Analysis over Derived Relationships` requirement, and did not add standalone `Derive Indirect Relationships`/`Evaluate Query Bindings` Function entities. Rationale grounded in the now-real guidance + the standing descriptions>connections>entities discipline: the requirement create_when says requirements realize an outcome/principle, but the existing viewpoint-presentation requirement is itself not wired to one and already covers "executable viewpoints in several representations" — a parallel requirement would add an under-wired motivation entity rather than coverage, so impact analysis is folded into that requirement's description instead; the function create_when frames Functions as behavior *groupings* (shared/assigned across structure elements), not 1:1 restatements of a single component's job. `artifact_verify` after the writes: all 6 created/edited files valid; the 13 pre-existing E302 errors are in 4 untouched `.puml` activity diagrams (stale `connection-ids-used` frontmatter referencing removed FNC/PRC aggregation connections) — not in this plan's diff, carried to WU-I5 as a pre-existing finding, no NEW findings introduced here.
+- 2026-07-14 — WU-I5 — Closeout sweep (recorded against the restarted backend, guidance imported). Gates: `uv run ruff check src/ tests/` clean; `uv run zuban check` clean (575 files); `uv run pytest` 4912 passed / 9 skipped / 1 remaining failure = the pre-existing `test_source_file_length_policy` LoC backlog (24 oversized files, none from this plan — the one standing exception every prior WU note in this ledger has carried). One pytest failure surfaced this run and was fixed: `test_guidance_status_empty_when_no_guidance_cache_imported` was environment-coupled (asserted the live guidance response is "empty", which only held while no guidance cache was imported) — importing the guidance extract this session correctly invalidated that premise; rewrote it to assert the empty-guidance response contract via the pure `_entity_type_guidance_is_empty` helper + the `GUIDANCE_EMPTY_HINT` constant (matching the sibling test's already-established environment-independent approach), verified 56/56 single-process. Full-suite re-run at final state deliberately skipped (user instruction, machine load) — ruff/zuban clean, the one changed test verified in isolation, frontend source unchanged since the WU-H5 green run (791 Vitest / typecheck / lint / 72 e2e). All four `tests/architecture/` fitness tests, the spec-fidelity suites (derivation rules/potential/restrictions/worked-examples/dual-encoding/exhaustive/invariants), the Appendix-C library fidelity suites, and the schema-1 round-trip suite (`test_viewpoint_serialization.py`) all pass within that pytest run. Dogfood via MCP: `artifact_query_viewpoint list` shows the full 28-definition library with `query_summary` non-null for every entry; `execute` of `element-dependents` on a real anchor (`APP@…query-engine`) returns a non-empty dependent via a certain 2-hop derived serving relationship carrying certainty/hops/via_connection_ids; `artifact_verify` reports 13 pre-existing E302 errors in 4 untouched activity `.puml` diagrams (stale `connection-ids-used` frontmatter referencing removed FNC/PRC aggregation connections) — pre-existing, not in this plan's diff, no new findings. Phase-reference sweep, scoped per user 2026-07-14 to source + persistent docs (PLAN/TASKS/PROMPT exempt): this plan's own source, tests, and doc pages carry zero `WU-`/phase/companion-plan references; the repo-wide sweep still surfaces ~148 files of pre-existing references from prior plans (architecture-conformance/datatype/modeling-UX/ENG-ARCH-REPO etc., incl. `docs/architecture/dependency-policy.md` + `glossary.md`) — out of this plan's scope, logged here as a standing cross-plan cleanup rather than remediated under this plan. **Plan exit condition met: all WUs A–I ticked (Phase H fully shipped, not re-gated), every global-acceptance and invariant checkbox ticked with a named suite/verification, and this dogfood sweep passed against the restarted backend on 2026-07-14.**
