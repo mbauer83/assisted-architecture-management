@@ -64,6 +64,20 @@ export const formatPreviewCounts = (
   return `${entities} entit${entities === 1 ? 'y' : 'ies'} / ${connections} connection${connections === 1 ? '' : 's'}`
 }
 
+// ── Save As (fork a definition into a new engagement viewpoint) ──────────────
+
+/** A unique slug for a fork of *slug*: `<slug>-copy`, then `<slug>-copy-2`, … — slugs are
+ * unique across the merged catalog (module ∪ enterprise ∪ engagement), so the suggestion
+ * must dodge every tier, not just engagement-owned definitions. */
+export const suggestForkSlug = (slug: string, existingSlugs: readonly string[]): string => {
+  const taken = new Set(existingSlugs)
+  const base = `${slug}-copy`
+  if (!taken.has(base)) return base
+  let counter = 2
+  while (taken.has(`${base}-${counter}`)) counter += 1
+  return `${base}-${counter}`
+}
+
 /** The builder-node id to highlight for a full test-run's save-mode validation issues —
  * same convention `save()`'s real persist-error path already uses, so a definition that
  * fails validation points at the same offending node whether caught by a test-run or by an

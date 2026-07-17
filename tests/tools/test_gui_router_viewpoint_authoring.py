@@ -62,6 +62,9 @@ class TestCriteriaCatalog:
         # Reserved enumerable facets are always populated for the value picker.
         assert body["entity_attribute_enums"]["status"] == ["active", "deprecated", "draft"]
         assert "application" in body["entity_attribute_enums"]["domain"]
+        # The group facet is fed from the project registry + observed record groups —
+        # present (possibly empty) so the builder renders a picker, never free text.
+        assert "group" in body["entity_attribute_enums"]
 
 
 class TestReferencers:

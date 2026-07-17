@@ -17,9 +17,10 @@ validation is skipped (free schema).
 """
 
 import json
+from dataclasses import dataclass
 from functools import lru_cache
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
 
 import jsonschema  # type: ignore[import-untyped]
 
@@ -72,6 +73,59 @@ def load_specialization_attachment_schema(
     return _load_schema_file(repo_root, f"attributes.{artifact_type}.{specialization_slug}.schema.json")
 
 
+SchemaFileKind = Literal[
+    "entity-attributes", "specialization-attachment", "connection-metadata", "frontmatter", "unrecognized"
+]
+
+
+@dataclass(frozen=True)
+class SchemaFileRef:
+    """One classified ``.arch-repo/schemata/`` file, parsed per this module's filename
+    conventions. The inventory is the single place that understands those conventions —
+    consumers (startup validation, orphan detection, schema policy) filter typed records
+    instead of re-parsing filenames."""
+
+    filename: str
+    kind: SchemaFileKind
+    subject: str = ""  # entity type / connection type / frontmatter file-type
+    specialization_slug: str = ""  # kind == "specialization-attachment" only
+
+
+def _classify_schema_filename(filename: str) -> SchemaFileRef:
+    suffix = ".schema.json"
+    if filename.startswith("attributes.") and filename.endswith(suffix):
+        parts = filename[len("attributes.") : -len(suffix)].split(".")
+        if len(parts) == 1 and parts[0]:
+            return SchemaFileRef(filename=filename, kind="entity-attributes", subject=parts[0])
+        if len(parts) == 2 and all(parts):
+            return SchemaFileRef(
+                filename=filename, kind="specialization-attachment",
+                subject=parts[0], specialization_slug=parts[1],
+            )
+        return SchemaFileRef(filename=filename, kind="unrecognized")
+    if filename.startswith("connection-metadata.") and filename.endswith(suffix):
+        subject = filename[len("connection-metadata.") : -len(suffix)]
+        if subject:
+            return SchemaFileRef(filename=filename, kind="connection-metadata", subject=subject)
+        return SchemaFileRef(filename=filename, kind="unrecognized")
+    if filename.startswith("frontmatter.") and filename.endswith(suffix):
+        subject = filename[len("frontmatter.") : -len(suffix)]
+        if subject:
+            return SchemaFileRef(filename=filename, kind="frontmatter", subject=subject)
+    return SchemaFileRef(filename=filename, kind="unrecognized")
+
+
+def list_schema_files(repo_root: Path) -> tuple[SchemaFileRef, ...]:
+    """Classified inventory of one repo's ``.arch-repo/schemata/`` directory, sorted by
+    filename. Empty when the directory does not exist."""
+    schemata_dir = repo_root / SCHEMATA_DIR
+    if not schemata_dir.is_dir():
+        return ()
+    return tuple(
+        _classify_schema_filename(path.name) for path in sorted(schemata_dir.glob("*.schema.json"))
+    )
+
+
 def compute_effective_attribute_schema(
     repo_root: Path,
     artifact_type: str,
@@ -112,20 +166,12 @@ def compute_effective_attribute_schema(
 def find_orphan_attachment_schemata(repo_root: Path, specialization_catalog: SpecializationCatalog) -> list[str]:
     """Return `attributes.{artifact_type}.{slug}.schema.json` filenames whose `slug` is not a
     declared entity specialization of `artifact_type` in *specialization_catalog*."""
-    schemata_dir = repo_root / SCHEMATA_DIR
-    if not schemata_dir.is_dir():
-        return []
-    prefix, suffix = "attributes.", ".schema.json"
-    orphans: list[str] = []
-    for path in sorted(schemata_dir.glob(f"{prefix}*{suffix}")):
-        middle = path.name[len(prefix) : -len(suffix)]
-        parts = middle.split(".")
-        if len(parts) != 2:
-            continue
-        artifact_type, slug = parts
-        if specialization_catalog.get("entity", artifact_type, slug) is None:
-            orphans.append(path.name)
-    return orphans
+    return [
+        ref.filename
+        for ref in list_schema_files(repo_root)
+        if ref.kind == "specialization-attachment"
+        and specialization_catalog.get("entity", ref.subject, ref.specialization_slug) is None
+    ]
 
 
 def validate_against_schema(instance: dict[str, Any], schema: dict[str, Any]) -> list[str]:

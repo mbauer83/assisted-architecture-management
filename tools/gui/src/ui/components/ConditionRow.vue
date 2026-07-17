@@ -4,7 +4,8 @@ import type { CriteriaCatalog } from '../../domain'
 import type { Comparator, ConditionNode, GroupKind, ValueRef } from '../../domain/viewpointCriteria'
 import { bindingValue, literalValue } from '../../domain/viewpointCriteria'
 import {
-  HIGHLIGHTED_NODE_ID_KEY, attributeOptions, comparatorsFor, enumChoicesFor, isEntityReferencePath,
+  HIGHLIGHTED_NODE_ID_KEY, attributeOptionLabel, attributeOptions, comparatorsFor, enumChoicesFor,
+  isEntityReferencePath,
 } from './CriteriaTreeBuilder.helpers'
 import ValueRefInput from './ValueRefInput.vue'
 import EnumChipMultiSelect from './EnumChipMultiSelect.vue'
@@ -91,7 +92,7 @@ const onListBindingChange = (patch: { binding?: string; project?: string }) => {
         :key="attribute.path"
         :value="attribute.path"
       >
-        {{ attribute.path }}
+        {{ attributeOptionLabel(attribute) }}
       </option>
     </select>
 

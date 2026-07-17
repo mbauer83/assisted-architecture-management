@@ -7,8 +7,12 @@
  * `draft.presentation`.
  */
 import type { CriteriaCatalog } from '../../domain'
-import { GROUP_BY_DIMENSIONS, mkColumn, mkPresentation } from '../../domain/viewpointPresentation'
-import type { ColumnSpecNode, PresentationNode, Representation } from '../../domain/viewpointPresentation'
+import {
+  EXPLORATION_LAYOUTS, GROUP_BY_DIMENSIONS, layoutOption, mkColumn, mkPresentation, withLayoutOption,
+} from '../../domain/viewpointPresentation'
+import type {
+  ColumnSpecNode, ExplorationLayout, PresentationNode, Representation,
+} from '../../domain/viewpointPresentation'
 import StyleRuleEditor from './StyleRuleEditor.vue'
 import MatrixAxesEditor from './MatrixAxesEditor.vue'
 
@@ -19,6 +23,10 @@ const props = defineProps<{
 const emit = defineEmits<{ 'update:modelValue': [value: PresentationNode | null] }>()
 
 const REPRESENTATIONS: Representation[] = ['exploration', 'table', 'matrix', 'diagram']
+
+const LAYOUT_LABELS: Record<ExplorationLayout, string> = {
+  clusters: 'Clusters', radial: 'Radial (by distance from anchor)', force: 'Force',
+}
 
 const emitUpdate = (patch: Partial<PresentationNode>) => {
   if (!props.modelValue) return
@@ -38,6 +46,11 @@ const updateColumn = (index: number, column: ColumnSpecNode) => {
   const columns = [...props.modelValue.columns]
   columns[index] = column
   emitUpdate({ columns })
+}
+const onLayoutChange = (raw: string) => {
+  if (!props.modelValue) return
+  const layout = EXPLORATION_LAYOUTS.find((candidate) => candidate === raw) ?? null
+  emitUpdate({ displayOptions: withLayoutOption(props.modelValue.displayOptions, layout) })
 }
 </script>
 
@@ -137,6 +150,28 @@ const updateColumn = (index: number, column: ColumnSpecNode) => {
           :catalog="catalog"
           @update:model-value="emit('update:modelValue', $event)"
         />
+      </div>
+
+      <div v-if="modelValue.representation === 'exploration'">
+        <label class="field">
+          layout
+          <select
+            class="inp"
+            :value="layoutOption(modelValue.displayOptions) ?? ''"
+            @change="onLayoutChange(($event.target as HTMLSelectElement).value)"
+          >
+            <option value="">
+              Auto
+            </option>
+            <option
+              v-for="layout in EXPLORATION_LAYOUTS"
+              :key="layout"
+              :value="layout"
+            >
+              {{ LAYOUT_LABELS[layout] }}
+            </option>
+          </select>
+        </label>
       </div>
 
       <div v-if="modelValue.representation === 'exploration' || modelValue.representation === 'diagram'">

@@ -99,6 +99,20 @@ def list_viewpoint_definitions() -> dict[str, Any]:
     return {"viewpoints": entries}
 
 
+def _known_group_slugs() -> list[str]:
+    """Every project/group slug a ``group`` criterion can meaningfully match: declared
+    ``model-project`` registry entries plus the distinct ``group`` facet observed on
+    indexed entities (covering enterprise-side and legacy/uncategorized groups)."""
+    from src.application.group_registry import load_group_registry  # noqa: PLC0415
+
+    slugs = {record.group for record in s.get_repo().list_entities() if record.group}
+    engagement_root = s.maybe_engagement_root()
+    if engagement_root is not None:
+        registry = load_group_registry(engagement_root)
+        slugs |= {entry.slug for entry in registry.list_axis("model-project")}
+    return sorted(slugs)
+
+
 @router.get("/api/viewpoints/criteria-catalog")
 def get_criteria_catalog() -> dict[str, Any]:
     """Registries snapshot the criteria-tree builder's pickers are fed from — the same
@@ -122,12 +136,14 @@ def get_criteria_catalog() -> dict[str, Any]:
     # Enumerable value sets for the criteria value picker, keyed by the flat attribute-path
     # namespace: schema-declared ``enum`` attributes, plus the enumerable reserved read-model
     # facets (``domain`` from the distinct owning-domain set, ``status`` from the canonical
-    # status vocabulary). Reserved facets take precedence over a like-named schema attribute.
+    # status vocabulary, ``group`` from the project registry plus every group observed on
+    # indexed records). Reserved facets take precedence over a like-named schema attribute.
     entity_attribute_enums: dict[str, list[str]] = {
         str(path): list(values) for path, values in registries.entity_attribute_enums.items()
     }
     entity_attribute_enums["domain"] = sorted(set(entity_type_domains.values()))
     entity_attribute_enums["status"] = sorted(VALID_STATUSES)
+    entity_attribute_enums["group"] = _known_group_slugs()
     connection_attribute_enums = {
         str(path): list(values) for path, values in registries.connection_attribute_enums.items()
     }

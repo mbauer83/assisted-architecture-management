@@ -14,6 +14,7 @@ const baseResult: ViewpointExecutionResult = {
   index_generation: null, entity_ids: [], connection_ids: [], entities: [], connections: [],
   total_entity_count: 0, returned_entity_count: 0, total_connection_count: 0, returned_connection_count: 0,
   truncated: false, entity_limit: 500, matrix_axes: null, warnings: [], duration_ms: 1, query_summary: 'test',
+  anchor_ids: [],
 }
 
 describe('computeExecutionDiagnostics', () => {

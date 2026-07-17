@@ -1414,17 +1414,13 @@ viewpoints:
       direction: incoming
       reduce: min
       of: relationship.hops
+  # No node_color rule: per-node distance-from-anchor is computed by the exploration
+  # surface itself (breadth-first from the anchor), which colors and lays out by true
+  # hop distance. A scale rule over derived.impact-distance cannot express that — the
+  # reduction runs per node over its own incident derived relationships, not relative
+  # to the anchor.
   presentation:
     representation: exploration
-    styling_rules:
-    - capability: node_color
-      mode: scale
-      scale_attribute: derived.impact-distance
-      scale_min: 1
-      scale_max: 4
-      scale_tokens:
-      - heat-near
-      - heat-far
   representation_types:
   - archimate-layered
 
@@ -1474,17 +1470,11 @@ viewpoints:
       direction: outgoing
       reduce: min
       of: relationship.hops
+  # No node_color rule — see element-dependents: anchored-distance coloring is owned by
+  # the exploration surface's breadth-first distances, which a per-node derived-attribute
+  # scale rule cannot express.
   presentation:
     representation: exploration
-    styling_rules:
-    - capability: node_color
-      mode: scale
-      scale_attribute: derived.impact-distance
-      scale_min: 1
-      scale_max: 4
-      scale_tokens:
-      - heat-near
-      - heat-far
   representation_types:
   - archimate-layered
 

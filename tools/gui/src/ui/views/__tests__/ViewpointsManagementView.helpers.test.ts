@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   csvToList, executionRouteFor, firstErrorNodeId, formatPreviewCounts, formatScopeSummary, isSemanticEdit, listToCsv,
+  suggestForkSlug,
 } from '../ViewpointsManagementView.helpers'
 import { mkDefinitionDraft, mkScope } from '../../../domain/viewpointDefinitionDraft'
 import { mkPresentation } from '../../../domain/viewpointPresentation'
@@ -28,6 +29,17 @@ describe('executionRouteFor', () => {
 
   it('falls back to exploration when the definition carries no presentation', () => {
     expect(executionRouteFor(mkEnvelope(null)).path).toBe('/graph')
+  })
+})
+
+describe('suggestForkSlug', () => {
+  it('appends -copy when free', () => {
+    expect(suggestForkSlug('capability-map', ['capability-map'])).toBe('capability-map-copy')
+  })
+
+  it('counts up past every taken suggestion across all tiers', () => {
+    const taken = ['capability-map', 'capability-map-copy', 'capability-map-copy-2']
+    expect(suggestForkSlug('capability-map', taken)).toBe('capability-map-copy-3')
   })
 })
 

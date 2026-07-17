@@ -411,8 +411,14 @@ export const makeHttpModelRepository = (): ModelRepository => ({
   editEntity: (body) => postJson(buildUrl('/entity/edit'), body, WriteResultSchema),
   deleteEntity: (body) => postJson(buildUrl('/entity/remove'), body, WriteResultSchema),
 
-  getEntitySchemata: (artifactType: string) =>
-    fetchJson(buildUrl('/entity-schemata', { artifact_type: artifactType }), EntitySchemaInfoSchema),
+  getEntitySchemata: (artifactType: string, specialization?: string) =>
+    fetchJson(
+      buildUrl('/entity-schemata', {
+        artifact_type: artifactType,
+        specialization: specialization || undefined,
+      }),
+      EntitySchemaInfoSchema,
+    ),
 
   getDiagramEntities: (diagramId: string) =>
     fetchJson(buildUrl('/diagram-entities', { id: diagramId }), Schema.Array(EntitySummarySchema)).pipe(

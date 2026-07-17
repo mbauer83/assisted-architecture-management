@@ -87,6 +87,33 @@ class TestParameters:
             assert error.value.code == code
 
 
+class TestAnchorIds:
+    def _anchored_query(self) -> ExecutableViewpointQuery:
+        anchor_condition = AttributeCondition(
+            attribute="id", comparator="eq", value=ValueRef(kind="parameter", parameter="anchor")
+        )
+        return ExecutableViewpointQuery(
+            entity_criteria=EntityCriteriaGroup(children=(anchor_condition,)),
+            parameters=(QueryParameter("anchor", "entity-id"),),
+        )
+
+    def test_entity_id_parameters_become_anchor_ids(self) -> None:
+        store = Store(entities={"ENT@A": entity(artifact_id="ENT@A"), "ENT@B": entity(artifact_id="ENT@B")})
+        result = _run(
+            ViewpointExecutionRequest(query=self._anchored_query(), parameters={"anchor": "ENT@A"}),
+            catalog=ViewpointCatalog.empty(),
+            read_access=store,
+        )
+        assert result.anchor_ids == ("ENT@A",)
+        assert result.entity_ids == ("ENT@A",)
+
+    def test_unanchored_execution_has_no_anchor_ids(self) -> None:
+        store = Store(entities={"ENT@A": entity(artifact_id="ENT@A")})
+        query = ExecutableViewpointQuery(entity_criteria=EntityCriteriaGroup())
+        result = _run(ViewpointExecutionRequest(query=query), catalog=ViewpointCatalog.empty(), read_access=store)
+        assert result.anchor_ids == ()
+
+
 class TestSummaries:
     def test_entity_and_connection_summaries(self) -> None:
         store = Store(

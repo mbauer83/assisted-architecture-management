@@ -160,9 +160,11 @@ export type EntityAttributeDescriptor = typeof EntityAttributeDescriptorSchema.T
 
 export const EntitySchemaInfoSchema = Schema.Struct({
   artifact_type: Schema.String,
+  specialization: Schema.optional(Schema.String),
   schema: Schema.NullOr(Schema.Unknown),
   properties: Schema.Array(Schema.String),
   required: Schema.Array(Schema.String),
   descriptors: Schema.Record({ key: Schema.String, value: EntityAttributeDescriptorSchema }),
+  conflicts: Schema.optional(Schema.Array(Schema.String)),
 })
 export type EntitySchemaInfo = typeof EntitySchemaInfoSchema.Type

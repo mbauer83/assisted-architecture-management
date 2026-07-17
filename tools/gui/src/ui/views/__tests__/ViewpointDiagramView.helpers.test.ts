@@ -4,8 +4,10 @@
 // application), which a node environment cannot construct.
 import { describe, expect, it } from 'vitest'
 import {
-  applyEdgeHighlightOverlay, applyNodeColorOverlay, markDerivedConnections, projectionByItemId,
-  toDiagramConnectionStub, toEntitySummaryStub,
+  ANCHOR_MARKER_COLOR, anchorBadges, applyAnchorMarker, applyEdgeHighlightOverlay,
+  applyNodeColorOverlay, centerAnchorsAfterFit, centerDelta, markAnchorEntities,
+  markDerivedConnections, projectionByItemId, resolveAnchorElements,
+  toDiagramConnectionStub, toEntitySummaryStub, unionRect,
 } from '../ViewpointDiagramView.helpers'
 import type { ConnectionItemSummary, DiagramConnection, EntityItemSummary, ProjectedOccurrence } from '../../../domain'
 
@@ -138,6 +140,12 @@ describe('applyNodeColorOverlay', () => {
     applyNodeColorOverlay([group], 'critical')
     expect(group.style.getPropertyValue('stroke')).toBe('')
   })
+
+  it('renders an explicit #rrggbb style value as-is (custom colors flow through tokenColor)', () => {
+    const { group, child } = groupWith('rect')
+    applyNodeColorOverlay([group], '#123abc')
+    expect(child.style.getPropertyValue('stroke')).toBe('rgb(18, 58, 188)')
+  })
 })
 
 describe('applyEdgeHighlightOverlay', () => {
@@ -161,6 +169,173 @@ describe('applyEdgeHighlightOverlay', () => {
     applyEdgeHighlightOverlay([group], undefined, undefined)
     expect(child.style.getPropertyValue('stroke')).toBe('rgb(24, 24, 24)')
     expect(child.style.getPropertyValue('stroke-width')).toBe('1')
+  })
+})
+
+describe('resolveAnchorElements', () => {
+  it('collects matched node elements in anchor order', () => {
+    const a = groupWith('rect').group
+    const b = groupWith('rect').group
+    const nodes = new Map<string, readonly Element[]>([['A@1', [a]], ['B@1', [b]]])
+    expect(resolveAnchorElements(['B@1', 'A@1'], nodes)).toEqual([b, a])
+  })
+
+  it('contributes nothing for an anchor id with no matched SVG element', () => {
+    const a = groupWith('rect').group
+    const nodes = new Map<string, readonly Element[]>([['A@1', [a]]])
+    expect(resolveAnchorElements(['A@1', 'dropped'], nodes)).toEqual([a])
+  })
+
+  it('resolves to an empty list when there are no anchors', () => {
+    expect(resolveAnchorElements([], new Map())).toEqual([])
+  })
+})
+
+describe('applyAnchorMarker', () => {
+  it('tags the group and inserts a dashed halo clone underneath the body shape', () => {
+    const { group, child } = groupWith('rect')
+    applyAnchorMarker([group])
+    expect(group.getAttribute('data-anchor')).toBe('true')
+    const halo = group.firstElementChild as SVGElement
+    expect(halo).not.toBe(child)
+    expect(halo.tagName).toBe('rect')
+    expect(halo.getAttribute('data-anchor-halo')).toBe('true')
+    expect(halo.style.getPropertyValue('stroke')).toBe('rgb(124, 58, 237)')
+    expect(halo.style.getPropertyPriority('stroke')).toBe('important')
+    expect(halo.style.getPropertyValue('stroke-width')).toBe('6')
+    expect(halo.style.getPropertyValue('stroke-dasharray')).toBe('8 4')
+    expect(halo.style.getPropertyValue('fill')).toBe('none')
+    expect(halo.style.getPropertyValue('pointer-events')).toBe('none')
+  })
+
+  it('halos only the first (body) shape, not every decorative shape child', () => {
+    const { group } = groupWith('rect')
+    group.appendChild(svgEl('path'))
+    applyAnchorMarker([group])
+    expect(group.querySelectorAll('[data-anchor-halo]')).toHaveLength(1)
+  })
+
+  it('composes with a node_color overlay: the body keeps the overlay stroke, the halo keeps the anchor accent', () => {
+    const { group, child } = groupWith('rect')
+    applyNodeColorOverlay([group], 'critical')
+    applyAnchorMarker([group])
+    expect(child.style.getPropertyValue('stroke')).toBe('rgb(220, 38, 38)')
+    const halo = group.querySelector('[data-anchor-halo]') as SVGElement
+    expect(halo.style.getPropertyValue('stroke')).toBe('rgb(124, 58, 237)')
+  })
+
+  it('never stacks a second halo when applied again to the same group', () => {
+    const { group } = groupWith('rect')
+    applyAnchorMarker([group])
+    applyAnchorMarker([group])
+    expect(group.querySelectorAll('[data-anchor-halo]')).toHaveLength(1)
+  })
+
+  it('tags a group with no shape children without inserting a halo', () => {
+    const { group } = groupWith('text')
+    applyAnchorMarker([group])
+    expect(group.getAttribute('data-anchor')).toBe('true')
+    expect(group.querySelectorAll('[data-anchor-halo]')).toHaveLength(0)
+  })
+
+  it('uses an accent outside the style-token palette', () => {
+    expect(ANCHOR_MARKER_COLOR).toBe('#7c3aed')
+  })
+})
+
+describe('anchorBadges', () => {
+  const entity = (id: string, name: string): EntityItemSummary => ({
+    id, name, type: 'application-component',
+    specialization_slugs: [], group: 'uncategorized', membership: 'primary',
+  })
+
+  it('resolves each anchor id to its entity name', () => {
+    const badges = anchorBadges(['A@1'], [entity('A@1', 'Alpha'), entity('B@1', 'Beta')])
+    expect(badges).toEqual([{ id: 'A@1', name: 'Alpha' }])
+  })
+
+  it('falls back to the raw id when the entity is absent from the population', () => {
+    expect(anchorBadges(['gone'], [])).toEqual([{ id: 'gone', name: 'gone' }])
+  })
+})
+
+describe('unionRect', () => {
+  it('is null for an empty list', () => {
+    expect(unionRect([])).toBeNull()
+  })
+
+  it('covers all input rects', () => {
+    const union = unionRect([
+      { left: 10, top: 20, width: 30, height: 10 },
+      { left: 0, top: 25, width: 15, height: 40 },
+    ])
+    expect(union).toEqual({ left: 0, top: 20, width: 40, height: 45 })
+  })
+})
+
+describe('markAnchorEntities', () => {
+  it('marks the matched elements and returns them for centering', () => {
+    const { group } = groupWith('rect')
+    const marked = markAnchorEntities(['A@1'], new Map([['A@1', [group]]]))
+    expect(marked).toEqual([group])
+    expect(group.getAttribute('data-anchor')).toBe('true')
+    expect(group.querySelectorAll('[data-anchor-halo]')).toHaveLength(1)
+  })
+
+  it('marks nothing and returns an empty list without anchors', () => {
+    const { group } = groupWith('rect')
+    expect(markAnchorEntities([], new Map([['A@1', [group]]]))).toEqual([])
+    expect(group.hasAttribute('data-anchor')).toBe(false)
+  })
+})
+
+describe('centerAnchorsAfterFit', () => {
+  const withRect = (left: number, top: number, width: number, height: number): Element => {
+    const el = svgEl('g')
+    el.getBoundingClientRect = () => ({ left, top, width, height, right: left + width, bottom: top + height, x: left, y: top, toJSON: () => ({}) })
+    return el
+  }
+
+  it('fits first, then pans the anchor union center onto the container center', async () => {
+    const calls: string[] = []
+    const container = withRect(0, 0, 800, 600)
+    const anchor = withRect(500, 100, 100, 50)
+    let panned: readonly [number, number] | null = null
+    const fit = () => { calls.push('fit'); return Promise.resolve() }
+    await centerAnchorsAfterFit([anchor], container, fit, (dx, dy) => {
+      calls.push('pan')
+      panned = [dx, dy]
+    })
+    expect(calls).toEqual(['fit', 'pan'])
+    expect(panned).toEqual([-150, 175])
+  })
+
+  it('never fits or pans when there is no anchor element', async () => {
+    const calls: string[] = []
+    const fit = () => { calls.push('fit'); return Promise.resolve() }
+    await centerAnchorsAfterFit([], withRect(0, 0, 800, 600), fit, () => calls.push('pan'))
+    expect(calls).toEqual([])
+  })
+
+  it('never fits or pans when the container is not mounted', async () => {
+    const calls: string[] = []
+    const fit = () => { calls.push('fit'); return Promise.resolve() }
+    await centerAnchorsAfterFit([withRect(0, 0, 10, 10)], null, fit, () => calls.push('pan'))
+    expect(calls).toEqual([])
+  })
+})
+
+describe('centerDelta', () => {
+  it('moves the target center onto the viewport center', () => {
+    const viewport = { left: 0, top: 0, width: 800, height: 600 }
+    const target = { left: 500, top: 100, width: 100, height: 50 }
+    expect(centerDelta(viewport, target)).toEqual({ dx: -150, dy: 175 })
+  })
+
+  it('is zero when the target is already centered', () => {
+    const viewport = { left: 100, top: 50, width: 200, height: 100 }
+    const target = { left: 190, top: 95, width: 20, height: 10 }
+    expect(centerDelta(viewport, target)).toEqual({ dx: 0, dy: 0 })
   })
 })
 

@@ -1,0 +1,673 @@
+# Canonical persona catalog: target-user personas and the questions various aspects of
+# the software should answer for them. Semi-structured for reuse by tests, evaluation
+# sessions, and agents. Guarded by tests/common/test_persona_catalog.py.
+#
+# PERSONA-VISIBLE vs EVALUATOR-ONLY: when composing an isolated persona brief (use
+# tools/usability_test/compose_persona_brief.py, never manual composition), include
+# ONLY: name, segment, capabilities, resources, cognitive_profile, focus, strategies,
+# budgets, questions[].text, questions[].information_need,
+# questions[].decision_artifact, authoring_challenge.id, authoring_challenge.text.
+# The fields candidate_routes, fit_kind, preconditions, and expected_catalog_action are
+# the evaluator's answer-key material and MUST NOT reach a persona context before its
+# runs are complete.
+#
+# Field semantics:
+#   budgets.max_task_actions / budgets.max_authoring_actions — hard ordinal action
+#     budgets (an action = click / submitted text / selection / navigation / tab
+#     switch); the persona abandons when the budget is exhausted
+#   questions[].information_need — what form of answer counts as "answered"
+#   questions[].decision_artifact — the concrete output the answer must feed
+#   questions[].candidate_routes — viewpoint slugs worth trying (catalog-scent
+#     candidates; NEVER a completeness oracle)
+#   questions[].fit_kind — shipped | fork | authoring | docs | fixture-gap | gap
+#   questions[].expected_catalog_action — the CORRECT route class for scoring:
+#     execute | fork | create | consult-docs | recognize-fixture-gap |
+#     recognize-product-gap. hit@k scoring applies ONLY to execute questions; for all
+#     others score recognition of the route class.
+#   questions[].preconditions — model data / fixtures required for task validity
+#   authoring_challenge — structured task: id, text, preconditions
+
+schema: 3
+scope: viewpoints
+personas:
+- id: PA
+  name: Product Owner
+  segment: 8-person SaaS team
+  expert: false
+  capabilities:
+  - user stories
+  - roadmaps
+  - OKRs; non-programmer; no ArchiMate knowledge
+  resources: 15-20 min per question; GUI and docs only
+  cognitive_profile: Goal-first skimmer; trusts pictures over tables; abandons after ~3 dead ends; recency
+    bias toward the first screen; reads "capability" as product capability and "service" as customer-facing
+    service.
+  focus: value delivery, prioritization, stakeholder communication
+  strategies: Search box first, then menu labels; reads only the first sentence of descriptions; never
+    opens advanced sections.
+  questions:
+  - id: PA1
+    text: Which product goals are actually supported by something we built, and which are aspirational?
+    information_need: A gap list or picture separating realized from unrealized goals, defensible in
+      a roadmap discussion.
+    decision_artifact: slide
+    candidate_routes:
+    - goal-realization
+    - requirements-realization
+    fit_kind: authoring
+    preconditions: goal-realization admits only motivation-domain types; the realized/unrealized split
+      needs cross-domain realization traversal no shipped view isolates.
+    expected_catalog_action: create
+  - id: PA2
+    text: If we drop feature X (the Promotion Engine), what else is affected?
+    information_need: A blast-radius picture around one chosen element, small enough to read in a meeting.
+    decision_artifact: slide
+    candidate_routes:
+    - element-dependents
+    fit_kind: shipped
+    preconditions: anchor entity "Promotion Engine" exists with incoming dependency paths.
+    expected_catalog_action: execute
+  - id: PA3
+    text: What are all the things the team says this product is FOR, in one slide-ready picture?
+    information_need: One exportable motivation overview (drivers/goals), low-jargon.
+    decision_artifact: slide
+    candidate_routes:
+    - motivation
+    - stakeholder
+    - strategy
+    fit_kind: shipped
+    preconditions: motivation-domain population exists (it does in ENG-ARCH-REPO).
+    expected_catalog_action: execute
+  authoring_challenge:
+    id: PA-A1
+    text: From goal-realization, produce a variant showing only goals + outcomes (no requirements) via
+      Save As.
+    preconditions: goal-realization executes with a non-empty motivation population.
+  budgets:
+    max_task_actions: 15
+    max_authoring_actions: 20
+- id: PB
+  name: Development Lead
+  segment: feature team of 6
+  expert: false
+  capabilities:
+  - senior engineer
+  - git/CI native
+  - informal C4
+  - comfortable with query builders and JSON
+  resources: 30 min; GUI, docs, will open a second tab
+  cognitive_profile: Systems thinker; wants dependencies and blast radius; distrusts diagrams that hide
+    edges; reads tooltips and load-bearing docs sections.
+  focus: delivery flow, technical risk, cross-team interfaces
+  strategies: Docs in parallel tab; tries the most specific-sounding tool first; verifies one known-true
+    fact in any result before trusting it.
+  questions:
+  - id: PB1
+    text: What breaks downstream if we change the artifact index?
+    information_need: Anchored impact set with direction and reach, verifiable against code knowledge.
+    decision_artifact: ticket
+    candidate_routes:
+    - element-dependents
+    fit_kind: shipped
+    preconditions: oracle must fix the direct/transitive semantics expected (derived traversal, incoming,
+      max hops).
+    expected_catalog_action: execute
+  - id: PB2
+    text: Which application components does the backend depend on, direct and transitive?
+    information_need: Dependency closure from one component, distinguishing direct from derived.
+    decision_artifact: design-review
+    candidate_routes:
+    - element-dependencies
+    - application-structure
+    fit_kind: shipped
+    preconditions: oracle must state expected direct vs derived edges explicitly.
+    expected_catalog_action: execute
+  - id: PB3
+    text: Show everything in the `assurance` project only — what is in that bounded context?
+    information_need: A project-scoped inventory view usable as a team boundary map.
+    decision_artifact: link
+    candidate_routes: []
+    fit_kind: authoring
+    preconditions: group facet populated (assurance project exists).
+    expected_catalog_action: create
+  authoring_challenge:
+    id: PB-A1
+    text: Build from scratch "components in project X with their services", filtered or parameterized
+      by project, exploration representation, custom colors for components vs services.
+    preconditions: group facet populated; component/service types present.
+  budgets:
+    max_task_actions: 25
+    max_authoring_actions: 30
+- id: PC
+  name: CTO
+  segment: ~40-developer SME (target buyer)
+  expert: false
+  capabilities:
+  - ex-engineer; thinks in risk
+  - cost
+  - alignment
+  resources: 10 min; delegates anything needing >2 screens of configuration
+  cognitive_profile: Wants layered story views (strategy -> capabilities -> systems); allergic to empty
+    results and unexplained jargon; judges tool adoptability while using it.
+  focus: alignment of investment with strategy, organizational and cost risk
+  strategies: Clicks the most executive-sounding names; expects legends to explain colors unprompted.
+  questions:
+  - id: PC1
+    text: Do our capabilities map to actual applications — where are the gaps?
+    information_need: Capability coverage with visible gaps, suitable for an investment conversation.
+    decision_artifact: steering-recommendation
+    candidate_routes:
+    - capability-map
+    fit_kind: fixture-gap
+    preconditions: requires strategy-domain capability population; the current self-model has none (capability-map
+      returns entities with zero connections + schema-drift warning).
+    expected_catalog_action: recognize-fixture-gap
+  - id: PC2
+    text: What is the technology footprint and what depends on each piece?
+    information_need: Inventory of runtimes/stores with dependents, for risk and cost review.
+    decision_artifact: steering-recommendation
+    candidate_routes:
+    - technology
+    - technology-usage
+    fit_kind: shipped
+    preconditions: type-based scope also admits common events/functions — the oracle must state the
+      expected noise; NOT an honest footprint oracle by itself.
+    expected_catalog_action: execute
+  - id: PC3
+    text: Is there one view showing motivation to realization end-to-end for an audit?
+    information_need: A single traceability overview acceptable as audit evidence.
+    decision_artifact: audit-evidence
+    candidate_routes:
+    - layered
+    - motivation
+    fit_kind: authoring
+    preconditions: layered excludes motivation; no shipped view spans motivation through realization.
+    expected_catalog_action: create
+  - id: PC4
+    text: Which technology choices carry cost or obsolescence exposure, and which capabilities depend
+      on them?
+    information_need: Exposure-annotated technology list with dependent business impact.
+    decision_artifact: go-no-go
+    candidate_routes: []
+    fit_kind: gap
+    preconditions: no cost/lifecycle attributes exist in the model; tests catalog honesty about its
+      limits.
+    expected_catalog_action: recognize-product-gap
+  authoring_challenge:
+    id: PC-A1
+    text: Via Save As, re-color capability-map by project — is that reachable without delegation?
+    preconditions: 'FIXTURE-DEGRADED: capability-map has no strategy-domain population; the challenge
+      still probes editor reachability, not result quality.'
+  budgets:
+    max_task_actions: 10
+    max_authoring_actions: 15
+- id: PD
+  name: DevOps / Platform Engineer
+  segment: platform/infra role in a small company
+  expert: false
+  capabilities:
+  - IaC native
+  - reads YAML fluently
+  - REST-comfortable
+  resources: 20 min; suspicious of GUIs, looks for the file/API behind everything
+  cognitive_profile: Bottom-up; starts from concrete nodes (databases, runtimes); wants exact counts;
+    cares about deployment topology and infra blast radius.
+  focus: reliability, deployment, operational blast radius
+  strategies: Search a concrete node name first; prefers filters over curated views; opens reference
+    docs when the GUI is ambiguous.
+  questions:
+  - id: PD1
+    text: What runs on / depends on the SQLite database?
+    information_need: Anchored dependent set for one technology element, with counts; "runs on" implies
+      deployment semantics, not mere adjacency.
+    decision_artifact: incident-note
+    candidate_routes:
+    - element-dependents
+    - technology-usage
+    fit_kind: shipped
+    preconditions: oracle must distinguish deployment-semantic edges from generic connections.
+    expected_catalog_action: execute
+  - id: PD2
+    text: Which artifacts/nodes realize which application components (deployment picture)?
+    information_need: Deployment/realization mapping across the tech-application boundary.
+    decision_artifact: design-review
+    candidate_routes:
+    - implementation-and-deployment
+    - technology
+    fit_kind: shipped
+    preconditions: realization/assignment edges between technology and application layers exist.
+    expected_catalog_action: execute
+  - id: PD3
+    text: Which technology elements are connected to nothing (dead inventory)?
+    information_need: An absence query — elements with zero connections — as a cleanup worklist.
+    decision_artifact: worklist
+    candidate_routes: []
+    fit_kind: authoring
+    preconditions: negated incident condition expressible in the builder.
+    expected_catalog_action: create
+  authoring_challenge:
+    id: PD-A1
+    text: '"Technology elements plus their dependents" with a group filter excluding `uncategorized`,
+      table representation with a status column.'
+    preconditions: technology-domain population with status attributes.
+  budgets:
+    max_task_actions: 20
+    max_authoring_actions: 25
+- id: PE
+  name: Due-Diligence Consultant
+  segment: external tech DD for an acquisition
+  expert: false
+  capabilities:
+  - methodical outsider
+  - strong TOGAF/ArchiMate literacy
+  - evidence-driven
+  resources: 45 min; needs exportable, citable evidence
+  cognitive_profile: Coverage-driven; wants completeness statements and provenance (status, versions,
+    staleness); documents everything; samples results against raw data before citing.
+  focus: risk assessment, completeness, model trustworthiness
+  strategies: Docs first, then systematic catalog walk top-to-bottom; cross-checks a sample of every
+    result.
+  questions:
+  - id: PE1
+    text: Which requirements have no realization path to any application element?
+    information_need: A defensible unrealized-requirements list for the DD report.
+    decision_artifact: audit-evidence
+    candidate_routes:
+    - requirements-realization
+    fit_kind: authoring
+    preconditions: requirements-realization returns a 350+-entity union, not isolated unrealized requirements;
+      the question needs a negated-path query plus an independent oracle.
+    expected_catalog_action: create
+  - id: PE2
+    text: How current is this model — statuses, drafts vs accepted?
+    information_need: Status distribution over the model, exportable; note status is a lifecycle field,
+      not proof of currency.
+    decision_artifact: audit-evidence
+    candidate_routes: []
+    fit_kind: authoring
+    preconditions: status facet populated; last-updated data exists but no shipped view exposes it.
+    expected_catalog_action: create
+  - id: PE3
+    text: Show stakeholder -> driver -> goal traceability with gaps marked.
+    information_need: Motivation traceability with explicit gap marking.
+    decision_artifact: audit-evidence
+    candidate_routes:
+    - stakeholder
+    - motivation
+    - goal-realization
+    fit_kind: authoring
+    preconditions: shipped views show present edges but mark no gaps; gap marking needs authored absence
+      criteria.
+    expected_catalog_action: create
+  authoring_challenge:
+    id: PE-A1
+    text: '"All draft-status motivation elements", styled by status, matrix or table for a report appendix.'
+    preconditions: motivation elements with draft status exist.
+  budgets:
+    max_task_actions: 35
+    max_authoring_actions: 40
+- id: PF
+  name: Solo Developer
+  segment: indie developer, several side projects
+  expert: false
+  capabilities:
+  - full-stack generalist
+  - C4 from blog posts
+  - no modeling vocabulary
+  resources: 15 min total; leaves if first success takes >10 minutes
+  cognitive_profile: Example-driven; copies and modifies rather than builds from blank; judges by whether
+    defaults look good unconfigured; time-to-first-wow decides adoption.
+  focus: personal productivity, coherence across own projects
+  strategies: Clicks before reading; picks whatever has a play/Execute affordance; searches only when
+    stuck.
+  questions:
+  - id: PF1
+    text: Show me SOMETHING useful about this codebase in one click.
+    information_need: An immediately legible default view with zero configuration.
+    decision_artifact: link
+    candidate_routes:
+    - layered
+    - application-structure
+    fit_kind: shipped
+    preconditions: none.
+    expected_catalog_action: execute
+  - id: PF2
+    text: What is connected to the thing I am about to refactor?
+    information_need: Fast anchored neighborhood for any picked element.
+    decision_artifact: ticket
+    candidate_routes:
+    - element-dependents
+    fit_kind: shipped
+    preconditions: none.
+    expected_catalog_action: execute
+  - id: PF3
+    text: Can I make my own view without learning a query language?
+    information_need: A copy-and-modify authoring path that never shows raw query syntax.
+    decision_artifact: link
+    candidate_routes: []
+    fit_kind: fork
+    preconditions: Save As available on executed viewpoints.
+    expected_catalog_action: fork
+  authoring_challenge:
+    id: PF-A1
+    text: Save As on whatever was executed first; change one color to a custom hex; save and re-execute.
+      Count actions to first personally-useful result.
+    preconditions: any executable viewpoint (whatever was executed first).
+  budgets:
+    max_task_actions: 12
+    max_authoring_actions: 18
+- id: PG
+  name: Open-Source Maintainer
+  segment: FOSS project growing contributors
+  expert: false
+  capabilities:
+  - daily PR review
+  - documentation-literate
+  - no modeling background
+  resources: 25 min; wants stable links/exports
+  cognitive_profile: Audience-oriented — "can I link this to a first-time contributor?"; low-jargon
+    output matters more than completeness.
+  focus: contributor onboarding, subsystem boundaries, review load
+  strategies: Evaluates everything as a potential CONTRIBUTING.md link; tests views by imagining a newcomer
+    reading them.
+  questions:
+  - id: PG1
+    text: Which view do I link in CONTRIBUTING.md to explain the system's parts and boundaries?
+    information_need: A stable, legible overview link for newcomers (link durability matters).
+    decision_artifact: link
+    candidate_routes:
+    - application-structure
+    - layered
+    fit_kind: shipped
+    preconditions: executed views must be reachable via a stable URL for linking to make sense.
+    expected_catalog_action: execute
+  - id: PG2
+    text: What belongs to which subsystem (project), visually?
+    information_need: Project/group-clustered composition view.
+    decision_artifact: link
+    candidate_routes: []
+    fit_kind: authoring
+    preconditions: group facet populated.
+    expected_catalog_action: create
+  - id: PG3
+    text: Where would a new contributor's change to the GUI ripple to?
+    information_need: Anchored impact view around the GUI component, newcomer-readable.
+    decision_artifact: design-review
+    candidate_routes:
+    - element-dependents
+    fit_kind: shipped
+    preconditions: GUI component entity findable by a newcomer's search vocabulary.
+    expected_catalog_action: execute
+  authoring_challenge:
+    id: PG-A1
+    text: 'Fork application-structure (Save As) into a contributor view: cluster by project, neutral
+      colors except emphasized entry points.'
+    preconditions: application-structure executes; group facet populated.
+  budgets:
+    max_task_actions: 20
+    max_authoring_actions: 25
+- id: PH
+  name: Software Architect
+  segment: hands-on, embedded in the product team
+  expert: true
+  capabilities:
+  - daily system design
+  - working C4
+  - partial ArchiMate
+  - codebase-familiar
+  - power user
+  resources: 45 min; reads specs; probes tool limits deliberately
+  cognitive_profile: Model-first; treats the repo as a design instrument; verifies model-reality fidelity
+    before trusting views; irritated by semantic vagueness about edges.
+  focus: design integrity, layering, contract surfaces between teams
+  strategies: Docs and spec first; builds custom queries early instead of hunting curated fits; cross-checks
+    results against known code structure (evaluator grants source access only in a post-task verification
+    phase, never during navigation measurement).
+  questions:
+  - id: PH1
+    text: Which application/domain elements depend on technology-layer elements directly — where does
+      layering leak?
+    information_need: A layering-violation list precise enough to file tickets from.
+    decision_artifact: ticket
+    candidate_routes: []
+    fit_kind: authoring
+    preconditions: cross-layer dependency criterion expressible (domain facet + incident condition);
+      note in report if not.
+    expected_catalog_action: create
+  - id: PH2
+    text: Which services does each application component serve/consume — the contract surface between
+      teams?
+    information_need: Service-to-component contract map.
+    decision_artifact: design-review
+    candidate_routes:
+    - application-cooperation
+    - service-realization
+    - application-usage
+    fit_kind: shipped
+    preconditions: serving/realization edges populated in the application domain.
+    expected_catalog_action: execute
+  - id: PH3
+    text: Which connections in a result are derived vs actually modeled, and can I tell before citing
+      the view?
+    information_need: Discoverable, legible modeled-vs-derived encoding (dashed + certainty) in every
+      representation.
+    decision_artifact: design-review
+    candidate_routes: []
+    fit_kind: docs
+    preconditions: a result containing derived connections (any anchored impact execution).
+    expected_catalog_action: consult-docs
+  authoring_challenge:
+    id: PH-A1
+    text: A multi-hop/derived traversal with a derived attribute (e.g. dependency count) driving a scale-mode
+      color, exploration representation — does progressive disclosure hold at the deep end?
+    preconditions: derived traversal reachable from the query tab; numeric derived attribute expressible.
+  budgets:
+    max_task_actions: 35
+    max_authoring_actions: 40
+- id: PI
+  name: Solution Architect
+  segment: cross-team delivery, audience-switching
+  expert: true
+  capabilities:
+  - TOGAF/ArchiMate literate
+  - owns designs across 2-3 teams
+  - presentation-heavy
+  resources: 40 min; judged on clarity of presented views
+  cognitive_profile: 'Audience-first: same content, different views per stakeholder; thinks in baseline/target/transition;
+    sensitive to staleness of pinned views.'
+  focus: solution shaping, stakeholder communication, migration planning
+  strategies: Walks the catalog by purpose/stakeholder metadata (actually reads those fields); forks
+    near-fits; validates a view by presenting it aloud.
+  questions:
+  - id: PI1
+    text: What is the migration/implementation picture — work packages, plateaus, what realizes what?
+    information_need: Transition-state views suitable for planning.
+    decision_artifact: steering-recommendation
+    candidate_routes:
+    - migration
+    - implementation-and-migration
+    - project
+    fit_kind: fixture-gap
+    preconditions: requires implementation-domain population (work packages, plateaus); the current
+      self-model has none — preflight and mark invalid if absent.
+    expected_catalog_action: recognize-fixture-gap
+  - id: PI2
+    text: Give me one capability's full realization chain as a steering-meeting diagram.
+    information_need: Anchored/filtered realization chain, coarse enough for executives.
+    decision_artifact: slide
+    candidate_routes:
+    - service-realization
+    fit_kind: fixture-gap
+    preconditions: requires a capability anchor with a realization chain; current self-model has no
+      strategy-domain population — preflight.
+    expected_catalog_action: recognize-fixture-gap
+  - id: PI3
+    text: When a diagram pins a viewpoint version and the definition evolves, how do I see what is stale?
+    information_need: Version-pinning/staleness visibility across referencing diagrams.
+    decision_artifact: governance-review
+    candidate_routes: []
+    fit_kind: docs
+    preconditions: at least one persisted diagram with a viewpoint application pinned — preflight; mark
+      fixture-gap if none exists.
+    expected_catalog_action: consult-docs
+  - id: PI4
+    text: What changed in the model recently, and which published views does that staleness affect?
+    information_need: Change-over-time awareness connected to published views.
+    decision_artifact: governance-review
+    candidate_routes: []
+    fit_kind: gap
+    preconditions: no shipped change-over-time view; tests honesty about temporal limits.
+    expected_catalog_action: recognize-product-gap
+  authoring_challenge:
+    id: PI-A1
+    text: Fork a realization-style viewpoint twice (Save As) into executive and engineering audience
+      variants; judge fork-per-audience as a publishing model. The variants are then evaluated by a
+      fresh target-role context, not by their author.
+    preconditions: a realization-style viewpoint executes; two forks allowed within the run manifest.
+  budgets:
+    max_task_actions: 30
+    max_authoring_actions: 35
+- id: PJ
+  name: Enterprise Architect
+  segment: owns the meta-model and two-tier governance
+  expert: true
+  capabilities:
+  - EA-framework expert
+  - tool-class expert
+  - governs tiers/promotion/standards
+  resources: 45 min; evaluates as power user AND curator for everyone else
+  cognitive_profile: Consistency-, coverage-, governance-driven; asks whether the catalog scales to
+    20 teams and what stops convention drift; distrusts the unauditable.
+  focus: standards, tier hygiene, promotion, catalog curation for non-experts
+  strategies: Systematic catalog inventory first (tiers, versions, duplicates); reads validation and
+    summary language critically; tests governance edges before content.
+  questions:
+  - id: PJ1
+    text: Which model areas violate the standard that every component traces to a goal or requirement
+      — coverage, not examples?
+    information_need: A conformance/coverage result usable in a governance review, with an independent
+      oracle.
+    decision_artifact: governance-review
+    candidate_routes: []
+    fit_kind: authoring
+    preconditions: oracle derived via model queries before the authored view is trusted.
+    expected_catalog_action: create
+  - id: PJ2
+    text: What is the tier hygiene — which engagement definitions duplicate shipped ones, and what deserves
+      promotion?
+    information_need: Tier/duplication overview; today only the management list's tier column exists;
+      no enterprise-tier definitions exist in this workspace.
+    decision_artifact: governance-review
+    candidate_routes: []
+    fit_kind: gap
+    preconditions: scale claims ("20 teams") are out of scope for a 34-definition catalog — report as
+      inspection, not evidence.
+    expected_catalog_action: recognize-product-gap
+  - id: PJ3
+    text: Can I curate a pinned starter set for non-architect roles, and does it answer their questions?
+    information_need: Pin-curation assessment PLUS evidence the proposed set covers the non-expert personas'
+      questions (blinded scent results only).
+    decision_artifact: governance-review
+    candidate_routes: []
+    fit_kind: docs
+    preconditions: ASSESSMENT ONLY — pin state must not be mutated unless separately authorized with
+      snapshot/restore.
+    expected_catalog_action: consult-docs
+  authoring_challenge:
+    id: PJ-A1
+    text: A conformance viewpoint (governed types lacking motivation traceability — negated incident
+      condition) with table/matrix representation; additionally assess Save-As governance implications
+      (fork sprawl, provenance, version pinning) as a curator.
+    preconditions: governed types and motivation connections present; conformance oracle derived in
+      S0A first.
+  budgets:
+    max_task_actions: 35
+    max_authoring_actions: 40
+- id: PK
+  name: Risk & Compliance Officer
+  segment: regulated SME / customer-audit-driven company
+  expert: false
+  capabilities:
+  - control frameworks (ISO 27001/SOC2 vocabulary)
+  - evidence collection
+  - no modeling background
+  resources: 30 min; everything must end up in an evidence pack
+  cognitive_profile: 'Control-first: thinks in "applicable requirement -> implemented control -> evidence";
+    intolerant of unverifiable claims; needs exports with provenance.'
+  focus: audit readiness, control coverage, evidence trails
+  strategies: Looks for words like compliance, requirement, evidence, control in navigation; follows
+    documented procedures over exploration.
+  questions:
+  - id: PK1
+    text: Show evidence that every applicable requirement has an implementation path; export it for
+      a control review.
+    information_need: A coverage table (requirement -> realizing elements or GAP) exportable as audit
+      evidence.
+    decision_artifact: audit-evidence
+    candidate_routes:
+    - requirements-realization
+    fit_kind: authoring
+    preconditions: independent oracle for the unrealized set; export path existence is itself under
+      test.
+    expected_catalog_action: create
+  - id: PK2
+    text: Which parts of the system does a given policy or standard actually govern?
+    information_need: Traceability from a standard/policy document to governed elements.
+    decision_artifact: audit-evidence
+    candidate_routes: []
+    fit_kind: authoring
+    preconditions: standards/ADRs exist as documents with entity references; whether doc-to-entity links
+      are queryable by viewpoints is itself a finding.
+    expected_catalog_action: create
+  authoring_challenge:
+    id: PK-A1
+    text: A table viewpoint "requirements without realization", status column included, suitable for
+      an evidence pack appendix.
+    preconditions: requirements with and without realization paths exist (oracle-verified).
+  budgets:
+    max_task_actions: 25
+    max_authoring_actions: 30
+- id: PL
+  name: Safety / Security Analyst
+  segment: product with assurance obligations (the self-model names this stakeholder)
+  expert: false
+  capabilities:
+  - threat/hazard analysis literacy (STPA/STRIDE vocabulary)
+  - reads architecture diagrams
+  - no ArchiMate authoring
+  resources: 30 min; outcome feeds a risk assessment
+  cognitive_profile: 'Path-focused: wants control/data paths, trust boundaries, and missing links; treats
+    absence of a link as a finding, not as clean.'
+  focus: security exposure, control coverage, hazard traceability
+  strategies: Starts from a security-relevant component; expands outward; asks "what mediates this connection?"
+    at every hop.
+  questions:
+  - id: PL1
+    text: Trace a security-relevant component (the confidential assurance store) to the requirements
+      and controls that govern it and the technology it touches — what links are missing?
+    information_need: A traceability neighborhood with explicit missing-link identification.
+    decision_artifact: incident-note
+    candidate_routes:
+    - element-dependents
+    - element-dependencies
+    fit_kind: shipped
+    preconditions: assurance-related entities exist in the model; missing-link marking still needs analyst
+      judgement — record what the view cannot say.
+    expected_catalog_action: execute
+  - id: PL2
+    text: Which components sit on the boundary between confidential (assurance) content and the rest
+      of the system?
+    information_need: Boundary set between the assurance project/group and other groups.
+    decision_artifact: design-review
+    candidate_routes: []
+    fit_kind: authoring
+    preconditions: group facet distinguishes assurance content; cross-group incident condition expressible.
+    expected_catalog_action: create
+  authoring_challenge:
+    id: PL-A1
+    text: A viewpoint "elements in group `assurance` plus their direct non-assurance neighbors", edge-emphasized
+      across the boundary.
+    preconditions: assurance group populated; cross-group neighbors exist.
+  budgets:
+    max_task_actions: 25
+    max_authoring_actions: 30

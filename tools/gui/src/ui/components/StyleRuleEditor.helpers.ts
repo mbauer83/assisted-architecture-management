@@ -37,7 +37,8 @@ export const derivedLegend = (presentation: PresentationNode): LegendEntry[] => 
   }
   for (const rule of presentation.stylingRules) {
     if (rule.mode === 'match') bump(rule.value)
-    else for (const band of rule.rangeBands) bump(band.value)
+    else if (rule.mode === 'range') for (const band of rule.rangeBands) bump(band.value)
+    else for (const token of rule.scaleTokens ?? []) bump(token)
   }
   for (const token of Object.values(presentation.defaultStyle)) bump(token)
   return [...counts.entries()].map(([token, usageCount]) => ({ token, usageCount }))

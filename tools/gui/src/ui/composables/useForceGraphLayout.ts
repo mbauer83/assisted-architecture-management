@@ -138,6 +138,55 @@ export const layoutGroupClusters = (
   return { posMap, cx: Math.max(width, maxX), cy: Math.max(height, rowY + rowHeight + topPad) }
 }
 
+/** Concentric-ring layout keyed by hop distance: anchors (distance 0) sit at `center`
+ *  (on a tight inner ring when there are several), a node at distance d sits on the ring
+ *  of radius `d * ringSpacing`, and nodes without a distance (unreachable from any
+ *  anchor) land together on one ring beyond the farthest reachable one. Ring members are
+ *  ordered lexicographically by id — deterministic, and adjacent BFS siblings (which
+ *  usually share an id prefix via their type/group) tend to stay adjacent on the ring. */
+const RING_RADIUS_DECAY = 0.75
+const MIN_RING_ARC = 70
+
+/** Sub-linear ring radii: each additional hop adds a geometrically shrinking increment
+ * (spacing · Σ decay^k), so deep neighborhoods stay compact instead of growing linearly
+ * with hop count. A crowded ring is widened to give every member at least MIN_RING_ARC
+ * of circumference, whichever radius is larger. */
+const ringRadius = (ring: number, memberCount: number, ringSpacing: number): number => {
+  const base = ringSpacing * ((1 - RING_RADIUS_DECAY ** ring) / (1 - RING_RADIUS_DECAY))
+  const crowdFit = (memberCount * MIN_RING_ARC) / (2 * Math.PI)
+  return Math.max(base, crowdFit)
+}
+
+export const layoutRadialByDistance = (
+  nodes: readonly GraphNode[],
+  distances: ReadonlyMap<string, number>,
+  center: { x: number; y: number },
+  ringSpacing: number,
+): PosMap => {
+  const maxDistance = Math.max(0, ...distances.values())
+  const unreachableRing = maxDistance + 1
+  const rings = new Map<number, string[]>()
+  for (const node of nodes) {
+    const ring = distances.get(node.id) ?? unreachableRing
+    if (!rings.has(ring)) rings.set(ring, [])
+    rings.get(ring)!.push(node.id)
+  }
+  const posMap: PosMap = new Map()
+  for (const [ring, ids] of rings) {
+    ids.sort((a, b) => a.localeCompare(b))
+    if (ring === 0 && ids.length === 1) {
+      posMap.set(ids[0], { x: center.x, y: center.y })
+      continue
+    }
+    const radius = ring === 0 ? ringSpacing * 0.4 : ringRadius(ring, ids.length, ringSpacing)
+    ids.forEach((id, index) => {
+      const angle = -Math.PI / 2 + (index / ids.length) * Math.PI * 2
+      posMap.set(id, { x: center.x + Math.cos(angle) * radius, y: center.y + Math.sin(angle) * radius })
+    })
+  }
+  return posMap
+}
+
 export const layoutTree = (
   nodes: readonly GraphNode[],
   tree: TreeNode,

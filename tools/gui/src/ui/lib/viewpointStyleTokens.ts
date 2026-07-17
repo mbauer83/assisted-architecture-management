@@ -19,18 +19,31 @@ const TOKEN_COLORS: Record<StyleToken, string> = {
   neutral: '#6b7280',
 }
 
-/** `scale_tokens` names a `mode: "scale"` rule's own two gradient endpoints — an opaque,
- * author-chosen pair (never restricted to the fixed match/range `STYLE_TOKENS`
- * vocabulary), resolved here so a scale rule's declared endpoints render as recognizably
- * distinct colors rather than silently collapsing to the same neutral fallback. */
+/** Named gradient-endpoint tokens for `mode: "scale"` rules: the distance pair
+ * (`heat-near`/`heat-far`) and the magnitude pair (`heat-low`/`heat-high`) — the same
+ * vocabulary `viewpoint_style_values.py` validates against. */
 const SCALE_ENDPOINT_COLORS: Record<string, string> = {
   'heat-near': '#0891b2',
   'heat-far': '#dc2626',
+  'heat-low': '#fbbf24',
+  'heat-high': '#dc2626',
 }
 
-/** `node_color` / `edge_color` / `cluster_grouping`: a solid color swatch. */
+const HEX_COLOR = /^#[0-9a-f]{6}$/i
+
+/** An explicit author-chosen `#rrggbb` style value, rendered as-is. */
+export const isHexColorValue = (value: string): boolean => HEX_COLOR.test(value)
+
+/** `node_color` / `edge_color` / `cluster_grouping`: a solid color swatch. A style value
+ * is either a semantic token, a named scale endpoint, or an explicit `#rrggbb` color
+ * literal (custom colors) — validated at save time, so an unknown value here means a
+ * definition predating validation and falls back to neutral. */
 export const tokenColor = (token: string): string =>
-  TOKEN_COLORS[token as StyleToken] ?? SCALE_ENDPOINT_COLORS[token] ?? TOKEN_COLORS.neutral
+  isHexColorValue(token)
+    ? token
+    : TOKEN_COLORS[token as StyleToken] ?? SCALE_ENDPOINT_COLORS[token] ?? TOKEN_COLORS.neutral
+
+export const SCALE_ENDPOINT_TOKENS: readonly string[] = Object.keys(SCALE_ENDPOINT_COLORS)
 
 const TOKEN_SHAPES: Record<StyleToken, 'circle' | 'diamond' | 'triangle' | 'square'> = {
   emphasis: 'circle',

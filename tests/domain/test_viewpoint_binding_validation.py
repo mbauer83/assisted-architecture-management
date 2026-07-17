@@ -214,7 +214,7 @@ def test_presentation_criteria_can_reference_query_parameters() -> None:
         query=definition.query,
         presentation=PresentationSpec(
             representation="exploration",
-            styling_rules=(StyleRule(capability="node_color", match_criteria=match_criteria, value="highlight"),),
+            styling_rules=(StyleRule(capability="node_color", match_criteria=match_criteria, value="emphasis"),),
         ),
     )
     assert _issues(definition) == ()

@@ -18,6 +18,7 @@ from collections.abc import Iterable, Iterator
 from itertools import chain
 from typing import TYPE_CHECKING
 
+from src.application.artifact_schema import list_schema_files
 from src.domain.bindings import CORE_CORRESPONDENCE_KINDS
 from src.domain.permitted_mappings import concept_scope_from_mapping_spec
 
@@ -313,20 +314,30 @@ def _split_unknown_types(
     return errors, warnings
 
 
-def _unknown_schema_errors(
-    repo: "ArtifactRepository", *, prefix: str, suffix: str, known: set[str], label: str
-) -> list[str]:
-    """Report ``<prefix><stem><suffix>`` schema files whose *stem* type is not in *known*."""
+def _schema_inventory_findings(
+    repo: "ArtifactRepository", *, known_entity_types: set[str], known_connection_types: set[str]
+) -> tuple[list[str], list[str]]:
+    """``(errors, warnings)`` from the classified schema-file inventory
+    (``artifact_schema.list_schema_files``, the one owner of the filename conventions):
+    entity-attribute and specialization-attachment schemas must name a known entity type,
+    connection-metadata schemas a known connection type (errors); a filename matching no
+    convention is warned about — it would otherwise be silently ignored by every loader —
+    but never aborts startup. An unknown specialization slug is deliberately not checked
+    here: that is the verifier's orphan-attachment warning."""
     errors: list[str] = []
+    warnings: list[str] = []
     for repo_root in repo.repo_roots:
-        schemata_dir = repo_root / ".arch-repo" / "schemata"
-        if not schemata_dir.is_dir():
-            continue
-        for f in sorted(schemata_dir.glob(f"{prefix}*{suffix}")):
-            stem = f.name[len(prefix) : -len(suffix)]
-            if stem and stem not in known:
-                errors.append(f"{label} {stem!r} (file: {f.relative_to(repo_root)})")
-    return errors
+        for ref in list_schema_files(repo_root):
+            location = f"(file: .arch-repo/schemata/{ref.filename})"
+            if ref.kind in ("entity-attributes", "specialization-attachment"):
+                if ref.subject not in known_entity_types:
+                    errors.append(f"Attribute schema for unknown entity type {ref.subject!r} {location}")
+            elif ref.kind == "connection-metadata":
+                if ref.subject not in known_connection_types:
+                    errors.append(f"Connection metadata schema for unknown connection type {ref.subject!r} {location}")
+            elif ref.kind == "unrecognized":
+                warnings.append(f"Schema filename matches no known convention and is ignored {location}")
+    return errors, warnings
 
 
 def _element_class_errors(registry: "ModuleRegistry", known_element_classes: set[str]) -> list[str]:
@@ -397,14 +408,11 @@ def _collect_errors(
 
     # Schema files for disabled-module types are tolerated (checked against the complete set);
     # only schemas for types no module declares are errors.
-    errors.extend(_unknown_schema_errors(
-        repo, prefix="attributes.", suffix=".schema.json", known=complete_e,
-        label="Attribute schema for unknown entity type",
-    ))
-    errors.extend(_unknown_schema_errors(
-        repo, prefix="connection-metadata.", suffix=".schema.json", known=complete_c,
-        label="Connection metadata schema for unknown connection type",
-    ))
+    inventory_errors, inventory_warnings = _schema_inventory_findings(
+        repo, known_entity_types=complete_e, known_connection_types=complete_c
+    )
+    errors.extend(inventory_errors)
+    warnings.extend(inventory_warnings)
 
     try:
         known_element_classes: set[str] = {str(c) for c in registry.all_element_classes()}

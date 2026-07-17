@@ -71,3 +71,6 @@ class ViewpointExecutionResult:
     warnings: tuple[str, ...]
     duration_ms: float
     query_summary: str
+    anchor_ids: tuple[str, ...] = ()
+    """Entity ids the execution was anchored on — resolved ``entity-id`` parameter values.
+    Presentations use these to mark/center the anchor and derive hop distances."""

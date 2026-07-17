@@ -25,7 +25,7 @@ import { attributeTypeTablesFromCatalog } from '../../domain/viewpointBindings'
 import { groupFromMapping } from '../../domain/viewpointCriteriaSerialization'
 import { resolveIssuePathNodeId } from '../../domain/viewpointIssuePath'
 import { HIGHLIGHTED_NODE_ID_KEY } from '../components/CriteriaTreeBuilder.helpers'
-import { firstErrorNodeId, isSemanticEdit } from './ViewpointsManagementView.helpers'
+import { firstErrorNodeId, isSemanticEdit, suggestForkSlug } from './ViewpointsManagementView.helpers'
 import ViewpointDefinitionsList from '../components/ViewpointDefinitionsList.vue'
 import ViewpointGeneralTab from '../components/ViewpointGeneralTab.vue'
 import ViewpointScopeTab from '../components/ViewpointScopeTab.vue'
@@ -104,7 +104,26 @@ const backToList = () => {
   draft.value = null
   originalDraft.value = null
   viewingTier.value = null
+  forkedFromSlug.value = null
   void loadDefinitions()
+}
+
+// ── Save As: fork the open definition (any tier) into a new engagement viewpoint ──
+
+const forkedFromSlug = ref<string | null>(null)
+
+const startSaveAs = () => {
+  if (!draft.value) return
+  forkedFromSlug.value = originalDraft.value?.slug ?? draft.value.slug
+  draft.value.slug = suggestForkSlug(forkedFromSlug.value, definitions.value.map((d) => d.slug))
+  draft.value.version = 1
+  isCreating.value = true
+  viewingTier.value = 'engagement'
+  originalDraft.value = null
+  referencers.value = []
+  issues.value = []
+  saveError.value = null
+  activeTab.value = 'general'
 }
 
 const isSemantic = computed(() => draft.value && originalDraft.value && isSemanticEdit(draft.value, originalDraft.value))
@@ -168,8 +187,16 @@ const focusIssue = (issue: ViewpointValidationIssue) => {
         v-if="isReadOnly"
         class="hint hint--readonly"
       >
-        This is a {{ viewingTier }}-tier definition — only engagement-tier definitions can be
-        edited here. Promote a copy into the engagement repository to customize it.
+        This is a {{ viewingTier }}-tier definition and cannot be changed in place — adjust it
+        freely, then use "Save as…" to keep your changes as a new engagement viewpoint.
+      </p>
+
+      <p
+        v-if="forkedFromSlug"
+        class="hint"
+      >
+        Saving as a new engagement viewpoint forked from "{{ forkedFromSlug }}" — adjust the
+        slug and name, then save.
       </p>
 
       <p
@@ -263,17 +290,25 @@ const focusIssue = (issue: ViewpointValidationIssue) => {
         </button>
       </p>
 
-      <div
-        v-if="!isReadOnly"
-        class="save-row"
-      >
+      <div class="save-row">
         <button
+          v-if="!isReadOnly"
           type="button"
           class="primary-btn"
           :disabled="saving || writeBlocked"
           @click="save"
         >
           {{ saving ? 'Saving…' : 'Save' }}
+        </button>
+        <button
+          v-if="!isCreating"
+          type="button"
+          class="save-as-btn"
+          :disabled="saving || writeBlocked"
+          title="Keep the current definition (including your unsaved changes) as a new engagement viewpoint"
+          @click="startSaveAs"
+        >
+          Save as…
         </button>
       </div>
     </template>
@@ -288,6 +323,12 @@ const focusIssue = (issue: ViewpointValidationIssue) => {
 .retry-btn:hover { background: #fef2f2; }
 .primary-btn { background: #6366f1; color: #fff; border: none; border-radius: 7px; padding: 8px 16px; font-weight: 600; cursor: pointer; margin-bottom: 12px; }
 .primary-btn:disabled { opacity: .5; cursor: not-allowed; }
+.save-as-btn {
+  background: #fff; color: #4338ca; border: 1px solid #c7d2fe; border-radius: 7px;
+  padding: 8px 16px; font-weight: 600; cursor: pointer; margin-bottom: 12px; margin-left: 8px;
+}
+.save-as-btn:hover:not(:disabled) { background: #eef2ff; }
+.save-as-btn:disabled { opacity: .5; cursor: not-allowed; }
 .hint { background: #fef3c7; color: #92400e; padding: 8px 12px; border-radius: 6px; }
 .hint--readonly { background: #f3f4f6; color: #374151; }
 .issue-list { list-style: none; padding: 0; }
@@ -297,7 +338,7 @@ const focusIssue = (issue: ViewpointValidationIssue) => {
 .tabs { display: flex; gap: 4px; border-bottom: 1px solid #d1d5db; margin: 12px 0; }
 .tabs button { appearance: none; border: none; background: none; padding: 8px 14px; font-size: 13px; font-weight: 600; color: #9ca3af; cursor: pointer; border-bottom: 2px solid transparent; }
 .tabs button.sel { color: #4338ca; border-color: #6366f1; }
-.save-row { margin-top: 20px; }
+.save-row { margin-top: 20px; display: flex; align-items: center; }
 .back-btn { appearance: none; border: 1px solid #d1d5db; background: #fff; color: #374151; border-radius: 6px; padding: 5px 12px; font-size: 12.5px; font-weight: 600; cursor: pointer; }
 .back-btn:hover { border-color: #6366f1; color: #4338ca; }
 </style>

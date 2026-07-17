@@ -105,6 +105,9 @@ export const ViewpointExecutionResultSchema = Schema.Struct({
   warnings: Schema.Array(Schema.String),
   duration_ms: Schema.Number,
   query_summary: Schema.String,
+  /** Entity ids the execution was anchored on (resolved `entity-id` parameter values) —
+   * presentations mark/center these and derive hop distances from them. */
+  anchor_ids: Schema.optionalWith(Schema.Array(Schema.String), { default: () => [] }),
 })
 export type ViewpointExecutionResult = typeof ViewpointExecutionResultSchema.Type
 

@@ -211,9 +211,11 @@ def _scale_value(
     if numeric is None:
         return None
     scale = bounds[index]
-    if numeric < scale.minimum or numeric > scale.maximum:
-        return None
-    position = 0.0 if scale.maximum == scale.minimum else (numeric - scale.minimum) / (scale.maximum - scale.minimum)
+    # Out-of-range values saturate at the nearest endpoint (standard heat-map behavior)
+    # rather than dropping out of the scale entirely — an item beyond the declared bounds
+    # still reads as "far"/"near", never as unstyled.
+    clamped = min(max(numeric, scale.minimum), scale.maximum)
+    position = 0.0 if scale.maximum == scale.minimum else (clamped - scale.minimum) / (scale.maximum - scale.minimum)
     return ScaleStyleValue(position=position, tokens=(rule.scale_tokens[0], rule.scale_tokens[1]))
 
 

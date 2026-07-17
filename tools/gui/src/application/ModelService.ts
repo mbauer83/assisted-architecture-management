@@ -59,7 +59,8 @@ export const makeModelService = (repo: ModelRepository) =>
     createEntity: (body: Parameters<ModelRepository['createEntity']>[0]) => repo.createEntity(body),
     editEntity: (body: Parameters<ModelRepository['editEntity']>[0]) => repo.editEntity(body),
     deleteEntity: (body: Parameters<ModelRepository['deleteEntity']>[0]) => repo.deleteEntity(body),
-    getEntitySchemata: (artifactType: string) => repo.getEntitySchemata(artifactType),
+    getEntitySchemata: (artifactType: string, specialization?: string) =>
+      repo.getEntitySchemata(artifactType, specialization),
     getDiagramEntities: (diagramId: string) => repo.getDiagramEntities(diagramId),
     getDiagramConnections: (diagramId: string) => repo.getDiagramConnections(diagramId),
     getDiagramSvg: (diagramId: string) => repo.getDiagramSvg(diagramId),

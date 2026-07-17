@@ -1,7 +1,7 @@
 import { ref, reactive, onUnmounted } from 'vue'
-import { buildClusterBoxes, buildTree, layoutGroupClusters, layoutTree } from './useForceGraphLayout'
+import { buildClusterBoxes, buildTree, layoutGroupClusters, layoutRadialByDistance, layoutTree } from './useForceGraphLayout'
 
-export type LayoutMode = 'force' | 'cluster'
+export type LayoutMode = 'force' | 'cluster' | 'radial'
 
 export interface GraphNode {
   id: string
@@ -224,6 +224,23 @@ export function useForceGraph(width: () => number, height: () => number) {
     }
   }
 
+  /** Positions the current node set on concentric rings by hop distance from an anchored
+   *  execution's anchors (`layoutRadialByDistance`) — anchors at the canvas centre, more
+   *  distant nodes on farther rings. Returns the ring centre so callers can pan onto it. */
+  const applyRadialLayout = (distances: ReadonlyMap<string, number>, ringSpacing: number): { cx: number; cy: number } => {
+    stop()
+    layoutMode.value = 'radial'
+    const center = { x: width() / 2, y: height() / 2 }
+    if (nodes.value.length === 0) return { cx: center.x, cy: center.y }
+    const posMap = layoutRadialByDistance(nodes.value, distances, center, ringSpacing)
+    for (const nd of nodes.value) {
+      const pos = posMap.get(nd.id)
+      if (pos) { nd.x = pos.x; nd.y = pos.y }
+      nd.vx = 0; nd.vy = 0
+    }
+    return { cx: center.x, cy: center.y }
+  }
+
   /** Remove a node and all nodes that were added exclusively by its expansion. */
   const collapseNode = (id: string) => {
     const toRemove = new Set<string>()
@@ -268,6 +285,6 @@ export function useForceGraph(width: () => number, height: () => number) {
     nodes, edges, options, layoutMode,
     addNode, addEdge, markExpanded, collapseNode, spreadAroundParent,
     start, stop, restart,
-    applyClusterLayout, applyGroupClusterLayout, applyForceLayout,
+    applyClusterLayout, applyGroupClusterLayout, applyRadialLayout, applyForceLayout,
   }
 }

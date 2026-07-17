@@ -7,6 +7,7 @@ import TypedPropertyInput from '../components/TypedPropertyInput.vue'
 import type { WriteHelp, WriteResult, EntityAttributeDescriptor, AuthoringGuidance } from '../../domain'
 import { hasVerificationErrors, readErrorMessage, collectVerificationIssues } from '../lib/errors'
 import { specializationOptionsForEntityType, specializationOptionLabel } from '../lib/specializationOptions'
+import { reconcileRowsWithSchema, rowsFromSchema } from '../lib/schemaPropertyRows'
 
 const svc = inject(modelServiceKey)!
 const router = useRouter()
@@ -60,34 +61,49 @@ const createRequiredMissing = computed(() =>
   }),
 )
 
-watch(artifactType, (newType) => {
-  specialization.value = ''
-  typeGuidance.value = null
-  if (!newType) {
-    schemaProps.value = []
-    schemaRequired.value = new Set()
-    schemaDescriptors.value = {}
-    return
-  }
-  void Effect.runPromise(svc.getEntitySchemata(newType))
+// Guards against out-of-order schema responses when type/specialization change quickly.
+let schemaRequestSeq = 0
+
+const loadEffectiveSchema = (type: string, spec: string, preserveRows: boolean) => {
+  const requestId = ++schemaRequestSeq
+  void Effect.runPromise(svc.getEntitySchemata(type, spec))
     .then((info) => {
+      if (requestId !== schemaRequestSeq) return
+      const previousSchemaKeys = schemaProps.value
       schemaProps.value = [...info.properties]
       schemaRequired.value = new Set(info.required)
       schemaDescriptors.value = info.descriptors
-      properties.value = info.properties.length > 0
-        ? [...info.properties].map((key) => ({
-            key,
-            value: info.descriptors[key]?.default ?? '',
-            adHocType: 'string',
-          }))
-        : []
+      properties.value = preserveRows
+        ? reconcileRowsWithSchema(properties.value, previousSchemaKeys, info)
+        : rowsFromSchema(info)
     })
     .catch((error: unknown) => {
+      if (requestId !== schemaRequestSeq) return
       schemaProps.value = []
       schemaRequired.value = new Set()
       schemaDescriptors.value = {}
       formError.value = readErrorMessage(error)
     })
+}
+
+// A type switch resets the specialization; that programmatic reset must not
+// re-run the specialization watcher's row-preserving reload across types.
+let specializationResetByTypeChange = false
+
+watch(artifactType, (newType) => {
+  if (specialization.value !== '') {
+    specializationResetByTypeChange = true
+    specialization.value = ''
+  }
+  typeGuidance.value = null
+  if (!newType) {
+    schemaRequestSeq += 1
+    schemaProps.value = []
+    schemaRequired.value = new Set()
+    schemaDescriptors.value = {}
+    return
+  }
+  loadEffectiveSchema(newType, '', false)
   void Effect.runPromise(svc.getAuthoringGuidance({ entityTypes: [newType] }))
     .then((info) => {
       typeGuidance.value = info
@@ -95,6 +111,18 @@ watch(artifactType, (newType) => {
     .catch(() => {
       typeGuidance.value = null
     })
+})
+
+watch(specialization, (newSpec, oldSpec) => {
+  if (specializationResetByTypeChange) {
+    specializationResetByTypeChange = false
+    return
+  }
+  if (newSpec === oldSpec || !artifactType.value) return
+  // The effective schema changes with the specialization; re-preview before create.
+  preview.value = null
+  previewClean.value = false
+  loadEffectiveSchema(artifactType.value, newSpec, true)
 })
 
 watch(name, () => {
@@ -317,11 +345,19 @@ const doCreate = () => {
             :key="i"
             class="prop-row"
           >
+            <span
+              v-if="schemaProps.includes(row.key)"
+              class="prop-key-label"
+              :title="row.key"
+            >{{ row.key }}<span
+              v-if="schemaRequired.has(row.key)"
+              class="required"
+            > *</span></span>
             <input
+              v-else
               :value="row.key"
               class="prop-key"
-              :placeholder="schemaRequired.has(row.key) ? row.key + ' *' : 'key'"
-              :readonly="schemaProps.includes(row.key)"
+              placeholder="key"
               @input="row.key = ($event.target as HTMLInputElement).value"
             >
             <TypedPropertyInput
@@ -491,9 +527,22 @@ const doCreate = () => {
 }
 .form-select:focus { border-color: #2563eb; }
 
-.prop-row { display: flex; gap: 6px; margin-bottom: 6px; align-items: center; }
-.prop-key { flex: 1; padding: 6px 8px; border-radius: 6px; border: 1px solid #d1d5db; font-size: 12px; outline: none; }
-.prop-value { flex: 2; padding: 6px 8px; border-radius: 6px; border: 1px solid #d1d5db; font-size: 12px; outline: none; }
+.prop-row { display: flex; gap: 8px; margin-bottom: 8px; align-items: flex-start; }
+.prop-key-label {
+  flex: 0 0 150px; font-size: 12px; font-weight: 500; color: #374151;
+  padding-top: 7px; overflow-wrap: break-word; min-width: 0;
+}
+.prop-key {
+  flex: 0 0 150px; padding: 6px 8px; border-radius: 6px; border: 1px solid #d1d5db;
+  font-size: 12px; outline: none; box-sizing: border-box; min-width: 0;
+}
+.prop-key:focus { border-color: #2563eb; }
+.prop-type-select {
+  flex: 0 0 auto; padding: 6px; border-radius: 6px; border: 1px solid #d1d5db;
+  font-size: 12px; color: #374151; background: white; outline: none; cursor: pointer;
+}
+.prop-type-select:focus { border-color: #2563eb; }
+.prop-row .icon-btn { margin-top: 5px; }
 .icon-btn {
   width: 22px; height: 22px; border-radius: 4px; border: 1px solid #d1d5db;
   background: white; cursor: pointer; font-size: 14px; line-height: 1;

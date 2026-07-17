@@ -65,6 +65,63 @@ export const mkStyleRule = (representation: Representation): StyleRuleNode => {
   }
 }
 
+/** The gradient-endpoint pair a fresh scale rule starts from — the distance heat pair,
+ * matching the most common scale use (styling by hop distance from an anchor). */
+export const DEFAULT_SCALE_TOKENS: readonly [string, string] = ['heat-near', 'heat-far']
+
+/** Switching a rule's mode clears every other mode's fields (a definition mixing fields
+ * across modes is rejected server-side) and seeds the target mode's required ones:
+ * `match` gets a fresh criteria group + first token, `scale` gets the default endpoint
+ * pair. Same-mode switches are identity. */
+export const withStyleMode = (rule: StyleRuleNode, mode: StyleMode): StyleRuleNode => {
+  if (rule.mode === mode) return rule
+  const cleared: StyleRuleNode = {
+    ...rule, mode, matchCriteria: null, value: null, rangeAttribute: null, rangeBands: [],
+    scaleAttribute: null, scaleMin: null, scaleMax: null, scaleTokens: null,
+  }
+  if (mode === 'match') {
+    return {
+      ...cleared,
+      matchCriteria: mkGroup(isEdgeCapability(rule.capability) ? 'connection' : 'entity'),
+      value: STYLE_TOKENS[0],
+    }
+  }
+  return mode === 'scale' ? { ...cleared, scaleTokens: DEFAULT_SCALE_TOKENS } : cleared
+}
+
+/** A scale bound as typed: empty = data-driven (`null`), numeric text = number, anything
+ * else (e.g. an ISO date) stays a string — the same shapes the backend bound parser takes. */
+export const parseScaleBound = (raw: string): number | string | null => {
+  const trimmed = raw.trim()
+  if (trimmed === '') return null
+  const parsed = Number(trimmed)
+  return Number.isNaN(parsed) ? trimmed : parsed
+}
+
+export type ExplorationLayout = 'clusters' | 'radial' | 'force'
+
+export const EXPLORATION_LAYOUTS: readonly ExplorationLayout[] = ['clusters', 'radial', 'force']
+
+/** The exploration `display_options.layout` value, if present and recognised. */
+export const layoutOption = (displayOptions: Record<string, unknown>): ExplorationLayout | null => {
+  const value = displayOptions.layout
+  return typeof value === 'string' && (EXPLORATION_LAYOUTS as readonly string[]).includes(value)
+    ? (value as ExplorationLayout)
+    : null
+}
+
+/** Display options with `layout` set, or with the key removed entirely (`null` = auto —
+ * absence is the wire representation of the default). */
+export const withLayoutOption = (
+  displayOptions: Record<string, unknown>,
+  layout: ExplorationLayout | null,
+): Record<string, unknown> => {
+  const next = { ...displayOptions }
+  if (layout === null) delete next.layout
+  else next.layout = layout
+  return next
+}
+
 export interface ColumnSpecNode {
   readonly id: string
   label: string

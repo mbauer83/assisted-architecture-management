@@ -61,4 +61,20 @@ describe('derivedLegend', () => {
       { token: 'neutral', usageCount: 1 },
     ])
   })
+
+  it('counts scale-mode endpoint values, including explicit hex colors', () => {
+    const presentation = mkPresentation('exploration')
+    presentation.stylingRules = [
+      {
+        id: 'r1', capability: 'node_color', appliesTo: [], mode: 'scale', matchCriteria: null,
+        rangeAttribute: null, rangeBands: [], value: null,
+        scaleAttribute: 'derived.impact-distance', scaleMin: null, scaleMax: null,
+        scaleTokens: ['heat-near', '#123456'],
+      },
+    ]
+    expect(derivedLegend(presentation)).toEqual([
+      { token: 'heat-near', usageCount: 1 },
+      { token: '#123456', usageCount: 1 },
+    ])
+  })
 })

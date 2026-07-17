@@ -180,3 +180,107 @@ viewpoints:
       traversal: both
       include_potential: true
       max_hops: 5
+- slug: impacted-entity-diagram
+  version: 3
+  name: ArchiMate Impact Analysis
+  purpose: informing
+  content: overview
+  description: Shows all entities related directly and indirectly to to a given entity
+  stakeholders:
+  - All Users
+  query:
+    query_schema: 1
+    entity_criteria:
+      kind: group
+      conjunction: and
+      children:
+      - kind: condition
+        attribute: id
+        comparator: eq
+        value:
+          from: parameter
+          name: source_entity_id
+    include_connected:
+    - connection_criteria:
+        kind: group
+        conjunction: and
+        children: []
+      neighbor_criteria:
+        kind: group
+        conjunction: and
+        children: []
+    - connection_criteria:
+        kind: group
+        conjunction: and
+        children: []
+      neighbor_criteria:
+        kind: group
+        conjunction: and
+        children: []
+      traversal: derived
+    parameters:
+    - name: source_entity_id
+      type: entity-id
+  presentation:
+    representation: diagram
+- slug: element-dependents-archimate
+  version: 1
+  name: ArchiMate Impact Analysis (Dependents)
+  purpose:
+  - informing
+  - deciding
+  content:
+  - overview
+  - coherence
+  stakeholders:
+  - architects
+  - product owners
+  - team leads
+  - operational managers
+  concerns:
+  - what is affected if this element changes
+  query:
+    query_schema: 1
+    entity_criteria:
+      kind: group
+      conjunction: and
+      children:
+      - kind: condition
+        attribute: id
+        comparator: eq
+        value:
+          from: parameter
+          name: anchor
+    include_connected:
+    - direction: incoming
+      connection_criteria:
+        kind: group
+        conjunction: and
+        children: []
+      neighbor_criteria:
+        kind: group
+        conjunction: and
+        children: []
+      traversal: derived
+      max_hops: 4
+    connections:
+      traversal: both
+    parameters:
+    - name: anchor
+      type: entity-id
+      description: The element whose dependents are analyzed
+    derived:
+    - name: impact-distance
+      direction: incoming
+      traversal: derived
+      reduce: min
+      of: relationship.hops
+  presentation:
+    representation: diagram
+    styling_rules:
+    - capability: node_color
+      match_criteria:
+        kind: group
+        conjunction: and
+        children: []
+      value: emphasis

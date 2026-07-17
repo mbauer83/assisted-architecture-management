@@ -155,7 +155,7 @@ export interface ModelRepository {
   readonly deleteEntity: (body: {
     artifact_id: string; dry_run?: boolean;
   }) => Effect.Effect<WriteResult, RepoError>
-  readonly getEntitySchemata: (artifactType: string) => Effect.Effect<EntitySchemaInfo, RepoError>
+  readonly getEntitySchemata: (artifactType: string, specialization?: string) => Effect.Effect<EntitySchemaInfo, RepoError>
   readonly getDiagramEntities: (diagramId: string) => Effect.Effect<EntitySummary[], RepoError>
   readonly getDiagramConnections: (diagramId: string) => Effect.Effect<DiagramConnection[], RepoError>
   readonly getDiagramSvg: (diagramId: string) => Effect.Effect<string, RepoError>

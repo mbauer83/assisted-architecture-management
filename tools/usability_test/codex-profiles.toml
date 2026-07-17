@@ -1,0 +1,47 @@
+# Codex CLI profiles for executing PROMPT-viewpoint-usability-stress-test.md.
+# Merge into ~/.codex/config.toml (or keep separate and pass each setting via
+# `-c key=value`). Substitute the model ids with the exact identifiers your Codex
+# tenant exposes for the GPT-5.6 family (check with `codex /model` or your model list):
+#   Sol   -> frontier class   (orchestrator, heuristic pass A)
+#   Terra -> Opus-class       (all personas, heuristic pass B, FMEA calibrator)
+#   Luna  -> mid class        (NOT used for personas or judgement; optional glue only)
+#
+# Key-name caveat: written against Codex CLI config syntax as of early 2026
+# (model / model_reasoning_effort / approval_policy / sandbox_mode / [profiles.*] /
+# [mcp_servers.*]). Verify against `codex --help` for your installed version.
+
+# Playwright MCP server — each codex process spawns its OWN instance (stdio), so every
+# persona subprocess gets a fresh browser: stronger isolation than a shared browser.
+[mcp_servers.playwright]
+command = "npx"
+args = ["-y", "@playwright/mcp@latest"]
+
+[profiles.vp-orchestrator]
+model = "gpt-5.6-sol"
+model_reasoning_effort = "high"
+approval_policy = "on-request"
+sandbox_mode = "workspace-write"   # writes run artifacts under test-results/ and the report
+
+[profiles.vp-persona]
+model = "gpt-5.6-terra"
+model_reasoning_effort = "medium"  # uniform for ALL personas — never vary per persona
+approval_policy = "never"
+sandbox_mode = "read-only"         # personas never write files; logs come back on stdout
+
+[profiles.vp-heuristic-a]
+model = "gpt-5.6-sol"
+model_reasoning_effort = "high"
+approval_policy = "never"
+sandbox_mode = "read-only"
+
+[profiles.vp-heuristic-b]
+model = "gpt-5.6-terra"            # deliberately a different class than pass A
+model_reasoning_effort = "high"
+approval_policy = "never"
+sandbox_mode = "read-only"
+
+[profiles.vp-fmea]
+model = "gpt-5.6-terra"
+model_reasoning_effort = "high"
+approval_policy = "never"
+sandbox_mode = "read-only"

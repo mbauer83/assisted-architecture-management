@@ -1,9 +1,10 @@
 import { describe, it, expect } from 'vitest'
 import {
   groupKeyFor, nodeVisualFor, edgeVisualFor, projectionByItemId, edgeStyleKey, buildConnectionStyleIndex,
-  nodeShapePoints, explorationRedirectFor,
+  nodeShapePoints, explorationRedirectFor, hopDistances, effectiveExplorationLayout, distanceColor, distanceLegend,
+  contrastTextColor,
 } from '../GraphExploreView.helpers'
-import { tokenColor, tokenShape, tokenIconLetter, tokenEdgeEmphasis } from '../../lib/viewpointStyleTokens'
+import { tokenColor, tokenShape, tokenIconLetter, tokenEdgeEmphasis, resolveStyleColor } from '../../lib/viewpointStyleTokens'
 import type { ViewpointDefinitionEnvelope } from '../../../domain'
 
 const mkEnvelope = (representation: string | null): ViewpointDefinitionEnvelope => ({
@@ -126,6 +127,123 @@ describe('explorationRedirectFor', () => {
 
   it('stays put when no envelope was found for the selected slug', () => {
     expect(explorationRedirectFor(undefined)).toBeNull()
+  })
+})
+
+describe('hopDistances', () => {
+  const edge = (source: string, target: string) => ({ source, target })
+
+  it('computes BFS depth from a single anchor over undirected edges', () => {
+    const distances = hopDistances(
+      ['a'],
+      [edge('a', 'b'), edge('c', 'b'), edge('c', 'd')],
+      ['a', 'b', 'c', 'd'],
+    )
+    expect(distances.get('a')).toBe(0)
+    expect(distances.get('b')).toBe(1)
+    expect(distances.get('c')).toBe(2) // reached against the c→b edge direction
+    expect(distances.get('d')).toBe(3)
+  })
+
+  it('takes the shortest path when several exist', () => {
+    const distances = hopDistances(
+      ['a'],
+      [edge('a', 'b'), edge('b', 'c'), edge('c', 'd'), edge('a', 'd')],
+      ['a', 'b', 'c', 'd'],
+    )
+    expect(distances.get('d')).toBe(1)
+    expect(distances.get('c')).toBe(2)
+  })
+
+  it('is multi-source: each node gets the distance to its nearest anchor', () => {
+    const distances = hopDistances(
+      ['a', 'z'],
+      [edge('a', 'b'), edge('b', 'c'), edge('c', 'z')],
+      ['a', 'b', 'c', 'z'],
+    )
+    expect(distances.get('a')).toBe(0)
+    expect(distances.get('z')).toBe(0)
+    expect(distances.get('b')).toBe(1)
+    expect(distances.get('c')).toBe(1)
+  })
+
+  it('omits unreachable nodes from the map', () => {
+    const distances = hopDistances(['a'], [edge('a', 'b')], ['a', 'b', 'island'])
+    expect(distances.has('island')).toBe(false)
+    expect(distances.size).toBe(2)
+  })
+
+  it('ignores anchors and edge endpoints outside the node population', () => {
+    const distances = hopDistances(['ghost', 'a'], [edge('a', 'ghost'), edge('a', 'b')], ['a', 'b'])
+    expect(distances.get('a')).toBe(0)
+    expect(distances.get('b')).toBe(1)
+    expect(distances.has('ghost')).toBe(false)
+  })
+})
+
+describe('effectiveExplorationLayout', () => {
+  it('lets an explicit user override win over everything', () => {
+    expect(effectiveExplorationLayout('force', 'radial', true)).toBe('force')
+    expect(effectiveExplorationLayout('clusters', undefined, true)).toBe('clusters')
+  })
+
+  it('uses the definition display option when the override is auto', () => {
+    expect(effectiveExplorationLayout('auto', 'force', true)).toBe('force')
+    expect(effectiveExplorationLayout('auto', 'clusters', true)).toBe('clusters')
+  })
+
+  it('ignores an unknown or absent display option', () => {
+    expect(effectiveExplorationLayout('auto', 'spiral', false)).toBe('clusters')
+    expect(effectiveExplorationLayout('auto', undefined, false)).toBe('clusters')
+  })
+
+  it('defaults an anchored execution to radial and an unanchored one to clusters', () => {
+    expect(effectiveExplorationLayout('auto', undefined, true)).toBe('radial')
+    expect(effectiveExplorationLayout('auto', undefined, false)).toBe('clusters')
+  })
+})
+
+describe('contrastTextColor', () => {
+  it('uses white text on dark fills and dark ink on light fills', () => {
+    expect(contrastTextColor('#dc2626')).toBe('#ffffff')
+    expect(contrastTextColor('#4f6d83')).toBe('#ffffff')
+    expect(contrastTextColor('#fbbf24')).toBe('#252327')
+    expect(contrastTextColor('#ffffff')).toBe('#252327')
+  })
+
+  it('defaults to dark ink for non-hex input', () => {
+    expect(contrastTextColor('neutral')).toBe('#252327')
+  })
+})
+
+describe('distanceColor', () => {
+  it('maps depth 0 to the near endpoint and max depth to the far endpoint', () => {
+    expect(distanceColor(0, 4)).toBe(tokenColor('heat-near'))
+    expect(distanceColor(4, 4)).toBe(tokenColor('heat-far'))
+  })
+
+  it('uses the near endpoint when everything is at depth 0', () => {
+    expect(distanceColor(0, 0)).toBe(tokenColor('heat-near'))
+  })
+
+  it('interpolates intermediate depths on the heat-near→heat-far scale', () => {
+    expect(distanceColor(1, 2)).toBe(resolveStyleColor({ position: 0.5, tokens: ['heat-near', 'heat-far'] }))
+    expect(distanceColor(1, 2)).not.toBe(tokenColor('heat-near'))
+    expect(distanceColor(1, 2)).not.toBe(tokenColor('heat-far'))
+  })
+})
+
+describe('distanceLegend', () => {
+  it('produces one chip per hop count with the node colors', () => {
+    const legend = distanceLegend(2)
+    expect(legend.map((entry) => entry.label)).toEqual(['0 hops', '1 hop', '2 hops'])
+    expect(legend[0].color).toBe(tokenColor('heat-near'))
+    expect(legend[2].color).toBe(tokenColor('heat-far'))
+    expect(legend[1].color).toBe(distanceColor(1, 2))
+  })
+
+  it('shows a single near-colored chip for a depth-0-only population', () => {
+    expect(distanceLegend(0)).toEqual([{ label: '0 hops', color: tokenColor('heat-near') }])
   })
 })
 

@@ -27,7 +27,8 @@ import { presentationFromMapping } from '../../domain/viewpointPresentationSeria
 import { resolveElementMap } from '../lib/diagramViewerExtensions'
 import { sanitizeDiagramSvg } from '../lib/svgSanitize'
 import {
-  applyEdgeHighlightOverlay, applyNodeColorOverlay, markDerivedConnections, projectionByItemId,
+  anchorBadges, applyEdgeHighlightOverlay, applyNodeColorOverlay, centerAnchorsAfterFit,
+  markAnchorEntities, markDerivedConnections, projectionByItemId,
   toDiagramConnectionStub, toEntitySummaryStub,
 } from './ViewpointDiagramView.helpers'
 import type { ViewpointDefinitionEnvelope } from '../../domain'
@@ -100,10 +101,13 @@ const sidebarResize = useSidebarResize(mainGridRef)
 
 watch(svgHtml, (svg) => { if (svg) void panZoom.fitDiagramToViewport() })
 
-const applyOverlay = () => {
+const anchorLegend = computed(() =>
+  anchorBadges(execution.result.value?.anchor_ids ?? [], execution.result.value?.entities ?? []))
+
+const applyOverlay = (): readonly Element[] => {
   const svgEl = svgContainer.value?.querySelector('svg')
   const result = execution.result.value
-  if (!svgEl || !result) return
+  if (!svgEl || !result) return []
   const entityStyleById = projectionByItemId(execution.projection.value?.items ?? [])
   const { nodes, edges } = resolveElementMap('archimate-layered', svgEl, {
     entities: diagramEntities.value,
@@ -115,7 +119,10 @@ const applyOverlay = () => {
     applyEdgeHighlightOverlay(elems, style?.edge_color, style?.edge_emphasis)
   }
   markDerivedConnections(edges, diagramConnections.value)
+  return markAnchorEntities(result.anchor_ids, nodes)
 }
+
+const panBy = (dx: number, dy: number) => { panZoom.tx.value += dx; panZoom.ty.value += dy }
 
 const runExecution = async (resolved: ResolvedViewpointExecution) => {
   await execution.execute(resolved)
@@ -131,7 +138,7 @@ const runExecution = async (resolved: ResolvedViewpointExecution) => {
     diagramError.value = String(exit.cause)
   }
   await nextTick()
-  applyOverlay()
+  await centerAnchorsAfterFit(applyOverlay(), containerRef.value, panZoom.fitDiagramToViewport, panBy)
 }
 const prompt = useViewpointParameterPrompt(runExecution, definitions)
 
@@ -165,6 +172,17 @@ onMounted(() => { if (slug.value) void load() })
       :query-summary="execution.result.value?.query_summary ?? ''"
       @rerun="rerun"
     />
+
+    <div
+      v-if="anchorLegend.length && !prompt.visible.value"
+      class="anchor-legend"
+    >
+      <span
+        v-for="badge in anchorLegend"
+        :key="badge.id"
+        class="anchor-badge"
+      >◎ anchor: {{ badge.name }}</span>
+    </div>
 
     <div
       v-for="warning in diagramWarnings"
@@ -269,6 +287,8 @@ onMounted(() => { if (slug.value) void load() })
 .state-msg { color: #9ca3af; font-size: 14px; padding: 24px 0; }
 .state-msg--error { color: #dc2626; }
 .diagram-warning { color: #92400e; background: #fef3c7; padding: 4px 8px; border-radius: 4px; font-size: 12px; margin-bottom: 6px; }
+.anchor-legend { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 6px; }
+.anchor-badge { color: #6d28d9; background: #f5f3ff; border: 1px dashed #8b5cf6; border-radius: 4px; padding: 2px 8px; font-size: 12px; }
 
 .main-grid { --sidebar-width: 320px; display: grid; grid-template-columns: minmax(0, 1fr) 12px var(--sidebar-width); gap: 0; align-items: start; }
 @media (max-width: 800px) { .main-grid { grid-template-columns: 1fr; } }

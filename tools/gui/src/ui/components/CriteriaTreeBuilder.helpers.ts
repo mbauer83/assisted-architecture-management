@@ -75,6 +75,13 @@ export const enumChoicesFor = (attribute: string, groupKind: GroupKind, catalog:
  * contexts); no schema attribute declares an entity-reference type today. */
 export const isEntityReferencePath = (attribute: string): boolean => attribute === 'id'
 
+/** Display labels for reserved paths whose raw name undersells what they filter on:
+ * `group` is the project/directory membership facet, so surface that in the picker. */
+const ATTRIBUTE_PATH_LABELS: Readonly<Record<string, string>> = { group: 'group (project)' }
+
+export const attributeOptionLabel = (option: AttributeOption): string =>
+  ATTRIBUTE_PATH_LABELS[option.path] ?? option.path
+
 export interface ValueKindOption {
   kind: ValueRefKind
   label: string

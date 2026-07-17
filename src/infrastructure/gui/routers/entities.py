@@ -203,31 +203,43 @@ def _attribute_descriptors(schema: dict[str, Any]) -> dict[str, dict[str, Any]]:
 
 
 @router.get("/api/entity-schemata")
-def get_entity_schemata(artifact_type: str) -> dict[str, Any]:
+def get_entity_schemata(artifact_type: str, specialization: str = "") -> dict[str, Any]:
+    """Effective attribute schema for an entity type, merged with the selected
+    specialization's contributed attributes — the same schema the verifier
+    validates against, so the authoring form and verification can never drift."""
     repo_root = s.maybe_engagement_root()
     if repo_root is None:
         raise HTTPException(500, "Repository not initialized")
     from src.application.artifact_schema import (
-        load_attribute_schema,
+        compute_effective_attribute_schema,
         schema_all_properties,
         schema_required_properties,
     )
 
-    schema = load_attribute_schema(repo_root, artifact_type)
+    schema, conflicts = compute_effective_attribute_schema(
+        repo_root,
+        artifact_type,
+        specialization,
+        specialization_catalog=_catalogs().specializations,
+    )
     if schema is None:
         return {
             "artifact_type": artifact_type,
+            "specialization": specialization,
             "schema": None,
             "properties": [],
             "required": [],
             "descriptors": {},
+            "conflicts": conflicts,
         }
     return {
         "artifact_type": artifact_type,
+        "specialization": specialization,
         "schema": schema,
         "properties": schema_all_properties(schema),
         "required": schema_required_properties(schema),
         "descriptors": _attribute_descriptors(schema),
+        "conflicts": conflicts,
     }
 
 

@@ -1,7 +1,8 @@
 /**
  * Pure helpers for the viewpoint-driven exploration mode: `group_by` -> cluster key
- * resolution, and style-token -> node/edge visual mapping layered on top of
- * `viewpointStyleTokens.ts`'s fixed vocabulary.
+ * resolution, style-token -> node/edge visual mapping layered on top of
+ * `viewpointStyleTokens.ts`'s fixed vocabulary, and anchored-execution derivations
+ * (hop distances, layout choice, distance coloring).
  */
 
 import type {
@@ -89,6 +90,96 @@ export const nodeShapePoints = (shape: NodeVisual['shape'], radius: number): str
     points.push(`${(Math.cos(angle) * radius).toFixed(2)},${(Math.sin(angle) * radius).toFixed(2)}`)
   }
   return points.join(' ')
+}
+
+/** Multi-source BFS over the undirected edge set: hop distance from the nearest anchor
+ * for every reachable node. Unreachable nodes (and anchors absent from `nodeIds`) are
+ * simply absent from the map — callers treat "no distance" as its own visual category. */
+export const hopDistances = (
+  anchorIds: readonly string[],
+  edges: readonly { source: string; target: string }[],
+  nodeIds: readonly string[],
+): Map<string, number> => {
+  const nodeSet = new Set(nodeIds)
+  const adjacency = new Map<string, string[]>()
+  for (const edge of edges) {
+    if (!nodeSet.has(edge.source) || !nodeSet.has(edge.target)) continue
+    if (!adjacency.has(edge.source)) adjacency.set(edge.source, [])
+    if (!adjacency.has(edge.target)) adjacency.set(edge.target, [])
+    adjacency.get(edge.source)!.push(edge.target)
+    adjacency.get(edge.target)!.push(edge.source)
+  }
+  const distances = new Map<string, number>()
+  const queue: string[] = []
+  for (const anchorId of anchorIds) {
+    if (nodeSet.has(anchorId) && !distances.has(anchorId)) {
+      distances.set(anchorId, 0)
+      queue.push(anchorId)
+    }
+  }
+  for (let head = 0; head < queue.length; head++) {
+    const current = queue[head]
+    const depth = distances.get(current)!
+    for (const neighbor of adjacency.get(current) ?? []) {
+      if (!distances.has(neighbor)) {
+        distances.set(neighbor, depth + 1)
+        queue.push(neighbor)
+      }
+    }
+  }
+  return distances
+}
+
+export type ExplorationLayoutChoice = 'clusters' | 'radial' | 'force'
+export type ExplorationLayoutOverride = ExplorationLayoutChoice | 'auto'
+
+const EXPLORATION_LAYOUT_VALUES: readonly ExplorationLayoutChoice[] = ['clusters', 'radial', 'force']
+
+/** Which layout the exploration surface should apply for the current execution: an
+ * explicit in-session user override always wins; otherwise the definition's validated
+ * `display_options.layout` (an unknown/absent value is ignored, not an error); otherwise
+ * an anchored execution defaults to the anchor-centric radial layout and an unanchored
+ * one to the `group_by` cluster packing. */
+export const effectiveExplorationLayout = (
+  override: ExplorationLayoutOverride,
+  displayOptionLayout: unknown,
+  anchored: boolean,
+): ExplorationLayoutChoice => {
+  if (override !== 'auto') return override
+  const declared = EXPLORATION_LAYOUT_VALUES.find((value) => value === displayOptionLayout)
+  if (declared) return declared
+  return anchored ? 'radial' : 'clusters'
+}
+
+/** Hop-distance fill for nodes the projection leaves uncolored: the same
+ * `heat-near`→`heat-far` spectrum scale-mode style rules use, so distance reads
+ * consistently across surfaces. Depth 0 (the anchor itself) is the near endpoint. */
+export const distanceColor = (depth: number, maxDepth: number): string =>
+  resolveStyleColor({ position: maxDepth > 0 ? depth / maxDepth : 0, tokens: ['heat-near', 'heat-far'] })
+
+export interface DistanceLegendEntry {
+  readonly label: string
+  readonly color: string
+}
+
+/** One legend chip per hop count, colored exactly as `distanceColor` colors the nodes. */
+export const distanceLegend = (maxDepth: number): readonly DistanceLegendEntry[] =>
+  maxDepth < 0
+    ? []
+    : Array.from({ length: maxDepth + 1 }, (_, depth) => ({
+        label: depth === 1 ? '1 hop' : `${depth} hops`,
+        color: distanceColor(depth, maxDepth),
+      }))
+
+/** Legible text color for glyphs drawn on top of a node fill: dark ink on light fills,
+ * white on dark fills, decided by perceived (YIQ) brightness. Non-hex input (never
+ * produced by the fill pipeline) defaults to dark ink. */
+export const contrastTextColor = (fillColor: string): string => {
+  const match = /^#([0-9a-f]{6})$/i.exec(fillColor)
+  if (!match) return '#252327'
+  const [r, g, b] = [0, 2, 4].map((offset) => parseInt(match[1].slice(offset, offset + 2), 16))
+  const brightness = (r * 299 + g * 587 + b * 114) / 1000
+  return brightness >= 145 ? '#252327' : '#ffffff'
 }
 
 export interface EdgeVisual {

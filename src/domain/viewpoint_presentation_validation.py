@@ -12,6 +12,7 @@ from src.domain.viewpoint_criteria_validation import (
     validate_depth_cap,
     validate_entity_criteria,
 )
+from src.domain.viewpoint_style_values import is_valid_style_value, style_value_error
 from src.domain.viewpoint_validation_issue import ViewpointValidationIssue
 from src.domain.viewpoints import (
     GROUP_BY_DIMENSIONS,
@@ -23,6 +24,21 @@ from src.domain.viewpoints import (
 
 LABEL_ATTRIBUTE_OPTION = "label_attribute"
 _LABEL_ATTRIBUTE_REPRESENTATIONS: frozenset[Representation] = frozenset({"exploration", "diagram"})
+
+LAYOUT_OPTION = "layout"
+_LAYOUT_REPRESENTATIONS: frozenset[Representation] = frozenset({"exploration"})
+VALID_EXPLORATION_LAYOUTS: frozenset[str] = frozenset({"clusters", "radial", "force"})
+
+
+def _style_value_issues(capability: str, values: tuple[tuple[str, str], ...]) -> list[ViewpointValidationIssue]:
+    """One ``unknown-style-value`` error per ``(path, value)`` outside *capability*'s
+    value domain (color capabilities: token or ``#rrggbb``; notation capabilities:
+    semantic tokens; anything else is free-form and never flagged)."""
+    return [
+        issue("error", "unknown-style-value", path, style_value_error(capability, value))
+        for path, value in values
+        if not is_valid_style_value(capability, value)
+    ]
 
 
 def _validate_group_by_field(
@@ -135,7 +151,17 @@ def _validate_style_rule(
     else:
         issues.extend(_validate_scale_rule(rule, path=path, registries=registries))
     issues.extend(_validate_mode_fields(rule, path=path))
+    issues.extend(_style_value_issues(rule.capability, _rule_style_values(rule, path=path)))
     return issues
+
+
+def _rule_style_values(rule: StyleRule, *, path: str) -> tuple[tuple[str, str], ...]:
+    values: list[tuple[str, str]] = []
+    if rule.value is not None:
+        values.append((f"{path}/value", rule.value))
+    values.extend((f"{path}/range_bands/{index}/value", band.value) for index, band in enumerate(rule.range_bands))
+    values.extend((f"{path}/scale_tokens/{index}", token) for index, token in enumerate(rule.scale_tokens))
+    return tuple(values)
 
 
 def _validate_scale_rule(
@@ -196,6 +222,21 @@ def _validate_mode_fields(rule: StyleRule, *, path: str) -> list[ViewpointValida
     ]
 
 
+def _validate_layout_option(presentation: PresentationSpec, *, path: str) -> list[ViewpointValidationIssue]:
+    if LAYOUT_OPTION not in presentation.display_options:
+        return []
+    option_path = f"{path}/display_options/{LAYOUT_OPTION}"
+    if presentation.representation not in _LAYOUT_REPRESENTATIONS:
+        representation = presentation.representation
+        message = f"display option {LAYOUT_OPTION!r} is unsupported by representation {representation!r}"
+        return [issue("error", "unsupported-display-option", option_path, message)]
+    value = presentation.display_options[LAYOUT_OPTION]
+    if not isinstance(value, str) or value not in VALID_EXPLORATION_LAYOUTS:
+        layouts = ", ".join(sorted(VALID_EXPLORATION_LAYOUTS))
+        return [issue("error", "unknown-layout", option_path, f"layout must be one of: {layouts}")]
+    return []
+
+
 def _validate_label_attribute(
     presentation: PresentationSpec, *, path: str, registries: RegistrySnapshot
 ) -> list[ViewpointValidationIssue]:
@@ -221,7 +262,7 @@ def validate_presentation(
     issues: list[ViewpointValidationIssue] = []
     capabilities = REPRESENTATION_CAPABILITIES[presentation.representation]
     for option in presentation.display_options:
-        if option == LABEL_ATTRIBUTE_OPTION:
+        if option in (LABEL_ATTRIBUTE_OPTION, LAYOUT_OPTION):
             continue
         if option not in capabilities:
             issues.append(
@@ -233,7 +274,8 @@ def validate_presentation(
                 )
             )
     issues.extend(_validate_label_attribute(presentation, path=path, registries=registries))
-    for key in presentation.default_style:
+    issues.extend(_validate_layout_option(presentation, path=path))
+    for key, token in presentation.default_style.items():
         if key not in capabilities:
             issues.append(
                 issue(
@@ -243,6 +285,7 @@ def validate_presentation(
                     f"capability {key!r} is unsupported by representation {presentation.representation!r}",
                 )
             )
+        issues.extend(_style_value_issues(key, ((f"{path}/default_style/{key}", token),)))
     for index, rule in enumerate(presentation.styling_rules):
         issues.extend(
             _validate_style_rule(

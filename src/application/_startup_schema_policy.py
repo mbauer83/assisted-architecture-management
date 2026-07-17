@@ -15,6 +15,8 @@ from typing import TYPE_CHECKING, Any
 import jsonschema
 import yaml
 
+from src.application.artifact_schema import list_schema_files
+
 if TYPE_CHECKING:
     from src.application.artifact_repository import ArtifactRepository
 
@@ -130,8 +132,11 @@ def validate_attribute_schemata_policy(
         return errors, warnings
 
     policy = get_required_defaults_policy(repo_root)
-    for schema_path in sorted(schemata_dir.glob("attributes.*.schema.json")):
-        errs, warns = _validate_one_schema_file(schema_path, policy)
+    attribute_kinds = ("entity-attributes", "specialization-attachment")
+    for ref in list_schema_files(repo_root):
+        if ref.kind not in attribute_kinds:
+            continue
+        errs, warns = _validate_one_schema_file(schemata_dir / ref.filename, policy)
         errors.extend(errs)
         warnings.extend(warns)
     return errors, warnings

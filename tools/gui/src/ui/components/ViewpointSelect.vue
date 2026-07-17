@@ -28,7 +28,7 @@ watch(() => props.viewpoints, (viewpoints) => {
 
 <template>
   <select
-    class="inp"
+    class="inp viewpoint-select"
     :value="modelValue ?? ''"
     @change="onChange"
   >
@@ -44,3 +44,20 @@ watch(() => props.viewpoints, (viewpoints) => {
     </option>
   </select>
 </template>
+
+<style scoped>
+/* Self-contained look: this select is embedded in several hosts (graph toolbar,
+   diagram views) whose scoped styles cannot reach into it. */
+.viewpoint-select {
+  max-width: 260px;
+  padding: 5px 8px;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  background: white;
+  font-size: 12px;
+  color: #374151;
+  outline: none;
+  cursor: pointer;
+}
+.viewpoint-select:focus { border-color: #2563eb; }
+</style>

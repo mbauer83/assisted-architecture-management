@@ -97,6 +97,117 @@ export const applyEdgeHighlightOverlay = (
 export const projectionByItemId = (items: readonly ProjectedOccurrence[]): ReadonlyMap<string, ProjectedOccurrence> =>
   new Map(items.map((item) => [item.item_id, item]))
 
+/** Distinct accent for the anchor marker — deliberately outside the style-token palette
+ * (`viewpointStyleTokens.ts`) so an anchor stays identifiable no matter which `node_color`
+ * overlay token also applies to the same entity. */
+export const ANCHOR_MARKER_COLOR = '#7c3aed'
+
+/** Narrows the mapped node elements down to the execution's anchor entities (the ids the
+ * `entity-id` parameters resolved to), preserving anchor order. An anchor id with no
+ * matched SVG element (e.g. dropped from the final render) contributes nothing. */
+export const resolveAnchorElements = (
+  anchorIds: readonly string[],
+  nodes: ReadonlyMap<string, readonly Element[]>,
+): readonly Element[] => anchorIds.flatMap((id) => [...(nodes.get(id) ?? [])])
+
+/** Resolves the anchors' node elements and applies the anchor marker in one step —
+ * returns the marked elements so the caller can center them in the viewport. */
+export const markAnchorEntities = (
+  anchorIds: readonly string[],
+  nodes: ReadonlyMap<string, readonly Element[]>,
+): readonly Element[] => {
+  const anchorElems = resolveAnchorElements(anchorIds, nodes)
+  applyAnchorMarker(anchorElems)
+  return anchorElems
+}
+
+/** Anchor marker: a thick dashed halo ring cloned from the node's primary body shape and
+ * inserted underneath it, plus `data-anchor` on the matched group. The halo is a SEPARATE
+ * element rather than a stroke override on the body shape itself, so it composes with —
+ * never fights — a `node_color` overlay, which owns the body shape's own stroke. Skips
+ * groups already carrying a halo, so re-application never stacks rings. */
+export const applyAnchorMarker = (elems: readonly Element[]): void => {
+  for (const el of elems) {
+    el.setAttribute('data-anchor', 'true')
+    if (el.querySelector('[data-anchor-halo]')) continue
+    // PlantUML emits the node's body shape as the group's first rect/polygon/path,
+    // before any icon paths — halo only that one, not every decorative glyph.
+    const body = shapeChildren(el)[0]
+    if (!body?.parentNode) continue
+    const halo = body.cloneNode(false) as SVGElement
+    halo.setAttribute('data-anchor-halo', 'true')
+    halo.removeAttribute('id')
+    halo.style.setProperty('fill', 'none', 'important')
+    halo.style.setProperty('stroke', ANCHOR_MARKER_COLOR, 'important')
+    halo.style.setProperty('stroke-width', '6', 'important')
+    halo.style.setProperty('stroke-dasharray', '8 4', 'important')
+    halo.style.setProperty('pointer-events', 'none', 'important')
+    body.parentNode.insertBefore(halo, body)
+  }
+}
+
+export interface AnchorBadge {
+  readonly id: string
+  readonly name: string
+}
+
+/** Legend entries for the anchor badge row — resolves each anchor id to its entity name,
+ * falling back to the raw id when the entity is absent from the returned population. */
+export const anchorBadges = (
+  anchorIds: readonly string[],
+  entities: readonly EntityItemSummary[],
+): readonly AnchorBadge[] => {
+  const nameById = new Map(entities.map((entity) => [entity.id, entity.name]))
+  return anchorIds.map((id) => ({ id, name: nameById.get(id) ?? id }))
+}
+
+/** Screen-space rectangle (`getBoundingClientRect` shape, structurally). */
+export interface ScreenRect {
+  readonly left: number
+  readonly top: number
+  readonly width: number
+  readonly height: number
+}
+
+/** Smallest rect covering every input; `null` for an empty list. */
+export const unionRect = (rects: readonly ScreenRect[]): ScreenRect | null => {
+  if (rects.length === 0) return null
+  const left = Math.min(...rects.map((r) => r.left))
+  const top = Math.min(...rects.map((r) => r.top))
+  const right = Math.max(...rects.map((r) => r.left + r.width))
+  const bottom = Math.max(...rects.map((r) => r.top + r.height))
+  return { left, top, width: right - left, height: bottom - top }
+}
+
+/** Screen-space translation moving `target`'s center onto `viewport`'s center. The pan/zoom
+ * translate is applied outermost (before scale, origin 0 0), so screen pixels and translate
+ * pixels coincide regardless of the current zoom — the delta adds straight onto `tx`/`ty`. */
+export const centerDelta = (
+  viewport: ScreenRect,
+  target: ScreenRect,
+): { readonly dx: number; readonly dy: number } => ({
+  dx: viewport.left + viewport.width / 2 - (target.left + target.width / 2),
+  dy: viewport.top + viewport.height / 2 - (target.top + target.height / 2),
+})
+
+/** Re-fits the diagram, then pans the anchors' union bounding box to the viewport center
+ * via `panBy`. Awaiting `fit` first makes the sequence deterministic against the view's
+ * own fit-on-render watcher (fitting is idempotent), and both rects are only measured
+ * AFTER the fit so the screen-space delta reflects the final fitted transform. */
+export const centerAnchorsAfterFit = async (
+  anchorElems: readonly Element[],
+  container: Element | null,
+  fit: () => Promise<void>,
+  panBy: (dx: number, dy: number) => void,
+): Promise<void> => {
+  if (anchorElems.length === 0 || container === null) return
+  await fit()
+  const target = unionRect(anchorElems.map((el) => el.getBoundingClientRect()))
+  if (!target) return
+  const { dx, dy } = centerDelta(container.getBoundingClientRect(), target)
+  panBy(dx, dy)
+}
+
 /** Tags each derived connection's matched SVG elements with `data-certainty` — nothing
  * else reads the notation differently for a derived edge (PlantUML draws every connection
  * the same way regardless of provenance), so this is purely a hook for the sidebar's own

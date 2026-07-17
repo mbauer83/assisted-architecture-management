@@ -127,6 +127,25 @@ const CANONICAL_EXAMPLES: Record<string, unknown>[] = [
     },
   },
   {
+    slug: 'impact-heatmap', version: 1, name: 'Impact Heatmap',
+    query: {
+      query_schema: 1,
+      entity_criteria: { kind: 'group', conjunction: 'and', children: [] },
+    },
+    presentation: {
+      representation: 'exploration',
+      display_options: { layout: 'radial' },
+      styling_rules: [
+        {
+          capability: 'node_color', mode: 'scale',
+          scale_attribute: 'derived.impact-distance', scale_min: 0, scale_max: 6,
+          scale_tokens: ['heat-near', '#123456'],
+        },
+      ],
+      default_style: { node_color: '#a1b2c3' },
+    },
+  },
+  {
     slug: 'requirement-coverage', version: 1, name: 'Requirement Coverage',
     query: {
       query_schema: 1,
@@ -169,4 +188,27 @@ describe('canonical example round-trip', () => {
       expect(reMapping).toEqual(mapping)
     },
   )
+})
+
+describe('scale rule and layout wire keys', () => {
+  const example = CANONICAL_EXAMPLES.find((candidate) => candidate.slug === 'impact-heatmap')
+
+  it('round-trips scale_attribute/scale_min/scale_max/scale_tokens exactly', () => {
+    const mapping = definitionToMapping(definitionFromMapping(example as Record<string, unknown>))
+    const presentation = mapping.presentation as Record<string, unknown>
+    expect(presentation.styling_rules).toEqual([
+      {
+        capability: 'node_color', mode: 'scale',
+        scale_attribute: 'derived.impact-distance', scale_min: 0, scale_max: 6,
+        scale_tokens: ['heat-near', '#123456'],
+      },
+    ])
+    expect(presentation.default_style).toEqual({ node_color: '#a1b2c3' })
+  })
+
+  it('round-trips display_options.layout', () => {
+    const mapping = definitionToMapping(definitionFromMapping(example as Record<string, unknown>))
+    const presentation = mapping.presentation as Record<string, unknown>
+    expect(presentation.display_options).toEqual({ layout: 'radial' })
+  })
 })

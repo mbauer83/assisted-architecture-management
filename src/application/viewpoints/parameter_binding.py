@@ -44,6 +44,18 @@ def bind_parameters(
     return resolved
 
 
+def anchor_entity_ids(query: ExecutableViewpointQuery, resolved: Mapping[str, object]) -> tuple[str, ...]:
+    """Entity ids one execution is anchored on: the resolved values of the query's declared
+    ``entity-id`` parameters, deduplicated in declaration order. ``bind_parameters`` has
+    already dropped values that resolve to no known entity."""
+    values = (
+        resolved.get(parameter.name)
+        for parameter in query.parameters
+        if parameter.value_type == "entity-id"
+    )
+    return tuple(dict.fromkeys(value for value in values if isinstance(value, str)))
+
+
 def _matches_parameter(value: object, parameter: QueryParameter) -> bool:
     if parameter.value_type in {"string", "slug", "date", "entity-id"}:
         return isinstance(value, str)

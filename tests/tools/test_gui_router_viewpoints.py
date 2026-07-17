@@ -171,6 +171,7 @@ class TestRequestShape:
             "entity_ids", "connection_ids", "entities", "connections",
             "total_entity_count", "returned_entity_count", "total_connection_count", "returned_connection_count",
             "truncated", "entity_limit", "matrix_axes", "warnings", "duration_ms", "query_summary",
+            "anchor_ids",
         }
         # D15 boundary: the shared MCP/REST content stays unstyled — no style tokens leak in.
         assert all("style" not in entity for entity in body["entities"])
@@ -222,6 +223,14 @@ class TestExecuteProjection:
         assert body["target"] == "repository"
         item = next(i for i in body["items"] if i["item_id"] == ENT_ID)
         assert item["style"] == {"node_color": "positive"}
+
+    def test_carries_index_generation_for_snapshot_correlation(self, client) -> None:
+        """Same provenance contract as /execute — a consumer pairing an execution result
+        with its styled projection can verify both saw the same model snapshot."""
+        projection = client.post("/api/viewpoints/execute-projection", json={"slug": "exec-test"}).json()
+        execution = client.post("/api/viewpoints/execute", json={"slug": "exec-test"}).json()
+        assert isinstance(projection["index_generation"], int)
+        assert projection["index_generation"] == execution["index_generation"]
 
     def test_executes_inline_query(self, client) -> None:
         resp = client.post("/api/viewpoints/execute-projection", json={"query": {}})

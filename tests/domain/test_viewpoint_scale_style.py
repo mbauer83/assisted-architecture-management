@@ -46,7 +46,7 @@ def _presentation(**overrides: object) -> PresentationSpec:
         "capability": "node_color",
         "mode": "scale",
         "scale_attribute": "score",
-        "scale_tokens": ("cool", "warm"),
+        "scale_tokens": ("#00ffff", "#ff8800"),
     }
     fields.update(overrides)
     rule = StyleRule(**fields)  # type: ignore[arg-type]
@@ -69,7 +69,7 @@ def test_data_driven_scale_bounds_are_order_independent_and_emit_legend() -> Non
 
     assert bounds[0].minimum == 10
     assert bounds[0].maximum == 30
-    assert legends[0].tokens == ("cool", "warm")
+    assert legends[0].tokens == ("#00ffff", "#ff8800")
     assert drift == frozenset()
     style, _ = evaluate_item_style(
         low,
@@ -79,19 +79,20 @@ def test_data_driven_scale_bounds_are_order_independent_and_emit_legend() -> Non
         registries=_REGISTRIES,
         scale_bounds=bounds,
     )
-    assert style == {"node_color": ScaleStyleValue(position=0.0, tokens=("cool", "warm"))}
+    assert style == {"node_color": ScaleStyleValue(position=0.0, tokens=("#00ffff", "#ff8800"))}
 
 
-def test_missing_and_out_of_range_scale_values_use_default_style() -> None:
-    missing, outside = _entity("missing", None), _entity("outside", 50)
+def test_missing_scale_value_uses_default_style_and_out_of_range_saturates() -> None:
+    missing, below, above = _entity("missing", None), _entity("below", 5), _entity("above", 50)
     presentation = _presentation(scale_min=10, scale_max=30)
     bounds, _, _ = calculate_scale_bounds(
         presentation,
-        ((missing, "entity"), (outside, "entity")),
+        ((missing, "entity"), (below, "entity"), (above, "entity")),
         registries=_REGISTRIES,
         environment=EvaluationEnvironment(),
     )
-    for entity in (missing, outside):
+
+    def style_for(entity: EntityRecord) -> object:
         style, _ = evaluate_item_style(
             entity,
             "entity",
@@ -100,11 +101,16 @@ def test_missing_and_out_of_range_scale_values_use_default_style() -> None:
             registries=_REGISTRIES,
             scale_bounds=bounds,
         )
-        assert style == {"node_color": "neutral"}
+        return style["node_color"]
+
+    assert style_for(missing) == "neutral"
+    # Out-of-range values clamp to the nearest endpoint instead of dropping out of the scale.
+    assert style_for(below) == ScaleStyleValue(position=0.0, tokens=("#00ffff", "#ff8800"))
+    assert style_for(above) == ScaleStyleValue(position=1.0, tokens=("#00ffff", "#ff8800"))
 
 
 def test_scale_validation_rejects_mixed_mode_fields_and_wrong_token_count() -> None:
-    presentation = _presentation(value="not-valid", scale_tokens=("only-one",))
+    presentation = _presentation(value="emphasis", scale_tokens=("heat-near",))
     issues = validate_presentation(presentation, path="/presentation", registries=_REGISTRIES, check_ergonomics=True)
 
     assert {(issue.code, issue.path) for issue in issues} == {

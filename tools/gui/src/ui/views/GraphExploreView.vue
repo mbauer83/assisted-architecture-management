@@ -17,6 +17,8 @@ import { computeExecutionDiagnostics, deriveLegend, deriveScaleGradients } from 
 import {
   groupKeyFor, nodeVisualFor, edgeVisualFor, nodeShapePoints,
   buildConnectionStyleIndex, edgeStyleKey, projectionByItemId, explorationRedirectFor,
+  hopDistances, effectiveExplorationLayout, distanceColor, distanceLegend, contrastTextColor,
+  type ExplorationLayoutOverride,
 } from './GraphExploreView.helpers'
 import { presentationFromMapping } from '../../domain/viewpointPresentationSerialization'
 import type { PresentationNode } from '../../domain/viewpointPresentation'
@@ -40,7 +42,7 @@ const selectedDetail = useQuery<EntityDetail, RepoError | NotFoundError | Markdo
 const {
   nodes, edges, options, layoutMode,
   addNode, addEdge, markExpanded, collapseNode, spreadAroundParent, restart,
-  applyClusterLayout, applyGroupClusterLayout, applyForceLayout,
+  applyClusterLayout, applyGroupClusterLayout, applyRadialLayout, applyForceLayout,
 } = useForceGraph(() => svgWidth.value, () => svgHeight.value)
 
 // Selected edge (connection) for sidebar
@@ -77,6 +79,60 @@ const diagnostics = computed(() => computeExecutionDiagnostics(
 const legend = computed(() => deriveLegend(selectedPresentation.value))
 const scaleGradients = computed(() => deriveScaleGradients(selectedPresentation.value))
 
+// ── Anchored executions: hop distances, distance fill, anchor marking ───────
+
+const anchorIds = computed(() => viewpointExecution.result.value?.anchor_ids ?? [])
+const isAnchor = (id: string) => anchorIds.value.includes(id)
+const hopDepthById = computed(() => {
+  const result = viewpointExecution.result.value
+  if (!result || result.anchor_ids.length === 0) return new Map<string, number>()
+  return hopDistances(result.anchor_ids, result.connections, result.entities.map((e) => e.id))
+})
+const maxHopDepth = computed(() => Math.max(0, ...hopDepthById.value.values()))
+const hopLegend = computed(() => (anchorIds.value.length > 0 ? distanceLegend(maxHopDepth.value) : []))
+
+const RADIAL_RING_SPACING = 180
+const layoutOverride = ref<ExplorationLayoutOverride>('auto')
+const EXPLORATION_LAYOUT_OPTIONS: { value: ExplorationLayoutOverride; label: string }[] = [
+  { value: 'auto', label: 'Auto' }, { value: 'clusters', label: 'Clusters' },
+  { value: 'radial', label: 'Radial' }, { value: 'force', label: 'Force' },
+]
+
+const centerViewportOn = (x: number, y: number) => {
+  viewBox.value.x = x - viewBox.value.w / 2
+  viewBox.value.y = y - viewBox.value.h / 2
+}
+
+const applyExplorationLayout = () => {
+  const result = viewpointExecution.result.value
+  if (!result) return
+  const layout = effectiveExplorationLayout(
+    layoutOverride.value, selectedPresentation.value?.displayOptions['layout'], result.anchor_ids.length > 0,
+  )
+  if (layout === 'radial') {
+    const { cx, cy } = applyRadialLayout(hopDepthById.value, RADIAL_RING_SPACING)
+    centerViewportOn(cx, cy)
+    return
+  }
+  if (layout === 'force') {
+    applyForceLayout()
+  } else {
+    const groupBy = selectedPresentation.value?.groupBy ?? null
+    const byId = new Map(result.entities.map((e) => [e.id, e]))
+    applyGroupClusterLayout((id) => {
+      const entity = byId.get(id)
+      return entity ? groupKeyFor(entity, groupBy) : 'other'
+    })
+  }
+  const anchorNode = nodes.value.find((n) => isAnchor(n.id))
+  if (anchorNode) centerViewportOn(anchorNode.x, anchorNode.y)
+}
+
+const setExplorationLayout = (value: ExplorationLayoutOverride) => {
+  layoutOverride.value = value
+  applyExplorationLayout()
+}
+
 const runViewpointExecution = async (resolved: ResolvedViewpointExecution) => {
   nodes.value = []
   edges.value = []
@@ -92,12 +148,7 @@ const runViewpointExecution = async (resolved: ResolvedViewpointExecution) => {
     addEdge({ source: connection.source, target: connection.target, connType: connection.type })
   }
   for (const n of nodes.value) resolveNodeDomain(n)
-  const groupBy = selectedPresentation.value?.groupBy ?? null
-  const byId = new Map(result.entities.map((e) => [e.id, e]))
-  applyGroupClusterLayout((id) => {
-    const entity = byId.get(id)
-    return entity ? groupKeyFor(entity, groupBy) : 'other'
-  })
+  applyExplorationLayout()
 }
 const viewpointPrompt = useViewpointParameterPrompt(runViewpointExecution, viewpointDefinitions)
 const loadViewpointPopulation = (slug: string) => viewpointPrompt.run(slug)
@@ -122,7 +173,13 @@ const rerunViewpoint = () => {
   if (selectedViewpointSlug.value) void loadViewpointPopulation(selectedViewpointSlug.value)
 }
 
-const nodeVisual = (n: GraphNode) => nodeVisualFor(entityStyleById.value.get(n.id)?.style, nodeColor(n))
+/** Anchored executions fill unstyled nodes by hop distance from the anchor; a
+ * projection-provided `node_color` still wins inside `nodeVisualFor`. */
+const nodeFallbackFill = (n: GraphNode) => {
+  const depth = hopDepthById.value.get(n.id)
+  return depth !== undefined ? distanceColor(depth, maxHopDepth.value) : nodeColor(n)
+}
+const nodeVisual = (n: GraphNode) => nodeVisualFor(entityStyleById.value.get(n.id)?.style, nodeFallbackFill(n))
 const edgeVisual = (e: GraphEdge) => edgeVisualFor(connectionStyleIndex.value.get(edgeStyleKey(e.source, e.target, e.connType)))
 
 const SPACING_PRESETS = [
@@ -386,7 +443,10 @@ const edgeCardPos = (e: typeof edges.value[number], frac: number) => {
             @select="onSelectViewpoint"
           />
         </div>
-        <div class="spacing-controls">
+        <div
+          v-if="selectedViewpointSlug === null"
+          class="spacing-controls"
+        >
           <span class="spacing-label">Layout:</span>
           <button
             v-for="m in LAYOUT_MODES"
@@ -396,6 +456,21 @@ const edgeCardPos = (e: typeof edges.value[number], frac: number) => {
             @click="switchLayout(m.value)"
           >
             {{ m.label }}
+          </button>
+        </div>
+        <div
+          v-else
+          class="spacing-controls"
+        >
+          <span class="spacing-label">Layout:</span>
+          <button
+            v-for="o in EXPLORATION_LAYOUT_OPTIONS"
+            :key="o.value"
+            class="spacing-btn"
+            :class="{ 'spacing-btn--active': layoutOverride === o.value }"
+            @click="setExplorationLayout(o.value)"
+          >
+            {{ o.label }}
           </button>
         </div>
         <div
@@ -422,6 +497,18 @@ const edgeCardPos = (e: typeof edges.value[number], frac: number) => {
         :query-summary="viewpointExecution.result.value?.query_summary ?? ''"
         @rerun="rerunViewpoint"
       />
+      <div
+        v-if="hopLegend.length > 0"
+        class="hop-legend"
+      >
+        <span class="hop-chip hop-chip--anchor">Anchor</span>
+        <span
+          v-for="entry in hopLegend"
+          :key="entry.label"
+          class="hop-chip"
+          :style="{ background: entry.color }"
+        >{{ entry.label }}</span>
+      </div>
       <ViewpointParameterPrompt
         v-if="viewpointPrompt.visible.value"
         :parameters="viewpointPrompt.parameters.value"
@@ -522,8 +609,16 @@ const edgeCardPos = (e: typeof edges.value[number], frac: number) => {
           @click.stop="onNodeClick(n)"
           @dblclick.stop="onNodeDblClick(n)"
         >
+          <!-- Anchor halo: outer ring + the white main-shape stroke = double ring -->
           <polygon
-            :points="nodeShapePoints(nodeVisual(n).shape, 24)"
+            v-if="isAnchor(n.id)"
+            :points="nodeShapePoints(nodeVisual(n).shape, 32)"
+            fill="none"
+            stroke="#1e293b"
+            stroke-width="2"
+          />
+          <polygon
+            :points="nodeShapePoints(nodeVisual(n).shape, isAnchor(n.id) ? 27 : 24)"
             :fill="nodeVisual(n).color"
             :opacity="selectedId === n.id ? 1 : 0.8"
             :stroke="selectedId === n.id ? '#1e293b' : 'white'"
@@ -532,17 +627,18 @@ const edgeCardPos = (e: typeof edges.value[number], frac: number) => {
           <text
             dy="4"
             text-anchor="middle"
-            fill="#252327"
+            :fill="contrastTextColor(nodeVisual(n).color)"
             font-size="9"
             font-weight="600"
           >
             {{ n.type }}
           </text>
           <text
-            dy="40"
+            :dy="isAnchor(n.id) ? 46 : 40"
             text-anchor="middle"
-            fill="#374151"
+            :fill="isAnchor(n.id) ? '#1e293b' : '#374151'"
             font-size="10"
+            :font-weight="isAnchor(n.id) ? 700 : 400"
           >
             {{ truncLabel(n.label) }}
           </text>
@@ -551,7 +647,7 @@ const edgeCardPos = (e: typeof edges.value[number], frac: number) => {
             x="-17"
             y="-14"
             text-anchor="middle"
-            fill="#252327"
+            :fill="contrastTextColor(nodeVisual(n).color)"
             font-size="9"
             font-weight="bold"
             pointer-events="none"
@@ -730,6 +826,13 @@ const edgeCardPos = (e: typeof edges.value[number], frac: number) => {
 }
 .spacing-btn:hover { background: #f3f4f6; }
 .spacing-btn--active { background: #2563eb; color: white; border-color: #2563eb; }
+
+.hop-legend {
+  display: flex; align-items: center; flex-wrap: wrap; gap: 6px;
+  padding: 6px 16px; background: white; border-bottom: 1px solid #e5e7eb;
+}
+.hop-chip { font-size: 10px; font-weight: 500; color: white; padding: 2px 8px; border-radius: 9999px; }
+.hop-chip--anchor { color: #1e293b; background: white; border: 3px double #1e293b; }
 
 .graph-svg { flex: 1; cursor: grab; user-select: none; }
 .graph-svg:active { cursor: grabbing; }

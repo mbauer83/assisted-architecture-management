@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   atDepthCap,
+  attributeOptionLabel,
   attributeOptions,
   comparatorsFor,
   depthLabel,
@@ -20,6 +21,7 @@ const CATALOG: CriteriaCatalog = {
     lifecycle_stage: ['alpha', 'beta', 'ga'],
     domain: ['application', 'common'],
     status: ['draft', 'active', 'deprecated'],
+    group: ['assurance', 'platform-core', 'uncategorized'],
   },
   connection_attribute_enums: {},
   symmetric_connection_types: [],
@@ -68,7 +70,22 @@ describe('comparatorsFor', () => {
   })
 })
 
+describe('attributeOptionLabel', () => {
+  it('labels the group facet as project membership', () => {
+    expect(attributeOptionLabel({ path: 'group', reserved: true, declaredType: null })).toBe('group (project)')
+  })
+
+  it('passes every other path through unchanged', () => {
+    expect(attributeOptionLabel({ path: 'status', reserved: true, declaredType: null })).toBe('status')
+    expect(attributeOptionLabel({ path: 'risk_score', reserved: false, declaredType: 'number' })).toBe('risk_score')
+  })
+})
+
 describe('enumChoicesFor', () => {
+  it('serves the group facet from the catalog enum feed so project membership is a picker', () => {
+    expect(enumChoicesFor('group', 'entity', CATALOG)).toEqual(['assurance', 'platform-core', 'uncategorized'])
+  })
+
   it('offers known entity types for the type attribute on an entity group', () => {
     expect(enumChoicesFor('type', 'entity', CATALOG)).toEqual(['application-component', 'process'])
   })

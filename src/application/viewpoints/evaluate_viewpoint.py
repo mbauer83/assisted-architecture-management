@@ -18,7 +18,7 @@ from src.application.viewpoints.execution_result import (
     Membership,
     ViewpointExecutionResult,
 )
-from src.application.viewpoints.parameter_binding import bind_parameters
+from src.application.viewpoints.parameter_binding import anchor_entity_ids, bind_parameters
 from src.application.viewpoints.ports import RepositoryReadAccess
 from src.application.viewpoints.repository_projection import project_repository
 from src.application.viewpoints.scope_query import definition_with_scope_query
@@ -29,9 +29,11 @@ from src.domain.viewpoint_binding_evaluation import (
     evaluate_bindings,
     evaluate_derived_attributes,
 )
+from src.domain.viewpoint_bindings import DerivedAttribute
 from src.domain.viewpoint_condition_validation import RegistrySnapshot
 from src.domain.viewpoint_criteria_evaluation import evaluate_entity_criteria
 from src.domain.viewpoint_derived_attribute_deferral import split_eager_and_deferred_derived_attributes
+from src.domain.viewpoint_evaluation_context import EvaluationEnvironment
 from src.domain.viewpoint_projection import ViewpointProjection, drift_warnings
 from src.domain.viewpoint_summary import render_query_summary
 from src.domain.viewpoints import (
@@ -117,17 +119,15 @@ def project_viewpoint_repository(
     execution result already uses internally.
     """
     definition, _, _ = resolve_viewpoint_definition(slug, query, catalog=catalog)
-    executable_definition, scope_derived, entity_candidates, environment, deferred_derived = _prepare_query_environment(
-        definition, parameters, read_access, registries
-    )
+    prepared = _prepare_query_environment(definition, parameters, read_access, registries)
     return project_repository(
-        executable_definition,
+        prepared.executable_definition,
         read_access=read_access,
         registries=registries,
-        scope_filter=definition.scope if scope_derived else None,
-        environment=environment,
-        candidate_entity_ids=entity_candidates,
-        deferred_derived=deferred_derived,
+        scope_filter=definition.scope if prepared.scope_derived else None,
+        environment=prepared.environment,
+        candidate_entity_ids=prepared.entity_candidates,
+        deferred_derived=prepared.deferred_derived,
     )
 
 
@@ -175,9 +175,8 @@ def evaluate_viewpoint(
     start = time.monotonic()
 
     definition, slug, version = resolve_viewpoint_definition(request.slug, request.query, catalog=catalog)
-    executable_definition, scope_derived, entity_candidates, environment, deferred_derived = _prepare_query_environment(
-        definition, request.parameters, read_access, registries
-    )
+    prepared = _prepare_query_environment(definition, request.parameters, read_access, registries)
+    executable_definition, scope_derived = prepared.executable_definition, prepared.scope_derived
 
     requested_limit = request.limit if request.limit is not None else default_limit
     limit = max(0, min(requested_limit, max_entities))
@@ -187,9 +186,9 @@ def evaluate_viewpoint(
         read_access=read_access,
         registries=registries,
         scope_filter=definition.scope if scope_derived else None,
-        environment=environment,
-        candidate_entity_ids=entity_candidates,
-        deferred_derived=deferred_derived,
+        environment=prepared.environment,
+        candidate_entity_ids=prepared.entity_candidates,
+        deferred_derived=prepared.deferred_derived,
     )
 
     primary_ids = sorted(
@@ -275,6 +274,7 @@ def evaluate_viewpoint(
         matrix_axes=matrix_axes,
         warnings=warnings,
         duration_ms=(time.monotonic() - start) * 1000,
+        anchor_ids=prepared.anchor_ids,
         query_summary=(
             f"Selection derived from the viewpoint's concept scope: {render_query_summary(query)}"
             if scope_derived
@@ -298,12 +298,22 @@ def evaluate_viewpoint(
     return result
 
 
+@dataclass(frozen=True)
+class _PreparedQueryEnvironment:
+    executable_definition: ViewpointDefinition
+    scope_derived: bool
+    entity_candidates: frozenset[str]
+    environment: EvaluationEnvironment
+    deferred_derived: tuple[DerivedAttribute, ...]
+    anchor_ids: tuple[str, ...]
+
+
 def _prepare_query_environment(
     definition: ViewpointDefinition,
     parameters: Mapping[str, object] | None,
     read_access: RepositoryReadAccess,
     registries: RegistrySnapshot,
-):
+) -> _PreparedQueryEnvironment:
     executable_definition, scope_derived = definition_with_scope_query(definition)
     assert executable_definition.query is not None
     query = executable_definition.query
@@ -312,14 +322,20 @@ def _prepare_query_environment(
     binding_input = BindingEvaluationInput(
         tuple(sorted(entity_ids)), tuple(sorted(connection_ids)), read_access, registries
     )
-    bindings = evaluate_bindings(
-        query.bindings, parameters=bind_parameters(query, parameters, read_access), input=binding_input
-    )
+    resolved_parameters = bind_parameters(query, parameters, read_access)
+    bindings = evaluate_bindings(query.bindings, parameters=resolved_parameters, input=binding_input)
     eager_derived, deferred_derived = split_eager_and_deferred_derived_attributes(query)
     environment = evaluate_derived_attributes(
         eager_derived, tuple(sorted(entity_ids)), input=binding_input, environment=bindings.environment
     )
-    return executable_definition, scope_derived, frozenset(entity_ids), environment, deferred_derived
+    return _PreparedQueryEnvironment(
+        executable_definition=executable_definition,
+        scope_derived=scope_derived,
+        entity_candidates=frozenset(entity_ids),
+        environment=environment,
+        deferred_derived=deferred_derived,
+        anchor_ids=anchor_entity_ids(query, resolved_parameters),
+    )
 
 
 def _scoped_entity_ids(read_access: RepositoryReadAccess, scope: str) -> set[str]:

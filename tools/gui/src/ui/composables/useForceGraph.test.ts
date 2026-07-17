@@ -36,3 +36,20 @@ describe('applyGroupClusterLayout', () => {
     expect(Math.max(...xs) - Math.min(...xs)).toBeLessThan(600)
   })
 })
+
+describe('applyRadialLayout', () => {
+  it('positions the anchor at the reported canvas centre and rings farther nodes outward', () => {
+    const graph = useForceGraph(() => 1200, () => 800)
+    for (const id of ['anchor', 'near', 'far']) graph.addNode({ id, label: id, type: 'X' })
+
+    const { cx, cy } = graph.applyRadialLayout(new Map([['anchor', 0], ['near', 1], ['far', 2]]), 150)
+
+    expect({ cx, cy }).toEqual({ cx: 600, cy: 400 })
+    const byId = new Map(graph.nodes.value.map((n) => [n.id, n]))
+    expect({ x: byId.get('anchor')!.x, y: byId.get('anchor')!.y }).toEqual({ x: 600, y: 400 })
+    expect(Math.hypot(byId.get('near')!.x - 600, byId.get('near')!.y - 400)).toBeCloseTo(150, 6)
+    // Ring radii grow sub-linearly (spacing · Σ 0.75^k): hop 2 sits at 1.75 × spacing.
+    expect(Math.hypot(byId.get('far')!.x - 600, byId.get('far')!.y - 400)).toBeCloseTo(262.5, 6)
+    expect(graph.layoutMode.value).toBe('radial')
+  })
+})

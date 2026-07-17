@@ -316,6 +316,38 @@ class TestSchemaFilenames:
         repo = _FakeRepo(repo_roots=[tmp_path])
         validate_repo_compatibility(repo, reg)  # must not raise
 
+    def test_specialization_attachment_schema_for_known_type_passes(self, tmp_path: Path) -> None:
+        """`attributes.{type}.{slug}.schema.json` is the specialization-attachment
+        convention — only the type part gates startup; an unknown slug is the verifier's
+        orphan-attachment warning, never a startup abort."""
+        schemata = tmp_path / ".arch-repo" / "schemata"
+        schemata.mkdir(parents=True)
+        (schemata / "attributes.driver.regulatory-driver.schema.json").write_text("{}")
+        reg = _make_registry(["driver"], [], [])
+        repo = _FakeRepo(repo_roots=[tmp_path])
+        validate_repo_compatibility(repo, reg)  # must not raise
+
+    def test_specialization_attachment_schema_for_unknown_type_is_error(self, tmp_path: Path) -> None:
+        schemata = tmp_path / ".arch-repo" / "schemata"
+        schemata.mkdir(parents=True)
+        (schemata / "attributes.ghost-type.some-slug.schema.json").write_text("{}")
+        reg = _make_registry(["driver"], [], [])
+        repo = _FakeRepo(repo_roots=[tmp_path])
+        with pytest.raises(RepoCompatibilityError) as exc_info:
+            validate_repo_compatibility(repo, reg)
+        assert any("ghost-type" in e for e in exc_info.value.errors)
+
+    def test_unconventional_schema_filename_warns_but_never_aborts(self, tmp_path: Path) -> None:
+        """A filename no loader will ever pick up must be surfaced (it is otherwise
+        silently dead configuration) without blocking startup."""
+        schemata = tmp_path / ".arch-repo" / "schemata"
+        schemata.mkdir(parents=True)
+        (schemata / "attributes.driver.extra.dots.schema.json").write_text("{}")
+        reg = _make_registry(["driver"], [], [])
+        repo = _FakeRepo(repo_roots=[tmp_path])
+        warnings = validate_repo_compatibility(repo, reg)  # must not raise
+        assert any("matches no known convention" in w for w in warnings)
+
     def test_unknown_connection_metadata_schema_type(self, tmp_path: Path) -> None:
         schemata = tmp_path / ".arch-repo" / "schemata"
         schemata.mkdir(parents=True)

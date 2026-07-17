@@ -2,17 +2,21 @@
 /**
  * Ordered style-rule list (first-match-wins per capability), the default-style fallback
  * map, and the read-only derived legend. `mode="match"` reuses the criteria-tree builder
- * unmodified; `mode="range"` is a numeric attribute plus ordered half-open bands. Style
- * token values are never free text — always one of the fixed opaque tokens a surface
- * adapter resolves to a shape/icon/color per capability.
+ * unmodified; `mode="range"` is a numeric attribute plus ordered half-open bands;
+ * `mode="scale"` is a numeric/derived attribute, optional bounds, and a two-endpoint
+ * gradient. Every style value is picked visually (semantic token, named endpoint, or an
+ * explicit hex color) — never typed as free text.
  */
 import { computed } from 'vue'
 import type { CriteriaCatalog } from '../../domain'
 import type { GroupNode } from '../../domain/viewpointCriteria'
-import { isEdgeCapability, mkRangeBand, mkStyleRule, STYLE_TOKENS } from '../../domain/viewpointPresentation'
+import { isEdgeCapability, mkRangeBand, mkStyleRule, withStyleMode } from '../../domain/viewpointPresentation'
 import type { PresentationNode, RangeBandNode, StyleMode, StyleRuleNode } from '../../domain/viewpointPresentation'
+import { tokenColor } from '../lib/viewpointStyleTokens'
 import { capabilitiesFor, derivedLegend, numericAttributeOptions } from './StyleRuleEditor.helpers'
 import CriteriaTreeBuilder from './CriteriaTreeBuilder.vue'
+import StyleRuleScaleFields from './StyleRuleScaleFields.vue'
+import StyleValuePicker from './StyleValuePicker.vue'
 
 const props = defineProps<{
   modelValue: PresentationNode
@@ -20,9 +24,7 @@ const props = defineProps<{
 }>()
 const emit = defineEmits<{ 'update:modelValue': [value: PresentationNode] }>()
 
-const TOKEN_SWATCH: Record<string, string> = {
-  emphasis: '#6366f1', positive: '#16a34a', caution: '#d97706', critical: '#dc2626', neutral: '#9ca3af',
-}
+const STYLE_MODES: readonly StyleMode[] = ['match', 'range', 'scale']
 
 const capabilities = computed(() => capabilitiesFor(props.modelValue.representation))
 const numericAttributes = computed(() => numericAttributeOptions(props.catalog))
@@ -49,12 +51,8 @@ const onCapabilityChange = (index: number, capability: string) => {
   const rule = props.modelValue.stylingRules[index]
   updateRule(index, { ...rule, capability })
 }
-const onModeChange = (index: number, mode: StyleMode) => {
-  const rule = props.modelValue.stylingRules[index]
-  updateRule(index, mode === 'match'
-    ? { ...rule, mode, matchCriteria: rule.matchCriteria ?? { kind: 'group', id: rule.id, groupKind: isEdgeCapability(rule.capability) ? 'connection' : 'entity', conjunction: 'and', negate: false, children: [] } }
-    : { ...rule, mode })
-}
+const onModeChange = (index: number, mode: StyleMode) =>
+  updateRule(index, withStyleMode(props.modelValue.stylingRules[index], mode))
 const onMatchCriteriaChange = (index: number, group: GroupNode) => {
   const rule = props.modelValue.stylingRules[index]
   updateRule(index, { ...rule, matchCriteria: group })
@@ -108,18 +106,13 @@ const onDefaultStyleChange = (capability: string, token: string) => {
           </select>
           <div class="mode-toggle">
             <button
+              v-for="mode in STYLE_MODES"
+              :key="mode"
               type="button"
-              :class="{ sel: rule.mode === 'match' }"
-              @click="onModeChange(index, 'match')"
+              :class="{ sel: rule.mode === mode }"
+              @click="onModeChange(index, mode)"
             >
-              match
-            </button>
-            <button
-              type="button"
-              :class="{ sel: rule.mode === 'range' }"
-              @click="onModeChange(index, 'range')"
-            >
-              range
+              {{ mode }}
             </button>
           </div>
           <button
@@ -155,24 +148,15 @@ const onDefaultStyleChange = (capability: string, token: string) => {
             @update:model-value="onMatchCriteriaChange(index, $event)"
           />
           <label class="value-line">
-            token:
-            <select
-              class="inp"
-              :value="rule.value ?? ''"
-              @change="updateRule(index, { ...rule, value: ($event.target as HTMLSelectElement).value || null })"
-            >
-              <option
-                v-for="token in STYLE_TOKENS"
-                :key="token"
-                :value="token"
-              >
-                {{ token }}
-              </option>
-            </select>
+            value:
+            <StyleValuePicker
+              :model-value="rule.value"
+              @update:model-value="updateRule(index, { ...rule, value: $event || null })"
+            />
           </label>
         </template>
 
-        <template v-else>
+        <template v-else-if="rule.mode === 'range'">
           <label class="value-line">
             range_attribute:
             <select
@@ -210,19 +194,10 @@ const onDefaultStyleChange = (capability: string, token: string) => {
               :value="band.maximum ?? ''"
               @input="updateBand(index, bandIndex, { ...band, maximum: ($event.target as HTMLInputElement).value === '' ? null : Number(($event.target as HTMLInputElement).value) })"
             >
-            <select
-              class="inp"
-              :value="band.value"
-              @change="updateBand(index, bandIndex, { ...band, value: ($event.target as HTMLSelectElement).value })"
-            >
-              <option
-                v-for="token in STYLE_TOKENS"
-                :key="token"
-                :value="token"
-              >
-                {{ token }}
-              </option>
-            </select>
+            <StyleValuePicker
+              :model-value="band.value"
+              @update:model-value="updateBand(index, bandIndex, { ...band, value: $event })"
+            />
             <button
               type="button"
               class="icon-btn"
@@ -239,6 +214,13 @@ const onDefaultStyleChange = (capability: string, token: string) => {
             + Add band
           </button>
         </template>
+
+        <StyleRuleScaleFields
+          v-else
+          :model-value="rule"
+          :numeric-attributes="numericAttributes"
+          @update:model-value="updateRule(index, $event)"
+        />
       </div>
     </div>
     <div class="add-row">
@@ -259,22 +241,12 @@ const onDefaultStyleChange = (capability: string, token: string) => {
         class="default-row"
       >
         <span>{{ capability }}</span>
-        <select
-          class="inp"
-          :value="modelValue.defaultStyle[capability] ?? ''"
-          @change="onDefaultStyleChange(capability, ($event.target as HTMLSelectElement).value)"
-        >
-          <option value="">
-            (none)
-          </option>
-          <option
-            v-for="token in STYLE_TOKENS"
-            :key="token"
-            :value="token"
-          >
-            {{ token }}
-          </option>
-        </select>
+        <StyleValuePicker
+          :model-value="modelValue.defaultStyle[capability] ?? null"
+          allow-scale-endpoints
+          clearable
+          @update:model-value="onDefaultStyleChange(capability, $event)"
+        />
       </div>
     </div>
 
@@ -300,7 +272,7 @@ const onDefaultStyleChange = (capability: string, token: string) => {
         >
           <span
             class="swatch"
-            :style="{ background: TOKEN_SWATCH[entry.token] ?? '#e5e7eb' }"
+            :style="{ background: tokenColor(entry.token) }"
           />
           {{ entry.token }} ({{ entry.usageCount }})
         </span>
@@ -329,7 +301,11 @@ const onDefaultStyleChange = (capability: string, token: string) => {
 .add-btn { appearance: none; border: 1px dashed #d1d5db; background: #fff; color: #6b7280; border-radius: 7px; padding: 5px 10px; font-size: 12px; font-weight: 600; cursor: pointer; }
 .add-btn:hover { border-color: #6366f1; color: #4338ca; }
 .card { border: 1px solid #d1d5db; border-radius: 10px; padding: 12px; margin-top: 12px; }
-.default-row { display: flex; align-items: center; gap: 8px; margin: 4px 0; font-size: 12.5px; }
+.default-row {
+  display: grid; grid-template-columns: 140px auto; align-items: center;
+  column-gap: 16px; margin: 6px 0; font-size: 12.5px;
+}
+.default-row > span:first-child { color: #374151; }
 .legend-header { display: flex; align-items: center; justify-content: space-between; }
 .pill { font-size: 11px; font-weight: 600; color: #6b7280; background: #f3f4f6; border-radius: 99px; padding: 2px 8px; }
 .legend { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 8px; }

@@ -20,6 +20,7 @@ from src.application.repository_upgrade.steps.specialization_declaration_scan im
 from src.application.repository_upgrade.steps.unrecognized_structure import UnrecognizedStructureScanStep
 from src.application.repository_upgrade.steps.viewpoint_application_scan import ViewpointApplicationScanStep
 from src.application.repository_upgrade.steps.viewpoint_declaration_scan import ViewpointDeclarationScanStep
+from src.application.repository_upgrade.steps.viewpoint_style_value_upgrade import ViewpointStyleValueUpgradeStep
 from src.domain.repository_upgrade import StepIdentity
 
 FORMAT_CONTRACT_VERSION = "1"
@@ -48,6 +49,7 @@ def _build_default_registry() -> StepRegistry:
     registry.register(UnrecognizedStructureScanStep())
     registry.register(SpecializationDeclarationScanStep())
     registry.register(ViewpointDeclarationScanStep())
+    registry.register(ViewpointStyleValueUpgradeStep())
     registry.register(SchemaFileScanStep())
     registry.register(ConnectionMetadataScanStep())
     registry.register(ViewpointApplicationScanStep())

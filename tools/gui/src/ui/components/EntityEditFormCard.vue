@@ -89,13 +89,14 @@ const edit = inject(entityEditFormKey)!
         :key="i"
         class="prop-row"
       >
-        <input
+        <span
           v-if="edit.editSchemaDescriptors[row.key]"
-          :value="row.key"
-          class="prop-key"
-          readonly
-          :placeholder="edit.editSchemaRequired.has(row.key) ? row.key + ' *' : row.key"
-        >
+          class="prop-key-label"
+          :title="row.key"
+        >{{ row.key }}<span
+          v-if="edit.editSchemaRequired.has(row.key)"
+          class="prop-required"
+        > *</span></span>
         <input
           v-else
           v-model="row.key"
@@ -242,9 +243,23 @@ const edit = inject(entityEditFormKey)!
 }
 .edit-textarea:focus { border-color: #2563eb; }
 
-.prop-row { display: flex; gap: 6px; margin-bottom: 6px; align-items: center; }
-.prop-key { flex: 1; padding: 6px 8px; border-radius: 6px; border: 1px solid #d1d5db; font-size: 12px; outline: none; }
-.prop-value { flex: 2; padding: 6px 8px; border-radius: 6px; border: 1px solid #d1d5db; font-size: 12px; outline: none; }
+.prop-row { display: flex; gap: 8px; margin-bottom: 8px; align-items: flex-start; }
+.prop-key-label {
+  flex: 0 0 150px; font-size: 12px; font-weight: 500; color: #374151;
+  padding-top: 7px; overflow-wrap: break-word; min-width: 0;
+}
+.prop-required { color: #dc2626; }
+.prop-key {
+  flex: 0 0 150px; padding: 6px 8px; border-radius: 6px; border: 1px solid #d1d5db;
+  font-size: 12px; outline: none; box-sizing: border-box; min-width: 0;
+}
+.prop-key:focus { border-color: #2563eb; }
+.prop-type-select {
+  flex: 0 0 auto; padding: 6px; border-radius: 6px; border: 1px solid #d1d5db;
+  font-size: 12px; color: #374151; background: white; outline: none; cursor: pointer;
+}
+.prop-type-select:focus { border-color: #2563eb; }
+.prop-row .remove-prop-btn { margin-top: 5px; }
 .add-prop-btn {
   font-size: 12px; color: #2563eb; background: none; border: none; cursor: pointer; padding: 4px 0;
 }

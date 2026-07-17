@@ -1,4 +1,4 @@
-import { computed, reactive, ref, type InjectionKey, type Ref } from 'vue'
+import { computed, reactive, ref, watch, type InjectionKey, type Ref } from 'vue'
 import { Effect } from 'effect'
 import type { ModelService } from '../../application/ModelService'
 import type { AuthoringGuidance, EntityAttributeDescriptor, EntityDetail } from '../../domain'
@@ -64,6 +64,49 @@ export function useEntityEditForm(options: {
     }),
   )
 
+  // Guards against out-of-order schema responses when the specialization changes quickly.
+  let schemaRequestSeq = 0
+
+  const loadEffectiveSchema = (artifactType: string, specialization: string): void => {
+    const requestId = ++schemaRequestSeq
+    void Effect.runPromise(svc.getEntitySchemata(artifactType, specialization))
+      .then((info) => {
+        if (requestId !== schemaRequestSeq) return
+        editSchemaDescriptors.value = info.descriptors
+        editSchemaRequired.value = new Set(info.required)
+        const present = new Set(editProperties.value.map((row) => row.key))
+        const missing = info.required.filter((key) => !present.has(key))
+        editProperties.value = [
+          ...editProperties.value,
+          ...missing.map((key) => ({
+            key,
+            value: info.descriptors[key]?.default ?? '',
+            adHocType: 'string' as const,
+          })),
+        ]
+      })
+      .catch(() => {
+        if (requestId !== schemaRequestSeq) return
+        editSchemaDescriptors.value = {}
+        editSchemaRequired.value = new Set()
+      })
+  }
+
+  // startEdit seeds editSpecialization programmatically and loads the schema itself;
+  // that seed must not re-trigger the watcher's reload.
+  let specializationSeededByStartEdit = false
+
+  watch(editSpecialization, (newSpec, oldSpec) => {
+    if (specializationSeededByStartEdit) {
+      specializationSeededByStartEdit = false
+      return
+    }
+    if (!editing.value || newSpec === oldSpec) return
+    const d = detail.value
+    if (!d) return
+    loadEffectiveSchema(d.artifact_type, newSpec)
+  })
+
   const startEdit = (): void => {
     const d = detail.value
     if (!d) return
@@ -72,7 +115,10 @@ export function useEntityEditForm(options: {
     editKeywords.value = (d.keywords ?? []).join(', ')
     editStatus.value = d.status
     editNotes.value = d.notes ?? ''
-    editSpecialization.value = d.specialization ?? ''
+    if (editSpecialization.value !== (d.specialization ?? '')) {
+      specializationSeededByStartEdit = true
+      editSpecialization.value = d.specialization ?? ''
+    }
     editTypeGuidance.value = null
     void Effect.runPromise(svc.getAuthoringGuidance({ entityTypes: [d.artifact_type] }))
       .then((info) => { editTypeGuidance.value = info })
@@ -94,15 +140,7 @@ export function useEntityEditForm(options: {
     editPreview.value = null
     editError.value = null
     editing.value = true
-    void Effect.runPromise(svc.getEntitySchemata(d.artifact_type))
-      .then((info) => {
-        editSchemaDescriptors.value = info.descriptors
-        editSchemaRequired.value = new Set(info.required)
-      })
-      .catch(() => {
-        editSchemaDescriptors.value = {}
-        editSchemaRequired.value = new Set()
-      })
+    loadEffectiveSchema(d.artifact_type, d.specialization ?? '')
   }
 
   const cancelEdit = (): void => {

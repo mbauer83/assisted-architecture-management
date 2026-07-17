@@ -44,8 +44,13 @@ plantuml.jar
 
 # C19C model/diagram/view exchange specs + example/interoperability-test snippets
 # (license-encumbered reference material for the ArchiMate 4 compliance plan's
-# WU-F1/F2/F3a/F3b exchange work — local reference only, never committed)
-/spec/
+# WU-F1/F2/F3a/F3b exchange work — local reference only, never committed).
+# Exception: spec/personas/personas.yaml is our own canonical persona catalog
+# (guarded by tests/common/test_persona_catalog.py) and must stay tracked.
+/spec/*
+!/spec/personas/
+/spec/personas/*
+!/spec/personas/personas.yaml
 
 # Guidance-cache files — license-encumbered spec prose, imported per repo via
 # arch-import-guidance; the per-repo ignore lives in <repo>/.arch-repo/.gitignore, this is

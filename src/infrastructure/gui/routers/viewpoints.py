@@ -128,6 +128,7 @@ def execute_viewpoint_projection(
     parsed_query = query_from_mapping(query, label="query") if query is not None else None
     repo = s.get_repo()
     registries = _registry_snapshot(catalogs, repo.repo_roots)
+    index_generation = repo.read_model_version().generation
     try:
         projection = project_viewpoint_repository(
             slug,
@@ -145,7 +146,9 @@ def execute_viewpoint_projection(
         raise _execution_error(exc.code, str(exc)) from exc
     except DerivationLimitError as exc:
         raise _execution_error("derivation-limit", str(exc)) from exc
-    return {"applied": True, **asdict(projection)}
+    # Same provenance contract as /execute: consumers correlating an execution result
+    # with its styled projection can verify both came from the same model snapshot.
+    return {"applied": True, "index_generation": index_generation, **asdict(projection)}
 
 
 @router.post("/api/viewpoints/execute-diagram")
