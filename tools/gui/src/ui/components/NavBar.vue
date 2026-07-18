@@ -198,10 +198,10 @@ onMounted(async () => {
               :class="`nav__ent-status--${entStatus.status}`"
             >{{ entStatus.label }}</span>
           </template>
-          <RouterLink to="/global/entities">
+          <RouterLink :to="{ path: '/entities', query: { tier: 'enterprise' } }">
             Browse
           </RouterLink>
-          <RouterLink to="/global/diagrams">
+          <RouterLink :to="{ path: '/diagrams', query: { tier: 'enterprise' } }">
             Diagrams
           </RouterLink>
         </nav>

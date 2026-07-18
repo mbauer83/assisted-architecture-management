@@ -41,3 +41,13 @@ export const withTier = (query: LocationQuery, tier: TierSelection): LocationQue
   if (tier !== 'all') merged.tier = tier
   return merged
 }
+
+/** API `scope` param for a tier selection — the API keeps `scope=global` as its
+ * internal identifier for the enterprise tier; All sends no scope. */
+export const scopeForTier = (tier: TierSelection): 'global' | 'engagement' | undefined => {
+  if (tier === 'enterprise') return 'global'
+  return tier === 'engagement' ? 'engagement' : undefined
+}
+
+/** Engagement collections (groups) exist only outside the Enterprise tier. */
+export const tierAllowsEngagementCollections = (tier: TierSelection): boolean => tier !== 'enterprise'

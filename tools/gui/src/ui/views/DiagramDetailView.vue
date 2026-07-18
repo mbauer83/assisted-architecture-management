@@ -90,7 +90,7 @@ watch(detail, (next) => {
 watch(diagramId, load)
 
 const executeDelete = () => {
-  void router.push(isGlobalDiagram.value ? '/global/diagrams' : '/diagrams')
+  void router.push(isGlobalDiagram.value ? { path: '/diagrams', query: { tier: 'enterprise' } } : '/diagrams')
 }
 </script>
 

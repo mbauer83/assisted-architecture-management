@@ -39,9 +39,9 @@ export const router = createRouter({
     { path: '/viewpoints/:slug/edit', component: () => import('../views/ViewpointsManagementView.vue') },
     { path: '/viewpoints/matrix', component: () => import('../views/ViewpointMatrixView.vue') },
     { path: '/viewpoints/diagram', component: () => import('../views/ViewpointDiagramView.vue') },
-    // Global (enterprise) repo routes — reuse same views with scope param
-    { path: '/global/entities', component: EntitiesView, props: () => ({ scope: 'global' }) },
-    { path: '/global/diagrams', component: DiagramsView, props: () => ({ scope: 'global' }) },
+    // Legacy tier-first deep links → faceted routes (query + hash preserved)
+    { path: '/global/entities', redirect: to => ({ path: '/entities', query: { ...to.query, tier: 'enterprise' }, hash: to.hash }) },
+    { path: '/global/diagrams', redirect: to => ({ path: '/diagrams', query: { ...to.query, tier: 'enterprise' }, hash: to.hash }) },
     { path: '/global/search', redirect: '/search' },
     // Promotion
     { path: '/promote', component: PromoteView },

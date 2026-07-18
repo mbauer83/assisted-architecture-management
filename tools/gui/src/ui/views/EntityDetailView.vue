@@ -35,8 +35,8 @@ const browseQuery = computed(() => {
   return q
 })
 const backTo = computed(() => ({
-  path: detail.value?.is_global ? '/global/entities' : '/entities',
-  query: browseQuery.value,
+  path: '/entities',
+  query: { ...browseQuery.value, ...(detail.value?.is_global ? { tier: 'enterprise' } : {}) },
 }))
 
 const context = useQuery<EntityContext, RepoError | NotFoundError | MarkdownError>()

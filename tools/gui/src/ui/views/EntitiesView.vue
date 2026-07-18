@@ -6,6 +6,17 @@ import type { RepoScope, RepoError } from '../../ports/ModelRepository'
 import { modelServiceKey } from '../keys'
 import { useQuery } from '../composables/useQuery'
 import { usePagination } from '../composables/usePagination'
+import { useTierFacet } from '../composables/useTierFacet'
+import {
+  LIST_TIERS,
+  tierAllowsEngagementCollections,
+  withTier,
+  type TierSelection,
+} from '../lib/tierUrlState'
+import { entityListScope, savedGroupToMerge } from '../composables/listRequestParams'
+import TierBadge from '../components/TierBadge.vue'
+import TierFacet from '../components/TierFacet.vue'
+import { tierFromIsGlobal } from '../components/TierBadge.helpers'
 import EntitiesTreemap from '../components/EntitiesTreemap.vue'
 import ArchimateTypeGlyph from '../components/ArchimateTypeGlyph.vue'
 import EntityGroupNavTree from '../components/EntityGroupNavTree.vue'
@@ -15,12 +26,10 @@ import {
   getEntityConnectionTotal,
   getDomainLabel,
 } from '../lib/domains'
-import { filtersToEntityCriteriaMapping } from './EntitiesView.helpers'
-
-const props = defineProps<{ scope?: RepoScope }>()
+import { filtersToEntityCriteriaMapping, sortEntityRows, type EntitySortKey } from './EntitiesView.helpers'
 
 type ViewMode = 'table' | 'treemap'
-type SortKey = 'type' | 'in' | 'sym' | 'out' | 'total'
+type SortKey = EntitySortKey
 
 const PAGE_SIZE = 50
 const STORAGE_KEY = 'arch_group_model-project'
@@ -33,8 +42,8 @@ const groupsState = useQuery<GroupList, RepoError>()
 const taxonomyState = useQuery<EntityTaxonomy, RepoError>()
 const modulesState = useQuery<readonly ModuleSummary[], RepoError>()
 
-const isGlobal = computed(() => props.scope === 'global')
-const basePath = computed(() => isGlobal.value ? '/global/entities' : '/entities')
+const { tier } = useTierFacet(LIST_TIERS)
+const isGlobal = computed(() => tier.value === 'enterprise')
 
 const activeDomain = computed(() => (route.query.domain as string | undefined) ?? '')
 const activeGroup = computed(() => (route.query.group as string | undefined) ?? '')
@@ -50,18 +59,24 @@ const showArchivedGroups = ref(false)
 const isGroupView = computed(() =>
   !isGlobal.value && Boolean(activeGroup.value)
 )
-const listScope = computed<RepoScope | undefined>(() => isGroupView.value ? 'engagement' : props.scope)
+const listScope = computed<RepoScope | undefined>(() => entityListScope(tier.value, isGroupView.value))
 
 const { currentPage, pageCount, hasPrev, hasNext, goNext, goPrev, reset: resetPage, offset } =
   usePagination(computed(() => entityListState.data.value?.total ?? 0), PAGE_SIZE)
 
 const replaceQuery = (patch: Record<string, string | undefined>) =>
-  void router.replace({ path: basePath.value, query: { ...route.query, ...patch } })
+  void router.replace({ query: { ...route.query, ...patch }, hash: route.hash })
+
+const selectTier = (value: TierSelection) => {
+  const query = withTier(route.query, value)
+  if (!tierAllowsEngagementCollections(value)) delete query.group
+  void router.replace({ query, hash: route.hash })
+}
 
 const setDomain = (domain: string) => replaceQuery({ domain: domain || undefined })
 const setGroup = (group: string) => {
   replaceQuery({ group: group || undefined, domain: undefined })
-  if (!isGlobal.value) localStorage.setItem(STORAGE_KEY, group)
+  localStorage.setItem(STORAGE_KEY, group)
 }
 const goToGroups = () => { localStorage.removeItem(STORAGE_KEY); void router.push('/entities/groups') }
 const setViewMode = (view: ViewMode) => replaceQuery({ view: view === 'table' ? undefined : view })
@@ -100,15 +115,9 @@ const viewpointSlug = computed(() => (route.query.viewpoint as string | undefine
 
 onMounted(() => {
   if (viewpointSlug.value) return
-  if (!isGlobal.value) {
-    const saved = localStorage.getItem(STORAGE_KEY)
-    if (saved === null && !route.query.group && !route.query.domain) {
-      void router.replace('/entities/groups')
-      return
-    }
-    if (saved && !route.query.group) {
-      void router.replace({ path: '/entities', query: { ...route.query, group: saved || undefined } })
-    }
+  const saved = savedGroupToMerge(activeGroup.value, tier.value, localStorage.getItem(STORAGE_KEY))
+  if (saved) {
+    void router.replace({ query: { ...route.query, group: saved }, hash: route.hash })
   }
   load()
   loadGroups()
@@ -116,7 +125,7 @@ onMounted(() => {
   loadTaxonomy()
 })
 
-watch(() => props.scope, () => { typeFilter.value = ''; loadTaxonomy(); load() })
+watch(tier, () => { typeFilter.value = ''; loadTaxonomy(); load() })
 watch(activeGroup, () => { loadTaxonomy(); load() })
 watch(activeDomain, () => { typeFilter.value = '' })
 watch([activeDomain, typeFilter], () => { if (!isGroupView.value) load() })
@@ -163,9 +172,6 @@ const uniqueTypes = computed(() => {
   return [...new Set((entityListState.data.value?.items ?? []).map(e => e.artifact_type))].sort()
 })
 
-const compareValues = (left: number | string, right: number | string) =>
-  left < right ? -1 * sortOrder.value : left > right ? 1 * sortOrder.value : 0
-
 const sortBy = (key: SortKey) => {
   if (sortKey.value !== key) { sortKey.value = key; sortOrder.value = 1; return }
   if (sortOrder.value === 1) sortOrder.value = -1
@@ -181,14 +187,7 @@ const sortedEntities = computed(() => {
         (!activeDomain.value || item.domain === activeDomain.value)
       ) ?? [])
     : (entityListState.data.value?.items ?? [])
-  if (!sortKey.value) return [...items]
-  return [...items].sort((a, b) => {
-    if (sortKey.value === 'type') return compareValues(a.artifact_type, b.artifact_type)
-    if (sortKey.value === 'in') return compareValues(a.conn_in ?? 0, b.conn_in ?? 0)
-    if (sortKey.value === 'sym') return compareValues(a.conn_sym ?? 0, b.conn_sym ?? 0)
-    if (sortKey.value === 'out') return compareValues(a.conn_out ?? 0, b.conn_out ?? 0)
-    return compareValues(getEntityConnectionTotal(a), getEntityConnectionTotal(b))
-  })
+  return sortEntityRows(items, sortKey.value, sortOrder.value)
 })
 
 const browseReturnQuery = computed(() => {
@@ -222,13 +221,15 @@ const displayCount = computed(() => {
     v-else
     class="layout"
   >
-    <aside class="sidebar">
+    <aside
+      v-if="!isGlobal"
+      class="sidebar"
+    >
       <div class="sidebar-header">
         <h2 class="sidebar-title">
           Project
         </h2>
         <RouterLink
-          v-if="!isGlobal"
           to="/entities/groups"
           class="manage-link"
           title="Manage projects"
@@ -238,7 +239,6 @@ const displayCount = computed(() => {
       </div>
 
       <EntityGroupNavTree
-        v-if="!isGlobal"
         :groups="groupOptions"
         :active-group="activeGroup"
         :active-domain="activeDomain"
@@ -253,27 +253,6 @@ const displayCount = computed(() => {
         @group-mutated="() => { load(); loadGroups(); loadTaxonomy() }"
         @navigate-to-groups="goToGroups"
       />
-
-      <!-- Global view: flat domain list only -->
-      <template v-else>
-        <h2
-          class="sidebar-title"
-          style="margin-top:1rem"
-        >
-          Domain
-        </h2>
-        <ul class="domain-list">
-          <li>
-            <button
-              class="domain-btn"
-              :class="{ active: activeDomain === '' }"
-              @click="setDomain('')"
-            >
-              All
-            </button>
-          </li>
-        </ul>
-      </template>
     </aside>
 
     <section class="content">
@@ -300,6 +279,11 @@ const displayCount = computed(() => {
           </p>
         </div>
         <div class="actions">
+          <TierFacet
+            :model-value="tier"
+            :allowed="LIST_TIERS"
+            @update:model-value="selectTier"
+          />
           <div class="view-toggle">
             <button
               class="toggle-btn"
@@ -439,11 +423,11 @@ const displayCount = computed(() => {
                   <RouterLink :to="{ path: '/entity', query: { id: entity.artifact_id, ...browseReturnQuery } }">
                     {{ entity.name || friendlyEntityId(entity.artifact_id) }}
                   </RouterLink>
-                  <span
+                  <TierBadge
                     v-if="entity.is_global && !isGlobal"
-                    class="global-chip"
-                    title="From the global repository"
-                  >global</span>
+                    class="row-tier-badge"
+                    :tier="tierFromIsGlobal(entity.is_global)"
+                  />
                   <button
                     v-if="!activeGroup && groupOptions.length > 1 && entity.group && entity.group !== 'uncategorized'"
                     class="group-chip"
@@ -570,7 +554,7 @@ const displayCount = computed(() => {
 .conn-counts { font-size: 12px; white-space: nowrap; }
 .state-msg--error { color: #dc2626; }
 .global-badge { display: inline-block; background: #fef3c7; color: #92400e; border: 1px solid #fde68a; border-radius: 4px; padding: 1px 7px; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; margin-right: 8px; vertical-align: middle; }
-.global-chip { display: inline-block; margin-left: 8px; background: #fef3c7; color: #92400e; border: 1px solid #fde68a; border-radius: 3px; padding: 0 5px; font-size: 10px; font-weight: 600; vertical-align: middle; }
+.row-tier-badge { margin-left: 8px; vertical-align: middle; }
 .group-chip { display: inline-block; margin-left: 6px; background: #e0f2fe; color: #0369a1; border: 1px solid #bae6fd; border-radius: 3px; padding: 0 5px; font-size: 10px; font-weight: 500; vertical-align: middle; cursor: pointer; }
 .group-chip:hover { background: #bae6fd; }
 .row--global td { background: #fffbeb; }

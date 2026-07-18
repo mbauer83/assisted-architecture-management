@@ -47,7 +47,7 @@ SOURCE_FILE_BASELINE_LIMITS: dict[str, int] = {
     "tools/gui/src/ui/views/CreateDiagramView.vue": 529,
     "tools/gui/src/ui/views/DocumentCreateView.vue": 606,
     "tools/gui/src/ui/views/DocumentDetailView.vue": 432,
-    "tools/gui/src/ui/views/EntitiesView.vue": 532,
+    "tools/gui/src/ui/views/EntitiesView.vue": 518,
     "tools/gui/src/ui/views/EntityCreateView.vue": 530,
     "tools/gui/src/ui/views/GraphExploreView.vue": 658,
     "tools/gui/src/ui/views/GroupManagementView.vue": 618,

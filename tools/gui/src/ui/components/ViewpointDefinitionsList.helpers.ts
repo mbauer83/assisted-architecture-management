@@ -78,3 +78,22 @@ export const filterAndSortDefinitions = (
  * creation is a first-class route, distinct from forking via Save as. */
 export const CREATE_CAPABILITY_COPY =
   'Build your own view — filter by type, project, status, or connections.'
+
+
+/** Column-sort cycling: same key toggles direction, a new key starts ascending. */
+export const nextCatalogSort = (
+  currentKey: CatalogSortKey | null,
+  currentDirection: CatalogSortDirection,
+  clicked: CatalogSortKey,
+): { key: CatalogSortKey; direction: CatalogSortDirection } =>
+  currentKey === clicked
+    ? { key: clicked, direction: currentDirection === 'asc' ? 'desc' : 'asc' }
+    : { key: clicked, direction: 'asc' }
+
+/** Immutable membership toggle for the expanded-scope set. */
+export const toggledMember = (members: ReadonlySet<string>, slug: string): Set<string> => {
+  const next = new Set(members)
+  if (next.has(slug)) next.delete(slug)
+  else next.add(slug)
+  return next
+}

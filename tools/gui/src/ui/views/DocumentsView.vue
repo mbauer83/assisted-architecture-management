@@ -1,108 +1,33 @@
 <script setup lang="ts">
-import { computed, inject, onMounted, onUnmounted, ref } from 'vue'
-import { Effect } from 'effect'
-import { RouterLink, useRoute, useRouter } from 'vue-router'
+import { inject } from 'vue'
+import { RouterLink, useRouter } from 'vue-router'
 import { modelServiceKey } from '../keys'
-import { useQuery } from '../composables/useQuery'
-import type { DocumentList, DocumentType, GroupList } from '../../domain'
-import type { RepoError } from '../../ports/ModelRepository'
+import { LIST_TIERS } from '../lib/tierUrlState'
+import { tierFromIsGlobal } from '../components/TierBadge.helpers'
+import { useDocumentsListState } from '../composables/useDocumentsListState'
 import GroupSelector from '../components/GroupSelector.vue'
+import TierBadge from '../components/TierBadge.vue'
+import TierFacet from '../components/TierFacet.vue'
 
 const svc = inject(modelServiceKey)!
 const router = useRouter()
-const route = useRoute()
 
-const documentTypes = ref<DocumentType[]>([])
-const documentList = ref<DocumentList | null>(null)
-const groupsState = useQuery<GroupList, RepoError>()
-const loading = ref(false)
-const error = ref<string | null>(null)
-const docTypeFilter = ref('')
-const titleFilter = ref('')
-const showArchivedGroups = ref(false)
-
-const activeGroup = computed(() => (route.query.group as string | undefined) ?? '')
-const STORAGE_KEY = 'arch_group_document-collection'
-const setGroup = (g: string) => {
-  void router.replace({ path: '/documents', query: { ...(docTypeFilter.value ? { doc_type: docTypeFilter.value } : {}), group: g || undefined } })
-  localStorage.setItem(STORAGE_KEY, g)
-}
-const goToGroups = () => {
-  localStorage.removeItem(STORAGE_KEY)
-  void router.push('/documents/groups')
-}
-
-const groupOptions = computed(() => {
-  const all = documentList.value?.items ?? []
-  const counts: Record<string, number> = {}
-  for (const item of all) { const g = item.group ?? 'uncategorized'; counts[g] = (counts[g] ?? 0) + 1 }
-  const registry = groupsState.data.value?.['document-collections'] ?? []
-  if (registry.length > 0) {
-    // Whole-catalog member_count from the registry — the loaded list is group-filtered, so
-    // counting it shows zero for every non-active group.
-    return registry.map(g => ({
-      slug: g.slug, name: g.name, count: g.member_count ?? 0,
-      archived: g.archived ?? false, type_filter: g.type_filter ?? [],
-    }))
-  }
-  return Object.entries(counts).sort(([a], [b]) => a.localeCompare(b)).map(([slug, count]) => ({ slug, name: slug, count, type_filter: [] as string[] }))
-})
-
-const load = () => {
-  loading.value = true
-  error.value = null
-  Promise.all([
-    Effect.runPromise(svc.listDocumentTypes()),
-    Effect.runPromise(svc.listDocuments(docTypeFilter.value ? { doc_type: docTypeFilter.value } : {})),
-  ]).then(([types, docs]) => {
-    documentTypes.value = types
-    documentList.value = docs
-    loading.value = false
-  }).catch((e) => {
-    error.value = String(e)
-    loading.value = false
-  })
-}
-const loadGroups = () => groupsState.run(svc.listGroups('document-collection'))
-
-let refreshEventSource: EventSource | null = null
-onMounted(() => {
-  if (!route.query.group) {
-    const saved = localStorage.getItem(STORAGE_KEY)
-    if (saved === null) {
-      void router.replace('/documents/groups')
-      return
-    }
-    if (saved) {
-      void router.replace({ path: '/documents', query: { group: saved } })
-    }
-  }
-  load()
-  loadGroups()
-  refreshEventSource = new EventSource('/api/events')
-  refreshEventSource.addEventListener('artifact_write_completed', () => { load(); loadGroups() })
-})
-onUnmounted(() => { refreshEventSource?.close() })
-
-const activeGroupTypeFilter = computed(() =>
-  groupOptions.value.find(g => g.slug === activeGroup.value)?.type_filter ?? [],
-)
-
-const filteredItems = computed(() => {
-  const lc = titleFilter.value.trim().toLowerCase()
-  const items = documentList.value?.items ?? []
-  return items.filter(item =>
-    (!lc || item.title.toLowerCase().includes(lc)) &&
-    (!activeGroup.value || (item.group ?? 'uncategorized') === activeGroup.value) &&
-    (activeGroupTypeFilter.value.length === 0 || activeGroupTypeFilter.value.includes(item.doc_type)),
-  )
-})
+const {
+  tier, selectTier, collectionsAvailable,
+  documentTypes, loading, error,
+  docTypeFilter, titleFilter, showArchivedGroups,
+  activeGroup, setGroup, goToGroups,
+  groupOptions, filteredItems, load, loadGroups,
+} = useDocumentsListState(svc)
 </script>
 
 <template>
   <div class="documents-page">
     <div class="layout">
-      <aside class="sidebar">
+      <aside
+        v-if="collectionsAvailable"
+        class="sidebar"
+      >
         <div class="sidebar-header">
           <h2 class="sidebar-title">
             Collection
@@ -144,6 +69,14 @@ const filteredItems = computed(() => {
         </div>
 
         <div class="toolbar card">
+          <label class="toolbar-field">
+            <span>Tier</span>
+            <TierFacet
+              :model-value="tier"
+              :allowed="LIST_TIERS"
+              @update:model-value="selectTier"
+            />
+          </label>
           <label class="toolbar-field">
             <span>Type</span>
             <select
@@ -195,6 +128,7 @@ const filteredItems = computed(() => {
               <tr>
                 <th>Title</th>
                 <th>Type</th>
+                <th>Tier</th>
                 <th>Status</th>
               </tr>
             </thead>
@@ -209,6 +143,7 @@ const filteredItems = computed(() => {
                   </RouterLink>
                 </td>
                 <td><span class="doc-type">{{ doc.doc_type }}</span></td>
+                <td><TierBadge :tier="tierFromIsGlobal(doc.is_global)" /></td>
                 <td>
                   <span
                     class="status-badge"
@@ -218,7 +153,7 @@ const filteredItems = computed(() => {
               </tr>
               <tr v-if="!filteredItems.length">
                 <td
-                  colspan="3"
+                  colspan="4"
                   class="empty-row"
                 >
                   <template v-if="activeGroup">

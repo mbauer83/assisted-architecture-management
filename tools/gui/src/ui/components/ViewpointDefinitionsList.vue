@@ -10,12 +10,17 @@ import { computed, inject, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { Effect } from 'effect'
 import { modelServiceKey } from '../keys'
+import { tierFromViewpointFilter, viewpointFilterFromTier } from '../composables/listRequestParams'
+import { useTierFacet } from '../composables/useTierFacet'
 import { useWriteBlock } from '../composables/useWriteBlock'
+import { VIEWPOINT_TIERS } from '../lib/tierUrlState'
 import { readErrorMessage } from '../lib/errors'
 import type { ViewpointDefinitionEnvelope, ViewpointReferencer } from '../../domain'
 import { executionRouteFor } from '../views/ViewpointsManagementView.helpers'
 import {
   CREATE_CAPABILITY_COPY, filterAndSortDefinitions, type CatalogSortDirection, type CatalogSortKey,
+  nextCatalogSort,
+  toggledMember,
 } from './ViewpointDefinitionsList.helpers'
 import ViewpointCatalogRow from './ViewpointCatalogRow.vue'
 
@@ -28,18 +33,19 @@ const router = useRouter()
 
 const executeViewpoint = (envelope: ViewpointDefinitionEnvelope) => void router.push(executionRouteFor(envelope))
 
-// ── Search / tier filter / sort ──────────────────────────────────────────────
+// ── Search / tier filter (URL-backed) / sort ─────────────────────────────────
 const search = ref('')
-const tierFilter = ref<ViewpointDefinitionEnvelope['tier'] | ''>('')
+const { tier, setTier } = useTierFacet(VIEWPOINT_TIERS)
+const tierFilter = computed<ViewpointDefinitionEnvelope['tier'] | ''>({
+  get: () => viewpointFilterFromTier(tier.value),
+  set: (value) => setTier(tierFromViewpointFilter(value)),
+})
 const sortKey = ref<CatalogSortKey | null>(null)
 const sortDirection = ref<CatalogSortDirection>('asc')
 const toggleSort = (key: CatalogSortKey) => {
-  if (sortKey.value === key) {
-    sortDirection.value = sortDirection.value === 'asc' ? 'desc' : 'asc'
-  } else {
-    sortKey.value = key
-    sortDirection.value = 'asc'
-  }
+  const next = nextCatalogSort(sortKey.value, sortDirection.value, key)
+  sortKey.value = next.key
+  sortDirection.value = next.direction
 }
 const visibleDefinitions = computed(() =>
   filterAndSortDefinitions(props.definitions, search.value, tierFilter.value, sortKey.value, sortDirection.value))
@@ -47,12 +53,7 @@ const ariaSortFor = (key: CatalogSortKey) =>
   sortKey.value === key ? (sortDirection.value === 'asc' ? 'ascending' : 'descending') : undefined
 
 const expandedScopes = ref<Set<string>>(new Set())
-const toggleScope = (slug: string) => {
-  const next = new Set(expandedScopes.value)
-  if (next.has(slug)) next.delete(slug)
-  else next.add(slug)
-  expandedScopes.value = next
-}
+const toggleScope = (slug: string) => { expandedScopes.value = toggledMember(expandedScopes.value, slug) }
 
 // ── Pins (Home quick access) ─────────────────────────────────────────────────
 const pinnedSlugs = ref<Set<string>>(new Set())
@@ -120,14 +121,12 @@ const deleteDefinition = (envelope: ViewpointDefinitionEnvelope) => {
           <option value="">
             all tiers
           </option>
-          <option value="engagement">
-            engagement
-          </option>
-          <option value="enterprise">
-            enterprise
-          </option>
-          <option value="module">
-            module
+          <option
+            v-for="tierOption in VIEWPOINT_TIERS"
+            :key="tierOption"
+            :value="tierOption"
+          >
+            {{ tierOption }}
           </option>
         </select>
       </div>

@@ -295,7 +295,7 @@ memory. Tick items only after the listed verification passes, recording evidence
 
 ## S5 — Facet adoption & route consolidation
 
-- [ ] **S5a — Adopt codec/facet/badge on Documents, Diagrams, Entities, Viewpoints.**
+- [x] **S5a — Adopt codec/facet/badge on Documents, Diagrams, Entities, Viewpoints.**
       Remove the `DiagramsView` global stub. **Remove the mandatory first-visit
       redirect to group management** on Documents and Diagrams: no `group` + no saved
       preference → list at All/no collection; saved preference merges into the URL only
@@ -304,7 +304,22 @@ memory. Tick items only after the listed verification passes, recording evidence
       (keeps `module`). Extract view state into composables/helpers per the pressure
       list. Vitest: per-surface facet↔URL↔fetch mapping; adjacent-mutation
       preservation; clean-localStorage direct load shows the list.
-- [ ] **S5b — Functional redirects + link inventory.**
+      > Evidence (2026-07-18): Documents/Diagrams state extracted into
+      > useDocumentsListState/useDiagramsListState (views 290→233, 336→248 counted;
+      > global stub + scope prop REMOVED; query writes merge `...route.query` +
+      > hash); EntitiesView adopts useTierFacet (scope prop removed, vestigial
+      > enterprise flat-domain sidebar removed, sort logic extracted → 532→518,
+      > baseline ratcheted); viewpoint tier filter now URL-backed through
+      > useTierFacet(VIEWPOINT_TIERS) keeping `module`
+      > (ViewpointDefinitionsList 252→251 via helper extraction). First-visit
+      > group-management redirects REMOVED on all three surfaces (savedGroupToMerge:
+      > clean localStorage → list at All; merge only when tier allows engagement
+      > collections; Enterprise clears `group`; All never restores). TierBadge on
+      > document rows, diagram cards, entity rows; scope mapping via pure
+      > listRequestParams helpers. Vitest: listRequestParams.test.ts (facet↔fetch per
+      > surface, savedGroupToMerge table, viewpoint filter round-trip),
+      > EntitiesViewSort.helpers.test.ts, ViewpointDefinitionsList.helpers additions.
+- [x] **S5b — Functional redirects + link inventory.**
       `/global/entities`, `/global/diagrams` → faceted routes via
       `to => ({ path, query: { ...to.query, tier: "enterprise" }, hash: to.hash })`.
       Update `EntityDetailView`/`DiagramDetailView` back-links, Home, NavBar Browse
@@ -312,6 +327,17 @@ memory. Tick items only after the listed verification passes, recording evidence
       Tests: redirect preserves query+hash (pin
       `/global/entities?domain=motivation&view=treemap#catalog`,
       `/global/diagrams?type=archimate&group=x`); back/forward; copied URL.
+      > Evidence (2026-07-18): router `/global/entities` + `/global/diagrams` are
+      > functional redirects `to => ({ path, query: { ...to.query, tier:
+      > 'enterprise' }, hash: to.hash })`; `/global/search` unchanged;
+      > `searchHitRoute` untouched. Links updated: NavBar enterprise Browse/Diagrams
+      > → faceted routes; DiagramDetailView back-push → `/diagrams?tier=enterprise`;
+      > EntityDetailView backTo carries `tier=enterprise` for enterprise entities.
+      > Tests: router/__tests__/globalRedirects.test.ts (5 — both pinned URLs with
+      > query+hash, back/forward across the redirect, copied faceted URL,
+      > /global/search) via memory-history navigation. Gates: GUI lint 0, vue-tsc
+      > clean, vitest 994 passed (95 files); backend length policy green with
+      > EntitiesView baseline ratcheted 532→518.
 
 ## S6 — Sync aggregate, authority read model & status cluster
 

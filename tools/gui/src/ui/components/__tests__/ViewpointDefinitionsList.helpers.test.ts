@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
-  collapsedScopeSummary, definitionNeedsInput, filterAndSortDefinitions, representationOf,
+  collapsedScopeSummary, definitionNeedsInput, filterAndSortDefinitions, nextCatalogSort,
+  representationOf, toggledMember,
 } from '../ViewpointDefinitionsList.helpers'
 import type { ViewpointDefinitionEnvelope } from '../../../domain'
 
@@ -63,5 +64,22 @@ describe('filterAndSortDefinitions', () => {
     expect(filterAndSortDefinitions(definitions, '', '', 'name', 'asc').map((d) => d.name)).toEqual(['Alpha', 'Beta', 'Gamma'])
     expect(filterAndSortDefinitions(definitions, '', '', 'version', 'desc').map((d) => d.version)).toEqual([3, 2, 1])
     expect(filterAndSortDefinitions(definitions, '', '', 'tier', 'asc').map((d) => d.tier)).toEqual(['engagement', 'enterprise', 'module'])
+  })
+})
+
+describe('nextCatalogSort', () => {
+  it('starts ascending on a new key and toggles on the same key', () => {
+    expect(nextCatalogSort(null, 'asc', 'name')).toEqual({ key: 'name', direction: 'asc' })
+    expect(nextCatalogSort('name', 'asc', 'name')).toEqual({ key: 'name', direction: 'desc' })
+    expect(nextCatalogSort('name', 'desc', 'tier')).toEqual({ key: 'tier', direction: 'asc' })
+  })
+})
+
+describe('toggledMember', () => {
+  it('adds and removes without mutating the source set', () => {
+    const source = new Set(['a'])
+    expect([...toggledMember(source, 'b')].sort()).toEqual(['a', 'b'])
+    expect([...toggledMember(source, 'a')]).toEqual([])
+    expect([...source]).toEqual(['a'])
   })
 })

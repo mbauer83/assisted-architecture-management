@@ -6,7 +6,29 @@
  */
 
 import type { ColumnSpecNode, PresentationNode } from '../../domain/viewpointPresentation'
-import type { EntityItemSummary, ProjectedOccurrence, ViewpointProjection } from '../../domain'
+import type { EntityItemSummary, EntitySummary, ProjectedOccurrence, ViewpointProjection } from '../../domain'
+import { getEntityConnectionTotal } from '../lib/domains'
+
+export type EntitySortKey = 'type' | 'in' | 'sym' | 'out' | 'total'
+
+/** Catalog-table sort: rank by the selected column with a stable copy; a null key
+ * returns the items in server order. */
+export const sortEntityRows = (
+  items: readonly EntitySummary[],
+  sortKey: EntitySortKey | null,
+  sortOrder: 1 | -1,
+): EntitySummary[] => {
+  if (!sortKey) return [...items]
+  const compare = (left: number | string, right: number | string) =>
+    left < right ? -1 * sortOrder : left > right ? 1 * sortOrder : 0
+  return [...items].sort((a, b) => {
+    if (sortKey === 'type') return compare(a.artifact_type, b.artifact_type)
+    if (sortKey === 'in') return compare(a.conn_in ?? 0, b.conn_in ?? 0)
+    if (sortKey === 'sym') return compare(a.conn_sym ?? 0, b.conn_sym ?? 0)
+    if (sortKey === 'out') return compare(a.conn_out ?? 0, b.conn_out ?? 0)
+    return compare(getEntityConnectionTotal(a), getEntityConnectionTotal(b))
+  })
+}
 
 export const filtersToEntityCriteriaMapping = (domain: string, artifactType: string): Record<string, unknown> => {
   const children: Record<string, unknown>[] = []
