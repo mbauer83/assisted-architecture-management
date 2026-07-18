@@ -11,6 +11,7 @@ import { useRouter } from 'vue-router'
 import { Effect } from 'effect'
 import { modelServiceKey } from '../keys'
 import { tierFromViewpointFilter, viewpointFilterFromTier } from '../composables/listRequestParams'
+import { tierDisplayLowercase } from './TierBadge.helpers'
 import { useTierFacet } from '../composables/useTierFacet'
 import { useWriteBlock } from '../composables/useWriteBlock'
 import { VIEWPOINT_TIERS } from '../lib/tierUrlState'
@@ -126,7 +127,7 @@ const deleteDefinition = (envelope: ViewpointDefinitionEnvelope) => {
             :key="tierOption"
             :value="tierOption"
           >
-            {{ tierOption }}
+            {{ tierDisplayLowercase(tierOption) }}
           </option>
         </select>
       </div>

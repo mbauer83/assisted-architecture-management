@@ -4,6 +4,7 @@
  * per-tier action set. Pure display + emits; catalog state (search/sort/pins) stays in
  * the list. */
 import type { ViewpointDefinitionEnvelope } from '../../domain'
+import { tierDisplayLowercase } from './TierBadge.helpers'
 import { formatScopeSummary } from '../views/ViewpointsManagementView.helpers'
 import {
   REPRESENTATION_BADGES, collapsedScopeSummary, definitionNeedsInput, representationOf,
@@ -50,7 +51,7 @@ const emit = defineEmits<{
       <span
         class="tier-tag"
         :class="`tier-${def.tier}`"
-      >{{ def.tier }}</span>
+      >{{ tierDisplayLowercase(def.tier) }}</span>
       <span
         v-if="def.forked_from"
         class="fork-tag"

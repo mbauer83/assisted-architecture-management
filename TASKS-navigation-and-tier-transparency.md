@@ -38,8 +38,13 @@ memory. Tick items only after the listed verification passes, recording evidence
 
 ## Open questions
 
-- [ ] **Q2**: viewpoint third-tier facet label `module` vs `Built-in` — cosmetic,
+- [x] **Q2**: viewpoint third-tier facet label `module` vs `Built-in` — cosmetic,
       non-blocking; default `module` until answered.
+      > ANSWERED by owner 2026-07-18: display label is "Built-in" ("built-in" in
+      > lowercase inline contexts). Applied via TIER_LABELS.module +
+      > tierDisplayLowercase (TierFacet segmented control, TierBadge, viewpoint
+      > catalog select options, catalog row tier tag). URL value and internal
+      > identifiers keep `module` per the settled tier vocabulary.
 
 ## S1 — Search visibility policy
 
