@@ -1,4 +1,4 @@
-import { computed, onMounted, onUnmounted, ref } from 'vue'
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { Effect } from 'effect'
 import { useRoute, useRouter } from 'vue-router'
 import type { DocumentList, DocumentType, GroupList } from '../../domain'
@@ -49,8 +49,9 @@ export function useDocumentsListState(svc: ModelService) {
   const selectTier = (value: TierSelection) => {
     const query = withTier(route.query, value)
     if (!tierAllowsEngagementCollections(value)) delete query.group
+    // Refetch happens in the tier watcher AFTER route.query (and the derived tier)
+    // updates — calling load() here would fetch with the stale pre-navigation tier.
     void router.replace({ query, hash: route.hash })
-    load()
   }
 
   const goToGroups = () => {
@@ -95,6 +96,9 @@ export function useDocumentsListState(svc: ModelService) {
     })
   }
   const loadGroups = () => groupsState.run(svc.listGroups('document-collection'))
+
+  // The facet writes the URL; the derived tier updates reactively, then we refetch.
+  watch(tier, () => { load() })
 
   let refreshEventSource: EventSource | null = null
   onMounted(() => {

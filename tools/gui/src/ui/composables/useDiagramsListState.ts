@@ -54,8 +54,9 @@ export function useDiagramsListState(svc: ModelService) {
   const selectTier = (value: TierSelection) => {
     const query = withTier(route.query, value)
     if (!tierAllowsEngagementCollections(value)) delete query.group
+    // Refetch happens in the tier watcher AFTER route.query (and the derived tier)
+    // updates — calling load() here would fetch with the stale pre-navigation tier.
     void router.replace({ query, hash: route.hash })
-    load()
   }
 
   const goToGroups = () => {
@@ -139,6 +140,8 @@ export function useDiagramsListState(svc: ModelService) {
       load()
     },
   )
+  // The facet writes the URL; the derived tier updates reactively, then we refetch.
+  watch(tier, () => { load() })
 
   return {
     tier, selectTier, collectionsAvailable,
