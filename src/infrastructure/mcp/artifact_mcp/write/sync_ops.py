@@ -144,7 +144,6 @@ def artifact_withdraw_changes(*, confirm: bool = False) -> dict[str, object]:
     repository is affected; engagement repository changes are never discarded.
     """
     from src.infrastructure.git import enterprise_git_ops
-    from src.infrastructure.git.enterprise_sync_state import load as load_state
     from src.infrastructure.gui.routers.state import maybe_enterprise_root
 
     if not confirm:
@@ -157,14 +156,6 @@ def artifact_withdraw_changes(*, confirm: bool = False) -> dict[str, object]:
     if ent_root is None:
         return {"ok": False, "error": "Enterprise repository is not configured"}
 
-    state = load_state(ent_root)
-    if state.is_synced():
-        return {
-            "ok": True,
-            "nothing_to_discard": True,
-            "message": "No pending enterprise changes to discard.",
-        }
-
     try:
         branch = enterprise_git_ops.abandon_enterprise_branch(ent_root)
         return {
@@ -172,6 +163,8 @@ def artifact_withdraw_changes(*, confirm: bool = False) -> dict[str, object]:
             "discarded_branch": branch,
             "message": "All pending enterprise changes have been discarded.",
         }
+    except ValueError as exc:
+        return {"ok": False, "error": str(exc)}
     except RuntimeError as exc:
         return {"ok": False, "error": str(exc)}
 

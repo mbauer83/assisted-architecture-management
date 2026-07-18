@@ -30,6 +30,12 @@ def _reset_executor_for_test() -> None:
         _installed_executor = None
 
 
+def authorization_snapshot():
+    """A fresh authority snapshot from the installed executor's provider — never
+    cached; every status request composes its projection from this."""
+    return mutation_executor().snapshot_provider.snapshot()
+
+
 def mutation_executor() -> AuthorizedMutationExecutor:
     """Return the installed executor, composing a workspace-default one lazily for
     processes whose entrypoint installed none."""
@@ -65,13 +71,19 @@ class _DynamicWorkspaceSnapshots:
             )
         except RuntimeError:
             enterprise = None
+        if enterprise is not None:
+            from src.infrastructure.write.workspace_authorization import persisted_sync_health  # noqa: PLC0415
+
+            sync_health = persisted_sync_health(enterprise)()
+        else:
+            sync_health = SyncHealth()
         return AuthorizationSnapshot(
             engagement_root=engagement.resolve(),
             enterprise_root=enterprise.resolve() if enterprise is not None else None,
             admin_mode=gui_state.is_admin_mode(),
             read_only=gui_state.is_read_only(),
             gate_block=get_workspace_gate().block_reason,
-            sync_health=SyncHealth(),
+            sync_health=sync_health,
         )
 
 

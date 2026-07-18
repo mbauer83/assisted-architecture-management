@@ -171,6 +171,30 @@ def load(enterprise_root: Path) -> EnterpriseSyncState:
         return _load_unlocked(enterprise_root)
 
 
+_MTIME_CACHE: dict[Path, tuple[tuple[int, int] | None, EnterpriseSyncState]] = {}
+
+
+def load_cached(enterprise_root: Path) -> EnterpriseSyncState:
+    """mtime-validated read for hot paths (per-operation authority snapshots).
+
+    One stat() per call; the parsed aggregate is reused until the file changes,
+    so authorization stays O(1) and never re-parses on steady state.
+    """
+    with _lock:
+        path = _state_path(enterprise_root)
+        try:
+            stat = path.stat()
+            key: tuple[int, int] | None = (stat.st_mtime_ns, stat.st_size)
+        except FileNotFoundError:
+            key = None
+        cached = _MTIME_CACHE.get(enterprise_root)
+        if cached is not None and cached[0] == key:
+            return cached[1]
+        state = _load_unlocked(enterprise_root)
+        _MTIME_CACHE[enterprise_root] = (key, state)
+        return state
+
+
 def _transition(
     enterprise_root: Path, mutate: Callable[[EnterpriseSyncState], EnterpriseSyncState]
 ) -> SyncTransition:

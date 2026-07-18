@@ -1,9 +1,11 @@
-"""Cached sync-status read model for GUI and other HTTP clients.
+"""Sync-status read model: cached measurements, fresh authority.
 
-The underlying git probes are relatively expensive. This module keeps a small
-in-process cache with singleflight refresh so many concurrent clients do not
-multiply git work. Correctness comes from explicit invalidation on writes and
-repo updates, plus a stale-age fallback refresh.
+Only the EXPENSIVE git probes (dirty flags, ahead counts) are cached, with
+singleflight refresh and explicit invalidation. Everything cheap is composed
+per request: the persisted lifecycle+health aggregate and the per-intent
+authority projection from the executor's snapshot provider — so a live
+``gate.blocking_writes()`` transition or a persisted-health change is visible
+to the very next request with no TTL and no ``write_block_manager`` shims.
 """
 
 from __future__ import annotations
@@ -23,28 +25,52 @@ _cached_at_monotonic = 0.0
 _dirty = True
 
 
-async def _compute_sync_status() -> dict[str, Any]:
-    from src.infrastructure.git import enterprise_git_ops, enterprise_sync_state
+async def _measure() -> dict[str, Any]:
+    """Expensive git probes only — the cacheable part of the status."""
+    from src.infrastructure.git import enterprise_git_ops
     from src.infrastructure.gui.routers import state as s
-    from src.infrastructure.gui.routers.sync import _status_label
 
-    out: dict[str, Any] = {"engagement": None, "enterprise": None}
+    measurements: dict[str, Any] = {"engagement_dirty": None, "enterprise_dirty": None, "commits_ahead": None}
 
     eng_root = s.maybe_engagement_root()
     if eng_root is not None:
-        dirty = await asyncio.to_thread(
-            enterprise_git_ops.has_uncommitted_changes,
-            eng_root,
-            MODEL,
-            DOCS,
-            DIAGRAM_CATALOG,
+        measurements["engagement_dirty"] = await asyncio.to_thread(
+            enterprise_git_ops.has_uncommitted_changes, eng_root, MODEL, DOCS, DIAGRAM_CATALOG
         )
-        out["engagement"] = {"has_uncommitted_changes": dirty}
 
     ent_root = s.maybe_enterprise_root()
     if ent_root is not None:
-        sync_state = enterprise_sync_state.load(ent_root)
-        dirty = await asyncio.to_thread(enterprise_git_ops.has_uncommitted_changes, ent_root)
+        measurements["enterprise_dirty"] = await asyncio.to_thread(
+            enterprise_git_ops.has_uncommitted_changes, ent_root
+        )
+        # Live ahead-count in every mode (including read-only): behind-state must be truthful.
+        measurements["commits_ahead"] = await asyncio.to_thread(enterprise_git_ops.commits_ahead_of_main, ent_root)
+
+    return measurements
+
+
+async def get_sync_status() -> dict[str, Any]:
+    measurements = await _cached_measurements()
+    return _compose(measurements)
+
+
+def _compose(measurements: dict[str, Any]) -> dict[str, Any]:
+    """Fresh lifecycle + health + authority over the cached measurements."""
+    from src.infrastructure.git import enterprise_sync_state
+    from src.infrastructure.gui.routers import state as s
+    from src.infrastructure.gui.routers._sync_authority import authority_projection
+    from src.infrastructure.gui.routers.sync import _status_label
+    from src.infrastructure.write.mutation_executor_registry import authorization_snapshot
+
+    out: dict[str, Any] = {"engagement": None, "enterprise": None}
+
+    if s.maybe_engagement_root() is not None:
+        out["engagement"] = {"has_uncommitted_changes": bool(measurements["engagement_dirty"])}
+
+    ent_root = s.maybe_enterprise_root()
+    if ent_root is not None:
+        sync_state = enterprise_sync_state.load_cached(ent_root)
+        health = sync_state.health
         info: dict[str, Any] = {
             "status": sync_state.status,
             "label": _status_label(sync_state.status),
@@ -52,16 +78,20 @@ async def _compute_sync_status() -> dict[str, Any]:
             "branch_tip": sync_state.branch_tip,
             "pushed_at": sync_state.pushed_at,
             "commits_behind": sync_state.commits_behind,
-            "has_uncommitted_changes": dirty,
+            "has_uncommitted_changes": bool(measurements["enterprise_dirty"]),
+            "health": None
+            if health is None
+            else {"reason": health.reason, "message": health.message, "observed_at": health.observed_at},
         }
         if sync_state.is_accumulating():
-            info["commits_ahead"] = await asyncio.to_thread(enterprise_git_ops.commits_ahead_of_main, ent_root)
+            info["commits_ahead"] = measurements["commits_ahead"]
         out["enterprise"] = info
 
+    out["authority"] = authority_projection(authorization_snapshot())
     return out
 
 
-async def get_sync_status() -> dict[str, Any]:
+async def _cached_measurements() -> dict[str, Any]:
     global _refresh_task
     now = time.monotonic()
     cached = _cached_value
@@ -82,7 +112,7 @@ async def get_sync_status() -> dict[str, Any]:
 
 async def _refresh_now() -> dict[str, Any]:
     global _cached_value, _cached_at_monotonic, _dirty
-    value = await _compute_sync_status()
+    value = await _measure()
     async with _lock:
         _cached_value = value
         _cached_at_monotonic = time.monotonic()
@@ -91,7 +121,7 @@ async def _refresh_now() -> dict[str, Any]:
 
 
 def invalidate_sync_status_cache(*, repo: Path | None = None) -> None:
-    """Mark the cached sync status dirty.
+    """Mark the cached measurements dirty.
 
     The optional repo path is reserved for future per-repo segmentation.
     """

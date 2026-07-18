@@ -19,6 +19,24 @@ def _healthy() -> SyncHealth:
     return SyncHealth()
 
 
+def persisted_sync_health(enterprise_root: Path) -> Callable[[], SyncHealth]:
+    """Reader over the persisted enterprise sync aggregate's health overlay.
+
+    Uses the aggregate's mtime-validated cache, so each snapshot costs one
+    stat() — O(1), model-size independent.
+    """
+
+    def read() -> SyncHealth:
+        from src.infrastructure.git import enterprise_sync_state  # noqa: PLC0415
+
+        record = enterprise_sync_state.load_cached(enterprise_root).health
+        if record is None:
+            return SyncHealth()
+        return SyncHealth(reason=record.reason, message=record.message)
+
+    return read
+
+
 class WorkspaceAuthorizationSnapshots:
     """Fresh per-operation snapshots — authority is never cached here.
 

@@ -111,11 +111,11 @@ const buildSaveEffect = (): Effect.Effect<string, RepoError, never> => {
           : `Branch ${res.branch ?? 'unknown'} ready — open a pull request to merge into the enterprise repository`,
       )
     case 'enterprise-withdraw':
+      // A no-op withdraw is a 400 from the backend now (never a silent success),
+      // so a success here always names the discarded branch.
       return Effect.map(
         svc.withdrawEnterpriseChanges(),
-        (res) => res.nothing_to_discard ? 'Nothing to discard'
-          : res.discarded_branch ? `Branch ${res.discarded_branch} discarded`
-          : 'Submission withdrawn',
+        (res) => res.discarded_branch ? `Branch ${res.discarded_branch} discarded` : 'Submission withdrawn',
       )
   }
 }

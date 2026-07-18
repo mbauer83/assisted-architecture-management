@@ -213,7 +213,6 @@ async def submit_enterprise() -> dict:
 async def withdraw_enterprise(body: WithdrawBody) -> dict:
     """Discard all pending enterprise changes and return the repo to main."""
     from src.infrastructure.git import enterprise_git_ops
-    from src.infrastructure.git import enterprise_sync_state as es
     from src.infrastructure.gui.routers import state as s
     from src.infrastructure.gui.routers.events import event_bus
 
@@ -226,10 +225,6 @@ async def withdraw_enterprise(body: WithdrawBody) -> dict:
     ent_root = s.maybe_enterprise_root()
     if ent_root is None:
         raise HTTPException(400, "Enterprise repository is not configured")
-
-    sync_state = es.load(ent_root)
-    if sync_state.is_synced():
-        return {"ok": True, "nothing_to_discard": True}
 
     try:
         branch = await s.authorized_write_async(
@@ -244,5 +239,7 @@ async def withdraw_enterprise(body: WithdrawBody) -> dict:
             }
         )
         return {"ok": True, "discarded_branch": branch}
+    except ValueError as exc:
+        raise HTTPException(400, str(exc))
     except RuntimeError as exc:
         raise HTTPException(500, str(exc))

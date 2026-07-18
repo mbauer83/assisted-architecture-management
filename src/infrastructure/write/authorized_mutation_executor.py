@@ -48,6 +48,12 @@ class AuthorizedMutationExecutor:
         self._submitter = submitter
         self._gate = gate
 
+    @property
+    def snapshot_provider(self) -> AuthorizationSnapshotProvider:
+        """The provider composing fresh per-operation snapshots — status read models
+        consume the SAME source of authority the executor enforces."""
+        return self._snapshots
+
     def _authorize_or_raise(self, request: MutationRequest) -> None:
         decision = authorize(self._snapshots.snapshot(), request)
         if isinstance(decision, MutationDenied):

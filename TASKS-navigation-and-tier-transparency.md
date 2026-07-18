@@ -383,7 +383,7 @@ memory. Tick items only after the listed verification passes, recording evidence
       > zuban 0. Counted lines: enterprise_sync_state 187, git_sync_enterprise 243,
       > git_sync 237, enterprise_git_ops 235. Backend restart NEEDED (pending
       > owner).
-- [ ] **S6b — Per-action authority read model and truthful workflow ops.**
+- [x] **S6b — Per-action authority read model and truthful workflow ops.**
       Restructure the status service (`sync_status_cache.py`): the cache holds ONLY
       expensive git/lifecycle measurements; every status request composes the fresh
       authority projection (`denied_intents` with reasons,
@@ -404,6 +404,34 @@ memory. Tick items only after the listed verification passes, recording evidence
       `withdraw_enterprise` rejects when there is nothing to discard and on dirty
       trees (real-git postcondition tests per PLAN §12/criterion 7). Close the TS
       sync-status schema to typed unions. Backend restart.
+      > Evidence (2026-07-18): sync_status_cache caches ONLY `_measure()` git probes
+      > (dirty flags + live commits_ahead in every mode incl. read-only);
+      > `_compose()` per request pulls fresh lifecycle+health from the aggregate's
+      > mtime-validated `load_cached` and the authority projection
+      > (`_sync_authority.py`: per-intent denied_intents with codes, block_kind
+      > read_only > sync_in_progress > sync_health) from the installed executor's
+      > snapshot provider (`snapshot_provider` property + registry
+      > `authorization_snapshot()`). Persisted health now feeds the EXECUTOR too:
+      > `persisted_sync_health` reader wired at the backend install and the dynamic
+      > fallback (O(1): one stat per snapshot). `abandon_enterprise_branch` is the
+      > idempotent desired-state transition (remote ref absent → checkout main →
+      > local branch absent → aggregate cleared; failed deletion of an absent ref =
+      > step success; rejects nothing-to-discard + dirty trees); REST withdraw drops
+      > the silent nothing_to_discard success (ValueError → 400), MCP withdraw
+      > errors truthfully; SaveChangesDialog copy updated; TS sync-status schema
+      > closed (lifecycle/health-reason/block-kind literals, SyncAuthority required,
+      > nothing_to_discard removed). Tests:
+      > test_gui_router_sync_status_authority.py (6 — real blocking_writes
+      > before/during/after with no TTL, persisted-health reconstruction on a fresh
+      > request, read-only denial sweep + truthful ahead counts,
+      > accumulating+clean+ahead=0, pending+dirty),
+      > test_enterprise_discard.py (8 — real bare remote: postconditions, truthful
+      > rejections, initial remote-deletion failure preserves pending,
+      > fault-injection after remote deletion/checkout/local deletion/state
+      > persistence each converging on retry with unrelated files preserved);
+      > test_sync_status_cache.py updated to the measurements API. Gates: pytest
+      > 5460 passed/5 skipped, ruff 0, zuban 0; GUI lint 0/vue-tsc clean/vitest 994.
+      > Backend restart NEEDED (pending owner).
 - [ ] **S6c — `SyncStatusCluster` component + fail-closed authority.**
       Implements the §12 reducer (every row component-tested, incl.
       `accumulating+clean+ahead=0`, `pending+dirty`, precedence, behind overlay);

@@ -7,42 +7,44 @@ from src.infrastructure.gui.routers.events import EventBus
 
 
 def test_sync_status_cache_coalesces_concurrent_refreshes(monkeypatch) -> None:
+    """Only the EXPENSIVE measurements are cached with singleflight — the
+    lifecycle/authority composition happens fresh per request."""
     sync_status_cache.reset_sync_status_cache()
     calls = 0
 
-    async def fake_compute() -> dict[str, object]:
+    async def fake_measure() -> dict[str, object]:
         nonlocal calls
         calls += 1
         await asyncio.sleep(0.01)
-        return {"engagement": {"has_uncommitted_changes": False}, "enterprise": None}
+        return {"engagement_dirty": False, "enterprise_dirty": None, "commits_ahead": None}
 
-    monkeypatch.setattr(sync_status_cache, "_compute_sync_status", fake_compute)
+    monkeypatch.setattr(sync_status_cache, "_measure", fake_measure)
 
     async def run() -> list[dict[str, object]]:
-        return await asyncio.gather(*[sync_status_cache.get_sync_status() for _ in range(25)])
+        return await asyncio.gather(*[sync_status_cache._cached_measurements() for _ in range(25)])
 
     results = asyncio.run(run())
 
     assert calls == 1
     assert len(results) == 25
-    assert all(result["engagement"] == {"has_uncommitted_changes": False} for result in results)
+    assert all(result["engagement_dirty"] is False for result in results)
 
 
 def test_sync_status_cache_recomputes_after_invalidation(monkeypatch) -> None:
     sync_status_cache.reset_sync_status_cache()
     calls = 0
 
-    async def fake_compute() -> dict[str, object]:
+    async def fake_measure() -> dict[str, object]:
         nonlocal calls
         calls += 1
-        return {"engagement": {"has_uncommitted_changes": bool(calls % 2)}, "enterprise": None}
+        return {"engagement_dirty": bool(calls % 2), "enterprise_dirty": None, "commits_ahead": None}
 
-    monkeypatch.setattr(sync_status_cache, "_compute_sync_status", fake_compute)
+    monkeypatch.setattr(sync_status_cache, "_measure", fake_measure)
 
-    first = asyncio.run(sync_status_cache.get_sync_status())
-    second = asyncio.run(sync_status_cache.get_sync_status())
+    first = asyncio.run(sync_status_cache._cached_measurements())
+    second = asyncio.run(sync_status_cache._cached_measurements())
     sync_status_cache.invalidate_sync_status_cache()
-    third = asyncio.run(sync_status_cache.get_sync_status())
+    third = asyncio.run(sync_status_cache._cached_measurements())
 
     assert calls == 2
     assert first == second

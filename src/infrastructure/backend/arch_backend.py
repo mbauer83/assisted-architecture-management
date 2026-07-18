@@ -397,12 +397,18 @@ def _configure_server_state(
     from src.infrastructure.mcp.artifact_mcp.mutation_registration import install_mutation_executor
     from src.infrastructure.workspace.mutation_gate import get_workspace_gate
     from src.infrastructure.write.authorized_mutation_executor import build_workspace_mutation_executor
-    from src.infrastructure.write.workspace_authorization import WorkspaceAuthorizationSnapshots
+    from src.infrastructure.write.workspace_authorization import (
+        WorkspaceAuthorizationSnapshots,
+        persisted_sync_health,
+    )
 
     gui_state.init_state(
         repo, repo_root_path, enterprise_root_path, admin_mode=args.admin_mode, read_only=args.read_only
     )
     load_document_schemata(repo_root_path)
+    health_kwargs = (
+        {"sync_health": persisted_sync_health(enterprise_root_path)} if enterprise_root_path is not None else {}
+    )
     install_mutation_executor(
         build_workspace_mutation_executor(
             WorkspaceAuthorizationSnapshots(
@@ -411,6 +417,7 @@ def _configure_server_state(
                 admin_mode=args.admin_mode,
                 read_only=args.read_only,
                 gate=get_workspace_gate(),
+                **health_kwargs,
             )
         )
     )

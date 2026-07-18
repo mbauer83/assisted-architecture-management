@@ -210,19 +210,59 @@ def push_enterprise_branch(enterprise_root: Path) -> str:
     return branch
 
 
+def _remote_ref_exists(enterprise_root: Path, branch: str) -> bool:
+    rc, out, _ = _run(enterprise_root, "ls-remote", "--heads", "origin", branch, timeout=_PUSH_TIMEOUT)
+    if rc != 0:
+        raise RuntimeError(f"Could not inspect origin for branch '{branch}'")
+    return bool(out)
+
+
+def _local_ref_exists(enterprise_root: Path, branch: str) -> bool:
+    rc, _, _ = _run(enterprise_root, "show-ref", "--verify", "--quiet", f"refs/heads/{branch}")
+    return rc == 0
+
+
 def abandon_enterprise_branch(enterprise_root: Path) -> str | None:
-    """Discard all working-branch changes and return the enterprise repo to main.
+    """Discard the working branch: an idempotent desired-state transition.
 
     Content-neutral git operation (branch cleanup, no artifact content) — exempt
-    from save verification.
+    from save verification. Rejects when there is nothing to discard or the tree
+    is dirty (never a silent success). Four postconditions, in order: remote ref
+    absent → checkout ``main`` → local branch absent → aggregate cleared. Every
+    step treats "already absent / already on main" as success, so a retry after
+    any partial failure converges without recreating or requiring the remote
+    ref; the aggregate stays pending until every postcondition holds.
     """
     state = enterprise_sync_state.load(enterprise_root)
+    if state.is_synced():
+        raise ValueError("Nothing to discard: the enterprise repository has no working branch.")
+    if has_uncommitted_changes(enterprise_root):
+        raise ValueError(
+            "The enterprise working tree has unsaved changes. Save them first — Discard only removes the branch."
+        )
     branch = state.branch
-    rc, _, stderr = _run(enterprise_root, "checkout", "main")
-    if rc != 0:
-        raise RuntimeError(f"Failed to return enterprise repo to main: {stderr}")
-    if branch:
-        _run(enterprise_root, "branch", "-D", branch)
+
+    # 1. Remote ref absent (pending submissions only). A failed deletion whose ref
+    #    is in fact gone counts as success; a failure with the ref still present
+    #    preserves the pending state and reports — no claimed withdrawal.
+    if state.is_pending() and branch and _remote_ref_exists(enterprise_root, branch):
+        rc, _, stderr = _run(enterprise_root, "push", "origin", "--delete", branch, timeout=_PUSH_TIMEOUT)
+        if rc != 0 and _remote_ref_exists(enterprise_root, branch):
+            raise RuntimeError(f"Failed to delete remote branch '{branch}': {stderr}")
+
+    # 2. Checkout main (already on main = success).
+    if current_branch(enterprise_root) != "main":
+        rc, _, stderr = _run(enterprise_root, "checkout", "main")
+        if rc != 0:
+            raise RuntimeError(f"Failed to return enterprise repo to main: {stderr}")
+
+    # 3. Local branch absent (already absent = success).
+    if branch and _local_ref_exists(enterprise_root, branch):
+        rc, _, stderr = _run(enterprise_root, "branch", "-D", branch)
+        if rc != 0 and _local_ref_exists(enterprise_root, branch):
+            raise RuntimeError(f"Failed to delete local branch '{branch}': {stderr}")
+
+    # 4. Aggregate cleared — only now that every postcondition holds.
     enterprise_sync_state.clear_lifecycle(enterprise_root)
     logger.info("Enterprise working branch abandoned: %s", branch)
     return branch
