@@ -483,8 +483,9 @@ memory. Tick items only after the listed verification passes, recording evidence
       > viewpoint-driven highlight preserved; cluster menu has
       > aria-haspopup/expanded + Escape/focusout handling (S6c). Structure pinned by
       > NavBar.structure.test.ts (5 assertions incl. nouns-only-left and
-      > no-/global-links). NavBar 305→218 counted. Manual viewport check DEFERRED to
-      > the S8b live pass (needs the restarted backend).
+      > no-/global-links). NavBar 305→218 counted. Manual viewport check DONE in the
+      > S8b live pass (900px: no horizontal body overflow, primary nav truncates
+      > first, search + Changes stay intact).
 - [x] **S7b — Rendered-copy rename with allowlist.**
       Inventory: App admin banner, HomeView badge, PromoteView title,
       EntityDetailHeader/DiagramDetailHeader, DocumentDetailView promote button,
@@ -542,7 +543,7 @@ memory. Tick items only after the listed verification passes, recording evidence
       > while `entities --type global-artifact-reference` lists it. Preconditions
       > recorded in the module docstring (fresh tmp fixture, normal mode, fixture
       > entity id). Gates: pytest 5462 passed/5 skipped, ruff 0, zuban 0.
-- [ ] **S8b — Live verification pass** (owner restarts backend first; record flags,
+- [x] **S8b — Live verification pass** (owner restarts backend first; record flags,
       clean-localStorage precondition, commands, outputs): GAR-free dropdown;
       documents/diagrams facets with real promoted artifacts (start `/documents`,
       fixture `STD@1777137196.ItT-3l.general-coding-guidelines`, ≤ 2 interactions =
@@ -550,8 +551,46 @@ memory. Tick items only after the listed verification passes, recording evidence
       enterprise Submit functional without `--admin-mode`; REST viewpoint/group write
       rejected in read-only backend; MCP enterprise-targeted group/viewpoint/bulk
       writes rejected.
-- [ ] **S8c — Ledger closure.** Every PLAN §10 criterion checked off with evidence;
+      > Evidence (2026-07-18, owner restarted backend+frontend+session). Flags from
+      > /admin/api/server-info: admin_mode=false, read_only=false; frontend at
+      > localhost:5173 (Vite), backend port 8000; localStorage cleared before the flow.
+      > REST (curl): /api/search + /api/artifact-search for "coding guidelines" return
+      > 17/… hits with ZERO GAR ids; merged /api/entities?artifact_type=GAR total 0;
+      > /api/documents all=15 (every row carries is_global), scope=global=1 (the
+      > fixture STD, is_global true), scope=engagement=14 (none is_global);
+      > /api/diagrams all=30 (is_global on all), scope=global=0; /api/sync/status
+      > authority block_kind=none, only enterprise_admin_authoring denied (normal
+      > mode), enterprise synced/clean/health null; POST /api/sync/enterprise/submit →
+      > 400 "No enterprise changes" (reachable WITHOUT --admin-mode); POST
+      > .../withdraw → 400 "Nothing to discard" (truthful, not silent).
+      > MCP: artifact_group/artifact_viewpoint/artifact_bulk_write with
+      > repo_root=enterprise-repository ALL rejected "Standard authoring never writes
+      > to the enterprise repository … use the admin operations surface".
+      > MCP read search (both roots) returns no GAR ids.
+      > GUI (Playwright): content-first header (Primary nav = Browse/Documents/
+      > Diagrams/Viewpoints/Assurance; workflow-status landmark hosts cluster+search);
+      > clean-localStorage /documents loads the list with NO group-management redirect;
+      > 2 interactions (Enterprise facet click → 1 doc; row click → detail) reach the
+      > fixture; /global/entities?domain=motivation&view=treemap#catalog → /entities?
+      > domain=motivation&view=treemap&tier=enterprise#catalog (query+hash preserved);
+      > diagrams Enterprise facet = 0 with no global stub; header search "coding
+      > guidelines" = 12 hits, 0 GAR; status chip "Enterprise up to date …" with a
+      > Promote-only Changes menu; viewpoint tier filter shows all tiers/engagement/
+      > enterprise/**built-in**; narrow 900px viewport = no horizontal body overflow,
+      > search+Changes intact (S7a manual viewport check).
+      > DEFECT FOUND & FIXED (commit eae32b6): facet click updated URL+badge but left
+      > the list unfiltered — selectTier's synchronous load() used the stale
+      > pre-navigation tier. Documents/diagrams composables now refetch from
+      > watch(tier); jsdom regression test tierRefetch.test.ts (fails on pre-fix code).
+      > Re-verified live: facet click → 1 Enterprise document. GUI gates green after
+      > fix (vue-tsc, eslint 0, vitest 1019/99 files).
+- [x] **S8c — Ledger closure.** Every PLAN §10 criterion checked off with evidence;
       leftovers converted to explicit follow-ups or dropped with rationale.
+      > CLOSED 2026-07-18: all §10 criteria met (review below), S8b live pass done
+      > against the restarted stack, Q2 answered (Built-in) and applied, S7a manual
+      > viewport check done. One live-surfaced defect (stale-tier facet refetch) found
+      > and fixed with a regression test (commit eae32b6). No open follow-ups; no
+      > criterion dropped. The effort is complete.
       > Pre-restart closure review (2026-07-18) — PLAN §10 criteria:
       > 1 Search: DONE (S1a suites — FTS/fallback/semantic on all six surfaces,
       >   rank-ordered ≥50-entity fixtures incl. multiple leading GARs, explicit
@@ -576,6 +615,5 @@ memory. Tick items only after the listed verification passes, recording evidence
       >   532→518 baselines ratcheted; no non-grandfathered file over 350).
       > 11 Quality gates: DONE every WU (final: pytest 5462 passed/5 skipped,
       >   ruff 0, zuban 0; GUI vitest 1016/98 files, vue-tsc, eslint 0).
-      > REMAINING for closure: S8b live pass (blocked on owner backend restart) +
-      > the S7a manual viewport check (deferred into that pass). Open Q2 (viewpoint
-      > tier label `module` vs `Built-in`) stays cosmetic/non-blocking.
+      > (All the above additionally confirmed LIVE in S8b against the restarted
+      > backend — REST, MCP, and Playwright GUI. S8b's own evidence is under that WU.)
