@@ -18,6 +18,7 @@ from typing import Any
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
+from src.application.entity_type_predicates import is_internal_entity_type
 from src.application.verification.artifact_verifier_types import VALID_STATUSES
 from src.application.viewpoints.persist_definition import (
     PersistAction,
@@ -35,8 +36,10 @@ from src.config.viewpoints_settings import (
 )
 from src.domain.viewpoint_condition_validation import RegistrySnapshot
 from src.domain.viewpoint_criteria import RESERVED_CONNECTION_PATHS, RESERVED_ENTITY_PATHS
+from src.domain.viewpoint_lineage import definition_digest, fork_status
 from src.domain.viewpoint_parsing import viewpoint_definition_from_mapping
 from src.domain.viewpoint_query_parsing import query_from_mapping
+from src.domain.viewpoint_scope_query import definition_with_scope_query
 from src.domain.viewpoint_serialization import viewpoint_definition_to_mapping
 from src.domain.viewpoint_summary import render_query_summary
 from src.domain.viewpoints import ViewpointCatalog, ViewpointDefinition
@@ -71,12 +74,28 @@ def _tier(slug: str, *, engagement_catalog: ViewpointCatalog, enterprise_catalog
     return "module"
 
 
-def _full_entry(definition: ViewpointDefinition, *, tier: str) -> dict[str, Any]:
+def _full_entry(definition: ViewpointDefinition, *, tier: str, merged: ViewpointCatalog) -> dict[str, Any]:
+    # The catalog row must describe the ACTIVE selection: a scope-mode definition's
+    # (possibly divergent) inactive query never appears as its summary.
+    active_query = definition_with_scope_query(definition)[0].query
     return {
         **viewpoint_definition_to_mapping(definition),
         "tier": tier,
         "scope_summary": summarize_scope(definition.scope),
-        "query_summary": render_query_summary(definition.query) if definition.query is not None else None,
+        "query_summary": (
+            render_query_summary(active_query, default_derivation_max_hops=viewpoints_derivation_max_hops())
+            if active_query is not None
+            else None
+        ),
+        # The definition's CURRENT content digest — verified execution references pin it,
+        # and fork staleness is decided against it.
+        "definition_digest": definition_digest(definition),
+        # Staleness by content-digest comparison against the CURRENT origin, never by
+        # version comparison — versions are hand-edited integers.
+        "fork_status": fork_status(
+            definition.forked_from,
+            merged.get(definition.forked_from.slug) if definition.forked_from is not None else None,
+        ),
     }
 
 
@@ -93,7 +112,11 @@ def list_viewpoint_definitions() -> dict[str, Any]:
     )
     merged = load_effective_viewpoint_catalog(_both_roots())
     entries = [
-        _full_entry(d, tier=_tier(d.slug, engagement_catalog=engagement_catalog, enterprise_catalog=enterprise_catalog))
+        _full_entry(
+            d,
+            tier=_tier(d.slug, engagement_catalog=engagement_catalog, enterprise_catalog=enterprise_catalog),
+            merged=merged,
+        )
         for d in sorted(merged.entries, key=lambda d: d.slug)
     ]
     return {"viewpoints": entries}
@@ -147,8 +170,16 @@ def get_criteria_catalog() -> dict[str, Any]:
     connection_attribute_enums = {
         str(path): list(values) for path, values in registries.connection_attribute_enums.items()
     }
+    # Internal entity types (e.g. global-artifact-reference) are system-managed and are
+    # excluded from every authoring surface; the validation snapshot itself still knows
+    # them, so promotion-created definitions referencing them stay valid.
+    authorable_entity_types = [
+        entity_type
+        for entity_type in sorted(registries.known_entity_types)
+        if not is_internal_entity_type(entity_type, catalogs.ontology)
+    ]
     return {
-        "entity_types": sorted(registries.known_entity_types),
+        "entity_types": authorable_entity_types,
         "connection_types": sorted(registries.known_connection_types),
         "specialization_slugs": sorted(registries.known_specialization_slugs),
         "entity_attribute_types": dict(registries.entity_attribute_types),
@@ -229,7 +260,7 @@ def summarize_query(body: SummarizeQueryBody) -> dict[str, str]:
         query = query_from_mapping(body.query, label="query")
     except ValueError as exc:
         raise HTTPException(400, str(exc)) from exc
-    return {"summary": render_query_summary(query)}
+    return {"summary": render_query_summary(query, default_derivation_max_hops=viewpoints_derivation_max_hops())}
 
 
 def _result_to_dict(result: ViewpointPersistResult, *, dry_run: bool) -> dict[str, Any]:
@@ -247,6 +278,9 @@ def _result_to_dict(result: ViewpointPersistResult, *, dry_run: bool) -> dict[st
 class ViewpointWriteBody(BaseModel):
     definition: dict[str, Any]
     dry_run: bool = True
+    fork_of: str | None = None
+    """Origin slug when this create is a fork (Save as…) — the persist path stamps the
+    lineage server-side; a client can never assert its own provenance."""
 
 
 def _persist(action: PersistAction, body: ViewpointWriteBody) -> dict[str, Any]:
@@ -266,8 +300,17 @@ def _persist(action: PersistAction, body: ViewpointWriteBody) -> dict[str, Any]:
         parsed = viewpoint_definition_from_mapping(body.definition)
     except ValueError as exc:
         raise HTTPException(400, str(exc)) from exc
+    # The model generation is only recorded into fork lineage — plain creates/edits
+    # never need it.
+    index_generation = s.get_repo().read_model_version().generation if body.fork_of is not None else None
     result = persist_viewpoint_definition(
-        action, parsed, local_catalog=local_catalog, merged_catalog=merged_catalog, registries=registries
+        action,
+        parsed,
+        local_catalog=local_catalog,
+        merged_catalog=merged_catalog,
+        registries=registries,
+        fork_of=body.fork_of,
+        index_generation=index_generation,
     )
     if result.ok and not body.dry_run and result.catalog_to_write is not None:
         write_viewpoint_catalog_file(engagement_root, result.catalog_to_write)

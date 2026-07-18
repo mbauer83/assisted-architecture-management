@@ -52,6 +52,7 @@ def artifact_viewpoint(
     definition: dict[str, object] | None = None,
     dry_run: bool = True,
     repo_root: str | None = None,
+    fork_of: str | None = None,
 ) -> dict[str, object]:
     """create/edit: definition is the full Appendix-A viewpoint-definition mapping (slug,
     version, name, scope, query, presentation, ...) — see artifact_help's 'viewpoints' topic
@@ -90,8 +91,19 @@ def artifact_viewpoint(
             parsed = viewpoint_definition_from_mapping(definition)
         except ValueError as exc:
             return {"error": str(exc), "action": action}
+        # The model generation is only recorded into fork lineage — plain creates/edits
+        # never touch the repo index at all.
+        index_generation = (
+            repo_cached(roots_key(both_roots)).read_model_version().generation if fork_of is not None else None
+        )
         result = persist_viewpoint_definition(
-            action, parsed, local_catalog=local_catalog, merged_catalog=merged_catalog, registries=registries
+            action,
+            parsed,
+            local_catalog=local_catalog,
+            merged_catalog=merged_catalog,
+            registries=registries,
+            fork_of=fork_of,
+            index_generation=index_generation,
         )
 
     if result.ok and not dry_run and result.catalog_to_write is not None:
@@ -116,6 +128,9 @@ def register(mcp: FastMCP) -> None:
             "Semantic edits (scope/query/presentation/representation_types) require a version "
             "bump; descriptive-only edits don't. Delete is blocked while any diagram/matrix "
             "references the slug (referencers lists them — no force flag). "
+            "fork_of (create only): origin slug when the new definition is a fork — lineage "
+            "(origin slug/version/content digest + model generation) is stamped server-side; "
+            "GUI- and MCP-created forks carry identical lineage. "
             "dry_run: True (default) validates/reports without writing, False applies. "
             "Read the effective merged catalog via artifact_query_viewpoint (arch-repo-read)."
         ),

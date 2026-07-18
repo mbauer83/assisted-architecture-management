@@ -71,8 +71,11 @@ class TestListAction:
         assert b_entry["scope_summary"] == {"unrestricted": True}
         assert b_entry["query_summary"] is not None
 
+        # A query-less definition's listing describes its ACTIVE selection — the
+        # scope-derived query — never a blank.
         a_entry = next(e for e in result["viewpoints"] if e["slug"] == "a-viewpoint")
-        assert a_entry["query_summary"] is None
+        assert a_entry["query_summary"] is not None
+        assert "any entity" in a_entry["query_summary"]
 
     def test_pinned_flag_reflects_the_engagement_repo_local_pins_file(self, monkeypatch, catalogs, repo: Path) -> None:
         definition_a = ViewpointDefinition(slug="a-viewpoint", version=1, name="A")

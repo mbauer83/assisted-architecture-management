@@ -70,6 +70,7 @@ def entity_display_search_impl(
         ]
         candidates.sort(
             key=lambda rec: (
+                rec.host_diagram_id is not None,
                 ordered_domains.index(rec.domain) if rec.domain in ordered_domains else 99,
                 rec.name,
                 rec.artifact_id,
@@ -114,6 +115,9 @@ def entity_display_search_impl(
         if entity_filter.domains:
             fuzzy = [item for item in fuzzy if item["domain"] in entity_filter.domains]
         items.extend(fuzzy)
+    # Model entities always rank above diagram-owned constructs (stable within each
+    # partition, so relevance order is preserved on both sides of the divider).
+    items = [i for i in items if not i["diagram_internal"]] + [i for i in items if i["diagram_internal"]]
     page = items[offset : offset + limit]
     next_cursor = str(offset + limit) if offset + limit < len(items) else None
     return EntityDisplaySearchResult(items=page, next_cursor=next_cursor)

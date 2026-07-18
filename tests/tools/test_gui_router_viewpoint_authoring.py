@@ -66,6 +66,10 @@ class TestCriteriaCatalog:
         # present (possibly empty) so the builder renders a picker, never free text.
         assert "group" in body["entity_attribute_enums"]
 
+    def test_internal_entity_types_are_excluded_from_authoring_pickers(self, client) -> None:
+        body = client.get("/api/viewpoints/criteria-catalog").json()
+        assert "global-artifact-reference" not in body["entity_types"]
+
 
 class TestReferencers:
     def test_empty_when_unreferenced(self, client) -> None:

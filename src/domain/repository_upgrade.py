@@ -48,6 +48,12 @@ class UpgradeFinding:
     auto_migratable: bool
     rewrite_summary: str | None = None
     manual_instructions: str | None = None
+    blocks_commit: bool = False
+    """True when this finding makes a COMMIT run unsafe as a whole: the upgrade must
+    either complete in full or change nothing, so a commit with any blocking finding
+    anywhere in the workspace exits with the distinct unresolved-migration status and
+    writes nothing — not even other steps' mechanical rewrites. Ordinary informational
+    scan findings never set this."""
 
     def __post_init__(self) -> None:
         if self.auto_migratable and not self.rewrite_summary:

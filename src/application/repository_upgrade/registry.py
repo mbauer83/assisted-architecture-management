@@ -9,6 +9,8 @@ is what the CLI uses by default.
 
 from __future__ import annotations
 
+from collections.abc import Mapping
+
 from src.application.repository_upgrade.ports import UpgradeStep
 from src.application.repository_upgrade.steps.connection_metadata_scan import ConnectionMetadataScanStep
 from src.application.repository_upgrade.steps.group_meta_ontology_rename import GroupMetaOntologyRenameStep
@@ -20,6 +22,13 @@ from src.application.repository_upgrade.steps.specialization_declaration_scan im
 from src.application.repository_upgrade.steps.unrecognized_structure import UnrecognizedStructureScanStep
 from src.application.repository_upgrade.steps.viewpoint_application_scan import ViewpointApplicationScanStep
 from src.application.repository_upgrade.steps.viewpoint_declaration_scan import ViewpointDeclarationScanStep
+from src.application.repository_upgrade.steps.viewpoint_incident_traversal_stamp import (
+    ViewpointIncidentTraversalStampStep,
+)
+from src.application.repository_upgrade.steps.viewpoint_selection_mode_stamp import (
+    SelectionMode,
+    ViewpointSelectionModeStampStep,
+)
 from src.application.repository_upgrade.steps.viewpoint_style_value_upgrade import ViewpointStyleValueUpgradeStep
 from src.domain.repository_upgrade import StepIdentity
 
@@ -42,7 +51,9 @@ class StepRegistry:
         return tuple(StepIdentity(id=s.id, version=s.version) for s in self._steps.values())
 
 
-def _build_default_registry() -> StepRegistry:
+def build_registry(selection_resolutions: Mapping[str, SelectionMode] | None = None) -> StepRegistry:
+    """The full step catalog. ``selection_resolutions`` parameterizes the
+    selection-mode stamp with the operator's ``--resolve-selection`` choices."""
     registry = StepRegistry()
     registry.register(MultiplicityRenameStep())
     registry.register(GroupMetaOntologyRenameStep())
@@ -50,10 +61,12 @@ def _build_default_registry() -> StepRegistry:
     registry.register(SpecializationDeclarationScanStep())
     registry.register(ViewpointDeclarationScanStep())
     registry.register(ViewpointStyleValueUpgradeStep())
+    registry.register(ViewpointIncidentTraversalStampStep())
+    registry.register(ViewpointSelectionModeStampStep(selection_resolutions))
     registry.register(SchemaFileScanStep())
     registry.register(ConnectionMetadataScanStep())
     registry.register(ViewpointApplicationScanStep())
     return registry
 
 
-DEFAULT_REGISTRY = _build_default_registry()
+DEFAULT_REGISTRY = build_registry()

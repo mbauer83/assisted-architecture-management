@@ -75,6 +75,10 @@ def entity_display_item(rec: EntityRecord, catalogs: RuntimeCatalogs) -> dict[st
         "display_alias": rec.display_alias,
         "element_type": rec.artifact_type,
         "element_label": str(arch_data.get("label") or rec.name),
+        # Diagram-owned constructs (swimlanes, lifelines, actions, …) are pickable in
+        # diagram contexts but must never outrank — or be confusable with — model
+        # entities, so every display surface can partition on this flag.
+        "diagram_internal": rec.host_diagram_id is not None,
     }
 
 

@@ -23,12 +23,15 @@ from src.config.viewpoints_settings import (
     viewpoints_execution_default_entity_limit_mcp,
     viewpoints_execution_max_entities,
     viewpoints_execution_timeout_seconds,
+    viewpoints_legibility_budget,
 )
 from src.domain.relationship_reachability import DerivationLimitError
 from src.domain.viewpoint_binding_evaluation import BindingCardinalityError
+from src.domain.viewpoint_lineage import fork_status
 from src.domain.viewpoint_query_parsing import query_from_mapping
+from src.domain.viewpoint_scope_query import definition_with_scope_query
 from src.domain.viewpoint_summary import render_query_summary
-from src.domain.viewpoints import ViewpointDefinition
+from src.domain.viewpoints import ViewpointCatalog, ViewpointDefinition
 from src.infrastructure.mcp.artifact_mcp.context import (
     RepoScope,
     repo_cached,
@@ -42,7 +45,12 @@ from src.infrastructure.viewpoint_declarations import load_effective_viewpoint_c
 from src.infrastructure.write.artifact_write.viewpoint_type_guidance import summarize_scope
 
 
-def _list_entry(definition: ViewpointDefinition, *, pinned_slugs: frozenset[str]) -> dict[str, object]:
+def _list_entry(
+    definition: ViewpointDefinition, *, pinned_slugs: frozenset[str], merged: ViewpointCatalog
+) -> dict[str, object]:
+    # The listing must describe the ACTIVE selection: a scope-mode definition's
+    # (possibly divergent) inactive query never appears as its summary.
+    active_query = definition_with_scope_query(definition)[0].query
     return {
         "slug": definition.slug,
         "version": definition.version,
@@ -53,12 +61,30 @@ def _list_entry(definition: ViewpointDefinition, *, pinned_slugs: frozenset[str]
         "stakeholders": list(definition.stakeholders),
         "concerns": list(definition.concerns),
         "scope_summary": summarize_scope(definition.scope),
-        "query_summary": render_query_summary(definition.query) if definition.query is not None else None,
+        "query_summary": (
+            render_query_summary(active_query, default_derivation_max_hops=viewpoints_derivation_max_hops())
+            if active_query is not None
+            else None
+        ),
         "parameters": [
             {"name": parameter.name, "type": parameter.value_type, "required": parameter.required}
             for parameter in (() if definition.query is None else definition.query.parameters)
         ],
         "pinned": definition.slug in pinned_slugs,
+        "forked_from": (
+            {
+                "slug": definition.forked_from.slug,
+                "version": definition.forked_from.version,
+            }
+            if definition.forked_from is not None
+            else None
+        ),
+        # Staleness by content-digest comparison against the CURRENT origin, never by
+        # version comparison — versions are hand-edited integers.
+        "fork_status": fork_status(
+            definition.forked_from,
+            merged.get(definition.forked_from.slug) if definition.forked_from is not None else None,
+        ),
     }
 
 
@@ -100,7 +126,8 @@ def register_query_viewpoint_tools(mcp: FastMCP) -> None:
             known_slugs = frozenset(d.slug for d in merged_catalog.entries)
             pinned_slugs = frozenset(load_pinned_slugs(engagement_root, known_slugs=known_slugs).slugs)
             entries = [
-                _list_entry(d, pinned_slugs=pinned_slugs) for d in sorted(merged_catalog.entries, key=lambda d: d.slug)
+                _list_entry(d, pinned_slugs=pinned_slugs, merged=merged_catalog)
+                for d in sorted(merged_catalog.entries, key=lambda d: d.slug)
             ]
             return {"viewpoints": entries}
 
@@ -127,6 +154,7 @@ def register_query_viewpoint_tools(mcp: FastMCP) -> None:
                 index_generation=repo.read_model_version().generation,
                 max_entities=viewpoints_execution_max_entities(),
                 default_limit=viewpoints_execution_default_entity_limit_mcp(),
+                default_legibility_budget=viewpoints_legibility_budget(),
                 timeout_seconds=viewpoints_execution_timeout_seconds(),
             )
         except UnknownViewpointSlugError as exc:

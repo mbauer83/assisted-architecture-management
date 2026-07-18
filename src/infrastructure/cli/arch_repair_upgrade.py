@@ -34,11 +34,13 @@ from __future__ import annotations
 
 import argparse
 import json
+import sys
 from importlib.metadata import PackageNotFoundError
 from importlib.metadata import version as _pkg_version
 from pathlib import Path
+from typing import Literal, cast
 
-from src.application.repository_upgrade.registry import DEFAULT_REGISTRY, StepRegistry
+from src.application.repository_upgrade.registry import StepRegistry, build_registry
 from src.application.repository_upgrade.workspace import (
     RepoUpgradeTarget,
     apply_workspace,
@@ -75,6 +77,12 @@ def software_version() -> str:
         return "unknown"
 
 
+EXIT_UNRESOLVED_MIGRATION = 3
+"""Distinct commit-mode exit status: a finding that blocks the whole commit (e.g. a
+divergent viewpoint selection with no --resolve-selection choice) was present — nothing
+was written anywhere; the report lists the required choices."""
+
+
 def parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(
         prog="arch-repair upgrade",
@@ -84,7 +92,27 @@ def parser() -> argparse.ArgumentParser:
     p.add_argument("--workspace", metavar="PATH", help="Resolve engagement + enterprise roots from arch-init state")
     p.add_argument("--commit", action="store_true", default=False)
     p.add_argument("--json", action="store_true", default=False, dest="json_output")
+    p.add_argument(
+        "--resolve-selection",
+        action="append",
+        default=[],
+        metavar="SLUG=scope|query",
+        help=(
+            "Resolve one divergent viewpoint's active selection layer (repeatable). "
+            "Writes ONLY that definition's selection_mode — never a semantic conversion."
+        ),
+    )
     return p
+
+
+def parse_selection_resolutions(raw: list[str]) -> dict[str, Literal["scope", "query"]]:
+    resolutions: dict[str, Literal["scope", "query"]] = {}
+    for item in raw:
+        slug, separator, mode = item.partition("=")
+        if not separator or mode not in ("scope", "query") or not slug:
+            raise SystemExit(f"ERROR: --resolve-selection expects SLUG=scope|query, got {item!r}")
+        resolutions[slug] = cast(Literal["scope", "query"], mode)
+    return resolutions
 
 
 def resolve_repo_roots(*, repo_root: list[str], workspace: str | None) -> list[Path]:
@@ -104,8 +132,10 @@ def resolve_repo_roots(*, repo_root: list[str], workspace: str | None) -> list[P
     return unique
 
 
-def main_upgrade(argv: list[str], *, registry: StepRegistry = DEFAULT_REGISTRY) -> int:
+def main_upgrade(argv: list[str], *, registry: StepRegistry | None = None) -> int:
     args = parser().parse_args(argv)
+    if registry is None:
+        registry = build_registry(parse_selection_resolutions(args.resolve_selection))
     roots = resolve_repo_roots(repo_root=args.repo_root, workspace=args.workspace)
     version = software_version()
     targets = [RepoUpgradeTarget(FilesystemRepoUpgradeView(r), FilesystemRepoUpgradeWriter(r)) for r in roots]
@@ -114,6 +144,24 @@ def main_upgrade(argv: list[str], *, registry: StepRegistry = DEFAULT_REGISTRY) 
         report = evaluate_workspace(targets, registry=registry, software_version=version)
         _emit(report, args.json_output)
         return 0
+
+    # 0: whole-deployment atomicity gate — a commit-blocking finding ANYWHERE means the
+    # upgrade must not write anything (not even other steps' mechanical rewrites): the
+    # run either completes in full or changes nothing and fails loudly with a worklist.
+    gate_report = evaluate_workspace(targets, registry=registry, software_version=version)
+    blocking = [
+        result.finding
+        for repo_report in gate_report.per_repo
+        for result in repo_report.results
+        if result.finding.blocks_commit
+    ]
+    if blocking:
+        print("UNRESOLVED MIGRATION — nothing was written. Required choices:", file=sys.stderr)
+        for finding in blocking:
+            print(f"  {finding.finding_id}: {finding.description}", file=sys.stderr)
+            if finding.manual_instructions:
+                print(f"    → {finding.manual_instructions}", file=sys.stderr)
+        return EXIT_UNRESOLVED_MIGRATION
 
     # 1–3: hard backend guard, then sweep + recovery — must all land before we look at git
     # status at all, since recovery can itself materialize real (legitimate) file changes.

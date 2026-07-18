@@ -171,7 +171,7 @@ class TestRequestShape:
             "entity_ids", "connection_ids", "entities", "connections",
             "total_entity_count", "returned_entity_count", "total_connection_count", "returned_connection_count",
             "truncated", "entity_limit", "matrix_axes", "warnings", "duration_ms", "query_summary",
-            "anchor_ids",
+            "anchor_ids", "target_population", "aggregation",
         }
         # D15 boundary: the shared MCP/REST content stays unstyled — no style tokens leak in.
         assert all("style" not in entity for entity in body["entities"])
@@ -251,6 +251,22 @@ class TestExecuteProjection:
         assert resp.status_code == 400
 
 
+class TestExportCsv:
+    def test_export_is_a_csv_attachment_with_provenance(self, client) -> None:
+        resp = client.post("/api/viewpoints/export-csv", json={"slug": "exec-test"})
+        assert resp.status_code == 200
+        assert resp.headers["content-type"].startswith("text/csv")
+        assert 'attachment; filename="exec-test-gen' in resp.headers["content-disposition"]
+        text = resp.text
+        assert "# viewpoint: exec-test v1" in text
+        assert "# index_generation:" in text
+        assert ENT_ID in text
+
+    def test_unknown_slug_is_400(self, client) -> None:
+        resp = client.post("/api/viewpoints/export-csv", json={"slug": "does-not-exist"})
+        assert resp.status_code == 400
+
+
 class TestExecuteDiagram:
     """The GUI-only unpersisted ArchiMate diagram rendering route."""
 
@@ -280,6 +296,17 @@ class TestExecuteDiagram:
         resp = client.post("/api/viewpoints/execute-diagram", json={"query": {}})
         assert resp.status_code == 200
         assert "<svg" in resp.json()["svg"]
+
+    def test_oversized_result_gets_a_friendly_refusal_not_a_renderer_error(self, client, monkeypatch) -> None:
+        import src.infrastructure.gui.routers.viewpoints as viewpoints_router
+
+        monkeypatch.setattr(viewpoints_router, "viewpoints_diagram_render_max_entities", lambda: 0)
+        resp = client.post("/api/viewpoints/execute-diagram", json={"query": {}})
+        assert resp.status_code == 400
+        detail = resp.json()["detail"]
+        assert detail["code"] == "diagram-render-limit"
+        assert "too large for diagram rendering" in detail["message"]
+        assert "exploration or table" in detail["message"]
 
     def test_unknown_slug_is_400(self, client) -> None:
         resp = client.post("/api/viewpoints/execute-diagram", json={"slug": "does-not-exist"})

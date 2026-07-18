@@ -6,7 +6,7 @@ from dataclasses import asdict
 from pathlib import Path
 from typing import Annotated
 
-from fastapi import APIRouter, Body, Depends, HTTPException
+from fastapi import APIRouter, Body, Depends, HTTPException, Response
 
 from src.application.runtime_catalogs import RuntimeCatalogs
 from src.application.viewpoints.artifact_projection import project_artifact_by_frontmatter
@@ -18,14 +18,17 @@ from src.application.viewpoints.evaluate_viewpoint import (
     evaluate_viewpoint,
     project_viewpoint_repository,
 )
+from src.application.viewpoints.export_csv import build_execution_csv
 from src.application.viewpoints.parameter_binding import ViewpointParameterError
 from src.application.viewpoints.registry_snapshot import build_registry_snapshot
 from src.config.viewpoints_settings import (
     viewpoints_derivation_max_hops,
     viewpoints_derivation_max_relationships,
     viewpoints_derivation_time_budget_seconds,
+    viewpoints_diagram_render_max_entities,
     viewpoints_execution_max_entities,
     viewpoints_execution_timeout_seconds,
+    viewpoints_legibility_budget,
 )
 from src.domain.relationship_reachability import DerivationLimitError, is_derived_connection_id
 from src.domain.viewpoint_binding_evaluation import BindingCardinalityError
@@ -101,6 +104,7 @@ def execute_viewpoint(
             max_entities=max_entities,
             default_limit=max_entities,
             timeout_seconds=viewpoints_execution_timeout_seconds(),
+            default_legibility_budget=viewpoints_legibility_budget(),
         )
     except UnknownViewpointSlugError as exc:
         raise HTTPException(400, str(exc)) from exc
@@ -113,6 +117,56 @@ def execute_viewpoint(
     except DerivationLimitError as exc:
         raise _execution_error("derivation-limit", str(exc)) from exc
     return asdict(result)
+
+
+@router.post("/api/viewpoints/export-csv")
+def export_viewpoint_csv(
+    slug: Annotated[str | None, Body()] = None,
+    query: Annotated[dict[str, object] | None, Body()] = None,
+    parameters: Annotated[dict[str, object] | None, Body()] = None,
+    catalogs: RuntimeCatalogs = Depends(fresh_viewpoints_runtime_catalogs_dependency),
+) -> Response:
+    """COMPLETE, generation-pinned CSV of an execution: the full result set (one snapshot
+    execution — never the visible page of a paginated view) with a provenance header
+    block. Client-side CSV of rendered rows is deliberately not the mechanism."""
+    if (slug is None) == (query is None):
+        raise HTTPException(400, "exactly one of 'slug' or 'query' must be provided")
+    parsed_query = query_from_mapping(query, label="query") if query is not None else None
+    repo = s.get_repo()
+    registries = _registry_snapshot(catalogs, repo.repo_roots)
+    max_entities = viewpoints_execution_max_entities()
+    request = ViewpointExecutionRequest(slug=slug, query=parsed_query, limit=max_entities, parameters=parameters)
+    try:
+        result = evaluate_viewpoint(
+            request,
+            catalog=catalogs.viewpoints,
+            read_access=repo,
+            registries=registries,
+            index_generation=repo.read_model_version().generation,
+            max_entities=max_entities,
+            default_limit=max_entities,
+            timeout_seconds=viewpoints_execution_timeout_seconds(),
+            default_legibility_budget=viewpoints_legibility_budget(),
+        )
+    except UnknownViewpointSlugError as exc:
+        raise HTTPException(400, str(exc)) from exc
+    except ViewpointExecutionTimeoutError as exc:
+        raise HTTPException(504, {"code": "execution-timeout", "path": "query", "message": str(exc)}) from exc
+    except ViewpointParameterError as exc:
+        raise _parameter_error(exc) from exc
+    except BindingCardinalityError as exc:
+        raise _execution_error(exc.code, str(exc)) from exc
+    except DerivationLimitError as exc:
+        raise _execution_error("derivation-limit", str(exc)) from exc
+    definition = catalogs.viewpoints.get(slug) if slug is not None else None
+    columns = definition.presentation.columns if definition is not None and definition.presentation else None
+    text = build_execution_csv(result, columns, parameters)
+    filename = f"{result.slug or 'viewpoint-export'}-gen{result.index_generation}.csv"
+    return Response(
+        content=text,
+        media_type="text/csv; charset=utf-8",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
 
 
 @router.post("/api/viewpoints/execute-projection")
@@ -179,6 +233,7 @@ def execute_viewpoint_diagram(
             max_entities=max_entities,
             default_limit=max_entities,
             timeout_seconds=viewpoints_execution_timeout_seconds(),
+            default_legibility_budget=viewpoints_legibility_budget(),
         )
     except UnknownViewpointSlugError as exc:
         raise HTTPException(400, str(exc)) from exc
@@ -190,6 +245,15 @@ def execute_viewpoint_diagram(
         raise _execution_error(exc.code, str(exc)) from exc
     except DerivationLimitError as exc:
         raise _execution_error("derivation-limit", str(exc)) from exc
+
+    render_limit = viewpoints_diagram_render_max_entities()
+    if result.total_entity_count > render_limit:
+        raise _execution_error(
+            "diagram-render-limit",
+            f"this result has {result.total_entity_count} entities — too large for diagram rendering "
+            f"(limit {render_limit}). Try the exploration or table representation, or narrow the "
+            "scope (filter by group/type, or anchor the view).",
+        )
 
     from src.application.artifact_parsing import normalize_puml_alias
     from src.infrastructure.rendering.diagram_builder import generate_archimate_puml_body, render_puml_svg
