@@ -29,7 +29,7 @@ _FRONTEND_GENERATED_NAMES = frozenset({"types.generated.ts"})
 SOURCE_FILE_BASELINE_LIMITS: dict[str, int] = {
     "src/application/verification/artifact_verifier.py": 403,
     "src/infrastructure/artifact_index/_sqlite_store.py": 396,
-    "src/infrastructure/artifact_index/service.py": 547,
+    "src/infrastructure/artifact_index/service.py": 546,
     "tools/gui/src/ui/components/ArtifactReferenceInput.vue": 619,
     "tools/gui/src/ui/components/AssuranceAnalysisPicker.vue": 407,
     "tools/gui/src/ui/components/AssuranceDiagramPanel.vue": 370,

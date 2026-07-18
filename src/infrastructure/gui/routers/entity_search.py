@@ -190,7 +190,9 @@ def get_entity_taxonomy(
         _cat = _catalogs()
         entities = [
             e for e in entities
-            if s.is_global(e.path) and not is_assurance_entity_type(e.artifact_type, _cat.module_catalog)
+            if s.is_global(e.path)
+            and not is_internal_entity_type(e.artifact_type, _cat.ontology)
+            and not is_assurance_entity_type(e.artifact_type, _cat.module_catalog)
         ]
     elif scope == "engagement":
         _cat = _catalogs()

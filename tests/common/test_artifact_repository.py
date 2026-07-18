@@ -313,6 +313,7 @@ class FakeStore:
         include_connections: bool = True,
         include_diagrams: bool = True,
         include_documents: bool = True,
+        excluded_entity_types: frozenset[str] = frozenset(),
     ) -> list[tuple[str, str, float]]:
         return []
 

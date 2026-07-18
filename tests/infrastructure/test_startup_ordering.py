@@ -111,8 +111,9 @@ def _patch_initialise(monkeypatch: pytest.MonkeyPatch, order: list[str], index: 
     )
 
     class _FakeRepo:
-        def __init__(self, idx: _FakeIndex) -> None:
+        def __init__(self, idx: _FakeIndex, *, excluded_entity_types: frozenset[str] = frozenset()) -> None:
             self._idx = idx
+            self._excluded_entity_types = excluded_entity_types
 
         def refresh(self) -> None:
             self._idx.refresh()

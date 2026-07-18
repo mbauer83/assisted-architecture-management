@@ -1,11 +1,10 @@
-"""Standalone search and aggregation functions for ArtifactRepository."""
+"""Standalone search functions for ArtifactRepository."""
 
 from __future__ import annotations
 
 from typing import Literal, cast
 
-from src.application._artifact_query_helpers import single_or_none as _single_or_none
-from src.application._artifact_query_helpers import summary_group_key as _summary_group_key
+from src.application._search_eligibility import EntityEligibility, semantic_entity_hits
 from src.application.artifact_scoring import (
     score_connection,
     score_diagram,
@@ -24,7 +23,7 @@ from src.domain.artifact_types import (
     SemanticSearchProvider,
 )
 
-# ── Canonical record-type vocabulary (shared with list_artifacts / WU-A3) ───
+# ── Canonical record-type vocabulary (shared with list_artifacts) ────────────
 # Singular form: discriminator value on individual hit records.
 RecordType = Literal["entity", "connection", "diagram", "document"]
 # Plural form: member of an include-set that gates which kinds participate.
@@ -40,54 +39,7 @@ _KIND_TO_RECORD_TYPE: dict[str, str] = {
 }
 _RECORD_TYPE_TO_KIND: dict[str, str] = {v: k for k, v in _KIND_TO_RECORD_TYPE.items()}
 
-_NONE_LABEL = "(none)"
 _RecordType = RecordType  # internal alias for cast()
-
-
-def count_artifacts_by(
-    store: ReadableArtifactStore,
-    group_by: Literal["artifact_type", "diagram_type", "domain", "group"],
-    *,
-    artifact_type: str | list[str] | None = None,
-    domain: str | list[str] | None = None,
-    status: str | list[str] | None = None,
-    include_connections: bool = True,
-    include_diagrams: bool = True,
-) -> dict[str, int]:
-    counts: dict[str, int] = {}
-    if group_by == "diagram_type":
-        for diag in store.list_diagrams(status=_single_or_none(status)):
-            key = diag.diagram_type or _NONE_LABEL
-            counts[key] = counts.get(key, 0) + 1
-        return dict(sorted(counts.items()))
-    if group_by == "domain":
-        for ent in store.list_entities(
-            artifact_type=_single_or_none(artifact_type),
-            domain=_single_or_none(domain),
-            status=_single_or_none(status),
-        ):
-            key = ent.domain or _NONE_LABEL
-            counts[key] = counts.get(key, 0) + 1
-        return dict(sorted(counts.items()))
-    if group_by == "group":
-        result: dict[str, int] = {}
-        for ent in store.list_entities(artifact_type=_single_or_none(artifact_type), status=_single_or_none(status)):
-            result[f"entities/{ent.group}"] = result.get(f"entities/{ent.group}", 0) + 1
-        for diag in store.list_diagrams(status=_single_or_none(status)):
-            result[f"diagrams/{diag.group}"] = result.get(f"diagrams/{diag.group}", 0) + 1
-        for doc in store.list_documents(status=_single_or_none(status)):
-            result[f"documents/{doc.group}"] = result.get(f"documents/{doc.group}", 0) + 1
-        return dict(sorted(result.items()))
-    for summary in store.list_artifacts(
-        artifact_type=artifact_type,
-        domain=domain,
-        status=status,
-        include_connections=include_connections,
-        include_diagrams=include_diagrams,
-    ):
-        key = _summary_group_key(summary, group_by)
-        counts[key] = counts.get(key, 0) + 1
-    return dict(sorted(counts.items()))
 
 
 def search_artifacts(
@@ -104,6 +56,7 @@ def search_artifacts(
     include_documents: bool = True,
     prefer_record_type: RecordType | None = None,
     strict_record_type: bool = False,
+    excluded_entity_types: frozenset[str] = frozenset(),
 ) -> SearchResult:
     """Backward-compatible wrapper: maps old boolean flags to included_kinds."""
     kinds: set[str] = set()
@@ -132,6 +85,7 @@ def search_artifacts(
         entity_types=entity_types,
         included_kinds=frozenset(kinds),
         prefer_kind=prefer_kind,
+        excluded_entity_types=excluded_entity_types,
     )
 
 
@@ -145,6 +99,7 @@ def search(
     domains: list[str] | None = None,
     included_kinds: frozenset[str] | None = None,
     prefer_kind: str | None = None,
+    excluded_entity_types: frozenset[str] = frozenset(),
 ) -> SearchResult:
     """Search across requested kinds with per-kind FTS + scored supplement.
 
@@ -153,12 +108,16 @@ def search(
     the ranked results. For any included kind that returns zero FTS hits, the
     full scored path supplements.
     ``prefer_kind`` boosts one kind in cross-kind ranking without excluding others.
+    ``excluded_entity_types`` hides those entity types from every branch; an
+    explicit entity-type request fully consumed by the exclusion set yields zero
+    entity hits.
     """
     kinds = (included_kinds if included_kinds is not None else ALL_SEARCHABLE_KINDS) & ALL_SEARCHABLE_KINDS
     query_lc = query.lower()
     tokens = tokenize(query_lc)
-    entity_type_set = set(entity_types) if entity_types else set()
-    domain_set = set(domains) if domains else set()
+    eligibility = EntityEligibility.build(excluded_entity_types, entity_types, domains)
+    if eligibility.effective_request_is_empty:
+        kinds = kinds - {"entities"}
 
     # Per-kind FTS: each kind gets its own slot budget to prevent starvation.
     per_kind_limit = max(limit * 2, 10)
@@ -169,6 +128,7 @@ def search(
         include_connections="connections" in kinds,
         include_diagrams="diagrams" in kinds,
         include_documents="documents" in kinds,
+        excluded_entity_types=excluded_entity_types,
     )
 
     seen: set[tuple[str, str]] = set()
@@ -180,11 +140,7 @@ def search(
         match record_type:
             case "entity":
                 artifact = store.get_entity(artifact_id)
-                if artifact is None:
-                    continue
-                if entity_type_set and artifact.artifact_type not in entity_type_set:
-                    continue
-                if domain_set and artifact.domain not in domain_set:
+                if artifact is None or not eligibility.is_eligible(artifact.artifact_type, artifact.domain):
                     continue
             case "connection":
                 artifact = store.get_connection(artifact_id)
@@ -213,7 +169,7 @@ def search(
             continue
         match kind:
             case "entities":
-                scored = _search_entities(store, query_lc, tokens, entity_type_set, domain_set)
+                scored = _search_entities(store, query_lc, tokens, eligibility)
             case "connections":
                 scored = _search_connections(store, query_lc, tokens)
             case "diagrams":
@@ -230,7 +186,7 @@ def search(
 
     # Semantic supplement is entity-only; only inject when entities are in scope.
     if "entities" in kinds:
-        _apply_semantic_supplement(store, semantic, query, hits, seen)
+        hits.extend(semantic_entity_hits(store, semantic, query, eligibility=eligibility, seen=seen))
 
     prefer_rt = _KIND_TO_RECORD_TYPE.get(prefer_kind) if prefer_kind else None
     return SearchResult(query=query, hits=_rank_balanced(hits, limit, prefer_rt))
@@ -268,14 +224,11 @@ def _search_entities(
     store: ReadableArtifactStore,
     query_lc: str,
     tokens: list[str],
-    entity_type_set: set[str],
-    domain_set: set[str],
+    eligibility: EntityEligibility,
 ) -> list[SearchHit]:
     hits = []
     for rec in store.list_entities():
-        if entity_type_set and rec.artifact_type not in entity_type_set:
-            continue
-        if domain_set and rec.domain not in domain_set:
+        if not eligibility.is_eligible(rec.artifact_type, rec.domain):
             continue
         if (score := score_entity(rec, query_lc, tokens)) > 0:
             hits.append(SearchHit(score=score, record_type="entity", record=rec))
@@ -304,23 +257,3 @@ def _search_documents(store: ReadableArtifactStore, query_lc: str, tokens: list[
         for r in store.list_documents()
         if (s := score_document(r, query_lc, tokens)) > 0
     ]
-
-
-def _apply_semantic_supplement(
-    store: ReadableArtifactStore,
-    semantic: SemanticSearchProvider | None,
-    query: str,
-    hits: list[SearchHit],
-    seen: set[tuple[str, str]],
-) -> None:
-    if semantic is None or not isinstance(semantic, SemanticSearchProvider):
-        return
-    if len(store.entity_ids()) < 50:
-        return
-    for sem_score, artifact_id in semantic.top_k(query, k=1, threshold=0.75):
-        if ("entity", artifact_id) in seen:
-            continue
-        rec = store.get_entity(artifact_id)
-        if rec is not None:
-            seen.add(("entity", artifact_id))
-            hits.append(SearchHit(score=sem_score * 3.0, record_type="entity", record=rec))

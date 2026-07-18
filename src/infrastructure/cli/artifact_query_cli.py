@@ -107,8 +107,11 @@ def main(argv: list[str] | None = None) -> int:
         print(f"Error: repository path does not exist: {repo}", file=sys.stderr)
         return 1
 
-    build_runtime_catalogs(get_module_registry())
-    registry = ArtifactRepository(shared_artifact_index(repo))
+    catalogs = build_runtime_catalogs(get_module_registry())
+    registry = ArtifactRepository(
+        shared_artifact_index(repo),
+        excluded_entity_types=catalogs.ontology.entity_types_with_class("internal"),
+    )
     dispatch = {
         "stats": _cmd_stats,
         "entities": _cmd_entities,

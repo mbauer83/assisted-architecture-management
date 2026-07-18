@@ -323,7 +323,9 @@ def _initialise_repo(
     repo_root_path: Path, enterprise_root_path: Path | None, args: argparse.Namespace
 ) -> "ArtifactRepository":
     from src.application.artifact_query import ArtifactRepository
+    from src.infrastructure.app_bootstrap import build_runtime_catalogs, get_module_registry
     from src.infrastructure.artifact_index import combined_artifact_index, shared_artifact_index
+    from src.infrastructure.backend._group_registry_startup import repair_group_registries
     from src.infrastructure.write.artifact_write.m4_transaction import recover_transactions
 
     roots = [p for p in (repo_root_path, enterprise_root_path) if p is not None]
@@ -342,45 +344,17 @@ def _initialise_repo(
         recovered = recover_transactions(root, rebuild_index=index.refresh)
         if recovered:
             logger.warning("Recovered %s durable transaction(s) in %s", recovered, root)
-    _repair_group_registries(repo_root_path, enterprise_root_path)
-    repo = ArtifactRepository(index)
+    repair_group_registries(repo_root_path, enterprise_root_path)
+    repo = ArtifactRepository(
+        index,
+        excluded_entity_types=build_runtime_catalogs(get_module_registry()).ontology.entity_types_with_class(
+            "internal"
+        ),
+    )
     repo.refresh()
     assert_no_duplicate_short_ids(index)
     assert_no_cross_repo_id_collisions(index)
     return repo
-
-
-def _repair_group_registries(repo_root_path: Path, enterprise_root_path: Path | None) -> None:
-    """Repair the engagement group registry (and validate the enterprise one) under the gate.
-
-    Runs before the index build so any file mutation is reflected by the first index load.
-    """
-    from src.application.group_registry_validation import GroupRegistryError, validate_and_repair_group_registry
-    from src.infrastructure.app_bootstrap import get_module_registry, registered_meta_ontology_values
-    from src.infrastructure.workspace.mutation_gate import get_workspace_gate
-
-    valid_meta_ontologies = registered_meta_ontology_values(get_module_registry())
-    with get_workspace_gate().privileged_writing():
-        try:
-            for msg in validate_and_repair_group_registry(
-                repo_root_path,
-                valid_meta_ontologies=valid_meta_ontologies,
-            ):
-                logger.info("Group registry repair: %s", msg)
-        except (GroupRegistryError, OSError) as exc:
-            logger.error("Startup aborted — group registry error:\n%s\nFix .arch-repo/groups.yaml and restart.", exc)
-            sys.exit(1)
-
-        if enterprise_root_path is not None:
-            try:
-                for msg in validate_and_repair_group_registry(
-                    enterprise_root_path,
-                    valid_meta_ontologies=valid_meta_ontologies,
-                    read_only=True,
-                ):
-                    logger.warning("Group registry (enterprise): %s", msg)
-            except GroupRegistryError as exc:
-                logger.warning("Enterprise group registry has errors (server will start; fix when possible):\n%s", exc)
 
 
 def _run_startup_validations(repo: "ArtifactRepository") -> None:

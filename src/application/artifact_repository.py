@@ -5,18 +5,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Literal
 
-from src.application._artifact_search import (
-    _RECORD_TYPE_TO_KIND,
-)
-from src.application._artifact_search import (
-    ALL_SEARCHABLE_KINDS as _ALL_SEARCHABLE_KINDS,
-)
-from src.application._artifact_search import (
-    count_artifacts_by as _count_artifacts_by,
-)
-from src.application._artifact_search import (
-    search as _search,
-)
+from src.application._artifact_aggregation import count_artifacts_by as _count_artifacts_by
 from src.application._artifact_search import (
     search_artifacts as _search_artifacts,
 )
@@ -48,9 +37,12 @@ class ArtifactRepository:
         self,
         store: ReadableArtifactStore,
         semantic_provider: SemanticSearchProvider | None = None,
+        *,
+        excluded_entity_types: frozenset[str] = frozenset(),
     ) -> None:
         self._store = store
         self._semantic = semantic_provider
+        self._excluded_entity_types = excluded_entity_types
 
     @property
     def repo_mounts(self) -> list[RepoMount]:
@@ -285,6 +277,7 @@ class ArtifactRepository:
             include_documents=include_documents,
             prefer_record_type=prefer_record_type,
             strict_record_type=strict_record_type,
+            excluded_entity_types=self._excluded_entity_types,
         )
 
     def scope_for_path(self, path: Path) -> Literal["enterprise", "engagement", "unknown"]:
@@ -323,25 +316,16 @@ class ArtifactRepository:
         prefer_record_type: _RecordType | None = None,
         strict_record_type: bool = False,
     ) -> SearchResult:
-        kinds: set[str] = {"entities"}  # entities are always in for this .search() method
-        if include_connections:
-            kinds.add("connections")
-        if include_diagrams:
-            kinds.add("diagrams")
-        if include_documents:
-            kinds.add("documents")
-        if strict_record_type and prefer_record_type is not None:
-            kind = _RECORD_TYPE_TO_KIND.get(prefer_record_type)
-            if kind:
-                kinds = {kind}
-        prefer_kind = _RECORD_TYPE_TO_KIND.get(prefer_record_type) if prefer_record_type else None
-        return _search(
-            self._store,
-            self._semantic,
+        # Entities are always in for this .search() method.
+        return self.search_artifacts(
             query,
             limit=limit,
-            entity_types=entity_types,
-            domains=domains,
-            included_kinds=frozenset(kinds) & _ALL_SEARCHABLE_KINDS,
-            prefer_kind=prefer_kind,
+            domain=domains,
+            artifact_type=entity_types,
+            include_entities=True,
+            include_connections=include_connections,
+            include_diagrams=include_diagrams,
+            include_documents=include_documents,
+            prefer_record_type=prefer_record_type,
+            strict_record_type=strict_record_type,
         )

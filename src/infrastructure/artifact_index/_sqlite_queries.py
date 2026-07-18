@@ -7,6 +7,19 @@ from src.application.artifact_scoring import tokenize
 
 from .types import EntityContextConnection, EntityContextCounts, EntityContextReadModel
 
+# Entity name column (position 1) gets 15× weight over content_text (0.5).
+# Columns: artifact_id(UNINDEXED), name, artifact_type, domain, subdomain, keywords, content_text, display_label
+_ENT_WEIGHTS = "0, 15.0, 1.0, 1.0, 1.0, 4.0, 0.5, 4.0"
+
+
+def _entity_exclusion_filter(excluded_entity_types: frozenset[str]) -> tuple[str, tuple[str, ...]]:
+    """Prepared NOT IN filter, applied before the per-kind LIMIT so hidden entity
+    rows never consume the result budget."""
+    if not excluded_entity_types:
+        return "", ()
+    placeholders = ",".join("?" * len(excluded_entity_types))
+    return f" AND artifact_type NOT IN ({placeholders})", tuple(sorted(excluded_entity_types))
+
 
 def search_fts(
     conn: sqlite3.Connection,
@@ -17,52 +30,36 @@ def search_fts(
     include_connections: bool = True,
     include_diagrams: bool = True,
     include_documents: bool = True,
+    excluded_entity_types: frozenset[str] = frozenset(),
     fts_enabled: bool,
 ) -> list[tuple[str, str, float]]:
     tokens = tokenize(query.lower())
     if not tokens or not fts_enabled:
         return []
     match_query = " OR ".join(f'"{token}"' for token in tokens)
-    # Entity name column (position 1) gets 15× weight over content_text (0.5).
-    # Columns: artifact_id(UNINDEXED), name, artifact_type, domain, subdomain, keywords, content_text, display_label
-    _ENT_WEIGHTS = "0, 15.0, 1.0, 1.0, 1.0, 4.0, 0.5, 4.0"
+    per_kind_limit = max(limit, 1)
+    entity_filter_sql, entity_filter_params = _entity_exclusion_filter(excluded_entity_types)
     # Per-kind subqueries each get their own ORDER BY + LIMIT so that a dominant
     # kind (e.g. hundreds of entity hits) cannot crowd out minority kinds.
+    kind_rows: list[tuple[bool, str, str, str, str, tuple[str, ...]]] = [
+        (include_entities, "entity", "entities_fts", f"-bm25(entities_fts, {_ENT_WEIGHTS})",
+         entity_filter_sql, entity_filter_params),
+        (include_connections, "connection", "connections_fts", "-bm25(connections_fts)", "", ()),
+        (include_diagrams, "diagram", "diagrams_fts", "-bm25(diagrams_fts)", "", ()),
+        (include_documents, "document", "documents_fts", "-bm25(documents_fts)", "", ()),
+    ]
     subqueries: list[str] = []
     params: list[str] = []
-    per_kind_limit = max(limit, 1)
-    if include_entities:
+    for included, record_type, table, score_expr, filter_sql, filter_params in kind_rows:
+        if not included:
+            continue
         subqueries.append(
-            "SELECT artifact_id, 'entity' AS record_type, "
-            f"-bm25(entities_fts, {_ENT_WEIGHTS}) AS score "
-            "FROM entities_fts WHERE entities_fts MATCH ? "
+            f"SELECT artifact_id, '{record_type}' AS record_type, {score_expr} AS score "
+            f"FROM {table} WHERE {table} MATCH ?{filter_sql} "
             f"ORDER BY score DESC LIMIT {per_kind_limit}"
         )
         params.append(match_query)
-    if include_connections:
-        subqueries.append(
-            "SELECT artifact_id, 'connection' AS record_type, "
-            "-bm25(connections_fts) AS score "
-            "FROM connections_fts WHERE connections_fts MATCH ? "
-            f"ORDER BY score DESC LIMIT {per_kind_limit}"
-        )
-        params.append(match_query)
-    if include_diagrams:
-        subqueries.append(
-            "SELECT artifact_id, 'diagram' AS record_type, "
-            "-bm25(diagrams_fts) AS score "
-            "FROM diagrams_fts WHERE diagrams_fts MATCH ? "
-            f"ORDER BY score DESC LIMIT {per_kind_limit}"
-        )
-        params.append(match_query)
-    if include_documents:
-        subqueries.append(
-            "SELECT artifact_id, 'document' AS record_type, "
-            "-bm25(documents_fts) AS score "
-            "FROM documents_fts WHERE documents_fts MATCH ? "
-            f"ORDER BY score DESC LIMIT {per_kind_limit}"
-        )
-        params.append(match_query)
+        params.extend(filter_params)
     if not subqueries:
         return []
     sql = (

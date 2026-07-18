@@ -465,20 +465,19 @@ class ArtifactIndex(_ReverseReferenceQueries):
         include_connections: bool = True,
         include_diagrams: bool = True,
         include_documents: bool = True,
+        excluded_entity_types: frozenset[str] = frozenset(),
     ) -> list[tuple[str, str, float]]:
         self._ensure_loaded()
-        with self._lock.reading():
-            with self._db.reader() as conn:
-                return _q.search_fts(
-                    conn,
-                    query,
-                    limit=limit,
-                    include_entities=include_entities,
-                    include_connections=include_connections,
-                    include_diagrams=include_diagrams,
-                    include_documents=include_documents,
-                    fts_enabled=self._db.fts_enabled,
-                )
+        with self._lock.reading(), self._db.reader() as conn:
+            return _q.search_fts(
+                conn, query, limit=limit,
+                include_entities=include_entities,
+                include_connections=include_connections,
+                include_diagrams=include_diagrams,
+                include_documents=include_documents,
+                excluded_entity_types=excluded_entity_types,
+                fts_enabled=self._db.fts_enabled,
+            )
 
     def find_entity_by_workspace_id(
         self,

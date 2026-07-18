@@ -110,6 +110,7 @@ class CombinedSearchMixin:
         include_connections: bool = True,
         include_diagrams: bool = True,
         include_documents: bool = True,
+        excluded_entity_types: frozenset[str] = frozenset(),
     ) -> list[tuple[str, str, float]]:
         def call(store: ReadableArtifactStore) -> list[tuple[str, str, float]]:
             return store.search_fts(
@@ -119,6 +120,7 @@ class CombinedSearchMixin:
                 include_connections=include_connections,
                 include_diagrams=include_diagrams,
                 include_documents=include_documents,
+                excluded_entity_types=excluded_entity_types,
             )
 
         left, right = dispatch_both(call, self._engagement, self._enterprise)

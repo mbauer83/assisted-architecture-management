@@ -102,26 +102,21 @@ def repo_root_from_preset(preset: RepoPreset) -> Path:
             return roots[1]
 
 
+def _absolutized(p: Path) -> Path:
+    return p if p.is_absolute() else workspace_root() / p
+
+
 def resolve_repo_root(*, repo_root: str | None, repo_preset: RepoPreset | None) -> Path:
     if repo_root:
-        p = Path(repo_root).expanduser()
-        if not p.is_absolute():
-            p = workspace_root() / p
-        return p
+        return _absolutized(Path(repo_root).expanduser())
     if repo_preset:
         return repo_root_from_preset(repo_preset)
-    p = default_engagement_repo_root()
-    if not p.is_absolute():
-        p = workspace_root() / p
-    return p
+    return _absolutized(default_engagement_repo_root())
 
 
 def resolve_enterprise_repo_root(*, enterprise_root: str | None) -> Path:
     if enterprise_root:
-        p = Path(enterprise_root).expanduser()
-        if not p.is_absolute():
-            p = workspace_root() / p
-        return p
+        return _absolutized(Path(enterprise_root).expanduser())
     return default_enterprise_repo_root()
 
 
@@ -175,7 +170,10 @@ def repo_cached(roots_key_str: str) -> ArtifactRepository:
     shared = _shared_state_repo_for_roots(roots)
     if shared is not None:
         return shared
-    return ArtifactRepository(shared_artifact_index(roots))
+    return ArtifactRepository(
+        shared_artifact_index(roots),
+        excluded_entity_types=runtime_catalogs().ontology.entity_types_with_class("internal"),
+    )
 
 
 @lru_cache(maxsize=8)
