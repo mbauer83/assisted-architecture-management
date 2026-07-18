@@ -316,12 +316,51 @@ def refresh_now() -> None:
         repo.refresh()
 
 
-def run_serialized_write(fn: Any, /, *args: Any, **kwargs: Any) -> Any:
-    from src.infrastructure.mcp.artifact_mcp.write_queue import run_sync
-    from src.infrastructure.workspace.mutation_gate import GateRejected
+_RETRYABLE_DENIALS = frozenset({"read_only", "sync_in_progress", "sync_health"})
 
+
+def _rejection_to_http(exc: Any) -> HTTPException:
+    status = 423 if exc.denial.code in _RETRYABLE_DENIALS else 403
+    return HTTPException(status, f"Write rejected: {exc.denial.message}")
+
+
+def authorized_write(route: tuple[str, str], fn: Any, /, *args: Any, **kwargs: Any) -> Any:
+    """Execute a repository mutation through the authorized mutation executor.
+
+    ``route`` is the handler's (METHOD, path) key in the REST mutation manifest —
+    the only way a REST handler reaches the write queue and gate. Denials surface
+    with the ordinary REST write status/payload (423 retryable, 403 forbidden).
+    """
+    from src.application.mutation_authorization import MutationRejected
+    from src.infrastructure.gui.routers.rest_mutation_manifest import build_rest_request
+    from src.infrastructure.workspace.mutation_gate import GateRejected
+    from src.infrastructure.write.mutation_executor_registry import mutation_executor
+
+    request = build_rest_request(route)
     try:
-        return run_sync(fn, *args, **kwargs)
+        return mutation_executor().run(request, lambda: fn(*args, **kwargs), operation_name=fn.__name__)
+    except MutationRejected as exc:
+        raise _rejection_to_http(exc) from exc
+    except GateRejected as exc:
+        raise HTTPException(423, f"Write rejected: {exc.reason}") from exc
+
+
+async def authorized_write_async(route: tuple[str, str], fn: Any, /, *args: Any, **kwargs: Any) -> Any:
+    """Async variant of ``authorized_write`` for coroutine handlers: awaits the queued
+    write without blocking the event loop."""
+    import asyncio
+
+    from src.application.mutation_authorization import MutationRejected
+    from src.infrastructure.gui.routers.rest_mutation_manifest import build_rest_request
+    from src.infrastructure.workspace.mutation_gate import GateRejected
+    from src.infrastructure.write.mutation_executor_registry import mutation_executor
+
+    request = build_rest_request(route)
+    try:
+        future = mutation_executor().submit(request, lambda: fn(*args, **kwargs), operation_name=fn.__name__)
+        return await asyncio.wrap_future(future)
+    except MutationRejected as exc:
+        raise _rejection_to_http(exc) from exc
     except GateRejected as exc:
         raise HTTPException(423, f"Write rejected: {exc.reason}") from exc
 

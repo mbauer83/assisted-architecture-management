@@ -86,7 +86,7 @@ def add_connection(body: AddConnectionBody) -> dict[str, Any]:
         global_rec = repo.get_entity(global_id)
         global_name = global_rec.name if global_rec else global_id
         global_entity_type = global_rec.artifact_type if global_rec else None
-        gar_result = s.run_serialized_write(
+        gar_result = s.authorized_write(("POST", "/api/connection"), 
             ensure_global_artifact_reference,
             engagement_repo=repo,
             engagement_root=repo_root,
@@ -119,7 +119,7 @@ def add_connection(body: AddConnectionBody) -> dict[str, Any]:
         effective_target = gar_artifact_id
 
     try:
-        result = s.run_serialized_write(
+        result = s.authorized_write(("POST", "/api/connection"), 
             _add,
             repo_root=repo_root,
             registry=registry,
@@ -185,7 +185,7 @@ def edit_connection(body: EditConnectionBody) -> dict[str, Any]:
 
     provided = body.model_fields_set
     try:
-        result = s.run_serialized_write(
+        result = s.authorized_write(("POST", "/api/connection/edit"), 
             _edit,
             repo_root=repo_root,
             registry=registry,
@@ -211,7 +211,7 @@ def manage_connection_associations(body: ConnectionAssociateBody) -> dict[str, A
     from src.infrastructure.write.artifact_write.connection_edit import edit_connection_associations as _assoc
 
     try:
-        result = s.run_serialized_write(
+        result = s.authorized_write(("POST", "/api/connection/associate"), 
             _assoc,
             repo_root=repo_root,
             registry=registry,
@@ -235,7 +235,7 @@ def remove_connection(body: RemoveConnectionBody) -> dict[str, Any]:
     from src.infrastructure.write.artifact_write.connection_edit import remove_connection as _remove
 
     try:
-        result = s.run_serialized_write(
+        result = s.authorized_write(("POST", "/api/connection/remove"), 
             _remove,
             repo_root=repo_root,
             registry=registry,

@@ -42,7 +42,31 @@ def test_save_commits_work_but_never_the_state_file(tmp_path: Path) -> None:
     _write_state(repo)
     doc = repo / "model" / "motivation" / "requirement" / "REQ@1.Abc123.thing.md"
     doc.parent.mkdir(parents=True)
-    doc.write_text("content\n", encoding="utf-8")
+    # Save commits verify the working tree, so the fixture must be a valid artifact.
+    doc.write_text(
+        "---\n"
+        "artifact-id: REQ@1.Abc123.thing\n"
+        "artifact-type: requirement\n"
+        "name: Thing\n"
+        "version: 0.1.0\n"
+        "status: draft\n"
+        "last-updated: '2026-01-01'\n"
+        "---\n\n"
+        "<!-- §content -->\n\n"
+        "## Thing\n\n"
+        "Fixture requirement.\n\n"
+        "## Properties\n\n"
+        "| Attribute | Value |\n"
+        "|---|---|\n"
+        "| (none) | (none) |\n\n"
+        "<!-- §display -->\n\n"
+        "### archimate\n\n"
+        "```yaml\n"
+        "label: Thing\n"
+        "alias: REQ_Abc123\n"
+        "```\n",
+        encoding="utf-8",
+    )
 
     commit_enterprise_work(repo, "save work")
 

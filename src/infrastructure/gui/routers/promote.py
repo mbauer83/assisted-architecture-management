@@ -199,8 +199,6 @@ def promotion_execute(
 
     from src.infrastructure.git.enterprise_git_ops import ensure_working_branch
 
-    ensure_working_branch(ent_root)
-
     resolutions = [
         ConflictResolution(
             engagement_id=r.engagement_id,
@@ -209,15 +207,22 @@ def promotion_execute(
         )
         for r in body.conflict_resolutions
     ]
-    result = execute_promotion(
-        plan,
-        eng_root,
-        ent_root,
-        registry,
-        conflict_resolutions=resolutions,
-        group_mapping_resolutions=body.group_mapping_resolutions or None,
-        viewpoint_resolutions=body.viewpoint_resolutions or None,
-    )
+
+    def _branch_and_promote():
+        # One write lease for the whole promotion transaction: working branch +
+        # copy + state update.
+        ensure_working_branch(ent_root)
+        return execute_promotion(
+            plan,
+            eng_root,
+            ent_root,
+            registry,
+            conflict_resolutions=resolutions,
+            group_mapping_resolutions=body.group_mapping_resolutions or None,
+            viewpoint_resolutions=body.viewpoint_resolutions or None,
+        )
+
+    result = s.authorized_write(("POST", "/api/promote/execute"), _branch_and_promote)
     if result.executed:
         repo.refresh()
     return {

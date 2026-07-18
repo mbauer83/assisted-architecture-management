@@ -14,7 +14,6 @@ from __future__ import annotations
 
 import asyncio
 import inspect
-import threading
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from functools import wraps
@@ -30,7 +29,11 @@ from src.application.mutation_authorization import (
     RepositoryWrite,
 )
 from src.infrastructure.mcp.artifact_mcp.context import resolve_enterprise_repo_root, resolve_repo_root
-from src.infrastructure.write.authorized_mutation_executor import AuthorizedMutationExecutor
+from src.infrastructure.write.mutation_executor_registry import (
+    _reset_executor_for_test,  # noqa: F401  (re-export: test harness reset)
+    install_mutation_executor,  # noqa: F401  (re-export: composition-root install)
+    mutation_executor,
+)
 
 ToolArguments = Mapping[str, object]
 
@@ -141,57 +144,6 @@ NON_MUTATING_WRITE_TOOLS: frozenset[str] = frozenset(
     {"artifact_help", "artifact_authoring_guidance", "artifact_get_operation"}
 )
 
-_executor_lock = threading.Lock()
-_installed_executor: AuthorizedMutationExecutor | None = None
-
-
-def install_mutation_executor(executor: AuthorizedMutationExecutor) -> None:
-    """Install the executor. Called only from composition roots (backend startup,
-    standalone-server bootstrap, test harnesses)."""
-    global _installed_executor
-    with _executor_lock:
-        _installed_executor = executor
-
-
-def _reset_executor_for_test() -> None:
-    global _installed_executor
-    with _executor_lock:
-        _installed_executor = None
-
-
-def mutation_executor() -> AuthorizedMutationExecutor:
-    """Return the installed executor, composing a workspace-default one lazily for
-    standalone server processes whose entrypoint installed none."""
-    global _installed_executor
-    with _executor_lock:
-        if _installed_executor is None:
-            _installed_executor = _default_executor()
-        return _installed_executor
-
-
-def _default_executor() -> AuthorizedMutationExecutor:
-    from src.infrastructure.gui.routers import state as gui_state  # noqa: PLC0415
-    from src.infrastructure.workspace.mutation_gate import get_workspace_gate  # noqa: PLC0415
-    from src.infrastructure.write.authorized_mutation_executor import (  # noqa: PLC0415
-        build_workspace_mutation_executor,
-    )
-    from src.infrastructure.write.workspace_authorization import WorkspaceAuthorizationSnapshots  # noqa: PLC0415
-
-    engagement = gui_state.maybe_engagement_root() or resolve_repo_root(repo_root=None, repo_preset=None)
-    try:
-        enterprise: Path | None = gui_state.maybe_enterprise_root() or resolve_enterprise_repo_root(
-            enterprise_root=None
-        )
-    except RuntimeError:
-        enterprise = None
-    snapshots = WorkspaceAuthorizationSnapshots(
-        engagement_root=engagement,
-        enterprise_root=enterprise,
-        admin_mode=False,
-        read_only=gui_state.is_read_only(),
-        gate=get_workspace_gate(),
-    )
-    return build_workspace_mutation_executor(snapshots)
 
 
 def register_mutation_tool(

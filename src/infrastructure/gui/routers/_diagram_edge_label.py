@@ -25,7 +25,7 @@ def set_edge_label_gui(body: SetEdgeLabelBody) -> dict[str, Any]:
 
     repo_root, _, verifier = s.get_write_deps()
     try:
-        result = s.run_serialized_write(
+        result = s.authorized_write(("PUT", "/api/diagram/edge-label"), 
             set_diagram_edge_label,
             repo_root=repo_root,
             verifier=verifier,

@@ -33,7 +33,10 @@ class GuiArchitectureEntityCreator:
         from src.infrastructure.write.artifact_write.entity import create_entity as _create  # noqa: PLC0415
 
         repo_root, _registry, verifier = s.get_write_deps()
-        result = s.run_serialized_write(
+        # Same authorization identity as POST /api/entity — this adapter creates an
+        # ordinary engagement entity on behalf of the assurance model-and-bind flow.
+        result = s.authorized_write(
+            ("POST", "/api/entity"),
             _create,
             repo_root=repo_root,
             verifier=verifier,

@@ -286,7 +286,7 @@ def create_entity(body: CreateEntityBody) -> dict[str, Any]:
     from src.infrastructure.write.artifact_write.entity import create_entity as _create
 
     try:
-        result = s.run_serialized_write(
+        result = s.authorized_write(("POST", "/api/entity"), 
             _create,
             repo_root=repo_root,
             verifier=verifier,
@@ -318,7 +318,7 @@ def edit_entity(body: EditEntityBody) -> dict[str, Any]:
 
     provided = body.model_fields_set
     try:
-        result = s.run_serialized_write(
+        result = s.authorized_write(("POST", "/api/entity/edit"), 
             _edit,
             repo_root=repo_root,
             registry=registry,
@@ -347,7 +347,7 @@ def delete_entity(body: DeleteEntityBody) -> dict[str, Any]:
     from src.infrastructure.write.artifact_write.entity_delete import delete_entity as _delete
 
     try:
-        result = s.run_serialized_write(
+        result = s.authorized_write(("POST", "/api/entity/remove"), 
             _delete,
             repo_root=repo_root,
             registry=registry,

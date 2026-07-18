@@ -89,16 +89,20 @@ async def save_engagement(body: SaveBody) -> dict:
     eng_root = s.maybe_engagement_root()
     if eng_root is None:
         raise HTTPException(400, "Engagement repository is not configured")
-    try:
-        commit = await asyncio.to_thread(
-            enterprise_git_ops.commit_engagement_work,
+
+    def _save_and_push() -> str:
+        commit = enterprise_git_ops.commit_engagement_work(
             eng_root,
             body.message,
             author_name=body.author_name,
             author_email=body.author_email,
         )
         if body.push:
-            await asyncio.to_thread(enterprise_git_ops.push_engagement, eng_root)
+            enterprise_git_ops.push_engagement(eng_root)
+        return commit
+
+    try:
+        commit = await s.authorized_write_async(("POST", "/api/sync/engagement/save"), _save_and_push)
         sync_status_cache.invalidate_sync_status_cache(repo=eng_root)
         await event_bus.publish(
             {
@@ -130,15 +134,19 @@ async def save_enterprise(body: SaveBody) -> dict:
     ent_root = s.maybe_enterprise_root()
     if ent_root is None:
         raise HTTPException(400, "Enterprise repository is not configured")
-    try:
-        await asyncio.to_thread(enterprise_git_ops.ensure_working_branch, ent_root)
-        commit = await asyncio.to_thread(
-            enterprise_git_ops.commit_enterprise_work,
+
+    def _branch_and_commit() -> str:
+        # One write lease for the whole transaction: working branch + commit + state.
+        enterprise_git_ops.ensure_working_branch(ent_root)
+        return enterprise_git_ops.commit_enterprise_work(
             ent_root,
             body.message,
             author_name=body.author_name,
             author_email=body.author_email,
         )
+
+    try:
+        commit = await s.authorized_write_async(("POST", "/api/sync/enterprise/save"), _branch_and_commit)
         sync_state = enterprise_sync_state.load(ent_root)
         sync_status_cache.invalidate_sync_status_cache(repo=ent_root)
         await event_bus.publish(
@@ -180,7 +188,9 @@ async def submit_enterprise() -> dict:
         raise HTTPException(400, "No enterprise changes to submit for review")
 
     try:
-        branch = await asyncio.to_thread(enterprise_git_ops.push_enterprise_branch, ent_root)
+        branch = await s.authorized_write_async(
+            ("POST", "/api/sync/enterprise/submit"), enterprise_git_ops.push_enterprise_branch, ent_root
+        )
         sync_status_cache.invalidate_sync_status_cache(repo=ent_root)
         await event_bus.publish(
             {
@@ -222,7 +232,9 @@ async def withdraw_enterprise(body: WithdrawBody) -> dict:
         return {"ok": True, "nothing_to_discard": True}
 
     try:
-        branch = await asyncio.to_thread(enterprise_git_ops.abandon_enterprise_branch, ent_root)
+        branch = await s.authorized_write_async(
+            ("POST", "/api/sync/enterprise/withdraw"), enterprise_git_ops.abandon_enterprise_branch, ent_root
+        )
         sync_status_cache.invalidate_sync_status_cache(repo=ent_root)
         await event_bus.publish(
             {

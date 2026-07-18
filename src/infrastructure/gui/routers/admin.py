@@ -77,7 +77,7 @@ def admin_create_entity(body: AdminCreateEntityBody) -> dict[str, Any]:
     from src.infrastructure.write.artifact_write.admin_ops import admin_create_entity as _create
 
     try:
-        result = s.run_serialized_write(
+        result = s.authorized_write(("POST", "/admin/api/entity"), 
             _create,
             repo_root=ent_root,
             verifier=verifier,
@@ -108,7 +108,7 @@ def admin_edit_entity(body: AdminEditEntityBody) -> dict[str, Any]:
 
     provided = body.model_fields_set
     try:
-        result = s.run_serialized_write(
+        result = s.authorized_write(("POST", "/admin/api/entity/edit"), 
             _edit,
             repo_root=ent_root,
             registry=registry,
@@ -136,7 +136,7 @@ def admin_delete_entity(body: AdminDeleteEntityBody) -> dict[str, Any]:
     from src.infrastructure.write.artifact_write.admin_ops import admin_delete_entity as _delete
 
     try:
-        result = s.run_serialized_write(
+        result = s.authorized_write(("POST", "/admin/api/entity/remove"), 
             _delete,
             repo_root=ent_root,
             registry=registry,
@@ -174,7 +174,7 @@ def admin_add_connection(body: AdminAddConnectionBody) -> dict[str, Any]:
     from src.infrastructure.write.artifact_write.admin_ops import admin_add_connection as _add
 
     try:
-        result = s.run_serialized_write(
+        result = s.authorized_write(("POST", "/admin/api/connection"), 
             _add,
             repo_root=ent_root,
             registry=registry,
@@ -201,7 +201,7 @@ def admin_remove_connection(body: AdminRemoveConnectionBody) -> dict[str, Any]:
     from src.infrastructure.write.artifact_write.admin_ops import admin_remove_connection as _remove
 
     try:
-        result = s.run_serialized_write(
+        result = s.authorized_write(("POST", "/admin/api/connection/remove"), 
             _remove,
             repo_root=ent_root,
             registry=registry,
@@ -261,7 +261,7 @@ def admin_create_diagram(body: AdminCreateDiagramBody) -> dict[str, Any]:
     entities, connections, _, _ = resolve_diagram_selection(repo, body.entity_ids, body.connection_ids)
     puml = generate_archimate_puml_body(body.name, entities, connections, diagram_type=body.diagram_type)
     try:
-        result = s.run_serialized_write(
+        result = s.authorized_write(("POST", "/admin/api/diagram"), 
             _write_diagram_to_enterprise,
             repo_root=ent_root,
             verifier=verifier,
@@ -289,7 +289,7 @@ def admin_delete_diagram(body: AdminDeleteDiagramBody) -> dict[str, Any]:
     from src.infrastructure.write.artifact_write.admin_ops import admin_delete_diagram as _delete
 
     try:
-        result = s.run_serialized_write(
+        result = s.authorized_write(("POST", "/admin/api/diagram/remove"), 
             _delete,
             repo_root=ent_root,
             clear_repo_caches=s.clear_caches,

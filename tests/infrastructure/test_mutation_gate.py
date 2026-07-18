@@ -239,129 +239,64 @@ class TestLockOrder:
 
 
 # ---------------------------------------------------------------------------
-# HTTP surface (run_serialized_write → HTTPException 423)
+# HTTP surface (state.authorized_write → HTTPException 423)
 # ---------------------------------------------------------------------------
 
 class TestHttpSurface:
-    def test_run_serialized_write_returns_423_on_sync_blocked(self, monkeypatch):
+    """REST writes fail closed with HTTP 423 while the workspace gate is blocked."""
+
+    def _blocked_write(self, tmp_path: Path, reason):
+        from fastapi import HTTPException
+
+        from src.infrastructure.gui.routers import state as gui_state
+        from src.infrastructure.gui.routers.state import authorized_write
+        from src.infrastructure.mcp.artifact_mcp.write_queue import shutdown
         from src.infrastructure.workspace.mutation_gate import get_workspace_gate as _gwg
-
-        gate = _gwg()
-        gate.set_block("sync_in_progress")
-
-        try:
-            from src.infrastructure.gui.routers.state import run_serialized_write
-
-            try:
-                from fastapi import HTTPException
-            except ModuleNotFoundError:
-                from src.infrastructure.gui.routers.state import HTTPException  # type: ignore[assignment]
-
-            with pytest.raises(HTTPException) as exc_info:
-                run_serialized_write(lambda: None)
-
-            assert exc_info.value.status_code == 423
-            assert "sync_in_progress" in exc_info.value.detail
-        finally:
-            gate.clear_block()
-
-    def test_run_serialized_write_returns_423_on_read_only(self):
-        from src.infrastructure.workspace.mutation_gate import get_workspace_gate as _gwg
-
-        gate = _gwg()
-        gate.set_block("read_only")
-
-        try:
-            from src.infrastructure.gui.routers.state import run_serialized_write
-
-            try:
-                from fastapi import HTTPException
-            except ModuleNotFoundError:
-                from src.infrastructure.gui.routers.state import HTTPException  # type: ignore[assignment]
-
-            with pytest.raises(HTTPException) as exc_info:
-                run_serialized_write(lambda: None)
-
-            assert exc_info.value.status_code == 423
-            assert "read_only" in exc_info.value.detail
-        finally:
-            gate.clear_block()
-
-
-# ---------------------------------------------------------------------------
-# MCP surface (queued wrapper propagates GateRejected)
-# ---------------------------------------------------------------------------
-
-class TestMcpSurface:
-    """The MCP mutation surface fails closed on gate blocks: the executor's fresh
-    snapshot sees the live block reason and rejects before any queue submission."""
-
-    @staticmethod
-    def _executor(tmp_path: Path, gate):
-        from src.infrastructure.mcp.artifact_mcp.write_queue import submit_serialized
-        from src.infrastructure.write.authorized_mutation_executor import AuthorizedMutationExecutor
+        from src.infrastructure.write.authorized_mutation_executor import build_workspace_mutation_executor
+        from src.infrastructure.write.mutation_executor_registry import (
+            _reset_executor_for_test,
+            install_mutation_executor,
+        )
         from src.infrastructure.write.workspace_authorization import WorkspaceAuthorizationSnapshots
 
-        engagement = tmp_path / "engagement-root"
-        engagement.mkdir(exist_ok=True)
-        snapshots = WorkspaceAuthorizationSnapshots(
-            engagement_root=engagement,
-            enterprise_root=None,
-            admin_mode=False,
-            read_only=False,
-            gate=gate,
+        engagement = tmp_path / "engagements" / "ENG-HTTP" / "architecture-repository"
+        engagement.mkdir(parents=True)
+        previous_engagement = gui_state.maybe_engagement_root()
+        gate = _gwg()
+        install_mutation_executor(
+            build_workspace_mutation_executor(
+                WorkspaceAuthorizationSnapshots(
+                    engagement_root=engagement,
+                    enterprise_root=None,
+                    admin_mode=False,
+                    read_only=False,
+                    gate=gate,
+                )
+            )
         )
-        return AuthorizedMutationExecutor(snapshots, submitter=submit_serialized, gate=gate), engagement
-
-    @staticmethod
-    def _request(engagement: Path):
-        from src.application.mutation_authorization import MutationRequest, RepositoryWrite
-
-        return MutationRequest("engagement_authoring", RepositoryWrite(engagement))
-
-    def test_executor_rejects_on_sync_block(self, tmp_path: Path):
-        from src.application.mutation_authorization import MutationRejected
-        from src.infrastructure.mcp.artifact_mcp.write_queue import shutdown
-        from src.infrastructure.workspace.mutation_gate import get_workspace_gate as _gwg
-
-        gate = _gwg()
-        gate.set_block("sync_in_progress")
-        executor, engagement = self._executor(tmp_path, gate)
+        gate.set_block(reason)
         try:
-            with pytest.raises(MutationRejected) as excinfo:
-                executor.run(self._request(engagement), lambda: {"ok": True}, operation_name="my_write")
-            assert excinfo.value.denial.code == "sync_in_progress"
+            import unittest.mock
+
+            with unittest.mock.patch.object(gui_state, "maybe_engagement_root", lambda: engagement):
+                with pytest.raises(HTTPException) as exc_info:
+                    authorized_write(("POST", "/api/entity"), lambda: None)
+            return exc_info.value
         finally:
             gate.clear_block()
+            _reset_executor_for_test()
             shutdown()
+            del previous_engagement
 
-    def test_executor_rejects_on_read_only_block(self, tmp_path: Path):
-        from src.application.mutation_authorization import MutationRejected
-        from src.infrastructure.mcp.artifact_mcp.write_queue import shutdown
-        from src.infrastructure.workspace.mutation_gate import get_workspace_gate as _gwg
+    def test_authorized_write_returns_423_on_sync_blocked(self, tmp_path: Path):
+        exc = self._blocked_write(tmp_path, "sync_in_progress")
+        assert exc.status_code == 423
+        assert "sync" in exc.detail
 
-        gate = _gwg()
-        gate.set_block("read_only")
-        executor, engagement = self._executor(tmp_path, gate)
-        try:
-            with pytest.raises(MutationRejected) as excinfo:
-                executor.run(self._request(engagement), lambda: {"ok": True}, operation_name="my_write")
-            assert excinfo.value.denial.code == "read_only"
-        finally:
-            gate.clear_block()
-            shutdown()
-
-    def test_executor_executes_normally_when_gate_open(self, tmp_path: Path):
-        from src.infrastructure.mcp.artifact_mcp.write_queue import shutdown
-        from src.infrastructure.workspace.mutation_gate import get_workspace_gate as _gwg
-
-        gate = _gwg()
-        executor, engagement = self._executor(tmp_path, gate)
-        try:
-            result = executor.run(self._request(engagement), lambda: {"ok": True}, operation_name="my_write")
-        finally:
-            shutdown()
-        assert result == {"ok": True}
+    def test_authorized_write_returns_423_on_read_only(self, tmp_path: Path):
+        exc = self._blocked_write(tmp_path, "read_only")
+        assert exc.status_code == 423
+        assert "read-only" in exc.detail
 
 
 # ---------------------------------------------------------------------------

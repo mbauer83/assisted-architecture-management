@@ -159,10 +159,17 @@ def commit_enterprise_work(
     author_name: str | None = None,
     author_email: str | None = None,
 ) -> str:
-    """Stage and commit all changes in the enterprise repo. Returns the new commit hash."""
+    """Stage and commit all changes in the enterprise repo. Returns the new commit hash.
+
+    Verifies the whole working tree first (it may hold manually edited files);
+    a failing tree rejects the save with no commit and no state change.
+    """
+    from src.infrastructure.write.save_commit_verification import assert_repository_verifies  # noqa: PLC0415
+
     author = optional_git_author(author_name, author_email)
     if not has_uncommitted_changes(enterprise_root):
         raise ValueError("No changes to save in the enterprise repository")
+    assert_repository_verifies(enterprise_root)
     rc, _, stderr = _run(enterprise_root, *_STAGE_ALL_BUT_RUNTIME_STATE)
     if rc != 0:
         raise RuntimeError(f"Failed to stage enterprise changes: {stderr}")
@@ -181,8 +188,10 @@ def commit_enterprise_work(
 def push_enterprise_branch(enterprise_root: Path) -> str:
     """Push the working branch to origin and transition the state to PENDING.
 
-    Returns the branch name. Raises ValueError if there are unsaved changes,
-    RuntimeError if the push fails.
+    Content-neutral git operation: it publishes already-committed (and therefore
+    already-verified) work and introduces no artifact content, so it is exempt
+    from save verification. Returns the branch name. Raises ValueError if there
+    are unsaved changes, RuntimeError if the push fails.
     """
     state = enterprise_sync_state.load(enterprise_root)
     branch = current_branch(enterprise_root)
@@ -209,7 +218,11 @@ def push_enterprise_branch(enterprise_root: Path) -> str:
 
 
 def abandon_enterprise_branch(enterprise_root: Path) -> str | None:
-    """Discard all working-branch changes and return the enterprise repo to main."""
+    """Discard all working-branch changes and return the enterprise repo to main.
+
+    Content-neutral git operation (branch cleanup, no artifact content) — exempt
+    from save verification.
+    """
     state = enterprise_sync_state.load(enterprise_root)
     branch = state.branch
     rc, _, stderr = _run(enterprise_root, "checkout", "main")
@@ -234,10 +247,17 @@ def commit_engagement_work(
     author_name: str | None = None,
     author_email: str | None = None,
 ) -> str:
-    """Stage and commit all changes in the engagement repo. Returns the commit hash."""
+    """Stage and commit all changes in the engagement repo. Returns the commit hash.
+
+    Verifies the whole working tree first (it may hold manually edited files);
+    a failing tree rejects the save with no commit and no state change.
+    """
+    from src.infrastructure.write.save_commit_verification import assert_repository_verifies  # noqa: PLC0415
+
     author = optional_git_author(author_name, author_email)
     if not has_uncommitted_changes(engagement_root):
         raise ValueError("No changes to save in the engagement repository")
+    assert_repository_verifies(engagement_root)
     rc, _, stderr = _run(engagement_root, *_STAGE_ALL_BUT_RUNTIME_STATE)
     if rc != 0:
         raise RuntimeError(f"Failed to stage engagement changes: {stderr}")

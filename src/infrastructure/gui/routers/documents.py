@@ -137,7 +137,7 @@ def create_document(req: CreateDocumentRequest) -> dict[str, Any]:
 
     repo_root, _, verifier = s.get_write_deps()
 
-    result = s.run_serialized_write(
+    result = s.authorized_write(("POST", "/api/document"), 
         _create,
         repo_root=repo_root,
         verifier=verifier,
@@ -169,7 +169,7 @@ def edit_document(artifact_id: str, req: EditDocumentRequest) -> dict[str, Any]:
 
     repo_root, _, verifier = s.get_write_deps()
 
-    result = s.run_serialized_write(
+    result = s.authorized_write(("PUT", "/api/document/{artifact_id}"), 
         _edit,
         repo_root=repo_root,
         verifier=verifier,
@@ -200,7 +200,7 @@ def delete_document(artifact_id: str, dry_run: bool = False) -> dict[str, Any]:
 
     repo_root, _, _ = s.get_write_deps()
 
-    result = s.run_serialized_write(
+    result = s.authorized_write(("DELETE", "/api/document/{artifact_id}"), 
         _delete,
         repo_root=repo_root,
         clear_repo_caches=s.clear_caches,

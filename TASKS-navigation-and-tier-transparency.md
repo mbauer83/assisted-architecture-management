@@ -181,7 +181,7 @@ memory. Tick items only after the listed verification passes, recording evidence
       > passed/5 skipped, ruff 0, zuban 0. Counted lines: mutation_registration 184,
       > edit_tools 337, write_queue 201, arch_backend 343 (all ≤ limits). Backend
       > restart NEEDED (pending owner).
-- [ ] **S2c — REST inventory migration.**
+- [x] **S2c — REST inventory migration.**
       Manifest rows + executor adoption for ALL architecture-repository REST mutators:
       ordinary entity/connection/document/diagram routes (already queued — wire through
       the executor's authorize step), `routers/viewpoint_authoring.py` (pins,
@@ -199,6 +199,41 @@ memory. Tick items only after the listed verification passes, recording evidence
       change after rejection; synced-dirty Save succeeds under enterprise health
       warnings; concurrency test: promotion cannot overlap a queued write. Backend
       restart.
+      > Evidence (2026-07-18): `rest_mutation_manifest.py` — 40 mutators classified
+      > by (METHOD, path) → intent (29 engagement, 7 admin, promotion,
+      > save/submit/withdraw), 9 non-mutating routes (previews, plan, summarize,
+      > query execution/export, identifier mint), `/api/assurance/*` excluded by
+      > prefix (own gating). `state.run_serialized_write` DELETED; the only REST
+      > write path is `authorized_write`/`authorized_write_async` (manifest row
+      > required → LookupError otherwise; MutationRejected → 423 retryable / 403
+      > forbidden). Executor registry moved to
+      > `write/mutation_executor_registry.py` (shared by MCP + REST; fallback
+      > provider re-reads gui state per snapshot — O(1)). Migrations: 25
+      > run_serialized_write sites (entities/connections/documents/diagram
+      > write+edge-label/admin/_arch_entity_creator), groups (_exec_op executor-run,
+      > manual read-only check removed), viewpoint pins/create/edit/remove writes,
+      > promote/execute (one write lease: branch+copy+state), sync routes (one
+      > operation per workflow transaction). Save commits run the artifact verifier
+      > in `commit_engagement_work`/`commit_enterprise_work`
+      > (write/save_commit_verification.py); Submit push + Discard documented as the
+      > content-neutral exemption in enterprise_git_ops. Tests:
+      > test_rest_mutation_manifest.py (both-direction app-route ⇔ manifest
+      > equality, per-intent builders, unmanifested-route refusal),
+      > test_gui_router_sync_workflow.py (10 real-git: save commits, malformed
+      > artifact → 400 + no commit + tree untouched, read-only 423 side-effect-free,
+      > enterprise save under persisted fetch fault ACCEPTED, submit pushes with
+      > upstream / denied under fault with no push + state preserved, withdraw local
+      > allowed under fault / read-only preserved),
+      > test_gui_router_write_authorization.py (10: groups/viewpoints/entity
+      > read-only 423 with no side effects, promotion read-only rejection leaves
+      > enterprise repo untouched, promotion serializes behind a queued write —
+      > timeout-bounded), gate/mutation HTTP-surface tests rewritten onto
+      > authorized_write. Gates: pytest 5414 passed/5 skipped (two unrelated
+      > timing/isolation flakes observed once each under xdist load —
+      > test_http_concurrent read-latency bound, test_viewpoint_execute_after_create
+      > — both pass in isolation and in the final full run), ruff 0, zuban 0.
+      > Counted lines: state.py 302, viewpoint_authoring 286, all others < 250; no
+      > pressure-list file touched. Backend restart NEEDED (pending owner).
 
 ## S3 — Tier URL codec & shared components
 

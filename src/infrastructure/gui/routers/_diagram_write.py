@@ -119,7 +119,7 @@ def create_diagram_gui(body: CreateDiagramGuiBody) -> dict[str, Any]:
         diagram_connections=dc,
     )
     try:
-        result = s.run_serialized_write(
+        result = s.authorized_write(("POST", "/api/diagram"), 
             create_diagram,
             repo_root=repo_root,
             verifier=verifier,
@@ -174,7 +174,7 @@ def edit_diagram_gui(body: EditDiagramGuiBody) -> dict[str, Any]:
     )
     from src.application.candidate_repository import committed_repository  # noqa: PLC0415
     try:
-        result = s.run_serialized_write(
+        result = s.authorized_write(("POST", "/api/diagram/edit"), 
             edit_diagram,
             repo_root=repo_root,
             verifier=verifier,
@@ -273,7 +273,7 @@ def create_matrix_gui(body: CreateMatrixBody) -> dict[str, Any]:
         to_entity_ids=body.to_entity_ids,
     )
     try:
-        result = s.run_serialized_write(
+        result = s.authorized_write(("POST", "/api/matrix"), 
             create_matrix,
             repo_root=repo_root,
             registry=registry,
@@ -313,7 +313,7 @@ def edit_matrix_gui(body: EditMatrixBody) -> dict[str, Any]:
     )
     diag = repo.get_diagram(body.artifact_id)
     try:
-        result = s.run_serialized_write(
+        result = s.authorized_write(("POST", "/api/matrix/edit"), 
             create_matrix,
             repo_root=repo_root,
             registry=registry,
@@ -344,7 +344,7 @@ def sync_diagram_to_model_gui(body: SyncDiagramToModelBody) -> dict[str, Any]:
     repo = s.get_repo()
     repo_root, _, verifier = s.get_write_deps()
     try:
-        result = s.run_serialized_write(
+        result = s.authorized_write(("POST", "/api/diagram/sync"), 
             refresh_diagram,
             repo_root=repo_root,
             store=repo,
@@ -368,7 +368,7 @@ def delete_diagram_gui(body: DeleteDiagramBody) -> dict[str, Any]:
     repo = s.get_repo()
     repo_root, _registry, _verifier = s.get_write_deps()
     try:
-        result = s.run_serialized_write(
+        result = s.authorized_write(("POST", "/api/diagram/remove"), 
             delete_diagram,
             repo_root=repo_root,
             clear_repo_caches=s.clear_caches,

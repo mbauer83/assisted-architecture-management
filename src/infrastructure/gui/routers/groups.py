@@ -114,16 +114,14 @@ def list_groups(kind: str | None = None) -> dict[str, Any]:
     return result
 
 
-async def _exec_op(**kwargs: Any) -> dict[str, Any]:
-    if s.is_read_only():
-        raise HTTPException(403, "Repository is in read-only mode")
+async def _exec_op(route: tuple[str, str], **kwargs: Any) -> dict[str, Any]:
     repo_root = s.maybe_engagement_root()
     if repo_root is None:
         raise HTTPException(500, "Repository not initialized")
     from src.infrastructure.write.artifact_write.group_ops import GroupOpError, group_op  # noqa: PLC0415
 
     try:
-        result = await asyncio.to_thread(group_op, repo_root, **kwargs)
+        result = await s.authorized_write_async(route, group_op, repo_root, **kwargs)
     except GroupOpError as exc:
         raise HTTPException(400, str(exc))
     await asyncio.to_thread(s.refresh_now)
@@ -136,6 +134,7 @@ async def _exec_op(**kwargs: Any) -> dict[str, Any]:
 @router.post("/api/group")
 async def create_group(body: CreateGroupBody) -> dict[str, Any]:
     return await _exec_op(
+        ("POST", "/api/group"),
         axis=body.kind,
         action="create",
         target=body.slug,
@@ -150,6 +149,7 @@ async def create_group(body: CreateGroupBody) -> dict[str, Any]:
 @router.put("/api/group")
 async def rename_group(body: RenameGroupBody) -> dict[str, Any]:
     return await _exec_op(
+        ("PUT", "/api/group"),
         axis=body.kind,
         action="rename",
         target=body.target,
@@ -160,17 +160,20 @@ async def rename_group(body: RenameGroupBody) -> dict[str, Any]:
 
 @router.post("/api/group/archive")
 async def archive_group(body: ArchiveGroupBody) -> dict[str, Any]:
-    return await _exec_op(axis=body.kind, action="archive", target=body.target, confirm=body.confirm)
+    return await _exec_op(
+        ("POST", "/api/group/archive"), axis=body.kind, action="archive", target=body.target, confirm=body.confirm
+    )
 
 
 @router.post("/api/group/unarchive")
 async def unarchive_group(body: UnarchiveGroupBody) -> dict[str, Any]:
-    return await _exec_op(axis=body.kind, action="unarchive", target=body.target)
+    return await _exec_op(("POST", "/api/group/unarchive"), axis=body.kind, action="unarchive", target=body.target)
 
 
 @router.patch("/api/group")
 async def update_group(body: UpdateGroupBody) -> dict[str, Any]:
     return await _exec_op(
+        ("PATCH", "/api/group"),
         axis=body.kind,
         action="update",
         target=body.target,
@@ -187,4 +190,4 @@ async def delete_group(
     target: str = Query(...),
     confirm: str | None = Query(default=None),
 ) -> dict[str, Any]:
-    return await _exec_op(axis=kind, action="delete", target=target, confirm=confirm)
+    return await _exec_op(("DELETE", "/api/group"), axis=kind, action="delete", target=target, confirm=confirm)

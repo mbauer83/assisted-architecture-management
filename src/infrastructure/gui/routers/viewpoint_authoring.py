@@ -234,7 +234,7 @@ def put_viewpoint_pins(body: ViewpointPinsBody) -> dict[str, Any]:
     unknown = [slug for slug in body.slugs if slug not in known]
     if unknown:
         raise HTTPException(400, f"unknown viewpoint slug(s): {', '.join(unknown)}")
-    save_pinned_slugs(engagement_root, tuple(body.slugs))
+    s.authorized_write(("PUT", "/api/viewpoints/pins"), save_pinned_slugs, engagement_root, tuple(body.slugs))
     return {"slugs": body.slugs}
 
 
@@ -283,7 +283,7 @@ class ViewpointWriteBody(BaseModel):
     lineage server-side; a client can never assert its own provenance."""
 
 
-def _persist(action: PersistAction, body: ViewpointWriteBody) -> dict[str, Any]:
+def _persist(action: PersistAction, body: ViewpointWriteBody, *, route: tuple[str, str]) -> dict[str, Any]:
     engagement_root = _engagement_root()
     both_roots = _both_roots()
     catalogs = build_runtime_catalogs(get_module_registry())
@@ -313,18 +313,18 @@ def _persist(action: PersistAction, body: ViewpointWriteBody) -> dict[str, Any]:
         index_generation=index_generation,
     )
     if result.ok and not body.dry_run and result.catalog_to_write is not None:
-        write_viewpoint_catalog_file(engagement_root, result.catalog_to_write)
+        s.authorized_write(route, write_viewpoint_catalog_file, engagement_root, result.catalog_to_write)
     return _result_to_dict(result, dry_run=body.dry_run)
 
 
 @router.post("/api/viewpoints")
 def create_viewpoint_definition(body: ViewpointWriteBody) -> dict[str, Any]:
-    return _persist("create", body)
+    return _persist("create", body, route=("POST", "/api/viewpoints"))
 
 
 @router.post("/api/viewpoints/edit")
 def edit_viewpoint_definition(body: ViewpointWriteBody) -> dict[str, Any]:
-    return _persist("edit", body)
+    return _persist("edit", body, route=("POST", "/api/viewpoints/edit"))
 
 
 class DeleteViewpointBody(BaseModel):
@@ -343,5 +343,7 @@ def delete_viewpoint_definition_route(body: DeleteViewpointBody) -> dict[str, An
         body.slug, local_catalog=local_catalog, merged_catalog=merged_catalog, read_access=repo
     )
     if result.ok and not body.dry_run and result.catalog_to_write is not None:
-        write_viewpoint_catalog_file(engagement_root, result.catalog_to_write)
+        s.authorized_write(
+            ("POST", "/api/viewpoints/remove"), write_viewpoint_catalog_file, engagement_root, result.catalog_to_write
+        )
     return _result_to_dict(result, dry_run=body.dry_run)
