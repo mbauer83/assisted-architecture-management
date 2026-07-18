@@ -5,7 +5,8 @@ import { Effect } from 'effect'
 import { modelServiceKey } from '../keys'
 import { searchHitRoute } from '../lib/searchNavigation'
 import ArchimateTypeGlyph from './ArchimateTypeGlyph.vue'
-import type { EnterpriseSyncStatus, SearchHit } from '../../domain'
+import SyncStatusCluster from './SyncStatusCluster.vue'
+import type { EnterpriseSyncStatus, SearchHit, SyncAuthority } from '../../domain'
 import { readErrorMessage } from '../lib/errors'
 
 type SaveMode = 'engagement-save' | 'enterprise-save' | 'enterprise-submit' | 'enterprise-withdraw'
@@ -15,6 +16,8 @@ defineProps<{
   readOnly: boolean
   engDirty: boolean
   entStatus: EnterpriseSyncStatus | null
+  authorityKnown: boolean
+  authority: SyncAuthority | null
 }>()
 
 const emit = defineEmits<{ openSaveDialog: [mode: SaveMode] }>()
@@ -125,15 +128,6 @@ onMounted(async () => {
           class="nav__links"
           aria-label="Engagement"
         >
-          <button
-            v-if="!readOnly"
-            class="nav__save-btn"
-            :class="{ 'nav__save-btn--clean': !engDirty }"
-            :disabled="!engDirty"
-            @click="emit('openSaveDialog', 'engagement-save')"
-          >
-            ● Save
-          </button>
           <RouterLink
             :to="browseTo"
             :class="{ 'nav__link--suppressed': viewpointDriven }"
@@ -170,34 +164,6 @@ onMounted(async () => {
           class="nav__links"
           aria-label="Global"
         >
-          <template v-if="entStatus && adminMode">
-            <button
-              v-if="entStatus.has_uncommitted_changes"
-              class="nav__save-btn nav__save-btn--global"
-              @click="emit('openSaveDialog', 'enterprise-save')"
-            >
-              ● Save
-            </button>
-            <button
-              v-if="entStatus.status === 'accumulating'"
-              class="nav__action-btn"
-              @click="emit('openSaveDialog', 'enterprise-submit')"
-            >
-              Submit
-            </button>
-            <button
-              v-if="entStatus.status === 'pending'"
-              class="nav__action-btn nav__action-btn--warn"
-              @click="emit('openSaveDialog', 'enterprise-withdraw')"
-            >
-              Discard
-            </button>
-            <span
-              v-if="entStatus.status !== 'synced'"
-              class="nav__ent-status"
-              :class="`nav__ent-status--${entStatus.status}`"
-            >{{ entStatus.label }}</span>
-          </template>
           <RouterLink :to="{ path: '/entities', query: { tier: 'enterprise' } }">
             Browse
           </RouterLink>
@@ -229,6 +195,14 @@ onMounted(async () => {
         </div>
       </template>
     </div>
+    <SyncStatusCluster
+      class="nav__cluster"
+      :authority-known="authorityKnown"
+      :authority="authority"
+      :enterprise="entStatus"
+      :engagement-dirty="engDirty"
+      @open-save-dialog="emit('openSaveDialog', $event)"
+    />
     <form
       class="nav__search"
       @submit.prevent="submitSearch"
@@ -285,20 +259,8 @@ onMounted(async () => {
 .nav__links a.nav__link--forced-active { color: #f8fafc; font-weight: 500; background: #2d3f55; }
 .nav__promote { color: #fbbf24 !important; }
 .nav__promote:hover { color: #f59e0b !important; }
-.nav__save-btn { background: #166534; color: #bbf7d0; border: none; border-radius: 4px; font-size: 12px; font-weight: 600; padding: 3px 9px; cursor: pointer; white-space: nowrap; flex-shrink: 0; }
-.nav__save-btn:hover:not(:disabled) { background: #15803d; }
-.nav__save-btn:disabled { cursor: not-allowed; }
-.nav__save-btn--clean { background: #1e3a2a; color: #4b7a5c; opacity: 0.6; }
-.nav__save-btn--global { background: #78350f; color: #fde68a; }
-.nav__save-btn--global:hover:not(:disabled) { background: #92400e; }
-.nav__action-btn { background: transparent; color: #93c5fd; border: 1px solid #475569; border-radius: 4px; font-size: 12px; padding: 3px 9px; cursor: pointer; white-space: nowrap; flex-shrink: 0; }
-.nav__action-btn:hover { background: #263347; }
-.nav__action-btn--warn { color: #fca5a5; border-color: #7f1d1d; }
-.nav__action-btn--warn:hover { background: #450a0a; }
-.nav__ent-status { font-size: 11px; padding: 2px 7px; border-radius: 10px; font-weight: 600; }
-.nav__ent-status--accumulating { background: #1e3a5f; color: #93c5fd; }
-.nav__ent-status--pending { background: #3b0764; color: #d8b4fe; }
-.nav__search { margin-left: auto; display: flex; align-items: center; flex-shrink: 0; position: relative; }
+.nav__cluster { margin-inline-start: auto; }
+.nav__search { display: flex; align-items: center; flex-shrink: 0; position: relative; }
 .nav__search-input { width: clamp(140px, 18vw, 260px); padding: 5px 10px; border-radius: 5px; border: 1px solid #334155; background: #0f172a; color: #f1f5f9; font-size: 13px; outline: none; transition: width .2s, border-color .15s; }
 .nav__search-input::placeholder { color: #64748b; }
 .nav__search-input:focus { width: clamp(180px, 22vw, 340px); border-color: #475569; background: #1e293b; }

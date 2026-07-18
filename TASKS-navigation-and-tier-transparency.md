@@ -432,7 +432,7 @@ memory. Tick items only after the listed verification passes, recording evidence
       > test_sync_status_cache.py updated to the measurements API. Gates: pytest
       > 5460 passed/5 skipped, ruff 0, zuban 0; GUI lint 0/vue-tsc clean/vitest 994.
       > Backend restart NEEDED (pending owner).
-- [ ] **S6c — `SyncStatusCluster` component + fail-closed authority.**
+- [x] **S6c — `SyncStatusCluster` component + fail-closed authority.**
       Implements the §12 reducer (every row component-tested, incl.
       `accumulating+clean+ahead=0`, `pending+dirty`, precedence, behind overlay);
       authority initializes unknown → mutating controls hidden/disabled until the first
@@ -441,6 +441,26 @@ memory. Tick items only after the listed verification passes, recording evidence
       triggers re-reads. Engagement Save + enterprise Save/Submit/Discard + Promote
       entry; empty-state cycle one-liner. Extract App.vue sync/authority coordination
       into a composable (pressure list). NavBar.vue shrinks.
+      > Evidence (2026-07-18): reducer in SyncStatusCluster.helpers.ts (available =
+      > intent-not-denied ∧ lifecycle-offers; behind = post-selection overlay; dirty
+      > never an authority block) with 15 Vitest rows covering EVERY §12 row incl.
+      > accumulating+clean+ahead=0, pending+dirty, dirty+behind precedence,
+      > health-filtered actions, unknown-authority fail-closed, engagement-save
+      > availability. SyncStatusCluster.vue = right-aligned status chip (tone +
+      > behind glyph) + Changes menu (aria-haspopup/expanded, Escape + focusout
+      > close) housing engagement Save, enterprise Save/Submit/Discard, Promote
+      > entry; synced-clean presentation carries the promote workflow hint.
+      > useSyncCoordination.ts extracts ALL App.vue sync/authority coordination:
+      > authority initializes UNKNOWN (authorityFresh ∧ serverInfoKnown), cross-tab
+      > cached status renders lifecycle but never enables actions, server-info/
+      > status failure stays closed, SSE handlers only scheduleSyncStatusRefresh
+      > (re-reads); provide('writeBlocked') is now fail-closed
+      > (!authorityKnown ∨ readOnly ∨ writeBlocked). SSE guards extracted to
+      > lib/syncEvents.ts. Counted lines: App.vue 301→74, NavBar 305→267
+      > (workflow buttons/status pill removed; cluster hosted with
+      > margin-inline-start:auto), useSyncCoordination 238. GUI gates: lint 0,
+      > vue-tsc clean, vitest 1009 passed (96 files). Backend restart NEEDED
+      > (shared with S6a/S6b).
 
 ## S7 — Nav consolidation, rename, docs
 
