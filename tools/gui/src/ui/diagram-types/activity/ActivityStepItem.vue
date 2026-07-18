@@ -7,10 +7,10 @@ export default { name: 'ActivityStepItem' }
 import { computed } from 'vue'
 import ActivityEntityPicker from './ActivityEntityPicker.vue'
 import NoteSection from './NoteSection.vue'
+import type { StepNote } from './activityElementMapping'
 
 type Lane = { id: string; label: string }
 type StepType = 'action' | 'decision' | 'fork' | 'partition'
-type StepNote = { side: string; text: string }
 type Step = { type: string; id: string; [key: string]: unknown }
 
 const ACTION_TYPES: string[] = ['process', 'function']

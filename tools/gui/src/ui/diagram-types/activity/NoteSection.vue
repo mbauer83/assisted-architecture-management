@@ -1,10 +1,15 @@
 <script setup lang="ts">
-type StepNote = { side: string; text: string }
+import type { StepNote } from './activityElementMapping'
 
 const props = defineProps<{ note?: StepNote | null }>()
 const emit = defineEmits<{ update: [note: StepNote | null] }>()
 
-const set = (patch: Partial<StepNote>) => emit('update', { ...props.note!, ...patch })
+const set = (patch: Partial<StepNote>) => {
+  const note = props.note
+  if (!note) return
+  const next: StepNote = { side: patch.side ?? note.side, text: patch.text ?? note.text }
+  emit('update', next)
+}
 </script>
 
 <template>

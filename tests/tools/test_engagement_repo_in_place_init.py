@@ -113,7 +113,7 @@ class TestResolveRepoAutoInit:
         subprocess.run(["git", "clone", str(remote), str(dest)], check=True, capture_output=True, text=True)
         spec = {"git": {"url": str(remote), "branch": "main", "path": "eng"}}
 
-        with pytest.raises(SystemExit, match="no model/ directory"):
+        with pytest.raises(SystemExit, match="no model content"):
             _resolve_repo("engagement", spec, ws, initialize_if_empty=False)
 
 

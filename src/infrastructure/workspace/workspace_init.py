@@ -24,7 +24,8 @@ from typing import TypedDict
 
 import yaml
 
-from src.config.repo_paths import MODEL
+from src.application.repo_path_helpers import all_model_roots
+from src.config.repo_paths import MODEL, PROJECTS
 from src.config.settings import (
     repo_init_commit_author_email,
     repo_init_commit_author_name,
@@ -165,8 +166,11 @@ def _resolve_repo(
         resolved = local if local.is_absolute() else workspace_root / local
         if not resolved.is_dir():
             raise SystemExit(f"ERROR: {label} local path does not exist: {resolved}")
-        if not (resolved / MODEL).is_dir():
-            raise SystemExit(f"ERROR: {label} path has no model/ directory: {resolved}")
+        if not all_model_roots(resolved):
+            raise SystemExit(
+                f"ERROR: {label} path has no model content — expected {MODEL}/ or "
+                f"{PROJECTS}/<slug>/{MODEL}/: {resolved}"
+            )
         return resolved.resolve()
 
     if "git" in spec:
@@ -203,10 +207,11 @@ def _resolve_repo(
         else:
             git_remote.bootstrap_absent(ctx)
 
-        if not (dest / MODEL).is_dir():
+        if not all_model_roots(dest):
             if not initialize_if_empty:
                 raise SystemExit(
-                    f"ERROR: {label} remote {url} has no {MODEL}/ directory and is not an architecture "
+                    f"ERROR: {label} remote {url} has no model content ({MODEL}/ or "
+                    f"{PROJECTS}/<slug>/{MODEL}/) and is not an architecture "
                     f"repository. Re-run with --initialize-{label}-repo-if-empty to scaffold and publish one."
                 )
             git_remote.scaffold_in_place_and_publish(ctx)

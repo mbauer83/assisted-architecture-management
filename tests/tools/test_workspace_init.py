@@ -114,8 +114,20 @@ class TestResolveRepo:
     def test_local_without_model_dir_raises(self, tmp_path: Path) -> None:
         empty = tmp_path / "empty-repo"
         empty.mkdir()
-        with pytest.raises(SystemExit, match="model/"):
+        with pytest.raises(SystemExit, match="model"):
             _resolve_repo("test", {"local": str(empty)}, tmp_path)
+
+    def test_local_projects_era_layout_accepted(self, tmp_path: Path) -> None:
+        repo = tmp_path / "projects-repo"
+        (repo / "projects" / "platform-core" / "model").mkdir(parents=True)
+        result = _resolve_repo("test", {"local": str(repo)}, tmp_path)
+        assert result == repo.resolve()
+
+    def test_local_projects_dir_without_model_raises(self, tmp_path: Path) -> None:
+        repo = tmp_path / "projects-no-model"
+        (repo / "projects" / "platform-core").mkdir(parents=True)
+        with pytest.raises(SystemExit, match="model"):
+            _resolve_repo("test", {"local": str(repo)}, tmp_path)
 
     def test_missing_spec_raises(self, tmp_path: Path) -> None:
         with pytest.raises(SystemExit, match="local.*git"):

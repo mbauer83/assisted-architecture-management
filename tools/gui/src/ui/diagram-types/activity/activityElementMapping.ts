@@ -1,5 +1,8 @@
 import type { DiagramMapContext, DiagramElementMap } from '../../lib/diagramViewerExtensions'
 
+/** A step's attached note as stored in the diagram-entities payload. */
+export type StepNote = { side: string; text: string }
+
 const _SENTINEL_STEP_TYPES = new Set(['action', 'decision', 'partition'])
 const _SENTINEL_PREFIX = 'arch://'
 
