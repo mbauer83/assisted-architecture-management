@@ -520,11 +520,23 @@ memory. Tick items only after the listed verification passes, recording evidence
 
 ## S8 — Deterministic end-to-end closure
 
-- [ ] **S8a — Fixture cycle test.** Local bare remote + second reviewer worktree:
+- [x] **S8a — Fixture cycle test.** Local bare remote + second reviewer worktree:
       promote → save → submit (assert upstream tracking) → reviewer merge → bounded
       poll → assert checkout main, aggregate cleared, enterprise content under the
       Enterprise facet, GAR in raw reads but absent from every search surface (GUI/MCP
       combined roots; CLI single root).
+      > Evidence (2026-07-18): tests/integration/test_promotion_cycle_end_to_end.py —
+      > full cycle on a real bare origin with a reviewer clone: live REST promote
+      > (executed=True, files landed), enterprise save (arch/work-* branch), submit
+      > with `branch@{upstream} == origin/branch` asserted + pending state, reviewer
+      > --no-ff merge + push, bounded 30s poll via sync_enterprise → checkout main +
+      > aggregate cleared (state file gone). Enterprise facet: /api/entities?
+      > scope=global lists the promoted entity with is_global=true. GAR: exactly one
+      > in raw list_entities; absent from /api/search, /api/artifact-search, and
+      > repo.search_artifacts on the combined roots; CLI single-root search hides it
+      > while `entities --type global-artifact-reference` lists it. Preconditions
+      > recorded in the module docstring (fresh tmp fixture, normal mode, fixture
+      > entity id). Gates: pytest 5462 passed/5 skipped, ruff 0, zuban 0.
 - [ ] **S8b — Live verification pass** (owner restarts backend first; record flags,
       clean-localStorage precondition, commands, outputs): GAR-free dropdown;
       documents/diagrams facets with real promoted artifacts (start `/documents`,
