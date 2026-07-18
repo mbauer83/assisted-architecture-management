@@ -59,17 +59,42 @@ def test_full_reindex_delegates_to_disk_refresh(tmp_path: Path, monkeypatch) -> 
 
 
 def test_reindex_respects_mutation_gate(tmp_path: Path, monkeypatch) -> None:
-    gate = WorkspaceMutationGate()
+    """The executor owns the gate for the registered tool: a gate block rejects
+    the reindex before it runs."""
+    from src.application.mutation_authorization import MutationRequest, RepositoryWrite
+    from src.infrastructure.mcp.artifact_mcp.write_queue import submit_serialized
+    from src.infrastructure.write.authorized_mutation_executor import AuthorizedMutationExecutor
+    from src.infrastructure.write.workspace_authorization import WorkspaceAuthorizationSnapshots
+
+    calls: list[Path] = []
     monkeypatch.setattr(
-        "src.infrastructure.mcp.artifact_mcp.admin_tools.get_workspace_gate",
-        lambda: gate,
+        "src.infrastructure.mcp.artifact_mcp.admin_tools.sync_refresh_for_roots",
+        calls.append,
     )
+    gate = WorkspaceMutationGate()
+    executor = AuthorizedMutationExecutor(
+        WorkspaceAuthorizationSnapshots(
+            engagement_root=tmp_path,
+            enterprise_root=None,
+            admin_mode=False,
+            read_only=False,
+            gate=gate,
+        ),
+        submitter=submit_serialized,
+        gate=gate,
+    )
+    request = MutationRequest("maintenance", RepositoryWrite(tmp_path))
 
     with gate.blocking_writes("sync_in_progress"):
         with pytest.raises(GateRejected) as exc:
-            artifact_admin_reindex(scope="full", repo_root=str(tmp_path))
+            executor.run(
+                request,
+                lambda: artifact_admin_reindex(scope="full", repo_root=str(tmp_path)),
+                operation_name="artifact_admin_reindex",
+            )
 
     assert exc.value.reason == "sync_in_progress"
+    assert calls == []
 
 
 def test_entity_scope_requires_short_id(tmp_path: Path) -> None:

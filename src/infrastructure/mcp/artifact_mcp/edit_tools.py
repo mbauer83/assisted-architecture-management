@@ -319,52 +319,64 @@ def artifact_delete_diagram(
 
 
 def register_edit_tools(mcp: FastMCP) -> None:
-    from src.infrastructure.mcp.artifact_mcp.write_queue import queued
+    from src.infrastructure.mcp.artifact_mcp.mutation_registration import register_mutation_tool  # noqa: PLC0415
 
-    mcp.tool(
+    register_mutation_tool(
+        mcp,
+        artifact_edit_entity,
         name="artifact_edit_entity",
         title="Artifact Write: Edit Entity",
         description=descriptions.EDIT_ENTITY_DESCRIPTION,
         annotations=LOCAL_WRITE,
         structured_output=True,
-    )(queued(artifact_edit_entity))
+    )
 
-    mcp.tool(
+    register_mutation_tool(
+        mcp,
+        artifact_edit_connection,
         name="artifact_edit_connection",
         title="Artifact Write: Edit/Remove Connection",
         description=descriptions.EDIT_CONNECTION_DESCRIPTION,
         annotations=DESTRUCTIVE_LOCAL_WRITE,
         structured_output=True,
-    )(queued(artifact_edit_connection))
+    )
 
-    mcp.tool(
+    register_mutation_tool(
+        mcp,
+        artifact_edit_diagram,
         name="artifact_edit_diagram",
         title="Artifact Write: Edit Diagram",
         description=descriptions.EDIT_DIAGRAM_DESCRIPTION,
         annotations=LOCAL_WRITE,
         structured_output=True,
-    )(queued(artifact_edit_diagram))
+    )
 
-    mcp.tool(
+    register_mutation_tool(
+        mcp,
+        artifact_edit_connection_associations,
         name="artifact_edit_connection_associations",
         title="Artifact Write: Edit Connection Associations",
         description=descriptions.EDIT_CONNECTION_ASSOCIATIONS_DESCRIPTION,
         annotations=LOCAL_WRITE,
         structured_output=True,
-    )(queued(artifact_edit_connection_associations))
+    )
 
-    mcp.tool(
+    register_mutation_tool(
+        mcp,
+        artifact_delete_entity,
         name="artifact_delete_entity",
         title="Artifact Write: Delete Entity",
         description=descriptions.DELETE_ENTITY_DESCRIPTION,
         annotations=DESTRUCTIVE_LOCAL_WRITE,
         structured_output=True,
-    )(queued(artifact_delete_entity))
+    )
 
-    mcp.tool(
+    register_mutation_tool(
+        mcp,
+        artifact_delete_diagram,
         name="artifact_delete_diagram",
         title="Artifact Write: Delete Diagram",
         description=descriptions.DELETE_DIAGRAM_DESCRIPTION,
         annotations=DESTRUCTIVE_LOCAL_WRITE,
         structured_output=True,
-    )(queued(artifact_delete_diagram))
+    )

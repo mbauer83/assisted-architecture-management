@@ -160,9 +160,11 @@ def artifact_promote_to_enterprise(
 
 
 def register(mcp: FastMCP) -> None:
-    from src.infrastructure.mcp.artifact_mcp.write_queue import queued
+    from src.infrastructure.mcp.artifact_mcp.mutation_registration import register_mutation_tool  # noqa: PLC0415
 
-    mcp.tool(
+    register_mutation_tool(
+        mcp,
+        artifact_promote_to_enterprise,
         name="artifact_promote_to_enterprise",
         title="Artifact Write: Promote to Enterprise",
         description=(
@@ -174,4 +176,4 @@ def register(mcp: FastMCP) -> None:
         ),
         annotations=DESTRUCTIVE_LOCAL_WRITE,
         structured_output=True,
-    )(queued(artifact_promote_to_enterprise))
+    )

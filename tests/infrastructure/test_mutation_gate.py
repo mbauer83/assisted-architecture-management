@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import asyncio
 import threading
 from pathlib import Path
 
@@ -294,75 +293,75 @@ class TestHttpSurface:
 # ---------------------------------------------------------------------------
 
 class TestMcpSurface:
-    def test_queued_propagates_gate_rejected_on_sync_block(self):
-        from src.infrastructure.mcp.artifact_mcp.write_queue import queued, shutdown
+    """The MCP mutation surface fails closed on gate blocks: the executor's fresh
+    snapshot sees the live block reason and rejects before any queue submission."""
+
+    @staticmethod
+    def _executor(tmp_path: Path, gate):
+        from src.infrastructure.mcp.artifact_mcp.write_queue import submit_serialized
+        from src.infrastructure.write.authorized_mutation_executor import AuthorizedMutationExecutor
+        from src.infrastructure.write.workspace_authorization import WorkspaceAuthorizationSnapshots
+
+        engagement = tmp_path / "engagement-root"
+        engagement.mkdir(exist_ok=True)
+        snapshots = WorkspaceAuthorizationSnapshots(
+            engagement_root=engagement,
+            enterprise_root=None,
+            admin_mode=False,
+            read_only=False,
+            gate=gate,
+        )
+        return AuthorizedMutationExecutor(snapshots, submitter=submit_serialized, gate=gate), engagement
+
+    @staticmethod
+    def _request(engagement: Path):
+        from src.application.mutation_authorization import MutationRequest, RepositoryWrite
+
+        return MutationRequest("engagement_authoring", RepositoryWrite(engagement))
+
+    def test_executor_rejects_on_sync_block(self, tmp_path: Path):
+        from src.application.mutation_authorization import MutationRejected
+        from src.infrastructure.mcp.artifact_mcp.write_queue import shutdown
         from src.infrastructure.workspace.mutation_gate import get_workspace_gate as _gwg
 
         gate = _gwg()
         gate.set_block("sync_in_progress")
-
-        def my_write() -> dict[str, object]:
-            return {"ok": True}
-
-        wrapped = queued(my_write)
-
-        async def run():
-            return await wrapped()
-
+        executor, engagement = self._executor(tmp_path, gate)
         try:
-            result = asyncio.run(run())
-            # Should not reach here — GateRejected propagates
-            pytest.fail(f"Expected GateRejected to propagate, got {result}")
-        except GateRejected as exc:
-            assert exc.reason == "sync_in_progress"
+            with pytest.raises(MutationRejected) as excinfo:
+                executor.run(self._request(engagement), lambda: {"ok": True}, operation_name="my_write")
+            assert excinfo.value.denial.code == "sync_in_progress"
         finally:
             gate.clear_block()
             shutdown()
 
-    def test_queued_propagates_gate_rejected_on_read_only(self):
-        from src.infrastructure.mcp.artifact_mcp.write_queue import queued, shutdown
+    def test_executor_rejects_on_read_only_block(self, tmp_path: Path):
+        from src.application.mutation_authorization import MutationRejected
+        from src.infrastructure.mcp.artifact_mcp.write_queue import shutdown
         from src.infrastructure.workspace.mutation_gate import get_workspace_gate as _gwg
 
         gate = _gwg()
         gate.set_block("read_only")
-
-        def my_write() -> dict[str, object]:
-            return {"ok": True}
-
-        wrapped = queued(my_write)
-
-        async def run():
-            return await wrapped()
-
+        executor, engagement = self._executor(tmp_path, gate)
         try:
-            asyncio.run(run())
-            pytest.fail("Expected GateRejected to propagate")
-        except GateRejected as exc:
-            assert exc.reason == "read_only"
+            with pytest.raises(MutationRejected) as excinfo:
+                executor.run(self._request(engagement), lambda: {"ok": True}, operation_name="my_write")
+            assert excinfo.value.denial.code == "read_only"
         finally:
             gate.clear_block()
             shutdown()
 
-    def test_queued_executes_normally_when_gate_open(self):
-        from src.infrastructure.mcp.artifact_mcp.write_queue import queued, shutdown
+    def test_executor_executes_normally_when_gate_open(self, tmp_path: Path):
+        from src.infrastructure.mcp.artifact_mcp.write_queue import shutdown
+        from src.infrastructure.workspace.mutation_gate import get_workspace_gate as _gwg
 
-        results: list[dict[str, object]] = []
-
-        def my_write() -> dict[str, object]:
-            return {"ok": True}
-
-        wrapped = queued(my_write)
-
-        async def run():
-            return await wrapped()
-
+        gate = _gwg()
+        executor, engagement = self._executor(tmp_path, gate)
         try:
-            result = asyncio.run(run())
-            results.append(result)
+            result = executor.run(self._request(engagement), lambda: {"ok": True}, operation_name="my_write")
         finally:
             shutdown()
-
-        assert results == [{"ok": True}]
+        assert result == {"ok": True}
 
 
 # ---------------------------------------------------------------------------

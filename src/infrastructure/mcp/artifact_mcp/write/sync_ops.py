@@ -177,9 +177,11 @@ def artifact_withdraw_changes(*, confirm: bool = False) -> dict[str, object]:
 
 
 def register(mcp: FastMCP) -> None:
-    from src.infrastructure.mcp.artifact_mcp.write_queue import queued  # noqa: PLC0415
+    from src.infrastructure.mcp.artifact_mcp.mutation_registration import register_mutation_tool  # noqa: PLC0415
 
-    mcp.tool(
+    register_mutation_tool(
+        mcp,
+        artifact_save_changes,
         name="artifact_save_changes",
         title="Save Changes",
         description=(
@@ -192,9 +194,11 @@ def register(mcp: FastMCP) -> None:
         ),
         annotations=OPEN_WORLD_WRITE,
         structured_output=True,
-    )(queued(artifact_save_changes))
+    )
 
-    mcp.tool(
+    register_mutation_tool(
+        mcp,
+        artifact_submit_for_review,
         name="artifact_submit_for_review",
         title="Submit Enterprise Changes for Review",
         description=(
@@ -204,9 +208,11 @@ def register(mcp: FastMCP) -> None:
         ),
         annotations=OPEN_WORLD_WRITE,
         structured_output=True,
-    )(queued(artifact_submit_for_review))
+    )
 
-    mcp.tool(
+    register_mutation_tool(
+        mcp,
+        artifact_withdraw_changes,
         name="artifact_withdraw_changes",
         title="Withdraw Enterprise Changes",
         description=(
@@ -215,4 +221,4 @@ def register(mcp: FastMCP) -> None:
         ),
         annotations=DESTRUCTIVE_LOCAL_WRITE,
         structured_output=True,
-    )(queued(artifact_withdraw_changes))
+    )

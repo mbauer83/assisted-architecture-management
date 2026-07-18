@@ -9,7 +9,6 @@ from src.domain.artifact_id import parse_entity_id
 from src.infrastructure.artifact_index import shared_artifact_index
 from src.infrastructure.mcp.artifact_mcp.context import resolve_repo_root, sync_refresh_for_roots
 from src.infrastructure.mcp.artifact_mcp.tool_annotations import LOCAL_WRITE
-from src.infrastructure.workspace.mutation_gate import get_workspace_gate
 
 ReindexScope = Literal["full", "entity"]
 
@@ -20,10 +19,13 @@ def artifact_admin_reindex(
     short_id: str | None = None,
     repo_root: str | None = None,
 ) -> dict[str, object]:
-    """Rebuild the disk-backed index, globally or for one stable entity ID."""
+    """Rebuild the disk-backed index, globally or for one stable entity ID.
+
+    Registered through the mutation manifest (maintenance intent): the executor
+    serializes the rebuild and holds the workspace write gate around it.
+    """
     root = resolve_repo_root(repo_root=repo_root, repo_preset=None).resolve()
-    with get_workspace_gate().writing():
-        return _reindex_locked(scope=scope, short_id=short_id, root=root)
+    return _reindex_locked(scope=scope, short_id=short_id, root=root)
 
 
 def _reindex_locked(
@@ -63,7 +65,11 @@ def _reindex_locked(
 
 
 def register_admin_tools(mcp: FastMCP) -> None:
-    mcp.tool(
+    from src.infrastructure.mcp.artifact_mcp.mutation_registration import register_mutation_tool  # noqa: PLC0415
+
+    register_mutation_tool(
+        mcp,
+        artifact_admin_reindex,
         name="artifact_admin_reindex",
         title="Reindex Architecture Repository",
         description=(
@@ -72,4 +78,4 @@ def register_admin_tools(mcp: FastMCP) -> None:
         ),
         annotations=LOCAL_WRITE,
         structured_output=True,
-    )(artifact_admin_reindex)
+    )

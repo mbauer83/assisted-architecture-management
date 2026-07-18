@@ -6,12 +6,10 @@ a single-worker ThreadPoolExecutor that drains write operations serially: each c
 is accepted immediately and returns its result as soon as it completes, but only one
 write runs at a time.
 
-Usage at MCP registration time:
-    from src.infrastructure.mcp.artifact_mcp.write_queue import queued
-    mcp.tool(...)(queued(my_sync_write_fn))
-
-The wrapped function is async and preserves the original signature via __wrapped__
-so FastMCP can derive the correct JSON schema.
+MCP mutation tools do not use this module directly: they register through
+``mutation_registration.register_mutation_tool``, whose executor submits via
+``submit_serialized`` and owns the workspace gate. ``run_sync`` remains for
+REST handlers not yet migrated onto the executor.
 """
 
 from __future__ import annotations
@@ -20,13 +18,11 @@ import asyncio
 import atexit
 import threading
 from concurrent.futures import ThreadPoolExecutor
-from functools import wraps
-from typing import Any, Callable, TypeVar
+from typing import Any, Callable
 
 from src.infrastructure.artifact_index.coordination import publish_write_queue_state
 from src.infrastructure.write.operation_registry import operation_registry
 
-_F = TypeVar("_F", bound=Callable[..., Any])
 _WRITE_EXECUTOR_WORKERS = 1
 
 _executor: ThreadPoolExecutor | None = None
@@ -145,34 +141,6 @@ def submit_serialized(operation_name: str, fn: Callable[..., Any], /, *args: Any
     submitted job themselves, exactly once.
     """
     return _submit(operation_name, fn, *args, **kwargs)
-
-
-def queued(fn: _F) -> _F:
-    """Wrap a synchronous write function to execute serially through the write queue.
-
-    Returns an async coroutine function with the same parameter signature as *fn*
-    (FastMCP inspects __wrapped__ to derive the tool schema). At most one queued
-    operation runs at a time; all others wait in the executor's work queue.
-
-    The workspace mutation gate is acquired inside the executor worker so the
-    block check and the execution are atomic (no TOCTOU window).
-    """
-
-    @wraps(fn)
-    async def wrapper(*args: Any, **kwargs: Any) -> Any:
-        from src.infrastructure.workspace.mutation_gate import get_workspace_gate  # noqa: PLC0415
-
-        gate = get_workspace_gate()
-        fn_name = fn.__name__
-
-        def _gated() -> Any:
-            with gate.writing():
-                return fn(*args, **kwargs)
-
-        future = _submit(fn_name, _gated)
-        return await asyncio.wrap_future(future)
-
-    return wrapper  # type: ignore[return-value]
 
 
 def run_sync(fn: Callable[..., Any], /, *args: Any, **kwargs: Any) -> Any:

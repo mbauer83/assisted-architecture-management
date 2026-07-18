@@ -146,8 +146,8 @@ def test_cli_targets_diagram_remove_path(monkeypatch) -> None:
 
 
 def test_write_queue_module_is_imported_by_mcp_write_tools() -> None:
-    """The MCP write tools depend on write_queue, ensuring single-writer serialisation."""
+    """The MCP mutation path depends on write_queue, ensuring single-writer serialisation."""
     from src.infrastructure.mcp.artifact_mcp import write_queue  # noqa: PLC0415
 
-    assert hasattr(write_queue, "queued"), "queued() decorator must exist"
+    assert hasattr(write_queue, "submit_serialized"), "single-writer submission port must exist"
     assert hasattr(write_queue, "attach_event_loop")

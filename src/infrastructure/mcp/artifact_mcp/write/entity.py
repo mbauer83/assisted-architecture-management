@@ -121,7 +121,7 @@ def artifact_create_entity(
 
 
 def register(mcp: FastMCP) -> None:
-    from src.infrastructure.mcp.artifact_mcp.write_queue import queued
+    from src.infrastructure.mcp.artifact_mcp.mutation_registration import register_mutation_tool  # noqa: PLC0415
 
     mcp.tool(
         name="artifact_help",
@@ -165,7 +165,9 @@ def register(mcp: FastMCP) -> None:
         structured_output=False,
     )(artifact_authoring_guidance)
 
-    mcp.tool(
+    register_mutation_tool(
+        mcp,
+        artifact_create_entity,
         name="artifact_create_entity",
         title="Artifact Write: Create Entity",
         description=(
@@ -178,4 +180,4 @@ def register(mcp: FastMCP) -> None:
         ),
         annotations=LOCAL_WRITE,
         structured_output=True,
-    )(queued(artifact_create_entity))
+    )

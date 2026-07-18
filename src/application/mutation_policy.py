@@ -121,7 +121,11 @@ def _check_engagement_root(snapshot: AuthorizationSnapshot, root: Path) -> Mutat
     if snapshot.enterprise_root is not None and resolved.is_relative_to(snapshot.enterprise_root):
         return MutationDenied(
             code="enterprise_target_forbidden",
-            message="Standard authoring never writes to the enterprise repository.",
+            message=(
+                "Standard authoring never writes to the enterprise repository: promote from the "
+                "engagement repository instead, or use the admin operations surface of an "
+                "admin-mode backend for direct enterprise authoring."
+            ),
         )
     return MutationDenied(
         code="target_not_engagement_root",

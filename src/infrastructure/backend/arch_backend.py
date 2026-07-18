@@ -394,11 +394,26 @@ def _configure_server_state(
 ) -> None:
     from src.application.artifact_document_schema import load_document_schemata
     from src.infrastructure.gui.routers import state as gui_state
+    from src.infrastructure.mcp.artifact_mcp.mutation_registration import install_mutation_executor
+    from src.infrastructure.workspace.mutation_gate import get_workspace_gate
+    from src.infrastructure.write.authorized_mutation_executor import build_workspace_mutation_executor
+    from src.infrastructure.write.workspace_authorization import WorkspaceAuthorizationSnapshots
 
     gui_state.init_state(
         repo, repo_root_path, enterprise_root_path, admin_mode=args.admin_mode, read_only=args.read_only
     )
     load_document_schemata(repo_root_path)
+    install_mutation_executor(
+        build_workspace_mutation_executor(
+            WorkspaceAuthorizationSnapshots(
+                engagement_root=repo_root_path,
+                enterprise_root=enterprise_root_path,
+                admin_mode=args.admin_mode,
+                read_only=args.read_only,
+                gate=get_workspace_gate(),
+            )
+        )
+    )
     if args.read_only:
         from src.infrastructure.workspace.write_block_manager import block_repo
         block_repo(repo_root_path, reason="read_only")

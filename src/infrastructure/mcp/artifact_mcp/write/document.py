@@ -122,9 +122,11 @@ def artifact_delete_document(
 
 
 def register(mcp: FastMCP) -> None:
-    from src.infrastructure.mcp.artifact_mcp.write_queue import queued
+    from src.infrastructure.mcp.artifact_mcp.mutation_registration import register_mutation_tool  # noqa: PLC0415
 
-    mcp.tool(
+    register_mutation_tool(
+        mcp,
+        artifact_create_document,
         name="artifact_create_document",
         title="Artifact Write: Create Document",
         description=(
@@ -138,9 +140,11 @@ def register(mcp: FastMCP) -> None:
         ),
         annotations=LOCAL_WRITE,
         structured_output=True,
-    )(queued(artifact_create_document))
+    )
 
-    mcp.tool(
+    register_mutation_tool(
+        mcp,
+        artifact_edit_document,
         name="artifact_edit_document",
         title="Artifact Write: Edit Document",
         description=(
@@ -154,9 +158,11 @@ def register(mcp: FastMCP) -> None:
         ),
         annotations=LOCAL_WRITE,
         structured_output=True,
-    )(queued(artifact_edit_document))
+    )
 
-    mcp.tool(
+    register_mutation_tool(
+        mcp,
+        artifact_delete_document,
         name="artifact_delete_document",
         title="Artifact Write: Delete Document",
         description=(
@@ -168,4 +174,4 @@ def register(mcp: FastMCP) -> None:
         ),
         annotations=DESTRUCTIVE_LOCAL_WRITE,
         structured_output=True,
-    )(queued(artifact_delete_document))
+    )

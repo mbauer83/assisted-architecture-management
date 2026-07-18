@@ -113,9 +113,11 @@ def artifact_viewpoint(
 
 
 def register(mcp: FastMCP) -> None:
-    from src.infrastructure.mcp.artifact_mcp.write_queue import queued  # noqa: PLC0415
+    from src.infrastructure.mcp.artifact_mcp.mutation_registration import register_mutation_tool  # noqa: PLC0415
 
-    mcp.tool(
+    register_mutation_tool(
+        mcp,
+        artifact_viewpoint,
         name="artifact_viewpoint",
         title="Artifact Write: Viewpoint Definitions",
         description=(
@@ -136,4 +138,4 @@ def register(mcp: FastMCP) -> None:
         ),
         annotations=LOCAL_WRITE,
         structured_output=True,
-    )(queued(artifact_viewpoint))
+    )

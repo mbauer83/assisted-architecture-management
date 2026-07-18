@@ -216,9 +216,11 @@ def artifact_add_connection(
 
 
 def register(mcp: FastMCP) -> None:
-    from src.infrastructure.mcp.artifact_mcp.write_queue import queued
+    from src.infrastructure.mcp.artifact_mcp.mutation_registration import register_mutation_tool  # noqa: PLC0415
 
-    mcp.tool(
+    register_mutation_tool(
+        mcp,
+        artifact_add_connection,
         name="artifact_add_connection",
         title="Artifact Write: Add Connection",
         description=(
@@ -236,4 +238,4 @@ def register(mcp: FastMCP) -> None:
         ),
         annotations=LOCAL_WRITE,
         structured_output=True,
-    )(queued(artifact_add_connection))
+    )

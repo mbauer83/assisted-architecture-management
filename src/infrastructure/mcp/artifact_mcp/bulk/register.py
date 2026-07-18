@@ -16,9 +16,11 @@ from .write import artifact_bulk_write
 
 
 def register(mcp: FastMCP) -> None:
-    from src.infrastructure.mcp.artifact_mcp.write_queue import queued
+    from src.infrastructure.mcp.artifact_mcp.mutation_registration import register_mutation_tool  # noqa: PLC0415
 
-    mcp.tool(
+    register_mutation_tool(
+        mcp,
+        artifact_bulk_write,
         name="artifact_bulk_write",
         title="Artifact Write: Bulk Create/Edit",
         description=(
@@ -41,9 +43,11 @@ def register(mcp: FastMCP) -> None:
         ),
         annotations=LOCAL_WRITE,
         structured_output=True,
-    )(queued(artifact_bulk_write))
+    )
 
-    mcp.tool(
+    register_mutation_tool(
+        mcp,
+        artifact_bulk_delete,
         name="artifact_bulk_delete",
         title="Artifact Write: Bulk Delete",
         description=(
@@ -64,7 +68,7 @@ def register(mcp: FastMCP) -> None:
         ),
         annotations=DESTRUCTIVE_LOCAL_WRITE,
         structured_output=True,
-    )(queued(artifact_bulk_delete))
+    )
 
     mcp.tool(
         name="artifact_get_operation",

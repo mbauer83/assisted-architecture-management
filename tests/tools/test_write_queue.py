@@ -1,24 +1,23 @@
 """Tests for the model write queue serialization mechanism.
 
 Verifies that:
-- queued() wraps sync functions into awaitable coroutines
-- concurrent writes are serialized (no interleaving)
-- results are returned correctly to each caller
-- exceptions raised inside queued functions propagate to the caller
-- the original function signature is preserved via __wrapped__
+- submit_serialized schedules work on the single write worker and returns a Future
+- concurrent writes are serialized (no interleaving) and FIFO-ordered
+- results and exceptions propagate to each caller without wedging the queue
+- queue-state publication carries active operation metadata
+- shutdown resets cleanly and a new executor is created on the next call
 """
 
 from __future__ import annotations
 
-import asyncio
-import inspect
 import threading
 import time
+from concurrent.futures import Future
 from typing import Any
 
 import pytest
 
-from src.infrastructure.mcp.artifact_mcp.write_queue import queued, shutdown
+from src.infrastructure.mcp.artifact_mcp.write_queue import shutdown, submit_serialized
 from src.infrastructure.write.operation_registry import operation_registry
 
 
@@ -30,69 +29,35 @@ def reset_executor():
     shutdown(wait=True)
 
 
-# ---------------------------------------------------------------------------
-# Basic contract
-# ---------------------------------------------------------------------------
-
-
-class TestQueuedDecorator:
-    def test_returns_coroutine_function(self):
-        def sync_fn(x: int) -> int:
-            return x * 2
-
-        wrapped = queued(sync_fn)
-        assert inspect.iscoroutinefunction(wrapped), "queued() must return an async function"
-
-    def test_preserves_signature_via_wrapped(self):
-        def sync_fn(a: int, b: str = "default") -> dict[str, Any]:
-            return {"a": a, "b": b}
-
-        wrapped = queued(sync_fn)
-        sig = inspect.signature(wrapped)
-        params = list(sig.parameters.keys())
-        assert params == ["a", "b"], f"Unexpected params: {params}"
-
-    def test_preserves_name_and_docstring(self):
-        def my_write_fn(x: int) -> int:
-            """Does a thing."""
-            return x
-
-        wrapped = queued(my_write_fn)
-        assert wrapped.__name__ == "my_write_fn"
-        assert wrapped.__doc__ == "Does a thing."
-
-    def test_result_returned_correctly(self):
+class TestSubmitSerialized:
+    def test_returns_future_with_result(self):
         def sync_fn(x: int, y: int) -> int:
             return x + y
 
-        wrapped = queued(sync_fn)
-        result = asyncio.run(wrapped(3, 4))
-        assert result == 7
+        future = submit_serialized("sync_fn", sync_fn, 3, 4)
+        assert isinstance(future, Future)
+        assert future.result(timeout=10) == 7
 
     def test_kwargs_forwarded(self):
         def sync_fn(*, name: str, count: int = 1) -> list[str]:
             return [name] * count
 
-        wrapped = queued(sync_fn)
-        result = asyncio.run(wrapped(name="hello", count=3))
-        assert result == ["hello", "hello", "hello"]
+        assert submit_serialized("sync_fn", sync_fn, name="hello", count=3).result(timeout=10) == [
+            "hello",
+            "hello",
+            "hello",
+        ]
 
     def test_exception_propagates(self):
         def sync_fn() -> None:
             raise ValueError("boom")
 
-        wrapped = queued(sync_fn)
         with pytest.raises(ValueError, match="boom"):
-            asyncio.run(wrapped())
-
-
-# ---------------------------------------------------------------------------
-# Serialization
-# ---------------------------------------------------------------------------
+            submit_serialized("sync_fn", sync_fn).result(timeout=10)
 
 
 class TestSerialization:
-    def test_concurrent_calls_are_serialized(self):
+    def test_concurrent_submissions_are_serialized(self):
         """At most one queued write should run at a time."""
         active: list[int] = []
         peak_concurrency: list[int] = []
@@ -102,41 +67,26 @@ class TestSerialization:
             with lock:
                 active.append(task_id)
                 peak_concurrency.append(len(active))
-            import time
-
             time.sleep(0.01)
             with lock:
                 active.remove(task_id)
             return task_id
 
-        wrapped = queued(slow_write)
-
-        async def run_all() -> list[int]:
-            tasks = [wrapped(i) for i in range(8)]
-            return await asyncio.gather(*tasks)
-
-        results = asyncio.run(run_all())
+        futures = [submit_serialized("slow_write", slow_write, i) for i in range(8)]
+        results = [future.result(timeout=10) for future in futures]
         assert sorted(results) == list(range(8))
         assert max(peak_concurrency) == 1, f"Expected max concurrency of 1, got {max(peak_concurrency)}"
 
     def test_ordering_is_fifo(self):
-        """Results should complete in the order submitted (FIFO queue)."""
+        """Work executes in submission order (FIFO queue)."""
         execution_order: list[int] = []
 
         def ordered_write(task_id: int) -> int:
             execution_order.append(task_id)
             return task_id
 
-        wrapped = queued(ordered_write)
-
-        async def run_sequentially() -> list[int]:
-            results = []
-            for i in range(5):
-                results.append(await wrapped(i))
-            return results
-
-        results = asyncio.run(run_sequentially())
-        assert results == list(range(5))
+        futures = [submit_serialized("ordered_write", ordered_write, i) for i in range(5)]
+        assert [future.result(timeout=10) for future in futures] == list(range(5))
         assert execution_order == list(range(5))
 
     def test_exception_does_not_block_subsequent_writes(self):
@@ -149,15 +99,9 @@ class TestSerialization:
                 raise RuntimeError("intentional failure")
             return "ok"
 
-        wrapped = queued(maybe_raise)
-
-        async def run() -> None:
-            with pytest.raises(RuntimeError):
-                await wrapped(fail=True)
-            result = await wrapped(fail=False)
-            assert result == "ok"
-
-        asyncio.run(run())
+        with pytest.raises(RuntimeError):
+            submit_serialized("maybe_raise", maybe_raise, fail=True).result(timeout=10)
+        assert submit_serialized("maybe_raise", maybe_raise, fail=False).result(timeout=10) == "ok"
         assert call_count[0] == 2
 
     def test_multiple_concurrent_exceptions_do_not_block(self):
@@ -166,16 +110,10 @@ class TestSerialization:
         def always_fail(task_id: int) -> None:
             raise ValueError(f"fail-{task_id}")
 
-        wrapped = queued(always_fail)
-
-        async def run_all() -> None:
-            tasks = [wrapped(i) for i in range(4)]
-            results = await asyncio.gather(*tasks, return_exceptions=True)
-            for i, r in enumerate(results):
-                assert isinstance(r, ValueError)
-                assert str(r) == f"fail-{i}"
-
-        asyncio.run(run_all())
+        futures = [submit_serialized("always_fail", always_fail, i) for i in range(4)]
+        for i, future in enumerate(futures):
+            with pytest.raises(ValueError, match=f"fail-{i}"):
+                future.result(timeout=10)
 
     def test_queue_state_includes_active_operation_metadata(self, monkeypatch: pytest.MonkeyPatch):
         published: list[dict[str, Any]] = []
@@ -199,8 +137,7 @@ class TestSerialization:
             operation_registry.complete(operation.operation_id, {"ok": True})
             return operation.operation_id
 
-        wrapped = queued(tracked_write)
-        operation_id = asyncio.run(wrapped())
+        operation_id = submit_serialized("tracked_write", tracked_write).result(timeout=10)
 
         active_snapshots = [snapshot for snapshot in published if snapshot.get("active_operation_id") == operation_id]
         assert active_snapshots, published
@@ -211,11 +148,6 @@ class TestSerialization:
         assert published[-1]["active_operation_id"] is None
 
 
-# ---------------------------------------------------------------------------
-# Shutdown / reset
-# ---------------------------------------------------------------------------
-
-
 class TestShutdown:
     def test_shutdown_and_restart(self):
         """After shutdown, a new executor is created on the next call."""
@@ -223,12 +155,6 @@ class TestShutdown:
         def sync_fn() -> str:
             return "alive"
 
-        wrapped = queued(sync_fn)
-
-        result1 = asyncio.run(wrapped())
-        assert result1 == "alive"
-
+        assert submit_serialized("sync_fn", sync_fn).result(timeout=10) == "alive"
         shutdown(wait=True)
-
-        result2 = asyncio.run(wrapped())
-        assert result2 == "alive"
+        assert submit_serialized("sync_fn", sync_fn).result(timeout=10) == "alive"

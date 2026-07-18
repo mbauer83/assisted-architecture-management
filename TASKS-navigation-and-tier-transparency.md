@@ -146,7 +146,7 @@ memory. Tick items only after the listed verification passes, recording evidence
       > REQ concurrent-reads-serialized-writes): snapshot+authorize ≈ 10µs/call,
       > model-size independent (~20µs per write for both checks vs ms-scale
       > serialized writes); guard test bounds it at 500µs.
-- [ ] **S2b — Registration factory + MCP migration.**
+- [x] **S2b — Registration factory + MCP migration.**
       Mutation registration goes through a wrapper/factory that REQUIRES a manifest row
       (intent + target extractor) and installs the executor — unwrapped mutators cannot
       register. Migrate the direct writers (`write/group.py`, `write/viewpoint.py`,
@@ -157,6 +157,30 @@ memory. Tick items only after the listed verification passes, recording evidence
       single-submission/single-gate test on representative formerly queued tools;
       enterprise/child/symlink/non-configured targets rejected on standard tools in
       every mode with an error naming the admin surface. Backend restart.
+      > Evidence (2026-07-18): `mutation_registration.py` — manifest of all 22
+      > mutators (intents + per-call request builders over bound-with-defaults
+      > arguments; save_changes switches intent on its target param; withdraw reads
+      > pending state for the remote-discard variant) + `NON_MUTATING_WRITE_TOOLS`
+      > (help, authoring_guidance, get_operation); `register_mutation_tool` refuses
+      > unmanifested names and installs the executor wrapper (signature-preserving,
+      > marker attribute). All register() sites migrated; `queued` DELETED from
+      > write_queue.py (structural: the old wrapper no longer exists);
+      > `artifact_admin_reindex` migrated to maintenance intent (internal gate
+      > acquisition removed — executor owns the gate). Executor installed at the
+      > backend composition root (`_configure_server_state`); standalone servers
+      > compose a workspace-default lazily. Dry-run variants classified: they route
+      > through the executor like live calls (fail-closed, same as prior queue
+      > behavior). Tests: test_mcp_mutation_manifest.py (both-direction registry ⇔
+      > manifest equality, wrapper markers/signatures, every builder invoked),
+      > test_mcp_write_authorization.py (enterprise/child/symlink/non-configured ×
+      > normal/admin rejected — enterprise rejections name the admin surface;
+      > read-only; timeout-bounded single-submission/single-gate on artifact_group +
+      > artifact_create_entity), test_write_queue.py rewritten onto
+      > submit_serialized, test_mutation_gate.py MCP surface rewritten onto the
+      > executor, test_reindex_tool.py gate test via executor. Gates: pytest 5390
+      > passed/5 skipped, ruff 0, zuban 0. Counted lines: mutation_registration 184,
+      > edit_tools 337, write_queue 201, arch_backend 343 (all ≤ limits). Backend
+      > restart NEEDED (pending owner).
 - [ ] **S2c — REST inventory migration.**
       Manifest rows + executor adoption for ALL architecture-repository REST mutators:
       ordinary entity/connection/document/diagram routes (already queued — wire through
