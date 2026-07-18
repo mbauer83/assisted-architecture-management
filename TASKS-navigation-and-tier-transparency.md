@@ -98,7 +98,7 @@ memory. Tick items only after the listed verification passes, recording evidence
 
 ## S2 — Authorized mutation executor & write-target policy
 
-- [ ] **S2a — Authorization policy, intents, snapshot provider, executor.**
+- [x] **S2a — Authorization policy, intents, snapshot provider, executor.**
       `src/application` (new focused modules): closed `MutationIntent`
       (`engagement_authoring | enterprise_admin_authoring | promotion |
       enterprise_save | enterprise_submit | enterprise_discard | maintenance` — Save,
@@ -124,6 +124,28 @@ memory. Tick items only after the listed verification passes, recording evidence
       action, incl. `accumulating + dirty + persisted fetch fault → enterprise_save
       offered and accepted`; upstream fault permits engagement authoring and
       enterprise_save, denies promotion, enterprise_submit, and pending-remote discard.
+      > Evidence (2026-07-18): contract in `src/application/mutation_authorization.py`
+      > (intents, target shapes RepositoryWrite/PromotionWrite/DiscardWrite, closed
+      > `SyncHealthReason` = fetch_failed|upstream_missing|diverged|sync_state_unknown|
+      > state_file_corrupt|repository_uninitialized, snapshot + provider/executor
+      > ports); pure policy in `mutation_policy.py` (`authorize`, `denied_intents`);
+      > infrastructure: `write/workspace_authorization.py` (fresh-snapshot provider,
+      > O(1) inputs) + `write/authorized_mutation_executor.py` (authorize → ONE
+      > `submit_serialized` → fresh re-check in worker → gate once); public
+      > `submit_serialized` added to write_queue.py. Wiring to composition roots
+      > lands with the first consumers (S2b/S2c) — no dead wiring now. The
+      > `accumulating+dirty+fetch → Save ACCEPTED` end-to-end case lands with S2c
+      > real-git REST tests (policy side covered here: dirty is not a policy input).
+      > Tests: test_mutation_policy_targets.py (path spellings incl. symlink/../
+      > relative/child/non-configured), test_mutation_policy_matrix.py (reason ×
+      > action × mode, both discard variants, denied_intents projection),
+      > test_authorized_mutation_executor.py (single submission/single gate,
+      > timeout-bounded, fresh re-check rejection, gate release on failure, perf
+      > guard). 168 targeted tests; full gates: pytest 5374 passed/5 skipped,
+      > ruff 0, zuban 0. Perf (owner request, grounded in self-model
+      > REQ concurrent-reads-serialized-writes): snapshot+authorize ≈ 10µs/call,
+      > model-size independent (~20µs per write for both checks vs ms-scale
+      > serialized writes); guard test bounds it at 500µs.
 - [ ] **S2b — Registration factory + MCP migration.**
       Mutation registration goes through a wrapper/factory that REQUIRES a manifest row
       (intent + target extractor) and installs the executor — unwrapped mutators cannot

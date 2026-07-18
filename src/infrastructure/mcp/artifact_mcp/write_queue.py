@@ -137,6 +137,16 @@ def _submit(tool_name: str, fn: Callable[..., Any], /, *args: Any, **kwargs: Any
     return _get_executor().submit(_run_job, tool_name, fn, *args, **kwargs)
 
 
+def submit_serialized(operation_name: str, fn: Callable[..., Any], /, *args: Any, **kwargs: Any):
+    """Public submission port: schedule *fn* on the single write worker.
+
+    Unlike ``queued``/``run_sync`` this takes NO gate — callers that need the
+    workspace gate (the authorized mutation executor) acquire it inside the
+    submitted job themselves, exactly once.
+    """
+    return _submit(operation_name, fn, *args, **kwargs)
+
+
 def queued(fn: _F) -> _F:
     """Wrap a synchronous write function to execute serially through the write queue.
 
