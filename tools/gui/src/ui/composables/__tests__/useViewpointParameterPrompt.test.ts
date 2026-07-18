@@ -4,7 +4,7 @@ import { useViewpointParameterPrompt } from '../useViewpointParameterPrompt'
 import type { ViewpointDefinitionEnvelope } from '../../../domain'
 
 const envelope = (slug: string, parameters: unknown[]): ViewpointDefinitionEnvelope => ({
-  slug, version: 1, name: slug, tier: 'module', scope_summary: { unrestricted: true }, query_summary: null,
+  slug, version: 1, name: slug, tier: 'module', scope_summary: { unrestricted: true }, query_summary: null, fork_status: null,
   query: { query_schema: 1, entity_criteria: { kind: 'group', conjunction: 'and', children: [] }, parameters },
 })
 

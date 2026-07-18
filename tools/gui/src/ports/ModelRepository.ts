@@ -216,8 +216,11 @@ export interface ModelRepository {
   ) => Effect.Effect<ViewpointDiagramResult, RepoError>
   readonly getCriteriaCatalog: () => Effect.Effect<CriteriaCatalog, RepoError>
   readonly summarizeViewpointQuery: (query: unknown) => Effect.Effect<string, RepoError>
+  readonly exportViewpointCsv: (body: {
+    slug?: string; query?: unknown; parameters?: Record<string, unknown>
+  }) => Effect.Effect<string, RepoError>
   readonly createViewpointDefinition: (body: {
-    definition: Record<string, unknown>; dry_run?: boolean
+    definition: Record<string, unknown>; dry_run?: boolean; fork_of?: string
   }) => Effect.Effect<ViewpointPersistResult, RepoError>
   readonly editViewpointDefinition: (body: {
     definition: Record<string, unknown>; dry_run?: boolean

@@ -13,6 +13,7 @@ import { RouterLink, useRoute, useRouter } from 'vue-router'
 import { modelServiceKey } from '../keys'
 import { useViewpointExecution } from '../composables/useViewpointExecution'
 import { useViewpointParameterPrompt } from '../composables/useViewpointParameterPrompt'
+import { executionTitleFor } from './ViewpointsManagementView.helpers'
 import type { ResolvedViewpointExecution } from '../composables/useViewpointParameterPrompt'
 import { useFittedPanZoom } from '../composables/useFittedPanZoom'
 import { useSidebarResize } from '../composables/useSidebarResize'
@@ -51,8 +52,8 @@ const presentation = computed(() => {
   return envelope ? presentationFromMapping(envelope.presentation) : null
 })
 const diagnostics = computed(() => computeExecutionDiagnostics(execution.result.value, presentation.value, 'diagram'))
-const legend = computed(() => deriveLegend(presentation.value))
-const scaleGradients = computed(() => deriveScaleGradients(presentation.value))
+const legend = computed(() => deriveLegend(presentation.value, execution.projection.value?.rule_outcomes ?? []))
+const scaleGradients = computed(() => deriveScaleGradients(presentation.value, execution.projection.value?.scale_legends ?? []))
 const svgHtml = computed(() => (svgMarkup.value ? sanitizeDiagramSvg(svgMarkup.value) : null))
 
 // ── Pan/zoom + click-to-select (same composables `DiagramDetailView.vue` uses for a
@@ -154,7 +155,7 @@ onMounted(() => { if (slug.value) void load() })
   <div class="page">
     <div class="hdr">
       <h1 class="pg-title">
-        {{ slug }} <span class="count">(diagram)</span>
+        {{ executionTitleFor(slug, definitions) }} <span class="count">— diagram</span>
       </h1>
       <RouterLink
         to="/viewpoints"

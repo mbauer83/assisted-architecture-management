@@ -5,9 +5,10 @@ import type { ConnectionItemSummary, EntityItemSummary } from '../../../domain'
 
 const entity = (id: string): EntityItemSummary => ({
   id, name: `Name ${id}`, type: 'business-process', specialization_slugs: [], group: 'g', membership: 'primary',
+  status: 'draft', version: '1', column_values: null, anchor_modeled_distance: null, matched_via_derived_hops: null,
 })
 const conn = (overrides: Partial<ConnectionItemSummary>): ConnectionItemSummary => ({
-  id: 'c', type: 'archimate-serving', source: 'a', target: 'b', certainty: null, hops: null, via_connection_ids: [], ...overrides,
+  id: 'c', type: 'archimate-serving', source: 'a', target: 'b', certainty: null, hops: null, via_connection_ids: [], witness_steps: [], ...overrides,
 })
 
 describe('buildRenderGraph', () => {

@@ -66,7 +66,14 @@ export function useFittedPanZoom(containerRef: Ref<HTMLElement | null>, svgConta
     const bottomPadding = 24
     const availableWidth = Math.max(rect.width - horizontalPadding * 2, 80)
     const availableHeight = Math.max(rect.height - topPadding - bottomPadding, 80)
-    const fittedScale = Math.min(availableWidth / contentWidth, availableHeight / contentHeight)
+    // Contain-fit when the whole diagram stays legible; otherwise fit to WIDTH at up to
+    // natural size and let the rest scroll — a wide diagram squeezed into the viewport
+    // renders as an illegible strip, which is worse than panning.
+    const LEGIBLE_MIN_SCALE = 0.5
+    const containScale = Math.min(availableWidth / contentWidth, availableHeight / contentHeight)
+    const fittedScale = containScale >= LEGIBLE_MIN_SCALE
+      ? containScale
+      : Math.min(availableWidth / contentWidth, 1)
     if (!Number.isFinite(fittedScale) || fittedScale <= 0) return
 
     fitScale.value = fittedScale

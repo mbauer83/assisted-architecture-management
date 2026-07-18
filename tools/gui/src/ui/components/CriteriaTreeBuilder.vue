@@ -14,7 +14,7 @@
 import { computed, inject, ref } from 'vue'
 import type { CriteriaCatalog } from '../../domain'
 import type {
-  Conjunction, CriteriaNode, GroupKind, GroupNode, IncidentDirection, IncidentNode,
+  Conjunction, CriteriaNode, GroupKind, GroupNode, IncidentDirection, IncidentNode, IncidentTraversal,
 } from '../../domain/viewpointCriteria'
 import { mkCondition, mkGroup, mkIncident } from '../../domain/viewpointCriteria'
 import { HIGHLIGHTED_NODE_ID_KEY, atDepthCap, attributeOptions, depthLabel } from './CriteriaTreeBuilder.helpers'
@@ -148,7 +148,24 @@ const atCap = computed(() => atDepthCap(props.depth))
         :class="{ highlighted: highlightedNodeId === child.id }"
       >
         <div class="incident-head">
-          <b>has a connection</b>
+          <b>has a</b>
+          <select
+            class="conj-select"
+            aria-label="connection traversal"
+            :value="child.traversal"
+            @change="updateIncident(index, { traversal: ($event.target as HTMLSelectElement).value as IncidentTraversal })"
+          >
+            <option value="direct">
+              direct
+            </option>
+            <option value="derived">
+              derived
+            </option>
+            <option value="both">
+              direct or derived
+            </option>
+          </select>
+          <b>connection</b>
           <select
             class="conj-select"
             aria-label="connection direction"

@@ -12,6 +12,7 @@ import {
   type Purpose,
   type ScopeDraft,
   type ViewpointDefinitionDraft,
+  isEmptyQuery,
   mkDefinitionDraft,
 } from './viewpointDefinitionDraft'
 
@@ -87,8 +88,14 @@ export const definitionToMapping = (
   if (Object.keys(scope).length > 0) result.scope = scope
   if (draft.representationTypes.length > 0) result.representation_types = draft.representationTypes
   if (Object.keys(draft.derivationDefaults).length > 0) result.derivation_defaults = draft.derivationDefaults
-  if (draft.query !== null) result.query = queryToMapping(draft.query, attributeTypes)
+  // In scope mode a pristine (says-nothing) builder query is noise, not intent — it is
+  // dropped rather than persisted as a divergent inactive layer. A NON-empty query is
+  // kept as inactive history in either mode.
+  const keepQuery = draft.query !== null && !(draft.selectionMode === 'scope' && isEmptyQuery(draft.query))
+  if (keepQuery && draft.query !== null) result.query = queryToMapping(draft.query, attributeTypes)
   if (draft.presentation !== null) result.presentation = presentationToMapping(draft.presentation)
+  // Always written: exactly one selection layer is active, and every GUI save states which.
+  result.selection_mode = draft.selectionMode
   return result
 }
 
@@ -109,5 +116,10 @@ export const definitionFromMapping = (raw: Record<string, unknown>): ViewpointDe
     ? asRecord(raw.derivation_defaults) : {}
   draft.query = raw.query != null ? queryFromMapping(raw.query) : null
   draft.presentation = presentationFromMapping(raw.presentation)
+  // Legacy (pre-migration) definitions carry no mode; the editor mirrors the engine's
+  // legacy behavior: the query is active when present, else the scope.
+  draft.selectionMode = raw.selection_mode === 'scope' || raw.selection_mode === 'query'
+    ? raw.selection_mode
+    : (draft.query !== null ? 'query' : 'scope')
   return draft
 }

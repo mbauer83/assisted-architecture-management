@@ -3,12 +3,15 @@ import {
   DEFAULT_SCALE_TOKENS,
   EXPLORATION_LAYOUTS,
   layoutOption,
+  mkPresentation,
   mkStyleRule,
   parseScaleBound,
   withLayoutOption,
   withStyleMode,
 } from './viewpointPresentation'
 import type { StyleRuleNode } from './viewpointPresentation'
+import { presentationFromMapping, presentationToMapping } from './viewpointPresentationSerialization'
+import { mkGroup } from './viewpointCriteria'
 
 const scaleRule = (): StyleRuleNode => ({
   ...mkStyleRule('exploration'),
@@ -90,5 +93,36 @@ describe('layout display option', () => {
 
   it('covers exactly the backend-validated layouts', () => {
     expect(EXPLORATION_LAYOUTS).toEqual(['clusters', 'radial', 'force'])
+  })
+})
+
+describe('endpoint criteria and quarantined rules round-trip', () => {
+  it('serializes source/target criteria and disabled, and reads them back', () => {
+    const presentation = mkPresentation('exploration')
+    const rule = mkStyleRule('exploration')
+    rule.capability = 'edge_color'
+    rule.matchCriteria = mkGroup('connection')
+    rule.sourceCriteria = mkGroup('entity')
+    rule.targetCriteria = mkGroup('entity')
+    rule.disabled = true
+    presentation.stylingRules = [rule]
+    const mapping = presentationToMapping(presentation)
+    const serialized = (mapping.styling_rules as Record<string, unknown>[])[0]
+    expect(serialized.disabled).toBe(true)
+    expect(serialized.source_criteria).toBeDefined()
+    expect(serialized.target_criteria).toBeDefined()
+    const parsed = presentationFromMapping(mapping)!
+    expect(parsed.stylingRules[0].disabled).toBe(true)
+    expect(parsed.stylingRules[0].sourceCriteria).not.toBeNull()
+    expect(parsed.stylingRules[0].targetCriteria).not.toBeNull()
+  })
+
+  it('omits the endpoint keys and disabled=false for plain rules', () => {
+    const presentation = mkPresentation('exploration')
+    presentation.stylingRules = [mkStyleRule('exploration')]
+    const serialized = (presentationToMapping(presentation).styling_rules as Record<string, unknown>[])[0]
+    expect('source_criteria' in serialized).toBe(false)
+    expect('target_criteria' in serialized).toBe(false)
+    expect('disabled' in serialized).toBe(false)
   })
 })

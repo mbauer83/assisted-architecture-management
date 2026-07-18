@@ -68,7 +68,7 @@ export function useMatrixEditor(opts?: { toEntityIds?: () => string[] }) {
           artifact_type: artifactType,
           domain: domain,
           subdomain: '', status: '', display_alias: '',
-          element_type: artifactType, element_label: name,
+          element_type: artifactType, element_label: name, diagram_internal: false,
         })
       }
     }

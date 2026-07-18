@@ -24,6 +24,7 @@ import { createDebouncer } from '../lib/debounce'
 import { firstErrorNodeId, formatPreviewCounts } from '../views/ViewpointsManagementView.helpers'
 import CriteriaTreeBuilder from './CriteriaTreeBuilder.vue'
 import NeighborInclusionEditor from './NeighborInclusionEditor.vue'
+import TestRunMatchedEntities from './TestRunMatchedEntities.vue'
 import QueryBindingsPanel from './QueryBindingsPanel.vue'
 import QueryParametersPanel from './QueryParametersPanel.vue'
 import QueryDerivedAttributesPanel from './QueryDerivedAttributesPanel.vue'
@@ -32,6 +33,9 @@ const props = defineProps<{
   draft: ViewpointDefinitionDraft
   catalog: CriteriaCatalog
   isCreating: boolean
+  /** Read-only master (module/enterprise tier) open in the editor — a Test run is not a
+   * write attempt, so persistence-blocking issues must not surface as error banners. */
+  isReadOnly?: boolean
 }>()
 const emit = defineEmits<{
   'update:query': [value: ExecutableQueryNode]
@@ -95,8 +99,14 @@ const testRun = async () => {
     const body = { definition: definitionToMapping(props.draft, attributeTypes.value), dry_run: true }
     const call = props.isCreating ? svc.createViewpointDefinition(body) : svc.editViewpointDefinition(body)
     const result = await Effect.runPromise(call)
-    emit('issues', result.issues)
-    highlightedNodeId.value = firstErrorNodeId(result.issues, props.draft)
+    // A read-only master legitimately fails the persist gate — that is not feedback
+    // about the query being tested, so it never becomes a banner here (it would
+    // contradict the adjacent "adjust it freely, then Save as…" guidance).
+    const issues = props.isReadOnly
+      ? result.issues.filter((issue) => issue.code !== 'read-only-definition')
+      : result.issues
+    emit('issues', issues)
+    highlightedNodeId.value = firstErrorNodeId(issues, props.draft)
   } catch (reason) {
     testRunError.value = readErrorMessage(reason)
   } finally {
@@ -243,6 +253,11 @@ const testRun = async () => {
         >{{ warning }}</span>
       </template>
     </div>
+    <TestRunMatchedEntities
+      v-if="testRunResult && !testRunError"
+      :entities="testRunResult.entities"
+      :total-count="testRunResult.total_entity_count"
+    />
   </div>
 </template>
 

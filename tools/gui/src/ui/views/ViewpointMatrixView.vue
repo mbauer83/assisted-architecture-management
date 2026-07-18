@@ -11,6 +11,7 @@ import { RouterLink, useRoute } from 'vue-router'
 import { modelServiceKey } from '../keys'
 import { useViewpointExecution } from '../composables/useViewpointExecution'
 import { useViewpointParameterPrompt } from '../composables/useViewpointParameterPrompt'
+import { executionTitleFor } from './ViewpointsManagementView.helpers'
 import ViewpointExecutionDiagnostics from '../components/ViewpointExecutionDiagnostics.vue'
 import ViewpointExecutionError from '../components/ViewpointExecutionError.vue'
 import ViewpointParameterPrompt from '../components/ViewpointParameterPrompt.vue'
@@ -35,8 +36,8 @@ const presentation = computed(() => {
   return envelope ? presentationFromMapping(envelope.presentation) : null
 })
 const diagnostics = computed(() => computeExecutionDiagnostics(execution.result.value, presentation.value, 'matrix'))
-const legend = computed(() => deriveLegend(presentation.value))
-const scaleGradients = computed(() => deriveScaleGradients(presentation.value))
+const legend = computed(() => deriveLegend(presentation.value, execution.projection.value?.rule_outcomes ?? []))
+const scaleGradients = computed(() => deriveScaleGradients(presentation.value, execution.projection.value?.scale_legends ?? []))
 const entityStyleById = computed(() => projectionByItemId(execution.projection.value))
 const axes = computed(() => resolveMatrixAxes(presentation.value, execution.result.value))
 const cells = computed(() => buildMatrixCells(axes.value.rowIds, axes.value.columnIds, execution.result.value?.connections ?? []))
@@ -68,7 +69,7 @@ onMounted(() => { if (slug.value) void load() })
   <div class="page">
     <div class="hdr">
       <h1 class="pg-title">
-        {{ slug }} <span class="count">(matrix)</span>
+        {{ executionTitleFor(slug, definitions) }} <span class="count">— matrix</span>
       </h1>
       <RouterLink
         to="/viewpoints"

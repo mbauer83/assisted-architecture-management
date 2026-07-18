@@ -1,0 +1,78 @@
+<script setup lang="ts">
+/** The editor's notice stack: read-only-master hint, fork-in-progress hint, version-bump
+ * hint, and the clickable validation-issue list. Pure display — issue focusing stays with
+ * the parent, which owns the highlighted-node overlay. */
+import type { ViewpointDefinitionEnvelope, ViewpointReferencer, ViewpointValidationIssue } from '../../domain'
+
+withDefaults(defineProps<{
+  isReadOnly: boolean
+  viewingTier: ViewpointDefinitionEnvelope['tier'] | null
+  forkedFromSlug: string | null
+  showVersionBumpHint: boolean
+  quarantinedRuleCount?: number
+  referencers: readonly ViewpointReferencer[]
+  issues: readonly ViewpointValidationIssue[]
+}>(), { quarantinedRuleCount: 0 })
+const emit = defineEmits<{ focusIssue: [issue: ViewpointValidationIssue] }>()
+</script>
+
+<template>
+  <p
+    v-if="isReadOnly"
+    class="hint hint--readonly"
+  >
+    This is a {{ viewingTier }}-tier definition and cannot be changed in place — adjust it
+    freely, then use "Save as…" to keep your changes as a new engagement viewpoint.
+  </p>
+
+  <p
+    v-if="forkedFromSlug"
+    class="hint"
+  >
+    Saving as a new engagement viewpoint forked from "{{ forkedFromSlug }}" — adjust the
+    slug and name, then save.
+  </p>
+
+  <p
+    v-if="quarantinedRuleCount > 0"
+    class="hint"
+  >
+    {{ quarantinedRuleCount }} inherited style rule{{ quarantinedRuleCount === 1 ? '' : 's' }}
+    disabled — attribute no longer resolvable on this repository. The rule{{ quarantinedRuleCount === 1 ? ' stays' : 's stay' }}
+    saved but inert; re-enable from the Presentation tab after fixing the reference.
+  </p>
+
+  <p
+    v-if="showVersionBumpHint"
+    class="hint"
+  >
+    This is a semantic edit (scope/query/presentation/representation types changed) —
+    bump the version, or diagrams pinned to the current version will be flagged stale.
+    <span v-if="referencers.length > 0">
+      Currently pinned: {{ referencers.map((r) => r.artifact_id).join(', ') }}.
+    </span>
+  </p>
+
+  <ul
+    v-if="issues.length > 0"
+    class="issue-list"
+  >
+    <li
+      v-for="(issue, i) in issues"
+      :key="i"
+      :class="issue.severity"
+      @click="emit('focusIssue', issue)"
+    >
+      <b>{{ issue.code }}</b> ({{ issue.path }}): {{ issue.message }}
+    </li>
+  </ul>
+</template>
+
+<style scoped>
+.hint { background: #fef3c7; color: #92400e; padding: 8px 12px; border-radius: 6px; }
+.hint--readonly { background: #f3f4f6; color: #374151; }
+.issue-list { list-style: none; padding: 0; }
+.issue-list li { padding: 6px 10px; border-radius: 6px; margin: 4px 0; cursor: pointer; font-size: 12.5px; }
+.issue-list li.error { background: #fee2e2; color: #991b1b; }
+.issue-list li.warning { background: #fef3c7; color: #92400e; }
+</style>

@@ -15,10 +15,14 @@ import type {
 } from '../../domain/viewpointPresentation'
 import StyleRuleEditor from './StyleRuleEditor.vue'
 import MatrixAxesEditor from './MatrixAxesEditor.vue'
+import TargetPopulationEditor from './TargetPopulationEditor.vue'
 
 const props = defineProps<{
   modelValue: PresentationNode | null
   catalog: CriteriaCatalog
+  /** Derived-attribute names the Query tab declares — offered as `derived.<name>`
+   * scale-attribute options so authored references can only point at real ones. */
+  declaredDerivedNames?: readonly string[]
 }>()
 const emit = defineEmits<{ 'update:modelValue': [value: PresentationNode | null] }>()
 
@@ -108,6 +112,12 @@ const onLayoutChange = (raw: string) => {
         </div>
       </div>
 
+      <TargetPopulationEditor
+        :model-value="modelValue.targetTypes"
+        :entity-types="catalog.entity_types"
+        @update:model-value="emitUpdate({ targetTypes: $event })"
+      />
+
       <div v-if="modelValue.representation === 'table'">
         <h3>Columns</h3>
         <div
@@ -192,12 +202,51 @@ const onLayoutChange = (raw: string) => {
             </option>
           </select>
         </label>
+        <label
+          class="field"
+          title="Node count above which the result opens as group super-nodes instead of a flat graph (empty = deployment default, 100)"
+        >
+          legibility_budget
+          <input
+            class="inp budget-inp"
+            type="number"
+            min="1"
+            placeholder="100 (default)"
+            :value="modelValue.legibilityBudget ?? ''"
+            @input="emitUpdate({ legibilityBudget: ($event.target as HTMLInputElement).value === '' ? null : Number(($event.target as HTMLInputElement).value) })"
+          >
+        </label>
+        <label
+          class="field"
+          title="How an over-budget result is aggregated into super-nodes"
+        >
+          aggregate_by
+          <select
+            class="inp"
+            :value="modelValue.aggregateBy ?? ''"
+            @change="emitUpdate({ aggregateBy: ($event.target as HTMLSelectElement).value || null })"
+          >
+            <option value="">
+              auto (group_by, else group)
+            </option>
+            <option value="group">
+              group
+            </option>
+            <option value="domain">
+              domain
+            </option>
+            <option value="type">
+              type
+            </option>
+          </select>
+        </label>
       </div>
 
       <h3>Style rules</h3>
       <StyleRuleEditor
         :model-value="modelValue"
         :catalog="catalog"
+        :declared-derived-names="props.declaredDerivedNames ?? []"
         @update:model-value="emit('update:modelValue', $event)"
       />
     </div>
@@ -212,6 +261,7 @@ const onLayoutChange = (raw: string) => {
 .representation-row { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
 .representation-row .inp, .representation-row .btn { min-height: 32px; margin-top: 0; }
 .inp { display: block; padding: 6px 8px; border-radius: 6px; border: 1px solid #d1d5db; font-size: 13px; font-family: inherit; background: #fff; box-sizing: border-box; margin-top: 3px; }
+.budget-inp { max-width: 140px; }
 select.inp { cursor: pointer; min-width: 160px; }
 .column-row { display: flex; gap: 6px; margin: 4px 0; align-items: center; }
 .column-row .inp { flex: 1; margin-top: 0; }

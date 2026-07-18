@@ -35,6 +35,8 @@ export const router = createRouter({
     { path: '/graph', component: GraphExploreView },
     { path: '/graph/layered', component: () => import('../views/LayeredExplorationView.vue') },
     { path: '/viewpoints', component: () => import('../views/ViewpointsManagementView.vue') },
+    { path: '/viewpoints/new', component: () => import('../views/ViewpointsManagementView.vue') },
+    { path: '/viewpoints/:slug/edit', component: () => import('../views/ViewpointsManagementView.vue') },
     { path: '/viewpoints/matrix', component: () => import('../views/ViewpointMatrixView.vue') },
     { path: '/viewpoints/diagram', component: () => import('../views/ViewpointDiagramView.vue') },
     // Global (enterprise) repo routes — reuse same views with scope param

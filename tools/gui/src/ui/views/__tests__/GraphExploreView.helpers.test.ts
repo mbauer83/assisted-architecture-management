@@ -1,7 +1,9 @@
 import { describe, it, expect } from 'vitest'
 import {
+  fitViewBox, wrapLabel,
   groupKeyFor, nodeVisualFor, edgeVisualFor, projectionByItemId, edgeStyleKey, buildConnectionStyleIndex,
-  nodeShapePoints, explorationRedirectFor, hopDistances, effectiveExplorationLayout, distanceColor, distanceLegend,
+  buildConnectionSummaryIndex, DERIVED_EDGE_DASH,
+  nodeShapePoints, explorationRedirectFor, anchorDistancesFromResult, effectiveExplorationLayout, distanceColor, distanceLegend,
   contrastTextColor,
 } from '../GraphExploreView.helpers'
 import { tokenColor, tokenShape, tokenIconLetter, tokenEdgeEmphasis, resolveStyleColor } from '../../lib/viewpointStyleTokens'
@@ -9,7 +11,7 @@ import type { ViewpointDefinitionEnvelope } from '../../../domain'
 
 const mkEnvelope = (representation: string | null): ViewpointDefinitionEnvelope => ({
   slug: 'application-structure', version: 1, name: 'Application Structure', tier: 'module',
-  scope_summary: { unrestricted: true }, query_summary: null,
+  scope_summary: { unrestricted: true }, query_summary: null, fork_status: null,
   presentation: representation === null ? undefined : { representation },
 })
 
@@ -64,6 +66,28 @@ describe('edgeVisualFor', () => {
       stroke: tokenColor('positive'), strokeWidth: null, dashArray: undefined,
     })
   })
+
+  it('gives an unstyled derived edge its provenance dash, denser for potential', () => {
+    expect(edgeVisualFor(undefined, 'certain').dashArray).toBe(DERIVED_EDGE_DASH.certain)
+    expect(edgeVisualFor(undefined, 'potential').dashArray).toBe(DERIVED_EDGE_DASH.potential)
+    expect(DERIVED_EDGE_DASH.certain).not.toBe(DERIVED_EDGE_DASH.potential)
+  })
+
+  it('lets an authored edge_emphasis dash win over the provenance dash', () => {
+    const emphasis = tokenEdgeEmphasis('caution')
+    expect(edgeVisualFor({ edge_emphasis: 'caution' }, 'certain').dashArray).toBe(emphasis.dashArray)
+  })
+})
+
+describe('buildConnectionSummaryIndex', () => {
+  it('joins each connection summary onto its source/target/type key', () => {
+    const derived = {
+      id: 'derived::x', type: 'archimate-serving', source: 'ENT@A', target: 'ENT@B',
+      certainty: 'certain' as const, hops: 2, via_connection_ids: ['c1', 'c2'], witness_steps: [],
+    }
+    const index = buildConnectionSummaryIndex([derived])
+    expect(index.get(edgeStyleKey('ENT@A', 'ENT@B', 'archimate-serving'))?.hops).toBe(2)
+  })
 })
 
 describe('projectionByItemId', () => {
@@ -85,7 +109,7 @@ describe('projectionByItemId', () => {
 
 describe('buildConnectionStyleIndex', () => {
   it('joins a connection style back onto its source/target/type key', () => {
-    const connections = [{ id: 'CON@ab', type: 'archimate-serving', source: 'ENT@A', target: 'ENT@B', certainty: null, hops: null, via_connection_ids: [] }]
+    const connections = [{ id: 'CON@ab', type: 'archimate-serving', source: 'ENT@A', target: 'ENT@B', certainty: null, hops: null, via_connection_ids: [], witness_steps: [] }]
     const projection = {
       applied: true, target: 'repository' as const,
       items: [
@@ -100,7 +124,7 @@ describe('buildConnectionStyleIndex', () => {
   })
 
   it('omits connections absent from the projection', () => {
-    const connections = [{ id: 'CON@ab', type: 'archimate-serving', source: 'ENT@A', target: 'ENT@B', certainty: null, hops: null, via_connection_ids: [] }]
+    const connections = [{ id: 'CON@ab', type: 'archimate-serving', source: 'ENT@A', target: 'ENT@B', certainty: null, hops: null, via_connection_ids: [], witness_steps: [] }]
     expect(buildConnectionStyleIndex(connections, null).size).toBe(0)
   })
 })
@@ -130,54 +154,27 @@ describe('explorationRedirectFor', () => {
   })
 })
 
-describe('hopDistances', () => {
-  const edge = (source: string, target: string) => ({ source, target })
-
-  it('computes BFS depth from a single anchor over undirected edges', () => {
-    const distances = hopDistances(
-      ['a'],
-      [edge('a', 'b'), edge('c', 'b'), edge('c', 'd')],
-      ['a', 'b', 'c', 'd'],
-    )
+describe('anchorDistancesFromResult', () => {
+  it('maps each ranked entity to its server-computed modeled distance', () => {
+    const distances = anchorDistancesFromResult([
+      { id: 'a', anchor_modeled_distance: 0 },
+      { id: 'b', anchor_modeled_distance: 1 },
+      { id: 'c', anchor_modeled_distance: 4 }, // witness-chain length, NOT one traversal step
+    ])
     expect(distances.get('a')).toBe(0)
     expect(distances.get('b')).toBe(1)
-    expect(distances.get('c')).toBe(2) // reached against the c→b edge direction
-    expect(distances.get('d')).toBe(3)
+    expect(distances.get('c')).toBe(4)
   })
 
-  it('takes the shortest path when several exist', () => {
-    const distances = hopDistances(
-      ['a'],
-      [edge('a', 'b'), edge('b', 'c'), edge('c', 'd'), edge('a', 'd')],
-      ['a', 'b', 'c', 'd'],
-    )
-    expect(distances.get('d')).toBe(1)
-    expect(distances.get('c')).toBe(2)
-  })
-
-  it('is multi-source: each node gets the distance to its nearest anchor', () => {
-    const distances = hopDistances(
-      ['a', 'z'],
-      [edge('a', 'b'), edge('b', 'c'), edge('c', 'z')],
-      ['a', 'b', 'c', 'z'],
-    )
-    expect(distances.get('a')).toBe(0)
-    expect(distances.get('z')).toBe(0)
-    expect(distances.get('b')).toBe(1)
-    expect(distances.get('c')).toBe(1)
-  })
-
-  it('omits unreachable nodes from the map', () => {
-    const distances = hopDistances(['a'], [edge('a', 'b')], ['a', 'b', 'island'])
+  it('leaves unranked entities out of the map instead of defaulting them', () => {
+    const distances = anchorDistancesFromResult([
+      { id: 'a', anchor_modeled_distance: 0 },
+      { id: 'island', anchor_modeled_distance: null },
+      { id: 'legacy' },
+    ])
     expect(distances.has('island')).toBe(false)
-    expect(distances.size).toBe(2)
-  })
-
-  it('ignores anchors and edge endpoints outside the node population', () => {
-    const distances = hopDistances(['ghost', 'a'], [edge('a', 'ghost'), edge('a', 'b')], ['a', 'b'])
-    expect(distances.get('a')).toBe(0)
-    expect(distances.get('b')).toBe(1)
-    expect(distances.has('ghost')).toBe(false)
+    expect(distances.has('legacy')).toBe(false)
+    expect(distances.size).toBe(1)
   })
 })
 
@@ -234,16 +231,20 @@ describe('distanceColor', () => {
 })
 
 describe('distanceLegend', () => {
-  it('produces one chip per hop count with the node colors', () => {
-    const legend = distanceLegend(2)
-    expect(legend.map((entry) => entry.label)).toEqual(['0 hops', '1 hop', '2 hops'])
-    expect(legend[0].color).toBe(tokenColor('heat-near'))
+  it('shows the real observed ring set, not a dense 0..max range', () => {
+    const legend = distanceLegend([0, 1, 2, 4, 2, 1])
+    expect(legend.map((entry) => entry.label)).toEqual(['1 hop', '2 hops', '4 hops'])
     expect(legend[2].color).toBe(tokenColor('heat-far'))
-    expect(legend[1].color).toBe(distanceColor(1, 2))
+    expect(legend[0].color).toBe(distanceColor(1, 4))
+    expect(legend[1].color).toBe(distanceColor(2, 4))
   })
 
-  it('shows a single near-colored chip for a depth-0-only population', () => {
-    expect(distanceLegend(0)).toEqual([{ label: '0 hops', color: tokenColor('heat-near') }])
+  it('omits the anchor distance (0) — the Anchor chip already names it', () => {
+    expect(distanceLegend([0])).toEqual([])
+  })
+
+  it('is empty for no observed distances', () => {
+    expect(distanceLegend([])).toEqual([])
   })
 })
 
@@ -257,5 +258,44 @@ describe('nodeShapePoints', () => {
 
   it('gives diamond and square the same vertex count but a different orientation', () => {
     expect(nodeShapePoints('diamond', 24)).not.toBe(nodeShapePoints('square', 24))
+  })
+})
+
+describe('fitViewBox', () => {
+  it('bounds every node with padding, aspect-corrected to the container', () => {
+    const box = fitViewBox([{ x: 0, y: 0 }, { x: 1000, y: 100 }], 800, 600, 50)
+    expect(box.x).toBe(-50)
+    expect(box.w).toBe(1100)
+    // Content is wider than the container ratio → height is corrected up to match.
+    expect(box.h).toBeCloseTo(1100 / (800 / 600))
+    // Every node stays inside the box.
+    expect(box.y).toBeLessThan(0)
+    expect(box.y + box.h).toBeGreaterThan(100)
+  })
+
+  it('falls back to the container rect when there is nothing to fit', () => {
+    expect(fitViewBox([], 800, 600)).toEqual({ x: 0, y: 0, w: 800, h: 600 })
+  })
+})
+
+describe('wrapLabel', () => {
+  it('keeps short labels on one line', () => {
+    expect(wrapLabel('Query Engine')).toEqual(['Query Engine'])
+  })
+
+  it('wraps at word boundaries up to two lines', () => {
+    expect(wrapLabel('Canonical Per-Repo Artifact Index', 14, 2)).toEqual(['Canonical', 'Per-Repo…'])
+  })
+
+  it('ellipsizes when content remains beyond the last line', () => {
+    const lines = wrapLabel('Architecture Management Platform Backend Service', 14, 2)
+    expect(lines).toHaveLength(2)
+    expect(lines[1].endsWith('…')).toBe(true)
+  })
+
+  it('hard-truncates a single overlong word', () => {
+    const lines = wrapLabel('supercalifragilisticexpialidocious', 14, 2)
+    expect(lines[0].length).toBeLessThanOrEqual(14)
+    expect(lines[0].endsWith('…')).toBe(true)
   })
 })

@@ -15,7 +15,20 @@ test.beforeEach(async ({ context }) => {
   })
 })
 
-const uniqueSlug = (label: string) => `viewpoint-query-builder-e2e-${label}-${Date.now()}`
+// Every minted slug is registered and swept in afterEach — cleanup must survive a
+// mid-test failure, or aborted runs strand test rows in the engagement catalog.
+const createdSlugs: string[] = []
+const uniqueSlug = (label: string) => {
+  const slug = `viewpoint-query-builder-e2e-${label}-${Date.now()}`
+  createdSlugs.push(slug)
+  return slug
+}
+
+test.afterEach(async ({ request }) => {
+  for (const slug of createdSlugs.splice(0)) {
+    await request.post('/api/viewpoints/remove', { data: { slug, dry_run: false } })
+  }
+})
 
 const removeViewpoint = async (request: APIRequestContext, slug: string) => {
   await request.post('/api/viewpoints/remove', { data: { slug, dry_run: false } })
@@ -31,7 +44,7 @@ test.describe('bindings, parameters, and derived attributes authored entirely in
   test('an entity binding, a connection binding, a parameter, and a derived attribute all round-trip through save/reload', async ({ page, request }) => {
     const slug = uniqueSlug('full-declaration')
     await page.goto('/viewpoints')
-    await page.getByRole('button', { name: '+ New viewpoint' }).click()
+    await page.getByRole('button', { name: '+ Create viewpoint' }).click()
     await page.getByRole('textbox', { name: 'slug' }).fill(slug)
     await page.getByRole('textbox', { name: 'name' }).fill('Full Declaration Test')
     await page.getByRole('button', { name: 'Query' }).click()
@@ -74,7 +87,7 @@ test.describe('extended comparator vocabulary', () => {
   test('not_in, like, and ilike are reachable and round-trip', async ({ page, request }) => {
     const slug = uniqueSlug('comparators')
     await page.goto('/viewpoints')
-    await page.getByRole('button', { name: '+ New viewpoint' }).click()
+    await page.getByRole('button', { name: '+ Create viewpoint' }).click()
     await page.getByRole('textbox', { name: 'slug' }).fill(slug)
     await page.getByRole('textbox', { name: 'name' }).fill('Comparators Test')
     await page.getByRole('button', { name: 'Query' }).click()
@@ -109,7 +122,7 @@ test.describe('enumerable and entity-reference value inputs', () => {
   test('an enumerable attribute offers a dropdown (eq) and a chip multi-select (in), not free text', async ({ page, request }) => {
     const slug = uniqueSlug('enum-value')
     await page.goto('/viewpoints')
-    await page.getByRole('button', { name: '+ New viewpoint' }).click()
+    await page.getByRole('button', { name: '+ Create viewpoint' }).click()
     await page.getByRole('textbox', { name: 'slug' }).fill(slug)
     await page.getByRole('textbox', { name: 'name' }).fill('Enum Value Test')
     await page.getByRole('button', { name: 'Query' }).click()
@@ -137,7 +150,7 @@ test.describe('enumerable and entity-reference value inputs', () => {
 
   test('the reserved id path uses the entity picker rather than a text value field', async ({ page }) => {
     await page.goto('/viewpoints')
-    await page.getByRole('button', { name: '+ New viewpoint' }).click()
+    await page.getByRole('button', { name: '+ Create viewpoint' }).click()
     await page.getByRole('textbox', { name: 'slug' }).fill(uniqueSlug('id-picker'))
     await page.getByRole('textbox', { name: 'name' }).fill('Id Picker Test')
     await page.getByRole('button', { name: 'Query' }).click()
@@ -153,7 +166,7 @@ test.describe('enumerable and entity-reference value inputs', () => {
 test.describe('path-addressed validation into the new panels', () => {
   test('a duplicate binding name highlights the offending binding row, not just a flat error string', async ({ page }) => {
     await page.goto('/viewpoints')
-    await page.getByRole('button', { name: '+ New viewpoint' }).click()
+    await page.getByRole('button', { name: '+ Create viewpoint' }).click()
     await page.getByRole('textbox', { name: 'slug' }).fill(uniqueSlug('dup-binding'))
     await page.getByRole('textbox', { name: 'name' }).fill('Duplicate Binding Test')
     await page.getByRole('button', { name: 'Query' }).click()
@@ -174,7 +187,7 @@ test.describe('derived-traversal authoring on neighbor inclusions and connection
   test('traversal, include-potential, and max-hops all round-trip through save/reload', async ({ page, request }) => {
     const slug = uniqueSlug('traversal')
     await page.goto('/viewpoints')
-    await page.getByRole('button', { name: '+ New viewpoint' }).click()
+    await page.getByRole('button', { name: '+ Create viewpoint' }).click()
     await page.getByRole('textbox', { name: 'slug' }).fill(slug)
     await page.getByRole('textbox', { name: 'name' }).fill('Traversal Test')
     await page.getByRole('button', { name: 'Query' }).click()
@@ -204,7 +217,7 @@ test.describe('derived-traversal authoring on neighbor inclusions and connection
 
   test("a direct-only neighbor inclusion hides include-potential and max-hops controls, since 'both' is not offered for inclusions", async ({ page }) => {
     await page.goto('/viewpoints')
-    await page.getByRole('button', { name: '+ New viewpoint' }).click()
+    await page.getByRole('button', { name: '+ Create viewpoint' }).click()
     await page.getByRole('textbox', { name: 'slug' }).fill(uniqueSlug('direct-only'))
     await page.getByRole('textbox', { name: 'name' }).fill('Direct Only Test')
     await page.getByRole('button', { name: 'Query' }).click()

@@ -49,6 +49,13 @@ export interface StyleRuleNode {
   scaleMin: number | string | null
   scaleMax: number | string | null
   scaleTokens: readonly [string, string] | null
+  /** Edge rules only: entity criteria the connection's source/target endpoint must
+   * satisfy — how a boundary view accents exactly the edges crossing a group boundary. */
+  sourceCriteria: GroupNode | null
+  targetCriteria: GroupNode | null
+  /** Quarantined: saveable exactly as inherited but never evaluated (fork-safe escape
+   * hatch for inherited rules whose attribute no longer resolves). */
+  disabled: boolean
 }
 
 /** An `edge_*` capability's `match_criteria` is connection criteria; every other
@@ -62,6 +69,7 @@ export const mkStyleRule = (representation: Representation): StyleRuleNode => {
     matchCriteria: mkGroup(isEdgeCapability(capability) ? 'connection' : 'entity'),
     rangeAttribute: null, rangeBands: [], value: STYLE_TOKENS[0],
     scaleAttribute: null, scaleMin: null, scaleMax: null, scaleTokens: null,
+    sourceCriteria: null, targetCriteria: null, disabled: false,
   }
 }
 
@@ -143,12 +151,20 @@ export interface PresentationNode {
   groupBy: string | null
   stylingRules: StyleRuleNode[]
   defaultStyle: Record<string, string>
+  /** The TARGET population this view is about — drives honest-empty messaging. Null =
+   * undeclared (in query mode that means absence claims are suppressed at execution). */
+  targetTypes: string[] | null
+  /** Node count above which the result opens aggregated on graph surfaces (null =
+   * deployment default). */
+  legibilityBudget: number | null
+  /** Aggregation dimension for over-budget results ('group' | 'domain' | 'type'). */
+  aggregateBy: string | null
 }
 
 export const mkPresentation = (representation: Representation): PresentationNode => ({
   representation, displayOptions: {}, columns: representation === 'table' ? [] : null,
   rowBy: null, columnBy: null, rowCriteria: null, columnCriteria: null, groupBy: null,
-  stylingRules: [], defaultStyle: {},
+  stylingRules: [], defaultStyle: {}, targetTypes: null, legibilityBudget: null, aggregateBy: null,
 })
 
 export const matrixAxisMode = (presentation: PresentationNode): MatrixAxisMode | null => {

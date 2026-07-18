@@ -7,14 +7,14 @@ import type { ViewpointDefinitionEnvelope } from '../../domain'
 
 const envelopeWithParameters = (parameters: unknown[]): ViewpointDefinitionEnvelope => ({
   slug: 'x', version: 1, name: 'X', tier: 'module',
-  scope_summary: { unrestricted: true }, query_summary: null,
+  scope_summary: { unrestricted: true }, query_summary: null, fork_status: null,
   query: { query_schema: 1, entity_criteria: { kind: 'group', conjunction: 'and', children: [] }, parameters },
 })
 
 describe('parameterSignatureOf', () => {
   it('is empty for a scope-only definition (no query)', () => {
     const envelope: ViewpointDefinitionEnvelope = {
-      slug: 'x', version: 1, name: 'X', tier: 'module', scope_summary: { unrestricted: true }, query_summary: null,
+      slug: 'x', version: 1, name: 'X', tier: 'module', scope_summary: { unrestricted: true }, query_summary: null, fork_status: null,
     }
     expect(parameterSignatureOf(envelope)).toEqual([])
   })

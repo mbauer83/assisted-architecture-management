@@ -1,14 +1,17 @@
 import { describe, expect, it } from 'vitest'
 import {
   effectiveTableColumns, filtersToEntityCriteriaMapping, groupKeyForEntity, groupTableRows,
-  isColumnSourceResolvable, projectionByItemId, resolveSummaryColumnValue,
+  hasBadgeStyling, isColumnSourceResolvable, projectionByItemId, resolveSummaryColumnValue, sortEntitiesBy,
 } from '../EntitiesView.helpers'
+import { mkPresentation, mkStyleRule } from '../../../domain/viewpointPresentation'
 import type { ColumnSpecNode } from '../../../domain/viewpointPresentation'
 import type { EntityItemSummary, ViewpointProjection } from '../../../domain'
 
 const entity = (overrides: Partial<EntityItemSummary> = {}): EntityItemSummary => ({
   id: 'APC@1.EntSch.a', name: 'Alpha', type: 'application-component',
-  specialization_slugs: [], group: 'uncategorized', membership: 'primary', ...overrides,
+  specialization_slugs: [], group: 'uncategorized', membership: 'primary',
+  status: 'draft', version: '1', column_values: null, anchor_modeled_distance: null, matched_via_derived_hops: null,
+  ...overrides,
 })
 
 describe('filtersToEntityCriteriaMapping', () => {
@@ -44,11 +47,27 @@ describe('resolveSummaryColumnValue', () => {
     expect(resolveSummaryColumnValue(e, 'group')).toBe('uncategorized')
   })
 
+  it('resolves status and version from the summary', () => {
+    expect(resolveSummaryColumnValue(entity(), 'status')).toBe('draft')
+    expect(resolveSummaryColumnValue(entity(), 'version')).toBe('1')
+  })
+
   it('returns null for a specialization-less entity and for unresolvable paths', () => {
     expect(resolveSummaryColumnValue(entity(), 'specialization')).toBeNull()
     expect(resolveSummaryColumnValue(entity(), 'domain')).toBeNull()
-    expect(resolveSummaryColumnValue(entity(), 'status')).toBeNull()
     expect(resolveSummaryColumnValue(entity(), 'some.schema.attribute')).toBeNull()
+  })
+
+  it('prefers the server-resolved column_values, including explicit missing marks', () => {
+    const e = entity({ column_values: { criticality: 'high', status: 'active', owner: null } })
+    expect(resolveSummaryColumnValue(e, 'criticality')).toBe('high')
+    expect(resolveSummaryColumnValue(e, 'status')).toBe('active')
+    expect(resolveSummaryColumnValue(e, 'owner')).toBeNull()
+  })
+
+  it('formats list-valued server columns readably', () => {
+    const e = entity({ column_values: { tags: ['a', 'b'] } })
+    expect(resolveSummaryColumnValue(e, 'tags')).toBe('a, b')
   })
 })
 
@@ -56,8 +75,15 @@ describe('isColumnSourceResolvable', () => {
   it('is true for reserved paths carried by the summary, false otherwise', () => {
     expect(isColumnSourceResolvable('name')).toBe(true)
     expect(isColumnSourceResolvable('group')).toBe(true)
+    expect(isColumnSourceResolvable('status')).toBe(true)
+    expect(isColumnSourceResolvable('version')).toBe(true)
     expect(isColumnSourceResolvable('domain')).toBe(false)
-    expect(isColumnSourceResolvable('status')).toBe(false)
+  })
+
+  it('is true for any source the server resolved into column_values', () => {
+    const e = entity({ column_values: { criticality: null } })
+    expect(isColumnSourceResolvable('criticality', e)).toBe(true)
+    expect(isColumnSourceResolvable('criticality', entity())).toBe(false)
   })
 })
 
@@ -128,5 +154,42 @@ describe('projectionByItemId', () => {
     }
     const byId = projectionByItemId(projection)
     expect(byId.get('a')?.style.badges).toBe('positive')
+  })
+})
+
+describe('sortEntitiesBy', () => {
+  const rows = [
+    entity({ id: 'b', name: 'Beta', status: 'active' }),
+    entity({ id: 'a', name: 'Alpha', status: 'draft' }),
+    entity({ id: 'c', name: 'Gamma', status: '' }),
+  ]
+
+  it('sorts by resolved value with missing values last', () => {
+    expect(sortEntitiesBy(rows, 'status', 'asc').map((e) => e.id)).toEqual(['b', 'a', 'c'])
+    expect(sortEntitiesBy(rows, 'status', 'desc').map((e) => e.id)).toEqual(['a', 'b', 'c'])
+  })
+
+  it('sorts numerically when both values are numbers', () => {
+    const numbered = [
+      entity({ id: 'x', column_values: { score: 10 } }),
+      entity({ id: 'y', column_values: { score: 2 } }),
+    ]
+    expect(sortEntitiesBy(numbered, 'score', 'asc').map((e) => e.id)).toEqual(['y', 'x'])
+  })
+})
+
+describe('hasBadgeStyling', () => {
+  it('shows the Style column only when badges are actually styled', () => {
+    expect(hasBadgeStyling(null)).toBe(false)
+    const bare = mkPresentation('table')
+    expect(hasBadgeStyling(bare)).toBe(false)
+    const withRule = mkPresentation('table')
+    const rule = mkStyleRule('table')
+    rule.capability = 'badges'
+    withRule.stylingRules = [rule]
+    expect(hasBadgeStyling(withRule)).toBe(true)
+    const withDefault = mkPresentation('table')
+    withDefault.defaultStyle = { badges: 'neutral' }
+    expect(hasBadgeStyling(withDefault)).toBe(true)
   })
 })

@@ -9,7 +9,7 @@ import type { ConnectionItemSummary, ProjectedOccurrence, ViewpointExecutionResu
 
 const conn = (overrides: Partial<ConnectionItemSummary> = {}): ConnectionItemSummary => ({
   id: 'c1', type: 'serving', source: 'a', target: 'b',
-  certainty: null, hops: null, via_connection_ids: [], ...overrides,
+  certainty: null, hops: null, via_connection_ids: [], witness_steps: [], ...overrides,
 })
 
 const baseResult = (overrides: Partial<ViewpointExecutionResult> = {}): ViewpointExecutionResult => ({
@@ -17,7 +17,7 @@ const baseResult = (overrides: Partial<ViewpointExecutionResult> = {}): Viewpoin
   index_generation: 1, entity_ids: ['a', 'b', 'c'], connection_ids: [], entities: [], connections: [],
   total_entity_count: 3, returned_entity_count: 3, total_connection_count: 0, returned_connection_count: 0,
   truncated: false, entity_limit: 500, matrix_axes: null, warnings: [], duration_ms: 1, query_summary: '',
-  anchor_ids: [],
+  anchor_ids: [], target_population: null, aggregation: null,
   ...overrides,
 })
 

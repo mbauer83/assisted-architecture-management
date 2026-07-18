@@ -109,6 +109,9 @@ export const EntityDisplayInfoSchema = Schema.Struct({
   display_alias: Schema.String,
   element_type: Schema.String,
   element_label: Schema.String,
+  /** Diagram-owned construct (swimlane, C4 person, …) — pickable, but rendered below a
+   * "diagram-internal" divider, never interleaved with model entities. */
+  diagram_internal: Schema.optionalWith(Schema.Boolean, { default: () => false }),
 })
 export type EntityDisplayInfo = typeof EntityDisplayInfoSchema.Type
 

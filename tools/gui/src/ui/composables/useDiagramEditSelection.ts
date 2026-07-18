@@ -94,7 +94,7 @@ export function useDiagramEditSelection(options: {
           artifact_type: artifactType,
           domain,
           subdomain: '', status: scope, display_alias: '',
-          element_type: artifactType, element_label: name,
+          element_type: artifactType, element_label: name, diagram_internal: false,
         })
       }
     }
@@ -194,7 +194,7 @@ export function useDiagramEditSelection(options: {
     includedEntities.value = context.entities.map((s) => ({
       artifact_id: s.artifact_id, name: s.name, artifact_type: s.artifact_type,
       domain: s.domain, subdomain: s.subdomain, status: s.status,
-      display_alias: s.display_alias ?? '', element_type: s.artifact_type, element_label: s.name,
+      display_alias: s.display_alias ?? '', element_type: s.artifact_type, element_label: s.name, diagram_internal: false,
     }))
     allModelConns.value = new Map(context.candidate_connections.map((conn) => [conn.artifact_id, conn]))
     const inc = new Set<string>()

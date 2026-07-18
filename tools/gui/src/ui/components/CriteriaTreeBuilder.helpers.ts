@@ -5,7 +5,7 @@
  */
 
 import type { InjectionKey, Ref } from 'vue'
-import type { Comparator, GroupKind, Quantifier, ValueRefKind } from '../../domain/viewpointCriteria'
+import type { Comparator, ConditionNode, GroupKind, Quantifier, ValueRefKind } from '../../domain/viewpointCriteria'
 import { NUMERIC_COMPARATORS, RESERVED_CONNECTION_PATHS, RESERVED_ENTITY_PATHS, STRING_PATTERN_COMPARATORS } from '../../domain/viewpointCriteria'
 import type { AggregateKind } from '../../domain/viewpointBindings'
 import type { CriteriaCatalog } from '../../domain'
@@ -109,3 +109,28 @@ export const valueKindOptions = (groupKind: GroupKind, hasBindings = false, hasP
 
 export const depthLabel = (depth: number): string => `nesting ${depth + 1} of ${DEPTH_CAP}`
 export const atDepthCap = (depth: number): boolean => depth + 1 >= DEPTH_CAP
+
+/** Edit-time coherence check for one condition row — the same faults the server rejects
+ * at save time ("exists takes no value", numeric comparator without a numeric/date
+ * value, an empty membership list), surfaced while the row is being edited instead of as
+ * a save-time dead end. Null = coherent. */
+export const conditionCoherenceIssue = (node: ConditionNode): string | null => {
+  const value = node.value
+  if (node.comparator === 'exists' || node.comparator === 'absent') {
+    const hasValue = !(value.kind === 'literal' && (value.literal === null || value.literal === ''))
+    return hasValue ? `'${node.comparator}' takes no value` : null
+  }
+  if (value.kind !== 'literal') return null
+  if (node.comparator === 'in' || node.comparator === 'not_in') {
+    return Array.isArray(value.literal) && value.literal.length === 0 ? `'${node.comparator}' needs at least one value` : null
+  }
+  if ((NUMERIC_COMPARATORS as readonly string[]).includes(node.comparator)) {
+    const raw = value.literal
+    if (raw === null || raw === undefined || raw === '') return null
+    if (typeof raw !== 'string' && typeof raw !== 'number') return `'${node.comparator}' needs a number or date`
+    const text = String(raw)
+    const numeric = !Number.isNaN(Number(text)) || !Number.isNaN(Date.parse(text))
+    return numeric ? null : `'${node.comparator}' needs a number or date`
+  }
+  return null
+}

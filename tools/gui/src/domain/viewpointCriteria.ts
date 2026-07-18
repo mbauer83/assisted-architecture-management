@@ -74,6 +74,9 @@ export interface IncidentNode {
   readonly id: string
   direction: IncidentDirection
   negate: boolean
+  /** direct | derived | both — 'both' is the union of the direct and derived incident
+   * sets, computed before any negation. Load-bearing semantics: always serialized. */
+  traversal: IncidentTraversal
   connectionCriteria: GroupNode | null
   endpointCriteria: GroupNode | null
 }
@@ -98,11 +101,12 @@ export const mkGroup = (groupKind: GroupKind, conjunction: Conjunction = 'and'):
 })
 
 export const mkIncident = (): IncidentNode => ({
-  kind: 'incident', id: nextNodeId(), direction: 'either', negate: false,
+  kind: 'incident', id: nextNodeId(), direction: 'either', negate: false, traversal: 'direct',
   connectionCriteria: mkGroup('connection'), endpointCriteria: mkGroup('entity'),
 })
 
 export type RelationshipTraversal = 'direct' | 'derived' | 'both'
+export type IncidentTraversal = 'direct' | 'derived' | 'both'
 
 export interface NeighborInclusionNode {
   readonly id: string

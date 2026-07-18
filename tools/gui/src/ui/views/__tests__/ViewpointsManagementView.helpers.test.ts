@@ -10,7 +10,7 @@ import type { ViewpointDefinitionEnvelope, ViewpointValidationIssue } from '../.
 
 const mkEnvelope = (representation: Parameters<typeof mkPresentation>[0] | null): ViewpointDefinitionEnvelope => ({
   slug: 'goal-realization', version: 1, name: 'Goal Realization', tier: 'module',
-  scope_summary: { unrestricted: true }, query_summary: null,
+  scope_summary: { unrestricted: true }, query_summary: null, fork_status: null,
   presentation: representation === null ? undefined : presentationToMapping(mkPresentation(representation)),
 })
 

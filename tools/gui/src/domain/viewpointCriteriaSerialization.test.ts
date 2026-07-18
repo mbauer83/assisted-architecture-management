@@ -86,15 +86,17 @@ describe('condition value refs', () => {
 })
 
 describe('incident conditions', () => {
-  it('omits direction when either, includes it otherwise', () => {
+  it('omits direction when either, includes it otherwise; traversal is always explicit', () => {
     const outgoing = groupFromMapping(
       { kind: 'group', conjunction: 'and', children: [{ kind: 'incident', direction: 'outgoing' }] },
       'entity',
     )
-    expect(groupToMapping(outgoing).children).toEqual([{ kind: 'incident', direction: 'outgoing' }])
+    expect(groupToMapping(outgoing).children).toEqual([
+      { kind: 'incident', direction: 'outgoing', traversal: 'direct' },
+    ])
 
     const either = groupFromMapping({ kind: 'group', conjunction: 'and', children: [{ kind: 'incident' }] }, 'entity')
-    expect(groupToMapping(either).children).toEqual([{ kind: 'incident' }])
+    expect(groupToMapping(either).children).toEqual([{ kind: 'incident', traversal: 'direct' }])
   })
 
   it('nests connection_criteria and endpoint_criteria', () => {
@@ -107,7 +109,20 @@ describe('incident conditions', () => {
       }],
     }
     const parsed = groupFromMapping(raw, 'entity')
-    expect(groupToMapping(parsed)).toEqual(raw)
+    expect(groupToMapping(parsed)).toEqual({
+      ...raw,
+      children: [{ ...raw.children[0], traversal: 'direct' }],
+    })
+  })
+
+  it('round-trips a non-default traversal instead of silently dropping it', () => {
+    for (const traversal of ['derived', 'both'] as const) {
+      const parsed = groupFromMapping(
+        { kind: 'group', conjunction: 'and', children: [{ kind: 'incident', traversal }] },
+        'entity',
+      )
+      expect(groupToMapping(parsed).children).toEqual([{ kind: 'incident', traversal }])
+    }
   })
 })
 

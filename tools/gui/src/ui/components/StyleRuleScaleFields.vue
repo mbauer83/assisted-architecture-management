@@ -1,8 +1,9 @@
 <script setup lang="ts">
 /**
- * Scale-mode fields of one style rule: the driving attribute (numeric schema attributes
- * offered via datalist, `derived.<name>` paths typed freely), optional bounds (empty =
- * data-driven), the two gradient endpoints, and a live gradient preview. Standard
+ * Scale-mode fields of one style rule: the driving attribute (a combobox over numeric
+ * schema attributes plus the query's declared `derived.<name>` entries, with an inline
+ * warning for references outside that set), optional bounds (empty = data-driven), the
+ * two gradient endpoints, and a live gradient preview. Standard
  * modelValue/update:modelValue binding on the whole rule node.
  */
 import { computed } from 'vue'
@@ -13,11 +14,18 @@ import StyleValuePicker from './StyleValuePicker.vue'
 
 const props = defineProps<{
   modelValue: StyleRuleNode
-  numericAttributes: readonly string[]
+  /** Every reference the rule may legally use: numeric schema attributes plus the
+   * query's declared `derived.<name>` entries. */
+  attributeOptions: readonly string[]
 }>()
 const emit = defineEmits<{ 'update:modelValue': [value: StyleRuleNode] }>()
 
 const emitUpdate = (patch: Partial<StyleRuleNode>) => emit('update:modelValue', { ...props.modelValue, ...patch })
+
+const unknownReference = computed(() => {
+  const value = props.modelValue.scaleAttribute
+  return value !== null && value.length > 0 && !props.attributeOptions.includes(value)
+})
 
 const endpoints = computed((): readonly [string, string] => props.modelValue.scaleTokens ?? DEFAULT_SCALE_TOKENS)
 const setEndpoint = (position: 0 | 1, token: string) => {
@@ -36,6 +44,7 @@ const gradient = computed(() => {
       scale_attribute:
       <input
         class="inp scale-attr"
+        :class="{ 'scale-attr--unknown': unknownReference }"
         :value="modelValue.scaleAttribute ?? ''"
         :list="`scale-attrs-${modelValue.id}`"
         placeholder="numeric attribute or derived.<name>"
@@ -43,11 +52,15 @@ const gradient = computed(() => {
       >
       <datalist :id="`scale-attrs-${modelValue.id}`">
         <option
-          v-for="attr in numericAttributes"
+          v-for="attr in attributeOptions"
           :key="attr"
           :value="attr"
         />
       </datalist>
+      <span
+        v-if="unknownReference"
+        class="attr-warning"
+      >not a numeric attribute or declared derived name — the rule would style nothing</span>
     </label>
     <label class="value-line">
       bounds:
@@ -90,6 +103,8 @@ const gradient = computed(() => {
 .value-line { display: flex; align-items: center; gap: 6px; font-size: 12.5px; color: #6b7280; margin-top: 8px; }
 .inp { padding: 4px 6px; border-radius: 5px; border: 1px solid #d1d5db; font-size: 12.5px; font-family: inherit; }
 .scale-attr { min-width: 220px; }
+.scale-attr--unknown { border-color: #dc2626; }
+.attr-warning { color: #dc2626; font-size: 11.5px; }
 .bound-input { width: 90px; }
 .gradient-preview { height: 10px; max-width: 280px; border-radius: 5px; border: 1px solid rgba(0,0,0,.1); margin-top: 6px; }
 </style>

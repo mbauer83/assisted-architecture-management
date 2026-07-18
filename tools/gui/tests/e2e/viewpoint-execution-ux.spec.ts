@@ -37,7 +37,7 @@ test.describe('a non-exploration definition redirects off the graph explorer', (
   test('selecting a diagram-representation viewpoint on /graph redirects to the diagram surface', async ({ page }) => {
     await page.goto('/graph?viewpoint=application-structure')
     await expect(page).toHaveURL(/\/viewpoints\/diagram\?viewpoint=application-structure/)
-    await expect(page.getByRole('heading', { name: 'application-structure (diagram)' })).toBeVisible()
+    await expect(page.getByRole('heading', { name: /Application Structure \(application-structure\) — diagram/ })).toBeVisible()
   })
 })
 

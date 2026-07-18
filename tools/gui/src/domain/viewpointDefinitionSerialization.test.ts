@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { definitionFromMapping, definitionToMapping } from './viewpointDefinitionSerialization'
+import { isEmptyQuery, queryFromScopeDraft } from './viewpointDefinitionDraft'
+import { mkQuery } from './viewpointCriteria'
 
 // Same five representative definitions exercised by the Python fixture suite — one canonical
 // mapping shared by both the Python and TypeScript parsers/serializers.
@@ -188,6 +190,63 @@ describe('canonical example round-trip', () => {
       expect(reMapping).toEqual(mapping)
     },
   )
+})
+
+describe('selection mode', () => {
+  it('every GUI save states its selection mode explicitly', () => {
+    const draft = definitionFromMapping({ slug: 'x', version: 1, name: 'X' })
+    expect(definitionToMapping(draft).selection_mode).toBe('scope')
+  })
+
+  it('legacy definitions infer the engine legacy behavior: query when present, else scope', () => {
+    const withQuery = definitionFromMapping(CANONICAL_EXAMPLES[0])
+    expect(withQuery.selectionMode).toBe('query')
+    const scopeOnly = definitionFromMapping({ slug: 'x', version: 1, name: 'X', scope: { entity_types: ['goal'] } })
+    expect(scopeOnly.selectionMode).toBe('scope')
+  })
+
+  it('round-trips a stamped mode', () => {
+    const draft = definitionFromMapping({ slug: 'x', version: 1, name: 'X', selection_mode: 'scope' })
+    expect(draft.selectionMode).toBe('scope')
+    expect(definitionToMapping(draft).selection_mode).toBe('scope')
+  })
+
+  it('drops a pristine builder query in scope mode instead of persisting a divergent layer', () => {
+    const draft = definitionFromMapping({ slug: 'x', version: 1, name: 'X', scope: { entity_types: ['goal'] } })
+    // A fresh editor session materializes an empty builder query; scope mode must not persist it.
+    draft.query = mkQuery()
+    expect(definitionToMapping(draft).query).toBeUndefined()
+  })
+
+  it('keeps a NON-empty query as inactive history in scope mode', () => {
+    const draft = definitionFromMapping(CANONICAL_EXAMPLES[0])
+    draft.selectionMode = 'scope'
+    const mapping = definitionToMapping(draft)
+    expect(mapping.selection_mode).toBe('scope')
+    expect(mapping.query).toBeDefined()
+  })
+})
+
+describe('queryFromScopeDraft conversion', () => {
+  it('translates the scope entity types to an explicit type-in condition', () => {
+    const query = queryFromScopeDraft({
+      entityTypes: ['process', 'goal'], connectionTypes: null,
+      excludedEntityTypes: [], excludedDomains: [], excludedConnectionTypes: [],
+    })
+    const [condition] = query.entityCriteria.children
+    expect(condition).toMatchObject({
+      kind: 'condition', attribute: 'type', comparator: 'in',
+      value: { kind: 'literal', literal: ['goal', 'process'] },
+    })
+  })
+
+  it('yields a match-all query for an unrestricted scope', () => {
+    const query = queryFromScopeDraft({
+      entityTypes: null, connectionTypes: null,
+      excludedEntityTypes: [], excludedDomains: [], excludedConnectionTypes: [],
+    })
+    expect(isEmptyQuery(query)).toBe(true)
+  })
 })
 
 describe('scale rule and layout wire keys', () => {

@@ -14,6 +14,7 @@ import {
   type GroupKind,
   type GroupNode,
   type IncidentDirection,
+  type IncidentTraversal,
   type IncidentNode,
   type NeighborInclusionNode,
   type Quantifier,
@@ -79,6 +80,9 @@ const incidentToMapping = (node: IncidentNode): Record<string, unknown> => {
   if (node.connectionCriteria !== null) result.connection_criteria = groupToMapping(node.connectionCriteria)
   if (node.endpointCriteria !== null) result.endpoint_criteria = groupToMapping(node.endpointCriteria)
   if (node.negate) result.negate = true
+  // Always written, even at the default — a predicate's traversal is load-bearing
+  // semantics, and dropping it on re-save would silently rewrite a loaded definition.
+  result.traversal = node.traversal
   return result
 }
 
@@ -152,6 +156,7 @@ const incidentFromMapping = (raw: Record<string, unknown>): IncidentNode => ({
   kind: 'incident', id: nextNodeId(),
   direction: (raw.direction as IncidentDirection) ?? 'either',
   negate: Boolean(raw.negate ?? false),
+  traversal: (raw.traversal as IncidentTraversal) ?? 'direct',
   connectionCriteria: raw.connection_criteria != null ? groupFromMapping(asRecord(raw.connection_criteria), 'connection') : null,
   endpointCriteria: raw.endpoint_criteria != null ? groupFromMapping(asRecord(raw.endpoint_criteria), 'entity') : null,
 })

@@ -106,4 +106,25 @@ export default tseslint.config(
       },
     },
   },
+  {
+    // This config file itself runs in Node (env-gated fast tier below reads process.env).
+    files: ['eslint.config.js'],
+    languageOptions: {
+      globals: {
+        ...globals.node,
+      },
+    },
+  },
+  // Fast tier (`npm run lint:fast`, LINT_TYPED=0): disables type-aware rules so that
+  // ESLint's per-file --cache is sound. The per-file cache cannot see the type graph:
+  // a cached "clean" verdict of a type-aware rule goes stale when OTHER files or
+  // dependencies change types, and a partial-program run (file subset) cannot resolve
+  // types at all — both produce wrong verdicts. Syntactic rules are a pure function
+  // of the single file, so caching them is correct. Type errors remain covered in the
+  // inner loop by `npm run typecheck` (vue-tsc), whose incremental mode tracks the
+  // dependency graph soundly. The authoritative full typed lint is `npm run lint`
+  // (cold, whole program) — the same thing CI runs.
+  ...(process.env.LINT_TYPED === '0'
+    ? [{ files: ['**/*.ts', '**/*.vue'], extends: [tseslint.configs.disableTypeChecked] }]
+    : []),
 )

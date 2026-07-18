@@ -1,21 +1,25 @@
 <script setup lang="ts">
 /**
- * List mode of the viewpoints management view: browse the effective merged catalog and
- * route each definition to its representation-appropriate execution surface. Fully
- * self-contained — injects the model service itself for delete, and emits only the two
- * things the parent must react to: switching into create/edit mode, and a delete having
- * changed the catalog.
+ * List mode of the viewpoints management view: browse the effective merged catalog as a
+ * decision surface (description, representation, needs-input marker, search/sort/tier
+ * filter) and route each definition to its representation-appropriate execution surface.
+ * Injects the model service itself for pins/delete, and emits only what the parent must
+ * react to: switching into create/edit mode, and a delete having changed the catalog.
  */
-import { inject, onMounted, ref } from 'vue'
+import { computed, inject, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { Effect } from 'effect'
 import { modelServiceKey } from '../keys'
 import { useWriteBlock } from '../composables/useWriteBlock'
 import { readErrorMessage } from '../lib/errors'
 import type { ViewpointDefinitionEnvelope, ViewpointReferencer } from '../../domain'
-import { executionRouteFor, formatScopeSummary } from '../views/ViewpointsManagementView.helpers'
+import { executionRouteFor } from '../views/ViewpointsManagementView.helpers'
+import {
+  CREATE_CAPABILITY_COPY, filterAndSortDefinitions, type CatalogSortDirection, type CatalogSortKey,
+} from './ViewpointDefinitionsList.helpers'
+import ViewpointCatalogRow from './ViewpointCatalogRow.vue'
 
-defineProps<{ definitions: readonly ViewpointDefinitionEnvelope[] }>()
+const props = defineProps<{ definitions: readonly ViewpointDefinitionEnvelope[] }>()
 const emit = defineEmits<{ create: []; edit: [envelope: ViewpointDefinitionEnvelope]; refresh: []; error: [message: string] }>()
 
 const svc = inject(modelServiceKey)!
@@ -23,6 +27,32 @@ const writeBlocked = useWriteBlock()
 const router = useRouter()
 
 const executeViewpoint = (envelope: ViewpointDefinitionEnvelope) => void router.push(executionRouteFor(envelope))
+
+// ── Search / tier filter / sort ──────────────────────────────────────────────
+const search = ref('')
+const tierFilter = ref<ViewpointDefinitionEnvelope['tier'] | ''>('')
+const sortKey = ref<CatalogSortKey | null>(null)
+const sortDirection = ref<CatalogSortDirection>('asc')
+const toggleSort = (key: CatalogSortKey) => {
+  if (sortKey.value === key) {
+    sortDirection.value = sortDirection.value === 'asc' ? 'desc' : 'asc'
+  } else {
+    sortKey.value = key
+    sortDirection.value = 'asc'
+  }
+}
+const visibleDefinitions = computed(() =>
+  filterAndSortDefinitions(props.definitions, search.value, tierFilter.value, sortKey.value, sortDirection.value))
+const ariaSortFor = (key: CatalogSortKey) =>
+  sortKey.value === key ? (sortDirection.value === 'asc' ? 'ascending' : 'descending') : undefined
+
+const expandedScopes = ref<Set<string>>(new Set())
+const toggleScope = (slug: string) => {
+  const next = new Set(expandedScopes.value)
+  if (next.has(slug)) next.delete(slug)
+  else next.add(slug)
+  expandedScopes.value = next
+}
 
 // ── Pins (Home quick access) ─────────────────────────────────────────────────
 const pinnedSlugs = ref<Set<string>>(new Set())
@@ -59,14 +89,49 @@ const deleteDefinition = (envelope: ViewpointDefinitionEnvelope) => {
 
 <template>
   <div>
-    <button
-      type="button"
-      class="primary-btn"
-      :disabled="writeBlocked"
-      @click="emit('create')"
-    >
-      + New viewpoint
-    </button>
+    <div class="catalog-toolbar">
+      <div class="create-block">
+        <button
+          type="button"
+          class="primary-btn"
+          :disabled="writeBlocked"
+          :title="writeBlocked
+            ? 'Creating a viewpoint needs engagement write access — this session is read-only'
+            : 'Starts a NEW blank definition (no lineage). To adapt an existing one, open it and use Save as…'"
+          @click="emit('create')"
+        >
+          + Create viewpoint
+        </button>
+        <span class="capability-copy">{{ CREATE_CAPABILITY_COPY }}</span>
+      </div>
+      <div class="filter-block">
+        <input
+          v-model="search"
+          type="search"
+          class="catalog-search"
+          placeholder="Search name, slug, description…"
+          aria-label="Search viewpoints"
+        >
+        <select
+          v-model="tierFilter"
+          class="tier-filter"
+          aria-label="Filter by tier"
+        >
+          <option value="">
+            all tiers
+          </option>
+          <option value="engagement">
+            engagement
+          </option>
+          <option value="enterprise">
+            enterprise
+          </option>
+          <option value="module">
+            module
+          </option>
+        </select>
+      </div>
+    </div>
     <div
       v-if="blockedDelete"
       class="blocked-panel"
@@ -96,96 +161,103 @@ const deleteDefinition = (envelope: ViewpointDefinitionEnvelope) => {
         Dismiss
       </button>
     </div>
-    <table class="def-table">
+    <p
+      v-if="visibleDefinitions.length === 0"
+      class="empty-state"
+    >
+      <template v-if="definitions.length === 0">
+        No viewpoints yet.
+      </template>
+      <template v-else>
+        No viewpoint matches this search.
+      </template>
+      No viewpoint fits? <button
+        type="button"
+        class="empty-create-link"
+        :disabled="writeBlocked"
+        @click="emit('create')"
+      >
+        Create one
+      </button> — {{ CREATE_CAPABILITY_COPY.toLowerCase() }}
+    </p>
+    <table
+      v-else
+      class="def-table"
+    >
       <thead>
         <tr>
-          <th>Slug</th><th>Name</th><th>Version</th><th>Tier</th><th>Scope</th><th />
+          <th
+            class="sortable"
+            :aria-sort="ariaSortFor('name')"
+            @click="toggleSort('name')"
+          >
+            Viewpoint <span
+              v-if="sortKey === 'name'"
+              class="sort-arrow"
+            >{{ sortDirection === 'asc' ? '▲' : '▼' }}</span>
+          </th>
+          <th
+            class="sortable"
+            :aria-sort="ariaSortFor('version')"
+            @click="toggleSort('version')"
+          >
+            Version <span
+              v-if="sortKey === 'version'"
+              class="sort-arrow"
+            >{{ sortDirection === 'asc' ? '▲' : '▼' }}</span>
+          </th>
+          <th
+            class="sortable"
+            :aria-sort="ariaSortFor('tier')"
+            @click="toggleSort('tier')"
+          >
+            Tier <span
+              v-if="sortKey === 'tier'"
+              class="sort-arrow"
+            >{{ sortDirection === 'asc' ? '▲' : '▼' }}</span>
+          </th>
+          <th>Scope</th><th />
         </tr>
       </thead>
       <tbody>
-        <tr
-          v-for="def in definitions"
+        <ViewpointCatalogRow
+          v-for="def in visibleDefinitions"
           :key="def.slug"
-        >
-          <td>{{ def.slug }}</td>
-          <td>{{ def.name }}</td>
-          <td>{{ def.version }}</td>
-          <td>
-            <span
-              class="tier-tag"
-              :class="`tier-${def.tier}`"
-            >{{ def.tier }}</span>
-          </td>
-          <td>{{ formatScopeSummary(def.scope_summary) }}</td>
-          <td>
-            <div class="row-actions">
-              <button
-                type="button"
-                class="pin-btn"
-                :class="{ 'pin-btn--active': isPinned(def.slug) }"
-                :aria-label="isPinned(def.slug) ? `Unpin ${def.slug}` : `Pin ${def.slug}`"
-                :aria-pressed="isPinned(def.slug)"
-                @click="togglePin(def.slug)"
-              >
-                {{ isPinned(def.slug) ? '★' : '☆' }}
-              </button>
-              <button
-                type="button"
-                class="btn"
-                @click="executeViewpoint(def)"
-              >
-                Execute
-              </button>
-              <button
-                v-if="def.tier === 'engagement'"
-                type="button"
-                class="btn"
-                :disabled="writeBlocked"
-                @click="emit('edit', def)"
-              >
-                Edit
-              </button>
-              <button
-                v-if="def.tier === 'engagement'"
-                type="button"
-                class="btn btn--danger"
-                :disabled="writeBlocked"
-                @click="deleteDefinition(def)"
-              >
-                Delete
-              </button>
-              <button
-                v-else
-                type="button"
-                class="btn"
-                @click="emit('edit', def)"
-              >
-                View
-              </button>
-            </div>
-          </td>
-        </tr>
+          :def="def"
+          :pinned="isPinned(def.slug)"
+          :scope-expanded="expandedScopes.has(def.slug)"
+          :write-blocked="writeBlocked"
+          @execute="executeViewpoint(def)"
+          @edit="emit('edit', def)"
+          @delete="deleteDefinition(def)"
+          @toggle-pin="togglePin(def.slug)"
+          @toggle-scope="toggleScope(def.slug)"
+        />
       </tbody>
     </table>
   </div>
 </template>
 
 <style scoped>
-.primary-btn { background: #6366f1; color: #fff; border: none; border-radius: 7px; padding: 8px 16px; font-weight: 600; cursor: pointer; margin-bottom: 12px; }
+.catalog-toolbar { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; margin-bottom: 12px; flex-wrap: wrap; }
+.create-block { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.capability-copy { font-size: 12px; color: #6b7280; }
+.filter-block { display: flex; align-items: center; gap: 8px; }
+.catalog-search { padding: 7px 10px; border-radius: 6px; border: 1px solid #d1d5db; font-size: 13px; min-width: 220px; }
+.tier-filter { padding: 7px 8px; border-radius: 6px; border: 1px solid #d1d5db; font-size: 12.5px; background: #fff; color: #374151; }
+.primary-btn { background: #6366f1; color: #fff; border: none; border-radius: 7px; padding: 8px 16px; font-weight: 600; cursor: pointer; }
 .primary-btn:disabled { opacity: .5; cursor: not-allowed; }
+.empty-state { font-size: 13px; color: #6b7280; background: #f9fafb; border: 1px dashed #d1d5db; border-radius: 8px; padding: 14px 16px; }
+.empty-create-link { appearance: none; border: none; background: none; color: #4338ca; font-weight: 600; text-decoration: underline; cursor: pointer; font-size: 13px; padding: 0; }
+.empty-create-link:disabled { color: #9ca3af; cursor: not-allowed; }
 .blocked-panel { background: #fee2e2; color: #991b1b; border-radius: 8px; padding: 10px 14px; margin-bottom: 12px; font-size: 13px; }
 .blocked-panel ul { margin: 6px 0; padding-left: 18px; }
 .referencer-link { appearance: none; border: none; background: none; color: #991b1b; text-decoration: underline; cursor: pointer; font-size: 13px; padding: 0; }
 .def-table { width: 100%; border-collapse: collapse; }
-.def-table th, .def-table td { text-align: left; padding: 6px 10px; border-bottom: 1px solid #e5e7eb; font-size: 13px; }
-.tier-tag { font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 99px; }
-.tier-engagement { background: #dcfce7; color: #166534; }
-.tier-enterprise { background: #dbeafe; color: #1e40af; }
-.tier-module { background: #f3f4f6; color: #6b7280; }
-.pin-btn { border: none; background: none; cursor: pointer; font-size: 15px; color: #d1d5db; padding: 0 4px; }
-.pin-btn--active { color: #d97706; }
-.def-table td:last-child { white-space: nowrap; }
-.row-actions { display: flex; align-items: center; gap: 6px; }
+.def-table th, .def-table td { text-align: left; padding: 6px 10px; border-bottom: 1px solid #e5e7eb; font-size: 13px; vertical-align: top; }
+.sortable { cursor: pointer; user-select: none; white-space: nowrap; }
+.sortable:hover { color: #4338ca; }
+.sort-arrow { font-size: 9px; }
 .btn { appearance: none; border: 1px solid #d1d5db; background: #fff; color: #374151; border-radius: 6px; padding: 5px 12px; font-size: 12.5px; font-weight: 600; cursor: pointer; }
 .btn:hover:not(:disabled) { border-color: #6366f1; color: #4338ca; }
 .btn:disabled { opacity: .5; cursor: not-allowed; }

@@ -24,7 +24,7 @@ const groupWith = (childTag: string): { group: SVGElement; child: SVGElement } =
 describe('toEntitySummaryStub', () => {
   const entity: EntityItemSummary = {
     id: 'APC@1.EntSch.a', name: 'Alpha', type: 'application-component',
-    specialization_slugs: [], group: 'uncategorized', membership: 'primary',
+    specialization_slugs: [], group: 'uncategorized', membership: 'primary', status: 'draft', version: '1', column_values: null, anchor_modeled_distance: null, matched_via_derived_hops: null,
   }
 
   it('falls back to the raw artifact id when no alias lookup is given', () => {
@@ -43,7 +43,7 @@ describe('toEntitySummaryStub', () => {
 
 describe('toDiagramConnectionStub', () => {
   const conn: ConnectionItemSummary = {
-    id: 'c1', type: 'serving', source: 'a', target: 'b', certainty: null, hops: null, via_connection_ids: [],
+    id: 'c1', type: 'serving', source: 'a', target: 'b', certainty: null, hops: null, via_connection_ids: [], witness_steps: [],
   }
 
   it('falls back to the raw source/target artifact ids when no alias lookup is given', () => {
@@ -73,7 +73,7 @@ describe('toDiagramConnectionStub', () => {
   it('carries certainty/hops/via_connection_ids straight through for a derived connection', () => {
     const derived: ConnectionItemSummary = {
       id: 'derived::archimate-serving::x', type: 'archimate-serving', source: 'a', target: 'b',
-      certainty: 'potential', hops: 3, via_connection_ids: ['CON@1', 'CON@2', 'CON@3'],
+      certainty: 'potential', hops: 3, via_connection_ids: ['CON@1', 'CON@2', 'CON@3'], witness_steps: [],
     }
     const stub = toDiagramConnectionStub(derived)
     expect(stub.certainty).toBe('potential')
@@ -246,7 +246,7 @@ describe('applyAnchorMarker', () => {
 describe('anchorBadges', () => {
   const entity = (id: string, name: string): EntityItemSummary => ({
     id, name, type: 'application-component',
-    specialization_slugs: [], group: 'uncategorized', membership: 'primary',
+    specialization_slugs: [], group: 'uncategorized', membership: 'primary', status: 'draft', version: '1', column_values: null, anchor_modeled_distance: null, matched_via_derived_hops: null,
   })
 
   it('resolves each anchor id to its entity name', () => {

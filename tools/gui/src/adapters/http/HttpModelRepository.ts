@@ -1,6 +1,6 @@
-import { Effect, Schema, ParseResult, Either } from 'effect'
+import { Effect, Schema, Either } from 'effect'
 import type { ModelRepository, ListParams, Direction } from '../../ports/ModelRepository'
-import { NetworkError, NotFoundError } from '../../domain/errors'
+import { NetworkError } from '../../domain/errors'
 import {
   StatsSchema,
   EntityListSchema,
@@ -57,180 +57,17 @@ import {
   ViewpointExecutionResultSchema,
 } from '../../domain/schemas'
 import { SyncChangesResultSchema } from '../../domain/schemas-changes'
+import {
+  buildUrl, deleteReq, fetchJson, fetchJsonNotFound, fetchText, fetchWithTimeout,
+  patchJson, postJson, putJson,
+} from './httpTransport'
 import { parseMarkdown } from '../../application/MarkdownService'
 
-// ── Helpers ───────────────────────────────────────────────────────────────────
-
-const REQUEST_TIMEOUT_MS = 10000
 // Viewpoint execution runs bounded graph derivation over the scoped population — legitimately
-// slower than the CRUD/read endpoints above, especially against a cold index. The 10s default
-// exists to fail fast on a genuinely hung request; that's the wrong bound for these routes.
+// slower than the CRUD/read endpoints above, especially against a cold index. The 10s transport
+// default exists to fail fast on a genuinely hung request; that's the wrong bound for these routes.
 const VIEWPOINT_EXECUTION_TIMEOUT_MS = 60000
 let serverInfoPromise: Promise<unknown> | null = null
-
-const buildUrl = (
-  path: string,
-  params?: Readonly<Record<string, string | number | boolean | undefined>>,
-  adminPath?: boolean,
-): string => {
-  const url = new URL((adminPath ? '/admin/api' : '/api') + path, window.location.origin)
-  if (params) {
-    for (const [k, v] of Object.entries(params)) {
-      if (v !== undefined) url.searchParams.set(k, String(v))
-    }
-  }
-  return url.toString()
-}
-
-const fetchWithTimeout = async (
-  url: string,
-  init?: RequestInit,
-  timeoutMs: number = REQUEST_TIMEOUT_MS,
-): Promise<Response> => {
-  const controller = new AbortController()
-  const timeout = window.setTimeout(() => controller.abort(new DOMException(`Timed out after ${timeoutMs}ms`, 'TimeoutError')), timeoutMs)
-  try {
-    return await fetch(url, { ...init, signal: controller.signal })
-  } catch (error) {
-    console.error('HTTP request failed', {
-      url,
-      method: init?.method ?? 'GET',
-      timeoutMs,
-      error,
-    })
-    throw error
-  } finally {
-    window.clearTimeout(timeout)
-  }
-}
-
-const fetchJson = <A, I>(
-  url: string,
-  schema: Schema.Schema<A, I>,
-  timeoutMs?: number,
-): Effect.Effect<A, NetworkError | ParseResult.ParseError> =>
-  Effect.tryPromise({
-    try: async () => {
-      const resp = await fetchWithTimeout(url, undefined, timeoutMs)
-      if (resp.status === 404) throw new NotFoundError({ id: url })
-      if (!resp.ok) throw new NetworkError({ status: resp.status, message: resp.statusText })
-      return resp.json() as Promise<unknown>
-    },
-    catch: (e) =>
-      e instanceof NetworkError ? e : new NetworkError({ status: 0, message: String(e) }),
-  }).pipe(Effect.flatMap(Schema.decodeUnknown(schema)))
-
-const fetchJsonNotFound = <A, I>(
-  url: string,
-  schema: Schema.Schema<A, I>,
-  id: string,
-): Effect.Effect<A, NetworkError | ParseResult.ParseError | NotFoundError> =>
-  Effect.tryPromise({
-    try: async () => {
-      const resp = await fetchWithTimeout(url)
-      if (resp.status === 404) throw new NotFoundError({ id })
-      if (!resp.ok) throw new NetworkError({ status: resp.status, message: resp.statusText })
-      return resp.json() as Promise<unknown>
-    },
-    catch: (e) => {
-      if (e instanceof NotFoundError || e instanceof NetworkError) return e
-      return new NetworkError({ status: 0, message: String(e) })
-    },
-  }).pipe(Effect.flatMap(Schema.decodeUnknown(schema)))
-
-const fetchText = (url: string): Effect.Effect<string, NetworkError> =>
-  Effect.tryPromise({
-    try: async () => {
-      const resp = await fetchWithTimeout(url)
-      if (!resp.ok) throw new NetworkError({ status: resp.status, message: resp.statusText })
-      return resp.text()
-    },
-    catch: (e) => e instanceof NetworkError ? e : new NetworkError({ status: 0, message: String(e) }),
-  })
-
-const postJson = <A, I>(
-  url: string,
-  body: unknown,
-  schema: Schema.Schema<A, I>,
-  timeoutMs?: number,
-): Effect.Effect<A, NetworkError | ParseResult.ParseError> =>
-  Effect.tryPromise({
-    try: async () => {
-      const resp = await fetchWithTimeout(url, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body),
-      }, timeoutMs)
-      if (!resp.ok) {
-        const text = await resp.text().catch(() => resp.statusText)
-        throw new NetworkError({ status: resp.status, message: text })
-      }
-      return resp.json() as Promise<unknown>
-    },
-    catch: (e) =>
-      e instanceof NetworkError ? e : new NetworkError({ status: 0, message: String(e) }),
-  }).pipe(Effect.flatMap(Schema.decodeUnknown(schema)))
-
-const putJson = <A, I>(
-  url: string,
-  body: unknown,
-  schema: Schema.Schema<A, I>,
-): Effect.Effect<A, NetworkError | ParseResult.ParseError> =>
-  Effect.tryPromise({
-    try: async () => {
-      const resp = await fetchWithTimeout(url, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body),
-      })
-      if (!resp.ok) {
-        const text = await resp.text().catch(() => resp.statusText)
-        throw new NetworkError({ status: resp.status, message: text })
-      }
-      return resp.json() as Promise<unknown>
-    },
-    catch: (e) =>
-      e instanceof NetworkError ? e : new NetworkError({ status: 0, message: String(e) }),
-  }).pipe(Effect.flatMap(Schema.decodeUnknown(schema)))
-
-const patchJson = <A, I>(
-  url: string,
-  body: unknown,
-  schema: Schema.Schema<A, I>,
-): Effect.Effect<A, NetworkError | ParseResult.ParseError> =>
-  Effect.tryPromise({
-    try: async () => {
-      const resp = await fetchWithTimeout(url, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body),
-      })
-      if (!resp.ok) {
-        const text = await resp.text().catch(() => resp.statusText)
-        throw new NetworkError({ status: resp.status, message: text })
-      }
-      return resp.json() as Promise<unknown>
-    },
-    catch: (e) =>
-      e instanceof NetworkError ? e : new NetworkError({ status: 0, message: String(e) }),
-  }).pipe(Effect.flatMap(Schema.decodeUnknown(schema)))
-
-const deleteReq = <A, I>(
-  url: string,
-  schema: Schema.Schema<A, I>,
-): Effect.Effect<A, NetworkError | ParseResult.ParseError> =>
-  Effect.tryPromise({
-    try: async () => {
-      const resp = await fetchWithTimeout(url, { method: 'DELETE' })
-      if (!resp.ok) {
-        const text = await resp.text().catch(() => resp.statusText)
-        throw new NetworkError({ status: resp.status, message: text })
-      }
-      return resp.json() as Promise<unknown>
-    },
-    catch: (e) =>
-      e instanceof NetworkError ? e : new NetworkError({ status: 0, message: String(e) }),
-  }).pipe(Effect.flatMap(Schema.decodeUnknown(schema)))
 
 // ── Factory ───────────────────────────────────────────────────────────────────
 
@@ -477,6 +314,22 @@ export const makeHttpModelRepository = (): ModelRepository => ({
     postJson(buildUrl('/viewpoints/summarize'), { query }, ViewpointSummarizeResultSchema).pipe(
       Effect.map((r) => r.summary),
     ),
+  exportViewpointCsv: (body) =>
+    Effect.tryPromise({
+      try: async () => {
+        const resp = await fetchWithTimeout(buildUrl('/viewpoints/export-csv'), {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body),
+        })
+        if (!resp.ok) {
+          const text = await resp.text().catch(() => resp.statusText)
+          throw new NetworkError({ status: resp.status, message: text })
+        }
+        return resp.text()
+      },
+      catch: (e) => (e instanceof NetworkError ? e : new NetworkError({ status: 0, message: String(e) })),
+    }),
   createViewpointDefinition: (body) => postJson(buildUrl('/viewpoints'), body, ViewpointPersistResultSchema),
   editViewpointDefinition: (body) => postJson(buildUrl('/viewpoints/edit'), body, ViewpointPersistResultSchema),
   deleteViewpointDefinition: (body) => postJson(buildUrl('/viewpoints/remove'), body, ViewpointPersistResultSchema),

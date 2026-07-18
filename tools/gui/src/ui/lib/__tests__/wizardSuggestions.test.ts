@@ -12,7 +12,7 @@ import type { EntityDisplayInfo } from '../../../domain'
 
 const entity = (artifact_id: string, name: string): EntityDisplayInfo => ({
   artifact_id, name, artifact_type: 'outcome', domain: 'motivation', subdomain: '',
-  status: 'draft', display_alias: artifact_id, element_type: 'outcome', element_label: 'Outcome',
+  status: 'draft', display_alias: artifact_id, element_type: 'outcome', element_label: 'Outcome', diagram_internal: false,
 })
 
 describe('legalConnectionPairs', () => {

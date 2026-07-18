@@ -5,7 +5,7 @@
  * flow as a seed.
  */
 
-import type { ColumnSpecNode } from '../../domain/viewpointPresentation'
+import type { ColumnSpecNode, PresentationNode } from '../../domain/viewpointPresentation'
 import type { EntityItemSummary, ProjectedOccurrence, ViewpointProjection } from '../../domain'
 
 export const filtersToEntityCriteriaMapping = (domain: string, artifactType: string): Record<string, unknown> => {
@@ -22,24 +22,40 @@ export const filtersToEntityCriteriaMapping = (domain: string, artifactType: str
 export const projectionByItemId = (projection: ViewpointProjection | null): ReadonlyMap<string, ProjectedOccurrence> =>
   new Map((projection?.items ?? []).map((item) => [item.item_id, item]))
 
-/** §3.3 reserved paths resolvable from the fixed, unstyled `EntityItemSummary` — every
- * other reserved path (`domain`/`subdomain`/`status`/`version`) and any schema attribute
- * path is NOT resolvable here: the summary carries no properties map and no record fields
- * beyond these (the same category of gap WU-E8 recorded for `group_by`). */
+const formatColumnValue = (value: unknown): string =>
+  Array.isArray(value) ? value.map((item) => String(item)).join(', ') : String(value)
+
+/** Column resolution order: the execution's server-resolved `column_values` first (they
+ * carry every authored source — schema attributes and `derived.<name>` included — with
+ * explicit nulls for missing values), then the reserved paths the fixed summary carries
+ * directly. Null means "this entity has no value", rendered as an em dash. */
 export const resolveSummaryColumnValue = (entity: EntityItemSummary, source: string): string | null => {
+  const serverValues = entity.column_values
+  if (serverValues != null && source in serverValues) {
+    const value = serverValues[source]
+    return value == null ? null : formatColumnValue(value)
+  }
   switch (source) {
     case 'id': return entity.id
     case 'name': return entity.name
     case 'type': return entity.type
     case 'specialization': return entity.specialization_slugs.join(', ') || null
     case 'group': return entity.group
+    case 'status': return entity.status || null
+    case 'version': return entity.version || null
     default: return null
   }
 }
 
-export const RESOLVABLE_COLUMN_SOURCES: readonly string[] = ['id', 'name', 'type', 'specialization', 'group']
+export const RESOLVABLE_COLUMN_SOURCES: readonly string[] = [
+  'id', 'name', 'type', 'specialization', 'group', 'status', 'version',
+]
 
-export const isColumnSourceResolvable = (source: string): boolean => RESOLVABLE_COLUMN_SOURCES.includes(source)
+/** A column source is renderable when the server resolved it into `column_values` or
+ * the fixed summary carries it directly — anything else gets the header's
+ * "not available" marker instead of a silently blank column. */
+export const isColumnSourceResolvable = (source: string, entity?: EntityItemSummary): boolean =>
+  (entity?.column_values != null && source in entity.column_values) || RESOLVABLE_COLUMN_SOURCES.includes(source)
 
 export interface TableColumn {
   readonly label: string
@@ -91,3 +107,33 @@ export const groupTableRows = (
   }
   return [...byKey.entries()].sort(([a], [b]) => a.localeCompare(b)).map(([groupKey, groupEntities]) => ({ groupKey, entities: groupEntities }))
 }
+
+export type SortDirection = 'asc' | 'desc'
+
+/** Stable sort by a column source's resolved display value (missing values last),
+ * numeric-aware so versions/counts don't sort lexicographically. */
+export const sortEntitiesBy = (
+  entities: readonly EntityItemSummary[],
+  source: string,
+  direction: SortDirection,
+): EntityItemSummary[] => {
+  const factor = direction === 'asc' ? 1 : -1
+  return [...entities].sort((a, b) => {
+    const left = resolveSummaryColumnValue(a, source)
+    const right = resolveSummaryColumnValue(b, source)
+    if (left === null && right === null) return 0
+    if (left === null) return 1
+    if (right === null) return -1
+    const leftNum = Number(left)
+    const rightNum = Number(right)
+    if (!Number.isNaN(leftNum) && !Number.isNaN(rightNum)) return (leftNum - rightNum) * factor
+    return left.localeCompare(right) * factor
+  })
+}
+
+/** The Style column earns its slot only when the definition actually styles table rows
+ * (a `badges` rule or default) — a permanently empty column is noise, not a feature. */
+export const hasBadgeStyling = (presentation: PresentationNode | null): boolean =>
+  presentation !== null
+  && (presentation.stylingRules.some((rule) => rule.capability === 'badges')
+    || 'badges' in presentation.defaultStyle)

@@ -23,6 +23,11 @@ const svc = inject(modelServiceKey)!
 const route = useRoute()
 const router = useRouter()
 
+// A viewpoint-driven execution surface (/entities?viewpoint=…, /graph?viewpoint=…)
+// belongs to Viewpoints in the user's mental model — highlight follows the origin, not
+// the host path.
+const viewpointDriven = computed(() => Boolean(route.query.viewpoint))
+
 const browseTo = computed(() => {
   const q: Record<string, string> = {}
   const { domain, view, type } = route.query
@@ -129,7 +134,10 @@ onMounted(async () => {
           >
             ● Save
           </button>
-          <RouterLink :to="browseTo">
+          <RouterLink
+            :to="browseTo"
+            :class="{ 'nav__link--suppressed': viewpointDriven }"
+          >
             Browse
           </RouterLink>
           <RouterLink to="/documents">
@@ -138,7 +146,10 @@ onMounted(async () => {
           <RouterLink to="/diagrams">
             Diagrams
           </RouterLink>
-          <RouterLink to="/viewpoints">
+          <RouterLink
+            to="/viewpoints"
+            :class="{ 'nav__link--forced-active': viewpointDriven }"
+          >
             Viewpoints
           </RouterLink>
           <RouterLink
@@ -270,6 +281,8 @@ onMounted(async () => {
 .nav__links a { color: #b0bec5; font-size: 13px; padding: 4px 8px; border-radius: 4px; white-space: nowrap; }
 .nav__links a.router-link-active { color: #f8fafc; font-weight: 500; background: #2d3f55; }
 .nav__links a:hover { color: #f1f5f9; text-decoration: none; background: #263347; }
+.nav__links a.nav__link--suppressed.router-link-active { color: #b0bec5; font-weight: 400; background: transparent; }
+.nav__links a.nav__link--forced-active { color: #f8fafc; font-weight: 500; background: #2d3f55; }
 .nav__promote { color: #fbbf24 !important; }
 .nav__promote:hover { color: #f59e0b !important; }
 .nav__save-btn { background: #166534; color: #bbf7d0; border: none; border-radius: 4px; font-size: 12px; font-weight: 600; padding: 3px 9px; cursor: pointer; white-space: nowrap; flex-shrink: 0; }

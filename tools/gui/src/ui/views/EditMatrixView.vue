@@ -72,7 +72,7 @@ const stub = (id: string): EntityDisplayInfo => ({
   artifact_type: '',
   domain: '',
   subdomain: '', status: '', display_alias: '',
-  element_type: '', element_label: id,
+  element_type: '', element_label: id, diagram_internal: false,
 })
 
 onMounted(async () => {

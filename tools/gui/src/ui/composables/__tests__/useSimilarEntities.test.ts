@@ -5,7 +5,7 @@ import type { EntityDisplayInfo } from '../../../domain'
 
 const entity = (artifact_id: string, name: string): EntityDisplayInfo => ({
   artifact_id, name, artifact_type: 'stakeholder', domain: 'motivation', subdomain: '',
-  status: 'draft', display_alias: artifact_id, element_type: 'stakeholder', element_label: 'Stakeholder',
+  status: 'draft', display_alias: artifact_id, element_type: 'stakeholder', element_label: 'Stakeholder', diagram_internal: false,
 })
 
 describe('useSimilarEntities', () => {

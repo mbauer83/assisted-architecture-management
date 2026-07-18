@@ -42,6 +42,7 @@ describe('derivedLegend', () => {
         id: 'r1', capability: 'badges', appliesTo: [], mode: 'match', matchCriteria: mkGroup('entity'),
         rangeAttribute: null, rangeBands: [], value: 'critical',
         scaleAttribute: null, scaleMin: null, scaleMax: null, scaleTokens: null,
+        sourceCriteria: null, targetCriteria: null, disabled: false,
       },
       {
         id: 'r2', capability: 'badges', appliesTo: [], mode: 'range', matchCriteria: null, rangeAttribute: 'risk_score',
@@ -51,6 +52,7 @@ describe('derivedLegend', () => {
         ],
         value: null,
         scaleAttribute: null, scaleMin: null, scaleMax: null, scaleTokens: null,
+        sourceCriteria: null, targetCriteria: null, disabled: false,
       },
     ]
     presentation.defaultStyle = { badges: 'neutral' }
@@ -70,6 +72,7 @@ describe('derivedLegend', () => {
         rangeAttribute: null, rangeBands: [], value: null,
         scaleAttribute: 'derived.impact-distance', scaleMin: null, scaleMax: null,
         scaleTokens: ['heat-near', '#123456'],
+        sourceCriteria: null, targetCriteria: null, disabled: false,
       },
     ]
     expect(derivedLegend(presentation)).toEqual([

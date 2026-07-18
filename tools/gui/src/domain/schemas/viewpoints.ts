@@ -43,12 +43,36 @@ export const ProjectedOccurrenceSchema = Schema.Struct({
 })
 export type ProjectedOccurrence = typeof ProjectedOccurrenceSchema.Type
 
+export const ScaleLegendDataSchema = Schema.Struct({
+  capability: Schema.String,
+  attribute: Schema.String,
+  minimum: Schema.Number,
+  maximum: Schema.Number,
+  tokens: Schema.Array(Schema.String),
+})
+export type ScaleLegendData = typeof ScaleLegendDataSchema.Type
+
+/** One authored style rule's observable outcome for an execution — the "no silent
+ * no-op" contract. `expected-empty` is a legitimate state rendered as a quiet badge;
+ * `unresolvable` and `shadowed` also arrive as warnings. */
+export const StyleRuleOutcomeSchema = Schema.Struct({
+  rule_index: Schema.Number,
+  capability: Schema.String,
+  kind: Schema.Literal('applied', 'expected-empty', 'shadowed', 'unresolvable', 'disabled'),
+  matched_count: Schema.Number,
+  applied_count: Schema.Number,
+  detail: Schema.NullOr(Schema.String),
+})
+export type StyleRuleOutcome = typeof StyleRuleOutcomeSchema.Type
+
 export const ViewpointProjectionSchema = Schema.Struct({
   applied: Schema.Boolean,
   target: Schema.optional(Schema.Literal('repository', 'diagram', 'matrix')),
   items: Schema.optional(Schema.Array(ProjectedOccurrenceSchema)),
   stale_pin: Schema.optional(Schema.Boolean),
   warnings: Schema.optional(Schema.Array(Schema.String)),
+  scale_legends: Schema.optional(Schema.Array(ScaleLegendDataSchema)),
+  rule_outcomes: Schema.optional(Schema.Array(StyleRuleOutcomeSchema)),
 })
 export type ViewpointProjection = typeof ViewpointProjectionSchema.Type
 
@@ -64,8 +88,38 @@ export const EntityItemSummarySchema = Schema.Struct({
   specialization_slugs: Schema.Array(Schema.String),
   group: Schema.String,
   membership: Schema.Literal('primary', 'expanded'),
+  status: Schema.optionalWith(Schema.String, { default: () => '' }),
+  version: Schema.optionalWith(Schema.String, { default: () => '' }),
+  /** Present when the definition authors table columns: one entry per column source,
+   * resolved server-side at the execution's snapshot; a source with no value for this
+   * entity is explicitly null. */
+  column_values: Schema.optionalWith(
+    Schema.NullOr(Schema.Record({ key: Schema.String, value: Schema.NullOr(Schema.Unknown) })),
+    { default: () => null },
+  ),
+  /** Modeled hop distance from the nearest anchor (0 = anchor, 1 = direct modeled edge,
+   * N = minimum derived witness-chain length). Null/absent when the execution is
+   * unanchored or the entity has no connecting edge to any anchor (unranked — rendered
+   * as its own state, never as distance 0 or 1). */
+  anchor_modeled_distance: Schema.optionalWith(Schema.NullOr(Schema.Number), { default: () => null }),
+  /** Set when this entity's criteria match required derived-relationship evidence: the
+   * minimum witness-chain length the verdict rested on. Null when the match holds on
+   * modeled facts alone — surfaces tag such rows "matched via derived (N hops)". */
+  matched_via_derived_hops: Schema.optionalWith(Schema.NullOr(Schema.Number), { default: () => null }),
 })
 export type EntityItemSummary = typeof EntityItemSummarySchema.Type
+
+/** One step of a derived connection's witness chain, already ordered source→target by
+ * the server (`via_connection_ids` is unordered membership and never renderable as-is). */
+export const WitnessStepSchema = Schema.Struct({
+  connection_id: Schema.String,
+  source: Schema.String,
+  target: Schema.String,
+  connection_type: Schema.String,
+  direction: Schema.Literal('forward', 'reverse'),
+  hop_index: Schema.Number,
+})
+export type WitnessStep = typeof WitnessStepSchema.Type
 
 export const ConnectionItemSummarySchema = Schema.Struct({
   id: Schema.String,
@@ -75,6 +129,9 @@ export const ConnectionItemSummarySchema = Schema.Struct({
   certainty: Schema.NullOr(Schema.Literal('certain', 'potential')),
   hops: Schema.NullOr(Schema.Number),
   via_connection_ids: Schema.Array(Schema.String),
+  /** Empty for modeled connections, and for a derived connection whose chain could not
+   * be reconstructed (renderers show that as "chain unavailable", never as no chain). */
+  witness_steps: Schema.optionalWith(Schema.Array(WitnessStepSchema), { default: () => [] }),
 })
 export type ConnectionItemSummary = typeof ConnectionItemSummarySchema.Type
 
@@ -83,6 +140,48 @@ export const MatrixAxisIdsSchema = Schema.Struct({
   column_entity_ids: Schema.Array(Schema.String),
 })
 export type MatrixAxisIds = typeof MatrixAxisIdsSchema.Type
+
+/** Classification of the FULL result against the definition's declared target
+ * population — absent when the target population is unknown, in which case headers show
+ * plain counts and make NO absence claims. */
+export const AggregateNodeSchema = Schema.Struct({
+  id: Schema.String,
+  dimension: Schema.Literal('group', 'domain', 'type'),
+  dimension_value: Schema.String,
+  entity_type: Schema.String,
+  member_count: Schema.Number,
+  member_ids: Schema.Array(Schema.String),
+})
+export type AggregateNode = typeof AggregateNodeSchema.Type
+
+export const AggregateEdgeSchema = Schema.Struct({
+  id: Schema.String,
+  source_aggregate_id: Schema.String,
+  target_aggregate_id: Schema.String,
+  connection_type: Schema.String,
+  provenance: Schema.Literal('modeled', 'derived-certain', 'derived-potential'),
+  member_count: Schema.Number,
+  member_connection_ids: Schema.Array(Schema.String),
+})
+export type AggregateEdge = typeof AggregateEdgeSchema.Type
+
+/** Present when the complete population exceeds the effective legibility budget on a
+ * graph surface: the super-nodes and bundled edges the surface opens with. */
+export const AggregationSummarySchema = Schema.Struct({
+  dimension: Schema.Literal('group', 'domain', 'type'),
+  legibility_budget: Schema.Number,
+  nodes: Schema.Array(AggregateNodeSchema),
+  edges: Schema.Array(AggregateEdgeSchema),
+})
+export type AggregationSummary = typeof AggregationSummarySchema.Type
+
+export const TargetPopulationSummarySchema = Schema.Struct({
+  target_types: Schema.Array(Schema.String),
+  target_count: Schema.Number,
+  incidental_type_counts: Schema.Record({ key: Schema.String, value: Schema.Number }),
+  structural_count: Schema.Number,
+})
+export type TargetPopulationSummary = typeof TargetPopulationSummarySchema.Type
 
 export const ViewpointExecutionResultSchema = Schema.Struct({
   slug: Schema.NullOr(Schema.String),
@@ -108,6 +207,8 @@ export const ViewpointExecutionResultSchema = Schema.Struct({
   /** Entity ids the execution was anchored on (resolved `entity-id` parameter values) —
    * presentations mark/center these and derive hop distances from them. */
   anchor_ids: Schema.optionalWith(Schema.Array(Schema.String), { default: () => [] }),
+  target_population: Schema.optionalWith(Schema.NullOr(TargetPopulationSummarySchema), { default: () => null }),
+  aggregation: Schema.optionalWith(Schema.NullOr(AggregationSummarySchema), { default: () => null }),
 })
 export type ViewpointExecutionResult = typeof ViewpointExecutionResultSchema.Type
 
@@ -162,6 +263,26 @@ export const ViewpointDefinitionEnvelopeSchema = Schema.Struct({
   derivation_defaults: Schema.optional(Schema.Record({ key: Schema.String, value: Schema.Unknown })),
   query: Schema.optional(Schema.Unknown),
   presentation: Schema.optional(Schema.Unknown),
+  /** Which selection layer is ACTIVE (scope | query); absent on pre-migration
+   * definitions, where the legacy behavior (query when present, else scope) applies. */
+  selection_mode: Schema.optional(Schema.Literal('scope', 'query')),
+  /** Fork provenance, stamped server-side at fork time (origin slug/version/content
+   * digest); absent on non-forks. */
+  forked_from: Schema.optional(Schema.Struct({
+    slug: Schema.String,
+    version: Schema.Number,
+    definition_digest: Schema.String,
+    index_generation: Schema.optional(Schema.Number),
+  })),
+  /** Digest-computed staleness against the CURRENT origin — 'stale' the moment the
+   * origin's content changes, even without a version bump. Null for non-forks. */
+  fork_status: Schema.optionalWith(
+    Schema.NullOr(Schema.Literal('current', 'stale', 'origin-missing')),
+    { default: () => null },
+  ),
+  /** The definition's CURRENT canonical content digest — verified execution references
+   * pin it so a later open can say the definition changed. */
+  definition_digest: Schema.optional(Schema.String),
   tier: Schema.Literal('module', 'enterprise', 'engagement'),
   scope_summary: ScopeSummarySchema,
   query_summary: Schema.NullOr(Schema.String),

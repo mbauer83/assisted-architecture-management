@@ -1,31 +1,21 @@
 <script setup lang="ts">
 import { computed, inject, onMounted, onUnmounted, ref, watch } from 'vue'
-import { Effect } from 'effect'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
-import type { EntityList, EntityTaxonomy, GroupList, ModuleSummary, ViewpointDefinitionEnvelope } from '../../domain'
+import type { EntityList, EntityTaxonomy, GroupList, ModuleSummary } from '../../domain'
 import type { RepoScope, RepoError } from '../../ports/ModelRepository'
 import { modelServiceKey } from '../keys'
 import { useQuery } from '../composables/useQuery'
 import { usePagination } from '../composables/usePagination'
-import { useViewpointExecution } from '../composables/useViewpointExecution'
-import { useViewpointParameterPrompt } from '../composables/useViewpointParameterPrompt'
 import EntitiesTreemap from '../components/EntitiesTreemap.vue'
 import ArchimateTypeGlyph from '../components/ArchimateTypeGlyph.vue'
 import EntityGroupNavTree from '../components/EntityGroupNavTree.vue'
-import ViewpointExecutionDiagnostics from '../components/ViewpointExecutionDiagnostics.vue'
-import ViewpointExecutionError from '../components/ViewpointExecutionError.vue'
-import ViewpointParameterPrompt from '../components/ViewpointParameterPrompt.vue'
-import { computeExecutionDiagnostics, deriveLegend, deriveScaleGradients } from '../components/ViewpointExecutionDiagnostics.helpers'
-import { presentationFromMapping } from '../../domain/viewpointPresentationSerialization'
+import ViewpointTablePage from '../components/ViewpointTablePage.vue'
 import {
   friendlyEntityId,
   getEntityConnectionTotal,
   getDomainLabel,
 } from '../lib/domains'
-import {
-  effectiveTableColumns, filtersToEntityCriteriaMapping, groupTableRows,
-  isColumnSourceResolvable, projectionByItemId, resolveSummaryColumnValue,
-} from './EntitiesView.helpers'
+import { filtersToEntityCriteriaMapping } from './EntitiesView.helpers'
 
 const props = defineProps<{ scope?: RepoScope }>()
 
@@ -104,37 +94,12 @@ const goToNextPage = () => { goNext(); loadCurrentPage() }
 const goToPrevPage = () => { goPrev(); loadCurrentPage() }
 
 // ── Viewpoint-driven table execution ────────────────────────────────────────
-// Drives this same catalog view from a fixed viewpoint population instead of the
-// domain/group/pagination browsing above — mirrors GraphExploreView's viewpoint mode.
+// A `?viewpoint=` query switches this catalog view to ViewpointTablePage — the same
+// table driven by a fixed viewpoint population instead of domain/group browsing.
 const viewpointSlug = computed(() => (route.query.viewpoint as string | undefined) ?? null)
-const viewpointDefinitions = ref<readonly ViewpointDefinitionEnvelope[]>([])
-const viewpointExecution = useViewpointExecution(svc)
-const viewpointPrompt = useViewpointParameterPrompt((resolved) => viewpointExecution.execute(resolved), viewpointDefinitions)
-
-const selectedViewpointPresentation = computed(() => {
-  const envelope = viewpointDefinitions.value.find((d) => d.slug === viewpointSlug.value)
-  return envelope ? presentationFromMapping(envelope.presentation) : null
-})
-const viewpointDiagnostics = computed(() => computeExecutionDiagnostics(
-  viewpointExecution.result.value, selectedViewpointPresentation.value, 'table',
-))
-const viewpointLegend = computed(() => deriveLegend(selectedViewpointPresentation.value))
-const viewpointScaleGradients = computed(() => deriveScaleGradients(selectedViewpointPresentation.value))
-const viewpointEntityStyleById = computed(() => projectionByItemId(viewpointExecution.projection.value))
-const viewpointColumns = computed(() => effectiveTableColumns(selectedViewpointPresentation.value?.columns ?? null))
-const viewpointRowGroups = computed(() => groupTableRows(
-  viewpointExecution.result.value?.entities ?? [], selectedViewpointPresentation.value?.groupBy ?? null,
-))
-
-const loadViewpointTable = async (slug: string) => {
-  viewpointDefinitions.value = await Effect.runPromise(svc.listViewpointDefinitions()).catch(() => [])
-  await viewpointPrompt.run(slug)
-}
-
-const rerunViewpointTable = () => { if (viewpointSlug.value) void loadViewpointTable(viewpointSlug.value) }
 
 onMounted(() => {
-  if (viewpointSlug.value) { void loadViewpointTable(viewpointSlug.value); return }
+  if (viewpointSlug.value) return
   if (!isGlobal.value) {
     const saved = localStorage.getItem(STORAGE_KEY)
     if (saved === null && !route.query.group && !route.query.domain) {
@@ -249,106 +214,10 @@ const displayCount = computed(() => {
 </script>
 
 <template>
-  <div
+  <ViewpointTablePage
     v-if="viewpointSlug"
-    class="vp-table-page"
-  >
-    <div class="vp-table-header">
-      <h1 class="page-title">
-        {{ viewpointSlug }} <span class="count">(table)</span>
-      </h1>
-      <RouterLink
-        to="/viewpoints"
-        class="back-link"
-      >
-        ← Viewpoints
-      </RouterLink>
-    </div>
-
-    <ViewpointExecutionDiagnostics
-      v-if="!viewpointPrompt.visible.value && !viewpointExecution.errorMessage.value"
-      :diagnostics="viewpointDiagnostics"
-      :legend="viewpointLegend"
-      :scale-gradients="viewpointScaleGradients"
-      :query-summary="viewpointExecution.result.value?.query_summary ?? ''"
-      @rerun="rerunViewpointTable"
-    />
-
-    <ViewpointParameterPrompt
-      v-if="viewpointPrompt.visible.value"
-      :parameters="viewpointPrompt.parameters.value"
-      @submit="viewpointPrompt.submit"
-      @cancel="viewpointPrompt.cancel"
-    />
-
-    <div
-      v-if="viewpointExecution.loading.value"
-      class="state-msg"
-    >
-      Loading…
-    </div>
-    <ViewpointExecutionError
-      v-else-if="viewpointExecution.errorMessage.value"
-      :typed-error="viewpointExecution.typedError.value"
-      :fallback-message="viewpointExecution.errorMessage.value"
-      @retry="rerunViewpointTable"
-    />
-    <table
-      v-else-if="viewpointRowGroups.length > 0"
-      class="entity-table"
-    >
-      <thead>
-        <tr>
-          <th
-            v-for="col in viewpointColumns"
-            :key="col.source"
-          >
-            {{ col.label }}
-          </th>
-          <th>Style</th>
-        </tr>
-      </thead>
-      <tbody>
-        <template
-          v-for="group in viewpointRowGroups"
-          :key="group.groupKey || '(all)'"
-        >
-          <tr
-            v-if="group.groupKey"
-            class="vp-group-row"
-          >
-            <td :colspan="viewpointColumns.length + 1">
-              {{ group.groupKey }}
-            </td>
-          </tr>
-          <tr
-            v-for="entity in group.entities"
-            :key="entity.id"
-          >
-            <td
-              v-for="col in viewpointColumns"
-              :key="col.source"
-            >
-              <span
-                v-if="!isColumnSourceResolvable(col.source)"
-                class="vp-col-unavailable"
-                title="Not available in this view — profile attributes aren't carried by the fixed execution summary"
-              >—</span>
-              <template v-else>
-                {{ resolveSummaryColumnValue(entity, col.source) ?? '—' }}
-              </template>
-            </td>
-            <td>
-              <span
-                v-if="viewpointEntityStyleById.get(entity.id)?.style.badges"
-                class="vp-badge"
-              >{{ viewpointEntityStyleById.get(entity.id)?.style.badges }}</span>
-            </td>
-          </tr>
-        </template>
-      </tbody>
-    </table>
-  </div>
+    :slug="viewpointSlug"
+  />
   <div
     v-else
     class="layout"
@@ -712,12 +581,4 @@ const displayCount = computed(() => {
 .page-btn:hover:not(:disabled) { background: #f3f4f6; }
 .page-btn:disabled { opacity: 0.4; cursor: not-allowed; }
 .page-info { font-size: 13px; color: #6b7280; }
-
-.vp-table-page { max-width: 1100px; margin: 0 auto; }
-.vp-table-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; }
-.back-link { font-size: 13px; color: #6b7280; text-decoration: none; }
-.back-link:hover { color: #374151; }
-.vp-group-row td { background: #f3f4f6; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; color: #6b7280; }
-.vp-col-unavailable { color: #d1d5db; cursor: help; }
-.vp-badge { display: inline-block; padding: 1px 8px; border-radius: 10px; font-size: 11px; font-weight: 600; background: #eef2ff; color: #4338ca; }
 </style>

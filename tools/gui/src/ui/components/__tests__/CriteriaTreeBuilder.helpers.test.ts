@@ -8,8 +8,11 @@ import {
   enumChoicesFor,
   isEntityReferencePath,
   valueKindOptions,
+  conditionCoherenceIssue,
 } from '../CriteriaTreeBuilder.helpers'
 import type { CriteriaCatalog } from '../../../domain'
+import { literalValue } from '../../../domain/viewpointCriteria'
+import type { Comparator, ConditionNode } from '../../../domain/viewpointCriteria'
 
 const CATALOG: CriteriaCatalog = {
   entity_types: ['application-component', 'process'],
@@ -147,5 +150,30 @@ describe('depth meter', () => {
   it('flags the depth cap once nesting would reach it', () => {
     expect(atDepthCap(2)).toBe(false)
     expect(atDepthCap(3)).toBe(true)
+  })
+})
+
+describe('conditionCoherenceIssue', () => {
+  const condition = (comparator: Comparator, literal: unknown): ConditionNode => ({
+    kind: 'condition', id: 'c1', attribute: 'status', comparator, value: literalValue(literal), negate: false,
+  })
+
+  it('flags exists/absent carrying a value, accepts the unset and empty literal', () => {
+    expect(conditionCoherenceIssue(condition('exists', 'x'))).toBe("'exists' takes no value")
+    expect(conditionCoherenceIssue(condition('absent', 'x'))).toBe("'absent' takes no value")
+    expect(conditionCoherenceIssue(condition('exists', null))).toBeNull()
+    expect(conditionCoherenceIssue(condition('exists', ''))).toBeNull()
+  })
+
+  it('flags an empty membership list and a non-numeric ordering value', () => {
+    expect(conditionCoherenceIssue(condition('in', []))).toBe("'in' needs at least one value")
+    expect(conditionCoherenceIssue(condition('in', ['a']))).toBeNull()
+    expect(conditionCoherenceIssue(condition('gte', 'not-a-number'))).toBe("'gte' needs a number or date")
+    expect(conditionCoherenceIssue(condition('gte', '4'))).toBeNull()
+    expect(conditionCoherenceIssue(condition('lt', '2026-01-01'))).toBeNull()
+  })
+
+  it('stays quiet for coherent equality conditions and non-literal values', () => {
+    expect(conditionCoherenceIssue(condition('eq', 'active'))).toBeNull()
   })
 })

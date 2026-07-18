@@ -50,6 +50,9 @@ const styleRuleToMapping = (rule: StyleRuleNode): Record<string, unknown> => {
     if (rule.scaleMax !== null) result.scale_max = rule.scaleMax
     if (rule.scaleTokens !== null) result.scale_tokens = [...rule.scaleTokens]
   }
+  if (rule.sourceCriteria !== null) result.source_criteria = groupToMapping(rule.sourceCriteria)
+  if (rule.targetCriteria !== null) result.target_criteria = groupToMapping(rule.targetCriteria)
+  if (rule.disabled) result.disabled = true
   return result
 }
 
@@ -64,6 +67,9 @@ export const presentationToMapping = (presentation: PresentationNode): Record<st
   if (presentation.groupBy !== null) result.group_by = presentation.groupBy
   if (presentation.stylingRules.length > 0) result.styling_rules = presentation.stylingRules.map(styleRuleToMapping)
   if (Object.keys(presentation.defaultStyle).length > 0) result.default_style = presentation.defaultStyle
+  if (presentation.targetTypes !== null) result.target_types = presentation.targetTypes
+  if (presentation.legibilityBudget !== null) result.legibility_budget = presentation.legibilityBudget
+  if (presentation.aggregateBy !== null) result.aggregate_by = presentation.aggregateBy
   return result
 }
 
@@ -105,6 +111,9 @@ const styleRuleFromMapping = (raw: Record<string, unknown>): StyleRuleNode => {
     matchCriteria: null, value: null,
     rangeAttribute: null, rangeBands: [],
     scaleAttribute: null, scaleMin: null, scaleMax: null, scaleTokens: null,
+    sourceCriteria: raw.source_criteria != null ? groupFromMapping(asRecord(raw.source_criteria), 'entity') : null,
+    targetCriteria: raw.target_criteria != null ? groupFromMapping(asRecord(raw.target_criteria), 'entity') : null,
+    disabled: raw.disabled === true,
   }
   if (mode === 'match') {
     return { ...base, matchCriteria: matchCriteriaGroup(raw.match_criteria, capability), value: stringOr(raw.value, null) }
@@ -143,5 +152,9 @@ export const presentationFromMapping = (raw: unknown): PresentationNode | null =
     ? rec.styling_rules.map((r) => styleRuleFromMapping(asRecord(r))) : []
   presentation.defaultStyle = typeof rec.default_style === 'object' && rec.default_style != null
     ? Object.fromEntries(Object.entries(asRecord(rec.default_style)).map(([k, v]) => [k, String(v)])) : {}
+  presentation.legibilityBudget = typeof rec.legibility_budget === 'number' ? rec.legibility_budget : null
+  presentation.aggregateBy = typeof rec.aggregate_by === 'string' ? rec.aggregate_by : null
+  presentation.targetTypes = Array.isArray(rec.target_types)
+    ? rec.target_types.map((t) => String(t)) : null
   return presentation
 }

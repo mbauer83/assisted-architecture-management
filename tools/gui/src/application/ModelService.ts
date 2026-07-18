@@ -81,6 +81,8 @@ export const makeModelService = (repo: ModelRepository) =>
     executeViewpointDiagram: (request: Parameters<ModelRepository['executeViewpointDiagram']>[0]) =>
       repo.executeViewpointDiagram(request),
     summarizeViewpointQuery: (query: unknown) => repo.summarizeViewpointQuery(query),
+    exportViewpointCsv: (body: Parameters<ModelRepository['exportViewpointCsv']>[0]) =>
+      repo.exportViewpointCsv(body),
     createViewpointDefinition: (body: Parameters<ModelRepository['createViewpointDefinition']>[0]) =>
       repo.createViewpointDefinition(body),
     editViewpointDefinition: (body: Parameters<ModelRepository['editViewpointDefinition']>[0]) =>

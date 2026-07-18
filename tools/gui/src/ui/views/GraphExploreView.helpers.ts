@@ -49,6 +49,26 @@ export const buildConnectionStyleIndex = (
   return index
 }
 
+/** Execution connection summaries joined onto rendered edges by the same
+ * source/target/connType key `buildConnectionStyleIndex` uses — this is how a selected
+ * edge finds its provenance (certainty, hops, ordered witness steps). */
+export const buildConnectionSummaryIndex = (
+  connections: readonly ConnectionItemSummary[],
+): ReadonlyMap<string, ConnectionItemSummary> => {
+  const index = new Map<string, ConnectionItemSummary>()
+  for (const connection of connections) {
+    index.set(edgeStyleKey(connection.source, connection.target, connection.type), connection)
+  }
+  return index
+}
+
+/** Human-readable name derived from an artifact id's slug part — used where the real
+ * display name is not in the result (e.g. witness-chain intermediates). */
+export const friendlyEntityName = (id: string): string => {
+  const parts = id.split('.')
+  return parts.length > 2 ? parts.slice(2).join(' ').replace(/-/g, ' ') : id
+}
+
 /** `group_by` resolves against the fixed entity summary — the three well-known
  * non-attribute dimensions are always resolvable; an arbitrary profile-attribute path is
  * not (the summary carries no properties map), so it falls back to grouping by type
@@ -92,40 +112,16 @@ export const nodeShapePoints = (shape: NodeVisual['shape'], radius: number): str
   return points.join(' ')
 }
 
-/** Multi-source BFS over the undirected edge set: hop distance from the nearest anchor
- * for every reachable node. Unreachable nodes (and anchors absent from `nodeIds`) are
- * simply absent from the map — callers treat "no distance" as its own visual category. */
-export const hopDistances = (
-  anchorIds: readonly string[],
-  edges: readonly { source: string; target: string }[],
-  nodeIds: readonly string[],
+/** Anchor-relative modeled distances as the execution reported them
+ * (`anchor_modeled_distance`: 0 = anchor, 1 = direct modeled edge, N = minimum derived
+ * witness-chain length). Entities the server left unranked are absent from the map —
+ * "no distance" is its own visual category, never rendered as 0 or 1. */
+export const anchorDistancesFromResult = (
+  entities: readonly { id: string; anchor_modeled_distance?: number | null }[],
 ): Map<string, number> => {
-  const nodeSet = new Set(nodeIds)
-  const adjacency = new Map<string, string[]>()
-  for (const edge of edges) {
-    if (!nodeSet.has(edge.source) || !nodeSet.has(edge.target)) continue
-    if (!adjacency.has(edge.source)) adjacency.set(edge.source, [])
-    if (!adjacency.has(edge.target)) adjacency.set(edge.target, [])
-    adjacency.get(edge.source)!.push(edge.target)
-    adjacency.get(edge.target)!.push(edge.source)
-  }
   const distances = new Map<string, number>()
-  const queue: string[] = []
-  for (const anchorId of anchorIds) {
-    if (nodeSet.has(anchorId) && !distances.has(anchorId)) {
-      distances.set(anchorId, 0)
-      queue.push(anchorId)
-    }
-  }
-  for (let head = 0; head < queue.length; head++) {
-    const current = queue[head]
-    const depth = distances.get(current)!
-    for (const neighbor of adjacency.get(current) ?? []) {
-      if (!distances.has(neighbor)) {
-        distances.set(neighbor, depth + 1)
-        queue.push(neighbor)
-      }
-    }
+  for (const entity of entities) {
+    if (entity.anchor_modeled_distance != null) distances.set(entity.id, entity.anchor_modeled_distance)
   }
   return distances
 }
@@ -162,14 +158,18 @@ export interface DistanceLegendEntry {
   readonly color: string
 }
 
-/** One legend chip per hop count, colored exactly as `distanceColor` colors the nodes. */
-export const distanceLegend = (maxDepth: number): readonly DistanceLegendEntry[] =>
-  maxDepth < 0
-    ? []
-    : Array.from({ length: maxDepth + 1 }, (_, depth) => ({
-        label: depth === 1 ? '1 hop' : `${depth} hops`,
-        color: distanceColor(depth, maxDepth),
-      }))
+/** One legend chip per OBSERVED nonzero modeled distance (the real ring set — e.g.
+ * 1/2/4 when those are the witness-chain lengths present), colored exactly as
+ * `distanceColor` colors the nodes. Distance 0 is the anchor itself, which the legend
+ * already names with its dedicated Anchor chip. */
+export const distanceLegend = (depths: readonly number[]): readonly DistanceLegendEntry[] => {
+  const observed = [...new Set(depths.filter((depth) => depth > 0))].sort((a, b) => a - b)
+  const maxDepth = observed.length > 0 ? observed[observed.length - 1] : 0
+  return observed.map((depth) => ({
+    label: depth === 1 ? '1 hop' : `${depth} hops`,
+    color: distanceColor(depth, maxDepth),
+  }))
+}
 
 /** Legible text color for glyphs drawn on top of a node fill: dark ink on light fills,
  * white on dark fills, decided by perceived (YIQ) brightness. Non-hex input (never
@@ -188,13 +188,145 @@ export interface EdgeVisual {
   readonly dashArray: string | undefined
 }
 
+/** Provenance dash patterns: derived edges are visually distinct from modeled ones by
+ * construction, and certain vs potential derivations differ in dash density. The edge
+ * legend labels exactly these patterns. */
+export const DERIVED_EDGE_DASH: Readonly<Record<'certain' | 'potential', string>> = {
+  certain: '7 4',
+  potential: '2 4',
+}
+
 /** `edge_color`/`edge_emphasis` resolved from the projection's per-connection style map;
- * `null` fields mean "no viewpoint style — render the default edge". */
-export const edgeVisualFor = (style: Readonly<Record<string, StyleValue>> | undefined): EdgeVisual => {
+ * `null` fields mean "no viewpoint style — render the default edge". A derived
+ * connection with no authored emphasis falls back to its provenance dash so modeled and
+ * derived edges never look identical. */
+export const edgeVisualFor = (
+  style: Readonly<Record<string, StyleValue>> | undefined,
+  certainty: 'certain' | 'potential' | null = null,
+): EdgeVisual => {
   const emphasis = style?.edge_emphasis !== undefined ? tokenEdgeEmphasis(styleTokenString(style.edge_emphasis)) : null
   return {
     stroke: style?.edge_color !== undefined ? resolveStyleColor(style.edge_color) : null,
     strokeWidth: emphasis?.strokeWidth ?? null,
-    dashArray: emphasis?.dashArray,
+    dashArray: emphasis?.dashArray ?? (certainty !== null ? DERIVED_EDGE_DASH[certainty] : undefined),
+  }
+}
+
+/** Static UI option tables for the exploration surface. */
+export const EXPLORATION_LAYOUT_OPTIONS: { value: ExplorationLayoutOverride; label: string }[] = [
+  { value: 'auto', label: 'Auto' }, { value: 'clusters', label: 'Clusters' },
+  { value: 'radial', label: 'Radial' }, { value: 'force', label: 'Force' },
+]
+
+export const SPACING_PRESETS = [
+  { label: 'Compact', repulsion: 1500, idealDist: 150 },
+  { label: 'Normal', repulsion: 3000, idealDist: 250 },
+  { label: 'Spacious', repulsion: 6000, idealDist: 400 },
+  { label: 'Very spacious', repulsion: 12000, idealDist: 600 },
+]
+
+export const DOMAIN_COLORS: Record<string, string> = {
+  motivation: '#d8c1e4', strategy: '#efbd5d', business: '#f4de7f',
+  common: '#e8e5d3', application: '#b6d7e1', technology: '#c3e1b4',
+}
+
+export interface ViewBoxRect { x: number; y: number; w: number; h: number }
+
+/** ViewBox that fits every node with padding, aspect-corrected to the container — the
+ * one-click answer to results rendered off-viewport. Falls back to the container rect
+ * when there is nothing to fit. */
+export const fitViewBox = (
+  nodes: readonly { x: number; y: number }[],
+  containerWidth: number,
+  containerHeight: number,
+  padding = 80,
+): ViewBoxRect => {
+  if (nodes.length === 0 || containerWidth <= 0 || containerHeight <= 0) {
+    return { x: 0, y: 0, w: Math.max(containerWidth, 1), h: Math.max(containerHeight, 1) }
+  }
+  const xs = nodes.map((n) => n.x)
+  const ys = nodes.map((n) => n.y)
+  const minX = Math.min(...xs) - padding
+  const maxX = Math.max(...xs) + padding
+  const minY = Math.min(...ys) - padding
+  const maxY = Math.max(...ys) + padding
+  const width = maxX - minX
+  const height = maxY - minY
+  const containerRatio = containerWidth / containerHeight
+  const contentRatio = width / height
+  if (contentRatio > containerRatio) {
+    const correctedHeight = width / containerRatio
+    return { x: minX, y: minY - (correctedHeight - height) / 2, w: width, h: correctedHeight }
+  }
+  const correctedWidth = height * containerRatio
+  return { x: minX - (correctedWidth - width) / 2, y: minY, w: correctedWidth, h: height }
+}
+
+/** Word-aware label wrapping for SVG tspans: up to `maxLines` lines of `maxChars`,
+ * with an ellipsis when content remains — mid-word truncation was producing misreadings
+ * that reached real review artifacts. The full name always travels in the node tooltip. */
+export const wrapLabel = (label: string, maxChars = 14, maxLines = 2): string[] => {
+  const words = label.split(/\s+/).filter((word) => word.length > 0)
+  const wrapped: string[] = []
+  let current = ''
+  for (const word of words) {
+    const candidate = current === '' ? word : `${current} ${word}`
+    if (candidate.length <= maxChars) {
+      current = candidate
+      continue
+    }
+    if (current !== '') wrapped.push(current)
+    current = word
+  }
+  if (current !== '') wrapped.push(current)
+  const lines = wrapped.slice(0, maxLines).map(
+    (line) => (line.length > maxChars ? `${line.slice(0, maxChars - 1)}…` : line),
+  )
+  if (wrapped.length > maxLines && !lines[maxLines - 1].endsWith('…')) {
+    const last = lines[maxLines - 1]
+    lines[maxLines - 1] = last.length >= maxChars ? `${last.slice(0, maxChars - 1)}…` : `${last}…`
+  }
+  return lines.length > 0 ? lines : ['']
+}
+
+interface PositionedNode {
+  readonly id: string
+  readonly x: number
+  readonly y: number
+}
+
+/** SVG path for an edge: orthogonal elbows in cluster layout, a straight segment
+ * otherwise. Empty string when either endpoint is missing from the node set. */
+export const edgePathFor = (
+  nodes: readonly PositionedNode[],
+  edge: { readonly source: string; readonly target: string },
+  clusterLayout: boolean,
+): string => {
+  const src = nodes.find((n) => n.id === edge.source)
+  const tgt = nodes.find((n) => n.id === edge.target)
+  if (!src || !tgt) return ''
+  if (clusterLayout) {
+    const midY = (src.y + tgt.y) / 2
+    return `M ${src.x} ${src.y} V ${midY} H ${tgt.x} V ${tgt.y}`
+  }
+  return `M ${src.x} ${src.y} L ${tgt.x} ${tgt.y}`
+}
+
+/** SVG coords for a multiplicity label at `frac` (0=source, 1=target) along an edge,
+ * offset 8px perpendicular-ish above the line for legibility. */
+export const edgeCardPosFor = (
+  nodes: readonly PositionedNode[],
+  edge: { readonly source: string; readonly target: string },
+  frac: number,
+): { x: number; y: number } => {
+  const src = nodes.find((n) => n.id === edge.source)
+  const tgt = nodes.find((n) => n.id === edge.target)
+  if (!src || !tgt) return { x: 0, y: 0 }
+  const dx = tgt.x - src.x
+  const dy = tgt.y - src.y
+  const len = Math.max(Math.sqrt(dx * dx + dy * dy), 1)
+  return {
+    x: src.x + dx * frac - (dy / len) * 8,
+    y: src.y + dy * frac + (dx / len) * 8,
   }
 }

@@ -15,7 +15,20 @@ test.beforeEach(async ({ context }) => {
   })
 })
 
-const uniqueSlug = (label: string) => `viewpoint-editor-e2e-${label}-${Date.now()}`
+// Every minted slug is registered and swept in afterEach — cleanup must survive a
+// mid-test failure, or aborted runs strand test rows in the engagement catalog.
+const createdSlugs: string[] = []
+const uniqueSlug = (label: string) => {
+  const slug = `viewpoint-editor-e2e-${label}-${Date.now()}`
+  createdSlugs.push(slug)
+  return slug
+}
+
+test.afterEach(async ({ request }) => {
+  for (const slug of createdSlugs.splice(0)) {
+    await request.post('/api/viewpoints/remove', { data: { slug, dry_run: false } })
+  }
+})
 
 const removeViewpoint = async (request: APIRequestContext, slug: string) => {
   await request.post('/api/viewpoints/remove', { data: { slug, dry_run: false } })
@@ -50,7 +63,7 @@ test.describe('create/edit lifecycle with scope + query round-trip', () => {
     expect(motivationTypes.length).toBeGreaterThan(0)
 
     await page.goto('/viewpoints')
-    await page.getByRole('button', { name: '+ New viewpoint' }).click()
+    await page.getByRole('button', { name: '+ Create viewpoint' }).click()
     await page.getByRole('textbox', { name: 'slug' }).fill(slug)
     await page.getByRole('textbox', { name: 'name' }).fill('Roundtrip Test')
 
@@ -104,6 +117,8 @@ test.describe('semantic vs descriptive edits', () => {
     await page.getByRole('radio', { name: 'Include only selected entity types' }).click()
     await expect(page.getByText(/semantic edit/i)).toBeVisible()
 
+    // Back with unsaved edits must prompt before discarding (accept = discard).
+    page.once('dialog', (dialog) => void dialog.accept())
     await page.getByRole('button', { name: '← Back' }).click()
     await removeViewpoint(request, slug)
   })
@@ -129,7 +144,7 @@ test.describe('path-addressed validation errors', () => {
 test.describe('non-engagement tiers are read-only', () => {
   test('viewing a module-tier definition shows no Save button and explains why', async ({ page }) => {
     await page.goto('/viewpoints')
-    await page.locator('tr', { hasText: 'capability-map' }).getByRole('button', { name: 'View' }).click()
+    await page.locator('tr', { hasText: 'capability-map' }).getByRole('button', { name: 'Customize…' }).click()
     await expect(page.getByText(/module-tier definition — only engagement-tier definitions can be edited here/)).toBeVisible()
     await expect(page.getByRole('button', { name: /^Save/ })).toHaveCount(0)
   })
@@ -174,8 +189,8 @@ test.describe('query tab renders for every shipped definition', () => {
     expect(definitions.length).toBeGreaterThan(0)
 
     for (const def of definitions) {
-      const row = page.locator('tr').filter({ has: page.getByRole('cell', { name: def.slug, exact: true }) })
-      await row.getByRole('button', { name: /^(Edit|View)$/ }).click()
+      const row = page.locator('tr').filter({ hasText: `(${def.slug})` })
+      await row.getByRole('button', { name: /^(Edit|Customize…)$/ }).click()
       await page.getByRole('button', { name: 'Query' }).click()
       await expect(page.getByText('Scope-only viewpoint', { exact: false })).toHaveCount(0)
       await expect(page.getByRole('heading', { name: 'Show entities where…' })).toBeVisible()
@@ -195,7 +210,7 @@ test.describe('query tab renders for every shipped definition', () => {
 test.describe('scope picker keyboard operability', () => {
   test('type-ahead, mode switching, domain bulk action, per-type override, and chip removal all work via keyboard', async ({ page }) => {
     await page.goto('/viewpoints')
-    await page.getByRole('button', { name: '+ New viewpoint' }).click()
+    await page.getByRole('button', { name: '+ Create viewpoint' }).click()
     await page.getByRole('button', { name: 'Scope' }).click()
 
     // Native radio-group arrow-key navigation moves focus+checked together starting from
@@ -240,7 +255,7 @@ test.describe('scope picker keyboard operability', () => {
 
   test('a scope-picker search with zero matches shows an explicit no-matches state', async ({ page }) => {
     await page.goto('/viewpoints')
-    await page.getByRole('button', { name: '+ New viewpoint' }).click()
+    await page.getByRole('button', { name: '+ Create viewpoint' }).click()
     await page.getByRole('button', { name: 'Scope' }).click()
     await page.getByRole('radio', { name: 'Exclude selected entity types' }).check()
 
@@ -259,7 +274,7 @@ test.describe('scope picker keyboard operability', () => {
 test.describe('criteria builder keyboard operability', () => {
   test('Tab moves coherently through a condition row and NOT/remove are keyboard-operable', async ({ page }) => {
     await page.goto('/viewpoints')
-    await page.getByRole('button', { name: '+ New viewpoint' }).click()
+    await page.getByRole('button', { name: '+ Create viewpoint' }).click()
     await page.getByRole('button', { name: 'Query' }).click()
     await page.getByRole('button', { name: '+ Add condition' }).first().click()
 
@@ -290,7 +305,7 @@ test.describe('failed save', () => {
   test('a network error on save shows a retry affordance without losing edits', async ({ page, request }) => {
     const slug = uniqueSlug('save-retry')
     await page.goto('/viewpoints')
-    await page.getByRole('button', { name: '+ New viewpoint' }).click()
+    await page.getByRole('button', { name: '+ Create viewpoint' }).click()
     await page.getByRole('textbox', { name: 'slug' }).fill(slug)
     await page.getByRole('textbox', { name: 'name' }).fill('Save Retry Test')
 

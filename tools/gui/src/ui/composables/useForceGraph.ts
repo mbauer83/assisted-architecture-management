@@ -189,6 +189,18 @@ export function useForceGraph(width: () => number, height: () => number) {
 
   const restart = () => { stop(); start() }
 
+  /** Run the simulation synchronously until it settles (or `maxTicks`), leaving it
+   * STOPPED — a freshly rendered fixed population is immediately hit-testable, with
+   * nothing drifting away under the pointer. Incremental free exploration keeps the
+   * animated loop; viewpoint executions (fixed result sets) settle before first paint. */
+  const settleForceLayout = (maxTicks = 300) => {
+    layoutMode.value = 'force'
+    stop()
+    for (let i = 0; i < maxTicks; i++) {
+      if (!tick()) break
+    }
+  }
+
   // ── Cluster / dendrogram layout (helpers live in useForceGraphLayout.ts) ──
 
   const applyClusterLayout = (rootId: string, centerId?: string): { cx?: number; cy?: number } => {
@@ -284,7 +296,7 @@ export function useForceGraph(width: () => number, height: () => number) {
   return {
     nodes, edges, options, layoutMode,
     addNode, addEdge, markExpanded, collapseNode, spreadAroundParent,
-    start, stop, restart,
+    start, stop, restart, settleForceLayout,
     applyClusterLayout, applyGroupClusterLayout, applyRadialLayout, applyForceLayout,
   }
 }

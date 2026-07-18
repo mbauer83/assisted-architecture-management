@@ -40,6 +40,7 @@ const makeEntity = (id: string, archType: EntityTypeName, name = id): EntityDisp
   display_alias: '',
   element_type: archType,
   element_label: name,
+  diagram_internal: false,
 })
 
 const SYSTEM_CONTEXT_DOTS: DiagramOwnEntityTypeUiConfig[] = [

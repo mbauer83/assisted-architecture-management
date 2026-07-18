@@ -110,7 +110,7 @@ const relatedEntitiesById = computed<Record<string, EntityDisplayInfo[]>>(() => 
         status: scope,
         display_alias: '',
         element_type: artifactType,
-        element_label: name,
+        element_label: name, diagram_internal: false,
       })
     }
   }

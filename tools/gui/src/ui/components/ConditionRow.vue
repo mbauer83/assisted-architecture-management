@@ -4,8 +4,8 @@ import type { CriteriaCatalog } from '../../domain'
 import type { Comparator, ConditionNode, GroupKind, ValueRef } from '../../domain/viewpointCriteria'
 import { bindingValue, literalValue } from '../../domain/viewpointCriteria'
 import {
-  HIGHLIGHTED_NODE_ID_KEY, attributeOptionLabel, attributeOptions, comparatorsFor, enumChoicesFor,
-  isEntityReferencePath,
+  HIGHLIGHTED_NODE_ID_KEY, attributeOptionLabel, attributeOptions, comparatorsFor,
+  conditionCoherenceIssue, enumChoicesFor, isEntityReferencePath,
 } from './CriteriaTreeBuilder.helpers'
 import ValueRefInput from './ValueRefInput.vue'
 import EnumChipMultiSelect from './EnumChipMultiSelect.vue'
@@ -48,6 +48,8 @@ const listValues = computed<string[]>(() => {
  * to a scalar, and a membership test's right-hand side is the whole list itself. */
 const listValueIsBinding = computed(() => props.modelValue.value.kind === 'binding')
 
+const coherenceIssue = computed(() => conditionCoherenceIssue(props.modelValue))
+
 const update = (patch: Partial<ConditionNode>) => emit('update:modelValue', { ...props.modelValue, ...patch })
 
 const onAttributeChange = (event: Event) => {
@@ -60,7 +62,12 @@ const onAttributeChange = (event: Event) => {
 const onComparatorChange = (event: Event) => {
   const comparator = (event.target as HTMLSelectElement).value as Comparator
   const takesList = comparator === 'in' || comparator === 'not_in'
-  update({ comparator, value: takesList ? literalValue([]) : literalValue('') })
+  // exists/absent take NO value: seed the unset literal (null) — the serializer omits it,
+  // so the saved mapping can never trip the server's "takes no value" check.
+  const value = comparator === 'exists' || comparator === 'absent'
+    ? literalValue(null)
+    : takesList ? literalValue([]) : literalValue('')
+  update({ comparator, value })
 }
 
 const onValueChange = (value: ValueRef) => update({ value })
@@ -201,6 +208,11 @@ const onListBindingChange = (patch: { binding?: string; project?: string }) => {
     >
       ✕
     </button>
+    <span
+      v-if="coherenceIssue"
+      class="inline-issue"
+      role="alert"
+    >{{ coherenceIssue }}</span>
   </div>
 </template>
 
@@ -224,4 +236,5 @@ const onListBindingChange = (patch: { binding?: string; project?: string }) => {
   font-size: 15px; line-height: 1; padding: 2px 5px; border-radius: 5px;
 }
 .icon-btn:hover { background: #fee2e2; color: #991b1b; }
+.inline-issue { flex-basis: 100%; font-size: 11px; color: #b45309; }
 </style>

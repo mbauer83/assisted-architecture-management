@@ -5,10 +5,18 @@ import { Effect } from 'effect'
 import { modelServiceKey } from '../keys'
 import { useQuery } from '../composables/useQuery'
 import { useForceGraph, type GraphNode, type GraphEdge, type LayoutMode } from '../composables/useForceGraph'
+import { useGraphPanZoom } from '../composables/useGraphPanZoom'
 import { useViewpointExecution } from '../composables/useViewpointExecution'
 import { useViewpointParameterPrompt } from '../composables/useViewpointParameterPrompt'
 import type { ResolvedViewpointExecution } from '../composables/useViewpointParameterPrompt'
-import ArchimateTypeGlyph from '../components/ArchimateTypeGlyph.vue'
+import EdgeConnectionDetails from '../components/EdgeConnectionDetails.vue'
+import GraphNodeDetails from '../components/GraphNodeDetails.vue'
+import AggregationBanner from '../components/AggregationBanner.vue'
+import ExecutionReferenceBar from '../components/ExecutionReferenceBar.vue'
+import GraphLayoutToolbar from '../components/GraphLayoutToolbar.vue'
+import DomainColorLegend from '../components/DomainColorLegend.vue'
+import EdgeProvenanceLegend from '../components/EdgeProvenanceLegend.vue'
+import HopDistanceLegend from '../components/HopDistanceLegend.vue'
 import ViewpointSelect from '../components/ViewpointSelect.vue'
 import ViewpointExecutionDiagnostics from '../components/ViewpointExecutionDiagnostics.vue'
 import ViewpointExecutionError from '../components/ViewpointExecutionError.vue'
@@ -16,10 +24,13 @@ import ViewpointParameterPrompt from '../components/ViewpointParameterPrompt.vue
 import { computeExecutionDiagnostics, deriveLegend, deriveScaleGradients } from '../components/ViewpointExecutionDiagnostics.helpers'
 import {
   groupKeyFor, nodeVisualFor, edgeVisualFor, nodeShapePoints,
-  buildConnectionStyleIndex, edgeStyleKey, projectionByItemId, explorationRedirectFor,
-  hopDistances, effectiveExplorationLayout, distanceColor, distanceLegend, contrastTextColor,
+  buildConnectionStyleIndex, buildConnectionSummaryIndex, edgeStyleKey, projectionByItemId, explorationRedirectFor,
+  anchorDistancesFromResult, effectiveExplorationLayout, distanceColor, contrastTextColor,
+  friendlyEntityName, edgePathFor, edgeCardPosFor, DOMAIN_COLORS, SPACING_PRESETS, wrapLabel,
   type ExplorationLayoutOverride,
 } from './GraphExploreView.helpers'
+import { VERIFIED_KEYS, executionQuery, parametersFromQuery } from '../lib/viewpointUrlState'
+import { useAggregatedExploration } from '../composables/useAggregatedExploration'
 import { presentationFromMapping } from '../../domain/viewpointPresentationSerialization'
 import type { PresentationNode } from '../../domain/viewpointPresentation'
 import type {
@@ -41,9 +52,17 @@ const selectedDetail = useQuery<EntityDetail, RepoError | NotFoundError | Markdo
 
 const {
   nodes, edges, options, layoutMode,
-  addNode, addEdge, markExpanded, collapseNode, spreadAroundParent, restart,
+  addNode, addEdge, markExpanded, collapseNode, spreadAroundParent, restart, settleForceLayout,
   applyClusterLayout, applyGroupClusterLayout, applyRadialLayout, applyForceLayout,
 } = useForceGraph(() => svgWidth.value, () => svgHeight.value)
+
+const {
+  viewBox, vb,
+  onNodeMouseDown, onSvgMouseDown, onSvgMouseMove, onSvgMouseUp, onWheel,
+  zoomBy, fitToView,
+} = useGraphPanZoom(svgRef, svgWidth, svgHeight, nodes, () => {
+  if (layoutMode.value === 'force') restart()
+})
 
 // Selected edge (connection) for sidebar
 const selectedEdge = ref<GraphEdge | null>(null)
@@ -73,11 +92,22 @@ const entityStyleById = computed(() => projectionByItemId(viewpointExecution.pro
 const connectionStyleIndex = computed(() =>
   buildConnectionStyleIndex(viewpointExecution.result.value?.connections ?? [], viewpointExecution.projection.value),
 )
+const connectionSummaryIndex = computed(() =>
+  buildConnectionSummaryIndex(viewpointExecution.result.value?.connections ?? []),
+)
+const selectedEdgeSummary = computed(() => {
+  const edge = selectedEdge.value
+  if (!edge) return null
+  return connectionSummaryIndex.value.get(edgeStyleKey(edge.source, edge.target, edge.connType)) ?? null
+})
 const diagnostics = computed(() => computeExecutionDiagnostics(
   viewpointExecution.result.value, selectedPresentation.value, currentRepresentation.value,
 ))
-const legend = computed(() => deriveLegend(selectedPresentation.value))
-const scaleGradients = computed(() => deriveScaleGradients(selectedPresentation.value))
+const selectedEnvelope = computed(() =>
+  viewpointDefinitions.value.find((d) => d.slug === selectedViewpointSlug.value) ?? null,
+)
+const legend = computed(() => deriveLegend(selectedPresentation.value, viewpointExecution.projection.value?.rule_outcomes ?? []))
+const scaleGradients = computed(() => deriveScaleGradients(selectedPresentation.value, viewpointExecution.projection.value?.scale_legends ?? []))
 
 // ── Anchored executions: hop distances, distance fill, anchor marking ───────
 
@@ -86,23 +116,15 @@ const isAnchor = (id: string) => anchorIds.value.includes(id)
 const hopDepthById = computed(() => {
   const result = viewpointExecution.result.value
   if (!result || result.anchor_ids.length === 0) return new Map<string, number>()
-  return hopDistances(result.anchor_ids, result.connections, result.entities.map((e) => e.id))
+  return anchorDistancesFromResult(result.entities)
 })
 const maxHopDepth = computed(() => Math.max(0, ...hopDepthById.value.values()))
-const hopLegend = computed(() => (anchorIds.value.length > 0 ? distanceLegend(maxHopDepth.value) : []))
+const hasUnrankedNodes = computed(() =>
+  (viewpointExecution.result.value?.entities ?? []).some((e) => e.anchor_modeled_distance == null),
+)
 
 const RADIAL_RING_SPACING = 180
 const layoutOverride = ref<ExplorationLayoutOverride>('auto')
-const EXPLORATION_LAYOUT_OPTIONS: { value: ExplorationLayoutOverride; label: string }[] = [
-  { value: 'auto', label: 'Auto' }, { value: 'clusters', label: 'Clusters' },
-  { value: 'radial', label: 'Radial' }, { value: 'force', label: 'Force' },
-]
-
-const centerViewportOn = (x: number, y: number) => {
-  viewBox.value.x = x - viewBox.value.w / 2
-  viewBox.value.y = y - viewBox.value.h / 2
-}
-
 const applyExplorationLayout = () => {
   const result = viewpointExecution.result.value
   if (!result) return
@@ -110,22 +132,24 @@ const applyExplorationLayout = () => {
     layoutOverride.value, selectedPresentation.value?.displayOptions['layout'], result.anchor_ids.length > 0,
   )
   if (layout === 'radial') {
-    const { cx, cy } = applyRadialLayout(hopDepthById.value, RADIAL_RING_SPACING)
-    centerViewportOn(cx, cy)
+    applyRadialLayout(hopDepthById.value, RADIAL_RING_SPACING)
+    fitToView()
     return
   }
   if (layout === 'force') {
-    applyForceLayout()
-  } else {
-    const groupBy = selectedPresentation.value?.groupBy ?? null
-    const byId = new Map(result.entities.map((e) => [e.id, e]))
-    applyGroupClusterLayout((id) => {
-      const entity = byId.get(id)
-      return entity ? groupKeyFor(entity, groupBy) : 'other'
-    })
+    // Fixed result population: settle synchronously so nodes are immediately
+    // hit-testable — nothing drifts away under the pointer.
+    settleForceLayout()
+    fitToView()
+    return
   }
-  const anchorNode = nodes.value.find((n) => isAnchor(n.id))
-  if (anchorNode) centerViewportOn(anchorNode.x, anchorNode.y)
+  const groupBy = selectedPresentation.value?.groupBy ?? null
+  const byId = new Map(result.entities.map((e) => [e.id, e]))
+  applyGroupClusterLayout((id) => {
+    const entity = byId.get(id)
+    return entity ? groupKeyFor(entity, groupBy) : 'other'
+  })
+  fitToView()
 }
 
 const setExplorationLayout = (value: ExplorationLayoutOverride) => {
@@ -133,30 +157,44 @@ const setExplorationLayout = (value: ExplorationLayoutOverride) => {
   applyExplorationLayout()
 }
 
+// ── Scale-adaptive aggregation (over-budget populations open as super-nodes) ──
+const {
+  activeAggregation, aggregationHint, missingMemberCount,
+  populateFromResult, toggleAggregate, resetExpansion, isAggregateNodeId,
+} = useAggregatedExploration(viewpointExecution.result, {
+  clear: () => { nodes.value = []; edges.value = [] },
+  addNode,
+  addEdge,
+  finalize: () => {
+    for (const n of nodes.value) resolveNodeDomain(n)
+    applyExplorationLayout()
+  },
+})
+
 const runViewpointExecution = async (resolved: ResolvedViewpointExecution) => {
   nodes.value = []
   edges.value = []
   selectedId.value = null
   selectedEdge.value = null
+  // URL = state: the address always names the ON-SCREEN execution (slug + parameters).
+  // Verification pins survive only a same-viewpoint re-run/reload — switching viewpoints
+  // must never carry a previous reference's pins forward.
+  const pins = route.query.viewpoint === resolved.slug
+    ? Object.fromEntries(VERIFIED_KEYS.flatMap((key) => (typeof route.query[key] === 'string' ? [[key, route.query[key]]] : [])))
+    : {}
+  void router.replace({ query: { ...executionQuery(resolved.slug, resolved.parameters), ...pins } })
   await viewpointExecution.execute(resolved)
-  const result = viewpointExecution.result.value
-  if (!result) return
-  for (const entity of result.entities) {
-    addNode({ id: entity.id, label: entity.name, type: entity.id.split('@')[0] })
-  }
-  for (const connection of result.connections) {
-    addEdge({ source: connection.source, target: connection.target, connType: connection.type })
-  }
-  for (const n of nodes.value) resolveNodeDomain(n)
-  applyExplorationLayout()
+  resetExpansion()
+  populateFromResult()
 }
 const viewpointPrompt = useViewpointParameterPrompt(runViewpointExecution, viewpointDefinitions)
-const loadViewpointPopulation = (slug: string) => viewpointPrompt.run(slug)
+const loadViewpointPopulation = (slug: string, preset?: Record<string, string>) => viewpointPrompt.run(slug, preset)
 
 const onSelectViewpoint = (viewpoint: ViewpointSummary | null) => {
   selectedViewpointSlug.value = viewpoint?.slug ?? null
   if (!viewpoint) {
     viewpointExecution.clear()
+    void router.replace({ query: rootId.value ? { id: rootId.value } : {} })
     loadRoot()
     return
   }
@@ -177,17 +215,15 @@ const rerunViewpoint = () => {
  * projection-provided `node_color` still wins inside `nodeVisualFor`. */
 const nodeFallbackFill = (n: GraphNode) => {
   const depth = hopDepthById.value.get(n.id)
-  return depth !== undefined ? distanceColor(depth, maxHopDepth.value) : nodeColor(n)
+  return depth !== undefined
+    ? distanceColor(depth, maxHopDepth.value)
+    : DOMAIN_COLORS[n.domain ?? ''] ?? '#6b7280'
 }
 const nodeVisual = (n: GraphNode) => nodeVisualFor(entityStyleById.value.get(n.id)?.style, nodeFallbackFill(n))
-const edgeVisual = (e: GraphEdge) => edgeVisualFor(connectionStyleIndex.value.get(edgeStyleKey(e.source, e.target, e.connType)))
-
-const SPACING_PRESETS = [
-  { label: 'Compact', repulsion: 1500, idealDist: 150 },
-  { label: 'Normal', repulsion: 3000, idealDist: 250 },
-  { label: 'Spacious', repulsion: 6000, idealDist: 400 },
-  { label: 'Very spacious', repulsion: 12000, idealDist: 600 },
-]
+const edgeVisual = (e: GraphEdge) => {
+  const key = edgeStyleKey(e.source, e.target, e.connType)
+  return edgeVisualFor(connectionStyleIndex.value.get(key), connectionSummaryIndex.value.get(key)?.certainty ?? null)
+}
 
 const applyPreset = (p: typeof SPACING_PRESETS[number]) => {
   options.repulsion = p.repulsion
@@ -195,39 +231,10 @@ const applyPreset = (p: typeof SPACING_PRESETS[number]) => {
   restart()
 }
 
-const LAYOUT_MODES: { value: LayoutMode; label: string }[] = [
-  { value: 'force', label: 'Force' },
-  { value: 'cluster', label: 'Cluster' },
-]
-
 const switchLayout = (mode: LayoutMode) => {
   if (mode === 'cluster') applyClusterLayout(rootId.value)
   else applyForceLayout()
 }
-
-// Pan / zoom state
-const viewBox = ref({ x: 0, y: 0, w: 800, h: 600 })
-const isPanning = ref(false)
-const panStart = ref({ x: 0, y: 0 })
-
-// Drag state
-const dragging = ref<GraphNode | null>(null)
-const dragOffset = ref({ x: 0, y: 0 })
-
-const DOMAIN_COLORS: Record<string, string> = {
-  motivation: '#d8c1e4', strategy: '#efbd5d', business: '#f4de7f',
-  common: '#e8e5d3', application: '#b6d7e1', technology: '#c3e1b4',
-}
-
-const nodeColor = (n: GraphNode) => DOMAIN_COLORS[n.domain ?? ''] ?? '#6b7280'
-
-const friendlyName = (id: string) => {
-  const parts = id.split('.')
-  return parts.length > 2 ? parts.slice(2).join(' ').replace(/-/g, ' ') : id
-}
-
-const truncLabel = (label: string, max = 22) =>
-  label.length > max ? label.slice(0, max - 1) + '...' : label
 
 // ── Data loading ─────────────────────────────────────────────────────────────
 
@@ -237,7 +244,7 @@ const expandNode = (entityId: string) => {
     for (const c of conns) {
       const otherId = c.source === entityId ? c.target : c.source
       const isNew = !beforeIds.has(otherId)
-      addNode({ id: otherId, label: friendlyName(otherId), type: otherId.split('@')[0], addedBy: isNew ? entityId : undefined })
+      addNode({ id: otherId, label: friendlyEntityName(otherId), type: otherId.split('@')[0], addedBy: isNew ? entityId : undefined })
       addEdge({
           source: c.source,
           target: c.target,
@@ -275,7 +282,7 @@ const loadRoot = () => {
   nodes.value = []
   edges.value = []
   selectedId.value = rootId.value
-  addNode({ id: rootId.value, label: friendlyName(rootId.value), type: rootId.value.split('@')[0] })
+  addNode({ id: rootId.value, label: friendlyEntityName(rootId.value), type: rootId.value.split('@')[0] })
   resolveNodeDomain(nodes.value[0])
   expandNode(rootId.value)
   selectNode(rootId.value)
@@ -286,7 +293,16 @@ onMounted(() => {
   void loadViewpointCatalog().then(() => {
     const viewpointSlug = route.query.viewpoint as string | undefined
     const preselected = viewpointSlug ? viewpoints.value.find((v) => v.slug === viewpointSlug) : undefined
-    if (preselected) onSelectViewpoint(preselected)
+    if (!preselected) return
+    const envelope = viewpointDefinitions.value.find((d) => d.slug === preselected.slug)
+    const redirect = explorationRedirectFor(envelope)
+    if (redirect) {
+      void router.push(redirect)
+      return
+    }
+    // Reload/shared link: URL-carried parameters execute directly (no re-prompt).
+    selectedViewpointSlug.value = preselected.slug
+    void loadViewpointPopulation(preselected.slug, parametersFromQuery(route.query))
   })
   loadRoot()
 })
@@ -315,7 +331,13 @@ const onEdgeClick = (e: typeof edges.value[number]) => {
   selectedId.value = null
 }
 
-const onNodeClick = (n: GraphNode) => selectNode(n.id)
+const onNodeClick = (n: GraphNode) => {
+  if (isAggregateNodeId(n.id)) {
+    toggleAggregate(n.id)
+    return
+  }
+  selectNode(n.id)
+}
 
 const onNodeDblClick = (n: GraphNode) => {
   // A viewpoint's result is a fixed population — no incremental expand/collapse.
@@ -329,98 +351,17 @@ const onNodeDblClick = (n: GraphNode) => {
   }
 }
 
-// ── Drag ─────────────────────────────────────────────────────────────────────
-
-const toSvgCoords = (clientX: number, clientY: number) => {
-  const svg = svgRef.value
-  if (!svg) return { x: clientX, y: clientY }
-  const pt = svg.createSVGPoint()
-  pt.x = clientX; pt.y = clientY
-  const ctm = svg.getScreenCTM()?.inverse()
-  if (!ctm) return { x: clientX, y: clientY }
-  const svgPt = pt.matrixTransform(ctm)
-  return { x: svgPt.x, y: svgPt.y }
-}
-
-const onNodeMouseDown = (e: MouseEvent, n: GraphNode) => {
-  e.preventDefault(); e.stopPropagation()
-  dragging.value = n
-  n.pinned = true
-  const svgPt = toSvgCoords(e.clientX, e.clientY)
-  dragOffset.value = { x: n.x - svgPt.x, y: n.y - svgPt.y }
-}
-
-const onSvgMouseMove = (e: MouseEvent) => {
-  if (dragging.value) {
-    const svgPt = toSvgCoords(e.clientX, e.clientY)
-    dragging.value.x = svgPt.x + dragOffset.value.x
-    dragging.value.y = svgPt.y + dragOffset.value.y
-    if (layoutMode.value === 'force') restart()
-    return
-  }
-  if (isPanning.value) {
-    const dx = (e.clientX - panStart.value.x) * (viewBox.value.w / svgWidth.value)
-    const dy = (e.clientY - panStart.value.y) * (viewBox.value.h / svgHeight.value)
-    viewBox.value.x -= dx; viewBox.value.y -= dy
-    panStart.value = { x: e.clientX, y: e.clientY }
-  }
-}
-
-const onSvgMouseUp = () => {
-  if (dragging.value) {
-    dragging.value.pinned = false; dragging.value = null
-    if (layoutMode.value === 'force') restart()
-  }
-  isPanning.value = false
-}
-
-const onSvgMouseDown = (e: MouseEvent) => {
-  isPanning.value = true
-  panStart.value = { x: e.clientX, y: e.clientY }
-}
-
-const onWheel = (e: WheelEvent) => {
-  e.preventDefault()
-  const factor = e.deltaY > 0 ? 1.1 : 0.9
-  const svgPt = toSvgCoords(e.clientX, e.clientY)
-  const vb = viewBox.value
-  vb.x = svgPt.x - (svgPt.x - vb.x) * factor
-  vb.y = svgPt.y - (svgPt.y - vb.y) * factor
-  vb.w *= factor; vb.h *= factor
-}
-
-const vb = computed(() => `${viewBox.value.x} ${viewBox.value.y} ${viewBox.value.w} ${viewBox.value.h}`)
 
 const sd = computed(() => selectedDetail.data.value)
 
-const edgePath = (e: typeof edges.value[number]) => {
-  const src = nodes.value.find((n) => n.id === e.source)
-  const tgt = nodes.value.find((n) => n.id === e.target)
-  if (!src || !tgt) return ''
-  if (layoutMode.value === 'cluster') {
-    const midY = (src.y + tgt.y) / 2
-    return `M ${src.x} ${src.y} V ${midY} H ${tgt.x} V ${tgt.y}`
-  }
-  return `M ${src.x} ${src.y} L ${tgt.x} ${tgt.y}`
-}
+const edgePath = (e: typeof edges.value[number]) =>
+  edgePathFor(nodes.value, e, layoutMode.value === 'cluster')
 
 const shownEdgeCount = (nodeId: string) =>
   edges.value.filter((e) => e.source === nodeId || e.target === nodeId).length
 
-// Returns SVG coords for a multiplicity label at `frac` (0=source, 1=target) along edge.
-// Offset 8px perpendicular-ish above the line for legibility.
-const edgeCardPos = (e: typeof edges.value[number], frac: number) => {
-  const src = nodes.value.find((n) => n.id === e.source)
-  const tgt = nodes.value.find((n) => n.id === e.target)
-  if (!src || !tgt) return { x: 0, y: 0 }
-  const dx = tgt.x - src.x
-  const dy = tgt.y - src.y
-  const len = Math.max(Math.sqrt(dx * dx + dy * dy), 1)
-  return {
-    x: src.x + dx * frac - (dy / len) * 8,
-    y: src.y + dy * frac + (dx / len) * 8,
-  }
-}
+const edgeCardPos = (e: typeof edges.value[number], frac: number) =>
+  edgeCardPosFor(nodes.value, e, frac)
 </script>
 
 <template>
@@ -443,49 +384,43 @@ const edgeCardPos = (e: typeof edges.value[number], frac: number) => {
             @select="onSelectViewpoint"
           />
         </div>
-        <div
-          v-if="selectedViewpointSlug === null"
-          class="spacing-controls"
-        >
-          <span class="spacing-label">Layout:</span>
+        <GraphLayoutToolbar
+          :viewpoint-active="selectedViewpointSlug !== null"
+          :layout-mode="layoutMode"
+          :layout-override="layoutOverride"
+          :ideal-dist="options.idealDist"
+          :radial-available="anchorIds.length > 0"
+          @switch-layout="switchLayout"
+          @set-exploration-layout="setExplorationLayout"
+          @apply-preset="applyPreset"
+        />
+        <div class="zoom-controls">
           <button
-            v-for="m in LAYOUT_MODES"
-            :key="m.value"
-            class="spacing-btn"
-            :class="{ 'spacing-btn--active': layoutMode === m.value }"
-            @click="switchLayout(m.value)"
+            type="button"
+            class="zoom-btn"
+            title="Zoom in"
+            aria-label="Zoom in"
+            @click="zoomBy(0.8)"
           >
-            {{ m.label }}
+            ＋
           </button>
-        </div>
-        <div
-          v-else
-          class="spacing-controls"
-        >
-          <span class="spacing-label">Layout:</span>
           <button
-            v-for="o in EXPLORATION_LAYOUT_OPTIONS"
-            :key="o.value"
-            class="spacing-btn"
-            :class="{ 'spacing-btn--active': layoutOverride === o.value }"
-            @click="setExplorationLayout(o.value)"
+            type="button"
+            class="zoom-btn"
+            title="Zoom out"
+            aria-label="Zoom out"
+            @click="zoomBy(1.25)"
           >
-            {{ o.label }}
+            －
           </button>
-        </div>
-        <div
-          v-if="layoutMode === 'force'"
-          class="spacing-controls"
-        >
-          <span class="spacing-label">Spacing:</span>
           <button
-            v-for="p in SPACING_PRESETS"
-            :key="p.label"
-            class="spacing-btn"
-            :class="{ 'spacing-btn--active': options.idealDist === p.idealDist }"
-            @click="applyPreset(p)"
+            type="button"
+            class="zoom-btn"
+            title="Fit all nodes in view"
+            aria-label="Fit to view"
+            @click="fitToView"
           >
-            {{ p.label }}
+            ⛶
           </button>
         </div>
       </div>
@@ -497,18 +432,25 @@ const edgeCardPos = (e: typeof edges.value[number], frac: number) => {
         :query-summary="viewpointExecution.result.value?.query_summary ?? ''"
         @rerun="rerunViewpoint"
       />
-      <div
-        v-if="hopLegend.length > 0"
-        class="hop-legend"
-      >
-        <span class="hop-chip hop-chip--anchor">Anchor</span>
-        <span
-          v-for="entry in hopLegend"
-          :key="entry.label"
-          class="hop-chip"
-          :style="{ background: entry.color }"
-        >{{ entry.label }}</span>
-      </div>
+      <AggregationBanner
+        v-if="activeAggregation"
+        :aggregation="activeAggregation"
+        :hint="aggregationHint"
+        :total-entity-count="viewpointExecution.result.value?.total_entity_count ?? 0"
+        :missing-member-count="missingMemberCount"
+      />
+      <ExecutionReferenceBar
+        v-if="selectedViewpointSlug !== null"
+        :envelope="selectedEnvelope"
+        :result="viewpointExecution.result.value"
+      />
+      <HopDistanceLegend
+        v-if="anchorIds.length > 0"
+        :depths="[...hopDepthById.values()]"
+        :has-unranked="hasUnrankedNodes"
+      />
+      <EdgeProvenanceLegend :connections="viewpointExecution.result.value?.connections ?? []" />
+      <DomainColorLegend :domains="nodes.map((n) => n.domain)" />
       <ViewpointParameterPrompt
         v-if="viewpointPrompt.visible.value"
         :parameters="viewpointPrompt.parameters.value"
@@ -640,7 +582,13 @@ const edgeCardPos = (e: typeof edges.value[number], frac: number) => {
             font-size="10"
             :font-weight="isAnchor(n.id) ? 700 : 400"
           >
-            {{ truncLabel(n.label) }}
+            <title>{{ n.label }}</title>
+            <tspan
+              v-for="(line, li) in wrapLabel(n.label)"
+              :key="li"
+              x="0"
+              :dy="li === 0 ? 0 : 12"
+            >{{ line }}</tspan>
           </text>
           <text
             v-if="nodeVisual(n).iconLetter"
@@ -689,47 +637,11 @@ const edgeCardPos = (e: typeof edges.value[number], frac: number) => {
       </div>
 
       <!-- Edge details -->
-      <template v-else-if="selectedEdge">
-        <div class="detail-field">
-          <label>Connection type</label><span class="detail-value mono">{{ selectedEdge.connType }}</span>
-        </div>
-        <div
-          v-if="selectedEdge.srcMultiplicity || selectedEdge.tgtMultiplicity"
-          class="detail-field"
-        >
-          <label>Multiplicity</label>
-          <span class="detail-value mono">
-            {{ selectedEdge.srcMultiplicity || '?' }} → {{ selectedEdge.tgtMultiplicity || '?' }}
-          </span>
-        </div>
-        <div class="detail-field">
-          <label>Source</label>
-          <RouterLink
-            :to="{ path: '/entity', query: { id: selectedEdge.source } }"
-            class="detail-value detail-link"
-          >
-            {{ friendlyName(selectedEdge.source) }}
-          </RouterLink>
-        </div>
-        <div class="detail-field">
-          <label>Target</label>
-          <RouterLink
-            :to="{ path: '/entity', query: { id: selectedEdge.target } }"
-            class="detail-value detail-link"
-          >
-            {{ friendlyName(selectedEdge.target) }}
-          </RouterLink>
-        </div>
-        <div
-          v-if="selectedEdge.description?.trim()"
-          class="detail-content"
-        >
-          <label>Description</label>
-          <div class="content-body">
-            {{ selectedEdge.description.trim() }}
-          </div>
-        </div>
-      </template>
+      <EdgeConnectionDetails
+        v-else-if="selectedEdge"
+        :edge="selectedEdge"
+        :summary="selectedEdgeSummary"
+      />
 
       <!-- Node details -->
       <div
@@ -744,64 +656,11 @@ const edgeCardPos = (e: typeof edges.value[number], frac: number) => {
       >
         {{ selectedDetail.errorMessage.value }}
       </div>
-      <template v-else-if="sd">
-        <div class="detail-field">
-          <label>Name</label>
-          <RouterLink
-            :to="{ path: '/entity', query: { id: selectedId } }"
-            class="detail-value detail-link"
-          >
-            {{ sd.name }}
-          </RouterLink>
-        </div>
-        <div class="detail-field">
-          <label>Type</label>
-          <span class="detail-type">
-            <ArchimateTypeGlyph
-              :type="sd.artifact_type"
-              :size="16"
-              class="detail-glyph"
-            />
-            <span class="detail-value mono">{{ sd.artifact_type }}</span>
-          </span>
-        </div>
-        <div class="detail-field">
-          <label>Domain</label><span
-            class="detail-value domain-badge"
-            :class="`domain--${sd.domain}`"
-          >{{ sd.domain }}</span>
-        </div>
-        <div class="detail-field">
-          <label>Status</label><span
-            class="detail-value status-badge"
-            :class="`status--${sd.status}`"
-          >{{ sd.status }}</span>
-        </div>
-        <div class="detail-field">
-          <label>Version</label><span class="detail-value">{{ sd.version }}</span>
-        </div>
-        <div class="detail-field">
-          <label>Artifact ID</label><span class="detail-value mono id-value">{{ sd.artifact_id }}</span>
-        </div>
-        <div
-          v-if="sd.content_html"
-          class="detail-content"
-        >
-          <label>Content</label>
-          <div
-            class="content-body markdown-body"
-            v-html="sd.content_html"
-          />
-        </div>
-        <div class="detail-explore">
-          <RouterLink
-            :to="{ path: '/graph', query: { id: selectedId } }"
-            class="explore-link"
-          >
-            Explore graph →
-          </RouterLink>
-        </div>
-      </template>
+      <GraphNodeDetails
+        v-else-if="sd && selectedId"
+        :detail="sd"
+        :selected-id="selectedId"
+      />
     </aside>
   </div>
 </template>
@@ -809,7 +668,7 @@ const edgeCardPos = (e: typeof edges.value[number], frac: number) => {
 <style scoped>
 .graph-layout { display: flex; height: calc(100vh - 96px); gap: 0; margin: -24px; }
 
-.graph-canvas { flex: 1; display: flex; flex-direction: column; background: #fafafa; }
+.graph-canvas { flex: 1; display: flex; flex-direction: column; background: #fafafa; position: relative; }
 .canvas-header {
   display: flex; align-items: center; gap: 12px; padding: 12px 16px;
   border-bottom: 1px solid #e5e7eb; background: white;
@@ -827,13 +686,16 @@ const edgeCardPos = (e: typeof edges.value[number], frac: number) => {
 .spacing-btn:hover { background: #f3f4f6; }
 .spacing-btn--active { background: #2563eb; color: white; border-color: #2563eb; }
 
-.hop-legend {
-  display: flex; align-items: center; flex-wrap: wrap; gap: 6px;
-  padding: 6px 16px; background: white; border-bottom: 1px solid #e5e7eb;
+.zoom-controls {
+  position: absolute; right: 12px; bottom: 12px; display: flex; flex-direction: column;
+  gap: 4px; z-index: 5;
 }
-.hop-chip { font-size: 10px; font-weight: 500; color: white; padding: 2px 8px; border-radius: 9999px; }
-.hop-chip--anchor { color: #1e293b; background: white; border: 3px double #1e293b; }
-
+.zoom-btn {
+  width: 30px; height: 30px; border: 1px solid #d1d5db; border-radius: 6px; background: white;
+  cursor: pointer; font-size: 15px; color: #374151; line-height: 1;
+  box-shadow: 0 1px 2px rgba(0,0,0,.08);
+}
+.zoom-btn:hover { background: #f3f4f6; }
 .graph-svg { flex: 1; cursor: grab; user-select: none; }
 .graph-svg:active { cursor: grabbing; }
 .graph-node { cursor: pointer; }
@@ -850,28 +712,5 @@ const edgeCardPos = (e: typeof edges.value[number], frac: number) => {
 .sidebar-empty, .sidebar-loading { font-size: 13px; color: #6b7280; }
 .sidebar-error { font-size: 13px; color: #dc2626; }
 
-.detail-field { margin-bottom: 12px; }
-.detail-field label { display: block; font-size: 11px; color: #6b7280; text-transform: uppercase; letter-spacing: .05em; margin-bottom: 2px; }
-.detail-value { font-size: 13px; color: #1e293b; }
-.detail-type { display: inline-flex; align-items: center; gap: 8px; }
-.detail-glyph { color: #374151; fill: none; flex: 0 0 auto; }
-.detail-link { font-weight: 600; }
-.id-value { font-size: 11px; color: #9ca3af; word-break: break-all; }
 .mono { font-family: monospace; }
-.detail-content { margin-top: 16px; }
-.detail-content label { display: block; font-size: 11px; color: #6b7280; text-transform: uppercase; letter-spacing: .05em; margin-bottom: 6px; }
-.content-body { font-size: 13px; line-height: 1.5; color: #374151; max-height: 300px; overflow-y: auto; white-space: pre-wrap; }
-.content-body :deep(p) { margin: 0.5rem 0; }
-.detail-explore { margin-top: 12px; }
-.explore-link { font-size: 12px; color: #2563eb; font-weight: 500; }
-.domain-badge, .status-badge { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 500; }
-.domain--motivation  { background: #d8c1e4; color: #252327; }
-.domain--strategy    { background: #efbd5d; color: #252327; }
-.domain--business    { background: #f4de7f; color: #252327; }
-.domain--common      { background: #e8e5d3; color: #252327; }
-.domain--application { background: #b6d7e1; color: #252327; }
-.domain--technology  { background: #c3e1b4; color: #252327; }
-.status--draft       { background: #f3f4f6; color: #6b7280; }
-.status--active      { background: #dcfce7; color: #166534; }
-.status--deprecated  { background: #fee2e2; color: #991b1b; }
 </style>

@@ -4,15 +4,16 @@ import { Effect, Exit } from 'effect'
 import { modelServiceKey } from '../keys'
 import { useEntityFilters } from '../composables/useEntityFilters'
 import type { EntityDisplayInfo, ReferenceSearchHit } from '../../domain'
-import { entityDisplayInfoToHit } from './EntityPickerInput.helpers'
+import { dividerIndex, entityDisplayInfoToHit } from './EntityPickerInput.helpers'
 import ArchimateTypeGlyph from './ArchimateTypeGlyph.vue'
+import EntityPickerFixedRows from './EntityPickerFixedRows.vue'
 import { toGlyphKey } from '../lib/glyphKey'
 import {
   calcHasStageUI,
   calcCanGoBack,
   calcCanGoForward,
 } from './EntityPickerInput.helpers'
-import type { WidenableTo } from './EntityPickerInput.helpers'
+import type { PickerHit, WidenableTo } from './EntityPickerInput.helpers'
 
 type Stage = 'scope' | 'entity-type'
 
@@ -40,7 +41,7 @@ const { selectedDomains, selectedEntityTypes, domainOptions, availableEntityType
   useEntityFilters({ fixedEntityTypes: props.fixedEntityTypes })
 
 const query = ref('')
-const results = ref<ReferenceSearchHit[]>([])
+const results = ref<PickerHit[]>([])
 const open = ref(false)
 const busy = ref(false)
 const loadingMore = ref(false)
@@ -122,7 +123,7 @@ const summaryParts = computed(() => {
 
 // ── Search ─────────────────────────────────────────────────────────────────────
 
-const acceptHits = (items: readonly EntityDisplayInfo[]): ReferenceSearchHit[] =>
+const acceptHits = (items: readonly EntityDisplayInfo[]): PickerHit[] =>
   items.map(entityDisplayInfoToHit).filter(r =>
     !props.excludedIds?.has(r.artifact_id)
     && (!props.acceptedTypes || props.acceptedTypes.has(String(r.artifact_type))),
@@ -183,6 +184,8 @@ const openDropdown = () => {
 }
 
 const onInput = () => { open.value = true; scheduleSearch() }
+
+const internalDividerIdx = computed(() => dividerIndex(results.value))
 
 const pick = async (hit: ReferenceSearchHit) => {
   const exit = await Effect.runPromiseExit(svc.getEntityDisplayItem(hit.artifact_id))
@@ -247,7 +250,7 @@ const onChipKeydown = (e: KeyboardEvent, i: number) => {
   else if (e.key === 'Escape') { open.value = false; inputRef.value?.focus() }
 }
 
-const onResultKeydown = (e: KeyboardEvent, hit: ReferenceSearchHit, i: number) => {
+const onResultKeydown = (e: KeyboardEvent, hit: PickerHit, i: number) => {
   if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); void pick(hit) }
   else if (e.key === 'ArrowDown') { e.preventDefault(); focusResult(Math.min(i + 1, results.value.length - 1)) }
   else if (e.key === 'ArrowUp') {
@@ -294,67 +297,10 @@ watch([selectedDomains, selectedEntityTypes], scheduleSearch)
       :style="dropStyle"
       @mousedown.prevent
     >
-      <!-- Fixed domain display — strategy A: compact chip (1 value), disabled row (N values) -->
-      <div
-        v-if="fixedDomains?.length"
-        class="ep-fixed-row"
-      >
-        <span class="ep-fixed-label">{{ fixedDomains.length === 1 ? 'Domain' : 'Domains' }}</span>
-        <template v-if="fixedDomains.length === 1">
-          <span
-            class="ep-fixed-chip"
-            title="Domain filter is pinned"
-          >{{ fixedDomains[0] }}</span>
-          <span
-            class="ep-fixed-lock"
-            aria-label="locked"
-          >🔒</span>
-        </template>
-        <template v-else>
-          <div class="ep-fixed-set">
-            <span
-              v-for="d in fixedDomains"
-              :key="d"
-              class="ep-fixed-chip"
-            >{{ d }}</span>
-          </div>
-          <span
-            class="ep-fixed-lock"
-            aria-label="locked"
-          >🔒</span>
-        </template>
-      </div>
-
-      <!-- Fixed entity type display — strategy A: compact chip (1 value), disabled row (N values) -->
-      <div
-        v-if="fixedEntityTypes?.length"
-        class="ep-fixed-row ep-fixed-row--types"
-      >
-        <span class="ep-fixed-label">{{ fixedEntityTypes.length === 1 ? 'Type' : 'Types' }}</span>
-        <template v-if="fixedEntityTypes.length === 1">
-          <span
-            class="ep-fixed-chip ep-fixed-chip--type"
-            title="Entity type filter is pinned"
-          >{{ fixedEntityTypes[0] }}</span>
-          <span
-            class="ep-fixed-lock"
-            aria-label="locked"
-          >🔒</span>
-        </template>
-        <template v-else>
-          <div class="ep-fixed-set">
-            <span
-              v-for="t in fixedEntityTypes"
-              :key="t"
-              class="ep-fixed-chip ep-fixed-chip--type"
-            >{{ t }}</span>
-          </div>
-          <span
-            class="ep-fixed-lock"
-            aria-label="locked"
-          >🔒</span>
-        </template>
-      </div>
+      <EntityPickerFixedRows
+        :fixed-domains="fixedDomains"
+        :fixed-entity-types="fixedEntityTypes"
+      />
 
       <!-- Interactive filter stage (hidden when widenableTo=none or all levels are fixed) -->
       <div
@@ -446,29 +392,46 @@ watch([selectedDomains, selectedEntityTypes], scheduleSearch)
         role="listbox"
       >
         <li
+          v-if="query.trim()"
+          class="ep-note"
+          aria-hidden="true"
+        >
+          showing best matches for "{{ query.trim() }}"
+        </li>
+        <template
           v-for="(r, i) in results"
           :key="r.artifact_id"
-          data-result
-          role="option"
-          class="ep-result"
-          :class="{ 'ep-result--hi': i === activeResultIdx }"
-          tabindex="0"
-          @mousedown.prevent="void pick(r)"
-          @keydown="onResultKeydown($event, r, i)"
-          @focus="activeResultIdx = i"
         >
-          <span
-            v-if="r.artifact_type"
-            class="ep-glyph"
+          <li
+            v-if="i === internalDividerIdx"
+            class="ep-divider"
+            aria-hidden="true"
           >
-            <ArchimateTypeGlyph
-              :type="toGlyphKey(r.artifact_type)"
-              :size="14"
-            />
-          </span>
-          <span class="ep-name">{{ r.name }}</span>
-          <span class="ep-meta">{{ r.artifact_type ?? r.record_type }} · {{ r.domain }}</span>
-        </li>
+            diagram-internal
+          </li>
+          <li
+            data-result
+            role="option"
+            class="ep-result"
+            :class="{ 'ep-result--hi': i === activeResultIdx }"
+            tabindex="0"
+            @mousedown.prevent="void pick(r)"
+            @keydown="onResultKeydown($event, r, i)"
+            @focus="activeResultIdx = i"
+          >
+            <span
+              v-if="r.artifact_type"
+              class="ep-glyph"
+            >
+              <ArchimateTypeGlyph
+                :type="toGlyphKey(r.artifact_type)"
+                :size="14"
+              />
+            </span>
+            <span class="ep-name">{{ r.name }}</span>
+            <span class="ep-meta">{{ r.artifact_type ?? r.record_type }} · {{ r.domain }}</span>
+          </li>
+        </template>
         <li
           v-if="nextCursor"
           ref="sentinelRef"
@@ -499,15 +462,6 @@ watch([selectedDomains, selectedEntityTypes], scheduleSearch)
   box-shadow: 0 6px 20px rgba(0,0,0,.13); overflow-y: auto;
 }
 
-/* Fixed-level read-only sections (strategy A: compact chip for single, row for set) */
-.ep-fixed-row { display: flex; align-items: center; gap: 6px; padding: 6px 10px; background: #f0f9ff; border-bottom: 1px solid #bae6fd; font-size: 12px; flex-wrap: wrap; }
-.ep-fixed-row--types { background: #f5f3ff; border-bottom-color: #c4b5fd; }
-.ep-fixed-label { font-size: 10px; font-weight: 700; color: #0369a1; flex-shrink: 0; text-transform: uppercase; letter-spacing: .05em; }
-.ep-fixed-row--types .ep-fixed-label { color: #6d28d9; }
-.ep-fixed-chip { background: #e0f2fe; border: 1px solid #7dd3fc; color: #0369a1; border-radius: 999px; padding: 2px 9px; font-size: 11px; cursor: default; }
-.ep-fixed-chip--type { background: #ede9fe; border-color: #a78bfa; color: #6d28d9; }
-.ep-fixed-set { display: flex; flex-wrap: wrap; gap: 4px; }
-.ep-fixed-lock { color: #94a3b8; font-size: 10px; }
 
 .ep-stage { padding: 10px 10px 6px; border-bottom: 1px solid #f3f4f6; background: #f8fafc; }
 .ep-stage-hdr { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
@@ -536,4 +490,6 @@ watch([selectedDomains, selectedEntityTypes], scheduleSearch)
 .ep-name { flex: 1; font-weight: 500; font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .ep-meta { font-size: 11px; color: #9ca3af; white-space: nowrap; }
 .ep-state { font-size: 12px; color: #9ca3af; padding: 10px 12px; }
+.ep-note { font-size: 10.5px; color: #94a3b8; padding: 3px 10px; font-style: italic; }
+.ep-divider { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: #94a3b8; padding: 6px 10px 2px; border-top: 1px solid #e5e7eb; margin-top: 4px; }
 </style>

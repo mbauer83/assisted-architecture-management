@@ -27,9 +27,18 @@ export function useViewpointParameterPrompt(
     pendingSlug.value === null ? [] : parameterSignatureOf(definitions.value.find((d) => d.slug === pendingSlug.value)),
   )
 
-  const run = async (slug: string): Promise<void> => {
+  const run = async (slug: string, preset?: Record<string, string>): Promise<void> => {
     const signature = parameterSignatureOf(definitions.value.find((d) => d.slug === slug))
     if (needsParameterPrompt(signature)) {
+      // A URL-provided preset that covers every required parameter executes directly —
+      // reloading a shared link must reproduce the result, not re-open the dialog.
+      const covered = signature
+        .filter((parameter) => parameter.required)
+        .every((parameter) => (preset?.[parameter.name] ?? '') !== '')
+      if (preset !== undefined && covered) {
+        await onResolved({ slug, parameters: parametersToWireValues(signature, preset) })
+        return
+      }
       pendingSlug.value = slug
       return
     }

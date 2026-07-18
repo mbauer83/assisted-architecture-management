@@ -46,6 +46,13 @@ const emit = defineEmits<{ rerun: [] }>()
       </div>
 
       <div
+        v-if="diagnostics.absenceStatement"
+        class="vp-absence"
+      >
+        {{ diagnostics.absenceStatement }}
+      </div>
+
+      <div
         v-if="diagnostics.truncated"
         class="vp-warning"
       >
@@ -82,6 +89,10 @@ const emit = defineEmits<{ rerun: [] }>()
           :style="{ background: tokenColor(entry.token) }"
         />
         {{ entry.capability }}: {{ tokenLabel(entry.token) }} ({{ entry.label }})
+        <span
+          v-if="entry.note"
+          class="vp-legend-note"
+        >{{ entry.note }}</span>
       </span>
     </div>
 
@@ -116,10 +127,18 @@ const emit = defineEmits<{ rerun: [] }>()
 .vp-rerun-btn:hover { background: #f3f4f6; }
 .vp-counts { color: #6b7280; }
 .vp-empty-state { color: #6b7280; font-style: italic; }
+.vp-absence {
+  color: #92400e; background: #fef3c7; border: 1px solid #fde68a;
+  border-radius: 6px; padding: 4px 10px; font-size: 12.5px;
+}
 .vp-warning { color: #92400e; background: #fef3c7; padding: 4px 8px; border-radius: 4px; }
 .vp-legend { display: flex; flex-wrap: wrap; gap: 10px; }
 .vp-legend-entry { display: inline-flex; align-items: center; gap: 4px; color: #374151; }
 .vp-legend-swatch { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }
+.vp-legend-note {
+  font-size: 10.5px; color: #6b7280; background: #f3f4f6;
+  padding: 0 5px; border-radius: 9999px; white-space: nowrap;
+}
 .vp-scale-gradient { display: flex; align-items: center; gap: 6px; color: #374151; }
 .vp-scale-label { font-weight: 600; color: #6b7280; }
 .vp-scale-endpoint { font-size: 11px; color: #6b7280; }

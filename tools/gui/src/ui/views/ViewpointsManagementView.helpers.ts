@@ -26,6 +26,16 @@ export const executionRouteFor = (envelope: ViewpointDefinitionEnvelope): { path
   return { path: EXECUTION_ROUTE_BY_REPRESENTATION[representation], query: { viewpoint: envelope.slug } }
 }
 
+/** Execution surfaces title by human name, slug secondary: "Name (slug)" — never the
+ * raw slug alone. Falls back to the slug while the catalog is still loading. */
+export const executionTitleFor = (
+  slug: string,
+  definitions: readonly ViewpointDefinitionEnvelope[],
+): string => {
+  const envelope = definitions.find((d) => d.slug === slug)
+  return envelope ? `${envelope.name} (${slug})` : slug
+}
+
 const SEMANTIC_KEYS = ['scope', 'query', 'presentation', 'representation_types'] as const
 
 /** True when any semantic field differs from `original` — a real editor never diffs by
@@ -88,4 +98,31 @@ export const firstErrorNodeId = (
 ): string | null => {
   const firstError = issues.find((issue) => issue.severity === 'error')
   return firstError ? resolveIssuePathNodeId(firstError.path, draft) : null
+}
+
+/** Indices of style rules a dry-run persist rejected — the fork-safe quarantine set.
+ * Only error-severity issues anchored under a specific rule count. */
+export const failingStyleRuleIndices = (
+  issues: readonly ViewpointValidationIssue[],
+): ReadonlySet<number> => {
+  const failing = new Set<number>()
+  for (const validationIssue of issues) {
+    if (validationIssue.severity !== 'error') continue
+    const match = /^\/presentation\/styling_rules\/(\d+)(\/|$)/.exec(validationIssue.path)
+    if (match) failing.add(Number(match[1]))
+  }
+  return failing
+}
+
+/** Unsaved-work check for the editor's discard guard: a read-only view is never dirty;
+ * an edit is dirty when the draft's wire mapping differs from the original's; a
+ * create/fork is dirty as soon as it exists (there is no saved original). */
+export const isDraftDirty = (
+  draft: ViewpointDefinitionDraft | null,
+  originalDraft: ViewpointDefinitionDraft | null,
+  options: { isCreating: boolean; isReadOnly: boolean },
+): boolean => {
+  if (!draft || options.isReadOnly) return false
+  if (!originalDraft) return options.isCreating
+  return JSON.stringify(definitionToMapping(draft)) !== JSON.stringify(definitionToMapping(originalDraft))
 }

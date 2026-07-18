@@ -9,6 +9,7 @@ import {
   calcHasStageUI,
   calcCanGoBack,
   calcCanGoForward,
+  dividerIndex,
   entityDisplayInfoToHit,
 } from '../EntityPickerInput.helpers'
 import type { EntityDisplayInfo } from '../../../domain'
@@ -124,6 +125,7 @@ describe('entityDisplayInfoToHit', () => {
     display_alias: 'bar',
     element_type: 'ApplicationComponent',
     element_label: 'Bar',
+    diagram_internal: false,
   }
 
   it('adapts an entity-display item to a record_type=entity result hit', () => {
@@ -135,6 +137,23 @@ describe('entityDisplayInfoToHit', () => {
       path: '',
       artifact_type: 'application-component',
       domain: 'application',
+      diagram_internal: false,
     })
+  })
+})
+
+// ── dividerIndex ───────────────────────────────────────────────────────────────
+
+describe('dividerIndex', () => {
+  const hit = (id: string, internal: boolean) => ({
+    artifact_id: id, record_type: 'entity' as const, name: id, status: 'active',
+    path: '', artifact_type: 'application-component', domain: 'application',
+    diagram_internal: internal,
+  })
+
+  it('is the first diagram-internal hit, -1 when all are model entities', () => {
+    expect(dividerIndex([hit('a', false), hit('b', false)])).toBe(-1)
+    expect(dividerIndex([hit('a', false), hit('b', true), hit('c', true)])).toBe(1)
+    expect(dividerIndex([])).toBe(-1)
   })
 })

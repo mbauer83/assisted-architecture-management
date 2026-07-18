@@ -55,5 +55,5 @@ test('a diagram-representation pin routes Home straight to the diagram surface',
   await expect(pinnedLink).toHaveAttribute('href', '/viewpoints/diagram?viewpoint=application-structure')
   await pinnedLink.click()
   await expect(page).toHaveURL(/\/viewpoints\/diagram\?viewpoint=application-structure/)
-  await expect(page.getByRole('heading', { name: 'application-structure (diagram)' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: /Application Structure \(application-structure\) — diagram/ })).toBeVisible()
 })

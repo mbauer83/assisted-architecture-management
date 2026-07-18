@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import {
+  absenceStatementFor,
   computeExecutionDiagnostics,
   computeUnsupportedCapabilities,
   deriveLegend,
@@ -14,7 +15,7 @@ const baseResult: ViewpointExecutionResult = {
   index_generation: null, entity_ids: [], connection_ids: [], entities: [], connections: [],
   total_entity_count: 0, returned_entity_count: 0, total_connection_count: 0, returned_connection_count: 0,
   truncated: false, entity_limit: 500, matrix_axes: null, warnings: [], duration_ms: 1, query_summary: 'test',
-  anchor_ids: [],
+  anchor_ids: [], target_population: null, aggregation: null,
 }
 
 describe('computeExecutionDiagnostics', () => {
@@ -113,7 +114,7 @@ describe('deriveLegend', () => {
     rule.matchCriteria = mkGroup('entity')
     presentation.stylingRules = [rule]
     expect(deriveLegend(presentation)).toEqual([
-      { capability: 'node_color', token: 'positive', label: 'application-component' },
+      { capability: 'node_color', token: 'positive', label: 'application-component', note: null },
     ])
   })
 
@@ -129,15 +130,15 @@ describe('deriveLegend', () => {
     ]
     presentation.stylingRules = [rule]
     expect(deriveLegend(presentation)).toEqual([
-      { capability: 'node_color', token: 'positive', label: 'risk_score in [-∞, 5)' },
-      { capability: 'node_color', token: 'critical', label: 'risk_score in [5, ∞)' },
+      { capability: 'node_color', token: 'positive', label: 'risk_score in [-∞, 5)', note: null },
+      { capability: 'node_color', token: 'critical', label: 'risk_score in [5, ∞)', note: null },
     ])
   })
 
   it('derives an entry from default_style', () => {
     const presentation = mkPresentation('exploration')
     presentation.defaultStyle = { node_color: 'neutral' }
-    expect(deriveLegend(presentation)).toEqual([{ capability: 'node_color', token: 'neutral', label: 'default' }])
+    expect(deriveLegend(presentation)).toEqual([{ capability: 'node_color', token: 'neutral', label: 'default', note: null }])
   })
 })
 
@@ -192,5 +193,107 @@ describe('deriveScaleGradients', () => {
     const gradients = deriveScaleGradients(presentation)
     expect(gradients[0].minLabel).toBe('1')
     expect(gradients[0].maxLabel).toBe('4')
+  })
+
+  it('resolves Auto (null) bounds to the observed min/max the server reported', () => {
+    const presentation = mkPresentation('exploration')
+    const rule = mkStyleRule('exploration')
+    rule.capability = 'node_color'
+    rule.mode = 'scale'
+    rule.scaleAttribute = 'derived.impact-distance'
+    rule.scaleTokens = ['heat-near', 'heat-far']
+    presentation.stylingRules = [rule]
+    const gradients = deriveScaleGradients(presentation, [
+      { capability: 'node_color', attribute: 'derived.impact-distance', minimum: 1, maximum: 4, tokens: ['heat-near', 'heat-far'] },
+    ])
+    expect(gradients[0].minLabel).toBe('1')
+    expect(gradients[0].maxLabel).toBe('4')
+  })
+
+  it('keeps unbounded labels only when the server produced no legend for the rule', () => {
+    const presentation = mkPresentation('exploration')
+    const rule = mkStyleRule('exploration')
+    rule.capability = 'node_color'
+    rule.mode = 'scale'
+    rule.scaleAttribute = 'derived.conn_count'
+    rule.scaleTokens = ['heat-near', 'heat-far']
+    presentation.stylingRules = [rule]
+    const gradients = deriveScaleGradients(presentation, [
+      { capability: 'node_color', attribute: 'derived.other', minimum: 0, maximum: 9, tokens: ['heat-near', 'heat-far'] },
+    ])
+    expect(gradients[0].minLabel).toBe('−∞')
+    expect(gradients[0].maxLabel).toBe('∞')
+  })
+})
+
+describe('never-run and honest-empty states', () => {
+  it('a null result reads as NOT EXECUTED, never as "no entities match"', () => {
+    const diagnostics = computeExecutionDiagnostics(null, null, 'exploration')
+    expect(diagnostics.isEmpty).toBe(false)
+    expect(diagnostics.emptyReason).toBe('Not executed — this viewpoint has not been run.')
+    expect(diagnostics.absenceStatement).toBeNull()
+  })
+
+  it('states target absence and names what IS shown when the target population is declared', () => {
+    const statement = absenceStatementFor({
+      ...baseResult,
+      target_population: {
+        target_types: ['capability', 'resource'],
+        target_count: 0,
+        incidental_type_counts: { outcome: 15 },
+        structural_count: 7,
+      },
+    })
+    expect(statement).toBe(
+      'This model contains no capability or resource elements; '
+      + 'showing 15 outcomes and 7 structural elements (junctions/groupings).',
+    )
+  })
+
+  it('makes NO absence claim when the target population is unknown or present', () => {
+    expect(absenceStatementFor({ ...baseResult, target_population: null })).toBeNull()
+    expect(absenceStatementFor({
+      ...baseResult,
+      target_population: {
+        target_types: ['capability'], target_count: 3, incidental_type_counts: {}, structural_count: 0,
+      },
+    })).toBeNull()
+  })
+
+  it('stays silent for a fully empty declared-target result — the empty state already covers it', () => {
+    expect(absenceStatementFor({
+      ...baseResult,
+      target_population: {
+        target_types: ['capability'], target_count: 0, incidental_type_counts: {}, structural_count: 0,
+      },
+    })).toBeNull()
+  })
+})
+
+describe('deriveLegend rule outcomes', () => {
+  it("badges an expected-empty rule's entries with a quiet '0 matches' note", () => {
+    const presentation = mkPresentation('exploration')
+    const rule = mkStyleRule('exploration')
+    rule.capability = 'node_color'
+    rule.value = 'critical'
+    rule.matchCriteria = mkGroup('entity')
+    presentation.stylingRules = [rule]
+    const legend = deriveLegend(presentation, [
+      { rule_index: 0, capability: 'node_color', kind: 'expected-empty', matched_count: 0, applied_count: 0, detail: null },
+    ])
+    expect(legend[0].note).toBe('0 matches')
+  })
+
+  it('leaves applied rules unbadged', () => {
+    const presentation = mkPresentation('exploration')
+    const rule = mkStyleRule('exploration')
+    rule.capability = 'node_color'
+    rule.value = 'critical'
+    rule.matchCriteria = mkGroup('entity')
+    presentation.stylingRules = [rule]
+    const legend = deriveLegend(presentation, [
+      { rule_index: 0, capability: 'node_color', kind: 'applied', matched_count: 3, applied_count: 3, detail: null },
+    ])
+    expect(legend[0].note).toBeNull()
   })
 })

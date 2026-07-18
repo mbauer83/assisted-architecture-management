@@ -15,9 +15,16 @@ const props = defineProps<{ parameters: readonly QueryParameterNode[] }>()
 const emit = defineEmits<{ submit: [draft: Record<string, string>]; cancel: [] }>()
 
 const draft = ref<Record<string, string>>(initialParameterDraft(props.parameters))
-watch(() => props.parameters, (parameters) => { draft.value = initialParameterDraft(parameters) })
+// Confirmation echoes the picked entity's display name (the id stays secondary) — a raw
+// artifact id alone makes users second-guess whether they picked the right anchor.
+const pickedNames = ref<Record<string, string>>({})
+watch(() => props.parameters, (parameters) => { draft.value = initialParameterDraft(parameters); pickedNames.value = {} })
 
 const setValue = (name: string, value: string) => { draft.value = { ...draft.value, [name]: value } }
+const setEntityValue = (name: string, entity: EntityDisplayInfo) => {
+  pickedNames.value = { ...pickedNames.value, [name]: entity.name }
+  setValue(name, entity.artifact_id)
+}
 const missing = () => missingRequiredParameters(props.parameters, draft.value)
 const onSubmit = () => { if (missing().length === 0) emit('submit', draft.value) }
 </script>
@@ -49,7 +56,7 @@ const onSubmit = () => { if (missing().length === 0) emit('submit', draft.value)
           v-if="parameter.valueType === 'entity-id'"
           :placeholder="`select an entity for ${parameter.name}`"
           close-on-select
-          @select="(entity: EntityDisplayInfo) => setValue(parameter.name, entity.artifact_id)"
+          @select="(entity: EntityDisplayInfo) => setEntityValue(parameter.name, entity)"
         />
         <input
           v-else-if="parameter.valueType === 'boolean'"
@@ -83,7 +90,11 @@ const onSubmit = () => { if (missing().length === 0) emit('submit', draft.value)
         <span
           v-if="parameter.valueType === 'entity-id' && draft[parameter.name]"
           class="selected-hint"
-        >selected: {{ draft[parameter.name] }}</span>
+        >selected: <b>{{ pickedNames[parameter.name] ?? draft[parameter.name] }}</b>
+          <span
+            v-if="pickedNames[parameter.name]"
+            class="selected-id"
+          >({{ draft[parameter.name] }})</span></span>
       </div>
 
       <p
@@ -122,6 +133,7 @@ const onSubmit = () => { if (missing().length === 0) emit('submit', draft.value)
 .param-desc { font-size: 11.5px; color: #6b7280; margin: 0; }
 .param-field input { padding: 6px 8px; border-radius: 6px; border: 1px solid #d1d5db; font-size: 13px; font-family: inherit; }
 .selected-hint { font-size: 11.5px; color: #4338ca; }
+.selected-id { font-size: 10.5px; color: #9ca3af; margin-left: 4px; font-family: monospace; }
 .missing-hint { font-size: 12px; color: #92400e; background: #fef3c7; padding: 6px 10px; border-radius: 6px; }
 .prompt-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 14px; }
 .prompt-actions button { padding: 6px 14px; border-radius: 7px; border: 1px solid #d1d5db; background: #fff; font-size: 13px; cursor: pointer; }

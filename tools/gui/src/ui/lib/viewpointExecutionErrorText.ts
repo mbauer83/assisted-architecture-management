@@ -41,6 +41,12 @@ export const executionErrorDisplay = (error: TypedApiError): ExecutionErrorDispl
       detail: `${error.message} Reduce the hop bound or narrow the derived-traversal criteria, then run it again.`,
     }
   }
+  if (error.code === 'diagram-render-limit') {
+    return {
+      title: 'Result too large for diagram rendering',
+      detail: error.message,
+    }
+  }
   if (error.code === 'binding-cardinality-violation') {
     return {
       title: 'A binding matched the wrong number of items',
