@@ -6,7 +6,7 @@ from __future__ import annotations
 
 from src.application.viewpoints.repository_projection import project_repository
 from src.domain.viewpoint_criteria import AttributeCondition, EntityCriteriaGroup, NeighborInclusion, ValueRef
-from src.domain.viewpoints import ExecutableViewpointQuery, PresentationSpec, StyleRule, ViewpointDefinition
+from src.domain.viewpoints import ColumnSpec, ExecutableViewpointQuery, PresentationSpec, StyleRule, ViewpointDefinition
 from tests.application.viewpoints._fixtures import REGISTRIES, Store, connection, entity
 
 
@@ -70,6 +70,111 @@ class TestStyling:
         definition = _definition(query=query, presentation=presentation)
         projection = project_repository(definition, read_access=store, registries=REGISTRIES)
         assert projection.items[0].style == {"badges": "badge-warning"}
+
+
+class TestRuleOutcomes:
+    """Every authored style rule reports exactly one observable outcome — never a
+    silent no-op."""
+
+    def _match_rule(self, capability: str, status: str, value: str) -> StyleRule:
+        return StyleRule(
+            capability=capability,
+            mode="match",
+            match_criteria=EntityCriteriaGroup(
+                children=(AttributeCondition(attribute="status", comparator="eq", value=ValueRef(literal=status)),)
+            ),
+            value=value,
+        )
+
+    def _project(self, presentation: PresentationSpec, *, store: Store | None = None):
+        query = ExecutableViewpointQuery(entity_criteria=EntityCriteriaGroup())
+        definition = _definition(query=query, presentation=presentation)
+        effective_store = store if store is not None else Store(
+            entities={"ENT@A": entity(artifact_id="ENT@A", status="deprecated")}
+        )
+        return project_repository(definition, read_access=effective_store, registries=REGISTRIES)
+
+    def test_applied_rule_reports_its_count(self) -> None:
+        projection = self._project(
+            PresentationSpec(representation="table", styling_rules=(self._match_rule("badges", "deprecated", "x"),))
+        )
+        (outcome,) = projection.rule_outcomes
+        assert (outcome.kind, outcome.applied_count, outcome.matched_count) == ("applied", 1, 1)
+        assert not any("style rule" in warning for warning in projection.warnings)
+
+    def test_valid_rule_with_zero_matches_is_expected_empty_and_never_warns(self) -> None:
+        projection = self._project(
+            PresentationSpec(representation="table", styling_rules=(self._match_rule("badges", "retired", "x"),))
+        )
+        (outcome,) = projection.rule_outcomes
+        assert outcome.kind == "expected-empty"
+        assert outcome.matched_count == 0
+        assert not any("style rule" in warning for warning in projection.warnings)
+
+    def test_fully_shadowed_rule_reports_shadowed_and_warns(self) -> None:
+        projection = self._project(
+            PresentationSpec(
+                representation="table",
+                styling_rules=(
+                    self._match_rule("badges", "deprecated", "first"),
+                    self._match_rule("badges", "deprecated", "second"),
+                ),
+            )
+        )
+        first, second = projection.rule_outcomes
+        assert first.kind == "applied"
+        assert second.kind == "shadowed"
+        assert second.matched_count == 1
+        assert second.applied_count == 0
+        assert any(
+            "style rule 2 (badges)" in warning and "higher-precedence" in warning for warning in projection.warnings
+        )
+
+    def test_scale_rule_with_undeclared_derived_attribute_is_unresolvable_and_warns(self) -> None:
+        projection = self._project(
+            PresentationSpec(
+                representation="exploration",
+                styling_rules=(
+                    StyleRule(
+                        capability="node_color",
+                        mode="scale",
+                        scale_attribute="derived.conn_count",
+                        scale_tokens=("heat-near", "heat-far"),
+                    ),
+                ),
+            )
+        )
+        (outcome,) = projection.rule_outcomes
+        assert outcome.kind == "unresolvable"
+        assert outcome.detail == "derived.conn_count"
+        assert any("derived.conn_count" in warning and "cannot resolve" in warning for warning in projection.warnings)
+
+
+class TestColumnValues:
+    def test_authored_columns_are_resolved_server_side_with_explicit_missing_marks(self) -> None:
+        store = Store(
+            entities={
+                "ENT@A": entity(artifact_id="ENT@A", status="draft", extra={"criticality": "high"}),
+                "ENT@B": entity(artifact_id="ENT@B", status="active"),
+            }
+        )
+        presentation = PresentationSpec(
+            representation="table",
+            columns=(ColumnSpec(label="Status", source="status"), ColumnSpec(label="Crit", source="criticality")),
+        )
+        definition = _definition(
+            query=ExecutableViewpointQuery(entity_criteria=EntityCriteriaGroup()), presentation=presentation
+        )
+        projection = project_repository(definition, read_access=store, registries=REGISTRIES)
+        values = {item.item_id: item.column_values for item in projection.items}
+        assert values["ENT@A"] == {"status": "draft", "criticality": "high"}
+        assert values["ENT@B"] == {"status": "active", "criticality": None}
+
+    def test_no_authored_columns_means_no_column_values(self) -> None:
+        store = Store(entities={"ENT@A": entity(artifact_id="ENT@A")})
+        definition = _definition(query=ExecutableViewpointQuery(entity_criteria=EntityCriteriaGroup()))
+        projection = project_repository(definition, read_access=store, registries=REGISTRIES)
+        assert all(item.column_values is None for item in projection.items)
 
 
 class TestDeterministicOrder:

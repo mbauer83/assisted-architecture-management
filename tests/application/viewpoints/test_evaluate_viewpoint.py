@@ -113,6 +113,52 @@ class TestAnchorIds:
         result = _run(ViewpointExecutionRequest(query=query), catalog=ViewpointCatalog.empty(), read_access=store)
         assert result.anchor_ids == ()
 
+    def test_anchored_execution_ranks_entities_by_modeled_distance(self) -> None:
+        store = Store(
+            entities={"ENT@A": entity(artifact_id="ENT@A"), "ENT@B": entity(artifact_id="ENT@B")},
+            connections=[connection(artifact_id="CON@ab", source="ENT@A", target="ENT@B")],
+        )
+        query = ExecutableViewpointQuery(
+            entity_criteria=self._anchored_query().entity_criteria,
+            parameters=self._anchored_query().parameters,
+            include_connected=(NeighborInclusion(),),
+        )
+        result = _run(
+            ViewpointExecutionRequest(query=query, parameters={"anchor": "ENT@A"}),
+            catalog=ViewpointCatalog.empty(),
+            read_access=store,
+        )
+        by_id = {e.id: e.anchor_modeled_distance for e in result.entities}
+        assert by_id == {"ENT@A": 0, "ENT@B": 1}
+
+    def test_scope_mode_execution_carries_a_target_population_summary(self) -> None:
+        from src.domain.concept_scope import ConceptScope
+
+        store = Store(entities={"ENT@P": entity(artifact_id="ENT@P", artifact_type="process")})
+        definition = _definition(
+            scope=ConceptScope(entity_types=frozenset({"application-component", "process"})),
+            selection_mode="scope",
+        )
+        result = _run(
+            ViewpointExecutionRequest(slug="test-viewpoint"),
+            catalog=ViewpointCatalog(entries=(definition,)),
+            read_access=store,
+        )
+        assert result.target_population is not None
+        assert result.target_population.target_count == 1
+
+    def test_ad_hoc_query_has_unknown_target_population(self) -> None:
+        store = Store(entities={"ENT@A": entity(artifact_id="ENT@A")})
+        query = ExecutableViewpointQuery(entity_criteria=EntityCriteriaGroup())
+        result = _run(ViewpointExecutionRequest(query=query), catalog=ViewpointCatalog.empty(), read_access=store)
+        assert result.target_population is None
+
+    def test_unanchored_execution_leaves_entities_unranked(self) -> None:
+        store = Store(entities={"ENT@A": entity(artifact_id="ENT@A")})
+        query = ExecutableViewpointQuery(entity_criteria=EntityCriteriaGroup())
+        result = _run(ViewpointExecutionRequest(query=query), catalog=ViewpointCatalog.empty(), read_access=store)
+        assert all(e.anchor_modeled_distance is None for e in result.entities)
+
 
 class TestSummaries:
     def test_entity_and_connection_summaries(self) -> None:
@@ -134,6 +180,8 @@ class TestSummaries:
         assert alpha.specialization_slugs == ("custom-spec",)
         assert alpha.group == "core"
         assert alpha.membership == "primary"
+        assert isinstance(alpha.status, str) and alpha.status != ""
+        assert isinstance(alpha.version, str) and alpha.version != ""
 
         assert result.connection_ids == ("CON@ab",)
         link = result.connections[0]

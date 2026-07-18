@@ -45,6 +45,40 @@ class ProjectedOccurrence:
     certainty: Literal["certain", "potential"] | None = None
     hops: int | None = None
     via_connection_ids: tuple[str, ...] = ()
+    derived_match_hops: int | None = None
+    """Entities only: set when the entity's criteria match REQUIRED derived-relationship
+    evidence — the minimum witness-chain length it rested on. ``None`` for matches
+    establishable from modeled facts alone (and for connections/expanded members)."""
+    column_values: Mapping[str, object] | None = None
+    """Entities only, and only when the definition authors table columns: one entry per
+    authored column source, resolved server-side at execution time. A source that does
+    not resolve for this entity is explicitly ``None`` — present-but-missing, never a
+    silently absent key — so renderers can distinguish "no value" from "not fetched"."""
+
+
+StyleRuleOutcomeKind = Literal["applied", "expected-empty", "shadowed", "unresolvable", "disabled"]
+
+
+@dataclass(frozen=True)
+class StyleRuleOutcome:
+    """One authored style rule's observable outcome for this execution.
+
+    Every rule reports exactly one outcome: ``applied`` (styled ``applied_count`` items),
+    ``shadowed`` (matched items, but a higher-precedence rule claimed every one),
+    ``expected-empty`` (valid rule, zero matches — a legitimate state, e.g. a gap rule
+    over a healthy model), ``unresolvable`` (its attribute/reference cannot resolve), or
+    ``disabled`` (quarantined — deliberately inert, e.g. a fork's inherited rule whose
+    attribute no longer resolves). Only ``unresolvable`` and ``shadowed`` warrant
+    warnings; ``expected-empty`` must stay quiet or healthy conformance views cry wolf,
+    and ``disabled`` is a deliberate authoring state, not a defect.
+    """
+
+    rule_index: int
+    capability: str
+    kind: StyleRuleOutcomeKind
+    matched_count: int = 0
+    applied_count: int = 0
+    detail: str | None = None  # e.g. the unresolvable attribute path
 
 
 @dataclass(frozen=True)
@@ -54,6 +88,7 @@ class ViewpointProjection:
     stale_pin: bool = False  # artifact-local only: pinned_version < current definition version
     warnings: tuple[str, ...] = ()  # schema drift, capability drift, unresolved references
     scale_legends: tuple["ScaleLegendData", ...] = ()
+    rule_outcomes: tuple[StyleRuleOutcome, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -71,6 +106,23 @@ def drift_warnings(drift: frozenset[str]) -> tuple[str, ...]:
     """One human-readable warning per schema-drifted attribute path (degraded loudly,
     never silently"), sorted for deterministic output."""
     return tuple(f"schema drift: attribute '{attribute}' is no longer resolvable" for attribute in sorted(drift))
+
+
+def rule_outcome_warnings(outcomes: tuple[StyleRuleOutcome, ...]) -> tuple[str, ...]:
+    """Warnings for the two defect-class outcomes only: an unresolvable reference and a
+    fully shadowed rule. ``expected-empty`` never warns — zero matches is a legitimate
+    state for a healthy gap rule, and warning on it would train users to ignore warnings."""
+    warnings: list[str] = []
+    for outcome in outcomes:
+        position = f"style rule {outcome.rule_index + 1} ({outcome.capability})"
+        if outcome.kind == "unresolvable":
+            warnings.append(f"{position}: reference '{outcome.detail}' cannot resolve — the rule styles nothing")
+        elif outcome.kind == "shadowed":
+            warnings.append(
+                f"{position}: matched {outcome.matched_count} item(s), but a higher-precedence rule "
+                "claimed every one — the rule styles nothing"
+            )
+    return tuple(warnings)
 
 
 def derivation_truncation_warnings(truncated: bool) -> tuple[str, ...]:

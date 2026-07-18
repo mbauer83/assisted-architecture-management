@@ -12,7 +12,7 @@ concern — see ``viewpoint_validation.py``. Query/presentation leaf shapes live
 from __future__ import annotations
 
 from collections.abc import Mapping
-from typing import Any
+from typing import Any, Literal, cast
 
 from src.domain.concept_scope import ConceptScope, HierarchyPredicate
 from src.domain.module_types import ConnectionTypeName, EntityTypeName
@@ -22,6 +22,7 @@ from src.domain.viewpoints import (
     VALID_CONTENTS,
     VALID_PURPOSES,
     Content,
+    ForkLineage,
     Purpose,
     ViewpointCatalog,
     ViewpointDefinition,
@@ -43,6 +44,8 @@ _DEFINITION_KEYS = frozenset(
         "derivation_defaults",
         "query",
         "presentation",
+        "selection_mode",
+        "forked_from",
     }
 )
 
@@ -93,6 +96,35 @@ def _string_tuple(raw: object) -> tuple[str, ...]:
 
 def _string_frozenset(raw: object) -> frozenset[str]:
     return frozenset(str(v) for v in raw) if isinstance(raw, (list, tuple)) else frozenset()
+
+
+def _fork_lineage_from_mapping(raw: object, *, label: str) -> ForkLineage | None:
+    if raw is None:
+        return None
+    if not isinstance(raw, Mapping):
+        raise ValueError(f"{label}: forked_from must be a mapping")
+    unknown = set(raw.keys()) - {"slug", "version", "definition_digest", "index_generation"}
+    if unknown:
+        raise ValueError(f"{label}: forked_from: unknown key(s) {sorted(unknown)}")
+    slug = raw.get("slug")
+    digest = raw.get("definition_digest")
+    if not isinstance(slug, str) or not slug or not isinstance(digest, str) or not digest:
+        raise ValueError(f"{label}: forked_from requires 'slug' and 'definition_digest'")
+    generation = raw.get("index_generation")
+    return ForkLineage(
+        slug=slug,
+        version=int(raw.get("version", 1)),
+        definition_digest=digest,
+        index_generation=int(generation) if isinstance(generation, int) else None,
+    )
+
+
+def _selection_mode(raw: object, *, label: str) -> Literal["scope", "query"] | None:
+    if raw is None:
+        return None
+    if raw not in ("scope", "query"):
+        raise ValueError(f"{label}: selection_mode must be 'scope' or 'query'")
+    return cast(Literal["scope", "query"], raw)
 
 
 _SCOPE_KEYS = frozenset(
@@ -146,6 +178,8 @@ def viewpoint_definition_from_mapping(raw: Mapping[str, Any]) -> ViewpointDefini
         derivation_defaults=dict(derivation_defaults) if isinstance(derivation_defaults, Mapping) else {},
         query=query_from_mapping(raw.get("query"), label=label) if raw.get("query") is not None else None,
         presentation=presentation_from_mapping(raw.get("presentation"), label=label),
+        selection_mode=_selection_mode(raw.get("selection_mode"), label=label),
+        forked_from=_fork_lineage_from_mapping(raw.get("forked_from"), label=label),
     )
 
 

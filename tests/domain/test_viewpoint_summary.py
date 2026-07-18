@@ -15,6 +15,7 @@ from src.domain.viewpoint_criteria import (
 from src.domain.viewpoint_summary import (
     render_condition,
     render_connection_selection,
+    render_derived_attribute,
     render_entity_group,
     render_incident,
     render_neighbor_inclusion,
@@ -147,16 +148,33 @@ class TestIncidentRendering:
             endpoint_criteria=EntityCriteriaGroup(children=(_eq("type", "process"),)),
         )
         rendered = render_incident(condition)
-        assert rendered == "has an outgoing connection (type is archimate-serving) to an entity where (type is process)"
+        assert rendered == (
+            "has a direct outgoing connection (type is archimate-serving) to an entity where (type is process)"
+        )
 
-    def test_negated_incident_reads_has_no_such_connection(self) -> None:
-        """Incident negate is strict complement, spelled 'has no such connection'."""
+    def test_negated_incident_states_the_excluded_union(self) -> None:
+        """Incident negate is strict complement: the sentence names what is excluded,
+        including the traversal — a negated ``both`` reads as excluding either kind."""
         condition = IncidentConnectionCondition(negate=True)
-        assert render_incident(condition) == "has no such connection"
+        assert render_incident(condition) == "has no direct connection (any) to an entity where (any entity)"
+        negated_both = IncidentConnectionCondition(negate=True, traversal="both")
+        assert render_incident(negated_both) == (
+            "has no direct or derived connection (any) to an entity where (any entity)"
+        )
 
     def test_any_connection_any_entity_defaults(self) -> None:
         condition = IncidentConnectionCondition()
-        assert render_incident(condition) == "has an connection (any) to an entity where (any entity)"
+        assert render_incident(condition) == "has a direct connection (any) to an entity where (any entity)"
+
+    def test_each_traversal_reads_as_a_distinct_condition(self) -> None:
+        rendered = {
+            traversal: render_incident(IncidentConnectionCondition(direction="outgoing", traversal=traversal))
+            for traversal in ("direct", "derived", "both")
+        }
+        assert rendered["direct"].startswith("has a direct outgoing connection")
+        assert rendered["derived"].startswith("has a derived outgoing connection")
+        assert rendered["both"].startswith("has a direct or derived outgoing connection")
+        assert len(set(rendered.values())) == 3
 
 
 class TestNeighborInclusionRendering:
@@ -164,7 +182,7 @@ class TestNeighborInclusionRendering:
         inclusion = NeighborInclusion()
         rendered = render_neighbor_inclusion(inclusion)
         assert rendered == (
-            "Also include entities where (any entity) connected via an connection (any connection) "
+            "Also include entities where (any entity) connected via a connection (any connection) "
             "to the primary selection"
         )
 
@@ -181,6 +199,35 @@ class TestNeighborInclusionRendering:
             "Also include entities where ((type is process and specialization is business-process)) "
             "connected via an outgoing connection (type is archimate-serving) to the primary selection"
         )
+
+    def test_derived_inclusion_states_its_own_bound(self) -> None:
+        """The hop bound in a derived-inclusion sentence comes from THIS inclusion's
+        ``max_hops``, never from another clause's definition."""
+        inclusion = NeighborInclusion(direction="incoming", traversal="derived", max_hops=4)
+        rendered = render_neighbor_inclusion(inclusion)
+        assert rendered == (
+            "Also include entities where (any entity) connected via incoming derived relationships "
+            "(any connection, up to 4 steps) to the primary selection"
+        )
+
+    def test_derived_inclusion_without_bound_uses_engine_default(self) -> None:
+        inclusion = NeighborInclusion(traversal="derived")
+        rendered = render_neighbor_inclusion(inclusion, default_max_hops=6)
+        assert "(any connection, up to 6 steps)" in rendered
+
+    def test_derived_inclusion_without_bound_or_default_names_the_limit(self) -> None:
+        inclusion = NeighborInclusion(traversal="derived")
+        rendered = render_neighbor_inclusion(inclusion)
+        assert "(any connection, up to the configured hop limit)" in rendered
+
+    def test_derived_inclusion_single_step_is_singular(self) -> None:
+        inclusion = NeighborInclusion(traversal="derived", max_hops=1)
+        assert "up to 1 step)" in render_neighbor_inclusion(inclusion)
+
+    def test_derived_inclusion_discloses_potential_derivations(self) -> None:
+        inclusion = NeighborInclusion(traversal="derived", max_hops=3, include_potential=True)
+        rendered = render_neighbor_inclusion(inclusion)
+        assert "(any connection, up to 3 steps, including potential derivations)" in rendered
 
 
 class TestConnectionSelectionRendering:
@@ -226,9 +273,14 @@ class TestFullQuerySummary:
             ),
         )
         summary = render_query_summary(query)
-        assert summary.startswith("Entity selection: (type is application-component and has an outgoing connection")
+        assert summary.startswith(
+            "Entity selection: (type is application-component and has a direct outgoing connection"
+        )
         assert "Also include entities where" in summary
-        assert summary.endswith("All connections between included entities are displayed.")
+        assert (
+            "All connections between included entities are displayed. "
+            "Undirected connection types match direction filters in either direction."
+        ) in summary
 
     def test_renders_parameter_binding_and_derived_attribute(self) -> None:
         query = ExecutableViewpointQuery(
@@ -247,3 +299,113 @@ class TestFullQuerySummary:
         assert "Takes a required entity-id input ⟨anchor⟩." in summary
         assert "Let critical be entities where any entity." in summary
         assert "Derived impact: count connections for directly connected outgoing." in summary
+
+
+class TestDerivedAttributeRendering:
+    def test_derived_traversal_names_its_own_bound(self) -> None:
+        attribute = DerivedAttribute(
+            "impact-distance",
+            direction="incoming",
+            traversal="derived",
+            max_hops=3,
+            reduce="min",
+            of="relationship.hops",
+        )
+        assert render_derived_attribute(attribute) == (
+            "Derived impact-distance: min relationship.hops across incoming derived relationships (up to 3 steps)."
+        )
+
+    def test_derived_traversal_without_bound_uses_engine_default(self) -> None:
+        attribute = DerivedAttribute("impact-distance", traversal="derived", reduce="min", of="relationship.hops")
+        assert render_derived_attribute(attribute, default_max_hops=4) == (
+            "Derived impact-distance: min relationship.hops across derived relationships (up to 4 steps)."
+        )
+
+    def test_derived_traversal_discloses_potential(self) -> None:
+        attribute = DerivedAttribute("reach", traversal="derived", max_hops=2, include_potential=True)
+        assert render_derived_attribute(attribute) == (
+            "Derived reach: count connections across derived relationships "
+            "(up to 2 steps, including potential derivations)."
+        )
+
+
+class TestClauseBoundIndependence:
+    def test_each_clause_renders_its_own_hop_bound(self) -> None:
+        """A query whose derived attribute and derived inclusion carry DIFFERENT bounds
+        must render each number in its own sentence — never one clause's bound applied
+        to another's."""
+        query = ExecutableViewpointQuery(
+            derived=(
+                DerivedAttribute(
+                    "impact-distance",
+                    direction="incoming",
+                    traversal="derived",
+                    max_hops=2,
+                    reduce="min",
+                    of="relationship.hops",
+                ),
+            ),
+            entity_criteria=EntityCriteriaGroup(children=(_eq("type", "application-component"),)),
+            include_connected=(NeighborInclusion(direction="incoming", traversal="derived", max_hops=4),),
+        )
+        summary = render_query_summary(query, default_derivation_max_hops=9)
+        assert (
+            "Derived impact-distance: min relationship.hops across incoming derived relationships (up to 2 steps)."
+        ) in summary
+        assert "connected via incoming derived relationships (any connection, up to 4 steps)" in summary
+        assert "9" not in summary
+
+    def test_element_dependents_shape_regression(self) -> None:
+        """The anchored dependents recipe: the inclusion's 4-step derived traversal and
+        the attribute's default-bounded aggregation each read from their own clause."""
+        query = ExecutableViewpointQuery(
+            parameters=(QueryParameter("anchor", "entity-id"),),
+            derived=(
+                DerivedAttribute(
+                    "impact-distance", direction="incoming", traversal="derived", reduce="min", of="relationship.hops"
+                ),
+            ),
+            entity_criteria=EntityCriteriaGroup(
+                children=(
+                    AttributeCondition(
+                        attribute="id", comparator="eq", value=ValueRef(kind="parameter", parameter="anchor")
+                    ),
+                )
+            ),
+            include_connected=(NeighborInclusion(direction="incoming", traversal="derived", max_hops=4),),
+        )
+        summary = render_query_summary(query, default_derivation_max_hops=4)
+        assert summary == (
+            "Takes a required entity-id input ⟨anchor⟩. "
+            "Derived impact-distance: min relationship.hops across incoming derived relationships (up to 4 steps). "
+            "Entity selection: id is the supplied ⟨anchor⟩. "
+            "Also include entities where (any entity) connected via incoming derived relationships "
+            "(any connection, up to 4 steps) to the primary selection. "
+            "All connections between included entities are displayed. "
+            "Undirected connection types match direction filters in either direction."
+        )
+
+
+class TestSymmetricDirectionDisclosure:
+    def test_directional_incident_predicate_appends_the_note(self) -> None:
+        query = ExecutableViewpointQuery(
+            entity_criteria=EntityCriteriaGroup(
+                children=(IncidentConnectionCondition(direction="outgoing"),),
+            ),
+        )
+        assert render_query_summary(query).endswith(
+            "Undirected connection types match direction filters in either direction."
+        )
+
+    def test_directional_predicate_nested_in_endpoint_criteria_appends_the_note(self) -> None:
+        nested = IncidentConnectionCondition(
+            endpoint_criteria=EntityCriteriaGroup(children=(IncidentConnectionCondition(direction="incoming"),))
+        )
+        query = ExecutableViewpointQuery(entity_criteria=EntityCriteriaGroup(children=(nested,)))
+        assert "Undirected connection types" in render_query_summary(query)
+
+    def test_direction_free_query_has_no_note(self) -> None:
+        query = ExecutableViewpointQuery(
+            entity_criteria=EntityCriteriaGroup(children=(_eq("type", "application-component"),)),
+        )
+        assert "Undirected connection types" not in render_query_summary(query)

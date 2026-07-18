@@ -2,14 +2,45 @@
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from pathlib import Path
 
 from src.domain.artifact_types import EntityRecord
 from src.domain.viewpoint_condition_validation import RegistrySnapshot
-from src.domain.viewpoint_evaluation_context import EvaluationEnvironment
+from src.domain.viewpoint_evaluation_context import CriteriaReadAccess, EvaluationEnvironment
 from src.domain.viewpoint_presentation_validation import validate_presentation
-from src.domain.viewpoint_style_evaluation import ScaleStyleValue, calculate_scale_bounds, evaluate_item_style
+from src.domain.viewpoint_style_evaluation import (
+    Item,
+    ItemKind,
+    ScaleBounds,
+    ScaleStyleValue,
+    StyleValue,
+    calculate_scale_bounds,
+    evaluate_item_style,
+)
 from src.domain.viewpoints import PresentationSpec, StyleRule
+
+
+def _style_and_drift(
+    item: Item,
+    item_kind: ItemKind,
+    presentation: PresentationSpec | None,
+    *,
+    read_access: CriteriaReadAccess,
+    registries: RegistrySnapshot,
+    environment: EvaluationEnvironment = EvaluationEnvironment(),
+    scale_bounds: Mapping[int, ScaleBounds] = {},
+) -> tuple[Mapping[str, StyleValue], frozenset[str]]:
+    evaluation = evaluate_item_style(
+        item,
+        item_kind,
+        presentation,
+        read_access=read_access,
+        registries=registries,
+        environment=environment,
+        scale_bounds=scale_bounds,
+    )
+    return evaluation.style, evaluation.schema_drift
 
 
 def _entity(identifier: str, score: int | None) -> EntityRecord:
@@ -71,7 +102,7 @@ def test_data_driven_scale_bounds_are_order_independent_and_emit_legend() -> Non
     assert bounds[0].maximum == 30
     assert legends[0].tokens == ("#00ffff", "#ff8800")
     assert drift == frozenset()
-    style, _ = evaluate_item_style(
+    style, _ = _style_and_drift(
         low,
         "entity",
         presentation,
@@ -93,7 +124,7 @@ def test_missing_scale_value_uses_default_style_and_out_of_range_saturates() -> 
     )
 
     def style_for(entity: EntityRecord) -> object:
-        style, _ = evaluate_item_style(
+        style, _ = _style_and_drift(
             entity,
             "entity",
             presentation,
@@ -117,6 +148,33 @@ def test_scale_validation_rejects_mixed_mode_fields_and_wrong_token_count() -> N
         ("style-mode-field-mismatch", "/presentation/styling_rules/0"),
         ("scale-token-count", "/presentation/styling_rules/0/scale_tokens"),
     }
+
+
+def test_scale_validation_rejects_a_derived_reference_the_query_never_declares() -> None:
+    presentation = _presentation(scale_attribute="derived.conn_count")
+    issues = validate_presentation(
+        presentation,
+        path="/presentation",
+        registries=_REGISTRIES,
+        check_ergonomics=True,
+        declared_derived_names=frozenset({"impact-distance"}),
+    )
+    assert [(issue.severity, issue.code, issue.path) for issue in issues] == [
+        ("error", "unknown-attribute", "/presentation/styling_rules/0/scale_attribute")
+    ]
+    assert "conn_count" in issues[0].message
+
+
+def test_scale_validation_accepts_a_declared_derived_reference() -> None:
+    presentation = _presentation(scale_attribute="derived.impact-distance")
+    issues = validate_presentation(
+        presentation,
+        path="/presentation",
+        registries=_REGISTRIES,
+        check_ergonomics=True,
+        declared_derived_names=frozenset({"impact-distance"}),
+    )
+    assert issues == []
 
 
 class _EmptyGraph:

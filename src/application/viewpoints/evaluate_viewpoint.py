@@ -14,16 +14,18 @@ from dataclasses import dataclass
 from src.application.viewpoints.execution_result import (
     ConnectionItemSummary,
     EntityItemSummary,
-    MatrixAxisIds,
     Membership,
     ViewpointExecutionResult,
 )
 from src.application.viewpoints.parameter_binding import anchor_entity_ids, bind_parameters
 from src.application.viewpoints.ports import RepositoryReadAccess
 from src.application.viewpoints.repository_projection import project_repository
-from src.application.viewpoints.scope_query import definition_with_scope_query
+from src.application.viewpoints.result_aggregation import aggregation_for_result
+from src.application.viewpoints.result_summaries import matrix_axis_ids, ordered_witness_steps_for
 from src.domain.artifact_types import EntityRecord
 from src.domain.clock import utc_now_iso
+from src.domain.viewpoint_aggregation import AggregateConnection
+from src.domain.viewpoint_anchor_distance import anchor_modeled_distances
 from src.domain.viewpoint_binding_evaluation import (
     BindingEvaluationInput,
     evaluate_bindings,
@@ -31,14 +33,14 @@ from src.domain.viewpoint_binding_evaluation import (
 )
 from src.domain.viewpoint_bindings import DerivedAttribute
 from src.domain.viewpoint_condition_validation import RegistrySnapshot
-from src.domain.viewpoint_criteria_evaluation import evaluate_entity_criteria
 from src.domain.viewpoint_derived_attribute_deferral import split_eager_and_deferred_derived_attributes
 from src.domain.viewpoint_evaluation_context import EvaluationEnvironment
 from src.domain.viewpoint_projection import ViewpointProjection, drift_warnings
+from src.domain.viewpoint_scope_query import definition_with_scope_query
 from src.domain.viewpoint_summary import render_query_summary
+from src.domain.viewpoint_target_population import declared_target_types, summarize_target_population
 from src.domain.viewpoints import (
     ExecutableViewpointQuery,
-    PresentationSpec,
     ViewpointCatalog,
     ViewpointDefinition,
 )
@@ -131,36 +133,6 @@ def project_viewpoint_repository(
     )
 
 
-def _matrix_axis_ids(
-    presentation: PresentationSpec | None,
-    retained_entities: list[EntityRecord],
-    *,
-    read_access: RepositoryReadAccess,
-    registries: RegistrySnapshot,
-) -> tuple[MatrixAxisIds | None, frozenset[str]]:
-    if presentation is None or presentation.representation != "matrix":
-        return None, frozenset()
-    if presentation.row_criteria is None or presentation.column_criteria is None:
-        return None, frozenset()
-    drift: set[str] = set()
-    rows: list[str] = []
-    columns: list[str] = []
-    for record in retained_entities:
-        row_outcome = evaluate_entity_criteria(
-            presentation.row_criteria, record, read_access=read_access, registries=registries
-        )
-        drift |= row_outcome.schema_drift
-        if row_outcome.matched:
-            rows.append(record.artifact_id)
-        column_outcome = evaluate_entity_criteria(
-            presentation.column_criteria, record, read_access=read_access, registries=registries
-        )
-        drift |= column_outcome.schema_drift
-        if column_outcome.matched:
-            columns.append(record.artifact_id)
-    return MatrixAxisIds(row_entity_ids=tuple(sorted(rows)), column_entity_ids=tuple(sorted(columns))), frozenset(drift)
-
-
 def evaluate_viewpoint(
     request: ViewpointExecutionRequest,
     *,
@@ -171,6 +143,7 @@ def evaluate_viewpoint(
     max_entities: int,
     default_limit: int,
     timeout_seconds: float,
+    default_legibility_budget: int = 100,
 ) -> ViewpointExecutionResult:
     start = time.monotonic()
 
@@ -197,6 +170,16 @@ def evaluate_viewpoint(
     expanded_ids = sorted(
         item.item_id for item in projection.items if item.item_kind == "entity" and item.membership == "expanded"
     )
+    derived_match_hops_by_id = {
+        item.item_id: item.derived_match_hops
+        for item in projection.items
+        if item.item_kind == "entity" and item.derived_match_hops is not None
+    }
+    column_values_by_id = {
+        item.item_id: item.column_values
+        for item in projection.items
+        if item.item_kind == "entity" and item.column_values is not None
+    }
     total_entity_count = len(primary_ids) + len(expanded_ids)
     # Primary-before-expanded retention order: context neighbors drop first.
     retained_id_set = frozenset((primary_ids + expanded_ids)[:limit])
@@ -205,6 +188,44 @@ def evaluate_viewpoint(
 
     connection_items = [item for item in projection.items if item.item_kind == "connection"]
     total_connection_count = len(connection_items)
+
+    aggregate_connections: list[AggregateConnection] = []
+    connection_summaries: list[ConnectionItemSummary] = []
+    for item in connection_items:
+        connection = read_access.get_connection(item.item_id)
+        source = connection.source if connection is not None else item.source_id
+        target = connection.target if connection is not None else item.target_id
+        connection_type = connection.conn_type if connection is not None else item.connection_type
+        if source is None or target is None or connection_type is None:
+            continue
+        # Aggregation reads the COMPLETE population — collected before the retained-set
+        # cut, or a truncated-then-aggregated result would masquerade as an overview.
+        aggregate_connections.append(
+            AggregateConnection(
+                connection_id=item.item_id,
+                source=source,
+                target=target,
+                connection_type=connection_type,
+                certainty=item.certainty,
+            )
+        )
+        if source not in retained_id_set or target not in retained_id_set:
+            continue
+        connection_summaries.append(
+            ConnectionItemSummary(
+                id=item.item_id,
+                type=connection_type,
+                source=source,
+                target=target,
+                certainty=item.certainty,
+                hops=item.hops,
+                via_connection_ids=item.via_connection_ids,
+                witness_steps=ordered_witness_steps_for(item, source, target, read_access),
+            )
+        )
+    connection_summaries.sort(key=lambda summary: summary.id)
+
+    distances = anchor_modeled_distances(prepared.anchor_ids, connection_summaries)
 
     retained_entities: list[EntityRecord] = []
     entity_summaries: list[EntityItemSummary] = []
@@ -221,36 +242,42 @@ def evaluate_viewpoint(
                 specialization_slugs=(record.specialization,) if record.specialization else (),
                 group=record.group,
                 membership=membership_by_id[entity_id],
+                status=record.status,
+                version=record.version,
+                column_values=column_values_by_id.get(entity_id),
+                anchor_modeled_distance=distances.get(entity_id),
+                matched_via_derived_hops=derived_match_hops_by_id.get(entity_id),
             )
         )
 
-    connection_summaries: list[ConnectionItemSummary] = []
-    for item in connection_items:
-        connection = read_access.get_connection(item.item_id)
-        source = connection.source if connection is not None else item.source_id
-        target = connection.target if connection is not None else item.target_id
-        connection_type = connection.conn_type if connection is not None else item.connection_type
-        if source is None or target is None or connection_type is None:
-            continue
-        if source not in retained_id_set or target not in retained_id_set:
-            continue
-        connection_summaries.append(
-            ConnectionItemSummary(
-                id=item.item_id,
-                type=connection_type,
-                source=source,
-                target=target,
-                certainty=item.certainty,
-                hops=item.hops,
-                via_connection_ids=item.via_connection_ids,
-            )
-        )
-    connection_summaries.sort(key=lambda summary: summary.id)
-
-    matrix_axes, matrix_drift = _matrix_axis_ids(
+    matrix_axes, matrix_drift = matrix_axis_ids(
         executable_definition.presentation, retained_entities, read_access=read_access, registries=registries
     )
     warnings = tuple(projection.warnings) + drift_warnings(frozenset(matrix_drift))
+
+    aggregation = aggregation_for_result(
+        executable_definition.presentation,
+        total_entity_count=total_entity_count,
+        population_entity_ids=tuple(primary_ids + expanded_ids),
+        aggregate_connections=tuple(aggregate_connections),
+        read_access=read_access,
+        default_legibility_budget=default_legibility_budget,
+    )
+
+    target_types = declared_target_types(definition, registries.entity_type_infos)
+    target_population = (
+        summarize_target_population(
+            target_types,
+            (
+                record.artifact_type
+                for item in projection.items
+                if item.item_kind == "entity" and (record := read_access.get_entity(item.item_id)) is not None
+            ),
+            registries.entity_type_infos,
+        )
+        if target_types is not None
+        else None
+    )
 
     query = executable_definition.query
     assert query is not None
@@ -275,10 +302,13 @@ def evaluate_viewpoint(
         warnings=warnings,
         duration_ms=(time.monotonic() - start) * 1000,
         anchor_ids=prepared.anchor_ids,
+        target_population=target_population,
+        aggregation=aggregation,
         query_summary=(
-            f"Selection derived from the viewpoint's concept scope: {render_query_summary(query)}"
+            f"Selection derived from the viewpoint's concept scope: "
+            f"{render_query_summary(query, default_derivation_max_hops=registries.derivation_max_hops)}"
             if scope_derived
-            else render_query_summary(query)
+            else render_query_summary(query, default_derivation_max_hops=registries.derivation_max_hops)
         ),
     )
 

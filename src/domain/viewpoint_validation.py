@@ -24,6 +24,7 @@ from src.domain.viewpoint_criteria_validation import (
     validate_neighbor_inclusion,
 )
 from src.domain.viewpoint_presentation_validation import validate_presentation
+from src.domain.viewpoint_scope_query import classify_selection_layers
 from src.domain.viewpoint_validation_issue import ValidationMode, ViewpointValidationIssue
 from src.domain.viewpoint_value_reference_validation import validate_query_value_references
 from src.domain.viewpoints import ExecutableViewpointQuery, PresentationSpec, ViewpointCatalog, ViewpointDefinition
@@ -209,6 +210,24 @@ def _validate_lifecycle(
     return issues
 
 
+def _selection_divergence_issues(definition: ViewpointDefinition) -> list[ViewpointValidationIssue]:
+    """INFORMATIONAL only: a divergent inactive layer is the normal state of a definition
+    whose author chose one selection mode and kept the other layer for history/conversion.
+    Execution and save always follow the active layer; this never blocks either."""
+    if classify_selection_layers(definition) != "dual-divergent":
+        return []
+    active = definition.selection_mode or "query"
+    return [
+        issue(
+            "warning",
+            "selection-layers-diverge",
+            "/selection_mode",
+            f"the scope and query layers select different populations; the {active} layer is active "
+            "and the other is informational history",
+        )
+    ]
+
+
 def validate_viewpoint_definition(
     definition: ViewpointDefinition,
     *,
@@ -240,6 +259,7 @@ def validate_viewpoint_definition(
     )
     check_ergonomics = mode != "load"
     structural_issues = list(_validate_scope(definition.scope, path="/scope", registries=registries))
+    structural_issues.extend(_selection_divergence_issues(definition))
     registry_issues: list[ViewpointValidationIssue] = []
     if definition.query is not None:
         registry_issues.extend(
@@ -257,7 +277,15 @@ def validate_viewpoint_definition(
     if definition.presentation is not None:
         registry_issues.extend(
             validate_presentation(
-                definition.presentation, path="/presentation", registries=registries, check_ergonomics=check_ergonomics
+                definition.presentation,
+                path="/presentation",
+                registries=registries,
+                check_ergonomics=check_ergonomics,
+                declared_derived_names=(
+                    frozenset(attribute.name for attribute in definition.query.derived)
+                    if definition.query is not None
+                    else frozenset()
+                ),
             )
         )
         registry_issues.extend(_validate_matrix_needs_connections(definition, path="/presentation"))

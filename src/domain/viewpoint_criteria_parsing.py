@@ -23,6 +23,7 @@ from src.domain.viewpoint_criteria import (
     EntityCriteriaNode,
     IncidentConnectionCondition,
     IncidentDirection,
+    IncidentTraversal,
     NeighborInclusion,
     RelationshipTraversal,
     ValueRef,
@@ -80,6 +81,12 @@ def _require_traversal(value: object) -> RelationshipTraversal:
     if value not in {"direct", "derived"}:
         raise ValueError("traversal must be direct or derived")
     return cast(RelationshipTraversal, value)
+
+
+def _require_incident_traversal(value: object) -> IncidentTraversal:
+    if value not in {"direct", "derived", "both"}:
+        raise ValueError("traversal must be direct, derived, or both")
+    return cast(IncidentTraversal, value)
 
 
 def _optional_hops(raw: object) -> int | None:
@@ -184,7 +191,7 @@ def _incident_from_raw(raw: Mapping[str, object]) -> IncidentConnectionCondition
         if endpoint_criteria_raw is not None
         else None,
         negate=bool(raw.get("negate", False)),
-        traversal=_require_traversal(raw.get("traversal", "direct")),
+        traversal=_require_incident_traversal(raw.get("traversal", "direct")),
         include_potential=bool(raw.get("include_potential", False)),
         max_hops=_optional_hops(raw.get("max_hops")),
     )

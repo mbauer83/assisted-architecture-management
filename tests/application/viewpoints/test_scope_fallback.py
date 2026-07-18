@@ -8,6 +8,8 @@ pre-uplift definitions rather than depending on the shipped file staying scope-o
 
 from __future__ import annotations
 
+from dataclasses import replace
+
 from src.application.viewpoints.evaluate_viewpoint import ViewpointExecutionRequest, evaluate_viewpoint
 from src.domain.concept_scope import ConceptScope, HierarchyPredicate
 from src.domain.ontology_types import EntityTypeInfo
@@ -138,6 +140,46 @@ def test_scope_connection_types_narrow_the_implicit_connection_selection() -> No
     )
 
     assert _execute(definition, store).connection_ids == ("CON@serving",)
+
+
+def _dual_divergent_definition() -> ViewpointDefinition:
+    """The fork-with-scope-edits class: scope declares two types, the persisted query is
+    an empty match-all group — the layers select different populations."""
+    return ViewpointDefinition(
+        slug="dual",
+        version=1,
+        name="Dual",
+        scope=ConceptScope(entity_types=frozenset({"goal", "process"})),
+        query=ExecutableViewpointQuery(entity_criteria=EntityCriteriaGroup()),
+    )
+
+
+def _dual_store() -> Store:
+    return Store(
+        entities={
+            "ENT@goal": entity(artifact_id="ENT@goal", artifact_type="goal"),
+            "ENT@process": entity(artifact_id="ENT@process", artifact_type="process"),
+            "ENT@app": entity(artifact_id="ENT@app", artifact_type="application-component"),
+        }
+    )
+
+
+def test_scope_mode_executes_the_declared_types_even_when_a_divergent_query_is_kept() -> None:
+    definition = replace(_dual_divergent_definition(), selection_mode="scope")
+    result = _execute(definition, _dual_store())
+    assert result.entity_ids == ("ENT@goal", "ENT@process")
+    assert result.query_summary.startswith("Selection derived from the viewpoint's concept scope")
+
+
+def test_query_mode_executes_the_query_even_when_a_divergent_scope_is_kept() -> None:
+    definition = replace(_dual_divergent_definition(), selection_mode="query")
+    result = _execute(definition, _dual_store())
+    assert result.entity_ids == ("ENT@app", "ENT@goal", "ENT@process")
+
+
+def test_unstamped_legacy_definition_keeps_executing_its_query() -> None:
+    result = _execute(_dual_divergent_definition(), _dual_store())
+    assert result.entity_ids == ("ENT@app", "ENT@goal", "ENT@process")
 
 
 def test_ad_hoc_query_is_not_replaced_by_scope_fallback() -> None:

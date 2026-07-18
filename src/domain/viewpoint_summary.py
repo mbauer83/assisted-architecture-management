@@ -32,18 +32,56 @@ _COMPARATOR_WORDS: dict[str, str] = {"lt": "less than", "lte": "at most", "gt": 
 _INCIDENT_DIRECTION_WORDS: dict[IncidentDirection, str] = {
     "outgoing": "an outgoing",
     "incoming": "an incoming",
-    "either": "an",
+    "either": "a",
 }
+_DIRECTION_ADJECTIVES: dict[IncidentDirection, str] = {"outgoing": "outgoing ", "incoming": "incoming ", "either": ""}
+
+_SYMMETRIC_DIRECTION_NOTE = "Undirected connection types match direction filters in either direction."
 
 
-def render_query_summary(query: ExecutableViewpointQuery) -> str:
+def render_query_summary(query: ExecutableViewpointQuery, *, default_derivation_max_hops: int | None = None) -> str:
     sentences = [render_parameter(parameter) for parameter in query.parameters]
     sentences.extend(render_binding(binding) for binding in query.bindings)
-    sentences.extend(render_derived_attribute(attribute) for attribute in query.derived)
+    sentences.extend(
+        render_derived_attribute(attribute, default_max_hops=default_derivation_max_hops)
+        for attribute in query.derived
+    )
     sentences.append(f"Entity selection: {render_entity_group(query.entity_criteria)}.")
-    sentences.extend(f"{render_neighbor_inclusion(inclusion)}." for inclusion in query.include_connected)
+    sentences.extend(
+        f"{render_neighbor_inclusion(inclusion, default_max_hops=default_derivation_max_hops)}."
+        for inclusion in query.include_connected
+    )
     sentences.append(f"{render_connection_selection(query.connections)}.")
+    if _has_directional_clause(query):
+        sentences.append(_SYMMETRIC_DIRECTION_NOTE)
     return " ".join(sentences)
+
+
+def _hop_bound_phrase(max_hops: int | None, default_max_hops: int | None) -> str:
+    bound = max_hops if max_hops is not None else default_max_hops
+    if bound is None:
+        return "up to the configured hop limit"
+    return f"up to {bound} step" + ("s" if bound != 1 else "")
+
+
+def _entity_node_is_directional(node: EntityCriteriaNode) -> bool:
+    if isinstance(node, EntityCriteriaGroup):
+        return any(_entity_node_is_directional(child) for child in node.children)
+    if isinstance(node, IncidentConnectionCondition):
+        if node.direction != "either":
+            return True
+        return node.endpoint_criteria is not None and _entity_node_is_directional(node.endpoint_criteria)
+    return False
+
+
+def _has_directional_clause(query: ExecutableViewpointQuery) -> bool:
+    """True when any clause filters by connection direction — the case where the
+    symmetric-type normalization (undirected types match regardless) is observable."""
+    if _entity_node_is_directional(query.entity_criteria):
+        return True
+    if any(inclusion.direction != "either" for inclusion in query.include_connected):
+        return True
+    return any(attribute.direction != "either" for attribute in query.derived)
 
 
 def render_value(value: ValueRef) -> str:
@@ -101,17 +139,29 @@ def render_condition(condition: AttributeCondition) -> str:
     return f"NOT ({_condition_phrase(condition)})"
 
 
+_INCIDENT_TRAVERSAL_WORDS: dict[str, str] = {
+    "direct": "direct",
+    "derived": "derived",
+    "both": "direct or derived",
+}
+
+
 def render_incident(condition: IncidentConnectionCondition) -> str:
-    if condition.negate:
-        return "has no such connection"
-    direction_word = _INCIDENT_DIRECTION_WORDS[condition.direction]
+    """The traversal is spelled out per predicate — two predicates differing only in
+    traversal must read as two different conditions. The negated form states the whole
+    excluded union ("has no direct or derived connection …"), matching the evaluator's
+    union-before-negation semantics."""
+    traversal_words = _INCIDENT_TRAVERSAL_WORDS[condition.traversal]
+    direction_word = _DIRECTION_ADJECTIVES[condition.direction].strip()
+    qualifier = f"{traversal_words} {direction_word}".strip()
     connection_phrase = (
         render_connection_group(condition.connection_criteria) if condition.connection_criteria is not None else "any"
     )
     endpoint_phrase = (
         render_entity_group(condition.endpoint_criteria) if condition.endpoint_criteria is not None else "any entity"
     )
-    return f"has {direction_word} connection ({connection_phrase}) to an entity where ({endpoint_phrase})"
+    article = "no" if condition.negate else "a"
+    return f"has {article} {qualifier} connection ({connection_phrase}) to an entity where ({endpoint_phrase})"
 
 
 def _render_entity_node(node: EntityCriteriaNode) -> str:
@@ -146,8 +196,10 @@ def render_connection_group(group: ConnectionCriteriaGroup) -> str:
     return f"NOT {phrase}" if group.negate else phrase
 
 
-def render_neighbor_inclusion(inclusion: NeighborInclusion) -> str:
-    direction_word = _INCIDENT_DIRECTION_WORDS[inclusion.direction]
+def render_neighbor_inclusion(inclusion: NeighborInclusion, *, default_max_hops: int | None = None) -> str:
+    """The traversal mode and its hop bound are part of the clause's executed semantics —
+    a derived inclusion must never read like a direct one (nor borrow another clause's
+    bound), so both are rendered inline from this inclusion's own fields."""
     neighbor_phrase = (
         render_entity_group(inclusion.neighbor_criteria) if inclusion.neighbor_criteria is not None else "any entity"
     )
@@ -156,6 +208,16 @@ def render_neighbor_inclusion(inclusion: NeighborInclusion) -> str:
         if inclusion.connection_criteria is not None
         else "any connection"
     )
+    if inclusion.traversal == "derived":
+        qualifiers = f"{connection_phrase}, {_hop_bound_phrase(inclusion.max_hops, default_max_hops)}"
+        if inclusion.include_potential:
+            qualifiers += ", including potential derivations"
+        return (
+            f"Also include entities where ({neighbor_phrase}) connected via "
+            f"{_DIRECTION_ADJECTIVES[inclusion.direction]}derived relationships ({qualifiers}) "
+            f"to the primary selection"
+        )
+    direction_word = _INCIDENT_DIRECTION_WORDS[inclusion.direction]
     return (
         f"Also include entities where ({neighbor_phrase}) connected via {direction_word} "
         f"connection ({connection_phrase}) to the primary selection"
@@ -195,12 +257,18 @@ def render_binding(binding: QueryBinding) -> str:
     return f"Let {binding.name} be {phrase}."
 
 
-def render_derived_attribute(attribute: DerivedAttribute) -> str:
-    direction = "" if attribute.direction == "either" else f" {attribute.direction}"
+def render_derived_attribute(attribute: DerivedAttribute, *, default_max_hops: int | None = None) -> str:
+    """The hop bound rendered here is the attribute's own (or the engine default when the
+    attribute declares none) — it bounds this attribute's aggregation only, never which
+    entities the query selects, so the sentence names the attribute's traversal explicitly."""
     source = "connections" if attribute.of is None else attribute.of
-    traversal = "directly connected"
     if attribute.traversal == "derived":
-        traversal = f"connected directly or indirectly (up to {attribute.max_hops or 1} steps)"
+        qualifiers = _hop_bound_phrase(attribute.max_hops, default_max_hops)
         if attribute.include_potential:
-            traversal += ", including potential derivations"
-    return f"Derived {attribute.name}: {attribute.reduce} {source} for {traversal}{direction}."
+            qualifiers += ", including potential derivations"
+        return (
+            f"Derived {attribute.name}: {attribute.reduce} {source} across "
+            f"{_DIRECTION_ADJECTIVES[attribute.direction]}derived relationships ({qualifiers})."
+        )
+    direction = "" if attribute.direction == "either" else f" {attribute.direction}"
+    return f"Derived {attribute.name}: {attribute.reduce} {source} for directly connected{direction}."

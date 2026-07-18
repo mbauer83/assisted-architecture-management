@@ -19,6 +19,7 @@ Comparator = Literal["eq", "neq", "in", "not_in", "exists", "absent", "lt", "lte
 ValueRefKind = Literal["literal", "attribute_of_self", "attribute_of_endpoint", "binding", "parameter"]
 IncidentDirection = Literal["outgoing", "incoming", "either"]
 RelationshipTraversal = Literal["direct", "derived"]
+IncidentTraversal = Literal["direct", "derived", "both"]
 
 # Not every comparator needs a negated dual — `exists`/`absent` already form the
 # null/not-null pair via `negate`. `not_in` is the deliberate exception: list membership
@@ -102,7 +103,9 @@ class IncidentConnectionCondition:
     direction: IncidentDirection = "either"
     endpoint_criteria: EntityCriteriaGroup | None = None  # None = any entity
     negate: bool = False
-    traversal: RelationshipTraversal = "direct"
+    # "both" is the union of the direct and derived incident sets, computed BEFORE any
+    # negation (a negated "both" predicate excludes entities with EITHER kind of connection).
+    traversal: IncidentTraversal = "direct"
     include_potential: bool = False
     max_hops: int | None = None
 

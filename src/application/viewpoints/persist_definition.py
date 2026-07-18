@@ -16,11 +16,12 @@ result is ``ok`` and not a dry run, persist ``result.catalog_to_write`` via
 from __future__ import annotations
 
 from collections.abc import Mapping
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from typing import Literal, Protocol
 
 from src.domain.artifact_types import DiagramRecord
 from src.domain.viewpoint_condition_validation import RegistrySnapshot, issue
+from src.domain.viewpoint_lineage import fork_lineage
 from src.domain.viewpoint_validation import validate_viewpoint_definition
 from src.domain.viewpoint_validation_issue import ViewpointValidationIssue
 from src.domain.viewpoints import TargetKind, ViewpointCatalog, ViewpointDefinition
@@ -109,11 +110,19 @@ def persist_viewpoint_definition(
     local_catalog: ViewpointCatalog,
     merged_catalog: ViewpointCatalog,
     registries: RegistrySnapshot,
+    fork_of: str | None = None,
+    index_generation: int | None = None,
 ) -> ViewpointPersistResult:
     """``create``: rejects a slug already present anywhere in ``merged_catalog``. ``edit``:
     rejects a slug that is not present in ``local_catalog`` (unknown, or an enterprise/module
     definition that is read-only here). On success, ``result.catalog_to_write`` is the full
-    updated local catalog — the caller's to persist (or discard, for a dry run)."""
+    updated local catalog — the caller's to persist (or discard, for a dry run).
+
+    Lineage is stamped HERE and only here — the one service every authoring route (GUI
+    Save-as and MCP alike) goes through. A create with ``fork_of`` records the origin's
+    slug/version/content-digest (+ ``index_generation``); a plain create strips any
+    client-supplied lineage (provenance is never self-asserted); an edit preserves the
+    stored lineage verbatim (provenance is written once, never altered by later edits)."""
     local_definition = local_catalog.get(definition.slug)
 
     if action == "create":
@@ -124,6 +133,18 @@ def persist_viewpoint_definition(
             return ViewpointPersistResult(
                 ok=False, action=action, slug=definition.slug, version=definition.version, issues=(collision,)
             )
+        if fork_of is not None:
+            origin = merged_catalog.get(fork_of)
+            if origin is None:
+                unknown_origin = issue(
+                    "error", "unknown-fork-origin", "/forked_from", f"fork origin {fork_of!r} does not exist"
+                )
+                return ViewpointPersistResult(
+                    ok=False, action=action, slug=definition.slug, version=definition.version, issues=(unknown_origin,)
+                )
+            definition = replace(definition, forked_from=fork_lineage(origin, index_generation))
+        else:
+            definition = replace(definition, forked_from=None)
         prior_definition = None
     else:
         if local_definition is None:
@@ -135,6 +156,7 @@ def persist_viewpoint_definition(
                 version=definition.version,
                 issues=(_read_only_or_unknown_issue(definition.slug, exists_in_merged_catalog=exists_elsewhere),),
             )
+        definition = replace(definition, forked_from=local_definition.forked_from)
         prior_definition = local_definition
 
     issues = _validate(definition, registries=registries, prior_definition=prior_definition, catalog=merged_catalog)

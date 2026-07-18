@@ -30,6 +30,9 @@ _PRESENTATION_KEYS = frozenset(
         "group_by",
         "styling_rules",
         "default_style",
+        "target_types",
+        "legibility_budget",
+        "aggregate_by",
     }
 )
 _COLUMN_KEYS = frozenset({"label", "source"})
@@ -38,6 +41,7 @@ _STYLE_RULE_KEYS = frozenset(
     {
         "capability", "applies_to", "mode", "match_criteria", "range_attribute", "range_bands", "value",
         "scale_attribute", "scale_min", "scale_max", "scale_tokens",
+        "source_criteria", "target_criteria", "disabled",
     }
 )
 
@@ -89,6 +93,13 @@ def _style_rule_from_mapping(raw: object, *, label: str) -> StyleRule:
     capability = str(raw["capability"])
     mode = _require_style_mode(raw.get("mode", "match"), label=label)
     applies_to = frozenset(str(v) for v in raw.get("applies_to", ()))
+    source_criteria = (
+        parse_entity_criteria_group(raw["source_criteria"]) if raw.get("source_criteria") is not None else None
+    )
+    target_criteria = (
+        parse_entity_criteria_group(raw["target_criteria"]) if raw.get("target_criteria") is not None else None
+    )
+    disabled = bool(raw.get("disabled", False))
     if mode == "match":
         match_raw = raw.get("match_criteria")
         match_criteria = None
@@ -104,6 +115,9 @@ def _style_rule_from_mapping(raw: object, *, label: str) -> StyleRule:
             mode="match",
             match_criteria=match_criteria,
             value=str(raw["value"]) if raw.get("value") is not None else None,
+            source_criteria=source_criteria,
+            target_criteria=target_criteria,
+            disabled=disabled,
         )
     if mode == "scale":
         tokens_raw = raw.get("scale_tokens", ())
@@ -116,6 +130,9 @@ def _style_rule_from_mapping(raw: object, *, label: str) -> StyleRule:
             scale_min=_scale_bound(raw.get("scale_min")),
             scale_max=_scale_bound(raw.get("scale_max")),
             scale_tokens=tokens if len(tokens) == 2 else (),
+            source_criteria=source_criteria,
+            target_criteria=target_criteria,
+            disabled=disabled,
         )
     range_attribute = raw.get("range_attribute")
     range_bands = tuple(_range_band_from_mapping(b, label=label) for b in raw.get("range_bands", ()))
@@ -125,6 +142,9 @@ def _style_rule_from_mapping(raw: object, *, label: str) -> StyleRule:
         mode="range",
         range_attribute=str(range_attribute) if range_attribute else None,
         range_bands=range_bands,
+        source_criteria=source_criteria,
+        target_criteria=target_criteria,
+        disabled=disabled,
     )
 
 
@@ -169,4 +189,13 @@ def presentation_from_mapping(raw: object, *, label: str) -> PresentationSpec | 
         if isinstance(styling_raw, (list, tuple))
         else (),
         default_style={str(k): str(v) for k, v in default_style.items()} if isinstance(default_style, Mapping) else {},
+        target_types=(
+            tuple(str(t) for t in raw["target_types"])
+            if isinstance(raw.get("target_types"), (list, tuple))
+            else None
+        ),
+        legibility_budget=(
+            int(budget_raw) if isinstance(budget_raw := raw.get("legibility_budget"), (int, float, str)) else None
+        ),
+        aggregate_by=str(raw["aggregate_by"]) if raw.get("aggregate_by") is not None else None,
     )

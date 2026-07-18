@@ -14,10 +14,27 @@ from tests.fixtures.viewpoints.standard_viewpoint_tables import STANDARD_VIEWPOI
 _CATALOGS = build_runtime_catalogs(get_module_registry())
 _DEFINITIONS_BY_SLUG = {d.slug: d for d in _CATALOGS.viewpoints.entries}
 
-_CORE_ELEMENT_SLUGS = frozenset({"layered", "requirements-realization", "outcome-realization"})
-# Custom, non-spec impact-analysis definitions shipped alongside the standard library —
-# they have no ArchiMate spec table to compare against, so they're excluded here.
-_CUSTOM_SLUGS = frozenset({"element-dependents", "element-dependencies", "process-technology-support"})
+_CORE_ELEMENT_SLUGS = frozenset({"layered"})
+# Custom, non-spec definitions shipped alongside the standard library — they have no
+# ArchiMate spec table to compare against, so they're excluded here.
+_CUSTOM_SLUGS = frozenset(
+    {
+        "element-dependents",
+        "element-dependencies",
+        "process-technology-support",
+        "requirements-coverage-gaps",
+        "component-traceability-gaps",
+    }
+)
+# The realization family deliberately deviates from the bare spec tables: each member
+# assesses ONE target population (banded realized/unrealized) and includes its realizers
+# as unbanded context, instead of rendering an undifferentiated type/domain dump. Their
+# fidelity gate is the family-contract test below, not the spec element list.
+_REALIZATION_FAMILY: dict[str, str] = {
+    "goal-realization": "goal",
+    "outcome-realization": "outcome",
+    "requirements-realization": "requirement",
+}
 
 
 def test_every_table_has_a_shipped_definition() -> None:
@@ -51,7 +68,7 @@ def test_concerns_match_the_spec_table_verbatim() -> None:
 
 def test_scope_element_list_matches_the_spec_table() -> None:
     for table in STANDARD_VIEWPOINT_TABLES:
-        if table.slug in _CORE_ELEMENT_SLUGS:
+        if table.slug in _CORE_ELEMENT_SLUGS or table.slug in _REALIZATION_FAMILY:
             continue
         definition = _DEFINITIONS_BY_SLUG[table.slug]
         scope_types = {str(t) for t in (definition.scope.entity_types or ())} - {
@@ -69,3 +86,24 @@ def test_core_element_viewpoints_have_no_fixed_scope_and_use_domain_union() -> N
         assert isinstance(condition, AttributeCondition)
         assert condition.attribute == "domain"
         assert condition.comparator == "in"
+
+
+def test_realization_family_upholds_the_target_and_banding_contract() -> None:
+    """Per family member: the primary selection is exactly the assessed target type, that
+    target population is declared for honest-empty messaging, realizers arrive via
+    incoming-realization inclusions (direct AND derived), and realized/unrealized banding
+    applies ONLY to the target type — contextual realizers are never banded."""
+    for slug, target in _REALIZATION_FAMILY.items():
+        definition = _DEFINITIONS_BY_SLUG[slug]
+        assert definition.query is not None, slug
+        condition = definition.query.entity_criteria.children[0]
+        assert isinstance(condition, AttributeCondition), slug
+        assert (condition.attribute, condition.comparator, condition.value.literal) == ("type", "eq", target), slug
+        assert definition.presentation is not None, slug
+        assert definition.presentation.target_types == (target,), slug
+        inclusions = definition.query.include_connected
+        assert {inclusion.traversal for inclusion in inclusions} == {"direct", "derived"}, slug
+        assert all(inclusion.direction == "incoming" for inclusion in inclusions), slug
+        rules = definition.presentation.styling_rules
+        assert {rule.value for rule in rules} == {"positive", "critical"}, slug
+        assert all(rule.applies_to == frozenset({target}) for rule in rules), slug

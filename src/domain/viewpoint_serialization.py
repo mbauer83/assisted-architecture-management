@@ -69,6 +69,17 @@ def viewpoint_definition_to_mapping(definition: ViewpointDefinition) -> dict[str
         result["query"] = query_to_mapping(definition.query)
     if definition.presentation is not None:
         result["presentation"] = presentation_to_mapping(definition.presentation)
+    if definition.selection_mode is not None:
+        result["selection_mode"] = definition.selection_mode
+    if definition.forked_from is not None:
+        lineage: dict[str, Any] = {
+            "slug": definition.forked_from.slug,
+            "version": definition.forked_from.version,
+            "definition_digest": definition.forked_from.definition_digest,
+        }
+        if definition.forked_from.index_generation is not None:
+            lineage["index_generation"] = definition.forked_from.index_generation
+        result["forked_from"] = lineage
     return result
 
 

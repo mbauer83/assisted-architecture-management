@@ -77,8 +77,10 @@ def _incident_to_mapping(condition: IncidentConnectionCondition) -> dict[str, An
         result["endpoint_criteria"] = entity_criteria_group_to_mapping(condition.endpoint_criteria)
     if condition.negate:
         result["negate"] = True
-    if condition.traversal != "direct":
-        result["traversal"] = condition.traversal
+    # Always written, even at the default: a predicate's traversal is load-bearing
+    # semantics, and an explicit value keeps saved recipes stable if the default
+    # ever changes.
+    result["traversal"] = condition.traversal
     if condition.include_potential:
         result["include_potential"] = True
     if condition.max_hops is not None:

@@ -45,7 +45,26 @@ def _combine(outcomes: tuple[EvaluationOutcome, ...], *, conjunction: str, negat
         matched = all(outcome.matched for outcome in outcomes) if outcomes else True
     else:
         matched = any(outcome.matched for outcome in outcomes) if outcomes else False
-    return EvaluationOutcome(not matched if negate else matched, drift)
+    return EvaluationOutcome(
+        not matched if negate else matched,
+        drift,
+        derived_evidence_hops=None if negate or not matched else _combined_evidence(outcomes, conjunction),
+    )
+
+
+def _combined_evidence(outcomes: tuple[EvaluationOutcome, ...], conjunction: str) -> int | None:
+    """Derived evidence for a matched group: an AND depends on derived evidence when any
+    matched child does; an OR only when EVERY matched child does (one direct-only match
+    means the group would match without derivation)."""
+    matched_children = tuple(outcome for outcome in outcomes if outcome.matched)
+    evidence = tuple(
+        outcome.derived_evidence_hops for outcome in matched_children if outcome.derived_evidence_hops is not None
+    )
+    if not evidence:
+        return None
+    if conjunction == "or" and len(evidence) < len(matched_children):
+        return None
+    return min(evidence)
 
 
 def evaluate_entity_criteria(
@@ -138,9 +157,37 @@ def _evaluate_incident(
     registries: RegistrySnapshot,
     environment: EvaluationEnvironment,
 ) -> EvaluationOutcome:
-    if condition.traversal == "derived":
-        return _evaluate_derived_incident(condition, entity, read_access, registries, environment)
+    """``both`` is the UNION of the direct and derived incident sets, computed before any
+    negation is applied — a negated ``both`` predicate excludes entities with either kind
+    of connection. A direct and a derived match can never be the same connection (derived
+    relationships are ≥2-hop compositions), so the union needs no identity de-duplication;
+    provenance is retained by preferring the direct verdict when both legs match."""
     drift: set[str] = set()
+    direct_matched = False
+    if condition.traversal in ("direct", "both"):
+        direct_matched = _direct_incident_matches(
+            condition, entity, drift, read_access=read_access, registries=registries, environment=environment
+        )
+    derived_hops: int | None = None
+    if condition.traversal in ("derived", "both") and not direct_matched:
+        derived_hops = _derived_incident_min_hops(
+            condition, entity, drift, read_access=read_access, registries=registries, environment=environment
+        )
+    any_match = direct_matched or derived_hops is not None
+    matched = not any_match if condition.negate else any_match
+    evidence = derived_hops if matched and not condition.negate and not direct_matched else None
+    return EvaluationOutcome(matched, frozenset(drift), derived_evidence_hops=evidence)
+
+
+def _direct_incident_matches(
+    condition: IncidentConnectionCondition,
+    entity: EntityRecord,
+    drift: set[str],
+    *,
+    read_access: CriteriaReadAccess,
+    registries: RegistrySnapshot,
+    environment: EvaluationEnvironment,
+) -> bool:
     any_match = False
     for connection in read_access.find_connections_for(entity.artifact_id, direction="any"):
         if condition.connection_criteria is not None:
@@ -172,19 +219,22 @@ def _evaluate_incident(
             if not outcome.matched:
                 continue
         any_match = True
-    matched = not any_match if condition.negate else any_match
-    return EvaluationOutcome(matched, frozenset(drift))
+    return any_match
 
 
-def _evaluate_derived_incident(
+def _derived_incident_min_hops(
     condition: IncidentConnectionCondition,
     entity: EntityRecord,
+    drift: set[str],
+    *,
     read_access: CriteriaReadAccess,
     registries: RegistrySnapshot,
     environment: EvaluationEnvironment,
-) -> EvaluationOutcome:
+) -> int | None:
+    """Minimum witness-chain length among matching derived relationships, ``None`` when
+    none match — the value doubles as the match verdict and its provenance."""
     if registries.derivation_catalog is None:
-        return EvaluationOutcome(condition.negate)
+        return None
     relationships = derive_relationships(
         RelationshipDerivationRequest(
             frozenset({entity.artifact_id}),
@@ -199,7 +249,7 @@ def _evaluate_derived_incident(
         read_access=read_access,
         registries=registries.derivation_catalog,
     ).relationships
-    drift: set[str] = set()
+    min_hops: int | None = None
     for relationship in relationships:
         if condition.connection_criteria is not None and not _derived_matches(
             condition.connection_criteria, relationship.connection_type, relationship.certainty, relationship.hops
@@ -220,8 +270,9 @@ def _evaluate_derived_incident(
             drift |= outcome.schema_drift
             if not outcome.matched:
                 continue
-        return EvaluationOutcome(not condition.negate, frozenset(drift))
-    return EvaluationOutcome(condition.negate, frozenset(drift))
+        if min_hops is None or relationship.hops < min_hops:
+            min_hops = relationship.hops
+    return min_hops
 
 
 def _derived_matches(group: ConnectionCriteriaGroup, type_name: str, certainty: str, hops: int) -> bool:

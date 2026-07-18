@@ -14,6 +14,7 @@ from src.domain.concept_scope import ConceptScope
 from src.domain.module_types import EntityTypeName
 from src.domain.viewpoint_binding_evaluation import evaluate_derived_attributes
 from src.domain.viewpoint_bindings import DerivedAttribute
+from src.domain.viewpoint_condition_evaluation import read_attribute_value
 from src.domain.viewpoint_condition_validation import RegistrySnapshot
 from src.domain.viewpoint_criteria_evaluation import evaluate_entity_criteria
 from src.domain.viewpoint_evaluation_context import BindingEvaluationInput, EvaluationEnvironment
@@ -25,8 +26,14 @@ from src.domain.viewpoint_projection import (
     ViewpointProjection,
     derivation_truncation_warnings,
     drift_warnings,
+    rule_outcome_warnings,
 )
-from src.domain.viewpoint_style_evaluation import calculate_scale_bounds, evaluate_item_style
+from src.domain.viewpoint_style_evaluation import (
+    RuleItemHit,
+    calculate_scale_bounds,
+    classify_style_rule_outcomes,
+    evaluate_item_style,
+)
 from src.domain.viewpoints import ExecutableViewpointQuery, RepoScope, ViewpointDefinition
 
 
@@ -54,6 +61,7 @@ def project_repository(
 
     drift: set[str] = set()
     primary_ids: set[str] = set()
+    derived_match_hops_by_id: dict[str, int] = {}
     for entity_id in candidate_entity_ids or _population_entity_ids(read_access, query.repo_scope):
         entity = read_access.get_entity(entity_id)
         if entity is None:
@@ -68,6 +76,8 @@ def project_repository(
         drift |= outcome.schema_drift
         if outcome.matched:
             primary_ids.add(entity_id)
+            if outcome.derived_evidence_hops is not None:
+                derived_match_hops_by_id[entity_id] = outcome.derived_evidence_hops
 
     inclusion_result = resolve_neighbor_inclusions(
         frozenset(primary_ids),
@@ -117,10 +127,16 @@ def project_repository(
     )
     drift |= scale_drift
 
+    column_sources: tuple[str, ...] = (
+        tuple(column.source for column in definition.presentation.columns)
+        if definition.presentation is not None and definition.presentation.columns is not None
+        else ()
+    )
     items: list[ProjectedOccurrence] = []
+    rule_hits: list[RuleItemHit] = []
     for entity in entity_records:
         entity_id = entity.artifact_id
-        style, style_drift = evaluate_item_style(
+        evaluation = evaluate_item_style(
             entity,
             "entity",
             definition.presentation,
@@ -129,15 +145,22 @@ def project_repository(
             environment=environment,
             scale_bounds=scale_bounds,
         )
-        drift |= style_drift
+        drift |= evaluation.schema_drift
+        rule_hits.extend(evaluation.rule_hits)
         membership: Membership = "primary" if entity_id in primary_ids else "expanded"
         items.append(
             ProjectedOccurrence(
-                item_id=entity_id, item_kind="entity", state="visible", membership=membership, style=style
+                item_id=entity_id,
+                item_kind="entity",
+                state="visible",
+                membership=membership,
+                style=evaluation.style,
+                derived_match_hops=derived_match_hops_by_id.get(entity_id),
+                column_values=_resolved_column_values(entity, column_sources, environment),
             )
         )
     for connection in connections_result.connections:
-        style, style_drift = evaluate_item_style(
+        evaluation = evaluate_item_style(
             connection,
             "connection",
             definition.presentation,
@@ -146,13 +169,14 @@ def project_repository(
             environment=environment,
             scale_bounds=scale_bounds,
         )
-        drift |= style_drift
+        drift |= evaluation.schema_drift
+        rule_hits.extend(evaluation.rule_hits)
         items.append(
             ProjectedOccurrence(
                 item_id=connection.artifact_id,
                 item_kind="connection",
                 state="visible",
-                style=style,
+                style=evaluation.style,
                 connection_type=connection.conn_type,
                 source_id=connection.source,
                 target_id=connection.target,
@@ -173,10 +197,21 @@ def project_repository(
             )
         )
 
+    declared_derived_names = frozenset(attribute.name for attribute in query.derived)
+    rule_outcomes = classify_style_rule_outcomes(
+        definition.presentation,
+        rule_hits,
+        registries=registries,
+        declared_derived_names=declared_derived_names,
+    )
     return ViewpointProjection(
         target="repository",
         items=tuple(items),
-        warnings=drift_warnings(frozenset(drift)) + derivation_truncation_warnings(derivation_truncated),
+        warnings=(
+            drift_warnings(frozenset(drift))
+            + rule_outcome_warnings(rule_outcomes)
+            + derivation_truncation_warnings(derivation_truncated)
+        ),
         scale_legends=tuple(
             ScaleLegendData(
                 capability=legend.capability,
@@ -187,7 +222,24 @@ def project_repository(
             )
             for legend in scale_legends
         ),
+        rule_outcomes=rule_outcomes,
     )
+
+
+def _resolved_column_values(
+    entity: EntityRecord, column_sources: tuple[str, ...], environment: EvaluationEnvironment
+) -> dict[str, object] | None:
+    """Server-resolved values for every authored column, at the same snapshot the rest of
+    the execution used — a source that does not resolve for this entity is explicitly
+    ``None``. Resolution happens here (not in the execution-result assembly) because
+    presentation-only derived attributes are evaluated into THIS environment."""
+    if not column_sources:
+        return None
+    values: dict[str, object] = {}
+    for source in column_sources:
+        value, present = read_attribute_value(entity, source, context="entity", environment=environment)
+        values[source] = value if present else None
+    return values
 
 
 def _result_included_binding_ids(query: ExecutableViewpointQuery, environment: EvaluationEnvironment) -> frozenset[str]:

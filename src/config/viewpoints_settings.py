@@ -72,6 +72,20 @@ def viewpoints_max_derived_attributes() -> int:
     return _viewpoints_positive_integer("max_derived_attributes", 8)
 
 
+def viewpoints_diagram_render_max_entities() -> int:
+    """Pre-flight ceiling for the ad-hoc diagram representation: beyond this many
+    entities PlantUML rendering degenerates (or fails outright), so the surface refuses
+    with a friendly, actionable message instead of a renderer stack error."""
+    return _viewpoints_positive_integer("diagram_render_max_entities", 150)
+
+
+def viewpoints_legibility_budget() -> int:
+    """Default node count above which an exploration result opens aggregated instead of
+    flat — the deployment-wide default a definition's ``presentation.legibility_budget``
+    overrides per viewpoint."""
+    return _viewpoints_positive_integer("legibility_budget", 100)
+
+
 def viewpoints_derivation_max_hops() -> int:
     """Maximum modeled-relationship hops used to derive a relationship."""
     return _viewpoints_positive_integer("derivation_max_hops", 4)

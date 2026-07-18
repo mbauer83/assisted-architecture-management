@@ -12,7 +12,8 @@ caller's job to discard it when an occurrence carries exclusion reasons.
 
 from __future__ import annotations
 
-from collections.abc import Mapping
+from collections import Counter
+from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
 from datetime import date, datetime
 from typing import Literal
@@ -23,6 +24,7 @@ from src.domain.viewpoint_condition_validation import CriteriaContext, RegistryS
 from src.domain.viewpoint_criteria import ConnectionCriteriaGroup, EntityCriteriaGroup
 from src.domain.viewpoint_criteria_evaluation import evaluate_connection_criteria, evaluate_entity_criteria
 from src.domain.viewpoint_evaluation_context import CriteriaReadAccess, EvaluationEnvironment
+from src.domain.viewpoint_projection import StyleRuleOutcome, StyleRuleOutcomeKind
 from src.domain.viewpoints import PresentationSpec, RangeBand, StyleRule
 
 ItemKind = Literal["entity", "connection"]
@@ -55,6 +57,25 @@ class ScaleLegend:
     tokens: tuple[str, str]
 
 
+@dataclass(frozen=True)
+class RuleItemHit:
+    """One rule's engagement with one item: ``matched`` (the rule's own predicate/value
+    held, so it WOULD style the item) and ``applied`` (it actually styled it — false when
+    a higher-precedence rule had already claimed the capability). The gap between the two
+    is what lets callers report a rule as shadowed rather than silently inert."""
+
+    rule_index: int
+    matched: bool
+    applied: bool
+
+
+@dataclass(frozen=True)
+class ItemStyleEvaluation:
+    style: Mapping[str, StyleValue]
+    schema_drift: frozenset[str]
+    rule_hits: tuple[RuleItemHit, ...]
+
+
 def _item_tags(item: Item, item_kind: ItemKind) -> frozenset[str]:
     if item_kind == "connection":
         assert isinstance(item, ConnectionRecord)
@@ -79,6 +100,33 @@ def _match_outcome(
             rule.match_criteria, item, read_access=read_access, registries=registries
         )
     return outcome.matched, outcome.schema_drift
+
+
+def _endpoints_match(
+    rule: StyleRule,
+    connection: ConnectionRecord,
+    *,
+    read_access: CriteriaReadAccess,
+    registries: RegistrySnapshot,
+) -> tuple[bool, frozenset[str]]:
+    """Endpoint sub-criteria gate for edge rules: BOTH declared endpoint criteria must
+    match their endpoint entity. A missing endpoint record fails the gate — an edge whose
+    endpoint cannot be read never silently counts as matching a boundary predicate."""
+    drift: set[str] = set()
+    for criteria, entity_id in (
+        (rule.source_criteria, connection.source),
+        (rule.target_criteria, connection.target),
+    ):
+        if criteria is None:
+            continue
+        record = read_access.get_entity(entity_id)
+        if record is None:
+            return False, frozenset(drift)
+        outcome = evaluate_entity_criteria(criteria, record, read_access=read_access, registries=registries)
+        drift |= outcome.schema_drift
+        if not outcome.matched:
+            return False, frozenset(drift)
+    return True, frozenset(drift)
 
 
 def _band_for(value: object, bands: tuple[RangeBand, ...]) -> str | None:
@@ -147,7 +195,7 @@ def calculate_scale_bounds(
     legends: list[ScaleLegend] = []
     drift: set[str] = set()
     for index, rule in enumerate(presentation.styling_rules):
-        if rule.mode != "scale" or rule.scale_attribute is None or len(rule.scale_tokens) != 2:
+        if rule.disabled or rule.mode != "scale" or rule.scale_attribute is None or len(rule.scale_tokens) != 2:
             continue
         values: list[float] = []
         for item, kind in items:
@@ -219,6 +267,66 @@ def _scale_value(
     return ScaleStyleValue(position=position, tokens=(rule.scale_tokens[0], rule.scale_tokens[1]))
 
 
+def _unresolvable_reference(
+    rule: StyleRule, *, registries: RegistrySnapshot, declared_derived_names: frozenset[str]
+) -> str | None:
+    """The rule's attribute reference when it cannot resolve — a ``derived.<name>`` whose
+    name the query never declares, or a schema path the registries don't know."""
+    attribute = rule.scale_attribute if rule.mode == "scale" else rule.range_attribute if rule.mode == "range" else None
+    if attribute is None:
+        return None
+    if attribute.startswith("derived."):
+        return attribute if attribute.removeprefix("derived.") not in declared_derived_names else None
+    context: CriteriaContext = "connection" if rule.capability.startswith("edge_") else "entity"
+    return attribute if resolve_attribute_path(attribute, context=context, registries=registries) is None else None
+
+
+def classify_style_rule_outcomes(
+    presentation: PresentationSpec | None,
+    hits: Iterable[RuleItemHit],
+    *,
+    registries: RegistrySnapshot,
+    declared_derived_names: frozenset[str],
+) -> tuple[StyleRuleOutcome, ...]:
+    """Exactly one observable outcome per authored style rule (the "no silent no-op"
+    contract): ``unresolvable`` beats the count-based kinds because an unresolvable
+    reference styling nothing is a defect, not a legitimately empty match set."""
+    if presentation is None:
+        return ()
+    matched: Counter[int] = Counter()
+    applied: Counter[int] = Counter()
+    for hit in hits:
+        if hit.matched:
+            matched[hit.rule_index] += 1
+        if hit.applied:
+            applied[hit.rule_index] += 1
+    outcomes: list[StyleRuleOutcome] = []
+    for index, rule in enumerate(presentation.styling_rules):
+        detail = _unresolvable_reference(rule, registries=registries, declared_derived_names=declared_derived_names)
+        if rule.disabled:
+            kind: StyleRuleOutcomeKind = "disabled"
+            detail = None
+        elif detail is not None:
+            kind = "unresolvable"
+        elif applied[index] > 0:
+            kind = "applied"
+        elif matched[index] > 0:
+            kind = "shadowed"
+        else:
+            kind = "expected-empty"
+        outcomes.append(
+            StyleRuleOutcome(
+                rule_index=index,
+                capability=rule.capability,
+                kind=kind,
+                matched_count=matched[index],
+                applied_count=applied[index],
+                detail=detail,
+            )
+        )
+    return tuple(outcomes)
+
+
 def evaluate_item_style(
     item: Item,
     item_kind: ItemKind,
@@ -228,49 +336,66 @@ def evaluate_item_style(
     registries: RegistrySnapshot,
     environment: EvaluationEnvironment = EvaluationEnvironment(),
     scale_bounds: Mapping[int, ScaleBounds] = {},
-) -> tuple[Mapping[str, StyleValue], frozenset[str]]:
-    """Resolve every display capability for one occurrence: ``(style_map, schema_drift)``."""
+) -> ItemStyleEvaluation:
+    """Resolve every display capability for one occurrence. First match per capability
+    wins the styling, but every applicable rule is still evaluated so its engagement is
+    observable (``rule_hits``) — a rule outshadowed on every item must be reportable,
+    never silently inert."""
     if presentation is None:
-        return {}, frozenset()
+        return ItemStyleEvaluation({}, frozenset(), ())
     context: CriteriaContext = item_kind
     tags = _item_tags(item, item_kind)
     resolved: dict[str, StyleValue] = {}
     decided: set[str] = set()
     drift: set[str] = set()
+    hits: list[RuleItemHit] = []
     for index, rule in enumerate(presentation.styling_rules):
-        if rule.capability in decided:
-            continue
         # A capability is node-scoped or edge-scoped by the same `edge_` convention the
         # presentation validator enforces (an `edge_*` capability pairs with connection
         # criteria, every other capability with entity criteria). Only evaluate a rule
         # against the item kind it targets — otherwise a node rule's entity criteria would
         # be matched against a connection (and vice versa), which is both meaningless and,
         # for `mode='match'`, a criteria-kind mismatch.
+        if rule.disabled:
+            continue
         if rule.capability.startswith("edge_") != (item_kind == "connection"):
             continue
         if rule.applies_to and not (rule.applies_to & tags):
             continue
+        if item_kind == "connection" and (rule.source_criteria is not None or rule.target_criteria is not None):
+            assert isinstance(item, ConnectionRecord)
+            endpoints_ok, endpoint_drift = _endpoints_match(
+                rule, item, read_access=read_access, registries=registries
+            )
+            drift |= endpoint_drift
+            if not endpoints_ok:
+                hits.append(RuleItemHit(rule_index=index, matched=False, applied=False))
+                continue
+        matched = False
+        style_value: StyleValue | None = None
         if rule.mode == "match":
             matched, rule_drift = _match_outcome(rule, item, item_kind, read_access=read_access, registries=registries)
             drift |= rule_drift
-            if matched and rule.value is not None:
-                resolved[rule.capability] = rule.value
-                decided.add(rule.capability)
+            style_value = rule.value if matched and rule.value is not None else None
+            matched = style_value is not None
         elif rule.mode == "range":
             token, rule_drift = _range_token(
                 rule, item, context, registries=registries, environment=environment
             )
             drift |= rule_drift
-            if token is not None:
-                resolved[rule.capability] = token
-                decided.add(rule.capability)
+            style_value = token
+            matched = token is not None
         else:
             value = _scale_value(
                 rule, index, item, context, registries=registries, environment=environment, bounds=scale_bounds
             )
-            if value is not None:
-                resolved[rule.capability] = value
-                decided.add(rule.capability)
+            style_value = value
+            matched = value is not None
+        applied = matched and rule.capability not in decided
+        if applied and style_value is not None:
+            resolved[rule.capability] = style_value
+            decided.add(rule.capability)
+        hits.append(RuleItemHit(rule_index=index, matched=matched, applied=applied))
     for capability, token in presentation.default_style.items():
         resolved.setdefault(capability, token)
-    return resolved, frozenset(drift)
+    return ItemStyleEvaluation(resolved, frozenset(drift), tuple(hits))

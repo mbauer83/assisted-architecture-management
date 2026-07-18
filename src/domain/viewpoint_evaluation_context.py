@@ -44,6 +44,13 @@ class EvaluationOutcome:
 
     matched: bool
     schema_drift: frozenset[str] = frozenset()
+    derived_evidence_hops: int | None = None
+    """Set iff this outcome is a match that REQUIRED derived-relationship evidence: the
+    minimum witness-chain length among the derived incident matches the verdict rests on.
+    ``None`` for non-matches, for matches establishable from direct/modeled facts alone,
+    and for negated (sub)trees — a negation's match asserts absence, not derived presence.
+    Surfaces let users distinguish "matched via a modeled connection" from "matched via a
+    derived one" without re-deriving anything."""
 
 
 @dataclass(frozen=True)

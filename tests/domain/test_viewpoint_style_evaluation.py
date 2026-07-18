@@ -5,6 +5,7 @@ cluster — first-match-wins ordering, ``applies_to`` scoping, half-open range b
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -17,8 +18,31 @@ from src.domain.viewpoint_criteria import (
     IncidentConnectionCondition,
     ValueRef,
 )
-from src.domain.viewpoint_style_evaluation import evaluate_item_style
+from src.domain.viewpoint_evaluation_context import CriteriaReadAccess, EvaluationEnvironment
+from src.domain.viewpoint_style_evaluation import Item, ItemKind, ScaleBounds, StyleValue, evaluate_item_style
 from src.domain.viewpoints import PresentationSpec, RangeBand, StyleRule
+
+
+def _style_and_drift(
+    item: Item,
+    item_kind: ItemKind,
+    presentation: PresentationSpec | None,
+    *,
+    read_access: CriteriaReadAccess,
+    registries: RegistrySnapshot,
+    environment: EvaluationEnvironment = EvaluationEnvironment(),
+    scale_bounds: Mapping[int, ScaleBounds] = {},
+) -> tuple[Mapping[str, StyleValue], frozenset[str]]:
+    evaluation = evaluate_item_style(
+        item,
+        item_kind,
+        presentation,
+        read_access=read_access,
+        registries=registries,
+        environment=environment,
+        scale_bounds=scale_bounds,
+    )
+    return evaluation.style, evaluation.schema_drift
 
 
 def _entity(**kw: object) -> EntityRecord:
@@ -100,7 +124,7 @@ class TestFirstMatchWins:
                 _status_rule("badges", "deprecated", "badge-danger"),  # would also match — ignored
             ),
         )
-        style, drift = evaluate_item_style(
+        style, drift = _style_and_drift(
             entity, "entity", presentation, read_access=_Graph(), registries=_REGISTRIES
         )
         assert style == {"badges": "badge-warning"}
@@ -115,7 +139,7 @@ class TestFirstMatchWins:
                 _status_rule("badges", "active", "badge-ok"),
             ),
         )
-        style, _ = evaluate_item_style(entity, "entity", presentation, read_access=_Graph(), registries=_REGISTRIES)
+        style, _ = _style_and_drift(entity, "entity", presentation, read_access=_Graph(), registries=_REGISTRIES)
         assert style == {"badges": "badge-ok"}
 
 
@@ -127,7 +151,7 @@ class TestDefaultStyle:
             styling_rules=(_status_rule("badges", "deprecated", "badge-warning"),),
             default_style={"badges": "badge-neutral"},
         )
-        style, _ = evaluate_item_style(entity, "entity", presentation, read_access=_Graph(), registries=_REGISTRIES)
+        style, _ = _style_and_drift(entity, "entity", presentation, read_access=_Graph(), registries=_REGISTRIES)
         assert style == {"badges": "badge-neutral"}
 
 
@@ -143,7 +167,7 @@ class TestAppliesToScoping:
             value=rule.value,
         )
         presentation = PresentationSpec(representation="table", styling_rules=(rule,))
-        style, _ = evaluate_item_style(entity, "entity", presentation, read_access=_Graph(), registries=_REGISTRIES)
+        style, _ = _style_and_drift(entity, "entity", presentation, read_access=_Graph(), registries=_REGISTRIES)
         assert style == {}
 
     def test_rule_scoped_to_matching_type_applies(self) -> None:
@@ -157,7 +181,7 @@ class TestAppliesToScoping:
             value=rule.value,
         )
         presentation = PresentationSpec(representation="table", styling_rules=(rule,))
-        style, _ = evaluate_item_style(entity, "entity", presentation, read_access=_Graph(), registries=_REGISTRIES)
+        style, _ = _style_and_drift(entity, "entity", presentation, read_access=_Graph(), registries=_REGISTRIES)
         assert style == {"badges": "badge-warning"}
 
 
@@ -178,21 +202,21 @@ class TestRangeBands:
 
     def test_half_open_lower_boundary_included(self) -> None:
         entity = _entity(extra={"risk_score": 4})
-        style, _ = evaluate_item_style(
+        style, _ = _style_and_drift(
             entity, "entity", self._presentation(), read_access=_Graph(), registries=_REGISTRIES
         )
         assert style == {"badges": "badge-caution"}
 
     def test_half_open_upper_boundary_excluded(self) -> None:
         entity = _entity(extra={"risk_score": 7})
-        style, _ = evaluate_item_style(
+        style, _ = _style_and_drift(
             entity, "entity", self._presentation(), read_access=_Graph(), registries=_REGISTRIES
         )
         assert style == {"badges": "badge-danger"}
 
     def test_unbounded_band_matches_extreme_value(self) -> None:
         entity = _entity(extra={"risk_score": 0})
-        style, _ = evaluate_item_style(
+        style, _ = _style_and_drift(
             entity, "entity", self._presentation(), read_access=_Graph(), registries=_REGISTRIES
         )
         assert style == {"badges": "badge-ok"}
@@ -206,7 +230,7 @@ class TestRangeBands:
             ),
             default_style={"badges": "badge-neutral"},
         )
-        style, _ = evaluate_item_style(entity, "entity", presentation, read_access=_Graph(), registries=_REGISTRIES)
+        style, _ = _style_and_drift(entity, "entity", presentation, read_access=_Graph(), registries=_REGISTRIES)
         assert style == {"badges": "badge-neutral"}
 
     def test_out_of_band_value_falls_back_to_default(self) -> None:
@@ -216,7 +240,7 @@ class TestRangeBands:
         presentation = PresentationSpec(
             representation="table", styling_rules=(rule,), default_style={"badges": "badge-neutral"}
         )
-        style, _ = evaluate_item_style(entity, "entity", presentation, read_access=_Graph(), registries=_REGISTRIES)
+        style, _ = _style_and_drift(entity, "entity", presentation, read_access=_Graph(), registries=_REGISTRIES)
         assert style == {"badges": "badge-neutral"}
 
 
@@ -250,10 +274,10 @@ class TestRelationalStyling:
             value="highlight",
         )
         presentation = PresentationSpec(representation="exploration", styling_rules=(rule,))
-        style_server, _ = evaluate_item_style(
+        style_server, _ = _style_and_drift(
             server, "entity", presentation, read_access=graph, registries=_REGISTRIES
         )
-        style_idle, _ = evaluate_item_style(idle, "entity", presentation, read_access=graph, registries=_REGISTRIES)
+        style_idle, _ = _style_and_drift(idle, "entity", presentation, read_access=graph, registries=_REGISTRIES)
         assert style_server == {"node_color": "highlight"}
         assert style_idle == {}
 
@@ -272,7 +296,7 @@ class TestConnectionStyling:
             value="blue",
         )
         presentation = PresentationSpec(representation="exploration", styling_rules=(rule,))
-        style, _ = evaluate_item_style(
+        style, _ = _style_and_drift(
             connection, "connection", presentation, read_access=_Graph(), registries=_REGISTRIES
         )
         assert style == {"edge_color": "blue"}
@@ -287,7 +311,7 @@ class TestConnectionStyling:
         connection = _connection(status="draft")
         node_rule = _status_rule("node_color", "draft", "highlight")
         presentation = PresentationSpec(representation="exploration", styling_rules=(node_rule,))
-        style, drift = evaluate_item_style(
+        style, drift = _style_and_drift(
             connection, "connection", presentation, read_access=_Graph(), registries=_REGISTRIES
         )
         assert style == {}
@@ -306,10 +330,10 @@ class TestConnectionStyling:
             value="blue",
         )
         presentation = PresentationSpec(representation="exploration", styling_rules=(node_rule, edge_rule))
-        entity_style, _ = evaluate_item_style(
+        entity_style, _ = _style_and_drift(
             _entity(status="draft"), "entity", presentation, read_access=_Graph(), registries=_REGISTRIES
         )
-        connection_style, _ = evaluate_item_style(
+        connection_style, _ = _style_and_drift(
             _connection(status="draft"), "connection", presentation, read_access=_Graph(), registries=_REGISTRIES
         )
         assert entity_style == {"node_color": "highlight"}
@@ -319,7 +343,7 @@ class TestConnectionStyling:
 class TestNoPresentation:
     def test_none_presentation_yields_empty_style(self) -> None:
         entity = _entity()
-        style, drift = evaluate_item_style(entity, "entity", None, read_access=_Graph(), registries=_REGISTRIES)
+        style, drift = _style_and_drift(entity, "entity", None, read_access=_Graph(), registries=_REGISTRIES)
         assert style == {}
         assert drift == frozenset()
 
@@ -338,5 +362,5 @@ class TestSchemaDrift:
                 ),
             ),
         )
-        _, drift = evaluate_item_style(entity, "entity", presentation, read_access=_Graph(), registries=_REGISTRIES)
+        _, drift = _style_and_drift(entity, "entity", presentation, read_access=_Graph(), registries=_REGISTRIES)
         assert drift == frozenset({"unknown_field"})

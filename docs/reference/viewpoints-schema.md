@@ -13,6 +13,26 @@ and the round-trip tests all use this shape. Unknown keys are a parse error, not
 ignored — a typo like `comparater` is caught, not swallowed. Field defaults are omitted on
 write, so a minimal definition stays minimal.
 
+A definition created as a fork (GUI *Save as…* or MCP `artifact_viewpoint` with
+`fork_of`) carries `forked_from: {slug, version, definition_digest, index_generation}` —
+provenance stamped SERVER-side at fork time and never altered by later edits (a plain
+create strips any client-supplied lineage; an edit preserves the stored lineage
+verbatim). `definition_digest` is a canonical content hash of the origin at fork time, so
+catalog staleness (`fork_status: current | stale | origin-missing`) is decided by digest
+comparison against the current origin — editing the origin flips every fork's badge even
+when nobody bumped the origin's hand-edited version integer. Descriptive only: no
+format-version bump.
+
+A definition's `scope` and `query` are ALTERNATIVE selection mechanisms — `selection_mode:
+scope | query` states which one is ACTIVE. `scope` mode executes the scope's implicit
+type-selection query; `query` mode executes the query. The inactive layer, when kept, is
+informational history: it never executes and never blocks anything (a divergent inactive
+layer surfaces only as the `selection-layers-diverge` warning). Definitions predating the
+mode field keep the legacy behavior (query when present, else scope) until `arch-repair
+upgrade` stamps a mode; a dual-DIVERGENT pre-change definition is never guessed — the
+upgrade requires `--resolve-selection <slug>=scope|query` and, unresolved, exits with the
+distinct unresolved-migration status having written nothing anywhere.
+
 ```yaml
 viewpoints:
   # A flat filter
@@ -21,6 +41,7 @@ viewpoints:
     name: Application Components
     purpose: informing        # informing | designing | deciding
     content: overview          # overview | coherence | details
+    selection_mode: query      # scope | query — which selection layer is ACTIVE
     query:
       query_schema: 1
       entity_criteria:
@@ -141,7 +162,7 @@ Every node in `entity_criteria`/`connection_criteria`/`neighbor_criteria`/`endpo
 |---|---|---|
 | `condition` | entity or connection | `attribute`, `comparator`, `value`, `negate` |
 | `group` | entity or connection | `conjunction` (`and`\|`or`), `children`, `negate` |
-| `incident` | entity only | `connection_criteria`, `direction`, `endpoint_criteria`, `negate` — matches an entity with an incident connection satisfying both criteria |
+| `incident` | entity only | `connection_criteria`, `direction`, `endpoint_criteria`, `negate`, `traversal` (`direct` \| `derived` \| `both`, default `direct` — always written explicitly on save), `include_potential`, `max_hops` — matches an entity with an incident connection satisfying both criteria. `both` is the UNION of the direct and derived incident sets, computed before any negation: a negated `both` predicate excludes entities with either kind of connection |
 
 `negate` is the strict logical complement of the node's own match result — including the
 missing-attribute case (see the comparator table below). An empty root group is match-all; an
@@ -278,7 +299,8 @@ plainly since it surprises people the first time a binding legitimately resolves
 
 `traversal: derived` (on an `incident` condition, a neighbor inclusion, `connections`, or a
 derived attribute) composes indirect relationships from real ones per the ArchiMate
-derivation rules — see
+derivation rules; `traversal: both` (incident conditions and `connections` only) unions the
+direct and derived sets — see
 [Impact analysis](../03-modeling/impact-analysis.md) for the semantics (certain vs.
 potential, role/strength composition, why Association can't be composed through).
 
@@ -288,14 +310,54 @@ potential, role/strength composition, why Association can't be composed through)
 | `max_hops` | any `derived`-traversal node | integer ≥ 2; `derivation-hops-exceeded` below that |
 
 A derived connection's summary carries `certainty` (`certain` \| `potential`), `hops`
-(integer), and `via_connection_ids` (the witnessing real connections, in an order the
-consuming code reconstructs into a path — not guaranteed to already be source-to-target
-order in the raw list). These three fields are `null`/empty on a directly modeled
-connection, so existing consumers that only handle direct connections see no shape change.
+(integer), `via_connection_ids` (the witnessing real connections, NOT guaranteed to be in
+source-to-target order — never renderable as-is), and `witness_steps`: the same chain as
+an ORDERED source-to-target walk, one step per underlying modeled connection
+(`connection_id`, `source`, `target`, `connection_type`, `direction`
+`forward`/`reverse` relative to the walk, `hop_index`), reconstructed server-side with a
+deterministic connection-id tie-break. `witness_steps` is empty on modeled connections
+and on a derived connection whose chain can no longer be reconstructed (a witness was
+deleted since derivation) — renderers show the latter as "chain unavailable", never as no
+chain. These fields are `null`/empty on a directly modeled connection, so existing
+consumers that only handle direct connections see no shape change.
 
 A `derived`-traversal node's own `connection_criteria` may only reference `type`,
 `certainty`, or `hops` — a derived relationship has no single connection artifact backing it
 for endpoint-attribute references (`derived-traversal-path-unsupported` otherwise).
+
+&nbsp;
+
+## Style-rule outcomes
+
+The styled projection reports one observable outcome per authored style rule
+(`rule_outcomes`: rule index, capability, kind, matched/applied counts) — a rule can never
+be a silent no-op:
+
+| kind | Meaning | Warning? |
+|---|---|---|
+| `applied` | styled `applied_count` items | no |
+| `expected-empty` | valid rule, zero matches this execution — a legitimate state (e.g. a gap rule over a healthy model) | no — rendered as a quiet "0 matches" legend badge |
+| `shadowed` | matched items, but a higher-precedence rule claimed every one | yes |
+| `unresolvable` | its attribute/reference cannot resolve (unknown schema path, or a `derived.<name>` the query never declares) | yes |
+| `disabled` | quarantined rule (`disabled: true`) — deliberately inert, e.g. a fork's inherited rule whose attribute no longer resolves | no |
+
+A `scale` rule's Auto (omitted) bounds resolve to the observed min/max of the execution
+and the legend labels show those numbers; `derived.<name>` scale references are validated
+at save time against the query's declared derived attributes.
+
+Every style rule additionally accepts:
+
+- `disabled: true` — quarantines the rule: it is saveable exactly as authored but never
+  evaluated and never validated for resolution (validation skips it entirely). Forking a
+  definition whose inherited rule no longer resolves quarantines that rule instead of
+  dead-ending the save; the execution reports it as outcome kind `disabled`.
+- `source_criteria` / `target_criteria` (edge rules only — `edge_*` capabilities): entity
+  criteria groups evaluated against the connection's source/target endpoint entity. Both
+  declared criteria must match for the rule to engage the edge — this is how a
+  trust-boundary view accents exactly the edges whose endpoints sit in different groups
+  (`source_criteria: {group: trusted}`, `target_criteria: {group: untrusted}`). A missing
+  endpoint record never matches. On a node rule they are a save-time error
+  (`endpoint-criteria-on-node-rule`).
 
 &nbsp;
 
@@ -380,16 +442,71 @@ and `expected`/`found` values, so both the GUI and an agent can converge on the 
 
 &nbsp;
 
+Every presentation additionally accepts `legibility_budget` (a positive node count above
+which the result opens aggregated on graph surfaces; omitted = deployment default) and
+`aggregate_by` (`group | domain | type` — the aggregation dimension; omitted = a
+dimension-naming `group_by`, else `group`).
+
 ## Execution result & bounds
 
 `artifact_query_viewpoint`'s `execute` action (and the GUI's table/matrix/diagram execution
 views) returns: sorted entity/connection ids, a fixed per-item summary (id/name/type/
-specializations/group/membership for entities; id/type/source/target for connections), four
+specializations/group/membership/status/version/`anchor_modeled_distance`, plus
+`column_values` when the definition authors table columns, for entities; id/type/source/
+target for connections), four
 counts (`total_entity_count`, `returned_entity_count`, `total_connection_count`,
 `returned_connection_count`), a `truncated` flag, `matrix_axes` (criteria-axes matrix only),
 warnings, and the plain-language `query_summary`. No presentation/styling/column parameters
 are ever part of an execution result — that boundary is intentional (agents and humans see
 identical descriptive content; only the GUI additionally renders it styled).
+
+`column_values` is present on each entity when the executed definition authors table
+columns: one entry per column `source`, resolved server-side at the execution's snapshot
+(schema attributes and `derived.<name>` included). A source with no value for that entity
+is explicitly `null` — renderers never issue a second fetch to fill a column, so a column
+can never silently show a different snapshot than the rows around it.
+
+`target_population` classifies the FULL (pre-truncation) result against the definition's
+declared target population: the declared `target_types`, the count of target instances,
+per-type counts of INCIDENTAL substantive content, and the count of STRUCTURAL helpers
+(junctions/groupings). The declaration comes from `presentation.target_types`, or — in
+scope mode — mechanically from the active scope minus structural helpers. It is `null`
+when the target population is UNKNOWN (an undeclared query-mode definition, or an ad-hoc
+query); surfaces must then show plain counts and make NO absence claims — a guessed
+absence claim is exactly the false copy honest-empty messaging exists to prevent.
+
+`matched_via_derived_hops` is set on an entity when its criteria match REQUIRED
+derived-relationship evidence (e.g. a `has a derived connection…` or `direct or derived`
+predicate that only the derived leg satisfied): the value is the minimum witness-chain
+length the verdict rested on. It is `null` when the match holds on modeled facts alone,
+so surfaces can tag results "matched via derived (N hops)" without re-deriving anything.
+
+`anchor_modeled_distance` is the entity's modeled hop distance from the nearest anchor:
+`0` for an anchor, `1` for a direct modeled edge to an anchor, otherwise the minimum
+witness-chain length (`hops`) across the derived edges connecting it to an anchor. It is
+`null` for unanchored executions and for entities with no connecting edge to any anchor —
+that unranked state is distinct and is never rendered as distance 0 or 1. Distance-based
+node coloring and the exploration ring legend bind to exactly this value, so a node whose
+shortest witness chain is 4 modeled hops reads as 4, never as "1 traversal step".
+
+`aggregation` is present when the COMPLETE population exceeds the effective legibility
+budget on a graph surface (exploration/diagram representations). The budget is
+`presentation.legibility_budget` when authored, else the deployment default
+(`viewpoints.legibility_budget`, 100). The aggregation dimension is
+`presentation.aggregate_by` (`group | domain | type`) when authored, else a `group_by`
+naming one of those dimensions, else `group`. The block carries:
+
+- `nodes` — one per (dimension value, entity type): immutable identity, `member_count`,
+  and sorted `member_ids` (the stable drill-down reference). Membership is conserved:
+  Σ `member_count` = `total_entity_count`.
+- `edges` — one per (source aggregate, target aggregate, connection type, provenance
+  class `modeled | derived-certain | derived-potential`): no bundle ever mixes modeled
+  and derived edges, mixes connection types, or spans more than one endpoint pair, and
+  two same-typed edges between different aggregate pairs stay two bundles (topology
+  preservation).
+
+Aggregation always reads the COMPLETE population — it is computed before the entity limit
+applies, so a truncated execution still reports a faithful overview.
 
 The limit is entity-denominated (connections are a derived, re-filtered set — never
 independently capped); truncation drops **expanded members first**, in reverse stable order,
@@ -406,6 +523,10 @@ viewpoints:
   derivation_max_hops: 4                   # default max_hops when a derived-traversal node omits it
   derivation_max_relationships: 20000      # hard memory-protection ceiling — raises derivation-limit
   derivation_time_budget_seconds: 2.0      # the practical enforcement: derivation stops gracefully here
+  diagram_render_max_entities: 150         # pre-flight ceiling for the ad-hoc diagram representation —
+                                           # larger results get a friendly refusal, never a renderer stack error
+  legibility_budget: 100                   # default node count above which a graph surface opens aggregated;
+                                           # overridable per definition via presentation.legibility_budget
 ```
 
 A timeout is a typed error, never a silently partial result. Derivation-relationship search

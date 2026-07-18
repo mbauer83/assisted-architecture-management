@@ -5,40 +5,25 @@ matrix axis-mode exclusivity, and column/group_by attribute resolution.
 
 from __future__ import annotations
 
-from src.domain.viewpoint_condition_validation import CriteriaContext, RegistrySnapshot, issue, resolve_attribute_path
-from src.domain.viewpoint_criteria import NUMERIC_ATTRIBUTE_TYPES, ConnectionCriteriaGroup, EntityCriteriaGroup
+from src.domain.viewpoint_aggregation import AGGREGATION_DIMENSIONS
+from src.domain.viewpoint_condition_validation import RegistrySnapshot, issue, resolve_attribute_path
 from src.domain.viewpoint_criteria_validation import (
-    validate_connection_criteria,
     validate_depth_cap,
     validate_entity_criteria,
 )
-from src.domain.viewpoint_style_values import is_valid_style_value, style_value_error
+from src.domain.viewpoint_display_option_validation import (
+    LABEL_ATTRIBUTE_OPTION,
+    LAYOUT_OPTION,
+    validate_label_attribute,
+    validate_layout_option,
+)
+from src.domain.viewpoint_style_rule_validation import style_value_issues, validate_style_rule
 from src.domain.viewpoint_validation_issue import ViewpointValidationIssue
 from src.domain.viewpoints import (
     GROUP_BY_DIMENSIONS,
     REPRESENTATION_CAPABILITIES,
     PresentationSpec,
-    Representation,
-    StyleRule,
 )
-
-LABEL_ATTRIBUTE_OPTION = "label_attribute"
-_LABEL_ATTRIBUTE_REPRESENTATIONS: frozenset[Representation] = frozenset({"exploration", "diagram"})
-
-LAYOUT_OPTION = "layout"
-_LAYOUT_REPRESENTATIONS: frozenset[Representation] = frozenset({"exploration"})
-VALID_EXPLORATION_LAYOUTS: frozenset[str] = frozenset({"clusters", "radial", "force"})
-
-
-def _style_value_issues(capability: str, values: tuple[tuple[str, str], ...]) -> list[ViewpointValidationIssue]:
-    """One ``unknown-style-value`` error per ``(path, value)`` outside *capability*'s
-    value domain (color capabilities: token or ``#rrggbb``; notation capabilities:
-    semantic tokens; anything else is free-form and never flagged)."""
-    return [
-        issue("error", "unknown-style-value", path, style_value_error(capability, value))
-        for path, value in values
-        if not is_valid_style_value(capability, value)
-    ]
 
 
 def _validate_group_by_field(
@@ -52,212 +37,18 @@ def _validate_group_by_field(
     return []
 
 
-def _validate_range_bands(rule: StyleRule, *, path: str) -> list[ViewpointValidationIssue]:
-    issues: list[ViewpointValidationIssue] = []
-    bands = sorted(
-        rule.range_bands,
-        key=lambda band: (band.minimum is not None, band.minimum if band.minimum is not None else float("-inf")),
-    )
-    for position in range(len(bands) - 1):
-        current = bands[position]
-        following = bands[position + 1]
-        if current.maximum is None or following.minimum is None or current.maximum > following.minimum:
-            issues.append(
-                issue(
-                    "error",
-                    "range-band-overlap",
-                    f"{path}/range_bands",
-                    "range bands must be non-overlapping and half-open",
-                )
-            )
-            break
-    return issues
 
 
-def _validate_style_rule(
-    rule: StyleRule,
-    *,
-    path: str,
-    representation_capabilities: frozenset[str],
-    registries: RegistrySnapshot,
-    check_ergonomics: bool,
-) -> list[ViewpointValidationIssue]:
-    issues: list[ViewpointValidationIssue] = []
-    if rule.capability not in representation_capabilities:
-        issues.append(
-            issue(
-                "error",
-                "unsupported-capability",
-                f"{path}/capability",
-                f"capability {rule.capability!r} is unsupported by this representation",
-            )
-        )
-    is_edge_capability = rule.capability.startswith("edge_")
-    if rule.mode == "match":
-        criteria = rule.match_criteria
-        if criteria is None:
-            issues.append(
-                issue(
-                    "error", "missing-match-criteria", f"{path}/match_criteria", "mode='match' requires match_criteria"
-                )
-            )
-        elif is_edge_capability != isinstance(criteria, ConnectionCriteriaGroup):
-            issues.append(
-                issue(
-                    "error",
-                    "capability-criteria-kind-mismatch",
-                    f"{path}/match_criteria",
-                    f"capability {rule.capability!r} requires "
-                    + ("connection" if is_edge_capability else "entity")
-                    + " criteria",
-                )
-            )
-        elif isinstance(criteria, ConnectionCriteriaGroup):
-            issues.extend(
-                validate_connection_criteria(
-                    criteria,
-                    path=f"{path}/match_criteria",
-                    is_root=True,
-                    registries=registries,
-                    check_ergonomics=check_ergonomics,
-                )
-            )
-            if check_ergonomics:
-                issues.extend(validate_depth_cap(criteria, path=f"{path}/match_criteria", registries=registries))
-        elif isinstance(criteria, EntityCriteriaGroup):
-            issues.extend(
-                validate_entity_criteria(
-                    criteria,
-                    path=f"{path}/match_criteria",
-                    is_root=True,
-                    registries=registries,
-                    check_ergonomics=check_ergonomics,
-                )
-            )
-            if check_ergonomics:
-                issues.extend(validate_depth_cap(criteria, path=f"{path}/match_criteria", registries=registries))
-    elif rule.mode == "range":
-        if rule.range_attribute is None:
-            issues.append(
-                issue(
-                    "error",
-                    "missing-range-attribute",
-                    f"{path}/range_attribute",
-                    "mode='range' requires range_attribute",
-                )
-            )
-        if check_ergonomics:
-            issues.extend(_validate_range_bands(rule, path=path))
-    else:
-        issues.extend(_validate_scale_rule(rule, path=path, registries=registries))
-    issues.extend(_validate_mode_fields(rule, path=path))
-    issues.extend(_style_value_issues(rule.capability, _rule_style_values(rule, path=path)))
-    return issues
 
-
-def _rule_style_values(rule: StyleRule, *, path: str) -> tuple[tuple[str, str], ...]:
-    values: list[tuple[str, str]] = []
-    if rule.value is not None:
-        values.append((f"{path}/value", rule.value))
-    values.extend((f"{path}/range_bands/{index}/value", band.value) for index, band in enumerate(rule.range_bands))
-    values.extend((f"{path}/scale_tokens/{index}", token) for index, token in enumerate(rule.scale_tokens))
-    return tuple(values)
-
-
-def _validate_scale_rule(
-    rule: StyleRule, *, path: str, registries: RegistrySnapshot
-) -> list[ViewpointValidationIssue]:
-    if rule.scale_attribute is None:
-        return [
-            issue(
-                "error",
-                "missing-scale-attribute",
-                f"{path}/scale_attribute",
-                "mode='scale' requires scale_attribute",
-            )
-        ]
-    context: CriteriaContext = "connection" if rule.capability.startswith("edge_") else "entity"
-    declared = resolve_attribute_path(rule.scale_attribute, context=context, registries=registries)
-    if declared is None and not rule.scale_attribute.startswith("derived."):
-        return [issue("error", "unknown-attribute", f"{path}/scale_attribute", "unknown scale attribute")]
-    if declared not in (None, "reserved") and declared not in NUMERIC_ATTRIBUTE_TYPES:
-        return [
-            issue(
-                "error",
-                "operator-type-mismatch",
-                f"{path}/scale_attribute",
-                "scale attributes must be numeric or date values",
-            )
-        ]
-    if len(rule.scale_tokens) != 2:
-        return [issue("error", "scale-token-count", f"{path}/scale_tokens", "scale mode requires exactly two tokens")]
-    return []
-
-
-def _validate_mode_fields(rule: StyleRule, *, path: str) -> list[ViewpointValidationIssue]:
-    if rule.mode == "match":
-        mismatched = rule.range_attribute is not None or bool(rule.range_bands) or any(
-            value is not None for value in (rule.scale_attribute, rule.scale_min, rule.scale_max)
-        ) or bool(rule.scale_tokens)
-    elif rule.mode == "range":
-        mismatched = rule.match_criteria is not None or rule.value is not None or any(
-            value is not None for value in (rule.scale_attribute, rule.scale_min, rule.scale_max)
-        ) or bool(rule.scale_tokens)
-    else:
-        mismatched = (
-            rule.match_criteria is not None
-            or rule.value is not None
-            or rule.range_attribute is not None
-            or bool(rule.range_bands)
-        )
-    if not mismatched:
-        return []
-    return [
-        issue(
-            "error",
-            "style-mode-field-mismatch",
-            path,
-            f"style fields do not match mode {rule.mode!r}",
-        )
-    ]
-
-
-def _validate_layout_option(presentation: PresentationSpec, *, path: str) -> list[ViewpointValidationIssue]:
-    if LAYOUT_OPTION not in presentation.display_options:
-        return []
-    option_path = f"{path}/display_options/{LAYOUT_OPTION}"
-    if presentation.representation not in _LAYOUT_REPRESENTATIONS:
-        representation = presentation.representation
-        message = f"display option {LAYOUT_OPTION!r} is unsupported by representation {representation!r}"
-        return [issue("error", "unsupported-display-option", option_path, message)]
-    value = presentation.display_options[LAYOUT_OPTION]
-    if not isinstance(value, str) or value not in VALID_EXPLORATION_LAYOUTS:
-        layouts = ", ".join(sorted(VALID_EXPLORATION_LAYOUTS))
-        return [issue("error", "unknown-layout", option_path, f"layout must be one of: {layouts}")]
-    return []
-
-
-def _validate_label_attribute(
-    presentation: PresentationSpec, *, path: str, registries: RegistrySnapshot
-) -> list[ViewpointValidationIssue]:
-    if LABEL_ATTRIBUTE_OPTION not in presentation.display_options:
-        return []
-    option_path = f"{path}/display_options/{LABEL_ATTRIBUTE_OPTION}"
-    if presentation.representation not in _LABEL_ATTRIBUTE_REPRESENTATIONS:
-        representation = presentation.representation
-        message = f"display option {LABEL_ATTRIBUTE_OPTION!r} is unsupported by representation {representation!r}"
-        return [issue("error", "unsupported-display-option", option_path, message)]
-    value = presentation.display_options[LABEL_ATTRIBUTE_OPTION]
-    if not isinstance(value, str) or not value:
-        return [issue("error", "unknown-attribute", option_path, "label_attribute must be an attribute path")]
-    declared = resolve_attribute_path(value, context="entity", registries=registries)
-    if declared is None and not value.startswith("derived."):
-        return [issue("error", "unknown-attribute", option_path, f"unknown label attribute {value!r}")]
-    return []
 
 
 def validate_presentation(
-    presentation: PresentationSpec, *, path: str, registries: RegistrySnapshot, check_ergonomics: bool
+    presentation: PresentationSpec,
+    *,
+    path: str,
+    registries: RegistrySnapshot,
+    check_ergonomics: bool,
+    declared_derived_names: frozenset[str] = frozenset(),
 ) -> list[ViewpointValidationIssue]:
     issues: list[ViewpointValidationIssue] = []
     capabilities = REPRESENTATION_CAPABILITIES[presentation.representation]
@@ -273,8 +64,8 @@ def validate_presentation(
                     f"display option {option!r} is unsupported by representation {presentation.representation!r}",
                 )
             )
-    issues.extend(_validate_label_attribute(presentation, path=path, registries=registries))
-    issues.extend(_validate_layout_option(presentation, path=path))
+    issues.extend(validate_label_attribute(presentation, path=path, registries=registries))
+    issues.extend(validate_layout_option(presentation, path=path))
     for key, token in presentation.default_style.items():
         if key not in capabilities:
             issues.append(
@@ -285,15 +76,16 @@ def validate_presentation(
                     f"capability {key!r} is unsupported by representation {presentation.representation!r}",
                 )
             )
-        issues.extend(_style_value_issues(key, ((f"{path}/default_style/{key}", token),)))
+        issues.extend(style_value_issues(key, ((f"{path}/default_style/{key}", token),)))
     for index, rule in enumerate(presentation.styling_rules):
         issues.extend(
-            _validate_style_rule(
+            validate_style_rule(
                 rule,
                 path=f"{path}/styling_rules/{index}",
                 representation_capabilities=capabilities,
                 registries=registries,
                 check_ergonomics=check_ergonomics,
+                declared_derived_names=declared_derived_names,
             )
         )
     if presentation.columns is not None:
@@ -308,7 +100,36 @@ def validate_presentation(
                         f"unknown column source {column.source!r}",
                     )
                 )
+    if presentation.target_types is not None:
+        for index, type_name in enumerate(presentation.target_types):
+            if type_name not in registries.known_entity_types:
+                issues.append(
+                    issue(
+                        "error",
+                        "unknown-entity-type",
+                        f"{path}/target_types/{index}",
+                        f"unknown target entity type {type_name!r}",
+                    )
+                )
     issues.extend(_validate_group_by_field(presentation.group_by, path=f"{path}/group_by", registries=registries))
+    if presentation.legibility_budget is not None and presentation.legibility_budget < 1:
+        issues.append(
+            issue(
+                "error",
+                "invalid-legibility-budget",
+                f"{path}/legibility_budget",
+                "legibility_budget must be a positive node count",
+            )
+        )
+    if presentation.aggregate_by is not None and presentation.aggregate_by not in AGGREGATION_DIMENSIONS:
+        issues.append(
+            issue(
+                "error",
+                "invalid-aggregation-dimension",
+                f"{path}/aggregate_by",
+                f"aggregate_by must be one of {sorted(AGGREGATION_DIMENSIONS)}",
+            )
+        )
     if check_ergonomics:
         issues.extend(_validate_matrix_axes(presentation, path=path, registries=registries))
     return issues

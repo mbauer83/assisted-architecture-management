@@ -50,6 +50,12 @@ def _style_rule_to_mapping(rule: StyleRule) -> dict[str, Any]:
             result["range_attribute"] = rule.range_attribute
         if rule.mode == "range" and rule.range_bands:
             result["range_bands"] = [_range_band_to_mapping(b) for b in rule.range_bands]
+    if rule.source_criteria is not None:
+        result["source_criteria"] = entity_criteria_group_to_mapping(rule.source_criteria)
+    if rule.target_criteria is not None:
+        result["target_criteria"] = entity_criteria_group_to_mapping(rule.target_criteria)
+    if rule.disabled:
+        result["disabled"] = True
     return result
 
 
@@ -73,4 +79,10 @@ def presentation_to_mapping(presentation: PresentationSpec) -> dict[str, Any]:
         result["styling_rules"] = [_style_rule_to_mapping(r) for r in presentation.styling_rules]
     if presentation.default_style:
         result["default_style"] = dict(presentation.default_style)
+    if presentation.target_types is not None:
+        result["target_types"] = list(presentation.target_types)
+    if presentation.legibility_budget is not None:
+        result["legibility_budget"] = presentation.legibility_budget
+    if presentation.aggregate_by is not None:
+        result["aggregate_by"] = presentation.aggregate_by
     return result

@@ -90,6 +90,12 @@ class StyleRule:
     scale_min: float | str | None = None  # None = data-driven bound
     scale_max: float | str | None = None  # None = data-driven bound
     scale_tokens: tuple[str, ...] = ()  # mode == "scale": adapter interpolation endpoints
+    source_criteria: EntityCriteriaGroup | None = None  # edge rules: restrict by source endpoint
+    target_criteria: EntityCriteriaGroup | None = None  # edge rules: restrict by target endpoint
+    disabled: bool = False
+    """Quarantined rule: parseable and saveable but never evaluated, never validated for
+    resolution, and reported as outcome kind ``disabled``. Forking a definition whose
+    inherited rule no longer resolves quarantines it instead of dead-ending the save."""
 
 
 @dataclass(frozen=True)
@@ -110,6 +116,17 @@ class PresentationSpec:
     group_by: str | None = None  # exploration/table row_grouping
     styling_rules: tuple[StyleRule, ...] = ()  # ordered, first-match-wins per capability
     default_style: Mapping[str, str] = field(default_factory=dict)  # capability -> fallback token
+    target_types: tuple[str, ...] | None = None
+    """The TARGET population this view is about (honest-empty messaging keys off it).
+    Mechanically derivable from the ACTIVE scope in scope mode; in query mode it must be
+    declared here or the target population is UNKNOWN and absence claims are suppressed."""
+    legibility_budget: int | None = None
+    """Node count above which an exploration result opens aggregated instead of flat.
+    ``None`` defers to the deployment default (~100). Curators tune it per viewpoint;
+    the probe asserts against it."""
+    aggregate_by: str | None = None
+    """Aggregation dimension (``group | domain | type``) for over-budget results;
+    ``None`` falls back to ``group_by`` when that names a dimension, else ``group``."""
 
 
 @dataclass(frozen=True)
@@ -130,6 +147,18 @@ class ExecutableViewpointQuery:
 
 
 @dataclass(frozen=True)
+class ForkLineage:
+    """What a fork was forked FROM, bound to immutable content: versions are hand-edited
+    integers, so only the origin's content digest at fork time can establish provenance
+    (staleness = digest comparison, never version comparison)."""
+
+    slug: str
+    version: int
+    definition_digest: str
+    index_generation: int | None = None
+
+
+@dataclass(frozen=True)
 class ViewpointDefinition:
     slug: str
     version: int
@@ -145,6 +174,17 @@ class ViewpointDefinition:
     derivation_defaults: Mapping[str, object] = field(default_factory=dict)
     query: ExecutableViewpointQuery | None = None
     presentation: PresentationSpec | None = None
+    selection_mode: Literal["scope", "query"] | None = None
+    """Which selection layer is ACTIVE: ``scope`` executes the scope's implicit
+    type-selection query (the query field, if kept, is inactive history); ``query``
+    executes the query. ``None`` on pre-migration definitions only — legacy behavior
+    (query when present, else scope) applies until the upgrade CLI stamps a mode.
+    Exactly one layer is ever active; the inactive layer's disagreement is a normal,
+    informational state, never an execution or save blocker."""
+    forked_from: ForkLineage | None = None
+    """Provenance stamped ONCE by the save path when a definition is created as a fork —
+    never client-supplied, never altered by later edits. Descriptive only (no version
+    bump on schema introduction)."""
 
 
 @dataclass(frozen=True)

@@ -6,7 +6,7 @@ callers own loading ``local_catalog`` and persisting ``result.catalog_to_write``
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 
 from src.application.viewpoints.persist_definition import (
     delete_viewpoint_definition,
@@ -15,7 +15,8 @@ from src.application.viewpoints.persist_definition import (
 )
 from src.domain.concept_scope import ConceptScope
 from src.domain.module_types import EntityTypeName
-from src.domain.viewpoints import ViewpointCatalog, ViewpointDefinition
+from src.domain.viewpoint_lineage import definition_digest
+from src.domain.viewpoints import ForkLineage, ViewpointCatalog, ViewpointDefinition
 from tests.application.viewpoints._fixtures import REGISTRIES
 
 
@@ -38,6 +39,82 @@ def _definition(**kw: object) -> ViewpointDefinition:
     defaults: dict[str, object] = dict(slug="test-viewpoint", version=1, name="Test")
     defaults.update(kw)
     return ViewpointDefinition(**defaults)  # type: ignore[arg-type]
+
+
+class TestForkLineageStamping:
+    """Lineage is stamped by THIS service and only this service — the single path both
+    the GUI Save-as and the MCP tool go through, so forks carry identical lineage."""
+
+    def _origin(self) -> ViewpointDefinition:
+        return _definition(slug="origin", version=3, name="Origin")
+
+    def test_create_with_fork_of_stamps_origin_digest_and_generation(self) -> None:
+        origin = self._origin()
+        result = persist_viewpoint_definition(
+            "create",
+            _definition(slug="fork", name="Fork"),
+            local_catalog=ViewpointCatalog.empty(),
+            merged_catalog=ViewpointCatalog((origin,)),
+            registries=REGISTRIES,
+            fork_of="origin",
+            index_generation=42,
+        )
+        assert result.ok is True
+        assert result.catalog_to_write is not None
+        stored = result.catalog_to_write.get("fork")
+        assert stored is not None and stored.forked_from is not None
+        assert stored.forked_from.slug == "origin"
+        assert stored.forked_from.version == 3
+        assert stored.forked_from.definition_digest == definition_digest(origin)
+        assert stored.forked_from.index_generation == 42
+
+    def test_unknown_fork_origin_is_rejected(self) -> None:
+        result = persist_viewpoint_definition(
+            "create",
+            _definition(slug="fork"),
+            local_catalog=ViewpointCatalog.empty(),
+            merged_catalog=ViewpointCatalog.empty(),
+            registries=REGISTRIES,
+            fork_of="ghost",
+        )
+        assert result.ok is False
+        assert result.issues[0].code == "unknown-fork-origin"
+
+    def test_plain_create_strips_client_supplied_lineage(self) -> None:
+        forged = replace(
+            _definition(slug="fresh"),
+            forked_from=ForkLineage(slug="origin", version=1, definition_digest="forged"),
+        )
+        result = persist_viewpoint_definition(
+            "create",
+            forged,
+            local_catalog=ViewpointCatalog.empty(),
+            merged_catalog=ViewpointCatalog.empty(),
+            registries=REGISTRIES,
+        )
+        assert result.ok is True
+        assert result.catalog_to_write is not None
+        stored = result.catalog_to_write.get("fresh")
+        assert stored is not None and stored.forked_from is None
+
+    def test_edit_preserves_stored_lineage_regardless_of_what_the_client_sends(self) -> None:
+        origin = self._origin()
+        lineage = ForkLineage(slug="origin", version=3, definition_digest=definition_digest(origin))
+        existing = replace(_definition(slug="fork", name="Fork"), forked_from=lineage)
+        edited = _definition(slug="fork", name="Fork (renamed)")  # client sends NO lineage
+        result = persist_viewpoint_definition(
+            "edit",
+            edited,
+            local_catalog=ViewpointCatalog((existing,)),
+            merged_catalog=ViewpointCatalog((existing, origin)),
+            registries=REGISTRIES,
+        )
+        assert result.ok is True
+        assert result.catalog_to_write is not None
+        stored = result.catalog_to_write.get("fork")
+        assert stored is not None
+        assert stored.forked_from == lineage
+        assert stored.name == "Fork (renamed)"
 
 
 class TestCreate:

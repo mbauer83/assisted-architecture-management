@@ -142,10 +142,11 @@ def project_artifact_local(
         effective_reasons = () if enforcement == "off" else reasons
         style: Mapping[str, StyleValue] = {}
         if not effective_reasons:
-            style, style_drift = evaluate_item_style(
+            evaluation = evaluate_item_style(
                 entity, "entity", definition.presentation, read_access=read_access, registries=registries
             )
-            drift |= style_drift
+            style = evaluation.style
+            drift |= evaluation.schema_drift
         state: OcclusionState = "ghosted" if enforcement == "ghost" and effective_reasons else "visible"
         items.append(
             ProjectedOccurrence(
@@ -161,10 +162,11 @@ def project_artifact_local(
         effective_reasons = () if enforcement == "off" else reasons
         style = {}
         if not effective_reasons:
-            style, style_drift = evaluate_item_style(
+            evaluation = evaluate_item_style(
                 connection, "connection", definition.presentation, read_access=read_access, registries=registries
             )
-            drift |= style_drift
+            style = evaluation.style
+            drift |= evaluation.schema_drift
         state: OcclusionState = "ghosted" if enforcement == "ghost" and effective_reasons else "visible"
         items.append(
             ProjectedOccurrence(
