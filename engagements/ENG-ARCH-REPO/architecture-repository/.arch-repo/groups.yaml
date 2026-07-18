@@ -71,4 +71,7 @@ document-collections:
 - slug: promotion-and-tiering
   id: GRP@1783411088.YSQzlI
   name: Promotion And Tiering
+- slug: motivation-narrative
+  id: GRP@1784370259.CwFXGq
+  name: Motivation Narrative
 analysis-collections: []

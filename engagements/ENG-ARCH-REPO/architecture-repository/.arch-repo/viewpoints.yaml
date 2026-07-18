@@ -57,6 +57,7 @@ viewpoints:
       max_hops: 3
   presentation:
     representation: diagram
+  selection_mode: query
 - slug: motivation-technology-support
   version: 6
   name: Motivation as supported by Technology
@@ -108,6 +109,7 @@ viewpoints:
       max_hops: 4
   presentation:
     representation: exploration
+  selection_mode: query
 - slug: business-technology-support
   version: 1
   name: Business as supported by Technology
@@ -154,32 +156,7 @@ viewpoints:
       max_hops: 4
   presentation:
     representation: diagram
-- slug: viewpoint-query-builder-e2e-traversal-1784012999169
-  version: 1
-  name: Traversal Test
-  purpose: informing
-  content: overview
-  query:
-    query_schema: 1
-    entity_criteria:
-      kind: group
-      conjunction: and
-      children: []
-    include_connected:
-    - connection_criteria:
-        kind: group
-        conjunction: and
-        children: []
-      neighbor_criteria:
-        kind: group
-        conjunction: and
-        children: []
-      traversal: derived
-      include_potential: true
-    connections:
-      traversal: both
-      include_potential: true
-      max_hops: 5
+  selection_mode: query
 - slug: impacted-entity-diagram
   version: 3
   name: ArchiMate Impact Analysis
@@ -223,6 +200,7 @@ viewpoints:
       type: entity-id
   presentation:
     representation: diagram
+  selection_mode: query
 - slug: element-dependents-archimate
   version: 1
   name: ArchiMate Impact Analysis (Dependents)
@@ -284,3 +262,4 @@ viewpoints:
         conjunction: and
         children: []
       value: emphasis
+  selection_mode: query
