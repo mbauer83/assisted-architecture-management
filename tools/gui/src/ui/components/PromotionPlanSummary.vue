@@ -25,7 +25,7 @@ const visibleSchemaErrors = computed(() =>
   (props.plan?.schema_errors ?? []).filter((error) => !error.startsWith('Broken structural closure:')))
 
 const strategyOptions = [
-  { value: 'accept_enterprise', label: 'Keep global version' },
+  { value: 'accept_enterprise', label: 'Keep enterprise version' },
   { value: 'accept_engagement', label: 'Replace with selected version' },
 ] as const
 
@@ -132,7 +132,7 @@ const matchStatusLabel = (entry: PromotionGroupMappingEntry): string => {
         class="section"
       >
         <h3 class="section-title">
-          Already in global repository
+          Already in the enterprise repository
         </h3>
         <ul class="id-list id-list--muted">
           <li
@@ -176,7 +176,7 @@ const matchStatusLabel = (entry: PromotionGroupMappingEntry): string => {
             title: 'Entity conflicts',
             conflicts: props.plan.conflicts.map((conflict) => ({
               id: conflict.engagement_id,
-              heading: `${conflict.engagement_id} vs global ${conflict.enterprise_id}`,
+              heading: `${conflict.engagement_id} vs enterprise ${conflict.enterprise_id}`,
               meta: '',
             })),
           },
@@ -184,7 +184,7 @@ const matchStatusLabel = (entry: PromotionGroupMappingEntry): string => {
             title: 'Document conflicts',
             conflicts: props.plan.doc_conflicts.map((conflict) => ({
               id: conflict.engagement_id,
-              heading: `${conflict.engagement_title} vs global ${conflict.enterprise_title}`,
+              heading: `${conflict.engagement_title} vs enterprise ${conflict.enterprise_title}`,
               meta: `${conflict.engagement_id} → ${conflict.enterprise_id}`,
             })),
           },
@@ -192,7 +192,7 @@ const matchStatusLabel = (entry: PromotionGroupMappingEntry): string => {
             title: 'Diagram conflicts',
             conflicts: props.plan.diagram_conflicts.map((conflict) => ({
               id: conflict.engagement_id,
-              heading: `${conflict.engagement_name} vs global ${conflict.enterprise_name}`,
+              heading: `${conflict.engagement_name} vs enterprise ${conflict.enterprise_name}`,
               meta: `${conflict.engagement_id} → ${conflict.enterprise_id}`,
             })),
           },

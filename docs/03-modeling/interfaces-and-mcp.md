@@ -72,6 +72,18 @@ a dry-run preview, and returns structured error codes with locations on failure.
 output is returned as YAML for token efficiency. The tables above are generated from the
 registered MCP servers by `uv run tools/generate_mcp_docs.py`.
 
+Every mutation — MCP tool or REST route — executes through one authorized path: a closed
+per-intent policy checked against a fresh authority snapshot, then the shared single-writer
+queue and workspace write gate. Standard authoring tools are **engagement-only in every
+mode** and accept only the configured active engagement root (an explicit `repo_root`
+pointing at the enterprise repository — or a child, relative, or symlinked spelling of it —
+is rejected with an error naming the admin surface). Promotion, enterprise save, submit, and
+discard are the only enterprise writes outside admin mode; `--read-only` denies every
+architecture-repository mutation on every interface. Save commits run the artifact verifier
+over the whole working tree (it may contain manual edits); only content-neutral git
+operations — Submit's push of already-committed work and Discard's branch cleanup — are
+exempt.
+
 > The optional **assurance** MCP servers (`arch-assurance-read` / `arch-assurance-write`)
 > are documented separately under [Assurance MCP tools](../04-assurance/mcp-tools.md).
 

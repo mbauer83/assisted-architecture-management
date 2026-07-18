@@ -32,8 +32,6 @@ provide(toastKey, addToast)
 
 <template>
   <NavBar
-    :admin-mode="adminMode"
-    :read-only="readOnly"
     :eng-dirty="engDirty"
     :ent-status="entStatus"
     :authority-known="authorityKnown"

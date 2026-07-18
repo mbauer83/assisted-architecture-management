@@ -81,7 +81,7 @@ const onBlur = () => {
         <span
           v-if="e.is_global"
           class="item-global"
-        >global</span>
+        >enterprise</span>
         <span class="item-type">{{ e.artifact_type }}</span>
         <span class="item-id">{{ e.artifact_id.split('.')[1] }}</span>
       </button>

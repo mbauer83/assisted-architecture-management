@@ -12,8 +12,6 @@ import { readErrorMessage } from '../lib/errors'
 type SaveMode = 'engagement-save' | 'enterprise-save' | 'enterprise-submit' | 'enterprise-withdraw'
 
 defineProps<{
-  adminMode: boolean
-  readOnly: boolean
   engDirty: boolean
   entStatus: EnterpriseSyncStatus | null
   authorityKnown: boolean
@@ -121,123 +119,84 @@ onMounted(async () => {
     >
       Architecture Repository
     </RouterLink>
-    <div class="nav__sections">
-      <div class="nav__section">
-        <span class="nav__section-label">Engagement</span>
-        <nav
-          class="nav__links"
-          aria-label="Engagement"
-        >
-          <RouterLink
-            :to="browseTo"
-            :class="{ 'nav__link--suppressed': viewpointDriven }"
-          >
-            Browse
-          </RouterLink>
-          <RouterLink to="/documents">
-            Documents
-          </RouterLink>
-          <RouterLink to="/diagrams">
-            Diagrams
-          </RouterLink>
-          <RouterLink
-            to="/viewpoints"
-            :class="{ 'nav__link--forced-active': viewpointDriven }"
-          >
-            Viewpoints
-          </RouterLink>
-          <RouterLink
-            to="/promote"
-            class="nav__promote"
-          >
-            ↑ Promote
-          </RouterLink>
-        </nav>
-      </div>
-      <div
-        class="nav__divider"
-        aria-hidden="true"
-      />
-      <div class="nav__section">
-        <span class="nav__section-label nav__section-label--global">Global</span>
-        <nav
-          class="nav__links"
-          aria-label="Global"
-        >
-          <RouterLink :to="{ path: '/entities', query: { tier: 'enterprise' } }">
-            Browse
-          </RouterLink>
-          <RouterLink :to="{ path: '/diagrams', query: { tier: 'enterprise' } }">
-            Diagrams
-          </RouterLink>
-        </nav>
-      </div>
-      <template v-if="assuranceStatus !== null">
-        <div
-          class="nav__divider"
-          aria-hidden="true"
-        />
-        <div class="nav__section">
-          <span
-            class="nav__section-label nav__section-label--assurance"
-            :title="assuranceStatus === 'unlocked' ? 'Assurance store unlocked' : 'Assurance store locked'"
-          >
-            {{ assuranceStatus === 'unlocked' ? '🔓' : '🔒' }} Assurance
-          </span>
-          <nav
-            class="nav__links"
-            aria-label="Assurance"
-          >
-            <RouterLink to="/assurance">
-              Overview
-            </RouterLink>
-          </nav>
-        </div>
-      </template>
-    </div>
-    <SyncStatusCluster
-      class="nav__cluster"
-      :authority-known="authorityKnown"
-      :authority="authority"
-      :enterprise="entStatus"
-      :engagement-dirty="engDirty"
-      @open-save-dialog="emit('openSaveDialog', $event)"
-    />
-    <form
-      class="nav__search"
-      @submit.prevent="submitSearch"
+    <nav
+      class="nav__links"
+      aria-label="Primary"
     >
-      <input
-        v-model="searchQuery"
-        class="nav__search-input"
-        type="search"
-        placeholder="Search…"
-        aria-label="Search"
-        autocomplete="off"
-        @input="onSearchInput"
-        @focus="onSearchFocus"
-        @blur="onSearchBlur"
+      <RouterLink
+        :to="browseTo"
+        :class="{ 'nav__link--suppressed': viewpointDriven }"
       >
-      <div
-        v-if="showDropdown"
-        class="nav__search-dropdown"
+        Browse
+      </RouterLink>
+      <RouterLink to="/documents">
+        Documents
+      </RouterLink>
+      <RouterLink to="/diagrams">
+        Diagrams
+      </RouterLink>
+      <RouterLink
+        to="/viewpoints"
+        :class="{ 'nav__link--forced-active': viewpointDriven }"
       >
-        <button
-          v-for="hit in searchHits"
-          :key="hit.artifact_id"
-          class="nav__search-item"
-          @mousedown.prevent="selectHit(hit)"
+        Viewpoints
+      </RouterLink>
+      <RouterLink
+        v-if="assuranceStatus !== null"
+        to="/assurance"
+        :title="assuranceStatus === 'unlocked' ? 'Assurance store unlocked' : 'Assurance store locked'"
+      >
+        {{ assuranceStatus === 'unlocked' ? '🔓' : '🔒' }} Assurance
+      </RouterLink>
+    </nav>
+    <div
+      class="nav__workflow"
+      role="group"
+      aria-label="Workflow and status"
+    >
+      <SyncStatusCluster
+        :authority-known="authorityKnown"
+        :authority="authority"
+        :enterprise="entStatus"
+        :engagement-dirty="engDirty"
+        @open-save-dialog="emit('openSaveDialog', $event)"
+      />
+      <form
+        class="nav__search"
+        @submit.prevent="submitSearch"
+      >
+        <input
+          v-model="searchQuery"
+          class="nav__search-input"
+          type="search"
+          placeholder="Search…"
+          aria-label="Search"
+          autocomplete="off"
+          @input="onSearchInput"
+          @focus="onSearchFocus"
+          @blur="onSearchBlur"
         >
-          <ArchimateTypeGlyph
-            :type="hitGlyphType(hit)"
-            :size="14"
-            class="nav__search-item-glyph"
-          />
-          <span class="nav__search-item-name">{{ hit.name || hit.artifact_id }}</span>
-          <span class="nav__search-item-type">{{ hitTypeLabel(hit) }}</span>
-        </button>
-      </div>
-    </form>
+        <div
+          v-if="showDropdown"
+          class="nav__search-dropdown"
+        >
+          <button
+            v-for="hit in searchHits"
+            :key="hit.artifact_id"
+            class="nav__search-item"
+            @mousedown.prevent="selectHit(hit)"
+          >
+            <ArchimateTypeGlyph
+              :type="hitGlyphType(hit)"
+              :size="14"
+              class="nav__search-item-glyph"
+            />
+            <span class="nav__search-item-name">{{ hit.name || hit.artifact_id }}</span>
+            <span class="nav__search-item-type">{{ hitTypeLabel(hit) }}</span>
+          </button>
+        </div>
+      </form>
+    </div>
   </header>
 </template>
 
@@ -245,21 +204,15 @@ onMounted(async () => {
 .nav { display: flex; align-items: center; gap: 20px; padding: 0 24px; height: 48px; background: #1e293b; color: #f8fafc; position: sticky; top: 0; z-index: 10; }
 .nav__brand { font-weight: 600; font-size: 15px; color: #f8fafc; white-space: nowrap; flex-shrink: 0; }
 .nav__brand:hover { text-decoration: none; color: #93c5fd; }
-.nav__sections { display: flex; align-items: center; gap: 0; flex: 1; min-width: 0; overflow: hidden; }
-.nav__section { display: flex; align-items: center; gap: 8px; flex-shrink: 1; min-width: 0; }
-.nav__section-label { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .07em; color: #64748b; white-space: nowrap; padding: 0 4px; flex-shrink: 0; }
-.nav__section-label--global { color: #f59e0b; padding-top: 0.3em; }
-.nav__section-label--assurance { color: #a78bfa; padding-top: 0.3em; }
-.nav__divider { width: 1px; height: 20px; background: #334155; margin: 0 12px; flex-shrink: 0; }
-.nav__links { display: flex; gap: 4px; flex-wrap: nowrap; min-width: 0; overflow: hidden; }
+/* Wrap order: the primary links shrink and truncate FIRST; the workflow/status
+   landmark and search keep their size (flex-shrink: 0). */
+.nav__links { display: flex; gap: 4px; flex-wrap: nowrap; min-width: 0; overflow: hidden; flex: 1; }
 .nav__links a { color: #b0bec5; font-size: 13px; padding: 4px 8px; border-radius: 4px; white-space: nowrap; }
 .nav__links a.router-link-active { color: #f8fafc; font-weight: 500; background: #2d3f55; }
 .nav__links a:hover { color: #f1f5f9; text-decoration: none; background: #263347; }
 .nav__links a.nav__link--suppressed.router-link-active { color: #b0bec5; font-weight: 400; background: transparent; }
 .nav__links a.nav__link--forced-active { color: #f8fafc; font-weight: 500; background: #2d3f55; }
-.nav__promote { color: #fbbf24 !important; }
-.nav__promote:hover { color: #f59e0b !important; }
-.nav__cluster { margin-inline-start: auto; }
+.nav__workflow { margin-inline-start: auto; display: flex; align-items: center; gap: 12px; flex-shrink: 0; }
 .nav__search { display: flex; align-items: center; flex-shrink: 0; position: relative; }
 .nav__search-input { width: clamp(140px, 18vw, 260px); padding: 5px 10px; border-radius: 5px; border: 1px solid #334155; background: #0f172a; color: #f1f5f9; font-size: 13px; outline: none; transition: width .2s, border-color .15s; }
 .nav__search-input::placeholder { color: #64748b; }
@@ -272,8 +225,6 @@ onMounted(async () => {
 .nav__search-item-name { flex: 1; font-weight: 500; }
 .nav__search-item-type { font-size: 11px; color: #64748b; white-space: nowrap; flex-shrink: 0; }
 @media (max-width: 1060px) {
-  .nav__section-label { display: none; }
-  .nav__divider { margin: 0 6px; }
   .nav { gap: 12px; padding: 0 16px; }
 }
 @media (max-width: 820px) {

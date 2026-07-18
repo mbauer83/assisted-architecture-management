@@ -199,7 +199,7 @@ const browseReturnQuery = computed(() => {
 })
 
 const pageTitle = computed(() => {
-  const scope = isGlobal.value ? 'Global ' : ''
+  const scope = isGlobal.value ? 'Enterprise ' : ''
   const domainPart = activeDomain.value ? `${getDomainLabel(activeDomain.value)} ` : ''
   return `${scope}${domainPart}Entities`
 })
@@ -262,7 +262,7 @@ const displayCount = computed(() => {
             <span
               v-if="isGlobal"
               class="global-badge"
-            >Global</span>
+            >Enterprise</span>
             {{ pageTitle }}
             <span
               v-if="entityListState.data.value"
@@ -271,7 +271,7 @@ const displayCount = computed(() => {
           </h1>
           <p class="subtitle">
             <template v-if="isGlobal">
-              Read-only view of the shared global (enterprise) repository.
+              Read-only view of the shared enterprise repository.
             </template>
             <template v-else>
               Filter by project and domain, then inspect the catalog as a sortable table or treemap.

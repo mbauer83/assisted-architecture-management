@@ -66,16 +66,30 @@ integration:
   `arch/work-20260425-143012`); later promotions accumulate on it. The enterprise read view
   always reflects branch content.
 - **Saving** — commits the working branch without pushing
-  (`artifact_save_changes(target="enterprise")` / `POST /api/sync/enterprise/save`).
-- **Submitting** — pushes and marks pending; the returned branch name is used to open a PR
-  (`artifact_submit_for_review()` / `POST /api/sync/enterprise/submit`).
+  (`artifact_save_changes(target="enterprise")` / `POST /api/sync/enterprise/save`). Save
+  commits (engagement and enterprise) run the artifact verifier over the whole working tree
+  first — a tree holding a malformed manual edit rejects the save with no commit and no
+  state change. Submit's push and Discard's branch cleanup are the content-neutral
+  exceptions: they introduce no artifact content and skip verification.
+- **Submitting** — pushes with upstream tracking and marks pending; the returned branch name
+  is used to open a PR (`artifact_submit_for_review()` / `POST /api/sync/enterprise/submit`).
 - **Auto-merge detection** — the sync loop polls `origin/main`; when the branch content is
   detected there (content diff, so squash/rebase merges are handled), it checks out `main`,
   pulls, and transitions to *synced*.
 - **Discarding** — `artifact_withdraw_changes(confirm=True)` /
-  `POST /api/sync/enterprise/withdraw`.
+  `POST /api/sync/enterprise/withdraw`. Discard requires a clean tree and rejects when there
+  is nothing to discard (never a silent success). A pending discard is an idempotent
+  desired-state transition — remote ref deleted, checkout `main`, local branch deleted,
+  state cleared — where every already-satisfied step counts as success, so a retry after a
+  partial failure converges.
 
-State is persisted in `.arch/enterprise-sync.json` and survives restarts.
+The workflow controls live in the header's **Changes** menu next to the repository status
+chip; each action appears exactly when the sync lifecycle offers it AND the backend's
+per-intent authority allows it (a fetch/upstream fault still allows the local Save that
+resolves a dirty tree while denying promotion, Submit, and remote-touching Discard).
+
+State is persisted in `.arch/enterprise-sync.json` (versioned, with a typed sync-health
+overlay) and survives restarts.
 
 &nbsp;
 

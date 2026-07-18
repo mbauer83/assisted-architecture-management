@@ -74,7 +74,7 @@ const activeDomainOptions = computed(() =>
           :class="{ 'repo-card--empty': !hasGlobal }"
         >
           <div class="repo-card__header">
-            <span class="repo-label repo-label--global">Global</span>
+            <span class="repo-label repo-label--global">Enterprise</span>
           </div>
           <div class="repo-stats">
             <div class="repo-stat">
@@ -86,7 +86,7 @@ const activeDomainOptions = computed(() =>
             v-if="!hasGlobal"
             class="repo-empty"
           >
-            No global entities yet. Promote engagement entities to populate the global repository.
+            No enterprise entities yet. Promote engagement entities to populate the enterprise repository.
           </p>
         </div>
       </div>

@@ -185,7 +185,7 @@ const insertReference = (markdownLink: string) => {
           :to="{ path: '/promote', query: { document_id: detail.artifact_id } }"
           class="secondary-btn"
         >
-          ↑ Promote to Global
+          ↑ Promote to Enterprise
         </RouterLink>
         <template v-if="!editing">
           <button

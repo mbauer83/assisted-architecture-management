@@ -44,8 +44,8 @@ arch-backend --restart --daemon
 | Mode | Flag | Effect |
 |---|---|---|
 | Normal (default) | — | Read/write engagement; enterprise read-only via promotion |
-| Admin | `--admin-mode` | Direct enterprise writes via GUI/REST; GUI shows a banner |
-| Read-only | `--read-only` | All writes blocked globally; MCP write server rejects mutations |
+| Admin | `--admin-mode` | Direct enterprise authoring, exclusively through the admin operations surface (`/admin/api/*`); standard authoring tools stay engagement-only even here; GUI shows a banner |
+| Read-only | `--read-only` | Every architecture-repository mutation is denied on every interface (REST, MCP, GUI) by the server-side authorization policy — authoring, group and viewpoint writes, promotion, save/submit/discard |
 
 `--daemon` starts a detached session, redirects stdin from `/dev/null`, and writes to
 `backend.log_path`. `arch-backend &` also works and detaches stdin when it detects a

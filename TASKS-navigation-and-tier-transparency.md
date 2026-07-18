@@ -464,12 +464,23 @@ memory. Tick items only after the listed verification passes, recording evidence
 
 ## S7 — Nav consolidation, rename, docs
 
-- [ ] **S7a — NavBar restructure.**
+- [x] **S7a — NavBar restructure.**
       Left nav landmark (5 content links + Search) / right workflow-status landmark
       (`margin-inline-start: auto` or grid equivalent); defined wrap order; menu
       keyboard/focus behavior; keep viewpoint-driven highlight. Component test pins
       landmark/link/action membership; record a manual viewport check.
-- [ ] **S7b — Rendered-copy rename with allowlist.**
+      > Evidence (2026-07-18): one `aria-label="Primary"` nav landmark
+      > (Browse · Documents · Diagrams · Viewpoints · Assurance) — tier sections,
+      > per-tier duplicate links, and the nav Promote verb are gone (verbs live in
+      > the cluster); right `aria-label="Workflow and status"` group hosts
+      > SyncStatusCluster + search with `margin-inline-start: auto`; wrap order
+      > documented in CSS (primary links shrink first, workflow/search keep size);
+      > viewpoint-driven highlight preserved; cluster menu has
+      > aria-haspopup/expanded + Escape/focusout handling (S6c). Structure pinned by
+      > NavBar.structure.test.ts (5 assertions incl. nouns-only-left and
+      > no-/global-links). NavBar 305→218 counted. Manual viewport check DEFERRED to
+      > the S8b live pass (needs the restarted backend).
+- [x] **S7b — Rendered-copy rename with allowlist.**
       Inventory: App admin banner, HomeView badge, PromoteView title,
       EntityDetailHeader/DiagramDetailHeader, DocumentDetailView promote button,
       EntitiesView computed titles/chips, dialogs, toasts, ARIA labels, empty states.
@@ -477,11 +488,35 @@ memory. Tick items only after the listed verification passes, recording evidence
       final audit: `rg -n -i "global" tools/gui/src docs` reviewed against a recorded
       allowlist (`/global/*` routes, `scope=global`, `is_global`/`isGlobal*`, GAR
       terminology, compatibility comments).
-- [ ] **S7c — Docs.** Update `docs/03-modeling/interfaces-and-mcp.md`,
+      > Evidence (2026-07-18): renamed — EntityDetailHeader badge/titles/promote
+      > link, DiagramDetailHeader + DocumentDetailView promote links, PromoteView
+      > title/subtitle/result heading, PromotionPlanSummary conflict copy,
+      > HomeView repo card + empty state, EntitiesView computed title prefix +
+      > header badge + read-only subtitle, EntitySearchInput + SearchView row chips,
+      > App admin banner (S6c). renderedCopyAudit.test.ts scans EVERY .vue
+      > template's rendered text for \bglobal\b (one explicit allowlist entry: the
+      > delete panel's GAR-terminology sentence) and pins Enterprise on the key
+      > surfaces. Final `rg -n -i global tools/gui/src docs`: 113 hits, all in
+      > allowlisted categories — internal identifiers (is_global/isGlobal*/scope=
+      > global/'global' literals), /global/* redirect routes, CSS class names
+      > (global-badge/global-chip/item-global/row--global/repo-*--global),
+      > GAR terminology, compatibility comments, generic-English "global(ly)" in
+      > extensibility docs.
+- [x] **S7c — Docs.** Update `docs/03-modeling/interfaces-and-mcp.md`,
       `docs/03-modeling/views-and-exploration.md`,
       `docs/reference/git-sync-promotion.md`, `docs/reference/cli-and-backend.md` for
       content-first nav, tier facets, Enterprise wording, the write-boundary/read-only
       semantics, and the workflow-ops verifier exception.
+      > Evidence (2026-07-18): views-and-exploration gains the tier-facet paragraph
+      > (?tier= URL persistence, uniform badges, enterprise-clears-collection);
+      > interfaces-and-mcp documents the single authorized mutation path
+      > (engagement-only standard authoring incl. child/relative/symlink spellings,
+      > admin-surface-naming rejection, read-only scope, save-verifier +
+      > content-neutral exemptions); git-sync-promotion documents save verification,
+      > upstream-tracking submit, truthful + idempotent discard, the Changes menu ×
+      > per-intent authority, and the versioned health overlay; cli-and-backend's
+      > --read-only/--admin-mode rows updated. Gates: pytest 5460 passed/5 skipped,
+      > ruff 0, zuban 0; GUI vitest 1016 (98 files), vue-tsc clean, lint 0.
 
 ## S8 — Deterministic end-to-end closure
 

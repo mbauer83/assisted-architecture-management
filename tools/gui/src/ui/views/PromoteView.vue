@@ -25,7 +25,7 @@ onUnmounted(() => {
   <div class="promote-view">
     <div class="page-header">
       <h1 class="page-title">
-        Promote to Global Repository
+        Promote to Enterprise Repository
       </h1>
       <p class="page-sub">
         Build an explicit promotion set of entities, documents, and diagrams, review conflicts, then execute.
@@ -67,7 +67,7 @@ onUnmounted(() => {
         Select the first artifact to promote
       </h2>
       <p class="card-hint">
-        Start with an entity, document, or diagram, then add anything else that belongs in the same global promotion.
+        Start with an entity, document, or diagram, then add anything else that belongs in the same promotion.
       </p>
       <div class="search-wrap">
         <input
@@ -244,7 +244,7 @@ onUnmounted(() => {
       </h2>
       <div
         v-for="entry in [
-          { title: 'Files added to global repo', items: workflow.executeMutation.result.value.copied_files },
+          { title: 'Files added to the enterprise repo', items: workflow.executeMutation.result.value.copied_files },
           { title: 'Files updated', items: workflow.executeMutation.result.value.updated_files },
         ]"
         v-show="entry.items.length"

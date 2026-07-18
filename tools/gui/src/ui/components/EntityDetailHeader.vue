@@ -1,6 +1,6 @@
 <script setup lang="ts">
 /**
- * Entity detail's top bar (back link, global badge, graph/promote links, edit/delete/
+ * Entity detail's top bar (back link, tier badge, graph/promote links, edit/delete/
  * cancel/preview/save actions) and header block (name/status — editable in place — plus
  * the type/domain/version/specialization meta row). `edit` (the `useEntityEditForm`
  * reactive bundle) is injected, not a prop — its fields are v-model-bound here, and a prop
@@ -37,8 +37,8 @@ const edit = inject(entityEditFormKey)!
         <span
           v-if="isGlobalEntity"
           class="global-badge"
-          title="From the global (enterprise) repository"
-        >Global</span>
+          title="From the enterprise repository"
+        >Enterprise</span>
         <RouterLink
           :to="{ path: '/graph', query: { id: entityId } }"
           class="graph-btn"
@@ -49,9 +49,9 @@ const edit = inject(entityEditFormKey)!
           v-if="!isGlobalEntity && !edit.editing"
           :to="{ path: '/promote', query: { entity_id: entityId } }"
           class="promote-btn"
-          title="Promote this entity to the global repository"
+          title="Promote this entity to the enterprise repository"
         >
-          ↑ Promote to Global
+          ↑ Promote to Enterprise
         </RouterLink>
         <button
           v-if="!edit.editing && (!isGlobalEntity || adminMode)"

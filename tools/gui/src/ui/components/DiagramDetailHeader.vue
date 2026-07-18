@@ -35,7 +35,7 @@ const emit = defineEmits<{ sync: []; delete: [] }>()
       :to="{ path: '/promote', query: { diagram_id: diagramId } }"
       class="promote-btn"
     >
-      ↑ Promote to Global
+      ↑ Promote to Enterprise
     </RouterLink>
     <RouterLink
       :to="{ path: editPath, query: { id: diagramId } }"

@@ -109,7 +109,7 @@ const friendlyName = (id: string) => {
             <span
               v-if="h.is_global"
               class="global-chip"
-            >global</span>
+            >enterprise</span>
             <span
               v-if="h.domain"
               class="domain-badge"

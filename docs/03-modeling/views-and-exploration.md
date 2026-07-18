@@ -21,6 +21,13 @@ A filterable, sortable table of entities (and parallel list views for documents 
 for diagrams). Filter by domain, type, status, and keyword; full-text search narrows the
 list as you type.
 
+Every list surface carries the same **tier facet** — `All · Engagement · Enterprise`
+(viewpoints add their built-in `module` tier) — persisted in the URL as `?tier=`, so a
+copied link restores the exact tier you were looking at. Rows show a uniform tier badge,
+and the enterprise tier is browsed through the same views rather than a separate section.
+Engagement collections (groups) apply only outside the Enterprise tier; selecting
+Enterprise clears the active collection.
+
 ![Entities list view with filters](../media/entities-list.png)
 
 &nbsp;
