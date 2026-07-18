@@ -547,3 +547,30 @@ memory. Tick items only after the listed verification passes, recording evidence
       writes rejected.
 - [ ] **S8c — Ledger closure.** Every PLAN §10 criterion checked off with evidence;
       leftovers converted to explicit follow-ups or dropped with rationale.
+      > Pre-restart closure review (2026-07-18) — PLAN §10 criteria:
+      > 1 Search: DONE (S1a suites — FTS/fallback/semantic on all six surfaces,
+      >   rank-ordered ≥50-entity fixtures incl. multiple leading GARs, explicit
+      >   GAR-type query → zero entity hits, GAR-free repo).
+      > 2 List contracts: DONE (S4a router tests, required is_global on all three).
+      > 3 URL state: DONE (S3a codec table; S5 redirect/back-forward/copied-URL
+      >   tests; clean-localStorage direct load).
+      > 4 Mutation authority: DONE (S2a policy matrix + spellings; S2b registry ⇔
+      >   manifest both directions + builders invoked + single-submission timeout
+      >   tests; S2c REST manifest equality + read-only/side-effect tests; S6b
+      >   dirty+fetch-fault Save ACCEPTED end-to-end).
+      > 5 Promotion/save/submit/withdraw: DONE (S2c real-git suites, S6b discard,
+      >   S8a cycle; rejection side-effect-freedom asserted on the filesystem;
+      >   promotion-vs-queued-write concurrency timeout test).
+      > 6 Status: DONE (S6b authority-freshness through real blocking_writes with
+      >   no TTL, old-file load, health preservation, failed-persistence ordering,
+      >   completed-gated clearing; S6c reducer rows component-tested).
+      > 7 Discard postconditions + fault injection: DONE (S6b, real bare remote).
+      > 8 S8 fixture cycle: DONE (S8a, bounded poll, recorded preconditions).
+      > 9 Rendered-copy audit: DONE (S7b test + recorded rg allowlist).
+      > 10 Counted lines: DONE (per-WU records; service.py 547→546 and EntitiesView
+      >   532→518 baselines ratcheted; no non-grandfathered file over 350).
+      > 11 Quality gates: DONE every WU (final: pytest 5462 passed/5 skipped,
+      >   ruff 0, zuban 0; GUI vitest 1016/98 files, vue-tsc, eslint 0).
+      > REMAINING for closure: S8b live pass (blocked on owner backend restart) +
+      > the S7a manual viewport check (deferred into that pass). Open Q2 (viewpoint
+      > tier label `module` vs `Built-in`) stays cosmetic/non-blocking.
