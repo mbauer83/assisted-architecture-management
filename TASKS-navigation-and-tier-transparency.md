@@ -237,15 +237,28 @@ memory. Tick items only after the listed verification passes, recording evidence
 
 ## S3 — Tier URL codec & shared components
 
-- [ ] **S3a — Pure tier codec (per-surface allowed set) + route-merge composable.**
+- [x] **S3a — Pure tier codec (per-surface allowed set) + route-merge composable.**
       Codec accepts an allowed-tier parameter (viewpoints:
       engagement/enterprise/module; other lists: engagement/enterprise); absent, array,
       or disallowed values normalize to All via one `router.replace` preserving
       unrelated keys + hash. Vitest: codec table incl. disallowed-value normalization,
       merge rules.
-- [ ] **S3b — `TierFacet` + `TierBadge` presentational components.**
+      > Evidence (2026-07-18): `ui/lib/tierUrlState.ts` (Tier/TierSelection unions,
+      > LIST_TIERS/VIEWPOINT_TIERS, decodeTier/tierNeedsNormalization/withTier) +
+      > `ui/composables/useTierFacet.ts` (immediate-watch normalization, one
+      > replace, hash preserved, owned key only). Vitest table:
+      > tierUrlState.test.ts (12 — absent/array/empty/null/disallowed/case,
+      > per-surface module handling, merge rules).
+- [x] **S3b — `TierFacet` + `TierBadge` presentational components.**
       Facet emits typed tier (no router import); badge one semantic + ARIA label,
       visual language from the viewpoint tier-tag. Vitest per component.
+      > Evidence (2026-07-18): TierFacet.vue (typed v-model emit, aria-pressed
+      > segmented group, no router import) + TierBadge.vue (role=img, one
+      > `tierBadgeAriaLabel`, pill styling matching the viewpoint tier-tag) with
+      > logic in .helpers.ts per the repo's node-env Vitest idiom
+      > (TierFacet.helpers.test.ts 3, TierBadge.helpers.test.ts 3 — incl.
+      > "never renders Global"). GUI gates: eslint 0 (new files), vue-tsc clean,
+      > vitest 964 passed incl. new suites.
 
 ## S4 — List contracts
 
