@@ -156,10 +156,14 @@ export const makeHttpModelRepository = (): ModelRepository => ({
       Effect.map((items) => [...items] as import('../../domain').DocumentType[]),
     ),
 
-  listDocuments: (params: { doc_type?: string; status?: string; limit?: number; offset?: number; group?: string } = {}) =>
+  listDocuments: (
+    params: {
+      doc_type?: string; status?: string; limit?: number; offset?: number; group?: string; scope?: string;
+    } = {},
+  ) =>
     fetchJson(buildUrl('/documents', {
       doc_type: params.doc_type, status: params.status,
-      limit: params.limit, offset: params.offset, group: params.group,
+      limit: params.limit, offset: params.offset, group: params.group, scope: params.scope,
     }), DocumentListSchema),
 
   getDocument: (id) =>
@@ -183,8 +187,10 @@ export const makeHttpModelRepository = (): ModelRepository => ({
       entity_types: params.entity_types?.join(','), doc_types: params.doc_types?.join(','), limit: params.limit,
     }), ReferenceSearchResultSchema),
 
-  listDiagrams: (diagramType?: string, status?: string, group?: string) =>
-    fetchJson(buildUrl('/diagrams', { diagram_type: diagramType, status, group }), DiagramListSchema),
+  listDiagrams: (params: { diagram_type?: string; status?: string; group?: string; scope?: string } = {}) =>
+    fetchJson(buildUrl('/diagrams', {
+      diagram_type: params.diagram_type, status: params.status, group: params.group, scope: params.scope,
+    }), DiagramListSchema),
 
   listDiagramTypes: () =>
     fetchJson(buildUrl('/diagram-types'), Schema.Array(DiagramTypeSummarySchema))

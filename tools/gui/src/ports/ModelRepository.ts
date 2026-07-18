@@ -94,9 +94,9 @@ export interface ModelRepository {
   readonly search: (
     query: string, limit?: number,
   ) => Effect.Effect<SearchResult, RepoError>
-  readonly listDiagrams: (
-    diagramType?: string, status?: string, group?: string,
-  ) => Effect.Effect<DiagramList, RepoError>
+  readonly listDiagrams: (params?: {
+    diagram_type?: string; status?: string; group?: string; scope?: string;
+  }) => Effect.Effect<DiagramList, RepoError>
   readonly listDiagramTypes: () => Effect.Effect<DiagramTypeSummary[], RepoError>
   readonly getDiagramTypeUiConfig: (type: string) => Effect.Effect<DiagramTypeUiConfig, RepoError | NotFoundError>
   readonly getDatatypeTypes: (params?: {
@@ -296,7 +296,7 @@ export interface ModelRepository {
   // ── Document methods ──────────────────────────────────────────────────────
   readonly listDocumentTypes: () => Effect.Effect<DocumentType[], RepoError>
   readonly listDocuments: (params?: {
-    doc_type?: string; status?: string; limit?: number; offset?: number; group?: string;
+    doc_type?: string; status?: string; limit?: number; offset?: number; group?: string; scope?: string;
   }) => Effect.Effect<DocumentList, RepoError>
   readonly getDocument: (id: string) => Effect.Effect<DocumentDetail, RepoError | NotFoundError>
   readonly createDocument: (body: {

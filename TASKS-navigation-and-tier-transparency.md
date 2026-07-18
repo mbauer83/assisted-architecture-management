@@ -262,12 +262,18 @@ memory. Tick items only after the listed verification passes, recording evidence
 
 ## S4 — List contracts
 
-- [ ] **S4a — Backend scope + `is_global` on documents and diagrams.**
+- [x] **S4a — Backend scope + `is_global` on documents and diagrams.**
       `/api/documents`, `/api/diagrams`: `scope` param; filter via
       `s.is_global(record.path)` **before** totals/pagination; `is_global: bool`
       required in both list serializers. Router tests: one artifact per tier; exact
       totals per scope; badge values; tier+type and tier+group combinations.
-- [ ] **S4b — Frontend contract threading + entity contract closure.**
+      > Evidence (2026-07-18): scope param + pre-total tier filter on both routes;
+      > `is_global` added to the document item serializer and to
+      > `state.diagram_to_summary` (single diagram-summary producer). Tests:
+      > tests/tools/test_gui_router_list_scopes.py (11 — per-tier fixtures, exact
+      > totals, filtered-before-pagination limit=1 pin, badge values, tier+type,
+      > tier+group). Backend restart NEEDED (pending owner).
+- [x] **S4b — Frontend contract threading + entity contract closure.**
       Typed diagram list params (diagram_type, status, group, scope) through port →
       service → adapter (delegation test pins `group` no longer dropped); document
       scope param; `DocumentSummarySchema`/`DiagramSummarySchema` gain required
@@ -275,6 +281,17 @@ memory. Tick items only after the listed verification passes, recording evidence
       already always emits it — list summary only; detail/search schemas unchanged);
       schema contract tests updated; entity list contract test renders both badge
       variants.
+      > Evidence (2026-07-18): `listDiagrams` is now a typed params object across
+      > ModelRepository port → ModelService → HttpModelRepository (the positional
+      > service signature that dropped `group` is gone); `listDocuments` gains
+      > `scope`. Required `is_global` on all three summary schemas (producers
+      > verified: entity rows + diagram-context + diagram-entities all serialize via
+      > entity_to_summary; ViewpointDiagramView alias stub defaults engagement).
+      > Tests: ModelService.listParams.test.ts (3, pins group/scope forwarding),
+      > domain/schemas/listSummaries.contract.test.ts (6 — both badge variants +
+      > closed-contract rejection per record kind). Gates: GUI lint 0 / vue-tsc
+      > clean / vitest 973 passed; backend pytest 5425 passed/5 skipped, ruff 0,
+      > zuban 0.
 
 ## S5 — Facet adoption & route consolidation
 

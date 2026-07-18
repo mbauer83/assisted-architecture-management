@@ -61,7 +61,7 @@ const goToGroups = () => {
 
 const load = () => {
   if (isGlobal.value) return
-  diagramsState.run(svc.listDiagrams(undefined))
+  diagramsState.run(svc.listDiagrams())
 }
 const loadGroups = () => { if (!isGlobal.value) groupsState.run(svc.listGroups('diagram-collection')) }
 

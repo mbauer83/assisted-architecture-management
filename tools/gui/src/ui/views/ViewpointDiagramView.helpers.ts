@@ -23,6 +23,9 @@ export const toEntitySummaryStub = (
 ): EntitySummary => ({
   artifact_id: entity.id, artifact_type: entity.type, name: entity.name,
   display_alias: aliasById.get(entity.id) ?? entity.id, version: '', status: '', domain: '', subdomain: '', path: '',
+  // Execution items carry no tier; the stub exists only for alias resolution, so the
+  // required list-contract flag defaults to the engagement tier.
+  is_global: false,
 })
 
 /** `nameById` fills in the sidebar's connection-flow display (`source_name`/`target_name`);

@@ -76,11 +76,17 @@ def list_diagrams(
     diagram_type: str | None = None,
     status: str | None = None,
     group: str | None = None,
+    scope: str | None = None,
 ) -> dict[str, Any]:
     if diagram_type in ASSURANCE_SURFACE_DIAGRAM_TYPES:
         return {"total": 0, "items": []}
     diagrams = s.get_repo().list_diagrams(diagram_type=diagram_type, status=status, group=group)
     diagrams = [d for d in diagrams if d.diagram_type not in ASSURANCE_SURFACE_DIAGRAM_TYPES]
+    # Tier filtering happens BEFORE totals so `total` is the facet's count.
+    if scope == "global":
+        diagrams = [d for d in diagrams if s.is_global(d.path)]
+    elif scope == "engagement":
+        diagrams = [d for d in diagrams if not s.is_global(d.path)]
     return {"total": len(diagrams), "items": [s.diagram_to_summary(d) for d in diagrams]}
 
 

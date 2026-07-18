@@ -44,6 +44,7 @@ export const DocumentSummarySchema = Schema.Struct({
   keywords: Schema.Array(Schema.String),
   sections: Schema.Array(Schema.String),
   group: Schema.optional(Schema.String),
+  is_global: Schema.Boolean,
 })
 export type DocumentSummary = typeof DocumentSummarySchema.Type
 

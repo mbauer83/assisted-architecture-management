@@ -8,6 +8,7 @@ export const DiagramSummarySchema = Schema.Struct({
   status: Schema.String,
   path: Schema.String,
   group: Schema.optional(Schema.String),
+  is_global: Schema.Boolean,
 })
 export type DiagramSummary = typeof DiagramSummarySchema.Type
 

@@ -15,7 +15,7 @@ export const EntitySummarySchema = Schema.Struct({
   domain: Schema.String,
   subdomain: Schema.String,
   path: Schema.String,
-  is_global: Schema.optional(Schema.Boolean),
+  is_global: Schema.Boolean,
   host_diagram_id: Schema.optional(Schema.String),
   display_alias: Schema.optional(Schema.String),
   parent_entity_id: Schema.optional(Schema.NullOr(Schema.String)),

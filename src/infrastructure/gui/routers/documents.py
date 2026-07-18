@@ -95,11 +95,17 @@ def list_documents(
     doc_type: str | None = None,
     status: str | None = None,
     group: str | None = None,
+    scope: str | None = None,
     limit: int = Query(default=200, le=1000),
     offset: int = 0,
 ) -> dict[str, Any]:
     repo = s.get_repo()
     docs = repo.list_documents(doc_type=doc_type, status=status, group=group)
+    # Tier filtering happens BEFORE totals/pagination so `total` is the facet's count.
+    if scope == "global":
+        docs = [d for d in docs if s.is_global(d.path)]
+    elif scope == "engagement":
+        docs = [d for d in docs if not s.is_global(d.path)]
     page = docs[offset : offset + limit]
     return {
         "total": len(docs),
@@ -113,6 +119,7 @@ def list_documents(
                 "keywords": list(d.keywords),
                 "sections": list(d.sections),
                 "group": d.group,
+                "is_global": s.is_global(d.path),
             }
             for d in page
         ],

@@ -29,8 +29,7 @@ export const makeModelService = (repo: ModelRepository) =>
       repo.artifactSearch(query, params),
     searchReferenceArtifacts: (params: Parameters<ModelRepository['searchReferenceArtifacts']>[0]) =>
       repo.searchReferenceArtifacts(params),
-    listDiagrams: (diagramType?: string, status?: string) =>
-      repo.listDiagrams(diagramType, status),
+    listDiagrams: (params?: Parameters<ModelRepository['listDiagrams']>[0]) => repo.listDiagrams(params),
     listDiagramTypes: () => repo.listDiagramTypes(),
     getDiagramTypeUiConfig: (type: string) => repo.getDiagramTypeUiConfig(type),
     getDatatypeTypes: (params?: Parameters<ModelRepository['getDatatypeTypes']>[0]) =>

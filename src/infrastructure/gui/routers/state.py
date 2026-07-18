@@ -238,6 +238,7 @@ def diagram_to_summary(d: DiagramRecord) -> dict[str, Any]:
         "status": d.status,
         "path": str(d.path),
         "group": d.group,
+        "is_global": is_global(d.path),
     }
 
 
