@@ -41,7 +41,7 @@ optionally `enforcement_override`) to pin it to a definition. Every placed entit
 connection is then classified against that definition:
 
 - **Fully matching** (in scope, satisfies the query) — rendered normally, and styled per the
-  definition's styling rules if it has any.
+  definition's style rules if it has any.
 - **Out of scope** — the entity/connection type isn't in the definition's scope at all.
 - **Criteria mismatch** — in scope, but fails the query's criteria (only checked when the
   definition has a query).
@@ -367,17 +367,20 @@ Three equivalent surfaces write the same catalog file and run the same validatio
   rejection) rather than the fuller save-time checks the GUI/MCP path enforces — see
   [Lifecycle & validation](../reference/viewpoints-schema.md#lifecycle--validation).
 
-Module-shipped and enterprise-tier definitions are read-only from an engagement context; an
-engagement repo authors its own definitions in its own `.arch-repo/viewpoints.yaml`. An edit
+Module-shipped and enterprise-tier definitions are read-only from an engagement context; open
+one via **Customize…** in the catalog, adjust it, and keep your version with **Save as…** —
+this records fork lineage (origin slug, version, and content digest), so the catalog can flag
+the fork as stale the moment its origin changes. An engagement repo authors its own
+definitions in its own `.arch-repo/viewpoints.yaml`. An edit
 that changes `scope`, `query`, `presentation`, or `representation_types` requires a version
 bump (enforced, not left to author discipline) — that's what makes the stale-pin warning
 (W180) meaningful. Deleting a definition is blocked while any diagram/matrix still applies
 it; detach those applications first.
 
 Every MCP `artifact_query_viewpoint` `list` entry and every `create`/`edit` response through
-`artifact_viewpoint` carries a **plain-language `query_summary`** — the same renderer the
-GUI's live preview uses — so an agent (or a person reading raw YAML) sees what a viewpoint
-*means*, not just its structure.
+`artifact_viewpoint` carries a **plain-language `query_summary`** — the same renderer behind the summary the GUI
+editor shows beside the query builder (and its **Test run** results) — so an agent (or a
+person reading raw YAML) sees what a viewpoint *means*, not just its structure.
 
 ---
 
