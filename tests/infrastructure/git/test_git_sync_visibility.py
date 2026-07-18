@@ -53,7 +53,7 @@ def _blocked_reasons(bus: _Bus) -> list[str]:
     return [e["reason"] for e in bus.events if e["type"] == "sync_blocked"]
 
 
-def test_missing_upstream_emits_blocked_once(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_missing_upstream_emits_blocked_once(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     bus = _patch_bus(monkeypatch)
 
     def responder(args: tuple[str, ...]) -> tuple[int, str, str]:
@@ -63,16 +63,16 @@ def test_missing_upstream_emits_blocked_once(monkeypatch: pytest.MonkeyPatch) ->
 
     mgr = _manager(monkeypatch, responder)
 
-    asyncio.run(ent_on_main(mgr, Path("/repo-no-upstream")))
+    asyncio.run(ent_on_main(mgr, tmp_path / "repo-no-upstream"))
     assert bus.types() == ["sync_blocked"]
     assert "upstream" in bus.events[0]["reason"]
 
     # A second poll with the same condition must not re-spam the GUI.
-    asyncio.run(ent_on_main(mgr, Path("/repo-no-upstream")))
+    asyncio.run(ent_on_main(mgr, tmp_path / "repo-no-upstream"))
     assert len(bus.events) == 1
 
 
-def test_diverged_mirror_emits_blocked(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_diverged_mirror_emits_blocked(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     bus = _patch_bus(monkeypatch)
 
     def responder(args: tuple[str, ...]) -> tuple[int, str, str]:
@@ -84,11 +84,11 @@ def test_diverged_mirror_emits_blocked(monkeypatch: pytest.MonkeyPatch) -> None:
 
     mgr = _manager(monkeypatch, responder)
 
-    asyncio.run(ent_on_main(mgr, Path("/repo-diverged")))
+    asyncio.run(ent_on_main(mgr, tmp_path / "repo-diverged"))
     assert any("ahead" in r for r in _blocked_reasons(bus))
 
 
-def test_dirty_tree_emits_blocked(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_dirty_tree_emits_blocked(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     bus = _patch_bus(monkeypatch)
 
     def responder(args: tuple[str, ...]) -> tuple[int, str, str]:
@@ -102,11 +102,11 @@ def test_dirty_tree_emits_blocked(monkeypatch: pytest.MonkeyPatch) -> None:
 
     mgr = _manager(monkeypatch, responder)
 
-    asyncio.run(ent_on_main(mgr, Path("/repo-dirty")))
+    asyncio.run(ent_on_main(mgr, tmp_path / "repo-dirty"))
     assert any("uncommitted" in r for r in _blocked_reasons(bus))
 
 
-def test_invalid_count_emits_blocked(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_invalid_count_emits_blocked(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     bus = _patch_bus(monkeypatch)
 
     def responder(args: tuple[str, ...]) -> tuple[int, str, str]:
@@ -118,11 +118,11 @@ def test_invalid_count_emits_blocked(monkeypatch: pytest.MonkeyPatch) -> None:
 
     mgr = _manager(monkeypatch, responder)
 
-    asyncio.run(ent_on_main(mgr, Path("/repo-badref")))
+    asyncio.run(ent_on_main(mgr, tmp_path / "repo-badref"))
     assert any("could not compute sync state" in r for r in _blocked_reasons(bus))
 
 
-def test_clean_and_behind_pulls_to_completion(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_clean_and_behind_pulls_to_completion(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     bus = _patch_bus(monkeypatch)
 
     from src.infrastructure.git import git_sync_m4
@@ -151,14 +151,14 @@ def test_clean_and_behind_pulls_to_completion(monkeypatch: pytest.MonkeyPatch) -
 
     mgr = _manager(monkeypatch, responder)
 
-    asyncio.run(ent_on_main(mgr, Path("/repo-clean")))
+    asyncio.run(ent_on_main(mgr, tmp_path / "repo-clean"))
     assert "sync_pull_started" in bus.types()
     assert "sync_pull_completed" in bus.types()
     completed = next(e for e in bus.events if e["type"] == "sync_pull_completed")
     assert completed["commits_pulled"] == 3
 
 
-def test_fetch_failure_is_surfaced(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_fetch_failure_is_surfaced(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     bus = _patch_bus(monkeypatch)
 
     def responder(args: tuple[str, ...]) -> tuple[int, str, str]:
@@ -170,5 +170,5 @@ def test_fetch_failure_is_surfaced(monkeypatch: pytest.MonkeyPatch) -> None:
 
     mgr = _manager(monkeypatch, responder)
 
-    asyncio.run(sync_enterprise(mgr, Path("/repo-offline")))
+    asyncio.run(sync_enterprise(mgr, tmp_path / "repo-offline"))
     assert any("fetch" in r for r in _blocked_reasons(bus))

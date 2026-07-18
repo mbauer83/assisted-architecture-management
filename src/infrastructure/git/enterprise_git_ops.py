@@ -17,8 +17,8 @@ from pathlib import Path
 
 from src.config.git_identity import GitIdentity, load_service_git_identity, optional_git_author
 from src.config.repo_paths import DIAGRAM_CATALOG, DOCS, MODEL
+from src.domain.clock import utc_now_iso
 from src.infrastructure.git import enterprise_sync_state
-from src.infrastructure.git.enterprise_sync_state import EnterpriseSyncState
 from src.infrastructure.mutation_adapters import run_git
 
 logger = logging.getLogger(__name__)
@@ -127,15 +127,13 @@ def ensure_working_branch(enterprise_root: Path) -> str:
                     state.branch,
                     branch,
                 )
-                enterprise_sync_state.save(
+                enterprise_sync_state.replace_lifecycle(
                     enterprise_root,
-                    EnterpriseSyncState(
-                        status=state.status,
-                        branch=branch,
-                        branch_tip=state.branch_tip,
-                        pushed_at=state.pushed_at,
-                        commits_behind=state.commits_behind,
-                    ),
+                    status=state.status,
+                    branch=branch,
+                    branch_tip=state.branch_tip,
+                    pushed_at=state.pushed_at,
+                    commits_behind=state.commits_behind,
                 )
             return branch
 
@@ -144,10 +142,7 @@ def ensure_working_branch(enterprise_root: Path) -> str:
     rc, _, stderr = _run(enterprise_root, "checkout", "-b", branch_name)
     if rc != 0:
         raise RuntimeError(f"Failed to create enterprise working branch '{branch_name}': {stderr}")
-    enterprise_sync_state.save(
-        enterprise_root,
-        EnterpriseSyncState(status="accumulating", branch=branch_name),
-    )
+    enterprise_sync_state.replace_lifecycle(enterprise_root, status="accumulating", branch=branch_name)
     logger.info("Created enterprise working branch: %s", branch_name)
     return branch_name
 
@@ -203,15 +198,13 @@ def push_enterprise_branch(enterprise_root: Path) -> str:
     if rc != 0:
         raise RuntimeError(f"Failed to push enterprise branch '{branch}': {stderr}")
     commit = current_commit(enterprise_root) or ""
-    enterprise_sync_state.save(
+    enterprise_sync_state.replace_lifecycle(
         enterprise_root,
-        EnterpriseSyncState(
-            status="pending",
-            branch=branch,
-            branch_tip=commit,
-            pushed_at=datetime.now(timezone.utc).isoformat(),
-            commits_behind=state.commits_behind,
-        ),
+        status="pending",
+        branch=branch,
+        branch_tip=commit,
+        pushed_at=utc_now_iso(),
+        commits_behind=state.commits_behind,
     )
     logger.info("Enterprise branch submitted for review: %s", branch)
     return branch
@@ -230,7 +223,7 @@ def abandon_enterprise_branch(enterprise_root: Path) -> str | None:
         raise RuntimeError(f"Failed to return enterprise repo to main: {stderr}")
     if branch:
         _run(enterprise_root, "branch", "-D", branch)
-    enterprise_sync_state.clear(enterprise_root)
+    enterprise_sync_state.clear_lifecycle(enterprise_root)
     logger.info("Enterprise working branch abandoned: %s", branch)
     return branch
 

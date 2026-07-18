@@ -19,6 +19,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Literal
 
 if TYPE_CHECKING:
+    from src.application.mutation_authorization import SyncHealthReason
     from src.infrastructure.git.git_auth import GitCredentials
 
 
@@ -44,11 +45,15 @@ class GitSyncManager:
         poll_interval_s: float = _DEFAULT_POLL_S,
         credentials: "GitCredentials | None" = None,
         on_repo_changed: Callable[[Path], Awaitable[None]] | None = None,
+        on_health_changed: Callable[[Path], None] | None = None,
     ) -> None:
         self._repos = repos
         self._poll_interval_s = poll_interval_s
         self._credentials = credentials
         self._on_repo_changed = on_repo_changed
+        # Injected invalidation port: persisted-health transitions must invalidate
+        # cached status measurements, and only AFTER successful persistence.
+        self._on_health_changed = on_health_changed
         self._task: asyncio.Task[None] | None = None
         self._askpass_script: Path | None = None
         self._last_dirty_state: dict[Path, bool] = {}
@@ -174,6 +179,34 @@ class GitSyncManager:
 
     def _clear_block_reason(self, repo: Path) -> None:
         self._last_block_reason[repo] = None
+
+    async def _record_sync_blocked(self, repo: Path, reason: "SyncHealthReason", message: str) -> None:
+        """Persist a typed health block, then invalidate and notify.
+
+        Ordering is load-bearing: a failed persistence raises before any event or
+        cache update, so consumers never observe health that did not durably land.
+        """
+        from src.infrastructure.git import enterprise_sync_state  # noqa: PLC0415
+
+        transition = await asyncio.to_thread(enterprise_sync_state.record_block, repo, reason, message)
+        if transition.changed and self._on_health_changed is not None:
+            self._on_health_changed(repo)
+        await self._notify_sync_blocked(repo, message)
+
+    async def _clear_sync_health(self, repo: Path) -> None:
+        """Clear persisted health after a fully successful poll; invalidate + notify
+        only when something actually changed."""
+        from src.infrastructure.git import enterprise_sync_state  # noqa: PLC0415
+
+        transition = await asyncio.to_thread(enterprise_sync_state.clear_block, repo)
+        self._clear_block_reason(repo)
+        if not transition.changed:
+            return
+        if self._on_health_changed is not None:
+            self._on_health_changed(repo)
+        from src.infrastructure.gui.routers.events import event_bus  # noqa: PLC0415
+
+        await event_bus.publish({"type": "sync_status_changed", "repo": str(repo)})
 
     async def _notify_changed(self, repo: Path) -> None:
         if self._on_repo_changed:

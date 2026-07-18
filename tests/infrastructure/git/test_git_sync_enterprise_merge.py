@@ -57,9 +57,7 @@ def _clone_pair(tmp_path: Path) -> tuple[Path, Path]:
 def _start_work_branch(ent: Path, branch: str) -> None:
     _git(ent, "checkout", "-b", branch)
     _commit_file(ent, "model/motivation/requirement/REQ@1.Work01.promoted.md", "promoted\n", "promote work")
-    enterprise_sync_state.save(
-        ent, enterprise_sync_state.EnterpriseSyncState(status="accumulating", branch=branch)
-    )
+    enterprise_sync_state.replace_lifecycle(ent, status="accumulating", branch=branch)
 
 
 def _merge_on_origin(origin: Path, ent: Path, branch: str) -> None:
@@ -163,9 +161,7 @@ def test_runtime_state_file_alone_does_not_count_as_dirty(tmp_path: Path, bus: _
 def test_fresh_branch_without_commits_never_transitions(tmp_path: Path, bus: _Bus) -> None:
     origin, ent = _clone_pair(tmp_path)
     _git(ent, "checkout", "-b", "arch/work-test")
-    enterprise_sync_state.save(
-        ent, enterprise_sync_state.EnterpriseSyncState(status="accumulating", branch="arch/work-test")
-    )
+    enterprise_sync_state.replace_lifecycle(ent, status="accumulating", branch="arch/work-test")
     # origin/main gains a commit that does not touch model/docs/diagram-catalog,
     # so the content diff is empty — but the branch carries no work to merge.
     other = tmp_path / "other"

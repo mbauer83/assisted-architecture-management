@@ -239,10 +239,13 @@ def _build_app(credentials: "GitCredentials | None" = None):  # type: ignore[no-
                     "Starting git-sync for repos: %s",
                     ", ".join(f"{r.path}({r.role})" for r in git_repos),
                 )
+                from src.infrastructure.gui.routers.sync_status_cache import invalidate_sync_status_cache
+
                 sync_mgr = GitSyncManager(
                     git_repos,
                     credentials=credentials,
                     on_repo_changed=_on_repo_changed,
+                    on_health_changed=lambda repo: invalidate_sync_status_cache(repo=repo),
                 )
                 await sync_mgr.start()
             else:

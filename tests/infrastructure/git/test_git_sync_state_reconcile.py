@@ -50,16 +50,27 @@ def ent(tmp_path: Path) -> Path:
 
 
 def _reconcile(root: Path) -> enterprise_sync_state.EnterpriseSyncState:
-    return asyncio.run(reconcile_state(GitSyncManager([]), root))
+    return asyncio.run(reconcile_state(GitSyncManager([]), root)).lifecycle
 
 
 def _accumulating(branch: str) -> enterprise_sync_state.EnterpriseSyncState:
     return enterprise_sync_state.EnterpriseSyncState(status="accumulating", branch=branch)
 
 
+def _save(root: Path, state: enterprise_sync_state.EnterpriseSyncState) -> None:
+    enterprise_sync_state.replace_lifecycle(
+        root,
+        status=state.status,
+        branch=state.branch,
+        branch_tip=state.branch_tip,
+        pushed_at=state.pushed_at,
+        commits_behind=state.commits_behind,
+    )
+
+
 def test_consistent_state_is_untouched(ent: Path) -> None:
     _git(ent, "checkout", "-b", "arch/work-x")
-    enterprise_sync_state.save(ent, _accumulating("arch/work-x"))
+    _save(ent, _accumulating("arch/work-x"))
 
     state = _reconcile(ent)
 
@@ -79,7 +90,7 @@ def test_untracked_manual_branch_is_adopted_as_accumulating(ent: Path) -> None:
 
 def test_recorded_branch_replaced_by_checked_out_branch(ent: Path) -> None:
     _git(ent, "checkout", "-b", "arch/work-new")
-    enterprise_sync_state.save(ent, _accumulating("arch/work-old"))
+    _save(ent, _accumulating("arch/work-old"))
 
     state = _reconcile(ent)
 
@@ -88,7 +99,7 @@ def test_recorded_branch_replaced_by_checked_out_branch(ent: Path) -> None:
 
 
 def test_missing_recorded_branch_resets_to_synced(ent: Path) -> None:
-    enterprise_sync_state.save(ent, _accumulating("arch/work-gone"))
+    _save(ent, _accumulating("arch/work-gone"))
 
     state = _reconcile(ent)
 
@@ -104,7 +115,7 @@ def test_externally_merged_branch_is_cleaned_up_from_main(ent: Path) -> None:
     _git(ent, "push", "origin", "arch/work-merged:main")
     _git(ent, "checkout", "main")
     _git(ent, "fetch", "origin")
-    enterprise_sync_state.save(ent, _accumulating("arch/work-merged"))
+    _save(ent, _accumulating("arch/work-merged"))
 
     state = _reconcile(ent)
 
@@ -116,7 +127,7 @@ def test_unmerged_branch_left_behind_on_main_blocks_instead_of_discarding(ent: P
     _git(ent, "checkout", "-b", "arch/work-open")
     _commit_file(ent, "model/motivation/requirement/REQ@1.Work02.open.md", "x\n", "unmerged work")
     _git(ent, "checkout", "main")
-    enterprise_sync_state.save(ent, _accumulating("arch/work-open"))
+    _save(ent, _accumulating("arch/work-open"))
 
     state = _reconcile(ent)
 
@@ -128,7 +139,7 @@ def test_unmerged_branch_left_behind_on_main_blocks_instead_of_discarding(ent: P
 def test_detached_head_is_left_alone(ent: Path) -> None:
     sha = _git(ent, "rev-parse", "HEAD")
     _git(ent, "checkout", "--detach", sha)
-    enterprise_sync_state.save(ent, _accumulating("arch/work-x"))
+    _save(ent, _accumulating("arch/work-x"))
 
     state = _reconcile(ent)
 

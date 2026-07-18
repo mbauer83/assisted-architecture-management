@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+from dataclasses import dataclass
 from pathlib import Path
 
 from src.config.repo_paths import DIAGRAM_CATALOG, DOCS, MODEL
@@ -30,24 +31,49 @@ from src.infrastructure.git.git_sync import (
 logger = logging.getLogger(__name__)
 
 
+@dataclass(frozen=True)
+class ReconcileOutcome:
+    """Result of grounding the recorded state against git reality.
+
+    Only ``completed=True`` (the poll reached a coherent, fully grounded state)
+    may clear a previously persisted health block.
+    """
+
+    lifecycle: enterprise_sync_state.EnterpriseSyncState
+    health: enterprise_sync_state.SyncHealthRecord | None
+    completed: bool
+
+
 async def sync_enterprise(sync: GitSyncManager, root: Path) -> None:
     if not await sync._is_git_repo(root):
         return
     rc, _, err = await sync._git(root, "fetch", "origin", timeout=_FETCH_TIMEOUT_S)
     if rc != 0:
-        await sync._notify_sync_blocked(root, f"git fetch from origin failed — {err.strip() or 'unknown error'}")
+        await sync._record_sync_blocked(
+            root, "fetch_failed", f"git fetch from origin failed — {err.strip() or 'unknown error'}"
+        )
         return
 
-    state = await reconcile_state(sync, root)
+    outcome = await reconcile_state(sync, root)
+    state = outcome.lifecycle
+    handled_cleanly = True
     if state.is_synced():
-        await ent_on_main(sync, root)
+        handled_cleanly = await ent_on_main(sync, root)
     elif state.is_accumulating():
         await ent_accumulating(sync, root, state)
     elif state.is_pending():
         await ent_pending(sync, root, state)
+    if handled_cleanly and outcome.completed:
+        await sync._clear_sync_health(root)
 
 
-async def reconcile_state(sync: GitSyncManager, root: Path) -> enterprise_sync_state.EnterpriseSyncState:
+def _outcome(
+    state: enterprise_sync_state.EnterpriseSyncState, *, completed: bool
+) -> ReconcileOutcome:
+    return ReconcileOutcome(lifecycle=state, health=state.health, completed=completed)
+
+
+async def reconcile_state(sync: GitSyncManager, root: Path) -> ReconcileOutcome:
     """Repair the recorded state when git reality disagrees — git wins, every poll.
 
     The state file is a cache of intent, and it drifts whenever branches are
@@ -60,30 +86,29 @@ async def reconcile_state(sync: GitSyncManager, root: Path) -> enterprise_sync_s
     rc, out, _ = await sync._git(root, "rev-parse", "--abbrev-ref", "HEAD")
     head = out.strip()
     if rc != 0 or head == "HEAD":  # unreadable or detached HEAD: nothing safe to repair
-        return state
+        return _outcome(state, completed=False)
 
     if state.is_synced():
         if head == "main":
-            return state
-        adopted = enterprise_sync_state.EnterpriseSyncState(status="accumulating", branch=head)
-        enterprise_sync_state.save(root, adopted)
+            return _outcome(state, completed=True)
+        transition = enterprise_sync_state.replace_lifecycle(root, status="accumulating", branch=head)
         logger.warning("enterprise checkout is on %s with no recorded state — adopted as accumulating", head)
-        return adopted
+        return _outcome(transition.current, completed=True)
 
     if head == state.branch:
-        return state
+        return _outcome(state, completed=True)
 
     if head != "main":  # on a different working branch than recorded: adopt it
-        adopted = enterprise_sync_state.EnterpriseSyncState(
+        transition = enterprise_sync_state.replace_lifecycle(
+            root,
             status=state.status,
             branch=head,
             branch_tip=state.branch_tip,
             pushed_at=state.pushed_at,
             commits_behind=state.commits_behind,
         )
-        enterprise_sync_state.save(root, adopted)
         logger.warning("enterprise state recorded branch %s but %s is checked out — adopted", state.branch, head)
-        return adopted
+        return _outcome(transition.current, completed=True)
 
     branch = state.branch
     branch_exists = (
@@ -91,61 +116,66 @@ async def reconcile_state(sync: GitSyncManager, root: Path) -> enterprise_sync_s
         and (await sync._git(root, "show-ref", "--verify", "--quiet", f"refs/heads/{branch}"))[0] == 0
     )
     if branch is None or not branch_exists:
-        enterprise_sync_state.clear(root)
+        transition = enterprise_sync_state.clear_lifecycle(root)
         logger.warning("enterprise state recorded missing branch %s — reset to synced", branch)
-        return enterprise_sync_state.EnterpriseSyncState()
+        return _outcome(transition.current, completed=True)
 
     rc, out, _ = await sync._git(root, "diff", "origin/main", branch, "--", MODEL, DOCS, DIAGRAM_CATALOG)
     if rc == 0 and not out.strip():  # branch content already in origin/main: finish the cleanup
         await sync._git(root, "branch", "-D", branch)
-        enterprise_sync_state.clear(root)
+        transition = enterprise_sync_state.clear_lifecycle(root)
         logger.info("enterprise working branch %s was merged externally — cleaned up", branch)
-        return enterprise_sync_state.EnterpriseSyncState()
+        return _outcome(transition.current, completed=True)
 
-    await sync._notify_sync_blocked(
+    await sync._record_sync_blocked(
         root,
+        "diverged",
         f"checkout is on main but working branch {state.branch} still holds unmerged work — "
         "switch back to the branch or resolve it manually",
     )
-    return state
+    return _outcome(enterprise_sync_state.load(root), completed=False)
 
 
-async def ent_on_main(sync: GitSyncManager, root: Path) -> None:
+async def ent_on_main(sync: GitSyncManager, root: Path) -> bool:
+    """Returns True when the poll assessed the remote relationship cleanly (a dirty
+    tree or a read-only gate merely SKIPS the pull — that is lifecycle state, never
+    a health fault, so the orchestrator may still clear a prior block)."""
     from src.infrastructure.gui.routers.events import event_bus
     from src.infrastructure.workspace.mutation_gate import get_workspace_gate
 
     upstream = await sync._upstream_ref(root)
     if upstream is None:
-        await sync._notify_sync_blocked(
+        await sync._record_sync_blocked(
             root,
+            "upstream_missing",
             "no upstream tracking for the checked-out branch — the repository was not cloned "
             "from origin (likely an unrelated local init). Re-clone it so sync can fast-forward.",
         )
-        return
+        return False
     behind = await sync._rev_count(root, f"HEAD..{upstream}")
     ahead = await sync._rev_count(root, f"{upstream}..HEAD")
     if behind is None or ahead is None:
-        await sync._notify_sync_blocked(root, f"could not compute sync state against {upstream}")
-        return
+        await sync._record_sync_blocked(root, "sync_state_unknown", f"could not compute sync state against {upstream}")
+        return False
     if ahead > 0:
-        await sync._notify_sync_blocked(
+        await sync._record_sync_blocked(
             root,
+            "diverged",
             f"local branch is {ahead} commit(s) ahead of {upstream} — the enterprise mirror has "
             "diverged (unpublished commits). Investigate before sync can resume.",
         )
-        return
+        return False
     if behind == 0:
-        sync._clear_block_reason(root)
-        return
+        return True
     if not await sync._is_clean(root):
+        # Dirty tree is lifecycle/working-tree state — notify, never record health.
         await sync._notify_sync_blocked(root, "local working tree has uncommitted changes — pull skipped")
-        return
+        return True
 
-    sync._clear_block_reason(root)
     root_label = str(root)
     gate = get_workspace_gate()
     if gate.block_reason == "read_only":
-        return
+        return True
 
     rc, head_out, _ = await sync._git(root, "rev-parse", "HEAD")
     old_sha = head_out.strip()
@@ -172,10 +202,11 @@ async def ent_on_main(sync: GitSyncManager, root: Path) -> None:
             "auto_unblock_in_seconds": int(_AUTO_UNBLOCK_S),
         })
         asyncio.create_task(sync._auto_unblock(root, _AUTO_UNBLOCK_S, False))
-        return
+        return False  # transient pull failure: no typed reason, but never clear prior health
 
     await event_bus.publish({"type": "sync_pull_completed", "repo": root_label, "commits_pulled": behind})
     await sync._notify_changed(root)
+    return True
 
 
 async def ent_accumulating(
@@ -187,8 +218,7 @@ async def ent_accumulating(
 
     behind = await sync._count(root, "HEAD..origin/main")
     if behind != state.commits_behind:
-        state.commits_behind = behind
-        enterprise_sync_state.save(root, state)
+        enterprise_sync_state.record_commits_behind(root, behind)
     if behind == 0:
         return
     if await merged_without_submit(sync, root):
@@ -219,8 +249,7 @@ async def ent_pending(
 ) -> None:
     behind = await sync._count(root, "HEAD..origin/main")
     if behind != state.commits_behind:
-        state.commits_behind = behind
-        enterprise_sync_state.save(root, state)
+        enterprise_sync_state.record_commits_behind(root, behind)
 
     if not await promotion_merged(sync, root):
         return
@@ -251,7 +280,7 @@ async def ent_switch_to_main(
                 raise RuntimeError(err.strip() or "git error")
         if state.branch:
             await sync._git(root, "branch", "-D", state.branch)
-        enterprise_sync_state.clear(root)
+        enterprise_sync_state.clear_lifecycle(root)
         unblock_repo(root)
         await event_bus.publish({"type": "sync_enterprise_merged", "repo": root_label})
         await sync._notify_changed(root)

@@ -34,3 +34,18 @@ def pytest_collection_modifyitems(items: list[pytest.Item]) -> None:
         return
     remaining = [item for item in items if item not in run_last]
     items[:] = remaining + run_last
+
+
+@pytest.fixture(autouse=True)
+def _reset_installed_mutation_executor():
+    """No test may leak an installed AuthorizedMutationExecutor to its successors.
+
+    Tests that install one (over their own tmp roots and mode flags) would
+    otherwise poison later tests on the same worker with foreign-root snapshots —
+    every later REST/MCP write then 403s as target_not_engagement_root. Resetting
+    after every test restores the dynamic workspace-default composition.
+    """
+    yield
+    from src.infrastructure.write.mutation_executor_registry import _reset_executor_for_test
+
+    _reset_executor_for_test()

@@ -341,7 +341,7 @@ memory. Tick items only after the listed verification passes, recording evidence
 
 ## S6 — Sync aggregate, authority read model & status cluster
 
-- [ ] **S6a — Pure versioned lifecycle+health aggregate.**
+- [x] **S6a — Pure versioned lifecycle+health aggregate.**
       Files: `src/infrastructure/git/enterprise_sync_state.py` (version field; closed
       lifecycle + health unions: `healthy | blocked` with closed reason code, message,
       observed timestamp via `src/domain/clock.py`; unversioned files load as healthy
@@ -359,6 +359,30 @@ memory. Tick items only after the listed verification passes, recording evidence
       Tests: old-file load, restart survival, every transition preserves health,
       completed-gated clearing (failed reconcile does NOT clear), failed-persistence
       ordering, corrupt file, concurrent lifecycle/health updates. Backend restart.
+      > Evidence (2026-07-18): aggregate v2 (version field, frozen dataclasses,
+      > closed lifecycle union + SyncHealthRecord serializing the
+      > application-owned reason type, atomic tmp+os.replace persist-on-change,
+      > default aggregate = no file, re-recording identical block = no-op, corrupt/
+      > unknown-reason/unknown-status → state_file_corrupt health; NO GUI/event
+      > imports). Helpers: replace_lifecycle/clear_lifecycle/record_commits_behind/
+      > record_block/clear_block returning SyncTransition; `save`/`clear` REMOVED
+      > (all call sites in git_sync_enterprise.py + enterprise_git_ops.py
+      > converted). ReconcileOutcome(lifecycle, health, completed) from
+      > reconcile_state; sync_enterprise clears health only on completed +
+      > cleanly-handled polls; git_sync faults typed (fetch_failed,
+      > upstream_missing, diverged, sync_state_unknown; dirty tree = notify-only,
+      > never health). GitSyncManager gains injected on_health_changed port
+      > (wired to invalidate_sync_status_cache at the backend composition root);
+      > _record_sync_blocked persists BEFORE invalidate/notify (failed persistence
+      > → no event, no cache update — tested). New tests:
+      > test_enterprise_sync_aggregate.py (16), test_sync_health_clearing.py (5,
+      > real git + bare origin); reconcile/visibility/merge suites updated to the
+      > typed API. Also: suite-wide autouse executor reset in tests/conftest.py
+      > (fixes cross-test executor leakage that intermittently 403'd unrelated
+      > viewpoint tests in full runs). Gates: pytest 5446 passed/5 skipped, ruff 0,
+      > zuban 0. Counted lines: enterprise_sync_state 187, git_sync_enterprise 243,
+      > git_sync 237, enterprise_git_ops 235. Backend restart NEEDED (pending
+      > owner).
 - [ ] **S6b — Per-action authority read model and truthful workflow ops.**
       Restructure the status service (`sync_status_cache.py`): the cache holds ONLY
       expensive git/lifecycle measurements; every status request composes the fresh
