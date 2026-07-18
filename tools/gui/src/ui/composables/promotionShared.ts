@@ -64,6 +64,7 @@ export const loadPromotionEntity = async (svc: ModelService, artifactId: string)
       display_alias: '',
       element_type: entity.artifact_type,
       element_label: entity.name,
+      diagram_internal: false,
     }),
     onFailure: () => null,
   })
@@ -93,4 +94,12 @@ export const loadPromotionDiagram = async (svc: ModelService, artifactId: string
     }),
     onFailure: () => ({ artifact_id: artifactId, name: fallbackName, record_type: 'diagram' as const, status: '' }),
   })
+}
+
+/** The set with *id* toggled — promotion state keeps several expand/include id-sets. */
+export const toggledSet = (current: Set<string>, id: string): Set<string> => {
+  const next = new Set(current)
+  if (next.has(id)) next.delete(id)
+  else next.add(id)
+  return next
 }

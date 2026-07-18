@@ -3,6 +3,7 @@ from collections.abc import Callable
 from functools import lru_cache
 from pathlib import Path
 
+from src.application.global_reference_endpoints import GLOBAL_REFERENCE_SOURCE_ERROR, effective_endpoint
 from src.application.modeling.artifact_write import format_outgoing_markdown
 from src.application.verification.artifact_verifier import ArtifactRegistry, ArtifactVerifier
 from src.domain.artifact_id import stable_id
@@ -109,15 +110,25 @@ def _validate_inputs(
         raise ValueError(f"Target entity '{target_entity}' not found in model")
     _check_junction_homogeneity(registry, connection_type, source_entity, target_entity)
 
-    src_type = _entity_artifact_type(registry, source_entity)
-    tgt_type = _entity_artifact_type(registry, target_entity)
+    source_endpoint = effective_endpoint(registry, source_entity)
+    target_endpoint = effective_endpoint(registry, target_entity)
+    catalogs = build_runtime_catalogs(reg)
+    if source_endpoint.is_global_reference and not catalogs.connections.is_symmetric(connection_type):
+        raise ValueError(GLOBAL_REFERENCE_SOURCE_ERROR)
+    src_type = source_endpoint.entity_type
+    tgt_type = target_endpoint.entity_type
     if src_type and tgt_type:
-        allowed = build_runtime_catalogs(reg).connections.permissible_connection_types(src_type, tgt_type)
+        # A GAR endpoint is judged as the type it references; the source-side invariant
+        # above already excludes directed relationships FROM a global reference.
+        allowed = catalogs.connections.permissible_connection_types(src_type, tgt_type)
         if connection_type not in allowed:
             alt_str = ", ".join(allowed) if allowed else "none"
+            gar_note = " (resolved through the global reference)" if (
+                source_endpoint.is_global_reference or target_endpoint.is_global_reference
+            ) else ""
             raise ValueError(
                 f"Relationship '{connection_type}' is not permitted from "
-                f"'{src_type}' to '{tgt_type}'. "
+                f"'{src_type}' to '{tgt_type}'{gar_note}. "
                 f"Permitted alternatives: {alt_str}."
             )
 
@@ -252,6 +263,22 @@ def _rollback(path: Path, prev: str | None) -> None:
         path.write_text(prev, encoding="utf-8")
 
 
+def _canonical_entity_id(
+    registry: ArtifactRegistry, entity_id: str, extra_known_ids: frozenset[str] = frozenset()
+) -> str:
+    """The full (PREFIX@epoch.random.slug) form of a possibly short-form id.
+
+    Persisted outgoing files must always carry the full form: the read model joins a
+    connection's endpoints to entity records by full id, so a short form written
+    verbatim (e.g. as a fresh file's ``source-entity``) produces a connection that
+    never joins — indexed but invisible to traversal and viewpoints."""
+    short = stable_id(entity_id)
+    for known in registry.entity_ids() | extra_known_ids:
+        if stable_id(known) == short:
+            return known
+    return entity_id
+
+
 def add_connection(
     *,
     repo_root: Path,
@@ -274,6 +301,8 @@ def add_connection(
     """Add a connection to the source entity's .outgoing.md file."""
     assert_engagement_write_root(repo_root)
     _validate_inputs(registry, connection_type, source_entity, target_entity, extra_known_ids)
+    source_entity = _canonical_entity_id(registry, source_entity, extra_known_ids)
+    target_entity = _canonical_entity_id(registry, target_entity, extra_known_ids)
 
     if src_multiplicity or tgt_multiplicity:
         for eid, label in ((source_entity, "source"), (target_entity, "target")):

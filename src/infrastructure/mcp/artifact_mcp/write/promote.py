@@ -110,6 +110,18 @@ def artifact_promote_to_enterprise(
         ],
         "warnings": plan.warnings,
         "schema_errors": plan.schema_errors,
+        "structural_closure": [
+            {
+                "entity_id": r.entity_id,
+                "entity_name": r.entity_name,
+                "kind": r.kind,
+                "missing": [
+                    {"artifact_id": m.artifact_id, "name": m.name, "artifact_type": m.artifact_type}
+                    for m in r.missing
+                ],
+            }
+            for r in plan.structural_closure
+        ],
     }
 
     if not dry_run:

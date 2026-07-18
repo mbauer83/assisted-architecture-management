@@ -83,6 +83,18 @@ def copy_entity(
         result.copied_files.append(str(out_rel))
 
 
+def _remap_grouped_rel(rel: Path, group_remap: dict[str, str]) -> Path:
+    """Rewrite the group directory segment of a docs/ or diagram-catalog/ path —
+    a promoted document/diagram must land in its REMAPPED enterprise group directory,
+    exactly as `_remap_entity_rel` already does for `projects/<slug>/` entity paths."""
+    parts = rel.parts
+    if len(parts) >= 3 and parts[0] == "docs" and parts[2] in group_remap:
+        return Path(parts[0]) / parts[1] / group_remap[parts[2]] / Path(*parts[3:])
+    if len(parts) >= 3 and parts[0] == "diagram-catalog" and parts[1] == "diagrams" and parts[2] in group_remap:
+        return Path(parts[0]) / parts[1] / group_remap[parts[2]] / Path(*parts[3:])
+    return rel
+
+
 def copy_simple(
     aid: str,
     eng_root: Path,
@@ -91,19 +103,34 @@ def copy_simple(
     result: Any,
     copied: list[Path],
     backups: list[Any],
+    group_remap: dict[str, str] | None = None,
 ) -> None:
-    """Copy a document or diagram file verbatim to enterprise."""
+    """Copy a document or diagram file to enterprise, honoring group remapping.
+
+    With a remap, the destination group directory is rewritten AND every relative
+    reference into a remapped `projects/<slug>/` directory is rewritten in the copied
+    content — otherwise a promoted document's required entity links break the moment
+    its linked entities land in a differently named enterprise group."""
     src = registry.find_file_by_id(aid)
     if src is None:
         result.verification_errors.append(f"File not found for {aid}")
         return
+    remap = group_remap or {}
     rel = src.relative_to(eng_root)
-    dest = ent_root / rel
+    dest_rel = _remap_grouped_rel(rel, remap)
+    dest = ent_root / dest_rel
     dest.parent.mkdir(parents=True, exist_ok=True)
     backups.append((dest, dest.read_bytes() if dest.exists() else None))
-    shutil.copy2(src, dest)
+    text = src.read_text(encoding="utf-8")
+    rewritten = text
+    for old_slug, new_slug in remap.items():
+        rewritten = rewritten.replace(f"projects/{old_slug}/", f"projects/{new_slug}/")
+    if rewritten != text or dest_rel != rel:
+        dest.write_text(rewritten, encoding="utf-8")
+    else:
+        shutil.copy2(src, dest)
     copied.append(dest)
-    result.copied_files.append(str(rel))
+    result.copied_files.append(str(dest_rel))
 
 
 def update_outgoing_references(old_id: str, new_id: str, eng_root: Path, result: Any) -> None:
@@ -157,6 +184,9 @@ def rewrite_outgoing(
                 source_entity_id = m.group(1).strip()
         m = _CONN_HEADER.match(stripped)
         if m:
+            # Every heading re-decides for its own section — including one that directly
+            # follows a dropped section, which must still be resolved or dropped itself.
+            drop_section = False
             conn_type, target_id = m.group(1).strip(), m.group(2).strip()
             conn_aid = f"{source_entity_id}---{target_id}@@{conn_type}" if source_entity_id else None
             if conn_ids is not None and conn_aid is not None and conn_aid not in conn_ids:
@@ -169,15 +199,13 @@ def rewrite_outgoing(
                 )
                 drop_section = True
                 continue
-            drop_section = False
             if resolved != target_id:
                 line = line.replace(target_id, resolved, 1)
         elif drop_section:
-            if not stripped or stripped.startswith("### "):
-                drop_section = False
-                if stripped.startswith("### "):
-                    out.append(line)
-                    continue
+            # A dropped section is dropped WHOLE — description paragraphs and blank
+            # lines included — until the next heading re-decides. Ending the drop at the
+            # first blank line leaked dropped connections' descriptions into the
+            # promoted file as floating prose.
             continue
         out.append(line)
     return "".join(out)

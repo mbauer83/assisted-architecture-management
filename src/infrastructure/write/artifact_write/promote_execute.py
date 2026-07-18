@@ -79,7 +79,7 @@ def _copy_simple_artifacts(ctx: _ExecCtx) -> None:
     def _copy(did: str) -> None:
         copy_simple(
             did, ctx.engagement_root, ctx.enterprise_root, ctx.registry,
-            ctx.result, ctx.ent_copied, ctx.ent_backups,
+            ctx.result, ctx.ent_copied, ctx.ent_backups, ctx.slug_remap,
         )
 
     def _resolve(dc: Any, kind: str) -> None:

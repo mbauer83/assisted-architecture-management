@@ -1,11 +1,11 @@
 import { computed, ref, watch, type Ref } from 'vue'
 import { Effect, Exit } from 'effect'
-import type { EntityContextConnection, EntityDisplayInfo, PromotionGroupMappingEntry, PromotionPlan, PromotionResult } from '../../domain'
+import type { EntityContextConnection, EntityDisplayInfo, PromotionGroupMappingEntry, PromotionPlan, PromotionResult, StructuralClosureRequirement } from '../../domain'
 import type { RepoError } from '../../ports/ModelRepository'
 import type { ModelService } from '../../application/ModelService'
 import { useMutation } from './useMutation'
 import { useQuery } from './useQuery'
-import { formatArtifactFallbackName, loadPromotionDiagram, loadPromotionDocument, loadPromotionEntity, searchPromotionArtifacts, type ConflictStrategy, type PromotionArtifact, type PromotionArtifactKind, type Step } from './promotionShared'
+import { formatArtifactFallbackName, loadPromotionDiagram, loadPromotionDocument, loadPromotionEntity, searchPromotionArtifacts, toggledSet, type ConflictStrategy, type PromotionArtifact, type PromotionArtifactKind, type Step } from './promotionShared'
 import { usePromotionSearch } from './usePromotionSearch'
 
 export const usePromotionWorkflow = (
@@ -33,8 +33,6 @@ export const usePromotionWorkflow = (
   const groupMappingResolutions = ref<Record<string, string>>({})
 
   const includedEntityIds = computed(() => new Set(includedEntities.value.map((entity) => entity.artifact_id)))
-  const includedDocumentIds = computed(() => includedDocuments.value.map((document) => document.artifact_id))
-  const includedDiagramIds = computed(() => includedDiagrams.value.map((diagram) => diagram.artifact_id))
   const selectedArtifactIds = computed(() => new Set([
     ...includedEntities.value.map((entity) => entity.artifact_id), ...includedDocuments.value.map((document) => document.artifact_id), ...includedDiagrams.value.map((diagram) => diagram.artifact_id),
   ]))
@@ -101,7 +99,7 @@ export const usePromotionWorkflow = (
           status: isSource ? conn.target_scope : conn.source_scope,
           display_alias: '',
           element_type: isSource ? conn.target_artifact_type : conn.source_artifact_type,
-          element_label: isSource ? (conn.target_name ?? otherId) : (conn.source_name ?? otherId),
+          element_label: isSource ? (conn.target_name ?? otherId) : (conn.source_name ?? otherId), diagram_internal: false,
         })
       }
     }
@@ -126,10 +124,12 @@ export const usePromotionWorkflow = (
     )
   })
   const totalSelectedArtifacts = computed(() => includedEntities.value.length + includedDocuments.value.length + includedDiagrams.value.length)
+  const structuralClosure = computed(() => planQuery.data.value?.structural_closure ?? [])
   const canExecute = computed(
     () => totalSelectedArtifacts.value > 0
       && unresolvedConflicts.value.length === 0
-      && unresolvedGroupConflicts.value.length === 0,
+      && unresolvedGroupConflicts.value.length === 0
+      && structuralClosure.value.length === 0,
   )
   const promotionTargetCount = computed(() => {
     const plan = planQuery.data.value
@@ -190,12 +190,13 @@ export const usePromotionWorkflow = (
     includedConnIds.value = nextConnIds
   }
   const includeDocument = async (artifactId: string, fallbackName: string, markNew: boolean) => {
-    if (includedDocumentIds.value.includes(artifactId)) return
+    if (includedDocuments.value.some((document) => document.artifact_id === artifactId)) return
     includedDocuments.value.push(await loadPromotionDocument(svc, artifactId, fallbackName))
     if (markNew) newInclusionIds.value = new Set(newInclusionIds.value).add(artifactId)
   }
+
   const includeDiagram = async (artifactId: string, fallbackName: string, markNew: boolean) => {
-    if (includedDiagramIds.value.includes(artifactId)) return
+    if (includedDiagrams.value.some((diagram) => diagram.artifact_id === artifactId)) return
     includedDiagrams.value.push(await loadPromotionDiagram(svc, artifactId, fallbackName))
     if (markNew) newInclusionIds.value = new Set(newInclusionIds.value).add(artifactId)
   }
@@ -205,6 +206,13 @@ export const usePromotionWorkflow = (
     if (artifact.record_type === 'document') await includeDocument(artifact.artifact_id, artifact.name, markNew)
     if (artifact.record_type === 'diagram') await includeDiagram(artifact.artifact_id, artifact.name, markNew)
     addSearch.clear()
+    refreshPlan()
+  }
+
+  /** One-action closure fix: include a blocked junction/grouping's missing
+   * meaning-carrying entities, then re-plan — the block clears once complete. */
+  const includeClosureEntities = async (requirement: StructuralClosureRequirement) => {
+    for (const entity of requirement.missing) await includeEntity(entity.artifact_id, true)
     refreshPlan()
   }
 
@@ -324,28 +332,21 @@ export const usePromotionWorkflow = (
     closeRootDropdown: rootSearch.closeDropdown,
     closeAddDropdown: addSearch.closeDropdown,
     toggleConnections: (entityId: string) => {
-      const next = new Set(expandedConnectionEntityIds.value)
-      if (next.has(entityId)) next.delete(entityId)
-      else next.add(entityId)
-      expandedConnectionEntityIds.value = next
+      expandedConnectionEntityIds.value = toggledSet(expandedConnectionEntityIds.value, entityId)
     },
     toggleRelated: (entityId: string) => {
-      const next = new Set(expandedRelatedEntityIds.value)
-      if (next.has(entityId)) next.delete(entityId)
-      else next.add(entityId)
-      expandedRelatedEntityIds.value = next
+      expandedRelatedEntityIds.value = toggledSet(expandedRelatedEntityIds.value, entityId)
     },
     toggleConnection: (artifactId: string) => {
-      const next = new Set(includedConnIds.value)
-      if (next.has(artifactId)) next.delete(artifactId)
-      else next.add(artifactId)
-      includedConnIds.value = next
+      includedConnIds.value = toggledSet(includedConnIds.value, artifactId)
       refreshPlan()
     },
     groupMappingResolutions,
     unresolvedGroupConflicts,
     setGroupMapping,
     setConflictStrategy,
+    structuralClosure,
+    includeClosureEntities,
     selectRoot,
     addArtifact,
     removeEntity,

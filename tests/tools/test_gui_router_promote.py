@@ -180,6 +180,14 @@ class TestPromotePlan:
         assert r.status_code == 200
         assert "schema_errors" in r.json()
 
+    def test_plan_response_has_structural_closure(self, both_roots_client) -> None:
+        r = both_roots_client.post(
+            "/api/promote/plan",
+            json={"entity_ids": [ENT_ID]},
+        )
+        assert r.status_code == 200
+        assert r.json()["structural_closure"] == []
+
 
 # ── promote/execute errors ────────────────────────────────────────────────────
 

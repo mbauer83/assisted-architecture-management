@@ -362,6 +362,13 @@ entity_types:
   # NOT an ArchiMate element.  Created automatically as a per-engagement proxy
   # for a global (enterprise) entity.  May not be created or edited directly;
   # only produced by the connection-to-global-entity mechanism.
+  #
+  # Connection surface: a GAR carries EXACTLY the permitted connections of the
+  # entity type (and specialization) it references — resolved per instance at
+  # validation time (src/application/global_reference_endpoints.py), since a
+  # type-level pair rule cannot express it. One tier invariant on top: the
+  # global object (and thus its reference) is never the SOURCE of a directed
+  # relationship — only incoming and symmetric relationships may attach.
   global-artifact-reference:
     prefix: GAR
     hierarchy: [common]

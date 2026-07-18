@@ -38,6 +38,24 @@ export const PromotionGroupMappingEntrySchema = Schema.Struct({
 })
 export type PromotionGroupMappingEntry = typeof PromotionGroupMappingEntrySchema.Type
 
+export const StructuralClosureEntitySchema = Schema.Struct({
+  artifact_id: Schema.String,
+  name: Schema.String,
+  artifact_type: Schema.String,
+})
+export type StructuralClosureEntity = typeof StructuralClosureEntitySchema.Type
+
+/** One selected junction/grouping whose meaning-carrying entities are missing from the
+ * promotion selection — the GUI offers a one-action "include the missing entities" flow
+ * from exactly this data. */
+export const StructuralClosureRequirementSchema = Schema.Struct({
+  entity_id: Schema.String,
+  entity_name: Schema.String,
+  kind: Schema.Literal('junction', 'grouping'),
+  missing: Schema.Array(StructuralClosureEntitySchema),
+})
+export type StructuralClosureRequirement = typeof StructuralClosureRequirementSchema.Type
+
 export const PromotionPlanSchema = Schema.Struct({
   entity_id: Schema.String,
   entities_to_add: Schema.Array(Schema.String),
@@ -50,6 +68,7 @@ export const PromotionPlanSchema = Schema.Struct({
   doc_conflicts: Schema.Array(PromotionDocumentConflictSchema),
   diagram_conflicts: Schema.Array(PromotionDiagramConflictSchema),
   schema_errors: Schema.Array(Schema.String),
+  structural_closure: Schema.optionalWith(Schema.Array(StructuralClosureRequirementSchema), { default: () => [] }),
   group_mapping: Schema.optional(Schema.Array(PromotionGroupMappingEntrySchema)),
   available_enterprise_groups: Schema.optional(Schema.Array(Schema.Struct({
     slug: Schema.String,

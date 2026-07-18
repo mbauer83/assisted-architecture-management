@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import type { PromotionGroupMappingEntry, PromotionPlan } from '../../domain'
+import { computed } from 'vue'
+import type { PromotionGroupMappingEntry, PromotionPlan, StructuralClosureRequirement } from '../../domain'
 import type { ConflictStrategy } from '../composables/promotionShared'
 
 const props = defineProps<{
@@ -15,7 +16,13 @@ const props = defineProps<{
 const emit = defineEmits<{
   setStrategy: [artifactId: string, strategy: ConflictStrategy]
   setGroupMapping: [engagementSlug: string, enterpriseSlug: string]
+  includeClosure: [requirement: StructuralClosureRequirement]
 }>()
+
+/** The structured closure panel below renders these facts actionably, so the raw prose
+ * duplicates are filtered out of the plain error box. */
+const visibleSchemaErrors = computed(() =>
+  (props.plan?.schema_errors ?? []).filter((error) => !error.startsWith('Broken structural closure:')))
 
 const strategyOptions = [
   { value: 'accept_enterprise', label: 'Keep global version' },
@@ -67,15 +74,56 @@ const matchStatusLabel = (entry: PromotionGroupMappingEntry): string => {
       </div>
 
       <div
-        v-if="props.plan.schema_errors.length"
+        v-if="visibleSchemaErrors.length"
         class="errors-box"
       >
         <div
-          v-for="error in props.plan.schema_errors"
+          v-for="error in visibleSchemaErrors"
           :key="error"
           class="error-item"
         >
           {{ error }}
+        </div>
+      </div>
+
+      <div
+        v-if="props.plan.structural_closure.length"
+        class="closure-box"
+      >
+        <div
+          v-for="requirement in props.plan.structural_closure"
+          :key="requirement.entity_id"
+          class="closure-item"
+        >
+          <p class="closure-head">
+            <template v-if="requirement.kind === 'junction'">
+              Junction <b>{{ requirement.entity_name }}</b> has no meaning without its complete
+              connection set — {{ requirement.missing.length }} connected
+              {{ requirement.missing.length === 1 ? 'entity is' : 'entities are' }} missing from the selection:
+            </template>
+            <template v-else>
+              Grouping <b>{{ requirement.entity_name }}</b> would be promoted without its contents,
+              erasing the membership edges — {{ requirement.missing.length }}
+              member{{ requirement.missing.length === 1 ? ' is' : 's are' }} missing from the selection:
+            </template>
+          </p>
+          <ul class="closure-missing">
+            <li
+              v-for="entity in requirement.missing"
+              :key="entity.artifact_id"
+            >
+              <span class="closure-name">{{ entity.name }}</span>
+              <span class="closure-type mono">{{ entity.artifact_type }}</span>
+            </li>
+          </ul>
+          <button
+            class="btn btn--closure"
+            type="button"
+            :disabled="loading"
+            @click="emit('includeClosure', requirement)"
+          >
+            + Include {{ requirement.missing.length === 1 ? 'it' : `all ${requirement.missing.length}` }} in the promotion
+          </button>
         </div>
       </div>
 
@@ -258,6 +306,17 @@ const matchStatusLabel = (entry: PromotionGroupMappingEntry): string => {
 .section-title { font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; color: #374151; margin-bottom: 8px; }
 .section-title--warn { color: #b45309; }
 .warnings-box { background: #fffbeb; border: 1px solid #fde68a; border-radius: 6px; padding: 10px 14px; margin-bottom: 14px; }
+.closure-box { background: #fff7ed; border: 1px solid #fed7aa; border-radius: 6px; padding: 10px 14px; margin-bottom: 14px; }
+.closure-item { padding: 4px 0; }
+.closure-item + .closure-item { border-top: 1px dashed #fed7aa; margin-top: 8px; padding-top: 10px; }
+.closure-head { font-size: 12.5px; color: #9a3412; margin: 0 0 6px; }
+.closure-missing { list-style: none; margin: 0 0 8px; padding: 0; display: flex; flex-direction: column; gap: 2px; }
+.closure-missing li { display: flex; align-items: center; gap: 8px; font-size: 12.5px; color: #431407; }
+.closure-name { font-weight: 600; }
+.closure-type { font-size: 11px; color: #9a3412; }
+.btn--closure { background: #ea580c; color: #fff; border: none; border-radius: 6px; padding: 5px 12px; font-size: 12.5px; font-weight: 600; cursor: pointer; }
+.btn--closure:hover:not(:disabled) { background: #c2410c; }
+.btn--closure:disabled { opacity: .5; cursor: wait; }
 .errors-box { background: #fff7f7; border: 1px solid #fecaca; border-radius: 6px; padding: 10px 14px; margin-bottom: 14px; }
 .warn-item { font-size: 13px; color: #92400e; }
 .error-item { font-size: 13px; color: #b91c1c; }

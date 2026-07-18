@@ -16,6 +16,12 @@ triple for the role that entity plays.
 
 from __future__ import annotations
 
+from src.application.global_reference_endpoints import (
+    GLOBAL_ARTIFACT_REFERENCE_TYPE,
+    GLOBAL_REFERENCE_SOURCE_ERROR,
+    EffectiveEndpoint,
+    effective_endpoint,
+)
 from src.application.verification.artifact_verifier_parsing import parse_frontmatter_from_path
 from src.application.verification.artifact_verifier_registry import ArtifactRegistry
 from src.application.verification.artifact_verifier_types import Issue, Severity, VerificationResult
@@ -32,6 +38,22 @@ def _entity_type(registry: ArtifactRegistry, entity_id: str) -> str | None:
     if not isinstance(fm, dict):
         return None
     return str(fm.get("artifact-type", "")) or None
+
+
+def _endpoint(registry: ArtifactRegistry, entity_id: str, *, read_specialization: bool) -> EffectiveEndpoint:
+    """Endpoint identity with GAR proxies resolved. Non-GAR entities resolve through the
+    module-level readers (kept as the fast path — and the seam tests patch), and the
+    specialization read stays conditional so the no-catalog contract ("zero
+    entity-resolution I/O") holds; only an actual global-artifact-reference pays for
+    full reference resolution."""
+    own_type = _entity_type(registry, entity_id)
+    if own_type != GLOBAL_ARTIFACT_REFERENCE_TYPE:
+        return EffectiveEndpoint(
+            entity_type=own_type,
+            specialization=_entity_specialization(registry, entity_id) if read_specialization else "",
+            is_global_reference=False,
+        )
+    return effective_endpoint(registry, entity_id)
 
 
 def _entity_specialization(registry: ArtifactRegistry, entity_id: str) -> str:
@@ -188,15 +210,25 @@ def check_connection_semantics(
     if connections_catalog is None and ontology_catalog is None and specialization_catalog is None:
         return
 
-    source_type = _entity_type(registry, source_id)
+    source_endpoint = _endpoint(registry, source_id, read_specialization=specialization_catalog is not None)
+    source_type = source_endpoint.entity_type
     if source_type is None:
         return
-    source_specialization = _entity_specialization(registry, source_id) if specialization_catalog else ""
+    source_specialization = source_endpoint.specialization
 
     for decl in connections:
         conn_type, target_id = decl.conn_type, decl.target_id
         src_mult, tgt_mult = decl.src_multiplicity, decl.tgt_multiplicity
-        target_type = _entity_type(registry, target_id)
+        target_endpoint = _endpoint(registry, target_id, read_specialization=specialization_catalog is not None)
+        target_type = target_endpoint.entity_type
+
+        if (
+            source_endpoint.is_global_reference
+            and connections_catalog is not None
+            and not connections_catalog.is_symmetric(conn_type)
+        ):
+            result.issues.append(Issue(Severity.ERROR, "E127", GLOBAL_REFERENCE_SOURCE_ERROR, loc))
+            continue
 
         if ontology_catalog is not None:
             _check_junction_multiplicity(
@@ -244,7 +276,7 @@ def check_connection_semantics(
                     result=result,
                     loc=loc,
                 )
-            target_specialization = _entity_specialization(registry, target_id)
+            target_specialization = target_endpoint.specialization
             if target_specialization:
                 _check_entity_relationship_restriction(
                     specialization_catalog,

@@ -43,6 +43,11 @@ from src.infrastructure.write.artifact_write._promote_viewpoints import (
     viewpoint_dependency_errors,
 )
 from src.infrastructure.write.artifact_write.promote_schema_check import check_promotion_schema_compatibility
+from src.infrastructure.write.artifact_write.promote_structural_closure import (
+    StructuralClosureRequirement,
+    compute_structural_closure,
+    structural_closure_errors,
+)
 from src.infrastructure.write.artifact_write.promote_type_closure import compute_type_closure
 
 __all__ = [
@@ -118,6 +123,7 @@ class PromotionPlan:
     doc_conflicts: list[DocPromotionConflict] = field(default_factory=list)
     diagram_conflicts: list[DiagramPromotionConflict] = field(default_factory=list)
     schema_errors: list[str] = field(default_factory=list)
+    structural_closure: list[StructuralClosureRequirement] = field(default_factory=list)
     group_mapping: list[GroupMappingEntry] = field(default_factory=list)
     available_enterprise_groups: list[dict[str, str]] = field(default_factory=list)
     type_closure_additions: list[str] = field(default_factory=list)
@@ -266,6 +272,12 @@ def plan_promotion(
             f"Broken type closure: classifier {clf_id} is referenced in a promoted diagram "
             "but its host diagram cannot be found — exclude the referencing diagram or include its host"
         )
+    structural_closure = compute_structural_closure(
+        set(to_add) | {c.engagement_id for c in conflicts},
+        repo=repo,
+        enterprise_ids=set(enterprise_ids),
+    )
+    schema_errors.extend(structural_closure_errors(structural_closure))
 
     group_mapping: list[GroupMappingEntry] = []
     available_enterprise_groups: list[dict[str, str]] = []
@@ -305,6 +317,7 @@ def plan_promotion(
         doc_conflicts=doc_conflicts,
         diagram_conflicts=diagram_conflicts,
         schema_errors=schema_errors,
+        structural_closure=structural_closure,
         group_mapping=group_mapping,
         available_enterprise_groups=available_enterprise_groups,
         viewpoint_dependencies=viewpoint_dependencies,

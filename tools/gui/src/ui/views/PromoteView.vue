@@ -230,6 +230,7 @@ onUnmounted(() => {
           :unresolved-group-conflict-count="workflow.unresolvedGroupConflicts.value.length"
           @set-strategy="workflow.setConflictStrategy"
           @set-group-mapping="workflow.setGroupMapping"
+          @include-closure="workflow.includeClosureEntities"
         />
       </div>
     </template>
