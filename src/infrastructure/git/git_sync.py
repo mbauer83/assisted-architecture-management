@@ -5,10 +5,8 @@ Two repo roles are handled differently:
 engagement  — fetch + pull (ff-only when clean, rebase when local commits exist).
               Rebase conflicts abort cleanly and surface a sync_conflict event.
 
-enterprise  — state-machine-aware (see enterprise_sync_state.py):
-  synced      : fetch + ff-only pull (checkout is always clean on main)
-  accumulating: fetch only; emits sync_enterprise_diverged if origin/main moved
-  pending     : fetch + content-diff; auto-transitions to main on merge detection
+enterprise  — state-machine-aware; the handlers live in git_sync_enterprise.py
+              (see enterprise_sync_state.py for the states).
 """
 
 from __future__ import annotations
@@ -23,8 +21,6 @@ from typing import TYPE_CHECKING, Literal
 if TYPE_CHECKING:
     from src.infrastructure.git.git_auth import GitCredentials
 
-from src.config.repo_paths import DIAGRAM_CATALOG, DOCS, MODEL
-from src.infrastructure.git import enterprise_sync_state
 
 logger = logging.getLogger(__name__)
 _DEFAULT_POLL_S = 60.0
@@ -97,7 +93,9 @@ class GitSyncManager:
                     if spec.role == "engagement":
                         await self._sync_engagement(spec.path)
                     else:
-                        await self._sync_enterprise(spec.path)
+                        from src.infrastructure.git.git_sync_enterprise import sync_enterprise  # noqa: PLC0415
+
+                        await sync_enterprise(self, spec.path)
                 except Exception:
                     logger.exception("git sync error for %s (%s)", spec.path, spec.role)
             await asyncio.sleep(self._poll_interval_s)
@@ -150,7 +148,8 @@ class GitSyncManager:
             return None
 
     async def _is_clean(self, repo: Path) -> bool:
-        rc, out, _ = await self._git(repo, "status", "--porcelain")
+        """True when nothing outside ``.arch/`` changed — runtime sync state is never work."""
+        rc, out, _ = await self._git(repo, "status", "--porcelain", "--", ".", ":(exclude).arch")
         return rc == 0 and not out.strip()
 
     async def _upstream_ref(self, repo: Path) -> str | None:
@@ -175,19 +174,6 @@ class GitSyncManager:
 
     def _clear_block_reason(self, repo: Path) -> None:
         self._last_block_reason[repo] = None
-
-    async def _promotion_merged(self, enterprise_root: Path) -> bool:
-        rc, out, _ = await self._git(
-            enterprise_root,
-            "diff",
-            "origin/main",
-            "HEAD",
-            "--",
-            MODEL,
-            DOCS,
-            DIAGRAM_CATALOG,
-        )
-        return rc == 0 and not out.strip()
 
     async def _notify_changed(self, repo: Path) -> None:
         if self._on_repo_changed:
@@ -281,139 +267,3 @@ class GitSyncManager:
 
         await event_bus.publish({"type": "sync_pull_completed", "repo": str(repo), "commits_pulled": behind})
         await self._notify_changed(repo)
-
-    # ------------------------------------------------------------------
-    # Enterprise (state-machine dispatch)
-    # ------------------------------------------------------------------
-
-    async def _sync_enterprise(self, root: Path) -> None:
-        if not await self._is_git_repo(root):
-            return
-        rc, _, err = await self._git(root, "fetch", "origin", timeout=_FETCH_TIMEOUT_S)
-        if rc != 0:
-            await self._notify_sync_blocked(root, f"git fetch from origin failed — {err.strip() or 'unknown error'}")
-            return
-
-        state = enterprise_sync_state.load(root)
-        if state.is_synced():
-            await self._ent_on_main(root)
-        elif state.is_accumulating():
-            await self._ent_accumulating(root, state)
-        elif state.is_pending():
-            await self._ent_pending(root, state)
-
-    async def _ent_on_main(self, root: Path) -> None:
-        from src.infrastructure.gui.routers.events import event_bus
-        from src.infrastructure.workspace.mutation_gate import get_workspace_gate
-
-        upstream = await self._upstream_ref(root)
-        if upstream is None:
-            await self._notify_sync_blocked(
-                root,
-                "no upstream tracking for the checked-out branch — the repository was not cloned "
-                "from origin (likely an unrelated local init). Re-clone it so sync can fast-forward.",
-            )
-            return
-        behind = await self._rev_count(root, f"HEAD..{upstream}")
-        ahead = await self._rev_count(root, f"{upstream}..HEAD")
-        if behind is None or ahead is None:
-            await self._notify_sync_blocked(root, f"could not compute sync state against {upstream}")
-            return
-        if ahead > 0:
-            await self._notify_sync_blocked(
-                root,
-                f"local branch is {ahead} commit(s) ahead of {upstream} — the enterprise mirror has "
-                "diverged (unpublished commits). Investigate before sync can resume.",
-            )
-            return
-        if behind == 0:
-            self._clear_block_reason(root)
-            return
-        if not await self._is_clean(root):
-            await self._notify_sync_blocked(root, "local working tree has uncommitted changes — pull skipped")
-            return
-
-        self._clear_block_reason(root)
-        root_label = str(root)
-        gate = get_workspace_gate()
-        if gate.block_reason == "read_only":
-            return
-
-        rc, head_out, _ = await self._git(root, "rev-parse", "HEAD")
-        old_sha = head_out.strip()
-        rc, branch_out, _ = await self._git(root, "rev-parse", "--abbrev-ref", "HEAD")
-        branch = branch_out.strip()
-        rc, new_sha_out, _ = await self._git(root, "rev-parse", upstream)
-        new_sha = new_sha_out.strip()
-
-        from src.infrastructure.git.git_sync_m4 import add_detached_worktree, run_m4_pull  # noqa: PLC0415
-
-        await event_bus.publish({"type": "sync_pull_started", "repo": root_label, "behind": behind})
-        try:
-            with gate.blocking_writes("sync_in_progress"):
-                worktree_path = await add_detached_worktree(self._git, root, new_sha, timeout=_PULL_TIMEOUT_S)
-                try:
-                    run_m4_pull(root, worktree_path, branch=branch, old_sha=old_sha, new_sha=new_sha, gate=gate)
-                finally:
-                    await self._git(root, "worktree", "remove", "--force", str(worktree_path))
-                await self._git(root, "reset", "--mixed", "HEAD")
-        except Exception as exc:
-            from src.infrastructure.gui.routers.events import event_bus as _bus  # noqa: PLC0415
-            await _bus.publish({
-                "type": "sync_pull_failed", "repo": root_label, "error": str(exc),
-                "auto_unblock_in_seconds": int(_AUTO_UNBLOCK_S),
-            })
-            asyncio.create_task(self._auto_unblock(root, _AUTO_UNBLOCK_S, False))
-            return
-
-        await event_bus.publish({"type": "sync_pull_completed", "repo": root_label, "commits_pulled": behind})
-        await self._notify_changed(root)
-
-    async def _ent_accumulating(
-        self,
-        root: Path,
-        state: enterprise_sync_state.EnterpriseSyncState,
-    ) -> None:
-        from src.infrastructure.gui.routers.events import event_bus
-
-        behind = await self._count(root, "HEAD..origin/main")
-        if behind != state.commits_behind:
-            state.commits_behind = behind
-            enterprise_sync_state.save(root, state)
-        if behind > 0:
-            await event_bus.publish({"type": "sync_enterprise_diverged", "repo": str(root), "commits_behind": behind})
-
-    async def _ent_pending(
-        self,
-        root: Path,
-        state: enterprise_sync_state.EnterpriseSyncState,
-    ) -> None:
-        from src.infrastructure.gui.routers.events import event_bus
-        from src.infrastructure.workspace.write_block_manager import block_repo, unblock_repo
-
-        behind = await self._count(root, "HEAD..origin/main")
-        if behind != state.commits_behind:
-            state.commits_behind = behind
-            enterprise_sync_state.save(root, state)
-
-        if not await self._promotion_merged(root):
-            return
-
-        root_label = str(root)
-        block_repo(root)
-        await event_bus.publish({"type": "sync_enterprise_merging", "repo": root_label})
-        try:
-            for git_args in [["checkout", "main"], ["pull", "--ff-only"]]:
-                rc, _, err = await self._git(root, *git_args, timeout=_PULL_TIMEOUT_S)
-                if rc != 0:
-                    raise RuntimeError(err.strip() or "git error")
-            if state.branch:
-                await self._git(root, "branch", "-D", state.branch)
-            enterprise_sync_state.clear(root)
-            unblock_repo(root)
-            await event_bus.publish({"type": "sync_enterprise_merged", "repo": root_label})
-            await self._notify_changed(root)
-        except Exception as exc:
-            logger.exception("enterprise merge transition failed for %s", root)
-            unblock_repo(root)
-            await event_bus.publish({"type": "sync_enterprise_merge_failed", "repo": root_label, "error": str(exc)})

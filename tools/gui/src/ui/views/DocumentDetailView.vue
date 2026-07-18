@@ -2,13 +2,13 @@
 import { computed, inject, onMounted, ref, watch } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
 import { Effect } from 'effect'
-import { marked } from 'marked'
-import DOMPurify from 'dompurify'
+import { renderMarkdown } from '../../application/MarkdownService'
 import { modelServiceKey, toastKey } from '../keys'
 import MarkdownEditor from '../components/MarkdownEditor.vue'
 import ArtifactReferenceInput from '../components/ArtifactReferenceInput.vue'
 import type { DocumentDetail, DocumentType } from '../../domain'
 import { collectVerificationIssues, readErrorMessage } from '../lib/errors'
+import { routeInternalLinkClicks } from '../lib/internalLinkClicks'
 import { findSectionSpec, sectionAtOffset, sectionEntityTypeTerms } from '../lib/documentSections'
 
 const svc = inject(modelServiceKey)!
@@ -47,9 +47,8 @@ const titleError = computed(() =>
     : null,
 )
 
-const previewHtml = computed(() =>
-  DOMPurify.sanitize(marked.parse(body.value || '') as string),
-)
+const previewHtml = computed(() => renderMarkdown(body.value || ''))
+const onBodyClick = routeInternalLinkClicks(router)
 
 const load = async () => {
   loading.value = true
@@ -266,6 +265,7 @@ const insertReference = (markdownLink: string) => {
       </div>
       <div
         class="doc-body"
+        @click="onBodyClick"
         v-html="previewHtml"
       />
       <div class="artifact-meta">

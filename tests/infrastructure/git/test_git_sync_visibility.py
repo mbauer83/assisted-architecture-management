@@ -14,6 +14,7 @@ from pathlib import Path
 import pytest
 
 from src.infrastructure.git.git_sync import GitSyncManager
+from src.infrastructure.git.git_sync_enterprise import ent_on_main, sync_enterprise
 
 _BEHIND = "HEAD..origin/main"
 _AHEAD = "origin/main..HEAD"
@@ -62,12 +63,12 @@ def test_missing_upstream_emits_blocked_once(monkeypatch: pytest.MonkeyPatch) ->
 
     mgr = _manager(monkeypatch, responder)
 
-    asyncio.run(mgr._ent_on_main(Path("/repo-no-upstream")))
+    asyncio.run(ent_on_main(mgr, Path("/repo-no-upstream")))
     assert bus.types() == ["sync_blocked"]
     assert "upstream" in bus.events[0]["reason"]
 
     # A second poll with the same condition must not re-spam the GUI.
-    asyncio.run(mgr._ent_on_main(Path("/repo-no-upstream")))
+    asyncio.run(ent_on_main(mgr, Path("/repo-no-upstream")))
     assert len(bus.events) == 1
 
 
@@ -83,7 +84,7 @@ def test_diverged_mirror_emits_blocked(monkeypatch: pytest.MonkeyPatch) -> None:
 
     mgr = _manager(monkeypatch, responder)
 
-    asyncio.run(mgr._ent_on_main(Path("/repo-diverged")))
+    asyncio.run(ent_on_main(mgr, Path("/repo-diverged")))
     assert any("ahead" in r for r in _blocked_reasons(bus))
 
 
@@ -101,7 +102,7 @@ def test_dirty_tree_emits_blocked(monkeypatch: pytest.MonkeyPatch) -> None:
 
     mgr = _manager(monkeypatch, responder)
 
-    asyncio.run(mgr._ent_on_main(Path("/repo-dirty")))
+    asyncio.run(ent_on_main(mgr, Path("/repo-dirty")))
     assert any("uncommitted" in r for r in _blocked_reasons(bus))
 
 
@@ -117,7 +118,7 @@ def test_invalid_count_emits_blocked(monkeypatch: pytest.MonkeyPatch) -> None:
 
     mgr = _manager(monkeypatch, responder)
 
-    asyncio.run(mgr._ent_on_main(Path("/repo-badref")))
+    asyncio.run(ent_on_main(mgr, Path("/repo-badref")))
     assert any("could not compute sync state" in r for r in _blocked_reasons(bus))
 
 
@@ -150,7 +151,7 @@ def test_clean_and_behind_pulls_to_completion(monkeypatch: pytest.MonkeyPatch) -
 
     mgr = _manager(monkeypatch, responder)
 
-    asyncio.run(mgr._ent_on_main(Path("/repo-clean")))
+    asyncio.run(ent_on_main(mgr, Path("/repo-clean")))
     assert "sync_pull_started" in bus.types()
     assert "sync_pull_completed" in bus.types()
     completed = next(e for e in bus.events if e["type"] == "sync_pull_completed")
@@ -169,5 +170,5 @@ def test_fetch_failure_is_surfaced(monkeypatch: pytest.MonkeyPatch) -> None:
 
     mgr = _manager(monkeypatch, responder)
 
-    asyncio.run(mgr._sync_enterprise(Path("/repo-offline")))
+    asyncio.run(sync_enterprise(mgr, Path("/repo-offline")))
     assert any("fetch" in r for r in _blocked_reasons(bus))

@@ -25,6 +25,11 @@ logger = logging.getLogger(__name__)
 _GIT_TIMEOUT = 30
 _PUSH_TIMEOUT = 60
 
+# Stage everything EXCEPT `.arch/` — the runtime sync-state directory. A blind
+# `git add .` once carried .arch/enterprise-sync.json through a PR into
+# origin/main; the pathspec exclude holds even when the repo has no .gitignore.
+_STAGE_ALL_BUT_RUNTIME_STATE = ("add", "-A", "--", ".", ":(exclude).arch")
+
 
 def _run(
     repo: Path,
@@ -62,9 +67,9 @@ def current_commit(repo: Path) -> str | None:
 
 
 def has_uncommitted_changes(repo: Path, *pathspecs: str) -> bool:
-    args = ["status", "--porcelain"]
-    if pathspecs:
-        args += ["--", *pathspecs]
+    # `.arch/` holds runtime sync state, never user work — it must not count as
+    # (or ever be committed with) unsaved changes.
+    args = ["status", "--porcelain", "--", *(pathspecs or (".",)), ":(exclude).arch"]
     rc, out, _ = _run(repo, *args)
     return rc == 0 and bool(out)
 
@@ -158,7 +163,7 @@ def commit_enterprise_work(
     author = optional_git_author(author_name, author_email)
     if not has_uncommitted_changes(enterprise_root):
         raise ValueError("No changes to save in the enterprise repository")
-    rc, _, stderr = _run(enterprise_root, "add", ".")
+    rc, _, stderr = _run(enterprise_root, *_STAGE_ALL_BUT_RUNTIME_STATE)
     if rc != 0:
         raise RuntimeError(f"Failed to stage enterprise changes: {stderr}")
     rc, _, stderr = _commit(
@@ -233,7 +238,7 @@ def commit_engagement_work(
     author = optional_git_author(author_name, author_email)
     if not has_uncommitted_changes(engagement_root):
         raise ValueError("No changes to save in the engagement repository")
-    rc, _, stderr = _run(engagement_root, "add", ".")
+    rc, _, stderr = _run(engagement_root, *_STAGE_ALL_BUT_RUNTIME_STATE)
     if rc != 0:
         raise RuntimeError(f"Failed to stage engagement changes: {stderr}")
     rc, _, stderr = _commit(
