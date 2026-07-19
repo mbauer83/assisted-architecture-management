@@ -27,6 +27,18 @@ model-projects:
   description: Cross-cutting diagram-type rendering and authoring capability (PlantUML
     rendering, scaffolding, diagram-type modules) — not the assurance-specific GSN
     capability.
+- slug: strategy-and-value
+  id: GRP@1784482380.j78JVr
+  name: Strategy & Value
+  description: 'The product''s strategy domain: capabilities, value streams and stages,
+    values, courses of action, and strategic resources bridging the motivation and
+    business/application layers. Models the solution-as-product (stable abilities,
+    persona value streams, already-made strategic choices, accumulated strategic assets)
+    — no revenue/market/go-to-market content, no fictitious org structures. Maintenance:
+    owned by the repository owner; the review trigger is any business-model-level
+    change (public announcement, licensing or tier change) — never ordinary feature
+    work. Strategy-layer content is deliberately low-volatility; new entries must
+    pass the strategy-domain distinction litmus tests in the authoring guidance.'
 diagram-collections:
 - slug: meta-ontology
   id: GRP@1782086787.3BRrmg

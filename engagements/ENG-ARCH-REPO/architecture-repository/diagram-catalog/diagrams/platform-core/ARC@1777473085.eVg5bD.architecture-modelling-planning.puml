@@ -6,40 +6,36 @@ version: 0.1.0
 status: draft
 diagram-type: archimate-layered
 entity-ids-used:
-- PRC@1776635640.U4aAdh.architecture-modelling-planning
+- FNC@1777409722.ErTqVT.scope-formulate-modelling-task
+- FNC@1777472861.HgWMdN.decide-changes-to-plan-or-implement
+- FNC@1777390445.NGjUCa.verify-artifact-integrity-coherence
+- FNC@1777390444.lLdx12.discover-relevant-architecture-content
+- FNC@1777409722.rkx32U.determine-required-changes-to-architecture-content
 - FNC@1777409722.saMRQ0.author-architecture-documents
 - FNC@1777390449.uzJGYp.author-diagrams
 - FNC@1777390448.yuFXVJ.author-model-artifacts
-- FNC@1777472861.HgWMdN.decide-changes-to-plan-or-implement
-- FNC@1777409722.rkx32U.determine-required-changes-to-architecture-content
-- FNC@1777390444.lLdx12.discover-relevant-architecture-content
-- FNC@1777409722.ErTqVT.scope-formulate-modelling-task
-- FNC@1777390445.NGjUCa.verify-artifact-integrity-coherence
 - JNO@1777467627.chqH1_.inclusive-or-for-architecture-work
+- PRC@1776635640.U4aAdh.architecture-modelling-planning
 connection-ids-used:
-- PRC@1776635640.U4aAdh.architecture-modelling-planning---FNC@1777409722.saMRQ0.author-architecture-documents@@archimate-aggregation
-- PRC@1776635640.U4aAdh.architecture-modelling-planning---FNC@1777390449.uzJGYp.author-diagrams@@archimate-aggregation
-- PRC@1776635640.U4aAdh.architecture-modelling-planning---FNC@1777390448.yuFXVJ.author-model-artifacts@@archimate-aggregation
-- PRC@1776635640.U4aAdh.architecture-modelling-planning---FNC@1777472861.HgWMdN.decide-changes-to-plan-or-implement@@archimate-aggregation
-- FNC@1777472861.HgWMdN.decide-changes-to-plan-or-implement---FNC@1777409722.rkx32U.determine-required-changes-to-architecture-content@@archimate-triggering
-- PRC@1776635640.U4aAdh.architecture-modelling-planning---FNC@1777409722.rkx32U.determine-required-changes-to-architecture-content@@archimate-aggregation
-- PRC@1776635640.U4aAdh.architecture-modelling-planning---FNC@1777390444.lLdx12.discover-relevant-architecture-content@@archimate-aggregation
-- FNC@1777390444.lLdx12.discover-relevant-architecture-content---FNC@1777472861.HgWMdN.decide-changes-to-plan-or-implement@@archimate-triggering
-- FNC@1777409722.ErTqVT.scope-formulate-modelling-task---FNC@1777390444.lLdx12.discover-relevant-architecture-content@@archimate-triggering
-- PRC@1776635640.U4aAdh.architecture-modelling-planning---FNC@1777409722.ErTqVT.scope-formulate-modelling-task@@archimate-aggregation
-- FNC@1777390448.yuFXVJ.author-model-artifacts---FNC@1777390445.NGjUCa.verify-artifact-integrity-coherence@@archimate-triggering
-- FNC@1777390449.uzJGYp.author-diagrams---FNC@1777390445.NGjUCa.verify-artifact-integrity-coherence@@archimate-triggering
-- FNC@1777409722.saMRQ0.author-architecture-documents---FNC@1777390445.NGjUCa.verify-artifact-integrity-coherence@@archimate-triggering
-- PRC@1776635640.U4aAdh.architecture-modelling-planning---FNC@1777390445.NGjUCa.verify-artifact-integrity-coherence@@archimate-aggregation
-- FNC@1777409722.rkx32U.determine-required-changes-to-architecture-content---JNO@1777467627.chqH1_.inclusive-or-for-architecture-work@@archimate-triggering
-- JNO@1777467627.chqH1_.inclusive-or-for-architecture-work---FNC@1777390448.yuFXVJ.author-model-artifacts@@archimate-triggering
-- JNO@1777467627.chqH1_.inclusive-or-for-architecture-work---FNC@1777390449.uzJGYp.author-diagrams@@archimate-triggering
-- JNO@1777467627.chqH1_.inclusive-or-for-architecture-work---FNC@1777409722.saMRQ0.author-architecture-documents@@archimate-triggering
-last-updated: '2026-07-05'
+- FNC@1777472861.HgWMdN---FNC@1777409722.rkx32U@@archimate-triggering
+- FNC@1777390444.lLdx12---FNC@1777472861.HgWMdN@@archimate-triggering
+- FNC@1777409722.ErTqVT---FNC@1777390444.lLdx12@@archimate-triggering
+- FNC@1777390448.yuFXVJ---FNC@1777390445.NGjUCa@@archimate-triggering
+- FNC@1777390449.uzJGYp---FNC@1777390445.NGjUCa@@archimate-triggering
+- FNC@1777409722.saMRQ0---FNC@1777390445.NGjUCa@@archimate-triggering
+- FNC@1777409722.rkx32U---JNO@1777467627.chqH1_@@archimate-triggering
+- JNO@1777467627.chqH1_---FNC@1777390448.yuFXVJ@@archimate-triggering
+- JNO@1777467627.chqH1_---FNC@1777390449.uzJGYp@@archimate-triggering
+- JNO@1777467627.chqH1_---FNC@1777409722.saMRQ0@@archimate-triggering
+- PRC@1776635640.U4aAdh---FNC@1777409722.saMRQ0@@archimate-aggregation
+- PRC@1776635640.U4aAdh---FNC@1777390449.uzJGYp@@archimate-aggregation
+- PRC@1776635640.U4aAdh---FNC@1777390448.yuFXVJ@@archimate-aggregation
+- PRC@1776635640.U4aAdh---FNC@1777409722.rkx32U@@archimate-aggregation
+- PRC@1776635640.U4aAdh---FNC@1777390444.lLdx12@@archimate-aggregation
+- PRC@1776635640.U4aAdh---FNC@1777390445.NGjUCa@@archimate-aggregation
+last-updated: '2026-07-19'
 ---
 @startuml architecture-modelling---planning
-!define ARCHIMATE_VERSION 3.2
-!include <archimate/Archimate>
 hide stereotype
 
 skinparam defaultFontName "Helvetica Neue, Helvetica, Arial, sans-serif"
@@ -51,6 +47,15 @@ skinparam backgroundColor #FAFAFA
 skinparam linetype ortho
 skinparam nodesep 60
 skinparam ranksep 80
+!define Rel_Triggering(from, to, label) from --> to
+!define Rel_Realization(from, to, label) from ..|> to
+!define Rel_Realization_Up(from, to, label) from ..|> to
+!define Rel_Serving(from, to, label) from --> to
+!define Rel_Association(from, to, label) from -- to
+!define Rel_Association_Left(from, to, label) from -- to
+!define Rel_Association_Right(from, to, label) from -- to
+!define Rel_Access(from, to, label) from ..> to
+!define Rel_Influence(from, to, label) from ..> to
 skinparam rectangle<<CommonGrouping>> {
   BackgroundColor #EDE8E1
   BorderColor #8C7E6A
@@ -71,19 +76,15 @@ top to bottom direction
 title Architecture Modelling & Planning
 
 rectangle "Processes" <<CommonGrouping>> {
-  rectangle "<$archimate_process{scale=1.5}> Architecture Modelling & Planning" <<process>> as PRC_U4aAdh {
-    rectangle "<$archimate_function{scale=1.5}> Author Architecture Documents" <<function>> as FNC_saMRQ0
-    rectangle "<$archimate_function{scale=1.5}> Author Diagrams" <<function>> as FNC_uzJGYp
-    rectangle "<$archimate_function{scale=1.5}> Author Model Artifacts" <<function>> as FNC_yuFXVJ
-    rectangle "<$archimate_function{scale=1.5}> Decide Changes to Plan or Implement" <<function>> as FNC_HgWMdN
-    rectangle "<$archimate_function{scale=1.5}> Determine Required Changes to Architecture Content" <<function>> as FNC_rkx32U
-    rectangle "<$archimate_function{scale=1.5}> Discover Relevant Architecture Content" <<function>> as FNC_lLdx12
-    rectangle "<$archimate_function{scale=1.5}> Scope & Formulate Modelling Task" <<function>> as FNC_ErTqVT
-    rectangle "<$archimate_function{scale=1.5}> Verify Artifact Integrity & Coherence" <<function>> as FNC_NGjUCa
+  rectangle "<$archimate_process{scale=1.5}> Architecture Modelling & Planning «Business Process»" <<process>> as PRC_U4aAdh {
+    rectangle "<$archimate_function{scale=1.5}> Verify Artifact Integrity & Coherence «Application Function»" <<function>> as FNC_NGjUCa
+    rectangle "<$archimate_function{scale=1.5}> Discover Relevant Architecture Content «Application Function»" <<function>> as FNC_lLdx12
+    rectangle "<$archimate_function{scale=1.5}> Determine Required Changes to Architecture Content «Business Function»" <<function>> as FNC_rkx32U
+    rectangle "<$archimate_function{scale=1.5}> Author Architecture Documents «Business Function»" <<function>> as FNC_saMRQ0
+    rectangle "<$archimate_function{scale=1.5}> Author Diagrams «Business Function»" <<function>> as FNC_uzJGYp
+    rectangle "<$archimate_function{scale=1.5}> Author Model Artifacts «Business Function»" <<function>> as FNC_yuFXVJ
     circle " " as JNO_chqH1_
-    FNC_ErTqVT -[hidden]down- FNC_lLdx12
-    FNC_lLdx12 -[hidden]down- FNC_HgWMdN
-    FNC_HgWMdN -[hidden]down- FNC_rkx32U
+    FNC_lLdx12 -[hidden]down- FNC_rkx32U
     FNC_rkx32U -[hidden]down- JNO_chqH1_
     JNO_chqH1_ -[hidden]down- FNC_saMRQ0
     FNC_saMRQ0 -[hidden]right- FNC_uzJGYp
@@ -95,16 +96,23 @@ rectangle "Processes" <<CommonGrouping>> {
   }
 }
 
+rectangle "Functions" <<CommonGrouping>> {
+  rectangle "<$archimate_function{scale=1.5}> Scope & Formulate Modelling Task «Business Function»" <<function>> as FNC_ErTqVT
+  rectangle "<$archimate_function{scale=1.5}> Decide Changes to Plan or Implement «Business Function»" <<function>> as FNC_HgWMdN
+}
+FNC_ErTqVT -[hidden]down- FNC_HgWMdN
+PRC_U4aAdh -[hidden]down- FNC_ErTqVT
+
 ' Connections
-Rel_Triggering(FNC_HgWMdN, FNC_rkx32U, "")
-Rel_Triggering(FNC_lLdx12, FNC_HgWMdN, "")
-Rel_Triggering(FNC_ErTqVT, FNC_lLdx12, "")
-Rel_Triggering(FNC_yuFXVJ, FNC_NGjUCa, "")
-Rel_Triggering(FNC_uzJGYp, FNC_NGjUCa, "")
-Rel_Triggering(FNC_saMRQ0, FNC_NGjUCa, "")
-Rel_Triggering(FNC_rkx32U, JNO_chqH1_, "")
-Rel_Triggering(JNO_chqH1_, FNC_yuFXVJ, "")
-Rel_Triggering(JNO_chqH1_, FNC_uzJGYp, "")
-Rel_Triggering(JNO_chqH1_, FNC_saMRQ0, "")
+FNC_HgWMdN --> FNC_rkx32U
+FNC_lLdx12 --> FNC_HgWMdN
+FNC_ErTqVT --> FNC_lLdx12
+FNC_yuFXVJ --> FNC_NGjUCa
+FNC_uzJGYp --> FNC_NGjUCa
+FNC_saMRQ0 --> FNC_NGjUCa
+FNC_rkx32U --> JNO_chqH1_
+JNO_chqH1_ --> FNC_yuFXVJ
+JNO_chqH1_ --> FNC_uzJGYp
+JNO_chqH1_ --> FNC_saMRQ0
 
 @enduml

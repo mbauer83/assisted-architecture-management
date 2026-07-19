@@ -6,30 +6,23 @@ version: 0.1.0
 status: draft
 diagram-type: archimate-layered
 entity-ids-used:
-- PRC@1776635645.GHVpDA.provide-implementation-guidance
-- FNC@1777390444.lLdx12.discover-relevant-architecture-content
 - FNC@1777409722.4LZhtI.implement-the-change
-- FNC@1777409722.TSs7wk.plan-implementation-approach
-- FNC@1777409722.LxeSn1.record-implementation-decisions
 - FNC@1777390454.4ce2Qt.synthesize-deliver-implementation-guidance
+- FNC@1777409722.LxeSn1.record-implementation-decisions
+- FNC@1777409722.TSs7wk.plan-implementation-approach
 - FNC@1777474430.fCdnJ2.refine-architecture-content-after-implementation
+- FNC@1777390444.lLdx12.discover-relevant-architecture-content
+- PRC@1776635645.GHVpDA.provide-implementation-guidance
 connection-ids-used:
-- PRC@1776635645.GHVpDA.provide-implementation-guidance---FNC@1777390444.lLdx12.discover-relevant-architecture-content@@archimate-aggregation
-- PRC@1776635645.GHVpDA.provide-implementation-guidance---FNC@1777409722.4LZhtI.implement-the-change@@archimate-aggregation
-- FNC@1777390444.lLdx12.discover-relevant-architecture-content---FNC@1777409722.TSs7wk.plan-implementation-approach@@archimate-triggering
-- PRC@1776635645.GHVpDA.provide-implementation-guidance---FNC@1777409722.TSs7wk.plan-implementation-approach@@archimate-aggregation
-- FNC@1777409722.4LZhtI.implement-the-change---FNC@1777409722.LxeSn1.record-implementation-decisions@@archimate-triggering
-- PRC@1776635645.GHVpDA.provide-implementation-guidance---FNC@1777409722.LxeSn1.record-implementation-decisions@@archimate-aggregation
-- FNC@1777409722.TSs7wk.plan-implementation-approach---FNC@1777390454.4ce2Qt.synthesize-deliver-implementation-guidance@@archimate-triggering
-- PRC@1776635645.GHVpDA.provide-implementation-guidance---FNC@1777390454.4ce2Qt.synthesize-deliver-implementation-guidance@@archimate-aggregation
-- FNC@1777390454.4ce2Qt.synthesize-deliver-implementation-guidance---FNC@1777409722.4LZhtI.implement-the-change@@archimate-triggering
-- FNC@1777409722.LxeSn1.record-implementation-decisions---FNC@1777474430.fCdnJ2.refine-architecture-content-after-implementation@@archimate-triggering
-- PRC@1776635645.GHVpDA.provide-implementation-guidance---FNC@1777474430.fCdnJ2.refine-architecture-content-after-implementation@@archimate-aggregation
-last-updated: '2026-07-05'
+- FNC@1777390444.lLdx12---FNC@1777409722.TSs7wk@@archimate-triggering
+- FNC@1777409722.4LZhtI---FNC@1777409722.LxeSn1@@archimate-triggering
+- FNC@1777409722.TSs7wk---FNC@1777390454.4ce2Qt@@archimate-triggering
+- FNC@1777390454.4ce2Qt---FNC@1777409722.4LZhtI@@archimate-triggering
+- FNC@1777409722.LxeSn1---FNC@1777474430.fCdnJ2@@archimate-triggering
+- PRC@1776635645.GHVpDA---FNC@1777390444.lLdx12@@archimate-aggregation
+last-updated: '2026-07-19'
 ---
 @startuml architecture-implementation
-!define ARCHIMATE_VERSION 3.2
-!include <archimate/Archimate>
 hide stereotype
 
 skinparam defaultFontName "Helvetica Neue, Helvetica, Arial, sans-serif"
@@ -41,6 +34,15 @@ skinparam backgroundColor #FAFAFA
 skinparam linetype ortho
 skinparam nodesep 60
 skinparam ranksep 80
+!define Rel_Triggering(from, to, label) from --> to
+!define Rel_Realization(from, to, label) from ..|> to
+!define Rel_Realization_Up(from, to, label) from ..|> to
+!define Rel_Serving(from, to, label) from --> to
+!define Rel_Association(from, to, label) from -- to
+!define Rel_Association_Left(from, to, label) from -- to
+!define Rel_Association_Right(from, to, label) from -- to
+!define Rel_Access(from, to, label) from ..> to
+!define Rel_Influence(from, to, label) from ..> to
 skinparam rectangle<<CommonGrouping>> {
   BackgroundColor #EDE8E1
   BorderColor #8C7E6A
@@ -61,26 +63,29 @@ top to bottom direction
 title Architecture Implementation
 
 rectangle "Processes" <<CommonGrouping>> {
-  rectangle "<$archimate_process{scale=1.5}> Architecture Implementation" <<process>> as PRC_GHVpDA {
-    rectangle "<$archimate_function{scale=1.5}> Discover Relevant Architecture Content" <<function>> as FNC_lLdx12
-    rectangle "<$archimate_function{scale=1.5}> Implement the Change" <<function>> as FNC_4LZhtI
-    rectangle "<$archimate_function{scale=1.5}> Plan Implementation Approach" <<function>> as FNC_TSs7wk
-    rectangle "<$archimate_function{scale=1.5}> Record Implementation Decisions" <<function>> as FNC_LxeSn1
-    rectangle "<$archimate_function{scale=1.5}> Synthesize & Deliver Implementation Guidance" <<function>> as FNC_4ce2Qt
-    rectangle "<$archimate_function{scale=1.5}> Refine Architecture Content after Implementation" <<function>> as FNC_fCdnJ2
-    FNC_lLdx12 -[hidden]down- FNC_TSs7wk
-    FNC_TSs7wk -[hidden]down- FNC_4ce2Qt
-    FNC_4ce2Qt -[hidden]down- FNC_4LZhtI
-    FNC_4LZhtI -[hidden]down- FNC_LxeSn1
-    FNC_LxeSn1 -[hidden]down- FNC_fCdnJ2
+  rectangle "<$archimate_process{scale=1.5}> Architecture Implementation «Business Process»" <<process>> as PRC_GHVpDA {
+    rectangle "<$archimate_function{scale=1.5}> Discover Relevant Architecture Content «Application Function»" <<function>> as FNC_lLdx12
   }
 }
 
+rectangle "Functions" <<CommonGrouping>> {
+  rectangle "<$archimate_function{scale=1.5}> Implement the Change «Business Function»" <<function>> as FNC_4LZhtI
+  rectangle "<$archimate_function{scale=1.5}> Synthesize & Deliver Implementation Guidance «Business Function»" <<function>> as FNC_4ce2Qt
+  rectangle "<$archimate_function{scale=1.5}> Record Implementation Decisions «Business Function»" <<function>> as FNC_LxeSn1
+  rectangle "<$archimate_function{scale=1.5}> Plan Implementation Approach «Business Function»" <<function>> as FNC_TSs7wk
+  rectangle "<$archimate_function{scale=1.5}> Refine Architecture Content after Implementation «Business Function»" <<function>> as FNC_fCdnJ2
+}
+FNC_4LZhtI -[hidden]down- FNC_4ce2Qt
+FNC_4ce2Qt -[hidden]down- FNC_LxeSn1
+FNC_LxeSn1 -[hidden]down- FNC_TSs7wk
+FNC_TSs7wk -[hidden]down- FNC_fCdnJ2
+PRC_GHVpDA -[hidden]down- FNC_4LZhtI
+
 ' Connections
-Rel_Triggering(FNC_lLdx12, FNC_TSs7wk, "")
-Rel_Triggering(FNC_4LZhtI, FNC_LxeSn1, "")
-Rel_Triggering(FNC_TSs7wk, FNC_4ce2Qt, "")
-Rel_Triggering(FNC_4ce2Qt, FNC_4LZhtI, "")
-Rel_Triggering(FNC_LxeSn1, FNC_fCdnJ2, "")
+FNC_lLdx12 --> FNC_TSs7wk
+FNC_4LZhtI --> FNC_LxeSn1
+FNC_TSs7wk --> FNC_4ce2Qt
+FNC_4ce2Qt --> FNC_4LZhtI
+FNC_LxeSn1 --> FNC_fCdnJ2
 
 @enduml

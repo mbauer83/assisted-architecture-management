@@ -6,22 +6,19 @@ version: 0.1.0
 status: draft
 diagram-type: archimate-layered
 entity-ids-used:
+- FNC@1776633706.3jpc7O.metadata-filter
 - FNC@1777390452.3seqIw.retrieve-architectural-context
-- FNC@1777390444.lLdx12.discover-relevant-architecture-content
 - FNC@1776633080.BdEMPx.graph-traversal
 - FNC@1776633704.bFY40B.full-text-search
-- FNC@1776633706.3jpc7O.metadata-filter
+- FNC@1777390444.lLdx12.discover-relevant-architecture-content
 - SRV@1712870400.Qr8St8.discovery-querying-stats-service
 connection-ids-used:
-- FNC@1777390444.lLdx12.discover-relevant-architecture-content---FNC@1776633080.BdEMPx.graph-traversal@@archimate-aggregation
-- FNC@1777390444.lLdx12.discover-relevant-architecture-content---FNC@1776633080.BdEMPx.graph-traversal@@archimate-triggering
-- FNC@1777390444.lLdx12.discover-relevant-architecture-content---FNC@1776633704.bFY40B.full-text-search@@archimate-aggregation
-- FNC@1777390444.lLdx12.discover-relevant-architecture-content---FNC@1776633704.bFY40B.full-text-search@@archimate-triggering
-- FNC@1777390444.lLdx12.discover-relevant-architecture-content---FNC@1776633706.3jpc7O.metadata-filter@@archimate-aggregation
-- FNC@1777390444.lLdx12.discover-relevant-architecture-content---FNC@1776633706.3jpc7O.metadata-filter@@archimate-triggering
-- FNC@1777390452.3seqIw.retrieve-architectural-context---FNC@1777390444.lLdx12.discover-relevant-architecture-content@@archimate-triggering
-- FNC@1777390444.lLdx12.discover-relevant-architecture-content---SRV@1712870400.Qr8St8.discovery-querying-stats-service@@archimate-realization
-last-updated: '2026-07-05'
+- FNC@1777390444.lLdx12---FNC@1776633080.BdEMPx@@archimate-triggering
+- FNC@1777390444.lLdx12---FNC@1776633704.bFY40B@@archimate-triggering
+- FNC@1777390444.lLdx12---FNC@1776633706.3jpc7O@@archimate-triggering
+- FNC@1777390452.3seqIw---FNC@1777390444.lLdx12@@archimate-triggering
+- FNC@1777390444.lLdx12---SRV@1712870400.Qr8St8@@archimate-realization
+last-updated: '2026-07-19'
 ---
 @startuml querying---navigation
 hide stereotype
@@ -64,21 +61,21 @@ top to bottom direction
 title Querying & Navigation
 
 rectangle "Services" <<CommonGrouping>> {
-  rectangle "<$archimate_service{scale=1.5}> Discovery, Querying & Stats Service" <<service>> as SRV_Qr8St8
+  rectangle "<$archimate_service{scale=1.5}> Discovery, Querying & Stats Service «Application Service»" <<service>> as SRV_Qr8St8
 }
 
 rectangle "Functions" <<CommonGrouping>> {
-  rectangle "<$archimate_function{scale=1.5}> Retrieve Architectural Context" <<function>> as FNC_3seqIw
-  rectangle "<$archimate_function{scale=1.5}> Discover Relevant Architecture Content" <<function>> as FNC_lLdx12 {
-    rectangle "<$archimate_function{scale=1.5}> Graph Traversal" <<function>> as FNC_BdEMPx
-    rectangle "<$archimate_function{scale=1.5}> Full-Text Search" <<function>> as FNC_bFY40B
-    rectangle "<$archimate_function{scale=1.5}> Metadata Filter" <<function>> as FNC_3jpc7O
-    FNC_BdEMPx -[hidden]down- FNC_bFY40B
-    FNC_bFY40B -[hidden]down- FNC_3jpc7O
-  }
+  rectangle "<$archimate_function{scale=1.5}> Metadata Filter «Application Function»" <<function>> as FNC_3jpc7O
+  rectangle "<$archimate_function{scale=1.5}> Retrieve Architectural Context «Application Function»" <<function>> as FNC_3seqIw
+  rectangle "<$archimate_function{scale=1.5}> Graph Traversal «Application Function»" <<function>> as FNC_BdEMPx
+  rectangle "<$archimate_function{scale=1.5}> Full-Text Search «Application Function»" <<function>> as FNC_bFY40B
+  rectangle "<$archimate_function{scale=1.5}> Discover Relevant Architecture Content «Application Function»" <<function>> as FNC_lLdx12
 }
-FNC_3seqIw -[hidden]down- FNC_lLdx12
-SRV_Qr8St8 -[hidden]down- FNC_3seqIw
+FNC_3jpc7O -[hidden]down- FNC_3seqIw
+FNC_3seqIw -[hidden]down- FNC_BdEMPx
+FNC_BdEMPx -[hidden]down- FNC_bFY40B
+FNC_bFY40B -[hidden]down- FNC_lLdx12
+SRV_Qr8St8 -[hidden]down- FNC_3jpc7O
 
 ' Connections
 FNC_lLdx12 --> FNC_BdEMPx
