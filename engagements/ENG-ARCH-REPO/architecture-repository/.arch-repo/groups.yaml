@@ -71,6 +71,9 @@ diagram-collections:
 - slug: confidential
   id: GRP@1783240811.5kkTbK
   name: Confidential
+- slug: strategy-and-value
+  id: GRP@1784488671.LTdR3m
+  name: Strategy And Value
 document-collections:
 - slug: platform-core
   id: GRP@1783198413.qrAOwZ
