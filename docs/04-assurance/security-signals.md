@@ -75,8 +75,8 @@ usually the next one:
 
 The same three views are available to agents as
 `assurance_security_metrics`, `assurance_list_vulnerabilities`, and
-`assurance_vulnerability_impact`, and over REST as `/security-metrics`,
-`/security-findings`, and `/vulnerability-impact`.
+`assurance_vulnerability_impact`, and over REST as `/api/assurance/security-metrics`,
+`/api/assurance/security-findings`, and `/api/assurance/vulnerability-impact`.
 
 ## Vulnerability identity
 

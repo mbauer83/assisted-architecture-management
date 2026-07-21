@@ -124,7 +124,7 @@ class TestExecution:
         ingest_security_signals(with_finding, store=store, new_snapshot_id=_snapshot_ids())
         second = ingest_security_signals(without_finding, store=store, new_snapshot_id=_snapshot_ids())
         assert isinstance(second, IngestActivated)
-        conn = store._conn()  # noqa: SLF001
+        conn = store.connection.open()
         active_findings = conn.execute(
             "SELECT COUNT(*) AS n FROM snapshot_vulnerability_findings WHERE snapshot_id=?",
             (second.snapshot_id,),

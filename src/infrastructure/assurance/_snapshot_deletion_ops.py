@@ -11,9 +11,16 @@ from __future__ import annotations
 from typing import Any
 
 from src.infrastructure.assurance._archive import append_audit_row
+from src.infrastructure.assurance._snapshot_connection import SnapshotConnection
+from src.infrastructure.assurance._snapshot_reads import (
+    get_snapshot,
+    list_snapshot_components,
+    list_snapshot_findings,
+    list_snapshots,
+)
 
 
-def delete_one_snapshot(store: Any, snapshot_id: str) -> dict[str, Any] | None:
+def delete_one_snapshot(connection: SnapshotConnection, snapshot_id: str) -> dict[str, Any] | None:
     """Delete one snapshot and its OWN rows; returns what was removed, or None
     if the snapshot does not exist.
 
@@ -31,8 +38,8 @@ def delete_one_snapshot(store: Any, snapshot_id: str) -> dict[str, Any] | None:
     through them) or vex_assessments (keyed by anchor and vulnerability, not by
     snapshot: an assessment outlives the scan that surfaced the finding).
     """
-    conn = store._conn()
-    snapshot = store.get_snapshot(snapshot_id)
+    conn = connection.open()
+    snapshot = get_snapshot(connection, snapshot_id)
     if snapshot is None:
         return None
     removed = {
@@ -40,10 +47,10 @@ def delete_one_snapshot(store: Any, snapshot_id: str) -> dict[str, Any] | None:
         "anchor_entity_id": str(snapshot["anchor_entity_id"]),
         "status": str(snapshot["status"]),
         "was_active": str(snapshot["status"]) == "active",
-        "component_count": len(store.list_snapshot_components(snapshot_id)),
-        "finding_count": len(store.list_snapshot_findings(snapshot_id)),
+        "component_count": len(list_snapshot_components(connection, snapshot_id)),
+        "finding_count": len(list_snapshot_findings(connection, snapshot_id)),
     }
-    store._begin(conn)
+    connection.begin(conn)
     try:
         # Children first: the cascade is declared, but deleting explicitly keeps
         # the unit of work correct even if PRAGMA foreign_keys is ever off.
@@ -59,14 +66,14 @@ def delete_one_snapshot(store: Any, snapshot_id: str) -> dict[str, Any] | None:
         raise
     return removed
 
-def delete_all_for_anchor(store: Any, anchor_entity_id: str) -> list[dict[str, Any]]:
+def delete_all_for_anchor(connection: SnapshotConnection, anchor_entity_id: str) -> list[dict[str, Any]]:
     """Delete every snapshot for one anchor. Each snapshot is its own audited
     transaction, so a mid-way failure leaves a consistent store with a truthful
     audit trail rather than a partial delete recorded as whole."""
-    snapshots = store.list_snapshots(anchor_entity_id=anchor_entity_id)
+    snapshots = list_snapshots(connection, anchor_entity_id=anchor_entity_id)
     removed: list[dict[str, Any]] = []
     for snapshot in snapshots:
-        outcome = store.delete_snapshot(str(snapshot["snapshot_id"]))
+        outcome = delete_one_snapshot(connection, str(snapshot["snapshot_id"]))
         if outcome is not None:
             removed.append(outcome)
     return removed

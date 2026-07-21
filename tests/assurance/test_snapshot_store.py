@@ -11,7 +11,7 @@ from typing import Any
 
 import pytest
 
-import src.infrastructure.assurance._snapshot_store as store_module
+import src.infrastructure.assurance._snapshot_lifecycle as lifecycle_module
 from src.domain.security_signal_snapshot import ReplayStoredSuccess, StoredSnapshotKey, replay_decision
 from src.infrastructure.assurance._snapshot_store import (
     SnapshotTransitionError,
@@ -107,7 +107,7 @@ class TestActivationAtomicity:
         def _boom(*args: object, **kwargs: object) -> None:
             raise RuntimeError("crash before commit")
 
-        monkeypatch.setattr(store_module, "append_audit_row", _boom)
+        monkeypatch.setattr(lifecycle_module, "append_audit_row", _boom)
         with pytest.raises(RuntimeError, match="crash before commit"):
             store.activate_snapshot("SNAP@2")
         monkeypatch.undo()
@@ -123,13 +123,13 @@ class TestActivationAtomicity:
         def _boom(*args: object, **kwargs: object) -> None:
             raise RuntimeError("crash before commit")
 
-        monkeypatch.setattr(store_module, "append_audit_row", _boom)
+        monkeypatch.setattr(lifecycle_module, "append_audit_row", _boom)
         with pytest.raises(RuntimeError):
             store.populate_snapshot("SNAP@1", components=[
                 {"component_id": "C1", "name": "requests"},
             ], findings=[])
         monkeypatch.undo()
-        conn = store._conn()  # noqa: SLF001
+        conn = store.connection.open()
         assert conn.execute("SELECT COUNT(*) AS n FROM snapshot_components").fetchone()["n"] == 0
 
 
@@ -180,7 +180,7 @@ class TestAliasMerge:
             {"component_id": "C1", "external_ids": ["CVE-2024-1", "GHSA-x"]},
         ])
         canonical = next(iter(population.canonical_by_external_id.values()))
-        conn = store._conn()  # noqa: SLF001
+        conn = store.connection.open()
         distinct = conn.execute(
             "SELECT COUNT(DISTINCT canonical_vulnerability_id) AS n FROM snapshot_vulnerability_findings"
         ).fetchone()["n"]

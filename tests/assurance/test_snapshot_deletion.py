@@ -105,7 +105,7 @@ class TestBlastRadius:
     """What deletion must NOT touch."""
 
     def _conn(self, store: Any) -> Any:
-        return store._conn()  # noqa: SLF001
+        return store.connection.open()
 
     def test_shared_vulnerability_identities_and_aliases_survive(self, store: Any) -> None:
         """Other snapshots resolve findings through these rows; cascading them away

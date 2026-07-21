@@ -52,8 +52,8 @@ Legend:
 | Register architecture reference | — | — | register | — | — | Y | N | Y | N |
 | Model and bind architecture gap | — | — | task spec only | — | — | Y | N | N | N |
 | Promotion preflight | promotion preflight | — | preflight | — | — | Y | P | N | P |
-| Ingest security signals | ingest command | — | ingest | ingest | — (CLI/MCP/REST only) | S | Y | Y | N |
-| Delete signal snapshot | — | — | delete | snapshot-delete | — | S | Y | Y | N |
+| Ingest security signals | ingest command | — | ingest | security-ingest | — (CLI/MCP/REST only) | S | Y | Y | N |
+| Delete signal snapshot | — | — | delete | security-snapshot-delete | — | S | Y | Y | N |
 | Component vulnerabilities | signals read | list | — | security-findings | findings view | S | Y | N | N |
 | Vulnerability impact | impact use case | impact | — | vulnerability-impact | impact view | S | Y | N | N |
 | Reconcile AI-BOM | — | — | reconcile | — | — | N | N/A | N | N |
