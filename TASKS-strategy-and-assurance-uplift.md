@@ -2895,6 +2895,41 @@ only existing nodes cannot measure a missing one".
   · G2 BOUNDARY: only the crit-21b e2e G-S3 GUI walk is outstanding (needs the GUI dev
     server). Everything else in that boundary is now witnessed.
 
+- 2026-07-21 · LIVE VERIFICATION (backlog item 7, PARTIAL) + NEW DEFECT: ingest finding_count
+  over-reports.
+  · TLP visibility_limited fix · LIVE-VERIFIED FIXED. assurance_security_metrics
+    (APP@1777293133.OYEmP1) → visibility_limited FALSE, content_state "complete", on the same
+    basis_run_id RUN@7dd6d24d2ffb45a7 / component_count 107 / max_cvss 8.7 / bands high 12,
+    medium 7, low 4 as before the fix. assurance_list_vulnerabilities agrees: count 24,
+    withheld 0. The misleading "some info hidden by TLP" banner no longer fires when nothing
+    is actually withheld.
+  · Restored read tools · LIVE-VERIFIED: assurance_list_vulnerabilities and
+    assurance_security_stats both return over the active snapshot.
+  · assurance_ingest_security_signals · LIVE-VERIFIED (throwaway anchor
+    APP@live-check-ingest-tool → RUN@1e149a72dcc9405f, 3 components / 1 finding; directness
+    "direct" dep-graph classified; advisory matched to urllib3 and NOT to the sibling attrs).
+  · STILL QUEUED: the REST /api/assurance/security-ingest route (added AFTER the restart, so
+    restart-gated); the GUI surfaces.
+
+  · **NEW DEFECT — ingest reports the SUBMITTED finding count, not the PERSISTED one.**
+    Found by reconciling the live numbers rather than assuming the verification was clean:
+    the 2026-07-21 ingest entry records 41 findings for APP@1777293133.OYEmP1, but the
+    snapshot holds 24 (metrics finding_total 24, list count 24, withheld 0, suppressed 0 —
+    so NOT a TLP or VEX effect).
+    ROOT CAUSE (verified in `_refresh_run_store.populate_run`):
+    `finding_id = _stable_id("FND", run_id, component_row_id, canonical_id)` followed by
+    `INSERT OR REPLACE`. Two bundle findings whose alias sets resolve to the SAME canonical
+    vulnerability for the SAME component collapse to one row — correct semantics (one
+    component + one canonical vulnerability = one finding), driven by GHSA/PYSEC aliases.
+    The DEFECT is the reporting: `RefreshActivated.finding_count = len(bundle.findings)` is
+    the PRE-dedup submitted count. So the CLI prints 41, the MCP ingest tool returns
+    finding_count 41, and the caller then reads back 24 — a number that does not match what
+    was written. This affects code added this session (the tool projects RefreshActivated).
+    FIX DIRECTION: have `populate_run` return the persisted component/finding counts and have
+    the command report those — ideally both (submitted vs persisted) with the delta named as
+    alias collapse, so the dedup stays visible instead of silently swallowing 17 findings.
+    Co-land with the rename sweep (backlog 2), which already touches this result type.
+
 ### REMAINING BACKLOG (assurance security-signals — sequenced, owner-directed)
 1. [x] INGEST-via-MCP tool (bundle-submit to the ingest command) + decide aibom_coverage — DONE
        2026-07-21 (see the entry above); aibom_coverage DROPPED with rationale. REST parity
