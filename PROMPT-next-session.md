@@ -1,107 +1,108 @@
 # PROMPT — next session
 
 Continue work in `scalable-architecture-for-humans-and-ai`. Clean tree on `main`
-at `eab3fff`.
+at `dd10c62`.
 
 ## Read first, in this order
 
 1. `CLAUDE.md` — quality gates, architectural discipline, tool-based authoring.
-2. **`TASKS-strategy-and-assurance-uplift.md`, the `⚠ READ FIRST` section at the
-   top** — the reconciled true state and the cross-plan sequencing. Checkbox
-   state in that file lags reality in three WUs; the table there is
-   authoritative, not the boxes.
-3. The plan(s) for whichever step you are on (below).
+2. **`TASKS-strategy-and-assurance-uplift.md`, the `⚠ READ FIRST` section** — the
+   reconciled state and cross-plan sequencing. Checkbox state lags reality in some
+   WUs; that table is authoritative, not the boxes.
+3. **`## Stream R`** in the same file — this session's work. Read the whole section
+   including its locked decisions, not just the checkboxes.
 
 ## Enumeration discipline (non-negotiable — a prior session got this wrong)
 
-A previous session was asked what work remained, ran a `grep … | head -20`,
-derived a follow-up line-range from that truncated output, and then presented a
-*complete* remaining-work list and a sequencing recommendation from it. It missed
-`## Stream R` entirely — 9 open checkboxes, the largest untouched stream, and
-directly relevant to the sequencing it was recommending.
-
-**Count first, enumerate second, reconcile the two:**
+A session once capped a completeness grep with `head -20`, missed Stream R
+entirely, and reported an unbounded conclusion from the truncated output. Count
+first, enumerate second, reconcile the two:
 
 ```
-grep -c '^- \[ \]' TASKS-strategy-and-assurance-uplift.md    # total open
-grep -c '^- \[x\]' TASKS-strategy-and-assurance-uplift.md    # total done
-grep -n  '^## Stream\|^### WU' TASKS-strategy-and-assurance-uplift.md
+grep -c '^- \[ \]' TASKS-strategy-and-assurance-uplift.md    # 46 open at handoff
+grep -c '^- \[x\]' TASKS-strategy-and-assurance-uplift.md    # 87 done at handoff
+awk '/^## Stream|^### WU|^## WU/{s=$0} /^- \[ \]/{c[s]++} END{for(k in c) printf "%4d  %s\n", c[k], k}' \
+  TASKS-strategy-and-assurance-uplift.md | sort -rn
 ```
 
-If a per-stream enumeration doesn't sum to the total, it is incomplete — say so
-rather than presenting it. Never apply `head`/line caps to a search whose purpose
-is completeness; aggregate programmatically instead. A truncated search supports
-only a bounded claim, never an unbounded one.
+If the per-stream counts do not sum to the total, the enumeration is incomplete —
+say so rather than presenting it. Verified at handoff: 8+7+6+6+5+5+3+3+2+1 = 46.
 
-## Agreed sequencing
+## Where the plan stands
 
-1. **Security-signals backlog items 2–7** ← start here
-2. Stream R — viewpoint reference integrity (its own focused session)
-3. `PLAN-attribute-profile-registry.md` — Streams P, Q (+R1), S, W, then R2, T
-4. Profile-registry Stream V — multiple specializations per concept
-5. OpenAPI — modeling/querying endpoints first
-6. `PLAN-aibom-model-derived.md`
+The **security-signals backlog is COMPLETE (items 1–9)**, landed across 11 commits:
+the refresh→ingest/snapshot rename, persisted-vs-submitted count reporting,
+anchor-identity normalization, `arch-assurance seed`, the directness fix, snapshot
+deletion, vulnerability→affected-entities, the GUI views, documentation, and GUI
+ingest with enforced anchor validation. All live-verified against the running
+backend.
 
-Rationale is recorded in the `⚠ READ FIRST` section; do not re-derive it.
+Remaining, in the ledger's agreed order:
 
-## This session's task: security-signals backlog 2–7
+1. **Stream R — viewpoint reference integrity** ← start here (9 open)
+2. `PLAN-attribute-profile-registry.md` — Streams P, Q (+R1), S, W, then R2, T
+3. Profile-registry Stream V — multiple specializations per concept
+4. OpenAPI — modeling/querying endpoints first
+5. `PLAN-aibom-model-derived.md` — depends on named profiles
 
-The backlog is at the very end of `TASKS-strategy-and-assurance-uplift.md`.
-Item 1 is done (MCP ingest tool + REST parity, live-verified).
+Also open, unsequenced: D1 (7), E1 (2), E2 (3), G1 (8 — likely stale, see the
+table), G2 (6 — mostly stale; the crit-21b Playwright walk is the real remainder),
+U0b (5), X1 (6, restart-gated closure).
 
-**Start with item 2, the rename sweep**, and co-land the defect below.
+## This session's task: Stream R
 
-### Locked naming (do not re-litigate)
+**The problem in one line:** a viewpoint definition references model elements that
+can disappear underneath it, and today only style rules report breakage. Every
+other reference class fails silently, so a broken query is indistinguishable from a
+legitimately empty result.
 
-The act = **ingest** (`IngestSecuritySignals`, `tools/ingest_security_signals.py`,
-CLI verb `ingest`). The data = **SecuritySignalSnapshot** (table
-`security_signal_snapshots`, `SnapshotStore`, `snapshot_id` / `_components` /
-`_findings`, lifecycle staging→complete→active→superseded). "An ingest produces a
-snapshot."
+**The invariant that matters — I-R1: broken ≠ inactive.** An unset optional
+parameter DROPS its term (widens; legitimate — WU-G1 §10.3a). A broken reference
+must NEVER drop, because that silently widens results. It keeps not-matching
+(narrowing, visible), is reported, AND suppresses absence claims. *A broken query
+returning zero gaps must never read as a clean bill of health.* Same discipline as
+`target_population: null` refusing to claim "nothing is missing".
 
-Rename across domain / store / command / bundle / script / MCP / REST / CLI /
-docstrings, ~30 tests, and the sizing spike. Rename the DDL table + columns in
-the v2 DDL — **no data migration**; recreate the dev store (Q12: pre-alpha, no
-assurance user, no data to preserve).
+**Locked decisions — do not re-litigate** (full text in the Stream R section):
 
-### Co-land with the rename: the finding_count defect
+- GENERALIZE the existing mechanism — `StyleRuleOutcomeKind`
+  (`applied`/`expected-empty`/`shadowed`/`unresolvable`/`disabled`), the execution
+  `warnings` channel, `_downgrade_registry_findings` (warning at load, error at
+  save), `ForkStatus` digest staleness. Do NOT build a parallel sync-status
+  subsystem, and do NOT introduce a second vocabulary.
+- NO persisted broken-reference buffer. It is a pure function of (definition,
+  current model); persisting it repeats the rename-stale-index failure mode, would
+  not self-clear when the model changes back, and adds ack state + git churn +
+  cross-tier promotion conflicts. Compute on demand, memoised by
+  `index_generation` + definition digest.
+- Acknowledgement = saving a new version; the version + digest is the audit record.
+  `disabled` is the existing "keep it, make it inert, stop nagging" quarantine.
+- Severity ladder: ontology refs (entity/connection type, specialization, attribute
+  path) → error on save · warning on load · LOUD at execute; entity-id refs
+  (anchors, `entity-id` params) → warning; dynamic vocabulary (`group`) → advisory
+  (§10.2e mandates a typed empty result, not an error).
+- Exploit STABLE SHORT IDS: a rename rewrites only the trailing slug, so comparing
+  on `PREFIX@epoch.random` makes renames a non-event. Real breakage reduces to
+  deletion and cross-tier promotion.
 
-`RefreshActivated.finding_count` reports the **submitted** bundle count, not what
-was **persisted**. Live evidence: an ingest reported 41 findings for
-`APP@1777293133.OYEmP1`; the snapshot holds 24 (`withheld` 0, `suppressed` 0 — so
-neither TLP nor VEX).
+Work R1 → R2 → R3. **Write R1's fixture first** — it is the acceptance test for the
+whole stream: retire a referenced entity type, assert the result is loudly degraded
+rather than a silent empty pass.
 
-Root cause verified in `_refresh_run_store.populate_run`: `finding_id =
-_stable_id("FND", run_id, component_row_id, canonical_id)` with `INSERT OR
-REPLACE`, so bundle findings whose alias sets resolve to the same canonical
-vulnerability for the same component collapse. **The collapse is correct; the
-reporting is not** — the CLI prints 41 and the MCP tool returns 41 while the
-caller reads back 24.
+## Tooling added this session that you should use
 
-Fix: return persisted counts from `populate_run` and report both submitted and
-persisted, naming the delta as alias collapse so dedup stays visible. This
-touches the command's result type, which the rename already touches — hence
-co-landing. Affects `security_write_tools.py` (MCP), `_assurance_signals_routes.py`
-(REST), and `tools/refresh_security_signals.py`.
-
-### Then items 3–7
-
-3. `arch-assurance seed [--with-signals]` (loads `seed-assurance.json`; opt-in
-   signal ingest for the frontend `APP@1776149382.lmO0mp` and backend
-   `APP@1777293133.OYEmP1` anchors) + Quickstart/README/docs.
-4. Directness fix: capture the python (`cyclonedx-py`) dependency graph so
-   directness isn't all `unknown`. npm already classifies transitive; the live
-   python snapshot shows `directness: "unknown"` on every finding.
-5. GUI: component-vulnerability details view fed by `/security-findings`, reached
-   **primarily by a link from `EntityDetailView`** (the anchor entity), secondarily
-   from the wizard. Rework `AssuranceSupplyChainWizardView` (calls removed
-   endpoints → 404) to view the active snapshot; drop the aibom-coverage panel bits.
-6. Docs: `reference/cli-and-backend` + configuration for the removed import/list
-   endpoints and the new snapshot list endpoints; regenerate MCP docs after the
-   rename.
-7. Live re-verify (restart-gated). Mostly done — see the dated entries; the TLP
-   flag, restored read tools, MCP ingest, and REST ingest are all live-verified.
-   What remains is whatever the rename and the GUI work change.
+- **`tests/common/test_documentation_claims.py`** — a drift detector resolving what
+  the docs NAME against the code: HTTP endpoints, `arch-assurance` subcommands, MCP
+  tool names, repository paths, the assurance capability inventory's HTTP column,
+  and the frontend↔backend anchor-type vocabularies. Doc claims of those kinds are
+  now checked automatically; extend it rather than hand-checking. It caught its own
+  author's regression within the hour.
+- **`tools/gui/tests/media/media.spec.ts`** (`npm run media`) — the deterministic
+  screenshot harness, fixed 1440×900 @2x, writing to `docs/media/`. Its `watch()`
+  fails a capture on any page error or 5xx, so captures double as smoke tests.
+  R2's UI surfacing can add a block here; that also serves WU-E2.
+- `arch-assurance seed --with-signals` rebuilds a demo store with real dogfooded
+  snapshots for the anchors declared in `seed-assurance.json`.
 
 ## Gates
 
@@ -114,27 +115,46 @@ uv run ruff check src/ tests/
 uv run zuban check
 ```
 
-Frontend from `tools/gui/`: `npm run lint && npm run typecheck && npx vitest run`
-— full `npm run lint`, never `lint:fast`.
+Frontend **from `tools/gui/`**: `npm run lint && npm run typecheck && npx vitest run`
+— full `npm run lint`, never `lint:fast`. Running vitest from the repo root resolves
+a different config and reports spurious failures; check `pwd` before believing a
+frontend failure.
 
-Baseline at handoff: 6124 passed / 5 skipped; ruff + zuban clean.
+Baseline at handoff: **6215 passed / 5 skipped**; ruff + zuban clean; frontend
+**1148 tests** across 112 files; lint + typecheck clean.
 
 ## Environment notes
 
-- Backend and frontend were restarted recently; the MCP + REST signal surfaces
-  are live and the assurance store auto-unlocks via the OS keychain.
 - Backend code changes are inert until the owner restarts `arch-backend`; MCP
-  *surface* changes also need a Claude session restart. Queue live verification
-  rather than blocking on it.
+  *surface* changes (new or renamed tools) also need a Claude session restart.
+  Queue restart-gated verification rather than blocking, and state plainly what
+  needs a restart.
 - **Never commit `.arch-assurance/`.** Stage files explicitly; never `git add -A`.
-- Two throwaway anchors (`APP@live-check-ingest-tool`, `APP@live-check-rest-ingest`)
-  exist in the dev store from live verification. No snapshot-delete capability
-  exists on any surface; the seed work in item 3 recreates the store.
+- The assurance store is CO-LOCATED: signals share `store.db` with the authored
+  STPA/CAST/GRC model. Any repair must be scoped to the signal tables — deleting
+  the database destroys authored content that is not regenerable.
+- Dev store at handoff: 4 snapshots / 2 active, for the two real anchors.
 
-## Other plans (context, not this session's work)
+## Process notes worth carrying (earned the hard way this session)
 
-- `PLAN-attribute-profile-registry.md` + TASKS — named reusable profiles, their
-  lifecycle and failure semantics (Class A hard-fail / Class B quarantine),
-  relationship profiles, and the D6 rewrite for multiple specializations.
-- `PLAN-aibom-model-derived.md` + TASKS — model-derived AIBOM; depends on named
-  profiles.
+- **Assert that an edit applied.** Three string-replacement edits silently matched
+  nothing and were caught only later, by a test or a type error. An unverified edit
+  is indistinguishable from a completed one.
+- **Verify a check is non-vacuous.** The first cut of the docs drift detector
+  checked 3 of 17 paths and passed, because fenced code blocks break backtick
+  pairing. A check that passes because it found nothing is worse than no check.
+  Self-refute by injecting the failure it is supposed to catch.
+- **Repair means repair.** Asked to fix a 404ing view, I removed the capability and
+  wrote the removal into a design document. If you are arguing a removal in prose
+  rather than writing a repair in code, stop and ask.
+- **Check the design record, not only the code.** `gui-capability-design.md` holds
+  normative contracts (architecture model as the navigation spine for assurance,
+  `AssuranceExposurePolicy` in the application layer, adapters as thin transports).
+  Its capability *inventory* is descriptive and follows the code; its *contracts*
+  bind.
+- **Prefer generation over prose** for anything enumerable. The MCP tool table
+  cannot go stale because it is generated; that is the strongest fix for
+  documentation drift, and the drift detector is second best.
+- A handoff's stated diagnosis can be wrong. Backlog 4 said "capture the python
+  dependency graph"; the graph was always present and the missing piece was the BOM
+  *root*. Reproduce the symptom before implementing the described fix.
