@@ -8,6 +8,9 @@ import type { WriteHelp, WriteResult, EntityAttributeDescriptor, AuthoringGuidan
 import { hasVerificationErrors, readErrorMessage, collectVerificationIssues } from '../lib/errors'
 import { specializationOptionsForEntityType, specializationOptionLabel } from '../lib/specializationOptions'
 import { reconcileRowsWithSchema, rowsFromSchema } from '../lib/schemaPropertyRows'
+import SchemaQuarantineBanner from '../components/SchemaQuarantineBanner.vue'
+import { NO_QUARANTINE, quarantineFromSchemaInfo } from '../lib/schemaQuarantine'
+import { createBlockedReason, previewBlockedReason } from './EntityCreateView.helpers'
 
 const svc = inject(modelServiceKey)!
 const router = useRouter()
@@ -53,6 +56,7 @@ const previewIssues = ref<string[]>([])
 const schemaProps = ref<string[]>([])
 const schemaRequired = ref<Set<string>>(new Set())
 const schemaDescriptors = ref<Record<string, EntityAttributeDescriptor>>({})
+const quarantine = ref(NO_QUARANTINE)
 
 const createRequiredMissing = computed(() =>
   [...schemaRequired.value].some((key) => {
@@ -73,6 +77,7 @@ const loadEffectiveSchema = (type: string, spec: string, preserveRows: boolean) 
       schemaProps.value = [...info.properties]
       schemaRequired.value = new Set(info.required)
       schemaDescriptors.value = info.descriptors
+      quarantine.value = quarantineFromSchemaInfo(info)
       properties.value = preserveRows
         ? reconcileRowsWithSchema(properties.value, previousSchemaKeys, info)
         : rowsFromSchema(info)
@@ -82,6 +87,7 @@ const loadEffectiveSchema = (type: string, spec: string, preserveRows: boolean) 
       schemaProps.value = []
       schemaRequired.value = new Set()
       schemaDescriptors.value = {}
+      quarantine.value = NO_QUARANTINE
       formError.value = readErrorMessage(error)
     })
 }
@@ -101,6 +107,7 @@ watch(artifactType, (newType) => {
     schemaProps.value = []
     schemaRequired.value = new Set()
     schemaDescriptors.value = {}
+    quarantine.value = NO_QUARANTINE
     return
   }
   loadEffectiveSchema(newType, '', false)
@@ -282,6 +289,12 @@ const doCreate = () => {
           </select>
         </div>
 
+        <SchemaQuarantineBanner
+          :quarantine="quarantine"
+          :artifact-type="artifactType"
+          :specialization="specialization"
+        />
+
         <div class="form-row">
           <label class="form-label">Name <span class="required">*</span></label>
           <input
@@ -430,16 +443,16 @@ const doCreate = () => {
         <div class="form-actions">
           <button
             class="preview-btn"
-            :disabled="busy || createRequiredMissing"
-            :title="createRequiredMissing ? 'Fill in all required properties first' : undefined"
+            :disabled="busy || createRequiredMissing || quarantine.quarantined"
+            :title="previewBlockedReason(quarantine.quarantined, createRequiredMissing)"
             @click="doPreview"
           >
             Preview
           </button>
           <button
             class="create-btn"
-            :disabled="busy || !previewClean || createRequiredMissing"
-            :title="!previewClean ? 'Run preview first to enable create' : createRequiredMissing ? 'Fill in all required properties first' : ''"
+            :disabled="busy || !previewClean || createRequiredMissing || quarantine.quarantined"
+            :title="createBlockedReason(quarantine.quarantined, previewClean, createRequiredMissing)"
             @click="doCreate"
           >
             Create
@@ -511,27 +524,18 @@ const doCreate = () => {
 }
 .required { color: #dc2626; }
 .form-hint { font-weight: 400; text-transform: none; color: #9ca3af; }
-.form-input {
+.form-input, .form-textarea, .form-select {
   width: 100%; padding: 7px 10px; border-radius: 6px; border: 1px solid #d1d5db;
   font-size: 13px; outline: none; box-sizing: border-box;
 }
-.form-input:focus { border-color: #2563eb; }
-.form-textarea {
-  width: 100%; padding: 7px 10px; border-radius: 6px; border: 1px solid #d1d5db;
-  font-size: 13px; outline: none; resize: vertical; box-sizing: border-box; font-family: inherit;
-}
-.form-textarea:focus { border-color: #2563eb; }
-.form-select {
-  width: 100%; padding: 7px 10px; border-radius: 6px; border: 1px solid #d1d5db;
-  font-size: 13px; outline: none; background: white; box-sizing: border-box;
-}
-.form-select:focus { border-color: #2563eb; }
+.form-textarea { resize: vertical; font-family: inherit; }
+.form-select { background: white; }
+.form-input:focus, .form-textarea:focus, .form-select:focus { border-color: #2563eb; }
 
 .prop-row { display: flex; gap: 8px; margin-bottom: 8px; align-items: flex-start; }
 .prop-key-label {
   flex: 0 0 150px; font-size: 12px; font-weight: 500; color: #374151;
-  padding-top: 7px; overflow-wrap: break-word; min-width: 0;
-}
+  padding-top: 7px; overflow-wrap: break-word; min-width: 0; }
 .prop-key {
   flex: 0 0 150px; padding: 6px 8px; border-radius: 6px; border: 1px solid #d1d5db;
   font-size: 12px; outline: none; box-sizing: border-box; min-width: 0;
@@ -560,20 +564,16 @@ const doCreate = () => {
 .state-msg--ok { color: #16a34a; }
 
 .form-actions { display: flex; gap: 8px; justify-content: flex-end; padding-top: 4px; }
-.preview-btn {
-  padding: 7px 16px; background: #f3f4f6; color: #1d4ed8; border: 1px solid #bfdbfe;
-  border-radius: 6px; font-size: 13px; cursor: pointer; font-weight: 500;
+.preview-btn, .create-btn {
+  padding: 7px 16px; border-radius: 6px; font-size: 13px; font-weight: 500; cursor: pointer;
 }
+.preview-btn { background: #f3f4f6; color: #1d4ed8; border: 1px solid #bfdbfe; }
 .preview-btn:hover:not(:disabled) { background: #eff6ff; }
-.create-btn {
-  padding: 7px 16px; background: #16a34a; color: white; border: none;
-  border-radius: 6px; font-size: 13px; font-weight: 500; cursor: pointer;
-}
+.create-btn { background: #16a34a; color: white; border: none; }
 .create-btn:hover:not(:disabled) { background: #15803d; }
 .preview-btn:disabled, .create-btn:disabled { opacity: 0.5; cursor: not-allowed; }
 
 /* Preview pane */
-.preview-section { }
 .preview-title {
   font-size: 13px; font-weight: 600; text-transform: uppercase; letter-spacing: .05em;
   color: #374151; margin-bottom: 12px;

@@ -248,12 +248,42 @@ never hardcode `archimate_4`.
       same conflict information, no new surface. Recorded interpretation, not an omission.
 
 ### WU-S2 — GUI surfacing (needs S1)
-- [ ] Banner on affected entity types; submit disabled with the reconciliation
+- [x] Banner on affected entity types; submit disabled with the reconciliation
       message.
-- [ ] Progressive enhancement only — correctness is already guaranteed by WU-Q3
+- [x] Progressive enhancement only — correctness is already guaranteed by WU-Q3
       (PLAN §3 P8). Verify by testing that a GUI unaware of quarantine still
       cannot write ambiguous data.
-- [ ] Vitest coverage, separate file per component.
+- [x] Vitest coverage, separate file per component.
+
+#### WU-S2 PROGRESS (2026-07-21)
+- Contract: `EntitySchemaInfoSchema` gains `quarantined` (optional boolean). `ui/lib/
+  schemaQuarantine.ts` reads it via `quarantineFromSchemaInfo`, falling back to
+  `conflicts.length > 0` so a backend predating the derived flag is not read as clean.
+- Banner: `ui/components/SchemaQuarantineBanner.vue` — headline naming the (type,
+  specialization) pair, the remedy sentence, and the endpoint's conflict list. Pure
+  display; each form owns its own submit gating.
+- Create path: `EntityCreateView.vue` tracks a `quarantine` ref (set on schema load,
+  reset on load failure and on type deselect), renders the banner above the name field,
+  and disables Preview + Create. Blocked-reason ordering extracted to
+  `EntityCreateView.helpers.ts` (quarantine outranks the in-form reasons — filling the
+  form in would not unblock it) rather than nesting ternaries in the template.
+- Edit path: `useEntityEditForm` gains `editQuarantine` + `editArtifactType`; the banner
+  renders in `EntityEditFormCard`, and BOTH mirrored action trios (card + header) disable
+  Preview/Save through the shared `ui/lib/entityEditBlocking.ts`.
+- `WizardEntityForm` deliberately untouched: it only ever fetches the UNSPECIALIZED
+  schema, and a bare type with no specialization and no bindings has nothing to conflict
+  with — it cannot be quarantined. The Q3 write gate covers it regardless.
+- LoC: `EntityCreateView.vue` was AT its 530 baseline, so the additions were paid for by
+  consolidating the duplicated `.form-input/.form-textarea/.form-select` and
+  `.preview-btn/.create-btn` CSS and dropping an empty rule (529/530 after).
+- Tests: vitest `ui/lib/schemaQuarantine.test.ts`, `ui/lib/entityEditBlocking.test.ts`,
+  `ui/views/__tests__/EntityCreateView.helpers.test.ts` (separate file per unit).
+  Backend acceptance in `tests/tools/test_gui_entity_schemata_endpoint.py::
+  TestQuarantineHoldsWithoutTheFlag` — a REST client that never reads `quarantined` still
+  gets a 400 and writes no file, while the clean pair still writes (gate does not
+  over-reach).
+- Gates: backend 6294 passed / 5 skipped; ruff + zuban clean; frontend lint + typecheck +
+  vitest (115 files / 1168 tests) green.
 
 ## Stream W — Relationship profiles (needs P3, Q2)
 

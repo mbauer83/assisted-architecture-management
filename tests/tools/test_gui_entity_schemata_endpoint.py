@@ -133,3 +133,48 @@ class TestEntitySchemataEndpoint:
         ).json()
         assert body["quarantined"] is True
         assert any("scope" in message for message in body["conflicts"])
+
+
+class TestQuarantineHoldsWithoutTheFlag:
+    """The banner and disabled submit are progressive enhancement (WU-S2): a client that
+    never reads ``quarantined`` still cannot write ambiguous data, because the single write
+    boundary refuses it regardless (PLAN §3 P8)."""
+
+    def _conflicting_pair(self, engagement_root: Path) -> None:
+        _write_schema(
+            engagement_root, "attributes.collaboration.schema.json", {"properties": {"scope": {"type": "string"}}}
+        )
+        _write_schema(
+            engagement_root,
+            "attributes.collaboration.business-collaboration.schema.json",
+            {"properties": {"scope": {"type": "integer"}}},
+        )
+        clear_schema_cache()
+
+    def test_create_onto_a_quarantined_pair_is_refused_over_rest(self, client, engagement_root: Path) -> None:
+        self._conflicting_pair(engagement_root)
+        resp = client.post(
+            "/api/entity",
+            json={
+                "artifact_type": "collaboration",
+                "name": "Unaware Client Collaboration",
+                "specialization": "business-collaboration",
+                "dry_run": False,
+            },
+        )
+        assert resp.status_code == 400
+        assert "scope" in resp.json()["detail"]
+        assert not list(engagement_root.rglob("*collaboration*.md"))
+
+    def test_the_clean_pair_still_writes(self, client, engagement_root: Path) -> None:
+        # Guards against the gate over-reaching: quarantine is per (type, specialization).
+        _write_schema(
+            engagement_root, "attributes.collaboration.schema.json", {"properties": {"scope": {"type": "string"}}}
+        )
+        clear_schema_cache()
+        resp = client.post(
+            "/api/entity",
+            json={"artifact_type": "collaboration", "name": "Clean Collaboration", "dry_run": False},
+        )
+        assert resp.status_code == 200
+        assert resp.json()["wrote"] is True

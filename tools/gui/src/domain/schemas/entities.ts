@@ -169,5 +169,8 @@ export const EntitySchemaInfoSchema = Schema.Struct({
   required: Schema.Array(Schema.String),
   descriptors: Schema.Record({ key: Schema.String, value: EntityAttributeDescriptorSchema }),
   conflicts: Schema.optional(Schema.Array(Schema.String)),
+  // Derived read of the SAME conflicts channel, not a parallel one: true means the write
+  // boundary will refuse a create/edit for this (type, specialization) pair.
+  quarantined: Schema.optional(Schema.Boolean),
 })
 export type EntitySchemaInfo = typeof EntitySchemaInfoSchema.Type

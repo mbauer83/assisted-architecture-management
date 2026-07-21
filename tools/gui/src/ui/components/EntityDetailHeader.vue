@@ -12,6 +12,7 @@ import type { RouteLocationRaw } from 'vue-router'
 import type { EntityDetail } from '../../domain'
 import { entityEditFormKey } from '../composables/useEntityEditForm'
 import ArchimateTypeGlyph from './ArchimateTypeGlyph.vue'
+import { editBlockedReason } from '../lib/entityEditBlocking'
 
 defineProps<{
   detail: EntityDetail
@@ -81,7 +82,8 @@ const edit = inject(entityEditFormKey)!
         <button
           v-if="edit.editing"
           class="preview-btn"
-          :disabled="edit.editBusy"
+          :disabled="edit.editBusy || edit.editQuarantine.quarantined"
+          :title="editBlockedReason(edit.editQuarantine.quarantined, false)"
           @click="edit.previewEdit()"
         >
           Preview
@@ -89,8 +91,8 @@ const edit = inject(entityEditFormKey)!
         <button
           v-if="edit.editing"
           class="save-btn"
-          :disabled="edit.editBusy || edit.editRequiredMissing"
-          :title="edit.editRequiredMissing ? 'Fill in all required properties first' : undefined"
+          :disabled="edit.editBusy || edit.editRequiredMissing || edit.editQuarantine.quarantined"
+          :title="editBlockedReason(edit.editQuarantine.quarantined, edit.editRequiredMissing)"
           @click="edit.saveEdit()"
         >
           Save

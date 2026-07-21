@@ -10,6 +10,8 @@ import { inject } from 'vue'
 import { specializationOptionLabel } from '../lib/specializationOptions'
 import { entityEditFormKey } from '../composables/useEntityEditForm'
 import TypedPropertyInput from './TypedPropertyInput.vue'
+import SchemaQuarantineBanner from './SchemaQuarantineBanner.vue'
+import { editBlockedReason } from '../lib/entityEditBlocking'
 
 const emit = defineEmits<{ 'open-reference-picker': [field: 'summary' | 'notes'] }>()
 const edit = inject(entityEditFormKey)!
@@ -178,6 +180,12 @@ const edit = inject(entityEditFormKey)!
       >{{ edit.editPreview.content }}</pre>
     </div>
 
+    <SchemaQuarantineBanner
+      :quarantine="edit.editQuarantine"
+      :artifact-type="edit.editArtifactType"
+      :specialization="edit.editSpecialization"
+    />
+
     <div
       v-if="edit.editError"
       class="state-msg state-msg--error"
@@ -195,15 +203,16 @@ const edit = inject(entityEditFormKey)!
       </button>
       <button
         class="preview-btn"
-        :disabled="edit.editBusy"
+        :disabled="edit.editBusy || edit.editQuarantine.quarantined"
+        :title="editBlockedReason(edit.editQuarantine.quarantined, false)"
         @click="edit.previewEdit()"
       >
         Preview
       </button>
       <button
         class="save-btn"
-        :disabled="edit.editBusy || edit.editRequiredMissing"
-        :title="edit.editRequiredMissing ? 'Fill in all required properties first' : undefined"
+        :disabled="edit.editBusy || edit.editRequiredMissing || edit.editQuarantine.quarantined"
+        :title="editBlockedReason(edit.editQuarantine.quarantined, edit.editRequiredMissing)"
         @click="edit.saveEdit()"
       >
         Save

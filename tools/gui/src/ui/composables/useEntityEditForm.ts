@@ -4,6 +4,7 @@ import type { ModelService } from '../../application/ModelService'
 import type { AuthoringGuidance, EntityAttributeDescriptor, EntityDetail } from '../../domain'
 import { readErrorMessage } from '../lib/errors'
 import { specializationOptionsForEntityType } from '../lib/specializationOptions'
+import { NO_QUARANTINE, quarantineFromSchemaInfo } from '../lib/schemaQuarantine'
 
 type AdHocType = 'string' | 'integer' | 'number' | 'boolean' | 'array'
 const ADHOC_VALID = new Set<string>(['string', 'integer', 'number', 'boolean', 'array'])
@@ -53,7 +54,11 @@ export function useEntityEditForm(options: {
   const notesTextareaRef = ref<HTMLTextAreaElement | null>(null)
   const editSchemaDescriptors = ref<Record<string, EntityAttributeDescriptor>>({})
   const editSchemaRequired = ref<Set<string>>(new Set())
+  // Class-B quarantine for the edited (type, specialization) pair. The write boundary
+  // refuses the save regardless; this only lets the form say so first (WU-S2).
+  const editQuarantine = ref(NO_QUARANTINE)
 
+  const editArtifactType = computed(() => detail.value?.artifact_type ?? '')
   const editSpecializationOptions = computed(() =>
     detail.value ? specializationOptionsForEntityType(editTypeGuidance.value, detail.value.artifact_type) : [],
   )
@@ -74,6 +79,7 @@ export function useEntityEditForm(options: {
         if (requestId !== schemaRequestSeq) return
         editSchemaDescriptors.value = info.descriptors
         editSchemaRequired.value = new Set(info.required)
+        editQuarantine.value = quarantineFromSchemaInfo(info)
         const present = new Set(editProperties.value.map((row) => row.key))
         const missing = info.required.filter((key) => !present.has(key))
         editProperties.value = [
@@ -89,6 +95,7 @@ export function useEntityEditForm(options: {
         if (requestId !== schemaRequestSeq) return
         editSchemaDescriptors.value = {}
         editSchemaRequired.value = new Set()
+        editQuarantine.value = NO_QUARANTINE
       })
   }
 
@@ -245,6 +252,7 @@ export function useEntityEditForm(options: {
     editNotes,
     editSpecialization,
     editTypeGuidance,
+    editArtifactType,
     editSpecializationOptions,
     editBusy,
     editError,
@@ -255,6 +263,7 @@ export function useEntityEditForm(options: {
     notesTextareaRef,
     editSchemaDescriptors,
     editSchemaRequired,
+    editQuarantine,
     editRequiredMissing,
     startEdit,
     cancelEdit,
