@@ -2942,13 +2942,187 @@ only existing nodes cannot measure a missing one".
     alias collapse, so the dedup stays visible instead of silently swallowing 17 findings.
     Co-land with the rename sweep (backlog 2), which already touches this result type.
 
+- 2026-07-21 · BACKLOG 2 — RENAME SWEEP (refresh→ingest / →snapshot) + the finding_count
+  defect, CO-LANDED. 58 files changed. Naming now: the ACT is **ingest**
+  (`IngestSecuritySignals`, `ingest_security_signals()`, `IngestBundle`,
+  `Ingest{Activated,Invalid,Replayed,Conflict,Failed}`, `tools/ingest_security_signals.py`);
+  the DATA is **SecuritySignalSnapshot** (`security_signal_snapshots` /
+  `snapshot_components` / `snapshot_vulnerability_findings`, `snapshot_id`, `SnapshotStore`,
+  `SQLCipherSnapshotStore`, `SnapshotTransitionError`, id prefix `SNAP@`).
+  · PACKAGE: `src/application/security_refresh/` → `src/application/security_signals/`
+    (owner-chosen: it holds metrics/signals_read/vex/severity, none of which are ingest).
+  · TOKEN COLLISION RESOLVED (owner: "consistently rename everywhere"): the pre-existing
+    `SignalSnapshotToken` (a read-consistency token — a DIFFERENT concept from the persisted
+    snapshot) became `SignalReadToken` in `read_token.py`, so "snapshot" now names exactly
+    one thing in the package. `SnapshotRunReads`→`SnapshotReads`, `SignalBasisRun`→
+    `SignalBasisSnapshot`.
+  · WIRE VOCABULARY also renamed for role-functional consistency: `basis_run_id`→
+    `basis_snapshot_id`, `total_runs`/`active_runs`/`anchors_with_active_run`→
+    `total_snapshots`/`active_snapshots`/`anchors_with_active_snapshot`, `basis_runs`→
+    `basis_snapshots`, content-state `no_active_run`→`no_active_snapshot`. The ingest
+    response already used `snapshot_id`, so that half of the contract was unchanged.
+  · DDL: version 2 renamed IN PLACE (Q12 pre-alpha, no data to preserve) — the append-only
+    rule is documented as having this ONE recorded exception in `signals_schema.py`. Because
+    both the old and new schemas stamp version 2, version alone cannot tell them apart, so
+    the upgrade step gained a **pre-rename detector**: a store stamped 2 that still carries
+    `security_refresh_runs` reports `signals-schema-pre-rename` (severity error,
+    auto_migratable=False, blocks_commit=True, "recreate the store") instead of reading as
+    current and then failing at query time on a missing table. Test:
+    `test_pre_rename_store_blocks_instead_of_reading_as_current`.
+  · DEFECT FIXED — ingest reported SUBMITTED counts, not PERSISTED. `populate_snapshot` now
+    returns a typed `SnapshotPopulation` (domain) carrying canonical map + submitted AND
+    persisted component/finding counts; persisted counts come from the sets of deterministic
+    row ids actually written (exact, no extra `COUNT(*)`). `IngestActivated` carries both
+    pairs plus `collapsed_finding_count`. The shared wire projection reports
+    `component_count`/`finding_count` as the PERSISTED values (what a read-back returns),
+    with `submitted_*` and `collapsed_finding_count` alongside so alias dedup stays
+    distinguishable from data loss. The audit row records both counts for the same reason.
+    CLI prints the breakdown. Regression tests:
+    `test_reported_counts_are_what_was_persisted_not_what_was_submitted` (real store, asserts
+    the reported count equals `len(list_snapshot_findings(...))`) and
+    `test_activated_reports_persisted_counts_and_names_the_collapse` (the live 41→24 numbers).
+  · GUI BREAKS FOUND AND FIXED (would have shipped as silent blank fields — the backend had
+    already stopped emitting these keys): `SignalRenderBanner.vue` rendered `run.run_id`;
+    `SecurityPostureDashboard` and `DerivedSecurityAttributesPanel` read `basis_run_id`; the
+    TS `SignalBanner` schema declared `run_id`. All now `snapshot_id`/`basis_snapshot_id`.
+  · GUARD REPAIRED: `test_no_lifecycle_transports.py`'s forbidden-fragment list had been
+    mangled by the mechanical pass; rewritten around the transition verbs
+    (activate/supersede/staging) with `security-ingest` explicitly documented as the one
+    sanctioned mutation route (it submits a bundle; it does not step the lifecycle).
+  · MCP docs regenerated (`uv run tools/generate_mcp_docs.py`); `viewpoints.yaml`
+    security-posture description updated.
+  · NOTE (not fixed, owner decision needed): `_snapshot_store.py` is 380 lines, over the
+    350 hard limit. It was ALREADY over at 355 before this change (HEAD e83b12c); the
+    defect fix added ~25. The natural split is reads vs lifecycle mutations, but that
+    changes the port shape, so it is flagged rather than done inside a rename.
+  · GATES ALL GREEN: backend 6127 passed / 5 skipped (was 6124/5 — +3 net from the new
+    regression tests); ruff + zuban clean; frontend `npm run lint` (full, not lint:fast) +
+    typecheck + vitest 1099 passed. One real catch from the full suite: the frontend
+    line-length policy test — a reworded message string went to 121 cols. Fixed by wrapping
+    the line, NOT by raising the baseline (the file's one remaining over-limit line is
+    pre-existing and untouched).
+  · STILL QUEUED: backlog 3–7.
+
+- 2026-07-21 · LIVE VERIFICATION of the rename + the finding_count fix (owner restarted
+  backend + frontend) · DONE, and it found three further defects.
+  · PRE-RENAME STORE, AS PREDICTED: the first live call failed with
+    `no such table: security_signal_snapshots` — confirming the restarted backend runs the
+    renamed code and that the dev store carried the pre-rename schema.
+  · DEFECT A (runtime failure face) — the migration loop correctly SKIPS a store stamped at
+    the current version, so every query then failed with an opaque `no such table`. Added a
+    runtime guard in `_signals_migrations.apply_signals_migrations`: typed
+    `SignalsSchemaUnsupportedError` with actionable text, detected via one `sqlite_master`
+    lookup taken ONLY on the migrations-skipped path. This is the runtime counterpart of the
+    upgrade step's `signals-schema-pre-rename` finding. Tests: raises for a pre-rename store;
+    does NOT false-positive when a leftover old table sits alongside the current one.
+  · DEFECT B (DESTRUCTIVE GUIDANCE — the important one) — both my new error message and the
+    upgrade finding said "recreate/delete the signals store". In the co-located backend
+    (`signals_backend: sqlcipher-colocated`) signals live in the SAME `store.db` as the
+    AUTHORED STPA/CAST/GRC model. Following that advice would have destroyed 17 assurance
+    nodes / 30 edges / 8 arch_refs / 32 audit rows. Both messages now scope the repair to the
+    three SIGNAL tables and explicitly say **do NOT delete the assurance database file**.
+  · DEFECT C (incomplete repair) — dropping the pre-rename tables ALONE leaves the schema
+    stamped current with no signal tables, which fails identically. Both messages now require
+    resetting `signals_schema_meta.schema_version` to 1 so the current DDL is reapplied, and
+    say why.
+  · OWNER DECISION: the pre-rename repair stays MANUAL + blocking (not auto-migratable) —
+    destroying data inside an upgrade step is not a behaviour to add implicitly.
+  · DEV STORE REPAIRED (owner-approved, scoped): backed up first, then dropped ONLY
+    run_vulnerability_findings (82) / run_components (1520) / security_refresh_runs (8) and
+    reset the stamp; verified assurance_nodes 17, assurance_edges 30, arch_refs 8,
+    audit_log 32, canonical_vulnerabilities 29, vulnerability_aliases 75 ALL unchanged.
+    Re-applied migrations → the three snapshot tables exist.
+  · MISSED KEY FOUND BY THE LIVE CALL: `assurance_security_stats` returned
+    `active_run_findings` — the one payload key every sweep missed (it matched none of the
+    grep patterns used). Renamed to `active_snapshot_findings`; a follow-up exhaustive
+    `run`-token sweep over the whole signal scope also caught a local `run_part`. The signal
+    scope now contains NO `run_id`/`*_run_*` token except the deliberate historical reference
+    in `signals_schema.py`.
+  · LIVE-VERIFIED, THE DEFECT FIX END TO END: ingest for APP@live-check-collapse with TWO
+    advisories that are aliases of one another (GHSA-collapse-aaa aliases CVE-2026-9001)
+    returned `submitted_finding_count 2 · finding_count 1 · collapsed_finding_count 1`, and
+    `assurance_list_vulnerabilities` read back exactly `count 1`. Under the old code this
+    would have reported 2 and read back 1 — the precise defect, now closed and witnessed.
+    Also witnessed: `snapshot_id`/`SNAP@` ids, `SCM@` component row ids, directness "direct"
+    from the dependency graph, and `assurance_security_metrics.basis_snapshot_id` with
+    `finding_total 1` agreeing with the persisted count.
+  · RESTART-GATED REMAINDER: the running backend predates the `active_snapshot_findings`,
+    `basis_part` and migration-guard edits, so those need one more restart to be live.
+  · HOUSEKEEPING: this left one more throwaway anchor (APP@live-check-collapse); still no
+    snapshot-delete capability on any surface. Backlog 3's seed work is the intended reset.
+
+- 2026-07-21 · BACKLOG 3 — `arch-assurance seed [--with-signals]` · DONE, and verifying the
+  anchors found a defect that would have made the whole feature silently useless.
+  · **ANCHOR-IDENTITY DEFECT (the important find).** Snapshots are matched by exact SQL
+    equality on `anchor_entity_id`, but the two sides used DIFFERENT id forms:
+    `EntityDetailView` navigates by the FULL slugged id (`route.query.id`, e.g.
+    `APP@1777293133.OYEmP1.architecture-backend`) while every ingest to date used the SHORT
+    id (`APP@1777293133.OYEmP1`). Seeded signals were therefore invisible to the GUI, which
+    renders `no_active_snapshot` — a clean-looking empty state, never an error.
+    REPRODUCED LIVE on the pre-fix backend: metrics for the SHORT id returned the full
+    snapshot (107 components / 24 findings), the FULL id returned `no_active_snapshot` with
+    zeros. FIX: snapshots are keyed by the STABLE (slug-free) id via a new domain helper
+    `anchor_key()` (delegating to the existing `stable_id`), normalized at BOTH boundaries —
+    writes in `IngestBundle.__post_init__` so the stored key and the idempotency digest agree,
+    reads in the store adapter which owns the anchor→row mapping. This also makes anchors
+    survive entity RENAMES, since the slug is rename-volatile. Added public `is_entity_id()`
+    to `artifact_id.py` rather than reaching into its private regex; anchors that are not
+    well-formed artifact ids are returned unchanged so synthetic/test anchors are never
+    truncated at their last dot. Tests: both directions resolve, both forms are ONE replay
+    key (else one entity could get two active snapshots), listing resolves either form, and
+    a non-artifact anchor is untouched. VERIFIED with the fixed code: full and short ids both
+    resolve to SNAP@be03c4f151a644c1.
+  · DESIGN — anchors are declared BY THE BUNDLE (`signal_anchors: [{anchor_entity_id, target,
+    label}]`), never hardcoded in shipped source: an anchor id identifies an entity in ONE
+    architecture repository and is meaningless in any other workspace. Both shipped anchors
+    were verified to exist and to match their target: APP@1777293133.OYEmP1 (Architecture
+    Backend) → python, APP@1776149382.lmO0mp (GUI Authoring Tool) → npm. Recorded asymmetry:
+    `signal_anchors` is authored seed metadata, NOT store state — `export` does not emit it,
+    so regenerating a bundle from a live store drops the block.
+  · REUSE, NOT DUPLICATION — seeding IS an import with a conventional default input and
+    replace-by-default semantics, so `cmd_seed` calls the existing `import_store` rather than
+    growing a second bundle reader; `--keep-existing` merges instead. `import_bundle` reads
+    known keys explicitly, so the new top-level block passes through untouched.
+  · LAYERING FIX — SBOM generation + live OSV acquisition moved out of `tools/` into
+    `src/infrastructure/assurance/signal_sources.py` so the CLI does not import from a script
+    directory; `tools/ingest_security_signals.py` is now a thin CLI over it, and both surfaces
+    perform the identical act. The move immediately exposed a latent typing hole
+    (`OsvClient(**kwargs)`) that `tools/` was never type-checked for.
+  · FAIL BEFORE MUTATING — `--with-signals` against a bundle declaring no anchors, or a
+    malformed anchor entry, exits non-zero BEFORE the model import: importing and reporting
+    success while silently ingesting nothing is indistinguishable from a clean run.
+    `_assurance_commands.py` was already at 400 lines, so the command lives in a new
+    `_seed_commands.py`.
+  · LIVE END-TO-END: `arch-assurance seed --with-signals` → 17 nodes / 30 edges / 8 arch_refs
+    restored, then python SNAP@be03c4f151a644c1 (107 components, 24 findings, **17 collapsed
+    by alias**) and npm SNAP@be455aff61d44f8d (398 components, 6 findings). The backend
+    snapshot reproduces the pre-rename numbers EXACTLY (107 / 24 / max_cvss 8.7 / high 12,
+    medium 7, low 4) and **41 submitted − 17 collapsed = 24 persisted** — an independent
+    confirmation that the finding_count diagnosis and fix were both right.
+  · CONFIRMS BACKLOG 4 IS STILL OPEN: the python snapshot's
+    `open_component_findings` is `{"unknown": 24}` — every finding unclassified — while the
+    npm side classifies. That is exactly the cyclonedx-py dependency-graph gap backlog 4
+    describes.
+  · RESTART-GATED: the anchor normalization is inert on the running backend, so the GUI still
+    shows `no_active_snapshot` for the full-id path until `arch-backend` is restarted.
+  · TEST STRENGTHENED (it caught the refactor, then proved too weak): the script-architecture
+    contract asserted `"assemble_bundle" in source` — a text grep on a function name, which
+    failed purely because the shared entry point is now `build_live_bundle`. Replaced with the
+    STRUCTURAL contract, checked over the AST: the script must import its submission from
+    `signal_ingest` and its bundle from `signal_sources`, and must NOT construct an
+    `IngestBundle` itself (that is the duplication the shared boundary exists to prevent).
+    Both assertions were self-refuted — confirmed non-vacuous against the real imports, and a
+    synthetic bypass script is correctly flagged.
+
 ### REMAINING BACKLOG (assurance security-signals — sequenced, owner-directed)
 1. [x] INGEST-via-MCP tool (bundle-submit to the ingest command) + decide aibom_coverage — DONE
        2026-07-21 (see the entry above); aibom_coverage DROPPED with rationale. REST parity
        endpoint added the same day (see the ingest-REST-parity entry).
-2. [ ] Rename sweep: refresh→ingest (act) + →snapshot (data), consistent & role-functional (above).
-3. [ ] `arch-assurance seed [--with-signals]` command (loads seed-assurance.json; opt-in signal
-       ingest for frontend+backend anchors) + Quickstart/README/docs for demo use.
+2. [x] Rename sweep: refresh→ingest (act) + →snapshot (data), consistent & role-functional —
+       DONE 2026-07-21, co-landed with the finding_count defect fix (see the entry above).
+3. [x] `arch-assurance seed [--with-signals]` command — DONE 2026-07-21 (see the entry above);
+       anchors are bundle-declared, and an anchor-identity defect was found and fixed.
+       REMAINING SUB-ITEM: Quickstart/README/docs for demo use (folded into backlog 6).
 4. [ ] Directness fix: capture the python (cyclonedx-py) dependency graph so directness isn't all
        'unknown' (npm already classifies transitive).
 5. [ ] GUI: the snapshot/vulnerability details view is PRIMARILY reached by a LINK from the arch
@@ -2960,3 +3134,26 @@ only existing nodes cannot measure a missing one".
 6. [ ] Docs: reference/cli-and-backend + configuration for the removed import/list endpoints + the
        new snapshot list endpoints; regenerate MCP docs after the ingest-MCP tool + rename.
 7. [ ] RESTART-GATED live re-verify: restored MCP/REST tools, TLP visibility_limited flag, metrics.
+8. [ ] **Snapshot deletion** (owner-requested 2026-07-21) — tools + endpoints to delete security
+       snapshots. Ingest is currently IRREVERSIBLE on every surface (MCP/REST/CLI): live
+       verification has already left three junk anchors in the dev store
+       (APP@live-check-ingest-tool, APP@live-check-rest-ingest, APP@live-check-collapse) that
+       cannot be removed without hand-editing the DB. Design questions to settle first:
+       delete a single snapshot vs every snapshot for an anchor; what happens to the ACTIVE
+       one (refuse? auto-promote the previous superseded snapshot? leave the anchor with
+       none?); whether deletion is a hard delete or a lifecycle transition (a `deleted`
+       status would preserve the audit chain's referents); and the capability gate + audit
+       event, since this is a destructive signal mutation and the audited-mutation
+       invariant applies. Note the FK cascade already removes components/findings with the
+       snapshot row, but canonical_vulnerabilities/vulnerability_aliases are SHARED identity
+       data and must NOT be cascaded away.
+9. [ ] **Vulnerability → affected entities** (owner-requested 2026-07-21) — find and present
+       every entity affected by a given vulnerability. This is the REVERSE of the current
+       read model: today everything is keyed anchor→snapshot→components→findings, so the
+       only way to answer "who is affected by CVE-X" is to scan every active snapshot.
+       Needs: a canonical-vulnerability-keyed query (the canonical id already exists and
+       already merges aliases, so CVE/GHSA/PYSEC all resolve to one identity — that is the
+       right key), returning the affected anchors with their component and severity context;
+       exposure filtering applied BEFORE aggregation, as everywhere else; and a presentation
+       surface (MCP tool + REST endpoint + a GUI view reachable from a finding). Relates to
+       backlog 5's component-vulnerability details view — same data, opposite direction.
