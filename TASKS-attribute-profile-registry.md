@@ -189,6 +189,11 @@ never hardcode `archimate_4`.
   domain (overlay/bindings). ruff + zuban clean.
 - RESTART-GATED: the Q1 startup abort and the Q3 gate are new backend code — inert until the
   next `arch-backend` restart; the logic is fully covered in-process.
+- LIVE-VERIFIED 2026-07-21 (post-restart, non-invasive): backend started clean (Q1 ran on the
+  real repo with no false abort); `GET /api/entity-schemata?...service` resolves the effective
+  schema with `conflicts: []` (P3 live via the new list signature); a dry-run create returned a
+  normal result (Q3 gate wired + inert for a clean pair). The rejection path is covered by the
+  e2e/unit tests — not forced live (would require adding a conflicting schema to the real repo).
 
 ### WU-Q4 — Stream Q boundary
 - [x] Full backend gates green (see the commit's gate line). No entity is written against an
@@ -199,13 +204,30 @@ never hardcode `archimate_4`.
 ## Stream R — Reconciliation
 
 ### WU-R1 — Conflict and drift reporting (needs Q2)
-- [ ] Upgrade step reporting each conflict (profiles, field, types, resulting
-      quarantined pairs) and content-version drift (shipped profile advanced
-      past a customisation — the capability P4's content version exists for).
-- [ ] Non-destructive: never overwrite operator content
-      (`DefaultSchemataEnsureStep`'s contract).
-- [ ] Tests: conflicts reported; drift reported with the intervening changes;
-      operator customisations preserved.
+- [x] Upgrade step (`ProfileReconciliationScanStep`, registered) reporting each conflict
+      (the quarantined `entity-type/specialization` pair; profiles/field/types named in the
+      merge message).
+- [~] Content-version DRIFT: DEFERRED — no reusable profiles are shipped, so there is no
+      baseline to drift from. The mechanism (P4 per-profile `version`) is in place; the drift
+      comparison activates when shipped profiles land, by feeding the step the shipped
+      registry via an `RepoUpgradeView` property (the `known_entity_type_names` pattern).
+      Deferring avoids enriching the view Protocol (many test adapters) for a vacuous check.
+- [x] Non-destructive: detect-only; `apply` returns `[]`; all findings `auto_migratable=False`
+      with manual instructions (mirrors `DefaultSchemataEnsureStep`'s no-overwrite contract).
+- [x] Tests: conflict reported; non-conflicting binding quiet; no-repo-specializations quiet;
+      report-only writes nothing. (Drift test lands with the deferred drift logic.)
+
+#### WU-R1 PROGRESS (2026-07-21)
+- `src/application/repository_upgrade/steps/profile_reconciliation_scan.py`: for each
+  specialization the repo's `.arch-repo/specializations.yaml` declares with `profiles:`
+  bindings, resolves the effective schema via `compute_effective_attribute_schema` (repo
+  profiles.yaml read internally) and reports each type conflict as a quarantined-pair
+  warning. Fully computable from repo files — no catalogs/infra needed by the step.
+- Architectural finding: application upgrade steps are view-based (file reads + a few
+  registry-derived properties like `known_entity_type_names`); they cannot reach
+  `RuntimeCatalogs`. So the step scans REPO-defined specialization bindings (which it can
+  parse) — symmetric to Q3 gating MODULE specializations. Drift needs the shipped baseline,
+  hence the deferral above.
 
 ### WU-R2 — Proposed resolutions (needs R1)
 - [ ] Propose rename / align-type / unbind as manual instructions.

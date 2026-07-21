@@ -16,6 +16,7 @@ from src.application.repository_upgrade.steps.connection_metadata_scan import Co
 from src.application.repository_upgrade.steps.default_schemata_ensure import DefaultSchemataEnsureStep
 from src.application.repository_upgrade.steps.group_meta_ontology_rename import GroupMetaOntologyRenameStep
 from src.application.repository_upgrade.steps.multiplicity_rename import MultiplicityRenameStep
+from src.application.repository_upgrade.steps.profile_reconciliation_scan import ProfileReconciliationScanStep
 from src.application.repository_upgrade.steps.schema_file_scan import SchemaFileScanStep
 from src.application.repository_upgrade.steps.specialization_declaration_scan import (
     SpecializationDeclarationScanStep,
@@ -66,6 +67,7 @@ def build_registry(selection_resolutions: Mapping[str, SelectionMode] | None = N
     registry.register(ViewpointSelectionModeStampStep(selection_resolutions))
     registry.register(SchemaFileScanStep())
     registry.register(DefaultSchemataEnsureStep())
+    registry.register(ProfileReconciliationScanStep())
     registry.register(ConnectionMetadataScanStep())
     registry.register(ViewpointApplicationScanStep())
     return registry
