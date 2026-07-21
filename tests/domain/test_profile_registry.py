@@ -8,9 +8,11 @@ from src.domain.profile_registry import (
     PROFILE_SCHEMA_VERSION,
     ProfileRegistry,
     ProfileRegistryError,
+    classify_profile_conflicts,
     merge_profile_registries,
     profile_registry_from_mapping,
 )
+from src.domain.profiles import merge_property_schemas
 
 
 def _valid_mapping() -> dict[str, object]:
@@ -98,3 +100,49 @@ def test_merge_rejects_a_duplicate_name_across_registries() -> None:
     b = profile_registry_from_mapping({"profile_schema": 1, "profiles": {"dup": {"version": 2}}}, label="b")
     with pytest.raises(ProfileRegistryError, match="'dup' is defined more than once"):
         merge_profile_registries([a, b])
+
+
+# --- WU-P4: conflict classification -----------------------------------------------------
+
+_REGISTRY = profile_registry_from_mapping(
+    {"profile_schema": 1, "profiles": {"known": {"version": 1, "attributes": {"X": {"type": "string"}}}}},
+    label="test",
+)
+
+
+def test_undefined_binding_is_a_structural_conflict() -> None:
+    conflicts = classify_profile_conflicts(["known", "ghost"], _REGISTRY, [])
+    assert [(c.conflict_class, "ghost" in c.message) for c in conflicts] == [("structural", True)]
+
+
+def test_defined_binding_is_not_a_conflict() -> None:
+    assert classify_profile_conflicts(["known"], _REGISTRY, []) == ()
+
+
+def test_identical_redefinition_is_not_a_conflict() -> None:
+    # Two fragments declaring the same attribute+type compose with no merge conflict, so
+    # classification reports nothing scoped.
+    _merged, merge_conflicts = merge_property_schemas(
+        [{"properties": {"Supplier": {"type": "string"}}}, {"properties": {"Supplier": {"type": "string"}}}]
+    )
+    assert merge_conflicts == []
+    assert classify_profile_conflicts([], _REGISTRY, merge_conflicts) == ()
+
+
+def test_incompatible_type_redefinition_is_a_scoped_conflict() -> None:
+    _merged, merge_conflicts = merge_property_schemas(
+        [{"properties": {"Supplier": {"type": "string"}}}, {"properties": {"Supplier": {"type": "number"}}}]
+    )
+    assert len(merge_conflicts) == 1
+    conflicts = classify_profile_conflicts([], _REGISTRY, merge_conflicts)
+    assert [c.conflict_class for c in conflicts] == ["scoped"]
+
+
+def test_both_classes_are_assigned_in_one_pass() -> None:
+    _merged, merge_conflicts = merge_property_schemas(
+        [{"properties": {"S": {"type": "string"}}}, {"properties": {"S": {"type": "integer"}}}]
+    )
+    conflicts = classify_profile_conflicts(["ghost"], _REGISTRY, merge_conflicts)
+    assert {c.conflict_class for c in conflicts} == {"structural", "scoped"}
+    # Structural is reported first (it subsumes the scoped one: the schema is indeterminable).
+    assert conflicts[0].conflict_class == "structural"

@@ -117,12 +117,25 @@ never hardcode `archimate_4`.
   parent-inheritance regression, Class-B conflict, undefined-name-unresolved). ruff + zuban clean.
 
 ### WU-P4 — Conflict classification (needs P3)
-- [ ] Classify each conflict as Class A (structural) or Class B (scoped) per
+- [x] Classify each conflict as Class A (structural) or Class B (scoped) per
       PLAN §4.
-- [ ] Identical redefinition composes silently; only incompatible `type`
+- [x] Identical redefinition composes silently; only incompatible `type`
       redefinition conflicts (PLAN §3 P3 — today's semantic, keep it).
-- [ ] Tests: identical redefinition across two profiles is NOT a conflict;
+- [x] Tests: identical redefinition across two profiles is NOT a conflict;
       differing types IS; each class is assigned correctly.
+
+#### WU-P4 PROGRESS (2026-07-21)
+- `ConflictClass` (`structural`|`scoped`) + `ProfileConflict` + pure
+  `classify_profile_conflicts(bound_names, effective_registry, merge_conflicts)` in
+  `profile_registry.py`: an undefined binding → structural (Class A, reported first — it
+  subsumes any scoped conflict because the schema is then indeterminable); a merge type
+  conflict → scoped (Class B). Identical redefinition never produces a merge conflict, so it
+  never appears. The `registry` argument must be the EFFECTIVE registry (shipped ∪ repo).
+- This is the pure classification PRIMITIVE only; Q1 (startup Class A) and Q2 (Class B
+  quarantine set) are its consumers. No consumer wired yet — compute_effective still returns
+  the raw merge list for the existing E043 path; Q1/Q2 will assemble inputs and call this.
+- Tests: 5 added to test_profile_registry.py (undefined→structural, defined→none,
+  identical→none, type→scoped, both-in-one-pass with structural-first). ruff + zuban clean.
 
 ## Stream Q — Failure semantics
 

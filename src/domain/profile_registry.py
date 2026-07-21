@@ -22,10 +22,13 @@ from __future__ import annotations
 from collections.abc import Iterable, Mapping
 from dataclasses import dataclass, field
 from types import MappingProxyType
+from typing import Literal
 
 from src.domain.profiles import ProfileDefinition, attributes_from_mapping
 
 PROFILE_SCHEMA_VERSION = 1
+
+ConflictClass = Literal["structural", "scoped"]
 
 
 class ProfileRegistryError(ValueError):
@@ -80,6 +83,40 @@ def merge_profile_registries(registries: Iterable[ProfileRegistry]) -> ProfileRe
                 )
             merged[name] = profile
     return ProfileRegistry(profile_schema=PROFILE_SCHEMA_VERSION, profiles=MappingProxyType(merged))
+
+
+@dataclass(frozen=True)
+class ProfileConflict:
+    """One classified conflict from resolving a (entity-type, specialization) pair, tagged
+    by blast radius (PLAN §4). ``structural`` = Class A; ``scoped`` = Class B."""
+
+    conflict_class: ConflictClass
+    message: str
+
+
+def classify_profile_conflicts(
+    bound_profile_names: Iterable[str],
+    registry: ProfileRegistry,
+    merge_conflicts: Iterable[str],
+) -> tuple[ProfileConflict, ...]:
+    """Classify the conflicts a (entity-type, specialization) resolution surfaces, by blast
+    radius (PLAN §4):
+
+    * STRUCTURAL (Class A) — a binding names a profile the registry does not define; the
+      effective schema cannot even be determined, so nothing downstream is trustworthy.
+    * SCOPED (Class B) — an incompatible-type redefinition confined to this pair; the rest
+      of the model is well-defined.
+
+    Identical redefinition composes silently (PLAN §3 P3), so it never produces a merge
+    conflict and never appears here. ``registry`` must be the EFFECTIVE registry (shipped
+    overlaid by repo) so a repo-defined profile is not misreported as undefined."""
+    conflicts: list[ProfileConflict] = [
+        ProfileConflict("structural", f"binding references undefined named profile {name!r}")
+        for name in bound_profile_names
+        if registry.get(name) is None
+    ]
+    conflicts.extend(ProfileConflict("scoped", message) for message in merge_conflicts)
+    return tuple(conflicts)
 
 
 def profile_registry_from_mapping(raw: object, *, label: str) -> ProfileRegistry:
