@@ -35,12 +35,13 @@ incomplete. (A prior session missed Stream R entirely by capping a grep with
 | E2 — Deterministic screenshots | 3 | **GENUINELY OPEN.** Gated on the UI surfaces it captures. |
 | G1 — Trace evaluator etc. | 8 | **STALE — substantially complete.** Evidenced by G2's live validation: the shipped `motivation-coverage` viewpoint executed live returning 91 gap rows / 0 warnings, which exercises the grammar, result union, evaluator, and post-projection pipeline. Individual sub-items (enum-set parameter type, §10.7 format impact) were not separately re-verified. |
 | G2 — Shipped viewpoint, docs, self-model, boundary | 6 | **STALE except one item.** Live-validated 2026-07-21; self-model saved (engagement commit `4f5a22e1`); frontend boundary gate green. The deferred **full backend suite is now satisfied** — 6124 passed / 5 skipped, 2026-07-21. **REMAINING: the crit-21b e2e G-S3 GUI walk** (Playwright; needs the running GUI dev server). |
-| R1/R2/R3 — Viewpoint reference integrity | 9 | **GENUINELY OPEN — never started.** The largest untouched stream. Independent of G; owner-approved 2026-07-20. Deferred previously because I-R1 execution-honesty wiring is integration-heavy and should not land unverified. |
+| R1/R2/R3 — Viewpoint reference integrity | 0 | **COMPLETE (2026-07-21)** — commits `b349250` (R1) + `c8eb759` (R2) + docs/self-model (R3). All gates green; ONLY the R2 e2e route walk is restart-gated. See STREAM R PROGRESS. |
 | U0a — Upgrade foundation | 4 | **STALE.** U0a itself is COMPLETE (2026-07-19). All four open boxes are co-landing hooks, and all four are verified registered: `SignalsRefreshRunSchemaStep`, `GuidanceCacheFormatStep`, `ViewpointDeclarationScanStep`, `DefaultSchemataEnsureStep`. |
 | U0b — Previous-release, partial-failure, Docker | 11 | **GENUINELY OPEN.** Last in stream. |
 
-**Genuinely remaining:** D1 (7), E1 (2), E2 (3), G2's e2e walk (1), Stream R (9),
+**Genuinely remaining:** D1 (7), E1 (2), E2 (3), G2's e2e walk (1),
 U0b (11) — plus the security-signals backlog items 2–7 at the end of this file.
+(Stream R — viewpoint reference integrity — COMPLETE 2026-07-21.)
 
 ### Cross-plan sequencing (owner-agreed 2026-07-21)
 
@@ -804,31 +805,69 @@ so a broken query is indistinguishable from a legitimately empty result.
   breakage cases reduce to deletion and cross-tier promotion.
 
 ### WU-R1 — Reference report + execution honesty
-- [ ] One pure `reference_report(definition, registries) -> tuple[BrokenReference, ...]`
+- [x] One pure `reference_report(definition, registries) -> tuple[BrokenReference, ...]`
       over ALL reference classes (criteria attribute paths + reserved type values,
       neighbor/connection criteria, style rules, matrix axes, anchors, `entity-id`
       params, vocabulary names). Classified by the severity ladder; short-id
       comparison so renames do not register.
-- [ ] Memoised by `index_generation` + definition digest; never persisted; recomputed
+- [x] Memoised by `index_generation` + definition digest; never persisted; recomputed
       when either changes (self-clears when the model changes back).
-- [ ] Execution honesty (I-R1): broken refs never drop; they surface in the result
+- [x] Execution honesty (I-R1): broken refs never drop; they surface in the result
       `warnings` AND suppress absence claims (no "0 gaps = clean" when a reference is
       broken). Fixture: retire a referenced entity type → result is loudly degraded,
       never a silent empty pass.
-- [ ] Reuse `unresolvable`/`disabled`; do NOT introduce a second vocabulary.
-- [ ] Cross-tier case: a definition promoted engagement→enterprise referencing an
+- [x] Reuse `unresolvable`/`disabled`; do NOT introduce a second vocabulary.
+- [x] Cross-tier case: a definition promoted engagement→enterprise referencing an
       engagement-local group/type reports correctly at the destination tier.
 
 ### WU-R2 — Surfacing + repair (needs R1)
-- [ ] Report surfaced on catalogue LIST (badge), OPEN/EDIT (inline, per reference),
+- [x] Report surfaced on catalogue LIST (badge), OPEN/EDIT (inline, per reference),
       and EXECUTE (result warnings) — one report, three renderings.
-- [ ] Repair affordances: remap the reference, drop the term, or quarantine
+- [x] Repair affordances: remap the reference, drop the term, or quarantine
       (`disabled`); each produces a NEW definition version (= the acknowledgement).
-- [ ] Vitest + a route walk; no new persisted state asserted by a repository scan.
+- [x] Vitest + a route walk; no new persisted state asserted by a repository scan.
 
 ### WU-R3 — Boundary
-- [ ] Full gates; docs note in the viewpoint reference page; self-model sync only if
+- [x] Full gates; docs note in the viewpoint reference page; self-model sync only if
       new entities are warranted (prefer descriptions — motivation-entity discipline).
+
+### STREAM R PROGRESS (2026-07-21) — COMPLETE
+- R1 (commit `b349250`): `src/domain/viewpoint_reference_report.py` — pure
+  `reference_report(definition, *, registries, read_access)` over scope/query criteria
+  (attribute paths + reserved type/spec values, incident + neighbor + derived criteria),
+  style-rule `applies_to`, matrix axes, column sources, target types, and entity-id
+  parameter defaults; classified `ontology`/`entity-id`; short-id comparison
+  (renames are non-events); disabled rules skipped (quarantine). Reused
+  `resolve_attribute_path` and the `disabled` quarantine — no second vocabulary. Memoised
+  by `(index_generation, definition_digest)` in `reference_report_cache.py` (never
+  persisted; bypassed when generation is None). Wired into `evaluate_viewpoint`: broken
+  refs add `warnings` and force `target_population=None`; dropped supplied entity-id
+  anchors surfaced too. Boundary of the warning channel: attribute-path breakage stays
+  owned by `drift_warnings`/style `unresolvable` at execution (same
+  `resolve_attribute_path is None` condition) — the report enumerates it for static
+  surfaces but omits it from `reference_report_warnings` so execution never double-reports;
+  suppression still keys off the FULL report. Tests: `tests/domain/…reference_report` (14),
+  `tests/application/viewpoints/test_reference_integrity` (the acceptance fixture) +
+  `…test_reference_report_cache` (memo contract).
+- R2 (commit `c8eb759`): the ONE report, three renderings. `GET /api/viewpoints` entries
+  carry `broken_references` (`_full_entry`, computed once per request via the memoiser,
+  read back into both the list badge and the editor since there is no separate detail
+  endpoint). Frontend: red count badge on `ViewpointCatalogRow`, per-reference notice
+  block in `ViewpointEditorNotices`, schema `BrokenReferenceSchema` (optional, tolerant of
+  an older backend). Repair reuses the existing editor per the locked "acknowledgement =
+  save a new version" decision (remap/drop in the criteria builder, quarantine via the
+  StyleRuleCard disable toggle) — no bespoke repair engine. `no new persisted state`:
+  backend test scans the written catalog file for `broken_references` (absent). e2e route
+  walk (`viewpoint-editor.spec.ts`) seeds a broken entity-id anchor through the create
+  endpoint (warning-severity = savable) and asserts badge + notice — RESTART-GATED (needs
+  the GUI dev server); a backend test confirms the same savable path non-gated.
+- R3: docs — new "Reference integrity" section in `docs/reference/viewpoints-schema.md`
+  + the `target_population` note now records the second suppression trigger. Self-model:
+  NO new entity (motivation-entity discipline); enriched the existing `Query Engine`
+  (`APP@1712870400.v9LvfK`) description with one execution-honesty clause; `artifact_verify`
+  clean. Gates: full backend 6234→(this run) passed / 5 skipped, ruff + zuban clean,
+  docs-drift 6 passed; frontend lint + typecheck clean, vitest 1150 passed (112 files).
+  ONLY restart-gated remainder: the R2 e2e route walk.
 
 ---
 

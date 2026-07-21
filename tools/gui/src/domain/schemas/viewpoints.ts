@@ -1,5 +1,6 @@
 import { Schema } from 'effect'
 
+import { BrokenReferenceSchema } from './viewpointReferences'
 import { TraceTableSchema } from './viewpointTrace'
 
 export type { PatternResult, TraceObligation, TraceRow, TraceTable } from './viewpointTrace'
@@ -273,18 +274,6 @@ export const ScopeSummarySchema = Schema.Struct({
 })
 export type ScopeSummary = typeof ScopeSummarySchema.Type
 
-/** One authored reference (entity/connection type, specialization slug, attribute path,
- * or entity-id anchor) that no longer resolves against the current model. Computed on
- * demand from (definition, model), never persisted — the same report is rendered as a
- * catalogue-list badge, per-reference editor notices, and execution warnings. */
-export const BrokenReferenceSchema = Schema.Struct({
-  kind: Schema.Literal('entity-type', 'connection-type', 'specialization', 'attribute-path', 'entity-id'),
-  reference: Schema.String,
-  locus: Schema.String,
-  severity: Schema.Literal('ontology', 'entity-id'),
-})
-export type BrokenReference = typeof BrokenReferenceSchema.Type
-
 export const ViewpointDefinitionEnvelopeSchema = Schema.Struct({
   slug: Schema.String,
   version: Schema.Number,
@@ -300,8 +289,8 @@ export const ViewpointDefinitionEnvelopeSchema = Schema.Struct({
   derivation_defaults: Schema.optional(Schema.Record({ key: Schema.String, value: Schema.Unknown })),
   query: Schema.optional(Schema.Unknown),
   presentation: Schema.optional(Schema.Unknown),
-  /** Which selection layer is ACTIVE (scope | query); absent on pre-migration
-   * definitions, where the legacy behavior (query when present, else scope) applies. */
+  // Which selection layer is ACTIVE (scope | query); absent on pre-migration definitions,
+  // where the legacy behavior (query when present, else scope) applies.
   selection_mode: Schema.optional(Schema.Literal('scope', 'query')),
   /** Fork provenance, stamped server-side at fork time (origin slug/version/content
    * digest); absent on non-forks. */
@@ -317,15 +306,14 @@ export const ViewpointDefinitionEnvelopeSchema = Schema.Struct({
     Schema.NullOr(Schema.Literal('current', 'stale', 'origin-missing')),
     { default: () => null },
   ),
-  /** The definition's CURRENT canonical content digest — verified execution references
-   * pin it so a later open can say the definition changed. */
+  // The definition's CURRENT canonical content digest — verified execution references pin
+  // it so a later open can say the definition changed.
   definition_digest: Schema.optional(Schema.String),
   tier: Schema.Literal('module', 'enterprise', 'engagement'),
   scope_summary: ScopeSummarySchema,
   query_summary: Schema.NullOr(Schema.String),
-  /** Broken references in this definition's active selection + presentation, computed on
-   * demand and never persisted. Optional so an older backend (or a hand-built fixture)
-   * decodes cleanly; treat absent as none. */
+  // Broken references, computed on demand and never persisted; optional so an older
+  // backend (or a hand-built fixture) decodes cleanly. Treat absent as none.
   broken_references: Schema.optional(Schema.Array(BrokenReferenceSchema)),
 })
 export type ViewpointDefinitionEnvelope = typeof ViewpointDefinitionEnvelopeSchema.Type

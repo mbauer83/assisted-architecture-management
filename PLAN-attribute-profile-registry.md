@@ -231,6 +231,22 @@ naturally), the GUI picker from single- to multi-select, and cross-repo
 promotion. Sequenced after Streams P–S, but its *decision* is locked now
 because P2a depends on it.
 
+**Stream Y — Attribute-profile fields in the entity authoring GUI.** Two concrete
+gaps the current forms leave open, independent of the registry format but sharing its
+resolved-schema output:
+- **Create page — real list widgets.** When the specialization changes, the attribute
+  fields already re-render to the resolved schema, but a `list`-typed attribute renders
+  as a single free-text box labelled "JSON-Array", which is error-prone and opaque. Replace
+  it with a true list editor (add / remove / reorder items), typed per the item schema,
+  reusing the same `TypedPropertyInput` path the other attribute kinds use.
+- **Edit page — show the profile fields at all.** The entity *edit* page does not surface
+  the specialization's attribute-profile fields today; only create does. The edit form must
+  render them and re-render on a specialization change, applying MERGE SEMANTICS for
+  already-present values (keep an existing value where the new profile still declares its
+  attribute; drop/quarantine only where the attribute is gone — the merge rules worked out
+  earlier for the create path). This is the same resolved-schema the write boundary gains in
+  Streams P/Q, so it depends on that resolution landing but adds no new resolution concept.
+
 ## 7. Standing checklist verdicts
 
 **Self-model sync: REQUIRED.** Profiles are an ontology-core capability.

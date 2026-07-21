@@ -361,6 +361,48 @@ Every style rule additionally accepts:
 
 &nbsp;
 
+## Reference integrity
+
+Style rules are not the only place a definition names model elements that can disappear
+underneath it. Criteria reference entity/connection **types** and **specialization slugs**
+(reserved `type`/`specialization` values), **attribute paths**, and **entity-id** anchors
+(parameter defaults and supplied anchors). When the model changes — a type retired, an
+entity deleted, a definition promoted engagement→enterprise — those references can break.
+
+The catalogue computes a **reference report** for every definition: the same breakage
+contract as `rule_outcomes`, generalized to every reference class. It is a pure function of
+`(definition, current model)`, **never persisted** (it recomputes per model generation, so a
+reference that comes back self-heals), and rendered three ways — a `broken_references` array
+on each `GET /api/viewpoints` entry (a count badge on the list, per-reference notices in the
+editor) and result `warnings` at execution.
+
+Severity follows the class:
+
+| Reference class | On breakage |
+|---|---|
+| ontology refs — entity/connection type, specialization slug, attribute path | **error on save**, warning on load, loud at execute (they silently change result semantics) |
+| entity-id refs — anchors and `entity-id` parameter defaults | **warning** (a dropped anchor otherwise widens results unremarked) |
+| open vocabularies — `group` and other advisory pickers | none — a nonexistent value yields a typed empty result, not an error |
+
+Renames are a non-event: entity-id references compare on the rename-stable short id, so only
+a genuine deletion (or a cross-tier reference the destination registry does not know)
+registers. Because ontology references are a save-time error, a broken one can arise only
+from a definition that was valid when saved and later invalidated by model change.
+
+**Broken ≠ inactive.** An unset optional parameter legitimately *drops* its term (widening);
+a broken reference must NEVER drop, because that silently widens the result and hides the
+breakage. A broken reference keeps not-matching (narrowing, visible), is reported in
+`warnings`, **and suppresses absence claims** — `target_population` is forced to `null` (see
+[Execution result & bounds](#execution-result--bounds)) so a broken query returning zero
+rows can never read as a clean bill of health.
+
+**Repair = a new version.** There is no separate acknowledgement flag: remap the reference,
+drop the offending term, or quarantine the affected style rule (`disabled: true`), then save
+with a bumped version. The version and content digest are the audit record; the report clears
+on the next load because the digest changed.
+
+&nbsp;
+
 ## Representations & styling capabilities
 
 | Representation | Capabilities |
@@ -473,7 +515,10 @@ per-type counts of INCIDENTAL substantive content, and the count of STRUCTURAL h
 scope mode — mechanically from the active scope minus structural helpers. It is `null`
 when the target population is UNKNOWN (an undeclared query-mode definition, or an ad-hoc
 query); surfaces must then show plain counts and make NO absence claims — a guessed
-absence claim is exactly the false copy honest-empty messaging exists to prevent.
+absence claim is exactly the false copy honest-empty messaging exists to prevent. It is
+ALSO forced to `null` whenever the execution has a broken reference (see
+[Reference integrity](#reference-integrity)), for the same reason: a query that cannot
+resolve what it references cannot honestly claim what is absent.
 
 `matched_via_derived_hops` is set on an entity when its criteria match REQUIRED
 derived-relationship evidence (e.g. a `has a derived connection…` or `direct or derived`

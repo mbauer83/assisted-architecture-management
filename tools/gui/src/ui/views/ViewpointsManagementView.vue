@@ -16,8 +16,7 @@ import { modelServiceKey } from '../keys'
 import { useWriteBlock } from '../composables/useWriteBlock'
 import { readErrorMessage } from '../lib/errors'
 import type {
-  BrokenReference, CriteriaCatalog, ViewpointDefinitionEnvelope, ViewpointPersistResult,
-  ViewpointReferencer, ViewpointValidationIssue,
+  CriteriaCatalog, ViewpointDefinitionEnvelope, ViewpointPersistResult, ViewpointReferencer, ViewpointValidationIssue,
 } from '../../domain'
 import { isEmptyQuery, mkDefinitionDraft, queryFromScopeDraft } from '../../domain/viewpointDefinitionDraft'
 import type { SelectionMode, ViewpointDefinitionDraft } from '../../domain/viewpointDefinitionDraft'
@@ -75,9 +74,6 @@ const setSelectionMode = (mode: SelectionMode) => {
 }
 const issues = ref<readonly ViewpointValidationIssue[]>([])
 const referencers = ref<readonly ViewpointReferencer[]>([])
-// The broken-reference report for the definition being edited — the report as SAVED, so it
-// clears on the next load after a repair is saved (acknowledgement = a new version).
-const editingBrokenReferences = ref<readonly BrokenReference[]>([])
 const saving = ref(false)
 
 const loadDefinitions = () =>
@@ -118,7 +114,6 @@ const startCreate = () => {
   forkedFromSlug.value = null
   isCreating.value = true
   viewingTier.value = 'engagement'
-  editingBrokenReferences.value = []
   issues.value = []
   referencers.value = []
   saveError.value = null
@@ -134,7 +129,6 @@ const startEdit = (envelope: ViewpointDefinitionEnvelope) => {
   originalDraft.value = definitionFromMapping(envelope)
   isCreating.value = false
   viewingTier.value = envelope.tier
-  editingBrokenReferences.value = envelope.broken_references ?? []
   issues.value = []
   saveError.value = null
   activeTab.value = 'general'
@@ -267,7 +261,7 @@ const focusIssue = (issue: ViewpointValidationIssue) => {
         :forked-from-slug="forkedFromSlug"
         :show-version-bump-hint="Boolean(showVersionBumpHint)"
         :quarantined-rule-count="quarantinedRuleCount"
-        :broken-references="editingBrokenReferences"
+        :broken-references="definitions.find((d) => d.slug === draft?.slug)?.broken_references ?? []"
         :referencers="referencers"
         :issues="issues"
         @focus-issue="focusIssue"
