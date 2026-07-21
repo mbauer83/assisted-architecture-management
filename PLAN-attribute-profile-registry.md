@@ -295,12 +295,34 @@ profiles rather than after: the two share the resolver, the conflict
 classifier, the quarantine machinery, and the reconciliation step. Building
 entity-only first would mean writing all five twice.
 
-## 10. Open question
+## 10. Scope note: the mechanism is module-agnostic
 
-**Q1 — Existing connection types that are arguably specializations.** The
-repository has distinct connection types (`responsible-for`, `accountable-for`)
-that ArchiMate models as *specializations of assignment* — and
-`specializations.yaml` already declares exactly those as assignment
-specializations. Whether the standalone types should be reconciled with the
-specializations is a modelling-conformance question beyond this plan's scope,
-but it should not be left undecided indefinitely.
+`SpecializationCatalog` keys entries by `(module, concept kind, parent type,
+slug)` — uniqueness is *per module*. The specialization and profile machinery is
+therefore generic across ontology modules, not ArchiMate-specific. Streams P–W
+must not assume `archimate_4`: any module that declares specializations gets
+profiles for free.
+
+The `assurance` module declares none today, which is a fact about that module,
+not a limitation of the mechanism.
+
+**A distinction worth recording, since it is easy to conflate.** The assurance
+relations `responsible-for` and `accountable-for` are *not* candidates for
+reconciliation with the ArchiMate assignment specializations
+`responsibility-assignment` / `behavior-assignment`. They are unrelated
+concepts that merely share vocabulary:
+
+| | `responsible-for` / `accountable-for` | `responsibility-assignment` / `behavior-assignment` |
+|---|---|---|
+| Module | `assurance` | `archimate_4` |
+| Endpoints | `control-structure-node → assurance-constraint`, `control-structure-node → risk` | ArchiMate active-structure → behavior |
+| Semantics | GRC governance: who answers for a risk or constraint | ArchiMate Assignment: an active structure element is assigned to behavior |
+| Persistence | confidential SQLCipher store | repository markdown artifacts |
+| Exposure | TLP-gated | public model |
+
+They cannot be unified even in principle: an assurance edge's endpoints are
+assurance node types, not ArchiMate elements, and unifying them would either
+leak TLP-gated governance data into the public model or drag ArchiMate relations
+into the confidential store. The designed bridge between the two worlds is the
+assurance→architecture cross-reference (`assurance_register_arch_ref`), and it
+is the correct one.

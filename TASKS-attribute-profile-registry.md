@@ -17,11 +17,19 @@ normative; this file tracks execution and records what was verified.
 
 ## Questions
 
-- **Q1 — Reconciling standalone connection types with assignment
-  specializations.** `responsible-for` / `accountable-for` exist as distinct
-  connection types while `specializations.yaml` also declares them as
-  assignment specializations. A modelling-conformance question beyond this
-  plan, but it should not stay undecided indefinitely. OPEN.
+None open.
+
+RETRACTED — a previous Q1 proposed reconciling the assurance relations
+`responsible-for` / `accountable-for` with the ArchiMate assignment
+specializations `responsibility-assignment` / `behavior-assignment`. Verified
+false: different modules, different endpoint type systems, different semantics
+(GRC accountability vs ArchiMate active-structure-to-behavior assignment), and
+different persistence and exposure (confidential SQLCipher store vs public
+markdown). They share vocabulary and nothing else. See PLAN §10.
+
+Carry the scope note from PLAN §10 into every stream: `SpecializationCatalog`
+keys by `(module, kind, parent, slug)`, so the mechanism is module-agnostic —
+never hardcode `archimate_4`.
 
 ## Stream P — Registry and resolution
 
