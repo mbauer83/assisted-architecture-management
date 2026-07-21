@@ -17,9 +17,11 @@ normative; this file tracks execution and records what was verified.
 
 ## Questions
 
-- **Q1 — Relationship profiles in scope?** ArchiMate applies profiles to
-  relationships too, and `connection-metadata.*` schemata already exist. This
-  plan covers entities only. Extend now or defer? OPEN.
+- **Q1 — Reconciling standalone connection types with assignment
+  specializations.** `responsible-for` / `accountable-for` exist as distinct
+  connection types while `specializations.yaml` also declares them as
+  assignment specializations. A modelling-conformance question beyond this
+  plan, but it should not stay undecided indefinitely. OPEN.
 
 ## Stream P — Registry and resolution
 
@@ -40,11 +42,17 @@ normative; this file tracks execution and records what was verified.
 
 ### WU-P3 — Resolution order (needs P2)
 - [ ] Extend `compute_effective_attribute_schema` to append bound-profile
-      fragments between the base schema and the specialization's own profile
+      fragments between the base schema and specialization profiles
       (PLAN §3 P2). The merge itself is already N-ary — do not modify it.
+- [ ] **Accept an ordered list of applied specializations, not a scalar**
+      (PLAN §3 P2a) even before Stream V rolls out multiple specializations
+      model-wide. Retrofitting scalar→list through the merge, verifier, and
+      conflict classifier later is far more expensive than accepting a list now.
 - [ ] Tests: order holds (specialization overrides shared profile overrides
       base); parent-attribute inheritance still works (regression — this
-      already works today via fragment 1 and must not break).
+      already works today via fragment 1 and must not break); two
+      specializations contributing an incompatible attribute is an ordinary
+      Class B conflict.
 
 ### WU-P4 — Conflict classification (needs P3)
 - [ ] Classify each conflict as Class A (structural) or Class B (scoped) per
@@ -57,6 +65,10 @@ normative; this file tracks execution and records what was verified.
 ## Stream Q — Failure semantics
 
 ### WU-Q1 — Class A startup validation (needs P4)
+- [ ] **Extend `startup_validation.py`** (`validate_repo_compatibility` /
+      `_schema_inventory_findings` / `RepoCompatibilityError`) — it already
+      implements this exact posture (hard errors raise, tolerable ones warn).
+      Do NOT build a parallel validator.
 - [ ] Validate attached repos at startup, before the index build, under the
       privileged write gate — mirroring `_group_registry_startup.py`.
 - [ ] Engagement (writable) repo: hard fail with the file, the reason, and the
@@ -121,6 +133,36 @@ normative; this file tracks execution and records what was verified.
       cannot write ambiguous data.
 - [ ] Vitest coverage, separate file per component.
 
+## Stream W — Relationship profiles (needs P3, Q2)
+
+Symmetric with entities. The specialization dimension is already wired for
+connections through every layer (PLAN §9) — only the schema side is entity-only.
+Land WITH the entity work, not after: both share the resolver, conflict
+classifier, quarantine machinery, and reconciliation step.
+
+### WU-W1 — Specialization-scoped connection schemata (needs P3)
+- [ ] `connection-metadata.{type}.{slug}.schema.json` filename convention.
+- [ ] `list_schema_files` classifies it (today `specialization-attachment` is
+      entity-only), and `startup_validation._schema_inventory_findings`
+      validates its subject.
+- [ ] `compute_effective_connection_metadata_schema`, mirroring the entity
+      resolver including named-profile bindings and resolution order.
+- [ ] Tests: mirror the entity resolution tests.
+
+### WU-W2 — Verifier merge for connections (needs W1)
+- [ ] `check_connection_metadata_schema` validates against the MERGED effective
+      schema and reports conflicts, mirroring E043.
+- [ ] Tests: conflict reported; quarantine applies to a (connection-type,
+      specialization) pair exactly as for entities.
+
+### WU-W3 — Surfaces (needs W1)
+- [ ] Effective merged connection-metadata schema in the authoring-guidance
+      payload (REST + MCP parity).
+- [ ] GUI renders it through the existing `TypedPropertyInput` — the connection
+      specialization picker already exists
+      (`specializationOptionsForConnectionType`). No new GUI concept.
+- [ ] Tests: Vitest for the connection metadata editor.
+
 ## Stream T — Docs and self-model
 
 ### WU-T1 — Reference documentation
@@ -131,6 +173,38 @@ normative; this file tracks execution and records what was verified.
 ### WU-T2 — Self-model sync
 - [ ] Model the profile-registry capability in ENG-ARCH-REPO: guidance-first,
       descriptions over new entities.
+
+## Stream V — Multiple specializations per concept (P9)
+
+Rewrites D6. ArchiMate 3.1 §15.2 verbatim: *"multiple specialization profiles
+may be assigned to the same generalized concept; in the default notation, these
+are shown as a comma-separated list"*. Sequenced after P–S; the DECISION is
+already locked because WU-P3 depends on it.
+
+### WU-V1 — Storage and back-compatibility
+- [ ] Frontmatter accepts a list; a bare scalar keeps working and is read as a
+      one-element list. No repo migration required.
+- [ ] Tests: scalar form round-trips unchanged (regression).
+
+### WU-V2 — Rendering (needs V1)
+- [ ] `format_specialization_guillemet` renders the spec's comma-separated list
+      («a, b»). It is singular today.
+- [ ] Tests: single and multiple render per spec.
+
+### WU-V3 — Querying and styling (needs V1)
+- [ ] Viewpoint grouping by `specialization` and style/scale `applies_to`
+      matching over a set. Both already compare via `frozenset`
+      (`viewpoint_style_evaluation.py`, `viewpoint_scale_styling.py`), so this
+      extends naturally — verify rather than assume.
+- [ ] Decide and document what grouping by specialization MEANS for a concept in
+      several groups (appears in each, versus a composite bucket).
+- [ ] Tests: grouping and style matching with multiple specializations.
+
+### WU-V4 — Write paths and GUI (needs V1)
+- [ ] Entity and connection write paths accept multiple; `promote_schema_check`
+      handles the set across repos.
+- [ ] GUI picker single-select → multi-select; `types.generated.ts` regenerated.
+- [ ] Tests: per-transport write coverage; Vitest for the picker.
 
 ## Stream U — AIBOM handoff
 

@@ -35,8 +35,16 @@ of the work — defines their lifecycle, versioning, and failure semantics.
 | Write path uses base schema only | `artifact_write_formatting.py:336` via `load_attribute_schema` | **Gap: the write boundary never sees specialization profiles** |
 | Startup validation with hard fail is house style | `_group_registry_startup.py` | Precedent for the failure posture below |
 | Schema-version tags are house style | `QUERY_SCHEMA_VERSION` | Precedent for versioning below |
+| **A startup schema-inventory validator already exists** | `startup_validation.py` — `validate_repo_compatibility`, `_schema_inventory_findings`, `RepoCompatibilityError` | **Class A extends this; do not build a new validator** |
+| **Connections already have specializations** | `specializations.yaml` `connection:` block; `SpecializationCatalog.get("connection", …)`; `connection_edit.py` | Relationship profiles are an extension of a wired path |
+| Connection metadata schemas are **type-level only** | `connection-metadata.{type}.schema.json` | No specialization-scoped variant — the asymmetry to close |
+| GUI already picks connection specializations | `specializationOptions.ts::specializationOptionsForConnectionType` | Relationship profiles need no new GUI concept |
 
-The last three rows decide most of this plan.
+The last five rows decide most of this plan. Note especially that
+`startup_validation.py` already implements the exact posture designed in §4 —
+hard errors raise `RepoCompatibilityError`, tolerable ones return warnings, with
+a "disabled module ⇒ warning, unknown ⇒ error" nuance. Class A validation is an
+extension of that function, not a new mechanism.
 
 ## 3. Locked decisions
 
@@ -48,13 +56,36 @@ repos changes, and the common case stays the simple case.
 **P2 — Resolution order is deterministic and explicit.**
 
 ```
-base-type schema  →  bound named profiles (declaration order)  →  the
-specialization's own profile
+base-type schema
+  →  bound named profiles (declaration order)
+  →  each applied specialization's own profile (declaration order)
 ```
 
-The specialization's own profile is last, so it always wins over a shared
-profile it composes — the specific overrides the general. Parent-attribute
-inheritance (fragment 1) is unchanged.
+A specialization's own profile is last, so it always wins over a shared profile
+it composes — the specific overrides the general. Parent-attribute inheritance
+(fragment 1) is unchanged. The order is total and stable: named profiles before
+specialization profiles, and within each group, declaration order.
+
+**P2a — The resolution pipeline is N-specialization from the start.** Per P9,
+a concept may carry several specializations. Even if P9's model-wide rollout
+lands later, resolution is built to accept an ordered *list* of applied
+specializations now: retrofitting a scalar-to-list change through the merge,
+verifier, and conflict classification afterwards costs far more than accepting a
+list from the outset. Two specializations contributing the same attribute with
+incompatible types is an ordinary Class B conflict, handled by the same
+machinery as any other.
+
+**P9 — D6 is rewritten: a concept may carry multiple specializations.** The
+prior decision (at most one specialization per entity) is stricter than
+ArchiMate 3.1 §15.2, which states verbatim: *"Note that multiple specialization
+profiles may be assigned to the same generalized concept; in the default
+notation, these are shown as a comma-separated list («specialization 1,
+specialization 2»)."* The spec also fixes the notation, so rendering is
+specified rather than invented.
+
+This is deliberately decided **now** even though the full rollout is sequenced
+later (§6, Stream V), because P2a depends on it. Deciding it late would mean
+building the resolution pipeline twice.
 
 **P3 — Identical redefinition is legal; incompatible redefinition is an error.**
 Two profiles declaring `Supplier: string` compose silently — that is the point
@@ -192,6 +223,14 @@ submit.
 **Stream T — Docs and self-model.** Reference documentation for profile
 authoring and the failure semantics; self-model sync.
 
+**Stream V — Multiple specializations per concept (P9).** The model-wide
+rollout: frontmatter list form with single-value back-compatibility, guillemet
+rendering as the spec's comma-separated list, viewpoint grouping and style
+matching over a set (both already use `frozenset` comparisons, so they extend
+naturally), the GUI picker from single- to multi-select, and cross-repo
+promotion. Sequenced after Streams P–S, but its *decision* is locked now
+because P2a depends on it.
+
 ## 7. Standing checklist verdicts
 
 **Self-model sync: REQUIRED.** Profiles are an ontology-core capability.
@@ -225,9 +264,43 @@ reconciliation (Stream R).
 9. The reconciliation step reports conflicts and version drift, and never
    overwrites operator content.
 
-## 9. Open question
+## 9. Relationship profiles — in scope, and cheaper than expected
 
-**Q1 — Relationship profiles.** ArchiMate applies profiles to relationships as
-well as elements, and `connection-metadata.*` schemata already exist. This plan
-covers entity profiles only. Extending named profiles to connections is a natural
-follow-on — confirm whether it should be in scope now or deferred.
+ArchiMate applies profiles to relationships as well as elements (*"a specialized
+relationship inherits all properties of its 'parent' relationship"*, §15.2, with
+responsibility-vs-accountability assignment as the spec's own example). This is
+in scope.
+
+The integration cost is low because **the specialization dimension is already
+plumbed through every layer for connections** — it is only the *profile* (schema)
+dimension that is entity-only today.
+
+| Layer | Connection specializations today | Gap for relationship profiles |
+|---|---|---|
+| Ontology | `specializations.yaml` `connection:` block — already ships `responsibility-assignment` / `behavior-assignment` (the spec's own example) | Bindings to named profiles |
+| Application | `SpecializationCatalog.get("connection", …)`; `promote_schema_check` handles connection specializations | `compute_effective_connection_metadata_schema`, mirroring the entity function |
+| Schema files | `connection-metadata.{type}.schema.json` (type-level) | `connection-metadata.{type}.{slug}.schema.json`; `list_schema_files` must classify it (today `specialization-attachment` is entity-only) |
+| Verifier | `check_connection_metadata_schema` loads the type-level schema | Merge + conflict reporting, mirroring E043 |
+| REST / MCP | `/api/authoring-guidance` already returns `connection_types[].specializations` | Effective merged metadata schema in the payload |
+| GUI | `specializationOptionsForConnectionType()` already drives a picker | Render the merged schema through the existing `TypedPropertyInput` — the same component entity attributes use |
+
+So there is **no new integration surface and no new GUI concept**: connections
+already have a specialization picker, and the typed attribute editor is already
+generic. The work is making the schema side symmetric with entities — one
+resolution function, one filename convention, one verifier merge — and then the
+existing surfaces carry it.
+
+This symmetry is also why relationship profiles should land *with* entity
+profiles rather than after: the two share the resolver, the conflict
+classifier, the quarantine machinery, and the reconciliation step. Building
+entity-only first would mean writing all five twice.
+
+## 10. Open question
+
+**Q1 — Existing connection types that are arguably specializations.** The
+repository has distinct connection types (`responsible-for`, `accountable-for`)
+that ArchiMate models as *specializations of assignment* — and
+`specializations.yaml` already declares exactly those as assignment
+specializations. Whether the standalone types should be reconciled with the
+specializations is a modelling-conformance question beyond this plan's scope,
+but it should not be left undecided indefinitely.
