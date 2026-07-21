@@ -23,6 +23,7 @@ from src.domain.module_catalog import ModuleCatalog, ModuleCatalogBuilder
 from src.domain.module_filter import is_module_enabled
 from src.domain.module_registry import ModuleRegistry
 from src.domain.ontology_protocol import OntologyModule
+from src.domain.profile_registry import merge_profile_registries
 from src.domain.specializations import SpecializationCatalog, merge_specialization_catalogs
 from src.domain.viewpoints import ViewpointCatalog
 from src.infrastructure.assurance.capability import make_capability
@@ -217,6 +218,9 @@ def build_runtime_catalogs(registry: ModuleRegistry) -> RuntimeCatalogs:
     specializations = merge_specialization_catalogs(
         *(module.specialization_catalog for module in module_catalog.all_ontologies().values())
     )
+    profiles = merge_profile_registries(
+        module.profile_registry for module in module_catalog.all_ontologies().values()
+    )
     return RuntimeCatalogs(
         module_catalog=module_catalog,
         ontology=OntologyCatalogImpl(module_catalog, _archimate_matrix_abbreviations),
@@ -224,6 +228,7 @@ def build_runtime_catalogs(registry: ModuleRegistry) -> RuntimeCatalogs:
         diagram_types=DiagramTypeCatalogImpl(module_catalog),
         derivation=_build_derivation_catalog(),
         specializations=specializations,
+        profiles=profiles,
         viewpoints=_load_viewpoints(),
         viewpoint_enforcement=viewpoint_enforcement_setting(),
         datatype_type_references_blocking=datatype_type_references_blocking(),

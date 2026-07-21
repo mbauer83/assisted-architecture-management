@@ -17,6 +17,7 @@ from src.domain.permitted_relationships import (
     PermittedRelationship,
     PermittedRelationshipSet,
 )
+from src.domain.profile_registry import ProfileRegistry
 from src.domain.relationship_derivation_restrictions import DerivationRestriction
 from src.domain.relationship_derivation_rules import (
     CompositionRule,
@@ -27,8 +28,8 @@ from src.domain.specializations import (
     SpecializationCatalog,
     merge_specialization_catalogs,
     overlay_specialization_guidance,
-    specialization_catalog_from_mapping,
 )
+from src.ontologies.archimate_4._yaml_data import load_module_profiles, load_module_specializations
 
 _PACKAGE_DIR = Path(__file__).parent
 
@@ -65,6 +66,7 @@ class _ArchiMate4Module:
         matrix_abbreviations: dict[str, str],
         element_classes: dict[str, ElementClassInfo] | None = None,
         specialization_catalog: SpecializationCatalog | None = None,
+        profile_registry: ProfileRegistry | None = None,
         derivation_rules: tuple[CompositionRule, ...] = (),
         derivation_restrictions: tuple[DerivationRestriction, ...] = (),
         svg_converter: Callable[[str], str] | None = None,
@@ -75,6 +77,7 @@ class _ArchiMate4Module:
         self._matrix_abbreviations = matrix_abbreviations
         self._element_classes: dict[str, ElementClassInfo] = element_classes or {}
         self._specialization_catalog = specialization_catalog or SpecializationCatalog.empty()
+        self._profile_registry = profile_registry or ProfileRegistry.empty()
         self._svg_converter = svg_converter
         self._derivation_rules = derivation_rules
         self._derivation_restrictions = derivation_restrictions
@@ -124,6 +127,10 @@ class _ArchiMate4Module:
     @property
     def specialization_catalog(self) -> SpecializationCatalog:
         return self._specialization_catalog
+
+    @property
+    def profile_registry(self) -> ProfileRegistry:
+        return self._profile_registry
 
     @property
     def derivation_rules(self) -> tuple[CompositionRule, ...]:
@@ -324,17 +331,6 @@ def _load_element_classes(data: dict[str, Any]) -> dict[str, ElementClassInfo]:
     return out
 
 
-def _load_module_specializations(package_dir: Path) -> SpecializationCatalog:
-    path = package_dir / "specializations.yaml"
-    if not path.exists():
-        return SpecializationCatalog.empty()
-    with path.open(encoding="utf-8") as handle:
-        loaded: Any = yaml.safe_load(handle) or {}
-    if not isinstance(loaded, dict):
-        raise ValueError(f"Invalid specialization declarations in {path}: top-level YAML value must be a mapping")
-    return specialization_catalog_from_mapping(loaded, module_alias=META_ONTOLOGY_ALIAS)
-
-
 def _specialization_guidance_entries(
     guidance: GuidanceOverlay,
 ) -> dict[tuple[str, Literal["entity", "connection"], str, str], tuple[str, str]]:
@@ -381,7 +377,7 @@ def load_archimate_4_module(
     element_classes = _load_element_classes(entity_data)
     overlay = guidance if guidance is not None else GuidanceOverlay()
     module_specializations = overlay_specialization_guidance(
-        _load_module_specializations(package_dir),
+        load_module_specializations(package_dir, META_ONTOLOGY_ALIAS),
         _specialization_guidance_entries(overlay),
     )
     specialization_catalog = merge_specialization_catalogs(
@@ -397,6 +393,7 @@ def load_archimate_4_module(
         matrix_abbreviations=matrix_abbreviations,
         element_classes=element_classes,
         specialization_catalog=specialization_catalog,
+        profile_registry=load_module_profiles(package_dir),
         derivation_rules=derivation_rules,
         derivation_restrictions=derivation_restrictions,
         svg_converter=svg_converter,

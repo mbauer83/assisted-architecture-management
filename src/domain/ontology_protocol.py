@@ -29,6 +29,7 @@ from src.domain.ontology_types import (
     EntityTypeInfo,
 )
 from src.domain.permitted_relationships import PermittedRelationshipSet
+from src.domain.profile_registry import ProfileRegistry
 from src.domain.relationship_derivation_restrictions import DerivationRestriction
 from src.domain.relationship_derivation_rules import CompositionRule
 from src.domain.specializations import SpecializationCatalog
@@ -90,6 +91,9 @@ class OntologyModule(Protocol):
 
     @property
     def specialization_catalog(self) -> SpecializationCatalog: ...
+
+    @property
+    def profile_registry(self) -> ProfileRegistry: ...
 
     def entity_types_with_class(self, cls: ElementClassName) -> frozenset[EntityTypeName]: ...
 

@@ -1,7 +1,9 @@
 """Domain model for attribute profiles (D13).
 
-A profile and its specialization are one concept, one-to-one: there is no separate,
-reusable profile registry a specialization references by slug. The existing
+This module models a specialization's OWN 1:1 profile. Reusable, named profiles that
+several specializations may bind by name are a separate, opt-in concept modelled in
+`profile_registry.py`; the 1:1 profile here stays the default and is unchanged. The
+existing
 `attributes.{artifact_type}.schema.json` files are the *default* profile for unspecialized
 elements (base-type profiles, unchanged on disk, still loaded by
 `artifact_schema.load_attribute_schema`); a specialization's own profile is compiled
@@ -70,8 +72,10 @@ def compile_profile_schema(profile: ProfileDefinition) -> dict[str, Any]:
     return schema
 
 
-def profile_from_inline_attributes(slug: str, attributes: Mapping[str, Any]) -> ProfileDefinition:
-    """Compile a specialization's inline `attributes: {}` mapping to an anonymous profile."""
+def attributes_from_mapping(attributes: Mapping[str, Any]) -> tuple[ProfileAttribute, ...]:
+    """Parse an `attributes: {}` mapping (name → {type, level, default, enum}) into typed
+    `ProfileAttribute`s. Shared by inline specialization profiles and named profiles so both
+    read attribute declarations identically; non-mapping entries are skipped."""
     attrs: list[ProfileAttribute] = []
     for attr_name, raw in attributes.items():
         if not isinstance(raw, Mapping):
@@ -86,7 +90,14 @@ def profile_from_inline_attributes(slug: str, attributes: Mapping[str, Any]) -> 
                 enum=tuple(str(v) for v in raw["enum"]) if isinstance(raw.get("enum"), (list, tuple)) else (),
             )
         )
-    return ProfileDefinition(slug=f"{slug}:inline", name=f"{slug} (inline)", attributes=tuple(attrs))
+    return tuple(attrs)
+
+
+def profile_from_inline_attributes(slug: str, attributes: Mapping[str, Any]) -> ProfileDefinition:
+    """Compile a specialization's inline `attributes: {}` mapping to an anonymous profile."""
+    return ProfileDefinition(
+        slug=f"{slug}:inline", name=f"{slug} (inline)", attributes=attributes_from_mapping(attributes)
+    )
 
 
 def merge_property_schemas(schemas: list[dict[str, Any]]) -> tuple[dict[str, Any], list[str]]:

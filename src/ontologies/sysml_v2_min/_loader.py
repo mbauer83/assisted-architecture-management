@@ -15,6 +15,7 @@ from src.domain.permitted_relationships import (
     PermittedRelationship,
     PermittedRelationshipSet,
 )
+from src.domain.profile_registry import ProfileRegistry
 from src.domain.relationship_derivation_restrictions import DerivationRestriction
 from src.domain.relationship_derivation_rules import (
     CompositionRule,
@@ -36,6 +37,7 @@ class _SysmlV2MinModule:
     enabled: bool = True
     requires: list[str] = []
     specialization_catalog: SpecializationCatalog = SpecializationCatalog.empty()
+    profile_registry: ProfileRegistry = ProfileRegistry.empty()
 
     def __init__(
         self,

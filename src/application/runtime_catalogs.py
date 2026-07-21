@@ -12,6 +12,7 @@ from src.application.derivation.strategy_registry import DerivationStrategyCatal
 from src.application.guidance_composition import GuidanceContextView
 from src.domain.catalogs import ConnectionSemantics, DiagramTypeCatalog, OntologyCatalog
 from src.domain.module_catalog import ModuleCatalog
+from src.domain.profile_registry import ProfileRegistry
 from src.domain.specializations import SpecializationCatalog
 from src.domain.viewpoints import EnforcementSetting, ViewpointCatalog
 
@@ -26,6 +27,7 @@ class RuntimeCatalogs:
     diagram_types: DiagramTypeCatalog
     derivation: DerivationStrategyCatalog
     specializations: SpecializationCatalog = field(default_factory=SpecializationCatalog.empty)
+    profiles: ProfileRegistry = field(default_factory=ProfileRegistry.empty)
     viewpoints: ViewpointCatalog = field(default_factory=ViewpointCatalog.empty)
     viewpoint_enforcement: EnforcementSetting = "warn"
     datatype_type_references_blocking: bool = True

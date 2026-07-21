@@ -1,0 +1,22 @@
+# Named attribute-profile registry for the archimate-4 module.
+#
+# Reusable, opt-in attribute sets that several specializations may bind by name (see
+# PLAN-attribute-profile-registry.md). Distinct from a specialization's own 1:1 profile
+# (its inline `attributes:` in specializations.yaml, or its dedicated
+# `attributes.<type>.<slug>.schema.json` attachment), which stays the default.
+#
+# `profile_schema` is the declaration-format version (an unrecognised value is a hard,
+# typed error). Each profile carries its own content `version` so reconciliation can
+# distinguish a local customisation from an outdated base.
+#
+# Format:
+#   profile_schema: 1
+#   profiles:
+#     <profile-name>:
+#       version: <int>
+#       attributes:
+#         <Attribute Name>: { type: string, level: required|recommended|optional, enum: [...] }
+#
+# No reusable profiles are shipped yet; the empty registry is the valid default state.
+profile_schema: 1
+profiles: {}

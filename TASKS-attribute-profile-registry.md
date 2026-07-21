@@ -34,13 +34,37 @@ never hardcode `archimate_4`.
 ## Stream P — Registry and resolution
 
 ### WU-P1 — Registry format and loader
-- [ ] Declaration format with `profile_schema: <int>` (format version) and per
+- [x] Declaration format with `profile_schema: <int>` (format version) and per
       profile `version: <int>` (content version) — PLAN §3 P4.
-- [ ] An unrecognised `profile_schema` is a typed error, never a best-effort
+- [x] An unrecognised `profile_schema` is a typed error, never a best-effort
       parse (follow the `QUERY_SCHEMA_VERSION` precedent).
-- [ ] Shipped registry in the ontology module; optional repo-level registry.
-- [ ] Tests: valid load; unknown format version rejected; absent registry is a
+- [x] Shipped registry in the ontology module; optional repo-level registry.
+- [x] Tests: valid load; unknown format version rejected; absent registry is a
       valid "no named profiles" state (regression guard for existing repos).
+
+#### WU-P1 PROGRESS (2026-07-21)
+- Domain: `src/domain/profile_registry.py` — `PROFILE_SCHEMA_VERSION`, `NamedProfile`
+  (name + content `version` + compiled `ProfileDefinition`), `ProfileRegistry` (unique
+  by name; `.empty()` = the no-named-profiles state), `profile_registry_from_mapping`
+  (typed `ProfileRegistryError` on non-mapping / missing-or-unknown `profile_schema` /
+  non-int version / missing per-profile `version`), `merge_profile_registries` (union;
+  raises on a duplicate name across shipped modules). Attribute parsing factored out of
+  `profiles.py` as `attributes_from_mapping` and reused so named-profile attributes read
+  identically to inline specialization attributes.
+- Loaders: `src/application/profile_registry_loading.py::load_repo_profile_registry`
+  reads optional `.arch-repo/profiles.yaml` (absent → empty; malformed → ProfileRegistryError).
+  Shipped module registry: `src/ontologies/archimate_4/profiles.yaml` (empty `profiles: {}`,
+  documents the format) loaded by `_load_module_profiles` in the module loader.
+- Wiring (parallels `specialization_catalog` exactly): `OntologyModule.profile_registry`
+  added to the protocol + all three module impls (archimate loads its file; sysml/assurance
+  return empty); `RuntimeCatalogs.profiles` field + `merge_profile_registries` in
+  `build_runtime_catalogs`.
+- NOT DONE here (later WUs): binding a specialization to a named profile (P2), folding
+  bound profiles into `compute_effective_attribute_schema` (P3), conflict classification
+  (P4). Repo loader is standalone until P3 consumes it. `.arch-repo/profiles.yaml` lives
+  OUTSIDE `schemata/`, so `_schema_inventory_findings` does not flag it (Class-A teaching is Q1).
+- Tests: `tests/domain/test_profile_registry.py` (11) + `tests/application/test_profile_registry_loading.py`
+  (6, incl. the shipped-empty regression guard through `build_runtime_catalogs`). ruff + zuban clean.
 
 ### WU-P2 — Binding declaration (needs P1)
 - [ ] A specialization may bind named profiles by name, in declaration order.
