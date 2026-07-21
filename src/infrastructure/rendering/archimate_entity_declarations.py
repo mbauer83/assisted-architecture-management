@@ -5,7 +5,7 @@ from __future__ import annotations
 from collections.abc import Mapping
 from typing import Any
 
-from src.domain.archimate_relation_rendering import format_specialization_guillemet
+from src.domain.archimate_relation_rendering import format_specializations_guillemet
 from src.domain.artifact_types import EntityRecord
 from src.domain.module_types import EntityTypeName
 from src.domain.ontology_types import EntityTypeInfo
@@ -138,11 +138,15 @@ def entity_label_and_stereotype(
     label = str(archimate_block.get("label") or entity.display_label or entity.name).replace('"', "'")
     info = registry.find_entity_type(EntityTypeName(entity.artifact_type))
     stereotype = stereotype_key(info.artifact_type) if isinstance(info, EntityTypeInfo) else None
-    spec: SpecializationInfo | None = None
-    if entity.specialization:
-        spec = specialization_catalog.get("entity", entity.artifact_type, entity.specialization)
-    if spec is not None:
-        label = f"{label} {format_specialization_guillemet(spec.name)}"
+    # All applied specializations show in the label (§15.2 comma-separated list); the PRIMARY
+    # one drives notation (icon/color) below, since a single glyph cannot honour several.
+    resolved = [
+        specialization_catalog.get("entity", entity.artifact_type, slug) for slug in entity.specializations
+    ]
+    spec: SpecializationInfo | None = next((info for info in resolved if info is not None), None)
+    guillemet = format_specializations_guillemet([info.name for info in resolved if info is not None])
+    if guillemet:
+        label = f"{label} {guillemet}"
     if label_attribute:
         value, present = read_attribute_value(entity, label_attribute, context="entity")
         if present and value is not None:

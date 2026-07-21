@@ -267,7 +267,7 @@ def evaluate_viewpoint(
                 id=record.artifact_id,
                 name=record.name,
                 type=record.artifact_type,
-                specialization_slugs=(record.specialization,) if record.specialization else (),
+                specialization_slugs=record.specializations,
                 group=record.group,
                 membership=membership_by_id[entity_id],
                 status=record.status,

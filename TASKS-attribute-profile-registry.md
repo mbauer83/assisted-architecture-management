@@ -461,23 +461,67 @@ are shown as a comma-separated list"*. Sequenced after P–S; the DECISION is
 already locked because WU-P3 depends on it.
 
 ### WU-V1 — Storage and back-compatibility
-- [ ] Frontmatter accepts a list; a bare scalar keeps working and is read as a
+- [x] Frontmatter accepts a list; a bare scalar keeps working and is read as a
       one-element list. No repo migration required.
-- [ ] Tests: scalar form round-trips unchanged (regression).
+- [x] Tests: scalar form round-trips unchanged (regression).
+
+#### WU-V1 PROGRESS (2026-07-22)
+- `EntityRecord`/`ConnectionRecord` gain `specializations: tuple[str, ...]` (canonical,
+  ordered) alongside `specialization: str` (the PRIMARY = first). `_reconcile_specializations`
+  in `__post_init__` derives one from the other so a caller may set EITHER — the ~91 existing
+  `specialization=` construction sites keep working, and setting both to disagree is a
+  ValueError, not a silent reconcile. Chosen over a pure derived property to avoid churning
+  every construction site for a representation change.
+- Parsing (`artifact_parsing._parse_specializations`) reads a scalar (one-element set, no
+  migration) or a list (ordered, de-duplicated, blanks dropped) for both entity frontmatter
+  and connection metadata.
+- No SQLite change needed: entity/connection records flow to consumers as full mem-store
+  objects (`get_entity`/`list_connections` etc.), preserving `specializations`; the SQLite
+  scalar `specialization` column and `EntityContextConnection` are aggregate/display
+  projections keyed on the primary.
+- Tests: `tests/application/test_specialization_list_parsing.py` (scalar/list/absent
+  round-trip, de-dup, and the record invariant incl. the disagreement guard).
 
 ### WU-V2 — Rendering (needs V1)
-- [ ] `format_specialization_guillemet` renders the spec's comma-separated list
+- [x] `format_specialization_guillemet` renders the spec's comma-separated list
       («a, b»). It is singular today.
-- [ ] Tests: single and multiple render per spec.
+- [x] Tests: single and multiple render per spec.
+
+#### WU-V2 PROGRESS (2026-07-22)
+- Replaced the singular `format_specialization_guillemet` with
+  `format_specializations_guillemet(names)` → `«a, b»` (§15.2 default notation; one name
+  gives `«Name»`, empty gives `""`). Both render sites (`archimate_entity_declarations`,
+  `generic_puml_renderer`) resolve ALL `specializations` for the LABEL and keep the PRIMARY
+  spec for notation (a single icon/line-style cannot honour several). Old singular removed
+  (no remaining callers).
+- Tests: `tests/domain/test_specializations_guillemet.py` + multi-render cases in
+  `tests/rendering/test_specialization_rendering.py` (entity and connection).
 
 ### WU-V3 — Querying and styling (needs V1)
-- [ ] Viewpoint grouping by `specialization` and style/scale `applies_to`
+- [x] Viewpoint grouping by `specialization` and style/scale `applies_to`
       matching over a set. Both already compare via `frozenset`
       (`viewpoint_style_evaluation.py`, `viewpoint_scale_styling.py`), so this
-      extends naturally — verify rather than assume.
-- [ ] Decide and document what grouping by specialization MEANS for a concept in
+      extends naturally — verified.
+- [x] Decide and document what grouping by specialization MEANS for a concept in
       several groups (appears in each, versus a composite bucket).
-- [ ] Tests: grouping and style matching with multiple specializations.
+- [x] Tests: grouping and style matching with multiple specializations.
+
+#### WU-V3 PROGRESS (2026-07-22)
+- Both `_item_tags` (style_evaluation + scale_styling) now union the type with EVERY applied
+  specialization, so a rule/scale whose `applies_to` names any one of a concept's
+  specializations matches — this is the "grouping by specialization" of V3 (style-rule
+  frozenset grouping), verified as the plan predicted. `evaluate_viewpoint` passes the full
+  `specializations` as `specialization_slugs` (execution results + CSV export now list all).
+- **Grouping-meaning decision:** a concept with several specializations appears under EACH
+  matching style-group (styling naturally unions — every rule whose `applies_to` hits any of
+  its specializations applies), NOT a single composite bucket. The condition/presentation
+  reserved `specialization` path continues to resolve the PRIMARY scalar (one canonical
+  value per concept keeps population counts and column display unambiguous); the comparator
+  already handles collection membership, so set-membership filtering is a one-line change if
+  the owner later wants it. Recorded here as the durable decision.
+- Tests: non-primary `applies_to` match in both `test_viewpoint_style_evaluation.py` and
+  `test_viewpoint_scale_style.py`.
+- Gates (V1–V3 together): backend 6358 passed / 5 skipped; ruff + zuban clean.
 
 ### WU-V4 — Write paths and GUI (needs V1)
 - [ ] Entity and connection write paths accept multiple; `promote_schema_check`

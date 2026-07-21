@@ -51,11 +51,13 @@ class ItemStyleEvaluation:
 
 
 def _item_tags(item: Item, item_kind: ItemKind) -> frozenset[str]:
+    # An item's tags are its type plus EVERY applied specialization (§15.2), so a style rule
+    # whose `applies_to` names any one of them matches — not only the primary.
     if item_kind == "connection":
         assert isinstance(item, ConnectionRecord)
-        return frozenset({item.conn_type, item.specialization}) - {""}
+        return frozenset({item.conn_type, *item.specializations}) - {""}
     assert isinstance(item, EntityRecord)
-    return frozenset({item.artifact_type, item.specialization}) - {""}
+    return frozenset({item.artifact_type, *item.specializations}) - {""}
 
 
 def _match_outcome(

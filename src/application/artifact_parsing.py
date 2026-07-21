@@ -218,8 +218,7 @@ def parse_entity(
     kw_raw: object = frontmatter.get("keywords") or []
     keywords: tuple[str, ...] = tuple(str(k) for k in kw_raw) if isinstance(kw_raw, list) else ()
 
-    spec_raw = frontmatter.get("specialization")
-    specialization = spec_raw if isinstance(spec_raw, str) else ""
+    specializations = _parse_specializations(frontmatter.get("specialization"))
 
     content_text = extract_section(content, "content")
     return EntityRecord(
@@ -231,7 +230,7 @@ def parse_entity(
         domain=domain,
         subdomain=subdomain,
         keywords=keywords,
-        specialization=specialization,
+        specializations=specializations,
         path=path,
         extra={key: value for key, value in frontmatter.items() if key not in STANDARD_ENTITY_FIELDS},
         content_text=content_text,
@@ -240,6 +239,23 @@ def parse_entity(
         display_alias=display_alias,
         attributes=_decode_attributes(content_text, frontmatter),
     )
+
+
+def _parse_specializations(raw: object) -> tuple[str, ...]:
+    """Read a ``specialization`` frontmatter/metadata value as the ordered set it now is.
+
+    A bare scalar (every existing repo) reads as a one-element set — no migration. A list
+    reads in order, de-duplicated, with blanks dropped. Anything else is no specialization.
+    """
+    if isinstance(raw, str):
+        return (raw,) if raw else ()
+    if isinstance(raw, list):
+        seen: dict[str, None] = {}
+        for item in raw:
+            if isinstance(item, str) and item and item not in seen:
+                seen[item] = None
+        return tuple(seen)
+    return ()
 
 
 def _decode_attributes(content_text: str, frontmatter: dict) -> dict[str, Any]:
@@ -276,8 +292,7 @@ def parse_outgoing_file(path: Path) -> list[ConnectionRecord]:
     records: list[ConnectionRecord] = []
     for decl in parse_connection_declarations(content):
         artifact_id = f"{stable_id(source_entity)}---{stable_id(decl.target_id)}@@{decl.conn_type}"
-        conn_spec_raw = decl.metadata.get("specialization")
-        specialization = conn_spec_raw if isinstance(conn_spec_raw, str) else ""
+        specializations = _parse_specializations(decl.metadata.get("specialization"))
         records.append(
             ConnectionRecord(
                 artifact_id=artifact_id,
@@ -292,7 +307,7 @@ def parse_outgoing_file(path: Path) -> list[ConnectionRecord]:
                 associated_entities=decl.associated_entities,
                 src_multiplicity=decl.src_multiplicity,
                 tgt_multiplicity=decl.tgt_multiplicity,
-                specialization=specialization,
+                specializations=specializations,
             )
         )
     return records

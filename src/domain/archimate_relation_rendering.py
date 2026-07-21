@@ -1,17 +1,21 @@
 from __future__ import annotations
 
 import re
+from collections.abc import Sequence
 
 
 def display_connection_label(conn_type: str) -> str:
     return conn_type.removeprefix("archimate-")
 
 
-def format_specialization_guillemet(specialization_name: str) -> str:
-    """Render a specialization's display name as a guillemet stereotype, e.g. ``«Business
-    Service»`` — visually distinct from the ``<<connection-type>>`` ASCII-bracket
-    stereotype used for relationship types, so a reader can tell them apart at a glance."""
-    return f"«{specialization_name}»"
+def format_specializations_guillemet(specialization_names: Sequence[str]) -> str:
+    """Render specialization display names as one comma-separated guillemet stereotype, e.g.
+    ``«Business Service, Audited»`` — ArchiMate §15.2's default notation for a concept
+    carrying multiple specialization profiles, and ``«Name»`` for a single one. Visually
+    distinct from the ``<<connection-type>>`` ASCII-bracket stereotype used for relationship
+    types, so a reader can tell them apart at a glance. An empty sequence yields ``""``."""
+    names = [name for name in specialization_names if name]
+    return f"«{', '.join(names)}»" if names else ""
 
 
 _STEREOTYPE_TOKEN_RE = re.compile(r"<<\s*([A-Za-z][A-Za-z0-9_-]*)\s*>>")

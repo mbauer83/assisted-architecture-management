@@ -29,7 +29,8 @@ _ARCHIMATE_CONFIG = {
 
 
 def _entity(
-    artifact_id: str, artifact_type: str, name: str, alias: str, *, specialization: str = ""
+    artifact_id: str, artifact_type: str, name: str, alias: str, *,
+    specialization: str = "", specializations: tuple[str, ...] = (),
 ) -> EntityRecord:
     display_blocks = {"archimate": f'```yaml\nlabel: "{name}"\nalias: {alias}\n```'}
     return EntityRecord(
@@ -48,10 +49,13 @@ def _entity(
         display_label=name,
         display_alias=alias,
         specialization=specialization,
+        specializations=specializations,
     )
 
 
-def _conn(source: str, target: str, conn_type: str, *, specialization: str = "") -> ConnectionRecord:
+def _conn(
+    source: str, target: str, conn_type: str, *, specialization: str = "", specializations: tuple[str, ...] = ()
+) -> ConnectionRecord:
     return ConnectionRecord(
         artifact_id=f"{source}---{target}@@{conn_type}",
         source=source,
@@ -63,6 +67,7 @@ def _conn(source: str, target: str, conn_type: str, *, specialization: str = "")
         extra={},
         content_text="",
         specialization=specialization,
+        specializations=specializations,
     )
 
 
@@ -125,6 +130,18 @@ class TestEntityRendering:
         assert "«" not in puml
         assert 'rectangle "Cross-team" <<collaboration>> as COL_TEAM' in puml
 
+    def test_multiple_specializations_render_as_a_comma_separated_list(self, tmp_path: Path) -> None:
+        # WU-V2 / ArchiMate §15.2: several specialization profiles show as one guillemet list.
+        renderer = GenericPumlRenderer(_ARCHIMATE_CONFIG)
+        team = _entity(
+            "COL@1.a.team", "collaboration", "Cross-team", "COL_TEAM",
+            specializations=("business-collaboration", "application-collaboration"),
+        )
+
+        puml = renderer.render_body("Team", [team], [], "archimate-business", tmp_path)
+
+        assert "«Business Collaboration, Application Collaboration»" in puml
+
 
 class TestConnectionRendering:
     def test_guillemet_renders_when_type_stereotype_is_suppressed(self, tmp_path: Path) -> None:
@@ -142,6 +159,19 @@ class TestConnectionRendering:
 
         assert "«Responsibility Assignment»" in puml
         assert "<<assignment>>" not in puml
+
+    def test_multiple_connection_specializations_render_as_a_list(self, tmp_path: Path) -> None:
+        renderer = GenericPumlRenderer(_ARCHIMATE_CONFIG)
+        src = _entity("GRP@1.a.src", "grouping", "Src", "GRP_SRC")
+        tgt = _entity("REQ@1.a.tgt", "requirement", "Tgt", "REQ_TGT")
+        conn = _conn(
+            src.artifact_id, tgt.artifact_id, "archimate-assignment",
+            specializations=("responsibility-assignment", "behavior-assignment"),
+        )
+
+        puml = renderer.render_body("Diag", [src, tgt], [conn], "archimate-motivation", tmp_path)
+
+        assert "«Responsibility Assignment, Behavior Assignment»" in puml
 
     def test_guillemet_composes_with_shown_type_stereotype(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch

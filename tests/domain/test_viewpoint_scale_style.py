@@ -41,7 +41,7 @@ def _style_and_drift(
     return evaluation.style, evaluation.schema_drift
 
 
-def _entity(identifier: str, score: int | None) -> EntityRecord:
+def _entity(identifier: str, score: int | None, *, specializations: tuple[str, ...] = ()) -> EntityRecord:
     extra: dict[str, object] = {} if score is None else {"score": score}
     return EntityRecord(
         artifact_id=identifier,
@@ -58,6 +58,7 @@ def _entity(identifier: str, score: int | None) -> EntityRecord:
         display_blocks={},
         display_label=identifier,
         display_alias="",
+        specializations=specializations,
     )
 
 
@@ -109,6 +110,19 @@ def test_data_driven_scale_bounds_are_order_independent_and_emit_legend() -> Non
         scale_bounds=bounds,
     )
     assert style == {"node_color": ScaleStyleValue(position=0.0, tokens=("#00ffff", "#ff8800"))}
+
+
+def test_scale_applies_to_matches_any_specialization_not_only_the_primary() -> None:
+    # WU-V3: a scale scoped to a concept's SECOND specialization still applies to it.
+    entity = _entity("multi", 20, specializations=("service", "audited"))
+    presentation = _presentation(applies_to=frozenset({"audited"}))
+    bounds, _, _ = calculate_scale_bounds(
+        presentation, ((entity, "entity"),), registries=_REGISTRIES, environment=EvaluationEnvironment(),
+    )
+    style, _ = _style_and_drift(
+        entity, "entity", presentation, read_access=_EmptyGraph(), registries=_REGISTRIES, scale_bounds=bounds,
+    )
+    assert isinstance(style["node_color"], ScaleStyleValue)
 
 
 def test_missing_scale_value_uses_default_style_and_out_of_range_saturates() -> None:

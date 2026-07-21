@@ -19,6 +19,29 @@ class DuplicateArtifactIdError(ValueError):
     pass
 
 
+def _reconcile_specializations(record: object) -> None:
+    """Keep an artifact's scalar ``specialization`` and list ``specializations`` consistent,
+    so a constructor may set EITHER one. The list is canonical; the scalar is its first
+    element. A caller that passes only the scalar (the many existing sites) gets a
+    one-element list; one that passes only the list gets the primary scalar derived. Passing
+    both that disagree is a programming error, not silently reconciled.
+
+    Frozen-dataclass safe: uses ``object.__setattr__`` in ``__post_init__``.
+    """
+    scalar: str = getattr(record, "specialization", "") or ""
+    listed: tuple[str, ...] = tuple(getattr(record, "specializations", ()) or ())
+    if listed:
+        primary = listed[0]
+        if scalar and scalar != primary:
+            raise ValueError(
+                f"specialization {scalar!r} disagrees with specializations[0] {primary!r}; "
+                "set one or the other, not both"
+            )
+        object.__setattr__(record, "specialization", primary)
+    elif scalar:
+        object.__setattr__(record, "specializations", (scalar,))
+
+
 def infer_engagement_label(root: Path, *, scope: MountScope) -> str:
     if scope == "enterprise":
         return "enterprise"
@@ -56,10 +79,20 @@ class EntityRecord:
     """None for model entities; the owning diagram's artifact_id for diagram-only entities."""
     group: str = "uncategorized"
     specialization: str = ""
+    """The PRIMARY specialization — the first of ``specializations``, kept as a scalar for
+    the many consumers that need one label. A concept may carry several (ArchiMate §15.2);
+    read ``specializations`` for the full ordered set."""
+    specializations: tuple[str, ...] = ()
+    """Every applied specialization slug, in declaration order. Canonical for resolution,
+    rendering, and styling. ``specialization`` is its first element; the two are kept
+    consistent in ``__post_init__`` so a caller may set either one."""
     attributes: Mapping[str, object] = field(default_factory=dict)
     """Typed values decoded from the entity's Properties table (the user-facing
     attribute surface). Distinct from `extra`, which carries frontmatter fields —
     attribute reads consult this first, then fall back to `extra`."""
+
+    def __post_init__(self) -> None:
+        _reconcile_specializations(self)
 
     def __str__(self) -> str:
         return (
@@ -85,6 +118,13 @@ class ConnectionRecord:
     tgt_multiplicity: str = ""
     group: str = "uncategorized"
     specialization: str = ""
+    """The PRIMARY specialization — the first of ``specializations`` (see EntityRecord)."""
+    specializations: tuple[str, ...] = ()
+    """Every applied connection specialization slug, in declaration order; kept consistent
+    with ``specialization`` in ``__post_init__``."""
+
+    def __post_init__(self) -> None:
+        _reconcile_specializations(self)
 
     @property
     def source_ids(self) -> list[str]:

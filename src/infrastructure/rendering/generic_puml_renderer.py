@@ -12,7 +12,7 @@ from src.application.artifact_parsing import normalize_puml_alias
 from src.domain.archimate_relation_rendering import (
     display_connection_label,
     format_multiplicity_label,
-    format_specialization_guillemet,
+    format_specializations_guillemet,
 )
 from src.domain.artifact_types import ConnectionRecord, EntityRecord
 from src.domain.module_types import ConnectionTypeName, ElementClassName
@@ -213,11 +213,12 @@ class GenericPumlRenderer:
                 tgt_group = group_index_by_alias.get(tgt)
                 if direction is None and src_group is not None and tgt_group is not None and src_group != tgt_group:
                     direction = "down" if src_group < tgt_group else "up"
-            conn_spec = (
-                specialization_catalog.get("connection", conn.conn_type, conn.specialization)
-                if conn.specialization
-                else None
-            )
+            resolved_specs = [
+                specialization_catalog.get("connection", conn.conn_type, slug) for slug in conn.specializations
+            ]
+            # Primary specialization drives notation (arrow line style, marker); the label
+            # below shows all of them (§15.2 comma-separated list).
+            conn_spec = next((info for info in resolved_specs if info is not None), None)
             arrow = conn_info.puml_arrow if conn_info else "-->"
             if is_derived_connection_id(conn.artifact_id):
                 certainty = conn.extra.get("certainty") if isinstance(conn.extra, Mapping) else None
@@ -240,8 +241,10 @@ class GenericPumlRenderer:
                         label = f"{label} {visible_label}"
                 else:
                     label = visible_label
-                if conn_spec is not None:
-                    guillemet = format_specialization_guillemet(conn_spec.name)
+                guillemet = format_specializations_guillemet(
+                    [info.name for info in resolved_specs if info is not None]
+                )
+                if guillemet:
                     label = f"{label} {guillemet}".strip() if label else guillemet
             if label:
                 conn_lines.append(f"{src} {arrow} {tgt} : {label}")

@@ -184,6 +184,21 @@ class TestAppliesToScoping:
         style, _ = _style_and_drift(entity, "entity", presentation, read_access=_Graph(), registries=_REGISTRIES)
         assert style == {"badges": "badge-warning"}
 
+    def test_rule_scoped_to_a_non_primary_specialization_applies(self) -> None:
+        # WU-V3: `applies_to` matches ANY of a concept's specializations, not only the first.
+        entity = _entity(status="deprecated", specializations=("service", "audited"))
+        rule = _status_rule("badges", "deprecated", "badge-warning")
+        rule = StyleRule(
+            capability=rule.capability,
+            applies_to=frozenset({"audited"}),  # the SECOND specialization
+            mode=rule.mode,
+            match_criteria=rule.match_criteria,
+            value=rule.value,
+        )
+        presentation = PresentationSpec(representation="table", styling_rules=(rule,))
+        style, _ = _style_and_drift(entity, "entity", presentation, read_access=_Graph(), registries=_REGISTRIES)
+        assert style == {"badges": "badge-warning"}
+
 
 class TestRangeBands:
     _BANDS = (
