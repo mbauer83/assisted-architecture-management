@@ -19,6 +19,7 @@ from src.application.viewpoints.execution_result import (
 )
 from src.application.viewpoints.ports import RepositoryReadAccess, SignalAttributeCapability
 from src.application.viewpoints.prepare_environment import prepare_query_environment
+from src.application.viewpoints.reference_report_cache import cached_reference_report
 from src.application.viewpoints.repository_projection import project_repository
 from src.application.viewpoints.result_aggregation import aggregation_for_result
 from src.application.viewpoints.result_summaries import matrix_axis_ids, ordered_witness_steps_for
@@ -29,6 +30,7 @@ from src.domain.viewpoint_aggregation import AggregateConnection
 from src.domain.viewpoint_anchor_distance import anchor_modeled_distances
 from src.domain.viewpoint_condition_validation import RegistrySnapshot
 from src.domain.viewpoint_projection import ViewpointProjection, drift_warnings
+from src.domain.viewpoint_reference_report import reference_report_warnings
 from src.domain.viewpoint_summary import render_query_summary
 from src.domain.viewpoint_target_population import declared_target_types, summarize_target_population
 from src.domain.viewpoints import (
@@ -74,6 +76,28 @@ class ViewpointExecutionRequest:
 
 def _ad_hoc_definition(query: ExecutableViewpointQuery) -> ViewpointDefinition:
     return ViewpointDefinition(slug="", version=0, name="", query=query, presentation=None)
+
+
+def _dropped_entity_id_anchors(
+    query: ExecutableViewpointQuery | None,
+    supplied: Mapping[str, object] | None,
+    bound: Mapping[str, object],
+) -> tuple[tuple[str, str], ...]:
+    """Supplied ``entity-id`` parameters that ``bind_parameters`` silently dropped because
+    their value resolves to no live entity — the anchor loss I-R1 requires be surfaced
+    rather than left to widen the result unremarked (a dropped anchor is a BROKEN reference,
+    never an unused optional filter)."""
+    if query is None or not supplied:
+        return ()
+    declared = {parameter.name: parameter for parameter in query.parameters}
+    return tuple(
+        (name, value)
+        for name, value in supplied.items()
+        if (parameter := declared.get(name)) is not None
+        and parameter.value_type == "entity-id"
+        and name not in bound
+        and isinstance(value, str)
+    )
 
 
 def resolve_viewpoint_definition(
@@ -257,7 +281,26 @@ def evaluate_viewpoint(
     matrix_axes, matrix_drift = matrix_axis_ids(
         executable_definition.presentation, retained_entities, read_access=read_access, registries=registries
     )
-    warnings = tuple(projection.warnings) + drift_warnings(frozenset(matrix_drift))
+    # Reference integrity (I-R1: broken ≠ inactive). Broken references are reported LOUDLY
+    # and suppress absence claims; they are never allowed to silently widen or narrow a
+    # result unremarked. Attribute-path breakage is already carried by the drift warnings
+    # above, so reference_report_warnings omits it — but suppression keys off the FULL report.
+    reference_breakage = cached_reference_report(
+        definition, registries=registries, read_access=read_access, index_generation=index_generation
+    )
+    dropped_anchors = _dropped_entity_id_anchors(
+        executable_definition.query, request.parameters, prepared.environment.parameters
+    )
+    warnings = (
+        tuple(projection.warnings)
+        + drift_warnings(frozenset(matrix_drift))
+        + reference_report_warnings(reference_breakage)
+        + tuple(
+            f"anchor parameter '{name}': entity '{value}' no longer exists — anchoring is degraded"
+            for name, value in dropped_anchors
+        )
+    )
+    references_broken = bool(reference_breakage) or bool(dropped_anchors)
 
     aggregation = aggregation_for_result(
         executable_definition.presentation,
@@ -269,6 +312,9 @@ def evaluate_viewpoint(
     )
 
     target_types = declared_target_types(definition, registries.entity_type_infos)
+    # A broken reference forbids any absence claim: a query that cannot resolve what it
+    # references must never read as "nothing is missing" (same discipline as an unknown
+    # target population). Suppression keys off the full report, including attribute paths.
     target_population = (
         summarize_target_population(
             target_types,
@@ -279,7 +325,7 @@ def evaluate_viewpoint(
             ),
             registries.entity_type_infos,
         )
-        if target_types is not None
+        if target_types is not None and not references_broken
         else None
     )
 
