@@ -267,3 +267,33 @@ def test_documented_repository_paths_exist() -> None:
         "Documentation points at repository paths that do not exist:\n  "
         + "\n  ".join(offenders)
     )
+
+
+# ── Vocabularies duplicated in a client ───────────────────────────────────────
+
+_WIZARD_HELPERS = (
+    REPO_ROOT / "tools" / "gui" / "src" / "ui" / "views"
+    / "AssuranceSupplyChainWizard.helpers.ts"
+)
+
+
+def test_frontend_anchor_types_match_the_backend_vocabulary() -> None:
+    """The scope picker needs the admissible anchor types synchronously, so it
+    keeps a client copy of a vocabulary the BACKEND owns. A copy that can drift is
+    how a GUI comes to offer an ingest the API refuses — this pins the two
+    together so the duplication is safe rather than merely convenient."""
+    from src.domain.security_signal_snapshot import ADMISSIBLE_ANCHOR_TYPES
+
+    source = _WIZARD_HELPERS.read_text(encoding="utf-8")
+    block = re.search(
+        r"ADMISSIBLE_ANCHOR_TYPES\s*=\s*\[(.*?)\]", source, re.S,
+    )
+    assert block, "could not locate ADMISSIBLE_ANCHOR_TYPES in the wizard helpers"
+    frontend = tuple(re.findall(r"'([a-z-]+)'", block.group(1)))
+
+    assert frontend == tuple(ADMISSIBLE_ANCHOR_TYPES), (
+        "The GUI's admissible anchor types have drifted from the backend's:\n"
+        f"  frontend: {frontend}\n"
+        f"  backend:  {tuple(ADMISSIBLE_ANCHOR_TYPES)}\n"
+        "The backend owns this vocabulary; update the client copy."
+    )

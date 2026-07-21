@@ -3114,6 +3114,51 @@ only existing nodes cannot measure a missing one".
     Both assertions were self-refuted — confirmed non-vacuous against the real imports, and a
     synthetic bypass script is correctly flagged.
 
+- 2026-07-21 · GUI INGEST RESTORED + ANCHOR VALIDATION ENFORCED (owner correction) · The GUI
+  ingest capability I removed should never have been removed, and writing it out of
+  `gui-capability-design.md` was overreach: the task was repairing a 404ing view, not deciding
+  the capability was wrong. The stated reason was also FALSE — a CycloneDX document carries its
+  generator in `metadata.tools`, and a request id is generated, not typed.
+  · RESTORED, primary entry on the ENTITY page (owner: "not necessarily a wizard — maybe a
+    button on the entity-details page"), which also satisfies the capability doc's own
+    contract 1 (the architecture model is the navigation spine for assurance):
+    `SignalIngestPanel` posts to `/api/assurance/security-ingest`, the same gated, audited,
+    idempotent command every other surface uses. The wizard's ingest step delegates to the SAME
+    component, so the two cannot drift.
+  · ANCHOR VALIDATION — owner questions dismantled my objection, correctly:
+    "we already have a dependency of the tool… if the anchor doesn't exist, it has to fail" and
+    "why is the dependency-direction bad?". VERIFIED: `assurance_model_bind.py` already declares
+    an `ArchitectureEntityCreator` port with `is_known_type()`, so assurance already reads AND
+    writes architecture through ports. The rule this codebase holds is that ARCHITECTURE never
+    depends on assurance — not the reverse. My objection defended a constraint that does not
+    exist. The ingest command now takes an `AnchorReader` port and refuses, BEFORE any write:
+    an anchor the model does not know, and an anchor an SBOM cannot describe.
+  · ADMISSIBLE ANCHORS (owner-set, narrowed then widened): application-component unspecialized
+    or `service`; `node` and `system-software` any specialization. Refused: `module` (a part of
+    a shipped thing), `endpoint` (an interface), and the aggregates `grouping` /
+    `application-collaboration`. node/system-software use `None` = "any specialization" rather
+    than `frozenset({""})`, because neither declares specializations today and enumerating the
+    empty case would silently refuse every anchor the moment the ontology gained one — a test
+    pins that a hypothetical `node/cluster` is admitted.
+    The vocabulary is BACKEND-OWNED (`/api/assurance/signal-anchor-types`, the established
+    `aibom/roles` pattern) and ENFORCED, not advisory. It had previously existed ONLY as a
+    frontend constant, so a GUI-only restriction would have been cosmetic.
+  · request_id UX FIXED (owner: "request from whom, to whom, for what?"). It is an idempotency
+    key naming ONE submission attempt so a timed-out retry replays instead of duplicating.
+    Exposing it as a free-text field asked a human to invent a machine concept, and leaving it
+    blank meant every click generated a fresh one — a double-click would have created two
+    snapshots. Now DERIVED from the pasted content: same paste replays, edited BOM is a new
+    request. Four tests, including that the two fields are separated so ("ab","") and ("a","b")
+    are not the same request.
+  · THE DRIFT DETECTOR CAUGHT MY OWN REGRESSION: narrowing the backend list left the frontend
+    copy at five types, and `test_frontend_anchor_types_match_the_backend_vocabulary` failed —
+    the mechanism working on the person who built it.
+  · AI-BOM coverage panel: owner confirmed it does NOT come back (AI-BOM is a separate plan).
+  · Gates: 6215 passed / 5 skipped; ruff + zuban clean; frontend 1148 tests.
+  · RESTART-GATED: `/api/assurance/signal-anchor-types` postdates the last backend restart, so
+    the entity-page panel currently hides itself (fail-closed: no vocabulary ⇒ no affordance,
+    verified live). Needs one more restart for the GUI ingest to appear.
+
 ### REMAINING BACKLOG (assurance security-signals — sequenced, owner-directed)
 1. [x] INGEST-via-MCP tool (bundle-submit to the ingest command) + decide aibom_coverage — DONE
        2026-07-21 (see the entry above); aibom_coverage DROPPED with rationale. REST parity

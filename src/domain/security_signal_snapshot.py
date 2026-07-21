@@ -49,6 +49,116 @@ def transition_error(current: str, target: str) -> str:
     )
 
 
+# ── Which architecture elements may anchor a snapshot ─────────────────────────
+
+#: Admissible anchors, as (artifact type → permitted specializations). ``None``
+#: means every specialization of that type qualifies; a frozenset restricts to the
+#: listed ones, where ``""`` is the unspecialized form.
+#:
+#: An SBOM is a bill of materials for ONE built, independently shipped artifact,
+#: which is what constrains this. An application-component that is a *service* (or
+#: an unspecialized one, which is the same thing before anyone has bothered to
+#: specialize it) is such an artifact; a *module* is a part of one, so its
+#: dependencies belong to whatever ships it, and an *endpoint* is an interface,
+#: which is not built at all. Technology nodes and system software are shipped
+#: artifacts in their own right — a container image or a database engine has a bill
+#: of materials — so every specialization of those qualifies.
+#:
+#: ``None`` rather than ``frozenset({""})`` for the technology types on purpose:
+#: neither declares specializations today, and enumerating the empty case would
+#: silently refuse every anchor the moment the ontology gained one.
+#:
+#: Owned HERE rather than in a client so the GUI, REST and MCP surfaces cannot
+#: disagree about what may be anchored, and ENFORCED by the ingest command so the
+#: rule is not merely advisory to whoever happens to read it.
+ADMISSIBLE_ANCHORS: Mapping[str, frozenset[str] | None] = {
+    "application-component": frozenset({"", "service"}),
+    "node": None,
+    "system-software": None,
+}
+
+#: The bare types, for surfaces that only need the coarse vocabulary (entity
+#: pickers, "can this element anchor signals?" affordances).
+ADMISSIBLE_ANCHOR_TYPES: tuple[str, ...] = tuple(ADMISSIBLE_ANCHORS)
+
+
+@dataclass(frozen=True)
+class AnchorDescriptor:
+    """What the architecture model says about a prospective anchor."""
+
+    entity_id: str
+    artifact_type: str
+    specialization: str = ""
+
+
+@dataclass(frozen=True)
+class AnchorAdmissible:
+    """The anchor exists and may carry security signals."""
+
+    entity_id: str
+
+
+@dataclass(frozen=True)
+class AnchorUnknown:
+    """No such architecture entity. A snapshot anchored on nothing is unreachable
+    from the model, so this is refused rather than stored."""
+
+    entity_id: str
+
+
+@dataclass(frozen=True)
+class AnchorTypeNotPermitted:
+    """The entity exists but is not a thing an SBOM can describe."""
+
+    entity_id: str
+    artifact_type: str
+    specialization: str
+
+    def message(self) -> str:
+        described = (
+            f"{self.artifact_type}/{self.specialization}"
+            if self.specialization else self.artifact_type
+        )
+        permitted = ", ".join(
+            artifact_type if specs is None else
+            f"{artifact_type} ({', '.join(spec or 'unspecialized' for spec in sorted(specs))})"
+            for artifact_type, specs in sorted(ADMISSIBLE_ANCHORS.items())
+        )
+        return (
+            f"{self.entity_id} is a {described}, which cannot anchor security "
+            f"signals. An SBOM describes one built, independently shipped artifact; "
+            f"permitted anchors are: {permitted}."
+        )
+
+
+AnchorDecision = AnchorAdmissible | AnchorUnknown | AnchorTypeNotPermitted
+
+
+def evaluate_anchor(entity_id: str, descriptor: AnchorDescriptor | None) -> AnchorDecision:
+    """Decide whether an ingest may be anchored on this entity.
+
+    A missing descriptor means the architecture model does not know the id — the
+    ingest already REQUIRES an anchor, so accepting one that resolves to nothing
+    would store a snapshot no model surface can ever reach.
+    """
+    if descriptor is None:
+        return AnchorUnknown(entity_id=entity_id)
+    if descriptor.artifact_type not in ADMISSIBLE_ANCHORS:
+        return AnchorTypeNotPermitted(
+            entity_id=entity_id,
+            artifact_type=descriptor.artifact_type,
+            specialization=descriptor.specialization,
+        )
+    permitted = ADMISSIBLE_ANCHORS[descriptor.artifact_type]
+    if permitted is not None and descriptor.specialization not in permitted:
+        return AnchorTypeNotPermitted(
+            entity_id=entity_id,
+            artifact_type=descriptor.artifact_type,
+            specialization=descriptor.specialization,
+        )
+    return AnchorAdmissible(entity_id=entity_id)
+
+
 # ── Anchor identity ────────────────────────────────────────────────────────────
 
 

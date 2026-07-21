@@ -7,17 +7,17 @@ export interface SupplyStep {
   needsAnchor: boolean
 }
 
-// Supply-chain flow: Scope (ArchiMate anchor) → Components → Vulnerabilities →
-// Posture & VEX → AI-BOM. The AI-BOM step is store-/architecture-wide (candidate
-// scan, ML-BOM export), so it does not require a per-scope anchor.
+// Supply-chain flow: Scope (ArchiMate anchor) → Ingest SBOM → Components →
+// Vulnerabilities → Posture & VEX → AI-BOM. The AI-BOM step is
+// store-/architecture-wide (candidate scan, ML-BOM export), so it does not require
+// a per-scope anchor.
 //
-// There is deliberately NO import step. Ingest is a serialised, audited, idempotent
-// act owned by the IngestSecuritySignals command, reached through the CLI, MCP, or
-// the REST ingest endpoint. A paste-JSON box could not carry a request id or
-// generator provenance, so this wizard VIEWS the active snapshot rather than
-// pretending to produce one.
+// The ingest step delegates to the SAME component the entity page uses, which posts
+// to the same gated, audited, idempotent command as the CLI, MCP and REST surfaces.
+// The browser is another adapter, not a bypass.
 export const SUPPLY_STEPS: SupplyStep[] = [
   { key: 'scope', label: 'Scope', needsAnchor: false },
+  { key: 'ingest', label: 'Ingest SBOM', needsAnchor: true },
   { key: 'components', label: 'Components', needsAnchor: true },
   { key: 'vulnerabilities', label: 'Vulnerabilities', needsAnchor: true },
   { key: 'posture', label: 'Posture & VEX', needsAnchor: true },
@@ -25,15 +25,20 @@ export const SUPPLY_STEPS: SupplyStep[] = [
 ]
 
 /**
- * Admissible ArchiMate anchor types for an SBOM scope. Scope is expressed in
- * ArchiMate terms (never C4 container/system, which is only a view): one service
- * → application-component; a system or subset of services → application-collaboration
- * or grouping; technology → node or system-software.
+ * Admissible ArchiMate anchor types, for the scope picker's synchronous filter.
+ *
+ * The BACKEND owns this vocabulary (`/api/assurance/signal-anchor-types`) and
+ * enforces it on ingest; the panel fetches it. This copy exists only because the
+ * picker needs the list before any request completes, and a test asserts the two
+ * stay identical so the duplication cannot drift silently.
+ *
+ * Coarse by design: the backend additionally restricts by SPECIALIZATION (an
+ * application-component may anchor an SBOM when it is a service or unspecialized,
+ * but not as a module or endpoint), which the picker cannot express. The ingest
+ * itself refuses the narrower cases.
  */
 export const ADMISSIBLE_ANCHOR_TYPES = [
   'application-component',
-  'application-collaboration',
-  'grouping',
   'node',
   'system-software',
 ] as const

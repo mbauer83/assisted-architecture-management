@@ -9,6 +9,7 @@ import ConnectionsPanel from '../components/ConnectionsPanel.vue'
 import ArtifactReferenceInput from '../components/ArtifactReferenceInput.vue'
 import AssuranceLens from '../components/AssuranceLens.vue'
 import DerivedSecurityAttributesPanel from '../components/DerivedSecurityAttributesPanel.vue'
+import SignalIngestPanel from '../components/SignalIngestPanel.vue'
 import EntityDetailHeader from '../components/EntityDetailHeader.vue'
 import EntityEditFormCard from '../components/EntityEditFormCard.vue'
 import EntityDeletePanel from '../components/EntityDeletePanel.vue'
@@ -26,6 +27,9 @@ const adminMode = ref(false)
 const route = useRoute()
 
 const entityId = computed(() => (route.query.id as string | undefined) ?? '')
+/** Bumped after an ingest so the derived-attributes panel re-reads: it shows the
+ *  ACTIVE snapshot, which a successful ingest has just replaced. */
+const signalsVersion = ref(0)
 
 const browseQuery = computed(() => {
   const q: Record<string, string> = {}
@@ -185,7 +189,16 @@ const executeDelete = () => { void router.push(backTo.value) }
       <!-- Derived security attributes (read-only; absent when locked/unanchored) -->
       <DerivedSecurityAttributesPanel
         v-if="entityId"
+        :key="`derived-${signalsVersion}`"
         :artifact-id="entityId"
+      />
+
+      <!-- Ingest an SBOM for this element (only for admissible anchor types) -->
+      <SignalIngestPanel
+        v-if="entityId"
+        :artifact-id="entityId"
+        :entity-type="detail?.artifact_type"
+        @ingested="signalsVersion++"
       />
 
       <div

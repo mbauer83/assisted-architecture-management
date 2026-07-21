@@ -18,6 +18,23 @@ from src.application.security_signals.command import IngestBundle, ingest_securi
 
 pytest.importorskip("sqlcipher3", reason="sqlcipher3 not installed")
 
+class _AdmissibleAnchors:
+    """Every anchor in this test file is admissible.
+
+    Stated explicitly rather than skipped: the command now REQUIRES an anchor
+    reader, so a test that wants to exercise ingestion has to say its anchor is a
+    real, permitted architecture element.
+    """
+
+    def describe_anchor(self, entity_id: str):  # type: ignore[no-untyped-def]
+        from src.domain.security_signal_snapshot import AnchorDescriptor
+
+        return AnchorDescriptor(
+            entity_id=entity_id, artifact_type="application-component",
+            specialization="service",
+        )
+
+
 _CTX_PATH = "src.infrastructure.gui.routers._assurance_signals_routes.get_assurance_context"
 _counter = itertools.count(1)
 
@@ -81,6 +98,7 @@ def _ingest(ctx: Any, anchor: str, *, vuln: str = "CVE-2024-1", purl: str = "pkg
         ),
         store=ctx.snapshot_store,
         new_snapshot_id=lambda: f"SNAP@{next(_counter)}",
+        anchor_reader=_AdmissibleAnchors(),
     )
     return result.snapshot_id  # type: ignore[union-attr]
 

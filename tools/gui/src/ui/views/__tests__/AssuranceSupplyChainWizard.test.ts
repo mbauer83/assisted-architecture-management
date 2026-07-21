@@ -6,18 +6,17 @@ import {
 } from '../AssuranceSupplyChainWizard.helpers'
 
 describe('SUPPLY_STEPS', () => {
-  it('runs Scope → Components → Vulnerabilities → Posture & VEX → AI-BOM', () => {
+  it('runs Scope → Ingest SBOM → Components → Vulnerabilities → Posture & VEX → AI-BOM', () => {
     expect(SUPPLY_STEPS.map((s) => s.key)).toEqual([
-      'scope', 'components', 'vulnerabilities', 'posture', 'aibom',
+      'scope', 'ingest', 'components', 'vulnerabilities', 'posture', 'aibom',
     ])
   })
 
-  it('has no import step — ingest is not a browser action', () => {
-    /* Ingest is serialised, audited and idempotent, owned by the
-       IngestSecuritySignals command and reached via CLI/MCP/REST. A paste-JSON box
-       could carry neither a request id nor generator provenance, so the wizard
-       VIEWS the active snapshot instead of appearing to produce one. */
-    expect(SUPPLY_STEPS.map((s) => s.key)).not.toContain('import')
+  it('offers ingest in the GUI, through the same gated command as every surface', () => {
+    /* The browser is another adapter over IngestSecuritySignals, not a bypass:
+       a CycloneDX document carries its generator in metadata.tools and the
+       request id is supplied by the form or generated server-side. */
+    expect(SUPPLY_STEPS.map((s) => s.key)).toContain('ingest')
   })
 
   it('gates the SBOM steps on an anchor; scope and aibom are anchor-free', () => {
@@ -28,9 +27,14 @@ describe('SUPPLY_STEPS', () => {
     expect(anchorGated.every((s) => s.needsAnchor)).toBe(true)
   })
 
-  it('admits ArchiMate scope types (never C4 container/system)', () => {
+  it('admits the types that ship a bill of materials (never C4 container/system)', () => {
+    /* An SBOM describes one built, independently shipped artifact: an application
+       component, a technology node, or system software. Aggregates like grouping
+       and application-collaboration do not ship as one thing. The backend owns
+       this list and additionally restricts by specialization; a Python test pins
+       this copy to it. */
     expect([...ADMISSIBLE_ANCHOR_TYPES]).toEqual([
-      'application-component', 'application-collaboration', 'grouping', 'node', 'system-software',
+      'application-component', 'node', 'system-software',
     ])
   })
 })

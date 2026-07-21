@@ -32,7 +32,7 @@ from src.application.security_signals.command import (
     IngestResult,
     ingest_security_signals,
 )
-from src.application.security_signals.ports import SnapshotStore
+from src.application.security_signals.ports import AnchorReader, SnapshotStore
 
 Acquire = Callable[[Sequence[Mapping[str, str]]], AcquisitionInputs]
 
@@ -77,12 +77,25 @@ def assemble_bundle(
     )
 
 
-def submit_bundle(bundle: IngestBundle, *, snapshot_store: SnapshotStore) -> IngestResult:
-    """Execute one ingest on the serialised assurance writer."""
+def submit_bundle(
+    bundle: IngestBundle,
+    *,
+    snapshot_store: SnapshotStore,
+    anchor_reader: AnchorReader | None = None,
+) -> IngestResult:
+    """Execute one ingest on the serialised assurance writer.
+
+    The anchor reader is resolved here when not supplied, so every transport gets
+    anchor validation without each one wiring it — a surface that forgot would
+    otherwise accept anchors the others refuse.
+    """
+    from src.infrastructure.assurance.anchor_reader import anchor_reader_for  # noqa: PLC0415
     from src.infrastructure.assurance.write_serialization import run_write  # noqa: PLC0415
 
+    reader = anchor_reader if anchor_reader is not None else anchor_reader_for()
     return run_write(lambda: ingest_security_signals(
         bundle, store=snapshot_store, new_snapshot_id=new_snapshot_id,
+        anchor_reader=reader,
     ))
 
 
@@ -94,6 +107,7 @@ def ingest_supplied_bom(
     snapshot_store: SnapshotStore,
     request_id: str = "",
     source: str = "",
+    anchor_reader: AnchorReader | None = None,
 ) -> IngestResult:
     """Ingest a caller-supplied BOM (+ advisories) for one anchor.
 
@@ -114,7 +128,8 @@ def ingest_supplied_bom(
         generator_metadata={"generator": "supplied-bom"},
         source_metadata={"vulnerability_source": source or "caller-supplied"},
     )
-    return submit_bundle(bundle, snapshot_store=snapshot_store)
+    return submit_bundle(
+        bundle, snapshot_store=snapshot_store, anchor_reader=anchor_reader)
 
 
 # HTTP status per ingest outcome; the MCP surface reports the same `status`

@@ -3,6 +3,7 @@ import { ref, computed } from 'vue'
 import EntityPickerInput from '../components/EntityPickerInput.vue'
 import AssuranceAibomPanel from './AssuranceAibomPanel.vue'
 import type { EntityDisplayInfo } from '../../domain'
+import SignalIngestPanel from '../components/SignalIngestPanel.vue'
 import {
   SUPPLY_STEPS,
   ADMISSIBLE_ANCHOR_TYPES,
@@ -115,9 +116,9 @@ async function loadVulns() {
         Supply-chain wizard
       </h1>
       <p class="wiz-sub">
-        The ACTIVE signal snapshot for an architecture element: its components,
-        vulnerabilities, posture and VEX. Ingest runs from the CLI, MCP, or the REST
-        ingest endpoint — this view reads what those produced.
+        Ingest an SBOM for an architecture element and read back the resulting
+        signal snapshot: components, vulnerabilities, posture and VEX. The same
+        ingest is available directly from the element's own detail page.
       </p>
     </div>
 
@@ -187,8 +188,24 @@ async function loadVulns() {
         v-if="hasAnchor"
         class="ok-note"
       >
-        Scope set. Continue to <strong>Components</strong>.
+        Scope set. Continue to <strong>Ingest SBOM</strong>.
       </p>
+    </section>
+
+    <!-- Ingest SBOM — the same component the entity page uses, so the two
+         surfaces cannot drift in what they accept or how they report it. -->
+    <section
+      v-else-if="currentStep.key === 'ingest'"
+      class="step-body"
+    >
+      <p class="scope-line">
+        Scope: <strong>{{ anchorName }}</strong> <span class="anchor-type">{{ anchorType }}</span>
+      </p>
+      <SignalIngestPanel
+        :artifact-id="anchorId"
+        :entity-type="anchorType"
+        @ingested="() => { void loadComponents(); void loadVulns() }"
+      />
     </section>
 
     <!-- Components -->
@@ -221,9 +238,10 @@ async function loadVulns() {
         v-if="components.length === 0"
         class="empty"
       >
-        No active signal snapshot for this scope. Run an ingest
-        (<code>arch-assurance seed --with-signals</code>, the ingest script, or the
-        MCP/REST ingest surface) to produce one.
+        No active signal snapshot for this scope yet — use the
+        <strong>Ingest SBOM</strong> step, or run an ingest from the CLI
+        (<code>arch-assurance seed --with-signals</code>, the ingest script) or the
+        MCP/REST surface.
       </p>
       <table
         v-else
@@ -400,6 +418,8 @@ async function loadVulns() {
 .badge { font-size: 11px; padding: 2px 8px; border-radius: 10px; font-weight: 600; }
 .badge--ok { background: #dcfce7; color: #15803d; }
 .badge--none { background: #f1f5f9; color: #64748b; }
+.req-input { flex: 1; min-width: 18rem; font-size: 12px; padding: 7px 10px;
+  border: 1px solid #cbd5e1; border-radius: 6px; }
 .sev-select { font-size: 13px; padding: 6px 8px; border: 1px solid #cbd5e1; border-radius: 6px; }
 .sev-bar { display: flex; gap: 8px; flex-wrap: wrap; }
 .sev-pill { font-size: 11px; padding: 2px 10px; border-radius: 10px; font-weight: 600; background: #f1f5f9; color: #334155; }

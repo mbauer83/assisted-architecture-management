@@ -23,6 +23,23 @@ from src.application.security_signals.command import (
 
 pytest.importorskip("sqlcipher3", reason="sqlcipher3 not installed")
 
+class _AdmissibleAnchors:
+    """Every anchor in this test file is admissible.
+
+    Stated explicitly rather than skipped: the command now REQUIRES an anchor
+    reader, so a test that wants to exercise ingestion has to say its anchor is a
+    real, permitted architecture element.
+    """
+
+    def describe_anchor(self, entity_id: str):  # type: ignore[no-untyped-def]
+        from src.domain.security_signal_snapshot import AnchorDescriptor
+
+        return AnchorDescriptor(
+            entity_id=entity_id, artifact_type="application-component",
+            specialization="service",
+        )
+
+
 _counter = itertools.count(1)
 
 
@@ -66,7 +83,9 @@ class TestValidation:
             components=({"component_id": "", "name": ""},),
             findings=({"component_id": "ghost", "external_ids": []},),
         )
-        result = ingest_security_signals(bundle, store=store, new_snapshot_id=_snapshot_ids())
+        result = ingest_security_signals(bundle,
+            store=store, new_snapshot_id=_snapshot_ids(),
+            anchor_reader=_AdmissibleAnchors())
         assert isinstance(result, IngestInvalid)
         fields = {e.field for e in result.errors}
         assert fields == {"anchor_entity_id", "components", "findings"}
@@ -76,7 +95,7 @@ class TestExecution:
     def test_successful_ingest_activates_atomically(self, store: Any) -> None:
         result = ingest_security_signals(
             _bundle(findings=({"component_id": "C1", "external_ids": ["CVE-2024-1"]},)),
-            store=store, new_snapshot_id=_snapshot_ids(),
+            store=store, new_snapshot_id=_snapshot_ids(), anchor_reader=_AdmissibleAnchors(),
         )
         assert isinstance(result, IngestActivated)
         assert store.get_active_snapshot("APP@1")["snapshot_id"] == result.snapshot_id
@@ -97,7 +116,7 @@ class TestExecution:
                 # Same vulnerability, same component, reached via its GHSA alias.
                 {"component_id": "C1", "external_ids": ["GHSA-x", "CVE-2024-1"]},
             )),
-            store=store, new_snapshot_id=_snapshot_ids(),
+            store=store, new_snapshot_id=_snapshot_ids(), anchor_reader=_AdmissibleAnchors(),
         )
         assert isinstance(result, IngestActivated)
         assert result.submitted_finding_count == 2
@@ -107,8 +126,12 @@ class TestExecution:
         assert len(store.list_snapshot_findings(result.snapshot_id)) == 1
 
     def test_second_ingest_supersedes_the_first(self, store: Any) -> None:
-        first = ingest_security_signals(_bundle("req-1"), store=store, new_snapshot_id=_snapshot_ids())
-        second = ingest_security_signals(_bundle("req-2"), store=store, new_snapshot_id=_snapshot_ids())
+        first = ingest_security_signals(_bundle("req-1"),
+            store=store, new_snapshot_id=_snapshot_ids(),
+            anchor_reader=_AdmissibleAnchors())
+        second = ingest_security_signals(_bundle("req-2"),
+            store=store, new_snapshot_id=_snapshot_ids(),
+            anchor_reader=_AdmissibleAnchors())
         assert isinstance(first, IngestActivated) and isinstance(second, IngestActivated)
         assert second.superseded_snapshot_id == first.snapshot_id
         assert store.get_active_snapshot("APP@1")["snapshot_id"] == second.snapshot_id
@@ -121,8 +144,12 @@ class TestExecution:
             "req-1", findings=({"component_id": "C1", "external_ids": ["CVE-2024-1"]},),
         )
         without_finding = _bundle("req-2")
-        ingest_security_signals(with_finding, store=store, new_snapshot_id=_snapshot_ids())
-        second = ingest_security_signals(without_finding, store=store, new_snapshot_id=_snapshot_ids())
+        ingest_security_signals(with_finding,
+            store=store, new_snapshot_id=_snapshot_ids(),
+            anchor_reader=_AdmissibleAnchors())
+        second = ingest_security_signals(without_finding,
+            store=store, new_snapshot_id=_snapshot_ids(),
+            anchor_reader=_AdmissibleAnchors())
         assert isinstance(second, IngestActivated)
         conn = store.connection.open()
         active_findings = conn.execute(
@@ -140,11 +167,11 @@ class TestExecution:
         request_id (F3.8) — serial equality never implies payload equality."""
         first = ingest_security_signals(
             _bundle("req-1", bom_serial="urn:uuid:same"),
-            store=store, new_snapshot_id=_snapshot_ids(),
+            store=store, new_snapshot_id=_snapshot_ids(), anchor_reader=_AdmissibleAnchors(),
         )
         second = ingest_security_signals(
             _bundle("req-2", bom_serial="urn:uuid:same", diagnostics={"unmatched": 1}),
-            store=store, new_snapshot_id=_snapshot_ids(),
+            store=store, new_snapshot_id=_snapshot_ids(), anchor_reader=_AdmissibleAnchors(),
         )
         assert isinstance(first, IngestActivated) and isinstance(second, IngestActivated)
         assert first.snapshot_id != second.snapshot_id
@@ -152,9 +179,13 @@ class TestExecution:
 
 class TestReplay:
     def test_replaying_a_success_returns_the_original_run_without_mutation(self, store: Any) -> None:
-        first = ingest_security_signals(_bundle("req-1"), store=store, new_snapshot_id=_snapshot_ids())
+        first = ingest_security_signals(_bundle("req-1"),
+            store=store, new_snapshot_id=_snapshot_ids(),
+            anchor_reader=_AdmissibleAnchors())
         assert isinstance(first, IngestActivated)
-        replay = ingest_security_signals(_bundle("req-1"), store=store, new_snapshot_id=_snapshot_ids())
+        replay = ingest_security_signals(_bundle("req-1"),
+            store=store, new_snapshot_id=_snapshot_ids(),
+            anchor_reader=_AdmissibleAnchors())
         assert replay == IngestReplayed(
             snapshot_id=first.snapshot_id, stored_outcome="success",
             message="This request already succeeded; returning the original snapshot.",
@@ -167,16 +198,20 @@ class TestReplay:
             snapshot_id="SNAP@staging", anchor_entity_id="APP@1", request_id="req-1",
             request_payload_digest=bundle.payload_digest(),
         )
-        replay = ingest_security_signals(bundle, store=store, new_snapshot_id=_snapshot_ids())
+        replay = ingest_security_signals(bundle,
+            store=store, new_snapshot_id=_snapshot_ids(),
+            anchor_reader=_AdmissibleAnchors())
         assert isinstance(replay, IngestReplayed)
         assert replay.stored_outcome == "in_progress"
         assert len(store.list_snapshots(anchor_entity_id="APP@1")) == 1
 
     def test_same_request_different_payload_is_a_conflict_with_no_write(self, store: Any) -> None:
-        ingest_security_signals(_bundle("req-1"), store=store, new_snapshot_id=_snapshot_ids())
+        ingest_security_signals(_bundle("req-1"),
+            store=store, new_snapshot_id=_snapshot_ids(),
+            anchor_reader=_AdmissibleAnchors())
         conflict = ingest_security_signals(
             _bundle("req-1", diagnostics={"changed": True}),
-            store=store, new_snapshot_id=_snapshot_ids(),
+            store=store, new_snapshot_id=_snapshot_ids(), anchor_reader=_AdmissibleAnchors(),
         )
         assert isinstance(conflict, IngestConflict)
         assert len(store.list_snapshots(anchor_entity_id="APP@1")) == 1
@@ -188,15 +223,21 @@ class TestReplay:
             raise RuntimeError("complete blew up")
 
         monkeypatch.setattr(store, "complete_snapshot", _boom)
-        failed = ingest_security_signals(_bundle("req-1"), store=store, new_snapshot_id=_snapshot_ids())
+        failed = ingest_security_signals(_bundle("req-1"),
+            store=store, new_snapshot_id=_snapshot_ids(),
+            anchor_reader=_AdmissibleAnchors())
         assert isinstance(failed, IngestFailed)
         monkeypatch.setattr(store, "complete_snapshot", original)
-        replay = ingest_security_signals(_bundle("req-1"), store=store, new_snapshot_id=_snapshot_ids())
+        replay = ingest_security_signals(_bundle("req-1"),
+            store=store, new_snapshot_id=_snapshot_ids(),
+            anchor_reader=_AdmissibleAnchors())
         assert isinstance(replay, IngestReplayed)
         assert replay.stored_outcome == "failed"
         assert "new request_id" in replay.message
         # And a NEW request id executes fine — failed never resumes, callers move on.
-        retry = ingest_security_signals(_bundle("req-2"), store=store, new_snapshot_id=_snapshot_ids())
+        retry = ingest_security_signals(_bundle("req-2"),
+            store=store, new_snapshot_id=_snapshot_ids(),
+            anchor_reader=_AdmissibleAnchors())
         assert isinstance(retry, IngestActivated)
 
 
@@ -208,7 +249,9 @@ class TestFailureRecording:
             raise ValueError("secret detail that must not leak")
 
         monkeypatch.setattr(store, "populate_snapshot", _boom)
-        result = ingest_security_signals(_bundle("req-1"), store=store, new_snapshot_id=_snapshot_ids())
+        result = ingest_security_signals(_bundle("req-1"),
+            store=store, new_snapshot_id=_snapshot_ids(),
+            anchor_reader=_AdmissibleAnchors())
         assert isinstance(result, IngestFailed)
         assert "secret detail" not in result.reason  # type name only
         snapshot = store.find_snapshot_by_request("APP@1", "req-1")
@@ -229,7 +272,9 @@ class TestConcurrentDuplicates:
         def _submit() -> None:
             try:
                 results.append(
-                    ingest_security_signals(bundle, store=store, new_snapshot_id=_snapshot_ids())
+                    ingest_security_signals(bundle,
+                        store=store, new_snapshot_id=_snapshot_ids(),
+                        anchor_reader=_AdmissibleAnchors())
                 )
             except Exception as exc:  # noqa: BLE001 — constraint loss is acceptable
                 results.append(exc)
@@ -242,3 +287,95 @@ class TestConcurrentDuplicates:
         snapshots = store.list_snapshots(anchor_entity_id="APP@1")
         assert len(snapshots) == 1
         assert sum(1 for r in results if isinstance(r, IngestActivated)) >= 1
+
+
+class _NoSuchAnchor:
+    def describe_anchor(self, entity_id: str):  # type: ignore[no-untyped-def]
+        return None
+
+
+class _AnchorOfType:
+    def __init__(self, artifact_type: str, specialization: str = "") -> None:
+        self._type = artifact_type
+        self._spec = specialization
+
+    def describe_anchor(self, entity_id: str):  # type: ignore[no-untyped-def]
+        from src.domain.security_signal_snapshot import AnchorDescriptor
+
+        return AnchorDescriptor(
+            entity_id=entity_id, artifact_type=self._type, specialization=self._spec)
+
+
+class TestAnchorValidation:
+    """The ingest requires an anchor, so it must also require that the anchor is
+    real and is a thing an SBOM can describe — otherwise it stores a snapshot no
+    model surface can ever reach."""
+
+    def test_an_anchor_the_model_does_not_know_is_refused(self, store: Any) -> None:
+        result = ingest_security_signals(
+            _bundle(), store=store, new_snapshot_id=_snapshot_ids(),
+            anchor_reader=_NoSuchAnchor(),
+        )
+
+        assert isinstance(result, IngestInvalid)
+        assert [e.field for e in result.errors] == ["anchor_entity_id"]
+        assert "no architecture entity" in result.errors[0].message
+
+    def test_nothing_is_written_when_the_anchor_is_refused(self, store: Any) -> None:
+        """Refusal must precede every write — a rejected ingest that had already
+        created a staging snapshot would leave the store dirtier than before."""
+        ingest_security_signals(
+            _bundle(), store=store, new_snapshot_id=_snapshot_ids(),
+            anchor_reader=_NoSuchAnchor(),
+        )
+
+        assert store.list_snapshots() == []
+
+    @pytest.mark.parametrize("artifact_type, specialization", [
+        ("application-component", "module"),    # part of a shipped thing, not one
+        ("application-component", "endpoint"),  # an interface, not built at all
+        ("business-process", ""),
+        ("grouping", ""),               # an aggregate does not ship as one thing
+        ("application-collaboration", ""),
+    ])
+    def test_an_element_an_sbom_cannot_describe_is_refused(
+        self, store: Any, artifact_type: str, specialization: str,
+    ) -> None:
+        result = ingest_security_signals(
+            _bundle(), store=store, new_snapshot_id=_snapshot_ids(),
+            anchor_reader=_AnchorOfType(artifact_type, specialization),
+        )
+
+        assert isinstance(result, IngestInvalid)
+        assert "cannot anchor security signals" in result.errors[0].message
+        # The message names what IS permitted, so the caller can act on it.
+        assert "application-component" in result.errors[0].message
+
+    @pytest.mark.parametrize("artifact_type, specialization", [
+        ("application-component", ""),
+        ("application-component", "service"),
+        ("node", ""),               # a container image ships a bill of materials
+        ("system-software", ""),    # so does a database engine
+    ])
+    def test_a_shipped_artifact_is_admissible(
+        self, store: Any, artifact_type: str, specialization: str,
+    ) -> None:
+        result = ingest_security_signals(
+            _bundle(), store=store, new_snapshot_id=_snapshot_ids(),
+            anchor_reader=_AnchorOfType(artifact_type, specialization),
+        )
+
+        assert isinstance(result, IngestActivated)
+
+    def test_a_future_specialization_of_a_technology_type_still_qualifies(
+        self, store: Any,
+    ) -> None:
+        """node/system-software declare no specializations today. Enumerating the
+        empty case would silently refuse every anchor the moment the ontology
+        gained one, so those types admit any specialization."""
+        result = ingest_security_signals(
+            _bundle(), store=store, new_snapshot_id=_snapshot_ids(),
+            anchor_reader=_AnchorOfType("node", "cluster"),
+        )
+
+        assert isinstance(result, IngestActivated)

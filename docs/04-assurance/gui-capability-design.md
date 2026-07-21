@@ -52,7 +52,7 @@ Legend:
 | Register architecture reference | — | — | register | — | — | Y | N | Y | N |
 | Model and bind architecture gap | — | — | task spec only | — | — | Y | N | N | N |
 | Promotion preflight | promotion preflight | — | preflight | — | — | Y | P | N | P |
-| Ingest security signals | ingest command | — | ingest | security-ingest | — (CLI/MCP/REST only) | S | Y | Y | N |
+| Ingest security signals | ingest command | — | ingest | security-ingest | entity page + wizard | S | Y | Y | N |
 | Delete signal snapshot | — | — | delete | security-snapshot-delete | — | S | Y | Y | N |
 | Component vulnerabilities | signals read | list | — | security-findings | findings view | S | Y | N | N |
 | Vulnerability impact | impact use case | impact | — | vulnerability-impact | impact view | S | Y | N | N |
@@ -70,9 +70,16 @@ described adapters that called connectors directly and did not consistently gate
 audit, or verify. They were replaced by the signal-snapshot model, in which every
 ingest runs through one application command under the signal-mutation capability
 gate and lands its audit record in the same transaction. The rows above reflect
-the current surfaces; see [Security signals](security-signals.md). Ingest is
-deliberately absent from the GUI — a browser form can carry neither a request id
-nor generator provenance.
+the current surfaces; see [Security signals](security-signals.md).
+
+Ingest IS a GUI capability, reached from the architecture entity it anchors (and
+from the supply-chain wizard), consistent with contract 1 above: the architecture
+model is the entry point for assurance work. The browser is another adapter over
+the same gated command, not a bypass — a CycloneDX document carries its generator
+in `metadata.tools`, and the request id is supplied by the form or generated
+server-side. The admissible anchor types are served from
+`/api/assurance/signal-anchor-types` so the GUI cannot offer an ingest the API
+would refuse.
 
 ### Required application use cases
 

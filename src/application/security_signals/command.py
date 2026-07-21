@@ -10,8 +10,10 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Callable, Mapping
 
-from src.application.security_signals.ports import SnapshotStore
+from src.application.security_signals.ports import AnchorReader, SnapshotStore
 from src.domain.security_signal_snapshot import (
+    AnchorTypeNotPermitted,
+    AnchorUnknown,
     CreateNewSnapshot,
     IdempotencyConflict,
     ReplayInProgress,
@@ -20,6 +22,7 @@ from src.domain.security_signal_snapshot import (
     StoredSnapshotKey,
     anchor_key,
     canonical_bundle_digest,
+    evaluate_anchor,
     replay_decision,
 )
 
@@ -152,14 +155,30 @@ def ingest_security_signals(
     *,
     store: SnapshotStore,
     new_snapshot_id: Callable[[], str],
+    anchor_reader: AnchorReader,
 ) -> IngestResult:
-    """Execute one ingest: validate → replay decision → staging → populate →
-    complete → activate. Any populate/complete/activate error records the snapshot
-    as failed with a safe reason (failed is terminal — a retry needs a new
-    request_id)."""
+    """Execute one ingest: validate → check the anchor → replay decision → staging
+    → populate → complete → activate. Any populate/complete/activate error records
+    the snapshot as failed with a safe reason (failed is terminal — a retry needs a
+    new request_id)."""
     errors = validate_bundle(bundle)
     if errors:
         return IngestInvalid(errors=tuple(errors))
+
+    # The anchor is checked BEFORE anything is written. An ingest already requires
+    # an anchor id, so accepting one that names nothing — or names something an
+    # SBOM cannot describe — would store a snapshot the model can never reach.
+    anchor_decision = evaluate_anchor(
+        bundle.anchor_entity_id, anchor_reader.describe_anchor(bundle.anchor_entity_id))
+    if isinstance(anchor_decision, AnchorUnknown):
+        return IngestInvalid(errors=(IngestValidationError(
+            "anchor_entity_id",
+            f"no architecture entity {bundle.anchor_entity_id!r} exists; "
+            "signals must anchor on an entity in the model",
+        ),))
+    if isinstance(anchor_decision, AnchorTypeNotPermitted):
+        return IngestInvalid(errors=(
+            IngestValidationError("anchor_entity_id", anchor_decision.message()),))
 
     digest = bundle.payload_digest()
     existing = store.find_snapshot_by_request(bundle.anchor_entity_id, bundle.request_id)

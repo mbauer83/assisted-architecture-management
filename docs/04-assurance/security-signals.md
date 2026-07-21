@@ -19,17 +19,38 @@ ingest  ─┬─ CLI script      ┐
 
 ## Producing a snapshot
 
-Ingest is a serialised, audited, idempotent act. It is **not** available in the
-GUI: a browser form could carry neither a request id nor the provenance of the
-generator that produced the SBOM, and both are part of what makes a snapshot
-trustworthy.
+Ingest is a serialised, audited, idempotent act with one command behind every
+surface, so no route can bypass the capability gate or the audit record.
 
 | Route | Use it for |
 |---|---|
+| **Entity page → Ingest SBOM** | Ingesting a bill of materials for the element you are looking at |
+| Supply-chain wizard → Ingest SBOM | The same act inside the guided scope→ingest→review flow |
 | `arch-assurance seed --with-signals` | Bootstrapping a demo or a fresh store |
 | `uv run tools/ingest_security_signals.py --target python --anchor <id>` | Dogfooding this repository |
 | `assurance_ingest_security_signals` (MCP) | An agent holding a BOM and advisories |
 | `POST /api/assurance/security-ingest` | Programmatic ingest |
+
+### What may be anchored
+
+An SBOM is a bill of materials for **one built, independently shipped artifact**,
+and that is what constrains the anchor:
+
+| Anchor | Why |
+|---|---|
+| `application-component`, unspecialized or `service` | A service is a shipped artifact; an unspecialized component is the same thing before anyone specialized it |
+| `node` | A container image or host ships with a bill of materials |
+| `system-software` | So does a database engine or runtime |
+
+A `module` is a *part* of a shipped thing — its dependencies belong to the SBOM of
+whatever ships it — and an `endpoint` is an interface, which is not built at all.
+Aggregates (`grouping`, `application-collaboration`) do not ship as one thing.
+
+This is **enforced, not advisory**: the ingest command checks the anchor before
+writing anything and refuses an entity the model does not know, or one an SBOM
+cannot describe. The vocabulary is owned by the backend and served from
+`/api/assurance/signal-anchor-types`, so the ingest a GUI offers is the ingest the
+API accepts.
 
 `--target` selects the SBOM generator: `python` (cyclonedx-py over the uv
 environment) or `npm` (`npm sbom` over the GUI workspace). Both preserve the

@@ -339,3 +339,16 @@ def vulnerability_impact(identifier: str) -> JSONResponse:
         content=payload,
         headers={"Cache-Control": _NO_STORE},
     )
+
+
+@signals_router.get("/api/assurance/signal-anchor-types")
+def signal_anchor_types() -> JSONResponse:
+    """Admissible ArchiMate anchor types for a signal snapshot.
+
+    A single backend source of truth: clients consume this rather than redeclaring
+    the list, so a GUI that offers ingest and an API that accepts it cannot drift
+    apart. Un-gated — it is a static vocabulary, not store content.
+    """
+    from src.domain.security_signal_snapshot import ADMISSIBLE_ANCHOR_TYPES  # noqa: PLC0415
+
+    return _ok({"anchor_types": list(ADMISSIBLE_ANCHOR_TYPES)})

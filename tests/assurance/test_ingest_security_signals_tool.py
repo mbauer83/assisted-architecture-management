@@ -30,6 +30,29 @@ from src.infrastructure.mcp.assurance_mcp.security_write_tools import (
 
 pytest.importorskip("sqlcipher3", reason="sqlcipher3 not installed")
 
+@pytest.fixture(autouse=True)
+def _admissible_anchor(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Treat this file's synthetic anchors as real, permitted architecture
+    elements.
+
+    The ingest now validates its anchor against the architecture model, which
+    these tests deliberately do not stand up. Patching the resolution point keeps
+    the transport under test while stating the assumption out loud — a test that
+    silently bypassed validation would stop exercising the real path.
+    """
+    import src.infrastructure.assurance.anchor_reader as anchor_module
+    from src.domain.security_signal_snapshot import AnchorDescriptor
+
+    class _Admissible:
+        def describe_anchor(self, entity_id: str) -> AnchorDescriptor:
+            return AnchorDescriptor(
+                entity_id=entity_id, artifact_type="application-component",
+                specialization="service",
+            )
+
+    monkeypatch.setattr(anchor_module, "anchor_reader_for", lambda *a, **k: _Admissible())
+
+
 _BOM: dict[str, Any] = {
     "bomFormat": "CycloneDX",
     "serialNumber": "urn:uuid:tool",
