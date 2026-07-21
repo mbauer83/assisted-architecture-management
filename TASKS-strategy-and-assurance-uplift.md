@@ -3123,8 +3123,18 @@ only existing nodes cannot measure a missing one".
 3. [x] `arch-assurance seed [--with-signals]` command — DONE 2026-07-21 (see the entry above);
        anchors are bundle-declared, and an anchor-identity defect was found and fixed.
        REMAINING SUB-ITEM: Quickstart/README/docs for demo use (folded into backlog 6).
-4. [ ] Directness fix: capture the python (cyclonedx-py) dependency graph so directness isn't all
-       'unknown' (npm already classifies transitive).
+4. [x] Directness fix — DONE 2026-07-21. The stated diagnosis was WRONG: the dependency graph
+       was never missing (cyclonedx-py emits all 107 entries, 64 with dependsOn). What was
+       missing is `metadata.component` — the BOM ROOT that classify_directness measures depth
+       FROM. Fixed by passing `--pyproject` to the generator. Measured through the real parser:
+       without it 107 unknown / 0 direct / 0 transitive; with it 18 direct / 71 transitive /
+       18 unknown (the root itself plus dev-group packages present in the environment but not
+       reachable from the declared project dependencies — honest, not wrong). A missing
+       pyproject.toml now WARNS: an all-unknown snapshot reads exactly like a successful scan.
+       LIVE-VERIFIED after re-seed: open_component_findings went from {"unknown": 24} to
+       {"direct": 4, "transitive": 20} on SNAP@840c9c7d9e614473, zero unknown remaining.
+       Tests pin it at the parser level (no subprocess), including one isolating that the
+       edges parse identically with and without a root.
 5. [ ] GUI: the snapshot/vulnerability details view is PRIMARILY reached by a LINK from the arch
        ENTITY details page (EntityDetailView) of the entity the SBOM/vuln-analysis is anchored to —
        NOT (just/mainly) from the supply-chain wizard (owner 2026-07-21). Add a component-vulnerability

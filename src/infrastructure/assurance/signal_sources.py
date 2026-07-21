@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import json
 import subprocess
+import sys
 from pathlib import Path
 from typing import Any, Callable, Mapping, Sequence
 
@@ -41,10 +42,28 @@ def _run(command: list[str], *, cwd: Path | None = None) -> str:
 
 
 def generate_python_sbom(repo_root: Path) -> tuple[dict[str, object], dict[str, str]]:
-    """The backend's uv environment via the pinned cyclonedx-py generator."""
+    """The backend's uv environment via the pinned cyclonedx-py generator.
+
+    ``--pyproject`` is what makes directness classifiable. Without it,
+    ``cyclonedx-py environment`` describes an environment with NO
+    ``metadata.component``: the dependency graph is still emitted in full, but
+    there is no root to measure depth from, so every component classifies as
+    "unknown" (measured: 107 unknown vs 18 direct / 71 transitive with the root).
+    """
     version = _run(["uv", "run", "cyclonedx-py", "--version"]).strip()
-    raw = _run(["uv", "run", "cyclonedx-py", "environment", "--output-format", "JSON"],
-               cwd=repo_root)
+    command = ["uv", "run", "cyclonedx-py", "environment", "--output-format", "JSON"]
+    pyproject = repo_root / "pyproject.toml"
+    if pyproject.is_file():
+        command += ["--pyproject", str(pyproject)]
+    else:
+        # Degrading silently here would produce an all-"unknown" snapshot that
+        # reads exactly like a successful scan.
+        print(
+            f"warning: {pyproject} not found — the SBOM will have no root component "
+            "and every component's directness will be 'unknown'",
+            file=sys.stderr,
+        )
+    raw = _run(command, cwd=repo_root)
     return json.loads(raw), {"generator": "cyclonedx-py", "generator_version": version}
 
 
